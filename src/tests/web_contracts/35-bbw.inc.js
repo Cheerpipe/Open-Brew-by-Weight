@@ -163,23 +163,23 @@
   assert.equal(lines.length, 101);
   assert.equal(lines[0][11], 'offset_g');
   assert.equal(lines[1][11], '0');
-  assert.deepEqual(lines[0].slice(-19), ['curve_truncated', 'curve_break_before', 'curve_held', 'cut_s', 'cut_weight_g', 'drip_g', 'drip_delay_s', ...Array.from({length:4}, (_,i)=>['sample_'+(i+1)+'_time_s','sample_'+(i+1)+'_weight_g','sample_'+(i+1)+'_flow_g_s']).flat()]);
-  assert.deepEqual(lines[1].slice(-19), ['0', '', '', ...Array(16).fill('')]);
-  assert.deepEqual(lines[2].slice(-19), ['0', '', '', '', '', '', '', '0', '0', '', '0.45', '15.2', '', '0.9', '31.05', '', '1.6', '36.2', '15.72']);
+  assert.deepEqual(lines[0].slice(-22), ['target_temp_c', 'dose_g', 'ratio', 'curve_truncated', 'curve_break_before', 'curve_held', 'cut_s', 'cut_weight_g', 'drip_g', 'drip_delay_s', ...Array.from({length:4}, (_,i)=>['sample_'+(i+1)+'_time_s','sample_'+(i+1)+'_weight_g','sample_'+(i+1)+'_flow_g_s']).flat()]);
+  assert.deepEqual(lines[1].slice(-22), ['-1', '', '', '0', '', '', ...Array(16).fill('')]);
+  assert.deepEqual(lines[2].slice(-22), ['-1', '', '', '0', '', '', '', '', '', '', '0', '0', '', '0.45', '15.2', '', '0.9', '31.05', '', '1.6', '36.2', '15.72']);
   assert.equal(+lines[2][43], 15.716666666666665);
   // The cut: stop time, the reading latched there, the drip to the settled yield, the drip delay.
-  assert.deepEqual(lines[3].slice(-19), ['0', '', '', '0.5', '8', '28.20', '3', '0', '0', '', '0.5', '8', '', ...Array(6).fill('')]);
+  assert.deepEqual(lines[3].slice(-22), ['-1', '', '', '0', '', '', '0.5', '8', '28.20', '3', '0', '0', '', '0.5', '8', '', ...Array(6).fill('')]);
   assert.deepEqual(lines[4].slice(-12), ['0','0','','0.137','1.37','','1.001','10.01','10.00','1.138','11.38','10.00']);
   records[1].wAtMs=Array.from({length:1201},(_,i)=>i*50);
   records[1].wCg=records[1].wAtMs.map(t=>t/5);
   records[1].durationS=60;
   await vm.runInContext('exportShotsCsv()',context);
   const complete=(await blob.text()).split('\n')[2].split(',');
-  assert.equal(complete[44],'0');
+  assert.equal(complete[47],'0');
   assert.equal(complete[43],'2');
   assert.equal(complete.at(-3),'60');
   assert.equal(complete.at(-1),'2.00');
-  assert.equal(complete.slice(51).filter((v,i)=>i%3===2&&v==='2.00').length,1181);
+  assert.equal(complete.slice(54).filter((v,i)=>i%3===2&&v==='2.00').length,1181);
   for (const record of records) {
     record.wCg = Array(1201).fill(1234);
     record.wAtMs = Array.from({length:1201}, (_,i)=>i*50);
@@ -190,13 +190,13 @@
   await vm.runInContext('exportShotsCsv()', context);
   const maximum = (await blob.text()).split('\n').map(line=>line.split(','));
   assert.equal(maximum.length, 101);
-  assert.equal(maximum[0].length, 3654);
+  assert.equal(maximum[0].length, 3657);
   assert.equal(maximum[0].at(-3), 'sample_1201_time_s');
   for (const row of maximum.slice(1)) {
     assert.equal(row.length, maximum[0].length);
-    assert.equal(row[44], '1');
-    assert.equal(row[45].split(';').length, 1200);
-    assert.equal(row[46], '7;9');
+    assert.equal(row[47], '1');
+    assert.equal(row[48].split(';').length, 1200);
+    assert.equal(row[49], '7;9');
     assert.equal(row.at(-3), '60');
     assert.equal(row.at(-2), '12.34');
   }

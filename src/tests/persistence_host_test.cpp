@@ -565,10 +565,10 @@ void p65_factory_settings_survives_second_slot_write_fail() {
 
 void p66_shot_log_dual_slot_generation_flip() {
   resetHostPersistence();
-  CHECK(sizeof(ShotLogStore) == 60024);
+  CHECK(sizeof(ShotLogStore) == 62024);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   CHECK(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES);
-  CHECK(SHOT_LOG_FLASH_SLOT_COUNT * SHOT_LOG_FLASH_SLOT_BYTES <= 0x1E000);
+  CHECK(SHOT_LOG_FLASH_SLOT_COUNT * SHOT_LOG_FLASH_SLOT_BYTES <= 0xFC000);
   ShotLog log;
   CHECK(log.load());
   ShotLogRecord record = {};
@@ -1890,7 +1890,7 @@ void p61_shot_curve_dual_slot_round_trip_and_delete() {
   // dt 0 with an escaped -32767 (00 80 01 80), then dt 50, dw 0 (32 00).
   CHECK(strstr(curveJson, "\"wD\":\"AIABgDIAMgAy") == curveJson);
   CHECK(strstr(curveJson, ",1200],\"wHeld\"") != nullptr);
-  ShotCurveLog curves;
+  static ShotCurveLog curves;  // 2.7 MB each: three stack copies overflow the 8 MB Debug frame.
   CHECK(curves.load());
   CHECK(curves.count() == 0);
   ShotCurveRecord first = emptyShotCurveRecord();
@@ -1913,7 +1913,7 @@ void p61_shot_curve_dual_slot_round_trip_and_delete() {
   CHECK(appendShotCurvePoint(second, 10, 0, false) &&
         appendShotCurvePoint(second, 400, 0, false));
   CHECK(curves.append(second));
-  ShotCurveLog reloaded;
+  static ShotCurveLog reloaded;
   CHECK(reloaded.load());
   CHECK(reloaded.count() == 2);
   ShotCurveRecord newest[2] = {};
@@ -1948,7 +1948,7 @@ void p61_shot_curve_dual_slot_round_trip_and_delete() {
   CHECK(newest[0].shotId == 8);
   CHECK(reloaded.clear());
   CHECK(reloaded.count() == 0);
-  ShotCurveLog afterClear;
+  static ShotCurveLog afterClear;
   CHECK(afterClear.load());
   CHECK(afterClear.count() == 0);
   for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY + 1; ++id) {
@@ -1967,7 +1967,7 @@ void p61_shot_curve_dual_slot_round_trip_and_delete() {
 
 void p61b_shot_curve_failed_compaction_restores_durable_ring() {
   resetHostPersistence();
-  ShotCurveLog curves;
+  static ShotCurveLog curves;  // 2.7 MB each: stacked copies overflow the 8 MB Debug frame.
   CHECK(curves.load());
   ShotCurveRecord record = emptyShotCurveRecord();
   for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY; ++id) {
@@ -2561,7 +2561,9 @@ void p61c_timestamped_capacity_and_interrupted_blocks() {
   sampler.snapshot(complete, 101);
   complete.truncated = false;
   ShotCurveLog::resetHostStorage();
-  ShotCurveLog maximum;
+  // Static: with the loop's second curve log the two 2.7 MB stores would
+  // overflow the main-thread stack depending on its ASLR placement.
+  static ShotCurveLog maximum;
   const size_t denseErased = ShotCurveLog::hostEraseBytes();
   const size_t denseWritten = ShotCurveLog::hostWriteBytes();
   CHECK(maximum.load() && maximum.append(complete) && maximum.load());
@@ -2638,7 +2640,7 @@ void p61c_timestamped_capacity_and_interrupted_blocks() {
   // Reuse a former long block for a short record; its untouched second sector
   // is padding, never another curve or part of the short-record checksum.
   ShotCurveLog::resetHostStorage();
-  ShotCurveLog reuse;
+  static ShotCurveLog reuse;
   CHECK(reuse.load());
   complete.shotId = 1;
   CHECK(reuse.append(complete));
@@ -2660,9 +2662,11 @@ void p61c_timestamped_capacity_and_interrupted_blocks() {
 }
 
 void p61d_clear_epochs_and_stale_worker_images() {
+  // Static: the section-local curve logs would otherwise stack six 2.7 MB
+  // stores in one Debug frame and overflow the 8 MB main-thread stack.
   for (int stop = 0; stop <= 1; ++stop) {
     ShotCurveLog::resetHostStorage();
-    ShotCurveLog live;
+    static ShotCurveLog live;
     CHECK(live.load());
     ShotCurveRecord r = emptyShotCurveRecord();
     r.shotId = 1;
@@ -2672,13 +2676,13 @@ void p61d_clear_epochs_and_stale_worker_images() {
     ShotCurveLog::setHostFailAfter(stop);
     while (live.flushStep() == FlashStoreStepResult::MORE) {}
     ShotCurveLog::setHostFailAfter(-1);
-    ShotCurveLog reboot;
+    static ShotCurveLog reboot;
     CHECK(reboot.load());
     CHECK(reboot.count() == (stop == 0 ? 1 : 0));
   }
   for (int stop = 0; stop <= 3; ++stop) {
     ShotCurveLog::resetHostStorage();
-    ShotCurveLog live;
+    static ShotCurveLog live;
     CHECK(live.load());
     ShotCurveRecord r = emptyShotCurveRecord();
     r.shotId = 1;
@@ -2688,7 +2692,7 @@ void p61d_clear_epochs_and_stale_worker_images() {
     ShotCurveLog::setHostFailAfter(stop);
     while (live.flushStep() == FlashStoreStepResult::MORE) {}
     ShotCurveLog::setHostFailAfter(-1);
-    ShotCurveLog reboot;
+    static ShotCurveLog reboot;
     CHECK(reboot.load());
     CHECK(reboot.count() == (stop == 3 ? 0 : 1));
     if (stop == 3) {
@@ -2702,7 +2706,7 @@ void p61d_clear_epochs_and_stale_worker_images() {
     }
   }
   ShotCurveLog::resetHostStorage();
-  ShotCurveLog live;
+  static ShotCurveLog live;
   CHECK(live.load());
   ShotCurveRecord r = emptyShotCurveRecord();
   r.shotId = 1;
@@ -2715,7 +2719,7 @@ void p61d_clear_epochs_and_stale_worker_images() {
   live.acknowledgePersisted(image, false);
   CHECK(live.dirty() && live.count() == 0);
   CHECK(live.flush());
-  ShotCurveLog reboot;
+  static ShotCurveLog reboot;
   CHECK(reboot.load() && reboot.count() == 0);
   resetShotCurveRecord(r);
   r.shotId = 1;
@@ -3149,14 +3153,14 @@ void p91_schema1_golden_settings_blob_loads() {
   CHECK(!custom->fastSideEnabled && custom->goalWeightDg == FACTORY_SINGLE_GOAL_WEIGHT_DG);
 }
 
-// Golden shot-log blob of schema 1 (W4b): header plus two records, each a
+// Golden shot-log blob of schema 2 (W4b): header plus two records, each a
 // self-contained snapshot of the cut parameters. Later firmware must accept it.
 std::string goldenShotLogPath() {
   const std::string file(__FILE__);
-  return file.substr(0, file.find_last_of('/')) + "/fixtures/shotlog_schema1_golden_hex.txt";
+  return file.substr(0, file.find_last_of('/')) + "/fixtures/shotlog_schema2_golden_hex.txt";
 }
 
-void p92_schema1_golden_shot_log_loads() {
+void p92_schema2_golden_shot_log_loads() {
   if (getenv("GOLDEN_SHOTLOG_WRITE") != nullptr) {
     ShotLogStore store;
     resetShotLogStore(store);
@@ -3185,6 +3189,9 @@ void p92_schema1_golden_shot_log_loads() {
       r.fastMarginDg = 40;
       r.slowMarginDg = 30;
       r.cutRampDs = 50;
+      r.targetTempDeciC = i == 0 ? 935 : 0;
+      r.doseDg = 180;
+      r.ratioX100 = static_cast<uint16_t>(10 * (i == 0 ? 3880 : 3340) / 180);
       copyCString(r.presetName, sizeof(r.presetName), "Double \xC2\xB7 Adaptive");
       copyCString(r.scaleName, sizeof(r.scaleName), "Lunar");
     }
@@ -3221,7 +3228,9 @@ void p92_schema1_golden_shot_log_loads() {
   CHECK(fast.fastBeforeDs == 270 && fast.slowAfterDs == 340 && fast.delayDs == 120);
   CHECK(fast.wallDs == 500 && fast.fastMarginDg == 40 && fast.slowMarginDg == 30);
   CHECK(fast.cutRampDs == 50 && shotLogPresetId(fast) == FACTORY_PRESET_ID_DOUBLE_ADAPTIVE);
+  CHECK(fast.targetTempDeciC == 935 && fast.doseDg == 180 && fast.ratioX100 == 215);
   CHECK(corridor::verdictOf(store.records[1].verdict) == corridor::Verdict::SLOW);
+  CHECK(store.records[1].targetTempDeciC == 0 && store.records[1].ratioX100 == 185);
   store.header.schemaVersion = 0;  // Another schema never loads.
   store.header.checksum = 0;
   store.header.checksum = shotLogChecksum(store);
@@ -3240,7 +3249,7 @@ const TestCase tests[] = {
     {"P86", p86_timezone_preference_and_durable_initialization},
     {"P85", p85_schema1_is_strict_and_micra_defaults_round_trip},
     {"P91", p91_schema1_golden_settings_blob_loads},
-    {"P92", p92_schema1_golden_shot_log_loads},
+    {"P92", p92_schema2_golden_shot_log_loads},
     {"P82", p82_ble_scan_strict_versions_and_roundtrip},
     {"P82B", p82b_ble_scan_legacy_minute_bytes_stay_readable},
     {"P80", p80_boot_id_advances_in_its_own_nvs_key},

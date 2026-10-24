@@ -1040,6 +1040,9 @@ function renderShots() {
       __WEBUI_TEXT__("runtime.drip"),
       __WEBUI_TEXT__("runtime.avg_flow"),
       __WEBUI_TEXT__("runtime.max_flow"),
+      __WEBUI_TEXT__("runtime.target_temp"),
+      __WEBUI_TEXT__("runtime.dose"),
+      __WEBUI_TEXT__("runtime.ratio"),
       __WEBUI_TEXT__("runtime.1st_drop"),
       __WEBUI_TEXT__("runtime.tare_time"),
       __WEBUI_TEXT__("runtime.ended"),
@@ -1066,6 +1069,9 @@ function renderShots() {
         maxFlow = m ? m.maxFlow : null,
         cut = shotCut(r, m, actual),
         drip = cut.drip ?? null;
+      // Without a machine-reported target the temp cell is skipped outright,
+      // so Dose and Ratio slide into its slot.
+      const tempC = r.targetTempDeciC > 0 ? r.targetTempDeciC / 10 : null;
       const vals = [
         formatShotTime(r),
         r.durationS.toFixed(1) + S,
@@ -1083,6 +1089,9 @@ function renderShots() {
           : maxFlow.toFixed(2) +
             __WEBUI_TEXT__("runtime.g_s") +
             (r.wTruncated ? __WEBUI_TEXT__("runtime.recorded_suffix") : ""),
+        tempC === null ? null : tempC.toFixed(1) + "°C",
+        r.doseG > 0 ? r.doseG.toFixed(1) + G : "—",
+        r.ratio > 0 ? "1:" + r.ratio.toFixed(1) : "—",
         r.firstDropS === null ? "—" : r.firstDropS.toFixed(1) + S,
         r.tareS == null ? __WEBUI_TEXT__("runtime.none") : r.tareS.toFixed(1) + S,
         R.formatShotEnded(r.stopDetail, r.verdict),
@@ -1099,7 +1108,10 @@ function renderShots() {
         "shotActual",
         errN > 0 ? "shotErrHi" : errN < 0 ? "shotErrLo" : "",
       ];
-      vals.forEach((v, i) => td(row, labels[i], v, cls[i]));
+      if (tempC === null) row.classList.add("noTemp");
+      vals.forEach((v, i) => {
+        if (v !== null) td(row, labels[i], v, cls[i]);
+      });
       R.wrapTimeEl(row.cells[0], r);
       // The verdict sits beside the time so each card says at a glance how the shot landed.
       if (r.arrivalS > 0 && ["fast", "on_recipe", "slow"].includes(r.verdict))
@@ -1281,7 +1293,7 @@ async function exportShotsCsv() {
           "cut_line_g arrival_s fast_before_s slow_after_s fast_margin_g slow_margin_g " +
           "delay_s wall_s cut_ramp_s shot_type cut_type yield_source rating ended_at_ms " +
           "bbw_algorithm bbw_algorithm_version bbw_alpha bbw_learning_applied preset_id " +
-          "scale_name max_flow_g_s curve_truncated curve_break_before curve_held cut_s cut_weight_g " +
+          "scale_name max_flow_g_s target_temp_c dose_g ratio curve_truncated curve_break_before curve_held cut_s cut_weight_g " +
           "drip_g drip_delay_s"
         ).split(" "),
         ...Array.from({ length: maxW }, (_, i) => [
@@ -1335,6 +1347,9 @@ async function exportShotsCsv() {
         r.presetId || "",
         r.scaleName || "",
         shotMaxFlowGS(r, m) ?? "",
+        r.targetTempDeciC > 0 ? (r.targetTempDeciC / 10).toFixed(1) : "-1",
+        r.doseG > 0 ? r.doseG.toFixed(1) : "",
+        r.ratio > 0 ? r.ratio.toFixed(2) : "",
         r.wTruncated ? "1" : "0",
         (r.wBreakBefore || []).join(";"),
         (r.wHeld || []).join(";"),

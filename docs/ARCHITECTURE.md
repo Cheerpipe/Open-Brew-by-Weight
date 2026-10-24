@@ -291,17 +291,18 @@ changing the 32-byte record size or partition layout; see the
 Each inactive slot or used curve sector is
 erased one 4 KiB sector at a time, programmed one 1 KiB staged chunk at a time,
 and receives its validity-bearing header last; the worker rechecks the current
-machine and scale gates between steps. The shot log's whole 60,024-byte store and the
+machine and scale gates between steps. The shot log's whole 62,024-byte store and the
 16,024-byte activation-history store live in PSRAM and move to and from their
 slots in 1 KiB chunks staged through the small internal flash-I/O scratch only
 while that owner holds the flash lock. Each keeps two slots in its own data
-partition — 2×60 KiB for `shotlog`, 2×16 KiB for `history` — with generation
+partition — 2×504 KiB for `shotlog` (reserving room for 1 KiB records), 2×16 KiB for `history` — with generation
 and checksum selection preserving the atomic whole-store update; a failed
 write never erases the last-good slot. Writes remain deferred until the shot
-has ended. The shot log uses schema 1 in its dedicated partition (120-byte records, each
+has ended. The shot log uses schema 2 in its dedicated partition (124-byte records, each
 a self-contained snapshot of the cut parameters in force: target, window,
 side switches, margins, delay, max shot time and ramp length, plus the cut
-line at the stop, arrival time and packed verdict byte); any other
+line at the stop, arrival time, packed verdict byte, the machine integration's
+target temperature, the preset's dose and the shot's brew ratio); any other
 schema is discarded and the shot history starts empty. The boot ID lives in
 its own small NVS key, so a boot never rewrites the shot log.
 

@@ -110,6 +110,15 @@ than the friendly-name limit is shortened to fit. **Late cup**, after
 when no late tare succeeded. Its chart label always uses one decimal, such
 as **3.0 s**. The initial shot-start tare is not a late tare.
 
+**Target temp**, after **Max flow**, shows the coffee temperature the
+machine was set to when the shot ended, such as **93.5°C**. It only appears
+when the machine integration reports a target temperature, so shots pulled
+without that connection simply leave the space to the fields after it.
+**Dose** and **Ratio** follow it: the dose the active preset had when the
+shot started, such as **18.0 g**, and the brew ratio that came out of the
+shot, the recorded yield over that dose, such as **1:2.0**. Both are kept
+with the shot, so editing the preset later never rewrites them.
+
 **Drip**, after the error, shows how much coffee kept dripping into the cup
 after the machine stopped: the settled yield minus the weight at the stop, such
 as **+1.6 g**. It shows **—** when the scale gave no settled reading after the
@@ -391,7 +400,10 @@ zone later does not recalculate either row. If the clock was unavailable,
 recorded per shot.
 
 CSV retains the scalar shot columns, including `yield_g`,
-`yield_source`, `max_flow_g_s`, the BBW fields and `preset_id`.
+`yield_source`, `max_flow_g_s`, the BBW fields and `preset_id`. Each shot
+also exports `target_temp_c`, the machine's coffee target in °C at the shot
+(`-1` when the integration reported none), plus `dose_g` and `ratio`, the
+preset dose and the shot's brew ratio kept with the record.
 
 The file opens cleanly in spreadsheet apps: it is marked as UTF-8, so preset
 and scale names with accents read correctly, and a text cell that starts with

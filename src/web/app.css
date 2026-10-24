@@ -3277,7 +3277,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 #shotTable tr {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate" "spark spark spark spark spark spark";
+  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate" "spark spark spark spark spark spark";
   gap: 0.6rem 0.5rem;
   align-items: start;
   position: relative;
@@ -3334,28 +3334,37 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 #shotTable td:nth-child(8) {
   grid-area: maxflow;
 }
-#shotTable td:nth-child(10) {
-  grid-area: tare;
-}
 #shotTable td:nth-child(9) {
-  grid-area: drop;
+  grid-area: temp;
+}
+#shotTable td:nth-child(10) {
+  grid-area: dose;
 }
 #shotTable td:nth-child(11) {
-  grid-area: ended;
-}
-#shotTable td:nth-child(12) {
-  grid-area: shot;
+  grid-area: ratio;
 }
 #shotTable td:nth-child(13) {
-  grid-area: preset;
+  grid-area: tare;
+}
+#shotTable td:nth-child(12) {
+  grid-area: drop;
 }
 #shotTable td:nth-child(14) {
-  grid-area: scale;
+  grid-area: ended;
 }
 #shotTable td:nth-child(15) {
-  grid-area: atcut;
+  grid-area: shot;
 }
 #shotTable td:nth-child(16) {
+  grid-area: preset;
+}
+#shotTable td:nth-child(17) {
+  grid-area: scale;
+}
+#shotTable td:nth-child(18) {
+  grid-area: atcut;
+}
+#shotTable td:nth-child(19) {
   grid-area: dripdelay;
 }
 #shotTable td.shotRateCell {
@@ -3495,7 +3504,45 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   left: 0;
 }
 #shotTable tr.noSpark {
-  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate";
+  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate";
+}
+/* A shot without a machine-reported target skips its cell: Dose and Ratio
+   take the freed slot and every later metric moves up one place. */
+#shotTable tr.noTemp {
+  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "dose dose ratio ratio err err" "atcut atcut drip drip dripdelay dripdelay" "drop drop tare tare ended ended" "shot shot preset preset scale scale" "rate rate rate rate rate rate" "spark spark spark spark spark spark";
+}
+#shotTable tr.noTemp.noSpark {
+  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "dose dose ratio ratio err err" "atcut atcut drip drip dripdelay dripdelay" "drop drop tare tare ended ended" "shot shot preset preset scale scale" "rate rate rate rate rate rate";
+}
+#shotTable tr.noTemp td:nth-child(9) {
+  grid-area: dose;
+}
+#shotTable tr.noTemp td:nth-child(10) {
+  grid-area: ratio;
+}
+#shotTable tr.noTemp td:nth-child(11) {
+  grid-area: drop;
+}
+#shotTable tr.noTemp td:nth-child(12) {
+  grid-area: tare;
+}
+#shotTable tr.noTemp td:nth-child(13) {
+  grid-area: ended;
+}
+#shotTable tr.noTemp td:nth-child(14) {
+  grid-area: shot;
+}
+#shotTable tr.noTemp td:nth-child(15) {
+  grid-area: preset;
+}
+#shotTable tr.noTemp td:nth-child(16) {
+  grid-area: scale;
+}
+#shotTable tr.noTemp td:nth-child(17) {
+  grid-area: atcut;
+}
+#shotTable tr.noTemp td:nth-child(18) {
+  grid-area: dripdelay;
 }
 #historySentinel {
   min-height: 1px;

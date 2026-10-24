@@ -14,7 +14,9 @@
 namespace openbrewbyweight {
 
 constexpr uint32_t SHOT_LOG_MAGIC = 0x534C4F47U;  // "SLOG"
-constexpr uint16_t SHOT_LOG_SCHEMA_VERSION = 1;
+// Schema 2 appends the machine target temp, preset dose, and brew ratio
+// snapshots to the schema 1 record; older slots are discarded.
+constexpr uint16_t SHOT_LOG_SCHEMA_VERSION = 2;
 constexpr size_t SHOT_LOG_CAPACITY = 500;
 constexpr size_t SHOT_LOG_PAGE_DEFAULT = 10;
 // Maximum number of records in each independent read-time Stats window.
@@ -378,12 +380,20 @@ struct ShotLogRecord {
   uint8_t cutRampDs;      // Ramp length D (0 = step).
   // Drip delay + 1 ds; 0 = unknown.
   uint8_t dripDelayCode;
+  // Machine integration's live coffee target at the shot's end; 0 = the
+  // integration reported none.
+  uint16_t targetTempDeciC;
+  uint16_t doseDg;      // Active preset's dose; 0 = unknown.
+  uint16_t ratioX100;   // Recorded yield / dose, hundredths; 0 = not computable.
 };
 
-static_assert(sizeof(ShotLogRecord) == 120, "Shot-log schema 1 record size");
+static_assert(sizeof(ShotLogRecord) == 124, "Shot-log schema 2 record size");
 static_assert(offsetof(ShotLogRecord, verdict) == 27, "schema 1 verdict byte");
 static_assert(offsetof(ShotLogRecord, slowAfterDs) == 108, "schema 1 snapshot tail");
 static_assert(offsetof(ShotLogRecord, dripDelayCode) == 117, "schema 1 drip delay byte");
+static_assert(offsetof(ShotLogRecord, targetTempDeciC) == 118,
+              "schema 2 snapshot tail");
+static_assert(offsetof(ShotLogRecord, ratioX100) == 122, "schema 2 ratio");
 
 inline ShotLogType shotLogType(const ShotLogRecord &record);
 

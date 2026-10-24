@@ -71,6 +71,13 @@ void requestMachineIntegrationPresetTemperature(
   service.post(request);
 }
 
+// Control task only (the finalize path): the cached poll never blocks on the
+// service mutex, and the loop refreshes that cache each iteration.
+uint16_t machineIntegrationShotTargetDeciC() {
+  const LineaMicraStatus status = service.statusPoll();
+  return status.targetValid ? status.targetDeciC : 0;
+}
+
 void serviceMachineIntegrationScaleLink(uint32_t now, bool scaleLinkUp,
                                         uint32_t scaleDisconnectSequence,
                                         uint8_t scaleDisconnectReason,

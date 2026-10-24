@@ -9,11 +9,11 @@ constexpr char kStatsRowColumns[] =
     "id,bootId,endedAtMs,hasWallTime,endedAtLocalSec,endedAtUnixSec,"
     "timezoneOffsetMinutesAtCommit,durationS,presetId,presetName,scaleName,goalG,"
     "actualG,offsetG,bbwAlgorithm,bbwAlgorithmVersion,bbwAlpha,bbwLearningApplied,"
-    "avgFlowGS,firstDropS,tareS,shotType,cutType,extractionGuardEnabled,"
-    "extractionExtended,slowExtractionGuardEnabled,slowExtractionExtended,"
-    "stopDetail,cutLineG,arrivalS,verdict,channeling,scaleLossSource,estimatedG,"
-    "blind,fastBeforeS,slowAfterS,fastMarginG,slowMarginG,delayS,wallS,cutRampS,"
-    "dripDelayS,actualWeightSource,rating";
+    "avgFlowGS,targetTempDeciC,doseG,ratio,firstDropS,tareS,shotType,cutType,"
+    "extractionGuardEnabled,extractionExtended,slowExtractionGuardEnabled,"
+    "slowExtractionExtended,stopDetail,cutLineG,arrivalS,verdict,channeling,"
+    "scaleLossSource,estimatedG,blind,fastBeforeS,slowAfterS,fastMarginG,"
+    "slowMarginG,delayS,wallS,cutRampS,dripDelayS,actualWeightSource,rating";
 
 // The Stats row projection (extracted from the former REST shots handler):
 // row values, then the curve object that formatShotCurveJsonBody fills with
@@ -78,8 +78,8 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
   // Values in kStatsRowColumns order, then the curve body as one object.
   const int bytes = snprintf(work.jsonItem, NetworkWorkBuf::kJsonItem,
       "[%lu,%lu,%lu,%s,%lu,%lu,%d,%.1f,%u,\"%s\",\"%s\",%.1f,%s,%.2f,\"%s\",%s,"
-      "%s,%s,%s,%s,%s,\"%s\",\"%s\",%s,%s,%s,%s,\"%s\",%s,%s,%s,%s,%s,%s,%s,"
-      "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%s,\"%s\",%u,{%s}]",
+      "%s,%s,%s,%u,%.1f,%.2f,%s,%s,\"%s\",\"%s\",%s,%s,%s,%s,\"%s\",%s,%s,%s,%s,"
+      "%s,%s,%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%s,\"%s\",%u,{%s}]",
       static_cast<unsigned long>(record.id),
       static_cast<unsigned long>(record.bootId),
       static_cast<unsigned long>(record.endedAtMs),
@@ -93,7 +93,11 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
       static_cast<double>(goalWeightDgToGrams(record.goalWeightDg)), actual,
       static_cast<double>(record.offsetUsedCg) / 100.0,
       shotLogBbwAlgorithm(record), shotLogBbwVersion(record),
-      alphaJson, shotLogBbwLearningApplied(record), flow, firstDrop, tareAt,
+      alphaJson, shotLogBbwLearningApplied(record), flow,
+      static_cast<unsigned>(record.targetTempDeciC),
+      static_cast<double>(record.doseDg) / 10.0,
+      static_cast<double>(record.ratioX100) / 100.0,
+      firstDrop, tareAt,
       shotLogTypeName(shotLogType(record)),
       shotLogCutName(shotLogCut(record)),
       shotLogFastGuardEnabled(record.sideFlags) ? "true" : "false",

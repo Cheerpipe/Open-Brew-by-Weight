@@ -12,8 +12,10 @@
 
 namespace openbrewbyweight {
 
-// Two 60 KiB slots fill the dedicated shotlog data partition.
-constexpr size_t SHOT_LOG_FLASH_SLOT_BYTES = 61440;
+// Two 504 KiB slots fill the dedicated shotlog data partition; each slot
+// reserves room for 1 KiB records so later schema growth never touches the
+// partition table again.
+constexpr size_t SHOT_LOG_FLASH_SLOT_BYTES = 516096;
 constexpr size_t SHOT_LOG_FLASH_SLOT_COUNT = 2;
 static_assert(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES,
               "Two shot-log slots of 500 records must fit the shotlog partition");

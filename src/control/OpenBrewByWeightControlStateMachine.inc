@@ -34,6 +34,7 @@ void resetSessionForNewCycle(ControlSource source) {
   session.activePresetId = presetBank.activeId;
   const ShotPreset &preset = activeShotPreset(presetBank);
   copyCString(session.activePresetName, sizeof(session.activePresetName), preset.name);
+  session.activePresetDoseDg = preset.doseDg;
   session.config.bbwAlpha = preset.bbwEwmaAlpha;
   session.config.bbwLearningGeneration = bbwLearningBank.forPreset(
       preset.id, presetBank).generation;

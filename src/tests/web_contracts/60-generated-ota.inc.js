@@ -753,8 +753,10 @@ if (generated.jsGzip.length > 7850) {
 // detached download button: 17146, owner-requested 2026-10-23; cap 17150. The device
 // rename button and dimmed inert controls: 17154, owner-requested 2026-10-23; cap 17160.
 // The red Access password note: 17163, owner-requested 2026-10-23; cap 17163.
-if (generated.cssGzip.length > 17163) {
-  throw new Error(`Compressed Web CSS exceeds the 17163-byte gzip budget (${generated.cssGzip.length})`);
+// Shot-card Target temp, Dose, and Ratio grid rows with the temp-less
+// fallback layout: 17337, owner-requested 2026-10-24; cap 17337.
+if (generated.cssGzip.length > 17337) {
+  throw new Error(`Compressed Web CSS exceeds the 17337-byte gzip budget (${generated.cssGzip.length})`);
 }
 // Include zero baselines and the first-drop marker without sacrificing legibility.
 // Exporting the saved weight curve as per-shot CSV columns raises the cap by 100 bytes.
@@ -1237,8 +1239,10 @@ const coldHomeGzip = generated.gzip.length + generated.cssGzip.length +
 // shared list filter menu, its shell icon, and the Stats window bar bring it to 73206,
 // owner-requested 2026-10-23; cap 73230.
 // Rejected-op (4003) recovery: 73288, owner-requested 2026-10-23; cap 73300.
-if (coldHomeGzip > 73300) {
-  throw new Error(`Cold Home download exceeds the 73300-byte gzip budget (${coldHomeGzip})`);
+// Shot-card Target temp, Dose, and Ratio: 73373, owner-requested 2026-10-24;
+// cap 73380.
+if (coldHomeGzip > 73380) {
+  throw new Error(`Cold Home download exceeds the 73380-byte gzip budget (${coldHomeGzip})`);
 }
 // The optional Web UI login brings every embedded asset together to 149453,
 // owner-requested 2026-10-22; cap 149480 for asset-tag gzip wobble. The Admin
@@ -1255,8 +1259,10 @@ if (coldHomeGzip > 73300) {
 // Fixed Administration unlock section: 155002, owner-requested 2026-10-22; cap 155010.
 // Access password notes (the approved admin and CSS raises): 155040, owner-requested
 // 2026-10-23; cap 155040.
-if (generated.combined > 155040) {
-  throw new Error(`Combined Web UI gzip exceeds the 155040-byte flash budget (${generated.combined})`);
+// Shot-card Target temp, Dose, and Ratio (CSS and JS raises): 155359,
+// owner-requested 2026-10-24; cap 155360.
+if (generated.combined > 155360) {
+  throw new Error(`Combined Web UI gzip exceeds the 155360-byte flash budget (${generated.combined})`);
 }
 if (!network.includes('#include "OpenBrewByWeightWebAssetsGzip.h"') ||
     network.includes('#include "OpenBrewByWeightWebAssets.h"')) {

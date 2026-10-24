@@ -486,9 +486,9 @@ partition_contracts = {
                  "history": (0x620000, 0x8000),
                  "scaleprof": (0x628000, 0x41000),
                  "auditlog": (0x669000, 0x10000),
-                 "shotlog": (0x679000, 0x1E000),
-                 "shotcurve": (0x697000, 0x3EC000),
-                 "reserved": (0xA83000, 0x37D000),
+                 "shotlog": (0x679000, 0xFC000),
+                 "shotcurve": (0x775000, 0x3EC000),
+                 "reserved": (0xB61000, 0x29F000),
                  "coredump": (0xE00000, 0xA0000),
                  "crashhist": (0xEA0000, 0x160000)},
     },
@@ -505,7 +505,7 @@ for filename, contract in partition_contracts.items():
     last_offset, last_size = ordered[-1][1]
     assert last_offset + last_size == contract["flash"]
     assert rows["shotcurve"][1] == 4016 * 1024, "shot-curve partition changed"
-    assert rows["shotlog"][1] == 120 * 1024, "shot-log partition changed"
+    assert rows["shotlog"][1] == 1008 * 1024, "shot-log partition changed"
     assert rows["history"][1] == 32 * 1024, "activation-history partition changed"
     assert rows["scaleprof"][1] == 0x41000, "scale-profile partition changed"
 

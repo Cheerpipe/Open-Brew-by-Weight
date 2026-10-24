@@ -297,6 +297,7 @@ struct CycleSession {
   uint8_t scaleLossSource = 0; bool scaleLossBlind = false;  // deadline source; no valid flow
   uint8_t activePresetId = 0;
   char activePresetName[SHOT_PRESET_NAME_CAPACITY] = {};
+  uint16_t activePresetDoseDg = 0;  // Snapshot at cycle start; 0 = unknown.
   char scaleName[SCALE_FRIENDLY_NAME_MAX_LEN + 1] = {};
   bool cupRemovedPending = false;
   AccidentalTouchPhase accidentalTouchPhase = AccidentalTouchPhase::STARTUP;
@@ -367,6 +368,8 @@ struct PendingShotFinalize {
   float tailMaxG = 0.0f;
   uint8_t activePresetId = 0;
   char activePresetName[SHOT_PRESET_NAME_CAPACITY] = {};
+  uint16_t targetTempDeciC = 0;  // Machine target at the shot's end; 0 = none.
+  uint16_t activePresetDoseDg = 0;
   char scaleName[SCALE_FRIENDLY_NAME_MAX_LEN + 1] = {};
   uint32_t cycleId = 0;
   bool retarePerformed = false;

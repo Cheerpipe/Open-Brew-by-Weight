@@ -612,7 +612,7 @@ cases also remain pending; the successful full transfer does not qualify them.
 
 | Resource | Placement and bound |
 |---|---|
-| Network work buffer | external, bounded at 640 KiB; includes the Stats capture's full-capacity shot-record snapshot (500 × 120 bytes) with one-curve fetch scratch (also the empty-curve template), 19,554-byte curve JSON, 23,650-byte row JSON, 40,960-byte status JSON, the Home shot's curve copy, 3,168 bytes of session fingerprints and a bounded page header/cache key; handlers share the work-buffer mutex. The earlier 629,376-byte measurement predates this layout; verify the current size in the matched firmware build |
+| Network work buffer | external, bounded at 640 KiB; includes the Stats capture's full-capacity shot-record snapshot (500 × 124 bytes) with one-curve fetch scratch (also the empty-curve template), 19,554-byte curve JSON, 23,650-byte row JSON, 40,960-byte status JSON, the Home shot's curve copy, 3,168 bytes of session fingerprints and a bounded page header/cache key; handlers share the work-buffer mutex. The earlier 629,376-byte measurement predates this layout; verify the current size in the matched firmware build |
 | HTTP response send | complete assets and JSON use HTTPD Content-Length responses; streamed bodies retain chunked transfer. Source buffers pass directly to HTTPD's default socket send, which copies into lwIP; no application bounce buffer or extra copy |
 | NVS metadata cache | PSRAM preferred with internal fallback; flash I/O still uses the internal scratch below |
 | Shot-curve store | external, 2,804,004-byte cache for 500 delta-stream records of 5,608 bytes (stream reserved for the valid-record worst case); bounded block-header index and two 5,632-byte disk/verification workspaces belong to the same owner; copies move only used stream and bitmap bytes; immutable worker image is separately external and holds at most four unpersisted curves |
@@ -706,7 +706,7 @@ Both supported partition tables reserve `shotcurve` at custom subtype
 plus two separate 4096-byte epoch sectors. The maximum used record is 5632
 bytes, leaving 2560 reserved bytes per block. A shorter curve erases/programs
 only its used length and ignores stale bytes beyond it. The partition occupies
-`0x697000`–`0xA82FFF`. The installer accepts only the exact current table;
+`0x775000`–`0xB60FFF`. The installer accepts only the exact current table;
 any other layout needs a USB `--erase-all` installation.
 
 Capability samples use `INTERNAL|8BIT` and `SPIRAM|8BIT`, including the PSRAM

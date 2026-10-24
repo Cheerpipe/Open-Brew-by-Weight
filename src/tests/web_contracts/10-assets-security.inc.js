@@ -969,8 +969,11 @@ if (htmlBytes > 107310) {
 // the corrupt-frame path: measured 523859, owner-requested 2026-10-23. v1 Web UI
 // fixes (stream-confirmed commands, bounded sign-in and scan, keyed scale list,
 // modal overlay, Diagnostic action gate): measured 524387, owner-requested 2026-10-23.
-if (jsBytes > 524387) {
-  throw new Error(`Web UI JS source exceeds the authoring budget (${jsBytes} > 524387)`);
+// Shot-record Target temp, Dose, and Ratio: three Stats card cells with a
+// conditional temp layout plus their CSV columns: measured 524984,
+// owner-requested 2026-10-24.
+if (jsBytes > 524984) {
+  throw new Error(`Web UI JS source exceeds the authoring budget (${jsBytes} > 524984)`);
 }
 // Sharing the brand wordmark selectors between the header, the loading view,
 // and the inactive overlay pays for the added shell markup.
@@ -1142,8 +1145,10 @@ if (jsBytes > 524387) {
 // owner-requested 2026-10-23. Rejected-op (4003) recovery: measured 630012, owner-requested 2026-10-23.
 // Stream render errors kept off the corrupt-frame path: measured 630275, owner-requested 2026-10-23.
 // v1 Web UI fixes: measured 630821, owner-requested 2026-10-23.
-if (htmlBytes + jsBytes > 630821) {
-  throw new Error(`Web UI HTML+JS source exceeds the combined authoring budget (${htmlBytes + jsBytes} > 630821)`);
+// Shot-record Target temp, Dose, and Ratio cells plus their table headers:
+// measured 631575, owner-requested 2026-10-24.
+if (htmlBytes + jsBytes > 631575) {
+  throw new Error(`Web UI HTML+JS source exceeds the combined authoring budget (${htmlBytes + jsBytes} > 631575)`);
 }
 if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !codeIncludes(ui, 'id="dActivator"') || !codeIncludes(ui, 'firstDropBeep') ||

@@ -12217,6 +12217,41 @@ void shot_scale_name_snapshot_survives_link_changes() {
   CHECK(strcmp(pendingFinalize.scaleName, "Late scale") == 0);
 }
 
+void shot_record_snapshots_target_temp_dose_and_ratio() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  hostMachineShotTargetDeciC = 935;
+  schedulePendingShotFinalize(EndReason::ACTIVATOR, 14000);
+  CHECK(pendingFinalize.targetTempDeciC == 935);
+  CHECK(pendingFinalize.activePresetDoseDg ==
+        activeShotPreset(presetBank).doseDg);
+  session.active = false;
+  commitPendingShotLog(pendingFinalize, 36.0f, true,
+                       ActualWeightSource::LAST_KNOWN);
+  ShotLogRecord record = {};
+  CHECK(shotLog.copyNewestFirst(&record, 1) == 1);
+  CHECK(record.targetTempDeciC == 935);
+  CHECK(record.doseDg == activeShotPreset(presetBank).doseDg);
+  // 3600 cg over a 180 dg dose: 2.00.
+  CHECK(record.ratioX100 == 3600 * 10 / record.doseDg);
+  CHECK(record.ratioX100 == 200);
+
+  // No machine target and no weighed yield: temp and ratio stay missing
+  // while the dose snapshot persists.
+  resetHarness(false, true);
+  hostMachineShotTargetDeciC = 0;
+  reachReadyFromBoot();
+  startCycle();
+  schedulePendingShotFinalize(EndReason::ACTIVATOR, 14000);
+  session.active = false;
+  commitPendingShotLog(pendingFinalize, 0.0f, false, ActualWeightSource::NONE);
+  CHECK(shotLog.copyNewestFirst(&record, 1) == 1);
+  CHECK(record.targetTempDeciC == 0);
+  CHECK(record.doseDg == activeShotPreset(presetBank).doseDg);
+  CHECK(record.ratioX100 == 0);
+}
+
 void shot_tare_time_uses_successful_write_and_circuit_clock() {
   // Success, failed write, lost connection, saturated event queue, delayed
   // publication, completion after shot end, another request, and clock wrap.
@@ -16493,7 +16528,7 @@ void s08_shot_log_without_sync_has_no_wall_time() {
 }
 
 void s11_shot_log_record_includes_preset_snapshot() {
-  CHECK(sizeof(ShotLogRecord) == 120);
+  CHECK(sizeof(ShotLogRecord) == 124);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   // A fast weight cut records its own cut parameters, cut line and verdict.
   resetHarness(false, true);
@@ -22268,6 +22303,7 @@ const TestCase testCases[] = {
     {"ST08", st08_scale_timer_stop_extra_delay_applies_without_valid_timer},
     {"RT01", rt01_late_cup_triggers_single_retare},
     {"SHOT_SCALE", shot_scale_name_snapshot_survives_link_changes},
+    {"SHOT_SNAP", shot_record_snapshots_target_temp_dose_and_ratio},
     {"SHOT_TARE", shot_tare_time_uses_successful_write_and_circuit_clock},
     {"RT02", rt02_sub_minimum_stable_cup_is_ignored},
     {"RT03", rt03_spike_without_stable_cup_does_not_retare},

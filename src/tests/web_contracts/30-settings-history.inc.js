@@ -789,8 +789,10 @@ if (!codeIncludes(ui, 'id="shotTable"') ||
     !codeIncludes(js, "'shotDur'") ||
     !codeIncludes(js, "'shotActual'") ||
     !css.includes('#shotTable .shotDur,#shotTable .shotActual') ||
-    !css.includes('grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate" "spark spark spark spark spark spark"') ||
-    !css.includes('#shotTable tr.noSpark{grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate"}') ||
+    !css.includes('grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate" "spark spark spark spark spark spark"') ||
+    !css.includes('#shotTable tr.noSpark{grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate"}') ||
+    !css.includes('#shotTable tr.noTemp{grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "dose dose ratio ratio err err" "atcut atcut drip drip dripdelay dripdelay" "drop drop tare tare ended ended" "shot shot preset preset scale scale" "rate rate rate rate rate rate" "spark spark spark spark spark spark"}') ||
+    !css.includes('#shotTable tr.noTemp.noSpark{grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "dose dose ratio ratio err err" "atcut atcut drip drip dripdelay dripdelay" "drop drop tare tare ended ended" "shot shot preset preset scale scale" "rate rate rate rate rate rate"}') ||
     css.includes('grid-area:guard') ||
     css.includes('grid-area:ext') ||
     css.includes('grid-area:stop') ||
@@ -816,7 +818,7 @@ if (!codeIncludes(ui, 'id="shotTable"') ||
     codeIncludes(statsRuntimeJs, 'const live=!!((s.cycle&&s.cycle.active)||s.relayClosed)') ||
     !codeIncludes(statsRuntimeJs, 'drop=d.firstDropMs') ||
     !codeIncludes(statsRuntimeJs, 'formatShotEnded(r.stopDetail, r.verdict)') ||
-    !codeIncludes(js, "labels=['Date','Dur','Goal','Yield','Err%','Drip','Avg flow','Max flow','1st drop','Late cup','Ended','Shot','Preset','Scale'") ||
+    !codeIncludes(js, "labels=['Date','Dur','Goal','Yield','Err%','Drip','Avg flow','Max flow','Target temp','Dose','Ratio','1st drop','Late cup','Ended','Shot','Preset','Scale'") ||
     codeIncludes(js, "labels=['Time','Dur','Goal','Actual','Err%','Flow','1st drop','Ended','Shot']") ||
     codeIncludes(js, "labels=['Time','Dur','Goal','Actual','Err%','Flow','1st drop','Guard','Ext','Stop','Shot','Cut']") ||
     partialHtml.stats.includes('<th>Guard</th>') ||

@@ -12,7 +12,10 @@ The first stable release.
   stops the shot near your recipe's target weight, learning from each shot.
   You keep using the machine's own brew switch.
 - **Presets and shot monitor:** saved recipes, a live shot view, shot history
-  with curves, statistics, and an activation history.
+  with curves, statistics, and an activation history. Each stored shot keeps
+  the machine's target temperature (when the integration reports one), the
+  preset's dose, and the resulting brew ratio, shown on its history card and
+  included in the CSV export.
 - **Safety backups:** cup protection, a timed fallback when the scale drops
   out, and a relay that always stays open on startup, reset, and power loss.
 - **Machines and switches:** paddle, momentary, and momentary-plus-reed
