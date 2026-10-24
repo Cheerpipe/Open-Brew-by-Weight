@@ -3452,7 +3452,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   color: var(--mu);
   letter-spacing: 0.04em;
 }
-#shotTable td:nth-child(n + 6):nth-child(-n + 16) {
+#shotTable td:nth-child(n + 6):nth-child(-n + 19) {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--mu);

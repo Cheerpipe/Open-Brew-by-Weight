@@ -793,6 +793,8 @@ if (!codeIncludes(ui, 'id="shotTable"') ||
     !css.includes('#shotTable tr.noSpark{grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate"}') ||
     !css.includes('#shotTable tr.noTemp{grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "dose dose ratio ratio err err" "atcut atcut drip drip dripdelay dripdelay" "drop drop tare tare ended ended" "shot shot preset preset scale scale" "rate rate rate rate rate rate" "spark spark spark spark spark spark"}') ||
     !css.includes('#shotTable tr.noTemp.noSpark{grid-template-areas:"dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "dose dose ratio ratio err err" "atcut atcut drip drip dripdelay dripdelay" "drop drop tare tare ended ended" "shot shot preset preset scale scale" "rate rate rate rate rate rate"}') ||
+    !codeIncludes(viewJs.stats, 'if (tempC === null) row.classList.add("noTemp")') ||
+    !codeIncludes(viewJs.stats, 'if (v !== null) td(row, labels[i], v, cls[i])') ||
     css.includes('grid-area:guard') ||
     css.includes('grid-area:ext') ||
     css.includes('grid-area:stop') ||

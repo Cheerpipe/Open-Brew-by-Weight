@@ -87,6 +87,7 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   outboundShotActive.store(false);
   outboundScaleConnected.store(false);
   hostMachineCloudInhibitCount = 0;
+  hostMachineShotTargetDeciC = 0;
   powerPolicy = PowerPolicy{};
   powerWebUntilMs.store(0);
   powerNetworkBusy.store(false);
@@ -12240,7 +12241,6 @@ void shot_record_snapshots_target_temp_dose_and_ratio() {
   // No machine target and no weighed yield: temp and ratio stay missing
   // while the dose snapshot persists.
   resetHarness(false, true);
-  hostMachineShotTargetDeciC = 0;
   reachReadyFromBoot();
   startCycle();
   schedulePendingShotFinalize(EndReason::ACTIVATOR, 14000);

@@ -463,8 +463,10 @@ void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeight
     }
   }
 
-  // Ratio snapshot: the recorded yield over the snapshotted dose.
-  if (record.doseDg >= MIN_DOSE_DG &&
+  // Ratio snapshot: the recorded yield over the snapshotted dose. The
+  // positive-weight guard keeps the uint16 cast from wrapping on a
+  // non-positive recorded yield.
+  if (record.doseDg >= MIN_DOSE_DG && record.actualWeightCg > 0 &&
       !shotLogWeightIsMissing(record.actualWeightCg)) {
     record.ratioX100 = static_cast<uint16_t>(
         static_cast<int32_t>(record.actualWeightCg) * 10 / record.doseDg);
