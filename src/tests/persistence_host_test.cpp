@@ -2172,13 +2172,13 @@ void p71_nvs_capacity_budget_keeps_compaction_margin() {
   constexpr size_t lastShotEntries = nvsBlobRequiredEntries(sizeof(LastShotBlob));
   constexpr size_t remainingRecords = lastShotEntries + 6U + 3U + 24U + 32U;
   constexpr size_t applicationEntries = settingsEntries + remainingRecords;
-  CHECK(EXPECTED_NVS_PARTITION_BYTES == 0x15000U);
+  CHECK(EXPECTED_NVS_PARTITION_BYTES == 0x65000U);
   CHECK(sizeof(PersistedSettings) == 3056U);
   CHECK(settingsEntries == 196U);
   CHECK(lastShotEntries == 14U);
   CHECK(applicationEntries == 275U);
-  CHECK(conservativeEntries == 2394U);
-  CHECK(conservativeEntries - applicationEntries == 2119U);
+  CHECK(conservativeEntries == 12474U);
+  CHECK(conservativeEntries - applicationEntries == 12199U);
 }
 
 void p72_factory_intent_recovers_only_from_nvs_no_space() {

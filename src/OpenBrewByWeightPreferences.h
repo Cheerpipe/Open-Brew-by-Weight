@@ -20,7 +20,7 @@
 
 namespace openbrewbyweight {
 
-constexpr size_t EXPECTED_NVS_PARTITION_BYTES = 0x15000;
+constexpr size_t EXPECTED_NVS_PARTITION_BYTES = 0x65000;
 constexpr int32_t HOST_NVS_ERROR = -1;
 constexpr int32_t HOST_NVS_NOT_ENOUGH_SPACE = -1001;
 

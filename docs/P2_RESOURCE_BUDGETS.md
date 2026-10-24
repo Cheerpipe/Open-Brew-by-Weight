@@ -824,28 +824,29 @@ rate are fixed for production hardware.
 
 ## NVS capacity
 
-Both supported partition tables reserve `0x15000` bytes (84 KiB) for NVS. With
-4 KiB pages this gives 21 pages. The capacity contract conservatively reserves
-two whole pages for NVS housekeeping/compaction, leaving 2,394 32-byte entries
-for application records.
+The supported partition table reserves `0x65000` bytes (404.5 KiB) for NVS.
+With 4 KiB pages this gives 101 pages. The capacity contract conservatively
+reserves two whole pages for NVS housekeeping/compaction, leaving 12,474
+32-byte entries for application records.
 
 The worst-case application set is budgeted by the NVS blob rule
 `2 + ceil(bytes / 32)` per blob, plus namespace and scalar-key entries:
 
 | Records retained together | Maximum entries |
 |---|---:|
-| Settings A/B (`2 × 2,748 B`) | 176 |
-| Last Shot (`2 + ceil(252 / 32)`) | 10 |
+| Settings A/B (`2 × 3,056 B`) | 196 |
+| Last Shot (`2 + ceil(356 / 32)`) | 14 |
 | BLE settings A/B | 6 |
 | Recovery intent | 3 |
 | OTA journal A/B | 24 |
 | Reset history, active pointers, and namespaces | 32 |
-| **Application total** | **251** |
+| **Application total** | **275** |
 
 Shot and activation history use their dedicated flash partitions rather than
-NVS entries. The resulting conservative compaction margin is 2,143 entries
-(89.4%). Host
-tests bind the large record sizes and this arithmetic to the 84 KiB layout.
+NVS entries. The resulting conservative compaction margin is 12,199 entries
+(97.8%). Host
+tests bind the large record sizes and this arithmetic to the installed
+partition layout.
 Diagnostic status and debug exports publish the installed partition size,
 layout match, NVS used/free/available/total entries, namespace count, failure
 count, last failing subsystem/operation/error, and flash-I/O lock timeouts.

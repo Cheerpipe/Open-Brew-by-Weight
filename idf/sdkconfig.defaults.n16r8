@@ -1,4 +1,4 @@
-# n16r8: 16 MB flash, 8 MB OPI PSRAM, v1 partition table (partitions-n16r8.csv).
+# n16r8: 16 MB flash, 8 MB OPI PSRAM, partition table (partitions-n16r8.csv).
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-n16r8.csv"

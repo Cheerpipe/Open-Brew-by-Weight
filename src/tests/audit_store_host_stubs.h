@@ -23,7 +23,7 @@ struct esp_partition_t {
   std::vector<uint8_t> bytes;
 };
 
-inline esp_partition_t fakeAuditLog{0x669000, 0x10000, "auditlog",
+inline esp_partition_t fakeAuditLog{0x6B9000, 0x10000, "auditlog",
                                     std::vector<uint8_t>(0x10000, 0xFF)};
 inline bool fakeAuditLogPresent = true;
 inline size_t fakeAuditOps = 0;

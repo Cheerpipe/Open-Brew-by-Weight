@@ -481,14 +481,14 @@ def partition_rows(name: str) -> dict[str, tuple[int, int]]:
 partition_contracts = {
     "partitions-n16r8.csv": {
         "flash": 0x1000000,
-        "rows": {"nvs": (0x9000, 0x15000), "otadata": (0x1E000, 0x2000),
-                 "app0": (0x20000, 0x300000), "app1": (0x320000, 0x300000),
-                 "history": (0x620000, 0x8000),
-                 "scaleprof": (0x628000, 0x41000),
-                 "auditlog": (0x669000, 0x10000),
-                 "shotlog": (0x679000, 0xFC000),
-                 "shotcurve": (0x775000, 0x3EC000),
-                 "reserved": (0xB61000, 0x29F000),
+        "rows": {"nvs": (0x9000, 0x65000), "otadata": (0x6E000, 0x2000),
+                 "app0": (0x70000, 0x300000), "app1": (0x370000, 0x300000),
+                 "history": (0x670000, 0x8000),
+                 "scaleprof": (0x678000, 0x41000),
+                 "auditlog": (0x6B9000, 0x10000),
+                 "shotlog": (0x6C9000, 0xFC000),
+                 "shotcurve": (0x7C5000, 0x3EC000),
+                 "reserved": (0xBB1000, 0x24F000),
                  "coredump": (0xE00000, 0xA0000),
                  "crashhist": (0xEA0000, 0x160000)},
     },
@@ -1473,7 +1473,7 @@ assert unchecked_result.returncode == 0 and \
     unchecked_flash
 external_result, external_flash = flash_command("present", "--image", "placeholder")
 assert external_result.returncode == 0 and \
-    any("write-flash 0x20000" in line for line in external_flash) and \
+    any("write-flash 0x70000" in line for line in external_flash) and \
     not any(" flash" in line for line in external_flash if line.startswith("idf:")), \
     external_flash
 for incompatible_layout in ("missing", "wrong", "type", "subtype", "size", "nvs", "loose"):

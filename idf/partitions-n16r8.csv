@@ -1,18 +1,20 @@
 # Name,   Type, SubType, Offset,  Size, Flags
 #
-# v1 layout for 16 MiB flash. Data stores sit contiguously after app1; the
+# Layout for 16 MiB flash. Data stores sit contiguously after app1; the
 # `reserved` partition is unused space kept for future firmware. Every store
 # is opened by label. The table cannot change by OTA: any other installed
 # table requires a USB installation with --erase-all.
-nvs,      data, nvs,     0x9000,  0x15000,
-otadata,  data, ota,     0x1e000, 0x2000,
-app0,     app,  ota_0,   0x20000, 0x300000,
-app1,     app,  ota_1,   0x320000,0x300000,
-history,  data, 0x40,    0x620000,0x8000,
-scaleprof,data, 0x40,    0x628000,0x41000,
-auditlog, data, 0x40,    0x669000,0x10000,
-shotlog,  data, 0x40,    0x679000,0xFC000,
-shotcurve,data, 0x40,    0x775000,0x3EC000,
-reserved, data, 0x40,    0xB61000,0x29F000,
+# nvs is 0x65000 (101 pages) for settings headroom; `reserved` funds the
+# growth and every store size and OTA slot is unchanged.
+nvs,      data, nvs,     0x9000,  0x65000,
+otadata,  data, ota,     0x6E000, 0x2000,
+app0,     app,  ota_0,   0x70000, 0x300000,
+app1,     app,  ota_1,   0x370000,0x300000,
+history,  data, 0x40,    0x670000,0x8000,
+scaleprof,data, 0x40,    0x678000,0x41000,
+auditlog, data, 0x40,    0x6B9000,0x10000,
+shotlog,  data, 0x40,    0x6C9000,0xFC000,
+shotcurve,data, 0x40,    0x7C5000,0x3EC000,
+reserved, data, 0x40,    0xBB1000,0x24F000,
 coredump, data, coredump,0xE00000,0xA0000,
 crashhist,data, 0x40,    0xEA0000,0x160000,
