@@ -1539,8 +1539,8 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
   const msg = {hidden: true, textContent: ''};
   const render = new Function('$', 'R', viewJs.home.slice(at, viewJs.home.indexOf('\n}', at) + 2) +
     ';return renderReadyMsg;')(() => msg, {reveal: (el, show) => { el.hidden = !show; }});
-  const show = (mode, enabled, armed) => (render({state: 'IDLE', config: {brewByWeight: true},
-    scale: {available: false}, noScaleShotGuard: {mode, enabled, armed}}), msg.hidden ? '' : msg.textContent);
+  const show = (mode, enabled, armed) => (render({state: 'IDLE', config: {brewByWeight: true, noScaleBbwMode: mode},
+    scale: {available: false}, noScaleShotGuard: {enabled, armed}}), msg.hidden ? '' : msg.textContent);
   if (!/blocked once/.test(show('warn_once', true, true)) || /blocked once/.test(show('warn_once', true, false)) ||
       !/Connect a scale/.test(show('require_scale', true, true)) || /Connect a scale/.test(show('require_scale', true, false)) ||
       !/yourself/.test(show('off', false, false)))

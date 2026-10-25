@@ -46,9 +46,24 @@
       uiStreamSource.includes('kUiStreamCloseRejected'),
   'resync always sends a snapshot; a malformed op is logged and closed with 4003');
 
-  // One owner per path: neither projection repeats, or nests inside, the other's paths.
+  // One owner per path (Home > Settings > Diagnostic): no projection repeats,
+  // or nests inside, another's paths. The only overlap is the compatibility
+  // fallback: Diagnostic keeps four Micra slots that Settings owns and skips
+  // their emission while the session holds the Settings subscription.
+  const diagRegion = homeStreamSource.slice(homeStreamSource.indexOf('bool OpenBrewByWeightNetwork::sendDiagnosticStream'),
+      homeStreamSource.indexOf('bool OpenBrewByWeightNetwork::sendLogStream'));
+  const diagPaths = [...diagRegion.matchAll(/(?:delta|telemetry)\.field\("([^"]+)"/g)].map((m) => m[1]);
   const overlaps = (a, b) => a.filter((p) => b.some((q) => p === q || p.startsWith(q + '.') || q.startsWith(p + '.')));
   assert.deepEqual(overlaps(settingsPaths, homePaths), [], 'Home and Settings paths must be disjoint');
+  assert.deepEqual(overlaps(diagPaths, homePaths), [], 'Diagnostic must not repeat Home paths');
+  const shared = ['lineaMicra.phase', 'lineaMicra.email', 'lineaMicra.selectedSerial', 'lineaMicra.selectedName'];
+  assert.deepEqual(overlaps(diagPaths, settingsPaths).sort(), [...shared].sort(),
+      'Diagnostic shares only the compatibility-mode Micra paths with Settings');
+  for (const p of shared)
+    assert(new RegExp(`delta\\.skipNext = session\\.settingsOn;\\s*delta\\.field\\("${p.replace('.', '\\.')}"`).test(diagRegion),
+        p + ' must be skipped by Diagnostic while Settings is subscribed');
+  assert(codeIncludes(runtimeJs, 'mergeStatus(homeFrame?.status,diagFrame.status,settingsFrame?.status)'),
+      'Diagnostic reads the shared Micra paths from Settings when it exists');
   // Every Settings path has a reader in the Settings view or the runtime it uses.
   const readers = (rawViewJs.settings + rawRuntimeJs).toLowerCase();
   const unread = settingsPaths.filter((p) => {

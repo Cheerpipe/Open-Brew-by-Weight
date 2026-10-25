@@ -43,24 +43,23 @@ bool OpenBrewByWeightNetwork::sendAuditDiagFrame(UiStreamSession &session,
     const AuditRecord &record = g_work->auditBatch[index];
     // Full detail rebuilt from the persisted args plus the emit-time excerpt;
     // the field stays `text` so the frame shape and its closer are unchanged.
+    // The sequence keeps identical records distinct for the page's change
+    // detection; uptime and raw arguments stay in the text export.
     // The escaped text goes to the PSRAM item scratch, not the httpd stack.
     char detail[128];
     char *const safeDetail = g_work->jsonItem;
     formatAuditRecordDetail(record, detail, sizeof(detail));
     escapeJsonString(detail, safeDetail, sizeof(detail) * 6);
     if (!statusJsonAppend(&used,
-            "%s{\"sequence\":%lu,\"wallSec\":%lu,\"atMs\":%lu,"
+            "%s{\"sequence\":%lu,\"wallSec\":%lu,"
             "\"level\":\"%s\",\"category\":\"%s\",\"code\":\"%s\","
-            "\"argument1\":%ld,\"argument2\":%ld,\"text\":\"%s\"}",
+            "\"text\":\"%s\"}",
             index == 0 ? "" : ",",
             static_cast<unsigned long>(record.sequence),
             static_cast<unsigned long>(record.wallSec),
-            static_cast<unsigned long>(record.atMs),
             logLevelName(static_cast<LogLevel>(record.level)),
             debugCategoryName(static_cast<DebugCategory>(record.category)),
-            debugCodeName(static_cast<DebugCode>(record.code)),
-            static_cast<long>(record.argument1),
-            static_cast<long>(record.argument2), safeDetail)) {
+            debugCodeName(static_cast<DebugCode>(record.code)), safeDetail)) {
       return false;
     }
   }

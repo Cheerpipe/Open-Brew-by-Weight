@@ -118,7 +118,7 @@ qualifies the FSM's stable absent/present records, calculates their difference,
 and invalidates the evidence. Qualified idle unloading can reuse its trusted
 empty anchor without forging a new stable-absence record. The scale worker returns
 an opaque request ID, pre-write weight, and tare outcome for uncertainty handling.
-Both status JSON paths publish `cupPresence`
+The Home stream publishes `cupPresence`
 with `weightG` (finite grams or null), `weightValid`, and `placementId` from that
 committed snapshot. `cupPresence.idleTare` projects readiness and
 `cupPresence.accessory`/`accessoryG` the accessory state from those same

@@ -923,7 +923,6 @@ bool formatTaskProfilerObject(char *buf, size_t cap, size_t *used,
           "\"truncated\":%s,"
           "\"peakGapMs\":%lu,\"recentGapMs\":%lu,"
           "\"peakGapUs\":%lu,\"recentGapUs\":%lu,"
-          "\"peakGapCpuUs\":%lu,\"peakGapIdleUs\":%lu,\"peakGapAtMs\":%lu,"
           "\"peakDelayUs\":%lu,\"recentDelayUs\":%lu,"
           "\"peakDispatchUs\":%lu,\"recentDispatchUs\":%lu",
           taskProfilerStateName(tasks.state),
@@ -937,9 +936,6 @@ bool formatTaskProfilerObject(char *buf, size_t cap, size_t *used,
           static_cast<unsigned long>(tasks.loopPhases.recentGapMs),
           static_cast<unsigned long>(tasks.loopPhases.peakGapUs),
           static_cast<unsigned long>(tasks.loopPhases.recentGapUs),
-          static_cast<unsigned long>(tasks.loopPhases.peakGapCpuUs),
-          static_cast<unsigned long>(tasks.loopPhases.peakGapIdleUs),
-          static_cast<unsigned long>(tasks.loopPhases.peakGapAtMs),
           static_cast<unsigned long>(tasks.loopPhases.peakDelayUs),
           static_cast<unsigned long>(tasks.loopPhases.recentDelayUs),
           static_cast<unsigned long>(tasks.loopPhases.peakDispatchUs),
@@ -948,13 +944,17 @@ bool formatTaskProfilerObject(char *buf, size_t cap, size_t *used,
   }
   // Detailed measurements remain available in the full debug export.
   if (full && !jsonScratchAppend(buf, cap, used,
-          ",\"stackUnit\":\"bytes\",\"remainingMs\":%lu,\"sampleCount\":%lu,"
+          ",\"peakGapCpuUs\":%lu,\"peakGapIdleUs\":%lu,\"peakGapAtMs\":%lu,"
+          "\"stackUnit\":\"bytes\",\"remainingMs\":%lu,\"sampleCount\":%lu,"
           "\"averageTotalCpuPct\":%.1f,\"lastCaptureUs\":%lu,\"maxCaptureUs\":%lu,"
           "\"lockWaits\":{\"micraBackflush\":{\"lastUs\":%lu,\"maxUs\":%lu,"
           "\"holdLastUs\":%lu,\"holdMaxUs\":%lu},"
           "\"scaleEvents\":{\"lastUs\":%lu,\"maxUs\":%lu},"
           "\"shotStore\":{\"lastUs\":%lu,\"maxUs\":%lu},"
           "\"controlStatus\":{\"lastUs\":%lu,\"maxUs\":%lu}}",
+          static_cast<unsigned long>(tasks.loopPhases.peakGapCpuUs),
+          static_cast<unsigned long>(tasks.loopPhases.peakGapIdleUs),
+          static_cast<unsigned long>(tasks.loopPhases.peakGapAtMs),
           static_cast<unsigned long>(tasks.remainingMs),
           static_cast<unsigned long>(tasks.sampleCount),
           static_cast<double>(tasks.averageTotalCpuPct),
@@ -1183,9 +1183,7 @@ void buildSlimPresetsJson(const ShotPresetBank &presets) {
         "\"slowAfterS\":%.1f,\"fastMarginG\":%.1f,\"slowMarginG\":%.1f,"
         "\"operationalWallMs\":%lu,\"bbwProtectionMs\":%lu,"
         "\"fastExtractionGuardEnabled\":%s,\"slowExtractionGuardEnabled\":%s,"
-        "\"grindHintsEnabled\":%s,\"scaleLossFixedS\":%.1f,"
-        "\"bbwAlgorithm\":\"%s\",\"bbwAlphaBaseline\":%.2f,"
-        "\"lineaMicraBrewTargetC\":%.1f",
+        "\"grindHintsEnabled\":%s,\"lineaMicraBrewTargetC\":%.1f",
         i == 0 ? "" : ",", static_cast<unsigned>(p.id), safeName,
         p.isFactory ? "true" : "false", p.brewByWeight ? "true" : "false",
         static_cast<double>(goalWeightDgToGrams(p.doseDg)),
@@ -1197,9 +1195,7 @@ void buildSlimPresetsJson(const ShotPresetBank &presets) {
         static_cast<unsigned long>(p.bbwProtectionMs),
         p.fastSideEnabled ? "true" : "false",
         p.slowSideEnabled ? "true" : "false",
-        p.grindHintsEnabled ? "true" : "false", p.scaleLossFixedMs / 1000.0,
-        bbwAlgorithmName(static_cast<uint8_t>(BbwAlgorithm::LINEAR_EWMA)),
-        p.bbwAlphaBaseline / 100.0,
+        p.grindHintsEnabled ? "true" : "false",
         static_cast<double>(p.lineaMicraBrewTargetDeciC) / 10.0);
     if (n < 0 || static_cast<size_t>(n) >= cap - used) {
       break;

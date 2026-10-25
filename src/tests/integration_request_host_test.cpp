@@ -183,7 +183,8 @@ void stats_json_preserves_independent_metrics() {
   rows[1].actualWeightCg = 150;
   CHECK(view(3).shotCount == 2);
   CHECK(buildIntegrationStats(view(3), output, sizeof(output), 50, false));
-  CHECK(strstr(output, "\"window\":50") != nullptr && strstr(output, "durationsS") == nullptr);
+  CHECK(strstr(output, "\"window\"") == nullptr && strstr(output, "totalDurationS") == nullptr &&
+        strstr(output, "durationsS") == nullptr);
   rows[1].actualWeightCg = 3790;
   rows[0].avgFlowCgS = SHOT_LOG_METRIC_MISSING;
   rows[0].hasWallTime = false;

@@ -1967,7 +1967,8 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
   }
   if (!html.includes('id="diagnosticControls"') ||
       !codeIncludes(js, 'showDiagnosticPage') ||
-      !codeIncludes(js, 'diagnosticPublic') ||
+      // Diagnostic reads are always public: no flag gates them.
+      codeIncludes(js, 'diagnosticPublic') || network.includes('diagnosticPublic') ||
       !codeIncludes(viewJs.admin, "saveDurableConfigKey('showDiagnosticPage','the Diagnostic page setting'") ||
       !codeIncludes(viewJs.admin, 'await waitSaved(a.requestId,label,p,key)') ||
       !codeIncludes(viewJs.admin, 'R.withBaseRev({[key]:wanted})') ||
@@ -2053,9 +2054,8 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
     throw new Error('status/admin must report adminUnlocked');
   }
   if (!network.includes('delta.field("adminUnlocked"') ||
-      !network.includes('delta.field("diagnosticPublic"') ||
       !network.includes('delta.field("development"')) {
-    throw new Error('the Diagnostic stream must identify public and development access');
+    throw new Error('the Home stream, which Diagnostic reads, must identify unlocked and development access');
   }
   if (!network.includes('delta.field("adminUnlocked"') ||
       !codeIncludes(ui, "v==='home'?!!(typeof s.adminUnlocked==='boolean'") ||

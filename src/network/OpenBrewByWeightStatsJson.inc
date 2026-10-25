@@ -7,19 +7,24 @@ const char *formatStatFloat(char (&buffer)[32], double value, unsigned decimals)
 }  // namespace
 
 // Pre-computed stats over the newest `window` shots (integration payload,
-// always ten, and the Web UI Stats header, which leaves out the durations it
-// never draws). External linkage with a header declaration: the shots-page
-// handler is inlined into this translation unit before this include.
+// always ten, and the Web UI Stats header, which leaves out the window, total
+// and durations it never shows). External linkage with a header declaration:
+// the shots-page handler is inlined into this translation unit before this include.
 bool buildIntegrationStats(const ShotStatsView &stats, char *output,
                            size_t capacity, size_t window, bool durations) {
-  char values[5][32];
+  char values[5][32], head[96];
+  if (durations)
+    snprintf(head, sizeof(head), "\"window\":%u,\"shotCount\":%lu,\"totalDurationS\":%.1f",
+             static_cast<unsigned>(window), static_cast<unsigned long>(stats.shotCount),
+             static_cast<double>(stats.durationDsSum) / 10.0);
+  else
+    snprintf(head, sizeof(head), "\"shotCount\":%lu", static_cast<unsigned long>(stats.shotCount));
   const int written = snprintf(
       output, capacity,
-      "{\"window\":%u,\"shotCount\":%lu,\"totalDurationS\":%.1f,\"avgDurationS\":%s,"
+      "{%s,\"avgDurationS\":%s,"
       "\"avgYieldG\":%s,\"avgErrorPct\":%s,\"avgFlowGps\":%s,"
       "\"shotsPerDay\":%s}",
-      static_cast<unsigned>(window), static_cast<unsigned long>(stats.shotCount),
-      static_cast<double>(stats.durationDsSum) / 10.0,
+      head,
       stats.shotCount > 0
           ? formatStatFloat(values[0], static_cast<double>(stats.durationDsSum) /
                             (10.0 * stats.shotCount), 1)

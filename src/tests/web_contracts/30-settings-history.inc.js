@@ -871,7 +871,6 @@ if (codeIncludes(ui, 'id="shotRating"') ||
     !network.includes('shotsRateHandler') ||
     !network.includes('LAST_SHOT_NOT_FOUND') ||
     !network.includes('\\"rating\\":%u') ||
-    !network.includes('\\"shotId\\":%lu') ||
     !lastShotIo.includes('LAST_SHOT_SCHEMA_VERSION = 1') ||
     !lastShotIo.includes(
         'void advance(const PersistedLastShot &shot,') ||

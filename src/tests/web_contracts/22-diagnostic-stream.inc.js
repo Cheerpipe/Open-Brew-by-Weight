@@ -21,33 +21,31 @@
     webUiPollingActive: () => owner, webUiClientId: '0123456789abcdef', webUiPowerSeconds: () => 30,
     activeView: 'diagnostic', viewSeq: 1, viewReady: Promise.resolve(), lastStatusAt: 0,
     performance: {now: () => 1234}, invalidateHomeStream() {}, noteReachFail() {}, homeResolve() {},
+    homeStale: false,
     viewStatusHandlers: {diagnostic: () => {}, diagnosticLive: status => applied.push(status)},
   };
   vm.runInNewContext(source, context);
+  // Diagnostic owns only the paths Home does not carry; the page reads the
+  // machine, cup, safety state and scale weight/timer from the Home model.
   const changes = {
-    'state': 'READY', 'machineState': 'IDLE', 'relayClosed': false,
-    'controlSource': 'none', 'physicalActivatorOn': false, 'reedOn': false,
-    'backflush.stopReason': 'none',
-    'cupPresence.state': 'ABSENT', 'cupPresence.present': false,
-    'cupPresence.weightG': null, 'cupPresence.weightValid': false,
-    'safety.state': 'READY', 'safety.taskWatchdogReady': true,
-    'scale.available': true, 'scale.streamState': 'FRESH',
+    'relayClosed': false, 'controlSource': 'none', 'reedOn': false,
+    'backflush.hardLimitMs': 0, 'safety.fault': 'NONE', 'safety.taskWatchdogReady': true,
     'scale.controlState': 'ACTIVE', 'scale.rssi': -52,
-    'scale.weightUpdateIntervalMs': 100, 'scale.timerMs': 65430,
-    'scale.maxPacketGapMs': 240, 'scale.lastDisconnect.summary': '',
+    'scale.weightUpdateIntervalMs': 100, 'scale.maxPacketGapMs': 240,
+    'scale.lastDisconnect.summary': '',
   };
   const snapshot = {v: 1, type: 'diagnostic', boot: 7, snapshot: true, changes: {...changes}};
   const snapshotFrame = context.statusStreamFrame(null, snapshot);
-  assert.equal(snapshotFrame.status.scale.timerMs, 65430);
+  assert.equal(snapshotFrame.status.scale.maxPacketGapMs, 240);
   const patch = context.statusStreamFrame(snapshotFrame,
       {v: 1, type: 'diagnostic', boot: 7, snapshot: false,
-       changes: {'scale.timerMs': 65900, 'relayClosed': true}});
+       changes: {'scale.maxPacketGapMs': 260, 'relayClosed': true}});
   assert.equal(patch.status.relayClosed, true, 'deltas patch the live cache');
   assert.equal(patch.status.scale.rssi, -52, 'unchanged fields survive a patch');
   for (const bad of [{...patch, boot: 8},
-      {...patch, changes: {'scale.timerMs': Infinity}},
+      {...patch, changes: {'scale.maxPacketGapMs': Infinity}},
       {...patch, changes: {'scale.constructor.prototype': {poisoned: true}}},
-      {...patch, snapshot: true, changes: {'scale.available': true}}]) {
+      {...patch, snapshot: true, changes: {'scale.rssi': -50}}]) {
     assert.throws(() => context.statusStreamFrame(patch, bad),
         'invalid diagnostic frames must fail closed');
   }
@@ -61,17 +59,17 @@
   context.startDiagnosticStream();
   assert.deepEqual(sockets[0].sent.at(-1), {op: 'diagnostic', on: true});
   sockets[0].onmessage({data: JSON.stringify(snapshot)});
-  assert.equal(applied.at(-1).scale.timerMs, 65430, 'live frames render the three sections');
+  assert.equal(applied.at(-1).scale.maxPacketGapMs, 240, 'live frames render the three sections');
   vm.runInContext("activeView='settings'", context);
   const paints = applied.length;
   sockets[0].onmessage({data: JSON.stringify({
-    v: 1, type: 'diagnostic', boot: 7, snapshot: false, changes: {'scale.timerMs': 66100}})});
+    v: 1, type: 'diagnostic', boot: 7, snapshot: false, changes: {'scale.maxPacketGapMs': 300}})});
   assert.equal(applied.length, paints,
       'frames on another page must not render diagnostics');
   vm.runInContext("activeView='diagnostic'", context);
   context.paintDiagnosticStream();
   assert.equal(applied.length, paints + 1);
-  assert.equal(applied.at(-1).scale.timerMs, 66100,
+  assert.equal(applied.at(-1).scale.maxPacketGapMs, 300,
       'returning to the page renders the updated cache');
   sockets[0].onmessage({data: JSON.stringify(
       {v: 1, type: 'diagnostic', boot: 7, snapshot: false, changes: {'__proto__.x': 1}})});
@@ -171,8 +169,10 @@
       'the Diagnostic view must not read REST status');
   assert(!codeIncludes(js, "api('/api/v1/log'"),
       'the Diagnostic view must not poll the REST log');
-  assert(codeIncludes(runtimeJs, 'if(!apply||!diagnosticReady())return;apply(diagFrame.status);'),
-      'the full view waits for all diagnostic sections, then resumes the log stream');
+  assert(codeIncludes(runtimeJs, 'if(!apply||!diagnosticReady())return;apply(s);') &&
+      codeIncludes(runtimeJs, 'mergeStatus(homeFrame?.status,diagFrame.status,settingsFrame?.status)') &&
+      codeIncludes(runtimeJs, "if(activeView==='diagnostic')scheduleDiagPaint()"),
+      'the full view waits for all diagnostic sections, reads Home and Settings paths from their models, and repaints on Home frames');
   assert(codeIncludes(runtimeJs, 'shotWs=null;resetUiStream();'),
       'socket loss must drop the cache');
 }
@@ -185,8 +185,10 @@
   let settle, sent;
   const R = {withBaseRev: (v) => v,
     command: (url, v) => { sent = v; return {finally: (f) => { settle = f; }}; }};
+  // Only the log-level hydration at the top of applyStatus runs here.
   const [apply, save] = new Function('applyDiagnosticStatus', '$', 'R', source.slice(source.indexOf('const LOG_LEVELS'),
-      source.indexOf('export function init(')).replace('export ', '') + ';return [applyStatus, saveLogLevel];')(
+      source.indexOf('export function init(')).replace('export ', '').replace('if (!s) return;', 'return;') +
+      ';return [applyStatus, saveLogLevel];')(
       () => {}, id => controls[id], R);
   apply({config: {serialLogLevel: 'warning', ringRetainLogLevel: 'debug'}});
   assert.equal(controls.serialLogLevel.value, 'warning');
@@ -265,17 +267,18 @@
   const diagCalls = (diagRegion.match(/\bdelta\.field\(/g) || []).length;
   assert(diagCalls > 0 && diagCalls <= diagSlots,
       `Diagnostic projection ${diagCalls} fields exceeds ${diagSlots} fingerprint slots`);
-  for (const field of ['"state"', '"machineState"', '"backflush.remainingMs"',
-      '"cupPresence.weightG"', '"physicalActivatorOn"', '"relayClosed"', '"controlSource"',
-      '"safety.taskWatchdogReady"', '"scale.streamState"', '"scale.timerMs"',
-      '"scale.observedWeightG"', '"scale.maxPacketGapMs"',
+  for (const field of ['"backflush.remainingMs"', '"relayClosed"', '"controlSource"',
+      '"safety.taskWatchdogReady"', '"scale.maxPacketGapMs"',
       '"scale.lastDisconnect.summary"',
-      '"scale.lastCommandFailure.summary"', '"scale.connectedMac"',
-      '"lineaMicra.powerState"']) {
+      '"scale.lastCommandFailure.summary"', '"scale.connectedMac"']) {
     assert(diagRegion.includes('delta.field(' + field), 'missing diagnostic field ' + field);
   }
-  assert(diagRegion.includes('control.scaleAvailable && control.currentTimerValid'));
-  assert(diagRegion.includes('control.currentTimerMs / 100 * 100'),
+  // Home owns the shared live state; Diagnostic reads it from the Home model.
+  for (const field of ['"state"', '"machineState"', '"cupPresence.weightG"', '"physicalActivatorOn"',
+      '"scale.streamState"', '"scale.timerMs"', '"scale.observedWeightG"', '"lineaMicra.powerState"'])
+    assert(!diagRegion.includes('delta.field(' + field), 'Home-owned path repeated by Diagnostic: ' + field);
+  assert(homeStream.includes('control.scaleAvailable && control.currentTimerValid') &&
+      homeStream.includes('control.currentTimerMs / 100 * 100'),
       'the timer keeps the Home projection 0.1 s quantization');
   assert(diagRegion.includes('static_cast<uint32_t>(millis() - micra.sampleAtMs) / 1000 * 1000'),
       'the Micra sample age must quantize to whole seconds so an idle stream'
