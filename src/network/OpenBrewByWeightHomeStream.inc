@@ -611,8 +611,8 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
   sanitizeJsonEmbed(network.iface.staSsid, safeStaSsid, sizeof(safeStaSsid));
   sanitizeJsonEmbed(network.iface.apSsid, safeApSsid, sizeof(safeApSsid));
   delta.field("network.apActive", bool(network.apActive));
-  delta.field("network.iface.apSsid", "\"%s\"", safeApSsid);
-  delta.field("network.iface.apIp", "\"%s\"", network.iface.apIp);
+  delta.field("network.apSsid", "\"%s\"", safeApSsid);
+  delta.field("network.apIp", "\"%s\"", network.iface.apIp);
   delta.field("network.wifiConfigured", bool(network.wifiConfigured));
   delta.field("network.ssid", "\"%s\"", safeStaSsid);
   delta.field("network.staState", "\"%s\"", staStateName(network.staState));
@@ -621,7 +621,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
   if (network.channel != 0)
     delta.field("network.channel", "%u", static_cast<unsigned>(network.channel));
   else delta.field("network.channel", "null");
-  delta.field("network.iface.staIp", "\"%s\"", network.iface.staIp);
+  delta.field("network.staIp", "\"%s\"", network.iface.staIp);
   delta.field("network.ipMode", "\"%s\"", staIpModeName(network.staIpMode));
   delta.field("network.configState", "\"%s\"", staConfigStateName(network.staConfigState));
   // Whole seconds: the UI ceils the remaining window for display.
