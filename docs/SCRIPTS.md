@@ -164,11 +164,14 @@ only and are never persisted.
 
 `./scripts/dev validate --risk R2` builds each official validation pair twice:
 a `--development` budget build and the flag-free release image that ships,
-each checked against its own size baseline. `--risk R3` also checks each pair
+each checked against its own size baseline and, right after it, against the
+stack-depth gate of the destructive recovery paths (see
+[Validation](../VALIDATION.md)). `--risk R3` also checks each pair
 with Cppcheck and a GCC warning build.
 R2 and R3 run two lanes at once: the host tests, and the firmware steps in a
 fixed order (route capacity, Web UI budgets, Web contracts, then each pair's
-development build, release build, Cppcheck, and warning build). Each step's
+development build and stack depth, release build and stack depth, Cppcheck,
+and warning build). Each step's
 output appears in the log as one block when
 the step finishes. After any failure neither lane starts another step;
 steps already running finish first. When both lanes pass, a final

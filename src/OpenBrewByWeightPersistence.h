@@ -325,7 +325,9 @@ inline bool savePersistedSettings(PersistedSettings &settings) {
 }
 
 inline bool initializeDefaultSettings(PersistedSettings &settings) {
-  settings = PersistedSettings{};
+  // Construct in place: assigning PersistedSettings{} stages a ~3.4 KB
+  // temporary on the stack of the boot and network factory-reset paths.
+  new (&settings) PersistedSettings{};
   if (!initializeDefaultDevicePassword(settings) ||
       !initializeDefaultDeviceName(settings)) {
     return false;

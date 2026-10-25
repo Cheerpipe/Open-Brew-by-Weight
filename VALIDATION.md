@@ -66,6 +66,20 @@ profile build directories and the release images in `build-idf/release/`.
 Image and memory regions are compared by
 `src/tests/check_firmware_size.js` against those versioned budgets.
 
+After each development and release build, R2/R3 also run the stack-depth gate
+(`stack-<pair>` and `stack-release-<pair>`, `scripts/check_stack_depth.py`). It
+recompiles every unit of that build with GCC `-fcallgraph-info=su` into
+`<build>/stack-usage/` and bounds the worst-case stack of the destructive
+recovery paths against their task stacks: boot recovery on the Arduino
+loopTask (`CONFIG_ARDUINO_LOOP_STACK_SIZE`) and the Web UI factory reset on
+`network_manager` (`NETWORK_MANAGER_TASK_STACK_SIZE`). Calls GCC cannot follow
+are charged declared reserves (function pointers, ROM/libc, the kernel's
+per-task context); a function pointer that leads to a gated root must be
+declared in the gate, and recursion or an unbounded dynamic frame on a gated
+path fails. A path over budget fails with its full call chain; shrink the
+deepest frames (for example a `PersistedSettings` copy on the stack) instead
+of raising a task stack.
+
 ## Size budgets and parallel work
 
 Every gate that measures sizes (`test web`, `test budgets`, and the R2/R3

@@ -787,9 +787,13 @@ def main() -> int:
                     build = ["./scripts/internal/build-idf", "--hardware", hardware,
                              "--machine", machine, "--webui-language", webui_language]
                     # The shipped image builds in its own tree against its own baseline.
+                    stack = ["python3", "scripts/check_stack_depth.py", "--build-dir"]
                     firmware += [(f"idf-{variant}", [*build, *FIRMWARE_BUDGET_OPTIONS]),
+                                 (f"stack-{variant}", [*stack, f"build-idf/{variant}"]),
                                  (f"release-{variant}", ["env", RELEASE_BUILD_ROOT, *build,
-                                                         "--flags="])]
+                                                         "--flags="]),
+                                 (f"stack-release-{variant}",
+                                  [*stack, f"build-idf/release/{variant}"])]
                     if risk == "R3":
                         firmware += [(f"cppcheck-{variant}", ["./scripts/static-idf",
                                       "--arch", "n16r8", "--build-dir", f"build-idf/{variant}"]),

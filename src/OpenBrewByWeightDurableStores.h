@@ -32,26 +32,19 @@ inline bool verifyFactorySettings(const PersistedSettings &settings) {
   return true;
 }
 
+// Boot recovery only: setup() reloads settings from NVS afterwards, so the
+// caller's copy is the working copy (a second ~3.4 KB one overflowed loopTask).
 inline bool resetPersistedNetworkAccess(PersistedSettings &settings) {
   if (!settingsSchemaWritesAdmitted.load(std::memory_order_acquire)) return false;
-  PersistedSettings candidate;
-  if (!loadPersistedSettings(candidate) &&
-      !initializeDefaultSettings(candidate)) {
+  if (!loadPersistedSettings(settings) && !initializeDefaultSettings(settings)) {
     return false;
   }
-  clearStaNetwork(candidate);
-  if (!initializeDefaultDevicePassword(candidate) ||
-      !savePersistedSettings(candidate)) {
-    return false;
-  }
-  if (!loadPersistedSettings(candidate) || candidate.staConfigured ||
-      candidate.lkgValid ||
-      candidate.staIpMode != static_cast<uint8_t>(StaIpMode::DHCP) ||
-      !passwordIsFactoryDefault(candidate)) {
-    return false;
-  }
-  settings = candidate;
-  return true;
+  clearStaNetwork(settings);
+  return initializeDefaultDevicePassword(settings) &&
+         savePersistedSettings(settings) && loadPersistedSettings(settings) &&
+         !settings.staConfigured && !settings.lkgValid &&
+         settings.staIpMode == static_cast<uint8_t>(StaIpMode::DHCP) &&
+         passwordIsFactoryDefault(settings);
 }
 
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                      \

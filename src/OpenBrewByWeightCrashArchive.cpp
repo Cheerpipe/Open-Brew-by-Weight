@@ -59,12 +59,14 @@ size_t metaOffset(uint8_t slot) {
 
 bool digestPartition(const esp_partition_t *part, size_t offset, size_t length,
                      uint8_t digest[32]) {
-  uint8_t chunk[1024];
+  // Callers hold tryLockFlashIo(); a 1 KiB stack chunk here pushed the Web UI
+  // factory reset past the network task stack.
+  uint8_t *chunk = flashIoScratchBytes();
   psa_hash_operation_t context = PSA_HASH_OPERATION_INIT;
   bool ok = psa_hash_setup(&context, PSA_ALG_SHA_256) == PSA_SUCCESS;
-  for (size_t done = 0; ok && done < length; done += sizeof(chunk)) {
-    const size_t bytes = length - done < sizeof(chunk)
-                             ? length - done : sizeof(chunk);
+  for (size_t done = 0; ok && done < length; done += FLASH_IO_CHUNK_BYTES) {
+    const size_t bytes = length - done < FLASH_IO_CHUNK_BYTES
+                             ? length - done : FLASH_IO_CHUNK_BYTES;
     ok = esp_partition_read(part, offset + done, chunk, bytes) == ESP_OK &&
          psa_hash_update(&context, chunk, bytes) == PSA_SUCCESS;
     feedFlashIoWatchdog();

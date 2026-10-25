@@ -1107,7 +1107,8 @@ assert firmware_names[:4] == ["http-route-capacity", "web-budgets", "web-contrac
                              "web-preview"], firmware_names
 assert firmware_names[4:] == [f"{kind}-{hardware}--{machine}"
                               for hardware, machine in dev_module["BUILD_PROFILES"]
-                              for kind in ("idf", "release", "cppcheck", "warnings")], firmware_names
+                              for kind in ("idf", "stack", "release", "stack-release",
+                                           "cppcheck", "warnings")], firmware_names
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for name, argv in host_lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
@@ -1721,8 +1722,7 @@ for arch, arch_selectors in profile_arch.items():
 durable_stores = (ROOT / "src/OpenBrewByWeightDurableStores.h").read_text()
 network_reset = durable_stores.split("bool resetPersistedNetworkAccess", 1)[1].split(
     "bool resetAllDurableStores", 1)[0]
-assert re.findall(r"^\s+PersistedSettings\s+(\w+);", network_reset, re.MULTILINE) == [
-    "candidate"]
+assert re.findall(r"^\s+PersistedSettings\s+(\w+);", network_reset, re.MULTILINE) == []
 scale_worker = (ROOT / "src/OpenBrewByWeightScaleWorker.cpp").read_text()
 cleanup = scale_worker.split("if (!runtimeReady) {", 1)[1].split(
     "scaleWorkerStartupFinished.store", 1)[0]
@@ -1834,4 +1834,50 @@ with tempfile.TemporaryDirectory(prefix="openbrewbyweight-lint-") as temporary:
 template = (ROOT / ".github/PULL_REQUEST_TEMPLATE.md").read_text()
 for field in ("Risk", "Safety invariants", "Validation", "HIL/manual evidence"):
     assert field in template, f"PR template field missing: {field}"
+
+# Stack-depth gate: only the entry-to-root chain counts, below the root every
+# call is bounded (reserves for pointers and externals), and gaps fail loudly.
+stack = runpy.run_path(str(ROOT / "scripts/check_stack_depth.py"))
+Gate, kernel = stack["Gate"], stack["KERNEL_RESERVE"]
+
+
+def stack_graph(frames: dict[str, int], edges: list[tuple[str, str]]):
+    graph = stack["Graph"]()
+    graph.add([f'node: {{ title: "{t}" label: "{t}()\\nfile.cpp:1:1\\n{n} bytes (static)" }}'
+               for t, n in frames.items()] +
+              [f'edge: {{ sourcename: "{a}" targetname: "{b}" }}' for a, b in edges])
+    return graph
+
+
+def stack_eval(graph, budget=4096, indirect=None):
+    gate = Gate("t", lambda _: budget, r"\bentry\(", (r"\broot\(",), indirect or {})
+    return stack["evaluate"](graph, gate, budget)
+
+
+chain = stack_graph({"entry": 32, "setup": 1000, "root": 100, "leaf": 200,
+                     "other": 5000, "__assert_func": 4000},
+                    [("entry", "setup"), ("entry", "other"), ("setup", "root"),
+                     ("root", "leaf"), ("leaf", "memcpy"), ("leaf", "__assert_func")])
+result = stack_eval(chain)
+assert result.depth == 32 + 1000 + 100 + 200 + stack["EXTERNAL_RESERVE"] + kernel
+assert [name for _, name in result.path] == ["entry()", "setup()", "root()", "leaf()"]
+assert not result.errors
+pointer = stack_graph({"entry": 32, "root": 100, "ptr": 64},
+                      [("entry", "root"), ("root", "ptr"), ("ptr", "__indirect_call")])
+assert stack_eval(pointer).depth == 32 + 100 + 64 + stack["INDIRECT_RESERVE"] + kernel
+hidden = stack_graph({"entry": 32, "dispatch": 48, "root": 100},
+                     [("entry", "dispatch"), ("dispatch", "__indirect_call")])
+assert "entry does not reach any root; declare the indirect edge" in stack_eval(hidden).errors
+declared = stack_eval(hidden, indirect={r"\bdispatch\(": (r"\broot\(",)})
+assert declared.depth == 32 + 48 + 100 + kernel and not declared.errors
+loop = stack_graph({"entry": 32, "root": 100, "a": 64}, [("entry", "root"), ("root", "a"),
+                                                          ("a", "root")])
+assert "recursion through root()" in stack_eval(loop).errors
+assert stack_eval(chain, budget=1000).depth > 1000
+with tempfile.TemporaryDirectory(prefix="openbrewbyweight-stack-") as temporary:
+    (Path(temporary) / "sdkconfig").write_text("CONFIG_ARDUINO_LOOP_STACK_SIZE=8192\n")
+    assert stack["sdkconfig_value"](Path(temporary), "CONFIG_ARDUINO_LOOP_STACK_SIZE") == 8192
+assert stack["source_constant"]("src/OpenBrewByWeightNetwork.cpp",
+                                "NETWORK_MANAGER_TASK_STACK_SIZE") > 0
+assert '"scripts/check_stack_depth.py"' in DEV.read_text(), "R2/R3 must run the stack gate"
 print(f"developer facade: {len(golden)} risk cases, 11 context areas, and script contracts passed")
