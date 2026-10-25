@@ -250,7 +250,10 @@
       // choice, waiting for the device to persist it, without restarting the
       // setup network; save and skip there still require it.
       !codeIncludes(setupJs, 'if (pass) await setPassword(password); if (brew) await R.api("/api/v1/network"') ||
-      !codeIncludes(setupJs, 'if(c.state==="PERSISTED"||c.state==="APPLIED")return;') ||
+      !codeIncludes(setupJs, 'saved||=c.state==="PERSISTED"||c.state==="APPLIED";') ||
+      // ...and for the controller to release its lock, so Wi-Fi opens on a scan.
+      !codeIncludes(setupJs, 'if(saved&&s&&s.configLockReason!=="maintenance")return;') ||
+      !codeIncludes(setupJs, 'maintenance:"Saving your settings. Setup continues in a moment."') ||
       !setupHtml.includes('id="setupNewPassword"') ||
       !setupHtml.includes('id="setupConfirmPassword"') ||
       !networkHandlerBlock.includes('"DEVICE_PASSWORD_REQUIRED"') ||

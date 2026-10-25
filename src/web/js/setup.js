@@ -56,6 +56,7 @@ const BLOCKED = {
   activator_on: __WEBUI_TEXT__("setup.blocked_paddle"),
   active_shot: __WEBUI_TEXT__("setup.blocked_brewing"),
   machine_running: __WEBUI_TEXT__("setup.blocked_brewing"),
+  maintenance: __WEBUI_TEXT__("setup.blocked_saving"),
 };
 let bound = false,
   pollTimer = 0,
@@ -513,14 +514,20 @@ async function setPassword(newPassword) {
     method: "POST",
     body: R.body({ newPassword }),
   });
+  let saved = false;
   for (let i = 0; i < 40; i++) {
     await new Promise((resolve) => setTimeout(resolve, 250));
-    const c = (await pollStatus())?.lastCommand;
-    if (c?.requestId !== accepted.requestId) continue;
-    if (c.state === "PERSISTED" || c.state === "APPLIED") return;
-    if (c.state === "FAILED" || c.state === "CANCELED") break;
+    const s = await pollStatus(),
+      c = s?.lastCommand;
+    if (c?.requestId === accepted.requestId) {
+      if (c.state === "FAILED" || c.state === "CANCELED") break;
+      saved ||= c.state === "PERSISTED" || c.state === "APPLIED";
+    }
+    // The result is published just before the controller releases its
+    // maintenance lock: leaving earlier would find the Wi-Fi scan locked.
+    if (saved && s && s.configLockReason !== "maintenance") return;
   }
-  throw new Error(__WEBUI_TEXT__("setup.password_not_saved"));
+  if (!saved) throw new Error(__WEBUI_TEXT__("setup.password_not_saved"));
 }
 
 // Part one, or a change made from the summary. Password first: should the

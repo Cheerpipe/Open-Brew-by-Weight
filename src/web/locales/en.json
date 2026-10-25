@@ -1666,6 +1666,7 @@
     "setup.blocked_brewing": "Wi-Fi setup continues when the shot is finished.",
     "setup.blocked_busy": "The controller is busy for a moment. Setup continues by itself.",
     "setup.blocked_paddle": "Turn the machine's paddle off to continue. Wi-Fi can't be changed while it's on.",
+    "setup.blocked_saving": "Saving your settings. Setup continues in a moment.",
     "setup.brewing_usual": "As usual",
     "setup.brewing_weight": "By weight",
     "setup.by_weight": "by Weight",
