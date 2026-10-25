@@ -641,14 +641,11 @@ function applyDiagnosticLive(s) {
 let lastCmdFailShown = 0;
 function applyDiagnosticStatus(s) {
   if (!s) return;
-  const u = !!s.adminUnlocked,
-    p = !!s.diagnosticPublic;
+  const u = !!s.adminUnlocked;
   R.syncAdminSessionUi(u);
   // Reads stay public; actions follow the firmware gate.
   for (const e of document.querySelectorAll(".diagGate"))
     e.inert = !u && !s.development && !R.diagnosticVisible;
-  R.uiState.diagnosticPublicView = p;
-  if (!u && !p) return;
   const t = (i, v) => ($(i).textContent = v || __WEBUI_TEXT__("runtime.unknown"));
   t("hFirmware", s.firmwareVersion);
   t("hBoot", typeof s.bootId === "number" && s.bootId ? "#" + s.bootId : "");
@@ -903,17 +900,28 @@ function applyTaskProfiler(t) {
     H.textContent = p.join(__WEBUI_TEXT__("diagnostic.symbol_3"));
   }
 }
+// The guard switches are Home's config and noScaleShotGuard paths; the stop
+// weight and early target are shared by both extraction guards.
 function applyDiagnosticGuards(s) {
   const g = s && s.guards;
   if (!g) return;
-  const live = !!s.machineRunning,
-    b = !!g.bbwEnabled,
-    ns = g.noScale || {},
-    atm = g.atm || {},
-    slow = g.slowExtraction || {},
-    fast = g.fastExtraction || {},
-    touch = g.accidentalTouch || {},
-    cup = g.cupProtection || {},
+  const c = s.config || {},
+    h = s.noScaleShotGuard || {},
+    shared = { targetReachedEarly: g.targetReachedEarly, activeStopWeightG: g.activeStopWeightG },
+    live = !!s.machineRunning,
+    b = !!c.brewByWeight,
+    ns = { ...g.noScale, enabled: h.enabled, armed: h.armed, mode: c.noScaleBbwMode },
+    atm = { ...g.atm, enabled: c.autoToManualGuardEnabled },
+    slow = { ...g.slowExtraction, enabled: c.slowExtractionGuardEnabled, ...shared },
+    fast = { ...g.fastExtraction, enabled: c.fastExtractionGuardEnabled, ...shared },
+    touch = { ...g.accidentalTouch, enabled: c.avoidAccidentalTouchEnabled },
+    cup = {
+      ...g.cupProtection,
+      enabled: c.cupProtectionEnabled,
+      stopIfRemoved: c.stopIfCupRemoved,
+      requireCupToStart: c.requireCupToStart,
+      present: s.cupPresence?.present,
+    },
     t = (i, v) => {
       const e = $(i);
       if (e) e.textContent = v || __WEBUI_TEXT__("diagnostic.unknown");
@@ -1276,7 +1284,7 @@ export function applyStatus(s) {
   logLevels = s?.config;
   for (const id of LOG_LEVELS)
     if ($(id) && !$(id).dataset.pending) $(id).value = logLevels?.[id] || "none";
-  if (!s || !(s.adminUnlocked || s.diagnosticPublic)) return;
+  if (!s) return;
   if (__LINEA_MICRA__ && s.lineaMicra) renderMicraCloudDiagnostic(s.lineaMicra);
   const sc = s.scale || {};
   applyScaleCommands(sc);

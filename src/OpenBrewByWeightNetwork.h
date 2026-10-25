@@ -712,8 +712,7 @@ class OpenBrewByWeightNetwork {
   bool sendShotCard(UiStreamSession &session, const ControlStatusSnapshot &control,
                     const ShotLogRecord &latest, bool eligible);
   bool sendHomeStream(UiStreamSession &session, const ControlStatusSnapshot &control,
-                      const NetworkStatusSnapshot &network,
-                      const ShotLogRecord *latest);
+                      const NetworkStatusSnapshot &network);
   bool sendDiagnosticStream(UiStreamSession &session,
                             const ControlStatusSnapshot &control,
                             const NetworkStatusSnapshot &network);

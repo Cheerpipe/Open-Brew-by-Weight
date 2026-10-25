@@ -226,9 +226,7 @@ if (network.includes('page == StatusPage::Diagnostic')) {
     'resetReasonCode', 'packetGaps', 'rejectedPackets', 'reconnects',
     'eventsDropped', 'recoveredStaleCount', 'recoveredStaleMs',
     'weightUpdateIntervalMs', 'maxPacketGapMs',
-    'lastCommand', 'loopMaxGapMs',
-    'machineState', 'physicalActivatorOn', 'reedOn', 'controlSource', 'cupPresence',
-    'streamState', 'controlState', 'taskWatchdogReady',
+    'loopMaxGapMs', 'reedOn', 'controlSource', 'controlState', 'taskWatchdogReady',
     'compileFlags', 'remoteMachineControl', 'hardwareProfile', 'machineProfile',
     'machineBrand', 'machineModel', 'serial', 'io4',
     'crashCount', 'resetHistory', 'supportedCommands', 'guards'
@@ -272,7 +270,8 @@ if (network.includes('page == StatusPage::Diagnostic')) {
       !homeStreamSource.includes('delta.field("configMutable"') ||
       !homeStreamSource.includes('delta.field("liveShot"') ||
       !diagRegion.includes('config.ringRetainLogLevel') ||
-      !diagRegion.includes('config.appliedTimezoneOffsetMinutes') ||
+      !homeStreamSource.includes('delta.field("config.appliedTimezoneOffsetMinutes"') ||
+      diagRegion.includes('delta.field("config.appliedTimezoneOffsetMinutes"') ||
       !codeIncludes(ui, "typeof s.bootId==='number'") ||
       !codeIncludes(ui, 'function applyDiagnosticStatus(') ||
       !codeIncludes(ui, 'dBz') ||
@@ -293,7 +292,7 @@ if (network.includes('page == StatusPage::Diagnostic')) {
       !css.includes('.momentaryOnly') ||
       !codeIncludes(ui, 'function applyMachineTypeUi(')) {
     throw new Error(
-        'diagnostic stream must keep transversal bootId/firmware/liveShot/ringRetain for the Diagnostic page');
+        'Diagnostic must read bootId/firmware/liveShot/timezone from Home and keep its ringRetain level');
   }
   for (const forbidden of [
     'configuredIp', 'configuredNetmask', 'configuredGateway', 'configuredDns1',

@@ -776,18 +776,6 @@ const char *OpenBrewByWeightNetwork::controlSourceName(ControlSource source) {
   return "unknown";
 }
 
-const char *activeCycleShotTypeLabel(const ControlStatusSnapshot &control) {
-  if (!control.activeCycle) {
-    return "idle";
-  }
-  if (control.state == StopperState::RINSE) {
-    return "rinse";
-  }
-  return shotLogTypeName(shotLogTypeFromCycle(
-      control.state, control.cycleStartedWithScale, control.cycleTimerOnly,
-      control.cycleAutomaticBrew));
-}
-
 const char *OpenBrewByWeightNetwork::endReasonName(EndReason reason) {
   const EndReasonLabel *label = findEndReasonLabel(reason);
   return label ? label->apiName : "UNKNOWN";

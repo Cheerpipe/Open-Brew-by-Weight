@@ -57,7 +57,8 @@ int main(){
   assert(format(false)==live && format(true)!=full);
   const auto detailed=format(true);
   assert(detailed.find("\\\"maxCpuUs\\\":7,\\\"maxAtMs\\\":8")!=std::string::npos);
-  assert(live.find("\\\"peakGapAtMs\\\":4242")!=std::string::npos);
+  assert(live.find("peakGapAtMs")==std::string::npos &&
+         detailed.find("\\\"peakGapAtMs\\\":4242")!=std::string::npos);
   assert(detailed.find("\\\"lockWaits\\\":{\\\"micraBackflush\\\":{\\\"lastUs\\\":11,"
                       "\\\"maxUs\\\":22,\\\"holdLastUs\\\":13,\\\"holdMaxUs\\\":24},"
                       "\\\"scaleEvents\\\":{\\\"lastUs\\\":33,"

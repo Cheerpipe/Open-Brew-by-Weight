@@ -72,8 +72,7 @@ struct HomeStreamDelta {
 __attribute__((optimize("Os")))
 bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
                                       const ControlStatusSnapshot &control,
-                                      const NetworkStatusSnapshot &network,
-                                      const ShotLogRecord *latest) {
+                                      const NetworkStatusSnapshot &network) {
   uiStreamSendKind = "home";
   const bool initial = session.homeResync || session.homeBoot != control.bootId;
   auto &hashes = workBuf_->uiFingerprints[&session - uiStreams_];
@@ -202,7 +201,6 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
               static_cast<unsigned long>((control.scaleMacCachePauseRemainingMs + 999U) / 1000U * 1000U));
   delta.field("connections.wifiConnected", bool(network.staState == StaState::CONNECTED));
   delta.field("connections.wifiLevel", "%s", connectionSignalLevelJson(network.staSignalLevel));
-  delta.field("connections.bluetoothConnected", bool(control.scaleAvailable));
   delta.field("connections.bluetoothLevel", "%s", connectionSignalLevelJson(control.scaleSignalLevel));
   escapeJsonString(network.staState == StaState::CONNECTED ? network.iface.staSsid : "", g_work->historyJson, NetworkWorkBuf::kHistoryJson);
   delta.field("connections.wifiName", "\"%s\"", g_work->historyJson);
@@ -224,21 +222,8 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("cupPresence.anchorDeltaG", tare.anchorDeltaG);
   delta.field("cupPresence.anchorWaitS", static_cast<unsigned long>(tare.anchorWaitMs / 1000U));
   delta.field("cycle.active", bool(control.activeCycle));
-  delta.field("cycle.shotType", "\"%s\"", activeCycleShotTypeLabel(control));
-  delta.field("cycle.extractionExtended", bool(control.cycleExtractionExtended));
-  delta.field("cycle.slowExtractionExtended", bool(control.cycleSlowExtractionExtended));
-  delta.field("cycle.activeStopWeightG", control.cycleActiveStopWeightG);
-  delta.field("cycle.accidentalTouchHolding", bool(control.cycleAccidentalTouchHolding));
-  delta.field("lastShot.valid", bool(latest));
-  delta.field("lastShot.endReason", "\"%s\"", latest ? shotLogStopDetailName(static_cast<ShotLogStopDetail>(latest->stopDetail)) : "none");
   delta.field("noScaleShotGuard.enabled", bool(control.noScaleShotGuardEnabled));
   delta.field("noScaleShotGuard.armed", bool(control.noScaleShotGuardArmed));
-  delta.field("noScaleShotGuard.mode", "\"%s\"", noScaleBbwModeId(config.noScaleBbwMode));
-  // Whole-minute ceiling (UI resolution): an hour-long cooldown must not wake
-  // the idle stream on every tick.
-  delta.field("noScaleShotGuard.cooldownRemainingMs",
-              static_cast<unsigned long>((control.noScaleShotGuardCooldownRemainingMs + 59999U) / 60000U * 60000U));
-  delta.field("noScaleShotGuard.scaleUsable", bool(control.scaleAvailable && control.weightStreamState == WeightStreamState::FRESH));
   if (callbacks_.copyPresetBank) callbacks_.copyPresetBank(&g_work->presetBank);
   else memset(&g_work->presetBank, 0, sizeof(g_work->presetBank));
   // Preset statistics replay every stored shot: recompute them only when the
@@ -380,32 +365,17 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
             "{\"v\":1,\"type\":\"diagnostic\",\"boot\":%lu,\"snapshot\":true,\"changes\":{",
             static_cast<unsigned long>(control.bootId))
       : statusJsonAppend(&delta.used, "{\"type\":\"diagnostic\",\"changes\":{");
-  delta.field("state", "\"%s\"", stopperStateName(control.state));
-  delta.field("machineState", "\"%s\"", machineRunStateName(control.machineRunState));
-  delta.field("machineRunning", bool(control.machineRunning));
-  delta.field("backflush.waiting", bool(control.backflushWaiting));
-  delta.field("backflush.ready", bool(control.backflushReady));
-  delta.field("backflush.unresolved", bool(control.backflushUnresolved));
-  delta.field("backflush.stopReason", "\"%s\"", control.backflushStopReason);
+  // One owner per path: the Home frame, first in every dispatch, carries the
+  // shared state (machine, cup, safety state, scale weight and timer, guard
+  // switches, identity, timezone, Micra summary) that the page reads from it.
   delta.field("backflush.hardLimitMs", static_cast<unsigned long>(control.safetyHardLimitMs));
   delta.field("backflush.remainingMs", static_cast<unsigned long>(control.safetyRemainingMs));
-  delta.field("cupPresence.state", "\"%s\"", control.scaleAvailable
-      ? cupPresenceStateName(control.cupPresenceState) : "UNKNOWN");
-  delta.field("cupPresence.present", bool(control.cupPresent));
-  const bool cupWeightValid = control.cupPresent && control.cupTare.weightValid &&
-      std::isfinite(control.cupTare.weightG);
-  delta.field("cupPresence.weightG", cupWeightValid ? control.cupTare.weightG : NAN);
-  delta.field("cupPresence.weightValid", bool(cupWeightValid));
-  delta.field("physicalActivatorOn", bool(control.physicalActivatorOn));
   delta.field("reedOn", bool(control.reedOn));
   delta.field("relayClosed", bool(control.relayClosed));
   delta.field("controlSource", "\"%s\"", controlSourceName(control.source));
-  delta.field("safety.state", "\"%s\"", relaySafetyStateName(control.safetyState));
   delta.field("safety.fault", "\"%s\"", relaySafetyFaultName(control.safetyFault));
   delta.field("safety.taskWatchdogReady", bool(control.taskWatchdogReady));
   delta.field("safety.externalHardware", bool(control.externalSafetyPresent));
-  delta.field("scale.available", bool(control.scaleAvailable));
-  delta.field("scale.streamState", "\"%s\"", weightStreamStateName(control.weightStreamState));
   delta.field("scale.controlState", "\"%s\"", weightControlStateName(control.weightControlState));
   if (control.scaleRssiValid)
     delta.field("scale.rssi", "%d", static_cast<int>(control.scaleRssi));
@@ -415,15 +385,6 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("scale.weightUpdateIntervalMs",
                 static_cast<unsigned long>(control.scaleWeightUpdateIntervalMs));
   else delta.field("scale.weightUpdateIntervalMs", "null");
-  if (control.scaleAvailable && control.currentTimerValid)
-    delta.field("scale.timerMs", static_cast<unsigned long>(control.currentTimerMs / 100 * 100));
-  else delta.field("scale.timerMs", "null");
-  // Same observed-then-current preference and null gating as the Home stream.
-  if (control.scaleAvailable && control.observedWeightValid && std::isfinite(control.observedWeightG))
-    delta.field("scale.observedWeightG", control.observedWeightG);
-  else if (control.scaleAvailable && control.currentWeightValid && std::isfinite(control.currentWeightG))
-    delta.field("scale.observedWeightG", control.currentWeightG);
-  else delta.field("scale.observedWeightG", "null");
   // sendHomeStream filled g_work->scaleHistory earlier in this same dispatch.
   char connectedFriendly[PREFERRED_SCALE_NAME_CAPACITY] = {};
   findScaleHistoryFriendlyName(g_work->scaleHistory, control.connectedScaleMac,
@@ -490,18 +451,11 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   {
     const auto micra = machineIntegrationStatus();
-    uint8_t options, connection;
-    { TaskLockGuard lock(dataMux_); options = settings_.lineaMicra.options; connection = settings_.lineaMicra.connectionType; }
     const bool sampleValid = micra.sampleAtMs != 0 &&
         (micra.quality == LineaMicraObservationQuality::CURRENT ||
          micra.quality == LineaMicraObservationQuality::STALE ||
          micra.quality == LineaMicraObservationQuality::UNSUPPORTED);
-    delta.field("lineaMicra.accountConfigured", bool(micra.accountConfigured));
-    delta.field("lineaMicra.observeState", bool(options & LINEA_MICRA_OBSERVE_STATE));
-    delta.field("lineaMicra.connectionType", "\"%s\"", micraConnectionTypeName(connection));
-    delta.field("lineaMicra.powerState", "\"%s\"", lineaMicraPowerStateName(micra.powerState));
     delta.field("lineaMicra.observedMode", "\"%s\"", lineaMicraObservedModeName(micra.observedMode));
-    delta.field("lineaMicra.quality", "\"%s\"", lineaMicraObservationQualityName(micra.quality));
     delta.field("lineaMicra.sampleValid", bool(sampleValid));
     // Whole seconds: the UI renders integer age and interpolates locally, so
     // a raw millisecond age would force one frame every dispatch tick.
@@ -511,20 +465,8 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                 micra.connectionFreshness ? "connection" : "time");
     delta.field("lineaMicra.freshnessMs",
                 static_cast<unsigned long>(micra_timing::kStateFreshnessMs));
-    delta.field("lineaMicra.readiness", "\"%s\"",
-                lineaMicraReadinessName(lineaMicraReadiness(micra)));
-    delta.field("lineaMicra.boiler.coffee.state", "\"%s\"",
-                lineaMicraBoilerStateName(micra.coffeeBoiler));
-    delta.field("lineaMicra.boiler.coffee.targetDeciC", "%u",
-                static_cast<unsigned>(micra.targetDeciC));
-    delta.field("lineaMicra.boiler.coffee.readyAtUtcSec",
-                static_cast<unsigned long>(micra.coffeeReadyAtUtcSec));
-    delta.field("lineaMicra.boiler.steam.state", "\"%s\"",
-                lineaMicraBoilerStateName(micra.steamBoiler));
     delta.field("lineaMicra.boiler.steam.level", "\"%s\"",
                 lineaMicraSteamLevelName(micra.steamLevel));
-    delta.field("lineaMicra.boiler.steam.readyAtUtcSec",
-                static_cast<unsigned long>(micra.steamReadyAtUtcSec));
     // Whole seconds, like sampleAgeMs: the browser interpolates the boiler
     // age and estimate countdowns locally instead of costing delta frames.
     delta.field("lineaMicra.boiler.sampleAgeMs",
@@ -532,6 +474,9 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                     ? 0
                     : static_cast<uint32_t>(millis() - micra.temperatureAtMs) / 1000 * 1000));
     delta.field("lineaMicra.powerSource", "\"%s\"", micraPowerSourceName(micra.powerSource));
+    // Settings owns these four while subscribed; compatibility mode has no
+    // Settings stream, so the slots stay and only their emission is skipped.
+    delta.skipNext = session.settingsOn;
     delta.field("lineaMicra.phase", "\"%s\"", lineaMicraPhaseName(micra.phase));
     delta.field("lineaMicra.temperatureState", "\"%s\"", lineaMicraTemperatureStateName(micra.temperatureState));
     delta.field("lineaMicra.temperatureError", "\"%s\"", lineaMicraErrorName(micra.temperatureError));
@@ -542,8 +487,11 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
       sanitizeJsonEmbed(settings_.lineaMicra.username, safeEmail, sizeof(safeEmail));
       sanitizeJsonEmbed(settings_.lineaMicra.selectedSerial, safeSerial, sizeof(safeSerial));
       sanitizeJsonEmbed(settings_.lineaMicra.selectedName, safeName, sizeof(safeName)); }
+    delta.skipNext = session.settingsOn;
     delta.field("lineaMicra.email", "\"%s\"", safeEmail);
+    delta.skipNext = session.settingsOn;
     delta.field("lineaMicra.selectedSerial", "\"%s\"", safeSerial);
+    delta.skipNext = session.settingsOn;
     delta.field("lineaMicra.selectedName", "\"%s\"", safeName);
     const LineaMicraCloudCall call = machineIntegrationCloudCall();
     if (call.api == nullptr)
@@ -562,13 +510,6 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
 #endif
   // Event-driven sections migrated from the REST diagnostic payload; paths
   // keep their REST names so the shared painters apply unchanged.
-  bool unlocked = DEVELOPMENT_BUILD;
-  {
-    TaskLockGuard lock(dataMux_);
-    unlocked |= adminUnlocked_ && strcmp(adminUnlockClientId_, session.clientId) == 0 &&
-        static_cast<int32_t>(millis() - adminUnlockUntilMs_) < 0;
-  }
-  unlocked |= session.fromSoftAp;
   const auto &config = control.config;
   const auto timeStatus = g_wallClock.snapshot(now);
   int16_t timezoneOffset = 0, lastSyncTimezoneOffset = 0;
@@ -577,21 +518,10 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
   const bool lastSyncOffsetKnown = timeStatus.lastSyncUtcSec != 0 &&
       timeZoneOffsetAtOrUtc(config.timezoneId, timeStatus.lastSyncUtcSec,
                             lastSyncTimezoneOffset);
-  delta.field("firmwareVersion", "\"%s\"", FW_VERSION);
-  delta.field("bootId", static_cast<unsigned long>(control.bootId));
-  delta.field("adminUnlocked", bool(unlocked));
-  delta.field("diagnosticPublic", true);
-  delta.field("development", bool(DEVELOPMENT_BUILD));
-  delta.field("lastCommand.requestId", static_cast<unsigned long>(network.lastCommandRequestId));
-  delta.field("lastCommand.state", "\"%s\"",
-              commandResultStateName(network.lastCommandState));
   delta.field("config.serialLogLevel", "\"%s\"",
               logLevelName(serialLogLevelFromRuntime(config)));
   delta.field("config.ringRetainLogLevel", "\"%s\"",
               logLevelName(static_cast<LogLevel>(config.ringRetainLogLevel)));
-  delta.field("config.timezoneId", "\"%s\"", config.timezoneId);
-  delta.field("config.appliedTimezoneOffsetMinutes", "%d",
-              static_cast<int>(timezoneOffset));
   delta.field("config.timezoneOffsetKnown", bool(timezoneOffsetKnown));
   delta.field("config.timezoneResolution", "\"%s\"",
               timeZoneResolution(config.timezoneId, timeStatus.utcSec));
@@ -665,41 +595,29 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     // Guard state machines are event-driven; countdowns hash at whole-second
     // (whole-minute cooldown) resolution so they tick no faster than the
     // display while transitions still land within one dispatch.
-    const bool bbwEnabled = !config.timerOnly;
+    // The guard switches are the Home config.* and noScaleShotGuard.* paths;
+    // shared readings (stop weight, early target) have one slot each.
     const bool scaleUsable = control.scaleAvailable &&
         control.weightStreamState == WeightStreamState::FRESH;
     const bool lastShotCupRemoved = control.lastShot.valid &&
         control.lastShot.endReason == EndReason::CUP_REMOVED;
-    delta.field("guards.bbwEnabled", bool(bbwEnabled));
     delta.field("guards.scaleUsable", bool(scaleUsable));
     delta.field("guards.lastShotCupRemoved", bool(lastShotCupRemoved));
-    delta.field("guards.noScale.enabled", bool(control.noScaleShotGuardEnabled));
-    delta.field("guards.noScale.armed", bool(control.noScaleShotGuardArmed));
+    delta.field("guards.targetReachedEarly", bool(control.cycleTargetReachedEarly));
+    delta.field("guards.activeStopWeightG", static_cast<float>(control.cycleActiveStopWeightG));
     delta.field("guards.noScale.hold", bool(control.noScaleShotGuardHold));
-    delta.field("guards.noScale.mode", "\"%s\"", noScaleBbwModeId(config.noScaleBbwMode));
     delta.field("guards.noScale.cooldownRemainingMs",
                 static_cast<unsigned long>(control.noScaleShotGuardCooldownRemainingMs / 60000 * 60000));
     delta.field("guards.noScale.scaleWasAvailable",
                 bool(control.noScaleShotGuardScaleWasAvailable));
-    delta.field("guards.atm.enabled", bool(config.scaleLossEnabled));
-    delta.field("scaleLoss.projectedS", control.autoToManualGuardTrendMs / 1000.0f);
     delta.field("guards.atm.armed", bool(control.cycleAutoToManualGuardArmed));
     delta.field("guards.atm.enforced", bool(control.cycleAutoToManualGuardEnforced));
     delta.field("guards.atm.remainingMs",
                 static_cast<unsigned long>(control.cycleAutoToManualGuardRemainingMs / 1000 * 1000));
-    delta.field("guards.slowExtraction.enabled", bool(config.slowSideEnabled));
     delta.field("guards.slowExtraction.extended", bool(control.cycleSlowExtractionExtended));
-    delta.field("guards.slowExtraction.targetReachedEarly", bool(control.cycleTargetReachedEarly));
-    delta.field("guards.slowExtraction.activeStopWeightG",
-                static_cast<float>(control.cycleActiveStopWeightG));
-    delta.field("guards.fastExtraction.enabled", bool(config.fastSideEnabled));
     delta.field("guards.fastExtraction.extended", bool(control.cycleExtractionExtended));
-    delta.field("guards.fastExtraction.targetReachedEarly", bool(control.cycleTargetReachedEarly));
-    delta.field("guards.fastExtraction.activeStopWeightG",
-                static_cast<float>(control.cycleActiveStopWeightG));
     delta.field("guards.fastExtraction.minBbwBrewTimeRemainingMs",
                 static_cast<unsigned long>(control.cycleMinBbwBrewTimeRemainingMs / 1000 * 1000));
-    delta.field("guards.accidentalTouch.enabled", bool(config.avoidAccidentalTouchEnabled));
     delta.field("guards.accidentalTouch.holding", bool(control.cycleAccidentalTouchHolding));
     delta.field("guards.accidentalTouch.phase", "\"%s\"",
                 accidentalTouchPhaseName(static_cast<AccidentalTouchPhase>(control.cycleAccidentalTouchPhase)));
@@ -707,10 +625,6 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                 accidentalTouchClassName(static_cast<AccidentalTouchClass>(control.cycleAccidentalTouchClass)));
     delta.field("guards.accidentalTouch.pendingCount", "%u",
                 static_cast<unsigned>(control.cycleAccidentalTouchPendingCount));
-    delta.field("guards.cupProtection.enabled", bool(config.cupProtectionEnabled));
-    delta.field("guards.cupProtection.stopIfRemoved", bool(config.stopIfCupRemoved));
-    delta.field("guards.cupProtection.requireCupToStart", bool(config.requireCupToStart));
-    delta.field("guards.cupProtection.present", bool(control.cupPresent));
     delta.field("guards.cupProtection.startHold", bool(control.cupStartGuardHold));
     delta.field("guards.cupProtection.removedPending", bool(control.cycleCupRemovedPending));
     delta.field("guards.cupProtection.bbwProtectionActive",
@@ -839,9 +753,8 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     {
       const MicraWebSocketStatus ws = machineIntegrationWebSocketStatus();
-      char safeReason[48] = {}, safeCleaningLabel[6 * sizeof(ws.cleaningLabel)] = {};
+      char safeReason[48] = {};
       sanitizeJsonEmbed(ws.reason, safeReason, sizeof(safeReason));
-      escapeJsonString(ws.cleaningLabel, safeCleaningLabel, sizeof(safeCleaningLabel));
       // Whole seconds: the UI derives ages from nowMs locally.
       telemetry.field("lineaMicra.websocket.nowMs", static_cast<unsigned long>(now / 1000 * 1000));
       telemetry.field("lineaMicra.websocket.state", "\"%s\"", micraSocketStateName(ws.state));
@@ -894,13 +807,6 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                       static_cast<long>(ws.stopHeap.lastDelta.freeBytes));
       telemetry.field("lineaMicra.websocket.stopLargestDelta", "%ld",
                       static_cast<long>(ws.stopHeap.lastDelta.largestBlock));
-      telemetry.field("lineaMicra.websocket.cleaning", "\"%s\"",
-                      ws.cleaning == MicraCleaningState::OFF ? "inactive" :
-                      ws.cleaning == MicraCleaningState::REQUESTED ? "waiting_for_paddle" :
-                      ws.cleaning == MicraCleaningState::CLEANING ? "cleaning" : "unknown");
-      telemetry.field("lineaMicra.websocket.cleaningLabel", "\"%s\"", safeCleaningLabel);
-      telemetry.field("lineaMicra.websocket.cleaningAvailable",
-                      bool(ws.cleaningAvailable));
       telemetry.field("lineaMicra.websocket.cleaningAtMs", "%u",
                       static_cast<unsigned>(ws.cleaningAtMs));
     }

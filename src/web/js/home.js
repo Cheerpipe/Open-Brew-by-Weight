@@ -226,7 +226,7 @@ function renderReadyMsg(s, lm) {
     : cfg.brewByWeight && !(sc.available && sc.streamState === "FRESH")
       ? !(g.enabled && g.armed)
         ? __WEBUI_TEXT__("home.no_scale_manual")
-        : g.mode === "require_scale"
+        : cfg.noScaleBbwMode === "require_scale"
           ? __WEBUI_TEXT__("home.no_scale_required")
           : __WEBUI_TEXT__("home.no_scale_warn")
       : s.machineIntegration === "linea_micra_cloud" &&

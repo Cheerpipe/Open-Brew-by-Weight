@@ -648,7 +648,7 @@ void OpenBrewByWeightNetwork::sendUiStream(UiStreamSession &session,
   memcpy(workBuf_->batchCardHashes, hashes.cardHashes, sizeof(hashes.cardHashes));
   memcpy(workBuf_->batchSettingsHashes, hashes.settingsHashes, sizeof(hashes.settingsHashes));
   uiStreamBatchBegin();
-  bool open = sendHomeStream(session, control, network, eligible ? &latest : nullptr) &&
+  bool open = sendHomeStream(session, control, network) &&
       within() && sendShotCard(session, control, latest, eligible) &&
       (!session.settingsOn || (within() && sendSettingsStream(session, control)));
   uiStreamSendKind = "batch";
@@ -768,11 +768,10 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
   if (!(replace
             ? statusJsonAppend(&used,
                   "{\"v\":1,\"boot\":%lu,\"seq\":%lu,\"snapshot\":true,\"cycle\":%lu,"
-                  "\"shotId\":%lu,\"cursor\":%u",
+                  "\"cursor\":%u",
                   static_cast<unsigned long>(control.bootId),
                   static_cast<unsigned long>(session.sequence + 1),
-                  static_cast<unsigned long>(card.cycleId),
-                  static_cast<unsigned long>(card.shotLogId), curve.count)
+                  static_cast<unsigned long>(card.cycleId), curve.count)
             : statusJsonAppend(&used, "{\"seq\":%lu,\"cursor\":%u",
                   static_cast<unsigned long>(session.sequence + 1), curve.count)) ||
       (envelope && !statusJsonAppend(&used, ",\"stale\":%s,\"phase\":\"%s\"",

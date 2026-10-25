@@ -43,9 +43,9 @@
         'SoftAP admin bypass must match the AP interface address and peer subnet, gated on apActive');
   }
   if (!codeIncludes(handshake, 'session.fromSoftAp=socketServedBySoftAp(session.fd)') ||
-      (network.match(/unlocked \|= session\.fromSoftAp/g) || []).length !== 2) {
+      (network.match(/unlocked \|= session\.fromSoftAp/g) || []).length !== 1) {
     throw new Error(
-        'Home and diagnostic streams must OR the latched SoftAP session flag into adminUnlocked');
+        'The Home stream must OR the latched SoftAP session flag into adminUnlocked, which Diagnostic reads from it');
   }
 
   // Captive portal: wildcard DNS owned by the AP lifecycle, DHCP offers the

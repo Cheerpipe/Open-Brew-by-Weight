@@ -338,9 +338,10 @@ development build), like the other audit routes.
 The diagnostic stream carries the audit surface on its own fingerprinted
 frame under `changes.audit`: `state` (`ready` / `unsupported` / `io_error`),
 `retained`, `dropped`, `rateLimited`, `verboseUntilUtcSec`, and `items` with
-the newest records (`sequence`, `wallSec`, `atMs`, `level`, `category`,
-`code`, `argument1`, `argument2`, `text`). In both this frame and the debug
-export, `text` is the full human-readable detail, rebuilt from the record's
+the newest records (`sequence`, `wallSec`, `level`, `category`, `code`,
+`text`); the debug export's records also carry `atMs`, `argument1` and
+`argument2`. In both this frame and the debug export, `text` is the full
+human-readable detail, rebuilt from the record's
 stored arguments and excerpt — for example
 `health heap low free=31000 largest=12000 (limits 49152/16384 bytes)`. The
 debug export's `audit` section carries the same records for the whole
@@ -454,7 +455,9 @@ commands: `POST /api/v1/stats/clear|delete|rate`,
 
 Stats and History frames both carry `boot`, `total`, `offset`, `limit`, and
 `hasMore`. Stats frames also
-carry `stats` (the firmware-computed aggregate) and `rows`. The first frame
+carry `stats` (the firmware-computed aggregate, without the integration
+payload's `window`, `totalDurationS` and `durationsS`, which the page does not
+show) and `rows`. The first frame
 of a page names the row fields once in `cols`, a comma-separated list; each
 row is then an array of those values in that order, followed by the row's
 curve object. The browser rebuilds the row objects (the same fields the table
@@ -482,7 +485,9 @@ activity, and the view subscriptions) retain the confirmation of pending
 Wi-Fi settings on a station connection.
 
 Home's live stream and the Admin status response include
-`connections`: `wifiConnected` and `bluetoothConnected` are booleans;
+`connections` (the Home stream names the scale link `scale.available`
+instead of `connections.bluetoothConnected`): `wifiConnected` and
+`bluetoothConnected` are booleans;
 `wifiLevel` and `bluetoothLevel` are firmware-calculated levels:
 `1` weak, `2` medium, `3` strong, or `null` when unavailable. The connection
 booleans determine whether to display disconnected, regardless of a cached level.
@@ -535,7 +540,7 @@ unit when they change. Reliable, ordered WebSocket delivery applies these
 scalar assignments in order. The shot card and curve retain their independent
 sequence and cursor contract on the same socket. A shot snapshot
 (`snapshot: true`) names the whole identity (`v`, `boot`, `seq`, `cycle`,
-`shotId`, `stale`, `phase`, `cursor`) and carries the complete card and curve.
+`stale`, `phase`, `cursor`) and carries the complete card and curve.
 Each following frame carries only `seq` and `cursor` (plus `stale` and `phase`
 together when either changed), the card fields that changed, which the browser
 merges over the previous card, the curve points after the previous cursor, and
@@ -604,7 +609,7 @@ opening Settings paints at once from the model it already holds, without
 another message or request. Compatibility mode, which has no Settings page,
 never subscribes. The op accepts only `op`, `on` (which must be `true`) and an
 optional `tag`; anything else closes the stream with code 4003 and a Web UI log
-warning, like the other ops. `GET /api/v1/status/settings` no longer exists.
+warning, like the other ops. Settings has no REST status route.
 
 A settings snapshot has `v: 1`, `type: "settings"`, `boot`, `snapshot: true`,
 `changes` and `tag`; later frames carry `type`, `changes` and `tag`, with only
@@ -649,7 +654,15 @@ and `/api/v1/status/diagnostic` no longer exist.
 
 Diagnostic frames follow the same shape: the snapshot names `v: 1`,
 `type: "diagnostic"`, `boot` and `snapshot: true`; later frames carry only
-`type` and `changes`. A field is sent only when its value changed since it was last
+`type` and `changes`. They carry only paths no other frame owns: the page
+reads the machine and cup state, safety state, scale weight, timer and stream
+state, guard switches (the `config.*` and `noScaleShotGuard.*` paths),
+firmware identity, unlock state, last command, timezone and the Micra summary
+from the Home frame, which every dispatch sends first, and the Micra account,
+selection and request phase from the Settings frame. In compatibility mode,
+which has no Settings subscription, Diagnostic sends those four Micra paths
+itself. The extraction guards share one `guards.activeStopWeightG` and one
+`guards.targetReachedEarly`. A field is sent only when its value changed since it was last
 sent. An unchanged projection emits no frame; displayed ages, uptime,
 traffic and other live measurements can still change on an otherwise idle device.
 Event-driven state (control, safety, guards, maintenance, crash count, NTP
@@ -893,8 +906,8 @@ it includes the `lineaMicra.websocket` detail: socket lifecycle/reason/epoch,
 subscription and machine connectivity, genuine evidence timestamps, payload
 byte counters, fixed 1s/60s rates, retry/stop/publication latency and memory
 metrics. It also carries the boiler detail beyond the Home projection:
-`lineaMicra.boiler.coffee.targetDeciC`, `lineaMicra.boiler.steam.level`
-(`level_1`–`level_3`), and a whole-second `lineaMicra.boiler.sampleAgeMs`.
+`lineaMicra.boiler.steam.level` (`level_1`–`level_3`) and a whole-second
+`lineaMicra.boiler.sampleAgeMs`.
 `cloudCall` remains the last HTTP call. Cleaning never changes control state.
 Payload byte totals use 64-bit counters and include positive partial sends.
 Rate windows use the 64-bit monotonic clock, independently of millisecond

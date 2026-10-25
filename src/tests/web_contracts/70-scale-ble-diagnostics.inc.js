@@ -127,12 +127,13 @@
                        'delta.field("cupPresence.present"',
                        'delta.field("cupPresence.weightG"',
                        'delta.field("cupPresence.weightValid"']) {
-    if (!diagSender.includes(field) || !network.includes(field)) {
-      throw new Error('Diagnostic cup JSON and Home cup deltas required: ' + field);
+    // Home owns the cup state; the Diagnostic page reads it from the Home model.
+    if (diagSender.includes(field) || !network.includes(field)) {
+      throw new Error('Home cup deltas required, without a Diagnostic copy: ' + field);
     }
   }
-  if (!diagSender.includes('const bool cupWeightValid = control.cupPresent')) {
-    throw new Error('Cup weight gating must match the Home projection');
+  if (!network.includes('const bool cupWeightValid = control.cupPresent')) {
+    throw new Error('Cup weight gating must stay in the Home projection');
   }
 }
 

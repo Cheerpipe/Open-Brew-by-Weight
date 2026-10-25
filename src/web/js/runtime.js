@@ -277,7 +277,6 @@ const uiState = {
   statsExportResolve: null,
   savedTimezoneId: "",
   bbwReadback: null,
-  diagnosticPublicView: false,
   bleBaseline: null,
   powerBaseline: null,
   frontendBaseline: null,
@@ -315,7 +314,8 @@ let bootId = 0,
 
 const $ = (id) => document.getElementById(id);
 function updateHeaderSignals(s = {}) {
-  const c = s.snapshotStale ? {} : s.connections || {},
+  // Home names the scale link once, as scale.available.
+  const c = s.snapshotStale ? {} : { bluetoothConnected: s.scale?.available, ...s.connections },
     levels = [
       __WEBUI_TEXT__("runtime.disconnected"),
       __WEBUI_TEXT__("runtime.signal_weak"),
@@ -4391,7 +4391,6 @@ function paintUiStream() {
     renderShotHero({
       ...shotFrame.card,
       ...shotFrame.curve,
-      shotId: shotFrame.shotId,
       clockMs: shotClock || shotClockFinish ? shotClockElapsed() : shotFrame.card.elapsedMs,
     }),
       shotStale
@@ -4418,7 +4417,6 @@ function uiStreamFrame(e, t) {
       v: e.v,
       boot: e.boot,
       cycle: e.cycle,
-      shotId: e.shotId,
       stale: t.stale ?? e.stale,
       phase: t.phase ?? e.phase,
       snapshot: false,
@@ -4433,7 +4431,6 @@ function uiStreamFrame(e, t) {
       o(t.boot) &&
       o(t.seq) &&
       o(t.cycle) &&
-      o(t.shotId) &&
       o(t.cursor, 1201) &&
       o(t.curveBase, 1201) &&
       "boolean" == typeof t.snapshot &&
@@ -4663,6 +4660,7 @@ function startUiStream() {
         )
           finishShotClock();
         paint(renderHomeStream);
+        if (activeView === "diagnostic") scheduleDiagPaint();
         // Live weight only moves the Settings cup hint.
         if (activeView === "settings")
           Object.keys(data.changes).some((k) => !SETTINGS_LIVE_PATHS.test(k))
@@ -5106,12 +5104,17 @@ function scheduleDiagPaint() {
       paintDiagnosticStream();
     }));
 }
+// Diagnostic reads the paths it does not own from the Home and Settings models.
+function diagnosticStatus() {
+  return mergeStatus(homeFrame?.status, diagFrame.status, settingsFrame?.status);
+}
 function paintDiagnosticStream() {
-  if (activeView !== "diagnostic" || !diagFrame) return;
-  viewStatusHandlers.diagnosticLive?.(diagFrame.status);
+  if (activeView !== "diagnostic" || !diagFrame || homeStale) return;
+  const s = diagnosticStatus();
+  viewStatusHandlers.diagnosticLive?.(s);
   const apply = viewStatusHandlers["diagnostic"];
   if (!apply || !diagnosticReady()) return;
-  apply(diagFrame.status);
+  apply(s);
   // A resume whose first snapshot failed never reached startView's log
   // subscription: the recovered stream restarts it (a no-op once wanted).
   startLogStream();
@@ -5119,7 +5122,7 @@ function paintDiagnosticStream() {
 async function loadDiagnosticStatus() {
   startUiStream();
   startDiagnosticStream();
-  return diagnosticReady() || (await diagReady) ? diagFrame?.status : null;
+  return (diagnosticReady() || (await diagReady)) && (await loadHomeStatus()) && diagnosticStatus();
 }
 function startDiagnosticStream() {
   if (!webUiPollingActive() || diagStreamWanted) return;
@@ -5200,10 +5203,7 @@ function sendUiOperation(op) {
   noteUiSent(op.seconds > 0);
 }
 function startLogStream() {
-  if (
-    webUiPollingActive() &&
-    (diagnosticUnlocked || uiState.diagnosticPublicView || developmentMode)
-  ) {
+  if (webUiPollingActive()) {
     if (!logStreamWanted) {
       logStreamWanted = true;
       sendUiOperation({ op: "log", on: true, after: lastLog });
@@ -5262,16 +5262,10 @@ function applyLogFrame(m) {
 }
 function diagSnapshotOk(s) {
   return (
-    typeof s.machineState === "string" &&
-    typeof s.state === "string" &&
     typeof s.relayClosed === "boolean" &&
     typeof s.controlSource === "string" &&
-    s.cupPresence &&
-    typeof s.cupPresence.state === "string" &&
-    s.safety &&
-    typeof s.safety.state === "string" &&
-    s.scale &&
-    typeof s.scale.streamState === "string"
+    typeof s.safety?.fault === "string" &&
+    typeof s.scale?.controlState === "string"
   );
 }
 // Request IDs separate the standing History window from scroll fetches.
@@ -5740,7 +5734,6 @@ function renderShotHero(d) {
       wBreakBefore: d.wBreakBefore,
       wHeld: d.wHeld,
       wTruncated: d.wTruncated,
-      wDtS: d.wDtS,
       durationS: typeof el === "number" ? el / 1000 : null,
       firstDropS: drop != null ? drop / 1000 : null,
       tareS: d.tareMs != null ? d.tareMs / 1000 : null,
@@ -6550,7 +6543,6 @@ function statusPageOk(v, s) {
         s.scale &&
         s.presets &&
         s.cycle &&
-        s.lastShot &&
         s.noScaleShotGuard &&
         typeof s.machineState === "string" &&
         s.cupPresence
