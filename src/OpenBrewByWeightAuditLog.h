@@ -14,6 +14,7 @@ constexpr DebugCode AUDIT_WARNING_ALLOWLIST[] = {
     DebugCode::HEALTH_HEAP_LOW,
     DebugCode::HEALTH_HEAP_RESTART,
     DebugCode::HEALTH_STACK_LOW,
+    DebugCode::BOOT_RECOVERY_STACK,
     DebugCode::HEALTH_LOOP_GAP,
     DebugCode::SYSTEM_LOG_OVERRUN,
     DebugCode::RELAY_GPIO_DESYNC,

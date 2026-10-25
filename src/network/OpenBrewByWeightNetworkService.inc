@@ -255,10 +255,10 @@ void OpenBrewByWeightNetwork::finishOwnedHeapLifecycle(
   dataMux_.unlock();
 }
 
-PersistedSettings OpenBrewByWeightNetwork::settingsCopy() {
-  PersistedSettings copy;
-  copySettings(copy);
-  return copy;
+// Network task only: refreshes and returns the shared working copy.
+PersistedSettings &OpenBrewByWeightNetwork::workingSettings() {
+  copySettings(g_networkWorkingSettings);
+  return g_networkWorkingSettings;
 }
 
 void OpenBrewByWeightNetwork::copySettings(PersistedSettings &output) {

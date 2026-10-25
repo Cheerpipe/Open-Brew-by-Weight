@@ -1315,9 +1315,9 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
         !networkFn.includes('strcmp(action, "confirm") != 0')) {
       throw new Error('Network save/forget must require admin unlock; confirm may stay ungated');
     }
-    if (networkFn.includes('settingsCopy()')) {
+    if (networkFn.includes('workingSettings()')) {
       throw new Error(
-          'networkHandler must not return PersistedSettings by value on the httpd stack');
+          'networkHandler must not touch the network task working settings from httpd');
     }
   }
   if ((statusFormat.match(/\\"adminUnlocked\\":%s/g) || []).length < 1) {

@@ -2209,7 +2209,10 @@ enum class DebugCode : uint8_t {
   SCHEDULED_RESTART_ARMED,
   SCHEDULED_RESTART_DEFERRED,
   SCHEDULED_RESTART_FIRED,
-  SCHEDULED_RESTART_SKIPPED
+  SCHEDULED_RESTART_SKIPPED,
+  // argument1: loopTask stack bytes the last boot recovery never used;
+  // argument2: its RecoveryOperation (1 network access, 2 factory reset).
+  BOOT_RECOVERY_STACK
 };
 
 enum class ScheduledRestartCause : uint8_t {
@@ -2622,6 +2625,7 @@ inline const char *debugCodeName(DebugCode code) {
     case DebugCode::SCHEDULED_RESTART_FIRED: return "scheduled restart";
     case DebugCode::SCHEDULED_RESTART_SKIPPED:
       return "scheduled restart skipped";
+    case DebugCode::BOOT_RECOVERY_STACK: return "boot recovery stack";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2927,6 +2931,11 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
       return true;
     case DebugCode::BOOT_RESET_REASON:
       snprintf(message, capacity, "reset reason code=%ld",
+               static_cast<long>(event.argument1));
+      return true;
+    case DebugCode::BOOT_RECOVERY_STACK:
+      snprintf(message, capacity, "%s left %ld B of loopTask stack unused",
+               event.argument2 == 2 ? "factory reset" : "network access reset",
                static_cast<long>(event.argument1));
       return true;
     case DebugCode::BOOT_SUBSYSTEM:

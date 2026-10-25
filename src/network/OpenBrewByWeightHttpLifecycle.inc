@@ -222,7 +222,7 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
   if (command.type == WebCommandType::CLEAR_RESET_HISTORY) {
     return callbacks_.clearResetHistory(command.resetHistoryUnsafeCount);
   }
-  PersistedSettings next = settingsCopy();
+  PersistedSettings &next = workingSettings();
   char previousDeviceName[DEVICE_NAME_CAPACITY] = {};
   memcpy(previousDeviceName, next.deviceName, sizeof(previousDeviceName));
   bool persist = false;

@@ -308,7 +308,7 @@ class OpenBrewByWeightNetwork {
                                  const RuntimeConfig &after);
   void syncLiveBullseye(const BullseyeMelodyConfig &config);
   void syncDurableStorageRevision(uint32_t storageRevision);
-  PersistedSettings settingsCopy();
+  PersistedSettings &workingSettings();
   void copySettings(PersistedSettings &output);
   StaJoinHints staJoinHints();
   bool enqueueWebhook(const WebhookEvent &event);

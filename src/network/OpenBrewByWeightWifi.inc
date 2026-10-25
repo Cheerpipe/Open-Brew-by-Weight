@@ -208,7 +208,7 @@ void OpenBrewByWeightNetwork::requestPendingNetworkConfirm() {
 }
 
 bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
-  PersistedSettings next = settingsCopy();
+  PersistedSettings &next = workingSettings();
   NetworkStatusSnapshot status = snapshot();
   if (next.staConfigState != static_cast<uint8_t>(StaConfigState::PENDING) ||
       !next.staConfigured || status.staState != StaState::CONNECTED ||
@@ -270,7 +270,7 @@ bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
 
 bool OpenBrewByWeightNetwork::revertPendingNetwork(uint32_t,
                                               const char *reason) {
-  PersistedSettings next = settingsCopy();
+  PersistedSettings &next = workingSettings();
   if (next.staConfigState != static_cast<uint8_t>(StaConfigState::PENDING)) {
     return false;
   }
@@ -324,9 +324,9 @@ bool OpenBrewByWeightNetwork::revertPendingNetwork(uint32_t,
   // Keep staEverConnected_: SoftAP auto-raise stays boot-only after any prior
   // successful STA join this process (AP_START / reboot still available).
   if (next.staConfigured) {
-    // Do not startStation/ensureAccessPoint here: this frame already holds
-    // settingsCopy() plus service()/serviceStaState. httpd_start on that nest
-    // overflows the 10 KiB network task (pthread TLS LoadProhibited).
+    // Do not startStation/ensureAccessPoint here: httpd_start nested under
+    // service()/serviceStaState overflowed the 10 KiB network task (pthread
+    // TLS LoadProhibited).
     startupComplete_ = false;
     return true;
   }

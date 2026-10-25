@@ -1872,7 +1872,15 @@ declared = stack_eval(hidden, indirect={r"\bdispatch\(": (r"\broot\(",)})
 assert declared.depth == 32 + 48 + 100 + kernel and not declared.errors
 loop = stack_graph({"entry": 32, "root": 100, "a": 64}, [("entry", "root"), ("root", "a"),
                                                           ("a", "root")])
-assert "recursion through root()" in stack_eval(loop).errors
+assert "unbounded recursion through a(), root()" in stack_eval(loop).errors
+# lwip_send <-> lwip_sendto is a declared two-level recursion: charged twice.
+bounded = stack_graph({"entry": 32, "root": 100, "lwip_send": 64, "lwip_sendto": 80},
+                      [("entry", "root"), ("root", "lwip_send"),
+                       ("lwip_send", "lwip_sendto"), ("lwip_sendto", "lwip_send")])
+bounded_result = stack_eval(bounded)
+assert bounded_result.depth == 32 + 100 + 2 * (64 + 80) + kernel, bounded_result
+assert not bounded_result.errors
+assert any("recursion x2 over 2 functions" in name for _, name in bounded_result.path)
 assert stack_eval(chain, budget=1000).depth > 1000
 with tempfile.TemporaryDirectory(prefix="openbrewbyweight-stack-") as temporary:
     (Path(temporary) / "sdkconfig").write_text("CONFIG_ARDUINO_LOOP_STACK_SIZE=8192\n")

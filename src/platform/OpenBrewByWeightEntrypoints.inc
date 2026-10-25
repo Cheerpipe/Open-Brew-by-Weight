@@ -402,6 +402,7 @@ void setup() {
   if (bootRecoveryAbandoned)
     logEmit(LogLevel::CRITICAL, DebugCategory::BOOT, DebugCode::BOOT_SUBSYSTEM,
             BOOT_SUBSYSTEM_RECOVERY, 0);
+  publishBootRecoveryStack();
   crashArchiveSetBootId(bootIdentityDurable ? activationStores.bootId() : 0);
   crashArchivePromote(bootIdentityDurable ? activationStores.bootId() : 0,
                       safetyResetStatus.reasonCode);

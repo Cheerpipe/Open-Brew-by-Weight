@@ -214,6 +214,9 @@ static_assert(sizeof(NetworkWorkBuf) <= 655360,
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WifiScanSnapshot g_wifiScan;
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WifiScanSnapshot g_wifiScanWorking;
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkSettings;
+// Network-task working copy for persisted commands and Wi-Fi confirm/revert,
+// which never nest; the flash path stages it through the internal scratch.
+static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkWorkingSettings;
 // Web UI login state; dataMux_ guards it and the network task persists it.
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebAccessState g_webAccess;
 
@@ -298,10 +301,9 @@ constexpr const char *STATUS_CONFLICT = "409 Conflict";
 constexpr const char *STATUS_NOT_FOUND = "404 Not Found";
 constexpr const char *STATUS_UNPROCESSABLE = "422 Unprocessable Entity";
 constexpr const char *STATUS_UNAVAILABLE = "503 Service Unavailable";
-// PersistedSettings is ≤ PERSISTED_SETTINGS_NVS_BUDGET (3328 B).
-// processPersistedCommand() keeps one copy on the stack via settingsCopy();
-// NVS dual-slot scratch is shared off-stack. 7 168 was too small (canary on
-// FACTORY_RESET). 10 240 keeps headroom without the old 12 KiB margin.
+// No PersistedSettings lives on this stack: commands edit the PSRAM working
+// copy (workingSettings()) and NVS stages through the internal scratch. The
+// Web UI factory reset depth is bounded by scripts/check_stack_depth.py.
 // Keep this stack internal: flash writes disable both caches (flash and
 // PSRAM mappings) while they run, so a PSRAM stack could not perform them.
 constexpr uint32_t NETWORK_MANAGER_TASK_STACK_SIZE = 10240;

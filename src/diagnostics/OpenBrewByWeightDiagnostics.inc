@@ -1193,6 +1193,31 @@ void completeBootRecovery(RecoveryOperation operation);
 // Logged once the Web UI log is up: recovery runs before it exists.
 bool bootRecoveryAbandoned = false;
 
+// loopTask stack the last boot recovery never used, kept in RTC memory across
+// its restart so the next boot can compare it with scripts/check_stack_depth.py.
+struct BootRecoveryStackNote {
+  uint32_t freeBytes;
+  uint32_t operation;
+  uint32_t check;
+};
+constexpr uint32_t BOOT_RECOVERY_STACK_MAGIC = 0x52535431UL;  // "RST1"
+RTC_NOINIT_ATTR BootRecoveryStackNote bootRecoveryStackNote;
+
+uint32_t bootRecoveryStackCheck() {
+  return bootRecoveryStackNote.freeBytes ^ bootRecoveryStackNote.operation ^
+         BOOT_RECOVERY_STACK_MAGIC;
+}
+
+void publishBootRecoveryStack() {
+  if (bootRecoveryStackNote.check != bootRecoveryStackCheck()) return;
+  const uint32_t freeBytes = bootRecoveryStackNote.freeBytes;
+  logEmit(freeBytes < HEALTH_STACK_MIN_ALERT_BYTES ? LogLevel::WARNING : LogLevel::INFO,
+          DebugCategory::BOOT, DebugCode::BOOT_RECOVERY_STACK,
+          static_cast<int32_t>(freeBytes),
+          static_cast<int32_t>(bootRecoveryStackNote.operation));
+  bootRecoveryStackNote.check = ~bootRecoveryStackNote.check;
+}
+
 void abandonFailedBootRecovery(RecoveryOperation operation) {
   bootRecoveryAbandoned = true;
   (void)playRecoveryCue(BuzzerCue::RECOVERY_ERROR);
@@ -1227,7 +1252,11 @@ bool applyBootRecoveryOperation(RecoveryOperation operation) {
 void completeBootRecovery(RecoveryOperation operation) {
   // Do not rewrite a valid latch: a failed put on full NVS can tear it.
   (void)ensureRecoveryIntent(operation);
-  if (!applyBootRecoveryOperation(operation)) {
+  const bool applied = applyBootRecoveryOperation(operation);
+  bootRecoveryStackNote.freeBytes = uxTaskGetStackHighWaterMark(nullptr);
+  bootRecoveryStackNote.operation = static_cast<uint32_t>(operation);
+  bootRecoveryStackNote.check = bootRecoveryStackCheck();
+  if (!applied) {
     abandonFailedBootRecovery(operation);
     return;
   }

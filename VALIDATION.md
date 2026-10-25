@@ -71,12 +71,15 @@ After each development and release build, R2/R3 also run the stack-depth gate
 recompiles every unit of that build with GCC `-fcallgraph-info=su` into
 `<build>/stack-usage/` and bounds the worst-case stack of the destructive
 recovery paths against their task stacks: boot recovery on the Arduino
-loopTask (`CONFIG_ARDUINO_LOOP_STACK_SIZE`) and the Web UI factory reset on
-`network_manager` (`NETWORK_MANAGER_TASK_STACK_SIZE`). Calls GCC cannot follow
-are charged declared reserves (function pointers, ROM/libc, the kernel's
-per-task context); a function pointer that leads to a gated root must be
-declared in the gate, and recursion or an unbounded dynamic frame on a gated
-path fails. A path over budget fails with its full call chain; shrink the
+loopTask (`CONFIG_ARDUINO_LOOP_STACK_SIZE`), the Web UI factory reset on
+`network_manager` (`NETWORK_MANAGER_TASK_STACK_SIZE`), and the OTA transfer
+and commit on `ota_worker` and its inline httpd fallback
+(`HTTP_SERVER_TASK_STACK_SIZE`). Calls GCC cannot follow are charged declared
+reserves (function pointers, ROM/libc, the kernel's per-task context); a
+function pointer that leads to a gated root must be declared in the gate.
+Recursion is charged its declared bound (for example the 32-level JSON
+nesting limit) times the frames of the cycle; undeclared recursion or an
+unbounded dynamic frame on a gated path fails. A path over budget fails with its full call chain; shrink the
 deepest frames (for example a `PersistedSettings` copy on the stack) instead
 of raising a task stack.
 

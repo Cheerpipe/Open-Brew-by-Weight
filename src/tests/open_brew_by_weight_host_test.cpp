@@ -2648,6 +2648,16 @@ void r20g_boot_recovery_stops_replaying_after_a_crash_loop() {
   CHECK(bootRecoveryMayResume(beginSafetyResetGuard()));
 }
 
+void r20h_boot_recovery_stack_reads_as_a_sentence() {
+  DebugEvent event{};
+  event.code = DebugCode::BOOT_RECOVERY_STACK;
+  event.argument1 = 2304;
+  event.argument2 = 2;
+  char message[96] = {};
+  formatDebugEventMessage(event, message, sizeof(message), FW_VERSION);
+  CHECK(strcmp(message, "factory reset left 2304 B of loopTask stack unused") == 0);
+}
+
 void r20b_reset_history_keeps_reason_and_previous_uptime() {
   resetHarness(false, false);
   SafetyResetSnapshot reset = beginSafetyResetGuard();
@@ -22229,6 +22239,7 @@ const TestCase testCases[] = {
     {"R20e", r20e_uptime_forced_invalid_and_wrapped_checkpoints},
     {"R20f", r20f_reset_history_clear_waits_for_configuration_safe},
     {"R20g", r20g_boot_recovery_stops_replaying_after_a_crash_loop},
+    {"R20h", r20h_boot_recovery_stack_reads_as_a_sentence},
     {"R21", r21_automatic_control_requires_fresh_weight},
     {"R22", r22_confirmed_implausible_weight_does_not_stop},
     {"R23", r23_maintenance_is_canceled_fail_open_by_physical_paddle},

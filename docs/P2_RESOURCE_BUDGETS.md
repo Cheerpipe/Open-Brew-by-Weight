@@ -283,6 +283,16 @@ still required. Curve helpers fill their owned destinations directly, and
 control-status publication initializes its existing object in place, avoiding
 large return-value and default-aggregate temporaries.
 
+The destructive paths have a whole-call-chain bound instead: the stack-depth
+gate in [Validation](../VALIDATION.md) covers boot recovery on the loopTask,
+the Web UI factory reset on `network_manager`, and the OTA transfer and commit
+on `ota_worker` and its inline httpd fallback. No `PersistedSettings` copy
+lives on those stacks: the network task edits a PSRAM working copy and NVS
+stages through the internal scratch. After every boot recovery the next boot
+writes `factory reset left N B of loopTask stack unused` (or `network access
+reset ...`) to the Web UI log, a warning below 1,024 bytes, so field units
+qualify the static bound against the real watermark.
+
 Network command builders must activate their union member with
 `setNetworkType()` before writing credentials. Preset metadata remains outside
 the union because a preset operation also carries configuration. Settings
