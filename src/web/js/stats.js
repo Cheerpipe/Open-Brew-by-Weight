@@ -1696,48 +1696,12 @@ async function openInBeanconqueror(r) {
     );
   }
 }
-// An action menu on the shared popup: a string starts a group, null draws a
-// separator, and [icon path, title, hint, run, danger] is an item.
-function actionMenu(label, items) {
-  const menu = R.createPopup(label, (p, ...args) => {
-    for (const item of items(...args)) {
-      if (item === null) {
-        p.append(document.createElement("hr"));
-        continue;
-      }
-      if (typeof item === "string") {
-        p.append(
-          Object.assign(document.createElement("div"), {
-            className: "histFilterGroup",
-            textContent: item,
-          }),
-        );
-        continue;
-      }
-      const [icon, title, hint, run, danger] = item,
-        b = document.createElement("button");
-      b.type = "button";
-      b.className = "histFilterItem menuAction" + (danger ? " menuDanger" : "");
-      b.setAttribute("role", "menuitem");
-      b.innerHTML =
-        '<span class="histFilterIcon" aria-hidden="true"><svg class="o" viewBox="0 0 24 24"><path d="' +
-        icon +
-        '"/></svg></span><span class="menuText"><b></b><small></small></span>';
-      b.querySelector("b").textContent = title;
-      b.querySelector("small").textContent = hint;
-      b.onclick = () => (menu.close(), run());
-      p.append(b);
-    }
-  });
-  return menu;
-}
 const ICON = {
   csv: "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14",
   json: "M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1",
   chart: "M3 20h18M4 16l4-6 4 3 4-7 4 5",
   visualizer: "M3 3v18h18M7 15l3-4 3 2 5-7",
   bean: "M17 4c3 3 2 9-2 13s-10 5-13 2 0-9 4-13 8-5 11-2zM15 5c-1 3-3 4-5 6s-3 5-4 8",
-  trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
 };
 let shotMenu;
 // The pending export window: a second export and scroll paging wait for it
@@ -1807,13 +1771,13 @@ export function init() {
   });
   // The toolbar exports every stored shot, whatever the filter; a card's menu
   // acts on its own shot only.
-  const exportMenu = actionMenu(__WEBUI_TEXT__("stats.export_all_shots"), () => [
+  const exportMenu = R.actionMenu(__WEBUI_TEXT__("stats.export_all_shots"), () => [
     __WEBUI_TEXT__("stats.export_all_shots"),
     [ICON.csv, "CSV", __WEBUI_TEXT__("stats.csv_hint"), exportShotsCsv],
     [ICON.json, "JSON", __WEBUI_TEXT__("stats.json_all_hint"), exportShotsJson],
   ]);
   $("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"));
-  shotMenu = actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r) => [
+  shotMenu = R.actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r) => [
     __WEBUI_TEXT__("stats.open_in"),
     [
       ICON.bean,
@@ -1841,7 +1805,7 @@ export function init() {
       () => downloadJson(`openbrewbyweight-shot-${r.id}-visualizer.json`, shotVisualizer(r)),
     ],
     null,
-    [ICON.trash, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
+    [R.ICON_TRASH, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
   ]);
   $("clearShotsButton").onclick = clearShotHistory;
   if ($("shotSort")) {

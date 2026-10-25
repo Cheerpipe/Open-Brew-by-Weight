@@ -84,12 +84,14 @@ function renderHistory() {
     del.className = "shotDel";
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "btnGlyph btnDanger";
-    btn.title = __WEBUI_TEXT__("runtime.delete");
-    btn.setAttribute("aria-label", __WEBUI_TEXT__("runtime.delete"));
+    btn.className = "btnGlyph";
+    btn.title = __WEBUI_TEXT__("history.entry_actions");
+    btn.setAttribute("aria-label", __WEBUI_TEXT__("history.entry_actions"));
+    btn.setAttribute("aria-haspopup", "true");
+    btn.setAttribute("aria-expanded", "false");
     btn.innerHTML =
-      '<span class="g" aria-hidden="true">' + __WEBUI_TEXT__("runtime.close") + "</span>";
-    btn.onclick = () => deleteOneHistory(r.id);
+      '<span class="g" aria-hidden="true">' + __WEBUI_TEXT__("stats.more") + "</span>";
+    btn.onclick = () => entryMenu.open(btn, r);
     del.append(btn);
     const typeSvg = HIST_TYPE_SVG[r.type];
     if (typeSvg) {
@@ -117,6 +119,7 @@ function renderHistory() {
   );
   updateHistorySentinel();
 }
+let entryMenu;
 async function deleteOneHistory(id) {
   if (!id || !confirm(__WEBUI_TEXT__("runtime.delete_this_history_record"))) return;
   return R.withCommandGate(async () => {
@@ -229,6 +232,9 @@ export function init() {
   if (ready) return;
   ready = true;
   R.setHistoryRenderer(renderHistory);
+  entryMenu = R.actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) => [
+    [R.ICON_TRASH, __WEBUI_TEXT__("runtime.delete"), "", () => deleteOneHistory(r.id), true],
+  ]);
   R.createFilterMenu(
     "historyFilterButton",
     __WEBUI_TEXT__("history.filter_types"),

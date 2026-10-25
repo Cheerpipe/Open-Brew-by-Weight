@@ -1521,6 +1521,42 @@ function createPopup(label, fill) {
   window.addEventListener("resize", reposition, { passive: true });
   return { open, close };
 }
+// An action menu on the shared popup: a string starts a group, null draws a
+// separator, and [icon path, title, hint, run, danger] is an item.
+function actionMenu(label, items) {
+  const menu = createPopup(label, (p, ...args) => {
+    for (const item of items(...args)) {
+      if (item === null) {
+        p.append(document.createElement("hr"));
+        continue;
+      }
+      if (typeof item === "string") {
+        p.append(
+          Object.assign(document.createElement("div"), {
+            className: "histFilterGroup",
+            textContent: item,
+          }),
+        );
+        continue;
+      }
+      const [icon, title, hint, run, danger] = item,
+        b = document.createElement("button");
+      b.type = "button";
+      b.className = "histFilterItem menuAction" + (danger ? " menuDanger" : "");
+      b.setAttribute("role", "menuitem");
+      b.innerHTML =
+        '<span class="histFilterIcon" aria-hidden="true"><svg class="o" viewBox="0 0 24 24"><path d="' +
+        icon +
+        '"/></svg></span><span class="menuText"><b></b><small></small></span>';
+      b.querySelector("b").textContent = title;
+      b.querySelector("small").textContent = hint;
+      b.onclick = () => (menu.close(), run());
+      p.append(b);
+    }
+  });
+  return menu;
+}
+const ICON_TRASH = "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3";
 function refreshShots() {
   return shotStatsViewActive() ? startStatsStream(true) : Promise.resolve(false);
 }
@@ -6808,7 +6844,8 @@ export {
   sendUiOperation,
   SHOTS_EXPORT_LIMIT,
   downloadCsv,
-  createPopup,
+  actionMenu,
+  ICON_TRASH,
   firmwareVersion,
   shotRuleModel,
   cutLine,
