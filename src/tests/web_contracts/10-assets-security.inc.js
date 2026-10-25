@@ -670,6 +670,7 @@ const jsBytes = Buffer.byteLength(allJs, 'utf8');
 // Settings group rows (icon sprite and group keys for the summaries): measured 102184, owner-requested 2026-10-22.
 // Admin sections as collapsible group rows (icon sprite, details for the panels): measured 104225, owner-requested 2026-10-22.
 // Diagnostics sections as collapsible rows with icons (sprite, details markup): measured 107310, owner-requested 2026-10-22.
+// Shots Export as a CSV/JSON menu (popup trigger attributes): +43, owner-requested 2026-10-25.
 // Admin Scheduled restart section (switch, 24-hour time pair, status, save/revert): measured 108304, owner-requested 2026-10-25.
 if (htmlBytes > 108304) {
   throw new Error(`Web UI HTML source exceeds the authoring budget (${htmlBytes} > 108304)`);
