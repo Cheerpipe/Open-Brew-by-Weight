@@ -156,9 +156,14 @@ async function renderRoute(pathname, focus) {
     if (seq !== routeSeq) return;
     document.body.classList.toggle("homeView", view === "home");
     document.body.classList.toggle("setupView", view === "setup");
-    document
-      .querySelectorAll(".view")
-      .forEach((el) => el.classList.toggle("hidden", el.dataset.view !== view));
+    let changed = false;
+    document.querySelectorAll(".view").forEach((el) => {
+      if (el.dataset.view === view) changed = el.classList.contains("hidden");
+      el.classList.toggle("hidden", el.dataset.view !== view);
+    });
+    // Each page keeps its own scroll: a new page opens at the top, Back returns
+    // to where it was left, and a deep link scrolls to its own section.
+    if (changed && !location.hash) scrollTo(0, history.state?.y || 0);
     markNavActive(viewToPath(view));
     const section = focus && document.getElementById("view-" + view);
     if (section) {
@@ -193,9 +198,13 @@ function settleView(ok, boot) {
 }
 function navigate(path, replace) {
   const target = knownPath(path) || "/";
-  if (location.pathname !== target) history[replace ? "replaceState" : "pushState"]({}, "", target);
+  if (location.pathname !== target) {
+    if (!replace) history.replaceState({ ...history.state, y: scrollY }, "");
+    history[replace ? "replaceState" : "pushState"]({}, "", target);
+  }
   renderRoute(target, true);
 }
+history.scrollRestoration = "manual";
 R.setViewPollHooks({
   stop: stopExtraPolls,
   start: () => renderRoute(location.pathname),
