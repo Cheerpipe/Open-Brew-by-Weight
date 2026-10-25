@@ -6598,8 +6598,8 @@ async function loadStatus() {
     const apply = viewStatusHandlers[v];
     if (apply) apply(s);
     // Presets reach Settings only with a Home frame that changes them, so a
-    // view mounted after that frame paints the model it already holds.
-    if (v === "settings") renderAllPresetUi();
+    // view mounted after that frame applies the model it already holds.
+    if (v === "settings") ingestPresets(s);
     if (v === "admin" && s.adminUnlocked) {
       await timezoneCatalogPromise;
       await timezonePreviewLoad?.catch(() => {});
