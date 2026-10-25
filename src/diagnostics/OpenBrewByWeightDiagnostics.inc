@@ -1295,20 +1295,19 @@ void completeBootRecovery(RecoveryOperation operation) {
 void resumePendingBootRecovery() {
   RecoveryIntent intent;
   const PendingRecoveryKind kind = inspectPendingRecovery(intent);
-  if (kind == PendingRecoveryKind::VALID &&
-      bootRecoveryMayResume(safetyResetStatus)) {
-    completeBootRecovery(static_cast<RecoveryOperation>(intent.operation));
-    return;
-  }
-  if (kind == PendingRecoveryKind::VALID) {
-    // Drop the latch before touching storage again: the fallback below may
-    // be what crashes, and it must not replay on the next boot.
+  if (kind == PendingRecoveryKind::NONE) return;
+  const BootRecoveryStep step = bootRecoveryStep(safetyResetStatus);
+  if (step == BootRecoveryStep::GIVE_UP) {
+    bootRecoveryAbandoned = true;
+    (void)playRecoveryCue(BuzzerCue::RECOVERY_ERROR);
+    waitForRecoveryBuzzer();
     (void)abandonRecoveryIntent();
-    abandonFailedBootRecovery(static_cast<RecoveryOperation>(intent.operation));
-    return;
-  }
-  if (kind == PendingRecoveryKind::MALFORMED) {
+  } else if (kind == PendingRecoveryKind::MALFORMED) {
     abandonMalformedRecoveryIntent();
+  } else if (step == BootRecoveryStep::RESUME) {
+    completeBootRecovery(static_cast<RecoveryOperation>(intent.operation));
+  } else {
+    abandonFailedBootRecovery(static_cast<RecoveryOperation>(intent.operation));
   }
 }
 

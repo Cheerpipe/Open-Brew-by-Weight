@@ -79,12 +79,14 @@ the last storage error.
 
 Once the controller restarts, it finishes the reset before anything else
 starts. If it cannot finish, it plays a long-short-long sound and starts
-normally, so the Web UI and its access point stay reachable. The same applies
-when the reset keeps crashing: after three failed restarts in a row the
-controller stops retrying and starts normally. Some of your data may already
-be erased and the rest kept. The Web UI log then shows `recovery=fail`; run
-the factory reset again from the Web UI. A power cut during the reset is not a
-failure: the next start simply finishes it.
+normally, so the Web UI and its access point stay reachable. If the reset
+keeps crashing the controller instead, after three failed restarts in a row it
+only restores the factory Wi-Fi and password, so you can reach it through its
+access point again; shots and other data may be partly erased. Only if that
+also keeps failing does it start with its previous settings. Either way the
+Web UI log shows `recovery=fail`; run the factory reset again once you are
+connected. A power cut during the reset is not a failure: the next start
+simply finishes it.
 
 Related: [Wi-Fi](wifi.md), [Emergency recovery](../EMERGENCY_RECOVERY.md),
 [Linea Micra](linea-micra.md), [FAQ](../FAQ.md).

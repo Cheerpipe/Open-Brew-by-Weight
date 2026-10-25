@@ -94,9 +94,10 @@ still applies.
 
 A long-short-long sound means storage could not complete the operation. The
 firmware leaves recovery and continues startup; access depends on the settings
-it could recover. If the operation keeps crashing the controller instead, it
-gives up after three failed restarts in a row and continues startup the same
-way; the Web UI log shows `recovery=fail`. If the AP is still unavailable, use
+it could recover. If the operation keeps crashing the controller instead,
+after three failed restarts in a row it only restores the factory Wi-Fi and
+password and continues startup, and only after three more does it start with
+its previous settings; the Web UI log shows `recovery=fail`. If the AP is still unavailable, use
 [USB commands](SERIAL_CLI.md) or [USB firmware recovery](BUILD.md#6-flash-usb).
 
 Implementation: [recovery state machine](STATE_MACHINES.md#12-recovery-gesture).

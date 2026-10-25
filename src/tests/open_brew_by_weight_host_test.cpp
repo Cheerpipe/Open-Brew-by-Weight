@@ -2635,17 +2635,20 @@ void r20g_boot_recovery_stops_replaying_after_a_crash_loop() {
   hostSafetyResetReasonCode = 3;  // software restart into the pending reset
   hostSafetyResetReasonUnsafe = false;
   hostSafetyResetReasonPowerOn = false;
-  CHECK(bootRecoveryMayResume(beginSafetyResetGuard()));
-  hostSafetyResetReasonCode = 4;  // the wipe panics
+  CHECK(bootRecoveryStep(beginSafetyResetGuard()) == BootRecoveryStep::RESUME);
+  hostSafetyResetReasonCode = 4;  // the wipe, then the settings fallback, panic
   hostSafetyResetReasonUnsafe = true;
-  for (uint32_t count = 1; count < SAFETY_BOOT_LOOP_THRESHOLD; ++count) {
-    CHECK(bootRecoveryMayResume(beginSafetyResetGuard()));
+  for (uint32_t count = 1; count <= 2 * SAFETY_BOOT_LOOP_THRESHOLD; ++count) {
+    const BootRecoveryStep expected =
+        count < SAFETY_BOOT_LOOP_THRESHOLD       ? BootRecoveryStep::RESUME
+        : count < 2 * SAFETY_BOOT_LOOP_THRESHOLD ? BootRecoveryStep::SETTINGS_ONLY
+                                                 : BootRecoveryStep::GIVE_UP;
+    CHECK(bootRecoveryStep(beginSafetyResetGuard()) == expected);
   }
-  CHECK(!bootRecoveryMayResume(beginSafetyResetGuard()));
   hostSafetyResetReasonCode = 1;  // a power cut mid-wipe resumes again
   hostSafetyResetReasonUnsafe = false;
   hostSafetyResetReasonPowerOn = true;
-  CHECK(bootRecoveryMayResume(beginSafetyResetGuard()));
+  CHECK(bootRecoveryStep(beginSafetyResetGuard()) == BootRecoveryStep::RESUME);
 }
 
 void r20h_boot_recovery_stack_reads_as_a_sentence() {

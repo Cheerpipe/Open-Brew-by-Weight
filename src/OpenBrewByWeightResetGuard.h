@@ -255,9 +255,18 @@ inline SafetyResetSnapshot beginSafetyResetGuard() {
 
 // A pending recovery intent replays on every boot, so a crash inside the
 // operation (panic, stack overflow, watchdog) would loop forever and brick
-// the unit. Once a boot loop is latched, the latch must be dropped instead.
-inline bool bootRecoveryMayResume(const SafetyResetSnapshot &reset) {
-  return !reset.bootLoopDetected;
+// the unit. Each further boot loop steps down: resume the whole operation,
+// then only restore factory settings while still latched (a crash there is
+// retried too), then drop the latch without touching storage again.
+enum class BootRecoveryStep : uint8_t { RESUME, SETTINGS_ONLY, GIVE_UP };
+
+inline BootRecoveryStep bootRecoveryStep(const SafetyResetSnapshot &reset) {
+  if (reset.unsafeResetCount < SAFETY_BOOT_LOOP_THRESHOLD) {
+    return BootRecoveryStep::RESUME;
+  }
+  return reset.unsafeResetCount < 2 * SAFETY_BOOT_LOOP_THRESHOLD
+             ? BootRecoveryStep::SETTINGS_ONLY
+             : BootRecoveryStep::GIVE_UP;
 }
 
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
