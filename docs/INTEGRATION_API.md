@@ -124,7 +124,7 @@ preset revision, and the complete Quick Settings snapshot.
   "manufacturer": "Open Brew by Weight",
   "model": "Open Brew by Weight",
   "firmwareVersion": "0.1.0",
-  "capabilities": ["webhook_v1", "preset_select_v1", "quick_settings_v1", "restart_v1", "stored_shots_v1"],
+  "capabilities": ["webhook_v1", "preset_select_v1", "quick_settings_v1", "restart_v1", "stored_shots_v1", "preset_rules_v1", "last_shot_curve_v1"],
   "shotState": "idle",
   "bootId": 123,
   "activePresetId": 2,
@@ -150,7 +150,8 @@ preset revision, and the complete Quick Settings snapshot.
 history: a confirmed non-rinse cycle longer than 12 seconds with a valid final
 yield over 2 g. Other completed activations appear only in `lastActivation`.
 When present, `lastShot` contains
-`cycleId`, `uptimeMs`, `durationMs`, `targetWeightG`, `presetId`, `presetName`,
+`cycleId`, `shotId` (the shot's id in shot history, the `id` column of
+[the last shot route](#get-apiv1integrationshotslast)), `uptimeMs`, `durationMs`, `targetWeightG`, `presetId`, `presetName`,
 `shotType`, `stopDetail`, `savePending`, and the optional `firstDropMs`, `weightG`,
 `averageFlowGps`, and `rating` fields defined by the webhook contract. When the
 controller has a valid clock at shot completion, it also includes
@@ -235,24 +236,79 @@ newly registered receiver is reachable.
 
 ### `GET /api/v1/integration/presets`
 
-Returns a bounded snapshot:
+Returns a bounded snapshot. With the `preset_rules_v1` capability each item
+is the same preset render the Web UI draws its preset chart from (shortened
+here to one item):
 
 ```json
-{"apiVersion":1,"activeId":1,"revision":19,"items":[
-  {"id":1,"name":"Double · Adaptive","isFactory":true},
-  {"id":2,"name":"Single · Adaptive","isFactory":true},
-  {"id":3,"name":"Double · Fixed","isFactory":true},
-  {"id":4,"name":"Single · Fixed","isFactory":true},
-  {"id":255,"name":"Manual","isFactory":true}
+{"apiVersion":1,"revision":19,"activeId":1,"cutRampS":3.0,"items":[
+  {"id":1,"name":"Double · Adaptive","isFactory":true,"brewByWeight":true,
+   "doseG":18.0,"goalWeightG":36.0,"fastBeforeS":27.0,"slowAfterS":36.0,
+   "fastMarginG":6.0,"slowMarginG":3.0,"operationalWallMs":50000,
+   "bbwProtectionMs":12000,"fastExtractionGuardEnabled":true,
+   "slowExtractionGuardEnabled":true,"grindHintsEnabled":true,
+   "lineaMicraBrewTargetC":93.0,
+   "shotStats":{"n":5,"total":5,"minS":21.4,"maxS":34.2,"medianS":30.6},
+   "firstDropS":4.9,"firstDropN":5,"arrivalsS":[21.4,29.1,30.6,32.7,34.2],
+   "grindHint":null}
 ]}
 ```
 
+`id`, `name`, and `isFactory` are the original contract; the rest is
+additive. `cutRampS` is the length of the smooth step between the extended
+or shortened cut line and the target. The rule fields mirror the preset
+editor: the on-recipe window runs from `fastBeforeS` to `slowAfterS`, the
+cut line is raised by `fastMarginG` before it and lowered by `slowMarginG`
+after it when the matching guard is enabled, nothing is cut before
+`bbwProtectionMs`, and the shot ends by `operationalWallMs`. `shotStats` and
+`arrivalsS` describe the preset's newest timed shots (arrival times at the
+target, oldest first), `firstDropS` is their median first drop (`firstDropN`
+shots; `0` falls back to other presets), and `grindHint` is the Web UI grind
+hint object or `null`. `lineaMicraBrewTargetC` only matters on Linea Micra
+builds. The statistics follow every stored shot, so Home Assistant's read
+after the `end` webhook already returns the new arrival.
+
 Preset IDs are stable while an item exists and names are unique. A fresh or
-factory-reset controller has the five factory presets above (ids 1–4 and 255),
+factory-reset controller has the five factory presets (ids 1–4 and 255),
 which can be restored but not deleted. User presets never receive a factory id.
 Manual (id 255) has brew by weight off. A controller updated from earlier
 firmware appends it on restart when a slot is free and no preset is named
 "Manual".
+
+### `GET /api/v1/integration/shots/last`
+
+Available with the `last_shot_curve_v1` capability. Returns the shot that
+`lastShot` in the snapshot describes as one row of the Web UI Stats page,
+with its weight curve:
+
+```json
+{"apiVersion":1,"cols":"id,bootId,endedAtMs,…,actualWeightSource,rating",
+ "shot":[1042,30,930100,true,…,"post_drip",4,
+   {"wD":"AAAA…","wBreakBefore":[],"wHeld":[],"wTruncated":false,
+    "dropS":5.200,"dropCg":20,"extendedS":null,"extCg":null,"atmS":null,
+    "atmCg":null,"atmClearedS":null,"endS":31.000,"endCg":3632}]}
+```
+
+`shot` is `null` before the first qualifying shot. `cols` names the row's
+values in order and the last element is the curve object; read values by
+column name, because later firmware may add columns. The columns and curve
+keys are the ones the Stats page and the [shot JSON export](schemas/README.md)
+use: for example `goalG`, `actualG`, `durationS`, `firstDropS`, `doseG`,
+`ratio`, `targetTempDeciC`, `cutLineG`, `arrivalS`, `verdict`, `stopDetail`,
+`scaleName`, and the rule the shot ran with (`fastBeforeS`, `slowAfterS`,
+`fastMarginG`, `slowMarginG`, `delayS`, `wallS`, `cutRampS`).
+
+`wD` is the curve as base64 point records: each point is a time step in
+milliseconds (one byte, or `255` followed by the absolute time as a
+little-endian `uint16`) and a weight step in centigrams (one signed byte, or
+`-128` followed by the absolute weight as a little-endian `int16`), starting
+from 0 ms and 0 cg. `wBreakBefore` lists points that start a new segment,
+`wHeld` points the scale held, and the scalars mark the first drop, a
+fast-shot extension, the scale-loss takeover, and the end of the shot.
+
+The row is a few kilobytes, so read it once per shot: after the `end`
+webhook, and only when the snapshot's `lastShot.shotId` differs from the
+`id` of the shot you already hold.
 
 ### `PUT /api/v1/integration/presets/active`
 

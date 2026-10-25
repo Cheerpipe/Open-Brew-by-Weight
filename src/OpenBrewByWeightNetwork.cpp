@@ -1110,10 +1110,23 @@ bool statusJsonAppendScaleProfiler(size_t *used,
       canDelete ? "true" : "false", canDownload ? "true" : "false");
 }
 
-void copyPresetStatsForJson(const NetworkBridgeCallbacks &callbacks,
+// Preset statistics replay every stored shot: recompute them only when the
+// bank or the shot-log epoch moved. A changed render clears presetsJsonHome.
+// Shared by the Home stream and the integration presets route (httpd only).
+void refreshRenderedPresets(const NetworkBridgeCallbacks &callbacks,
                             const ShotPresetBank &bank) {
+  const uint32_t epoch = callbacks.shotLogEpoch ? callbacks.shotLogEpoch() : 0;
+  const bool bankMoved = memcmp(&g_work->renderedPresets, &bank, sizeof(bank)) != 0;
+  if (!bankMoved && epoch == g_work->renderedShotLogEpoch) return;
   memset(g_work->presetStats, 0, sizeof(g_work->presetStats));
   if (callbacks.copyPresetShotStats) callbacks.copyPresetShotStats(bank, g_work->presetStats);
+  g_work->renderedShotLogEpoch = epoch;
+  if (!bankMoved &&
+      memcmp(g_work->renderedStats, g_work->presetStats, sizeof(g_work->renderedStats)) == 0)
+    return;
+  g_work->renderedPresets = bank;
+  memcpy(g_work->renderedStats, g_work->presetStats, sizeof(g_work->renderedStats));
+  g_work->presetsJsonHome = false;
 }
 
 // Grind hint JSON (null when there is none): enum names by value.
@@ -1158,22 +1171,25 @@ int formatPresetShotStats(char *out, size_t cap, const PresetShotStats &s) {
       hintJson);
 }
 
-void buildSlimPresetsJson(const ShotPresetBank &presets) {
+// Renders the cached preset render (refreshRenderedPresets) into presetsJson
+// after `lead` (extra leading members, each ending in a comma). Returns false
+// when an item did not fit; the JSON stays valid without it.
+bool buildSlimPresetsJson(const char *lead = "") {
   if (g_work == nullptr) {
-    return;
+    return false;
   }
+  const ShotPresetBank &presets = g_work->renderedPresets;
   char *buf = g_work->presetsJson;
   const size_t cap = NetworkWorkBuf::kPresetsJson;
-  buf[0] = '{';
-  buf[1] = '}';
-  buf[2] = 0;
-  size_t used = 0;
-  int n = snprintf(buf, cap, "{\"activeId\":%u,\"cutRampS\":%.1f,\"items\":[",
+  int n = snprintf(buf, cap, "{%s\"activeId\":%u,\"cutRampS\":%.1f,\"items\":[", lead,
                    static_cast<unsigned>(presets.activeId), corridor::RAMP_MS / 1000.0);
-  if (n > 0) {
-    used = static_cast<size_t>(n);
+  if (n < 0 || static_cast<size_t>(n) + 3 > cap) {
+    snprintf(buf, cap, "{}");
+    return false;
   }
-  for (uint8_t i = 0; i < presets.count && i < MAX_SHOT_PRESETS; ++i) {
+  size_t used = static_cast<size_t>(n);
+  uint8_t i = 0;
+  for (; i < presets.count && i < MAX_SHOT_PRESETS; ++i) {
     const ShotPreset &p = presets.presets[i];
     char safeName[SHOT_PRESET_NAME_CAPACITY * 6] = {};
     escapeJsonString(p.name, safeName, sizeof(safeName));
@@ -1203,18 +1219,15 @@ void buildSlimPresetsJson(const ShotPresetBank &presets) {
       break;
     }
     used += static_cast<size_t>(n);
-    n = formatPresetShotStats(buf + used, cap - used, g_work->presetStats[i]);
-    if (n < 0 || static_cast<size_t>(n) >= cap - used) {
+    n = formatPresetShotStats(buf + used, cap - used, g_work->renderedStats[i]);
+    if (n < 0 || static_cast<size_t>(n) + 3 > cap - used) {
       used = itemStart;  // never leave an item unterminated
       break;
     }
     used += static_cast<size_t>(n);
   }
-  if (used + 2 < cap) {
-    buf[used++] = ']';
-    buf[used++] = '}';
-    buf[used] = 0;
-  }
+  memcpy(buf + used, "]}", 3);
+  return i >= presets.count || i >= MAX_SHOT_PRESETS;
 }
 
 void buildScaleHistoryJson(const ScaleHistoryEntry *entries) {

@@ -226,28 +226,12 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("noScaleShotGuard.armed", bool(control.noScaleShotGuardArmed));
   if (callbacks_.copyPresetBank) callbacks_.copyPresetBank(&g_work->presetBank);
   else memset(&g_work->presetBank, 0, sizeof(g_work->presetBank));
-  // Preset statistics replay every stored shot: recompute them only when the
-  // bank or the shot-log epoch moved, and rebuild the slim JSON only when the
-  // render changed or another handler reused the shared buffer
-  // (presetsJsonHome). Single-threaded: httpd dispatch.
-  ShotPresetBank &renderedPresets = g_work->renderedPresets;
-  PresetShotStats (&renderedStats)[MAX_SHOT_PRESETS] = g_work->renderedStats;
+  // Rebuild the slim JSON only when the render changed or another handler
+  // reused the shared buffer (presetsJsonHome). Single-threaded: httpd dispatch.
   uint32_t &renderedPresetsHash = g_work->renderedPresetsHash;
-  const uint32_t shotLogEpoch = callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0;
-  const bool bankMoved =
-      memcmp(&renderedPresets, &g_work->presetBank, sizeof(renderedPresets)) != 0;
-  if (bankMoved || shotLogEpoch != g_work->renderedShotLogEpoch) {
-    copyPresetStatsForJson(callbacks_, g_work->presetBank);
-    g_work->renderedShotLogEpoch = shotLogEpoch;
-    if (bankMoved || memcmp(renderedStats, g_work->presetStats, sizeof(renderedStats)) != 0) {
-      renderedPresets = g_work->presetBank;
-      memcpy(renderedStats, g_work->presetStats, sizeof(renderedStats));
-      g_work->presetsJsonHome = false;
-    }
-  }
+  refreshRenderedPresets(callbacks_, g_work->presetBank);
   if (!g_work->presetsJsonHome) {
-    memcpy(g_work->presetStats, renderedStats, sizeof(renderedStats));
-    buildSlimPresetsJson(renderedPresets);
+    buildSlimPresetsJson();
     renderedPresetsHash = crc32Update(0xFFFFFFFFU,
         reinterpret_cast<const uint8_t *>(g_work->presetsJson),
         strlen(g_work->presetsJson));

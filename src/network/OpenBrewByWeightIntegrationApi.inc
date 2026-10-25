@@ -50,26 +50,6 @@ bool buildIntegrationLastActivation(const ControlStatusSnapshot &control,
   return written > 0 && static_cast<size_t>(written) < capacity;
 }
 
-bool buildIntegrationPresets(const ShotPresetBank &bank, uint32_t revision,
-                             char *output, size_t capacity) {
-  size_t used = 0;
-  if (!jsonScratchAppend(output, capacity, &used,
-                         "{\"apiVersion\":1,\"activeId\":%u,"
-                         "\"revision\":%lu,\"items\":[",
-                         static_cast<unsigned>(bank.activeId),
-                         static_cast<unsigned long>(revision))) return false;
-  for (uint8_t i = 0; i < bank.count && i < MAX_SHOT_PRESETS; ++i) {
-    char name[SHOT_PRESET_NAME_CAPACITY * 6] = {};
-    if (!escapeJsonString(bank.presets[i].name, name, sizeof(name))) return false;
-    if (!jsonScratchAppend(
-            output, capacity, &used,
-            "%s{\"id\":%u,\"name\":\"%s\",\"isFactory\":%s}",
-            i == 0 ? "" : ",", static_cast<unsigned>(bank.presets[i].id),
-            name, bank.presets[i].isFactory ? "true" : "false")) return false;
-  }
-  return jsonScratchAppend(output, capacity, &used, "]}");
-}
-
 bool buildIntegrationLastShot(const PersistedLastShot &shot, const char *detail,
                               bool savePending, char *output, size_t capacity) {
   const auto type = static_cast<LastShotType>(shot.shotType);
@@ -81,10 +61,11 @@ bool buildIntegrationLastShot(const PersistedLastShot &shot, const char *detail,
   size_t used = 0;
   if (!jsonScratchAppend(
           output, capacity, &used,
-          "{\"cycleId\":%lu,\"uptimeMs\":%lu,\"durationMs\":%lu,"
+          "{\"cycleId\":%lu,\"shotId\":%lu,\"uptimeMs\":%lu,\"durationMs\":%lu,"
           "\"targetWeightG\":%.1f,\"presetId\":%u,\"presetName\":\"%s\","
           "\"shotType\":\"%s\",\"stopDetail\":\"%s\",\"savePending\":%s",
           static_cast<unsigned long>(shot.cycleId),
+          static_cast<unsigned long>(shot.shotLogId),
           static_cast<unsigned long>(shot.endedAtUptimeMs),
           static_cast<unsigned long>(shot.durationMs),
           static_cast<double>(goalWeightDgToGrams(shot.goalWeightDg)),
@@ -197,7 +178,8 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
         "\"machineName\":\"%s\",\"machineProfile\":\"%s\","
         "\"ip\":\"%s\",\"mdnsHost\":\"%s\","
         "\"capabilities\":[\"webhook_v1\",\"preset_select_v1\","
-        "\"quick_settings_v1\",\"restart_v1\",\"stored_shots_v1\"],"
+        "\"quick_settings_v1\",\"restart_v1\",\"stored_shots_v1\","
+        "\"preset_rules_v1\",\"last_shot_curve_v1\"],"
         "\"shotState\":\"%s\",\"bootId\":%lu,\"activePresetId\":%u,"
         "\"presetRevision\":%lu,\"quickSettings\":%s,"
         "\"lastShot\":%s,"
@@ -232,14 +214,49 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     RecipeSnapshot &recipe = self.workBuf_->recipe;
     if (self.callbacks_.copyRecipeSnapshot != nullptr)
       self.callbacks_.copyRecipeSnapshot(&recipe);
-    const bool ok = buildIntegrationPresets(
-        recipe.presets, recipe.runtime.revision, self.workBuf_->presetsJson,
-        NetworkWorkBuf::kPresetsJson);
+    // The Web UI's preset render (rules, first drop, recent arrivals), led by
+    // this route's version and the revision the snapshot reports.
+    refreshRenderedPresets(self.callbacks_, recipe.presets);
+    char lead[48] = {};
+    snprintf(lead, sizeof(lead), "\"apiVersion\":1,\"revision\":%lu,",
+             static_cast<unsigned long>(recipe.runtime.revision));
+    const bool ok = buildSlimPresetsJson(lead);
     self.workBuf_->presetsJsonHome = false;
     const esp_err_t result = ok
         ? sendJson(request, STATUS_OK, self.workBuf_->presetsJson)
         : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
                     "The preset snapshot exceeded its fixed buffer.");
+    self.unlockWorkBuf();
+    return result;
+  }
+
+  // The newest eligible shot as one Stats row (columns named in `cols`) with
+  // its curve, so a client draws it exactly like the Web UI Stats card.
+  if (apiUriMatches(uri, "/api/v1/integration/shots/last") &&
+      request->method == HTTP_GET) {
+    static_assert(NetworkWorkBuf::kJsonItem + sizeof(kStatsRowColumns) + 64 <=
+                      NetworkWorkBuf::kStatusJson,
+                  "a full Stats row must fit the integration response");
+    if (!self.lockWorkBuf()) return self.workBufBusy(request);
+    NetworkWorkBuf &work = *self.workBuf_;
+    ShotLogRecord latest = {};
+    ShotCurveRecord &curve = work.statsCache.fetchCurve;
+    const bool hasShot = self.callbacks_.copyHomeShot != nullptr &&
+        self.callbacks_.copyHomeShot(latest, nullptr);
+    const bool hasCurve = hasShot && self.callbacks_.copyShotCurveById != nullptr &&
+        self.callbacks_.copyShotCurveById(latest.id, curve);
+    const bool rowOk =
+        !hasShot || self.formatShotStatsRow(work, latest, hasCurve ? &curve : nullptr) != 0;
+    const int written = snprintf(
+        work.statusJson, NetworkWorkBuf::kStatusJson,
+        "{\"apiVersion\":1,\"cols\":\"%s\",\"shot\":%s}", kStatsRowColumns,
+        hasShot ? work.jsonItem : "null");
+    const bool ok = rowOk && written > 0 &&
+                    static_cast<size_t>(written) < NetworkWorkBuf::kStatusJson;
+    const esp_err_t result = ok
+        ? sendJson(request, STATUS_OK, work.statusJson)
+        : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
+                    "The last shot exceeded its fixed buffer.");
     self.unlockWorkBuf();
     return result;
   }
