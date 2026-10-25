@@ -169,12 +169,14 @@
       settingsTake('function scaleHistoryLabel(', 'function brewWarningList('),
       blockAt(viewJs.settings, 'function selectPreferredScale('),
       blockAt(viewJs.settings, 'async function saveMachineConfig('),
-      settingsTake('const SAVE_GAP_MS', 'let ready = false;'),
+      take('const SAVE_GAP_MS', 'const QUICK_GUARDS'),
+      settingsTake('const autosave = {', 'let ready = false;'),
     ].join('\n'), context);
+    const autosave = vm.runInContext('autosave', context);
     // applySettingsStatus takes the shown values as the next edit's base.
     const settle = () => vm.runInContext('autosave.config.last = autosave.config.payload()', context);
-    const edit = () => context.noteEdit('config', 300);
-    const flush = () => context.flushSection('config', true);
+    const edit = () => context.noteEdit(autosave.config, 300);
+    const flush = () => context.flushEdits(autosave.config, true);
     context.updatePreferredScaleSelect(status()); settle();
     context.updatePreferredScaleSelect(status());
     assert.equal(rebuilds, 1, 'An unchanged scale list is not rebuilt, so an open list stays open');
@@ -203,7 +205,7 @@
     assert.equal(requests.length, sent, 'A setting edited back to its saved value is not sent');
     machine.autoTare = true; edit();
     sent = requests.length;
-    assert.equal(await context.flushSection('config'), false);
+    assert.equal(await context.flushEdits(autosave.config), false);
     assert.equal(requests.length, sent, 'Saves of one section stay SAVE_GAP_MS apart');
     editDuringSave = () => {machine.autoTare = false; edit();};
     assert.equal(await flush(), true);
@@ -229,6 +231,108 @@
     bullseye.bullseyeRtttl = 'not a tune'; edit(); failures.push('INVALID_FIELD');
     assert.equal(await flush(), false);
     assert.equal(errors.at(-1), 'bullseyeRtttl', 'A rejected tune is marked on its field, not saved');
+  };
+  run().catch(error => {console.error(error); process.exitCode = 1;});
+}
+// Execute the header Quick Settings autosave: a switch shows its choice at
+// once, a pause sends only the switches that changed as one patch (one
+// changed switch alone), a switch toggled back sends nothing, saves stay
+// SAVE_GAP_MS apart with a trailing patch, a stale revision resends once, the
+// duration goes alone, a failure shows the live values, a preset change or a
+// cycle drops pending choices, and Reset now cancels them.
+{
+  const assert = require('assert').strict, vm = require('vm');
+  const run = async () => {
+    const requests = [], failures = [], messages = [];
+    const live = {brewByWeight: true, noScaleBbwMode: 'warn_once', autoToManualGuardEnabled: true,
+      slowExtractionGuardEnabled: true, fastExtractionGuardEnabled: true,
+      avoidAccidentalTouchEnabled: true, cupProtectionEnabled: true, revision: 7};
+    let after = 'keep', editDuringSave = null;
+    const status = (extra = {}) => ({config: {...live}, quickRevert: {after, overrides: 0}, ...extra});
+    const els = {};
+    const context = vm.createContext({
+      $: id => els[id] ??= {dataset: {}, classList: {toggle() {}}, setAttribute() {}, querySelectorAll: () => []},
+      controlsMutable: true, configRevision: 7, presetState: {activeId: 1},
+      message: m => messages.push(m), setTimeout: () => 0, clearTimeout() {},
+      refreshStatus: async () => {context.configRevision = live.revision;},
+      command: async (path, payload) => {
+        assert.equal(path, '/api/v1/integration/quick-settings');
+        requests.push({...payload});
+        const code = failures.shift();
+        if (code) throw Object.assign(new Error('rejected'), {code});
+        if (editDuringSave) [editDuringSave] = [null, editDuringSave()];
+        const {baseRevision, revertAfter, revertNow, ...fields} = payload;
+        if (Object.keys(fields).length) Object.assign(live, fields, {revision: live.revision + 1});
+        if (revertAfter) after = revertAfter;
+        // The stream frame that reports the result carries the new revision.
+        context.configRevision = live.revision;
+        context.updateQuickSettings(status());
+        return true;
+      }});
+    const take = (start, end) => runtimeJs.slice(runtimeJs.indexOf(start), runtimeJs.indexOf(end));
+    vm.runInContext(runtimeStateGlobals + take('const SAVE_GAP_MS', 'function initHeaderSignals('), context);
+    const quick = vm.runInContext('quickAutosave', context);
+    const shown = k => quick.payload()[k];
+    const edit = (k, v) => context.editQuickSetting(k, v);
+    const flush = () => context.flushEdits(quick, true);
+    context.updateQuickSettings(status());
+
+    edit('cupProtectionEnabled', false);
+    assert.equal(shown('cupProtectionEnabled'), false, 'A switch shows its choice at once');
+    assert(context.quickDirty); assert.equal(requests.length, 0, 'A choice waits for its pause');
+    context.updateQuickSettings(status());
+    assert.equal(shown('cupProtectionEnabled'), false, 'A stream frame keeps a pending choice');
+    edit('cupProtectionEnabled', true);
+    assert.equal(await flush(), true);
+    assert.equal(requests.length, 0, 'A switch toggled back to its live value is not sent');
+
+    edit('cupProtectionEnabled', false); edit('avoidAccidentalTouchEnabled', false);
+    edit('autoToManualGuardEnabled', false);
+    assert.equal(await flush(), true);
+    assert.deepEqual(requests, [{baseRevision: 7, cupProtectionEnabled: false,
+      avoidAccidentalTouchEnabled: false, autoToManualGuardEnabled: false}],
+      'Choices within one pause travel as one patch of only those switches');
+    assert(!context.quickDirty);
+
+    edit('fastExtractionGuardEnabled', false);
+    assert.equal(await context.flushEdits(quick), false);
+    assert.equal(requests.length, 1, 'Saves stay SAVE_GAP_MS apart');
+    editDuringSave = () => edit('slowExtractionGuardEnabled', false);
+    assert.equal(await flush(), true);
+    assert.deepEqual(requests.slice(1), [{baseRevision: 8, fastExtractionGuardEnabled: false},
+      {baseRevision: 9, slowExtractionGuardEnabled: false}],
+      'One changed switch travels alone; a choice made during a save follows as a trailing patch');
+
+    edit('brewByWeight', false); failures.push('STALE_REVISION'); context.configRevision = 3;
+    assert.equal(await flush(), true);
+    assert.deepEqual(requests.slice(-2), [{baseRevision: 3, brewByWeight: false},
+      {baseRevision: 10, brewByWeight: false}], 'A stale revision resends the same patch once, refreshed');
+
+    edit('revertAfter', '15m'); edit('noScaleBbwMode', 'off');
+    assert.equal(await flush(), true);
+    assert.deepEqual(requests.slice(-2), [{baseRevision: 11, noScaleBbwMode: 'off'},
+      {baseRevision: 12, revertAfter: '15m'}], 'The duration goes alone after the settings patch');
+
+    edit('cupProtectionEnabled', true); failures.push('INVALID_REQUEST');
+    assert.equal(await flush(), false);
+    assert.equal(messages.at(-1), 'rejected');
+    assert.equal(shown('cupProtectionEnabled'), false, 'A failed patch shows the live value again');
+    assert(!context.quickDirty);
+
+    let sent = requests.length;
+    edit('cupProtectionEnabled', true); context.presetState.activeId = 2;
+    context.updateQuickSettings(status());
+    edit('avoidAccidentalTouchEnabled', true);
+    context.updateQuickSettings(status({cycle: {active: true}}));
+    assert.equal(await flush(), true);
+    assert.equal(requests.length, sent, 'A preset change or a cycle drops pending choices');
+    assert.equal(shown('cupProtectionEnabled'), false);
+
+    edit('cupProtectionEnabled', true);
+    await context.revertQuickSettingsNow();
+    assert.equal(await flush(), true);
+    assert.deepEqual(requests.slice(sent), [{baseRevision: 12, revertNow: true}],
+      'Reset now cancels pending choices and goes out alone');
   };
   run().catch(error => {console.error(error); process.exitCode = 1;});
 }

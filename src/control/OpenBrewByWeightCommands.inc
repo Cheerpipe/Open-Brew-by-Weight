@@ -341,33 +341,42 @@ void processWebCommand(const WebCommand &command) {
         rejectWebCommand(command);
         return;
       }
-      const auto quickField = static_cast<QuickSettingField>(command.presetAction);
-      if (command.presetAction == QUICK_REVERT_NOW_ACTION) {
+      const uint8_t action = command.presetAction;
+      if (action == QUICK_REVERT_NOW_ACTION) {
         revertSessionQuickSettings();
-      } else if (command.presetAction == QUICK_REVERT_POLICY_ACTION &&
+      } else if (action == QUICK_REVERT_POLICY_ACTION &&
                  command.presetId < QUICK_REVERT_POLICY_COUNT) {
         sessionQuickSettings.revertPolicy = static_cast<QuickRevertPolicy>(command.presetId);
         sessionQuickSettings.changedAtMs = millis();
         sessionQuickSettings.shotEnded = false;
-      } else if (quickField > QuickSettingField::CUP_PROTECTION ||
-                 command.presetId > (quickField == QuickSettingField::NO_SCALE_BBW_MODE
-                                         ? static_cast<uint8_t>(NoScaleBbwMode::REQUIRE_SCALE)
-                                         : 1)) {
+      } else if (action == 0 || action >= (1U << QUICK_SETTING_FIELD_COUNT)) {
         rejectWebCommand(command);
         return;
-      } else if (quickSettingValue(runtimeConfig, quickField) != command.presetId) {
+      } else {
+        // `action` is the patch's field mask and command.config holds its
+        // values: the patch goes live as one change (one revision, webhook and
+        // revert-timer restart) or, if invalid, not at all.
         RuntimeConfig candidate = runtimeConfig;
         SessionQuickSettings session = sessionQuickSettings;
-        setSessionQuickSetting(session, presetBank.activeId, candidate, quickField,
-                               command.presetId);
-        if (validateRuntimeConfig(candidate) != ConfigValidationError::NONE) {
+        bool changed = false;
+        for (uint8_t index = 0; index < QUICK_SETTING_FIELD_COUNT; ++index) {
+          const auto field = static_cast<QuickSettingField>(index);
+          const uint8_t value = quickSettingValue(command.config, field);
+          if ((action & (1U << index)) == 0 || quickSettingValue(candidate, field) == value)
+            continue;
+          setSessionQuickSetting(session, presetBank.activeId, candidate, field, value);
+          changed = true;
+        }
+        if (changed && validateRuntimeConfig(candidate) != ConfigValidationError::NONE) {
           rejectWebCommand(command);
           return;
         }
-        session.changedAtMs = millis();
-        session.shotEnded = false;
-        sessionQuickSettings = session;
-        commitSessionQuickSettings(candidate);
+        if (changed) {
+          session.changedAtMs = millis();
+          session.shotEnded = false;
+          sessionQuickSettings = session;
+          commitSessionQuickSettings(candidate);
+        }
       }
       // Nothing to save: the change is complete once it is live.
       reportControlCommandResult(command, CommandResultState::PERSISTED);

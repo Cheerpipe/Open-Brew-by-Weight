@@ -13983,6 +13983,21 @@ void w90c_preset_temperature_presence_and_learning_invalidation() {
   CHECK(hostMachineTemperatureRequestCount == 1);
 }
 
+// A Quick Settings patch as the Integration API builds it: the field mask in
+// presetAction, the values in the command's config copy.
+WebCommand quickSettingsPatch(
+    uint32_t requestId, std::initializer_list<std::pair<QuickSettingField, uint8_t>> changes) {
+  WebCommand command;
+  command.type = WebCommandType::QUICK_SETTING;
+  command.requestId = requestId;
+  command.config = runtimeConfig;
+  for (const auto &change : changes) {
+    setQuickSettingValue(command.config, change.first, change.second);
+    command.presetAction |= static_cast<uint8_t>(1U << static_cast<uint8_t>(change.first));
+  }
+  return command;
+}
+
 void hq01_quick_settings_are_session_only() {
   resetHarness(false, false);
   reachReadyFromBoot();
@@ -14013,12 +14028,7 @@ void hq01_quick_settings_are_session_only() {
   };
   uint32_t requestId = 200;
   for (const auto &change : changes) {
-    WebCommand command;
-    command.type = WebCommandType::QUICK_SETTING;
-    command.requestId = requestId++;
-    command.config.revision = runtimeConfig.revision;
-    command.presetAction = static_cast<uint8_t>(change.field);
-    command.presetId = change.value;
+    const WebCommand command = quickSettingsPatch(requestId++, {{change.field, change.value}});
     const uint32_t previousRevision = runtimeConfig.revision;
     processWebCommand(command);
     CHECK(runtimeConfig.revision == previousRevision + 1);
@@ -14081,29 +14091,22 @@ void hq01_quick_settings_are_session_only() {
   CHECK(hostLastFlushedRuntime.avoidAccidentalTouchEnabled);
   CHECK(!runtimeConfig.avoidAccidentalTouchEnabled);
 
-  WebCommand stale;
-  stale.type = WebCommandType::QUICK_SETTING;
-  stale.requestId = ++requestId;
+  WebCommand stale = quickSettingsPatch(++requestId, {{QuickSettingField::CUP_PROTECTION, 1}});
   stale.config.revision = runtimeConfig.revision - 1;
-  stale.presetAction = static_cast<uint8_t>(QuickSettingField::CUP_PROTECTION);
-  stale.presetId = 1;
   processWebCommand(stale);
   CHECK(!runtimeConfig.cupProtectionEnabled);
   CHECK(hostLastForwardedNetworkCommand.resultState == CommandResultState::FAILED);
 
-  WebCommand unchanged = stale;
-  unchanged.requestId = ++requestId;
-  unchanged.config.revision = runtimeConfig.revision;
-  unchanged.presetId = 0;
+  const WebCommand unchanged =
+      quickSettingsPatch(++requestId, {{QuickSettingField::CUP_PROTECTION, 0}});
   const uint32_t unchangedRevision = runtimeConfig.revision;
   processWebCommand(unchanged);
   CHECK(runtimeConfig.revision == unchangedRevision);
   CHECK(hostLastForwardedNetworkCommand.resultState == CommandResultState::PERSISTED);
 
   session.active = true;
-  WebCommand active = unchanged;
-  active.requestId = ++requestId;
-  active.presetId = 1;
+  const WebCommand active =
+      quickSettingsPatch(++requestId, {{QuickSettingField::CUP_PROTECTION, 1}});
   processWebCommand(active);
   CHECK(!runtimeConfig.cupProtectionEnabled);
   CHECK(hostLastForwardedNetworkCommand.resultState == CommandResultState::FAILED);
@@ -14126,21 +14129,22 @@ void hq02_quick_settings_revert_after_duration() {
   reachReadyFromBoot();
   const RuntimeConfig saved = runtimeConfig;
   uint32_t requestId = 300;
-  const auto quick = [&](uint8_t action, uint8_t value) {
-    WebCommand command;
-    command.type = WebCommandType::QUICK_SETTING;
+  const auto quick = [&](WebCommand command) {
     command.requestId = requestId++;
-    command.config.revision = runtimeConfig.revision;
-    command.presetAction = action;
-    command.presetId = value;
     processWebCommand(command);
     CHECK(hostLastForwardedNetworkCommand.resultState == CommandResultState::PERSISTED);
   };
+  const auto revert = [&](uint8_t action, uint8_t value) {
+    WebCommand command = quickSettingsPatch(0, {});
+    command.presetAction = action;
+    command.presetId = value;
+    quick(command);
+  };
   const auto policy = [&](QuickRevertPolicy value) {
-    quick(QUICK_REVERT_POLICY_ACTION, static_cast<uint8_t>(value));
+    revert(QUICK_REVERT_POLICY_ACTION, static_cast<uint8_t>(value));
   };
   const auto toggle = [&](QuickSettingField field) {
-    quick(static_cast<uint8_t>(field), !quickSettingValue(runtimeConfig, field));
+    quick(quickSettingsPatch(0, {{field, !quickSettingValue(runtimeConfig, field)}}));
   };
   const auto restored = [&]() {
     return sessionQuickSettings.mask == 0 &&
@@ -14168,7 +14172,7 @@ void hq02_quick_settings_revert_after_duration() {
   toggle(QuickSettingField::AUTO_TO_MANUAL_GUARD);
   runLoopAfter(61 * minute);
   CHECK(sessionQuickSettings.mask != 0);
-  quick(QUICK_REVERT_NOW_ACTION, 0);
+  revert(QUICK_REVERT_NOW_ACTION, 0);
   CHECK(restored());
 
   // A due revert waits for the cycle to end.
@@ -14192,6 +14196,33 @@ void hq02_quick_settings_revert_after_duration() {
   releaseAtPhysicalDuration(rawOnAtMs, 20000);
   CHECK(restored());
   CHECK(sessionQuickSettings.revertPolicy == QuickRevertPolicy::NEXT_SHOT);
+}
+
+// A patch of several settings goes live as one change, or not at all.
+void hq03_quick_settings_patch_is_one_change() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  runtimeConfig.cupProtectionEnabled = true;
+  runtimeConfig.avoidAccidentalTouchEnabled = true;
+  const uint8_t scaleLoss = quickSettingValue(runtimeConfig, QuickSettingField::AUTO_TO_MANUAL_GUARD);
+  const uint32_t revision = runtimeConfig.revision;
+  const uint32_t webhooks = hostQuickSettingsWebhookCount;
+  processWebCommand(quickSettingsPatch(400, {{QuickSettingField::CUP_PROTECTION, 0},
+                                             {QuickSettingField::NO_SCALE_BBW_MODE, 3}}));
+  CHECK(hostLastForwardedNetworkCommand.resultState == CommandResultState::FAILED);
+  CHECK(runtimeConfig.cupProtectionEnabled && runtimeConfig.revision == revision);
+  CHECK(sessionQuickSettings.mask == 0 && hostQuickSettingsWebhookCount == webhooks);
+
+  processWebCommand(quickSettingsPatch(401, {{QuickSettingField::CUP_PROTECTION, 0},
+                                             {QuickSettingField::AVOID_ACCIDENTAL_TOUCH, 0},
+                                             {QuickSettingField::AUTO_TO_MANUAL_GUARD, scaleLoss}}));
+  CHECK(hostLastForwardedNetworkCommand.resultState == CommandResultState::PERSISTED);
+  CHECK(!runtimeConfig.cupProtectionEnabled && !runtimeConfig.avoidAccidentalTouchEnabled);
+  CHECK(runtimeConfig.revision == revision + 1);
+  CHECK(hostQuickSettingsWebhookCount == webhooks + 1);
+  CHECK(sessionQuickSettings.mask ==
+        ((1U << static_cast<uint8_t>(QuickSettingField::CUP_PROTECTION)) |
+         (1U << static_cast<uint8_t>(QuickSettingField::AVOID_ACCIDENTAL_TOUCH))));
 }
 
 void s20_last_good_shot_advances_independently() {
@@ -22559,6 +22590,7 @@ const TestCase testCases[] = {
     {"W87c", w87c_runtime_persist_io_backoff_is_bounded_and_resets},
     {"HQ01", hq01_quick_settings_are_session_only},
     {"HQ02", hq02_quick_settings_revert_after_duration},
+    {"HQ03", hq03_quick_settings_patch_is_one_change},
     {"S03", s03_shot_log_clear_empties_records},
     {"S03B", s03b_good_shot_records_stats_and_history},
     {"S03C", s03c_short_activation_is_other_in_history_only},

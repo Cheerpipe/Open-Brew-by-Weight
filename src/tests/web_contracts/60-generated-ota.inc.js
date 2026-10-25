@@ -920,8 +920,10 @@ if (generated.cssGzip.length > 17337) {
 // 2026-10-23; cap 43180.
 // Stream render errors kept off the corrupt-frame path bring it to 43181, owner-requested
 // 2026-10-23; cap 43200.
-if (sentinelRuntimeGzip.length > 43200) {
-  throw new Error(`Compressed Web UI runtime JS exceeds the 43200-byte gzip budget (${sentinelRuntimeGzip.length})`);
+// The autosave engine moved from Settings plus the Quick Settings autosave bring it
+// to 43650, owner-requested 2026-10-24; cap 43660.
+if (sentinelRuntimeGzip.length > 43660) {
+  throw new Error(`Compressed Web UI runtime JS exceeds the 43660-byte gzip budget (${sentinelRuntimeGzip.length})`);
 }
 if (generated.otaImageGzip.length > 3072) {
   throw new Error('Compressed OTA image module exceeds the 3 KiB gzip budget');
@@ -1240,9 +1242,10 @@ const coldHomeGzip = generated.gzip.length + generated.cssGzip.length +
 // owner-requested 2026-10-23; cap 73230.
 // Rejected-op (4003) recovery: 73288, owner-requested 2026-10-23; cap 73300.
 // Shot-card Target temp, Dose, and Ratio: 73373, owner-requested 2026-10-24;
-// cap 73380.
-if (coldHomeGzip > 73380) {
-  throw new Error(`Cold Home download exceeds the 73380-byte gzip budget (${coldHomeGzip})`);
+// cap 73380. The autosave engine shared with Settings and the Quick Settings
+// autosave: 73952 (73967 with asset-tag gzip wobble), owner-requested 2026-10-24; cap 73990.
+if (coldHomeGzip > 73990) {
+  throw new Error(`Cold Home download exceeds the 73990-byte gzip budget (${coldHomeGzip})`);
 }
 // The optional Web UI login brings every embedded asset together to 149453,
 // owner-requested 2026-10-22; cap 149480 for asset-tag gzip wobble. The Admin
@@ -1261,9 +1264,11 @@ if (coldHomeGzip > 73380) {
 // 2026-10-23; cap 155040.
 // Shot-card Target temp, Dose, and Ratio (CSS and JS raises): 155359,
 // owner-requested 2026-10-24; cap 155360. The audit's metric-typography
-// range fix re-measured 155373; cap 155380.
-if (generated.combined > 155380) {
-  throw new Error(`Combined Web UI gzip exceeds the 155380-byte flash budget (${generated.combined})`);
+// range fix re-measured 155373; cap 155380. Quick Settings autosave on the engine
+// shared with Settings: 155704 (155719 with asset-tag gzip wobble), owner-requested
+// 2026-10-24; cap 155740.
+if (generated.combined > 155740) {
+  throw new Error(`Combined Web UI gzip exceeds the 155740-byte flash budget (${generated.combined})`);
 }
 if (!network.includes('#include "OpenBrewByWeightWebAssetsGzip.h"') ||
     network.includes('#include "OpenBrewByWeightWebAssets.h"')) {

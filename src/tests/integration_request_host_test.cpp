@@ -57,15 +57,27 @@ void valid_quick_settings_map_exactly() {
   for (const auto &item : cases) {
     IntegrationQuickSettingRequest request;
     CHECK(parse(item.json, request));
+    const auto index = static_cast<uint8_t>(item.field);
     CHECK(request.baseRevision == 7);
-    CHECK(request.field == item.field);
-    CHECK(request.value == item.value);
+    CHECK(request.mask == (1U << index));
+    CHECK(request.value[index] == item.value);
     CHECK(request.revertAction == 0);
   }
+  // A patch carries every changed setting at once.
+  IntegrationQuickSettingRequest patch;
+  CHECK(parse(R"({"baseRevision":7,"cupProtectionEnabled":true,)"
+              R"("noScaleBbwMode":"off","brewByWeight":false})", patch));
+  CHECK(patch.mask == ((1U << static_cast<uint8_t>(QuickSettingField::CUP_PROTECTION)) |
+                       (1U << static_cast<uint8_t>(QuickSettingField::NO_SCALE_BBW_MODE)) |
+                       (1U << static_cast<uint8_t>(QuickSettingField::BREW_BY_WEIGHT))));
+  CHECK(patch.value[static_cast<uint8_t>(QuickSettingField::CUP_PROTECTION)] == 1);
+  CHECK(patch.value[static_cast<uint8_t>(QuickSettingField::BREW_BY_WEIGHT)] == 0);
+  CHECK(patch.revertAction == 0);
   IntegrationQuickSettingRequest revert;
   CHECK(parse(R"({"baseRevision":7,"revertAfter":"30m"})", revert));
   CHECK(revert.revertAction == QUICK_REVERT_POLICY_ACTION);
-  CHECK(revert.value == static_cast<uint8_t>(QuickRevertPolicy::MINUTES_30));
+  CHECK(revert.revertPolicy == static_cast<uint8_t>(QuickRevertPolicy::MINUTES_30));
+  CHECK(revert.mask == 0);
   IntegrationQuickSettingRequest now;
   CHECK(parse(R"({"baseRevision":7,"revertNow":true})", now));
   CHECK(now.revertAction == QUICK_REVERT_NOW_ACTION);
@@ -76,7 +88,10 @@ void malformed_quick_settings_fail_closed() {
       "{}",
       R"({"baseRevision":7,"brewByWeight":1})",
       R"({"baseRevision":7})",
-      R"({"baseRevision":7,"autoToManualGuardEnabled":true,"cupProtectionEnabled":true})",
+      R"({"baseRevision":7,"baseRevision":7,"cupProtectionEnabled":true})",
+      R"({"baseRevision":7,"cupProtectionEnabled":true,"revertAfter":"keep"})",
+      R"({"baseRevision":7,"revertNow":true,"cupProtectionEnabled":true})",
+      R"({"baseRevision":7,"revertAfter":"keep","revertAfter":"15m"})",
       R"({"baseRevision":7,"cupProtectionEnabled":true,"extra":false})",
       R"({"baseRevision":7,"cupProtectionEnabled":true,"cupProtectionEnabled":false})",
       R"({"baseRevision":true,"cupProtectionEnabled":true})",

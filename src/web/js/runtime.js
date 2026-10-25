@@ -260,6 +260,7 @@ const uiState = {
   brewWarnSeq: 0,
   configBaseline: null,
   micraDirty: false,
+  quickDirty: false,
   micraSignIn: null,
   dateTimeBaseline: null,
   scanBusy: false,
@@ -356,8 +357,56 @@ function updateHeaderSignals(s = {}) {
     if (detail) detail.textContent = label;
   }
 }
+// Autosave: after a pause a section sends only the keys its edits changed (a
+// patch); one request in flight per section, SAVE_GAP_MS apart, later edits
+// follow as one trailing patch. A section supplies payload(), save(patch) and
+// optionally valid(), and owns uiState[key + "Dirty"]: pending or in flight.
+const SAVE_GAP_MS = 1000;
+function autosaveSection(key, a) {
+  return Object.assign(a, { key, last: null, base: {}, at: 0 });
+}
+// A key keeps the value its first edit replaced: edited back, it is not sent.
+function noteEdit(a, waitMs) {
+  const now = a.payload();
+  for (const k in now)
+    if (a.last && !(k in a.base) && !Object.is(now[k], a.last[k])) a.base[k] = a.last[k];
+  a.last = now;
+  uiState[a.key + "Dirty"] = true;
+  clearTimeout(a.timer);
+  a.timer = setTimeout(() => flushEdits(a), waitMs);
+}
+// True once nothing is left to save; `force` skips the gap and drains edits.
+async function flushEdits(a, force) {
+  while (a.busy) await a.busy;
+  clearTimeout(a.timer);
+  const now = a.payload(),
+    patch = {};
+  for (const k in a.base) if (!Object.is(now[k], a.base[k])) patch[k] = now[k];
+  // Nothing changed, or the page dropped the edit (preset switch, disconnect).
+  if (!uiState[a.key + "Dirty"] || !Object.keys(patch).length) {
+    a.base = {};
+    uiState[a.key + "Dirty"] = false;
+    return true;
+  }
+  const gap = a.at + SAVE_GAP_MS - Date.now();
+  if (!force && gap > 0) {
+    a.timer = setTimeout(() => flushEdits(a), gap);
+    return false;
+  }
+  if (a.valid && !a.valid()) return false;
+  const sent = a.base;
+  a.base = {};
+  a.at = Date.now();
+  const ok = await (a.busy = a.save(patch));
+  a.busy = null;
+  if (ok) return flushEdits(a, force);
+  // A failed patch stays pending with its error shown; the next edit retries.
+  Object.assign(a.base, sent);
+  return false;
+}
 // Home Quick Settings in the header mirror the Integration API (and Home
-// Assistant): every change is a session-only override on the controller.
+// Assistant): every change is a session-only override on the controller,
+// autosaved like Settings so a burst of taps travels as one patch.
 const QUICK_GUARDS = [
   "slowExtractionGuardEnabled",
   "fastExtractionGuardEnabled",
@@ -422,8 +471,8 @@ function buildQuickSettings() {
     const button = e.target.closest("button");
     if (!button || button.disabled) return;
     if (button.dataset.quick) setQuickSetting(button);
-    else if (button.dataset.revert) putQuickSettings({ revertAfter: button.dataset.revert });
-    else if (button.id === "quickRevertNow") putQuickSettings({ revertNow: true });
+    else if (button.dataset.revert) editQuickSetting("revertAfter", button.dataset.revert);
+    else if (button.id === "quickRevertNow") revertQuickSettingsNow();
   });
 }
 const QUICK_REVERT = ["next_shot", "15m", "30m", "60m", "keep"];
@@ -442,18 +491,38 @@ function quickRevertNote(r, i) {
   ).replace("{when}", when);
 }
 let quickNoScaleMode = "warn_once",
-  quickBusy = false,
-  quickStatus = {};
+  quickStatus = {},
+  quickDraft = {};
 const quickOn = (c, k) => (k === "noScaleBbwMode" ? !!c[k] && c[k] !== "off" : !!c[k]);
+// The shown values: the controller's, with this page's pending choices on top.
+const quickAutosave = autosaveSection("quick", {
+  payload: () => {
+    const c = { ...quickStatus.config, revertAfter: quickStatus.quickRevert?.after, ...quickDraft };
+    return Object.fromEntries(
+      ["brewByWeight", "revertAfter", ...QUICK_GUARDS].map((k) => [k, c[k]]),
+    );
+  },
+  save: saveQuickSettings,
+});
 function updateQuickSettings(s = quickStatus) {
-  const c = s.config || {},
-    root = $("headerSignals");
-  if (!root || typeof c.brewByWeight !== "boolean") return;
+  const root = $("headerSignals");
+  if (!root || typeof s.config?.brewByWeight !== "boolean") return;
   quickStatus = s;
+  // A preset change or a cycle drops pending choices: the controller would
+  // restore or refuse them. Settled, the shown values base the next edit.
+  const a = quickAutosave;
+  if (!a.busy && (!uiState.quickDirty || s.cycle?.active || presetState.activeId !== a.presetId)) {
+    clearTimeout(a.timer);
+    uiState.quickDirty = false;
+    quickDraft = {};
+    a.base = {};
+    a.last = a.payload();
+  }
+  const c = { ...s.config, ...quickDraft };
   if (quickOn(c, "noScaleBbwMode")) quickNoScaleMode = c.noScaleBbwMode;
   const manual = !c.brewByWeight,
     on = QUICK_GUARDS.filter((k) => quickOn(c, k)).length,
-    locked = quickBusy || !controlsMutable || !!s.cycle?.active,
+    locked = !controlsMutable || !!s.cycle?.active,
     status = manual
       ? __WEBUI_TEXT__("runtime.quick_manual_status")
       : on === QUICK_GUARDS.length
@@ -474,7 +543,8 @@ function updateQuickSettings(s = quickStatus) {
     el.disabled = locked || (manual && k !== "brewByWeight");
   });
   const r = s.quickRevert || {},
-    i = QUICK_REVERT.includes(r.after) ? QUICK_REVERT.indexOf(r.after) : 4;
+    after = quickDraft.revertAfter ?? r.after,
+    i = QUICK_REVERT.includes(after) ? QUICK_REVERT.indexOf(after) : 4;
   root.querySelectorAll("[data-revert]").forEach((el) => {
     el.setAttribute("aria-checked", String(el.dataset.revert === QUICK_REVERT[i]));
     el.disabled = locked;
@@ -483,7 +553,7 @@ function updateQuickSettings(s = quickStatus) {
   $("quickRevertNow").hidden = !r.overrides;
   $("quickRevertNow").disabled = locked;
 }
-async function setQuickSetting(button) {
+function setQuickSetting(button) {
   const k = button.dataset.quick,
     on = button.getAttribute("aria-checked") === "true",
     value =
@@ -495,29 +565,60 @@ async function setQuickSetting(button) {
             : quickNoScaleMode
           : !on;
   if (k === "brewByWeight" && on) return;
-  await putQuickSettings({ [k]: value });
+  editQuickSetting(k, value);
 }
-async function putQuickSettings(change) {
-  quickBusy = true;
-  if (change.revertAfter)
-    quickStatus.quickRevert = { ...quickStatus.quickRevert, after: change.revertAfter };
+function editQuickSetting(k, value) {
+  if (!uiState.quickDirty) quickAutosave.presetId = presetState.activeId;
+  quickDraft[k] = value;
+  noteEdit(quickAutosave, 300);
   updateQuickSettings();
-  try {
-    await api("/api/v1/integration/quick-settings", {
-      method: "PUT",
-      body: body({ baseRevision: configRevision, ...change }),
-    });
-  } catch (err) {
-    message(err.message, "error");
-  } finally {
-    quickBusy = false;
-    updateQuickSettings();
+}
+// The settings go as one patch; revertAfter and revertNow go alone. A failed
+// change drops the pending choices, so the panel shows what is live.
+async function saveQuickSettings(patch) {
+  const { revertAfter, ...fields } = patch;
+  for (const change of [fields, { revertAfter }]) {
+    if (Object.values(change).every((v) => v === undefined)) continue;
+    for (let retry = true; ; retry = false)
+      try {
+        await command(
+          "/api/v1/integration/quick-settings",
+          { baseRevision: configRevision, ...change },
+          1,
+          "",
+        );
+        break;
+      } catch (e) {
+        // The patch holds only this page's choices: resend it once on a newer revision.
+        if (retry && e.code === "STALE_REVISION") {
+          await refreshStatus();
+          continue;
+        }
+        quickDraft = {};
+        uiState.quickDirty = false;
+        message(e.message, "error");
+        updateQuickSettings();
+        return false;
+      }
   }
+  return true;
+}
+// Reset now drops the pending choices and goes out after any save in flight.
+async function revertQuickSettingsNow() {
+  const a = quickAutosave;
+  clearTimeout(a.timer);
+  quickDraft = {};
+  uiState.quickDirty = false;
+  updateQuickSettings();
+  while (a.busy) await a.busy;
+  await (a.busy = saveQuickSettings({ revertNow: true }));
+  a.busy = null;
 }
 function initHeaderSignals() {
   if ($("modeSignal")) buildQuickSettings();
   const buttons = [...document.querySelectorAll(".signalIndicator[aria-controls]")];
   function close() {
+    if (uiState.quickDirty) flushEdits(quickAutosave, true);
     for (const button of buttons) {
       $(button.getAttribute("aria-controls")).hidden = true;
       button.setAttribute("aria-expanded", "false");
@@ -5534,14 +5635,15 @@ document.addEventListener("visibilitychange", onPageVisibility);
 if (document.hidden) onPageVisibility();
 window.addEventListener("pagehide", stopUiStream);
 // Unloading the page drops every unsaved Save/Revert section (setSaveDirty
-// marks them) and a Settings autosave still pending or in flight.
+// marks them) and an autosave still pending or in flight.
 window.addEventListener("beforeunload", (e) => {
   if (
     !fwReloading &&
     (document.querySelector('[data-dirty="1"]') ||
       uiState.configDirty ||
       uiState.brewDirty ||
-      uiState.micraDirty)
+      uiState.micraDirty ||
+      uiState.quickDirty)
   )
     e.preventDefault();
 });
@@ -6455,11 +6557,12 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
           path.endsWith("/network") && value.action === "save" && value._noReconnectWait,
         firmwareModeSave = path.endsWith("/firmware-mode"),
         presetOp = path.endsWith("/presets"),
-        waitForRevision = presetOp || path.endsWith("/config"),
+        quickOp = path.endsWith("/quick-settings"),
+        waitForRevision = presetOp || quickOp || path.endsWith("/config"),
         previousRevision = configRevision;
       const payload = value;
       delete payload._noReconnectWait;
-      const accepted = await api(path, { method: "POST", body: body(payload) });
+      const accepted = await api(path, { method: quickOp ? "PUT" : "POST", body: body(payload) });
       clearFieldErrors();
       noteReachOk();
       if (noReconnect) uiState.savedStaWifiSleep = !!$("staWifiSleep").checked;
@@ -6488,13 +6591,14 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
           if (result.state === "FAILED" || result.state === "CANCELED")
             throw new Error(__WEBUI_TEXT__("runtime.device_did_not_apply_the_change"));
           // The device rejects a preset operation until the previous one is saved.
+          // A duration or an unchanged Quick Setting keeps the revision.
           applied =
             (result.state === "PERSISTED" || (!presetOp && result.state === "APPLIED")) &&
-            configRevision !== previousRevision;
+            (quickOp || configRevision !== previousRevision);
         }
         if (!applied) throw new Error(__WEBUI_TEXT__("runtime.device_did_not_apply_the_change"));
-        // Repaint REST-backed forms once.
-        if (!polled) await refreshStatus();
+        // Repaint REST-backed forms once; Quick Settings live on the stream.
+        if (!polled && !quickOp) await refreshStatus();
       } else await refreshStatus();
       if (okMsg !== "")
         message(
@@ -6550,6 +6654,9 @@ export {
   command,
   withCommandGate,
   withBaseRev,
+  autosaveSection,
+  noteEdit,
+  flushEdits,
   registerViewStatus,
   setEnsureViewHook,
   setActiveView,

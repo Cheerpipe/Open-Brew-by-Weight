@@ -17,7 +17,7 @@
     window: {addEventListener: (name, fn) => {events[name] = fn;}},
   });
   const regionEnd = runtimeJs.slice(start).search(/\nlet\s+homeBootDone\s*=/);
-  vm.runInContext(runtimeJs.slice(start, regionEnd < 0 ? undefined : regionEnd + start).replace(/^export /gm, ''), context);
+  vm.runInContext(runtimeStateDecl + runtimeJs.slice(start, regionEnd < 0 ? undefined : regionEnd + start).replace(/^export /gm, ''), context);
   for (const [signal, level] of [[1, '1'], [2, '2'], [3, '3'], [null, 'unknown'], [NaN, 'unknown'], [Infinity, 'unknown'], [-1, 'unknown'], [0, 'unknown'], [4, 'unknown'], [1.5, 'unknown'], ['3', 'unknown']]) {
     context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: signal, bluetoothConnected: true, bluetoothLevel: signal}});
     for (const kind of ['wifi', 'bluetooth']) assert.equal(elements[kind + 'Signal'].dataset.level, level, String(signal));

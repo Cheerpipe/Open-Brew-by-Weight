@@ -259,14 +259,23 @@ candidate as confirmed.
 
 ### `PUT /api/v1/integration/quick-settings`
 
-Requires `baseRevision` plus exactly one setting. Boolean settings are
+Requires `baseRevision` plus one or more settings. Boolean settings are
 `brewByWeight`, `autoToManualGuardEnabled`, `slowExtractionGuardEnabled`,
 `fastExtractionGuardEnabled`, `avoidAccidentalTouchEnabled`, and
 `cupProtectionEnabled`; `noScaleBbwMode` accepts `off`, `warn_once`, or
-`require_scale`. Extra, duplicate, or incorrectly typed fields are rejected.
-Instead of a setting, the single field may be `revertAfter` (`next_shot`,
-`15m`, `30m`, `60m`, or `keep`) to choose how long overrides last, or
-`revertNow: true` to drop every override at once.
+`require_scale`. Settings sent together are one change: they are validated
+together and go live all at once or not at all, with one revision, one
+`quick_settings_changed` webhook, and one restart of the revert timer. Unknown,
+duplicate, or incorrectly typed fields are rejected. Instead of settings, the
+request may carry only `revertAfter` (`next_shot`, `15m`, `30m`, `60m`, or
+`keep`) to choose how long overrides last, or only `revertNow: true` to drop
+every override at once. A request with a single setting, as earlier clients
+send, keeps working unchanged.
+
+The Web UI header panel sends one such request per pause: switches flip at
+once on screen, and about 0.3 s after the last tap only the switches that end
+up different from the controller's values travel, at most one request every
+second. A switch turned back before then sends nothing.
 
 These are the same session-only overrides as the Web UI header panel. A change
 applies to the next shot immediately and is never written to flash, a preset,

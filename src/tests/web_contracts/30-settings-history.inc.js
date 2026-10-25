@@ -79,7 +79,7 @@
         field.addEventListener = (type, fn) => events[type] = fn;
         // Settings-owned helpers are module locals; the rest come from R.
         new Function('document', 'R',
-            'const {noteEdit, clearBrewFieldErrors, refreshBrewWarnings} = R;' + bindings)(
+            'const {clearBrewFieldErrors, refreshBrewWarnings} = R, autosave = {};' + bindings)(
             {querySelectorAll: () => [field]}, {
           settingsSectionOf: () => 'brew', noteEdit() {},
           clearBrewFieldErrors() {}, refreshBrewWarnings() {},
@@ -926,7 +926,7 @@ if (!codeIncludes(js, 'function commandOkMessage(') ||
 {
   const commandFn = runtimeJs.slice(runtimeJs.indexOf('async function command('),
       runtimeJs.indexOf('async function setBleScanIntensity('));
-  if (!codeIncludes(commandFn, "presetOp=path.endsWith('/presets'),waitForRevision=presetOp||path.endsWith('/config')") ||
+  if (!codeIncludes(commandFn, "presetOp=path.endsWith('/presets'),quickOp=path.endsWith('/quick-settings'),waitForRevision=presetOp||quickOp||path.endsWith('/config')") ||
       !codeIncludes(commandFn, "result.state==='PERSISTED'||(!presetOp&&result.state==='APPLIED')") ||
       !codeIncludes(commandFn, 'configRevision!==previousRevision') ||
       !codeIncludes(commandFn, 'result?.requestId!==accepted.requestId') ||

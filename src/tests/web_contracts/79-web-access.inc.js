@@ -105,7 +105,7 @@
       integration.indexOf('readWebAccessToken(request, "Authorization", "Bearer ", token)'));
   // The Web UI's own Quick Settings calls use its session, not a bearer token.
   assert.ok(integration.includes('if (webAccessSessionAllowed(request)) return false;'));
-  assert.ok(codeIncludes(rawRuntimeJs, 'api("/api/v1/integration/quick-settings"'));
+  assert.ok(codeIncludes(rawRuntimeJs, 'command("/api/v1/integration/quick-settings"'));
 
   // The Home stream drives the notice and the pairing prompt.
   for (const field of ['access.login', 'access.notice', 'access.pairId', 'access.pairCode',

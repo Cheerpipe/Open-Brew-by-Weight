@@ -408,8 +408,8 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.unlockJsonBody();
     if (!parsed)
       return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                       "Provide baseRevision and exactly one valid Quick Settings field, "
-                       "revertAfter, or revertNow.");
+                       "Provide baseRevision and one or more valid Quick Settings fields, "
+                       "or revertAfter or revertNow alone.");
     RecipeSnapshot recipe;
     if (self.callbacks_.copyRecipeSnapshot != nullptr)
       self.callbacks_.copyRecipeSnapshot(&recipe);
@@ -419,10 +419,16 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     WebCommand command;
     command.type = WebCommandType::QUICK_SETTING;
     command.requestId = self.allocateRequestId();
+    // A settings patch carries its field mask and, in the config copy, the
+    // requested values; a revert action carries its policy.
     command.config = recipe.runtime;
+    for (uint8_t index = 0; index < QUICK_SETTING_FIELD_COUNT; ++index)
+      if (parsedRequest.mask & (1U << index))
+        setQuickSettingValue(command.config, static_cast<QuickSettingField>(index),
+                             parsedRequest.value[index]);
     command.presetAction = parsedRequest.revertAction != 0
-        ? parsedRequest.revertAction : static_cast<uint8_t>(parsedRequest.field);
-    command.presetId = parsedRequest.value;
+        ? parsedRequest.revertAction : parsedRequest.mask;
+    command.presetId = parsedRequest.revertPolicy;
     self.dataMux_.lock();
     const bool available = self.stagedPresetRequestId_ == 0;
     if (available) self.stagedPresetRequestId_ = command.requestId;

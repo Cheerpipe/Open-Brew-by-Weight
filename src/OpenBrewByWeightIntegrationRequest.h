@@ -10,24 +10,28 @@ namespace openbrewbyweight {
 
 struct IntegrationQuickSettingRequest {
   uint32_t baseRevision = 0;
-  QuickSettingField field = QuickSettingField::BREW_BY_WEIGHT;
-  uint8_t value = 0;
-  // QUICK_REVERT_*_ACTION for `revertAfter` / `revertNow`, else 0.
+  // Settings present (bit = QuickSettingField index) and their values.
+  uint8_t mask = 0;
+  uint8_t value[QUICK_SETTING_FIELD_COUNT] = {};
+  // QUICK_REVERT_*_ACTION for `revertAfter` (with its policy) / `revertNow`,
+  // else 0. Either one stands alone; settings may arrive together.
   uint8_t revertAction = 0;
+  uint8_t revertPolicy = 0;
 };
 
 inline bool parseIntegrationQuickSettingRequest(
     const cJSON *root, IntegrationQuickSettingRequest &output) {
-  if (!cJSON_IsObject(root) || cJSON_GetArraySize(root) != 2) return false;
+  if (!cJSON_IsObject(root)) return false;
   const cJSON *revision = cJSON_GetObjectItemCaseSensitive(root, "baseRevision");
   if (!cJSON_IsNumber(revision) || !std::isfinite(revision->valuedouble) ||
       revision->valuedouble < 0 || revision->valuedouble > UINT32_MAX ||
       std::floor(revision->valuedouble) != revision->valuedouble) return false;
 
-  uint8_t selected = 0;
+  int selected = 0;
   for (const cJSON *item = root->child; item != nullptr; item = item->next) {
     if (item->string == nullptr || strcmp(item->string, "baseRevision") == 0)
       continue;
+    ++selected;
     struct BooleanField {
       const char *name;
       QuickSettingField field;
@@ -40,47 +44,50 @@ inline bool parseIntegrationQuickSettingRequest(
         {"avoidAccidentalTouchEnabled", QuickSettingField::AVOID_ACCIDENTAL_TOUCH},
         {"cupProtectionEnabled", QuickSettingField::CUP_PROTECTION},
     };
-    bool matched = false;
+    int field = -1;
+    uint8_t value = 0;
     for (const auto &candidate : fields) {
       if (strcmp(item->string, candidate.name) != 0) continue;
       if (!cJSON_IsBool(item)) return false;
-      output.field = candidate.field;
-      output.value = cJSON_IsTrue(item) ? 1 : 0;
-      matched = true;
+      field = static_cast<int>(candidate.field);
+      value = cJSON_IsTrue(item) ? 1 : 0;
       break;
     }
-    if (!matched && strcmp(item->string, "noScaleBbwMode") == 0) {
+    if (field < 0 && strcmp(item->string, "noScaleBbwMode") == 0) {
       if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
-      output.field = QuickSettingField::NO_SCALE_BBW_MODE;
+      field = static_cast<int>(QuickSettingField::NO_SCALE_BBW_MODE);
       if (strcmp(item->valuestring, "off") == 0) {
-        output.value = static_cast<uint8_t>(NoScaleBbwMode::OFF);
+        value = static_cast<uint8_t>(NoScaleBbwMode::OFF);
       } else if (strcmp(item->valuestring, "warn_once") == 0) {
-        output.value = static_cast<uint8_t>(NoScaleBbwMode::WARN_ONCE);
+        value = static_cast<uint8_t>(NoScaleBbwMode::WARN_ONCE);
       } else if (strcmp(item->valuestring, "require_scale") == 0) {
-        output.value = static_cast<uint8_t>(NoScaleBbwMode::REQUIRE_SCALE);
+        value = static_cast<uint8_t>(NoScaleBbwMode::REQUIRE_SCALE);
       } else {
         return false;
       }
-      matched = true;
     }
-    if (!matched && strcmp(item->string, "revertAfter") == 0) {
+    if (field >= 0) {
+      const auto bit = static_cast<uint8_t>(1U << field);
+      if (output.mask & bit) return false;
+      output.mask |= bit;
+      output.value[field] = value;
+    } else if (strcmp(item->string, "revertAfter") == 0) {
       if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
-      for (uint8_t policy = 0; policy < QUICK_REVERT_POLICY_COUNT && !matched; ++policy) {
-        matched = strcmp(item->valuestring, QUICK_REVERT_POLICY_IDS[policy]) == 0;
-        output.value = policy;
-      }
-      if (!matched) return false;
+      while (output.revertPolicy < QUICK_REVERT_POLICY_COUNT &&
+             strcmp(item->valuestring, QUICK_REVERT_POLICY_IDS[output.revertPolicy]) != 0)
+        ++output.revertPolicy;
+      if (output.revertPolicy == QUICK_REVERT_POLICY_COUNT) return false;
       output.revertAction = QUICK_REVERT_POLICY_ACTION;
-    }
-    if (!matched && strcmp(item->string, "revertNow") == 0) {
-      if (!cJSON_IsTrue(item)) return false;
+    } else if (strcmp(item->string, "revertNow") == 0 && cJSON_IsTrue(item)) {
       output.revertAction = QUICK_REVERT_NOW_ACTION;
-      matched = true;
+    } else {
+      return false;
     }
-    if (!matched || ++selected != 1) return false;
   }
   output.baseRevision = static_cast<uint32_t>(revision->valuedouble);
-  return selected == 1;
+  // One baseRevision; a revert action alone, or one or more settings.
+  return cJSON_GetArraySize(root) == selected + 1 &&
+         (output.revertAction != 0 ? selected == 1 : output.mask != 0);
 }
 
 inline bool parseIntegrationRestartRequest(const cJSON *root) {

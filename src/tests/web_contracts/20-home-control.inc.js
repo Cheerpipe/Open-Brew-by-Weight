@@ -1508,7 +1508,7 @@ if (!html.includes('id="postTareBaselineGraceS" type="number" min="0.5" max="10"
     !codeIncludes(ui, "$(k+'S').value=String(c[k+'Ms']/1000)") ||
     !codeIncludes(ui, "apply('tareOpt',!$('autoTare').checked)") ||
     // Tare switches go through the shared #workflowPanel field listener.
-    !codeIncludes(viewJs.settings, 'noteEdit(sec,!typed?300:e.type===change&&e.isTrusted?0:1200);updateConfigGroups();') ||
+    !codeIncludes(viewJs.settings, 'noteEdit(autosave[sec],!typed?300:e.type===change&&e.isTrusted?0:1200);updateConfigGroups();') ||
     !codeIncludes(ui, "typeof c.postTareBaselineGraceMs==='number'") ||
     !network.includes('\\"postTareBaselineGraceMs\\":%lu') ||
     !network.includes('Post-tare grace must be from 0.5 to 10 s.') ||
