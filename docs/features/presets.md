@@ -36,9 +36,10 @@ marked with a filled circle and expands to show how it cuts, for example
 a small chart, and tap it again to fold the chart away. The chart shows
 the same cut line over the shot, the colored fast, on-recipe and slow zones,
 the opening seconds where weight never stops the shot, and dots where your
-recent shots on that preset reached the target. Tap it or drag sideways
-along it to try shot timings, just like **How this preset cuts** in Settings;
-swiping up or down over either chart scrolls the page instead. A note below
+recent shots on that preset reached the target. Touch it or drag along it to
+try shot timings, just like **How this preset cuts** in Settings: the example
+shot follows your finger right away, and swiping up or down over either chart
+still scrolls the page. A note below
 it says where its reference pace starts.
 The shot card at the top of Home draws a lighter version behind your shot: the
 cut line, the reference paces that separate fast, on-recipe and slow, the

@@ -4060,49 +4060,20 @@ function drawPresetGraph(host, m, x, readout, key) {
       );
       positionPresetScrub(host);
     };
-    // Mouse and pen grab the shot at once. A touch first shows its intent: a
-    // tap or a horizontal drag moves the shot, while a vertical one scrolls the
-    // page (touch-action: pan-y) and the browser cancels the pointer. A drag
-    // glides the shot to the finger instead of jumping there.
-    let x0 = null,
-      y0 = 0,
-      aim = 0,
-      glide = false;
-    const move = (e) => {
-      aim = host._view.tAt(e.clientX - host.firstChild.getBoundingClientRect().left);
-      if (!glide) scrub(aim);
-    };
-    const slide = (from, t0) =>
-      requestAnimationFrame((now) => {
-        const k = Math.min(1, (now - (t0 ??= now)) / 140);
-        if (glide) scrub(from + (aim - from) * k * (2 - k));
-        if (k < 1 && glide) slide(from, t0);
-        else glide = false;
-      });
-    const grab = (e) => {
+    // Any pointer grabs the shot at once, as the Stats shot charts do. A
+    // vertical swipe still scrolls the page (touch-action: pan-y), and the
+    // browser then cancels the pointer.
+    const move = (e) =>
+      scrub(host._view.tAt(e.clientX - host.firstChild.getBoundingClientRect().left));
+    host.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      glide = x0 !== null;
-      x0 = null;
       host.setPointerCapture(e.pointerId);
       host.querySelector(".rvScrub")?.focus({ preventScroll: true });
       host.classList.add("rvHeld");
       move(e);
-      if (glide) slide(host._s);
-    };
-    host.addEventListener("pointerdown", (e) =>
-      e.pointerType === "touch" ? ((x0 = e.clientX), (y0 = e.clientY)) : grab(e),
-    );
-    host.addEventListener("pointermove", (e) => {
-      if (x0 === null) host.hasPointerCapture(e.pointerId) && move(e);
-      else if (Math.abs(e.clientX - x0) > Math.max(6, Math.abs(e.clientY - y0))) grab(e);
     });
-    host.addEventListener("pointerup", (e) => x0 !== null && ((x0 = null), move(e)));
-    host.addEventListener("pointercancel", () => (x0 = null));
-    host.addEventListener("lostpointercapture", () => {
-      if (glide) scrub(aim);
-      glide = false;
-      host.classList.remove("rvHeld");
-    });
+    host.addEventListener("pointermove", (e) => host.hasPointerCapture(e.pointerId) && move(e));
+    host.addEventListener("lostpointercapture", () => host.classList.remove("rvHeld"));
     host.addEventListener("keydown", (e) => {
       const step = {
         ArrowRight: 0.5,
