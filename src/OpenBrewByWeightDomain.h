@@ -74,6 +74,7 @@ constexpr uint32_t NTP_FIRST_SYNC_TIMEOUT_MS = 10UL * 1000UL;
 // DHCP/gateway warm-up; failures self-heal via retry plus server failover.
 constexpr uint32_t NTP_STA_SETTLE_MS = 1000;
 constexpr uint32_t NTP_STALE_AFTER_MS = 24UL * 3600UL * 1000UL;
+constexpr uint32_t NTP_ANCHOR_REBASE_SEC = 7UL * 24UL * 3600UL;
 constexpr uint8_t NTP_MAX_CONSECUTIVE_FAILURES = 255;
 
 enum class NtpServerPreset : uint8_t {

@@ -219,6 +219,53 @@ static void testIoFailureLeavesWindowConsistent() {
         "post-failure appends must be retained");
 }
 
+// Torn slots never move the cursor behind the newest record: many tears in
+// one lap stay readable around them, and a tear at the body end followed by a
+// wrap keeps the post-wrap records as the newest window.
+static void testTornSlotsKeepNewestWindow() {
+  resetStore();
+  AuditLogLatch latch;
+  uint32_t pendingAfter = 0;
+  auditStoreBootOpen(latch, pendingAfter);
+  for (uint32_t seq = 1; seq <= 40; ++seq) {
+    check(auditStoreAppend(makeRecord(seq, 1)), "append failed");
+  }
+  for (uint32_t slot = 3; slot <= 30; slot += 3) {
+    fakeAuditLog.bytes[slotOffset(slot)] = 0x02;
+  }
+  AuditLogLatch recovered;
+  auditStoreBootOpen(recovered, pendingAfter);
+  AuditRecord page[64];
+  check(auditStoreStatus().state == AuditStoreState::READY &&
+            auditStoreStatus().seqHigh == 40 &&
+            auditStoreCopyAfter(0, page, 64) == 30,
+        "torn slots must be skipped, not end the store");
+  check(auditStoreAppend(makeRecord(41, 1)) &&
+            auditStoreCopyAfter(39, page, 64) == 2 && page[1].sequence == 41,
+        "the next append must follow the newest record");
+
+  resetStore();
+  auditStoreBootOpen(latch, pendingAfter);
+  const uint32_t last = AUDIT_STORE_RECORD_CAPACITY - 1;
+  for (uint32_t seq = 1; seq <= last; ++seq) {
+    check(auditStoreAppend(makeRecord(seq, 1)), "append failed");
+  }
+  std::fill(fakeAuditLog.bytes.begin() + slotOffset(last),
+            fakeAuditLog.bytes.begin() + slotOffset(last) + AUDIT_STORE_RECORD_BYTES,
+            0x00);
+  auditStoreBootOpen(recovered, pendingAfter);
+  for (uint32_t seq = last + 1; seq <= last + 6; ++seq) {
+    check(auditStoreAppend(makeRecord(seq, 1)), "append after the tear failed");
+  }
+  auditStoreBootOpen(recovered, pendingAfter);
+  check(auditStoreStatus().seqHigh == last + 6 &&
+            auditStoreCopyAfter(last + 3, page, 64) == 3,
+        "a tear at the body end must not hide the post-wrap records");
+  check(auditStoreAppend(makeRecord(last + 7, 1)) &&
+            auditStoreCopyAfter(last + 6, page, 64) == 1,
+        "appends after the wrap boot must continue after the newest record");
+}
+
 int main() {
   testRoundtripAndPaging();
   testBootBackfill();
@@ -228,6 +275,7 @@ int main() {
   testFirstLapStaleSectorKeepsWindow();
   testAbsentPartitionAndClear();
   testIoFailureLeavesWindowConsistent();
+  testTornSlotsKeepNewestWindow();
   std::cout << "audit_store_host_test PASSED\n";
   return 0;
 }

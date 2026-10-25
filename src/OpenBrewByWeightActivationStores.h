@@ -88,20 +88,6 @@ class BasicActivationStores {
   // Written only by begin(), before any other task reads it: lock-free.
   uint32_t bootId() const { return bootId_; }
 
-  // Deferred flush of the three owned stores. Caller holds the store mutex,
-  // passes the control-loop try-lock budget (0 ms from the 1 ms loop) and the
-  // debug-event sink; last-shot NVS flushing stays with the caller.
-  ActivationStoresFlushReport service(uint32_t tryLockMs,
-                                      ActivationStoreEvent emit) {
-    ActivationStoresFlushReport report;
-    flushOne(shotLog, shotLogPersistFailLatched_, tryLockMs, emit, 0, report);
-    flushOne(shotCurves, shotCurvePersistFailLatched_, tryLockMs, emit, 1,
-             report);
-    flushOne(historyLog, historyPersistFailLatched_, tryLockMs, emit, 3,
-             report);
-    return report;
-  }
-
   // Advance at most one erase/program operation. This keeps every cache-off
   // window bounded and lets the worker re-check safety gates between steps.
   ActivationStoresFlushReport serviceStep(uint32_t tryLockMs,
@@ -197,29 +183,6 @@ class BasicActivationStores {
   }
 
  private:
-  template <typename Log>
-  void flushOne(Log &log, bool &latched, uint32_t tryLockMs,
-                ActivationStoreEvent emit, int32_t discriminator,
-                ActivationStoresFlushReport &report) {
-    if (!log.dirty()) {
-      return;
-    }
-    const uint32_t lockTimeoutsBefore = flashIoLockTimeouts();
-    if (log.flush(tryLockMs)) {
-      latched = false;
-      return;
-    }
-    report.anyFail = true;
-    report.anyIoFail |= flashIoLockTimeouts() == lockTimeoutsBefore;
-    if (!latched) {
-      latched = true;
-      if (emit != nullptr) {
-        emit(DebugCategory::CONFIG, DebugCode::SHOT_LOG_PERSIST_FAILED,
-             static_cast<int32_t>(log.count()), discriminator);
-      }
-    }
-  }
-
   bool shotLogPersistFailLatched_ = false;
   bool shotCurvePersistFailLatched_ = false;
   bool historyPersistFailLatched_ = false;

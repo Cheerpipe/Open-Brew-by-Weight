@@ -7291,6 +7291,23 @@ void r23_maintenance_is_canceled_fail_open_by_physical_paddle() {
   CHECK(!getRelaySafetySnapshot().closed);
 }
 
+void r23d_restart_waits_for_unpersisted_shot_records() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  runLoopAfter(1000);
+  lastShotNvsDirty = true;
+  shotStorePersistRetryAtMs = millis() + 2000;
+  WebCommand command;
+  command.type = WebCommandType::RESTART;
+  command.requestId = 79;
+  processWebCommand(command);
+  CHECK(plannedRestartHeld && !maintenanceLease.active);
+  runLoopAfter(1000);
+  CHECK(plannedRestartHeld && !maintenanceLease.active);
+  for (int i = 0; i < 50 && !maintenanceLease.active; ++i) runLoopAfter(100);
+  CHECK(maintenanceLease.active && !lastShotNvsDirty);
+}
+
 // A paused shot-store image must be acknowledged before maintenance (factory
 // reset) runs, or the resumed write would land over the reset slot.
 void r23b_maintenance_waits_for_shot_store_persist() {
@@ -14817,6 +14834,28 @@ void n01c_wall_clock_cancel_syncing_restores_anchor() {
   CHECK(!g_wallClock.synced());
 }
 
+void n01d_wall_clock_keeps_time_through_failures_and_rebase() {
+  g_wallClock.reset();
+  g_wallClock.queueSyncFromCallback(1'700'000'000U);
+  CHECK(g_wallClock.applyPendingSync(1000));
+  g_wallClock.setSyncing("pool.ntp.org", 3601000);
+  CHECK(g_wallClock.nowUtcSec(3601000) == 1'700'003'600U);
+  g_wallClock.markFailed(3611000, 5);
+  CHECK(g_wallClock.synced());
+  CHECK(g_wallClock.snapshot(3611000).utcSec == 1'700'003'610U);
+  CHECK(g_wallClock.snapshot(3611000).state == TimeSyncState::FAILED);
+  g_wallClock.markDisabled();
+  CHECK(g_wallClock.nowUtcSec(3621000) == 1'700'003'620U);
+  const uint32_t later = 1000U + (NTP_ANCHOR_REBASE_SEC + 5U) * 1000U;
+  const uint32_t expected = 1'700'000'000U + NTP_ANCHOR_REBASE_SEC + 5U;
+  g_wallClock.rebaseAnchor(later);
+  CHECK(g_wallClock.nowUtcSec(later) == expected);
+  CHECK(g_wallClock.nowUtcSec(later + 30U * 86400U * 1000U) ==
+        expected + 30U * 86400U);
+  CHECK(g_wallClock.snapshot(later).lastSyncUtcSec == 1'700'000'000U);
+  CHECK(g_wallClock.snapshot(later).lastSyncAgeMs > NTP_STALE_AFTER_MS);
+}
+
 void n01b_wall_clock_survives_millis_wrap() {
   g_wallClock.reset();
   g_wallClock.setSyncing("pool.ntp.org", 1000);
@@ -17102,7 +17141,7 @@ void sh01_activation_store_mutex_serializes_append_read_flush() {
     }
     while (!done.load(std::memory_order_acquire)) {
       TaskLockGuard lock(shotStoreMutex);
-      (void)activationStores.service(0, addDebugEvent);
+      (void)activationStores.serviceStep(0, addDebugEvent);
       std::this_thread::yield();
     }
   };
@@ -22172,6 +22211,7 @@ const TestCase testCases[] = {
     {"R22", r22_confirmed_implausible_weight_does_not_stop},
     {"R23", r23_maintenance_is_canceled_fail_open_by_physical_paddle},
     {"R23b", r23b_maintenance_waits_for_shot_store_persist},
+    {"R23d", r23d_restart_waits_for_unpersisted_shot_records},
     {"R23c", r23c_micra_settings_save_without_a_lease},
     {"R24", r24_web_control_is_available_without_session_owner},
     {"R25", r25_critical_scale_mailbox_never_blocks_and_keeps_latest},
@@ -22792,6 +22832,7 @@ const TestCase testCases[] = {
     {"H12", h12_persistence_fast_path_skips_clean_store_mutex},
     {"N01", n01_wall_clock_tracks_utc_from_anchor},
     {"N01b", n01b_wall_clock_survives_millis_wrap},
+    {"N01d", n01d_wall_clock_keeps_time_through_failures_and_rebase},
     {"N01c", n01c_wall_clock_cancel_syncing_restores_anchor},
     {"N02", n02_ntp_hostname_validation},
     {"N03", n03_unsynced_retry_is_fifteen_seconds},

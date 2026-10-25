@@ -1031,6 +1031,7 @@ void OpenBrewByWeightNetwork::handleNtpFailure(uint32_t now) {
 }
 
 void OpenBrewByWeightNetwork::serviceNtp(uint32_t now, bool staConnected) {
+  g_wallClock.rebaseAnchor(now);
   dataMux_.lock();
   const uint32_t settingsGeneration = ntpSettingsGeneration_;
   const bool ntpSyncEnabled = settings_.runtime.ntpSyncEnabled;

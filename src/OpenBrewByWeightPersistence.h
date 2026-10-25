@@ -37,11 +37,15 @@ inline void ensurePersistedPresetBank(PersistedSettings &settings) {
                        settings.runtime.autoRetare);
 }
 
+inline bool persistedSettingsIntact(const PersistedSettings &settings) {
+  return settings.magic == PERSISTED_SETTINGS_MAGIC &&
+         settings.schemaVersion == CONFIG_SCHEMA_VERSION &&
+         settings.structureSize == sizeof(PersistedSettings) &&
+         settings.checksum == persistedSettingsChecksum(settings);
+}
+
 inline bool validPersistedSettings(const PersistedSettings &settings) {
-  if (settings.magic != PERSISTED_SETTINGS_MAGIC ||
-      settings.schemaVersion != CONFIG_SCHEMA_VERSION ||
-      settings.structureSize != sizeof(PersistedSettings) ||
-      settings.checksum != persistedSettingsChecksum(settings) ||
+  if (!persistedSettingsIntact(settings) ||
       validateRuntimeConfig(settings.runtime) != ConfigValidationError::NONE ||
       settings.runtime.timezoneSource >= 3 ||
       settings.runtime.timezoneAutomatic > 1 ||
@@ -79,6 +83,44 @@ inline void finalizePersistedSettings(PersistedSettings &settings) {
   settings.checksum = persistedSettingsChecksum(settings);
 }
 
+// An intact blob (checksum and schema match) whose content no longer
+// validates, for example a field a newer image checks more strictly: reset
+// only the failing sections to factory values so Wi-Fi, the device password
+// and every valid section survive. Returns true when something changed.
+inline bool repairPersistedSettings(PersistedSettings &s) {
+  bool repaired = false;
+  const auto reset = [&repaired](auto &section) {
+    section = std::remove_reference_t<decltype(section)>{};
+    repaired = true;
+  };
+  RuntimeConfig &r = s.runtime;
+  if (r.scheduledRestartEnabled > 1 || r.scheduledRestartMinuteOfDay >= 24 * 60) {
+    r.scheduledRestartEnabled = RuntimeConfig{}.scheduledRestartEnabled;
+    r.scheduledRestartMinuteOfDay = RuntimeConfig{}.scheduledRestartMinuteOfDay;
+    repaired = true;
+  }
+  if (validateRuntimeConfig(r) != ConfigValidationError::NONE ||
+      r.timezoneSource >= 3 || r.timezoneAutomatic > 1) {
+    reset(r);
+  }
+  if (!validateShotPresetBank(s.presets, r.retareWindowMs, r.autoRetare)) reset(s.presets);
+  if (!validBullseyeMelodyConfig(s.bullseyeMelody)) reset(s.bullseyeMelody);
+  if (!validLineaMicraSettings(s.lineaMicra)) reset(s.lineaMicra);
+  if (!validWebhookConfig(s.webhook)) reset(s.webhook);
+  if (!validPreferredScaleMac(s.preferredScaleMac) ||
+      !validPreferredScaleName(s.preferredScaleName) ||
+      !validScaleHistoryEntries(s.scaleHistory)) {
+    memset(s.preferredScaleMac, 0, sizeof(s.preferredScaleMac));
+    memset(s.preferredScaleName, 0, sizeof(s.preferredScaleName));
+    memset(s.scaleHistory, 0, sizeof(s.scaleHistory));
+    repaired = true;
+  }
+  if (!validDevicePassword(s.devicePassword)) repaired |= initializeDefaultDevicePassword(s);
+  if (!validDeviceName(s.deviceName)) repaired |= initializeDefaultDeviceName(s);
+  if (repaired) finalizePersistedSettings(s);
+  return repaired;
+}
+
 // Single-record staging inside the shared flash-I/O scratch (see FlashIoScratch).
 // Allocated from internal SRAM (heap, not BSS): source/destination of
 // Preferences putBytes/getBytes if a flash path disables cache despite XIP.
@@ -92,16 +134,18 @@ inline PersistedSettings &persistedSettingsScratch() {
 // so the compiler does not embed one copy at every call site.
 __attribute__((noinline))
 inline bool readSettingsSlot(OpenBrewByWeightPreferences &preferences, const char *key,
-                             PersistedSettings &settings) {
+                             PersistedSettings &settings, bool repair = false) {
   const size_t stored = preferences.isKey(key)
                             ? preferences.getBytesLength(key)
                             : 0;
   if (stored != sizeof(PersistedSettings)) {
     return false;
   }
-  if (preferences.getBytes(key, &settings, stored) != stored) {
+  if (preferences.getBytes(key, &settings, stored) != stored ||
+      !persistedSettingsIntact(settings) || !validPersistedStaNetwork(settings)) {
     return false;
   }
+  if (repair) (void)repairPersistedSettings(settings);
   return validPersistedSettings(settings);
 }
 
@@ -125,7 +169,8 @@ inline bool eraseSettingsNvsKey(NvsSubsystem subsystem, const char *key) {
 
 inline bool savePersistedSettings(PersistedSettings &settings);
 
-inline bool loadPersistedSettings(PersistedSettings &settings) {
+inline bool loadPersistedSettings(PersistedSettings &settings,
+                                  bool *repaired = nullptr) {
   if (!lockSettingsNvs()) {
     return false;
   }
@@ -148,6 +193,17 @@ inline bool loadPersistedSettings(PersistedSettings &settings) {
     loadedRevision = scratch.storageRevision;
     loaded = true;
   }
+  // Last resort before factory defaults: repair the newest intact slot.
+  const bool loadedAsIs = loaded;
+  for (const char *key : {SETTINGS_SLOT_A, SETTINGS_SLOT_B}) {
+    if (!loadedAsIs && readSettingsSlot(preferences, key, scratch, true) &&
+        (!loaded || secondRevisionIsNewer(loadedRevision, scratch.storageRevision))) {
+      settings = scratch;
+      loadedRevision = scratch.storageRevision;
+      loaded = true;
+    }
+  }
+  if (repaired != nullptr) *repaired = loaded && !loadedAsIs;
   preferences.end();
   if (loaded) durableTimezoneSaved().store(settings.runtime.timezoneId[0] != '\0');
   unlockSettingsNvs();

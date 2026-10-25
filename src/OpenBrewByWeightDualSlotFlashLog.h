@@ -169,8 +169,13 @@ class DualSlotFlashLog {
     feedFlashIoWatchdog();
     // Chunked write: each 1 KiB step stages through the internal scratch
     // because the live store_ sits in PSRAM BSS, which may be unreachable
-    // if a flash path disables cache despite XIP.
-    if (!flashIoWriteChunked(part, targetOffset, &store_, sizeof(store_))) {
+    // if a flash path disables cache despite XIP. Body first, header last,
+    // like flushStep, so a torn save never presents a committed header.
+    const auto *bytes = reinterpret_cast<const uint8_t *>(&store_);
+    constexpr size_t kHeaderBytes = sizeof(store_.header);
+    if (!flashIoWriteChunked(part, targetOffset + kHeaderBytes, bytes + kHeaderBytes,
+                             sizeof(store_) - kHeaderBytes) ||
+        !flashIoWriteChunked(part, targetOffset, bytes, kHeaderBytes)) {
       unlockFlashIo();
       return false;
     }

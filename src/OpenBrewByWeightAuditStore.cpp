@@ -19,7 +19,6 @@ namespace {
 
 AuditStoreStatus g_status;
 
-constexpr size_t kMaxScanRuns = 8;
 constexpr size_t kRecordsPerSector =
     AUDIT_STORE_SECTOR_BYTES / AUDIT_STORE_RECORD_BYTES;
 
@@ -40,65 +39,40 @@ bool readSlot(const esp_partition_t *part, uint32_t index, uint8_t *slot) {
                             AUDIT_STORE_RECORD_BYTES) == ESP_OK;
 }
 
-struct ScanRun {
-  uint32_t start, end;  // slot indexes, half-open
-};
-
-// Boot scan: valid runs are separated by erased (wrap-ahead) or torn slots. The active window is the
-// run an append would extend: the last run in slot order, merged across the
-// wrap when a run reaches the body end and another starts at slot 0.
+// Boot scan anchored on the newest record: appends always follow it, so torn
+// slots (power cuts) and stale laps can never move the cursor backwards. The
+// window walks back from it over older records; torn slots are skipped, and
+// an erased slot or a sequence that stops decreasing marks the oldest one.
 bool scanWindow(const esp_partition_t *part) {
-  ScanRun runs[kMaxScanRuns];
-  size_t runCount = 0;
-  bool inRun = false;
   AuditRecord record;
   uint8_t slot[AUDIT_STORE_RECORD_BYTES];
+  bool found = false;
+  uint32_t newest = 0;
   for (uint32_t index = 0; index < AUDIT_STORE_RECORD_CAPACITY; ++index) {
     if (!readSlot(part, index, slot)) return false;
-    if (!auditStoreDecodeRecord(slot, record)) {
-      inRun = false;
-      continue;
-    }
-    if (!inRun) {
-      inRun = true;
-      if (runCount == kMaxScanRuns) return false;
-      runs[runCount++] = {index, index + 1};
-    } else {
-      runs[runCount - 1].end = index + 1;
+    if (auditStoreDecodeRecord(slot, record) &&
+        (!found || record.sequence > g_status.seqHigh)) {
+      found = true;
+      newest = index;
+      g_status.seqHigh = record.sequence;
     }
   }
-  if (runCount == 0) {
-    g_status = AuditStoreStatus{};
-    g_status.state = AuditStoreState::READY;
-    return true;
+  if (!found) return true;
+  uint32_t oldest = newest, previous = g_status.seqHigh;
+  for (uint32_t back = 1; back < AUDIT_STORE_RECORD_CAPACITY; ++back) {
+    const uint32_t index =
+        (newest + AUDIT_STORE_RECORD_CAPACITY - back) % AUDIT_STORE_RECORD_CAPACITY;
+    if (!readSlot(part, index, slot)) return false;
+    if (auditStoreSlotEmpty(slot)) break;
+    if (!auditStoreDecodeRecord(slot, record)) continue;
+    if (record.sequence >= previous) break;
+    previous = record.sequence;
+    oldest = index;
   }
-  const ScanRun &first = runs[0];
-  const ScanRun &last = runs[runCount - 1];
-  if (runCount > 1 && last.end == AUDIT_STORE_RECORD_CAPACITY &&
-      first.start == 0) {
-    g_status.windowStart = last.start;
-    g_status.writeCursor = AUDIT_STORE_RECORD_CAPACITY + first.end;
-  } else {
-    g_status.windowStart = last.start;
-    g_status.writeCursor = last.end;
-  }
-  g_status.seqHigh = 0;
-  uint32_t drop = 0;
-  for (uint32_t index = g_status.windowStart; index < g_status.writeCursor;
-       ++index) {
-    if (!readSlot(part, index, slot) || !auditStoreDecodeRecord(slot, record)) {
-      return false;
-    }
-    if (drop == 0 && record.sequence < g_status.seqHigh) drop = index;
-    if (record.sequence > g_status.seqHigh) g_status.seqHigh = record.sequence;
-  }
-  // A full ring (cursor on a not-yet-erased sector) is one run starting at
-  // slot 0: the oldest record sits where the sequence drops, not at slot 0.
-  if (drop != 0 && g_status.writeCursor - g_status.windowStart ==
-                       AUDIT_STORE_RECORD_CAPACITY) {
-    g_status.windowStart = drop;
-    g_status.writeCursor = AUDIT_STORE_RECORD_CAPACITY + drop;
-  }
+  g_status.windowStart = oldest;
+  g_status.writeCursor =
+      oldest + (newest + AUDIT_STORE_RECORD_CAPACITY - oldest) %
+                   AUDIT_STORE_RECORD_CAPACITY + 1;
   return true;
 }
 
@@ -124,12 +98,11 @@ void auditStoreBootOpen(AuditLogLatch &latch, uint32_t &latchPendingAfter) {
   uint8_t slot[AUDIT_STORE_RECORD_BYTES];
   for (uint32_t index = g_status.windowStart; ok && index < g_status.writeCursor;
        ++index) {
-    if (!readSlot(part, index, slot) ||
-        !auditStoreDecodeRecord(slot, record)) {
+    if (!readSlot(part, index, slot)) {
       ok = false;
       break;
     }
-    latch.adopt(record);
+    if (auditStoreDecodeRecord(slot, record)) latch.adopt(record);
   }
   if (ok) latchPendingAfter = g_status.seqHigh;
   g_status.state = ok ? AuditStoreState::READY : AuditStoreState::IO_ERROR;

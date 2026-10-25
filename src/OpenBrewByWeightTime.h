@@ -82,7 +82,7 @@ class WallClock {
     portENTER_CRITICAL(&mux_);
 #endif
     state_ = state;
-    anchorUtcSec_ = 0;
+    anchorUtcSec_ = lastSyncUtcSec_ = 0;
     anchorMonotonicMs_ = 0;
     lastSyncMonotonicMs_ = 0;
     nextRetryAtMs_ = 0;
@@ -120,7 +120,7 @@ class WallClock {
 #endif
       return false;
     }
-    anchorUtcSec_ = pendingUtcSec_;
+    anchorUtcSec_ = lastSyncUtcSec_ = pendingUtcSec_;
     anchorMonotonicMs_ = monotonicMs;
     lastSyncMonotonicMs_ = monotonicMs;
     state_ = TimeSyncState::SYNCED;
@@ -213,13 +213,37 @@ class WallClock {
 #endif
   }
 
+  // Moves the anchor forward before millis() can wrap past it (~49.7 d), and
+  // clamps the sync age so a long-unsynced clock keeps reading as stale.
+  void rebaseAnchor(uint32_t monotonicMs) {
+#if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
+    !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+    portENTER_CRITICAL(&mux_);
+#endif
+    const uint32_t elapsedSec =
+        monotonicElapsedMs(monotonicMs, anchorMonotonicMs_) / 1000U;
+    if (anchorUtcSec_ >= 1000000000U && elapsedSec >= NTP_ANCHOR_REBASE_SEC) {
+      anchorUtcSec_ += elapsedSec;
+      anchorMonotonicMs_ += elapsedSec * 1000U;
+      if (monotonicElapsedMs(monotonicMs, lastSyncMonotonicMs_) >
+          NTP_STALE_AFTER_MS) {
+        lastSyncMonotonicMs_ = monotonicMs - NTP_STALE_AFTER_MS - 1U;
+      }
+    }
+#if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
+    !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+    portEXIT_CRITICAL(&mux_);
+#endif
+  }
+
   bool synced() const {
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
     !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
     portENTER_CRITICAL(&mux_);
 #endif
-    const bool ready = state_ == TimeSyncState::SYNCED &&
-                       anchorUtcSec_ >= 1000000000U;
+    // An anchor stays valid through resync attempts, failures and STA loss;
+    // the snapshot reports staleness separately.
+    const bool ready = anchorUtcSec_ >= 1000000000U;
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
     !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
     portEXIT_CRITICAL(&mux_);
@@ -233,7 +257,7 @@ class WallClock {
     portENTER_CRITICAL(&mux_);
 #endif
     uint32_t utcSec = 0;
-    if (state_ == TimeSyncState::SYNCED && anchorUtcSec_ >= 1000000000U) {
+    if (anchorUtcSec_ >= 1000000000U) {
       utcSec = anchorUtcSec_ +
                monotonicElapsedMs(monotonicMs, anchorMonotonicMs_) / 1000U;
     }
@@ -251,14 +275,15 @@ class WallClock {
     portENTER_CRITICAL(&mux_);
 #endif
     output.state = state_;
-    output.lastSyncUtcSec = anchorUtcSec_ >= 1000000000U ? anchorUtcSec_ : 0;
-    if (state_ == TimeSyncState::SYNCED && anchorUtcSec_ >= 1000000000U) {
+    output.lastSyncUtcSec = lastSyncUtcSec_;
+    if (anchorUtcSec_ >= 1000000000U) {
       output.utcSec = anchorUtcSec_ +
                       monotonicElapsedMs(monotonicMs, anchorMonotonicMs_) /
                           1000U;
       output.lastSyncAgeMs =
           monotonicElapsedMs(monotonicMs, lastSyncMonotonicMs_);
-      if (output.lastSyncAgeMs > NTP_STALE_AFTER_MS) {
+      if (state_ == TimeSyncState::SYNCED &&
+          output.lastSyncAgeMs > NTP_STALE_AFTER_MS) {
         output.state = TimeSyncState::STALE;
       }
     }
@@ -281,6 +306,7 @@ class WallClock {
 #endif
   TimeSyncState state_ = TimeSyncState::OFF;
   uint32_t anchorUtcSec_ = 0;
+  uint32_t lastSyncUtcSec_ = 0;
   uint32_t anchorMonotonicMs_ = 0;
   uint32_t lastSyncMonotonicMs_ = 0;
   uint32_t nextRetryAtMs_ = 0;
