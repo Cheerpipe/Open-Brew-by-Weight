@@ -115,6 +115,48 @@ device password does not disconnect Home Assistant.
   connecting without a password. Admin still asks for the device password,
   so keep it somewhere safe.
 
+## Open it over HTTPS with a reverse proxy
+
+If you already run a reverse proxy at home, such as Nginx Proxy Manager, you
+can reach the controller at your own HTTPS address, for example
+`https://brew.example.com`. After your first visit over HTTPS, the browser
+keeps a full copy of the Web UI on your phone: it opens instantly, shows up
+even while the machine is off, and reconnects as soon as the controller is
+back. Everything you see and
+do still comes live from the controller. After a firmware update the phone
+picks up the new Web UI by itself.
+
+Give the controller a fixed IP address in your router first. Then, in Nginx
+Proxy Manager:
+
+1. Add a **Proxy Host** for your domain, with scheme `http`, the
+   controller's IP address, and port `80`.
+2. Switch on **Websockets Support**, which keeps the live readings flowing.
+3. On the **SSL** tab, choose your certificate and switch on **Force SSL**.
+4. On the **Advanced** tab, paste this, replacing `192.168.1.50` with the
+   controller's IP address:
+
+   ```nginx
+   location / {
+     proxy_pass http://192.168.1.50;
+     proxy_set_header Host 192.168.1.50;
+     proxy_set_header Origin http://192.168.1.50;
+     proxy_http_version 1.1;
+     proxy_set_header Upgrade $http_upgrade;
+     proxy_set_header Connection $http_connection;
+     proxy_buffering off;
+     proxy_read_timeout 1h;
+   }
+   ```
+
+   The controller only answers requests addressed to itself, so the proxy
+   has to present them that way.
+
+Opening the controller's plain address on your Wi-Fi keeps working as
+before, without the offline copy. Through the proxy, the controller sees
+every phone as the same device, so five wrong passwords pause sign-in for
+everyone who uses that address for 30 seconds.
+
 ## Forgot the password
 
 Use the paddle recovery steps in [Emergency recovery](../EMERGENCY_RECOVERY.md#recover-wi-fi-ap-and-password).

@@ -1,6 +1,9 @@
 "use strict";
 import * as R from "/js/runtime.js?v=__FW_ASSET_TAG__";
 R.paintTheme(R.themeMode());
+// Browsers expose service workers only over HTTPS (e.g. a reverse proxy); a
+// fixed URL lets each update check fetch the current worker uncached.
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 document.addEventListener("click", (e) => {
   if (e.target && e.target.closest("#themeSignal")) R.cycleTheme();
 });

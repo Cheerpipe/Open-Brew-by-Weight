@@ -4,8 +4,8 @@
   "description": "Build tooling for Open Brew by Weight embedded Web UI assets",
   "scripts": {
     "gen:web-ui": "node ./scripts/gen_web_ui.js",
-    "format:web": "prettier --write src/web/html src/web/app.css src/web/js src/web/app.js",
-    "format:web:check": "prettier --check src/web/html src/web/app.css src/web/js src/web/app.js"
+    "format:web": "prettier --write src/web/html src/web/app.css src/web/js src/web/app.js src/web/sw.js",
+    "format:web:check": "prettier --check src/web/html src/web/app.css src/web/js src/web/app.js src/web/sw.js"
   },
   "prettier": {
     "printWidth": 100

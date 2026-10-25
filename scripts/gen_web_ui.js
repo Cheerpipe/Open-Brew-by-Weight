@@ -17,6 +17,7 @@ const htmlDir = path.join(repoRoot, 'src', 'web', 'html');
 const sourcePath = path.join(htmlDir, 'shell.html');
 const appJsPath = path.join(repoRoot, 'src', 'web', 'app.js');
 const otaImageJsPath = path.join(jsDir, 'ota-image.js');
+const swPath = path.join(repoRoot, 'src', 'web', 'sw.js');
 const cssSourcePath = path.join(repoRoot, 'src', 'web', 'app.css');
 const manifestPath = path.join(repoRoot, 'src', 'web', 'manifest.webmanifest');
 const icon192Path = path.join(repoRoot, 'resources', 'icons', 'android',
@@ -46,7 +47,7 @@ const JS_TYPE = 'application/javascript; charset=utf-8';
 // Served paths of the WEB_ASSETS rows, in table order; the firmware registers
 // one exact route per path.
 const ASSET_PATHS = ['/app.js', '/app.css', '/js/runtime.js', '/js/ota-image.js',
-  ...Object.keys(VIEW_MODULES).map((file) => `/js/${file}.js`),
+  ...Object.keys(VIEW_MODULES).map((file) => `/js/${file}.js`), '/sw.js',
   '/manifest.webmanifest', '/icons/icon-192.png', '/favicon.ico', '/apple-touch-icon*'];
 
 // Machine-type exclusive markup classes. Sources stay type-agnostic and hide
@@ -363,6 +364,9 @@ async function generate(options = {}) {
     css: minifyCss(stripClassCss(options.remoteControl === false
         ? stripRemoteControlCss(localizedCss) : localizedCss, excluded)),
     manifest: JSON.stringify(manifestObject),
+    // The worker precaches every ?v= row; probe paths and itself stay out.
+    swJs: await minifyJs(fs.readFileSync(swPath, 'utf8').split('__SW_ASSETS__').join(
+        JSON.stringify(ASSET_PATHS.filter((p) => !p.endsWith('*') && p !== '/sw.js'))), options),
   };
   const modules = {};
   for (const [file, views] of Object.entries(VIEW_MODULES)) {
@@ -386,6 +390,7 @@ async function generate(options = {}) {
     modules[key] = modules[key].split(ASSET_TAG_PLACEHOLDER).join(assetTag);
   }
   out.shellHtml = out.shellHtml.split('__FW_RELEASE__').join(version);
+  out.swJs = out.swJs.split('__FW_RELEASE__').join(version);
 
   return finish({
     ...out,
@@ -404,7 +409,7 @@ async function generate(options = {}) {
 
 // Every asset except the shell is one row of the WEB_ASSETS table the
 // firmware serves from. PNG artwork is already compressed, so it ships raw.
-async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, modules,
+async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, modules, swJs,
                        css, manifest, icon192Raw, icon48Raw, assetTag,
                        version, inputLanguage, requestedLanguage,
                        resolvedLanguage, write}) {
@@ -416,6 +421,7 @@ async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, module
     text('/js/runtime.js', JS_TYPE, runtimeJs),
     text('/js/ota-image.js', JS_TYPE, otaImageJs),
     ...Object.entries(modules).map(([file, js]) => text(`/js/${file}.js`, JS_TYPE, js)),
+    text('/sw.js', JS_TYPE, swJs),
     text('/manifest.webmanifest', 'application/manifest+json', manifest),
     {path: '/icons/icon-192.png', contentType: 'image/png', raw: icon192Raw, gzip: false},
     {path: '/favicon.ico', contentType: 'image/png', raw: icon48Raw, gzip: false},

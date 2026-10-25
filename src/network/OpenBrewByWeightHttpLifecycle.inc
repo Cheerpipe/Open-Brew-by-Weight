@@ -1205,6 +1205,7 @@ bool OpenBrewByWeightNetwork::startHttpServer() {
       registerHandler(server_, "/js/admin.js", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/js/settings.js", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/js/setup.js", HTTP_GET, assetHandler) &&
+      registerHandler(server_, "/sw.js", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/manifest.webmanifest", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/icons/icon-192.png", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/favicon.ico", HTTP_GET, assetHandler) &&
