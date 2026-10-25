@@ -323,7 +323,7 @@ class OpenBrewByWeightOta {
   bool removeSessionJournal();
   void restoreSessionJournal();
   void publishState();
-  OtaStatusSnapshot snapshotLocked() const;
+  void publishSnapshotLocked() const;
   bool readBootState();
   bool confirmRunningImageLocked();
   enum class RejectResult { REJECTED, NO_ALTERNATIVE, FAILED };

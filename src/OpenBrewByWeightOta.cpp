@@ -312,7 +312,7 @@ void OpenBrewByWeightOta::publishState() {
     flags |= OTA_PUBLISHED_IMAGE_PENDING;
   }
   publishedFlags_.store(flags, std::memory_order_release);
-  (void)snapshotLocked();
+  publishSnapshotLocked();
 }
 
 OtaImageTag OpenBrewByWeightOta::runningTag() const {
@@ -502,13 +502,17 @@ OtaStatusSnapshot OpenBrewByWeightOta::snapshot(bool wait) const {
     TaskLockGuard published(publishedSnapshotMutex_);
     return publishedSnapshot_;
   }
-  const OtaStatusSnapshot copy = snapshotLocked();
+  publishSnapshotLocked();
   mutex_.unlock();
-  return copy;
+  TaskLockGuard published(publishedSnapshotMutex_);
+  return publishedSnapshot_;
 }
 
-OtaStatusSnapshot OpenBrewByWeightOta::snapshotLocked() const {
-  OtaStatusSnapshot copy;
+// Fills the published copy in place: progress updates from writeRange() must
+// not stage a second ~0.5 KB OtaStatusSnapshot on the OTA task stack.
+void OpenBrewByWeightOta::publishSnapshotLocked() const {
+  TaskLockGuard published(publishedSnapshotMutex_);
+  OtaStatusSnapshot &copy = publishedSnapshot_;
   copy.available = available_;
   copy.busy = busy_ || sessionActive_;
   copy.state = state_;
@@ -536,13 +540,9 @@ OtaStatusSnapshot OpenBrewByWeightOta::snapshotLocked() const {
   copy.confirmBlockReason = bootStatus_.reason;
   copy.confirmAttempts = bootStatus_.attempts;
   copy.confirmLastError = bootStatus_.lastError;
-  if (sessionActive_) {
-    const uint32_t age = static_cast<uint32_t>(millis() - sessionLastActivityMs_);
-    copy.sessionExpiresInMs = age < OTA_SESSION_TTL_MS ? OTA_SESSION_TTL_MS - age : 0;
-  }
-  TaskLockGuard published(publishedSnapshotMutex_);
-  publishedSnapshot_ = copy;
-  return copy;
+  const uint32_t age = static_cast<uint32_t>(millis() - sessionLastActivityMs_);
+  copy.sessionExpiresInMs =
+      sessionActive_ && age < OTA_SESSION_TTL_MS ? OTA_SESSION_TTL_MS - age : 0;
 }
 
 OtaResult OpenBrewByWeightOta::finishFailure(OtaResult result) {
@@ -854,7 +854,7 @@ OtaResult OpenBrewByWeightOta::writeRange(const char *transferId, uint32_t offse
     scanner_.feed(buffer, length);
     rangeReceived += static_cast<uint32_t>(length);
     receivedBytes_ += static_cast<uint32_t>(length);
-    (void)snapshotLocked();
+    publishSnapshotLocked();
     yieldFlashIo();
     feedFlashIoWatchdog();
     // The marker is in the early read-only segment. Reject a wrong board or

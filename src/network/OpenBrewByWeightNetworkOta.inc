@@ -1342,7 +1342,7 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
   }
   OpenBrewByWeightOta &ota = OpenBrewByWeightOta::instance();
   ota.expireSession(millis(), true);
-  const OtaStatusSnapshot snapshot = ota.snapshot();
+  OtaStatusSnapshot snapshot = ota.snapshot();  // one ~0.5 KB copy, reused below
   if (strncmp(snapshot.session.transferId, transferId, sizeof(transferId)) != 0 ||
       snapshot.expectedBytes != declaredTotal) {
     return rejectRange(STATUS_CONFLICT, "OTA_SESSION_IDENTITY_MISMATCH",
@@ -1363,18 +1363,18 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
   io.context = &transfer;
   const OtaResult result = ota.writeRange(transferId, offset, rangeLength, io, millis());
   if (result != OtaResult::OK) {
-    const OtaStatusSnapshot failed = ota.snapshot();
+    snapshot = ota.snapshot();
     self.log(DebugCategory::NETWORK, DebugCode::OTA_UPLOAD_REJECTED,
              static_cast<int32_t>(result),
-             static_cast<int32_t>(failed.lastReceivedBytes / 1024U));
+             static_cast<int32_t>(snapshot.lastReceivedBytes / 1024U));
     return rejectRange(otaResultHttpStatus(result), OpenBrewByWeightOta::resultName(result),
                        otaResultMessage(result));
   }
-  const OtaStatusSnapshot updated = ota.snapshot();
-  if (updated.stagedValid) {
+  snapshot = ota.snapshot();
+  if (snapshot.stagedValid) {
     self.log(DebugCategory::NETWORK, DebugCode::OTA_IMAGE_STAGED,
-             static_cast<int32_t>(updated.receivedBytes / 1024U),
-             static_cast<int32_t>(updated.staged.packed));
+             static_cast<int32_t>(snapshot.receivedBytes / 1024U),
+             static_cast<int32_t>(snapshot.staged.packed));
   }
   return self.sendOtaSnapshot(request, STATUS_OK);
 }
