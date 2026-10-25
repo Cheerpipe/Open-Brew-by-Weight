@@ -256,6 +256,7 @@ void publishControlStatus() {
       static_cast<uint8_t>(scheduledRestartPlanner.cause());
   next.quickRevertPolicy = static_cast<uint8_t>(sessionQuickSettings.revertPolicy);
   next.quickOverrideMask = sessionQuickSettings.mask;
+  memcpy(next.quickSaved, sessionQuickSettings.saved, sizeof(next.quickSaved));
   next.quickRevertRemainingMs = quickRevertRemainingMs(sessionQuickSettings, millis());
   next.safetyState = relay.state;
   next.safetyFault = relay.fault;

@@ -3494,7 +3494,7 @@ async function ensureSettingsHydrated() {
   await ensureSettingsDom();
   const s = await loadSettingsStatus();
   if (!s) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
-  loadSettingsConfig(s.config);
+  loadSettingsConfig(s);
 }
 function withBaseRev(p) {
   if (configRevision) p.baseRevision = configRevision;
@@ -6333,7 +6333,8 @@ function applyMachineTypeUi(s) {
   if ($("dMt")) $("dMt").textContent = t;
 }
 // Each field follows the device unless it differs from the baseline (an edit).
-function loadSettingsConfig(c) {
+// A Quick Settings override shows the saved value it hides; Home keeps the live one.
+function loadSettingsConfig({ config: c, quickRevert }) {
   if (!c || typeof c.goalWeightG !== "number" || !$("goalWeightG")) return;
   const els = [...settingsSectionEls("config"), ...settingsSectionEls("brew")],
     base = uiState.formBaseline || {},
@@ -6346,7 +6347,12 @@ function loadSettingsConfig(c) {
   if (configLoaded && els.includes(focused) && focused.type !== "checkbox")
     return focused.addEventListener("blur", scheduleSettingsPaint, { once: true });
   for (const id in edited) if (same(edited[id], base[id])) delete edited[id];
-  c = { ...c, doseG: active.doseG, grindHintsEnabled: active.grindHintsEnabled };
+  c = {
+    ...c,
+    ...quickRevert?.saved,
+    doseG: active.doseG,
+    grindHintsEnabled: active.grindHintsEnabled,
+  };
   bbwFormPresetId = c.bbwPresetId || 0;
   $("goalWeightG").value = c.goalWeightG.toFixed(1);
   [

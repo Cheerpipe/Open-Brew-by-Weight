@@ -32,30 +32,15 @@ inline bool parseIntegrationQuickSettingRequest(
     if (item->string == nullptr || strcmp(item->string, "baseRevision") == 0)
       continue;
     ++selected;
-    struct BooleanField {
-      const char *name;
-      QuickSettingField field;
-    };
-    static constexpr BooleanField fields[] = {
-        {"brewByWeight", QuickSettingField::BREW_BY_WEIGHT},
-        {"autoToManualGuardEnabled", QuickSettingField::AUTO_TO_MANUAL_GUARD},
-        {"slowExtractionGuardEnabled", QuickSettingField::SLOW_EXTRACTION_GUARD},
-        {"fastExtractionGuardEnabled", QuickSettingField::FAST_EXTRACTION_GUARD},
-        {"avoidAccidentalTouchEnabled", QuickSettingField::AVOID_ACCIDENTAL_TOUCH},
-        {"cupProtectionEnabled", QuickSettingField::CUP_PROTECTION},
-    };
-    int field = -1;
+    int field = 0;
+    while (field < QUICK_SETTING_FIELD_COUNT && strcmp(item->string, QUICK_SETTING_FIELD_IDS[field]) != 0)
+      ++field;
     uint8_t value = 0;
-    for (const auto &candidate : fields) {
-      if (strcmp(item->string, candidate.name) != 0) continue;
-      if (!cJSON_IsBool(item)) return false;
-      field = static_cast<int>(candidate.field);
+    if (field != static_cast<int>(QuickSettingField::NO_SCALE_BBW_MODE)) {
+      if (field < QUICK_SETTING_FIELD_COUNT && !cJSON_IsBool(item)) return false;
       value = cJSON_IsTrue(item) ? 1 : 0;
-      break;
-    }
-    if (field < 0 && strcmp(item->string, "noScaleBbwMode") == 0) {
+    } else {
       if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
-      field = static_cast<int>(QuickSettingField::NO_SCALE_BBW_MODE);
       if (strcmp(item->valuestring, "off") == 0) {
         value = static_cast<uint8_t>(NoScaleBbwMode::OFF);
       } else if (strcmp(item->valuestring, "warn_once") == 0) {
@@ -66,7 +51,7 @@ inline bool parseIntegrationQuickSettingRequest(
         return false;
       }
     }
-    if (field >= 0) {
+    if (field < QUICK_SETTING_FIELD_COUNT) {
       const auto bit = static_cast<uint8_t>(1U << field);
       if (output.mask & bit) return false;
       output.mask |= bit;

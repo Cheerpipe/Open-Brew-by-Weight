@@ -200,6 +200,8 @@ struct NetworkWorkBuf {
   ScaleHistoryEntry scaleHistory[SCALE_HISTORY_CAPACITY]{};
   BullseyeMelodyConfig bullseyeMelody{};
   char safeBullseyeRtttl[BULLSEYE_RTTTL_CAPACITY]{};
+  // Settings stream: the saved values of the active overrides (all seven fit).
+  char quickSaved[224]{};
   // Must match OpenBrewByWeightNetwork::REQUEST_BODY_CAPACITY (asserted in begin()).
   char requestBody[2048]{};
   WifiScanSnapshot wifiScan{};

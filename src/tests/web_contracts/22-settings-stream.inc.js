@@ -136,6 +136,24 @@
   sockets[0].onmessage({data: JSON.stringify({type: 'settings', tag: 78, changes: {'config.autoTare': false}})});
   assert.equal(context.settingsStatus().config.autoTare, false);
   assert.equal(context.settingsStatus().config.dripDelayMs, 3000);
+  // Home streams the effective Quick Settings, Settings the saved values they
+  // hide; a new saved object replaces the old one whole.
+  sockets[0].onmessage({data: JSON.stringify({type: 'home', changes: {
+    'config.cupProtectionEnabled': false, 'quickRevert.overrides': 64}})});
+  sockets[0].onmessage({data: JSON.stringify({type: 'settings', tag: 79, changes: {
+    'quickRevert.saved': {cupProtectionEnabled: true}}})});
+  const overridden = context.settingsStatus();
+  assert(overridden.config.cupProtectionEnabled === false && overridden.quickRevert.overrides === 64 &&
+      overridden.quickRevert.saved.cupProtectionEnabled === true, 'the header reads effective, the form saved');
+  sockets[0].onmessage({data: JSON.stringify({type: 'settings', tag: 80, changes: {'quickRevert.saved': {}}})});
+  assert.deepEqual(Object.keys(context.settingsStatus().quickRevert.saved), []);
+  assert(settingsSender.includes('fields.field("quickRevert.saved", "{%s}", g_work->quickSaved);') &&
+      settingsSender.includes('gate = gateOver(gate, g_work->quickSaved, strlen(g_work->quickSaved));') &&
+      codeIncludes(runtimeJs, 'function loadSettingsConfig({config:c,quickRevert}){') &&
+      codeIncludes(runtimeJs, 'c={...c,...quickRevert?.saved,doseG:active.doseG,') &&
+      codeIncludes(viewJs.settings, 'R.loadSettingsConfig(s);') &&
+      codeIncludes(viewJs.settings, 'saved=R.uiState.formBaseline?.[input.id]'),
+  'the form shows the saved value an override hides, so Use saved setting sends it and drops the override');
   // A warm Settings entry paints the cached model without an op.
   vm.runInNewContext("activeView='settings'", context);
   const sentBefore = sockets[0].sent.length;
@@ -151,7 +169,7 @@
   sockets[0].close();
   assert.equal(context.settingsStatus().config.autoTare, false, 'the model survives the socket');
   context.startUiStream(); sockets[1].onopen();
-  assert.deepEqual(ops(sockets[1]), [{op: 'settings', on: true, tag: 78}], 'the replayed subscribe carries the tag');
+  assert.deepEqual(ops(sockets[1]), [{op: 'settings', on: true, tag: 80}], 'the replayed subscribe carries the tag');
   sockets[1].onmessage({data: JSON.stringify(home(7))});
   sockets[1].onmessage({data: JSON.stringify({type: 'settings', changes: {'config.autoTare': true}})});
   assert.equal(sockets[1].sent.at(-1).op, 'resync', 'a frame without its tag fails closed');

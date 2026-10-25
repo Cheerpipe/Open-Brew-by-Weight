@@ -14148,6 +14148,10 @@ void hq01_quick_settings_are_session_only() {
   ControlStatusSnapshot overrideStatus;
   copyControlStatus(overrideStatus);
   CHECK(overrideStatus.quickOverrideMask == (1U << QUICK_SETTING_FIELD_COUNT) - 1);
+  // ...and the saved value each one hides, which the Settings form shows.
+  for (uint8_t index = 0; index < QUICK_SETTING_FIELD_COUNT; ++index)
+    CHECK(overrideStatus.quickSaved[index] ==
+          quickSettingValue(saved, static_cast<QuickSettingField>(index)));
   CHECK(activeShotPreset(presetBank).brewByWeight == savedPreset.brewByWeight);
   CHECK(activeShotPreset(presetBank).fastSideEnabled);
   CHECK(activeShotPreset(presetBank).slowSideEnabled);

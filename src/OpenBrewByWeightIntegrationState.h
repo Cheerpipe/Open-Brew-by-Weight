@@ -43,6 +43,12 @@ inline QuickSettingsSnapshot quickSettingsSnapshot(const RecipeSnapshot &recipe)
 
 constexpr uint8_t QUICK_SETTING_FIELD_COUNT =
     static_cast<uint8_t>(QuickSettingField::CUP_PROTECTION) + 1;
+// Wire names in field order, shared by the quick-settings request and stream.
+constexpr const char *QUICK_SETTING_FIELD_IDS[QUICK_SETTING_FIELD_COUNT] = {
+    "brewByWeight", "noScaleBbwMode", "autoToManualGuardEnabled", "slowExtractionGuardEnabled",
+    "fastExtractionGuardEnabled", "avoidAccidentalTouchEnabled", "cupProtectionEnabled"};
+static_assert(sizeof(ControlStatusFields::quickSaved) == QUICK_SETTING_FIELD_COUNT,
+              "one published saved value per Quick Settings field");
 
 [[gnu::noinline]] inline uint8_t quickSettingValue(const RuntimeConfig &config, QuickSettingField field) {
   switch (field) {

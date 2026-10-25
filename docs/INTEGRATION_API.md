@@ -298,7 +298,9 @@ overrides as `quickRevert.overrides`, a bit mask in field order: `brewByWeight`
 (1), `noScaleBbwMode` (2), `autoToManualGuardEnabled` (4),
 `slowExtractionGuardEnabled` (8), `fastExtractionGuardEnabled` (16),
 `avoidAccidentalTouchEnabled` (32), and `cupProtectionEnabled` (64); 0 means no
-override is active.
+override is active. The Settings stream adds `quickRevert.saved`, the saved value
+each active override hides, keyed by the same field names, so the Settings form
+shows saved values while Home shows the effective ones.
 
 The command completes as soon as it is live, so its `lastCommand` reaches
 `PERSISTED` without a flash write; an unchanged value completes immediately.
@@ -616,10 +618,16 @@ A settings snapshot has `v: 1`, `type: "settings"`, `boot`, `snapshot: true`,
 the paths whose values changed. The frame carries only paths the Home frame
 does not: Home owns `config.revision`, the shared `config.*` keys it already
 streams, `presets` (including the active preset's dose and grind-hint switch),
-`lastCommand`, `quickRevert`, `connections`, `scale.preferred*` and its
+`lastCommand`, `quickRevert.after`, `quickRevert.overrides`,
+`quickRevert.remainingS`, `connections`, `scale.preferred*` and its
 `lineaMicra.*` keys, and the page reads them from the Home model, so a change
-to one of those settings reaches the browser on the Home frame alone. The
-settings frame adds the remaining `config.*` keys the form shows, the drip
+to one of those settings reaches the browser on the Home frame alone. Home's
+`config.*` values are the effective ones, Quick Settings overrides included.
+The settings frame adds `quickRevert.saved`, an object with the saved value of
+each overridden field (empty when none is active, sent whole when it changes),
+which the form shows in place of the effective value so **Use saved setting**
+sends it and drops exactly that override. It also adds the remaining
+`config.*` keys the form shows, the drip
 chart and quick start as one `config.bbwDrip` object (sent whole when any part
 changes), `config.bbwPresetId`, `config.bbwEwmaOffsetG` and `config.bbwAlpha`,
 `scale.history`, `scaleLoss.projectedS` and `scaleLoss.source`,
@@ -631,7 +639,8 @@ measurement.
 A dispatch writes its Home, shot-card and settings frames together, so a
 save's new `config.revision` and its settings changes arrive in one write and
 in order. The firmware evaluates the projection only when one of its sources
-changed (saved settings and their revision, the bullseye tune, scale history,
+changed (saved settings and their revision, the saved values behind Quick
+Settings overrides, the bullseye tune, scale history,
 drip and learning readback, the scale-loss projection, Micra account state),
 so an idle controller sends no settings frames; each dispatch only compares a
 checksum of those sources, without formatting the projection. In

@@ -1,7 +1,8 @@
 // Settings page projection on the owned UI stream: only the paths Settings
 // reads that the Home frame does not carry. Home owns config.revision, the
-// shared config.* keys, presets, lastCommand, quickRevert, connections,
-// scale.preferred* and its lineaMicra.* keys; the page composes both models.
+// shared config.* keys (effective, overrides included), presets, lastCommand,
+// quickRevert.{after,overrides,remainingS}, connections, scale.preferred* and
+// its lineaMicra.* keys; the page composes both models.
 // The standing subscription rides the Home + shot-card batch. One source
 // fingerprint gates the evaluation, so an idle dispatch formats nothing, and
 // a reconnecting page whose tag still matches gets no snapshot.
@@ -18,6 +19,19 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   uint32_t readback[5] = {control.bbwPresetId, control.bbwAlpha,
                           control.autoToManualGuardTrendMs, control.scaleLossProjectedSource};
   memcpy(&readback[4], &control.bbwEwmaOffsetG, sizeof(float));
+  // The form shows the saved value each Quick Settings override hides.
+  g_work->quickSaved[0] = '\0';
+  for (size_t index = 0, used = 0; index < QUICK_SETTING_FIELD_COUNT; ++index) {
+    if ((control.quickOverrideMask & (1U << index)) == 0) continue;
+    const uint8_t value = control.quickSaved[index];
+    const bool mode = index == static_cast<size_t>(QuickSettingField::NO_SCALE_BBW_MODE);
+    const int n = snprintf(g_work->quickSaved + used, sizeof(g_work->quickSaved) - used,
+                           mode ? "%s\"%s\":\"%s\"" : "%s\"%s\":%s", used ? "," : "",
+                           QUICK_SETTING_FIELD_IDS[index],
+                           mode ? noScaleBbwModeId(value) : value ? "true" : "false");
+    if (n < 0 || static_cast<size_t>(n) >= sizeof(g_work->quickSaved) - used) return false;
+    used += static_cast<size_t>(n);
+  }
   const auto gateOver = [](uint32_t gate, const void *bytes, size_t length) {
     return crc32Update(gate, static_cast<const uint8_t *>(bytes), length);
   };
@@ -27,6 +41,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   gate = gateOver(gate, g_work->scaleHistory, sizeof(g_work->scaleHistory));
   gate = gateOver(gate, drip, strlen(drip));
   gate = gateOver(gate, readback, sizeof(readback));
+  gate = gateOver(gate, g_work->quickSaved, strlen(g_work->quickSaved));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   char email[LINEA_MICRA_USERNAME_CAPACITY] = {}, serial[LINEA_MICRA_SERIAL_CAPACITY] = {},
        name[LINEA_MICRA_NAME_CAPACITY] = {};
@@ -61,6 +76,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
             static_cast<unsigned long>(control.bootId))
       : statusJsonAppend(&fields.used, "{\"type\":\"settings\",\"changes\":{");
   fields.field("buzzerSupported", bool(BUZZER_SUPPORT_ENABLED));
+  fields.field("quickRevert.saved", "{%s}", g_work->quickSaved);
   fields.field("config.bbwPresetId", static_cast<unsigned long>(control.bbwPresetId));
   fields.field("config.bbwEwmaOffsetG", "%.2f", static_cast<double>(control.bbwEwmaOffsetG));
   fields.field("config.bbwAlpha", "%.2f", control.bbwAlpha / 100.0);

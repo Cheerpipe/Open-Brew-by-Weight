@@ -644,7 +644,7 @@ function applySettingsStatus(s) {
       R.controlsMutable &&
       (sc.preferredMac || sc.macCachePauseRemainingMs > 0)
     );
-  R.loadSettingsConfig(s.config);
+  R.loadSettingsConfig(s);
   loadBullseyeConfig(s.config);
   applyLineaMicraStatus(s);
   R.updateBbwControls();
