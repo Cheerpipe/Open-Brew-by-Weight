@@ -1510,6 +1510,7 @@
     "settings.preferred_only_hint": "Ignores every other scale.",
     "settings.preferred_scale": "My scale",
     "settings.preset_actions": "Preset actions",
+    "settings.preset_extensions": "Preset extensions",
     "settings.preset_name_hint": "E.g. \"Double · Kenya\". One preset per basket keeps drip learning accurate.",
     "settings.preset_review": "How this preset cuts",
     "settings.preset_tap_hint": "Tap a preset to use and review it.",
