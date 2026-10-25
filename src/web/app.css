@@ -3896,6 +3896,36 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   height: 100%;
   fill: currentColor;
 }
+.menuAction {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.menuText {
+  display: grid;
+  gap: 0.05rem;
+}
+.menuText small {
+  color: var(--mu);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+.menuText small:empty {
+  display: none;
+}
+.menuDanger,
+.menuDanger .histFilterIcon {
+  color: var(--dn);
+}
+.histFilterPanel hr {
+  margin: 0.35rem 0.25rem;
+  border: 0;
+  border-top: 1px solid var(--ln);
+}
 
 .otaProgress {
   display: block;

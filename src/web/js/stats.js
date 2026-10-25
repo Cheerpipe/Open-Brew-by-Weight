@@ -1141,12 +1141,14 @@ function renderShots() {
       del.className = "shotDel";
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "btnGlyph btnDanger";
-      btn.title = __WEBUI_TEXT__("runtime.delete");
-      btn.setAttribute("aria-label", __WEBUI_TEXT__("runtime.delete"));
+      btn.className = "btnGlyph";
+      btn.title = __WEBUI_TEXT__("stats.shot_actions");
+      btn.setAttribute("aria-label", __WEBUI_TEXT__("stats.shot_actions"));
+      btn.setAttribute("aria-haspopup", "true");
+      btn.setAttribute("aria-expanded", "false");
       btn.innerHTML =
-        '<span class="g" aria-hidden="true">' + __WEBUI_TEXT__("runtime.close") + "</span>";
-      btn.onclick = () => deleteOneShot(r.id);
+        '<span class="g" aria-hidden="true">' + __WEBUI_TEXT__("stats.more") + "</span>";
+      btn.onclick = () => shotMenu.open(btn, r);
       del.appendChild(btn);
       row.appendChild(del);
       body.appendChild(row);
@@ -1376,6 +1378,300 @@ async function exportShotsCsv() {
     );
   }
 }
+async function exportShotsJson() {
+  if (statsExportInFlight) return;
+  try {
+    const list = await statsFrameWindow(0, R.SHOTS_EXPORT_LIMIT, "date", "desc", 90e3);
+    if (!list) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
+    // Local time as YYYYMMDD-HHMM ("sv" formats dates ISO-like).
+    const stamp = new Date().toLocaleString("sv").slice(0, 16).replace(/\D/g, "");
+    downloadJson(
+      `openbrewbyweight-shots-${stamp.slice(0, 8)}-${stamp.slice(8)}.json`,
+      shotsJson(list),
+    );
+  } catch (e) {
+    R.message(
+      R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_export_shot_history"), e),
+      "error",
+    );
+  }
+}
+function downloadJson(name, value) {
+  R.saveFile(new Blob([JSON.stringify(value)], { type: "application/json" }), name);
+}
+// ISO 8601 in the shot's own offset (minutes east of UTC).
+function isoAt(unix, offset) {
+  const a = Math.abs(offset),
+    p = (n) => String(n).padStart(2, "0");
+  return (
+    new Date((unix + offset * 60) * 1e3).toISOString().slice(0, 19) +
+    (offset < 0 ? "-" : "+") +
+    p((a / 60) | 0) +
+    ":" +
+    p(a % 60)
+  );
+}
+function shotWallTimes(r) {
+  if (!(r.hasWallTime && r.endedAtUnixSec > 0)) return null;
+  const offset =
+    typeof r.timezoneOffsetMinutesAtCommit === "number"
+      ? r.timezoneOffsetMinutesAtCommit
+      : Math.round((r.endedAtLocalSec - r.endedAtUnixSec) / 60);
+  return [isoAt(r.endedAtUnixSec - r.durationS, offset), isoAt(r.endedAtUnixSec, offset), offset];
+}
+// Shot export v1 (docs/schemas/openbrewbyweight-shot-export-v1.schema.json):
+// what the firmware stored, then under `derived` what this page computes.
+function shotsJson(rows) {
+  return {
+    $schema:
+      "https://raw.githubusercontent.com/Cheerpipe/Open-Brew-by-Weight/main/docs/schemas/openbrewbyweight-shot-export-v1.schema.json",
+    format: "openbrewbyweight.shots",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    source: {
+      app: "openbrewbyweight",
+      firmwareVersion: R.firmwareVersion || null,
+      host: location.hostname || null,
+    },
+    shots: rows.map(shotJson),
+  };
+}
+function shotJson(r) {
+  const w = Array.isArray(r.wCg) ? r.wCg : [],
+    m = R.buildShotSparkModel(r),
+    flow = shotFlowCurveGS(r, m),
+    estimated = r.actualG == null && r.estimatedG != null,
+    actual = estimated ? null : shotDisplayActualG(r.actualG, r.wCg),
+    cut = shotCut(r, m, actual),
+    planned = r.cutLineG > 0 ? r.cutLineG : r.goalG,
+    time = shotWallTimes(r),
+    n = (v) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v * 100) / 100 : null),
+    pos = (v) => (v > 0 ? v : null),
+    event = (s, cg) => (s == null || cg == null ? null : { atS: s, weightG: cg / 100 }),
+    guard = (enabled, marginG, extended) => ({ enabled: !!enabled, marginG, extended: !!extended });
+  return {
+    id: r.id,
+    bootId: r.bootId,
+    time: {
+      startedAt: time?.[0] ?? null,
+      endedAt: time?.[1] ?? null,
+      utcOffsetMinutes: time?.[2] ?? null,
+      endedAtUptimeMs: r.endedAtMs,
+    },
+    type: r.shotType,
+    rating: r.rating || null,
+    preset: { id: r.presetId, name: r.presetName || null },
+    scale: r.scaleName ? { name: r.scaleName } : null,
+    recipe: {
+      targetYieldG: r.goalG,
+      doseG: pos(r.doseG),
+      targetTemperatureC: r.targetTempDeciC > 0 ? r.targetTempDeciC / 10 : null,
+    },
+    outcome: {
+      durationS: r.durationS,
+      yieldG: r.actualG ?? null,
+      yieldSource: r.actualWeightSource ?? null,
+      estimatedYieldG: r.estimatedG ?? null,
+      ratio: pos(r.ratio),
+      averageFlowGS: r.avgFlowGS ?? null,
+      firstDropS: r.firstDropS ?? null,
+      tareS: r.tareS ?? null,
+      arrivalS: r.arrivalS ?? null,
+      verdict: r.verdict ?? null,
+      channeling: !!r.channeling,
+    },
+    stop: {
+      cut: r.cutType,
+      reason: r.stopDetail,
+      cutLineG: r.cutLineG ?? null,
+      scaleLossSource: r.scaleLossSource ?? null,
+      blind: !!r.blind,
+    },
+    control: {
+      brewByWeight: {
+        algorithm: r.bbwAlgorithm === "unknown" ? null : r.bbwAlgorithm || null,
+        algorithmVersion: r.bbwAlgorithmVersion ?? null,
+        alpha: r.bbwAlpha ?? null,
+        learningApplied: r.bbwLearningApplied ?? null,
+        offsetG: r.offsetG,
+      },
+      window: { fastBeforeS: r.fastBeforeS, slowAfterS: r.slowAfterS },
+      fastGuard: guard(r.extractionGuardEnabled, r.fastMarginG, r.extractionExtended),
+      slowGuard: guard(r.slowExtractionGuardEnabled, r.slowMarginG, r.slowExtractionExtended),
+      cutDelayS: r.delayS,
+      cutRampS: r.cutRampS,
+      maxTimeS: r.wallS,
+      dripDelayS: r.dripDelayS ?? null,
+    },
+    curve: {
+      truncated: !!r.wTruncated,
+      timeS: w.map((_, i) => r.wAtMs[i] / 1000),
+      weightG: w.map((cg) => cg / 100),
+      heldIndices: r.wHeld || [],
+      gapBeforeIndices: r.wBreakBefore || [],
+      events: {
+        firstDrop: event(r.dropS, r.dropCg),
+        extended: event(r.extendedS, r.extCg),
+        scaleLoss: event(r.atmS, r.atmCg),
+        scaleLossClearedS: r.atmClearedS ?? null,
+        end: event(r.endS, r.endCg),
+      },
+    },
+    derived: {
+      flowGS: w.map((_, i) => n(flow[i])),
+      maxFlowGS: n(shotMaxFlowGS(r, m)),
+      errorVsTargetG: actual === null || !r.goalG ? null : n(actual - r.goalG),
+      errorVsTargetPct:
+        actual === null || !r.goalG ? null : n(((actual - r.goalG) / r.goalG) * 100),
+      errorVsPlannedStopPct:
+        actual === null || !planned ? null : n(((actual - planned) / planned) * 100),
+      cut: cut.s == null ? null : { atS: cut.s, weightG: cut.g },
+      dripG: n(cut.drip),
+    },
+  };
+}
+// The curve's samples as the scale weighed coffee: held readings (a hand on
+// the cup) left out, as [ms, cg] pairs.
+function coffeeSamples(r) {
+  const held = new Set(r.wHeld);
+  return (r.wCg || []).flatMap((cg, i) => (held.has(i) ? [] : [[r.wAtMs[i], cg, i]]));
+}
+// One shot in the Gaggiuino format Visualizer.coffee imports. The controller
+// weighs only, so pressure, pump flow and water temperature are left out.
+function shotGaggiuino(r) {
+  const flow = shotFlowCurveGS(r),
+    tempC = r.targetTempDeciC > 0 ? r.targetTempDeciC / 10 : undefined,
+    start = shotWallTimes(r) && Math.round(r.endedAtUnixSec - r.durationS);
+  return {
+    id: r.id,
+    timestamp: start || 0,
+    duration: Math.round(r.durationS * 10),
+    datapoints: coffeeSamples(r).map(([ms, cg, i]) => ({
+      timeInShot: ms,
+      shotWeight: Math.round(cg / 10) / 10,
+      weightFlow: Math.round((flow[i] ?? 0) * 10) / 10,
+      targetTemperature: tempC,
+    })),
+    profile: {
+      id: r.presetId,
+      name: r.presetName || "",
+      phases: [],
+      globalStopConditions: { weight: r.goalG },
+      waterTemperature: tempC,
+      recipe: {},
+    },
+  };
+}
+// Beanconqueror's brew handoff: the envelope gzipped, then unpadded base64url
+// split into 400-character shareBrew<n> parameters behind its total length.
+async function shotBeanconquerorLink(r) {
+  const s = coffeeSamples(r).map(([ms, cg]) => [ms, Math.round(cg / 10)]),
+    delta = (k) => s.map((q, i) => q[k] - (i ? s[i - 1][k] : 0)),
+    actual = r.actualG ?? r.estimatedG ?? 0,
+    envelope = {
+      v: 1,
+      app: { name: "Open Brew by Weight", version: R.firmwareVersion || undefined },
+      brew: {
+        date: shotWallTimes(r)?.[0] ?? new Date().toISOString(),
+        doseIn: r.doseG > 0 ? { value: r.doseG, unit: "g" } : undefined,
+        waterIn: { value: 0, unit: "ml" },
+        beverageOut: { value: actual, unit: "g" },
+        brewTime: r.durationS,
+        temperature: r.targetTempDeciC > 0 ? r.targetTempDeciC / 10 : undefined,
+        ratio: r.ratio > 0 ? r.ratio : undefined,
+        preparationMethod: "Espresso",
+        preparationType: "PORTAFILTER",
+        firstDripTime: r.firstDropS ?? undefined,
+        rating: r.rating || undefined,
+        note: [r.presetName, r.scaleName].filter(Boolean).join(" · "),
+      },
+      flow: s.length
+        ? {
+            fidelity: "full",
+            t: delta(0),
+            weight: delta(1),
+            waterDispensed: s.map(() => 0),
+          }
+        : undefined,
+      imported: {
+        source: "openbrewbyweight",
+        sourceName: "Open Brew by Weight",
+        device: location.hostname || undefined,
+        schema: 1,
+      },
+    };
+  const gz = new Uint8Array(
+    await new Response(
+      new Blob([JSON.stringify(envelope)]).stream().pipeThrough(new CompressionStream("gzip")),
+    ).arrayBuffer(),
+  );
+  let bin = "";
+  for (const b of gz) bin += String.fromCharCode(b);
+  const data = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return (
+    "beanconqueror://ADD_BREW?len=" +
+    data.length +
+    data
+      .match(/.{1,400}/g)
+      .map((part, i) => `&shareBrew${i}=${part}`)
+      .join("")
+  );
+}
+async function openInBeanconqueror(r) {
+  try {
+    if (typeof CompressionStream !== "function")
+      throw new Error(__WEBUI_TEXT__("stats.beanconqueror_unsupported"));
+    location.assign(await shotBeanconquerorLink(r));
+  } catch (e) {
+    R.message(
+      R.formatCommandError(__WEBUI_TEXT__("stats.could_not_open_beanconqueror"), e),
+      "error",
+    );
+  }
+}
+// An action menu on the shared popup: a string starts a group, null draws a
+// separator, and [icon path, title, hint, run, danger] is an item.
+function actionMenu(label, items) {
+  const menu = R.createPopup(label, (p, ...args) => {
+    for (const item of items(...args)) {
+      if (item === null) {
+        p.append(document.createElement("hr"));
+        continue;
+      }
+      if (typeof item === "string") {
+        p.append(
+          Object.assign(document.createElement("div"), {
+            className: "histFilterGroup",
+            textContent: item,
+          }),
+        );
+        continue;
+      }
+      const [icon, title, hint, run, danger] = item,
+        b = document.createElement("button");
+      b.type = "button";
+      b.className = "histFilterItem menuAction" + (danger ? " menuDanger" : "");
+      b.setAttribute("role", "menuitem");
+      b.innerHTML =
+        '<span class="histFilterIcon" aria-hidden="true"><svg class="o" viewBox="0 0 24 24"><path d="' +
+        icon +
+        '"/></svg></span><span class="menuText"><b></b><small></small></span>';
+      b.querySelector("b").textContent = title;
+      b.querySelector("small").textContent = hint;
+      b.onclick = () => (menu.close(), run());
+      p.append(b);
+    }
+  });
+  return menu;
+}
+const ICON = {
+  csv: "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14",
+  json: "M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1",
+  chart: "M3 20h18M4 16l4-6 4 3 4-7 4 5",
+  bean: "M17 4c3 3 2 9-2 13s-10 5-13 2 0-9 4-13 8-5 11-2zM15 5c-1 3-3 4-5 6s-3 5-4 8",
+  trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
+};
+let shotMenu;
 // The pending export window: a second export and scroll paging wait for it
 // instead of orphaning it to its timeout.
 let statsExportInFlight = null;
@@ -1441,7 +1737,38 @@ export function init() {
     renderStatsDurChart,
     relayoutCharts: () => chartObserver && layoutChartLabels(),
   });
-  $("exportShotsButton").onclick = exportShotsCsv;
+  // The toolbar exports every stored shot, whatever the filter; a card's menu
+  // acts on its own shot only.
+  const exportMenu = actionMenu(__WEBUI_TEXT__("stats.export_all_shots"), () => [
+    __WEBUI_TEXT__("stats.export_all_shots"),
+    [ICON.csv, "CSV", __WEBUI_TEXT__("stats.csv_hint"), exportShotsCsv],
+    [ICON.json, "JSON", __WEBUI_TEXT__("stats.json_all_hint"), exportShotsJson],
+  ]);
+  $("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"));
+  shotMenu = actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r) => [
+    __WEBUI_TEXT__("stats.open_in"),
+    [
+      ICON.bean,
+      "Beanconqueror",
+      __WEBUI_TEXT__("stats.beanconqueror_hint"),
+      () => openInBeanconqueror(r),
+    ],
+    __WEBUI_TEXT__("stats.download"),
+    [
+      ICON.json,
+      "JSON",
+      __WEBUI_TEXT__("stats.json_shot_hint"),
+      () => downloadJson(`openbrewbyweight-shot-${r.id}.json`, shotsJson([r])),
+    ],
+    [
+      ICON.chart,
+      "Gaggiuino",
+      __WEBUI_TEXT__("stats.gaggiuino_hint"),
+      () => downloadJson(`openbrewbyweight-shot-${r.id}-gaggiuino.json`, shotGaggiuino(r)),
+    ],
+    null,
+    [ICON.trash, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
+  ]);
   $("clearShotsButton").onclick = clearShotHistory;
   if ($("shotSort")) {
     $("sortDateButton").onclick = () => setShotSort("date");

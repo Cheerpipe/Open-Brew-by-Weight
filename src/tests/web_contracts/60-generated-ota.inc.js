@@ -755,8 +755,10 @@ if (generated.jsGzip.length > 7850) {
 // The red Access password note: 17163, owner-requested 2026-10-23; cap 17163.
 // Shot-card Target temp, Dose, and Ratio grid rows with the temp-less
 // fallback layout: 17337, owner-requested 2026-10-24; cap 17337.
-if (generated.cssGzip.length > 17337) {
-  throw new Error(`Compressed Web CSS exceeds the 17337-byte gzip budget (${generated.cssGzip.length})`);
+// Shot export action menus (item hints, separator, danger item): 17411,
+// owner-requested 2026-10-25; cap 17411.
+if (generated.cssGzip.length > 17411) {
+  throw new Error(`Compressed Web CSS exceeds the 17411-byte gzip budget (${generated.cssGzip.length})`);
 }
 // Include zero baselines and the first-drop marker without sacrificing legibility.
 // Exporting the saved weight curve as per-shot CSV columns raises the cap by 100 bytes.
@@ -1019,7 +1021,9 @@ if (generated.otaImageGzip.length > 3072) {
 // Localized, bounded Wi-Fi scan states and the keyboard rename button measure admin.js at 17947,
 // owner-requested 2026-10-23; cap 17970. Access password notes: admin 18002,
 // owner-requested 2026-10-23; cap 18002.
-const viewModuleBudgets = {records: 15440, diagnostic: 14690, admin: 18002, settings: 18430, setup: 5870};
+// Shot export (v1 JSON, Gaggiuino file, Beanconqueror link, Export and card action menus)
+// measures records.js at 17961, owner-requested 2026-10-25; cap 17980 for asset-tag gzip wobble.
+const viewModuleBudgets = {records: 17980, diagnostic: 14690, admin: 18002, settings: 18430, setup: 5870};
 for (const [file, budget] of Object.entries(viewModuleBudgets)) {
   if (generated.moduleGzip[file].length > budget) {
     throw new Error(`Compressed ${file}.js exceeds the ${budget}-byte gzip budget (${generated.moduleGzip[file].length})`);
@@ -1244,8 +1248,10 @@ const coldHomeGzip = generated.gzip.length + generated.cssGzip.length +
 // Shot-card Target temp, Dose, and Ratio: 73373, owner-requested 2026-10-24;
 // cap 73380. The autosave engine shared with Settings and the Quick Settings
 // autosave: 73952 (73967 with asset-tag gzip wobble), owner-requested 2026-10-24; cap 73990.
-if (coldHomeGzip > 73990) {
-  throw new Error(`Cold Home download exceeds the 73990-byte gzip budget (${coldHomeGzip})`);
+// Shot export action menus (shared popup shell and menu styles): 74026,
+// owner-requested 2026-10-25; cap 74040.
+if (coldHomeGzip > 74040) {
+  throw new Error(`Cold Home download exceeds the 74040-byte gzip budget (${coldHomeGzip})`);
 }
 // The optional Web UI login brings every embedded asset together to 149453,
 // owner-requested 2026-10-22; cap 149480 for asset-tag gzip wobble. The Admin
@@ -1267,8 +1273,10 @@ if (coldHomeGzip > 73990) {
 // range fix re-measured 155373; cap 155380. Quick Settings autosave on the engine
 // shared with Settings: 155704 (155719 with asset-tag gzip wobble), owner-requested
 // 2026-10-24; cap 155740.
-if (generated.combined > 155740) {
-  throw new Error(`Combined Web UI gzip exceeds the 155740-byte flash budget (${generated.combined})`);
+// Shot export (v1 JSON, Gaggiuino file, Beanconqueror link, Export and card action
+// menus): 158452, owner-requested 2026-10-25; cap 158480 for asset-tag gzip wobble.
+if (generated.combined > 158480) {
+  throw new Error(`Combined Web UI gzip exceeds the 158480-byte flash budget (${generated.combined})`);
 }
 if (!network.includes('#include "OpenBrewByWeightWebAssetsGzip.h"') ||
     network.includes('#include "OpenBrewByWeightWebAssets.h"')) {

@@ -974,8 +974,10 @@ if (htmlBytes > 107310) {
 // owner-requested 2026-10-24. Quick Settings autosave on the engine shared with
 // Settings (draft, one patch per pause, stale resend): measured 527437,
 // owner-requested 2026-10-24.
-if (jsBytes > 527437) {
-  throw new Error(`Web UI JS source exceeds the authoring budget (${jsBytes} > 527437)`);
+// Shot export (v1 JSON, Gaggiuino file, Beanconqueror link, the shared popup
+// shell, and the card's actions menu): measured 539923, owner-requested 2026-10-25.
+if (jsBytes > 539923) {
+  throw new Error(`Web UI JS source exceeds the authoring budget (${jsBytes} > 539923)`);
 }
 // Sharing the brand wordmark selectors between the header, the loading view,
 // and the inactive overlay pays for the added shell markup.
@@ -1150,8 +1152,9 @@ if (jsBytes > 527437) {
 // Shot-record Target temp, Dose, and Ratio cells plus their table headers:
 // measured 631575, owner-requested 2026-10-24. Quick Settings autosave: measured
 // 634028, owner-requested 2026-10-24.
-if (htmlBytes + jsBytes > 634028) {
-  throw new Error(`Web UI HTML+JS source exceeds the combined authoring budget (${htmlBytes + jsBytes} > 634028)`);
+// Shot export menus and formats: measured 646557, owner-requested 2026-10-25.
+if (htmlBytes + jsBytes > 646557) {
+  throw new Error(`Web UI HTML+JS source exceeds the combined authoring budget (${htmlBytes + jsBytes} > 646557)`);
 }
 if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !codeIncludes(ui, 'id="dActivator"') || !codeIncludes(ui, 'firstDropBeep') ||

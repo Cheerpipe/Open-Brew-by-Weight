@@ -72,8 +72,8 @@ Stopwatch and gram-weight icons sit beside the large duration and yield values
 in each shot card and beside Avg time and Avg yield in the Stats summary.
 Each icon and value are centered together within their column. The icons
 follow your chosen light or dark theme. History cards use equal left and right
-spacing for their measurements and charts, with the delete button in the top
-right corner.
+spacing for their measurements and charts, with the shot's actions menu (⋯)
+in the top right corner.
 
 ## What is recorded
 
@@ -228,8 +228,9 @@ weight alone cannot establish that the final reading belongs to another cup.
 
 ## In the Web UI
 
-Open the shot history table to browse rows, delete one entry, clear the
-whole log, or export CSV. Clearing requires an explicit confirm.
+Open the shot history table to browse rows, export or delete one shot from
+its ⋯ menu, clear the whole log, or export every shot as CSV or JSON.
+Clearing requires an explicit confirm.
 
 Home and Stats read the same shot history. Deleting the newest shot shows the
 next newest qualifying shot on Home; clearing the log empties the idle card.
@@ -264,12 +265,12 @@ sort order, every page you scroll to is full of matching shots, and the Filter
 button shows a count badge while a filter is active; Reset clears it, and
 tapping outside or pressing Escape closes the checklist. When nothing matches,
 the list says so. The filter changes only the list: the averages, charts, and
-Export CSV still cover your shots as described below.
+**Export** still cover your shots as described below.
 
 Changes arrive automatically while the
 page is open. After an entry is added, rated, or deleted, the list refreshes
-from the first page in your chosen order; scroll to load more again. Export CSV
-downloads the full log newest-first, independent of the on-screen sort. A large
+from the first page in your chosen order; scroll to load more again. **Export**
+downloads the full log newest-first, whatever the on-screen sort or filter. A large
 export can take up to 90 seconds on a slow connection. Wait for the download
 before changing the sort or leaving Stats.
 
@@ -389,6 +390,40 @@ The controller stores only the weight curve. The Flow rate chart and Max flow
 are derived locally, so viewing or reloading them does not create another
 history record or flash write.
 
+## Export and share shots
+
+**Export**, next to Filter, opens a small menu with two formats. Both always
+include every stored shot, whatever the list's filter or sort:
+
+- **CSV** is a table for Excel, Numbers, or Google Sheets, one row per shot.
+- **JSON** keeps everything the controller recorded about each shot, including
+  its full weight curve, in a structured file. Use it as a backup, to analyze
+  your shots in your own tools, or to bring them into other apps. Its layout is
+  published as a
+  [JSON Schema](../schemas/openbrewbyweight-shot-export-v1.schema.json), with an
+  [example file](../schemas/openbrewbyweight-shot-export-v1.example.json), so
+  other projects can read it reliably.
+
+Each shot card has a **⋯** button in its top right corner. Its menu acts on
+that shot only:
+
+- **Open in Beanconqueror** hands the shot to the Beanconqueror app on the same
+  phone or tablet, ready to save as a brew with its dose, yield, time, first
+  drip, target temperature, rating, and weight curve. Open the Web UI on the
+  device where Beanconqueror is installed. It needs a Beanconqueror version
+  that accepts brews from other apps; versions up to 8.7.0 do not, and on a
+  device without a suitable app nothing happens.
+- **JSON** downloads the shot in the same format as the full export, so one
+  shot and the whole log read the same way.
+- **Gaggiuino** downloads the shot in the format Gaggiuino machines use, which
+  [Visualizer](https://visualizer.coffee) can import. It carries the weight,
+  flow, and target temperature over time. Open Brew by Weight measures weight
+  only, so pressure, pump flow, and water temperature stay empty there.
+- **Delete shot**, at the bottom of the menu, removes the shot after you
+  confirm, as before.
+
+Exporting never changes your shots, so it also works while settings are locked.
+
 ## Read a result
 
 The CSV exports `local_time` as the local date and time saved for that shot,
@@ -486,7 +521,7 @@ the outcome. EWMA time/safety-limit outcomes remain in eligible history with
 learning-applied false; only a normal weight-target cut can train EWMA.
 Compare shots like for like using each shot's captured `bbw_alpha`,
 `offset_g` and the firmware identity recorded alongside the dataset; recipe
-changes and resets belong in those notes too. Export the CSV before a firmware
+changes and resets belong in those notes too. Export the CSV or JSON before a firmware
 update so pre-update shots keep their original algorithm identity.
 
 Average flow uses final weight (including accepted post-drip) minus baseline,

@@ -1417,27 +1417,10 @@ function createFilterMenu(buttonId, title, groups, onChange) {
     changed();
   };
   filterResets.push(clear);
-  const place = () => {
-    const r = $(buttonId).getBoundingClientRect(),
-      below = innerHeight - r.bottom;
-    panel.style.top =
-      (below >= panel.offsetHeight || below >= r.top
-        ? r.bottom + 8
-        : Math.max(8, r.top - panel.offsetHeight - 8)) + "px";
-    panel.style.left =
-      Math.min(
-        Math.max(8, r.left + r.width / 2 - panel.offsetWidth / 2),
-        innerWidth - panel.offsetWidth - 8,
-      ) + "px";
-  };
-  const build = () => {
-    panel?.remove();
-    const p = (panel = document.createElement("div")),
-      head = document.createElement("div"),
+  const popup = createPopup(title, (p) => {
+    const head = document.createElement("div"),
       reset = document.createElement("button");
-    p.className = "histFilterPanel";
-    p.setAttribute("role", "menu");
-    p.setAttribute("aria-label", title);
+    panel = p;
     head.className = "histFilterHead";
     reset.type = "button";
     reset.className = "histFilterReset";
@@ -1480,44 +1463,64 @@ function createFilterMenu(buttonId, title, groups, onChange) {
       for (const b of p.querySelectorAll(":checked")) (sel[b.name] ??= new Set()).add(b.value);
     };
     p.onchange = () => (pick(), changed());
-    document.body.append(p);
     const n = count();
     pick();
     count() < n && changed();
-  };
-  const toggle = (force) => {
-    const b = $(buttonId);
-    if (!b) return;
-    const open = force === undefined ? !panel || panel.hidden : force;
-    if (open) build();
-    if (!panel) return;
-    panel.hidden = !open;
-    b.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) {
-      place();
-      panel.querySelector("input")?.focus();
-    }
-  };
+  });
+  $(buttonId).onclick = () => popup.open($(buttonId));
+  sync();
+}
+// The popup panel shared by the filter and action menus: built by fill(panel,
+// ...args) on every open, placed below its trigger (above when that fits
+// better), and closed by a second click on the trigger, a click elsewhere,
+// Escape, or the trigger leaving the page.
+function createPopup(label, fill) {
+  let panel = null,
+    anchor = null;
   const shown = () => panel && !panel.hidden;
+  const place = () => {
+    const r = anchor.getBoundingClientRect(),
+      below = innerHeight - r.bottom;
+    panel.style.top =
+      (below >= panel.offsetHeight || below >= r.top
+        ? r.bottom + 8
+        : Math.max(8, r.top - panel.offsetHeight - 8)) + "px";
+    panel.style.left =
+      Math.min(
+        Math.max(8, r.left + r.width / 2 - panel.offsetWidth / 2),
+        innerWidth - panel.offsetWidth - 8,
+      ) + "px";
+  };
+  const close = (focus) => {
+    if (!shown()) return;
+    panel.hidden = true;
+    anchor.setAttribute("aria-expanded", "false");
+    if (focus) anchor.focus();
+  };
+  const open = (trigger, ...args) => {
+    const again = shown() && anchor === trigger;
+    close();
+    if (again) return;
+    panel?.remove();
+    panel = document.createElement("div");
+    panel.className = "histFilterPanel";
+    panel.setAttribute("role", "menu");
+    panel.setAttribute("aria-label", label);
+    fill(panel, ...args);
+    document.body.append(panel);
+    anchor = trigger;
+    anchor.setAttribute("aria-expanded", "true");
+    place();
+    panel.querySelector('[role^="menuitem"]')?.focus();
+  };
   document.addEventListener("click", (e) => {
-    if (
-      shown() &&
-      !panel.contains(e.target) &&
-      !(e.target instanceof Element && e.target.closest("#" + buttonId))
-    )
-      toggle(false);
+    if (shown() && !panel.contains(e.target) && !anchor.contains(e.target)) close();
   });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && shown()) {
-      toggle(false);
-      $(buttonId)?.focus();
-    }
-  });
-  const reposition = () => shown() && place();
+  document.addEventListener("keydown", (e) => e.key === "Escape" && close(true));
+  const reposition = () => shown() && (anchor.isConnected ? place() : close());
   window.addEventListener("scroll", reposition, { passive: true });
   window.addEventListener("resize", reposition, { passive: true });
-  $(buttonId).onclick = () => toggle();
-  sync();
+  return { open, close };
 }
 function refreshShots() {
   return shotStatsViewActive() ? startStatsStream(true) : Promise.resolve(false);
@@ -6730,6 +6733,8 @@ export {
   sendUiOperation,
   SHOTS_EXPORT_LIMIT,
   downloadCsv,
+  createPopup,
+  firmwareVersion,
   shotRuleModel,
   cutLine,
   placePill,
