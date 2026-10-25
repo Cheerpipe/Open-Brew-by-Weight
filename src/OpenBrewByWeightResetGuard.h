@@ -253,6 +253,13 @@ inline SafetyResetSnapshot beginSafetyResetGuard() {
   return snapshot;
 }
 
+// A pending recovery intent replays on every boot, so a crash inside the
+// operation (panic, stack overflow, watchdog) would loop forever and brick
+// the unit. Once a boot loop is latched, the latch must be dropped instead.
+inline bool bootRecoveryMayResume(const SafetyResetSnapshot &reset) {
+  return !reset.bootLoopDetected;
+}
+
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
 inline const volatile SafetyResetRecord &safetyResetRecordForHost() {
   return detail::safetyResetRecord;

@@ -1190,7 +1190,11 @@ void waitForRecoveryBuzzer() {
 
 void completeBootRecovery(RecoveryOperation operation);
 
+// Logged once the Web UI log is up: recovery runs before it exists.
+bool bootRecoveryAbandoned = false;
+
 void abandonFailedBootRecovery(RecoveryOperation operation) {
+  bootRecoveryAbandoned = true;
   (void)playRecoveryCue(BuzzerCue::RECOVERY_ERROR);
   waitForRecoveryBuzzer();
   if (operation == RecoveryOperation::FACTORY_RESET) {
@@ -1202,6 +1206,7 @@ void abandonFailedBootRecovery(RecoveryOperation operation) {
 }
 
 void abandonMalformedRecoveryIntent() {
+  bootRecoveryAbandoned = true;
   (void)playRecoveryCue(BuzzerCue::RECOVERY_ERROR);
   waitForRecoveryBuzzer();
   (void)resetPersistedSettingsToFactory(persistedSettings);
@@ -1257,8 +1262,16 @@ void completeBootRecovery(RecoveryOperation operation) {
 void resumePendingBootRecovery() {
   RecoveryIntent intent;
   const PendingRecoveryKind kind = inspectPendingRecovery(intent);
-  if (kind == PendingRecoveryKind::VALID) {
+  if (kind == PendingRecoveryKind::VALID &&
+      bootRecoveryMayResume(safetyResetStatus)) {
     completeBootRecovery(static_cast<RecoveryOperation>(intent.operation));
+    return;
+  }
+  if (kind == PendingRecoveryKind::VALID) {
+    // Drop the latch before touching storage again: the fallback below may
+    // be what crashes, and it must not replay on the next boot.
+    (void)abandonRecoveryIntent();
+    abandonFailedBootRecovery(static_cast<RecoveryOperation>(intent.operation));
     return;
   }
   if (kind == PendingRecoveryKind::MALFORMED) {

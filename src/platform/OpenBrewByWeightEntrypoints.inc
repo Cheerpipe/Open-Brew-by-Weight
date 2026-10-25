@@ -399,6 +399,9 @@ void setup() {
   addDebugEvent(DebugCategory::BOOT, DebugCode::BOOT_BANNER,
                 static_cast<int32_t>(activationStores.bootId()));
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
+  if (bootRecoveryAbandoned)
+    logEmit(LogLevel::CRITICAL, DebugCategory::BOOT, DebugCode::BOOT_SUBSYSTEM,
+            BOOT_SUBSYSTEM_RECOVERY, 0);
   crashArchiveSetBootId(bootIdentityDurable ? activationStores.bootId() : 0);
   crashArchivePromote(bootIdentityDurable ? activationStores.bootId() : 0,
                       safetyResetStatus.reasonCode);

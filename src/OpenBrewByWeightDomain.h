@@ -2281,6 +2281,7 @@ constexpr int32_t BOOT_SUBSYSTEM_WEB_QUEUE = 8;
 constexpr int32_t BOOT_SUBSYSTEM_NETWORK = 9;
 constexpr int32_t BOOT_SUBSYSTEM_MACHINE_INTEGRATION = 10;
 constexpr int32_t BOOT_SUBSYSTEM_PSRAM = 11;
+constexpr int32_t BOOT_SUBSYSTEM_RECOVERY = 12;
 struct DebugEvent {
   uint32_t sequence = 0;
   uint32_t atMs = 0;
@@ -2607,6 +2608,7 @@ inline const char *bootSubsystemName(int32_t subsystem) {
     case BOOT_SUBSYSTEM_NETWORK: return "network";
     case BOOT_SUBSYSTEM_MACHINE_INTEGRATION: return "machine_integration";
     case BOOT_SUBSYSTEM_PSRAM: return "psram";
+    case BOOT_SUBSYSTEM_RECOVERY: return "recovery";
   }
   return "unknown";
 }

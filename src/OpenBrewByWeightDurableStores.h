@@ -138,15 +138,17 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
 
   yieldFlashIo();
   feedFlashIoWatchdog();
-  PersistedSettings verifiedSettings;
+  // Read back into the caller's copy, which already holds the factory values:
+  // a second ~3.4 KB PersistedSettings overflowed the 8 KiB loopTask when a
+  // pending factory reset resumes during setup().
   BleScanPersistedSettings verifiedBle;
   const bool shotLogVerified = shotLog.load() && shotLog.count() == 0;
   const bool historyVerified = historyLog.load() && historyLog.count() == 0;
   const bool shotCurvesVerified = shotCurves.load() && shotCurves.count() == 0;
   const bool lastShotVerified = lastShot.load() && !lastShot.get().valid &&
                                 !lastShot.getGood().valid;
-  return loadPersistedSettings(verifiedSettings) &&
-         verifyFactorySettings(verifiedSettings) &&
+  return loadPersistedSettings(settings) &&
+         verifyFactorySettings(settings) &&
          readLatestBleScanSettings(verifiedBle) &&
          verifyFactoryBleScanSettings(verifiedBle) &&
          shotLogVerified && historyVerified && shotCurvesVerified &&

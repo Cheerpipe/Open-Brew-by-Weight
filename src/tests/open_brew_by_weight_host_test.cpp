@@ -2627,6 +2627,27 @@ void r20_three_unsafe_resets_are_latched_as_a_boot_loop() {
   CHECK(reset.bootLoopDetected);
 }
 
+// A factory reset that crashes every boot must stop replaying (the unit
+// bricked on a stack overflow inside the wipe); a power cut must still resume.
+void r20g_boot_recovery_stops_replaying_after_a_crash_loop() {
+  resetHarness(false, false);
+  (void)beginSafetyResetGuard();  // the controller has been running
+  hostSafetyResetReasonCode = 3;  // software restart into the pending reset
+  hostSafetyResetReasonUnsafe = false;
+  hostSafetyResetReasonPowerOn = false;
+  CHECK(bootRecoveryMayResume(beginSafetyResetGuard()));
+  hostSafetyResetReasonCode = 4;  // the wipe panics
+  hostSafetyResetReasonUnsafe = true;
+  for (uint32_t count = 1; count < SAFETY_BOOT_LOOP_THRESHOLD; ++count) {
+    CHECK(bootRecoveryMayResume(beginSafetyResetGuard()));
+  }
+  CHECK(!bootRecoveryMayResume(beginSafetyResetGuard()));
+  hostSafetyResetReasonCode = 1;  // a power cut mid-wipe resumes again
+  hostSafetyResetReasonUnsafe = false;
+  hostSafetyResetReasonPowerOn = true;
+  CHECK(bootRecoveryMayResume(beginSafetyResetGuard()));
+}
+
 void r20b_reset_history_keeps_reason_and_previous_uptime() {
   resetHarness(false, false);
   SafetyResetSnapshot reset = beginSafetyResetGuard();
@@ -22207,6 +22228,7 @@ const TestCase testCases[] = {
     {"R20d", r20d_clear_reset_history_keeps_current_reset_reason},
     {"R20e", r20e_uptime_forced_invalid_and_wrapped_checkpoints},
     {"R20f", r20f_reset_history_clear_waits_for_configuration_safe},
+    {"R20g", r20g_boot_recovery_stops_replaying_after_a_crash_loop},
     {"R21", r21_automatic_control_requires_fresh_weight},
     {"R22", r22_confirmed_implausible_weight_does_not_stop},
     {"R23", r23_maintenance_is_canceled_fail_open_by_physical_paddle},
