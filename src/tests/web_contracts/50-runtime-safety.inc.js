@@ -252,6 +252,16 @@ if (network.includes('page == StatusPage::Diagnostic')) {
       throw new Error('diagnostic stream missing required field: ' + field);
     }
   }
+  // Every network row the page paints must be emitted under its exact path.
+  const diagUi = fs.readFileSync(path.join(sketchDir, 'web', 'js', 'diagnostic.js'), 'utf8');
+  const networkPainter = diagUi.slice(diagUi.indexOf('const n = s.network;'), diagUi.indexOf('const ser = s.serial'));
+  const networkReads = [...new Set([...networkPainter.matchAll(/\bn\.([a-zA-Z]+)/g)].map((m) => m[1]))];
+  if (networkReads.length < 15) throw new Error('diagnostic network reader not found');
+  for (const field of networkReads) {
+    if (!new RegExp(`field\\("network\\.${field}"`).test(diagRegion)) {
+      throw new Error('diagnostic stream must emit network.' + field + ' (the path diagnostic.js reads)');
+    }
+  }
   if (!diagRegion.includes('delta.field("guards.atm.remainingMs",') ||
       !diagRegion.includes('/ 1000 * 1000') ||
       !diagRegion.includes('/ 60000 * 60000') ||
