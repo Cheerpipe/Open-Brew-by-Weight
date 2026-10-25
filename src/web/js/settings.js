@@ -743,9 +743,6 @@ export function applyStatus(s) {
     reminder.value = v;
     if (R.uiState.formBaseline) R.uiState.formBaseline.paddleReturnReminder = v;
   }
-  const link = document.querySelector('[data-route="/diagnostic"]');
-  if (link && typeof s.diagnosticPageVisible === "boolean")
-    link.classList.toggle("hidden", !s.diagnosticPageVisible);
   // Deep link (Home's Micra hint): open the group once it is laid out.
   const group = location.hash && document.getElementById(location.hash.slice(1));
   if (group?.offsetParent) {

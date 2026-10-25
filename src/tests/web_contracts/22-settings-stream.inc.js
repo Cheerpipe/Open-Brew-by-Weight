@@ -39,8 +39,9 @@
       uiStreamSource.indexOf('strcmp(op->valuestring, "log")'));
   assert(op.includes('{"op", "on", "tag"}') && op.includes('uiStreamKnownFields(message, kFields, 3)') &&
       op.includes('cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(message, "on"))') &&
-      op.includes('uiStreamIntInRange(tag, 1, UINT32_MAX)') && op.includes('uiStreamUrgent_.store(true'),
-  'the settings op takes an exact field whitelist, a bounded tag, and arms a dispatch');
+      op.includes('uiStreamIntInRange(tag, 0, UINT32_MAX)') && op.includes('uiStreamUrgent_.store(true') &&
+      op.includes('session->settingsOn = !firmwareCompatibilityMode();'),
+  'the settings op takes an exact field whitelist, any tag the sender can emit, stays inert in compatibility mode, and arms a dispatch');
   assert(uiStreamSource.includes('session->settingsResync = true;\n      session->settingsKnownTag = 0;') &&
       uiStreamSource.includes('failed validation; the page resets its list views') &&
       uiStreamSource.includes('kUiStreamCloseRejected'),
@@ -113,7 +114,7 @@
   const home = (boot, extra = {}) => ({v: 1, type: 'home', boot, snapshot: true, changes: {
     bootId: boot, configMutable: true, adminUnlocked: false, 'config.soundAlertsEnabled': true,
     'config.revision': 3, 'config.goalWeightG': 36, 'safety.state': 'READY', 'scale.available': true,
-    presets: {activeId: 1, items: []}, presetsTag: 9, 'cycle.active': false, 'lastShot.valid': false,
+    presets: {activeId: 1, items: []}, presetsTag: 9, 'cycle.active': false,
     'noScaleShotGuard.enabled': false, machineState: 'IDLE', 'cupPresence.present': false, ...extra}});
   const settings = {v: 1, type: 'settings', boot: 7, snapshot: true, tag: 77, changes: {
     buzzerSupported: true, 'config.dripDelayMs': 3000, 'config.autoTare': true,
@@ -171,6 +172,12 @@
       codeIncludes(runtimeJs, "if(activeView==='settings')return scheduleSettingsPaint()") &&
       !codeIncludes(viewJs.settings, 'micraPoll') && !codeIncludes(viewJs.settings, 'dataset.applied'),
   'Settings repaints from the stream: no REST status, no poll, no 1 s Micra re-poll');
+  // The form never rewrites the field being typed in, and "38" equals "38.0".
+  assert(codeIncludes(runtimeJs, "if(configLoaded&&els.includes(focused)&&focused.type!=='checkbox')return focused.addEventListener('blur',scheduleSettingsPaint,{once:true})") &&
+      codeIncludes(runtimeJs, "same=(a,b)=>a===b||(a!==''&&b!==''&&+a===+b)"),
+  'Settings re-hydration must skip the focused field and compare numbers by value');
+  assert(codeIncludes(runtimeJs, "if(activeView==='diagnostic')scheduleDiagPaint();return;}if(data.type==='home')"),
+      'a Settings frame repaints Diagnostic, which reads the Micra account paths from it');
   assert(codeIncludes(viewJs.settings, "if(retry&&e.code==='CONFIG_REVISION_STALE'){for(let i=0;i<20&&R.homeStatusCache()?.config.revision===patch.baseRevision;i++)"),
       'only a stale-revision save waits for the newer streamed revision before its one retry');
 }

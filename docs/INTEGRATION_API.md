@@ -633,7 +633,10 @@ save's new `config.revision` and its settings changes arrive in one write and
 in order. The firmware evaluates the projection only when one of its sources
 changed (saved settings and their revision, the bullseye tune, scale history,
 drip and learning readback, the scale-loss projection, Micra account state),
-so an idle controller sends no settings frames and spends no work on them.
+so an idle controller sends no settings frames; each dispatch only compares a
+checksum of those sources, without formatting the projection. In
+compatibility mode the controller accepts the subscribe but sends no
+settings frames.
 `tag` names the exact model a frame leaves the page with. The page keeps that
 model when the socket drops and replays the subscribe with
 `"tag":<last tag>`; when the controller's model still matches, that connection
