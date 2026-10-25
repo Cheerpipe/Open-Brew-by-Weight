@@ -1620,7 +1620,6 @@ async function saveFrontendSettings() {
         ok = false;
       }
     }
-    if (controlChanged("uiTheme", R.uiState.frontendBaseline)) R.setTheme($("uiTheme").value);
     if (controlChanged("heroTint", R.uiState.frontendBaseline))
       setHeroTintMode($("heroTint").value);
     if (ok) sectionDirty("frontend", false);
@@ -1722,7 +1721,7 @@ const ADMIN_SUMMARIES = {
       .split("/")
       .pop()
       .replaceAll("_", " "),
-  frontend: () => R.sub(__WEBUI_TEXT__("admin.sum_theme"), [$("uiTheme").selectedOptions[0].text]),
+  frontend: () => $("heroTint").selectedOptions[0].text,
   schedule: () =>
     $("scheduledRestartEnabled").checked
       ? restartTime(restartMinute())
@@ -1773,8 +1772,7 @@ export function init() {
   $("savePowerButton").onclick = savePowerSettings;
   $("revertPowerButton").onclick = () => revertSection("power");
   $("saveFrontendButton").onclick = saveFrontendSettings;
-  $("revertFrontendButton").onclick = () =>
-    revertSection("frontend", () => R.paintTheme($("uiTheme").value));
+  $("revertFrontendButton").onclick = () => revertSection("frontend");
   const firmwareModeChanged = () => {
     firmwareModeDirty = true;
     R.setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", true);
@@ -2030,7 +2028,5 @@ export function init() {
       R.command("/api/v1/factory-reset", { confirm: "ERASE_ALL_SETTINGS" });
   };
   R.populateTimezoneOptions().catch(() => {});
-  const themeSel = $("uiTheme");
-  if (themeSel) themeSel.value = R.themeMode();
   $("heroTint").value = R.heroTintMode();
 }

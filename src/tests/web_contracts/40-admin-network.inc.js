@@ -358,22 +358,20 @@ if (shellHtml.includes('class="themeSel"') ||
     !css.includes('html.theme-dark{') ||
     !codeIncludes(runtimeJs, "THEME_KEY='obbwTh'") ||
     !codeIncludes(runtimeJs, "THEME_MODES=['auto','light','dark']") ||
-    !codeIncludes(runtimeJs, "getElementById('uiTheme')") ||
+    runtimeJs.includes('uiTheme') ||
     !codeIncludes(runtimeJs, 'localStorage.getItem(THEME_KEY)') ||
     !codeIncludes(runtimeJs, 'localStorage.setItem(THEME_KEY,m)') ||
     !codeIncludes(runtimeJs, "classList.toggle('theme-dark'") ||
     !codeIncludes(runtimeJs, "classList.toggle('theme-light'") ||
     !codeIncludes(appJsSource, 'R.paintTheme(R.themeMode())') ||
-    !codeIncludes(appJsSource, 'R.paintTheme(e.target.value)') ||
+    !codeIncludes(appJsSource, "closest('#themeSignal'))R.cycleTheme()") ||
+    appJsSource.includes('uiTheme') ||
+    html.includes('uiTheme') ||
     !html.includes('id="frontendPanel"') ||
     !html.includes('<summary>Frontend</summary>') ||
-    !html.includes('id="uiTheme"') ||
-    !html.includes('<option value="auto" selected>Auto</option>') ||
-    !html.includes('<option value="light">Light</option>') ||
-    !html.includes('<option value="dark">Dark</option>') ||
     html.indexOf('id="dateTimePanel"') > html.indexOf('id="frontendPanel"') ||
     html.indexOf('id="frontendPanel"') > html.indexOf('id="accessPanel"')) {
-  throw new Error('Theme must be an Admin Frontend dropdown (Auto/Light/Dark), not a Home selector');
+  throw new Error('Theme must be chosen only by the header theme button, not an Admin or Home selector');
 }
 if (/<link\s+[^>]*href=["']https?:\/\//i.test(shellHtml) ||
     /cdn\.|unpkg\.|jsdelivr\./i.test(shellHtml)) {

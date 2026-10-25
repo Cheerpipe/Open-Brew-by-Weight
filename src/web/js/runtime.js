@@ -667,8 +667,6 @@ function paintTheme(m) {
   h.style.colorScheme = c;
   const e = document.querySelector('meta[name="color-scheme"]');
   if (e) e.content = c;
-  const s = document.getElementById("uiTheme");
-  if (s) s.value = m;
   const b = document.getElementById("themeSignal");
   if (b) {
     b.dataset.mode = m;
@@ -6799,7 +6797,6 @@ export {
   renameScale,
   themeMode,
   paintTheme,
-  setTheme,
   heroTintMode,
   cycleTheme,
   populateTimezoneOptions,

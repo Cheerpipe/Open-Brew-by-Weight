@@ -1,9 +1,6 @@
 "use strict";
 import * as R from "/js/runtime.js?v=__FW_ASSET_TAG__";
 R.paintTheme(R.themeMode());
-document.addEventListener("change", (e) => {
-  if (e.target && e.target.id === "uiTheme") R.paintTheme(e.target.value);
-});
 document.addEventListener("click", (e) => {
   if (e.target && e.target.closest("#themeSignal")) R.cycleTheme();
 });
