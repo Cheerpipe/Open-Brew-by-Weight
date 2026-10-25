@@ -28,7 +28,7 @@ window later never changes past shots.
 
 The chart starts on **Preset: All**; choose **Current** to see only the
 active preset's shots. When every shot shown used the same window, the time
-axis is in seconds and marks the window's edges, for example 27 s and 34 s.
+axis is in seconds and marks the window's edges, for example 27 s and 36 s.
 When the shots come from presets with different windows, each shot is placed
 against its own window instead: the axis shows **Window start** and
 **Window end**, and how many seconds before or after the window a shot reached

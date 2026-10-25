@@ -641,7 +641,7 @@ struct RuntimeConfig {
   bool powerManagementEnabled = true;
   uint8_t timezoneAutomatic = 1;
   float weightOffsetG = DEFAULT_WEIGHT_OFFSET_G;
-  // Seed for Reset learned stop offset; factory default remains 1.5 g.
+  // Seed for Reset learned stop offset (DEFAULT_WEIGHT_OFFSET_G).
   float weightOffsetBaselineG = DEFAULT_WEIGHT_OFFSET_G;
   bool autoTare = true;
   bool touchStopFallbackEnabled = true;

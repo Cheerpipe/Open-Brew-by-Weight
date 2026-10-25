@@ -16,6 +16,8 @@ The first stable release.
   the machine's target temperature (when the integration reports one), the
   preset's dose, and the resulting brew ratio, shown on its history card and
   included in the CSV export.
+- **Shot export:** save a shot as JSON or in the Gaggiuino format, open it in
+  Beanconqueror, or export it for Visualizer.coffee with its recipe details.
 - **Safety backups:** cup protection, a timed fallback when the scale drops
   out, and a relay that always stays open on startup, reset, and power loss.
 - **Machines and switches:** paddle, momentary, and momentary-plus-reed
@@ -26,7 +28,8 @@ The first stable release.
   machine before it installs, and the previous version stays available for
   rollback.
 - **Web UI password:** optional sign-in for the Web UI, remembered devices,
-  and protection against look-alike web addresses.
+  and protection against look-alike web addresses. First setup asks you to
+  replace the public factory password with your own.
 - **Diagnostic log:** Bluetooth radio messages have their own **ble**
   category, and everything about your scale (finding it, connecting, its
   readings and commands) appears under **scale**, so you can follow a scale

@@ -99,7 +99,7 @@ editable from the Web UI.
 | Activator (to GND) | **21** | Active **LOW** (internal pull-up; ON = GPIO LOW). Paddle or switch, depending on machine type. |
 | Reed (momentary+reed builds) | **13** | Active **LOW** (internal pull-up; ON = GPIO LOW). Compile `OPEN_BREW_BY_WEIGHT_MACHINE_TYPE=2`. Override with `-DOPEN_BREW_BY_WEIGHT_REED_GPIO`. Must stay distinct from activator, relay, LED, buzzer, USB console, and safety GPIOs. |
 | Onboard relay coil | **2** | Active **HIGH** (HIGH energizes the coil and closes NO) |
-| Scale-connected LED | **1** | Active HIGH while a BLE scale is connected (switchable in Alerts) |
+| Scale-connected LED | **1** | Active HIGH while a BLE scale is connected; fast blink while connecting, slow blink on a stale weight stream (switchable in Alerts) |
 | Optional buzzer | **14** | Present on speaker builds (passive piezo, RTTTL); sounds are compiled in from the hardware profile. `-DOPEN_BREW_BY_WEIGHT_ENABLE_BUZZER=0` omits them. |
 | USB console jumper | **4** | Active **LOW**. Dupont **IO4 → a GND pad you choose**. Sampled once at boot. **Do not** jumper IO4 to **EN** (that column is reset). Override with `-DOPEN_BREW_BY_WEIGHT_USB_CONSOLE_GPIO`. Must stay distinct from activator, relay, LED, buzzer, reed, and safety GPIOs. |
 
@@ -161,8 +161,9 @@ startup, reset, and power loss.
 ## Scale-connected LED
 
 GPIO 1 is HIGH while a BLE scale is connected and **Settings → Shared settings → Alerts → Blue
-LED while scale connected** is on. It is diagnostic only and is never part of
-the machine-circuit decision.
+LED while scale connected** is on. It blinks fast while a scale connects and
+slowly when a connected scale stops sending weight. It is diagnostic only and
+is never part of the machine-circuit decision.
 
 Override at compile time with `-DOPEN_BREW_BY_WEIGHT_SCALE_CONNECTED_LED_GPIO=…`.
 The pin must be output-capable and distinct from paddle, relay, buzzer,
