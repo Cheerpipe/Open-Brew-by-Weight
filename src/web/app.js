@@ -61,7 +61,8 @@ function addNumberKeys(root) {
     box.append(f);
     for (const up of [false, true]) {
       const b = document.createElement("button");
-      let timer;
+      let timer,
+        repeated = false;
       const step = () => {
         if (f.dataset.wrap != null && +f.value === +(up ? f.max : f.min))
           f.value = up ? f.min : f.max;
@@ -72,11 +73,15 @@ function addNumberKeys(root) {
       const stop = () => clearTimeout(timer);
       Object.assign(b, { type: "button", tabIndex: -1, textContent: up ? "+" : "−" });
       b.setAttribute("aria-hidden", "true");
+      // A second touch restarts the repeat instead of orphaning it, and the
+      // click that ends a repeating hold adds no extra step.
       b.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        timer = setTimeout(() => (timer = setInterval(step, 90)), 400);
+        stop();
+        repeated = false;
+        timer = setTimeout(() => (timer = setInterval(() => ((repeated = true), step()), 90)), 400);
       });
-      b.onclick = step;
+      b.onclick = () => (repeated ? (repeated = false) : step());
       ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => b.addEventListener(ev, stop));
       box.append(b);
     }

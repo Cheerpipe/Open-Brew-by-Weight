@@ -504,7 +504,8 @@ if (!release.html.includes('data-fw="9.8.7+contract"') ||
   const vm = require('vm');
   const fn = runtimeJs.slice(runtimeJs.indexOf('let fwShellRefreshed'), runtimeJs.indexOf('function applyCommonStatus('));
   const fetched = [];
-  const context = {SHELL_FW_VERSION: '2.0', uiState: {}, location: {search: '?fw=2.0', pathname: '/stats'},
+  const context = {SHELL_FW_VERSION: '2.0', uiState: {}, hasUnsavedEdits: () => false,
+    location: {search: '?fw=2.0', pathname: '/stats'},
     sessionStorage: {removeItem() {}, getItem() {}, setItem() {}},
     fetch: (url, init) => { fetched.push([url, init.cache]); return Promise.resolve(); }};
   vm.runInNewContext(fn + ';this.check=checkFirmwareReload;', context);

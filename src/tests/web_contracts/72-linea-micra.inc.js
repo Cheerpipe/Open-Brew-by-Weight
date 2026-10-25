@@ -33,7 +33,7 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   machineRow.classList = {toggle: (_, on) => { machineRow.bad = on; }};
   let lastStatus = null;
   const rowSlots = {};
-  const context = {R: {applyHomeStatus() {}, formatMicraCleaning:()=>'',
+  const context = {R: {applyHomeStatus() {}, formatMicraCleaning:()=>'', deviceUtcSec: () => 60,
       homeStatusCache: () => lastStatus,
       $: id => ({homeMicraCleaning: cleaning, homeMicraPower: power, machineRowState: rowState, state: brew, machineRow,
         homeMicraBrewBoiler: brewBoiler, homeMicraSteamBoiler: steamBoiler}[id] ||
@@ -427,6 +427,7 @@ for (const id of ['lineaMicraSignIn', 'lineaMicraBusy', 'lineaMicraSteps', 'line
       : ['diagnostic.deg_c', 'diagnostic.utc_close', 'diagnostic.minutes_short', 'diagnostic.s',
         'diagnostic.level_word'].includes(key) ? localeReference.strings[key] : key};
   context.formatWallTimeLocal = seconds => 'T' + seconds;
+  context.deviceUtcSec = () => Math.floor(context.Date.now() / 1000);
   context.R = context;
   vm.createContext(context);
   vm.runInContext(blockAt(rawViewJs.diagnostic, 'function renderLineaMicraDiagnostic('), context);
