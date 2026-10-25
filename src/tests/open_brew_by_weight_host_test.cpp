@@ -2566,6 +2566,19 @@ void r18_watchdog_fault_opens_circuit_and_requests_safe_restart() {
   CHECK(hostPinLevel[RELAY_GPIO] == RELAY_OPEN_LEVEL);
 }
 
+void r18b_lockout_mid_shot_finalizes_session() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  startCycle();
+  CHECK(session.active);
+  tripRelaySafety(RelaySafetyFault::INITIALIZATION_FAILED);
+  loop();
+  CHECK(!session.active);
+  CHECK(session.endReason == EndReason::RELAY_SAFETY_FAILURE);
+  CHECK(!getRelaySafetySnapshot().closed);
+  CHECK(stopperState == StopperState::REQUIRES_OFF);
+}
+
 void r19_reset_during_close_reopens_without_recovery_lockout() {
   resetHarness(false, false);
   recordRelayCommandedClosed(true);
@@ -3499,6 +3512,22 @@ void w21_network_change_is_rejected_while_active() {
   processWebCommand(network);
   CHECK(session.active);
   CHECK(getRelaySafetySnapshot().closed);
+}
+
+void w21b_override_maintenance_mid_shot_records_the_shot() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  startCycle();
+  WebCommand network;
+  network.setNetworkType(WebCommandType::SAVE_NETWORK);
+  strcpy(network.network.ssid, "test");
+  strcpy(network.network.password, "password");
+  network.unsafeWebUiOverride = true;
+  processWebCommand(network);
+  CHECK(maintenanceLease.active);
+  CHECK(!session.active);
+  CHECK(session.endReason == EndReason::WEB_STOP);
+  CHECK(!getRelaySafetySnapshot().closed);
 }
 
 void w22_timer_only_disables_predictive_stop() {
@@ -22130,6 +22159,7 @@ const TestCase testCases[] = {
     {"R16", r16_timeout_during_arm_transaction_can_never_close_circuit},
     {"R17", r17_gptimer_arm_failure_prevents_relay_energization},
     {"R18", r18_watchdog_fault_opens_circuit_and_requests_safe_restart},
+    {"R18b", r18b_lockout_mid_shot_finalizes_session},
     {"R19", r19_reset_during_close_reopens_without_recovery_lockout},
     {"R19b", r19b_panic_boot_is_ready_for_webui_and_next_circuit_cycle},
     {"R20", r20_three_unsafe_resets_are_latched_as_a_boot_loop},
@@ -22493,6 +22523,7 @@ const TestCase testCases[] = {
     {"W20b", w20b_planned_esp_restart_waits_for_shot},
     {"W20c", w20c_scheduled_restart_uses_the_planned_restart_lease},
     {"W21", w21_network_change_is_rejected_while_active},
+    {"W21b", w21b_override_maintenance_mid_shot_records_the_shot},
     {"W22", w22_timer_only_disables_predictive_stop},
     {"W23", w23_combined_tare_command_uses_cycle_snapshot},
     {"W24", w24_debug_ring_is_bounded_and_ordered},

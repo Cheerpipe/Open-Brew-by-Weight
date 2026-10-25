@@ -177,7 +177,9 @@ Otherwise it returns to `READY`.
 **Independence.** In full firmware mode, a 60 s (or operational-wall) timer ISR can trip
 safety while the control task is in BLE or flash I/O. The next loop
 sees `TRIPPED` / `LOCKOUT` and finalizes the cycle with
-`RELAY_SAFETY_FAILURE`. Consuming an ISR trip also publishes the RTC OPEN
+`RELAY_SAFETY_FAILURE`. Until that loop consumes the trip, activator drive is
+denied in both firmware modes, so a held paddle or button cannot re-close K1;
+the mirror then stays suppressed for the rest of that hold. Consuming an ISR trip also publishes the RTC OPEN
 marker and stops the deadline timers, even when no cycle is active (for
 example a wake passthrough), so a later restart is not counted as a reset
 during close. Network, OTA, and NTP never close the machine circuit. A
@@ -249,7 +251,7 @@ Source: `OpenBrewByWeightSafety.h`, `OpenBrewByWeightMachine.h`.
 | `ARMING` | Close requested: generation bumped, hard/operational timers started, GPIO not yet committed (or about to be). A timeout here still trips. |
 | `CLOSED` | K1 energized. `commandedClosed` is latched in RTC so a reset mid-close is treated as unsafe. |
 | `TRIPPED` | Opened by a limit or fault with **no lockout**. Control must still treat machine circuit as forbidden until the cycle is finalized. |
-| `LOCKOUT` | Opened by a fault that must not silently retry (stuck feedback, watchdog missing, unsafe reset, boot loop). New closes are refused until the fault is cleared by a safe boot path. |
+| `LOCKOUT` | Opened by a fault that must not silently retry (stuck feedback, watchdog missing, timer arm or initialization failure). New closes are refused until the fault is cleared by a safe boot path. An active session is finalized with `RELAY_SAFETY_FAILURE`. Unsafe resets and boot loops are counted in the reset history but never latch `LOCKOUT`. |
 
 ### Events / faults (`RelaySafetyFault`)
 
@@ -1146,7 +1148,9 @@ alerts, webhooks, or history. No guard or scale component knows Micra state.
 ## Compatibility mode (firmware master switch)
 
 Compatibility mode is **not** a state machine: it is a boot-scoped mode flag
-(`fwmode` NVS record, namespace `fwmode`, fail-safe to full firmware) read once
+(`fwmode` NVS record, namespace `fwmode`; an absent, invalid, or unreadable
+record means compatibility, so a fresh or factory-reset controller stays
+transparent until the owner enables the firmware) read once
 in `setup()` before any subsystem initializes. Saving the switch persists the
 record and queues the same idle-safe `RESTART` command the Admin Restart
 button uses, so a running pour always finishes before the mode flips. There

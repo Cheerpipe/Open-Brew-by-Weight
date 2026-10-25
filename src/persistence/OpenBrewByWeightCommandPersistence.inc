@@ -394,7 +394,12 @@ bool beginMaintenanceLease(const WebCommand &networkCommand,
        machineLastIntention().holdActive)) {
     return false;
   }
-  machineRequestStop();
+  // An override reaching here mid-shot ends that shot, so it is recorded.
+  if (session.active) {
+    finalizeCycle(EndReason::WEB_STOP, nextStateForUserHold(machineLastIntention()));
+  } else {
+    machineRequestStop();
+  }
   maintenanceLease = MaintenanceLease{};
   maintenanceLease.active = true;
   outboundMaintenance.store(true, std::memory_order_release);
