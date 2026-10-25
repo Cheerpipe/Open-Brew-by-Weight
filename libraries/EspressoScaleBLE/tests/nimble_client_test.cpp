@@ -443,6 +443,27 @@ static void run() {
     CHECK(c.notificationSequence()==sequence);
     CHECK(c.closedCommandGeneration_==c.generation_);
   }
+  {
+    // A timer-only stream after the first weight still times out.
+    testNowMs=100;
+    NimbleScaleClient c(false); ready(c);
+    ScaleProtocol timerOnly=*c.protocol_;
+    timerOnly.supportedPacketLength=[](int length) { return length==19 || length==20; };
+    timerOnly.parseTimer=[](const uint8_t *, int length, uint32_t *timerMs) {
+      *timerMs=0;
+      return length==19;
+    };
+    c.protocol_=&timerOnly;
+    notify(c,20); CHECK(c.newWeightAvailable());
+    const uint32_t limit=c.maxPacketPeriodMs();
+    for (uint32_t waited=0; waited<limit; waited+=500) {
+      testNowMs+=500;
+      notify(c,19);
+      CHECK(!c.newWeightAvailable());
+    }
+    CHECK(!c.isConnected());
+    CHECK(c.lastReason()==ScaleDisconnectReason::PACKET_TIMEOUT);
+  }
   for (bool first : {false, true}) {
     for (bool stale : {false, true}) {
       for (bool wrap : {false, true}) {
