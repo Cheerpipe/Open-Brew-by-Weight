@@ -171,4 +171,6 @@
       codeIncludes(runtimeJs, "if(activeView==='settings')return scheduleSettingsPaint()") &&
       !codeIncludes(viewJs.settings, 'micraPoll') && !codeIncludes(viewJs.settings, 'dataset.applied'),
   'Settings repaints from the stream: no REST status, no poll, no 1 s Micra re-poll');
+  assert(codeIncludes(viewJs.settings, "if(retry&&e.code==='CONFIG_REVISION_STALE'){for(let i=0;i<20&&R.homeStatusCache()?.config.revision===patch.baseRevision;i++)"),
+      'only a stale-revision save waits for the newer streamed revision before its one retry');
 }

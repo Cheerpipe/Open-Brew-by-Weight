@@ -386,9 +386,11 @@ async function saveMachineConfig(patch) {
     } catch (e) {
       // The patch holds only this page's edits: resend it once on the newer
       // revision the Home stream brings (within 2 s).
-      for (let i = 0; i < 20 && R.homeStatusCache()?.config.revision === patch.baseRevision; i++)
-        await new Promise((r) => setTimeout(r, 100));
-      if (retry && e.code === "CONFIG_REVISION_STALE") continue;
+      if (retry && e.code === "CONFIG_REVISION_STALE") {
+        for (let i = 0; i < 20 && R.homeStatusCache()?.config.revision === patch.baseRevision; i++)
+          await new Promise((r) => setTimeout(r, 100));
+        continue;
+      }
       // Only the firmware parses RTTTL: a rejected tune is marked, not kept.
       if (e.code === "INVALID_FIELD" && "bullseyeRtttl" in patch)
         R.showFieldError("bullseyeRtttl", __WEBUI_TEXT__("settings.rtttl_not_saved"));
