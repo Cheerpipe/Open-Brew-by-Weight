@@ -1562,6 +1562,73 @@ function shotGaggiuino(r) {
     },
   };
 }
+// One shot in the Decent JSON shape Visualizer.coffee imports by default: the
+// weighed curve, a stage change at the first drop and at the cut, the recipe,
+// and as Markdown notes what Visualizer has no field for.
+function shotVisualizer(r) {
+  const m = R.buildShotSparkModel(r),
+    flow = shotFlowCurveGS(r, m),
+    s = coffeeSamples(r),
+    estimated = r.actualG == null && r.estimatedG != null,
+    actual = estimated ? null : shotDisplayActualG(r.actualG, r.wCg),
+    cut = shotCut(r, m, actual),
+    tempC = r.targetTempDeciC > 0 ? r.targetTempDeciC / 10 : undefined,
+    g = (v, sign) => (sign && v >= 0 ? "+" : "") + v.toFixed(1) + " g",
+    error = actual !== null && r.goalG ? actual - r.goalG : null,
+    notes = [
+      "Ended: " + R.formatShotEnded(r.stopDetail, r.verdict),
+      `Shot: ${r.shotType} · ${r.cutType} cut`,
+      r.channeling && "Channeling detected",
+      error !== null &&
+        `Yield vs target: ${g(error, 1)} (${error >= 0 ? "+" : ""}${((error / r.goalG) * 100).toFixed(1)} %)`,
+      estimated && "Yield estimated: " + g(r.estimatedG),
+      r.scaleLossSource && "Scale lost, stop by " + r.scaleLossSource,
+      r.firstDropS != null && `First drop: ${r.firstDropS.toFixed(1)} s`,
+      cut.s != null && `Cut at ${g(cut.g)} · ${cut.s.toFixed(1)} s`,
+      cut.drip != null && "Drip: " + g(cut.drip, 1),
+      r.scaleName && "Scale: " + r.scaleName,
+      r.bbwAlgorithm &&
+        r.bbwAlgorithm !== "unknown" &&
+        `Brew by weight: ${r.bbwAlgorithm} v${r.bbwAlgorithmVersion}, offset ${g(r.offsetG)}`,
+      (r.extractionExtended || r.slowExtractionExtended) &&
+        `Extended by the ${r.slowExtractionExtended ? "slow" : "fast"}-shot guard`,
+      r.wTruncated && "Curve truncated",
+      ("Exported from Open Brew by Weight " + (R.firmwareVersion || "")).trim(),
+    ];
+  return {
+    version: 2,
+    timestamp:
+      (shotWallTimes(r) && Math.round(r.endedAtUnixSec - r.durationS)) ||
+      Math.round(Date.now() / 1e3),
+    elapsed: s.map(([ms]) => ms / 1e3),
+    totals: { weight: s.map(([, cg]) => cg / 100) },
+    flow: { by_weight: s.map(([, , i]) => Math.round((flow[i] ?? 0) * 100) / 100) },
+    temperature: tempC && { goal: s.map(() => tempC) },
+    // Visualizer draws a stage line wherever this value changes.
+    state_change: s.map(([ms]) =>
+      ms < r.firstDropS * 1e3 ? 1 : r.endS != null && ms > r.endS * 1e3 ? 3 : 2,
+    ),
+    profile: { title: r.presetName || undefined },
+    app: {
+      app_name: "openbrewbyweight",
+      app_version: R.firmwareVersion || undefined,
+      data: {
+        settings: {
+          profile_title: r.presetName || undefined,
+          drink_weight: actual ?? r.estimatedG ?? undefined,
+          bean_weight: r.doseG > 0 ? r.doseG : undefined,
+          final_desired_shot_weight: r.goalG,
+          espresso_temperature: tempC,
+          espresso_enjoyment: r.rating > 0 ? r.rating * 20 : undefined,
+          espresso_notes: notes
+            .filter(Boolean)
+            .map((l) => "- " + l)
+            .join("\n"),
+        },
+      },
+    },
+  };
+}
 // Beanconqueror's brew handoff: the envelope gzipped, then unpadded base64url
 // split into 400-character shareBrew<n> parameters behind its total length.
 async function shotBeanconquerorLink(r) {
@@ -1668,6 +1735,7 @@ const ICON = {
   csv: "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14",
   json: "M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1",
   chart: "M3 20h18M4 16l4-6 4 3 4-7 4 5",
+  visualizer: "M3 3v18h18M7 15l3-4 3 2 5-7",
   bean: "M17 4c3 3 2 9-2 13s-10 5-13 2 0-9 4-13 8-5 11-2zM15 5c-1 3-3 4-5 6s-3 5-4 8",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
 };
@@ -1765,6 +1833,12 @@ export function init() {
       "Gaggiuino",
       __WEBUI_TEXT__("stats.gaggiuino_hint"),
       () => downloadJson(`openbrewbyweight-shot-${r.id}-gaggiuino.json`, shotGaggiuino(r)),
+    ],
+    [
+      ICON.visualizer,
+      "Visualizer",
+      __WEBUI_TEXT__("stats.visualizer_hint"),
+      () => downloadJson(`openbrewbyweight-shot-${r.id}-visualizer.json`, shotVisualizer(r)),
     ],
     null,
     [ICON.trash, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],

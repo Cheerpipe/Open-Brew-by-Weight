@@ -69,8 +69,10 @@
       runtimeJs.indexOf('async function populateTimezoneOptions(')) + statsChartJs, context);
   const builders = ['function isoAt(', 'function shotWallTimes(', 'function shotsJson(',
     'function shotJson(', 'function coffeeSamples(', 'function shotGaggiuino(',
-    'async function shotBeanconquerorLink('].map((m) => blockAt(viewJs.stats, m));
-  vm.runInContext('var R = this;' + blockAt(viewJs.stats, 'function shotCut(') +
+    'async function shotBeanconquerorLink(', 'function shotVisualizer('].map((m) => blockAt(viewJs.stats, m));
+  vm.runInContext('var R = this;' + blockAt(runtimeJs, 'function verdictLabel(') +
+      blockAt(runtimeJs, 'function formatShotEnded(') +
+      blockAt(viewJs.stats, 'function shotCut(') +
       blockAt(viewJs.stats, 'function shotFlowCurveGS(') + builders.join('\n'), context);
 
   // Every Stats row column and curve key has a home in the export.
@@ -137,6 +139,41 @@
     globalStopConditions: {weight: 36}, waterTemperature: 93, recipe: {}});
   const gl = JSON.parse(JSON.stringify(context.shotGaggiuino(lost)));
   assert.deepEqual([gl.timestamp, gl.datapoints, 'waterTemperature' in gl.profile], [0, [], false]);
+
+  // Visualizer.coffee's default Decent JSON parser: none of the keys that
+  // route a file to another parser, series aligned with `elapsed` and free of
+  // nulls, settings in its units, and the rest of the metadata in the notes.
+  const routedAway = (j) => ['mill', 'brewFlow', 'datapoints', 'samples'].some((k) => k in j) ||
+      ('profile_name' in j && 'data' in j);
+  const v = JSON.parse(JSON.stringify(context.shotVisualizer(base)));
+  assert.ok(!routedAway(v));
+  assert.deepEqual([v.version, v.timestamp, v.profile], [2, 1792840336, {title: 'Daily'}]);
+  assert.deepEqual(v.elapsed, [0.1, 5, 6.2, 9, 18, 26, 28.4, 31.4], 'Held readings are not coffee');
+  assert.deepEqual(v.totals.weight, [0, 0, 1.2, 9, 24, 33, 35.1, 36.2]);
+  assert.deepEqual(v.state_change, [1, 1, 2, 2, 2, 2, 2, 3]);
+  for (const series of [v.flow.by_weight, v.temperature.goal]) {
+    assert.ok(series.length === v.elapsed.length && series.every((x) => typeof x === 'number'));
+  }
+  const {espresso_notes: notes, ...settings} = v.app.data.settings;
+  assert.deepEqual([v.app.app_name, v.app.app_version], ['openbrewbyweight', '1.2.3']);
+  assert.deepEqual(settings, {profile_title: 'Daily', drink_weight: 36.2, bean_weight: 18,
+    final_desired_shot_weight: 36, espresso_temperature: 93, espresso_enjoyment: 80});
+  for (const line of ['- Yield vs target: +0.2 g (+0.6 %)', '- First drop: 6.1 s',
+    '- Cut at 35.1 g · 28.4 s', '- Drip: +1.1 g', '- Scale: Lunar',
+    '- Brew by weight: corridor v1, offset 1.8 g', '- Exported from Open Brew by Weight 1.2.3']) {
+    assert.ok(notes.split('\n').includes(line), `Visualizer notes miss "${line}"`);
+  }
+  const before = Math.round(Date.now() / 1e3);
+  const vl = JSON.parse(JSON.stringify(context.shotVisualizer(lost)));
+  assert.ok(!routedAway(vl) && vl.timestamp >= before, 'No wall time falls back to now');
+  assert.deepEqual([vl.elapsed, vl.state_change, 'temperature' in vl, vl.profile.title],
+      [[], [], false, 'Daily']);
+  assert.deepEqual(Object.keys(vl.app.data.settings), ['profile_title', 'drink_weight',
+    'final_desired_shot_weight', 'espresso_notes']);
+  assert.equal(vl.app.data.settings.drink_weight, 30.5);
+  assert.ok(vl.app.data.settings.espresso_notes.includes('- Yield estimated: 30.5 g'));
+  assert.ok(vl.app.data.settings.espresso_notes.includes('- Scale lost, stop by projection'));
+  assert.ok(!vl.app.data.settings.espresso_notes.includes('Brew by weight'));
 
   // Beanconqueror's ADD_BREW handoff: len, 400-character slices, gzip JSON,
   // and the bounds its decoder enforces.

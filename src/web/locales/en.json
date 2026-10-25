@@ -1825,7 +1825,7 @@
     "stats.err": "Err%",
     "stats.export": "Export",
     "stats.export_all_shots": "Export all shots",
-    "stats.gaggiuino_hint": "This shot for Visualizer.coffee and Gaggiuino tools",
+    "stats.gaggiuino_hint": "The curve only, for Gaggiuino tools and Visualizer.coffee",
     "stats.goal": "Goal",
     "stats.json_all_hint": "Every shot with its full curve, for backups and other apps",
     "stats.json_shot_hint": "This shot with its full curve, for backups and other apps",
@@ -1848,6 +1848,7 @@
     "stats.target_temp": "Target temp",
     "stats.time": "Date",
     "stats.unknown": "—",
+    "stats.visualizer_hint": "This shot with dose, rating and notes, for Visualizer.coffee",
     "stats.yield": "Yield"
   }
 }

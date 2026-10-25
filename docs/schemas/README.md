@@ -44,7 +44,7 @@ Versioning:
 
 ## Formats written for other apps
 
-The Shots card menu also writes two third-party formats. They follow those
+The Shots card menu also writes three third-party formats. They follow those
 projects' own formats and are not versioned here:
 
 - **Gaggiuino shot** (`openbrewbyweight-shot-<id>-gaggiuino.json`), as read by
@@ -52,6 +52,20 @@ projects' own formats and are not versioned here:
   `shotWeight`, `weightFlow`, and `targetTemperature`; `duration` in
   deciseconds; `timestamp` is the start in Unix seconds, or 0 without wall
   time. Channels the controller does not measure are omitted.
+- **Visualizer shot** (`openbrewbyweight-shot-<id>-visualizer.json`), the
+  de1app shot JSON (`version` 2) that Visualizer.coffee reads with its default
+  Decent JSON parser; `shotVisualizer` in `src/web/js/stats.js`. It must not
+  carry the top-level keys that route a file to another parser (`mill`,
+  `brewFlow`, `datapoints`, `samples`, or `profile_name` with `data`).
+  `timestamp` is the start in Unix seconds, or the download time without wall
+  time (the parser has no fallback). `elapsed` (s), `totals.weight` (g),
+  `flow.by_weight` (g/s), `temperature.goal` (°C, only when known), and
+  `state_change` (1 before the first drop, 2 pouring, 3 after the cut) share one
+  index; held readings are left out. `app.data.settings` carries
+  `profile_title`, `drink_weight`, `bean_weight`, `final_desired_shot_weight`,
+  `espresso_temperature`, `espresso_enjoyment` (rating × 20), and
+  `espresso_notes`, a Markdown list of the stop, yield error, cut, drip, scale,
+  scale loss, and brew-by-weight details.
 - **Beanconqueror brew handoff**: `beanconqueror://ADD_BREW?len=<n>&shareBrew0=…`,
   a gzip-compressed `IHandoffEnvelope` v1 in unpadded base64url split into
   400-character `shareBrew<n>` parameters. Water in is sent as 0 ml because it

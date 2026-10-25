@@ -419,6 +419,16 @@ that shot only:
   [Visualizer](https://visualizer.coffee) can import. It carries the weight,
   flow, and target temperature over time. Open Brew by Weight measures weight
   only, so pressure, pump flow, and water temperature stay empty there.
+- **Visualizer** downloads the shot as a file made for
+  [Visualizer](https://visualizer.coffee): on its upload page, drop the file in
+  or pick it. Besides the weight and flow curves, it brings the preset name,
+  dose, target and final weight, target temperature, and your rating. Stage
+  lines mark the first drop and the cut. The shot's notes in Visualizer list
+  what has no field of its own there: how the shot ended, the cut weight and
+  time, drip, the scale, the brew-by-weight algorithm, and how far the yield
+  landed from the target. Grinder, beans, and roast stay empty for you to fill
+  in on Visualizer. A shot recorded before the controller knew the time is
+  dated when you download it.
 - **Delete shot**, at the bottom of the menu, removes the shot after you
   confirm, as before.
 
