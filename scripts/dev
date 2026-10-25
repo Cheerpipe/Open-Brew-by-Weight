@@ -69,6 +69,8 @@ WEB_BUDGETS_STEP = ("web-budgets", ["node", "src/tests/check_web_budgets.js"])
 SOURCE_TREE_LOCK = "build-idf/.locks/source-tree.lock"
 WEB_CONTRACTS_STEP = ("web-contracts", ["python3", "scripts/internal/with-flock",
                                         SOURCE_TREE_LOCK, "node", "src/tests/check_web_assets.js"])
+# The design preview slices live Web UI sources, so Web UI changes must keep it rendering.
+WEB_PREVIEW_STEP = ("web-preview", ["node", "src/tests/webui_preview_test.js"])
 BUDGET_FILES = ("config/web-asset-budgets.json", "config/resource-baselines.json")
 BUILD_PROFILES = (
     ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-micra"),
@@ -719,7 +721,8 @@ def main() -> int:
                 steps = [WEB_BUDGETS_STEP] if profile == "budgets" else [
                     ("web-format", ["node_modules/.bin/prettier", "--check", "src/web/html",
                                     "src/web/app.css", "src/web/app.js", "src/web/js"]),
-                    HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP]
+                    HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP,
+                    WEB_PREVIEW_STEP]
                 return execute(command, "R1", steps, verbosity,
                                **budget_gate(budget_report, firmware=False))
             elif profile == "lint":
@@ -777,7 +780,8 @@ def main() -> int:
             if risk in {"R2", "R3"}:
                 host += cmake_steps("asan-ubsan") + cmake_steps("tsan") + [
                     ("architecture", ["python3", "scripts/check_architecture.py"])]
-                firmware = [HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP]
+                firmware = [HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP,
+                            WEB_PREVIEW_STEP]
                 for hardware, machine in BUILD_PROFILES:
                     variant = f"{hardware}--{machine}"
                     build = ["./scripts/internal/build-idf", "--hardware", hardware,

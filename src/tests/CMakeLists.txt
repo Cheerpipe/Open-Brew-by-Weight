@@ -6,7 +6,8 @@ execute_process(
   COMMAND_ERROR_IS_FATAL ANY)
 
 set(OPENBREWBYWEIGHT_SANITIZER "" CACHE STRING "Host sanitizer")
-set(common_options -Wall -Wextra -Werror -pedantic)
+# Host tests rely on assert(); keep it active in every build type.
+set(common_options -Wall -Wextra -Werror -pedantic -UNDEBUG)
 if(OPENBREWBYWEIGHT_SANITIZER)
   list(APPEND common_options -fno-omit-frame-pointer -fsanitize=${OPENBREWBYWEIGHT_SANITIZER})
   add_link_options(-fno-omit-frame-pointer -fsanitize=${OPENBREWBYWEIGHT_SANITIZER})

@@ -18,6 +18,9 @@ import sys
 import tempfile
 from unittest.mock import patch
 
+if not __debug__:
+    raise SystemExit("assertions are disabled (PYTHONOPTIMIZE); these checks would not run")
+
 ROOT = Path(__file__).resolve().parents[2]
 DEV = ROOT / "scripts/dev"
 INTERNAL = ROOT / "scripts/internal"
@@ -1100,8 +1103,9 @@ assert [name for name, _ in host_lane] == [
     f"{stage}-{preset}" for preset in ("normal", "asan-ubsan", "tsan")
     for stage in ("configure", "build", "test")] + ["architecture"], host_lane
 firmware_names = [name for name, _ in firmware_lane]
-assert firmware_names[:3] == ["http-route-capacity", "web-budgets", "web-contracts"], firmware_names
-assert firmware_names[3:] == [f"{kind}-{hardware}--{machine}"
+assert firmware_names[:4] == ["http-route-capacity", "web-budgets", "web-contracts",
+                             "web-preview"], firmware_names
+assert firmware_names[4:] == [f"{kind}-{hardware}--{machine}"
                               for hardware, machine in dev_module["BUILD_PROFILES"]
                               for kind in ("idf", "release", "cppcheck", "warnings")], firmware_names
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
