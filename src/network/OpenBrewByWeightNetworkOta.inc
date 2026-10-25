@@ -36,6 +36,22 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       return ESP_OK;
     }
   }
+  // On the setup network the factory password is public: finishing setup
+  // (save or skip) needs the owner's own device password first.
+  if (parsed && (strcmp(action, "save") == 0 || strcmp(action, "skip") == 0) &&
+      socketServedBySoftAp(httpd_req_to_sockfd(request))) {
+    bool factory = false;
+    {
+      TaskLockGuard lock(self.dataMux_);
+      factory = passwordIsFactoryDefault(self.settings_);
+    }
+    if (factory) {
+      cJSON_Delete(root);
+      self.unlockJsonBody();
+      return sendError(request, STATUS_CONFLICT, "DEVICE_PASSWORD_REQUIRED",
+                       "Choose your own device password before finishing setup.");
+    }
+  }
   if (parsed &&
       (networkError = parseSetupBrew(root, brew, brewPresetId)) != nullptr) {
     parsed = false;
@@ -435,6 +451,9 @@ esp_err_t OpenBrewByWeightNetwork::devicePasswordHandler(httpd_req_t *request) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_DEVICE_PASSWORD",
                      "New device password cannot be the factory default.");
   }
+  // From the setup network, keep it running for the phone doing setup; the
+  // new passphrase applies the next time it starts.
+  command.network.applyLive = socketServedBySoftAp(httpd_req_to_sockfd(request));
   self.keepPasswordChangeSession(request, command.requestId);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     command.wipePassword();

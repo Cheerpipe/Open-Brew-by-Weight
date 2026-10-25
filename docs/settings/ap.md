@@ -37,7 +37,10 @@ after pulling a shot.
 The AP name is unique to this controller: **`OpenBrewByWeightAP-`** plus
 eight lowercase characters from the end of this device's AP address. USB
 `AP_STATUS` prints the exact name. SoftAP WPA2 uses the **device password**.
-Change it from **Admin** (unlock with the device password) **→ Access**
+Setup on the setup network does not finish while it is still the public
+factory password: the setup page asks you to choose your own first, and the
+setup network you are on keeps running with the old one until it next starts.
+Change it later from **Admin** (unlock with the device password) **→ Access**
 or from USB (`SET_DEVICE_PASSWORD` / `RESET_DEVICE_PASSWORD`). Admin unlock,
 OTA, and the optional [Web UI sign-in](web-access.md) use that same device
 password.

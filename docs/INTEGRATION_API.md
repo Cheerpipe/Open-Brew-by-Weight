@@ -19,8 +19,12 @@ or directly actuate the machine.
   `lastShot` contract. Errors use
   `{"error":"STABLE_CODE","message":"English diagnostic"}`.
 - While the Web UI login is off, every route is open on the trusted LAN and
-  needs no token. While it is on, every route except the [access
-  routes](#access) needs `Authorization: Bearer <token>`.
+  needs no token. That includes reading and changing the webhook destination
+  (with its Home Assistant webhook ID) and restarting the controller, so turn
+  the login on when other devices on the network are not trusted. While it is
+  on, every route except the [access routes](#access) needs
+  `Authorization: Bearer <token>`, and any signed-in Web UI device can
+  approve a pairing request.
 - Responses carry no cross-origin (CORS) headers, so a web page served from
   another site cannot read the API through a visitor's browser. Call it from a
   LAN client such as Home Assistant, a script, or the controller's own Web UI.

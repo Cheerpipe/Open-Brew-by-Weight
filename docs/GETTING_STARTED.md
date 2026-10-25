@@ -18,16 +18,19 @@ start with [Hardware](HARDWARE.md).
    browse to **`http://192.168.4.1/setup`**. A new controller is switched off
    and leaves the machine working as usual, so the page first asks how you
    want to brew: keep it **as usual**, or **stop shots by weight** and pick a
-   starting recipe. Then choose your home network, type its password, and
-   select **Connect**. The controller
+   starting recipe. Then choose your home network, type its password, choose
+   your own **controller password**, and select **Connect**. The factory
+   password is public, so setup does not finish until you replace it; you
+   will use the new one to unlock Admin and, next time, to join the setup
+   network (your phone stays connected now). The controller
    joins your network without restarting and keeps it as soon as it gets in.
    The page then reminds you to switch your phone back to your home network
    and shows the addresses to use from now on (`<name>.local` and the
    controller's new address), each with a **Copy** button. The setup network
    stays open for about a minute so you can note them — select **Finish**
    (**Finish and restart** when you chose to stop shots by weight) when you
-   have them. No other password is asked during this flow, and the
-   setup page never asks you to **Reload**. Your brewing choice and your
+   have them. **Continue without Wi-Fi** also asks for the controller
+   password first. The setup page never asks you to **Reload**. Your brewing choice and your
    home network are saved together: once the controller keeps the network,
    it keeps your choice too, even if you close the page or lose power before
    **Finish**; if it cannot keep the network, it keeps neither.

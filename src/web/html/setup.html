@@ -115,6 +115,19 @@
       />
     </div>
     <p class="fieldHint">{{webui:setup.band_hint}}</p>
+    <div id="setupDeviceWrap" hidden>
+      <label for="setupDevicePassword">{{webui:setup.device_password}}</label>
+      <input
+        type="password"
+        id="setupDevicePassword"
+        autocomplete="new-password"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        maxlength="63"
+      />
+      <p class="fieldHint">{{webui:setup.device_password_hint}}</p>
+    </div>
     <p class="fieldError" id="setupFieldError" hidden></p>
     <button type="submit" id="setupConnect" class="setupPrimary">{{webui:setup.connect}}</button>
     <button type="button" id="setupSkip" class="textLock">{{webui:setup.skip}}</button>

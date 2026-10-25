@@ -403,7 +403,7 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
         return false;
       }
       persist = true;
-      apRestartPending_ = snapshot().apActive;
+      apRestartPending_ = snapshot().apActive && !command.network.applyLive;
       break;
 
     case WebCommandType::RESET_DEVICE_PASSWORD:

@@ -1756,7 +1756,8 @@ struct WebCommandNetworkPayload {
   bool wifiSleepSpecified = false;
   // USB SET_WIFI only. Web UI keeps the HTTP confirm window.
   bool commitConfirmed = false;
-  // /setup onboarding: connect live under the SoftAP instead of restarting.
+  // /setup onboarding: connect live under the SoftAP instead of restarting;
+  // for a password change, keep the running SoftAP until its next start.
   bool applyLive = false;
   // mDNS device name; optional (USB SET_WIFI keeps the stored name).
   char deviceName[DEVICE_NAME_CAPACITY] = {};

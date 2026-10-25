@@ -78,7 +78,8 @@ drops. Use USB `AP_START` or reboot.
 
 ### The phone says the Wi-Fi password is wrong
 
-After a factory reset the password is still **`ineedacoffee`**. Phones and
+It is the controller password: **`ineedacoffee`** on a new or factory-reset
+controller, otherwise the one you chose during setup or in Admin. Phones and
 computers often show that message when they cannot finish joining, not only
 when the letters are wrong. Join the unique `OpenBrewByWeightAP-xxxxxxxx`
 name from USB `AP_STATUS`, forget any unsuffixed `OpenBrewByWeightAP`, and
