@@ -71,21 +71,18 @@ export function applyStatus(s) {
       quickWeight.open();
     }
   }
+  // Securing access comes first: it waits only while the grind hint shows,
+  // and the Micra hint waits for it.
+  const access = $("accessHint");
+  if (access) access.hidden = accessHintClosed || !s.access?.notice || !$("grindHintCard")?.hidden;
   const hint = $("micraCloudHint");
   if (hint)
     hint.hidden =
       micraHintClosed ||
+      (access && !access.hidden) ||
       s.lineaMicra?.accountConfigured !== false ||
       s.machineIntegration !== "linea_micra_cloud" ||
       R.cardDismissed("obbwCard:micraCloud");
-  // Lowest priority: it waits while the Micra or grind hint is showing.
-  const access = $("accessHint");
-  if (access)
-    access.hidden =
-      accessHintClosed ||
-      !s.access?.notice ||
-      (hint && !hint.hidden) ||
-      !$("grindHintCard")?.hidden;
   // Builds without the Micra integration ship none of its rows.
   if (__LINEA_MICRA__) {
     $("homeMicraPower").textContent = micraPower(s.lineaMicra);

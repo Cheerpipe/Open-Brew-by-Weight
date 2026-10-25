@@ -179,4 +179,20 @@
   assert.equal(context.sessionStorage.values.get('obbwSession'), 't2');
   context.storeSession('', false);
   assert.deepEqual({...context.webUiHeaders()}, {'X-WebUI-Client': 'abc'});
+  // Home asks to secure access first; the La Marzocco Cloud hint waits for
+  // it, and the access hint waits only for the grind hint.
+  const nodes = {grindHintCard: {hidden: true}, accessHint: {hidden: true}, micraCloudHint: {hidden: true}};
+  const $ = (id) => nodes[id] ||= {textContent: '', hidden: false,
+    classList: {toggle() {}, add() {}, remove() {}, contains: () => false}};
+  const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, cardDismissed: () => '',
+    presetState: {items: []}}, document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
+  vm.runInNewContext(viewJs.home.replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];?/, '')
+      .replace(/export /g, ''), home);
+  const fresh = {access: {notice: true}, machineIntegration: 'linea_micra_cloud',
+    lineaMicra: {accountConfigured: false}};
+  const shown = (s) => (home.applyStatus(s), [!nodes.accessHint.hidden, !nodes.micraCloudHint.hidden]);
+  assert.deepEqual(shown(fresh), [true, false]);
+  assert.deepEqual(shown({...fresh, access: {notice: false}}), [false, true]);
+  nodes.grindHintCard.hidden = false;
+  assert.deepEqual(shown(fresh), [false, true]);
 }
