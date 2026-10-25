@@ -79,6 +79,15 @@ matters most: the weight on the scale with its name, the weight of the cup, and,
 on a Linea Micra, the brew temperature or the minutes left to warm up. Tap a row
 for all its details.
 
+On your first visits, Home shows a few short notes, one at a time: whether to
+ask for a password, how to connect a Linea Micra to your La Marzocco account,
+a reminder to check your recipe before the first shot, and, once your scale is
+saved, the option to use only that scale. Each note has a button that takes
+you straight there and a **Dismiss** button. A dismissed note doesn't come back
+in that browser, and the password note doesn't come back on any phone. Notes
+also leave on their own once you're done: the recipe note, for example, goes
+away after your first shot or when you change a recipe.
+
 Home updates automatically when its information changes. In **Equipment → Scale**,
 weight and timer follow the connected scale even outside a shot. Disconnecting
 the scale clears those readings. **Equipment → Machine** follows the machine and

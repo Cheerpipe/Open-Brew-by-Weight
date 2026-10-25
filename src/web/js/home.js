@@ -4,8 +4,8 @@ const $ = R.$;
 let ready = false;
 let quickWeight = null;
 let quickWeightWanted = false;
-let micraHintClosed = false,
-  accessHintClosed = false;
+let accessHintClosed = false,
+  recipeTag = 0;
 
 // Boiler rows interpolate the warm-up estimate locally from the absolute
 // readyAtUtcSec the stream delivers once; a stable estimate costs no frames.
@@ -71,24 +71,41 @@ export function applyStatus(s) {
       quickWeight.open();
     }
   }
-  // Securing access comes first: it waits only while the grind hint shows,
-  // and the Micra hint waits for it.
-  const access = $("accessHint");
-  if (access) access.hidden = accessHintClosed || !s.access?.notice || !$("grindHintCard")?.hidden;
-  const hint = $("micraCloudHint");
-  if (hint)
-    hint.hidden =
-      micraHintClosed ||
-      (access && !access.hidden) ||
-      s.lineaMicra?.accountConfigured !== false ||
-      s.machineIntegration !== "linea_micra_cloud" ||
-      R.cardDismissed("obbwCard:micraCloud");
+  renderHints(s);
   // Builds without the Micra integration ship none of its rows.
   if (__LINEA_MICRA__) {
     $("homeMicraPower").textContent = micraPower(s.lineaMicra);
     $("homeMicraCleaning").textContent = R.formatMicraCleaning(s.lineaMicra);
   }
   renderMicraBoilers();
+}
+// Onboarding hints show one at a time, in this order, and wait while the
+// grind hint shows. Dismissals stay in this browser, except the access one,
+// which the controller keeps for every phone.
+const cardKey = (id) => "obbwCard:" + id.replace(/Hint$/, "");
+function renderHints(s) {
+  if (!s) return;
+  // A preset change means the recipe has been looked at.
+  if (recipeTag && s.presetsTag !== recipeTag) R.dismissCard(cardKey("recipeHint"));
+  recipeTag = s.presetsTag;
+  let free = $("grindHintCard")?.hidden !== false;
+  for (const [id, want] of [
+    ["accessHint", !accessHintClosed && s.access?.notice],
+    [
+      "micraCloudHint",
+      s.machineIntegration === "linea_micra_cloud" && s.lineaMicra?.accountConfigured === false,
+    ],
+    // Until the first shot is saved; unknown until the shot stream answers.
+    ["recipeHint", R.shotRecorded() === false],
+    // My scale first, with a scale already saved: it may still accept another.
+    ["scaleOnlyHint", s.config?.scaleMacCacheMode === "prefer" && !!s.scale?.preferredMac],
+  ]) {
+    const el = $(id);
+    if (!el) continue;
+    el.hidden = !(free && want && !R.cardDismissed(cardKey(id)));
+    free &&= el.hidden;
+  }
+  if ($("scaleOnlyHintUse")) $("scaleOnlyHintUse").disabled = !R.controlsMutable;
 }
 // The machine row ticks with the boiler rows so a warm-up countdown stays live.
 function renderMachineRow(s) {
@@ -184,30 +201,35 @@ export function init() {
   if ($("grindHintNewBeans")) $("grindHintNewBeans").onclick = () => R.startNewCoffee();
   if ($("grindHintLater"))
     $("grindHintLater").onclick = () => R.dismissCard($("grindHintCard").dataset.key);
-  if ($("accessHint")) {
-    $("accessHintOpen").onclick = (e) => {
-      e.preventDefault();
-      history.pushState(null, "", e.currentTarget.href);
-      R.renderRoute("/admin");
-    };
-    // The choice is kept on the controller, so other phones skip it too.
-    $("accessHintDismiss").onclick = () => {
-      accessHintClosed = $("accessHint").hidden = true;
-      R.api("/api/v1/auth/notice", { method: "POST", body: "{}" }).catch(() => {});
-    };
-  }
-  if ($("micraCloudHint")) {
-    $("micraCloudHintOpen").onclick = (e) => {
-      e.preventDefault();
-      history.pushState(null, "", e.currentTarget.href);
-      R.renderRoute("/settings");
-    };
-    // Dismiss hides it until the page reloads; the checkbox makes it permanent.
-    $("micraCloudHintDismiss").onclick = () => {
-      if ($("micraCloudHintMute").checked) R.dismissCard("obbwCard:micraCloud");
-      micraHintClosed = $("micraCloudHint").hidden = true;
+  for (const id of ["accessHint", "micraCloudHint", "recipeHint", "scaleOnlyHint"]) {
+    const open = $(id + "Open"),
+      dismiss = $(id + "Dismiss");
+    if (open)
+      open.onclick = (e) => {
+        e.preventDefault();
+        history.pushState(null, "", open.href);
+        R.renderRoute(open.pathname);
+      };
+    if (!dismiss) continue;
+    dismiss.onclick = () => {
+      // The access choice is kept on the controller, so other phones skip it too.
+      if (id === "accessHint") {
+        accessHintClosed = true;
+        R.api("/api/v1/auth/notice", { method: "POST", body: "{}" }).catch(() => {});
+      } else R.dismissCard(cardKey(id));
+      renderHints(R.homeStatusCache());
     };
   }
+  if ($("scaleOnlyHintUse"))
+    $("scaleOnlyHintUse").onclick = () =>
+      R.command(
+        "/api/v1/config",
+        R.withBaseRev({ scaleMacCacheMode: "only" }),
+        1,
+        "",
+        __WEBUI_TEXT__("runtime.could_not_save_shared_settings"),
+      );
+  R.registerViewStatus("homeHints", renderHints);
   quickWeight = initQuickWeight();
   quickWeightWanted = new URLSearchParams(location.search).has("edit_weight");
 }

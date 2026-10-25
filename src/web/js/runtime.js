@@ -4340,6 +4340,10 @@ async function loadHomeStatus() {
 }
 // Synchronous view for local tickers: null while the stream is invalidated,
 // so painters stop repainting stale values over the reset placeholders.
+// Whether the controller holds a last shot; null until the shot stream answers.
+function shotRecorded() {
+  return shotFrame ? !!shotFrame.card.valid : null;
+}
 function homeStatusCache() {
   return homeStale ? null : homeFrame?.status || null;
 }
@@ -4713,7 +4717,11 @@ function startUiStream() {
         const next = uiStreamFrame(shotGotShot ? shotFrame : null, data);
         if (next === shotFrame) return;
         syncShotClock(next);
+        // Home's recipe hint waits for the first answer and the first shot.
+        const hintsStale =
+          activeView === "home" && (!shotFrame || !shotFrame.card.valid !== !next.card.valid);
         shotFrame = next;
+        if (hintsStale) viewStatusHandlers.homeHints?.(homeStatusCache());
         shotGotShot = true;
         shotResync = false;
         shotStale = !!next.stale;
@@ -6739,6 +6747,7 @@ export {
   noteWebUiPowerActivity,
   initHeaderSignals,
   homeStatusCache,
+  shotRecorded,
   formatMicraCleaning,
   $,
   webUiOwner,

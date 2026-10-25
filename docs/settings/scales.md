@@ -207,6 +207,8 @@ If no compatible scale is available, the controller stays in the bootstrap
 name scan indefinitely and does not silently change the saved preference.
 Choosing **My scale first** before a scale has been adopted uses the same
 bootstrap; after adoption, its normal preferred-first fallback applies.
+When **My scale first** is active and a scale is already saved, Home suggests
+switching to **Only my scale**; its button changes this setting for you.
 Saving a changed preference mode or selected scale restarts an in-progress
 search with the new filter. If **Only my scale** is enabled while a
 different scale is connected, that connection is closed before directed

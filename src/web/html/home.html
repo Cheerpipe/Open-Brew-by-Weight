@@ -60,23 +60,42 @@
     </button>
   </div>
 </section>
-<section id="accessHint" class="homeCard accessHint" hidden>
+<section id="accessHint" class="homeCard infoHint" hidden>
   <p><strong>{{webui:home.access_hint_title}}</strong> {{webui:home.access_hint_text}}</p>
   <div class="btnBar">
     <a id="accessHintOpen" class="btnGlyph btnInvert" href="/admin#accessPanel"
       ><span class="t">{{webui:home.access_hint_open}}</span></a
     ><button id="accessHintDismiss" class="btnGlyph ghost" type="button">
-      <span class="t">{{webui:home.access_hint_dismiss}}</span>
+      <span class="t">{{webui:home.dismiss}}</span>
     </button>
   </div>
 </section>
-<section id="micraCloudHint" class="homeCard" hidden>
+<section id="micraCloudHint" class="homeCard infoHint" hidden>
   <p><strong>{{webui:home.micra_hint_title}}</strong> {{webui:home.micra_hint_text}}</p>
-  <label><input id="micraCloudHintMute" type="checkbox" /> {{webui:home.dont_show_again}}</label>
   <div class="btnBar">
     <a id="micraCloudHintOpen" class="btnGlyph btnInvert" href="/settings#lineaMicraSettings"
       ><span class="t">{{webui:home.micra_hint_open}}</span></a
     ><button id="micraCloudHintDismiss" class="btnGlyph ghost" type="button">
+      <span class="t">{{webui:home.dismiss}}</span>
+    </button>
+  </div>
+</section>
+<section id="recipeHint" class="homeCard infoHint" hidden>
+  <p><strong>{{webui:home.recipe_hint_title}}</strong> {{webui:home.recipe_hint_text}}</p>
+  <div class="btnBar">
+    <a id="recipeHintOpen" class="btnGlyph btnInvert" href="/settings#recipeSettings"
+      ><span class="t">{{webui:home.recipe_hint_open}}</span></a
+    ><button id="recipeHintDismiss" class="btnGlyph ghost" type="button">
+      <span class="t">{{webui:home.dismiss}}</span>
+    </button>
+  </div>
+</section>
+<section id="scaleOnlyHint" class="homeCard infoHint" hidden>
+  <p><strong>{{webui:home.scale_hint_title}}</strong> {{webui:home.scale_hint_text}}</p>
+  <div class="btnBar">
+    <button id="scaleOnlyHintUse" class="btnGlyph btnInvert" type="button">
+      <span class="t">{{webui:home.scale_hint_use}}</span></button
+    ><button id="scaleOnlyHintDismiss" class="btnGlyph ghost" type="button">
       <span class="t">{{webui:home.dismiss}}</span>
     </button>
   </div>

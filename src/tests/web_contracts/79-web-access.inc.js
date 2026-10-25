@@ -179,20 +179,41 @@
   assert.equal(context.sessionStorage.values.get('obbwSession'), 't2');
   context.storeSession('', false);
   assert.deepEqual({...context.webUiHeaders()}, {'X-WebUI-Client': 'abc'});
-  // Home asks to secure access first; the La Marzocco Cloud hint waits for
-  // it, and the access hint waits only for the grind hint.
-  const nodes = {grindHintCard: {hidden: true}, accessHint: {hidden: true}, micraCloudHint: {hidden: true}};
+  // Home onboarding hints show one at a time: access, La Marzocco Cloud,
+  // recipe, scale; each waits while the grind hint shows. Dismissals other
+  // than access stay in the browser under the legacy card keys.
+  const nodes = {grindHintCard: {hidden: true}};
+  for (const id of ['accessHint', 'micraCloudHint', 'recipeHint', 'scaleOnlyHint']) nodes[id] = {hidden: true};
   const $ = (id) => nodes[id] ||= {textContent: '', hidden: false,
     classList: {toggle() {}, add() {}, remove() {}, contains: () => false}};
-  const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, cardDismissed: () => '',
-    presetState: {items: []}}, document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
+  const cards = new Map();
+  let recorded = false;
+  const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, presetState: {items: []},
+    cardDismissed: (k) => cards.get(k) || '', dismissCard: (k) => cards.set(k, '1'), shotRecorded: () => recorded,
+    controlsMutable: true}, document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
   vm.runInNewContext(viewJs.home.replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];?/, '')
       .replace(/export /g, ''), home);
-  const fresh = {access: {notice: true}, machineIntegration: 'linea_micra_cloud',
-    lineaMicra: {accountConfigured: false}};
-  const shown = (s) => (home.applyStatus(s), [!nodes.accessHint.hidden, !nodes.micraCloudHint.hidden]);
-  assert.deepEqual(shown(fresh), [true, false]);
-  assert.deepEqual(shown({...fresh, access: {notice: false}}), [false, true]);
+  const order = ['accessHint', 'micraCloudHint', 'recipeHint', 'scaleOnlyHint'];
+  const fresh = {access: {notice: true}, machineIntegration: 'linea_micra_cloud', presetsTag: 7,
+    lineaMicra: {accountConfigured: false}, config: {scaleMacCacheMode: 'prefer'}, scale: {preferredMac: 'AA'}};
+  const shown = (s) => (home.applyStatus(s), order.filter((id) => !nodes[id].hidden));
+  assert.deepEqual(shown(fresh), ['accessHint']);
+  assert.deepEqual(shown({...fresh, access: {notice: false}}), ['micraCloudHint']);
+  const noCloud = {...fresh, access: {notice: false}, lineaMicra: {accountConfigured: true}};
+  assert.deepEqual(shown(noCloud), ['recipeHint']);
+  recorded = true;
+  assert.deepEqual(shown(noCloud), ['scaleOnlyHint']);
+  assert.deepEqual(shown({...noCloud, config: {scaleMacCacheMode: 'only'}}), []);
+  assert.deepEqual(shown({...noCloud, scale: {preferredMac: ''}}), []);
+  // A preset change retires the recipe hint for good.
+  recorded = false;
+  assert.deepEqual(shown({...noCloud, presetsTag: 8}), ['scaleOnlyHint']);
+  assert.equal(cards.get('obbwCard:recipe'), '1');
+  cards.set('obbwCard:scaleOnly', '1');
+  assert.deepEqual(shown({...noCloud, presetsTag: 8}), []);
   nodes.grindHintCard.hidden = false;
-  assert.deepEqual(shown(fresh), [false, true]);
+  assert.deepEqual(shown(fresh), []);
+  assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&
+      codeIncludes(rawPartialHtml.settings, 'id="recipeSettings"') &&
+      !codeIncludes(rawPartialHtml.home, 'type="checkbox"'));
 }

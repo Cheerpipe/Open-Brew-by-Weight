@@ -2164,8 +2164,8 @@ summary::marker {
 .homeCard a.btnGlyph {
   text-decoration: none;
 }
-/* Informative, not a warning: a neutral edge. */
-.accessHint {
+/* Onboarding hints inform, not warn: a neutral edge. */
+.infoHint {
   border-left-color: var(--bd);
 }
 .accessSheet {

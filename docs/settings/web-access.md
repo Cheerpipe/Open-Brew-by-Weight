@@ -20,7 +20,7 @@ a sign-in page. Access reminds you to keep the password somewhere safe: if
 you lose it, the only way back in is the recovery steps at the machine.
 
 The first time you open the Web UI, Home shows a short note that it is open on
-your network, with a **Set up** button that takes you to this panel. **Not now**
+your network, with a **Set up** button that takes you to this panel. **Dismiss**
 hides the note on every phone.
 
 ## Signing in
