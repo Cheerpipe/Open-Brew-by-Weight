@@ -1,8 +1,4 @@
 <svg hidden>
-  <symbol id="g-admin" viewBox="0 0 24 24">
-    <rect x="5" y="11" width="14" height="10" rx="2" />
-    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-  </symbol>
   <symbol id="g-override" viewBox="0 0 24 24">
     <path d="M12 3 4 7v5c0 5 4 8 8 9 4-1 8-4 8-9V7Zm0 5v5m0 3h.01" />
   </symbol>
@@ -45,11 +41,8 @@
     <path d="M4 7h16m-10 4v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
   </symbol>
 </svg>
-<section id="adminLockPanel">
-  <h2 class="adminLockTitle">
-    <svg class="cfgIcon" aria-hidden="true"><use href="#g-admin" /></svg
-    >{{webui:admin.administration}}
-  </h2>
+<fieldset id="adminLockPanel">
+  <legend>{{webui:admin.administration}}</legend>
   <form id="adminUnlockForm" novalidate>
     <label
       >{{webui:admin.device_password}}
@@ -74,7 +67,7 @@
   <small id="adminConfirmHint" class="warn hidden"
     >{{webui:admin.pending_wi_fi_confirm_this_window_will}}</small
   >
-</section>
+</fieldset>
 <div id="adminControls" class="hidden">
   <p class="adminSession">
     {{webui:admin.unlocked}}

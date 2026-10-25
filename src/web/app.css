@@ -1007,7 +1007,7 @@ body.pageLoading :is(.view, .view *)::after {
 }
 
 fieldset,
-#view-admin {
+#adminControls {
   min-width: 0;
   margin: 1rem 0;
   padding: 1rem;
@@ -1642,15 +1642,6 @@ html:not(.micraTemperatureEnabled) .micraTempOpt {
   font:
     italic 700 0.8rem Georgia,
     serif;
-}
-.adminLockTitle {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin: 0;
-  padding: 0.65rem 0.25rem;
-  color: var(--ac);
-  font-size: inherit;
 }
 #adminControls > .cfgGroup:last-child,
 #diagnosticsPanel > .cfgGroup:has(+ .btnBar) {
