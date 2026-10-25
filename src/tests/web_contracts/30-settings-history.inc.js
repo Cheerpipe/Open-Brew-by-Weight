@@ -286,7 +286,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     !wallClock.includes('monotonicElapsedMs(monotonicMs, anchorMonotonicMs_)') ||
     !network.includes('StaJoinHints OpenBrewByWeightNetwork::staJoinHints()') ||
     !dualSlotFlashIo.includes(
-        'flashIoWriteChunked(part, targetOffset, &store_, sizeof(store_))') ||
+        'flashIoWriteChunked(part, targetOffset, bytes, kHeaderBytes)') ||
     !lastShotIo.includes('copyToFlashIoScratch(&blob_') ||
     !jsonArena.includes('static const bool initialized') ||
     !jsonArena.includes('JSON_DOCUMENT_MAX_BYTES') ||
