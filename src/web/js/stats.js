@@ -1573,7 +1573,7 @@ function shotVisualizer(r) {
     actual = estimated ? null : shotDisplayActualG(r.actualG, r.wCg),
     cut = shotCut(r, m, actual),
     tempC = r.targetTempDeciC > 0 ? r.targetTempDeciC / 10 : undefined,
-    g = (v, sign) => (sign && v >= 0 ? "+" : "") + v.toFixed(1) + " g",
+    g = (v, sign) => (sign && v >= 0 ? "+" : "") + v.toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
     error = actual !== null && r.goalG ? actual - r.goalG : null,
     notes = [
       "Ended: " + R.formatShotEnded(r.stopDetail, r.verdict),

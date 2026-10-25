@@ -2460,7 +2460,8 @@ void p86_timezone_preference_and_durable_initialization() {
   CHECK(loadPersistedSettings(loaded));
   CHECK(loaded.runtime.scheduledRestartEnabled == 1 &&
         loaded.runtime.scheduledRestartMinuteOfDay == 1439);
-  // Stale tail padding from an older blob must not read as a schedule.
+  // Stale tail padding from an older blob must not read as a schedule; only
+  // the schedule is repaired, every other setting and Wi-Fi survive.
   for (const auto corrupt : {0, 1}) {
     resetHostPersistence();
     PersistedSettings raw = settings;
@@ -2468,18 +2469,42 @@ void p86_timezone_preference_and_durable_initialization() {
     else raw.runtime.scheduledRestartMinuteOfDay = 24 * 60;
     raw.checksum = persistedSettingsChecksum(raw);
     persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &raw, sizeof(raw));
-    CHECK(!loadPersistedSettings(loaded));
+    bool repaired = false;
+    CHECK(loadPersistedSettings(loaded, &repaired) && repaired);
+    CHECK(loaded.runtime.scheduledRestartEnabled == 0 &&
+          loaded.runtime.scheduledRestartMinuteOfDay == 720);
+    CHECK(loaded.runtime.timezoneAutomatic == 1 && loaded.runtime.ntpSyncEnabled);
+    CHECK(loaded.staConfigured == settings.staConfigured &&
+          strcmp(loaded.staSsid, settings.staSsid) == 0);
+    CHECK(validPersistedSettings(loaded));
   }
   settings.runtime.scheduledRestartEnabled = 0;
   settings.runtime.scheduledRestartMinuteOfDay = 720;
 
-  // An out-of-range preference byte rejects the record.
+  // An out-of-range preference byte resets the runtime section only; a slot
+  // that validates as-is still wins over a repair.
   resetHostPersistence();
-  settings.runtime.timezoneAutomatic = 0xA5;
-  settings.checksum = persistedSettingsChecksum(settings);
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &settings, sizeof(settings));
-  CHECK(!loadPersistedSettings(loaded));
+  PersistedSettings bad = settings;
+  bad.runtime.timezoneAutomatic = 0xA5;
+  bad.checksum = persistedSettingsChecksum(bad);
+  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &bad, sizeof(bad));
+  bool repaired = false;
+  CHECK(loadPersistedSettings(loaded, &repaired) && repaired);
+  CHECK(loaded.runtime.timezoneAutomatic == RuntimeConfig{}.timezoneAutomatic);
+  CHECK(strcmp(loaded.devicePassword, settings.devicePassword) == 0);
   CHECK(!durableTimezoneSaved().load());
+  PersistedSettings older = settings;
+  older.storageRevision = bad.storageRevision - 1;
+  older.checksum = persistedSettingsChecksum(older);
+  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_B, &older, sizeof(older));
+  CHECK(loadPersistedSettings(loaded, &repaired) && !repaired);
+  CHECK(loaded.storageRevision == older.storageRevision);
+
+  // A damaged blob (checksum mismatch) is still rejected outright.
+  resetHostPersistence();
+  bad.checksum ^= 1U;
+  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &bad, sizeof(bad));
+  CHECK(!loadPersistedSettings(loaded));
 }
 
 void p90_firmware_mode_store_round_trip_and_factory_reset() {

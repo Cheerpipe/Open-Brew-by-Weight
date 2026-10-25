@@ -227,6 +227,15 @@
       !codeIncludes(setupJs, 'box.focus({preventScroll:true})') ||
       !codeIncludes(setupJs, 'navigator.clipboard.writeText(text.textContent)') ||
       !codeIncludes(setupJs, 'if(finished)window.location.href=PROBE_URL;') ||
+      // The public factory password never survives setup: save and skip on
+      // the setup network need the owner's own password, set first without
+      // restarting the setup network.
+      !codeIncludes(setupJs, 'if(!(await protectDevice()))return;showConnecting(payload.ssid);') ||
+      !codeIncludes(setupJs, 'if(!(await protectDevice()))return;await R.api("/api/v1/network"') ||
+      !setupHtml.includes('id="setupDevicePassword"') ||
+      !networkHandlerBlock.includes('"DEVICE_PASSWORD_REQUIRED"') ||
+      !network.includes('command.network.applyLive = socketServedBySoftAp(httpd_req_to_sockfd(request));') ||
+      !network.includes('apRestartPending_ = snapshot().apActive && !command.network.applyLive;') ||
       !setupHtml.includes('id="setupBlocked"') ||
       !setupHtml.includes('id="setupErrorText" class="fieldError" role="alert"') ||
       setupHtml.indexOf('id="setupError"') > setupHtml.indexOf('<form id="setupForm"') ||

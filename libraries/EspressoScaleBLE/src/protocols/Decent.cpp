@@ -33,6 +33,9 @@ bool parseDecentWeight(const uint8_t *data, int length, float *weight) {
         (data[1] != 0xca && data[1] != 0xce)) {
         return false;
     }
+    // A zero check byte is accepted unverified, as in the original port;
+    // the controller's slew filter and two-sample stop confirmation bound a
+    // bad frame. Any other value must match the XOR.
     const uint8_t xorByte = data[length - 1];
     if (xorByte != 0 && scaleXorBytes(data, length - 1) != xorByte) {
         return false;

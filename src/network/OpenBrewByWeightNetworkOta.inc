@@ -28,13 +28,20 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   if (parsed && strcmp(action, "confirm") != 0 && strcmp(action, "skip") != 0 &&
       strcmp(action, "finish") != 0) {
     if (!self.requireAdminUnlock(request)) {
-      if (root != nullptr) {
-        cJSON_Delete(root);
-      }
+      cJSON_Delete(root);
       self.unlockJsonBody();
       command.wipePassword();
       return ESP_OK;
     }
+  }
+  // The factory password is public: setup (save or skip) needs the owner's own.
+  if (parsed && (strcmp(action, "save") == 0 || strcmp(action, "skip") == 0) &&
+      socketServedBySoftAp(httpd_req_to_sockfd(request)) &&
+      [&self] { TaskLockGuard lock(self.dataMux_); return passwordIsFactoryDefault(self.settings_); }()) {
+    cJSON_Delete(root);
+    self.unlockJsonBody();
+    return sendError(request, STATUS_CONFLICT, "DEVICE_PASSWORD_REQUIRED",
+                     "Choose your own device password before finishing setup.");
   }
   if (parsed &&
       (networkError = parseSetupBrew(root, brew, brewPresetId)) != nullptr) {
@@ -55,9 +62,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
         networkError = "No pending network configuration to confirm.";
       } else {
         self.requestPendingNetworkConfirm();
-        if (root != nullptr) {
-          cJSON_Delete(root);
-        }
+        cJSON_Delete(root);
         self.unlockJsonBody();
         return self.sendAccepted(request, command.requestId,
                                  "\"state\":\"QUEUED\"");
@@ -79,9 +84,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       brewSaveFailed = true;
     } else {
       self.portalExitRequested_.store(true, std::memory_order_release);
-      if (root != nullptr) {
-        cJSON_Delete(root);
-      }
+      cJSON_Delete(root);
       self.unlockJsonBody();
       return sendJson(request, STATUS_OK, "{\"skipped\":true}");
     }
@@ -122,18 +125,14 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
           self.requestSetupRestart();
         }
         self.portalExitRequested_.store(true, std::memory_order_release);
-        if (root != nullptr) {
-          cJSON_Delete(root);
-        }
+        cJSON_Delete(root);
         self.unlockJsonBody();
         return sendJson(request, STATUS_OK, "{\"finished\":true}");
       }
     }
   } else if (parsed && strcmp(action, "forget") == 0) {
     if (!self.webUiConfigurationAllowed(request, status)) {
-      if (root != nullptr) {
-        cJSON_Delete(root);
-      }
+      cJSON_Delete(root);
       self.unlockJsonBody();
       return sendError(request, STATUS_CONFLICT,
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
@@ -147,9 +146,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     }
   } else if (parsed && strcmp(action, "save") == 0) {
     if (!self.webUiConfigurationAllowed(request, status)) {
-      if (root != nullptr) {
-        cJSON_Delete(root);
-      }
+      cJSON_Delete(root);
       self.unlockJsonBody();
       return sendError(request, STATUS_CONFLICT,
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
@@ -281,9 +278,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     networkError =
         "action must be \"save\", \"forget\", \"confirm\", \"skip\", or \"finish\".";
   }
-  if (root != nullptr) {
-    cJSON_Delete(root);
-  }
+  cJSON_Delete(root);
   self.unlockJsonBody();
   if (!parsed) {
     command.wipePassword();
@@ -416,9 +411,7 @@ esp_err_t OpenBrewByWeightNetwork::devicePasswordHandler(httpd_req_t *request) {
       root != nullptr && jsonHasOnlyUniqueFields(root, fields, 1) &&
       jsonString(root, "newPassword", command.network.password,
                  sizeof(command.network.password), false);
-  if (root != nullptr) {
-    cJSON_Delete(root);
-  }
+  cJSON_Delete(root);
   self.unlockJsonBody();
   if (!parsed) {
     command.wipePassword();
@@ -435,6 +428,8 @@ esp_err_t OpenBrewByWeightNetwork::devicePasswordHandler(httpd_req_t *request) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_DEVICE_PASSWORD",
                      "New device password cannot be the factory default.");
   }
+  // From the setup network, keep it running (new passphrase at its next start).
+  command.network.applyLive = socketServedBySoftAp(httpd_req_to_sockfd(request));
   self.keepPasswordChangeSession(request, command.requestId);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     command.wipePassword();
@@ -472,9 +467,7 @@ esp_err_t OpenBrewByWeightNetwork::bleScanHandler(httpd_req_t *request) {
                    sizeof(intensityText), false) &&
         parseBleScanIntensityId(intensityText, intensity))) &&
       (!enabledPresent || jsonBoolean(root, "enabled", enabled));
-  if (root != nullptr) {
-    cJSON_Delete(root);
-  }
+  cJSON_Delete(root);
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_BLE_CONFIG",
@@ -512,9 +505,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileHandler(httpd_req_t *request) {
   const bool parsed =
       root != nullptr && jsonHasOnlyUniqueFields(root, fields, 1) &&
       jsonString(root, "action", action, sizeof(action), false);
-  if (root != nullptr) {
-    cJSON_Delete(root);
-  }
+  cJSON_Delete(root);
   self.unlockJsonBody();
   WebCommandType type;
   if (parsed && strcmp(action, "start") == 0) {

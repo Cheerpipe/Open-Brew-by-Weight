@@ -86,7 +86,7 @@ appears while you are looking at the active preset.
 | **Dose (g)** | Recipe | 18 g | 5–30 g in 0.1 g steps | Coffee in the basket. Shows your ratio; does not change the cut. |
 | **Target yield (g)** | Recipe | 36 g | 10–200 g in 0.1 g steps | Drink weight in the cup, drips included. The stop aims at `cut line − learned drip`. |
 | **Shot time window (s)** | Recipe | 27–36 s | See [Fast and slow shots](fast-and-slow-shots.md#settings) | Reaching the target inside the window is On recipe. |
-| **Earliest weight stop (s)** | Time limits | 12 s | 0.5–30 s; see [Cup protection](cup-protection.md) | The scale cannot stop the shot before this, so tare and first drops cannot trigger it. |
+| **Earliest weight stop (s)** | Time limits | 12 s | 3–30 s, and at least the retare window plus 3 s (7 s with the default 4 s window); see [Cup protection](cup-protection.md) | The scale cannot stop the shot before this, so tare and first drops cannot trigger it. |
 | **Max shot time (s)** | Time limits | 50 s | 5–60 s | The shot always stops here, target reached or not. Ignored on timer-only and no-scale shots. Cannot exceed the hard 60 s cap. |
 | **Backup stop time (s)** | Time limits | empty | Earliest weight stop to Max shot time | Leave empty to use your recent shots, or the middle of your window until there are enough. See [scale-loss backup](auto-to-manual.md). |
 | **Expected drip weight after the shot stops (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with **Set drip** | The coffee still dripping into the cup after the stop, subtracted from the cut line. It learns from every eligible weight-stopped shot, shown next to a chart of what your last five shots needed. **Set drip** uses a new value from the next shot and starts a quick start. |

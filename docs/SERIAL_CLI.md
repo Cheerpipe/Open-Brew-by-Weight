@@ -5,7 +5,8 @@ the logs (**115200** baud). Verbs are case-insensitive. SSIDs and passwords
 are case-sensitive; wrap values with spaces in double quotes.
 
 App CDC is off unless **GPIO 4 is jumpered to GND at reset**, or the
-firmware was compiled with `-DOPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1`. See
+firmware was built with `./scripts/dev build --development` (the only build
+that includes the USB console). See
 [Hardware](HARDWARE.md). Without that Dupont (on the default build), the CLI
 port does not enumerate while the app is running; use **OTA** or **BOOT + RST**
 (ROM download) to flash. Remove the jumper before installing the controller in
@@ -25,10 +26,11 @@ Open the port through the supported developer facade:
 On Linux the port is often `/dev/ttyACM0` or `/dev/ttyUSB0`. Exit with
 **Ctrl+]**. The script prompts for and remembers the port in `.openbrewbyweight`.
 
-To install and open the monitor in one ordered command:
+To build the console image, install it, and open the monitor in one ordered
+command:
 
 ```sh
-./scripts/dev build flash monitor --confirm \
+./scripts/dev build flash monitor --development --confirm \
   --hardware esp32-s3-relay-x1-speaker \
   --machine la-marzocco-linea-micra \
   --port /dev/cu.usbmodem2101 --speed 115200

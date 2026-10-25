@@ -32,6 +32,9 @@ const web = fs.readdirSync(jsDir).filter((name) => name.endsWith('.js'))
   .map((name) => fs.readFileSync(path.join(jsDir, name), 'utf8')).join('\n');
 const webFunctions = new Set([...web.matchAll(/^(?:export )?(?:async )?function ([\w$]+)\(/gm)]
   .map((match) => match[1]));
+// Module-level state (`uiState.x`, `presetState.y`) must be defined too.
+const webState = new Set([...web.matchAll(/^(?:export )?(?:let|const) ([\w$]+)\s*=/gm)]
+  .map((match) => match[1]));
 function checkScript(url, fixture, required, fixtureProvided = []) {
   const script = withoutMockup(get(url), fixture);
   assert.doesNotThrow(() => new Function(script), url + ' must compile');
@@ -42,6 +45,10 @@ function checkScript(url, fixture, required, fixtureProvided = []) {
     .map((match) => match[1]))]
     .filter((name) => webFunctions.has(name) && !defined.has(name) && !fixtureProvided.includes(name));
   assert.deepEqual(missing, [], url + ' calls Web UI functions it does not define');
+  const missingState = [...new Set([...script.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\./g)]
+    .map((match) => match[1]))]
+    .filter((name) => webState.has(name) && !defined.has(name) && !fixtureProvided.includes(name));
+  assert.deepEqual(missingState, [], url + ' reads Web UI state it does not define');
 }
 
 for (const url of ['/', '/mobile-menu', '/micra', '/app.css']) get(url);

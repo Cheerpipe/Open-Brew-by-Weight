@@ -636,6 +636,11 @@ void stateMachineTask() {
     handleOperationalLimitTrip();
     return;
   }
+  // A fault lockout opens K1 without the limit flags; still end the session.
+  if (session.active && relay.state == RelaySafetyState::LOCKOUT) {
+    finalizeCycle(EndReason::RELAY_SAFETY_FAILURE, StopperState::REQUIRES_OFF);
+    return;
+  }
   if (relay.closed && session.active &&
       machineCloseLimitMs(session.config.operationalWallMs) ==
           HARD_MAX_CIRCUIT_CLOSED_MS &&

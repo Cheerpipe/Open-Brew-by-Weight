@@ -61,12 +61,15 @@ let controlsMutable = true, configRevision = 1;
 const previewStatus = {config: {revision: 1, brewByWeight: true, noScaleBbwMode: 'warn_once',
   fastExtractionGuardEnabled: true, slowExtractionGuardEnabled: true, autoToManualGuardEnabled: true,
   avoidAccidentalTouchEnabled: true, cupProtectionEnabled: true}};
+const uiState = {}, presetState = {activeId: 0};
 const body = values => JSON.stringify(values), message = text => console.info(text);
 async function api(path, options) {
   const {baseRevision, ...change} = JSON.parse(options.body);
   Object.assign(previewStatus.config, change, {revision: (configRevision = baseRevision + 1)});
   setTimeout(() => updateQuickSettings(structuredClone(previewStatus)));
 }
+const command = (path, value) => api(path, {body: body(value)});
+const refreshStatus = async () => updateQuickSettings(structuredClone(previewStatus));
 // Runs even if an optional webui-mockups/header.js fixture throws.
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('quickPanel')) initHeaderSignals();

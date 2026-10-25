@@ -30,7 +30,7 @@ last shot card) before changing calibration.
 | Above target, **Fast** / **EXTENDED** | [Extend fast shots](features/fast-and-slow-shots.md#fast-shots) raised the cut line, up to the preset's extra yield. |
 | Below target, **Slow** / **STOPPED EARLY** | [Shorten slow shots](features/fast-and-slow-shots.md#slow-shots) lowered the cut line, down to the preset's reduced yield. |
 | **CHANNELING** | A flow surge kept the cut line at the target. |
-| **MAX TIME**, around 50 s on factory Double | Max shot time, well after the 34 s window end. |
+| **MAX TIME**, around 50 s on factory Double | Max shot time, well after the 36 s window end. |
 | After scale loss (**NO SCALE**) | The [scale-loss backup](features/auto-to-manual.md) time is measured from shot start, not disconnect. |
 | Ordinary stop followed by extra dripping | Learned offset and drip delay; see [BBW](features/brew-by-weight.md). |
 
@@ -78,7 +78,8 @@ drops. Use USB `AP_START` or reboot.
 
 ### The phone says the Wi-Fi password is wrong
 
-After a factory reset the password is still **`ineedacoffee`**. Phones and
+It is the controller password: **`ineedacoffee`** on a new or factory-reset
+controller, otherwise the one you chose during setup or in Admin. Phones and
 computers often show that message when they cannot finish joining, not only
 when the letters are wrong. Join the unique `OpenBrewByWeightAP-xxxxxxxx`
 name from USB `AP_STATUS`, forget any unsuffixed `OpenBrewByWeightAP`, and

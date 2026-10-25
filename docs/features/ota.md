@@ -4,7 +4,10 @@ Loading settings during a trial boot never writes them back. Settings saves
 and resets wait until the image is confirmed, retaining the previous durable
 record for rollback. Pending edits remain queued; confirmation does not depend
 on saving those edits. The existing Wi-Fi update, rollback and USB recovery
-paths remain available. Downgrade restrictions above still apply.
+paths remain available. Downgrade restrictions above still apply. If a new
+version finds a saved setting it no longer accepts, only that group of
+settings returns to its factory values; Wi-Fi, the device password, and every
+other group are kept, and the Web UI log notes the repair.
 
 Firmware can be updated over Wi-Fi without opening the case or using USB.
 Upload a built image with the project scripts while the controller is on

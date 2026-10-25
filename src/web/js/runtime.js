@@ -102,6 +102,8 @@ function setViewPollHooks(hooks) {
 }
 function stopViewPolls() {
   clearCupWeights();
+  clearTimeout(uiState.scanTimer);
+  uiState.scanTimer = 0;
   clearInterval(statusTimer);
   statusTimer = 0;
   stopExtraPollsHook();
@@ -812,13 +814,16 @@ function formatWallTimeLocal(unixLocalSec) {
 }
 const HUMAN_WD = __WEBUI_TEXT__("runtime.weekdays").split(","),
   HUMAN_MON = __WEBUI_TEXT__("runtime.months_short").split(",");
+// The controller's UTC now, from its last status (the phone's clock may be
+// wrong); the phone's clock only until a status arrives.
+function deviceUtcSec() {
+  return statusUtcAnchorSec
+    ? statusUtcAnchorSec + Math.floor((performance.now() - statusUtcAnchorAt) / 1000)
+    : Math.floor(Date.now() / 1000);
+}
 function formatHumanTime(l) {
   const dt = new Date(l * 1e3),
-    now = statusUtcAnchorSec
-      ? statusUtcAnchorSec +
-        Math.floor((performance.now() - statusUtcAnchorAt) / 1000) +
-        statusTimezoneOffsetMinutes * 60
-      : 0,
+    now = statusUtcAnchorSec ? deviceUtcSec() + statusTimezoneOffsetMinutes * 60 : 0,
     n = new Date(now * 1e3),
     d = Math.floor(now / 86400) - Math.floor(l / 86400),
     c = dt.toISOString().slice(11, 16),
@@ -2354,8 +2359,6 @@ function deactivateWebUi() {
   webUiActiveUntil = 0;
   clearTimeout(webUiInactivityTimer);
   webUiInactivityTimer = 0;
-  clearTimeout(uiState.scanTimer);
-  uiState.scanTimer = 0;
   stopViewPolls();
   lockAdminUi();
   setMutable(false);
@@ -3141,7 +3144,7 @@ function validateBrewClient() {
       id: "fastMarginG",
       msg: sub(BREW_CROSS_TEXT.le, [
         brewFieldLabel("fastMarginG"),
-        (goal / 4).toFixed(1) + " g",
+        (goal / 4).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
         __WEBUI_TEXT__("runtime.quarter_of_target"),
         recipe,
       ]),
@@ -3151,7 +3154,7 @@ function validateBrewClient() {
       id: "slowMarginG",
       msg: sub(BREW_CROSS_TEXT.le, [
         brewFieldLabel("slowMarginG"),
-        (goal - 5).toFixed(1) + " g",
+        (goal - 5).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
         BREW_FIELD_TEXT.goalWeightG[0] + " − 5 g",
         recipe,
       ]),
@@ -3921,7 +3924,7 @@ function presetGraph(host, m, x = {}) {
     lastR = -99;
   for (let v = 0; v <= top; v += step) {
     grid += `<path class="rvGrid" d="M${L} ${f(Y(v))}H${R}"/>`;
-    marks += label(L - 4, Y(v) + 3, v + " g", "", "end");
+    marks += label(L - 4, Y(v) + 3, v + __WEBUI_TEXT__("runtime.g_2"), "", "end");
   }
   (tens
     ? Array.from({ length: Math.floor(tMax / 10) + 1 }, (_, i) => i * 10)
@@ -5734,16 +5737,17 @@ if (document.hidden) onPageVisibility();
 window.addEventListener("pagehide", stopUiStream);
 // Unloading the page drops every unsaved Save/Revert section (setSaveDirty
 // marks them) and an autosave still pending or in flight.
+// Unsaved edits anywhere: a dirty Save button or any autosave or draft flag.
+function hasUnsavedEdits() {
+  return !!(
+    document.querySelector('[data-dirty="1"]') ||
+    ["config", "brew", "dateTime", "ble", "power", "frontend", "micra", "quick"].some(
+      (k) => uiState[k + "Dirty"],
+    )
+  );
+}
 window.addEventListener("beforeunload", (e) => {
-  if (
-    !fwReloading &&
-    (document.querySelector('[data-dirty="1"]') ||
-      uiState.configDirty ||
-      uiState.brewDirty ||
-      uiState.micraDirty ||
-      uiState.quickDirty)
-  )
-    e.preventDefault();
+  if (!fwReloading && hasUnsavedEdits()) e.preventDefault();
 });
 window.addEventListener("pageshow", () => {
   // A restored page starts fresh here; its visibility return must not redo it.
@@ -5817,7 +5821,7 @@ function renderShotHero(d) {
           ? " / ~" + +sl.stopAtS.toFixed(1) + __WEBUI_TEXT__("runtime.s_2")
           : ""
         : goal > 0
-          ? " / " + goal.toFixed(1) + " g"
+          ? " / " + goal.toFixed(1) + __WEBUI_TEXT__("runtime.g_2")
           : "",
     );
   const chip = (id, v) => {
@@ -6286,17 +6290,8 @@ function clearShotHero() {
 }
 let fwShellRefreshed = false;
 function checkFirmwareReload(version) {
-  if (
-    !version ||
-    SHELL_FW_VERSION === "dev" ||
-    uiState.configDirty ||
-    uiState.brewDirty ||
-    uiState.dateTimeDirty ||
-    uiState.bleDirty ||
-    uiState.powerDirty ||
-    uiState.frontendDirty
-  )
-    return;
+  // Reload only when nothing unsaved would be lost; the next status retries.
+  if (!version || SHELL_FW_VERSION === "dev" || hasUnsavedEdits()) return;
   if (version === SHELL_FW_VERSION) {
     try {
       sessionStorage.removeItem("obbwFwReload");
@@ -6799,6 +6794,7 @@ export {
   historySendSubscribe,
   historyLoaded,
   formatHumanTime,
+  deviceUtcSec,
   resetNetworkAddressLoaded,
   formatWallTimeLocal,
   applyHomeStatus,

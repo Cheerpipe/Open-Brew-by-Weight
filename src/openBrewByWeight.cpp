@@ -159,6 +159,7 @@ constexpr uint8_t SCALE_STOP_MAX_ATTEMPTS = 3;
 constexpr uint32_t MAINTENANCE_LEASE_SETTLE_MS = 100;
 constexpr uint32_t RUNTIME_PERSIST_RETRY_MS = 500;
 constexpr uint32_t SHOT_STORE_PERSIST_RETRY_MS = 500;
+constexpr uint32_t PLANNED_RESTART_RECORD_WAIT_MS = 30000;
 constexpr uint32_t PERSIST_IO_RETRY_MAX_MS = 30000;
 constexpr uint32_t RUNTIME_PERSIST_DEBOUNCE_MS = 300;
 constexpr uint32_t SETTINGS_PERSIST_IDLE_WAIT_MS = 1000;
@@ -578,6 +579,7 @@ bool maintenanceCancellationPending = false;
 // Planned ESP.restart (OTA flash, Admin, CLI) waits here while a shot is
 // running. The paddle is never blocked; the restart proceeds once idle.
 bool plannedRestartHeld = false;
+uint32_t plannedRestartHeldAtMs = 0;
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebCommand pendingPlannedRestart;
 // Daily scheduled restart; its internal request id marks the lease it owns.
 ScheduledRestartPlanner scheduledRestartPlanner;

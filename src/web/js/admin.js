@@ -593,7 +593,8 @@ async function refreshWifiScan() {
             ? __WEBUI_TEXT__("setup.searching_networks")
             : __WEBUI_TEXT__("setup.scan_failed");
       if (d.state === "READY") showScanResults(d);
-      if (R.webUiPollingActive() && waiting) R.uiState.scanTimer = setTimeout(refreshWifiScan, 500);
+      if (R.webUiPollingActive() && waiting)
+        R.uiState.scanTimer = setTimeout(refreshWifiScan, 1000);
     } catch (e) {
       R.message(e.message, "error");
     } finally {
@@ -1187,7 +1188,7 @@ async function otaUpload() {
       status,
       __WEBUI_TEXT__("runtime.firmware_verified") +
         otaTagText(status.staged) +
-        ". Review it, then flash.",
+        __WEBUI_TEXT__("runtime.firmware_verified_review"),
       "ok",
     );
   } catch (e) {

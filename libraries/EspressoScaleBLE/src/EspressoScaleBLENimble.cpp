@@ -522,6 +522,8 @@ class NimbleScaleClient {
         hasTimer_ = true;
       }
       if (hasWeight) {
+        lastWeightPacket_ = frame.receivedAtMs;
+        hasWeightPacket_ = true;
         backoff_.reset();
         portENTER_CRITICAL(&mux_);
         if (!timing_.has(ScaleBleTimingFirstWeight)) {
@@ -549,9 +551,12 @@ class NimbleScaleClient {
         return true;
       }
     }
+    // Timer-only frames keep a link alive but not a weight stream that went
+    // silent after its first weight: that silence also times out.
     if (state_ == State::Ready &&
-        elapsedMs(hasValidPacket_ ? lastPacket_ : connectedAt_) >=
-            (hasValidPacket_ ? maxPacketPeriodMs() : FIRST_PACKET_TIMEOUT_MS)) {
+        ((hasWeightPacket_ && elapsedMs(lastWeightPacket_) >= maxPacketPeriodMs()) ||
+         elapsedMs(hasValidPacket_ ? lastPacket_ : connectedAt_) >=
+             (hasValidPacket_ ? maxPacketPeriodMs() : FIRST_PACKET_TIMEOUT_MS))) {
       finishLink(true, hasValidPacket_ ? ScaleDisconnectReason::PACKET_TIMEOUT
                                       : ScaleDisconnectReason::FIRST_PACKET_TIMEOUT,
                  BLE_HS_ETIMEOUT);
@@ -2419,7 +2424,7 @@ class NimbleScaleClient {
             ? protocol_->features.heartbeatPeriodMs
             : HEARTBEAT_PERIOD_MS;
     lastHeartbeat_ = connectedAt_ - heartbeatPeriod;
-    hasValidPacket_ = false;
+    hasValidPacket_ = hasWeightPacket_ = false;
     portENTER_CRITICAL(&mux_);
     invalidNotificationStreak_ = 0;
     portEXIT_CRITICAL(&mux_);
@@ -2560,7 +2565,7 @@ class NimbleScaleClient {
     lastPacket_ = 0;
     packetPeriod_ = 0;
     lastHeartbeat_ = 0;
-    hasValidPacket_ = false;
+    hasValidPacket_ = hasWeightPacket_ = false;
     consecutiveRejectedPackets_ = 0;
     hasTimer_ = false;
     currentTimerMs_ = 0;
@@ -2846,6 +2851,7 @@ class NimbleScaleClient {
   uint32_t lastPacket_ = 0;
   uint32_t packetPeriod_ = 0;
   uint32_t lastTimerPacket_ = 0;
+  uint32_t lastWeightPacket_ = 0;
   uint32_t currentTimerMs_ = 0;
   ScaleWeightSample currentWeightSample_ = {};
   uint32_t notificationSequence_ = 0;
@@ -2861,6 +2867,7 @@ class NimbleScaleClient {
   uint32_t lastAdvertisementToFirstWeightMs_ = 0;
   uint32_t lastReadyToFirstWeightMs_ = 0;
   bool hasValidPacket_ = false;
+  bool hasWeightPacket_ = false;
   bool hasTimer_ = false;
 };
 

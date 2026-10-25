@@ -74,6 +74,7 @@ constexpr uint32_t NTP_FIRST_SYNC_TIMEOUT_MS = 10UL * 1000UL;
 // DHCP/gateway warm-up; failures self-heal via retry plus server failover.
 constexpr uint32_t NTP_STA_SETTLE_MS = 1000;
 constexpr uint32_t NTP_STALE_AFTER_MS = 24UL * 3600UL * 1000UL;
+constexpr uint32_t NTP_ANCHOR_REBASE_SEC = 7UL * 24UL * 3600UL;
 constexpr uint8_t NTP_MAX_CONSECUTIVE_FAILURES = 255;
 
 enum class NtpServerPreset : uint8_t {
@@ -640,7 +641,7 @@ struct RuntimeConfig {
   bool powerManagementEnabled = true;
   uint8_t timezoneAutomatic = 1;
   float weightOffsetG = DEFAULT_WEIGHT_OFFSET_G;
-  // Seed for Reset learned stop offset; factory default remains 1.5 g.
+  // Seed for Reset learned stop offset (DEFAULT_WEIGHT_OFFSET_G).
   float weightOffsetBaselineG = DEFAULT_WEIGHT_OFFSET_G;
   bool autoTare = true;
   bool touchStopFallbackEnabled = true;
@@ -1755,7 +1756,8 @@ struct WebCommandNetworkPayload {
   bool wifiSleepSpecified = false;
   // USB SET_WIFI only. Web UI keeps the HTTP confirm window.
   bool commitConfirmed = false;
-  // /setup onboarding: connect live under the SoftAP instead of restarting.
+  // /setup onboarding: connect live under the SoftAP instead of restarting;
+  // for a password change, keep the running SoftAP until its next start.
   bool applyLive = false;
   // mDNS device name; optional (USB SET_WIFI keeps the stored name).
   char deviceName[DEVICE_NAME_CAPACITY] = {};

@@ -288,11 +288,19 @@ void setup() {
   settingsLoaded = false;
   settingsDurable = false;
   bool freshSettings = false;
-  if (persistenceReady && loadPersistedSettings(persistedSettings)) {
+  bool settingsRepaired = false;
+  if (persistenceReady && loadPersistedSettings(persistedSettings, &settingsRepaired)) {
     settingsLoaded = true;
     settingsDurable = true;
     noteDurableStorageRevision(persistedSettings.storageRevision);
     resolveSetupIntent(persistedSettings);
+    if (settingsRepaired) {
+      addDebugEvent(DebugCategory::CONFIG, DebugCode::CONFIG_REJECTED);
+      // Not saved here: a trial boot must not write, and every boot repairs
+      // the same blob the same way until the next settings save stores it.
+      serialTraceCategory(LogLevel::WARNING, DebugCategory::CONFIG,
+                          "Saved settings repaired: invalid sections reset to factory values");
+    }
   } else if (persistenceReady) {
     if (initializeDefaultSettings(persistedSettings)) {
       settingsLoaded = true;

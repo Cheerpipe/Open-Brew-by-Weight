@@ -394,7 +394,12 @@ bool beginMaintenanceLease(const WebCommand &networkCommand,
        machineLastIntention().holdActive)) {
     return false;
   }
-  machineRequestStop();
+  // An override reaching here mid-shot ends that shot, so it is recorded.
+  if (session.active) {
+    finalizeCycle(EndReason::WEB_STOP, nextStateForUserHold(machineLastIntention()));
+  } else {
+    machineRequestStop();
+  }
   maintenanceLease = MaintenanceLease{};
   maintenanceLease.active = true;
   outboundMaintenance.store(true, std::memory_order_release);
@@ -423,30 +428,37 @@ bool persistentConfigurationMutationAllowed(const WebCommand &command) {
          webCommandAllowsUnsafeConfiguration(command);
 }
 
+// A planned restart waits for the shot to end and, for a bounded time, for
+// its drip-delayed finalize and shot stores to reach flash, so a restart
+// right after a shot keeps it. A failing store never holds it.
+bool plannedRestartMustWait() {
+  if (!controlAllowsConfigurationNow() || session.active ||
+      relayCircuitClosed() || machineLastIntention().holdActive) {
+    return true;
+  }
+  if (elapsedMs(plannedRestartHeldAtMs) >= PLANNED_RESTART_RECORD_WAIT_MS ||
+      shotStorePersistIoRetryMs != 0) {
+    return false;
+  }
+  if (pendingFinalize.pending) return true;
+  TaskLockGuard lock(shotStoreMutex);
+  return shotLog.dirty() || shotCurves.dirty() || historyLog.dirty() ||
+         lastShotNvsDirty;
+}
+
+void servicePendingPlannedRestart();
+
 void holdOrBeginPlannedRestart(const WebCommand &command) {
-  WebCommand restart = command;
-  restart.type = WebCommandType::RESTART;
-  restart.unsafeWebUiOverride = false;
-  if (!controlAllowsConfigurationNow() ||
-      session.active || relayCircuitClosed() ||
-      machineLastIntention().holdActive) {
-    pendingPlannedRestart = restart;
-    plannedRestartHeld = true;
-    return;
-  }
-  plannedRestartHeld = false;
-  pendingPlannedRestart = WebCommand{};
-  if (!beginMaintenanceLease(restart, false)) {
-    rejectWebCommand(restart);
-  }
+  pendingPlannedRestart = command;
+  pendingPlannedRestart.type = WebCommandType::RESTART;
+  pendingPlannedRestart.unsafeWebUiOverride = false;
+  plannedRestartHeld = true;
+  plannedRestartHeldAtMs = millis();
+  servicePendingPlannedRestart();
 }
 
 void servicePendingPlannedRestart() {
-  if (!plannedRestartHeld || maintenanceLease.active) {
-    return;
-  }
-  if (!controlAllowsConfigurationNow() || session.active ||
-      relayCircuitClosed() || machineLastIntention().holdActive) {
+  if (!plannedRestartHeld || maintenanceLease.active || plannedRestartMustWait()) {
     return;
   }
   const WebCommand restart = pendingPlannedRestart;

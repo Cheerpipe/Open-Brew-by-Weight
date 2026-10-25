@@ -505,10 +505,7 @@ function renderLineaMicraDiagnostic() {
       const parts = [];
       if (b.state) parts.push(b.state.replace(/_/g, " "));
       if (qualifier) parts.push(qualifier);
-      const left = Math.max(
-        0,
-        b.readyAtUtcSec ? b.readyAtUtcSec - Math.floor(Date.now() / 1000) : 0,
-      );
+      const left = Math.max(0, b.readyAtUtcSec ? b.readyAtUtcSec - R.deviceUtcSec() : 0);
       if ((b.state === "heating_up" || b.state === "eco") && b.readyAtUtcSec)
         parts.push(
           __WEBUI_TEXT__("diagnostic.ready_in").replace(

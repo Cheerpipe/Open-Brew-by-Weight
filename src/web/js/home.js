@@ -24,7 +24,7 @@ function micraBoilerText(lm, boiler) {
 }
 // Whole minutes until a boiler's readyAtUtcSec; zero or less once it passed.
 function minsLeft(boiler) {
-  return Math.ceil(((boiler?.readyAtUtcSec || 0) * 1000 - Date.now()) / 60000);
+  return Math.ceil(((boiler?.readyAtUtcSec || 0) - R.deviceUtcSec()) / 60);
 }
 function readyIn(mins) {
   return mins > 0 ? " · " + __WEBUI_TEXT__("home.ready_in").replace("%1", mins) : "";
@@ -127,7 +127,7 @@ function renderMachineRow(s) {
   setRowValue(
     "machineRow",
     ...(mins > 0
-      ? [mins + " min", __WEBUI_TEXT__("home.until_ready")]
+      ? [mins + __WEBUI_TEXT__("runtime.min_2"), __WEBUI_TEXT__("home.until_ready")]
       : target > 0
         ? [target + "°C", __WEBUI_TEXT__("home.brew_temperature")]
         : micraActive
@@ -315,7 +315,7 @@ function initQuickWeight() {
     ratio.firstChild.textContent = __WEBUI_TEXT__("home.dose_in").replace("%1", dose.toFixed(1));
     ratio.lastChild.textContent = "1:" + (value / 10 / dose).toFixed(1);
     zone.setAttribute("aria-valuenow", (value / 10).toFixed(1));
-    zone.setAttribute("aria-valuetext", (value / 10).toFixed(1) + " g");
+    zone.setAttribute("aria-valuetext", (value / 10).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"));
     limitMin.hidden = value > lo;
     limitMax.hidden = value < hi;
     def.textContent = (openValue / 10).toFixed(1);
@@ -531,6 +531,7 @@ function initQuickWeight() {
     const btn = $(id);
     btn.onpointerdown = (e) => {
       e.preventDefault();
+      stop();
       let n = 0;
       const step = () => {
         nudge(dir * (n > 20 ? 10 : 1));
@@ -549,8 +550,9 @@ function initQuickWeight() {
     paint();
   };
   backdrop.onclick = () => close(true);
+  // Escape cancels; Done, a backdrop tap, and a swipe down keep the value.
   sheet.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") close(true);
+    if (e.key === "Escape") close(false);
   });
   addEventListener("resize", () => {
     if (sheet.classList.contains("open")) paint();

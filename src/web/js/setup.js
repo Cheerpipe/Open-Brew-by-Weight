@@ -66,7 +66,10 @@ let bound = false,
   brewRestored = false,
   lastBrew = "none",
   apSsid = "",
-  wifiDone = "";
+  wifiDone = "",
+  // Factory (public) device password: setup asks for the owner's own.
+  factoryPassword = false,
+  configMutable = true;
 
 const formLike = (name) => name === "form" || name === "scanning";
 const polling = () => formLike(state) || state === "connecting";
@@ -246,6 +249,9 @@ async function pollStatus() {
 // finished attempt is a verdict only for the attempt this page is waiting on.
 function applyStatus(s) {
   if (s.adminUnlocked === false) return show("locked");
+  factoryPassword = s.factoryPassword === true;
+  configMutable = s.configMutable !== false;
+  $("setupDeviceWrap").hidden = !factoryPassword;
   const n = s.network || {};
   compat = s.compatibilityMode === true;
   lastBrew = n.setupBrew || "none";
@@ -342,6 +348,34 @@ function payloadFromForm() {
   };
 }
 
+// The factory password is public, so setup ends only after the owner picks
+// their own. The setup network keeps running; the new password protects
+// Admin and updates now, and the setup network from its next start.
+async function protectDevice() {
+  if (!factoryPassword) return true;
+  const password = $("setupDevicePassword").value;
+  if (password.length < 8) {
+    setStatusError(__WEBUI_TEXT__("setup.device_password_required"));
+    return false;
+  }
+  try {
+    await R.api("/api/v1/device/password", {
+      method: "POST",
+      body: R.body({ newPassword: password }),
+    });
+    for (let i = 0; i < 40 && (factoryPassword || !configMutable); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await pollStatus();
+    }
+  } catch (e) {
+    setStatusError(R.formatCommandError(__WEBUI_TEXT__("setup.device_password_failed"), e));
+    return false;
+  }
+  if (!factoryPassword) return true;
+  setStatusError(__WEBUI_TEXT__("setup.device_password_failed"));
+  return false;
+}
+
 async function connect() {
   const payload = payloadFromForm();
   const manual = $("setupHiddenToggle").checked;
@@ -359,6 +393,7 @@ async function connect() {
   }
   setStatusError("");
   clearError();
+  if (!(await protectDevice())) return;
   showConnecting(payload.ssid);
   try {
     await R.api("/api/v1/network", { method: "POST", body: R.body(payload) });
@@ -480,6 +515,7 @@ async function skipSetup() {
   skipping = true;
   setStatusError("");
   try {
+    if (!(await protectDevice())) return;
     await R.api("/api/v1/network", {
       method: "POST",
       body: R.body({ action: "skip", ...brewPayload() }),

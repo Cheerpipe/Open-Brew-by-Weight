@@ -560,18 +560,20 @@ void refreshLoopGuardsFromLastIntention(
 void pushActivatorDrivePermission(const ScaleLinkSnapshot &link) {
   serviceIdleTare();
   refreshLoopGuardsFromLastIntention(link);
-  // Compatibility bypasses brew guards, while retaining the boot/trip OFF
-  // interlock before either specialization samples and mirrors its input.
+  // A pending trip denies drive in both modes, so the mirror suppresses the
+  // current hold instead of re-closing K1 before stateMachineTask consumes it.
+  // Compatibility bypasses brew guards, while retaining the boot OFF interlock.
+  const auto relay = getRelaySafetySnapshot();
+  const bool tripPending = relay.tripped || relay.operationalTripped;
   if (firmwareCompatibilityMode()) {
-    const auto relay = getRelaySafetySnapshot();
     machineSetActivatorDriveAllowed(stopperState == StopperState::READY &&
-        !relay.tripped && !relay.operationalTripped);
+                                    !tripPending);
     return;
   }
   machineSetActivatorDriveAllowed(
-      machineWakePassthroughActive ||
-      backflushActive(stopperState) ||
-      session.active || !guardsWouldBlockActivatorDrive(loopGuardInputs));
+      !tripPending &&
+      (machineWakePassthroughActive || backflushActive(stopperState) ||
+       session.active || !guardsWouldBlockActivatorDrive(loopGuardInputs)));
 }
 
 // Grace ended without a zero. If the shot-start tare left the tared load on

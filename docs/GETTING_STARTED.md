@@ -18,16 +18,19 @@ start with [Hardware](HARDWARE.md).
    browse to **`http://192.168.4.1/setup`**. A new controller is switched off
    and leaves the machine working as usual, so the page first asks how you
    want to brew: keep it **as usual**, or **stop shots by weight** and pick a
-   starting recipe. Then choose your home network, type its password, and
-   select **Connect**. The controller
+   starting recipe. Then choose your home network, type its password, choose
+   your own **controller password**, and select **Connect**. The factory
+   password is public, so setup does not finish until you replace it; you
+   will use the new one to unlock Admin and, next time, to join the setup
+   network (your phone stays connected now). The controller
    joins your network without restarting and keeps it as soon as it gets in.
    The page then reminds you to switch your phone back to your home network
    and shows the addresses to use from now on (`<name>.local` and the
    controller's new address), each with a **Copy** button. The setup network
    stays open for about a minute so you can note them — select **Finish**
    (**Finish and restart** when you chose to stop shots by weight) when you
-   have them. No other password is asked during this flow, and the
-   setup page never asks you to **Reload**. Your brewing choice and your
+   have them. **Continue without Wi-Fi** also asks for the controller
+   password first. The setup page never asks you to **Reload**. Your brewing choice and your
    home network are saved together: once the controller keeps the network,
    it keeps your choice too, even if you close the page or lose power before
    **Finish**; if it cannot keep the network, it keeps neither.
@@ -180,7 +183,7 @@ check the preview, and save your settings. See
 
 **Settings** and **Admin** group their options into rows you tap to open. A
 closed row shows its current choice on the right, such as `18 → 36 g · 1:2.0`
-for the recipe, `Max 60 s` for time limits, your Wi-Fi network, or `Off`, so you
+for the recipe, `Max 50 s` for time limits, your Wi-Fi network, or `Off`, so you
 can check your setup at a glance. The text changes as you edit, before you save.
 While Admin is locked, its unlock row stays open so you can type the password
 right away.
@@ -227,7 +230,9 @@ according to the selected [paddle](settings/paddle.md) or
 4. For a latch/paddle installation, start with **Natural**, the default mode.
    Momentary builds show **Switch** instead; use their
    [button and sensor settings](settings/momentary.md).
-5. Leave Quick rinse off until you have tried its
+5. Check **Quick rinse**. Some machine profiles, including the La Marzocco
+   Linea Micra, ship with it on: a quick paddle ON→OFF then runs a short
+   rinse instead of starting a shot. Turn it off until you have tried its
    [gesture deliberately](settings/quick-rinse.md).
 
 ## First shot

@@ -2415,6 +2415,20 @@ void t_compatibility_trip_stays_open_until_release() {
   CHECK(getRelaySafetySnapshot().closed);
 }
 
+void t_full_mode_held_button_stays_open_after_hard_limit() {
+  resetMomentaryHarness();
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS + 1);
+  pressDown();
+  CHECK(getRelaySafetySnapshot().closed);
+  runLoopAfter(HARD_MAX_CIRCUIT_CLOSED_MS + 10);
+  CHECK(!getRelaySafetySnapshot().closed);
+  runLoopAfter(90000);
+  CHECK(!getRelaySafetySnapshot().closed);
+  releaseUp();
+  pressDown();
+  CHECK(getRelaySafetySnapshot().closed);
+}
+
 struct TestCase {
   const char *id;
   void (*function)();
@@ -2504,6 +2518,7 @@ const TestCase kTests[] = {
     {"CM10", t_compatibility_mode_mirrors_without_session},
     {"CM11", t_compatibility_boot_hold_waits_for_stable_off},
     {"CM12", t_compatibility_trip_stays_open_until_release},
+    {"CM13", t_full_mode_held_button_stays_open_after_hard_limit},
     {"P25T", t_forced_pulse_has_no_logical_side_effects},
     {"P25U", t_forced_pulse_queues_once_behind_active_pulse},
     {"P25V", t_physical_press_cancels_pending_forced_pulse},

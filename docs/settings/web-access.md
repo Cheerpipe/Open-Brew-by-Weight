@@ -35,7 +35,10 @@ save it; it shows the controller's name so you can tell controllers apart.
 
 Five wrong passwords in a row from one phone or computer pause its password
 attempts for 30 seconds, including Admin unlock and firmware updates that use
-the password. Other devices can still sign in meanwhile.
+the password. Other devices can still sign in meanwhile, unless four
+different devices are all paused at once: then every device waits until the
+oldest pause ends, so repeated wrong guesses cannot be spread across many
+devices.
 
 Up to 8 devices can be remembered at once; signing in on a ninth forgets the
 one you used least recently. Signing in with the password also unlocks Admin

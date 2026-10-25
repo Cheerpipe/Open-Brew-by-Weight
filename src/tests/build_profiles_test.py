@@ -6,6 +6,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+if not __debug__:
+    raise SystemExit("assertions are disabled (PYTHONOPTIMIZE); these checks would not run")
+
 
 ROOT = Path(__file__).resolve().parents[2]
 RESOLVER = ROOT / "scripts/resolve_build_profiles.py"
