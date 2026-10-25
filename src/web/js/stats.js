@@ -221,7 +221,8 @@ function formatShotTimeCsv(r) {
 }
 // The stop: its time, the reading latched there and, against a post-drip yield, the drip.
 function shotCut(r, m, actual) {
-  const p = m && r.endS != null && (m.dripSegs[0]?.pts[0] ?? m.pts.at(-1)),
+  const p =
+      m && r.endS != null && (m.dripSegs[0]?.pts[0] ?? m.pts.reduce((a, b) => (b.t > a.t ? b : a))),
     g = p && p.cg / 100;
   return p
     ? {

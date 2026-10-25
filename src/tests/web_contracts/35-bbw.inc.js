@@ -169,6 +169,12 @@
   assert.equal(+lines[2][43], 15.716666666666665);
   // The cut: stop time, the reading latched there, the drip to the settled yield, the drip delay.
   assert.deepEqual(lines[3].slice(-22), ['-1', '', '', '0', '', '', '0.5', '8', '28.20', '3', '0', '0', '', '0.5', '8', '', ...Array(6).fill('')]);
+  // Without a drip tail the cut is the curve's latest weight, never an event
+  // annotation such as the first drop the model appends after the readings.
+  const noTail = {endS: 2, durationS: 2, actualWeightSource: 'post_drip', dropS: 0.5, dropCg: 20,
+    wAtMs: [0, 1000, 2000], wCg: [0, 1000, 2000]};
+  assert.deepEqual(JSON.parse(JSON.stringify(context.shotCut(noTail, context.buildShotSparkModel(noTail), 20.5))),
+    {s: 2, g: 20, drip: 0.5});
   assert.deepEqual(lines[4].slice(-12), ['0','0','','0.137','1.37','','1.001','10.01','10.00','1.138','11.38','10.00']);
   records[1].wAtMs=Array.from({length:1201},(_,i)=>i*50);
   records[1].wCg=records[1].wAtMs.map(t=>t/5);
