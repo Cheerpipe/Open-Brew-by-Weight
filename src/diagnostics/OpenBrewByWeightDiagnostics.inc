@@ -250,6 +250,10 @@ void publishControlStatus() {
   next.maintenanceLeaseId = maintenanceLease.active ? maintenanceLease.id : 0;
   next.maintenanceStartedAtMs =
       maintenanceLease.active ? maintenanceLease.startedAtMs : 0;
+  next.scheduledRestartState =
+      static_cast<uint8_t>(scheduledRestartPlanner.state());
+  next.scheduledRestartCause =
+      static_cast<uint8_t>(scheduledRestartPlanner.cause());
   next.quickRevertPolicy = static_cast<uint8_t>(sessionQuickSettings.revertPolicy);
   next.quickOverrideMask = sessionQuickSettings.mask;
   next.quickRevertRemainingMs = quickRevertRemainingMs(sessionQuickSettings, millis());

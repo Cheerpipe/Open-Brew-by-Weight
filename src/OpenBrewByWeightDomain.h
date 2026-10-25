@@ -745,7 +745,15 @@ struct RuntimeConfig {
   // Retare even when no brew is active.
   bool autoTareOutsideBrew = true;
   bool ntpSyncEnabled = true;  // NTP sync master switch; Sync now still works.
+  // Daily restart at a local minute of day; fills the former tail padding.
+  uint8_t scheduledRestartEnabled = 0;
+  uint16_t scheduledRestartMinuteOfDay = 12 * 60;
 };
+
+static_assert(sizeof(RuntimeConfig) == 312 &&
+                  offsetof(RuntimeConfig, scheduledRestartEnabled) == 308 &&
+                  offsetof(RuntimeConfig, scheduledRestartMinuteOfDay) == 310,
+              "Scheduled restart fields must stay in the schema-1 tail padding");
 
 #include "domain/OpenBrewByWeightTimeZoneState.inc"
 
@@ -963,7 +971,8 @@ enum class ConfigValidationError : uint8_t {
   STOP_PULSE,
   MAX_SINGLE_PRESS,
   REED_CONFIRM_TIMEOUT,
-  SHOT_REACT_TIMEOUT
+  SHOT_REACT_TIMEOUT,
+  SCHEDULED_RESTART
 };
 
 constexpr size_t MAX_SHOT_PRESETS = 8;
@@ -1244,6 +1253,10 @@ inline ConfigValidationError validateRuntimeConfig(
        config.scaleLossFixedMs > config.operationalWallMs)) {
     return ConfigValidationError::SCALE_LOSS_FIXED;
   }
+  if (config.scheduledRestartEnabled > 1 ||
+      config.scheduledRestartMinuteOfDay >= 24 * 60) {
+    return ConfigValidationError::SCHEDULED_RESTART;
+  }
   return ConfigValidationError::NONE;
 }
 
@@ -1333,6 +1346,8 @@ inline const char *configValidationErrorName(ConfigValidationError error) {
       return "paddleMode";
     case ConfigValidationError::CUP_REMOVED_WEIGHT:
       return "cupRemovedWeightG";
+    case ConfigValidationError::SCHEDULED_RESTART:
+      return "scheduledRestartMinuteOfDay";
   }
   return "unknown";
 }
@@ -2185,8 +2200,41 @@ enum class DebugCode : uint8_t {
   MACHINE_MUX_WAIT,
   // A bounded message emitted by the application logger. This exists for
   // legacy diagnostics whose values cannot be represented by two integers.
-  LOG_TEXT
+  LOG_TEXT,
+  // Daily scheduled restart; appended so stored audit codes keep their values.
+  // argument1 is a ScheduledRestartCause, argument2 the local minute of day.
+  SCHEDULED_RESTART_ARMED,
+  SCHEDULED_RESTART_DEFERRED,
+  SCHEDULED_RESTART_FIRED,
+  SCHEDULED_RESTART_SKIPPED
 };
+
+enum class ScheduledRestartCause : uint8_t {
+  NONE = 0,
+  SHOT,                // brewing, or less than 5 min since it ended
+  UPDATE,              // firmware upload or staged image, or < 5 min since
+  UPDATE_UNCONFIRMED,  // running image not confirmed yet (restart = rollback)
+  RECENT_BOOT,         // under 30 min of uptime at the target
+  BUSY,                // maintenance or another restart in progress
+  NO_CLOCK,
+  NO_TIMEZONE,
+  CLOCK_STALE          // FIRED annotation: no NTP sync for over a day
+};
+
+inline const char *scheduledRestartCauseName(int32_t cause) {
+  switch (static_cast<ScheduledRestartCause>(cause)) {
+    case ScheduledRestartCause::NONE: return "none";
+    case ScheduledRestartCause::SHOT: return "shot";
+    case ScheduledRestartCause::UPDATE: return "update";
+    case ScheduledRestartCause::UPDATE_UNCONFIRMED: return "update_unconfirmed";
+    case ScheduledRestartCause::RECENT_BOOT: return "recent_boot";
+    case ScheduledRestartCause::BUSY: return "busy";
+    case ScheduledRestartCause::NO_CLOCK: return "no_clock";
+    case ScheduledRestartCause::NO_TIMEZONE: return "no_timezone";
+    case ScheduledRestartCause::CLOCK_STALE: return "clock_stale";
+  }
+  return "unknown";
+}
 
 // argument1 for SCALE_SCAN_STARTED / SCALE_GATT_CONNECTING.
 constexpr int32_t SCALE_SCAN_TARGET_ANY = 0;
@@ -2485,6 +2533,8 @@ inline LogLevel debugCodeDefaultLevel(DebugCode code) {
     case DebugCode::SCALE_CONNECT_ATTEMPT_FAILED:
     case DebugCode::SCALE_CONNECT_FAILED:
     case DebugCode::MACHINE_MUX_WAIT:
+    case DebugCode::SCHEDULED_RESTART_FIRED:
+    case DebugCode::SCHEDULED_RESTART_SKIPPED:
       return LogLevel::WARNING;
     case DebugCode::OTA_ROLLBACK_ARMED:
     case DebugCode::OTA_ROLLBACK_FAILED:
@@ -2560,6 +2610,12 @@ inline const char *bootSubsystemName(int32_t subsystem) {
 inline const char *debugCodeName(DebugCode code) {
   switch (code) {
     case DebugCode::LOG_TEXT: return "log text";
+    case DebugCode::SCHEDULED_RESTART_ARMED: return "scheduled restart armed";
+    case DebugCode::SCHEDULED_RESTART_DEFERRED:
+      return "scheduled restart deferred";
+    case DebugCode::SCHEDULED_RESTART_FIRED: return "scheduled restart";
+    case DebugCode::SCHEDULED_RESTART_SKIPPED:
+      return "scheduled restart skipped";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2847,6 +2903,18 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
   char weightText[24] = {};
   char offsetText[24] = {};
   switch (event.code) {
+    case DebugCode::SCHEDULED_RESTART_ARMED:
+    case DebugCode::SCHEDULED_RESTART_DEFERRED:
+    case DebugCode::SCHEDULED_RESTART_FIRED:
+    case DebugCode::SCHEDULED_RESTART_SKIPPED:
+      snprintf(message, capacity, "%s at %02ld:%02ld%s%s",
+               debugCodeName(event.code),
+               static_cast<long>(event.argument2 / 60),
+               static_cast<long>(event.argument2 % 60),
+               event.argument1 != 0 ? ": " : "",
+               event.argument1 != 0
+                   ? scheduledRestartCauseName(event.argument1) : "");
+      return true;
     case DebugCode::BOOT_BANNER:
       snprintf(message, capacity, "firmware boot (bootId=%ld)",
                static_cast<long>(event.argument1));

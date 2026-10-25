@@ -109,7 +109,9 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       jsonFieldPresent(root, "timezoneAutomatic") ||
       jsonFieldPresent(root, "ntpSyncEnabled") ||
       jsonFieldPresent(root, "ntpServerPreset") ||
-      jsonFieldPresent(root, "ntpServerCustom");
+      jsonFieldPresent(root, "ntpServerCustom") ||
+      jsonFieldPresent(root, "scheduledRestartEnabled") ||
+      jsonFieldPresent(root, "scheduledRestartMinuteOfDay");
   // Log/debug fields stay public with the Diagnostic page; the visibility
   // toggle itself always requires the Admin session.
   const bool diagnosticPagePatch =
@@ -130,6 +132,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   bool timezoneAutomatic = candidate.timezoneAutomatic != 0;
   bool browserTimezonePatch = false;
   bool soundAlertsEnabled = !candidate.soundAlertsMuted;
+  bool scheduledRestartEnabled = candidate.scheduledRestartEnabled != 0;
+  uint32_t scheduledRestartMinute = candidate.scheduledRestartMinuteOfDay;
   BullseyeMelodyConfig candidateBullseye = {};
   if (self.callbacks_.copyBullseyeConfig != nullptr) {
     self.callbacks_.copyBullseyeConfig(&candidateBullseye);
@@ -175,7 +179,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "weightOffsetBaselineG", "timezoneId", "timezoneAutoInit",
       "timezoneDetected", "timezoneAutomatic", "ntpSyncEnabled",
       "ntpServerPreset",
-      "ntpServerCustom", "scaleMacCacheMode", "preferredScaleMac", "bookooMuteOnBuzzerOnly",
+      "ntpServerCustom", "scheduledRestartEnabled", "scheduledRestartMinuteOfDay",
+      "scaleMacCacheMode", "preferredScaleMac", "bookooMuteOnBuzzerOnly",
       "bookooConnectBeepLevel", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
@@ -436,6 +441,16 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "ntpSyncEnabled") &&
              !jsonBoolean(root, "ntpSyncEnabled", candidate.ntpSyncEnabled)) {
     parseError = "ntpSyncEnabled must be a boolean.";
+  } else if (jsonFieldPresent(root, "scheduledRestartEnabled") &&
+             !jsonBoolean(root, "scheduledRestartEnabled",
+                          scheduledRestartEnabled)) {
+    parseError = "scheduledRestartEnabled must be a boolean.";
+  } else if (jsonFieldPresent(root, "scheduledRestartMinuteOfDay") &&
+             (!jsonUint32(root, "scheduledRestartMinuteOfDay",
+                          scheduledRestartMinute) ||
+              scheduledRestartMinute >= 24 * 60)) {
+    parseError =
+        "scheduledRestartMinuteOfDay must be an integer from 0 to 1439.";
   } else if (jsonFieldPresent(root, "ntpServerPreset") &&
              !jsonNtpPreset(root, "ntpServerPreset",
                             candidate.ntpServerPreset)) {
@@ -539,6 +554,9 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
                      "The time zone was already saved.");
   }
   candidate.timezoneAutomatic = timezoneAutomatic;
+  candidate.scheduledRestartEnabled = scheduledRestartEnabled ? 1 : 0;
+  candidate.scheduledRestartMinuteOfDay =
+      static_cast<uint16_t>(scheduledRestartMinute);
   if (timezoneIdPresent) {
     candidate.timezoneSource = timezoneAutoInit ? 3 :
         timezoneDetected ? (browserTimezonePatch ? 4 : 1) : 2;

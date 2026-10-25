@@ -201,7 +201,10 @@ Settings status publishes active-preset identity, both offsets, alpha baseline, 
 and evidence count together in the existing coherent control snapshot.
 
 Settings schema 1 uses the 312-byte `RuntimeConfig`, 76-byte `ShotPreset`, and
-3,056-byte settings blob. A preset stores the recipe: target, dose (reference
+3,056-byte settings blob. The scheduled restart fields (`scheduledRestartEnabled`,
+`scheduledRestartMinuteOfDay`) occupy the struct's former tail padding, so the
+golden blob still loads (as off, 00:00) and validation rejects stale non-zero
+padding instead of reading it as a schedule. A preset stores the recipe: target, dose (reference
 only), shot time window (`fastBeforeMs`/`slowAfterMs`), fast and slow side
 switches with margins relative to the target (decigrams), weight-cut delay, max
 shot time, the optional fixed scale-loss stop time, drip compensation, grind

@@ -676,9 +676,15 @@ void stateMachineTask() {
       if (!maintenanceLease.forwarded) {
         if (maintenanceLease.command.type == WebCommandType::RESTART) {
           // Shot wins: keep the planned restart and let the paddle proceed.
-          // Do not report CANCELED — the reboot still happens after idle.
-          pendingPlannedRestart = maintenanceLease.command;
-          plannedRestartHeld = true;
+          // Do not report CANCELED — the reboot still happens after idle. A
+          // scheduled restart goes back to its planner (quiet time, window).
+          if (scheduledRestartRequestId != 0 &&
+              maintenanceLease.command.requestId == scheduledRestartRequestId) {
+            scheduledRestartPlanner.aborted(millis());
+          } else {
+            pendingPlannedRestart = maintenanceLease.command;
+            plannedRestartHeld = true;
+          }
           maintenanceLease = MaintenanceLease{};
           outboundMaintenance.store(false, std::memory_order_release);
         } else {

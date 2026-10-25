@@ -153,6 +153,15 @@ per-session filter and window fields) and external BSS (the Stats chart
 scratch lives in the PSRAM network work buffer) stay inside their
 allowances. Task priorities, cadences, OTA identity and partitions are
 unchanged.
+The optional daily scheduled restart (owner-reviewed 2026-10-24: the
+once-a-second planner, its Admin config and status fields, the OTA staged
+flag, four debug codes, and the Admin section's Web UI) measures 2,472,512
+image, 2,472,395 linked and 1,665,416 flash-code bytes on the development
+Micra build, so the image, linked and flash-code allowances move to 103,120,
+103,124 and 76,408 bytes, keeping the 64-byte headroom. Rodata (646,456,
+27,584 over baseline) and DIRAM (193,510, 368 over baseline: the planner
+state) stay inside their allowances; the app partition keeps 21% free.
+Control timing, OTA identity and partitions are unchanged.
 Urgent control-gate publication and the no-scale timer's stop fade add another
 640 bytes of reviewed image/linked allowance, to 44,976 and 44,968 bytes.
 The mobile full-screen Home shot card and the Brew by Weight master toggle

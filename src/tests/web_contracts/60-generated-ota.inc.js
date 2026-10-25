@@ -641,8 +641,10 @@ if (!generated.html.includes('rel="manifest" href="/manifest.webmanifest?v=' + g
 // The Home access notice wiring in the inlined home module measures 7612,
 // owner-requested 2026-10-22. Cap raised to 7630 for the stamped asset tag.
 // − and + keys inside number fields measure 7840, owner-requested 2026-10-22; cap 7850.
-if (generated.jsGzip.length > 7850) {
-  throw new Error(`Compressed Web UI shell JS exceeds the 7850-byte gzip budget (${generated.jsGzip.length})`);
+// Wrapping keys for clock fields (Scheduled restart hours and minutes) measure 7865,
+// owner-requested 2026-10-24; cap 7880.
+if (generated.jsGzip.length > 7880) {
+  throw new Error(`Compressed Web UI shell JS exceeds the 7880-byte gzip budget (${generated.jsGzip.length})`);
 }
 // Allow fixed chart grids and adaptive axes while retaining the combined cap.
 // The activation-history table cards and type badges raise the cap to 7050.
@@ -757,8 +759,10 @@ if (generated.jsGzip.length > 7850) {
 // fallback layout: 17337, owner-requested 2026-10-24; cap 17337.
 // Shot export action menus (item hints, separator, danger item): 17411,
 // owner-requested 2026-10-25; cap 17411.
-if (generated.cssGzip.length > 17411) {
-  throw new Error(`Compressed Web CSS exceeds the 17411-byte gzip budget (${generated.cssGzip.length})`);
+// Two-field rows padded inside their separator like other rows: 17414,
+// owner-requested 2026-10-25; cap 17420.
+if (generated.cssGzip.length > 17420) {
+  throw new Error(`Compressed Web CSS exceeds the 17420-byte gzip budget (${generated.cssGzip.length})`);
 }
 // Include zero baselines and the first-drop marker without sacrificing legibility.
 // Exporting the saved weight curve as per-shot CSV columns raises the cap by 100 bytes.
@@ -1023,7 +1027,9 @@ if (generated.otaImageGzip.length > 3072) {
 // owner-requested 2026-10-23; cap 18002.
 // Shot export (v1 JSON, Gaggiuino file, Beanconqueror link, Export and card action menus)
 // measures records.js at 17961, owner-requested 2026-10-25; cap 17980 for asset-tag gzip wobble.
-const viewModuleBudgets = {records: 17980, diagnostic: 14690, admin: 18002, settings: 18430, setup: 5870};
+// The Scheduled restart section (status text, 24-hour wrapping pair, save/revert):
+// admin 18907, owner-requested 2026-10-25; cap 18920.
+const viewModuleBudgets = {records: 17980, diagnostic: 14690, admin: 18920, settings: 18430, setup: 5870};
 for (const [file, budget] of Object.entries(viewModuleBudgets)) {
   if (generated.moduleGzip[file].length > budget) {
     throw new Error(`Compressed ${file}.js exceeds the ${budget}-byte gzip budget (${generated.moduleGzip[file].length})`);
@@ -1250,8 +1256,9 @@ const coldHomeGzip = generated.gzip.length + generated.cssGzip.length +
 // autosave: 73952 (73967 with asset-tag gzip wobble), owner-requested 2026-10-24; cap 73990.
 // Shot export action menus (shared popup shell and menu styles): 74026,
 // owner-requested 2026-10-25; cap 74040.
-if (coldHomeGzip > 74040) {
-  throw new Error(`Cold Home download exceeds the 74040-byte gzip budget (${coldHomeGzip})`);
+// Wrapping keys for clock fields: 74060, owner-requested 2026-10-25; cap 74080.
+if (coldHomeGzip > 74080) {
+  throw new Error(`Cold Home download exceeds the 74080-byte gzip budget (${coldHomeGzip})`);
 }
 // The optional Web UI login brings every embedded asset together to 149453,
 // owner-requested 2026-10-22; cap 149480 for asset-tag gzip wobble. The Admin
@@ -1275,8 +1282,10 @@ if (coldHomeGzip > 74040) {
 // 2026-10-24; cap 155740.
 // Shot export (v1 JSON, Gaggiuino file, Beanconqueror link, Export and card action
 // menus): 158452, owner-requested 2026-10-25; cap 158480 for asset-tag gzip wobble.
-if (generated.combined > 158480) {
-  throw new Error(`Combined Web UI gzip exceeds the 158480-byte flash budget (${generated.combined})`);
+// The Admin Scheduled restart section with wrapping clock fields (the approved
+// admin, shell and CSS raises): 159393, owner-requested 2026-10-25; cap 159420.
+if (generated.combined > 159420) {
+  throw new Error(`Combined Web UI gzip exceeds the 159420-byte flash budget (${generated.combined})`);
 }
 if (!network.includes('#include "OpenBrewByWeightWebAssetsGzip.h"') ||
     network.includes('#include "OpenBrewByWeightWebAssets.h"')) {

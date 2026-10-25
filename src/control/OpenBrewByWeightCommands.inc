@@ -275,6 +275,9 @@ void processWebCommand(const WebCommand &command) {
       candidate.ntpServerPreset = command.config.ntpServerPreset;
       memcpy(candidate.ntpServerCustom, command.config.ntpServerCustom,
              sizeof(candidate.ntpServerCustom));
+      candidate.scheduledRestartEnabled = command.config.scheduledRestartEnabled;
+      candidate.scheduledRestartMinuteOfDay =
+          command.config.scheduledRestartMinuteOfDay;
       if (candidate.scaleMacCacheMode != command.config.scaleMacCacheMode) {
         serialTracef(LogLevel::INFO, "Scale preference: %s",
                      scaleMacCacheModeId(command.config.scaleMacCacheMode));

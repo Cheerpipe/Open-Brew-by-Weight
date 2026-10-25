@@ -457,6 +457,59 @@ void servicePendingPlannedRestart() {
   }
 }
 
+// Once a second the planner picks the moment; the restart then takes the
+// planned-restart lease like an Admin restart, after the durable audit log
+// has written the FIRED record (the flush pauses under a lease).
+void serviceScheduledRestart() {
+  const uint32_t now = millis();
+  const bool firing =
+      scheduledRestartPlanner.state() == ScheduledRestartState::FIRING;
+  if (!firing && elapsedMs(scheduledRestartStepAtMs) < 1000) return;
+  scheduledRestartStepAtMs = now;
+  const TimeStatusSnapshot clock = g_wallClock.snapshot(now);
+  ScheduledRestartInput in;
+  in.enabled = runtimeConfig.scheduledRestartEnabled != 0;
+  in.minuteOfDay = runtimeConfig.scheduledRestartMinuteOfDay;
+  in.zone = runtimeConfig.timezoneId;
+  in.utcSec = clock.utcSec;
+  in.clockStale = clock.state == TimeSyncState::STALE;
+  in.nowMs = now;
+  in.shotActive = session.active || relayCircuitClosed() ||
+                  machineLastIntention().holdActive;
+  readScheduledRestartOta(in);
+  in.busy = !controlAllowsConfigurationNow() || maintenanceLease.active ||
+            plannedRestartHeld || safeRestartPending();
+  const ScheduledRestartLog log = scheduledRestartPlanner.step(in);
+  if (log.emit) {
+    addDebugEvent(DebugCategory::SYSTEM, log.code,
+                  static_cast<int32_t>(log.cause), in.minuteOfDay);
+    if (log.code == DebugCode::SCHEDULED_RESTART_FIRED) {
+      scheduledRestartFiredAtMs = now;
+    }
+  }
+  if (scheduledRestartPlanner.state() != ScheduledRestartState::FIRING) return;
+  if (elapsedMs(scheduledRestartFiredAtMs) < 10000) {
+    TaskLockGuard lock(debugLogMutex);
+    if (auditLog.hasPending()) return;
+  }
+  WebCommand restart;
+  restart.type = WebCommandType::RESTART;
+  restart.requestId = nextInternalRequestId++;
+  scheduledRestartRequestId = restart.requestId;
+  holdOrBeginPlannedRestart(restart);
+  if (maintenanceLease.active && maintenanceLease.id == restart.requestId) {
+    scheduledRestartPlanner.submitted();
+    return;
+  }
+  // Never left to the generic hold, which would restart right after a shot.
+  if (plannedRestartHeld &&
+      pendingPlannedRestart.requestId == restart.requestId) {
+    plannedRestartHeld = false;
+    pendingPlannedRestart = WebCommand{};
+  }
+  scheduledRestartPlanner.aborted(now);
+}
+
 void holdOrBeginResetHistoryClear(const WebCommand &command) {
   if (resetHistoryClearHeld) {
     rejectWebCommand(command);

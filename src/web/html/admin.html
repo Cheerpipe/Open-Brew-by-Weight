@@ -35,6 +35,9 @@
   <symbol id="g-restart" viewBox="0 0 24 24">
     <path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 4v4.5h4.5" />
   </symbol>
+  <symbol id="g-schedule" viewBox="0 0 24 24">
+    <path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 4v4.5h4.5M12 8v4l2.5 1.5" />
+  </symbol>
   <symbol id="g-update" viewBox="0 0 24 24">
     <path d="M12 15V3m-4 8 4 4 4-4M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
   </symbol>
@@ -616,6 +619,68 @@
         </button>
       </div>
     </div>
+  </details>
+  <details id="scheduledRestartPanel" data-g="schedule" class="cfgGroup">
+    <summary>{{webui:admin.scheduled_restart}}</summary>
+    <label
+      ><input id="scheduledRestartEnabled" type="checkbox" role="switch" />
+      {{webui:admin.scheduled_restart_enabled}}<small class="fieldHint"
+        >{{webui:admin.scheduled_restart_hint}}</small
+      ></label
+    >
+    <div class="windowField">
+      <span>{{webui:admin.scheduled_restart_time}}</span>
+      <div class="windowPair">
+        <label
+          ><input
+            id="scheduledRestartHour"
+            type="number"
+            min="0"
+            max="23"
+            step="1"
+            data-wrap
+            required
+            aria-label="{{webui:admin.scheduled_restart_hour}}" /></label
+        ><span>:</span
+        ><label
+          ><input
+            id="scheduledRestartMinute"
+            type="number"
+            min="0"
+            max="59"
+            step="1"
+            data-wrap
+            required
+            aria-label="{{webui:admin.scheduled_restart_minute}}"
+        /></label>
+      </div>
+      <small id="scheduledRestartStatus" class="fieldHint" role="status" aria-live="polite"></small>
+    </div>
+    <div class="btnBar">
+      <button
+        id="saveScheduledRestartButton"
+        class="btnGlyph mutable btnInvert"
+        data-dirty="0"
+        disabled
+        type="button"
+      >
+        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        ><span class="t">{{webui:admin.save_scheduled_restart}}</span></button
+      ><button
+        id="revertScheduledRestartButton"
+        class="btnGlyph mutable btnRevert"
+        data-dirty="0"
+        disabled
+        title="{{webui:runtime.revert_unsaved_changes}}"
+        aria-label="{{webui:runtime.revert_unsaved_changes}}"
+        type="button"
+      >
+        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+      </button>
+    </div>
+    <small id="scheduledRestartDirtyHint" class="warn hidden"
+      >{{webui:admin.unsaved_changes}}</small
+    >
   </details>
   <details id="restartPanel" data-g="restart" class="cfgGroup">
     <summary>{{webui:admin.restart}}</summary>

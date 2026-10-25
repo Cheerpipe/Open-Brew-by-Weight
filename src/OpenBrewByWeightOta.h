@@ -232,6 +232,7 @@ struct OtaPublishedState {
   bool pendingVerify = false;
   bool confirmed = false;
   bool rejected = false;
+  bool imagePending = false;  // STAGED or COMMITTED, waiting for its restart
 };
 
 // Transport hooks supplied by the HTTP layer. Keeping them as plain function

@@ -670,8 +670,9 @@ const jsBytes = Buffer.byteLength(allJs, 'utf8');
 // Settings group rows (icon sprite and group keys for the summaries): measured 102184, owner-requested 2026-10-22.
 // Admin sections as collapsible group rows (icon sprite, details for the panels): measured 104225, owner-requested 2026-10-22.
 // Diagnostics sections as collapsible rows with icons (sprite, details markup): measured 107310, owner-requested 2026-10-22.
-if (htmlBytes > 107310) {
-  throw new Error(`Web UI HTML source exceeds the authoring budget (${htmlBytes} > 107310)`);
+// Admin Scheduled restart section (switch, 24-hour time pair, status, save/revert): measured 108304, owner-requested 2026-10-25.
+if (htmlBytes > 108304) {
+  throw new Error(`Web UI HTML source exceeds the authoring budget (${htmlBytes} > 108304)`);
 }
 // Resumable OTA hashes File slices incrementally in a lazy module so it never
 // retains a full firmware image or charges the normal runtime path for it.
@@ -976,8 +977,10 @@ if (htmlBytes > 107310) {
 // owner-requested 2026-10-24.
 // Shot export (v1 JSON, Gaggiuino file, Beanconqueror link, the shared popup
 // shell, and the card's actions menu): measured 539923, owner-requested 2026-10-25.
-if (jsBytes > 539923) {
-  throw new Error(`Web UI JS source exceeds the authoring budget (${jsBytes} > 539923)`);
+// Admin Scheduled restart section (status text, two-digit wrapping time
+// fields, save/revert): +3943 (measured 543866), owner-requested 2026-10-25.
+if (jsBytes > 543866) {
+  throw new Error(`Web UI JS source exceeds the authoring budget (${jsBytes} > 543866)`);
 }
 // Sharing the brand wordmark selectors between the header, the loading view,
 // and the inactive overlay pays for the added shell markup.
@@ -1153,8 +1156,9 @@ if (jsBytes > 539923) {
 // measured 631575, owner-requested 2026-10-24. Quick Settings autosave: measured
 // 634028, owner-requested 2026-10-24.
 // Shot export menus and formats: measured 646557, owner-requested 2026-10-25.
-if (htmlBytes + jsBytes > 646557) {
-  throw new Error(`Web UI HTML+JS source exceeds the combined authoring budget (${htmlBytes + jsBytes} > 646557)`);
+// Admin Scheduled restart section: +5656 (measured 652170), owner-requested 2026-10-25.
+if (htmlBytes + jsBytes > 652170) {
+  throw new Error(`Web UI HTML+JS source exceeds the combined authoring budget (${htmlBytes + jsBytes} > 652170)`);
 }
 if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !codeIncludes(ui, 'id="dActivator"') || !codeIncludes(ui, 'firstDropBeep') ||

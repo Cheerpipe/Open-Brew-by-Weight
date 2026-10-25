@@ -27,6 +27,9 @@ The first stable release.
   rollback.
 - **Web UI password:** optional sign-in for the Web UI, remembered devices,
   and protection against look-alike web addresses.
+- **Scheduled restart:** an optional daily restart at a local time you choose
+  in Admin. It waits for shots and firmware updates, skips the day rather
+  than interrupting you, and records each restart in the audit log.
 
 **Installing 1.0.0 over an earlier development build** needs one USB
 installation with `--erase-all`: version 1.0.0 uses a new storage layout, so

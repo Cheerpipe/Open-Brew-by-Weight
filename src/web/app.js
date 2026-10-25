@@ -50,7 +50,8 @@ function fetchView(name) {
 }
 const viewFails = {};
 // Number fields get − and + keys for touch and mouse; a tap (not a scroll)
-// steps on click; holding one repeats.
+// steps on click; holding one repeats. data-wrap fields (clock hours and
+// minutes) roll over from max to min and back instead of stopping.
 // The field keeps its arrow keys, so the keys stay out of the tab order.
 function addNumberKeys(root) {
   root.querySelectorAll('input[type="number"]').forEach((f) => {
@@ -62,7 +63,9 @@ function addNumberKeys(root) {
       const b = document.createElement("button");
       let timer;
       const step = () => {
-        up ? f.stepUp() : f.stepDown();
+        if (f.dataset.wrap != null && +f.value === +(up ? f.max : f.min))
+          f.value = up ? f.min : f.max;
+        else up ? f.stepUp() : f.stepDown();
         f.dispatchEvent(new Event("input", { bubbles: true }));
         f.dispatchEvent(new Event("change", { bubbles: true }));
       };

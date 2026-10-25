@@ -4085,7 +4085,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   stroke-linecap: round;
 }
 .windowField {
-  margin: 0.75rem 0;
+  padding: 0.75rem 0;
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.35;

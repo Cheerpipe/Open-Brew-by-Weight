@@ -23,6 +23,8 @@ struct ControlStatusFields : ScaleLinkMetrics {
   bool maintenanceLeaseActive = false;
   uint32_t maintenanceLeaseId = 0;
   uint32_t maintenanceStartedAtMs = 0;
+  uint8_t scheduledRestartState = 0;  // ScheduledRestartState
+  uint8_t scheduledRestartCause = 0;  // ScheduledRestartCause
   // Quick Settings Duration: policy, live overrides, time left.
   uint8_t quickRevertPolicy = 0;
   uint8_t quickOverrideMask = 0;  // one bit per QuickSettingField

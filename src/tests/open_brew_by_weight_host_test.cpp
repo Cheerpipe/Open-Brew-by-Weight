@@ -246,6 +246,12 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   maintenanceLease = MaintenanceLease{};
   plannedRestartHeld = false;
   pendingPlannedRestart = WebCommand{};
+  scheduledRestartPlanner = ScheduledRestartPlanner{};
+  scheduledRestartRequestId = 0;
+  scheduledRestartStepAtMs = 0;
+  scheduledRestartFiredAtMs = 0;
+  hostOtaUpdateActive = false;
+  hostOtaImageConfirmed = true;
   resetHistoryClearHeld = false;
   pendingResetHistoryClear = WebCommand{};
   maintenanceCancellationCommand = WebCommand{};
@@ -7190,6 +7196,51 @@ void r22_confirmed_implausible_weight_does_not_stop() {
   loop();
   CHECK(stopperState == StopperState::BREW);
   CHECK(getRelaySafetySnapshot().closed);
+}
+
+// The scheduled restart takes the planned-restart lease once the FIRED audit
+// record is drained; a paddle press during the lease hands it back to the
+// planner (5 quiet minutes, 30-minute window) instead of the generic hold.
+void w20c_scheduled_restart_uses_the_planned_restart_lease() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  runtimeConfig.scheduledRestartEnabled = 1;
+  runtimeConfig.scheduledRestartMinuteOfDay = 720;
+  copyCString(runtimeConfig.timezoneId, sizeof(runtimeConfig.timezoneId),
+              "Etc/UTC");
+  runLoopAfter(SCHEDULED_RESTART_MIN_UPTIME_MS);
+  constexpr uint32_t noon = 1768046400U;  // 2026-01-10 12:00 UTC
+  g_wallClock.setSyncing("pool.ntp.org", hostMillis);
+  g_wallClock.queueSyncFromCallback(noon - 60);
+  CHECK(g_wallClock.applyPendingSync(hostMillis));
+  runLoopAfter(1000);
+  CHECK(debugEventExists(DebugCode::SCHEDULED_RESTART_ARMED, 0, 720));
+  runLoopAfter(60000);
+  CHECK(debugEventExists(DebugCode::SCHEDULED_RESTART_FIRED, 0, 720));
+  CHECK(!maintenanceLease.active);  // the durable record is still pending
+  {
+    TaskLockGuard lock(debugLogMutex);
+    CHECK(auditLog.hasPending());
+    auditLog.clear();
+  }
+  runLoopAfter(1);
+  CHECK(maintenanceLease.active &&
+        maintenanceLease.command.type == WebCommandType::RESTART &&
+        maintenanceLease.command.requestId == scheduledRestartRequestId);
+  CHECK(publishedControlStatus.scheduledRestartState ==
+            static_cast<uint8_t>(ScheduledRestartState::SUBMITTED) ||
+        scheduledRestartPlanner.state() == ScheduledRestartState::SUBMITTED);
+
+  setRawPaddle(true);
+  CHECK(!maintenanceLease.active);
+  CHECK(!plannedRestartHeld);
+  CHECK(scheduledRestartPlanner.state() == ScheduledRestartState::PENDING);
+  setRawPaddle(false);
+  runLoopAfter(1000);
+  CHECK(debugEventExists(
+      DebugCode::SCHEDULED_RESTART_DEFERRED,
+      static_cast<int32_t>(ScheduledRestartCause::SHOT), 720));
+  CHECK(!maintenanceLease.active && !plannedRestartHeld);
 }
 
 void r23_maintenance_is_canceled_fail_open_by_physical_paddle() {
@@ -22401,6 +22452,7 @@ const TestCase testCases[] = {
     {"W19", w19_web_start_is_rejected_outside_ready},
     {"W20", w20_restart_waits_while_active},
     {"W20b", w20b_planned_esp_restart_waits_for_shot},
+    {"W20c", w20c_scheduled_restart_uses_the_planned_restart_lease},
     {"W21", w21_network_change_is_rejected_while_active},
     {"W22", w22_timer_only_disables_predictive_stop},
     {"W23", w23_combined_tare_command_uses_cycle_snapshot},

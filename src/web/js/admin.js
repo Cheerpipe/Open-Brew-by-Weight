@@ -852,6 +852,7 @@ function applyAdminStatus(s) {
   $("restartButton").disabled = !R.controlsMutable;
   applyOtaStatus(s.ota);
   loadAdminConfig(s.config);
+  loadScheduledRestart(s.config);
   if (!R.uiState.dateTimeDirty)
     R.uiState.dateTimeBaseline = R.snapshotControls(
       document.querySelectorAll(
@@ -1627,6 +1628,85 @@ async function saveFrontendSettings() {
   }
   return ok;
 }
+// Scheduled restart: two 24-hour fields stored as one minute of the day.
+const pad2 = (v) => String(v).padStart(2, "0");
+const restartMinute = () =>
+  Number($("scheduledRestartHour").value) * 60 + Number($("scheduledRestartMinute").value);
+const restartTime = (m) => pad2(Math.floor(m / 60)) + ":" + pad2(m % 60);
+const RESTART_WAIT = {
+  shot: __WEBUI_TEXT__("admin.scheduled_restart_wait_shot"),
+  update: __WEBUI_TEXT__("admin.scheduled_restart_wait_update"),
+  update_unconfirmed: __WEBUI_TEXT__("admin.scheduled_restart_wait_update"),
+  busy: __WEBUI_TEXT__("admin.scheduled_restart_wait_busy"),
+};
+function scheduledRestartStatus(c) {
+  if (!c.scheduledRestartEnabled) return "";
+  const at = restartTime(c.scheduledRestartMinuteOfDay);
+  switch (c.scheduledRestartState) {
+    case "armed":
+      return R.sub(__WEBUI_TEXT__("admin.scheduled_restart_next"), [at]);
+    case "pending":
+      return R.sub(RESTART_WAIT[c.scheduledRestartCause] || RESTART_WAIT.busy, [at]);
+    case "restarting":
+      return __WEBUI_TEXT__("admin.scheduled_restart_now");
+    case "no_timezone":
+      return __WEBUI_TEXT__("admin.scheduled_restart_no_timezone");
+    default:
+      return __WEBUI_TEXT__("admin.scheduled_restart_no_clock");
+  }
+}
+function loadScheduledRestart(c) {
+  if (!c || !$("scheduledRestartEnabled") || typeof c.scheduledRestartMinuteOfDay !== "number")
+    return;
+  if (!R.uiState.scheduledRestartDirty) {
+    $("scheduledRestartEnabled").checked = !!c.scheduledRestartEnabled;
+    $("scheduledRestartHour").value = pad2(Math.floor(c.scheduledRestartMinuteOfDay / 60));
+    $("scheduledRestartMinute").value = pad2(c.scheduledRestartMinuteOfDay % 60);
+    R.uiState.scheduledRestartBaseline = R.snapshotControls(
+      document.querySelectorAll("#scheduledRestartPanel input"),
+    );
+  }
+  $("scheduledRestartStatus").textContent = R.uiState.scheduledRestartDirty
+    ? ""
+    : scheduledRestartStatus(c);
+}
+async function saveScheduledRestart() {
+  if (!R.uiState.scheduledRestartDirty) return;
+  for (const id of ["scheduledRestartHour", "scheduledRestartMinute"]) {
+    const el = $(id);
+    if (!el.checkValidity() || el.value === "") {
+      R.message(__WEBUI_TEXT__("admin.scheduled_restart_invalid_time"), "error");
+      el.focus();
+      return false;
+    }
+  }
+  const b = $("saveScheduledRestartButton");
+  b.classList.add("busy");
+  try {
+    await R.withCommandGate(async () => {
+      const p = R.withBaseRev({
+          scheduledRestartEnabled: $("scheduledRestartEnabled").checked,
+          scheduledRestartMinuteOfDay: restartMinute(),
+        }),
+        a = await R.api("/api/v1/config", { method: "POST", body: R.body(p) });
+      await waitSaved(
+        a.requestId,
+        __WEBUI_TEXT__("admin.scheduled_restart_setting"),
+        p,
+        "scheduledRestartMinuteOfDay",
+      );
+      R.message(__WEBUI_TEXT__("admin.setting_saved"), "ok");
+    });
+    sectionDirty("scheduledRestart", false);
+    return true;
+  } catch (e) {
+    R.message(e.message, "error");
+    return false;
+  } finally {
+    b.classList.remove("busy");
+    R.refreshStatus();
+  }
+}
 // Each Admin section row summarizes its current values; keys are the
 // sections' data-g names.
 const onOff = (id) =>
@@ -1642,6 +1722,10 @@ const ADMIN_SUMMARIES = {
       .pop()
       .replaceAll("_", " "),
   frontend: () => R.sub(__WEBUI_TEXT__("admin.sum_theme"), [$("uiTheme").selectedOptions[0].text]),
+  schedule: () =>
+    $("scheduledRestartEnabled").checked
+      ? restartTime(restartMinute())
+      : onOff("scheduledRestartEnabled"),
   webhooks: () => onOff("webhookEnabled"),
   events: () => {
     const n = ["webhookBrewState", "webhookFirstDrop", "webhookEnd"].filter(
@@ -1674,8 +1758,15 @@ export function init() {
       el.addEventListener("change", mark);
     });
   };
-  for (const name of ["ble", "power", "frontend"])
+  for (const name of ["ble", "power", "frontend", "scheduledRestart"])
     sectionChanged("#" + name + "Panel", () => sectionDirty(name, true));
+  // Two-digit hours and minutes once a value settles (stepper keys or blur).
+  for (const id of ["scheduledRestartHour", "scheduledRestartMinute"])
+    $(id).addEventListener("change", (e) => {
+      if (e.target.value !== "" && e.target.checkValidity()) e.target.value = pad2(e.target.value);
+    });
+  $("saveScheduledRestartButton").onclick = saveScheduledRestart;
+  $("revertScheduledRestartButton").onclick = () => revertSection("scheduledRestart");
   $("saveBleButton").onclick = saveBleSettings;
   $("revertBleButton").onclick = () => revertSection("ble");
   $("savePowerButton").onclick = savePowerSettings;

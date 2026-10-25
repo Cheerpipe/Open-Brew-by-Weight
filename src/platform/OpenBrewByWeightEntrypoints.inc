@@ -820,6 +820,7 @@ void loop() {
       (powerIntention.turnedOn || powerIntention.turnedOff), loopScaleLink);
   servicePendingResetHistoryClear();
   servicePendingPlannedRestart();
+  serviceScheduledRestart();
   finishLoopPhase(LoopPhase::COMMANDS_POWER_RESTART);
   if (controlHousekeepingDue(loopStartedAtMs)) {
     serviceSerialLogDump();

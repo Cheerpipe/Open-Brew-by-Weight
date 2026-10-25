@@ -46,11 +46,13 @@
   const adminUi = viewJs.admin, normalizedUi = ui.replace(/\\"/g, '"');
   for (const id of ['saveWebhookButton',
     'saveNetworkButton', 'saveDateTimeButton', 'changeDevicePasswordButton',
-    'saveFirmwareModeButton', 'saveBleButton', 'savePowerButton', 'saveFrontendButton'])
+    'saveFirmwareModeButton', 'saveBleButton', 'savePowerButton', 'saveFrontendButton',
+    'saveScheduledRestartButton'])
     assert(new RegExp(`id="${id}"[^>]*data-dirty="0"[^>]*disabled`).test(normalizedUi),
         `${id} must start visibly disabled`);
   for (const id of ['revertWebhookButton', 'revertNetworkButton', 'revertDateTimeButton', 'revertDevicePasswordButton',
-    'revertFirmwareModeButton', 'revertBleButton', 'revertPowerButton', 'revertFrontendButton'])
+    'revertFirmwareModeButton', 'revertBleButton', 'revertPowerButton', 'revertFrontendButton',
+    'revertScheduledRestartButton'])
     assert(new RegExp(`id="${id}"[^>]*data-dirty="0"[^>]*disabled`).test(normalizedUi),
         `${id} must start visibly disabled next to its save button`);
   // Settings saves every edit by itself: no Save/Revert button or unsaved hint.
@@ -68,7 +70,7 @@
          codeIncludes(adminUi, "R.command('/api/v1/network',payload,undefined,undefined,undefined,'saveNetworkButton',).then((ok)=>{if(!ok)return") &&
          codeIncludes(adminUi, "R.command('/api/v1/device/password',{newPassword:") &&
          // Every Admin section marks itself dirty through one named helper.
-         codeIncludes(adminUi, "for(const name of['ble','power','frontend'])sectionChanged('#'+name+'Panel',()=>sectionDirty(name,true))") &&
+         codeIncludes(adminUi, "for(const name of['ble','power','frontend','scheduledRestart'])sectionChanged('#'+name+'Panel',()=>sectionDirty(name,true))") &&
          codeIncludes(adminUi, "R.setSaveDirty('save'+name[0].toUpperCase()+name.slice(1)+'Button',name+'DirtyHint',on)") &&
          codeIncludes(adminUi, "const b=$('savePowerButton');b.classList.add('busy')") &&
          css.includes('.btnGlyph:disabled{opacity:.4;cursor:not-allowed}'),

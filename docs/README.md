@@ -34,6 +34,7 @@ needed rather than reading the entire directory.
 | Network | [Wi-Fi](settings/wifi.md) / [access point](settings/ap.md) / [device name](settings/wifi.md#discovery-by-name) / [Web UI access](settings/web-access.md) |
 | Energy | [Power management](settings/power-management.md) |
 | Interface | [Theme](settings/theme.md) / [shot card colors](settings/theme.md#shot-card-colors) |
+| Maintenance | [Scheduled restart](settings/scheduled-restart.md) |
 | Reset | [Factory reset](settings/factory-reset.md) / [firmware mode](settings/firmware-mode.md) |
 
 ## Developer map

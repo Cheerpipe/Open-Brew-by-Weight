@@ -69,6 +69,7 @@ constexpr uint32_t OTA_PUBLISHED_BUSY = 1U << 1;
 constexpr uint32_t OTA_PUBLISHED_PENDING_VERIFY = 1U << 2;
 constexpr uint32_t OTA_PUBLISHED_CONFIRMED = 1U << 3;
 constexpr uint32_t OTA_PUBLISHED_REJECTED = 1U << 4;
+constexpr uint32_t OTA_PUBLISHED_IMAGE_PENDING = 1U << 5;
 std::atomic<uint32_t> otaAbortFailures{0};
 std::atomic<uint32_t> otaJournalFailures{0};
 
@@ -296,6 +297,7 @@ OtaPublishedState OpenBrewByWeightOta::publishedState() const {
   state.pendingVerify = (flags & OTA_PUBLISHED_PENDING_VERIFY) != 0;
   state.confirmed = (flags & OTA_PUBLISHED_CONFIRMED) != 0;
   state.rejected = (flags & OTA_PUBLISHED_REJECTED) != 0;
+  state.imagePending = (flags & OTA_PUBLISHED_IMAGE_PENDING) != 0;
   return state;
 }
 
@@ -306,6 +308,9 @@ void OpenBrewByWeightOta::publishState() {
   if (pendingVerify_) flags |= OTA_PUBLISHED_PENDING_VERIFY;
   if (confirmed_) flags |= OTA_PUBLISHED_CONFIRMED;
   if (rejected_) flags |= OTA_PUBLISHED_REJECTED;
+  if (state_ == OtaState::STAGED || state_ == OtaState::COMMITTED) {
+    flags |= OTA_PUBLISHED_IMAGE_PENDING;
+  }
   publishedFlags_.store(flags, std::memory_order_release);
   (void)snapshotLocked();
 }

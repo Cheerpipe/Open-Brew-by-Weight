@@ -30,6 +30,7 @@ endfunction()
 host_test(power_policy_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
   LABEL "host;control;concurrency")
 host_test(timezone_host_test LABEL "host;time")
+host_test(scheduled_restart_host_test LABEL "host;control;time")
 host_test(ble_runtime_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_BLE_RUNTIME_HOST_TEST
   LABEL "host;ble;concurrency")
 target_include_directories(ble_runtime_host_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")

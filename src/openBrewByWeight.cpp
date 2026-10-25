@@ -120,6 +120,7 @@ HWCDC openBrewByWeightUsbConsole;
 #include "OpenBrewByWeightShotCurve.h"
 #include "OpenBrewByWeightLastShot.h"
 #include "OpenBrewByWeightTime.h"
+#include "OpenBrewByWeightScheduledRestart.h"
 #include "OpenBrewByWeightWatchdog.h"
 #include "OpenBrewByWeightHwmon.h"
 #include "OpenBrewByWeightTaskProfiler.h"
@@ -578,10 +579,30 @@ bool maintenanceCancellationPending = false;
 // running. The paddle is never blocked; the restart proceeds once idle.
 bool plannedRestartHeld = false;
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebCommand pendingPlannedRestart;
+// Daily scheduled restart; its internal request id marks the lease it owns.
+ScheduledRestartPlanner scheduledRestartPlanner;
+uint32_t scheduledRestartRequestId = 0;
+uint32_t scheduledRestartStepAtMs = 0;
+uint32_t scheduledRestartFiredAtMs = 0;
 bool resetHistoryClearHeld = false;
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebCommand pendingResetHistoryClear;
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebCommand controlResultCommand;
 bool controlResultPending = false;
+#ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
+bool hostOtaUpdateActive = false;
+bool hostOtaImageConfirmed = true;
+#endif
+// Lock-free read of the OTA publication for the scheduled restart gates.
+void readScheduledRestartOta(ScheduledRestartInput &in) {
+#ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
+  in.updateActive = hostOtaUpdateActive;
+  in.imageConfirmed = hostOtaImageConfirmed;
+#else
+  const OtaPublishedState ota = OpenBrewByWeightOta::instance().publishedState();
+  in.updateActive = ota.busy || ota.imagePending;
+  in.imageConfirmed = ota.confirmed;
+#endif
+}
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
 bool hostForwardAcceptedNetworkCommandSucceeds = true;
 uint32_t hostForwardAcceptedNetworkCommandCalls = 0;

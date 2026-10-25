@@ -300,7 +300,9 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         "\"firstTimezoneAutoBootId\":%lu,\"firstTimezoneAutoClockQuality\":%u,"
         "\"ntpServerPreset\":\"%s\",\"ntpSyncEnabled\":%s,"
         "\"ntpServerCustom\":\"%s\",\"showDiagnosticPage\":%s,\"powerManagementEnabled\":%s,"
-        "\"persistPending\":%s,\"persistFailed\":%s",
+        "\"persistPending\":%s,\"persistFailed\":%s,"
+        "\"scheduledRestartEnabled\":%s,\"scheduledRestartMinuteOfDay\":%u,"
+        "\"scheduledRestartState\":\"%s\",\"scheduledRestartCause\":\"%s\"",
         static_cast<unsigned>(control.config.timezoneSource),
         static_cast<unsigned long>(control.config.firstTimezoneAutoUtcSec),
         static_cast<unsigned long long>(control.config.firstTimezoneAutoUptimeUs),
@@ -311,7 +313,12 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         control.config.showDiagnosticPage ? "true" : "false",
         control.config.powerManagementEnabled ? "true" : "false",
         control.configPersistPending ? "true" : "false",
-        control.configPersistFailed ? "true" : "false");
+        control.configPersistFailed ? "true" : "false",
+        control.config.scheduledRestartEnabled != 0 ? "true" : "false",
+        static_cast<unsigned>(control.config.scheduledRestartMinuteOfDay),
+        scheduledRestartStateName(
+            static_cast<ScheduledRestartState>(control.scheduledRestartState)),
+        scheduledRestartCauseName(control.scheduledRestartCause));
   }
 
   if (ok && page == StatusPage::Settings) {

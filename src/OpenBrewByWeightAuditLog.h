@@ -26,6 +26,8 @@ constexpr DebugCode AUDIT_WARNING_ALLOWLIST[] = {
     DebugCode::OTA_FLASH_COMMITTED,
     DebugCode::OTA_ROLLBACK_ARMED,
     DebugCode::OTA_ROLLBACK_FAILED,
+    DebugCode::SCHEDULED_RESTART_FIRED,
+    DebugCode::SCHEDULED_RESTART_SKIPPED,
 };
 
 // Rare DEBUG events admitted only during an opt-in verbose audit session:

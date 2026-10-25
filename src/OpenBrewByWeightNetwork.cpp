@@ -17,6 +17,7 @@
 #include "OpenBrewByWeightPsram.h"
 #include "OpenBrewByWeightRecovery.h"
 #include "OpenBrewByWeightResetGuard.h"
+#include "OpenBrewByWeightScheduledRestart.h"
 #include "OpenBrewByWeightCrashArchive.h"
 #include "OpenBrewByWeightSerialCli.h"
 #include "OpenBrewByWeightScaleWorker.h"
@@ -554,6 +555,8 @@ const char *configValidationMessage(ConfigValidationError error) {
       return "Reed confirm timeout must be from 0.2 to 5 s.";
     case ConfigValidationError::SHOT_REACT_TIMEOUT:
       return "Shot reaction timeout must be 0 (compiled default) or from 3 to 30 s.";
+    case ConfigValidationError::SCHEDULED_RESTART:
+      return "Scheduled restart time must be from 00:00 to 23:59.";
   }
   return "Invalid configuration.";
 }

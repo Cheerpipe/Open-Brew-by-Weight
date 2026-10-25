@@ -59,6 +59,8 @@ void p01_defaults_are_valid() {
   CHECK(settings.staWifiSleep);
   CHECK(!settings.runtime.showDiagnosticPage);
   CHECK(settings.runtime.ntpSyncEnabled);
+  CHECK(settings.runtime.scheduledRestartEnabled == 0);
+  CHECK(settings.runtime.scheduledRestartMinuteOfDay == 720);
   CHECK(settings.runtime.timezoneAutomatic == 1);
   CHECK(settings.runtime.autoTareOutsideBrew);
   CHECK(idleAccessoryRetareEnabled(settings.runtime.noScaleBbwMode));
@@ -2452,6 +2454,24 @@ void p86_timezone_preference_and_durable_initialization() {
   CHECK(savePersistedSettings(settings));
   CHECK(loadPersistedSettings(loaded));
   CHECK(loaded.runtime.ntpSyncEnabled);
+  settings.runtime.scheduledRestartEnabled = 1;
+  settings.runtime.scheduledRestartMinuteOfDay = 1439;
+  CHECK(savePersistedSettings(settings));
+  CHECK(loadPersistedSettings(loaded));
+  CHECK(loaded.runtime.scheduledRestartEnabled == 1 &&
+        loaded.runtime.scheduledRestartMinuteOfDay == 1439);
+  // Stale tail padding from an older blob must not read as a schedule.
+  for (const auto corrupt : {0, 1}) {
+    resetHostPersistence();
+    PersistedSettings raw = settings;
+    if (corrupt == 0) raw.runtime.scheduledRestartEnabled = 0xA5;
+    else raw.runtime.scheduledRestartMinuteOfDay = 24 * 60;
+    raw.checksum = persistedSettingsChecksum(raw);
+    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &raw, sizeof(raw));
+    CHECK(!loadPersistedSettings(loaded));
+  }
+  settings.runtime.scheduledRestartEnabled = 0;
+  settings.runtime.scheduledRestartMinuteOfDay = 720;
 
   // An out-of-range preference byte rejects the record.
   resetHostPersistence();
@@ -3142,6 +3162,9 @@ void p91_schema1_golden_settings_blob_loads() {
   CHECK(loaded.schemaVersion == 1 && loaded.runtime.goalWeightDg == DEFAULT_GOAL_WEIGHT_DG);
   CHECK(!loaded.runtime.scaleLossEnabled && !loaded.runtime.cupProtectionEnabled);
   CHECK(!loaded.runtime.touchStopFallbackEnabled && loaded.runtime.avoidAccidentalTouchEnabled);
+  // The scheduled restart fields fill zeroed tail padding: off at 00:00.
+  CHECK(loaded.runtime.scheduledRestartEnabled == 0 &&
+        loaded.runtime.scheduledRestartMinuteOfDay == 0);
   CHECK(loaded.presets.count == FACTORY_PRESET_COUNT + 2);  // Manual, Golden
   CHECK(loaded.presets.activeId == FACTORY_PRESET_ID_SINGLE_ADAPTIVE);
   const ShotPreset *dbl = findShotPreset(loaded.presets, FACTORY_PRESET_ID_DOUBLE_ADAPTIVE);

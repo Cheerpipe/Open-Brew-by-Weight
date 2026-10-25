@@ -100,6 +100,7 @@ void testFragmentedHeaderAndTail() {
   auto ota = OtaHostTestAccess::fresh();
   Image image(65536 + 31);
   CHECK(ota->createSession(image.identity, hostMillis) == OtaResult::OK);
+  CHECK(ota->publishedState().busy && !ota->publishedState().imagePending);
   Stream stream{image.bytes};
   stream.readLimit = 100;
   CHECK(ota->writeRange(kTransfer, 0, 65536, stream.io(), hostMillis) == OtaResult::OK);
@@ -110,10 +111,13 @@ void testFragmentedHeaderAndTail() {
   CHECK(ota_host::writes == 16 && stream.position == 65536);
   CHECK(ota->writeRange(kTransfer, 65536, 31, stream.io(), hostMillis) == OtaResult::OK);
   CHECK(ota->snapshot().state == OtaState::STAGED);
+  // A staged or committed image keeps a scheduled restart away.
+  CHECK(!ota->publishedState().busy && ota->publishedState().imagePending);
   CHECK(ota_host::ends == 1 && ota_host::aborts == 0);
   CHECK(std::equal(image.bytes.begin(), image.bytes.end(), ota_host::flash.begin()));
   CHECK(ota->commit() == OtaResult::OK);
   CHECK(ota->snapshot().state == OtaState::COMMITTED);
+  CHECK(ota->publishedState().imagePending);
   // After a commit only a restart remains; every retry path says so.
   CHECK(ota->commit() == OtaResult::COMMITTED);
   CHECK(ota->createSession(image.identity, hostMillis) == OtaResult::COMMITTED);
