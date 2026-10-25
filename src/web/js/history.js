@@ -233,7 +233,7 @@ export function init() {
   ready = true;
   R.setHistoryRenderer(renderHistory);
   entryMenu = R.actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) => [
-    [R.ICON_TRASH, __WEBUI_TEXT__("runtime.delete"), "", () => deleteOneHistory(r.id), true],
+    [R.ICON_TRASH, __WEBUI_TEXT__("history.delete_entry"), "", () => deleteOneHistory(r.id), true],
   ]);
   R.createFilterMenu(
     "historyFilterButton",
