@@ -160,6 +160,7 @@ void sendUiStreamClose(httpd_handle_t server, int fd, uint16_t reason) {
 #include "OpenBrewByWeightStatsPage.inc"
 #include "OpenBrewByWeightHomeStream.inc"
 #include "OpenBrewByWeightAuditStream.inc"
+#include "OpenBrewByWeightSettingsStream.inc"
 
 esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
@@ -255,10 +256,26 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
       session->resync = true;
       session->homeResync = true;
       session->diagResync = session->diagnostic;
+      session->settingsResync = true;
+      session->settingsKnownTag = 0;
       session->historyResync = true;
       session->statsResync = true;
       session->statsFetch = false;
       accepted = true;
+    } else if (cJSON_IsString(op) && session->bound &&
+               strcmp(op->valuestring, "settings") == 0 &&
+               strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+      // Standing Settings subscription: the page subscribes once per socket
+      // and never unsubscribes; `tag` names the model it still holds.
+      static const char *const kFields[] = {"op", "on", "tag"};
+      const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
+      if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(message, "on")) &&
+          uiStreamKnownFields(message, kFields, 3) && uiStreamIntInRange(tag, 1, UINT32_MAX)) {
+        session->settingsOn = session->settingsResync = true;
+        session->settingsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
+        self.uiStreamUrgent_.store(true, std::memory_order_release);
+        accepted = true;
+      }
     } else if (cJSON_IsString(op) && session->bound &&
                strcmp(op->valuestring, "diagnostic") == 0 &&
                strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
@@ -621,22 +638,26 @@ void OpenBrewByWeightNetwork::sendUiStream(UiStreamSession &session,
   // task; past the dispatch budget, close it instead of serializing more.
   const uint32_t started = millis();
   const auto within = [&] { return millis() - started < kUiStreamDispatchBudgetMs; };
-  // Both frames leave in one write after consuming their fingerprints: a
-  // cleanly dropped batch rolls session and fingerprints back, so the next
-  // dispatch resends the same deltas; a partial one closes.
+  // Home, shot card and Settings leave in one write after consuming their
+  // fingerprints, so a save's revision and its Settings deltas arrive together
+  // and in order: a cleanly dropped batch rolls session and fingerprints
+  // back, so the next dispatch resends the same deltas; a partial one closes.
   auto &hashes = workBuf_->uiFingerprints[&session - uiStreams_];
   const UiStreamSession saved = session;
   memcpy(workBuf_->batchHomeHashes, hashes.homeHashes, sizeof(hashes.homeHashes));
   memcpy(workBuf_->batchCardHashes, hashes.cardHashes, sizeof(hashes.cardHashes));
+  memcpy(workBuf_->batchSettingsHashes, hashes.settingsHashes, sizeof(hashes.settingsHashes));
   uiStreamBatchBegin();
   bool open = sendHomeStream(session, control, network, eligible ? &latest : nullptr) &&
-      within() && sendShotCard(session, control, latest, eligible);
+      within() && sendShotCard(session, control, latest, eligible) &&
+      (!session.settingsOn || (within() && sendSettingsStream(session, control)));
   uiStreamSendKind = "batch";
   if (!uiStreamBatchEnd(open) && open) {
     if (uiStreamSendCleanAbort) {
       session = saved;
       memcpy(hashes.homeHashes, workBuf_->batchHomeHashes, sizeof(hashes.homeHashes));
       memcpy(hashes.cardHashes, workBuf_->batchCardHashes, sizeof(hashes.cardHashes));
+      memcpy(hashes.settingsHashes, workBuf_->batchSettingsHashes, sizeof(hashes.settingsHashes));
       // Record pages take their page state from Home: none may overtake it.
       return;
     } else open = false;

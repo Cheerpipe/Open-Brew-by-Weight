@@ -237,7 +237,7 @@ int main(){
     doc = {hidden: true, body: {classList: {contains: (c) => loading.has(c)}}};
   const settle = new Function('R', 'document', '__WEBUI_TEXT__', 'activeView',
       `${blockAt(appJsSource, 'function settleView(')};return settleView;`)(
-      {hideHomeBoot: () => calls.push('boot'), ensureBackgroundRecordStreams: () => calls.push('streams'),
+      {hideHomeBoot: () => calls.push('boot'), ensureBackgroundStreams: () => calls.push('streams'),
         webUiPollingActive: () => true, message: (m) => calls.push(m)}, doc, (k) => k, 'home');
   settle(undefined, 1);
   assert.deepEqual(calls, [], 'a hidden tab that loaded nothing reports no failure');

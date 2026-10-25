@@ -390,7 +390,6 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
     bool diagnostic = false;  // also needs Admin or the public Diagnostic page
   };
   static const Route routes[] = {
-      {"/api/v1/status/settings", HTTP_GET, statusHandler},
       {"/api/v1/status/admin", HTTP_GET, statusHandler, true},
       {"/api/v1/debug/export", HTTP_GET, debugExportHandler},
       {"/api/v1/diagnostic/crashes", HTTP_GET, crashArchiveDownloadHandler},

@@ -172,11 +172,12 @@ struct NetworkWorkBuf {
   AuditRecord auditBatch[kAuditBatchSize]{};
   DebugLogReadMetadata logMetadata{};
   UiStreamFingerprints uiFingerprints[2]{};
-  // Rollback copy of one session's Home and shot-card fingerprints for the
-  // stream's Home + shot-card batch (httpd only, under the work buffer).
+  // Rollback copy of one session's Home, shot-card and Settings fingerprints
+  // for the stream's batch (httpd only, under the work buffer).
   uint32_t batchHomeHashes[UiStreamFingerprints::kHomeFields]{};
   uint32_t batchCardHashes[UiStreamFingerprints::kCardFields +
                            UiStreamFingerprints::kCurveFields]{};
+  uint32_t batchSettingsHashes[UiStreamFingerprints::kSettingsFields]{};
   StatsStreamCache statsCache{};
   ShotCurveRecord homeCurve{};
   ControlStatusSnapshot control{};
@@ -864,31 +865,13 @@ void sanitizeJsonEmbed(const char *input, char *output, size_t capacity) {
   output[written] = '\0';
 }
 
-enum class StatusPage : uint8_t { Settings, Admin, Unknown };
-
-StatusPage parseStatusPage(const char *uri) {
-  if (uri == nullptr) {
-    return StatusPage::Unknown;
-  }
-  const char *path = uri;
+// The one REST status page left: Admin, which the Setup portal also reads.
+bool statusPageIsAdmin(const char *uri) {
+  static constexpr char kPath[] = "/api/v1/status/admin";
+  if (uri == nullptr) return false;
   const char *query = strchr(uri, '?');
-  char stack[64] = {};
-  if (query != nullptr) {
-    const size_t len = static_cast<size_t>(query - uri);
-    if (len >= sizeof(stack)) {
-      return StatusPage::Unknown;
-    }
-    memcpy(stack, uri, len);
-    stack[len] = '\0';
-    path = stack;
-  }
-  if (strcmp(path, "/api/v1/status/settings") == 0) {
-    return StatusPage::Settings;
-  }
-  if (strcmp(path, "/api/v1/status/admin") == 0) {
-    return StatusPage::Admin;
-  }
-  return StatusPage::Unknown;
+  const size_t length = query != nullptr ? static_cast<size_t>(query - uri) : strlen(uri);
+  return length == sizeof(kPath) - 1 && strncmp(uri, kPath, length) == 0;
 }
 
 bool statusJsonAppend(size_t *used, const char *fmt, ...)

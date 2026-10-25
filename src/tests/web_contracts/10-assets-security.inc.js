@@ -257,7 +257,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
     !codeIncludes(runtimeJs, "location.replace(location.pathname+'?fw='+version)") ||
     !codeIncludes(appJsSource, 'boot=R.showPageBoot();R.stopViewPolls();') ||
     !codeIncludes(appJsSource, 'if(ok){R.hideHomeBoot(boot);') ||
-    !codeIncludes(appJsSource, 'if(activeView!=="setup")R.ensureBackgroundRecordStreams();')) {
+    !codeIncludes(appJsSource, 'if(activeView!=="setup")R.ensureBackgroundStreams();')) {
   throw new Error(
       'Every view must reuse the Home splash and fade immediately after data loads, preserving firmware reload and inactive overlay handoff');
 }
@@ -377,7 +377,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
         AbortController, setTimeout: () => 1, clearTimeout() {}, __WEBUI_TEXT__: key => key,
         fetch: path => {const response = deferred(); requests.push(path); responses.push(response); return response.promise;}});
       vm.runInContext(slotSource, slots);
-      const records = view === 'history' ? '/api/v1/log' : '/api/v1/status/settings';
+      const records = view === 'history' ? '/api/v1/log' : '/api/v1/status/admin';
       const one = slots.api(records), two = slots.api(records),
         three = slots.api(records);
       const finish = () => responses.shift().resolve({ok: true, text: async () => '{}'});
@@ -457,7 +457,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
           startDiagnosticStream() {}, stopDiagnosticStream() {},
           startStatsStream: () => {events.push('data'); return data.promise;},
           startHistoryStream: () => {events.push('data'); return data.promise;},
-          ensureBackgroundRecordStreams() {},
+          ensureBackgroundStreams() {},
           loadStatus: () => {events.push('status'); return status.promise;},
           startLogStream: () => {events.push('data'); return data.promise;},
           hideHomeBoot: () => events.push('fade'), message: () => events.push('error')}});
@@ -1262,7 +1262,7 @@ if (!network.includes('"firstDropBeep"') ||
     !network.includes('allowedCount > kSeenWords * 64U') ||
     !network.includes('uint64_t seen[kSeenWords]') ||
     !network.includes('WEB_UI_ETAG') ||
-    !network.includes('\\"buzzerSupported\\"') ||
+    !network.includes('fields.field("buzzerSupported"') ||
     !network.includes('BUZZER_SUPPORT_ENABLED') ||
     !network.includes('"autoRetare"') ||
     !network.includes('"retareWindowMs"') ||
@@ -1363,11 +1363,11 @@ if (!codeIncludes(ui, 'id="bullseyeMelodyEnabled"') ||
 }
 if (!codeIncludes(ui, "scaleConnectedLed:$('scaleConnectedLed').checked") ||
     !codeIncludes(ui, "'scaleConnectedLed'") ||
-    !network.includes('\\"scaleConnectedLed\\":%s') ||
+    !network.includes('fields.field("config.scaleConnectedLed"') ||
     !firmware.includes('serviceScaleConnectedLed') ||
     !firmware.includes('SCALE_CONNECTED_LED_GPIO') ||
     !domain.includes('bool scaleConnectedLed = true')) {
-  throw new Error('Scale-connected GPIO LED must be wired through Settings, status/settings, and firmware');
+  throw new Error('Scale-connected GPIO LED must be wired through Settings, the Settings stream, and firmware');
 }
 
 if (!codeIncludes(ui, 'id="soundAlertsEnabled"') ||

@@ -96,11 +96,8 @@ struct ControlStatusFields : ScaleLinkMetrics {
   uint32_t allocExternalFallbackCount = 0;
   uint32_t scaleEventsDropped = 0;
   RuntimeConfig config = {};
-  uint8_t bbwEvidenceCount = 0;
   uint8_t bbwPresetId = 0;
-  uint8_t bbwAlphaBaseline = DEFAULT_BBW_EWMA_ALPHA;
   uint8_t bbwAlpha = DEFAULT_BBW_EWMA_ALPHA;
-  bool bbwAlphaLearned = false;
   float bbwEwmaOffsetG = DEFAULT_WEIGHT_OFFSET_G;
   // Drip chart: the active preset's newest shots (cg, newest first), how many
   // came after the drip was set and after quick start decided (0xFF = no

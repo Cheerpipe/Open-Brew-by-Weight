@@ -75,7 +75,6 @@ function updatePreferredScaleSelect(s) {
   if (sel.innerHTML !== list.innerHTML) sel.innerHTML = list.innerHTML;
   sel.value = keep ? prev : preferred || "";
   R.updateScalePreferenceOptions();
-  sel.dataset.applied = preferred;
   const opt = sel.selectedOptions && sel.selectedOptions[0];
   R.updateScaleRenameUi(
     "preferredScaleSelectRenameWrap",
@@ -378,14 +377,17 @@ async function saveMachineConfig(patch) {
     try {
       await R.command("/api/v1/config", R.withBaseRev(patch), 1, "", fail);
       if (patch.preferredScaleMac !== undefined) {
-        if (sel.dataset.applied.toUpperCase() !== patch.preferredScaleMac.toUpperCase())
+        const applied = R.homeStatusCache()?.scale?.preferredMac || "";
+        if (applied.toUpperCase() !== patch.preferredScaleMac.toUpperCase())
           throw new Error(__WEBUI_TEXT__("runtime.device_did_not_apply_the_change"));
         sel.dataset.pending = "0";
       }
       return true;
     } catch (e) {
-      // The patch holds only this page's edits: resend it once on a newer revision.
-      await R.refreshStatus();
+      // The patch holds only this page's edits: resend it once on the newer
+      // revision the Home stream brings (within 2 s).
+      for (let i = 0; i < 20 && R.homeStatusCache()?.config.revision === patch.baseRevision; i++)
+        await new Promise((r) => setTimeout(r, 100));
       if (retry && e.code === "CONFIG_REVISION_STALE") continue;
       // Only the firmware parses RTTTL: a rejected tune is marked, not kept.
       if (e.code === "INVALID_FIELD" && "bullseyeRtttl" in patch)
@@ -477,12 +479,8 @@ function applyLineaMicraStatus(s) {
   const linking = R.uiState.micraSignIn === "linking" && !connected && machines.length === 1,
     busy = signingIn || linking,
     choosing = changing || (!connected && !busy && machines.length > 0),
-    stage = linking ? 2 : m.phase === "listing" ? 1 : 0;
-  if (busy && !R.uiState.micraPoll)
-    R.uiState.micraPoll = setTimeout(() => {
-      R.uiState.micraPoll = 0;
-      R.refreshStatus();
-    }, 1000);
+    stage = linking ? 2 : m.phase === "listing" ? 1 : 0,
+    target = m.boiler?.coffee?.targetDeciC;
   $("lineaMicraLegendHint").textContent =
     connected && !changing
       ? __WEBUI_TEXT__("runtime.micra_state_connected")
@@ -541,9 +539,7 @@ function applyLineaMicraStatus(s) {
                         }[m.readiness] || [__WEBUI_TEXT__("runtime.micra_power_on"), "on", 1];
   pill.textContent = [
     label,
-    warm && m.targetValid
-      ? __WEBUI_TEXT__("runtime.target") + " " + (m.targetDeciC / 10).toFixed(1) + " °C"
-      : "",
+    warm && target ? __WEBUI_TEXT__("runtime.target") + " " + (target / 10).toFixed(1) + " °C" : "",
     m.shotPaused ? __WEBUI_TEXT__("runtime.shot_paused") : "",
   ]
     .filter(Boolean)
@@ -638,7 +634,7 @@ function loadBullseyeConfig(c) {
   R.updateBullseyeControls();
 }
 function applySettingsStatus(s) {
-  R.uiState.bbwReadback = s.config;
+  R.uiState.bbwReadback = { ...s.config, ...s.config.bbwDrip };
   updatePreferredScaleSelect(s);
   const sc = s.scale || {};
   if ($("forgetPairedScale"))
@@ -649,7 +645,6 @@ function applySettingsStatus(s) {
   R.loadSettingsConfig(s.config);
   loadBullseyeConfig(s.config);
   applyLineaMicraStatus(s);
-  R.ingestPresets(s);
   R.updateBbwControls();
   const sl = s.scaleLoss,
     active = R.presetState.items.find((x) => x.id === R.presetState.activeId);
@@ -663,19 +658,17 @@ function applySettingsStatus(s) {
         fixed: __WEBUI_TEXT__("runtime.scale_loss_from_fixed"),
       }[sl.source],
     ]);
-  if (R.configLoaded) {
-    if (!R.uiState.configDirty)
-      R.uiState.configBaseline = R.snapshotControls(R.settingsSectionEls("config"));
-    if (!R.uiState.brewDirty)
-      R.uiState.brewBaseline = R.snapshotControls(R.settingsSectionEls("brew"));
-    // A settled section bases its next edit on the shown values.
+  // Every section bases its next edit on the shown values; a settled one
+  // also drops what it had pending.
+  if (R.configLoaded)
     for (const [sec, a] of Object.entries(autosave))
-      if (!a.busy && !R.uiState[sec + "Dirty"]) {
-        clearTimeout(a.timer);
-        a.base = {};
+      if (!a.busy) {
+        if (!R.uiState[sec + "Dirty"]) {
+          clearTimeout(a.timer);
+          a.base = {};
+        }
         a.last = a.payload();
       }
-  }
   refreshBrewWarnings();
 }
 async function forgetPairedScale() {
@@ -733,6 +726,7 @@ async function flushSettings() {
 }
 let ready = false;
 export function applyStatus(s) {
+  R.updateBuzzerAlertVisibility(s.buzzerSupported);
   applySettingsStatus(s);
   updateSettingsOverrides(s);
   updateCupMinGuidance(s);
@@ -745,6 +739,7 @@ export function applyStatus(s) {
     );
     if (![...reminder.options].some((o) => o.value === v)) reminder.add(new Option(v, v));
     reminder.value = v;
+    if (R.uiState.formBaseline) R.uiState.formBaseline.paddleReturnReminder = v;
   }
   const link = document.querySelector('[data-route="/diagnostic"]');
   if (link && typeof s.diagnosticPageVisible === "boolean")
@@ -796,9 +791,7 @@ document.addEventListener("click", async (e) => {
   const button = e.target.closest?.(".qsOverride button[data-saved]");
   if (!button) return;
   const input = $(button.dataset.saved),
-    saved = (
-      R.settingsSectionOf(input.id) === "brew" ? R.uiState.brewBaseline : R.uiState.configBaseline
-    )?.[input.id];
+    saved = R.uiState.formBaseline?.[input.id];
   button.disabled = true;
   try {
     await R.api("/api/v1/integration/quick-settings", {
@@ -815,12 +808,12 @@ document.addEventListener("click", async (e) => {
 });
 
 // Setup help: something rests on the platform but reads below the configured
-// cup minimum, so cup detection and late tare will not see it as a cup.
+// cup minimum, so cup detection and late tare will not see it as a cup. It
+// follows the live weight on the Home stream.
 function updateCupMinGuidance(s) {
   const hint = $("cupMinGuidance");
   if (!hint) return;
-  const observed =
-      s.cupSetup && typeof s.cupSetup.observedG === "number" ? s.cupSetup.observedG : null,
+  const observed = typeof s.scale?.observedWeightG === "number" ? s.scale.observedWeightG : null,
     min = R.number("minimumCupWeightG");
   const show = observed !== null && Number.isFinite(min) && observed > 0.5 && observed < min;
   hint.hidden = !show;
@@ -1063,6 +1056,7 @@ export function init() {
   ready = true;
   R.initGroupRows($("workflowPanel"));
   R.registerViewStatus("settings", applyStatus);
+  R.registerViewStatus("settingsLive", updateCupMinGuidance);
   $("presetCards")?.addEventListener("click", () => setTimeout(updateSettingsOverrides));
   R.uiState.flushSettings = flushSettings;
   if ($("presetNewBtn"))

@@ -188,13 +188,15 @@ inline int8_t clampWifiRssi(int32_t rssi) {
 struct NetworkWorkBuf;
 
 struct UiStreamFingerprints {
-  static constexpr size_t kHomeFields = 128, kDiagFields = 224, kCardFields = 32;
+  static constexpr size_t kHomeFields = 128, kDiagFields = 224, kCardFields = 32,
+                          kSettingsFields = 80;
   // The shot card's ten curve scalars (forEachShotCurveScalar) follow its
   // card fields in cardHashes.
   static constexpr size_t kCurveFields = 10;
   uint32_t homeHashes[kHomeFields] = {};
   uint32_t diagHashes[kDiagFields] = {};
   uint32_t cardHashes[kCardFields + kCurveFields] = {};
+  uint32_t settingsHashes[kSettingsFields] = {};
   // Rows (id, content hash) of the last standing Stats and History pages the
   // page holds: a later standing page names an unchanged row by its id.
   // statsNext collects a paced page until its last frame lands.
@@ -412,6 +414,11 @@ class OpenBrewByWeightNetwork {
     uint32_t diagTasksFingerprint = 0, diagProfileFingerprint = 0,
              diagAuditFingerprint = 0;
     bool diagnostic = false, diagResync = true;
+    // Settings subscription: standing for the page session once subscribed.
+    // The source gate keeps idle dispatches from formatting the projection;
+    // the tag names the model a reconnecting page still holds.
+    bool settingsOn = false, settingsResync = true;
+    uint32_t settingsBoot = 0, settingsGate = 0, settingsKnownTag = 0;
     // Serial-log subscription, same view-scoped contract: a cheap ring
     // watermark gates the copy, hasMore pages across dispatches, and a
     // cursor reset refills from the oldest retained event.
@@ -714,6 +721,9 @@ class OpenBrewByWeightNetwork {
   // durable-window records plus the hunt-session state (own .inc fragment).
   bool sendAuditDiagFrame(UiStreamSession &session, bool initial);
   bool sendUiStreamFrame(UiStreamSession &session, size_t used, bool &deferArm);
+  // Settings-only paths (own .inc fragment); rides the Home + shot-card batch.
+  bool sendSettingsStream(UiStreamSession &session,
+                          const ControlStatusSnapshot &control);
   bool sendLogStream(UiStreamSession &session,
                      const ControlStatusSnapshot &control);
   bool sendHistoryStream(UiStreamSession &session,

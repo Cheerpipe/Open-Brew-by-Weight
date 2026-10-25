@@ -77,7 +77,7 @@
   'Save actions must enable on edits, disable only after success, and look disabled');
   assert(codeIncludes(js, 'function snapshotControls(') &&
          codeIncludes(js, 'function restoreSnapshot(') &&
-         codeIncludes(js, "if(!configDirty)configBaseline=snapshotControls(settingsSectionEls('config'))") &&
+         codeIncludes(js, 'formBaseline=snapshotControls(els)') &&
          codeIncludes(js, 'if(!dateTimeDirty)dateTimeBaseline=snapshotControls(') &&
          codeIncludes(js, 'if(!bleDirty)bleBaseline=snapshotControls(') &&
          codeIncludes(js, 'if(!powerDirty)powerBaseline=snapshotControls(') &&
@@ -87,7 +87,7 @@
          codeIncludes(js, 'confirm("Discard unsaved changes?")') &&
          codeIncludes(adminUi, 'confirm("Discard unsaved changes?")') &&
          css.includes('.btnGlyph.btnRevert{'),
-    'Revert buttons must confirm, then restore the snapshot taken when the section was last hydrated clean');
+    'Revert buttons must confirm, then restore the snapshot taken when the section was last hydrated clean; the Settings baseline follows the device');
 
   assert(codeIncludes(js, 'command(path,value={},soft,okMsg,failMsg,busyId)') &&
          codeIncludes(js, 'busyId?$(busyId):null') &&
@@ -148,6 +148,7 @@
       addBullseyePayload: p => Object.assign(p, bullseye), showFieldError: id => errors.push(id),
       brewPayload: () => ({}), validateBrewClient: () => [],
       withBaseRev: p => ({...p, baseRevision: 7}),
+      homeStatusCache: () => ({config: {revision: 8}, scale: {preferredMac: applied}}),
       formatCommandError: (_, e) => e.message, message: e => errors.push(e),
       setTimeout: () => 0, clearTimeout() {},
       refreshStatus: async () => context.updatePreferredScaleSelect(status()),
@@ -350,7 +351,7 @@
   }
   const settings = compactSource(viewJs.settings);
   if (!settings.includes('[input.id]:saved??(input.type===checkbox?input.checked:input.value)') ||
-      !settings.includes("settingsSectionOf(input.id)===brew?brewBaseline:configBaseline)?.[input.id]")) {
+      !settings.includes('saved=formBaseline?.[input.id]')) {
     throw new Error('Use saved setting must send the saved baseline value');
   }
   const reminder = blockAt(viewJs.settings, 'export function applyStatus(');
