@@ -267,11 +267,14 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
                strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
       // Standing Settings subscription: the page subscribes once per socket
       // and never unsubscribes; `tag` names the model it still holds.
+      // Compatibility mode has no Settings view: the op is accepted inert,
+      // since a reconnecting page replays it before Home names the mode.
       static const char *const kFields[] = {"op", "on", "tag"};
       const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
       if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(message, "on")) &&
-          uiStreamKnownFields(message, kFields, 3) && uiStreamIntInRange(tag, 1, UINT32_MAX)) {
-        session->settingsOn = session->settingsResync = true;
+          uiStreamKnownFields(message, kFields, 3) && uiStreamIntInRange(tag, 0, UINT32_MAX)) {
+        session->settingsOn = !firmwareCompatibilityMode();
+        session->settingsResync = true;
         session->settingsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
         self.uiStreamUrgent_.store(true, std::memory_order_release);
         accepted = true;

@@ -32,7 +32,7 @@
   const status = {firmwareVersion: 'test', bootId: 7, configMutable: true, timeUtcSec: 1700000000,
     adminUnlocked: false, snapshotStale: false, config: {soundAlertsEnabled: true, revision: 1},
     safety: {state: 'READY'}, scale: {available: true, streamState: 'FRESH', observedWeightG: 12, timerMs: 1000},
-    presets: {activeId: 1, items: []}, presetsTag: 42, cycle: {active: false}, lastShot: {valid: false},
+    presets: {activeId: 1, items: []}, presetsTag: 42, cycle: {active: false},
     noScaleShotGuard: {enabled: true}, machineState: 'IDLE', cupPresence: {present: false}};
   const flatten = (value, prefix = '', output = {}) => {
     for (const [key, item] of Object.entries(value)) {

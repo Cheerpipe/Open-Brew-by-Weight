@@ -4624,6 +4624,8 @@ function startUiStream() {
         settingsResolve?.(true);
         settingsResolve = settingsReady = null;
         scheduleSettingsPaint();
+        // Diagnostic reads the Micra account paths from this model.
+        if (activeView === "diagnostic") scheduleDiagPaint();
         return;
       }
       if (data.type === "home") {
@@ -6336,8 +6338,14 @@ function loadSettingsConfig(c) {
   const els = [...settingsSectionEls("config"), ...settingsSectionEls("brew")],
     base = uiState.formBaseline || {},
     edited = configLoaded ? snapshotControls(els) : {},
-    active = presetState.items.find((x) => x.id === presetState.activeId) || {};
-  for (const id in edited) if (Object.is(edited[id], base[id])) delete edited[id];
+    active = presetState.items.find((x) => x.id === presetState.activeId) || {},
+    focused = document.activeElement,
+    // "38" and "38.0" are one value: the form writes canonical text.
+    same = (a, b) => a === b || (a !== "" && b !== "" && +a === +b);
+  // Never rewrite the field being typed in; catch up when it loses focus.
+  if (configLoaded && els.includes(focused) && focused.type !== "checkbox")
+    return focused.addEventListener("blur", scheduleSettingsPaint, { once: true });
+  for (const id in edited) if (same(edited[id], base[id])) delete edited[id];
   c = { ...c, doseG: active.doseG, grindHintsEnabled: active.grindHintsEnabled };
   bbwFormPresetId = c.bbwPresetId || 0;
   $("goalWeightG").value = c.goalWeightG.toFixed(1);
@@ -6428,7 +6436,7 @@ function loadSettingsConfig(c) {
   $("scaleLossFixedS").value = c.scaleLossFixedS > 0 ? String(c.scaleLossFixedS) : "";
   // The baseline is the device; an edit the device now holds is settled.
   uiState.formBaseline = snapshotControls(els);
-  for (const id in edited) if (Object.is(edited[id], uiState.formBaseline[id])) delete edited[id];
+  for (const id in edited) if (same(edited[id], uiState.formBaseline[id])) delete edited[id];
   restoreSnapshot(edited);
   formRev = c.revision;
   configRevision = c.revision;
