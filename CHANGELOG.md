@@ -27,6 +27,10 @@ The first stable release.
   rollback.
 - **Web UI password:** optional sign-in for the Web UI, remembered devices,
   and protection against look-alike web addresses.
+- **Diagnostic log:** Bluetooth radio messages have their own **ble**
+  category, and everything about your scale (finding it, connecting, its
+  readings and commands) appears under **scale**, so you can follow a scale
+  problem with the category filter instead of searching the **system** lines.
 - **Scheduled restart:** an optional daily restart at a local time you choose
   in Admin. It waits for shots and firmware updates, skips the day rather
   than interrupting you, and records each restart in the audit log.

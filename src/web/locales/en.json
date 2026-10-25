@@ -287,6 +287,7 @@
     "diagnostic.audit_when": "When",
     "diagnostic.avg": "Avg",
     "diagnostic.avoid_accidental_touch": "Avoid accidental touch",
+    "diagnostic.ble": "ble",
     "diagnostic.boot": "Boot",
     "diagnostic.boot_2": "boot",
     "diagnostic.brew": "Brew",

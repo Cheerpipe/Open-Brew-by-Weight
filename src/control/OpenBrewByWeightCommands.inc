@@ -279,8 +279,9 @@ void processWebCommand(const WebCommand &command) {
       candidate.scheduledRestartMinuteOfDay =
           command.config.scheduledRestartMinuteOfDay;
       if (candidate.scaleMacCacheMode != command.config.scaleMacCacheMode) {
-        serialTracef(LogLevel::INFO, "Scale preference: %s",
-                     scaleMacCacheModeId(command.config.scaleMacCacheMode));
+        serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                             "Scale preference: %s",
+                             scaleMacCacheModeId(command.config.scaleMacCacheMode));
       }
       candidate.scaleMacCacheMode = command.config.scaleMacCacheMode;
       candidate.noScaleBbwMode = command.config.noScaleBbwMode;

@@ -144,8 +144,9 @@ bool tryQueueRemoteTimerStop() {
   } else {
     session.timerStopResult = TimerStopResult::PENDING;
     session.stopTimerCommandQueued = true;
-    serialTracef(LogLevel::DEBUG, "Remote timer stop queued for cycle %lu",
-                 static_cast<unsigned long>(session.id));
+    serialTraceCategoryf(LogLevel::DEBUG, DebugCategory::SCALE,
+                         "Remote timer stop queued for cycle %lu",
+                         static_cast<unsigned long>(session.id));
     return true;
   }
 }
@@ -159,8 +160,9 @@ void requestRemoteTimerStop() {
   session.stopTimerRetryDeadlineMs = millis() + SCALE_STOP_RETRY_WINDOW_MS;
   if (!tryQueueRemoteTimerStop()) {
     session.timerStopResult = TimerStopResult::NOT_ATTEMPTED;
-    serialTracef(LogLevel::DEBUG, "Remote timer stop deferred for cycle %lu",
-                 static_cast<unsigned long>(session.id));
+    serialTraceCategoryf(LogLevel::DEBUG, DebugCategory::SCALE,
+                         "Remote timer stop deferred for cycle %lu",
+                         static_cast<unsigned long>(session.id));
   }
 }
 
@@ -784,7 +786,8 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   if (!std::isfinite(weight) || fabsf(weight) > MAX_PARSED_WEIGHT_G) {
     resetCupSampleEvidence();
     approveScaleTareSample(ScaleTareSample{});
-    serialTrace(LogLevel::WARNING, "Invalid or out-of-range weight ignored");
+    serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                        "Invalid or out-of-range weight ignored");
     rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_INVALID, weight);
     profileScaleWeightDecision(false, DebugCode::SCALE_SAMPLE_REJECTED_INVALID,
                                weight, receivedAtMs, packetSequence,

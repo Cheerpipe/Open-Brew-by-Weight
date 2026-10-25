@@ -299,10 +299,12 @@ void servicePreferredScaleMacPersistence() {
   }
   networkManager.syncPreferredScale(mac, name);
   if (mac[0] == '\0') {
-    serialTrace(LogLevel::INFO, "Preferred scale MAC cleared; persist queued");
+    serialTraceCategory(LogLevel::INFO, DebugCategory::SCALE,
+                        "Preferred scale MAC cleared; persist queued");
   } else {
-    serialTracef(LogLevel::INFO, "Preferred scale MAC queued: %s — %s",
-                 name[0] != '\0' ? name : "(unknown)", mac);
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                         "Preferred scale MAC queued: %s — %s",
+                         name[0] != '\0' ? name : "(unknown)", mac);
   }
 #endif
 }
@@ -458,8 +460,8 @@ void processScaleWorkerEvents() {
             fabsf(event.weightG) > MAX_PARSED_WEIGHT_G) {
           session.touchStop = {};
           resetCupSampleEvidence();
-          serialTrace(LogLevel::WARNING,
-                      "Invalid scale weight event ignored");
+          serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                              "Invalid scale weight event ignored");
           rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_INVALID,
                             event.weightG);
           break;
@@ -529,8 +531,9 @@ void processScaleWorkerEvents() {
                            event.commandAttempted, event.writeSucceeded,
                            event.commandFeedbackExpected);
         }
-        serialTracef(LogLevel::DEBUG, "Remote timer start write: %s",
-                     event.writeSucceeded ? "successful" : "failed/skipped");
+        serialTraceCategoryf(LogLevel::DEBUG, DebugCategory::SCALE,
+                             "Remote timer start write: %s",
+                             event.writeSucceeded ? "successful" : "failed/skipped");
         addDebugEvent(DebugCategory::SCALE,
                       event.writeSucceeded ? DebugCode::SCALE_TIMER_START_OK
                                            : DebugCode::SCALE_TIMER_START_FAILED,

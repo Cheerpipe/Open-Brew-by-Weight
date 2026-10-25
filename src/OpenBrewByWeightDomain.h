@@ -2058,7 +2058,8 @@ enum class DebugCategory : uint8_t {
   SECURITY,
   WEB,
   BOOT,
-  SYSTEM
+  SYSTEM,
+  BLE  // appended: persisted audit records keep their category values
 };
 
 enum class CircuitArmFailReason : int32_t {
@@ -2571,6 +2572,7 @@ inline const char *debugCategoryName(DebugCategory category) {
     case DebugCategory::WEB: return "web";
     case DebugCategory::BOOT: return "boot";
     case DebugCategory::SYSTEM: return "system";
+    case DebugCategory::BLE: return "ble";
   }
   return "unknown";
 }

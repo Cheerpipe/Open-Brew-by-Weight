@@ -8466,6 +8466,41 @@ void w25c_ring_retain_none_skips_ring_and_error_filters() {
   CHECK(errorEvents[0].level == LogLevel::CRITICAL);
 }
 
+void w25d_ble_and_scale_lines_use_their_categories() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::DEBUG;
+  serialLogLevel = LogLevel::NONE;
+  CHECK(strcmp(debugCategoryName(DebugCategory::BLE), "ble") == 0);
+  CHECK(static_cast<uint8_t>(DebugCategory::BLE) ==
+        static_cast<uint8_t>(DebugCategory::SYSTEM) + 1);
+  CHECK(espLogCategory("NimBLE: GAP procedure initiated") == DebugCategory::BLE);
+  CHECK(espLogCategory("BLE_INIT: BT controller compile version") ==
+        DebugCategory::BLE);
+  CHECK(espLogCategory("NimBLEx: same prefix") == DebugCategory::SYSTEM);
+  CHECK(espLogCategory("phy_init: phy_version 700") == DebugCategory::SYSTEM);
+  CHECK(espLogCategory("wifi:connected") == DebugCategory::SYSTEM);
+  openBrewByWeightScaleLog(4, true, "ble teardown complete raw=0 at_ms=1");
+  openBrewByWeightScaleLog(0, false, "ready: acaia @ AA:BB");
+  selectPreferredScale("AA:BB:CC:DD:EE:FF", "LUNAR");
+  DebugEvent events[DEBUG_EVENT_CAPACITY] = {};
+  const size_t count = copyDebugEvents(0, events, DEBUG_EVENT_CAPACITY);
+  auto categoryOf = [&](const char *prefix) {
+    for (size_t i = 0; i < count; ++i) {
+      if (events[i].code == DebugCode::LOG_TEXT &&
+          strncmp(events[i].text, prefix, strlen(prefix)) == 0) {
+        return static_cast<int>(events[i].category);
+      }
+    }
+    return -1;
+  };
+  CHECK(categoryOf("ble teardown") == static_cast<int>(DebugCategory::BLE));
+  CHECK(categoryOf("ready: acaia") == static_cast<int>(DebugCategory::SCALE));
+  CHECK(categoryOf("Preferred scale selected") ==
+        static_cast<int>(DebugCategory::SCALE));
+}
+
 void r41_negative_weight_in_range_starts_automatic_cycle() {
   resetHarness(false, true);
   reachReadyFromBoot();
@@ -22460,6 +22495,7 @@ const TestCase testCases[] = {
     {"W25", w25_weight_samples_do_not_fill_debug_log},
     {"W25B", w25b_log_levels_and_cycle_events_reach_ring},
     {"W25C", w25c_ring_retain_none_skips_ring_and_error_filters},
+    {"W25D", w25d_ble_and_scale_lines_use_their_categories},
     {"W26", w26_status_is_a_copied_snapshot},
     {"W27", w27_stale_weight_is_not_presented_as_current},
     {"W28", w28_web_command_queue_is_bounded},

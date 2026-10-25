@@ -24,8 +24,10 @@ static int unlockedSnprintf(char *out, size_t capacity, const char *format, ...)
 #include "../src/EspressoScaleBLENimble.cpp"
 #undef snprintf
 static std::vector<std::pair<uint8_t,std::string>> capturedScaleLogs;
-extern "C" void openBrewByWeightScaleLog(uint8_t severity, const char *message) {
+static std::vector<bool> capturedScaleLogTransport;
+extern "C" void openBrewByWeightScaleLog(uint8_t severity, bool transport, const char *message) {
   capturedScaleLogs.emplace_back(severity,message==nullptr ? "" : message);
+  capturedScaleLogTransport.push_back(transport);
 }
 
 static unsigned checks=0;
@@ -38,7 +40,7 @@ static void ready(NimbleScaleClient &c) {
   testOnConnectCancel={}; testOnTerminate={}; testConnectCancelStatus=0;
   testTerminateStatus=0; testRssiStatus=0; testRadioProcedures=0; testTerminations=0;
   testWrites=0; testWakeCount=0;
-  capturedScaleLogs.clear();
+  capturedScaleLogs.clear(); capturedScaleLogTransport.clear();
   testRuntimeReady=true; testSyncGeneration=1;
   c.beginGeneration(); c.lifecycleActive_=true; c.syncGeneration_=1;
   c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
@@ -259,6 +261,7 @@ static void run() {
     CHECK(!c.linkCleanupPending() && c.cleanupCount_==1);
     CHECK(capturedScaleLogs.size()==logsBefore+1);
     CHECK(capturedScaleLogs.back().second=="ble teardown complete raw=533 at_ms=4000");
+    CHECK(capturedScaleLogTransport.back()); // BLE stack lines carry the ble hint.
     c.onGapEvent(&gone,operation); // Duplicate completion cannot extend silence.
     testNowMs=4100;
     c.service(); CHECK(c.scanStarts_==0 && testTerminations==1);
@@ -384,6 +387,11 @@ static void run() {
     for (const auto &log : capturedScaleLogs) {
       CHECK(log.second.find("ble teardown complete")==std::string::npos);
     }
+  }
+  {
+    NimbleScaleClient c(true); ready(c); // The protocol-ready line is a scale line.
+    CHECK(!capturedScaleLogs.empty() && capturedScaleLogs.back().second.find("ready: ")==0);
+    CHECK(!capturedScaleLogTransport.back());
   }
   {
     testNowMs=100;

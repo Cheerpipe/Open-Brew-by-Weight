@@ -32,7 +32,9 @@
 
 // Open Brew by Weight retains scale diagnostics in its bounded WebUI log. Keep
 // the bridge weak so this library remains reusable by standalone IDF projects.
-extern "C" void openBrewByWeightScaleLog(uint8_t severity, const char *message)
+// transport marks Bluetooth stack/GAP/GATT lines (ble) apart from scale lines.
+extern "C" void openBrewByWeightScaleLog(uint8_t severity, bool transport,
+                                         const char *message)
     __attribute__((weak));
 
 namespace {
@@ -54,15 +56,18 @@ constexpr uint32_t kUnsupportedCooldownMs = 60000;
 constexpr uint32_t kConnectCallbackMarginMs = 50;
 constexpr uint8_t kScaleLogInfoSeverity = 4;
 constexpr uint8_t kScaleLogWarningSeverity = 1;
+constexpr bool kBleLog = true;
+constexpr bool kScaleLog = false;
 
-void scaleLogV(uint8_t severity, bool info, const char *format, va_list args) {
+void scaleLogV(uint8_t severity, bool info, bool transport, const char *format,
+               va_list args) {
   if (format == nullptr) {
     return;
   }
   char message[128] = {};
   vsnprintf(message, sizeof(message), format, args);
   if (openBrewByWeightScaleLog != nullptr) {
-    openBrewByWeightScaleLog(severity, message);
+    openBrewByWeightScaleLog(severity, transport, message);
   } else if (severity == kScaleLogWarningSeverity) {
     ESP_LOGW(kTag, "%s", message);
   } else if (info) {
@@ -72,24 +77,24 @@ void scaleLogV(uint8_t severity, bool info, const char *format, va_list args) {
   }
 }
 
-void scaleLogDebug(const char *format, ...) {
+void scaleLogDebug(bool transport, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  scaleLogV(0, false, format, args);
+  scaleLogV(0, false, transport, format, args);
   va_end(args);
 }
 
-void scaleLogInfo(const char *format, ...) {
+void scaleLogInfo(bool transport, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  scaleLogV(kScaleLogInfoSeverity, true, format, args);
+  scaleLogV(kScaleLogInfoSeverity, true, transport, format, args);
   va_end(args);
 }
 
-void scaleLogWarning(const char *format, ...) {
+void scaleLogWarning(bool transport, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  scaleLogV(kScaleLogWarningSeverity, false, format, args);
+  scaleLogV(kScaleLogWarningSeverity, false, transport, format, args);
   va_end(args);
 }
 
@@ -98,7 +103,7 @@ void scaleLogError(const char *operation, int32_t status, const char *reason,
                        ScaleBleDisconnectOrigin::Local,
                    bool expected = false) {
   if (status == 0) return;
-  (expected ? scaleLogInfo : scaleLogWarning)("ble error op=%s domain=%s raw=%ld hex=0x%lX code=0x%02lX reason=%s",
+  (expected ? scaleLogInfo : scaleLogWarning)(kBleLog, "ble error op=%s domain=%s raw=%ld hex=0x%lX code=0x%02lX reason=%s",
                   operation, scaleBleStatusDomain(status, origin),
                   static_cast<long>(status), static_cast<unsigned long>(status),
                   static_cast<unsigned long>(status & 0xff), reason);
@@ -826,7 +831,7 @@ class NimbleScaleClient {
                                            "%s%02X", index == 0 ? "" : " ",
                                            static_cast<unsigned>(data[index])));
     }
-    scaleLogInfo("ble tx %s/%s response=%u bytes=%s", writePurposeName(purpose),
+    scaleLogInfo(kBleLog, "ble tx %s/%s response=%u bytes=%s", writePurposeName(purpose),
                  label != nullptr ? label : "unknown", withResponse ? 1U : 0U,
                  bytes);
   }
@@ -1726,7 +1731,7 @@ class NimbleScaleClient {
       ++scanRestarts_;
     }
     if (debug_) {
-      scaleLogDebug("active scan started (%u/%u)", scanInterval_, scanWindow_);
+      scaleLogDebug(kBleLog, "active scan started (%u/%u)", scanInterval_, scanWindow_);
     }
     return true;
   }
@@ -2360,7 +2365,7 @@ class NimbleScaleClient {
     service();
     const bool linkSurvived = generation_ == commandGeneration && isLinkUp();
     if (submitted && result == 0 && !interrupted && linkSurvived) {
-      scaleLogInfo("command done op=%s gen=%lu submitted=1 result=ok raw=0 elapsed_ms=%lu gap_ms=%lu",
+      scaleLogInfo(kBleLog, "command done op=%s gen=%lu submitted=1 result=ok raw=0 elapsed_ms=%lu gap_ms=%lu",
                    operation, static_cast<unsigned long>(commandGeneration),
                    static_cast<unsigned long>(elapsedMs(commandStartedAt_)),
                    static_cast<unsigned long>(gapMs));
@@ -2392,7 +2397,7 @@ class NimbleScaleClient {
     } else if (linkSurvived) {
       scaleLogError(operation, result, "command rejected");
     }
-    scaleLogInfo("command done op=%s gen=%lu submitted=%u result=failed raw=%ld elapsed_ms=%lu gap_ms=%lu",
+    scaleLogInfo(kBleLog, "command done op=%s gen=%lu submitted=%u result=failed raw=%ld elapsed_ms=%lu gap_ms=%lu",
                  operation, static_cast<unsigned long>(commandGeneration),
                  submitted ? 1U : 0U,
                  static_cast<long>(diagnostics_.commandStatus),
@@ -2434,7 +2439,7 @@ class NimbleScaleClient {
     }
     portEXIT_CRITICAL(&mux_);
     if (debug_) {
-      scaleLogDebug("ready: %s @ %s", protocol_->id, address_);
+      scaleLogDebug(kScaleLog, "ready: %s @ %s", protocol_->id, address_);
     }
   }
 
@@ -2605,7 +2610,7 @@ class NimbleScaleClient {
       backoff_.reset();
     }
     if (debug_ && reason != ScaleDisconnectReason::NONE) {
-      scaleLogDebug("link finished: %s raw=%ld gen=%lu",
+      scaleLogDebug(kBleLog, "link finished: %s raw=%ld gen=%lu",
                     disconnectReasonName(reason), static_cast<long>(rawStatus),
                     static_cast<unsigned long>(finishedGeneration));
     }
@@ -2634,7 +2639,7 @@ class NimbleScaleClient {
     }
     portEXIT_CRITICAL(&mux_);
     if (gapReceived) {
-      scaleLogInfo("ble teardown complete raw=%ld at_ms=%lu",
+      scaleLogInfo(kBleLog, "ble teardown complete raw=%ld at_ms=%lu",
                    static_cast<long>(gapStatus), static_cast<unsigned long>(gapAtMs));
       return true;
     }

@@ -188,8 +188,8 @@ void beginCycle(ControlSource source = ControlSource::PHYSICAL) {
     if (!requestRemoteTimerStart()) {
       session.automaticEnabled = false;
       session.scaleWasLost = true;
-      serialTrace(LogLevel::WARNING,
-                  "Scale start command unavailable; cycle marked manual");
+      serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                          "Scale start command unavailable; cycle marked manual");
     }
   }
 
@@ -489,8 +489,8 @@ bool beginRinseCycle(ControlSource source) {
       session.startedWithScale = false;
       session.automaticEnabled = false;
       session.scaleWasLost = true;
-      serialTrace(LogLevel::WARNING,
-                  "Scale start command unavailable; rinse marked manual");
+      serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                          "Scale start command unavailable; rinse marked manual");
     }
   }
   return true;
@@ -790,7 +790,8 @@ void stateMachineTask() {
         suspendWeightControl();
         weightStreamState = WeightStreamState::STALE;
         addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_STREAM_STALE);
-        serialTrace(LogLevel::WARNING, "Scale stream suspended during brew");
+        serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                            "Scale stream suspended during brew");
       }
 
       if (machineAllowsAutomationStop()) {

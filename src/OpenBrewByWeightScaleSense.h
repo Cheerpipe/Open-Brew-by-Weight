@@ -73,7 +73,8 @@ bool acceptWeightIntoTrajectory(float weight, uint32_t receivedAtMs,
     session.receivedFreshWeightInCycle = true;
     session.lastAcceptedWeightG = weight;
     session.lastAcceptedPacketSequence = packetSequence;
-    serialTracef(LogLevel::DEBUG, "%.2fg, t=dup, kept freshness only", weight);
+    serialTraceCategoryf(LogLevel::DEBUG, DebugCategory::SCALE,
+                         "%.2fg, t=dup, kept freshness only", weight);
     return true;
   }
   size_t index;
@@ -97,8 +98,9 @@ bool acceptWeightIntoTrajectory(float weight, uint32_t receivedAtMs,
   session.lastAcceptedPacketSequence = packetSequence;
   updateCutPrediction(weight, receivedAtMs);
 
-  serialTracef(LogLevel::DEBUG, "%.2fg, t=%.2fs, expected end=%.2fs",
-               weight, shot.timeS[index], shot.expectedEndS);
+  serialTraceCategoryf(LogLevel::DEBUG, DebugCategory::SCALE,
+                       "%.2fg, t=%.2fs, expected end=%.2fs",
+                       weight, shot.timeS[index], shot.expectedEndS);
   return true;
 }
 

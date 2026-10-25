@@ -39,8 +39,12 @@ void addDebugEvent(openbrewbyweight::DebugCategory category, openbrewbyweight::D
 void addDebugEventDetail(openbrewbyweight::DebugCategory category,
                          openbrewbyweight::DebugCode code, int32_t argument1,
                          int32_t argument2, const char *detail);
-void serialTrace(openbrewbyweight::LogLevel level, const char *message);
-void serialTracef(openbrewbyweight::LogLevel level, const char *fmt, ...);
+void serialTraceCategory(openbrewbyweight::LogLevel level,
+                         openbrewbyweight::DebugCategory category,
+                         const char *message);
+void serialTraceCategoryf(openbrewbyweight::LogLevel level,
+                          openbrewbyweight::DebugCategory category,
+                          const char *fmt, ...);
 void logEmit(openbrewbyweight::LogLevel level, openbrewbyweight::DebugCategory category,
              openbrewbyweight::DebugCode code, int32_t argument1 = 0,
              int32_t argument2 = 0);
@@ -89,8 +93,8 @@ void reportNimbleRuntimeHealth(bool force) {
   previousCleanupCount = client.cleanupCount;
   previousTotalDrops = totalDrops;
   previousClientState = client.state;
-  serialTracef(
-      LogLevel::DEBUG,
+  serialTraceCategoryf(
+      LogLevel::DEBUG, DebugCategory::BLE,
       "NimBLE runtime state=%u raw=%ld linkRaw=%ld reset=%ld sync=%lu resets=%lu "
       "hostStackMin=%lu internal=%lu/%lu/%lu psram=%lu/%lu/%lu",
       static_cast<unsigned>(health.state), static_cast<long>(health.lastError),
@@ -105,8 +109,8 @@ void reportNimbleRuntimeHealth(bool force) {
       static_cast<unsigned long>(health.psramFreeBytes),
       static_cast<unsigned long>(health.psramMinimumFreeBytes),
       static_cast<unsigned long>(health.psramLargestBlockBytes));
-  serialTracef(
-      LogLevel::DEBUG,
+  serialTraceCategoryf(
+      LogLevel::DEBUG, DebugCategory::BLE,
       "NimBLE client state=%u age=%lu gen/op=%lu/%lu adv=%lu compatible=%lu "
       "discarded=%lu malformed=%lu cache=%u hits=%lu scans=%lu/%lu/%lu "
       "connect=%lu/%lu gattFail=%lu/%lu writeFail=%lu",
@@ -128,8 +132,8 @@ void reportNimbleRuntimeHealth(bool force) {
       static_cast<unsigned long>(client.discoveryFailures),
       static_cast<unsigned long>(client.subscriptionFailures),
       static_cast<unsigned long>(client.writeFailures));
-  serialTracef(
-      LogLevel::DEBUG,
+  serialTraceCategoryf(
+      LogLevel::DEBUG, DebugCategory::BLE,
       "NimBLE resilience stale=%lu cleanup=%lu duplicate=%lu backoff=%lu/%u "
       "queueHwm=%u/%u/%u drops=%lu/%lu/%lu mbuf=%lu latency=%lu/%lu/%lu/%lu",
       static_cast<unsigned long>(client.staleCallbacks),
@@ -783,7 +787,8 @@ bool enqueueScaleCommand(const ScaleCommand &command, bool toFront) {
   if (stamped.idleTareRequestId != 0) {
     cancelIdleScaleTare(stamped.idleTareRequestId);
   }
-  serialTrace(LogLevel::WARNING, "Scale command queue full");
+  serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                      "Scale command queue full");
   return false;
 }
 
@@ -1370,12 +1375,12 @@ void executeScaleDebugCommand(BookooDebugAction action, uint8_t beepLevel) {
   }
   if (result == ScaleCommandResult::Unsupported ||
       result == ScaleCommandResult::InvalidArgument) {
-    serialTracef(LogLevel::WARNING,
-                 "Scale command not sent: %s%u is unsupported by this model",
-                 action == BookooDebugAction::VOLUME ? "volume level " : "action ",
-                 action == BookooDebugAction::VOLUME
-                         ? static_cast<unsigned>(beepLevel)
-                         : static_cast<unsigned>(action));
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                         "Scale command not sent: %s%u is unsupported by this model",
+                         action == BookooDebugAction::VOLUME ? "volume level " : "action ",
+                         action == BookooDebugAction::VOLUME
+                                 ? static_cast<unsigned>(beepLevel)
+                                 : static_cast<unsigned>(action));
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_DEBUG_UNSUPPORTED);
     return;
   }
@@ -1416,11 +1421,11 @@ void applyBookooConnectBeepPolicy() {
         scale.setBeepLevel(static_cast<uint8_t>(volume), &admission);
     if (result == ScaleCommandResult::InvalidArgument ||
         result == ScaleCommandResult::Unsupported) {
-      serialTracef(LogLevel::WARNING,
-                   "Connection volume %d not sent: connected scale supports levels %u-%u",
-                   static_cast<int>(volume),
-                   static_cast<unsigned>(scale.features().volumeMin),
-                   static_cast<unsigned>(scale.features().volumeMax));
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                           "Connection volume %d not sent: connected scale supports levels %u-%u",
+                           static_cast<int>(volume),
+                           static_cast<unsigned>(scale.features().volumeMin),
+                           static_cast<unsigned>(scale.features().volumeMax));
     } else {
       yieldBetweenScaleAttOps();
     }
@@ -1577,10 +1582,10 @@ void requestScalePowerOff() {
     return;
   }
   if (!link.features.has(ScaleFeaturePowerOff)) {
-    serialTracef(LogLevel::WARNING,
-                 "Power off not sent: %s does not support it",
-                 link.model == ScaleModel::BookooMini
-                     ? "Bookoo Themis Mini" : "connected scale");
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                         "Power off not sent: %s does not support it",
+                         link.model == ScaleModel::BookooMini
+                             ? "Bookoo Themis Mini" : "connected scale");
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_DEBUG_UNSUPPORTED);
     return;
   }
@@ -1630,8 +1635,8 @@ void executeScalePowerOffCommand() {
   }
   if (!scale.supportsPowerOff()) {
     clearScalePowerOffLifecycle();
-    serialTracef(LogLevel::WARNING,
-                 "Power off not sent: connected scale does not support it");
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                         "Power off not sent: connected scale does not support it");
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_DEBUG_UNSUPPORTED);
     return;
   }
@@ -1642,8 +1647,8 @@ void executeScalePowerOffCommand() {
   const ScaleCommandResult result = scale.powerOff();
   if (result == ScaleCommandResult::Unsupported) {
     clearScalePowerOffLifecycle();
-    serialTracef(LogLevel::WARNING,
-                 "Power off not sent: connected scale does not support it");
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                         "Power off not sent: connected scale does not support it");
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_DEBUG_UNSUPPORTED);
     return;
   }
@@ -1880,10 +1885,10 @@ void notePreferredScale(const char *mac, const char *name) {
   }
   scalePreferredMacMux.unlock();
   if (changed) {
-    serialTracef(LogLevel::INFO,
-                 adopted ? "First detected scale adopted: %s — %s"
-                         : "Preferred scale name updated: %s — %s",
-                 safeName[0] != '\0' ? safeName : "(unknown)", canonicalMac);
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                         adopted ? "First detected scale adopted: %s — %s"
+                                 : "Preferred scale name updated: %s — %s",
+                         safeName[0] != '\0' ? safeName : "(unknown)", canonicalMac);
   }
 }
 
@@ -1897,7 +1902,8 @@ static void clearPreferredScaleSelectionOnly() {
   ++scalePreferredDirectedResetGeneration;
   scalePreferredResetReasonBits |= SCALE_PREFERENCE_RESET_IDENTITY;
   scalePreferredMacMux.unlock();
-  serialTrace(LogLevel::INFO, "Preferred scale cleared (history kept)");
+  serialTraceCategory(LogLevel::INFO, DebugCategory::SCALE,
+                      "Preferred scale cleared (history kept)");
 }
 
 void selectPreferredScale(const char *mac, const char *name) {
@@ -1937,9 +1943,10 @@ void selectPreferredScale(const char *mac, const char *name) {
   ++scalePreferredDirectedResetGeneration;
   scalePreferredResetReasonBits |= SCALE_PREFERENCE_RESET_IDENTITY;
   scalePreferredMacMux.unlock();
-  serialTracef(LogLevel::INFO, "Preferred scale selected: %s — %s",
-               resolvedName[0] != '\0' ? resolvedName : "(unknown)",
-               canonicalMac);
+  serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                       "Preferred scale selected: %s — %s",
+                       resolvedName[0] != '\0' ? resolvedName : "(unknown)",
+                       canonicalMac);
 }
 
 // Assign or clear (empty name) the user-facing override of a known scale.
@@ -1967,8 +1974,9 @@ bool setScaleFriendlyName(const char *mac, const char *name) {
   }
   scalePreferredMacMux.unlock();
   if (applied) {
-    serialTracef(LogLevel::INFO, "Scale friendly name set: %s — %s",
-                 name[0] != '\0' ? name : "(cleared)", canonicalMac);
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                         "Scale friendly name set: %s — %s",
+                         name[0] != '\0' ? name : "(cleared)", canonicalMac);
   }
   return applied;
 }
@@ -1983,15 +1991,15 @@ void clearPreferredScaleCache() {
   ++scalePreferredDirectedResetGeneration;
   scalePreferredResetReasonBits |= SCALE_PREFERENCE_RESET_IDENTITY;
   scalePreferredMacMux.unlock();
-  serialTrace(LogLevel::INFO,
-              "Paired scale forgotten; looking paused for 30 s");
+  serialTraceCategory(LogLevel::INFO, DebugCategory::SCALE,
+                      "Paired scale forgotten; looking paused for 30 s");
 }
 
 void logScaleConnectionFailed(bool directed) {
-  serialTracef(LogLevel::WARNING, "%s: %s",
-               directed ? "Preferred scale connection failed"
-                        : "Scale connection failed",
-               scale.lastDisconnectReasonName());
+  serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE, "%s: %s",
+                       directed ? "Preferred scale connection failed"
+                                : "Scale connection failed",
+                       scale.lastDisconnectReasonName());
 }
 
 void logScaleScanStarted(bool directed) {
@@ -2400,11 +2408,12 @@ void serviceScaleWorkerDiscovery(uint32_t &lastScanCycleMs,
       const char *address = scale.address();
       const char *name = scale.localName();
       notePreferredScale(address, name);
-      serialTracef(LogLevel::INFO, "Scale connected: %s @ %s (%s)",
-                   name != nullptr && name[0] != '\0' ? name : "(unknown)",
-                   address != nullptr && address[0] != '\0' ? address
-                                                             : "(no address)",
-                   scale.connectedProtocolName());
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                           "Scale connected: %s @ %s (%s)",
+                           name != nullptr && name[0] != '\0' ? name : "(unknown)",
+                           address != nullptr && address[0] != '\0' ? address
+                                                                     : "(no address)",
+                           scale.connectedProtocolName());
       updateWorkerLinkState();
       setScaleLinkState(ScaleLinkState::CONNECTED);
       armBookooConnectBeepPolicy();
@@ -2431,11 +2440,12 @@ void serviceScaleWorkerDiscovery(uint32_t &lastScanCycleMs,
       const char *address = scale.address();
       const char *name = scale.localName();
       notePreferredScale(address, name);
-      serialTracef(LogLevel::INFO, "Scale connected: %s @ %s (%s)",
-                   name != nullptr && name[0] != '\0' ? name : "(unknown)",
-                   address != nullptr && address[0] != '\0' ? address
-                                                             : "(no address)",
-                   scale.connectedProtocolName());
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                           "Scale connected: %s @ %s (%s)",
+                           name != nullptr && name[0] != '\0' ? name : "(unknown)",
+                           address != nullptr && address[0] != '\0' ? address
+                                                                     : "(no address)",
+                           scale.connectedProtocolName());
       updateWorkerLinkState();
       setScaleLinkState(ScaleLinkState::CONNECTED);
       armBookooConnectBeepPolicy();
@@ -2461,26 +2471,26 @@ void serviceScaleWorkerDiscovery(uint32_t &lastScanCycleMs,
         addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_SCAN_WAITING,
                       SCALE_SCAN_WAIT_NO_ADVERT);
         if (directed) {
-          serialTrace(LogLevel::DEBUG,
-                      "Preferred scale attempt: no advertisement");
+          serialTraceCategory(LogLevel::DEBUG, DebugCategory::SCALE,
+                              "Preferred scale attempt: no advertisement");
         } else {
-          serialTrace(LogLevel::DEBUG,
-                      "Scale name scan: no advertisement");
+          serialTraceCategory(LogLevel::DEBUG, DebugCategory::SCALE,
+                              "Scale name scan: no advertisement");
         }
       } else if (logAttempt && directed && sawCompatibleAd) {
         lastConnectLogMs = lastScanCycleMs;
         connectAttemptSeriesActive = true;
         addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_SCAN_WAITING,
                       SCALE_SCAN_WAIT_OTHER_SCALE);
-        serialTrace(LogLevel::DEBUG,
-                    "Preferred scale attempt: other scale seen, waiting");
+        serialTraceCategory(LogLevel::DEBUG, DebugCategory::SCALE,
+                            "Preferred scale attempt: other scale seen, waiting");
       }
       // PREFER: after grace, drop the preferred-only filter and accept any.
       if (cacheMode == ScaleMacCacheMode::PREFER && directed &&
           elapsedMs(scanSessionAtMs) >= SCALE_PREFER_FALLBACK_MS) {
         if (startScaleDiscoveryScan(nullptr, true)) {
-          serialTrace(LogLevel::INFO,
-                      "Preferred scale not found; falling back to any scale");
+          serialTraceCategory(LogLevel::INFO, DebugCategory::SCALE,
+                              "Preferred scale not found; falling back to any scale");
           scanLastAdvertAtMs = 0;
           logScaleScanStarted(false);
         }
@@ -2517,9 +2527,9 @@ void serviceScaleWorkerDiscovery(uint32_t &lastScanCycleMs,
         hasPreferredScaleMac();
 
     if (finishedDirectedAttempt) {
-      serialTracef(LogLevel::WARNING,
-                   "Preferred scale attempt: %s",
-                   scale.lastDisconnectReasonName());
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                           "Preferred scale attempt: %s",
+                           scale.lastDisconnectReasonName());
     }
 
     const bool logAttempt =
@@ -2555,11 +2565,11 @@ void serviceScaleWorkerDiscovery(uint32_t &lastScanCycleMs,
     lastConnectLogMs = lastScanCycleMs;
     connectAttemptSeriesActive = true;
     if (useDirected) {
-      serialTracef(LogLevel::INFO, "Scanning for preferred scale %s...",
-                   preferredMac);
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                           "Scanning for preferred scale %s...", preferredMac);
     } else {
-      serialTrace(LogLevel::INFO,
-                  "Scanning for any compatible scale (name scan)");
+      serialTraceCategory(LogLevel::INFO, DebugCategory::SCALE,
+                          "Scanning for any compatible scale (name scan)");
     }
     logScaleScanStarted(useDirected);
     return;
@@ -2569,7 +2579,8 @@ void serviceScaleWorkerDiscovery(uint32_t &lastScanCycleMs,
   connectAttemptSeriesActive = true;
   logScaleConnectFailed(0);
   if (useDirected) {
-    serialTrace(LogLevel::WARNING, "Preferred scale scan failed to start");
+    serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                        "Preferred scale scan failed to start");
   } else {
     logScaleConnectionFailed(false);
   }
@@ -2695,7 +2706,7 @@ void scaleWorkerTask(void *) {
       openBrewByWeightBleRuntimeStart(BLE_STACK_READY_WAIT_MS);
   bleStackReady.store(runtimeReady, std::memory_order_release);
   if (!runtimeReady) {
-    addDebugEvent(DebugCategory::SCALE, DebugCode::INITIALIZATION_FAILED,
+    addDebugEvent(DebugCategory::BLE, DebugCode::INITIALIZATION_FAILED,
                   BOOT_SUBSYSTEM_BLE);
     logEmit(LogLevel::ERROR, DebugCategory::BOOT, DebugCode::BOOT_SUBSYSTEM,
             BOOT_SUBSYSTEM_BLE, 0);
@@ -2715,7 +2726,7 @@ void scaleWorkerTask(void *) {
   }
   scaleWorkerStartupFinished.store(true, std::memory_order_release);
   if (!ensureRfCoexBt()) {
-    addDebugEvent(DebugCategory::NETWORK, DebugCode::INITIALIZATION_FAILED,
+    addDebugEvent(DebugCategory::BLE, DebugCode::INITIALIZATION_FAILED,
                   BOOT_SUBSYSTEM_BLE, rfCoexLastError());
   }
   logEmit(LogLevel::INFO, DebugCategory::BOOT, DebugCode::BOOT_SUBSYSTEM,

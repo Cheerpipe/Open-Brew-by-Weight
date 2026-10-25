@@ -15,6 +15,21 @@ void retainLogText(LogLevel level, DebugCategory category, const char *message) 
                    __ATOMIC_RELAXED);
 }
 
+// Bluetooth stack tags go to ble; every other ESP-IDF component stays system.
+// body is the retained "TAG: text"; the colon keeps prefixes from colliding.
+DebugCategory espLogCategory(const char *body) {
+  static const char *const bleTags[] = {
+      "NimBLE", "BLE_INIT", "BT_INIT", "BLE_LOG", "ble_log", "bt_hci_log",
+      "HCI_UTIL", "hci_uart", "bt_osi_config", "ble_svc_gap", "scale.nimble"};
+  for (const char *tag : bleTags) {
+    const size_t length = strlen(tag);
+    if (strncmp(body, tag, length) == 0 && body[length] == ':') {
+      return DebugCategory::BLE;
+    }
+  }
+  return DebugCategory::SYSTEM;
+}
+
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 esp_log_level_t espLogLevel(LogLevel level) {
   switch (level) {
@@ -46,7 +61,7 @@ void retainEspLogLine(const char *text) {
                 : text[0] == 'W' ? LogLevel::WARNING
                 : text[0] == 'I' ? LogLevel::INFO
                                  : LogLevel::DEBUG,
-                DebugCategory::SYSTEM, message);
+                espLogCategory(message), message);
 }
 
 int openBrewByWeightEspLogVprintf(const char *format, va_list args) {
@@ -177,7 +192,8 @@ void configureEspLogRuntime() {
   const esp_log_level_t level = espLogLevel(applicationLevel);
   static const char *const tags[] = {
       "obbw.activator", "obbw.relay", "obbw.state", "obbw.scale", "obbw.config",
-      "obbw.network", "obbw.security", "obbw.web", "obbw.boot", "obbw.system"};
+      "obbw.network", "obbw.security", "obbw.web", "obbw.boot", "obbw.system",
+      "obbw.ble"};
   for (const char *tag : tags) {
     esp_log_level_set(tag, level);
   }
@@ -263,7 +279,8 @@ void serialTraceCategory(LogLevel level, DebugCategory category,
   logText(level, category, message);
 }
 
-extern "C" void openBrewByWeightScaleLog(uint8_t severity, const char *message) {
+extern "C" void openBrewByWeightScaleLog(uint8_t severity, bool transport,
+                                         const char *message) {
   LogLevel level = LogLevel::DEBUG;
   if (severity == 4) {
     level = LogLevel::INFO;
@@ -272,7 +289,8 @@ extern "C" void openBrewByWeightScaleLog(uint8_t severity, const char *message) 
   } else if (severity >= 2) {
     level = LogLevel::ERROR;
   }
-  serialTraceCategory(level, DebugCategory::SCALE, message);
+  serialTraceCategory(
+      level, transport ? DebugCategory::BLE : DebugCategory::SCALE, message);
 }
 
 // Formats only when logText would keep the line: the per-sample DEBUG traces
