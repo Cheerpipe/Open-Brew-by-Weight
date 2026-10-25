@@ -4038,6 +4038,40 @@ function placePill(pill, text, x, y) {
   pill.firstChild.setAttribute("width", pw);
   pill.setAttribute("transform", `translate(${x - 11 - pw < 1 ? x + 11 : x - 11 - pw} ${y})`);
 }
+// Every chart cursor scrubs alike: any pointer grabs it at once and drags it
+// anywhere on the chart, and arrow keys step it once focused. A vertical swipe
+// still scrolls the page (touch-action: pan-y) and the browser cancels the
+// pointer. The node is the slider unless a selector names one inside it.
+function bindScrub(node, tAt, seek, now, slider) {
+  const move = (e) => seek(tAt(e.clientX));
+  node.addEventListener("pointerdown", (e) => {
+    if (tAt(e.clientX) == null) return;
+    e.preventDefault();
+    node.setPointerCapture(e.pointerId);
+    (slider ? node.querySelector(slider) : node)?.focus({ preventScroll: true });
+    node.classList.add("rvHeld");
+    move(e);
+  });
+  node.addEventListener("pointermove", (e) => node.hasPointerCapture(e.pointerId) && move(e));
+  node.addEventListener("lostpointercapture", () => node.classList.remove("rvHeld"));
+  node.addEventListener("keydown", (e) => {
+    const step = {
+      ArrowRight: 0.5,
+      ArrowUp: 0.5,
+      ArrowLeft: -0.5,
+      ArrowDown: -0.5,
+      PageUp: 5,
+      PageDown: -5,
+    }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    seek(now() + step);
+  });
+  if (slider) return;
+  node.tabIndex = 0;
+  node.setAttribute("role", "slider");
+  node.setAttribute("aria-label", __WEBUI_TEXT__("runtime.shot_cursor_label"));
+}
 // One preset graph with its scrubber, used by the Settings review and by each
 // Home preset panel: same drawing, axis, and scrub behavior. The scrub state
 // lives on the host, so every graph scrubs on its own.
@@ -4060,33 +4094,13 @@ function drawPresetGraph(host, m, x, readout, key) {
       );
       positionPresetScrub(host);
     };
-    // Any pointer grabs the shot at once, as the Stats shot charts do. A
-    // vertical swipe still scrolls the page (touch-action: pan-y), and the
-    // browser then cancels the pointer.
-    const move = (e) =>
-      scrub(host._view.tAt(e.clientX - host.firstChild.getBoundingClientRect().left));
-    host.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      host.setPointerCapture(e.pointerId);
-      host.querySelector(".rvScrub")?.focus({ preventScroll: true });
-      host.classList.add("rvHeld");
-      move(e);
-    });
-    host.addEventListener("pointermove", (e) => host.hasPointerCapture(e.pointerId) && move(e));
-    host.addEventListener("lostpointercapture", () => host.classList.remove("rvHeld"));
-    host.addEventListener("keydown", (e) => {
-      const step = {
-        ArrowRight: 0.5,
-        ArrowUp: 0.5,
-        ArrowLeft: -0.5,
-        ArrowDown: -0.5,
-        PageUp: 5,
-        PageDown: -5,
-      }[e.key];
-      if (!step) return;
-      e.preventDefault();
-      scrub(host._s + step);
-    });
+    bindScrub(
+      host,
+      (x) => host._view.tAt(x - host.firstChild.getBoundingClientRect().left),
+      scrub,
+      () => host._s,
+      ".rvScrub",
+    );
   }
   positionPresetScrub(host);
   return view;
@@ -6820,6 +6834,7 @@ export {
   placePill,
   escHtml,
   PILL,
+  bindScrub,
   presetGraph,
   observePresetHost,
   fadeFill,

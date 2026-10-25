@@ -50,7 +50,7 @@
   const render = new Function('document', 'ResizeObserver', '$', 'requestAnimationFrame',
       'const presetState={cutRampS:0.5};' + helpers + preset + renderer +
       runtimeJs.slice(runtimeJs.indexOf('const sub = '), runtimeJs.indexOf('\n', runtimeJs.indexOf('const sub = '))) +
-      ';const R={buildShotSparkModel,shotRuleModel,cutLine,placePill,sub,PILL,presetGraph,observePresetHost,' +
+      ';const R={buildShotSparkModel,shotRuleModel,cutLine,placePill,sub,PILL,bindScrub,presetGraph,observePresetHost,' +
       'axisLabel,fadeFill};return renderShotSpark;')(
       document, class{observe(){}}, ()=>({}), ()=>{});
   const observed = render(host, {wCg:[0,100,100,200], wAtMs:[0,100,600,600],
@@ -1568,7 +1568,7 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
     throw new Error('An invalid snapshot (delay not before the window) must render without the preset chart');
   const cardSrc = viewJs.stats.slice(viewJs.stats.indexOf('function renderShotSpark('), viewJs.stats.indexOf('function fillShotCharts('));
   if (cardSrc.includes('aria-expanded') || cardSrc.includes('shotMore') ||
-      !cardSrc.includes('bindShotScrub(') || !/"role",\s*"slider"/.test(viewJs.stats) || !cardSrc.includes('dataset.zone') ||
+      !cardSrc.includes('R.bindScrub(') || !/"role",\s*"slider"/.test(runtimeJs) || !cardSrc.includes('dataset.zone') ||
       !cardSrc.includes('observePresetHost(preset)') || cardSrc.includes('hatch') ||
       !cardSrc.includes('h.append(preset, readout, legend, combo);') || !cardSrc.includes('fillShotCharts(combo, m);') ||
       !cardSrc.includes('if (preset._view) h.style.setProperty("--shot-plot-h", preset._view.B - preset._view.T + "px");') ||

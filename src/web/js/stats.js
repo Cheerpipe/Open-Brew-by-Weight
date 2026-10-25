@@ -244,36 +244,6 @@ function curveAt(curve, t) {
     k = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0;
   return (a.cg + (b.cg - a.cg) * k) / 100;
 }
-// Both shot charts scrub alike: drag anywhere on the chart, or arrow keys once focused.
-function bindShotScrub(node, tAt, seek, now) {
-  const move = (e) => seek(tAt(e.clientX));
-  node.addEventListener("pointerdown", (e) => {
-    if (tAt(e.clientX) == null) return;
-    e.preventDefault();
-    node.setPointerCapture(e.pointerId);
-    node.focus({ preventScroll: true });
-    node.classList.add("rvHeld");
-    move(e);
-  });
-  node.addEventListener("pointermove", (e) => node.hasPointerCapture(e.pointerId) && move(e));
-  node.addEventListener("lostpointercapture", () => node.classList.remove("rvHeld"));
-  node.addEventListener("keydown", (e) => {
-    const step = {
-      ArrowRight: 0.5,
-      ArrowUp: 0.5,
-      ArrowLeft: -0.5,
-      ArrowDown: -0.5,
-      PageUp: 5,
-      PageDown: -5,
-    }[e.key];
-    if (!step) return;
-    e.preventDefault();
-    seek(now() + step);
-  });
-  node.tabIndex = 0;
-  node.setAttribute("role", "slider");
-  node.setAttribute("aria-label", __WEBUI_TEXT__("runtime.shot_cursor_label"));
-}
 function renderShotSpark(h, shot, m = R.buildShotSparkModel(shot)) {
   if (!h) return null;
   h.replaceChildren();
@@ -349,7 +319,7 @@ function renderShotSpark(h, shot, m = R.buildShotSparkModel(shot)) {
       );
     place();
   };
-  bindShotScrub(
+  R.bindScrub(
     preset,
     (x) => preset._view?.tAt(x - preset.firstChild.getBoundingClientRect().left),
     seek,
@@ -629,7 +599,7 @@ function fillShotCharts(h, m) {
       Math.min(yW, yF) * box.height,
     );
   };
-  bindShotScrub(
+  R.bindScrub(
     c,
     (x) =>
       ((((x - cur.getBoundingClientRect().left) / cur.clientWidth) * W - p) / (W - 2 * p)) *
@@ -934,7 +904,7 @@ function renderStatsConsistency(shots) {
         (Y(rel[at]) / 50) * cur.clientHeight,
       );
   };
-  bindShotScrub(
+  R.bindScrub(
     plot,
     (cx) => {
       const b = cur.getBoundingClientRect();
