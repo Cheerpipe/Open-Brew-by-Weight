@@ -164,11 +164,12 @@ a `--development` budget build and the flag-free release image that ships,
 each checked against its own size baseline. `--risk R3` also checks each pair
 with Cppcheck and a GCC warning build.
 R2 and R3 run two lanes at once: the host tests, and the firmware steps in a
-fixed order (route capacity, Web contracts, then each pair's development
-build, release build, Cppcheck, and warning build). Each step's output appears
-in the log as one block when
+fixed order (route capacity, Web UI budgets, Web contracts, then each pair's
+development build, release build, Cppcheck, and warning build). Each step's
+output appears in the log as one block when
 the step finishes. After any failure neither lane starts another step;
-steps already running finish first. The release and warning builds use their
+steps already running finish first. When both lanes pass, a final
+`budget-verdict` step judges every size budget the run measured. The release and warning builds use their
 own trees, `build-idf/release/<hardware>--<machine>/` and
 `build-idf/warnings/<hardware>--<machine>/`, so the gate's
 `build-idf/<hardware>--<machine>/` images stay incremental. Host tests and
@@ -186,6 +187,35 @@ command line; use the hidden prompt or the documented USB serial procedure.
 The current n16r8 resource baseline applies to the default `-O2` builds.
 Other optimization levels
 retain the physical image and memory placement checks; see [Build](BUILD.md#compiler-optimization-and-existing-sdkconfig).
+
+## Size budgets
+
+`./scripts/dev test budgets` measures every Web UI size budget in
+`config/web-asset-budgets.json` in a few seconds and lists each measurement
+against its limit. `test web` runs the same step before the Web contracts.
+Inside `test web`, `test budgets`, and the R2/R3 `validate` gates, the Web
+UI budget step and each firmware size check only record overruns under the
+run's `artifacts/runs/<run-id>/budgets/`; the final `budget-verdict` step
+fails once, listing all of them together with the command that accepts them.
+Running `node src/tests/check_web_budgets.js` or a firmware build on its own
+still fails on the first measurement over its limit.
+
+`--budget-report` on `validate`, `test web`, or `test budgets` turns the
+verdict into warnings and marks the run as not budget evidence, for work that
+is still in development.
+
+`./scripts/dev budget update --from <run-id>` accepts the sizes a finished
+run measured: it raises only the exceeded limits in
+`config/web-asset-budgets.json` and `config/resource-baselines.json`, prints
+each change, and re-checks the run's measurements, without rebuilding. It
+refuses report-mode, incomplete, or failed runs and any run whose recorded
+tree (`HEAD`, working-tree fingerprint, and budget-file hashes) no longer
+matches; see [Validation](../VALIDATION.md#size-budgets-and-parallel-work) for
+the parallel-work rules.
+
+Firmware builds and the Web contracts both rewrite the generated Web UI header
+under `src/`, so one checkout runs them one at a time behind
+`build-idf/.locks/source-tree.lock`; separate worktrees build in parallel.
 
 ## Diagnostics and recovery
 

@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""Judge or update the versioned size budgets from one run's measurements.
+
+Budget checks inside a gate only record what they measured under
+`<run>/budgets/`; this helper judges all of them at once at the end.
+
+verdict [--report]   list every overrun the current run recorded; --report
+                     prints them as warnings and passes (not budget evidence)
+update RUN_DIR       raise only the exceeded limits to the measured value plus
+                     the file's update headroom, print every change, and
+                     confirm the run's measurements now fit
+
+`./scripts/dev` owns the run checks (evidence, completeness, stale tree);
+this helper trusts the run it is given.
+"""
+import json
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+WEB = ROOT / "config/web-asset-budgets.json"
+FIRMWARE = ROOT / "config/resource-baselines.json"
+
+
+def load(path: Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def measurements(run_dir: Path) -> list[dict]:
+    return [load(path) for path in sorted((run_dir / "budgets").glob("*.json"))]
+
+
+def baselines(firmware: dict, target: str) -> dict:
+    group, name = target.split(".", 1)
+    return firmware[group][name]
+
+
+def overruns(records: list[dict], web: dict, firmware: dict) -> list[str]:
+    found = []
+    for record in records:
+        if record["kind"] == "web":
+            rows = [(row["name"], row["actual"], web["limits"][row["name"]])
+                    for row in record["rows"]]
+        else:
+            base = baselines(firmware, record["target"])
+            rows = [(f"{record['target']}.{row['metric']}", row["value"],
+                     base[row["metric"]] + firmware["allowedGrowthBytes"][row["metric"]])
+                    for row in record["rows"]]
+        found += [f"{name}: {actual} > {limit} (+{actual - limit})"
+                  for name, actual, limit in rows if actual > limit]
+    return found
+
+
+def verdict(report: bool) -> int:
+    run_dir = Path(os.environ["OPENBREWBYWEIGHT_RUN_DIR"])
+    records = measurements(run_dir)
+    if not records:
+        print("budget verdict: no budget measurements were recorded", file=sys.stderr)
+        return 1
+    found = overruns(records, load(WEB), load(FIRMWARE))
+    prefix = "warning: budget exceeded (report mode, not budget evidence): " if report \
+        else "BUDGET EXCEEDED "
+    for line in found:
+        print(prefix + line)
+    print(f"budget verdict: {len(records)} measurement set(s), {len(found)} overrun(s)")
+    if found and not report:
+        print(f"budget verdict: run `./scripts/dev budget update --from {run_dir.name}` "
+              "to accept these sizes after review")
+        return 1
+    return 0
+
+
+def update(run_dir: Path) -> int:
+    web, firmware = load(WEB), load(FIRMWARE)
+    before = {"limits": dict(web["limits"]),
+              "allowedGrowthBytes": dict(firmware["allowedGrowthBytes"])}
+    records = measurements(run_dir)
+    growth: dict[str, int] = {}
+    for record in records:
+        if record["kind"] == "web":
+            for row in record["rows"]:
+                if row["actual"] > web["limits"][row["name"]]:
+                    headroom = web["updateHeadroomBytes"][row["name"].split(".", 1)[0]]
+                    web["limits"][row["name"]] = row["actual"] + headroom
+            continue
+        base = baselines(firmware, record["target"])
+        for row in record["rows"]:
+            growth[row["metric"]] = max(growth.get(row["metric"], 0),
+                                        row["value"] - base[row["metric"]])
+    # Development and release images share one allowance per metric: it
+    # covers the largest growth any of them measured.
+    for metric, largest in growth.items():
+        if largest > firmware["allowedGrowthBytes"][metric]:
+            firmware["allowedGrowthBytes"][metric] = largest + firmware["updateHeadroomBytes"]
+    changes = [f"{group}.{name}: {old} -> {new} (+{new - old})"
+               for group, values in (("limits", web["limits"]),
+                                     ("allowedGrowthBytes", firmware["allowedGrowthBytes"]))
+               for name, new in values.items()
+               if (old := before[group][name]) != new]
+    if not changes:
+        print("budget update: no budget was exceeded; nothing changed")
+        return 0
+    for path, config in ((WEB, web), (FIRMWARE, firmware)):
+        path.write_text(json.dumps(config, indent=2) + "\n")
+    for line in changes:
+        print("updated " + line)
+    remaining = overruns(records, web, firmware)
+    if remaining:
+        print("budget update: still exceeded: " + "; ".join(remaining), file=sys.stderr)
+        return 1
+    print(f"budget update: every measurement of run {run_dir.name} fits the updated budgets; "
+          "record why each budget moved in the commit body")
+    return 0
+
+
+if __name__ == "__main__":
+    command = sys.argv[1:]
+    if command in (["verdict"], ["verdict", "--report"]):
+        sys.exit(verdict(len(command) == 2))
+    if len(command) == 2 and command[0] == "update":
+        sys.exit(update(Path(command[1])))
+    sys.exit("usage: budgets verdict [--report] | budgets update RUN_DIR")

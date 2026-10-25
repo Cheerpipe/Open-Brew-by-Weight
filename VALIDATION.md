@@ -38,9 +38,9 @@ the [manual test plan](docs/MANUAL_TEST_PLAN.md) and curated evidence by
 Any change to `src/OpenBrewByWeightNetwork.cpp`,
 `src/network/OpenBrewByWeightHttpLifecycle.inc`, or another source that defines or
 registers HTTP routes or handlers must run `./scripts/dev test web`. That profile,
-and every R2/R3 validation gate, runs the named `http-route-capacity` check before
-the broader Web contracts; the profile first checks that the Web UI sources are
-Prettier-formatted (`web-format`). The check counts all `registerHandler(server_, ...)`
+and every R2/R3 validation gate, runs the named `http-route-capacity` check and
+the Web UI budgets (`web-budgets`) before the broader Web contracts; the profile
+first checks that the Web UI sources are Prettier-formatted (`web-format`). The check counts all `registerHandler(server_, ...)`
 registrations in the network sources and requires `max_uri_handlers` to be
 strictly greater, preserving at least one spare slot.
 
@@ -63,6 +63,44 @@ R2/R3 validation builds all supported built-in profile pairs in
 profile build directories and the release images in `build-idf/release/`.
 Image and memory regions are compared by
 `src/tests/check_firmware_size.js` against those versioned budgets.
+
+## Size budgets and parallel work
+
+Every gate that measures sizes (`test web`, `test budgets`, and the R2/R3
+`validate` gates) records each measurement and ends with one `budget-verdict`
+step that lists every overrun at once: the Web UI budgets in
+`config/web-asset-budgets.json` and every development and release image
+against `config/resource-baselines.json`. `./scripts/dev test budgets` checks
+only the Web UI budgets, in a few seconds.
+
+When agents work in parallel:
+
+- Give each agent its own worktree. Web contracts and firmware builds rewrite
+  the shared generated Web UI header under `src/`, so in one checkout they
+  hold a checkout-wide lock and wait for each other, and a measurement there
+  includes every other session's edits. Gates in separate worktrees run
+  independently.
+- While a change is still in development, validate with `--budget-report`
+  (on `validate` and `test web|budgets`). Overruns print as warnings and the
+  run passes, but it is not budget evidence. Do not edit budget numbers in
+  that change; report the measured deltas instead.
+- The change that lands last integrates, whether or not a coordinator
+  session runs it. Before landing in `main`, rebase on the current `main`
+  and run the full classified gate without `--budget-report`. If its only
+  failed check is `budget-verdict` and the growth is reviewed, run
+  `./scripts/dev budget update --from <run-id>` for that same run and commit
+  the budget change with the feature, explaining in the body why each budget
+  moved. That run together with the update's re-check of its measurements is
+  the gate evidence; the gate does not run again.
+
+`budget update` refuses a run that recorded no budget measurements, used
+`--budget-report`, failed any check other than `budget-verdict` or stopped
+before it, or, for R2/R3, lacks the development or release measurement of
+some pair. It also refuses a stale run: every budget gate records `HEAD`, a
+fingerprint of tracked changes and untracked files, and the hash of both
+budget files, and any difference from the current tree (for example, a run
+taken before the rebase) means the gate must run again. The budget files
+classify as R1 validation data.
 
 The documentation check covers root guides, canonical guides in `docs/`, the BLE
 library README, and the safety README. Local working files in `temp/`,

@@ -74,10 +74,11 @@ if [[ "${OBBW_BUILD_LOCKED:-}" != "1" ]]; then
   obbw_cli_resolve_profiles "$effective_flags" || exit $?
   printf '%s\n' "$OBBW_PROFILE_OUTPUT"
 
-  # Serialize per-variant builds across parallel agents and sessions: the
-  # variant tree (generated headers, sdkconfig, artifacts) is mutated by the
-  # whole remainder of this script. Prompted input happened above, so no
-  # interactive pause holds the lock. The shell state crosses the exec via a
+  # Serialize builds in this checkout across parallel agents and sessions:
+  # the remainder of this script mutates the variant tree (generated headers,
+  # sdkconfig, artifacts) and the Web UI header under src/ that every variant
+  # and the Web contracts share, so it holds one lock per checkout. Prompted
+  # input happened above, so no interactive pause holds the lock. The shell state crosses the exec via a
   # declare -p dump (arrays survive; export would flatten them); with-flock
   # holds the lock and execs the second pass, so the kernel releases it on
   # every exit path including signals.
@@ -86,10 +87,9 @@ if [[ "${OBBW_BUILD_LOCKED:-}" != "1" ]]; then
   # shellcheck disable=SC2086  # names list is meant to word-split
   { [[ -z "$state_vars" ]] || declare -p $state_vars 2>/dev/null; } \
     >"$OBBW_BUILD_STATE_FILE" || true
-  mkdir -p "$OBBW_IDF_BUILD_ROOT/.locks"
   OBBW_BUILD_LOCKED=1 OBBW_BUILD_STATE_FILE="$OBBW_BUILD_STATE_FILE" \
     exec python3 "$SCRIPT_DIR/internal/with-flock" \
-    "$OBBW_IDF_BUILD_ROOT/.locks/$OPENBREWBYWEIGHT_VARIANT.lock" \
+    "$root/build-idf/.locks/source-tree.lock" \
     bash "$SCRIPT_DIR/internal/${0##*/}"
 fi
 

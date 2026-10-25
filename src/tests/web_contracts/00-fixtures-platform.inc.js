@@ -4,7 +4,22 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
-const webUi = require('../../scripts/gen_web_ui.js');
+// Contracts compare many Web UI variants: each distinct set of options is
+// generated once per run. Injected sources bypass the cache.
+const webUi = {...require('../../scripts/gen_web_ui.js')};
+const generateUncached = webUi.generate;
+const generatedVariants = new Map();
+webUi.generate = (options = {}) => {
+  if (options.readSource) return generateUncached(options);
+  const key = JSON.stringify(options);
+  if (!generatedVariants.has(key)) {
+    generatedVariants.set(key, generateUncached(options).catch((error) => {
+      generatedVariants.delete(key);
+      throw error;
+    }));
+  }
+  return generatedVariants.get(key);
+};
 const webUiLocale = require('../../scripts/localize_web_ui.js');
 const imageTag = require('../../scripts/image_tag.js');
 
@@ -13,24 +28,9 @@ function readSources(files) {
   return files.map((file) => fs.readFileSync(path.join(sketchDir, file), 'utf8'))
     .join('\n');
 }
-// Contracts read HTML and CSS in one compact form, so how the sources are
-// formatted cannot change what a needle matches. Markup collapses like the
-// shipped build; CSS drops comments and the spacing, quotes, leading zeros,
-// and last semicolons a formatter adds.
-const compactMarkup = (source) => require('html-minifier-terser').minify(source,
-    {collapseWhitespace: true, collapseBooleanAttributes: true});
-const compactCss = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ')
-    .replace(/\s*([{};,]|!important)\s*/g, '$1')
-    .replace(/([(:])\s+|\s+\)/g, (_, open) => open || ')')
-    .replace(/[^{}]+\{/g, (prelude) => prelude.replace(/\s*([>+~])\s*/g, '$1'))
-    .replace(/\{[^{}]*\}/g, (block) => block.replace(/\s*\*\s*/g, '*'))
-    .replace(/;}/g, '}')
-    .replace(/@media \(/g, '@media(')
-    .replace(/(^|[^\w.])0\.(\d)/g, '$1.$2')
-    .replace(/\[([-\w]+)([~|^$*]?=)"(-?[_a-zA-Z][-\w]*)"\]/g, '[$1$2$3]')
-    .replace(/'([^'"]*)'/g, '"$1"')
-    .trim();
-const rawShellHtml = await compactMarkup(fs.readFileSync(webUi.sourcePath, 'utf8'));
+// The size-budget step reads the same compact, localized authoring sources.
+const authoring = await require('./check_web_budgets.js').authoringSources();
+const rawShellHtml = authoring.raw.shellHtml;
 const network = readSources([
   'OpenBrewByWeightNetwork.cpp',
   'network/OpenBrewByWeightNetworkService.inc',

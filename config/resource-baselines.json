@@ -8,6 +8,7 @@
     "flash_code": 76408,
     "flash_rodata": 40496
   },
+  "updateHeadroomBytes": 64,
   "targets": {
     "n16r8": {
       "image": 2369456,

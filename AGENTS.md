@@ -100,6 +100,13 @@ failures, not silent skips. Tests must not install packages, use the network, or
 touch hardware implicitly. Static analysis is run only when explicitly requested
 or required by the requested validation gate.
 
+Parallel agents work in separate worktrees, validate with `--budget-report`,
+and never edit budget numbers in a change still in development. The change
+that lands last rebases on `main`, runs the full gate once, and accepts
+reviewed overruns only with `./scripts/dev budget update --from <run-id>` from
+that post-rebase run; see
+[Size budgets and parallel work](VALIDATION.md#size-budgets-and-parallel-work).
+
 Firmware compile checks and examples use the canonical development pair
 `--hardware esp32-s3-relay-x1-speaker --machine la-marzocco-linea-micra`, the
 project's reference machine; select another supported pair only when the

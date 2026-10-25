@@ -75,16 +75,33 @@ console.log(`external BSS: ${externalBssBytes} (budget ${config.maximumExternalB
 if (actual.image > slotLimits[arch]) {
   failures.push(`image ${actual.image} > OTA slot ${slotLimits[arch]}`);
 }
+// A deferred gate records baseline overruns and judges them once at its end;
+// the OTA slot and memory placement checks above always fail at once.
+const deferred = process.env.OPENBREWBYWEIGHT_BUDGET_DEFER === '1';
+const rows = [];
+let over = 0;
 for (const [metric, baseline] of Object.entries(baselines || config.targets[arch])) {
   const value = actual[metric];
   const limit = baseline + config.allowedGrowthBytes[metric];
+  const exceeded = qualifiedSizeProfile && value > limit;
+  over += exceeded;
   if (!Number.isFinite(value) || value < 0) failures.push(`${metric} is missing or invalid`);
-  else if (qualifiedSizeProfile && value > limit) failures.push(`${metric} ${value} > baseline budget ${limit}`);
+  else if (exceeded && !deferred) failures.push(`${metric} ${value} > baseline budget ${limit}`);
   else console.log(qualifiedSizeProfile
-      ? `${metric}: ${value} (baseline ${baseline}, delta ${value - baseline})`
+      ? `${exceeded ? 'BUDGET EXCEEDED ' : ''}${metric}: ${value} (baseline ${baseline}, delta ${value - baseline}, limit ${limit})`
       : `${metric}: ${value} (${unqualified})`);
+  rows.push({metric, value, baseline});
+}
+if (qualifiedSizeProfile && !failures.length && process.env.OPENBREWBYWEIGHT_RUN_DIR) {
+  const profile = process.argv.includes('--development') ? 'development' : 'release';
+  const target = profile === 'development' ? `targets.${arch}` :
+    `releaseTargets.${path.basename(path.dirname(binPath))}`;
+  const directory = path.join(process.env.OPENBREWBYWEIGHT_RUN_DIR, 'budgets');
+  fs.mkdirSync(directory, {recursive: true});
+  fs.writeFileSync(path.join(directory, `firmware-${profile}-${path.basename(path.dirname(binPath))}.json`),
+      JSON.stringify({kind: 'firmware', target, rows}, null, 2) + '\n');
 }
 if (failures.length) throw new Error(failures.join('; '));
-console.log(qualifiedSizeProfile
-  ? `${arch}: image and memory regions are within versioned budgets`
-  : `${arch}: ${unqualified}; OTA slot and memory checks passed`);
+console.log(!qualifiedSizeProfile ? `${arch}: ${unqualified}; OTA slot and memory checks passed` :
+  over ? `${arch}: ${over} budget overrun(s) deferred to the gate's budget verdict` :
+  `${arch}: image and memory regions are within versioned budgets`);

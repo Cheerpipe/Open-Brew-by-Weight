@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -62,6 +63,13 @@ AREAS = {
 SECRET = re.compile(r"(?i)(password|token)(\s*[=:]\s*|\s+)\S+")
 HTTP_ROUTE_CAPACITY_STEP = (
     "http-route-capacity", ["node", "src/tests/check_http_route_capacity.js"])
+WEB_BUDGETS_STEP = ("web-budgets", ["node", "src/tests/check_web_budgets.js"])
+# The contracts and every IDF build rewrite the shared Web UI header under src/,
+# so one checkout runs them one at a time.
+SOURCE_TREE_LOCK = "build-idf/.locks/source-tree.lock"
+WEB_CONTRACTS_STEP = ("web-contracts", ["python3", "scripts/internal/with-flock",
+                                        SOURCE_TREE_LOCK, "node", "src/tests/check_web_assets.js"])
+BUDGET_FILES = ("config/web-asset-budgets.json", "config/resource-baselines.json")
 BUILD_PROFILES = (
     ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-micra"),
     ("esp32-s3-relay-x1-speaker", "rancilio-silvia-pro-x"),
@@ -97,6 +105,57 @@ def changed_paths() -> list[str]:
     return sorted(set(tracked + untracked))
 
 
+def tree_state() -> dict[str, object]:
+    """The tree a budget measurement describes: `budget update` refuses to
+    apply a run's measurements to any other tree."""
+    worktree = hashlib.sha256(subprocess.run(
+        ["git", "diff", "--binary", "HEAD"], cwd=ROOT, capture_output=True).stdout)
+    for path in subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "-z"],
+                               cwd=ROOT, capture_output=True).stdout.split(b"\0"):
+        file = ROOT / path.decode()
+        if path and file.is_file():
+            worktree.update(path + b"\0" + file.read_bytes())
+    return {"head": sha(), "worktree": worktree.hexdigest(),
+            "budgetFiles": {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+                            for path in BUDGET_FILES}}
+
+
+def budget_gate(report: bool, firmware: bool) -> dict[str, object]:
+    """Gate options that measure budgets: every check records instead of
+    failing, and one final verdict judges all of them together."""
+    return {"env_extra": {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1"},
+            "final": [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict",
+                                          *(["--report"] if report else [])])],
+            "summary_extra": {"budget": {"evidence": not report, "firmware": firmware,
+                                         "tree": tree_state()}}}
+
+
+def budget_update_problems(run_id: str) -> list[str]:
+    run_dir = ROOT / "artifacts/runs" / run_id
+    summary_path = run_dir / "summary.json"
+    budget = json.loads(summary_path.read_text()).get("budget") if summary_path.is_file() else None
+    if not budget:
+        return [f"run {run_id} recorded no budget measurements"]
+    if not budget["evidence"]:
+        return [f"run {run_id} used --budget-report and is not budget evidence"]
+    checks = json.loads(summary_path.read_text())["checks"]
+    problems = [f"check {check['name']} failed; only budget overruns can be accepted"
+                for check in checks
+                if check["status"] != "passed" and check["name"] != "budget-verdict"]
+    if not any(check["name"] == "budget-verdict" for check in checks):
+        problems.append(f"run {run_id} stopped before its budget verdict")
+    if budget["firmware"] and len(list((run_dir / "budgets").glob("firmware-*.json"))) != \
+            2 * len(BUILD_PROFILES):
+        problems.append(f"run {run_id} lacks a development or release measurement of some pair")
+    now = tree_state()
+    stale = [name for name in ("head", "worktree", "budgetFiles")
+             if now[name] != budget["tree"][name]]
+    if stale:
+        problems.append(f"run {run_id} is stale: {', '.join(stale)} changed since it was "
+                        "measured; run the gate again on this tree")
+    return problems
+
+
 def path_risk(path: str) -> str:
     p = path.replace("\\", "/")
     while p.startswith("./"):
@@ -109,7 +168,8 @@ def path_risk(path: str) -> str:
             r"(?i)(ble|network|webhook|ota|persist|nvs|shotlog)", p):
         return "R2"
     if p.startswith(("src/web/", "src/tests/", "scripts/", ".github/")) or p in {
-            "CMakeLists.txt", "CMakePresets.json", "package.json", "package-lock.json"}:
+            "CMakeLists.txt", "CMakePresets.json", "package.json", "package-lock.json",
+            *BUDGET_FILES}:
         return "R1"
     if p.endswith(".md") or name in {"agents.md", ".cursorignore", ".gitignore", ".git-blame-ignore-revs"} or p.startswith(".cursor/"):
         return "R0"
@@ -247,8 +307,10 @@ def safe_args(args: list[str]) -> list[str]:
 
 def write_summary(command: list[str], risk: str, status: str, started: float,
                   checks: list[dict[str, str]], log_path: Path,
-                  manual: list[str], inputs: dict[str, object]) -> Path:
+                  manual: list[str], inputs: dict[str, object],
+                  extra: dict[str, object] | None = None) -> Path:
     summary = {
+        **(extra or {}),
         "schemaVersion": 1,
         "command": safe_args(command),
         "risk": risk,
@@ -272,9 +334,12 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
             verbosity: str, manual: list[str] | None = None,
             prelude: list[str] | None = None, interactive: bool = False,
             env_extra: dict[str, str] | None = None,
-            lanes: list[list[tuple[str, list[str]]]] | None = None) -> int:
+            lanes: list[list[tuple[str, list[str]]]] | None = None,
+            final: list[tuple[str, list[str]]] | None = None,
+            summary_extra: dict[str, object] | None = None) -> int:
     """Run steps in order, or each lane in parallel with whole-step log blocks.
-    After a failure no lane starts another step; running steps finish."""
+    After a failure no lane starts another step; running steps finish. Final
+    steps run after every lane, only when nothing failed."""
     started = time.monotonic()
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{os.getpid()}"
     run_dir = ROOT / "artifacts/runs" / run_id
@@ -282,7 +347,9 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
     log_path = run_dir / "run.log"
     lines = list(prelude or [])
     lanes = lanes or [steps]
-    order = {name: i for i, (name, _) in enumerate(s for lane in lanes for s in lane)}
+    final = final or []
+    order = {name: i for i, (name, _) in
+             enumerate(s for lane in [*lanes, final] for s in lane)}
     checks: list[dict[str, str]] = []
     failures: list[tuple[int, list[str]]] = []
     lock = threading.Lock()
@@ -304,7 +371,8 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
                     if failures:
                         return
                 block = [f"==> {name}: {' '.join(safe_args(argv))}"]
-                child_env = {**os.environ, **(env_extra or {})}
+                child_env = {**os.environ, **(env_extra or {}),
+                             "OPENBREWBYWEIGHT_RUN_DIR": str(run_dir)}
                 if interactive:
                     child_env.pop("OPENBREWBYWEIGHT_NONINTERACTIVE", None)
                 else:
@@ -336,12 +404,14 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
             thread.start()
         for thread in threads:
             thread.join()
+        if not failures:
+            run_lane(final)
     checks.sort(key=lambda check: order[check["name"]])
     child_code = failures[0][0] if failures else 0
     code = child_code if child_code in {0, 2, 127} else 1
     status = "passed" if code == 0 else ("missing_dependency" if code == 127 else "failed")
     summary = write_summary(command, risk, status, started, checks, log_path,
-                            manual or [], {"verbosity": verbosity})
+                            manual or [], {"verbosity": verbosity}, summary_extra)
     if verbosity == "compact":
         limit = 20 if code == 0 else 80
         shown = (failures[0][1] if failures else lines)[-max(0, limit - 3):]
@@ -472,8 +542,10 @@ commands:
   doctor                     report local tools and the ESP-IDF environment; never installs
   context AREA               list focused paths and their purpose
   classify [PATH ...]        print path risks and aggregate risk
-  test [normal|asan|tsan|web|ble|ota|tooling|lint]
-  validate [--risk R0..R3] [--webui-language CODE] [PATH ...]
+  test [normal|asan|tsan|web|budgets|ble|ota|tooling|lint] [--budget-report]
+  validate [--risk R0..R3] [--webui-language CODE] [--budget-report] [PATH ...]
+  budget update --from RUN_ID
+                             raise only the budgets that run exceeded; no rebuild
   profiles                   list exact profile IDs and compatibility
   preview [--port N]         serve the Web UI design preview on localhost
   build [flash|ota] [monitor] [ARGS]
@@ -616,9 +688,12 @@ def main() -> int:
                            env_extra={"PORT": port} if port else None)
 
         if verb == "test":
+            budget_report, args = extract_switch(args, "--budget-report")
             profile = args[0] if args else "normal"
             if len(args) > 1:
                 raise ValueError("test accepts one profile")
+            if budget_report and profile not in {"web", "budgets"}:
+                raise ValueError("--budget-report applies to the web and budgets profiles")
             missing = require(["cmake", "ctest", "c++"])
             if missing:
                 return record(command, "R1", verbosity,
@@ -635,16 +710,18 @@ def main() -> int:
                 steps = cmake_steps("normal", "ota") + [
                     ("ota-cli", ["bash", "src/tests/ota_cli_resilience_test.sh"]),
                     ("ota-web", ["node", "src/tests/ota_web_resilience_test.js"])]
-            elif profile == "web":
+            elif profile in {"web", "budgets"}:
                 deps = [ROOT / "node_modules" / name for name in
                         ["terser", "html-minifier-terser", "clean-css", "lightningcss", "prettier", "@gfx/zopfli"]]
                 if require(["node"]) or any(not dep.exists() for dep in deps):
                     return record(command, "R1", verbosity,
-                                  ["Web dependencies missing; run npm ci explicitly"], 127, "web")
-                steps = [("web-format", ["node_modules/.bin/prettier", "--check", "src/web/html",
-                                         "src/web/app.css", "src/web/app.js", "src/web/js"]),
-                         HTTP_ROUTE_CAPACITY_STEP,
-                         ("web-contracts", ["node", "src/tests/check_web_assets.js"])]
+                                  ["Web dependencies missing; run npm ci explicitly"], 127, profile)
+                steps = [WEB_BUDGETS_STEP] if profile == "budgets" else [
+                    ("web-format", ["node_modules/.bin/prettier", "--check", "src/web/html",
+                                    "src/web/app.css", "src/web/app.js", "src/web/js"]),
+                    HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP]
+                return execute(command, "R1", steps, verbosity,
+                               **budget_gate(budget_report, firmware=False))
             elif profile == "lint":
                 # Opt-in Web UI static analysis; the pinned linters come from npm ci.
                 bins = ["node_modules/.bin/eslint", "node_modules/.bin/stylelint"]
@@ -666,6 +743,7 @@ def main() -> int:
                            steps, verbosity)
 
         if verb == "validate":
+            budget_report, args = extract_switch(args, "--budget-report")
             override, paths = extract_option(args, "--risk")
             webui_language, paths = extract_option(paths, "--webui-language")
             webui_language = (webui_language or
@@ -699,8 +777,7 @@ def main() -> int:
             if risk in {"R2", "R3"}:
                 host += cmake_steps("asan-ubsan") + cmake_steps("tsan") + [
                     ("architecture", ["python3", "scripts/check_architecture.py"])]
-                firmware = [HTTP_ROUTE_CAPACITY_STEP,
-                            ("web-contracts", ["node", "src/tests/check_web_assets.js"])]
+                firmware = [HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP]
                 for hardware, machine in BUILD_PROFILES:
                     variant = f"{hardware}--{machine}"
                     build = ["./scripts/internal/build-idf", "--hardware", hardware,
@@ -718,7 +795,8 @@ def main() -> int:
                                       *FIRMWARE_BUDGET_OPTIONS])]
             manual = ["Complete and attach applicable HIL/manual evidence"] if risk == "R3" else []
             return execute(command, risk, host + firmware, verbosity, manual, prelude,
-                           lanes=[host, firmware] if firmware else None)
+                           lanes=[host, firmware] if firmware else None,
+                           **(budget_gate(budget_report, firmware=True) if firmware else {}))
 
         if verb in FIRMWARE_STAGES:
             ensure_no_secret_argv(args)
@@ -752,6 +830,18 @@ def main() -> int:
                 verbosity,
                 ["Verify physical safety before hardware use"] if transfer else [],
                 interactive=sys.stdin.isatty(), env_extra=env_extra)
+
+        if verb == "budget":
+            run_id, rest = extract_option(args[1:], "--from")
+            if args[:1] != ["update"] or rest or not run_id or \
+                    not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9]+", run_id):
+                raise ValueError("usage: budget update --from RUN_ID (an artifacts/runs directory)")
+            problems = budget_update_problems(run_id)
+            if problems:
+                return record(command, "R1", verbosity, problems, 1, "budget-update")
+            return execute(command, "R1", [("budget-update", [
+                "python3", "scripts/internal/budgets", "update",
+                str(ROOT / "artifacts/runs" / run_id)])], verbosity)
 
         if verb == "analyze":
             ensure_no_secret_argv(args)

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "updateHeadroomBytes": {
+    "source": 0,
+    "gzip": 32,
+    "raw": 0
+  },
+  "limits": {
+    "source.html": 108304,
+    "source.js": 543866,
+    "source.htmlJs": 652170,
+    "gzip.shellHtml": 5180,
+    "gzip.shellJs": 7880,
+    "gzip.css": 17420,
+    "gzip.runtime": 43660,
+    "gzip.otaImage": 3072,
+    "gzip.module.records": 17980,
+    "gzip.module.diagnostic": 14690,
+    "gzip.module.admin": 18920,
+    "gzip.module.settings": 18430,
+    "gzip.module.setup": 5870,
+    "gzip.manifest": 1024,
+    "raw.icon192": 31500,
+    "raw.icon48": 3500,
+    "gzip.coldHome": 74080,
+    "gzip.combined": 159420
+  }
+}

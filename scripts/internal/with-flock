@@ -13,6 +13,7 @@ import sys
 if len(sys.argv) < 3:
     sys.exit("usage: with-flock LOCKFILE COMMAND [ARGS...]")
 lock_path, command = sys.argv[1], sys.argv[2:]
+os.makedirs(os.path.dirname(os.path.abspath(lock_path)), exist_ok=True)
 holder = open(lock_path, "w")
 try:
     fcntl.flock(holder.fileno(), fcntl.LOCK_EX)

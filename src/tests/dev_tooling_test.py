@@ -263,11 +263,11 @@ with tempfile.TemporaryDirectory(prefix="ai_temp_size_check_", dir=ROOT / "temp"
     size.write_text(json.dumps(metrics))
     sdkconfig = build / "sdkconfig"
 
-    def check_size(arch="n16r8", development=False):
+    def check_size(arch="n16r8", development=False, env=None):
         args = ["node", str(ROOT / "src/tests/check_firmware_size.js"),
                 str(image), "--arch", arch,
                 "--development" if development else "--release"]
-        return subprocess.run(args, cwd=ROOT,
+        return subprocess.run(args, cwd=ROOT, env={**os.environ, **(env or {})},
                               text=True, capture_output=True)
 
     sdkconfig.write_text("CONFIG_COMPILER_OPTIMIZATION_PERF=y\n")
@@ -293,6 +293,17 @@ with tempfile.TemporaryDirectory(prefix="ai_temp_size_check_", dir=ROOT / "temp"
     size.write_text(json.dumps({**metrics, "total_size": 3_000_000}))
     assert check_size().returncode == 0
     assert "total_size 3000000 > baseline budget" in check_size(development=True).stderr
+    # A deferring gate records the overrun for its final verdict instead.
+    with tempfile.TemporaryDirectory(prefix="openbrewbyweight-budget-run-") as run_dir:
+        deferred = check_size(development=True, env={
+            "OPENBREWBYWEIGHT_BUDGET_DEFER": "1", "OPENBREWBYWEIGHT_RUN_DIR": run_dir})
+        assert deferred.returncode == 0 and "BUDGET EXCEEDED total_size: 3000000" in deferred.stdout
+        recorded = json.loads(next(Path(run_dir, "budgets").glob(
+            "firmware-development-*.json")).read_text())
+        assert recorded["target"] == "targets.n16r8" and {
+            "metric": "total_size", "value": 3_000_000,
+            "baseline": json.loads((ROOT / "config/resource-baselines.json").read_text())
+            ["targets"]["n16r8"]["total_size"]} in recorded["rows"], recorded
     sdkconfig.write_text("CONFIG_COMPILER_OPTIMIZATION_SIZE=y\n")
     assert check_size().returncode == 0
     assert check_size(development=True).returncode == 0
@@ -340,15 +351,19 @@ assert "cmake: MISSING" in failed_line(
     [{"name": "doctor", "status": "failed"}], ["cmake: MISSING"],
     "missing_dependency")
 
-# Per-variant build serialization: build-idf must re-exec through with-flock
-# holding the variant lock, and the helper must be the portable fcntl holder.
+# Checkout-wide build serialization: build-idf must re-exec through with-flock
+# holding the source-tree lock the Web contracts share, and the helper must be
+# the portable fcntl holder.
 with_flock = INTERNAL / "with-flock"
 assert with_flock.is_file() and with_flock.stat().st_mode & 0o111
 assert "fcntl.flock" in with_flock.read_text()
 assert "set_inheritable" in with_flock.read_text(), (
     "PEP 446 close-on-exec would release the lock before the build starts")
 assert "OBBW_BUILD_LOCKED" in internal_build and "with-flock" in internal_build
-assert ".locks/" in internal_build and "OPENBREWBYWEIGHT_VARIANT.lock" in internal_build
+assert '"$root/build-idf/.locks/source-tree.lock"' in internal_build
+assert dev_module["SOURCE_TREE_LOCK"] == "build-idf/.locks/source-tree.lock"
+assert dev_module["WEB_CONTRACTS_STEP"][1][:3] == [
+    "python3", "scripts/internal/with-flock", dev_module["SOURCE_TREE_LOCK"]]
 
 # Serialization actually blocks: a held lock must delay a second holder.
 import time as _time
@@ -1030,9 +1045,9 @@ def validate_language_steps(args: list[str], environment: str | None = None,
     captured = {}
 
     def capture(command, risk, steps, verbosity, manual=None, prelude=None,
-                lanes=None):
+                lanes=None, **options):
         assert lanes is None or steps == [s for lane in lanes for s in lane]
-        captured.update(command=command, risk=risk, steps=steps, lanes=lanes)
+        captured.update(command=command, risk=risk, steps=steps, lanes=lanes, **options)
         return 0
 
     main = dev_module["main"]
@@ -1044,6 +1059,7 @@ def validate_language_steps(args: list[str], environment: str | None = None,
         else:
             os.environ["OPENBREWBYWEIGHT_WEBUI_LANGUAGE"] = environment
         assert main() == 0
+    validate_language_steps.captured = captured
     return captured["lanes"] if lanes else captured["steps"]
 
 
@@ -1084,13 +1100,103 @@ assert [name for name, _ in host_lane] == [
     f"{stage}-{preset}" for preset in ("normal", "asan-ubsan", "tsan")
     for stage in ("configure", "build", "test")] + ["architecture"], host_lane
 firmware_names = [name for name, _ in firmware_lane]
-assert firmware_names[:2] == ["http-route-capacity", "web-contracts"], firmware_names
-assert firmware_names[2:] == [f"{kind}-{hardware}--{machine}"
+assert firmware_names[:3] == ["http-route-capacity", "web-budgets", "web-contracts"], firmware_names
+assert firmware_names[3:] == [f"{kind}-{hardware}--{machine}"
                               for hardware, machine in dev_module["BUILD_PROFILES"]
                               for kind in ("idf", "release", "cppcheck", "warnings")], firmware_names
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for name, argv in host_lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
+
+# Budget gates defer every size check to one verdict after all lanes, and
+# record the measured tree; report mode is never budget evidence.
+validate_language_steps(["src/web/app.js"], risk="R2")
+gate = validate_language_steps.captured
+assert gate["env_extra"] == {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1"}, gate
+assert gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict"])]
+assert gate["summary_extra"]["budget"]["evidence"] is True
+assert gate["summary_extra"]["budget"]["firmware"] is True
+assert set(gate["summary_extra"]["budget"]["tree"]) == {"head", "worktree", "budgetFiles"}
+validate_language_steps(["--budget-report", "src/web/app.js"], risk="R2")
+report_gate = validate_language_steps.captured
+assert report_gate["final"][0][1][-1] == "--report"
+assert report_gate["summary_extra"]["budget"]["evidence"] is False
+for path in dev_module["BUDGET_FILES"]:
+    assert dev_module["path_risk"](path) == "R1", path
+
+# The budget helper judges every recorded overrun at once and raises only the
+# exceeded limits, each by its file's update headroom.
+with tempfile.TemporaryDirectory(prefix="openbrewbyweight-budgets-") as temporary:
+    root = Path(temporary)
+    (root / "scripts/internal").mkdir(parents=True)
+    (root / "config").mkdir()
+    shutil.copy2(INTERNAL / "budgets", root / "scripts/internal/budgets")
+    web_file, firmware_file = root / "config/web-asset-budgets.json", root / "config/resource-baselines.json"
+    web_file.write_text(json.dumps({"updateHeadroomBytes": {"gzip": 32, "source": 0},
+                                    "limits": {"gzip.css": 100, "source.js": 50}}))
+    firmware_file.write_text(json.dumps({
+        "allowedGrowthBytes": {"image": 10}, "updateHeadroomBytes": 64,
+        "targets": {"n16r8": {"image": 1000}}, "releaseTargets": {"pair": {"image": 2000}}}))
+    run_dir = root / "artifacts/runs/r"
+    (run_dir / "budgets").mkdir(parents=True)
+    (run_dir / "budgets/web.json").write_text(json.dumps({"kind": "web", "rows": [
+        {"name": "gzip.css", "actual": 120, "limit": 100},
+        {"name": "source.js", "actual": 40, "limit": 50}]}))
+    for profile, target, value in (("development", "targets.n16r8", 1030),
+                                   ("release", "releaseTargets.pair", 2050)):
+        (run_dir / f"budgets/firmware-{profile}-pair.json").write_text(json.dumps({
+            "kind": "firmware", "target": target,
+            "rows": [{"metric": "image", "value": value, "baseline": 0}]}))
+
+    def helper(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["python3", str(root / "scripts/internal/budgets"), *args],
+                              env={**os.environ, "OPENBREWBYWEIGHT_RUN_DIR": str(run_dir)},
+                              text=True, capture_output=True)
+
+    judged = helper("verdict")
+    assert judged.returncode == 1 and "source.js" not in judged.stdout, judged.stdout
+    assert "BUDGET EXCEEDED gzip.css: 120 > 100 (+20)" in judged.stdout, judged.stdout
+    assert "BUDGET EXCEEDED targets.n16r8.image: 1030 > 1010 (+20)" in judged.stdout
+    assert "BUDGET EXCEEDED releaseTargets.pair.image: 2050 > 2010 (+40)" in judged.stdout
+    reported = helper("verdict", "--report")
+    assert reported.returncode == 0 and "not budget evidence" in reported.stdout
+    updated = helper("update", str(run_dir))
+    assert updated.returncode == 0, updated.stderr
+    assert json.loads(web_file.read_text())["limits"] == {"gzip.css": 152, "source.js": 50}
+    assert json.loads(firmware_file.read_text())["allowedGrowthBytes"] == {"image": 114}
+    assert helper("verdict").returncode == 0
+    assert "nothing changed" in helper("update", str(run_dir)).stdout
+
+# `budget update` accepts only a complete, non-report run of this exact tree
+# whose only failure is the budget verdict.
+update_problems = dev_module["budget_update_problems"]
+with tempfile.TemporaryDirectory(prefix="openbrewbyweight-budget-runs-") as temporary:
+    tree = {"head": "a", "worktree": "b", "budgetFiles": {"config/x.json": "c"}}
+    run_dir = Path(temporary) / "artifacts/runs/r"
+    (run_dir / "budgets").mkdir(parents=True)
+
+    def problems_for(checks, firmware=False, evidence=True, recorded=tree):
+        (run_dir / "summary.json").write_text(json.dumps({"checks": checks, "budget": {
+            "evidence": evidence, "firmware": firmware, "tree": recorded}}))
+        with patch.dict(update_problems.__globals__, ROOT=Path(temporary),
+                        tree_state=lambda: dict(tree)):
+            return " | ".join(update_problems("r"))
+
+    verdict_failed = [{"name": "web-budgets", "status": "passed"},
+                      {"name": "budget-verdict", "status": "failed"}]
+    assert problems_for(verdict_failed) == ""
+    assert "--budget-report" in problems_for(verdict_failed, evidence=False)
+    assert "check web-contracts failed" in problems_for(
+        [{"name": "web-contracts", "status": "failed"}, *verdict_failed])
+    assert "stopped before its budget verdict" in problems_for(verdict_failed[:1])
+    assert "lacks a development or release measurement" in problems_for(
+        verdict_failed, firmware=True)
+    assert "is stale: head" in problems_for(verdict_failed, recorded={**tree, "head": "old"})
+    assert "is stale: worktree, budgetFiles" in problems_for(
+        verdict_failed, recorded={**tree, "worktree": "x", "budgetFiles": {}})
+    (run_dir / "summary.json").unlink()
+    with patch.dict(update_problems.__globals__, ROOT=Path(temporary)):
+        assert "recorded no budget measurements" in update_problems("r")[0]
 
 # A failing lane stops every lane from starting another step, while the step
 # already running finishes and its whole output stays one contiguous block.
@@ -1715,7 +1821,7 @@ assert set(release_baselines["releaseTargets"]) == {
     f"{hardware}--{machine}" for hardware, machine in local_pairs}, \
     "every supported pair needs its own release-image baseline"
 # The opt-in Web UI lint profile never installs: absent linters fail with 127.
-assert "test [normal|asan|tsan|web|ble|ota|tooling|lint]" in dev_module["help_text"]()
+assert "test [normal|asan|tsan|web|budgets|ble|ota|tooling|lint]" in dev_module["help_text"]()
 with tempfile.TemporaryDirectory(prefix="openbrewbyweight-lint-") as temporary:
     lint_main = runpy.run_path(str(DEV))["main"]
     with patch.dict(lint_main.__globals__, {"ROOT": Path(temporary)}), \
