@@ -6426,9 +6426,10 @@ function loadSettingsConfig(c) {
   for (const k of ["doseG", "fastBeforeS", "slowAfterS", "fastMarginG", "slowMarginG"])
     $(k).value = (+c[k]).toFixed(1);
   $("scaleLossFixedS").value = c.scaleLossFixedS > 0 ? String(c.scaleLossFixedS) : "";
-  restoreSnapshot(edited);
+  // The baseline is the device; an edit the device now holds is settled.
   uiState.formBaseline = snapshotControls(els);
-  for (const id in edited) uiState.formBaseline[id] = base[id];
+  for (const id in edited) if (Object.is(edited[id], uiState.formBaseline[id])) delete edited[id];
+  restoreSnapshot(edited);
   formRev = c.revision;
   configRevision = c.revision;
   configLoaded = true;
