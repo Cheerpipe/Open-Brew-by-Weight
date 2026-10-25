@@ -258,7 +258,7 @@ const uiState = {
   brewDirty: false,
   brewWarnSig: "",
   brewWarnSeq: 0,
-  configBaseline: null,
+  formBaseline: null,
   micraDirty: false,
   quickDirty: false,
   micraSignIn: null,
@@ -277,7 +277,6 @@ const uiState = {
   statsExportResolve: null,
   savedTimezoneId: "",
   bbwReadback: null,
-  brewBaseline: null,
   diagnosticPublicView: false,
   bleBaseline: null,
   powerBaseline: null,
@@ -772,10 +771,10 @@ function releaseDeviceSlot() {
 function statusPollDue() {
   return !commandBusy && !uiState.otaBusy && Date.now() - lastStatusAt >= 900;
 }
-// Settings/Admin only; live state rides the Home stream (ARCHITECTURE.md).
+// Admin only; every other view rides the owned UI stream (ARCHITECTURE.md).
 function armStatusTimer() {
   clearInterval(statusTimer);
-  if (!webUiPollingActive() || (activeView !== "settings" && activeView !== "admin")) return;
+  if (!webUiPollingActive() || activeView !== "admin") return;
   statusTimer = setInterval(() => {
     if (webUiPollingActive() && statusPollDue()) refreshStatus();
   }, 1e4);
@@ -3017,14 +3016,14 @@ function brewCrossErr(kind, id, other, off = 0) {
     BREW_SECTION_TEXT[refSection],
   ]);
 }
-// The fields the user changed since the form was last clean: the baseline is
-// refreshed whenever the brew section is saved or re-hydrated clean, so
-// programmatic writes (the Home quick-weight sheet) count as edits too.
+// The fields the user changed: the baseline follows the device for every
+// field without a pending edit, so programmatic writes (the Home quick-weight
+// sheet) count as edits too.
 function editedBrewFields() {
   const edited = new Set();
-  if (!uiState.brewBaseline) return edited;
+  if (!uiState.formBaseline) return edited;
   for (const el of settingsSectionEls("brew"))
-    if (el.id && uiState.brewBaseline[el.id] !== (el.type === "checkbox" ? el.checked : el.value))
+    if (el.id && uiState.formBaseline[el.id] !== (el.type === "checkbox" ? el.checked : el.value))
       edited.add(el.id);
   return edited;
 }
@@ -3489,18 +3488,13 @@ async function cleanBrewForm() {
   await ensureSettingsHydrated();
   return true;
 }
+// The Home quick-weight sheet saves through the streamed Settings form.
 async function ensureSettingsHydrated() {
   if (configLoaded) return;
   await ensureSettingsDom();
-  const s = await api("/api/v1/status/settings");
-  if (!statusPageOk("settings", s)) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
-  applyCommonStatus(s);
+  const s = await loadSettingsStatus();
+  if (!s) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
   loadSettingsConfig(s.config);
-  // The hydrated form is clean, so snapshot the brew baseline here as well:
-  // a Home quick-weight write that follows must count as an edited field for
-  // error attribution even when the Settings view has never been polled.
-  if (!uiState.brewDirty) uiState.brewBaseline = snapshotControls(settingsSectionEls("brew"));
-  if (s.presets) ingestPresets(s);
 }
 function withBaseRev(p) {
   if (configRevision) p.baseRevision = configRevision;
@@ -4250,7 +4244,9 @@ function statusStreamFrame(previous, message, kept) {
   if (
     message.type === "diagnostic"
       ? snapshot && !diagSnapshotOk(status)
-      : !statusPageOk("home", status) || status.bootId !== boot
+      : message.type === "settings"
+        ? snapshot && !settingsSnapshotOk(status)
+        : !statusPageOk("home", status) || status.bootId !== boot
   )
     throw Error();
   return { boot, status };
@@ -4344,6 +4340,9 @@ function resetUiStream() {
   diagFrame = null;
   diagResolve?.(false);
   diagResolve = null;
+  // The Settings model outlives the socket.
+  settingsResolve?.(false);
+  settingsResolve = settingsReady = null;
   historyFetchOffset = -1;
   historyResolve?.(false);
   uiState.statsFetchMark = null;
@@ -4564,6 +4563,7 @@ function startUiStream() {
       if (!diagResolve) armDiagnosticReady();
       socket.send('{"op":"diagnostic","on":true}');
     }
+    if (settingsStreamWanted) settingsSendSubscribe();
     if (historyStreamWanted) historySendSubscribe();
     if (logStreamWanted) sendUiOperation({ op: "log", on: true, after: lastLog });
     if (statsStreamWanted) statsSendSubscribe();
@@ -4620,6 +4620,15 @@ function startUiStream() {
         applyStatsStream(statsStreamFrame(data));
         return;
       }
+      if (data.type === "settings") {
+        if (!settingsStreamWanted) return;
+        if (!Number.isInteger(data.tag)) throw Error();
+        settingsFrame = { ...statusStreamFrame(settingsFrame, data), tag: data.tag };
+        settingsResolve?.(true);
+        settingsResolve = settingsReady = null;
+        scheduleSettingsPaint();
+        return;
+      }
       if (data.type === "home") {
         const paddleOff =
           homeFrame?.status.physicalActivatorOn === true &&
@@ -4636,6 +4645,9 @@ function startUiStream() {
           statusUtcAnchorAt = performance.now();
         }
         delete homeFrame.status.timeUtcSec;
+        if (settingsFrame && settingsFrame.boot !== homeFrame.boot) settingsFrame = null;
+        // One preset model for every view.
+        if ("presets" in data.changes) ingestPresets(homeFrame.status);
         shotGotHome = true;
         homeStale = false;
         // Navigation visibility is a Home-stream field; applying it here keeps
@@ -4651,6 +4663,11 @@ function startUiStream() {
         )
           finishShotClock();
         paint(renderHomeStream);
+        // Live weight only moves the Settings cup hint.
+        if (activeView === "settings")
+          Object.keys(data.changes).some((k) => !SETTINGS_LIVE_PATHS.test(k))
+            ? scheduleSettingsPaint()
+            : paint(() => viewStatusHandlers.settingsLive?.(homeFrame.status));
         homeResolve(true);
       } else {
         if (!shotGotShot && !data.snapshot) throw Error();
@@ -5120,6 +5137,53 @@ function stopDiagnosticStream() {
   diagResolve && diagResolve(false);
   diagResolve = null;
 }
+// Standing Settings subscription (not in compatibility mode): its model holds
+// the paths Home lacks and survives reconnects, named by its tag.
+let settingsFrame = null,
+  settingsStreamWanted = false,
+  settingsPaint = 0,
+  settingsReady = null,
+  settingsResolve = null;
+// Home paths the Settings form does not show.
+const SETTINGS_LIVE_PATHS =
+  /^(scale\.(observedWeightG|timerMs)$|timeUtcSec$|quickRevert\.remainingS$|cupPresence\.|connections\.)/;
+function settingsSendSubscribe() {
+  sendUiOperation({ op: "settings", on: true, ...(settingsFrame && { tag: settingsFrame.tag }) });
+}
+function ensureSettingsStream() {
+  if (settingsStreamWanted || compatMode) return;
+  settingsStreamWanted = true;
+  settingsSendSubscribe();
+}
+function settingsSnapshotOk(s) {
+  return typeof s.config?.dripDelayMs === "number" && Array.isArray(s.scale?.history);
+}
+// One owner per path: objects several models hold merge key by key.
+function mergeStatus(...models) {
+  const out = {},
+    plain = (v) => v?.constructor === Object;
+  for (const model of models)
+    for (const [k, v] of Object.entries(model || {}))
+      out[k] = plain(out[k]) && plain(v) ? mergeStatus(out[k], v) : v;
+  return out;
+}
+function settingsStatus() {
+  return homeFrame && settingsFrame ? mergeStatus(homeFrame.status, settingsFrame.status) : null;
+}
+// A warm entry paints the cached model with no op.
+async function loadSettingsStatus() {
+  startUiStream();
+  ensureSettingsStream();
+  if (!settingsFrame) await (settingsReady ||= new Promise((r) => (settingsResolve = r)));
+  return settingsFrame && (await loadHomeStatus()) && settingsStatus();
+}
+function scheduleSettingsPaint() {
+  settingsPaint ||= requestAnimationFrame(() => {
+    settingsPaint = 0;
+    const s = !homeStale && settingsStatus();
+    if (s && activeView === "settings") paint(() => viewStatusHandlers.settings?.(s));
+  });
+}
 // The serial log rides the owned socket: subscribe with the rendered tail's
 // cursor; watermark-gated frames push new events without REST polling.
 let logStreamWanted = false,
@@ -5585,12 +5649,11 @@ function applyStatsStream(message) {
     statsResolve?.(true);
   }
 }
-// After the first view paints, subscribe whichever record page is not
-// standing yet so both datasets refresh in the background for the rest of
-// the session. The active view has already painted, so the record pages
-// cannot delay it; compat mode never loads record views.
-function ensureBackgroundRecordStreams() {
+// After the first view paints, subscribe the standing Settings, Stats and
+// History streams in the background; compat mode has none of these views.
+function ensureBackgroundStreams() {
   if (!webUiPollingActive() || compatMode) return;
+  ensureSettingsStream();
   ensureStatsStream();
   ensureHistoryStream();
 }
@@ -6262,7 +6325,6 @@ function applyCommonStatus(s) {
     if (c.ntpServerCustom != null && $("ntpServerCustom"))
       $("ntpServerCustom").value = c.ntpServerCustom || "";
   }
-  if (typeof s.buzzerSupported === "boolean") updateBuzzerAlertVisibility(!!s.buzzerSupported);
   applyMachineTypeUi(s);
 }
 function applyMachineTypeUi(s) {
@@ -6275,9 +6337,15 @@ function applyMachineTypeUi(s) {
   );
   if ($("dMt")) $("dMt").textContent = t;
 }
+// Each field follows the device unless it differs from the baseline (an edit).
 function loadSettingsConfig(c) {
   if (!c || typeof c.goalWeightG !== "number" || !$("goalWeightG")) return;
-  if (configLoaded && (uiState.configDirty || uiState.brewDirty || formRev === c.revision)) return;
+  const els = [...settingsSectionEls("config"), ...settingsSectionEls("brew")],
+    base = uiState.formBaseline || {},
+    edited = configLoaded ? snapshotControls(els) : {},
+    active = presetState.items.find((x) => x.id === presetState.activeId) || {};
+  for (const id in edited) if (Object.is(edited[id], base[id])) delete edited[id];
+  c = { ...c, doseG: active.doseG, grindHintsEnabled: active.grindHintsEnabled };
   bbwFormPresetId = c.bbwPresetId || 0;
   $("goalWeightG").value = c.goalWeightG.toFixed(1);
   [
@@ -6365,6 +6433,9 @@ function loadSettingsConfig(c) {
   for (const k of ["doseG", "fastBeforeS", "slowAfterS", "fastMarginG", "slowMarginG"])
     $(k).value = (+c[k]).toFixed(1);
   $("scaleLossFixedS").value = c.scaleLossFixedS > 0 ? String(c.scaleLossFixedS) : "";
+  restoreSnapshot(edited);
+  uiState.formBaseline = snapshotControls(els);
+  for (const id in edited) uiState.formBaseline[id] = base[id];
   formRev = c.revision;
   configRevision = c.revision;
   configLoaded = true;
@@ -6484,33 +6555,24 @@ function statusPageOk(v, s) {
         typeof s.machineState === "string" &&
         s.cupPresence
       )
-    : v === "settings"
+    : v === "admin"
       ? !!(
-          typeof c.soundAlertsEnabled === "boolean" &&
-          typeof c.dripDelayMs === "number" &&
-          typeof c.postTareBaselineGraceMs === "number" &&
-          s.scale &&
-          s.presets &&
-          typeof s.buzzerSupported === "boolean"
+          typeof s.adminUnlocked === "boolean" &&
+          s.network &&
+          (s.adminUnlocked
+            ? s.bleScan &&
+              typeof s.bleScan.scanIntensity === "string" &&
+              typeof c.timezoneId === "string" &&
+              c.ntpServerPreset != null &&
+              s.ota &&
+              typeof s.ota.available === "boolean" &&
+              s.webhooks &&
+              typeof s.webhooks.enabled === "boolean" &&
+              s.lastCommand &&
+              typeof s.lastCommand.requestId === "number"
+            : typeof s.network.configState === "string")
         )
-      : v === "admin"
-        ? !!(
-            typeof s.adminUnlocked === "boolean" &&
-            s.network &&
-            (s.adminUnlocked
-              ? s.bleScan &&
-                typeof s.bleScan.scanIntensity === "string" &&
-                typeof c.timezoneId === "string" &&
-                c.ntpServerPreset != null &&
-                s.ota &&
-                typeof s.ota.available === "boolean" &&
-                s.webhooks &&
-                typeof s.webhooks.enabled === "boolean" &&
-                s.lastCommand &&
-                typeof s.lastCommand.requestId === "number"
-              : typeof s.network.configState === "string")
-          )
-        : !1;
+      : !1;
 }
 async function loadStatus() {
   if (document.hidden || !webUiPollingActive()) return;
@@ -6522,10 +6584,12 @@ async function loadStatus() {
           ? await loadHomeStatus()
           : v === "diagnostic"
             ? await loadDiagnosticStatus()
-            : await api("/api/v1/status/" + v);
+            : v === "settings"
+              ? await loadSettingsStatus()
+              : await api("/api/v1/status/admin");
     await viewReady;
     if (seq !== viewSeq || !webUiPollingActive()) return false;
-    if (!s || (v !== "diagnostic" && !statusPageOk(v, s)))
+    if (!s || (v !== "diagnostic" && v !== "settings" && !statusPageOk(v, s)))
       throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
     lastStatusAt = Date.now();
     if (v !== "diagnostic") applyCommonStatus(s);
@@ -6545,6 +6609,7 @@ async function loadStatus() {
   }
 }
 function refreshStatus() {
+  if (activeView === "settings") return scheduleSettingsPaint();
   return withPollGate(
     activeView === "stats" ? refreshShots : activeView === "history" ? refreshHistory : loadStatus,
   );
@@ -6600,7 +6665,7 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
             (quickOp || configRevision !== previousRevision);
         }
         if (!applied) throw new Error(__WEBUI_TEXT__("runtime.device_did_not_apply_the_change"));
-        // Repaint REST-backed forms once; Quick Settings live on the stream.
+        // Repaint the REST-backed Admin form once; other views follow streams.
         if (!polled && !quickOp) await refreshStatus();
       } else await refreshStatus();
       if (okMsg !== "")
@@ -6674,7 +6739,7 @@ export {
   stopLogStream,
   startHistoryStream,
   startStatsStream,
-  ensureBackgroundRecordStreams,
+  ensureBackgroundStreams,
   renderLog,
   armListSentinel,
   armStickyBar,
@@ -6790,8 +6855,8 @@ export {
   sToMs,
   extRate,
   updateBullseyeControls,
+  updateBuzzerAlertVisibility,
   loadSettingsConfig,
-  ingestPresets,
   updateBbwControls,
   configLoaded,
 };

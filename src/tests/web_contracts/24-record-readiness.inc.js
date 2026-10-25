@@ -119,13 +119,13 @@
       socket.open(); f.mount(); await Promise.resolve();
       deliver(socket, 'stats', {});
       await cold;
-      f.context.ensureBackgroundRecordStreams();
+      f.context.ensureBackgroundStreams();
       assert.equal(socket.sent.filter(message => message.op === 'history' && message.on).length, 1,
           'the ensure subscribes the non-active record page at once');
       assert.equal(socket.sent.filter(message => message.op === 'stats' && message.on).length, 1,
           'the already-standing page is not re-subscribed');
       f.context.activeView = 'home';
-      f.context.ensureBackgroundRecordStreams();
+      f.context.ensureBackgroundStreams();
       assert.equal(socket.sent.filter(message => message.op === 'history' && message.on).length, 1,
           'a later ensure stays a no-op while both pages stand');
     }
@@ -133,7 +133,7 @@
       const f = fixture('admin'), socket = f.sockets[0];
       socket.open();
       f.context.compatMode = true;
-      f.context.ensureBackgroundRecordStreams();
+      f.context.ensureBackgroundStreams();
       assert.equal(socket.sent.filter(message => message.op === 'stats' || message.op === 'history').length, 0,
           'compat mode never subscribes record pages');
     }

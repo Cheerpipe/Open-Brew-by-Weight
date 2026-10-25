@@ -63,7 +63,7 @@
       (id) => fields[id],
       {documentElement: {classList: {contains: () => false}}},
       (section) => (section === 'brew' ? Object.values(fields) : []),
-      {brewBaseline: baseline});
+      {formBaseline: baseline});
     return {errors: api.validateBrewClient(), warnings: api.brewWarningList(),
             rules: api.rules};
   };
@@ -169,11 +169,11 @@
       codeIncludes(runtimeJs, 'clearBrewWarnings(); showFieldErrors(errs); return false; }'),
     'saveBrewPreset must render the full violation list, replacing the yellow preview');
   svAssert.ok(codeIncludes(runtimeJs,
-      'brewBaseline[el.id] !== (el.type === "checkbox" ? el.checked : el.value)'),
-    'Attribution must diff the live form against the clean brew baseline');
+      'formBaseline[el.id] !== (el.type === "checkbox" ? el.checked : el.value)'),
+    'Attribution must diff the live form against the device baseline');
   svAssert.equal(
-    (js.match(/brewBaseline = (?:R\.)?snapshotControls\(/g) || []).length, 2,
-    'The brew baseline must be captured on hydration as well as on clean polls');
+    (js.match(/formBaseline = (?:R\.)?snapshotControls\(/g) || []).length, 1,
+    'The form baseline must be captured where the form is hydrated');
 
   // Multi-error UI: inline marking per field with focus on the first offender
   // inside Settings, and the joined banner fallback when Settings is not the

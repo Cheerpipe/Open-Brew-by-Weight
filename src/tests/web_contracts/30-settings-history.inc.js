@@ -942,7 +942,7 @@ if (!codeIncludes(runtimeJs, 'SHOTS_PAGE_SIZE=10') ||
     codeIncludes(runtimeJs, "api('/api/v1/stats')") ||
     !codeIncludes(runtimeJs, 'function startStatsStream(') ||
     !codeIncludes(runtimeJs, 'function ensureStatsStream(') ||
-    !codeIncludes(runtimeJs, 'function ensureBackgroundRecordStreams(') ||
+    !codeIncludes(runtimeJs, 'function ensureBackgroundStreams(') ||
     // Navigation must settle a pending cold record entry so the serialized
     // poll gate never waits on an abandoned view's page.
     !codeIncludes(runtimeJs, 'if(activeView!==name){statsResolve?.(false);statsResolve=null;historyResolve?.(false);historyResolve=null;}') ||
@@ -971,8 +971,8 @@ if (!codeIncludes(runtimeJs, 'SHOTS_PAGE_SIZE=10') ||
     !network.includes('\\"hasMore\\":%s') ||
     !network.includes('\\"total\\":%u') ||
     !codeIncludes(appJsSource, 'R.startStatsStream()') ||
-    !codeIncludes(appJsSource, 'R.ensureBackgroundRecordStreams()') ||
-    codeIncludes(appJsSource, 'setTimeout(R.ensureBackgroundRecordStreams') ||
+    !codeIncludes(appJsSource, 'R.ensureBackgroundStreams()') ||
+    codeIncludes(appJsSource, 'setTimeout(R.ensureBackgroundStreams') ||
     // Backpressure pacing: the client guard covers a solo maximal row frame
     // (server rows are bounded by the external kJsonItem workspace), and a
     // tab returning from the background resyncs the owned socket instead of
@@ -1720,9 +1720,9 @@ if (html.includes('id="debugPanel"') ||
 }
 
 {
-  // Cup-minimum setup guidance: a live platform weight between 0.5 g and
-  // the configured minimum must surface the hint with both placeholders
-  // substituted; everything else keeps it hidden without crashing.
+  // Cup-minimum setup guidance: the Home stream's live platform weight
+  // between 0.5 g and the configured minimum must surface the hint with both
+  // placeholders substituted; everything else keeps it hidden without crashing.
   const assert = require('assert');
   let minimumCupWeightG = 10;
   const hint = {hidden: true, textContent: ''};
@@ -1731,19 +1731,21 @@ if (html.includes('id="debugPanel"') ||
     ';return updateCupMinGuidance;')(
     id => id === 'cupMinGuidance' ? hint : null,
     {number: () => minimumCupWeightG});
-  guidance({cupSetup: {observedG: 4.21}});
+  guidance({scale: {observedWeightG: 4.21}});
   assert(!hint.hidden && hint.textContent.includes('4.2') &&
       hint.textContent.includes('10.0') &&
       !hint.textContent.includes('{x}') && !hint.textContent.includes('{n}'));
-  for (const status of [{}, {cupSetup: {}}, {cupSetup: {observedG: null}},
-    {cupSetup: {observedG: 0.4}}, {cupSetup: {observedG: 12}}]) {
+  for (const status of [{}, {scale: {}}, {scale: {observedWeightG: null}},
+    {scale: {observedWeightG: 0.4}}, {scale: {observedWeightG: 12}}]) {
     guidance(status);
     assert(hint.hidden, 'Guidance must hide for absent, tiny and over-minimum cups');
   }
   minimumCupWeightG = Number.NaN;
-  guidance({cupSetup: {observedG: 4.2}});
+  guidance({scale: {observedWeightG: 4.2}});
   assert(hint.hidden, 'An unparseable minimum must keep the guidance hidden');
   assert(settingsHtml.includes('id="cupMinGuidance" class="fieldHint" hidden'));
+  assert(codeIncludes(viewJs.settings, 'R.registerViewStatus("settingsLive", updateCupMinGuidance)'),
+      'The guidance follows every Home frame while Settings is shown');
 }
 
 // NET-05: POST /api/v1/config validates every field into the candidate in one

@@ -44,6 +44,7 @@ const network = readSources([
   'network/OpenBrewByWeightHomeStream.inc',
   'network/OpenBrewByWeightStatsPage.inc',
   'network/OpenBrewByWeightAuditStream.inc',
+  'network/OpenBrewByWeightSettingsStream.inc',
   'network/OpenBrewByWeightIntegrationApi.inc',
   'diagnostics/OpenBrewByWeightNetworkDiagnostics.inc',
   'network/OpenBrewByWeightConfiguration.inc',
@@ -544,7 +545,7 @@ if (firmwareCore.includes('portENTER_CRITICAL(&webStatusMux)') ||
     firmwareCore.includes('controlStatusSeq') ||
     firmwareCore.includes('controlGateSeq') ||
     firmwareCore.includes('recipeSeq') ||
-    !network.includes('self.callbacks_.copyPresetBank(&g_work->presetBank)') ||
+    !network.includes('callbacks_.copyPresetBank(&g_work->presetBank)') ||
     !network.includes('self.callbacks_.copyScaleHistory(g_work->scaleHistory)')) {
   throw new Error(
       'Status and recipe snapshots must use task mutexes and fill presets/history on demand');

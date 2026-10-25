@@ -222,7 +222,7 @@ originating placement even after a different cup replaces it. An accessory
 request released as `unstable` before its write can be requested again once a
 new stable window qualifies; no periodic retry is performed.
 
-Both Home and full Web status payloads additionally expose `cupPresence.idleTare`
+The Home stream additionally exposes `cupPresence.idleTare`
 as a presentation code: `empty`, `ready`, `pending`, `tared`, `remove`,
 `retry`, `uncertain`, or the existing eligibility reason, and
 `cupPresence.anchorDeltaG` with the same meaning as in the debug export, plus

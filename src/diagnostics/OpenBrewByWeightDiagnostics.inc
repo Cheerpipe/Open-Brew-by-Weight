@@ -368,13 +368,9 @@ void publishControlStatus() {
   next.hwmon = hwmonSnapshot;
   next.scaleEventsDropped = scaleWorkerDroppedEventCount();
   next.config = effectiveRuntimeConfig();
-  next.bbwEvidenceCount =
-      bbwLearningBank.forPreset(presetBank.activeId, presetBank).evidence.count;
   const ShotPreset &bbwPreset = activeShotPreset(presetBank);
   next.bbwPresetId = bbwPreset.id;
   next.bbwAlpha = bbwPreset.bbwEwmaAlpha;
-  next.bbwAlphaBaseline = bbwPreset.bbwAlphaBaseline;
-  next.bbwAlphaLearned = bbwPreset.bbwAlphaLearned != 0;
   next.bbwEwmaOffsetG = bbwPreset.bbwEwmaOffsetG;
   next.bbwRecentCount = statusDripCount;
   next.bbwRecentSkipped = statusDripSkipped;

@@ -11,9 +11,9 @@
   throw new Error('Web UI must adapt/pause status polls, serialize commands, time out hung fetches, and use DEVICE_MAX_INFLIGHT without POST heartbeat');
 }
 if (!codeIncludes(runtimeJs, "if(webUiPollingActive()&&statusPollDue())refreshStatus();},1e4)") ||
-    !codeIncludes(runtimeJs, "s=v==='home'?await loadHomeStatus():v==='diagnostic'?await loadDiagnosticStatus():await api(") ||
-    !codeIncludes(runtimeJs, "activeView!=='settings'&&activeView!=='admin'")) {
-  throw new Error('Home and Diagnostic must use their socket; Settings/Admin keep only the slow REST poll');
+    !codeIncludes(runtimeJs, "s=v==='home'?await loadHomeStatus():v==='diagnostic'?await loadDiagnosticStatus():v==='settings'?await loadSettingsStatus():await api(") ||
+    !codeIncludes(runtimeJs, "if(!webUiPollingActive()||activeView!=='admin')return")) {
+  throw new Error('Home, Diagnostic and Settings must use their socket; Admin keeps only the slow REST poll');
 }
 if (!codeIncludes(ui, 'async function loadStatus(){') ||
     !codeIncludes(ui, 'function startStatsStream(force){') ||
@@ -21,7 +21,7 @@ if (!codeIncludes(ui, 'async function loadStatus(){') ||
     !codeIncludes(ui, 'function applyLogFrame(') ||
     !codeIncludes(ui, 'LOG_EVENTS_CAPACITY') ||
     !codeIncludes(ui, 'logEvents.splice(0,logEvents.length-LOG_EVENTS_CAPACITY)') ||
-    !codeIncludes(ui, "function refreshStatus(){return withPollGate(activeView==='stats'?refreshShots:activeView==='history'?refreshHistory:loadStatus") ||
+    !codeIncludes(ui, "function refreshStatus(){if(activeView==='settings')return scheduleSettingsPaint();return withPollGate(activeView==='stats'?refreshShots:activeView==='history'?refreshHistory:loadStatus") ||
     !codeIncludes(ui, "function refreshShots(){return shotStatsViewActive()?startStatsStream(true):Promise.resolve(false)}") ||
     !(codeIncludes(ui, "name==='home'||name==='settings'||name==='admin'||name==='diagnostic'") ||
       codeIncludes(ui, "name === 'home' || name === 'settings' || name === 'admin' ||") ||
@@ -181,44 +181,29 @@ for (const field of forbiddenResponseFields) {
     throw new Error(`Secret field exposed by status JSON: ${field}`);
   }
 }
-const soundAlertStatusFields =
-    statusFormat.match(/\\"soundAlertsEnabled\\":%s/g) || [];
-if (soundAlertStatusFields.length !== 1 ||
+// Settings reads the owned UI stream: Home owns soundAlertsEnabled, the
+// Settings projection owns alertOutputChannel and buzzerSupported, and the
+// remaining REST status (Admin and Setup) carries none of them.
+if (/soundAlertsEnabled|alertOutputChannel|buzzerSupported/.test(statusFormat) ||
     !network.includes('delta.field("config.soundAlertsEnabled"') ||
-    !statusFormat.includes('page == StatusPage::Settings')) {
-  throw new Error(
-      'soundAlertsEnabled must be projected by the Home stream and status/settings');
+    !network.includes('fields.field("config.alertOutputChannel"') ||
+    !network.includes('fields.field("buzzerSupported", bool(BUZZER_SUPPORT_ENABLED))')) {
+  throw new Error('Settings fields must ride the Home and Settings streams, not REST status');
 }
-const alertChannelStatusFields =
-    statusFormat.match(/\\"alertOutputChannel\\":\\"%s\\"/g) || [];
-if (alertChannelStatusFields.length !== 1 ||
-    !statusFormat.includes('page == StatusPage::Settings')) {
-  throw new Error(
-      'alertOutputChannel must remain available in status/settings');
-}
-// Shared status envelope: firmware/bootId/mutable/liveShot/ringRetain only.
-// NTP → admin; serialDebug/diagnostics → diagnostic; buzzerSupported → settings.
+// Admin/Setup envelope: only the fields those pages read.
 if (!statusFormat.includes('{\\"firmwareVersion\\":\\"%s\\",\\"bootId\\":%lu,\\"configMutable\\":%s,') ||
     !statusFormat.includes('\\"webUiOverrideActive\\":%s,\\"webUiOverrideRemainingMs\\":%lu,') ||
-    !statusFormat.includes('\\"configLockReason\\":\\"%s\\",\\"liveShot\\":%s"') ||
+    !statusFormat.includes('\\"configLockReason\\":\\"%s\\""') ||
+    /liveShot|quickRevert|tzdbVersion|timezoneResolution|OffsetKnown|lastSyncApplied|LogLevel/.test(statusFormat) ||
+    statusFormat.includes('StatusPage::') ||
     !codeIncludes(ui, "typeof s.bootId==='number'") ||
     !codeIncludes(ui, 'updateFirmwareFooter()')) {
   throw new Error(
-      'Status shared envelope must open with firmwareVersion/bootId/configMutable/webUiOverride/liveShot');
+      'Admin status envelope must open with firmwareVersion/bootId/configMutable/webUiOverride/configLockReason and omit unread fields');
 }
-if (/buzzerSupported.*liveShot|liveShot.*buzzerSupported/.test(
-        statusFormat.slice(
-            statusFormat.indexOf('{\\"firmwareVersion\\"'),
-            statusFormat.indexOf('{\\"firmwareVersion\\"') + 200))) {
-  throw new Error('buzzerSupported must not ride in the shared status open append');
-}
-if (!statusFormat.includes('page == StatusPage::Settings') ||
-    !statusFormat.includes(',\\"buzzerSupported\\":%s') ||
-    statusFormat.includes('StatusPage::Debug')) {
-  throw new Error('buzzerSupported must be gated to status settings only');
-}
-if (codeIncludes(ui, "statusPageOk(v,s)") && !codeIncludes(ui, "v!=='diagnostic'&&!statusPageOk(v,s)")) {
-  throw new Error('statusPageOk must not validate a diagnostic REST payload');
+if (codeIncludes(ui, "statusPageOk(v,s)") &&
+    !codeIncludes(ui, "v!=='diagnostic'&&v!=='settings'&&!statusPageOk(v,s)")) {
+  throw new Error('statusPageOk must not validate the Diagnostic or Settings stream models');
 }
 if (network.includes('page == StatusPage::Diagnostic')) {
   throw new Error('diagnostic metrics must not ride the REST status pages');
@@ -394,24 +379,17 @@ if (!codeIncludes(firmwareCore,
   throw new Error(
       'The debug export must carry the audit latch section, event text, and Micra heap counters');
 }
-const sharedRingOpen = statusFormat.indexOf(
-    ',\\"config\\":{\\"revision\\":%lu,\\"ringRetainLogLevel\\":\\"%s\\"');
-if (sharedRingOpen < 0) {
-  throw new Error(
-      'Status shared config must open with revision then ringRetainLogLevel');
+const sharedConfigOpen = statusFormat.indexOf(
+    ',\\"config\\":{\\"revision\\":%lu,\\"timezoneId\\":\\"%s\\"');
+if (sharedConfigOpen < 0) {
+  throw new Error('Admin status config must open with revision then timezoneId');
 }
-const ringOpenSlice = statusFormat.slice(sharedRingOpen, sharedRingOpen + 180);
-if (ringOpenSlice.includes('timezoneOffsetMinutes') ||
-    ringOpenSlice.includes('ntpServerPreset')) {
-  throw new Error(
-      'NTP must not share the revision/ringRetainLogLevel open append');
+if (statusFormat.slice(sharedConfigOpen, sharedConfigOpen + 180).includes('ntpServerPreset')) {
+  throw new Error('NTP must not share the revision/timezone open append');
 }
-if (!codeIncludes(ui, 
-        "typeof s.buzzerSupported==='boolean')updateBuzzerAlertVisibility") &&
-    !codeIncludes(ui, 
-        'typeof s.buzzerSupported==="boolean")updateBuzzerAlertVisibility')) {
-  throw new Error(
-      'applyCommonStatus must only update buzzer visibility when buzzerSupported is present');
+if (!codeIncludes(viewJs.settings, 'R.updateBuzzerAlertVisibility(s.buzzerSupported)') ||
+    codeIncludes(blockAt(runtimeJs, 'function applyCommonStatus('), 'buzzerSupported')) {
+  throw new Error('Buzzer visibility follows the Settings model, not the shared status');
 }
 
 // The serial log rides the owned UI stream: the retired REST handler's

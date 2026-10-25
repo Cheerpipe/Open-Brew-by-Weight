@@ -26,7 +26,7 @@
     applyPairingPrompt() {},
     setMutable: value => { mutable = value; }, noteReachOk: () => { reachOk++; }, noteReachFail() {}, hideHomeBoot() {},
     clearCupWeights() {}, updateHeaderSignals() {}, updateHomeAdminActions() {}, setHomeSub() {},
-    deactivateWebUi: () => { owner = false; }, $: () => null, console: {error() {}},
+    deactivateWebUi: () => { owner = false; }, $: () => null, console: {error() {}}, ingestPresets() {},
   };
   vm.runInNewContext(validator + source, context);
   const status = {firmwareVersion: 'test', bootId: 7, configMutable: true, timeUtcSec: 1700000000,
@@ -117,8 +117,8 @@
   sockets[1].close(4001); assert.equal(owner, false, 'takeover must deactivate the old Home without REST');
   const polling = runtimeJs.slice(runtimeJs.indexOf('function armStatusTimer('), runtimeJs.indexOf('function pad2('));
   assert(!polling.includes("activeView!=='home'"), 'Home must not arm the REST polling timer');
-  assert(codeIncludes(runtimeJs, "s=v==='home'?await loadHomeStatus():v==='diagnostic'?await loadDiagnosticStatus():await api("),
-      'Home and Diagnostic load from the stream; only the remaining views REST');
+  assert(codeIncludes(runtimeJs, "s=v==='home'?await loadHomeStatus():v==='diagnostic'?await loadDiagnosticStatus():v==='settings'?await loadSettingsStatus():await api('/api/v1/status/admin')"),
+      'Home, Diagnostic and Settings load from the stream; only Admin uses REST');
   const rest = fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightStatus.inc'), 'utf8');
   assert(!rest.includes('StatusPage::Home') && !rest.includes('/api/v1/status/home'),
       'Home state must be WebSocket-only; the REST metadata stub is deleted');

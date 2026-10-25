@@ -2,7 +2,7 @@ const micraWeb = fs.readFileSync(
     path.join(sketchDir, 'network/OpenBrewByWeightLineaMicraWeb.inc'), 'utf8');
 const micraStatus = fs.readFileSync(
     path.join(sketchDir, 'network/OpenBrewByWeightStatus.inc'), 'utf8') + fs.readFileSync(
-    path.join(sketchDir, 'network/OpenBrewByWeightLineaMicraStatus.inc'), 'utf8') +
+    path.join(sketchDir, 'network/OpenBrewByWeightSettingsStream.inc'), 'utf8') +
     fs.readFileSync(
         path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
 const micraService = fs.readFileSync(
@@ -140,7 +140,7 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
       /\/(\^\[a-zA-Z\]\[a-zA-Z0-9\]\*\(\\\.\[a-zA-Z\]\[a-zA-Z0-9\]\*\)\{0,\d\}\$)\/\.test\(path\)/);
   assert(gateSource, 'client delta path gate must exist');
   const gate = new RegExp(gateSource[1]);
-  const streamPaths = [...micraStatus.matchAll(/delta\.field\("([^"]+)"/g)].map(m => m[1]);
+  const streamPaths = [...micraStatus.matchAll(/(?:delta|fields)\.field\("([^"]+)"/g)].map(m => m[1]);
   assert(streamPaths.length > 30, 'stream field extraction found no paths');
   for (const path of streamPaths)
     assert(gate.test(path), `firmware field path rejected by the client gate: ${path}`);
@@ -309,12 +309,12 @@ if (!network.includes('/api/v1/machine/linea-micra') ||
 const micraStatusFailures = [
   micraStatus.includes('\"password\"') && 'password exposed',
   micraStatus.includes('\"username\"') && 'username exposed',
-  !micraStatus.includes('\\\"accountConfigured\\\"') && 'account status missing',
-  !micraStatus.includes('\\\"email\\\"') && 'account email missing',
-  !micraStatus.includes('\\\"machines\\\"') && 'machine list missing',
-  !micraStatus.includes('\\\"accountMachineCount\\\"') && 'account machine count missing',
+  !micraStatus.includes('delta.field("lineaMicra.accountConfigured"') && 'account status missing',
+  !micraStatus.includes('fields.field("lineaMicra.email"') && 'account email missing',
+  !micraStatus.includes('fields.field("lineaMicra.machines"') && 'machine list missing',
+  micraStatus.includes('accountMachineCount') && 'unread account machine count streamed',
   !micraStatus.includes('OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD') && 'compile gate missing',
-  !micraStatus.includes('\\\"machineIntegration\\\"') && 'integration capability missing',
+  !micraStatus.includes('delta.field("machineIntegration"') && 'integration capability missing',
 ].filter(Boolean);
 if (micraStatusFailures.length) {
   throw new Error('Linea Micra status contract: ' + micraStatusFailures.join(', '));
@@ -364,7 +364,8 @@ if (!micraTiming.includes('kStatePollMs = 30000') ||
     !micraService.includes('scheduleAutomatic(millis(), connecting)')) {
   throw new Error('Linea Micra observations must wait for readiness and the post-wake convergence deadline');
 }
-if (!micraStatus.includes('\\\"optimisticOn\\\":%s,\\\"optimisticOff\\\":%s') ||
+if (!micraStatus.includes('delta.field("lineaMicra.optimisticOn"') ||
+    !micraStatus.includes('delta.field("lineaMicra.optimisticOff"') ||
     !deferObservation.includes('powerState_.hold(published_, true, millis());') ||
     deferObservation.includes('published_.powerState =') ||
     !micraService.includes('status.phase = LineaMicraPhase::BACKOFF;\n    publish(status);') ||
@@ -395,13 +396,8 @@ if (!micraTypes.includes('APPLY_TEMPERATURE') ||
     !micraService.includes('esp_http_client_set_header(work_->client, "Authorization",\n                                               authorization) == ESP_OK') ||
     !micraService.includes('secureWipe(authorization, kTokenCapacity + 8);') ||
     micraService.includes('Bearer %s", work_->accessToken);\n    const bool ok = length > 0 &&\n                    static_cast<size_t>(length) < sizeof(io_->response)') ||
-    !micraStatus.includes('\\\"temperatureState\\\"') ||
-    !micraStatus.includes('\\\"temperatureCommandAccepted\\\"') ||
-    !micraStatus.includes('\\\"temperatureRetryable\\\"') ||
-    !micraStatus.includes('\\\"requestedTargetDeciC\\\"') ||
-    !micraStatus.includes('\\\"appliedTargetDeciC\\\"') ||
-    !micraStatus.includes('\\\"temperatureHttpStatus\\\"') ||
-    !micraStatus.includes('\\\"scalePaused\\\"')) {
+    !micraStatus.includes('delta.field("lineaMicra.temperatureState"') ||
+    !micraStatus.includes('delta.field("lineaMicra.temperatureError"')) {
   throw new Error('Linea Micra preset temperature must coalesce, gate on scale/shot activity, reuse authentication, and confirm dashboard readback');
 }
 for (const id of ['lineaMicraSignIn', 'lineaMicraBusy', 'lineaMicraSteps', 'lineaMicraLegendHint',
@@ -466,8 +462,8 @@ for (const id of ['lineaMicraSignIn', 'lineaMicraBusy', 'lineaMicraSteps', 'line
   vm.runInContext('renderLineaMicraDiagnostic()', context);
   assert.strictEqual(nodes.get('dMicraReadiness').textContent, 'runtime.disabled');
   assert.strictEqual(nodes.get('dMicraWater').textContent, 'runtime.disabled');
-  assert(micraStatus.includes('micraPowerSourceName(micraStatus.powerSource)'));
-  assert(micraStatus.includes('micraStatus.connectionFreshness ? "connection" : "time"'));
+  assert(micraStatus.includes('micraPowerSourceName(micra.powerSource)'));
+  assert(micraStatus.includes('micra.connectionFreshness ? "connection" : "time"'));
   assert(network.includes('delta.field("lineaMicra.readiness"'),
       'Home stream must project the derived Micra readiness');
   assert(network.includes('delta.field("lineaMicra.boiler.coffee.state"') &&
@@ -521,7 +517,7 @@ for (const id of ['dMicraPower', 'dMicraPowerValue', 'dMicraMode',
   get('lineaMicraSteps').children = [node(), node(), node()];
   const steps = () => get('lineaMicraSteps').children.map(li => li.className).join();
   const context = vm.createContext({__LINEA_MICRA__: true, $: get, controlsMutable: true,
-    micraDirty: false, micraSignIn: null, micraChange: false, micraPoll: 0,
+    micraDirty: false, micraSignIn: null, micraChange: false,
     refreshStatus: () => {}, setTimeout: () => { polls++; return 1; },
     lineaMicraAction: async action => { commands.push({action}); return actionOk; },
     document: {documentElement: {classList: {toggle() {}}}, createElement() {
@@ -554,8 +550,7 @@ for (const id of ['dMicraPower', 'dMicraPowerValue', 'dMicraMode',
     assert.strictEqual(panes(), 'Busy', 'A running sign-in replaces the form with its progress steps');
     assert.strictEqual(steps(), 'on,,');
     assert.strictEqual(get('lineaMicraLegendHint').textContent, 'runtime.micra_state_connecting');
-    assert.strictEqual(polls, 1, 'Status refreshes quickly while signing in');
-    context.micraPoll = 0;
+    assert.strictEqual(polls, 0, 'Sign-in progress arrives on the Settings stream; nothing polls');
     apply({...base, phase: 'listing'});
     assert.strictEqual(steps(), 'ok,on,', 'Finished steps turn green as the next one starts');
     apply({...base, phase: 'failed', error: 'invalid_auth'});
@@ -596,7 +591,7 @@ for (const id of ['dMicraPower', 'dMicraPowerValue', 'dMicraMode',
     assert(get('lineaMicraSelectButton').disabled, 'Use this machine waits for a choice');
 
     const connected = {...base, accountConfigured: true, email: 'user@example.test', selectedName: 'Micra',
-      selectedSerial: 'ABC', phase: 'idle', powerState: 'ON', targetValid: true, targetDeciC: 935};
+      selectedSerial: 'ABC', phase: 'idle', powerState: 'ON', boiler: {coffee: {targetDeciC: 935}}};
     apply(connected);
     assert.strictEqual(panes(), 'Connected');
     assert.strictEqual(context.micraSignIn, null);
@@ -771,8 +766,8 @@ if (!micraScaleShutdown.includes('LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT = 9') ||
     !entrypoints.includes('serviceMachineIntegrationScaleLink(') ||
     !micraWeb.includes('"shutdownWithScale"') ||
     !micraWeb.includes('"shutdownGraceSeconds"') ||
-    !micraStatus.includes('\\"shutdownWithScale\\"') ||
-    !micraStatus.includes('\\"shutdownGraceSeconds\\"')) {
+    !micraStatus.includes('fields.field("lineaMicra.shutdownWithScale"') ||
+    !micraStatus.includes('fields.field("lineaMicra.shutdownGraceSeconds"')) {
   throw new Error('Scale power-off shutdown must be machine-side, explicit-disconnect only, relay-guarded, grace-cancelled, and cloud-gated');
 }
 if (!micraScalePowerOn.includes('LINEA_MICRA_POWER_ON_WITH_SCALE') ||
@@ -783,7 +778,7 @@ if (!micraScalePowerOn.includes('LINEA_MICRA_POWER_ON_WITH_SCALE') ||
     !machineIntegration.includes('MicraScalePowerOnTracker') ||
     !machineIntegration.includes('LineaMicraRequestType::SET_POWER_ON') ||
     !micraWeb.includes('"powerOnWithScale"') ||
-    !micraStatus.includes('\\"powerOnWithScale\\"')) {
+    !micraStatus.includes('fields.field("lineaMicra.powerOnWithScale"')) {
   throw new Error('Scale power-on must fire only after the scale\'s own power-off, stay relay-guarded, and send BrewingMode through the cloud');
 }
 if (!micraMachinePower.includes('LINEA_MICRA_SCALE_OFF_WITH_MACHINE') ||
@@ -798,11 +793,11 @@ if (!micraMachinePower.includes('LINEA_MICRA_SCALE_OFF_WITH_MACHINE') ||
     !scaleWorker.includes('executeScalePowerOffCommand') ||
     !protocolGeneric.includes('ScaleFeaturePowerOff') ||
     !micraWeb.includes('"scaleOffWithMachine"') ||
-    !micraStatus.includes('\\"scaleOffWithMachine\\"') ||
+    !micraStatus.includes('fields.field("lineaMicra.scaleOffWithMachine"') ||
     !micraWeb.includes('"boostScaleDetectionWhenOn"') ||
     !micraWeb.includes('"reduceScaleScanningWhenOff"') ||
-    !micraStatus.includes('\\"boostScaleDetectionWhenOn\\"') ||
-    !micraStatus.includes('\\"reduceScaleScanningWhenOff\\"')) {
+    !micraStatus.includes('fields.field("lineaMicra.boostScaleDetectionWhenOn"') ||
+    !micraStatus.includes('fields.field("lineaMicra.reduceScaleScanningWhenOff"')) {
   throw new Error('Scale-off-with-machine must fire once per confirmed ON→OFF edge, warn instead of writing to unsupported scales, and never re-trigger the shutdown cycle');
 }
 

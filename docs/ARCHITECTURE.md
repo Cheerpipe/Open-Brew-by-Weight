@@ -69,13 +69,13 @@ feedback, lost diagnostics, or weaker reliability. When an exception is
 necessary, document the reason with the change. Modem sleep stays enabled;
 these rules reduce wakeups rather than disabling power saving.
 
-Documented exception: the Settings and Admin pages read their own status by
-REST every 10 seconds while visible and owned. Live and shared state (machine,
-scale, presets, command results, configuration revision) reaches every page
-on the Home stream, and command confirmation waits on that stream; the slow
-poll only catches device-side changes these forms show that have no stream
-projection (scale history, network, OTA, webhooks), which would otherwise need
-a per-page stream of their own.
+Documented exception: the Admin page reads its own status by REST every 10
+seconds while visible and owned. Live and shared state (machine, scale,
+presets, command results, configuration revision) reaches every page on the
+Home stream, Settings has its own standing stream, and command confirmation
+waits on the Home stream; the slow poll only catches device-side changes the
+Admin forms show that have no stream projection (network, OTA, webhooks),
+which would otherwise need a stream of their own.
 
 ## PSRAM cache before flash
 
@@ -197,8 +197,8 @@ actual alpha, the rate at the stop and a per-learner generation. Learning checks
 the originating state; reset/delete/recreation or a conflicting update
 invalidates it. Recipe changes clear evidence.
 Editing reset bases alone preserves current learning and evidence.
-Settings status publishes active-preset identity, both offsets, alpha baseline, gain/provenance
-and evidence count together in the existing coherent control snapshot.
+The Settings stream publishes the active-preset identity, the drip in use and
+the gain together from the existing coherent control snapshot.
 
 Settings schema 1 uses the 312-byte `RuntimeConfig`, 76-byte `ShotPreset`, and
 3,056-byte settings blob. The scheduled restart fields (`scheduledRestartEnabled`,

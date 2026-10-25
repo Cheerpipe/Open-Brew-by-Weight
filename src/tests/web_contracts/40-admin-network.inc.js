@@ -389,7 +389,6 @@ const expected = new Map([
   ['GET /settings', 'rootHandler'],
   ...webUi.ASSET_PATHS.map((path) => ['GET ' + path, 'assetHandler']),
   ['POST /api/v1/ui/claim', 'claimHandler'],
-  ['GET /api/v1/status/settings', 'ownedApiHandler'],
   ['GET /api/v1/status/admin', 'ownedApiHandler'],
   ['GET /api/v1/debug/export', 'ownedApiHandler'],
   ['POST /api/v1/config', 'ownedApiHandler'],
@@ -660,9 +659,8 @@ if (!codeIncludes(ui, 'id="forcePulseButton"') ||
   throw new Error('Momentary Web controls must expose an admin-gated forced pulse and a dedicated Web STOP path');
 }if (network.includes('/api/v1/status/home') ||
     network.includes('/api/v1/status/diagnostic') ||
-    !network.includes('/api/v1/status/settings') ||
     !network.includes('/api/v1/status/admin')) {
-  throw new Error('Status API must expose only /api/v1/status/{settings|admin}; Home and Diagnostic are WebSocket-only');
+  throw new Error('Status API must expose only /api/v1/status/admin; Home, Settings and Diagnostic are WebSocket-only');
 }
 
 // Development builds compile out the unlock endpoints: administration is
@@ -745,11 +743,11 @@ if (!codeIncludes(ui, 'function withPollGate(') ||
     !codeIncludes(ui, 'Device timeout') ||
     !codeIncludes(ui, "new Error('Invalid response')") ||
     !codeIncludes(ui, "throw new Error('Invalid status')") ||
-    !codeIncludes(ui, "await loadDiagnosticStatus():await api('/api/v1/status/'+v)") ||
+    !codeIncludes(ui, "await loadSettingsStatus():await api('/api/v1/status/admin')") ||
     !codeIncludes(ui, 'function ensureSettingsHydrated(') ||
     !codeIncludes(ui, 'function withBaseRev(') ||
     !codeIncludes(ui, 'formRev') ||
-    !codeIncludes(ui, 'formRev===c.revision') ||
+    !codeIncludes(ui, 'restoreSnapshot(edited)') ||
     !codeIncludes(ui, 'baseRevision') ||
     !codeIncludes(ui, 'command(path,value={},soft,okMsg,failMsg,busyId)') ||
     !codeIncludes(ui, '/api/v1/status/') ||

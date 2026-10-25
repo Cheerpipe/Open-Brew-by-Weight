@@ -170,15 +170,15 @@ async function renderRoute(pathname, focus) {
     if (seq === routeSeq) R.message(__WEBUI_TEXT__("shell.unable_to_load_view"), "error");
   }
 }
-// Record pages subscribe in the background as soon as the active view has
-// loaded, so they stay fresh without delaying first paint. Setup (captive
+// Settings and the record pages subscribe in the background as soon as the
+// active view has loaded, so they stay fresh without delaying first paint. Setup (captive
 // portal) skips them: sockets are scarce on the SoftAP. A tab opened in the
 // background loads nothing until it shows, which is not a failure; once the
 // page has loaded, a failed refresh is left to the reachability debounce.
 function settleView(ok, boot) {
   if (ok) {
     R.hideHomeBoot(boot);
-    if (activeView !== "setup") R.ensureBackgroundRecordStreams();
+    if (activeView !== "setup") R.ensureBackgroundStreams();
   } else if (
     R.webUiPollingActive() &&
     !document.hidden &&

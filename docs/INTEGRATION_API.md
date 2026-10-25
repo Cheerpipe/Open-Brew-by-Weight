@@ -293,7 +293,7 @@ cycle. A later Settings save that changes the same shared setting, or an edit
 of the active preset's Brew by weight, fast or slow choice, replaces the
 override with the saved value.
 
-The Web UI status (`/api/v1/status/{page}`) and the Home stream report the
+In the Web UI, which is separate from this API, the Home stream marks the
 overrides as `quickRevert.overrides`, a bit mask in field order: `brewByWeight`
 (1), `noScaleBbwMode` (2), `autoToManualGuardEnabled` (4),
 `slowExtractionGuardEnabled` (8), `fastExtractionGuardEnabled` (16),
@@ -481,7 +481,7 @@ socket. Accepted WebSocket ops (claim, bind,
 activity, and the view subscriptions) retain the confirmation of pending
 Wi-Fi settings on a station connection.
 
-Home's live stream and the other Web UI page status responses include
+Home's live stream and the Admin status response include
 `connections`: `wifiConnected` and `bluetoothConnected` are booleans;
 `wifiLevel` and `bluetoothLevel` are firmware-calculated levels:
 `1` weak, `2` medium, `3` strong, or `null` when unavailable. The connection
@@ -589,9 +589,54 @@ supplies a new time anchor; the browser advances relative time locally.
 `GET /api/v1/status/home` no longer exists: navigation visibility
 (`diagnosticPageVisible`, `compatibilityMode`) is carried by the Home stream
 itself and applied on every view, and the browser no longer probes a status
-route when entering Stats, History, or Diagnostic. Settings, Admin, and the
-public integration API keep their existing REST contracts;
-the Diagnostic page is WebSocket-only and is described next.
+route when entering Stats, History, or Diagnostic. Settings and Diagnostic are
+WebSocket-only as well and are described next; only the Admin page (and the
+setup portal) still reads `GET /api/v1/status/admin`. These Web UI routes and
+streams belong to the embedded page alone: Home Assistant and other
+integrations use the public `/api/v1/integration` routes and webhooks.
+
+### Settings live updates
+
+The Settings page subscribes on the same owned socket with
+`{"op":"settings","on":true}` once per connection, in the background after the
+first view has loaded, and stays subscribed for the rest of the session, so
+opening Settings paints at once from the model it already holds, without
+another message or request. Compatibility mode, which has no Settings page,
+never subscribes. The op accepts only `op`, `on` (which must be `true`) and an
+optional `tag`; anything else closes the stream with code 4003 and a Web UI log
+warning, like the other ops. `GET /api/v1/status/settings` no longer exists.
+
+A settings snapshot has `v: 1`, `type: "settings"`, `boot`, `snapshot: true`,
+`changes` and `tag`; later frames carry `type`, `changes` and `tag`, with only
+the paths whose values changed. The frame carries only paths the Home frame
+does not: Home owns `config.revision`, the shared `config.*` keys it already
+streams, `presets` (including the active preset's dose and grind-hint switch),
+`lastCommand`, `quickRevert`, `connections`, `scale.preferred*` and its
+`lineaMicra.*` keys, and the page reads them from the Home model, so a change
+to one of those settings reaches the browser on the Home frame alone. The
+settings frame adds the remaining `config.*` keys the form shows, the drip
+chart and quick start as one `config.bbwDrip` object (sent whole when any part
+changes), `config.bbwPresetId`, `config.bbwEwmaOffsetG` and `config.bbwAlpha`,
+`scale.history`, `scaleLoss.projectedS` and `scaleLoss.source`,
+`buzzerSupported`, and in Micra firmware the Settings part of `lineaMicra`
+described under [Linea Micra Web API](#linea-micra-web-api). The cup-minimum
+hint follows Home's `scale.observedWeightG`, so this frame carries no live
+measurement.
+
+A dispatch writes its Home, shot-card and settings frames together, so a
+save's new `config.revision` and its settings changes arrive in one write and
+in order. The firmware evaluates the projection only when one of its sources
+changed (saved settings and their revision, the bullseye tune, scale history,
+drip and learning readback, the scale-loss projection, Micra account state),
+so an idle controller sends no settings frames and spends no work on them.
+`tag` names the exact model a frame leaves the page with. The page keeps that
+model when the socket drops and replays the subscribe with
+`"tag":<last tag>`; when the controller's model still matches, that connection
+sends no settings snapshot and only later changes follow. `{"op":"resync"}`
+and a controller restart always send one. Saves stay REST commands and still
+wait for `lastCommand` and `config.revision` on the Home frame; the form then
+follows the streamed values field by field and keeps any field with a pending
+local edit.
 
 ### Diagnostic live updates
 
@@ -824,28 +869,30 @@ disconnect erases durable credentials/selection and the RAM session. Unknown,
 duplicate, or action-inappropriate fields are rejected. Accepted commands
 return `202`.
 
-Settings and diagnostic status include a Micra subtree only in Micra firmware.
-It reports whether an account is configured, selected name/serial, option flags,
-request phase/error, ON/OFF/UNKNOWN power state, raw observed mode, evidence
-quality, optimistic-ON and optimistic-OFF provenance, sample age/freshness,
-selected target
-temperature, STA/AP/shot gates,
-last HTTP/transport status, and the bounded machine list returned while
-connecting or after `relist`. `accountMachineCount` is the number of machines on
-the saved account at its latest listing (`0` until listed after a boot),
-`machineListing` is true while a `relist` is queued or running, and
-`machineListError` reports its outcome with the same error names. Settings status
-also reports `readiness` (`off`, `warming_up`, `waiting_for_steam`, `ready`,
-`needs_water` or `unknown`, the same rollup Home uses) and `machineOffline`,
-true when the cloud reports that the machine itself is disconnected. The saved account email is visible in Settings and Diagnostics; password,
-installation private key, access token and refresh token are never returned. `refresh` is read-only and requires a selected
+The Web UI streams carry a `lineaMicra` subtree only in Micra firmware. The
+Home frame reports whether an account is configured, `observeState`,
+`connectionType`, the ON/OFF/UNKNOWN power state, evidence quality,
+optimistic-ON and optimistic-OFF provenance, `readiness` (`off`, `warming_up`,
+`waiting_for_steam`, `ready`, `needs_water` or `unknown`) and the boiler states,
+estimates and brew target (`lineaMicra.boiler.coffee.targetDeciC`, 0 when the
+machine reported none). The Settings frame adds the saved account `email`, the
+selected name and serial, the option flags with `shutdownGraceSeconds`, the
+request `phase` and `error`, `machineOffline` (true when the cloud reports that
+the machine itself is disconnected), the STA/AP/shot gates (`staConnected`,
+`apActive`, `shotPaused`), and the bounded machine list returned while
+connecting or after `relist`: `machines`, `machineListing` (true while a
+`relist` is queued or running) and `machineListError` (its outcome, with the
+same error names). The saved account email is visible in Settings and
+Diagnostics; password, installation private key, access token and refresh
+token are never returned. `refresh` is read-only and requires a selected
 machine; none of these fields authorizes machine actuation.
 
-The subtree also reports `connectionType`. Diagnostic status alone includes
-`lineaMicra.websocket`: socket lifecycle/reason/epoch, subscription and machine
-connectivity, genuine evidence timestamps, payload byte counters, fixed 1s/60s
-rates, retry/stop/publication latency, cleaning availability and memory metrics.
-Diagnostic status also carries the boiler detail beyond the Home projection:
+The Diagnostic stream adds the raw observed mode, power source, sample age and
+freshness, and temperature state. Beyond the cleaning fields Home shows, only
+it includes the `lineaMicra.websocket` detail: socket lifecycle/reason/epoch,
+subscription and machine connectivity, genuine evidence timestamps, payload
+byte counters, fixed 1s/60s rates, retry/stop/publication latency and memory
+metrics. It also carries the boiler detail beyond the Home projection:
 `lineaMicra.boiler.coffee.targetDeciC`, `lineaMicra.boiler.steam.level`
 (`level_1`–`level_3`), and a whole-second `lineaMicra.boiler.sampleAgeMs`.
 `cloudCall` remains the last HTTP call. Cleaning never changes control state.

@@ -847,7 +847,7 @@ if (!codeIncludes(ui, 'id="renameScaleLink"') ||
     !network.includes('connectedFriendlyName') ||
     !network.includes('connectedMac') ||
     !codeIncludes(viewJs.diagnostic, "R.updateScaleRenameUi('dScaleNameRenameWrap',sc.connectedMac||'',sc.connectedFriendlyName||''") ||
-    !network.includes('\\"preferredFriendlyName\\"') ||
+    !network.includes('delta.field("scale.preferredFriendlyName"') ||
     !scaleWorker.includes('bool setScaleFriendlyName(') ||
     codeIncludes(ui, "label.split(' — ')")) {
   throw new Error(
@@ -1509,21 +1509,20 @@ if (!html.includes('id="postTareBaselineGraceS" type="number" min="0.5" max="10"
     !codeIncludes(ui, "apply('tareOpt',!$('autoTare').checked)") ||
     // Tare switches go through the shared #workflowPanel field listener.
     !codeIncludes(viewJs.settings, 'noteEdit(autosave[sec],!typed?300:e.type===change&&e.isTrusted?0:1200);updateConfigGroups();') ||
-    !codeIncludes(ui, "typeof c.postTareBaselineGraceMs==='number'") ||
-    !network.includes('\\"postTareBaselineGraceMs\\":%lu') ||
+    !network.includes('fields.field("config.postTareBaselineGraceMs",') ||
     !network.includes('Post-tare grace must be from 0.5 to 10 s.') ||
     !network.includes('candidate.postTareBaselineGraceMs') ||
     !firmware.includes('session.config.postTareBaselineGraceMs')) {
-  throw new Error('Post-tare grace must be wired through Tare settings, status/settings, and firmware');
+  throw new Error('Post-tare grace must be wired through Tare settings, the Settings stream, and firmware');
 }
 if (!codeIncludes(ui, "rangeCheck('dripDelayS',0,10,'Drip delay',{unit:'s',}") ||
     !codeIncludes(ui, "dripDelayMs:sToMs('dripDelayS')") ||
     !codeIncludes(ui, "$('dripDelayS').value=String((c.dripDelayMs??3000)/1000)") ||
     !codeIncludes(ui, 'The yield is recorded this long after the stop.') ||
-    !network.includes('\\"dripDelayMs\\":%lu') ||
+    !network.includes('fields.field("config.dripDelayMs",') ||
     !network.includes('Drip delay must be from 0 to 10 s.') ||
     !network.includes('candidate.dripDelayMs')) {
-  throw new Error('Drip delay must be wired through Settings, status/settings, and config validation');
+  throw new Error('Drip delay must be wired through Settings, the Settings stream, and config validation');
 }
 if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
     !html.includes('Eclair uses the regular tare and timer workflow') ||

@@ -1333,7 +1333,7 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
       !codeIncludes(js, 'updateHomeAdminActions(on,remoteEnabled)')) {
     throw new Error('Home Actions must require adminUnlocked and remoteControlEnabled');
   }
-  if (!network.includes('page == StatusPage::Admin') ||
+  if (!network.includes('statusPageIsAdmin(request->uri)') ||
       !network.includes('self.touchAdminUnlock()')) {
     throw new Error(
         'Home status must report adminUnlocked without sliding idle; Admin polls may renew');
