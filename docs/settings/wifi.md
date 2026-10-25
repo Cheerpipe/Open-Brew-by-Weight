@@ -75,8 +75,9 @@ IANA rules for 2025–2099; future legal changes require a firmware update.
 
 First-time setup is guided: join the controller's [setup network](ap.md#first-connection)
 and the setup page opens by itself (or at `http://192.168.4.1/setup`), asks for
-your network and its password, and connects live — no restart, no extra
-password. The table's **Home Wi-Fi (STA)**, **IP mode**, and **Confirm window**
+your network and its password, and connects live — no restart. **Connect**
+tests the network and **Save Wi-Fi** keeps it, so a wrong pick is never
+saved. The table's **Home Wi-Fi (STA)**, **IP mode**, and **Confirm window**
 rows describe the **Admin → Wi-Fi** page, which is the advanced path for
 changing an already-configured network.
 
@@ -117,11 +118,11 @@ the same maintenance window.
 
 ## Example
 
-From the setup page (see [AP](ap.md#first-connection)), save your home
-network: the controller joins it live and keeps it as soon as it connects,
-the page reminds you to switch your phone back to that network and shows the
-new addresses, and the setup network stays open for about a minute (or until
-you select **Done**) before closing by itself. From **Admin → Wi-Fi** the classic save
+From the setup page (see [AP](ap.md#first-connection)), connect to your home
+network: the controller joins it live, and **Save Wi-Fi** keeps it. The page
+then reminds you to switch your phone back to that network and shows the new
+addresses, and the setup network stays open for about a minute (or until you
+select **Finish**) before closing by itself. From **Admin → Wi-Fi** the classic save
 still restarts the controller and waits for you to reopen the new address
 within 3 minutes to confirm. If you later lose that network, the device keeps
 retrying STA. Recover the setup network with USB

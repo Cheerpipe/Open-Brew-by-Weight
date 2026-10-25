@@ -1417,16 +1417,13 @@ esp_err_t OpenBrewByWeightNetwork::factoryResetHandler(httpd_req_t *request) {
                                 "\"state\":\"QUEUED\"");
 }
 
-// Optional onboarding brewing choice on the setup actions, accepted only while
-// the firmware is off: brewByWeight, plus presetId exactly when it is true.
+// Onboarding brewing choice (the setup "brew" action), accepted only while the
+// firmware is off: brewByWeight, plus presetId exactly when it is true.
 static const char *parseSetupBrew(cJSON *root, SetupBrew &brew,
                                   uint8_t &presetId) {
   brew = SetupBrew::NONE;
   const bool hasPreset = jsonFieldPresent(root, "presetId");
   bool byWeight = false;
-  if (!jsonFieldPresent(root, "brewByWeight") && !hasPreset) {
-    return nullptr;
-  }
   if (!firmwareCompatibilityMode()) {
     return "The brewing choice is part of setup only while the firmware is off.";
   }
@@ -1438,49 +1435,20 @@ static const char *parseSetupBrew(cJSON *root, SetupBrew &brew,
   return nullptr;
 }
 
-// Keeps the onboarding brewing choice with the setup session; commit also
-// records it against the current Wi-Fi (skip and finish).
-bool OpenBrewByWeightNetwork::keepSetupBrew(SetupBrew brew, uint8_t presetId,
-                                       bool commit) {
-  dataMux_.lock();
-  if (brew != SetupBrew::NONE) {
-    status_.setupBrew = brew;
-    status_.setupPresetId = presetId;
-  }
-  const bool bound = settings_.staConfigured;
-  const uint32_t staCrc = staConfigCrc(settings_);
-  const bool committed =
-      !bound || settings_.staConfigState ==
-                    static_cast<uint8_t>(StaConfigState::CONFIRMED);
-  const SetupBrew kept = status_.setupBrew;
-  dataMux_.unlock();
-  if (!commit || kept == SetupBrew::NONE || !firmwareCompatibilityMode()) {
-    return true;
-  }
-  if (!networkFlashWriteAllowed() || !persistSetupIntent(bound, staCrc)) {
+// Saves the onboarding brewing choice on its own, unbound to any Wi-Fi: boot
+// applies "by weight" at the next start, which Finish or the setup network
+// closing triggers; "usual" keeps compatibility mode and drops an earlier one.
+bool OpenBrewByWeightNetwork::saveSetupBrew(SetupBrew brew, uint8_t presetId) {
+  SetupIntent intent;
+  intent.presetId = presetId;
+  if (!networkFlashWriteAllowed() ||
+      !(brew == SetupBrew::USUAL ? clearSetupIntent() : saveSetupIntent(intent))) {
     return false;
   }
-  setupRestartPending_.store(kept == SetupBrew::BY_WEIGHT && committed,
-                             std::memory_order_release);
-  return true;
-}
-
-// Durable half of the onboarding transaction, written before the Wi-Fi
-// commit it is bound to: "by weight" stores the intent that boot applies with
-// that Wi-Fi; "usual" keeps compatibility mode, so it only drops a stale one.
-bool OpenBrewByWeightNetwork::persistSetupIntent(bool bound, uint32_t staCrc) {
   dataMux_.lock();
-  const SetupBrew brew = status_.setupBrew;
-  SetupIntent intent;
-  intent.presetId = status_.setupPresetId;
+  status_.setupBrew = brew;
+  status_.setupPresetId = presetId;
   dataMux_.unlock();
-  if (brew == SetupBrew::NONE || !firmwareCompatibilityMode()) {
-    return true;
-  }
-  if (brew == SetupBrew::USUAL) {
-    return clearSetupIntent();
-  }
-  intent.bound = bound;
-  intent.staCrc = bound ? staCrc : 0;
-  return saveSetupIntent(intent);
+  setupRestartPending_.store(brew == SetupBrew::BY_WEIGHT, std::memory_order_release);
+  return true;
 }

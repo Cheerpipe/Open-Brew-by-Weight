@@ -3,12 +3,31 @@
   ><span><small>{{webui:setup.open_brew}}</small>{{webui:setup.by_weight}}</span>
 </div>
 <section class="setupCard" id="setupCard">
+  <ol class="setupProgress" id="setupProgress" aria-label="{{webui:setup.progress}}" hidden>
+    <li><i aria-hidden="true">1</i><span>{{webui:setup.part_controller}}</span></li>
+    <li><i aria-hidden="true">2</i><span>{{webui:setup.part_wifi}}</span></li>
+    <li><i aria-hidden="true">3</i><span>{{webui:setup.part_finish}}</span></li>
+  </ol>
+  <p id="setupStep" class="setupStep" hidden></p>
+  <p id="setupSaved" class="setupSaved" role="status" hidden></p>
   <h1 id="setupTitle" tabindex="-1">{{webui:setup.title}}</h1>
   <p class="setupIntro" id="setupIntro">{{webui:setup.intro}}</p>
   <p id="setupBlocked" class="fieldError" role="status" hidden></p>
   <div id="setupError" tabindex="-1" hidden>
     <p id="setupErrorText" class="fieldError" role="alert"></p>
     <p id="setupErrorHint" class="fieldHint">{{webui:setup.error_hints}}</p>
+  </div>
+  <div id="setupWelcome" hidden>
+    <ol class="setupParts">
+      <li><b>{{webui:setup.part_controller}}</b><span id="setupPart1Hint"></span></li>
+      <li>
+        <b>{{webui:setup.part_wifi}} <small>· {{webui:setup.optional}}</small></b
+        ><span>{{webui:setup.part_wifi_hint}}</span>
+      </li>
+      <li><b>{{webui:setup.part_finish}}</b><span id="setupPart3Hint"></span></li>
+    </ol>
+    <p class="fieldHint">{{webui:setup.nothing_until_save}}</p>
+    <button type="button" id="setupStart" class="setupPrimary">{{webui:setup.start}}</button>
   </div>
   <div id="setupMode" hidden>
     <fieldset class="setupChoices" aria-labelledby="setupTitle">
@@ -25,8 +44,10 @@
         ></label
       >
     </fieldset>
-    <p class="fieldHint">{{webui:setup.mode_later}}</p>
     <button type="button" id="setupModeNext" class="setupPrimary">{{webui:setup.continue}}</button>
+    <button type="button" id="setupModeBack" class="textLock setupBack">
+      {{webui:setup.back}}
+    </button>
   </div>
   <div id="setupRecipe" hidden>
     <fieldset class="setupChoices" aria-labelledby="setupTitle">
@@ -73,6 +94,70 @@
       {{webui:setup.back}}
     </button>
   </div>
+  <form id="setupProtect" novalidate hidden>
+    <div id="setupNewPassWrap">
+      <div class="setupPassRow">
+        <label for="setupNewPassword">{{webui:setup.new_password}}</label>
+        <button type="button" id="setupNewPassShow" class="setupPassToggle" aria-pressed="false">
+          {{webui:setup.show}}
+        </button>
+      </div>
+      <input
+        type="password"
+        id="setupNewPassword"
+        autocomplete="new-password"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        maxlength="63"
+        aria-describedby="setupPassRules"
+      />
+      <label for="setupConfirmPassword">{{webui:setup.confirm_password}}</label>
+      <input
+        type="password"
+        id="setupConfirmPassword"
+        autocomplete="new-password"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        maxlength="63"
+        aria-describedby="setupConfirmError"
+      />
+      <p id="setupConfirmError" class="fieldError" hidden>{{webui:setup.passwords_differ}}</p>
+      <ul id="setupPassRules" class="setupRules">
+        <li data-rule="len">{{webui:setup.rule_length}}</li>
+        <li data-rule="factory">{{webui:setup.rule_factory}}</li>
+        <li data-rule="match">{{webui:setup.rule_match}}</li>
+      </ul>
+    </div>
+    <div id="setupSaveBox" class="setupCallout">
+      <b>{{webui:setup.save_stores}}</b>
+      <dl class="setupSaveList">
+        <div id="setupSaveModeRow">
+          <dt>{{webui:setup.summary_brewing}}</dt>
+          <dd id="setupSaveMode"></dd>
+        </div>
+        <div id="setupSaveRecipeRow">
+          <dt>{{webui:setup.summary_recipe}}</dt>
+          <dd id="setupSaveRecipe"></dd>
+        </div>
+        <div id="setupSavePassRow">
+          <dt>{{webui:setup.summary_password}}</dt>
+          <dd>{{webui:setup.password_entered}}</dd>
+        </div>
+      </dl>
+      <p id="setupSaveNote"></p>
+    </div>
+    <p class="fieldError" id="setupProtectError" hidden></p>
+    <button type="submit" id="setupSave" class="setupPrimary">{{webui:setup.save_continue}}</button>
+    <button type="button" id="setupProtectBack" class="textLock setupBack">
+      {{webui:setup.back}}
+    </button>
+  </form>
+  <div id="setupSaving" class="setupState" hidden>
+    <span class="bootWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+    <p id="setupSavingText"></p>
+  </div>
   <div id="setupScanning" class="setupState" hidden>
     <span class="bootWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
     <p>{{webui:setup.searching_networks}}</p>
@@ -115,25 +200,10 @@
       />
     </div>
     <p class="fieldHint">{{webui:setup.band_hint}}</p>
-    <div id="setupDeviceWrap" hidden>
-      <label for="setupDevicePassword">{{webui:setup.device_password}}</label>
-      <input
-        type="password"
-        id="setupDevicePassword"
-        autocomplete="new-password"
-        autocapitalize="off"
-        autocorrect="off"
-        spellcheck="false"
-        maxlength="63"
-      />
-      <p class="fieldHint">{{webui:setup.device_password_hint}}</p>
-    </div>
     <p class="fieldError" id="setupFieldError" hidden></p>
     <button type="submit" id="setupConnect" class="setupPrimary">{{webui:setup.connect}}</button>
     <button type="button" id="setupSkip" class="textLock">{{webui:setup.skip}}</button>
-    <button type="button" id="setupFormBack" class="textLock setupBack" hidden>
-      {{webui:setup.back}}
-    </button>
+    <button type="button" id="setupFormBack" class="textLock setupBack" hidden></button>
   </form>
   <div id="setupConnecting" class="setupState" hidden>
     <span class="bootWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
@@ -141,37 +211,54 @@
     <p id="setupConnectingWhere" class="fieldHint" hidden></p>
     <p id="setupConnectingCountdown" class="setupCountdown" hidden></p>
   </div>
+  <div id="setupConnected" class="setupState" hidden>
+    <p class="setupCheck" aria-hidden="true">&#10003;</p>
+    <p class="setupLead">{{webui:setup.connected_text}}</p>
+    <p class="setupCallout">
+      <b>{{webui:setup.not_saved_yet}}</b><span id="setupConnectedNote"></span>
+    </p>
+    <p class="fieldError" id="setupConnectedError" hidden></p>
+    <button type="button" id="setupSaveWifi" class="setupPrimary">{{webui:setup.save_wifi}}</button>
+    <button type="button" id="setupOther" class="textLock setupBack">
+      {{webui:setup.choose_another}}
+    </button>
+  </div>
   <div id="setupSuccess" class="setupState" hidden>
     <p class="setupCheck" aria-hidden="true">&#10003;</p>
-    <p id="setupSuccessText"></p>
-    <dl id="setupSummary" class="setupSummary" hidden>
-      <div>
+    <p id="setupDoneLead" class="setupLead"></p>
+    <dl class="setupSummary">
+      <div id="setupSumModeRow" data-saved="true">
         <dt>{{webui:setup.summary_brewing}}</dt>
         <dd id="setupSumMode"></dd>
         <button type="button" id="setupChangeMode" class="textLock">{{webui:setup.change}}</button>
       </div>
-      <div id="setupSumRecipeRow">
+      <div id="setupSumRecipeRow" data-saved="true">
         <dt>{{webui:setup.summary_recipe}}</dt>
         <dd id="setupSumRecipe"></dd>
         <button type="button" id="setupChangeRecipe" class="textLock">
           {{webui:setup.change}}
         </button>
       </div>
-      <div>
+      <div data-saved="true">
+        <dt>{{webui:setup.summary_password}}</dt>
+        <dd id="setupSumPass">{{webui:setup.saved}}</dd>
+        <button type="button" id="setupRevealPass" class="textLock" aria-pressed="false" hidden>
+          {{webui:setup.show}}
+        </button>
+        <button type="button" id="setupChangePass" class="textLock">{{webui:setup.change}}</button>
+      </div>
+      <div id="setupSumWifiRow">
         <dt>{{webui:setup.summary_wifi}}</dt>
         <dd id="setupSumWifi"></dd>
+        <button type="button" id="setupChangeWifi" class="textLock"></button>
       </div>
     </dl>
-    <p id="setupRestartNote" class="setupNote" hidden>{{webui:setup.note_restart}}</p>
-    <p id="setupNextStep"></p>
+    <p id="setupNextStep" class="setupNote"></p>
     <div id="setupSuccessLinks" class="setupLinks"></div>
     <p id="setupLaterNote" class="setupNote fieldHint" hidden></p>
-    <p id="setupCloseHint" class="fieldHint">{{webui:setup.close_hint}}</p>
-    <button type="button" id="setupFinish">{{webui:setup.done}}</button>
-  </div>
-  <div id="setupSkipped" class="setupState" hidden>
-    <p>{{webui:setup.skip_text}}</p>
-    <a id="setupSkipDone">{{webui:setup.done}}</a>
+    <p id="setupPassNote" class="setupNote fieldHint"></p>
+    <p id="setupCloseHint" class="setupNote fieldHint"></p>
+    <button type="button" id="setupFinish" class="setupPrimary">{{webui:setup.done}}</button>
   </div>
   <div id="setupLocked" class="setupState" hidden>
     <p>{{webui:setup.locked_hint}}</p>

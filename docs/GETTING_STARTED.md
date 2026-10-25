@@ -15,25 +15,33 @@ start with [Hardware](HARDWARE.md).
    password (**`ineedacoffee`** from the factory). Stay joined even if your
    phone reports "no internet".
 3. The setup page opens on its own within a few seconds; if it does not,
-   browse to **`http://192.168.4.1/setup`**. A new controller is switched off
-   and leaves the machine working as usual, so the page first asks how you
-   want to brew: keep it **as usual**, or **stop shots by weight** and pick a
-   starting recipe. Then choose your home network, type its password, choose
-   your own **controller password**, and select **Connect**. The factory
-   password is public, so setup does not finish until you replace it; you
-   will use the new one to unlock Admin and, next time, to join the setup
-   network (your phone stays connected now). The controller
-   joins your network without restarting and keeps it as soon as it gets in.
-   The page then reminds you to switch your phone back to your home network
-   and shows the addresses to use from now on (`<name>.local` and the
-   controller's new address), each with a **Copy** button. The setup network
-   stays open for about a minute so you can note them — select **Finish**
-   (**Finish and restart** when you chose to stop shots by weight) when you
-   have them. **Continue without Wi-Fi** also asks for the controller
-   password first. The setup page never asks you to **Reload**. Your brewing choice and your
-   home network are saved together: once the controller keeps the network,
-   it keeps your choice too, even if you close the page or lose power before
-   **Finish**; if it cannot keep the network, it keeps neither.
+   browse to **`http://192.168.4.1/setup`**. It walks you through three short
+   parts, and a bar at the top shows where you are:
+   - **Your controller.** A new controller is switched off and leaves the
+     machine working as usual, so the page first asks how you want to brew:
+     keep it **as usual**, or **stop shots by weight** and pick a starting
+     recipe. Then you choose your own **password**, typed twice. The factory
+     password is the same on every controller, so setup always replaces it;
+     from now on you use yours to unlock Admin and to join the setup network.
+     **Save and continue** stores your brewing choice and your password right
+     away, and a note confirms it. Your phone stays connected.
+   - **Wi-Fi** (optional). Choose your home network, type its password, and
+     select **Connect**. This only tests the network: the page tells you when
+     the controller got in, and **Save Wi-Fi** keeps it. Picked the wrong one?
+     Choose **Wrong network? Choose another** before saving. A tested network
+     you do not save is forgotten after ten minutes, and the page shows the
+     time left. If your phone drops off the setup network meanwhile, join it
+     again and the page picks up where you were. **Continue without Wi-Fi**
+     skips this part.
+   - **Review and finish.** Everything is already saved here. The summary lets
+     you change any item (each change is saved on its own), reminds you to
+     switch your phone back to your home network, and shows the addresses to
+     use from now on (`<name>.local` and the controller's new address), each
+     with a **Copy** button. **Finish** (**Finish and restart** when you chose
+     to stop shots by weight) closes the setup network. Closing the page
+     without it loses nothing: the setup network closes by itself about a
+     minute after the Wi-Fi is saved, and the controller restarts then if you
+     chose to stop shots by weight.
 4. Rejoin your home network on the phone/computer and open the controller at
    the address the setup page showed. On most home networks
    `openbrewbyweight.local` answers (a renamed controller answers at
@@ -42,16 +50,15 @@ start with [Hardware](HARDWARE.md).
    [USB NET_STATUS](SERIAL_CLI.md).
 5. If the Web UI shows **Reload**, select it to claim this browser session,
    then open **Admin** and unlock it with the device password.
-6. Change the factory device password in **Admin → Access**. It is
-   shared by Admin and the setup network. If you later use the setup network
-   again, join it with the new password. To ask for that password before
+6. The password you chose during setup is shared by Admin and the setup
+   network; change it any time in **Admin → Access**. To ask for it before
    anyone can use the Web UI, see [Web UI access](settings/web-access.md).
 
-A wrong password in the setup page can be corrected right there: the reason
-appears at the top of the card, your entries stay in place, and **Connect**
-tries again. The controller keeps its setup network alive for about three
-minutes before it falls back to the previous settings. If the paddle is on,
-the card asks you to turn it off first.
+A wrong Wi-Fi password can be corrected right there: the reason appears at
+the top of the card, your entries stay in place, and **Connect** tries again.
+Nothing is saved until **Save Wi-Fi**, so a failed or unsaved test never
+replaces a network that already works. If the paddle is on, the card asks
+you to turn it off first.
 
 You can also operate locally over the setup network while your client remains
 associated. The [AP guide](settings/ap.md) explains its idle shutdown and

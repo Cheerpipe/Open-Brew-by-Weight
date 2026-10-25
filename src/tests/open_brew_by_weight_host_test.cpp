@@ -3078,7 +3078,8 @@ void w04c_setup_onboarding_phase_scenarios() {
   };
 
   // Fresh device, working network: the attempt keeps the AP, never confirms
-  // before its own lease, then auto-confirms and hands over to the grace.
+  // before its own lease, then waits for the owner's "Save Wi-Fi" (status
+  // polls do not confirm it) and hands over to the grace once confirmed.
   P phase = nextSetupPhase(P::NONE, E::APPLY_SAVED);
   CHECK(phase == P::QUEUED && setupKeepsSoftAp(phase));
   CHECK(!setupConfirmAllowed(phase, true));
@@ -3088,6 +3089,8 @@ void w04c_setup_onboarding_phase_scenarios() {
   CHECK(strcmp(setupPhaseName(phase), "connecting") == 0);
   phase = nextSetupPhase(phase, E::JOINED);
   CHECK(phase == P::JOINED && setupConfirmAllowed(phase, true));
+  CHECK(setupAwaitsOwnerSave(phase, true) && !setupAwaitsOwnerSave(phase, false));
+  CHECK(!setupAwaitsOwnerSave(P::CONFIRMED, true) && !setupAwaitsOwnerSave(P::NONE, false));
   CHECK(softApTeardownStep(phase, 1, 0, 5000) == SoftApTeardown::KEEP);
   phase = nextSetupPhase(phase, E::CONFIRMED);
   CHECK(phase == P::CONFIRMED && !setupKeepsSoftAp(phase));
@@ -3140,15 +3143,22 @@ void w04c_setup_onboarding_phase_scenarios() {
   CHECK(softApTeardownStep(P::NONE, 1, 0xFFFFF000u, 0x00000100u) ==
         SoftApTeardown::STOP);
 
-  // F-14: Done works while the joined network is still being confirmed and
-  // during the grace, never mid-attempt, after the deadline, or with the AP
-  // down.
-  CHECK(setupFinishAllowed(P::JOINED, true, 0, 1000));
+  // Finish ends a saved session during the grace, never with an unsaved
+  // joined test, mid-attempt, after the deadline, or with the AP down.
+  CHECK(!setupFinishAllowed(P::JOINED, true, 0, 1000));
+  CHECK(!setupFinishAllowed(P::JOINED, true, 61000, 1000));
   CHECK(setupFinishAllowed(P::CONFIRMED, true, 61000, 1000));
   CHECK(setupFinishAllowed(P::NONE, true, 61000, 1000));
   CHECK(!setupFinishAllowed(P::ATTEMPTING, true, 0, 1000));
   CHECK(!setupFinishAllowed(P::CONFIRMED, true, 61000, 61000));
   CHECK(!setupFinishAllowed(P::JOINED, false, 0, 1000));
+
+  // "Keep" / "Continue without Wi-Fi" drop a test once its attempt began:
+  // joined, failed, or still attempting; never a saved or queued network.
+  CHECK(setupDiscardAllowed(P::JOINED) && setupDiscardAllowed(P::FAILED) &&
+        setupDiscardAllowed(P::ATTEMPTING));
+  CHECK(!setupDiscardAllowed(P::QUEUED) && !setupDiscardAllowed(P::CONFIRMED) &&
+        !setupDiscardAllowed(P::NONE) && !setupDiscardAllowed(P::KEEP));
 }
 
 void w04b_select_best_sta_ap_prefers_strongest_matching_bssid() {

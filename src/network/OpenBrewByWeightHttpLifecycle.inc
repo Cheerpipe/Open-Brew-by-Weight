@@ -371,13 +371,6 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
       memcpy(next.staDns1, command.network.staDns1, sizeof(next.staDns1));
       memcpy(next.staDns2, command.network.staDns2, sizeof(next.staDns2));
       finalizeSavedStaCredentials(next, command.network.commitConfirmed);
-      // Onboarding: the brewing choice is durable before this Wi-Fi can
-      // commit, or nothing is saved.
-      if (command.network.applyLive &&
-          !persistSetupIntent(true, staConfigCrc(next))) {
-        log(DebugCategory::CONFIG, DebugCode::CONFIG_REJECTED);
-        return false;
-      }
       persist = true;
       if (command.network.applyLive) {
         // /setup onboarding: the network task consumes the flag and connects

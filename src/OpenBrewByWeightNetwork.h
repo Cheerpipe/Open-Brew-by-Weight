@@ -330,6 +330,9 @@ class OpenBrewByWeightNetwork {
   // association progress.
   static constexpr uint32_t LIVE_APPLY_ATTEMPT_MS = 20000;
   static constexpr uint32_t STA_CONFIRM_TIMEOUT_MS = 180000;
+  // Onboarding waits longer for "Save Wi-Fi": the phone may drop off the
+  // setup network when it follows the station's channel and has to rejoin.
+  static constexpr uint32_t SETUP_CONFIRM_TIMEOUT_MS = 600000;
   // Automatic STA retries back off from 10 s to 120 s while the network
   // stays unreachable; every retry costs an all-channel scan.
   static constexpr uint32_t STA_RECONNECT_INTERVAL_MS = 10000;
@@ -634,8 +637,7 @@ class OpenBrewByWeightNetwork {
   // A committed onboarding switch to full mode restarts the controller once
   // the setup SoftAP stops.
   std::atomic<bool> setupRestartPending_{false};
-  bool persistSetupIntent(bool bound, uint32_t staCrc);
-  bool keepSetupBrew(SetupBrew brew, uint8_t presetId, bool commit);
+  bool saveSetupBrew(SetupBrew brew, uint8_t presetId);
   void requestSetupRestart();
   void clearSoftApIdleState();
   void armSoftApIdleDeadline(uint32_t now);
@@ -654,9 +656,10 @@ class OpenBrewByWeightNetwork {
   bool processAcceptedCommand(const WebCommand &command);
   bool processPersistedCommand(const WebCommand &command);
   void publishConfiguredAddressStatus();
-  void armPendingConfirmWindow(uint32_t now);
+  void armPendingConfirmWindow(uint32_t now, uint32_t timeoutMs = STA_CONFIRM_TIMEOUT_MS);
   void clearPendingConfirmWindow();
-  void requestPendingNetworkConfirm();
+  void requestPendingNetworkConfirm(bool fromOwner = false);
+  void requestPendingNetworkDiscard();
   bool confirmPendingNetwork(const char *reason);
   bool revertPendingNetwork(uint32_t now, const char *reason);
   bool controlAllowsNetworkMutation();

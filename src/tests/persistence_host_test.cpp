@@ -2581,7 +2581,18 @@ void p90b_setup_intent_commits_with_its_wifi() {
   resolveSetupIntent(settings);
   CHECK(loadFirmwareMode() == FirmwareMode::COMPATIBILITY);
   CHECK(!loadSetupIntent(intent));
-  // Unbound ("Continue without Wi-Fi") applies; factory reset clears it.
+  // Part one of setup saves the choice unbound: boot applies it whatever the
+  // Wi-Fi state, a pending (unsaved) network included.
+  CHECK(saveFirmwareMode(FirmwareMode::COMPATIBILITY));
+  settings.staConfigState = static_cast<uint8_t>(StaConfigState::PENDING);
+  CHECK(savePersistedSettings(settings));
+  intent = SetupIntent{};
+  intent.presetId = presetId;
+  CHECK(saveSetupIntent(intent));
+  resolveSetupIntent(settings);
+  CHECK(loadFirmwareMode() == FirmwareMode::FULL);
+  CHECK(!loadSetupIntent(intent));
+  // An unbound choice is always applied; factory reset clears it.
   intent.presetId = presetId;
   intent.bound = false;
   CHECK(setupIntentVerdict(intent, settings) == SetupIntentVerdict::APPLY);

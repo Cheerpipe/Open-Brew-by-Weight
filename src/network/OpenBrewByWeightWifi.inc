@@ -54,6 +54,9 @@ ControlGateSnapshot OpenBrewByWeightNetwork::controlGate() const {
 SetupPhase OpenBrewByWeightNetwork::advanceSetupPhase(SetupEvent event) {
   TaskLockGuard lock(dataMux_);
   status_.setupPhase = nextSetupPhase(status_.setupPhase, event);
+  // A phase that keeps the SoftAP owns it: a grace left by an earlier saved
+  // network (the summary's Change) must not close it mid-attempt.
+  if (setupKeepsSoftAp(status_.setupPhase)) status_.apTeardownAtMs = 0;
   return status_.setupPhase;
 }
 
@@ -177,13 +180,14 @@ void OpenBrewByWeightNetwork::publishConfiguredAddressStatus() {
   dataMux_.unlock();
 }
 
-void OpenBrewByWeightNetwork::armPendingConfirmWindow(uint32_t now) {
+void OpenBrewByWeightNetwork::armPendingConfirmWindow(uint32_t now, uint32_t timeoutMs) {
   dataMux_.lock();
   staConfirmArmed_ = true;
-  staConfirmDeadlineMs_ = now + STA_CONFIRM_TIMEOUT_MS;
+  staConfirmDeadlineMs_ = now + timeoutMs;
   dataMux_.unlock();
-  ::serialTraceCategory(LogLevel::INFO, DebugCategory::NETWORK,
-                        "WiFi STA config pending confirmation for 180 s");
+  ::serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                         "WiFi STA config pending confirmation for %lu s",
+                         static_cast<unsigned long>(timeoutMs / 1000));
 }
 
 void OpenBrewByWeightNetwork::clearPendingConfirmWindow() {
@@ -193,18 +197,30 @@ void OpenBrewByWeightNetwork::clearPendingConfirmWindow() {
   dataMux_.unlock();
 }
 
-void OpenBrewByWeightNetwork::requestPendingNetworkConfirm() {
+void OpenBrewByWeightNetwork::requestPendingNetworkConfirm(bool fromOwner) {
   dataMux_.lock();
-  // Runs on the httpd task: read the published phase under the lock.
+  // Runs on the httpd task: read the published phase under the lock. A page
+  // reaching the device confirms a network change, except a joined onboarding
+  // attempt, which waits for the owner's "Save Wi-Fi" (the confirm action).
   const bool pending =
       settings_.staConfigState ==
           static_cast<uint8_t>(StaConfigState::PENDING) &&
       settings_.staConfigured &&
-      setupConfirmAllowed(status_.setupPhase, status_.apActive);
+      setupConfirmAllowed(status_.setupPhase, status_.apActive) &&
+      (fromOwner || !setupAwaitsOwnerSave(status_.setupPhase, status_.apActive));
   if (pending) {
     pendingConfirmRequest_ = true;
   }
   dataMux_.unlock();
+}
+
+// Runs on the httpd task: ends the test's confirm window now, so the network
+// task's expiry path disconnects and reverts it (retrying a closed write gate).
+void OpenBrewByWeightNetwork::requestPendingNetworkDiscard() {
+  TaskLockGuard lock(dataMux_);
+  if (staConfirmArmed_ && status_.apActive && setupDiscardAllowed(status_.setupPhase)) {
+    staConfirmDeadlineMs_ = millis();
+  }
 }
 
 bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
@@ -249,8 +265,8 @@ bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
   }
   clearPendingConfirmWindow();
   publishConfiguredAddressStatus();
-  // The onboarding choice bound to this Wi-Fi is now committed: boot applies
-  // it, after the setup network closes (or now, without one).
+  // A saved onboarding choice (or a legacy one bound to this Wi-Fi) is now
+  // final: boot applies it, after the setup network closes (or now, without one).
   SetupIntent intent;
   if (loadSetupIntent(intent)) {
     setupRestartPending_.store(true, std::memory_order_release);
@@ -291,9 +307,10 @@ bool OpenBrewByWeightNetwork::revertPendingNetwork(uint32_t,
   if (!savePersistedSettings(next)) {
     return false;
   }
-  // Rolls back the onboarding choice bound to the reverted Wi-Fi; should
-  // this fail, boot drops it on the binding mismatch.
-  (void)clearSetupIntent();
+  // A legacy onboarding choice bound to the reverted Wi-Fi goes with it (boot
+  // also drops it on the binding mismatch); part one's unbound choice stays.
+  SetupIntent intent;
+  if (loadSetupIntent(intent) && intent.bound) (void)clearSetupIntent();
   dataMux_.lock();
   settings_ = next;
   status_.wifiConfigured = next.staConfigured;
@@ -1164,25 +1181,22 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
     ntpRearmPending_ = true;
     const StaJoinHints hints = staJoinHints();
     if (hints.staConfigState == static_cast<uint8_t>(StaConfigState::PENDING)) {
-      armPendingConfirmWindow(now);
+      armPendingConfirmWindow(now, status.apActive && setupKeepsSoftAp(status.setupPhase)
+                                       ? SETUP_CONFIRM_TIMEOUT_MS
+                                       : STA_CONFIRM_TIMEOUT_MS);
     }
     if (status.setupPhase == SetupPhase::ATTEMPTING ||
         status.setupPhase == SetupPhase::FAILED) {
-      // Only a lease on the saved SSID proves this attempt. It confirms
-      // without waiting for the page: the phone may lose the SoftAP when it
-      // follows the station's channel, and the AP stays up during the grace.
+      // Only a lease on the saved SSID proves this attempt. The owner then
+      // saves it from the page ("Save Wi-Fi" confirms); until then the setup
+      // network stays up, and a phone that lost it when the SoftAP followed
+      // the station's channel can rejoin and resume on the same step.
       wifi_ap_record_t ap = {};
       const bool joined =
           esp_wifi_sta_get_ap_info(&ap) == ESP_OK &&
           strncmp(reinterpret_cast<const char *>(ap.ssid), hints.staSsid,
                   sizeof(ap.ssid)) == 0;
-      if (advanceSetupPhase(joined ? SetupEvent::JOINED
-                                   : SetupEvent::JOINED_OTHER) ==
-          SetupPhase::JOINED) {
-        dataMux_.lock();
-        pendingConfirmRequest_ = true;
-        dataMux_.unlock();
-      }
+      advanceSetupPhase(joined ? SetupEvent::JOINED : SetupEvent::JOINED_OTHER);
     }
     applyWifiPowerSave();
     return;

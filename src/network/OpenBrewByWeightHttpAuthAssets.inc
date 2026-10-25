@@ -432,7 +432,7 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       {"/api/v1/network", HTTP_POST, networkHandler, true},
       {"/api/v1/network/scan", HTTP_GET, wifiScanStatusHandler, true},
       {"/api/v1/network/scan", HTTP_POST, wifiScanStartHandler, true},
-      {"/api/v1/device/password", HTTP_POST, devicePasswordHandler},
+      {"/api/v1/device/password", HTTP_POST, devicePasswordHandler, true},
       {"/api/v1/auth", HTTP_GET, authStatusHandler, false, true},
       {"/api/v1/auth/login", HTTP_POST, authLoginHandler, false, true},
       {"/api/v1/auth/logout", HTTP_POST, authLogoutHandler, false, true},
@@ -472,7 +472,8 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
   }
   if (matched->open) return matched->handler(request);
   // /setup holds no UI claim: joining the SoftAP already proved the device
-  // password, the same trust as the admin bypass, so its own routes skip it.
+  // password, the same trust as the admin bypass, so its own routes (status,
+  // scan, network, and the owner password it asks for) skip it.
   const bool setupPeer = matched->setup && self.snapshot().apActive &&
                          socketServedBySoftAp(httpd_req_to_sockfd(request));
   if (!setupPeer && !self.requireActiveWebUiClient(request)) {

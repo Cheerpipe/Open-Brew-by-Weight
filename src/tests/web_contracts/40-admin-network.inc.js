@@ -162,13 +162,13 @@ if (!codeIncludes(ui, 'id="staIpMode"') ||
     !network.includes('or empty to keep the saved password.') ||
     !network.includes('StaIpMode::STATIC') ||
     !network.includes('STA_CONFIRM_TIMEOUT_MS') ||
-    !network.includes('action must be \\"save\\", \\"forget\\", \\"confirm\\", \\"skip\\", or \\"finish\\".') ||
+    !network.includes('action must be \\"save\\", \\"forget\\", \\"confirm\\", \\"skip\\", \\"finish\\", \\"brew\\", or \\"discard\\".') ||
     !network.includes('No pending network configuration to confirm.') ||
     // Skip portal exit: setup-context action (no admin unlock, like confirm),
-    // action plus the optional brewing choice, gated on the SoftAP being up AND the request coming
+    // action only, gated on the SoftAP being up AND the request coming
     // from the SoftAP socket, arms probe success.
     !network.includes('strcmp(action, "confirm") != 0 && strcmp(action, "skip") != 0') ||
-    !network.includes('Skip request accepts only action=\\"skip\\" and the brewing choice.') ||
+    !network.includes('Skip request must include only action=\\"skip\\".') ||
     !network.includes('No setup network to skip.') ||
     !network.includes('!socketServedBySoftAp(httpd_req_to_sockfd(request))') ||
     !network.includes('self.portalExitRequested_.store(true, std::memory_order_release)') ||
@@ -179,7 +179,7 @@ if (!codeIncludes(ui, 'id="staIpMode"') ||
     !networkHeader.includes('SOFTAP_TEARDOWN_GRACE_MS = 60000') ||
     !networkHeader.includes('SOFTAP_FINISH_LINGER_MS = 3000') ||
     !networkHeader.includes('uint32_t apTeardownAtMs = 0;') ||
-    !network.includes('Finish request accepts only action=\\"finish\\" and the brewing choice.') ||
+    !network.includes('Finish request must include only action=\\"finish\\".') ||
     !network.includes('No setup network to finish.') ||
     !network.includes('status_.apTeardownAtMs = now + SOFTAP_FINISH_LINGER_MS') ||
     !network.includes('sendJson(request, STATUS_OK, "{\\"finished\\":true}")') ||
@@ -216,7 +216,7 @@ if (!network.includes('restoreLkgToActive(next)') ||
       !codeIncludes(ui, 'R.resetNetworkAddressLoaded()') ||
       !codeIncludes(ui, 'Wi-Fi sleep saved.') ||
       !network.includes('\\"wifiSleep\\":%s') ||
-      !network.includes('jsonHasOnlyUniqueFields(root, saveFields, 15)') ||
+      !network.includes('jsonHasOnlyUniqueFields(root, saveFields, 13)') ||
       !network.includes('jsonBoolean(root, "wifiSleep", command.network.wifiSleep)') ||
       !network.includes('command.network.wifiSleepSpecified = true') ||
       !network.includes('void OpenBrewByWeightNetwork::applyWifiPowerSave(bool apStarting)') ||

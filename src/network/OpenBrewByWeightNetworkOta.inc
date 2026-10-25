@@ -11,20 +11,20 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   WebCommand command;
   command.requestId = self.allocateRequestId();
   command.unsafeWebUiOverride = self.webUiOverrideAllowed(request);
-  static const char *const forgetFields[] = {"action"};
-  static const char *const confirmFields[] = {"action"};
-  static const char *const skipFields[] = {"action", "brewByWeight", "presetId"};
-  static const char *const finishFields[] = {"action", "brewByWeight", "presetId"};
+  static const char *const actionFields[] = {"action"};
+  static const char *const brewFields[] = {"action", "brewByWeight", "presetId"};
   static const char *const saveFields[] = {
-      "action", "ssid",     "password", "open",  "wifiSleep", "ipMode",
-      "ip",     "netmask",  "gateway",  "dns1",  "dns2",      "name",
-      "apply",  "brewByWeight", "presetId"};
+      "action", "ssid",    "password", "open", "wifiSleep", "ipMode", "ip",
+      "netmask", "gateway", "dns1",    "dns2", "name",      "apply"};
   const char *networkError = nullptr;
   SetupBrew brew = SetupBrew::NONE;
   uint8_t brewPresetId = 0;
   bool brewSaveFailed = false;
   bool parsed = root != nullptr &&
                 jsonString(root, "action", action, sizeof(action), false);
+  // skip, discard, and brew act only for a peer on the running setup network.
+  const bool setupPeer = self.snapshot().apActive &&
+                         socketServedBySoftAp(httpd_req_to_sockfd(request));
   if (parsed && strcmp(action, "confirm") != 0 && strcmp(action, "skip") != 0 &&
       strcmp(action, "finish") != 0) {
     if (!self.requireAdminUnlock(request)) {
@@ -43,11 +43,8 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     return sendError(request, STATUS_CONFLICT, "DEVICE_PASSWORD_REQUIRED",
                      "Choose your own device password before finishing setup.");
   }
-  if (parsed &&
-      (networkError = parseSetupBrew(root, brew, brewPresetId)) != nullptr) {
-    parsed = false;
-  } else if (parsed && strcmp(action, "confirm") == 0) {
-    parsed = jsonHasOnlyUniqueFields(root, confirmFields, 1);
+  if (parsed && strcmp(action, "confirm") == 0) {
+    parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (!parsed) {
       networkError = "Confirm request must include only action=\"confirm\".";
     } else {
@@ -61,7 +58,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
         parsed = false;
         networkError = "No pending network configuration to confirm.";
       } else {
-        self.requestPendingNetworkConfirm();
+        self.requestPendingNetworkConfirm(true);
         cJSON_Delete(root);
         self.unlockJsonBody();
         return self.sendAccepted(request, command.requestId,
@@ -72,16 +69,12 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     // Setup-context action (SoftAP peer, same trust as confirm): arm the
     // portal-exit probe answers so the OS captive window closes as "logged
     // in" while the association — and /setup at 192.168.4.1 — stay up.
-    parsed = jsonHasOnlyUniqueFields(root, skipFields, 3);
+    parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (!parsed) {
-      networkError = "Skip request accepts only action=\"skip\" and the brewing choice.";
-    } else if (!self.snapshot().apActive ||
-               !socketServedBySoftAp(httpd_req_to_sockfd(request))) {
+      networkError = "Skip request must include only action=\"skip\".";
+    } else if (!setupPeer) {
       parsed = false;
       networkError = "No setup network to skip.";
-    } else if (!self.keepSetupBrew(brew, brewPresetId, true)) {
-      parsed = false;
-      brewSaveFailed = true;
     } else {
       self.portalExitRequested_.store(true, std::memory_order_release);
       cJSON_Delete(root);
@@ -89,14 +82,14 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       return sendJson(request, STATUS_OK, "{\"skipped\":true}");
     }
   } else if (parsed && strcmp(action, "finish") == 0) {
-    // Setup-context action: valid while the joined network is being
-    // confirmed or a teardown grace runs, or (firmware off) after "skip"; it
-    // commits the brewing choice. Arm the portal-exit probe answers,
+    // Setup-context action: valid while the saved network's teardown grace
+    // runs, or (firmware off) after "skip"; everything is already saved, so
+    // it only ends the session early. Arm the portal-exit probe answers,
     // then shorten the SoftAP teardown to a short linger so the captive
     // window can fetch its probe-success page before the link drops.
-    parsed = jsonHasOnlyUniqueFields(root, finishFields, 3);
+    parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (!parsed) {
-      networkError = "Finish request accepts only action=\"finish\" and the brewing choice.";
+      networkError = "Finish request must include only action=\"finish\".";
     } else if (!socketServedBySoftAp(httpd_req_to_sockfd(request))) {
       parsed = false;
       networkError = "No setup network to finish.";
@@ -113,9 +106,6 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       if (!grace && !skipped) {
         parsed = false;
         networkError = "No setup network to finish.";
-      } else if (!self.keepSetupBrew(brew, brewPresetId, true)) {
-        parsed = false;
-        brewSaveFailed = true;
       } else {
         if (grace) {
           self.dataMux_.lock();
@@ -130,6 +120,38 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
         return sendJson(request, STATUS_OK, "{\"finished\":true}");
       }
     }
+  } else if (parsed && strcmp(action, "discard") == 0) {
+    // Setup-context action: "Keep" or "Continue without Wi-Fi" drops this
+    // session's unsaved test now; nothing to drop is not an error.
+    parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
+    if (!parsed) {
+      networkError = "Discard request must include only action=\"discard\".";
+    } else if (!setupPeer) {
+      parsed = false;
+      networkError = "No setup network to discard a test from.";
+    } else {
+      self.requestPendingNetworkDiscard();
+      cJSON_Delete(root);
+      self.unlockJsonBody();
+      return sendJson(request, STATUS_OK, "{\"discarded\":true}");
+    }
+  } else if (parsed && strcmp(action, "brew") == 0) {
+    // Setup-context action: part one of onboarding saves the brewing choice
+    // on its own, before and independent of Wi-Fi, without restarting.
+    networkError = !jsonHasOnlyUniqueFields(root, brewFields, 3)
+                       ? "Brew request accepts only action=\"brew\" and the brewing choice."
+                   : !setupPeer ? "No setup network to save the brewing choice."
+                                : parseSetupBrew(root, brew, brewPresetId);
+    if (networkError != nullptr) {
+      parsed = false;
+    } else if (!self.saveSetupBrew(brew, brewPresetId)) {
+      parsed = false;
+      brewSaveFailed = true;
+    } else {
+      cJSON_Delete(root);
+      self.unlockJsonBody();
+      return sendJson(request, STATUS_OK, "{\"saved\":true}");
+    }
   } else if (parsed && strcmp(action, "forget") == 0) {
     if (!self.webUiConfigurationAllowed(request, status)) {
       cJSON_Delete(root);
@@ -138,7 +160,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
                        "Network settings are locked while a cycle is active.");
     }
-    parsed = jsonHasOnlyUniqueFields(root, forgetFields, 1);
+    parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (parsed) {
       command.type = WebCommandType::FORGET_NETWORK;
     } else {
@@ -168,7 +190,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
         cJSON_GetObjectItemCaseSensitive(root, "dns1") != nullptr;
     const bool hasDns2 =
         cJSON_GetObjectItemCaseSensitive(root, "dns2") != nullptr;
-    if (!jsonHasOnlyUniqueFields(root, saveFields, 15) ||
+    if (!jsonHasOnlyUniqueFields(root, saveFields, 13) ||
         !jsonString(root, "ssid", command.network.ssid, sizeof(command.network.ssid), false) ||
         !jsonString(root, "password", command.network.password,
                     sizeof(command.network.password), true) ||
@@ -236,10 +258,6 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
         command.network.applyLive = true;
       }
     }
-    if (parsed && brew != SetupBrew::NONE && !command.network.applyLive) {
-      parsed = false;
-      networkError = "The brewing choice requires a live setup save.";
-    }
     if (parsed) {
       command.network.wifiSleepSpecified = true;
     }
@@ -276,7 +294,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   } else {
     parsed = false;
     networkError =
-        "action must be \"save\", \"forget\", \"confirm\", \"skip\", or \"finish\".";
+        "action must be \"save\", \"forget\", \"confirm\", \"skip\", \"finish\", \"brew\", or \"discard\".";
   }
   cJSON_Delete(root);
   self.unlockJsonBody();
@@ -291,8 +309,6 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
                          ? networkError
                          : "Invalid network SSID or password.");
   }
-  // The save records this choice before its Wi-Fi commit.
-  self.keepSetupBrew(brew, brewPresetId, false);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     command.wipePassword();
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",

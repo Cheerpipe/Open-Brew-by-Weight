@@ -67,9 +67,9 @@ off, like a new controller.
 by Weight**, or the brewing step of the
 [first-time setup page](ap.md#first-connection) while the switch is off. The
 change takes effect after **Save firmware settings** and the restart that
-follows. On the setup page, the choice is saved together with your home
-network (or with **Continue without Wi-Fi**) and applied on the restart after
-the setup network closes. Unplug-level safety behavior does not change: the relay
+follows. On the setup page, the choice is saved in its first part (with your
+password), before and independently of Wi-Fi, and applied on the restart
+after the setup network closes or when you select **Finish and restart**. Unplug-level safety behavior does not change: the relay
 still opens on power loss, and a hardware safety fault still stops the
 machine in both modes.
 

@@ -22,7 +22,7 @@
   const confirmBlock =
       blockAt(network, 'bool OpenBrewByWeightNetwork::confirmPendingNetwork(');
   const requestConfirmBlock = blockAt(
-      network, 'void OpenBrewByWeightNetwork::requestPendingNetworkConfirm() {');
+      network, 'void OpenBrewByWeightNetwork::requestPendingNetworkConfirm(bool fromOwner) {');
   const revertBlock =
       blockAt(network, 'bool OpenBrewByWeightNetwork::revertPendingNetwork(');
   const snapshotBlock =
@@ -97,7 +97,7 @@
 
   // Live apply: /setup saves connect without a restart on the network task.
   if (!domainCore.includes('bool applyLive = false;') ||
-      !codeIncludes(networkHandlerBlock, 'jsonHasOnlyUniqueFields(root,saveFields,15)') ||
+      !codeIncludes(networkHandlerBlock, 'jsonHasOnlyUniqueFields(root,saveFields,13)') ||
       !networkHandlerBlock.includes('"apply"') ||
       !codeIncludes(networkHandlerBlock, 'strcmp(applyMode,"live")!=0') ||
       !codeIncludes(networkHandlerBlock, '!self.snapshot().apActive') ||
@@ -125,10 +125,13 @@
     throw new Error('SoftAP onboarding must be driven by the published SetupPhase only');
   }
   // Confirm is bound to the live attempt: status polls and the confirm
-  // action only persist a network this attempt joined (F-04); the join on
-  // the saved SSID queues the confirm in firmware (F-05); a join on another
-  // SSID fails the attempt; the unconfirmed window reverts while the SoftAP
-  // stays the fallback.
+  // action only persist a network this attempt joined (F-04). Onboarding
+  // tests the network first: the join on the saved SSID waits for the
+  // owner's "Save Wi-Fi" (the confirm action) for the longer onboarding
+  // window, status polls and the UI stream never confirm it, and a stale
+  // grace from an earlier saved network cannot close the SoftAP mid-attempt;
+  // a join on another SSID fails the attempt; the unconfirmed window reverts
+  // while the SoftAP stays the fallback.
   if (!codeIncludes(requestConfirmBlock, 'setupConfirmAllowed(status_.setupPhase,status_.apActive)') ||
       !codeIncludes(snapshotBlock, '(!status_.apActive||setupKeepsSoftAp(status_.setupPhase))') ||
       !codeIncludes(confirmBlock, '!setupConfirmAllowed(status.setupPhase,status.apActive)') ||
@@ -137,7 +140,18 @@
                     'status_.setupPhase=nextSetupPhase(status_.setupPhase,SetupEvent::CONFIRMED)') ||
       !codeIncludes(staStateBlock, 'esp_wifi_sta_get_ap_info(&ap)') ||
       !codeIncludes(staStateBlock, 'joined?SetupEvent::JOINED:SetupEvent::JOINED_OTHER') ||
-      !codeIncludes(staStateBlock, 'pendingConfirmRequest_=true') ||
+      staStateBlock.includes('pendingConfirmRequest_ = true') ||
+      !codeIncludes(requestConfirmBlock, '(fromOwner||!setupAwaitsOwnerSave(status_.setupPhase,status_.apActive))') ||
+      !codeIncludes(networkHandlerBlock, 'self.requestPendingNetworkConfirm(true);') ||
+      !codeIncludes(staStateBlock, 'setupKeepsSoftAp(status.setupPhase)?SETUP_CONFIRM_TIMEOUT_MS:STA_CONFIRM_TIMEOUT_MS') ||
+      !networkHeader.includes('SETUP_CONFIRM_TIMEOUT_MS = 600000') ||
+      !codeIncludes(network, 'if(setupKeepsSoftAp(status_.setupPhase))status_.apTeardownAtMs=0;') ||
+      // "Keep" / "Continue without Wi-Fi" drop an unsaved test now through
+      // the same expiry path (disconnect, revert, retry on a closed gate).
+      !codeIncludes(networkHandlerBlock, 'elseif(parsed&&strcmp(action,"discard")==0){') ||
+      !codeIncludes(networkHandlerBlock, 'self.requestPendingNetworkDiscard();') ||
+      !codeIncludes(blockAt(network, 'void OpenBrewByWeightNetwork::requestPendingNetworkDiscard() {'),
+                    'if(staConfirmArmed_&&status_.apActive&&setupDiscardAllowed(status_.setupPhase)){staConfirmDeadlineMs_=millis();}') ||
       // Post-confirm grace: confirm schedules the SoftAP teardown (keeping an
       // earlier "finish" linger); with the station up the AP stops at the
       // deadline, and a recovery AP with phones associated gets the grace
@@ -154,16 +168,17 @@
                     'status.apActive&&setupKeepsSoftAp(status.setupPhase)&&staConfirmArmed_') ||
       !codeIncludes(staStateBlock, 'revertPendingNetwork(now,"confirm timeout")')) {
     throw new Error(
-        'Live-apply confirm must be bound to the joined attempt, auto-confirm, and revert to the SoftAP fallback');
+        'Live-apply confirm must be bound to the joined attempt, saved only by the owner, and revert to the SoftAP fallback');
   }
-  // "finish" also lands while the joined network is still confirming (F-14),
-  // and status/admin publishes the phase and the AP closing time for /setup.
+  // "finish" ends a saved session early (an unsaved joined attempt is not
+  // finished), and status/admin publishes the phase, the AP closing time,
+  // and the confirm window for /setup.
   if (!codeIncludes(networkHandlerBlock,
                     'grace=setupFinishAllowed(self.status_.setupPhase,self.status_.apActive,self.status_.apTeardownAtMs,now)') ||
       !network.includes('\\"setup\\":\\"%s\\",\\"setupBrew\\":\\"%s\\",\\"setupPresetId\\":%u,') ||
       !network.includes('\\"apClosingMs\\":%lu,') ||
       !codeIncludes(network, 'setupPhaseName(network.setupPhase),setupBrewName(network.setupBrew)')) {
-    throw new Error('finish must accept the joined phase and status/admin must publish setup, the brewing draft, and apClosingMs');
+    throw new Error('finish must follow the teardown grace and status/admin must publish setup, the brewing choice, and apClosingMs');
   }
 
   // Scan pipeline: the HTTP handler's optimistic QUEUED must not be canceled
@@ -217,22 +232,27 @@
       !codeIncludes(runtimeJs, 'if(webUiPollingActive()&&!setupSession)startUiStream();') ||
       !codeIncludes(blockAt(runtimeJs, 'function applyCompatibilityChrome() {'), '!["admin","diagnostic","setup"].includes(activeView)') ||
       !codeIncludes(blockAt(runtimeJs, 'function startSetupSession() {'), 'webUiActiveUntil=Infinity') ||
-      // Steps come from the firmware phase, errors sit above the form and
-      // are focused/announced, blocked configuration is explained, and the
-      // success screen names the next step with copyable addresses.
-      codeIncludes(setupJs, '{action:"confirm"}') ||
-      !codeIncludes(setupJs, 'lastPhase==="joined"||lastPhase==="confirmed"') ||
+      // Steps come from the firmware phase (a joined test waits on
+      // "Connected" for Save Wi-Fi, which confirms it), errors sit above the
+      // form and are focused/announced, blocked configuration is explained,
+      // and the summary names the next step with copyable addresses.
+      !codeIncludes(setupJs, 'R.body({action:"confirm"})') ||
+      !codeIncludes(setupJs, 'if(lastPhase==="confirmed")returnwifiSaved(n);') ||
+      !codeIncludes(setupJs, 'if(lastPhase==="joined")returnstate==="connected"?noteConfirmWindow(n):showConnected(n);') ||
+      !codeIncludes(setupJs, 'if(lastPhase==="joined")returnshowConnected(n);') ||
       !codeIncludes(setupJs, 'n.apClosingMs>0&&n.staState==="CONNECTED"') ||
       !codeIncludes(setupJs, 's.configMutable===false?s.configLockReason:""') ||
       !codeIncludes(setupJs, 'box.focus({preventScroll:true})') ||
       !codeIncludes(setupJs, 'navigator.clipboard.writeText(text.textContent)') ||
       !codeIncludes(setupJs, 'if(finished)window.location.href=PROBE_URL;') ||
-      // The public factory password never survives setup: save and skip on
-      // the setup network need the owner's own password, set first without
-      // restarting the setup network.
-      !codeIncludes(setupJs, 'if(!(await protectDevice()))return;showConnecting(payload.ssid);') ||
-      !codeIncludes(setupJs, 'if(!(await protectDevice()))return;await R.api("/api/v1/network"') ||
-      !setupHtml.includes('id="setupDevicePassword"') ||
+      // The public factory password never survives setup: part one sets the
+      // owner's own (typed twice, never the factory one) before the brewing
+      // choice, waiting for the device to persist it, without restarting the
+      // setup network; save and skip there still require it.
+      !codeIncludes(setupJs, 'if (pass) await setPassword(password); if (brew) await R.api("/api/v1/network"') ||
+      !codeIncludes(setupJs, 'if(c.state==="PERSISTED"||c.state==="APPLIED")return;') ||
+      !setupHtml.includes('id="setupNewPassword"') ||
+      !setupHtml.includes('id="setupConfirmPassword"') ||
       !networkHandlerBlock.includes('"DEVICE_PASSWORD_REQUIRED"') ||
       !network.includes('command.network.applyLive = socketServedBySoftAp(httpd_req_to_sockfd(request));') ||
       !network.includes('apRestartPending_ = snapshot().apActive && !command.network.applyLive;') ||
@@ -261,21 +281,22 @@
       // the device address visible, and a probe-URL link that closes the
       // captive window after the device arms portal-exit success.
       !partialHtml.setup.includes('id="setupSkip"') ||
-      !partialHtml.setup.includes('id="setupSkipped"') ||
       !codeIncludes(setupJs, 'captive.apple.com/hotspot-detect.html') ||
-      !codeIncludes(setupJs, '{action:"skip",...brewPayload()}') ||
-      !codeIncludes(setupJs, 'show("skipped")') ||
+      !codeIncludes(setupJs, 'R.body({action:"skip"})') ||
+      !codeIncludes(setupJs, 'await discardTest(); await R.api("/api/v1/network", { method: "POST", body: R.body({ action: "skip" }) })') ||
+      !codeIncludes(setupJs, 'R.body({action:"discard"})') ||
+      !codeIncludes(setupJs, 'wifiState="skipped";showSummary();') ||
       !codeIncludes(setupJs, 'connectivitycheck.gstatic.com/generate_204') ||
-      !codeIncludes(setupJs, '$("setupSkipDone").href=PROBE_URL') ||
+      !codeIncludes(setupJs, 'letfinished=!compat&&wifiState!=="joined";') ||
       !codeIncludes(setupJs, '$("setupSkip").onclick=skipSetup') ||
       // Post-confirm grace: the success screen stays readable and its Done
       // button ends the window early (finish arms probe success, then the
       // device lingers briefly before dropping the setup network).
       !partialHtml.setup.includes('id="setupFinish"') ||
-      !codeIncludes(setupJs, '{action:"finish",...brewPayload()}') ||
+      !codeIncludes(setupJs, 'body:R.body({action:"finish"})') ||
       !codeIncludes(setupJs, '$("setupFinish").onclick=finishSetup') ||
       !codeIncludes(setupJs, 'input.type=show?"text":"password"') ||
-      !codeIncludes(setupJs, 'passToggle.setAttribute("aria-pressed"') ||
+      !codeIncludes(setupJs, 'button.setAttribute("aria-pressed"') ||
       !codeIncludes(setupJs, 'setInterval(chainWatchdog,2500)') ||
       !codeIncludes(setupJs, 'window.addEventListener("pageshow"') ||
       !codeIncludes(setupJs, '"http://"+deviceHost+".local"') ||
@@ -288,36 +309,37 @@
     throw new Error(
         '/setup must be a routed menu-less view with the live-apply save pipeline, the skip portal exit, and captive-portal fallbacks');
   }
-  // Brewing onboarding (firmware off only): the draft rides on save/skip/finish
-  // and is recorded durably before the Wi-Fi it is bound to can commit (boot
-  // applies or drops it with that Wi-Fi); a committed "by weight" choice
-  // restarts the controller once the setup SoftAP stops; full mode lets the
-  // machine's activator close the automatic SoftAP.
-  const intentBlock = blockAt(network, 'bool OpenBrewByWeightNetwork::persistSetupIntent(');
+  // Brewing onboarding (firmware off only): part one saves the choice with its
+  // own "brew" action as an intent unbound to any Wi-Fi (no restart there), so
+  // a Wi-Fi revert drops only a legacy bound intent; save/skip/finish carry no
+  // brewing fields; a saved "by weight" choice restarts the controller once
+  // the setup SoftAP stops; full mode lets the activator close the SoftAP.
+  const intentBlock = blockAt(network, 'bool OpenBrewByWeightNetwork::saveSetupBrew(');
   const idleBlock = blockAt(network, 'void OpenBrewByWeightNetwork::serviceSoftApIdle(');
   if (!codeIncludes(network, 'if(!firmwareCompatibilityMode()){return"The brewing choice is part of setup only while the firmware is off.";}') ||
-      !codeIncludes(networkHandlerBlock, 'if(parsed&&brew!=SetupBrew::NONE&&!command.network.applyLive){') ||
-      !codeIncludes(networkHandlerBlock, 'if(parsed&&(networkError=parseSetupBrew(root,brew,brewPresetId))!=nullptr){') ||
-      !codeIncludes(saveCommandBlock, 'if(command.network.applyLive&&!persistSetupIntent(true,staConfigCrc(next))){') ||
+      !codeIncludes(networkHandlerBlock, 'elseif(parsed&&strcmp(action,"brew")==0){') ||
+      !codeIncludes(networkHandlerBlock, ':!setupPeer?"No setup network to save the brewing choice.":parseSetupBrew(root,brew,brewPresetId);') ||
+      !codeIncludes(networkHandlerBlock, '!self.saveSetupBrew(brew,brewPresetId)') ||
+      !codeIncludes(networkHandlerBlock, 'parsed=jsonHasOnlyUniqueFields(root,actionFields,1);if(!parsed){networkError="Skip request must include only action=\\"skip\\".";}') ||
+      !codeIncludes(networkHandlerBlock, 'parsed=jsonHasOnlyUniqueFields(root,actionFields,1);if(!parsed){networkError="Finish request must include only action=\\"finish\\".";}') ||
+      /persistSetupIntent|keepSetupBrew|intent\.bound = true/.test(network + networkHeader) ||
       !codeIncludes(confirmBlock, 'if(loadSetupIntent(intent)){setupRestartPending_.store(true,std::memory_order_release);') ||
-      !codeIncludes(revertBlock, '(void)clearSetupIntent();') ||
-      !codeIncludes(intentBlock, 'if(brew==SetupBrew::NONE||!firmwareCompatibilityMode()){returntrue;}') ||
-      !codeIncludes(intentBlock, 'returnsaveSetupIntent(intent);') ||
-      !codeIncludes(network, 'if(!networkFlashWriteAllowed()||!persistSetupIntent(bound,staCrc)){returnfalse;}') ||
-      !codeIncludes(network, 'setupRestartPending_.store(kept==SetupBrew::BY_WEIGHT&&committed,std::memory_order_release);') ||
+      !codeIncludes(revertBlock, 'if(loadSetupIntent(intent)&&intent.bound)(void)clearSetupIntent();') ||
+      !codeIncludes(intentBlock, '!(brew==SetupBrew::USUAL?clearSetupIntent():saveSetupIntent(intent))') ||
+      !codeIncludes(intentBlock, 'setupRestartPending_.store(brew==SetupBrew::BY_WEIGHT,std::memory_order_release);') ||
       !codeIncludes(stopSoftApBlock, 'status_.setupBrew=SetupBrew::NONE;') ||
       !codeIncludes(stopSoftApBlock, 'if(setupRestartPending_.load(std::memory_order_acquire)){requestSetupRestart();}') ||
       !codeIncludes(networkHandlerBlock, 'constboolskipped=firmwareCompatibilityMode()&&self.status_.apActive&&self.status_.setupPhase==SetupPhase::NONE;') ||
       !codeIncludes(idleBlock, 'constboolbrewing=activatorOn&&!firmwareCompatibilityMode();') ||
       !codeIncludes(idleBlock, 'if(!brewing&&clients>0){') ||
       !codeIncludes(network, 'serviceSoftApIdle(now,networkSnapshot.apActive,apClients,controlGate().physicalActivatorOn);') ||
-      !codeIncludes(setupJs, 'if(compat&&lastBrew==="none"&&lastPhase==="none")returnshow("mode");') ||
-      !codeIncludes(setupJs, 'body:R.body({action:"finish",...brewPayload()})') ||
-      !codeIncludes(setupJs, 'body:R.body({action:"skip",...brewPayload()})') ||
-      !codeIncludes(setupJs, 'apply:"live",...brewPayload(),') ||
+      !codeIncludes(setupJs, 'constpart1Done=()=>!factoryPassword&&(!compat||lastBrew!=="none");') ||
+      !codeIncludes(setupJs, 'if(!part1Done())returnrenderWelcome();') ||
+      !codeIncludes(setupJs, 'body:R.body({action:"brew",...brewPayload()})') ||
+      codeIncludes(setupJs, 'apply:"live",...brewPayload()') ||
       !partialHtml.setup.includes('name="setupRecipe" value="255" checked')) {
     throw new Error(
-        'Brewing onboarding must stay firmware-off only, be recorded before its Wi-Fi commits, restart after the setup SoftAP, and let the activator close it only in full mode');
+        'Brewing onboarding must stay firmware-off only, be saved by part one unbound to Wi-Fi, restart after the setup SoftAP, and let the activator close it only in full mode');
   }
   // The starting-recipe cards print the factory dose and yield: keep the copy
   // tied to the firmware constants it describes.
@@ -332,11 +354,18 @@
           recipeCopy(grams(domainHeader, 'FACTORY_SINGLE_DOSE_DG'), grams(domainHeader, 'FACTORY_SINGLE_GOAL_WEIGHT_DG'))) {
     throw new Error('Onboarding recipe dose/yield copy must match the factory preset constants');
   }
-  // /setup is claim-less: only its status, scan, and network routes skip the
-  // UI claim, and only for a SoftAP peer while the AP is up.
+  // The new-password check refuses exactly the firmware's factory password.
+  const persistedSettings = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightPersistedSettings.h'), 'utf8');
+  const factoryPassword = (persistedSettings.match(/DEFAULT_DEVICE_PASSWORD = "([^"]+)"/) || [])[1];
+  if (!factoryPassword || !codeIncludes(setupJs, `FACTORY_PASSWORD="${factoryPassword}"`)) {
+    throw new Error('Setup FACTORY_PASSWORD must mirror DEFAULT_DEVICE_PASSWORD');
+  }
+  // /setup is claim-less: only its status, scan, network, and owner-password
+  // routes skip the UI claim, and only for a SoftAP peer while the AP is up.
   const ownedBlock = blockAt(network, 'esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(');
   const setupRoutes = (ownedBlock.match(/HTTP_(?:GET|POST|PUT|DELETE), \w+, true\}/g) || []).length;
-  if (setupRoutes !== 4 ||
+  if (setupRoutes !== 5 ||
+      !codeIncludes(ownedBlock, '{"/api/v1/device/password",HTTP_POST,devicePasswordHandler,true}') ||
       !codeIncludes(ownedBlock, '{"/api/v1/status/admin",HTTP_GET,statusHandler,true}') ||
       !codeIncludes(ownedBlock, '{"/api/v1/network",HTTP_POST,networkHandler,true}') ||
       !codeIncludes(ownedBlock, 'constboolsetupPeer=matched->setup&&self.snapshot().apActive&&socketServedBySoftAp(httpd_req_to_sockfd(request));') ||

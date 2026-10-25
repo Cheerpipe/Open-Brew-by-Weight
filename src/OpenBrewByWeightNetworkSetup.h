@@ -15,7 +15,7 @@ enum class SetupPhase : uint8_t {
   QUEUED,      // /setup saved a network with live apply; not associating yet
   ATTEMPTING,  // associating with the saved (PENDING) network
   FAILED,      // that attempt failed; reconnects held until the page retries
-  JOINED,      // this attempt got a lease on the saved SSID; confirm queued
+  JOINED,      // this attempt got a lease on the saved SSID; awaits "Save Wi-Fi"
   CONFIRMED,   // saved network persisted; the SoftAP closes after a grace
 };
 
@@ -84,13 +84,25 @@ constexpr bool setupConfirmAllowed(SetupPhase phase, bool apActive) {
           !apActive);
 }
 
-// "finish" from the success screen: valid while the joined network is being
-// confirmed or while a teardown deadline is still ahead.
+// A joined onboarding attempt is saved only by the owner's "Save Wi-Fi" (the
+// confirm action); status polls and the UI stream do not confirm it.
+constexpr bool setupAwaitsOwnerSave(SetupPhase phase, bool apActive) {
+  return apActive && phase == SetupPhase::JOINED;
+}
+
+// "Keep" or "Continue without Wi-Fi" drops this session's unsaved test now
+// instead of at its window's end, once the attempt has begun.
+constexpr bool setupDiscardAllowed(SetupPhase phase) {
+  return phase == SetupPhase::ATTEMPTING || phase == SetupPhase::FAILED ||
+         phase == SetupPhase::JOINED;
+}
+
+// "finish" from the summary: valid while the saved network's teardown
+// deadline is still ahead; an unsaved joined attempt is not finished.
 constexpr bool setupFinishAllowed(SetupPhase phase, bool apActive,
                                   uint32_t teardownAtMs, uint32_t now) {
-  return apActive &&
-         (phase == SetupPhase::JOINED ||
-          (teardownAtMs != 0 && static_cast<int32_t>(teardownAtMs - now) > 0));
+  return apActive && phase != SetupPhase::JOINED && teardownAtMs != 0 &&
+         static_cast<int32_t>(teardownAtMs - now) > 0;
 }
 
 enum class SoftApTeardown : uint8_t { KEEP, ARM_GRACE, STOP };
@@ -120,8 +132,8 @@ constexpr const char *setupPhaseName(SetupPhase phase) {
   return "none";
 }
 
-// Onboarding brewing choice, offered only while the firmware is off: kept with
-// the setup session until the network is confirmed, skipped, or finished.
+// Onboarding brewing choice, offered only while the firmware is off: saved by
+// part one of setup (the "brew" action) and published so the page can resume.
 enum class SetupBrew : uint8_t { NONE, USUAL, BY_WEIGHT };
 
 constexpr const char *setupBrewName(SetupBrew brew) {
