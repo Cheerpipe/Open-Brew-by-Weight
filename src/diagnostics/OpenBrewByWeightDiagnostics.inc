@@ -1250,8 +1250,12 @@ bool applyBootRecoveryOperation(RecoveryOperation operation) {
 }
 
 void completeBootRecovery(RecoveryOperation operation) {
-  // Do not rewrite a valid latch: a failed put on full NVS can tear it.
-  (void)ensureRecoveryIntent(operation);
+  // Do not rewrite a valid latch: a failed put on full NVS can tear it. A
+  // gesture factory reset gets the Web UI's full-NVS fallback, so a power cut
+  // or crash during the wipe still resumes it.
+  (void)(operation == RecoveryOperation::FACTORY_RESET
+             ? ensureFactoryResetIntent(releaseNvsSpaceForFactoryResetForNetwork)
+             : ensureRecoveryIntent(operation));
   const bool applied = applyBootRecoveryOperation(operation);
   bootRecoveryStackNote.freeBytes = uxTaskGetStackHighWaterMark(nullptr);
   bootRecoveryStackNote.operation = static_cast<uint32_t>(operation);

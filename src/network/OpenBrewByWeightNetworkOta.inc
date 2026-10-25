@@ -1396,7 +1396,7 @@ esp_err_t OpenBrewByWeightNetwork::otaFlashWork(httpd_req_t *request) {
     return sendError(request, STATUS_CONFLICT, "OTA_RESTART_PENDING",
                      "The flashed image is already waiting for the restart.");
   }
-  const OtaImageTag staged = ota.snapshot().staged;
+  const OtaImageTag staged = ota.stagedTag();
   self.beginOwnedHeapLifecycle(self.otaHeap_,
                                HeapLifecycleEvent::OTA_FLASH_BEGIN);
   const OtaResult result = ota.commit();

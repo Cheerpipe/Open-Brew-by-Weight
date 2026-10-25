@@ -199,6 +199,8 @@ void serviceHealthWorkerSample() {
   if (!healthSnapshotValid) hwmonSnapshot.cpuLoadValid = false;
 }
 
+[[gnu::noinline]] void startAfterBootRecovery();
+
 void setup() {
   bootStartedAtMs = millis();
   bootCapabilities = BootCapabilities{};
@@ -258,7 +260,12 @@ void setup() {
   maybeRunBootRecoveryGesture();
   machineOnActivatorReady();
 #endif
+  // Out of line: the rest of startup needs a ~1.4 KB frame that must not sit
+  // under boot recovery on the 8 KiB loopTask (scripts/check_stack_depth.py).
+  startAfterBootRecovery();
+}
 
+void startAfterBootRecovery() {
   // Default builds keep USB Serial/JTAG off until GPIO4 is jumpered to GND.
   // Serial is HWCDC (native USB), not UART0 — see OpenBrewByWeightUsbConsole.h.
   // -DOPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1 starts CDC at boot (OpenOCD + CLI, no jumper).

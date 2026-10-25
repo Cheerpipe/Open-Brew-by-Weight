@@ -320,6 +320,11 @@ OtaImageTag OpenBrewByWeightOta::runningTag() const {
   return runningTag_;
 }
 
+OtaImageTag OpenBrewByWeightOta::stagedTag() const {
+  TaskLockGuard lock(mutex_);
+  return stagedTag_;
+}
+
 void OpenBrewByWeightOta::begin() {
   TaskLockGuard lock(mutex_);
   if (started_) {
@@ -1004,15 +1009,19 @@ bool OpenBrewByWeightOta::reconfirmStagedTag() {
   if (stagedTagOffset_ + length > target->size) {
     length = target->size - stagedTagOffset_;
   }
-  uint8_t bytes[OTA_TAG_REREAD_BYTES] = {};
+  // Off the stack: commit() runs with no session, so the transfer scanner is
+  // idle (a new session resets it), and the bytes stage in the flash scratch.
+  static_assert(OTA_TAG_REREAD_BYTES <= FLASH_IO_SCRATCH_BYTES,
+                "tag re-read must fit the flash I/O scratch");
   FlashIoGuard flash;
+  uint8_t *bytes = flashIoScratchBytes();
   if (!flash.ok() ||
       esp_partition_read(target, stagedTagOffset_, bytes, length) != ESP_OK) {
     return false;
   }
-  OtaImageTagScanner scanner;
-  scanner.feed(bytes, length);
-  return scanner.found() && sameTag(scanner.tag(), stagedTag_);
+  scanner_.reset();
+  scanner_.feed(bytes, length);
+  return scanner_.found() && sameTag(scanner_.tag(), stagedTag_);
 }
 
 OtaResult OpenBrewByWeightOta::commit() {

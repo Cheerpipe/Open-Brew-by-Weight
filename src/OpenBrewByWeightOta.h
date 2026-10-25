@@ -302,6 +302,7 @@ class OpenBrewByWeightOta {
                            uint32_t minUptimeMs, uint32_t deadlineMs);
 
   OtaImageTag runningTag() const;
+  OtaImageTag stagedTag() const;
 
   static const char *resultName(OtaResult result);
   static const char *stateName(OtaState state);
