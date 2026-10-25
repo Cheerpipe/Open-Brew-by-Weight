@@ -78,6 +78,8 @@
   assert(codeIncludes(js, 'function snapshotControls(') &&
          codeIncludes(js, 'function restoreSnapshot(') &&
          codeIncludes(js, 'formBaseline=snapshotControls(els)') &&
+         // An edit the device now holds is settled: its field follows the device again.
+         codeIncludes(js, 'for(const id in edited)if(Object.is(edited[id],uiState.formBaseline[id]))delete edited[id];restoreSnapshot(edited)') &&
          codeIncludes(js, 'if(!dateTimeDirty)dateTimeBaseline=snapshotControls(') &&
          codeIncludes(js, 'if(!bleDirty)bleBaseline=snapshotControls(') &&
          codeIncludes(js, 'if(!powerDirty)powerBaseline=snapshotControls(') &&
