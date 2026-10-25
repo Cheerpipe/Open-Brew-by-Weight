@@ -141,7 +141,7 @@ function createServer() {
       return;
     }
     try {
-      const mobileMenu = /^\/mobile-menu(?:\/(?:stats|history|settings|diagnostic|admin))?\/?$/.test(pathname);
+      const mobileMenu = /^(?:\/mobile-menu|(?:\/mobile-menu)?\/(?:stats|history|settings|diagnostic|admin))\/?$/.test(pathname);
       const micraScript = pathname === '/micra-preview.js';
       const micra = pathname === '/micra' || micraScript;
       const signals = pathname === '/preview.js';

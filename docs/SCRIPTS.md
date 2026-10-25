@@ -78,8 +78,11 @@ design asset it serves is a local file that never enters Git:
 
 The server offers two kinds of pages. Reference views are rendered live
 from the firmware sources: `/` shows the Home screen, `/mobile-menu` the
-bottom-navigation sample views, and `/micra` the machine diagnostics, with
-the firmware stylesheet at `/app.css`. Everything else is served from
+bottom-navigation sample views, `/stats`, `/history`, `/settings`,
+`/diagnostic`, and `/admin` open those same views directly, and `/micra` the
+machine diagnostics, with the firmware stylesheet at `/app.css`. These names
+always render the live views, even when a mockup with the same name exists.
+Everything else is served from
 `webui-mockups/` by file name: drop `proposal.html` into the folder and
 open `http://127.0.0.1:4173/proposal`; `proposal.css` and `proposal.js`
 resolve the same way, so adding or removing a mockup never requires a

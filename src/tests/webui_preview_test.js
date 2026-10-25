@@ -52,6 +52,8 @@ function checkScript(url, fixture, required, fixtureProvided = []) {
 }
 
 for (const url of ['/', '/mobile-menu', '/micra', '/app.css']) get(url);
+// Header nav links point at bare view routes; they must not fall through to stale mockup files.
+assert.ok(get('/admin').includes('id="adminLockPanel"'), '/admin must render the live Admin view');
 checkScript('/preview.js', 'header.js',
   ['updateHeaderSignals', 'initHeaderSignals', 'updateQuickSettings', 'buildQuickSettings', 'escHtml']);
 // The Micra controller actions come from the local webui-mockups/micra.js fixture.
