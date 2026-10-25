@@ -3670,6 +3670,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 .presetAccGraph {
   margin: 0 0.6rem;
+  touch-action: pan-y;
 }
 .presetAccReadout {
   margin: 0.35rem 0.6rem 0.6rem;
@@ -4062,11 +4063,11 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 .reviewGraph {
   width: 100%;
+  touch-action: pan-y;
 }
 .reviewGraph svg {
   display: block;
   overflow: visible;
-  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
 }
