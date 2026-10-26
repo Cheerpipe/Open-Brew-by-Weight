@@ -376,3 +376,20 @@
     throw new Error('Static Admin and Settings markup must live in the partials');
   }
 }
+// Enter in a credential or Save card clicks its primary button: each one is
+// the submit button of an .enterForm that app.js keeps from submitting.
+{
+  for (const [view, id] of [['settings', 'lineaMicraConnectButton'], ['admin', 'loginConfirmButton'],
+    ['admin', 'changeDevicePasswordButton'], ['admin', 'saveNetworkButton'], ['admin', 'saveDateTimeButton'],
+    ['admin', 'saveWebhookButton'], ['admin', 'saveScheduledRestartButton']]) {
+    const html = partialHtml[view], at = html.indexOf(`<button id="${id}"`),
+      form = html.lastIndexOf('<form', at), tag = html.slice(at, html.indexOf('>', at));
+    if (at < 0 || !/type="submit"/.test(tag) || html.lastIndexOf('</form>', at) > form ||
+        !/^<form[^>]*class="[^"]*enterForm[^"]*"[^>]*novalidate/.test(html.slice(form))) {
+      throw new Error(`${id} must be the submit button of a novalidate .enterForm`);
+    }
+  }
+  if (!codeIncludes(rawAppJsSource, 'document.addEventListener("submit", (e) => e.target.matches(".enterForm") && e.preventDefault())')) {
+    throw new Error('An .enterForm must never submit or reload the page');
+  }
+}

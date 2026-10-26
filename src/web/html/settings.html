@@ -496,7 +496,7 @@
     <legend>
       {{webui:settings.la_marzocco_cloud}} <span id="lineaMicraLegendHint" class="hint"></span>
     </legend>
-    <div id="lineaMicraSignIn">
+    <form id="lineaMicraSignIn" class="enterForm" novalidate>
       <p>
         {{webui:settings.micra_intro}}<small class="fieldHint"
           >{{webui:settings.micra_cloud_hint}}</small
@@ -521,12 +521,12 @@
       >
       <p id="lineaMicraWifiNote" class="readyMsg hidden">{{webui:settings.micra_needs_wifi}}</p>
       <div class="btnBar">
-        <button id="lineaMicraConnectButton" class="btnGlyph mutable btnInvert" type="button">
+        <button id="lineaMicraConnectButton" class="btnGlyph mutable btnInvert" type="submit">
           <span class="g" aria-hidden="true">↻</span
           ><span class="t">{{webui:settings.connect_account}}</span>
         </button>
       </div>
-    </div>
+    </form>
     <div id="lineaMicraBusy" hidden>
       <p>{{webui:settings.micra_connecting}}</p>
       <ol id="lineaMicraSteps" class="micraSteps">

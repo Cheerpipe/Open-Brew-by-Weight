@@ -146,131 +146,138 @@
   </details>
   <details id="networkPanel" data-g="network" class="cfgGroup">
     <summary>{{webui:admin.network}}</summary>
-    <div id="networkStatus">—</div>
-    <label
-      >{{webui:admin.device_name}}
-      <input
-        id="deviceName"
-        type="text"
-        maxlength="32"
-        autocomplete="off"
-        spellcheck="false"
-      /><small class="fieldHint">{{webui:admin.identifies_the_controller_on_the}}</small></label
-    >
-    <div class="btnBar">
-      <button id="scanNetworkButton" class="btnGlyph mutable" type="button">
-        <span class="g" aria-hidden="true">⊕</span
-        ><span class="t">{{webui:admin.scan_networks}}</span>
-      </button>
-    </div>
-    <span id="scanStatus" role="status"></span
-    ><label
-      >{{webui:admin.detected_network}}
-      <select id="staNetwork">
-        <option value="">{{webui:admin.select}}</option></select
-      ><small class="fieldHint">{{webui:admin.select_to_fill_ssid_and_security}}</small></label
-    ><label
-      >{{webui:admin.selected_ssid_or_hidden_network}}
-      <input id="staSsid" type="text" maxlength="32" autocomplete="off" spellcheck="false" /><small
-        class="fieldHint"
-        >{{webui:admin.1_32_characters_hidden_networks_supported}}</small
-      ></label
-    ><label
-      >{{webui:admin.password}}
-      <input
-        id="staPassword"
-        type="password"
-        maxlength="63"
-        autocomplete="current-password"
-      /><small class="fieldHint"
-        >{{webui:admin.leave_empty_to_keep_the_saved_password}}</small
-      ></label
-    ><label
-      ><input id="staOpen" type="checkbox" /> {{webui:admin.open_network}}<small class="fieldHint"
-        >{{webui:admin.leave_password_empty}}</small
-      ></label
-    ><label
-      >{{webui:admin.ip_mode}}
-      <select id="staIpMode">
-        <option value="dhcp">{{webui:admin.dhcp}}</option>
-        <option value="static">{{webui:admin.static_ip}}</option></select
-      ><small class="fieldHint"
-        >{{webui:admin.automatic_or_fixed_address_avoid_192_168}}</small
-      ></label
-    >
-    <div class="staticIpOpt">
+    <form class="enterForm" novalidate>
+      <div id="networkStatus">—</div>
       <label
-        >{{webui:admin.ip}}
+        >{{webui:admin.device_name}}
         <input
-          id="staStaticIp"
+          id="deviceName"
           type="text"
-          maxlength="15"
-          inputmode="decimal"
-          placeholder="192.168.1.50"
-        /><small class="fieldHint">{{webui:admin.device_ipv4_not_192_168_4_x}}</small></label
+          maxlength="32"
+          autocomplete="off"
+          spellcheck="false"
+        /><small class="fieldHint">{{webui:admin.identifies_the_controller_on_the}}</small></label
+      >
+      <div class="btnBar">
+        <button id="scanNetworkButton" class="btnGlyph mutable" type="button">
+          <span class="g" aria-hidden="true">⊕</span
+          ><span class="t">{{webui:admin.scan_networks}}</span>
+        </button>
+      </div>
+      <span id="scanStatus" role="status"></span
       ><label
-        >{{webui:admin.mask}}
-        <input
-          id="staNetmask"
-          type="text"
-          maxlength="15"
-          inputmode="decimal"
-          placeholder="255.255.255.0" /></label
+        >{{webui:admin.detected_network}}
+        <select id="staNetwork">
+          <option value="">{{webui:admin.select}}</option></select
+        ><small class="fieldHint">{{webui:admin.select_to_fill_ssid_and_security}}</small></label
       ><label
-        >{{webui:admin.gateway}}
+        >{{webui:admin.selected_ssid_or_hidden_network}}
         <input
-          id="staGateway"
+          id="staSsid"
           type="text"
-          maxlength="15"
-          inputmode="decimal"
-          placeholder="192.168.1.1"
+          maxlength="32"
+          autocomplete="off"
+          spellcheck="false"
         /><small class="fieldHint"
-          >{{webui:admin.router_address_in_the_same_subnet_must}}</small
+          >{{webui:admin.1_32_characters_hidden_networks_supported}}</small
         ></label
       ><label
-        >{{webui:admin.dns_1}}
+        >{{webui:admin.password}}
         <input
-          id="staDns1"
-          type="text"
-          maxlength="15"
-          inputmode="decimal"
-          placeholder="1.1.1.1" /></label
+          id="staPassword"
+          type="password"
+          maxlength="63"
+          autocomplete="current-password"
+        /><small class="fieldHint"
+          >{{webui:admin.leave_empty_to_keep_the_saved_password}}</small
+        ></label
       ><label
-        >{{webui:admin.dns_2}}
-        <input
-          id="staDns2"
-          type="text"
-          maxlength="15"
-          inputmode="decimal"
-          placeholder="{{webui:admin.optional}}"
-      /></label>
-    </div>
-    <div class="btnBar">
-      <button
-        id="saveNetworkButton"
-        class="btnGlyph mutable btnInvert"
-        data-dirty="0"
-        disabled
-        type="button"
+        ><input id="staOpen" type="checkbox" /> {{webui:admin.open_network}}<small class="fieldHint"
+          >{{webui:admin.leave_password_empty}}</small
+        ></label
+      ><label
+        >{{webui:admin.ip_mode}}
+        <select id="staIpMode">
+          <option value="dhcp">{{webui:admin.dhcp}}</option>
+          <option value="static">{{webui:admin.static_ip}}</option></select
+        ><small class="fieldHint"
+          >{{webui:admin.automatic_or_fixed_address_avoid_192_168}}</small
+        ></label
       >
-        <span class="g" aria-hidden="true">✓</span
-        ><span class="t">{{webui:admin.save_network_settings_and_restart}}</span></button
-      ><button id="forgetNetworkButton" class="btnGlyph mutable btnDanger" type="button">
-        <span class="g" aria-hidden="true">×</span
-        ><span class="t">{{webui:admin.forget_network_and_restart}}</span></button
-      ><button
-        id="revertNetworkButton"
-        class="btnGlyph mutable btnRevert"
-        data-dirty="0"
-        disabled
-        title="{{webui:runtime.revert_unsaved_changes}}"
-        aria-label="{{webui:runtime.revert_unsaved_changes}}"
-        type="button"
-      >
-        <span class="g" aria-hidden="true">↺</span>
-      </button>
-    </div>
-    <small>{{webui:admin.scan_while_ready_after_saving_wi_fi}}</small>
+      <div class="staticIpOpt">
+        <label
+          >{{webui:admin.ip}}
+          <input
+            id="staStaticIp"
+            type="text"
+            maxlength="15"
+            inputmode="decimal"
+            placeholder="192.168.1.50"
+          /><small class="fieldHint">{{webui:admin.device_ipv4_not_192_168_4_x}}</small></label
+        ><label
+          >{{webui:admin.mask}}
+          <input
+            id="staNetmask"
+            type="text"
+            maxlength="15"
+            inputmode="decimal"
+            placeholder="255.255.255.0" /></label
+        ><label
+          >{{webui:admin.gateway}}
+          <input
+            id="staGateway"
+            type="text"
+            maxlength="15"
+            inputmode="decimal"
+            placeholder="192.168.1.1"
+          /><small class="fieldHint"
+            >{{webui:admin.router_address_in_the_same_subnet_must}}</small
+          ></label
+        ><label
+          >{{webui:admin.dns_1}}
+          <input
+            id="staDns1"
+            type="text"
+            maxlength="15"
+            inputmode="decimal"
+            placeholder="1.1.1.1" /></label
+        ><label
+          >{{webui:admin.dns_2}}
+          <input
+            id="staDns2"
+            type="text"
+            maxlength="15"
+            inputmode="decimal"
+            placeholder="{{webui:admin.optional}}"
+        /></label>
+      </div>
+      <div class="btnBar">
+        <button
+          id="saveNetworkButton"
+          class="btnGlyph mutable btnInvert"
+          data-dirty="0"
+          disabled
+          type="submit"
+        >
+          <span class="g" aria-hidden="true">✓</span
+          ><span class="t">{{webui:admin.save_network_settings_and_restart}}</span></button
+        ><button id="forgetNetworkButton" class="btnGlyph mutable btnDanger" type="button">
+          <span class="g" aria-hidden="true">×</span
+          ><span class="t">{{webui:admin.forget_network_and_restart}}</span></button
+        ><button
+          id="revertNetworkButton"
+          class="btnGlyph mutable btnRevert"
+          data-dirty="0"
+          disabled
+          title="{{webui:runtime.revert_unsaved_changes}}"
+          aria-label="{{webui:runtime.revert_unsaved_changes}}"
+          type="button"
+        >
+          <span class="g" aria-hidden="true">↺</span>
+        </button>
+      </div>
+      <small>{{webui:admin.scan_while_ready_after_saving_wi_fi}}</small>
+    </form>
   </details>
   <details id="powerPanel" data-g="energy" class="cfgGroup">
     <summary>{{webui:admin.power_management}}</summary>
@@ -320,70 +327,74 @@
   </details>
   <details id="dateTimePanel" data-g="clock" class="cfgGroup">
     <summary>{{webui:admin.date_time}}</summary>
-    <label
-      ><input id="timezoneAutomatic" type="checkbox" role="switch" />
-      {{webui:admin.timezone_automatic}}<small class="fieldHint"
-        >{{webui:admin.timezone_automatic_hint}}</small
-      ></label
-    ><label
-      >{{webui:admin.timezone}}
-      <select id="timezoneId" required></select
-      ><small class="fieldHint">{{webui:admin.timezone_iana_hint}}</small></label
-    ><small id="timezonePreview" class="fieldHint" role="status" aria-live="polite"
-      >{{webui:admin.timezone_preview_waiting}}</small
-    ><small id="timezoneSaveState" class="fieldHint"></small
-    ><label
-      ><input id="ntpSyncEnabled" type="checkbox" role="switch" />
-      {{webui:admin.automatic_date_time}}<small class="fieldHint"
-        >{{webui:admin.automatic_date_time_hint}}</small
-      ></label
-    ><label
-      >{{webui:admin.ntp_server}}
-      <select id="ntpServerPreset">
-        <option value="pool">{{webui:admin.pool_ntp_org}}</option>
-        <option value="google">time.google.com</option>
-        <option value="cloudflare">time.cloudflare.com</option>
-        <option value="nist">{{webui:admin.time_nist_gov}}</option></select
-      ><small class="fieldHint">{{webui:admin.public_ntp_host_used_when_custom_ntp}}</small></label
-    ><label
-      >{{webui:admin.custom_ntp_optional}}
-      <input
-        id="ntpServerCustom"
-        type="text"
-        maxlength="63"
-        placeholder="{{webui:admin.e_g_ntp_example_com}}"
-        autocomplete="off"
-        spellcheck="false"
-      /><small class="fieldHint"
-        >{{webui:admin.overrides_preset_when_set_empty_preset_max}}</small
-      ></label
-    >
-    <div class="btnBar">
-      <button
-        id="saveDateTimeButton"
-        class="btnGlyph mutable btnInvert"
-        data-dirty="0"
-        disabled
-        type="button"
+    <form class="enterForm" novalidate>
+      <label
+        ><input id="timezoneAutomatic" type="checkbox" role="switch" />
+        {{webui:admin.timezone_automatic}}<small class="fieldHint"
+          >{{webui:admin.timezone_automatic_hint}}</small
+        ></label
+      ><label
+        >{{webui:admin.timezone}}
+        <select id="timezoneId" required></select
+        ><small class="fieldHint">{{webui:admin.timezone_iana_hint}}</small></label
+      ><small id="timezonePreview" class="fieldHint" role="status" aria-live="polite"
+        >{{webui:admin.timezone_preview_waiting}}</small
+      ><small id="timezoneSaveState" class="fieldHint"></small
+      ><label
+        ><input id="ntpSyncEnabled" type="checkbox" role="switch" />
+        {{webui:admin.automatic_date_time}}<small class="fieldHint"
+          >{{webui:admin.automatic_date_time_hint}}</small
+        ></label
+      ><label
+        >{{webui:admin.ntp_server}}
+        <select id="ntpServerPreset">
+          <option value="pool">{{webui:admin.pool_ntp_org}}</option>
+          <option value="google">time.google.com</option>
+          <option value="cloudflare">time.cloudflare.com</option>
+          <option value="nist">{{webui:admin.time_nist_gov}}</option></select
+        ><small class="fieldHint"
+          >{{webui:admin.public_ntp_host_used_when_custom_ntp}}</small
+        ></label
+      ><label
+        >{{webui:admin.custom_ntp_optional}}
+        <input
+          id="ntpServerCustom"
+          type="text"
+          maxlength="63"
+          placeholder="{{webui:admin.e_g_ntp_example_com}}"
+          autocomplete="off"
+          spellcheck="false"
+        /><small class="fieldHint"
+          >{{webui:admin.overrides_preset_when_set_empty_preset_max}}</small
+        ></label
       >
-        <span class="g" aria-hidden="true">✓</span
-        ><span class="t">{{webui:admin.save_date_and_time_settings}}</span></button
-      ><button id="syncTimeButton" class="btnGlyph mutable" type="button">
-        <span class="g" aria-hidden="true">↻</span
-        ><span class="t">{{webui:admin.sync_now}}</span></button
-      ><button
-        id="revertDateTimeButton"
-        class="btnGlyph mutable btnRevert"
-        data-dirty="0"
-        disabled
-        title="{{webui:runtime.revert_unsaved_changes}}"
-        aria-label="{{webui:runtime.revert_unsaved_changes}}"
-        type="button"
-      >
-        <span class="g" aria-hidden="true">↺</span>
-      </button>
-    </div>
-    <small id="dateTimeDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
+      <div class="btnBar">
+        <button
+          id="saveDateTimeButton"
+          class="btnGlyph mutable btnInvert"
+          data-dirty="0"
+          disabled
+          type="submit"
+        >
+          <span class="g" aria-hidden="true">✓</span
+          ><span class="t">{{webui:admin.save_date_and_time_settings}}</span></button
+        ><button id="syncTimeButton" class="btnGlyph mutable" type="button">
+          <span class="g" aria-hidden="true">↻</span
+          ><span class="t">{{webui:admin.sync_now}}</span></button
+        ><button
+          id="revertDateTimeButton"
+          class="btnGlyph mutable btnRevert"
+          data-dirty="0"
+          disabled
+          title="{{webui:runtime.revert_unsaved_changes}}"
+          aria-label="{{webui:runtime.revert_unsaved_changes}}"
+          type="button"
+        >
+          <span class="g" aria-hidden="true">↺</span>
+        </button>
+      </div>
+      <small id="dateTimeDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
+    </form>
   </details>
   <details id="frontendPanel" data-g="frontend" class="cfgGroup">
     <summary>{{webui:admin.frontend}}</summary>
@@ -426,67 +437,69 @@
   </details>
   <details id="webhookPanel" data-g="webhooks" class="cfgGroup">
     <summary>{{webui:admin.webhooks}}</summary>
-    <label
-      ><input id="webhookEnabled" type="checkbox" role="switch" /> {{webui:admin.webhooks}}</label
-    ><label
-      >{{webui:admin.webhook_url}}
-      <input
-        id="webhookUrl"
-        type="url"
-        maxlength="191"
-        placeholder="http://192.168.1.10:8123/path"
-        autocomplete="off"
-        spellcheck="false"
-      /><small class="fieldHint">{{webui:admin.http_only_no_retries}}</small></label
-    ><label
-      ><input id="webhookDeferDuringShot" type="checkbox" role="switch" />
-      {{webui:admin.queue_webhooks_during_shots}}<small class="fieldHint"
-        >{{webui:admin.off_send_immediately_enable_to_defer_webhooks}}</small
-      ></label
-    >
-    <details data-g="events" class="cfgGroup">
-      <summary>{{webui:admin.events}}</summary>
+    <form class="enterForm" novalidate>
       <label
-        ><input id="webhookBrewState" type="checkbox" checked /> {{webui:admin.brew_state}}<small
-          class="fieldHint"
-          >{{webui:admin.queued_brewing_waits_up_to_2_s}}</small
-        ></label
+        ><input id="webhookEnabled" type="checkbox" role="switch" /> {{webui:admin.webhooks}}</label
       ><label
-        ><input id="webhookFirstDrop" type="checkbox" checked /> {{webui:admin.first_drop}}</label
+        >{{webui:admin.webhook_url}}
+        <input
+          id="webhookUrl"
+          type="url"
+          maxlength="191"
+          placeholder="http://192.168.1.10:8123/path"
+          autocomplete="off"
+          spellcheck="false"
+        /><small class="fieldHint">{{webui:admin.http_only_no_retries}}</small></label
       ><label
-        ><input id="webhookEnd" type="checkbox" checked /> {{webui:admin.end}}<small
-          class="fieldHint"
-          >{{webui:admin.sent_after_drip_delay_with_final_time}}</small
+        ><input id="webhookDeferDuringShot" type="checkbox" role="switch" />
+        {{webui:admin.queue_webhooks_during_shots}}<small class="fieldHint"
+          >{{webui:admin.off_send_immediately_enable_to_defer_webhooks}}</small
         ></label
       >
-    </details>
-    <div id="webhookStatus">—</div>
-    <div class="btnBar">
-      <button
-        id="saveWebhookButton"
-        class="btnGlyph mutable btnInvert"
-        data-dirty="0"
-        type="button"
-        disabled
-      >
-        <span class="g" aria-hidden="true">✓</span
-        ><span class="t">{{webui:admin.save_webhook_settings}}</span></button
-      ><button id="testWebhookButton" class="btnGlyph mutable" type="button">
-        <span class="g" aria-hidden="true">↗</span
-        ><span class="t">{{webui:admin.send_test}}</span></button
-      ><button
-        id="revertWebhookButton"
-        class="btnGlyph mutable btnRevert"
-        data-dirty="0"
-        type="button"
-        disabled
-        title="{{webui:runtime.revert_unsaved_changes}}"
-        aria-label="{{webui:runtime.revert_unsaved_changes}}"
-      >
-        <span class="g" aria-hidden="true">↺</span>
-      </button>
-    </div>
-    <small id="webhookDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
+      <details data-g="events" class="cfgGroup">
+        <summary>{{webui:admin.events}}</summary>
+        <label
+          ><input id="webhookBrewState" type="checkbox" checked /> {{webui:admin.brew_state}}<small
+            class="fieldHint"
+            >{{webui:admin.queued_brewing_waits_up_to_2_s}}</small
+          ></label
+        ><label
+          ><input id="webhookFirstDrop" type="checkbox" checked /> {{webui:admin.first_drop}}</label
+        ><label
+          ><input id="webhookEnd" type="checkbox" checked /> {{webui:admin.end}}<small
+            class="fieldHint"
+            >{{webui:admin.sent_after_drip_delay_with_final_time}}</small
+          ></label
+        >
+      </details>
+      <div id="webhookStatus">—</div>
+      <div class="btnBar">
+        <button
+          id="saveWebhookButton"
+          class="btnGlyph mutable btnInvert"
+          data-dirty="0"
+          type="submit"
+          disabled
+        >
+          <span class="g" aria-hidden="true">✓</span
+          ><span class="t">{{webui:admin.save_webhook_settings}}</span></button
+        ><button id="testWebhookButton" class="btnGlyph mutable" type="button">
+          <span class="g" aria-hidden="true">↗</span
+          ><span class="t">{{webui:admin.send_test}}</span></button
+        ><button
+          id="revertWebhookButton"
+          class="btnGlyph mutable btnRevert"
+          data-dirty="0"
+          type="button"
+          disabled
+          title="{{webui:runtime.revert_unsaved_changes}}"
+          aria-label="{{webui:runtime.revert_unsaved_changes}}"
+        >
+          <span class="g" aria-hidden="true">↺</span>
+        </button>
+      </div>
+      <small id="webhookDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
+    </form>
   </details>
   <details id="accessPanel" data-g="access" class="cfgGroup">
     <summary>{{webui:admin.access}}</summary>
@@ -496,7 +509,7 @@
         >{{webui:admin.login_off_hint}}</small
       ></label
     >
-    <div id="loginSheet" class="accessSheet hidden">
+    <form id="loginSheet" class="accessSheet enterForm hidden" novalidate>
       <p id="loginSheetText"></p>
       <label id="loginNewWrap"
         >{{webui:admin.new_device_password}}
@@ -529,13 +542,13 @@
         {{webui:admin.home_assistant_recent_warning}}
       </p>
       <div class="btnBar">
-        <button id="loginConfirmButton" class="btnGlyph btnInvert" type="button">
+        <button id="loginConfirmButton" class="btnGlyph btnInvert" type="submit">
           <span class="t">{{webui:admin.turn_on}}</span></button
         ><button id="loginCancelButton" class="btnGlyph ghost" type="button">
           <span class="t">{{webui:shell.cancel}}</span>
         </button>
       </div>
-    </div>
+    </form>
     <p id="loginOnNote" class="readyMsg isOk" hidden>{{webui:admin.login_on_note}}</p>
     <p id="loginOffNote" class="readyMsg isErr" hidden>{{webui:admin.login_off_note}}</p>
     <details id="accessDevices" class="cfgGroup hidden">
@@ -553,7 +566,7 @@
       <span><b>{{webui:admin.device_password}}</b> <span id="devicePasswordKind"></span></span>
     </div>
     <div id="apStatus">{{webui:admin.ap_ssid_address}}</div>
-    <div id="devicePasswordForm">
+    <form id="devicePasswordForm" class="enterForm" novalidate>
       <label
         >{{webui:admin.new_device_password}}
         <input
@@ -586,7 +599,7 @@
           class="btnGlyph"
           data-dirty="0"
           disabled
-          type="button"
+          type="submit"
         >
           <span class="g" aria-hidden="true">∗</span
           ><span class="t">{{webui:admin.change_device_password}}</span></button
@@ -602,69 +615,76 @@
           <span class="g" aria-hidden="true">↺</span>
         </button>
       </div>
-    </div>
+    </form>
   </details>
   <details id="scheduledRestartPanel" data-g="schedule" class="cfgGroup">
     <summary>{{webui:admin.scheduled_restart}}</summary>
-    <label
-      ><input id="scheduledRestartEnabled" type="checkbox" role="switch" />
-      {{webui:admin.scheduled_restart_enabled}}<small class="fieldHint"
-        >{{webui:admin.scheduled_restart_hint}}</small
-      ></label
-    >
-    <div class="windowField">
-      <span>{{webui:admin.scheduled_restart_time}}</span>
-      <div class="windowPair">
-        <label
-          ><input
-            id="scheduledRestartHour"
-            type="number"
-            min="0"
-            max="23"
-            step="1"
-            data-wrap
-            required
-            aria-label="{{webui:admin.scheduled_restart_hour}}" /></label
-        ><span>:</span
-        ><label
-          ><input
-            id="scheduledRestartMinute"
-            type="number"
-            min="0"
-            max="59"
-            step="1"
-            data-wrap
-            required
-            aria-label="{{webui:admin.scheduled_restart_minute}}"
-        /></label>
+    <form class="enterForm" novalidate>
+      <label
+        ><input id="scheduledRestartEnabled" type="checkbox" role="switch" />
+        {{webui:admin.scheduled_restart_enabled}}<small class="fieldHint"
+          >{{webui:admin.scheduled_restart_hint}}</small
+        ></label
+      >
+      <div class="windowField">
+        <span>{{webui:admin.scheduled_restart_time}}</span>
+        <div class="windowPair">
+          <label
+            ><input
+              id="scheduledRestartHour"
+              type="number"
+              min="0"
+              max="23"
+              step="1"
+              data-wrap
+              required
+              aria-label="{{webui:admin.scheduled_restart_hour}}" /></label
+          ><span>:</span
+          ><label
+            ><input
+              id="scheduledRestartMinute"
+              type="number"
+              min="0"
+              max="59"
+              step="1"
+              data-wrap
+              required
+              aria-label="{{webui:admin.scheduled_restart_minute}}"
+          /></label>
+        </div>
+        <small
+          id="scheduledRestartStatus"
+          class="fieldHint"
+          role="status"
+          aria-live="polite"
+        ></small>
       </div>
-      <small id="scheduledRestartStatus" class="fieldHint" role="status" aria-live="polite"></small>
-    </div>
-    <div class="btnBar">
-      <button
-        id="saveScheduledRestartButton"
-        class="btnGlyph mutable btnInvert"
-        data-dirty="0"
-        disabled
-        type="button"
+      <div class="btnBar">
+        <button
+          id="saveScheduledRestartButton"
+          class="btnGlyph mutable btnInvert"
+          data-dirty="0"
+          disabled
+          type="submit"
+        >
+          <span class="g" aria-hidden="true">✓</span
+          ><span class="t">{{webui:admin.save_scheduled_restart}}</span></button
+        ><button
+          id="revertScheduledRestartButton"
+          class="btnGlyph mutable btnRevert"
+          data-dirty="0"
+          disabled
+          title="{{webui:runtime.revert_unsaved_changes}}"
+          aria-label="{{webui:runtime.revert_unsaved_changes}}"
+          type="button"
+        >
+          <span class="g" aria-hidden="true">↺</span>
+        </button>
+      </div>
+      <small id="scheduledRestartDirtyHint" class="warn hidden"
+        >{{webui:admin.unsaved_changes}}</small
       >
-        <span class="g" aria-hidden="true">✓</span
-        ><span class="t">{{webui:admin.save_scheduled_restart}}</span></button
-      ><button
-        id="revertScheduledRestartButton"
-        class="btnGlyph mutable btnRevert"
-        data-dirty="0"
-        disabled
-        title="{{webui:runtime.revert_unsaved_changes}}"
-        aria-label="{{webui:runtime.revert_unsaved_changes}}"
-        type="button"
-      >
-        <span class="g" aria-hidden="true">↺</span>
-      </button>
-    </div>
-    <small id="scheduledRestartDirtyHint" class="warn hidden"
-      >{{webui:admin.unsaved_changes}}</small
-    >
+    </form>
   </details>
   <details id="restartPanel" data-g="restart" class="cfgGroup">
     <summary>{{webui:admin.restart}}</summary>

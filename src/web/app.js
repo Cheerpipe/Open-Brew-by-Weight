@@ -8,6 +8,9 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").cat
 document.addEventListener("click", (e) => {
   if (e.target && e.target.closest("#themeSignal")) R.cycleTheme();
 });
+// Enter in an .enterForm field clicks its submit button, whose click handler
+// does the work; the form itself never submits.
+document.addEventListener("submit", (e) => e.target.matches(".enterForm") && e.preventDefault());
 const assetQuery = new URL(import.meta.url).search;
 const jsMods = new Map();
 const viewLoads = new Map();
