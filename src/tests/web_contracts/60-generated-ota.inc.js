@@ -42,8 +42,10 @@ if (!generated.assetTag || !generated.cacheVersion ||
     !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebAssetsGzip.h'), 'utf8')
          .includes(`WEB_UI_ASSET_TAG[] = "${generated.assetTag}"`) ||
     !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebAssetsGzip.h'), 'utf8')
-         .includes(`WEB_UI_ETAG[] = ${JSON.stringify('"' + generated.cacheVersion + '"')}`)) {
-  throw new Error('Asset URLs must carry the content tag alone; the ETag embeds FW version + tag');
+         .includes(`WEB_UI_ETAG[] = ${JSON.stringify('"' + generated.cacheVersion + '"')}`) ||
+    !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebAssetsGzip.h'), 'utf8')
+         .includes(`WEB_UI_ASSET_ETAG[] = ${JSON.stringify('"' + generated.assetTag + '"')}`)) {
+  throw new Error('Asset URLs and their ETag must carry the content tag alone; the shell ETag embeds FW version + tag');
 }
 const normalizedEnglish = await webUi.generate({webUiLanguage: 'EN', write: false});
 const regionalEnglish = await webUi.generate({webUiLanguage: 'En_en', write: false});
@@ -495,6 +497,7 @@ if (!release.html.includes('data-fw="9.8.7+contract"') ||
     !codeIncludes(release.runtimeJs, 'obbwFwReload') ||
     !codeIncludes(release.runtimeJs, 'location.replace(') ||
     release.assetTag !== otherRelease.assetTag ||
+    release.assetEtag !== otherRelease.assetEtag ||
     release.etag === otherRelease.etag) {
   throw new Error('Shell must carry the firmware version for cached-shell self-heal; asset tags must ignore it');
 }
@@ -638,6 +641,7 @@ if (!serveImmutable.includes('requestsCurrentAssetTag(request)') ||
         'worker ? "no-cache" : current ? "public, max-age=31536000, immutable" : "no-store"')) ||
     !serveImmutable.includes('const bool worker = strcmp(asset.path, "/sw.js") == 0;') ||
     !serveImmutable.includes('const bool current = !worker && requestsCurrentAssetTag(request);') ||
+    !serveImmutable.includes('worker ? WEB_UI_ETAG : current ? WEB_UI_ASSET_ETAG : nullptr') ||
     !serveImmutable.includes('max-age=31536000') ||
     !serveImmutable.includes('immutable') ||
     !serveImmutable.includes('STATUS_NOT_MODIFIED') ||

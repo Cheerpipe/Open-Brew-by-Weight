@@ -565,15 +565,16 @@ static esp_err_t serveWebAsset(httpd_req_t *request, const WebAsset &asset) {
   // Only the URL naming these exact bytes may be cached as immutable. Any
   // other ?v= (a stale shell after OTA or rollback) or a bare probe path gets
   // the current bytes uncached, so no cache key ever holds a body it does
-  // not name. The shell and assets keep the connection open so a page load
-  // reuses its handshakes; the bound ui-stream refreshes its LRU slot, so
-  // lru_purge evicts idle asset sockets first. API JSON and OTA responses
-  // still close. The service worker keeps one bare URL (it names this
+  // not name. Their ETag is the asset tag alone, so a firmware-only update
+  // still answers a forced revalidation with 304. The shell and assets keep
+  // the connection open so a page load reuses its handshakes; the bound
+  // ui-stream refreshes its LRU slot, so lru_purge evicts idle asset sockets
+  // first. API JSON and OTA responses still close. The service worker keeps one bare URL (it names this
   // release and asset tag, like the shell), so each update check revalidates
   // it against the shell's ETag and an unchanged worker costs a 304.
   const bool worker = strcmp(asset.path, "/sw.js") == 0;
   const bool current = !worker && requestsCurrentAssetTag(request);
-  const char *etag = worker || current ? WEB_UI_ETAG : nullptr;
+  const char *etag = worker ? WEB_UI_ETAG : current ? WEB_UI_ASSET_ETAG : nullptr;
   const char *cacheControl = worker    ? "no-cache"
                              : current ? "public, max-age=31536000, immutable"
                                        : "no-store";
