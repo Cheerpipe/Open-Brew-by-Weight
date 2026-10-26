@@ -44,9 +44,10 @@ shot follows your finger right away, and swiping up or down over either chart
 still scrolls the page. A note below
 it says where its reference pace starts.
 The shot card at the top of Home draws a lighter version behind your shot: the
-cut line, the reference paces that separate fast, on-recipe and slow, the
-on-recipe zone between them, dotted marks where the time window starts and
-ends, and a faint hatch over the seconds when weight never stops the shot.
+cut line with its **Up to** and **Down to** weights, the reference paces that
+separate fast, on-recipe and slow, the on-recipe zone between them, dotted
+marks where the time window starts and ends, and a faint hatch over the
+seconds when weight never stops the shot.
 Low in the chart, a soft shaded area traces your flow, the same flow the shot
 history shows, smoothed so scale jitter and splashes don't show as spikes;
 after the machine stops, the drip tail fades further.

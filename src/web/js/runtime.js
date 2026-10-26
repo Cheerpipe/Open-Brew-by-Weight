@@ -5038,6 +5038,25 @@ function renderHeroChart(host, model, m, goal, label) {
       put("xl", String(m.t1), X(m.t1)),
       put("xl", m.t2 + __WEBUI_TEXT__("runtime.s_2"), X(m.t2)),
     );
+    // The upper and lower holds are named where the cut line holds them.
+    if (m.mode === "active" && m.ceil > m.goal)
+      over.push(
+        put(
+          "hold",
+          sub(__WEBUI_TEXT__("runtime.graph_up_to"), [+m.ceil.toFixed(1)]),
+          X(m.prot),
+          Y(m.ceil),
+        ),
+      );
+    if (m.mode === "active" && m.floor < m.goal)
+      over.push(
+        put(
+          "hold down",
+          sub(__WEBUI_TEXT__("runtime.graph_down_to"), [+m.floor.toFixed(1)]),
+          100,
+          Y(m.floor),
+        ),
+      );
   }
   host.innerHTML =
     svg +

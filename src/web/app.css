@@ -2093,14 +2093,23 @@ summary::marker {
   background: var(--on);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--on) 30%, transparent);
 }
-.heroChart .xl {
+.heroChart .xl,
+.heroChart .hold {
   position: absolute;
-  top: calc(100% + 0.3rem);
-  transform: translateX(-50%);
   font-size: 0.66rem;
   font-weight: 700;
   color: var(--w78);
   white-space: nowrap;
+}
+.heroChart .xl {
+  top: calc(100% + 0.3rem);
+  transform: translateX(-50%);
+}
+.heroChart .hold {
+  transform: translateY(calc(-100% - 0.15rem));
+}
+.heroChart .hold.down {
+  transform: translate(-100%, 0.15rem);
 }
 .heroChart .noCut {
   position: absolute;
@@ -2552,7 +2561,8 @@ body.shotFs {
   font-size: clamp(1rem, 5.2vmin, 3rem);
 }
 .shotHero.fs .heroPill,
-.shotHero.fs .heroChart .xl {
+.shotHero.fs .heroChart .xl,
+.shotHero.fs .heroChart .hold {
   font-size: clamp(0.66rem, 3.2vmin, 1.6rem);
 }
 /* The vh/vw fallback only matters on engines older than dvh support, which
