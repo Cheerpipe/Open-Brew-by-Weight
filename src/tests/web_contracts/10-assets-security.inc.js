@@ -654,6 +654,8 @@ if (!network.includes('"firstDropBeep"') ||
     !network.includes('"slowExtractionGuardEnabled"') ||
     !network.includes('"slowMarginG"') ||
     !network.includes('"slowAfterS"') ||
+    ['fastRampS', 'fastCurve', 'fastCurveHardness', 'slowRampS', 'slowCurve',
+      'slowCurveHardness'].some((key) => !network.includes(`"${key}"`)) ||
     !network.includes('\\"extractionExtended\\"') ||
     !network.includes('\\"stopDetail\\"') ||
     !network.includes('"paddleReturnReminderIntervalMs"') ||
@@ -679,6 +681,8 @@ if (!network.includes('"firstDropBeep"') ||
     !codeIncludes(ui, 'id="slowExtractionGuardEnabled"') ||
     !codeIncludes(ui, 'id="slowMarginG"') ||
     !codeIncludes(ui, 'id="slowAfterS"') ||
+    ['fastRampS', 'fastCurve', 'fastCurveHardness', 'fastRampPreview', 'slowRampS', 'slowCurve',
+      'slowCurveHardness', 'slowRampPreview'].some((id) => !codeIncludes(ui, `id="${id}"`)) ||
     !codeIncludes(ui, 'Slow shots') ||
     !codeIncludes(ui, 'id="retareWindowS"') ||
     !codeIncludes(ui, 'id="minimumCupWeightG"') ||

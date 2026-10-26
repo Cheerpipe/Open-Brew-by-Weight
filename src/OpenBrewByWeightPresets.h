@@ -1,5 +1,7 @@
 #pragma once
 
+#include <initializer_list>
+
 #include "OpenBrewByWeightDomain.h"
 #include "machine/OpenBrewByWeightLineaMicraSettings.h"
 
@@ -29,7 +31,8 @@ inline void fillDoubleFirmwareDefaults(ShotPreset &preset) {
   if (single) {
     preset.goalWeightDg = FACTORY_SINGLE_GOAL_WEIGHT_DG;
     preset.doseDg = FACTORY_SINGLE_DOSE_DG;
-    preset.fastMarginDg = FACTORY_SINGLE_FAST_MARGIN_DG;
+    preset.fastMarginDg =
+        adaptive ? FACTORY_SINGLE_ADAPTIVE_FAST_MARGIN_DG : FACTORY_SINGLE_FAST_MARGIN_DG;
     preset.slowMarginDg = FACTORY_SINGLE_SLOW_MARGIN_DG;
     preset.fastBeforeMs = FACTORY_SINGLE_FAST_BEFORE_MS;
     preset.slowAfterMs = FACTORY_SINGLE_SLOW_AFTER_MS;
@@ -37,9 +40,15 @@ inline void fillDoubleFirmwareDefaults(ShotPreset &preset) {
     preset.bbwEwmaOffsetG = FACTORY_SINGLE_WEIGHT_OFFSET_G;
   }
   // Fixed presets keep their margins stored but always stop at the target;
-  // Manual keeps the Double recipe but never stops by weight.
+  // Manual keeps the Double recipe but never stops by weight. Only the
+  // Adaptive presets carry the factory transition curves.
   preset.fastSideEnabled = adaptive;
   preset.slowSideEnabled = adaptive;
+  if (adaptive) {
+    preset.fastRampMs = preset.slowRampMs = FACTORY_RAMP_MS;
+    preset.fastCurve = RAMP_CURVE_EARLY;
+    preset.slowCurve = RAMP_CURVE_LATE;
+  }
   preset.brewByWeight = !manual;
 }
 
@@ -196,6 +205,13 @@ inline void ensureShotPresetBank(ShotPresetBank &bank,
          preset.scaleLossFixedMs > preset.operationalWallMs)) {
       preset.scaleLossFixedMs = 0;
     }
+    // Transitions out of range fall back to the default 5 s Even + Soft.
+    for (uint16_t *ramp : {&preset.fastRampMs, &preset.slowRampMs})
+      if (*ramp > MAX_RAMP_MS || *ramp % RAMP_STEP_MS != 0) *ramp = DEFAULT_RAMP_MS;
+    for (uint8_t *curve : {&preset.fastCurve, &preset.slowCurve})
+      if (*curve >= RAMP_CURVE_TYPES) *curve = RAMP_CURVE_EVEN;
+    for (uint8_t *hardness : {&preset.fastCurveHardness, &preset.slowCurveHardness})
+      if (*hardness >= RAMP_HARDNESS_LEVELS) *hardness = RAMP_HARDNESS_SOFT;
     if (!std::isfinite(preset.weightOffsetBaselineG) ||
         preset.weightOffsetBaselineG < 0.0f ||
         preset.weightOffsetBaselineG > MAX_OFFSET_G) {
@@ -279,6 +295,12 @@ inline void applyShotPresetToConfig(const ShotPreset &preset,
   config.slowSideEnabled = preset.slowSideEnabled;
   config.slowMarginDg = preset.slowMarginDg;
   config.slowAfterMs = preset.slowAfterMs;
+  config.fastRampMs = preset.fastRampMs;
+  config.slowRampMs = preset.slowRampMs;
+  config.fastCurve = preset.fastCurve;
+  config.fastCurveHardness = preset.fastCurveHardness;
+  config.slowCurve = preset.slowCurve;
+  config.slowCurveHardness = preset.slowCurveHardness;
   config.scaleLossFixedMs = preset.scaleLossFixedMs;
   config.timerOnly = !preset.brewByWeight;
 }
@@ -305,7 +327,7 @@ inline void copyDeviceProtectionFromConfig(const RuntimeConfig &from,
 // `fields` limits the copy to the PresetRecipeField bits a partial save sent.
 inline void copyUserRecipeFromConfig(const RuntimeConfig &config,
                                      ShotPreset &preset,
-                                     uint16_t fields = PRESET_RECIPE_ALL) {
+                                     uint32_t fields = PRESET_RECIPE_ALL) {
   if (fields & PRESET_RECIPE_BREW_BY_WEIGHT) preset.brewByWeight = !config.timerOnly;
   if (fields & PRESET_RECIPE_GOAL_WEIGHT) preset.goalWeightDg = config.goalWeightDg;
   if (fields & PRESET_RECIPE_OPERATIONAL_WALL) preset.operationalWallMs = config.operationalWallMs;
@@ -318,6 +340,12 @@ inline void copyUserRecipeFromConfig(const RuntimeConfig &config,
   if (fields & PRESET_RECIPE_SLOW_MARGIN) preset.slowMarginDg = config.slowMarginDg;
   if (fields & PRESET_RECIPE_SLOW_AFTER) preset.slowAfterMs = config.slowAfterMs;
   if (fields & PRESET_RECIPE_SCALE_LOSS_FIXED) preset.scaleLossFixedMs = config.scaleLossFixedMs;
+  if (fields & PRESET_RECIPE_FAST_RAMP) preset.fastRampMs = config.fastRampMs;
+  if (fields & PRESET_RECIPE_FAST_CURVE) preset.fastCurve = config.fastCurve;
+  if (fields & PRESET_RECIPE_FAST_CURVE_HARDNESS) preset.fastCurveHardness = config.fastCurveHardness;
+  if (fields & PRESET_RECIPE_SLOW_RAMP) preset.slowRampMs = config.slowRampMs;
+  if (fields & PRESET_RECIPE_SLOW_CURVE) preset.slowCurve = config.slowCurve;
+  if (fields & PRESET_RECIPE_SLOW_CURVE_HARDNESS) preset.slowCurveHardness = config.slowCurveHardness;
 }
 
 inline bool allocateShotPresetId(ShotPresetBank &bank, uint8_t &outId) {

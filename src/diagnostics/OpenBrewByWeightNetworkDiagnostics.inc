@@ -111,6 +111,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            "\"fastExtractionGuardEnabled\":%s,\"fastMarginG\":%.1f,"
            "\"fastBeforeMs\":%lu,\"slowExtractionGuardEnabled\":%s,"
            "\"slowMarginG\":%.1f,\"slowAfterMs\":%lu,"
+           "\"fastRampMs\":%u,\"slowRampMs\":%u,\"fastCurve\":\"%s\","
+           "\"fastCurveHardness\":\"%s\",\"slowCurve\":\"%s\",\"slowCurveHardness\":\"%s\","
            "\"autoToManualGuardEnabled\":%s,\"scaleLossFixedMs\":%lu,"
            "\"cupProtectionEnabled\":%s,\"stopIfCupRemoved\":%s,"
            "\"requireCupToStart\":%s,\"avoidAccidentalTouchEnabled\":%s,"
@@ -148,6 +150,9 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            c.config.slowSideEnabled ? "true" : "false",
            static_cast<double>(goalWeightDgToGrams(c.config.slowMarginDg)),
            static_cast<unsigned long>(c.config.slowAfterMs),
+           static_cast<unsigned>(c.config.fastRampMs), static_cast<unsigned>(c.config.slowRampMs),
+           rampCurveName(c.config.fastCurve), rampHardnessName(c.config.fastCurveHardness),
+           rampCurveName(c.config.slowCurve), rampHardnessName(c.config.slowCurveHardness),
            c.config.scaleLossEnabled ? "true" : "false",
            static_cast<unsigned long>(c.config.scaleLossFixedMs),
            c.config.cupProtectionEnabled ? "true" : "false",
@@ -189,7 +194,9 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
         "\"slowAfterMs\":%lu,\"fastSideEnabled\":%s,\"fastMarginG\":%.1f,"
         "\"slowSideEnabled\":%s,\"slowMarginG\":%.1f,"
         "\"scaleLossFixedMs\":%lu,\"learningEpoch\":%lu,"
-        "\"grindHintsEnabled\":%s}",
+        "\"grindHintsEnabled\":%s,\"fastRampMs\":%u,\"slowRampMs\":%u,"
+        "\"fastCurve\":\"%s\",\"fastCurveHardness\":\"%s\",\"slowCurve\":\"%s\","
+        "\"slowCurveHardness\":\"%s\"}",
         i == 0 ? "" : ",", static_cast<unsigned>(p.id), safeName,
         p.isFactory ? "true" : "false", p.brewByWeight ? "true" : "false",
         static_cast<double>(goalWeightDgToGrams(p.goalWeightDg)),
@@ -202,7 +209,10 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
         static_cast<double>(goalWeightDgToGrams(p.slowMarginDg)),
         static_cast<unsigned long>(p.scaleLossFixedMs),
         static_cast<unsigned long>(p.learningEpoch),
-        p.grindHintsEnabled ? "true" : "false");
+        p.grindHintsEnabled ? "true" : "false", static_cast<unsigned>(p.fastRampMs),
+        static_cast<unsigned>(p.slowRampMs), rampCurveName(p.fastCurve),
+        rampHardnessName(p.fastCurveHardness), rampCurveName(p.slowCurve),
+        rampHardnessName(p.slowCurveHardness));
   }
   ok = ok && debugExportChunk(request, "]},");
 

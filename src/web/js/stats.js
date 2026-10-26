@@ -1265,7 +1265,8 @@ async function exportShotsCsv() {
           "yield_g error_g error_pct offset_g avg_flow_g_s first_drop_s tare_s fast_side " +
           "cut_raised slow_side cut_lowered stop verdict channeling scale_loss_source " +
           "cut_line_g arrival_s fast_before_s slow_after_s fast_margin_g slow_margin_g " +
-          "delay_s wall_s cut_ramp_s shot_type cut_type yield_source rating ended_at_ms " +
+          "delay_s wall_s fast_ramp_s slow_ramp_s fast_curve slow_curve fast_curve_hardness " +
+          "slow_curve_hardness shot_type cut_type yield_source rating ended_at_ms " +
           "bbw_algorithm bbw_algorithm_version bbw_alpha bbw_learning_applied preset_id " +
           "scale_name max_flow_g_s target_temp_c dose_g ratio curve_truncated curve_break_before curve_held cut_s cut_weight_g " +
           "drip_g drip_delay_s"
@@ -1305,7 +1306,8 @@ async function exportShotsCsv() {
         ...(
           "extractionGuardEnabled extractionExtended slowExtractionGuardEnabled slowExtractionExtended " +
           "stopDetail verdict channeling scaleLossSource cutLineG arrivalS fastBeforeS slowAfterS " +
-          "fastMarginG slowMarginG delayS wallS cutRampS"
+          "fastMarginG slowMarginG delayS wallS fastRampS slowRampS fastCurve slowCurve " +
+          "fastCurveHardness slowCurveHardness"
         )
           .split(" ")
           .map((k) => (typeof r[k] == "boolean" ? +r[k] : (r[k] ?? ""))),
@@ -1390,14 +1392,14 @@ function shotWallTimes(r) {
       : Math.round((r.endedAtLocalSec - r.endedAtUnixSec) / 60);
   return [isoAt(r.endedAtUnixSec - r.durationS, offset), isoAt(r.endedAtUnixSec, offset), offset];
 }
-// Shot export v1 (docs/schemas/openbrewbyweight-shot-export-v1.schema.json):
+// Shot export v2 (docs/schemas/openbrewbyweight-shot-export-v2.schema.json):
 // what the firmware stored, then under `derived` what this page computes.
 function shotsJson(rows) {
   return {
     $schema:
-      "https://raw.githubusercontent.com/Cheerpipe/Open-Brew-by-Weight/main/docs/schemas/openbrewbyweight-shot-export-v1.schema.json",
+      "https://raw.githubusercontent.com/Cheerpipe/Open-Brew-by-Weight/main/docs/schemas/openbrewbyweight-shot-export-v2.schema.json",
     format: "openbrewbyweight.shots",
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     source: {
       app: "openbrewbyweight",
@@ -1470,7 +1472,12 @@ function shotJson(r) {
       fastGuard: guard(r.extractionGuardEnabled, r.fastMarginG, r.extractionExtended),
       slowGuard: guard(r.slowExtractionGuardEnabled, r.slowMarginG, r.slowExtractionExtended),
       cutDelayS: r.delayS,
-      cutRampS: r.cutRampS,
+      fastRampS: r.fastRampS,
+      slowRampS: r.slowRampS,
+      fastCurve: r.fastCurve,
+      slowCurve: r.slowCurve,
+      fastCurveHardness: r.fastCurveHardness,
+      slowCurveHardness: r.slowCurveHardness,
       maxTimeS: r.wallS,
       dripDelayS: r.dripDelayS ?? null,
     },

@@ -17,10 +17,10 @@
 namespace openbrewbyweight {
 namespace corridor {
 
-// Ramp length D: the ceiling/floor ramps to the target over D before t1 and
-// after t2. D = 0 is exactly the legacy Fast/Slow guard step shape.
-constexpr int32_t RAMP_MS = 5000;
-static_assert(RAMP_MS <= 20000, "D bound keeps MR*D^3 inside int64 and 2^53");
+// Default ramp length D per side: the ceiling ramps to the target over D before
+// t1, the target to the floor over D after t2. D = 0 is exactly the legacy
+// Fast/Slow guard step shape.
+constexpr int32_t RAMP_MS = DEFAULT_RAMP_MS;
 // Bisection over [t_k, wall] in integer ms needs at most 16 halvings.
 static_assert(HARD_MAX_CIRCUIT_CLOSED_MS < 65536, "solver iteration bound");
 constexpr int32_t STOP_LATENCY_MS = 100;
@@ -82,8 +82,101 @@ struct Params {
   int32_t fastBeforeMs = 0;  // t1
   int32_t slowAfterMs = 0;   // t2
   int32_t wallMs = 0;
-  int32_t rampMs = RAMP_MS;  // D
+  int32_t fastRampMs = RAMP_MS;  // D before t1
+  int32_t slowRampMs = RAMP_MS;  // D after t2
+  uint8_t fastCurve = 0;         // RAMP_CURVES index
+  uint8_t slowCurve = 0;
 };
+
+// Transition curves e(u), u in [0, 1]: the regularized incomplete beta
+// I(u; a, b) with integer a, b >= 2, so each is monotone (the line never
+// rises, which crossingMs relies on) and flat at both ends. Index = type *
+// RAMP_HARDNESS_LEVELS + hardness; index 0 (Even, Soft) is Beta(2,2), the
+// original smoothstep 3u^2 - 2u^3.
+struct RampCurve {
+  uint8_t a;
+  uint8_t b;
+};
+constexpr RampCurve RAMP_CURVES[RAMP_CURVE_TYPES * RAMP_HARDNESS_LEVELS] = {
+    {2, 2}, {3, 3}, {4, 4},  // Even: smoothstep, smootherstep, smootheststep
+    {2, 3}, {2, 4}, {2, 6},  // Steep early
+    {3, 2}, {4, 2}, {6, 2}};  // Steep late
+constexpr uint8_t RAMP_CURVE_MAX_DEGREE = 7;
+constexpr bool rampCurvesValid() {
+  for (const RampCurve &c : RAMP_CURVES)
+    if (c.a < 2 || c.b < 2 || c.a + c.b - 1 > RAMP_CURVE_MAX_DEGREE) return false;
+  return true;
+}
+static_assert(rampCurvesValid(), "curves must be flat at both ends and fit the evaluator");
+constexpr double rampWideBound() {
+  double v = MAX_SIDE_MARGIN_DG;
+  for (uint8_t i = 0; i < RAMP_CURVE_MAX_DEGREE; ++i) v *= MAX_RAMP_MS;
+  return v;
+}
+static_assert(rampWideBound() < 3.4e38, "margin * D^7 must fit the 128-bit evaluator");
+static_assert(MAX_RAMP_MS < 65536, "D^2 must fit one 32-bit divisor");
+inline uint8_t rampCurveIndex(uint8_t type, uint8_t hardness) {
+  return type < RAMP_CURVE_TYPES && hardness < RAMP_HARDNESS_LEVELS
+             ? static_cast<uint8_t>(type * RAMP_HARDNESS_LEVELS + hardness)
+             : 0;
+}
+inline uint8_t rampCurveTypeOf(uint8_t index) { return index / RAMP_HARDNESS_LEVELS; }
+inline uint8_t rampCurveHardnessOf(uint8_t index) { return index % RAMP_HARDNESS_LEVELS; }
+
+// Unsigned 128-bit value in 32-bit limbs: products and quotients by small
+// integers, all the exact ramp evaluation needs on any target.
+struct RampWide {
+  uint32_t w[4] = {};
+  void mul(uint32_t k) {
+    uint64_t c = 0;
+    for (uint32_t &x : w) {
+      c += static_cast<uint64_t>(x) * k;
+      x = static_cast<uint32_t>(c);
+      c >>= 32;
+    }
+  }
+  void add(const RampWide &y) {
+    uint64_t c = 0;
+    for (int i = 0; i < 4; ++i) {
+      c += static_cast<uint64_t>(w[i]) + y.w[i];
+      w[i] = static_cast<uint32_t>(c);
+      c >>= 32;
+    }
+  }
+  void div(uint32_t k) {
+    uint64_t r = 0;
+    for (int i = 3; i >= 0; --i) {
+      r = (r << 32) | w[i];
+      w[i] = static_cast<uint32_t>(r / k);
+      r -= static_cast<uint64_t>(w[i]) * k;
+    }
+  }
+};
+
+// Exact floor(margin * e(n / d)) when `reached`, else floor(margin * (1 - e)):
+// the Bernstein sum of I over j >= a (or j < a) divided by d^N, N = a + b - 1.
+// For Beta(2,2) these are the original smoothstep expressions bit for bit.
+inline int32_t rampDg(int32_t marginDg, int32_t n, int32_t d, uint8_t curve, bool reached) {
+  const RampCurve c = RAMP_CURVES[curve < RAMP_CURVE_TYPES * RAMP_HARDNESS_LEVELS ? curve : 0];
+  const uint32_t degree = c.a + c.b - 1u;
+  RampWide sum;
+  uint32_t choose = 1;  // C(degree, j)
+  for (uint32_t j = 0; j <= degree; ++j) {
+    if ((j >= c.a) == reached) {
+      RampWide term;
+      term.w[0] = choose;
+      for (uint32_t i = 0; i < j; ++i) term.mul(static_cast<uint32_t>(n));
+      for (uint32_t i = j; i < degree; ++i) term.mul(static_cast<uint32_t>(d - n));
+      sum.add(term);
+    }
+    choose = choose * (degree - j) / (j + 1);
+  }
+  sum.mul(static_cast<uint32_t>(marginDg));
+  // floor(floor(x / D^2) / D) = floor(x / D^3): D^2 per step halves the divisions.
+  const uint32_t ud = static_cast<uint32_t>(d);
+  for (uint32_t i = 0; i < degree; i += 2) sum.div(i + 1 < degree ? ud * ud : ud);
+  return static_cast<int32_t>(sum.w[0]);
+}
 
 inline int32_t ceilingDg(const Params &p) {
   return p.goalDg + (p.fastOn ? p.fastMarginDg : 0);
@@ -92,35 +185,32 @@ inline int32_t floorDg(const Params &p) {
   return p.goalDg - (p.slowOn ? p.slowMarginDg : 0);
 }
 inline int32_t fastRampStartMs(const Params &p) {
-  const int32_t a = p.fastBeforeMs - p.rampMs > p.delayMs ? p.fastBeforeMs - p.rampMs
-                                                          : p.delayMs;
+  const int32_t a = p.fastBeforeMs - p.fastRampMs > p.delayMs ? p.fastBeforeMs - p.fastRampMs
+                                                              : p.delayMs;
   return a < p.fastBeforeMs ? a : p.fastBeforeMs;
 }
 inline int32_t slowRampEndMs(const Params &p) {
-  const int32_t b = p.slowAfterMs + p.rampMs < p.wallMs ? p.slowAfterMs + p.rampMs
-                                                        : p.wallMs;
+  const int32_t b = p.slowAfterMs + p.slowRampMs < p.wallMs ? p.slowAfterMs + p.slowRampMs
+                                                            : p.wallMs;
   return b > p.slowAfterMs ? b : p.slowAfterMs;
 }
 
-// f(t): ceiling held to a, smoothstep down to the target at t1, straight
-// target through [t1, t2], smoothstep down to the floor at b, floor held.
-// Ramps truncate toward the target; zero-length ramps are legacy steps.
+// f(t): ceiling held to a, eased down to the target at t1 along the Fast curve,
+// straight target through [t1, t2], eased down to the floor at b along the Slow
+// curve, floor held. Ramps truncate toward the target; zero-length ramps are
+// legacy steps.
 inline int32_t cutLineDg(const Params &p, int32_t t) {
   const int32_t a = fastRampStartMs(p);
   if (t < p.fastBeforeMs) {
     if (t < a) return ceilingDg(p);
-    const int64_t d = p.fastBeforeMs - a, n = t - a;
-    const int64_t margin = ceilingDg(p) - p.goalDg;
-    return p.goalDg + static_cast<int32_t>(
-        margin * (d * d * d - 3 * n * n * d + 2 * n * n * n) / (d * d * d));
+    return p.goalDg +
+           rampDg(ceilingDg(p) - p.goalDg, t - a, p.fastBeforeMs - a, p.fastCurve, false);
   }
-  if (t < p.slowAfterMs || (t == p.slowAfterMs && p.rampMs > 0)) return p.goalDg;
+  if (t < p.slowAfterMs || (t == p.slowAfterMs && p.slowRampMs > 0)) return p.goalDg;
   const int32_t b = slowRampEndMs(p);
   if (t >= b) return floorDg(p);
-  const int64_t d = b - p.slowAfterMs, n = t - p.slowAfterMs;
-  const int64_t margin = p.goalDg - floorDg(p);
-  return p.goalDg - static_cast<int32_t>(
-      margin * (3 * n * n * d - 2 * n * n * n) / (d * d * d));
+  return p.goalDg -
+         rampDg(p.goalDg - floorDg(p), t - p.slowAfterMs, b - p.slowAfterMs, p.slowCurve, true);
 }
 
 // EndReason of a weight cut = the segment of f that fired.

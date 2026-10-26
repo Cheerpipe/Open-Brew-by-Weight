@@ -85,9 +85,9 @@ if (firmware.indexOf('publishLogLevels(serialLogLevelFromRuntime(runtimeConfig)'
     fastBeforeS: 27, slowAfterS: 34, goalWeightG: 36, fastMarginG: 4, slowMarginG: 3};
   const context = vm.createContext({__WEBUI_TEXT__: key => strings[key],
     document: {createElement: node, createTextNode: text => ({textContent: text})},
-    presetState: {activeId: 1, items: [saved], cutRampS: 5}, renderHomePresetAccordion() {}});
+    presetState: {activeId: 1, items: [saved]}, renderHomePresetAccordion() {}});
   vm.runInContext([runtimeJs.match(/^const sub = \(t, vals\).*$/m)[0],
-    ...['axisLabel', 'guardRuleRows', 'buildRuleChartModel',
+    ...['axisLabel', 'guardRuleRows', 'rampCurveIndex', 'buildRuleChartModel',
       'updateRuleChartFromStatus'].map((name) => blockAt(runtimeJs, 'function ' + name + '('))]
       .join('\n'), context);
   // Each row names its time span and what the cut line does there.

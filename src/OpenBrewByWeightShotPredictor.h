@@ -234,7 +234,7 @@ inline Forecast forecastBasis(const corridor::CorridorState &cut, int32_t nowMs,
   const int32_t floorStart = corridor::slowRampEndMs(p);
   const bool goalFlat =
       p.fastBeforeMs <= tPlain &&
-      (tPlain < p.slowAfterMs || (tPlain == p.slowAfterMs && p.rampMs > 0));
+      (tPlain < p.slowAfterMs || (tPlain == p.slowAfterMs && p.slowRampMs > 0));
   const bool floorFlat = tPlain >= floorStart;
   if (basis == 0 && aX100 != 0 && (goalFlat || floorFlat)) {
     // Closed-form quadratic on the flat level: with qc = q + a*T_w/2 and

@@ -48,7 +48,7 @@
   const stretched = (s) => s.split('shotSparkCursor')[0];
   const fills = () => (markup.match(/fill="url\(#sc/g)||[]).length;
   const render = new Function('document', 'ResizeObserver', '$', 'requestAnimationFrame',
-      'const presetState={cutRampS:0.5};' + helpers + preset + renderer +
+      'const presetState={};' + helpers + preset + renderer +
       runtimeJs.slice(runtimeJs.indexOf('const sub = '), runtimeJs.indexOf('\n', runtimeJs.indexOf('const sub = '))) +
       ';const R={buildShotSparkModel,shotRuleModel,cutLine,placePill,sub,PILL,bindScrub,presetGraph,observePresetHost,' +
       'axisLabel,fadeFill};return renderShotSpark;')(
@@ -229,7 +229,7 @@
   if(lookup('shotHeroState').textContent!=='Fast'||heroEl().dataset.tint!=='fast'||
       lookup('shotHeroCut').textContent!=='Extended')throw new Error('A fast shot must read Fast, turn red and keep Extended');
   // The stored shot's own rule draws the cut line on first paint, without the Stats records.
-  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,cutRampS:2}});
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
   if(ruleArgs.length!==1||ruleArgs[0].goalG!==36||ruleArgs[0].fastBeforeS!==27||
       ruleArgs[0].shotType!=='auto'||ruleArgs[0].firstDropS!==0)
     throw new Error('A finished shot must build its cut line from the card rule');
@@ -459,7 +459,7 @@
     throw new Error('Bind/resync must share the coalesced publication cadence');
   if(!streamSource.includes('setsockopt(session.fd, IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay));'))
     throw new Error('The UI stream socket must send frames without Nagle delay');
-  if(!/rule\[320\] = "null";\n  if \(canonical\) \{\n    snprintf\(rule,/.test(streamSource)||
+  if(!/rule\[392\] = "null";\n  if \(canonical\) \{\n    snprintf\(rule,/.test(streamSource)||
       !streamSource.includes('delta.field("rule", "%s", rule);')||
       !streamSource.includes('reinterpret_cast<const uint8_t *>(phase), strlen(phase)')||
       !streamSource.includes('delta.field("tintClass", "\\"%s\\"", control.activeCycle')||
@@ -1554,12 +1554,16 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
   const shotModel = runtimeJs.slice(runtimeJs.indexOf('function shotRuleModel('),
       runtimeJs.indexOf('let shotPresetObserver'));
   const {shotRuleModel} = new Function('presetState',
-      presetModel + shotModel + ';return {shotRuleModel};')({cutRampS: 0.5, items: [{id: 1, name: 'Live', goalWeightG: 99}]});
-  const row = {goalG: 36, fastBeforeS: 10, slowAfterS: 20, delayS: 5, wallS: 30, cutRampS: 1,
+      presetModel + shotModel + ';return {shotRuleModel};')({items: [{id: 1, name: 'Live', goalWeightG: 99}]});
+  const row = {goalG: 36, fastBeforeS: 10, slowAfterS: 20, delayS: 5, wallS: 30, fastRampS: 1,
+    slowRampS: 2, fastCurve: 'late', fastCurveHardness: 'hard', slowCurve: 'even',
+    slowCurveHardness: 'soft',
     extractionGuardEnabled: true, slowExtractionGuardEnabled: true, fastMarginG: 2, slowMarginG: 2,
     firstDropS: 3, shotType: 'auto', verdict: 'on_recipe'};
   const live = shotRuleModel(row);
-  if (live.mode !== 'active' || live.goal !== 36 || live.t1 !== 10 || live.d !== 1 || live.prot !== 5 || live.wall !== 30)
+  if (live.mode !== 'active' || live.goal !== 36 || live.t1 !== 10 || live.dFast !== 1 ||
+      live.dSlow !== 2 || live.curveFast !== 8 || live.curveSlow !== 0 || live.prot !== 5 ||
+      live.wall !== 30)
     throw new Error('A Stats shot must chart its own stored snapshot');
   const timer = shotRuleModel({...row, shotType: 'timer_only'});
   if (timer.mode !== 'timerOnly' || timer.fast || timer.slow)

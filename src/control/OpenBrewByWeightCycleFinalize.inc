@@ -119,7 +119,10 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   pendingFinalize.fastBeforeMs = session.config.fastBeforeMs;
   pendingFinalize.slowAfterMs = session.config.slowAfterMs;
   pendingFinalize.wallMs = session.config.operationalWallMs;
-  pendingFinalize.rampMs = static_cast<uint32_t>(session.cut.params.rampMs);
+  pendingFinalize.fastRampMs = static_cast<uint32_t>(session.cut.params.fastRampMs);
+  pendingFinalize.slowRampMs = static_cast<uint32_t>(session.cut.params.slowRampMs);
+  pendingFinalize.fastCurve = session.cut.params.fastCurve;
+  pendingFinalize.slowCurve = session.cut.params.slowCurve;
   pendingFinalize.rateAtStopX100 =
       session.cut.rate.valid ? session.cut.rate.rateX100 : 0;
   pendingFinalize.channeling = session.cut.rate.channeling;
@@ -172,7 +175,10 @@ corridor::Params pendingCutParams(const PendingShotFinalize &snapshot) {
   p.fastBeforeMs = static_cast<int32_t>(snapshot.fastBeforeMs);
   p.slowAfterMs = static_cast<int32_t>(snapshot.slowAfterMs);
   p.wallMs = static_cast<int32_t>(snapshot.wallMs);
-  p.rampMs = static_cast<int32_t>(snapshot.rampMs);
+  p.fastRampMs = static_cast<int32_t>(snapshot.fastRampMs);
+  p.slowRampMs = static_cast<int32_t>(snapshot.slowRampMs);
+  p.fastCurve = snapshot.fastCurve;
+  p.slowCurve = snapshot.slowCurve;
   return p;
 }
 
@@ -427,7 +433,10 @@ void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeight
       snapshot.fastMarginDg > UINT8_MAX ? UINT8_MAX : snapshot.fastMarginDg);
   record.slowMarginDg = static_cast<uint8_t>(
       snapshot.slowMarginDg > UINT8_MAX ? UINT8_MAX : snapshot.slowMarginDg);
-  record.cutRampDs = static_cast<uint8_t>(snapshot.rampMs / 100U);
+  record.cutRampDs = static_cast<uint8_t>(snapshot.fastRampMs / 100U);
+  record.slowRampCode = static_cast<uint16_t>(snapshot.slowRampMs / 100U + 1U);
+  record.fastCurve = snapshot.fastCurve;
+  record.slowCurve = snapshot.slowCurve;
   record.dripDelayCode = static_cast<uint8_t>(snapshot.dripDelayMs / 100U + 1U);
   record.targetTempDeciC = snapshot.targetTempDeciC;
   record.doseDg = snapshot.activePresetDoseDg;

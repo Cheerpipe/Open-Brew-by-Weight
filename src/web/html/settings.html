@@ -246,41 +246,173 @@
     </details>
     <details data-g="fast" class="cfgGroup">
       <summary>{{webui:settings.fast_shots}}</summary>
-      <label
-        ><input id="fastExtractionGuardEnabled" type="checkbox" />
-        {{webui:settings.fast_protection}}<small class="fieldHint"
-          >{{webui:settings.fast_protection_hint}}</small
-        ></label
-      ><label class="fastGuardOpt"
-        >{{webui:settings.fast_margin_g}}<input
-          id="fastMarginG"
-          type="number"
-          min="0.5"
-          max="10"
-          step="0.1"
-          required
-        /><small id="fastMarginResult" class="fieldResult"></small
-        ><small class="fieldHint">{{webui:settings.fast_margin_hint}}</small></label
-      >
+      <div class="rampHead">
+        <div class="rampPin">
+          <label
+            ><input id="fastExtractionGuardEnabled" type="checkbox" />
+            {{webui:settings.fast_protection}}<small class="fieldHint"
+              >{{webui:settings.fast_protection_hint}}</small
+            ></label
+          >
+          <div id="fastRampPreview" class="rampPreview fastGuardOpt"></div>
+        </div>
+        <label class="fastGuardOpt"
+          >{{webui:settings.fast_margin_g}}<input
+            id="fastMarginG"
+            type="number"
+            min="0.5"
+            max="10"
+            step="0.1"
+            required
+          /><small id="fastMarginResult" class="fieldResult"></small
+          ><small class="fieldHint">{{webui:settings.fast_margin_hint}}</small></label
+        ><label class="fastGuardOpt"
+          >{{webui:settings.ramp_s}}<input
+            id="fastRampS"
+            type="number"
+            min="0"
+            max="10"
+            step="0.5"
+            required
+          /><small class="fieldHint">{{webui:settings.fast_ramp_hint}}</small></label
+        >
+      </div>
+      <div class="rampChoice fastGuardOpt">
+        <span class="rampChoiceLbl">{{webui:settings.ramp_curve}}</span>
+        <div class="rampCurves" role="radiogroup" aria-label="{{webui:settings.ramp_curve}}">
+          <span id="fastRampColEarly" class="rampCol">{{webui:settings.ramp_steep_early}}</span
+          ><span id="fastRampColEven" class="rampCol">{{webui:settings.ramp_even}}</span
+          ><span id="fastRampColLate" class="rampCol">{{webui:settings.ramp_steep_late}}</span
+          ><button
+            type="button"
+            role="radio"
+            data-ramp="fastCurve"
+            value="early"
+            aria-describedby="fastRampColEarly"
+          >
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
+          ><button
+            type="button"
+            role="radio"
+            data-ramp="fastCurve"
+            value="even"
+            aria-describedby="fastRampColEven"
+          >
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
+          ><button
+            type="button"
+            role="radio"
+            data-ramp="fastCurve"
+            value="late"
+            aria-describedby="fastRampColLate"
+          >
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span>
+          </button>
+        </div>
+        <div class="rampStrength" role="radiogroup" aria-label="{{webui:settings.ramp_hardness}}">
+          <button type="button" role="radio" data-ramp="fastCurveHardness" value="soft">
+            {{webui:settings.ramp_soft}}</button
+          ><button type="button" role="radio" data-ramp="fastCurveHardness" value="medium">
+            {{webui:settings.ramp_medium}}</button
+          ><button type="button" role="radio" data-ramp="fastCurveHardness" value="hard">
+            {{webui:settings.ramp_hard}}
+          </button>
+        </div>
+        <select id="fastCurve" class="hidden" aria-hidden="true" tabindex="-1">
+          <option value="even"></option>
+          <option value="early"></option>
+          <option value="late"></option></select
+        ><select id="fastCurveHardness" class="hidden" aria-hidden="true" tabindex="-1">
+          <option value="soft"></option>
+          <option value="medium"></option>
+          <option value="hard"></option></select
+        ><small id="fastCurveHint" class="fieldHint"></small>
+      </div>
     </details>
     <details data-g="slow" class="cfgGroup">
       <summary>{{webui:settings.slow_shots}}</summary>
-      <label
-        ><input id="slowExtractionGuardEnabled" type="checkbox" />
-        {{webui:settings.slow_protection}}<small class="fieldHint"
-          >{{webui:settings.slow_protection_hint}}</small
-        ></label
-      ><label class="slowGuardOpt"
-        >{{webui:settings.slow_margin_g}}<input
-          id="slowMarginG"
-          type="number"
-          min="0.5"
-          max="10"
-          step="0.1"
-          required
-        /><small id="slowMarginResult" class="fieldResult"></small
-        ><small class="fieldHint">{{webui:settings.slow_margin_hint}}</small></label
-      >
+      <div class="rampHead">
+        <div class="rampPin">
+          <label
+            ><input id="slowExtractionGuardEnabled" type="checkbox" />
+            {{webui:settings.slow_protection}}<small class="fieldHint"
+              >{{webui:settings.slow_protection_hint}}</small
+            ></label
+          >
+          <div id="slowRampPreview" class="rampPreview slowGuardOpt"></div>
+        </div>
+        <label class="slowGuardOpt"
+          >{{webui:settings.slow_margin_g}}<input
+            id="slowMarginG"
+            type="number"
+            min="0.5"
+            max="10"
+            step="0.1"
+            required
+          /><small id="slowMarginResult" class="fieldResult"></small
+          ><small class="fieldHint">{{webui:settings.slow_margin_hint}}</small></label
+        ><label class="slowGuardOpt"
+          >{{webui:settings.ramp_s}}<input
+            id="slowRampS"
+            type="number"
+            min="0"
+            max="10"
+            step="0.5"
+            required
+          /><small class="fieldHint">{{webui:settings.slow_ramp_hint}}</small></label
+        >
+      </div>
+      <div class="rampChoice slowGuardOpt">
+        <span class="rampChoiceLbl">{{webui:settings.ramp_curve}}</span>
+        <div class="rampCurves" role="radiogroup" aria-label="{{webui:settings.ramp_curve}}">
+          <span id="slowRampColEarly" class="rampCol">{{webui:settings.ramp_steep_early}}</span
+          ><span id="slowRampColEven" class="rampCol">{{webui:settings.ramp_even}}</span
+          ><span id="slowRampColLate" class="rampCol">{{webui:settings.ramp_steep_late}}</span
+          ><button
+            type="button"
+            role="radio"
+            data-ramp="slowCurve"
+            value="early"
+            aria-describedby="slowRampColEarly"
+          >
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
+          ><button
+            type="button"
+            role="radio"
+            data-ramp="slowCurve"
+            value="even"
+            aria-describedby="slowRampColEven"
+          >
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
+          ><button
+            type="button"
+            role="radio"
+            data-ramp="slowCurve"
+            value="late"
+            aria-describedby="slowRampColLate"
+          >
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span>
+          </button>
+        </div>
+        <div class="rampStrength" role="radiogroup" aria-label="{{webui:settings.ramp_hardness}}">
+          <button type="button" role="radio" data-ramp="slowCurveHardness" value="soft">
+            {{webui:settings.ramp_soft}}</button
+          ><button type="button" role="radio" data-ramp="slowCurveHardness" value="medium">
+            {{webui:settings.ramp_medium}}</button
+          ><button type="button" role="radio" data-ramp="slowCurveHardness" value="hard">
+            {{webui:settings.ramp_hard}}
+          </button>
+        </div>
+        <select id="slowCurve" class="hidden" aria-hidden="true" tabindex="-1">
+          <option value="even"></option>
+          <option value="early"></option>
+          <option value="late"></option></select
+        ><select id="slowCurveHardness" class="hidden" aria-hidden="true" tabindex="-1">
+          <option value="soft"></option>
+          <option value="medium"></option>
+          <option value="hard"></option></select
+        ><small id="slowCurveHint" class="fieldHint"></small>
+      </div>
     </details>
     <details data-g="limits" class="cfgGroup">
       <summary>{{webui:settings.shot_limits}}</summary>

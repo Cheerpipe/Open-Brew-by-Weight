@@ -32,6 +32,8 @@
     slowAfterS: ['number', '0.5', '34'],
     fastMarginG: ['number', '0.1', '4'],
     slowMarginG: ['number', '0.1', '3'],
+    fastRampS: ['number', '0.5', '5'],
+    slowRampS: ['number', '0.5', '5'],
     scaleLossFixedS: ['number', '0.1', ''],
     retareWindowS: ['number', '0.1', '5'],
     fastExtractionGuardEnabled: ['checkbox', '', true],

@@ -705,6 +705,12 @@ struct RuntimeConfig {
   bool slowSideEnabled = true;
   uint16_t slowMarginDg = DEFAULT_SLOW_MARGIN_DG;
   uint32_t slowAfterMs = DEFAULT_SLOW_AFTER_MS;
+  uint16_t fastRampMs = DEFAULT_RAMP_MS;
+  uint16_t slowRampMs = DEFAULT_RAMP_MS;
+  uint8_t fastCurve = RAMP_CURVE_EVEN;
+  uint8_t fastCurveHardness = RAMP_HARDNESS_SOFT;
+  uint8_t slowCurve = RAMP_CURVE_EVEN;
+  uint8_t slowCurveHardness = RAMP_HARDNESS_SOFT;
   uint32_t scaleLossFixedMs = 0;  // Recipe mirror; 0 = no fixed time.
   // Device-level: the scale-loss backup applies to every preset.
   bool scaleLossEnabled = true;
@@ -867,6 +873,12 @@ struct CycleConfigSnapshot {
   bool slowSideEnabled = true;
   uint16_t slowMarginDg = DEFAULT_SLOW_MARGIN_DG;
   uint32_t slowAfterMs = DEFAULT_SLOW_AFTER_MS;
+  uint16_t fastRampMs = DEFAULT_RAMP_MS;
+  uint16_t slowRampMs = DEFAULT_RAMP_MS;
+  uint8_t fastCurve = RAMP_CURVE_EVEN;
+  uint8_t fastCurveHardness = RAMP_HARDNESS_SOFT;
+  uint8_t slowCurve = RAMP_CURVE_EVEN;
+  uint8_t slowCurveHardness = RAMP_HARDNESS_SOFT;
   bool scaleLossEnabled = true;
   uint32_t scaleLossFixedMs = 0;
   bool cupProtectionEnabled = true;
@@ -911,6 +923,12 @@ inline CycleConfigSnapshot snapshotConfig(const RuntimeConfig &config) {
   snapshot.slowSideEnabled = config.slowSideEnabled;
   snapshot.slowMarginDg = config.slowMarginDg;
   snapshot.slowAfterMs = config.slowAfterMs;
+  snapshot.fastRampMs = config.fastRampMs;
+  snapshot.slowRampMs = config.slowRampMs;
+  snapshot.fastCurve = config.fastCurve;
+  snapshot.fastCurveHardness = config.fastCurveHardness;
+  snapshot.slowCurve = config.slowCurve;
+  snapshot.slowCurveHardness = config.slowCurveHardness;
   snapshot.scaleLossEnabled = config.scaleLossEnabled;
   snapshot.scaleLossFixedMs = config.scaleLossFixedMs;
   snapshot.cupProtectionEnabled = config.cupProtectionEnabled;
@@ -969,7 +987,11 @@ enum class ConfigValidationError : uint8_t {
   MAX_SINGLE_PRESS,
   REED_CONFIRM_TIMEOUT,
   SHOT_REACT_TIMEOUT,
-  SCHEDULED_RESTART
+  SCHEDULED_RESTART,
+  FAST_RAMP,
+  FAST_CURVE,
+  SLOW_RAMP,
+  SLOW_CURVE
 };
 
 constexpr size_t MAX_SHOT_PRESETS = 8;
@@ -990,6 +1012,7 @@ inline bool factoryShotPresetId(uint8_t id) {
 constexpr float FACTORY_SINGLE_WEIGHT_OFFSET_G = 0.5f;
 constexpr uint16_t FACTORY_SINGLE_GOAL_WEIGHT_DG = 180;
 constexpr uint16_t FACTORY_SINGLE_FAST_MARGIN_DG = 40;
+constexpr uint16_t FACTORY_SINGLE_ADAPTIVE_FAST_MARGIN_DG = 30;
 constexpr uint16_t FACTORY_SINGLE_SLOW_MARGIN_DG = 15;
 constexpr uint32_t FACTORY_SINGLE_FAST_BEFORE_MS = 23000;
 constexpr uint32_t FACTORY_SINGLE_SLOW_AFTER_MS = 32000;
@@ -1012,7 +1035,7 @@ enum class PresetAction : uint8_t {
 };
 
 // Recipe fields a preset save carries; a save writes only the present ones.
-enum PresetRecipeField : uint16_t {
+enum PresetRecipeField : uint32_t {
   PRESET_RECIPE_BREW_BY_WEIGHT = 1U << 0,
   PRESET_RECIPE_GOAL_WEIGHT = 1U << 1,
   PRESET_RECIPE_OPERATIONAL_WALL = 1U << 2,
@@ -1024,7 +1047,13 @@ enum PresetRecipeField : uint16_t {
   PRESET_RECIPE_SLOW_MARGIN = 1U << 8,
   PRESET_RECIPE_SLOW_AFTER = 1U << 9,
   PRESET_RECIPE_SCALE_LOSS_FIXED = 1U << 10,
-  PRESET_RECIPE_ALL = (1U << 11) - 1U,
+  PRESET_RECIPE_FAST_RAMP = 1U << 11,
+  PRESET_RECIPE_FAST_CURVE = 1U << 12,
+  PRESET_RECIPE_FAST_CURVE_HARDNESS = 1U << 13,
+  PRESET_RECIPE_SLOW_RAMP = 1U << 14,
+  PRESET_RECIPE_SLOW_CURVE = 1U << 15,
+  PRESET_RECIPE_SLOW_CURVE_HARDNESS = 1U << 16,
+  PRESET_RECIPE_ALL = (1U << 17) - 1U,
 };
 
 #include "domain/OpenBrewByWeightPresetTypes.inc"
@@ -1244,6 +1273,18 @@ inline ConfigValidationError validateRuntimeConfig(
       config.slowAfterMs + MIN_WINDOW_BEFORE_WALL_MS > config.operationalWallMs) {
     return ConfigValidationError::SLOW_AFTER;
   }
+  // A side's transition, like its margin, is checked only while it is on.
+  const auto rampValid = [](uint16_t ms) { return ms <= MAX_RAMP_MS && ms % RAMP_STEP_MS == 0; };
+  if (config.fastSideEnabled && !rampValid(config.fastRampMs)) return ConfigValidationError::FAST_RAMP;
+  if (config.fastSideEnabled &&
+      (config.fastCurve >= RAMP_CURVE_TYPES || config.fastCurveHardness >= RAMP_HARDNESS_LEVELS)) {
+    return ConfigValidationError::FAST_CURVE;
+  }
+  if (config.slowSideEnabled && !rampValid(config.slowRampMs)) return ConfigValidationError::SLOW_RAMP;
+  if (config.slowSideEnabled &&
+      (config.slowCurve >= RAMP_CURVE_TYPES || config.slowCurveHardness >= RAMP_HARDNESS_LEVELS)) {
+    return ConfigValidationError::SLOW_CURVE;
+  }
   if (config.scaleLossFixedMs != 0 &&
       (config.scaleLossFixedMs < config.bbwProtectionMs ||
        config.scaleLossFixedMs > config.operationalWallMs)) {
@@ -1344,6 +1385,14 @@ inline const char *configValidationErrorName(ConfigValidationError error) {
       return "cupRemovedWeightG";
     case ConfigValidationError::SCHEDULED_RESTART:
       return "scheduledRestartMinuteOfDay";
+    case ConfigValidationError::FAST_RAMP:
+      return "fastRampS";
+    case ConfigValidationError::FAST_CURVE:
+      return "fastCurve";
+    case ConfigValidationError::SLOW_RAMP:
+      return "slowRampS";
+    case ConfigValidationError::SLOW_CURVE:
+      return "slowCurve";
   }
   return "unknown";
 }
@@ -1797,7 +1846,7 @@ struct WebCommand {
   uint8_t bbwAlphaBaseline = 0;  // Zero means omitted; valid bases are 1–100.
   uint16_t presetDoseDg = 0;     // Zero means omitted.
   int8_t presetGrindHints = -1;  // Negative means omitted.
-  uint16_t presetRecipeFields = PRESET_RECIPE_ALL;
+  uint32_t presetRecipeFields = PRESET_RECIPE_ALL;
   bool bbwFullReset = false;
   bool bbwSetDrip = false;  // Set drip: config.weightOffsetBaselineG is the value.
   bool bbwResetRevisionSpecified = false;

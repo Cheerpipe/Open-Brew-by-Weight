@@ -96,7 +96,9 @@ inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
     SF(70, reedConfirmTimeoutHundredMs), SF(71, assumeIdleWhenScaleConnects),
     SF(72, shotReactTimeoutS), SF(73, rinseEnabled), SF(74, showDiagnosticPage),
     SF(75, autoTareOutsideBrew), SF(76, ntpSyncEnabled),
-    SF(77, scheduledRestartEnabled), SF(78, scheduledRestartMinuteOfDay)};
+    SF(77, scheduledRestartEnabled), SF(78, scheduledRestartMinuteOfDay),
+    SF(79, fastRampMs), SF(80, slowRampMs), SF(81, fastCurve), SF(82, fastCurveHardness),
+    SF(83, slowCurve), SF(84, slowCurveHardness)};
 #undef SF
 
 #define SF(tag, member) OBBW_SETTINGS_FIELD(tag, ShotPreset, member)
@@ -107,7 +109,9 @@ inline constexpr SettingsField SETTINGS_PRESET_FIELDS[] = {
     SF(13, scaleLossFixedMs), SF(14, learningEpoch), SF(15, bbwEwmaOffsetG),
     SF(16, weightOffsetBaselineG), SF(17, fastSideEnabled), SF(18, slowSideEnabled),
     SF(19, grindHintsEnabled), SF(20, bbwEwmaAlpha), SF(21, bbwAlphaLearned),
-    SF(22, bbwAlphaBaseline), SF(23, lineaMicraBrewTargetDeciC)};
+    SF(22, bbwAlphaBaseline), SF(23, lineaMicraBrewTargetDeciC), SF(24, fastRampMs),
+    SF(25, slowRampMs), SF(26, fastCurve), SF(27, fastCurveHardness), SF(28, slowCurve),
+    SF(29, slowCurveHardness)};
 #undef SF
 
 // The bank's preset count is the number of preset groups.

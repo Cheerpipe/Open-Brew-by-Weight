@@ -129,11 +129,13 @@ cut later. Cup `REMOVED` can cut if that option is on.
 
 At cycle start, control snapshots the preset's smooth-cut parameters into the
 control-owned corridor state: target, shot time window t1/t2, side switches and
-margins, weight-cut delay, max shot time, ramp length D (5 s), the drip offset r
+margins, weight-cut delay, max shot time, each side's ramp length and curve
+(D_fast, D_slow, 5 s smoothstep by default), the drip offset r
 and τ (scale protocol sensor lag + 100 ms valve latency + the momentary stop
 pulse where the machine has one). The cut line f(t) holds the ceiling (target +
-fast margin) until t1 − D, eases into the target at t1, stays on the target
-through t2, eases down to the floor (target − slow margin) by t2 + D and holds
+fast margin) until t1 − D_fast, eases into the target at t1 along the Fast
+curve, stays on the target through t2, eases down to the floor (target − slow
+margin) by t2 + D_slow along the Slow curve and holds
 it; a side that is off is the target line. All times are stop-command times
 from the machine running start.
 

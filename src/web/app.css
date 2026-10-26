@@ -4061,6 +4061,145 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   margin: 0 0 0.35rem;
   font-size: 0.9375rem;
 }
+/* Fast and Slow pin their header, their switch row and their preview right
+   under the page header (--rampTop), so while the rows scroll the section
+   reads as starting with its switch and graph. The preview spans the band and
+   closes it with the row line. */
+.cfgGroup:is([data-g="fast"], [data-g="slow"])[open] > summary {
+  position: sticky;
+  top: var(--rampTop, var(--hdr));
+  z-index: 8;
+  background: var(--sf);
+}
+/* Pinned, the header would cut the band square: it carries the band's
+   rounded top corners, which at rest match the real ones exactly. */
+.cfgGroup:is([data-g="fast"], [data-g="slow"])[open] > summary::before {
+  content: "";
+  position: absolute;
+  inset: 100% 0 auto;
+  height: var(--r);
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 100% 100%, transparent calc(var(--r) - 0.5px), var(--sf) var(--r))
+      left top / var(--r) var(--r) no-repeat,
+    radial-gradient(circle at 0 100%, transparent calc(var(--r) - 0.5px), var(--sf) var(--r)) right
+      top / var(--r) var(--r) no-repeat;
+}
+.cfgGroup:has(> .rampHead)[open]::details-content {
+  padding-top: 0;
+}
+.rampPin {
+  position: sticky;
+  top: calc(var(--rampTop, var(--hdr)) + var(--rampSum, 0px));
+  z-index: 7;
+  margin-inline: -0.85rem;
+  padding-inline: 0.85rem;
+  background: var(--in);
+}
+.rampPreview {
+  margin: 0.75rem -0.85rem 0.25rem;
+  padding: 0.25rem 0.85rem 0.1rem;
+  background: var(--in);
+  box-shadow: 0 1px 0 var(--ln);
+  touch-action: pan-y;
+}
+.rampPreview svg {
+  display: block;
+  overflow: visible;
+}
+.rampSpan {
+  fill: none;
+  stroke: var(--mu);
+  stroke-width: 1;
+}
+.rampGuide {
+  stroke: var(--mu);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.rampChoice {
+  margin: 0.85rem 0 0;
+}
+.rampChoiceLbl {
+  display: block;
+  font-weight: 600;
+  margin: 0 0 0.45rem;
+}
+.rampCurves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.rampCol {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mu);
+  text-align: center;
+}
+.rampCurves button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: var(--tap);
+  margin: 0;
+  padding: 0.55rem 0.2rem 0.45rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--sf);
+  color: var(--fg);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rampCurves button:not([aria-checked="true"]):hover {
+  background: var(--in);
+}
+.rampCurves button[aria-checked="true"] {
+  background: var(--pa);
+  border-color: var(--ac);
+  color: var(--ac);
+}
+.rampCurves svg {
+  width: 2.5rem;
+  height: 1.25rem;
+  overflow: visible;
+}
+.rampCurves path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rampStrength {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0;
+}
+.rampStrength button {
+  flex: 1;
+  margin: 0;
+  min-height: 2.1rem;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: 1.6rem;
+  background: transparent;
+  color: var(--ac);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rampStrength button:hover,
+.rampStrength button[aria-checked="true"] {
+  background: var(--pa);
+}
+.rampStrength button[aria-checked="true"] {
+  font-weight: 700;
+}
+.rampChoice button:disabled {
+  cursor: default;
+}
 .reviewGraph {
   width: 100%;
   touch-action: pan-y;

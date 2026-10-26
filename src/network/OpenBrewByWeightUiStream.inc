@@ -752,16 +752,22 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
   // estimated only when the flow projection chose the stop time.
   // A stored shot also carries its preset snapshot, so the hero draws the cut
   // line on first paint without waiting for the Stats records.
-  char cutG[16] = "null", scaleLoss[80] = "null", rule[320] = "null";
+  char cutG[16] = "null", scaleLoss[80] = "null", rule[392] = "null";
   if (canonical) {
     snprintf(rule, sizeof(rule),
              "{\"fastBeforeS\":%s,\"slowAfterS\":%s,\"fastMarginG\":%s,"
-             "\"slowMarginG\":%s,\"delayS\":%s,\"wallS\":%s,\"cutRampS\":%s,"
+             "\"slowMarginG\":%s,\"delayS\":%s,\"wallS\":%s,\"fastRampS\":%s,"
+             "\"slowRampS\":%s,\"fastCurve\":\"%s\",\"slowCurve\":\"%s\","
+             "\"fastCurveHardness\":\"%s\",\"slowCurveHardness\":\"%s\","
              "\"extractionGuardEnabled\":%s,\"slowExtractionGuardEnabled\":%s}",
              FixedText(latest.fastBeforeDs, 1).text, FixedText(latest.slowAfterDs, 1).text,
              FixedText(latest.fastMarginDg, 1).text, FixedText(latest.slowMarginDg, 1).text,
              FixedText(latest.delayDs, 1).text, FixedText(latest.wallDs, 1).text,
-             FixedText(latest.cutRampDs, 1).text,
+             FixedText(latest.cutRampDs, 1).text, FixedText(shotLogSlowRampDs(latest), 1).text,
+             rampCurveName(corridor::rampCurveTypeOf(latest.fastCurve)),
+             rampCurveName(corridor::rampCurveTypeOf(latest.slowCurve)),
+             rampHardnessName(corridor::rampCurveHardnessOf(latest.fastCurve)),
+             rampHardnessName(corridor::rampCurveHardnessOf(latest.slowCurve)),
              shotLogFastGuardEnabled(latest.sideFlags) ? "true" : "false",
              shotLogSlowGuardEnabled(latest.sideFlags) ? "true" : "false");
     if (latest.cutLineCg > 0 &&

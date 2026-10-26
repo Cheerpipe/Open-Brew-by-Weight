@@ -10,6 +10,7 @@
 
 using namespace openbrewbyweight::corridor;
 using openbrewbyweight::EndReason;
+using namespace openbrewbyweight;
 
 namespace {
 
@@ -50,7 +51,7 @@ Params paramsOf(const cJSON *presets, const char *name) {
   out.fastBeforeMs = num(p, "fastBeforeMs");
   out.slowAfterMs = num(p, "slowAfterMs");
   out.wallMs = num(p, "wallMs");
-  out.rampMs = num(p, "rampMs");
+  out.fastRampMs = out.slowRampMs = num(p, "rampMs");
   return out;
 }
 
@@ -58,7 +59,7 @@ Params paramsOf(const cJSON *presets, const char *name) {
 void checkCutLineInvariants(const Params &p) {
   const int32_t ceiling = ceilingDg(p), floor = floorDg(p);
   CHECK(cutLineDg(p, p.fastBeforeMs) == p.goalDg);
-  CHECK(cutLineDg(p, p.slowAfterMs) == (p.rampMs > 0 ? p.goalDg : floor));
+  CHECK(cutLineDg(p, p.slowAfterMs) == (p.slowRampMs > 0 ? p.goalDg : floor));
   CHECK(cutLineDg(p, fastRampStartMs(p)) == (fastRampStartMs(p) < p.fastBeforeMs ? ceiling : p.goalDg));
   CHECK(cutLineDg(p, slowRampEndMs(p)) == floor);
   const int32_t a = fastRampStartMs(p), b = slowRampEndMs(p);
@@ -208,7 +209,7 @@ void testLegacyOracle() {
     p.fastBeforeMs = num(row, "fastBeforeMs");
     p.slowAfterMs = num(row, "slowAfterMs");
     p.wallMs = num(row, "wallMs");
-    p.rampMs = 0;
+    p.fastRampMs = p.slowRampMs = 0;
     const int32_t r = num(row, "offsetDg"), first = num(row, "firstDropMs"),
                   rate = num(row, "rateDgPerS"), change = num(row, "changeAtMs"),
                   rate2 = num(row, "rate2DgPerS"), period = num(row, "periodMs");
@@ -294,7 +295,7 @@ Params doubleAdaptive() {
 
 void testStepsAndZeroLengthSegments() {
   Params p = doubleAdaptive();
-  p.rampMs = 0;
+  p.fastRampMs = p.slowRampMs = 0;
   CHECK(cutLineDg(p, 26999) == 400);
   CHECK(cutLineDg(p, 27000) == 360);
   CHECK(cutLineDg(p, 33999) == 360);
@@ -675,6 +676,117 @@ void testGrindHintReplay() {
   CHECK(shown > 0 && shown <= 5);
 }
 
+// e(u) = I(u; a, b) in long double, the reference for the exact evaluator.
+long double betaReference(long double u, int a, int b) {
+  const int n = a + b - 1;
+  long double e = 0, choose = 1;
+  for (int j = 0; j <= n; ++j) {
+    if (j >= a) e += choose * std::pow(u, j) * std::pow(1 - u, n - j);
+    choose = choose * (n - j) / (j + 1);
+  }
+  return e;
+}
+
+// Every transition curve, exhaustively over the ms grid of a ramp: the exact
+// share never steps backwards (the cut line never rises), it is flat at both
+// ends, the two shares of one point add up to the margin, and it matches the
+// real-valued curve to within the floor.
+void testRampCurvesExhaustive() {
+  for (uint8_t c = 0; c < RAMP_CURVE_TYPES * RAMP_HARDNESS_LEVELS; ++c) {
+    const RampCurve curve = RAMP_CURVES[c];
+    for (const int32_t d : {500, 1000, 2500, 5000, 7500, 10000}) {
+      for (const int32_t m : {5, 100}) {
+        int32_t previous = 0;
+        CHECK(rampDg(m, 0, d, c, true) == 0);
+        CHECK(rampDg(m, 0, d, c, false) == m);
+        CHECK(rampDg(m, d, d, c, true) == m);
+        CHECK(rampDg(m, 1, d, c, true) <= 1);
+        CHECK(m - rampDg(m, d - 1, d, c, true) <= 1);
+        for (int32_t n = 0; n <= d; ++n) {
+          const int32_t reached = rampDg(m, n, d, c, true);
+          const int32_t left = rampDg(m, n, d, c, false);
+          CHECK(reached >= previous);
+          CHECK(reached + left == m || reached + left == m - 1);
+          const long double ideal =
+              m * betaReference(static_cast<long double>(n) / d, curve.a, curve.b);
+          CHECK(reached <= ideal + 1e-9L && reached > ideal - 1 - 1e-9L);
+          previous = reached;
+        }
+      }
+    }
+  }
+  CHECK(rampCurveIndex(RAMP_CURVE_EVEN, RAMP_HARDNESS_SOFT) == 0);
+  CHECK(rampCurveIndex(RAMP_CURVE_LATE, RAMP_HARDNESS_HARD) == 8);
+  CHECK(rampCurveIndex(RAMP_CURVE_TYPES, RAMP_HARDNESS_SOFT) == 0);
+  CHECK(rampCurveTypeOf(5) == RAMP_CURVE_EARLY && rampCurveHardnessOf(5) == RAMP_HARDNESS_HARD);
+}
+
+// The default curve keeps the original smoothstep law bit for bit.
+void testSmoothstepIdentity() {
+  for (const int64_t d : {1, 7, 500, 3000, 5000, 10000}) {
+    for (const int64_t m : {5, 37, 100}) {
+      for (int64_t n = 0; n < d; ++n) {
+        CHECK(rampDg(static_cast<int32_t>(m), static_cast<int32_t>(n), static_cast<int32_t>(d), 0,
+                     false) == m * (d * d * d - 3 * n * n * d + 2 * n * n * n) / (d * d * d));
+        CHECK(rampDg(static_cast<int32_t>(m), static_cast<int32_t>(n), static_cast<int32_t>(d), 0,
+                     true) == m * (3 * n * n * d - 2 * n * n * n) / (d * d * d));
+      }
+    }
+  }
+}
+
+// Per-side lengths and curves: the kernel reproduces the recorded vectors (the
+// Web UI checks the same file), the line stays monotone and bounded, and the
+// solver still finds the first crossing.
+void testTransitionVectors() {
+  cJSON *root = loadVectors("corridor_transitions_v1.json");
+  CHECK(root != nullptr);
+  if (root == nullptr) return;
+  const cJSON *curves = cJSON_GetObjectItemCaseSensitive(root, "curves");
+  CHECK(cJSON_GetArraySize(curves) == RAMP_CURVE_TYPES * RAMP_HARDNESS_LEVELS);
+  for (int c = 0; c < cJSON_GetArraySize(curves); ++c) {
+    const cJSON *ab = cJSON_GetArrayItem(curves, c);
+    CHECK(cJSON_GetArrayItem(ab, 0)->valueint == RAMP_CURVES[c].a);
+    CHECK(cJSON_GetArrayItem(ab, 1)->valueint == RAMP_CURVES[c].b);
+  }
+  const cJSON *item = nullptr;
+  cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(root, "cases")) {
+    Params p;
+    p.goalDg = num(item, "goalDg");
+    p.fastMarginDg = num(item, "fastMarginDg");
+    p.slowMarginDg = num(item, "slowMarginDg");
+    p.fastOn = flag(item, "fastOn");
+    p.slowOn = flag(item, "slowOn");
+    p.delayMs = num(item, "delayMs");
+    p.fastBeforeMs = num(item, "fastBeforeMs");
+    p.slowAfterMs = num(item, "slowAfterMs");
+    p.wallMs = num(item, "wallMs");
+    p.fastRampMs = num(item, "fastRampMs");
+    p.slowRampMs = num(item, "slowRampMs");
+    p.fastCurve = static_cast<uint8_t>(num(item, "fastCurve"));
+    p.slowCurve = static_cast<uint8_t>(num(item, "slowCurve"));
+    const cJSON *point = nullptr;
+    cJSON_ArrayForEach(point, cJSON_GetObjectItemCaseSensitive(item, "cutLine")) {
+      CHECK(cutLineDg(p, cJSON_GetArrayItem(point, 0)->valueint) ==
+            cJSON_GetArrayItem(point, 1)->valueint);
+    }
+    int32_t previous = cutLineDg(p, p.delayMs);
+    for (int32_t t = p.delayMs; t <= p.wallMs; ++t) {
+      const int32_t f = cutLineDg(p, t);
+      CHECK(f <= previous && f <= ceilingDg(p) && f >= floorDg(p));
+      previous = f;
+    }
+    for (int32_t tk = p.delayMs; tk < p.wallMs; tk += 4000) {
+      for (const int32_t q : {400, 1500, 3500}) {
+        int32_t out = 0;
+        CHECK(crossingMs(p, tk, p.goalDg / 2, q, 790, 15, out));
+        CHECK(out == bruteCrossing(p, tk, p.goalDg / 2, q, 790, 15));
+      }
+    }
+  }
+  cJSON_Delete(root);
+}
+
 void testShotStatsSummary() {
   // The Web UI's shot statistics: every admissible shot since the epoch
   // counts in total, the newest ten feed the sorted arrivals, and the first
@@ -719,6 +831,9 @@ void testShotStatsSummary() {
 
 int main() {
   testVectors();
+  testRampCurvesExhaustive();
+  testSmoothstepIdentity();
+  testTransitionVectors();
   testLegacyOracle();
   testStepsAndZeroLengthSegments();
   testSolverAgainstBruteForce();

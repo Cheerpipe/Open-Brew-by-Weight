@@ -382,7 +382,7 @@ struct ShotLogRecord {
   uint16_t wallDs;        // Max shot time.
   uint8_t fastMarginDg;   // Relative to the target; meaningful with the side on.
   uint8_t slowMarginDg;
-  uint8_t cutRampDs;      // Ramp length D (0 = step).
+  uint8_t cutRampDs;      // Fast ramp length D (0 = step).
   // Drip delay + 1 ds; 0 = unknown.
   uint8_t dripDelayCode;
   // Machine integration's live coffee target at the shot's end; 0 = the
@@ -390,17 +390,30 @@ struct ShotLogRecord {
   uint16_t targetTempDeciC;
   uint16_t doseDg;      // Active preset's dose; 0 = unknown.
   uint16_t ratioX100;   // Recorded yield / dose, hundredths; 0 = not computable.
+  // Slow ramp length + 1 ds; 0 = an earlier record, whose single ramp length
+  // (cutRampDs) applied to both sides.
+  uint16_t slowRampCode;
+  // corridor::RAMP_CURVES index per side; an earlier record reads 0, the
+  // smoothstep both sides used.
+  uint8_t fastCurve;
+  uint8_t slowCurve;
 };
 
 // Appended fields read as zero in records widened from an earlier image, so
 // zero must mean "missing" for them, or the widening must set their default.
-static_assert(sizeof(ShotLogRecord) == 124, "Shot-log schema 2 record size");
+static_assert(sizeof(ShotLogRecord) == 128, "Shot-log schema 2 record size");
 static_assert(offsetof(ShotLogRecord, verdict) == 27, "schema 1 verdict byte");
 static_assert(offsetof(ShotLogRecord, slowAfterDs) == 108, "schema 1 snapshot tail");
 static_assert(offsetof(ShotLogRecord, dripDelayCode) == 117, "schema 1 drip delay byte");
 static_assert(offsetof(ShotLogRecord, targetTempDeciC) == 118,
               "schema 2 snapshot tail");
 static_assert(offsetof(ShotLogRecord, ratioX100) == 122, "schema 2 ratio");
+static_assert(offsetof(ShotLogRecord, slowCurve) == 127, "schema 2 per-side transitions");
+
+inline uint16_t shotLogSlowRampDs(const ShotLogRecord &record) {
+  return record.slowRampCode == 0 ? record.cutRampDs
+                                  : static_cast<uint16_t>(record.slowRampCode - 1U);
+}
 
 inline ShotLogType shotLogType(const ShotLogRecord &record);
 

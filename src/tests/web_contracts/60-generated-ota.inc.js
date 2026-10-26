@@ -720,7 +720,7 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
   if (start < 0 || end < 0 || end <= start) {
     throw new Error('Rule chart model helpers not found for matrix checks');
   }
-  const presetState = {cutRampS: 5};
+  const presetState = {};
   const helpers = new Function('presetState', 'sub',
       js.slice(start, end) +
       ';return{buildRuleChartModel:buildRuleChartModel,cutLine:cutLine,paceStartNote:paceStartNote};')(
@@ -744,7 +744,8 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
   const both = helpers.buildRuleChartModel(base);
   if (both.mode !== 'active' || !both.fast || !both.slow ||
       both.t1 !== 28 || both.t2 !== 44 || both.prot !== 12 || both.wall !== 50 ||
-      both.goal !== 36 || both.floor !== 34 || both.ceil !== 42.5 || both.d !== 5) {
+      both.goal !== 36 || both.floor !== 34 || both.ceil !== 42.5 || both.dFast !== 5 ||
+      both.dSlow !== 5 || both.curveFast !== 0 || both.curveSlow !== 0) {
     throw new Error('Rule chart: every limit must come from settings, never baked in');
   }
   // The cut line holds the ceiling until t1 - D, ramps to the target at t1,
@@ -784,20 +785,22 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
       throw new Error('Rule chart: an incomplete or out-of-order recipe must render nothing');
     }
   }
-  presetState.cutRampS = undefined;
-  if (helpers.buildRuleChartModel(base).mode !== 'empty') {
-    throw new Error('Rule chart: the ramp length comes from the firmware');
+  // Each side's transition comes from the recipe; an unreadable length draws nothing.
+  const sides = helpers.buildRuleChartModel({...base, fastRampS: 2, slowRampS: 8,
+    fastCurve: 'early', fastCurveHardness: 'medium', slowCurve: 'late',
+    slowCurveHardness: 'hard'});
+  if (sides.dFast !== 2 || sides.dSlow !== 8 || sides.curveFast !== 4 || sides.curveSlow !== 8 ||
+      helpers.buildRuleChartModel({...base, slowRampS: 'x'}).mode !== 'empty') {
+    throw new Error('Rule chart: the transition length and curve come from each side');
   }
   // The graph's cut line reproduces the firmware kernel's golden vectors
-  // exactly. legacy_step (D = 0) is the old step oracle; the firmware always
-  // serves its 5 s ramp to the UI.
+  // exactly, legacy_step (D = 0, a transition set to Step) included.
   const vectors = JSON.parse(fs.readFileSync(
       path.join(sketchDir, 'tests/fixtures/corridor_vectors_v1.json'), 'utf8'));
   let compared = 0;
   for (const [name, p] of Object.entries(vectors.presets)) {
-    if (!p.rampMs) continue;
-    presetState.cutRampS = p.rampMs / 1000;
     const m = helpers.buildRuleChartModel({brewByWeight: true,
+      fastRampS: p.rampMs / 1000, slowRampS: p.rampMs / 1000,
       fastExtractionGuardEnabled: p.fastOn, slowExtractionGuardEnabled: p.slowOn,
       goalWeightG: p.goalDg / 10, fastMarginG: p.fastMarginDg / 10,
       slowMarginG: p.slowMarginDg / 10, fastBeforeS: p.fastBeforeMs / 1000,
@@ -813,6 +816,30 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
     }
   }
   if (compared < 500) throw new Error(`Rule chart: only ${compared} golden points compared`);
+  // Every transition curve on each side, from the firmware kernel's vectors:
+  // the graph runs the same exact integer law, point for point.
+  const transitions = JSON.parse(fs.readFileSync(
+      path.join(sketchDir, 'tests/fixtures/corridor_transitions_v1.json'), 'utf8'));
+  const types = ['even', 'early', 'late'], hardness = ['soft', 'medium', 'hard'];
+  let curvePoints = 0;
+  for (const c of transitions.cases) {
+    const m = helpers.buildRuleChartModel({brewByWeight: true,
+      fastExtractionGuardEnabled: c.fastOn, slowExtractionGuardEnabled: c.slowOn,
+      goalWeightG: c.goalDg / 10, fastMarginG: c.fastMarginDg / 10,
+      slowMarginG: c.slowMarginDg / 10, fastBeforeS: c.fastBeforeMs / 1000,
+      slowAfterS: c.slowAfterMs / 1000, bbwProtectionMs: c.delayMs, operationalWallMs: c.wallMs,
+      fastRampS: c.fastRampMs / 1000, slowRampS: c.slowRampMs / 1000,
+      fastCurve: types[Math.floor(c.fastCurve / 3)], fastCurveHardness: hardness[c.fastCurve % 3],
+      slowCurve: types[Math.floor(c.slowCurve / 3)], slowCurveHardness: hardness[c.slowCurve % 3]});
+    for (const [tMs, dg] of c.cutLine) {
+      if (tMs < c.delayMs || tMs > c.wallMs) continue;
+      const got = Math.round(helpers.cutLine(tMs / 1000, m) * 10);
+      ++curvePoints;
+      if (got !== dg)
+        throw new Error(`Rule chart: ${c.name} at ${tMs} ms draws ${got} dg, firmware ${dg} dg`);
+    }
+  }
+  if (curvePoints < 1000) throw new Error(`Rule chart: only ${curvePoints} curve points compared`);
   const empty = helpers.buildRuleChartModel(null);
   if (empty.mode !== 'empty') {
     throw new Error('Rule chart: no config must render nothing');

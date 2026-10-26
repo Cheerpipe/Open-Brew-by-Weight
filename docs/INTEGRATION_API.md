@@ -241,13 +241,15 @@ is the same preset render the Web UI draws its preset chart from (shortened
 here to one item):
 
 ```json
-{"apiVersion":1,"revision":19,"activeId":1,"cutRampS":3.0,"items":[
+{"apiVersion":1,"revision":19,"activeId":1,"items":[
   {"id":1,"name":"Double · Adaptive","isFactory":true,"brewByWeight":true,
    "doseG":18.0,"goalWeightG":36.0,"fastBeforeS":27.0,"slowAfterS":36.0,
    "fastMarginG":6.0,"slowMarginG":3.0,"operationalWallMs":50000,
    "bbwProtectionMs":12000,"fastExtractionGuardEnabled":true,
    "slowExtractionGuardEnabled":true,"grindHintsEnabled":true,
-   "lineaMicraBrewTargetC":93.0,
+   "lineaMicraBrewTargetC":93.0,"fastRampS":5.0,"slowRampS":5.0,
+   "fastCurve":"even","slowCurve":"even","fastCurveHardness":"soft",
+   "slowCurveHardness":"soft",
    "shotStats":{"n":5,"total":5,"minS":21.4,"maxS":34.2,"medianS":30.6},
    "firstDropS":4.9,"firstDropN":5,"arrivalsS":[21.4,29.1,30.6,32.7,34.2],
    "grindHint":null}
@@ -255,8 +257,15 @@ here to one item):
 ```
 
 `id`, `name`, and `isFactory` are the original contract; the rest is
-additive. `cutRampS` is the length of the smooth step between the extended
-or shortened cut line and the target. The rule fields mirror the preset
+additive. Each side eases between the target and its extended or shortened
+cut line over its own transition: `fastRampS` before the window and
+`slowRampS` after it (0–10 s; 0 is a step), along a curve named by
+`fastCurve` / `slowCurve` (`early`, `even` or `late`: where the change is
+steepest) and `fastCurveHardness` / `slowCurveHardness` (`soft`, `medium` or
+`hard`). The curves are the regularized incomplete beta I(u; a, b) of the
+firmware's `RAMP_CURVES`, and a reader that draws the line must use the same
+exact integer law to match the stops. Earlier firmware sent one top-level
+`cutRampS` for both sides instead. The rule fields mirror the preset
 editor: the on-recipe window runs from `fastBeforeS` to `slowAfterS`, the
 cut line is raised by `fastMarginG` before it and lowered by `slowMarginG`
 after it when the matching guard is enabled, nothing is cut before
@@ -296,7 +305,8 @@ keys are the ones the Stats page and the [shot JSON export](schemas/README.md)
 use: for example `goalG`, `actualG`, `durationS`, `firstDropS`, `doseG`,
 `ratio`, `targetTempDeciC`, `cutLineG`, `arrivalS`, `verdict`, `stopDetail`,
 `scaleName`, and the rule the shot ran with (`fastBeforeS`, `slowAfterS`,
-`fastMarginG`, `slowMarginG`, `delayS`, `wallS`, `cutRampS`).
+`fastMarginG`, `slowMarginG`, `delayS`, `wallS`, `fastRampS`, `slowRampS`,
+`fastCurve`, `slowCurve`, `fastCurveHardness`, `slowCurveHardness`).
 
 `wD` is the curve as base64 point records: each point is a time step in
 milliseconds (one byte, or `255` followed by the absolute time as a

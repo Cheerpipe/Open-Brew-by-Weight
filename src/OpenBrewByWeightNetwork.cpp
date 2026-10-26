@@ -139,9 +139,10 @@ struct NetworkWorkBuf {
   // share this buffer.
   static constexpr size_t kStatusJson = 40960;
   // Worst case: 8 presets with fully escaped 23-char names plus every
-  // per-preset rule field and shot statistic the Web UI renders.
-  // Eight realistic items with the grind hint object: ~6.2 KB.
-  static constexpr size_t kPresetsJson = 7168;
+  // per-preset rule field (both transitions included) and shot statistic the
+  // Web UI renders: ~7.8 KB. Eight realistic items with the grind hint
+  // object: ~7.3 KB.
+  static constexpr size_t kPresetsJson = 8192;
   static constexpr size_t kHistoryJson = 1400;
   // One full-capacity curve plus scalar fields per row; the 4 KiB headroom
   // (external memory) keeps a maximal row well under the client's frame
@@ -563,6 +564,14 @@ const char *configValidationMessage(ConfigValidationError error) {
       return "Shot reaction timeout must be 0 (compiled default) or from 3 to 30 s.";
     case ConfigValidationError::SCHEDULED_RESTART:
       return "Scheduled restart time must be from 00:00 to 23:59.";
+    case ConfigValidationError::FAST_RAMP:
+      return "Fast transition must be from 0 to 10 s in 0.5 s steps.";
+    case ConfigValidationError::FAST_CURVE:
+      return "Fast transition curve must be early, even or late, soft, medium or hard.";
+    case ConfigValidationError::SLOW_RAMP:
+      return "Slow transition must be from 0 to 10 s in 0.5 s steps.";
+    case ConfigValidationError::SLOW_CURVE:
+      return "Slow transition curve must be early, even or late, soft, medium or hard.";
   }
   return "Invalid configuration.";
 }
@@ -592,6 +601,28 @@ bool jsonSecondsMs(cJSON *object, const char *name, uint32_t &output) {
   if (!jsonTenths(object, name, UINT32_MAX / 100, tenths)) return false;
   output = tenths * 100;
   return true;
+}
+
+bool jsonRampMs(cJSON *object, const char *name, uint16_t &output) {
+  uint32_t tenths = 0;
+  if (!jsonTenths(object, name, UINT16_MAX / 100, tenths)) return false;
+  output = static_cast<uint16_t>(tenths * 100);
+  return true;
+}
+
+// A transition curve type or hardness by its wire name (rampCurveName,
+// rampHardnessName); the index is the stored value.
+bool jsonRampChoice(cJSON *object, const char *name, const char *(*nameOf)(uint8_t),
+                    uint8_t count, uint8_t &output) {
+  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+  if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
+  for (uint8_t i = 0; i < count; ++i) {
+    if (strcmp(item->valuestring, nameOf(i)) == 0) {
+      output = i;
+      return true;
+    }
+  }
+  return false;
 }
 
 bool jsonNoScaleBbwMode(cJSON *object, const char *name, uint8_t &output) {
@@ -1184,8 +1215,8 @@ bool buildSlimPresetsJson(const char *lead = "") {
   const ShotPresetBank &presets = g_work->renderedPresets;
   char *buf = g_work->presetsJson;
   const size_t cap = NetworkWorkBuf::kPresetsJson;
-  int n = snprintf(buf, cap, "{%s\"activeId\":%u,\"cutRampS\":%.1f,\"items\":[", lead,
-                   static_cast<unsigned>(presets.activeId), corridor::RAMP_MS / 1000.0);
+  int n = snprintf(buf, cap, "{%s\"activeId\":%u,\"items\":[", lead,
+                   static_cast<unsigned>(presets.activeId));
   if (n < 0 || static_cast<size_t>(n) + 3 > cap) {
     snprintf(buf, cap, "{}");
     return false;
@@ -1204,7 +1235,9 @@ bool buildSlimPresetsJson(const char *lead = "") {
         "\"slowAfterS\":%.1f,\"fastMarginG\":%.1f,\"slowMarginG\":%.1f,"
         "\"operationalWallMs\":%lu,\"bbwProtectionMs\":%lu,"
         "\"fastExtractionGuardEnabled\":%s,\"slowExtractionGuardEnabled\":%s,"
-        "\"grindHintsEnabled\":%s,\"lineaMicraBrewTargetC\":%.1f",
+        "\"grindHintsEnabled\":%s,\"lineaMicraBrewTargetC\":%.1f,"
+        "\"fastRampS\":%.1f,\"slowRampS\":%.1f,\"fastCurve\":\"%s\",\"slowCurve\":\"%s\","
+        "\"fastCurveHardness\":\"%s\",\"slowCurveHardness\":\"%s\"",
         i == 0 ? "" : ",", static_cast<unsigned>(p.id), safeName,
         p.isFactory ? "true" : "false", p.brewByWeight ? "true" : "false",
         static_cast<double>(goalWeightDgToGrams(p.doseDg)),
@@ -1217,7 +1250,9 @@ bool buildSlimPresetsJson(const char *lead = "") {
         p.fastSideEnabled ? "true" : "false",
         p.slowSideEnabled ? "true" : "false",
         p.grindHintsEnabled ? "true" : "false",
-        static_cast<double>(p.lineaMicraBrewTargetDeciC) / 10.0);
+        static_cast<double>(p.lineaMicraBrewTargetDeciC) / 10.0, p.fastRampMs / 1000.0,
+        p.slowRampMs / 1000.0, rampCurveName(p.fastCurve), rampCurveName(p.slowCurve),
+        rampHardnessName(p.fastCurveHardness), rampHardnessName(p.slowCurveHardness));
     if (n < 0 || static_cast<size_t>(n) >= cap - used) {
       break;
     }

@@ -16769,7 +16769,7 @@ void s08_shot_log_without_sync_has_no_wall_time() {
 }
 
 void s11_shot_log_record_includes_preset_snapshot() {
-  CHECK(sizeof(ShotLogRecord) == 124);
+  CHECK(sizeof(ShotLogRecord) == 128);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   // A fast weight cut records its own cut parameters, cut line and verdict.
   resetHarness(false, true);
@@ -16829,6 +16829,22 @@ void s11_shot_log_record_includes_preset_snapshot() {
   snapshot.cutStopMs = 0;
   snapshot.cutLineDg = 0;
   snapshot.rateAtStopX100 = 2108;
+  // Each side's transition length and curve go into the record; the line at
+  // the end of an unlatched cut follows the Fast curve (Steep late, Hard).
+  shotLog.clear();
+  snapshot.fastRampMs = 3500;
+  snapshot.slowRampMs = 8000;
+  snapshot.fastCurve = corridor::rampCurveIndex(RAMP_CURVE_LATE, RAMP_HARDNESS_HARD);
+  snapshot.slowCurve = corridor::rampCurveIndex(RAMP_CURVE_EARLY, RAMP_HARDNESS_MEDIUM);
+  commitPendingShotLog(snapshot, 39.0f, true, ActualWeightSource::POST_DRIP);
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  CHECK(stored[0].cutRampDs == 35 && stored[0].slowRampCode == 81);
+  CHECK(shotLogSlowRampDs(stored[0]) == 80);
+  CHECK(stored[0].fastCurve == 8 && stored[0].slowCurve == 4);
+  CHECK(stored[0].cutLineCg == corridor::cutLineDg(pendingCutParams(snapshot), 24500) * 10);
+  CHECK(stored[0].cutLineCg > 3600 && stored[0].cutLineCg < 4000);
+  snapshot.fastRampMs = snapshot.slowRampMs = 0;
+  snapshot.fastCurve = snapshot.slowCurve = 0;
   // A wall stop is not classified.
   shotLog.clear();
   snapshot.endReason = EndReason::CONFIGURED_WALL_LIMIT;
@@ -18481,7 +18497,7 @@ void at13_touch_fallback_guard_thresholds() {
   prepareTouchFallbackTest();
   corridor::Params &p = session.cut.params;
   p.delayMs = 0;
-  p.rampMs = 0;
+  p.fastRampMs = p.slowRampMs = 0;
   p.fastOn = true;
   p.fastBeforeMs = static_cast<int32_t>(cycleShotElapsedMs()) + 450;
   publishWeight(44.0f, hostMillis + 100);
@@ -18535,7 +18551,7 @@ void at16_touch_fallback_uses_receive_time_for_guard_boundaries() {
     prepareTouchFallbackTest();
     corridor::Params &p = session.cut.params;
     p.delayMs = 0;
-    p.rampMs = 0;  // Steps make the boundary exact.
+    p.fastRampMs = p.slowRampMs = 0;  // Steps make the boundary exact.
     p.fastOn = fast;
     p.slowOn = !fast;
     p.fastMarginDg = 340;  // 70 g ceiling
@@ -19761,7 +19777,7 @@ corridor::CorridorState spArmed(int32_t goalDg = 360, int32_t t1 = 27000,
   cut.params.fastOn = true;
   cut.params.slowOn = true;
   cut.params.delayMs = 12000;
-  cut.params.rampMs = 5000;
+  cut.params.fastRampMs = cut.params.slowRampMs = 5000;
   cut.params.fastBeforeMs = t1;
   cut.params.slowAfterMs = t2;
   cut.params.wallMs = 50000;

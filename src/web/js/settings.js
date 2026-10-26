@@ -789,6 +789,8 @@ const BREW_FIELD_TEXT = {
     fastMarginG: [__WEBUI_TEXT__("runtime.fast_margin"), __WEBUI_TEXT__("runtime.g"), "fast"],
     slowAfterS: [__WEBUI_TEXT__("runtime.window_end"), __WEBUI_TEXT__("runtime.s"), "recipe"],
     slowMarginG: [__WEBUI_TEXT__("runtime.slow_margin"), __WEBUI_TEXT__("runtime.g"), "slow"],
+    fastRampS: [__WEBUI_TEXT__("settings.fast_ramp"), __WEBUI_TEXT__("runtime.s"), "fast"],
+    slowRampS: [__WEBUI_TEXT__("settings.slow_ramp"), __WEBUI_TEXT__("runtime.s"), "slow"],
     scaleLossFixedS: [
       __WEBUI_TEXT__("runtime.scale_loss_override"),
       __WEBUI_TEXT__("runtime.s"),
@@ -871,6 +873,8 @@ function validateBrewClient() {
   add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));
   if (fastOn) add(brewRange("fastMarginG", 0.5, 10, { step: 0.1 }));
   if (slowOn) add(brewRange("slowMarginG", 0.5, 10, { step: 0.1 }));
+  if (fastOn) add(brewRange("fastRampS", 0, 10, { step: 0.5 }));
+  if (slowOn) add(brewRange("slowRampS", 0, 10, { step: 0.5 }));
   if (brewFieldValue("scaleLossFixedS") !== "")
     add(
       brewRange(
@@ -967,10 +971,266 @@ function brewPayload() {
     ]),
     // Empty means "use your recent shots": the firmware stores it as 0.
     scaleLossFixedS: R.number("scaleLossFixedS"),
+    ...Object.fromEntries(
+      ["fast", "slow"].flatMap((s) => [
+        [s + "RampS", R.number(s + "RampS")],
+        [s + "Curve", $(s + "Curve").value],
+        [s + "CurveHardness", $(s + "CurveHardness").value],
+      ]),
+    ),
     ...(document.documentElement.classList.contains("micraTemperatureEnabled")
       ? { lineaMicraBrewTargetC: R.number("lineaMicraBrewTargetC") }
       : {}),
   };
+}
+// Each side's transition curve, named as RAMP_CURVES orders it; the hint
+// follows where the curve is steepest, which reads differently per side.
+const RAMP_CURVE_NAMES = [
+    __WEBUI_TEXT__("settings.curve_smoothstep"),
+    __WEBUI_TEXT__("settings.curve_smootherstep"),
+    __WEBUI_TEXT__("settings.curve_smootheststep"),
+    __WEBUI_TEXT__("settings.curve_beta23"),
+    __WEBUI_TEXT__("settings.curve_beta24"),
+    __WEBUI_TEXT__("settings.curve_beta26"),
+    __WEBUI_TEXT__("settings.curve_beta32"),
+    __WEBUI_TEXT__("settings.curve_beta42"),
+    __WEBUI_TEXT__("settings.curve_beta62"),
+  ],
+  RAMP_CURVE_TEXT = {
+    fast: {
+      early: __WEBUI_TEXT__("settings.ramp_fast_early"),
+      even: __WEBUI_TEXT__("settings.ramp_fast_even"),
+      late: __WEBUI_TEXT__("settings.ramp_fast_late"),
+    },
+    slow: {
+      early: __WEBUI_TEXT__("settings.ramp_slow_early"),
+      even: __WEBUI_TEXT__("settings.ramp_slow_even"),
+      late: __WEBUI_TEXT__("settings.ramp_slow_late"),
+    },
+  };
+// The curve and hardness buttons stand in for their hidden selects, which
+// keep the form's edit, autosave and revert behavior. Each curve button draws
+// and names the curve it picks at the current hardness.
+function rampIcon(curve) {
+  let d = "M0 3H8";
+  for (let i = 1; i <= 24; i++) d += `L${8 + i} ${(3 + 14 * R.rampEase(curve, i / 24)).toFixed(2)}`;
+  return d + "H40";
+}
+function syncRampChoice(side) {
+  const type = $(side + "Curve"),
+    hardness = $(side + "CurveHardness"),
+    box = type.closest(".rampChoice");
+  if (!box._bound) {
+    box._bound = true;
+    box.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-ramp]"),
+        select = b && $(b.dataset.ramp);
+      if (!select || select.disabled || select.value === b.value) return;
+      select.value = b.value;
+      select.dispatchEvent(new Event("change"));
+    });
+  }
+  for (const b of box.querySelectorAll("button[data-ramp]")) {
+    const select = $(b.dataset.ramp);
+    b.setAttribute("aria-checked", b.value === select.value);
+    b.disabled = select.disabled;
+    if (select !== type) continue;
+    const curve = R.rampCurveIndex(b.value, hardness.value);
+    b.querySelector("path").setAttribute("d", rampIcon(curve));
+    b.lastChild.textContent = RAMP_CURVE_NAMES[curve];
+  }
+}
+// The page header shrinks while scrolling on phones: its measured bottom
+// edge is where the pinned Fast or Slow header starts.
+let rampTopObserver = null;
+function pinRampSections() {
+  if (rampTopObserver) return;
+  const bar = document.querySelector(".topBar"),
+    set = () =>
+      document.body.style.setProperty("--rampTop", bar.getBoundingClientRect().bottom + "px");
+  rampTopObserver = new ResizeObserver(set);
+  rampTopObserver.observe(bar);
+  set();
+}
+// Each side's transition, drawn from the cut law on a fixed 12.5 s span with
+// at least 6 g of margin room and room under the lower level, in the review
+// graph's language: zones under the cut line, dotted target and held levels,
+// the scrub marker and its pill. A side that is off draws flat and dimmed.
+function renderRampPreviews(m) {
+  for (const side of ["fast", "slow"]) {
+    const host = $(side + "RampPreview"),
+      fast = side === "fast";
+    syncRampChoice(side);
+    $(side + "CurveHint").textContent = RAMP_CURVE_TEXT[side][$(side + "Curve").value] || "";
+    const pad = parseFloat(getComputedStyle(host).paddingLeft) || 0,
+      W = host.clientWidth && host.clientWidth - 2 * pad,
+      group = host.closest("details");
+    // Drawn when its group opens or resizes, like the review graph.
+    host._draw = renderPresetReview;
+    host._w = host.clientWidth;
+    R.observePresetHost(host);
+    pinRampSections();
+    if (!W) continue;
+    group.style.setProperty("--rampSum", group.querySelector("summary").offsetHeight + "px");
+    const H = 124,
+      L = 46,
+      Rt = W - 8,
+      T = 26,
+      B = H - 22,
+      f = (v) => v.toFixed(1),
+      n = (v) => +(+v).toFixed(1),
+      edge = fast ? m.t1 : m.t2,
+      t0 = fast ? edge - 11 : edge - 1.5,
+      span = 12.5,
+      room = Math.max(6, (fast ? m.ceil - m.goal : m.goal - m.floor) + 1),
+      X = (t) => L + ((Rt - L) * (t - t0)) / span,
+      // The lower level sits above the base, so the zones under it have height.
+      lo = T + (B - T) * 0.64,
+      Y = (g) =>
+        fast ? lo - ((lo - T) * (g - m.goal)) / room : T + ((lo - T) * (m.goal - g)) / room,
+      a = fast ? Math.max(m.prot, m.t1 - m.dFast) : m.t2,
+      b = fast ? m.t1 : Math.min(m.wall, m.t2 + m.dSlow),
+      from = Math.max(t0, m.prot),
+      to = Math.min(t0 + span, m.wall),
+      held = fast ? m.ceil : m.floor,
+      gy = Y(m.goal),
+      hy = Y(held),
+      on = fast ? m.fast : m.slow,
+      curve = fast ? m.curveFast : m.curveSlow,
+      P = (t, g) => f(X(t)) + " " + f(Y(g)),
+      // Exact curve, like the review graph: hold, transition, hold.
+      [g0, g1] = on ? (fast ? [m.ceil, m.goal] : [m.goal, m.floor]) : [m.goal, m.goal],
+      lineAt = (t) =>
+        t <= a ? g0 : t >= b ? g1 : g0 + (g1 - g0) * R.rampEase(curve, (t - a) / (b - a));
+    let line = `M${P(from, g0)}L${P(a, g0)}`;
+    for (let i = 1; i <= 60; i++)
+      line += `L${P(a + ((b - a) * i) / 60, g0 + (g1 - g0) * R.rampEase(curve, i / 60))}`;
+    line += `L${P(to, g1)}`;
+    const zones = fast
+        ? [
+            ["rvFastFull", from, a, on],
+            ["rvFastPart", a, m.t1, on],
+            ["rvWindow", m.t1, to, true],
+          ]
+        : [
+            ["rvWindow", from, m.t2, true],
+            ["rvSlowPart", m.t2, b, on],
+            ["rvSlowFull", b, to, on],
+          ],
+      zone = ([cls, z0, z1, lit]) => {
+        if (z1 <= z0) return "";
+        let d = `M${P(z0, lineAt(z0))}`;
+        for (let i = 1; i <= 40; i++) {
+          const t = z0 + ((z1 - z0) * i) / 40;
+          d += `L${P(t, lineAt(t))}`;
+        }
+        return `<path class="${lit ? cls : "rvBandOff"}" d="${d}L${f(X(z1))} ${B}L${f(X(z0))} ${B}Z" fill="url(#${side}Ramp${cls})"/>`;
+      },
+      fills = [
+        ["rvFastFull", "gFast", "Full"],
+        ["rvFastPart", "gFast", "Part"],
+        ["rvWindow", "ok", "Win"],
+        ["rvSlowPart", "gSlow", "Part"],
+        ["rvSlowFull", "gSlow", "Full"],
+      ]
+        .map(([c, k, z]) =>
+          R.fadeFill(side + "Ramp" + c, `var(--${k})`, `calc(var(--band${z}) * 2.2)`, 0.03),
+        )
+        .join(""),
+      label = (x, y, text, cls = "", anchor = "middle") =>
+        `<text class="rvLbl ${cls}" x="${f(x)}" y="${f(y)}" text-anchor="${anchor}">${text}</text>`,
+      apart = Math.abs(hy - gy) >= 12,
+      length = b - a,
+      // No weight cut before the earliest weight stop or after the max shot time.
+      limited = fast ? m.t1 - m.dFast < m.prot : m.t2 + m.dSlow > m.wall,
+      noCut = fast ? Math.min(Rt, X(m.prot)) - L : Rt - Math.max(L, X(m.wall));
+    host.innerHTML =
+      `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+      `<defs>${fills}<pattern id="${side}RampHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="rvHatchLine" d="M0 0V6"/></pattern></defs>` +
+      zones.map(zone).join("") +
+      (noCut > 0
+        ? `<rect x="${f(fast ? L : X(m.wall))}" y="${T - 4}" width="${f(noCut)}" height="${B - T + 8}" fill="url(#${side}RampHatch)"/>`
+        : "") +
+      `<path class="rvTarget" d="M${L} ${f(gy)}H${Rt}"/>` +
+      // The held Fast or Slow level gets the same dotted line, under the cut line.
+      (on && held !== m.goal ? `<path class="rvTarget" d="M${L} ${f(hy)}H${Rt}"/>` : "") +
+      `<path class="rvWin" d="M${f(X(edge))} ${T - 4}V${B + 4}"/>` +
+      `<path class="rvCut${on ? "" : " off"}" d="${line}"/>` +
+      (length > 0
+        ? `<path class="rampSpan" d="M${f(X(a))} ${T - 8}v-5H${f(X(b))}v5"/>` +
+          // The bracket end away from the window drops to its time label.
+          `<path class="rampGuide" d="M${f(X(fast ? a : b))} ${T - 8}V${H - 16}"/>`
+        : "") +
+      label(
+        (X(a) + X(b)) / 2,
+        T - 17,
+        length > 0 ? n(length) + " s" : __WEBUI_TEXT__("settings.ramp_step"),
+        "strong",
+      ) +
+      label(L - 6, gy + 4, n(m.goal) + " g", "strong", "end") +
+      (apart ? label(L - 6, hy + 4, n(held) + " g", "", "end") : "") +
+      label(X(fast ? a : edge), H - 4, n(fast ? a : edge) + " s") +
+      (X(b) - X(a) >= 34 ? label(X(fast ? edge : b), H - 4, n(fast ? edge : b) + " s") : "") +
+      (noCut >= 84
+        ? label(
+            fast ? L + noCut / 2 : X(m.wall) + noCut / 2,
+            (T + B) / 2 + 4,
+            __WEBUI_TEXT__("runtime.graph_legend_no_cut"),
+            "rvHalo",
+          )
+        : "") +
+      `<g class="rvScrub" role="slider" tabindex="0" aria-label="${R.escHtml(__WEBUI_TEXT__("runtime.graph_scrub"))}" aria-valuemin="${f(from)}" aria-valuemax="${f(to)}"><path class="rvGuide"/><circle class="rvHandle" r="5"/>${R.PILL}</g>` +
+      "</svg>" +
+      (limited
+        ? `<small class="fieldHint">${R.sub(
+            fast
+              ? __WEBUI_TEXT__("settings.ramp_limited_fast")
+              : __WEBUI_TEXT__("settings.ramp_limited_slow"),
+            [n(length), n(fast ? m.prot : m.wall)],
+          )}</small>`
+        : "");
+    host._view = { m, X, Y, T, B, from, to, tAt: (px) => t0 + ((px - L) * span) / (Rt - L) };
+    if (!(host._s >= from && host._s <= to)) host._s = Math.round((a + b) * 5) / 10;
+    if (!host.dataset.scrub) {
+      host.dataset.scrub = "1";
+      R.bindScrub(
+        host,
+        (x) => host._view.tAt(x - host.querySelector("svg").getBoundingClientRect().left),
+        (t) => {
+          const v = host._view;
+          host._s = Math.max(v.from, Math.min(v.to, Math.round(t * 10) / 10));
+          positionRampScrub(host);
+        },
+        () => host._s,
+        ".rvScrub",
+      );
+    }
+    positionRampScrub(host);
+  }
+}
+// The marker rides the side's cut line like the review graph's scrubber;
+// held, the same pill reads when and at what weight the shot would be cut.
+function positionRampScrub(host) {
+  const v = host._view,
+    g = host.querySelector(".rvScrub");
+  if (!v || !g) return;
+  const stop = host._s,
+    w = R.cutLine(stop, v.m),
+    [guide, handle, pill] = g.children,
+    hx = v.X(stop),
+    text = R.sub(__WEBUI_TEXT__("runtime.graph_cut_pill"), [
+      0,
+      0,
+      "",
+      w.toFixed(1),
+      stop.toFixed(1),
+    ]);
+  guide.setAttribute("d", `M${hx.toFixed(1)} ${v.T - 4}V${v.B + 4}`);
+  handle.setAttribute("cx", hx.toFixed(2));
+  handle.setAttribute("cy", v.Y(w).toFixed(2));
+  R.placePill(pill, text, hx, v.Y(w));
+  g.setAttribute("aria-valuenow", stop.toFixed(1));
+  g.setAttribute("aria-valuetext", text);
 }
 // Review graph of the preset under review: pace curves fan out from the
 // origin into corridors whose boundaries are the preset's thresholds, colored
@@ -1002,11 +1262,13 @@ function renderPresetReview() {
         ? R.buildRuleChartModel({ ...saved, ...brewPayload() })
         : null,
     m = draft && draft.mode !== "empty" ? draft : savedModel,
-    ghost = JSON.stringify(m.pts) !== JSON.stringify(savedModel.pts) ? savedModel : null;
+    shape = (x) => JSON.stringify([x.pts, x.curveFast, x.curveSlow]),
+    ghost = shape(m) !== shape(savedModel) ? savedModel : null;
   $("presetReview").hidden = savedModel.mode === "empty";
   const statsLine = R.shotStatsLine(saved);
   $("windowStatsText").textContent = statsLine || __WEBUI_TEXT__("runtime.no_shots_yet");
   if (savedModel.mode === "empty") return;
+  renderRampPreviews(m);
   // Past arrivals were judged against the saved target: hidden while it is edited.
   const arrivals = m.goal === savedModel.goal ? saved.arrivalsS || [] : [];
   host._draw = renderPresetReview;

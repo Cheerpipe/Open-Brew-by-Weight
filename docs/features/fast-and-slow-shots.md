@@ -28,7 +28,8 @@ these options would do.
 The controller stops a shot when its weight meets the preset's **cut line**. The
 line sits on the target inside the window. With the fast and slow options on,
 it is higher before the window and lower after it, and it moves between those
-levels gradually over 5 seconds instead of jumping. Reaching the target a
+levels gradually instead of jumping: over a few seconds on each side, unless you
+[shape the transition](#shape-the-transition) yourself. Reaching the target a
 fraction of a second earlier or later therefore never changes your cup by more
 than a fraction of a gram.
 
@@ -47,8 +48,8 @@ timing over, while editing the window or the target keeps it.
 
 Turn on **Extend fast shots** (Settings → Presets → **Fast shots**) to let
 a fast shot keep going past the target. The cut line starts at the target plus
-**Extend by up to (g)**, then eases down to the target over the 5 seconds
-before the window starts.
+**Extend by up to (g)**, then eases down to the target over its
+**Transition (s)**, which ends as the window starts.
 
 - A shot that is well ahead of the window stops at the full extra yield.
 - A shot that is only a little early gets only a little more.
@@ -64,8 +65,8 @@ target before the window, and reads **Running fast** once it is sure.
 
 Turn on **Shorten slow shots** (Settings → Presets → **Slow shots**) to
 stop a slow shot before the target. The cut line stays on the target until the
-window ends, then eases down by up to **Shorten by up to (g)** over the next
-5 seconds, where it stays.
+window ends, then eases down by up to **Shorten by up to (g)** over its
+**Transition (s)**, and stays there.
 
 - A shot that is only a little late loses only a little yield.
 - A very slow shot stops at the full reduction, or at Max shot time if it never
@@ -77,6 +78,47 @@ While a slow shot is stopping sooner, its line reads
 **STOPPED EARLY**.
 Home's shot card reads **Past window** and turns blue as soon as the window
 ends without a stop.
+
+## Shape the transition
+
+Both **Fast shots** and **Slow shots** open with a small graph of their part of
+the cut line: the extra or reduced yield on one side, your target on the other,
+and the transition between them. It updates as you change the settings below
+it, and it stays at the top of the section while you scroll through them.
+Drag the marker along the line to read when a shot would be cut and at what
+weight.
+
+- **Transition (s)** sets how long the change takes. A longer transition is
+  gentler: shots close to the window get only part of the extra or reduced
+  yield. **0** switches straight from one level to the other at the window
+  edge.
+- **Transition curve** sets where the change happens fastest:
+  - **Steep early**: on Fast shots, the extra grams fade early, so only clearly
+    fast shots get them; on Slow shots, the cut comes down soon after the
+    window, so slightly slow shots are shortened too.
+  - **Even**: the change is spread evenly.
+  - **Steep late**: on Fast shots, most of the extra grams stay until close to
+    the window; on Slow shots, the cut stays near your target for a while, so
+    only clearly slow shots are shortened by the full amount.
+- **Soft**, **Medium** and **Hard** set how marked that curve is. Each button
+  shows its curve's drawing and its name (such as Smoothstep or Beta(3,2)), so
+  you can match it to the graph.
+
+The factory **Double · Adaptive** and **Single · Adaptive** presets use a 6 s
+**Soft** transition, **Steep early** on Fast shots and **Steep late** on Slow
+shots. Both keep the cut line close to your target for the first second or two
+beside the window, because a shot's timing drifts that much from day to day on
+its own, and still give a clearly fast or slow shot the full amount. Presets
+you create start with a 5 s **Even**, **Soft** transition.
+
+Every curve leaves and joins the levels smoothly, so a shot that reaches the
+target a moment earlier or later still stops only a fraction of a gram
+differently. If **Earliest weight stop** or **Max shot time** leaves less room
+than the transition you chose, the graph hatches the part where no weight stop
+happens and a note under it says how long the transition really is.
+
+Each shot keeps the transitions it ran with, so its graph in Stats shows the
+cut line of that moment even after you change the preset.
 
 ## Settings
 
@@ -92,6 +134,9 @@ While you edit, the field result shows the resulting weight and ratio, such as
 | **Extend by up to (g)** | 6 g | 0.5–10 g in 0.1 g steps, and no more than a quarter of the target | The most a very fast shot gains over the target. |
 | **Shorten slow shots** | ON | ON / OFF | Lets slow shots stop before the target. |
 | **Shorten by up to (g)** | 3 g | 0.5–10 g in 0.1 g steps, leaving at least 5 g in the cup | The most a very slow shot stops short of the target. |
+| **Transition (s)** (Fast shots, Slow shots) | 6 s | 0–10 s in 0.5 s steps | How long the cut line takes to move between the target and the extra or reduced yield. |
+| **Transition curve** (Fast shots, Slow shots) | Steep early (Fast shots), Steep late (Slow shots) | Steep early, Even, Steep late | Where that change happens fastest. |
+| **Soft / Medium / Hard** (Fast shots, Slow shots) | Soft | Soft, Medium, Hard | How marked the transition curve is. |
 
 The extra and reduced yields are amounts relative to the target, so they move
 with it when you change the target from Home or Settings. Fixed presets keep
@@ -155,9 +200,10 @@ Factory Double · Adaptive: 36 g target, 27–36 s window, up to 6 g extra and
 3 g less.
 
 - 36 g reached at 30 s: On recipe, stops at 36 g.
-- A shot that would reach 36 g at 24 s keeps running and stops near 40 g.
+- A shot that would reach 36 g at 26 s, a second early, stops at 36 g.
+- A shot that would reach 36 g at 24 s keeps running and stops near 37 g.
 - A gusher reaching 36 g at 16 s stops at 42 g.
-- A shot that would reach 36 g at 36 s stops a little earlier, near 35 g.
+- A shot that would reach 36 g at 40 s stops a little earlier, near 35 g.
 - A very slow shot stops once it reaches 33 g, or at the 50 s Max shot time.
 - Scale lost during the shot: weight decisions pause, and the
   [scale-loss backup](auto-to-manual.md) and the time limits take over until

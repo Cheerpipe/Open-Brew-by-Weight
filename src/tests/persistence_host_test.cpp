@@ -586,7 +586,7 @@ void p65_factory_settings_survives_second_slot_write_fail() {
 
 void p66_shot_log_dual_slot_generation_flip() {
   resetHostPersistence();
-  CHECK(sizeof(ShotLogStore) == 62024);
+  CHECK(sizeof(ShotLogStore) == 64024);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   CHECK(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES);
   CHECK(SHOT_LOG_FLASH_SLOT_COUNT * SHOT_LOG_FLASH_SLOT_BYTES <= 0xFC000);
@@ -741,6 +741,26 @@ void p09_fast_extraction_guard_validation() {
   config = {};
   config.operationalWallMs = config.slowAfterMs;
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::SLOW_AFTER);
+  // Each side's transition: 0–10 s in 0.5 s steps and a known curve, checked
+  // like its margin only while the side is on.
+  config = {};
+  config.fastRampMs = 0;
+  config.slowRampMs = MAX_RAMP_MS;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);
+  config.fastRampMs = MAX_RAMP_MS + RAMP_STEP_MS;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::FAST_RAMP);
+  config.fastSideEnabled = false;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);
+  config = {};
+  config.slowRampMs = 2250;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::SLOW_RAMP);
+  config = {};
+  config.fastCurveHardness = RAMP_HARDNESS_LEVELS;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::FAST_CURVE);
+  config = {};
+  config.slowCurve = RAMP_CURVE_TYPES;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::SLOW_CURVE);
+  CHECK(strcmp(configValidationErrorName(ConfigValidationError::SLOW_CURVE), "slowCurve") == 0);
 }
 
 void p10_auto_to_manual_guard_trend_and_validation() {
@@ -1100,7 +1120,7 @@ void p24_preset_bank_size_and_crud_budgets() {
     float offset;
   } factory[] = {
       {"Double \xC2\xB7 Adaptive", 180, 360, 60, 30, 27000, 36000, true, DEFAULT_WEIGHT_OFFSET_G},
-      {"Single \xC2\xB7 Adaptive", 90, 180, 40, 15, 23000, 32000, true, 0.5f},
+      {"Single \xC2\xB7 Adaptive", 90, 180, 30, 15, 23000, 32000, true, 0.5f},
       {"Double \xC2\xB7 Fixed", 180, 360, 60, 30, 27000, 36000, false, DEFAULT_WEIGHT_OFFSET_G},
       {"Single \xC2\xB7 Fixed", 90, 180, 40, 15, 23000, 32000, false, 0.5f},
   };
@@ -1113,6 +1133,12 @@ void p24_preset_bank_size_and_crud_budgets() {
     CHECK(preset.fastBeforeMs == factory[i].t1 && preset.slowAfterMs == factory[i].t2);
     CHECK(preset.fastSideEnabled == factory[i].sides &&
           preset.slowSideEnabled == factory[i].sides);
+    const uint32_t ramp = factory[i].sides ? FACTORY_RAMP_MS : DEFAULT_RAMP_MS;
+    CHECK(preset.fastRampMs == ramp && preset.slowRampMs == ramp);
+    CHECK(preset.fastCurve == (factory[i].sides ? RAMP_CURVE_EARLY : RAMP_CURVE_EVEN) &&
+          preset.slowCurve == (factory[i].sides ? RAMP_CURVE_LATE : RAMP_CURVE_EVEN) &&
+          preset.fastCurveHardness == RAMP_HARDNESS_SOFT &&
+          preset.slowCurveHardness == RAMP_HARDNESS_SOFT);
     CHECK(preset.bbwProtectionMs == DEFAULT_BBW_PROTECTION_MS &&
           preset.operationalWallMs == DEFAULT_OPERATIONAL_WALL_MS);
     CHECK(preset.scaleLossFixedMs == 0 && preset.grindHintsEnabled);
@@ -1127,6 +1153,8 @@ void p24_preset_bank_size_and_crud_budgets() {
     CHECK(manual.id == FACTORY_PRESET_ID_MANUAL && manual.isFactory);
     CHECK(strcmp(manual.name, "Manual") == 0 && !manual.brewByWeight);
     CHECK(!manual.fastSideEnabled && !manual.slowSideEnabled);
+    CHECK(manual.fastRampMs == DEFAULT_RAMP_MS && manual.fastCurve == RAMP_CURVE_EVEN &&
+          manual.slowRampMs == DEFAULT_RAMP_MS && manual.slowCurve == RAMP_CURVE_EVEN);
     CHECK(manual.goalWeightDg == factory[0].goal && manual.fastBeforeMs == factory[0].t1);
     CHECK(validateShotPresetRecipe(manual, DEFAULT_RETARE_WINDOW_MS, true));
     CHECK(!deleteShotPreset(bank, manual.id));
@@ -3240,6 +3268,14 @@ void p91_schema2_golden_settings_blob_loads() {
   CHECK(dbl != nullptr && dbl->fastBeforeMs == 26500 && dbl->fastMarginDg == 35);
   CHECK(dbl->scaleLossFixedMs == 31000 && dbl->doseDg == 185 && !dbl->grindHintsEnabled);
   CHECK(dbl->learningEpoch == 42 && dbl->lineaMicraBrewTargetDeciC == 940);
+  // The blob predates the per-side transitions: they load as the original cut.
+  for (uint8_t i = 0; i < loaded.presets.count; ++i) {
+    const ShotPreset &p = loaded.presets.presets[i];
+    CHECK(p.fastRampMs == DEFAULT_RAMP_MS && p.slowRampMs == DEFAULT_RAMP_MS);
+    CHECK(p.fastCurve == RAMP_CURVE_EVEN && p.fastCurveHardness == RAMP_HARDNESS_SOFT);
+    CHECK(p.slowCurve == RAMP_CURVE_EVEN && p.slowCurveHardness == RAMP_HARDNESS_SOFT);
+  }
+  CHECK(loaded.runtime.fastRampMs == DEFAULT_RAMP_MS && loaded.runtime.slowCurve == RAMP_CURVE_EVEN);
   const ShotPreset *custom = findShotPreset(loaded.presets, FACTORY_PRESET_COUNT + 1);
   CHECK(custom != nullptr && strcmp(custom->name, "Golden") == 0 && !custom->isFactory);
   CHECK(!custom->fastSideEnabled && custom->goalWeightDg == FACTORY_SINGLE_GOAL_WEIGHT_DG);
@@ -3291,6 +3327,27 @@ std::vector<uint8_t> settingsBlobWithBody(const std::vector<uint8_t> &body) {
   blob.resize(blob.size() + 4U);
   resealSettingsBlob(blob);
   return blob;
+}
+
+// A stored transition out of range falls back to the factory one, side on or
+// off, so the cut kernel never receives an unbounded ramp.
+void p91c_preset_transitions_repair_out_of_range() {
+  ShotPresetBank bank;
+  seedDefaultShotPresetBank(bank);
+  ShotPreset &p = bank.presets[0];
+  p.fastSideEnabled = false;
+  p.fastRampMs = MAX_RAMP_MS + RAMP_STEP_MS;
+  p.slowRampMs = 1234;
+  p.fastCurve = RAMP_CURVE_TYPES;
+  p.slowCurveHardness = RAMP_HARDNESS_LEVELS;
+  bank.presets[1].fastRampMs = 0;
+  bank.presets[1].slowCurve = RAMP_CURVE_LATE;
+  bank.presets[1].slowCurveHardness = RAMP_HARDNESS_HARD;
+  ensureShotPresetBank(bank, DEFAULT_RETARE_WINDOW_MS, true);
+  CHECK(p.fastRampMs == DEFAULT_RAMP_MS && p.slowRampMs == DEFAULT_RAMP_MS);
+  CHECK(p.fastCurve == RAMP_CURVE_EVEN && p.slowCurveHardness == RAMP_HARDNESS_SOFT);
+  CHECK(bank.presets[1].fastRampMs == 0 && bank.presets[1].slowCurve == RAMP_CURVE_LATE &&
+        bank.presets[1].slowCurveHardness == RAMP_HARDNESS_HARD);
 }
 
 void p91b_settings_codec_round_trips_and_evolves() {
@@ -3488,6 +3545,9 @@ void p92_schema2_golden_shot_log_loads() {
   CHECK(fast.fastBeforeDs == 270 && fast.slowAfterDs == 340 && fast.delayDs == 120);
   CHECK(fast.wallDs == 500 && fast.fastMarginDg == 40 && fast.slowMarginDg == 30);
   CHECK(fast.cutRampDs == 50 && shotLogPresetId(fast) == FACTORY_PRESET_ID_DOUBLE_ADAPTIVE);
+  // The widened tail reads as the record's single ramp and smoothstep.
+  CHECK(fast.slowRampCode == 0 && shotLogSlowRampDs(fast) == 50);
+  CHECK(fast.fastCurve == 0 && fast.slowCurve == 0);
   CHECK(fast.targetTempDeciC == 935 && fast.doseDg == 180 && fast.ratioX100 == 215);
   CHECK(corridor::verdictOf(store.records[1].verdict) == corridor::Verdict::SLOW);
   CHECK(store.records[1].targetTempDeciC == 0 && store.records[1].ratioX100 == 185);
@@ -3614,6 +3674,7 @@ const TestCase tests[] = {
     {"P72", p72_factory_intent_recovers_only_from_nvs_no_space},
     {"P73", p73_factory_intent_does_not_free_data_for_other_failures},
     {"P74", p74_factory_intent_second_failure_keeps_settings},
+    {"P91C", p91c_preset_transitions_repair_out_of_range},
     {"P61", p61_shot_curve_dual_slot_round_trip_and_delete},
     {"P61B", p61b_shot_curve_failed_compaction_restores_durable_ring},
     {"P61C", p61c_shot_curve_held_and_break_bits_round_trip},

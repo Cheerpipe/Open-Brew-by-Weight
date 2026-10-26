@@ -83,6 +83,17 @@ void armSmoothCut(uint16_t sensorLagMs) {
   cut.params.fastBeforeMs = static_cast<int32_t>(session.config.fastBeforeMs);
   cut.params.slowAfterMs = static_cast<int32_t>(session.config.slowAfterMs);
   cut.params.wallMs = static_cast<int32_t>(session.config.operationalWallMs);
+  // The exact curve evaluator is bounded for ramps up to MAX_RAMP_MS.
+  cut.params.fastRampMs = session.config.fastRampMs > MAX_RAMP_MS
+                              ? static_cast<int32_t>(MAX_RAMP_MS)
+                              : session.config.fastRampMs;
+  cut.params.slowRampMs = session.config.slowRampMs > MAX_RAMP_MS
+                              ? static_cast<int32_t>(MAX_RAMP_MS)
+                              : session.config.slowRampMs;
+  cut.params.fastCurve =
+      corridor::rampCurveIndex(session.config.fastCurve, session.config.fastCurveHardness);
+  cut.params.slowCurve =
+      corridor::rampCurveIndex(session.config.slowCurve, session.config.slowCurveHardness);
   cut.tauMs = corridor::tauMs(sensorLagMs, machineStopCommandLatencyMs());
   cut.offsetDg = gramsToDg(session.config.weightOffsetG);
 }

@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Cheerpipe/Open-Brew-by-Weight/main/docs/schemas/openbrewbyweight-shot-export-v2.schema.json",
+  "title": "Open Brew by Weight shot export, version 2",
+  "description": "Shots exported from the Open Brew by Weight Web UI, either the whole log or a single shot. Units are in the key names: G grams, S seconds, GS grams per second, C degrees Celsius, Ms milliseconds. Unknown values are null. Readers must ignore properties they do not know: new optional properties keep version 2, while removals, renames, or changes of meaning use a new version and schema file.",
+  "type": "object",
+  "required": ["format", "version", "exportedAt", "source", "shots"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "const": "openbrewbyweight.shots" },
+    "version": { "const": 2 },
+    "exportedAt": {
+      "type": "string",
+      "description": "When the file was made, ISO 8601 in UTC."
+    },
+    "source": {
+      "type": "object",
+      "required": ["app", "firmwareVersion", "host"],
+      "properties": {
+        "app": { "const": "openbrewbyweight" },
+        "firmwareVersion": { "type": ["string", "null"] },
+        "host": {
+          "type": ["string", "null"],
+          "description": "Host name or address the Web UI was opened from."
+        }
+      }
+    },
+    "shots": {
+      "type": "array",
+      "description": "Newest first; a single-shot export holds exactly one.",
+      "items": { "$ref": "#/$defs/shot" }
+    }
+  },
+  "$defs": {
+    "shot": {
+      "type": "object",
+      "required": [
+        "id",
+        "bootId",
+        "time",
+        "type",
+        "rating",
+        "preset",
+        "scale",
+        "recipe",
+        "outcome",
+        "stop",
+        "control",
+        "curve",
+        "derived"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Record number on this controller."
+        },
+        "bootId": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Controller start count when the shot ended."
+        },
+        "time": {
+          "type": "object",
+          "required": ["startedAt", "endedAt", "utcOffsetMinutes", "endedAtUptimeMs"],
+          "description": "Wall-clock times are null when the controller did not know the time yet.",
+          "properties": {
+            "startedAt": {
+              "type": ["string", "null"],
+              "description": "ISO 8601 with the offset in force then."
+            },
+            "endedAt": {
+              "type": ["string", "null"],
+              "description": "ISO 8601 with the offset in force then."
+            },
+            "utcOffsetMinutes": {
+              "type": ["integer", "null"],
+              "description": "Minutes east of UTC."
+            },
+            "endedAtUptimeMs": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Controller uptime at the end, within bootId."
+            }
+          }
+        },
+        "type": {
+          "enum": ["auto", "manual", "timer_only", "unknown"],
+          "description": "auto: stopped by weight; manual: stopped by hand or without a scale; timer_only: timed without weight control."
+        },
+        "rating": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Stars from 1 to 5; null when not rated."
+        },
+        "preset": {
+          "type": "object",
+          "required": ["id", "name"],
+          "properties": {
+            "id": { "type": "integer", "minimum": 0 },
+            "name": { "type": ["string", "null"] }
+          }
+        },
+        "scale": {
+          "type": ["object", "null"],
+          "required": ["name"],
+          "properties": { "name": { "type": "string" } }
+        },
+        "recipe": {
+          "type": "object",
+          "required": ["targetYieldG", "doseG", "targetTemperatureC"],
+          "description": "The preset as it was when the shot ran.",
+          "properties": {
+            "targetYieldG": { "type": "number" },
+            "doseG": { "type": ["number", "null"] },
+            "targetTemperatureC": {
+              "type": ["number", "null"],
+              "description": "The machine's coffee temperature target, when it reports one."
+            }
+          }
+        },
+        "outcome": {
+          "type": "object",
+          "required": [
+            "durationS",
+            "yieldG",
+            "yieldSource",
+            "estimatedYieldG",
+            "ratio",
+            "averageFlowGS",
+            "firstDropS",
+            "tareS",
+            "arrivalS",
+            "verdict",
+            "channeling"
+          ],
+          "properties": {
+            "durationS": { "type": "number", "minimum": 0 },
+            "yieldG": { "type": ["number", "null"], "description": "Weighed yield in the cup." },
+            "yieldSource": {
+              "enum": ["post_drip", "last_known", "none", "unknown", null],
+              "description": "post_drip: settled after the drip delay; last_known: last reading before the scale went away."
+            },
+            "estimatedYieldG": {
+              "type": ["number", "null"],
+              "description": "Estimate when the scale was lost during the shot."
+            },
+            "ratio": { "type": ["number", "null"], "description": "Yield divided by dose." },
+            "averageFlowGS": { "type": ["number", "null"] },
+            "firstDropS": { "type": ["number", "null"] },
+            "tareS": {
+              "type": ["number", "null"],
+              "description": "When a late tare happened, if any."
+            },
+            "arrivalS": {
+              "type": ["number", "null"],
+              "description": "When the shot reached, or would have reached, its target."
+            },
+            "verdict": {
+              "enum": ["on_recipe", "fast", "slow", null],
+              "description": "Against the preset's shot time window."
+            },
+            "channeling": { "type": "boolean" }
+          }
+        },
+        "stop": {
+          "type": "object",
+          "required": ["cut", "reason", "cutLineG", "scaleLossSource", "blind"],
+          "properties": {
+            "cut": { "enum": ["auto", "manual", "limit", "unknown"] },
+            "reason": {
+              "enum": [
+                "normal_target",
+                "extended_max_weight",
+                "extended_min_time",
+                "auto_to_manual",
+                "slow_max_time",
+                "slow_min_weight",
+                "cup_removed",
+                "activator",
+                "web_stop",
+                "physical_override",
+                "web_heartbeat",
+                "hard_limit",
+                "wall_limit",
+                "relay_safety",
+                "weight_anomaly",
+                "touch_weight_fallback",
+                "other",
+                "unknown"
+              ]
+            },
+            "cutLineG": {
+              "type": ["number", "null"],
+              "description": "Planned stop weight when the stop was commanded."
+            },
+            "scaleLossSource": {
+              "enum": ["projection", "history", "window", "fixed", null],
+              "description": "How the stop time was chosen after the scale was lost."
+            },
+            "blind": {
+              "type": "boolean",
+              "description": "The scale was lost and no valid weight was ever read for this shot."
+            }
+          }
+        },
+        "control": {
+          "type": "object",
+          "required": [
+            "brewByWeight",
+            "window",
+            "fastGuard",
+            "slowGuard",
+            "cutDelayS",
+            "fastRampS",
+            "slowRampS",
+            "fastCurve",
+            "slowCurve",
+            "fastCurveHardness",
+            "slowCurveHardness",
+            "maxTimeS",
+            "dripDelayS"
+          ],
+          "description": "Settings in force for this shot.",
+          "properties": {
+            "brewByWeight": {
+              "type": "object",
+              "required": ["algorithm", "algorithmVersion", "alpha", "learningApplied", "offsetG"],
+              "properties": {
+                "algorithm": { "type": ["string", "null"] },
+                "algorithmVersion": { "type": ["integer", "null"] },
+                "alpha": { "type": ["number", "null"] },
+                "learningApplied": { "type": ["boolean", "null"] },
+                "offsetG": {
+                  "type": "number",
+                  "description": "Stop-early offset used for this shot."
+                }
+              }
+            },
+            "window": {
+              "type": "object",
+              "required": ["fastBeforeS", "slowAfterS"],
+              "properties": {
+                "fastBeforeS": { "type": "number" },
+                "slowAfterS": { "type": "number" }
+              }
+            },
+            "fastGuard": { "$ref": "#/$defs/guard" },
+            "slowGuard": { "$ref": "#/$defs/guard" },
+            "cutDelayS": { "type": "number" },
+            "fastRampS": {
+              "type": "number",
+              "description": "Fast transition length into the window start (s); 0 is a step."
+            },
+            "slowRampS": {
+              "type": "number",
+              "description": "Slow transition length after the window end (s); 0 is a step."
+            },
+            "fastCurve": { "$ref": "#/$defs/transitionCurve" },
+            "slowCurve": { "$ref": "#/$defs/transitionCurve" },
+            "fastCurveHardness": { "$ref": "#/$defs/transitionHardness" },
+            "slowCurveHardness": { "$ref": "#/$defs/transitionHardness" },
+            "maxTimeS": { "type": "number" },
+            "dripDelayS": { "type": ["number", "null"] }
+          }
+        },
+        "curve": {
+          "type": "object",
+          "required": [
+            "truncated",
+            "timeS",
+            "weightG",
+            "heldIndices",
+            "gapBeforeIndices",
+            "events"
+          ],
+          "description": "Every scale reading the controller kept, in time order; timeS and weightG have the same length.",
+          "properties": {
+            "truncated": {
+              "type": "boolean",
+              "description": "The curve hit its sample limit before the shot ended."
+            },
+            "timeS": { "type": "array", "items": { "type": "number" } },
+            "weightG": { "type": "array", "items": { "type": "number" } },
+            "heldIndices": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0 },
+              "description": "Readings taken while something pressed on the cup; not coffee."
+            },
+            "gapBeforeIndices": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0 },
+              "description": "Readings that follow a gap in the data; do not join them to the one before."
+            },
+            "events": {
+              "type": "object",
+              "required": ["firstDrop", "extended", "scaleLoss", "scaleLossClearedS", "end"],
+              "properties": {
+                "firstDrop": { "$ref": "#/$defs/event" },
+                "extended": {
+                  "$ref": "#/$defs/event",
+                  "description": "A fast or slow guard moved the stop away from the target."
+                },
+                "scaleLoss": { "$ref": "#/$defs/event" },
+                "scaleLossClearedS": { "type": ["number", "null"] },
+                "end": { "$ref": "#/$defs/event", "description": "The stop command." }
+              }
+            }
+          }
+        },
+        "derived": {
+          "type": "object",
+          "required": [
+            "flowGS",
+            "maxFlowGS",
+            "errorVsTargetG",
+            "errorVsTargetPct",
+            "errorVsPlannedStopPct",
+            "cut",
+            "dripG"
+          ],
+          "description": "Computed by the Web UI from the values above at export time; readers may recompute or ignore them.",
+          "properties": {
+            "flowGS": {
+              "type": "array",
+              "items": { "type": ["number", "null"] },
+              "description": "Flow at each curve reading, same length as curve.weightG; null where none is defined."
+            },
+            "maxFlowGS": { "type": ["number", "null"] },
+            "errorVsTargetG": { "type": ["number", "null"] },
+            "errorVsTargetPct": { "type": ["number", "null"] },
+            "errorVsPlannedStopPct": { "type": ["number", "null"] },
+            "cut": {
+              "type": ["object", "null"],
+              "required": ["atS", "weightG"],
+              "properties": {
+                "atS": { "type": "number" },
+                "weightG": { "type": "number" }
+              }
+            },
+            "dripG": { "type": ["number", "null"], "description": "Yield after the stop." }
+          }
+        }
+      }
+    },
+    "guard": {
+      "type": "object",
+      "required": ["enabled", "marginG", "extended"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "marginG": { "type": "number" },
+        "extended": {
+          "type": "boolean",
+          "description": "This guard moved the stop during the shot."
+        }
+      }
+    },
+    "transitionCurve": {
+      "enum": ["early", "even", "late"],
+      "description": "Where the transition is steepest; every curve eases in and out."
+    },
+    "transitionHardness": {
+      "enum": ["soft", "medium", "hard"],
+      "description": "How marked the transition curve is."
+    },
+    "event": {
+      "type": ["object", "null"],
+      "required": ["atS", "weightG"],
+      "properties": {
+        "atS": { "type": "number" },
+        "weightG": { "type": "number" }
+      }
+    }
+  }
+}

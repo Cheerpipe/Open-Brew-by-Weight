@@ -1270,7 +1270,12 @@ function shotRuleModel(r) {
     slowAfterS: r.slowAfterS,
     bbwProtectionMs: r.delayS * 1e3,
     operationalWallMs: r.wallS * 1e3,
-    cutRampS: r.cutRampS,
+    fastRampS: r.fastRampS,
+    slowRampS: r.slowRampS,
+    fastCurve: r.fastCurve,
+    slowCurve: r.slowCurve,
+    fastCurveHardness: r.fastCurveHardness,
+    slowCurveHardness: r.slowCurveHardness,
     fastExtractionGuardEnabled: !timer && r.extractionGuardEnabled,
     slowExtractionGuardEnabled: !timer && r.slowExtractionGuardEnabled,
     fastMarginG: r.fastMarginG,
@@ -2420,6 +2425,12 @@ const BREW_CONTROL_IDS = [
   "slowExtractionGuardEnabled",
   "slowAfterS",
   "slowMarginG",
+  "fastRampS",
+  "fastCurve",
+  "fastCurveHardness",
+  "slowRampS",
+  "slowCurve",
+  "slowCurveHardness",
   "grindHintsEnabled",
   "scaleLossFixedS",
   "lineaMicraBrewTargetC",
@@ -3112,7 +3123,6 @@ function ingestPresets(s) {
   const prev = presetState.activeId;
   presetState.activeId = s.presets.activeId || 0;
   presetState.items = s.presets.items || [];
-  presetState.cutRampS = s.presets.cutRampS;
   if (
     !presetState.activeId ||
     !presetState.items.some((x) => x.id === presetState.selectedId) ||
@@ -3137,9 +3147,10 @@ function ingestPresets(s) {
     $("lineaMicraBrewTargetC").value = active.lineaMicraBrewTargetC.toFixed(1);
 }
 
-// Cut line f(t), piecewise linear and non-increasing: the ceiling holds until
-// D s before the fast threshold, ramps to the target, holds through the
-// window, then ramps over D s to the floor. A side that is off is the target.
+// Cut line f(t), non-increasing: the ceiling holds until the Fast transition
+// starts, eases to the target at the window start, holds through the window,
+// then eases to the floor over the Slow transition. A side that is off is the
+// target.
 function buildRuleChartModel(c) {
   if (!c) return { mode: "empty" };
   const N = (v) => (Number.isFinite(+v) ? +v : NaN),
@@ -3148,7 +3159,9 @@ function buildRuleChartModel(c) {
     t2 = N(c.slowAfterS),
     prot = N(c.bbwProtectionMs) / 1e3,
     wall = N(c.operationalWallMs) / 1e3,
-    d = N(c.cutRampS ?? presetState.cutRampS),
+    // Shots and presets without a transition length used the 5 s default.
+    dFast = N(c.fastRampS ?? 5),
+    dSlow = N(c.slowRampS ?? 5),
     fast = !!c.fastExtractionGuardEnabled,
     slow = !!c.slowExtractionGuardEnabled,
     fastMargin = N(c.fastMarginG),
@@ -3158,7 +3171,7 @@ function buildRuleChartModel(c) {
     // Paces start at the usual first drop, kept 0.5 s before the window.
     start = Math.max(0, Math.min(N(c.firstDropS) || 0, t1 - 0.5));
   if (
-    ![goal, t1, t2, prot, wall, d, ceil, floor].every(Number.isFinite) ||
+    ![goal, t1, t2, prot, wall, dFast, dSlow, ceil, floor].every(Number.isFinite) ||
     !(prot < t1 && t1 < t2 && t2 < wall)
   )
     return { mode: "empty" };
@@ -3175,44 +3188,90 @@ function buildRuleChartModel(c) {
     t2,
     prot,
     wall,
-    d,
+    dFast,
+    dSlow,
+    curveFast: rampCurveIndex(c.fastCurve, c.fastCurveHardness),
+    curveSlow: rampCurveIndex(c.slowCurve, c.slowCurveHardness),
     firstDrop: start,
     firstDropN: N(c.firstDropN) || 0,
     scrubMin: Math.max(prot, start + 0.5),
     pts: [
       [prot, ceil],
-      [Math.max(prot, t1 - d), ceil],
+      [Math.max(prot, t1 - dFast), ceil],
       [t1, goal],
       [t2, goal],
-      [Math.min(wall, t2 + d), floor],
+      [Math.min(wall, t2 + dSlow), floor],
       [wall, floor],
     ],
   };
 }
+// Index of a side's transition curve in RAMP_CURVES: type * 3 + hardness.
+function rampCurveIndex(type, hardness) {
+  const t = ["even", "early", "late"].indexOf(type),
+    h = ["soft", "medium", "hard"].indexOf(hardness);
+  return t < 0 || h < 0 ? 0 : t * 3 + h;
+}
+// Transition curves e(u) = I(u; a, b), the regularized incomplete beta, as the
+// firmware's corridor::RAMP_CURVES; index 0 (even, soft) is smoothstep. Every
+// one is monotone and flat at both ends.
+const RAMP_CURVES = [
+  [2, 2],
+  [3, 3],
+  [4, 4],
+  [2, 3],
+  [2, 4],
+  [2, 6],
+  [3, 2],
+  [4, 2],
+  [6, 2],
+];
+// e(u) for drawing (Number); the cut weights come from rampDg.
+function rampEase(curve, u) {
+  const [a, b] = RAMP_CURVES[curve] || RAMP_CURVES[0],
+    n = a + b - 1;
+  let e = 0,
+    choose = 1;
+  for (let j = 0; j <= n; j++) {
+    if (j >= a) e += choose * u ** j * (1 - u) ** (n - j);
+    choose = (choose * (n - j)) / (j + 1);
+  }
+  return e;
+}
+// The firmware's corridor::rampDg, exactly: floor(margin * e(n / d)) when
+// `reached`, else floor(margin * (1 - e)), from the Bernstein sum over d^N.
+// The products reach 2^100, hence BigInt.
+function rampDg(margin, n, d, curve, reached) {
+  const [a, b] = RAMP_CURVES[curve] || RAMP_CURVES[0],
+    deg = a + b - 1,
+    big = BigInt;
+  let sum = big(0),
+    choose = big(1);
+  for (let j = 0; j <= deg; j++) {
+    if (j >= a === reached) sum += choose * big(n) ** big(j) * big(d - n) ** big(deg - j);
+    choose = (choose * big(deg - j)) / big(j + 1);
+  }
+  return Number((big(margin) * sum) / big(d) ** big(deg));
+}
 // Cut weight (g) at time t (s), in the firmware's integer units (dg, ms):
-// each ramp is a smooth S-curve between the held ceiling or floor and the
-// target, which stays a straight line through the window. Products stay
-// below 2^53, so Number math is exact.
+// each transition follows its side's curve between the held ceiling or floor
+// and the target, which stays a straight line through the window. A Slow
+// step (0 s) is already at the floor at the window end, as in the firmware.
 function cutLine(t, m) {
   const ms = (v) => Math.round(v * 1000),
     dg = (v) => Math.round(v * 10),
     now = ms(Math.max(m.prot, Math.min(m.wall, t))),
     goal = dg(m.goal),
-    a = ms(Math.max(m.prot, m.t1 - m.d)),
+    a = ms(Math.max(m.prot, m.t1 - m.dFast)),
     t1 = ms(m.t1),
     t2 = ms(m.t2),
-    b = ms(Math.min(m.wall, m.t2 + m.d));
+    b = ms(Math.min(m.wall, m.t2 + m.dSlow));
   if (now < t1) {
-    const up = m.fast ? dg(m.fastMargin) : 0,
-      n = Math.max(0, now - a),
-      d = t1 - a;
-    return (goal + Math.floor((up * (d ** 3 - 3 * n * n * d + 2 * n ** 3)) / d ** 3)) / 10;
+    const up = m.fast ? dg(m.fastMargin) : 0;
+    return (goal + (now < a ? up : rampDg(up, now - a, t1 - a, m.curveFast, false))) / 10;
   }
-  if (now > t2) {
-    const down = m.slow ? dg(m.slowMargin) : 0,
-      n = Math.min(now, b) - t2,
-      d = b - t2;
-    return (goal - Math.floor((down * (3 * n * n * d - 2 * n ** 3)) / d ** 3)) / 10;
+  if (now > t2 || (now === t2 && b === t2)) {
+    const down = m.slow ? dg(m.slowMargin) : 0;
+    return (goal - (now >= b ? down : rampDg(down, now - t2, b - t2, m.curveSlow, true))) / 10;
   }
   return goal / 10;
 }
@@ -3272,19 +3331,26 @@ function presetGraph(host, m, x = {}) {
     P = (t, g) => X(t).toFixed(2) + " " + Y(g).toFixed(2),
     label = (x, y, s, cls = "", anchor = "middle") =>
       `<text class="rvLbl ${cls}" x="${f(x)}" y="${f(y)}" text-anchor="${anchor}">${s}</text>`,
-    a = Math.max(m.prot, m.t1 - m.d),
-    b = Math.min(m.wall, m.t2 + m.d),
-    // Holds and the window are straight; each S-ramp is one cubic Bézier with
-    // control points (x0 + Δx/3, y0) and (x0 + 2Δx/3, y1): exactly smoothstep.
-    ramp = (t0, y0, t1, y1) =>
-      `C${P(t0 + (t1 - t0) / 3, y0)} ${P(t0 + (2 * (t1 - t0)) / 3, y1)} ${P(t1, y1)}`,
+    a = Math.max(m.prot, m.t1 - m.dFast),
+    b = Math.min(m.wall, m.t2 + m.dSlow),
+    // Holds and the window are straight. Smoothstep is one cubic Bézier with
+    // control points (x0 + Δx/3, y0) and (x0 + 2Δx/3, y1), exactly; any other
+    // curve is sampled finely enough to draw as exact.
+    ramp = (t0, y0, t1, y1, curve) => {
+      if (!curve)
+        return `C${P(t0 + (t1 - t0) / 3, y0)} ${P(t0 + (2 * (t1 - t0)) / 3, y1)} ${P(t1, y1)}`;
+      let d = "";
+      for (let i = 1; i <= 48; i++)
+        d += `L${P(t0 + ((t1 - t0) * i) / 48, y0 + (y1 - y0) * rampEase(curve, i / 48))}`;
+      return d;
+    },
     edges = (x) => {
-      const xa = Math.max(x.prot, x.t1 - x.d),
-        xb = Math.min(x.wall, x.t2 + x.d);
+      const xa = Math.max(x.prot, x.t1 - x.dFast),
+        xb = Math.min(x.wall, x.t2 + x.dSlow);
       return [
-        `L${P(xa, x.ceil)}` + ramp(xa, x.ceil, x.t1, x.goal),
+        `L${P(xa, x.ceil)}` + ramp(xa, x.ceil, x.t1, x.goal, x.curveFast),
         `L${P(x.t2, x.goal)}`,
-        ramp(x.t2, x.goal, xb, x.floor) + `L${P(x.wall, x.floor)}`,
+        ramp(x.t2, x.goal, xb, x.floor, x.curveSlow) + `L${P(x.wall, x.floor)}`,
       ];
     },
     [fastEdge, windowEdge, slowEdge] = edges(m),
@@ -3307,8 +3373,8 @@ function presetGraph(host, m, x = {}) {
     O = `M${P(0, 0)}L${P(t0, 0)}`,
     S = `M${P(t0, 0)}`,
     corner = `L${P(tMax, top + 1)}`,
-    tA = Math.max(t0 + 0.5, m.t1 - m.d),
-    tB = m.t2 + m.d,
+    tA = Math.max(t0 + 0.5, m.t1 - m.dFast),
+    tB = m.t2 + m.dSlow,
     band = (cls, d, on) =>
       `<path class="${on ? cls : "rvBandOff"}" d="${d}" fill="url(#${u + cls})"/>`,
     curves = (lines, cls) =>
@@ -4887,7 +4953,7 @@ function renderHeroChart(host, model, m, goal, label) {
   const cut = segs.at(-1).pts.at(-1),
     drip = model.dripSegs,
     end = drip.at(-1)?.pts.at(-1) || cut,
-    xMax = Math.max(model.timeMax, m ? Math.min(m.wall, m.t2 + m.d + 4) : 0),
+    xMax = Math.max(model.timeMax, m ? Math.min(m.wall, m.t2 + m.dSlow + 4) : 0),
     yMax = 1.15 * Math.max(model.maxW, m ? m.ceil : 0, goal > 0 ? goal : 0),
     X = (v) => (100 * Math.min(v, xMax)) / xMax,
     Y = (g) => 100 - (100 * Math.max(0, g)) / yMax,
@@ -5317,6 +5383,11 @@ function loadSettingsConfig({ config: c, quickRevert }) {
   if ($("shotReactTimeoutS")) $("shotReactTimeoutS").value = String(c.shotReactTimeoutS ?? 12);
   for (const k of ["doseG", "fastBeforeS", "slowAfterS", "fastMarginG", "slowMarginG"])
     $(k).value = (+c[k]).toFixed(1);
+  for (const side of ["fast", "slow"]) {
+    $(side + "RampS").value = (+(c[side + "RampS"] ?? 5)).toFixed(1);
+    $(side + "Curve").value = c[side + "Curve"] || "even";
+    $(side + "CurveHardness").value = c[side + "CurveHardness"] || "soft";
+  }
   $("scaleLossFixedS").value = c.scaleLossFixedS > 0 ? String(c.scaleLossFixedS) : "";
   // The baseline is the device; an edit the device now holds is settled.
   uiState.formBaseline = snapshotControls(els);
@@ -5687,6 +5758,8 @@ export {
   firmwareVersion,
   shotRuleModel,
   cutLine,
+  rampEase,
+  rampCurveIndex,
   placePill,
   escHtml,
   PILL,

@@ -151,6 +151,12 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("config.slowAfterS", config.slowAfterMs / 1000.0f);
   delta.field("config.fastMarginG", goalWeightDgToGrams(config.fastMarginDg));
   delta.field("config.slowMarginG", goalWeightDgToGrams(config.slowMarginDg));
+  delta.field("config.fastRampS", config.fastRampMs / 1000.0f);
+  delta.field("config.slowRampS", config.slowRampMs / 1000.0f);
+  delta.field("config.fastCurve", "\"%s\"", rampCurveName(config.fastCurve));
+  delta.field("config.slowCurve", "\"%s\"", rampCurveName(config.slowCurve));
+  delta.field("config.fastCurveHardness", "\"%s\"", rampHardnessName(config.fastCurveHardness));
+  delta.field("config.slowCurveHardness", "\"%s\"", rampHardnessName(config.slowCurveHardness));
   delta.field("config.fastExtractionGuardEnabled", bool(config.fastSideEnabled));
   delta.field("config.slowExtractionGuardEnabled", bool(config.slowSideEnabled));
   delta.field("config.autoToManualGuardEnabled", bool(config.scaleLossEnabled));

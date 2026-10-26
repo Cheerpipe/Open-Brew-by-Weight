@@ -237,7 +237,7 @@ LawResult runLaw(const std::vector<CorpusShot> &shots, Law law, int32_t rampMs,
   double offset[2] = {1.5, 1.5};
   for (const CorpusShot &c : shots) {
     Params p = factory(c.dbl);
-    p.rampMs = rampMs;
+    p.fastRampMs = p.slowRampMs = rampMs;
     const Outcome o = simulate(c.shot, p, law, offset[c.dbl]);
     if (outcomes) outcomes->push_back(o);
     if (o.cutMs < p.delayMs || o.cutMs > p.wallMs) ++result.outside;

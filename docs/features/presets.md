@@ -19,8 +19,8 @@ cuts** draws the preset's cut line, and the editor groups its settings:
 | Group | Settings |
 | --- | --- |
 | **Recipe** | Brew by weight, Dose (g), Target yield (g), Brew temperature (°C, Linea Micra only), Shot time window (s), Grind hints |
-| **Fast shots** | Extend fast shots, Extend by up to (g) |
-| **Slow shots** | Shorten slow shots, Shorten by up to (g) |
+| **Fast shots** | Extend fast shots, Extend by up to (g), Transition (s), Transition curve and its hardness |
+| **Slow shots** | Shorten slow shots, Shorten by up to (g), Transition (s), Transition curve and its hardness |
 | **Time limits** | Earliest weight stop (s), Max shot time (s), Backup stop time (s) |
 | **Drip compensation** | Expected drip weight after the shot stops with its recent-shots chart, Set drip, Learning speed, Set learning speed |
 
@@ -159,8 +159,9 @@ reported only after the Micra dashboard confirms the same temperature.
 | Dose | 18 g | 9 g | 18 g | 9 g |
 | Target yield | 36 g | 18 g | 36 g | 18 g |
 | Shot time window | 27–36 s | 23–32 s | 27–36 s | 23–32 s |
-| Extend fast shots: extend by up to | 6 g (42 g) | 4 g (22 g) | off (6 g saved) | off (4 g saved) |
+| Extend fast shots: extend by up to | 6 g (42 g) | 3 g (21 g) | off (6 g saved) | off (4 g saved) |
 | Shorten slow shots: shorten by up to | 3 g (33 g) | 1.5 g (16.5 g) | off (3 g saved) | off (1.5 g saved) |
+| Fast and slow transitions | 6 s, Soft: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Soft (saved) | 5 s, Even, Soft (saved) |
 | Expected drip weight after the shot stops | 0.5 g | 0.5 g | 0.5 g | 0.5 g |
 
 All four start with brew by weight and grind hints on, Max shot time 50 s,

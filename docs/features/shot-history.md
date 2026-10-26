@@ -400,8 +400,8 @@ include every stored shot, whatever the list's filter or sort:
   its full weight curve, in a structured file. Use it as a backup, to analyze
   your shots in your own tools, or to bring them into other apps. Its layout is
   published as a
-  [JSON Schema](../schemas/openbrewbyweight-shot-export-v1.schema.json), with an
-  [example file](../schemas/openbrewbyweight-shot-export-v1.example.json), so
+  [JSON Schema](../schemas/openbrewbyweight-shot-export-v2.schema.json), with an
+  [example file](../schemas/openbrewbyweight-shot-export-v2.example.json), so
   other projects can read it reliably.
 
 Each shot card has a **⋯** button in its top right corner. Its menu acts on
@@ -460,7 +460,10 @@ Every shot also keeps the cut settings it actually ran with, so editing or
 deleting a preset later never changes how a past shot reads:
 `fast_before_s` and `slow_after_s` (the shot time window), `fast_side` and
 `slow_side` (`1` when that side was on), `fast_margin_g` and `slow_margin_g`,
-`delay_s` (earliest weight stop), `wall_s` (max shot time) and `cut_ramp_s`.
+`delay_s` (earliest weight stop), `wall_s` (max shot time), and each side's
+transition: `fast_ramp_s` and `slow_ramp_s` (its length), `fast_curve` and
+`slow_curve` (`early`, `even` or `late`) and `fast_curve_hardness` and
+`slow_curve_hardness` (`soft`, `medium` or `hard`).
 `cut_line_g` is where the cut line stood when the stop was commanded, and
 `cut_raised` / `cut_lowered` are `1` when it was above or below the target.
 `arrival_s` is when the shot reached the target, or would have reached it,

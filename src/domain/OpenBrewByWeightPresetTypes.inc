@@ -1,7 +1,8 @@
 // Preset recipe, included inside the domain namespace. Every member needs a
 // row in OpenBrewByWeightSettingsCodec.h. The cut line is the target held
 // through the shot time window [fastBeforeMs, slowAfterMs]; each side's margin
-// (decigrams, relative to the target) applies only while its switch is on.
+// (decigrams, relative to the target) applies only while its switch is on and
+// is reached over that side's transition (length, curve type and hardness).
 struct ShotPreset {
   uint8_t id = 0;
   char name[SHOT_PRESET_NAME_CAPACITY] = {};
@@ -27,6 +28,12 @@ struct ShotPreset {
   uint8_t bbwAlphaBaseline = DEFAULT_BBW_EWMA_ALPHA;  // Hundredths.
   // Deci-Celsius (80.0–100.0 °C), applied only by the Linea Micra integration.
   uint16_t lineaMicraBrewTargetDeciC = 930;
+  uint16_t fastRampMs = DEFAULT_RAMP_MS;
+  uint16_t slowRampMs = DEFAULT_RAMP_MS;
+  uint8_t fastCurve = RAMP_CURVE_EVEN;
+  uint8_t fastCurveHardness = RAMP_HARDNESS_SOFT;
+  uint8_t slowCurve = RAMP_CURVE_EVEN;
+  uint8_t slowCurveHardness = RAMP_HARDNESS_SOFT;
 };
 
 struct ShotPresetBank {

@@ -185,7 +185,13 @@ machine/safety authority remain outside the kernel; it never actuates hardware
 or writes flash. The trend fit remains only for accidental-touch sensing. The
 `replay` host test fixed the timed law, D = 5 s and the channeling floor from a
 synthetic uncensored corpus, and a D = 0 oracle reproduces the captured legacy
-Fast/Slow decisions.
+Fast/Slow decisions. Each preset sets its Fast and Slow ramps on their own:
+length D (0–10 s, 5 s by default) and a curve from `RAMP_CURVES`, the
+regularized incomplete beta I(u; a, b) with integer a, b ≥ 2 (monotone and
+flat at both ends, as the crossing bisection requires). The kernel evaluates
+it exactly as floor(margin · Bernstein sum / d^(a+b−1)) in a 128-bit
+multi-limb integer; the default Beta(2,2) is the original smoothstep bit for
+bit, and the Web UI repeats the same law with `BigInt`.
 
 Control owns `BbwLearningBank`: up to eight identity-keyed states, under 3,000
 bytes total, with 20 observations and five trajectory anchors per preset.
@@ -300,9 +306,11 @@ while that owner holds the flash lock. Each keeps two slots in its own data
 partition — 2×504 KiB for `shotlog` (reserving room for 1 KiB records), 2×16 KiB for `history` — with generation
 and checksum selection preserving the atomic whole-store update; a failed
 write never erases the last-good slot. Writes remain deferred until the shot
-has ended. The shot log uses schema 2 in its dedicated partition (124-byte records, each
+has ended. The shot log uses schema 2 in its dedicated partition (128-byte records, each
 a self-contained snapshot of the cut parameters in force: target, window,
-side switches, margins, delay, max shot time and ramp length, plus the cut
+side switches, margins, delay, max shot time, each side's ramp length and
+curve (a 124-byte record widens to one ramp length for both sides and
+smoothstep), plus the cut
 line at the stop, arrival time, packed verdict byte, the machine integration's
 target temperature, the preset's dose and the shot's brew ratio); any other
 schema is discarded and the shot history starts empty. Within schema 2,

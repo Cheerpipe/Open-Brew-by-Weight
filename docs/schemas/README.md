@@ -3,12 +3,18 @@
 Published formats other projects can read without depending on the firmware's
 internal wire protocol.
 
-## Shot export v1
+## Shot export v2
 
-- Schema: [`openbrewbyweight-shot-export-v1.schema.json`](openbrewbyweight-shot-export-v1.schema.json)
+- Schema: [`openbrewbyweight-shot-export-v2.schema.json`](openbrewbyweight-shot-export-v2.schema.json)
   (JSON Schema draft 2020-12).
-- Example: [`openbrewbyweight-shot-export-v1.example.json`](openbrewbyweight-shot-export-v1.example.json),
+- Example: [`openbrewbyweight-shot-export-v2.example.json`](openbrewbyweight-shot-export-v2.example.json),
   produced by the Web UI's own exporter.
+- Version 2 replaces `control.cutRampS`, one transition length for both
+  sides, with each side's transition: `fastRampS`, `slowRampS`, `fastCurve`,
+  `slowCurve`, `fastCurveHardness` and `slowCurveHardness`. The
+  [version 1 schema](openbrewbyweight-shot-export-v1.schema.json) and its
+  [example](openbrewbyweight-shot-export-v1.example.json) stay published for
+  files exported before.
 - Produced by: the Shots page, **Export → JSON** (every stored shot) and a
   card's **⋯ → JSON** (that shot). Both write the same envelope; a single-shot
   file has one entry in `shots`. File names are
@@ -37,7 +43,7 @@ Conventions:
 
 Versioning:
 
-- `version` is `1`. Adding optional properties keeps version 1; readers must
+- `version` is `2`. Adding optional properties keeps version 2; readers must
   ignore properties they do not know.
 - Removing or renaming a property, or changing its meaning or unit, requires
   version 2 with a new schema file; the v1 file stays published.

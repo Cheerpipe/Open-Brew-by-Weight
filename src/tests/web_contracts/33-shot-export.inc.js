@@ -1,4 +1,4 @@
-// Shot export: the v1 JSON carries every stored Stats column and validates
+// Shot export: the v2 JSON carries every stored Stats column and validates
 // against its published schema, the Gaggiuino file reads the way
 // Visualizer.coffee parses it, and the Beanconqueror link decodes within the
 // brew handoff's limits. The toolbar menu exports everything; a card's menu
@@ -8,9 +8,9 @@
   const vm = require('vm');
   const schemaDir = path.join(sketchDir, '..', 'docs', 'schemas');
   const schema = JSON.parse(fs.readFileSync(
-      path.join(schemaDir, 'openbrewbyweight-shot-export-v1.schema.json'), 'utf8'));
+      path.join(schemaDir, 'openbrewbyweight-shot-export-v2.schema.json'), 'utf8'));
   const example = JSON.parse(fs.readFileSync(
-      path.join(schemaDir, 'openbrewbyweight-shot-export-v1.example.json'), 'utf8'));
+      path.join(schemaDir, 'openbrewbyweight-shot-export-v2.example.json'), 'utf8'));
   // The schema stays inside a keyword subset any reader can implement, and
   // every key the exporter writes must be documented in it.
   const keywords = new Set(['$schema', '$id', '$defs', '$ref', 'title', 'description', 'type',
@@ -48,7 +48,8 @@
     slowExtractionExtended: false, stopDetail: 'normal_target', cutLineG: 35.1,
     arrivalS: 27.9, verdict: 'on_recipe', channeling: false, scaleLossSource: null,
     estimatedG: null, blind: false, fastBeforeS: 25, slowAfterS: 33, fastMarginG: 2,
-    slowMarginG: 2, delayS: 0.4, wallS: 45, cutRampS: 0, dripDelayS: 3,
+    slowMarginG: 2, delayS: 0.4, wallS: 45, fastRampS: 0, slowRampS: 4, fastCurve: 'even',
+    slowCurve: 'late', fastCurveHardness: 'soft', slowCurveHardness: 'hard', dripDelayS: 3,
     actualWeightSource: 'post_drip', rating: 4,
     wCg: [0, 0, 120, 900, 2400, 2600, 3300, 3510, 3620],
     wAtMs: [100, 5000, 6200, 9000, 18000, 18500, 26000, 28400, 31400],

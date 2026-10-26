@@ -73,6 +73,32 @@ constexpr uint32_t WINDOW_STEP_MS = 500;
 constexpr uint32_t MIN_WINDOW_AFTER_DELAY_MS = 2000;
 constexpr uint32_t MIN_WINDOW_SPAN_MS = 1000;
 constexpr uint32_t MIN_WINDOW_BEFORE_WALL_MS = 1000;
+// Cut-line transition per side: its length (0 = a step at the window edge)
+// and a curve picked by where it is steepest and how hard it is
+// (corridor::RAMP_CURVES). The struct default is 5 s Even + Soft
+// (smoothstep); the factory Adaptive presets use 6 s Early (Fast) and Late
+// (Slow), flat beside the window so near-recipe shots stay on target.
+constexpr uint32_t DEFAULT_RAMP_MS = 5000;
+constexpr uint32_t FACTORY_RAMP_MS = 6000;
+constexpr uint32_t MAX_RAMP_MS = 10000;
+constexpr uint32_t RAMP_STEP_MS = 500;
+constexpr uint8_t RAMP_CURVE_EVEN = 0;
+constexpr uint8_t RAMP_CURVE_EARLY = 1;
+constexpr uint8_t RAMP_CURVE_LATE = 2;
+constexpr uint8_t RAMP_CURVE_TYPES = 3;
+constexpr uint8_t RAMP_HARDNESS_SOFT = 0;
+constexpr uint8_t RAMP_HARDNESS_MEDIUM = 1;
+constexpr uint8_t RAMP_HARDNESS_HARD = 2;
+constexpr uint8_t RAMP_HARDNESS_LEVELS = 3;
+// Wire names of the transition curve type and hardness.
+inline const char *rampCurveName(uint8_t type) {
+  return type == RAMP_CURVE_EARLY ? "early" : type == RAMP_CURVE_LATE ? "late" : "even";
+}
+inline const char *rampHardnessName(uint8_t hardness) {
+  return hardness == RAMP_HARDNESS_MEDIUM ? "medium"
+         : hardness == RAMP_HARDNESS_HARD ? "hard"
+                                          : "soft";
+}
 // Extra delay after the scale timer catches up to machine circuit time (whole seconds)
 // before sending STOP_TIMER. 0 stops in that same instant.
 constexpr uint32_t DEFAULT_SCALE_TIMER_STOP_EXTRA_DELAY_MS = 0;

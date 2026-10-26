@@ -176,6 +176,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "requireCupToStart",
       "fastMarginG", "fastBeforeS", "slowExtractionGuardEnabled", "slowMarginG",
       "slowAfterS", "autoToManualGuardEnabled", "scaleLossFixedS",
+      "fastRampS", "fastCurve", "fastCurveHardness", "slowRampS", "slowCurve",
+      "slowCurveHardness",
       "weightOffsetBaselineG", "timezoneId", "timezoneAutoInit",
       "timezoneDetected", "timezoneAutomatic", "ntpSyncEnabled",
       "ntpServerPreset",
@@ -413,6 +415,28 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "slowMarginG") &&
              !jsonGramsDg(root, "slowMarginG", candidate.slowMarginDg)) {
     parseError = "slowMarginG must be a number of grams.";
+  } else if (jsonFieldPresent(root, "fastRampS") &&
+             !jsonRampMs(root, "fastRampS", candidate.fastRampMs)) {
+    parseError = "fastRampS must be a number of seconds.";
+  } else if (jsonFieldPresent(root, "fastCurve") &&
+             !jsonRampChoice(root, "fastCurve", rampCurveName, RAMP_CURVE_TYPES,
+                             candidate.fastCurve)) {
+    parseError = "fastCurve must be early, even or late.";
+  } else if (jsonFieldPresent(root, "fastCurveHardness") &&
+             !jsonRampChoice(root, "fastCurveHardness", rampHardnessName,
+                             RAMP_HARDNESS_LEVELS, candidate.fastCurveHardness)) {
+    parseError = "fastCurveHardness must be soft, medium or hard.";
+  } else if (jsonFieldPresent(root, "slowRampS") &&
+             !jsonRampMs(root, "slowRampS", candidate.slowRampMs)) {
+    parseError = "slowRampS must be a number of seconds.";
+  } else if (jsonFieldPresent(root, "slowCurve") &&
+             !jsonRampChoice(root, "slowCurve", rampCurveName, RAMP_CURVE_TYPES,
+                             candidate.slowCurve)) {
+    parseError = "slowCurve must be early, even or late.";
+  } else if (jsonFieldPresent(root, "slowCurveHardness") &&
+             !jsonRampChoice(root, "slowCurveHardness", rampHardnessName,
+                             RAMP_HARDNESS_LEVELS, candidate.slowCurveHardness)) {
+    parseError = "slowCurveHardness must be soft, medium or hard.";
   } else if (jsonFieldPresent(root, "autoToManualGuardEnabled") &&
              !jsonBoolean(root, "autoToManualGuardEnabled",
                           candidate.scaleLossEnabled)) {
@@ -962,11 +986,12 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
           "brewByWeight", "goalWeightG", "operationalWallMs", "bbwProtectionMs",
           "fastExtractionGuardEnabled", "fastMarginG", "fastBeforeS",
           "slowExtractionGuardEnabled", "slowMarginG", "slowAfterS", "scaleLossFixedS",
-          "weightOffsetBaselineG", "doseG", "grindHintsEnabled", "bbwAlphaBaseline",
-          "lineaMicraBrewTargetC"};
-      uint16_t present = 0;
+          "fastRampS", "fastCurve", "fastCurveHardness", "slowRampS", "slowCurve",
+          "slowCurveHardness", "weightOffsetBaselineG", "doseG", "grindHintsEnabled",
+          "bbwAlphaBaseline", "lineaMicraBrewTargetC"};
+      uint32_t present = 0;
       for (size_t i = 0; i < sizeof(recipeKeys) / sizeof(recipeKeys[0]); ++i)
-        if (jsonFieldPresent(root, recipeKeys[i])) present |= static_cast<uint16_t>(1U << i);
+        if (jsonFieldPresent(root, recipeKeys[i])) present |= 1UL << i;
       command.presetRecipeFields = present & PRESET_RECIPE_ALL;
       const auto absent = [&](const char *key) { return !jsonFieldPresent(root, key); };
       bool brewByWeight = true, grindHints = true;
@@ -989,6 +1014,20 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
                    (absent("slowMarginG") || jsonGramsDg(root, "slowMarginG", c.slowMarginDg)) &&
                    (absent("scaleLossFixedS") ||
                     jsonSecondsMs(root, "scaleLossFixedS", c.scaleLossFixedMs)) &&
+                   (absent("fastRampS") || jsonRampMs(root, "fastRampS", c.fastRampMs)) &&
+                   (absent("fastCurve") ||
+                    jsonRampChoice(root, "fastCurve", rampCurveName, RAMP_CURVE_TYPES,
+                                   c.fastCurve)) &&
+                   (absent("fastCurveHardness") ||
+                    jsonRampChoice(root, "fastCurveHardness", rampHardnessName,
+                                   RAMP_HARDNESS_LEVELS, c.fastCurveHardness)) &&
+                   (absent("slowRampS") || jsonRampMs(root, "slowRampS", c.slowRampMs)) &&
+                   (absent("slowCurve") ||
+                    jsonRampChoice(root, "slowCurve", rampCurveName, RAMP_CURVE_TYPES,
+                                   c.slowCurve)) &&
+                   (absent("slowCurveHardness") ||
+                    jsonRampChoice(root, "slowCurveHardness", rampHardnessName,
+                                   RAMP_HARDNESS_LEVELS, c.slowCurveHardness)) &&
                    (absent("doseG") || jsonGramsDg(root, "doseG", command.presetDoseDg)) &&
                    (absent("grindHintsEnabled") || jsonBoolean(root, "grindHintsEnabled", grindHints)))) {
         parseError = "save has an invalid preset recipe field.";

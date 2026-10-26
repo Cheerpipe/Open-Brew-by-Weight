@@ -13,7 +13,8 @@ constexpr char kStatsRowColumns[] =
     "extractionGuardEnabled,extractionExtended,slowExtractionGuardEnabled,"
     "slowExtractionExtended,stopDetail,cutLineG,arrivalS,verdict,channeling,"
     "scaleLossSource,estimatedG,blind,fastBeforeS,slowAfterS,fastMarginG,"
-    "slowMarginG,delayS,wallS,cutRampS,dripDelayS,actualWeightSource,rating";
+    "slowMarginG,delayS,wallS,fastRampS,slowRampS,fastCurve,slowCurve,fastCurveHardness,"
+    "slowCurveHardness,dripDelayS,actualWeightSource,rating";
 
 // The Stats row projection (extracted from the former REST shots handler):
 // row values, then the curve object that formatShotCurveJsonBody fills with
@@ -79,7 +80,8 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
   const int bytes = snprintf(work.jsonItem, NetworkWorkBuf::kJsonItem,
       "[%lu,%lu,%lu,%s,%lu,%lu,%d,%.1f,%u,\"%s\",\"%s\",%.1f,%s,%.2f,\"%s\",%s,"
       "%s,%s,%s,%u,%.1f,%.2f,%s,%s,\"%s\",\"%s\",%s,%s,%s,%s,\"%s\",%s,%s,%s,%s,"
-      "%s,%s,%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%s,\"%s\",%u,{%s}]",
+      "%s,%s,%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,\"%s\",\"%s\",\"%s\",\"%s\",%s,"
+      "\"%s\",%u,{%s}]",
       static_cast<unsigned long>(record.id),
       static_cast<unsigned long>(record.bootId),
       static_cast<unsigned long>(record.endedAtMs),
@@ -114,7 +116,12 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
       corridor::blindOf(record.verdict) ? "true" : "false",
       record.fastBeforeDs / 10.0, record.slowAfterDs / 10.0,
       record.fastMarginDg / 10.0, record.slowMarginDg / 10.0,
-      record.delayDs / 10.0, record.wallDs / 10.0, record.cutRampDs / 10.0, dripDelay,
+      record.delayDs / 10.0, record.wallDs / 10.0, record.cutRampDs / 10.0,
+      shotLogSlowRampDs(record) / 10.0,
+      rampCurveName(corridor::rampCurveTypeOf(record.fastCurve)),
+      rampCurveName(corridor::rampCurveTypeOf(record.slowCurve)),
+      rampHardnessName(corridor::rampCurveHardnessOf(record.fastCurve)),
+      rampHardnessName(corridor::rampCurveHardnessOf(record.slowCurve)), dripDelay,
       actualWeightSourceName(static_cast<ActualWeightSource>(record.actualWeightSource)),
       static_cast<unsigned>(shotLogRating(record.sideFlags)),
       curveJson);
