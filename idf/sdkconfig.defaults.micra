@@ -7,3 +7,11 @@ CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
 # The transport's HTTP upgrade buffer also exceeds ALWAYSINTERNAL=2048.
 CONFIG_WS_BUFFER_SIZE=4096
+# Precomputed fixed-point tables (flash, not RAM) make the per-request ECDSA
+# P-256 signature 3-4x faster. Curves no web TLS peer uses are dropped to
+# offset part of that flash.
+CONFIG_MBEDTLS_ECP_FIXED_POINT_OPTIM=y
+# CONFIG_MBEDTLS_ECP_DP_SECP256K1_ENABLED is not set
+# CONFIG_MBEDTLS_ECP_DP_BP256R1_ENABLED is not set
+# CONFIG_MBEDTLS_ECP_DP_BP384R1_ENABLED is not set
+# CONFIG_MBEDTLS_ECP_DP_BP512R1_ENABLED is not set
