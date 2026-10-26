@@ -3,6 +3,14 @@
 constexpr uint32_t kUiStreamHeaderWaitMs = 100, kUiStreamPayloadWaitMs = 500;
 constexpr uint32_t kStatsStreamPaceMs = 100;
 constexpr uint32_t kUiStreamDispatchBudgetMs = 800;
+// The dispatch arms a per-session deadline that caps every wait below, so a
+// stalled peer cannot hold the httpd task past the budget; outside a dispatch
+// (op replies, control frames) there is none.
+uint32_t uiStreamDeadlineStartMs = 0, uiStreamDeadlineBudgetMs = UINT32_MAX;
+uint32_t uiStreamDeadlineLeft() {
+  const uint32_t used = millis() - uiStreamDeadlineStartMs;
+  return used < uiStreamDeadlineBudgetMs ? uiStreamDeadlineBudgetMs - used : 0;
+}
 // One TCP segment (lwIP MSS 1440): a frame's header and payload, and a
 // dispatch's Home + shot card pair, leave in one write so the radio shared
 // with the BLE scale transmits once instead of once per piece.
@@ -42,7 +50,8 @@ int uiStreamSendFailed(int fd, size_t done, size_t length, uint32_t started,
 
 // Bounded nonblocking write that accepts short sends. Until its first byte is
 // out an uncommitted write stays deferrable; once anything of the frame is on
-// the wire, allow modem-sleep ACK gaps.
+// the wire, allow modem-sleep ACK gaps. The dispatch deadline only shortens a
+// wait: a timed-out write fails the same way at either limit.
 int uiStreamWrite(int fd, const char *data, size_t length, bool committed) {
   uiStreamSendCleanAbort = false;
   const uint32_t started = millis();
@@ -50,16 +59,18 @@ int uiStreamWrite(int fd, const char *data, size_t length, bool committed) {
   while (done < length) {
     const uint32_t budget = committed || done ? kUiStreamPayloadWaitMs
                                               : kUiStreamHeaderWaitMs;
-    const uint32_t age = millis() - started;
-    if (age >= budget) {
+    const uint32_t age = millis() - started, left = uiStreamDeadlineLeft();
+    uint32_t wait = age < budget ? budget - age : 0;
+    if (wait > left) wait = left;
+    if (wait == 0) {
       errno = EAGAIN;
       break;
     }
     fd_set writable;
     FD_ZERO(&writable);
     FD_SET(fd, &writable);
-    timeval wait = {0, static_cast<suseconds_t>((budget - age) * 1000)};
-    const int ready = select(fd + 1, nullptr, &writable, nullptr, &wait);
+    timeval timeout = {0, static_cast<suseconds_t>(wait * 1000)};
+    const int ready = select(fd + 1, nullptr, &writable, nullptr, &timeout);
     if (ready < 0) {
       if (errno == EINTR) continue;
       break;

@@ -595,8 +595,11 @@ void OpenBrewByWeightNetwork::uiStreamDispatch(void *context) {
   // shared by the home and diagnostic projections.
   const NetworkStatusSnapshot network = self.snapshot();
   const bool live = control.activeCycle || control.homePending || control.relayClosed;
+  uiStreamDeadlineBudgetMs = kUiStreamDispatchBudgetMs;
   for (auto &session : self.uiStreams_) {
     if (session.fd < 0) continue;
+    // Each session gets the budget; its close, takeover and stream writes share it.
+    uiStreamDeadlineStartMs = millis();
     bool allowed, silent;
     {
       TaskLockGuard lock(self.dataMux_);
@@ -628,6 +631,7 @@ void OpenBrewByWeightNetwork::uiStreamDispatch(void *context) {
     }
   }
   self.unlockWorkBuf();
+  uiStreamDeadlineBudgetMs = UINT32_MAX;
   uiStreamSendKind = "control";
   self.uiStreamWorkPending_.store(false, std::memory_order_release);
 }
@@ -638,10 +642,9 @@ void OpenBrewByWeightNetwork::sendUiStream(UiStreamSession &session,
                                       const ShotLogRecord &latest, bool eligible) {
   // Home first, then the shot card: the client's setup window waits for both
   // and must not queue behind record pages, which can pace across dispatches.
-  // A stalled peer can hold each frame for up to 500 ms on the single httpd
-  // task; past the dispatch budget, close it instead of serializing more.
-  const uint32_t started = millis();
-  const auto within = [&] { return millis() - started < kUiStreamDispatchBudgetMs; };
+  // The dispatch deadline caps every write's wait on the single httpd task;
+  // once it is spent, close the session instead of serializing more.
+  const auto within = [] { return uiStreamDeadlineLeft() > 0; };
   // Home, shot card and Settings leave in one write after consuming their
   // fingerprints, so a save's revision and its Settings deltas arrive together
   // and in order: a cleanly dropped batch rolls session and fingerprints

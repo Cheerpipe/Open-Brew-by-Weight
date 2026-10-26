@@ -138,6 +138,26 @@ int main() {
   assert(transmit(8192) == -1 && now - started == 500 && accepted == 100);
   assert(!uiStreamSendCleanAbort);  // Progress must not renew the deadline.
 
+  // The dispatch deadline caps each wait: a header wait ends at the deadline
+  // and stays cleanly deferrable, a committed one ends there as torn, progress
+  // does not extend it, and a spent deadline fails before the first wait.
+  reset(); readiness = {{0}}; started = now;
+  uiStreamDeadlineStartMs = now - 760; uiStreamDeadlineBudgetMs = 800;
+  assert(transmit(4) == -1 && now - started == 40 && uiStreamSendCleanAbort);
+  reset(); readiness = {{0}}; started = now;
+  uiStreamDeadlineStartMs = now - 760;
+  assert(transmit(512) == -1 && now - started == 40 && !uiStreamSendCleanAbort);
+  reset(); readiness = {{1, 30}, {0}}; writes = {{100}}; started = now;
+  uiStreamDeadlineStartMs = now - 700;
+  assert(transmit(8192) == -1 && now - started == 100 && accepted == 100);
+  reset(); readiness = {{0}}; started = now;
+  uiStreamDeadlineStartMs = now - 800;
+  assert(transmit(4) == -1 && now == started && readiness.size() == 1 && uiStreamSendCleanAbort);
+  assert(uiStreamDeadlineLeft() == 0);
+  uiStreamDeadlineBudgetMs = UINT32_MAX;  // Outside a dispatch the stage limits alone apply.
+  reset(); readiness = {{0}}; started = now;
+  assert(transmit(512) == -1 && now - started == 500);
+
   for (int error : {EPIPE, ECONNRESET, ENOTCONN, EBADF, ENOTSOCK}) {
     reset(); writes = {{-1, 0, error}};
     assert(transmit(4) == -1 && errno == error && !uiStreamSendCleanAbort);
