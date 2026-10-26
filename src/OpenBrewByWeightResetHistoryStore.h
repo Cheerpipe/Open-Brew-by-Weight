@@ -25,6 +25,12 @@ inline uint32_t resetHistoryStoreChecksum(const ResetHistoryStoreBlob &blob) {
   return (value * 16777619UL) ^ blob.currentUptimeMs;
 }
 
+// The NVS copy of the running uptime is only the fallback "uptime before
+// reset" when a power loss wipes the RTC record (recordResetUptime keeps the
+// one-minute RTC checkpoint for every other reset); five minutes between NVS
+// writes bounds the wear of that diagnostic value.
+constexpr uint32_t RESET_UPTIME_NVS_CHECKPOINT_INTERVAL_MS = 300000UL;
+
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
 inline ResetHistoryStoreBlob resetHistoryStoreLive;
 inline std::atomic<uint32_t> resetHistoryStoreLastCheckpointMs{0};
@@ -103,16 +109,16 @@ inline bool persistResetUptimeCheckpoint(uint32_t uptimeMs) {
   (void)uptimeMs;
   return true;
 #else
-  if (uptimeMs < RESET_UPTIME_CHECKPOINT_INTERVAL_MS ||
+  if (uptimeMs < RESET_UPTIME_NVS_CHECKPOINT_INTERVAL_MS ||
       uptimeMs - resetHistoryStoreLastCheckpointMs.load(
                      std::memory_order_relaxed) <
-          RESET_UPTIME_CHECKPOINT_INTERVAL_MS) {
+          RESET_UPTIME_NVS_CHECKPOINT_INTERVAL_MS) {
     return true;
   }
   if (!tryLockFlashIo(FLASH_IO_LOCK_TIMEOUT_MS)) return false;
   if (uptimeMs - resetHistoryStoreLastCheckpointMs.load(
                      std::memory_order_relaxed) <
-      RESET_UPTIME_CHECKPOINT_INTERVAL_MS) {
+      RESET_UPTIME_NVS_CHECKPOINT_INTERVAL_MS) {
     unlockFlashIo();
     return true;
   }
