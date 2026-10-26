@@ -92,9 +92,12 @@ learning-speed sets, and every history or shot mutation.
 
 Only some Admin operations may read or write flash directly, because they must
 be durable before they take effect: Wi-Fi and access point, device password and
-Web UI access, webhooks, firmware mode, factory reset, restart, and OTA. A new
-setting belongs to the cached group unless it has the same durability need;
-an exception must be documented with the change.
+Web UI access, webhooks, firmware mode, factory reset, restart, and OTA. The
+onboarding brewing choice (`saveSetupBrew`) is the one non-Admin exception: it
+writes the setup intent directly because the next boot applies it, with or
+without a saved Wi-Fi network. A new setting belongs to the cached group
+unless it has the same durability need; an exception must be documented with
+the change.
 
 ## Machine integration modules
 
