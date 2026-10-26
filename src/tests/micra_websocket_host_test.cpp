@@ -195,8 +195,8 @@ struct MicraWebSocketTest {
       subscribe(service);
       inhibited.store(true);
       service.serviceWebSocket();
-      // Established WSS stays open but parks its subscription for the scale.
-      assert(service.websocket_->client && service.websocketStatus().parked);
+      // Established WSS keeps its subscription through scale setup.
+      assert(service.websocket_->client && service.websocketStatus().subscribed);
       service.websocket_->failed.store(true);
       service.serviceWebSocket();
       now = service.websocketStatus().retryAtMs;
@@ -282,7 +282,7 @@ struct MicraWebSocketTest {
     service.stopWebSocket(true);
     delete service.work_;
   }
-  static void renewalDeferredWhileParked() {
+  static void renewalKeepsSubscription() {
     now = 1000;
     OpenBrewByWeightMicraService service;
     service.config_.accountConfigured = true;
@@ -293,34 +293,19 @@ struct MicraWebSocketTest {
     const auto stopsBefore = stops;
     const auto initsBefore = initCalls;
     const auto errorsBefore = service.websocketStatus().errors;
-    // A scaled shot parks the subscription; the token then becomes due.
-    service.shotActive_.store(true);
-    outboundScaleConnected.store(true);
-    service.serviceWebSocket();
-    assert(service.websocketStatus().parked && transmitted.rfind("UNSUBSCRIBE\n", 0) == 0);
+    const auto sent = transmitted;
+    // A due token renews over HTTP while the same socket stays subscribed.
     now += micra_timing::kAccessTokenRefreshAgeMs;
-    deliver(service, "", true, 0xA);  // WS ping keeps the parked socket alive.
+    deliver(service, "", true, 0xA);
     service.serviceWebSocket();
-    // Renewal waits for the park to end: same socket, no HTTP, no reconnect.
-    assert(stops == stopsBefore && initCalls == initsBefore);
-    assert(service.websocket_->client && service.websocketStatus().parked);
-    assert(micra_timing::accessTokenRefreshDue(now - service.work_->accessTokenIssuedAtMs));
-    // Leaving the park renews through a planned reconnect instead of SUBSCRIBE.
-    service.shotActive_.store(false);
-    outboundScaleConnected.store(false);
-    service.serviceWebSocket();
-    assert(stops == stopsBefore + 1 && initCalls == initsBefore + 1);
-    assert(service.websocket_->client && !service.websocketStatus().parked);
+    assert(stops == stopsBefore && initCalls == initsBefore && transmitted == sent);
+    assert(service.websocket_->client && service.websocketStatus().subscribed);
     assert(service.work_->accessTokenIssuedAtMs == now);
-    assert(std::strcmp(service.websocketStatus().reason, "token_renewal") == 0);
-    assert(service.websocketStatus().errors == errorsBefore);
-    subscribe(service);
-    assert(service.websocketStatus().plannedConnections == 2);
-    assert(service.websocketStatus().unexpectedConnections == 0);
-    // An obsolete observation epoch also reconnects as planned, with its own reason.
+    assert(service.websocketStatus().plannedConnections == 1);
+    // An obsolete observation epoch still reconnects as planned, with its own reason.
     ++service.observationFence_.epoch;
     service.serviceWebSocket();
-    assert(stops == stopsBefore + 2);
+    assert(stops == stopsBefore + 1);
     assert(std::strcmp(service.websocketStatus().reason, "obsolete") == 0);
     assert(service.websocketStatus().errors == errorsBefore);
     service.stopWebSocket(true);
@@ -352,7 +337,8 @@ struct MicraWebSocketTest {
     assert(service.websocketStatus().plannedConnections == 0);
     subscribe(service);
     uint32_t planned = 1, unexpected = 0;
-    // Every intentional pause, renewal and obsolete observation stays planned.
+    // Every intentional pause and obsolete observation stays planned; shots,
+    // scale gates and token renewal keep the open subscription.
     // A firmware update is not a cause: the subscription stays live through OTA.
     for (int cause = 0; cause < 10; ++cause) {
       switch (cause) {
@@ -360,7 +346,7 @@ struct MicraWebSocketTest {
         case 1: publishOutboundAcquisition(true, ++now); break;
         case 2: outboundBleQuiet.store(true); break;
         case 3: outboundMaintenance.store(true); break;
-        case 4: now += micra_timing::kAccessTokenRefreshAgeMs; break;
+        case 4: now += micra_timing::kAccessTokenRefreshAgeMs; deliver(service, "", true, 0xA); break;
         case 5:
           deliver(service, "MESS", false);
           now += 10000;
@@ -372,9 +358,8 @@ struct MicraWebSocketTest {
         case 9: service.clearSessionRequested_.store(true); break;
       }
       service.serviceWebSocket();
-      // Shot and scale gates park the subscription on the open socket.
-      assert(cause > 2 || (service.websocketStatus().parked && service.websocket_->client &&
-                           transmitted.rfind("UNSUBSCRIBE\n", 0) == 0));
+      const bool kept = cause <= 2 || cause == 4;
+      assert(!kept || (service.websocketStatus().subscribed && service.websocket_->client));
       service.shotActive_.store(false);
       outboundScaleConnected.store(false);
       publishOutboundAcquisition(false, now);
@@ -385,8 +370,8 @@ struct MicraWebSocketTest {
       service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
       service.clearSessionRequested_.store(false);
       service.serviceWebSocket();
-      if (cause > 2) { subscribe(service); ++planned; }
-      else assert(service.websocketStatus().subscribed && transmitted.rfind("SUBSCRIBE\n", 0) == 0);
+      if (!kept) { subscribe(service); ++planned; }
+      else assert(service.websocketStatus().subscribed);
       assert(service.websocketStatus().plannedConnections == planned);
       assert(service.websocketStatus().unexpectedConnections == unexpected);
     }
@@ -628,38 +613,31 @@ struct MicraWebSocketTest {
     assert(service.observationFence_.epoch == epoch);
     assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
     assert(!service.status().shotPaused && !service.abortRequested_.load());
-    // A live scale parks the subscription without closing WSS; late broker
-    // frames are ignored, and losing the scale resubscribes mid-shot.
+    // A live scale keeps the subscription through the shot: pushes stay
+    // evidence, and nothing is resent or re-read afterwards.
     outboundScaleConnected.store(true);
     service.serviceWebSocket();
-    assert(stops == stopsBeforeShot && service.websocket_->client);
-    assert(transmitted.rfind("UNSUBSCRIBE\n", 0) == 0 && service.websocketStatus().parked);
-    deliver(service, observation(service, on));
-    assert(!service.websocket_->failed.load() && service.status().shotPaused);
-    assert(service.status().quality != LineaMicraObservationQuality::CURRENT);
-    outboundScaleConnected.store(false);
-    service.serviceWebSocket();
-    assert(transmitted.rfind("SUBSCRIBE\n", 0) == 0 && service.websocketStatus().subscribed);
-    assert(stops == stopsBeforeShot && service.snapshotPending_);
+    assert(stops == stopsBeforeShot && service.websocketStatus().subscribed);
+    const auto sentBeforeShot = transmitted;
     deliver(service, observation(service, off));
+    assert(!service.websocket_->failed.load() && service.status().shotPaused);
     assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    outboundScaleConnected.store(false);
     service.shotActive_.store(false);
     outboundShotActive.store(false);
-    // A whole shot can elapse while the owner is busy: old ingress stays fenced.
-    deliver(service, observation(service, on));
-    const auto beforeShortShot = service.published_.sampleAtMs;
+    service.serviceWebSocket();
+    assert(stops == stopsBeforeShot && transmitted == sentBeforeShot);
+    // A whole shot elapsing between owner turns needs no resync either.
     outboundScaleConnected.store(true);
     outboundShotActive.store(true);
     service.inhibitCloud();
     outboundShotActive.store(false);
-    deliver(service, observation(service, off));
-    assert(service.published_.sampleAtMs == beforeShortShot);
+    deliver(service, observation(service, on));
     assert(service.published_.powerState == LineaMicraPowerState::ON);
     service.serviceWebSocket();
-    assert(stops == stopsBeforeShot && transmitted.rfind("SUBSCRIBE\n", 0) == 0);
-    assert(service.websocketStatus().subscribed && service.snapshotPending_);
+    assert(stops == stopsBeforeShot && transmitted == sentBeforeShot);
     outboundScaleConnected.store(false);
-    assert(service.powerState_.retained());
     deliver(service, observation(service, off));
     assert(!service.powerState_.retained());
     // A fragmented message started before an intent cannot confirm that intent.
@@ -1538,7 +1516,7 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::lifecycleRegressions();
   openbrewbyweight::MicraWebSocketTest::connectionClassification();
   openbrewbyweight::MicraWebSocketTest::slowHandshakeIsNotAReconnect();
-  openbrewbyweight::MicraWebSocketTest::renewalDeferredWhileParked();
+  openbrewbyweight::MicraWebSocketTest::renewalKeepsSubscription();
   openbrewbyweight::MicraWebSocketTest::initialSynchronization();
   openbrewbyweight::MicraWebSocketTest::commandsSkipUnchangedMachineState();
   openbrewbyweight::MicraWebSocketTest::backflushContract();

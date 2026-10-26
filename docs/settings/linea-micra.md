@@ -110,8 +110,8 @@ Diagnostics show the saved email as a read-only value; the password, installatio
 key, and short-lived access and refresh tokens are never returned by the Web UI
 or diagnostics. The access token is reused and renewed after 50
 minutes. Authentication, machine commands and the initial state read use the
-cloud API, reusing its secure HTTP connection when possible; live updates renew
-their connection with the current token. **Disconnect**
+cloud API, reusing its secure HTTP connection when possible. Renewing the token
+does not interrupt live updates: the connection stays open the whole time. **Disconnect**
 removes the saved account credentials, installation key, selected machine,
 cached list, in-memory session tokens, and cloud connection.
 
@@ -304,13 +304,12 @@ cloud call: its start date and time in UTC, API name and HTTP method, result,
 HTTP status when available, and duration in milliseconds. Duration helps spot
 slow cloud connections. Before the first call, the panel reads **None yet**.
 WebSocket connection state appears separately, including whether the live
-connection is receiving updates, parked with the connection kept open, or
-closed, along with retry time, message/power/pong ages, payload receive and
+connection is receiving updates or closed, along with retry time, message/power/pong ages, payload receive and
 transmit rates, totals, errors and stop latency.
 Two counters distinguish **Planned connections** from **Unexpected
 reconnections**. Planned connections include the normal initial
-connection and resumes after maintenance, account or monitoring changes, and routine
-session renewal. Unexpected recoveries follow Wi-Fi loss, cloud or protocol
+connection and resumes after maintenance and account or monitoring changes.
+Shots, scale connections and session renewal keep the existing connection. Unexpected recoveries follow Wi-Fi loss, cloud or protocol
 errors, or connection and message timeouts, even when the controller closes the
 socket to recover. A recovery remains unexpected if a planned pause occurs
 before reconnection. Only connections that reach the cloud subscription count;

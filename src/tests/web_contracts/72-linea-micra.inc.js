@@ -176,7 +176,7 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
     assert(micraDiagnosticHtml.includes(`id="${id}"`), `machine section row missing: ${id}`);
   }
   const labels = {'diagnostic.cloud_titles': 'Email|Machine|Time|API|Result|Duration|Connection|Traffic|Planned|Unexpected|Cleaning',
-    'diagnostic.cleaning_states': 'Inactive|Waiting for paddle|Cleaning', 'diagnostic.ws_links': 'live|parked|closed',
+    'diagnostic.cleaning_states': 'Inactive|Waiting for paddle|Cleaning', 'diagnostic.ws_links': 'live|closed',
     // Unit and separator fragments read as the English catalog has them.
     ...Object.fromEntries(['runtime.s_2', 'runtime.ms_2', 'diagnostic.utc_suffix', 'diagnostic.http_prefix',
       'diagnostic.retry_prefix', 'diagnostic.ms_stop', 'diagnostic.bytes_per_s', 'diagnostic.bytes_per_min',
@@ -206,8 +206,6 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert(dom.dMicraWsTraffic.textContent.includes('RX 20 B/s · 100 B/60s · 120 B'));
   show({...linked, websocket: {...socket, subscribed: true}});
   assert.strictEqual(dom.dMicraWsState.textContent, 'streaming · live');
-  show({...linked, websocket: {...socket, state: 'paused', reason: 'shot', parked: true}});
-  assert.strictEqual(dom.dMicraWsState.textContent, 'paused · shot · parked');
   show({...linked, websocket: {...socket, state: 'paused', reason: 'maintenance'}});
   assert.strictEqual(dom.dMicraWsState.textContent, 'paused · maintenance · closed');
   show({...linked, websocket: {...socket, state: 'paused', cleaning: 'unknown', cleaningLabel: '<b>Future</b>'}});

@@ -14,8 +14,8 @@ struct OpenBrewByWeightMicraService::WebSocketBuffer {
   std::atomic<bool> authFailed{false};
   std::atomic<uint32_t> partialAtMs{0};
   std::atomic<bool> partialPending{false};
-  uint32_t setupAtMs = 0;
-  uint32_t disconnectGeneration = 0, frameIntent = 0;
+  uint32_t setupAtMs = 0, renewRetryAtMs = 0;
+  uint32_t frameIntent = 0;
   int payloadOffset = 0;
   int payloadLength = 0;
   bool continuation = false;
@@ -74,7 +74,7 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
         powerState_.hold(published_, config_.accountConfigured &&
             (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0, millis());
       websocketStatus_.state = MicraSocketState::STOPPING;
-      websocketStatus_.subscribed = websocketStatus_.parked = false;
+      websocketStatus_.subscribed = false;
       backflush_.invalidate();
       if (buffer->heap.pending) finishHeapLifecycle(buffer->heap, HeapLifecycleResult::FAILURE, before);
       beginHeapLifecycle(buffer->stopHeap, HeapLifecycleEvent::HTTP_STOP, before);
@@ -121,61 +121,37 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
   }
 }
 
-bool OpenBrewByWeightMicraService::websocketParkDue() const {
-  if (shotTransportPaused()) return true;
-  if (!outboundScaleInhibited() && !scaleConnecting_.load(std::memory_order_acquire)) return false;
-  // Cleaning supervision keeps its pushes through scale acquisition/setup/quiet.
-  TaskLockGuard lock(mux_);
-  return !backflush_.status().busy();
-}
-
-// Parking UNSUBSCRIBEs but keeps WSS/TLS: the broker stops pushes while WS ping
-// continues. SUBSCRIBE (initial or resume) queues one initial dashboard read.
-bool OpenBrewByWeightMicraService::sendSubscription(bool subscribe) {
+// One SUBSCRIBE per connection, kept through shots and scale setup: the broker
+// pushes only changes, so the subscription queues one initial dashboard read.
+bool OpenBrewByWeightMicraService::sendSubscription() {
   WebSocketBuffer &buffer = *websocket_;
-  const bool park = subscribe && websocketParkDue();
-  const char *reason = shotTransportPaused() ? "shot" : "scale";
   char frame[256];
-  const int length = park ? 0 : subscribe
-      ? snprintf(frame, sizeof(frame), "SUBSCRIBE\ndestination:%s\nack:auto\nid:%s\ncontent-length:0\n\n",
-                 buffer.destination, buffer.subscription)
-      : snprintf(frame, sizeof(frame), "UNSUBSCRIBE\nid:%s\n\n", buffer.subscription);
+  const int length = snprintf(frame, sizeof(frame),
+      "SUBSCRIBE\ndestination:%s\nack:auto\nid:%s\ncontent-length:0\n\n",
+      buffer.destination, buffer.subscription);
   if (length < 0 || static_cast<size_t>(length + 1) >= sizeof(frame)) return false;
-  const int sent = park ? 1 : esp_websocket_client_send_text(buffer.client, frame, length + 1,
-                                                             pdMS_TO_TICKS(1000));
+  const int sent = esp_websocket_client_send_text(buffer.client, frame, length + 1,
+                                                  pdMS_TO_TICKS(1000));
   const bool admitted = websocketAdmitted();
   TaskLockGuard lock(mux_);
   auto &status = websocketStatus_;
-  if (!park) {
-    status.transmitBytes += std::max(0, sent);
-    const uint64_t second = static_cast<uint64_t>(esp_timer_get_time()) / 1000000;
-    auto &bin = buffer.rates[second % 60];
-    if (bin.second != second) bin = {second, 0, 0};
-    bin.tx += std::max(0, sent);
-  }
+  status.transmitBytes += std::max(0, sent);
+  const uint64_t second = static_cast<uint64_t>(esp_timer_get_time()) / 1000000;
+  auto &bin = buffer.rates[second % 60];
+  if (bin.second != second) bin = {second, 0, 0};
+  bin.tx += std::max(0, sent);
   if (sent != length + 1) return false;
   if (!admitted || buffer.stamp.epoch != observationFence_.epoch ||
       buffer.stamp.identity != identityGeneration_) return true;
-  buffer.disconnectGeneration = disconnectGeneration_.load(std::memory_order_acquire);
   backflush_.invalidate();
   observationFence_.invalidate();
-  if (subscribe && !park) {
-    if (!status.parked) status.pongAtMs = 0;
-    status.subscribed = true;
-    status.parked = status.machineConnectedKnown = false;
-    observationFence_.offline = false;
-    snapshotStamp_ = observationFence_.stamp(identityGeneration_, powerState_.generation());
-    snapshotPending_ = true;
-    status.state = MicraSocketState::WAITING_FOR_DATA;
-    return true;
-  }
-  status.subscribed = false;
-  status.parked = true;
-  snapshotPending_ = false;
-  powerState_.hold(published_, true, millis());
-  if (!status.pauseAtMs) status.pauseAtMs = millis();
-  status.state = MicraSocketState::PAUSED;
-  status.reason = reason;
+  status.pongAtMs = 0;
+  status.subscribed = true;
+  status.machineConnectedKnown = false;
+  observationFence_.offline = false;
+  snapshotStamp_ = observationFence_.stamp(identityGeneration_, powerState_.generation());
+  snapshotPending_ = true;
+  status.state = MicraSocketState::WAITING_FOR_DATA;
   return true;
 }
 
@@ -183,19 +159,18 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   auto &self = *static_cast<OpenBrewByWeightMicraService *>(context);
   WebSocketBuffer &buffer = *self.websocket_;
   if (!self.websocketAdmitted()) return true;
-  bool subscribed, parked;
+  bool subscribed;
   {
     TaskLockGuard lock(self.mux_);
     subscribed = self.websocketStatus_.subscribed;
-    parked = self.websocketStatus_.parked;
   }
   if (strcmp(frame.command, "CONNECTED") == 0) {
     if ((strcmp(frame.version, "1.2") != 0 && strcmp(frame.version, "1.1") != 0) ||
-        subscribed || parked) return false;
+        subscribed) return false;
     // CONNECT advertises 0,0: no STOMP heartbeat is negotiated. WS ping remains.
-    if (!self.sendSubscription(true)) return false;
+    if (!self.sendSubscription()) return false;
     TaskLockGuard lock(self.mux_);
-    if (!self.websocketStatus_.subscribed && !self.websocketStatus_.parked) return true;
+    if (!self.websocketStatus_.subscribed) return true;
     ++(self.websocketUnexpectedReconnect_ ? self.websocketStatus_.unexpectedConnections
                                          : self.websocketStatus_.plannedConnections);
     self.websocketUnexpectedReconnect_ = false;
@@ -208,8 +183,7 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   if (strcmp(frame.command, "MESSAGE") != 0) return false;
   if (strcmp(frame.destination, buffer.destination) != 0 ||
       strcmp(frame.subscription, buffer.subscription) != 0) return false;
-  // Frames the broker sent before processing UNSUBSCRIBE are not evidence.
-  if (!subscribed) return parked;
+  if (!subscribed) return false;
   // JSON cannot contain an embedded raw NUL, even with STOMP content-length.
   if (memchr(frame.body, '\0', frame.bodyLength)) return false;
   const uint32_t receivedAt = millis();
@@ -241,8 +215,7 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   if (!self.websocketAdmitted()) return true;
   TaskLockGuard lock(self.mux_);
   if (buffer.stamp.epoch != self.observationFence_.epoch ||
-      buffer.stamp.identity != self.identityGeneration_ ||
-      buffer.disconnectGeneration != self.disconnectGeneration_.load(std::memory_order_acquire)) return true;
+      buffer.stamp.identity != self.identityGeneration_) return true;
   if (!self.observationFence_.merge(self.published_, self.powerState_, update,
                                     true)) return true;
   self.mirrorPowerLocked();
@@ -299,8 +272,7 @@ void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
   if (event == WEBSOCKET_EVENT_CONNECTED || event == WEBSOCKET_EVENT_DATA) {
     TaskLockGuard lock(self.mux_);
     if (buffer.stamp.epoch != self.observationFence_.epoch ||
-        buffer.stamp.identity != self.identityGeneration_ ||
-        buffer.disconnectGeneration != self.disconnectGeneration_.load(std::memory_order_acquire)) return;
+        buffer.stamp.identity != self.identityGeneration_) return;
   }
   if (event == WEBSOCKET_EVENT_DISCONNECTED || event == WEBSOCKET_EVENT_CLOSED ||
       event == WEBSOCKET_EVENT_ERROR) {
@@ -336,8 +308,7 @@ void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
       recordBootHeap(BootHeapStage::WS_DONE, BootHeapResult::OK, millis(), heap);
       TaskLockGuard lock(self.mux_);
       if (buffer.stamp.epoch == self.observationFence_.epoch &&
-          buffer.stamp.identity == self.identityGeneration_ &&
-          buffer.disconnectGeneration == self.disconnectGeneration_.load()) {
+          buffer.stamp.identity == self.identityGeneration_) {
         finishHeapLifecycle(buffer.heap, HeapLifecycleResult::SUCCESS, heap);
         self.websocketStatus_.internalMinimum = heap.internalMinimum;
         self.websocketStatus_.psramMinimum = heap.psramMinimum;
@@ -450,7 +421,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
   if (websocket_ && websocket_->client) {
     const bool partialPending = websocket_->partialPending.load(std::memory_order_acquire);
     const uint32_t partial = websocket_->partialAtMs.load(std::memory_order_acquire);
-    bool subscribed, streaming, obsolete, parked, behind;
+    bool subscribed, streaming, obsolete;
     uint32_t pongAtMs, connectedAtMs;
     {
       TaskLockGuard lock(mux_);
@@ -458,26 +429,22 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
       streaming = websocketStatus_.state == MicraSocketState::STREAMING;
       pongAtMs = websocketStatus_.pongAtMs;
       connectedAtMs = websocketStatus_.connectedAtMs;
-      parked = websocketStatus_.parked;
       obsolete = websocket_->stamp.epoch != observationFence_.epoch;
-      behind = websocket_->disconnectGeneration != disconnectGeneration_.load();
     }
-    const bool park = websocketParkDue();
     now = millis();  // Callback timestamps in the snapshot can postdate the first sample.
     // The STOMP handshake gets 10 s from transport connect; before that the
     // SDK's own 10 s network timeout plus DNS bounds the connect itself.
-    const bool timeout = (!subscribed && !parked && (connectedAtMs
+    const bool timeout = (!subscribed && (connectedAtMs
         ? now - connectedAtMs >= 10000 : now - websocket_->setupAtMs >= 25000)) ||
         (partialPending && now - partial >= 10000) ||
-        ((subscribed || parked) && now - (pongAtMs ? pongAtMs : connectedAtMs) >= 30000);
-    // Renewal reconnects through HTTP, which a park also defers.
-    const bool renew = !park && work_ && micra_timing::accessTokenRefreshDue(now - work_->accessTokenIssuedAtMs);
-    if (!websocket_->failed.load(std::memory_order_acquire) && !timeout && !renew && !obsolete) {
-      // A shot that began and ended between owner turns still forces a resync.
-      const bool unsubscribe = subscribed && (park || behind);
-      if ((unsubscribe && !sendSubscription(false)) ||
-          (!park && (parked || unsubscribe) && !sendSubscription(true)))
-        websocket_->failed.store(true, std::memory_order_release);
+        (subscribed && now - (pongAtMs ? pongAtMs : connectedAtMs) >= 30000);
+    if (!websocket_->failed.load(std::memory_order_acquire) && !timeout && !obsolete) {
+      // The open subscription survives token renewal: only HTTPS needs the new
+      // token, so renew in place instead of reconnecting and re-reading.
+      if (work_ && micra_timing::accessTokenRefreshDue(now - work_->accessTokenIssuedAtMs) &&
+          micra_timing::deadlineReached(now, websocket_->renewRetryAtMs) &&
+          !ensureSession(settings, false))
+        websocket_->renewRetryAtMs = millis() + micra_timing::kExhaustedCooldownMs;
       if (streaming && now - connectedAtMs >= 30000) {
         websocket_->attempts = 0;
         websocketAuthRecoveries_ = 0;
@@ -486,7 +453,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
       return;
     }
     const bool auth = websocket_->authFailed.load(std::memory_order_acquire);
-    if (timeout && !renew && !obsolete) {
+    if (timeout && !obsolete) {
       TaskLockGuard lock(mux_);
       websocketUnexpectedReconnect_ = true;
     }
@@ -496,10 +463,10 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     TaskLockGuard lock(mux_);
     ++observationFence_.epoch;
     powerState_.hold(published_, true, now);
-    if (!renew && !obsolete) ++websocketStatus_.errors;
-    websocketStatus_.reason = auth ? "authentication" : renew ? "token_renewal"
-        : obsolete ? "obsolete" : timeout ? "frame_timeout" : "transport";
-    if (!renew && !obsolete) {
+    if (!obsolete) ++websocketStatus_.errors;
+    websocketStatus_.reason = auth ? "authentication" : obsolete ? "obsolete"
+        : timeout ? "frame_timeout" : "transport";
+    if (!obsolete) {
       if (auth) ++websocketAuthRecoveries_;
       ++websocket_->attempts;
       websocketStatus_.retryAtMs = now + (websocket_->attempts < micra_timing::kMaxAttempts
@@ -577,7 +544,6 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
   buffer.setupAtMs = millis();
   {
     TaskLockGuard lock(mux_);
-    buffer.disconnectGeneration = disconnectGeneration_.load(std::memory_order_acquire);
     buffer.stamp = observationFence_.stamp(identityGeneration_, powerState_.generation());
     websocketStatus_.epoch = buffer.stamp.epoch;
     websocketStatus_.pauseAtMs = 0;

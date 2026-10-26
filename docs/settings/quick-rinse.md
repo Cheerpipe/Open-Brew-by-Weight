@@ -6,8 +6,8 @@ not count toward the scale-loss backup's recent shots. Rinses do land in the [ac
 as `rinse` entries.
 
 On Micra, a gesture that starts as a shot with a connected scale pauses cloud
-updates and API work. As soon as it is recognized as a rinse, that pause ends:
-live updates resume and API work can continue while the rinse is still running. Ordinary
+API work; live updates keep arriving. As soon as it is recognized as a rinse,
+that pause ends and API work can continue while the rinse is still running. Ordinary
 network and scale-connection restrictions on API work still apply. Quick rinse
 is separate from [automatic backflush](linea-micra.md#automatic-backflush) and
 never receives its longer safety limit.

@@ -511,7 +511,7 @@
     "diagnostic.weight_updates": "Weight updates",
     "diagnostic.weights_short": "w ",
     "diagnostic.wifi": "WiFi",
-    "diagnostic.ws_links": "live|parked, socket open|closed",
+    "diagnostic.ws_links": "live|closed",
     "diagnostic.ws_prefix": "WS ",
     "history.activation_history": "Activation history",
     "history.clear": "Clear",

@@ -274,12 +274,11 @@ HTTP/TLS/socket error codes; signed headers and event payloads are never logged.
 A scale-worker-owned atomic connection flag qualifies the admitted-shot
 transport gate. Unscaled shots do not abort API reads or fence WS ingress;
 scale loss releases that gate independently of the shot's starting scale.
-A lock-free disconnect generation also invalidates in-flight HTTP/WS evidence
-when a scaled-shot pause starts and ends before the cloud owner runs. The next
-owner turn UNSUBSCRIBEs and resubscribes on the same socket to resynchronize;
-deferred HTTP observations retain held state. Broker MESSAGE frames that arrive
-after UNSUBSCRIBE are ignored rather than treated as protocol failures, and
-token renewal waits while the subscription is parked.
+A lock-free disconnect generation also invalidates in-flight HTTP evidence
+when a scaled-shot pause starts and ends before the cloud owner runs; deferred
+HTTP observations retain held state. The WSS subscription is never paused:
+pushes received during and after a shot remain evidence, and token renewal
+happens over HTTP while the same socket stays subscribed.
 A separate shot generation cancels queued power commands even when a complete
 cycle occurs between worker turns. Queue admission captures it before checking
 the shot gate; commands from earlier cycles cannot resume afterward. Scale-only
@@ -290,8 +289,8 @@ A discovery-owned atomic acquisition latch is published under the existing
 NimBLE discovery critical section before Candidate becomes consumable. Its
 callback performs atomic stores and notifications only: no task mutex, heap,
 network API or wait. HTTP/webhook/NTP owners close their transports independently;
-An established Micra WSS connection stays open through scale acquisition but
-parks its subscription unless a backflush is in progress.
+An established Micra WSS connection stays open and subscribed through scale
+acquisition.
 New WSS setup and reconnection wait for acquisition, setup, BLE quiet and scale
 connection gates to clear; admission is rechecked after session preparation and
 before SDK init/start. A handshake already in flight can still finish.

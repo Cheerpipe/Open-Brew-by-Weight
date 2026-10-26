@@ -32,7 +32,7 @@ struct MicraWebSocketStatus {
   uint32_t internalMinimum = 0, psramMinimum = 0, psramFree = 0, psramLargest = 0;
   MicraCleaningState cleaning = MicraCleaningState::UNKNOWN;
   char cleaningLabel[33] = {};
-  bool subscribed = false, parked = false, machineConnectedKnown = false, machineConnected = false;
+  bool subscribed = false, machineConnectedKnown = false, machineConnected = false;
   bool cleaningAvailable = false, workspaceExternal = false;
   HeapLifecycleAggregate heap = {};
   HeapLifecycleAggregate stopHeap = {};

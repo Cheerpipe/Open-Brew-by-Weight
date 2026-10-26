@@ -52,7 +52,7 @@ function renderMicraWebSocket(lm, set) {
   const ws = lm.websocket || {},
     unknown = "—",
     api = lm.connectionType === "api",
-    link = api ? 0 : ws.subscribed ? 1 : ws.parked ? 2 : ws.state === "paused" ? 3 : 0;
+    link = api ? 0 : ws.subscribed ? 1 : ws.state === "paused" ? 2 : 0;
   const age = (value) =>
     value && ws.nowMs != null
       ? (((ws.nowMs - value) >>> 0) / 1000).toFixed(1) + __WEBUI_TEXT__("runtime.s_2")

@@ -801,9 +801,7 @@ LineaMicraStatus OpenBrewByWeightMicraService::statusLocked() const {
   if (result.connectionFreshness && result.quality == LineaMicraObservationQuality::CURRENT &&
       (!observationFence_.synchronized || !websocketStatus_.subscribed || !websocket_ ||
        websocket_->failed.load() || websocket_->stamp.epoch != observationFence_.epoch ||
-       websocket_->disconnectGeneration != disconnectGeneration_.load() ||
-       !staConnected_.load() || apActive_.load() || shotTransportPaused() ||
-       outboundMaintenance.load()))
+       !staConnected_.load() || apActive_.load() || outboundMaintenance.load()))
     result.quality = LineaMicraObservationQuality::STALE;
   result.staConnected = staConnected_.load(std::memory_order_acquire);
   result.apActive = apActive_.load(std::memory_order_acquire);
@@ -848,7 +846,6 @@ void OpenBrewByWeightMicraService::qualifyBackflushLocked() {
       !tokenAvailable_.load(std::memory_order_acquire) ||
       websocket_->stamp.identity != identityGeneration_ ||
       websocket_->stamp.epoch != observationFence_.epoch ||
-      websocket_->disconnectGeneration != disconnectGeneration_.load() ||
       !websocketStatus_.machineConnectedKnown || !websocketStatus_.machineConnected ||
       observationFence_.offline || now - aliveAt >= 30000 ||
       !staConnected_.load() || apActive_.load() || shotActive_.load() ||
