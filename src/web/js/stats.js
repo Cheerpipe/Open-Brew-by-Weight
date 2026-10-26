@@ -638,6 +638,7 @@ function renderStatsDurChart() {
         statsPresetFilter = b.dataset.v;
         renderStatsDurChart();
       };
+    R.lockControls(root);
   }
   const host = $("statsDurChartPlot");
   if (!host) return;
@@ -1124,6 +1125,7 @@ function renderShots() {
       body.appendChild(row);
     }
   }
+  R.lockControls(body);
   R.setEmptyState(
     "shotTableState",
     rows.length

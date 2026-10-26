@@ -1528,7 +1528,7 @@ if (!statsSection ||
   const helpers = new Function('const uiState = globalThis;' +
       runtimeJs.slice(start, end) +
       viewJs.stats.slice(chartAt, chartEnd) +
-      ';const R = {uiState, axisLabel, fadeFill, escHtml: String, get homeStatusCache() { return homeStatusCache; },' +
+      ';const R = {uiState, axisLabel, fadeFill, escHtml: String, lockControls() {}, get homeStatusCache() { return homeStatusCache; },' +
       'get presetState() { return presetState; }};' +
       'return{renderStatsDurChart:renderStatsDurChart};')();
   const histRoot = {dataset: {}, className: '', innerHTML: ''};

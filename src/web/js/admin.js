@@ -451,6 +451,7 @@ function renderAccessDevices(a) {
     ),
   );
   $("devList").replaceChildren(...rows);
+  R.lockControls($("devList"));
   $("devCount").textContent = "(" + sessions.length + ")";
   $("signOutOthersButton").hidden = !sessions.some((s) => !s.self);
 }

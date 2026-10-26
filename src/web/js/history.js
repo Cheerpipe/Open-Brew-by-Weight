@@ -106,6 +106,7 @@ function renderHistory() {
     }
     row.append(time, dur, type, del);
   }
+  R.lockControls(body);
   R.setEmptyState(
     "historyTableState",
     rows.length

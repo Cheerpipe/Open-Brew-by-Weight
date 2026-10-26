@@ -2342,15 +2342,11 @@ function sToMs(id) {
 }
 // Home frames call this several times a second: the control sweep runs only
 // when mutability or ownership changed, or when a newly mounted view asks.
-let sweptMutable = null;
-function setMutable(enabled, mounted) {
-  const canEdit = !!enabled && webUiOwner;
-  const was = controlsMutable;
-  controlsMutable = canEdit;
-  if (!mounted && sweptMutable === canEdit + "/" + webUiOwner) return;
-  sweptMutable = canEdit + "/" + webUiOwner;
-  if (was !== canEdit) renderHomePresetAccordion();
-  document.querySelectorAll("#app input,#app select,#app button").forEach((e) => {
+// Applies the lock state to every control under root: the full sweep when
+// mutability or ownership changes, and the controls a view rebuilds later
+// (device rows, record rows, chart filters) as soon as they exist.
+function lockControls(root) {
+  root.querySelectorAll("input,select,button").forEach((e) => {
     if (e.closest("#message")) return;
     if (e.classList.contains("textLock")) {
       e.disabled = !webUiOwner;
@@ -2377,11 +2373,20 @@ function setMutable(enabled, mounted) {
       return;
     }
     if (e.dataset.dirty != null) {
-      e.disabled = !canEdit || e.dataset.dirty != 1;
+      e.disabled = !controlsMutable || e.dataset.dirty != 1;
       return;
     }
-    if (!webUiOwner || !e.closest("#actionsPanel")) e.disabled = !canEdit;
   });
+}
+let sweptMutable = null;
+function setMutable(enabled, mounted) {
+  const canEdit = !!enabled && webUiOwner;
+  const was = controlsMutable;
+  controlsMutable = canEdit;
+  if (!mounted && sweptMutable === canEdit + "/" + webUiOwner) return;
+  sweptMutable = canEdit + "/" + webUiOwner;
+  if (was !== canEdit) renderHomePresetAccordion();
+  lockControls($("app"));
   [
     "workflowPanel",
     "dateTimePanel",
@@ -5592,6 +5597,7 @@ export {
   claimWebUiOwnership,
   startSetupSession,
   setMutable,
+  lockControls,
   controlsMutable,
   showPageBoot,
   hideHomeBoot,
