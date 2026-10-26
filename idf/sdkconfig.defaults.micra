@@ -7,3 +7,6 @@ CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
 # The transport's HTTP upgrade buffer also exceeds ALWAYSINTERNAL=2048.
 CONFIG_WS_BUFFER_SIZE=4096
+# Resume the cloud TLS 1.2 session (ticket lifetime ~24 h) instead of a full
+# ECDHE + certificate handshake on every rare HTTPS call.
+CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS=y

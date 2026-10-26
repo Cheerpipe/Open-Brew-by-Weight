@@ -41,6 +41,8 @@ int esp_http_client_perform(void *) {
   return result;
 }
 void esp_http_client_cleanup(void *) {}
+static unsigned httpCloses = 0;
+int esp_http_client_close(void *) { ++httpCloses; return 0; }
 unsigned ulTaskNotifyTake(int, uint32_t ticks) {
   if (ticks == 250) throw WorkerStopped{};
   lastWaitTicks = ticks;
@@ -705,9 +707,15 @@ void MicraCancellationTest::idleClosesWebSocketModeClient() {
     service.clearSessionRequested_.store(false);
     OpenBrewByWeightMicraService::WorkBuffer work;
     work.client = &work;
+    work.connectionOpen = true;
     service.work_ = &work;
+    const auto closes = httpCloses;
     try { service.taskLoop(); } catch (const WorkerStopped &) {}
-    assert((work.client == nullptr) == (type == MicraConnectionType::WEBSOCKET));
+    // WebSocket mode closes the idle socket but keeps the client and its
+    // saved TLS session; API polling keeps the connection alive.
+    const bool websocket = type == MicraConnectionType::WEBSOCKET;
+    assert(work.client == &work && work.connectionOpen == !websocket);
+    assert(httpCloses == closes + (websocket ? 1U : 0U));
     service.work_ = nullptr;
   }
 }
