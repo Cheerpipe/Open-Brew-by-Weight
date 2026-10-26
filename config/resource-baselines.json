@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "maximumExternalBssBytes": 3186688,
   "allowedGrowthBytes": {
-    "image": 115152,
-    "total_size": 115160,
+    "image": 115392,
+    "total_size": 115388,
     "used_diram": 8192,
     "flash_code": 76408,
-    "flash_rodata": 40912
+    "flash_rodata": 41104
   },
   "updateHeadroomBytes": 64,
   "targets": {
