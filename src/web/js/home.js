@@ -19,7 +19,7 @@ function micraBoilerText(lm, boiler) {
     __WEBUI_TEXT__("home.boiler_states").split("|")[
       ["heating_up", "no_water", "eco", "off", "standby"].indexOf(state)
     ];
-  if (!label) return __WEBUI_TEXT__("runtime.unknown");
+  if (!label) return "—";
   return state === "heating_up" || state === "eco" ? label + readyIn(minsLeft(data)) : label;
 }
 // Whole minutes until a boiler's readyAtUtcSec; zero or less once it passed.
@@ -584,5 +584,5 @@ function micraPower(m) {
     ? p + " - " + __WEBUI_TEXT__("home.optimistic")
     : ["ON", "OFF"].includes(m?.powerState)
       ? m.powerState
-      : __WEBUI_TEXT__("runtime.unknown");
+      : "—";
 }

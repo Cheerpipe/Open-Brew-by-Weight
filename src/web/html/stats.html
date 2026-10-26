@@ -31,7 +31,7 @@
         >
           <use href="#shotMetricTime" /></svg
         ><strong>{{webui:stats.avg_time}}</strong>
-        <div id="statsAvgDur">{{webui:stats.unknown}}</div>
+        <div id="statsAvgDur">—</div>
       </div>
       <div class="shotActual">
         <svg
@@ -43,19 +43,19 @@
         >
           <use href="#shotMetricWeight" /></svg
         ><strong>{{webui:stats.avg_yield}}</strong>
-        <div id="statsAvgWeight">{{webui:stats.unknown}}</div>
+        <div id="statsAvgWeight">—</div>
       </div>
       <div>
         <strong>{{webui:stats.daily_shots}}</strong>
-        <div id="statsAvgDaily">{{webui:stats.unknown}}</div>
+        <div id="statsAvgDaily">—</div>
       </div>
       <div>
         <strong>{{webui:stats.avg_error}}</strong>
-        <div id="statsAvgErr">{{webui:stats.unknown}}</div>
+        <div id="statsAvgErr">—</div>
       </div>
       <div>
         <strong>{{webui:stats.avg_flow}}</strong>
-        <div id="statsAvgFlow">{{webui:stats.unknown}}</div>
+        <div id="statsAvgFlow">—</div>
       </div>
     </div>
     <div class="statsWindowBar">
@@ -100,7 +100,7 @@
         aria-expanded="false"
         title="{{webui:stats.export}}"
       >
-        <span class="g" aria-hidden="true">{{webui:stats.down}}</span
+        <span class="g" aria-hidden="true">↓</span
         ><span class="t">{{webui:stats.export}}</span></button
       ><button
         id="clearShotsButton"
@@ -108,8 +108,7 @@
         title="{{webui:stats.clear}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:stats.close}}</span
-        ><span class="t">{{webui:stats.clear}}</span>
+        <span class="g" aria-hidden="true">×</span><span class="t">{{webui:stats.clear}}</span>
       </button>
     </div>
     <p id="shotTableState" class="emptyState" role="status" hidden></p>

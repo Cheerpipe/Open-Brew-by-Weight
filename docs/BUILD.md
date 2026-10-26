@@ -248,7 +248,9 @@ are case-insensitive, `_` is normalized to `-`, and a regional code tries its
 exact catalog followed by its base language. English is currently the only
 shipped catalog, so another base language fails instead of silently producing
 English. Adding a complete locale file does not affect existing firmware until
-that locale is selected.
+that locale is selected. A catalog holds only words to translate: icons,
+numbers, punctuation and example addresses stay in the Web UI sources, and the
+build rejects a catalog entry without any letters.
 
 The served Web UI is also machine-type exclusive: a build compiled for a paddle
 machine ships only the paddle controls, a momentary build ships only the switch

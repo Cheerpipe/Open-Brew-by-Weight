@@ -201,7 +201,7 @@ int main(){
   assert.equal(action.inert, false, 'unlocked Admin keeps the Diagnostic actions usable');
   context.applyDiagnosticStatus({...status, adminUnlocked: false});
   assert.equal(action.inert, true, 'locked Admin with a hidden page disables refused actions');
-  for (const id of ['hNvsEntries','hNvsTotal','hNvsNamespaces']) assert.equal($(id).textContent, 'runtime.unknown');
+  for (const id of ['hNvsEntries','hNvsTotal','hNvsNamespaces']) assert.equal($(id).textContent, '—');
   status.nvs.statsValid=true;context.applyDiagnosticStatus(status);
   assert.equal($('hNvsNamespaces').textContent,'0');assert($('hNvsEntries').textContent.startsWith('0'));
   const cup={__WEBUI_TEXT__:key=>key,$:()=>null,sub:key=>key};

@@ -21,7 +21,7 @@ function renderMicraCloudDiagnostic(lm) {
     call
       ? call.startedAtUtcSec
         ? R.formatWallTimeLocal(call.startedAtUtcSec) + __WEBUI_TEXT__("diagnostic.utc_suffix")
-        : __WEBUI_TEXT__("runtime.unknown")
+        : "—"
       : none,
   );
   set("CloudApi", call ? call.method + " " + call.api : none);
@@ -50,7 +50,7 @@ function renderMicraCloudDiagnostic(lm) {
 
 function renderMicraWebSocket(lm, set) {
   const ws = lm.websocket || {},
-    unknown = __WEBUI_TEXT__("runtime.unknown"),
+    unknown = "—",
     api = lm.connectionType === "api",
     link = api ? 0 : ws.subscribed ? 1 : ws.parked ? 2 : ws.state === "paused" ? 3 : 0;
   const age = (value) =>
@@ -238,7 +238,7 @@ function formatWallTime(unixSec, tz) {
 }
 function formatDiagnosticTimezoneOffset(c) {
   if (c.timezoneOffsetKnown) return R.formatTzLabel(c.appliedTimezoneOffsetMinutes);
-  if (c.timezoneResolution === "clock_unavailable") return __WEBUI_TEXT__("runtime.unknown");
+  if (c.timezoneResolution === "clock_unavailable") return "—";
   const reason = {
     unconfigured: __WEBUI_TEXT__("runtime.timezone_unconfigured"),
     unknown_zone: __WEBUI_TEXT__("runtime.timezone_unknown_zone"),
@@ -279,7 +279,7 @@ function formatUptime(ms) {
   if (d || h) p.push(h + "h");
   if (d || h || m) p.push(m + "m");
   p.push((x % 60) + "s");
-  return p.join(__WEBUI_TEXT__("runtime.symbol_3"));
+  return p.join(" ");
 }
 function updH(h, s) {
   function b(n, k = false) {
@@ -294,7 +294,7 @@ function updH(h, s) {
             : n + "b";
   }
   const kb = (n) => b(n, true);
-  const t = (i, v) => ($(i).textContent = v || __WEBUI_TEXT__("runtime.unknown"));
+  const t = (i, v) => ($(i).textContent = v || "—");
   const cpu = [
     "hCpu5s",
     "hCpu1m",
@@ -317,16 +317,11 @@ function updH(h, s) {
         "hUptime",
         "hResetReason",
       ])
-      .forEach((i) => t(i, __WEBUI_TEXT__("runtime.unknown")));
+      .forEach((i) => t(i, "—"));
     return;
   }
-  t(
-    "hUptime",
-    typeof h.uptimeMs === "number" && h.uptimeMs >= 0
-      ? formatUptime(h.uptimeMs)
-      : __WEBUI_TEXT__("runtime.unknown"),
-  );
-  t("hResetReason", s ? RR[s.resetReasonCode] || __WEBUI_TEXT__("runtime.symbol_7") : "");
+  t("hUptime", typeof h.uptimeMs === "number" && h.uptimeMs >= 0 ? formatUptime(h.uptimeMs) : "—");
+  t("hResetReason", s ? RR[s.resetReasonCode] || "?" : "");
   t("hHeapMin", kb(h.minimumFreeHeapBytes));
   t("hHeapLargest", kb(h.largestFreeHeapBlockBytes) + (h.heap ? " · " + h.heap : ""));
   t("hPsramT", b(h.psramSizeBytes));
@@ -334,7 +329,7 @@ function updH(h, s) {
   t("hPsramL", kb(h.psramLargestFreeBlockBytes));
   const w = h.hwmon;
   if (!w) {
-    cpu.forEach((i) => t(i, __WEBUI_TEXT__("runtime.unknown")));
+    cpu.forEach((i) => t(i, "—"));
     return;
   }
   const load = (v) => (w.cpuLoadValid && typeof v === "number" ? v.toFixed(2) : "");
@@ -349,9 +344,7 @@ function updH(h, s) {
   t("hCpu5m", load(w.cpuLoad5m));
   t(
     "hCpuMhz",
-    typeof w.cpuMhz === "number" && w.cpuMhz > 0
-      ? w.cpuMhz + __WEBUI_TEXT__("runtime.mhz")
-      : __WEBUI_TEXT__("runtime.unknown"),
+    typeof w.cpuMhz === "number" && w.cpuMhz > 0 ? w.cpuMhz + __WEBUI_TEXT__("runtime.mhz") : "—",
   );
   t("hTemp", w.tempValid ? w.tempC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");
   t("hTPeak", w.tempValid ? w.tempPeakC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");
@@ -364,7 +357,7 @@ function formatExtractionGuard(d) {
     ? __WEBUI_TEXT__("runtime.off_2")
     : d.extended
       ? __WEBUI_TEXT__("runtime.ext") +
-        (d.goal ?? __WEBUI_TEXT__("runtime.unknown")) +
+        (d.goal ?? "—") +
         __WEBUI_TEXT__("runtime.g_or") +
         R.ms(d.minBbwBrewRemainingMs, 1) +
         __WEBUI_TEXT__("runtime.s_left")
@@ -376,9 +369,7 @@ function formatSlowExtractionGuard(d) {
   return !d.guardEnabled
     ? __WEBUI_TEXT__("runtime.off_2")
     : d.extended
-      ? __WEBUI_TEXT__("runtime.ext") +
-        (d.goal ?? __WEBUI_TEXT__("runtime.unknown")) +
-        __WEBUI_TEXT__("runtime.g")
+      ? __WEBUI_TEXT__("runtime.ext") + (d.goal ?? "—") + __WEBUI_TEXT__("runtime.g")
       : d.inShot
         ? __WEBUI_TEXT__("runtime.on_2")
         : __WEBUI_TEXT__("runtime.idle");
@@ -431,7 +422,7 @@ function formatCupProtection(d) {
 function renderDiagClock() {
   const t = (i) => (v) => {
     const e = $(i);
-    if (e) e.textContent = v || __WEBUI_TEXT__("runtime.unknown");
+    if (e) e.textContent = v || "—";
   };
   const u =
       R.statusUtcAnchorSec > 0
@@ -464,13 +455,11 @@ function renderLineaMicraDiagnostic() {
       : !lm.observeState
         ? __WEBUI_TEXT__("runtime.disabled")
         : "";
-  $("dMicraPowerValue").textContent = power || __WEBUI_TEXT__("runtime.unknown");
+  $("dMicraPowerValue").textContent = power || "—";
   const brief = $("dMicraPowerBrief");
-  if (brief) brief.textContent = power || __WEBUI_TEXT__("runtime.unknown");
-  $("dMicraMode").textContent =
-    (lm.observedMode || __WEBUI_TEXT__("runtime.unknown")) + (source ? " (" + source + ")" : "");
-  $("dMicraQuality").textContent =
-    (stale ? "stale" : lm.quality) || __WEBUI_TEXT__("runtime.unknown");
+  if (brief) brief.textContent = power || "—";
+  $("dMicraMode").textContent = (lm.observedMode || "—") + (source ? " (" + source + ")" : "");
+  $("dMicraQuality").textContent = (stale ? "stale" : lm.quality) || "—";
   $("dMicraAge").textContent =
     lm.temperatureState +
     "/" +
@@ -520,10 +509,9 @@ function renderLineaMicraDiagnostic() {
             __WEBUI_TEXT__("diagnostic.utc_close"),
         );
       if (boilerAge) parts.push(boilerAge + __WEBUI_TEXT__("runtime.s_ago"));
-      return parts.length ? parts.join(" · ") : __WEBUI_TEXT__("runtime.unknown");
+      return parts.length ? parts.join(" · ") : "—";
     };
-  $("dMicraReadiness").textContent =
-    unavailable || readinessLabel || lm.readiness || __WEBUI_TEXT__("runtime.unknown");
+  $("dMicraReadiness").textContent = unavailable || readinessLabel || lm.readiness || "—";
   $("dMicraBrewBoiler").textContent = boilerRow(
     coffee,
     coffee.targetDeciC
@@ -548,7 +536,7 @@ function renderLineaMicraDiagnostic() {
 function applyDiagnosticLive(s) {
   const t = (i, v) => {
       const e = $(i);
-      if (e) e.textContent = v || __WEBUI_TEXT__("runtime.unknown");
+      if (e) e.textContent = v || "—";
     },
     sf = s.safety || {},
     sc = s.scale || {},
@@ -563,9 +551,7 @@ function applyDiagnosticLive(s) {
   t("dCup", cp.state);
   t(
     "dScaleName",
-    sc.connectedMac
-      ? sc.connectedFriendlyName || __WEBUI_TEXT__("runtime.unknown")
-      : __WEBUI_TEXT__("runtime.not_connected"),
+    sc.connectedMac ? sc.connectedFriendlyName || "—" : __WEBUI_TEXT__("runtime.not_connected"),
   );
   R.updateScaleRenameUi(
     "dScaleNameRenameWrap",
@@ -643,7 +629,7 @@ function applyDiagnosticStatus(s) {
   // Reads stay public; actions follow the firmware gate.
   for (const e of document.querySelectorAll(".diagGate"))
     e.inert = !u && !s.development && !R.diagnosticVisible;
-  const t = (i, v) => ($(i).textContent = v || __WEBUI_TEXT__("runtime.unknown"));
+  const t = (i, v) => ($(i).textContent = v || "—");
   t("hFirmware", s.firmwareVersion);
   t("hBoot", typeof s.bootId === "number" && s.bootId ? "#" + s.bootId : "");
   const m = s.maintenance;
@@ -675,13 +661,13 @@ function applyDiagnosticStatus(s) {
   t(
     "hNvsEntries",
     nv.statsValid && typeof nv.usedEntries === "number"
-      ? nv.usedEntries + __WEBUI_TEXT__("runtime.symbol_11") + nv.availableEntries
+      ? nv.usedEntries + " / " + nv.availableEntries
       : "",
   );
   t(
     "hNvsTotal",
     nv.statsValid && typeof nv.freeEntries === "number"
-      ? nv.freeEntries + __WEBUI_TEXT__("runtime.symbol_11") + nv.totalEntries
+      ? nv.freeEntries + " / " + nv.totalEntries
       : "",
   );
   t(
@@ -692,11 +678,7 @@ function applyDiagnosticStatus(s) {
   t(
     "hNvsLastFailure",
     nf
-      ? nf.subsystem +
-          __WEBUI_TEXT__("runtime.symbol_8") +
-          nf.operation +
-          __WEBUI_TEXT__("runtime.symbol_8") +
-          nf.errorName
+      ? nf.subsystem + " · " + nf.operation + " · " + nf.errorName
       : __WEBUI_TEXT__("runtime.none_2"),
   );
   t(
@@ -746,12 +728,7 @@ function applyDiagnosticStatus(s) {
       : "",
   );
   t("hWifiIp", n.staIp);
-  t(
-    "hWifiSignal",
-    typeof n.signalQualityPct === "number"
-      ? n.signalQualityPct + __WEBUI_TEXT__("runtime.symbol_4")
-      : "",
-  );
+  t("hWifiSignal", typeof n.signalQualityPct === "number" ? n.signalQualityPct + "%" : "");
   t("hWifiRssi", typeof n.rssi === "number" ? n.rssi + __WEBUI_TEXT__("runtime.dbm") : "");
   t(
     "hWifiCreds",
@@ -766,9 +743,7 @@ function applyDiagnosticStatus(s) {
     n.configState === "PENDING"
       ? __WEBUI_TEXT__("runtime.pending") +
           (n.confirmRemainingMs
-            ? __WEBUI_TEXT__("runtime.symbol_3") +
-              Math.ceil(n.confirmRemainingMs / 1000) +
-              __WEBUI_TEXT__("runtime.s")
+            ? " " + Math.ceil(n.confirmRemainingMs / 1000) + __WEBUI_TEXT__("runtime.s")
             : "")
       : "",
   );
@@ -783,7 +758,7 @@ function applyDiagnosticStatus(s) {
   t(
     "dSerialIo4",
     { closed: __WEBUI_TEXT__("runtime.closed"), open: __WEBUI_TEXT__("runtime.open_2") }[ser.io4] ||
-      __WEBUI_TEXT__("runtime.unknown"),
+      "—",
   );
   t(
     "dSerialState",
@@ -791,7 +766,7 @@ function applyDiagnosticStatus(s) {
       enabled_jtag: __WEBUI_TEXT__("runtime.enabled_compile_flag"),
       enabled_io4: __WEBUI_TEXT__("runtime.enabled_io04"),
       disabled: __WEBUI_TEXT__("runtime.disabled"),
-    }[ser.state] || __WEBUI_TEXT__("runtime.unknown"),
+    }[ser.state] || "—",
   );
   const f = s.compileFlags || {};
   t("dBz", f.buzzer);
@@ -830,8 +805,8 @@ function applyTaskProfiler(t) {
     P = $("taskProfilerStopButton"),
     own = !!R.webUiOwner;
   if (!t || typeof t.state != "string") {
-    if (T) T.textContent = __WEBUI_TEXT__("diagnostic.unknown");
-    if (E) E.textContent = __WEBUI_TEXT__("diagnostic.unknown");
+    if (T) T.textContent = "—";
+    if (E) E.textContent = "—";
     if (B) fillRows(B, []);
     if (H) H.textContent = "";
     if (A) A.disabled = !own;
@@ -858,7 +833,7 @@ function applyTaskProfiler(t) {
   if (E)
     E.textContent = ["running", "stopped", "failed"].includes(t.state)
       ? Math.floor((t.elapsedMs || 0) / 1e3) + __WEBUI_TEXT__("diagnostic.s")
-      : __WEBUI_TEXT__("diagnostic.unknown");
+      : "—";
   if (A) A.disabled = run || !own;
   if (P) P.disabled = !run || !own;
   if (B)
@@ -894,7 +869,7 @@ function applyTaskProfiler(t) {
       if (Number.isFinite(value) && (label === total ? session : value > 0.05))
         p.push(label + " " + fmtTaskPct(value));
     if (!p.length && !session) p.push(__WEBUI_TEXT__("diagnostic.tasks_empty"));
-    H.textContent = p.join(__WEBUI_TEXT__("diagnostic.symbol_3"));
+    H.textContent = p.join(" · ");
   }
 }
 // The guard switches are Home's config and noScaleShotGuard paths; the stop
@@ -921,7 +896,7 @@ function applyDiagnosticGuards(s) {
     },
     t = (i, v) => {
       const e = $(i);
-      if (e) e.textContent = v || __WEBUI_TEXT__("diagnostic.unknown");
+      if (e) e.textContent = v || "—";
     };
   t(
     "dGuardNoScaleUser",
@@ -956,9 +931,7 @@ function applyDiagnosticGuards(s) {
     "dGuardSlowRaw",
     flags(slow, "enabled", "extended", "targetReachedEarly") +
       __WEBUI_TEXT__("diagnostic.activestopweightg") +
-      (typeof slow.activeStopWeightG === "number"
-        ? slow.activeStopWeightG.toFixed(1)
-        : __WEBUI_TEXT__("diagnostic.0_0")),
+      (typeof slow.activeStopWeightG === "number" ? slow.activeStopWeightG.toFixed(1) : "0.0"),
   );
   t(
     "dGuardFastUser",
@@ -974,9 +947,7 @@ function applyDiagnosticGuards(s) {
     "dGuardFastRaw",
     flags(fast, "enabled", "extended", "targetReachedEarly") +
       __WEBUI_TEXT__("diagnostic.activestopweightg") +
-      (typeof fast.activeStopWeightG === "number"
-        ? fast.activeStopWeightG.toFixed(1)
-        : __WEBUI_TEXT__("diagnostic.0_0")) +
+      (typeof fast.activeStopWeightG === "number" ? fast.activeStopWeightG.toFixed(1) : "0.0") +
       __WEBUI_TEXT__("diagnostic.minbbwbrewtimeremainingms") +
       (fast.minBbwBrewTimeRemainingMs || 0),
   );
@@ -1386,7 +1357,7 @@ function updateLogHealth(d) {
   if (d.serialDropped) a.push(__WEBUI_TEXT__("runtime.serial_dropped") + d.serialDropped);
   if (!e) return;
   e.hidden = !a.length;
-  e.textContent = a.join(__WEBUI_TEXT__("runtime.symbol_8"));
+  e.textContent = a.join(" · ");
 }
 const logStream = {
   // Log frames carry their own cursor: a pending resync must not drop them.

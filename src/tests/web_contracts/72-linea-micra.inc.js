@@ -681,7 +681,7 @@ for (const id of ['dMicraPower', 'dMicraPowerValue', 'dMicraMode',
 if (!rawCss.includes('html:not(.lineaMicraIntegration) .micraOnly') ||
     !rawCss.includes('.micraDeps{') ||
     !rawCss.includes('[type=email]') ||
-    !micraDiagnosticHtml.includes('<span id="dMicraPowerValue">{{webui:diagnostic.unknown}}</span> - <a id="lineaMicraRefreshLink" href="#" aria-disabled="true" tabindex="-1">({{webui:diagnostic.refresh_state}})</a>') ||
+    !micraDiagnosticHtml.includes('<span id="dMicraPowerValue">—</span> - <a id="lineaMicraRefreshLink" href="#" aria-disabled="true" tabindex="-1">({{webui:diagnostic.refresh_state}})</a>') ||
     micraDiagnosticHtml.includes('id="lineaMicraRefreshButton"') ||
     !codeIncludes(viewJs.diagnostic, "e.preventDefault();R.lineaMicraAction('refresh')") ||
     !codeIncludes(rawRuntimeJs, "s.machineIntegration==='linea_micra_cloud'") ||

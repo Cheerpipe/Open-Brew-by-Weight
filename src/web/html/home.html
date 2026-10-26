@@ -114,7 +114,7 @@
             d="M4 3h16v8H4zM8 11v2h8v-2M16 12h3.5M12 13v2.5M5 21h14M14 7h3M9.5 7a1.5 1.5 0 0 1-3 0a1.5 1.5 0 0 1 3 0"
           /></svg></span
       ><span class="devName">{{webui:home.machine}}</span
-      ><span class="lampState"><span id="machineRowState">{{webui:home.unknown}}</span></span
+      ><span class="lampState"><span id="machineRowState">—</span></span
       ><b id="machineRowValue"></b><small id="machineRowHint"></small
       ><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
     </summary>
@@ -122,34 +122,34 @@
       <div class="metric">
         <strong>{{webui:home.activity}}</strong>
         <div id="machineStateValue">
-          <span id="machineState">{{webui:home.unknown}}</span
+          <span id="machineState">—</span
           ><span class="switchOnly">
-            {{webui:home.symbol}}
+            -
             <a id="overrideIdleLink" href="#">{{webui:home.override_idle}}</a>
-            {{webui:home.symbol_2}}
+            /
             <a id="overrideBrewingLink" href="#">{{webui:home.override_brewing}}</a></span
           >
         </div>
       </div>
       <div class="metric">
         <strong>{{webui:home.brew}}</strong>
-        <div id="state">{{webui:home.unknown}}</div>
+        <div id="state">—</div>
       </div>
       <div class="metric micraOnly">
         <strong>{{webui:home.machine_power_state}}</strong>
-        <div id="homeMicraPower">{{webui:runtime.unknown}}</div>
+        <div id="homeMicraPower">—</div>
       </div>
       <div class="metric micraOnly">
         <strong>{{webui:home.machine_brew_boiler}}</strong>
-        <div id="homeMicraBrewBoiler">{{webui:runtime.unknown}}</div>
+        <div id="homeMicraBrewBoiler">—</div>
       </div>
       <div class="metric micraOnly">
         <strong>{{webui:home.machine_steam_boiler}}</strong>
-        <div id="homeMicraSteamBoiler">{{webui:runtime.unknown}}</div>
+        <div id="homeMicraSteamBoiler">—</div>
       </div>
       <div class="metric micraOnly">
         <strong>{{webui:home.machine_cleaning}}</strong>
-        <div id="homeMicraCleaning">{{webui:runtime.unknown}}</div>
+        <div id="homeMicraCleaning">—</div>
       </div>
     </div>
   </details>
@@ -161,7 +161,7 @@
             d="M3 13h18v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM4.5 10h15M7 10v3M17 10v3M9.5 16.5h5"
           /></svg></span
       ><span class="devName">{{webui:home.scale}}</span
-      ><span class="lampState"><span id="scale">{{webui:home.unknown}}</span></span
+      ><span class="lampState"><span id="scale">—</span></span
       ><b id="scaleRowValue"></b><small id="scaleRowHint"></small
       ><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
     </summary>
@@ -169,7 +169,7 @@
       <div class="metric">
         <strong>{{webui:home.preferred}}</strong>
         <div>
-          <span id="preferredScale">{{webui:home.unknown}}</span>
+          <span id="preferredScale">—</span>
           <span id="preferredScaleRenameWrap" class="hidden"
             >- <a id="renameScaleLink" href="#">{{webui:home.rename}}</a></span
           >
@@ -177,11 +177,11 @@
       </div>
       <div class="metric">
         <strong>{{webui:home.weight}}</strong>
-        <div id="scaleWeight">{{webui:home.unknown}}</div>
+        <div id="scaleWeight">—</div>
       </div>
       <div class="metric">
         <strong>{{webui:home.timer}}</strong>
-        <div id="scaleTimer">{{webui:home.unknown}}</div>
+        <div id="scaleTimer">—</div>
       </div>
     </div>
   </details>
@@ -193,22 +193,22 @@
             d="M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M3 21h16"
           /></svg></span
       ><span class="devName">{{webui:home.cup}}</span
-      ><span class="lampState"><span id="cupState">{{webui:home.unknown}}</span></span
+      ><span class="lampState"><span id="cupState">—</span></span
       ><b id="cupRowValue"></b><small id="cupRowHint"></small
       ><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
     </summary>
     <div class="metricRows">
       <div class="metric">
         <strong>{{webui:home.weight}}</strong>
-        <div id="cupWeight">{{webui:home.unknown}}</div>
+        <div id="cupWeight">—</div>
       </div>
       <div class="metric">
         <strong>{{webui:home.accessory}}</strong>
-        <div id="cupAccessory">{{webui:home.unknown}}</div>
+        <div id="cupAccessory">—</div>
       </div>
       <div class="metric">
         <strong>{{webui:home.idle_tare}}</strong>
-        <div id="idleTareStatus" aria-live="polite">{{webui:home.unknown}}</div>
+        <div id="idleTareStatus" aria-live="polite">—</div>
       </div>
     </div>
   </details>
@@ -217,7 +217,7 @@
   <legend>{{webui:home.actions}}</legend>
   <div class="btnBar">
     <button id="rinseButton" class="btnGlyph" title="{{webui:home.start_rinse}}" type="button">
-      <span class="g" aria-hidden="true">{{webui:home.symbol_3}}</span
+      <span class="g" aria-hidden="true">≋</span
       ><span class="t">{{webui:home.start_rinse}}</span></button
     ><button
       id="stopButton"
@@ -227,7 +227,7 @@
       data-mode="start"
       aria-label="{{webui:home.start_shot}}"
     >
-      <span class="g" aria-hidden="true">{{webui:home.start}}</span
+      <span class="g" aria-hidden="true">▶</span
       ><span class="t">{{webui:home.start_shot}}</span></button
     ><button
       id="forcePulseButton"
@@ -236,8 +236,7 @@
       type="button"
       aria-label="{{webui:home.force_switch_press}}"
     >
-      <span class="g" aria-hidden="true">{{webui:home.symbol_4}}</span
-      ><span class="t">{{webui:home.push}}</span>
+      <span class="g" aria-hidden="true">!</span><span class="t">{{webui:home.push}}</span>
     </button>
   </div>
   <small id="controlPolicy">{{webui:home.paddle_has_priority_stop_opens_the_circuit}}</small>

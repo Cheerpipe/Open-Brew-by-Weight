@@ -215,7 +215,7 @@ function shotMaxFlowGS(shot, model = R.buildShotSparkModel(shot)) {
   return model ? model.maxFlow : null;
 }
 function shotPresetName(shot) {
-  return (shot && shot.presetName) || __WEBUI_TEXT__("runtime.unknown");
+  return (shot && shot.presetName) || "—";
 }
 function formatShotTimeCsv(r) {
   if (r.hasWallTime && r.endedAtLocalSec) return R.formatWallTimeLocal(r.endedAtLocalSec);
@@ -795,9 +795,7 @@ function renderStatsConsistency(shots) {
   root.hidden = !n;
   if (!n) return;
   const L = (v) =>
-      sec
-        ? R.axisLabel(v * sec, __WEBUI_TEXT__("runtime.s"))
-        : +(v * 100).toFixed(1) + __WEBUI_TEXT__("runtime.symbol_4"),
+      sec ? R.axisLabel(v * sec, __WEBUI_TEXT__("runtime.s")) : +(v * 100).toFixed(1) + "%",
     signed = (v, k = Math.round(v * (sec || 100) * 10)) =>
       (k > 0 ? "+" : k < 0 ? "−" : "") + L(Math.abs(v)),
     X = (i) => 3 + (W - n + i) * gap,
@@ -937,7 +935,7 @@ function renderShotStats() {
   q("Dur", f(s.avgDurationS, 1, __WEBUI_TEXT__("runtime.s")));
   q("Weight", f(s.avgYieldG, 1, __WEBUI_TEXT__("runtime.g")));
   q("Daily", s.shotsPerDay == null ? z : s.shotsPerDay.toFixed(1));
-  q("Err", f(s.avgErrorPct, 1, __WEBUI_TEXT__("runtime.symbol_4")), s.avgErrorPct);
+  q("Err", f(s.avgErrorPct, 1, "%"), s.avgErrorPct);
   q("Flow", f(s.avgFlowGps, 2, __WEBUI_TEXT__("runtime.g_s")));
   const hint = $("statsWindowHint"),
     c = s.shotCount || 0;
@@ -1119,8 +1117,7 @@ function renderShots() {
       btn.setAttribute("aria-label", __WEBUI_TEXT__("stats.shot_actions"));
       btn.setAttribute("aria-haspopup", "true");
       btn.setAttribute("aria-expanded", "false");
-      btn.innerHTML =
-        '<span class="g" aria-hidden="true">' + __WEBUI_TEXT__("stats.more") + "</span>";
+      btn.innerHTML = '<span class="g" aria-hidden="true">' + "⋯" + "</span>";
       btn.onclick = () => shotMenu.open(btn, r);
       del.appendChild(btn);
       row.appendChild(del);
@@ -1141,7 +1138,7 @@ function updateShotLogSentinel() {
   const el = $("shotLogSentinel");
   if (el) {
     el.hidden = !R.uiState.shotHistory.hasMore;
-    el.textContent = R.uiState.shotHistory.hasMore ? __WEBUI_TEXT__("runtime.more") : "";
+    el.textContent = R.uiState.shotHistory.hasMore ? "…" : "";
   }
 }
 async function deleteOneShot(id) {
@@ -1193,7 +1190,7 @@ function syncShotSortButtons() {
   const d = $("sortDateButton"),
     r = $("sortRatingButton"),
     desc = R.uiState.shotSortDir === "desc",
-    arrow = desc ? __WEBUI_TEXT__("runtime.down") : __WEBUI_TEXT__("runtime.symbol_5"),
+    arrow = desc ? "↓" : "↑",
     // Each label names the order pressing that button will produce: the active
     // criterion flips the direction, the other one switches keeping it.
     sync = (b, on, name, after) => {

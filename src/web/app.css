@@ -1558,7 +1558,7 @@ html:not(.micraTemperatureEnabled) .micraTempOpt {
   color: var(--dn);
 }
 #message.error:before {
-  content: __WEBUI_CSS_TEXT__("css.symbol");
+  content: "!";
 }
 #message.ok {
   background: var(--mo);
@@ -1566,7 +1566,7 @@ html:not(.micraTemperatureEnabled) .micraTempOpt {
   color: var(--ok);
 }
 #message.ok:before {
-  content: __WEBUI_CSS_TEXT__("css.check");
+  content: "✓";
 }
 #message.warn {
   background: var(--mw);
@@ -1574,7 +1574,7 @@ html:not(.micraTemperatureEnabled) .micraTempOpt {
   color: var(--wn);
 }
 #message.warn:before {
-  content: __WEBUI_CSS_TEXT__("css.symbol");
+  content: "!";
 }
 .fieldError {
   display: block;
@@ -1602,7 +1602,7 @@ html:not(.micraTemperatureEnabled) .micraTempOpt {
   line-height: 1.35;
 }
 .fieldWarning:before {
-  content: __WEBUI_CSS_TEXT__("css.symbol");
+  content: "!";
   margin-right: 0.35rem;
 }
 .fieldWarn {

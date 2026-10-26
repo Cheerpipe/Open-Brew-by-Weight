@@ -36,7 +36,7 @@
       >
         <span class="sortLbl">{{webui:runtime.sort}}</span
         ><button id="historyDirButton" type="button" aria-label="{{webui:runtime.oldest_first}}">
-          {{webui:stats.date}} {{webui:history.down}}
+          {{webui:stats.date}} ↓
         </button>
       </div>
       <button
@@ -57,7 +57,7 @@
         title="{{webui:history.export_csv}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:history.down}}</span
+        <span class="g" aria-hidden="true">↓</span
         ><span class="t">{{webui:history.export_csv}}</span></button
       ><button
         id="clearHistoryButton"
@@ -65,8 +65,7 @@
         title="{{webui:history.clear}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:history.close}}</span
-        ><span class="t">{{webui:history.clear}}</span>
+        <span class="g" aria-hidden="true">×</span><span class="t">{{webui:history.clear}}</span>
       </button>
     </div>
     <p id="historyTableState" class="emptyState" role="status" hidden></p>

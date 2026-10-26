@@ -61,6 +61,8 @@ function validateCatalog(catalog, file, referenceKeys) {
     if (typeof catalog.strings[key] !== 'string') {
       fail(`${file}: ${key} must contain a string`);
     }
+    // Glyphs, numbers and punctuation are not translatable: keep them in the source.
+    if (!/\p{L}/u.test(catalog.strings[key])) fail(`${file}: ${key} has no words to translate`);
   }
   const sortedKeys = [...keys].sort();
   if (keys.some((key, index) => key !== sortedKeys[index])) {

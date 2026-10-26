@@ -105,6 +105,9 @@ expectLocaleFailure((c) => {
   c.en.strings[Object.keys(c.en.strings)[0]] = 7;
 }, /must contain a string/);
 expectLocaleFailure((c) => { c.en.strings.Bad = 'bad'; }, /invalid string key/);
+expectLocaleFailure((c) => {
+  c.en.strings[Object.keys(c.en.strings)[0]] = ' · ';
+}, /has no words to translate/);
 
 {
   const fixture = makeTestLocales();

@@ -156,7 +156,7 @@
         </button>
         <section id="wifiDetails" class="signalDetails" aria-labelledby="wifiDetailsTitle" hidden>
           <strong id="wifiDetailsTitle">{{webui:shell.wifi}}</strong>
-          <p><span>{{webui:shell.network}}</span><b id="wifiName">{{webui:runtime.unknown}}</b></p>
+          <p><span>{{webui:shell.network}}</span><b id="wifiName">—</b></p>
           <p>
             <span>{{webui:shell.signal}}</span
             ><b id="wifiDetail">{{webui:runtime.signal_unavailable}}</b>
@@ -169,9 +169,7 @@
           hidden
         >
           <strong id="bluetoothDetailsTitle">{{webui:shell.bluetooth}}</strong>
-          <p>
-            <span>{{webui:shell.scale}}</span><b id="bluetoothName">{{webui:runtime.unknown}}</b>
-          </p>
+          <p><span>{{webui:shell.scale}}</span><b id="bluetoothName">—</b></p>
           <p>
             <span>{{webui:shell.signal}}</span
             ><b id="bluetoothDetail">{{webui:runtime.signal_unavailable}}</b>
@@ -217,7 +215,7 @@
           class="messageClose"
           aria-label="{{webui:shell.close}}"
         >
-          {{webui:shell.close_2}}
+          ×
         </button>
       </p>
       <section id="view-home" class="view" data-view="home"></section>

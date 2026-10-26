@@ -37,11 +37,7 @@ const syncHistoryDirButton = () => {
   i.setAttribute("aria-label", l);
   i.title = l;
   i.textContent =
-    __WEBUI_TEXT__("stats.date") +
-    " " +
-    (R.uiState.historyDir === "desc"
-      ? __WEBUI_TEXT__("runtime.down")
-      : __WEBUI_TEXT__("runtime.symbol_5"));
+    __WEBUI_TEXT__("stats.date") + " " + (R.uiState.historyDir === "desc" ? "↓" : "↑");
 };
 const toggleHistoryDir = () => {
   R.uiState.historyDir = R.uiState.historyDir === "desc" ? "asc" : "desc";
@@ -52,7 +48,7 @@ const updateHistorySentinel = () => {
   const el = $("historySentinel");
   if (el) {
     el.hidden = !R.uiState.historyData.hasMore;
-    el.textContent = R.uiState.historyData.hasMore ? __WEBUI_TEXT__("runtime.more") : "";
+    el.textContent = R.uiState.historyData.hasMore ? "…" : "";
   }
 };
 function renderHistory() {
@@ -91,8 +87,7 @@ function renderHistory() {
     btn.setAttribute("aria-label", __WEBUI_TEXT__("history.entry_actions"));
     btn.setAttribute("aria-haspopup", "true");
     btn.setAttribute("aria-expanded", "false");
-    btn.innerHTML =
-      '<span class="g" aria-hidden="true">' + __WEBUI_TEXT__("stats.more") + "</span>";
+    btn.innerHTML = '<span class="g" aria-hidden="true">' + "⋯" + "</span>";
     btn.onclick = () => entryMenu.open(btn, r);
     del.append(btn);
     const typeSvg = HIST_TYPE_SVG[r.type];

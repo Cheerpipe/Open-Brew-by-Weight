@@ -8,7 +8,7 @@ function scaleHistoryLabel(e) {
     ((e.friendlyName && String(e.friendlyName).trim()) ||
       (e.name && String(e.name).trim()) ||
       __WEBUI_TEXT__("runtime.unknown_2")) +
-    __WEBUI_TEXT__("runtime.unknown_3") +
+    " — " +
     m
   );
 }
@@ -60,7 +60,7 @@ function updatePreferredScaleSelect(s) {
     o.textContent =
       ((s.scale && s.scale.preferredName && String(s.scale.preferredName).trim()) ||
         __WEBUI_TEXT__("runtime.unknown_2")) +
-      __WEBUI_TEXT__("runtime.unknown_3") +
+      " — " +
       preferred;
     list.appendChild(o);
   }

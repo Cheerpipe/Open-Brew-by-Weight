@@ -59,7 +59,7 @@
     >
     <div class="btnBar">
       <button id="adminUnlockButton" class="btnGlyph btnInvert" type="submit">
-        <span class="g" aria-hidden="true">{{webui:admin.symbol}}</span
+        <span class="g" aria-hidden="true">∗</span
         ><span class="t">{{webui:admin.unlock_administration}}</span>
       </button>
     </div>
@@ -96,7 +96,7 @@
         disabled
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_firmware_settings}}</span></button
       ><button
         id="revertFirmwareModeButton"
@@ -107,7 +107,7 @@
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small id="firmwareModeDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
@@ -128,7 +128,7 @@
         disabled
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_bluetooth_settings}}</span></button
       ><button
         id="revertBleButton"
@@ -139,14 +139,14 @@
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small id="bleDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
   </details>
   <details id="networkPanel" data-g="network" class="cfgGroup">
     <summary>{{webui:admin.network}}</summary>
-    <div id="networkStatus">{{webui:admin.unknown}}</div>
+    <div id="networkStatus">—</div>
     <label
       >{{webui:admin.device_name}}
       <input
@@ -159,7 +159,7 @@
     >
     <div class="btnBar">
       <button id="scanNetworkButton" class="btnGlyph mutable" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.symbol_2}}</span
+        <span class="g" aria-hidden="true">⊕</span
         ><span class="t">{{webui:admin.scan_networks}}</span>
       </button>
     </div>
@@ -206,7 +206,7 @@
           type="text"
           maxlength="15"
           inputmode="decimal"
-          placeholder="{{webui:admin.192_168_1_50}}"
+          placeholder="192.168.1.50"
         /><small class="fieldHint">{{webui:admin.device_ipv4_not_192_168_4_x}}</small></label
       ><label
         >{{webui:admin.mask}}
@@ -215,7 +215,7 @@
           type="text"
           maxlength="15"
           inputmode="decimal"
-          placeholder="{{webui:admin.255_255_255_0}}" /></label
+          placeholder="255.255.255.0" /></label
       ><label
         >{{webui:admin.gateway}}
         <input
@@ -223,7 +223,7 @@
           type="text"
           maxlength="15"
           inputmode="decimal"
-          placeholder="{{webui:admin.192_168_1_1}}"
+          placeholder="192.168.1.1"
         /><small class="fieldHint"
           >{{webui:admin.router_address_in_the_same_subnet_must}}</small
         ></label
@@ -234,7 +234,7 @@
           type="text"
           maxlength="15"
           inputmode="decimal"
-          placeholder="{{webui:admin.1_1_1_1}}" /></label
+          placeholder="1.1.1.1" /></label
       ><label
         >{{webui:admin.dns_2}}
         <input
@@ -253,10 +253,10 @@
         disabled
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_network_settings_and_restart}}</span></button
       ><button id="forgetNetworkButton" class="btnGlyph mutable btnDanger" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.close}}</span
+        <span class="g" aria-hidden="true">×</span
         ><span class="t">{{webui:admin.forget_network_and_restart}}</span></button
       ><button
         id="revertNetworkButton"
@@ -267,7 +267,7 @@
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small>{{webui:admin.scan_while_ready_after_saving_wi_fi}}</small>
@@ -302,7 +302,7 @@
         disabled
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_power_settings}}</span></button
       ><button
         id="revertPowerButton"
@@ -313,7 +313,7 @@
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small id="powerDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
@@ -341,8 +341,8 @@
       >{{webui:admin.ntp_server}}
       <select id="ntpServerPreset">
         <option value="pool">{{webui:admin.pool_ntp_org}}</option>
-        <option value="google">{{webui:admin.time_google_com}}</option>
-        <option value="cloudflare">{{webui:admin.time_cloudflare_com}}</option>
+        <option value="google">time.google.com</option>
+        <option value="cloudflare">time.cloudflare.com</option>
         <option value="nist">{{webui:admin.time_nist_gov}}</option></select
       ><small class="fieldHint">{{webui:admin.public_ntp_host_used_when_custom_ntp}}</small></label
     ><label
@@ -366,10 +366,10 @@
         disabled
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_date_and_time_settings}}</span></button
       ><button id="syncTimeButton" class="btnGlyph mutable" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.symbol_3}}</span
+        <span class="g" aria-hidden="true">↻</span
         ><span class="t">{{webui:admin.sync_now}}</span></button
       ><button
         id="revertDateTimeButton"
@@ -380,7 +380,7 @@
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small id="dateTimeDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
@@ -408,7 +408,7 @@
         disabled
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_frontend_settings}}</span></button
       ><button
         id="revertFrontendButton"
@@ -419,7 +419,7 @@
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small id="frontendDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
@@ -434,7 +434,7 @@
         id="webhookUrl"
         type="url"
         maxlength="191"
-        placeholder="{{webui:admin.http_192_168_1_10_8123_path}}"
+        placeholder="http://192.168.1.10:8123/path"
         autocomplete="off"
         spellcheck="false"
       /><small class="fieldHint">{{webui:admin.http_only_no_retries}}</small></label
@@ -460,7 +460,7 @@
         ></label
       >
     </details>
-    <div id="webhookStatus">{{webui:admin.unknown}}</div>
+    <div id="webhookStatus">—</div>
     <div class="btnBar">
       <button
         id="saveWebhookButton"
@@ -469,10 +469,10 @@
         type="button"
         disabled
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_webhook_settings}}</span></button
       ><button id="testWebhookButton" class="btnGlyph mutable" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.send}}</span
+        <span class="g" aria-hidden="true">↗</span
         ><span class="t">{{webui:admin.send_test}}</span></button
       ><button
         id="revertWebhookButton"
@@ -483,7 +483,7 @@
         title="{{webui:runtime.revert_unsaved_changes}}"
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small id="webhookDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
@@ -588,7 +588,7 @@
           disabled
           type="button"
         >
-          <span class="g" aria-hidden="true">{{webui:admin.symbol}}</span
+          <span class="g" aria-hidden="true">∗</span
           ><span class="t">{{webui:admin.change_device_password}}</span></button
         ><button
           id="revertDevicePasswordButton"
@@ -599,7 +599,7 @@
           aria-label="{{webui:runtime.revert_unsaved_changes}}"
           type="button"
         >
-          <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+          <span class="g" aria-hidden="true">↺</span>
         </button>
       </div>
     </div>
@@ -648,7 +648,7 @@
         disabled
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.check}}</span
+        <span class="g" aria-hidden="true">✓</span
         ><span class="t">{{webui:admin.save_scheduled_restart}}</span></button
       ><button
         id="revertScheduledRestartButton"
@@ -659,7 +659,7 @@
         aria-label="{{webui:runtime.revert_unsaved_changes}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:runtime.symbol_14}}</span>
+        <span class="g" aria-hidden="true">↺</span>
       </button>
     </div>
     <small id="scheduledRestartDirtyHint" class="warn hidden"
@@ -670,7 +670,7 @@
     <summary>{{webui:admin.restart}}</summary>
     <div class="btnBar">
       <button id="restartButton" class="btnGlyph btnWarn" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.symbol_3}}</span
+        <span class="g" aria-hidden="true">↻</span
         ><span class="t">{{webui:admin.restart_controller}}</span>
       </button>
     </div>
@@ -678,8 +678,8 @@
   </details>
   <details id="otaPanel" data-g="update" class="cfgGroup">
     <summary>{{webui:admin.firmware_update}}</summary>
-    <div id="otaStatus" role="status">{{webui:admin.unknown}}</div>
-    <div id="otaRunning">{{webui:admin.unknown}}</div>
+    <div id="otaStatus" role="status">—</div>
+    <div id="otaRunning">—</div>
     <label
       >{{webui:admin.firmware_file}} <input id="otaFile" type="file" accept=".bin" /><small
         class="fieldHint"
@@ -688,7 +688,7 @@
     >
     <div class="btnBar">
       <button id="otaVerifyButton" class="btnGlyph mutable" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.symbol_4}}</span
+        <span class="g" aria-hidden="true">↑</span
         ><span class="t">{{webui:admin.upload_and_verify}}</span>
       </button>
     </div>
@@ -696,7 +696,7 @@
     <div id="otaStaged">{{webui:admin.no_verified_image}}</div>
     <div class="btnBar">
       <button id="otaFlashButton" class="btnGlyph mutable btnInvert" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.symbol_5}}</span
+        <span class="g" aria-hidden="true">▲</span
         ><span class="t">{{webui:admin.flash_and_restart}}</span></button
       ><button
         id="otaDiscardButton"
@@ -704,8 +704,7 @@
         title="{{webui:admin.discard_verified_image}}"
         type="button"
       >
-        <span class="g" aria-hidden="true">{{webui:admin.close}}</span
-        ><span class="t">{{webui:admin.discard}}</span>
+        <span class="g" aria-hidden="true">×</span><span class="t">{{webui:admin.discard}}</span>
       </button>
     </div>
     <small>{{webui:admin.the_upload_goes_to_the_spare_slot}}</small>
@@ -715,7 +714,7 @@
     <p>{{webui:admin.erase_every_saved_setting_and_restore_the}}</p>
     <div class="btnBar">
       <button id="factoryResetButton" class="btnGlyph mutable btnInvert" type="button">
-        <span class="g" aria-hidden="true">{{webui:admin.symbol_6}}</span
+        <span class="g" aria-hidden="true">△</span
         ><span class="t">{{webui:admin.restore_all_factory_settings}}</span>
       </button>
     </div>

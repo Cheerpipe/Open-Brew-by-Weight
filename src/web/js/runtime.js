@@ -351,10 +351,10 @@ function updateHeaderSignals(s = {}) {
     if (identity)
       identity.textContent =
         connected === true
-          ? c[kind + "Name"] || __WEBUI_TEXT__("runtime.unknown")
+          ? c[kind + "Name"] || "—"
           : connected === false
             ? __WEBUI_TEXT__("runtime.none")
-            : __WEBUI_TEXT__("runtime.unknown");
+            : "—";
     if (detail) detail.textContent = label;
   }
 }
@@ -786,28 +786,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function formatTzLabel(min) {
   const sign = min >= 0 ? "+" : "-";
   const abs = Math.abs(min);
-  return (
-    __WEBUI_TEXT__("runtime.utc") +
-    sign +
-    pad2(Math.floor(abs / 60)) +
-    __WEBUI_TEXT__("runtime.symbol") +
-    pad2(abs % 60)
-  );
+  return __WEBUI_TEXT__("runtime.utc") + sign + pad2(Math.floor(abs / 60)) + ":" + pad2(abs % 60);
 }
 function formatWallTimeLocal(unixLocalSec) {
   const d = new Date(0);
   d.setUTCSeconds(unixLocalSec);
   return (
     d.getUTCFullYear() +
-    __WEBUI_TEXT__("runtime.symbol_2") +
+    "-" +
     pad2(d.getUTCMonth() + 1) +
-    __WEBUI_TEXT__("runtime.symbol_2") +
+    "-" +
     pad2(d.getUTCDate()) +
-    __WEBUI_TEXT__("runtime.symbol_3") +
+    " " +
     pad2(d.getUTCHours()) +
-    __WEBUI_TEXT__("runtime.symbol") +
+    ":" +
     pad2(d.getUTCMinutes()) +
-    __WEBUI_TEXT__("runtime.symbol") +
+    ":" +
     pad2(d.getUTCSeconds())
   );
 }
@@ -890,14 +884,12 @@ function formatShotEnded(d, verdict) {
       relay_safety: __WEBUI_TEXT__("runtime.relay"),
       weight_anomaly: __WEBUI_TEXT__("runtime.anomaly"),
       touch_weight_fallback: __WEBUI_TEXT__("runtime.touch_stop_fallback"),
-    }[k] || __WEBUI_TEXT__("runtime.unknown")
+    }[k] || "—"
   );
 }
 function axisLabel(v, u) {
   v = Math.round(+v * 10) / 10;
-  return isFinite(v)
-    ? v + __WEBUI_TEXT__("runtime.symbol_3") + u
-    : __WEBUI_TEXT__("runtime.unknown");
+  return isFinite(v) ? v + " " + u : "—";
 }
 // Derive one estimate per distinct accepted endpoint, without resampling weights.
 // Held readings (a hand on the cup) are what the scale showed, not coffee: they
@@ -1419,16 +1411,14 @@ function formatPreferredScale(s) {
     : __WEBUI_TEXT__("runtime.none");
 }
 function formatScaleWeight(s) {
-  if (!s.scale) return __WEBUI_TEXT__("runtime.unknown");
+  if (!s.scale) return "—";
   const w =
     typeof s.scale.observedWeightG === "number"
       ? s.scale.observedWeightG
       : typeof s.scale.currentWeightG === "number"
         ? s.scale.currentWeightG
         : null;
-  return w === null
-    ? __WEBUI_TEXT__("runtime.unknown")
-    : w.toFixed(1) + __WEBUI_TEXT__("runtime.g_2");
+  return w === null ? "—" : w.toFixed(1) + __WEBUI_TEXT__("runtime.g_2");
 }
 function formatScaleStatus(s) {
   const sc = s.scale || {};
@@ -1455,19 +1445,19 @@ function formatMachineState(s) {
 function clearCupWeights() {
   ["cupWeight", "dCupWeight", "idleTareStatus", "cupAccessory"].forEach((id) => {
     const el = $(id);
-    if (el) el.textContent = __WEBUI_TEXT__("runtime.unknown");
+    if (el) el.textContent = "—";
   });
 }
 function formatCupWeight(s) {
   const c = s.cupPresence || {},
     sc = s.scale || {};
   return !sc.available || sc.streamState !== "FRESH"
-    ? __WEBUI_TEXT__("runtime.unknown")
+    ? "—"
     : c.present === false
       ? __WEBUI_TEXT__("runtime.absent")
       : c.present && c.weightValid === true && Number.isFinite(c.weightG)
-        ? __WEBUI_TEXT__("runtime.symbol_6") + c.weightG.toFixed(1) + __WEBUI_TEXT__("runtime.g_2")
-        : __WEBUI_TEXT__("runtime.unknown");
+        ? "≈ " + c.weightG.toFixed(1) + __WEBUI_TEXT__("runtime.g_2")
+        : "—";
 }
 function formatCupAccessory(s) {
   const c = s.cupPresence || {};
@@ -1498,7 +1488,7 @@ function formatIdleTare(s) {
     d = (s.cupPresence || {}).anchorDeltaG,
     w = (s.cupPresence || {}).anchorWaitS,
     sc = s.scale || {};
-  if (!t) return __WEBUI_TEXT__("runtime.unknown");
+  if (!t) return "—";
   if (t === "disabled") return __WEBUI_TEXT__("runtime.off_2");
   if (!sc.available || sc.streamState !== "FRESH") return formatScaleStatus(s);
   if (t === "empty" && typeof d === "number" && Math.abs(d) >= 0.5)
@@ -1526,11 +1516,11 @@ function formatIdleTare(s) {
   );
 }
 function formatScaleTimer(s) {
-  if (!s.scale || typeof s.scale.timerMs !== "number") return __WEBUI_TEXT__("runtime.unknown");
+  if (!s.scale || typeof s.scale.timerMs !== "number") return "—";
   const totalTenths = Math.floor(Math.max(0, s.scale.timerMs) / 100);
   return (
     Math.floor(totalTenths / 600) +
-    __WEBUI_TEXT__("runtime.symbol") +
+    ":" +
     pad2(Math.floor(totalTenths / 10) % 60) +
     "." +
     (totalTenths % 10)
@@ -1682,7 +1672,7 @@ function formatCommandError(fail, e) {
   const detail = e && e.message ? String(e.message) : "";
   if (!fail) return detail || __WEBUI_TEXT__("runtime.request_failed");
   if (!detail || fail.indexOf(detail) >= 0) return fail;
-  return fail + __WEBUI_TEXT__("runtime.symbol_3") + detail;
+  return fail + " " + detail;
 }
 function cn(s) {
   return __WEBUI_TEXT__("runtime.could_not") + s + ".";
@@ -1842,7 +1832,7 @@ function setOverlayReconnectMode(on) {
       w.id = "reconnectWait";
       w.className = "reconnectRing";
       w.hidden = true;
-      w.innerHTML = '<span id="reconnectSeconds">' + __WEBUI_TEXT__("runtime.180") + "</span>";
+      w.innerHTML = '<span id="reconnectSeconds">' + "180" + "</span>";
       b.after(w);
     }
   }
@@ -2537,8 +2527,7 @@ function updateBbwControls() {
       ? uiState.bbwReadback
       : null;
   const use = c && c.bbwEwmaOffsetG;
-  $("learnedOffsetG").textContent =
-    typeof use === "number" ? use.toFixed(2) : __WEBUI_TEXT__("runtime.unknown");
+  $("learnedOffsetG").textContent = typeof use === "number" ? use.toFixed(2) : "—";
   renderSettings(c);
   if (c && c.bbwPresetId !== dripFieldsPresetId) {
     dripFieldsPresetId = c.bbwPresetId;
@@ -2921,9 +2910,7 @@ function updateActiveBrewProfileHint() {
   const el = $("activeBrewProfileHint");
   if (!el) return;
   const p = presetState.items.find((x) => x.id === presetState.activeId);
-  el.textContent =
-    __WEBUI_TEXT__("runtime.current_preset") +
-    (p && p.name ? p.name : __WEBUI_TEXT__("runtime.unknown"));
+  el.textContent = __WEBUI_TEXT__("runtime.current_preset") + (p && p.name ? p.name : "—");
 }
 function renderAllPresetUi() {
   renderPresetCards("presetCards");
@@ -3645,7 +3632,7 @@ function invalidateHomeStream() {
     "scaleRowValue",
     "cupRowValue",
   ])
-    setHomeSub(id, __WEBUI_TEXT__("runtime.unknown"));
+    setHomeSub(id, "—");
   setHomeSub("machineRowHint", "");
   updateHomeAdminActions(false, false);
 }
@@ -4651,12 +4638,7 @@ function renderShotHero(d) {
     });
   hero.hidden = false;
   hero.classList.toggle("live", !!d.live);
-  t(
-    "Preset",
-    d.presetName && d.presetName !== __WEBUI_TEXT__("runtime.unknown")
-      ? __WEBUI_TEXT__("runtime.symbol_8") + d.presetName
-      : "",
-  );
+  t("Preset", d.presetName && d.presetName !== "—" ? " · " + d.presetName : "");
   const noScale = d.scaleAvailable === false;
   const label =
     heroNum(
@@ -4668,7 +4650,7 @@ function renderShotHero(d) {
           : noScale
             ? ms(d.clockMs, 1) + __WEBUI_TEXT__("runtime.s_2")
             : wt === null
-              ? __WEBUI_TEXT__("runtime.unknown")
+              ? "—"
               : wt.toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
     ) +
     t(
@@ -4736,14 +4718,7 @@ function renderShotHero(d) {
               rinse: __WEBUI_TEXT__("runtime.rinse"),
             }[(d.shotType || "").toLowerCase()] || ""
           : formatShotEnded(d.endReason, d.verdict);
-  chip(
-    "Mode",
-    !kind &&
-      !cut &&
-      mode !== __WEBUI_TEXT__("runtime.unknown") &&
-      mode !== __WEBUI_TEXT__("runtime.bbw") &&
-      mode,
-  );
+  chip("Mode", !kind && !cut && mode !== "—" && mode !== __WEBUI_TEXT__("runtime.bbw") && mode);
   $("shotHeroPills").hidden = ["Cut", "Touch", "Mode"].every((id) => $("shotHero" + id).hidden);
   const m = d.live
       ? liveRuleModel
@@ -5374,7 +5349,7 @@ function applyHomeStatus(s) {
   syncAdminSessionUi(admin, remoteReady);
   // Stream frames repeat most values: unchanged text is not rewritten.
   setHomeSub("machineState", formatMachineState(s));
-  setHomeSub("state", formatBackflushState(s) || s.stateLabel || __WEBUI_TEXT__("runtime.unknown"));
+  setHomeSub("state", formatBackflushState(s) || s.stateLabel || "—");
   updateStateTone(s);
   setHomeSub("cupState", formatCupState(s));
   setHomeSub("cupWeight", formatCupWeight(s));
@@ -5409,7 +5384,7 @@ function applyHomeStatus(s) {
       : __WEBUI_TEXT__("runtime.start_shot_2");
     shot.setAttribute("aria-label", shot.title);
     shot.classList.toggle("btnDanger", live);
-    if (g) g.textContent = live ? __WEBUI_TEXT__("runtime.stop") : __WEBUI_TEXT__("runtime.start");
+    if (g) g.textContent = live ? "■" : "▶";
     if (t) t.textContent = shot.title;
     shot.disabled = !admin || (!live && !(remoteReady && relayStartReady && canControl));
     if (force) force.disabled = !(admin && remoteReady && relayStartReady && webUiOwner);

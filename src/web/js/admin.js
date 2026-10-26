@@ -590,12 +590,12 @@ function showScanResults(d) {
     o.dataset.open = String(n.open);
     o.textContent =
       n.ssid +
-      __WEBUI_TEXT__("runtime.symbol_9") +
+      " (" +
       n.rssi +
       __WEBUI_TEXT__("runtime.dbm_channel") +
       n.channel +
       (n.open ? __WEBUI_TEXT__("runtime.open") : __WEBUI_TEXT__("runtime.secured")) +
-      __WEBUI_TEXT__("runtime.symbol_10");
+      ")";
     select.appendChild(o);
   }
 }
@@ -837,11 +837,11 @@ function applyAdminStatus(s) {
   $("apStatus").textContent =
     __WEBUI_TEXT__("runtime.ap") +
     (s.network.apActive ? __WEBUI_TEXT__("runtime.active_2") : __WEBUI_TEXT__("runtime.inactive")) +
-    __WEBUI_TEXT__("runtime.ap_ssid_sep") +
+    " — " +
     (s.network.apSsid || __WEBUI_TEXT__("runtime.ap_ssid")) +
-    __WEBUI_TEXT__("runtime.ap_ssid_sep") +
+    " — " +
     s.network.apIp +
-    __WEBUI_TEXT__("runtime.unknown_3") +
+    " — " +
     s.network.apClients +
     __WEBUI_TEXT__("runtime.client_s");
   if (!R.uiState.powerDirty) {
@@ -895,9 +895,7 @@ function applyAdminStatus(s) {
 const OTA_UPLOAD_TIMEOUT_MS = 2 * 60 * 1000;
 const OTA_COMMAND_TIMEOUT_MS = 60 * 1000;
 function otaTagText(t) {
-  return t
-    ? t.version + __WEBUI_TEXT__("runtime.symbol_8") + t.arch
-    : __WEBUI_TEXT__("runtime.unknown");
+  return t ? t.version + " · " + t.arch : "—";
 }
 function otaKib(n) {
   return typeof n === "number" && isFinite(n)
@@ -913,17 +911,12 @@ function otaStatusText(o) {
     return (
       __WEBUI_TEXT__("runtime.firmware_confirmation_pending") +
       (o.confirmBlockReason || __WEBUI_TEXT__("runtime.waiting_for_startup")) +
-      __WEBUI_TEXT__("runtime.symbol_12") +
+      ")." +
       (o.confirmLastError ? __WEBUI_TEXT__("runtime.esp_idf_error") + o.confirmLastError + "." : "")
     );
   if (o.state === "receiving") return __WEBUI_TEXT__("runtime.receiving_a_firmware_image");
   if (o.state === "staged") return __WEBUI_TEXT__("runtime.verified_and_waiting_for_you_to_flash");
-  if (!o.safe)
-    return (
-      __WEBUI_TEXT__("runtime.waiting_for_idle") +
-      o.lockReason +
-      __WEBUI_TEXT__("runtime.symbol_12")
-    );
+  if (!o.safe) return __WEBUI_TEXT__("runtime.waiting_for_idle") + o.lockReason + ").";
   return __WEBUI_TEXT__("runtime.ready_for_a_firmware_image");
 }
 function applyOtaStatus(o) {
@@ -943,7 +936,7 @@ function applyOtaStatus(o) {
     (active
       ? __WEBUI_TEXT__("runtime.resumable_transfer") +
         otaKib(o.nextOffset || 0) +
-        __WEBUI_TEXT__("runtime.symbol_11") +
+        " / " +
         otaKib(o.expectedBytes || 0)
       : "");
   $("otaRunning").textContent =
@@ -954,7 +947,7 @@ function applyOtaStatus(o) {
   $("otaStaged").textContent = staged
     ? __WEBUI_TEXT__("runtime.verified_image") +
       otaTagText(staged) +
-      __WEBUI_TEXT__("runtime.unknown_3") +
+      " — " +
       otaKib(o.receivedBytes)
     : active
       ? __WEBUI_TEXT__("runtime.transfer") +
@@ -1415,7 +1408,7 @@ function ensureUiOverridePanel() {
     '<summary><svg class="cfgIcon" aria-hidden="true"><use href="#g-override"/></svg>' +
     __WEBUI_TEXT__("runtime.ui_override") +
     '</summary><div class="btnBar"><button id="uiOverrideButton" class="btnGlyph btnWarn" type="button"><span class="g" aria-hidden="true">' +
-    __WEBUI_TEXT__("runtime.symbol_13") +
+    "⏱" +
     '</span><span class="t">' +
     __WEBUI_TEXT__("runtime.unlock_1_min") +
     '</span></button></div><small id="uiOverrideHint"></small>';
@@ -1474,13 +1467,13 @@ export function applyStatus(s) {
   if (p && $("powerStatus"))
     $("powerStatus").textContent =
       p.profile +
-      __WEBUI_TEXT__("admin.symbol_7") +
+      " · " +
       p.cpuMhz +
       __WEBUI_TEXT__("admin.mhz_range") +
       p.minMhz +
-      __WEBUI_TEXT__("admin.symbol_8") +
+      "–" +
       p.maxMhz +
-      __WEBUI_TEXT__("admin.symbol_9") +
+      ")" +
       (p.clockError || p.bleError
         ? __WEBUI_TEXT__("admin.apply_error") + p.clockError + "/" + p.bleError
         : "");
@@ -1513,9 +1506,7 @@ export function applyStatus(s) {
     __WEBUI_TEXT__("admin.dropped") +
     (w.dropped || 0) +
     (w.staleConfigDropped
-      ? __WEBUI_TEXT__("admin.symbol_10") +
-        w.staleConfigDropped +
-        __WEBUI_TEXT__("admin.after_configuration_changes")
+      ? " (" + w.staleConfigDropped + __WEBUI_TEXT__("admin.after_configuration_changes")
       : "") +
     (w.workerStartFailures
       ? __WEBUI_TEXT__("admin.worker_start_failures") + w.workerStartFailures

@@ -577,8 +577,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       ui.slice(first, last) +
       blockAt(viewJs.diagnostic, 'function formatWallTime(').replace(/\bR\./g, '') +
       ';return {formatWallTime,formatWallTimeLocal};')(
-      key => ({'runtime.symbol': ':', 'runtime.symbol_2': '-',
-        'runtime.symbol_3': ' '}[key] || ''));
+      key => key);
   assert.equal(formatWallTimeLocal(1704069000), '2024-01-01 00:30:00');
   assert.equal(formatWallTime(1704069000, -180), '2023-12-31 21:30:00');
   if (!codeIncludes(ui, "t('ut')(utc&&utc.slice(11))") ||
