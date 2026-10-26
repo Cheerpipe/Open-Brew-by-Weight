@@ -25,6 +25,8 @@ std::string wire;
 std::deque<size_t> chunks;
 unsigned logs = 0;
 std::string lastLog;
+enum { ESP_LOG_WARN = 2, ESP_LOG_INFO = 3 };
+int lastLevel = 0;
 uint32_t millis() { return now; }
 
 int testSelect(int count, fd_set *, fd_set *writable, fd_set *, timeval *wait) {
@@ -58,23 +60,24 @@ int testSend(int fd, const char *data, size_t length, int flags) {
   return next.value;
 }
 
-void testLog(const char *format, ...) {
+void testLog(int level, const char *format, ...) {
   char line[256];
   va_list args;
   va_start(args, format);
   vsnprintf(line, sizeof(line), format, args);
   va_end(args);
   lastLog = line;
+  lastLevel = level;
   ++logs;
   errno = EIO;  // Logging must not overwrite the socket failure returned upstream.
 }
 
 #define select testSelect
 #define send testSend
-#define ESP_LOGW(tag, ...) testLog(__VA_ARGS__)
+#define ESP_LOG_LEVEL(level, tag, ...) testLog(level, __VA_ARGS__)
 #define OPEN_BREW_BY_WEIGHT_PSRAM_BSS
 #include "network/OpenBrewByWeightUiStreamTransport.inc"
-#undef ESP_LOGW
+#undef ESP_LOG_LEVEL
 #undef send
 #undef select
 
@@ -110,10 +113,12 @@ int main() {
   uint32_t started = now;
   assert(transmit(4) == -1 && now - started == 100 && uiStreamSendCleanAbort);
   assert(errno == EAGAIN && lastLog.find("stats fd=1 bytes=0/4 ms=100") != std::string::npos);
+  assert(lastLevel == ESP_LOG_INFO);  // A clean deferral is not a warning.
 
   reset();
   readiness = {{1}, {0}}; writes = {{2}};
   assert(transmit(4) == -1 && accepted == 2 && !uiStreamSendCleanAbort);
+  assert(lastLevel == ESP_LOG_WARN);
 
   // A large single curve can cross the TCP buffer size and an ACK sleep gap.
   reset();

@@ -39,7 +39,9 @@ int uiStreamSendFailed(int fd, size_t done, size_t length, uint32_t started,
   const uint32_t now = millis();
   if (++failures == 1 || now - loggedAt >= 1000) {
     loggedAt = now;
-    ESP_LOGW("ui_stream", "%s fd=%d bytes=%u/%u ms=%lu errno=%d failures=%lu",
+    // A clean abort is a deferral the caller retries, not a lost frame.
+    ESP_LOG_LEVEL(uiStreamSendCleanAbort ? ESP_LOG_INFO : ESP_LOG_WARN, "ui_stream",
+             "%s fd=%d bytes=%u/%u ms=%lu errno=%d failures=%lu",
              uiStreamSendKind, fd, static_cast<unsigned>(done),
              static_cast<unsigned>(length), static_cast<unsigned long>(now - started),
              error, static_cast<unsigned long>(failures));

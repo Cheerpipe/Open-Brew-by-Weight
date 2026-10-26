@@ -232,8 +232,10 @@ void quietIdfWifiDriverWarnings() {
   // mesh/UniFi setups. The closed-source driver then WARNs on every matching
   // BSS and falls back to WPA2-PSK. Association still succeeds; Open Brew by
   // Weight logs join/fail itself. Drop the wifi tag to ERROR so that expected
-  // fallback does not flood USB serial. Other IDF tags stay at WARN.
+  // fallback does not flood USB serial. Other IDF tags stay at WARN, except
+  // ui_stream, whose deferred-send line is INFO.
   esp_log_level_set("wifi", ESP_LOG_ERROR);
+  esp_log_level_set("ui_stream", ESP_LOG_INFO);
 }
 
 LogLevel networkTextLogLevel(const char *message) {
