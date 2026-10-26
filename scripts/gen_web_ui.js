@@ -53,6 +53,11 @@ const JS_TYPE = 'application/javascript; charset=utf-8';
 const ASSET_PATHS = ['/app.js', '/app.css', '/js/runtime.js', '/js/ota-image.js',
   ...Object.keys(VIEW_MODULES).map((file) => `/js/${file}.js`), '/sw.js',
   '/manifest.webmanifest', '/icons/icon-192.png', '/favicon.ico', '/apple-touch-icon*'];
+// Paths the firmware answers with the shell: the keys of app.js ROUTES, which
+// the service worker also matches navigations against.
+const SHELL_PATHS = [...fs.readFileSync(appJsPath, 'utf8')
+    .match(/^const ROUTES = \{\n([\s\S]*?)^\};/m)[1].matchAll(/^ {2}"(\/[a-z]*)":/gm)]
+    .map((m) => m[1]);
 
 // Machine-type exclusive markup classes. Sources stay type-agnostic and hide
 // excluded elements via CSS at runtime; typed builds strip them at generation
@@ -378,8 +383,10 @@ async function generate(options = {}) {
         ? stripRemoteControlCss(localizedCss) : localizedCss, excluded)),
     manifest: JSON.stringify(manifestObject),
     // The worker precaches every ?v= row; probe paths and itself stay out.
-    swJs: await minifyJs(fs.readFileSync(swPath, 'utf8').split('__SW_ASSETS__').join(
-        JSON.stringify(ASSET_PATHS.filter((p) => !p.endsWith('*') && p !== '/sw.js'))), options),
+    swJs: await minifyJs(fs.readFileSync(swPath, 'utf8')
+        .split('__SHELL_PATHS__').join(JSON.stringify(SHELL_PATHS))
+        .split('__SW_ASSETS__').join(
+            JSON.stringify(ASSET_PATHS.filter((p) => !p.endsWith('*') && p !== '/sw.js'))), options),
   };
   const modules = {};
   for (const [file, views] of Object.entries(VIEW_MODULES)) {
@@ -515,6 +522,7 @@ ${rows}
     runtimeJs,
     otaImageJs,
     modules,
+    swJs,
     css,
     manifest,
     icon192Raw,
@@ -560,6 +568,7 @@ module.exports = {
   VIEW_MODULES,
   JS_FILES,
   ASSET_PATHS,
+  SHELL_PATHS,
   htmlDir,
   jsDir,
   gzipBuffer,

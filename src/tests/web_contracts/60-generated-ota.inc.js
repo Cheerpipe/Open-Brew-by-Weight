@@ -659,6 +659,13 @@ if (assetRows.map((row) => row[1]).join() !== webUi.ASSET_PATHS.join() ||
     webUi.ASSET_PATHS.some((assetPath) =>
       !network.includes(`registerHandler(server_, "${assetPath}", HTTP_GET, assetHandler)`)) ||
     (network.match(/HTTP_GET, assetHandler\)/g) || []).length !== webUi.ASSET_PATHS.length ||
+    // The shell routes come from app.js ROUTES, as the service worker's list does.
+    webUi.SHELL_PATHS.join() !== Object.keys(new Function(
+        rawAppJsSource.match(/^const ROUTES = \{[\s\S]*?^\};/m)[0] + 'return ROUTES;')()).join() ||
+    webUi.SHELL_PATHS.some((shellPath) =>
+      !network.includes(`registerHandler(server_, "${shellPath}", HTTP_GET, rootHandler)`)) ||
+    (network.match(/HTTP_GET, rootHandler\)/g) || []).length !== webUi.SHELL_PATHS.length ||
+    !generated.swJs.includes(JSON.stringify(webUi.SHELL_PATHS)) ||
     !assetHandler.includes('strcspn(request->uri, "?")') ||
     !assetHandler.includes("asset.path[pathLength - 1] == '*'") ||
     !assetHandler.includes('return serveWebAsset(request, asset)') ||

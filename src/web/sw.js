@@ -6,17 +6,8 @@
 // The bytes name the firmware release and asset tag, so every update installs
 // a new worker that replaces the old cache.
 const CACHE = "obbw-__FW_RELEASE__.__FW_ASSET_TAG__";
-// Every path rootHandler answers with the same shell.
-const SHELL_PATHS = [
-  "/",
-  "/diagnostic",
-  "/log",
-  "/stats",
-  "/history",
-  "/admin",
-  "/settings",
-  "/setup",
-];
+// Every path rootHandler answers with the same shell (app.js ROUTES).
+const SHELL_PATHS = __SHELL_PATHS__;
 const ASSETS = __SW_ASSETS__.map((path) => path + "?v=__FW_ASSET_TAG__");
 
 self.addEventListener("install", (event) => {
