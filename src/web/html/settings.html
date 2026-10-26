@@ -457,34 +457,38 @@
           <div class="dcBarX" id="dripBarX" aria-hidden="true"></div>
           <small class="fieldHint" id="dripHint"></small>
         </figure>
-        <label
-          >{{webui:settings.drip_expected_g}}<input
-            id="dripSetG"
-            type="number"
-            min="0"
-            max="5"
-            step="0.01"
-          /><small class="fieldHint">{{webui:settings.drip_set_hint}}</small></label
-        >
-        <div class="btnBar">
-          <button id="dripSetButton" class="btnGlyph mutable" type="button">
-            <span class="t">{{webui:settings.set_drip}}</span>
-          </button>
-        </div>
-        <label
-          >{{webui:settings.learning_factor}}<input
-            id="alphaSet"
-            type="number"
-            min="0.01"
-            max="1"
-            step="0.01"
-          /><small class="fieldHint">{{webui:settings.learning_speed_hint}}</small></label
-        >
-        <div class="btnBar">
-          <button id="alphaSetButton" class="btnGlyph mutable" type="button">
-            <span class="t">{{webui:settings.set_learning_speed}}</span>
-          </button>
-        </div>
+        <form class="enterForm" novalidate>
+          <label
+            >{{webui:settings.drip_expected_g}}<input
+              id="dripSetG"
+              type="number"
+              min="0"
+              max="5"
+              step="0.01"
+            /><small class="fieldHint">{{webui:settings.drip_set_hint}}</small></label
+          >
+          <div class="btnBar">
+            <button id="dripSetButton" class="btnGlyph mutable" type="submit">
+              <span class="t">{{webui:settings.set_drip}}</span>
+            </button>
+          </div>
+        </form>
+        <form class="enterForm" novalidate>
+          <label
+            >{{webui:settings.learning_factor}}<input
+              id="alphaSet"
+              type="number"
+              min="0.01"
+              max="1"
+              step="0.01"
+            /><small class="fieldHint">{{webui:settings.learning_speed_hint}}</small></label
+          >
+          <div class="btnBar">
+            <button id="alphaSetButton" class="btnGlyph mutable" type="submit">
+              <span class="t">{{webui:settings.set_learning_speed}}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </details>
     <div class="configSaveBar">

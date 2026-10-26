@@ -200,7 +200,8 @@ different dose), the drip is not re-detected: use **Set drip** to start it again
 **Set drip** uses the value you enter from the next shot and keeps it as the
 preset's starting point; if your next three shots agree on a different amount,
 the drip moves there at once. **Set learning speed** (0.01–1.00, step 0.01)
-applies a new speed at once and keeps the drip.
+applies a new speed at once and keeps the drip. Pressing Enter in either field
+does the same as its button.
 **Restore** on a factory preset returns the whole recipe, its drip and a
 learning speed of 0.30, and starts a quick start; it is available only for
 factory presets. A device factory reset additionally erases other settings and
