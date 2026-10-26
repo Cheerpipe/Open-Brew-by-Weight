@@ -243,15 +243,12 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   if (buffer.stamp.epoch != self.observationFence_.epoch ||
       buffer.stamp.identity != self.identityGeneration_ ||
       buffer.disconnectGeneration != self.disconnectGeneration_.load(std::memory_order_acquire)) return true;
-  const bool wasOffline = self.observationFence_.offline;
   if (!self.observationFence_.merge(self.published_, self.powerState_, update,
                                     true)) return true;
   self.mirrorPowerLocked();
+  // The broker's online push carries the full dashboard, so going back online
+  // needs no HTTPS read; an offline machine makes a pending one useless.
   if (self.observationFence_.offline) self.snapshotPending_ = false;
-  else if (wasOffline && !self.observationFence_.synchronized) {
-    self.snapshotStamp_ = self.observationFence_.stamp(self.identityGeneration_, self.powerState_.generation());
-    self.snapshotPending_ = true;
-  }
   auto &status = self.websocketStatus_;
   status.state = MicraSocketState::STREAMING;
   status.reason = "none";

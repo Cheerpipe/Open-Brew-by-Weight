@@ -178,9 +178,9 @@ or hours. The next power update replaces it. Diagnostics shows the source beside
 **StandBy (API via WebSocket)**. The last label means the initial API reading
 requested when the WebSocket subscription starts; a later manual API read shows
 **API**. The sample age keeps increasing; unrelated messages do not reset it.
-An explicit machine-offline report makes the retained value stale. If the
-machine reports that it is back online without a power value, one new API read
-resynchronizes it.
+An explicit machine-offline report makes the retained value stale. When the
+machine comes back online, La Marzocco sends its full state over the
+WebSocket, so no extra API reading is needed.
 
 In API mode, power evidence becomes stale after 30 seconds. API failures use
 four attempts with 3, 6 and 9 second delays. Regular API polling resumes its

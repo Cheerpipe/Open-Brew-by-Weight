@@ -1105,7 +1105,9 @@ On resume, connection/subscription/pong or temperature-only updates do not clear
 the separate stale assumed-power hold; only current-epoch known power does.
 Machine `connected:false` is offline evidence, never power OFF. Cleaning is a
 separate WS-only diagnostic state and cannot create a control transition.
-Offline-to-online without power queues one new initialization cycle. Connection
+Offline-to-online queues no HTTPS read: the broker's online push carries the
+full dashboard, and power absent from it stays stale until a push supplies it.
+Connection
 revision fencing rejects HTTP results that predate offline, teardown or a new
 subscription, including late offline dashboard responses. Online-evidence
 revisions also prevent an older API offline result from overriding a repeated

@@ -701,8 +701,8 @@ struct MicraWebSocketTest {
     deliver(service, observation(service, R"({"connected":false})"));
     assert(service.observationFence_.offline && service.powerState_.retained());
     deliver(service, observation(service, R"({"connected":true})"));
-    assert(service.snapshotPending_ && !service.observationFence_.synchronized);
-    assert(service.snapshotStamp_.connectionRevision != firstStamp.connectionRevision);
+    // Back online without power queues no HTTPS read; the next push resyncs.
+    assert(!service.snapshotPending_ && !service.observationFence_.synchronized);
     deliver(service, observation(service, R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}}]})"));
     assert(service.observationFence_.synchronized);
     ++outboundAcquisitionGeneration;
