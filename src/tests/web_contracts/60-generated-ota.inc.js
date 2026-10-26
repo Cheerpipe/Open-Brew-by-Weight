@@ -736,6 +736,12 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
     goalWeightG: 36,
     fastMarginG: 6.5,
     slowMarginG: 2,
+    fastRampS: 5,
+    slowRampS: 5,
+    fastCurve: 'even',
+    slowCurve: 'even',
+    fastCurveHardness: 'soft',
+    slowCurveHardness: 'soft',
   };
   const off = helpers.buildRuleChartModel({...base, brewByWeight: false});
   if (off.mode !== 'timerOnly') {
@@ -785,12 +791,13 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
       throw new Error('Rule chart: an incomplete or out-of-order recipe must render nothing');
     }
   }
-  // Each side's transition comes from the recipe; an unreadable length draws nothing.
+  // Each side's transition comes from the recipe; an unreadable or missing one draws nothing.
   const sides = helpers.buildRuleChartModel({...base, fastRampS: 2, slowRampS: 8,
     fastCurve: 'early', fastCurveHardness: 'medium', slowCurve: 'late',
     slowCurveHardness: 'hard'});
   if (sides.dFast !== 2 || sides.dSlow !== 8 || sides.curveFast !== 4 || sides.curveSlow !== 8 ||
-      helpers.buildRuleChartModel({...base, slowRampS: 'x'}).mode !== 'empty') {
+      [{slowRampS: 'x'}, {fastRampS: undefined}, {slowCurve: undefined}, {fastCurveHardness: 'x'}]
+          .some((bad) => helpers.buildRuleChartModel({...base, ...bad}).mode !== 'empty')) {
     throw new Error('Rule chart: the transition length and curve come from each side');
   }
   // The graph's cut line reproduces the firmware kernel's golden vectors
@@ -799,7 +806,7 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
       path.join(sketchDir, 'tests/fixtures/corridor_vectors_v1.json'), 'utf8'));
   let compared = 0;
   for (const [name, p] of Object.entries(vectors.presets)) {
-    const m = helpers.buildRuleChartModel({brewByWeight: true,
+    const m = helpers.buildRuleChartModel({...base,
       fastRampS: p.rampMs / 1000, slowRampS: p.rampMs / 1000,
       fastExtractionGuardEnabled: p.fastOn, slowExtractionGuardEnabled: p.slowOn,
       goalWeightG: p.goalDg / 10, fastMarginG: p.fastMarginDg / 10,

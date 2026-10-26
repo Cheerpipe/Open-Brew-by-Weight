@@ -3159,9 +3159,10 @@ function buildRuleChartModel(c) {
     t2 = N(c.slowAfterS),
     prot = N(c.bbwProtectionMs) / 1e3,
     wall = N(c.operationalWallMs) / 1e3,
-    // Shots and presets without a transition length used the 5 s default.
-    dFast = N(c.fastRampS ?? 5),
-    dSlow = N(c.slowRampS ?? 5),
+    dFast = N(c.fastRampS),
+    dSlow = N(c.slowRampS),
+    curveFast = rampCurveIndex(c.fastCurve, c.fastCurveHardness),
+    curveSlow = rampCurveIndex(c.slowCurve, c.slowCurveHardness),
     fast = !!c.fastExtractionGuardEnabled,
     slow = !!c.slowExtractionGuardEnabled,
     fastMargin = N(c.fastMarginG),
@@ -3171,7 +3172,9 @@ function buildRuleChartModel(c) {
     // Paces start at the usual first drop, kept 0.5 s before the window.
     start = Math.max(0, Math.min(N(c.firstDropS) || 0, t1 - 0.5));
   if (
-    ![goal, t1, t2, prot, wall, dFast, dSlow, ceil, floor].every(Number.isFinite) ||
+    ![goal, t1, t2, prot, wall, dFast, dSlow, curveFast, curveSlow, ceil, floor].every(
+      Number.isFinite,
+    ) ||
     !(prot < t1 && t1 < t2 && t2 < wall)
   )
     return { mode: "empty" };
@@ -3190,8 +3193,8 @@ function buildRuleChartModel(c) {
     wall,
     dFast,
     dSlow,
-    curveFast: rampCurveIndex(c.fastCurve, c.fastCurveHardness),
-    curveSlow: rampCurveIndex(c.slowCurve, c.slowCurveHardness),
+    curveFast,
+    curveSlow,
     firstDrop: start,
     firstDropN: N(c.firstDropN) || 0,
     scrubMin: Math.max(prot, start + 0.5),
@@ -3205,11 +3208,11 @@ function buildRuleChartModel(c) {
     ],
   };
 }
-// Index of a side's transition curve in RAMP_CURVES: type * 3 + hardness.
+// Index of a side's transition curve in RAMP_CURVES: type * 3 + hardness; NaN if unknown.
 function rampCurveIndex(type, hardness) {
   const t = ["even", "early", "late"].indexOf(type),
     h = ["soft", "medium", "hard"].indexOf(hardness);
-  return t < 0 || h < 0 ? 0 : t * 3 + h;
+  return t < 0 || h < 0 ? NaN : t * 3 + h;
 }
 // Transition curves e(u) = I(u; a, b), the regularized incomplete beta, as the
 // firmware's corridor::RAMP_CURVES; index 0 (even, soft) is smoothstep. Every
@@ -3227,7 +3230,7 @@ const RAMP_CURVES = [
 ];
 // e(u) for drawing (Number); the cut weights come from rampDg.
 function rampEase(curve, u) {
-  const [a, b] = RAMP_CURVES[curve] || RAMP_CURVES[0],
+  const [a, b] = RAMP_CURVES[curve],
     n = a + b - 1;
   let e = 0,
     choose = 1;
@@ -3241,7 +3244,7 @@ function rampEase(curve, u) {
 // `reached`, else floor(margin * (1 - e)), from the Bernstein sum over d^N.
 // The products reach 2^100, hence BigInt.
 function rampDg(margin, n, d, curve, reached) {
-  const [a, b] = RAMP_CURVES[curve] || RAMP_CURVES[0],
+  const [a, b] = RAMP_CURVES[curve],
     deg = a + b - 1,
     big = BigInt;
   let sum = big(0),

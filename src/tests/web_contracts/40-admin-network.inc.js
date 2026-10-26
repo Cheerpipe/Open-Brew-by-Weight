@@ -82,7 +82,9 @@ if (firmware.indexOf('publishLogLevels(serialLogLevelFromRuntime(runtimeConfig)'
   const node = () => ({children: [], append(...children) { this.children.push(...children); }, setAttribute() {}});
   const saved = {id: 1, brewByWeight: true, fastExtractionGuardEnabled: true,
     slowExtractionGuardEnabled: true, operationalWallMs: 50000, bbwProtectionMs: 12000,
-    fastBeforeS: 27, slowAfterS: 34, goalWeightG: 36, fastMarginG: 4, slowMarginG: 3};
+    fastBeforeS: 27, slowAfterS: 34, goalWeightG: 36, fastMarginG: 4, slowMarginG: 3,
+    fastRampS: 5, slowRampS: 5, fastCurve: 'even', slowCurve: 'even',
+    fastCurveHardness: 'soft', slowCurveHardness: 'soft'};
   const context = vm.createContext({__WEBUI_TEXT__: key => strings[key],
     document: {createElement: node, createTextNode: text => ({textContent: text})},
     presetState: {activeId: 1, items: [saved]}, renderHomePresetAccordion() {}});
