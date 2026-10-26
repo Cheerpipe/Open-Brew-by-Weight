@@ -28,7 +28,7 @@ While the setup network is open or the controller isn't on your home Wi-Fi,
    to select instead.
 4. If the account has several, each machine is listed with its name and serial
    number. Choose the one this controller is paired with and select **Use this
-   machine**, or **Cancel** to sign out again.
+   machine** (or press Enter), or **Cancel** to sign out again.
 
 If the sign-in fails, the form returns and the line under **Sign in** says why in plain words — for
 example, when La Marzocco doesn't accept the email and password or the account

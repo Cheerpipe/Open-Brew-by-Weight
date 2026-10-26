@@ -382,7 +382,7 @@
   for (const [view, id] of [['settings', 'lineaMicraConnectButton'], ['admin', 'loginConfirmButton'],
     ['admin', 'changeDevicePasswordButton'], ['admin', 'saveNetworkButton'], ['admin', 'saveDateTimeButton'],
     ['admin', 'saveWebhookButton'], ['admin', 'saveScheduledRestartButton'],
-    ['settings', 'dripSetButton'], ['settings', 'alphaSetButton']]) {
+    ['settings', 'dripSetButton'], ['settings', 'alphaSetButton'], ['settings', 'lineaMicraSelectButton']]) {
     const html = partialHtml[view], at = html.indexOf(`<button id="${id}"`),
       form = html.lastIndexOf('<form', at), tag = html.slice(at, html.indexOf('>', at));
     if (at < 0 || !/type="submit"/.test(tag) || html.lastIndexOf('</form>', at) > form ||

@@ -539,7 +539,7 @@
         <li>{{webui:settings.micra_step_link}}</li>
       </ol>
     </div>
-    <div id="lineaMicraChoose" hidden>
+    <form id="lineaMicraChoose" class="enterForm" novalidate hidden>
       <p>
         {{webui:settings.micra_choose_intro}}<small class="fieldHint"
           >{{webui:settings.micra_machine_hint}}</small
@@ -554,7 +554,7 @@
         <button
           id="lineaMicraSelectButton"
           class="btnGlyph mutable btnInvert"
-          type="button"
+          type="submit"
           disabled
         >
           <span class="g" aria-hidden="true">✓</span
@@ -563,7 +563,7 @@
           {{webui:settings.cancel}}
         </button>
       </div>
-    </div>
+    </form>
     <small id="lineaMicraProgress" role="status"></small>
     <div id="lineaMicraConnected" hidden>
       <p class="scopeNote">{{webui:settings.micra_scope_note}}</p>
