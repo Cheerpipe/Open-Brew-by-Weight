@@ -332,15 +332,19 @@ CrashArchiveStatus crashArchiveStatus(bool verifyDumps) {
     }
     if (!digestPartition(history, g_status.slots[i] * CRASH_HISTORY_SLOT_BYTES,
                          g_status.entries[i].dumpBytes, digest)) {
+      // A read or flash-lock failure fails this download only; the record
+      // stays listed and unverified for the next attempt.
       g_status.state = CrashArchiveState::IO_ERROR;
-    } else if (memcmp(digest, g_status.entries[i].dumpSha256,
-                      sizeof(digest)) == 0) {
+      ++i;
+      continue;
+    }
+    if (memcmp(digest, g_status.entries[i].dumpSha256, sizeof(digest)) == 0) {
       g_unverifiedSlots &= static_cast<uint8_t>(~bit);
       ++i;
       continue;
     }
-    // Unreadable or mismatching dump: drop the record from the list, as a
-    // boot-time scan did before the digest became lazy.
+    // Mismatching dump: drop the record from the list, as a boot-time scan
+    // did before the digest became lazy.
     --g_status.count;
     g_status.entries[i] = g_status.entries[g_status.count];
     g_status.slots[i] = g_status.slots[g_status.count];
