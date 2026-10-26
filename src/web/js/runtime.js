@@ -2352,10 +2352,15 @@ function number(id) {
 function sToMs(id) {
   return Math.round(number(id) * 1000);
 }
-function setMutable(enabled) {
+// Home frames call this several times a second: the control sweep runs only
+// when mutability or ownership changed, or when a newly mounted view asks.
+let sweptMutable = null;
+function setMutable(enabled, mounted) {
   const canEdit = !!enabled && webUiOwner;
   const was = controlsMutable;
   controlsMutable = canEdit;
+  if (!mounted && sweptMutable === canEdit + "/" + webUiOwner) return;
+  sweptMutable = canEdit + "/" + webUiOwner;
   if (was !== canEdit) renderHomePresetAccordion();
   document.querySelectorAll("#app input,#app select,#app button").forEach((e) => {
     if (e.closest("#message")) return;

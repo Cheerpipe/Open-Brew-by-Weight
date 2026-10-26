@@ -93,18 +93,17 @@ async function ensureView(name) {
   const load = (async () => {
     const section = document.getElementById("view-" + name);
     if (!section) throw new Error(__WEBUI_TEXT__("shell.missing_view_section") + name);
-    if (name === "home") {
-      __homeModule.init();
-      jsMods.set("home", __homeModule);
-      return __homeModule;
+    let mod = name === "home" && __homeModule;
+    if (!mod) {
+      const boot = bootFetch?.[0] === name && bootFetch[1];
+      if (boot) bootFetch = null;
+      mod = await (boot || fetchView(name));
+      if (!mod) throw new Error(__WEBUI_TEXT__("shell.missing_secondary_view") + name);
+      section.innerHTML = mod.markup;
+      addNumberKeys(section);
     }
-    const boot = bootFetch?.[0] === name && bootFetch[1];
-    if (boot) bootFetch = null;
-    const mod = await (boot || fetchView(name));
-    if (!mod) throw new Error(__WEBUI_TEXT__("shell.missing_secondary_view") + name);
-    section.innerHTML = mod.markup;
-    addNumberKeys(section);
     if (mod.init) mod.init();
+    R.setMutable(R.controlsMutable, true);
     jsMods.set(name, mod);
     return mod;
   })();

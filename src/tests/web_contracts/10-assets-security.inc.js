@@ -383,7 +383,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
 
     // Stats and History share one module; the browser's module map
     // deduplicates a URL, which importModule mirrors here.
-    const records = deferred(), modules = new Map(), assetEvents = [], initialized = [], sections = {};
+    const records = deferred(), modules = new Map(), assetEvents = [], initialized = [], sections = {}, swept = [];
     for (const name of ['stats', 'history']) sections['view-' + name] = {
       set innerHTML(html) {assetEvents.push('insert-' + name + ':' + html);},
       querySelectorAll: () => [],
@@ -392,6 +392,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
       BUNDLES: {stats: 'records', history: 'records'}, bootFetch: null,
       assetQuery: '?v=test', document: {getElementById: id => sections[id]},
       __WEBUI_TEXT__: key => key,
+      R: {controlsMutable: true, setMutable: (on, mounted) => swept.push(on + '/' + mounted)},
       importModule: url => {
         if (!modules.has(url)) {assetEvents.push('js ' + url); modules.set(url, records.promise);}
         return modules.get(url);
@@ -412,6 +413,8 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
     await Promise.all([firstStats, againStats, firstHistory]);
     await assetContext.ensureView('stats'); await assetContext.ensureView('history');
     assert.deepEqual(initialized.sort(), ['history', 'stats'], 'Revisits reuse each initialized view');
+    assert.deepEqual(swept, ['true/true', 'true/true'],
+        'Each newly mounted view gets one mutability sweep; revisits skip it');
 
     for (const view of ['home', 'settings', 'stats', 'history', 'diagnostic', 'admin']) {
       const events = [], markup = deferred(), status = deferred(), data = deferred(), bodyClasses = new Set();
