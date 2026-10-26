@@ -1724,12 +1724,10 @@ const ADMIN_SUMMARIES = {
   firmware: () => onOff("firmwareModeEnabled"),
   ble: () => onOff("bleEnabled"),
   network: () => $("staSsid").value.trim() || __WEBUI_TEXT__("admin.sum_not_set"),
-  energy: () => onOff("powerManagementEnabled"),
-  clock: () =>
-    ($("timezoneId").value || R.uiState.savedTimezoneId || "")
-      .split("/")
-      .pop()
-      .replaceAll("_", " "),
+  energy: () =>
+    onOff("powerManagementEnabled") +
+    ($("staWifiSleep").checked ? " · " + __WEBUI_TEXT__("admin.wi_fi_sleep") : ""),
+  clock: () => ($("timezoneId").value || R.uiState.savedTimezoneId || "").replaceAll("_", " "),
   frontend: () => $("heroTint").selectedOptions[0].text,
   schedule: () =>
     $("scheduledRestartEnabled").checked
