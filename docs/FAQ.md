@@ -122,6 +122,16 @@ using such a name get an error and need the IP address or the `.local` name
 instead. The Diagnostic log shows each refused name. See
 [Web UI access](settings/web-access.md#what-it-protects-and-what-it-doesnt).
 
+### The browser shows its own cannot-connect page instead of "out of reach"
+
+The out-of-reach screen comes from a saved copy of the app. Over the
+controller's plain `http://` address, browsers keep that copy for about a day
+after the last successful open, so after a longer absence the browser shows its
+own error page until the controller answers again. If you want the app to open
+while the controller is unreachable for longer, reach it through a reverse
+proxy that serves it over HTTPS; browsers then keep the whole app until the
+next firmware update. See [Out of reach](GETTING_STARTED.md#web-access).
+
 ### Controls are locked or another browser took over
 
 Reload claims the Web UI. Admin unlock is a separate password check. Idle

@@ -180,7 +180,11 @@ straight into the message, check that the phone or computer is connected to the
 same network as the controller, then press **Reload**. Right after a firmware
 update the message can appear while the controller restarts; wait a moment and
 press **Reload**. If the browser has no saved copy of the page yet, it shows
-its own cannot-connect page instead.
+its own cannot-connect page instead. Over the controller's plain `http://`
+address the browser keeps that saved copy for about a day after the last
+successful open; to open the app while the controller stays unreachable for
+longer than that, reach it through a reverse proxy that serves it over HTTPS,
+which lets the browser keep the whole app until the next firmware update.
 
 **Admin unlock** is an additional password check for privileged actions.
 The **Firmware** section in Admin holds a master switch that can turn every
