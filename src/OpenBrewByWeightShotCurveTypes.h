@@ -406,7 +406,8 @@ inline bool forEachShotCurveScalar(const ShotCurveRecord &curve, Emit &&emit) {
 
 // Curve object body from point `start`: the points' delta stream in base64
 // ("wD"), the point before them when start > 0 ("wRef"), absolute break and
-// held indices, then the scalars unless the caller streams those itself.
+// held indices, then the scalars unless the caller streams those itself. A
+// fragment (start > 0) leaves out an index list it has nothing to add to.
 inline bool formatShotCurveJsonBody(char *out, size_t capacity,
                                     const ShotCurveRecord &curve,
                                     uint16_t start = 0, bool scalars = true) {
@@ -432,28 +433,26 @@ inline bool formatShotCurveJsonBody(char *out, size_t capacity,
              static_cast<unsigned>(from.atMs), static_cast<int>(from.weightCg));
     if (!append(piece)) return false;
   }
+  auto indices = [&](const char *key, size_t i,
+                     bool (*marked)(const ShotCurveRecord &, size_t)) -> bool {
+    bool first = true;
+    for (; i < curve.count; ++i) {
+      if (!marked(curve, i)) continue;
+      if (first) snprintf(piece, sizeof(piece), ",\"%s\":[%u", key, static_cast<unsigned>(i));
+      else snprintf(piece, sizeof(piece), ",%u", static_cast<unsigned>(i));
+      if (!append(piece)) return false;
+      first = false;
+    }
+    if (!first) return append("]");
+    if (start > 0) return true;
+    snprintf(piece, sizeof(piece), ",\"%s\":[]", key);
+    return append(piece);
+  };
   if (!append("\"wD\":\"") ||
       !appendBase64(out, capacity, used, curve.stream + from.offset,
                     from.size - from.offset) ||
-      !append("\",\"wBreakBefore\":[")) return false;
-  bool first = true;
-  for (size_t i = start > 1 ? start : 1; i < curve.count; ++i) {
-    if (!shotCurveBreakBefore(curve, i)) continue;
-    snprintf(piece, sizeof(piece), "%s%u", first ? "" : ",",
-             static_cast<unsigned>(i));
-    if (!append(piece)) return false;
-    first = false;
-  }
-  if (!append("],\"wHeld\":[")) return false;
-  first = true;
-  for (size_t i = start; i < curve.count; ++i) {
-    if (!shotCurveHeld(curve, i)) continue;
-    snprintf(piece, sizeof(piece), "%s%u", first ? "" : ",",
-             static_cast<unsigned>(i));
-    if (!append(piece)) return false;
-    first = false;
-  }
-  if (!append("]")) return false;
+      !append("\"") || !indices("wBreakBefore", start > 1 ? start : 1, shotCurveBreakBefore) ||
+      !indices("wHeld", start, shotCurveHeld)) return false;
   return !scalars ||
          forEachShotCurveScalar(curve, [&](const char *key, const char *value) {
            snprintf(piece, sizeof(piece), ",\"%s\":%s", key, value);

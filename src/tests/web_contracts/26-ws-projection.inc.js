@@ -144,6 +144,9 @@ int main(){
   for (const {pts, frags} of curves) {
     for (const {start, curve} of frags) {
       assert.deepEqual(curve.wRef, start > 0 && start < pts.length ? pts[start - 1] : undefined);
+      for (const key of ['wBreakBefore', 'wHeld'])
+        assert(start > 0 ? curve[key]?.length !== 0 : Array.isArray(curve[key]),
+            'a whole curve lists both index arrays; a fragment omits an empty one');
       const points = decode(curve.wD, curve.wRef);
       assert.deepEqual(points.wAtMs.map((t, i) => [t, points.wCg[i]]), pts.slice(start));
     }

@@ -3778,10 +3778,13 @@ function uiStreamFrame(e, t) {
   )
     throw Error();
   if (e && t.boot === e.boot && t.seq <= e.seq) return e;
-  const { wD, wRef, ...c } = t.curve || {},
+  // A fragment leaves out an index list it has nothing to add to.
+  const { wD, wRef, wBreakBefore = [], wHeld = [], ...c } = t.curve || {},
     s = (wRef === undefined ||
       (Array.isArray(wRef) && wRef.length === 2 && wRef.every(Number.isInteger))) && {
       ...c,
+      wBreakBefore,
+      wHeld,
       ...decodeCurveDeltas(wD, wRef),
     };
   if (

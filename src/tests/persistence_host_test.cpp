@@ -2058,6 +2058,8 @@ void p61c_shot_curve_held_and_break_bits_round_trip() {
   CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded, 3));
   CHECK(strstr(json, "\"wRef\":[200,80],") == json);
   CHECK(strstr(json, "\"wHeld\":[3]") != nullptr);
+  CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded, 4));
+  CHECK(strstr(json, "\"wBreakBefore\":[8]") != nullptr && strstr(json, "wHeld") == nullptr);
 }
 
 void p67_ensure_recovery_intent_skips_rewrite_when_valid() {

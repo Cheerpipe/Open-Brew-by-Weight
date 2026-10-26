@@ -605,7 +605,9 @@ sequence and cursor contract on the same socket. A shot snapshot
 `stale`, `phase`, `cursor`) and carries the complete card and curve.
 Each following frame carries only `seq` and `cursor` (plus `stale` and `phase`
 together when either changed), the card fields that changed, which the browser
-merges over the previous card, the curve points after the previous cursor, and
+merges over the previous card, the curve points after the previous cursor
+(with `wBreakBefore` or `wHeld` left out when the new points add no index to
+it; a snapshot always carries both), and
 the curve scalars (`wTruncated` and the markers: first drop, extension, scale
 loss and recovery, end) that changed. A frame whose card did not change
 carries an empty `card` object; everything a frame omits continues from the
