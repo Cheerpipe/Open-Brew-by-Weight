@@ -81,7 +81,9 @@ static_assert(offsetof(PersistedSettings, storageRevision) + sizeof(uint32_t) ==
 static_assert(sizeof(PersistedSettings) <= PERSISTED_SETTINGS_NVS_BUDGET,
               "PersistedSettings exceeds NVS dual-slot budget");
 static_assert(sizeof(PersistedSettings) == 3056,
-              "Settings schema 1; bump CONFIG_SCHEMA_VERSION on change");
+              "Settings schema 1: append only tail fields whose legacy default is "
+              "zero (readSettingsSlot loads shorter schema-1 blobs as a prefix); "
+              "any other layout change bumps CONFIG_SCHEMA_VERSION");
 static_assert(offsetof(PersistedSettings, lineaMicra) == 2735);
 static_assert(offsetof(PersistedSettings, checksum) == 3048);
 

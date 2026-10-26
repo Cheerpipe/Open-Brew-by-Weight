@@ -132,17 +132,43 @@ inline PersistedSettings &persistedSettingsScratch() {
 
 // Shared by the load/save/reset/revision-probe paths; must stay out-of-line
 // so the compiler does not embed one copy at every call site.
+// A shorter blob of the current schema, written by an earlier image before
+// tail fields were appended, loads as a prefix of the current struct with the
+// appended fields zeroed once its own checksum verifies (the last word, or the
+// one before 4 B of alignment padding). Appended fields must therefore take
+// zero as their legacy default. Longer, torn or other-schema blobs are
+// rejected. Load never writes back; the next save stores the full layout.
 __attribute__((noinline))
 inline bool readSettingsSlot(OpenBrewByWeightPreferences &preferences, const char *key,
                              PersistedSettings &settings, bool repair = false) {
   const size_t stored = preferences.isKey(key)
                             ? preferences.getBytesLength(key)
                             : 0;
-  if (stored != sizeof(PersistedSettings)) {
+  if (stored < sizeof(PersistedSettingsHeader) + 2 * sizeof(uint32_t) ||
+      stored > sizeof(PersistedSettings) || stored % sizeof(uint32_t) != 0 ||
+      preferences.getBytes(key, &settings, stored) != stored) {
     return false;
   }
-  if (preferences.getBytes(key, &settings, stored) != stored ||
-      !persistedSettingsIntact(settings) || !validPersistedStaNetwork(settings)) {
+  if (stored < sizeof(PersistedSettings)) {
+    auto *bytes = reinterpret_cast<uint8_t *>(&settings);
+    memset(bytes + stored, 0, sizeof(PersistedSettings) - stored);
+    if (settings.magic != PERSISTED_SETTINGS_MAGIC ||
+        settings.schemaVersion != CONFIG_SCHEMA_VERSION ||
+        settings.structureSize != stored) {
+      return false;
+    }
+    size_t at = stored - sizeof(uint32_t);
+    uint32_t checksum = 0;
+    memcpy(&checksum, bytes + at, sizeof(checksum));
+    if (checksum != crc32(bytes, at)) {
+      at -= sizeof(uint32_t);
+      memcpy(&checksum, bytes + at, sizeof(checksum));
+      if (checksum != crc32(bytes, at)) return false;
+    }
+    memset(bytes + at, 0, stored - at);
+    finalizePersistedSettings(settings);
+  }
+  if (!persistedSettingsIntact(settings) || !validPersistedStaNetwork(settings)) {
     return false;
   }
   if (repair) (void)repairPersistedSettings(settings);

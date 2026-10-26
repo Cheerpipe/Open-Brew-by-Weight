@@ -139,10 +139,15 @@ duration record without scale commands, shot statistics or brew events.
 
 The settings blob retains the 312-byte
 `LineaMicraPersistedSettings` record in every profile. The connection byte at
-record offset 311 occupies prior enclosing-blob padding: Micra offset 2991,
-checksum offset 3304 and total size 3312 remain unchanged. Values are explicitly
-WebSocket=0 and API=1. Blobs from earlier schema epochs are rejected.
-Load never writes back. Settings saves and resets
+record offset 311 occupies prior enclosing-blob padding: Micra offset 2735,
+checksum offset 3048 and total size 3056 remain unchanged. Values are explicitly
+WebSocket=0 and API=1. Blobs from other schema epochs are rejected. A shorter
+blob of the current schema, written by an earlier image before tail fields were
+appended, loads as a prefix of the current struct once its own checksum
+verifies, with the appended fields zeroed; appended fields must therefore treat
+zero as their legacy default, so an OTA update never discards Wi-Fi or presets
+over a layout growth. Load never writes back; the next save stores the full
+layout. Settings saves and resets
 wait for successful OTA trial confirmation, preserving the old durable records
 for rollback. This admission does not gate boot readiness or other stores.
 

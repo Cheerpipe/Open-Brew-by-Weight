@@ -3174,7 +3174,8 @@ void p61j_curve_image_batches_backlog_oldest_first() {
 
 // Golden settings blob of schema 1, written once when the layout was cut over
 // (W4a). Every later firmware must load it unchanged: OTA updates between
-// releases keep settings. A schema-0 or old-size blob never loads.
+// releases keep settings. A schema-0 or longer blob never loads; a shorter
+// schema-1 blob loads as a prefix with the appended fields zeroed.
 std::string goldenSettingsPath() {
   const std::string file(__FILE__);
   return file.substr(0, file.find_last_of('/')) + "/fixtures/settings_schema1_golden_hex.txt";
@@ -3238,6 +3239,53 @@ void p91_schema1_golden_settings_blob_loads() {
   const ShotPreset *custom = findShotPreset(loaded.presets, FACTORY_PRESET_COUNT + 1);
   CHECK(custom != nullptr && strcmp(custom->name, "Golden") == 0 && !custom->isFactory);
   CHECK(!custom->fastSideEnabled && custom->goalWeightDg == FACTORY_SINGLE_GOAL_WEIGHT_DG);
+
+  // The same settings as an earlier image would have stored them before the
+  // Micra record was appended: the blob ends after deviceName with its own
+  // checksum, followed by 4 B of alignment padding or by nothing.
+  const size_t at = offsetof(PersistedSettings, lineaMicra) + 1;
+  CHECK(at % sizeof(uint32_t) == 0 && alignof(PersistedSettings) == 8);
+  for (const size_t padding : {size_t{4}, size_t{0}}) {
+    PersistedSettings older = golden;
+    const size_t stored = at + sizeof(uint32_t) + padding;
+    older.structureSize = stored;
+    auto *raw = reinterpret_cast<uint8_t *>(&older);
+    const uint32_t checksum = crc32(raw, at);
+    memcpy(raw + at, &checksum, sizeof(checksum));
+    memset(raw + at + sizeof(checksum), 0xA5, padding);  // uncovered padding
+    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored);
+    PersistedSettings prefix;
+    bool repaired = true;
+    CHECK(loadPersistedSettings(prefix, &repaired) && !repaired);
+    CHECK(persistedSettingsIntact(prefix) && prefix.structureSize == sizeof(prefix));
+    CHECK(memcmp(&prefix.runtime, &golden.runtime, sizeof(golden.runtime)) == 0);
+    CHECK(memcmp(&prefix.presets, &golden.presets, sizeof(golden.presets)) == 0);
+    CHECK(strcmp(prefix.devicePassword, golden.devicePassword) == 0);
+    CHECK(strcmp(prefix.deviceName, golden.deviceName) == 0);
+    uint8_t zeroed[sizeof(prefix.lineaMicra)] = {};  // not the {} defaults
+    CHECK(memcmp(&prefix.lineaMicra, zeroed, sizeof(zeroed)) == 0);
+
+    // Torn or foreign short blobs never load: a flipped byte, another schema,
+    // an unaligned length, a header-only prefix and a longer blob.
+    raw[100] ^= 1;
+    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored);
+    CHECK(!loadPersistedSettings(prefix));
+    raw[100] ^= 1;
+    older.schemaVersion = CONFIG_SCHEMA_VERSION + 1;
+    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored);
+    CHECK(!loadPersistedSettings(prefix));
+    older.schemaVersion = CONFIG_SCHEMA_VERSION;
+    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored - 1);
+    CHECK(!loadPersistedSettings(prefix));
+  }
+  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &golden,
+                           sizeof(PersistedSettingsHeader));
+  PersistedSettings rejected;
+  CHECK(!loadPersistedSettings(rejected));
+  uint8_t longer[sizeof(PersistedSettings) + 8] = {};
+  memcpy(longer, &golden, sizeof(golden));
+  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, longer, sizeof(longer));
+  CHECK(!loadPersistedSettings(rejected));
 }
 
 // Golden shot-log blob of schema 2 (W4b): header plus two records, each a
