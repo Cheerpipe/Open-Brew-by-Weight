@@ -37,7 +37,7 @@ output.mkdir(parents=True, exist_ok=True)
 (output / "micra_websocket_status.inc").write_text(
     definition("powerOptionBit") + "\n" +
     "\n".join(definition("OpenBrewByWeightMicraService::" + name) for name in
-              ("status", "statusLocked", "statusPoll", "statusPollStale",
+              ("status", "statusLocked", "liveSubscriptionLocked", "statusPoll", "statusPollStale",
                "queue", "queueLocked", "muxWaitAnomalyDue",
                "qualifyBackflushLocked", "backflushReadyLocked", "backflush",
                "reportMuxWaitAnomaly", "finishBackflush", "physicalStart",
@@ -45,7 +45,7 @@ output.mkdir(parents=True, exist_ok=True)
 (output / "micra_websocket_commands.inc").write_text(
     "\n".join([definition("sameCommandRequest")] +
               [definition("OpenBrewByWeightMicraService::" + name) for name in
-               ("temperatureRequestCurrent", "powerRequestCurrent",
+               ("temperatureRequestCurrent", "powerRequestCurrent", "pushConfirms",
                 "temperatureEligible", "deferTemperature", "deferPower",
                 "executeTemperatureApplication", "executePowerApplication")])
     + "\n")

@@ -2,6 +2,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstring>
+#include <functional>
 #include <cstdarg>
 #include <cstdio>
 #include <string>
@@ -146,7 +147,14 @@ bool OpenBrewByWeightMicraService::applySignedHeaders(const LineaMicraPersistedS
 }
 #include "machine/OpenBrewByWeightMicraWebSocket.inc"
 #include "micra_websocket_status.inc"
-static unsigned temperatureWrites = 0, powerWrites = 0;
+static unsigned temperatureWrites = 0, powerWrites = 0, dashboardReads = 0;
+static std::function<void()> notifyHook;
+constexpr int pdTRUE = 1;
+unsigned ulTaskNotifyTake(int, int ticks) {
+  now += ticks;
+  if (notifyHook) notifyHook();
+  return 0;
+}
 static uint16_t cloudTargetDeciC = 0;
 static bool cloudIgnoresTemperature = false;
 static LineaMicraPowerState cloudPower = LineaMicraPowerState::UNKNOWN;
@@ -168,6 +176,7 @@ bool OpenBrewByWeightMicraService::writePowerOn(const LineaMicraPersistedSetting
 }
 bool OpenBrewByWeightMicraService::readDashboard(const LineaMicraPersistedSettings &,
     LineaMicraStatus &result, const MicraObservationStamp *) {
+  ++dashboardReads;
   result.targetValid = true;
   result.targetDeciC = cloudTargetDeciC;
   result.powerState = cloudPower;
@@ -771,8 +780,16 @@ struct MicraWebSocketTest {
     assert(service.executeTemperatureApplication(temperature(930), service.configGeneration_));
     assert(temperatureWrites == 0 && !service.desiredTemperature_.present);
     assert(service.published_.temperatureState == LineaMicraTemperatureState::CONFIRMED);
+    // The push showing the new target confirms it without an HTTPS read.
+    const auto readsBefore = dashboardReads;
+    notifyHook = [&] {
+      notifyHook = nullptr;
+      deliver(service, observation(service, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":94.0}}]})"));
+    };
     assert(service.executeTemperatureApplication(temperature(940), service.configGeneration_));
     assert(temperatureWrites == 1 && !service.desiredTemperature_.present);
+    assert(dashboardReads == readsBefore);
+    deliver(service, observation(service, brewing93));
     // A gap in observation removes the trust, so the equal target is written.
     service.observationFence_.invalidate();
     assert(service.executeTemperatureApplication(temperature(930), service.configGeneration_));

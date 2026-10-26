@@ -148,6 +148,8 @@ class OpenBrewByWeightMicraService {
   void clearRequestState();
   bool networkEligible(LineaMicraError &error, bool observation = false) const;
   LineaMicraStatus statusLocked() const;
+  bool liveSubscriptionLocked() const;
+  bool pushConfirms(uint16_t targetDeciC, LineaMicraPowerState power);
   bool queueLocked(const LineaMicraRequest &request);
   void qualifyBackflushLocked();
   bool backflushReadyLocked() const;

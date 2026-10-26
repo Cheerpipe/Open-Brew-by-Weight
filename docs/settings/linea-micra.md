@@ -542,9 +542,11 @@ authorization failures use the same bounded retries and saved account session
 as power-state monitoring. The integration never asks for credentials or registers a new
 installation merely to retry a temperature.
 
-The cloud command is complete only after a dashboard read reports the requested
-target. Once the cloud accepts a change, delayed confirmation retries only the
-dashboard read instead of resending the change. Status and diagnostics
+The cloud command is complete only after the machine reports the requested
+target. With live updates this normally arrives within seconds of the change;
+if it has not arrived after 10 seconds, a dashboard read checks instead. Once
+the cloud accepts a change, delayed confirmation retries only that check
+instead of resending the change. Status and diagnostics
 distinguish a pending, running, confirmed, canceled, rejected, unconfirmed, or
 communication-failed application from the Micra's last reported target, without
 mixing that result into power-observation quality. Status also reports whether

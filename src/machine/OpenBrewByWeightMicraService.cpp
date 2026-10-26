@@ -792,6 +792,33 @@ LineaMicraStatus OpenBrewByWeightMicraService::status() const {
   return statusLocked();
 }
 
+bool OpenBrewByWeightMicraService::liveSubscriptionLocked() const {
+  return websocketStatus_.subscribed && websocket_ && !websocket_->failed.load() &&
+         websocket_->stamp.epoch == observationFence_.epoch && staConnected_.load() &&
+         !apActive_.load() && !outboundMaintenance.load();
+}
+
+// A live subscription pushes the machine's new state seconds after an accepted
+// command, so wait for that push before paying for an HTTPS verification read.
+bool OpenBrewByWeightMicraService::pushConfirms(uint16_t targetDeciC,
+                                                LineaMicraPowerState power) {
+  const uint32_t deadline = millis() + micra_timing::kPushConfirmMs;
+  do {
+    {
+      TaskLockGuard lock(mux_);
+      if (!published_.connectionFreshness || observationFence_.offline ||
+          !liveSubscriptionLocked()) return false;
+      if (targetDeciC ? observationFence_.temperatureTrusted && published_.targetValid &&
+                            published_.targetDeciC == targetDeciC
+                      : observationFence_.powerTrusted && published_.powerState == power)
+        return true;
+    }
+    if (abortRequested_.load(std::memory_order_acquire)) return false;
+    (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(250));
+  } while (!micra_timing::deadlineReached(millis(), deadline));
+  return false;
+}
+
 LineaMicraStatus OpenBrewByWeightMicraService::statusLocked() const {
   LineaMicraStatus result = published_;
   const uint32_t now = millis();
@@ -799,9 +826,7 @@ LineaMicraStatus OpenBrewByWeightMicraService::statusLocked() const {
                          (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0;
   result = powerState_.effectiveStatus(result, observing, now);
   if (result.connectionFreshness && result.quality == LineaMicraObservationQuality::CURRENT &&
-      (!observationFence_.synchronized || !websocketStatus_.subscribed || !websocket_ ||
-       websocket_->failed.load() || websocket_->stamp.epoch != observationFence_.epoch ||
-       !staConnected_.load() || apActive_.load() || outboundMaintenance.load()))
+      (!observationFence_.synchronized || !liveSubscriptionLocked()))
     result.quality = LineaMicraObservationQuality::STALE;
   result.staConnected = staConnected_.load(std::memory_order_acquire);
   result.apActive = apActive_.load(std::memory_order_acquire);
@@ -1497,9 +1522,10 @@ bool OpenBrewByWeightMicraService::executeTemperatureApplication(
       }
       success = commandAccepted &&
                 temperatureRequestCurrent(request, machineConfigGeneration) &&
-                readDashboard(settings, verification) &&
-                verification.targetValid &&
-                verification.targetDeciC == request.targetDeciC;
+                (pushConfirms(request.targetDeciC, LineaMicraPowerState::UNKNOWN) ||
+                 (readDashboard(settings, verification) &&
+                  verification.targetValid &&
+                  verification.targetDeciC == request.targetDeciC));
     }
     if (success) {
       wipeLineaMicraSettings(settings);
@@ -1675,8 +1701,9 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
       }
       success = commandAccepted &&
                 powerRequestCurrent(request, machineConfigGeneration) &&
-                readDashboard(settings, verification) &&
-                verification.powerState == wantedState;
+                (pushConfirms(0, wantedState) ||
+                 (readDashboard(settings, verification) &&
+                  verification.powerState == wantedState));
     }
     if (success) {
       wipeLineaMicraSettings(settings);

@@ -1068,8 +1068,10 @@ Commands and authentication always use HTTP. At startup it waits for an eligible
 connection, a closed setup AP, no admitted shot with a connected scale, and a
 synchronized wall clock, then opens a WebSocket subscription or starts the initial API read on
 the next worker opportunity. Each admitted WebSocket subscription queues one
-initial dashboard cycle while push reception continues. Explicit refresh and
-post-command reconciliation retain their HTTP paths and coalesce when compatible.
+initial dashboard cycle while push reception continues. Explicit refresh retains its HTTP path. An accepted temperature or power
+command is verified by a push on the live subscription within
+`kPushConfirmMs` (10 s); only then does verification fall back to an HTTPS
+dashboard read.
 All API purposes, including sign-in and manual requests, remain deferred during
 scale acquisition/setup/quiet and shots with a connected scale; active requests
 cancel through the owner. Unscaled shots keep API observation and WSS active.

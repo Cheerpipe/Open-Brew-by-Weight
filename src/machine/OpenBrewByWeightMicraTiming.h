@@ -48,6 +48,9 @@ inline constexpr uint32_t kExhaustedCooldownMs = kOptimisticOverlayMs;
 // A machine command that exhausts this many cycles while the machine is online
 // is dropped instead of re-reading the dashboard every cooldown forever.
 inline constexpr uint8_t kMaxCommandCycles = 3;
+// An accepted command's new state normally arrives as a push within seconds;
+// only after this wait does verification fall back to an HTTPS read.
+inline constexpr uint32_t kPushConfirmMs = 10000;
 inline constexpr uint32_t kGateRetryMs = 1000;
 inline constexpr uint32_t kHttpTimeoutMs = 10000;
 // The cloud silently drops keep-alive sockets idle for ~3-5 min (reuse
