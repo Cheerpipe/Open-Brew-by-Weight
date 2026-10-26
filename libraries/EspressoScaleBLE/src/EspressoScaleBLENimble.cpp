@@ -58,6 +58,30 @@ constexpr uint8_t kScaleLogInfoSeverity = 4;
 constexpr uint8_t kScaleLogWarningSeverity = 1;
 constexpr bool kBleLog = true;
 constexpr bool kScaleLog = false;
+// Link parameters requested at connect and imposed on every peer update
+// request: interval 15-50 ms (1.25 ms units, inside NimBLE's default range),
+// no slave latency, and a 1000 ms supervision timeout (10 ms units). The
+// controller already treats a weight stream that is a second old as lost, so
+// the radio link gives up at the same moment and reconnection starts without
+// waiting for NimBLE's 2.56 s default.
+constexpr uint16_t kConnIntervalMinUnits = 12;
+constexpr uint16_t kConnIntervalMaxUnits = 40;
+constexpr uint16_t kConnLatency = 0;
+constexpr uint16_t kConnSupervisionTimeoutUnits = 100;
+
+uint16_t clampConnInterval(uint16_t units) {
+  return units < kConnIntervalMinUnits   ? kConnIntervalMinUnits
+         : units > kConnIntervalMaxUnits ? kConnIntervalMaxUnits
+                                         : units;
+}
+
+void clampLinkParams(ble_gap_upd_params &params) {
+  params.itvl_min = clampConnInterval(params.itvl_min);
+  params.itvl_max = clampConnInterval(
+      params.itvl_max > params.itvl_min ? params.itvl_max : params.itvl_min);
+  params.latency = kConnLatency;
+  params.supervision_timeout = kConnSupervisionTimeoutUnits;
+}
 
 void scaleLogV(uint8_t severity, bool info, bool transport, const char *format,
                va_list args) {
@@ -723,6 +747,21 @@ class NimbleScaleClient {
     return status == 0 ? static_cast<int>(value) : SCALE_LINK_RSSI_UNAVAILABLE;
   }
 
+  // Worker-task report of the live link parameters after CONNECT and every
+  // CONN_UPDATE; a link that is already gone has nothing to report.
+  void logLinkParams() {
+    ble_gap_conn_desc desc = {};
+    if (connectionHandle_ == kInvalidHandle ||
+        ble_gap_conn_find(connectionHandle_, &desc) != 0) {
+      return;
+    }
+    const unsigned intervalHundredths = desc.conn_itvl * 125U;
+    scaleLogInfo(kBleLog, "link params itvl_ms=%u.%02u latency=%u timeout_ms=%u",
+                 intervalHundredths / 100U, intervalHundredths % 100U,
+                 static_cast<unsigned>(desc.conn_latency),
+                 static_cast<unsigned>(desc.supervision_timeout) * 10U);
+  }
+
   uint16_t rxHighWater() const {
     portENTER_CRITICAL(&mux_);
     const uint16_t result = rxHighWater_;
@@ -1102,6 +1141,7 @@ class NimbleScaleClient {
               !pendingDisconnect_;
           if (current && event->connect.status == 0) {
             connectionHandle_ = event->connect.conn_handle;
+            linkParamsPending_ = true;
           }
           if (current) {
             connectComplete_ = true;
@@ -1155,6 +1195,22 @@ class NimbleScaleClient {
           onNotification(event->notify_rx.conn_handle,
                          event->notify_rx.attr_handle, event->notify_rx.om,
                          operationId);
+        }
+        return 0;
+      case BLE_GAP_EVENT_CONN_UPDATE_REQ:
+      case BLE_GAP_EVENT_L2CAP_UPDATE_REQ:
+        // NimBLE pre-fills self_params with the peer's request; the worker
+        // logs the outcome from the CONN_UPDATE that follows.
+        if (event->conn_update_req.self_params != nullptr) {
+          clampLinkParams(*event->conn_update_req.self_params);
+        }
+        return 0;
+      case BLE_GAP_EVENT_CONN_UPDATE:
+        if (event->conn_update.status == 0 &&
+            callbackMatches(operationId, CallbackDomain::Link)) {
+          portENTER_CRITICAL(&mux_);
+          linkParamsPending_ = true;
+          portEXIT_CRITICAL(&mux_);
         }
         return 0;
       default:
@@ -1787,18 +1843,22 @@ class NimbleScaleClient {
     bool rxOverflowed = false;
     bool mbufFailed = false;
     bool invalidNotificationStream = false;
+    bool linkParamsPending = false;
     portENTER_CRITICAL(&mux_);
     criticalOverflowed = criticalOverflowed_;
     controlOverflowed = eventOverflowed_;
     rxOverflowed = rxOverflowed_;
     mbufFailed = mbufFailed_;
     invalidNotificationStream = invalidNotificationStream_;
+    linkParamsPending = linkParamsPending_;
     criticalOverflowed_ = false;
     eventOverflowed_ = false;
     rxOverflowed_ = false;
     mbufFailed_ = false;
     invalidNotificationStream_ = false;
+    linkParamsPending_ = false;
     portEXIT_CRITICAL(&mux_);
+    if (linkParamsPending) logLinkParams();
     if (criticalOverflowed || controlOverflowed) {
       finishLink(true, ScaleDisconnectReason::EVENT_QUEUE_OVERFLOW,
                  BLE_HS_ENOMEM);
@@ -2065,9 +2125,18 @@ class NimbleScaleClient {
     portEXIT_CRITICAL(&mux_);
     const uint32_t linkOperationId = beginOperation(CallbackDomain::Link);
     ++connectAttemptsTotal_;
+    // The initiating scan keeps the configured preset duty instead of
+    // NimBLE's 100 % default; ce_len stays at the controller's discretion.
+    ble_gap_conn_params params = {};
+    params.scan_itvl = scanInterval_;
+    params.scan_window = scanWindow_;
+    params.itvl_min = kConnIntervalMinUnits;
+    params.itvl_max = kConnIntervalMaxUnits;
+    params.latency = kConnLatency;
+    params.supervision_timeout = kConnSupervisionTimeoutUnits;
     const int rc = submitRadioProcedure(false, [&] {
       return ble_gap_connect(openBrewByWeightBleRuntimeOwnAddressType(),
-                             &selectedAddress_, BLE_CONNECT_TIMEOUT_MS, nullptr,
+                             &selectedAddress_, BLE_CONNECT_TIMEOUT_MS, &params,
                              gapCallback, callbackArg(linkOperationId));
     });
     if (rc != 0) {
@@ -2839,6 +2908,7 @@ class NimbleScaleClient {
   bool rxOverflowed_ = false;
   bool mbufFailed_ = false;
   bool invalidNotificationStream_ = false;
+  bool linkParamsPending_ = false;
   uint8_t invalidNotificationStreak_ = 0;
   uint32_t mbufFailures_ = 0;
 

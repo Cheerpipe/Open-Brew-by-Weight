@@ -162,7 +162,11 @@ the scale is charging.
 
 A usable scale is required for automatic brew-by-weight. If the scale is
 missing, see [No-scale BBW](no-scale-bbw.md). If it drops mid-shot, see
-[Scale-loss backup](../features/auto-to-manual.md).
+[Scale-loss backup](../features/auto-to-manual.md). A Bluetooth link that
+goes silent, because the scale moved out of range or lost power without
+saying goodbye, is given up after one second, so the controller starts
+searching for the scale again right away instead of waiting for the
+Bluetooth stack's own, longer timeout.
 
 **Drip delay** runs after machine circuit opens. It is used for Last Shot, history,
 drip learning, and the scale-loss backup's recent shots.

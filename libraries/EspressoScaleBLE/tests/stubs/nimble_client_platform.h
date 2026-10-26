@@ -79,7 +79,9 @@ constexpr int BLE_HS_ERR_ATT_BASE=0x100, BLE_HS_ERR_HCI_BASE=0x200;
 constexpr int BLE_HS_FOREVER=0x7fffffff;
 constexpr uint8_t BLE_ERR_REM_USER_CONN_TERM=0x13;
 constexpr int BLE_GAP_EVENT_DISC=1, BLE_GAP_EVENT_DISC_COMPLETE=2,
-  BLE_GAP_EVENT_CONNECT=3, BLE_GAP_EVENT_DISCONNECT=4, BLE_GAP_EVENT_NOTIFY_RX=5;
+  BLE_GAP_EVENT_CONNECT=3, BLE_GAP_EVENT_DISCONNECT=4, BLE_GAP_EVENT_NOTIFY_RX=5,
+  BLE_GAP_EVENT_CONN_UPDATE=6, BLE_GAP_EVENT_CONN_UPDATE_REQ=7,
+  BLE_GAP_EVENT_L2CAP_UPDATE_REQ=8;
 constexpr int BLE_HCI_ADV_RPT_EVTYPE_ADV_IND=0, BLE_HCI_ADV_RPT_EVTYPE_DIR_IND=1,
   BLE_HCI_ADV_RPT_EVTYPE_ADV_NONCONN_IND=3, BLE_HCI_ADV_RPT_EVTYPE_SCAN_RSP=4;
 constexpr uint8_t BLE_GATT_CHR_PROP_NOTIFY=0x10, BLE_GATT_CHR_PROP_INDICATE=0x20,
@@ -99,6 +101,9 @@ inline int os_mbuf_copydata(os_mbuf *b,int offset,int length,void *out) {
   memcpy(out,b->data+offset,length); return 0;
 }
 struct ble_gap_disc_desc { ble_addr_t addr; uint8_t event_type; uint8_t *data; uint8_t length_data; };
+struct ble_gap_upd_params { uint16_t itvl_min,itvl_max,latency,supervision_timeout,min_ce_len,max_ce_len; };
+struct ble_gap_conn_params { uint16_t scan_itvl,scan_window,itvl_min,itvl_max,latency,supervision_timeout,min_ce_len,max_ce_len; };
+struct ble_gap_conn_desc { uint16_t conn_handle,conn_itvl,conn_latency,supervision_timeout; };
 struct ble_gap_event {
   int type;
   ble_gap_disc_desc disc;
@@ -106,7 +111,14 @@ struct ble_gap_event {
   struct { int status; uint16_t conn_handle; } connect;
   struct { int reason; struct { uint16_t conn_handle; } conn; } disconnect;
   struct { uint16_t conn_handle,attr_handle; os_mbuf *om; } notify_rx;
+  struct { int status; uint16_t conn_handle; } conn_update;
+  struct { const ble_gap_upd_params *peer_params; ble_gap_upd_params *self_params; uint16_t conn_handle; } conn_update_req;
 };
+// The stub keeps no connection table: tests publish the one descriptor a
+// ble_gap_conn_find() may return.
+inline ble_gap_conn_desc testConnDesc = {};
+inline int testConnFindStatus = BLE_HS_ENOTCONN;
+inline int ble_gap_conn_find(uint16_t, ble_gap_conn_desc *out) { *out = testConnDesc; return testConnFindStatus; }
 struct ble_hs_adv_fields {
   uint8_t *name; uint8_t name_len,name_is_complete,num_uuids16;
   ble_uuid_any_t *uuids16;
