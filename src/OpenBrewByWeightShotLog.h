@@ -20,7 +20,8 @@ constexpr size_t SHOT_LOG_FLASH_SLOT_COUNT = 2;
 static_assert(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES,
               "Two shot-log slots of 500 records must fit the shotlog partition");
 
-// Only the current schema is accepted; any older slot is discarded.
+// Only the current schema is accepted; any older slot is discarded. Records
+// of an earlier, shorter size are accepted and widened on load.
 inline bool validShotLogStoreCurrent(const ShotLogStore &store) {
   return validShotLogStore(store);
 }
@@ -36,6 +37,7 @@ struct DualSlotFlashLogTraits<ShotLogStore> {
   static constexpr size_t kSlotCount = SHOT_LOG_FLASH_SLOT_COUNT;
   static constexpr size_t kHeaderBytes = sizeof(ShotLogHeader);
   static constexpr void (*reset)(ShotLogStore &) = resetShotLogStore;
+  static constexpr void (*widen)(ShotLogStore &) = widenShotLogRecords;
   using Record = ShotLogRecord;
   static constexpr size_t kCapacity = SHOT_LOG_CAPACITY;
   static constexpr uint32_t (*recordIdOf)(const ShotLogRecord &) =

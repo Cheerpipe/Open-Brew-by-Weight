@@ -3473,13 +3473,14 @@ void p92_schema2_golden_shot_log_loads() {
   std::string hex;
   for (int c; (c = fgetc(in)) != EOF;) if (c != '\n') hex += static_cast<char>(c);
   fclose(in);
-  CHECK(hex.size() == 2 * (sizeof(ShotLogHeader) + 2 * sizeof(ShotLogRecord)));
+  CHECK(hex.size() == 2 * (sizeof(ShotLogHeader) + 2 * SHOT_LOG_MIN_RECORD_BYTES));
   static ShotLogStore store;
   memset(&store, 0, sizeof(store));
   auto *bytes = reinterpret_cast<uint8_t *>(&store);
   for (size_t i = 0; i < hex.size() / 2; ++i)
     bytes[i] = static_cast<uint8_t>(strtoul(hex.substr(2 * i, 2).c_str(), nullptr, 16));
   CHECK(validShotLogStore(store));
+  widenShotLogRecords(store);  // A later image with longer records widens the fixture.
   CHECK(store.header.count == 2 && store.header.nextRecordId == 43);
   const ShotLogRecord &fast = store.records[0];
   CHECK(fast.id == 41 && corridor::verdictOf(fast.verdict) == corridor::Verdict::FAST);
@@ -3491,6 +3492,43 @@ void p92_schema2_golden_shot_log_loads() {
   CHECK(corridor::verdictOf(store.records[1].verdict) == corridor::Verdict::SLOW);
   CHECK(store.records[1].targetTempDeciC == 0 && store.records[1].ratioX100 == 185);
   store.header.schemaVersion = 0;  // Another schema never loads.
+  store.header.checksum = 0;
+  store.header.checksum = shotLogChecksum(store);
+  CHECK(!validShotLogStore(store));
+}
+
+// Records stored by an image with shorter records keep their bytes at the
+// new stride; the appended tail reads as zero.
+void p92b_shorter_shot_log_records_widen_on_load() {
+  static ShotLogStore store, packed;
+  resetShotLogStore(store);
+  for (uint16_t i = 0; i < 3; ++i) {
+    memset(&store.records[i], 0x40 + i, sizeof(ShotLogRecord));
+    store.records[i].id = 10U + i;
+  }
+  store.header.count = 3;
+  store.header.writeIndex = 3;
+  constexpr size_t shorter = 100;
+  memcpy(&packed, &store, sizeof(packed));
+  auto *bytes = reinterpret_cast<uint8_t *>(packed.records);
+  for (size_t i = 0; i < 3; ++i) memcpy(bytes + i * shorter, &store.records[i], shorter);
+  packed.header.recordSize = shorter;
+  widenShotLogRecords(packed);
+  CHECK(packed.header.recordSize == sizeof(ShotLogRecord));
+  const uint8_t zeros[sizeof(ShotLogRecord) - shorter] = {};
+  for (size_t i = 0; i < 3; ++i) {
+    const auto *record = reinterpret_cast<const uint8_t *>(&packed.records[i]);
+    CHECK(memcmp(record, &store.records[i], shorter) == 0);
+    CHECK(memcmp(record + shorter, zeros, sizeof(zeros)) == 0);
+  }
+  CHECK(packed.records[2].id == 12);
+  // The current size is left alone; a shorter size than any image wrote is
+  // never valid.
+  widenShotLogRecords(store);
+  CHECK(store.records[0].id == 10 && store.header.recordSize == sizeof(ShotLogRecord));
+  finalizeShotLogStore(store);
+  CHECK(validShotLogStore(store));
+  store.header.recordSize = SHOT_LOG_MIN_RECORD_BYTES - 1U;
   store.header.checksum = 0;
   store.header.checksum = shotLogChecksum(store);
   CHECK(!validShotLogStore(store));
@@ -3510,6 +3548,7 @@ const TestCase tests[] = {
     {"P91", p91_schema2_golden_settings_blob_loads},
     {"P91b", p91b_settings_codec_round_trips_and_evolves},
     {"P92", p92_schema2_golden_shot_log_loads},
+    {"P92b", p92b_shorter_shot_log_records_widen_on_load},
     {"P82", p82_ble_scan_strict_versions_and_roundtrip},
     {"P82B", p82b_ble_scan_legacy_minute_bytes_stay_readable},
     {"P80", p80_boot_id_advances_in_its_own_nvs_key},

@@ -305,8 +305,16 @@ a self-contained snapshot of the cut parameters in force: target, window,
 side switches, margins, delay, max shot time and ramp length, plus the cut
 line at the stop, arrival time, packed verdict byte, the machine integration's
 target temperature, the preset's dose and the shot's brew ratio); any other
-schema is discarded and the shot history starts empty. The boot ID lives in
-its own small NVS key, so a boot never rewrites the shot log.
+schema is discarded and the shot history starts empty. Within schema 2,
+records grow only by appending fields: the header stores the record size, and
+an image with longer records widens a store of shorter ones on load (appended
+fields read as zero, so zero must mean "missing" for them unless the widening
+sets an explicit default). History and the statistics replayed from it
+therefore survive an OTA update that grows the record. The reverse is not
+supported: an earlier image discards a store written with longer records.
+Each slot leaves room for 1,032-byte records, but every save rewrites the
+whole store, so the per-shot write cost grows with the record size. The boot
+ID lives in its own small NVS key, so a boot never rewrites the shot log.
 
 On n16r8, ESP-IDF writes one ELF core dump to a 640 KiB capture partition
 after a panic. Once the relay is open and the durable boot ID has been saved,

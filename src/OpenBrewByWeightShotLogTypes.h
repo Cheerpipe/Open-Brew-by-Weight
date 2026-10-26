@@ -15,8 +15,13 @@ namespace openbrewbyweight {
 
 constexpr uint32_t SHOT_LOG_MAGIC = 0x534C4F47U;  // "SLOG"
 // Schema 2 appends the machine target temp, preset dose, and brew ratio
-// snapshots to the schema 1 record; older slots are discarded.
+// snapshots to the schema 1 record; older slots are discarded. Within schema
+// 2 records grow only by appending fields: a store keeps its record size, a
+// later image widens shorter records on load, and the schema changes only for
+// a change appending cannot express.
 constexpr uint16_t SHOT_LOG_SCHEMA_VERSION = 2;
+// Record size of the first schema-2 image; never changes.
+constexpr uint16_t SHOT_LOG_MIN_RECORD_BYTES = 124;
 constexpr size_t SHOT_LOG_CAPACITY = 500;
 constexpr size_t SHOT_LOG_PAGE_DEFAULT = 10;
 // Maximum number of records in each independent read-time Stats window.
@@ -387,6 +392,8 @@ struct ShotLogRecord {
   uint16_t ratioX100;   // Recorded yield / dose, hundredths; 0 = not computable.
 };
 
+// Appended fields read as zero in records widened from an earlier image, so
+// zero must mean "missing" for them, or the widening must set their default.
 static_assert(sizeof(ShotLogRecord) == 124, "Shot-log schema 2 record size");
 static_assert(offsetof(ShotLogRecord, verdict) == 27, "schema 1 verdict byte");
 static_assert(offsetof(ShotLogRecord, slowAfterDs) == 108, "schema 1 snapshot tail");
@@ -741,7 +748,7 @@ inline uint32_t shotLogChecksum(const ShotLogStore &store) {
   if (store.header.count > 0) {
     crc = crc32Update(crc, reinterpret_cast<const uint8_t *>(store.records),
                       static_cast<size_t>(store.header.count) *
-                          sizeof(ShotLogRecord));
+                          store.header.recordSize);
   }
   return ~crc;
 }
@@ -757,13 +764,28 @@ inline void finalizeShotLogStore(ShotLogStore &store) {
 inline bool validShotLogStore(const ShotLogStore &store) {
   if (store.header.magic != SHOT_LOG_MAGIC ||
       store.header.schemaVersion != SHOT_LOG_SCHEMA_VERSION ||
-      store.header.recordSize != sizeof(ShotLogRecord) ||
+      store.header.recordSize < SHOT_LOG_MIN_RECORD_BYTES ||
+      store.header.recordSize > sizeof(ShotLogRecord) ||
       store.header.count > SHOT_LOG_CAPACITY ||
       store.header.writeIndex >= SHOT_LOG_CAPACITY ||
       store.header.checksum != shotLogChecksum(store)) {
     return false;
   }
   return true;
+}
+
+// Re-strides the records of a valid store written with shorter records to
+// the current size; appended fields read as zero.
+inline void widenShotLogRecords(ShotLogStore &store) {
+  const size_t stored = store.header.recordSize;
+  if (stored >= sizeof(ShotLogRecord)) return;
+  const uint8_t *packed = reinterpret_cast<const uint8_t *>(store.records);
+  for (size_t i = store.header.count; i-- > 0;) {
+    auto *record = reinterpret_cast<uint8_t *>(&store.records[i]);
+    memmove(record, packed + i * stored, stored);
+    memset(record + stored, 0, sizeof(ShotLogRecord) - stored);
+  }
+  store.header.recordSize = sizeof(ShotLogRecord);
 }
 
 inline void resetShotLogStore(ShotLogStore &store) {

@@ -26,6 +26,7 @@ struct DualSlotFlashLogTraits<HistoryStore> {
   static constexpr size_t kSlotCount = HISTORY_FLASH_SLOT_COUNT;
   static constexpr size_t kHeaderBytes = sizeof(HistoryHeader);
   static constexpr void (*reset)(HistoryStore &) = resetHistoryStore;
+  static constexpr void (*widen)(HistoryStore &) = nullptr;
   using Record = HistoryRecord;
   static constexpr size_t kCapacity = HISTORY_CAPACITY;
   static constexpr uint32_t (*recordIdOf)(const HistoryRecord &) =
