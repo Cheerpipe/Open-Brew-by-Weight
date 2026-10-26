@@ -152,6 +152,14 @@ void pairingApprovesOnceDeniesAndExpires() {
   assert(!webAccessDecidePairing(state, 51, true, issued, expired + 1, T0));
   assert(!webAccessStartPairing(state, 52, 1, expired + 1));
   assert(webAccessStartPairing(state, 52, 1, expired + WEB_ACCESS_PAIRING_RESULT_MS));
+
+  // A password exchange closes the open request: approving it later must not
+  // replace the token Home Assistant just received.
+  token(6, out);
+  webAccessSetHomeAssistant(state, out, T0);
+  assert(state.pairing.state == WebAccessPairing::NONE);
+  assert(!webAccessDecidePairing(state, 52, true, issued, expired + 1, T0));
+  assert(webAccessHomeAssistantValid(state, out));
 }
 
 void storedBlobChecksum() {

@@ -85,7 +85,8 @@ Home Assistant asks again):
   to get its own key and does not keep the password.
 - **Approve it in the Web UI.** Home Assistant shows a four-digit code, and
   the Web UI shows **Home Assistant wants to connect** with the same code.
-  Tap **Allow** only if the codes match. The request expires after 2 minutes.
+  Tap **Allow** only if the codes match. The request expires after 2 minutes,
+  and it closes on its own if you type the password in Home Assistant instead.
 
 If Home Assistant was already set up when you turn the password on, it shows
 a "needs reauthentication" notice; answer it the same way. Its entities read

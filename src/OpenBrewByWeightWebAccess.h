@@ -312,10 +312,12 @@ inline bool webAccessHomeAssistantValid(const WebAccessState &state,
          webAccessTokenEqual(state.stored.homeAssistantToken, token);
 }
 
-// One integration slot: a new token replaces the previous one.
+// One integration slot: a new token replaces the previous one. It also closes
+// a still-pending pairing request, whose later approval would replace it.
 inline void webAccessSetHomeAssistant(WebAccessState &state,
                                       const uint8_t token[WEB_ACCESS_TOKEN_BYTES],
                                       uint32_t nowUtc) {
+  if (state.pairing.state == WebAccessPairing::PENDING) state.pairing = {};
   memcpy(state.stored.homeAssistantToken, token, WEB_ACCESS_TOKEN_BYTES);
   state.stored.homeAssistant = 1;
   state.stored.homeAssistantSinceUtc = nowUtc;
