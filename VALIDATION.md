@@ -43,8 +43,8 @@ the Web UI budgets (`web-budgets`) before the broader Web contracts, then
 checks that the design preview still renders from the current sources
 (`web-preview`); the profile first checks that the Web UI sources are
 Prettier-formatted (`web-format`). The route-capacity check counts all `registerHandler(server_, ...)`
-registrations in the network sources and requires `max_uri_handlers` to be
-strictly greater, preserving at least one spare slot.
+registrations in the network sources and requires `max_uri_handlers` to leave
+at least ten spare slots, the headroom the server configuration promises.
 
 Missing tools or dependencies fail profiles that require them with exit 127.
 Tests never bootstrap packages or access hardware/network implicitly. R3 is not
