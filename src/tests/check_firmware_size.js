@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..', '..');
-const slotLimits = {n16r8: 3145728};
+const slotLimits = {n16r8: 3670016};
 const binPath = process.argv[2] || path.join(root, 'build-idf', 'n16r8', 'openbrewbyweight.bin');
 const normalized = binPath.replace(/\\/g, '/');
 const explicitArch = process.argv[3] === '--arch' ? process.argv[4] : '';

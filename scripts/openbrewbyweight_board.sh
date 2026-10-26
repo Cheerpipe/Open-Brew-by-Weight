@@ -5,10 +5,10 @@
 # There is deliberately no default architecture and no automatic port pick.
 # Every caller resolves those through scripts/openbrewbyweight_cli.sh.
 
-# N16R8: 16 MB flash + 8 MB OPI PSRAM with two 3 MiB OTA app slots
+# N16R8: 16 MB flash + 8 MB OPI PSRAM with two 3.5 MiB OTA app slots
 # (idf/partitions-n16r8.csv). Usable bytes of a single OTA app slot, used by
 # the OTA client for a local size pre-check before uploading anything.
-OPENBREWBYWEIGHT_SLOT_BYTES_N16R8=3145728
+OPENBREWBYWEIGHT_SLOT_BYTES_N16R8=3670016
 
 openbrewbyweight_arch_help() {
   cat <<'EOF'

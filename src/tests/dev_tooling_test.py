@@ -310,8 +310,8 @@ with tempfile.TemporaryDirectory(prefix="ai_temp_size_check_", dir=ROOT / "temp"
     sdkconfig.write_text("CONFIG_COMPILER_OPTIMIZATION_SIZE=y\n")
     assert check_size().returncode == 0
     assert check_size(development=True).returncode == 0
-    image.write_bytes(b"x" * 3_145_729)
-    assert "image 3145729 > OTA slot 3145728" in check_size().stderr
+    image.write_bytes(b"x" * 3_670_017)
+    assert "image 3670017 > OTA slot 3670016" in check_size().stderr
     # A flag-free release build of an official pair compares its own baseline.
     with tempfile.TemporaryDirectory(prefix="ai_temp_release_size_", dir=ROOT / "temp") as other:
         image.write_bytes(b"x")
@@ -500,13 +500,13 @@ partition_contracts = {
     "partitions-n16r8.csv": {
         "flash": 0x1000000,
         "rows": {"nvs": (0x9000, 0x65000), "otadata": (0x6E000, 0x2000),
-                 "app0": (0x70000, 0x300000), "app1": (0x370000, 0x300000),
-                 "history": (0x670000, 0x8000),
-                 "scaleprof": (0x678000, 0x41000),
-                 "auditlog": (0x6B9000, 0x10000),
-                 "shotlog": (0x6C9000, 0xFC000),
-                 "shotcurve": (0x7C5000, 0x3EC000),
-                 "reserved": (0xBB1000, 0x24F000),
+                 "app0": (0x70000, 0x380000), "app1": (0x3F0000, 0x380000),
+                 "history": (0x770000, 0x8000),
+                 "scaleprof": (0x778000, 0x41000),
+                 "auditlog": (0x7B9000, 0x10000),
+                 "shotlog": (0x7C9000, 0xFC000),
+                 "shotcurve": (0x8C5000, 0x3EC000),
+                 "reserved": (0xCB1000, 0x14F000),
                  "coredump": (0xE00000, 0xA0000),
                  "crashhist": (0xEA0000, 0x160000)},
     },

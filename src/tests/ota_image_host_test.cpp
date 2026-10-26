@@ -449,12 +449,12 @@ void testOtaJournalUsesBoundedCheckpoints() {
 }
 
 void testOtaJournalBudgetCoversEverySupportedSlot() {
-  constexpr uint32_t n16r8SlotBytes = 0x300000U;
+  constexpr uint32_t n16r8SlotBytes = 0x380000U;
   CHECK(openbrewbyweight::otaJournalMaxDurableWrites(0) == 0U);
   CHECK(openbrewbyweight::otaJournalMaxDurableWrites(1) == 1U);
-  CHECK(openbrewbyweight::otaJournalMaxDurableWrites(n16r8SlotBytes) == 6U);
+  CHECK(openbrewbyweight::otaJournalMaxDurableWrites(n16r8SlotBytes) == 7U);
   CHECK(openbrewbyweight::OTA_SUPPORTED_MAX_SLOT_BYTES == n16r8SlotBytes);
-  CHECK(openbrewbyweight::OTA_JOURNAL_MAX_WRITES_PER_SESSION == 6U);
+  CHECK(openbrewbyweight::OTA_JOURNAL_MAX_WRITES_PER_SESSION == 7U);
   CHECK(openbrewbyweight::OTA_JOURNAL_ERASE_KEYS_PER_SESSION == 2U);
 }
 

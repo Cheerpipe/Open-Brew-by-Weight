@@ -38,7 +38,9 @@ omit, so the release Linea Micra image (2,477,840 bytes) was 9,216 bytes over
 the development baseline plus allowance (2,468,624) and its flash code
 (1,670,372 bytes) 5,916 bytes over that allowance, while still filling only
 78.8% of the 3 MiB OTA slot (667,888 bytes free). Nothing was removed to
-fit; each pair now compares against its own measured release image:
+fit; each pair now compares against its own measured release image. The OTA
+slots later grew to 3.5 MiB (3,670,016 bytes), where the same image fills
+67.5% (1,192,176 bytes free):
 
 | Pair | Image | Linked | DIRAM | Flash code | Rodata |
 | --- | --- | --- | --- | --- | --- |
@@ -55,7 +57,7 @@ The current baselines were measured with ESP-IDF 6.1, its GCC 15.2 toolchain,
 and the qualified `CONFIG_FREERTOS_IN_IRAM=y` build profile. The shared
 development baseline represents the largest reviewed supported profile: the
 Linea Micra cloud build with WebSocket observation on
-`esp32-s3-relay-x1-speaker`. The 3 MiB OTA slot remains the hard image limit
+`esp32-s3-relay-x1-speaker`. The 3.5 MiB OTA slot remains the hard image limit
 for every build, and static measurements do not qualify runtime heap or stack
 behavior.
 
@@ -450,7 +452,7 @@ do not each cause an NVS write or a full-prefix rehash.
 
 | Board | OTA slot | Maximum journal `putBytes` per attempt | Key removals on close |
 |---|---:|---:|---:|
-| n16r8 | 0x300000 (3 MiB) | 6 | up to 2 |
+| n16r8 | 0x380000 (3.5 MiB) | 7 | up to 2 |
 
 The write count is `1 + floor((imageBytes - 1) / 512 KiB)`: one empty-session
 record and checkpoints strictly before completion. `esp_ota_end()` validates

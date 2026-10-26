@@ -410,11 +410,11 @@ The build renders the selected catalog into
 `src/OpenBrewByWeightWebAssetsGzip.h`, generates version identity and
 `build-idf/<hardware-id>--<machine-id>/openbrewbyweight.bin`, then checks image and
 memory budgets. Use only the image for the intended profile pair. The supported partition layout has
-two app slots; arbitrary 4 MB layouts cannot hold this firmware.
+two 3.5 MiB app slots; arbitrary 4 MB layouts cannot hold this firmware.
 
 The layout reserves 640 KiB for a temporary ESP-IDF core dump,
 1,408 KiB for two saved crash records and 4,016 KiB for shot curves. A
-3,572 KiB `reserved` area is left unused for future firmware. The mDNS
+1,340 KiB `reserved` area is left unused for future firmware. The mDNS
 task stack is internal so that stack remains available to a core dump.
 
 Build the supported built-in pairs listed in
