@@ -1274,9 +1274,9 @@ static void run() {
     advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND);
     c.service();
     CHECK(c.connectAttemptsTotal_==1);
-    CHECK(testConnectParams.scan_itvl==preset.first && testConnectParams.scan_window==preset.second);
+    CHECK(testConnectParams.scan_itvl==preset.first && testConnectParams.scan_window==preset.first); // Full duty.
     CHECK(testConnectParams.itvl_min*125U==15U*100U && testConnectParams.itvl_max*125U==50U*100U);
-    CHECK(testConnectParams.latency==0 && testConnectParams.supervision_timeout*10U==1000U);
+    CHECK(testConnectParams.latency==0 && testConnectParams.supervision_timeout*10U==2000U);
     CHECK(testConnectParams.min_ce_len==0 && testConnectParams.max_ce_len==0);
   }
   {
@@ -1289,13 +1289,15 @@ static void run() {
     CHECK(self.itvl_min==kConnIntervalMinUnits && self.itvl_max==kConnIntervalMaxUnits);
     CHECK(self.latency==0 && self.supervision_timeout==kConnSupervisionTimeoutUnits);
     CHECK(self.min_ce_len==8 && self.max_ce_len==8); // ce_len stays the host's.
-    peer={16,24,0,100,0,0}; self=peer; e.type=BLE_GAP_EVENT_L2CAP_UPDATE_REQ;
+    // L2CAP requests carry no self_params: NimBLE applies the peer struct.
+    peer={16,24,0,100,0,0}; e.conn_update_req.self_params=nullptr;
+    e.type=BLE_GAP_EVENT_L2CAP_UPDATE_REQ;
     CHECK(c.onGapEvent(&e,c.linkOperationId_)==0);
-    CHECK(self.itvl_min==16 && self.itvl_max==24 && self.latency==0);
-    CHECK(self.supervision_timeout==kConnSupervisionTimeoutUnits);
-    peer={48,8,0,100,0,0}; self=peer; // Inverted range collapses onto the cap.
+    CHECK(peer.itvl_min==16 && peer.itvl_max==24 && peer.latency==0);
+    CHECK(peer.supervision_timeout==kConnSupervisionTimeoutUnits);
+    peer={48,8,0,100,0,0}; // Inverted range collapses onto the cap.
     c.onGapEvent(&e,c.linkOperationId_);
-    CHECK(self.itvl_min==kConnIntervalMaxUnits && self.itvl_max==kConnIntervalMaxUnits);
+    CHECK(peer.itvl_min==kConnIntervalMaxUnits && peer.itvl_max==kConnIntervalMaxUnits);
     CHECK(capturedScaleLogs.empty()); // Update requests log nothing on the host task.
     testConnDesc={1,24,0,kConnSupervisionTimeoutUnits}; testConnFindStatus=0;
     e.type=BLE_GAP_EVENT_CONN_UPDATE; e.conn_update.conn_handle=1;
@@ -1307,7 +1309,8 @@ static void run() {
     c.service();
     CHECK(capturedScaleLogs.size()==1 && capturedScaleLogTransport.back());
     CHECK(capturedScaleLogs.back().first==kScaleLogInfoSeverity);
-    CHECK(capturedScaleLogs.back().second=="link params itvl_ms=30.00 latency=0 timeout_ms=1000");
+    // The last clamped request (inverted 48/8) is reported as the peer's 10 ms wish.
+    CHECK(capturedScaleLogs.back().second=="link params itvl_ms=30.00 latency=0 timeout_ms=2000 peer_itvl_ms=10");
     e.conn_update.status=BLE_HS_EUNKNOWN;
     c.onGapEvent(&e,c.linkOperationId_);
     c.service();
@@ -1326,7 +1329,7 @@ static void run() {
     CHECK(capturedScaleLogs.empty());
     c.service();
     CHECK(!capturedScaleLogs.empty());
-    CHECK(capturedScaleLogs.front().second=="link params itvl_ms=15.00 latency=0 timeout_ms=1000");
+    CHECK(capturedScaleLogs.front().second=="link params itvl_ms=15.00 latency=0 timeout_ms=2000 peer_itvl_ms=0");
     testConnDesc={}; testConnFindStatus=BLE_HS_ENOTCONN;
     c.finishLink(false,ScaleDisconnectReason::HOST_RESET,0);
   }

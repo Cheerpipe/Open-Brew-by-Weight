@@ -208,17 +208,20 @@ production host uses the hardware-qualified external NimBLE allocator, a 4096
 byte internal host-task stack, MTU 23 and conservative fixed pools.
 
 Connections are requested with explicit link parameters: a 15-50 ms
-connection interval, no slave latency and a 1000 ms supervision timeout, and
-the initiating scan reuses the selected preset's interval and window rather
-than NimBLE's full-duty default. Peer connection-parameter update requests
-(link-layer or L2CAP) are answered with the requested interval clamped into
-that range and the same latency and timeout, so a scale can shorten the
-interval but never stretch it or the loss detection beyond those bounds. The
-supervision timeout mirrors the controller's one-second weight-loss threshold:
-when a shot already treats the stream as lost, the link is released at the
-same moment and reconnection starts instead of waiting out NimBLE's 2.56 s
-default. The live interval, latency and timeout are logged at `INFO` as
-`link params` after every connection and every accepted update.
+connection interval, no slave latency and a 2000 ms supervision timeout; the
+initiating scan runs at full duty, as NimBLE does by default, because it must
+catch one advertisement within the connect timeout (the discovery presets do
+not apply to it). Peer connection-parameter update requests are answered with
+the requested interval clamped into that range and the same latency and
+timeout, so a scale can shorten the interval but never stretch it or the loss
+detection beyond those bounds; a link-layer request is answered through
+`self_params`, an L2CAP request by clamping the struct NimBLE applies. The
+supervision timeout keeps a link alive across a one-to-two second Wi-Fi
+coexistence stall, so cup and tare evidence survive it, while still releasing
+a silent link before NimBLE's 2.56 s default. The live interval, latency and
+timeout are logged at `INFO` as `link params` after every connection and
+every accepted update, with `peer_itvl_ms` naming an interval the clamp
+overrode.
 
 Connectability follows the newest advertisement from each peer. A later
 nonconnectable report cannot reuse an older connectable report, while the scan

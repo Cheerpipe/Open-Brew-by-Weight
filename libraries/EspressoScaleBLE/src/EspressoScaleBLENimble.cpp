@@ -60,14 +60,16 @@ constexpr bool kBleLog = true;
 constexpr bool kScaleLog = false;
 // Link parameters requested at connect and imposed on every peer update
 // request: interval 15-50 ms (1.25 ms units, inside NimBLE's default range),
-// no slave latency, and a 1000 ms supervision timeout (10 ms units). The
-// controller already treats a weight stream that is a second old as lost, so
-// the radio link gives up at the same moment and reconnection starts without
-// waiting for NimBLE's 2.56 s default.
+// no slave latency, and a 2000 ms supervision timeout (10 ms units). The
+// controller treats a weight stream that is a second old as lost and a shot
+// already runs on its backup by then; outside a shot a link that survives a
+// one-to-two second coexistence stall keeps its cup and tare evidence, which a
+// reconnect (new connection generation) would discard. 2000 ms stays below
+// NimBLE's 2.56 s default and far above the two-interval spec floor.
 constexpr uint16_t kConnIntervalMinUnits = 12;
 constexpr uint16_t kConnIntervalMaxUnits = 40;
 constexpr uint16_t kConnLatency = 0;
-constexpr uint16_t kConnSupervisionTimeoutUnits = 100;
+constexpr uint16_t kConnSupervisionTimeoutUnits = 200;
 
 uint16_t clampConnInterval(uint16_t units) {
   return units < kConnIntervalMinUnits   ? kConnIntervalMinUnits
@@ -759,11 +761,18 @@ class NimbleScaleClient {
         ble_gap_conn_find(connectionHandle_, &desc) != 0) {
       return;
     }
+    portENTER_CRITICAL(&mux_);
+    const uint16_t peerUnits = peerIntervalUnits_;
+    peerIntervalUnits_ = 0;
+    portEXIT_CRITICAL(&mux_);
     const unsigned intervalHundredths = desc.conn_itvl * 125U;
-    scaleLogInfo(kBleLog, "link params itvl_ms=%u.%02u latency=%u timeout_ms=%u",
+    // peer_itvl_ms names a request the clamp overrode: a scale that wants a
+    // longer interval shows up here in the field log.
+    scaleLogInfo(kBleLog, "link params itvl_ms=%u.%02u latency=%u timeout_ms=%u peer_itvl_ms=%u",
                  intervalHundredths / 100U, intervalHundredths % 100U,
                  static_cast<unsigned>(desc.conn_latency),
-                 static_cast<unsigned>(desc.supervision_timeout) * 10U);
+                 static_cast<unsigned>(desc.supervision_timeout) * 10U,
+                 static_cast<unsigned>(peerUnits) * 125U / 100U);
   }
 
   uint16_t rxHighWater() const {
@@ -1202,13 +1211,26 @@ class NimbleScaleClient {
         }
         return 0;
       case BLE_GAP_EVENT_CONN_UPDATE_REQ:
-      case BLE_GAP_EVENT_L2CAP_UPDATE_REQ:
-        // NimBLE pre-fills self_params with the peer's request; the worker
-        // logs the outcome from the CONN_UPDATE that follows.
-        if (event->conn_update_req.self_params != nullptr) {
-          clampLinkParams(*event->conn_update_req.self_params);
+      case BLE_GAP_EVENT_L2CAP_UPDATE_REQ: {
+        // Link-layer requests pre-fill self_params with the peer's values and
+        // send them back as the reply. L2CAP requests carry no self_params:
+        // ble_l2cap_sig applies the very struct peer_params points to once
+        // this returns 0, so that is what to clamp. The worker logs the
+        // outcome, with the peer's wish, from the CONN_UPDATE that follows.
+        ble_gap_upd_params *params =
+            event->conn_update_req.self_params != nullptr
+                ? event->conn_update_req.self_params
+                : const_cast<ble_gap_upd_params *>(event->conn_update_req.peer_params);
+        if (params == nullptr) return 0;
+        const uint16_t requested = params->itvl_max;
+        clampLinkParams(*params);
+        if (params->itvl_max != requested) {
+          portENTER_CRITICAL(&mux_);
+          peerIntervalUnits_ = requested;
+          portEXIT_CRITICAL(&mux_);
         }
         return 0;
+      }
       case BLE_GAP_EVENT_CONN_UPDATE:
         if (event->conn_update.status == 0 &&
             callbackMatches(operationId, CallbackDomain::Link)) {
@@ -2129,11 +2151,13 @@ class NimbleScaleClient {
     portEXIT_CRITICAL(&mux_);
     const uint32_t linkOperationId = beginOperation(CallbackDomain::Link);
     ++connectAttemptsTotal_;
-    // The initiating scan keeps the configured preset duty instead of
-    // NimBLE's 100 % default; ce_len stays at the controller's discretion.
+    // The initiating scan runs at full duty like NimBLE's default: it has to
+    // catch one advertisement within BLE_CONNECT_TIMEOUT_MS, and the duty
+    // presets govern discovery only. ce_len stays at the controller's
+    // discretion.
     ble_gap_conn_params params = {};
     params.scan_itvl = scanInterval_;
-    params.scan_window = scanWindow_;
+    params.scan_window = scanInterval_;
     params.itvl_min = kConnIntervalMinUnits;
     params.itvl_max = kConnIntervalMaxUnits;
     params.latency = kConnLatency;
@@ -2913,6 +2937,7 @@ class NimbleScaleClient {
   bool mbufFailed_ = false;
   bool invalidNotificationStream_ = false;
   bool linkParamsPending_ = false;
+  uint16_t peerIntervalUnits_ = 0;
   uint8_t invalidNotificationStreak_ = 0;
   uint32_t mbufFailures_ = 0;
 
