@@ -1259,6 +1259,75 @@ static void run() {
     CHECK(!scaleBookooCommandAt(ultra,7,&command));
     CHECK(strcmp(scaleDefaultFriendlyName("LUNAR"),"LUNAR")==0);
   }
+  for (const auto preset : {std::make_pair(BLE_SCAN_RELAXED_INTERVAL,BLE_SCAN_RELAXED_WINDOW),
+                            std::make_pair(BLE_SCAN_AGGRESSIVE_INTERVAL,BLE_SCAN_AGGRESSIVE_WINDOW)}) {
+    // The discovery scan keeps its active, unfiltered preset duty; the connect
+    // request carries the same duty plus the fixed link parameters.
+    NimbleScaleClient c(false);
+    testDiscParams={}; testConnectParams={};
+    CHECK(c.startScan(nullptr,false,preset.first,preset.second,false));
+    CHECK(testDiscParams.passive==0 && testDiscParams.filter_duplicates==0);
+    CHECK(testDiscParams.filter_policy==0 && testDiscParams.limited==0);
+    CHECK(testDiscParams.itvl==preset.first && testDiscParams.window==preset.second);
+    advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND);
+    c.service();
+    CHECK(c.connectAttemptsTotal_==1);
+    CHECK(testConnectParams.scan_itvl==preset.first && testConnectParams.scan_window==preset.second);
+    CHECK(testConnectParams.itvl_min*125U==15U*100U && testConnectParams.itvl_max*125U==50U*100U);
+    CHECK(testConnectParams.latency==0 && testConnectParams.supervision_timeout*10U==1000U);
+    CHECK(testConnectParams.min_ce_len==0 && testConnectParams.max_ce_len==0);
+  }
+  {
+    NimbleScaleClient c(false); ready(c);
+    ble_gap_upd_params peer={6,3200,4,600,8,8}; ble_gap_upd_params self=peer;
+    ble_gap_event e={}; e.type=BLE_GAP_EVENT_CONN_UPDATE_REQ;
+    e.conn_update_req.peer_params=&peer; e.conn_update_req.self_params=&self;
+    e.conn_update_req.conn_handle=1;
+    CHECK(c.onGapEvent(&e,c.linkOperationId_)==0); // Accepted with our parameters.
+    CHECK(self.itvl_min==kConnIntervalMinUnits && self.itvl_max==kConnIntervalMaxUnits);
+    CHECK(self.latency==0 && self.supervision_timeout==kConnSupervisionTimeoutUnits);
+    CHECK(self.min_ce_len==8 && self.max_ce_len==8); // ce_len stays the host's.
+    peer={16,24,0,100,0,0}; self=peer; e.type=BLE_GAP_EVENT_L2CAP_UPDATE_REQ;
+    CHECK(c.onGapEvent(&e,c.linkOperationId_)==0);
+    CHECK(self.itvl_min==16 && self.itvl_max==24 && self.latency==0);
+    CHECK(self.supervision_timeout==kConnSupervisionTimeoutUnits);
+    peer={48,8,0,100,0,0}; self=peer; // Inverted range collapses onto the cap.
+    c.onGapEvent(&e,c.linkOperationId_);
+    CHECK(self.itvl_min==kConnIntervalMaxUnits && self.itvl_max==kConnIntervalMaxUnits);
+    CHECK(capturedScaleLogs.empty()); // Update requests log nothing on the host task.
+    testConnDesc={1,24,0,kConnSupervisionTimeoutUnits}; testConnFindStatus=0;
+    e.type=BLE_GAP_EVENT_CONN_UPDATE; e.conn_update.conn_handle=1;
+    c.onGapEvent(&e,c.linkOperationId_+1); // Another link's update is not ours.
+    c.service();
+    CHECK(capturedScaleLogs.empty());
+    c.onGapEvent(&e,c.linkOperationId_);
+    CHECK(capturedScaleLogs.empty()); // Deferred to the worker.
+    c.service();
+    CHECK(capturedScaleLogs.size()==1 && capturedScaleLogTransport.back());
+    CHECK(capturedScaleLogs.back().first==kScaleLogInfoSeverity);
+    CHECK(capturedScaleLogs.back().second=="link params itvl_ms=30.00 latency=0 timeout_ms=1000");
+    e.conn_update.status=BLE_HS_EUNKNOWN;
+    c.onGapEvent(&e,c.linkOperationId_);
+    c.service();
+    CHECK(capturedScaleLogs.size()==1); // A failed update keeps the old parameters.
+    testConnDesc={}; testConnFindStatus=BLE_HS_ENOTCONN;
+  }
+  {
+    // A fresh connection reports its parameters once the worker services it.
+    NimbleScaleClient c(false); ready(c);
+    c.connectionHandle_=kInvalidHandle;
+    c.enterState(NimbleScaleClient::State::Connecting);
+    const uint32_t operation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    testConnDesc={7,12,0,kConnSupervisionTimeoutUnits}; testConnFindStatus=0;
+    ble_gap_event e={}; e.type=BLE_GAP_EVENT_CONNECT; e.connect.conn_handle=7;
+    c.onGapEvent(&e,operation);
+    CHECK(capturedScaleLogs.empty());
+    c.service();
+    CHECK(!capturedScaleLogs.empty());
+    CHECK(capturedScaleLogs.front().second=="link params itvl_ms=15.00 latency=0 timeout_ms=1000");
+    testConnDesc={}; testConnFindStatus=BLE_HS_ENOTCONN;
+    c.finishLink(false,ScaleDisconnectReason::HOST_RESET,0);
+  }
   printf("NimBLE production client: %u checks passed\n",checks);
 }
 };

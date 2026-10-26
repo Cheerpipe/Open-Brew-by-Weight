@@ -154,8 +154,19 @@ inline int ble_gattc_write_no_rsp_flat(uint16_t,uint16_t,const void *,uint16_t) 
 template<class... T> int ble_gattc_disc_all_svcs(T...) { ++testRadioProcedures; return BLE_HS_EINVAL; }
 template<class... T> int ble_gattc_disc_all_chrs(T...) { ++testRadioProcedures; return BLE_HS_EINVAL; }
 template<class... T> int ble_gattc_disc_all_dscs(T...) { ++testRadioProcedures; return BLE_HS_EINVAL; }
-template<class... T> int ble_gap_connect(T...) { ++testRadioProcedures; return BLE_HS_EINVAL; }
-template<class... T> int ble_gap_disc(T...) { ++testRadioProcedures; return 0; }
+using ble_gap_event_fn = int(ble_gap_event *, void *);
+inline ble_gap_conn_params testConnectParams = {};
+inline ble_gap_disc_params testDiscParams = {};
+inline int ble_gap_connect(uint8_t, const ble_addr_t *, int32_t, const ble_gap_conn_params *params, ble_gap_event_fn *, void *) {
+  ++testRadioProcedures;
+  testConnectParams = params == nullptr ? ble_gap_conn_params{} : *params;
+  return BLE_HS_EINVAL;
+}
+inline int ble_gap_disc(uint8_t, int32_t, const ble_gap_disc_params *params, ble_gap_event_fn *, void *) {
+  ++testRadioProcedures;
+  testDiscParams = params == nullptr ? ble_gap_disc_params{} : *params;
+  return 0;
+}
 inline int ble_gap_disc_cancel() { ++testRadioProcedures; return 0; }
 inline bool testDiscoveryActive = true;
 inline int ble_gap_disc_active() { return testDiscoveryActive; }
