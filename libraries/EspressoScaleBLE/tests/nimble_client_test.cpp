@@ -1333,6 +1333,21 @@ static void run() {
     testConnDesc={}; testConnFindStatus=BLE_HS_ENOTCONN;
     c.finishLink(false,ScaleDisconnectReason::HOST_RESET,0);
   }
+  {
+    // A queued weight frame wakes the consumer from the host task; a stale or
+    // dropped frame does not.
+    NimbleScaleClient c(false); ready(c);
+    EspressoScaleBLE facade(false);
+    static unsigned framesQueued=0; framesQueued=0;
+    facade.setFrameQueuedObserver([] { CHECK(testCriticalDepth==0); ++framesQueued; });
+    notify(c,20);
+    CHECK(framesQueued==1);
+    os_mbuf b={}; b.length=20;
+    c.onNotification(1,10,&b,c.linkOperationId_+1); // Another link's frame.
+    CHECK(framesQueued==1);
+    facade.setFrameQueuedObserver(nullptr);
+    c.finishLink(false,ScaleDisconnectReason::HOST_RESET,0);
+  }
   printf("NimBLE production client: %u checks passed\n",checks);
 }
 };

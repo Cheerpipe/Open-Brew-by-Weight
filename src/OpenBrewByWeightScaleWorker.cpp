@@ -190,8 +190,6 @@ static std::atomic<bool> scaleGapMaxResetRequested{false};
 uint32_t lastScalePacketGapLogMs = 0;
 uint32_t lastScaleWeightAtMs = 0;
 uint32_t scaleWeightUpdateIntervalMs = 0;
-uint32_t scaleWeightPolledAtMs = 0;
-bool scaleWeightPollStarted = false;
 uint32_t scaleRejectedPackets = 0;
 uint32_t scaleReconnects = 0;
 uint8_t scaleLastDisconnectReason = 0;
@@ -351,6 +349,14 @@ void wakeScaleWorker() {
   if (worker != nullptr) {
     (void)xTaskNotifyGive(worker);
   }
+}
+
+// NimBLE host task, once per queued weight frame. It must not block, so it
+// reads the handle without scaleWorkerTaskHandleMutex: the BLE runtime stops
+// before the handle clears, so no late frame reaches a gone task.
+void wakeScaleWorkerForFrame() {
+  TaskHandle_t worker = scaleWorkerTaskHandle.load(std::memory_order_acquire);
+  if (worker != nullptr) (void)xTaskNotifyGive(worker);
 }
 
 void syncScaleSoftApRadio(bool apActive) {
@@ -588,9 +594,6 @@ void setScaleLinkState(ScaleLinkState state) {
     lastScaleLinkRssiSampleMs = 0;
   }
   portEXIT_CRITICAL(&scaleLinkMux);
-  if (previous != state) {
-    scaleWeightPollStarted = false;
-  }
   if (disconnectedGeneration != 0 &&
       scalePowerOffBlocksGeneration(disconnectedGeneration)) {
     clearScalePowerOffLifecycle();
@@ -1008,15 +1011,14 @@ bool publishPendingScaleWeightEvent() {
   return true;
 }
 
-bool pollPendingScaleWeightEvent(uint32_t nowMs) {
-  if (scaleWeightPollStarted &&
-      static_cast<uint32_t>(nowMs - scaleWeightPolledAtMs) <
-          SCALE_WEIGHT_POLL_INTERVAL_MS) {
-    return false;
-  }
-  scaleWeightPollStarted = true;
-  scaleWeightPolledAtMs = nowMs;
-  return publishPendingScaleWeightEvent();
+// Drains every frame queued since the last wake: the host task wakes the
+// worker per frame and the 10 ms tick only covers a missed notification, so
+// no weight waits for the next tick.
+bool pollPendingScaleWeightEvent() {
+  bool published = false;
+  for (unsigned n = 0; n < SCALE_WEIGHT_DRAIN_MAX && publishPendingScaleWeightEvent(); ++n)
+    published = true;
+  return published;
 }
 
 void yieldBetweenScaleAttOps() {
@@ -2148,8 +2150,6 @@ bool applyScalePreferenceReset() {
 
 void resetScaleWorkerRadioStateForHost() {
   scaleConnecting = false;
-  scaleWeightPolledAtMs = 0;
-  scaleWeightPollStarted = false;
   scaleScanAppliedInterval = 0;
   scaleScanAppliedWindow = 0;
   scaleHuntRfUntilMs = 0;
@@ -2622,7 +2622,7 @@ void serviceScaleWorkerLink() {
     snapshotDirty = true;
   }
 
-  const bool sawWeight = pollPendingScaleWeightEvent(millis());
+  const bool sawWeight = pollPendingScaleWeightEvent();
   if (sawWeight) {
     snapshotDirty = true;
   }
@@ -2925,6 +2925,7 @@ bool initializeScaleWorker() {
   if (scaleWorkerBridge.syncNetworkRf == nullptr) return false;
 #endif
   scale.setDroppedFrameObserver(&handleScaleDroppedFrameForProfile);
+  scale.setFrameQueuedObserver(&wakeScaleWorkerForFrame);
   scaleWorkerStartupFinished.store(false, std::memory_order_relaxed);
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
   bleStackReady.store(false, std::memory_order_relaxed);

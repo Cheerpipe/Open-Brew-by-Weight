@@ -166,6 +166,9 @@ class EspressoScaleBLE {
         // on the NimBLE host task: publish atomics/notifications, never block.
         // It may repeat a value; the last call reports the current state.
         void setAcquisitionObserver(void (*observer)(bool, uint32_t));
+        // Called on the NimBLE host task right after a weight frame is queued
+        // in the RX ring: wake the consumer, never block or parse here.
+        void setFrameQueuedObserver(void (*observer)());
         ScaleFeatureSet features() const;
         ScaleModel model() const;
         // Borrowed until the connection changes; copy if retained.

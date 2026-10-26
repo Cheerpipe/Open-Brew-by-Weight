@@ -368,6 +368,7 @@ using ScaleDroppedFrameObserver = void (*)(const ScaleDroppedFrame &);
 class EspressoScaleBLE {
  public:
   void setAcquisitionObserver(void (*)(bool, uint32_t)) {}
+  void setFrameQueuedObserver(void (*)()) {}
  public:
   explicit EspressoScaleBLE(bool debug) { (void)debug; }
 

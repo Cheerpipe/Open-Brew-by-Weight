@@ -46,6 +46,7 @@ ScaleDroppedFrameObserver g_droppedFrameObserver = nullptr;
 constexpr uint16_t kInvalidHandle = 0xffff;
 constexpr size_t kCandidateCount = 8;
 void (*g_acquisitionObserver)(bool, uint32_t) = nullptr;
+void (*g_frameQueuedObserver)() = nullptr;
 constexpr size_t kServiceCount = 24;
 constexpr size_t kEventCount = 12;
 constexpr size_t kCriticalEventCount = 6;
@@ -1419,6 +1420,7 @@ class NimbleScaleClient {
       portEXIT_CRITICAL(&mux_);
       return;
     }
+    bool queued = false;
     portENTER_CRITICAL(&mux_);
     if (operationId != linkOperationId_ ||
         connectionHandle != connectionHandle_ ||
@@ -1429,6 +1431,7 @@ class NimbleScaleClient {
       ++rxDrops_;
       rxOverflowed_ = true;
     } else {
+      queued = true;
       invalidNotificationStreak_ = 0;
       frame.generation = generation_;
       ++notificationSequence_;
@@ -1442,6 +1445,8 @@ class NimbleScaleClient {
       }
     }
     portEXIT_CRITICAL(&mux_);
+    // The consumer drains the ring on this wake instead of its fallback tick.
+    if (queued && g_frameQueuedObserver != nullptr) g_frameQueuedObserver();
   }
 
   int onService(uint16_t connectionHandle, const ble_gatt_error *error,
@@ -3187,6 +3192,10 @@ void EspressoScaleBLE::setDroppedFrameObserver(ScaleDroppedFrameObserver observe
 
 void EspressoScaleBLE::setAcquisitionObserver(void (*observer)(bool, uint32_t)) {
   g_acquisitionObserver = observer;
+}
+
+void EspressoScaleBLE::setFrameQueuedObserver(void (*observer)()) {
+  g_frameQueuedObserver = observer;
 }
 
 ScaleFeatureSet EspressoScaleBLE::features() const {

@@ -55,7 +55,11 @@ BleScanIntensity discoveryScanIntensity();
 
 constexpr uint32_t SCALE_WORKER_STALE_MS = 2000;
 constexpr uint32_t SCALE_WORKER_NO_SCALE_DELAY_MS = 10;
+// Linked fallback tick: the NimBLE host task wakes the worker per queued
+// weight frame, so this only covers a missed notification.
 constexpr uint32_t SCALE_WEIGHT_POLL_INTERVAL_MS = 10;
+// Frames drained per wake; the client RX ring holds this many.
+constexpr unsigned SCALE_WEIGHT_DRAIN_MAX = 16;
 constexpr uint32_t SCALE_POWER_OFF_DISCONNECT_TIMEOUT_MS = 3000;
 constexpr uint32_t SCALE_WORKER_BACKGROUND_MS = 25;
 constexpr uint32_t SCALE_LINK_SNAPSHOT_INTERVAL_MS = 50;

@@ -80,9 +80,10 @@ Weight delivery uses a fixed 16-event FIFO under its existing task mutex;
 overflow explicitly invalidates sample evidence instead of silently joining
 nonconsecutive readings. No parsing or cup-state transition runs under that
 mutex. Native NimBLE notification callbacks only copy bounded frames into the
-client RX ring. The scale owner parses and publishes queued weight frames on a
-10 ms cadence; command, policy, and beep wakeups cannot accelerate that normal
-polling, and ATT-yield paths do not drain it. The safety-critical final
+client RX ring and then notify the scale owner's task, which drains and
+publishes every queued frame on that wake (bounded by the ring depth); its
+10 ms linked tick is only the fallback for a missed notification, and
+ATT-yield paths do not drain the ring. The safety-critical final
 pre-tare harvest runs after the library's command-spacing wait. The worker keeps its 1 ms
 service cadence only while establishing a connection. Idle-tare
 claim/cancel/approved-sequence updates use the separate request

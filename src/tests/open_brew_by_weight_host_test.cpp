@@ -2269,22 +2269,19 @@ void r12_scale_worker_service_publishes_weight_and_detects_failure() {
   scale.newWeightAvailableValue = true;
   serviceScaleWorkerLink();
   processScaleWorkerEvents();
-  CHECK(scale.newWeightAvailableCalls == 1);
+  // Each service drains the ring: one frame, then the empty probe.
+  CHECK(scale.newWeightAvailableCalls == 2);
   CHECK(currentWeightSequence == 1);
   CHECK(fabsf(currentWeight - 12.34f) < 0.001f);
   CHECK(scaleAvailable());
 
+  // A frame queued after the drain is published on the very next service,
+  // without waiting out the fallback tick.
   scale.weight = 23.45f;
   scale.newWeightAvailableValue = true;
   serviceScaleWorkerLink();
-  CHECK(scale.newWeightAvailableCalls == 1);
-  hostMillis += SCALE_WEIGHT_POLL_INTERVAL_MS - 1;
-  serviceScaleWorkerLink();
-  CHECK(scale.newWeightAvailableCalls == 1);
-  ++hostMillis;
-  serviceScaleWorkerLink();
   processScaleWorkerEvents();
-  CHECK(scale.newWeightAvailableCalls == 2);
+  CHECK(scale.newWeightAvailableCalls == 4);
   CHECK(fabsf(currentWeight - 23.45f) < 0.001f);
 
   scale.heartbeatRequiredValue = true;
@@ -2346,8 +2343,8 @@ void r12d_command_does_not_drain_buffered_weight() {
   CHECK(executeNextScaleCommand());
   CHECK(scale.stopTimerCalls == 1);
   CHECK(scale.newWeightAvailableCalls == 0);
-  CHECK(pollPendingScaleWeightEvent(hostMillis));
-  CHECK(scale.newWeightAvailableCalls == 1);
+  CHECK(pollPendingScaleWeightEvent());
+  CHECK(scale.newWeightAvailableCalls == 2);
 }
 
 void r12b_discovery_clears_stale_connected_link_snapshot() {
