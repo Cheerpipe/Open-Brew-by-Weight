@@ -568,14 +568,19 @@ static esp_err_t serveWebAsset(httpd_req_t *request, const WebAsset &asset) {
   // not name. The shell and assets keep the connection open so a page load
   // reuses its handshakes; the bound ui-stream refreshes its LRU slot, so
   // lru_purge evicts idle asset sockets first. API JSON and OTA responses
-  // still close.
-  const bool current = requestsCurrentAssetTag(request);
-  const char *cacheControl =
-      current ? "public, max-age=31536000, immutable" : "no-store";
-  if (current && ifNoneMatchEquals(request, WEB_UI_ETAG)) {
+  // still close. The service worker keeps one bare URL (it names this
+  // release and asset tag, like the shell), so each update check revalidates
+  // it against the shell's ETag and an unchanged worker costs a 304.
+  const bool worker = strcmp(asset.path, "/sw.js") == 0;
+  const bool current = !worker && requestsCurrentAssetTag(request);
+  const char *etag = worker || current ? WEB_UI_ETAG : nullptr;
+  const char *cacheControl = worker    ? "no-cache"
+                             : current ? "public, max-age=31536000, immutable"
+                                       : "no-store";
+  if (etag != nullptr && ifNoneMatchEquals(request, etag)) {
     httpd_resp_set_status(request, STATUS_NOT_MODIFIED);
     httpd_resp_set_hdr(request, "Cache-Control", cacheControl);
-    httpd_resp_set_hdr(request, "ETag", WEB_UI_ETAG);
+    httpd_resp_set_hdr(request, "ETag", etag);
     return httpd_resp_send(request, nullptr, 0);
   }
   httpd_resp_set_type(request, asset.contentType);
@@ -583,8 +588,8 @@ static esp_err_t serveWebAsset(httpd_req_t *request, const WebAsset &asset) {
     httpd_resp_set_hdr(request, "Content-Encoding", "gzip");
   }
   httpd_resp_set_hdr(request, "Cache-Control", cacheControl);
-  if (current) {
-    httpd_resp_set_hdr(request, "ETag", WEB_UI_ETAG);
+  if (etag != nullptr) {
+    httpd_resp_set_hdr(request, "ETag", etag);
   }
   httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
   httpd_resp_set_hdr(request, "X-Frame-Options", "DENY");

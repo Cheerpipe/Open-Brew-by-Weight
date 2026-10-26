@@ -634,12 +634,15 @@ if (!rootHandler.includes("media-src data:;") || /media-src[^;]*(\*|https?:|'sel
   throw new Error('GET / may allow only data: media, for the full-screen keep-awake video');
 if (!serveImmutable.includes('requestsCurrentAssetTag(request)') ||
     !network.includes('strcmp(query + 3, WEB_UI_ASSET_TAG) == 0') ||
-    !serveImmutable.includes('current ? "public, max-age=31536000, immutable" : "no-store"') ||
+    !compactSource(serveImmutable).includes(compactSource(
+        'worker ? "no-cache" : current ? "public, max-age=31536000, immutable" : "no-store"')) ||
+    !serveImmutable.includes('const bool worker = strcmp(asset.path, "/sw.js") == 0;') ||
+    !serveImmutable.includes('const bool current = !worker && requestsCurrentAssetTag(request);') ||
     !serveImmutable.includes('max-age=31536000') ||
     !serveImmutable.includes('immutable') ||
     !serveImmutable.includes('STATUS_NOT_MODIFIED') ||
     serveImmutable.includes('"Connection"')) {
-  throw new Error('Immutable gzip assets must long-cache only their current ?v= tag (else no-store) with ETag/304 on kept-alive connections');
+  throw new Error('Immutable gzip assets must long-cache only their current ?v= tag (else no-store), /sw.js must revalidate (no-cache), both with ETag/304 on kept-alive connections');
 }
 // One exact route per WEB_ASSETS row, every row typed and only PNG rows raw;
 // the icon probe rows serve the real artwork, never a redirect.
