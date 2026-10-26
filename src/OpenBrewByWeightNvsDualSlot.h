@@ -4,8 +4,8 @@
 
 namespace openbrewbyweight {
 
-// Dual-slot pick by wrapping uint32 revision (settings + BLE scan intensity).
-// Shot log uses an active-slot pointer instead; do not reuse this there.
+// Dual-slot pick by wrapping uint32 revision: settings, BLE scan intensity and
+// the generation of the dual-slot flash logs (shot log, history).
 
 enum class DualSlotChoice : uint8_t {
   NONE = 0,

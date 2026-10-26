@@ -140,11 +140,7 @@ class DualSlotFlashLog {
       return false;
     }
     CompactFn(store_);
-    if (store_.header.generation == 0) {
-      store_.header.generation = 1;
-    } else if (store_.header.generation < UINT32_MAX) {
-      ++store_.header.generation;
-    }
+    bumpGeneration();
     FinalizeFn(store_);
     const uint8_t targetSlot = static_cast<uint8_t>(1U - (activeSlot_ & 1U));
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
@@ -216,8 +212,7 @@ class DualSlotFlashLog {
     }
     if (persistProgress_.phase == FlashStoreTransaction::Phase::IDLE) {
       CompactFn(store_);
-      if (store_.header.generation == 0) store_.header.generation = 1;
-      else if (store_.header.generation < UINT32_MAX) ++store_.header.generation;
+      bumpGeneration();
       FinalizeFn(store_);
       beginFlashStoreTransaction(
           persistProgress_,
@@ -383,6 +378,12 @@ class DualSlotFlashLog {
   }
 
  protected:
+  // Generations wrap like the settings revision (secondRevisionIsNewer picks
+  // the newer slot across the wrap); 0 is reserved for a never-saved store.
+  void bumpGeneration() {
+    if (++store_.header.generation == 0) store_.header.generation = 1;
+  }
+
   // Persists after a mutation: defer when allowed, otherwise save now and
   // reload the last-good slot when the immediate save fails.
   bool persistMutation(bool persistNow) {

@@ -607,6 +607,27 @@ void p66_shot_log_dual_slot_generation_flip() {
   CHECK(out[1].durationDs == 250);
 }
 
+// Generations keep flipping slots past UINT32_MAX: the wrapped generation 1
+// must still beat the stale slot left at UINT32_MAX, instead of tying with it.
+void p66d_shot_log_generation_wraps_without_tie() {
+  resetHostPersistence();
+  struct Probe : ShotLog { using ShotLog::store_; } log;
+  CHECK(log.load());
+  log.store_.header.generation = UINT32_MAX - 2;
+  ShotLogRecord record = {};
+  record.goalWeightDg = 360;
+  for (uint16_t duration = 1; duration <= 3; ++duration) {
+    record.durationDs = duration;
+    CHECK(log.append(record));
+  }
+  CHECK(log.store_.header.generation == 1);
+  ShotLog reloaded;
+  CHECK(reloaded.load());
+  CHECK(reloaded.count() == 3);
+  ShotLogRecord out = {};
+  CHECK(reloaded.copyNewestFirst(&out, 1) == 1 && out.durationDs == 3);
+}
+
 template <typename Log, typename Record>
 void check_snapshot_persistence(Record record) {
   Log::resetHostStorage();
@@ -3334,6 +3355,7 @@ const TestCase tests[] = {
     {"P65", p65_factory_settings_survives_second_slot_write_fail},
     {"P66", p66_shot_log_dual_slot_generation_flip},
     {"P66B", p66b_snapshot_acknowledgement_preserves_newest_generation},
+    {"P66D", p66d_shot_log_generation_wraps_without_tie},
     {"P09", p09_fast_extraction_guard_validation},
     {"P10", p10_auto_to_manual_guard_trend_and_validation},
     {"P12", p12_shot_log_persists_compact_blob},
