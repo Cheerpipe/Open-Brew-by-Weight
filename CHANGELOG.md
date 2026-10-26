@@ -4,9 +4,9 @@ Notable changes for people who install and use Open Brew by Weight. Version
 numbers follow `MAJOR.MINOR.PATCH`; the firmware reports the same number in the
 Web UI footer.
 
-## 1.0.0 — unreleased
+## 1.1.0 — 2026-10-26
 
-The first stable release.
+The first published stable release; it supersedes the unpublished 1.0.0 tag.
 
 - **Brew by weight:** a Bluetooth scale measures the drink and the controller
   stops the shot near your recipe's target weight, learning from each shot.
@@ -15,7 +15,9 @@ The first stable release.
   with curves, statistics, and an activation history. Each stored shot keeps
   the machine's target temperature (when the integration reports one), the
   preset's dose, and the resulting brew ratio, shown on its history card and
-  included in the CSV export.
+  included in the CSV export. Preset graphs and the shot card on Home name
+  how far the stop line moves for fast and slow shots, for example
+  **Up to 42 g** and **Down to 33 g**.
 - **Shot export:** save a shot as JSON or in the Gaggiuino format, open it in
   Beanconqueror, or export it for Visualizer.coffee with its recipe details.
 - **Safety backups:** cup protection, a timed fallback when the scale drops
