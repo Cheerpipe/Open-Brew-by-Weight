@@ -2212,7 +2212,8 @@ enum class DebugCode : uint8_t {
   SCHEDULED_RESTART_SKIPPED,
   // argument1: loopTask stack bytes the last boot recovery never used;
   // argument2: its RecoveryOperation (1 network access, 2 factory reset).
-  BOOT_RECOVERY_STACK
+  BOOT_RECOVERY_STACK,
+  BLE_LINK_PARAMS_OVERRIDDEN
 };
 
 enum class ScheduledRestartCause : uint8_t {
@@ -2542,6 +2543,7 @@ inline LogLevel debugCodeDefaultLevel(DebugCode code) {
     case DebugCode::MACHINE_MUX_WAIT:
     case DebugCode::SCHEDULED_RESTART_FIRED:
     case DebugCode::SCHEDULED_RESTART_SKIPPED:
+    case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN:
       return LogLevel::WARNING;
     case DebugCode::OTA_ROLLBACK_ARMED:
     case DebugCode::OTA_ROLLBACK_FAILED:
@@ -2626,6 +2628,7 @@ inline const char *debugCodeName(DebugCode code) {
     case DebugCode::SCHEDULED_RESTART_SKIPPED:
       return "scheduled restart skipped";
     case DebugCode::BOOT_RECOVERY_STACK: return "boot recovery stack";
+    case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN: return "scale link interval overridden";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2937,6 +2940,11 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
       snprintf(message, capacity, "%s left %ld B of loopTask stack unused",
                event.argument2 == 2 ? "factory reset" : "network access reset",
                static_cast<long>(event.argument1));
+      return true;
+    case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN:
+      snprintf(message, capacity,
+               "scale asked for a %ld ms link interval; %ld ms applied",
+               static_cast<long>(event.argument1), static_cast<long>(event.argument2));
       return true;
     case DebugCode::BOOT_SUBSYSTEM:
       snprintf(message, capacity, "%s=%s",

@@ -47,6 +47,7 @@ constexpr uint16_t kInvalidHandle = 0xffff;
 constexpr size_t kCandidateCount = 8;
 void (*g_acquisitionObserver)(bool, uint32_t) = nullptr;
 void (*g_frameQueuedObserver)() = nullptr;
+void (*g_linkParamsObserver)(uint16_t, uint16_t) = nullptr;
 constexpr size_t kServiceCount = 24;
 constexpr size_t kEventCount = 12;
 constexpr size_t kCriticalEventCount = 6;
@@ -774,6 +775,7 @@ class NimbleScaleClient {
                  static_cast<unsigned>(desc.conn_latency),
                  static_cast<unsigned>(desc.supervision_timeout) * 10U,
                  static_cast<unsigned>(peerUnits) * 125U / 100U);
+    if (g_linkParamsObserver != nullptr) g_linkParamsObserver(desc.conn_itvl, peerUnits);
   }
 
   uint16_t rxHighWater() const {
@@ -3196,6 +3198,10 @@ void EspressoScaleBLE::setAcquisitionObserver(void (*observer)(bool, uint32_t)) 
 
 void EspressoScaleBLE::setFrameQueuedObserver(void (*observer)()) {
   g_frameQueuedObserver = observer;
+}
+
+void EspressoScaleBLE::setLinkParamsObserver(void (*observer)(uint16_t, uint16_t)) {
+  g_linkParamsObserver = observer;
 }
 
 ScaleFeatureSet EspressoScaleBLE::features() const {

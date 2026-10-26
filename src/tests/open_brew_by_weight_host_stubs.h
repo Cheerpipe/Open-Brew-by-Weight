@@ -369,6 +369,7 @@ class EspressoScaleBLE {
  public:
   void setAcquisitionObserver(void (*)(bool, uint32_t)) {}
   void setFrameQueuedObserver(void (*)()) {}
+  void setLinkParamsObserver(void (*)(uint16_t, uint16_t)) {}
  public:
   explicit EspressoScaleBLE(bool debug) { (void)debug; }
 

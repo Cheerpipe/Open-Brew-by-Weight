@@ -221,7 +221,9 @@ coexistence stall, so cup and tare evidence survive it, while still releasing
 a silent link before NimBLE's 2.56 s default. The live interval, latency and
 timeout are logged at `INFO` as `link params` after every connection and
 every accepted update, with `peer_itvl_ms` naming an interval the clamp
-overrode.
+overrode; the facade's link-params observer hands the same values to the
+firmware, which keeps every overridden request in the persistent audit log as
+a WARNING (`scale link interval overridden`).
 
 Connectability follows the newest advertisement from each peer. A later
 nonconnectable report cannot reuse an older connectable report, while the scan

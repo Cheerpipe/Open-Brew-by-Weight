@@ -359,6 +359,16 @@ void wakeScaleWorkerForFrame() {
   if (worker != nullptr) (void)xTaskNotifyGive(worker);
 }
 
+// Worker task, after every connection and accepted update. A peer request the
+// clamp overrode is a scale that wants a longer interval than the controller
+// allows: rare, and worth keeping in the persistent audit log.
+void noteScaleLinkParams(uint16_t intervalUnits, uint16_t peerIntervalUnits) {
+  if (peerIntervalUnits == 0) return;
+  addDebugEvent(DebugCategory::BLE, DebugCode::BLE_LINK_PARAMS_OVERRIDDEN,
+                static_cast<int32_t>(peerIntervalUnits) * 125 / 100,
+                static_cast<int32_t>(intervalUnits) * 125 / 100);
+}
+
 void syncScaleSoftApRadio(bool apActive) {
   const bool previous =
       scaleSoftApActive.exchange(apActive, std::memory_order_acq_rel);
@@ -2926,6 +2936,7 @@ bool initializeScaleWorker() {
 #endif
   scale.setDroppedFrameObserver(&handleScaleDroppedFrameForProfile);
   scale.setFrameQueuedObserver(&wakeScaleWorkerForFrame);
+  scale.setLinkParamsObserver(&noteScaleLinkParams);
   scaleWorkerStartupFinished.store(false, std::memory_order_relaxed);
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
   bleStackReady.store(false, std::memory_order_relaxed);

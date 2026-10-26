@@ -8179,6 +8179,17 @@ void r32_old_connection_generation_cannot_update_weight() {
   CHECK(currentWeight != 12.0f);
 }
 
+void r34_overridden_link_interval_is_audited() {
+  resetHarness(false, true);
+  debugLog.clear();
+  noteScaleLinkParams(24, 0);  // The scale accepted our parameters: nothing to keep.
+  CHECK(!debugEventExists(DebugCode::BLE_LINK_PARAMS_OVERRIDDEN));
+  noteScaleLinkParams(40, 80);  // It asked for 100 ms; 50 ms was applied.
+  CHECK(debugEventExists(DebugCode::BLE_LINK_PARAMS_OVERRIDDEN, 100, 50));
+  CHECK(debugCodeDefaultLevel(DebugCode::BLE_LINK_PARAMS_OVERRIDDEN) == LogLevel::WARNING);
+  CHECK(auditWorthy(LogLevel::WARNING, DebugCode::BLE_LINK_PARAMS_OVERRIDDEN));
+}
+
 void r33_weight_mailbox_keeps_latest_without_consumer_gap() {
   resetHarness(false, true);
   reachReadyFromBoot();
@@ -22361,6 +22372,7 @@ const TestCase testCases[] = {
     {"R65", r65_non_weight_cut_does_not_learn_weight_offset},
     {"R32", r32_old_connection_generation_cannot_update_weight},
     {"R33", r33_weight_mailbox_keeps_latest_without_consumer_gap},
+    {"R34", r34_overridden_link_interval_is_audited},
     {"R33b", r33b_stream_gap_counts_connected_inter_packet_silence},
     {"R33c", r33c_weight_update_interval_is_smoothed_and_reset_safely},
     {"R34", r34_suspended_control_recovers_after_three_attributed_samples},

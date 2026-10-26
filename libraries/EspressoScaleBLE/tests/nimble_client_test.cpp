@@ -1306,11 +1306,16 @@ static void run() {
     CHECK(capturedScaleLogs.empty());
     c.onGapEvent(&e,c.linkOperationId_);
     CHECK(capturedScaleLogs.empty()); // Deferred to the worker.
+    EspressoScaleBLE facade(false);
+    static uint16_t observedItvl=0, observedPeer=0;
+    facade.setLinkParamsObserver([](uint16_t itvl, uint16_t peer) { observedItvl=itvl; observedPeer=peer; });
     c.service();
     CHECK(capturedScaleLogs.size()==1 && capturedScaleLogTransport.back());
     CHECK(capturedScaleLogs.back().first==kScaleLogInfoSeverity);
     // The last clamped request (inverted 48/8) is reported as the peer's 10 ms wish.
     CHECK(capturedScaleLogs.back().second=="link params itvl_ms=30.00 latency=0 timeout_ms=2000 peer_itvl_ms=10");
+    CHECK(observedItvl==24 && observedPeer==8);
+    facade.setLinkParamsObserver(nullptr);
     e.conn_update.status=BLE_HS_EUNKNOWN;
     c.onGapEvent(&e,c.linkOperationId_);
     c.service();

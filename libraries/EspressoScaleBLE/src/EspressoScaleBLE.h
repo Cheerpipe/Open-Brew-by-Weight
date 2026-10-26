@@ -169,6 +169,11 @@ class EspressoScaleBLE {
         // Called on the NimBLE host task right after a weight frame is queued
         // in the RX ring: wake the consumer, never block or parse here.
         void setFrameQueuedObserver(void (*observer)());
+        // Called on the consumer's task after every connection and accepted
+        // update with the live interval and, when the clamp overrode a peer
+        // request, the interval the scale asked for (0 otherwise); 1.25 ms units.
+        void setLinkParamsObserver(void (*observer)(uint16_t intervalUnits,
+                                                    uint16_t peerIntervalUnits));
         ScaleFeatureSet features() const;
         ScaleModel model() const;
         // Borrowed until the connection changes; copy if retained.
