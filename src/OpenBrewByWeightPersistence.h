@@ -136,15 +136,22 @@ inline PersistedSettings &persistedSettingsScratch() {
 // tail fields were appended, loads as a prefix of the current struct with the
 // appended fields zeroed once its own checksum verifies (the last word, or the
 // one before 4 B of alignment padding). Appended fields must therefore take
-// zero as their legacy default. Longer, torn or other-schema blobs are
-// rejected. Load never writes back; the next save stores the full layout.
+// zero as their legacy default. The oldest such layout ends right after
+// deviceName, where the Micra record now starts; anything shorter, longer,
+// torn or of another schema is rejected. Only size and checksum are restamped
+// so the stored values reach validation untouched. Load never writes back;
+// the next save stores the full layout.
+constexpr size_t PERSISTED_SETTINGS_MIN_PREFIX_BYTES =
+    (offsetof(PersistedSettings, lineaMicra) + sizeof(uint32_t) - 1) / sizeof(uint32_t) *
+        sizeof(uint32_t) +
+    sizeof(uint32_t);
 __attribute__((noinline))
 inline bool readSettingsSlot(OpenBrewByWeightPreferences &preferences, const char *key,
                              PersistedSettings &settings, bool repair = false) {
   const size_t stored = preferences.isKey(key)
                             ? preferences.getBytesLength(key)
                             : 0;
-  if (stored < sizeof(PersistedSettingsHeader) + 2 * sizeof(uint32_t) ||
+  if (stored < PERSISTED_SETTINGS_MIN_PREFIX_BYTES ||
       stored > sizeof(PersistedSettings) || stored % sizeof(uint32_t) != 0 ||
       preferences.getBytes(key, &settings, stored) != stored) {
     return false;
@@ -166,7 +173,8 @@ inline bool readSettingsSlot(OpenBrewByWeightPreferences &preferences, const cha
       if (checksum != crc32(bytes, at)) return false;
     }
     memset(bytes + at, 0, stored - at);
-    finalizePersistedSettings(settings);
+    settings.structureSize = sizeof(PersistedSettings);
+    settings.checksum = persistedSettingsChecksum(settings);
   }
   if (!persistedSettingsIntact(settings) || !validPersistedStaNetwork(settings)) {
     return false;
