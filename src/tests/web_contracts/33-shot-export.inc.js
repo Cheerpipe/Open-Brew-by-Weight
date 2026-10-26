@@ -70,7 +70,8 @@
   const builders = ['function isoAt(', 'function shotWallTimes(', 'function shotsJson(',
     'function shotJson(', 'function coffeeSamples(', 'function shotGaggiuino(',
     'async function shotBeanconquerorLink(', 'function shotVisualizer('].map((m) => blockAt(viewJs.stats, m));
-  vm.runInContext('var R = this;' + blockAt(runtimeJs, 'function verdictLabel(') +
+  vm.runInContext('var R = this;' + blockAt(runtimeJs, 'function pad2(') +
+      blockAt(runtimeJs, 'function verdictLabel(') +
       blockAt(runtimeJs, 'function formatShotEnded(') +
       blockAt(viewJs.stats, 'function shotCut(') +
       blockAt(viewJs.stats, 'function shotFlowCurveGS(') + builders.join('\n'), context);

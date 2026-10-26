@@ -115,7 +115,7 @@ const recipeName = (value = recipeInput().value) =>
 const sub = (text, values) => text.replace(/\{(\w)\}/g, (m, k) => values[k] ?? m);
 const minutes = (ms) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
-  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  return Math.floor(s / 60) + ":" + R.pad2(s % 60);
 };
 const brewPayload = () =>
   byWeight()
@@ -516,7 +516,7 @@ async function setPassword(newPassword) {
   });
   let saved = false;
   for (let i = 0; i < 40; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await R.sleep(250);
     const s = await pollStatus(),
       c = s?.lastCommand;
     if (c?.requestId === accepted.requestId) {
@@ -707,7 +707,7 @@ async function saveWifi() {
   try {
     await R.api("/api/v1/network", { method: "POST", body: R.body({ action: "confirm" }) });
     for (let i = 0; i < 40 && lastPhase === "joined"; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await R.sleep(250);
       await pollStatus();
     }
   } catch (e) {
@@ -873,7 +873,7 @@ async function discardTest() {
     return;
   }
   for (let i = 0; i < 12 && testing(); i++) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await R.sleep(250);
     await pollStatus();
   }
 }

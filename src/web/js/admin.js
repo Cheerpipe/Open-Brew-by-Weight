@@ -536,7 +536,7 @@ async function confirmLoginSheet() {
     if (mode === "enable" && accessState.factoryPassword) {
       if (!(await R.command("/api/v1/device/password", { newPassword: password }))) return;
       for (let i = 0; i < 40 && accessState.factoryPassword; i++) {
-        await new Promise((r) => setTimeout(r, 500));
+        await R.sleep(500);
         await R.refreshStatus();
       }
       if (accessState.factoryPassword)
@@ -996,11 +996,6 @@ function otaEndBusy(data, fallbackText, kind) {
   if (fallbackText) R.message(fallbackText, kind || "");
   R.refreshStatus();
 }
-function otaTransferId() {
-  const b = new Uint8Array(18);
-  crypto.getRandomValues(b);
-  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
-}
 function otaStored() {
   try {
     return JSON.parse(localStorage.getItem("obbwOtaSession") || "null");
@@ -1063,7 +1058,7 @@ function otaSessionIdentity(identity, status) {
       saved.machine === identity.machine &&
       saved.version === identity.version &&
       saved.transferId;
-  return { ...identity, transferId: same ? saved.transferId : otaTransferId() };
+  return { ...identity, transferId: same ? saved.transferId : R.randomHex(18) };
 }
 function otaSessionBody(session) {
   const { size, sha256, arch, hardware, machine, version, transferId } = session;
@@ -1173,7 +1168,7 @@ async function otaUpload() {
         failures++;
         // Back off before asking where the transfer stands, so a short blip
         // does not spend the whole retry budget at once.
-        await wait(1000 * failures);
+        await R.sleep(1000 * failures);
         status = await otaSend("/api/v1/ota/session", null, OTA_COMMAND_TIMEOUT_MS, "GET");
         if (
           !otaRemoteMatches(session, status) ||
@@ -1527,7 +1522,6 @@ export function applyStatus(s) {
       : "") +
     ".";
 }
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function validWebhookUrl(url) {
   if (!url.startsWith("http://") || /[\s#@"\\]/.test(url)) return false;
   try {
@@ -1543,7 +1537,7 @@ function validWebhookUrl(url) {
 async function waitSaved(requestId, label = __WEBUI_TEXT__("admin.webhook_settings"), config, key) {
   const deadline = Date.now() + 8e3;
   while (Date.now() < deadline) {
-    await wait(150);
+    await R.sleep(150);
     const s = await R.api("/api/v1/status/admin");
     const c = s && s.lastCommand;
     if (c && c.requestId === requestId) {
@@ -1653,10 +1647,9 @@ async function saveFrontendSettings() {
   return ok;
 }
 // Scheduled restart: two 24-hour fields stored as one minute of the day.
-const pad2 = (v) => String(v).padStart(2, "0");
 const restartMinute = () =>
   Number($("scheduledRestartHour").value) * 60 + Number($("scheduledRestartMinute").value);
-const restartTime = (m) => pad2(Math.floor(m / 60)) + ":" + pad2(m % 60);
+const restartTime = (m) => R.pad2(Math.floor(m / 60)) + ":" + R.pad2(m % 60);
 const RESTART_WAIT = {
   shot: __WEBUI_TEXT__("admin.scheduled_restart_wait_shot"),
   update: __WEBUI_TEXT__("admin.scheduled_restart_wait_update"),
@@ -1684,8 +1677,8 @@ function loadScheduledRestart(c) {
     return;
   if (!R.uiState.scheduledRestartDirty) {
     $("scheduledRestartEnabled").checked = !!c.scheduledRestartEnabled;
-    $("scheduledRestartHour").value = pad2(Math.floor(c.scheduledRestartMinuteOfDay / 60));
-    $("scheduledRestartMinute").value = pad2(c.scheduledRestartMinuteOfDay % 60);
+    $("scheduledRestartHour").value = R.pad2(Math.floor(c.scheduledRestartMinuteOfDay / 60));
+    $("scheduledRestartMinute").value = R.pad2(c.scheduledRestartMinuteOfDay % 60);
     R.uiState.scheduledRestartBaseline = R.snapshotControls(
       document.querySelectorAll("#scheduledRestartPanel input"),
     );
@@ -1787,7 +1780,8 @@ export function init() {
   // Two-digit hours and minutes once a value settles (stepper keys or blur).
   for (const id of ["scheduledRestartHour", "scheduledRestartMinute"])
     $(id).addEventListener("change", (e) => {
-      if (e.target.value !== "" && e.target.checkValidity()) e.target.value = pad2(e.target.value);
+      if (e.target.value !== "" && e.target.checkValidity())
+        e.target.value = R.pad2(e.target.value);
     });
   $("saveScheduledRestartButton").onclick = saveScheduledRestart;
   $("revertScheduledRestartButton").onclick = () => revertSection("scheduledRestart");

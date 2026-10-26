@@ -211,7 +211,7 @@
       gate.resolve(); await save; assert.equal(h.c.dateTimeDirty, true);
     }],
     ['a command rejection cannot be acknowledged by an unrelated revision', async () => {
-      const code = blockAt(rawRuntimeJs, 'async function command(');
+      const code = rawRuntimeJs.match(/const sleep = .*\n/)[0] + blockAt(rawRuntimeJs, 'async function command(');
       let polls = 0;
       const c = vm.createContext({configRevision: 10, lastCommandStatus: null, homeStale: true,
         withCommandGate: fn => fn(), api: async () => ({requestId: 7}), body: JSON.stringify,
@@ -226,7 +226,7 @@
       assert.equal(polls, 2);
     }],
     ['command success waits for its own applied result', async () => {
-      const code = blockAt(rawRuntimeJs, 'async function command(');
+      const code = rawRuntimeJs.match(/const sleep = .*\n/)[0] + blockAt(rawRuntimeJs, 'async function command(');
       let polls = 0;
       const c = vm.createContext({configRevision: 10, lastCommandStatus: null, homeStale: true,
         withCommandGate: fn => fn(), api: async () => ({requestId: 7}), body: JSON.stringify,
@@ -241,7 +241,7 @@
       assert.equal(polls, 2);
     }],
     ['a live Home stream confirms a preset save without status polls', async () => {
-      const code = blockAt(rawRuntimeJs, 'async function command(');
+      const code = rawRuntimeJs.match(/const sleep = .*\n/)[0] + blockAt(rawRuntimeJs, 'async function command(');
       let polls = 0, ticks = 0;
       const c = vm.createContext({configRevision: 10, lastCommandStatus: null, homeStale: false,
         withCommandGate: fn => fn(), api: async () => ({requestId: 7}), body: JSON.stringify,

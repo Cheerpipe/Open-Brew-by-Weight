@@ -44,12 +44,13 @@
       admin.indexOf('function controlChanged('));
   const run = async () => {
     let now = 0, snapshots = [];
-    const waiter = new Function('R', 'wait', 'Date', source + ';return waitSaved')({
+    const waiter = new Function('R', 'Date', source + ';return waitSaved')({
       api: async () => {
         assert(snapshots.length, 'unexpected extra poll after durable config');
         return snapshots.shift();
-      }
-    }, async () => { now += 150; }, {now: () => now});
+      },
+      sleep: async () => { now += 150; }
+    }, {now: () => now});
     for (const key of ['powerManagementEnabled', 'showDiagnosticPage']) {
       for (const value of [true, false]) {
         const snapshot = (state, revision, pending, failed = false, actual = value) => ({

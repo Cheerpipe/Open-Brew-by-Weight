@@ -382,7 +382,7 @@ async function saveMachineConfig(patch) {
       // revision the Home stream brings (within 2 s).
       if (retry && e.code === "CONFIG_REVISION_STALE") {
         for (let i = 0; i < 20 && R.homeStatusCache()?.config.revision === patch.baseRevision; i++)
-          await new Promise((r) => setTimeout(r, 100));
+          await R.sleep(100);
         continue;
       }
       // Only the firmware parses RTTTL: a rejected tune is marked, not kept.

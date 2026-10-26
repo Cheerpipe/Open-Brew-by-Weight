@@ -222,12 +222,12 @@ function webUiPowerSeconds() {
 const WEB_UI_INACTIVITY_MS = 15 * 60 * 1000;
 const NETWORK_RECONNECT_WAIT_MS = 180000;
 const SHELL_FW_VERSION = document.documentElement.dataset.fw || "dev";
-function newWebUiClientId() {
-  const b = new Uint8Array(12);
+function randomHex(bytes) {
+  const b = new Uint8Array(bytes);
   crypto.getRandomValues(b);
   return [...b].map((v) => v.toString(16).padStart(2, "0")).join("");
 }
-const webUiClientId = newWebUiClientId();
+const webUiClientId = randomHex(12);
 let webUiOwner = false,
   setupSession = false,
   webUiClaiming = false,
@@ -782,6 +782,7 @@ function armStatusTimer() {
 function pad2(n) {
   return String(n).padStart(2, "0");
 }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function formatTzLabel(min) {
   const sign = min >= 0 ? "+" : "-";
   const abs = Math.abs(min);
@@ -2267,10 +2268,7 @@ let pairShownId = 0,
 function paintPairExpiry() {
   const left = Math.max(0, Math.ceil((pairUntil - Date.now()) / 1000));
   $("pairExpires").textContent =
-    __WEBUI_TEXT__("runtime.pairing_expires_in") +
-    Math.floor(left / 60) +
-    ":" +
-    String(left % 60).padStart(2, "0");
+    __WEBUI_TEXT__("runtime.pairing_expires_in") + Math.floor(left / 60) + ":" + pad2(left % 60);
 }
 function applyPairingPrompt(access) {
   const dialog = $("pairDialog");
@@ -5547,7 +5545,7 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
         let applied = false,
           polled = false;
         for (let i = 0, next = 0, gap = 2.5; i < 40 && !applied; i++) {
-          if (i) await new Promise((r) => setTimeout(r, 100));
+          if (i) await sleep(100);
           if ((polled = homeStale && i >= next)) {
             await refreshStatus();
             next = i + gap;
@@ -5589,6 +5587,9 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
   });
 }
 export {
+  pad2,
+  randomHex,
+  sleep,
   diagnosticVisible,
   saveFile,
   resetWebUiInactivity,

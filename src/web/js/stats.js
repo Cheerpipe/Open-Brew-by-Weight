@@ -1374,14 +1374,13 @@ function downloadJson(name, value) {
 }
 // ISO 8601 in the shot's own offset (minutes east of UTC).
 function isoAt(unix, offset) {
-  const a = Math.abs(offset),
-    p = (n) => String(n).padStart(2, "0");
+  const a = Math.abs(offset);
   return (
     new Date((unix + offset * 60) * 1e3).toISOString().slice(0, 19) +
     (offset < 0 ? "-" : "+") +
-    p((a / 60) | 0) +
+    R.pad2((a / 60) | 0) +
     ":" +
-    p(a % 60)
+    R.pad2(a % 60)
   );
 }
 function shotWallTimes(r) {
