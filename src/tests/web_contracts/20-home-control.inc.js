@@ -466,7 +466,7 @@
       !streamSource.includes('delta.field("tintPct", "%u", control.activeCycle ?'))
     throw new Error('Only a stored shot card may carry its preset rule and live tint');
   const sockets=[],timers=new Map();let timerId=0,owner=true;
-  class Socket{static OPEN=1;constructor(url){this.url=url;this.readyState=1;this.sent=[];sockets.push(this)}send(body){this.sent.push(JSON.parse(body))}close(){this.readyState=3;this.onclose?.()}}
+  class Socket{static OPEN=1;constructor(url){this.url=url;this.readyState=1;this.sent=[];sockets.push(this)}send(body){const m=JSON.parse(body);this.sent.push(m,...(m.ops||[]))}close(){this.readyState=3;this.onclose?.()}}
   const listeners={};
   const controller=new Function('WebSocket','location','document','window','setTimeout','clearTimeout',
     'requestAnimationFrame','webUiPollingActive','webUiClientId','activeView','$','webUiPowerSeconds','invalidateHomeStream',

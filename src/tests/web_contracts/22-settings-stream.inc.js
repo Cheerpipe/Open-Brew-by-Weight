@@ -42,10 +42,31 @@
       op.includes('uiStreamIntInRange(tag, 0, UINT32_MAX)') && op.includes('uiStreamUrgent_.store(true') &&
       op.includes('session->settingsOn = !firmwareCompatibilityMode();'),
   'the settings op takes an exact field whitelist, any tag the sender can emit, stays inert in compatibility mode, and arms a dispatch');
-  assert(uiStreamSource.includes('session->settingsResync = true;\n      session->settingsKnownTag = 0;') &&
+  assert(uiStreamSource.includes('session->settingsResync = true;\n        session->settingsKnownTag = session->historyKnownTag = session->statsKnownTag = 0;') &&
       uiStreamSource.includes('failed validation; the page resets its list views') &&
       uiStreamSource.includes('kUiStreamCloseRejected'),
   'resync always sends a snapshot; a malformed op is logged and closed with 4003');
+  // A bind folds the reconnect subscriptions into `ops`: each runs through the
+  // op chain once the bind is accepted, and the page keeps the bind within
+  // the firmware's request buffer.
+  assert(uiStreamSource.includes('constexpr size_t kUiStreamRequestBytes = 640;') &&
+      codeIncludes(runtimeJs, 'if(JSON.stringify(bind).length>640)rest.push(bind.ops.pop())') &&
+      uiStreamSource.includes(': bound && ops ? ops->child : nullptr) {') &&
+      uiStreamSource.includes('session->bound && message == document &&') &&
+      uiStreamSource.includes('(!ops || cJSON_IsArray(ops))') &&
+      uiStreamSource.includes('const bool bindRejected = bindOp && !bound;'),
+  'the bind carries the replayed subscriptions within kUiStreamRequestBytes; activity stays top-level');
+  // History and Stats name their standing page by tag like Settings: a
+  // resubscribe still holding it gets a snapshot of bare ids.
+  assert(uiStreamSource.includes('session->historyKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;') &&
+      uiStreamSource.includes('session->statsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;') &&
+      homeStreamSource.includes('fingerprint == session.historyKnownTag;') &&
+      homeStreamSource.includes('if (kept || (!initial && !fetch &&') &&
+      homeStreamSource.includes('fingerprint == session.statsKnownTag;') &&
+      homeStreamSource.includes('if (session.statsPageKept ||') &&
+      codeIncludes(viewJs.history, '...(historyTag&&{tag:historyTag})') &&
+      codeIncludes(viewJs.stats, '...(statsTag&&{tag:statsTag})'),
+  'record subscriptions carry the held page tag and kept snapshots name rows by id');
 
   // One owner per path (Home > Settings > Diagnostic): no projection repeats,
   // or nests inside, another's paths. The only overlap is the compatibility
@@ -94,7 +115,7 @@
   class Socket {
     static OPEN = 1;
     constructor() { this.readyState = 1; this.sent = []; sockets.push(this); }
-    send(value) { this.sent.push(JSON.parse(value)); }
+    send(value) { const m = JSON.parse(value); this.sent.push(m, ...(m.ops || [])); }
     close(code = 1006) { this.readyState = 3; this.onclose?.({code}); }
   }
   const context = {
@@ -170,6 +191,9 @@
   assert.equal(context.settingsStatus().config.autoTare, false, 'the model survives the socket');
   context.startUiStream(); sockets[1].onopen();
   assert.deepEqual(ops(sockets[1]), [{op: 'settings', on: true, tag: 80}], 'the replayed subscribe carries the tag');
+  assert.deepEqual(sockets[1].sent[0].ops, [{op: 'settings', on: true, tag: 80}],
+      'the replayed subscriptions ride the bind frame');
+  assert.equal(sockets[1].sent[2].op, 'activity', 'no separate subscribe frame follows the bind');
   sockets[1].onmessage({data: JSON.stringify(home(7))});
   sockets[1].onmessage({data: JSON.stringify({type: 'settings', changes: {'config.autoTare': true}})});
   assert.equal(sockets[1].sent.at(-1).op, 'resync', 'a frame without its tag fails closed');

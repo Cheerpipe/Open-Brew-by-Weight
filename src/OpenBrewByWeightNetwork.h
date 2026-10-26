@@ -438,6 +438,9 @@ class OpenBrewByWeightNetwork {
     ShotLogSortDir historyDir = ShotLogSortDir::Desc;
     uint32_t historyEpoch = 0, historyFingerprint = 0, historyBoot = 0;
     uint32_t historyRequest = 0, historyFetchRequest = 0;
+    // Fingerprint of the standing page a resubscribing browser still holds
+    // (0: none); the next snapshot names those records by id.
+    uint32_t historyKnownTag = 0;
     // Stats page subscription, same layout plus the sort field and the
     // fetch's own window and filter (sentinel appends page by the view's
     // order and filter; the CSV export asks for date/desc, unfiltered), and
@@ -449,14 +452,15 @@ class OpenBrewByWeightNetwork {
     ShotLogSort statsSort = ShotLogSort::Date, statsFetchSort = ShotLogSort::Date;
     ShotLogSortDir statsDir = ShotLogSortDir::Desc, statsFetchDir = ShotLogSortDir::Desc;
     ShotListFilter statsFilter, statsFetchFilter;
-    uint32_t statsEpoch = 0, statsFingerprint = 0, statsBoot = 0, statsSeq = 0;
+    uint32_t statsEpoch = 0, statsFingerprint = 0, statsBoot = 0, statsSeq = 0, statsKnownTag = 0;
     // Window and active preset of the last standing page's header.
     size_t statsShownWindow = 0;
     uint8_t statsPresetId = 0;
     // Paced delivery: one budgeted frame per dispatch resumes the in-flight
     // page (snapshot/fetch identity and store epoch captured at page start)
     // until its terminating frame; a deferred send keeps this state intact.
-    bool statsPaging = false, statsPageSnapshot = false, statsPageFetch = false;
+    bool statsPaging = false, statsPageSnapshot = false, statsPageFetch = false,
+         statsPageKept = false;
     size_t statsSent = 0;
     uint32_t statsPageEpoch = 0, statsPageRequest = 0, statsSentAtMs = 0;
     uint32_t statsRequest = 0, statsFetchRequest = 0;

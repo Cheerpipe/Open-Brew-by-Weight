@@ -1780,6 +1780,7 @@ let statsStreamWanted = false,
   statsRequest = 0,
   statsLastSeq = 0,
   statsPage = null,
+  statsTag = 0,
   statsResolve = null;
 // The subscribe op: a fresh request id separates its page from older frames.
 function statsSubscribeOp() {
@@ -1798,6 +1799,7 @@ function statsSubscribeOp() {
     dir: R.uiState.shotSortDir,
     ...(Object.keys(R.uiState.shotFilter).length && { filter: R.uiState.shotFilter }),
     ...(R.uiState.statsWindow !== 10 && { window: R.uiState.statsWindow }),
+    ...(statsTag && { tag: statsTag }),
   };
 }
 function statsSendSubscribe() {
@@ -1906,11 +1908,11 @@ function statsStreamFrame(message) {
   // first frame names the columns, continuation frames reuse them.
   const cols = message.rowBase
     ? statsPage?.seq === message.seq && statsPage.cols
-    : typeof message.cols === "string" && message.cols.split(",");
+    : typeof message.cols === "string" && Number.isInteger(message.tag) && message.cols.split(",");
   if (!cols) throw Error();
   message.cols = cols;
-  // A standing refresh names held rows by id, as in History.
-  const held = !message.snapshot && R.uiState.shotHistory?.shots;
+  // Held rows come back as their id, as in History.
+  const held = R.uiState.shotHistory?.shots;
   message.rows = message.rows.map((a) => {
     const kept = Number.isInteger(a) && held && held.find((x) => x.id === a);
     if (kept) return kept;
@@ -1969,6 +1971,7 @@ function applyStatsStream(message) {
       hasMore: message.hasMore,
       stats: message.stats || null,
       cols: message.cols,
+      tag: message.tag,
       rows: [],
     };
   }
@@ -1984,6 +1987,7 @@ function applyStatsStream(message) {
   R.uiState.statsFetchMark = null;
   statsStreamBoot = message.boot;
   statsStreamEpoch = page.epoch;
+  if (page.mode === "replace") statsTag = page.tag;
   applyShotPage(
     {
       bootId: message.boot,

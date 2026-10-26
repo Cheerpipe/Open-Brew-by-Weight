@@ -11,7 +11,7 @@
     class Socket {
       static OPEN = 1;
       constructor() { this.readyState = 0; this.sent = []; sockets.push(this); }
-      send(value) { this.sent.push(JSON.parse(value)); }
+      send(value) { const m = JSON.parse(value); this.sent.push(m, ...(m.ops || [])); }
       open() { this.readyState = 1; this.onopen(); }
       close() { this.readyState = 3; this.onclose?.({code: 1006}); }
     }

@@ -157,7 +157,7 @@ int main(){
   class Socket {
     static OPEN=1;
     constructor(){this.readyState=0;this.sent=[];sockets.push(this);}
-    send(frame){this.sent.push(JSON.parse(frame));}
+    send(frame){const m=JSON.parse(frame);this.sent.push(m,...(m.ops||[]));}
     close(){this.readyState=3;this.onclose?.({});}
   }
   const context=vm.createContext({WebSocket:Socket,location:{protocol:'http:',host:'device.local'},

@@ -983,15 +983,20 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
     session.historyEpoch = epoch;
     return true;
   }
+  // The fingerprint is the standing page's tag: a page that resubscribes
+  // still holding it gets its snapshot with every record as a bare id.
+  const bool kept = initial && session.historyKnownTag != 0 &&
+                    fingerprint == session.historyKnownTag;
   // Page-level UI state (ownership, edit gate, clock) rides the Home stream.
   size_t used = 0;
   if (!statusJsonAppend(&used,
           "{\"v\":1,\"type\":\"history\",\"boot\":%lu,\"snapshot\":%s,"
-          "\"epoch\":%lu,\"request\":%lu,",
+          "\"epoch\":%lu,\"request\":%lu,\"tag\":%lu,",
           static_cast<unsigned long>(control.bootId),
           initial ? "true" : "false",
           static_cast<unsigned long>(epoch),
-          static_cast<unsigned long>(fetch ? session.historyFetchRequest : session.historyRequest)) ||
+          static_cast<unsigned long>(fetch ? session.historyFetchRequest : session.historyRequest),
+          static_cast<unsigned long>(fingerprint)) ||
       !statusJsonAppend(&used,
           "\"total\":%u,\"offset\":%u,\"limit\":%u,"
           "\"hasMore\":%s,\"records\":[",
@@ -1003,9 +1008,9 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
   for (size_t index = 0; index < page.count; ++index) {
     const HistoryRecord &record = page.records[index];
     // A standing refresh names the records the page already holds by id.
-    if (!initial && !fetch &&
-        uiStreamHeld(held.historyHeld, held.historyHeldCount, record.id,
-                     uiStreamRowHash(&record, sizeof(record)))) {
+    if (kept || (!initial && !fetch &&
+                 uiStreamHeld(held.historyHeld, held.historyHeldCount, record.id,
+                              uiStreamRowHash(&record, sizeof(record))))) {
       if (!statusJsonAppend(&used, "%s%lu", index == 0 ? "" : ",",
                             static_cast<unsigned long>(record.id)))
         return false;
@@ -1033,6 +1038,7 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
   if (deferred) return true;
   session.historyBoot = control.bootId;
   session.historyResync = false;
+  session.historyKnownTag = 0;
   session.historyFetch = false;
   if (!fetch) {
     session.historyEpoch = epoch;
@@ -1206,6 +1212,10 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     session.statsPageRequest = request;
     session.statsPageSnapshot = initial;
     session.statsPageFetch = fetch;
+    // As in History, the fingerprint is the standing page's tag.
+    session.statsPageKept = initial && !fetch && session.statsKnownTag != 0 &&
+                            fingerprint == session.statsKnownTag;
+    session.statsKnownTag = 0;
     session.statsBoot = control.bootId;
     session.statsResync = false;
     // The header identity a standing page carries: a later window or
@@ -1228,7 +1238,8 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   if (first && cache.statsOk &&
       !statusJsonAppend(&used, "\"stats\":%s,", cache.header))
     return false;
-  if (first && !statusJsonAppend(&used, "\"cols\":\"%s\",", kStatsRowColumns))
+  if (first && !statusJsonAppend(&used, "\"cols\":\"%s\",\"tag\":%lu,", kStatsRowColumns,
+                                 static_cast<unsigned long>(fingerprint)))
     return false;
   if (!statusJsonAppend(&used,
           "\"total\":%u,\"offset\":%u,\"limit\":%u,"
@@ -1245,8 +1256,9 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     const uint32_t key[3] = {record.id, record.sideFlags, curveHash ? *curveHash : 0U};
     const HeldRow row = {record.id, curveHash ? uiStreamRowHash(key, sizeof(key)) : 0U};
     size_t rowBytes;
-    if (row.hash && !session.statsPageSnapshot && !session.statsPageFetch &&
-        uiStreamHeld(held.statsHeld, held.statsHeldCount, row.id, row.hash)) {
+    if (session.statsPageKept ||
+        (row.hash && !session.statsPageSnapshot && !session.statsPageFetch &&
+         uiStreamHeld(held.statsHeld, held.statsHeldCount, row.id, row.hash))) {
       // A standing refresh names the rows the page already holds by id.
       rowBytes = static_cast<size_t>(snprintf(work.jsonItem, NetworkWorkBuf::kJsonItem, "%lu",
                                               static_cast<unsigned long>(record.id)));

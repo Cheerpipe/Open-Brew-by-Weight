@@ -10,7 +10,7 @@
   class Socket {
     static OPEN = 1;
     constructor(url) { this.url = url; this.readyState = 1; this.sent = []; sockets.push(this); }
-    send(value) { this.sent.push(JSON.parse(value)); }
+    send(value) { const m = JSON.parse(value); this.sent.push(m, ...(m.ops || [])); }
     close(code = 1006) { this.readyState = 3; this.onclose?.({code}); }
   }
   const context = {
@@ -279,7 +279,7 @@ int main(){
   class Socket {
     static OPEN = 1;
     constructor() { this.readyState = 1; this.sent = []; sockets.push(this); }
-    send(value) { this.sent.push(JSON.parse(value)); }
+    send(value) { const m = JSON.parse(value); this.sent.push(m, ...(m.ops || [])); }
     close(code = 1006) { if (this.readyState === 3) return; this.readyState = 3; this.onclose?.({code}); }
   }
   const document = {hidden: false, addEventListener: (name, fn) => { listeners[name] = fn; }};

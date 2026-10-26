@@ -139,9 +139,10 @@ start. No caller may replace the process-wide hooks afterward. This is not a
 resettable arena: simultaneous documents never share storage, and allocation
 failure rejects the current parse without invalidating another document.
 External allocations fail closed; they never fall back to internal RAM.
-UI WebSocket control frames have a 320-byte wire limit, sized for a Stats
-subscribe with the largest list filter, and use this same parser's depth and
-value limits. Micra HTTP RX/TX buffers are 4096 bytes each.
+UI WebSocket control frames have a 640-byte wire limit, held on the httpd
+task stack for one request and sized for a bind that carries the page's usual
+subscriptions or for a Stats subscribe with the largest list filter, and use
+this same parser's depth and value limits. Micra HTTP RX/TX buffers are 4096 bytes each.
 The SDK's ordinary malloc prefers PSRAM above the 2048-byte threshold, but can
 fall back to internal RAM; this differs from the application's fail-closed
 external allocator and the Micra mbedTLS allocator.

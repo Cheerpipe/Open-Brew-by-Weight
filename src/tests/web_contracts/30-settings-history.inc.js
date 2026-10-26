@@ -1340,7 +1340,7 @@ if (!statsSection ||
         const f = Object.assign({v: 1, type: 'stats', boot: 9, snapshot: true,
           epoch: 5, request: 1, seq: 1, stats: {avgDurationS: 28}, total: 2, offset: 0,
           limit: 10, hasMore: false, rows: [row(2)], rowBase: 0, more: true}, extras);
-        return {...f, ...(f.rowBase ? {} : {cols: cols.join(',')}), rows: f.rows.map(wire)};
+        return {...f, ...(f.rowBase ? {} : {cols: cols.join(','), tag: 77}), rows: f.rows.map(wire)};
       };
       context.applyStatsStream(context.statsStreamFrame(frame()));
       assert.deepEqual(events, [], 'A split page applies nothing until more:false');
@@ -1407,12 +1407,22 @@ if (!statsSection ||
         frame({snapshot: false, epoch: 9, seq: 8, rows: [{...row(3), wRef: [0, 0]}], more: false}),
         frame({snapshot: false, epoch: 9, seq: 9, rows: [row(2), row(1)], hasMore: true, more: false}),
         {...frame({snapshot: false, epoch: 9, seq: 8, more: false}), cols: undefined},
+        {...frame({snapshot: false, epoch: 9, seq: 8, more: false}), tag: undefined},
         {...frame({snapshot: false, epoch: 9, seq: 8, more: false}), rows: [[3, 9]]},
         {...frame({snapshot: false, epoch: 9, seq: 8, more: false}), rows: [[...wire(row(3)).slice(0, -1), []]]},
         frame({epoch: 9, seq: 10, total: -1, rows: [row(2)], more: false})]) {
         assert.throws(() => context.statsStreamFrame(bad),
             'invalid stats frames must fail closed');
       }
+      // A subscribe names the standing page it holds by tag; an unchanged
+      // page comes back as a snapshot of bare ids resolved from held rows.
+      context.statsSendSubscribe();
+      assert.equal(sent.at(-1).tag, 77, 'a resubscribe names the standing page it holds');
+      const heldRow = context.statsStreamFrame(frame({seq: 20, total: 1, more: false})).rows[0];
+      context.shotHistory = {bootId: 9, total: 1, hasMore: false, shots: [heldRow]};
+      const keptPage = {...frame({seq: 21, total: 1, more: false}), rows: [heldRow.id]};
+      assert.equal(context.statsStreamFrame(keptPage).rows[0], heldRow,
+          'a kept snapshot resolves its ids from the rows the page holds');
     }
     // History rides the owned socket: snapshot frames hydrate UI state and
     // replace the page, one-shot fetch frames append, epoch pushes replace, and
@@ -1426,6 +1436,7 @@ if (!statsSection ||
       const context = vm.createContext({activeView: 'history', viewSeq: 1,
         historyLoaded: false, historyData: {bootId: 0, total: 0, hasMore: false, records: []},
         historyFetchOffset: -1, historyStreamBoot: 0, historyStreamEpoch: 0, historyFetchRequest: 2,
+        historyTag: 0,
         historyExportWindow: null,
         historyResolve: value => resolved.push(value), historyViewActive: () => true,
         statusPageOk: (page, state) => !!state,
@@ -1444,7 +1455,7 @@ if (!statsSection ||
           rawViewJs.history.indexOf('const historyStream = {'));
       vm.runInContext(stream, context);
       const frame = extras => Object.assign({v: 1, type: 'history', boot: 9, snapshot: true,
-        epoch: 5, request: 1, ui, total: 2, offset: 0, limit: 20, hasMore: false,
+        epoch: 5, request: 1, tag: 33, ui, total: 2, offset: 0, limit: 20, hasMore: false,
         records: [
           {id: 2, type: 'shot', durationS: 28.5, hasWallTime: true,
            endedAtUnixSec: 1790809185, endedAtLocalSec: 1790794385},
@@ -1454,6 +1465,7 @@ if (!statsSection ||
       assert.deepEqual(events, ['records:replace', 'render:false'],
           'A snapshot renders its rows; UI state rides the Home stream');
       assert.deepEqual(resolved, [true], 'The view load settles on the first replace frame');
+      assert.equal(context.historyTag, 33, 'a standing page keeps its tag for the next subscribe');
       events.length = 0;
       context.applyHistoryStream(context.historyStreamFrame(frame({snapshot: false})));
       assert.deepEqual(events, ['records:replace', 'render:false'],
@@ -1470,7 +1482,7 @@ if (!statsSection ||
       assert.deepEqual(events, ['records:replace'],
           'Frames on another view refresh the cached records without rendering them');
       context.historyViewActive = () => true;
-      for (const bad of [frame({snapshot: false, boot: 10}),
+      for (const bad of [frame({snapshot: false, boot: 10}), frame({tag: undefined}),
         frame({snapshot: false, hasMore: true}),
         frame({snapshot: false, offset: 1, records: [
           {id: 3, type: 'shot', durationS: 1, hasWeight: true, hasWallTime: false,
@@ -1484,15 +1496,17 @@ if (!statsSection ||
         assert.throws(() => context.historyStreamFrame(bad),
             'invalid history frames must fail closed');
       }
-      // A standing refresh names the records the page holds by id; a snapshot
-      // or an id the page cannot resolve fails closed into a resync.
+      // A standing refresh, or the snapshot of the page a subscribe's tag
+      // named, sends held records by id; an id the page cannot resolve fails
+      // closed into a resync.
       const kept = frame().records[0], added = frame().records[1];
       vm.runInContext('uiState.historyData = {records: []}', context);
       context.uiState.historyData.records.push(kept);
       const refreshed = context.historyStreamFrame(frame({snapshot: false, records: [added, 2]}));
       assert.equal(refreshed.records[1], kept, 'a held id resolves to the record already held');
       assert.throws(() => context.historyStreamFrame(frame({snapshot: false, records: [added, 7]})));
-      assert.throws(() => context.historyStreamFrame(frame({records: [added, 2]})));
+      assert.equal(context.historyStreamFrame(frame({records: [added, 2]})).records[1], kept,
+          'the snapshot of a page its tag named resolves held ids too');
     }
     assert.ok(network.includes('requestPendingNetworkConfirm()'),
         'Accepted socket ops keep confirming pending station settings');

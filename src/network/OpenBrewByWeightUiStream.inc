@@ -16,8 +16,11 @@ bool uiStreamDispatchDue(bool urgent, uint32_t elapsedMs, uint32_t newSamples) {
   return urgent || elapsedMs >= kUiStreamFallbackMs ||
          (newSamples >= kUiStreamSampleStride && elapsedMs >= kUiStreamSampleFloorMs);
 }
-// Fits a Stats subscribe or fetch with the largest filter (~300 bytes).
-constexpr size_t kUiStreamRequestBytes = 320;
+// Fits a bind carrying the page's usual subscriptions (Settings, History,
+// Stats, and Diagnostic with its log), or one Stats subscribe or fetch with
+// the largest filter (~300 bytes); the page sends whatever does not fit as
+// separate ops. Lives on the httpd task stack for one request.
+constexpr size_t kUiStreamRequestBytes = 640;
 // Leave TCP send-buffer headroom for live state. A larger individual curve
 // stays intact, alone under the client's 28 KiB message guard.
 constexpr size_t kStatsStreamFrameBytes = 8192;
@@ -227,290 +230,310 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
   frame.payload = reinterpret_cast<uint8_t *>(body);
   if (httpd_ws_recv_frame(request, &frame, frame.len) != ESP_OK ||
       memchr(body, '\0', frame.len)) return ESP_FAIL;
-  cJSON *message = parseJsonDocumentWithinLimits(
+  cJSON *document = parseJsonDocumentWithinLimits(
       body, kUiStreamRequestBytes, JSON_DOCUMENT_MAX_VALUES);
-  if (!message) return ESP_FAIL;
-  const cJSON *op = cJSON_GetObjectItemCaseSensitive(message, "op");
-  const cJSON *client = cJSON_GetObjectItemCaseSensitive(message, "client");
-  bool accepted = false, owner = false;
+  if (!document) return ESP_FAIL;
+  const cJSON *op = cJSON_GetObjectItemCaseSensitive(document, "op");
+  const cJSON *client = cJSON_GetObjectItemCaseSensitive(document, "client");
+  // A bind may carry the page's subscriptions as `ops`: once the bind is
+  // accepted each runs through the same chain, and the first one rejected
+  // rejects the frame like a separate op would.
+  const cJSON *ops = cJSON_GetObjectItemCaseSensitive(document, "ops");
+  const bool bindOp = cJSON_IsString(op) && strcmp(op->valuestring, "bind") == 0 &&
+                      cJSON_IsString(client);
+  bool accepted = false, owner = false, bound = false;
   bool activity = false, resumed = false;
   int superseded = -1;
   {
     TaskLockGuard lock(self.dataMux_);
-    if (cJSON_IsString(op) && session->bound &&
-        strcmp(op->valuestring, "activity") == 0 &&
-        strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
-      const cJSON *seconds = cJSON_GetObjectItemCaseSensitive(message, "seconds");
-      const cJSON *hidden = cJSON_GetObjectItemCaseSensitive(message, "hidden");
-      if (cJSON_IsNumber(seconds) && seconds->valuedouble >= 0 &&
-          seconds->valuedouble <= 30 && seconds->valuedouble == seconds->valueint &&
-          (!hidden || cJSON_IsBool(hidden))) {
-        notePowerWebActivity(millis(), static_cast<uint32_t>(seconds->valueint));
-        // A visible page resumes with one delta of everything it missed.
-        resumed = session->paused && cJSON_IsFalse(hidden);
-        if (hidden) session->paused = cJSON_IsTrue(hidden);
-        accepted = activity = true;
-      }
-    } else if (cJSON_IsString(op) && session->bound &&
-               strcmp(op->valuestring, "resync") == 0 &&
-               strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
-      session->resync = true;
-      session->homeResync = true;
-      session->diagResync = session->diagnostic;
-      session->settingsResync = true;
-      session->settingsKnownTag = 0;
-      session->historyResync = true;
-      session->statsResync = true;
-      session->statsFetch = false;
-      accepted = true;
-    } else if (cJSON_IsString(op) && session->bound &&
-               strcmp(op->valuestring, "settings") == 0 &&
-               strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
-      // Standing Settings subscription: the page subscribes once per socket
-      // and never unsubscribes; `tag` names the model it still holds.
-      // Compatibility mode has no Settings view: the op is accepted inert,
-      // since a reconnecting page replays it before Home names the mode.
-      static const char *const kFields[] = {"op", "on", "tag"};
-      const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
-      if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(message, "on")) &&
-          uiStreamKnownFields(message, kFields, 3) && uiStreamIntInRange(tag, 0, UINT32_MAX)) {
-        session->settingsOn = !firmwareCompatibilityMode();
-        session->settingsResync = true;
-        session->settingsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
-        self.uiStreamUrgent_.store(true, std::memory_order_release);
-        accepted = true;
-      }
-    } else if (cJSON_IsString(op) && session->bound &&
-               strcmp(op->valuestring, "diagnostic") == 0 &&
-               strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
-      // View-scoped telemetry toggle: the client subscribes only while the
-      // Diagnostic page is shown and unsubscribes on every navigation.
-      const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
-      if (cJSON_IsBool(on)) {
-        session->diagnostic = cJSON_IsTrue(on);
+    for (const cJSON *message = document; message != nullptr;
+         message = !accepted ? nullptr
+                   : message != document ? message->next
+                   : bound && ops ? ops->child : nullptr) {
+      op = cJSON_GetObjectItemCaseSensitive(message, "op");
+      accepted = false;
+      if (cJSON_IsString(op) && session->bound && message == document &&
+          strcmp(op->valuestring, "activity") == 0 &&
+          strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        const cJSON *seconds = cJSON_GetObjectItemCaseSensitive(message, "seconds");
+        const cJSON *hidden = cJSON_GetObjectItemCaseSensitive(message, "hidden");
+        if (cJSON_IsNumber(seconds) && seconds->valuedouble >= 0 &&
+            seconds->valuedouble <= 30 && seconds->valuedouble == seconds->valueint &&
+            (!hidden || cJSON_IsBool(hidden))) {
+          notePowerWebActivity(millis(), static_cast<uint32_t>(seconds->valueint));
+          // A visible page resumes with one delta of everything it missed.
+          resumed = session->paused && cJSON_IsFalse(hidden);
+          if (hidden) session->paused = cJSON_IsTrue(hidden);
+          accepted = activity = true;
+        }
+      } else if (cJSON_IsString(op) && session->bound &&
+                 strcmp(op->valuestring, "resync") == 0 &&
+                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        session->resync = true;
+        session->homeResync = true;
         session->diagResync = session->diagnostic;
+        session->settingsResync = true;
+        session->settingsKnownTag = session->historyKnownTag = session->statsKnownTag = 0;
+        session->historyResync = true;
+        session->statsResync = true;
+        session->statsFetch = false;
         accepted = true;
-      }
-    } else if (cJSON_IsString(op) && session->bound &&
-               strcmp(op->valuestring, "log") == 0 &&
-               strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
-      // View-scoped serial-log toggle: the cursor comes from the client's
-      // rendered tail; unsubscribe carries no window fields.
-      const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
-      const cJSON *after = cJSON_GetObjectItemCaseSensitive(message, "after");
-      bool shapeOk = cJSON_IsBool(on);
-      for (const cJSON *field = message->child; shapeOk && field;
-           field = field->next) {
-        const char *name = field->string;
-        shapeOk = name && (!strcmp(name, "op") || !strcmp(name, "on") ||
-                           !strcmp(name, "after"));
-      }
-      const bool numbersOk = uiStreamIntInRange(after, 0, UINT32_MAX);
-      if (shapeOk && numbersOk) {
-        if (!cJSON_IsTrue(on)) {
-          accepted = !after;
-          if (accepted) session->logOn = false;
-        } else {
-          session->logOn = true;
-          session->logAfter = after ? static_cast<uint32_t>(after->valuedouble) : 0;
-          session->logPush = true;
+      } else if (cJSON_IsString(op) && session->bound &&
+                 strcmp(op->valuestring, "settings") == 0 &&
+                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        // Standing Settings subscription: the page subscribes once per socket
+        // and never unsubscribes; `tag` names the model it still holds.
+        // Compatibility mode has no Settings view: the op is accepted inert,
+        // since a reconnecting page replays it before Home names the mode.
+        static const char *const kFields[] = {"op", "on", "tag"};
+        const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
+        if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(message, "on")) &&
+            uiStreamKnownFields(message, kFields, 3) && uiStreamIntInRange(tag, 0, UINT32_MAX)) {
+          session->settingsOn = !firmwareCompatibilityMode();
+          session->settingsResync = true;
+          session->settingsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
+          self.uiStreamUrgent_.store(true, std::memory_order_release);
           accepted = true;
         }
-        if (accepted)
-          self.uiStreamUrgent_.store(true, std::memory_order_release);
-      }
-    } else if (cJSON_IsString(op) && session->bound &&
-               strcmp(op->valuestring, "history") == 0 &&
-               strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
-      // View-scoped History page subscription: the standing window tracks the
-      // page; a one-shot fetch serves sentinel appends without disturbing it.
-      // `types` filters both; a fetch without it keeps the standing filter.
-      static const char *const kFields[] = {"op", "on", "offset", "limit",
-                                            "dir", "fetch", "request", "types"};
-      const cJSON *requestId = cJSON_GetObjectItemCaseSensitive(message, "request");
-      const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
-      const cJSON *offset = cJSON_GetObjectItemCaseSensitive(message, "offset");
-      const cJSON *limit = cJSON_GetObjectItemCaseSensitive(message, "limit");
-      const cJSON *dir = cJSON_GetObjectItemCaseSensitive(message, "dir");
-      const cJSON *fetch = cJSON_GetObjectItemCaseSensitive(message, "fetch");
-      const cJSON *types = cJSON_GetObjectItemCaseSensitive(message, "types");
-      uint8_t typeMask = 0;
-      const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 8) &&
-                           uiStreamParseHistoryTypes(types, typeMask);
-      const bool numbersOk =
-          uiStreamIntInRange(requestId, 1, UINT32_MAX) &&
-          uiStreamIntInRange(offset, 0, HISTORY_CAPACITY) &&
-          uiStreamIntInRange(limit, 1, HISTORY_PAGE_MAX) &&
-          (!fetch || cJSON_IsBool(fetch)) &&
-          (!dir || (cJSON_IsString(dir) &&
-                    (!strcmp(dir->valuestring, "asc") ||
-                     !strcmp(dir->valuestring, "desc"))));
-      if (shapeOk && numbersOk) {
-        if (!cJSON_IsTrue(on)) {
-          // Unsubscribe carries no window fields.
-          accepted = !offset && !limit && !dir && !fetch && !requestId && !types;
-          if (accepted) {
-            session->historyOn = false;
-            session->historyFetch = false;
-          }
-        } else if (fetch && cJSON_IsTrue(fetch)) {
-          accepted = session->historyOn && offset != nullptr;
-          if (accepted) {
-            session->historyFetchOffset =
-                static_cast<size_t>(offset->valueint);
-            session->historyFetchTypes = types ? typeMask : session->historyTypes;
-            session->historyFetch = true;
-            session->historyFetchRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
-          }
-        } else {
-          session->historyOn = true;
-          session->historyResync = true;
-          session->historyRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
-          session->historyTypes = typeMask;
-          if (offset)
-            session->historyOffset = static_cast<size_t>(offset->valueint);
-          if (limit)
-            session->historyLimit = static_cast<size_t>(limit->valueint);
-          if (dir)
-            session->historyDir = !strcmp(dir->valuestring, "asc")
-                                       ? ShotLogSortDir::Asc
-                                       : ShotLogSortDir::Desc;
+      } else if (cJSON_IsString(op) && session->bound &&
+                 strcmp(op->valuestring, "diagnostic") == 0 &&
+                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        // View-scoped telemetry toggle: the client subscribes only while the
+        // Diagnostic page is shown and unsubscribes on every navigation.
+        const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
+        if (cJSON_IsBool(on)) {
+          session->diagnostic = cJSON_IsTrue(on);
+          session->diagResync = session->diagnostic;
           accepted = true;
         }
-        if (accepted)
-          self.uiStreamUrgent_.store(true, std::memory_order_release);
-      }
-    } else if (cJSON_IsString(op) && session->bound &&
-               strcmp(op->valuestring, "stats") == 0 &&
-               strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
-      // View-scoped Stats page subscription on the same contract; one-shot
-      // fetches also serve the CSV export window (date/desc, unfiltered).
-      // `filter` works like History's `types`; `window` (subscribe only)
-      // picks the newest shots the aggregate and charts cover.
-      static const char *const kFields[] = {"op",    "on",    "offset",
-                                            "limit", "sort",  "dir",
-                                            "fetch", "request", "filter",
-                                            "window"};
-      const cJSON *requestId = cJSON_GetObjectItemCaseSensitive(message, "request");
-      const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
-      const cJSON *offset = cJSON_GetObjectItemCaseSensitive(message, "offset");
-      const cJSON *limit = cJSON_GetObjectItemCaseSensitive(message, "limit");
-      const cJSON *sort = cJSON_GetObjectItemCaseSensitive(message, "sort");
-      const cJSON *dir = cJSON_GetObjectItemCaseSensitive(message, "dir");
-      const cJSON *fetch = cJSON_GetObjectItemCaseSensitive(message, "fetch");
-      const cJSON *filter = cJSON_GetObjectItemCaseSensitive(message, "filter");
-      const cJSON *window = cJSON_GetObjectItemCaseSensitive(message, "window");
-      ShotListFilter shotFilter;
-      bool windowOk = !window;
-      for (const size_t size : SHOT_LOG_STATS_WINDOWS)
-        windowOk = windowOk || (cJSON_IsNumber(window) && window->valuedouble == size);
-      const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 10) &&
-                           uiStreamParseShotFilter(filter, shotFilter) && windowOk;
-      const bool numbersOk =
-          uiStreamIntInRange(requestId, 1, UINT32_MAX) &&
-          uiStreamIntInRange(offset, 0, SHOT_LOG_CAPACITY) &&
-          uiStreamIntInRange(limit, 1, SHOT_LOG_CAPACITY) &&
-          (!fetch || cJSON_IsBool(fetch)) &&
-          (!sort || (cJSON_IsString(sort) &&
-                     (!strcmp(sort->valuestring, "date") ||
-                      !strcmp(sort->valuestring, "rating")))) &&
-          (!dir || (cJSON_IsString(dir) &&
-                    (!strcmp(dir->valuestring, "asc") ||
-                     !strcmp(dir->valuestring, "desc"))));
-      if (shapeOk && numbersOk) {
-        if (!cJSON_IsTrue(on)) {
-          accepted = !offset && !limit && !sort && !dir && !fetch && !requestId &&
-                     !filter && !window;
-          if (accepted) {
-            session->statsOn = false;
+      } else if (cJSON_IsString(op) && session->bound &&
+                 strcmp(op->valuestring, "log") == 0 &&
+                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        // View-scoped serial-log toggle: the cursor comes from the client's
+        // rendered tail; unsubscribe carries no window fields.
+        const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
+        const cJSON *after = cJSON_GetObjectItemCaseSensitive(message, "after");
+        bool shapeOk = cJSON_IsBool(on);
+        for (const cJSON *field = message->child; shapeOk && field;
+             field = field->next) {
+          const char *name = field->string;
+          shapeOk = name && (!strcmp(name, "op") || !strcmp(name, "on") ||
+                             !strcmp(name, "after"));
+        }
+        const bool numbersOk = uiStreamIntInRange(after, 0, UINT32_MAX);
+        if (shapeOk && numbersOk) {
+          if (!cJSON_IsTrue(on)) {
+            accepted = !after;
+            if (accepted) session->logOn = false;
+          } else {
+            session->logOn = true;
+            session->logAfter = after ? static_cast<uint32_t>(after->valuedouble) : 0;
+            session->logPush = true;
+            accepted = true;
+          }
+          if (accepted)
+            self.uiStreamUrgent_.store(true, std::memory_order_release);
+        }
+      } else if (cJSON_IsString(op) && session->bound &&
+                 strcmp(op->valuestring, "history") == 0 &&
+                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        // View-scoped History page subscription: the standing window tracks the
+        // page; a one-shot fetch serves sentinel appends without disturbing it.
+        // `types` filters both; a fetch without it keeps the standing filter.
+        // A subscribe's `tag` names the standing page the browser still holds.
+        static const char *const kFields[] = {"op", "on", "offset", "limit", "dir",
+                                              "fetch", "request", "types", "tag"};
+        const cJSON *requestId = cJSON_GetObjectItemCaseSensitive(message, "request");
+        const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
+        const cJSON *offset = cJSON_GetObjectItemCaseSensitive(message, "offset");
+        const cJSON *limit = cJSON_GetObjectItemCaseSensitive(message, "limit");
+        const cJSON *dir = cJSON_GetObjectItemCaseSensitive(message, "dir");
+        const cJSON *fetch = cJSON_GetObjectItemCaseSensitive(message, "fetch");
+        const cJSON *types = cJSON_GetObjectItemCaseSensitive(message, "types");
+        const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
+        uint8_t typeMask = 0;
+        const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 9) &&
+                             uiStreamParseHistoryTypes(types, typeMask);
+        const bool numbersOk =
+            uiStreamIntInRange(requestId, 1, UINT32_MAX) &&
+            uiStreamIntInRange(tag, 1, UINT32_MAX) &&
+            uiStreamIntInRange(offset, 0, HISTORY_CAPACITY) &&
+            uiStreamIntInRange(limit, 1, HISTORY_PAGE_MAX) &&
+            (!fetch || cJSON_IsBool(fetch)) &&
+            (!dir || (cJSON_IsString(dir) &&
+                      (!strcmp(dir->valuestring, "asc") ||
+                       !strcmp(dir->valuestring, "desc"))));
+        if (shapeOk && numbersOk) {
+          if (!cJSON_IsTrue(on)) {
+            // Unsubscribe carries no window fields.
+            accepted = !offset && !limit && !dir && !fetch && !requestId && !types && !tag;
+            if (accepted) {
+              session->historyOn = false;
+              session->historyFetch = false;
+            }
+          } else if (fetch && cJSON_IsTrue(fetch)) {
+            accepted = session->historyOn && offset != nullptr && !tag;
+            if (accepted) {
+              session->historyFetchOffset =
+                  static_cast<size_t>(offset->valueint);
+              session->historyFetchTypes = types ? typeMask : session->historyTypes;
+              session->historyFetch = true;
+              session->historyFetchRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
+            }
+          } else {
+            session->historyOn = true;
+            session->historyResync = true;
+            session->historyRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
+            session->historyTypes = typeMask;
+            session->historyKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
+            if (offset)
+              session->historyOffset = static_cast<size_t>(offset->valueint);
+            if (limit)
+              session->historyLimit = static_cast<size_t>(limit->valueint);
+            if (dir)
+              session->historyDir = !strcmp(dir->valuestring, "asc")
+                                         ? ShotLogSortDir::Asc
+                                         : ShotLogSortDir::Desc;
+            accepted = true;
+          }
+          if (accepted)
+            self.uiStreamUrgent_.store(true, std::memory_order_release);
+        }
+      } else if (cJSON_IsString(op) && session->bound &&
+                 strcmp(op->valuestring, "stats") == 0 &&
+                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        // View-scoped Stats page subscription on the same contract; one-shot
+        // fetches also serve the CSV export window (date/desc, unfiltered).
+        // `filter` works like History's `types`; `window` (subscribe only)
+        // picks the newest shots the aggregate and charts cover.
+        static const char *const kFields[] = {"op",    "on",      "offset",
+                                              "limit", "sort",    "dir",
+                                              "fetch", "request", "filter",
+                                              "window", "tag"};
+        const cJSON *requestId = cJSON_GetObjectItemCaseSensitive(message, "request");
+        const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
+        const cJSON *offset = cJSON_GetObjectItemCaseSensitive(message, "offset");
+        const cJSON *limit = cJSON_GetObjectItemCaseSensitive(message, "limit");
+        const cJSON *sort = cJSON_GetObjectItemCaseSensitive(message, "sort");
+        const cJSON *dir = cJSON_GetObjectItemCaseSensitive(message, "dir");
+        const cJSON *fetch = cJSON_GetObjectItemCaseSensitive(message, "fetch");
+        const cJSON *filter = cJSON_GetObjectItemCaseSensitive(message, "filter");
+        const cJSON *window = cJSON_GetObjectItemCaseSensitive(message, "window");
+        const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
+        ShotListFilter shotFilter;
+        bool windowOk = !window;
+        for (const size_t size : SHOT_LOG_STATS_WINDOWS)
+          windowOk = windowOk || (cJSON_IsNumber(window) && window->valuedouble == size);
+        const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 11) &&
+                             uiStreamParseShotFilter(filter, shotFilter) && windowOk;
+        const bool numbersOk =
+            uiStreamIntInRange(requestId, 1, UINT32_MAX) &&
+            uiStreamIntInRange(tag, 1, UINT32_MAX) &&
+            uiStreamIntInRange(offset, 0, SHOT_LOG_CAPACITY) &&
+            uiStreamIntInRange(limit, 1, SHOT_LOG_CAPACITY) &&
+            (!fetch || cJSON_IsBool(fetch)) &&
+            (!sort || (cJSON_IsString(sort) &&
+                       (!strcmp(sort->valuestring, "date") ||
+                        !strcmp(sort->valuestring, "rating")))) &&
+            (!dir || (cJSON_IsString(dir) &&
+                      (!strcmp(dir->valuestring, "asc") ||
+                       !strcmp(dir->valuestring, "desc"))));
+        if (shapeOk && numbersOk) {
+          if (!cJSON_IsTrue(on)) {
+            accepted = !offset && !limit && !sort && !dir && !fetch && !requestId &&
+                       !filter && !window && !tag;
+            if (accepted) {
+              session->statsOn = false;
+              session->statsFetch = false;
+              session->statsPaging = false;
+            }
+          } else if (fetch && cJSON_IsTrue(fetch)) {
+            accepted = session->statsOn && offset != nullptr && !window && !tag;
+            if (accepted) {
+              session->statsFetchFilter = filter ? shotFilter : session->statsFilter;
+              session->statsFetchOffset =
+                  static_cast<size_t>(offset->valueint);
+              session->statsFetchLimit = limit
+                  ? static_cast<size_t>(limit->valueint)
+                  : session->statsLimit;
+              session->statsFetchSort = sort
+                  ? shotLogSortFromName(sort->valuestring)
+                  : session->statsSort;
+              session->statsFetchDir = dir
+                  ? shotLogSortDirFromName(dir->valuestring)
+                  : session->statsDir;
+              session->statsFetch = true;
+              session->statsFetchRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
+            }
+          } else if (window && session->statsOn && !offset && !limit && !sort && !dir &&
+                     !filter && !requestId && !tag) {
+            // A window-only change refreshes the header: rows stay held.
+            session->statsWindow = static_cast<size_t>(window->valueint);
+            accepted = true;
+          } else {
+            session->statsOn = true;
+            session->statsResync = true;
             session->statsFetch = false;
             session->statsPaging = false;
+            session->statsRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
+            session->statsFilter = shotFilter;
+            session->statsFilter.hideLowYield = true;
+            session->statsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
+            session->statsWindow = window ? static_cast<size_t>(window->valueint)
+                                          : SHOT_LOG_STATS_WINDOW;
+            if (offset)
+              session->statsOffset = static_cast<size_t>(offset->valueint);
+            if (limit)
+              session->statsLimit = static_cast<size_t>(limit->valueint);
+            if (sort)
+              session->statsSort = shotLogSortFromName(sort->valuestring);
+            if (dir)
+              session->statsDir = shotLogSortDirFromName(dir->valuestring);
+            accepted = true;
           }
-        } else if (fetch && cJSON_IsTrue(fetch)) {
-          accepted = session->statsOn && offset != nullptr && !window;
-          if (accepted) {
-            session->statsFetchFilter = filter ? shotFilter : session->statsFilter;
-            session->statsFetchOffset =
-                static_cast<size_t>(offset->valueint);
-            session->statsFetchLimit = limit
-                ? static_cast<size_t>(limit->valueint)
-                : session->statsLimit;
-            session->statsFetchSort = sort
-                ? shotLogSortFromName(sort->valuestring)
-                : session->statsSort;
-            session->statsFetchDir = dir
-                ? shotLogSortDirFromName(dir->valuestring)
-                : session->statsDir;
-            session->statsFetch = true;
-            session->statsFetchRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
+          if (accepted)
+            self.uiStreamUrgent_.store(true, std::memory_order_release);
+        }
+      } else if (cJSON_IsString(op) && !session->bound &&
+                 strcmp(op->valuestring, "bind") == 0 && cJSON_IsString(client) &&
+                 (!ops || cJSON_IsArray(ops)) && self.activeWebUiClientId_[0] &&
+                 strcmp(client->valuestring, self.activeWebUiClientId_) == 0 &&
+                 millis() - session->openedAtMs < kUiStreamBindMs) {
+        copyCString(session->clientId, sizeof(session->clientId), client->valuestring);
+        const cJSON *cycle = cJSON_GetObjectItemCaseSensitive(message, "cycle");
+        const cJSON *boot = cJSON_GetObjectItemCaseSensitive(message, "boot");
+        if (cJSON_IsNumber(cycle) && cycle->valuedouble > 0 &&
+            cycle->valuedouble <= UINT32_MAX && floor(cycle->valuedouble) == cycle->valuedouble &&
+            cJSON_IsNumber(boot) && boot->valuedouble >= 0 &&
+            boot->valuedouble <= UINT32_MAX && floor(boot->valuedouble) == boot->valuedouble) {
+          session->observedCycle = static_cast<uint32_t>(cycle->valuedouble);
+          session->observedBoot = static_cast<uint32_t>(boot->valuedouble);
+        }
+        const cJSON *presetsTag = cJSON_GetObjectItemCaseSensitive(message, "presetsTag");
+        if (presetsTag && uiStreamIntInRange(presetsTag, 1, UINT32_MAX))
+          session->knownPresetsTag = static_cast<uint32_t>(presetsTag->valuedouble);
+        for (auto &other : self.uiStreams_) {
+          if (&other != session && other.bound) {
+            superseded = other.fd;
+            other.bound = false;
+            other.openedAtMs = millis() - kUiStreamBindMs;
           }
-        } else if (window && session->statsOn && !offset && !limit && !sort && !dir &&
-                   !filter && !requestId) {
-          // A window-only change refreshes the header: rows stay held.
-          session->statsWindow = static_cast<size_t>(window->valueint);
-          accepted = true;
-        } else {
-          session->statsOn = true;
-          session->statsResync = true;
-          session->statsFetch = false;
-          session->statsPaging = false;
-          session->statsRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
-          session->statsFilter = shotFilter;
-          session->statsFilter.hideLowYield = true;
-          session->statsWindow = window ? static_cast<size_t>(window->valueint)
-                                        : SHOT_LOG_STATS_WINDOW;
-          if (offset)
-            session->statsOffset = static_cast<size_t>(offset->valueint);
-          if (limit)
-            session->statsLimit = static_cast<size_t>(limit->valueint);
-          if (sort)
-            session->statsSort = shotLogSortFromName(sort->valuestring);
-          if (dir)
-            session->statsDir = shotLogSortDirFromName(dir->valuestring);
-          accepted = true;
         }
-        if (accepted)
-          self.uiStreamUrgent_.store(true, std::memory_order_release);
+        session->bound = true;
+        session->boundAtMs = millis();
+        bound = accepted = true;
       }
-    } else if (cJSON_IsString(op) && !session->bound &&
-               strcmp(op->valuestring, "bind") == 0 && cJSON_IsString(client) &&
-               self.activeWebUiClientId_[0] &&
-               strcmp(client->valuestring, self.activeWebUiClientId_) == 0 &&
-               millis() - session->openedAtMs < kUiStreamBindMs) {
-      copyCString(session->clientId, sizeof(session->clientId), client->valuestring);
-      const cJSON *cycle = cJSON_GetObjectItemCaseSensitive(message, "cycle");
-      const cJSON *boot = cJSON_GetObjectItemCaseSensitive(message, "boot");
-      if (cJSON_IsNumber(cycle) && cycle->valuedouble > 0 &&
-          cycle->valuedouble <= UINT32_MAX && floor(cycle->valuedouble) == cycle->valuedouble &&
-          cJSON_IsNumber(boot) && boot->valuedouble >= 0 &&
-          boot->valuedouble <= UINT32_MAX && floor(boot->valuedouble) == boot->valuedouble) {
-        session->observedCycle = static_cast<uint32_t>(cycle->valuedouble);
-        session->observedBoot = static_cast<uint32_t>(boot->valuedouble);
-      }
-      const cJSON *presetsTag = cJSON_GetObjectItemCaseSensitive(message, "presetsTag");
-      if (presetsTag && uiStreamIntInRange(presetsTag, 1, UINT32_MAX))
-        session->knownPresetsTag = static_cast<uint32_t>(presetsTag->valuedouble);
-      for (auto &other : self.uiStreams_) {
-        if (&other != session && other.bound) {
-          superseded = other.fd;
-          other.bound = false;
-          other.openedAtMs = millis() - kUiStreamBindMs;
-        }
-      }
-      session->bound = true;
-      session->boundAtMs = millis();
-      accepted = true;
     }
     if (accepted) session->heardAtMs = millis();
     owner = session->bound && strcmp(session->clientId, self.activeWebUiClientId_) == 0;
   }
-  const bool bindRejected = !accepted && cJSON_IsString(op) &&
-      strcmp(op->valuestring, "bind") == 0 && cJSON_IsString(client);
+  const bool bindRejected = bindOp && !bound;
   if (!accepted && !bindRejected && owner)
     self.lifecycleLogf("UI stream op %.12s failed validation; the page resets its list views",
                        cJSON_IsString(op) ? op->valuestring : "?");
-  cJSON_Delete(message);
+  cJSON_Delete(document);
   memset(body, 0, sizeof(body));
+  if (superseded >= 0) httpd_sess_trigger_close(request->handle, superseded);
   if (!accepted) {
     if (bindRejected || owner)
       sendUiStreamClose(request->handle, session->fd,
@@ -526,7 +549,6 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
     reply.len = sizeof(alive) - 1;
     return httpd_ws_send_frame_async(request->handle, session->fd, &reply);
   }
-  if (superseded >= 0) httpd_sess_trigger_close(request->handle, superseded);
   httpd_sess_set_send_override(request->handle, session->fd, uiStreamSend);
   self.requestPendingNetworkConfirm();
   return ESP_OK;

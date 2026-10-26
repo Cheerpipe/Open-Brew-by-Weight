@@ -289,6 +289,7 @@ let historyStreamWanted = false,
   historyStreamEpoch = 0,
   historyRequest = 0,
   historyFetchRequest = 0,
+  historyTag = 0,
   historyResolve = null;
 // The subscribe op: a fresh request id separates its page from older frames.
 function historySubscribeOp() {
@@ -304,6 +305,9 @@ function historySubscribeOp() {
     limit: HISTORY_PAGE_SIZE,
     dir: R.uiState.historyDir,
     ...(R.uiState.historyTypes.length && { types: R.uiState.historyTypes }),
+    // The standing page this model still holds: an unchanged one comes back
+    // as bare ids, also after a reconnect.
+    ...(historyTag && { tag: historyTag }),
   };
 }
 function historySendSubscribe() {
@@ -351,6 +355,7 @@ function historyStreamFrame(message) {
     typeof message.snapshot !== "boolean" ||
     !Number.isInteger(message.epoch) ||
     !Number.isInteger(message.request) ||
+    !Number.isInteger(message.tag) ||
     !Number.isInteger(message.total) ||
     message.total < 0 ||
     !Number.isInteger(message.offset) ||
@@ -363,8 +368,9 @@ function historyStreamFrame(message) {
   )
     throw Error();
   if (!message.snapshot && message.boot !== historyStreamBoot) throw Error();
-  // A standing refresh names records this page already holds by their id.
-  const held = !message.snapshot && R.uiState.historyData?.records;
+  // A standing refresh, or the snapshot of the page the subscribe's tag
+  // named, sends records this page already holds as their id.
+  const held = R.uiState.historyData?.records;
   message.records = message.records.map(
     (r) => (Number.isInteger(r) && held && held.find((x) => x.id === r)) || r,
   );
@@ -411,6 +417,7 @@ function applyHistoryStream(message) {
   );
   historyStreamBoot = message.boot;
   historyStreamEpoch = message.epoch;
+  if (!fetch) historyTag = message.tag;
   historyFetchOffset = -1;
   // The model updates on every view; only the hidden view's DOM work and
   // reachability signal wait until History is actually open.

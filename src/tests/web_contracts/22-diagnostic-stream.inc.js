@@ -9,7 +9,7 @@
   class Socket {
     static OPEN = 1;
     constructor(url) { this.url = url; this.readyState = 1; this.sent = []; sockets.push(this); }
-    send(value) { this.sent.push(JSON.parse(value)); }
+    send(value) { const m = JSON.parse(value); this.sent.push(m, ...(m.ops || [])); }
     close() { this.readyState = 3; this.onclose?.({}); }
   }
   const listeners = {};

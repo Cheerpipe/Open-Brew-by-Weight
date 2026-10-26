@@ -3882,18 +3882,24 @@ function startUiStream() {
       return;
     }
     const known = homeFrame?.status?.presets && homeFrame.status.presetsTag;
-    socket.send(
-      JSON.stringify({
+    // The bind carries the subscriptions that fit the firmware's 640-byte
+    // request buffer (kUiStreamRequestBytes); the rest follow as their own ops.
+    const bind = {
         op: "bind",
         client: webUiClientId,
         ...(shotSeen || {}),
         ...(known ? { presetsTag: known } : {}),
-      }),
-    );
+        ops: [],
+      },
+      rest = [];
     for (const h of Object.values(streamHandlers)) {
       const op = h.subscribe();
-      if (op) sendUiOperation(op);
+      if (!op) continue;
+      bind.ops.push(op);
+      if (JSON.stringify(bind).length > 640) rest.push(bind.ops.pop());
     }
+    socket.send(JSON.stringify(bind));
+    for (const op of rest) sendUiOperation(op);
     shotActivity();
   };
   socket.onmessage = (event) => {

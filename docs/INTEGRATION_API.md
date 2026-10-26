@@ -576,7 +576,14 @@ with `{"op":"bind","client":"<claimed X-WebUI-Client>"}`. A reconnecting page
 adds the `presetsTag` of the presets it still holds; when it matches, that
 connection's first Home snapshot omits `presets` (it still carries
 `presetsTag`) and the page keeps its copy. Home sends `presetsTag` with every
-presets change. Home receives an
+presets change. The bind also carries the page's standing subscriptions as
+`"ops":[…]`, each exactly the op it would otherwise send on its own (Settings,
+History, Stats, Diagnostic and its log), so a reconnect costs one request
+frame; the controller runs them in order once the bind is accepted, and one
+it rejects closes the stream with code 4003 like a separate op. A request
+frame holds at most 640 bytes, so the page sends any subscription that does
+not fit (a Stats subscribe with a long filter) as its own op after the bind.
+Home receives an
 initial snapshot and then field changes, without periodic REST status requests.
 While a browser is connected and a scale is streaming, the firmware's periodic
 comparison of the published state runs right after every second weight sample
@@ -829,18 +836,24 @@ every record:
 {"op":"history","on":true,"fetch":true,"offset":20}
 ```
 
-Leaving the view no longer unsubscribes it: the browser keeps the History
-window standing for the whole UI session, so arriving records update the page
-even while another view is open. Opening History with that live data paints
-straight from the cached page, and the page a URL load starts on is fetched
-first; any record page still not standing is subscribed in the background as
-soon as the first view finishes loading. After a reconnect the browser
-replays the subscription, so the first open still starts from a fresh
-snapshot; returning to a page whose socket stayed open needs no resync. Every accepted op forces the next frame to
-be a full snapshot of the requested window.
+History subscribes on the first visit to the view, and leaving the view does
+not unsubscribe it: the browser keeps the History window standing for the
+rest of the UI session, so arriving records update the page even while
+another view is open. Opening History again with that live data paints
+straight from the cached page. After a reconnect the browser
+replays the subscription, so the first open still starts from a snapshot;
+returning to a page whose socket stayed open needs no resync. Every accepted
+subscribe forces the next frame to be a snapshot of the requested window.
+
+Every History frame carries `tag`, which names the standing page it leaves
+the browser with. A subscribe may add `"tag":<last tag>` for the page the
+browser still holds (also after a reconnect); when the controller's page
+still matches, that snapshot sends every record as its bare `id`, so an
+unchanged page costs a few bytes. `{"op":"resync"}` always sends whole
+records.
 
 History frames have `v: 1`, `type: "history"`, `boot`, `snapshot`, `epoch`,
-`total`, `offset`, `limit`, `hasMore`,
+`request`, `tag`, `total`, `offset`, `limit`, `hasMore`,
 and `records`. Each record carries `id`, `type`, `durationS`, `hasWallTime`,
 `endedAtUnixSec`, and `endedAtLocalSec`. A store epoch and a fingerprint over the finished frame
 suppress sends while the page is unchanged, the same no-change contract as the
@@ -850,8 +863,9 @@ updated page without any browser request; clearing and deleting remain the
 confirmed REST commands above. In such a standing refresh (`snapshot: false`)
 a record the browser already holds unchanged from the previous standing page
 is sent as its bare `id` number, so a new activation costs one record; a
-snapshot (subscribe, resync, or reconnect) and append fetches always carry
-whole records, and an id the browser cannot resolve requests a resync.
+snapshot carries whole records unless its subscribe named the unchanged page
+by `tag`, append fetches always carry whole records, and an id the browser
+cannot resolve requests a resync.
 
 ### Stats live updates
 
@@ -885,14 +899,19 @@ without `filter` keeps the standing filter:
 {"op":"stats","on":true,"fetch":true,"offset":0,"limit":500,"sort":"date","dir":"desc","filter":{}}
 ```
 
-Leaving the view no longer unsubscribes it: the Stats window also stays
-standing for the whole UI session, refreshes in the background while any view
-is open, and re-opens paint straight from the cached rows. After a reconnect
-the browser replays the subscription, and every accepted op except a
-window-only change forces the next page to start from a full snapshot.
+Stats likewise subscribes on the first visit, and leaving the view does not
+unsubscribe it: the window stays standing for the rest of the UI session,
+refreshes in the background while any view is open, and re-opens paint
+straight from the cached rows. After a reconnect the browser replays the
+subscription, and every accepted op except a
+window-only change forces the next page to start from a snapshot. As in
+History, a subscribe may name the standing page the browser still holds with
+`"tag":<last tag>`; a page that still matches comes back as a snapshot whose
+rows are bare ids (the header is sent again).
 
 Stats frames have `v: 1`, `type: "stats"`, `boot`, `snapshot`, `epoch`,
-`seq`, the `stats` aggregate and `cols` (first frame of a page only), `total`, `offset`, `limit`, `hasMore`, `rows`, `rowBase`, and `more`.
+`seq`, `request`, the `stats` aggregate, `cols` and the page's `tag` (first
+frame of a page only), `total`, `offset`, `limit`, `hasMore`, `rows`, `rowBase`, and `more`.
 In this stream the aggregate covers the subscribed `window` (and leaves out
 `durationsS`), and it also carries what the Stats charts draw, so they match
 the averages whatever the sort, filter, or scroll:
@@ -923,8 +942,8 @@ deleting, or clearing moves the epoch, so the standing subscription pushes
 the updated page without any browser request. As in History, a standing
 refresh sends each row the browser already holds with the same rating and
 curve as its bare `id` number, so a new shot sends only its own row and curve
-plus the page header; snapshots, scroll fetches, and the export always carry
-whole rows. The export window streams the
+plus the page header; scroll fetches, the export, and snapshots not named by
+`tag` always carry whole rows. The export window streams the
 requested rows once without touching the subscribed view state. The server
 refreshes its cached records only when the store epoch moves; sort, filter,
 and window changes reuse that snapshot, and the header is rebuilt when the
