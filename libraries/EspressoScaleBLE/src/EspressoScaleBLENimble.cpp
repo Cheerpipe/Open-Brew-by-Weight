@@ -526,7 +526,11 @@ class NimbleScaleClient {
       const bool hasWeight = protocol_->parseWeight != nullptr &&
                              protocol_->parseWeight(frame.data, frame.length,
                                                     &weight);
+      // A timer carried inside the weight frame was validated by parseWeight;
+      // standalone timer frames still validate themselves.
       const bool hasTimer = protocol_->parseTimer != nullptr &&
+                            (hasWeight ||
+                             !features().has(ScaleFeatureTimerInWeightFrame)) &&
                             protocol_->parseTimer(frame.data, frame.length,
                                                   &timerMs);
       if (!hasWeight && !hasTimer) {

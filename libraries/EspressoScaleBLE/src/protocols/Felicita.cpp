@@ -16,7 +16,8 @@ static const ScalePayload kFelicitaInitWrites[] = {
 };
 
 static const ScaleFeatureSet kFelicitaFeatures = {
-    SCALE_CORE_FEATURES | ScaleFeatureCommandAudibleFeedback,
+    SCALE_CORE_FEATURES | ScaleFeatureCommandAudibleFeedback |
+        ScaleFeatureTimerInWeightFrame,
     0,
     0,
     0,
@@ -55,11 +56,9 @@ bool parseFelicitaWeight(const uint8_t *data, int length, float *weight) {
     return scaleValidWeight(*weight);
 }
 
+// Decodes a frame parseWeight already verified (ScaleFeatureTimerInWeightFrame).
 bool parseFelicitaTimer(const uint8_t *data, int length, uint32_t *timerMs) {
-    float ignoredWeight = 0.0f;
-    if (!parseFelicitaWeight(data, length, &ignoredWeight)) {
-        return false;
-    }
+    if (length != 18) return false;
     if (scaleFelicitaAsciiTimer(data, timerMs)) {
         return true;
     }

@@ -10,7 +10,7 @@ static const uint8_t RESET_TIMER_ECLAIR[3] = {0x52, 0x01, 0x01};
 static const char *const kEclairPrefixes[] = {"ECLAI"};
 
 static const ScaleFeatureSet kEclairFeatures = {
-    SCALE_CORE_FEATURES,
+    SCALE_CORE_FEATURES | ScaleFeatureTimerInWeightFrame,
     0,
     0,
     0,
@@ -34,11 +34,9 @@ bool parseEclairWeight(const uint8_t *data, int length, float *weight) {
     return scaleValidWeight(*weight);
 }
 
+// Decodes a frame parseWeight already verified (ScaleFeatureTimerInWeightFrame).
 bool parseEclairTimer(const uint8_t *data, int length, uint32_t *timerMs) {
-    float ignoredWeight = 0.0f;
-    if (!parseEclairWeight(data, length, &ignoredWeight)) {
-        return false;
-    }
+    if (length != 10) return false;
     *timerMs = scaleReadUint32LittleEndian(data + 5);
     return true;
 }

@@ -16,7 +16,10 @@ enum ScaleFeature {
     ScaleFeatureHeartbeat = 1u << 9,
     ScaleFeaturePowerOff = 1u << 10,
     // Weight frames also carry the scale's own flow rate (parseFlowRate).
-    ScaleFeatureFlowRate = 1u << 11
+    ScaleFeatureFlowRate = 1u << 11,
+    // The timer rides inside the weight frame: parseTimer is called only on
+    // frames parseWeight accepted and skips its own integrity check.
+    ScaleFeatureTimerInWeightFrame = 1u << 12
 };
 
 struct ScaleFeatureSet {

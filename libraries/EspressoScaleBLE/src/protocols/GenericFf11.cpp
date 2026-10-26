@@ -11,7 +11,7 @@ static const ScaleFeatureSet kGenericFeatures = {
     SCALE_CORE_FEATURES | ScaleFeatureCombinedTareStart |
         ScaleFeatureIndependentBeep | ScaleFeatureVolume |
         ScaleFeatureCommandAudibleFeedback | ScaleFeaturePowerOff |
-        ScaleFeatureFlowRate,
+        ScaleFeatureFlowRate | ScaleFeatureTimerInWeightFrame,
     0,
     5,
     0,
@@ -40,13 +40,9 @@ bool genericSign(uint8_t sign) {
 
 bool parseGenericWeight(const uint8_t *data, int length, float *weight) {
     if (length != 20 || data[0] != 0x03 || data[1] != 0x0b ||
-        !genericSign(data[6])) {
+        !genericSign(data[6]) || scaleXorBytes(data, 19) != data[19]) {
         return false;
     }
-    uint8_t checksum = 0;
-    for (int i = 0; i < length - 1; ++i) checksum ^= data[i];
-    if (checksum != data[length - 1]) return false;
-
     const uint32_t raw = (static_cast<uint32_t>(data[7]) << 16) |
                          (static_cast<uint32_t>(data[8]) << 8) |
                          data[9];
@@ -57,11 +53,10 @@ bool parseGenericWeight(const uint8_t *data, int length, float *weight) {
     return scaleValidWeight(*weight);
 }
 
+// Timer and flow decode frames parseWeight already verified
+// (ScaleFeatureTimerInWeightFrame); only the bounds are rechecked.
 bool parseGenericTimer(const uint8_t *data, int length, uint32_t *timerMs) {
-    float ignoredWeight = 0.0f;
-    if (!parseGenericWeight(data, length, &ignoredWeight)) {
-        return false;
-    }
+    if (length != 20) return false;
     *timerMs = (static_cast<uint32_t>(data[2]) << 16) |
                (static_cast<uint32_t>(data[3]) << 8) | data[4];
     return true;
@@ -69,10 +64,7 @@ bool parseGenericTimer(const uint8_t *data, int length, uint32_t *timerMs) {
 
 // Byte 10 is the flow sign, bytes 11-12 the flow x100 (big endian).
 bool parseGenericFlowRate(const uint8_t *data, int length, float *gramsPerSecond) {
-    float ignoredWeight = 0.0f;
-    if (!parseGenericWeight(data, length, &ignoredWeight) || !genericSign(data[10])) {
-        return false;
-    }
+    if (length != 20 || !genericSign(data[10])) return false;
     const float rate =
         static_cast<float>((static_cast<uint16_t>(data[11]) << 8) | data[12]) / 100.0f;
     *gramsPerSecond = data[10] == '-' ? -rate : rate;

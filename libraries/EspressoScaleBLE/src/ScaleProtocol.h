@@ -28,6 +28,10 @@ struct ScaleProtocol {
     size_t namePrefixCount;
     ScaleFeatureSet features;
     bool (*supportedPacketLength)(int length);
+    // parseWeight is the frame's integrity check. parseTimer validates its own
+    // frame unless ScaleFeatureTimerInWeightFrame is declared, in which case
+    // it and parseFlowRate only see frames parseWeight already accepted and
+    // may decode without re-checking them.
     bool (*parseWeight)(const uint8_t *data, int length, float *weight);
     bool (*parseTimer)(const uint8_t *data, int length, uint32_t *timerMs);
     // Signed grams per second from a frame parseWeight accepted; set only by

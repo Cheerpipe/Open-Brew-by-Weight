@@ -89,6 +89,9 @@ void testProtocolInitializationContracts() {
     // A flow hook exists exactly when the protocol declares the capability.
     CHECK((protocol->parseFlowRate != nullptr) ==
           protocol->features.has(ScaleFeatureFlowRate));
+    // An in-frame timer declaration needs the hook it exempts from checking.
+    CHECK(!protocol->features.has(ScaleFeatureTimerInWeightFrame) ||
+          protocol->parseTimer != nullptr);
     if (std::strcmp(protocol->id, "bookoo_generic") == 0) {
       sawBookoo = true;
       CHECK(protocol->features.has(ScaleFeatureFlowRate));
@@ -173,9 +176,15 @@ void testBookooFlowRateFrame() {
   frame[11] = frame[12] = 0xff;
   seal();
   CHECK(bookoo.parseFlowRate(frame, sizeof(frame), &flow) && flow == 655.35f);
-  frame[19] ^= 1;
-  CHECK(!bookoo.parseFlowRate(frame, sizeof(frame), &flow));
+  uint32_t timerMs = 0;
+  frame[4] = 1;  // Timer is bytes 2-4 in milliseconds, big endian.
+  seal();
+  CHECK(bookoo.parseTimer(frame, sizeof(frame), &timerMs) && timerMs == 1);
+  frame[19] ^= 1;  // One checksum per frame: parseWeight rejects it for all hooks.
+  CHECK(bookoo.features.has(ScaleFeatureTimerInWeightFrame));
+  CHECK(!bookoo.parseWeight(frame, sizeof(frame), &weight));
   CHECK(!bookoo.parseFlowRate(frame, sizeof(frame) - 1, &flow));
+  CHECK(!bookoo.parseTimer(frame, sizeof(frame) - 1, &timerMs));
 }
 
 void fuzzProtocolPacketBounds() {
@@ -190,19 +199,21 @@ void fuzzProtocolPacketBounds() {
         }
         float weight = 0;
         uint32_t timerMs = 0;
-        if (protocol->parseWeight != nullptr &&
-            protocol->parseWeight(frame.data(), length, &weight)) {
+        const bool hasWeight = protocol->parseWeight != nullptr &&
+            protocol->parseWeight(frame.data(), length, &weight);
+        if (hasWeight) {
           CHECK(std::isfinite(weight));
           CHECK(std::fabs(weight) <= SCALE_MAX_WEIGHT_GRAMS);
         }
+        // Every hook must stay in bounds on garbage, even the ones the client
+        // only calls after parseWeight accepted the frame.
         if (protocol->parseTimer != nullptr) {
           protocol->parseTimer(frame.data(), length, &timerMs);
         }
         float flow = 0;
         if (protocol->parseFlowRate != nullptr &&
-            protocol->parseFlowRate(frame.data(), length, &flow)) {
+            protocol->parseFlowRate(frame.data(), length, &flow) && hasWeight) {
           CHECK(std::isfinite(flow));
-          CHECK(protocol->parseWeight(frame.data(), length, &weight));
         }
       }
     }
@@ -259,17 +270,17 @@ void mutateAcceptedProtocolFrames() {
                 }
               }
             }
-            if (protocol->parseWeight(frame.data(),length,&weight)) {
+            const bool hasWeight=protocol->parseWeight(frame.data(),length,&weight);
+            if (hasWeight) {
               CHECK(std::isfinite(weight));
               CHECK(std::fabs(weight)<=SCALE_MAX_WEIGHT_GRAMS);
             }
             uint32_t timer=0;
             if (protocol->parseTimer) protocol->parseTimer(frame.data(),length,&timer);
             float flow=0;
-            if (protocol->parseFlowRate &&
+            if (hasWeight && protocol->parseFlowRate &&
                 protocol->parseFlowRate(frame.data(),length,&flow)) {
               CHECK(std::isfinite(flow));
-              CHECK(protocol->parseWeight(frame.data(),length,&weight));
             }
           }
           frame=original;

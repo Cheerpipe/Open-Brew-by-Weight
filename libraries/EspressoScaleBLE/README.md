@@ -78,6 +78,13 @@ tests require the flag and the hook to come together. The client then fills
 Bookoo declares it; adding another scale means implementing `parseFlowRate` for
 its frames and setting the flag, with no application change.
 
+Each frame is integrity-checked once, by `parseWeight`. Protocols whose timer
+rides inside the weight frame (Bookoo/generic FF11, Felicita, Eclair) declare
+`ScaleFeatureTimerInWeightFrame`; the client then calls their `parseTimer`
+and `parseFlowRate` only on frames `parseWeight` accepted, so those hooks
+decode without repeating the checksum. Protocols with standalone timer frames
+(Acaia, Varia) keep validating them in `parseTimer`.
+
 ## Requirements
 
 Release 5.0.0 uses the native NimBLE C APIs from ESP-IDF 6.1.x. The supported

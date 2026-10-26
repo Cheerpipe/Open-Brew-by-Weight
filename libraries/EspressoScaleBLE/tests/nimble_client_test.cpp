@@ -448,6 +448,7 @@ static void run() {
     testNowMs=100;
     NimbleScaleClient c(false); ready(c);
     ScaleProtocol timerOnly=*c.protocol_;
+    timerOnly.features.flags&=~static_cast<uint32_t>(ScaleFeatureTimerInWeightFrame);
     timerOnly.supportedPacketLength=[](int length) { return length==19 || length==20; };
     timerOnly.parseTimer=[](const uint8_t *, int length, uint32_t *timerMs) {
       *timerMs=0;
@@ -847,6 +848,7 @@ static void run() {
   {
     NimbleScaleClient c(false); ready(c);
     ScaleProtocol timerOnly=*c.protocol_;
+    timerOnly.features.flags&=~static_cast<uint32_t>(ScaleFeatureTimerInWeightFrame);
     timerOnly.parseWeight=[](const uint8_t *,int,float *) { return false; };
     timerOnly.parseTimer=[](const uint8_t *,int,uint32_t *timer) {
       *timer=0;
