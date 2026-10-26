@@ -2,9 +2,10 @@
 // network task queues at most one dispatch; it never sends or borrows JSON scratch.
 namespace {
 constexpr uint32_t kUiStreamBindMs = 5000, kUiStreamRetainMs = 30000;
-// A page pings every 20 s while its timers run; a bound session silent past
-// the page's own 5-minute hidden close plus one ping belongs to a page the
-// phone froze hidden.
+// A page pings every 19-20 s only while its power window is active or a shot
+// is live, otherwise every 120 s of silence; a bound session silent past the
+// page's own 5-minute hidden close plus one ping belongs to a page the phone
+// froze hidden.
 constexpr uint32_t kUiStreamSilentMs = 330000;
 // Wi-Fi and the BLE scale share one radio: a periodic frame leaves right after
 // every second weight sample, in the gap before the next notification. The
