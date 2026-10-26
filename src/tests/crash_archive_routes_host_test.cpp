@@ -35,7 +35,7 @@ namespace openbrewbyweight {
 CrashArchiveStatus fakeStatus{};
 std::vector<char> fakeDump(5000, 'D');
 int clears = 0;
-CrashArchiveStatus crashArchiveStatus() { return fakeStatus; }
+CrashArchiveStatus crashArchiveStatus(bool) { return fakeStatus; }
 bool crashArchiveRead(uint8_t, size_t offset, void *output, size_t length) {
   if (offset + length > fakeDump.size()) return false;
   std::memcpy(output, fakeDump.data() + offset, length);

@@ -54,7 +54,7 @@ esp_err_t OpenBrewByWeightNetwork::crashArchiveDownloadHandler(
     httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.requireAdminUnlock(request)) return ESP_OK;
-  const CrashArchiveStatus archive = crashArchiveStatus();
+  const CrashArchiveStatus archive = crashArchiveStatus(true);
   if (archive.count == 0)
     return sendError(request, STATUS_NOT_FOUND, "NO_CRASHES",
                      "No saved crash records are available.");

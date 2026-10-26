@@ -23,6 +23,9 @@ RTC_NOINIT_ATTR volatile CrashAddressRecord g_panicRecord;
 RTC_NOINIT_ATTR volatile uint32_t g_activeBootId;
 RTC_NOINIT_ATTR volatile uint8_t g_activeElfSha[32];
 CrashArchiveStatus g_status = {0, CrashArchiveState::UNSUPPORTED, {}, {}};
+// Slots listed by scanHistory whose dump digest has not been re-verified
+// since; crashArchiveStatus(true) verifies them before a download.
+uint8_t g_unverifiedSlots = 0;
 
 uint32_t IRAM_ATTR recordChecksum(const volatile CrashAddressRecord &record) {
   uint32_t checksum = 2166136261U;
@@ -59,16 +62,21 @@ size_t metaOffset(uint8_t slot) {
 
 bool digestPartition(const esp_partition_t *part, size_t offset, size_t length,
                      uint8_t digest[32]) {
-  // Callers hold tryLockFlashIo(); a 1 KiB stack chunk here pushed the Web UI
-  // factory reset past the network task stack.
-  uint8_t *chunk = flashIoScratchBytes();
+  // The shared scratch stages each chunk (a 1 KiB stack chunk here pushed the
+  // Web UI factory reset past the network task stack). The recursive flash
+  // lock is taken per chunk so a download-time verification never holds it
+  // across the whole dump; boot callers already holding it simply nest.
   psa_hash_operation_t context = PSA_HASH_OPERATION_INIT;
   bool ok = psa_hash_setup(&context, PSA_ALG_SHA_256) == PSA_SUCCESS;
   for (size_t done = 0; ok && done < length; done += FLASH_IO_CHUNK_BYTES) {
     const size_t bytes = length - done < FLASH_IO_CHUNK_BYTES
                              ? length - done : FLASH_IO_CHUNK_BYTES;
+    ok = tryLockFlashIo();
+    if (!ok) break;
+    uint8_t *chunk = flashIoScratchBytes();
     ok = esp_partition_read(part, offset + done, chunk, bytes) == ESP_OK &&
          psa_hash_update(&context, chunk, bytes) == PSA_SUCCESS;
+    unlockFlashIo();
     feedFlashIoWatchdog();
   }
   size_t digestBytes = 0;
@@ -97,8 +105,12 @@ bool decodeSha256(const uint8_t *text, uint8_t output[32]) {
   return true;
 }
 
+// The metadata checksum alone lists a record; the dump digest, verified when
+// the record was committed, is re-checked only on request (verifyDump) so a
+// boot does not re-read up to two 700 KiB dumps.
 bool readEntry(const esp_partition_t *part, uint8_t slot,
-               CrashArchiveEntry &entry, bool *ioError = nullptr) {
+               CrashArchiveEntry &entry, bool *ioError = nullptr,
+               bool verifyDump = true) {
   if (esp_partition_read(part, metaOffset(slot), &entry, sizeof(entry)) != ESP_OK) {
     if (ioError) *ioError = true;
     return false;
@@ -106,6 +118,7 @@ bool readEntry(const esp_partition_t *part, uint8_t slot,
   if (entry.magic != kEntryMagic || entry.version != kEntryVersion ||
       entry.dumpBytes < 64 || entry.dumpBytes > CRASH_HISTORY_DATA_BYTES ||
       entry.checksum != entryChecksum(entry)) return false;
+  if (!verifyDump) return true;
   uint8_t digest[32];
   if (!digestPartition(part, slot * CRASH_HISTORY_SLOT_BYTES,
                        entry.dumpBytes, digest)) {
@@ -127,13 +140,15 @@ bool eraseSectors(const esp_partition_t *part, size_t offset, size_t length) {
 
 bool scanHistory(const esp_partition_t *part) {
   g_status.count = 0;
+  g_unverifiedSlots = 0;
   bool ioError = false;
   for (uint8_t slot = 0; slot < 2; ++slot) {
     CrashArchiveEntry entry = {};
-    if (!readEntry(part, slot, entry, &ioError)) continue;
+    if (!readEntry(part, slot, entry, &ioError, false)) continue;
     const uint8_t index = g_status.count++;
     g_status.entries[index] = entry;
     g_status.slots[index] = slot;
+    g_unverifiedSlots |= static_cast<uint8_t>(1U << slot);
   }
   if (g_status.count == 2 &&
       g_status.entries[0].sequence < g_status.entries[1].sequence) {
@@ -294,6 +309,7 @@ void crashArchivePromote(uint32_t currentBootId, uint32_t resetReason) {
   if (ok) ok = readEntry(history, slot, verified);
   if (ok) {
     ok = scanHistory(history);
+    g_unverifiedSlots &= static_cast<uint8_t>(~(1U << slot));
     if (ok) ok = eraseSectors(capture, 0, 4096);
     if (ok) g_panicRecord.magic = 0;
   }
@@ -305,7 +321,33 @@ void crashArchivePromote(uint32_t currentBootId, uint32_t resetReason) {
 #endif
 }
 
-CrashArchiveStatus crashArchiveStatus() { return g_status; }
+CrashArchiveStatus crashArchiveStatus(bool verifyDumps) {
+  const esp_partition_t *history = historyPartition();
+  for (uint8_t i = 0; verifyDumps && history && i < g_status.count;) {
+    const uint8_t bit = static_cast<uint8_t>(1U << g_status.slots[i]);
+    uint8_t digest[32];
+    if (!(g_unverifiedSlots & bit)) {
+      ++i;
+      continue;
+    }
+    if (!digestPartition(history, g_status.slots[i] * CRASH_HISTORY_SLOT_BYTES,
+                         g_status.entries[i].dumpBytes, digest)) {
+      g_status.state = CrashArchiveState::IO_ERROR;
+    } else if (memcmp(digest, g_status.entries[i].dumpSha256,
+                      sizeof(digest)) == 0) {
+      g_unverifiedSlots &= static_cast<uint8_t>(~bit);
+      ++i;
+      continue;
+    }
+    // Unreadable or mismatching dump: drop the record from the list, as a
+    // boot-time scan did before the digest became lazy.
+    --g_status.count;
+    g_status.entries[i] = g_status.entries[g_status.count];
+    g_status.slots[i] = g_status.slots[g_status.count];
+    g_unverifiedSlots &= static_cast<uint8_t>(~bit);
+  }
+  return g_status;
+}
 
 bool crashArchiveRead(uint8_t slot, size_t offset, void *output, size_t length) {
   const esp_partition_t *part = historyPartition();

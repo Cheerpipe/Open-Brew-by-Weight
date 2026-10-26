@@ -317,7 +317,10 @@ On n16r8, ESP-IDF writes one ELF core dump to a 640 KiB capture partition
 after a panic. Once the relay is open and the durable boot ID has been saved,
 boot code validates that image and promotes it into one of two 704 KiB slots
 in the crash-history partition. Each slot commits a checksum-protected metadata
-sector last, after the dump copy and SHA-256 verification. The copy replaces
+sector last, after the dump copy and SHA-256 verification. Later boots list
+records by that metadata checksum alone; the dump digest is re-verified, chunk
+by chunk under the flash lock, when a download is requested, and a record whose
+dump no longer matches is dropped from the list then. The copy replaces
 the oldest valid slot only when both slots are occupied; interruption before
 commit leaves the capture available for retry. The capture's first sector is
 erased only after commit, so a reboot between those operations is recognized

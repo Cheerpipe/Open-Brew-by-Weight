@@ -305,7 +305,9 @@ manifest with the matching firmware ELF fingerprint. Use the ELF from that
 exact build when interpreting addresses. A watchdog dump may contain several
 tasks; the short address list describes only the panic callback's view.
 The archive can contain passwords or other private data, so share it only with
-someone you trust. Downloading does not delete records. **Empty** asks for
+someone you trust. Downloading does not delete records; before the archive is
+built, each saved dump is checked against its stored fingerprint, and a record
+that no longer matches is left out (the count drops accordingly). **Empty** asks for
 confirmation and permanently removes them; a full factory reset does too.
 An incomplete panic or a reboot loop before the record is copied can leave
 fewer than two records. The screen reports an error if a temporary dump cannot

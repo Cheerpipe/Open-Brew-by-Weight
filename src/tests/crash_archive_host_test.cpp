@@ -63,9 +63,17 @@ int main() {
             fakeCapture.bytes[0] == 0xFF,
         "address pair or capture cleanup failed");
   const size_t writes = fakeWrites, erases = fakeErases;
+  size_t reads = fakeReads;
   boot(3);
   check(fakeWrites == writes && fakeErases == erases,
         "ordinary reboot rewrote history");
+  check(fakeReads == reads + 2, "ordinary reboot re-read a stored dump");
+  reads = fakeReads;
+  check(crashArchiveStatus(true).count == 1 && fakeReads > reads,
+        "download verification skipped the stored dump");
+  reads = fakeReads;
+  check(crashArchiveStatus(true).count == 1 && fakeReads == reads,
+        "verified dump was hashed again");
 
   stageCrash(3, 0x22);
   fakeFailWriteAt = fakeWrites + 2;
@@ -136,8 +144,9 @@ int main() {
   check(crashArchiveStatus().count == 1, "validated capture was not retained");
   fakeHistory.bytes[0] ^= 1;
   boot(14);
-  check(crashArchiveStatus().count == 0,
-        "corrupted committed dump was counted");
+  check(crashArchiveStatus().count == 1 && crashArchiveStatus(true).count == 0 &&
+            crashArchiveStatus().count == 0,
+        "corrupted committed dump survived download verification");
   check(crashArchiveClear() && crashArchiveStatus().count == 0,
         "confirmed archive clear failed");
   return 0;

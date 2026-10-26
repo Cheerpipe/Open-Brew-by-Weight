@@ -61,7 +61,10 @@ void crashArchiveSetBootId(uint32_t bootId);
 void crashArchiveRecordPanic(const arduino_panic_info_t *info);
 #endif
 void crashArchivePromote(uint32_t currentBootId, uint32_t resetReason);
-CrashArchiveStatus crashArchiveStatus();
+// verifyDumps re-checks each listed dump against its stored SHA-256 (reading
+// it chunk by chunk under the flash lock) and drops records that fail; call it
+// before serving dumps, never from the periodic streams.
+CrashArchiveStatus crashArchiveStatus(bool verifyDumps = false);
 bool crashArchiveRead(uint8_t slot, size_t offset, void *output, size_t length);
 bool crashArchiveClear();
 
