@@ -679,7 +679,8 @@ the paths whose values changed. The frame carries only paths the Home frame
 does not: Home owns `config.revision`, the shared `config.*` keys it already
 streams, `presets` (including the active preset's dose and grind-hint switch),
 `lastCommand`, `quickRevert.after`, `quickRevert.overrides`,
-`quickRevert.remainingS`, `connections`, `scale.preferred*` and its
+`quickRevert.remainingS` (rounded up to whole minutes, the resolution the
+header panel shows), `connections`, `scale.preferred*` and its
 `lineaMicra.*` keys, and the page reads them from the Home model, so a change
 to one of those settings reaches the browser on the Home frame alone. Home's
 `config.*` values are the effective ones, Quick Settings overrides included.

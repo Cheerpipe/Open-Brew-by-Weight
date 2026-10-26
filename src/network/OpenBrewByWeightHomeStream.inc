@@ -163,7 +163,10 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("config.rinseEnabled", bool(config.rinseEnabled));
   delta.field("quickRevert.after", "\"%s\"", quickRevertPolicyId(control.quickRevertPolicy));
   delta.field("quickRevert.overrides", "%u", static_cast<unsigned>(control.quickOverrideMask));
-  delta.field("quickRevert.remainingS", static_cast<unsigned long>((control.quickRevertRemainingMs + 999) / 1000));
+  // Whole minutes, rounded up: the header panel shows ceil(remainingS / 60),
+  // so a per-second value would only re-hash and resend the field every tick.
+  delta.field("quickRevert.remainingS",
+              static_cast<unsigned long>((control.quickRevertRemainingMs + 59999) / 60000 * 60));
   delta.field("state", "\"%s\"", stopperStateName(control.state));
   delta.field("stateLabel", "\"%s\"", stateLabel(control.state));
   delta.field("machineState", "\"%s\"", machineRunStateName(control.machineRunState));
