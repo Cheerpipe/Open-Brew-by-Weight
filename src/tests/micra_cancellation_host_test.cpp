@@ -67,6 +67,8 @@ bool OpenBrewByWeightMicraService::listMachines(const LineaMicraPersistedSetting
 bool OpenBrewByWeightMicraService::readDashboard(const LineaMicraPersistedSettings &,
     LineaMicraStatus &, const MicraObservationStamp *snapshot) { return dashboardHook(snapshot); }
 void OpenBrewByWeightMicraService::waitRetry(uint32_t) { ++retries; }
+static bool liveSubscription = false;
+bool OpenBrewByWeightMicraService::liveSubscriptionLocked() const { return liveSubscription; }
 LineaMicraError OpenBrewByWeightMicraService::classifyFailure() const { return LineaMicraError::HTTP_ERROR; }
 void OpenBrewByWeightMicraService::fail(LineaMicraStatus &, LineaMicraError) { ++failures; }
 void OpenBrewByWeightMicraService::execute(PendingRequest &pending) {
@@ -107,6 +109,7 @@ struct MicraCancellationTest {
   static void invalidAuthLatchesApiObservation();
   static void relistKeepsSavedMachine();
   static void idleClosesWebSocketModeClient();
+  static void postWakeSettledFromPush();
   static void run();
 };
 }
@@ -712,7 +715,33 @@ void MicraCancellationTest::idleClosesWebSocketModeClient() {
   }
 }
 
+void MicraCancellationTest::postWakeSettledFromPush() {
+  for (const bool live : {true, false}) {
+    OpenBrewByWeightMicraService service;
+    service.config_.accountConfigured = true;
+    service.config_.options |= LINEA_MICRA_OBSERVE_STATE;
+    service.staConnected_.store(true);
+    service.published_.connectionFreshness = true;
+    service.published_.sampleAtMs = millis();
+    service.published_.powerState = LineaMicraPowerState::OFF;
+    service.published_.quality = LineaMicraObservationQuality::CURRENT;
+    service.observationFence_.powerTrusted = true;
+    assert(service.powerState_.notePowerOnCommandAccepted(service.published_, true, millis()));
+    testNowMs += micra_timing::kPostWakeObservationDelayMs;
+    service.observationSchedule_.armPostEvent(millis() - micra_timing::kPostWakeObservationDelayMs);
+    liveSubscription = live;
+    unsigned calls = 0;
+    executeHook = [&] { ++calls; };
+    try { service.taskLoop(); } catch (const WorkerStopped &) {}
+    // A live subscription settles the wake from pushed evidence; HTTPS is the fallback.
+    assert(calls == (live ? 0U : 1U));
+    assert(service.powerState_.effectiveStatus(service.published_, true, millis()).optimisticOn == !live);
+  }
+  liveSubscription = false;
+}
+
 int main() {
+  MicraCancellationTest::postWakeSettledFromPush();
   MicraCancellationTest::relistKeepsSavedMachine();
   MicraCancellationTest::idleClosesWebSocketModeClient();
   MicraCancellationTest::retireBackflushConfiguration();

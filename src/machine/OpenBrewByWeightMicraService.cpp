@@ -1128,6 +1128,7 @@ void OpenBrewByWeightMicraService::taskLoop() {
       }
     }
     const bool localActivity = shotTransportPaused();
+    bool settledFromPush = false;
     {
       TaskLockGuard lock(mux_);
       if (config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET))
@@ -1178,6 +1179,17 @@ void OpenBrewByWeightMicraService::taskLoop() {
         powerActive_.store(true, std::memory_order_release);
       } else if (observationReady && config_.accountConfigured &&
                  (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0 &&
+                 !snapshotPending_ && observationSchedule_.automaticDue(now) &&
+                 published_.connectionFreshness && observationFence_.powerTrusted &&
+                 liveSubscriptionLocked()) {
+        // A live subscription would already have pushed the wake: settle the
+        // post-wake optimism from pushed evidence; HTTPS stays the fallback.
+        (void)observationSchedule_.observationStarted(now);
+        (void)powerState_.noteEvidence(powerState_.generation(), published_.powerState,
+                                       now, true);
+        settledFromPush = true;
+      } else if (observationReady && config_.accountConfigured &&
+                 (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0 &&
                  (snapshotPending_ || observationSchedule_.automaticDue(now))) {
         pending.request.requestId = nextAutomaticRequestId_++;
         pending.request.configGeneration = configGeneration_;
@@ -1197,6 +1209,9 @@ void OpenBrewByWeightMicraService::taskLoop() {
         } else if (reconcile) pending.initialSnapshot = false;
       }
     }
+    if (settledFromPush)
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                           "Micra post-wake state settled from WebSocket, read skipped");
     if (haveRequest) {
       if (haveTemperature) {
         executeTemperatureApplication(pending.request,

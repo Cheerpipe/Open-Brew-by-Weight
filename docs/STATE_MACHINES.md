@@ -1125,7 +1125,10 @@ revisions are captured at subscription, so even push received before HTTP
 dispatch wins for that field. No repeated reads are scheduled after exhausted
 initialization; valid push remains usable even if that API cycle fails.
 Matching fresh push evidence clears local optimism early; contrary push evidence
-keeps it until the gated 15-second HTTP reconciliation or its original expiry.
+keeps it until the gated 15-second reconciliation or its original expiry. At
+that deadline a live subscription with trusted power settles the overlay from
+pushed evidence without HTTP; the HTTPS reconciliation read runs only when the
+subscription is not live or power is untrusted.
 During pause/resynchronization the separate hold retains the effective value
 past expiry without modifying the last cloud sample timestamp.
 

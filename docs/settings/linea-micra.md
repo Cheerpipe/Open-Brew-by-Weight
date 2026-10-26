@@ -386,10 +386,11 @@ The OFF→ON edge immediately adds an optimistic ON overlay for at most 60
 seconds—twice the normal read interval—and delays the next dashboard read for 15
 seconds so the cloud can converge. The overlay makes the operational state ON
 without rewriting the last cloud-confirmed OFF classification. **(Refresh)**
-waits for the same deadline. A fresh matching WebSocket power update can confirm the estimate earlier.
-A contrary update retains it until the delayed API reconciliation or expiry.
-The first successful reconciliation read after that delay supplies the next
-confirmed classification. A request
+waits for the same deadline. A fresh matching WebSocket power update confirms the estimate as soon as it
+arrives, usually within a few seconds. A contrary update retains it until the
+15-second deadline. At that point, if live updates are connected, their latest
+state settles the estimate with no cloud request; only without live updates
+does a reconciliation read supply the next confirmed classification. A request
 started before the edge cannot publish stale OFF or change the deadline. A
 failed read does not extend optimism. A pause retains the effective value until
 a fresh power observation arrives, even after the estimate expires. Paddle movement while the confirmed state is ON,
@@ -476,8 +477,9 @@ machine as already off: the operational state reads OFF for at most 60
 seconds—twice the normal read interval—while the last confirmed reading still
 says ON, and the next dashboard read is delayed 15 seconds so the cloud can
 settle. This mirrors the wake gesture, where the paddle ON is trusted before
-the cloud agrees. The first successful read started after that delay replaces
-the overlay with the confirmed state. If no read succeeds within the 60
+the cloud agrees. A matching live update replaces the overlay as soon as it
+arrives; after the delay, live updates settle it without a cloud request, and
+only without them does the first successful read replace it. If no read succeeds within the 60
 seconds, the confirmed ON simply becomes the visible state again until the
 next read lands.
 
