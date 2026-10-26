@@ -14,7 +14,9 @@ in a bar above the list (see [Preset actions](#preset-actions)). Each preset app
 card with its name, an **Adaptive**, **Fixed** or **Manual** badge, and a summary such as
 **18 → 36 g · 1:2.0 · 27–36 s** (dose, target yield, ratio and shot time
 window). Tap a card to use and review it. Below the cards, **How this preset
-cuts** draws the preset's cut line, and the editor groups its settings:
+cuts** draws the preset's cut line. Besides your target, it names how far the
+line moves for fast and slow shots, for example **Up to 42 g** over its high
+level and **Down to 33 g** under its low one. The editor groups its settings:
 
 | Group | Settings |
 | --- | --- |

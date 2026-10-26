@@ -3484,6 +3484,25 @@ function presetGraph(host, m, x = {}) {
       "rvHalo strong",
       "end",
     ) +
+    // The upper and lower holds are named where the cut line holds them.
+    (m.mode === "active" && m.ceil > m.goal
+      ? label(
+          X(m.prot) + 6,
+          Y(m.ceil) - 6,
+          sub(__WEBUI_TEXT__("runtime.graph_up_to"), [n(m.ceil)]),
+          "rvHalo rvHold",
+          "start",
+        )
+      : "") +
+    (m.mode === "active" && m.floor < m.goal
+      ? label(
+          X(m.wall) - 4,
+          Y(m.floor) + 15,
+          sub(__WEBUI_TEXT__("runtime.graph_down_to"), [n(m.floor)]),
+          "rvHalo rvHold",
+          "end",
+        )
+      : "") +
     (compact
       ? "</g></svg>"
       : label(X(m.wall), T - 4, sub(__WEBUI_TEXT__("runtime.graph_max"), [n(m.wall)]), "", "end") +

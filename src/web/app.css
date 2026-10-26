@@ -4312,6 +4312,10 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 .rvLbl.strong {
   fill: var(--fg);
 }
+.rvLbl.rvHold {
+  fill: var(--fg);
+  fill-opacity: 0.8;
+}
 .rvHalo {
   paint-order: stroke;
   stroke: var(--sf);
