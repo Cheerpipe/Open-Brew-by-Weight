@@ -1157,6 +1157,10 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
                                 filterHash};
     fingerprint = crc32Update(fingerprint,
         reinterpret_cast<const uint8_t *>(window), sizeof(window));
+    // The row format too: a page kept across a firmware update must not be
+    // resolved from rows of the old column order.
+    fingerprint = crc32Update(fingerprint,
+        reinterpret_cast<const uint8_t *>(kStatsRowColumns), strlen(kStatsRowColumns));
     if (cache.statsOk)
       fingerprint = crc32Update(fingerprint,
           reinterpret_cast<const uint8_t *>(cache.header), strlen(cache.header));

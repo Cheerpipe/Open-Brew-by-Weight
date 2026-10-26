@@ -164,7 +164,7 @@ struct JsonStructureScanner {
   }
 };
 
-inline bool jsonNestingWithinLimit(const char *body, size_t length) {
+inline bool jsonNestingWithinLimit(const char *body, size_t length, size_t maxDepth) {
   size_t depth = 0;
   bool inString = false;
   bool escaped = false;
@@ -183,7 +183,7 @@ inline bool jsonNestingWithinLimit(const char *body, size_t length) {
     if (c == '"') {
       inString = true;
     } else if (c == '{' || c == '[') {
-      if (++depth > JSON_DOCUMENT_MAX_DEPTH) return false;
+      if (++depth > maxDepth) return false;
     } else if ((c == '}' || c == ']') && depth > 0) {
       --depth;
     }
@@ -227,14 +227,15 @@ inline void initJsonParser() {
 }
 
 inline cJSON *parseJsonDocumentWithinLimits(const char *body, size_t maxBytes,
-                                            size_t maxValues) {
+                                            size_t maxValues,
+                                            size_t maxDepth = JSON_DOCUMENT_MAX_DEPTH) {
   detail::g_jsonLimitRejectedRecently = false;
   if (body == nullptr || maxBytes == 0 || maxValues == 0) return nullptr;
 
   const size_t length = strnlen(body, maxBytes + 1);
   bool overLimit = true;
   const bool accepted =
-      length <= maxBytes && detail::jsonNestingWithinLimit(body, length) &&
+      length <= maxBytes && detail::jsonNestingWithinLimit(body, length, maxDepth) &&
       detail::jsonStructureAccepted(body, length, maxValues, overLimit);
   if (!accepted && overLimit) detail::noteJsonLimitRejection();
   return accepted ? cJSON_ParseWithLengthOpts(body, length + 1, nullptr, 1)

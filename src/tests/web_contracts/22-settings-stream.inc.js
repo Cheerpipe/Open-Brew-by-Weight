@@ -51,11 +51,14 @@
   // the firmware's request buffer.
   assert(uiStreamSource.includes('constexpr size_t kUiStreamRequestBytes = 640;') &&
       codeIncludes(runtimeJs, 'if(JSON.stringify(bind).length>640)rest.push(bind.ops.pop())') &&
+      codeIncludes(runtimeJs, 'if(!bind.ops.length)delete bind.ops') &&
       uiStreamSource.includes(': bound && ops ? ops->child : nullptr) {') &&
       uiStreamSource.includes('session->bound && message == document &&') &&
-      uiStreamSource.includes('(!ops || cJSON_IsArray(ops))') &&
+      uiStreamSource.includes('accepted = !ops || cJSON_IsArray(ops);') &&
+      uiStreamSource.includes('kUiStreamRequestDepth') &&
+      uiStreamSource.includes('if (bound) self.requestPendingNetworkConfirm();') &&
       uiStreamSource.includes('const bool bindRejected = bindOp && !bound;'),
-  'the bind carries the replayed subscriptions within kUiStreamRequestBytes; activity stays top-level');
+  'the bind carries the replayed subscriptions within kUiStreamRequestBytes and its own nesting limit; an empty list is omitted, a malformed one fails like an op, and activity stays top-level');
   // History and Stats name their standing page by tag like Settings: a
   // resubscribe still holding it gets a snapshot of bare ids.
   assert(uiStreamSource.includes('session->historyKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;') &&

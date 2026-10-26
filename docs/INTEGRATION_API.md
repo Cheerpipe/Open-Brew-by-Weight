@@ -579,8 +579,9 @@ connection's first Home snapshot omits `presets` (it still carries
 presets change. The bind also carries the page's standing subscriptions as
 `"ops":[…]`, each exactly the op it would otherwise send on its own (Settings,
 History, Stats, Diagnostic and its log), so a reconnect costs one request
-frame; the controller runs them in order once the bind is accepted, and one
-it rejects closes the stream with code 4003 like a separate op. A request
+frame; a page with nothing to replay omits the list. The controller runs them
+in order once the bind is accepted, and one it rejects, or a list that is not
+an array, closes the stream with code 4003 like a separate op. A request
 frame holds at most 640 bytes, so the page sends any subscription that does
 not fit (a Stats subscribe with a long filter) as its own op after the bind.
 Home receives an

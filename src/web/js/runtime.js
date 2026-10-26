@@ -3903,6 +3903,7 @@ function startUiStream() {
       bind.ops.push(op);
       if (JSON.stringify(bind).length > 640) rest.push(bind.ops.pop());
     }
+    if (!bind.ops.length) delete bind.ops;
     socket.send(JSON.stringify(bind));
     for (const op of rest) sendUiOperation(op);
     shotActivity();

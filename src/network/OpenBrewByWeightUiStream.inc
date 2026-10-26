@@ -21,6 +21,9 @@ bool uiStreamDispatchDue(bool urgent, uint32_t elapsedMs, uint32_t newSamples) {
 // the largest filter (~300 bytes); the page sends whatever does not fit as
 // separate ops. Lives on the httpd task stack for one request.
 constexpr size_t kUiStreamRequestBytes = 640;
+// bind > ops[] > op > filter > list: the parser recurses once per level on the
+// httpd stack, so stream requests get their own nesting limit.
+constexpr size_t kUiStreamRequestDepth = 6;
 // Leave TCP send-buffer headroom for live state. A larger individual curve
 // stays intact, alone under the client's 28 KiB message guard.
 constexpr size_t kStatsStreamFrameBytes = 8192;
@@ -231,7 +234,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
   if (httpd_ws_recv_frame(request, &frame, frame.len) != ESP_OK ||
       memchr(body, '\0', frame.len)) return ESP_FAIL;
   cJSON *document = parseJsonDocumentWithinLimits(
-      body, kUiStreamRequestBytes, JSON_DOCUMENT_MAX_VALUES);
+      body, kUiStreamRequestBytes, JSON_DOCUMENT_MAX_VALUES, kUiStreamRequestDepth);
   if (!document) return ESP_FAIL;
   const cJSON *op = cJSON_GetObjectItemCaseSensitive(document, "op");
   const cJSON *client = cJSON_GetObjectItemCaseSensitive(document, "client");
@@ -496,7 +499,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         }
       } else if (cJSON_IsString(op) && !session->bound &&
                  strcmp(op->valuestring, "bind") == 0 && cJSON_IsString(client) &&
-                 (!ops || cJSON_IsArray(ops)) && self.activeWebUiClientId_[0] &&
+                 self.activeWebUiClientId_[0] &&
                  strcmp(client->valuestring, self.activeWebUiClientId_) == 0 &&
                  millis() - session->openedAtMs < kUiStreamBindMs) {
         copyCString(session->clientId, sizeof(session->clientId), client->valuestring);
@@ -521,7 +524,9 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         }
         session->bound = true;
         session->boundAtMs = millis();
-        bound = accepted = true;
+        bound = true;
+        // A malformed ops list fails like a rejected op, not like a takeover.
+        accepted = !ops || cJSON_IsArray(ops);
       }
     }
     if (accepted) session->heardAtMs = millis();
@@ -534,6 +539,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
   cJSON_Delete(document);
   memset(body, 0, sizeof(body));
   if (superseded >= 0) httpd_sess_trigger_close(request->handle, superseded);
+  // An accepted bind confirms the network even when a folded op then fails.
+  if (bound) self.requestPendingNetworkConfirm();
   if (!accepted) {
     if (bindRejected || owner)
       sendUiStreamClose(request->handle, session->fd,
@@ -550,7 +557,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
     return httpd_ws_send_frame_async(request->handle, session->fd, &reply);
   }
   httpd_sess_set_send_override(request->handle, session->fd, uiStreamSend);
-  self.requestPendingNetworkConfirm();
+  if (!bound) self.requestPendingNetworkConfirm();
   return ESP_OK;
 }
 
