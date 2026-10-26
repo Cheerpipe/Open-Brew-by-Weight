@@ -34,11 +34,12 @@ namespace openbrewbyweight {
 constexpr size_t FLASH_IO_CHUNK_BYTES = 1024;
 constexpr size_t FLASH_IO_SECTOR_BYTES = 4096;
 // Settings slots are processed sequentially; the shared internal workspace
-// therefore needs one record or one partition-transfer chunk, whichever is
-// larger. Larger stores transfer in FLASH_IO_CHUNK_BYTES steps.
+// therefore needs one encoded settings blob of the largest size any firmware
+// may write, or one partition-transfer chunk, whichever is larger. Larger
+// stores transfer in FLASH_IO_CHUNK_BYTES steps.
 constexpr size_t FLASH_IO_SCRATCH_BYTES =
-    sizeof(PersistedSettings) > FLASH_IO_CHUNK_BYTES
-        ? sizeof(PersistedSettings)
+    PERSISTED_SETTINGS_NVS_BUDGET > FLASH_IO_CHUNK_BYTES
+        ? PERSISTED_SETTINGS_NVS_BUDGET
         : FLASH_IO_CHUNK_BYTES;
 static_assert(FLASH_IO_CHUNK_BYTES % 4 == 0,
               "Flash I/O chunks must stay 4-byte aligned");

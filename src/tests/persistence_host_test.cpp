@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <vector>
 
 using namespace openbrewbyweight;
 
@@ -47,11 +48,28 @@ void resetHostPersistence() {
   memset(flashIoScratchBytes(), 0xA5, FLASH_IO_SCRATCH_BYTES);
 }
 
+// Encoded schema-2 blob of `settings` at its storage revision.
+std::vector<uint8_t> settingsBlob(const PersistedSettings &settings) {
+  std::vector<uint8_t> blob(PERSISTED_SETTINGS_NVS_BUDGET);
+  blob.resize(encodePersistedSettings(settings, settings.storageRevision, blob.data(),
+                                      blob.size()));
+  return blob;
+}
+
+// Recomputes the CRC after a test edits a blob in place.
+void resealSettingsBlob(std::vector<uint8_t> &blob) {
+  const uint32_t crc = crc32(blob.data(), blob.size() - 4U);
+  memcpy(blob.data() + blob.size() - 4U, &crc, 4);
+}
+
+void putSettingsBlob(const char *slot, const std::vector<uint8_t> &blob) {
+  persistence_host::putRaw(SETTINGS_NAMESPACE, slot, blob.data(), blob.size());
+}
+
 void p01_defaults_are_valid() {
   resetHostPersistence();
   PersistedSettings settings;
   CHECK(initializeDefaultSettings(settings));
-  CHECK(settings.schemaVersion == CONFIG_SCHEMA_VERSION);
   CHECK(settings.staIpMode == static_cast<uint8_t>(StaIpMode::DHCP));
   CHECK(settings.staConfigState ==
         static_cast<uint8_t>(StaConfigState::CONFIRMED));
@@ -222,10 +240,8 @@ void p02d_single_scratch_handles_wrap_and_external_destination() {
   afterWrap.storageRevision = 1;
   afterWrap.runtime.goalWeightDg = 480;
   finalizePersistedSettings(afterWrap);
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &beforeWrap,
-                           sizeof(beforeWrap));
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_B, &afterWrap,
-                           sizeof(afterWrap));
+  putSettingsBlob(SETTINGS_SLOT_A, settingsBlob(beforeWrap));
+  putSettingsBlob(SETTINGS_SLOT_B, settingsBlob(afterWrap));
 
   auto *loaded = static_cast<PersistedSettings *>(
       allocExternal(sizeof(PersistedSettings)));
@@ -245,7 +261,7 @@ void p03_corrupt_newest_slot_falls_back() {
   settings.runtime.goalWeightDg = 480;
   CHECK(savePersistedSettings(settings));
   CHECK(persistence_host::corrupt(SETTINGS_NAMESPACE, SETTINGS_SLOT_B,
-                                  offsetof(PersistedSettings, runtime)));
+                                  SETTINGS_BLOB_HEADER_BYTES + 4U));
 
   PersistedSettings loaded;
   CHECK(loadPersistedSettings(loaded));
@@ -256,10 +272,14 @@ void p04_crc_and_semantic_validation_reject_corruption() {
   resetHostPersistence();
   PersistedSettings settings;
   CHECK(initializeDefaultSettings(settings));
-  settings.runtime.goalWeightDg = 500;
-  CHECK(!validPersistedSettings(settings));
-  finalizePersistedSettings(settings);
   CHECK(validPersistedSettings(settings));
+  std::vector<uint8_t> blob = settingsBlob(settings);
+  uint32_t revision = 0;
+  CHECK(settingsBlobIntact(blob.data(), blob.size(), revision));
+  blob[blob.size() / 2U] ^= 1U;
+  CHECK(!settingsBlobIntact(blob.data(), blob.size(), revision));
+  settings.runtime.goalWeightDg = 0;
+  CHECK(!validPersistedSettings(settings));
 }
 
 void p05_password_change_updates_hash() {
@@ -412,7 +432,6 @@ void p08_factory_reset_rebuilds_defaults() {
   CHECK(savePersistedSettings(settings));
   CHECK(resetPersistedSettingsToFactory(settings));
   CHECK(idleAccessoryRetareEnabled(settings.runtime.noScaleBbwMode));
-  CHECK(settings.schemaVersion == CONFIG_SCHEMA_VERSION);
   CHECK(settings.staWifiSleep);
   CHECK(settings.runtime.goalWeightDg == DEFAULT_GOAL_WEIGHT_DG);
   CHECK(settings.runtime.fastSideEnabled);
@@ -781,14 +800,12 @@ void p47_rejects_non_current_schema_blob() {
   resetHostPersistence();
   PersistedSettings settings;
   CHECK(initializeDefaultSettings(settings));
-  finalizePersistedSettings(settings);
-  settings.schemaVersion = 31;
-  settings.checksum = 0;
-  settings.checksum = persistedSettingsChecksum(settings);
-  // Wrong schemaVersion must fail validPersistedSettings even with matching CRC.
-  CHECK(!validPersistedSettings(settings));
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &settings,
-                           sizeof(settings));
+  std::vector<uint8_t> blob = settingsBlob(settings);
+  const uint16_t foreignSchema = 31;
+  memcpy(blob.data() + 4, &foreignSchema, sizeof(foreignSchema));
+  resealSettingsBlob(blob);
+  // Another schema epoch never loads, even with a matching CRC.
+  putSettingsBlob(SETTINGS_SLOT_A, blob);
   PersistedSettings loaded;
   CHECK(!loadPersistedSettings(loaded));
 }
@@ -1032,13 +1049,8 @@ void p44_scale_history_canonicalizes_mac_case() {
 }
 
 void p24_preset_bank_size_and_crud_budgets() {
-  CHECK(sizeof(ShotPreset) <= 136);
-  CHECK(sizeof(ShotPresetBank) <= 1100);
-  CHECK(sizeof(PersistedSettings) <= PERSISTED_SETTINGS_NVS_BUDGET);
-  CHECK(sizeof(PersistedSettings) == 3056);
-  CHECK(FLASH_IO_SCRATCH_BYTES >= sizeof(PersistedSettings));
-  CHECK(sizeof(RuntimeConfig) == 312);
-  CHECK(sizeof(SettingsPersistRequest) <= PERSISTED_SETTINGS_NVS_BUDGET + 16);
+  CHECK(PERSISTED_SETTINGS_ENCODED_MAX_BYTES <= PERSISTED_SETTINGS_NVS_BUDGET);
+  CHECK(FLASH_IO_SCRATCH_BYTES >= PERSISTED_SETTINGS_NVS_BUDGET);
   // 6920: +8 bytes for the hero tint; 6944: +24 for the drip chart; 6952: +8
   // for its ten shots; 7432: the delta-stream curve record (external
   // work-area growth; see OpenBrewByWeightControlStatusTypes.inc).
@@ -2198,19 +2210,18 @@ void p71_nvs_capacity_budget_keeps_compaction_margin() {
   constexpr size_t conservativeEntries =
       (EXPECTED_NVS_PARTITION_BYTES / 4096U - 2U) * pageEntries;
   constexpr size_t settingsEntries =
-      2U * nvsBlobRequiredEntries(sizeof(PersistedSettings));
+      2U * nvsBlobRequiredEntries(PERSISTED_SETTINGS_NVS_BUDGET);
   // The shot log and activation history moved to dedicated flash partitions;
   // the last-shot record is the remaining history blob in NVS.
   constexpr size_t lastShotEntries = nvsBlobRequiredEntries(sizeof(LastShotBlob));
   constexpr size_t remainingRecords = lastShotEntries + 6U + 3U + 24U + 32U;
   constexpr size_t applicationEntries = settingsEntries + remainingRecords;
   CHECK(EXPECTED_NVS_PARTITION_BYTES == 0x65000U);
-  CHECK(sizeof(PersistedSettings) == 3056U);
-  CHECK(settingsEntries == 196U);
+  CHECK(settingsEntries == 260U);
   CHECK(lastShotEntries == 14U);
-  CHECK(applicationEntries == 275U);
+  CHECK(applicationEntries == 339U);
   CHECK(conservativeEntries == 12474U);
-  CHECK(conservativeEntries - applicationEntries == 12199U);
+  CHECK(conservativeEntries - applicationEntries == 12135U);
 }
 
 void p72_factory_intent_recovers_only_from_nvs_no_space() {
@@ -2344,20 +2355,17 @@ void p85_schema1_is_strict_and_micra_defaults_round_trip() {
   resetHostPersistence();
   PersistedSettings settings;
   CHECK(initializeDefaultSettings(settings));
-  CHECK(settings.schemaVersion == CONFIG_SCHEMA_VERSION);
   CHECK(settings.lineaMicra.options == LINEA_MICRA_DEFAULT_OPTIONS);
   CHECK(settings.lineaMicra.scaleOptions == LINEA_MICRA_KNOWN_SCALE_OPTIONS);
   CHECK(settings.lineaMicra.connectionType == 0);
 
-  // A checksum-corrupt record must be rejected, never repaired.
-  settings.checksum ^= 1;
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &settings,
-                           sizeof(settings));
+  // A CRC-corrupt record must be rejected, never repaired.
+  std::vector<uint8_t> blob = settingsBlob(settings);
+  blob[SETTINGS_BLOB_HEADER_BYTES + 8U] ^= 1U;
+  putSettingsBlob(SETTINGS_SLOT_A, blob);
   PersistedSettings migrated;
   CHECK(!loadPersistedSettings(migrated));
-  settings.schemaVersion = CONFIG_SCHEMA_VERSION;
   settings.lineaMicra.connectionType = 0;
-  settings.checksum = persistedSettingsChecksum(settings);
   settingsSchemaWritesAdmitted.store(false);
   const auto trialRecords = persistence_host::records;
   CHECK(!savePersistedSettings(settings));
@@ -2365,28 +2373,24 @@ void p85_schema1_is_strict_and_micra_defaults_round_trip() {
   CHECK(persistence_host::records == trialRecords);
   settingsSchemaWritesAdmitted.store(true);
 
-  uint8_t oldBlob[sizeof(PersistedSettings) - 1] = {};
+  // A schema-1 sized record of another layout never loads.
+  uint8_t oldBlob[3055] = {};
   persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, oldBlob,
                            sizeof(oldBlob));
   PersistedSettings rejected;
   CHECK(!loadPersistedSettings(rejected));
 
-  // A checksum-valid v1 blob is accepted without conversion.
-  settings.schemaVersion = CONFIG_SCHEMA_VERSION;
-  settings.checksum = 0;
-  settings.checksum = persistedSettingsChecksum(settings);
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_B, &settings,
-                           sizeof(settings));
+  // An intact blob is accepted without conversion.
+  putSettingsBlob(SETTINGS_SLOT_B, settingsBlob(settings));
   PersistedSettings loaded;
   CHECK(loadPersistedSettings(loaded));
-  CHECK(loaded.schemaVersion == CONFIG_SCHEMA_VERSION);
   CHECK(loaded.lineaMicra.scaleOptions == settings.lineaMicra.scaleOptions);
   CHECK(loaded.lineaMicra.options == settings.lineaMicra.options);
   CHECK(strcmp(loaded.lineaMicra.username, settings.lineaMicra.username) == 0);
-  // A corrupted v1 checksum stays invalid.
-  settings.checksum ^= 0xff;
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_B, &settings,
-                           sizeof(settings));
+  // A corrupted CRC stays invalid.
+  blob = settingsBlob(settings);
+  blob.back() ^= 0xffU;
+  putSettingsBlob(SETTINGS_SLOT_B, blob);
   CHECK(!loadPersistedSettings(rejected));
 
   strcpy(settings.lineaMicra.username, "barista@example.com");
@@ -2497,8 +2501,7 @@ void p86_timezone_preference_and_durable_initialization() {
     PersistedSettings raw = settings;
     if (corrupt == 0) raw.runtime.scheduledRestartEnabled = 0xA5;
     else raw.runtime.scheduledRestartMinuteOfDay = 24 * 60;
-    raw.checksum = persistedSettingsChecksum(raw);
-    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &raw, sizeof(raw));
+    putSettingsBlob(SETTINGS_SLOT_A, settingsBlob(raw));
     bool repaired = false;
     CHECK(loadPersistedSettings(loaded, &repaired) && repaired);
     CHECK(loaded.runtime.scheduledRestartEnabled == 0 &&
@@ -2516,8 +2519,7 @@ void p86_timezone_preference_and_durable_initialization() {
   resetHostPersistence();
   PersistedSettings bad = settings;
   bad.runtime.timezoneAutomatic = 0xA5;
-  bad.checksum = persistedSettingsChecksum(bad);
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &bad, sizeof(bad));
+  putSettingsBlob(SETTINGS_SLOT_A, settingsBlob(bad));
   bool repaired = false;
   CHECK(loadPersistedSettings(loaded, &repaired) && repaired);
   CHECK(loaded.runtime.timezoneAutomatic == RuntimeConfig{}.timezoneAutomatic);
@@ -2525,15 +2527,15 @@ void p86_timezone_preference_and_durable_initialization() {
   CHECK(!durableTimezoneSaved().load());
   PersistedSettings older = settings;
   older.storageRevision = bad.storageRevision - 1;
-  older.checksum = persistedSettingsChecksum(older);
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_B, &older, sizeof(older));
+  putSettingsBlob(SETTINGS_SLOT_B, settingsBlob(older));
   CHECK(loadPersistedSettings(loaded, &repaired) && !repaired);
   CHECK(loaded.storageRevision == older.storageRevision);
 
-  // A damaged blob (checksum mismatch) is still rejected outright.
+  // A damaged blob (CRC mismatch) is still rejected outright.
   resetHostPersistence();
-  bad.checksum ^= 1U;
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &bad, sizeof(bad));
+  std::vector<uint8_t> damaged = settingsBlob(bad);
+  damaged[SETTINGS_BLOB_HEADER_BYTES + 8U] ^= 1U;
+  putSettingsBlob(SETTINGS_SLOT_A, damaged);
   CHECK(!loadPersistedSettings(loaded));
 }
 
@@ -3174,20 +3176,21 @@ void p61j_curve_image_batches_backlog_oldest_first() {
   CHECK(reboot.containsId(1) && reboot.containsId(backlog));
 }
 
-// Golden settings blob of schema 1, written once when the layout was cut over
-// (W4a). Every later firmware must load it unchanged: OTA updates between
-// releases keep settings. A schema-0 or longer blob never loads; a shorter
-// schema-1 blob loads as a prefix with the appended fields zeroed.
+// Golden settings blob of schema 2, written once at the tagged-encoding
+// cutover. Every later firmware must load it unchanged: OTA updates between
+// releases keep settings. Regenerate (GOLDEN_SETTINGS_WRITE=1) only for a new
+// schema epoch.
 std::string goldenSettingsPath() {
   const std::string file(__FILE__);
-  return file.substr(0, file.find_last_of('/')) + "/fixtures/settings_schema1_golden_hex.txt";
+  return file.substr(0, file.find_last_of('/')) + "/fixtures/settings_schema2_golden_hex.txt";
 }
 
-void p91_schema1_golden_settings_blob_loads() {
+void p91_schema2_golden_settings_blob_loads() {
   resetHostPersistence();
   if (getenv("GOLDEN_SETTINGS_WRITE") != nullptr) {
     PersistedSettings settings;
     CHECK(initializeDefaultSettings(settings));
+    settings.storageRevision = 7;
     settings.runtime.scaleLossEnabled = false;
     settings.runtime.cupProtectionEnabled = false;
     settings.runtime.touchStopFallbackEnabled = false;
@@ -3204,12 +3207,12 @@ void p91_schema1_golden_settings_blob_loads() {
     CHECK(renameShotPreset(settings.presets, customId, "Golden"));
     settings.presets.activeId = FACTORY_PRESET_ID_SINGLE_ADAPTIVE;
     finalizePersistedSettings(settings);
+    const std::vector<uint8_t> blob = settingsBlob(settings);
     FILE *out = fopen(goldenSettingsPath().c_str(), "w");
     CHECK(out != nullptr);
     if (out == nullptr) return;
-    const auto *bytes = reinterpret_cast<const uint8_t *>(&settings);
-    for (size_t i = 0; i < sizeof(settings); ++i)
-      fprintf(out, "%02x%s", bytes[i], (i + 1) % 32 == 0 ? "\n" : "");
+    for (size_t i = 0; i < blob.size(); ++i)
+      fprintf(out, "%02x%s", blob[i], (i + 1) % 32 == 0 ? "\n" : "");
     fclose(out);
   }
   FILE *in = fopen(goldenSettingsPath().c_str(), "r");
@@ -3218,20 +3221,19 @@ void p91_schema1_golden_settings_blob_loads() {
   std::string hex;
   for (int c; (c = fgetc(in)) != EOF;) if (c != '\n') hex += static_cast<char>(c);
   fclose(in);
-  CHECK(hex.size() == 2 * sizeof(PersistedSettings));
-  PersistedSettings golden;
-  auto *bytes = reinterpret_cast<uint8_t *>(&golden);
-  for (size_t i = 0; i < sizeof(golden); ++i)
-    bytes[i] = static_cast<uint8_t>(strtoul(hex.substr(2 * i, 2).c_str(), nullptr, 16));
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &golden, sizeof(golden));
+  std::vector<uint8_t> golden(hex.size() / 2);
+  for (size_t i = 0; i < golden.size(); ++i)
+    golden[i] = static_cast<uint8_t>(strtoul(hex.substr(2 * i, 2).c_str(), nullptr, 16));
+  CHECK(!golden.empty() && golden.size() <= PERSISTED_SETTINGS_NVS_BUDGET);
+  putSettingsBlob(SETTINGS_SLOT_A, golden);
   PersistedSettings loaded;
-  CHECK(loadPersistedSettings(loaded));
-  CHECK(loaded.schemaVersion == 1 && loaded.runtime.goalWeightDg == DEFAULT_GOAL_WEIGHT_DG);
+  bool repaired = true;
+  CHECK(loadPersistedSettings(loaded, &repaired) && !repaired);
+  CHECK(loaded.storageRevision == 7 && loaded.runtime.goalWeightDg == DEFAULT_GOAL_WEIGHT_DG);
   CHECK(!loaded.runtime.scaleLossEnabled && !loaded.runtime.cupProtectionEnabled);
   CHECK(!loaded.runtime.touchStopFallbackEnabled && loaded.runtime.avoidAccidentalTouchEnabled);
-  // The scheduled restart fields fill zeroed tail padding: off at 00:00.
   CHECK(loaded.runtime.scheduledRestartEnabled == 0 &&
-        loaded.runtime.scheduledRestartMinuteOfDay == 0);
+        loaded.runtime.scheduledRestartMinuteOfDay == 720);
   CHECK(loaded.presets.count == FACTORY_PRESET_COUNT + 2);  // Manual, Golden
   CHECK(loaded.presets.activeId == FACTORY_PRESET_ID_SINGLE_ADAPTIVE);
   const ShotPreset *dbl = findShotPreset(loaded.presets, FACTORY_PRESET_ID_DOUBLE_ADAPTIVE);
@@ -3241,53 +3243,173 @@ void p91_schema1_golden_settings_blob_loads() {
   const ShotPreset *custom = findShotPreset(loaded.presets, FACTORY_PRESET_COUNT + 1);
   CHECK(custom != nullptr && strcmp(custom->name, "Golden") == 0 && !custom->isFactory);
   CHECK(!custom->fastSideEnabled && custom->goalWeightDg == FACTORY_SINGLE_GOAL_WEIGHT_DG);
+}
 
-  // The same settings as an earlier image would have stored them before the
-  // Micra record was appended: the blob ends after deviceName with its own
-  // checksum, followed by 4 B of alignment padding or by nothing.
-  const size_t at = offsetof(PersistedSettings, lineaMicra) + 1;
-  CHECK(at % sizeof(uint32_t) == 0 && alignof(PersistedSettings) == 8);
-  for (const size_t padding : {size_t{4}, size_t{0}}) {
-    PersistedSettings older = golden;
-    const size_t stored = at + sizeof(uint32_t) + padding;
-    older.structureSize = stored;
-    auto *raw = reinterpret_cast<uint8_t *>(&older);
-    const uint32_t checksum = crc32(raw, at);
-    memcpy(raw + at, &checksum, sizeof(checksum));
-    memset(raw + at + sizeof(checksum), 0xA5, padding);  // uncovered padding
-    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored);
-    PersistedSettings prefix;
-    bool repaired = true;
-    CHECK(loadPersistedSettings(prefix, &repaired) && !repaired);
-    CHECK(persistedSettingsIntact(prefix) && prefix.structureSize == sizeof(prefix));
-    CHECK(memcmp(&prefix.runtime, &golden.runtime, sizeof(golden.runtime)) == 0);
-    CHECK(memcmp(&prefix.presets, &golden.presets, sizeof(golden.presets)) == 0);
-    CHECK(strcmp(prefix.devicePassword, golden.devicePassword) == 0);
-    CHECK(strcmp(prefix.deviceName, golden.deviceName) == 0);
-    uint8_t zeroed[sizeof(prefix.lineaMicra)] = {};  // not the {} defaults
-    CHECK(memcmp(&prefix.lineaMicra, zeroed, sizeof(zeroed)) == 0);
-
-    // Torn or foreign short blobs never load: a flipped byte, another schema,
-    // an unaligned length, a header-only prefix and a longer blob.
-    raw[100] ^= 1;
-    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored);
-    CHECK(!loadPersistedSettings(prefix));
-    raw[100] ^= 1;
-    older.schemaVersion = CONFIG_SCHEMA_VERSION + 1;
-    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored);
-    CHECK(!loadPersistedSettings(prefix));
-    older.schemaVersion = CONFIG_SCHEMA_VERSION;
-    persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, raw, stored - 1);
-    CHECK(!loadPersistedSettings(prefix));
+// Assigns every table member a value that differs from its default.
+template <size_t N>
+void fillSettingsFields(const SettingsField (&fields)[N], void *object, uint8_t seed) {
+  auto *base = static_cast<uint8_t *>(object);
+  for (const SettingsField &field : fields) {
+    uint8_t *member = base + field.offset;
+    const uint8_t mark = static_cast<uint8_t>(seed + field.tag);
+    switch (field.kind) {
+      case SettingsFieldKind::BOOL:
+        *reinterpret_cast<bool *>(member) = !*reinterpret_cast<bool *>(member);
+        break;
+      case SettingsFieldKind::TEXT:
+        memset(member, 'a' + mark % 26, field.size - 1U);
+        member[field.size - 1U] = '\0';
+        break;
+      default:
+        for (size_t i = 0; i < field.size; ++i) member[i] = static_cast<uint8_t>(mark + i * 7U + 1U);
+    }
   }
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, &golden,
-                           sizeof(PersistedSettingsHeader));
-  PersistedSettings rejected;
-  CHECK(!loadPersistedSettings(rejected));
-  uint8_t longer[sizeof(PersistedSettings) + 8] = {};
-  memcpy(longer, &golden, sizeof(golden));
-  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, longer, sizeof(longer));
-  CHECK(!loadPersistedSettings(rejected));
+}
+
+template <size_t N>
+bool settingsFieldsEqual(const SettingsField (&fields)[N], const void *a, const void *b) {
+  for (const SettingsField &field : fields) {
+    if (memcmp(static_cast<const uint8_t *>(a) + field.offset,
+               static_cast<const uint8_t *>(b) + field.offset, field.size) != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Builds an intact blob around a hand-written body.
+std::vector<uint8_t> settingsBlobWithBody(const std::vector<uint8_t> &body) {
+  std::vector<uint8_t> blob(SETTINGS_BLOB_HEADER_BYTES, 0);
+  const uint32_t magic = PERSISTED_SETTINGS_MAGIC, revision = 3;
+  const uint16_t schema = static_cast<uint16_t>(CONFIG_SCHEMA_VERSION);
+  const uint16_t length = static_cast<uint16_t>(body.size());
+  memcpy(blob.data(), &magic, 4);
+  memcpy(blob.data() + 4, &schema, 2);
+  memcpy(blob.data() + 6, &length, 2);
+  memcpy(blob.data() + 8, &revision, 4);
+  blob.insert(blob.end(), body.begin(), body.end());
+  blob.resize(blob.size() + 4U);
+  resealSettingsBlob(blob);
+  return blob;
+}
+
+void p91b_settings_codec_round_trips_and_evolves() {
+  // Every persisted member survives an encode/decode round trip.
+  PersistedSettings original;
+  fillSettingsFields(SETTINGS_RUNTIME_FIELDS, &original.runtime, 1);
+  fillSettingsFields(SETTINGS_BULLSEYE_FIELDS, &original.bullseyeMelody, 2);
+  fillSettingsFields(SETTINGS_DEVICE_FIELDS, &original, 3);
+  original.presets.count = MAX_SHOT_PRESETS;
+  for (uint8_t i = 0; i < MAX_SHOT_PRESETS; ++i)
+    fillSettingsFields(SETTINGS_PRESET_FIELDS, &original.presets.presets[i], 10 + i);
+  fillSettingsFields(SETTINGS_PRESET_BANK_FIELDS, &original.presets, 4);
+  for (uint8_t i = 0; i < SCALE_HISTORY_CAPACITY; ++i)
+    fillSettingsFields(SETTINGS_SCALE_HISTORY_FIELDS, &original.scaleHistory[i], 30 + i);
+  fillSettingsFields(SETTINGS_WEBHOOK_FIELDS, &original.webhook, 5);
+  fillSettingsFields(SETTINGS_MICRA_FIELDS, &original.lineaMicra, 6);
+  std::vector<uint8_t> blob(PERSISTED_SETTINGS_NVS_BUDGET);
+  blob.resize(encodePersistedSettings(original, 9, blob.data(), blob.size()));
+  CHECK(blob.size() == PERSISTED_SETTINGS_ENCODED_MAX_BYTES);
+  uint32_t revision = 0, malformed = 0;
+  CHECK(settingsBlobIntact(blob.data(), blob.size(), revision) && revision == 9);
+  PersistedSettings decoded;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), decoded, malformed) && malformed == 0);
+  CHECK(settingsFieldsEqual(SETTINGS_RUNTIME_FIELDS, &original.runtime, &decoded.runtime));
+  CHECK(settingsFieldsEqual(SETTINGS_BULLSEYE_FIELDS, &original.bullseyeMelody,
+                            &decoded.bullseyeMelody));
+  CHECK(settingsFieldsEqual(SETTINGS_DEVICE_FIELDS, &original, &decoded));
+  CHECK(decoded.presets.count == MAX_SHOT_PRESETS);
+  for (uint8_t i = 0; i < MAX_SHOT_PRESETS; ++i)
+    CHECK(settingsFieldsEqual(SETTINGS_PRESET_FIELDS, &original.presets.presets[i],
+                              &decoded.presets.presets[i]));
+  CHECK(settingsFieldsEqual(SETTINGS_PRESET_BANK_FIELDS, &original.presets, &decoded.presets));
+  for (uint8_t i = 0; i < SCALE_HISTORY_CAPACITY; ++i)
+    CHECK(settingsFieldsEqual(SETTINGS_SCALE_HISTORY_FIELDS, &original.scaleHistory[i],
+                              &decoded.scaleHistory[i]));
+  CHECK(settingsFieldsEqual(SETTINGS_WEBHOOK_FIELDS, &original.webhook, &decoded.webhook));
+  CHECK(settingsFieldsEqual(SETTINGS_MICRA_FIELDS, &original.lineaMicra, &decoded.lineaMicra));
+
+  // Unknown groups and fields are skipped, missing fields keep defaults, and
+  // integers convert between widths while they fit.
+  const std::vector<uint8_t> evolved = settingsBlobWithBody({
+      99, 2, 0x01, 0x02,                     // unknown group
+      SETTINGS_GROUP_RUNTIME, 12,
+      0xC8, 0x01, 2, 0xAA, 0xBB,             // unknown field tag 200
+      2, 1, 7,                               // goalWeightDg in one byte
+      48, 2, 0x10, 0x27});                   // fastBeforeMs in two bytes
+  PersistedSettings fresh;
+  malformed = 0;
+  CHECK(settingsBlobIntact(evolved.data(), evolved.size(), revision));
+  CHECK(decodePersistedSettings(evolved.data(), evolved.size(), fresh, malformed) &&
+        malformed == 0);
+  CHECK(fresh.runtime.goalWeightDg == 7 && fresh.runtime.fastBeforeMs == 10000);
+  CHECK(fresh.runtime.slowAfterMs == RuntimeConfig{}.slowAfterMs);
+  CHECK(fresh.presets.count == 0 && fresh.webhook.brewState);
+
+  // Malformed values keep their defaults and are counted.
+  const std::vector<uint8_t> bad = settingsBlobWithBody({
+      SETTINGS_GROUP_RUNTIME, 21,
+      2, 3, 0x70, 0x11, 0x01,                // goalWeightDg: 70000 does not fit
+      7, 1, 2,                               // autoTare: not a bool
+      5, 2, 0, 0,                            // weightOffsetG: not 4 bytes
+      38, 2, 'a', 0,                         // timezoneId: embedded NUL
+      1, 0,                                  // revision: empty integer
+      66, 1, 9});                            // stopPulseTenMs: valid
+  PersistedSettings defaults;
+  malformed = 0;
+  CHECK(decodePersistedSettings(bad.data(), bad.size(), defaults, malformed) && malformed == 5);
+  CHECK(defaults.runtime.goalWeightDg == DEFAULT_GOAL_WEIGHT_DG && defaults.runtime.autoTare);
+  CHECK(defaults.runtime.timezoneId[0] == '\0' && defaults.runtime.stopPulseTenMs == 9);
+
+  // A field running past its group, or a group past the body, does not frame.
+  for (const std::vector<uint8_t> &torn :
+       {settingsBlobWithBody({SETTINGS_GROUP_RUNTIME, 3, 2, 5, 1}),
+        settingsBlobWithBody({SETTINGS_GROUP_RUNTIME, 9, 2, 1, 7})}) {
+    PersistedSettings target;
+    malformed = 0;
+    CHECK(settingsBlobIntact(torn.data(), torn.size(), revision));
+    CHECK(!decodePersistedSettings(torn.data(), torn.size(), target, malformed));
+  }
+  std::vector<uint8_t> truncated = settingsBlob(PersistedSettings{});
+  truncated.pop_back();
+  CHECK(!settingsBlobIntact(truncated.data(), truncated.size(), revision));
+
+  // Through the loader: a later firmware's longer blob loads as is, a
+  // malformed value loads as a repair, and an oversized blob never loads.
+  resetHostPersistence();
+  PersistedSettings settings;
+  CHECK(initializeDefaultSettings(settings));
+  settings.storageRevision = 5;
+  settings.runtime.goalWeightDg = 400;
+  std::vector<uint8_t> later = settingsBlob(settings);
+  later.resize(later.size() - 4U);
+  const std::vector<uint8_t> future = {120, 4, 1, 2, 0xDE, 0xAD};
+  later.insert(later.end(), future.begin(), future.end());
+  const uint16_t body = static_cast<uint16_t>(later.size() - SETTINGS_BLOB_HEADER_BYTES);
+  memcpy(later.data() + 6, &body, 2);
+  later.resize(later.size() + 4U);
+  resealSettingsBlob(later);
+  putSettingsBlob(SETTINGS_SLOT_A, later);
+  PersistedSettings loaded;
+  bool repaired = true;
+  CHECK(loadPersistedSettings(loaded, &repaired) && !repaired);
+  CHECK(loaded.runtime.goalWeightDg == 400 && loaded.storageRevision == 5);
+
+  // Runtime group: header, group tag, two length bytes, then the fields
+  // revision (6 B), goalWeightDg (4 B), two bools, two floats and autoTare.
+  std::vector<uint8_t> wrong = settingsBlob(settings);
+  const size_t autoTare = SETTINGS_BLOB_HEADER_BYTES + 3U + 6U + 4U + 3U + 3U + 6U + 6U;
+  CHECK(wrong[autoTare] == 7 && wrong[autoTare + 1U] == 1);
+  wrong[autoTare + 2U] = 2;
+  resealSettingsBlob(wrong);
+  putSettingsBlob(SETTINGS_SLOT_A, wrong);
+  CHECK(loadPersistedSettings(loaded, &repaired) && repaired);
+  CHECK(loaded.runtime.autoTare && loaded.runtime.goalWeightDg == 400);
+
+  std::vector<uint8_t> oversized(PERSISTED_SETTINGS_NVS_BUDGET + 4U, 0);
+  persistence_host::putRaw(SETTINGS_NAMESPACE, SETTINGS_SLOT_A, oversized.data(),
+                           oversized.size());
+  CHECK(!loadPersistedSettings(loaded));
 }
 
 // Golden shot-log blob of schema 2 (W4b): header plus two records, each a
@@ -3385,7 +3507,8 @@ const TestCase tests[] = {
     {"P90b", p90b_setup_intent_commits_with_its_wifi},
     {"P86", p86_timezone_preference_and_durable_initialization},
     {"P85", p85_schema1_is_strict_and_micra_defaults_round_trip},
-    {"P91", p91_schema1_golden_settings_blob_loads},
+    {"P91", p91_schema2_golden_settings_blob_loads},
+    {"P91b", p91b_settings_codec_round_trips_and_evolves},
     {"P92", p92_schema2_golden_shot_log_loads},
     {"P82", p82_ble_scan_strict_versions_and_roundtrip},
     {"P82B", p82b_ble_scan_legacy_minute_bytes_stay_readable},

@@ -1,6 +1,4 @@
 // Flash persistence owns this flag; HTTP/control only observe verified saves.
-static_assert(offsetof(RuntimeConfig, timezoneAutomatic) == 7,
-              "Settings v4: the decigram goal shifts the flag bytes by one");
 
 inline std::atomic<bool> &durableTimezoneSaved() {
   static std::atomic<bool> saved{false};

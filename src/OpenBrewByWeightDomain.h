@@ -61,9 +61,10 @@
 namespace openbrewbyweight {
 
 constexpr uint32_t SERIAL_BAUD = 115200;
-// Settings layout version. With the magic, size and CRC it rejects any other
-// layout; layouts are frozen at v1 (see ARCHITECTURE.md).
-constexpr uint32_t CONFIG_SCHEMA_VERSION = 1;
+// Settings blob epoch. Schema 2 is the tagged encoding that grows by adding
+// fields; bump only for a change that encoding cannot express (see
+// ARCHITECTURE.md). Other epochs are rejected.
+constexpr uint32_t CONFIG_SCHEMA_VERSION = 2;
 
 constexpr size_t NTP_SERVER_HOST_CAPACITY = 64;
 constexpr uint32_t NTP_RESYNC_INTERVAL_MS = 3600UL * 1000UL;
@@ -633,7 +634,7 @@ enum class LogLevel : uint8_t {
   NONE = 5
 };
 
-// Fixed NVS/UI layout; size or offset changes bump CONFIG_SCHEMA_VERSION.
+// Every member needs a row in OpenBrewByWeightSettingsCodec.h.
 struct RuntimeConfig {
   uint32_t revision = 1;
   uint16_t goalWeightDg = DEFAULT_GOAL_WEIGHT_DG;
@@ -746,15 +747,10 @@ struct RuntimeConfig {
   // Retare even when no brew is active.
   bool autoTareOutsideBrew = true;
   bool ntpSyncEnabled = true;  // NTP sync master switch; Sync now still works.
-  // Daily restart at a local minute of day; fills the former tail padding.
+  // Daily restart at a local minute of day.
   uint8_t scheduledRestartEnabled = 0;
   uint16_t scheduledRestartMinuteOfDay = 12 * 60;
 };
-
-static_assert(sizeof(RuntimeConfig) == 312 &&
-                  offsetof(RuntimeConfig, scheduledRestartEnabled) == 308 &&
-                  offsetof(RuntimeConfig, scheduledRestartMinuteOfDay) == 310,
-              "Scheduled restart fields must stay in the schema-1 tail padding");
 
 #include "domain/OpenBrewByWeightTimeZoneState.inc"
 
@@ -999,11 +995,10 @@ constexpr uint32_t FACTORY_SINGLE_FAST_BEFORE_MS = 23000;
 constexpr uint32_t FACTORY_SINGLE_SLOW_AFTER_MS = 32000;
 constexpr uint16_t FACTORY_SINGLE_DOSE_DG = 90;
 
-// NVS dual-slot budget headroom for PersistedSettings including the preset bank.
-// Settings v4 widens every preset goal to decigrams (+4 B × 8 presets); the
-// nvs partition holds ~2.6 K entries with ~2.3 K free, so the dual-slot blob
-// keeps ample room at 3360.
-constexpr size_t PERSISTED_SETTINGS_NVS_BUDGET = 3360;
+// Largest encoded settings blob any firmware may write or must read. It never
+// shrinks, so earlier firmware can still read a later blob. The 101-page nvs
+// partition keeps ample room for both slots.
+constexpr size_t PERSISTED_SETTINGS_NVS_BUDGET = 4096;
 
 enum class PresetAction : uint8_t {
   APPLY = 0,
@@ -1225,7 +1220,7 @@ inline ConfigValidationError validateRuntimeConfig(
       config.cupRemovedWeightG > MAX_CUP_REMOVED_WEIGHT_G) {
     return ConfigValidationError::CUP_REMOVED_WEIGHT;
   }
-  // Smooth-cut recipe (schema 1): the window is always valid; a side's margin
+  // Smooth-cut recipe: the window is always valid; a side's margin
   // is checked only while that side is on.
   if (config.fastSideEnabled &&
       (config.fastMarginDg < MIN_SIDE_MARGIN_DG ||

@@ -137,20 +137,11 @@ deadlines. Every non-active state after confirmation, observation loss, physical
 release or safety failure opens the relay. The end path appends one electrical
 duration record without scale commands, shot statistics or brew events.
 
-The settings blob retains the 312-byte
-`LineaMicraPersistedSettings` record in every profile. The connection byte at
-record offset 311 occupies prior enclosing-blob padding: Micra offset 2735,
-checksum offset 3048 and total size 3056 remain unchanged. Values are explicitly
-WebSocket=0 and API=1. Blobs from other schema epochs are rejected. A shorter
-blob of the current schema, written by an earlier image before tail fields were
-appended, loads as a prefix of the current struct once its own checksum
-verifies, with the appended fields zeroed and only its size and checksum
-restamped; the oldest accepted layout ends right after the device name, where
-the Micra record now starts. Appended fields must therefore treat zero as
-their legacy default, so an OTA update never discards Wi-Fi or presets over a
-layout growth. Load never writes back; the next save stores the full layout. Settings saves and resets
-wait for successful OTA trial confirmation, preserving the old durable records
-for rollback. This admission does not gate boot readiness or other stores.
+The settings blob carries the `LineaMicraPersistedSettings` record in every
+profile; its connection type is explicitly WebSocket=0 and API=1. Settings
+saves and resets wait for successful OTA trial confirmation, preserving the old
+durable records for rollback. This admission does not gate boot readiness or
+other stores.
 
 One facade reduces HTTP and WebSocket field updates. Each admitted subscription
 queues one initial dashboard cycle in the existing HTTP worker, concurrent with
@@ -209,11 +200,9 @@ Editing reset bases alone preserves current learning and evidence.
 The Settings stream publishes the active-preset identity, the drip in use and
 the gain together from the existing coherent control snapshot.
 
-Settings schema 1 uses the 312-byte `RuntimeConfig`, 76-byte `ShotPreset`, and
-3,056-byte settings blob. The scheduled restart fields (`scheduledRestartEnabled`,
-`scheduledRestartMinuteOfDay`) occupy the struct's former tail padding, so the
-golden blob still loads (as off, 00:00) and validation rejects stale non-zero
-padding instead of reading it as a schedule. A preset stores the recipe: target, dose (reference
+Settings schema 2 stores `PersistedSettings` as a tagged encoding (see
+[Settings encoding and evolution](#settings-encoding-and-evolution)). A preset
+stores the recipe: target, dose (reference
 only), shot time window (`fastBeforeMs`/`slowAfterMs`), fast and slow side
 switches with margins relative to the target (decigrams), weight-cut delay, max
 shot time, the optional fixed scale-loss stop time, drip compensation, grind
@@ -233,14 +222,14 @@ protection, accidental-touch, touch-stop fallback and the scale-loss backup
 switch are device-level `RuntimeConfig` fields and are never overlaid from a
 preset. A fresh or factory-reset bank holds four permanent factory presets (ids
 1–4: Double · Adaptive, Single · Adaptive, Double · Fixed, Single · Fixed);
-they can be restored but not deleted. A golden schema-1 blob in the host tests
+they can be restored but not deleted. A golden schema-2 blob in the host tests
 proves later firmware keeps settings across OTA. Candidate
 anchors/observations/generations are RAM only; deferred persistence retains
 offsets, gain/provenance, and profile through the existing dual-slot owner.
 `powerManagementEnabled`, webhook preset delivery, and Rinse without a scale
 are current explicit fields. Presets never copy the global power setting.
-`touchStopFallbackEnabled` is a device-level runtime field, defaulting to true. Blob sizes, revisions and
-dual-slot ownership remain unchanged. Other lengths and schemas are rejected.
+`touchStopFallbackEnabled` is a device-level runtime field, defaulting to true. Revisions and
+dual-slot ownership remain unchanged.
 The shot log is the authority for a completed shot: confirmed, non-rinse,
 strictly more than 12,000 ms of brewing and a finite settled yield strictly
 above 2 g. The fixed recording threshold does not alter the configurable BBW
@@ -463,25 +452,50 @@ evidence likewise use separate RAM generations. Boot initialization and a
 scale's initial connection retain their
 own policy application paths. Persistence and status publication are independent
 of these operational triggers. No callbacks run from an ISR or across a flash
-write, and the OTA update path remains available. The settings layout is
-schema 1; blobs from earlier firmware are rejected.
+write, and the OTA update path remains available.
 
-Every persisted layout (the settings blob, presets, the flash stores and each
-NVS record) is frozen at v1, and `static_assert` size checks turn an
-accidental change into a build error. Settings validation is all-or-nothing:
-after v1, a layout or range change must come with a versioned load path that
-converts the previous layout, or an OTA update would reset Wi-Fi, the device
-password and the machine account to factory values.
+## Settings encoding and evolution
+
+Settings schema 2 (`OpenBrewByWeightSettingsCodec.h`) stores the settings as
+groups of tagged fields: a header (magic, schema, body length, storage
+revision), the body and a CRC-32. Each group (runtime, bullseye, device and
+network, one per preset, preset bank, one per scale-history entry, webhook,
+Linea Micra) holds `tag, length, value` fields with LEB128 tags and lengths.
+Every persisted struct member has one table row; `static_assert` checks that
+each table covers its struct apart from padding, so a member added without a
+row fails the build. Encoding is canonical (table order, every field, text at
+its real length), and a save verifies the read-back length, revision and CRC.
+
+Loading starts from the struct defaults. Unknown groups and fields are
+skipped, so earlier firmware reads a later blob; a missing field keeps its
+default, so later firmware reads an earlier blob. Integers convert between
+widths while the value fits. A malformed value (bad length, out of range,
+unterminated text) keeps its default and makes the load a repair, logged as
+`CONFIG_REJECTED` in the Web UI log like a section repair. A blob that does not
+frame, fails its CRC, or belongs to another schema epoch never loads.
+
+Rules for every later change:
+
+- a released tag keeps its meaning forever and is never reused; a retired tag
+  is listed in the codec header;
+- a member whose type or meaning changes gets a new tag;
+- the encoded worst case stays within `PERSISTED_SETTINGS_NVS_BUDGET`
+  (4,096 B, never reduced), so earlier firmware can always read a later blob;
+- `CONFIG_SCHEMA_VERSION` changes only for a change the tags cannot express,
+  together with a load path that converts the previous epoch.
+
+The other persisted records (flash stores and the remaining NVS records) keep
+fixed layouts guarded by `static_assert` size checks; a layout change there
+needs a versioned load path or discards that record.
 
 ## Residual qualification
 
-`RuntimeConfig` uses a 312-byte fixed layout inside the schema-1 settings blob.
 `autoTareOutsideBrew` remains a global machine setting rather than part of the
 per-shot/preset recipe snapshot. No records from earlier schemas are converted
 at boot. The optional idle accessory retare uses spare bit 6 of
 the already-packed `noScaleBbwMode` byte. New and factory-reset records default
 on; existing saved records retain their stored bit, including OFF. The bit is
-preserved when the no-scale mode changes; this bit itself does not alter the blob.
+preserved when the no-scale mode changes.
 
 Idle tare arbitration lives in `control/OpenBrewByWeightCycleRuntime.inc`, reusing
 the cup FSM's PLACED event and ScaleService's TARE_ONLY transport. Worker

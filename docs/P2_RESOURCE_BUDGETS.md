@@ -482,17 +482,17 @@ The worst-case application set is budgeted by the NVS blob rule
 
 | Records retained together | Maximum entries |
 |---|---:|
-| Settings A/B (`2 × 3,056 B`) | 196 |
+| Settings A/B (`2 × 4,096 B` encoded budget) | 260 |
 | Last Shot (`2 + ceil(356 / 32)`) | 14 |
 | BLE settings A/B | 6 |
 | Recovery intent | 3 |
 | OTA journal A/B | 24 |
 | Reset history, active pointers, and namespaces | 32 |
-| **Application total** | **275** |
+| **Application total** | **339** |
 
 Shot and activation history use their dedicated flash partitions rather than
-NVS entries. The resulting conservative compaction margin is 12,199 entries
-(97.8%). Host
+NVS entries. The resulting conservative compaction margin is 12,135 entries
+(97.3%). Host
 tests bind the large record sizes and this arithmetic to the installed
 partition layout.
 Diagnostic status and debug exports publish the installed partition size,

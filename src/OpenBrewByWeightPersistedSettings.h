@@ -16,10 +16,10 @@ static_assert(sizeof(SETTINGS_NAMESPACE) <= 16,
 constexpr const char *SETTINGS_SLOT_A = "settingsA";
 constexpr const char *SETTINGS_SLOT_B = "settingsB";
 constexpr const char *DEFAULT_DEVICE_PASSWORD = "ineedacoffee";
+
+// Working copy of the settings; NVS stores it through
+// OpenBrewByWeightSettingsCodec.h, where every member needs a field row.
 struct PersistedSettings {
-  uint32_t magic = PERSISTED_SETTINGS_MAGIC;
-  uint32_t schemaVersion = CONFIG_SCHEMA_VERSION;
-  uint32_t structureSize = 0;
   uint32_t storageRevision = 0;
   RuntimeConfig runtime = {};
   BullseyeMelodyConfig bullseyeMelody = {};
@@ -55,41 +55,11 @@ struct PersistedSettings {
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   // Optional Micra cloud account, selected machine and independent options.
   LineaMicraPersistedSettings lineaMicra = {};
-  uint32_t checksum = 0;
 };
 
 struct SettingsPersistRequest {
   PersistedSettings blob;
   uint32_t runtimeRevision = 0;
 };
-
-static_assert(sizeof(SettingsPersistRequest) <=
-                  PERSISTED_SETTINGS_NVS_BUDGET + 16,
-              "SettingsPersistRequest must stay a single NVS blob plus revision");
-
-struct PersistedSettingsHeader {
-  uint32_t magic = 0;
-  uint32_t schemaVersion = 0;
-  uint32_t structureSize = 0;
-  uint32_t storageRevision = 0;
-};
-
-static_assert(offsetof(PersistedSettings, storageRevision) + sizeof(uint32_t) ==
-                  sizeof(PersistedSettingsHeader),
-              "PersistedSettings header layout changed");
-
-static_assert(sizeof(PersistedSettings) <= PERSISTED_SETTINGS_NVS_BUDGET,
-              "PersistedSettings exceeds NVS dual-slot budget");
-static_assert(sizeof(PersistedSettings) == 3056,
-              "Settings schema 1: append only tail fields whose legacy default is "
-              "zero (readSettingsSlot loads shorter schema-1 blobs as a prefix); "
-              "any other layout change bumps CONFIG_SCHEMA_VERSION");
-static_assert(offsetof(PersistedSettings, lineaMicra) == 2735);
-static_assert(offsetof(PersistedSettings, checksum) == 3048);
-
-inline uint32_t persistedSettingsChecksum(const PersistedSettings &settings) {
-  return crc32(reinterpret_cast<const uint8_t *>(&settings),
-               offsetof(PersistedSettings, checksum));
-}
 
 }  // namespace openbrewbyweight

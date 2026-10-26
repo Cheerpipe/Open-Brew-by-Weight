@@ -5,6 +5,7 @@
 #include "OpenBrewByWeightPersistedNetwork.h"
 #include "OpenBrewByWeightPersistedSettings.h"
 #include "OpenBrewByWeightPreferences.h"
+#include "OpenBrewByWeightSettingsCodec.h"
 #include "OpenBrewByWeightSettingsWriteAdmission.h"
 
 #include <stdint.h>
@@ -37,16 +38,8 @@ inline void ensurePersistedPresetBank(PersistedSettings &settings) {
                        settings.runtime.autoRetare);
 }
 
-inline bool persistedSettingsIntact(const PersistedSettings &settings) {
-  return settings.magic == PERSISTED_SETTINGS_MAGIC &&
-         settings.schemaVersion == CONFIG_SCHEMA_VERSION &&
-         settings.structureSize == sizeof(PersistedSettings) &&
-         settings.checksum == persistedSettingsChecksum(settings);
-}
-
 inline bool validPersistedSettings(const PersistedSettings &settings) {
-  if (!persistedSettingsIntact(settings) ||
-      validateRuntimeConfig(settings.runtime) != ConfigValidationError::NONE ||
+  if (validateRuntimeConfig(settings.runtime) != ConfigValidationError::NONE ||
       settings.runtime.timezoneSource >= 3 ||
       settings.runtime.timezoneAutomatic > 1 ||
       !validBullseyeMelodyConfig(settings.bullseyeMelody) ||
@@ -76,11 +69,6 @@ inline void finalizePersistedSettings(PersistedSettings &settings) {
   seedScaleHistoryFromPreferred(settings.scaleHistory, seedSeq,
                                 settings.preferredScaleMac,
                                 settings.preferredScaleName);
-  settings.magic = PERSISTED_SETTINGS_MAGIC;
-  settings.schemaVersion = CONFIG_SCHEMA_VERSION;
-  settings.structureSize = sizeof(PersistedSettings);
-  settings.checksum = 0;
-  settings.checksum = persistedSettingsChecksum(settings);
 }
 
 // An intact blob (checksum and schema match) whose content no longer
@@ -121,72 +109,74 @@ inline bool repairPersistedSettings(PersistedSettings &s) {
   return repaired;
 }
 
-// Single-record staging inside the shared flash-I/O scratch (see FlashIoScratch).
-// Allocated from internal SRAM (heap, not BSS): source/destination of
-// Preferences putBytes/getBytes if a flash path disables cache despite XIP.
-inline PersistedSettings &persistedSettingsScratch() {
-  static_assert(sizeof(PersistedSettings) <= FLASH_IO_SCRATCH_BYTES,
-                "PersistedSettings exceeds flash I/O buffer");
-  return *reinterpret_cast<PersistedSettings *>(flashIoScratchBytes());
-}
-
-// Shared by the load/save/reset/revision-probe paths; must stay out-of-line
-// so the compiler does not embed one copy at every call site.
-// A shorter blob of the current schema, written by an earlier image before
-// tail fields were appended, loads as a prefix of the current struct with the
-// appended fields zeroed once its own checksum verifies (the last word, or the
-// one before 4 B of alignment padding). Appended fields must therefore take
-// zero as their legacy default. The oldest such layout ends right after
-// deviceName, where the Micra record now starts; anything shorter, longer,
-// torn or of another schema is rejected. Only size and checksum are restamped
-// so the stored values reach validation untouched. Load never writes back;
-// the next save stores the full layout.
-constexpr size_t PERSISTED_SETTINGS_MIN_PREFIX_BYTES =
-    (offsetof(PersistedSettings, lineaMicra) + sizeof(uint32_t) - 1) / sizeof(uint32_t) *
-        sizeof(uint32_t) +
-    sizeof(uint32_t);
-__attribute__((noinline))
-inline bool readSettingsSlot(OpenBrewByWeightPreferences &preferences, const char *key,
-                             PersistedSettings &settings, bool repair = false) {
-  const size_t stored = preferences.isKey(key)
-                            ? preferences.getBytesLength(key)
-                            : 0;
-  if (stored < PERSISTED_SETTINGS_MIN_PREFIX_BYTES ||
-      stored > sizeof(PersistedSettings) || stored % sizeof(uint32_t) != 0 ||
-      preferences.getBytes(key, &settings, stored) != stored) {
-    return false;
-  }
-  if (stored < sizeof(PersistedSettings)) {
-    auto *bytes = reinterpret_cast<uint8_t *>(&settings);
-    memset(bytes + stored, 0, sizeof(PersistedSettings) - stored);
-    if (settings.magic != PERSISTED_SETTINGS_MAGIC ||
-        settings.schemaVersion != CONFIG_SCHEMA_VERSION ||
-        settings.structureSize != stored) {
-      return false;
-    }
-    size_t at = stored - sizeof(uint32_t);
-    uint32_t checksum = 0;
-    memcpy(&checksum, bytes + at, sizeof(checksum));
-    if (checksum != crc32(bytes, at)) {
-      at -= sizeof(uint32_t);
-      memcpy(&checksum, bytes + at, sizeof(checksum));
-      if (checksum != crc32(bytes, at)) return false;
-    }
-    memset(bytes + at, 0, stored - at);
-    settings.structureSize = sizeof(PersistedSettings);
-    settings.checksum = persistedSettingsChecksum(settings);
-  }
-  if (!persistedSettingsIntact(settings) || !validPersistedStaNetwork(settings)) {
-    return false;
-  }
-  if (repair) (void)repairPersistedSettings(settings);
-  return validPersistedSettings(settings);
-}
-
 inline bool lockSettingsNvs() { return lockFlashIo(); }
 inline void unlockSettingsNvs() { unlockFlashIo(); }
 inline void yieldSettingsNvs() { yieldFlashIo(); }
 inline void feedSettingsNvsWatchdog() { feedFlashIoWatchdog(); }
+
+// One encoded blob staged in the shared flash-I/O scratch (see
+// FlashIoScratch), allocated from internal SRAM: source/destination of
+// Preferences putBytes/getBytes if a flash path disables cache despite XIP.
+inline uint8_t *settingsBlobScratch() {
+  static_assert(PERSISTED_SETTINGS_NVS_BUDGET <= FLASH_IO_SCRATCH_BYTES,
+                "Settings blob exceeds flash I/O buffer");
+  return flashIoScratchBytes();
+}
+
+// Reads one slot into the scratch and checks its framing and CRC; returns
+// the blob length (0 when absent, torn, foreign or oversized).
+__attribute__((noinline))
+inline size_t readSettingsBlob(OpenBrewByWeightPreferences &preferences, const char *key,
+                               uint32_t &revision) {
+  const size_t stored = preferences.isKey(key) ? preferences.getBytesLength(key) : 0;
+  uint8_t *blob = settingsBlobScratch();
+  if (stored < SETTINGS_BLOB_MIN_BYTES || stored > PERSISTED_SETTINGS_NVS_BUDGET ||
+      preferences.getBytes(key, blob, stored) != stored ||
+      !settingsBlobIntact(blob, stored, revision)) {
+    return 0;
+  }
+  return stored;
+}
+
+// Decodes one slot over factory defaults. Without `repair` it succeeds only
+// when every value decoded and validates; with it, failing sections are reset
+// as repairPersistedSettings does. An unusable STA record never loads.
+__attribute__((noinline))
+inline bool readSettingsSlot(OpenBrewByWeightPreferences &preferences, const char *key,
+                             PersistedSettings &settings, bool repair = false) {
+  uint32_t revision = 0;
+  const size_t length = readSettingsBlob(preferences, key, revision);
+  if (length == 0) return false;
+  new (&settings) PersistedSettings{};
+  uint32_t malformed = 0;
+  if (!decodePersistedSettings(settingsBlobScratch(), length, settings, malformed)) {
+    return false;
+  }
+  settings.storageRevision = revision;
+  if (!validPersistedStaNetwork(settings)) return false;
+  if (!repair) return malformed == 0 && validPersistedSettings(settings);
+  (void)repairPersistedSettings(settings);
+  return validPersistedSettings(settings);
+}
+
+// Encodes `settings` at `revision` into one slot and verifies the read-back
+// blob (length, revision and CRC).
+inline bool writeSettingsSlot(OpenBrewByWeightPreferences &preferences, const char *key,
+                              const PersistedSettings &settings, uint32_t revision) {
+  uint8_t *blob = settingsBlobScratch();
+  const size_t length =
+      encodePersistedSettings(settings, revision, blob, PERSISTED_SETTINGS_NVS_BUDGET);
+  if (length == 0) return false;
+  uint32_t crc = 0;
+  memcpy(&crc, blob + length - 4U, 4);
+  yieldSettingsNvs();
+  feedSettingsNvsWatchdog();
+  if (preferences.putBytes(key, blob, length) != length) return false;
+  uint32_t storedRevision = 0, storedCrc = 0;
+  if (readSettingsBlob(preferences, key, storedRevision) != length) return false;
+  memcpy(&storedCrc, blob + length - 4U, 4);
+  return storedRevision == revision && storedCrc == crc;
+}
 
 // Removes one key of the settings namespace; an absent key already counts.
 inline bool eraseSettingsNvsKey(NvsSubsystem subsystem, const char *key) {
@@ -203,6 +193,21 @@ inline bool eraseSettingsNvsKey(NvsSubsystem subsystem, const char *key) {
 
 inline bool savePersistedSettings(PersistedSettings &settings);
 
+// Revisions of the intact slots, newest first; returns how many there are.
+inline uint8_t settingsSlotsNewestFirst(OpenBrewByWeightPreferences &preferences,
+                                        const char *(&keys)[2], uint32_t *newest = nullptr) {
+  uint32_t revisionA = 0, revisionB = 0;
+  const bool a = readSettingsBlob(preferences, SETTINGS_SLOT_A, revisionA) != 0;
+  const bool b = readSettingsBlob(preferences, SETTINGS_SLOT_B, revisionB) != 0;
+  const bool bFirst = b && (!a || secondRevisionIsNewer(revisionA, revisionB));
+  keys[0] = bFirst ? SETTINGS_SLOT_B : SETTINGS_SLOT_A;
+  keys[1] = bFirst ? SETTINGS_SLOT_A : SETTINGS_SLOT_B;
+  if (newest != nullptr) *newest = bFirst ? revisionB : revisionA;
+  return static_cast<uint8_t>(a) + static_cast<uint8_t>(b);
+}
+
+// Loads the newest slot that decodes and validates as is; failing that, the
+// newest one that repairs. `settings` is overwritten even when nothing loads.
 inline bool loadPersistedSettings(PersistedSettings &settings,
                                   bool *repaired = nullptr) {
   if (!lockSettingsNvs()) {
@@ -213,28 +218,16 @@ inline bool loadPersistedSettings(PersistedSettings &settings,
     unlockSettingsNvs();
     return false;
   }
-  PersistedSettings &scratch = persistedSettingsScratch();
-  bool loaded = readSettingsSlot(preferences, SETTINGS_SLOT_A, scratch);
-  uint32_t loadedRevision = 0;
-  if (loaded) {
-    settings = scratch;
-    loadedRevision = scratch.storageRevision;
-  }
-  if (readSettingsSlot(preferences, SETTINGS_SLOT_B, scratch) &&
-      (!loaded || secondRevisionIsNewer(loadedRevision,
-                                        scratch.storageRevision))) {
-    settings = scratch;
-    loadedRevision = scratch.storageRevision;
-    loaded = true;
-  }
-  // Last resort before factory defaults: repair the newest intact slot.
-  const bool loadedAsIs = loaded;
-  for (const char *key : {SETTINGS_SLOT_A, SETTINGS_SLOT_B}) {
-    if (!loadedAsIs && readSettingsSlot(preferences, key, scratch, true) &&
-        (!loaded || secondRevisionIsNewer(loadedRevision, scratch.storageRevision))) {
-      settings = scratch;
-      loadedRevision = scratch.storageRevision;
-      loaded = true;
+  const char *keys[2] = {};
+  const uint8_t intact = settingsSlotsNewestFirst(preferences, keys);
+  bool loaded = false, loadedAsIs = false;
+  for (const bool repair : {false, true}) {
+    for (uint8_t i = 0; i < intact && !loaded; ++i) {
+      loaded = readSettingsSlot(preferences, keys[i], settings, repair);
+    }
+    if (loaded) {
+      loadedAsIs = !repair;
+      break;
     }
   }
   if (repaired != nullptr) *repaired = loaded && !loadedAsIs;
@@ -282,7 +275,7 @@ inline void resetDurableStorageRevision() {
 
 inline bool savePersistedSettings(PersistedSettings &settings) {
   if (!settingsSchemaWritesAdmitted.load(std::memory_order_acquire)) return false;
-  // One internal record is reused for revision probes, candidate write, and
+  // The shared scratch is reused for revision probes, the candidate blob and
   // read-back verification. Never call loadPersistedSettings while locked.
   yieldSettingsNvs();
   feedSettingsNvsWatchdog();
@@ -290,67 +283,30 @@ inline bool savePersistedSettings(PersistedSettings &settings) {
     feedSettingsNvsWatchdog();
     return false;
   }
-  PersistedSettings &scratch = persistedSettingsScratch();
-  uint32_t revision = settings.storageRevision;
-  if (durableStorageRevisionValid()) {
-    revision = durableStorageRevision();
-  } else if (revision == 0) {
-    bool haveRevision = false;
-    OpenBrewByWeightPreferences probe(NvsSubsystem::SETTINGS);
-    if (probe.begin(SETTINGS_NAMESPACE, true)) {
-      if (readSettingsSlot(probe, SETTINGS_SLOT_A, scratch)) {
-        revision = scratch.storageRevision;
-        haveRevision = true;
-      }
-      if (readSettingsSlot(probe, SETTINGS_SLOT_B, scratch)) {
-        if (!haveRevision || secondRevisionIsNewer(
-                                 revision, scratch.storageRevision)) {
-          revision = scratch.storageRevision;
-        }
-        haveRevision = true;
-      }
-      probe.end();
-    }
-  }
-  const uint32_t originalRevision = settings.storageRevision;
-  const uint32_t originalChecksum = settings.checksum;
-  // Zero first: the shared scratch carries stale bytes from earlier reads,
-  // and memberwise assignment leaves padding indeterminate — stored blobs
-  // must stay byte-reproducible for the read-back verification.
-  memset(&scratch, 0, sizeof(scratch));
-  scratch = settings;
-  scratch.storageRevision = revision + 1U;
-  if (scratch.storageRevision == 0) {
-    scratch.storageRevision = 1;
-  }
-  finalizePersistedSettings(scratch);
-
   OpenBrewByWeightPreferences preferences(NvsSubsystem::SETTINGS);
   if (!preferences.begin(SETTINGS_NAMESPACE, false)) {
     unlockSettingsNvs();
     feedSettingsNvsWatchdog();
     return false;
   }
-  const char *target =
-      (scratch.storageRevision & 1U) ? SETTINGS_SLOT_A : SETTINGS_SLOT_B;
-  const uint32_t candidateRevision = scratch.storageRevision;
-  const bool written =
-      preferences.putBytes(target, &scratch, sizeof(scratch)) == sizeof(scratch);
-  if (written) {
-    // Bitwise copy: the read-back verification below compares every stored
-    // byte, including tail padding that struct assignment need not preserve.
-    memcpy(&settings, &scratch, sizeof(settings));
+  uint32_t revision = settings.storageRevision;
+  if (durableStorageRevisionValid()) {
+    revision = durableStorageRevision();
+  } else if (revision == 0) {
+    const char *keys[2] = {};
+    (void)settingsSlotsNewestFirst(preferences, keys, &revision);
   }
-  const bool saved = written && readSettingsSlot(preferences, target, scratch) &&
-                     memcmp(&settings, &scratch, sizeof(scratch)) == 0;
+  uint32_t candidateRevision = revision + 1U;
+  if (candidateRevision == 0) candidateRevision = 1;
+  finalizePersistedSettings(settings);
+  const char *target = (candidateRevision & 1U) ? SETTINGS_SLOT_A : SETTINGS_SLOT_B;
+  const bool saved = writeSettingsSlot(preferences, target, settings, candidateRevision);
   preferences.end();
   if (saved) {
+    settings.storageRevision = candidateRevision;
     durableStorageRevision() = candidateRevision;
     durableStorageRevisionValid() = true;
     durableTimezoneSaved().store(settings.runtime.timezoneId[0] != '\0');
-  } else {
-    settings.storageRevision = originalRevision;
-    settings.checksum = originalChecksum;
   }
   unlockSettingsNvs();
   yieldSettingsNvs();
@@ -382,14 +338,11 @@ inline bool resetPersistedSettingsToFactory(PersistedSettings &settings) {
   }
 
   uint32_t existingMax = 0;
-  PersistedSettings &probe = persistedSettingsScratch();
-  if (readSettingsSlot(preferences, SETTINGS_SLOT_A, probe) &&
-      probe.storageRevision > existingMax) {
-    existingMax = probe.storageRevision;
-  }
-  if (readSettingsSlot(preferences, SETTINGS_SLOT_B, probe) &&
-      probe.storageRevision > existingMax) {
-    existingMax = probe.storageRevision;
+  for (const char *key : {SETTINGS_SLOT_A, SETTINGS_SLOT_B}) {
+    uint32_t revision = 0;
+    if (readSettingsBlob(preferences, key, revision) != 0 && revision > existingMax) {
+      existingMax = revision;
+    }
   }
   if (durableStorageRevisionValid() &&
       durableStorageRevision() > existingMax) {
@@ -399,56 +352,22 @@ inline bool resetPersistedSettingsToFactory(PersistedSettings &settings) {
     existingMax = UINT32_MAX - 2U;
   }
 
-  PersistedSettings &scratch = persistedSettingsScratch();
-  if (!initializeDefaultSettings(scratch)) {
+  if (!initializeDefaultSettings(settings)) {
     preferences.end();
     unlockSettingsNvs();
     return false;
   }
-  scratch.storageRevision = existingMax + 1U;
-  finalizePersistedSettings(scratch);
-
-  yieldSettingsNvs();
-  feedSettingsNvsWatchdog();
-  const bool firstSaved =
-      preferences.putBytes(SETTINGS_SLOT_A, &scratch, sizeof(scratch)) ==
-      sizeof(scratch);
   const bool firstVerified =
-      firstSaved && readSettingsSlot(preferences, SETTINGS_SLOT_A, scratch);
-  if (firstVerified) {
-    settings = scratch;
-  } else if (!initializeDefaultSettings(scratch)) {
-    preferences.end();
-    unlockSettingsNvs();
-    return false;
-  }
-  scratch.storageRevision = existingMax + 2U;
-  finalizePersistedSettings(scratch);
-  yieldSettingsNvs();
-  feedSettingsNvsWatchdog();
-  const bool secondSaved =
-      preferences.putBytes(SETTINGS_SLOT_B, &scratch, sizeof(scratch)) ==
-      sizeof(scratch);
-  if (secondSaved) {
-    // Same invariant as savePersistedSettings: bitwise copy into the caller
-    // record before the byte-exact verification memcmp below.
-    memcpy(&settings, &scratch, sizeof(settings));
-  }
-  const bool secondVerified = secondSaved &&
-      readSettingsSlot(preferences, SETTINGS_SLOT_B, scratch) &&
-      memcmp(&scratch, &settings, sizeof(scratch)) == 0;
+      writeSettingsSlot(preferences, SETTINGS_SLOT_A, settings, existingMax + 1U);
+  const bool secondVerified =
+      writeSettingsSlot(preferences, SETTINGS_SLOT_B, settings, existingMax + 2U);
   preferences.end();
   unlockSettingsNvs();
 
   if (!firstVerified && !secondVerified) {
     return false;
   }
-  if (secondVerified) {
-    settings = scratch;
-  } else {
-    settings.storageRevision = existingMax + 1U;
-    finalizePersistedSettings(settings);
-  }
+  settings.storageRevision = existingMax + (secondVerified ? 2U : 1U);
   noteDurableStorageRevision(settings.storageRevision);
   durableTimezoneSaved().store(false);
   return true;
