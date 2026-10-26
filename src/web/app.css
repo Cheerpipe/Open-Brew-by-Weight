@@ -4224,7 +4224,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 .rvPill rect {
   fill: var(--sf);
-  stroke: var(--ac);
+  stroke: var(--gCut);
   stroke-width: 1.5;
 }
 .rvPill text {
