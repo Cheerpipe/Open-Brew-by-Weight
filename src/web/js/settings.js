@@ -86,7 +86,7 @@ function brewWarningList() {
   // Suppress only the empty-field "is required" result: it fires mid-typing
   // and is self-evident. Everything else is a true statement about the
   // pending set as a whole and self-clears as typing completes.
-  return R.validateBrewClient().filter((e) => !e.required);
+  return validateBrewClient().filter((e) => !e.required);
 }
 function refreshBrewWarnings() {
   if (!$("goalWeightG")) return;
@@ -140,21 +140,21 @@ function validateMachineClient() {
   const m = document.documentElement.classList.contains("momentaryMachine");
   const reedMachine = m && document.documentElement.classList.contains("reedMachine");
   let e =
-    R.rangeCheck("rinseGestureS", 0.1, 5, __WEBUI_TEXT__("runtime.rinse_gesture"), {
+    rangeCheck("rinseGestureS", 0.1, 5, __WEBUI_TEXT__("runtime.rinse_gesture"), {
       unit: __WEBUI_TEXT__("runtime.s"),
     }) ||
-    R.rangeCheck("rinseDurationS", 0.5, 10, __WEBUI_TEXT__("runtime.rinse_duration"), {
+    rangeCheck("rinseDurationS", 0.5, 10, __WEBUI_TEXT__("runtime.rinse_duration"), {
       unit: __WEBUI_TEXT__("runtime.s"),
     }) ||
     (m
-      ? R.rangeCheck("stopPulseMs", 50, 1000, __WEBUI_TEXT__("runtime.auto_stop_pulse"), {
+      ? rangeCheck("stopPulseMs", 50, 1000, __WEBUI_TEXT__("runtime.auto_stop_pulse"), {
           int: 1,
         }) ||
-        R.rangeCheck("maxSinglePressMs", 100, 5000, __WEBUI_TEXT__("runtime.single_press_limit"), {
+        rangeCheck("maxSinglePressMs", 100, 5000, __WEBUI_TEXT__("runtime.single_press_limit"), {
           int: 1,
         }) ||
         (reedMachine
-          ? R.rangeCheck(
+          ? rangeCheck(
               "reedConfirmTimeoutS",
               0.2,
               5,
@@ -164,62 +164,56 @@ function validateMachineClient() {
           : "") ||
         // Reed builds ship no switch-only fields.
         ($("shotReactTimeoutS") &&
-          R.rangeCheck(
-            "shotReactTimeoutS",
-            3,
-            30,
-            __WEBUI_TEXT__("runtime.shot_reaction_timeout"),
-            {
-              int: 1,
-              unit: __WEBUI_TEXT__("runtime.s"),
-            },
-          ))
-      : R.rangeCheck(
+          rangeCheck("shotReactTimeoutS", 3, 30, __WEBUI_TEXT__("runtime.shot_reaction_timeout"), {
+            int: 1,
+            unit: __WEBUI_TEXT__("runtime.s"),
+          }))
+      : rangeCheck(
           "paddleReturnReminderMaxDurationMin",
           1,
           60,
           __WEBUI_TEXT__("runtime.paddle_limit"),
           { int: 1, unit: __WEBUI_TEXT__("runtime.min") },
         )) ||
-    R.rangeCheck("retareWindowS", 0.5, 10, __WEBUI_TEXT__("runtime.retare_window"), {
+    rangeCheck("retareWindowS", 0.5, 10, __WEBUI_TEXT__("runtime.retare_window"), {
       unit: __WEBUI_TEXT__("runtime.s"),
     }) ||
-    R.rangeCheck("postTareBaselineGraceS", 0.5, 10, __WEBUI_TEXT__("runtime.post_tare_grace"), {
+    rangeCheck("postTareBaselineGraceS", 0.5, 10, __WEBUI_TEXT__("runtime.post_tare_grace"), {
       unit: __WEBUI_TEXT__("runtime.s"),
     }) ||
-    R.rangeCheck("minimumCupWeightG", 1, 500, __WEBUI_TEXT__("runtime.min_cup_weight"), {
+    rangeCheck("minimumCupWeightG", 1, 500, __WEBUI_TEXT__("runtime.min_cup_weight"), {
       unit: __WEBUI_TEXT__("runtime.g"),
     }) ||
-    R.rangeCheck("cupRemovedWeightG", -50, -0.1, __WEBUI_TEXT__("runtime.cup_removed"), {
+    rangeCheck("cupRemovedWeightG", -50, -0.1, __WEBUI_TEXT__("runtime.cup_removed"), {
       unit: __WEBUI_TEXT__("runtime.g"),
     }) ||
-    R.rangeCheck("retareStabilitySamples", 2, 10, __WEBUI_TEXT__("runtime.retare_samples"), {
+    rangeCheck("retareStabilitySamples", 2, 10, __WEBUI_TEXT__("runtime.retare_samples"), {
       int: 1,
     }) ||
-    R.rangeCheck("retareStabilityToleranceG", 0.1, 20, __WEBUI_TEXT__("runtime.retare_tolerance"), {
+    rangeCheck("retareStabilityToleranceG", 0.1, 20, __WEBUI_TEXT__("runtime.retare_tolerance"), {
       unit: __WEBUI_TEXT__("runtime.g"),
     }) ||
-    R.rangeCheck("retareStabilityMaxGapS", 0.1, 5, __WEBUI_TEXT__("runtime.retare_sample_gap"), {
+    rangeCheck("retareStabilityMaxGapS", 0.1, 5, __WEBUI_TEXT__("runtime.retare_sample_gap"), {
       unit: __WEBUI_TEXT__("runtime.s"),
     }) ||
-    R.rangeCheck(
+    rangeCheck(
       "retareStabilityMinDurationS",
       0,
       2,
       __WEBUI_TEXT__("runtime.retare_min_stable_time"),
       { unit: __WEBUI_TEXT__("runtime.s") },
     ) ||
-    R.rangeCheck(
+    rangeCheck(
       "scaleTimerStopExtraDelayMs",
       0,
       1000,
       __WEBUI_TEXT__("runtime.scale_timer_stop_extra_delay"),
       { int: 1, unit: __WEBUI_TEXT__("runtime.ms") },
     ) ||
-    R.rangeCheck("dripDelayS", 0, 10, __WEBUI_TEXT__("runtime.drip_delay"), {
+    rangeCheck("dripDelayS", 0, 10, __WEBUI_TEXT__("runtime.drip_delay"), {
       unit: __WEBUI_TEXT__("runtime.s"),
     }) ||
-    R.rangeCheck("lastShotCooldownMin", 5, 240, __WEBUI_TEXT__("runtime.last_shot_cooldown"), {
+    rangeCheck("lastShotCooldownMin", 5, 240, __WEBUI_TEXT__("runtime.last_shot_cooldown"), {
       int: 1,
       unit: __WEBUI_TEXT__("runtime.min"),
     });
@@ -708,8 +702,8 @@ const autosave = {
   },
   // Conflicts already show as live warnings; the patch waits for them.
   brew: {
-    payload: R.brewPayload,
-    valid: () => !R.validateBrewClient().length,
+    payload: brewPayload,
+    valid: () => !validateBrewClient().length,
     save: (patch) => R.saveBrewPreset(patch, ""),
   },
   ...(__LINEA_MICRA__ && {
@@ -727,6 +721,335 @@ async function flushSettings() {
   return false;
 }
 let ready = false;
+// Field validation and the brew form payload; Home's quick-weight saves reach
+// validateBrewClient and renderPresetReview through R.setSettingsForm.
+function rangeCheck(id, min, max, label, opts) {
+  const raw = $(id).value.trim(),
+    v = Number(raw),
+    unit = opts && opts.unit ? " " + opts.unit : "";
+  if (raw === "" || !Number.isFinite(v))
+    return {
+      id,
+      required: true,
+      msg: label + __WEBUI_TEXT__("runtime.is_required") + min + "–" + max + unit + ").",
+    };
+  if (opts && opts.int && !Number.isInteger(v))
+    return {
+      id,
+      msg:
+        label + __WEBUI_TEXT__("runtime.must_be_an_integer_from") + min + " to " + max + unit + ".",
+    };
+  if (opts && opts.step && Math.abs(v / opts.step - Math.round(v / opts.step)) > 1e-6)
+    return {
+      id,
+      msg:
+        label +
+        __WEBUI_TEXT__("runtime.must_be_from") +
+        min +
+        " to " +
+        max +
+        unit +
+        __WEBUI_TEXT__("runtime.in_steps_of").replace("%1", opts.step) +
+        ".",
+    };
+  if (v < min || v > max)
+    return {
+      id,
+      msg: label + __WEBUI_TEXT__("runtime.must_be_from") + min + " to " + max + unit + ".",
+    };
+  return null;
+}
+// Brew validation message values: formatted per the input's step so every
+// R.number shows the precision the field itself uses ("34.0 g", never "34 g"
+// for a 0.1-step field, and never a rounded-off typed value).
+function brewFieldValue(id) {
+  const raw = $(id).value.trim(),
+    v = Number(raw);
+  if (raw === "" || !Number.isFinite(v)) return "";
+  const step = Number($(id).step),
+    dec = step > 0 && step < 1 ? (String(step).split(".")[1] || "").length : 0,
+    fixed = v.toFixed(dec);
+  return Number(fixed) === v ? fixed : String(v);
+}
+const BREW_FIELD_TEXT = {
+    doseG: [__WEBUI_TEXT__("runtime.dose"), __WEBUI_TEXT__("runtime.g"), "recipe"],
+    goalWeightG: [__WEBUI_TEXT__("runtime.target_yield"), __WEBUI_TEXT__("runtime.g"), "recipe"],
+    operationalWallS: [
+      __WEBUI_TEXT__("runtime.max_bbw_time"),
+      __WEBUI_TEXT__("runtime.s"),
+      "limits",
+    ],
+    bbwProtectionS: [
+      __WEBUI_TEXT__("runtime.bbw_protection"),
+      __WEBUI_TEXT__("runtime.s"),
+      "limits",
+    ],
+    lineaMicraBrewTargetC: [__WEBUI_TEXT__("runtime.brew_temperature"), "°C"],
+    fastBeforeS: [__WEBUI_TEXT__("runtime.window_start"), __WEBUI_TEXT__("runtime.s"), "recipe"],
+    fastMarginG: [__WEBUI_TEXT__("runtime.fast_margin"), __WEBUI_TEXT__("runtime.g"), "fast"],
+    slowAfterS: [__WEBUI_TEXT__("runtime.window_end"), __WEBUI_TEXT__("runtime.s"), "recipe"],
+    slowMarginG: [__WEBUI_TEXT__("runtime.slow_margin"), __WEBUI_TEXT__("runtime.g"), "slow"],
+    scaleLossFixedS: [
+      __WEBUI_TEXT__("runtime.scale_loss_override"),
+      __WEBUI_TEXT__("runtime.s"),
+      "limits",
+    ],
+  },
+  BREW_SECTION_TEXT = {
+    recipe: __WEBUI_TEXT__("settings.recipe"),
+    fast: __WEBUI_TEXT__("settings.fast_shots"),
+    slow: __WEBUI_TEXT__("settings.slow_shots"),
+    limits: __WEBUI_TEXT__("settings.shot_limits"),
+  },
+  BREW_CROSS_TEXT = {
+    gt: __WEBUI_TEXT__("settings.err_greater"),
+    lt: __WEBUI_TEXT__("settings.err_less"),
+    ge: __WEBUI_TEXT__("settings.err_at_least"),
+    le: __WEBUI_TEXT__("settings.err_not_exceed"),
+  },
+  BREW_REL = {
+    ">": (a, b) => a > b,
+    "<": (a, b) => a < b,
+  },
+  // Cross-field rules as [fieldA, fieldB, violation(fieldA, fieldB + offset),
+  // messageA, messageB, offset]: each message is phrased from its own field's
+  // side and names the other field's value, label, and settings section. The
+  // retare floor entry is single-sided: its bound is computed, not an edited field.
+  BREW_CROSS_RULES = [
+    ["bbwProtectionS", "operationalWallS", ">", "le", "ge"],
+    ["bbwProtectionS", "retareFloor", "<", "ge"],
+    ["fastBeforeS", "bbwProtectionS", "<", "ge", "le", 2],
+    ["slowAfterS", "operationalWallS", ">", "le", "ge", -1],
+  ];
+// Message label for a brew field: the Settings form labels carry the unit in
+// parentheses, so every error and warning opens with the exact field name the
+// user sees, never the field's own current value.
+const brewFieldLabel = (id) => {
+  const [label, unit] = BREW_FIELD_TEXT[id];
+  return label + " (" + unit + ")";
+};
+function brewCrossErr(kind, id, other, off = 0) {
+  const [ref, refUnit, refSection] = BREW_FIELD_TEXT[other],
+    limit = (off ? (R.number(other) + off).toFixed(1) : brewFieldValue(other)) + " " + refUnit,
+    named = off ? ref + (off > 0 ? " + " : " − ") + Math.abs(off) + " " + refUnit : ref;
+  return R.sub(BREW_CROSS_TEXT[kind], [
+    brewFieldLabel(id),
+    limit,
+    named,
+    BREW_SECTION_TEXT[refSection],
+  ]);
+}
+// The fields the user changed: the baseline follows the device for every
+// field without a pending edit, so programmatic writes (the Home quick-weight
+// sheet) count as edits too.
+function editedBrewFields() {
+  const edited = new Set();
+  if (!R.uiState.formBaseline) return edited;
+  for (const el of R.settingsSectionEls("brew"))
+    if (el.id && R.uiState.formBaseline[el.id] !== (el.type === "checkbox" ? el.checked : el.value))
+      edited.add(el.id);
+  return edited;
+}
+function validateBrewClient() {
+  const errors = [],
+    edited = editedBrewFields(),
+    fastOn = $("fastExtractionGuardEnabled").checked,
+    slowOn = $("slowExtractionGuardEnabled").checked,
+    brewRange = (id, min, max, opts) =>
+      rangeCheck(id, min, max, brewFieldLabel(id), {
+        unit: BREW_FIELD_TEXT[id][1],
+        ...opts,
+      }),
+    add = (e) => e && errors.push(e);
+  add(brewRange("goalWeightG", 10, 200, { step: 0.1 }));
+  add(brewRange("operationalWallS", 5, 60, { int: 1 }));
+  add(brewRange("bbwProtectionS", 0.5, 30));
+  if (document.documentElement.classList.contains("micraTemperatureEnabled"))
+    add(brewRange("lineaMicraBrewTargetC", 80, 100));
+  add(brewRange("doseG", 5, 30, { step: 0.1 }));
+  add(brewRange("fastBeforeS", 2.5, 58, { step: 0.5 }));
+  add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));
+  if (fastOn) add(brewRange("fastMarginG", 0.5, 10, { step: 0.1 }));
+  if (slowOn) add(brewRange("slowMarginG", 0.5, 10, { step: 0.1 }));
+  if (brewFieldValue("scaleLossFixedS") !== "")
+    add(
+      brewRange(
+        "scaleLossFixedS",
+        R.formNumber("bbwProtectionS"),
+        R.formNumber("operationalWallS"),
+      ),
+    );
+  const rw = R.formNumber("retareWindowS"),
+    withRetare = !!$("autoRetare") && $("autoRetare").checked && Number.isFinite(rw),
+    floor = (withRetare ? rw : 0) + 3;
+  for (const [a, b, rel, kindA, kindB, off = 0] of BREW_CROSS_RULES) {
+    const retareRule = b === "retareFloor";
+    // An empty or non-numeric participant already produced its self-range
+    // error; cross rules only compare well-formed values (Number("") is 0).
+    if (brewFieldValue(a) === "" || (!retareRule && brewFieldValue(b) === "")) continue;
+    const x = R.number(a),
+      y = retareRule ? floor : R.number(b) + off;
+    if (!BREW_REL[rel](x, y)) continue;
+    if (retareRule) {
+      const unit = BREW_FIELD_TEXT[a][1],
+        fixed = floor.toFixed(1),
+        bound = (Number(fixed) === floor ? fixed : String(floor)) + " " + unit;
+      errors.push({
+        id: a,
+        msg: withRetare
+          ? R.sub(BREW_CROSS_TEXT.ge, [
+              brewFieldLabel(a),
+              bound,
+              R.sub(__WEBUI_TEXT__("settings.err_retare_sum"), [brewFieldValue("retareWindowS")]),
+              __WEBUI_TEXT__("settings.tare"),
+            ])
+          : R.sub(__WEBUI_TEXT__("settings.err_at_least_plain"), [brewFieldLabel(a), bound]),
+      });
+      continue;
+    }
+    const blamed = [a, b].filter((id) => edited.has(id));
+    for (const id of blamed.length ? blamed : [a])
+      errors.push({
+        id,
+        msg: brewCrossErr(id === a ? kindA : kindB, id, id === a ? b : a, id === a ? off : -off),
+      });
+  }
+  if (
+    brewFieldValue("fastBeforeS") !== "" &&
+    brewFieldValue("slowAfterS") !== "" &&
+    R.number("slowAfterS") < R.number("fastBeforeS") + 1
+  )
+    errors.push({
+      id: "slowAfterS",
+      msg: R.sub(__WEBUI_TEXT__("runtime.window_min_length"), [
+        +(R.number("fastBeforeS") + 1).toFixed(1),
+      ]),
+    });
+  // Margins are relative to the target: extra yield at most a quarter of it,
+  // and an early stop that still leaves 5 g in the cup.
+  const goal = brewFieldValue("goalWeightG") === "" ? NaN : R.number("goalWeightG"),
+    recipe = BREW_SECTION_TEXT.recipe;
+  if (fastOn && brewFieldValue("fastMarginG") !== "" && R.number("fastMarginG") > goal / 4)
+    errors.push({
+      id: "fastMarginG",
+      msg: R.sub(BREW_CROSS_TEXT.le, [
+        brewFieldLabel("fastMarginG"),
+        (goal / 4).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
+        __WEBUI_TEXT__("runtime.quarter_of_target"),
+        recipe,
+      ]),
+    });
+  if (slowOn && brewFieldValue("slowMarginG") !== "" && R.number("slowMarginG") > goal - 5)
+    errors.push({
+      id: "slowMarginG",
+      msg: R.sub(BREW_CROSS_TEXT.le, [
+        brewFieldLabel("slowMarginG"),
+        (goal - 5).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
+        BREW_FIELD_TEXT.goalWeightG[0] + " − 5 g",
+        recipe,
+      ]),
+    });
+  return errors;
+}
+function brewPayload() {
+  return {
+    ...Object.fromEntries([
+      ...["doseG", "goalWeightG", "fastBeforeS", "slowAfterS", "fastMarginG", "slowMarginG"].map(
+        (k) => [k, R.number(k)],
+      ),
+      ...["operationalWall", "bbwProtection"].map((k) => [k + "Ms", R.sToMs(k + "S")]),
+      ...[
+        "brewByWeight",
+        "fastExtractionGuardEnabled",
+        "slowExtractionGuardEnabled",
+        "grindHintsEnabled",
+      ].map((k) => [k, $(k).checked]),
+    ]),
+    // Empty means "use your recent shots": the firmware stores it as 0.
+    scaleLossFixedS: R.number("scaleLossFixedS"),
+    ...(document.documentElement.classList.contains("micraTemperatureEnabled")
+      ? { lineaMicraBrewTargetC: R.number("lineaMicraBrewTargetC") }
+      : {}),
+  };
+}
+// Review graph of the preset under review: pace curves fan out from the
+// origin into corridors whose boundaries are the preset's thresholds, colored
+// only under the cut line. Unsaved edits redraw live over the ghosted saved line.
+function renderPresetReview() {
+  const host = $("presetReviewGraph");
+  // Settings redraws it on entry; hidden, it would redraw on every Home frame.
+  if (!host || R.activeView !== "settings") return;
+  const goalNow = R.formNumber("goalWeightG"),
+    grams = (v) => (Number.isFinite(v) ? v.toFixed(1) : "\u2014");
+  for (const [id, key, w] of [
+    [
+      "fastMarginResult",
+      __WEBUI_TEXT__("runtime.margin_up_to"),
+      goalNow + R.formNumber("fastMarginG"),
+    ],
+    [
+      "slowMarginResult",
+      __WEBUI_TEXT__("runtime.margin_down_to"),
+      goalNow - R.formNumber("slowMarginG"),
+    ],
+  ])
+    $(id).textContent = R.sub(key, [grams(w), R.brewRatio(w, R.formNumber("doseG"))]);
+  const id = R.presetState.selectedId || R.presetState.activeId,
+    saved = R.presetState.items.find((x) => x.id === id),
+    savedModel = R.buildRuleChartModel(saved),
+    draft =
+      R.configLoaded && R.uiState.brewDirty && R.bbwFormPresetId === id
+        ? R.buildRuleChartModel({ ...saved, ...brewPayload() })
+        : null,
+    m = draft && draft.mode !== "empty" ? draft : savedModel,
+    ghost = JSON.stringify(m.pts) !== JSON.stringify(savedModel.pts) ? savedModel : null;
+  $("presetReview").hidden = savedModel.mode === "empty";
+  const statsLine = R.shotStatsLine(saved);
+  $("windowStatsText").textContent = statsLine || __WEBUI_TEXT__("runtime.no_shots_yet");
+  if (savedModel.mode === "empty") return;
+  // Past arrivals were judged against the saved target: hidden while it is edited.
+  const arrivals = m.goal === savedModel.goal ? saved.arrivalsS || [] : [];
+  host._draw = renderPresetReview;
+  const view = R.drawPresetGraph(host, m, { ghost, arrivals }, $("presetReviewReadout"), id);
+  if (!view) return;
+  const legend = $("presetReviewLegend");
+  if (!legend.childElementCount)
+    legend.innerHTML =
+      '<span class="rvLeg rvLegCut"><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_cut") +
+      "</span>" +
+      '<span class="rvLeg rvLegPace"><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_pace") +
+      "</span>" +
+      '<span class="rvLeg rvLegExample"><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_example") +
+      "</span>" +
+      '<span class="rvLeg rvLegArrivals"><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_arrivals") +
+      "</span>" +
+      '<span class="rvLeg rvLegWindow"><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_corridor") +
+      "</span>" +
+      '<span class="rvLeg rvLegFast"><i></i><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_fast") +
+      "</span>" +
+      '<span class="rvLeg rvLegSlow"><i></i><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_slow") +
+      "</span>" +
+      '<span class="rvLeg rvLegNoCut"><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_no_cut") +
+      "</span>" +
+      '<span class="rvLeg rvLegSaved"><i></i>' +
+      __WEBUI_TEXT__("runtime.graph_legend_saved") +
+      "</span>" +
+      '<small class="rvNote"></small>';
+  legend.lastChild.textContent =
+    __WEBUI_TEXT__("runtime.graph_pace_note") + " " + R.paceStartNote(m);
+  legend.classList.toggle("ghosted", !!ghost);
+  legend.classList.toggle("hasArrivals", view.arrivals > 0);
+  legend.classList.toggle("noFast", !m.fast);
+  legend.classList.toggle("noSlow", !m.slow);
+}
 export function applyStatus(s) {
   R.updateBuzzerAlertVisibility(s.buzzerSupported);
   applySettingsStatus(s);
@@ -1055,6 +1378,7 @@ export function init() {
   ready = true;
   R.initGroupRows($("workflowPanel"));
   R.registerViewStatus("settings", applyStatus);
+  R.setSettingsForm({ validateBrewClient, renderPresetReview });
   R.registerViewStatus("settingsLive", updateCupMinGuidance);
   $("presetCards")?.addEventListener("click", () => setTimeout(updateSettingsOverrides));
   R.uiState.flushSettings = flushSettings;
@@ -1179,7 +1503,7 @@ export function init() {
         // preview, which re-runs over the pending set as a whole.
         clearBrewFieldErrors();
         refreshBrewWarnings();
-        R.renderPresetReview();
+        renderPresetReview();
       };
       el.addEventListener("input", fn);
       el.addEventListener("change", fn);

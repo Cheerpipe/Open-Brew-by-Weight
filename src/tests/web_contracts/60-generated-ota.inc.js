@@ -133,10 +133,10 @@ for (const [machineType, forbidden] of Object.entries(machineTypeExclusive)) {
   // Save validation reads only shipped fields too.
   const typeClasses = {paddle: [], momentary: ['momentaryMachine'],
     momentary_reed: ['momentaryMachine', 'reedMachine']}[machineType];
-  new Function('$', 'R', 'document', blockAt(viewJs.settings, 'function validateMachineClient(') +
-      ';return validateMachineClient();')(field, {rangeCheck: (id) => (field(id).value, ''),
+  new Function('$', 'R', 'document', 'rangeCheck', blockAt(viewJs.settings, 'function validateMachineClient(') +
+      ';return validateMachineClient();')(field, {
     number: (id) => Number(field(id).value), formNumber: () => 1},
-  {documentElement: {classList: {contains: (c) => typeClasses.includes(c)}}});
+  {documentElement: {classList: {contains: (c) => typeClasses.includes(c)}}}, (id) => (field(id).value, ''));
 }
 // Typed CSS drops only the selectors naming stripped markup, never the
 // rules grouped with them.

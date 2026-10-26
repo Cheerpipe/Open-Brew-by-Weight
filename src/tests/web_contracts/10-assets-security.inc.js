@@ -92,18 +92,33 @@ if (!codeIncludes(rawViewJs.diagnostic, 'const saveFile=(blob,name)=>R.saveFile(
 const {shellHtml, partialHtml, appJs: appJsSource, runtimeJs, otaImageJs, viewJs, css} =
     authoring.localized;
 const {allHtml, allJs} = authoring;
-// Harnesses that run a slice of the runtime prepend its shared UI state.
-const runtimeStateDecl = blockAt(runtimeJs, 'const uiState = {') + ';\n';
+// Harnesses that run a slice of the runtime prepend its shared UI state and
+// the stream registry the views subscribe through.
+const uiStateDecl = blockAt(runtimeJs, 'const uiState = {') + ';\n';
+const runtimeStreamRegistry = 'const streamHandlers = {};\n' +
+    blockAt(runtimeJs, 'function registerStream(') + blockAt(runtimeJs, 'function eachStream(') + '\n';
+const runtimeStateDecl = uiStateDecl + runtimeStreamRegistry;
 // Harnesses that keep state as vm globals alias uiState and R to the global
 // object and seed the shared-state defaults they do not set themselves.
 const runtimeStateGlobals = 'var uiState = this, R = this;for (const [k, v] of Object.entries(' +
-    runtimeStateDecl.replace(/^const uiState = /, '').replace(/;\n$/, '') +
-    ')) if (!(k in this)) this[k] = v;\n';
-// The Stats export window lives in the Stats module; stream harnesses that
-// already declare uiState append it with its two runtime dependencies.
-const statsExportJs = '\nconst R = {uiState, sendUiOperation};\n' +
-    viewJs.stats.slice(viewJs.stats.indexOf('let statsExportInFlight'),
-        viewJs.stats.indexOf('async function clearShotHistory('));
+    uiStateDecl.replace(/^const uiState = /, '').replace(/;\n$/, '') +
+    ')) if (!(k in this)) this[k] = v;\n' + runtimeStreamRegistry;
+// View code reaches the runtime through R; harnesses that run it after a
+// runtime slice alias R to that slice's own scope.
+const viewRuntimeAlias = '\nconst R = new Proxy({}, {get: (_, k) => eval(k)});\n';
+// The record pages' stream machines and the Stats export window live in their
+// modules; stream harnesses register both pages as the views' init() would.
+const recordsStreamJs = viewRuntimeAlias +
+    viewJs.stats.slice(viewJs.stats.indexOf('function refreshShots('),
+        viewJs.stats.indexOf('let ready = false;')) +
+    viewJs.history.slice(viewJs.history.indexOf('const refreshHistory ='),
+        viewJs.history.indexOf('let ready = false;')) +
+    'registerStream("stats", statsStream);registerStream("history", historyStream);\n';
+const statsExportJs = viewJs.stats.slice(viewJs.stats.indexOf('let statsExportInFlight'),
+    viewJs.stats.indexOf('async function clearShotHistory('));
+// The log stream lives in the Diagnostic module.
+const logStreamJs = viewJs.diagnostic.slice(viewJs.diagnostic.indexOf('const LOG_EVENTS_CAPACITY'),
+    viewJs.diagnostic.indexOf('export function applyStatus(')) + 'registerStream("log", logStream);\n';
 // Stats renders its shots with runtime helpers; text contracts on that code read both.
 const statsRuntimeJs = runtimeJs + '\n' + viewJs.stats;
 // History renders its rows with runtime helpers; text contracts on that code read both.
@@ -300,9 +315,9 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
     const logContext = vm.createContext({logBootId: 3, bootId: 3, logEvents: [],
       lastLog: 9, logMissed: 0, LOG_EVENTS_CAPACITY: 500, activeView: 'diagnostic',
       updateLogHealth() {}, renderLog: () => {rendered++;}, updateFirmwareFooter() {},
-      noteReachOk() {}, noteReachFail() {}, paint: (fn) => fn()});
-    const logFns = rawRuntimeJs.slice(rawRuntimeJs.indexOf('function logStreamFrame('),
-        rawRuntimeJs.indexOf('function diagSnapshotOk('));
+      noteBootId() {}, noteReachOk() {}, noteReachFail() {}, paint: (fn) => fn()});
+    const logFns = rawViewJs.diagnostic.slice(rawViewJs.diagnostic.indexOf('function logStreamFrame('),
+        rawViewJs.diagnostic.indexOf('function renderLog('));
     vm.runInContext(runtimeStateGlobals + logFns, logContext);
     const event = sequence => ({sequence, atMs: 1, wallSec: 0, localSec: 0,
       level: 'info', category: 'web', message: 'm'});
@@ -401,6 +416,10 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
     for (const view of ['home', 'settings', 'stats', 'history', 'diagnostic', 'admin']) {
       const events = [], markup = deferred(), status = deferred(), data = deferred(), bodyClasses = new Set();
       const path = view === 'home' ? '/' : '/' + view;
+      const paired = ['stats', 'history'].includes(view), streams = paired || view === 'diagnostic';
+      // The view's module: record pages and the log own their start().
+      const mod = streams ? {start: () => {events.push('data'); return data.promise;}} : {};
+      const setLoad = (fn) => { if (paired) mod.start = fn; else r.R.loadStatus = fn; };
       const r = vm.createContext({activeView: '', routeSeq: 0, logTimer: 0,
         jsMods: new Map(),
         ROUTES: {[path]: view}, knownPath: () => path, viewToPath: () => path,
@@ -413,23 +432,20 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
           withPollGate: fn => fn(), webUiPollingActive: () => true,
           setActiveView() {}, armStatusTimer() {}, applyDiagnosticNavigation() {},
           startDiagnosticStream() {}, stopDiagnosticStream() {},
-          startStatsStream: () => {events.push('data'); return data.promise;},
-          startHistoryStream: () => {events.push('data'); return data.promise;},
           ensureBackgroundStreams() {},
           loadStatus: () => {events.push('status'); return status.promise;},
-          startLogStream: () => {events.push('data'); return data.promise;},
           hideHomeBoot: () => events.push('fade'), message: () => events.push('error')}});
       vm.runInContext(routeSource, r);
       const loading = r.renderRoute(path); await flush();
-      const paired = ['stats', 'history'].includes(view);
-      assert.deepEqual(events, paired ? ['show', 'markup', 'data'] :
-        ['show', 'markup', 'status'], view + ': fetch data while lazy markup loads');
-      markup.resolve(); await flush();
+      assert.deepEqual(events, paired ? ['show', 'markup', 'markup'] :
+        ['show', 'markup', 'status'], view + ': status loads while lazy markup does; a record page waits for its module');
+      markup.resolve(mod); await flush();
       assert.equal(bodyClasses.has('homeView'), view === 'home', 'Only Home uses the scrolling desktop header');
       assert.equal(events.includes('fade'), false, view + ': wait for initial data');
       status.resolve(true); await flush();
-      if (['stats', 'history', 'diagnostic'].includes(view)) {
-        assert.deepEqual(events, paired ? ['show', 'markup', 'data'] : ['show', 'markup', 'status', 'data']);
+      if (streams) {
+        assert.deepEqual(events, paired ? ['show', 'markup', 'markup', 'data'] :
+          ['show', 'markup', 'status', 'markup', 'data'], view + ': the view module starts its stream once it is in');
         data.resolve(true);
       }
       await loading;
@@ -440,17 +456,16 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
       await r.renderRoute(path);
       assert.equal(events.slice(beforeFailure).includes('error'), true, view + ': expose lazy-load failure');
       assert.equal(events.slice(beforeFailure).includes('fade'), false, view + ': failed markup cannot reveal the page');
-      r.ensureView = async () => {};
-      const loadName = view === 'stats' ? 'startStatsStream' : view === 'history' ? 'startHistoryStream' : 'loadStatus';
-      r.R[loadName] = async () => false;
+      r.ensureView = async () => mod;
+      setLoad(async () => false);
       await r.renderRoute(path);
       assert.equal(events.at(-1), 'error', view + ': expose initial data failure');
-      const old = deferred(); r.R[loadName] = () => old.promise;
+      const old = deferred(); setLoad(() => old.promise);
       const superseded = r.renderRoute(path); await flush();
       r.routeSeq++; old.resolve(true); await superseded;
       assert.notEqual(events.at(-1), 'fade', view + ': ignore superseded route readiness');
-      r.R[loadName] = async () => true;
-      r.ensureView = async () => {events.push('markup');};
+      setLoad(async () => true);
+      r.ensureView = async () => {events.push('markup'); return mod;};
       r.R.setViewPollHooks = hooks => {r.viewHooks = hooks;};
       vm.runInContext(hooksSource, r);
       const beforeReload = events.length;

@@ -107,12 +107,11 @@
   assert(learning.classList.contains('hidden'));
 
   // The preset save no longer carries drip or speed values.
-  const payload = blockAt(runtimeJs, 'function brewPayload(');
-  const makePayload = new Function('$', 'number', 'sToMs', 'presetState', 'bbwFormPresetId', 'document',
-    payload + ';return brewPayload();');
+  const payload = blockAt(viewJs.settings, 'function brewPayload(');
+  const makePayload = new Function('$', 'R', 'document', payload + ';return brewPayload();');
   const nonMicraDocument = {documentElement: {classList: {contains: () => false}}};
   const fields = makePayload(id => elements.get(id) || {checked: true, value: 'auto'},
-    () => 36, () => 30000, {activeId: 1}, 2, nonMicraDocument);
+    {number: () => 36, sToMs: () => 30000, presetState: {activeId: 1}, bbwFormPresetId: 2}, nonMicraDocument);
   assert(!('id' in fields) && codeIncludes(blockAt(runtimeJs, 'async function saveBrewPreset('),
       "{action:'save',id:bbwFormPresetId,...patch}"),
       'A selection change must not retarget the rendered recipe');
@@ -148,8 +147,8 @@
   });
   vm.runInContext(runtimeJs.slice(runtimeJs.indexOf('function axisLabel('),
     runtimeJs.indexOf('async function populateTimezoneOptions(')) + statsChartJs, context);
-  vm.runInContext(blockAt(runtimeJs, 'function saveFile(') + blockAt(runtimeJs, 'function downloadCsv('),
-      context);
+  vm.runInContext('var R = this;' + blockAt(runtimeJs, 'function saveFile(') +
+      blockAt(viewJs.records, 'function downloadCsv('), context);
   vm.runInContext('var R = this;' + blockAt(viewJs.stats, 'function shotCut(') +
     blockAt(viewJs.stats, 'function shotFlowCurveGS('), context);
   vm.runInContext(blockAt(viewJs.stats, 'async function exportShotsCsv('), context);
@@ -215,7 +214,8 @@
   const context = vm.createContext({Blob, setTimeout: () => 0,
     URL: {createObjectURL: (blob) => { saved = blob; return 'blob:x'; }, revokeObjectURL() {}},
     document: {createElement: () => ({click() {}, remove() {}}), body: {append() {}}}});
-  vm.runInContext(blockAt(runtimeJs, 'function saveFile(') + blockAt(runtimeJs, 'function downloadCsv('), context);
+  vm.runInContext('var R = this;' + blockAt(runtimeJs, 'function saveFile(') +
+      blockAt(viewJs.records, 'function downloadCsv('), context);
   context.downloadCsv('x.csv', [['=1+1', '-3.5', '@x', 'a\r\nb', 'x,"y"', 5, -2, '+cmd', '']]);
   const bytes = Buffer.from(await saved.arrayBuffer());
   assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);

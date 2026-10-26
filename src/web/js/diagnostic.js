@@ -1276,6 +1276,134 @@ function saveLogLevel(id) {
     el.value = logLevels?.[id] || "none";
   });
 }
+// The serial log rides the owned socket (runtime.js registerStream): subscribe
+// with the rendered tail's cursor; watermark-gated frames push new events
+// without REST polling.
+const LOG_EVENTS_CAPACITY = 500;
+let logStreamWanted = false,
+  logBootId = 0,
+  lastLog = 0;
+function startLogStream() {
+  if (R.webUiPollingActive()) {
+    if (!logStreamWanted) {
+      logStreamWanted = true;
+      R.sendUiOperation({ op: "log", on: true, after: lastLog });
+    }
+    return true;
+  }
+  return false;
+}
+function stopLogStream() {
+  if (logStreamWanted) R.sendUiOperation({ op: "log", on: false });
+  logStreamWanted = false;
+}
+function logStreamFrame(m) {
+  if (
+    m.v !== 1 ||
+    !Number.isInteger(m.bootId) ||
+    !Array.isArray(m.events) ||
+    typeof m.hasMore !== "boolean" ||
+    typeof m.cursorInvalid !== "boolean" ||
+    ["historyOverwritten", "missedEvents", "serialDropped"].some((k) => !Number.isInteger(m[k]))
+  )
+    throw Error();
+  for (const e of m.events)
+    if (
+      !e ||
+      !Number.isInteger(e.sequence) ||
+      !Number.isInteger(e.atMs) ||
+      !Number.isInteger(e.wallSec) ||
+      !Number.isInteger(e.localSec) ||
+      typeof e.level !== "string" ||
+      typeof e.category !== "string" ||
+      typeof e.message !== "string"
+    )
+      throw Error();
+  return m;
+}
+function applyLogFrame(m) {
+  const b = +m.bootId;
+  if ((logBootId && b && b !== logBootId) || m.cursorInvalid) {
+    R.uiState.logEvents = [];
+    lastLog = R.uiState.logMissed = 0;
+  }
+  logBootId = b;
+  R.noteBootId(b);
+  R.uiState.logMissed += m.missedEvents || 0;
+  for (const e of m.events) {
+    if (lastLog && ((e.sequence - lastLog) | 0) <= 0) continue;
+    R.uiState.logEvents.push(e);
+    lastLog = e.sequence;
+  }
+  if (R.uiState.logEvents.length > LOG_EVENTS_CAPACITY)
+    R.uiState.logEvents.splice(0, R.uiState.logEvents.length - LOG_EVENTS_CAPACITY);
+  updateLogHealth(m);
+  R.paint(renderLog);
+  R.updateFirmwareFooter();
+  if (R.activeView === "diagnostic") R.noteReachOk();
+}
+function renderLog() {
+  const f = $("logFilter").value,
+    m = +$("logLevelFilter").value,
+    r = { critical: 0, error: 1, warning: 2, info: 3, debug: 4 };
+  let o = "";
+  for (const e of R.uiState.logEvents) {
+    if (f && e.category !== f) continue;
+    if ((r[e.level] ?? 3) > m) continue;
+    o += e.line ??=
+      (e.wallSec ? R.formatWallTimeLocal(e.localSec) : "+" + (e.atMs / 1000).toFixed(3) + "s") +
+      " " +
+      e.level.toUpperCase() +
+      " [" +
+      e.category +
+      "] " +
+      e.message +
+      "\n";
+  }
+  // New lines append (and the oldest drop) in place, so a selection or a
+  // scrolled-back view survives; only a reader already at the end follows it.
+  const el = $("log"),
+    old = el.value,
+    cut = old.indexOf(o.slice(0, o.indexOf("\n") + 1)),
+    top = el.scrollTop,
+    h = el.scrollHeight,
+    stick = top + el.clientHeight >= h - 8;
+  if (o === old) return;
+  if (cut >= 0 && o.startsWith(old.slice(cut))) {
+    el.setRangeText("", 0, cut);
+    if (!stick) el.scrollTop = top - h + el.scrollHeight;
+    el.setRangeText(o.slice(old.length - cut), el.value.length, el.value.length);
+  } else el.value = o;
+  if (stick) el.scrollTop = el.scrollHeight;
+}
+function updateLogHealth(d) {
+  const a = [],
+    e = $("logDropped");
+  if (d.historyOverwritten)
+    a.push(__WEBUI_TEXT__("runtime.history_rotated") + d.historyOverwritten);
+  if (R.uiState.logMissed)
+    a.push(__WEBUI_TEXT__("runtime.missed_while_disconnected") + R.uiState.logMissed);
+  if (d.serialDropped) a.push(__WEBUI_TEXT__("runtime.serial_dropped") + d.serialDropped);
+  if (!e) return;
+  e.hidden = !a.length;
+  e.textContent = a.join(__WEBUI_TEXT__("runtime.symbol_8"));
+}
+const logStream = {
+  // Log frames carry their own cursor: a pending resync must not drop them.
+  cursor: true,
+  subscribe: () => (logStreamWanted ? { op: "log", on: true, after: lastLog } : null),
+  frame(data) {
+    if (logStreamWanted) applyLogFrame(logStreamFrame(data));
+  },
+  // A rebooted device restarts the log from its first event.
+  reboot(boot) {
+    if (!logStreamWanted || !logBootId || logBootId === boot) return;
+    logBootId = boot;
+    R.uiState.logEvents = [];
+    lastLog = R.uiState.logMissed = 0;
+    R.sendUiOperation({ op: "log", on: true, after: 0 });
+  },
+};
 export function applyStatus(s) {
   applyDiagnosticStatus(s);
   logLevels = s?.config;
@@ -1301,12 +1429,19 @@ export function applyStatus(s) {
         formatUptime(e.uptimeMs),
       ]),
     );
+  // A resume whose first snapshot failed never reached the route's log
+  // subscription: the recovered stream restarts it (a no-op once wanted).
+  startLogStream();
 }
+// The route starts the log with the view and stops it on every navigation.
+export const start = startLogStream,
+  stop = stopLogStream;
 export function init() {
   if (ready) return;
   ready = true;
   R.registerViewStatus("diagnostic", applyStatus);
   R.registerViewStatus("diagnosticLive", applyDiagnosticLive);
+  R.registerStream("log", logStream);
   setInterval(() => {
     if (!document.hidden && R.activeView === "diagnostic") renderDiagClock();
   }, 1000);
@@ -1333,8 +1468,8 @@ export function init() {
     title.onclick = (e) => void (copied && e.preventDefault());
   }
   for (const id of LOG_LEVELS) $(id).onchange = () => saveLogLevel(id);
-  $("logFilter").onchange = R.renderLog;
-  $("logLevelFilter").onchange = R.renderLog;
+  $("logFilter").onchange = renderLog;
+  $("logLevelFilter").onchange = renderLog;
   $("copyLogButton").onclick = () => copyText($("log").value);
   $("clearLogButton").onclick = () => clearLogView();
   $("auditVerboseButton").onclick = () => toggleAuditHunt();

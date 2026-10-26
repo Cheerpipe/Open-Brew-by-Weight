@@ -9,16 +9,16 @@
   const svAssert = require('assert').strict;
   const svCut = (start, end) => runtimeJs.slice(runtimeJs.indexOf(start),
     runtimeJs.indexOf(end));
+  // The field validator lives in the Settings module and reads the runtime's
+  // number helpers through R; the live-warning twin follows it.
   const svValidatorSrc =
-    svCut('function rangeCheck(', 'function formNumber(') +
     svCut('function number(', 'function sToMs(') +
     svCut('function formNumber(', 'const sub = (t, vals)') +
-    runtimeJs.slice(runtimeJs.indexOf('const sub = (t, vals)'),
-        runtimeJs.indexOf('\n}', runtimeJs.indexOf('function validateBrewClient(')) + 2) +
-    // The live-warning twin lives in the Settings module; the harness
-    // compiles it in so the executable cases below run the exact production
-    // filter, not a copy.
-    ';const R={validateBrewClient};' + blockAt(viewJs.settings, 'function brewWarningList(');
+    svCut('const sub = (t, vals)', 'function updateStaticIpFieldsState(') +
+    ';const R={number,formNumber,sub,uiState,settingsSectionEls};' +
+    viewJs.settings.slice(viewJs.settings.indexOf('function rangeCheck('),
+        viewJs.settings.indexOf('\n}', viewJs.settings.indexOf('function validateBrewClient(')) + 2) +
+    ';R.validateBrewClient=validateBrewClient;' + blockAt(viewJs.settings, 'function brewWarningList(');
   // Field defaults mirror the Settings form: steps come from the shipped
   // inputs (asserted below) and values form one consistent stored state.
   const svFieldSpec = {
@@ -165,10 +165,10 @@
   for (const section of ['Recipe', 'Fast shots', 'Slow shots', 'Time limits', 'Tare'])
     svAssert.ok(settingsHtml.includes('>' + section + '</summary>'),
       'Settings section summary missing: ' + section);
-  svAssert.ok(codeIncludes(runtimeJs, 'const errs = validateBrewClient(); if (errs.length) {') &&
+  svAssert.ok(codeIncludes(runtimeJs, 'const errs = settingsForm.validateBrewClient(); if (errs.length) {') &&
       codeIncludes(runtimeJs, 'clearBrewWarnings(); showFieldErrors(errs); return false; }'),
     'saveBrewPreset must render the full violation list, replacing the yellow preview');
-  svAssert.ok(codeIncludes(runtimeJs,
+  svAssert.ok(codeIncludes(viewJs.settings,
       'formBaseline[el.id] !== (el.type === "checkbox" ? el.checked : el.value)'),
     'Attribution must diff the live form against the device baseline');
   svAssert.equal(

@@ -165,9 +165,10 @@ int main(){
     setTimeout:(fn,delay)=>{timers.set(++nextTimer,{fn,delay});return nextTimer;},clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:()=>1,webUiPollingActive:()=>true,webUiClientId:'owner',webUiPowerSeconds:()=>0,
     activeView:'diagnostic',diagnosticUnlocked:true,developmentMode:false,lastLog:0,viewReady:Promise.resolve(),homeResolve(){},invalidateHomeStream(){},noteReachFail(){},
-    viewStatusHandlers:{diagnostic:s=>{assert(s.health);assert(s.tasks);paints.push(s);}}});
+    // The Diagnostic view restarts the log subscription from its status paint.
+    viewStatusHandlers:{diagnostic:s=>{assert(s.health);assert(s.tasks);paints.push(s);context.startLogStream();}}});
   vm.runInContext(runtimeStateDecl+'let homeFrame=null;'+runtimeJs.slice(runtimeJs.indexOf('function statusStreamFrame('),runtimeJs.indexOf('function renderHomeStream('))+
-      runtimeJs.slice(runtimeJs.search(/let\s+shotWs\s*=/),runtimeJs.indexOf('function setHomeSub('))+statsExportJs,context);
+      runtimeJs.slice(runtimeJs.search(/let\s+shotWs\s*=/),runtimeJs.indexOf('function setHomeSub('))+recordsStreamJs+logStreamJs+statsExportJs,context);
   (async()=>{
     let settled=false;
     const pending=context.loadDiagnosticStatus().then(value=>{settled=true;return value;});
@@ -215,12 +216,14 @@ int main(){
   }
 }
 // Log frames carry their own cursor and the firmware advances it on send, so a
-// pending snapshot resync must not drop them before the log dispatch.
+// pending snapshot resync must not drop them: the log handler is marked
+// `cursor` and the handler dispatch honors it ahead of the resync gate.
 {
   const onMessage = compactSource(blockAt(runtimeJs, 'function startUiStream('));
-  const logAt = onMessage.indexOf('if(data.type===log)');
+  const handlerAt = onMessage.indexOf('if(stream.cursor||!shotResync||data.snapshot)stream.frame(data)');
   const gateAt = onMessage.indexOf('if(shotResync&&!data.snapshot)return');
-  if (logAt < 0 || gateAt < 0 || logAt > gateAt) {
+  if (handlerAt < 0 || gateAt < 0 || handlerAt > gateAt ||
+      !codeIncludes(blockAt(viewJs.diagnostic, 'const logStream = {'), 'cursor:true,')) {
     throw new Error('Log frames must be dispatched before the stream resync gate');
   }
 }
@@ -230,7 +233,7 @@ int main(){
 // URL, and modified nav clicks keep the browser's own handling.
 {
   const assert = require('assert').strict;
-  assert(codeIncludes(runtimeJs, 'if(logStreamWanted)sendUiOperation({op:log,on:false})'));
+  assert(codeIncludes(viewJs.diagnostic, 'if(logStreamWanted)sendUiOperation({op:log,on:false})'));
   assert(codeIncludes(runtimeJs, "if(diagStreamWanted&&shotWs&&shotWs.readyState===1)shotWs.send('{\"op\":\"diagnostic\",\"on\":false}')"));
   assert(codeIncludes(appJsSource, 'if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'));
   const calls = [], loading = new Set(['pageLoading']),

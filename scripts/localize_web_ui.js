@@ -230,7 +230,7 @@ function projectSources() {
     ['html/setup.html', 'html'],
     ['app.css', 'css'], ['app.js', 'js'], ['js/runtime.js', 'js'],
     ['js/ota-image.js', 'js'], ['js/home.js', 'js'], ['js/stats.js', 'js'],
-    ['js/history.js', 'js'],
+    ['js/history.js', 'js'], ['js/records.js', 'js'],
     ['js/diagnostic.js', 'js'], ['js/settings.js', 'js'], ['js/admin.js', 'js'],
     ['js/setup.js', 'js'],
   ];

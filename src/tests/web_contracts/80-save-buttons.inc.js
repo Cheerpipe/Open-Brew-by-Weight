@@ -18,10 +18,10 @@
   const fwRevert = element('revertFirmwareModeButton');
   fwRevert.dataset.dirty = '0';
   const context = vm.createContext({$: id => elements.get(id), controlsMutable: true});
-  const helper = [blockAt(runtimeJs, 'function setSaveDirty('),
-    blockAt(runtimeJs, 'const REVERT_BUTTONS')];
-  assert(helper.every(Boolean), 'Missing shared dirty-save helper and revert pairing map');
-  vm.runInContext(helper.join('\n'), context);
+  const helper = [blockAt(viewJs.admin, 'function setSaveDirty('),
+    blockAt(viewJs.admin, 'const REVERT_BUTTONS')];
+  assert(helper.every(Boolean), 'Missing Admin dirty-save helper and revert pairing map');
+  vm.runInContext('var R = this;' + helper.join('\n'), context);
   vm.runInContext("setSaveDirty('save','hint',true)", context);
   assert(!button.disabled && button.dataset.dirty == 1 &&
          !hint.classList.contains('hidden'));
@@ -170,7 +170,7 @@
         viewJs.settings.indexOf(start), viewJs.settings.indexOf(end));
     vm.runInContext([
       runtimeStateGlobals,
-      take('function settingsSectionEls(', 'function setSaveDirty('),
+      take('function settingsSectionEls(', 'function updateScalePreferenceOptions('),
       settingsTake('function scaleHistoryLabel(', 'function brewWarningList('),
       blockAt(viewJs.settings, 'function selectPreferredScale('),
       blockAt(viewJs.settings, 'async function saveMachineConfig('),

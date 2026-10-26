@@ -1,5 +1,7 @@
 "use strict";
 import * as R from "./runtime.js?v=__FW_ASSET_TAG__";
+// createFilterMenu, actionMenu, downloadCsv, armListSentinel and ICON_TRASH come
+// from the records bundle prelude (records.js).
 const $ = R.$;
 function formatShotTime(r) {
   if (r.hasWallTime && r.endedAtLocalSec) return R.formatHumanTime(r.endedAtLocalSec);
@@ -981,7 +983,7 @@ function shotFilterGroups() {
 }
 function renderShots() {
   renderShotStats();
-  if (!R.shotsLoaded) return;
+  if (!shotsLoaded) return;
   const body = $("shotRows");
   if (!body) return;
   body.replaceChildren();
@@ -1185,7 +1187,7 @@ function rateHistoryShot(id, n, star) {
   return postShotRating({ id, rating: n }, () => {
     if (s) s.rating = p;
     renderShots();
-  }).then((ok) => ok && R.uiState.shotSort === "rating" && R.refreshShots());
+  }).then((ok) => ok && R.uiState.shotSort === "rating" && refreshShots());
 }
 function syncShotSortButtons() {
   const d = $("sortDateButton"),
@@ -1226,12 +1228,12 @@ function setShotSort(field) {
     R.uiState.shotSortDir = R.uiState.shotSortDir === "desc" ? "asc" : "desc";
   else R.uiState.shotSort = field;
   syncShotSortButtons();
-  R.statsSendSubscribe();
+  statsSendSubscribe();
 }
 const loadMoreShots = () => {
   if (
     R.uiState.shotHistory.hasMore &&
-    R.shotStatsViewActive() &&
+    shotStatsViewActive() &&
     !R.uiState.statsFetchMark &&
     !statsExportInFlight
   ) {
@@ -1245,7 +1247,7 @@ const loadMoreShots = () => {
       fetch: true,
       request: R.uiState.statsFetchMark.request,
       offset: R.uiState.statsFetchMark.offset,
-      limit: R.SHOTS_PAGE_SIZE,
+      limit: SHOTS_PAGE_SIZE,
       sort: R.uiState.shotSort,
       dir: R.uiState.shotSortDir,
     });
@@ -1254,7 +1256,7 @@ const loadMoreShots = () => {
 async function exportShotsCsv() {
   if (statsExportInFlight) return;
   try {
-    const list = await statsFrameWindow(0, R.SHOTS_EXPORT_LIMIT, "date", "desc", 90e3);
+    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 90e3);
     if (!list) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
     const maxW = list.reduce((m, r) => Math.max(m, r.wCg?.length || 0), 0);
     const rows = [
@@ -1341,7 +1343,7 @@ async function exportShotsCsv() {
         ).flat(),
       ]);
     }
-    R.downloadCsv("shot-history.csv", rows);
+    downloadCsv("shot-history.csv", rows);
   } catch (e) {
     R.message(
       R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_export_shot_history"), e),
@@ -1352,7 +1354,7 @@ async function exportShotsCsv() {
 async function exportShotsJson() {
   if (statsExportInFlight) return;
   try {
-    const list = await statsFrameWindow(0, R.SHOTS_EXPORT_LIMIT, "date", "desc", 90e3);
+    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 90e3);
     if (!list) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
     // Local time as YYYYMMDD-HHMM ("sv" formats dates ISO-like).
     const stamp = new Date().toLocaleString("sv").slice(0, 16).replace(/\D/g, "");
@@ -1731,6 +1733,324 @@ async function clearShotHistory() {
     }
   });
 }
+// The Stats page rides the owned socket (runtime.js registerStream): the
+// standing subscription is session-long once ensured, and these handlers run
+// from the runtime's socket callbacks.
+const SHOTS_PAGE_SIZE = 10,
+  SHOTS_EXPORT_LIMIT = 500;
+let shotsLoaded = false,
+  shotFilterReset = () => {};
+function applyShotPage(d, mode) {
+  shotsLoaded = true;
+  const a = d.shots,
+    t = d.total;
+  R.noteBootId(d.bootId);
+  if (d.stats) R.uiState.shotStats = d.stats;
+  if (mode === "append" && t) {
+    const s = {};
+    for (const x of R.uiState.shotHistory.shots) s[x.id] = 1;
+    let n = 0;
+    for (const x of a)
+      if (!s[x.id]) {
+        s[x.id] = 1;
+        R.uiState.shotHistory.shots.push(x);
+        n++;
+      }
+    R.uiState.shotHistory.total = t;
+    R.uiState.shotHistory.hasMore = !!n && !!d.hasMore;
+    return;
+  }
+  R.uiState.shotHistory = {
+    bootId: d.bootId,
+    total: t,
+    hasMore: !!d.hasMore && !!t,
+    shots: t ? a : [],
+  };
+}
+function shotStatsViewActive() {
+  if (R.activeView !== "stats" || !R.webUiPollingActive()) return false;
+  const view = $("view-stats");
+  return !!(view && !view.classList.contains("hidden"));
+}
+function refreshShots() {
+  return shotStatsViewActive() ? startStatsStream(true) : Promise.resolve(false);
+}
+// Stats pages assemble atomically; request IDs isolate sorting and CSV export.
+// statsSynced mirrors historySynced for the shot page cache.
+let statsStreamWanted = false,
+  statsSynced = false,
+  statsStreamBoot = 0,
+  statsStreamEpoch = 0,
+  statsRequest = 0,
+  statsLastSeq = 0,
+  statsPage = null,
+  statsResolve = null;
+// The subscribe op: a fresh request id separates its page from older frames.
+function statsSubscribeOp() {
+  R.uiState.statsFetchMark = null;
+  statsPage = null;
+  R.uiState.statsExportResolve?.(null);
+  statsSynced = false;
+  statsRequest = ++R.uiState.statsNextRequest;
+  return {
+    op: "stats",
+    on: true,
+    request: statsRequest,
+    offset: 0,
+    limit: SHOTS_PAGE_SIZE,
+    sort: R.uiState.shotSort,
+    dir: R.uiState.shotSortDir,
+    ...(Object.keys(R.uiState.shotFilter).length && { filter: R.uiState.shotFilter }),
+    ...(R.uiState.statsWindow !== 10 && { window: R.uiState.statsWindow }),
+  };
+}
+function statsSendSubscribe() {
+  if (R.shotWs?.readyState === 1) R.sendUiOperation(statsSubscribeOp());
+}
+// The Stats subscription is session-standing, like History above.
+function ensureStatsStream(resubscribe) {
+  if (resubscribe || !statsStreamWanted) {
+    statsStreamWanted = true;
+    if (R.shotWs?.readyState === 1) statsSendSubscribe();
+  }
+}
+function startStatsStream(force) {
+  if (!R.webUiPollingActive()) return Promise.resolve(false);
+  return R.viewReady.then(() => {
+    if (!R.webUiPollingActive() || R.activeView !== "stats") return false;
+    if (
+      !force &&
+      statsStreamWanted &&
+      statsSynced &&
+      shotsLoaded &&
+      R.shotWs?.readyState === 1 &&
+      !R.shotResync
+    ) {
+      renderShots();
+      R.updateFirmwareFooter();
+      R.noteReachOk();
+      return true;
+    }
+    statsResolve?.(false);
+    const ready = new Promise((r) => (statsResolve = r));
+    ensureStatsStream(force);
+    return ready;
+  });
+}
+function statsRowOk(r) {
+  if (
+    !r ||
+    !Number.isInteger(r.id) ||
+    r.id <= 0 ||
+    !Number.isInteger(r.bootId) ||
+    !Number.isInteger(r.endedAtMs) ||
+    r.endedAtMs < 0 ||
+    typeof r.hasWallTime !== "boolean" ||
+    !Number.isInteger(r.endedAtLocalSec) ||
+    !Number.isInteger(r.endedAtUnixSec) ||
+    typeof r.durationS !== "number" ||
+    !Number.isFinite(r.durationS) ||
+    !Number.isInteger(r.rating)
+  )
+    return false;
+  if (r.wD !== undefined) {
+    const d = r.wRef === undefined && R.decodeCurveDeltas(r.wD);
+    if (!d) return false;
+    delete r.wD;
+    Object.assign(r, d);
+  }
+  const w = r.wCg,
+    a = r.wAtMs;
+  if (!Array.isArray(w) || !Array.isArray(a) || w.length !== a.length || w.length > 1201)
+    return false;
+  for (let i = 0; i < w.length; i++) {
+    if (
+      !Number.isInteger(w[i]) ||
+      w[i] > 32767 ||
+      w[i] < -32767 ||
+      !Number.isInteger(a[i]) ||
+      a[i] < 0 ||
+      a[i] > 6e4 ||
+      (i && a[i] < a[i - 1])
+    )
+      return false;
+  }
+  return (
+    Array.isArray(r.wBreakBefore) &&
+    r.wBreakBefore.every((v) => Number.isInteger(v) && v > 0 && v < w.length) &&
+    Array.isArray(r.wHeld) &&
+    r.wHeld.every((v) => Number.isInteger(v) && v >= 0 && v < w.length)
+  );
+}
+function statsStreamFrame(message) {
+  if (
+    message.v !== 1 ||
+    !Number.isInteger(message.boot) ||
+    typeof message.snapshot !== "boolean" ||
+    !Number.isInteger(message.epoch) ||
+    !Number.isInteger(message.request) ||
+    !Number.isInteger(message.seq) ||
+    !Number.isInteger(message.total) ||
+    message.total < 0 ||
+    !Number.isInteger(message.offset) ||
+    message.offset < 0 ||
+    !Number.isInteger(message.limit) ||
+    message.limit < 1 ||
+    message.limit > SHOTS_EXPORT_LIMIT ||
+    typeof message.hasMore !== "boolean" ||
+    !Array.isArray(message.rows) ||
+    !Number.isInteger(message.rowBase) ||
+    message.rowBase < 0 ||
+    typeof message.more !== "boolean"
+  )
+    throw Error();
+  if (message.stats !== undefined && (typeof message.stats !== "object" || !message.stats))
+    throw Error();
+  // Rows are value arrays in the page's column order plus a curve object; the
+  // first frame names the columns, continuation frames reuse them.
+  const cols = message.rowBase
+    ? statsPage?.seq === message.seq && statsPage.cols
+    : typeof message.cols === "string" && message.cols.split(",");
+  if (!cols) throw Error();
+  message.cols = cols;
+  // A standing refresh names held rows by id, as in History.
+  const held = !message.snapshot && R.uiState.shotHistory?.shots;
+  message.rows = message.rows.map((a) => {
+    const kept = Number.isInteger(a) && held && held.find((x) => x.id === a);
+    if (kept) return kept;
+    const c = Array.isArray(a) && a.length === cols.length + 1 && a.at(-1);
+    if (!c || typeof c !== "object" || Array.isArray(c)) throw Error();
+    return { ...Object.fromEntries(cols.map((k, i) => [k, a[i]])), ...c };
+  });
+  for (const r of message.rows) if (!statsRowOk(r)) throw Error();
+  if (message.offset + message.rowBase + message.rows.length > message.total) throw Error();
+  const buffered = statsPage && statsPage.seq === message.seq;
+  if (buffered) {
+    if (
+      message.snapshot ||
+      message.boot !== statsPage.boot ||
+      message.epoch !== statsPage.epoch ||
+      message.request !== statsPage.request ||
+      message.rowBase !== statsPage.rows.length ||
+      message.total !== statsPage.total ||
+      message.offset !== statsPage.offset ||
+      message.limit !== statsPage.limit ||
+      message.hasMore !== statsPage.hasMore
+    )
+      throw Error();
+  } else {
+    if (message.rowBase !== 0 || message.seq <= statsLastSeq) throw Error();
+    if (!message.snapshot && message.boot !== statsStreamBoot) throw Error();
+  }
+  if (
+    !message.more &&
+    message.hasMore !== message.offset + message.rowBase + message.rows.length < message.total
+  )
+    throw Error();
+  return message;
+}
+function applyStatsStream(message) {
+  if (!statsPage || statsPage.seq !== message.seq) {
+    const mode =
+      message.request === R.uiState.statsExportRequest
+        ? "export"
+        : message.request === R.uiState.statsFetchMark?.request
+          ? "append"
+          : "replace";
+    if (mode === "append" && message.epoch !== statsStreamEpoch) {
+      statsSendSubscribe();
+      return;
+    }
+    statsPage = {
+      seq: message.seq,
+      boot: message.boot,
+      epoch: message.epoch,
+      request: message.request,
+      mode,
+      total: message.total,
+      offset: message.offset,
+      limit: message.limit,
+      hasMore: message.hasMore,
+      stats: message.stats || null,
+      cols: message.cols,
+      rows: [],
+    };
+  }
+  statsPage.rows.push(...message.rows);
+  if (message.more) return;
+  const page = statsPage;
+  statsPage = null;
+  statsLastSeq = page.seq;
+  if (page.mode === "export") {
+    R.uiState.statsExportResolve?.(page.rows);
+    return;
+  }
+  R.uiState.statsFetchMark = null;
+  statsStreamBoot = message.boot;
+  statsStreamEpoch = page.epoch;
+  applyShotPage(
+    {
+      bootId: message.boot,
+      total: page.total,
+      hasMore: page.hasMore,
+      stats: page.stats,
+      shots: page.rows,
+    },
+    page.mode,
+  );
+  // The model updates on every view; only the hidden view's DOM work and
+  // reachability signal wait until Stats is actually open.
+  if (shotStatsViewActive()) {
+    R.paint(renderShots);
+    R.updateFirmwareFooter();
+    R.noteReachOk();
+  }
+  if (page.mode !== "append") {
+    statsSynced = true;
+    statsResolve?.(true);
+  }
+}
+const statsStream = {
+  subscribe: () => (statsStreamWanted ? statsSubscribeOp() : null),
+  frame(data) {
+    if (
+      !statsStreamWanted ||
+      ![
+        statsRequest,
+        R.uiState.statsFetchMark?.request,
+        R.uiState.statsExportRequest || -1,
+      ].includes(data.request)
+    )
+      return;
+    applyStatsStream(statsStreamFrame(data));
+  },
+  // A closed socket ends the subscription generation; a resync keeps the
+  // request but drops the partial page like the server does.
+  reset() {
+    statsLastSeq = 0;
+    statsResolve?.(false);
+    this.resync();
+  },
+  resync() {
+    R.uiState.statsFetchMark = null;
+    statsPage = null;
+    R.uiState.statsExportResolve?.(null);
+    statsSynced = false;
+  },
+  // Navigation settles a pending cold entry so the poll gate never waits on
+  // an abandoned view's page.
+  leave() {
+    statsResolve?.(false);
+    statsResolve = null;
+  },
+  // The firmware rejected an op: clearing the free-form filters makes the
+  // replayed subscription valid.
+  rejected() {
+    shotFilterReset();
+    R.uiState.statsWindow = 10;
+  },
+  refresh: refreshShots,
+};
 let ready = false;
 export function init() {
   if (ready) return;
@@ -1740,15 +2060,16 @@ export function init() {
     renderStatsDurChart,
     relayoutCharts: () => chartObserver && layoutChartLabels(),
   });
+  R.registerStream("stats", statsStream);
   // The toolbar exports every stored shot, whatever the filter; a card's menu
   // acts on its own shot only.
-  const exportMenu = R.actionMenu(__WEBUI_TEXT__("stats.export_all_shots"), () => [
+  const exportMenu = actionMenu(__WEBUI_TEXT__("stats.export_all_shots"), () => [
     __WEBUI_TEXT__("stats.export_all_shots"),
     [ICON.csv, "CSV", __WEBUI_TEXT__("stats.csv_hint"), exportShotsCsv],
     [ICON.json, "JSON", __WEBUI_TEXT__("stats.json_all_hint"), exportShotsJson],
   ]);
   $("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"));
-  shotMenu = R.actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r) => [
+  shotMenu = actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r) => [
     __WEBUI_TEXT__("stats.open_in"),
     [
       ICON.bean,
@@ -1776,7 +2097,7 @@ export function init() {
       () => downloadJson(`openbrewbyweight-shot-${r.id}-visualizer.json`, shotVisualizer(r)),
     ],
     null,
-    [R.ICON_TRASH, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
+    [ICON_TRASH, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
   ]);
   $("clearShotsButton").onclick = clearShotHistory;
   if ($("shotSort")) {
@@ -1791,7 +2112,7 @@ export function init() {
       renderShotStats();
       R.sendUiOperation({ op: "stats", on: true, window: R.uiState.statsWindow });
     };
-  R.createFilterMenu(
+  shotFilterReset = createFilterMenu(
     "shotFilterButton",
     __WEBUI_TEXT__("history.filter_types"),
     shotFilterGroups,
@@ -1801,10 +2122,12 @@ export function init() {
           .filter(([, v]) => v.length)
           .map(([k, v]) => [k, k === "result" ? v : v.map(Number)]),
       );
-      R.statsSendSubscribe();
+      statsSendSubscribe();
     },
   );
-  R.armListSentinel("shotLogSentinel", loadMoreShots);
+  armListSentinel("shotLogSentinel", loadMoreShots);
   R.armStickyBar("shotStickySentinel");
   renderStatsDurChart();
 }
+// The route opens the page: a cold entry subscribes and waits for its page.
+export const start = startStatsStream;

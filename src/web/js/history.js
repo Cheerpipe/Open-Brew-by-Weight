@@ -1,5 +1,7 @@
 "use strict";
 import * as R from "./runtime.js?v=__FW_ASSET_TAG__";
+// createFilterMenu, actionMenu, downloadCsv, armListSentinel and ICON_TRASH come
+// from the records bundle prelude (records.js).
 const $ = R.$;
 const historyTypeLabel = (t) =>
   ({
@@ -44,7 +46,7 @@ const syncHistoryDirButton = () => {
 const toggleHistoryDir = () => {
   R.uiState.historyDir = R.uiState.historyDir === "desc" ? "asc" : "desc";
   syncHistoryDirButton();
-  R.historySendSubscribe();
+  historySendSubscribe();
 };
 const updateHistorySentinel = () => {
   const el = $("historySentinel");
@@ -55,7 +57,7 @@ const updateHistorySentinel = () => {
 };
 function renderHistory() {
   const body = $("historyRows");
-  if (!body || !R.historyLoaded) return;
+  if (!body || !historyLoaded) return;
   body.replaceChildren();
   const rows = R.uiState.historyData.records;
   let day;
@@ -205,7 +207,7 @@ async function exportActivationHistory() {
     let offset = 0,
       total = Infinity,
       hasMore = true;
-    while (hasMore && offset < total && rows.length - 1 < R.HISTORY_EXPORT_LIMIT) {
+    while (hasMore && offset < total && rows.length - 1 < HISTORY_EXPORT_LIMIT) {
       const page = await fetchHistoryWindow(offset);
       if (!page) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
       total = page.total;
@@ -222,20 +224,249 @@ async function exportActivationHistory() {
       offset += page.records.length;
       if (!page.records.length) break;
     }
-    R.downloadCsv("activation-history.csv", rows);
+    downloadCsv("activation-history.csv", rows);
   } catch (e) {
     R.message(R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_export_history"), e), "error");
   }
 }
+// The History page rides the owned socket (runtime.js registerStream): the
+// standing subscription is session-long once ensured, and these handlers run
+// from the runtime's socket callbacks.
+const HISTORY_PAGE_SIZE = 20,
+  HISTORY_EXPORT_LIMIT = 1000;
+let historyLoaded = false,
+  historyFilterReset = () => {};
+function applyHistoryPage(d, mode) {
+  historyLoaded = true;
+  const a = d.history,
+    t = d.total;
+  R.noteBootId(d.bootId);
+  if (mode === "append" && t) {
+    const s = {};
+    for (const x of R.uiState.historyData.records) s[x.id] = 1;
+    let n = 0;
+    for (const x of a)
+      if (!s[x.id]) {
+        s[x.id] = 1;
+        R.uiState.historyData.records.push(x);
+        n++;
+      }
+    R.uiState.historyData.total = t;
+    R.uiState.historyData.hasMore = !!n && !!d.hasMore;
+    return;
+  }
+  R.uiState.historyData = {
+    bootId: d.bootId,
+    total: t,
+    hasMore: !!d.hasMore && !!t,
+    records: t ? a : [],
+  };
+}
+const historyViewActive = () => R.activeView === "history" && R.webUiPollingActive();
+const loadMoreHistory = () => {
+  if (
+    R.uiState.historyData.hasMore &&
+    historyViewActive() &&
+    historyFetchOffset < 0 &&
+    !R.uiState.historyExportWindow
+  ) {
+    historyFetchOffset = R.uiState.historyData.records.length;
+    historyFetchRequest = ++R.uiState.historyNextRequest;
+    R.sendUiOperation({
+      op: "history",
+      on: true,
+      fetch: true,
+      request: historyFetchRequest,
+      offset: historyFetchOffset,
+    });
+  }
+};
+const refreshHistory = () =>
+  historyViewActive() ? startHistoryStream(true) : Promise.resolve(false);
+// Request IDs separate the standing History window from scroll fetches.
+// historySynced marks a cached model that reflects a completed page
+// from the current subscription generation, so warm view entries can paint
+// from it; every subscribe or resync drops it until a page lands again.
+let historyStreamWanted = false,
+  historySynced = false,
+  historyFetchOffset = -1,
+  historyStreamBoot = 0,
+  historyStreamEpoch = 0,
+  historyRequest = 0,
+  historyFetchRequest = 0,
+  historyResolve = null;
+// The subscribe op: a fresh request id separates its page from older frames.
+function historySubscribeOp() {
+  R.uiState.historyExportWindow?.resolve(null);
+  historyFetchOffset = -1;
+  historySynced = false;
+  historyRequest = ++R.uiState.historyNextRequest;
+  return {
+    op: "history",
+    on: true,
+    request: historyRequest,
+    offset: 0,
+    limit: HISTORY_PAGE_SIZE,
+    dir: R.uiState.historyDir,
+    ...(R.uiState.historyTypes.length && { types: R.uiState.historyTypes }),
+  };
+}
+function historySendSubscribe() {
+  if (R.shotWs?.readyState === 1) R.sendUiOperation(historySubscribeOp());
+}
+// The History subscription is session-standing: once ensured it stays on for
+// the whole UI session and socket.onopen replays it after a reconnect, so the
+// cached page keeps refreshing regardless of the active view.
+function ensureHistoryStream(resubscribe) {
+  if (resubscribe || !historyStreamWanted) {
+    historyStreamWanted = true;
+    if (R.shotWs?.readyState === 1) historySendSubscribe();
+  }
+}
+function startHistoryStream(force) {
+  if (!R.webUiPollingActive()) return Promise.resolve(false);
+  return R.viewReady.then(() => {
+    if (!R.webUiPollingActive() || R.activeView !== "history") return false;
+    // Warm entry: the standing subscription keeps the model current, so paint
+    // it without an op or a snapshot wait. Forced refreshes, first opens,
+    // reconnects, and pending resyncs take the subscribe-and-wait path.
+    if (
+      !force &&
+      historyStreamWanted &&
+      historySynced &&
+      historyLoaded &&
+      R.shotWs?.readyState === 1 &&
+      !R.shotResync
+    ) {
+      renderHistory();
+      R.updateFirmwareFooter();
+      R.noteReachOk();
+      return true;
+    }
+    historyResolve?.(false);
+    const ready = new Promise((r) => (historyResolve = r));
+    ensureHistoryStream(force);
+    return ready;
+  });
+}
+function historyStreamFrame(message) {
+  if (
+    message.v !== 1 ||
+    !Number.isInteger(message.boot) ||
+    typeof message.snapshot !== "boolean" ||
+    !Number.isInteger(message.epoch) ||
+    !Number.isInteger(message.request) ||
+    !Number.isInteger(message.total) ||
+    message.total < 0 ||
+    !Number.isInteger(message.offset) ||
+    message.offset < 0 ||
+    !Number.isInteger(message.limit) ||
+    message.limit < 1 ||
+    message.limit > 120 ||
+    typeof message.hasMore !== "boolean" ||
+    !Array.isArray(message.records)
+  )
+    throw Error();
+  if (!message.snapshot && message.boot !== historyStreamBoot) throw Error();
+  // A standing refresh names records this page already holds by their id.
+  const held = !message.snapshot && R.uiState.historyData?.records;
+  message.records = message.records.map(
+    (r) => (Number.isInteger(r) && held && held.find((x) => x.id === r)) || r,
+  );
+  if (
+    message.offset + message.records.length > message.total ||
+    message.hasMore !== message.offset + message.records.length < message.total
+  )
+    throw Error();
+  for (const r of message.records) {
+    if (
+      !r ||
+      !Number.isInteger(r.id) ||
+      r.id <= 0 ||
+      typeof r.type !== "string" ||
+      typeof r.durationS !== "number" ||
+      !Number.isFinite(r.durationS) ||
+      typeof r.hasWallTime !== "boolean" ||
+      !Number.isInteger(r.endedAtUnixSec) ||
+      !Number.isInteger(r.endedAtLocalSec)
+    )
+      throw Error();
+  }
+  return message;
+}
+function applyHistoryStream(message) {
+  if (R.uiState.historyExportWindow && message.request === R.uiState.historyExportWindow.request) {
+    R.uiState.historyExportWindow.resolve(message);
+    return;
+  }
+  const fetch = historyFetchOffset >= 0 && message.request === historyFetchRequest;
+  if (fetch && message.epoch !== historyStreamEpoch) {
+    historySendSubscribe();
+    return;
+  }
+  const mode = fetch ? "append" : "replace";
+  applyHistoryPage(
+    {
+      bootId: message.boot,
+      total: message.total,
+      hasMore: message.hasMore,
+      history: message.records,
+    },
+    mode,
+  );
+  historyStreamBoot = message.boot;
+  historyStreamEpoch = message.epoch;
+  historyFetchOffset = -1;
+  // The model updates on every view; only the hidden view's DOM work and
+  // reachability signal wait until History is actually open.
+  if (historyViewActive()) {
+    R.paint(renderHistory);
+    R.updateFirmwareFooter();
+    R.noteReachOk();
+  }
+  if (mode !== "append") {
+    historySynced = true;
+    historyResolve?.(true);
+  }
+}
+const historyStream = {
+  subscribe: () => (historyStreamWanted ? historySubscribeOp() : null),
+  frame(data) {
+    if (
+      !historyStreamWanted ||
+      !(
+        data.request === historyRequest ||
+        (historyFetchOffset >= 0 && data.request === historyFetchRequest) ||
+        (R.uiState.historyExportWindow && data.request === R.uiState.historyExportWindow.request)
+      )
+    )
+      return;
+    applyHistoryStream(historyStreamFrame(data));
+  },
+  reset() {
+    historyResolve?.(false);
+    this.resync();
+  },
+  resync() {
+    historyFetchOffset = -1;
+    historySynced = false;
+  },
+  leave() {
+    historyResolve?.(false);
+    historyResolve = null;
+  },
+  rejected: () => historyFilterReset(),
+  refresh: refreshHistory,
+};
 let ready = false;
 export function init() {
   if (ready) return;
   ready = true;
-  R.setHistoryRenderer(renderHistory);
-  entryMenu = R.actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) => [
-    [R.ICON_TRASH, __WEBUI_TEXT__("history.delete_entry"), "", () => deleteOneHistory(r.id), true],
+  R.registerStream("history", historyStream);
+  entryMenu = actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) => [
+    [ICON_TRASH, __WEBUI_TEXT__("history.delete_entry"), "", () => deleteOneHistory(r.id), true],
   ]);
-  R.createFilterMenu(
+  historyFilterReset = createFilterMenu(
     "historyFilterButton",
     __WEBUI_TEXT__("history.filter_types"),
     () => [
@@ -246,7 +477,7 @@ export function init() {
     ],
     (sel) => {
       R.uiState.historyTypes = sel.type || [];
-      R.historySendSubscribe();
+      historySendSubscribe();
     },
   );
   $("clearHistoryButton").onclick = clearActivationHistory;
@@ -256,6 +487,8 @@ export function init() {
     $("historyDirButton").onclick = toggleHistoryDir;
     syncHistoryDirButton();
   }
-  R.armListSentinel("historySentinel", R.loadMoreHistory);
+  armListSentinel("historySentinel", loadMoreHistory);
   R.armStickyBar("historyStickySentinel");
 }
+// The route opens the page: a cold entry subscribes and waits for its page.
+export const start = startHistoryStream;

@@ -11,7 +11,7 @@ const webUi = require('../../scripts/gen_web_ui.js');
 const webUiLocale = require('../../scripts/localize_web_ui.js');
 
 const budgetPath = path.resolve(__dirname, '..', '..', 'config', 'web-asset-budgets.json');
-const {VIEW_NAMES} = webUi;
+const {VIEW_NAMES, JS_FILES} = webUi;
 
 // Contracts read HTML and CSS in one compact form, so how the sources are
 // formatted cannot change what a needle matches or what a budget counts.
@@ -41,21 +41,21 @@ async function authoringSources() {
     css: compactCss(read(webUi.cssSourcePath))};
   for (const name of VIEW_NAMES) {
     raw.partialHtml[name] = await compactMarkup(read(path.join(webUi.htmlDir, name + '.html')));
-    raw.viewJs[name] = read(path.join(webUi.jsDir, name + '.js'));
   }
+  for (const name of JS_FILES) raw.viewJs[name] = read(path.join(webUi.jsDir, name + '.js'));
   const sources = webUiLocale.renderSources([
     {file: webUi.sourcePath, type: 'html', content: raw.shellHtml},
     ...VIEW_NAMES.map((name) => ({file: name + '.html', type: 'html', content: raw.partialHtml[name]})),
     {file: 'app.js', type: 'js', content: raw.appJs},
     {file: 'runtime.js', type: 'js', content: raw.runtimeJs},
     {file: 'ota-image.js', type: 'js', content: raw.otaImageJs},
-    ...VIEW_NAMES.map((name) => ({file: name + '.js', type: 'js', content: raw.viewJs[name]})),
+    ...JS_FILES.map((name) => ({file: name + '.js', type: 'js', content: raw.viewJs[name]})),
     {file: 'app.css', type: 'css', content: raw.css},
   ], {language: 'en'}).sources.map((source) => source.content);
   const localized = {shellHtml: sources.shift(), partialHtml: {}, viewJs: {}};
   for (const name of VIEW_NAMES) localized.partialHtml[name] = sources.shift();
   [localized.appJs, localized.runtimeJs, localized.otaImageJs] = sources.splice(0, 3);
-  for (const name of VIEW_NAMES) localized.viewJs[name] = sources.shift();
+  for (const name of JS_FILES) localized.viewJs[name] = sources.shift();
   localized.css = sources.shift();
   const allHtml = localized.shellHtml.replace(
       /<section id="view-([a-z]+)" class="view" data-view="\1"><\/section>/g, (_, name) => {
@@ -66,7 +66,7 @@ async function authoringSources() {
           localized.partialHtml[name]}</section>`;
       });
   const allJs = [localized.appJs, localized.runtimeJs, localized.otaImageJs,
-    ...VIEW_NAMES.map((name) => localized.viewJs[name])].join('\n');
+    ...JS_FILES.map((name) => localized.viewJs[name])].join('\n');
   return {raw, localized, allHtml, allJs};
 }
 

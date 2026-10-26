@@ -43,6 +43,10 @@ const VIEW_MODULES = {
   settings: ['settings'],
   setup: ['setup'],
 };
+// A bundle of several views carries a shared prelude, js/<bundle>.js, that the
+// generator places at the bundle's module scope ahead of its scoped views.
+const SHARED_JS = Object.keys(VIEW_MODULES).filter((file) => VIEW_MODULES[file].length > 1);
+const JS_FILES = [...VIEW_NAMES, ...SHARED_JS];
 const JS_TYPE = 'application/javascript; charset=utf-8';
 // Served paths of the WEB_ASSETS rows, in table order; the firmware registers
 // one exact route per path.
@@ -243,15 +247,23 @@ function injectHomePartial(shellHtml, homePartial) {
 
 // Give a view module its own scope inside a bundle: top-level names stay
 // private to the view, and the bundle supplies the runtime import.
-function scopedView(name, src, exports) {
+// A view or prelude source minus its "use strict" and runtime import: inside a
+// bundle the module's single import serves every file.
+function stripModuleHeader(name, src) {
   const body = src
       .replace(/^\(?['"]use strict['"]\)?;\s*/m, '')
-      .replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];\s*/m, '')
-      .replace(/export\s+(function|const|let)\s+/g, '$1 ');
+      .replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];\s*/m, '');
   if (/\bimport\s*\*/.test(body)) {
     throw new Error(`View ${name} retained its runtime import`);
   }
-  return `const ${name}=(()=>{${body}\nreturn{${exports.join(',')}};})();`;
+  return body;
+}
+// The scope returns the view's own exports plus the names the bundle adds.
+function scopedView(name, src, exports) {
+  const names = [...exports, ...src.matchAll(/^export\s+(?:function|const|let)\s+(\w+)/gm)
+      .map((m) => m[1])];
+  const body = stripModuleHeader(name, src).replace(/export\s+(function|const|let)\s+/g, '$1 ');
+  return `const ${name}=(()=>{${body}\nreturn{${names.join(',')}};})();`;
 }
 
 function inlineHomeModule(appSrc, homeSrc) {
@@ -263,20 +275,21 @@ function inlineHomeModule(appSrc, homeSrc) {
     throw new Error('app.js runtime import not found');
   }
   return appSrc.replace(marker, (m) =>
-    m + scopedView('__homeModule', homeSrc, ['init', 'applyStatus']) + '\n');
+    m + scopedView('__homeModule', homeSrc, []) + '\n');
 }
 
 // A single-view module exports its markup next to init; the records bundle
-// exposes each of its views under `views`.
-function buildViewModule(views, viewJsRaw, partials) {
+// exposes each of its views under `views`, after their shared prelude.
+function buildViewModule(file, views, viewJsRaw, partials) {
   if (views.length === 1) {
     return `${viewJsRaw[views[0]]}\nexport const markup=${JSON.stringify(partials[views[0]])};`;
   }
   return [
     `import * as R from '/js/runtime.js?v=${ASSET_TAG_PLACEHOLDER}';`,
+    stripModuleHeader(file, viewJsRaw[file]),
     ...views.map((name) => scopedView(`__${name}`,
         `${viewJsRaw[name]}\nconst markup=${JSON.stringify(partials[name])};`,
-        ['init', 'markup'])),
+        ['markup'])),
     `export const views={${views.map((name) => `${name}:__${name}`).join(',')}};`,
   ].join('\n');
 }
@@ -311,7 +324,7 @@ async function generate(options = {}) {
   const runtimeRaw = fs.readFileSync(path.join(jsDir, 'runtime.js'), 'utf8');
   const otaImageRaw = fs.readFileSync(otaImageJsPath, 'utf8');
   const viewJsRaw = {};
-  for (const name of VIEW_NAMES) {
+  for (const name of JS_FILES) {
     const viewPath = path.join(jsDir, `${name}.js`);
     if (!fs.existsSync(viewPath)) {
       throw new Error(`Missing JS view module: ${viewPath}`);
@@ -326,7 +339,7 @@ async function generate(options = {}) {
     {file: appJsPath, type: 'js', content: appJsRaw},
     {file: path.join(jsDir, 'runtime.js'), type: 'js', content: runtimeRaw},
     {file: otaImageJsPath, type: 'js', content: otaImageRaw},
-    ...VIEW_NAMES.map((name) => ({file: path.join(jsDir, `${name}.js`),
+    ...JS_FILES.map((name) => ({file: path.join(jsDir, `${name}.js`),
       type: 'js', content: viewJsRaw[name]})),
     {file: cssSourcePath, type: 'css', content: cssSource},
   ], {language: webUiLanguage, localesDir: options.localesDir,
@@ -338,7 +351,7 @@ async function generate(options = {}) {
   const localizedAppJs = localized.sources[at++].content;
   const localizedRuntime = localized.sources[at++].content;
   const localizedOtaImage = localized.sources[at++].content;
-  for (const name of VIEW_NAMES) viewJsRaw[name] = localized.sources[at++].content;
+  for (const name of JS_FILES) viewJsRaw[name] = localized.sources[at++].content;
   const localizedCss = localized.sources[at].content;
   const excluded = excludedClasses(options);
   for (const name of VIEW_NAMES) {
@@ -370,7 +383,7 @@ async function generate(options = {}) {
   };
   const modules = {};
   for (const [file, views] of Object.entries(VIEW_MODULES)) {
-    modules[file] = await minifyJs(buildViewModule(views, viewJsRaw, partials), options);
+    modules[file] = await minifyJs(buildViewModule(file, views, viewJsRaw, partials), options);
   }
 
   // The tag fingerprints the exact bytes served (with the placeholder still
@@ -542,6 +555,7 @@ module.exports = {
   outputPath,
   VIEW_NAMES,
   VIEW_MODULES,
+  JS_FILES,
   ASSET_PATHS,
   htmlDir,
   jsDir,

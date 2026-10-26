@@ -21,26 +21,21 @@ if (!codeIncludes(ui, 'async function loadStatus(){') ||
     !codeIncludes(ui, 'function applyLogFrame(') ||
     !codeIncludes(ui, 'LOG_EVENTS_CAPACITY') ||
     !codeIncludes(ui, 'logEvents.splice(0,logEvents.length-LOG_EVENTS_CAPACITY)') ||
-    !codeIncludes(ui, "function refreshStatus(){if(activeView==='settings')return scheduleSettingsPaint();return withPollGate(activeView==='stats'?refreshShots:activeView==='history'?refreshHistory:loadStatus") ||
+    !codeIncludes(ui, "function refreshStatus(){if(activeView==='settings')return scheduleSettingsPaint();return withPollGate(streamHandlers[activeView]?.refresh||loadStatus)") ||
     !codeIncludes(ui, "function refreshShots(){return shotStatsViewActive()?startStatsStream(true):Promise.resolve(false)}") ||
-    !(codeIncludes(ui, "name==='home'||name==='settings'||name==='admin'||name==='diagnostic'") ||
-      codeIncludes(ui, "name === 'home' || name === 'settings' || name === 'admin' ||") ||
-      codeIncludes(ui, "name === 'diagnostic'")) ||
+    !codeIncludes(appJsSource, "if(['home','settings','admin','diagnostic'].includes(name)){ok=await R.loadStatus();") ||
     codeIncludes(ui, "name==='presets'") ||
-    !(codeIncludes(ui, "name==='stats'") || codeIncludes(ui, "name === 'stats'")) ||
+    !codeIncludes(appJsSource, 'const{start}=await ensureView(name)') ||
     !codeIncludes(ui, 'renderRoute(location.pathname)') ||
     !codeIncludes(ui, 'ensureView') ||
     codeIncludes(ui, 'Promise.all([loadShots(),loadLog()])')) {
   throw new Error('Web UI must lazy-load status/shots/log per active SPA view; background polls stay gated');
 }
 {
-  const statsStart = (() => {
-    const i = appJsSource.search(/name\s*===\s*['"]stats['"]/);
-    if (i < 0) return '';
-    const j = appJsSource.indexOf('}', i);
-    return j > i ? appJsSource.slice(i, j) : '';
-  })();
-  if (statsStart.includes('R.loadStatus()') || !statsStart.includes('R.startStatsStream()') ||
+  // Record pages load their own state through the module's start(), never
+  // the REST status.
+  if (!codeIncludes(viewJs.stats, 'export const start=startStatsStream') ||
+      !codeIncludes(viewJs.history, 'export const start=startHistoryStream') ||
       !codeIncludes(runtimeJs, "was!==canEdit&&activeView==='stats'") ||
       !codeIncludes(statsRuntimeJs, "fillStarRate(rateHost,r.rating||0,!controlsMutable,")) {
     throw new Error(

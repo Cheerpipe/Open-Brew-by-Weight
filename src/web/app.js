@@ -116,29 +116,28 @@ async function ensureView(name) {
   }
 }
 R.setEnsureViewHook(ensureView);
+// Every route change stops the view-owned polls and streams (the Diagnostic
+// log, the onboarding scan); only a live subscription sends "off".
 function stopExtraPolls() {
   R.stopDiagnosticStream();
-  R.stopLogStream();
-  jsMods.get("setup")?.stop?.();
+  for (const mod of jsMods.values()) mod.stop?.();
 }
+// A view that owns a stream or poll (records pages, the log, onboarding)
+// exports start(); it runs once the view's module is in and settles false
+// when the page cannot load.
 function startView(name, seq = routeSeq) {
   return R.withPollGate(async () => {
     if (!R.webUiPollingActive() || name !== activeView || seq !== routeSeq) return false;
     stopExtraPolls();
-    let ok = false;
+    let ok = true;
     if (["home", "settings", "admin", "diagnostic"].includes(name)) {
       ok = await R.loadStatus();
       R.armStatusTimer();
-    } else if (name === "setup") {
-      // The onboarding view drives its own scan/connect polling.
-      await jsMods.get("setup")?.start?.();
-      ok = true;
     }
+    if (!ok || name !== activeView || seq !== routeSeq) return false;
+    const { start } = await ensureView(name);
     if (name !== activeView || seq !== routeSeq) return false;
-    if (name === "diagnostic" && ok) ok = await R.startLogStream();
-    if (name === "stats") ok = await R.startStatsStream();
-    else if (name === "history") ok = await R.startHistoryStream();
-    return ok;
+    return !start || (await start()) !== false;
   });
 }
 // A user navigation moves focus to the new page, so screen readers start there.

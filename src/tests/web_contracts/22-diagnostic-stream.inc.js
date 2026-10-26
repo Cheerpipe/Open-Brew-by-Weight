@@ -169,7 +169,7 @@
       'the Diagnostic view must not read REST status');
   assert(!codeIncludes(js, "api('/api/v1/log'"),
       'the Diagnostic view must not poll the REST log');
-  assert(codeIncludes(runtimeJs, 'if(!apply||!diagnosticReady())return;apply(s);') &&
+  assert(codeIncludes(runtimeJs, 'if(apply&&diagnosticReady())apply(s);') &&
       codeIncludes(runtimeJs, 'mergeStatus(homeFrame?.status,diagFrame.status,settingsFrame?.status)') &&
       codeIncludes(runtimeJs, "if(activeView==='diagnostic')scheduleDiagPaint()"),
       'the full view waits for all diagnostic sections, reads Home and Settings paths from their models, and repaints on Home frames');
@@ -187,7 +187,7 @@
     command: (url, v) => { sent = v; return {finally: (f) => { settle = f; }}; }};
   // Only the log-level hydration at the top of applyStatus runs here.
   const [apply, save] = new Function('applyDiagnosticStatus', '$', 'R', source.slice(source.indexOf('const LOG_LEVELS'),
-      source.indexOf('export function init(')).replace('export ', '').replace('if (!s) return;', 'return;') +
+      source.indexOf('export function init(')).replace(/export /g, '').replace('if (!s) return;', 'return;') +
       ';return [applyStatus, saveLogLevel];')(
       () => {}, id => controls[id], R);
   apply({config: {serialLogLevel: 'warning', ringRetainLogLevel: 'debug'}});
@@ -291,9 +291,11 @@
       'leaving the view must unsubscribe');
   assert(codeIncludes(runtimeJs, 'loadDiagnosticStatus'),
       'entering the view loads the stream snapshot');
-  assert(appJsSource.indexOf('R.startLogStream()') >= 0 &&
+  assert(codeIncludes(viewJs.diagnostic, 'export const start=startLogStream,stop=stopLogStream') &&
+         codeIncludes(appJsSource, 'const{start}=await ensureView(name)') &&
+         codeIncludes(appJsSource, 'for(const mod of jsMods.values())mod.stop?.()') &&
          !codeIncludes(appJsSource, 'R.loadLog()') && !codeIncludes(appJsSource, 'logTimer=setInterval'),
-      'the log view subscribes the stream instead of REST polling');
+      'the log view subscribes the stream through its module instead of REST polling');
   assert(partialHtml.diagnostic.includes('id="dScaleTimer"'));
   assert(partialHtml.diagnostic.includes('id="dScaleWeight"'));
   assert(JSON.parse(fs.readFileSync(
@@ -309,8 +311,9 @@
     get value() { return this.v; }, set value(v) { this.v = v; this.sets++; },
     setRangeText(t, a, b) { this.v = this.v.slice(0, a) + t + this.v.slice(b); }};
   const ui = {logEvents: []}, nodes = {log: ta, logFilter: {value: ''}, logLevelFilter: {value: '4'}};
-  const renderLog = new Function('$', 'uiState', 'formatWallTimeLocal',
-      `${blockAt(runtimeJs, 'function renderLog(')};return renderLog;`)((id) => nodes[id], ui, String);
+  const renderLog = new Function('$', 'R',
+      `${blockAt(viewJs.diagnostic, 'function renderLog(')};return renderLog;`)(
+      (id) => nodes[id], {uiState: ui, formatWallTimeLocal: String});
   const ev = (n) => ({sequence: n, atMs: n * 1000, wallSec: 0, level: 'info', category: 'web', message: 'm' + n});
   ui.logEvents = [ev(1), ev(2)];
   renderLog();

@@ -19,7 +19,7 @@
   const helpers = runtimeJs.slice(runtimeJs.indexOf('function axisLabel('),
       runtimeJs.indexOf('async function populateTimezoneOptions(')) + statsChartJs;
   const preset = runtimeJs.slice(runtimeJs.indexOf('function buildRuleChartModel('),
-      runtimeJs.indexOf('function renderPresetReview('));
+      runtimeJs.indexOf('function positionPresetScrub('));
   // The shot chart renderer lives in the Stats module; its runtime helpers reach it through R.
   const renderer = runtimeJs.slice(runtimeJs.indexOf('function shotRuleModel('),
       runtimeJs.indexOf('function setEmptyState(')) +
@@ -1550,7 +1550,7 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
   // Stats shot preset chart (plan AC1-AC3, AC5, AC8-AC9): the model comes from the
   // shot's stored snapshot, never the live preset; invalid snapshots keep the old card.
   const presetModel = runtimeJs.slice(runtimeJs.indexOf('function buildRuleChartModel('),
-      runtimeJs.indexOf('function renderPresetReview('));
+      runtimeJs.indexOf('function positionPresetScrub('));
   const shotModel = runtimeJs.slice(runtimeJs.indexOf('function shotRuleModel('),
       runtimeJs.indexOf('let shotPresetObserver'));
   const {shotRuleModel} = new Function('presetState',

@@ -4,7 +4,7 @@
 {
   const assert = require('assert').strict, vm = require('vm');
   const source = runtimeStateDecl + 'let homeFrame=null;' + rawRuntimeJs.slice(rawRuntimeJs.search(/let\s+shotWs\s*=/),
-      rawRuntimeJs.indexOf('function setHomeSub(')) + statsExportJs;
+      rawRuntimeJs.indexOf('function setHomeSub(')) + recordsStreamJs + statsExportJs;
   function fixture(view) {
     let mount;
     const sockets = [], timers = [], applied = [];
@@ -27,6 +27,7 @@
       shotStatsViewActive: () => context.activeView === 'stats',
       historyViewActive: () => context.activeView === 'history',
       shotsLoaded: false, historyLoaded: false, historyExportWindow: null,
+      shotFilterReset: () => applied.push('reset-stats'), historyFilterReset: () => applied.push('reset-history'),
       applyCommonStatus() {},
       applyShotPage: () => { context.shotsLoaded = true; applied.push('stats'); },
       scheduleShotPaint() {},
@@ -111,31 +112,26 @@
           : {snapshot: false, epoch: 6});
       assert.deepEqual(f.applied, [view], view + ': background frames update only the model');
     }
-    // The background ensure subscribes only the record page that is not
-    // standing yet, fires immediately after the active view's load, stays
-    // idempotent, and never runs in compat mode (AC3).
+    // A record page subscribes on its first visit, not from the background
+    // ensure, and a rejected op (close 4003) clears its filters (AC3).
     {
       const f = fixture('stats'), cold = f.start(), socket = f.sockets[0];
       socket.open(); f.mount(); await Promise.resolve();
       deliver(socket, 'stats', {});
       await cold;
       f.context.ensureBackgroundStreams();
-      assert.equal(socket.sent.filter(message => message.op === 'history' && message.on).length, 1,
-          'the ensure subscribes the non-active record page at once');
+      assert.equal(socket.sent.filter(message => message.op === 'history' && message.on).length, 0,
+          'the background ensure never subscribes an unvisited record page');
       assert.equal(socket.sent.filter(message => message.op === 'stats' && message.on).length, 1,
           'the already-standing page is not re-subscribed');
       f.context.activeView = 'home';
       f.context.ensureBackgroundStreams();
-      assert.equal(socket.sent.filter(message => message.op === 'history' && message.on).length, 1,
-          'a later ensure stays a no-op while both pages stand');
-    }
-    {
-      const f = fixture('admin'), socket = f.sockets[0];
-      socket.open();
-      f.context.compatMode = true;
-      f.context.ensureBackgroundStreams();
-      assert.equal(socket.sent.filter(message => message.op === 'stats' || message.op === 'history').length, 0,
-          'compat mode never subscribes record pages');
+      assert.equal(socket.sent.filter(message => message.op === 'history' && message.on).length, 0,
+          'a later ensure still leaves the unvisited page alone');
+      f.applied.length = 0;
+      vm.runInContext('uiState.statsWindow = 50; eachStream("rejected")', f.context);
+      assert.deepEqual(f.applied, ['reset-stats', 'reset-history'], 'a rejected op resets every list filter');
+      assert.equal(vm.runInContext('uiState.statsWindow', f.context), 10, 'and the Stats window');
     }
     // With both pages standing, navigating between record views sends no new
     // subscribe ops at all (AC1).

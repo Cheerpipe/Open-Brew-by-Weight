@@ -296,10 +296,12 @@ int main(){
     viewStatusHandlers: {}, applyCommonStatus() {}, setMutable: on => { if (!on) mutableOff++; }, noteReachOk() {},
     noteReachFail: () => { reachFails++; },
     hideHomeBoot() {}, clearCupWeights() {}, updateHeaderSignals() {}, updateHomeAdminActions() {},
-    setHomeSub() {}, $: () => null, filterResets: [() => resets++],
+    setHomeSub() {}, $: () => null,
   };
   vm.runInNewContext('var setupSession=false;' + source + ';this.setSetup=v=>{setupSession=v};this.ui=()=>uiState;' +
       'this.anchor=v=>{if(v!==undefined)statusUtcAnchorAt=v;return statusUtcAnchorAt};', context);
+  // A list view's handler clears its filters when the firmware rejects an op.
+  context.registerStream('stats', {subscribe: () => null, frame() {}, rejected() { resets++; context.ui().statsWindow = 10; }});
   const visibility = hidden => { document.hidden = hidden; listeners.visibilitychange(); };
   const closeTimer = () => [...timers].find(([, t]) => t.delay === 300000);
   context.startUiStream(); sockets[0].onopen();

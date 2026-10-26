@@ -9,22 +9,36 @@ function setEnsureViewHook(fn) {
   ensureViewHook = fn;
 }
 // Stats installs its renderers on init; until then there is no Stats DOM to paint.
-// History likewise installs its row renderer on init.
 let renderShots = () => {},
   renderStatsDurChart = () => {},
-  relayoutCharts = () => {},
-  renderHistory = () => {};
+  relayoutCharts = () => {};
 function setStatsRenderers(r) {
   ({ renderShots, renderStatsDurChart, relayoutCharts } = r);
 }
-function setHistoryRenderer(fn) {
-  renderHistory = fn;
-}
-// Settings installs its drip chart and group summaries on init; until then
-// there is no Settings DOM.
-let renderSettings = () => {};
+// Settings installs its drip chart and group summaries on init, and the brew
+// form's validation and preset review that Home's saves reach through it;
+// until then there is no Settings DOM.
+let renderSettings = () => {},
+  settingsForm = { validateBrewClient: () => [], renderPresetReview() {} };
 function setSettingsRenderer(fn) {
   renderSettings = fn;
+}
+function setSettingsForm(form) {
+  settingsForm = form;
+}
+// View-owned stream subscriptions ride the one socket. A view registers its
+// frame type once on init: socket.onopen sends every subscribe() op, onmessage
+// hands the type's frames to frame(), and the socket's close, a resync, a
+// device reboot, a rejected op (close 4003) and leaving the active view reach
+// reset(), resync(), reboot(boot), rejected() and leave(). `cursor` marks
+// frames that carry their own cursor, which a pending resync never drops;
+// `refresh` is the view's manual refresh.
+const streamHandlers = {};
+function registerStream(type, handler) {
+  streamHandlers[type] = handler;
+}
+function eachStream(hook, ...args) {
+  for (const h of Object.values(streamHandlers)) h[hook]?.(...args);
 }
 // Group rows: keyed top-level groups get an icon from the view's sprite (p),
 // and every keyed group a summary that the view's table fills in.
@@ -78,14 +92,9 @@ let activeView = "",
 let statusTimer = 0;
 function setActiveView(name, ready = Promise.resolve()) {
   // A cold record entry abandoned by navigation must not keep holding the
-  // serialized poll gate until its page lands; settle it like the old
-  // view-scoped stop paths did. The subscriptions themselves stay standing.
-  if (activeView !== name) {
-    statsResolve?.(false);
-    statsResolve = null;
-    historyResolve?.(false);
-    historyResolve = null;
-  }
+  // serialized poll gate until its page lands; the view settles it. The
+  // subscriptions themselves stay standing.
+  if (activeView !== name) eachStream("leave");
   activeView = name || "";
   if (shotFsActive && activeView !== "home") exitShotFullScreen();
   viewReady = ready;
@@ -138,11 +147,6 @@ function compatibilityModeOn() {
 }
 
 const DEVICE_MAX_INFLIGHT = 1;
-const LOG_EVENTS_CAPACITY = 500;
-const SHOTS_PAGE_SIZE = 10,
-  SHOTS_EXPORT_LIMIT = 500,
-  HISTORY_PAGE_SIZE = 20,
-  HISTORY_EXPORT_LIMIT = 1000;
 const WEB_UI_CLIENT_HEADER = "X-WebUI-Client",
   WEB_UI_SESSION_HEADER = "X-WebUI-Session",
   SESSION_KEY = "obbwSession";
@@ -289,8 +293,6 @@ const uiState = {
   shotStats: {},
 };
 let bootId = 0,
-  logBootId = 0,
-  lastLog = 0,
   configRevision = 0,
   lastCommandStatus = null,
   formRev = 0,
@@ -310,9 +312,7 @@ let bootId = 0,
   deviceWaiters = [],
   diagnosticUnlocked = false,
   developmentMode = false,
-  outOfReachOverlay = false,
-  shotsLoaded = false,
-  historyLoaded = false;
+  outOfReachOverlay = false;
 
 const $ = (id) => document.getElementById(id);
 function updateHeaderSignals(s = {}) {
@@ -1320,47 +1320,9 @@ function updateFirmwareFooter() {
 function resetNetworkAddressLoaded() {
   uiState.networkAddressLoaded = false;
 }
-function applyShotPage(d, mode) {
-  shotsLoaded = true;
-  const a = d.shots,
-    t = d.total;
-  bootId = d.bootId;
-  if (d.stats) uiState.shotStats = d.stats;
-  if (mode === "append" && t) {
-    const s = {};
-    for (const x of uiState.shotHistory.shots) s[x.id] = 1;
-    let n = 0;
-    for (const x of a)
-      if (!s[x.id]) {
-        s[x.id] = 1;
-        uiState.shotHistory.shots.push(x);
-        n++;
-      }
-    uiState.shotHistory.total = t;
-    uiState.shotHistory.hasMore = !!n && !!d.hasMore;
-    return;
-  }
-  uiState.shotHistory = {
-    bootId: d.bootId,
-    total: t,
-    hasMore: !!d.hasMore && !!t,
-    shots: t ? a : [],
-  };
-}
-function shotStatsViewActive() {
-  if (activeView !== "stats" || !webUiPollingActive()) return false;
-  const view = $("view-stats");
-  return !!(view && !view.classList.contains("hidden"));
-}
-// Arms a list-end sentinel once so its view loads the next page whenever
-// the sentinel scrolls close enough to the viewport.
-function armListSentinel(id, onLoad) {
-  const el = $(id);
-  if (!el || el.dataset.armed) return;
-  el.dataset.armed = 1;
-  new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && onLoad(), {
-    rootMargin: "240px",
-  }).observe(el);
+// Record pages and the log name the device boot their frames came from.
+function noteBootId(b) {
+  bootId = b;
 }
 // Arms a bar-top sentinel so the sticky toolbar after it carries the popup
 // shadow only while detached from its in-flow slot. Re-armed when the
@@ -1386,183 +1348,6 @@ function armStickyBar(id) {
   arm();
   window.matchMedia("(min-width: 700px)").addEventListener("change", arm);
 }
-// A record list's filter menu, anchored to its toolbar button: checkbox
-// groups under a Reset header. An empty group does not restrict and the
-// button carries the selected count. The firmware filters the pages, so
-// onChange(selection) only re-subscribes; groups() returns
-// [{key, label?, options: [[value, text, iconHtml?]]}] and is read on every
-// open, so the options follow the data.
-// Each menu's Reset, also run when the firmware rejects a list subscription.
-const filterResets = [];
-function createFilterMenu(buttonId, title, groups, onChange) {
-  const sel = {};
-  let panel = null;
-  const count = () => Object.values(sel).reduce((n, s) => n + s.size, 0);
-  const sync = () => {
-    const b = $(buttonId),
-      n = count(),
-      chip = b?.querySelector(".histFilterCount");
-    if (!b) return;
-    b.setAttribute("aria-pressed", !!n);
-    b.classList.toggle("btnFilterOn", !!n);
-    if (chip) Object.assign(chip, { textContent: n, hidden: !n });
-  };
-  const changed = () => {
-    if (panel)
-      for (const box of panel.querySelectorAll("input"))
-        box.checked = !!sel[box.name]?.has(box.value);
-    sync();
-    onChange(Object.fromEntries(Object.entries(sel).map(([k, s]) => [k, [...s]])));
-  };
-  const clear = () => {
-    for (const k in sel) sel[k].clear();
-    changed();
-  };
-  filterResets.push(clear);
-  const popup = createPopup(title, (p) => {
-    const head = document.createElement("div"),
-      reset = document.createElement("button");
-    panel = p;
-    head.className = "histFilterHead";
-    reset.type = "button";
-    reset.className = "histFilterReset";
-    reset.textContent = __WEBUI_TEXT__("history.filter_reset");
-    reset.onclick = clear;
-    head.append(Object.assign(document.createElement("span"), { textContent: title }), reset);
-    p.append(head);
-    for (const g of groups()) {
-      if (g.label)
-        p.append(
-          Object.assign(document.createElement("div"), {
-            className: "histFilterGroup",
-            textContent: g.label,
-          }),
-        );
-      for (const [value, text, icon] of g.options) {
-        const item = document.createElement("label"),
-          box = document.createElement("input");
-        item.className = "histFilterItem";
-        box.type = "checkbox";
-        box.name = g.key;
-        box.value = value;
-        box.checked = !!sel[g.key]?.has(box.value);
-        box.setAttribute("role", "menuitemcheckbox");
-        item.append(box);
-        if (icon != null) {
-          const i = document.createElement("span");
-          i.className = "histFilterIcon";
-          i.setAttribute("aria-hidden", "true");
-          i.innerHTML = icon;
-          item.append(i);
-        }
-        item.append(Object.assign(document.createElement("span"), { textContent: text }));
-        p.append(item);
-      }
-    }
-    // Picks are the shown boxes, so a stale one never filters unseen.
-    const pick = () => {
-      for (const k in sel) sel[k].clear();
-      for (const b of p.querySelectorAll(":checked")) (sel[b.name] ??= new Set()).add(b.value);
-    };
-    p.onchange = () => (pick(), changed());
-    const n = count();
-    pick();
-    count() < n && changed();
-  });
-  $(buttonId).onclick = () => popup.open($(buttonId));
-  sync();
-}
-// The popup panel shared by the filter and action menus: built by fill(panel,
-// ...args) on every open, placed below its trigger (above when that fits
-// better), and closed by a second click on the trigger, a click elsewhere,
-// Escape, or the trigger leaving the page.
-function createPopup(label, fill) {
-  let panel = null,
-    anchor = null;
-  const shown = () => panel && !panel.hidden;
-  const place = () => {
-    const r = anchor.getBoundingClientRect(),
-      below = innerHeight - r.bottom;
-    panel.style.top =
-      (below >= panel.offsetHeight || below >= r.top
-        ? r.bottom + 8
-        : Math.max(8, r.top - panel.offsetHeight - 8)) + "px";
-    panel.style.left =
-      Math.min(
-        Math.max(8, r.left + r.width / 2 - panel.offsetWidth / 2),
-        innerWidth - panel.offsetWidth - 8,
-      ) + "px";
-  };
-  const close = (focus) => {
-    if (!shown()) return;
-    panel.hidden = true;
-    anchor.setAttribute("aria-expanded", "false");
-    if (focus) anchor.focus();
-  };
-  const open = (trigger, ...args) => {
-    const again = shown() && anchor === trigger;
-    close();
-    if (again) return;
-    panel?.remove();
-    panel = document.createElement("div");
-    panel.className = "histFilterPanel";
-    panel.setAttribute("role", "menu");
-    panel.setAttribute("aria-label", label);
-    fill(panel, ...args);
-    document.body.append(panel);
-    anchor = trigger;
-    anchor.setAttribute("aria-expanded", "true");
-    place();
-    panel.querySelector('[role^="menuitem"]')?.focus();
-  };
-  document.addEventListener("click", (e) => {
-    if (shown() && !panel.contains(e.target) && !anchor.contains(e.target)) close();
-  });
-  document.addEventListener("keydown", (e) => e.key === "Escape" && close(true));
-  const reposition = () => shown() && (anchor.isConnected ? place() : close());
-  window.addEventListener("scroll", reposition, { passive: true });
-  window.addEventListener("resize", reposition, { passive: true });
-  return { open, close };
-}
-// An action menu on the shared popup: a string starts a group, null draws a
-// separator, and [icon path, title, hint, run, danger] is an item.
-function actionMenu(label, items) {
-  const menu = createPopup(label, (p, ...args) => {
-    for (const item of items(...args)) {
-      if (item === null) {
-        p.append(document.createElement("hr"));
-        continue;
-      }
-      if (typeof item === "string") {
-        p.append(
-          Object.assign(document.createElement("div"), {
-            className: "histFilterGroup",
-            textContent: item,
-          }),
-        );
-        continue;
-      }
-      const [icon, title, hint, run, danger] = item,
-        b = document.createElement("button");
-      b.type = "button";
-      b.className = "histFilterItem menuAction" + (danger ? " menuDanger" : "");
-      b.setAttribute("role", "menuitem");
-      b.innerHTML =
-        '<span class="histFilterIcon" aria-hidden="true"><svg class="o" viewBox="0 0 24 24"><path d="' +
-        icon +
-        '"/></svg></span><span class="menuText"><b></b><small></small></span>';
-      b.querySelector("b").textContent = title;
-      b.querySelector("small").textContent = hint;
-      b.onclick = () => (menu.close(), run());
-      p.append(b);
-    }
-  });
-  return menu;
-}
-const ICON_TRASH = "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3";
-function refreshShots() {
-  return shotStatsViewActive() ? startStatsStream(true) : Promise.resolve(false);
-}
 // One save path for every download: the anchor joins the document for the
 // click, and the object URL outlives it so a slow browser finishes reading.
 function saveFile(blob, name) {
@@ -1575,68 +1360,6 @@ function saveFile(blob, name) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 6e4);
 }
-// CSV for spreadsheets: a BOM marks it UTF-8, fields with quotes, commas or
-// line breaks are quoted, and text a spreadsheet would run as a formula
-// (=, +, -, @) gets a leading apostrophe; numbers stay as they are.
-function downloadCsv(name, rows) {
-  const cell = (v) => {
-    let s = String(v);
-    if (/^[=+\-@\t\r]/.test(s) && !Number.isFinite(+s)) s = "'" + s;
-    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  };
-  saveFile(
-    new Blob(["\uFEFF" + rows.map((r) => r.map(cell).join(",")).join("\n")], { type: "text/csv" }),
-    name,
-  );
-}
-function applyHistoryPage(d, mode) {
-  historyLoaded = true;
-  const a = d.history,
-    t = d.total;
-  bootId = d.bootId;
-  if (mode === "append" && t) {
-    const s = {};
-    for (const x of uiState.historyData.records) s[x.id] = 1;
-    let n = 0;
-    for (const x of a)
-      if (!s[x.id]) {
-        s[x.id] = 1;
-        uiState.historyData.records.push(x);
-        n++;
-      }
-    uiState.historyData.total = t;
-    uiState.historyData.hasMore = !!n && !!d.hasMore;
-    return;
-  }
-  uiState.historyData = {
-    bootId: d.bootId,
-    total: t,
-    hasMore: !!d.hasMore && !!t,
-    records: t ? a : [],
-  };
-}
-const historyViewActive = () => activeView === "history" && webUiPollingActive();
-const loadMoreHistory = () => {
-  if (
-    uiState.historyData.hasMore &&
-    historyViewActive() &&
-    historyFetchOffset < 0 &&
-    !uiState.historyExportWindow
-  ) {
-    historyFetchOffset = uiState.historyData.records.length;
-    historyFetchRequest = ++uiState.historyNextRequest;
-    sendUiOperation({
-      op: "history",
-      on: true,
-      fetch: true,
-      request: historyFetchRequest,
-      offset: historyFetchOffset,
-    });
-  }
-};
-const refreshHistory = () =>
-  historyViewActive() ? startHistoryStream(true) : Promise.resolve(false);
-
 function scaleDisplayName(sc) {
   const fr = (sc && sc.preferredFriendlyName && String(sc.preferredFriendlyName).trim()) || "";
   if (fr) return fr;
@@ -2703,16 +2426,6 @@ const BREW_CONTROL_IDS = [
   "scaleLossFixedS",
   "lineaMicraBrewTargetC",
 ];
-const REVERT_BUTTONS = {
-  saveNetworkButton: "revertNetworkButton",
-  saveDateTimeButton: "revertDateTimeButton",
-  saveWebhookButton: "revertWebhookButton",
-  changeDevicePasswordButton: "revertDevicePasswordButton",
-  saveFirmwareModeButton: "revertFirmwareModeButton",
-  saveBleButton: "revertBleButton",
-  savePowerButton: "revertPowerButton",
-  saveFrontendButton: "revertFrontendButton",
-};
 function settingsSectionOf(id) {
   if (BREW_CONTROL_IDS.includes(id)) return "brew";
   return id.startsWith("lineaMicra") ? "micra" : "config";
@@ -2739,19 +2452,6 @@ function restoreSnapshot(s) {
     if (el.type === "checkbox") el.checked = s[id];
     else el.value = s[id];
   }
-}
-function setSaveDirty(id, hintId, dirty) {
-  const b = $(id);
-  if (b) {
-    b.dataset.dirty = +dirty;
-    b.disabled = !controlsMutable || !dirty;
-  }
-  const r = REVERT_BUTTONS[id] && $(REVERT_BUTTONS[id]);
-  if (r) {
-    r.dataset.dirty = +dirty;
-    r.disabled = !controlsMutable || !dirty;
-  }
-  if (hintId) $(hintId)?.classList.toggle("hidden", !dirty);
 }
 function updateScalePreferenceOptions() {
   const sel = $("scalePreference");
@@ -2930,42 +2630,6 @@ function updateConfigGroups() {
 function extRate(v) {
   return ["disabled", "slow", "medium", "fast", "rapid"].includes(v) ? v : "fast";
 }
-function rangeCheck(id, min, max, label, opts) {
-  const raw = $(id).value.trim(),
-    v = Number(raw),
-    unit = opts && opts.unit ? " " + opts.unit : "";
-  if (raw === "" || !Number.isFinite(v))
-    return {
-      id,
-      required: true,
-      msg: label + __WEBUI_TEXT__("runtime.is_required") + min + "–" + max + unit + ").",
-    };
-  if (opts && opts.int && !Number.isInteger(v))
-    return {
-      id,
-      msg:
-        label + __WEBUI_TEXT__("runtime.must_be_an_integer_from") + min + " to " + max + unit + ".",
-    };
-  if (opts && opts.step && Math.abs(v / opts.step - Math.round(v / opts.step)) > 1e-6)
-    return {
-      id,
-      msg:
-        label +
-        __WEBUI_TEXT__("runtime.must_be_from") +
-        min +
-        " to " +
-        max +
-        unit +
-        __WEBUI_TEXT__("runtime.in_steps_of").replace("%1", opts.step) +
-        ".",
-    };
-  if (v < min || v > max)
-    return {
-      id,
-      msg: label + __WEBUI_TEXT__("runtime.must_be_from") + min + " to " + max + unit + ".",
-    };
-  return null;
-}
 function formNumber(id) {
   const el = $(id);
   if (!el) return NaN;
@@ -2973,213 +2637,6 @@ function formNumber(id) {
   return Number.isFinite(v) ? v : NaN;
 }
 const sub = (t, vals) => t.replace(/\{(\d)\}/g, (_, i) => vals[+i]);
-// Brew validation message values: formatted per the input's step so every
-// number shows the precision the field itself uses ("34.0 g", never "34 g"
-// for a 0.1-step field, and never a rounded-off typed value).
-function brewFieldValue(id) {
-  const raw = $(id).value.trim(),
-    v = Number(raw);
-  if (raw === "" || !Number.isFinite(v)) return "";
-  const step = Number($(id).step),
-    dec = step > 0 && step < 1 ? (String(step).split(".")[1] || "").length : 0,
-    fixed = v.toFixed(dec);
-  return Number(fixed) === v ? fixed : String(v);
-}
-const BREW_FIELD_TEXT = {
-    doseG: [__WEBUI_TEXT__("runtime.dose"), __WEBUI_TEXT__("runtime.g"), "recipe"],
-    goalWeightG: [__WEBUI_TEXT__("runtime.target_yield"), __WEBUI_TEXT__("runtime.g"), "recipe"],
-    operationalWallS: [
-      __WEBUI_TEXT__("runtime.max_bbw_time"),
-      __WEBUI_TEXT__("runtime.s"),
-      "limits",
-    ],
-    bbwProtectionS: [
-      __WEBUI_TEXT__("runtime.bbw_protection"),
-      __WEBUI_TEXT__("runtime.s"),
-      "limits",
-    ],
-    lineaMicraBrewTargetC: [__WEBUI_TEXT__("runtime.brew_temperature"), "°C"],
-    fastBeforeS: [__WEBUI_TEXT__("runtime.window_start"), __WEBUI_TEXT__("runtime.s"), "recipe"],
-    fastMarginG: [__WEBUI_TEXT__("runtime.fast_margin"), __WEBUI_TEXT__("runtime.g"), "fast"],
-    slowAfterS: [__WEBUI_TEXT__("runtime.window_end"), __WEBUI_TEXT__("runtime.s"), "recipe"],
-    slowMarginG: [__WEBUI_TEXT__("runtime.slow_margin"), __WEBUI_TEXT__("runtime.g"), "slow"],
-    scaleLossFixedS: [
-      __WEBUI_TEXT__("runtime.scale_loss_override"),
-      __WEBUI_TEXT__("runtime.s"),
-      "limits",
-    ],
-  },
-  BREW_SECTION_TEXT = {
-    recipe: __WEBUI_TEXT__("settings.recipe"),
-    fast: __WEBUI_TEXT__("settings.fast_shots"),
-    slow: __WEBUI_TEXT__("settings.slow_shots"),
-    limits: __WEBUI_TEXT__("settings.shot_limits"),
-  },
-  BREW_CROSS_TEXT = {
-    gt: __WEBUI_TEXT__("settings.err_greater"),
-    lt: __WEBUI_TEXT__("settings.err_less"),
-    ge: __WEBUI_TEXT__("settings.err_at_least"),
-    le: __WEBUI_TEXT__("settings.err_not_exceed"),
-  },
-  BREW_REL = {
-    ">": (a, b) => a > b,
-    "<": (a, b) => a < b,
-  },
-  // Cross-field rules as [fieldA, fieldB, violation(fieldA, fieldB + offset),
-  // messageA, messageB, offset]: each message is phrased from its own field's
-  // side and names the other field's value, label, and settings section. The
-  // retare floor entry is single-sided: its bound is computed, not an edited field.
-  BREW_CROSS_RULES = [
-    ["bbwProtectionS", "operationalWallS", ">", "le", "ge"],
-    ["bbwProtectionS", "retareFloor", "<", "ge"],
-    ["fastBeforeS", "bbwProtectionS", "<", "ge", "le", 2],
-    ["slowAfterS", "operationalWallS", ">", "le", "ge", -1],
-  ];
-// Message label for a brew field: the Settings form labels carry the unit in
-// parentheses, so every error and warning opens with the exact field name the
-// user sees, never the field's own current value.
-const brewFieldLabel = (id) => {
-  const [label, unit] = BREW_FIELD_TEXT[id];
-  return label + " (" + unit + ")";
-};
-function brewCrossErr(kind, id, other, off = 0) {
-  const [ref, refUnit, refSection] = BREW_FIELD_TEXT[other],
-    limit = (off ? (number(other) + off).toFixed(1) : brewFieldValue(other)) + " " + refUnit,
-    named = off ? ref + (off > 0 ? " + " : " − ") + Math.abs(off) + " " + refUnit : ref;
-  return sub(BREW_CROSS_TEXT[kind], [
-    brewFieldLabel(id),
-    limit,
-    named,
-    BREW_SECTION_TEXT[refSection],
-  ]);
-}
-// The fields the user changed: the baseline follows the device for every
-// field without a pending edit, so programmatic writes (the Home quick-weight
-// sheet) count as edits too.
-function editedBrewFields() {
-  const edited = new Set();
-  if (!uiState.formBaseline) return edited;
-  for (const el of settingsSectionEls("brew"))
-    if (el.id && uiState.formBaseline[el.id] !== (el.type === "checkbox" ? el.checked : el.value))
-      edited.add(el.id);
-  return edited;
-}
-function validateBrewClient() {
-  const errors = [],
-    edited = editedBrewFields(),
-    fastOn = $("fastExtractionGuardEnabled").checked,
-    slowOn = $("slowExtractionGuardEnabled").checked,
-    brewRange = (id, min, max, opts) =>
-      rangeCheck(id, min, max, brewFieldLabel(id), {
-        unit: BREW_FIELD_TEXT[id][1],
-        ...opts,
-      }),
-    add = (e) => e && errors.push(e);
-  add(brewRange("goalWeightG", 10, 200, { step: 0.1 }));
-  add(brewRange("operationalWallS", 5, 60, { int: 1 }));
-  add(brewRange("bbwProtectionS", 0.5, 30));
-  if (document.documentElement.classList.contains("micraTemperatureEnabled"))
-    add(brewRange("lineaMicraBrewTargetC", 80, 100));
-  add(brewRange("doseG", 5, 30, { step: 0.1 }));
-  add(brewRange("fastBeforeS", 2.5, 58, { step: 0.5 }));
-  add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));
-  if (fastOn) add(brewRange("fastMarginG", 0.5, 10, { step: 0.1 }));
-  if (slowOn) add(brewRange("slowMarginG", 0.5, 10, { step: 0.1 }));
-  if (brewFieldValue("scaleLossFixedS") !== "")
-    add(brewRange("scaleLossFixedS", formNumber("bbwProtectionS"), formNumber("operationalWallS")));
-  const rw = formNumber("retareWindowS"),
-    withRetare = !!$("autoRetare") && $("autoRetare").checked && Number.isFinite(rw),
-    floor = (withRetare ? rw : 0) + 3;
-  for (const [a, b, rel, kindA, kindB, off = 0] of BREW_CROSS_RULES) {
-    const retareRule = b === "retareFloor";
-    // An empty or non-numeric participant already produced its self-range
-    // error; cross rules only compare well-formed values (Number("") is 0).
-    if (brewFieldValue(a) === "" || (!retareRule && brewFieldValue(b) === "")) continue;
-    const x = number(a),
-      y = retareRule ? floor : number(b) + off;
-    if (!BREW_REL[rel](x, y)) continue;
-    if (retareRule) {
-      const unit = BREW_FIELD_TEXT[a][1],
-        fixed = floor.toFixed(1),
-        bound = (Number(fixed) === floor ? fixed : String(floor)) + " " + unit;
-      errors.push({
-        id: a,
-        msg: withRetare
-          ? sub(BREW_CROSS_TEXT.ge, [
-              brewFieldLabel(a),
-              bound,
-              sub(__WEBUI_TEXT__("settings.err_retare_sum"), [brewFieldValue("retareWindowS")]),
-              __WEBUI_TEXT__("settings.tare"),
-            ])
-          : sub(__WEBUI_TEXT__("settings.err_at_least_plain"), [brewFieldLabel(a), bound]),
-      });
-      continue;
-    }
-    const blamed = [a, b].filter((id) => edited.has(id));
-    for (const id of blamed.length ? blamed : [a])
-      errors.push({
-        id,
-        msg: brewCrossErr(id === a ? kindA : kindB, id, id === a ? b : a, id === a ? off : -off),
-      });
-  }
-  if (
-    brewFieldValue("fastBeforeS") !== "" &&
-    brewFieldValue("slowAfterS") !== "" &&
-    number("slowAfterS") < number("fastBeforeS") + 1
-  )
-    errors.push({
-      id: "slowAfterS",
-      msg: sub(__WEBUI_TEXT__("runtime.window_min_length"), [
-        +(number("fastBeforeS") + 1).toFixed(1),
-      ]),
-    });
-  // Margins are relative to the target: extra yield at most a quarter of it,
-  // and an early stop that still leaves 5 g in the cup.
-  const goal = brewFieldValue("goalWeightG") === "" ? NaN : number("goalWeightG"),
-    recipe = BREW_SECTION_TEXT.recipe;
-  if (fastOn && brewFieldValue("fastMarginG") !== "" && number("fastMarginG") > goal / 4)
-    errors.push({
-      id: "fastMarginG",
-      msg: sub(BREW_CROSS_TEXT.le, [
-        brewFieldLabel("fastMarginG"),
-        (goal / 4).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
-        __WEBUI_TEXT__("runtime.quarter_of_target"),
-        recipe,
-      ]),
-    });
-  if (slowOn && brewFieldValue("slowMarginG") !== "" && number("slowMarginG") > goal - 5)
-    errors.push({
-      id: "slowMarginG",
-      msg: sub(BREW_CROSS_TEXT.le, [
-        brewFieldLabel("slowMarginG"),
-        (goal - 5).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
-        BREW_FIELD_TEXT.goalWeightG[0] + " − 5 g",
-        recipe,
-      ]),
-    });
-  return errors;
-}
-function brewPayload() {
-  return {
-    ...Object.fromEntries([
-      ...["doseG", "goalWeightG", "fastBeforeS", "slowAfterS", "fastMarginG", "slowMarginG"].map(
-        (k) => [k, number(k)],
-      ),
-      ...["operationalWall", "bbwProtection"].map((k) => [k + "Ms", sToMs(k + "S")]),
-      ...[
-        "brewByWeight",
-        "fastExtractionGuardEnabled",
-        "slowExtractionGuardEnabled",
-        "grindHintsEnabled",
-      ].map((k) => [k, $(k).checked]),
-    ]),
-    // Empty means "use your recent shots": the firmware stores it as 0.
-    scaleLossFixedS: number("scaleLossFixedS"),
-    ...(document.documentElement.classList.contains("micraTemperatureEnabled")
-      ? { lineaMicraBrewTargetC: number("lineaMicraBrewTargetC") }
-      : {}),
-  };
-}
 function updateStaticIpFieldsState() {
   if (!$("staIpMode")) return;
   const on = $("staIpMode").value === "static";
@@ -3210,52 +2667,6 @@ function updateStateTone(s) {
     cr.classList.toggle("lampBad", blocks);
     cr.classList.toggle("lampWarn", !present && !blocks);
   }
-}
-function renderLog() {
-  const f = $("logFilter").value,
-    m = +$("logLevelFilter").value,
-    r = { critical: 0, error: 1, warning: 2, info: 3, debug: 4 };
-  let o = "";
-  for (const e of uiState.logEvents) {
-    if (f && e.category !== f) continue;
-    if ((r[e.level] ?? 3) > m) continue;
-    o += e.line ??=
-      (e.wallSec ? formatWallTimeLocal(e.localSec) : "+" + (e.atMs / 1000).toFixed(3) + "s") +
-      " " +
-      e.level.toUpperCase() +
-      " [" +
-      e.category +
-      "] " +
-      e.message +
-      "\n";
-  }
-  // New lines append (and the oldest drop) in place, so a selection or a
-  // scrolled-back view survives; only a reader already at the end follows it.
-  const el = $("log"),
-    old = el.value,
-    cut = old.indexOf(o.slice(0, o.indexOf("\n") + 1)),
-    top = el.scrollTop,
-    h = el.scrollHeight,
-    stick = top + el.clientHeight >= h - 8;
-  if (o === old) return;
-  if (cut >= 0 && o.startsWith(old.slice(cut))) {
-    el.setRangeText("", 0, cut);
-    if (!stick) el.scrollTop = top - h + el.scrollHeight;
-    el.setRangeText(o.slice(old.length - cut), el.value.length, el.value.length);
-  } else el.value = o;
-  if (stick) el.scrollTop = el.scrollHeight;
-}
-function updateLogHealth(d) {
-  const a = [],
-    e = $("logDropped");
-  if (d.historyOverwritten)
-    a.push(__WEBUI_TEXT__("runtime.history_rotated") + d.historyOverwritten);
-  if (uiState.logMissed)
-    a.push(__WEBUI_TEXT__("runtime.missed_while_disconnected") + uiState.logMissed);
-  if (d.serialDropped) a.push(__WEBUI_TEXT__("runtime.serial_dropped") + d.serialDropped);
-  if (!e) return;
-  e.hidden = !a.length;
-  e.textContent = a.join(__WEBUI_TEXT__("runtime.symbol_8"));
 }
 function updateNetworkPasswordState() {
   if (!$("staPassword")) return;
@@ -3513,7 +2924,7 @@ function updateActiveBrewProfileHint() {
 }
 function renderAllPresetUi() {
   renderPresetCards("presetCards");
-  renderPresetReview();
+  settingsForm.renderPresetReview();
   renderHomePresetAccordion();
   updatePresetActionButtons();
   updateActiveBrewProfileHint();
@@ -3593,7 +3004,7 @@ async function saveBrewPreset(patch, okMsg, failMsg) {
     message(formatCommandError(fail, e), "error");
     return false;
   }
-  const errs = validateBrewClient();
+  const errs = settingsForm.validateBrewClient();
   if (errs.length) {
     // The red report replaces the yellow preview (same sentences): drop the
     // amber marks so each verdict reads exactly once until the next edit.
@@ -4105,83 +3516,6 @@ function drawPresetGraph(host, m, x, readout, key) {
   positionPresetScrub(host);
   return view;
 }
-// Review graph of the preset under review: pace curves fan out from the
-// origin into corridors whose boundaries are the preset's thresholds, colored
-// only under the cut line. Unsaved edits redraw live over the ghosted saved line.
-function renderPresetReview() {
-  const host = $("presetReviewGraph");
-  // Settings redraws it on entry; hidden, it would redraw on every Home frame.
-  if (!host || activeView !== "settings") return;
-  const goalNow = formNumber("goalWeightG"),
-    grams = (v) => (Number.isFinite(v) ? v.toFixed(1) : "\u2014");
-  for (const [id, key, w] of [
-    [
-      "fastMarginResult",
-      __WEBUI_TEXT__("runtime.margin_up_to"),
-      goalNow + formNumber("fastMarginG"),
-    ],
-    [
-      "slowMarginResult",
-      __WEBUI_TEXT__("runtime.margin_down_to"),
-      goalNow - formNumber("slowMarginG"),
-    ],
-  ])
-    $(id).textContent = sub(key, [grams(w), brewRatio(w, formNumber("doseG"))]);
-  const id = presetState.selectedId || presetState.activeId,
-    saved = presetState.items.find((x) => x.id === id),
-    savedModel = buildRuleChartModel(saved),
-    draft =
-      configLoaded && uiState.brewDirty && bbwFormPresetId === id
-        ? buildRuleChartModel({ ...saved, ...brewPayload() })
-        : null,
-    m = draft && draft.mode !== "empty" ? draft : savedModel,
-    ghost = JSON.stringify(m.pts) !== JSON.stringify(savedModel.pts) ? savedModel : null;
-  $("presetReview").hidden = savedModel.mode === "empty";
-  const statsLine = shotStatsLine(saved);
-  $("windowStatsText").textContent = statsLine || __WEBUI_TEXT__("runtime.no_shots_yet");
-  if (savedModel.mode === "empty") return;
-  // Past arrivals were judged against the saved target: hidden while it is edited.
-  const arrivals = m.goal === savedModel.goal ? saved.arrivalsS || [] : [];
-  host._draw = renderPresetReview;
-  const view = drawPresetGraph(host, m, { ghost, arrivals }, $("presetReviewReadout"), id);
-  if (!view) return;
-  const legend = $("presetReviewLegend");
-  if (!legend.childElementCount)
-    legend.innerHTML =
-      '<span class="rvLeg rvLegCut"><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_cut") +
-      "</span>" +
-      '<span class="rvLeg rvLegPace"><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_pace") +
-      "</span>" +
-      '<span class="rvLeg rvLegExample"><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_example") +
-      "</span>" +
-      '<span class="rvLeg rvLegArrivals"><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_arrivals") +
-      "</span>" +
-      '<span class="rvLeg rvLegWindow"><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_corridor") +
-      "</span>" +
-      '<span class="rvLeg rvLegFast"><i></i><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_fast") +
-      "</span>" +
-      '<span class="rvLeg rvLegSlow"><i></i><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_slow") +
-      "</span>" +
-      '<span class="rvLeg rvLegNoCut"><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_no_cut") +
-      "</span>" +
-      '<span class="rvLeg rvLegSaved"><i></i>' +
-      __WEBUI_TEXT__("runtime.graph_legend_saved") +
-      "</span>" +
-      '<small class="rvNote"></small>';
-  legend.lastChild.textContent = __WEBUI_TEXT__("runtime.graph_pace_note") + " " + paceStartNote(m);
-  legend.classList.toggle("ghosted", !!ghost);
-  legend.classList.toggle("hasArrivals", view.arrivals > 0);
-  legend.classList.toggle("noFast", !m.fast);
-  legend.classList.toggle("noSlow", !m.slow);
-}
 // The scrubber rides the cut line: it picks when a shot is cut, and so the
 // weight it stops at. The reference pace through that point (inverting
 // referencePace) gives when the shot would have reached the target.
@@ -4357,23 +3691,9 @@ let shotWs = null,
   shotGotHome = !1,
   shotGotShot = !1;
 function resetUiStream() {
-  clearTimeout(diagSetup);
-  diagFrame = null;
-  diagResolve?.(false);
-  diagResolve = null;
-  // The Settings model outlives the socket.
-  settingsResolve?.(false);
-  settingsResolve = settingsReady = null;
-  historyFetchOffset = -1;
-  historyResolve?.(false);
-  uiState.statsFetchMark = null;
-  statsPage = null;
-  statsLastSeq = 0;
-  statsResolve?.(false);
-  uiState.statsExportResolve?.(null);
   // A closed socket ends every subscription generation: nothing stays synced
   // until socket.onopen replays the wanted subscriptions.
-  historySynced = statsSynced = false;
+  eachStream("reset");
   shotStale = true;
   shotResync = false;
   invalidateHomeStream();
@@ -4577,14 +3897,10 @@ function startUiStream() {
         ...(known ? { presetsTag: known } : {}),
       }),
     );
-    if (diagStreamWanted) {
-      if (!diagResolve) armDiagnosticReady();
-      socket.send('{"op":"diagnostic","on":true}');
+    for (const h of Object.values(streamHandlers)) {
+      const op = h.subscribe();
+      if (op) sendUiOperation(op);
     }
-    if (settingsStreamWanted) settingsSendSubscribe();
-    if (historyStreamWanted) historySendSubscribe();
-    if (logStreamWanted) sendUiOperation({ op: "log", on: true, after: lastLog });
-    if (statsStreamWanted) statsSendSubscribe();
     shotActivity();
   };
   socket.onmessage = (event) => {
@@ -4595,77 +3911,27 @@ function startUiStream() {
       uiFrameAt = Date.now();
       clearTimeout(shotDeadline);
       if (data.type === "alive") return;
-      // Log frames carry their own cursor: a pending resync must not drop them.
-      if (data.type === "log") {
-        if (!logStreamWanted) return;
-        applyLogFrame(logStreamFrame(data));
+      // A subscribed type's frames go to its handler; a pending resync drops
+      // all but snapshots and cursor-carrying frames (the log) until then.
+      const stream = streamHandlers[data.type];
+      if (stream) {
+        if (stream.cursor || !shotResync || data.snapshot) stream.frame(data);
         return;
       }
       if (shotResync && !data.snapshot) return;
-      if (data.type === "diagnostic") {
-        if (!diagStreamWanted) return;
-        const next = statusStreamFrame(diagFrame, data);
-        if (next !== diagFrame) {
-          diagFrame = next;
-          scheduleDiagPaint();
-        }
-        resolveDiagFrame();
-        return;
-      }
-      if (data.type === "history") {
-        if (
-          !historyStreamWanted ||
-          !(
-            data.request === historyRequest ||
-            (historyFetchOffset >= 0 && data.request === historyFetchRequest) ||
-            (uiState.historyExportWindow && data.request === uiState.historyExportWindow.request)
-          )
-        )
-          return;
-        applyHistoryStream(historyStreamFrame(data));
-        return;
-      }
-      if (data.type === "stats") {
-        if (
-          !statsStreamWanted ||
-          ![
-            statsRequest,
-            uiState.statsFetchMark?.request,
-            uiState.statsExportRequest || -1,
-          ].includes(data.request)
-        )
-          return;
-        applyStatsStream(statsStreamFrame(data));
-        return;
-      }
-      if (data.type === "settings") {
-        if (!settingsStreamWanted) return;
-        if (!Number.isInteger(data.tag)) throw Error();
-        settingsFrame = { ...statusStreamFrame(settingsFrame, data), tag: data.tag };
-        settingsResolve?.(true);
-        settingsResolve = settingsReady = null;
-        scheduleSettingsPaint();
-        // Diagnostic reads the Micra account paths from this model.
-        if (activeView === "diagnostic") scheduleDiagPaint();
-        return;
-      }
       if (data.type === "home") {
         const paddleOff =
           homeFrame?.status.physicalActivatorOn === true &&
           data.changes?.physicalActivatorOn === false;
+        const boot = homeFrame?.boot;
         homeFrame = statusStreamFrame(shotGotHome ? homeFrame : null, data, homeFrame?.status);
-        if (logStreamWanted && logBootId && logBootId !== homeFrame.boot) {
-          logBootId = homeFrame.boot;
-          uiState.logEvents = [];
-          lastLog = uiState.logMissed = 0;
-          sendUiOperation({ op: "log", on: true, after: 0 });
-        }
+        // A rebooted device invalidates the models that name their boot.
+        if (boot !== homeFrame.boot) eachStream("reboot", homeFrame.boot);
         if ("timeUtcSec" in data.changes) {
           statusUtcAnchorSec = homeFrame.status.timeUtcSec;
           statusUtcAnchorAt = performance.now();
         }
         delete homeFrame.status.timeUtcSec;
-        if (settingsFrame && settingsFrame.boot !== homeFrame.boot) settingsFrame = null;
         // One preset model for every view.
         if ("presets" in data.changes) ingestPresets(homeFrame.status);
         shotGotHome = true;
@@ -4743,10 +4009,8 @@ function startUiStream() {
     }
     // 4003: the firmware rejected an op. Clearing the free-form list views
     // makes the replayed subscriptions valid; the device is reachable.
-    if (event?.code === 4003) {
-      for (const r of filterResets) r();
-      uiState.statsWindow = 10;
-    } else if (webUiPollingActive()) noteReachFail({ network: true }, true);
+    if (event?.code === 4003) eachStream("rejected");
+    else if (webUiPollingActive()) noteReachFail({ network: true }, true);
     if (webUiPollingActive())
       shotRetry = setTimeout(
         startUiStream,
@@ -4785,11 +4049,7 @@ function requestShotResync() {
   if (!shotWs || shotWs.readyState !== 1) return;
   shotResync = true;
   shotGotHome = shotGotShot = false;
-  historyFetchOffset = -1;
-  uiState.statsFetchMark = null;
-  statsPage = null;
-  uiState.statsExportResolve?.(null);
-  historySynced = statsSynced = false;
+  eachStream("resync");
   homeResolve(false);
   homeReady = new Promise((r) => (homeResolve = r));
   clearTimeout(shotSetup);
@@ -5140,11 +4400,7 @@ function paintDiagnosticStream() {
   const s = diagnosticStatus();
   viewStatusHandlers.diagnosticLive?.(s);
   const apply = viewStatusHandlers["diagnostic"];
-  if (!apply || !diagnosticReady()) return;
-  apply(s);
-  // A resume whose first snapshot failed never reached startView's log
-  // subscription: the recovered stream restarts it (a no-op once wanted).
-  startLogStream();
+  if (apply && diagnosticReady()) apply(s);
 }
 async function loadDiagnosticStatus() {
   startUiStream();
@@ -5167,6 +4423,28 @@ function stopDiagnosticStream() {
   diagResolve && diagResolve(false);
   diagResolve = null;
 }
+registerStream("diagnostic", {
+  subscribe() {
+    if (!diagStreamWanted) return null;
+    if (!diagResolve) armDiagnosticReady();
+    return { op: "diagnostic", on: true };
+  },
+  frame(data) {
+    if (!diagStreamWanted) return;
+    const next = statusStreamFrame(diagFrame, data);
+    if (next !== diagFrame) {
+      diagFrame = next;
+      scheduleDiagPaint();
+    }
+    resolveDiagFrame();
+  },
+  reset() {
+    clearTimeout(diagSetup);
+    diagFrame = null;
+    diagResolve?.(false);
+    diagResolve = null;
+  },
+});
 // Standing Settings subscription (not in compatibility mode): its model holds
 // the paths Home lacks and survives reconnects, named by its tag.
 let settingsFrame = null,
@@ -5177,9 +4455,35 @@ let settingsFrame = null,
 // Home paths the Settings form does not show.
 const SETTINGS_LIVE_PATHS =
   /^(scale\.(observedWeightG|timerMs)$|timeUtcSec$|quickRevert\.remainingS$|cupPresence\.|connections\.)/;
+const settingsSubscribeOp = () => ({
+  op: "settings",
+  on: true,
+  ...(settingsFrame && { tag: settingsFrame.tag }),
+});
 function settingsSendSubscribe() {
-  sendUiOperation({ op: "settings", on: true, ...(settingsFrame && { tag: settingsFrame.tag }) });
+  sendUiOperation(settingsSubscribeOp());
 }
+registerStream("settings", {
+  subscribe: () => (settingsStreamWanted ? settingsSubscribeOp() : null),
+  frame(data) {
+    if (!settingsStreamWanted) return;
+    if (!Number.isInteger(data.tag)) throw Error();
+    settingsFrame = { ...statusStreamFrame(settingsFrame, data), tag: data.tag };
+    settingsResolve?.(true);
+    settingsResolve = settingsReady = null;
+    scheduleSettingsPaint();
+    // Diagnostic reads the Micra account paths from this model.
+    if (activeView === "diagnostic") scheduleDiagPaint();
+  },
+  // The Settings model outlives the socket, but not the device boot.
+  reset() {
+    settingsResolve?.(false);
+    settingsResolve = settingsReady = null;
+  },
+  reboot(boot) {
+    if (settingsFrame && settingsFrame.boot !== boot) settingsFrame = null;
+  },
+});
 function ensureSettingsStream() {
   if (settingsStreamWanted || compatMode) return;
   settingsStreamWanted = true;
@@ -5214,10 +4518,7 @@ function scheduleSettingsPaint() {
     if (s && activeView === "settings") paint(() => viewStatusHandlers.settings?.(s));
   });
 }
-// The serial log rides the owned socket: subscribe with the rendered tail's
-// cursor; watermark-gated frames push new events without REST polling.
-let logStreamWanted = false,
-  uiSentAt = 0,
+let uiSentAt = 0,
   uiPowerAt = 0,
   uiFrameAt = 0;
 function noteUiSent(power) {
@@ -5229,64 +4530,6 @@ function sendUiOperation(op) {
   shotWs.send(JSON.stringify(op));
   noteUiSent(op.seconds > 0);
 }
-function startLogStream() {
-  if (webUiPollingActive()) {
-    if (!logStreamWanted) {
-      logStreamWanted = true;
-      sendUiOperation({ op: "log", on: true, after: lastLog });
-    }
-    return true;
-  }
-  return false;
-}
-function stopLogStream() {
-  if (logStreamWanted) sendUiOperation({ op: "log", on: false });
-  logStreamWanted = false;
-}
-function logStreamFrame(m) {
-  if (
-    m.v !== 1 ||
-    !Number.isInteger(m.bootId) ||
-    !Array.isArray(m.events) ||
-    typeof m.hasMore !== "boolean" ||
-    typeof m.cursorInvalid !== "boolean" ||
-    ["historyOverwritten", "missedEvents", "serialDropped"].some((k) => !Number.isInteger(m[k]))
-  )
-    throw Error();
-  for (const e of m.events)
-    if (
-      !e ||
-      !Number.isInteger(e.sequence) ||
-      !Number.isInteger(e.atMs) ||
-      !Number.isInteger(e.wallSec) ||
-      !Number.isInteger(e.localSec) ||
-      typeof e.level !== "string" ||
-      typeof e.category !== "string" ||
-      typeof e.message !== "string"
-    )
-      throw Error();
-  return m;
-}
-function applyLogFrame(m) {
-  const b = +m.bootId;
-  if ((logBootId && b && b !== logBootId) || m.cursorInvalid) {
-    uiState.logEvents = [];
-    lastLog = uiState.logMissed = 0;
-  }
-  bootId = logBootId = b;
-  uiState.logMissed += m.missedEvents || 0;
-  for (const e of m.events) {
-    if (lastLog && ((e.sequence - lastLog) | 0) <= 0) continue;
-    uiState.logEvents.push(e);
-    lastLog = e.sequence;
-  }
-  if (uiState.logEvents.length > LOG_EVENTS_CAPACITY)
-    uiState.logEvents.splice(0, uiState.logEvents.length - LOG_EVENTS_CAPACITY);
-  updateLogHealth(m);
-  paint(renderLog);
-  updateFirmwareFooter();
-  if (activeView === "diagnostic") noteReachOk();
-}
 function diagSnapshotOk(s) {
   return (
     typeof s.relayClosed === "boolean" &&
@@ -5295,388 +4538,13 @@ function diagSnapshotOk(s) {
     typeof s.scale?.controlState === "string"
   );
 }
-// Request IDs separate the standing History window from scroll fetches.
-// historySynced marks a cached model that reflects a completed page
-// from the current subscription generation, so warm view entries can paint
-// from it; every subscribe or resync drops it until a page lands again.
-let historyStreamWanted = false,
-  historySynced = false,
-  historyFetchOffset = -1,
-  historyStreamBoot = 0,
-  historyStreamEpoch = 0,
-  historyRequest = 0,
-  historyFetchRequest = 0,
-  historyResolve = null;
-function historySendSubscribe() {
-  if (!shotWs || shotWs.readyState !== 1) return;
-  uiState.historyExportWindow?.resolve(null);
-  historyFetchOffset = -1;
-  historySynced = false;
-  historyRequest = ++uiState.historyNextRequest;
-  sendUiOperation({
-    op: "history",
-    on: true,
-    request: historyRequest,
-    offset: 0,
-    limit: HISTORY_PAGE_SIZE,
-    dir: uiState.historyDir,
-    ...(uiState.historyTypes.length && { types: uiState.historyTypes }),
-  });
-}
-// The History subscription is session-standing: once ensured it stays on for
-// the whole UI session and socket.onopen replays it after a reconnect, so the
-// cached page keeps refreshing regardless of the active view.
-function ensureHistoryStream(resubscribe) {
-  if (resubscribe || !historyStreamWanted) {
-    historyStreamWanted = true;
-    if (shotWs?.readyState === 1) historySendSubscribe();
-  }
-}
-function startHistoryStream(force) {
-  if (!webUiPollingActive()) return Promise.resolve(false);
-  return viewReady.then(() => {
-    if (!webUiPollingActive() || activeView !== "history") return false;
-    // Warm entry: the standing subscription keeps the model current, so paint
-    // it without an op or a snapshot wait. Forced refreshes, first opens,
-    // reconnects, and pending resyncs take the subscribe-and-wait path.
-    if (
-      !force &&
-      historyStreamWanted &&
-      historySynced &&
-      historyLoaded &&
-      shotWs?.readyState === 1 &&
-      !shotResync
-    ) {
-      renderHistory();
-      updateFirmwareFooter();
-      noteReachOk();
-      return true;
-    }
-    historyResolve?.(false);
-    const ready = new Promise((r) => (historyResolve = r));
-    ensureHistoryStream(force);
-    return ready;
-  });
-}
-function historyStreamFrame(message) {
-  if (
-    message.v !== 1 ||
-    !Number.isInteger(message.boot) ||
-    typeof message.snapshot !== "boolean" ||
-    !Number.isInteger(message.epoch) ||
-    !Number.isInteger(message.request) ||
-    !Number.isInteger(message.total) ||
-    message.total < 0 ||
-    !Number.isInteger(message.offset) ||
-    message.offset < 0 ||
-    !Number.isInteger(message.limit) ||
-    message.limit < 1 ||
-    message.limit > 120 ||
-    typeof message.hasMore !== "boolean" ||
-    !Array.isArray(message.records)
-  )
-    throw Error();
-  if (!message.snapshot && message.boot !== historyStreamBoot) throw Error();
-  // A standing refresh names records this page already holds by their id.
-  const held = !message.snapshot && uiState.historyData?.records;
-  message.records = message.records.map(
-    (r) => (Number.isInteger(r) && held && held.find((x) => x.id === r)) || r,
-  );
-  if (
-    message.offset + message.records.length > message.total ||
-    message.hasMore !== message.offset + message.records.length < message.total
-  )
-    throw Error();
-  for (const r of message.records) {
-    if (
-      !r ||
-      !Number.isInteger(r.id) ||
-      r.id <= 0 ||
-      typeof r.type !== "string" ||
-      typeof r.durationS !== "number" ||
-      !Number.isFinite(r.durationS) ||
-      typeof r.hasWallTime !== "boolean" ||
-      !Number.isInteger(r.endedAtUnixSec) ||
-      !Number.isInteger(r.endedAtLocalSec)
-    )
-      throw Error();
-  }
-  return message;
-}
-function applyHistoryStream(message) {
-  if (uiState.historyExportWindow && message.request === uiState.historyExportWindow.request) {
-    uiState.historyExportWindow.resolve(message);
-    return;
-  }
-  const fetch = historyFetchOffset >= 0 && message.request === historyFetchRequest;
-  if (fetch && message.epoch !== historyStreamEpoch) {
-    historySendSubscribe();
-    return;
-  }
-  const mode = fetch ? "append" : "replace";
-  applyHistoryPage(
-    {
-      bootId: message.boot,
-      total: message.total,
-      hasMore: message.hasMore,
-      history: message.records,
-    },
-    mode,
-  );
-  historyStreamBoot = message.boot;
-  historyStreamEpoch = message.epoch;
-  historyFetchOffset = -1;
-  // The model updates on every view; only the hidden view's DOM work and
-  // reachability signal wait until History is actually open.
-  if (historyViewActive()) {
-    paint(renderHistory);
-    updateFirmwareFooter();
-    noteReachOk();
-  }
-  if (mode !== "append") {
-    historySynced = true;
-    historyResolve?.(true);
-  }
-}
-// Stats pages assemble atomically; request IDs isolate sorting and CSV export.
-// statsSynced mirrors historySynced for the shot page cache.
-let statsStreamWanted = false,
-  statsSynced = false,
-  statsStreamBoot = 0,
-  statsStreamEpoch = 0,
-  statsRequest = 0,
-  statsLastSeq = 0,
-  statsPage = null,
-  statsResolve = null;
-function statsSendSubscribe() {
-  if (!shotWs || shotWs.readyState !== 1) return;
-  uiState.statsFetchMark = null;
-  statsPage = null;
-  uiState.statsExportResolve?.(null);
-  statsSynced = false;
-  statsRequest = ++uiState.statsNextRequest;
-  sendUiOperation({
-    op: "stats",
-    on: true,
-    request: statsRequest,
-    offset: 0,
-    limit: SHOTS_PAGE_SIZE,
-    sort: uiState.shotSort,
-    dir: uiState.shotSortDir,
-    ...(Object.keys(uiState.shotFilter).length && { filter: uiState.shotFilter }),
-    ...(uiState.statsWindow !== 10 && { window: uiState.statsWindow }),
-  });
-}
-// The Stats subscription is session-standing, like History above.
-function ensureStatsStream(resubscribe) {
-  if (resubscribe || !statsStreamWanted) {
-    statsStreamWanted = true;
-    if (shotWs?.readyState === 1) statsSendSubscribe();
-  }
-}
-function startStatsStream(force) {
-  if (!webUiPollingActive()) return Promise.resolve(false);
-  return viewReady.then(() => {
-    if (!webUiPollingActive() || activeView !== "stats") return false;
-    if (
-      !force &&
-      statsStreamWanted &&
-      statsSynced &&
-      shotsLoaded &&
-      shotWs?.readyState === 1 &&
-      !shotResync
-    ) {
-      renderShots();
-      updateFirmwareFooter();
-      noteReachOk();
-      return true;
-    }
-    statsResolve?.(false);
-    const ready = new Promise((r) => (statsResolve = r));
-    ensureStatsStream(force);
-    return ready;
-  });
-}
-function statsRowOk(r) {
-  if (
-    !r ||
-    !Number.isInteger(r.id) ||
-    r.id <= 0 ||
-    !Number.isInteger(r.bootId) ||
-    !Number.isInteger(r.endedAtMs) ||
-    r.endedAtMs < 0 ||
-    typeof r.hasWallTime !== "boolean" ||
-    !Number.isInteger(r.endedAtLocalSec) ||
-    !Number.isInteger(r.endedAtUnixSec) ||
-    typeof r.durationS !== "number" ||
-    !Number.isFinite(r.durationS) ||
-    !Number.isInteger(r.rating)
-  )
-    return false;
-  if (r.wD !== undefined) {
-    const d = r.wRef === undefined && decodeCurveDeltas(r.wD);
-    if (!d) return false;
-    delete r.wD;
-    Object.assign(r, d);
-  }
-  const w = r.wCg,
-    a = r.wAtMs;
-  if (!Array.isArray(w) || !Array.isArray(a) || w.length !== a.length || w.length > 1201)
-    return false;
-  for (let i = 0; i < w.length; i++) {
-    if (
-      !Number.isInteger(w[i]) ||
-      w[i] > 32767 ||
-      w[i] < -32767 ||
-      !Number.isInteger(a[i]) ||
-      a[i] < 0 ||
-      a[i] > 6e4 ||
-      (i && a[i] < a[i - 1])
-    )
-      return false;
-  }
-  return (
-    Array.isArray(r.wBreakBefore) &&
-    r.wBreakBefore.every((v) => Number.isInteger(v) && v > 0 && v < w.length) &&
-    Array.isArray(r.wHeld) &&
-    r.wHeld.every((v) => Number.isInteger(v) && v >= 0 && v < w.length)
-  );
-}
-function statsStreamFrame(message) {
-  if (
-    message.v !== 1 ||
-    !Number.isInteger(message.boot) ||
-    typeof message.snapshot !== "boolean" ||
-    !Number.isInteger(message.epoch) ||
-    !Number.isInteger(message.request) ||
-    !Number.isInteger(message.seq) ||
-    !Number.isInteger(message.total) ||
-    message.total < 0 ||
-    !Number.isInteger(message.offset) ||
-    message.offset < 0 ||
-    !Number.isInteger(message.limit) ||
-    message.limit < 1 ||
-    message.limit > SHOTS_EXPORT_LIMIT ||
-    typeof message.hasMore !== "boolean" ||
-    !Array.isArray(message.rows) ||
-    !Number.isInteger(message.rowBase) ||
-    message.rowBase < 0 ||
-    typeof message.more !== "boolean"
-  )
-    throw Error();
-  if (message.stats !== undefined && (typeof message.stats !== "object" || !message.stats))
-    throw Error();
-  // Rows are value arrays in the page's column order plus a curve object; the
-  // first frame names the columns, continuation frames reuse them.
-  const cols = message.rowBase
-    ? statsPage?.seq === message.seq && statsPage.cols
-    : typeof message.cols === "string" && message.cols.split(",");
-  if (!cols) throw Error();
-  message.cols = cols;
-  // A standing refresh names held rows by id, as in History.
-  const held = !message.snapshot && uiState.shotHistory?.shots;
-  message.rows = message.rows.map((a) => {
-    const kept = Number.isInteger(a) && held && held.find((x) => x.id === a);
-    if (kept) return kept;
-    const c = Array.isArray(a) && a.length === cols.length + 1 && a.at(-1);
-    if (!c || typeof c !== "object" || Array.isArray(c)) throw Error();
-    return { ...Object.fromEntries(cols.map((k, i) => [k, a[i]])), ...c };
-  });
-  for (const r of message.rows) if (!statsRowOk(r)) throw Error();
-  if (message.offset + message.rowBase + message.rows.length > message.total) throw Error();
-  const buffered = statsPage && statsPage.seq === message.seq;
-  if (buffered) {
-    if (
-      message.snapshot ||
-      message.boot !== statsPage.boot ||
-      message.epoch !== statsPage.epoch ||
-      message.request !== statsPage.request ||
-      message.rowBase !== statsPage.rows.length ||
-      message.total !== statsPage.total ||
-      message.offset !== statsPage.offset ||
-      message.limit !== statsPage.limit ||
-      message.hasMore !== statsPage.hasMore
-    )
-      throw Error();
-  } else {
-    if (message.rowBase !== 0 || message.seq <= statsLastSeq) throw Error();
-    if (!message.snapshot && message.boot !== statsStreamBoot) throw Error();
-  }
-  if (
-    !message.more &&
-    message.hasMore !== message.offset + message.rowBase + message.rows.length < message.total
-  )
-    throw Error();
-  return message;
-}
-function applyStatsStream(message) {
-  if (!statsPage || statsPage.seq !== message.seq) {
-    const mode =
-      message.request === uiState.statsExportRequest
-        ? "export"
-        : message.request === uiState.statsFetchMark?.request
-          ? "append"
-          : "replace";
-    if (mode === "append" && message.epoch !== statsStreamEpoch) {
-      statsSendSubscribe();
-      return;
-    }
-    statsPage = {
-      seq: message.seq,
-      boot: message.boot,
-      epoch: message.epoch,
-      request: message.request,
-      mode,
-      total: message.total,
-      offset: message.offset,
-      limit: message.limit,
-      hasMore: message.hasMore,
-      stats: message.stats || null,
-      cols: message.cols,
-      rows: [],
-    };
-  }
-  statsPage.rows.push(...message.rows);
-  if (message.more) return;
-  const page = statsPage;
-  statsPage = null;
-  statsLastSeq = page.seq;
-  if (page.mode === "export") {
-    uiState.statsExportResolve?.(page.rows);
-    return;
-  }
-  uiState.statsFetchMark = null;
-  statsStreamBoot = message.boot;
-  statsStreamEpoch = page.epoch;
-  applyShotPage(
-    {
-      bootId: message.boot,
-      total: page.total,
-      hasMore: page.hasMore,
-      stats: page.stats,
-      shots: page.rows,
-    },
-    page.mode,
-  );
-  // The model updates on every view; only the hidden view's DOM work and
-  // reachability signal wait until Stats is actually open.
-  if (shotStatsViewActive()) {
-    paint(renderShots);
-    updateFirmwareFooter();
-    noteReachOk();
-  }
-  if (page.mode !== "append") {
-    statsSynced = true;
-    statsResolve?.(true);
-  }
-}
-// After the first view paints, subscribe the standing Settings, Stats and
-// History streams in the background; compat mode has none of these views.
+// After the first view paints, subscribe the standing Settings stream in the
+// background; compat mode has no Settings view. Stats and History subscribe
+// on their first visit (their module owns the subscription) and then stay
+// standing for the session.
 function ensureBackgroundStreams() {
   if (!webUiPollingActive() || compatMode) return;
   ensureSettingsStream();
-  ensureStatsStream();
-  ensureHistoryStream();
 }
 // A page hidden for 5 minutes drops its stream (a live shot rechecks every
 // 30 s); phones freeze hidden timers, so the return also closes after such an
@@ -6635,11 +5503,10 @@ async function loadStatus() {
     return false;
   }
 }
+// A record page names its stream after the view and refreshes through it.
 function refreshStatus() {
   if (activeView === "settings") return scheduleSettingsPaint();
-  return withPollGate(
-    activeView === "stats" ? refreshShots : activeView === "history" ? refreshHistory : loadStatus,
-  );
+  return withPollGate(streamHandlers[activeView]?.refresh || loadStatus);
 }
 
 async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
@@ -6763,23 +5630,25 @@ export {
   loadStatus,
   armStatusTimer,
   stopDiagnosticStream,
-  startLogStream,
-  stopLogStream,
-  startHistoryStream,
-  startStatsStream,
   ensureBackgroundStreams,
-  renderLog,
-  armListSentinel,
   armStickyBar,
-  createFilterMenu,
   setStatsRenderers,
+  registerStream,
+  setSettingsForm,
+  paint,
+  viewReady,
+  shotResync,
+  decodeCurveDeltas,
+  updateFirmwareFooter,
+  noteBootId,
+  buildRuleChartModel,
+  shotStatsLine,
+  drawPresetGraph,
+  paceStartNote,
+  bbwFormPresetId,
   setSettingsRenderer,
   initGroupRows,
   renderGroupRows,
-  setHistoryRenderer,
-  loadMoreHistory,
-  historySendSubscribe,
-  historyLoaded,
   formatHumanTime,
   deviceUtcSec,
   resetNetworkAddressLoaded,
@@ -6787,9 +5656,7 @@ export {
   applyHomeStatus,
   updateConfigGroups,
   updateScalePreferenceOptions,
-  setSaveDirty,
   saveBrewPreset,
-  brewPayload,
   cleanBrewForm,
   settingsSectionOf,
   snapshotControls,
@@ -6803,7 +5670,6 @@ export {
   heroTintMode,
   cycleTheme,
   populateTimezoneOptions,
-  renderPresetReview,
   cardDismissed,
   dismissCard,
   startNewCoffee,
@@ -6820,14 +5686,7 @@ export {
   noteReachFail,
   uiState,
   buildShotSparkModel,
-  statsSendSubscribe,
-  shotStatsViewActive,
-  SHOTS_PAGE_SIZE,
   sendUiOperation,
-  SHOTS_EXPORT_LIMIT,
-  downloadCsv,
-  actionMenu,
-  ICON_TRASH,
   firmwareVersion,
   shotRuleModel,
   cutLine,
@@ -6839,14 +5698,11 @@ export {
   observePresetHost,
   fadeFill,
   axisLabel,
-  shotsLoaded,
   formatShotEnded,
   wrapTimeEl,
   verdictLabel,
   setEmptyState,
-  refreshShots,
   shotWs,
-  HISTORY_EXPORT_LIMIT,
   acquireDeviceSlot,
   webUiHeaders,
   storeSession,
@@ -6876,11 +5732,9 @@ export {
   timezonePreviewPending,
   renderTimezonePreview,
   updateScaleRenameUi,
-  validateBrewClient,
   clearBrewWarningsDom,
   settingsSectionEls,
   refreshFieldAria,
-  rangeCheck,
   formNumber,
   sToMs,
   extRate,

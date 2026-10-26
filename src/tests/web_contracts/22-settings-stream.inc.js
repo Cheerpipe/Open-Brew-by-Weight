@@ -194,7 +194,7 @@
   assert(codeIncludes(runtimeJs, "if(configLoaded&&els.includes(focused)&&focused.type!=='checkbox')return focused.addEventListener('blur',scheduleSettingsPaint,{once:true})") &&
       codeIncludes(runtimeJs, "same=(a,b)=>a===b||(a!==''&&b!==''&&+a===+b)"),
   'Settings re-hydration must skip the focused field and compare numbers by value');
-  assert(codeIncludes(runtimeJs, "if(activeView==='diagnostic')scheduleDiagPaint();return;}if(data.type==='home')"),
+  assert(codeIncludes(blockAt(runtimeJs, 'registerStream("settings", {'), "scheduleSettingsPaint();//DiagnosticreadstheMicraaccountpathsfromthismodel.if(activeView==='diagnostic')scheduleDiagPaint();}"),
       'a Settings frame repaints Diagnostic, which reads the Micra account paths from it');
   assert(codeIncludes(viewJs.settings, "if(retry&&e.code==='CONFIG_REVISION_STALE'){for(let i=0;i<20&&R.homeStatusCache()?.config.revision===patch.baseRevision;i++)"),
       'only a stale-revision save waits for the newer streamed revision before its one retry');

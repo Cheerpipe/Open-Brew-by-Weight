@@ -64,8 +64,8 @@
           get(childId).disabled !== (!mutable || !parent || !bbw)) {
         throw new Error('Inactive touch fallback must retain its saved checkbox value');
       }
-      const result = new Function('$', 'number', 'sToMs', 'bbwFormPresetId', 'document',
-        payload + ';return brewPayload();')(get, () => 36, () => 1000, 1, document);
+      const result = new Function('$', 'R', 'document',
+        payload + ';return brewPayload();')(get, {number: () => 36, sToMs: () => 1000, bbwFormPresetId: 1}, document);
       if (result.brewByWeight !== bbw ||
           [childId, 'cupProtectionEnabled', 'stopIfCupRemoved', 'requireCupToStart'].some(k => k in result) ||
           ['operationalWallMs', 'bbwProtectionMs'].some(k => result[k] !== 1000) ||
@@ -79,7 +79,7 @@
         field.addEventListener = (type, fn) => events[type] = fn;
         // Settings-owned helpers are module locals; the rest come from R.
         new Function('document', 'R',
-            'const {clearBrewFieldErrors, refreshBrewWarnings} = R, autosave = {};' + bindings)(
+            'const {clearBrewFieldErrors, refreshBrewWarnings, renderPresetReview} = R, autosave = {};' + bindings)(
             {querySelectorAll: () => [field]}, {
           settingsSectionOf: () => 'brew', noteEdit() {},
           clearBrewFieldErrors() {}, refreshBrewWarnings() {},
@@ -935,19 +935,21 @@ if (!codeIncludes(js, 'function commandOkMessage(') ||
     throw new Error('Config and preset saves must confirm their request and revision before showing success');
   }
 }
-if (!codeIncludes(runtimeJs, 'SHOTS_PAGE_SIZE=10') ||
-    !codeIncludes(runtimeJs, 'SHOTS_EXPORT_LIMIT=500') ||
-    codeIncludes(runtimeJs, "'/api/v1/stats?offset='") ||
-    codeIncludes(runtimeJs, "api('/api/v1/stats')") ||
-    !codeIncludes(runtimeJs, 'function startStatsStream(') ||
-    !codeIncludes(runtimeJs, 'function ensureStatsStream(') ||
+if (!codeIncludes(viewJs.stats, 'SHOTS_PAGE_SIZE=10') ||
+    !codeIncludes(viewJs.stats, 'SHOTS_EXPORT_LIMIT=500') ||
+    codeIncludes(statsRuntimeJs, "'/api/v1/stats?offset='") ||
+    codeIncludes(statsRuntimeJs, "api('/api/v1/stats')") ||
+    !codeIncludes(viewJs.stats, 'function startStatsStream(') ||
+    !codeIncludes(viewJs.stats, 'function ensureStatsStream(') ||
     !codeIncludes(runtimeJs, 'function ensureBackgroundStreams(') ||
     // Navigation must settle a pending cold record entry so the serialized
     // poll gate never waits on an abandoned view's page.
-    !codeIncludes(runtimeJs, 'if(activeView!==name){statsResolve?.(false);statsResolve=null;historyResolve?.(false);historyResolve=null;}') ||
-    !codeIncludes(runtimeJs, 'function statsStreamFrame(') ||
-    !codeIncludes(runtimeJs, 'function applyStatsStream(') ||
-    !codeIncludes(runtimeJs, 'if(statsStreamWanted)statsSendSubscribe()') ||
+    !codeIncludes(runtimeJs, 'if(activeView!==name)eachStream(leave)') ||
+    !codeIncludes(viewJs.stats, 'leave(){statsResolve?.(false);statsResolve=null;}') ||
+    !codeIncludes(viewJs.stats, 'function statsStreamFrame(') ||
+    !codeIncludes(viewJs.stats, 'function applyStatsStream(') ||
+    !codeIncludes(viewJs.stats, 'subscribe:()=>(statsStreamWanted?statsSubscribeOp():null)') ||
+    !codeIncludes(viewJs.stats, 'R.registerStream("stats",statsStream)') ||
     !codeIncludes(js, 'async function exportShotsCsv(){if(statsExportInFlight)return;') ||
     codeIncludes(js, 'return statsExportInFlight') ||
     !codeIncludes(statsRuntimeJs, 'statsRequest=++statsNextRequest') ||
@@ -955,7 +957,7 @@ if (!codeIncludes(runtimeJs, 'SHOTS_PAGE_SIZE=10') ||
     !codeIncludes(js, "statsFrameWindow(0,SHOTS_EXPORT_LIMIT,'date','desc',90e3)") ||
     !codeIncludes(statsRuntimeJs, 'function shotStatsViewActive(){') ||
     !codeIncludes(statsRuntimeJs, 'function renderShots(') ||
-    !codeIncludes(statsRuntimeJs, 'function armListSentinel(') ||
+    !codeIncludes(viewJs.records, 'function armListSentinel(') ||
     !codeIncludes(viewJs.stats, 'R.armListSentinel("shotLogSentinel", R.loadMoreShots)') ||
     !partialHtml.stats.includes('id="shotLogSentinel"') ||
     !css.includes('#shotLogSentinel{min-height:1px') ||
@@ -969,7 +971,7 @@ if (!codeIncludes(runtimeJs, 'SHOTS_PAGE_SIZE=10') ||
     !networkHeader.includes('sendStatsStream') ||
     !network.includes('\\"hasMore\\":%s') ||
     !network.includes('\\"total\\":%u') ||
-    !codeIncludes(appJsSource, 'R.startStatsStream()') ||
+    !codeIncludes(viewJs.stats, 'export const start=startStatsStream') ||
     !codeIncludes(appJsSource, 'R.ensureBackgroundStreams()') ||
     codeIncludes(appJsSource, 'setTimeout(R.ensureBackgroundStreams') ||
     // Backpressure pacing: the client guard covers a solo maximal row frame
@@ -1044,7 +1046,7 @@ if (!partialHtml.stats.includes('id="shotSort"') ||
   const sortState = {shotSort: 'date', shotSortDir: 'desc'};
   const sortContext = vm.createContext({
     $: (id) => sortButtons[id] || null,
-    R: {uiState: sortState, statsSendSubscribe: () => {subscriptions++;}},
+    R: {uiState: sortState}, statsSendSubscribe: () => {subscriptions++;},
   });
   vm.runInContext(
       blockAt(viewJs.stats, 'function syncShotSortButtons(') +
@@ -1106,7 +1108,7 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !shellHtml.includes('<section id="view-history" class="view" data-view="history"></section>') ||
     !codeIncludes(appJsSource, "'/history':'history'") ||
     !codeIncludes(appJsSource, "BUNDLES={stats:'records',history:'records'}") ||
-    !codeIncludes(appJsSource, 'R.startHistoryStream()') ||
+    !codeIncludes(viewJs.history, 'export const start=startHistoryStream') ||
     codeIncludes(appJsSource, 'historyTimer') ||
     codeIncludes(appJsSource, '/api/v1/status/home') ||
     // Record subscriptions are session-standing: navigation must not stop them.
@@ -1133,15 +1135,16 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !css.includes('#historyTable tr.histDay{display:block') ||
     !codeIncludes(viewJs.history, 'time.textContent.split(" at ")[0]') ||
     !codeIncludes(viewJs.history, 'head.className="histDay"') ||
-    !codeIncludes(runtimeJs, 'HISTORY_PAGE_SIZE=20') ||
-    codeIncludes(runtimeJs, "'/api/v1/history?offset='") ||
-    !codeIncludes(runtimeJs, 'function startHistoryStream(') ||
-    !codeIncludes(runtimeJs, 'function ensureHistoryStream(') ||
-    !codeIncludes(runtimeJs, 'function historyStreamFrame(') ||
-    !codeIncludes(runtimeJs, 'function applyHistoryStream(') ||
-    !codeIncludes(runtimeJs, 'if(diagStreamWanted){if(!diagResolve)armDiagnosticReady();') ||
-    !codeIncludes(runtimeJs, 'if(historyStreamWanted)historySendSubscribe()') ||
-    !codeIncludes(runtimeJs, 'function applyHistoryPage(') ||
+    !codeIncludes(viewJs.history, 'HISTORY_PAGE_SIZE=20') ||
+    codeIncludes(historyRuntimeJs, "'/api/v1/history?offset='") ||
+    !codeIncludes(viewJs.history, 'function startHistoryStream(') ||
+    !codeIncludes(viewJs.history, 'function ensureHistoryStream(') ||
+    !codeIncludes(viewJs.history, 'function historyStreamFrame(') ||
+    !codeIncludes(viewJs.history, 'function applyHistoryStream(') ||
+    !codeIncludes(runtimeJs, 'if(!diagStreamWanted)returnnull;if(!diagResolve)armDiagnosticReady();') ||
+    !codeIncludes(viewJs.history, 'subscribe:()=>(historyStreamWanted?historySubscribeOp():null)') ||
+    !codeIncludes(viewJs.history, 'R.registerStream("history",historyStream)') ||
+    !codeIncludes(viewJs.history, 'function applyHistoryPage(') ||
     !codeIncludes(historyRuntimeJs, 'function renderHistory(') ||
     !codeIncludes(historyRuntimeJs, 'function deleteOneHistory(') ||
     !codeIncludes(js, 'function clearActivationHistory(') ||
@@ -1155,23 +1158,23 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !codeIncludes(historyRuntimeJs, "'/api/v1/history/delete'") ||
     !codeIncludes(js, "'/api/v1/history/clear'") ||
     !codeIncludes(historyRuntimeJs, 'const toggleHistoryDir=()=>{') ||
-    !codeIncludes(runtimeJs, "sendUiOperation({op:'history',on:true,fetch:true,request:historyFetchRequest,offset:historyFetchOffset,}") ||
+    !codeIncludes(viewJs.history, "sendUiOperation({op:'history',on:true,fetch:true,request:historyFetchRequest,offset:historyFetchOffset,}") ||
     !partialHtml.history.includes('id="historyFilterButton"') ||
     !partialHtml.history.includes('id="exportHistoryButton"') ||
     !shellHtml.includes('id="hFl"') ||
     !codeIncludes(viewJs.history, 'R.exportActivationHistory') ||
-    !codeIncludes(viewJs.history, 'R.createFilterMenu("historyFilterButton"') ||
-    !codeIncludes(viewJs.history, 'R.uiState.historyTypes=sel.type||[];R.historySendSubscribe();') ||
-    !codeIncludes(runtimeJs, '...(uiState.historyTypes.length&&{types:uiState.historyTypes}),') ||
+    !codeIncludes(viewJs.history, 'historyFilterReset=createFilterMenu("historyFilterButton"') ||
+    !codeIncludes(viewJs.history, 'R.uiState.historyTypes=sel.type||[];historySendSubscribe();') ||
+    !codeIncludes(viewJs.history, '...(uiState.historyTypes.length&&{types:uiState.historyTypes}),') ||
     !codeIncludes(viewJs.history, 'offset,types:[],') ||
     !codeIncludes(js, 'function exportActivationHistory(') ||
-    !codeIncludes(runtimeJs, 'function createFilterMenu(') ||
+    !codeIncludes(viewJs.records, 'function createFilterMenu(') ||
     codeIncludes(viewJs.history, 'loadMoreHistory()') ||
     !codeIncludes(js, 'function fetchHistoryWindow(') ||
-    !codeIncludes(runtimeJs, 'historyExportWindow?.resolve(null)') ||
+    !codeIncludes(viewJs.history, 'historyExportWindow?.resolve(null)') ||
     // The owned-socket dispatcher must route export windows to the history
     // stream handler; dropping them by request id hangs the export.
-    !codeIncludes(runtimeJs, 'historyExportWindow&&data.request===historyExportWindow.request') ||
+    !codeIncludes(viewJs.history, 'historyExportWindow&&data.request===historyExportWindow.request') ||
     !codeIncludes(viewJs.history, 'const rows=R.uiState.historyData.records;') ||
     !network.includes('uiStreamParseHistoryTypes(types, typeMask)') ||
     !codeIncludes(js, 'Could not export history.') ||
@@ -1232,8 +1235,8 @@ if (!statsSection ||
     !statsSection[1].includes('id="statsWindow" class="shotSort" role="group"') ||
     !['10', '50', '100'].every((n) => statsSection[1].includes(`data-v="${n}">${n}</button`)) ||
     !codeIncludes(viewJs.stats, 'R.sendUiOperation({op:"stats",on:true,window:R.uiState.statsWindow});') ||
-    !codeIncludes(runtimeJs, '...(uiState.statsWindow!==10&&{window:uiState.statsWindow}),') ||
-    !codeIncludes(runtimeJs, '...(Object.keys(uiState.shotFilter).length&&{filter:uiState.shotFilter}),') ||
+    !codeIncludes(viewJs.stats, '...(uiState.statsWindow!==10&&{window:uiState.statsWindow}),') ||
+    !codeIncludes(viewJs.stats, '...(Object.keys(uiState.shotFilter).length&&{filter:uiState.shotFilter}),') ||
     !codeIncludes(viewJs.stats, 'R.createFilterMenu("shotFilterButton"') ||
     !codeIncludes(viewJs.stats, 'dir,filter:{},') ||
     !partialHtml.stats.includes('id="shotFilterButton"') ||
@@ -1317,8 +1320,8 @@ if (!statsSection ||
         atob, __WEBUI_TEXT__: key => key});
       // Shared state and runtime references resolve to this harness's globals.
       const stream = runtimeStateGlobals + blockAt(rawRuntimeJs, 'function decodeCurveDeltas(') + '\n' +
-          rawRuntimeJs.slice(rawRuntimeJs.search(/let\s+statsStreamWanted\s*=/),
-          rawRuntimeJs.search(/document\.addEventListener\(\s*['"]visibilitychange['"]/)) + '\n' +
+          rawViewJs.stats.slice(rawViewJs.stats.indexOf('// Stats pages assemble atomically;'),
+          rawViewJs.stats.indexOf('const statsStream = {')) + '\n' +
           rawViewJs.stats.slice(rawViewJs.stats.indexOf('let statsExportInFlight'),
               rawViewJs.stats.indexOf('async function clearShotHistory(')) + '\n' +
           blockAt(rawViewJs.stats, 'const loadMoreShots') +
@@ -1438,8 +1441,8 @@ if (!statsSection ||
         renderHistory: () => events.push('render:' + context.controlsMutable), paint: (fn) => fn(),
         updateHeaderSignals() {}, updateFirmwareFooter() {}, noteReachOk() {},
         __WEBUI_TEXT__: key => key});
-      const stream = runtimeStateGlobals + rawRuntimeJs.slice(rawRuntimeJs.indexOf('function historyStreamFrame('),
-          rawRuntimeJs.search(/document\.addEventListener\(\s*['"]visibilitychange['"]/));
+      const stream = runtimeStateGlobals + rawViewJs.history.slice(rawViewJs.history.indexOf('function historyStreamFrame('),
+          rawViewJs.history.indexOf('const historyStream = {'));
       vm.runInContext(stream, context);
       const frame = extras => Object.assign({v: 1, type: 'history', boot: 9, snapshot: true,
         epoch: 5, request: 1, ui, total: 2, offset: 0, limit: 20, hasMore: false,
@@ -1622,7 +1625,7 @@ if (!/<fieldset[^>]*><legend>Log<\/legend>/.test(html) ||
     /authenticatedOnly[^>]*><legend>Log<\/legend>/.test(html) ||
     !codeIncludes(ui, 'startLogStream()') ||
     !codeIncludes(ui, 'function logStreamFrame(') ||
-    !(codeIncludes(ui, "name==='diagnostic'") || codeIncludes(ui, "name === 'diagnostic'")) ||
+    !codeIncludes(appJsSource, "'diagnostic'].includes(name)") ||
     !codeIncludes(ui, 'id="view-diagnostic"') ||
     !codeIncludes(ui, 'data-route="/diagnostic"') ||
     !html.includes('<span>Diagnostic</span></a>') ||

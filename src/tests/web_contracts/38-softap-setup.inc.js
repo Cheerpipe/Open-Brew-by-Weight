@@ -268,7 +268,7 @@
       setupHtml.includes('id="setupRetry"') ||
       !codeIncludes(appJsSource, '"/setup":"setup"') ||
       !codeIncludes(appJsSource, 'setupView') ||
-      !codeIncludes(appJsSource, 'jsMods.get("setup")?.stop?.()') ||
+      !codeIncludes(appJsSource, 'for(const mod of jsMods.values())mod.stop?.()') ||
       !partialHtml.setup ||
       !codeIncludes(setupJs, 'apply:"live"') ||
       !codeIncludes(setupJs, '"/api/v1/status/admin"') ||

@@ -1,6 +1,30 @@
 "use strict";
 import * as R from "./runtime.js?v=__FW_ASSET_TAG__";
 const $ = R.$;
+// Save/Revert pairs: a dirty section enables both buttons and shows its hint.
+const REVERT_BUTTONS = {
+  saveNetworkButton: "revertNetworkButton",
+  saveDateTimeButton: "revertDateTimeButton",
+  saveWebhookButton: "revertWebhookButton",
+  changeDevicePasswordButton: "revertDevicePasswordButton",
+  saveFirmwareModeButton: "revertFirmwareModeButton",
+  saveBleButton: "revertBleButton",
+  savePowerButton: "revertPowerButton",
+  saveFrontendButton: "revertFrontendButton",
+};
+function setSaveDirty(id, hintId, dirty) {
+  const b = $(id);
+  if (b) {
+    b.dataset.dirty = +dirty;
+    b.disabled = !R.controlsMutable || !dirty;
+  }
+  const r = REVERT_BUTTONS[id] && $(REVERT_BUTTONS[id]);
+  if (r) {
+    r.dataset.dirty = +dirty;
+    r.disabled = !R.controlsMutable || !dirty;
+  }
+  if (hintId) $(hintId)?.classList.toggle("hidden", !dirty);
+}
 function timeZoneSelectionChanged() {
   markDateTimeDirty();
   R.refreshTimezonePreview();
@@ -41,7 +65,7 @@ function lockAdmin() {
 // hint, all named after the section (ble -> bleDirty, saveBleButton, ...).
 function sectionDirty(name, on) {
   R.uiState[name + "Dirty"] = on;
-  R.setSaveDirty("save" + name[0].toUpperCase() + name.slice(1) + "Button", name + "DirtyHint", on);
+  setSaveDirty("save" + name[0].toUpperCase() + name.slice(1) + "Button", name + "DirtyHint", on);
 }
 function markDateTimeDirty() {
   sectionDirty("dateTime", true);
@@ -61,7 +85,7 @@ function revertDateTimeConfig() {
   R.restoreSnapshot(R.uiState.dateTimeBaseline);
   R.uiState.dateTimeBaseline = null;
   R.uiState.dateTimeDirty = false;
-  R.setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
+  setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
   R.clearFieldErrors();
   R.refreshTimezonePreview();
   R.updateTimezoneControls();
@@ -76,7 +100,7 @@ function revertNetworkConfig() {
   if ($("saveNetworkButton").dataset.dirty !== "1") return;
   if (!confirm(__WEBUI_TEXT__("runtime.discard_unsaved_changes"))) return;
   R.restoreSnapshot(R.uiState.networkBaseline);
-  R.setSaveDirty("saveNetworkButton", "", false);
+  setSaveDirty("saveNetworkButton", "", false);
   R.clearFieldErrors();
   R.updateNetworkPasswordState();
   R.updateStaticIpFieldsState();
@@ -722,7 +746,7 @@ async function saveDateTimeConfig() {
     );
     if (JSON.stringify(dateTimePayload()) === JSON.stringify(payload)) {
       R.uiState.dateTimeDirty = false;
-      R.setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
+      setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
     }
     await R.refreshStatus();
   } catch (e) {
@@ -749,7 +773,7 @@ function loadAdminConfig(c) {
     select.value = c.timezoneId || "";
     $("timezoneAutomatic").checked = !!c.timezoneAutomatic;
     $("ntpSyncEnabled").checked = c.ntpSyncEnabled !== false;
-    R.setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
+    setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
   }
   const state = $("timezoneSaveState");
   if (state)
@@ -1448,7 +1472,7 @@ export function applyStatus(s) {
     const enabled = !compat;
     if ($("firmwareModeEnabled").checked !== enabled) {
       $("firmwareModeEnabled").checked = enabled;
-      R.setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", false);
+      setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", false);
     }
   }
   const p = s.power;
@@ -1475,7 +1499,7 @@ export function applyStatus(s) {
     $("webhookEnd").checked = !!w.end;
     $("webhookDeferDuringShot").checked = !!w.deferDuringShot;
     webhookBaseline = R.snapshotControls(WEBHOOK_IDS.map((id) => $(id)));
-    R.setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
+    setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
   }
   const result = w.sending
     ? __WEBUI_TEXT__("admin.sending")
@@ -1775,7 +1799,7 @@ export function init() {
   $("revertFrontendButton").onclick = () => revertSection("frontend");
   const firmwareModeChanged = () => {
     firmwareModeDirty = true;
-    R.setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", true);
+    setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", true);
   };
   const fwEl = $("firmwareModeEnabled");
   if (fwEl) {
@@ -1805,7 +1829,7 @@ export function init() {
     if (!firmwareModeDirty) return;
     if (!confirm(__WEBUI_TEXT__("admin.discard_unsaved_changes"))) return;
     firmwareModeDirty = false;
-    R.setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", false);
+    setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", false);
     R.refreshStatus();
   };
   // A form lets password managers fill the field; Enter submits it once.
@@ -1856,13 +1880,13 @@ export function init() {
     $("ntpServerPreset").onchange =
     $("ntpServerCustom").oninput =
       markDateTimeDirty;
-  const networkChanged = () => R.setSaveDirty("saveNetworkButton", "", true);
+  const networkChanged = () => setSaveDirty("saveNetworkButton", "", true);
   document.querySelectorAll("#networkPanel input,#networkPanel select").forEach((el) => {
     el.addEventListener("input", networkChanged);
     el.addEventListener("change", networkChanged);
   });
   const passwordChanged = () =>
-    R.setSaveDirty(
+    setSaveDirty(
       "changeDevicePasswordButton",
       "",
       !!$("newDevicePassword").value || !!$("confirmDevicePassword").value,
@@ -1874,7 +1898,7 @@ export function init() {
   $("syncTimeButton").onclick = () => R.command("/api/v1/time/sync");
   const webhookChanged = () => {
     webhookDirty = true;
-    R.setSaveDirty("saveWebhookButton", "webhookDirtyHint", true);
+    setSaveDirty("saveWebhookButton", "webhookDirtyHint", true);
   };
   WEBHOOK_IDS.forEach((id) => {
     const el = $(id);
@@ -1910,7 +1934,7 @@ export function init() {
         });
         await waitSaved(accepted.requestId);
         webhookDirty = false;
-        R.setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
+        setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
         R.message(__WEBUI_TEXT__("admin.webhook_settings_saved"), "ok");
       } catch (e) {
         R.message(
@@ -1961,7 +1985,7 @@ export function init() {
     ).then((ok) => {
       if (!ok) return;
       $("staPassword").value = "";
-      R.setSaveDirty("saveNetworkButton", "", false);
+      setSaveDirty("saveNetworkButton", "", false);
       R.resetNetworkAddressLoaded();
     });
   };
@@ -1988,7 +2012,7 @@ export function init() {
     ).then((ok) => {
       if (!ok) return;
       ["newDevicePassword", "confirmDevicePassword"].forEach((id) => ($(id).value = ""));
-      R.setSaveDirty("changeDevicePasswordButton", "", false);
+      setSaveDirty("changeDevicePasswordButton", "", false);
     });
   };
   $("revertWebhookButton").onclick = () => {
@@ -1996,7 +2020,7 @@ export function init() {
     if (!confirm(__WEBUI_TEXT__("admin.discard_unsaved_changes"))) return;
     R.restoreSnapshot(webhookBaseline);
     webhookDirty = false;
-    R.setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
+    setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
     R.clearFieldErrors();
     R.refreshStatus();
   };
@@ -2018,7 +2042,7 @@ export function init() {
     if (!$("newDevicePassword").value && !$("confirmDevicePassword").value) return;
     if (!confirm(__WEBUI_TEXT__("admin.discard_unsaved_changes"))) return;
     ["newDevicePassword", "confirmDevicePassword"].forEach((id) => ($(id).value = ""));
-    R.setSaveDirty("changeDevicePasswordButton", "", false);
+    setSaveDirty("changeDevicePasswordButton", "", false);
   };
   $("otaVerifyButton").onclick = otaUpload;
   $("otaFlashButton").onclick = otaFlash;

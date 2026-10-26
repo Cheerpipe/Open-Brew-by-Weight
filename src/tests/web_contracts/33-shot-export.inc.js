@@ -216,7 +216,7 @@
   assert.ok(codeIncludes(viewJs.stats, 'filter: {}'), 'Exports ignore the list filter');
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'async function exportShotsJson('),
       'statsFrameWindow(0, R.SHOTS_EXPORT_LIMIT, "date", "desc", 90e3)'));
-  assert.ok(codeIncludes(blockAt(runtimeJs, 'function createFilterMenu('), 'createPopup('));
+  assert.ok(codeIncludes(blockAt(viewJs.records, 'function createFilterMenu('), 'createPopup('));
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'function downloadJson('), 'R.saveFile('));
 })().catch((error) => {
   console.error(error);
