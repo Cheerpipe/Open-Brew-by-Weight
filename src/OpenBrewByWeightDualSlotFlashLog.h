@@ -45,14 +45,23 @@ class DualSlotFlashLog {
   using Record = typename Traits::Record;
 
  public:
+  // A save erases only the sectors the store occupies, not the whole slot:
+  // the slot stride and offsets are unchanged and readers read sizeof(store_).
+  static constexpr size_t kEraseBytes =
+      (sizeof(StoreT) + FLASH_IO_SECTOR_BYTES - 1) / FLASH_IO_SECTOR_BYTES *
+      FLASH_IO_SECTOR_BYTES;
+  static_assert(kEraseBytes <= Traits::kSlotBytes, "store exceeds its slot");
+
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   static void resetHostStorage() {
     memset(hostSlots_, 0, sizeof(hostSlots_));
     hostSlotValid_[0] = false;
     hostSlotValid_[1] = false;
     hostSaveSucceeds_ = true;
+    hostEraseBytes_ = 0;
   }
   static void setHostSaveSucceeds(bool succeeds) { hostSaveSucceeds_ = succeeds; }
+  static size_t hostEraseBytes() { return hostEraseBytes_; }
 #endif
 
   bool load() {
@@ -143,6 +152,7 @@ class DualSlotFlashLog {
       unlockFlashIo();
       return false;
     }
+    hostEraseBytes_ += kEraseBytes;
     memcpy(&hostSlots_[targetSlot], &store_, sizeof(store_));
     hostSlotValid_[targetSlot] = true;
     activeSlot_ = targetSlot;
@@ -160,8 +170,7 @@ class DualSlotFlashLog {
     feedFlashIoWatchdog();
     const size_t targetOffset =
         static_cast<size_t>(targetSlot) * Traits::kSlotBytes;
-    if (esp_partition_erase_range(part, targetOffset,
-                                  Traits::kSlotBytes) != ESP_OK) {
+    if (esp_partition_erase_range(part, targetOffset, kEraseBytes) != ESP_OK) {
       unlockFlashIo();
       return false;
     }
@@ -213,7 +222,7 @@ class DualSlotFlashLog {
       beginFlashStoreTransaction(
           persistProgress_,
           static_cast<size_t>(1U - (activeSlot_ & 1U)) * Traits::kSlotBytes,
-          Traits::kSlotBytes, Traits::kHeaderBytes, sizeof(store_));
+          kEraseBytes, Traits::kHeaderBytes, sizeof(store_));
     }
     const FlashStoreStepResult result = flashIoStoreStep(
         part, &store_, persistProgress_, lockTimeoutMs);
@@ -417,6 +426,7 @@ class DualSlotFlashLog {
   inline static StoreT hostSlots_[2] = {};
   inline static bool hostSlotValid_[2] = {};
   inline static bool hostSaveSucceeds_ = true;
+  inline static size_t hostEraseBytes_ = 0;
 #endif
 };
 

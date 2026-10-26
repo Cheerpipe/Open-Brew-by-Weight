@@ -294,9 +294,10 @@ advisory remaining-time estimate. Persistence state remains separate from
 capture occupancy. Existing record/header fields extend timestamps without
 changing the 32-byte record size or partition layout; see the
 [diagnostic API](INTEGRATION_API.md#post-apiv1diagnosticscale-profile).
-Each inactive slot or used curve sector is
-erased one 4 KiB sector at a time, programmed one 1 KiB staged chunk at a time,
-and receives its validity-bearing header last; the worker rechecks the current
+Only the sectors the store occupies in the
+inactive slot (16 of the shot log's 126, all four of the history slot) or the
+used curve sector are erased, one 4 KiB sector at a time; each is programmed
+one 1 KiB staged chunk at a time and receives its validity-bearing header last; the worker rechecks the current
 machine and scale gates between steps. The shot log's whole 62,024-byte store and the
 16,024-byte activation-history store live in PSRAM and move to and from their
 slots in 1 KiB chunks staged through the small internal flash-I/O scratch only

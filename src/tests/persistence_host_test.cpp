@@ -579,6 +579,10 @@ void p66_shot_log_dual_slot_generation_flip() {
   record.actualWeightCg = 3600;
   CHECK(log.append(record));
   CHECK(log.count() == 1);
+  // A save erases only the 16 sectors the 62024-byte store occupies, not the
+  // 504 KiB slot.
+  CHECK(ShotLog::kEraseBytes == 16 * FLASH_IO_SECTOR_BYTES);
+  CHECK(ShotLog::hostEraseBytes() == ShotLog::kEraseBytes);
 
   // A failed inactive-slot write leaves the last-good slot active and the
   // durable history intact.
@@ -2103,6 +2107,9 @@ void p69_history_log_round_trip_eviction_and_paging() {
   CHECK(log.dirty());
   CHECK(log.flush());
   CHECK(!log.dirty());
+  // The 16024-byte history store fills its 16 KiB slot: the erase is the slot.
+  CHECK(HistoryLog::kEraseBytes == HISTORY_FLASH_SLOT_BYTES);
+  CHECK(HistoryLog::hostEraseBytes() == HISTORY_FLASH_SLOT_BYTES);
 
   HistoryLog reloaded;
   CHECK(reloaded.load());

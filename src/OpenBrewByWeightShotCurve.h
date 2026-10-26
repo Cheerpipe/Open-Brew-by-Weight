@@ -477,7 +477,7 @@ class BasicShotCurveLog : public ShotCurveHostStorage {
         memset(hostFlash_ + tx_.targetOffset + tx_.offset, 0xff, FLASH_IO_SECTOR_BYTES);
         hostEraseBytes_ += FLASH_IO_SECTOR_BYTES;
         tx_.offset += FLASH_IO_SECTOR_BYTES;
-        if (tx_.offset == tx_.slotBytes) {
+        if (tx_.offset == tx_.eraseBytes) {
           tx_.phase = FlashStoreTransaction::Phase::BODY;
           tx_.offset = tx_.headerBytes;
         }

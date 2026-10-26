@@ -241,19 +241,21 @@ struct FlashStoreTransaction {
   Phase phase = Phase::IDLE;
   size_t targetOffset = 0;
   size_t offset = 0;
-  size_t slotBytes = 0;
+  size_t eraseBytes = 0;
   size_t headerBytes = 0;
   size_t totalBytes = 0;
 };
 
+// eraseBytes is the sector-aligned span erased before the body is written; it
+// may be shorter than the slot when the store does not fill it.
 inline void beginFlashStoreTransaction(FlashStoreTransaction &tx,
-                                       size_t targetOffset, size_t slotBytes,
+                                       size_t targetOffset, size_t eraseBytes,
                                        size_t headerBytes,
                                        size_t totalBytes) {
   tx.phase = FlashStoreTransaction::Phase::ERASE;
   tx.targetOffset = targetOffset;
   tx.offset = 0;
-  tx.slotBytes = slotBytes;
+  tx.eraseBytes = eraseBytes;
   tx.headerBytes = headerBytes;
   tx.totalBytes = totalBytes;
 }
@@ -327,7 +329,7 @@ inline FlashStoreStepResult flashIoStoreStep(
                                    FLASH_IO_SECTOR_BYTES) == ESP_OK;
     if (ok) {
       tx.offset += FLASH_IO_SECTOR_BYTES;
-      if (tx.offset == tx.slotBytes) {
+      if (tx.offset == tx.eraseBytes) {
         tx.phase = FlashStoreTransaction::Phase::BODY;
         tx.offset = tx.headerBytes;
       }
