@@ -286,7 +286,9 @@ large return-value and default-aggregate temporaries.
 The destructive paths have a whole-call-chain bound instead: the stack-depth
 gate in [Validation](../VALIDATION.md) covers boot recovery on the loopTask,
 the Web UI factory reset on `network_manager`, and the OTA transfer and commit
-on `ota_worker` and its inline httpd fallback. No `PersistedSettings` copy
+on `ota_worker` and its inline httpd fallback. It also bounds the two deepest
+httpd requests, a UI stream request and the crash archive download, against
+the HTTPD stack. No `PersistedSettings` copy
 lives on those stacks: the network task edits a PSRAM working copy and NVS
 stages through the internal scratch. After every boot recovery the next boot
 writes `factory reset left N B of loopTask stack unused` (or `network access

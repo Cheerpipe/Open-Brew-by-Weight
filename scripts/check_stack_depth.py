@@ -138,6 +138,17 @@ def http_stack(_: Path) -> int:
     return source_constant("src/OpenBrewByWeightNetwork.cpp", "HTTP_SERVER_TASK_STACK_SIZE")
 
 
+# httpd_uri calls timedHandler, which calls the registered handler through
+# user_ctx; ownedApiHandler calls its route table's handlers.
+HTTPD_DISPATCH = {
+    r"^httpd_sess_enum$": (r"^httpd_process_session$",),
+    r"^httpd_uri$": (r"\btimedHandler\(",),
+    r"\btimedHandler\(": (r"::ota(?:Session|Patch|Flash|Abort)Handler\(",
+                          r"::uiStreamHandler\(", r"::ownedApiHandler\("),
+    r"::ownedApiHandler\(": (r"::crashArchiveDownloadHandler\(",),
+}
+
+
 GATES = (
     Gate("loopTask boot recovery",
          lambda build: sdkconfig_value(build, "CONFIG_ARDUINO_LOOP_STACK_SIZE"),
@@ -157,10 +168,13 @@ GATES = (
          OTA_WORK, {r"::(?:otaWorkerTask|drainOtaJobs|runOtaJob)\(": OTA_WORK}),
     # Queue full or no memory: the same work runs inline on the httpd task.
     Gate("httpd inline OTA fallback", http_stack, r"^httpd_thread$", OTA_WORK,
-         {r"^httpd_sess_enum$": (r"^httpd_process_session$",),
-          r"^httpd_uri$": (r"\btimedHandler\(",),
-          r"\btimedHandler\(": (r"::ota(?:Session|Patch|Flash|Abort)Handler\(",),
-          r"::runOnOtaWorker\(": OTA_WORK}),
+         {**HTTPD_DISPATCH, r"::runOnOtaWorker\(": OTA_WORK}),
+    # A stream request keeps its frame buffer live through the parse and ops.
+    Gate("httpd UI stream request", http_stack, r"^httpd_thread$",
+         (r"::uiStreamHandler\(",), HTTPD_DISPATCH),
+    # The download verifies unverified dump digests before streaming the tar.
+    Gate("httpd crash archive download", http_stack, r"^httpd_thread$",
+         (r"::crashArchiveDownloadHandler\(",), HTTPD_DISPATCH),
 )
 
 
