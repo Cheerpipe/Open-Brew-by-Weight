@@ -86,6 +86,7 @@ class OpenBrewByWeightMicraService {
     LineaMicraRequest request = {};
     uint32_t machineConfigGeneration = 0;
     uint32_t retryAtMs = 0;
+    uint8_t cycles = 0;  // Exhausted cycles while the machine was online.
     bool present = false;
     bool commandAccepted = false;
   };
@@ -94,6 +95,7 @@ class OpenBrewByWeightMicraService {
     uint32_t machineConfigGeneration = 0;
     uint32_t shotGeneration = 0;
     uint32_t retryAtMs = 0;
+    uint8_t cycles = 0;  // Exhausted cycles while the machine was online.
     bool present = false;
     bool commandAccepted = false;
   };
@@ -178,10 +180,10 @@ class OpenBrewByWeightMicraService {
   bool temperatureEligible(LineaMicraError &error) const;
   void deferTemperature(const LineaMicraRequest &request,
                         LineaMicraError error, uint32_t delayMs,
-                        bool retryable = true);
+                        bool retryable = true, bool exhausted = false);
   void deferPower(const LineaMicraRequest &request,
                   LineaMicraError error, uint32_t delayMs,
-                  bool retryable = true);
+                  bool retryable = true, bool exhausted = false);
 
   mutable TaskMutex mux_;
   LineaMicraPersistedSettings config_ = {};

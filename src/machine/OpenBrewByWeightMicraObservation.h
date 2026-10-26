@@ -68,10 +68,15 @@ struct MicraObservationFence {
   uint32_t onlineRevision = 0;
   bool offline = false;
   bool synchronized = false;
+  // Evidence accepted on this subscription with no rejected push since: while
+  // it holds, every later change arrives as a push, so a command asking for
+  // the trusted value would change nothing.
+  bool temperatureTrusted = false;
+  bool powerTrusted = false;
 
   void invalidate() {
     ++connectionRevision;
-    synchronized = false;
+    synchronized = temperatureTrusted = powerTrusted = false;
   }
 
   MicraObservationStamp stamp(uint32_t identity, uint32_t intent) const {
@@ -110,7 +115,7 @@ struct MicraObservationFence {
       status.effectiveOn = status.powerState != LineaMicraPowerState::OFF;
       status.sampleAtMs = update.receivedAtMs;
       status.powerSource = update.source;
-      synchronized = status.powerState != LineaMicraPowerState::UNKNOWN;
+      synchronized = powerTrusted = status.powerState != LineaMicraPowerState::UNKNOWN;
       status.quality = update.mode == LineaMicraObservedMode::UNSUPPORTED
                            ? LineaMicraObservationQuality::UNSUPPORTED
                            : update.mode == LineaMicraObservedMode::NONE
@@ -126,7 +131,7 @@ struct MicraObservationFence {
     if (boilerWidget &&
         (push || update.stamp.temperatureRevision == temperatureRevision)) {
       if (update.temperaturePresent) {
-        status.targetValid = update.temperatureValid;
+        status.targetValid = temperatureTrusted = update.temperatureValid;
         status.targetDeciC = update.targetDeciC;
       }
       if (update.coffeeBoilerPresent) {

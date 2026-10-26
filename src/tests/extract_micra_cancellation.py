@@ -42,6 +42,13 @@ output.mkdir(parents=True, exist_ok=True)
                "qualifyBackflushLocked", "backflushReadyLocked", "backflush",
                "reportMuxWaitAnomaly", "finishBackflush", "physicalStart",
                "physicalStartLocked", "post", "applyPostedLocked")) + "\n")
+(output / "micra_websocket_commands.inc").write_text(
+    "\n".join([definition("sameCommandRequest")] +
+              [definition("OpenBrewByWeightMicraService::" + name) for name in
+               ("temperatureRequestCurrent", "powerRequestCurrent",
+                "temperatureEligible", "deferTemperature", "deferPower",
+                "executeTemperatureApplication", "executePowerApplication")])
+    + "\n")
 (output / "micra_cancellation_methods.inc").write_text(
     "namespace openbrewbyweight {\nconstexpr size_t kTokenCapacity = 2048;\n"
     + "\n".join(map(definition, names)) + "\n"

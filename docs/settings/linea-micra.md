@@ -409,7 +409,11 @@ you switch the scale on. It is the mirror of the shutdown option above: the
 machine turns on — the same wake the La Marzocco app performs — when the
 scale comes back from its own power-off. A scale that merely reconnects after
 a lost signal, and the first connection after the controller starts, never
-wake the machine, so an ordinary reconnect never sends a cloud command.
+wake the machine, so an ordinary reconnect never sends a cloud command. If the
+live connection already shows the machine on, nothing is sent either. If the
+cloud reports the machine offline (for example, unplugged), the wake is
+dropped rather than kept for later, so the machine never turns on long after
+you switched the scale on.
 
 The machine is never woken while a shot or rinse is running; that power-on
 is ignored completely and nothing is queued for later. Starting a shot or rinse
@@ -445,6 +449,8 @@ The machine is never turned off while a shot or rinse is running. If the
 scale is switched off during one, that power-off is ignored completely and
 the shot finishes with its normal protections; nothing is queued for later.
 Starting a shot or rinse also cancels a shutdown command still waiting to run.
+If the live connection already shows the machine in standby, or the cloud
+reports it offline, nothing is sent.
 
 The option only works with scales that report their power-off to the
 controller. Because the command travels through the La Marzocco cloud, a
@@ -520,7 +526,11 @@ to the selected Micra. Saving an already-active preset also sends the target
 after persistence when the temperature changed. A newly connected scale sends
 the current active target again, which covers sessions where the machine or
 controller was unavailable when the preset was selected. Repeated triggers are
-combined, and only the latest active target remains pending.
+combined, and only the latest active target remains pending. When the live
+connection already shows the machine at that temperature, nothing is sent:
+the target is reported as applied without contacting the cloud. While the
+La Marzocco cloud reports the machine offline, the target waits and is sent as
+soon as the machine is back online.
 
 Application waits while a shot or backflush is active, while a backflush request
 is pending, and while the scale is connecting. These conditions cancel an
@@ -543,7 +553,8 @@ the change was already accepted and whether another automatic attempt remains
 scheduled.
 
 Connection timeouts, rate limits, and temporary server failures remain pending
-and retry after the cooldown. An expired session gets bounded refresh/sign-in
+and retry after the cooldown, up to three rounds while the machine is online;
+after that the attempt stops until the next trigger. An expired session gets bounded refresh/sign-in
 attempts first; if authorization remains invalid, automatic attempts stop. A
 redirect or other permanent request rejection also stops automatic attempts for
 that trigger, avoiding repeated cloud requests. Selecting or saving a preset

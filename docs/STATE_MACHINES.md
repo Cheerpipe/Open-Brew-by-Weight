@@ -1081,7 +1081,13 @@ backflush gestures keep both transports available regardless of scale presence.
 Established WSS parks the same way during scale acquisition/setup/quiet, except
 while a backflush is in progress so cleaning supervision can continue; new setup and reconnection wait for those gates.
 Power commands are canceled when a shot starts, including previously queued
-commands; they require a new trigger after the shot. When initialization coalesces
+commands; they require a new trigger after the shot. Temperature and power
+commands are skipped without network I/O when a WebSocket-mode CURRENT status
+already holds the requested value from evidence accepted on the live
+subscription (`temperatureTrusted`/`powerTrusted`, cleared by every fence
+invalidation, including rejected pushes). A cloud-offline machine defers a
+temperature target locally and drops power commands. Exhausted command cycles
+stop after `kMaxCommandCycles` (3) while the machine is online. When initialization coalesces
 with post-wake reconciliation, reconciliation uses the request-time field
 baseline even if wake preceded the subscription.
 A current

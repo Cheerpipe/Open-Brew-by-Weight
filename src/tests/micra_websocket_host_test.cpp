@@ -26,7 +26,8 @@ static std::string transmitted;
 static std::string disconnectLog;
 void serialTraceCategoryf(openbrewbyweight::LogLevel level, openbrewbyweight::DebugCategory category,
                           const char *format, ...) {
-  assert(!locked && level == openbrewbyweight::LogLevel::WARNING &&
+  assert(!locked && (level == openbrewbyweight::LogLevel::WARNING ||
+                     level == openbrewbyweight::LogLevel::INFO) &&
          category == openbrewbyweight::DebugCategory::NETWORK);
   char line[160];
   va_list args;
@@ -145,6 +146,35 @@ bool OpenBrewByWeightMicraService::applySignedHeaders(const LineaMicraPersistedS
 }
 #include "machine/OpenBrewByWeightMicraWebSocket.inc"
 #include "micra_websocket_status.inc"
+static unsigned temperatureWrites = 0, powerWrites = 0;
+static uint16_t cloudTargetDeciC = 0;
+static bool cloudIgnoresTemperature = false;
+static LineaMicraPowerState cloudPower = LineaMicraPowerState::UNKNOWN;
+bool OpenBrewByWeightMicraService::writeTemperature(const LineaMicraPersistedSettings &,
+                                                    uint16_t targetDeciC) {
+  ++temperatureWrites;
+  if (!cloudIgnoresTemperature) cloudTargetDeciC = targetDeciC;
+  return true;
+}
+bool OpenBrewByWeightMicraService::writeStandby(const LineaMicraPersistedSettings &) {
+  ++powerWrites;
+  cloudPower = LineaMicraPowerState::OFF;
+  return true;
+}
+bool OpenBrewByWeightMicraService::writePowerOn(const LineaMicraPersistedSettings &) {
+  ++powerWrites;
+  cloudPower = LineaMicraPowerState::ON;
+  return true;
+}
+bool OpenBrewByWeightMicraService::readDashboard(const LineaMicraPersistedSettings &,
+    LineaMicraStatus &result, const MicraObservationStamp *) {
+  result.targetValid = true;
+  result.targetDeciC = cloudTargetDeciC;
+  result.powerState = cloudPower;
+  return true;
+}
+void OpenBrewByWeightMicraService::waitRetry(uint32_t) {}
+#include "micra_websocket_commands.inc"
 struct MicraWebSocketTest {
   static void setupAdmissionAndBackoff() {
     for (unsigned gate = 0; gate < 4; ++gate) {
@@ -718,6 +748,78 @@ struct MicraWebSocketTest {
     subscribe(service);
     assert(service.snapshotStamp_.connectionRevision != firstStamp.connectionRevision);
     assert(service.status().quality == LineaMicraObservationQuality::STALE);
+    service.stopWebSocket(true);
+    delete service.work_;
+  }
+  static void commandsSkipUnchangedMachineState() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    service.config_.accountConfigured = true;
+    service.config_.options = LINEA_MICRA_APPLY_TEMPERATURE | LINEA_MICRA_OBSERVE_STATE |
+        LINEA_MICRA_POWER_ON_WITH_SCALE | LINEA_MICRA_SHUTDOWN_WITH_SCALE;
+    std::strcpy(service.config_.selectedSerial, "synthetic");
+    service.published_.connectionFreshness = true;
+    service.staConnected_.store(true);
+    service.serviceWebSocket();
+    subscribe(service);
+    const char *brewing93 = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}}]})";
+    deliver(service, observation(service, brewing93));
+    assert(service.observationFence_.temperatureTrusted && service.observationFence_.powerTrusted);
+    uint32_t requestId = 0;
+    const auto temperature = [&](uint16_t targetDeciC) {
+      LineaMicraRequest request;
+      request.type = LineaMicraRequestType::APPLY_TEMPERATURE;
+      request.presetId = 1;
+      request.targetDeciC = targetDeciC;
+      request.requestId = ++requestId;
+      service.desiredTemperature_ = {};
+      service.desiredTemperature_.request = request;
+      service.desiredTemperature_.machineConfigGeneration = service.configGeneration_;
+      service.desiredTemperature_.present = true;
+      return request;
+    };
+    const auto power = [&](LineaMicraRequestType type) {
+      LineaMicraRequest request;
+      request.type = type;
+      request.requestId = ++requestId;
+      service.desiredPower_ = {};
+      service.desiredPower_.request = request;
+      service.desiredPower_.machineConfigGeneration = service.configGeneration_;
+      service.desiredPower_.shotGeneration = service.shotGeneration_.load();
+      service.desiredPower_.present = true;
+      return service.executePowerApplication(request, service.configGeneration_);
+    };
+    // A trusted equal target needs no cloud command; a different one does.
+    assert(service.executeTemperatureApplication(temperature(930), service.configGeneration_));
+    assert(temperatureWrites == 0 && !service.desiredTemperature_.present);
+    assert(service.published_.temperatureState == LineaMicraTemperatureState::CONFIRMED);
+    assert(service.executeTemperatureApplication(temperature(940), service.configGeneration_));
+    assert(temperatureWrites == 1 && !service.desiredTemperature_.present);
+    // A gap in observation removes the trust, so the equal target is written.
+    service.observationFence_.invalidate();
+    assert(service.executeTemperatureApplication(temperature(930), service.configGeneration_));
+    assert(temperatureWrites == 2);
+    // Measured power on a live subscription skips a command that changes nothing.
+    deliver(service, observation(service, brewing93));
+    assert(power(LineaMicraRequestType::SET_POWER_ON));
+    assert(powerWrites == 0 && !service.desiredPower_.present);
+    assert(power(LineaMicraRequestType::SET_STANDBY) && powerWrites == 1);
+    // An offline machine defers a target locally and drops power commands.
+    deliver(service, observation(service, R"({"connected":false})"));
+    assert(!service.executeTemperatureApplication(temperature(950), service.configGeneration_));
+    assert(temperatureWrites == 2 && service.desiredTemperature_.present);
+    assert(!power(LineaMicraRequestType::SET_POWER_ON));
+    assert(powerWrites == 1 && !service.desiredPower_.present);
+    // An accepted command the machine never confirms stops after a few cycles.
+    deliver(service, observation(service, R"({"connected":true})"));
+    cloudIgnoresTemperature = true;
+    const auto unconfirmed = temperature(960);
+    for (uint8_t cycle = 1; cycle <= micra_timing::kMaxCommandCycles; ++cycle) {
+      assert(!service.executeTemperatureApplication(unconfirmed, service.configGeneration_));
+      assert(service.desiredTemperature_.present == (cycle < micra_timing::kMaxCommandCycles));
+    }
+    assert(temperatureWrites == 3);
+    cloudIgnoresTemperature = false;
     service.stopWebSocket(true);
     delete service.work_;
   }
@@ -1438,6 +1540,7 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::slowHandshakeIsNotAReconnect();
   openbrewbyweight::MicraWebSocketTest::renewalDeferredWhileParked();
   openbrewbyweight::MicraWebSocketTest::initialSynchronization();
+  openbrewbyweight::MicraWebSocketTest::commandsSkipUnchangedMachineState();
   openbrewbyweight::MicraWebSocketTest::backflushContract();
   openbrewbyweight::MicraWebSocketTest::backflushIdlePoll();
   openbrewbyweight::MicraWebSocketTest::pongPublicationRace();

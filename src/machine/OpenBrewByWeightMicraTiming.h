@@ -45,6 +45,9 @@ inline constexpr uint32_t kStateFreshnessMs = kStatePollMs;
 inline constexpr uint32_t kOptimisticOverlayMs = 2U * kStatePollMs;
 inline constexpr uint32_t kPostWakeObservationDelayMs = 15000;
 inline constexpr uint32_t kExhaustedCooldownMs = kOptimisticOverlayMs;
+// A machine command that exhausts this many cycles while the machine is online
+// is dropped instead of re-reading the dashboard every cooldown forever.
+inline constexpr uint8_t kMaxCommandCycles = 3;
 inline constexpr uint32_t kGateRetryMs = 1000;
 inline constexpr uint32_t kHttpTimeoutMs = 10000;
 // The cloud silently drops keep-alive sockets idle for ~3-5 min (reuse

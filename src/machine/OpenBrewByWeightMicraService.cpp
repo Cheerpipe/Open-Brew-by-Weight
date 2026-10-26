@@ -702,6 +702,7 @@ bool OpenBrewByWeightMicraService::queueLocked(const LineaMicraRequest &request)
     desiredTemperature_.request.requestId = nextAutomaticRequestId_++;
     desiredTemperature_.machineConfigGeneration = configGeneration_;
     desiredTemperature_.retryAtMs = millis();
+    desiredTemperature_.cycles = 0;
     desiredTemperature_.present = true;
     desiredTemperature_.commandAccepted = false;
     published_.requestedTargetDeciC = request.targetDeciC;
@@ -730,6 +731,7 @@ bool OpenBrewByWeightMicraService::queueLocked(const LineaMicraRequest &request)
     desiredPower_.machineConfigGeneration = configGeneration_;
     desiredPower_.shotGeneration = shotGeneration;
     desiredPower_.retryAtMs = millis();
+    desiredPower_.cycles = 0;
     desiredPower_.present = true;
     desiredPower_.commandAccepted = false;
     if (powerActive_.load(std::memory_order_acquire)) {
@@ -1231,7 +1233,9 @@ bool OpenBrewByWeightMicraService::temperatureEligible(
   if (!networkEligible(error)) return false;
   {
     TaskLockGuard lock(mux_);
-    if (backflush_.status().busy()) {
+    // An offline machine cannot apply a target: wait locally for it to come
+    // back instead of spending cloud cycles that cannot confirm.
+    if (backflush_.status().busy() || observationFence_.offline) {
       error = LineaMicraError::CANCELED;
       return false;
     }
@@ -1333,12 +1337,14 @@ bool OpenBrewByWeightMicraService::observationCurrent(
 
 void OpenBrewByWeightMicraService::deferTemperature(
     const LineaMicraRequest &request, LineaMicraError error, uint32_t delayMs,
-    bool retryable) {
+    bool retryable, bool exhausted) {
   TaskLockGuard lock(mux_);
   if (!desiredTemperature_.present ||
       !sameCommandRequest(desiredTemperature_.request, request)) {
     return;
   }
+  if (exhausted && ++desiredTemperature_.cycles >= micra_timing::kMaxCommandCycles)
+    retryable = false;
   published_.temperatureCommandAccepted =
       desiredTemperature_.commandAccepted;
   published_.temperatureRetryable = retryable;
@@ -1371,12 +1377,14 @@ void OpenBrewByWeightMicraService::deferTemperature(
 
 void OpenBrewByWeightMicraService::deferPower(
     const LineaMicraRequest &request, LineaMicraError error, uint32_t delayMs,
-    bool retryable) {
+    bool retryable, bool exhausted) {
   TaskLockGuard lock(mux_);
   if (!desiredPower_.present ||
       !sameCommandRequest(desiredPower_.request, request)) {
     return;
   }
+  if (exhausted && ++desiredPower_.cycles >= micra_timing::kMaxCommandCycles)
+    retryable = false;
   if (retryable) {
     desiredPower_.retryAtMs = millis() + delayMs;
   } else {
@@ -1413,14 +1421,35 @@ bool OpenBrewByWeightMicraService::executeTemperatureApplication(
         configGeneration_ != machineConfigGeneration) {
       return true;
     }
-    settings = config_;
-    commandAccepted = desiredTemperature_.commandAccepted;
+    const LineaMicraStatus current = statusLocked();
+    const bool unchanged = current.connectionFreshness &&
+        current.quality == LineaMicraObservationQuality::CURRENT &&
+        observationFence_.temperatureTrusted && published_.targetValid &&
+        published_.targetDeciC == request.targetDeciC;
     published_.requestId = request.requestId;
     published_.requestedTargetDeciC = request.targetDeciC;
-    published_.temperatureState = LineaMicraTemperatureState::RUNNING;
+    published_.temperatureState = unchanged ? LineaMicraTemperatureState::CONFIRMED
+                                            : LineaMicraTemperatureState::RUNNING;
     published_.temperatureError = LineaMicraError::NONE;
+    published_.temperatureRetryable = !unchanged;
+    if (unchanged) {
+      // The subscription would have pushed any change: the machine already
+      // holds this target, so no cloud command is needed.
+      desiredTemperature_ = {};
+      published_.appliedTargetDeciC = request.targetDeciC;
+      published_.temperatureTransportStatus = 0;
+      published_.temperatureHttpStatus = 0;
+      published_.temperatureCommandAccepted = false;
+      lock.unlock();  // logging takes its own locks; never nest them in mux_
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                           "Micra temperature %u.%u already set, command skipped",
+                           static_cast<unsigned>(request.targetDeciC / 10U),
+                           static_cast<unsigned>(request.targetDeciC % 10U));
+      return true;
+    }
+    settings = config_;
+    commandAccepted = desiredTemperature_.commandAccepted;
     published_.temperatureCommandAccepted = commandAccepted;
-    published_.temperatureRetryable = true;
   }
   if (!ensureWorkBuffer()) {
     wipeLineaMicraSettings(settings);
@@ -1532,7 +1561,7 @@ bool OpenBrewByWeightMicraService::executeTemperatureApplication(
                             ? LineaMicraError::REJECTED
                             : LineaMicraError::HTTP_ERROR;
   deferTemperature(request, error, micra_timing::kExhaustedCooldownMs,
-                   lineaMicraTemperatureCycleRetryable(error));
+                   lineaMicraTemperatureCycleRetryable(error), true);
   return false;
 }
 
@@ -1541,6 +1570,9 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
     uint32_t machineConfigGeneration) {
   LineaMicraPersistedSettings settings;
   bool commandAccepted = false;
+  const bool standby = request.type == LineaMicraRequestType::SET_STANDBY;
+  const LineaMicraPowerState wantedState =
+      standby ? LineaMicraPowerState::OFF : LineaMicraPowerState::ON;
   {
     TaskLockGuard lock(mux_);
     if (!desiredPower_.present ||
@@ -1548,6 +1580,23 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
         !sameCommandRequest(desiredPower_.request, request) ||
         configGeneration_ != machineConfigGeneration) {
       return true;
+    }
+    // Measured on a live subscription (an optimistic overlay is not CURRENT):
+    // the machine is already in the wanted mode, so no cloud command is needed.
+    // An offline machine drops the command: powering it on whenever it later
+    // reconnects would be a surprise, unlike a deferred temperature target.
+    const LineaMicraStatus current = statusLocked();
+    const bool offline = observationFence_.offline;
+    if (offline || (current.connectionFreshness &&
+        current.quality == LineaMicraObservationQuality::CURRENT &&
+        observationFence_.powerTrusted && current.powerState == wantedState)) {
+      desiredPower_ = {};
+      lock.unlock();  // logging takes its own locks; never nest them in mux_
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                           offline ? "Micra offline, power command dropped"
+                           : standby ? "Micra already in StandBy, command skipped"
+                                     : "Micra already in BrewingMode, command skipped");
+      return !offline;
     }
     settings = config_;
     commandAccepted = desiredPower_.commandAccepted;
@@ -1562,9 +1611,6 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
   bool commandAttempted = false;
   int32_t commandTransportStatus = 0;
   uint16_t commandHttpStatus = 0;
-  const bool standby = request.type == LineaMicraRequestType::SET_STANDBY;
-  const LineaMicraPowerState wantedState =
-      standby ? LineaMicraPowerState::OFF : LineaMicraPowerState::ON;
   for (size_t attempt = 0; attempt < micra_timing::kMaxAttempts; ++attempt) {
     if (!powerRequestCurrent(request, machineConfigGeneration)) {
       wipeLineaMicraSettings(settings);
@@ -1685,7 +1731,7 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
                             ? LineaMicraError::REJECTED
                             : LineaMicraError::HTTP_ERROR;
   deferPower(request, error, micra_timing::kExhaustedCooldownMs,
-                lineaMicraTemperatureCycleRetryable(error));
+                lineaMicraTemperatureCycleRetryable(error), true);
   return false;
 }
 
