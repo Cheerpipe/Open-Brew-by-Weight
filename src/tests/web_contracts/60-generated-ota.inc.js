@@ -625,6 +625,7 @@ if (rootHandler.includes('no-store') ||
     !rootHandler.includes('STATUS_NOT_MODIFIED') ||
     !rootHandler.includes('ifNoneMatchEquals') ||
     !rootHandler.includes('ETag') ||
+    !rootHandler.includes('httpd_resp_set_hdr(request, "Vary", "Accept-Encoding");') ||
     !rootHandler.includes("style-src 'self'") ||
     !rootHandler.includes("script-src 'self'") ||
     rootHandler.includes('"Connection"') ||
@@ -645,6 +646,7 @@ if (!serveImmutable.includes('requestsCurrentAssetTag(request)') ||
     !serveImmutable.includes('max-age=31536000') ||
     !serveImmutable.includes('immutable') ||
     !serveImmutable.includes('STATUS_NOT_MODIFIED') ||
+    !/if \(asset\.gzip\) \{\s*httpd_resp_set_hdr\(request, "Vary", "Accept-Encoding"\);/.test(serveImmutable) ||
     serveImmutable.includes('"Connection"')) {
   throw new Error('Immutable gzip assets must long-cache only their current ?v= tag (else no-store), /sw.js must revalidate (no-cache), both with ETag/304 on kept-alive connections');
 }

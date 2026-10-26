@@ -578,6 +578,11 @@ static esp_err_t serveWebAsset(httpd_req_t *request, const WebAsset &asset) {
   const char *cacheControl = worker    ? "no-cache"
                              : current ? "public, max-age=31536000, immutable"
                                        : "no-store";
+  // Caches and proxies must not hand the gzip body to a client that did not
+  // ask for it; the 304 repeats the header like the full response.
+  if (asset.gzip) {
+    httpd_resp_set_hdr(request, "Vary", "Accept-Encoding");
+  }
   if (etag != nullptr && ifNoneMatchEquals(request, etag)) {
     httpd_resp_set_status(request, STATUS_NOT_MODIFIED);
     httpd_resp_set_hdr(request, "Cache-Control", cacheControl);
@@ -605,7 +610,8 @@ esp_err_t OpenBrewByWeightNetwork::rootHandler(httpd_req_t *request) {
   // navigations. Reload and the 304 path still revalidate against
   // WEB_UI_ETAG, and the UI navigates to a ?fw=<version> URL when the
   // status firmwareVersion differs from the baked build so the stale
-  // fresh-cached copy cannot mask the new one.
+  // fresh-cached copy cannot mask the new one. The shell is always gzip.
+  httpd_resp_set_hdr(request, "Vary", "Accept-Encoding");
   if (ifNoneMatchEquals(request, WEB_UI_ETAG)) {
     httpd_resp_set_status(request, STATUS_NOT_MODIFIED);
     httpd_resp_set_hdr(request, "Cache-Control",
