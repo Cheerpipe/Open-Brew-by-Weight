@@ -120,6 +120,14 @@ starts or STA is lost, and pauses state observations during shots. It has no
 NimBLE dependency and cannot delay scale discovery, scale commands, or weight
 delivery.
 
+The cloud client deliberately does full TLS 1.2 handshakes. Session-ticket
+resumption was shipped and reverted twice: ESP-IDF 6.1 re-applies the saved
+session on every step of an asynchronous handshake, so each resumed reconnect
+fails with `MBEDTLS_ERR_SSL_FEATURE_UNAVAILABLE`; a Web contract rejects
+`save_client_session` until ESP-IDF fixes asynchronous resumption. TLS 1.3 stays
+off: the cloud server repeats the key exchange when resuming TLS 1.3 sessions,
+so it saves one round trip but almost no CPU, at a flash cost.
+
 The Micra service also owns power-state freshness and the optimistic ON/OFF
 overlay lifetime.
 Its adapter returns normal, wake, backflush-candidate or cleaning-blocked
