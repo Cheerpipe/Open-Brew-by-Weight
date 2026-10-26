@@ -87,7 +87,6 @@ let bound = false,
   apSsid = "",
   // Factory (public) device password: part one asks for the owner's own.
   factoryPassword = false,
-  configMutable = true,
   // This session: what is being changed from the summary, the note shown
   // after a save, and where Wi-Fi stands ("joined" or "skipped").
   editing = "",
@@ -387,7 +386,6 @@ async function pollStatus() {
 function applyStatus(s) {
   if (s.adminUnlocked === false) return show("locked");
   factoryPassword = s.factoryPassword === true;
-  configMutable = s.configMutable !== false;
   const n = (lastNet = s.network || {});
   compat = s.compatibilityMode === true;
   lastBrew = n.setupBrew || "none";

@@ -268,6 +268,10 @@ function scopedView(name, src, exports) {
   const names = [...exports, ...src.matchAll(/^export\s+(?:function|const|let)\s+(\w+)/gm)
       .map((m) => m[1])];
   const body = stripModuleHeader(name, src).replace(/export\s+(function|const|let)\s+/g, '$1 ');
+  // `export async function` or a second name in `export const a, b` would
+  // leave a syntax error or drop an export inside the scope.
+  if (/^\s*export\s/m.test(body) || /^export\s+(?:const|let)\s+\w+[^;]*,\s*\w+\s*=/m.test(src))
+    throw new Error(`${name}.js: export form not supported by scopedView`);
   return `const ${name}=(()=>{${body}\nreturn{${names.join(',')}};})();`;
 }
 

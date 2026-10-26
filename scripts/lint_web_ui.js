@@ -16,7 +16,7 @@ function assembledDocument() {
   // The localizer checks the catalog against every source, so all of them go in.
   const html = [webUi.sourcePath, ...webUi.VIEW_NAMES.map((name) =>
     path.join(webUi.htmlDir, `${name}.html`))];
-  const js = [webUi.appJsPath, ...['runtime', 'ota-image', ...webUi.VIEW_NAMES].map((name) =>
+  const js = [webUi.appJsPath, ...['runtime', 'ota-image', 'records', ...webUi.VIEW_NAMES].map((name) =>
     path.join(webUi.jsDir, `${name}.js`))];
   const read = (type) => (file) => ({file, type, content: fs.readFileSync(file, 'utf8')});
   const [shell, ...partials] = renderSources([...html.map(read('html')), ...js.map(read('js')),
