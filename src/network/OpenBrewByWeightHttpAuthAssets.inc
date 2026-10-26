@@ -550,7 +550,7 @@ static bool ifNoneMatchEquals(httpd_req_t *request, const char *etag) {
                                   sizeof(value)) != ESP_OK) {
     return false;
   }
-  return strcmp(value, etag) == 0;
+  return ifNoneMatchContains(value, etag);
 }
 
 // Generated URLs carry exactly ?v=<WEB_UI_ASSET_TAG>, the hash of this

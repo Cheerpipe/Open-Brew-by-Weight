@@ -1,3 +1,4 @@
+#include "../OpenBrewByWeightHttpHeaders.h"
 #include "../OpenBrewByWeightWebAccess.h"
 
 #include <cassert>
@@ -249,9 +250,24 @@ void passwordCooldownIsPerPeer() {
   assert(webAccessPasswordSlot(peers, 13, 300 + WEB_ACCESS_PASSWORD_COOLDOWN_MS) != nullptr);
 }
 
+// The cached shell revalidates through proxies that weaken or list ETags.
+void ifNoneMatchAcceptsWeakAndListedTags() {
+  const char *etag = "\"1.2.3.0abc1234\"";
+  for (const char *header : {"\"1.2.3.0abc1234\"", "W/\"1.2.3.0abc1234\"",
+                             "\"old\", \"1.2.3.0abc1234\"", "\"old\",W/\"1.2.3.0abc1234\"",
+                             "W/\"1.2.3.0abc1234\", \"other\""}) {
+    assert(ifNoneMatchContains(header, etag));
+  }
+  for (const char *header : {"", "\"1.2.3.0abc1234-gzip\"", "\"1.2.3.0abc123\"",
+                             "1.2.3.0abc1234", "W/", "\"old\", \"older\""}) {
+    assert(!ifNoneMatchContains(header, etag));
+  }
+}
+
 }  // namespace
 
 int main() {
+  ifNoneMatchAcceptsWeakAndListedTags();
   tokenTextRoundTrips();
   browserSessionsExpireAndWrap();
   rememberedSessionsAgeRenewAndEvict();

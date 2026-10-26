@@ -3,6 +3,7 @@
 #include "OpenBrewByWeightBbwQuickStart.h"
 #include "OpenBrewByWeightDebugExport.h"
 #include "OpenBrewByWeightFirmwareMode.h"
+#include "OpenBrewByWeightHttpHeaders.h"
 #include "OpenBrewByWeightMachineMomentaryConfig.h"
 #include "OpenBrewByWeightMachinePaddleConfig.h"
 #include "OpenBrewByWeightBuildProfile.h"
