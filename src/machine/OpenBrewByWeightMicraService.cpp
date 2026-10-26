@@ -344,7 +344,6 @@ struct OpenBrewByWeightMicraService::WorkBuffer {
   // (which aliases response and body) and never adds a large stack frame.
   char authorization[kTokenCapacity + 8] = {};
   esp_http_client_handle_t client = nullptr;
-  bool connectionOpen = false;  // A request may have left a keep-alive socket.
   size_t responseUsed = 0;
   uint32_t accessTokenIssuedAtMs = 0;
   uint32_t lastRequestEndedAtMs = 0;
@@ -1097,11 +1096,10 @@ void OpenBrewByWeightMicraService::taskLoop() {
     }
     // Idle owner closes any HTTP keepalive before acknowledging the pause. The
     // rare WebSocket-mode API calls share a connection only within one
-    // operation; API polling keeps it for kHttpReuseIdleMs. Closing keeps the
-    // client and its TLS session ticket, so the next call resumes the session.
-    if ((scaleInhibited || websocketMode) && work_ && work_->connectionOpen) {
-      (void)esp_http_client_close(work_->client);
-      work_->connectionOpen = false;
+    // operation; API polling keeps it for kHttpReuseIdleMs.
+    if ((scaleInhibited || websocketMode) && work_ && work_->client) {
+      esp_http_client_cleanup(work_->client);
+      work_->client = nullptr;
     }
     if (scaleInhibited)
       completeOutboundAcquisitionPause(OutboundClient::MICRA_HTTP, millis());
@@ -2455,7 +2453,7 @@ bool OpenBrewByWeightMicraService::request(
   pendingCloudCall_.startedAtUtcSec =
       now >= 1700000000 ? static_cast<uint32_t>(now) : 0;
   if (work_ == nullptr || io_ == nullptr || url == nullptr) return false;
-  pendingCloudCall_.clientReused = work_->connectionOpen;
+  pendingCloudCall_.clientReused = work_->client != nullptr;
   if (pendingCloudCall_.clientReused) {
     pendingCloudCall_.idleMs =
         pendingCloudCall_.startedAtMs - work_->lastRequestEndedAtMs;
@@ -2476,10 +2474,6 @@ bool OpenBrewByWeightMicraService::request(
     config.buffer_size = 4096;
     config.buffer_size_tx = 4096;
     config.is_async = true;
-#if CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS
-    // A resumed TLS 1.2 session skips ECDHE and certificate verification.
-    config.save_client_session = true;
-#endif
     work_->client = esp_http_client_init(&config);
     if (work_->client == nullptr) return false;
     if (esp_http_client_set_header(work_->client, "Accept", "application/json") !=
@@ -2491,7 +2485,6 @@ bool OpenBrewByWeightMicraService::request(
       return false;
     }
   }
-  work_->connectionOpen = true;
   // The perform state machine sends the complete POST body before its response
   // callback runs, so those mutually exclusive phases share storage.
   const bool bodySharesResponse = body == io_->body;

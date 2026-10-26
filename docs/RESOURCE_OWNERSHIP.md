@@ -121,12 +121,7 @@ cleanup remains on that worker after HTTP progress returns. Connected-scale
 shots and scale acquisition/setup/quiet keep the WS subscription; the client,
 TLS state, scratch and session tokens stay allocated. API selection, observation disablement, account
 removal/change, STA loss/AP entry and maintenance release WS scratch after
-callback quiescence. Maintenance also releases the HTTP workspace. Between
-operations the idle worker closes the HTTPS socket but keeps the
-`esp_http_client` handle, whose saved TLS 1.2 session ticket
-(`CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS`) lets the next call resume instead
-of repeating ECDHE and certificate verification; session clearing and
-maintenance free it with the workspace. Each
+callback quiescence. Maintenance also releases the HTTP workspace. Each
 client records actual pause completion; residual SDK DNS resolution is excluded.
 Control owns the admitted-shot signal and clears it immediately on rinse
 classification. The scale worker owns live connection publication; Micra
