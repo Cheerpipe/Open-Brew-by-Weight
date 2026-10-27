@@ -8,6 +8,7 @@
 #include "OpenBrewByWeightPersistence.h"
 #include "OpenBrewByWeightShotCurve.h"
 #include "OpenBrewByWeightShotLog.h"
+#include "OpenBrewByWeightShotTracePool.h"
 #include "OpenBrewByWeightCrashArchive.h"
 #include "OpenBrewByWeightAuditStore.h"
 #include "OpenBrewByWeightWebAccessStore.h"
@@ -82,13 +83,16 @@ inline bool releaseNvsSpaceForFactoryReset(LastShotStore &lastShot) {
 // BLE scan settings last. Every store is verified before success. Idempotent
 // except that a mid-fail may already have dropped history.
 // LastShotStore owns the status aggregate. Callers only need to drop transient
-// dirty state after this durable reset succeeds.
+// dirty state after this durable reset succeeds. The shot trace pool, when
+// given, is cleared and verified by a fresh recovery; the caller holds its
+// writer mutex.
 inline bool resetAllDurableStores(PersistedSettings &settings,
                                   BleScanPersistedSettings &ble,
                                   ShotLog &shotLog,
                                   HistoryLog &historyLog,
                                   LastShotStore &lastShot,
-                                  ShotCurveLog &shotCurves) {
+                                  ShotCurveLog &shotCurves,
+                                  ShotTracePool *shotTraces = nullptr) {
   if (!settingsSchemaWritesAdmitted.load(std::memory_order_acquire)) return false;
   yieldFlashIo();
   feedFlashIoWatchdog();
@@ -101,7 +105,7 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
   yieldFlashIo();
   feedFlashIoWatchdog();
   if (!shotLog.clear() || !historyLog.clear() || !shotCurves.clear() ||
-      !lastShot.clear()) {
+      !lastShot.clear() || (shotTraces != nullptr && !shotTraces->clear())) {
     return false;
   }
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
@@ -140,12 +144,14 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
   const bool shotCurvesVerified = shotCurves.load() && shotCurves.count() == 0;
   const bool lastShotVerified = lastShot.load() && !lastShot.get().valid &&
                                 !lastShot.getGood().valid;
+  const bool shotTracesVerified =
+      shotTraces == nullptr || (shotTraces->recover() && shotTraces->count() == 0);
   return loadPersistedSettings(settings) &&
          verifyFactorySettings(settings) &&
          readLatestBleScanSettings(verifiedBle) &&
          verifyFactoryBleScanSettings(verifiedBle) &&
          shotLogVerified && historyVerified && shotCurvesVerified &&
-         lastShotVerified;
+         lastShotVerified && shotTracesVerified;
 }
 
 }  // namespace openbrewbyweight

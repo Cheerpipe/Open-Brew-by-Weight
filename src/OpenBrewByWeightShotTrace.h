@@ -248,6 +248,14 @@ constexpr uint32_t SHOT_TRACE_CHECK_SEED = 2166136261U;
 
 enum class ShotTraceExport : uint8_t { OK, BUSY, EMPTY, CHANGED, SINK_FAILED };
 
+// The newest completed trace, taken for the flash pool: its generation, the
+// export CRC and the identity of the summary it explains.
+struct ShotTracePending {
+  uint32_t generation, crc, shotLogId, bootId, endedAtMs, firmwarePacked;
+  uint16_t totalBytes;
+  uint8_t endReason;
+};
+
 inline int16_t shotTraceDg(float weightG) {
   if (!std::isfinite(weightG)) return SHOT_TRACE_NO_WEIGHT;
   const float dg = std::round(weightG * 10.0f);
@@ -630,35 +638,73 @@ class ShotTrace {
   // The mutex is held per chunk copy only, never across the sink.
   template <typename Sink>
   ShotTraceExport exportCompleted(uint8_t *chunk, size_t capacity, Sink &&sink) {
-    uint32_t generation = 0;
+    uint32_t generation = 0, crc = 0;
     size_t total = 0;
-    bool dropped = false;
-    uint32_t droppedBootId = 0;
-    {
-      const TaskLockGuard lock(mux_);
-      if (capturing_.load(std::memory_order_relaxed)) return ShotTraceExport::BUSY;
-      if (recoveredUnverified_) {
-        droppedBootId = completed_->header.bootId;
-        dropped = !verifyRecoveredLocked_();
-      }
-      generation = generation_;
-      total = completed_->header.totalBytes;
-    }
-    if (dropped) shotTraceLogRecoveryDropped(droppedBootId);
-    if (generation == 0) return ShotTraceExport::EMPTY;
-    uint32_t crc = 0;
+    const ShotTraceExport state = completedTrace_(generation, total);
+    if (state != ShotTraceExport::OK) return state;
+    if (!crcOf_(generation, total, chunk, capacity, crc)) return ShotTraceExport::CHANGED;
     for (size_t offset = 0; offset < total; offset += capacity) {
       const size_t bytes = total - offset < capacity ? total - offset : capacity;
-      if (!copyCompleted_(generation, offset, chunk, bytes)) return ShotTraceExport::CHANGED;
-      crc = scaleProfileChecksum(crc, chunk, bytes);
-    }
-    for (size_t offset = 0; offset < total; offset += capacity) {
-      const size_t bytes = total - offset < capacity ? total - offset : capacity;
-      if (!copyCompleted_(generation, offset, chunk, bytes)) return ShotTraceExport::CHANGED;
-      if (offset == 0) memcpy(chunk + offsetof(ShotTraceHeader, crc32), &crc, sizeof(crc));
+      if (!copyExport(generation, offset, chunk, bytes, crc)) return ShotTraceExport::CHANGED;
       if (!sink(chunk, bytes)) return ShotTraceExport::SINK_FAILED;
     }
     return ShotTraceExport::OK;
+  }
+
+  // Export bytes [offset, offset + bytes) of `generation`, its CRC set;
+  // false once a newer completion (or a capture) replaced it.
+  bool copyExport(uint32_t generation, size_t offset, uint8_t *out, size_t bytes,
+                  uint32_t crc) const {
+    if (!copyCompleted_(generation, offset, out, bytes)) return false;
+    for (size_t i = 0; i < sizeof(crc); ++i) {
+      const size_t at = offsetof(ShotTraceHeader, crc32) + i;
+      if (at >= offset && at < offset + bytes) out[at - offset] = static_cast<uint8_t>(crc >> (8U * i));
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // Flash pool (settings_persist worker). The newest completed trace waits
+  // until consumed; a newer completion replaces an unsaved one (newest
+  // wins), and the next consume() counts it as dropped.
+  // ---------------------------------------------------------------------
+
+  bool pendingPersist(ShotTracePending &out, uint8_t *chunk, size_t capacity) {
+    size_t total = 0;
+    if (completedTrace_(out.generation, total) != ShotTraceExport::OK) return false;
+    {
+      const TaskLockGuard lock(mux_);
+      if (out.generation != generation_ || out.generation == consumed_) return false;
+      const ShotTraceHeader &header = completed_->header;
+      out.shotLogId = header.shotLogId;
+      out.bootId = header.bootId;
+      out.endedAtMs = header.endedAtMs;
+      out.firmwarePacked = header.firmwarePacked;
+      out.endReason = header.endReason;
+    }
+    out.totalBytes = static_cast<uint16_t>(total);
+    return crcOf_(out.generation, total, chunk, capacity, out.crc);
+  }
+
+  // Saved, already on flash or given up; returns how many completions
+  // before it were never consumed (dropped).
+  uint32_t consume(uint32_t generation) {
+    const TaskLockGuard lock(mux_);
+    const uint32_t dropped = generation - consumed_ - 1U;
+    consumed_ = generation;
+    tracesDropped_ += dropped;
+    return dropped;
+  }
+
+  // Clear all and factory reset: the completed trace's summary is gone.
+  void consumeCompleted() {
+    const TaskLockGuard lock(mux_);
+    consumed_ = generation_;
+  }
+
+  uint32_t tracesDropped() const {
+    const TaskLockGuard lock(mux_);
+    return tracesDropped_;
   }
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
@@ -670,6 +716,7 @@ class ShotTrace {
     recoveredUnverified_ = false;
     capture_ = &shotTraceStore.buffers[0];
     completed_ = &shotTraceStore.buffers[1];
+    consumed_ = tracesDropped_ = 0;
     ringCount_ = 0;
     for (bool &known : stateKnown_) known = false;
     micraSubscribed_.store(false);
@@ -844,6 +891,37 @@ class ShotTrace {
     shotTraceStore.ringAtMs[slot] = nowMs;
   }
 
+  // The newest completed trace (a recovered one verified first): BUSY while
+  // a capture is open, EMPTY when there is none.
+  ShotTraceExport completedTrace_(uint32_t &generation, size_t &total) {
+    bool dropped = false;
+    uint32_t droppedBootId = 0;
+    {
+      const TaskLockGuard lock(mux_);
+      if (capturing_.load(std::memory_order_relaxed)) return ShotTraceExport::BUSY;
+      if (recoveredUnverified_) {
+        droppedBootId = completed_->header.bootId;
+        dropped = !verifyRecoveredLocked_();
+      }
+      generation = generation_;
+      total = completed_->header.totalBytes;
+    }
+    if (dropped) shotTraceLogRecoveryDropped(droppedBootId);
+    return generation == 0 ? ShotTraceExport::EMPTY : ShotTraceExport::OK;
+  }
+
+  // CRC-32 of the record with its CRC field zero, chunk by chunk.
+  bool crcOf_(uint32_t generation, size_t total, uint8_t *chunk, size_t capacity,
+              uint32_t &crc) const {
+    crc = 0;
+    for (size_t offset = 0; offset < total; offset += capacity) {
+      const size_t bytes = total - offset < capacity ? total - offset : capacity;
+      if (!copyCompleted_(generation, offset, chunk, bytes)) return false;
+      crc = scaleProfileChecksum(crc, chunk, bytes);
+    }
+    return true;
+  }
+
   bool copyCompleted_(uint32_t generation, size_t offset, uint8_t *out,
                       size_t bytes) const {
     const TaskLockGuard lock(mux_);
@@ -860,6 +938,7 @@ class ShotTrace {
   ShotTraceBuffer *capture_ = &shotTraceStore.buffers[0];
   ShotTraceBuffer *completed_ = &shotTraceStore.buffers[1];
   uint32_t generation_ = 0;  // 0: nothing completed since boot
+  uint32_t consumed_ = 0, tracesDropped_ = 0;  // Flash pool bookkeeping.
   bool recoveredUnverified_ = false;
   size_t ringCount_ = 0;
   // Control-loop-owned (noteState, noteReading).

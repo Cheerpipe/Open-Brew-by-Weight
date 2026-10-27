@@ -537,8 +537,9 @@ filled on export. Requires the exclusive Web UI claim like every owned route.
 | `404` | `NO_SHOT_TRACE` | No trace was completed since the last restart, and none was recovered from it (or the recovered one failed verification) |
 | `409` | `SHOT_TRACE_BUSY` | A shot is being captured, from cycle start to the end of its drip analysis; a shot that starts mid-download ends the stream |
 
-Only the newest trace is kept; a later shot replaces it. The trace is not yet
-written to flash: a completed trace is lost on restart. A shot cut short by a
+RAM keeps only the newest trace; a later shot replaces it, and after a restart
+this route has none until the next shot. Every completed trace is also saved
+to flash after its shot, for a per-shot download to come. A shot cut short by a
 panic, a watchdog or a software restart is served after the reboot as an
 interrupted trace (header flag `0x4`, `bootId` of the boot that crashed, no
 `shotLogId`); see [interrupted traces](SHOT_TRACE.md#interrupted-traces).

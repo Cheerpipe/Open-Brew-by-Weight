@@ -208,9 +208,17 @@ write-backs never run under the trace mutex: tasks call `esp_cache_msync`
 (the IDF wrapper with its own cache spinlock) after releasing it, for the
 shutdown hook and for each header whose magic changed; only the panic handler,
 with the other core stopped, calls the raw ROM write-back. The shot trace flash pool
-(`ShotTracePool`, not wired yet) belongs to the settings_persist worker:
-recovery, appends and clear run there, one flash operation per step under the
-shared flash lock. Its leaf mutex guards only the RAM index; the writer drops
+(`ShotTracePool`) belongs to the settings_persist worker: recovery, appends
+and clear run on its idle passes, one flash operation per step under the
+shared flash lock, only while the durable write gate is open and no trace
+capture is open; the pass returns as soon as either closes. One writer mutex
+(`shotTracePoolWriterMutex`) serializes that worker with a factory reset,
+which clears the pool on network_manager under the maintenance lease while
+holding `shotStoreMutex` (lock order: `shotStoreMutex`, writer mutex, flash
+lock, then the pool or the trace mutex). The worker reads the completed trace
+by generation under the trace mutex, one bounded copy per step, so a newer
+completion fails the copy instead of mixing two shots; clear all only sets an
+atomic request the worker lands before it persists the shot log. Its leaf mutex guards only the RAM index; the writer drops
 the entries of a sector before erasing it, and readers look the index up,
 release the mutex, read flash under the flash lock and check after every chunk
 that the record is still indexed. Lock order is flash lock, then pool mutex.

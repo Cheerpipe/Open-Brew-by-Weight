@@ -1,5 +1,7 @@
 #define OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST
 #include "../OpenBrewByWeightShotTracePool.h"
+#include "../OpenBrewByWeightShotCurve.h"
+#include "shot_curve_test_helpers.h"
 
 #include <algorithm>
 #include <atomic>
@@ -58,8 +60,8 @@ bool appendShot(ShotTracePool &pool, uint32_t id) {
   for (size_t i = 0; i < sizes.trace; ++i) traceBuffer[i] = contentByte(id, 2, i);
   for (size_t i = 0; i < sizes.curve; ++i) curveBuffer[i] = contentByte(id, 1, i);
   ShotTracePoolSource sources[2] = {
-      {ShotTracePoolSection::CURVE, 0, sizes.curve, curveBuffer},
-      {ShotTracePoolSection::TRACE, 0, sizes.trace, traceBuffer}};
+      {ShotTracePoolSection::CURVE, 0, sizes.curve, curveBuffer, nullptr, nullptr},
+      {ShotTracePoolSection::TRACE, 0, sizes.trace, traceBuffer, nullptr, nullptr}};
   return pool.append(identityOf(id), sources, 2);
 }
 
@@ -193,7 +195,7 @@ void tsp02_round_trip_spanning_sectors() {
   CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
         ShotTracePoolStatus::NOT_FOUND);
   // An odd section length is padded to 16 bytes: 32 + 4 + 8 (5 bytes) -> 48.
-  const ShotTracePoolSource odd = {ShotTracePoolSection::TRACE, 0, 5, traceBuffer};
+  const ShotTracePoolSource odd = {ShotTracePoolSection::TRACE, 0, 5, traceBuffer, nullptr, nullptr};
   CHECK(pool.append({78, 1, 2, 3, 0}, &odd, 1));
   CHECK(pool.open(78, 1, 2, ref, buffer, sizeof(buffer)) == ShotTracePoolStatus::OK && ref.bytes == 48);
   CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) == ShotTracePoolStatus::OK &&
@@ -651,8 +653,8 @@ void tsp13_stats() {
   const ShotTracePoolStats again = pool.stats(isLive, &live);
   CHECK(again.unusedBytes == stats.unusedBytes && again.liveBytes == stats.liveBytes);
   // Errors are reported.
-  ShotTracePoolSource huge[2] = {{ShotTracePoolSection::TRACE, 0, 16384, traceBuffer},
-                                 {ShotTracePoolSection::CURVE, 0, 8200, traceBuffer}};
+  ShotTracePoolSource huge[2] = {{ShotTracePoolSection::TRACE, 0, 16384, traceBuffer, nullptr, nullptr},
+                                 {ShotTracePoolSection::CURVE, 0, 8200, traceBuffer, nullptr, nullptr}};
   CHECK(!pool.append(identityOf(9), huge, 2));
   CHECK(pool.stats(nullptr, nullptr).lastError == ShotTracePoolError::TOO_LARGE);
   Flash::setFailAfter(0);
@@ -670,8 +672,8 @@ void tsp14_uncommitted_record_is_never_returned() {
   const Sizes sizes = sizesOf(2);
   for (size_t i = 0; i < sizes.trace; ++i) traceBuffer[i] = contentByte(2, 2, i);
   for (size_t i = 0; i < sizes.curve; ++i) curveBuffer[i] = contentByte(2, 1, i);
-  ShotTracePoolSource sources[2] = {{ShotTracePoolSection::CURVE, 0, sizes.curve, curveBuffer},
-                                    {ShotTracePoolSection::TRACE, 0, sizes.trace, traceBuffer}};
+  ShotTracePoolSource sources[2] = {{ShotTracePoolSection::CURVE, 0, sizes.curve, curveBuffer, nullptr, nullptr},
+                                    {ShotTracePoolSection::TRACE, 0, sizes.trace, traceBuffer, nullptr, nullptr}};
   CHECK(pool.beginAppend(identityOf(2), sources, 2));
   CHECK(!pool.beginAppend(identityOf(3), sources, 2));  // One at a time.
   size_t steps = 0;
@@ -721,8 +723,9 @@ void tsp16_transient_errors_keep_the_pool_consistent() {
       Flash::setFailAfter(-1);
       CHECK(pool.recover());
       Flash::setFailAfter(static_cast<int>(f), torn, true);
-      CHECK(!appendShot(pool, 4));
-      CHECK(pool.lastError() != ShotTracePoolError::NONE);
+      // Only a commit that landed in full (read back) counts as appended.
+      const bool appended = appendShot(pool, 4);
+      CHECK(appended ? readable(pool, 4) : pool.lastError() != ShotTracePoolError::NONE);
       CHECK(appendShot(pool, 5) && appendShot(pool, 6));
       CHECK(readable(pool, 5) && readable(pool, 6));
       CHECK(pool.recover());
@@ -730,6 +733,7 @@ void tsp16_transient_errors_keep_the_pool_consistent() {
       const ShotTracePoolStatus status = readShot(pool, 4, matches);
       CHECK(status == ShotTracePoolStatus::NOT_FOUND || (status == ShotTracePoolStatus::OK && matches));
       for (uint32_t id : {1U, 2U, 3U, 5U, 6U}) CHECK(readable(pool, id));
+      if (appended) CHECK(readable(pool, 4));
     }
   }
 }
@@ -877,7 +881,7 @@ void tsp20_eviction_precedes_every_erase() {
 bool appendSized(ShotTracePool &pool, uint32_t id, uint16_t total) {
   const uint16_t bytes = static_cast<uint16_t>(total - 36U);
   for (size_t i = 0; i < bytes; ++i) traceBuffer[i] = contentByte(id, 2, i);
-  const ShotTracePoolSource source = {ShotTracePoolSection::TRACE, 0, bytes, traceBuffer};
+  const ShotTracePoolSource source = {ShotTracePoolSection::TRACE, 0, bytes, traceBuffer, nullptr, nullptr};
   return pool.append(tinyIdentity(id), &source, 1);
 }
 bool readableSized(ShotTracePool &pool, uint32_t id, uint16_t total) {
@@ -932,7 +936,7 @@ void tsp21_sector_boundaries() {
   // right after the following sector's header (first record at 24) landed:
   // that head holds no committed record, so appends start a new sector.
   CHECK(appendSized(pool, 707, 8096) && addressOf(pool, 7) == 5 * S + 72);
-  const ShotTracePoolSource none = {ShotTracePoolSection::TRACE, 0, 12, traceBuffer};
+  const ShotTracePoolSource none = {ShotTracePoolSection::TRACE, 0, 12, traceBuffer, nullptr, nullptr};
   CHECK(pool.beginAppend(tinyIdentity(708), &none, 1));
   CHECK(pool.appendStep() == FlashStoreStepResult::MORE);  // Erase sector 7.
   CHECK(pool.appendStep() == FlashStoreStepResult::MORE);  // Its header, first record 24.
@@ -1163,6 +1167,89 @@ void tsp26_readers_race_recovery_clear_and_end_changes() {
   CHECK(bad.load() == 0 && ok.load() > 0);
 }
 
+// A section read through a callback: bytes that change mid-append abandon
+// it (SOURCE), nothing of it is ever committed, and the pool goes on.
+struct ChangingSource {
+  uint32_t id = 0, failAt = UINT32_MAX, reads = 0;
+};
+bool readChanging(void *context, size_t offset, uint8_t *out, size_t bytes) {
+  ChangingSource &source = *static_cast<ChangingSource *>(context);
+  if (source.reads++ >= source.failAt) return false;
+  for (size_t i = 0; i < bytes; ++i) out[i] = contentByte(source.id, 2, offset + i);
+  return true;
+}
+
+void tsp27_a_changing_source_abandons_the_append() {
+  freshFlash();
+  ShotTracePool pool(indexA);
+  CHECK(pool.recover() && appendShot(pool, 1));
+  ChangingSource changing;
+  changing.id = 2;
+  const ShotTracePoolSource source = {ShotTracePoolSection::TRACE, 0, 9000, nullptr, readChanging, &changing};
+  // Fails during the CRC pass: nothing starts.
+  changing.failAt = 3;
+  const size_t ops = Flash::operations();
+  CHECK(!pool.beginAppend(tinyIdentity(2), &source, 1) && pool.lastError() == ShotTracePoolError::SOURCE);
+  CHECK(Flash::operations() == ops && !pool.appending());
+  // Fails while being written: abandoned, never committed.
+  changing.reads = 0;
+  changing.failAt = 40;  // The CRC pass reads 36 chunks of 256 bytes.
+  CHECK(pool.beginAppend(tinyIdentity(2), &source, 1));
+  FlashStoreStepResult result;
+  do { result = pool.appendStep(); } while (result == FlashStoreStepResult::MORE);
+  CHECK(result == FlashStoreStepResult::FAILED && pool.lastError() == ShotTracePoolError::SOURCE);
+  CHECK(!readableSized(pool, 2, 9040) && pool.recover() && !readableSized(pool, 2, 9040));
+  // An unchanged source appends through the callback.
+  changing.reads = 0;
+  changing.failAt = UINT32_MAX;
+  CHECK(pool.append(tinyIdentity(2), &source, 1) && readableSized(pool, 2, 9040));
+  CHECK(readable(pool, 1) && pool.recover() && readableSized(pool, 2, 9040));
+}
+
+// A commit reported as failed that landed is read back and indexed: the
+// record exists once, in this boot and after the next.
+void tsp28_a_landed_commit_reported_failed_is_indexed() {
+  freshFlash();
+  ShotTracePool pool(indexA);
+  CHECK(pool.recover() && appendShot(pool, 1));
+  const size_t before = Flash::operations();
+  CHECK(appendShot(pool, 2));
+  const size_t ops = Flash::operations() - before;
+  freshFlash();
+  CHECK(pool.recover() && appendShot(pool, 1));
+  Flash::setFailAfter(static_cast<int>(ops - 1U), 4, true);  // The commit lands, reported failed.
+  CHECK(appendShot(pool, 2) && pool.count() == 2);
+  Flash::setFailAfter(static_cast<int>(ops - 1U), 2, true);  // Half a commit: not committed.
+  CHECK(!appendShot(pool, 3) && pool.count() == 2 && !readable(pool, 3));
+  CHECK(pool.recover() && pool.count() == 2 && readable(pool, 2));
+}
+
+// shotcurve still holding the legacy curve store's blocks when the ring
+// opens it: none reads as a record, and appends overwrite them.
+void tsp29_legacy_curve_blocks_are_holes() {
+  ShotCurveLog::resetHostStorage();
+  ShotCurveLog legacy;
+  CHECK(legacy.load());
+  ShotCurveRecord curve = emptyShotCurveRecord();
+  for (uint32_t point = 0; point < 400; ++point) CHECK(appendShotCurvePoint(curve, point * 7, point * 50, false));
+  for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY; ++id) {
+    curve.shotId = id;
+    CHECK(legacy.append(curve, false));
+  }
+  CHECK(legacy.save() && legacy.clear());  // A clear epoch in sectors 0-1 as well.
+  static_assert(SHOT_CURVE_PARTITION_BYTES == SHOT_TRACE_POOL_SHOTCURVE_BYTES, "Same partition");
+  freshFlash();
+  memcpy(Flash::sector(RESERVED), ShotCurveLog::hostFlashForTest(), SHOT_TRACE_POOL_SHOTCURVE_BYTES);
+  ShotTracePool pool(indexA);
+  CHECK(pool.setLogicalEnd(SHOT_TRACE_POOL_SECTORS) && pool.recover() && pool.count() == 0);
+  CHECK(pool.stats(nullptr, nullptr).unusedBytes == SHOT_TRACE_POOL_SECTORS * S);
+  uint32_t id = fillUntil(pool, 1, RESERVED + 40U);
+  CHECK(crossesPartitions(pool));
+  CHECK(pool.recover() && pool.count() == id - 1U);
+  for (uint32_t n = 1; n < id; ++n) CHECK(readable(pool, n));
+  CHECK(Flash::touched(LEGACY0) == 0 && Flash::touched(LEGACY1) == 0);
+}
+
 struct TestCase {
   const char *id;
   void (*function)();
@@ -1195,6 +1282,9 @@ const TestCase tests[] = {
     {"TSP24", tsp24_full_index_and_an_unconfirmed_span},
     {"TSP25", tsp25_crash_during_the_first_append_after_recovery},
     {"TSP26", tsp26_readers_race_recovery_clear_and_end_changes},
+    {"TSP27", tsp27_a_changing_source_abandons_the_append},
+    {"TSP28", tsp28_a_landed_commit_reported_failed_is_indexed},
+    {"TSP29", tsp29_legacy_curve_blocks_are_holes},
 };
 
 }  // namespace

@@ -98,12 +98,16 @@ static_assert(SHOT_TRACE_POOL_MAX_RECORD_BYTES <= UINT16_MAX,
 
 enum class ShotTracePoolSection : uint8_t { END = 0, CURVE = 1, TRACE = 2 };
 
-// One section to append; data stays the caller's until the append completes.
+// One section to append: `data`, or `read` when the bytes may be replaced
+// meanwhile (it copies a stable range and fails once they changed, which
+// abandons the append). Both stay the caller's until the append completes.
 struct ShotTracePoolSource {
   ShotTracePoolSection tag;
   uint8_t flags;
   uint16_t bytes;
   const void *data;
+  bool (*read)(void *context, size_t offset, uint8_t *out, size_t bytes);
+  void *context;
 };
 
 struct ShotTracePoolIdentity {
@@ -147,7 +151,8 @@ struct ShotTracePoolIndex {
 };
 
 enum class ShotTracePoolStatus : uint8_t { OK, NOT_READY, NOT_FOUND, GONE, CORRUPT, IO_ERROR };
-enum class ShotTracePoolError : uint8_t { NONE, READ, ERASE, PROGRAM, LOCK, TOO_LARGE };
+// SOURCE: a section's bytes changed while it was being written.
+enum class ShotTracePoolError : uint8_t { NONE, READ, ERASE, PROGRAM, LOCK, TOO_LARGE, SOURCE };
 
 // An opened, CRC-verified record; reads revalidate it against recycling.
 struct ShotTracePoolRef {
@@ -296,9 +301,10 @@ class ShotTracePool {
   ShotTracePool(const ShotTracePool &) = delete;
   ShotTracePool &operator=(const ShotTracePool &) = delete;
 
-  // Logical sectors in the ring: `reserved` alone until the migration opens
-  // shotcurve. It only grows, and a recover() must follow: a record that
-  // wrapped from the old last sector to sector 0 is dropped by that walk.
+  // Logical sectors in the ring: `reserved` alone until the legacy curve
+  // store is retired and shotcurve opens. It only grows, and a recover()
+  // must follow: a record that wrapped from the old last sector to sector 0
+  // is dropped by that walk.
   bool setLogicalEnd(size_t sectors) {
     if (op_ != Op::IDLE || sectors < end() || sectors > SHOT_TRACE_POOL_SECTORS) return false;
     TaskLockGuard lock(mux_);
@@ -347,7 +353,8 @@ class ShotTracePool {
     size_t total = sizeof(ShotTracePoolRecordHeader);
     for (size_t i = 0; i < count; ++i) {
       if (sources[i].tag == ShotTracePoolSection::END ||
-          (sources[i].data == nullptr && sources[i].bytes != 0)) return false;
+          (sources[i].data == nullptr && sources[i].read == nullptr && sources[i].bytes != 0))
+        return false;
       total += sizeof(ShotTracePoolSectionHeader) + align4(sources[i].bytes);
     }
     if (total > SHOT_TRACE_POOL_MAX_RECORD_BYTES) {
@@ -365,7 +372,7 @@ class ShotTracePool {
                                offsetof(ShotTracePoolRecordHeader, crc));
     for (size_t at = sizeof(header_); at < total; at += sizeof(chunk)) {
       const size_t piece = total - at < sizeof(chunk) ? total - at : sizeof(chunk);
-      gather(at, chunk, piece);
+      if (!gather(at, chunk, piece)) return fail(ShotTracePoolError::SOURCE);
       crc = crc32Update(crc, chunk, piece);
     }
     header_.crc = ~crc;
@@ -406,15 +413,20 @@ class ShotTracePool {
       size_t piece = header_.totalBytes - written_;
       if (piece > kSectorBytes - offset_) piece = kSectorBytes - offset_;
       if (piece > FLASH_IO_CHUNK_BYTES) piece = FLASH_IO_CHUNK_BYTES;
-      gather(written_, flashIoScratchBytes(), piece);
-      ok = program(sector_, offset_, flashIoScratchBytes(), piece);
+      if (!gather(written_, flashIoScratchBytes(), piece)) error = ShotTracePoolError::SOURCE;
+      ok = error != ShotTracePoolError::SOURCE &&
+           program(sector_, offset_, flashIoScratchBytes(), piece);
       written_ += piece;
       offset_ += piece;
       needErase_ = written_ < header_.totalBytes && offset_ == kSectorBytes;
     } else {
       const uint32_t commit = kCommitted;
-      ok = program(start_ / kSectorBytes, start_ % kSectorBytes + offsetof(ShotTracePoolRecordHeader, commit),
-                   &commit, sizeof(commit));
+      const size_t at = start_ % kSectorBytes + offsetof(ShotTracePoolRecordHeader, commit);
+      ok = program(start_ / kSectorBytes, at, &commit, sizeof(commit));
+      // A commit reported as failed may have landed: then it is committed,
+      // and indexing it keeps a retry from writing the shot twice.
+      uint32_t landed = 0;
+      if (!ok) ok = read(start_ / kSectorBytes, at, &landed, sizeof(landed)) && landed == kCommitted;
       if (ok) {
         push(header_, start_);
         op_ = Op::IDLE;
@@ -657,25 +669,33 @@ class ShotTracePool {
 
   // The virtual record: header (commit blank), then each section header,
   // payload and zero padding, then zero padding to the record length.
-  void gather(size_t pos, uint8_t *out, size_t bytes) const {
+  bool gather(size_t pos, uint8_t *out, size_t bytes) const {
     memset(out, 0, bytes);
     size_t at = 0;
-    copySpan(out, pos, bytes, at, &header_, sizeof(header_));
+    copySpan(out, pos, bytes, at, &header_, sizeof(header_), nullptr);
     at += sizeof(header_);
     for (size_t i = 0; i < sourceCount_; ++i) {
-      const ShotTracePoolSectionHeader section = {static_cast<uint8_t>(sources_[i].tag),
-                                                  sources_[i].flags, sources_[i].bytes};
-      copySpan(out, pos, bytes, at, &section, sizeof(section));
+      const ShotTracePoolSource &source = sources_[i];
+      const ShotTracePoolSectionHeader section = {static_cast<uint8_t>(source.tag),
+                                                  source.flags, source.bytes};
+      copySpan(out, pos, bytes, at, &section, sizeof(section), nullptr);
       at += sizeof(section);
-      copySpan(out, pos, bytes, at, sources_[i].data, sources_[i].bytes);
-      at += align4(sources_[i].bytes);
+      if (!copySpan(out, pos, bytes, at, source.data, source.bytes, &source)) return false;
+      at += align4(source.bytes);
     }
+    return true;
   }
-  static void copySpan(uint8_t *out, size_t pos, size_t bytes, size_t at, const void *source,
-                       size_t length) {
+  // The part of [at, at + length) inside [pos, pos + bytes), from memory or
+  // through the source's reader.
+  static bool copySpan(uint8_t *out, size_t pos, size_t bytes, size_t at, const void *data,
+                       size_t length, const ShotTracePoolSource *source) {
     const size_t from = pos > at ? pos : at;
     const size_t to = pos + bytes < at + length ? pos + bytes : at + length;
-    if (from < to) memcpy(out + (from - pos), static_cast<const uint8_t *>(source) + (from - at), to - from);
+    if (from >= to) return true;
+    if (source != nullptr && source->read != nullptr)
+      return source->read(source->context, from - at, out + (from - pos), to - from);
+    memcpy(out + (from - pos), static_cast<const uint8_t *>(data) + (from - at), to - from);
+    return true;
   }
 
   // Index ring addressed by serial; live serials [firstSerial_, +count_).

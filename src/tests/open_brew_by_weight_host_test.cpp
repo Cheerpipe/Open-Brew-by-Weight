@@ -23500,6 +23500,302 @@ void trc11_idle_placement_evidence_reaches_the_next_trace() {
   CHECK(placed && rejected && ineligible);
 }
 
+// ---------------------------------------------------------------------------
+// Shot trace flash pool (plan B4b): the settings_persist worker saves each
+// completed shot trace while no shot runs.
+// ---------------------------------------------------------------------------
+
+using PoolFlash = ShotTracePoolHostFlash;
+
+void freshShotTracePool() {
+  PoolFlash::reset();
+  PoolFlash::setEraseSpy(nullptr);
+  hostRebootShotTracePool();
+}
+
+// A trace completed through the API finalize uses (no host reset).
+void completePoolTestTrace(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs,
+                           uint16_t events = 40) {
+  shotTrace().begin(endedAtMs - 30000U);
+  ShotTraceSnapshot snapshot = {};
+  copyCString(snapshot.scaleName, sizeof(snapshot.scaleName), "Lunar");
+  shotTrace().attachStart(snapshot, bootId);
+  for (uint16_t i = 0; i < events; ++i)
+    shotTrace().note(ShotTraceKind::OVER_LINE, endedAtMs - 30000U + i * 10U,
+                     static_cast<int16_t>(i), static_cast<uint16_t>(shotLogId));
+  shotTrace().complete(shotLogId, bootId, endedAtMs, static_cast<uint8_t>(EndReason::ACTIVATOR));
+}
+
+// The trace section of a pool record, empty unless it opened and read.
+std::vector<uint8_t> poolTraceBytes(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs,
+                                    ShotTracePoolStatus *result = nullptr) {
+  ShotTracePoolRef ref;
+  uint8_t buffer[512];
+  size_t offset = 0, bytes = 0;
+  ShotTracePoolStatus status =
+      openShotTraceRecord(shotId, bootId, endedAtMs, ref, buffer, sizeof(buffer));
+  if (status == ShotTracePoolStatus::OK)
+    status = shotTracePool().findSection(ref, ShotTracePoolSection::TRACE, offset, bytes);
+  std::vector<uint8_t> out(status == ShotTracePoolStatus::OK ? bytes : 0);
+  if (status == ShotTracePoolStatus::OK) status = shotTracePool().read(ref, offset, out.data(), bytes);
+  if (status != ShotTracePoolStatus::OK) out.clear();
+  if (result != nullptr) *result = status;
+  return out;
+}
+
+void tpw01_a_finished_shot_is_saved_once_after_the_shot_and_linked() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  shotLog.clear();
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  ShotTracePoolStatus status = ShotTracePoolStatus::OK;
+  poolTraceBytes(1, currentBootId(), 1, &status);
+  CHECK(status == ShotTracePoolStatus::NOT_READY);  // Until the worker recovered it.
+  const uint32_t rawOnAt = startCycle();
+  advanceToBrew();
+  for (int i = 1; i <= 4; ++i) publishWeight(0.5f * i, hostMillis + 200);
+  serviceShotTracePool();  // During the shot: no flash I/O at all.
+  CHECK(!shotTracePool().ready() && PoolFlash::operations() == 0);
+  releaseAtPhysicalDuration(rawOnAt, 15000);
+  CHECK(!session.active && shotTrace().capturing());
+  serviceShotTracePool();  // Drip delay: the capture is still open.
+  CHECK(!shotTracePool().ready());
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  CHECK(!shotTrace().capturing());
+  serviceShotTracePool();
+  CHECK(shotTracePool().ready() && shotTracePool().count() == 1);
+  CHECK(debugLogTextCount("Shot trace pool ready: 0 records") == 1);
+  ShotLogRecord stored[1] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  // The record carries the summary's identity and the exported trace.
+  const std::vector<uint8_t> saved =
+      poolTraceBytes(stored[0].id, stored[0].bootId, stored[0].endedAtMs, &status);
+  CHECK(status == ShotTracePoolStatus::OK && saved == shot_trace_test::exportBytes());
+  Trace decoded;
+  CHECK(shot_trace_test::decode(saved, decoded) && decoded.header.shotLogId == stored[0].id);
+  ShotTracePoolRef ref;
+  uint8_t buffer[64];
+  CHECK(shotTracePool().open(stored[0].id, stored[0].bootId, stored[0].endedAtMs, ref, buffer,
+                             sizeof(buffer)) == ShotTracePoolStatus::OK);
+  CHECK(ref.header.endReason == static_cast<uint8_t>(EndReason::ACTIVATOR) &&
+        ref.header.firmwarePacked == FW_VERSION_PACKED);
+  // Consumed: the next pass neither writes it again nor looks it up.
+  static bool poolRead;
+  poolRead = false;
+  PoolFlash::setReadHook([] { poolRead = true; });
+  serviceShotTracePool();
+  PoolFlash::setReadHook(nullptr);
+  CHECK(shotTracePool().count() == 1 && !poolRead);
+  hostRebootShotTracePool();
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 &&
+        poolTraceBytes(stored[0].id, stored[0].bootId, stored[0].endedAtMs) == saved);
+}
+
+void tpw02_appends_wait_for_the_gate_and_resume_where_they_paused() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  serviceShotTracePool();
+  CHECK(shotTracePool().ready());
+  completePoolTestTrace(5, 7, 100000);
+  const std::vector<uint8_t> exported = shot_trace_test::exportBytes();
+  session.active = true;  // Another shot started first.
+  const size_t ops = PoolFlash::operations();
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 0 && PoolFlash::operations() == ops);
+  session.active = false;
+  // The gate closes during the append (at its first erase): it pauses.
+  PoolFlash::setEraseSpy([](size_t) { session.active = true; });
+  serviceShotTracePool();
+  PoolFlash::setEraseSpy(nullptr);
+  CHECK(shotTracePool().appending() && shotTracePool().count() == 0);
+  session.active = false;
+  serviceShotTracePool();
+  CHECK(!shotTracePool().appending() && shotTracePool().count() == 1);
+  CHECK(PoolFlash::erases(0) == 1);  // Resumed, not restarted.
+  CHECK(poolTraceBytes(5, 7, 100000) == exported);
+}
+
+void tpw03_the_newest_trace_wins_and_drops_are_counted() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  serviceShotTracePool();
+  completePoolTestTrace(1, 7, 100000);
+  completePoolTestTrace(2, 7, 200000);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && poolTraceBytes(1, 7, 100000).empty() &&
+        !poolTraceBytes(2, 7, 200000).empty());
+  CHECK(shotTrace().tracesDropped() == 1 &&
+        debugLogTextCount("1 shot trace(s) not saved: a newer shot ended first") == 1);
+  // A newer shot ends while an append is paused (at its first erase; 8 KiB
+  // need one): that append is abandoned.
+  completePoolTestTrace(3, 7, 300000, 900);
+  PoolFlash::setEraseSpy([](size_t) { session.active = true; });
+  serviceShotTracePool();
+  PoolFlash::setEraseSpy(nullptr);
+  CHECK(shotTracePool().appending());
+  session.active = false;
+  completePoolTestTrace(4, 7, 400000);
+  serviceShotTracePool();
+  CHECK(!shotTracePool().appending() && shotTracePool().count() == 1);
+  CHECK(shotTracePool().lastError() == ShotTracePoolError::SOURCE);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 2 && poolTraceBytes(3, 7, 300000).empty() &&
+        !poolTraceBytes(4, 7, 400000).empty() && shotTrace().tracesDropped() == 2);
+  CHECK(debugLogTextCount("Shot trace save failed") == 0);
+}
+
+void tpw04_failed_saves_retry_without_duplicates() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  serviceShotTracePool();
+  // Already on flash (a save reported failed after its commit landed):
+  // consumed without a second write.
+  completePoolTestTrace(9, 7, 900000);
+  CHECK(shotTracePool().append({9, 7, 900000, FW_VERSION_PACKED, 3}, nullptr, 0));
+  const size_t ops = PoolFlash::operations();
+  serviceShotTracePool();
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && PoolFlash::operations() == ops);
+  // A failed write is retried with the whole record, logged once.
+  completePoolTestTrace(10, 7, 1000000);
+  PoolFlash::setFailAfter(1, 0, true);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && debugLogTextCount("Shot trace save failed") == 1);
+  PoolFlash::setFailAfter(2, 0, true);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && debugLogTextCount("Shot trace save failed") == 1);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 2 && !poolTraceBytes(10, 7, 1000000).empty());
+  // Three failures give the trace up, with one warning.
+  completePoolTestTrace(11, 7, 1100000);
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    PoolFlash::setFailAfter(0, 0, true);
+    serviceShotTracePool();
+  }
+  serviceShotTracePool();
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 2 && poolTraceBytes(11, 7, 1100000).empty());
+  CHECK(debugLogTextCount("Shot trace of shot 11 not saved after 3 attempts") == 1);
+}
+
+void tpw05_an_interrupted_trace_is_saved_under_its_crashed_boot() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  serviceShotTracePool();
+  openTestTrace(1000, 41);
+  shotTrace().note(ShotTraceKind::OVER_LINE, 1200, 1, 2);
+  shotTrace().hostReset();
+  recoverShotTraceAtBoot(6);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1);
+  // No summary: shot 0 and end time 0 of the crashed boot reach it.
+  const std::vector<uint8_t> saved = poolTraceBytes(0, 41, 0);
+  ShotTraceHeader header = {};
+  CHECK(saved.size() >= sizeof(header));
+  if (saved.size() >= sizeof(header)) memcpy(&header, saved.data(), sizeof(header));
+  CHECK((header.flags & SHOT_TRACE_INTERRUPTED) != 0 && header.bootId == 41 &&
+        header.shotLogId == 0 && header.eventCount == 1);
+}
+
+void tpw06_clear_all_clears_the_pool_before_the_shot_log() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  serviceShotTracePool();
+  completePoolTestTrace(1, 7, 100000);
+  serviceShotTracePool();
+  completePoolTestTrace(2, 7, 200000);  // Not saved yet when the user clears.
+  CHECK(clearShotLog());
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 0 && debugLogTextCount("Shot trace pool cleared") == 1);
+  // A reused id never reaches the older record, now or after a reboot.
+  completePoolTestTrace(1, 7, 300000);
+  serviceShotTracePool();
+  CHECK(poolTraceBytes(1, 7, 100000).empty() && !poolTraceBytes(1, 7, 300000).empty());
+  hostRebootShotTracePool();
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && poolTraceBytes(2, 7, 200000).empty());
+  // The shot-store persist lands the pool clear first; a pool clear that
+  // fails holds the shot log clear back.
+  CHECK(initializeSettingsPersistenceWorker());
+  CHECK(clearShotLog());
+  PoolFlash::setFailAfter(0, 0, true);
+  activationStores.capturePersistenceImage(*shotStorePersistImage);
+  shotStorePersistImageGeneration = shotStoreDirtyGeneration.load();
+  persistShotStoreImage();
+  CHECK(shotStorePersistResultReady && !shotStorePersistResultOk);
+  CHECK(shotTracePoolClearRequested.load() && debugLogTextCount("Shot trace pool not cleared") == 1);
+  persistShotStoreImage();
+  CHECK(shotStorePersistResultOk && !shotTracePoolClearRequested.load() &&
+        shotTracePool().count() == 0);
+  releaseSettingsPersistenceWorkerForHost();
+}
+
+void tpw07_power_loss_while_saving_loses_only_that_trace() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  serviceShotTracePool();
+  completePoolTestTrace(1, 7, 100000);
+  serviceShotTracePool();
+  const std::vector<uint8_t> image(PoolFlash::image(), PoolFlash::image() + 8U * 4096U);
+  completePoolTestTrace(2, 7, 200000, 900);  // About 8 KiB: spans sectors.
+  const size_t before = PoolFlash::operations();
+  serviceShotTracePool();
+  const size_t ops = PoolFlash::operations() - before;
+  CHECK(ops > 6);
+  for (size_t f = 0; f < ops; ++f) {
+    for (size_t torn : {size_t(0), size_t(9), PoolFlash::kRandomTear}) {
+      memcpy(PoolFlash::image(), image.data(), image.size());
+      hostRebootShotTracePool();
+      shotTrace().hostReset();
+      serviceShotTracePool();
+      completePoolTestTrace(2, 7, 200000, 900);
+      PoolFlash::setFailAfter(static_cast<int>(f), torn, false, static_cast<uint32_t>(f + 1U));
+      serviceShotTracePool();
+      PoolFlash::setFailAfter(-1);
+      hostRebootShotTracePool();  // Power back: RAM is gone.
+      shotTrace().hostReset();
+      serviceShotTracePool();
+      CHECK(shotTracePool().ready() && !poolTraceBytes(1, 7, 100000).empty());
+      ShotTracePoolStatus status = ShotTracePoolStatus::OK;
+      const std::vector<uint8_t> lost = poolTraceBytes(2, 7, 200000, &status);
+      CHECK(status == ShotTracePoolStatus::NOT_FOUND || (status == ShotTracePoolStatus::OK &&
+                                                         lost.size() == 792U + 900U * 8U));
+      completePoolTestTrace(3, 7, 300000);
+      serviceShotTracePool();
+      hostRebootShotTracePool();
+      serviceShotTracePool();
+      CHECK(!poolTraceBytes(3, 7, 300000).empty() && !poolTraceBytes(1, 7, 100000).empty());
+    }
+  }
+}
+
+void tpw08_a_record_in_a_recycled_sector_reads_as_gone() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  serviceShotTracePool();
+  completePoolTestTrace(1, 7, 100000);
+  serviceShotTracePool();
+  ShotTracePoolEntry entry;
+  CHECK(shotTracePool().entryAt(0, entry));
+  PoolFlash::sector(entry.address() / 4096U)[entry.address() % 4096U + 300U] ^= 0x10;
+  ShotTracePoolStatus status = ShotTracePoolStatus::OK;
+  poolTraceBytes(1, 7, 100000, &status);
+  CHECK(status == ShotTracePoolStatus::GONE);
+  CHECK(debugLogTextCount("Shot trace of shot 1 is being recycled; not available") == 1);
+}
+
 const TestCase testCases[] = {
     {"HOME03", home03_active_flow_requires_fresh_baseline_and_confirmed_drop},
     {"HOME02", home02_nonqualifying_resolution_preserves_cutoff_and_endpoint},
@@ -24177,6 +24473,14 @@ const TestCase testCases[] = {
     {"TRC22", trc22_recovery_reaches_the_web_ui_log},
     {"TRC23", trc23_magic_changes_are_written_back},
     {"TRC24", trc24_a_new_trace_replaces_an_unverified_recovery},
+    {"TPW01", tpw01_a_finished_shot_is_saved_once_after_the_shot_and_linked},
+    {"TPW02", tpw02_appends_wait_for_the_gate_and_resume_where_they_paused},
+    {"TPW03", tpw03_the_newest_trace_wins_and_drops_are_counted},
+    {"TPW04", tpw04_failed_saves_retry_without_duplicates},
+    {"TPW05", tpw05_an_interrupted_trace_is_saved_under_its_crashed_boot},
+    {"TPW06", tpw06_clear_all_clears_the_pool_before_the_shot_log},
+    {"TPW07", tpw07_power_loss_while_saving_loses_only_that_trace},
+    {"TPW08", tpw08_a_record_in_a_recycled_sector_reads_as_gone},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},

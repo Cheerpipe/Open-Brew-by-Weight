@@ -305,9 +305,12 @@ changing the 32-byte record size or partition layout; see the
 [diagnostic API](INTEGRATION_API.md#post-apiv1diagnosticscale-profile). Independently
 of that manual capture, every brew cycle started with a scale records a
 compact [shot trace](SHOT_TRACE.md) of the controller's decisions in PSRAM
-no-init memory; it is not yet persisted, but a shot cut short by a panic,
-watchdog or software restart is recovered at boot as an interrupted trace
-linked to the crashed boot.
+no-init memory; a shot cut short by a panic, watchdog or software restart is
+recovered at boot as an interrupted trace linked to the crashed boot. The
+persistence worker saves each completed trace to a log-structured flash pool
+(`reserved`, later also `shotcurve`) on its idle passes while no shot runs,
+recovering the pool on its first pass; clear all lands in the pool before the
+shot log, and factory reset clears and verifies it.
 Only the sectors the store occupies in the
 inactive slot (16 of the shot log's 126, all four of the history slot) or the
 used curve sector are erased, one 4 KiB sector at a time; each is programmed

@@ -126,6 +126,7 @@ HWCDC openBrewByWeightUsbConsole;
 #include "OpenBrewByWeightTaskProfiler.h"
 #include "OpenBrewByWeightScaleProfiler.h"
 #include "OpenBrewByWeightShotTrace.h"
+#include "OpenBrewByWeightShotTracePool.h"
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
 #include <esp32s3/rom/cache.h>
 #include <esp_cache.h>
@@ -1449,6 +1450,7 @@ void appendHistoryRecord(HistoryType type, uint32_t durationMs,
 #include "scale/OpenBrewByWeightScaleEvents.inc"
 #include "control/OpenBrewByWeightControlStateMachine.inc"
 #include "control/OpenBrewByWeightSettingsCallbacks.inc"
+#include "persistence/OpenBrewByWeightShotTracePersistence.inc"
 #include "persistence/OpenBrewByWeightCommandPersistence.inc"
 #include "control/OpenBrewByWeightCommands.inc"
 #include "diagnostics/OpenBrewByWeightDiagnostics.inc"

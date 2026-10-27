@@ -7,12 +7,12 @@ good or bad. It explains a shot after the fact: what the controller knew at the
 start, what happened just before, every decision it took, and how healthy the
 weight stream was.
 
-The trace lives in PSRAM that survives panics, watchdog and software resets;
-it is not yet written to flash. The newest completed trace downloads from
-[`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace).
-The [flash pool](#flash-pool) that will keep one record per shot is
-specified below; the firmware does not write to it yet. A Web UI view is
-planned.
+The trace is captured in PSRAM that survives panics, watchdog and software
+resets, and each completed trace is then saved to the [flash pool](#flash-pool)
+once the shot is over ([saving](#saving-completed-traces)). The newest
+completed trace downloads from RAM through
+[`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace);
+a per-shot download from the pool and a Web UI view are planned.
 
 ## Capture window
 
@@ -24,8 +24,8 @@ planned.
 | Drip finalize, or drip analysis cancelled (new cycle, rinse, New coffee, cup lifted, backflush) | Completes the trace with the stored summary's id (0 if the shot log refused it). |
 
 Cycles without a scale never open a capture. While a capture is open the
-download answers `409`; nothing is exported during a shot. Only the newest
-completed trace is kept.
+download answers `409`; nothing is exported during a shot. RAM keeps only the
+newest completed trace; the flash pool keeps the history.
 
 ## Interrupted traces
 
@@ -266,8 +266,9 @@ when the ring comes back to them. All fields are little-endian.
 `reserved` comes first although it is physically after `shotcurve`.
 `shotcurve` sectors 0 and 1 keep the legacy curve epoch and are never part of
 the ring. Both partitions are found by label, subtype 0x40 and exact size. The
-ring ends at sector 335 (`reserved` only) until the curve migration opens the
-rest; the end only grows, and a recovery follows. A logical address is
+ring ends at sector 335 (`reserved` only) while the legacy curve store still
+owns `shotcurve`; retiring that store opens the rest. The end only grows, and
+a recovery follows. A logical address is
 sector × 4096 + offset; every flash call stays inside one sector, so none
 spans the partition boundary.
 
@@ -316,6 +317,48 @@ Each section is a 4-byte header, `tag` u8, `flags` u8 (0), `bytes` u16,
 followed by its payload and zero padding to 4 bytes. Tags: 1 curve, 2 trace (a
 record of the [layout above](#record-layout)); tag 0 ends the list and only
 padding follows. Readers skip unknown tags.
+
+### Saving completed traces
+
+The settings_persist worker owns the pool:
+
+1. Its first idle pass with the durable write gate open and no capture open
+   recovers the pool and logs "Shot trace pool ready" with the record count,
+   unused sectors and duration. Until then the pool answers not ready and
+   nothing reads or writes it; boot readiness and the relay never wait for it.
+2. Each idle pass (about once a second) takes the newest completed trace that
+   was not saved yet, with its export CRC, and appends it as one record whose
+   identity is the summary's shot id, boot id and end time, its raw end reason
+   and the firmware that wrote it. The trace section holds the export bytes;
+   the curve section is added with curves from the pool (planned).
+3. Steps run only while the gate stays open, which excludes the whole capture
+   window (cycle start to drip finalize), an active machine, a scale being
+   connected and a maintenance lease. When it closes the append pauses and
+   the next pass resumes it.
+4. The trace is copied by generation, so a shot that ends before the previous
+   trace was saved replaces it (newest wins): the paused append is abandoned,
+   and the log counts the traces that were never saved.
+5. A failed write is retried with the whole record up to three times, with one
+   warning; a record that is already on flash (a commit reported as failed
+   that landed) is never written again.
+
+An interrupted trace recovered after a crash is saved the same way. It has no
+summary: its record is shot 0, end time 0, under the boot that crashed. A
+completed trace whose summary the shot log refused is shot 0 with its boot and
+end time.
+
+Clear all marks the pool for clearing and drops the unsaved trace of a cleared
+shot; the worker clears the pool before it persists the cleared shot log, so a
+power loss leaves both cleared, neither, or only the pool, and an id reused
+after a clear never reaches an older record. Factory reset clears the pool and
+verifies it with a fresh recovery under the same writer lock. A pool that
+cannot be recovered never holds the shot log back.
+
+The pool starts as the `reserved` partition alone, about 1.36 MB of record
+space: roughly 700 shots of 2 KB traces, or 350 of 4 KB. When curves move to
+the pool, the legacy curve store is retired without migrating its curves and
+the ring opens `shotcurve`. Its legacy blocks are never read as records: they
+fail the sector magic, version or CRC and are holes the ring overwrites.
 
 ### Writing
 
@@ -371,10 +414,10 @@ Records in a sector whose erase was interrupted may open as `CORRUPT`: that
 is the oldest data being recycled, not damage, and the Web UI must not
 present it as such.
 
-The ring must be opened over `shotcurve` (`setLogicalEnd`) before it first
-wraps inside `reserved`; afterwards a record that wrapped from the last
-`reserved` sector to sector 0 is dropped, and the ring recycles the oldest
-`reserved` sectors before it extends.
+Opening `shotcurve` (`setLogicalEnd`) after the ring first wrapped inside
+`reserved` drops the record that wrapped from the last `reserved` sector to
+sector 0, and the ring recycles the oldest `reserved` sectors before it
+extends.
 
 ### Index, linkage and reads
 

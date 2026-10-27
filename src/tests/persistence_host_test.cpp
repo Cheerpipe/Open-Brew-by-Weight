@@ -1893,6 +1893,33 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   CHECK(reloaded.count() == 1);
 }
 
+// Factory reset clears the shot trace pool and verifies it by a fresh
+// recovery; a pool clear that fails fails the reset.
+ShotTracePoolIndex factoryPoolIndex;
+void p58b_factory_reset_clears_and_verifies_the_shot_trace_pool() {
+  resetHostPersistence();
+  ShotTracePoolHostFlash::reset();
+  PersistedSettings settings;
+  CHECK(initializeDefaultSettings(settings));
+  ShotLog log;
+  HistoryLog history;
+  LastShotStore lastShot;
+  ShotCurveLog curves;
+  BleScanPersistedSettings ble;
+  CHECK(log.load() && history.load() && lastShot.load() && curves.load());
+  ShotTracePool pool(factoryPoolIndex);
+  CHECK(pool.recover());
+  for (uint32_t id = 1; id <= 3; ++id) CHECK(pool.append({id, 5, id * 100U, 1, 0}, nullptr, 0));
+  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot, curves, &pool));
+  CHECK(pool.ready() && pool.count() == 0);
+  ShotTracePool rebooted(factoryPoolIndex);
+  CHECK(rebooted.recover() && rebooted.count() == 0 && !rebooted.contains(1, 5, 100));
+  CHECK(pool.append({4, 6, 400, 1, 0}, nullptr, 0));
+  ShotTracePoolHostFlash::setFailAfter(0, 0, true);  // The pool's erase fails.
+  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot, curves, &pool));
+  CHECK(rebooted.recover() && rebooted.contains(4, 6, 400));
+}
+
 void p59_deferred_shot_log_append_writes_only_on_flush() {
   resetHostPersistence();
   ShotLog log;
@@ -3665,6 +3692,7 @@ const TestCase tests[] = {
     {"P55", p55_network_access_reset_preserves_non_network_settings},
     {"P56", p56_shot_log_stale_slot_and_foreign_schema_rejected},
     {"P58", p58_reset_all_durable_stores_and_mid_fail_keeps_settings},
+    {"P58B", p58b_factory_reset_clears_and_verifies_the_shot_trace_pool},
     {"P59", p59_deferred_shot_log_append_writes_only_on_flush},
     {"P60", p60_factory_intent_survives_failed_store_reset},
     {"P67", p67_ensure_recovery_intent_skips_rewrite_when_valid},

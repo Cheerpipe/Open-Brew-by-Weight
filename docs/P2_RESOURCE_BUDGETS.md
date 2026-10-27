@@ -159,7 +159,7 @@ Coexistence arbitration is radio-time based, so it does not give BLE more air
 time. Apply it when internal RAM becomes the constraint.
 
 Both linker maps must also keep external BSS at or below `maximumExternalBssBytes`
-in `config/resource-baselines.json` (currently 3,186,688 bytes), keep the
+in `config/resource-baselines.json` (currently 3,194,880 bytes), keep the
 external no-init segment at or below `maximumExternalNoinitBytes` (currently
 34,816 bytes), and retain
 `localBuzzer` and `taskProfiler` in internal DRAM: both hold synchronization
@@ -199,6 +199,12 @@ external BSS and returned to 3,112 KiB once it moved; the no-init segment has
 its own 34 KiB ceiling. The matched development profile measured 3,172,720
 external-BSS and 33,408 no-init bytes; the runtime PSRAM heap had about 2.2 MB
 free before the change.
+The 3,112 KiB→3,120 KiB increase covers the shot trace flash pool's static
+PSRAM index ([flash pool](SHOT_TRACE.md#flash-pool)): 2,048 entries of 8 bytes
+for the newest records plus one bit per pool sector, 16,552 bytes. The matched
+development profile measured 3,189,264 external-BSS bytes; the pool object,
+its writer mutex and the worker's save state stay in internal DRAM (about
+500 bytes).
 The immutable persistence image is separately allocated in external heap.
 It mirrors the shot and activation logs but carries at most four unpersisted
 curves (about 22 KiB) instead of a second curve bank; a larger backlog is

@@ -149,6 +149,10 @@ bool clearShotLog() {
     return false;
   }
   if (!shotLog.clear(false)) return false;
+  // The pool clears before this clear is persisted; the unsaved trace of a
+  // cleared shot is not written.
+  shotTrace().consumeCompleted();
+  shotTracePoolClearRequested.store(true, std::memory_order_release);
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return true;
 }
@@ -171,10 +175,13 @@ void clearLastShotRuntimeState() {
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
 bool resetAllDurableStoresForNetwork(PersistedSettings &settings) {
   TaskLockGuard lock(shotStoreMutex);
+  TaskLockGuard poolWriter(shotTracePoolWriterMutex);
   if (!resetAllDurableStores(settings, bleScanPersistedSettings, shotLog,
-                             historyLog, lastShotStore, shotCurves)) {
+                             historyLog, lastShotStore, shotCurves, &shotTracePool())) {
     return false;
   }
+  shotTrace().consumeCompleted();
+  shotTracePoolClearRequested.store(false, std::memory_order_release);
   // The wiped stores are a mutation like any other: bump so the status
   // gather guard re-fetches and the persistence fast path keeps flowing
   // until the reset state is acknowledged as persisted.
@@ -669,6 +676,11 @@ void persistShotStoreImage() {
       break;
     }
 #endif
+    // A clear all lands in the shot trace pool before the shot log's.
+    if (!landShotTracePoolClearForShotStores()) {
+      report.anyFail = true;
+      break;
+    }
     report = shotStorePersistImage->serviceStep(FLASH_IO_LOCK_TIMEOUT_MS,
                                                 addDebugEvent);
     if (!report.complete && !report.anyFail) yieldFlashIo();
@@ -814,6 +826,7 @@ void settingsPersistTask(void *parameter) {
         (void)persistResetUptimeCheckpoint(millis());
         serviceBleScanPersist();
         serviceBbwQuickStartPersist();
+        serviceShotTracePool();
         if (auditFlushDue()) (void)dispatchAuditFlushWork();
       }
       continue;
