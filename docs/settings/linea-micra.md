@@ -135,25 +135,19 @@ that used it keeps it until you next choose **Save La Marzocco settings**,
 which switches it to live updates.
 
 Both wait for station Wi-Fi, a synchronized clock and a closed setup access
-point. During a shot with a connected scale, and while the controller finds and
-connects to a scale, WebSocket monitoring pauses so Bluetooth has the radio to
-itself: the live connection stays open, but La Marzocco stops sending updates
-until the pause ends. Updates then resume and the controller reads the current
-state once, without reconnecting. Without a connected scale, using the paddle
-keeps both WebSocket monitoring and API reads available, whether you brew a
-shot, rinse or turn the machine on. If a shot with a scale is classified as a
-quick rinse, the pause ends immediately; losing the scale also allows
-monitoring to resume. Backflush gestures keep monitoring available with or
-without a scale, and a backflush in progress keeps receiving updates while a
-scale connects. If monitoring needs a new connection during a shot with a
-scale or while a scale connects, it waits until that activity and the scale's
-communication pause have ended. Wi-Fi and the local Web UI remain available.
+point. Once open, the live connection stays subscribed through shots and while
+the controller finds and connects to a scale, so La Marzocco updates keep
+arriving during a shot. If monitoring needs a new connection during a shot
+with a scale or while a scale connects, it waits until that activity and the
+scale's communication pause have ended. Wi-Fi and the local Web UI remain
+available.
 Micra API requests, including sign-in, Refresh and machine commands, wait
-through scale connection. During a shot with a connected scale, reads wait.
-Starting any shot cancels pending power commands, including shots without a
-scale. Requests already in progress are canceled
-by the cloud worker as soon as it observes the pause; local control never waits
-for that cancellation.
+through scale connection. During a shot with a connected scale, API requests
+pause and reads wait; if the shot is recognized as a
+[quick rinse](quick-rinse.md), that pause ends. Starting any shot cancels
+pending power commands, including shots without a scale. Requests already in
+progress are canceled by the cloud worker as soon as it observes the pause;
+local control never waits for that cancellation.
 Paddle wake gestures and starts blocked by a guard keep observation connected;
 they do not count as shots or rinses.
 
@@ -204,7 +198,8 @@ WebSocket mode.
 The row identifies its last update and marks retained values stale when the
 stream is paused or the machine is offline. API mode shows that cleaning is
 unavailable. A cloud cleaning update never starts the machine or turns an
-existing shot into backflush. Transitions during a shot pause may be missed.
+existing shot into backflush. Transitions while the stream is paused for
+maintenance or waiting to reconnect may be missed.
 
 ## Boiler readiness
 
