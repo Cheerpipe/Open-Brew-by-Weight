@@ -318,8 +318,10 @@ inline bool shotLogEligible(EndReason reason, uint32_t durationMs) {
   return durationMs > MIN_SHOT_LOG_DURATION_MS;
 }
 
+// A yield the record cannot hold is stored as missing, so it is not good.
 inline bool shotLogWeightEligible(float weightG, bool valid) {
-  return valid && std::isfinite(weightG) && weightG > MIN_SHOT_LOG_WEIGHT_G;
+  return valid && std::isfinite(weightG) && weightG > MIN_SHOT_LOG_WEIGHT_G &&
+         weightToCentigrams(weightG) <= INT16_MAX;
 }
 
 inline bool shotLogBbwEligible(bool startedWithScale, bool timerOnly,
@@ -417,10 +419,18 @@ inline uint16_t shotLogSlowRampDs(const ShotLogRecord &record) {
 
 inline ShotLogType shotLogType(const ShotLogRecord &record);
 
+// A stored shot is good when it lasted over 12 s with a settled yield over
+// 2 g; otherwise it is bad, and this names why. Bad shots are only listed:
+// no statistic, aggregate or learning reads them.
+inline const char *shotLogBadReason(const ShotLogRecord &record) {
+  return record.durationDs <= MIN_SHOT_LOG_DURATION_MS / 100U ? "short"
+         : shotLogWeightIsMissing(record.actualWeightCg)      ? "no_yield"
+         : record.actualWeightCg <= 200                        ? "low_yield"
+                                                               : nullptr;
+}
+
 inline bool shotLogRecordEligible(const ShotLogRecord &record) {
-  return record.durationDs > MIN_SHOT_LOG_DURATION_MS / 100U &&
-         !shotLogWeightIsMissing(record.actualWeightCg) &&
-         record.actualWeightCg > 200;
+  return shotLogBadReason(record) == nullptr;
 }
 
 inline bool shotLogBbwErrorEligible(const ShotLogRecord &record) {
@@ -496,7 +506,7 @@ inline PersistedLastShot shotLogProjectLastShot(
   shot.durationMs = static_cast<uint32_t>(record.durationDs) * 100U;
   shot.currentWeightG = record.actualWeightCg / 100.0f;
   shot.weightValid = true;
-  // Only shots with a measured yield are logged, so every record had a scale.
+  // Only good shots are projected: a measured yield, so every one had a scale.
   shot.scaleAvailable = true;
   shot.goalWeightDg = record.goalWeightDg;
   shot.presetId = shotLogPresetId(record);
@@ -554,11 +564,11 @@ inline uint32_t shotLogScaleKey(const ShotLogRecord &record) {
 
 // Shots-list filter: an empty group does not restrict, groups combine with
 // AND and the options of a group with OR. Results are shotLogResult bits.
-// hideLowYield leaves out stored yields under 1 g, as the list always did;
-// the CSV export reads every stored row.
+// Every page and export holds good shots only unless includeBad also lists
+// the bad ones.
 struct ShotListFilter {
   uint8_t results = 0, presetCount = 0, scaleCount = 0;
-  bool hideLowYield = false;
+  bool includeBad = false;
   uint8_t presets[SHOT_LIST_FILTER_MAX] = {};
   uint32_t scales[SHOT_LIST_FILTER_MAX] = {};
 };
@@ -568,9 +578,7 @@ inline bool shotListFilterMatches(const ShotListFilter &filter,
   const uint8_t result = shotLogResult(record);
   if (filter.results && (result > 2 || !((filter.results >> result) & 1U)))
     return false;
-  if (filter.hideLowYield && !shotLogWeightIsMissing(record.actualWeightCg) &&
-      record.actualWeightCg < 100)
-    return false;
+  if (!filter.includeBad && !shotLogRecordEligible(record)) return false;
   bool preset = filter.presetCount == 0, scale = filter.scaleCount == 0;
   for (size_t i = 0; i < filter.presetCount; ++i)
     preset = preset || filter.presets[i] == shotLogPresetId(record);
@@ -583,7 +591,7 @@ inline bool shotListFilterMatches(const ShotListFilter &filter,
 // Identity of a filter for the page cache and the stream fingerprint.
 inline uint32_t shotListFilterHash(const ShotListFilter &filter) {
   const uint8_t head[4] = {filter.results, filter.presetCount, filter.scaleCount,
-                           filter.hideLowYield};
+                           filter.includeBad};
   uint32_t hash = crc32Update(0xFFFFFFFFU, head, sizeof(head));
   hash = crc32Update(hash, filter.presets, filter.presetCount);
   return crc32Update(hash, reinterpret_cast<const uint8_t *>(filter.scales),

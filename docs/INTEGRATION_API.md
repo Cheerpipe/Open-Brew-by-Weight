@@ -146,9 +146,11 @@ preset revision, and the complete Quick Settings snapshot.
 }
 ```
 
-`lastShot` is nullable and describes the newest qualifying record in shot
-history: a confirmed non-rinse cycle longer than 12 seconds with a valid final
-yield over 2 g. Other completed activations appear only in `lastActivation`.
+`lastShot` is nullable and describes the newest good shot in shot history: a
+confirmed non-rinse cycle longer than 12 seconds with a valid final yield over
+2 g. Shot history also stores the other cycles started with a scale as bad
+shots, which no integration field reports; other completed activations appear
+only in `lastActivation`.
 When present, `lastShot` contains
 `cycleId`, `shotId` (the shot's id in shot history, the `id` column of
 [the last shot route](#get-apiv1integrationshotslast)), `uptimeMs`, `durationMs`, `targetWeightG`, `presetId`, `presetName`,
@@ -180,7 +182,7 @@ the existing history record layout and schema.
 `window`, `shotCount`, `totalDurationS`, `avgDurationS`, `avgYieldG`,
 `avgErrorPct`, `avgFlowGps`, `shotsPerDay`, and `durationsS` for the duration
 chart. `window` is always `10`: the integration aggregate covers the newest ten
-eligible shot records, including manual and timer-only endings, whichever
+good shots, including manual and timer-only endings, whichever
 window the Web UI shows. `avgErrorPct` is the mean absolute percentage miss of
 the newest ten weight cuts (normal, raised or lowered cut line), measured
 against the cut line at the stop rather than the target. Unavailable averages are `null`.
@@ -274,8 +276,9 @@ after it when the matching guard is enabled, nothing is cut before
 target, oldest first), `firstDropS` is their median first drop (`firstDropN`
 shots; `0` falls back to other presets), and `grindHint` is the Web UI grind
 hint object or `null`. `lineaMicraBrewTargetC` only matters on Linea Micra
-builds. The statistics follow every stored shot, so Home Assistant's read
-after the `end` webhook already returns the new arrival.
+builds. The statistics follow every stored good shot (bad shots never count),
+so Home Assistant's read after the `end` webhook already returns the new
+arrival.
 
 Preset IDs are stable while an item exists and names are unique. A fresh or
 factory-reset controller has the five factory presets (ids 1–4 and 255),
@@ -291,8 +294,8 @@ Available with the `last_shot_curve_v1` capability. Returns the shot that
 with its weight curve:
 
 ```json
-{"apiVersion":1,"cols":"id,bootId,endedAtMs,…,actualWeightSource,rating",
- "shot":[1042,30,930100,true,…,"post_drip",4,
+{"apiVersion":1,"cols":"id,bootId,endedAtMs,…,actualWeightSource,rating,badReason",
+ "shot":[1042,30,930100,true,…,"post_drip",4,null,
    {"wD":"AAAA…","wBreakBefore":[],"wHeld":[],"wTruncated":false,
     "dropS":5.200,"dropCg":20,"extendedS":null,"extCg":null,"atmS":null,
     "atmCg":null,"atmClearedS":null,"endS":31.000,"endCg":3632}]}
@@ -307,6 +310,8 @@ use: for example `goalG`, `actualG`, `durationS`, `firstDropS`, `doseG`,
 `scaleName`, and the rule the shot ran with (`fastBeforeS`, `slowAfterS`,
 `fastMarginG`, `slowMarginG`, `delayS`, `wallS`, `fastRampS`, `slowRampS`,
 `fastCurve`, `slowCurve`, `fastCurveHardness`, `slowCurveHardness`).
+`badReason` is `short`, `no_yield` or `low_yield` for a bad shot and `null`
+for a good one; this route always returns a good shot.
 
 `wD` is the curve as base64 point records: each point is a time step in
 milliseconds (one byte, or `255` followed by the absolute time as a
@@ -892,18 +897,20 @@ with the page window:
 `on_recipe` (only timed by-weight shots have one), `preset` takes preset ids,
 and `scale` takes the scale keys listed in the header's `facets`. Each list
 holds at most eight values; an empty or missing list does not restrict, lists
-combine with AND and the values of a list with OR. `window` (`10`, `50`, or
-`100`, default `10`) picks how many of the newest eligible shots the `stats`
-header covers. The standing list and its scroll fetches also leave out stored
-yields under 1 g; a fetch with its own `filter` (the CSV export) reads every
-stored row. A subscribe carrying only `window` (no `request`) changes the
-header alone: the firmware sends a standing refresh with the new header and
-the rows it already holds as bare ids.
+combine with AND and the values of a list with OR. Every page and fetch holds
+good shots only (longer than 12 s with a settled yield over 2 g); `"bad":true`
+also lists the bad shots, combined with the other lists as usual, and each row
+names why it is bad in `badReason` (`short`, `no_yield`, `low_yield`, or
+`null` for a good shot). `window` (`10`, `50`, or `100`, default `10`) picks
+how many of the newest good shots the `stats` header covers. A subscribe
+carrying only `window` (no `request`) changes the header alone: the firmware
+sends a standing refresh with the new header and the rows it already holds as
+bare ids.
 
 Scrolling to the page sentinel sends a one-shot fetch for the next window,
 and the CSV export asks for its own export window — up to 500 rows,
-newest-first by date, unfiltered, regardless of the on-screen sort. A fetch
-without `filter` keeps the standing filter:
+newest-first by date, good shots only, regardless of the on-screen sort. A
+fetch without `filter` keeps the standing filter:
 
 ```json
 {"op":"stats","on":true,"fetch":true,"offset":20}
@@ -937,8 +944,9 @@ the averages whatever the sort, filter, or scroll:
 - `cons`: the window's timed shots oldest first, for the consistency chart:
   `t`, times to target in tenths of a second, and `p`, their preset ids (one
   number when they share one).
-- `facets`: the presets (`[id, name]`) and scales (`[key, name]`) the whole
-  log holds, newest first, up to eight of each, for the list filter.
+- `facets`: the presets (`[id, name]`) and scales (`[key, name]`) the good
+  shots of the whole log hold, newest first, up to eight of each, for the
+  list filter.
 
 The integration API's stats object stays at ten shots.
 Each row retains its own `bootId` and curve arrays; row errors are calculated
@@ -975,8 +983,9 @@ sync, it names the store epoch its copy holds (0 for none):
 The op needs no subscription and answers each named store once, one frame per
 dispatch: `v: 1`, `type: "records"`, `boot`, `store` (`"shots"` or
 `"history"`), and `epoch`. Only when that epoch differs from the one sent does
-the frame add `rows`, a flat array of `[id, revision]` pairs for every record,
-newest first, unfiltered. The revision is the low 24 bits of a CRC over the
+the frame add `rows`, a flat array of `[id, revision]` pairs for every record
+(for shots, every good shot: the offline copy keeps no bad ones), newest
+first. The revision is the low 24 bits of a CRC over the
 stored record, so a rating change, or an id reused after a clear, reads as a
 different record. Store epochs survive restarts, so an unchanged store costs
 one small frame per sync; 1000 History pairs stay under the 20 KiB frame

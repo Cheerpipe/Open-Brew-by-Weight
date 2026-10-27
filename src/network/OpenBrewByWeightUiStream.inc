@@ -70,13 +70,16 @@ bool uiStreamParseHistoryTypes(const cJSON *types, uint8_t &out) {
 }
 
 // A Shots-list filter: result names, preset ids, and scale keys from the
-// Stats facets, at most SHOT_LIST_FILTER_MAX of each.
+// Stats facets, at most SHOT_LIST_FILTER_MAX of each, and `bad`, which also
+// lists the bad shots.
 __attribute__((optimize("Os")))
 bool uiStreamParseShotFilter(const cJSON *filter, ShotListFilter &out) {
-  static const char *const kFields[] = {"result", "preset", "scale"};
+  static const char *const kFields[] = {"result", "preset", "scale", "bad"};
   static const char *const kResults[] = {"on_recipe", "fast", "slow"};
   if (!filter) return true;
-  if (!cJSON_IsObject(filter) || !uiStreamKnownFields(filter, kFields, 3)) return false;
+  if (!cJSON_IsObject(filter) || !uiStreamKnownFields(filter, kFields, 4)) return false;
+  const cJSON *bad = cJSON_GetObjectItemCaseSensitive(filter, "bad");
+  if (bad && !cJSON_IsBool(bad)) return false;
   const cJSON *lists[3];
   for (size_t index = 0; index < 3; ++index) {
     lists[index] = cJSON_GetObjectItemCaseSensitive(filter, kFields[index]);
@@ -85,6 +88,7 @@ bool uiStreamParseShotFilter(const cJSON *filter, ShotListFilter &out) {
       return false;
   }
   ShotListFilter parsed;
+  parsed.includeBad = cJSON_IsTrue(bad);
   for (const cJSON *item = lists[0] ? lists[0]->child : nullptr; item; item = item->next) {
     uint8_t result = 0;
     while (result < 3 && !(cJSON_IsString(item) && !strcmp(item->valuestring, kResults[result])))
@@ -406,7 +410,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
                  strcmp(op->valuestring, "stats") == 0 &&
                  strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
         // View-scoped Stats page subscription on the same contract; one-shot
-        // fetches also serve the CSV export window (date/desc, unfiltered).
+        // fetches also serve the CSV export window (date/desc, good shots).
         // `filter` works like History's `types`; `window` (subscribe only)
         // picks the newest shots the aggregate and charts cover.
         static const char *const kFields[] = {"op",    "on",      "offset",
@@ -480,7 +484,6 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
             session->statsPaging = false;
             session->statsRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
             session->statsFilter = shotFilter;
-            session->statsFilter.hideLowYield = true;
             session->statsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
             session->statsWindow = window ? static_cast<size_t>(window->valueint)
                                           : SHOT_LOG_STATS_WINDOW;

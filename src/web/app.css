@@ -2176,6 +2176,9 @@ summary::marker {
 [data-kind="slow"] {
   --z: var(--gSlow);
 }
+[data-kind="bad"] {
+  --z: var(--mu);
+}
 
 .homeCard {
   margin: 1rem 0;

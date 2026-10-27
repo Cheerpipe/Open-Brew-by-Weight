@@ -427,7 +427,9 @@ void processWebCommand(const WebCommand &command) {
         rejectWebCommand(command);
         return;
       }
-      pendingFinalize.pending = false;
+      // Store the pending shot before the new epoch, so it never counts for
+      // the new coffee; a cancelled analysis does not learn.
+      cancelPendingFinalize("Drip analysis ended by a new coffee", 2);
       mutableActiveShotPreset(presetBank).learningEpoch = shotStatisticsEpochNow();
       RuntimeConfig candidate = runtimeConfig;
       applyShotPresetToConfig(activeShotPreset(presetBank), candidate);

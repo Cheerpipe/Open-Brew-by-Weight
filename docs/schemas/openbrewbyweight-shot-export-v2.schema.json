@@ -160,7 +160,11 @@
               "enum": ["on_recipe", "fast", "slow", null],
               "description": "Against the preset's shot time window."
             },
-            "channeling": { "type": "boolean" }
+            "channeling": { "type": "boolean" },
+            "badReason": {
+              "enum": ["short", "no_yield", "low_yield", null],
+              "description": "Why the shot is bad: 12 s or shorter, no yield, or a yield of 2 g or less. null for a good shot; only good shots feed statistics and the full-log export."
+            }
           }
         },
         "stop": {

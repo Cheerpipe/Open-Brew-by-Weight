@@ -19,6 +19,7 @@
   const uiStream = read('network/OpenBrewByWeightUiStream.inc');
   const heldRows = body(uiStream, 'uint32_t uiStreamRowHash(') + '\n' + body(uiStream, 'bool uiStreamHeld(');
   const native = `
+#include <algorithm>
 #include <cassert>
 #include <atomic>
 #include <cmath>
@@ -35,7 +36,7 @@ constexpr size_t kStatsStreamFrameBytes=20480;
 constexpr uint32_t kStatsStreamPaceMs=100;
 const char *uiStreamSendKind="";
 bool uiStreamSendCleanAbort=false;
-uint32_t now=1,storeEpoch=1,frozen=0; unsigned captures=0,hashes=0; int sendResult=ESP_OK;
+uint32_t now=1,storeEpoch=1,frozen=0,shots=3; unsigned captures=0,hashes=0; int sendResult=ESP_OK;
 uint32_t millis(){return now;}
 struct TaskLockGuard {explicit TaskLockGuard(int){}};
 struct httpd_ws_frame_t{int type;uint8_t *payload;size_t len;};
@@ -75,12 +76,14 @@ size_t formatShotStatsRow(NetworkWorkBuf &buffer,const ShotLogRecord &record,
   return snprintf(buffer.jsonItem,sizeof(buffer.jsonItem),
       "{\\"id\\":%u,\\"weight\\":%u,\\"padding\\":\\"%015000d\\"}",record.id,record.actualWeightCg,0);
 }
+// Good shots 3..1 newest first; with shots=4 a newer bad (short) shot 4.
 void capture(ShotStatsRecordsSnapshot &out){
   ++captures;
-  out.epoch=storeEpoch;out.count=3;
+  out.epoch=storeEpoch;out.count=shots;
   const uint32_t content=frozen?frozen:storeEpoch;
   for(size_t i=0;i<out.count;++i){
-    out.records[i]={};out.records[i].id=3-i;out.records[i].actualWeightCg=content*100+i;
+    out.records[i]={};out.records[i].id=shots-i;out.records[i].durationDs=shots-i>3?110:300;
+    out.records[i].actualWeightCg=content*1000+3-out.records[i].id;
     out.records[i].sideFlags=shotLogPackRating(0,i==0?1:i==1?5:0);
     shotLogSetPresetId(out.records[i],i==1?2:1);
   }
@@ -94,8 +97,8 @@ void historyPage(HistoryPage &page,size_t offset,size_t limit,ShotLogSortDir dir
 }
 bool curveById(uint32_t id,ShotCurveRecord &curve){
   resetShotCurveRecord(curve);
-  if(id==0||id>3) return false;
-  appendShotCurvePoint(curve,(frozen?frozen:storeEpoch)*100+(3-id),0,false);
+  if(id==0||id>shots) return false;
+  appendShotCurvePoint(curve,(frozen?frozen:storeEpoch)*1000+3-id,0,false);
   return true;
 }
 struct OpenBrewByWeightNetwork {
@@ -136,9 +139,10 @@ int main(){
       ShotLogRecord &r=recent.records[i];r={};r.id=100-i;r.durationDs=300;
       r.actualWeightCg=i==1?150:3600;r.arrivalDs=i==0?SHOT_LOG_METRIC_MISSING:280+i;
       r.verdict=i==0?3:i==5?1:0;r.fastBeforeDs=250;r.slowAfterDs=320;
-      shotLogSetPresetId(r,i==3?7:4);
-      snprintf(r.presetName,sizeof(r.presetName),"%s",i==3?"Decaf":"House");
-      snprintf(r.scaleName,sizeof(r.scaleName),"%s",i<4?"Lunar":"");
+      // i=1, a bad shot, alone holds preset 9 and the Acaia: no facet lists them.
+      shotLogSetPresetId(r,i==3?7:i==1?9:4);
+      snprintf(r.presetName,sizeof(r.presetName),"%s",i==3?"Decaf":i==1?"Spoiled":"House");
+      snprintf(r.scaleName,sizeof(r.scaleName),"%s",i==1?"Acaia":i<4?"Lunar":"");
     }
     assert(formatStatsHeader(cache,10,4));
     std::string text=cache.header;
@@ -147,7 +151,7 @@ int main(){
     assert(text.find("\\"cons\\":{\\"t\\":[290,289,288,287,286,285,284,283,282],\\"p\\":[4,4,4,4,4,4,4,7,4]}")!=std::string::npos);
     assert(text.find("\\"dens\\":[{\\"lo\\":19,\\"hi\\":38,\\"a\\":25.0,\\"b\\":32.0,\\"shared\\":true,\\"n\\":[1,8,0],\\"h\\":[")!=std::string::npos);
     assert(text.find("]},\\"facets\\":{\\"presets\\":[[4,\\"House\\"],[7,\\"Decaf\\"]],\\"scales\\":[[")!=std::string::npos);
-    assert(text.find(",\\"Lunar\\"]]}}")!=std::string::npos);
+    assert(text.find(",\\"Lunar\\"]]}}")!=std::string::npos&&text.find("Acaia")==std::string::npos);
     // The active preset's own curve: one Decaf shot; a preset without timed
     // shots gets null, and one holding every timed shot repeats the first.
     assert(text.find("]},{\\"lo\\":")!=std::string::npos);
@@ -285,6 +289,22 @@ int main(){
     for(const auto &r:{before,after}){
       size_t at=0;for(int i=0;i<3;++i){at=r.find(',',at)+1;assert(std::stoul(r.substr(at))<=0xFFFFFFu);at=r.find(',',at)+1;}
     }
+    // A bad shot: left out of every page, the export and the offline index
+    // unless the filter asks for it; the good shots keep their order.
+    shots=4;++storeEpoch;
+    const std::string goodRows=shotRows();
+    assert(goodRows.rfind("3,",0)==0&&std::count(goodRows.begin(),goodRows.end(),',')==5);
+    fresh.statsFilter={};fresh.statsSort=ShotLogSort::Date;fresh.statsDir=ShotLogSortDir::Desc;
+    fresh.statsResync=true;frames.clear();
+    for(int i=0;i<3;++i)assert(send(fresh));
+    assert(!fresh.statsPaging&&frames.size()==3&&frames[0].find("\\"total\\":3,")!=std::string::npos);
+    for(size_t i=0;i<3;++i)assert(frames[i].find("\\"id\\":"+std::to_string(3-i))!=std::string::npos);
+    fresh.statsFilter.includeBad=true;fresh.statsResync=true;frames.clear();
+    for(int i=0;i<4;++i)assert(send(fresh));
+    assert(!fresh.statsPaging&&frames.size()==4&&frames[0].find("\\"total\\":4,")!=std::string::npos);
+    for(size_t i=0;i<4;++i)assert(frames[i].find("\\"id\\":"+std::to_string(4-i))!=std::string::npos);
+    page(ShotLogSort::Date,ShotLogSortDir::Desc,3,2,1,true);
+    shots=3;
   }
 }
 `;

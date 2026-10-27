@@ -43,25 +43,28 @@ void captureLateTareCompletion(uint32_t throughMs = millis()) {
   }
 }
 
-// Field diagnostics: a brew cycle started with a scale that does not reach
-// shot history says why. Manual cycles without a scale never have a yield.
-void logShotNotStoredShort(EndReason reason, uint32_t durationMs) {
+// Field diagnostics: a brew cycle started with a scale is always stored, and
+// one stored as a bad shot says why. A cycle without a scale is stored only
+// when good, so it leaves no line.
+void logBadShotShort(EndReason reason, uint32_t durationMs) {
   if (!session.startedWithScale) return;
   serialTraceCategoryf(
-      LogLevel::INFO, DebugCategory::STATE, "Shot not stored: short (%.2fs, stop %s)",
+      LogLevel::INFO, DebugCategory::STATE, "Shot stored as bad: short (%.2fs, stop %s)",
       static_cast<double>(durationMs) / 1000.0,
       shotLogStopDetailName(shotLogStopDetailFromEndReason(
           reason, session.config.fastSideEnabled, session.extractionExtended)));
 }
 
-void logShotNotStoredYield(const PendingShotFinalize &snapshot, float weightG,
-                           bool valid, ActualWeightSource source) {
+void logBadShotYield(const PendingShotFinalize &snapshot, float weightG,
+                     bool valid, ActualWeightSource source) {
   if (!snapshot.startedWithScale) return;
+  // Same reason the stored record reads: a yield it cannot hold is missing.
   const bool measured = valid && std::isfinite(weightG);
+  const bool stored = measured && !shotLogWeightIsMissing(shotLogWeightToCentigrams(weightG));
   serialTraceCategoryf(
       LogLevel::INFO, DebugCategory::STATE,
-      "Shot not stored: %s (%.1fs, yield %.1fg %s, stop %s, zero %.1fg)",
-      measured ? "low_yield" : "no_yield",
+      "Shot stored as bad: %s (%.1fs, yield %.1fg %s, stop %s, zero %.1fg)",
+      stored ? "low_yield" : "no_yield",
       static_cast<double>(snapshot.durationDs) / 10.0,
       static_cast<double>(measured ? weightG : 0.0f),
       actualWeightSourceName(source),
@@ -84,7 +87,7 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   }
   sessionQuickSettings.shotEnded = sessionQuickSettings.mask != 0;
   const bool logEligible = shotLogEligible(reason, durationMs);
-  if (!logEligible) logShotNotStoredShort(reason, durationMs);
+  if (!logEligible) logBadShotShort(reason, durationMs);
   const bool offsetAnalysis = shot.automaticBrew && !session.config.timerOnly &&
                               session.calibrationEligible;
   bool webhookEligible = false;
@@ -92,7 +95,9 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   const WebhookConfig webhook = networkManager.webhookConfig();
   webhookEligible = webhook.enabled && webhook.end;
 #endif
-  if (!logEligible && !offsetAnalysis && !webhookEligible) {
+  // A cycle started with a scale is stored whatever its outcome.
+  if (!logEligible && !session.startedWithScale && !offsetAnalysis &&
+      !webhookEligible) {
     return;
   }
 
@@ -430,8 +435,10 @@ void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeight
     record.hasWallTime = 0;
   }
   // The persisted duration has decisecond precision; keep a just-over-12 s
-  // shot distinguishable from an old row recorded at exactly 12.0 s.
-  record.durationDs = snapshot.durationDs > 120U ? snapshot.durationDs : 121U;
+  // shot distinguishable from an old row recorded at exactly 12.0 s. A short
+  // shot keeps its own duration, so it still reads as bad.
+  record.durationDs = snapshot.logEligible && snapshot.durationDs <= 120U
+                          ? 121U : snapshot.durationDs;
   record.goalWeightDg = snapshot.goalWeightDg;
   record.offsetUsedCg = shotLogWeightToCentigrams(snapshot.weightOffsetG);
   record.shotType = static_cast<uint8_t>(shotLogTypeFromCycle(
@@ -478,7 +485,8 @@ void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeight
 
   if (finalWeightValid) {
     record.actualWeightCg = shotLogWeightToCentigrams(finalWeightG);
-    if (finalWeightG > 2.0f && record.actualWeightCg <= 200)
+    if (finalWeightG > 2.0f && record.actualWeightCg <= 200 &&
+        !shotLogWeightIsMissing(record.actualWeightCg))
       record.actualWeightCg = 201;
     // Error against the planned stop (the cut line), else the target.
     record.errorCg = shotLogWeightToCentigrams(
@@ -533,12 +541,15 @@ void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeight
     return;
   }
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_relaxed);
-  if (homeCycleResult.cycleId == snapshot.cycleId) {
+  // A bad shot is only listed: Home and the last-shot links keep pointing at
+  // the newest good one, exactly as when such a cycle was not stored.
+  const bool good = shotLogRecordEligible(record);
+  if (good && homeCycleResult.cycleId == snapshot.cycleId) {
     record.id = newId;
     homeCycleResult.shotLogId = newId;
     homeCycleResult = shotLogProjectLastShot(record, homeCycleResult);
   }
-  if (persistedLastShot.valid && persistedLastShot.cycleId == snapshot.cycleId) {
+  if (good && persistedLastShot.valid && persistedLastShot.cycleId == snapshot.cycleId) {
     PersistedLastShot linked = persistedLastShot;
     linked.shotLogId = newId;
     lastShotStore.advance(linked, runtimeConfig.bbwProtectionMs);
@@ -663,17 +674,16 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
     weightG = snapshot.lastKnownWeightG;
     valid = true;
   }
-  const bool persistEligible =
-      snapshot.logEligible && shotLogWeightEligible(weightG, valid);
+  const bool good = snapshot.logEligible && shotLogWeightEligible(weightG, valid);
   // Keep the internal completed-cycle snapshot for linked metadata.
   if (!pendingFinalizeIsRinse(snapshot) &&
       !brewEndIsAbandonedStart(snapshot.endReason)) {
     persistLastShotFromFinalize(snapshot, weightG, valid);
   }
-  if (persistEligible && !pendingFinalizeIsRinse(snapshot))
+  if ((good || snapshot.startedWithScale) && !pendingFinalizeIsRinse(snapshot))
     commitPendingShotLog(snapshot, weightG, valid, source);
-  else if (snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
-    logShotNotStoredYield(snapshot, weightG, valid, source);
+  if (!good && snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
+    logBadShotYield(snapshot, weightG, valid, source);
   queueWebhookEnd(snapshot, weightG, valid);
 }
 
@@ -730,21 +740,22 @@ void pendingShotFinalizeTask() {
     pendingFinalize.curve.ended = snapshot.curve.ended;
   }
 
-  snapshot.bbwLearningApplied =
-      learnPendingBbw(snapshot, finalWeightG, postDripWeightValid);
-
-  const bool persistEligible =
+  // Only a good shot trains: a bad cycle never moves the drip, the offset,
+  // the learning speed or the quick start.
+  const bool good =
       snapshot.logEligible && shotLogWeightEligible(logWeightG, logWeightValid);
+  snapshot.bbwLearningApplied =
+      good && learnPendingBbw(snapshot, finalWeightG, postDripWeightValid);
 
   // Keep the internal completed-cycle snapshot for linked metadata.
   if (!pendingFinalizeIsRinse(snapshot) &&
       !brewEndIsAbandonedStart(snapshot.endReason)) {
     persistLastShotFromFinalize(snapshot, logWeightG, logWeightValid);
   }
-  if (persistEligible && !pendingFinalizeIsRinse(snapshot))
+  if ((good || snapshot.startedWithScale) && !pendingFinalizeIsRinse(snapshot))
     commitPendingShotLog(snapshot, logWeightG, logWeightValid, weightSource);
-  else if (snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
-    logShotNotStoredYield(snapshot, logWeightG, logWeightValid, weightSource);
+  if (!good && snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
+    logBadShotYield(snapshot, logWeightG, logWeightValid, weightSource);
   queueWebhookEnd(snapshot, logWeightG, logWeightValid);
 
 

@@ -14,7 +14,7 @@ constexpr char kStatsRowColumns[] =
     "slowExtractionExtended,stopDetail,cutLineG,arrivalS,verdict,channeling,"
     "scaleLossSource,estimatedG,blind,fastBeforeS,slowAfterS,fastMarginG,"
     "slowMarginG,delayS,wallS,fastRampS,slowRampS,fastCurve,slowCurve,fastCurveHardness,"
-    "slowCurveHardness,dripDelayS,actualWeightSource,rating";
+    "slowCurveHardness,dripDelayS,actualWeightSource,rating,badReason";
 
 // The Stats row projection (extracted from the former REST shots handler):
 // row values, then the curve object that formatShotCurveJsonBody fills with
@@ -30,6 +30,8 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
   char firstDrop[16] = "null";
   char tareAt[16] = "null";
   char cutLine[16] = "null", arrival[16] = "null", dripDelay[8] = "null";
+  char bad[16] = "null";
+  if (const char *reason = shotLogBadReason(record)) snprintf(bad, sizeof(bad), "\"%s\"", reason);
   char presetName[SHOT_PRESET_NAME_CAPACITY * 6] = {};
   char scaleNameJson[SCALE_FRIENDLY_NAME_MAX_LEN * 6 + 1] = {};
   escapeJsonString(record.presetName, presetName, sizeof(presetName));
@@ -81,7 +83,7 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
       "[%lu,%lu,%lu,%s,%lu,%lu,%d,%.1f,%u,\"%s\",\"%s\",%.1f,%s,%.2f,\"%s\",%s,"
       "%s,%s,%s,%u,%.1f,%.2f,%s,%s,\"%s\",\"%s\",%s,%s,%s,%s,\"%s\",%s,%s,%s,%s,"
       "%s,%s,%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,\"%s\",\"%s\",\"%s\",\"%s\",%s,"
-      "\"%s\",%u,{%s}]",
+      "\"%s\",%u,%s,{%s}]",
       static_cast<unsigned long>(record.id),
       static_cast<unsigned long>(record.bootId),
       static_cast<unsigned long>(record.endedAtMs),
@@ -123,7 +125,7 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
       rampHardnessName(corridor::rampCurveHardnessOf(record.fastCurve)),
       rampHardnessName(corridor::rampCurveHardnessOf(record.slowCurve)), dripDelay,
       actualWeightSourceName(static_cast<ActualWeightSource>(record.actualWeightSource)),
-      static_cast<unsigned>(shotLogRating(record.sideFlags)),
+      static_cast<unsigned>(shotLogRating(record.sideFlags)), bad,
       curveJson);
   if (bytes <= 0 || static_cast<size_t>(bytes) >= NetworkWorkBuf::kJsonItem)
     return 0;
@@ -190,8 +192,8 @@ bool appendStatsDensity(StatsStreamCache &cache, size_t n, size_t *used) {
 // (null without its timed shots, true when it equals the first); "cons",
 // the timed arrivals oldest first in tenths of a second with their preset
 // ids ("p", one number when they share one), for the consistency chart;
-// and "facets", the presets and scales the whole log holds, newest first,
-// for the list filter (scales keyed by shotLogScaleKey).
+// and "facets", the presets and scales the good shots of the whole log
+// hold, newest first, for the list filter (scales keyed by shotLogScaleKey).
 __attribute__((optimize("Os")))
 bool formatStatsHeader(StatsStreamCache &cache, size_t window, uint8_t presetId) {
   const ShotStatsRecordsSnapshot &snapshot = cache.snapshot;
@@ -249,7 +251,7 @@ bool formatStatsHeader(StatsStreamCache &cache, size_t window, uint8_t presetId)
   char name[SCALE_FRIENDLY_NAME_MAX_LEN * 6 + 1];
   for (size_t i = 0; i < snapshot.count && presetCount < SHOT_LIST_FILTER_MAX; ++i) {
     const uint8_t id = shotLogPresetId(snapshot.records[i]);
-    bool seen = false;
+    bool seen = !shotLogRecordEligible(snapshot.records[i]);
     for (size_t k = 0; k < presetCount; ++k) seen = seen || presets[k] == id;
     if (seen) continue;
     presets[presetCount] = id;
@@ -262,7 +264,7 @@ bool formatStatsHeader(StatsStreamCache &cache, size_t window, uint8_t presetId)
   for (size_t i = 0; i < snapshot.count && scaleCount < SHOT_LIST_FILTER_MAX; ++i) {
     const ShotLogRecord &record = snapshot.records[i];
     const uint32_t key = shotLogScaleKey(record);
-    bool seen = !record.scaleName[0];
+    bool seen = !record.scaleName[0] || !shotLogRecordEligible(record);
     for (size_t k = 0; k < scaleCount; ++k) seen = seen || scales[k] == key;
     if (seen) continue;
     scales[scaleCount] = key;

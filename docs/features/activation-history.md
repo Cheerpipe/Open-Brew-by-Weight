@@ -108,14 +108,17 @@ The two pages record different things and never substitute for each other:
 
 | | Stats (shot history) | History (activation diary) |
 | --- | --- | --- |
-| Records | Brews with a valid settled yield over 2 g | Confirmed activations and paddle attempts blocked by No-scale BBW protection |
-| Minimum duration | Longer than 12 seconds | Longer than the configured earliest weight stop time to carry a Shot label |
+| Records | Every brew started with a scale, good or bad; a good shot has a valid settled yield over 2 g | Confirmed activations and paddle attempts blocked by No-scale BBW protection |
+| Minimum duration | None; a good shot lasts longer than 12 seconds | Longer than the configured earliest weight stop time to carry a Shot label |
 | Detail | Goal, yield, error, flow, guards, rating, curve | Time, duration, type |
+| Statistics | Good shots only; bad shots are listed with **Show bad shots** | None |
 | Capacity | 500 shots | 1000 activations |
 
-A measured shot appears in both. A longer activation without a valid yield
-can appear as Shot here while staying out of Stats. Deleting or clearing in
-one page never touches the other.
+A brew pulled with a scale appears in both; when it is a bad shot, Stats lists
+it only with **Show bad shots** and leaves it out of its averages and charts.
+A brew started without a scale appears here as Shot, and in Stats only when a
+scale connected in time to measure a good yield. Deleting or clearing in one
+page never touches the other.
 
 USB: see [USB serial CLI](../SERIAL_CLI.md) for factory reset, which clears
 both logs.

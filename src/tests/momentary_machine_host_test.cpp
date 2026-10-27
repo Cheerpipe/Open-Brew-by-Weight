@@ -1588,7 +1588,7 @@ void t_firmware_cut_settles_off_after_drip() {
   CHECK(hostRelayClosedWrites == closedBefore + 1);
 }
 
-void t_firmware_cut_settles_off_without_pending_finalize() {
+void t_firmware_cut_settles_off_through_a_short_shot_finalize() {
   resetMomentaryHarness();
   runLoopAfter(ACTIVATOR_DEBOUNCE_MS + 1);
   shortPress(150);
@@ -1602,7 +1602,10 @@ void t_firmware_cut_settles_off_without_pending_finalize() {
   CHECK(brewWeightCutSettlesMachineOff(EndReason::FAST_EXTRACTION_MAX_WEIGHT));
   CHECK(brewWeightCutSettlesMachineOff(EndReason::SLOW_EXTRACTION_MIN_WEIGHT));
   CHECK(!brewWeightCutSettlesMachineOff(EndReason::WEB_STOP));
-  CHECK(!pendingFinalize.pending);
+  // Short and without drip analysis, the cycle still waits its drip delay to
+  // be stored as a bad shot; the machine settles off all the same.
+  CHECK(pendingFinalize.pending && !pendingFinalize.logEligible &&
+        !pendingFinalize.offsetAnalysis);
   CHECK(momentarySettledWeightCutArmed);
   CHECK(hostRelayClosedWrites == closedBefore + 1);
   CHECK(machineRunState() == MachineRunState::IDLE_UNCONFIRMED);
@@ -1613,6 +1616,7 @@ void t_firmware_cut_settles_off_without_pending_finalize() {
   holdStableWeight(1200);
   CHECK(machineRunState() == MachineRunState::IDLE);
   CHECK(hostRelayClosedWrites == closedBefore + 1);
+  CHECK(!pendingFinalize.pending);  // The bad shot was stored on the way.
 }
 
 void t_firmware_cut_stale_weight_stays_idle_unconfirmed() {
@@ -2489,7 +2493,7 @@ const TestCase kTests[] = {
     {"P25I5", t_cup_removed_ignored_while_running},
     {"P25I6", t_cup_removed_event_settles_idle_unconfirmed_after_stop},
     {"P25J", t_firmware_cut_settles_off_after_drip},
-    {"P25K", t_firmware_cut_settles_off_without_pending_finalize},
+    {"P25K", t_firmware_cut_settles_off_through_a_short_shot_finalize},
     {"P25L", t_firmware_cut_stale_weight_stays_idle_unconfirmed},
     {"P25M", t_gusher_flow_confirms_running},
     {"P25D", t_override_sets_inferred_idle_and_brewing_without_pulse},

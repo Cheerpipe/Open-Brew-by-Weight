@@ -951,7 +951,8 @@ function renderShotStats() {
     b.setAttribute("aria-pressed", String(+b.dataset.v === R.uiState.statsWindow));
   renderStatsDurChart();
 }
-// Results always; scales and presets only when the log holds more than one.
+// Results always; scales and presets only when the log holds more than one;
+// bad shots last, which the list leaves out unless asked.
 function shotFilterGroups() {
   const f = R.uiState.shotStats?.facets || {},
     presets = R.homeStatusCache()?.presets || R.presetState,
@@ -977,6 +978,11 @@ function shotFilterGroups() {
         id,
         presets.items?.find((p) => p.id === id)?.name || name,
       ]),
+    },
+    {
+      key: "bad",
+      label: __WEBUI_TEXT__("stats.filter_quality"),
+      options: [["1", __WEBUI_TEXT__("stats.show_bad_shots")]],
     },
   ].filter(Boolean);
 }
@@ -1030,13 +1036,19 @@ function renderShots() {
       const row = document.createElement("tr");
       row.dataset.id = r.id;
       // A scale-loss shot has no weighed yield: only its estimate, no error.
-      const estimated = r.actualG == null && r.estimatedG != null,
-        actual = estimated ? null : shotDisplayActualG(r.actualG, r.wCg),
+      // A bad shot shows what it stored, never a yield or flow from its curve.
+      const bad = r.badReason,
+        estimated = r.actualG == null && r.estimatedG != null,
+        actual = estimated
+          ? null
+          : bad
+            ? (r.actualG ?? null)
+            : shotDisplayActualG(r.actualG, r.wCg),
         planned = r.cutLineG > 0 ? r.cutLineG : r.goalG;
-      const errN = actual === null || !planned ? null : ((actual - planned) / planned) * 100;
+      const errN = bad || actual === null || !planned ? null : ((actual - planned) / planned) * 100;
       const err = errN === null ? "—" : errN.toFixed(1) + "%";
       // Drip: the settled yield minus the reading at the stop.
-      const flow = shotDisplayFlowGS(r),
+      const flow = bad ? (r.avgFlowGS ?? null) : shotDisplayFlowGS(r),
         m = R.buildShotSparkModel(r),
         maxFlow = m ? m.maxFlow : null,
         cut = shotCut(r, m, actual),
@@ -1086,13 +1098,29 @@ function renderShots() {
       });
       R.wrapTimeEl(row.cells[0], r);
       // The verdict sits beside the time so each card says at a glance how the shot landed.
-      if (r.arrivalS > 0 && ["fast", "on_recipe", "slow"].includes(r.verdict))
+      if (!bad && r.arrivalS > 0 && ["fast", "on_recipe", "slow"].includes(r.verdict))
         row.cells[0].insertAdjacentHTML(
           "beforeend",
           '<span class="heroPill" data-kind="' +
             r.verdict +
             '">' +
             R.verdictLabel(r.verdict) +
+            "</span>",
+        );
+      // A bad shot says why: statistics and learning leave it out.
+      if (bad)
+        row.cells[0].insertAdjacentHTML(
+          "beforeend",
+          '<span class="heroPill" data-kind="bad" title="' +
+            R.escHtml(__WEBUI_TEXT__("stats.bad_hint")) +
+            '">' +
+            R.escHtml(
+              {
+                short: __WEBUI_TEXT__("stats.bad_short"),
+                no_yield: __WEBUI_TEXT__("stats.bad_no_yield"),
+                low_yield: __WEBUI_TEXT__("stats.bad_low_yield"),
+              }[bad] || bad,
+            ) +
             "</span>",
         );
       const rate = document.createElement("td");
@@ -1452,6 +1480,7 @@ function shotJson(r) {
       arrivalS: r.arrivalS ?? null,
       verdict: r.verdict ?? null,
       channeling: !!r.channeling,
+      badReason: r.badReason ?? null,
     },
     stop: {
       cut: r.cutType,
@@ -2070,8 +2099,8 @@ export function init() {
     relayoutCharts: () => chartObserver && layoutChartLabels(),
   });
   R.registerStream("stats", statsStream);
-  // The toolbar exports every stored shot, whatever the filter; a card's menu
-  // acts on its own shot only.
+  // The toolbar exports every good shot, whatever the filter; a card's menu
+  // acts on its own shot only, a bad one included.
   const exportMenu = actionMenu(__WEBUI_TEXT__("stats.export_all_shots"), () => [
     __WEBUI_TEXT__("stats.export_all_shots"),
     [ICON.csv, "CSV", __WEBUI_TEXT__("stats.csv_hint"), exportShotsCsv],
@@ -2133,7 +2162,7 @@ export function init() {
       R.uiState.shotFilter = Object.fromEntries(
         Object.entries(sel)
           .filter(([, v]) => v.length)
-          .map(([k, v]) => [k, k === "result" ? v : v.map(Number)]),
+          .map(([k, v]) => [k, k === "bad" ? true : k === "result" ? v : v.map(Number)]),
       );
       statsSendSubscribe();
     },
@@ -2166,12 +2195,12 @@ export function syncOffline() {
     () => ({ stats: R.uiState.shotStats }),
   );
 }
-// Offline the page reads the copy: every saved shot newest first, without
-// the yields under 1 g the firmware list leaves out, and the last header.
+// Offline the page reads the copy: every saved shot newest first, good shots
+// only (the record index lists no others, so a sync drops any other row),
+// and the last header.
 export const showOffline = async () => {
-  const [rows, meta] = await Promise.all([offlineRecords("shots"), offlineMeta("shots")]);
+  const [shots, meta] = await Promise.all([offlineRecords("shots"), offlineMeta("shots")]);
   if (meta.stats) R.uiState.shotStats = meta.stats;
-  const shots = rows.filter((r) => r.actualG == null || r.actualG >= 1);
   applyShotPage({ bootId: R.bootId, total: shots.length, hasMore: false, shots }, "replace");
   R.paint(renderShots);
   R.offlineCopyNote();

@@ -15,7 +15,11 @@ internal wire protocol.
   [version 1 schema](openbrewbyweight-shot-export-v1.schema.json) and its
   [example](openbrewbyweight-shot-export-v1.example.json) stay published for
   files exported before.
-- Produced by: the Shots page, **Export → JSON** (every stored shot) and a
+- `outcome.badReason`, added within version 2, says why a shot is bad
+  (`short`, `no_yield` or `low_yield`) and is `null` for a good one. The
+  whole-log export holds good shots only; a bad shot exported from its card
+  carries its reason.
+- Produced by: the Shots page, **Export → JSON** (every good shot) and a
   card's **⋯ → JSON** (that shot). Both write the same envelope; a single-shot
   file has one entry in `shots`. File names are
   `openbrewbyweight-shots-YYYYMMDD-HHMM.json` and

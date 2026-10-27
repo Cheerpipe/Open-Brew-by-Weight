@@ -810,7 +810,9 @@ if (!codeIncludes(ui, 'id="shotTable"') ||
     !codeIncludes(statsRuntimeJs, 'shotDisplayActualG(r.actualG,r.wCg)') ||
     !codeIncludes(statsRuntimeJs, 'shotFrame.card') ||
     !codeIncludes(statsRuntimeJs, 'const rows=R.uiState.shotHistory.shots;') ||
-    !codeIncludes(network, 'session->statsFilter.hideLowYield = true;') ||
+    // Pages hold good shots only unless the filter's `bad` lists the others.
+    network.includes('hideLowYield') ||
+    !network.includes('parsed.includeBad = cJSON_IsTrue(bad);') ||
     !codeIncludes(statsRuntimeJs, 'shotDisplayFlowGS(r)') ||
     !codeIncludes(statsRuntimeJs, 'shotMaxFlowGS(r,m)') ||
     !codeIncludes(statsRuntimeJs, 'shotPresetName(r)') ||

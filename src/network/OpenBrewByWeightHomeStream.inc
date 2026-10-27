@@ -1322,7 +1322,8 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
 }
 
 // One store per dispatch: its epoch and, when that moved from the browser's
-// copy, every record newest first as an id and a 24-bit revision (a CRC of
+// copy, every record (every good one for shots, the only ones the offline
+// copy keeps) newest first as an id and a 24-bit revision (a CRC of
 // the packed record, so a rating change or an id reused after a clear reads
 // as changed). 1000 history pairs of at most 10+8 digits stay under the
 // frame budget. An epoch read ahead of a torn or newer copy only makes the
@@ -1354,8 +1355,10 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
                             static_cast<unsigned long>(uiStreamRowHash(record, size) & 0xFFFFFFU));
   };
   if (rows && shots) {
-    for (size_t n = 0; n < cache.snapshot.count; ++n)
-      if (!pair(n, cache.snapshot.records[n].id, &cache.snapshot.records[n], sizeof(ShotLogRecord)))
+    for (size_t n = 0, listed = 0; n < cache.snapshot.count; ++n)
+      if (shotLogRecordEligible(cache.snapshot.records[n]) &&
+          !pair(listed++, cache.snapshot.records[n].id, &cache.snapshot.records[n],
+                sizeof(ShotLogRecord)))
         return false;
   } else if (rows && callbacks_.copyHistoryPage) {
     HistoryPage &page = g_work->historyPage;

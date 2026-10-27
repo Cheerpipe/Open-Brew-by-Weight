@@ -2040,7 +2040,8 @@ void r11_final_shot_analysis_updates_only_valid_offset() {
   const uint32_t generation = getScaleLinkSnapshot().connectionGeneration;
   for (int part = 0; part < 3; ++part) {
     preparePendingBbwForTest();
-    pendingFinalize.offsetAnalysis = true;
+    pendingFinalize.offsetAnalysis = pendingFinalize.logEligible = true;
+    pendingFinalize.durationDs = 300;
     pendingFinalize.startedWithScale = pendingFinalize.automaticBrew = true;
     pendingFinalize.scaleBaselineReady = true;
     pendingFinalize.scaleConnectionGeneration = generation;
@@ -8164,7 +8165,8 @@ void r31_confirmed_overload_opens_without_learning() {
   CHECK(stopperState == StopperState::REQUIRES_OFF);
   CHECK(session.endReason == EndReason::WEIGHT_ANOMALY);
   CHECK(!session.calibrationEligible);
-  CHECK(!pendingFinalize.pending);
+  // Stored as a bad shot (it started with a scale), never analysed.
+  CHECK(pendingFinalize.pending && !pendingFinalize.logEligible);
   CHECK(!pendingFinalize.offsetAnalysis);
 }
 
@@ -13303,6 +13305,11 @@ void s01_shot_log_filters_short_and_rinse() {
   CHECK(!shotLogWeightEligible(2.0f, true));
   CHECK(shotLogWeightEligible(2.001f, true));
   CHECK(!shotLogWeightEligible(2.1f, false));
+  // Good live yields must survive storage: a yield stored as missing is bad.
+  CHECK(shotLogWeightEligible(327.67f, true));
+  CHECK(shotLogWeightToCentigrams(327.67f) == 32767);
+  CHECK(!shotLogWeightEligible(327.68f, true));
+  CHECK(shotLogWeightIsMissing(shotLogWeightToCentigrams(327.68f)));
 }
 
 void s01c_mixed_shots_share_stats_and_home_authority() {
@@ -13498,7 +13505,7 @@ void s01d_manual_timer_and_limit_share_settled_finalize() {
   }
 }
 
-void s01n_unstored_cycles_log_their_reason() {
+void s01n_bad_scale_cycles_are_stored_with_their_reason() {
   struct Case {
     uint32_t durationMs;
     bool withScale;
@@ -13510,18 +13517,18 @@ void s01n_unstored_cycles_log_their_reason() {
   };
   const Case cases[] = {
       {11960, true, true, 30.0f, 0.0f, false,
-       "Shot not stored: short (11.96s, stop activator)"},
+       "Shot stored as bad: short (11.96s, stop activator)"},
       {9000, true, true, 30.0f, 0.0f, true,
-       "Shot not stored: short (9.00s, stop activator)"},
+       "Shot stored as bad: short (9.00s, stop activator)"},
       {12001, true, true, 1.5f, 0.0f, false,
-       "Shot not stored: low_yield (12.0s, yield 1.5g last_known, stop "
+       "Shot stored as bad: low_yield (12.0s, yield 1.5g last_known, stop "
        "activator, zero 0.0g)"},
       {30000, true, false, 0.0f, 300.0f, false,
-       "Shot not stored: no_yield (30.0s, yield 0.0g none, stop activator, "
+       "Shot stored as bad: no_yield (30.0s, yield 0.0g none, stop activator, "
        "zero 300.0g)"},
       {30000, false, false, 0.0f, 0.0f, false, nullptr},  // No scale: no line.
       {9000, false, true, 30.0f, 0.0f, false, nullptr},
-      {30000, true, true, 36.0f, 0.0f, false, nullptr},  // Stored: no line.
+      {30000, true, true, 36.0f, 0.0f, false, nullptr},  // Good: no line.
   };
   for (const Case &sample : cases) {
     resetHarness(false, true);
@@ -13539,18 +13546,26 @@ void s01n_unstored_cycles_log_their_reason() {
     shot.automaticBrew = sample.keepPending;
     stopperState = StopperState::BREW;
     schedulePendingShotFinalize(EndReason::ACTIVATOR, sample.durationMs);
-    CHECK(pendingFinalize.pending == (sample.durationMs > 12000 || sample.keepPending));
+    // Every cycle started with a scale is stored; without one, as before,
+    // only a good one is (and none of these has a yield).
+    CHECK(pendingFinalize.pending ==
+          (sample.withScale || sample.durationMs > 12000 || sample.keepPending));
     if (pendingFinalize.pending) pendingShotFinalizeTask();
-    const bool stored = sample.expected == nullptr && sample.withScale;
-    CHECK(shotLog.count() == (stored ? 1U : 0U));
+    CHECK(shotLog.count() == (sample.withScale ? 1U : 0U));
+    ShotLogRecord stored[1] = {};
+    if (shotLog.copyNewestFirst(stored, 1) == 1) {
+      CHECK(shotLogRecordEligible(stored[0]) == (sample.expected == nullptr));
+      // A short shot keeps its own duration instead of the 12.1 s floor.
+      if (sample.durationMs <= 12000) CHECK(stored[0].durationDs == sample.durationMs / 100U);
+    }
     if (sample.expected == nullptr) {
-      CHECK(debugLogTextCount("Shot not stored") == 0);
+      CHECK(debugLogTextCount("Shot stored as bad") == 0);
     } else {
       CHECK(debugLogTextCount(sample.expected) == 1);
-      CHECK(debugLogTextCount("Shot not stored") == 1);
+      CHECK(debugLogTextCount("Shot stored as bad") == 1);
     }
   }
-  // A cancelled drip analysis reports through the same line.
+  // A cancelled drip analysis stores and reports through the same line.
   resetHarness(false, true);
   debugLog.clear();
   shotLog.clear(false);
@@ -13565,17 +13580,286 @@ void s01n_unstored_cycles_log_their_reason() {
   schedulePendingShotFinalize(EndReason::ACTIVATOR, 20000);
   CHECK(pendingFinalize.pending);
   cancelPendingFinalize(nullptr, 1);
-  CHECK(shotLog.count() == 0);
-  CHECK(debugLogTextCount("Shot not stored: low_yield (20.0s, yield 1.0g "
+  CHECK(shotLog.count() == 1);
+  CHECK(debugLogTextCount("Shot stored as bad: low_yield (20.0s, yield 1.0g "
                           "last_known, stop activator") == 1);
+  CHECK(debugLogTextCount("Shot stored as bad") == 1);
   // A rinse is never a shot and leaves no line.
   resetHarness(false, true);
   debugLog.clear();
   session.config = snapshotConfig(runtimeConfig);
   session.startedWithScale = true;
   schedulePendingShotFinalize(EndReason::RINSE_COMPLETE, 30000);
-  CHECK(debugLogTextCount("Shot not stored") == 0);
+  CHECK(!pendingFinalize.pending && debugLogTextCount("Shot stored as bad") == 0);
   debugLog.clear();
+}
+
+// Bad shots interleaved with good ones change no reader: every statistic,
+// learning input and Home read equals the one of a log holding the good
+// shots alone (record ids differ, so id outputs are compared by position).
+void s01o_bad_shots_feed_no_statistic_or_learning_input() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  ShotPreset &preset = mutableActiveShotPreset(presetBank);
+  const size_t own = static_cast<size_t>(&preset - presetBank.presets);
+  const uint8_t other = presetBank.presets[own == 0 ? 1 : 0].id;
+  preset.learningEpoch = 0;
+  preset.grindHintsEnabled = true;
+  auto shotRecord = [&](uint8_t presetId, uint16_t durationDs, int16_t yieldCg, int i) {
+    ShotLogRecord r = {};
+    r.durationDs = durationDs;
+    r.actualWeightCg = yieldCg;
+    r.goalWeightDg = preset.goalWeightDg;
+    r.cutLineCg = static_cast<int16_t>(preset.goalWeightDg * 10);
+    r.offsetUsedCg = 150;
+    r.stopDetail = static_cast<uint8_t>(i % 3 ? ShotLogStopDetail::NORMAL_TARGET
+                                              : ShotLogStopDetail::ACTIVATOR);
+    r.verdict = corridor::packVerdict(corridor::Verdict::ON_RECIPE, false,
+                                      corridor::LossSource::WINDOW, false);
+    r.fastBeforeDs = static_cast<uint16_t>(preset.fastBeforeMs / 100U);
+    r.slowAfterDs = static_cast<uint16_t>(preset.slowAfterMs / 100U);
+    r.arrivalDs = static_cast<uint16_t>(r.fastBeforeDs + 5 + i * 7 % 40);
+    r.firstDropDs = static_cast<uint16_t>(40 + i * 3 % 30);
+    r.avgFlowCgS = static_cast<uint16_t>(150 + i * 11 % 90);
+    r.hasWallTime = 1;
+    r.endedAtLocalSec = 1767225600U + static_cast<uint32_t>(i) * 43200U;
+    shotLogSetPresetId(r, presetId);
+    shotLogSetBbw(r, 1, BBW_PROFILE_VERSION, 30, i % 4 != 1);
+    return r;
+  };
+  struct Reads {
+    ShotStatsView view;
+    corridor::ArrivalStats arrival;
+    int32_t arrivals[corridor::STATS_MAX_SHOTS];
+    int32_t plateau;
+    corridor::GrindHintV2 hint;
+    corridor::FirstDropStats ownDrop, otherDrop;
+    size_t drips;
+    int16_t dripCg[10];
+    uint16_t skipped;
+    uint32_t dripIds[10];
+    ShotLogRecord home;
+    bool hasHome;
+    PresetShotStats preset[MAX_SHOT_PRESETS];
+  };
+  // The good shots in both logs, and in the mixed one every bad kind (a short
+  // shot, no yield, a low and a negative yield) with values far from them.
+  std::vector<uint32_t> goodIds;
+  auto fill = [&](bool withBad, Reads &out) {
+    shotLog.clear(false);
+    goodIds.clear();
+    for (int i = 0; i < 24; ++i) {
+      const uint8_t id = i % 5 == 4 ? other : preset.id;
+      if (withBad) {
+        static const int16_t yields[] = {3600, SHOT_LOG_WEIGHT_MISSING, 150, -500};
+        ShotLogRecord bad = shotRecord(id, i % 4 ? 300 : 110, yields[i % 4], 40 - i);
+        bad.arrivalDs = static_cast<uint16_t>(bad.fastBeforeDs - 30);
+        bad.firstDropDs = 5;
+        bad.avgFlowCgS = 900;
+        CHECK(!shotLogRecordEligible(bad));
+        CHECK(shotLog.append(bad, false));
+      }
+      goodIds.push_back(shotLog.nextRecordId());
+      CHECK(shotLog.append(shotRecord(id, static_cast<uint16_t>(250 + i), 3600 + i, i), false));
+    }
+    if (withBad) CHECK(shotLog.append(shotRecord(preset.id, 90, 3000, 99), false));
+    out.view = copyShotStats();
+    out.arrival = shotLog.arrivalStats(preset, out.arrivals);
+    out.plateau = shotLog.plateauFlowX100(preset);
+    out.hint = shotLog.grindHint(preset);
+    out.ownDrop = shotLog.firstDropStats(preset);
+    out.otherDrop = shotLog.firstDropStats(preset, true);
+    out.drips = shotLog.recentDrips(preset.id, out.dripIds, out.dripCg, out.skipped, 10);
+    out.hasHome = copyHomeShot(out.home, nullptr);
+    copyPresetShotStats(presetBank, out.preset);
+  };
+  static Reads mixed, clean;
+  fill(true, mixed);
+  const std::vector<uint32_t> mixedIds = goodIds;
+  fill(false, clean);
+  const auto position = [](const std::vector<uint32_t> &ids, uint32_t id) {
+    return std::find(ids.begin(), ids.end(), id) - ids.begin();
+  };
+  CHECK(clean.view.shotCount == 10 && clean.arrival.n > 0 && clean.plateau > 0 &&
+        clean.ownDrop.n > 0 && clean.otherDrop.n > 0 && clean.drips == 10);
+  CHECK(mixed.view.shotCount == clean.view.shotCount &&
+        mixed.view.flowCount == clean.view.flowCount &&
+        mixed.view.bbwCount == clean.view.bbwCount &&
+        mixed.view.timedCount == clean.view.timedCount &&
+        mixed.view.durationDsSum == clean.view.durationDsSum &&
+        mixed.view.actualCgSum == clean.view.actualCgSum &&
+        mixed.view.errorPctTenthsSum == clean.view.errorPctTenthsSum &&
+        mixed.view.flowCgSx100Sum == clean.view.flowCgSx100Sum &&
+        mixed.view.daysSpan == clean.view.daysSpan &&
+        !memcmp(mixed.view.durationsDs, clean.view.durationsDs, sizeof(clean.view.durationsDs)));
+  const auto sameArrivals = [](const corridor::ArrivalStats &a, const corridor::ArrivalStats &b) {
+    return a.n == b.n && a.minMs == b.minMs && a.maxMs == b.maxMs &&
+           a.medianMs == b.medianMs && a.sigmaMs == b.sigmaMs && a.total == b.total;
+  };
+  CHECK(sameArrivals(mixed.arrival, clean.arrival));
+  CHECK(sameArrivals(mixed.preset[own].stats, clean.preset[own].stats));
+  CHECK(!memcmp(mixed.arrivals, clean.arrivals, clean.arrival.n * sizeof(int32_t)));
+  CHECK(!memcmp(mixed.preset[own].arrivalsMs, clean.preset[own].arrivalsMs,
+                sizeof(clean.preset[own].arrivalsMs)));
+  CHECK(mixed.plateau == clean.plateau);
+  for (const auto &[a, b] : {std::pair{mixed.hint, clean.hint},
+                             std::pair{mixed.preset[own].grindHint, clean.preset[own].grindHint}})
+    CHECK(a.state == b.state && a.direction == b.direction && a.tier == b.tier &&
+          a.bin == b.bin && a.n == b.n && a.atLeast == b.atLeast &&
+          a.offsetMs == b.offsetMs && a.bandMs == b.bandMs &&
+          position(mixedIds, a.segmentStartId) == position(goodIds, b.segmentStartId));
+  CHECK(mixed.ownDrop.n == clean.ownDrop.n && mixed.ownDrop.medianMs == clean.ownDrop.medianMs);
+  CHECK(mixed.otherDrop.n == clean.otherDrop.n &&
+        mixed.otherDrop.medianMs == clean.otherDrop.medianMs);
+  CHECK(mixed.preset[own].firstDrop.n == clean.preset[own].firstDrop.n &&
+        mixed.preset[own].firstDrop.medianMs == clean.preset[own].firstDrop.medianMs);
+  CHECK(mixed.drips == clean.drips && mixed.skipped == clean.skipped &&
+        !memcmp(mixed.dripCg, clean.dripCg, sizeof(clean.dripCg)));
+  for (size_t n = 0; n < clean.drips; ++n)
+    CHECK(position(mixedIds, mixed.dripIds[n]) == position(goodIds, clean.dripIds[n]));
+  CHECK(mixed.hasHome && clean.hasHome && mixed.home.actualWeightCg == clean.home.actualWeightCg &&
+        mixed.home.durationDs == clean.home.durationDs);
+  // The default list filter keeps exactly the good shots.
+  ShotLogRecord rows[64];
+  const size_t count = copyShotRecords(rows, 64);
+  size_t listed = 0;
+  for (size_t n = 0; n < count; ++n) listed += shotListFilterMatches(ShotListFilter{}, rows[n]);
+  CHECK(count == 24 && listed == 24);
+  fill(true, mixed);
+  CHECK(copyShotRecords(rows, 64) == 49);
+  listed = 0;
+  for (size_t n = 0; n < 49; ++n) listed += shotListFilterMatches(ShotListFilter{}, rows[n]);
+  CHECK(listed == 24);
+}
+
+// A bad cycle trains nothing at finalize (drip, learning speed, quick
+// start) even before it is stored; the 12.1 s floor keeps a just-over-12 s
+// good shot good and never lifts a short one; a cycle without a scale keeps
+// the old rule: stored and linked only when good.
+void s01p_bad_cycles_never_train_and_no_scale_keeps_its_rule() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  shotLog.clear(false);
+  ShotPreset &preset = mutableActiveShotPreset(presetBank);
+  const uint32_t generation = getScaleLinkSnapshot().connectionGeneration;
+  armQuickStart(bbwQuickStart, presetBank, preset.id, preset.bbwEwmaOffsetG, 1);
+  const auto quick = [&] { return quickStartEntry(bbwQuickStart, presetBank, preset.id, false)->count; };
+  const auto finalize = [&](uint16_t durationDs, float finalG) -> ShotLogRecord {
+    preparePendingBbwForTest();
+    pendingFinalize.offsetAnalysis = pendingFinalize.startedWithScale = true;
+    pendingFinalize.automaticBrew = pendingFinalize.scaleBaselineReady = true;
+    pendingFinalize.logEligible = durationDs >= 120;
+    pendingFinalize.durationDs = durationDs;
+    pendingFinalize.scaleConnectionGeneration = generation;
+    pendingFinalize.endReason = EndReason::SCALE_THRESHOLD;
+    pendingFinalize.dripDelayMs = 0;
+    pendingFinalize.endedAtMs = hostMillis;
+    pendingFinalize.endedWeightSequence = currentWeightSequence;
+    pendingFinalize.goalWeightDg = DEFAULT_GOAL_WEIGHT_DG;
+    pendingFinalize.weightOffsetG = preset.bbwEwmaOffsetG;
+    pendingFinalize.activePresetId = preset.id;
+    currentWeightConnectionGeneration = generation;
+    currentWeight = finalG;
+    hostMillis += 20;
+    currentWeightReceivedAtMs = hostMillis;
+    ++currentWeightSequence;
+    pendingShotFinalizeTask();
+    ShotLogRecord stored[1] = {};
+    CHECK_VALUE(shotLog.copyNewestFirst(stored, 1) == 1, ShotLogRecord{});
+    return stored[0];
+  };
+  // A short weight cut with a fine yield: stored bad, nothing learned.
+  const float offset = preset.bbwEwmaOffsetG;
+  const uint8_t alpha = preset.bbwEwmaAlpha;
+  const uint32_t learning = bbwLearningBank.forPreset(preset.id, presetBank).generation;
+  ShotLogRecord record = finalize(115, goalWeightDgToGrams(DEFAULT_GOAL_WEIGHT_DG) + 1.0f);
+  CHECK(record.durationDs == 115 && !strcmp(shotLogBadReason(record), "short"));
+  CHECK(!strcmp(shotLogBbwLearningApplied(record), "false"));
+  CHECK(preset.bbwEwmaOffsetG == offset && preset.bbwEwmaAlpha == alpha && quick() == 0);
+  CHECK(bbwLearningBank.forPreset(preset.id, presetBank).generation == learning);
+  // The same shot just over 12 s (12.0 s at decisecond precision) is good:
+  // floored to 12.1 s, it trains and feeds the quick start.
+  record = finalize(120, goalWeightDgToGrams(DEFAULT_GOAL_WEIGHT_DG) + 1.0f);
+  CHECK(record.durationDs == 121 && shotLogRecordEligible(record));
+  CHECK(!strcmp(shotLogBbwLearningApplied(record), "true"));
+  CHECK(preset.bbwEwmaOffsetG != offset && quick() == 1);
+  // A bad yield after a long shot trains nothing either.
+  const float learned = preset.bbwEwmaOffsetG;
+  record = finalize(300, 1.5f);
+  CHECK(!strcmp(shotLogBadReason(record), "low_yield") && preset.bbwEwmaOffsetG == learned &&
+        quick() == 1);
+
+  // Without a scale: a short or yield-less cycle is not stored, a good one is
+  // stored and linked as before.
+  for (const auto &[durationMs, anchored, stored] :
+       {std::tuple{9000U, true, false}, std::tuple{30000U, false, false},
+        std::tuple{30000U, true, true}}) {
+    resetHarness(false, true);
+    shotLog.clear(false);
+    session.config = snapshotConfig(runtimeConfig);
+    session.config.dripDelayMs = 0;
+    session.startedWithScale = false;
+    session.hasWeightAnchor = anchored;
+    session.lastAcceptedWeightG = 36.0f;
+    session.activePresetId = presetBank.activeId;
+    session.id = 77;
+    shot.automaticBrew = false;
+    stopperState = StopperState::MANUAL_NO_SCALE;
+    homeCycleResult = lastShotFromEndedCycle(EndReason::ACTIVATOR, durationMs);
+    schedulePendingShotFinalize(EndReason::ACTIVATOR, durationMs);
+    CHECK(pendingFinalize.pending == (durationMs > 12000));
+    if (pendingFinalize.pending) pendingShotFinalizeTask();
+    CHECK(shotLog.count() == (stored ? 1U : 0U));
+    CHECK((homeCycleResult.shotLogId != 0) == stored);
+  }
+}
+
+void s01q_overflow_yield_and_new_coffee_keep_bad_shots_out() {
+  auto scaleCycle = [](float weightG, uint32_t dripDelayMs) {
+    resetHarness(false, true);
+    debugLog.clear();
+    shotLog.clear(false);
+    session.config = snapshotConfig(runtimeConfig);
+    session.config.dripDelayMs = dripDelayMs;
+    session.startedWithScale = true;
+    session.hasWeightAnchor = true;
+    session.lastAcceptedWeightG = weightG;
+    session.activePresetId = presetBank.activeId;
+    shot.automaticBrew = false;
+    stopperState = StopperState::BREW;
+    schedulePendingShotFinalize(EndReason::ACTIVATOR, 30000);
+    CHECK(pendingFinalize.pending);
+  };
+  ShotLogRecord home = {};
+  ShotCurveRecord curve = emptyShotCurveRecord();
+  // An untared cup reads past what a record holds: stored as a bad shot
+  // without yield, never as a good 2.01 g shot.
+  scaleCycle(400.0f, 0);
+  pendingShotFinalizeTask();
+  ShotLogRecord saved[1] = {};
+  CHECK(shotLog.copyNewestFirst(saved, 1) == 1);
+  CHECK(shotLogWeightIsMissing(saved[0].actualWeightCg));
+  CHECK(strcmp(shotLogBadReason(saved[0]), "no_yield") == 0);
+  CHECK(!copyHomeShot(home, &curve));
+  CHECK(debugLogTextCount("Shot stored as bad: no_yield (30.0s, yield 400.0g") == 1);
+
+  // "New coffee" during the drip delay stores the pending shot before the
+  // new statistics epoch, without learning.
+  scaleCycle(36.0f, 5000);
+  const uint32_t learningBefore =
+      bbwLearningBank.forPreset(presetBank.activeId, presetBank).generation;
+  stopperState = StopperState::READY;  // The shot ended; its drip delay runs.
+  WebCommand relearn;
+  relearn.type = WebCommandType::RESET_AUTO_TO_MANUAL_GUARD_SAMPLES;
+  processWebCommand(relearn);
+  CHECK(!pendingFinalize.pending);
+  CHECK(shotLog.count() == 1);
+  CHECK(shotLog.copyNewestFirst(saved, 1) == 1);
+  CHECK(shotLogRecordEligible(saved[0]));
+  CHECK(strcmp(shotLogBbwLearningApplied(saved[0]), "true") != 0);
+  CHECK(activeShotPreset(presetBank).learningEpoch > saved[0].id);
+  CHECK(bbwLearningBank.forPreset(presetBank.activeId, presetBank).generation ==
+        learningBefore);
 }
 
 void s01b_shot_log_stop_detail_names_end_reasons() {
@@ -13675,7 +13959,7 @@ void s02e_shot_log_appends_auto_bbw_after_drip_delay() {
   CHECK(strcmp(records[0].scaleName, "Lunar") == 0);
 }
 
-void s02f_shot_log_skips_sub_one_gram_weight() {
+void s02f_shot_log_stores_sub_one_gram_weight_as_bad() {
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear();
@@ -13701,8 +13985,15 @@ void s02f_shot_log_skips_sub_one_gram_weight() {
               activeShotPreset(presetBank).name);
   runLoopAfter(pendingFinalize.dripDelayMs);
   CHECK(!pendingFinalize.pending);
-  CHECK(shotLog.count() == 0);
+  // Stored as a bad shot that keeps its duration class (12.1 s, low yield),
+  // and Home's last-shot link stays on the newest good shot.
+  ShotLogRecord stored[1] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  CHECK(stored[0].durationDs == 121 && stored[0].actualWeightCg == 50);
+  CHECK(!strcmp(shotLogBadReason(stored[0]), "low_yield"));
+  CHECK(stored[0].ratioX100 == 0 && stored[0].avgFlowCgS == SHOT_LOG_METRIC_MISSING);
   CHECK(shotCurves.count() == 0);
+  CHECK(persistedLastShot.shotLogId == 0);
   // Home last shot is independent of the 1 g history floor.
   CHECK(persistedLastShot.valid);
   CHECK(persistedLastShot.presetId == presetBank.activeId);
@@ -13713,7 +14004,7 @@ void s02f_shot_log_skips_sub_one_gram_weight() {
   CHECK(fabsf(persistedLastShot.currentWeightG - 0.5f) < 0.001f);
 }
 
-void s02g_full_cycle_sub_one_gram_updates_last_shot_not_history() {
+void s02g_full_cycle_sub_one_gram_updates_last_shot_and_stores_bad() {
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear();
@@ -13734,9 +14025,14 @@ void s02g_full_cycle_sub_one_gram_updates_last_shot_not_history() {
   CHECK(fabsf(persistedLastShot.currentWeightG - 0.5f) < 0.001f);
   CHECK(shotLog.count() == 0);
   runLoopAfter(runtimeConfig.dripDelayMs);
-  CHECK(shotLog.count() == 0);
-  CHECK(shotCurves.count() == 0);
-  CHECK(persistedLastShot.valid);
+  // Stored as a bad shot with its curve; statistics and Home never see it.
+  ShotLogRecord stored[1] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1 && !shotLogRecordEligible(stored[0]));
+  CHECK(shotCurves.containsShotId(stored[0].id));
+  CHECK(copyShotStats().shotCount == 0);
+  ShotLogRecord home = {};
+  CHECK(!copyHomeShot(home, nullptr));
+  CHECK(persistedLastShot.valid && persistedLastShot.shotLogId == 0);
   CHECK(fabsf(persistedLastShot.currentWeightG - 0.5f) < 0.001f);
 }
 
@@ -14601,8 +14897,9 @@ void s20_last_good_shot_advances_independently() {
                        ActualWeightSource::POST_DRIP);
   CHECK(persistedLastShot.cycleId == 1);
   CHECK(persistedLastShot.durationMs == 12000);
-  CHECK(persistedLastShot.shotLogId != 0);
-  CHECK(persistedLastShot.shotLogId != 91);
+  // The colliding cycle is stored as a bad shot, which nothing links to.
+  CHECK(shotLog.count() == 1);
+  CHECK(persistedLastShot.shotLogId == 0);
   CHECK(persistedLastGoodShot.durationMs == 13000);
   CHECK(persistedLastGoodShot.shotLogId == 91);
   CHECK(persistedLastGoodShot.rating == 4);
@@ -14715,8 +15012,11 @@ void s03c_short_activation_is_other_in_history_only() {
   releaseAtPhysicalDuration(rawOnAt, runtimeConfig.bbwProtectionMs - 500U);
   runLoopAfter(runtimeConfig.dripDelayMs + 100U);
   // At or below the protection window an activation is not a shot: history
-  // keeps it as `other`, stats skip it entirely.
-  CHECK(shotLog.count() == 0);
+  // keeps it as `other`; shot history stores it as a bad shot that stats skip.
+  ShotLogRecord stored[1] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  CHECK(!strcmp(shotLogBadReason(stored[0]), "short"));
+  CHECK(copyShotStats().shotCount == 0);
   CHECK(historyLog.count() == 1);
   HistoryPage page;
   historyLog.copyPage(page, 0, 1, ShotLogSortDir::Desc);
@@ -16778,6 +17078,8 @@ void s04b_shot_log_page_slice() {
 
 void s04c_shot_list_filter_groups() {
   ShotLogRecord timed = {}, manual = {};
+  timed.durationDs = manual.durationDs = 300;
+  timed.actualWeightCg = manual.actualWeightCg = 3600;
   timed.arrivalDs = 280;
   timed.verdict = 1;  // fast
   shotLogSetPresetId(timed, 3);
@@ -16800,15 +17102,21 @@ void s04c_shot_list_filter_groups() {
   filter.presets[0] = 3;
   filter.scales[filter.scaleCount++] = shotLogScaleKey(timed);
   CHECK(shotListFilterMatches(filter, timed) && !shotListFilterMatches(filter, manual));
-  // List pages leave out stored yields under 1 g; a missing yield stays.
+  // Pages hold good shots only; `bad` also lists every bad one, and the
+  // other groups still apply to both.
   ShotListFilter listed;
-  listed.hideLowYield = true;
-  timed.actualWeightCg = 99;
+  listed.includeBad = true;
+  timed.actualWeightCg = -150;
   manual.actualWeightCg = SHOT_LOG_WEIGHT_MISSING;
-  CHECK(!shotListFilterMatches(listed, timed) && shotListFilterMatches(listed, manual));
-  CHECK(shotListFilterMatches(ShotListFilter{}, timed));
-  timed.actualWeightCg = 100;
-  CHECK(shotListFilterMatches(listed, timed));
+  CHECK(!shotListFilterMatches(ShotListFilter{}, timed) &&
+        !shotListFilterMatches(ShotListFilter{}, manual));
+  CHECK(shotListFilterMatches(listed, timed) && shotListFilterMatches(listed, manual));
+  listed.results = 1U << 1;
+  CHECK(shotListFilterMatches(listed, timed) && !shotListFilterMatches(listed, manual));
+  listed.results = 0;
+  timed.actualWeightCg = 3600;
+  timed.durationDs = 120;
+  CHECK(!shotListFilterMatches(ShotListFilter{}, timed) && shotListFilterMatches(listed, timed));
   CHECK(shotListFilterHash(listed) != shotListFilterHash(ShotListFilter{}));
   // Equal filters share an identity; group boundaries are part of it.
   ShotListFilter same = filter, moved = {};
@@ -22045,7 +22353,8 @@ void home02_nonqualifying_resolution_preserves_cutoff_and_endpoint() {
     publishControlStatus();
     ControlStatusSnapshot status;
     copyControlStatus(status);
-    CHECK(!status.homePending && shotLog.count() == 0);
+    // Stored as a bad shot; Home keeps the cycle unlinked, as before.
+    CHECK(!status.homePending && shotLog.count() == 1);
     CHECK(status.homeCycle.shotLogId == 0);
     CHECK(status.homeCycle.durationMs == 10057);
     CHECK(status.homeCycle.firstDropElapsedMs == 1057);
@@ -22965,12 +23274,15 @@ const TestCase testCases[] = {
     {"S12h", s12h_capped_curve_batch_keeps_generation_dirty_until_drained},
     {"S02k", s02k_curve_continuity_uses_control_rejections_and_fifo_provenance},
     {"S01d", s01d_manual_timer_and_limit_share_settled_finalize},
-    {"S01n", s01n_unstored_cycles_log_their_reason},
+    {"S01n", s01n_bad_scale_cycles_are_stored_with_their_reason},
+    {"S01o", s01o_bad_shots_feed_no_statistic_or_learning_input},
+    {"S01p", s01p_bad_cycles_never_train_and_no_scale_keeps_its_rule},
+    {"S01q", s01q_overflow_yield_and_new_coffee_keep_bad_shots_out},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},
-    {"S02F", s02f_shot_log_skips_sub_one_gram_weight},
-    {"S02G", s02g_full_cycle_sub_one_gram_updates_last_shot_not_history},
+    {"S02F", s02f_shot_log_stores_sub_one_gram_weight_as_bad},
+    {"S02G", s02g_full_cycle_sub_one_gram_updates_last_shot_and_stores_bad},
     {"S02C", s02c_shot_curve_samples_on_half_second_grid_and_latches_slow},
     {"S02L", s02l_post_drip_curve_keeps_observations_and_rejection_gaps},
     {"S02D", s02d_shot_curve_latches_first_drop_fast_and_atm},

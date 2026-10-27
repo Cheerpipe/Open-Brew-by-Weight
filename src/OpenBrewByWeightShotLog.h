@@ -56,12 +56,15 @@ class ShotLog
   // stores mutate only alongside these words. Caller holds the store mutex.
   uint32_t epoch() const { return dualSlotHeaderEpoch(store_.header); }
 
-  // The stored shots as corridor statistics rows, oldest first.
+  // The stored shots as corridor statistics rows, oldest first; a bad shot
+  // reads as an empty row that no statistic admits.
   auto arrivalRows() const {
     const size_t first = (store_.header.writeIndex + SHOT_LOG_CAPACITY -
                           store_.header.count) % SHOT_LOG_CAPACITY;
     return [this, first](size_t i) {
-      return shotLogArrivalRecord(store_.records[(first + i) % SHOT_LOG_CAPACITY]);
+      const ShotLogRecord &record = store_.records[(first + i) % SHOT_LOG_CAPACITY];
+      return shotLogRecordEligible(record) ? shotLogArrivalRecord(record)
+                                           : corridor::ArrivalRecord{};
     };
   }
 
@@ -113,8 +116,8 @@ class ShotLog
     });
   }
 
-  // The drip each newest shot of a preset needed (offset used + final − cut
-  // line, cg), newest first; skipped when the shot did not train the drip.
+  // The drip each newest good shot of a preset needed (offset used + final −
+  // cut line, cg), newest first; skipped when the shot did not train the drip.
   size_t recentDrips(uint8_t presetId, uint32_t *ids, int16_t *neededCg,
                      uint16_t &skippedMask, size_t max) const {
     size_t found = 0;
@@ -123,7 +126,7 @@ class ShotLog
     for (size_t n = 0; n < store_.header.count && found < max; ++n) {
       if (index == 0) index = SHOT_LOG_CAPACITY;
       const ShotLogRecord &record = store_.records[--index];
-      if (shotLogPresetId(record) != presetId) continue;
+      if (shotLogPresetId(record) != presetId || !shotLogRecordEligible(record)) continue;
       const bool trained = ((record.extractionExtended >> 5) & 3) == 2 &&
                            !shotLogWeightIsMissing(record.cutLineCg);
       ids[found] = record.id;

@@ -1,8 +1,8 @@
 # Shot history
 
-Completed shots with a measured yield are stored on the controller and shown
-in the Web UI shot log. Use it to see how long a shot ran, why it ended, and
-how close it landed to the target when brew by weight was in use.
+Every shot pulled with a scale is stored on the controller and shown in the
+Web UI shot log. Use it to see how long a shot ran, why it ended, and how
+close it landed to the target when brew by weight was in use.
 
 When you open **Shots**, the Stats section, including its chart, and the
 Shot history section, including its sort, export, and clear controls, normally
@@ -77,12 +77,23 @@ in the top right corner.
 
 ## What is recorded
 
-A confirmed, non-rinse cycle becomes a shot when it lasts **more than 12 seconds**
-and its settled final yield is valid and **more than 2 g**. Manual stops,
-timer-only brews, weight stops on any part of the cut line, and time or safety limits all
-use this same rule. A cycle without a valid measured yield cannot qualify.
-The 12-second recording rule is fixed; changing BBW's start-of-shot protection
-time changes weight stopping, not which completed cycles are recorded.
+Every confirmed, non-rinse cycle that started with a scale connected is
+stored, however short it was and however it ended. A shot that lasts **more
+than 12 seconds** with a valid settled final yield of **more than 2 g** is a
+**good shot**; any other is a **bad shot**: too short, without a yield, or
+with a yield of 2 g or less. Manual stops, timer-only brews, weight stops on
+any part of the cut line, and time or safety limits all use this same rule.
+The 12-second rule is fixed; changing BBW's start-of-shot protection time
+changes weight stopping, not which shots are good.
+
+Bad shots are kept so you can look back at what went wrong, but they never
+count. Only good shots feed the Stats averages and charts, Home's last shot,
+the preset statistics (**Last 10 shots**, first-drop timing and the grind
+hint), drip learning and its quick start, the scale-loss backup's recent
+shots, the Home Assistant statistics and last shot, and the CSV and JSON
+exports. A bad shot does not teach drip learning anything, even right after
+it is pulled. The shot list hides bad shots unless you ask for them with
+**Show bad shots**; see [In the Web UI](#in-the-web-ui).
 
 Typical fields include local time (from the saved time zone at shot end),
 duration, the exact preset name captured at shot start, goal and yield (the
@@ -137,11 +148,13 @@ unavailable. The rest of the shot curve is retained. **Late cup** records
 successful command completion, so it can also appear when zero was not
 confirmed and the earlier first-drop record was kept.
 
-The log holds up to **500** shots. The following are never stored:
+The log holds up to **500** shots, good and bad alike. When it is full, the
+newest shot replaces the oldest one, so a run of bad shots can push out older
+good shots. The following are never stored:
 
 - Rinses and starts that were not confirmed
-- Cycles lasting 12 seconds or less
-- Cycles whose final yield is missing, invalid, or 2 g or less
+- Brews started without a scale, unless a scale connected during the brew and
+  gave it a good yield
 
 Home shows the current activation as it happens. After the machine stops, its
 duration stays fixed while accepted drip readings continue updating the curve.
@@ -176,13 +189,14 @@ You can choose clock-based colors, or keep the usual brand color, in
 The timer comes from the controller and pauses on screen if the connection is
 lost; **Reconnecting…** indicates that the displayed result may be stale.
 
-If an activation does not qualify for Stats, the page that observed it keeps
-its result for 30 seconds after analysis finishes, then returns to the latest
-recorded shot. A temporary reconnection preserves the remaining interval;
-reloading the page opens the latest recorded shot instead. Starting another
-activation immediately replaces the temporary result. Confirmed activations
-also appear in the separate [activation history](activation-history.md).
-Drip learning and the scale-loss backup's recent shots keep their own eligibility rules.
+If an activation is not a good shot, the page that observed it keeps its
+result for 30 seconds after analysis finishes, then returns to the latest good
+shot. A temporary reconnection preserves the remaining interval; reloading the
+page opens the latest good shot instead. Starting another activation
+immediately replaces the temporary result. Confirmed activations also appear
+in the separate [activation history](activation-history.md). Drip learning and
+the scale-loss backup's recent shots read good shots only, and add their own
+rules on top.
 
 The controller collects accepted scale readings in memory while the shot runs
 and saves the completed curve after the configured drip delay. Each reading
@@ -217,7 +231,7 @@ The first-drop marker and late-tare cup marker keep their event times. Each
 curve takes its shot's Fast, On recipe or Slow colour, and a scale-loss stretch
 its own colour, without adding competing time labels;
 the time axis uses 10-second references. Home shows the live memory curve
-during a shot and the newest eligible history row's exact curve while idle.
+during a shot and the newest good shot's exact curve while idle.
 
 Observed removal or a new placement during the drip delay preserves the weight
 captured at shot end and discards post-drip learning, regardless of the idle
@@ -229,11 +243,12 @@ weight alone cannot establish that the final reading belongs to another cup.
 ## In the Web UI
 
 Open the shot history table to browse rows, export or delete one shot from
-its ⋯ menu, clear the whole log, or export every shot as CSV or JSON.
+its ⋯ menu, clear the whole log, or export every good shot as CSV or JSON.
 Clearing requires an explicit confirm.
 
-Home and Stats read the same shot history. Deleting the newest shot shows the
-next newest qualifying shot on Home; clearing the log empties the idle card.
+Home and Stats read the same shot history. Deleting the newest good shot
+shows the next newest good shot on Home; clearing the log empties the idle
+card.
 Factory reset clears both histories. The [activation history](activation-history.md)
 records every confirmed activation, including rinses and cycles that do not
 qualify as shots. Deleting or clearing shot history never changes that diary.
@@ -265,12 +280,23 @@ sort order, every page you scroll to is full of matching shots, and the Filter
 button shows a count badge while a filter is active; Reset clears it, and
 tapping outside or pressing Escape closes the checklist. When nothing matches,
 the list says so. The filter changes only the list: the averages, charts, and
-**Export** still cover your shots as described below.
+**Export** still cover your good shots as described below.
+
+The list shows good shots only. Tick **Show bad shots**, at the bottom of the
+checklist, to add the bad ones; it counts in the Filter badge like any other
+tick, Reset clears it, and it is off again whenever you reopen the Web UI. It
+works with the other ticks and either sort order: Show bad shots plus your
+house preset lists that preset's good and bad shots. Each bad shot carries a
+grey **Bad** label beside its time with the reason: **short** (12 seconds or
+less), **no yield**, or **low yield** (2 g or less). A bad shot shows only what
+the controller stored, so a missing yield, flow or ratio reads **—** instead of
+being estimated from its curve. The preset and scale choices in the checklist
+come from your good shots.
 
 Changes arrive automatically while the
 page is open. After an entry is added, rated, or deleted, the list refreshes
 from the first page in your chosen order; scroll to load more again. **Export**
-downloads the full log newest-first, whatever the on-screen sort or filter. A large
+downloads every good shot newest-first, whatever the on-screen sort or filter. A large
 export can take up to 90 seconds on a slow connection. Wait for the download
 before changing the sort or leaving Stats.
 
@@ -281,11 +307,11 @@ when it is not the current one). Hovering a time shows its exact date and
 time to the second, and the CSV export always keeps that full detail no
 matter how the table displays it.
 
-Stats uses up to the newest **10, 50, or 100 qualifying shots**, as you choose,
+Stats uses up to the newest **10, 50, or 100 good shots**, as you choose,
 for duration, yield, available flow, daily count, and both Stats charts,
 regardless of how the table is sorted, filtered, or how far you have scrolled
 it. **Avg BBW error** independently uses up to the same number of newest
-**shots stopped by weight** in the full history, skipping manual shots and time
+**good shots stopped by weight** in the full history, skipping manual shots and time
 or safety stops. Each miss is measured against the planned stop — the cut line
 when the stop was commanded, which is above the target for a fast shot and
 below it for a slow one — and the absolute percentages are averaged, so
@@ -294,9 +320,9 @@ shot has been stopped by weight yet. For example, a fast shot whose cut line
 stood at 38.0 g and that yielded 38.4 g counts as a 1.1 % miss. **Daily shots**
 averages the dated shots over the calendar days they span, including both ends.
 An erase-all firmware installation starts with empty shot history.
-If a low-weight older row is imported later, it stays in the CSV export but
-does not enter Home or these summaries; the list leaves it out only when its
-yield is under 1 g.
+A shot kept from an older firmware that does not meet the good-shot rule, for
+example one recorded at exactly 12.0 s or with a yield of 2 g or less, now
+counts as a bad shot.
 
 In its Stats history card, each shot shows everything at once. At the top are
 its duration and yield in large numbers, then when you pulled it, with a
@@ -393,13 +419,15 @@ history record or flash write.
 ### With the machine off
 
 A phone or computer that opens the Web UI over HTTPS keeps a copy of every
-saved shot, so **Shots** still works while the controller is out of reach.
+good shot, so **Shots** still works while the controller is out of reach. The
+copy leaves bad shots out, so **Show bad shots** needs the controller.
 See [Open it over HTTPS with a reverse proxy](../settings/web-access.md#open-it-over-https-with-a-reverse-proxy).
 
 ## Export and share shots
 
 **Export**, next to Filter, opens a small menu with two formats. Both always
-include every stored shot, whatever the list's filter or sort:
+include every good shot, and only good shots, whatever the list's filter or
+sort:
 
 - **CSV** is a table for Excel, Numbers, or Google Sheets, one row per shot.
 - **JSON** keeps everything the controller recorded about each shot, including
@@ -420,7 +448,8 @@ that shot only:
   that accepts brews from other apps; versions up to 8.7.0 do not, and on a
   device without a suitable app nothing happens.
 - **JSON** downloads the shot in the same format as the full export, so one
-  shot and the whole log read the same way.
+  shot and the whole log read the same way. A bad shot's file says why it is
+  bad.
 - **Gaggiuino** downloads the shot in the format Gaggiuino machines use, which
   [Visualizer](https://visualizer.coffee) can import. It carries the weight,
   flow, and target temperature over time. Open Brew by Weight measures weight
@@ -536,8 +565,9 @@ identity, not a setting.
 
 Algorithm identity describes the shot's configured policy even when a guard
 or manual action ends it; use `stop`, `shot_type` and `cut_type` to interpret
-the outcome. EWMA time/safety-limit outcomes remain in eligible history with
-learning-applied false; only a normal weight-target cut can train EWMA.
+the outcome. EWMA time/safety-limit outcomes remain in good history with
+learning-applied false; only a good shot ended by a normal weight-target cut
+can train EWMA, and a bad shot always shows learning-applied false.
 Compare shots like for like using each shot's captured `bbw_alpha`,
 `offset_g` and the firmware identity recorded alongside the dataset; recipe
 changes and resets belong in those notes too. Export the CSV or JSON before a firmware

@@ -953,16 +953,18 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
                          static_cast<unsigned long>(shotTotal));
   for (size_t index = 0; ok && index < recent; ++index) {
     const ShotLogRecord &record = work.statsCache.snapshot.records[index];
+    const char *bad = shotLogBadReason(record);
     ok = debugExportChunkf(
         request, buf, cap,
         "%s{\"id\":%lu,\"bootId\":%lu,\"durationDs\":%u,\"goalWeightG\":%.1f,"
-        "\"stopDetail\":\"%s\"}",
+        "\"stopDetail\":\"%s\",\"badReason\":%s%s%s}",
         index == 0 ? "" : ",", static_cast<unsigned long>(record.id),
         static_cast<unsigned long>(record.bootId),
         static_cast<unsigned>(record.durationDs),
         static_cast<double>(goalWeightDgToGrams(record.goalWeightDg)),
         shotLogStopDetailName(
-            static_cast<ShotLogStopDetail>(record.stopDetail)));
+            static_cast<ShotLogStopDetail>(record.stopDetail)),
+        bad ? "\"" : "", bad ? bad : "null", bad ? "\"" : "");
   }
   ok = ok && debugExportChunk(request, "]}}}");
 
