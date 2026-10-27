@@ -93,6 +93,25 @@ address in the router or USB `NET_STATUS`, then open that address and claim
 the UI within 3 minutes. The AP address cannot follow a change to a different
 network. Unconfirmed changes revert; see [Wi-Fi](settings/wifi.md).
 
+### Wi-Fi drops now and then
+
+The controller reconnects by itself. To find out why it dropped, look for
+`station connection failed` in **Diagnostic → Log**. That line tells you why
+the router connection ended and how strong the signal was when it did:
+
+- **beacon timeout**: the controller stopped hearing the router. This is
+  usually a weak signal. Inside a machine body, anything around −75 dBm or
+  weaker is marginal; move the router or an access point closer.
+- **no AP found**: the network wasn't visible when the controller tried to
+  join.
+- **auth failed**, **4-way timeout** or **handshake timeout** while joining:
+  check the Wi-Fi password, or the router's security mode.
+- **deauthenticated** or **disassociated**: the router ended the connection,
+  for example when it restarted, changed channel or removed idle devices.
+
+Any other reason shows as a number only; include it when you report an
+issue.
+
 ### How do I reach the controller the first time?
 
 Once the controller has joined your home Wi-Fi, open

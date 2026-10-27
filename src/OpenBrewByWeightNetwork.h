@@ -570,6 +570,9 @@ class OpenBrewByWeightNetwork {
   uint32_t staReconnectIntervalMs_ = STA_RECONNECT_INTERVAL_MS;
   uint32_t extendedStatusAtMs_ = 0;
   uint32_t staRssiSampledAtMs_ = 0;
+  // Last STA disconnect reason/RSSI (packStaDisconnectDetail): written by the
+  // Arduino event task, consumed by the network task's STA_FAILED log.
+  std::atomic<int32_t> staDisconnectDetail_{0};
   uint32_t staConfirmDeadlineMs_ = 0;
   uint32_t restartRequestedAtMs_ = 0;
   bool ntpStarted_ = false;
@@ -682,6 +685,11 @@ class OpenBrewByWeightNetwork {
                                 HeapLifecycleResult result);
   void log(DebugCategory category, DebugCode code, int32_t argument1 = 0,
            int32_t argument2 = 0);
+  void setStaState(StaState state) {
+    dataMux_.lock();
+    status_.staState = state;
+    dataMux_.unlock();
+  }
   void actionLog(const char *message);
   void actionLogf(const char *fmt, ...);
   void lifecycleLog(const char *message);

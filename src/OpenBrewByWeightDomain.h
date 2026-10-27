@@ -2952,6 +2952,27 @@ inline const char *wifiStatusName(int32_t status) {
   return "unknown";
 }
 
+// STA_FAILED argument2: 802.11 disconnect reason (bits 0-7) and the driver's
+// disconnect RSSI in dBm (bits 8-15); 0 means none was reported.
+inline int32_t packStaDisconnectDetail(uint8_t reason, int8_t rssi) {
+  return static_cast<int32_t>(reason | (static_cast<uint8_t>(rssi) << 8));
+}
+
+// ESP-IDF wifi_err_reason_t values seen on home networks; others print as numbers.
+inline const char *wifiDisconnectReasonName(uint32_t reason) {
+  switch (reason) {
+    case 2: return "auth expired";
+    case 3: return "deauthenticated";
+    case 8: return "disassociated";
+    case 15: return "4-way timeout";
+    case 200: return "beacon timeout";
+    case 201: return "no AP found";
+    case 202: return "auth failed";
+    case 204: return "handshake timeout";
+  }
+  return "";
+}
+
 inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
                                         size_t capacity) {
   if (message == nullptr || capacity == 0) {
@@ -3072,11 +3093,20 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
                static_cast<long>(event.argument1),
                static_cast<long>(event.argument2));
       return true;
-    case DebugCode::STA_FAILED:
-      snprintf(message, capacity, "station connection failed: %s (status %ld)",
-               wifiStatusName(event.argument1),
-               static_cast<long>(event.argument1));
+    case DebugCode::STA_FAILED: {
+      const int used = snprintf(message, capacity,
+                                "station connection failed: %s (status %ld)",
+                                wifiStatusName(event.argument1),
+                                static_cast<long>(event.argument1));
+      const uint32_t reason = static_cast<uint32_t>(event.argument2) & 0xFFu;
+      if (reason != 0 && used > 0 && static_cast<size_t>(used) < capacity) {
+        const char *name = wifiDisconnectReasonName(reason);
+        snprintf(message + used, capacity - used, " reason=%lu%s%s rssi=%d dBm",
+                 static_cast<unsigned long>(reason), name[0] != '\0' ? " " : "",
+                 name, static_cast<int8_t>(event.argument2 >> 8));
+      }
       return true;
+    }
     case DebugCode::SCALE_SCAN_STARTED:
       snprintf(message, capacity, "scale scan started (%s, intensity=%s)",
                event.argument1 == SCALE_SCAN_TARGET_PREFERRED ? "preferred"

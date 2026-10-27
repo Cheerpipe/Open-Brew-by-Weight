@@ -97,6 +97,12 @@ void OpenBrewByWeightNetwork::loadControlStatus(ControlStatusSnapshot &control) 
 bool OpenBrewByWeightNetwork::startNetwork() {
   const NetworkSettingsSnapshot settings = networkSettingsSnapshot();
   const uint32_t now = millis();
+  [[maybe_unused]] static const auto staDisconnectHandler = WiFi.onEvent(
+      [this](arduino_event_id_t, arduino_event_info_t info) {
+        staDisconnectDetail_.store(packStaDisconnectDetail(
+            info.wifi_sta_disconnected.reason, info.wifi_sta_disconnected.rssi));
+      },
+      ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.persistent(false);
   WiFi.setAutoReconnect(false);
   // STA link-local IPv6 lets mDNS answer AAAA queries instead of leaving
@@ -662,11 +668,10 @@ bool OpenBrewByWeightNetwork::beginStationConnect(const NetworkSettingsSnapshot 
   }
   applyWifiPowerSave();
   applyStationAddressConfig(settings);
+  staDisconnectDetail_.store(0);
   if (!WiFi.STA.connect(settings.staSsid,
                         settings.staOpen ? nullptr : settings.staPassword)) {
-    dataMux_.lock();
-    status_.staState = StaState::DISCONNECTED;
-    dataMux_.unlock();
+    setStaState(StaState::DISCONNECTED);
     finishOwnedHeapLifecycle(wifiHeap_, HeapLifecycleResult::FAILURE);
     lifecycleLog("WiFi STA connect request failed");
     return false;
@@ -1045,9 +1050,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
   if ((brewRf || scaleConnecting) && status.staState == StaState::CONNECTING &&
       WiFi.status() != WL_CONNECTED) {
     WiFi.disconnect(false, false);
-    dataMux_.lock();
-    status_.staState = StaState::DISCONNECTED;
-    dataMux_.unlock();
+    setStaState(StaState::DISCONNECTED);
     if (status.setupPhase == SetupPhase::ATTEMPTING) {
       // Same hold as the aged-attempt path: an aborted onboarding attempt
       // must not enter the 10 s reconnect loop (it aborts every UI scan and
@@ -1072,7 +1075,8 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
       clearStaLinkMetrics();
       dataMux_.unlock();
       log(DebugCategory::NETWORK, DebugCode::STA_FAILED,
-          static_cast<int32_t>(WiFi.status()));
+          static_cast<int32_t>(WiFi.status()),
+          staDisconnectDetail_.exchange(0));
       stopNtp();
       staNtpEligibleAtMs_ = 0;
       g_wallClock.markDisabled();
@@ -1232,13 +1236,12 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
     if (wifiScanInProgress()) {
       return;
     }
+    // Log before our own disconnect() reports a reason of its own.
+    log(DebugCategory::NETWORK, DebugCode::STA_FAILED,
+        static_cast<int32_t>(WiFi.status()), staDisconnectDetail_.exchange(0));
     WiFi.disconnect(false, false);
     finishOwnedHeapLifecycle(wifiHeap_, HeapLifecycleResult::FAILURE);
-    dataMux_.lock();
-    status_.staState = StaState::FAILED;
-    dataMux_.unlock();
-    log(DebugCategory::NETWORK, DebugCode::STA_FAILED,
-        static_cast<int32_t>(WiFi.status()));
+    setStaState(StaState::FAILED);
     const bool pending = staJoinHints().staConfigState ==
                          static_cast<uint8_t>(StaConfigState::PENDING);
     if (pending) {
@@ -1299,9 +1302,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
         static_cast<uint32_t>(millis() - staConnectStartedAtMs_) >=
         (liveOnboarding ? LIVE_APPLY_ATTEMPT_MS : STA_RECOVERY_ATTEMPT_MS);
     if (terminalFail || attemptAged) {
-      dataMux_.lock();
-      status_.staState = StaState::DISCONNECTED;
-      dataMux_.unlock();
+      setStaState(StaState::DISCONNECTED);
       staReconnectAttemptAtMs_ = now;
       if (liveOnboarding) {
         // Hold the reconnect loop: the /setup page owns the next attempt,

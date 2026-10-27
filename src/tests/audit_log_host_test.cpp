@@ -159,6 +159,16 @@ static void testFormatAuditRecordDetail() {
   record.argument1 = 42;
   formatAuditRecordDetail(record, detail, sizeof(detail));
   assert(strcmp(detail, "station connection failed: unknown (status 42)") == 0);
+  record.argument1 = 5;
+  record.argument2 = packStaDisconnectDetail(200, -79);
+  formatAuditRecordDetail(record, detail, sizeof(detail));
+  assert(strcmp(detail, "station connection failed: connection lost (status 5)"
+                        " reason=200 beacon timeout rssi=-79 dBm") == 0);
+  record.argument1 = 6;
+  record.argument2 = packStaDisconnectDetail(23, -61);
+  formatAuditRecordDetail(record, detail, sizeof(detail));
+  assert(strcmp(detail, "station connection failed: disconnected (status 6)"
+                        " reason=23 rssi=-61 dBm") == 0);
 
   // Codes without a dedicated formatter still expose their recorded args.
   record = AuditRecord{};
