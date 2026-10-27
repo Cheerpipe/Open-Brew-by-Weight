@@ -21,6 +21,8 @@ void serialTraceCategoryf(openbrewbyweight::LogLevel, openbrewbyweight::DebugCat
                           const char *, ...) {}
 void addDebugEventDetail(openbrewbyweight::DebugCategory, openbrewbyweight::DebugCode,
                          int32_t, int32_t, const char *) {}
+void shotTraceNoteMicraRx(uint32_t) {}
+void shotTraceNoteMicraSubscribed(bool) {}
 constexpr int ESP_OK = 0, ESP_FAIL = -1, ESP_ERR_HTTP_EAGAIN = 1;
 constexpr int ESP_ERR_HTTP_READ_TIMEOUT = 2, pdTRUE = 1;
 uint32_t pdMS_TO_TICKS(uint32_t ms) { return ms; }

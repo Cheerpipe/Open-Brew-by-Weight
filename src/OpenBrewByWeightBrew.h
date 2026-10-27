@@ -193,6 +193,7 @@ void notifyRetareFlowDetected(uint32_t receivedAtMs) {
 }
 
 void resetDirectStopConfirmation() {
+  if (session.thresholdConfirmations != 0) shotTrace().noteConfirmationReset();
   session.thresholdConfirmations = 0;
   session.lastThresholdAtMs = 0;
   session.lastThresholdPacketSequence = 0;
@@ -493,8 +494,19 @@ void noteCutLineSegment(int32_t weightDg, int32_t shotMs, uint32_t atMs) {
 void considerDirectStopSample(float weight, uint32_t receivedAtMs,
                               uint32_t packetSequence,
                               uint32_t connectionGeneration) {
-  if (!shouldTrackWeight() || packetSequence == 0 || !std::isfinite(weight) ||
-      bbwWeightStopInhibited()) {
+  if (!shouldTrackWeight() || packetSequence == 0 || !std::isfinite(weight)) {
+    return;
+  }
+  if (bbwWeightStopInhibited()) {
+    // Trace the first reading the protection window keeps above the line.
+    int32_t shotMs = 0;
+    if (shotTrace().capturing() && !(session.traceLatches & TRACE_LATCH_PROTECTION) &&
+        shotTimeAtMs(receivedAtMs, shotMs) &&
+        gramsToDg(weight) >= cutLineAtDg(shotMs) - session.cut.offsetDg) {
+      session.traceLatches |= TRACE_LATCH_PROTECTION;
+      shotTrace().note(ShotTraceKind::STOP_BLOCKED, millis(), 1,
+                       SHOT_TRACE_BLOCKED_PROTECTION);
+    }
     return;
   }
 
@@ -513,8 +525,21 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
   const bool timed = shotTimeAtMs(receivedAtMs, shotMs);
   const int32_t weightDg = gramsToDg(weight);
   if (timed && !overload) noteCutLineSegment(weightDg, shotMs, receivedAtMs);
-  const bool overThreshold =
-      timed && weightDg >= cutLineAtDg(shotMs) - session.cut.offsetDg;
+  const int32_t lineDg = timed ? cutLineAtDg(shotMs) : 0;
+  const bool overThreshold = timed && weightDg >= lineDg - session.cut.offsetDg;
+  if (timed && !overload && !(session.traceLatches & TRACE_LATCH_SLOW_WINDOW) &&
+      shotMs >= session.cut.params.slowAfterMs) {
+    // The slow-window end decides between the target and a slow extension.
+    session.traceLatches |= TRACE_LATCH_SLOW_WINDOW;
+    const uint16_t flags =
+        (weightDg >= session.cut.params.goalDg - session.cut.offsetDg ? SHOT_TRACE_SLOW_REACHED : 0) |
+        (session.slowExtractionExtended ? SHOT_TRACE_SLOW_EXTENDED : 0) |
+        (session.extractionExtended ? SHOT_TRACE_SLOW_FAST_EXTENDED : 0) |
+        (overThreshold ? SHOT_TRACE_SLOW_OVER_LINE : 0);
+    shotTrace().note(ShotTraceKind::SLOW_WINDOW_END, millis(), shotTraceSaturate16(weightDg),
+                     static_cast<uint16_t>(lineDg), true,
+                     shotTraceSaturate16(session.cut.offsetDg), flags);
+  }
   if (!overThreshold && !overload) {
     resetDirectStopConfirmation();
     return;
@@ -526,9 +551,19 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
       static_cast<int32_t>(receivedAtMs - session.lastThresholdAtMs) > 0 &&
       static_cast<uint32_t>(receivedAtMs - session.lastThresholdAtMs) <=
           DIRECT_STOP_CONFIRMATION_WINDOW_MS;
+  if (!consecutive && session.thresholdConfirmations != 0)
+    shotTrace().noteConfirmationReset();
   session.thresholdConfirmations = consecutive
       ? static_cast<uint8_t>(session.thresholdConfirmations + 1U)
       : 1U;
+  if (!overload && !(session.traceLatches & TRACE_LATCH_OVER_LINE)) {
+    // The first reading over the line, whether or not it ever confirms.
+    session.traceLatches |= TRACE_LATCH_OVER_LINE;
+    shotTrace().note(ShotTraceKind::OVER_LINE, millis(), shotTraceSaturate16(weightDg),
+                     static_cast<uint16_t>(lineDg), true,
+                     shotTraceSaturate16(session.cut.offsetDg),
+                     session.thresholdConfirmations);
+  }
   session.lastThresholdAtMs = receivedAtMs;
   session.lastThresholdPacketSequence = packetSequence;
   session.lastThresholdConnectionGeneration = connectionGeneration;

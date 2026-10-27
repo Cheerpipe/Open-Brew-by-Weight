@@ -56,7 +56,7 @@ host_test(boot_heap_host_test LABEL "host;resources;network;concurrency")
 host_test(ui_stream_transport_host_test LABEL "host;network")
 
 if(OPENBREWBYWEIGHT_SANITIZER STREQUAL "thread")
-  foreach(case M09 R25c F03 F04 F17 IT10 IT28 SH01 RACE06)
+  foreach(case M09 R25c F03 F04 F17 IT10 IT28 SH01 RACE06 TRC10)
     host_test(open_brew_by_weight_tsan_${case}
       SOURCE open_brew_by_weight_host_test.cpp ARGS ${case} LABEL "host;concurrency")
     set_target_properties(open_brew_by_weight_tsan_${case} PROPERTIES

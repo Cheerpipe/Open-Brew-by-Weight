@@ -806,6 +806,7 @@ class OpenBrewByWeightNetwork {
   static esp_err_t scaleGapMaxResetHandler(httpd_req_t *request);
   static esp_err_t scaleProfileHandler(httpd_req_t *request);
   static esp_err_t scaleProfileDownloadHandler(httpd_req_t *request);
+  static esp_err_t shotTraceDownloadHandler(httpd_req_t *request);
   static esp_err_t scaleTareHandler(httpd_req_t *request);
   // OTA routes authenticate with the device password instead of the
   // exclusive WebUI claim, so the command line client works without stealing

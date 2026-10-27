@@ -75,6 +75,7 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
             (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0, millis());
       websocketStatus_.state = MicraSocketState::STOPPING;
       websocketStatus_.subscribed = false;
+      shotTraceNoteMicraSubscribed(false);
       backflush_.invalidate();
       if (buffer->heap.pending) finishHeapLifecycle(buffer->heap, HeapLifecycleResult::FAILURE, before);
       beginHeapLifecycle(buffer->stopHeap, HeapLifecycleEvent::HTTP_STOP, before);
@@ -147,6 +148,7 @@ bool OpenBrewByWeightMicraService::sendSubscription() {
   observationFence_.invalidate();
   status.pongAtMs = 0;
   status.subscribed = true;
+  shotTraceNoteMicraSubscribed(true);
   status.machineConnectedKnown = false;
   observationFence_.offline = false;
   snapshotStamp_ = observationFence_.stamp(identityGeneration_, powerState_.generation());
@@ -332,6 +334,7 @@ void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
         if (bin.second != second) bin = {second, 0, 0};
         bin.rx += std::max(0, message.data_len);
       }
+      shotTraceNoteMicraRx(static_cast<uint32_t>(std::max(0, message.data_len)));
       if (!self.websocketAdmitted()) return;
       bool valid = message.data_len >= 0 && message.payload_len >= 0 &&
           message.payload_offset >= 0 && message.payload_offset <= message.payload_len &&

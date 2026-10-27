@@ -1,4 +1,5 @@
 #include "OpenBrewByWeightNetwork.h"
+#include "OpenBrewByWeightShotTrace.h"
 #include "OpenBrewByWeightOutboundAdmission.h"
 #include "OpenBrewByWeightBbwQuickStart.h"
 #include "OpenBrewByWeightDebugExport.h"

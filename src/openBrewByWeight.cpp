@@ -125,6 +125,7 @@ HWCDC openBrewByWeightUsbConsole;
 #include "OpenBrewByWeightHwmon.h"
 #include "OpenBrewByWeightTaskProfiler.h"
 #include "OpenBrewByWeightScaleProfiler.h"
+#include "OpenBrewByWeightShotTrace.h"
 #include "OpenBrewByWeightTaskMutex.h"
 #include "OpenBrewByWeightScheduling.h"
 #include "OpenBrewByWeightPsram.h"
@@ -217,6 +218,10 @@ struct ShotTrajectory {
   bool automaticBrew = false;
 };
 
+// Shot trace one-shot evaluations per cycle.
+constexpr uint8_t TRACE_LATCH_SLOW_WINDOW = 1, TRACE_LATCH_PADDLE = 2,
+                  TRACE_LATCH_PROTECTION = 4, TRACE_LATCH_OVER_LINE = 8;
+
 struct CycleSession {
   bool active = false;
   bool automaticEnabled = false;
@@ -292,6 +297,7 @@ struct CycleSession {
   bool extractionExtended = false;
   bool slowExtractionExtended = false;
   bool targetReachedEarly = false;
+  uint8_t traceLatches = 0;  // TRACE_LATCH_*
   uint32_t targetReachedAtMs = 0;
   bool autoToManualGuardArmed = false;
   bool autoToManualGuardEnforced = false;

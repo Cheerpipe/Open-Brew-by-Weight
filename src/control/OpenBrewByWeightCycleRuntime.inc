@@ -782,6 +782,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                                       uint32_t connectionGeneration,
                                       uint32_t captureSequence = 0) {
   const ProfileControlObservation profile(captureSequence, connectionGeneration);
+  shotTrace().noteReading(receivedAtMs);
   const bool touchProvenanceValid = packetSequence != 0 && connectionGeneration != 0;
   const TouchStopEvidence previousTouchStop = session.touchStop;
   session.touchStop = {};  // Only a qualifying touch sample may retain evidence.
@@ -964,6 +965,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   if (session.awaitingPostTareBaseline) {
     if (session.retareEffectPending) {
       shotCurveSampler.markBreak();
+      shotTrace().noteHeld();
       return false;
     }
     if (postTareBaselinePlausible(weight)) {
@@ -1067,6 +1069,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     if (session.recoveryConfirmations <
         WEIGHT_RECOVERY_CONFIRMATION_SAMPLES) {
       shotCurveSampler.markBreak();
+      shotTrace().noteHeld();
       return false;
     }
 
@@ -1091,6 +1094,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     const AccidentalTouchClass classified =
         evaluateAccidentalTouchSample(weight, receivedAtMs);
     if (classified == AccidentalTouchClass::TOUCH) {
+      shotTrace().noteHeld();
       shotCurveSampler.accept(weight, receivedAtMs, true);
       resetDirectStopConfirmation();
       if (touchProvenanceValid) considerTouchStopSample(weight, receivedAtMs, packetSequence,

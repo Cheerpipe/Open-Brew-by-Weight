@@ -35,6 +35,12 @@ ESP-IDF log hook relies on that when it retains component lines in the Web UI
 ring from whichever task logs; it skips contexts that cannot block and never
 re-enters for application (`obbw.*`) lines, which are already retained.
 
+The shot-trace mutex is a leaf in the same way: `addDebugEvent` takes it, so it
+may sit under whatever its caller holds (for example `shotStoreMutex`), and no
+holder logs, allocates, touches flash or takes another lock. It is never
+nested with the scale profiler's capture mutex: the profile note path appends
+to the trace first and then to the profiler, one lock at a time.
+
 No reverse edge is permitted. A callback that would require one must publish a
 queue item or atomic latch for the owner instead.
 
@@ -183,7 +189,18 @@ capture with the reserved terminal record. Producers (scale worker and control l
 through one leaf capture mutex they only take after releasing their own locks,
 flash invalidate/save run as single cache-off steps on the settings_persist
 worker between safe-write gates, and a download lease pins the frozen
-generation so Start/Delete cannot replace a trace while it streams. USB application logs are emitted by the bounded
+generation so Start/Delete cannot replace a trace while it streams. The
+per-shot trace (see [shot trace](SHOT_TRACE.md)) is opened, discarded and
+completed by the control loop, which alone owns its state-change cache and
+reading statistics. Before the relay acts it only resets the header and
+counters; the snapshot (including the network status copy) and the pre-shot
+ring freeze follow once the machine started. Its producers (scale worker, control loop, health worker,
+httpd, the Linea Micra WebSocket task and any `addDebugEvent` caller) append
+fixed 8-byte records in constant time under its leaf mutex, or bump relaxed
+atomic counters; `WEIGHT_ACCEPTED` and every closed-window call return after
+one atomic load, before any lock. The httpd export copies the immutable
+completed buffer in 4 KiB chunks through a static PSRAM buffer under that
+mutex, never across a send, and stops when a capture opens. USB application logs are emitted by the bounded
 `serial_log` queue on core 0. Eight short log records remain internal while a
 bounded 2.5 KiB PSRAM buffer carries the CLI reply published to that owner;
 saturation increments dropped/truncated counters instead of waiting in control.

@@ -21,6 +21,7 @@
 #include "../openBrewByWeight.cpp"
 #include "../OpenBrewByWeightNetworkSetup.h"
 #include "shot_curve_test_helpers.h"
+#include "shot_trace_test_decoder.h"
 
 namespace {
 
@@ -231,6 +232,7 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   hostMachineTemperatureGeneration = 0;
   hostMachineTemperatureTargetDeciC = 0;
   debugLog.clear();
+  shotTrace().hostReset();
   serialLogLevel = LogLevel::NONE;
   ringRetainLogLevel = LogLevel::INFO;
   publishedControlStatus = ControlStatusFields{};
@@ -22625,6 +22627,641 @@ void sl02_new_coffee_restarts_the_statistics_epoch() {
   CHECK(epoch != shotLog.nextRecordId());
 }
 
+// ---------------------------------------------------------------------------
+// Shot trace (plan B3): capture window, encoding, caps and export.
+// ---------------------------------------------------------------------------
+
+using shot_trace_test::Event;
+using shot_trace_test::Trace;
+
+bool shotTraceTimesAscend(const Trace &trace) {
+  for (size_t i = 1; i < trace.events.size(); ++i)
+    if (trace.events[i].ms < trace.events[i - 1].ms) return false;
+  return true;
+}
+
+void trc01_scale_shot_is_traced_from_cycle_start_to_drip_finalize() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  shotLog.clear();
+  runtimeConfig.minimumCupWeightG = 71.5f;
+  runtimeConfig.retareStabilitySamples = 6;
+  runtimeConfig.autoRetare = false;
+  CHECK(!shotTrace().capturing());
+  const uint32_t rawOnAt = startCycle();
+  CHECK(shotTrace().capturing());
+  ShotTraceExport result = ShotTraceExport::OK;
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::BUSY);  // Nothing is exported during a shot.
+  advanceToBrew();
+  for (int i = 1; i <= 4; ++i) publishWeight(0.5f * i, hostMillis + 200);
+  // A jump the slew limit rejects; control holds the recovery readings.
+  publishWeight(62.0f, hostMillis + 200);
+  for (int i = 1; i <= 3; ++i) publishWeight(2.0f + 0.1f * i, hostMillis + 200);
+  releaseAtPhysicalDuration(rawOnAt, 15000);
+  // The drip delay still belongs to the shot.
+  CHECK(!session.active && shotTrace().capturing());
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::BUSY);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  CHECK(!shotTrace().capturing());
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  ShotLogRecord stored[1] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  // Linkage to the summary and the raw end reason.
+  CHECK(trace.header.shotLogId == stored[0].id && trace.header.bootId == stored[0].bootId &&
+        trace.header.endedAtMs == stored[0].endedAtMs);
+  CHECK(trace.header.endReason == static_cast<uint8_t>(EndReason::ACTIVATOR));
+  CHECK(trace.header.anchorMs == session.startedAtMs);
+  CHECK(trace.header.vocabularyVersion == SHOT_TRACE_VOCABULARY_VERSION &&
+        strcmp(trace.header.firmware, FW_VERSION) == 0);
+  CHECK(trace.header.flags == 0 && shotTraceTimesAscend(trace));
+  // Profile, debug and trace-only decisions from the control loop.
+  const Event *start = shot_trace_test::find(trace, ScaleProfileEvent::SHOT_START);
+  CHECK(start != nullptr && start->profileArg1() == session.id && start->more &&
+        start->profileArg2() == static_cast<uint32_t>(weightToCentigrams(
+                                    goalWeightDgToGrams(session.config.goalWeightDg))));
+  const Event *cycle = shot_trace_test::find(trace, DebugCode::CYCLE_STARTED);
+  CHECK(cycle != nullptr && cycle->argument1() == weightToCentigrams(goalWeightDgToGrams(
+                                                      session.config.goalWeightDg)));
+  CHECK(shot_trace_test::find(trace, DebugCode::RELAY_CLOSED) != nullptr);
+  // The stop is recorded once the command returned, with its outcome.
+  const Event *stop = shot_trace_test::find(trace, ShotTraceKind::STOP_REQUESTED);
+  CHECK(stop != nullptr && stop->a == static_cast<int16_t>(EndReason::ACTIVATOR) && stop->b == 0);
+  const Event *opened = shot_trace_test::find(trace, DebugCode::RELAY_OPENED);
+  CHECK(opened != nullptr && opened < stop);
+  const Event *running = shot_trace_test::find(trace, ShotTraceKind::MACHINE_RUNNING);
+  CHECK(running != nullptr && running->a == 1);
+  const Event *idle = shot_trace_test::find(trace, ShotTraceKind::MACHINE_RUNNING, 1);
+  CHECK(idle != nullptr && idle->a == 0);
+  CHECK(shot_trace_test::find(trace, ScaleProfileEvent::SHOT_END) != nullptr);
+  const Event *final = shot_trace_test::find(trace, ShotTraceKind::FINAL_WEIGHT);
+  CHECK(final != nullptr && final == &trace.events.back() &&
+        final->b == stored[0].actualWeightSource);
+  // State changes: initial at the window start, then each change.
+  const Event *control = shot_trace_test::findState(trace, ScaleProfileSignal::WEIGHT_CONTROL);
+  CHECK(control != nullptr && (control->b & SHOT_TRACE_STATE_INITIAL) != 0 &&
+        control->a == static_cast<int16_t>(WeightControlState::ACTIVE));
+  CHECK(shot_trace_test::findState(trace, ScaleProfileSignal::CUP_PRESENT) == nullptr);
+  // A rejected reading carries weight and reason, once (no debug twin).
+  const Event *rejected = shot_trace_test::find(trace, ScaleProfileEvent::WEIGHT_REJECTED);
+  CHECK(rejected != nullptr && rejected->a == 620 &&
+        rejected->b == static_cast<uint16_t>(DebugCode::SCALE_SAMPLE_REJECTED_SLEW));
+  CHECK(shot_trace_test::count(trace, DebugCode::SCALE_SAMPLE_REJECTED_SLEW) == 0);
+  CHECK(trace.counters.readingsRejected[2] == 1 && trace.counters.readingsHeld == 2);
+  // Accepted readings are counted, never recorded.
+  CHECK(shot_trace_test::count(trace, ScaleProfileEvent::WEIGHT_ACCEPTED) == 0);
+  CHECK(trace.counters.readingsAccepted >= 4 &&
+        trace.counters.readingsReceived >= trace.counters.readingsAccepted);
+  CHECK(trace.counters.readingGapMaxMs >= trace.counters.readingGapMeanMs &&
+        trace.counters.readingGapMeanMs >= trace.counters.readingGapMinMs);
+  CHECK(trace.counters.loopGapMaxMs >= runtimeConfig.dripDelayMs / 2);
+  // Start snapshot: only what the summary lacks.
+  const ShotTraceSnapshot &snapshot = trace.snapshot;
+  CHECK(snapshot.minimumCupCg == 7150 && snapshot.stabilitySamples == 6);
+  CHECK(snapshot.postTareGraceMs == session.config.postTareBaselineGraceMs &&
+        snapshot.retareWindowMs == session.config.retareWindowMs);
+  CHECK(((snapshot.flags & SHOT_TRACE_SNAP_AUTO_TARE) != 0) == session.config.autoTare);
+  CHECK((snapshot.flags & SHOT_TRACE_SNAP_AUTO_RETARE) == 0);
+  CHECK(((snapshot.flags & SHOT_TRACE_SNAP_SCALE_TARE) != 0) ==
+        getScaleLinkSnapshot().features.has(ScaleFeatureTare));
+  CHECK(snapshot.paddleMode == runtimeConfig.paddleMode &&
+        snapshot.noScaleBbwMode == runtimeConfig.noScaleBbwMode);
+  CHECK(strcmp(snapshot.scaleName, session.scaleName) == 0);
+}
+
+void trc02_rinses_abandoned_starts_and_no_scale_cycles_leave_no_trace() {
+  ShotTraceExport result = ShotTraceExport::OK;
+  // Without a scale no capture opens.
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  uint32_t rawOnAt = startCycle();
+  CHECK(!shotTrace().capturing());
+  reachManualNoScaleState();
+  releaseAtPhysicalDuration(rawOnAt, 15000);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+  // A start the relay refuses is discarded at once.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  hostGptimerArmSucceeds = false;
+  currentWeightReceivedAtMs = hostMillis;  // Fresh: the cycle starts with a scale.
+  ++currentWeightSequence;
+  setRawPaddle(true);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  CHECK(stopperState == StopperState::REQUIRES_OFF && session.startedWithScale &&
+        session.endReason == EndReason::RELAY_SAFETY_FAILURE && !shotTrace().capturing());
+  // An abandoned start is discarded at its end.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  CHECK(shotTrace().capturing());
+  finalizeCycle(EndReason::UNCONFIRMED_START, StopperState::REQUIRES_OFF);
+  CHECK(!shotTrace().capturing());
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+  // A cycle classified as a rinse is discarded at the classification.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.paddleMode = static_cast<uint8_t>(PaddleMode::ORIGINAL);
+  rawOnAt = startCycle();
+  CHECK(shotTrace().capturing());
+  releaseAtPhysicalDuration(rawOnAt, runtimeConfig.rinseGestureMs);
+  CHECK(stopperState == StopperState::RINSE && !shotTrace().capturing());
+  runLoopAfter(runtimeConfig.rinseDurationMs + runtimeConfig.dripDelayMs);
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+}
+
+void trc03_end_counters_are_exact() {
+  shotTrace().hostReset();
+  shotTrace().begin(1000);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  for (uint32_t i = 0; i < 5000; ++i)
+    scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, 1000 + i, 0, i, 1.0f, i, 0);
+  for (uint32_t atMs : {1100U, 1150U, 1400U, 1500U}) shotTrace().noteReading(atMs);
+  shotTrace().noteHeld();
+  shotTrace().noteHeld();
+  for (uint32_t gapMs : {30U, 12U}) shotTrace().noteLoopGap(gapMs);
+  shotTrace().noteMicraRx(100);
+  shotTrace().noteMicraRx(50);
+  for (int i = 0; i < 3; ++i) shotTrace().noteUiDeferral();
+  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 1600, 0, 0, NAN, 900, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 1700, 0, 0, 12.34f,
+                        static_cast<uint32_t>(DebugCode::SCALE_SAMPLE_REJECTED_RECOVERY), 999);
+  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 1800, 0, 0, NAN,
+                        static_cast<uint32_t>(DebugCode::BOOT_READY), 0);
+  shotTrace().noteDebug(DebugCode::SCALE_PACKET_GAP, 1, 900, 1600);  // Twin: skipped.
+  scaleProfileNoteDroppedFrame(true, true, 1.0f, 1600, 1, 1, 8, 1600);
+  scaleProfileNoteDroppedFrame(false, false, NAN, 1600, 1, 2, 8, 1600);
+  scaleProfileNoteDroppedFrame(false, false, NAN, 1600, 1, 3, 8, 1600);
+  shotTrace().noteConfirmationReset();
+  shotTrace().complete(9, 4, 2000, static_cast<uint8_t>(EndReason::SCALE_THRESHOLD));
+  // Out of the window nothing counts.
+  shotTrace().noteMicraRx(1000);
+  shotTrace().noteUiDeferral();
+  scaleProfileNoteDroppedFrame(true, true, 1.0f, 2100, 1, 4, 8, 2100);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  const ShotTraceCounters &counters = trace.counters;
+  CHECK(counters.readingsAccepted == 5000 && counters.readingsReceived == 4 &&
+        counters.readingsHeld == 2);
+  CHECK(counters.readingGapMinMs == 50 && counters.readingGapMaxMs == 250 &&
+        counters.readingGapMeanMs == 400 / 3);
+  CHECK(counters.loopGapMaxMs == 30 && counters.micraRxBytes == 150 &&
+        counters.uiStreamDeferrals == 3 && counters.packetGaps == 1);
+  CHECK(counters.readingsRejected[3] == 1 && counters.readingsRejected[5] == 1);
+  CHECK(counters.staleFrames == 1 && counters.undecodableFrames == 2 &&
+        counters.confirmationResets == 1);
+  CHECK(shot_trace_test::count(trace, ScaleProfileEvent::WEIGHT_ACCEPTED) == 0);
+  // A rejected reading carries its weight and reason, not its reference.
+  const Event *rejected = shot_trace_test::find(trace, ScaleProfileEvent::WEIGHT_REJECTED);
+  CHECK(rejected != nullptr && rejected->a == 123 && !rejected->more &&
+        rejected->b == static_cast<uint16_t>(DebugCode::SCALE_SAMPLE_REJECTED_RECOVERY) &&
+        rejected->ms == 700);
+  const Event *gap = shot_trace_test::find(trace, ScaleProfileEvent::PACKET_GAP);
+  CHECK(gap != nullptr && gap->a == SHOT_TRACE_NO_WEIGHT && gap->b == 900);
+  CHECK(shot_trace_test::count(trace, DebugCode::SCALE_PACKET_GAP) == 0);
+  CHECK(trace.header.shotLogId == 9 && trace.header.bootId == 4 &&
+        trace.header.endedAtMs == 2000 &&
+        trace.header.endReason == static_cast<uint8_t>(EndReason::SCALE_THRESHOLD));
+}
+
+void trc04_verbose_events_truncate_first_and_time_passes_65_s() {
+  shotTrace().hostReset();
+  hostMillis = 600;
+  shotTrace().begin(500);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  // Rejected readings stop at 75 % of the buffer.
+  for (size_t i = 0; i < SHOT_TRACE_EVENT_CAPACITY; ++i)
+    scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 600, 0, 0, 1.0f,
+                          static_cast<uint32_t>(DebugCode::SCALE_SAMPLE_REJECTED_SLEW), 0);
+  // Decisions keep the rest; a wide debug event takes a continuation.
+  addDebugEvent(DebugCategory::SCALE, DebugCode::AUTO_TO_MANUAL_GUARD_FIRED, 70123, -2);
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, 500 + 9000000, 3, 0);
+  const size_t decisionRoom = SHOT_TRACE_EVENT_CAPACITY - SHOT_TRACE_VERBOSE_LIMIT - 3;
+  for (size_t i = 0; i + 1 < decisionRoom; ++i)
+    addDebugEvent(DebugCategory::STATE, DebugCode::STATE_TRANSITION, 1, 2);
+  // A continuation never splits: with one slot left the pair is dropped whole.
+  addDebugEvent(DebugCategory::SCALE, DebugCode::AUTO_TO_MANUAL_GUARD_FIRED, 70123, 0);
+  for (size_t i = 0; i < 8; ++i)
+    addDebugEvent(DebugCategory::STATE, DebugCode::STATE_TRANSITION, 1, 2);
+  shotTrace().complete(1, 1, 1, 1);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.header.eventCount == SHOT_TRACE_EVENT_CAPACITY);
+  CHECK(trace.header.totalBytes == SHOT_TRACE_BUFFER_BYTES);
+  CHECK(trace.header.flags == (SHOT_TRACE_VERBOSE_TRUNCATED | SHOT_TRACE_DECISIONS_TRUNCATED));
+  CHECK(shot_trace_test::count(trace, ScaleProfileEvent::WEIGHT_REJECTED) ==
+        SHOT_TRACE_VERBOSE_LIMIT);
+  CHECK(trace.counters.verboseDropped == SHOT_TRACE_EVENT_CAPACITY - SHOT_TRACE_VERBOSE_LIMIT);
+  CHECK(trace.counters.readingsRejected[2] == SHOT_TRACE_EVENT_CAPACITY);  // Exact.
+  CHECK(shot_trace_test::count(trace, DebugCode::STATE_TRANSITION) == decisionRoom);
+  CHECK(trace.counters.decisionsDropped == 8);
+  const Event *guard = shot_trace_test::find(trace, DebugCode::AUTO_TO_MANUAL_GUARD_FIRED);
+  CHECK(guard != nullptr && guard->more && guard->argument1() == 70123 &&
+        guard->argument2() == -2);
+  CHECK(shot_trace_test::count(trace, DebugCode::AUTO_TO_MANUAL_GUARD_FIRED) == 1);
+  const Event *late = shot_trace_test::find(trace, ShotTraceKind::STOP_REQUESTED);
+  CHECK(late != nullptr && late->ms == SHOT_TRACE_MS_MAX);  // Saturates, never wraps.
+  // Times past 65 535 ms keep counting (a shot plus its drip lasts ~70 s).
+  hostMillis = 500;
+  shotTrace().begin(500);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  addDebugEvent(DebugCategory::STATE, DebugCode::CYCLE_ENDED, 1, 0);
+  hostMillis = 500 + 70000;
+  addDebugEvent(DebugCategory::STATE, DebugCode::CYCLE_ENDED, 2, 0);
+  shotTrace().complete(2, 1, 1, 1);
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.events.size() == 2 && trace.events[0].ms == 0 && trace.events[1].ms == 70000);
+}
+
+void trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot() {
+  shotTrace().hostReset();
+  ShotTraceExport result = ShotTraceExport::OK;
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+  shotTrace().noteMicraSubscribed(true);
+  shotTrace().begin(100);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, 200, 1, 0);
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::BUSY);
+  shotTrace().complete(7, 1, 300, 1);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.header.shotLogId == 7 && trace.header.flags == 0);
+  CHECK(trace.snapshot.flags == SHOT_TRACE_SNAP_MICRA_CONNECTED);
+  // A new shot hides the completed trace until it ends.
+  shotTrace().begin(400);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::BUSY);
+  shotTrace().complete(8, 1, 500, 1);
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.header.shotLogId == 8 && trace.header.flags == 0);
+  // A discarded capture keeps the newest completed trace.
+  shotTrace().begin(600);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().discard(static_cast<uint8_t>(EndReason::UNCONFIRMED_START), 650);
+  CHECK(shot_trace_test::decodeCompleted(trace) && trace.header.shotLogId == 8);
+  // A shot starting mid-download ends the download.
+  size_t sent = 0;
+  uint8_t chunk[256];
+  result = shotTrace().exportCompleted(chunk, sizeof(chunk), [&](const uint8_t *, size_t) {
+    if (sent++ == 0) shotTrace().begin(700);
+    return true;
+  });
+  CHECK(result == ShotTraceExport::CHANGED && sent == 1);
+}
+
+void trc06_pre_shot_events_keep_the_latest_per_kind() {
+  shotTrace().hostReset();
+  scaleProfileNoteEvent(ScaleProfileEvent::SCALE_CONNECTED, 1000, 3, 0, NAN, 0, 0);
+  for (uint32_t i = 0; i < 3; ++i)
+    scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, 2000 + i * 100, 3, i, 80.0f + i, i + 1, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::TARE_REJECTED, 2500, 3, 0, 82.0f, 3,
+                        static_cast<uint32_t>(IdleTareReason::NO_ABSENCE));
+  // Not pre-shot evidence: ignored outside a shot.
+  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 2600, 3, 0, 1.0f, 1, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 2600, 3, 0, NAN, 900, 0);
+  addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_CONNECTED, 0, 0);
+  // CUP_PRESENT, EMPTY_READY, IDLE_ELIGIBILITY, then shot-only signals.
+  const uint32_t present[SHOT_TRACE_STATE_COUNT] = {1, 0, 0, 0, 0, 0, 0};
+  const uint32_t absent[SHOT_TRACE_STATE_COUNT] = {0, 0, 0, 2, 1, 1, 1};
+  shotTrace().noteState(present, 2700);
+  shotTrace().noteState(present, 2750);  // Unchanged: no entry.
+  shotTrace().noteState(absent, 2800);   // Shot-only changes are ignored.
+  shotTrace().begin(3000);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().complete(1, 1, 1, 1);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.preShot.size() == 6 && trace.events.empty());  // 3 events, 3 signals.
+  const auto entry = [&](uint8_t kind) -> const ShotTracePreShot * {
+    for (const ShotTracePreShot &item : trace.preShot)
+      if ((item.event.head >> 24) == kind) return &item;
+    return nullptr;
+  };
+  const ShotTracePreShot *placed = entry(shot_trace_test::kindOf(ScaleProfileEvent::CUP_PLACED));
+  CHECK(placed != nullptr && placed->repeats == 2 && placed->event.a == 820 &&
+        placed->event.b == 3 && placed->arg1High == 0 &&
+        (placed->event.head & SHOT_TRACE_MS_MAX) == 800);
+  const ShotTracePreShot *rejected = entry(shot_trace_test::kindOf(ScaleProfileEvent::TARE_REJECTED));
+  CHECK(rejected != nullptr &&
+        rejected->arg2 == static_cast<uint32_t>(IdleTareReason::NO_ABSENCE));
+  const ShotTracePreShot *state = entry(shot_trace_test::kindOf(ScaleProfileEvent::STATE_CHANGED));
+  CHECK(state != nullptr && state->repeats == 1 && state->event.a == 0 &&
+        (state->event.b & ~SHOT_TRACE_STATE_INITIAL) ==
+            static_cast<uint16_t>(ScaleProfileSignal::CUP_PRESENT) &&
+        (state->event.head & SHOT_TRACE_MS_MAX) == 200);
+  CHECK(entry(shot_trace_test::kindOf(ScaleProfileEvent::SCALE_CONNECTED)) != nullptr);
+  // The ring starts over for the next shot.
+  shotTrace().begin(4000);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().complete(2, 1, 1, 1);
+  CHECK(shot_trace_test::decodeCompleted(trace) && trace.preShot.empty());
+}
+
+void trc07_paddle_original_mode_blocks_and_releases_the_automation_stop() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.paddleMode = static_cast<uint8_t>(PaddleMode::ORIGINAL);
+  startCycle();
+  advanceToBrew();
+  setRawPaddle(false);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  CHECK(stopperState == StopperState::BREW);
+  finalizeCycle(EndReason::WEB_STOP, StopperState::READY, true);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  const Event *blocked = shot_trace_test::find(trace, ShotTraceKind::STOP_BLOCKED);
+  CHECK(blocked != nullptr && blocked->a == 1 && blocked->b == SHOT_TRACE_BLOCKED_PADDLE);
+  const Event *released = shot_trace_test::find(trace, ShotTraceKind::STOP_BLOCKED, 1);
+  CHECK(released != nullptr && released->a == 0 && released->b == SHOT_TRACE_BLOCKED_PADDLE &&
+        released->ms > blocked->ms);
+  CHECK(shot_trace_test::count(trace, ShotTraceKind::STOP_BLOCKED) == 2);
+  const Event *stop = shot_trace_test::find(trace, ShotTraceKind::STOP_REQUESTED);
+  CHECK(stop != nullptr && stop->a == static_cast<int16_t>(EndReason::WEB_STOP) &&
+        stop->b == SHOT_TRACE_STOP_WEB);
+}
+
+void trc08_slow_window_end_records_weight_line_and_decision() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.slowSideEnabled = true;
+  startCycle();
+  advanceToBrew();
+  endBbwProtectionForTests();
+  publishWeight(20.0f);
+  reachSessionElapsed(session.config.slowAfterMs + 1000);
+  publishWeight(20.2f);
+  CHECK(session.slowExtractionExtended);
+  publishWeight(20.4f);  // Evaluated once.
+  finalizeCycle(EndReason::ACTIVATOR, StopperState::READY);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(shot_trace_test::count(trace, ShotTraceKind::SLOW_WINDOW_END) == 1);
+  const Event *window = shot_trace_test::find(trace, ShotTraceKind::SLOW_WINDOW_END);
+  CHECK(window != nullptr && window->a == 202 && window->more);
+  CHECK(window->b < static_cast<uint16_t>(session.config.goalWeightDg));  // Line below target.
+  CHECK(window->moreA == static_cast<int16_t>(session.cut.offsetDg));
+  CHECK(window->moreB == SHOT_TRACE_SLOW_EXTENDED);
+  // The catch-all keeps the slow extension's own debug event next to it.
+  const Event *entered = shot_trace_test::find(trace, DebugCode::SLOW_EXTRACTION_ENTERED);
+  CHECK(entered != nullptr && entered->argument1() == 2020);
+}
+
+void trc09_protection_window_blocks_a_stop_once() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.goalWeightDg = 40;
+  runtimeConfig.fastSideEnabled = false;
+  startCycle();
+  advanceToBrew();
+  CHECK(bbwWeightStopInhibited());
+  for (int i = 1; i <= 12; ++i) publishWeight(0.5f * i, hostMillis + 200);
+  CHECK(session.active && bbwWeightStopInhibited());
+  finalizeCycle(EndReason::ACTIVATOR, StopperState::READY);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(shot_trace_test::count(trace, ShotTraceKind::STOP_BLOCKED) == 1);
+  const Event *blocked = shot_trace_test::find(trace, ShotTraceKind::STOP_BLOCKED);
+  CHECK(blocked != nullptr && blocked->a == 1 && blocked->b == 2);
+}
+
+// Producers on several tasks (scale worker, health worker, httpd, Micra
+// WebSocket) append while control opens and completes captures and a reader
+// exports; run under TSAN.
+void trc10_concurrent_producers_keep_counters_exact() {
+  shotTrace().hostReset();
+  constexpr uint32_t kRounds = 400;
+  shotTrace().begin(0);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  std::thread scaleWorker([] {
+    for (uint32_t i = 0; i < kRounds; ++i) {
+      scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, i, 1, i, NAN, 300, 0);
+      scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, i, 1, i, 1.0f, i, 0);
+    }
+  });
+  std::thread health([] {
+    for (uint32_t i = 0; i < kRounds; ++i)
+      shotTrace().noteDebug(DebugCode::HEALTH_LOOP_GAP, 250, 7, i);
+  });
+  std::thread network([] {
+    for (uint32_t i = 0; i < kRounds; ++i) {
+      shotTrace().noteUiDeferral();
+      shotTrace().noteMicraRx(3);
+    }
+  });
+  scaleWorker.join();
+  health.join();
+  network.join();
+  shotTrace().complete(1, 1, 1, 1);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.counters.packetGaps == kRounds && trace.counters.readingsAccepted == kRounds &&
+        trace.counters.uiStreamDeferrals == kRounds && trace.counters.micraRxBytes == 3 * kRounds);
+  CHECK(shot_trace_test::count(trace, DebugCode::HEALTH_LOOP_GAP) == kRounds);
+  // Captures open and close while producers append and a reader exports.
+  std::atomic<bool> done{false}, corrupt{false};
+  std::thread producer([&done] {
+    while (!done.load()) shotTrace().noteDebug(DebugCode::STATE_TRANSITION, 1, 2, 5);
+  });
+  std::thread idleEvidence([&done] {  // Pre-shot ring writes racing begin().
+    for (uint32_t i = 0; !done.load(); ++i)
+      scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, i, 1, i, 80.0f, i, 0);
+  });
+  std::thread reader([&done, &corrupt] {
+    Trace exported;
+    while (!done.load()) {
+      ShotTraceExport result = ShotTraceExport::OK;
+      const std::vector<uint8_t> bytes = shot_trace_test::exportBytes(&result);
+      if (result == ShotTraceExport::OK && !shot_trace_test::decode(bytes, exported))
+        corrupt.store(true);
+    }
+  });
+  for (uint32_t i = 0; i < 200; ++i) {
+    shotTrace().begin(i);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+    shotTrace().note(ShotTraceKind::STOP_REQUESTED, i, 1, 0);
+    shotTrace().complete(i + 2, 1, i, 1);
+  }
+  done.store(true);
+  producer.join();
+  idleEvidence.join();
+  reader.join();
+  CHECK(!corrupt.load());
+}
+
+void trc12_cancelled_drip_analysis_completes_the_trace() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  shotLog.clear();
+  uint32_t rawOnAt = startCycle();
+  const uint32_t firstCycle = session.id;
+  advanceToBrew();
+  releaseAtPhysicalDuration(rawOnAt, 15000);
+  CHECK(pendingFinalize.pending && shotTrace().capturing());
+  // The next shot cancels the drip analysis: the trace closes, linked to
+  // the stored summary, and a new capture opens.
+  runLoopAfter(1000);
+  startCycle();
+  CHECK(shotTrace().capturing() && session.id != firstCycle);
+  ShotTraceExport result = ShotTraceExport::OK;
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::BUSY);
+  finalizeCycle(EndReason::UNCONFIRMED_START, StopperState::REQUIRES_OFF);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  ShotLogRecord stored[1] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1 && trace.header.shotLogId == stored[0].id);
+  const Event *cancelled = shot_trace_test::find(trace, ScaleProfileEvent::FINALIZE_CANCELLED);
+  CHECK(cancelled != nullptr && cancelled->b == static_cast<uint16_t>(firstCycle) &&
+        cancelled->profileArg2() == 2);
+  const Event *final = shot_trace_test::find(trace, ShotTraceKind::FINAL_WEIGHT);
+  CHECK(final != nullptr && final->b == static_cast<uint16_t>(ActualWeightSource::LAST_KNOWN));
+}
+
+void trc13_pre_shot_ages_never_wrap() {
+  shotTrace().hostReset();
+  // Stamped after the anchor (between startedAtMs and begin()): age 0, not 2.3 h.
+  scaleProfileNoteEvent(ScaleProfileEvent::CUP_REMOVED, 1500, 1, 0, NAN, 1, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, 400, 1, 0, 80.0f, 2, 0);
+  shotTrace().begin(1000);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().complete(1, 1, 1, 1);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  const ShotTracePreShot *removed =
+      shot_trace_test::findPreShot(trace, shot_trace_test::kindOf(ScaleProfileEvent::CUP_REMOVED));
+  const ShotTracePreShot *placed =
+      shot_trace_test::findPreShot(trace, shot_trace_test::kindOf(ScaleProfileEvent::CUP_PLACED));
+  CHECK(removed != nullptr && (removed->event.head & SHOT_TRACE_MS_MAX) == 0);
+  CHECK(placed != nullptr && (placed->event.head & SHOT_TRACE_MS_MAX) == 600);
+  // A late attach after a discard never consumes the ring.
+  scaleProfileNoteEvent(ScaleProfileEvent::CUP_RESET, 2000, 1, 0, NAN, 3, 0);
+  shotTrace().begin(2100);
+  shotTrace().discard(static_cast<uint8_t>(EndReason::RELAY_SAFETY_FAILURE), 2100);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().begin(3000);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().complete(2, 1, 1, 1);
+  CHECK(shot_trace_test::decodeCompleted(trace) && trace.preShot.size() == 2);
+}
+
+void trc14_discarded_trace_is_noted_in_the_next_one() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  const uint32_t ranMs = 700;
+  runLoopAfter(ranMs - elapsedMs(session.startedAtMs));
+  finalizeCycle(EndReason::UNCONFIRMED_START, StopperState::REQUIRES_OFF);
+  CHECK(!shotTrace().capturing());
+  // A second discard of the closed window adds nothing.
+  shotTrace().discard(static_cast<uint8_t>(EndReason::RINSE_COMPLETE), hostMillis);
+  setRawPaddle(false);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  CHECK(stopperState == StopperState::READY);
+  const uint32_t rawOnAt = startCycle();
+  advanceToBrew();
+  releaseAtPhysicalDuration(rawOnAt, 15000);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  const ShotTracePreShot *discarded = shot_trace_test::findPreShot(
+      trace, shot_trace_test::kindOf(ShotTraceKind::TRACE_DISCARDED));
+  CHECK(discarded != nullptr && discarded->repeats == 0 &&
+        discarded->event.a == static_cast<int16_t>(EndReason::UNCONFIRMED_START) &&
+        discarded->event.b == ranMs);
+  // Every capture restates its signals, even when unchanged since the last.
+  const Event *control = shot_trace_test::findState(trace, ScaleProfileSignal::WEIGHT_CONTROL);
+  CHECK(control != nullptr && (control->b & SHOT_TRACE_STATE_INITIAL) != 0);
+}
+
+void trc15_over_line_reading_that_never_confirms_is_recorded() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  advanceToBrew();
+  endBbwProtectionForTests();
+  reachSessionElapsed(20000);
+  const float threshold = effectiveStopThreshold();
+  publishWeight(threshold - 2.0f, hostMillis + 200);
+  publishWeight(threshold + 0.1f, hostMillis + 200);   // First over the line.
+  publishWeight(threshold + 0.2f, hostMillis + 1500);  // Too late: chain restarts.
+  publishWeight(threshold - 0.5f, hostMillis + 200);   // Back under: chain resets.
+  CHECK(session.active && stopperState == StopperState::BREW);
+  finalizeCycle(EndReason::ACTIVATOR, StopperState::READY);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(shot_trace_test::count(trace, ShotTraceKind::OVER_LINE) == 1);
+  const Event *over = shot_trace_test::find(trace, ShotTraceKind::OVER_LINE);
+  CHECK(over != nullptr && over->a == gramsToDg(threshold + 0.1f) && over->more &&
+        over->moreB == 1 && over->moreA == static_cast<int16_t>(session.cut.offsetDg));
+  CHECK(over->a >= over->b - over->moreA);
+  CHECK(trace.counters.confirmationResets == 2);
+}
+
+void trc16_profile_arguments_keep_their_high_half() {
+  shotTrace().hostReset();
+  scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, 50, 1, 0, NAN, 0x12345, 4);
+  shotTrace().begin(100);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 200, 1, 0, NAN, 70000, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::SHOT_START, 200, 1, 0, NAN, 0x10002, 3600);
+  scaleProfileNoteEvent(ScaleProfileEvent::FIRST_DROP, 300, 1, 0, 0.4f, 1200, 0);
+  shotTrace().complete(1, 1, 1, 1);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  const Event *gap = shot_trace_test::find(trace, ScaleProfileEvent::PACKET_GAP);
+  CHECK(gap != nullptr && gap->more && gap->profileArg1() == 70000 && gap->profileArg2() == 0);
+  const Event *start = shot_trace_test::find(trace, ScaleProfileEvent::SHOT_START);
+  CHECK(start != nullptr && start->profileArg1() == 0x10002 && start->profileArg2() == 3600);
+  const Event *drop = shot_trace_test::find(trace, ScaleProfileEvent::FIRST_DROP);
+  CHECK(drop != nullptr && !drop->more && drop->profileArg1() == 1200 && drop->a == 4);
+  const ShotTracePreShot *request = shot_trace_test::findPreShot(
+      trace, shot_trace_test::kindOf(ScaleProfileEvent::TARE_REQUEST));
+  CHECK(request != nullptr && request->arg1High == 1 && request->event.b == 0x2345 &&
+        request->arg2 == 4);
+}
+
+void trc11_idle_placement_evidence_reaches_the_next_trace() {
+  prepareIdleTare();
+  maintenanceLease.active = true;
+  serviceIdleTare();
+  idleCup(80.0f);  // Placed while idle tare is not eligible.
+  maintenanceLease.active = false;
+  shotTrace().begin(hostMillis);
+  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().complete(1, 1, 1, 1);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  bool placed = false, rejected = false, ineligible = false;
+  for (const ShotTracePreShot &item : trace.preShot) {
+    const uint8_t kind = static_cast<uint8_t>(item.event.head >> 24);
+    placed = placed || (kind == shot_trace_test::kindOf(ScaleProfileEvent::CUP_PLACED) &&
+                        item.event.a == 800);
+    rejected = rejected ||
+               (kind == shot_trace_test::kindOf(ScaleProfileEvent::TARE_REJECTED) &&
+                item.arg2 == static_cast<uint32_t>(IdleTareReason::MAINTENANCE));
+    ineligible = ineligible ||
+                 (kind == shot_trace_test::kindOf(ScaleProfileEvent::STATE_CHANGED) &&
+                  (item.event.b & ~SHOT_TRACE_STATE_INITIAL) ==
+                      static_cast<uint16_t>(ScaleProfileSignal::IDLE_ELIGIBILITY) &&
+                  item.event.a == static_cast<int16_t>(IdleTareReason::MAINTENANCE));
+  }
+  CHECK(placed && rejected && ineligible);
+}
+
 const TestCase testCases[] = {
     {"HOME03", home03_active_flow_requires_fresh_baseline_and_confirmed_drop},
     {"HOME02", home02_nonqualifying_resolution_preserves_cutoff_and_endpoint},
@@ -23278,6 +23915,22 @@ const TestCase testCases[] = {
     {"S01o", s01o_bad_shots_feed_no_statistic_or_learning_input},
     {"S01p", s01p_bad_cycles_never_train_and_no_scale_keeps_its_rule},
     {"S01q", s01q_overflow_yield_and_new_coffee_keep_bad_shots_out},
+    {"TRC01", trc01_scale_shot_is_traced_from_cycle_start_to_drip_finalize},
+    {"TRC02", trc02_rinses_abandoned_starts_and_no_scale_cycles_leave_no_trace},
+    {"TRC03", trc03_end_counters_are_exact},
+    {"TRC04", trc04_verbose_events_truncate_first_and_time_passes_65_s},
+    {"TRC05", trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot},
+    {"TRC06", trc06_pre_shot_events_keep_the_latest_per_kind},
+    {"TRC07", trc07_paddle_original_mode_blocks_and_releases_the_automation_stop},
+    {"TRC08", trc08_slow_window_end_records_weight_line_and_decision},
+    {"TRC09", trc09_protection_window_blocks_a_stop_once},
+    {"TRC10", trc10_concurrent_producers_keep_counters_exact},
+    {"TRC11", trc11_idle_placement_evidence_reaches_the_next_trace},
+    {"TRC12", trc12_cancelled_drip_analysis_completes_the_trace},
+    {"TRC13", trc13_pre_shot_ages_never_wrap},
+    {"TRC14", trc14_discarded_trace_is_noted_in_the_next_one},
+    {"TRC15", trc15_over_line_reading_that_never_confirms_is_recorded},
+    {"TRC16", trc16_profile_arguments_keep_their_high_half},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},

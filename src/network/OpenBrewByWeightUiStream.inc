@@ -711,6 +711,7 @@ void OpenBrewByWeightNetwork::sendUiStream(UiStreamSession &session,
   uiStreamSendKind = "batch";
   if (!uiStreamBatchEnd(open) && open) {
     if (uiStreamSendCleanAbort) {
+      shotTrace().noteUiDeferral();
       session = saved;
       memcpy(hashes.homeHashes, workBuf_->batchHomeHashes, sizeof(hashes.homeHashes));
       memcpy(hashes.cardHashes, workBuf_->batchCardHashes, sizeof(hashes.cardHashes));

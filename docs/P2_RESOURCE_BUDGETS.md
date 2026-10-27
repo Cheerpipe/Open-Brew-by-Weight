@@ -159,7 +159,7 @@ Coexistence arbitration is radio-time based, so it does not give BLE more air
 time. Apply it when internal RAM becomes the constraint.
 
 Both linker maps must also keep external BSS at or below `maximumExternalBssBytes`
-in `config/resource-baselines.json` (currently 3,186,688 bytes) and retain
+in `config/resource-baselines.json` (currently 3,211,264 bytes) and retain
 `localBuzzer` and `taskProfiler` in internal DRAM: both hold synchronization
 state (mutexes, atomics) that must not live in PSRAM. The profiler's published
 report (`taskProfilerReport`) must instead reside in external BSS.
@@ -189,6 +189,11 @@ cut short or evicted by curve size. Across the 500-record bank, the worker
 image, sampler, published and finalization records it adds 237,504 bytes (about 232 KiB); the
 matched development profile measured 3,156,312 external-BSS bytes. The
 runtime PSRAM heap had 2.6 MB free before the change.
+The 3,112 KiB→3,136 KiB increase covers the per-shot decision trace
+([shot trace](SHOT_TRACE.md)): two fixed 16 KiB capture buffers, its
+640-byte pre-shot ring and a 4 KiB export chunk, 37,504 bytes in all; the
+matched development profile measured 3,206,128 external-BSS bytes. The
+runtime PSRAM heap had about 2.2 MB free before the change.
 The immutable persistence image is separately allocated in external heap.
 It mirrors the shot and activation logs but carries at most four unpersisted
 curves (about 22 KiB) instead of a second curve bank; a larger backlog is

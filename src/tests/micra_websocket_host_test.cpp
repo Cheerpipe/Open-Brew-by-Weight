@@ -67,6 +67,14 @@ void addDebugEventDetail(openbrewbyweight::DebugCategory category,
     muxWaitDepthAtEvent = muxObserverDepth;
   }
 }
+// Shot trace hooks: received bytes counted outside the facade mutex.
+static uint64_t traceRxBytes = 0;
+static bool traceSubscribed = false;
+void shotTraceNoteMicraRx(uint32_t bytes) {
+  assert(!locked);
+  traceRxBytes += bytes;
+}
+void shotTraceNoteMicraSubscribed(bool subscribed) { traceSubscribed = subscribed; }
 static int sendLimit = -1;
 static bool initFails = false, startFails = false;
 static bool sessionFails = false, inhibitAfterSession = false, inhibitAfterInit = false;
@@ -519,7 +527,9 @@ struct MicraWebSocketTest {
     message.fin = fin;
     message.op_code = opcode;
     callback = true;
+    const uint64_t traced = traceRxBytes;
     service.websocketEvent(&service, nullptr, WEBSOCKET_EVENT_DATA, &message);
+    assert(traceRxBytes == traced + (opcode <= 2 ? bytes.size() : 0));
     callback = false;
   }
   static std::string observation(OpenBrewByWeightMicraService &service, const char *body) {
@@ -535,7 +545,7 @@ struct MicraWebSocketTest {
     assert(transmitted.find("Authorization:Bearer synthetic-token") != std::string::npos);
     assert(service.websocket_->connect[0] == '\0');
     deliver(service, std::string("CONNECTED\nversion:1.2\n\n") + std::string(1, '\0'));
-    assert(service.websocketStatus().subscribed);
+    assert(service.websocketStatus().subscribed && traceSubscribed);
     assert(service.snapshotPending_);
     assert(service.snapshotStamp_.epoch == service.observationFence_.epoch);
     assert(service.snapshotStamp_.connectionRevision == service.observationFence_.connectionRevision);

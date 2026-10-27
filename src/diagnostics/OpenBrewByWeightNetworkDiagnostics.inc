@@ -1173,3 +1173,34 @@ esp_err_t OpenBrewByWeightNetwork::scaleGapMaxResetHandler(httpd_req_t *request)
   self.callbacks_.requestScaleGapMaxReset();
   return sendJson(request, STATUS_OK, "{\"reset\":true}");
 }
+
+// Shot trace export chunk: PSRAM, off the httpd stack; 4 KiB keeps a 16 KiB
+// trace to four sends.
+OPEN_BREW_BY_WEIGHT_PSRAM_BSS uint8_t shotTraceDownloadChunk[4096];
+
+// The newest completed shot trace, binary, straight from RAM. Nothing is
+// exported while a shot (cycle start to drip finalize) is captured.
+esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request) {
+  bool started = false;
+  const ShotTraceExport result = shotTrace().exportCompleted(
+      shotTraceDownloadChunk, sizeof(shotTraceDownloadChunk),
+      [&](const uint8_t *data, size_t bytes) {
+        if (!started) {
+          started = true;
+          httpd_resp_set_type(request, "application/octet-stream");
+          httpd_resp_set_hdr(request, "Content-Disposition",
+                             "attachment; filename=\"openbrewbyweight-shot-trace.bin\"");
+          httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+          httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+        }
+        return httpd_resp_send_chunk(request, reinterpret_cast<const char *>(data),
+                                     bytes) == ESP_OK;
+      });
+  if (result == ShotTraceExport::OK) return httpd_resp_send_chunk(request, nullptr, 0);
+  if (started) return ESP_FAIL;
+  if (result == ShotTraceExport::EMPTY)
+    return sendError(request, STATUS_NOT_FOUND, "NO_SHOT_TRACE",
+                     "No shot trace has been captured since the last restart.");
+  return sendError(request, STATUS_CONFLICT, "SHOT_TRACE_BUSY",
+                   "A shot is in progress; the trace is available after it ends.");
+}

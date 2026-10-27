@@ -368,8 +368,13 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
     if (idleTare.requestId != 0) releaseIdleTareRequest(IdleTareReason::REMOVED);
   }
   if (!idleTare.eligible) {
-    if (event == CupPresenceEvent::PLACED)
+    if (event == CupPresenceEvent::PLACED) {
+      scaleProfileNoteEvent(ScaleProfileEvent::TARE_REJECTED, millis(),
+                            idleTare.connectionGeneration, idleTare.lastPacketSequence,
+                            idleTare.lastWeightG, cupPresencePlacementId(),
+                            static_cast<uint32_t>(idleTare.eligibilityReason));
       logIdlePlacementNotTared(idleTare.eligibilityReason, false);
+    }
     return;
   }
   if (cupPresenceState() == CupPresenceState::ABSENT) {

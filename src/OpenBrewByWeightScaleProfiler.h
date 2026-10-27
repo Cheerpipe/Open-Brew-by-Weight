@@ -1575,10 +1575,18 @@ inline void scaleProfileNoteWeight(float weightG, uint32_t receivedAtMs,
                              captureSequence, discontinuity, nowMs);
 }
 
+// Shot trace sinks (OpenBrewByWeightShotTrace.h), defined once in the control
+// unit. They run whether or not a manual capture is active and never nest the
+// capture lock.
+void shotTraceNoteProfileEvent(ScaleProfileEvent kind, uint32_t nowMs, float weightG,
+                               uint32_t arg1, uint32_t arg2);
+void shotTraceNoteDroppedFrame(bool stale);
+
 inline void scaleProfileNoteEvent(ScaleProfileEvent kind, uint32_t nowMs,
                                   uint32_t connectionGeneration,
                                   uint32_t sequence, float weightG, uint32_t arg1,
                                   uint32_t arg2, uint16_t flags = 0) {
+  shotTraceNoteProfileEvent(kind, nowMs, weightG, arg1, arg2);
   scaleProfiler().noteEvent(kind, nowMs, connectionGeneration, sequence, weightG,
                             arg1, arg2, flags);
 }
@@ -1588,6 +1596,7 @@ inline void scaleProfileNoteDroppedFrame(bool stale, bool decoded,
                                          uint32_t connectionGeneration,
                                          uint32_t captureSequence,
                                          uint16_t length, uint32_t nowMs) {
+  shotTraceNoteDroppedFrame(stale);
   scaleProfiler().noteDroppedFrame(stale, decoded, weightG, receivedAtMs,
                                    connectionGeneration, captureSequence,
                                    length, nowMs);

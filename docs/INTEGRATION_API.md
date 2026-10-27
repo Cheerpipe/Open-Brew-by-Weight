@@ -495,7 +495,9 @@ Raw `WEIGHT` rows retain the received floating-point weight precision.
 `TARE_PHASE` preserves queued/writing/succeeded/failed command transitions even
 when they occur between control observations. Its ID belongs to the idle-tare
 request namespace; `boundary` is a capture sequence. `TARE_REJECTED` identifies
-the placement in `context`; `CUP_QUALIFICATION_RESET` uses context 0 for empty
+the placement in `context`; a placement while idle tare is not eligible is
+rejected with its eligibility reason (for example `maintenance`).
+`CUP_QUALIFICATION_RESET` uses context 0 for empty
 pan, 1 for cup placement, and 2 for accessory settling. Their `pkt` is the
 control packet sequence. `CUP_ANCHOR_REJECTED` marks one steady empty-pan
 plateau rejected as off the empty reference, with its `placement` and signed
@@ -519,6 +521,24 @@ The capture still reserves a terminal record and reports overflow/loss. Its
 per-signal deduplication cache is bounded PSRAM, reset for every capture;
 no new partition, endpoint, or control owner is introduced. Older captures
 remain readable; unknown event IDs render their numeric payload safely.
+
+### `GET /api/v1/diagnostic/shot-trace`
+
+Downloads the newest completed [shot trace](SHOT_TRACE.md) from RAM as a
+chunked `application/octet-stream` attachment
+(`openbrewbyweight-shot-trace.bin`, `Cache-Control: no-store`). A trace exists
+for every brew cycle started with a scale since the last restart; its header
+links it to the stored shot by id, boot id and end time, and carries a CRC-32
+filled on export. Requires the exclusive Web UI claim like every owned route.
+
+| Status | Code | When |
+| --- | --- | --- |
+| `200` | — | The newest completed trace, 784 B to 16 KiB |
+| `404` | `NO_SHOT_TRACE` | No trace was completed since the last restart |
+| `409` | `SHOT_TRACE_BUSY` | A shot is being captured, from cycle start to the end of its drip analysis; a shot that starts mid-download ends the stream |
+
+Only the newest trace is kept; a later shot replaces it. The trace is not yet
+written to flash and does not survive a restart.
 
 ## Web UI record API
 

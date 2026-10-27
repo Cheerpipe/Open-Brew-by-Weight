@@ -404,16 +404,36 @@ void logEmit(LogLevel level, DebugCategory category, DebugCode code,
   logEmitDetail(level, category, code, argument1, argument2, nullptr);
 }
 
+// Every debug event also reaches the shot trace while its window is open,
+// whatever the log levels retain.
 void addDebugEvent(DebugCategory category, DebugCode code,
                    int32_t argument1 = 0, int32_t argument2 = 0) {
+  if (shotTrace().capturing()) shotTrace().noteDebug(code, argument1, argument2, millis());
   logEmit(debugCodeDefaultLevel(code), category, code, argument1, argument2);
 }
 
 void addDebugEventDetail(DebugCategory category, DebugCode code,
                          int32_t argument1, int32_t argument2,
                          const char *detail) {
+  if (shotTrace().capturing()) shotTrace().noteDebug(code, argument1, argument2, millis());
   logEmitDetail(debugCodeDefaultLevel(code), category, code, argument1,
                 argument2, detail);
+}
+
+// Scale profile note path sinks (declared in OpenBrewByWeightScaleProfiler.h).
+void openbrewbyweight::shotTraceNoteProfileEvent(ScaleProfileEvent kind, uint32_t nowMs,
+                                                 float weightG, uint32_t arg1,
+                                                 uint32_t arg2) {
+  shotTrace().noteProfile(kind, nowMs, weightG, arg1, arg2);
+}
+void openbrewbyweight::shotTraceNoteDroppedFrame(bool stale) {
+  shotTrace().noteDroppedFrame(stale);
+}
+
+// Linea Micra WebSocket task hooks (declared in OpenBrewByWeightMicraService.cpp).
+void shotTraceNoteMicraRx(uint32_t bytes) { shotTrace().noteMicraRx(bytes); }
+void shotTraceNoteMicraSubscribed(bool subscribed) {
+  shotTrace().noteMicraSubscribed(subscribed);
 }
 
 uint32_t debugLogLatestSequence() {

@@ -1,7 +1,17 @@
 void profileControlState(uint32_t captureSequence, uint32_t evidenceConnection) {
-  if (!scaleProfiler().recording()) return;
-  const auto link = getScaleLinkSnapshot();
   const auto &cup = cupPresence;
+  // ShotTraceState order; shot-only signals are read only during a shot.
+  const bool shot = shotTrace().capturing();
+  const uint32_t traced[SHOT_TRACE_STATE_COUNT] = {
+      cup.state == CupPresenceState::PRESENT, cup.weight.emptyValid,
+      static_cast<uint32_t>(idleTare.eligibilityReason),
+      shot ? static_cast<uint32_t>(session.weightControlState) : 0,
+      shot && session.awaitingPostTareBaseline, shot && bbwProtectionActive(),
+      shot && session.autoToManualGuardEnforced};
+  shotTrace().noteState(traced, millis());
+  if (!scaleProfiler().recording()) return;
+  using S = ScaleProfileSignal;
+  const auto link = getScaleLinkSnapshot();
   const IdleTareStatus command = idleScaleTareStatus();
   CupTareDiagnostics presentation;
   presentation.eligibilityReason = static_cast<uint8_t>(idleTare.eligibilityReason);
@@ -15,7 +25,6 @@ void profileControlState(uint32_t captureSequence, uint32_t evidenceConnection) 
   presentation.placementId = cup.placementId;
   presentation.lastTerminalRequestId = idleTare.lastTerminalRequestId;
   presentation.absentObserved = idleTare.absentObserved;
-  using S = ScaleProfileSignal;
   const auto cg = [](float value) -> uint32_t {
     return std::isfinite(value) ? static_cast<uint32_t>(weightToCentigrams(value))
                               : static_cast<uint32_t>(INT32_MIN);
@@ -109,6 +118,8 @@ void publishControlGate() {
   next.maintenanceLeaseActive = maintenanceLease.active;
   next.maintenanceLeaseId = maintenanceLease.active ? maintenanceLease.id : 0;
   next.source = session.active ? session.source : ControlSource::NONE;
+  if (next.machineRunning != publishedControlGate.machineRunning)
+    shotTrace().note(ShotTraceKind::MACHINE_RUNNING, millis(), next.machineRunning, 0);
   // Single writer on the control task: an unchanged gate needs no commit —
   // readers keep the identical value and the RF gate setter is idempotent.
   if (publishedControlGate.bootState == next.bootState &&

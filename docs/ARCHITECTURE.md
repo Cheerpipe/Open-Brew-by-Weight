@@ -302,7 +302,10 @@ worker maintains a constant-memory, time-based EWMA of record growth for the
 advisory remaining-time estimate. Persistence state remains separate from
 capture occupancy. Existing record/header fields extend timestamps without
 changing the 32-byte record size or partition layout; see the
-[diagnostic API](INTEGRATION_API.md#post-apiv1diagnosticscale-profile).
+[diagnostic API](INTEGRATION_API.md#post-apiv1diagnosticscale-profile). Independently
+of that manual capture, every brew cycle started with a scale records a
+compact [shot trace](SHOT_TRACE.md) of the controller's decisions in PSRAM;
+it is not yet persisted.
 Only the sectors the store occupies in the
 inactive slot (16 of the shot log's 126, all four of the history slot) or the
 used curve sector are erased, one 4 KiB sector at a time; each is programmed

@@ -37,6 +37,8 @@ void addDebugEvent(openbrewbyweight::DebugCategory category,
 void addDebugEventDetail(openbrewbyweight::DebugCategory category,
                          openbrewbyweight::DebugCode code, int32_t argument1,
                          int32_t argument2, const char *detail);
+void shotTraceNoteMicraRx(uint32_t bytes);
+void shotTraceNoteMicraSubscribed(bool subscribed);
 
 namespace openbrewbyweight {
 namespace {

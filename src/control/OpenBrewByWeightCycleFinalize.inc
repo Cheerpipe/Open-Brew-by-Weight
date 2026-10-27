@@ -83,6 +83,7 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
     shotCurveSampler.captureEnd(end.endedAtMs);
   }
   if (brewEndIsAbandonedStart(reason) || endingRinseCycle(reason)) {
+    shotTrace().discard(static_cast<uint8_t>(reason), millis());
     return;
   }
   sessionQuickSettings.shotEnded = sessionQuickSettings.mask != 0;
@@ -409,9 +410,10 @@ PersistedLastShot lastShotFromEndedCycle(EndReason reason, uint32_t durationMs,
   return last;
 }
 
-void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeightG,
-                          bool finalWeightValid,
-                          ActualWeightSource weightSource) {
+// Returns the stored record's id, 0 when the log refused it.
+uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeightG,
+                              bool finalWeightValid,
+                              ActualWeightSource weightSource) {
   TaskLockGuard lock(shotStoreMutex);
   ShotLogRecord record;
   memset(&record, 0, sizeof(record));
@@ -538,7 +540,7 @@ void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeight
     addDebugEvent(DebugCategory::CONFIG, DebugCode::SHOT_LOG_PERSIST_FAILED,
                   static_cast<int32_t>(blobBytes),
                   static_cast<int32_t>(shotLog.count()));
-    return;
+    return 0;
   }
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_relaxed);
   // A bad shot is only listed: Home and the last-shot links keep pointing at
@@ -565,6 +567,16 @@ void commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWeight
                     static_cast<int32_t>(shotCurves.count()));
     }
   }
+  return newId;
+}
+
+// Closes the shot trace with the summary it explains (0: not stored).
+void completeShotTrace(const PendingShotFinalize &snapshot, uint32_t shotLogId,
+                       float weightG, bool valid, ActualWeightSource source) {
+  shotTrace().note(ShotTraceKind::FINAL_WEIGHT, millis(), shotTraceDg(valid ? weightG : NAN),
+                   static_cast<uint16_t>(source));
+  shotTrace().complete(shotLogId, snapshot.bootId, snapshot.endedAtMs,
+                       static_cast<uint8_t>(snapshot.endReason));
 }
 
 void queueWebhookEnd(const PendingShotFinalize &snapshot, float finalWeightG,
@@ -680,10 +692,12 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
       !brewEndIsAbandonedStart(snapshot.endReason)) {
     persistLastShotFromFinalize(snapshot, weightG, valid);
   }
+  uint32_t shotLogId = 0;
   if ((good || snapshot.startedWithScale) && !pendingFinalizeIsRinse(snapshot))
-    commitPendingShotLog(snapshot, weightG, valid, source);
+    shotLogId = commitPendingShotLog(snapshot, weightG, valid, source);
   if (!good && snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
     logBadShotYield(snapshot, weightG, valid, source);
+  completeShotTrace(snapshot, shotLogId, weightG, valid, source);
   queueWebhookEnd(snapshot, weightG, valid);
 }
 
@@ -752,10 +766,12 @@ void pendingShotFinalizeTask() {
       !brewEndIsAbandonedStart(snapshot.endReason)) {
     persistLastShotFromFinalize(snapshot, logWeightG, logWeightValid);
   }
+  uint32_t shotLogId = 0;
   if ((good || snapshot.startedWithScale) && !pendingFinalizeIsRinse(snapshot))
-    commitPendingShotLog(snapshot, logWeightG, logWeightValid, weightSource);
+    shotLogId = commitPendingShotLog(snapshot, logWeightG, logWeightValid, weightSource);
   if (!good && snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
     logBadShotYield(snapshot, logWeightG, logWeightValid, weightSource);
+  completeShotTrace(snapshot, shotLogId, logWeightG, logWeightValid, weightSource);
   queueWebhookEnd(snapshot, logWeightG, logWeightValid);
 
 

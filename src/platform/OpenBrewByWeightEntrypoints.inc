@@ -720,6 +720,7 @@ void loop() {
   recordResetUptime(loopStartedAtMs);
   if (lastLoopAtMs != 0) {
     const uint32_t gap = loopStartedAtMs - lastLoopAtMs;
+    shotTrace().noteLoopGap(gap);
     if (!resetLoopMax && gap > loopMaxGapMs) {
       loopMaxGapMs = gap;
       loopPhaseProfiler.capturePeakGap(gap, gapUs, delayUs, dispatchUs,

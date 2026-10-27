@@ -54,6 +54,61 @@ void maybeRequestNtpSyncOnActivity();
 bool beginRinseCycle(ControlSource source);
 bool enterRinse();
 
+// Completes the opening of a shot trace once the machine started; the
+// snapshot holds only what the shot log summary lacks (docs/SHOT_TRACE.md).
+void attachShotTraceStart(const ScaleLinkSnapshot &link) {
+  const auto cg = [](float grams) {
+    return std::isfinite(grams) ? weightToCentigrams(grams) : INT32_MIN;
+  };
+  ShotTraceSnapshot snapshot = {};
+  snapshot.freeHeapBytes = freeHeapBytes;
+  snapshot.freePsramBytes = psramFreeBytes;
+  snapshot.postTareGraceMs = session.config.postTareBaselineGraceMs;
+  snapshot.retareWindowMs = session.config.retareWindowMs;
+  snapshot.stabilityDurationMs = runtimeConfig.retareStabilityMinDurationMs;
+  snapshot.stabilityGapMs = runtimeConfig.retareStabilityMaxGapMs;
+  snapshot.stabilitySamples = runtimeConfig.retareStabilitySamples;
+  snapshot.minimumCupCg = cg(runtimeConfig.minimumCupWeightG);
+  snapshot.cupRemovedCg = cg(runtimeConfig.cupRemovedWeightG);
+  snapshot.stabilityToleranceCg = cg(runtimeConfig.retareStabilityToleranceG);
+  snapshot.emptyReferenceCg = cg(cupPresence.emptyAnchorG);
+  snapshot.occupiedReferenceCg = cupPresence.state == CupPresenceState::PRESENT
+                                     ? cg(cupPresence.occupiedReferenceG) : INT32_MIN;
+  snapshot.preTareWeightCg = cg(currentWeight);
+  snapshot.paddleMode = runtimeConfig.paddleMode;
+  snapshot.noScaleBbwMode = runtimeConfig.noScaleBbwMode;
+  snapshot.idleEligibility = static_cast<uint8_t>(idleTare.eligibilityReason);
+  snapshot.idleLastReason = static_cast<uint8_t>(idleTare.lastReason);
+  const std::pair<bool, uint16_t> flags[] = {
+      {session.config.autoTare, SHOT_TRACE_SNAP_AUTO_TARE},
+      {session.config.autoRetare, SHOT_TRACE_SNAP_AUTO_RETARE},
+      {runtimeConfig.autoTareOutsideBrew, SHOT_TRACE_SNAP_IDLE_TARE},
+      {idleAccessoryRetareEnabled(runtimeConfig.noScaleBbwMode),
+       SHOT_TRACE_SNAP_ACCESSORY_RETARE},
+      {session.config.avoidAccidentalTouchEnabled, SHOT_TRACE_SNAP_TOUCH_AVOIDANCE},
+      {session.config.requireCupToStart, SHOT_TRACE_SNAP_REQUIRE_CUP},
+      {session.config.stopIfCupRemoved, SHOT_TRACE_SNAP_STOP_IF_REMOVED},
+      {session.config.cupProtectionEnabled, SHOT_TRACE_SNAP_CUP_PROTECTION},
+      {cupPresence.state == CupPresenceState::PRESENT, SHOT_TRACE_SNAP_CUP_PRESENT},
+      {cupPresenceIsTared(), SHOT_TRACE_SNAP_CUP_TARED},
+      {cupPresence.weight.emptyValid, SHOT_TRACE_SNAP_EMPTY_VALID},
+      {idleTare.eligible, SHOT_TRACE_SNAP_IDLE_ELIGIBLE},
+      {link.features.has(ScaleFeatureTare), SHOT_TRACE_SNAP_SCALE_TARE}};
+  for (const auto &flag : flags) {
+    if (flag.first) snapshot.flags |= flag.second;
+  }
+#if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
+  const auto network = networkManager.snapshot();
+  if (network.staLinkMetricsValid) {
+    snapshot.wifiRssi = network.staRssi;
+    snapshot.flags |= SHOT_TRACE_SNAP_RSSI_VALID;
+  }
+#endif
+  copyCString(snapshot.scaleName, sizeof(snapshot.scaleName), link.shotScaleName);
+  copyCString(snapshot.scaleProtocol, sizeof(snapshot.scaleProtocol), link.protocolName);
+  shotTrace().attachStart(snapshot);
+}
+
 void beginCycle(ControlSource source = ControlSource::PHYSICAL) {
   if (backflushObservation.busy() || backflushActive(stopperState)) return;
   const ProfileControlObservation profile;
@@ -146,6 +201,7 @@ void beginCycle(ControlSource source = ControlSource::PHYSICAL) {
       session.scaleBaselineG = currentWeight;
       session.scaleBaselineReady = true;
     }
+    shotTrace().begin(session.startedAtMs);  // Before the relay closes.
   }
   resetShotTrajectory(session.startedAtMs);
   initializeBbwProtection();
@@ -161,6 +217,7 @@ void beginCycle(ControlSource source = ControlSource::PHYSICAL) {
   inhibitMachineIntegrationCloud();
   if (!servicePowerManagement() ||
       !machineRequestStart(closeLimitMs, source == ControlSource::WEB)) {
+    shotTrace().discard(static_cast<uint8_t>(EndReason::RELAY_SAFETY_FAILURE), millis());
     setScaleCommandCycle(0);
     session.active = false;
     outboundShotActive.store(false, std::memory_order_release);
@@ -171,6 +228,7 @@ void beginCycle(ControlSource source = ControlSource::PHYSICAL) {
     return;
   }
   captureCycleCircuitStart();
+  if (session.startedWithScale) attachShotTraceStart(scaleLinkAtStart);
   // Arm the tare baseline only for a started cycle: a refused start must not
   // leave the cup FSM held or believing an unsent tare happened.
   if (session.startedWithScale && session.config.autoTare) {
@@ -300,6 +358,9 @@ bool finalizeCycle(EndReason reason, StopperState nextState,
   } else {
     machineStopAccepted = machineRequestStop();
   }
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, millis(), static_cast<int16_t>(reason),
+                   (webStopActuation ? SHOT_TRACE_STOP_WEB : 0) |
+                       (machineStopAccepted ? 0 : SHOT_TRACE_STOP_REFUSED));
   const CycleWallTime cycleEndTime = captureCycleWallTime();
   rinseClear();
   session.rinseStartedAtMs = 0;
@@ -536,6 +597,8 @@ bool enterRinse() {
   session.awaitingPostTareBaseline = false;
   holdCupPresenceTransitions(false);
   addDebugEvent(DebugCategory::STATE, DebugCode::RINSE_CLASSIFIED);
+  // A rinse is never a shot; the next trace notes the discarded one.
+  shotTrace().discard(static_cast<uint8_t>(EndReason::RINSE_COMPLETE), millis());
   transitionTo(StopperState::RINSE);
   outboundShotActive.store(false, std::memory_order_release);
   maybeRequestNtpSyncOnActivity();
@@ -799,6 +862,14 @@ void stateMachineTask() {
                             "Scale stream suspended during brew");
       }
 
+      // Paddle original mode holds automation stops while the paddle is on.
+      if (machineAllowsAutomationStop() == ((session.traceLatches & TRACE_LATCH_PADDLE) != 0)) {
+        session.traceLatches ^= TRACE_LATCH_PADDLE;
+        shotTrace().note(ShotTraceKind::STOP_BLOCKED, millis(),
+                         (session.traceLatches & TRACE_LATCH_PADDLE) != 0,
+                         SHOT_TRACE_BLOCKED_PADDLE |
+                             (session.directStopPending ? SHOT_TRACE_BLOCKED_PENDING : 0));
+      }
       if (machineAllowsAutomationStop()) {
         const StopperState afterAutomation = nextStateForUserHold(intent);
         if (autoToManualGuardDeadlineDue()) {
