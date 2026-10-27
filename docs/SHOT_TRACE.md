@@ -9,8 +9,10 @@ weight stream was.
 
 The trace lives in PSRAM that survives panics, watchdog and software resets;
 it is not yet written to flash. The newest completed trace downloads from
-[`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace);
-a flash pool and a Web UI view are planned.
+[`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace).
+The [flash pool](#flash-pool) that will keep one record per shot is
+specified below; the firmware does not write to it yet. A Web UI view is
+planned.
 
 ## Capture window
 
@@ -244,3 +246,165 @@ statistics; producers on other tasks append under the trace's leaf mutex or
 through relaxed atomics. The export copies 4 KiB chunks through a static PSRAM
 buffer. See [concurrency](CONCURRENCY.md) and
 [resource ownership](RESOURCE_OWNERSHIP.md).
+
+## Flash pool
+
+`ShotTracePool` (`src/OpenBrewByWeightShotTracePool.h`) keeps one immutable
+record per shot in a log-structured FIFO ring: no filesystem, garbage
+collection, copy-forward or in-place update. Records are written back to back;
+before the ring uses a 4 KiB sector it erases it, and the records that start
+there are gone. Deleting a shot only marks its summary; its bytes are reclaimed
+when the ring comes back to them. All fields are little-endian.
+
+### Logical space
+
+| Logical sectors | Partition | Offset |
+| --- | --- | --- |
+| 0–334 | `reserved` (0xCB1000, 1340 KiB) | sector × 4 KiB |
+| 335–1336 | `shotcurve` (0x8C5000, 4016 KiB) | (sector − 333) × 4 KiB |
+
+`reserved` comes first although it is physically after `shotcurve`.
+`shotcurve` sectors 0 and 1 keep the legacy curve epoch and are never part of
+the ring. Both partitions are found by label, subtype 0x40 and exact size. The
+ring ends at sector 335 (`reserved` only) until the curve migration opens the
+rest; the end only grows, and a recovery follows. A logical address is
+sector × 4096 + offset; every flash call stays inside one sector, so none
+spans the partition boundary.
+
+### Sector header
+
+The first 24 bytes of every ring sector; data follows from offset 24.
+
+| Offset | Field | Meaning |
+| --- | --- | --- |
+| 0 | `magic` u32 | `0x53505453` ("STPS") |
+| 4 | `version` u16 | 1 |
+| 6 | `headerBytes` u16 | 24 |
+| 8 | `sequence` u32 | +1 for every sector the ring starts, never reused (a failed header program consumes its number) |
+| 12 | `floor` u32 | Sectors with a lower sequence are cleared |
+| 16 | `crc` u32 | CRC-32 (IEEE) of bytes 0–15 |
+| 20 | `firstRecord` u32 | Offset of the first record that starts in this sector, stored as `offset \| ~offset << 16`; `0xFFFFFFFF` while none has |
+
+The first 20 bytes are programmed right after the erase. `firstRecord` is
+programmed with the header when a record starts at offset 24, and otherwise
+on its own, before the first byte of the first record that starts later in
+the sector (NOR programming only clears bits). A sector whose header is blank,
+torn or fails its CRC is a **hole**, not the end of the ring.
+
+### Record
+
+A record is 32 to 24,576 bytes, a multiple of 16: a 32-byte header, tagged
+sections, and zero padding to the next 16 bytes. Its header never crosses a
+sector boundary (with fewer than 32 bytes left, the record starts in the next
+sector); the rest may span sectors and the partition boundary, skipping each
+sector header.
+
+| Offset | Field | Meaning |
+| --- | --- | --- |
+| 0 | `magic` u32 | `0x52505453` ("STPR") |
+| 4 | `version` u8 | 1 |
+| 5 | `endReason` u8 | Raw `EndReason` |
+| 6 | `totalBytes` u16 | Header, sections and padding; a multiple of 16 |
+| 8 | `shotId` u32 | Shot log summary id |
+| 12 | `bootId` u32 | Boot of the shot |
+| 16 | `endedAtMs` u32 | Shot end (`millis()`) |
+| 20 | `firmwarePacked` u32 | `FW_VERSION_PACKED` that wrote it |
+| 24 | `crc` u32 | CRC-32 of bytes 0–23 and of bytes 32 to `totalBytes` |
+| 28 | `commit` u32 | `0x54494D43` ("CMIT"), programmed last; anything else is uncommitted and ignored |
+
+Each section is a 4-byte header, `tag` u8, `flags` u8 (0), `bytes` u16,
+followed by its payload and zero padding to 4 bytes. Tags: 1 curve, 2 trace (a
+record of the [layout above](#record-layout)); tag 0 ends the list and only
+padding follows. Readers skip unknown tags.
+
+### Writing
+
+An append performs one flash operation per step, so its caller can pause it
+between steps: erase the next sector (after dropping the records that start
+in it from the index), program its header, program `firstRecord` when needed,
+write at most 1 KiB, and finally program the commit word. Writes are strictly
+sequential, one erase per sector the ring advances. A failed step abandons the
+record; the next one starts in a new sector.
+
+A record being written when the power goes is lost, by design: the machine is
+often switched off right after a shot. Recovery never returns it as data,
+always completes, keeps every older committed record outside the sector being
+recycled, and appends continue. A commit that reported a failure but landed
+does reappear after a reboot, so a writer checks `contains()` before writing
+the same shot again; until then the statistics may count one duplicate.
+
+Clearing (clear all, factory reset) empties the RAM index, erases the next
+sector and writes a header whose `floor` is its own sequence: two operations,
+after which every older sector reads as cleared. If power is lost before the
+header lands, the RAM index was already empty but the older records reappear
+after the reboot, so the caller re-runs and verifies the clear after boot.
+
+### Recovery
+
+Recovery runs on the persistence worker, never on the control loop:
+
+1. Read every sector header of the ring. The valid one with the highest
+   sequence is the head; its `floor` applies.
+2. Walk the ring from the sector after the head, oldest first. A sector joins
+   only if it is valid, at least the floor, and above every sequence before
+   it; otherwise it is a hole.
+3. Records chain by length through sectors with consecutive sequences. After
+   a hole, a sequence gap or an uncommitted record, the walk resumes at the
+   next sector's `firstRecord`. A record whose span crosses a hole is dropped.
+   Only record headers are read; payload CRCs are checked when a record is
+   opened.
+   A sector's valid `firstRecord` outranks the length read from the record
+   before it: on disagreement (a stale header in a sector whose erase was
+   interrupted can change its length bits) that record is dropped and the
+   walk resumes at the pointer. A torn `firstRecord` never reads as another
+   valid offset: partial programming only leaves extra 1 bits, which break
+   its complement check.
+4. The next record goes right after the newest one if that is a committed
+   record in the head sector, the rest of the head sector is blank and its
+   `firstRecord` is blank or valid; otherwise (a torn append, an interrupted
+   erase, a head with no committed record) it starts in the next sector.
+
+With `shotcurve` open that is about 2,674 sector-header reads (each sector is
+read in both passes), one record-header read per record, and a blank check of
+at most 4 KiB; the walk yields and feeds the watchdog every 64 sectors.
+Records in a sector whose erase was interrupted may open as `CORRUPT`: that
+is the oldest data being recycled, not damage, and the Web UI must not
+present it as such.
+
+The ring must be opened over `shotcurve` (`setLogicalEnd`) before it first
+wraps inside `reserved`; afterwards a record that wrapped from the last
+`reserved` sector to sector 0 is dropped, and the ring recycles the oldest
+`reserved` sectors before it extends.
+
+### Index, linkage and reads
+
+The RAM index holds one 8-byte entry per record, oldest first: bits 0–23 of
+the shot id with an 8-bit tag of its boot id and end time, the logical address
+in words (21 bits), and the length in 16-byte units (11 bits). It keeps the
+newest 2,048 records, twice the shot log's summary capacity, since a record
+is only reachable through its summary: 16,552 bytes of static PSRAM with a
+one-bit-per-sector map of unused space. When it is full, recovery and appends
+drop the oldest entry; that record stays on flash, unreachable, until the ring
+recycles its sector.
+
+A summary matches a record by shot id, boot id and end time, so an id reused
+after a clear or factory reset never reaches an older record. Opening a record
+finds the newest matching entry, checks the full identity in its flash header
+(trying older entries when an 8-bit tag collides) and verifies the CRC;
+`contains()` answers with the same identity check, so it never reports a
+record of another boot or end time. Reads then take any chunk size; the index is looked up under
+the pool's mutex, flash is read without it, and the record is checked again
+after every chunk, so one the writer recycled meanwhile reads as gone rather
+than as other data.
+
+The storage statistics divide the pool into live and reclaimable indexed
+records (the caller decides which are live: a deleted or evicted summary makes
+its record reclaimable), unindexed space (records dropped from a full index,
+sector headers, torn data and the head sector's unwritten tail) and unused
+sectors. They also report the indexed record count and mean size, how many
+records the full index dropped since the last recovery or clear, and the last
+error. They read RAM only and may be taken under the shot store lock; the
+oldest reachable record's boot and end time ("history since") is a separate
+flash read (`oldest()`) made without that lock, as are `open()` and
+`contains()`.
+

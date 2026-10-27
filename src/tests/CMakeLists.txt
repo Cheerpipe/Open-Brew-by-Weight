@@ -63,6 +63,10 @@ if(OPENBREWBYWEIGHT_SANITIZER STREQUAL "thread")
       OUTPUT_NAME open_brew_by_weight_tsan_${case})
   endforeach()
   host_test(ota_state_concurrency_host_test LABEL "host;ota;concurrency")
+  foreach(case TSP15 TSP26)
+    host_test(shot_trace_pool_tsan_${case} SOURCE shot_trace_pool_host_test.cpp ARGS ${case}
+      LABEL "host;persistence;concurrency")
+  endforeach()
 else()
   host_test(open_brew_by_weight_host_test LABEL "host;control")
   host_test(persistence_host_test LABEL "host;persistence")
@@ -86,6 +90,7 @@ host_test(audit_log_host_test LABEL "host;diagnostics")
 host_test(audit_store_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_AUDIT_HOST_TEST
   LABEL "host;diagnostics;persistence")
   host_test(scale_profiler_host_test LABEL "host;scale;persistence")
+  host_test(shot_trace_pool_host_test LABEL "host;persistence")
   host_test(resource_owner_host_test LABEL "host;resources")
   host_test(machine_integration_host_test
     SOURCES "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightMachineIntegration.cpp"

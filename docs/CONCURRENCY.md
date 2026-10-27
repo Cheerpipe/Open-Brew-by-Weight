@@ -207,7 +207,17 @@ under that mutex on httpd, once, hashing at most about 15.6 KB. Cache
 write-backs never run under the trace mutex: tasks call `esp_cache_msync`
 (the IDF wrapper with its own cache spinlock) after releasing it, for the
 shutdown hook and for each header whose magic changed; only the panic handler,
-with the other core stopped, calls the raw ROM write-back. USB application logs are emitted by the bounded
+with the other core stopped, calls the raw ROM write-back. The shot trace flash pool
+(`ShotTracePool`, not wired yet) belongs to the settings_persist worker:
+recovery, appends and clear run there, one flash operation per step under the
+shared flash lock. Its leaf mutex guards only the RAM index; the writer drops
+the entries of a sector before erasing it, and readers look the index up,
+release the mutex, read flash under the flash lock and check after every chunk
+that the record is still indexed. Lock order is flash lock, then pool mutex.
+Only the RAM statistics (`stats()`, whose callback runs under the pool mutex)
+may be called with `shotStoreMutex` held: `open()`, `read()`, `contains()` and
+`oldest()` read flash and run with no store lock, because control takes
+`shotStoreMutex` blocking. Control takes neither pool lock. USB application logs are emitted by the bounded
 `serial_log` queue on core 0. Eight short log records remain internal while a
 bounded 2.5 KiB PSRAM buffer carries the CLI reply published to that owner;
 saturation increments dropped/truncated counters instead of waiting in control.
