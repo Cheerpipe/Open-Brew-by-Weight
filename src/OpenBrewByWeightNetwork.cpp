@@ -73,7 +73,9 @@ WallClock g_wallClock;
 // changes (sort/dir/paging) re-fingerprint rows without re-fetching or
 // re-hashing their curves.
 struct StatsCurveHashCache {
-  static constexpr size_t kCapacity = 512;  // power of two, > SHOT_LOG_CAPACITY
+  static constexpr size_t kCapacity = 2048;  // power of two, > SHOT_LOG_CAPACITY
+  static_assert(kCapacity > SHOT_LOG_CAPACITY && (kCapacity & (kCapacity - 1)) == 0,
+                "Every row of a full window keeps its hash");
   uint32_t shotId[kCapacity] = {};
   uint32_t hash[kCapacity] = {};
 

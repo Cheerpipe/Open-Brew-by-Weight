@@ -13,12 +13,13 @@
 namespace openbrewbyweight {
 
 // Two 504 KiB slots fill the dedicated shotlog data partition; each slot
-// reserves room for 1 KiB records so later schema growth never touches the
-// partition table again.
+// leaves room for 1000 records of up to 516 bytes, so later schema growth
+// never touches the partition table again. A save erases and rewrites only
+// the sectors the store occupies (32 at 1000 records of 128 bytes).
 constexpr size_t SHOT_LOG_FLASH_SLOT_BYTES = 516096;
 constexpr size_t SHOT_LOG_FLASH_SLOT_COUNT = 2;
 static_assert(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES,
-              "Two shot-log slots of 500 records must fit the shotlog partition");
+              "Two shot-log slots of 1000 records must fit the shotlog partition");
 
 // Only the current schema is accepted; any older slot is discarded. Records
 // of an earlier, shorter size are accepted and widened on load.
@@ -137,6 +138,19 @@ class ShotLog
       ++found;
     }
     return found;
+  }
+  // The newest record with an id below `id`: ids grow with every append, so
+  // a walk by id survives appends and deletions in between.
+  bool copyNewestBefore(uint32_t id, ShotLogRecord &output) const {
+    size_t index = store_.header.writeIndex;
+    for (size_t n = 0; n < store_.header.count; ++n) {
+      if (index == 0) index = SHOT_LOG_CAPACITY;
+      if (store_.records[--index].id < id) {
+        output = store_.records[index];
+        return true;
+      }
+    }
+    return false;
   }
   bool copyNewestEligible(ShotLogRecord &output) const {
     size_t index = store_.header.writeIndex;

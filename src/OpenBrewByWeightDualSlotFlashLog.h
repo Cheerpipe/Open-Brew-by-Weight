@@ -1,7 +1,7 @@
 #pragma once
 
 // Shared machinery for the deferred dual-slot flash ring stores (ShotLog,
-// ShotCurveLog, HistoryLog): PSRAM working copy, generation flip through the
+// HistoryLog): PSRAM working copy, generation flip through the
 // inactive slot, chunked internal-SRAM-staged transfers while the flash cache
 // is disabled, and the host-test double for deterministic persistence tests.
 // Each store header specializes DualSlotFlashLogTraits (partition name, slot

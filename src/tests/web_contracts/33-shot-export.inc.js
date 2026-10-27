@@ -112,9 +112,9 @@
 
   // The toolbar's JSON export reads the same whole-log window as the CSV.
   let saved;
-  Object.assign(context, {SHOTS_EXPORT_LIMIT: 500, statsExportInFlight: null,
+  Object.assign(context, {SHOTS_EXPORT_LIMIT: 1000, statsExportInFlight: null,
     statsFrameWindow: async (...args) => {
-      assert.deepEqual(args, [0, 500, 'date', 'desc', 90e3]);
+      assert.deepEqual(args, [0, 1000, 'date', 'desc', 180e3]);
       return [base, lost];
     },
     saveFile: (blob, name) => (saved = {blob, name}),
@@ -217,7 +217,7 @@
   assert.ok(codeIncludes(viewJs.history, '() => deleteOneHistory(r.id), true]'));
   assert.ok(codeIncludes(viewJs.stats, 'filter: {}'), 'Exports ignore the list filter');
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'async function exportShotsJson('),
-      'statsFrameWindow(0, R.SHOTS_EXPORT_LIMIT, "date", "desc", 90e3)'));
+      'statsFrameWindow(0, R.SHOTS_EXPORT_LIMIT, "date", "desc", 180e3)'));
   assert.ok(codeIncludes(blockAt(viewJs.records, 'function createFilterMenu('), 'createPopup('));
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'function downloadJson('), 'R.saveFile('));
 })().catch((error) => {

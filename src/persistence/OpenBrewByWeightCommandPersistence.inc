@@ -26,13 +26,23 @@ void copyShotStatsRecords(ShotStatsRecordsSnapshot &output) {
   output.epoch = shotLog.epoch();
 }
 
-bool copyShotCurveById(uint32_t shotId, ShotCurveRecord &curve) {
-  const uint32_t lockStartedUs = micros();
-  TaskLockGuard lock(shotStoreMutex);
-  noteMutexWaitUs(shotStoreWaitLastUs, shotStoreWaitMaxUs,
-                  micros() - lockStartedUs);
-  resetShotCurveRecord(curve);
-  return shotCurves.copyByShotId(shotId, curve);
+// The cache answers under the store lock; an older curve is read from its
+// pool record after the lock is released.
+ShotCurveRead copyShotCurveById(uint32_t shotId, ShotCurveRecord &curve) {
+  uint32_t bootId = 0, endedAtMs = 0;
+  {
+    const uint32_t lockStartedUs = micros();
+    TaskLockGuard lock(shotStoreMutex);
+    noteMutexWaitUs(shotStoreWaitLastUs, shotStoreWaitMaxUs,
+                    micros() - lockStartedUs);
+    resetShotCurveRecord(curve);
+    if (shotCurves.copyByShotId(shotId, curve)) return ShotCurveRead::FOUND;
+    const ShotLogRecord *summary = shotLog.findNewestById(shotId);
+    if (summary == nullptr) return ShotCurveRead::NONE;
+    bootId = summary->bootId;
+    endedAtMs = summary->endedAtMs;
+  }
+  return readShotCurve(shotId, bootId, endedAtMs, curve);
 }
 
 // A null curve copies the record alone (the integration snapshot).
@@ -44,7 +54,9 @@ bool copyHomeShot(ShotLogRecord &record, ShotCurveRecord *curve) {
   }
   // Curves mutate only with the shot-log epoch (ShotLog::epoch): the idle
   // Home card keeps its copy of this shot's curve instead of re-reading it on
-  // every dispatch. A reset or foreign copy carries another shotId.
+  // every dispatch. A reset or foreign copy carries another shotId, so a
+  // curve the cache has not loaded back after boot yet is looked up again.
+  // The cache only: this runs under the store lock and never reads flash.
   static uint32_t copiedEpoch = 0;
   const uint32_t epoch = shotLog.epoch();
   if (curve && (curve->shotId != record.id || epoch != copiedEpoch)) {
@@ -57,7 +69,7 @@ bool copyHomeShot(ShotLogRecord &record, ShotCurveRecord *curve) {
 
 bool shotLogSavePending() {
   TaskLockGuard lock(shotStoreMutex);
-  return shotLog.dirty() || shotCurves.dirty();
+  return shotLog.dirty() || shotCurves.pending() != 0;
 }
 
 void copyHistoryPage(HistoryPage &page, size_t offset, size_t limit,
@@ -128,27 +140,16 @@ bool copyShotStoreStatus(uint32_t &bootId, PersistedLastShot &last,
 
 bool deleteShotRecord(uint32_t id) {
   TaskLockGuard lock(shotStoreMutex);
-  const bool hadCurve = shotCurves.containsShotId(id);
-  const bool hadLog = shotLog.containsId(id);
-  if (!hadLog && !hadCurve) {
-    return false;
-  }
-  if (hadCurve && !shotCurves.removeById(id, false)) {
-    return false;
-  }
-  if (hadLog && !shotLog.removeById(id, false)) {
-    return false;
-  }
+  const bool hadCurve = shotCurves.removeById(id);
+  if (!shotLog.removeById(id, false) && !hadCurve) return false;
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return true;
 }
 
 bool clearShotLog() {
   TaskLockGuard lock(shotStoreMutex);
-  if (!shotCurves.clear(false)) {
-    return false;
-  }
   if (!shotLog.clear(false)) return false;
+  shotCurves.clear();
   // The pool clears before this clear is persisted; the unsaved trace of a
   // cleared shot is not written.
   shotTrace().consumeCompleted();
@@ -161,9 +162,8 @@ bool clearLastShot() {
   TaskLockGuard lock(shotStoreMutex);
   ShotLogRecord latest = {};
   if (!shotLog.copyNewestEligible(latest)) return false;
-  if (shotCurves.containsShotId(latest.id) &&
-      !shotCurves.removeById(latest.id, false)) return false;
   if (!shotLog.removeById(latest.id, false)) return false;
+  shotCurves.removeById(latest.id);
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return true;
 }
@@ -177,9 +177,10 @@ bool resetAllDurableStoresForNetwork(PersistedSettings &settings) {
   TaskLockGuard lock(shotStoreMutex);
   TaskLockGuard poolWriter(shotTracePoolWriterMutex);
   if (!resetAllDurableStores(settings, bleScanPersistedSettings, shotLog,
-                             historyLog, lastShotStore, shotCurves, &shotTracePool())) {
+                             historyLog, lastShotStore, &shotTracePool())) {
     return false;
   }
+  shotCurves.clear();
   shotTrace().consumeCompleted();
   shotTracePoolClearRequested.store(false, std::memory_order_release);
   // The wiped stores are a mutation like any other: bump so the status
@@ -449,7 +450,7 @@ bool plannedRestartMustWait() {
   }
   if (pendingFinalize.pending) return true;
   TaskLockGuard lock(shotStoreMutex);
-  return shotLog.dirty() || shotCurves.dirty() || historyLog.dirty() ||
+  return shotLog.dirty() || shotCurves.pending() != 0 || historyLog.dirty() ||
          lastShotNvsDirty;
 }
 
@@ -900,9 +901,9 @@ bool initializeSettingsPersistenceWorker() {
 #endif
   }
   if (shotStorePersistImage == nullptr) {
-    void *block = allocExternal(sizeof(ActivationStoresPersistImage));
+    void *block = allocExternal(sizeof(ActivationStores));
     if (block == nullptr) return false;
-    shotStorePersistImage = new (block) ActivationStoresPersistImage();
+    shotStorePersistImage = new (block) ActivationStores();
   }
   if (lastShotPersistImage == nullptr) {
     void *block = allocExternal(sizeof(LastShotStore));
@@ -965,7 +966,7 @@ void releaseSettingsPersistenceWorkerForHost() {
   settingsPersistTaskHandle = nullptr;
   settingsPersistenceReady = false;
   if (shotStorePersistImage != nullptr) {
-    shotStorePersistImage->~ActivationStoresPersistImage();
+    shotStorePersistImage->~ActivationStores();
     free(shotStorePersistImage);
     shotStorePersistImage = nullptr;
   }
@@ -1244,8 +1245,7 @@ void serviceShotStorePersistence() {
       activationStores.acknowledgePersisted(*shotStorePersistImage,
                                             resultOk && current);
       if (resultOk && current) {
-        // A capped curve batch keeps the generation dirty for the remainder.
-        if (!shotCurves.dirty()) shotStorePersistCleanGeneration = resultGeneration;
+        shotStorePersistCleanGeneration = resultGeneration;
         if (shotStorePersistImageLastShotDirty) {
           lastShotNvsDirty = false;
         }
@@ -1292,8 +1292,7 @@ void serviceShotStorePersistence() {
   }
   {
     TaskLockGuard lock(shotStoreMutex);
-    if (!shotLog.dirty() && !shotCurves.dirty() && !historyLog.dirty() &&
-        !lastShotNvsDirty) {
+    if (!shotLog.dirty() && !historyLog.dirty() && !lastShotNvsDirty) {
       return;
     }
     activationStores.capturePersistenceImage(*shotStorePersistImage);

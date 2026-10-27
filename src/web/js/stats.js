@@ -1283,7 +1283,7 @@ const loadMoreShots = () => {
 async function exportShotsCsv() {
   if (statsExportInFlight) return;
   try {
-    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 90e3);
+    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3);
     if (!list) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
     const maxW = list.reduce((m, r) => Math.max(m, r.wCg?.length || 0), 0);
     const rows = [
@@ -1383,7 +1383,7 @@ async function exportShotsCsv() {
 async function exportShotsJson() {
   if (statsExportInFlight) return;
   try {
-    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 90e3);
+    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3);
     if (!list) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
     // Local time as YYYYMMDD-HHMM ("sv" formats dates ISO-like).
     const stamp = new Date().toLocaleString("sv").slice(0, 16).replace(/\D/g, "");
@@ -1771,7 +1771,7 @@ async function clearShotHistory() {
 // standing subscription is session-long once ensured, and these handlers run
 // from the runtime's socket callbacks.
 const SHOTS_PAGE_SIZE = 10,
-  SHOTS_EXPORT_LIMIT = 500;
+  SHOTS_EXPORT_LIMIT = 1000;
 let shotsLoaded = false,
   shotFilterReset = () => {};
 function applyShotPage(d, mode) {

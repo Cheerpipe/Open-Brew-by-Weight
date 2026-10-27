@@ -228,7 +228,7 @@ struct NetworkBridgeCallbacks {
   void (*requestSafeRestart)() = nullptr;
   size_t (*copyShotRecords)(ShotLogRecord *output, size_t capacity) = nullptr;
   void (*copyShotStatsRecords)(ShotStatsRecordsSnapshot &output) = nullptr;
-  bool (*copyShotCurveById)(uint32_t shotId, ShotCurveRecord &curve) = nullptr;
+  ShotCurveRead (*copyShotCurveById)(uint32_t shotId, ShotCurveRecord &curve) = nullptr;
   bool (*copyHomeShot)(ShotLogRecord &record, ShotCurveRecord *curve) = nullptr;
   bool (*shotLogSavePending)() = nullptr;
   void (*copyHistoryPage)(HistoryPage &page, size_t offset, size_t limit,

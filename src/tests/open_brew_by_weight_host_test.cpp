@@ -198,11 +198,10 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   shotCurveSampler.reset(0);
   ShotLog::resetHostStorage();
   ShotLog::setHostSaveSucceeds(true);
-  ShotCurveLog::resetHostStorage();
   HistoryLog::resetHostStorage();
   HistoryLog::setHostSaveSucceeds(true);
   shotLog.load();
-  shotCurves.load();
+  shotCurves.clear();
   historyLog.load();
   noScaleShotGuardArmed = true;
   noScaleShotGuardActivityAtMs = 0;
@@ -13428,31 +13427,35 @@ void s01f_curve_rollover_keeps_stats_windows_and_sorted_joins() {
     CHECK(shotLog.append(record, false));
     CHECK(shotCurves.append(curve));
   }
-  CHECK(shotLog.save() && shotLog.load() && shotCurves.load());
-  CHECK(!shotCurves.containsShotId(10) && shotCurves.containsShotId(11));
+  CHECK(shotLog.save() && shotLog.load() && shotLog.count() == SHOT_LOG_CAPACITY);
+  // The cache keeps the newest SHOT_CURVE_CAPACITY curves; the summaries 1000.
+  const uint32_t oldestCached = SHOT_LOG_CAPACITY + 10 - SHOT_CURVE_CAPACITY + 1;
+  CHECK(!shotCurves.containsShotId(oldestCached - 1) && shotCurves.containsShotId(oldestCached));
+  CHECK(shotCurves.count() == SHOT_CURVE_CAPACITY);
   const auto before = copyShotStats();
   CHECK(before.shotCount == 10 && before.bbwCount == 10);
   CHECK(before.errorPctTenthsSum == 1000 && before.flowCount == 5);
-  const size_t writes = ShotCurveLog::hostWriteBytes();
+  const size_t poolOperations = ShotTracePoolHostFlash::operations();
+  static ShotLogRecord rows[SHOT_LOG_CAPACITY];
   for (const auto sort : {ShotLogSort::Date, ShotLogSort::Rating})
     for (const auto dir : {ShotLogSortDir::Asc, ShotLogSortDir::Desc}) {
-      ShotLogRecord rows[SHOT_LOG_CAPACITY];
       const size_t count = copyShotRecords(rows, SHOT_LOG_CAPACITY);
+      CHECK(count == SHOT_LOG_CAPACITY);
       shotLogSortRecords(rows, count, sort, dir);
       for (size_t page = 0; page < count; page += 10)
         for (size_t n = page; n < page + 10 && n < count; ++n) {
-          CHECK(shotCurves.copyByShotId(rows[n].id, curve));
-          CHECK(curvePoint(curve, 1).cg == static_cast<int16_t>(rows[n].id));
+          const bool cached = shotCurves.copyByShotId(rows[n].id, curve);
+          CHECK(cached == (rows[n].id >= oldestCached));
+          if (cached) CHECK(curvePoint(curve, 1).cg == static_cast<int16_t>(rows[n].id));
         }
       const auto stats = copyShotStats();
       CHECK(stats.shotCount == before.shotCount && stats.bbwCount == before.bbwCount);
       CHECK(stats.errorPctTenthsSum == before.errorPctTenthsSum &&
             stats.flowCount == before.flowCount);
     }
-  CHECK(ShotCurveLog::hostWriteBytes() == writes);
+  CHECK(ShotTracePoolHostFlash::operations() == poolOperations);
   CHECK(shotCurves.removeById(SHOT_LOG_CAPACITY + 10));
   CHECK(copyShotStats().shotCount == 10); // Missing curve does not remove its summary.
-  ShotLogRecord rows[SHOT_LOG_CAPACITY];
   const size_t count = copyShotRecords(rows, SHOT_LOG_CAPACITY);
   size_t bbwKept = 0;
   for (size_t n = 0; n < count; ++n)
@@ -13460,8 +13463,7 @@ void s01f_curve_rollover_keeps_stats_windows_and_sorted_joins() {
       CHECK(deleteShotRecord(rows[n].id));
   const auto fewer = copyShotStats();
   CHECK(fewer.bbwCount == 7 && fewer.errorPctTenthsSum == 700);
-  CHECK(shotLog.save() && shotCurves.flush());
-  CHECK(shotLog.load() && shotCurves.load());
+  CHECK(shotLog.save() && shotLog.load());
   CHECK(copyShotStats().bbwCount == 7);
   CHECK(clearShotLog());
   CHECK(copyShotStats().shotCount == 0 && copyShotStats().bbwCount == 0);
@@ -13645,11 +13647,14 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
     PresetShotStats preset[MAX_SHOT_PRESETS];
   };
   // The good shots in both logs, and in the mixed one every bad kind (a short
-  // shot, no yield, a low and a negative yield) with values far from them.
+  // shot, no yield, a low and a negative yield) with values far from them,
+  // after a full log of short shots: the ring wraps at its 1000 summaries.
   std::vector<uint32_t> goodIds;
   auto fill = [&](bool withBad, Reads &out) {
     shotLog.clear(false);
     goodIds.clear();
+    for (size_t i = 0; withBad && i < SHOT_LOG_CAPACITY; ++i)
+      CHECK(shotLog.append(shotRecord(i % 5 == 4 ? other : preset.id, 110, 3600, 30), false));
     for (int i = 0; i < 24; ++i) {
       const uint8_t id = i % 5 == 4 ? other : preset.id;
       if (withBad) {
@@ -13721,17 +13726,24 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
     CHECK(position(mixedIds, mixed.dripIds[n]) == position(goodIds, clean.dripIds[n]));
   CHECK(mixed.hasHome && clean.hasHome && mixed.home.actualWeightCg == clean.home.actualWeightCg &&
         mixed.home.durationDs == clean.home.durationDs);
-  // The default list filter keeps exactly the good shots.
-  ShotLogRecord rows[64];
-  const size_t count = copyShotRecords(rows, 64);
+  // The default list filter keeps exactly the good shots; Show bad shots
+  // lists the whole full log.
+  static ShotLogRecord rows[SHOT_LOG_CAPACITY];
+  const size_t count = copyShotRecords(rows, SHOT_LOG_CAPACITY);
   size_t listed = 0;
   for (size_t n = 0; n < count; ++n) listed += shotListFilterMatches(ShotListFilter{}, rows[n]);
   CHECK(count == 24 && listed == 24);
   fill(true, mixed);
-  CHECK(copyShotRecords(rows, 64) == 49);
+  CHECK(copyShotRecords(rows, SHOT_LOG_CAPACITY) == SHOT_LOG_CAPACITY);
+  ShotListFilter withBad = {};
+  withBad.includeBad = true;
   listed = 0;
-  for (size_t n = 0; n < 49; ++n) listed += shotListFilterMatches(ShotListFilter{}, rows[n]);
-  CHECK(listed == 24);
+  size_t all = 0;
+  for (size_t n = 0; n < SHOT_LOG_CAPACITY; ++n) {
+    listed += shotListFilterMatches(ShotListFilter{}, rows[n]);
+    all += shotListFilterMatches(withBad, rows[n]);
+  }
+  CHECK(listed == 24 && all == SHOT_LOG_CAPACITY);
 }
 
 // A bad cycle trains nothing at finalize (drip, learning speed, quick
@@ -14010,8 +14022,7 @@ void s02g_full_cycle_sub_one_gram_updates_last_shot_and_stores_bad() {
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
   const uint32_t rawOnAt = startCycle();
   advanceToBrew();
   currentWeight = 0.5f;
@@ -14044,8 +14055,7 @@ void s02c_shot_curve_samples_on_half_second_grid_and_latches_slow() {
   ControlStatusSnapshot defaultStatus;
   CHECK(defaultStatus.shotCurve.count == 0);
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
   session.active = true;
   session.startedWithScale = true;
   session.hasWeightAnchor = true;
@@ -14152,8 +14162,7 @@ void s02l_post_drip_curve_keeps_observations_and_rejection_gaps() {
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
   session.active = session.startedWithScale = true;
   session.config = snapshotConfig(runtimeConfig);
   session.connectionGenerationAtStart = getScaleLinkSnapshot().connectionGeneration;
@@ -14206,8 +14215,7 @@ void s02d_shot_curve_latches_first_drop_fast_and_atm() {
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
   session.active = true;
   session.startedWithScale = true;
   session.hasWeightAnchor = true;
@@ -14295,8 +14303,7 @@ void s02h_fast_guard_keeps_sampling_and_settled_weight_replaces_endpoint() {
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
 
   session.active = true;
   session.startedWithScale = true;
@@ -14354,8 +14361,7 @@ void verifySettledCurveEndpointForCut(EndReason reason, bool slowExtended,
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
 
   session.active = true;
   session.startedWithScale = true;
@@ -16239,8 +16245,7 @@ void s04_shot_log_remove_by_id() {
 void s04c_delete_shot_record_removes_log_and_curve() {
   resetHarness(false, true);
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
   ShotLogRecord record = {};
   record.durationDs = 130;
   record.actualWeightCg = 3600;
@@ -16287,8 +16292,7 @@ void s04c_delete_shot_record_removes_log_and_curve() {
 void s04d_delete_shot_record_ok_without_curve() {
   resetHarness(false, true);
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
   ShotLogRecord record = {};
   record.durationDs = 80;
   CHECK(shotLog.append(record));
@@ -16304,8 +16308,7 @@ void s04d_delete_shot_record_ok_without_curve() {
 void s04e_delete_shot_record_is_ram_only_when_flash_is_busy() {
   resetHarness(false, true);
   shotLog.clear();
-  ShotCurveLog::resetHostStorage();
-  shotCurves.load();
+  shotCurves.clear();
   ShotLogRecord record = {};
   record.durationDs = 90;
   CHECK(shotLog.append(record));
@@ -16322,7 +16325,7 @@ void s04e_delete_shot_record_is_ram_only_when_flash_is_busy() {
   CHECK(!shotLog.containsId(id));
   CHECK(!shotCurves.containsShotId(id));
   CHECK(shotLog.dirty());
-  CHECK(shotCurves.dirty());
+  CHECK(shotCurves.pending() == 0);
 }
 
 void b01_scale_worker_requires_ble_stack() {
@@ -17074,7 +17077,8 @@ void s04b_shot_log_page_slice() {
   CHECK(shotLogClampPageLimit(0) == 1);
   CHECK(shotLogClampPageLimit(10) == 10);
   CHECK(shotLogClampPageLimit(100) == 100);
-  CHECK(shotLogClampPageLimit(999) == SHOT_LOG_CAPACITY);
+  CHECK(shotLogClampPageLimit(999) == 999 && SHOT_LOG_CAPACITY == 1000);
+  CHECK(shotLogClampPageLimit(1000) == 1000 && shotLogClampPageLimit(1001) == SHOT_LOG_CAPACITY);
   CHECK(SHOT_LOG_PAGE_DEFAULT == 10);
 }
 
@@ -17544,7 +17548,7 @@ void s12g_worker_acknowledgement_rechecks_generation_under_lock() {
     ShotCurveRecord curve = emptyShotCurveRecord();
     curve.shotId = 1;
     CHECK(appendShotCurvePoint(curve, 0, 0, false));
-    CHECK(shotCurves.append(curve, false));
+    CHECK(shotCurves.append(curve));
     activationStores.capturePersistenceImage(*shotStorePersistImage);
     shotStorePersistImageGeneration = shotStoreDirtyGeneration.load();
     persistShotStoreImage();
@@ -17557,9 +17561,10 @@ void s12g_worker_acknowledgement_rechecks_generation_under_lock() {
       TaskMutex::hostObserver = nullptr;
       // Emulate a Web mutation that completed just before control got the lock.
       if (selected == 0) {
-        CHECK(shotCurves.clear(false) && shotLog.clear(false));
+        shotCurves.clear();
+        CHECK(shotLog.clear(false));
       } else if (selected == 1) {
-        CHECK(shotCurves.removeById(1, false) && shotLog.removeById(1, false));
+        CHECK(shotCurves.removeById(1) && shotLog.removeById(1, false));
       } else {
         CHECK(shotLog.updateRating(1, 5, false));
       }
@@ -17568,11 +17573,10 @@ void s12g_worker_acknowledgement_rechecks_generation_under_lock() {
     serviceShotStorePersistence();
     TaskMutex::hostObserver = nullptr;
     CHECK(shotLog.dirty());
-    CHECK(mutation == 2 || shotCurves.dirty());
     session.active = false;
     serviceShotStorePersistence();
-    CHECK(!shotLog.dirty() && !shotCurves.dirty());
-    CHECK(shotLog.load() && shotCurves.load());
+    CHECK(!shotLog.dirty());
+    CHECK(shotLog.load());
     CHECK(shotLog.count() == (mutation == 2 ? 1U : 0U));
     CHECK(shotCurves.count() == (mutation == 2 ? 1U : 0U));
     if (mutation == 2) {
@@ -17580,25 +17584,6 @@ void s12g_worker_acknowledgement_rechecks_generation_under_lock() {
       CHECK(shotLogRating(record.sideFlags) == 5);
     }
   }
-}
-
-void s12h_capped_curve_batch_keeps_generation_dirty_until_drained() {
-  resetHarness(false, true);
-  CHECK(initializeSettingsPersistenceWorker());
-  constexpr uint32_t backlog = 2U * SHOT_CURVE_PERSIST_BATCH + 1U;
-  ShotCurveRecord curve = emptyShotCurveRecord();
-  CHECK(appendShotCurvePoint(curve, 0, 0, false));
-  for (uint32_t id = 1; id <= backlog; ++id) {
-    curve.shotId = id;
-    CHECK(shotCurves.append(curve, false));
-  }
-  shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
-  for (int call = 0; call < 8 && shotCurves.dirty(); ++call) {
-    serviceShotStorePersistence();
-  }
-  CHECK(!shotCurves.dirty());
-  CHECK(shotStorePersistCleanGeneration == shotStoreDirtyGeneration.load());
-  CHECK(shotCurves.load() && shotCurves.count() == backlog);
 }
 
 void s13_persist_debug_messages_identify_origin() {
@@ -17709,7 +17694,7 @@ void sh02_stats_snapshot_captures_one_store_generation() {
   ShotCurveRecord curve = emptyShotCurveRecord();
   curve.shotId = record.id;
   CHECK(appendShotCurvePoint(curve, record.actualWeightCg, 0, false));
-  CHECK(shotCurves.append(curve, false));
+  CHECK(shotCurves.append(curve));
   auto snapshot = std::make_unique<ShotStatsRecordsSnapshot>();
   static unsigned acquisitions;
   acquisitions = 0;
@@ -17730,7 +17715,7 @@ void sh02_stats_snapshot_captures_one_store_generation() {
   CHECK(snapshot->records[0].id == record.id);
   // Row curves are fetched on demand under one short lock each.
   ShotCurveRecord fetched = emptyShotCurveRecord();
-  CHECK(copyShotCurveById(record.id, fetched));
+  CHECK(copyShotCurveById(record.id, fetched) == ShotCurveRead::FOUND);
   CHECK(fetched.shotId == record.id);
   CHECK(curvePoint(fetched, 0).cg == record.actualWeightCg);
   CHECK(rateShotRecord(record.id, 5));
@@ -22243,7 +22228,7 @@ void home01_stream_lifecycle_uses_canonical_final_record() {
   resetHarness(false, true);
   reachReadyFromBoot();
   shotLog.clear(false);
-  shotCurves.clear(false);
+  shotCurves.clear();
   session.active = session.startedWithScale = true;
   session.id = 41;
   session.config = snapshotConfig(runtimeConfig);
@@ -23575,6 +23560,14 @@ void tpw01_a_finished_shot_is_saved_once_after_the_shot_and_linked() {
   CHECK(status == ShotTracePoolStatus::OK && saved == shot_trace_test::exportBytes());
   Trace decoded;
   CHECK(shot_trace_test::decode(saved, decoded) && decoded.header.shotLogId == stored[0].id);
+  // The same record holds the shot's curve, as the cache keeps it.
+  static ShotCurveRecord cached, fromFlash;
+  CHECK(shotCurves.copyByShotId(stored[0].id, cached) && cached.count > 0 &&
+        shotCurves.pending() == 0);
+  CHECK(readShotCurve(stored[0].id, stored[0].bootId, stored[0].endedAtMs, fromFlash) ==
+            ShotCurveRead::FOUND &&
+        memcmp(&cached, &fromFlash, offsetof(ShotCurveRecord, stream)) == 0 &&
+        memcmp(cached.stream, fromFlash.stream, cached.bytes) == 0);
   ShotTracePoolRef ref;
   uint8_t buffer[64];
   CHECK(shotTracePool().open(stored[0].id, stored[0].bootId, stored[0].endedAtMs, ref, buffer,
@@ -23646,7 +23639,7 @@ void tpw03_the_newest_trace_wins_and_drops_are_counted() {
   serviceShotTracePool();
   CHECK(shotTracePool().count() == 2 && poolTraceBytes(3, 7, 300000).empty() &&
         !poolTraceBytes(4, 7, 400000).empty() && shotTrace().tracesDropped() == 2);
-  CHECK(debugLogTextCount("Shot trace save failed") == 0);
+  CHECK(debugLogTextCount("Shot record save failed") == 0);
 }
 
 void tpw04_failed_saves_retry_without_duplicates() {
@@ -23667,10 +23660,10 @@ void tpw04_failed_saves_retry_without_duplicates() {
   completePoolTestTrace(10, 7, 1000000);
   PoolFlash::setFailAfter(1, 0, true);
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 1 && debugLogTextCount("Shot trace save failed") == 1);
+  CHECK(shotTracePool().count() == 1 && debugLogTextCount("Shot record save failed") == 1);
   PoolFlash::setFailAfter(2, 0, true);
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 1 && debugLogTextCount("Shot trace save failed") == 1);
+  CHECK(shotTracePool().count() == 1 && debugLogTextCount("Shot record save failed") == 1);
   serviceShotTracePool();
   CHECK(shotTracePool().count() == 2 && !poolTraceBytes(10, 7, 1000000).empty());
   // Three failures give the trace up, with one warning.
@@ -23682,7 +23675,7 @@ void tpw04_failed_saves_retry_without_duplicates() {
   serviceShotTracePool();
   serviceShotTracePool();
   CHECK(shotTracePool().count() == 2 && poolTraceBytes(11, 7, 1100000).empty());
-  CHECK(debugLogTextCount("Shot trace of shot 11 not saved after 3 attempts") == 1);
+  CHECK(debugLogTextCount("Shot record of shot 11 not saved after 3 attempts") == 1);
 }
 
 void tpw05_an_interrupted_trace_is_saved_under_its_crashed_boot() {
@@ -23794,6 +23787,298 @@ void tpw08_a_record_in_a_recycled_sector_reads_as_gone() {
   poolTraceBytes(1, 7, 100000, &status);
   CHECK(status == ShotTracePoolStatus::GONE);
   CHECK(debugLogTextCount("Shot trace of shot 1 is being recycled; not available") == 1);
+}
+
+// ---------------------------------------------------------------------------
+// Curves in the pool (plan B6): one record per stored shot, a PSRAM cache of
+// the newest curves, on-demand flash reads for older ones.
+// ---------------------------------------------------------------------------
+
+ShotCurveRecord poolTestCurve;
+
+// The curve storePoolTestShot gives shot `id`.
+const ShotCurveRecord &poolTestCurveOf(uint32_t id, uint16_t points = 40) {
+  poolTestCurve = emptyShotCurveRecord();
+  poolTestCurve.shotId = id;
+  for (uint16_t i = 0; i < points; ++i)
+    CHECK_VALUE(appendShotCurvePoint(poolTestCurve, static_cast<int16_t>(id % 1000U + i * 7U),
+                                     i * 40U, i == 3, i == 5),
+                poolTestCurve);
+  return poolTestCurve;
+}
+
+// A stored shot as finalize leaves it: its summary, its curve pending in the
+// cache and, when traced, its completed trace.
+uint32_t storePoolTestShot(uint32_t endedAtMs, bool traced = true, uint16_t points = 40,
+                           uint16_t durationDs = 300) {
+  ShotLogRecord record = {};
+  record.durationDs = durationDs;
+  record.actualWeightCg = 3600;
+  record.bootId = currentBootId();
+  record.endedAtMs = endedAtMs;
+  uint32_t id;
+  {
+    TaskLockGuard lock(shotStoreMutex);
+    id = shotLog.nextRecordId();
+    CHECK_VALUE(shotLog.append(record, false) && shotCurves.append(poolTestCurveOf(id, points)),
+                id);
+  }
+  if (traced) completePoolTestTrace(id, record.bootId, endedAtMs);
+  return id;
+}
+
+// The curve of a stored shot as readers get it, compared with what was stored.
+ShotCurveRead poolTestRead(uint32_t id, bool *intact = nullptr, uint16_t points = 40) {
+  static ShotCurveRecord read;
+  const ShotCurveRead result = copyShotCurveById(id, read);
+  const ShotCurveRecord &expected = poolTestCurveOf(id, points);
+  if (intact != nullptr)
+    *intact = memcmp(&read, &expected, offsetof(ShotCurveRecord, stream)) == 0 &&
+              memcmp(read.stream, expected.stream, expected.bytes) == 0 &&
+              memcmp(read.breakBefore, expected.breakBefore, (points + 7U) / 8U) == 0 &&
+              memcmp(read.held, expected.held, (points + 7U) / 8U) == 0;
+  return result;
+}
+
+bool poolRecordHas(uint32_t id, uint32_t endedAtMs, ShotTracePoolSection section) {
+  ShotTracePoolRef ref;
+  uint8_t buffer[512];
+  size_t offset = 0, bytes = 0;
+  return shotTracePool().open(id, currentBootId(), endedAtMs, ref, buffer, sizeof(buffer)) ==
+             ShotTracePoolStatus::OK &&
+         shotTracePool().findSection(ref, section, offset, bytes) == ShotTracePoolStatus::OK;
+}
+
+void freshPoolShotLog() {
+  freshShotTracePool();
+  resetHarness(false, true);
+  shotLog.clear(false);
+  shotCurves.clear();
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  serviceShotTracePool();
+}
+
+void tpw09_each_stored_shot_is_one_record_with_its_curve() {
+  freshPoolShotLog();
+  // The firmware opens the whole ring: the legacy curve store is retired.
+  CHECK(shotTracePool().ready() && shotTracePool().logicalEnd() == SHOT_TRACE_POOL_SECTORS);
+  const uint32_t one = storePoolTestShot(100000);
+  CHECK(shotCurves.pending() == 1);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && shotCurves.pending() == 0);
+  CHECK(poolRecordHas(one, 100000, ShotTracePoolSection::CURVE) &&
+        poolRecordHas(one, 100000, ShotTracePoolSection::TRACE));
+  CHECK(poolTraceBytes(one, currentBootId(), 100000) == shot_trace_test::exportBytes());
+  // A shot whose trace a newer one replaced (newest wins) is saved with its
+  // curve alone, before the newer shot's record.
+  const uint32_t two = storePoolTestShot(200000);
+  const uint32_t three = storePoolTestShot(300000);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 2 && shotCurves.pending() == 1);
+  CHECK(poolRecordHas(two, 200000, ShotTracePoolSection::CURVE) &&
+        !poolRecordHas(two, 200000, ShotTracePoolSection::TRACE));
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 3 && shotCurves.pending() == 0 &&
+        poolRecordHas(three, 300000, ShotTracePoolSection::CURVE) &&
+        poolRecordHas(three, 300000, ShotTracePoolSection::TRACE) &&
+        shotTrace().tracesDropped() == 1);
+  // A shot stored without a trace gets its curve; a trace without a stored
+  // shot (the log refused it) goes alone.
+  const uint32_t four = storePoolTestShot(400000, false);
+  completePoolTestTrace(0, currentBootId(), 450000);
+  serviceShotTracePool();
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 5 && shotCurves.pending() == 0 &&
+        poolRecordHas(four, 400000, ShotTracePoolSection::CURVE) &&
+        !poolRecordHas(four, 400000, ShotTracePoolSection::TRACE) &&
+        poolRecordHas(0, 450000, ShotTracePoolSection::TRACE) &&
+        !poolRecordHas(0, 450000, ShotTracePoolSection::CURVE));
+  // A curve is never taken while a capture is open: its trace is still to
+  // come (here the capture opens right as the worker looks at the cache).
+  const uint32_t six = storePoolTestShot(600000, false);
+  TaskMutex::hostObserver = [](const TaskMutex *mutex, bool acquired) {
+    if (mutex != &shotStoreMutex || !acquired) return;
+    TaskMutex::hostObserver = nullptr;
+    shotTrace().begin(hostMillis);
+  };
+  serviceShotTracePool();
+  TaskMutex::hostObserver = nullptr;
+  CHECK(shotTracePool().count() == 5 && shotCurves.pending() == 1 && shotTrace().capturing());
+  shotTrace().complete(six, currentBootId(), 600000, 1);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 6 && shotCurves.pending() == 0 &&
+        poolRecordHas(six, 600000, ShotTracePoolSection::CURVE) &&
+        poolRecordHas(six, 600000, ShotTracePoolSection::TRACE));
+  // A deleted shot's pending curve is never written, nor one whose summary
+  // left without it; neither holds up the next.
+  const uint32_t five = storePoolTestShot(500000, false);
+  CHECK(deleteShotRecord(five) && shotCurves.pending() == 0);
+  const uint32_t seven = storePoolTestShot(700000, false);
+  const uint32_t eight = storePoolTestShot(800000, false);
+  {
+    TaskLockGuard lock(shotStoreMutex);
+    CHECK(shotLog.removeById(seven, false) && shotCurves.pending() == 2);
+  }
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 7 && shotCurves.pending() == 0 &&
+        poolRecordHas(eight, 800000, ShotTracePoolSection::CURVE) &&
+        !poolRecordHas(seven, 700000, ShotTracePoolSection::CURVE));
+  CHECK(deleteShotRecord(eight));
+  // Every curve reads back from flash after a reboot, intact.
+  hostRebootShotTracePool();
+  serviceShotTracePool();
+  for (const uint32_t id : {one, two, three, four, six}) {
+    bool intact = false;
+    CHECK(poolTestRead(id, &intact) == ShotCurveRead::FOUND && intact);
+  }
+  CHECK(debugLogTextCount("Shot curves loaded: 5 in RAM") == 1);
+}
+
+// Holds shotStoreMutex? Pool flash reads must never run under it.
+thread_local bool poolTestStoreHeld = false;
+size_t poolTestReadsUnderStoreLock = 0, poolTestFlashReads = 0;
+void poolTestReadSpy() {
+  ++poolTestFlashReads;
+  if (poolTestStoreHeld) ++poolTestReadsUnderStoreLock;
+  PoolFlash::setReadHook(poolTestReadSpy);
+}
+
+void tpw10_the_cache_keeps_the_newest_curves_and_loads_them_back_after_boot() {
+  freshPoolShotLog();
+  const uint32_t total = SHOT_CURVE_CAPACITY + 10U;
+  for (uint32_t n = 1; n <= total; ++n) {
+    storePoolTestShot(n * 1000U, false, static_cast<uint16_t>(8U + n % 30U));
+    serviceShotTracePool();
+  }
+  CHECK(shotTracePool().count() == total && shotCurves.pending() == 0);
+  CHECK(shotCurves.count() == SHOT_CURVE_CAPACITY && !shotCurves.containsShotId(10) &&
+        shotCurves.containsShotId(11) && shotCurves.containsShotId(total));
+  // Older curves come from flash on demand, with no store lock held.
+  TaskMutex::hostObserver = [](const TaskMutex *mutex, bool acquired) {
+    if (mutex == &shotStoreMutex) poolTestStoreHeld = acquired;
+  };
+  poolTestReadsUnderStoreLock = poolTestFlashReads = 0;
+  PoolFlash::setReadHook(poolTestReadSpy);
+  bool intact = false;
+  CHECK(poolTestRead(3, &intact, 8U + 3U) == ShotCurveRead::FOUND && intact &&
+        poolTestFlashReads > 0);
+  const size_t flashReads = poolTestFlashReads;
+  CHECK(poolTestRead(total, &intact, 8U + total % 30U) == ShotCurveRead::FOUND && intact &&
+        poolTestFlashReads == flashReads);  // Cached: no flash.
+  // After a reboot the cache is empty: until the pool is recovered an older
+  // curve is busy and Home shows none; then the worker loads the newest back.
+  hostRebootShotTracePool();
+  CHECK(poolTestRead(total) == ShotCurveRead::BUSY && poolTestRead(3) == ShotCurveRead::BUSY);
+  ShotLogRecord home = {};
+  static ShotCurveRecord homeCurve;
+  homeCurve = emptyShotCurveRecord();
+  CHECK(copyHomeShot(home, &homeCurve) && home.id == total && homeCurve.count == 0);
+  serviceShotTracePool();
+  PoolFlash::setReadHook(nullptr);
+  TaskMutex::hostObserver = nullptr;
+  CHECK(poolTestReadsUnderStoreLock == 0);
+  CHECK(shotCurves.count() == SHOT_CURVE_CAPACITY && shotCurves.pending() == 0 &&
+        !shotCurves.containsShotId(10) && shotCurves.containsShotId(11));
+  static ShotCurveRecord newest;
+  CHECK(shotCurves.copyNewestFirst(&newest, 1) == 1 && newest.shotId == total);
+  CHECK(copyHomeShot(home, &homeCurve) && homeCurve.shotId == total &&
+        homeCurve.count == 8U + total % 30U);
+  CHECK(poolTestRead(3, &intact, 8U + 3U) == ShotCurveRead::FOUND && intact);
+  CHECK(debugLogTextCount("Shot curves loaded: 500 in RAM") == 1);
+  // A shot that ends before the load keeps its place as the newest curve and
+  // is saved after it; the load fills the older end only.
+  hostRebootShotTracePool();
+  const uint32_t late = storePoolTestShot(total * 1000U + 5000U, false);
+  serviceShotTracePool();
+  CHECK(shotCurves.count() == SHOT_CURVE_CAPACITY && shotCurves.pending() == 0 &&
+        !shotCurves.containsShotId(11) && shotCurves.containsShotId(12));
+  CHECK(shotCurves.copyNewestFirst(&newest, 1) == 1 && newest.shotId == late &&
+        poolRecordHas(late, total * 1000U + 5000U, ShotTracePoolSection::CURVE));
+}
+
+void tpw11_flash_is_never_read_during_a_shot() {
+  freshPoolShotLog();
+  for (uint32_t n = 1; n <= SHOT_CURVE_CAPACITY + 1U; ++n) {
+    storePoolTestShot(n * 1000U, false);
+    serviceShotTracePool();
+  }
+  poolTestFlashReads = 0;
+  PoolFlash::setReadHook(poolTestReadSpy);
+  session.active = true;
+  CHECK(poolTestRead(1) == ShotCurveRead::BUSY);
+  CHECK(poolTestRead(SHOT_CURVE_CAPACITY + 1U) == ShotCurveRead::FOUND);  // Cached.
+  session.active = false;
+  // The drip delay still has the capture open: busy too.
+  shotTrace().begin(hostMillis);
+  CHECK(shotTrace().capturing() && poolTestRead(1) == ShotCurveRead::BUSY);
+  shotTrace().complete(0, currentBootId(), hostMillis, 0);
+  CHECK(poolTestFlashReads == 0);
+  CHECK(poolTestRead(1) == ShotCurveRead::FOUND && poolTestFlashReads > 0);
+  PoolFlash::setReadHook(nullptr);
+  CHECK(poolTestRead(SHOT_CURVE_CAPACITY + 5U) == ShotCurveRead::NONE);  // No summary.
+}
+
+void tpw12_a_recycled_curve_reads_as_no_curve() {
+  freshPoolShotLog();
+  for (uint32_t n = 1; n <= SHOT_CURVE_CAPACITY + 2U; ++n) {
+    storePoolTestShot(n * 1000U, false);
+    serviceShotTracePool();
+  }
+  // Torn by an interrupted erase of its sector, or already erased: either
+  // way no curve, silently, never as damage.
+  ShotTracePoolEntry entry;
+  CHECK(shotTracePool().entryAt(0, entry));
+  PoolFlash::sector(entry.address() / 4096U)[entry.address() % 4096U + 40U] ^= 0x10;
+  CHECK(shotTracePool().entryAt(1, entry));
+  memset(PoolFlash::sector(entry.address() / 4096U) + entry.address() % 4096U, 0xFF, 32);
+  CHECK(poolTestRead(1) == ShotCurveRead::NONE && poolTestRead(2) == ShotCurveRead::NONE);
+  bool intact = false;
+  CHECK(poolTestRead(3, &intact) == ShotCurveRead::FOUND && intact);
+  CHECK(debugLogTextCount("recycled") == 0);
+}
+
+void tpw13_power_loss_while_saving_a_curve_loses_only_that_record() {
+  freshPoolShotLog();
+  const uint32_t one = storePoolTestShot(100000);
+  serviceShotTracePool();
+  const std::vector<uint8_t> image(PoolFlash::image(), PoolFlash::image() + 8U * 4096U);
+  const uint32_t two = storePoolTestShot(200000, true, 1201);  // Curve and a trace: spans sectors.
+  const size_t before = PoolFlash::operations();
+  serviceShotTracePool();
+  const size_t ops = PoolFlash::operations() - before;
+  CHECK(ops > 4 && shotTracePool().count() == 2);
+  uint32_t ended = 300000;
+  for (size_t f = 0; f < ops; ++f) {
+    for (size_t torn : {size_t(0), size_t(9), PoolFlash::kRandomTear}) {
+      memcpy(PoolFlash::image(), image.data(), image.size());
+      hostRebootShotTracePool();
+      shotTrace().hostReset();
+      serviceShotTracePool();
+      {
+        TaskLockGuard lock(shotStoreMutex);
+        CHECK(shotCurves.append(poolTestCurveOf(two, 1201)));
+      }
+      completePoolTestTrace(two, currentBootId(), 200000);
+      PoolFlash::setFailAfter(static_cast<int>(f), torn, false, static_cast<uint32_t>(f + 1U));
+      serviceShotTracePool();
+      PoolFlash::setFailAfter(-1);
+      hostRebootShotTracePool();  // Power back: RAM is gone.
+      shotTrace().hostReset();
+      serviceShotTracePool();
+      bool intact = false;
+      CHECK(shotTracePool().ready() && poolTestRead(one, &intact) == ShotCurveRead::FOUND &&
+            intact);
+      const ShotCurveRead lost = poolTestRead(two, &intact, 1201);
+      CHECK(lost == ShotCurveRead::NONE || (lost == ShotCurveRead::FOUND && intact));
+      const uint32_t three = storePoolTestShot(ended += 1000U);
+      serviceShotTracePool();
+      hostRebootShotTracePool();
+      serviceShotTracePool();
+      CHECK(poolTestRead(three, &intact) == ShotCurveRead::FOUND && intact &&
+            poolTestRead(one) == ShotCurveRead::FOUND);
+    }
+  }
 }
 
 const TestCase testCases[] = {
@@ -24442,7 +24727,6 @@ const TestCase testCases[] = {
     {"S01e", s01e_bbw_error_uses_its_own_ten_shots},
     {"S01f", s01f_curve_rollover_keeps_stats_windows_and_sorted_joins},
     {"S12g", s12g_worker_acknowledgement_rechecks_generation_under_lock},
-    {"S12h", s12h_capped_curve_batch_keeps_generation_dirty_until_drained},
     {"S02k", s02k_curve_continuity_uses_control_rejections_and_fifo_provenance},
     {"S01d", s01d_manual_timer_and_limit_share_settled_finalize},
     {"S01n", s01n_bad_scale_cycles_are_stored_with_their_reason},
@@ -24481,6 +24765,11 @@ const TestCase testCases[] = {
     {"TPW06", tpw06_clear_all_clears_the_pool_before_the_shot_log},
     {"TPW07", tpw07_power_loss_while_saving_loses_only_that_trace},
     {"TPW08", tpw08_a_record_in_a_recycled_sector_reads_as_gone},
+    {"TPW09", tpw09_each_stored_shot_is_one_record_with_its_curve},
+    {"TPW10", tpw10_the_cache_keeps_the_newest_curves_and_loads_them_back_after_boot},
+    {"TPW11", tpw11_flash_is_never_read_during_a_shot},
+    {"TPW12", tpw12_a_recycled_curve_reads_as_no_curve},
+    {"TPW13", tpw13_power_loss_while_saving_a_curve_loses_only_that_record},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},

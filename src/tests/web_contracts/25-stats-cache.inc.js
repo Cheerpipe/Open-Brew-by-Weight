@@ -33,10 +33,13 @@
 using namespace openbrewbyweight;
 constexpr int ESP_OK=0,HTTPD_WS_TYPE_TEXT=1;
 constexpr size_t kStatsStreamFrameBytes=20480;
-constexpr uint32_t kStatsStreamPaceMs=100;
+constexpr uint32_t kStatsStreamPaceMs=100,kUiStreamDispatchBudgetMs=800;
+uint32_t deadlineLeft=800;
+uint32_t uiStreamDeadlineLeft(){return deadlineLeft;}
 const char *uiStreamSendKind="";
 bool uiStreamSendCleanAbort=false;
-uint32_t now=1,storeEpoch=1,frozen=0,shots=3; unsigned captures=0,hashes=0; int sendResult=ESP_OK;
+uint32_t now=1,storeEpoch=1,frozen=0,shots=3; unsigned captures=0,hashes=0,curveReads=0; int sendResult=ESP_OK;
+bool flashBusy=false;  // Curves of shot 1 come from flash, busy during a shot.
 uint32_t millis(){return now;}
 struct TaskLockGuard {explicit TaskLockGuard(int){}};
 struct httpd_ws_frame_t{int type;uint8_t *payload;size_t len;};
@@ -95,11 +98,13 @@ void historyPage(HistoryPage &page,size_t offset,size_t limit,ShotLogSortDir dir
   page.hasMore=offset+page.count<130;
   for(size_t i=0;i<page.count;++i){page.records[i]={};page.records[i].id=130-offset-i;}
 }
-bool curveById(uint32_t id,ShotCurveRecord &curve){
+ShotCurveRead curveById(uint32_t id,ShotCurveRecord &curve){
+  ++curveReads;
   resetShotCurveRecord(curve);
-  if(id==0||id>shots) return false;
+  if(id==0||id>shots) return ShotCurveRead::NONE;
+  if(id==1&&flashBusy) return ShotCurveRead::BUSY;
   appendShotCurvePoint(curve,(frozen?frozen:storeEpoch)*1000+3-id,0,false);
-  return true;
+  return ShotCurveRead::FOUND;
 }
 struct OpenBrewByWeightNetwork {
   static constexpr size_t WEB_UI_CLIENT_ID_CAPACITY=25;
@@ -112,7 +117,7 @@ ${session}
   struct {
     uint32_t (*shotLogEpoch)()=+[](){return storeEpoch;};
     void (*copyShotStatsRecords)(ShotStatsRecordsSnapshot &)=capture;
-    bool (*copyShotCurveById)(uint32_t,ShotCurveRecord &)=curveById;
+    ShotCurveRead (*copyShotCurveById)(uint32_t,ShotCurveRecord &)=curveById;
     uint32_t (*historyEpoch)()=+[](){return 77u;};
     void (*copyHistoryPage)(HistoryPage &,size_t,size_t,ShotLogSortDir,uint8_t)=historyPage;
   } callbacks_;
@@ -305,6 +310,50 @@ int main(){
     for(size_t i=0;i<4;++i)assert(frames[i].find("\\"id\\":"+std::to_string(4-i))!=std::string::npos);
     page(ShotLogSort::Date,ShotLogSortDir::Desc,3,2,1,true);
     shots=3;
+  }
+  // A curve flash may not give now (a shot runs) holds the page: nothing is
+  // sent for it, and the page continues once flash reads again. A window
+  // whose curves are not hashed yet waits whole.
+  {
+    fresh.statsFilter={};fresh.statsResync=true;flashBusy=true;++storeEpoch;frames.clear();
+    assert(send(fresh)&&!fresh.statsPaging&&frames.empty());
+    assert(send(fresh)&&!fresh.statsPaging&&frames.empty());
+    flashBusy=false;
+    for(int i=0;i<3;++i)assert(send(fresh));
+    assert(!fresh.statsPaging&&frames.size()==3&&frames[2].find("\\"id\\":1")!=std::string::npos);
+    fresh.statsResync=true;frames.clear();
+    assert(send(fresh)&&send(fresh)&&frames.size()==2);
+    flashBusy=true;
+    assert(send(fresh)&&fresh.statsPaging&&frames.size()==2);
+    flashBusy=false;
+    assert(send(fresh)&&!fresh.statsPaging&&frames.size()==3);
+    // Flash reads for hashes stop at a quarter of the dispatch budget.
+    ++storeEpoch;fresh.statsResync=true;frames.clear();deadlineLeft=500;curveReads=0;
+    assert(send(fresh)&&frames.empty()&&curveReads==0&&network.uiStreamUrgent_.load());
+    deadlineLeft=800;
+    for(int i=0;i<3;++i)assert(send(fresh));
+    assert(!fresh.statsPaging&&frames.size()==3);
+  }
+  // A full log of 1000 summaries (shots 4-1000 bad): the export window lists
+  // the good shots only; with Show bad shots, a deep page and the ascending
+  // order reach the oldest.
+  {
+    auto fetch=[&](uint32_t request,size_t offset,size_t limit,bool bad,ShotLogSortDir dir){
+      fresh.statsFetch=true;fresh.statsFetchRequest=request;fresh.statsFetchOffset=offset;
+      fresh.statsFetchLimit=limit;fresh.statsFetchFilter={};fresh.statsFetchFilter.includeBad=bad;
+      fresh.statsFetchSort=ShotLogSort::Date;fresh.statsFetchDir=dir;frames.clear();
+      while(fresh.statsFetch)assert(send(fresh));
+    };
+    shots=SHOT_LOG_CAPACITY;++storeEpoch;
+    fetch(7,0,SHOT_LOG_CAPACITY,false,ShotLogSortDir::Desc);
+    assert(frames.size()==3&&frames[0].find("\\"total\\":3,")!=std::string::npos);
+    fetch(8,990,10,true,ShotLogSortDir::Desc);
+    assert(frames.size()==10&&frames[0].find("\\"total\\":1000,")!=std::string::npos);
+    assert(frames[0].find("\\"id\\":10,")!=std::string::npos&&frames[9].find("\\"id\\":1,")!=std::string::npos);
+    fetch(9,0,2,true,ShotLogSortDir::Asc);
+    assert(frames.size()==2&&frames[0].find("\\"id\\":1,")!=std::string::npos&&
+           frames[1].find("\\"id\\":2,")!=std::string::npos);
+    shots=3;++storeEpoch;
   }
 }
 `;

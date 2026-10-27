@@ -321,8 +321,10 @@ from 0 ms and 0 cg. `wBreakBefore` lists points that start a new segment,
 `wHeld` points the scale held, and the scalars mark the first drop, a
 fast-shot extension, the scale-loss takeover, and the end of the shot.
 
-The row is a few kilobytes, so read it once per shot: after the `end`
-webhook, and only when the snapshot's `lastShot.shotId` differs from the
+The newest 500 curves are kept in memory, so this route's curve is normally
+there; right after a restart, before the controller has loaded its curves
+back, it can come with an empty curve. The row
+is a few kilobytes, so read it once per shot: after the `end` webhook, and only when the snapshot's `lastShot.shotId` differs from the
 `id` of the shot you already hold.
 
 ### `PUT /api/v1/integration/presets/active`
@@ -932,13 +934,13 @@ sends a standing refresh with the new header and the rows it already holds as
 bare ids.
 
 Scrolling to the page sentinel sends a one-shot fetch for the next window,
-and the CSV export asks for its own export window — up to 500 rows,
+and the CSV export asks for its own export window — up to 1,000 rows,
 newest-first by date, good shots only, regardless of the on-screen sort. A
 fetch without `filter` keeps the standing filter:
 
 ```json
 {"op":"stats","on":true,"fetch":true,"offset":20}
-{"op":"stats","on":true,"fetch":true,"offset":0,"limit":500,"sort":"date","dir":"desc","filter":{}}
+{"op":"stats","on":true,"fetch":true,"offset":0,"limit":1000,"sort":"date","dir":"desc","filter":{}}
 ```
 
 Stats likewise subscribes on the first visit, and leaving the view does not
@@ -987,7 +989,11 @@ refresh sends each row the browser already holds with the same rating and
 curve as its bare `id` number, so a new shot sends only its own row and curve
 plus the page header; scroll fetches, the export, and snapshots not named by
 `tag` always carry whole rows. The export window streams the
-requested rows once without touching the subscribed view state. The server
+requested rows once without touching the subscribed view state. The newest
+500 curves are in memory; an older row's curve is read from flash, which is
+never done while a shot runs: such a page pauses at that row, sending
+nothing, and continues once the shot (and its drip delay) is over. A curve
+that storage recycled comes as an empty curve. The server
 refreshes its cached records only when the store epoch moves; sort, filter,
 and window changes reuse that snapshot, and the header is rebuilt when the
 store, the window, or the active preset changes. This preserves chronological

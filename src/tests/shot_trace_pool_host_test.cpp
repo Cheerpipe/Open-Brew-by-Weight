@@ -1,7 +1,5 @@
 #define OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST
 #include "../OpenBrewByWeightShotTracePool.h"
-#include "../OpenBrewByWeightShotCurve.h"
-#include "shot_curve_test_helpers.h"
 
 #include <algorithm>
 #include <atomic>
@@ -1224,30 +1222,35 @@ void tsp28_a_landed_commit_reported_failed_is_indexed() {
   CHECK(pool.recover() && pool.count() == 2 && readable(pool, 2));
 }
 
-// shotcurve still holding the legacy curve store's blocks when the ring
-// opens it: none reads as a record, and appends overwrite them.
+// The firmware's cutover: the ring opens all of shotcurve over what the
+// retired legacy curve store left there (its two epoch sectors and 501
+// committed 8 KiB blocks of 36-byte headers and stream bytes). None reads as
+// a record, the epoch sectors are never touched, and appends overwrite the
+// rest.
 void tsp29_legacy_curve_blocks_are_holes() {
-  ShotCurveLog::resetHostStorage();
-  ShotCurveLog legacy;
-  CHECK(legacy.load());
-  ShotCurveRecord curve = emptyShotCurveRecord();
-  for (uint32_t point = 0; point < 400; ++point) CHECK(appendShotCurvePoint(curve, point * 7, point * 50, false));
-  for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY; ++id) {
-    curve.shotId = id;
-    CHECK(legacy.append(curve, false));
-  }
-  CHECK(legacy.save() && legacy.clear());  // A clear epoch in sectors 0-1 as well.
-  static_assert(SHOT_CURVE_PARTITION_BYTES == SHOT_TRACE_POOL_SHOTCURVE_BYTES, "Same partition");
   freshFlash();
-  memcpy(Flash::sector(RESERVED), ShotCurveLog::hostFlashForTest(), SHOT_TRACE_POOL_SHOTCURVE_BYTES);
-  ShotTracePool pool(indexA);
-  CHECK(pool.setLogicalEnd(SHOT_TRACE_POOL_SECTORS) && pool.recover() && pool.count() == 0);
+  uint8_t *legacy = Flash::sector(RESERVED);
+  for (size_t at = 0; at < SHOT_TRACE_POOL_SHOTCURVE_BYTES; ++at)
+    legacy[at] = static_cast<uint8_t>(at * 31U >> 3);
+  const uint32_t epoch[4] = {0x53434550U, 7, 0x1234, 0};
+  memcpy(legacy, epoch, sizeof(epoch));
+  memcpy(legacy + S, epoch, sizeof(epoch));
+  for (uint32_t block = 0; block < 501; ++block) {
+    // Magic "SCRV", schema 3 of 5632 bytes, epoch, sequence, floor, shot
+    // id, count and flags, checksum, committed.
+    const uint32_t header[9] = {0x53435256U, 3U | 5632U << 16, 7, block + 1U, 0, block + 1U,
+                                1201U, 0x5555U, UINT32_MAX - 1U};
+    memcpy(legacy + 2U * S + block * 8192U, header, sizeof(header));
+  }
+  ShotTracePool pool(indexA, SHOT_TRACE_POOL_SECTORS);
+  CHECK(pool.logicalEnd() == SHOT_TRACE_POOL_SECTORS && pool.recover() && pool.count() == 0);
   CHECK(pool.stats(nullptr, nullptr).unusedBytes == SHOT_TRACE_POOL_SECTORS * S);
   uint32_t id = fillUntil(pool, 1, RESERVED + 40U);
   CHECK(crossesPartitions(pool));
   CHECK(pool.recover() && pool.count() == id - 1U);
   for (uint32_t n = 1; n < id; ++n) CHECK(readable(pool, n));
   CHECK(Flash::touched(LEGACY0) == 0 && Flash::touched(LEGACY1) == 0);
+  CHECK(memcmp(Flash::sector(LEGACY0), epoch, sizeof(epoch)) == 0);
 }
 
 struct TestCase {

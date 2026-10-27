@@ -41,7 +41,6 @@ void resetHostPersistence() {
   resetNvsDiagnosticsForHostTest();
   resetDurableStorageRevision();
   ShotLog::resetHostStorage();
-  ShotCurveLog::resetHostStorage();
   HistoryLog::resetHostStorage();
   g_hostFlashIoMutexAvailable = true;
   // Reused flash scratch must never supply defaults or stale record fields.
@@ -586,7 +585,7 @@ void p65_factory_settings_survives_second_slot_write_fail() {
 
 void p66_shot_log_dual_slot_generation_flip() {
   resetHostPersistence();
-  CHECK(sizeof(ShotLogStore) == 64024);
+  CHECK(sizeof(ShotLogStore) == 128024);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   CHECK(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES);
   CHECK(SHOT_LOG_FLASH_SLOT_COUNT * SHOT_LOG_FLASH_SLOT_BYTES <= 0xFC000);
@@ -598,9 +597,9 @@ void p66_shot_log_dual_slot_generation_flip() {
   record.actualWeightCg = 3600;
   CHECK(log.append(record));
   CHECK(log.count() == 1);
-  // A save erases only the 16 sectors the 62024-byte store occupies, not the
-  // 504 KiB slot.
-  CHECK(ShotLog::kEraseBytes == 16 * FLASH_IO_SECTOR_BYTES);
+  // A save erases only the 32 sectors the 128,024-byte store of 1000
+  // records occupies, not the 504 KiB slot.
+  CHECK(ShotLog::kEraseBytes == 32 * FLASH_IO_SECTOR_BYTES);
   CHECK(ShotLog::hostEraseBytes() == ShotLog::kEraseBytes);
 
   // A failed inactive-slot write leaves the last-good slot active and the
@@ -1837,13 +1836,6 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   activation.endedAtLocalSec = 1700000000;
   CHECK(history.append(activation));
 
-  ShotCurveLog curves;
-  CHECK(curves.load());
-  ShotCurveRecord curve = emptyShotCurveRecord();
-  curve.shotId = 1;
-  CHECK(appendShotCurvePoint(curve, 0, 0, false) &&
-        appendShotCurvePoint(curve, 1800, 0, false));
-  CHECK(curves.append(curve));
 
   LastShotStore lastShot;
   CHECK(lastShot.load());
@@ -1857,8 +1849,7 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   CHECK(saveBleScanSettings(ble));
   CHECK(saveQuickStart(QuickStartRecord{}));
 
-  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot,
-                              curves));
+  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot));
   CHECK(verifyFactorySettings(settings));
   // Without its record the next boot quick starts every factory preset.
   QuickStartRecord quickStart;
@@ -1866,7 +1857,6 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   CHECK(bootQuickStart(quickStart, false, settings.presets, nullptr));
   CHECK(log.count() == 0);
   CHECK(history.count() == 0);
-  CHECK(curves.count() == 0);
   CHECK(!lastShot.get().valid);
   CHECK(ble.enabled == 1);
   CHECK(ble.scanIntensity ==
@@ -1880,8 +1870,7 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   CHECK(savePersistedSettings(settings));
   CHECK(log.append(record));
   ShotLog::setHostSaveSucceeds(false);
-  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot,
-                               curves));
+  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot));
   ShotLog::setHostSaveSucceeds(true);
   PersistedSettings loaded;
   CHECK(loadPersistedSettings(loaded));
@@ -1904,19 +1893,18 @@ void p58b_factory_reset_clears_and_verifies_the_shot_trace_pool() {
   ShotLog log;
   HistoryLog history;
   LastShotStore lastShot;
-  ShotCurveLog curves;
   BleScanPersistedSettings ble;
-  CHECK(log.load() && history.load() && lastShot.load() && curves.load());
+  CHECK(log.load() && history.load() && lastShot.load());
   ShotTracePool pool(factoryPoolIndex);
   CHECK(pool.recover());
   for (uint32_t id = 1; id <= 3; ++id) CHECK(pool.append({id, 5, id * 100U, 1, 0}, nullptr, 0));
-  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot, curves, &pool));
+  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot, &pool));
   CHECK(pool.ready() && pool.count() == 0);
   ShotTracePool rebooted(factoryPoolIndex);
   CHECK(rebooted.recover() && rebooted.count() == 0 && !rebooted.contains(1, 5, 100));
   CHECK(pool.append({4, 6, 400, 1, 0}, nullptr, 0));
   ShotTracePoolHostFlash::setFailAfter(0, 0, true);  // The pool's erase fails.
-  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot, curves, &pool));
+  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot, &pool));
   CHECK(rebooted.recover() && rebooted.contains(4, 6, 400));
 }
 
@@ -1955,178 +1943,13 @@ void p60_factory_intent_survives_failed_store_reset() {
   LastShotStore lastShot;
   CHECK(lastShot.load());
   BleScanPersistedSettings ble;
-  ShotCurveLog curves;
-  CHECK(curves.load());
   ShotLog::setHostSaveSucceeds(false);
-  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot,
-                               curves));
+  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot));
   ShotLog::setHostSaveSucceeds(true);
   RecoveryIntent intent;
   CHECK(loadRecoveryIntent(intent));
   CHECK(intent.operation ==
         static_cast<uint8_t>(RecoveryOperation::FACTORY_RESET));
-}
-
-void p61_shot_curve_dual_slot_round_trip_and_delete() {
-  resetHostPersistence();
-  CHECK(SHOT_CURVE_MAX_POINTS == 1201);
-  CHECK(sizeof(ShotCurveRecord) == 5608);
-  CHECK(sizeof(ShotCurveStore) == 2804004);
-  CHECK(sizeof(ShotCurveStore) % 4 == 0);
-  CHECK(SHOT_CURVE_PARTITION_BYTES == 4016 * 1024);
-  ShotCurveRecord full = emptyShotCurveRecord();
-  for (size_t i = 0; i < SHOT_CURVE_MAX_POINTS; ++i)
-    CHECK(appendShotCurvePoint(full, -32767, static_cast<uint32_t>(i * 50), true, true));
-  CHECK(full.count == SHOT_CURVE_MAX_POINTS && curvePoint(full, 1200).atMs == 60000);
-  char curveJson[SHOT_CURVE_JSON_CAPACITY] = {};
-  CHECK(formatShotCurveJsonBody(curveJson, sizeof(curveJson), full));
-  CHECK(strstr(curveJson, "\"wHeld\":[0,1,2") != nullptr);
-  // dt 0 with an escaped -32767 (00 80 01 80), then dt 50, dw 0 (32 00).
-  CHECK(strstr(curveJson, "\"wD\":\"AIABgDIAMgAy") == curveJson);
-  CHECK(strstr(curveJson, ",1200],\"wHeld\"") != nullptr);
-  static ShotCurveLog curves;  // 2.7 MB each: three stack copies overflow the 8 MB Debug frame.
-  CHECK(curves.load());
-  CHECK(curves.count() == 0);
-  ShotCurveRecord first = emptyShotCurveRecord();
-  first.shotId = 7;
-  first.firstDrop.atMs = 4557;
-  first.firstDrop.weightCg = 50;
-  first.extended.atMs = 18013;
-  first.extended.weightCg = 1800;
-  first.atm.atMs = 20027;
-  first.atm.weightCg = 1900;
-  first.ended.atMs = 22057;
-  first.ended.weightCg = 1900;
-  CHECK(appendShotCurvePoint(first, 0, 0, false) &&
-        appendShotCurvePoint(first, 900, 0, false) &&
-        appendShotCurvePoint(first, 1800, 22000, false));
-  CHECK(appendShotCurveObservation(first, 19.0f, 23057, true));
-  CHECK(curves.append(first));
-  ShotCurveRecord second = emptyShotCurveRecord();
-  second.shotId = 8;
-  CHECK(appendShotCurvePoint(second, 10, 0, false) &&
-        appendShotCurvePoint(second, 400, 0, false));
-  CHECK(curves.append(second));
-  static ShotCurveLog reloaded;
-  CHECK(reloaded.load());
-  CHECK(reloaded.count() == 2);
-  ShotCurveRecord newest[2] = {};
-  CHECK(reloaded.copyNewestFirst(newest, 2) == 2);
-  CHECK(newest[0].shotId == 8);
-  CHECK(newest[1].shotId == 7);
-  CHECK(newest[1].firstDrop.atMs == 4557);
-  CHECK(newest[1].extended.atMs == 18013);
-  CHECK(newest[1].atm.atMs == 20027);
-  CHECK(newest[1].ended.atMs == 22057);
-  CHECK(newest[1].count == 4 && curvePoint(newest[1], 3).atMs == 23057);
-  CHECK(curvePoint(newest[1], 3).cg == 1900 && shotCurveBreakBefore(newest[1], 3));
-  CHECK(formatShotCurveJsonBody(curveJson, sizeof(curveJson), newest[1]));
-  CHECK(strstr(curveJson, "\"dropS\":4.557") != nullptr);
-  CHECK(strstr(curveJson, "\"extendedS\":18.013") != nullptr);
-  CHECK(strstr(curveJson, "\"atmS\":20.027") != nullptr);
-  CHECK(strstr(curveJson, "\"endS\":22.057") != nullptr);
-  CHECK(curvePoint(newest[1], 2).cg == 1800);
-  ShotCurveRecord exact = {};
-  CHECK(reloaded.copyByShotId(7, exact));
-  CHECK(exact.shotId == 7);
-  CHECK(curvePoint(exact, 2).cg == 1800);
-  CHECK(!appendShotCurveObservation(exact, 20, 21000, false));
-  CHECK(exact.count == 4);
-  CHECK(!appendShotCurveObservation(exact, 20, 60001, false));
-  CHECK(exact.truncated && exact.count == 4);
-  CHECK(!reloaded.copyByShotId(99, exact));
-  CHECK(reloaded.removeById(7));
-  CHECK(!reloaded.copyByShotId(7, exact));
-  CHECK(reloaded.count() == 1);
-  CHECK(reloaded.copyNewestFirst(newest, 2) == 1);
-  CHECK(newest[0].shotId == 8);
-  CHECK(reloaded.clear());
-  CHECK(reloaded.count() == 0);
-  static ShotCurveLog afterClear;
-  CHECK(afterClear.load());
-  CHECK(afterClear.count() == 0);
-  for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY + 1; ++id) {
-    first.shotId = id;
-    CHECK(reloaded.append(first, false));
-  }
-  CHECK(reloaded.dirty());
-  CHECK(reloaded.count() == SHOT_CURVE_CAPACITY);
-  CHECK(reloaded.flush());
-  ShotCurveRecord ring[SHOT_CURVE_CAPACITY] = {};
-  CHECK(reloaded.copyNewestFirst(ring, SHOT_CURVE_CAPACITY) ==
-        SHOT_CURVE_CAPACITY);
-  CHECK(ring[0].shotId == SHOT_CURVE_CAPACITY + 1);
-  CHECK(ring[SHOT_CURVE_CAPACITY - 1].shotId == 2);
-}
-
-void p61b_shot_curve_failed_compaction_restores_durable_ring() {
-  resetHostPersistence();
-  static ShotCurveLog curves;  // 2.7 MB each: stacked copies overflow the 8 MB Debug frame.
-  CHECK(curves.load());
-  ShotCurveRecord record = emptyShotCurveRecord();
-  for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY; ++id) {
-    resetShotCurveRecord(record);
-    record.shotId = id;
-    CHECK(appendShotCurvePoint(record, static_cast<int16_t>(id), 0, false));
-    CHECK(curves.append(record, false));
-  }
-  CHECK(curves.flush());
-  ShotCurveRecord durable[SHOT_CURVE_CAPACITY] = {};
-  CHECK(curves.copyNewestFirst(durable, SHOT_CURVE_CAPACITY) ==
-        SHOT_CURVE_CAPACITY);
-
-  record.shotId = SHOT_CURVE_CAPACITY + 1;
-  ShotCurveLog::setHostSaveSucceeds(false);
-  CHECK(!curves.append(record, true));
-  ShotCurveLog::setHostSaveSucceeds(true);
-  ShotCurveRecord restored[SHOT_CURVE_CAPACITY] = {};
-  CHECK(!curves.dirty());
-  CHECK(curves.copyNewestFirst(restored, SHOT_CURVE_CAPACITY) ==
-        SHOT_CURVE_CAPACITY);
-  for (size_t i = 0; i < SHOT_CURVE_CAPACITY; ++i) {
-    CHECK(restored[i].shotId == durable[i].shotId);
-    CHECK(curvePoint(restored[i], 0).cg == curvePoint(durable[i], 0).cg);
-  }
-}
-
-uint8_t *findCurveBlock(uint32_t shotId) {
-  uint8_t *flash = ShotCurveLog::hostFlashForTest();
-  for (size_t b = 0; b < SHOT_CURVE_BLOCK_COUNT; ++b) {
-    uint8_t *block = flash + 2U * FLASH_IO_SECTOR_BYTES + b * SHOT_CURVE_BLOCK_BYTES;
-    ShotCurveBlockHeader h = {};
-    memcpy(&h, block, sizeof(h));
-    if (h.magic == SHOT_CURVE_MAGIC && h.shotId == shotId &&
-        h.validity == UINT32_MAX - 1U) return block;
-  }
-  return nullptr;
-}
-
-void p61c_shot_curve_held_and_break_bits_round_trip() {
-  resetHostPersistence();
-  ShotCurveRecord current = emptyShotCurveRecord();
-  current.shotId = 43;
-  for (size_t i = 0; i < 9; ++i)  // Two bitmap bytes: 9 % 8 == 1.
-    CHECK(appendShotCurvePoint(current, static_cast<int16_t>(i * 40U),
-                               static_cast<uint32_t>(i * 100U), i == 8, i == 2 || i == 3));
-  ShotCurveLog updated;
-  CHECK(updated.load());
-  CHECK(updated.append(current));
-  ShotCurveLog reloaded;
-  CHECK(reloaded.load());
-  CHECK(reloaded.count() == 1);
-  ShotCurveRecord loaded = {};
-  CHECK(reloaded.copyByShotId(43, loaded));
-  CHECK(loaded.count == 9 && curvePoint(loaded, 8).cg == 320);
-  CHECK(shotCurveHeld(loaded, 2) && shotCurveHeld(loaded, 3) &&
-        !shotCurveHeld(loaded, 4) && shotCurveBreakBefore(loaded, 8));
-  char json[SHOT_CURVE_JSON_CAPACITY] = {};
-  CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded));
-  CHECK(strstr(json, "\"wBreakBefore\":[8],\"wHeld\":[2,3]") != nullptr);
-  CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded, 3));
-  CHECK(strstr(json, "\"wRef\":[200,80],") == json);
-  CHECK(strstr(json, "\"wHeld\":[3]") != nullptr);
-  CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded, 4));
-  CHECK(strstr(json, "\"wBreakBefore\":[8]") != nullptr && strstr(json, "wHeld") == nullptr);
 }
 
 void p67_ensure_recovery_intent_skips_rewrite_when_valid() {
@@ -2621,10 +2444,7 @@ void p90_firmware_mode_store_round_trip_and_factory_reset() {
   LastShotStore lastShot;
   CHECK(lastShot.load());
   BleScanPersistedSettings ble;
-  ShotCurveLog curves;
-  CHECK(curves.load());
-  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot,
-                              curves));
+  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot));
   CHECK(loadFirmwareMode() == FirmwareMode::COMPATIBILITY);
 }
 
@@ -2688,207 +2508,6 @@ void p90b_setup_intent_commits_with_its_wifi() {
   CHECK(!loadSetupIntent(intent));
 }
 
-void p61c_timestamped_capacity_and_interrupted_blocks() {
-  ShotCurveSampler sampler;
-  sampler.reset(UINT32_MAX - 1000U);
-  sampler.latchFirstDrop(sampler.startMs + 1057U, 0.5f);
-  CHECK(sampler.firstDrop.atMs == 1057);
-  for (uint32_t t = 0; t <= 60000; t += 50)
-    sampler.accept(12.34f, sampler.startMs + t);
-  CHECK(sampler.count == 1201);
-  CHECK(!sampler.truncated);
-  CHECK(curvePoint(sampler, 0).atMs == 0 && curvePoint(sampler, 1200).atMs == 60000);
-  sampler.accept(12.34f, sampler.startMs + 60000);
-  CHECK(sampler.truncated && sampler.count == 1201);
-  ShotCurveRecord complete;
-  sampler.snapshot(complete, 101);
-  complete.truncated = false;
-  ShotCurveLog::resetHostStorage();
-  // Static: with the loop's second curve log the two 2.7 MB stores would
-  // overflow the main-thread stack depending on its ASLR placement.
-  static ShotCurveLog maximum;
-  const size_t denseErased = ShotCurveLog::hostEraseBytes();
-  const size_t denseWritten = ShotCurveLog::hostWriteBytes();
-  CHECK(maximum.load() && maximum.append(complete) && maximum.load());
-  // Dense curves commit in one sector: the delta stream halves the payload.
-  CHECK(ShotCurveLog::hostEraseBytes() - denseErased == 4096);
-  CHECK(ShotCurveLog::hostWriteBytes() - denseWritten == 2760);
-  ShotCurveRecord restored;
-  CHECK(maximum.copyByShotId(101, restored));
-  CHECK(restored.count == 1201 && !restored.truncated && curvePoint(restored, 1200).atMs == 60000);
-  CHECK(restored.firstDrop.atMs == 1057);
-  ShotCurveRecord full;
-  sampler.snapshot(full, 101);
-  CHECK(validShotCurveRecord(full));
-  char json[SHOT_CURVE_JSON_CAPACITY] = {};
-  CHECK(formatShotCurveJsonBody(json, sizeof(json), full));
-  CHECK(strstr(json, "\"wTruncated\":true") != nullptr);
-
-  // Interrupt every erase/body/header operation across both physical sectors.
-  for (int stop = 0; stop <= 8; ++stop) {
-    ShotCurveLog::resetHostStorage();
-    ShotCurveLog live;
-    CHECK(live.load());
-    ShotCurveRecord small = emptyShotCurveRecord();
-    CHECK(appendShotCurvePoint(small, 100, 0, false));
-    for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY; ++id) {
-      small.shotId = id;
-      CHECK(live.append(small));
-    }
-    const size_t erased = ShotCurveLog::hostEraseBytes();
-    const size_t written = ShotCurveLog::hostWriteBytes();
-    CHECK(live.append(full, false));
-    CHECK(ShotCurveLog::hostEraseBytes() == erased);
-    ShotCurveLog::setHostFailAfter(stop);
-    while (live.flushStep() == FlashStoreStepResult::MORE) {}
-    ShotCurveLog::setHostFailAfter(-1);
-    ShotCurveLog reloaded;
-    CHECK(reloaded.load());
-    CHECK(reloaded.count() == SHOT_CURVE_CAPACITY);
-    const bool committed = reloaded.containsShotId(SHOT_CURVE_CAPACITY + 1);
-    CHECK(reloaded.containsShotId(1) != committed);
-    CHECK(ShotCurveLog::hostEraseBytes() - erased <= 8192);
-    CHECK(ShotCurveLog::hostWriteBytes() - written <= 2760);
-    if (committed) {
-      ShotCurveRecord out;
-      CHECK(reloaded.copyByShotId(SHOT_CURVE_CAPACITY + 1, out));
-      CHECK(out.count == 1201 && curvePoint(out, 1200).atMs == 60000);
-      CHECK(curvePoint(out, 1200).cg == 1234 && out.truncated);
-      CHECK(reloaded.removeById(SHOT_CURVE_CAPACITY + 1));
-      CHECK(live.load());
-      CHECK(!live.containsShotId(1)); // Retention floor survives newest deletion.
-      CHECK(live.count() == SHOT_CURVE_CAPACITY - 1);
-    }
-  }
-
-  // Genuine repeated weights, duplicate timestamps and healthy slow cadence.
-  sampler.reset(0);
-  sampler.accept(1, 0);
-  sampler.accept(1, 500);
-  sampler.accept(1, 500);
-  sampler.markBreak();
-  sampler.accept(2, 1250);
-  CHECK(sampler.count == 4 && curvePoint(sampler, 2).atMs == 500);
-  ShotCurveRecord sparse;
-  sampler.snapshot(sparse, 1);
-  CHECK(!shotCurveBreakBefore(sparse, 1));
-  CHECK(shotCurveBreakBefore(sparse, 3));
-  sampler.captureEnd(1400, 2);
-  sampler.accept(3, 1600);
-  CHECK(sampler.count == 4);
-  sampler.snapshot(sparse, 1);
-  CHECK(settleShotCurveEndWeight(sparse, 3));
-  CHECK(curvePoint(sparse, 3).cg == 200 && sparse.ended.weightCg == 300);
-
-  // Reuse a former long block for a short record; its untouched second sector
-  // is padding, never another curve or part of the short-record checksum.
-  ShotCurveLog::resetHostStorage();
-  static ShotCurveLog reuse;
-  CHECK(reuse.load());
-  complete.shotId = 1;
-  CHECK(reuse.append(complete));
-  resetShotCurveRecord(sparse);
-  CHECK(appendShotCurvePoint(sparse, 100, 0, false));
-  for (uint32_t id = 2; id <= SHOT_CURVE_CAPACITY; ++id) {
-    sparse.shotId = id;
-    CHECK(reuse.append(sparse));
-  }
-  const size_t erased = ShotCurveLog::hostEraseBytes();
-  const size_t programmed = ShotCurveLog::hostWriteBytes();
-  sparse.shotId = SHOT_CURVE_CAPACITY + 1;
-  CHECK(reuse.append(sparse));
-  CHECK(ShotCurveLog::hostEraseBytes() - erased == 4096);
-  CHECK(ShotCurveLog::hostWriteBytes() - programmed == 60);
-  ShotCurveLog::corruptHostByte(8192 + 4096);
-  CHECK(reuse.load() && reuse.count() == SHOT_CURVE_CAPACITY);
-  CHECK(reuse.copyByShotId(SHOT_CURVE_CAPACITY + 1, sparse) && sparse.count == 1);
-}
-
-void p61d_clear_epochs_and_stale_worker_images() {
-  // Static: the section-local curve logs would otherwise stack six 2.7 MB
-  // stores in one Debug frame and overflow the 8 MB main-thread stack.
-  for (int stop = 0; stop <= 1; ++stop) {
-    ShotCurveLog::resetHostStorage();
-    static ShotCurveLog live;
-    CHECK(live.load());
-    ShotCurveRecord r = emptyShotCurveRecord();
-    r.shotId = 1;
-    CHECK(appendShotCurvePoint(r, 0, 0, false));
-    CHECK(live.append(r));
-    CHECK(live.removeById(1, false));
-    ShotCurveLog::setHostFailAfter(stop);
-    while (live.flushStep() == FlashStoreStepResult::MORE) {}
-    ShotCurveLog::setHostFailAfter(-1);
-    static ShotCurveLog reboot;
-    CHECK(reboot.load());
-    CHECK(reboot.count() == (stop == 0 ? 1 : 0));
-  }
-  for (int stop = 0; stop <= 3; ++stop) {
-    ShotCurveLog::resetHostStorage();
-    static ShotCurveLog live;
-    CHECK(live.load());
-    ShotCurveRecord r = emptyShotCurveRecord();
-    r.shotId = 1;
-    CHECK(appendShotCurvePoint(r, 100, 0, false));
-    CHECK(live.append(r));
-    CHECK(live.clear(false));
-    ShotCurveLog::setHostFailAfter(stop);
-    while (live.flushStep() == FlashStoreStepResult::MORE) {}
-    ShotCurveLog::setHostFailAfter(-1);
-    static ShotCurveLog reboot;
-    CHECK(reboot.load());
-    CHECK(reboot.count() == (stop == 3 ? 0 : 1));
-    if (stop == 3) {
-      resetShotCurveRecord(r);
-      r.shotId = 1;
-      CHECK(appendShotCurvePoint(r, 200, 0, false));
-      CHECK(reboot.append(r));
-      CHECK(live.load());
-      CHECK(live.copyByShotId(1, r));
-      CHECK(curvePoint(r, 0).cg == 200);
-    }
-  }
-  ShotCurveLog::resetHostStorage();
-  static ShotCurveLog live;
-  CHECK(live.load());
-  ShotCurveRecord r = emptyShotCurveRecord();
-  r.shotId = 1;
-  CHECK(appendShotCurvePoint(r, 100, 0, false));
-  CHECK(live.append(r, false));
-  ShotCurvePersistImage image;
-  live.capturePersistenceImage(image);
-  CHECK(live.clear(false));
-  while (image.flushStep() == FlashStoreStepResult::MORE) {}
-  live.acknowledgePersisted(image, false);
-  CHECK(live.dirty() && live.count() == 0);
-  CHECK(live.flush());
-  static ShotCurveLog reboot;
-  CHECK(reboot.load() && reboot.count() == 0);
-  resetShotCurveRecord(r);
-  r.shotId = 1;
-  CHECK(appendShotCurvePoint(r, 200, 0, false));
-  CHECK(live.append(r, false));
-  live.capturePersistenceImage(image);
-  CHECK(live.removeById(1, false));
-  while (image.flushStep() == FlashStoreStepResult::MORE) {}
-  live.acknowledgePersisted(image, false);
-  CHECK(live.flush());
-  CHECK(reboot.load() && reboot.count() == 0);
-  r.shotId = 2;
-  CHECK(live.append(r, false));
-  live.capturePersistenceImage(image);
-  r.shotId = 3;
-  CHECK(live.append(r, false));
-  while (image.flushStep() == FlashStoreStepResult::MORE) {}
-  live.acknowledgePersisted(image, false);
-  CHECK(live.dirty() && live.count() == 2);
-  CHECK(live.flush());
-  CHECK(reboot.load() && reboot.containsId(2) && reboot.containsId(3));
-  const size_t writes = ShotCurveLog::hostWriteBytes();
-  CHECK(live.append(r));
-  CHECK(ShotCurveLog::hostWriteBytes() == writes && live.count() == 2);
-}
-
 uint32_t curveFuzzState = 0x9E3779B9U;
 uint32_t curveFuzzRand() {
   return curveFuzzState = curveFuzzState * 1664525U + 1013904223U;
@@ -2938,11 +2557,129 @@ ShotCurveRecord curveBoundaryRecord(uint32_t id) {
   return r;
 }
 
-void p61f_shot_curve_schema3_round_trip_is_lossless() {
-  resetHostPersistence();
-  ShotCurveLog log;
-  CHECK(log.load());
-  ShotCurveRecord records[52] = {};
+// The curve section of a pool record, encoded and decoded as the pool
+// worker and its readers do (the payload alone).
+uint8_t curveSection[SHOT_CURVE_SECTION_MAX_BYTES + 8];
+bool decodeCurveSection(const uint8_t *section, size_t bytes, uint32_t shotId,
+                        ShotCurveRecord &out) {
+  return decodeShotCurveSection(bytes, shotId, out, [&](size_t at, void *to, size_t n) {
+    if (at + n > bytes) return false;
+    memcpy(to, section + at, n);
+    return true;
+  });
+}
+bool curveSectionRoundTrip(const ShotCurveRecord &in, ShotCurveRecord &out,
+                           size_t *bytes = nullptr) {
+  const size_t encoded = encodeShotCurveSection(in, curveSection);
+  if (bytes != nullptr) *bytes = encoded;
+  return encoded <= SHOT_CURVE_SECTION_MAX_BYTES &&
+         decodeCurveSection(curveSection, encoded, in.shotId, out);
+}
+
+void p61c_timestamped_capacity_and_dense_sections() {
+  ShotCurveSampler sampler;
+  sampler.reset(UINT32_MAX - 1000U);
+  sampler.latchFirstDrop(sampler.startMs + 1057U, 0.5f);
+  CHECK(sampler.firstDrop.atMs == 1057);
+  for (uint32_t t = 0; t <= 60000; t += 50)
+    sampler.accept(12.34f, sampler.startMs + t);
+  CHECK(sampler.count == 1201);
+  CHECK(!sampler.truncated);
+  CHECK(curvePoint(sampler, 0).atMs == 0 && curvePoint(sampler, 1200).atMs == 60000);
+  sampler.accept(12.34f, sampler.startMs + 60000);
+  CHECK(sampler.truncated && sampler.count == 1201);
+  ShotCurveRecord complete;
+  sampler.snapshot(complete, 101);
+  complete.truncated = false;
+  // A dense curve's section: the delta stream halves the payload.
+  static ShotCurveRecord restored;
+  size_t bytes = 0;
+  CHECK(curveSectionRoundTrip(complete, restored, &bytes) && bytes == 2728);
+  CHECK(restored.count == 1201 && !restored.truncated && curvePoint(restored, 1200).atMs == 60000);
+  CHECK(restored.firstDrop.atMs == 1057);
+  ShotCurveRecord full;
+  sampler.snapshot(full, 101);
+  CHECK(validShotCurveRecord(full));
+  CHECK(curveSectionRoundTrip(full, restored) && restored.truncated);
+  char json[SHOT_CURVE_JSON_CAPACITY] = {};
+  CHECK(formatShotCurveJsonBody(json, sizeof(json), full));
+  CHECK(strstr(json, "\"wTruncated\":true") != nullptr);
+
+  // Genuine repeated weights, duplicate timestamps and healthy slow cadence.
+  sampler.reset(0);
+  sampler.accept(1, 0);
+  sampler.accept(1, 500);
+  sampler.accept(1, 500);
+  sampler.markBreak();
+  sampler.accept(2, 1250);
+  CHECK(sampler.count == 4 && curvePoint(sampler, 2).atMs == 500);
+  ShotCurveRecord sparse;
+  sampler.snapshot(sparse, 1);
+  CHECK(!shotCurveBreakBefore(sparse, 1));
+  CHECK(shotCurveBreakBefore(sparse, 3));
+  sampler.captureEnd(1400, 2);
+  sampler.accept(3, 1600);
+  CHECK(sampler.count == 4);
+  sampler.snapshot(sparse, 1);
+  CHECK(settleShotCurveEndWeight(sparse, 3));
+  CHECK(curvePoint(sparse, 3).cg == 200 && sparse.ended.weightCg == 300);
+}
+
+void p61c_shot_curve_held_and_break_bits_round_trip() {
+  ShotCurveRecord current = emptyShotCurveRecord();
+  current.shotId = 43;
+  for (size_t i = 0; i < 9; ++i)  // Two bitmap bytes: 9 % 8 == 1.
+    CHECK(appendShotCurvePoint(current, static_cast<int16_t>(i * 40U),
+                               static_cast<uint32_t>(i * 100U), i == 8, i == 2 || i == 3));
+  static ShotCurveRecord loaded;
+  CHECK(curveSectionRoundTrip(current, loaded));
+  CHECK(loaded.count == 9 && curvePoint(loaded, 8).cg == 320);
+  CHECK(shotCurveHeld(loaded, 2) && shotCurveHeld(loaded, 3) &&
+        !shotCurveHeld(loaded, 4) && shotCurveBreakBefore(loaded, 8));
+  char json[SHOT_CURVE_JSON_CAPACITY] = {};
+  CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded));
+  CHECK(strstr(json, "\"wBreakBefore\":[8],\"wHeld\":[2,3]") != nullptr);
+  CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded, 3));
+  CHECK(strstr(json, "\"wRef\":[200,80],") == json);
+  CHECK(strstr(json, "\"wHeld\":[3]") != nullptr);
+  CHECK(formatShotCurveJsonBody(json, sizeof(json), loaded, 4));
+  CHECK(strstr(json, "\"wBreakBefore\":[8]") != nullptr && strstr(json, "wHeld") == nullptr);
+}
+
+// The PSRAM curve cache: the newest SHOT_CURVE_CAPACITY curves; the ones
+// not in the pool yet are its newest suffix, saved oldest first; a load
+// after boot fills only the older end and never displaces a newer curve.
+void p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix() {
+  static ShotCurveCache cache;
+  cache.clear();
+  ShotCurveRecord curve = emptyShotCurveRecord();
+  CHECK(appendShotCurvePoint(curve, 100, 0, false));
+  auto add = [&](uint32_t id, bool saved) {
+    curve.shotId = id;
+    return saved ? cache.prependSaved(curve) : cache.append(curve);
+  };
+  CHECK(add(10, false) && add(11, false) && cache.pending() == 2);
+  CHECK(cache.oldestPending()->shotId == 10);
+  cache.markSaved(11);  // Not the oldest pending: ignored.
+  CHECK(cache.pending() == 2);
+  cache.markSaved(10);
+  CHECK(cache.pending() == 1 && cache.oldestPending()->shotId == 11);
+  CHECK(add(9, true) && add(8, true) && !add(8, true) && cache.pending() == 1);
+  static ShotCurveRecord order[4];
+  CHECK(cache.copyNewestFirst(order, 4) == 4 && order[0].shotId == 11 && order[3].shotId == 8);
+  CHECK(cache.removeById(11) && cache.pending() == 0 && cache.oldestPending() == nullptr);
+  for (uint32_t id = 100; cache.count() < SHOT_CURVE_CAPACITY; ++id) CHECK(add(id, false));
+  const uint32_t generation = cache.generation();
+  curve.shotId = 5;
+  CHECK(!cache.prependSaved(curve) && cache.full());
+  CHECK(cache.copyNewestFirst(order, 1) == 1 && order[0].shotId == 100U + SHOT_CURVE_CAPACITY - 4U);
+  CHECK(cache.containsShotId(8) && add(1000, false) && !cache.containsShotId(8));
+  cache.clear();
+  CHECK(cache.count() == 0 && cache.pending() == 0 && cache.generation() == generation + 1U);
+}
+
+void p61f_shot_curve_section_round_trip_is_lossless() {
+  static ShotCurveRecord records[52] = {};
   size_t n = 0;
   records[n] = emptyShotCurveRecord();  // Zero points is a legal curve.
   records[n++].shotId = 1;
@@ -2956,20 +2693,18 @@ void p61f_shot_curve_schema3_round_trip_is_lossless() {
     CHECK(appendShotCurvePoint(records[n], 1234, static_cast<uint32_t>(i * 50U), false));
   ++n;
   for (uint32_t id = 5; id <= 52; ++id) records[n++] = curveFuzzRecord(id);
-  for (size_t i = 0; i < n; ++i) CHECK(log.append(records[i], false));
-  CHECK(log.flush());
-  ShotCurveLog reloaded;
-  CHECK(reloaded.load());
-  CHECK(reloaded.count() == n);
   for (size_t i = 0; i < n; ++i) {
-    ShotCurveRecord out = {};
-    CHECK(reloaded.copyByShotId(records[i].shotId, out));
+    static ShotCurveRecord out;
+    out = {};
+    size_t bytes = 0;
+    CHECK(curveSectionRoundTrip(records[i], out, &bytes));
+    CHECK(bytes == SHOT_CURVE_SECTION_FIXED_BYTES + records[i].bytes +
+                       2U * ((records[i].count + 7U) / 8U));
     CHECK(memcmp(&out, &records[i], sizeof(out)) == 0);
   }
 }
 
-// Escaped stream: 1000 ms gaps with one weight escape. Counts 3 and 5 land
-// byte-exact (no padding); count 4 leaves two padding bytes.
+// Escaped stream: 1000 ms gaps with one weight escape.
 ShotCurveRecord curveEscapeRecord(uint32_t id, uint16_t count) {
   ShotCurveRecord r = emptyShotCurveRecord();
   r.shotId = id;
@@ -2980,19 +2715,9 @@ ShotCurveRecord curveEscapeRecord(uint32_t id, uint16_t count) {
   return r;
 }
 
-void resealCurveBlock(uint8_t *block) {
-  ShotCurveBlockHeader h = {};
-  memcpy(&h, block, sizeof(h));
-  uint32_t crc = crc32Update(0xffffffffU, block, offsetof(ShotCurveBlockHeader, checksum));
-  h.checksum = ~crc32Update(crc, block + sizeof(h), h.bytes - sizeof(h));
-  memcpy(block, &h, sizeof(h));
-}
-
-void p61g_shot_curve_schema3_worst_case_stays_within_budget() {
-  resetHostPersistence();
-  ShotCurveLog log;
-  CHECK(log.load());
-  ShotCurveRecord r = emptyShotCurveRecord();
+void p61g_shot_curve_section_worst_case_stays_within_budget() {
+  static ShotCurveRecord r;
+  r = emptyShotCurveRecord();
   r.shotId = 1;
   // Byte-maximum valid record: 235 time escapes (255 ms each stay under the
   // 60000 ms domain; more are impossible) and a weight escape on every point.
@@ -3004,57 +2729,43 @@ void p61g_shot_curve_schema3_worst_case_stays_within_budget() {
   static char json[SHOT_CURVE_JSON_CAPACITY];
   CHECK(formatShotCurveJsonBody(json, sizeof(json), r));
   CHECK(strlen(json) + 1U <= SHOT_CURVE_JSON_CAPACITY);
-  const size_t erased = ShotCurveLog::hostEraseBytes();
-  const size_t written = ShotCurveLog::hostWriteBytes();
-  CHECK(log.append(r));
-  CHECK(ShotCurveLog::hostEraseBytes() - erased <= 8192);
-  CHECK(ShotCurveLog::hostWriteBytes() - written == 5632);
-  const uint8_t *block = findCurveBlock(1);
-  CHECK(block != nullptr);
-  ShotCurveBlockHeader h = {};
-  memcpy(&h, block, sizeof(h));
-  CHECK(h.schema == 3 && h.count == SHOT_CURVE_MAX_POINTS && h.flags == 0U);
-  CHECK(h.bytes == 5632);
-  ShotCurveLog reloaded;
-  CHECK(reloaded.load() && reloaded.count() == 1);
-  ShotCurveRecord out = {};
-  CHECK(reloaded.copyByShotId(1, out));
+  static ShotCurveRecord out;
+  out = {};
+  size_t bytes = 0;
+  CHECK(curveSectionRoundTrip(r, out, &bytes));
+  CHECK(bytes == SHOT_CURVE_SECTION_MAX_BYTES && bytes == 5598);
   CHECK(memcmp(&out, &r, sizeof(out)) == 0);
+  // With a full trace it still fits one pool record.
+  CHECK(sizeof(ShotTracePoolRecordHeader) + 2U * sizeof(ShotTracePoolSectionHeader) +
+            ((bytes + 3U) & ~size_t(3U)) + 16384U <= SHOT_TRACE_POOL_MAX_RECORD_BYTES);
 }
 
-void p61h_shot_curve_schema3_malformed_blocks_are_rejected() {
-  // CRC is recomputed after every mutation: it is not a semantic gate.
-  // Out-of-bounds walking is caught by the ASan/UBSan profile.
-  for (int kind = 0; kind < 5; ++kind) {
-    ShotCurveLog::resetHostStorage();
-    ShotCurveLog log;
-    CHECK(log.load());
-    const uint16_t baseCount = kind <= 1 ? 5 : kind == 2 ? 4 : 3;
-    CHECK(log.append(curveEscapeRecord(1, baseCount)));
-    uint8_t *block = findCurveBlock(1);
-    CHECK(block != nullptr);
-    ShotCurveBlockHeader h = {};
-    memcpy(&h, block, sizeof(h));
-    if (kind == 0) h.count = 6;  // Stream shorter than count implies.
-    else if (kind == 1) block[73] = 0x80;  // Marker as the final stream byte.
-    else if (kind == 2) block[75] = 0x40;  // Nonzero padding byte.
-    else if (kind == 3) { block[65] = 0x64; block[66] = 0x00; }  // atMs[2] -> 100.
-    else h.bytes = 76;  // bytes/count mismatch.
-    memcpy(block, &h, sizeof(h));
-    resealCurveBlock(block);
-    ShotCurveLog reloaded;
-    CHECK(reloaded.load());
-    CHECK(!reloaded.containsShotId(1));
-    CHECK(reloaded.count() == 0);
+void p61h_shot_curve_section_malformed_payloads_are_rejected() {
+  // The pool's CRC guards the bytes; these are framing and semantic gates.
+  for (int kind = 0; kind < 7; ++kind) {
+    const ShotCurveRecord in = curveEscapeRecord(1, 5);
+    size_t bytes = encodeShotCurveSection(in, curveSection);
+    if (kind == 0) curveSection[0] = 6;  // Stream shorter than count implies.
+    else if (kind == 1) curveSection[SHOT_CURVE_SECTION_FIXED_BYTES + in.bytes - 1U] = 0x80;  // Marker last.
+    else if (kind == 2) curveSection[2] = 2;  // Unknown flag.
+    else if (kind == 3) curveSection[3] = 1;  // Reserved byte.
+    else if (kind == 4) { curveSection[22 + 4] = 0x64; curveSection[22 + 5] = 0x00; }  // Point 2 at 100 ms.
+    else if (kind == 5) bytes = SHOT_CURVE_SECTION_FIXED_BYTES + 1U;  // Shorter than its bitmaps.
+    else bytes += 4U;  // Stream framed longer than the points.
+    ShotCurveRecord out = {};
+    CHECK(!decodeCurveSection(curveSection, bytes, 1, out));
   }
+  ShotCurveRecord out = {};
+  CHECK(!decodeCurveSection(curveSection, SHOT_CURVE_SECTION_FIXED_BYTES - 1U, 1, out));
+  CHECK(!decodeCurveSection(curveSection, SHOT_CURVE_SECTION_MAX_BYTES + 4U, 1, out));
 }
 
-void p61i_shot_curve_schema3_wire_format_is_pinned() {
-  // Hand-built golden schema-3 block: the wire format is pinned from the
-  // outside, so a symmetric encode/decode bug (both sides wrong the same
-  // way) cannot hide. Marker bytes appear in both positions (dt 128 stores
-  // 0x80, dw -1 stores 0xFF), escapes store little-endian absolutes, the
-  // block carries zero padding, and dirty bitmap tail bits must load masked.
+void p61i_shot_curve_section_wire_format_is_pinned() {
+  // Hand-built golden section: the wire format is pinned from the outside,
+  // so a symmetric encode/decode bug (both sides wrong the same way) cannot
+  // hide. Marker bytes appear in both positions (dt 128 stores 0x80, dw -1
+  // stores 0xFF), escapes store little-endian absolutes, and dirty bitmap
+  // tail bits must load masked.
   static const uint8_t stream[36] = {
       0x00, 0x00,                             // dt 0, dw 0
       0xFE, 0x7F,                             // dt 254, dw +127
@@ -3072,37 +2783,21 @@ void p61i_shot_curve_schema3_wire_format_is_pinned() {
   // Indices 3 and 8 start segments; indices 0 and 7 were held.
   for (size_t i = 0; i < 9; ++i)
     CHECK(appendShotCurvePoint(expected, weight[i], at[i], i == 3 || i == 8, i == 0 || i == 7));
+  expected.truncated = true;
   CHECK(expected.bytes == sizeof(stream) && memcmp(expected.stream, stream, sizeof(stream)) == 0);
-
-  resetHostPersistence();
-  uint8_t *block = ShotCurveLog::hostFlashForTest() + 2U * FLASH_IO_SECTOR_BYTES;
-  memset(block, 0xff, SHOT_CURVE_BLOCK_BYTES);
-  memcpy(block + sizeof(ShotCurveBlockHeader), &expected.atmClearedMs, 18);
-  memcpy(block + 54, stream, sizeof(stream));
-  block[90] = expected.breakBefore[0];
-  block[91] = 0xFF;  // Index 8 plus dirty tail bits 9-15.
-  block[92] = expected.held[0];
-  block[93] = 0xFE;  // Dirty tail bits 9-15; index 8 was never held.
-  block[94] = block[95] = 0;  // Padding past the bitmaps must be zero.
-  ShotCurveBlockHeader h = {};
-  h.magic = SHOT_CURVE_MAGIC;
-  h.schema = 3;
-  h.bytes = 96;  // 54 header+fixed + 36 stream + 4 bitmaps + 2 zero padding.
-  h.epoch = 0;
-  h.sequence = 1;
-  h.floor = 0;
-  h.shotId = 44;
-  h.count = 9;
-  h.flags = 0;
-  h.validity = UINT32_MAX - 1U;  // kCommitted
-  memcpy(block, &h, sizeof(h));
-  resealCurveBlock(block);
-
-  ShotCurveLog golden;
-  CHECK(golden.load());
-  CHECK(golden.count() == 1);
+  uint8_t golden[62] = {9, 0, 1, 0};  // count 9, truncated, reserved 0.
+  memcpy(golden + 4, &expected.atmClearedMs, 18);
+  memcpy(golden + 22, stream, sizeof(stream));
+  golden[58] = expected.breakBefore[0];
+  golden[59] = 0x01;  // Index 8.
+  golden[60] = expected.held[0];
+  golden[61] = 0x00;
+  CHECK(encodeShotCurveSection(expected, curveSection) == sizeof(golden) &&
+        memcmp(curveSection, golden, sizeof(golden)) == 0);
+  golden[59] = 0xFF;  // Index 8 plus dirty tail bits 9-15.
+  golden[61] = 0xFE;  // Dirty tail bits 9-15; index 8 was never held.
   ShotCurveRecord loaded = {};
-  CHECK(golden.copyByShotId(44, loaded));
+  CHECK(decodeCurveSection(golden, sizeof(golden), 44, loaded));
   CHECK(memcmp(&loaded, &expected, sizeof(loaded)) == 0);
   CHECK(shotCurveBreakBefore(loaded, 8));
   CHECK(shotCurveHeld(loaded, 7) && !shotCurveHeld(loaded, 8));
@@ -3111,124 +2806,28 @@ void p61i_shot_curve_schema3_wire_format_is_pinned() {
 void p66c_activation_capture_skips_clean_payloads() {
   resetHostPersistence();
   ActivationStores live;
-  ActivationStoresPersistImage image;
+  ActivationStores image;
   CHECK(live.begin() && live.shotLog.flush());
-  ShotCurveRecord curve = emptyShotCurveRecord();
-  curve.shotId = 1;
-  CHECK(appendShotCurvePoint(curve, 0, 0, false));
-  CHECK(live.shotCurves.append(curve));
   // Stale clean payloads in the reused image must neither copy nor flush.
   CHECK(image.shotLog.append(ShotLogRecord{}, false));
   HistoryRecord activation = {};
   activation.type = static_cast<uint8_t>(HistoryType::POWER_ON);
   CHECK(live.historyLog.append(activation, false));
-  const size_t writesBefore = ShotCurveLog::hostWriteBytes();
+  const size_t erasesBefore = ShotLog::hostEraseBytes();
   live.capturePersistenceImage(image);
   CHECK(!image.shotLog.dirty() && image.shotLog.count() == 1);
-  CHECK(!image.shotCurves.dirty() && image.shotCurves.count() == 0);
   CHECK(image.historyLog.dirty());
   ActivationStoresFlushReport report;
   do { report = image.serviceStep(0, nullptr); } while (!report.complete && !report.anyFail);
   CHECK(!report.anyFail);
   live.acknowledgePersisted(image, true);
   CHECK(!live.historyLog.dirty());
-  CHECK(ShotCurveLog::hostWriteBytes() == writesBefore);
+  CHECK(ShotLog::hostEraseBytes() == erasesBefore);
   HistoryLog reboot;
   CHECK(reboot.load() && reboot.count() == 1);
   HistoryRecord stored;
   CHECK(reboot.copyNewestFirst(&stored, 1) == 1);
   CHECK(stored.type == static_cast<uint8_t>(HistoryType::POWER_ON));
-}
-
-void p61e_selective_curve_capture_preserves_retention_and_retry() {
-  for (int failureAfter : {-1, 0, 1, 2, 3, 4, 5, 6}) {
-    resetHostPersistence();
-    ShotCurveLog live, reboot;
-    ShotCurvePersistImage image;
-    CHECK(live.load());
-    ShotCurveRecord record = emptyShotCurveRecord();
-    const auto single = [&](uint32_t id, int16_t cg) {
-      resetShotCurveRecord(record);
-      record.shotId = id;
-      return appendShotCurvePoint(record, cg, 0, false);
-    };
-    for (uint32_t id = 1; id <= SHOT_CURVE_CAPACITY; ++id) {
-      CHECK(single(id, static_cast<int16_t>(id)));
-      CHECK(live.append(record));
-    }
-    live.capturePersistenceImage(image);
-    CHECK(!image.dirty() && image.count() == 0);
-    CHECK(single(SHOT_CURVE_CAPACITY + 1U, 1001));
-    CHECK(live.append(record, false));
-    live.capturePersistenceImage(image);
-    CHECK(image.dirty() && image.count() == 1);
-    CHECK(image.containsId(record.shotId));
-    CHECK(!image.containsId(SHOT_CURVE_CAPACITY));
-    // A newer live record cannot be cleared by this captured generation.
-    CHECK(single(SHOT_CURVE_CAPACITY + 2U, 1002));
-    CHECK(live.append(record, false));
-    ShotCurveLog::setHostFailAfter(failureAfter);
-    FlashStoreStepResult result;
-    do { result = image.flushStep(); } while (result == FlashStoreStepResult::MORE);
-    if (failureAfter < 0) CHECK(result == FlashStoreStepResult::COMPLETE);
-    live.acknowledgePersisted(image, false);
-    CHECK(live.dirty() && live.count() == SHOT_CURVE_CAPACITY);
-    ShotCurveLog::setHostFailAfter(-1);
-    live.capturePersistenceImage(image);
-    CHECK(image.count() >= 1 && image.count() <= 2);
-    do { result = image.flushStep(); } while (result == FlashStoreStepResult::MORE);
-    CHECK(result == FlashStoreStepResult::COMPLETE);
-    live.acknowledgePersisted(image, true);
-    CHECK(!live.dirty());
-    CHECK(reboot.load() && reboot.count() == SHOT_CURVE_CAPACITY);
-    CHECK(!reboot.containsId(1) && !reboot.containsId(2));
-    CHECK(reboot.copyByShotId(SHOT_CURVE_CAPACITY + 1U, record));
-    CHECK(curvePoint(record, 0).cg == 1001);
-    CHECK(reboot.copyByShotId(SHOT_CURVE_CAPACITY + 2U, record));
-    CHECK(curvePoint(record, 0).cg == 1002);
-    CHECK(live.removeById(SHOT_CURVE_CAPACITY + 1U, false));
-    live.capturePersistenceImage(image);
-    CHECK(image.dirty() && image.count() == 0);
-    do { result = image.flushStep(); } while (result == FlashStoreStepResult::MORE);
-    CHECK(result == FlashStoreStepResult::COMPLETE);
-    live.acknowledgePersisted(image, true);
-    CHECK(reboot.load() && reboot.count() == SHOT_CURVE_CAPACITY - 1U);
-    CHECK(!reboot.containsId(SHOT_CURVE_CAPACITY + 1U));
-  }
-}
-
-void p61j_curve_image_batches_backlog_oldest_first() {
-  // The image must not mirror the retained bank: it carries one small batch.
-  CHECK(sizeof(ActivationStoresPersistImage) + 2U * 1024U * 1024U <
-        sizeof(ActivationStores));
-  resetHostPersistence();
-  ShotCurveLog live, reboot;
-  ShotCurvePersistImage image;
-  CHECK(live.load());
-  constexpr uint32_t backlog = 2U * SHOT_CURVE_PERSIST_BATCH + 1U;
-  ShotCurveRecord record = emptyShotCurveRecord();
-  CHECK(appendShotCurvePoint(record, 0, 0, false));
-  for (uint32_t id = 1; id <= backlog; ++id) {
-    record.shotId = id;
-    CHECK(live.append(record, false));
-  }
-  size_t rounds = 0;
-  for (uint32_t persisted = 0; live.dirty(); ++rounds) {
-    live.capturePersistenceImage(image);
-    CHECK(image.count() == std::min<size_t>(SHOT_CURVE_PERSIST_BATCH, backlog - persisted));
-    ShotCurveRecord newest = emptyShotCurveRecord();
-    CHECK(image.copyNewestFirst(&newest, 1) == 1);
-    CHECK(newest.shotId == persisted + image.count());
-    FlashStoreStepResult result;
-    do { result = image.flushStep(); } while (result == FlashStoreStepResult::MORE);
-    CHECK(result == FlashStoreStepResult::COMPLETE);
-    persisted += static_cast<uint32_t>(image.count());
-    live.acknowledgePersisted(image, true);
-    CHECK(live.dirty() == (persisted < backlog));
-    CHECK(reboot.load() && reboot.count() == persisted);
-  }
-  CHECK(rounds == 3);
-  CHECK(reboot.containsId(1) && reboot.containsId(backlog));
 }
 
 // Golden settings blob of schema 2, written once at the tagged-encoding
@@ -3623,10 +3222,7 @@ void p92b_shorter_shot_log_records_widen_on_load() {
 
 const TestCase tests[] = {
     {"P66C", p66c_activation_capture_skips_clean_payloads},
-    {"P61E", p61e_selective_curve_capture_preserves_retention_and_retry},
-    {"P61J", p61j_curve_image_batches_backlog_oldest_first},
-    {"P61C", p61c_timestamped_capacity_and_interrupted_blocks},
-    {"P61D", p61d_clear_epochs_and_stale_worker_images},
+    {"P61C", p61c_timestamped_capacity_and_dense_sections},
     {"P90", p90_firmware_mode_store_round_trip_and_factory_reset},
     {"P91", p91_web_access_store_round_trip_and_corruption},
     {"P90b", p90b_setup_intent_commits_with_its_wifi},
@@ -3703,13 +3299,12 @@ const TestCase tests[] = {
     {"P73", p73_factory_intent_does_not_free_data_for_other_failures},
     {"P74", p74_factory_intent_second_failure_keeps_settings},
     {"P91C", p91c_preset_transitions_repair_out_of_range},
-    {"P61", p61_shot_curve_dual_slot_round_trip_and_delete},
-    {"P61B", p61b_shot_curve_failed_compaction_restores_durable_ring},
     {"P61C", p61c_shot_curve_held_and_break_bits_round_trip},
-    {"P61F", p61f_shot_curve_schema3_round_trip_is_lossless},
-    {"P61G", p61g_shot_curve_schema3_worst_case_stays_within_budget},
-    {"P61H", p61h_shot_curve_schema3_malformed_blocks_are_rejected},
-    {"P61I", p61i_shot_curve_schema3_wire_format_is_pinned},
+    {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
+    {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},
+    {"P61G", p61g_shot_curve_section_worst_case_stays_within_budget},
+    {"P61H", p61h_shot_curve_section_malformed_payloads_are_rejected},
+    {"P61I", p61i_shot_curve_section_wire_format_is_pinned},
     {"P63", p63_flash_io_lock_fails_closed_without_mutex},
 };
 

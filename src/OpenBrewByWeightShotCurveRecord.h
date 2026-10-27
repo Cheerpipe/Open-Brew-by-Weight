@@ -25,7 +25,7 @@ struct ShotCurveEvent {
 };
 
 static_assert(sizeof(ShotCurveEvent) == 4,
-              "ShotCurveEvent packing is part of the flash sidecar schema");
+              "ShotCurveEvent packing is part of the curve section format");
 
 // Readers never read past `bytes` (stream) or `count` (bitmap bits): bytes
 // beyond them may be stale, so copyShotCurve moves only the used ones.
@@ -34,7 +34,7 @@ struct ShotCurveRecord {
   uint16_t count;
   bool truncated;
   uint8_t reserved;
-  // atmClearedMs and the four events are the flash block's 18 fixed bytes.
+  // atmClearedMs and the four events are the curve section's 18 fixed bytes.
   uint16_t atmClearedMs;
   ShotCurveEvent firstDrop;
   ShotCurveEvent extended;
@@ -52,7 +52,7 @@ struct ShotCurveRecord {
 
 static_assert(offsetof(ShotCurveRecord, bytes) -
                       offsetof(ShotCurveRecord, atmClearedMs) == 18,
-              "The flash block's fixed bytes are atmClearedMs and the events");
+              "The curve section's fixed bytes are atmClearedMs and the events");
 static_assert(sizeof(ShotCurveRecord) == 5608,
               "ShotCurveRecord size pins the PSRAM curve-store footprint");
 

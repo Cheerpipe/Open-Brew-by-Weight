@@ -1,7 +1,7 @@
 #pragma once
 
-// Accepted extraction/drip observations with reception times and event annotations.
-// Flash sidecar, separate from the scalar ShotLogRecord.
+// Accepted extraction/drip observations with reception times and event annotations,
+// separate from the scalar ShotLogRecord; saved in the shot's pool record.
 
 #include "OpenBrewByWeightShotCurveRecord.h"
 #include "OpenBrewByWeightShotLogTypes.h"
@@ -14,12 +14,12 @@
 
 namespace openbrewbyweight {
 
-constexpr uint32_t SHOT_CURVE_MAGIC = 0x53435256U;  // "SCRV"
-// Schema 3: delta-encoded points with the held bitmap; the "extended" event
-// marks the cut line leaving the target. Earlier absolute schemas no longer
-// load.
-constexpr uint16_t SHOT_CURVE_SCHEMA_VERSION = 3;
-constexpr size_t SHOT_CURVE_CAPACITY = SHOT_LOG_CAPACITY;
+// Curves the PSRAM cache keeps, the newest; older ones are read from flash.
+constexpr size_t SHOT_CURVE_CAPACITY = 500;
+static_assert(SHOT_CURVE_CAPACITY <= SHOT_LOG_CAPACITY, "Cached curves have summaries");
+// A curve lookup: BUSY when it must come from flash and flash may not be
+// read now (a shot runs, or the pool is not recovered yet).
+enum class ShotCurveRead : uint8_t { NONE, FOUND, BUSY };
 // Worst case: the base64 stream plus 1201 break and 1201 held indices of up
 // to five characters each, plus the reference point, keys and events.
 constexpr size_t SHOT_CURVE_JSON_CAPACITY =
@@ -118,20 +118,16 @@ inline bool shotCurveSeek(const ShotCurveRecord &curve, uint16_t index, ShotCurv
   return true;
 }
 
-// The PSRAM ring's bookkeeping; flash blocks carry their own headers.
+// The PSRAM ring's bookkeeping.
 struct ShotCurveHeader {
   uint16_t count;
   uint16_t writeIndex;
 };
 
-// Live bank holds every retained curve; a persistence image holds only the
-// small batch it is about to commit.
-template <size_t Capacity>
-struct ShotCurveRingStore {
+struct ShotCurveStore {
   ShotCurveHeader header;
-  ShotCurveRecord records[Capacity];
+  ShotCurveRecord records[SHOT_CURVE_CAPACITY];
 };
-using ShotCurveStore = ShotCurveRingStore<SHOT_CURVE_CAPACITY>;
 
 static_assert(sizeof(ShotCurveStore) ==
                   sizeof(ShotCurveHeader) +

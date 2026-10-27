@@ -55,13 +55,16 @@ mutex covers both writes and the full reader copy, so their snapshot version,
 cycle identity and observations cannot tear. The control gate remains a
 separate internal snapshot with its existing owner and lock.
 
-Stats obtains records, curves, aggregate and epoch in one acquisition of
+Stats obtains records, aggregate and epoch in one acquisition of
 `shotStoreMutex`, then releases it before sorting or transmission. Its retained
 external capture is protected by the Network workspace mutex. Continuations
 reuse the capture; epoch changes reload it and window/order changes rebuild
 only the page projection. Debug export invalidates this cache before overwriting
-its record array. No second full curve cache or store-lock-to-network-I/O edge
-is introduced.
+its record array. Each row's curve is fetched in its own short acquisition:
+from the PSRAM cache of the newest 500, or, for an older shot, its identity is
+copied under the lock, the lock is released and the pool record is read under
+the flash lock; while a shot runs that read answers busy instead. No second
+full curve cache or store-lock-to-network-I/O edge is introduced.
 
 Scale results, fallback mailboxes and the weight FIFO share one task mutex.
 The consumer checks results and selects a weight only if none is pending,
@@ -215,7 +218,12 @@ capture is open; the pass returns as soon as either closes. One writer mutex
 (`shotTracePoolWriterMutex`) serializes that worker with a factory reset,
 which clears the pool on network_manager under the maintenance lease while
 holding `shotStoreMutex` (lock order: `shotStoreMutex`, writer mutex, flash
-lock, then the pool or the trace mutex). The worker reads the completed trace
+lock, then the pool or the trace mutex). The worker takes
+`shotStoreMutex` only while it does not hold the writer mutex: it stages the
+oldest unsaved curve (and checks that no capture is open) under the store
+lock, reads the trace and loads the curve cache back after boot with no lock
+held, then appends under the writer mutex, and marks the curve saved under
+the store lock again after releasing it. The worker reads the completed trace
 by generation under the trace mutex, one bounded copy per step, so a newer
 completion fails the copy instead of mixing two shots; clear all only sets an
 atomic request the worker lands before it persists the shot log. Its leaf mutex guards only the RAM index; the writer drops

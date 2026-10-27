@@ -1,16 +1,17 @@
 #pragma once
 
-// Data layer for the activation stores: the stats shot log, its flash curve
-// sidecar, and the independent activation history. One explicit owner for the
-// three PSRAM ring stores and their deferred flash persistence.
+// Data layer for the activation stores: the stats shot log and the
+// independent activation history. One explicit owner for the two PSRAM ring
+// stores and their deferred flash persistence. Shot curves live in the shot
+// trace pool and its PSRAM cache (OpenBrewByWeightShotCurve.h).
 //
 // Concurrency contract:
-// 1. Every read or write of shotLog/shotCurves/historyLog (append in the
-//    control loop, HTTP queries and mutations, deferred flush, delete/clear)
-//    runs under the caller's TaskLockGuard(shotStoreMutex). This component
-//    takes no hidden internal locks, so it can never recurse into that mutex.
-// 2. Control captures a selective immutable image under that mutex; the worker
-//    owns its stepped flash transaction after the mutex is released.
+// 1. Every read or write of shotLog/historyLog (append in the control loop,
+//    HTTP queries and mutations, deferred flush, delete/clear) runs under the
+//    caller's TaskLockGuard(shotStoreMutex). This component takes no hidden
+//    internal locks, so it can never recurse into that mutex.
+// 2. Control captures an immutable image under that mutex; the worker owns
+//    its stepped flash transaction after the mutex is released.
 // 3. No FreeRTOS task or ISR is created here. Live stores are touched only
 //    from control and network through the mutex; the worker touches its image.
 // 4. Flash reads/writes copy through the internal-SRAM FlashIoScratch while
@@ -24,7 +25,6 @@
 #include "OpenBrewByWeightFlashIoScratch.h"
 #include "OpenBrewByWeightHistory.h"
 #include "OpenBrewByWeightPreferences.h"
-#include "OpenBrewByWeightShotCurve.h"
 #include "OpenBrewByWeightShotLog.h"
 
 namespace openbrewbyweight {
@@ -70,17 +70,14 @@ struct ActivationStoresFlushReport {
   bool complete = true;
 };
 
-// Live stores and the worker's persistence image differ only in the curve
-// log: the image carries a bounded batch of unpersisted curves.
-template <typename CurveLog>
-class BasicActivationStores {
+// The live stores; the worker's persistence image is another instance.
+class ActivationStores {
  public:
   // Boot load. Returns whether the boot identity advanced durably. Call
   // before the network task serves endpoints; lastShotStore is loaded
   // separately by the platform boot.
   bool begin() {
     shotLog.load();
-    shotCurves.load();
     historyLog.load();
     return advanceBootId(bootId_);
   }
@@ -93,7 +90,7 @@ class BasicActivationStores {
   ActivationStoresFlushReport serviceStep(uint32_t tryLockMs,
                                            ActivationStoreEvent emit) {
     ActivationStoresFlushReport report;
-    while (persistCursor_ < 3) {
+    while (persistCursor_ < 2) {
       FlashStoreStepResult result = FlashStoreStepResult::COMPLETE;
       bool *latched = nullptr;
       bool hadDirty = false;
@@ -105,12 +102,6 @@ class BasicActivationStores {
         result = shotLog.flushStep(tryLockMs);
         latched = &shotLogPersistFailLatched_;
         count = shotLog.count();
-      } else if (persistCursor_ == 1) {
-        hadDirty = shotCurves.dirty();
-        result = shotCurves.flushStep(tryLockMs);
-        latched = &shotCurvePersistFailLatched_;
-        discriminator = 1;
-        count = shotCurves.count();
       } else {
         hadDirty = historyLog.dirty();
         result = historyLog.flushStep(tryLockMs);
@@ -135,7 +126,7 @@ class BasicActivationStores {
       }
       *latched = false;
       ++persistCursor_;
-      if (persistCursor_ < 3 && hadDirty) {
+      if (persistCursor_ < 2 && hadDirty) {
         report.complete = false;
         return report;
       }
@@ -145,54 +136,40 @@ class BasicActivationStores {
   }
 
   ShotLog shotLog;
-  CurveLog shotCurves;
   HistoryLog historyLog;
 
   // Harness support: reset and inspect the latched failure dedup state.
   void clearPersistFailLatches() {
     shotLogPersistFailLatched_ = false;
-    shotCurvePersistFailLatched_ = false;
     historyPersistFailLatched_ = false;
   }
 
   bool anyPersistFailLatched() const {
-    return shotLogPersistFailLatched_ || shotCurvePersistFailLatched_ ||
-           historyPersistFailLatched_;
+    return shotLogPersistFailLatched_ || historyPersistFailLatched_;
   }
 
-  void capturePersistenceImage(BasicActivationStores<ShotCurvePersistImage> &image) const {
+  void capturePersistenceImage(ActivationStores &image) const {
     shotLog.capturePersistenceImage(image.shotLog);
-    shotCurves.capturePersistenceImage(image.shotCurves);
     historyLog.capturePersistenceImage(image.historyLog);
     image.shotLogPersistFailLatched_ = shotLogPersistFailLatched_;
-    image.shotCurvePersistFailLatched_ = shotCurvePersistFailLatched_;
     image.historyPersistFailLatched_ = historyPersistFailLatched_;
     image.persistCursor_ = 0;
   }
 
-  void acknowledgePersisted(const BasicActivationStores<ShotCurvePersistImage> &image,
-                            bool clearDirty) {
+  void acknowledgePersisted(const ActivationStores &image, bool clearDirty) {
     shotLog.acknowledgePersisted(image.shotLog, clearDirty);
-    shotCurves.acknowledgePersisted(image.shotCurves, clearDirty);
     historyLog.acknowledgePersisted(image.historyLog, clearDirty);
     if (clearDirty) {
       shotLogPersistFailLatched_ = image.shotLogPersistFailLatched_;
-      shotCurvePersistFailLatched_ = image.shotCurvePersistFailLatched_;
       historyPersistFailLatched_ = image.historyPersistFailLatched_;
     }
   }
 
  private:
   bool shotLogPersistFailLatched_ = false;
-  bool shotCurvePersistFailLatched_ = false;
   bool historyPersistFailLatched_ = false;
   uint8_t persistCursor_ = 0;
   uint32_t bootId_ = 1;
-
-  template <typename> friend class BasicActivationStores;
 };
-
-using ActivationStores = BasicActivationStores<ShotCurveLog>;
-using ActivationStoresPersistImage = BasicActivationStores<ShotCurvePersistImage>;
 
 }  // namespace openbrewbyweight

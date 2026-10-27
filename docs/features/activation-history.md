@@ -112,7 +112,7 @@ The two pages record different things and never substitute for each other:
 | Minimum duration | None; a good shot lasts longer than 12 seconds | Longer than the configured earliest weight stop time to carry a Shot label |
 | Detail | Goal, yield, error, flow, guards, rating, curve | Time, duration, type |
 | Statistics | Good shots only; bad shots are listed with **Show bad shots** | None |
-| Capacity | 500 shots | 1000 activations |
+| Capacity | 1,000 shots | 1,000 activations |
 
 A brew pulled with a scale appears in both; when it is a bad shot, Stats lists
 it only with **Show bad shots** and leaves it out of its averages and charts.

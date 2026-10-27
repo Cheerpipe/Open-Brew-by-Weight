@@ -938,7 +938,7 @@ if (!codeIncludes(js, 'function commandOkMessage(') ||
   }
 }
 if (!codeIncludes(viewJs.stats, 'SHOTS_PAGE_SIZE=10') ||
-    !codeIncludes(viewJs.stats, 'SHOTS_EXPORT_LIMIT=500') ||
+    !codeIncludes(viewJs.stats, 'SHOTS_EXPORT_LIMIT=1000') ||
     codeIncludes(statsRuntimeJs, "'/api/v1/stats?offset='") ||
     codeIncludes(statsRuntimeJs, "api('/api/v1/stats')") ||
     !codeIncludes(viewJs.stats, 'function startStatsStream(') ||
@@ -956,7 +956,7 @@ if (!codeIncludes(viewJs.stats, 'SHOTS_PAGE_SIZE=10') ||
     codeIncludes(js, 'return statsExportInFlight') ||
     !codeIncludes(statsRuntimeJs, 'statsRequest=++statsNextRequest') ||
     !codeIncludes(js, "sendUiOperation({op:'stats',on:true,fetch:true,request:statsFetchMark.request,offset:statsFetchMark.offset,limit:SHOTS_PAGE_SIZE,sort:shotSort,dir:shotSortDir,}") ||
-    !codeIncludes(js, "statsFrameWindow(0,SHOTS_EXPORT_LIMIT,'date','desc',90e3)") ||
+    !codeIncludes(js, "statsFrameWindow(0,SHOTS_EXPORT_LIMIT,'date','desc',180e3)") ||
     !codeIncludes(statsRuntimeJs, 'function shotStatsViewActive(){') ||
     !codeIncludes(statsRuntimeJs, 'function renderShots(') ||
     !codeIncludes(viewJs.records, 'function armListSentinel(') ||
@@ -1205,7 +1205,7 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !historyTypesIo.includes('durationMs > protectionMs') ||
     !historyIo.includes('HISTORY_FLASH_SLOT_BYTES = 16384') ||
     !historyIo.includes('"history"') ||
-    !activationStoresIo.includes('using ActivationStores = BasicActivationStores<ShotCurveLog>') ||
+    !activationStoresIo.includes('class ActivationStores {') ||
     !activationStoresIo.includes('TaskLockGuard(shotStoreMutex)')) {
   throw new Error('Activation history must page 20 records over the owned WebSocket with sort direction, a type filter, clear, delete, and a streamed CSV export');
 }

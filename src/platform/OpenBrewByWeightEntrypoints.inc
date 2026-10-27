@@ -393,7 +393,7 @@ void startAfterBootRecovery() {
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
   bool bootIdentityDurable = false;
   {
-    // ActivationStores owns the shot log, curves, and activation history:
+    // ActivationStores owns the shot log and the activation history:
     // finish every load before the network task can serve endpoints.
     TaskLockGuard storeLock(shotStoreMutex);
     bootIdentityDurable = activationStores.begin();

@@ -88,7 +88,10 @@ writer) decides when and what reaches flash, coalescing bursts into one write.
 Reads always come from the cache, never from flash; flash is read only at boot
 to fill it. This covers presets, shared settings, Bullseye, scale choice and
 names, Linea Micra options and machine selection, quick settings, drip and
-learning-speed sets, and every history or shot mutation.
+learning-speed sets, and every history or shot mutation. Shot curves are the
+one bounded exception: the cache keeps the newest 500, filled back from the
+[shot trace pool](SHOT_TRACE.md#curves-in-the-pool) after boot, and an older
+curve is read from its pool record on demand, never while a shot runs.
 
 Only some Admin operations may read or write flash directly, because they must
 be durable before they take effect: Wi-Fi and access point, device password and
@@ -248,7 +251,7 @@ The shot log is the authority for a completed shot: confirmed, non-rinse,
 strictly more than 12,000 ms of brewing and a finite settled yield strictly
 above 2 g. The fixed recording threshold does not alter the configurable BBW
 protection window or actuation. Home and the integration snapshot resolve the
-newest eligible log record by ID under `shotStoreMutex`; the curve sidecar and
+newest eligible log record by ID under `shotStoreMutex`; the curve and
 rating use that same ID. Deleting the newest record advances Home to the next
 eligible row, and clearing the log empties the idle card. The in-progress card
 continues to use the live control snapshot. The legacy `LastShotStore` blob
@@ -276,21 +279,19 @@ across the same ring, counting every weight cut (target, raised or lowered
 segment) and measuring each against its stored cut line.
 Available flow is counted separately within the general window.
 
-The stats shot log, its curve sidecar, and the independent activation history
-are owned by one RAM data layer (`ActivationStores`) whose every access runs
-under the single `shotStoreMutex`. Control and HTTP mutate only RAM and advance
-a generation. Control housekeeping captures an immutable image under that
-mutex: clean shot/activation stores skip their record payloads, and the curve
-image carries only the uncommitted suffix plus block, deletion and epoch metadata.
-Oldest-first curve commits preserve this suffix across retries and ring eviction.
-The image is dispatched to the core-0 persistence worker. The worker performs
+The stats shot log and the independent activation history are owned by one
+RAM data layer (`ActivationStores`) whose every access runs under the single
+`shotStoreMutex`, as does the PSRAM curve cache beside it. Control and HTTP
+mutate only RAM and advance a generation. Control housekeeping captures an
+immutable image of the two logs under that mutex (clean stores skip their
+record payloads); curves never ride it: each reaches flash in its shot's pool
+record. The image is dispatched to the core-0 persistence worker. The worker performs
 flash I/O without the store mutex. Control acknowledges completion and clears
 live dirtiness only when the completion generation still matches.
 Acknowledgement carries the image's
 flash progress back to each live store even when newer RAM edits remain dirty,
 so the next snapshot advances from the committed physical state. ShotLog and
-History keep their two-slot generations; curves use block sequences, retention
-floors and clear epochs. The manual scale
+History keep their two-slot generations. The manual scale
 profiler follows the same deferred pattern: the health worker owns one
 bounded PSRAM capture of raw decoded weights plus correlated firmware
 decisions, and the persistence worker commits the completed trace to a
@@ -307,19 +308,20 @@ of that manual capture, every brew cycle started with a scale records a
 compact [shot trace](SHOT_TRACE.md) of the controller's decisions in PSRAM
 no-init memory; a shot cut short by a panic, watchdog or software restart is
 recovered at boot as an interrupted trace linked to the crashed boot. The
-persistence worker saves each completed trace to a log-structured flash pool
-(`reserved`, later also `shotcurve`) on its idle passes while no shot runs,
-recovering the pool on its first pass; clear all lands in the pool before the
-shot log, and factory reset clears and verifies it.
+persistence worker saves one record per stored shot, its curve with its
+trace, to a log-structured flash pool over `reserved` and `shotcurve` on its
+idle passes while no shot runs, recovering the pool and loading the curve
+cache back on its first pass; clear all lands in the pool before the shot
+log, and factory reset clears and verifies it.
 Only the sectors the store occupies in the
-inactive slot (16 of the shot log's 126, all four of the history slot) or the
-used curve sector are erased, one 4 KiB sector at a time; each is programmed
+inactive slot (32 of the shot log's 126, all four of the history slot) are
+erased, one 4 KiB sector at a time; each is programmed
 one 1 KiB staged chunk at a time and receives its validity-bearing header last; the worker rechecks the current
-machine and scale gates between steps. The shot log's whole 62,024-byte store and the
+machine and scale gates between steps. The shot log's whole 128,024-byte store of 1,000 records and the
 16,024-byte activation-history store live in PSRAM and move to and from their
 slots in 1 KiB chunks staged through the small internal flash-I/O scratch only
 while that owner holds the flash lock. Each keeps two slots in its own data
-partition — 2×504 KiB for `shotlog` (reserving room for 1 KiB records), 2×16 KiB for `history` — with generation
+partition — 2×504 KiB for `shotlog` (room for 1,000 records of up to 516 bytes), 2×16 KiB for `history` — with generation
 and checksum selection preserving the atomic whole-store update; a failed
 write never erases the last-good slot. Writes remain deferred until the shot
 has ended. The shot log uses schema 2 in its dedicated partition (128-byte records, each
@@ -336,8 +338,9 @@ fields read as zero, so zero must mean "missing" for them unless the widening
 sets an explicit default). History and the statistics replayed from it
 therefore survive an OTA update that grows the record. The reverse is not
 supported: an earlier image discards a store written with longer records.
-Each slot leaves room for 1,032-byte records, but every save rewrites the
-whole store, so the per-shot write cost grows with the record size. The boot
+Each slot leaves room for 516-byte records at 1,000 records, but every save
+rewrites the whole store (32 sector erases and 128 KB at today's 128-byte
+records), so the per-shot write cost grows with the record size. The boot
 ID lives in its own small NVS key, so a boot never rewrites the shot log.
 
 On n16r8, ESP-IDF writes one ELF core dump to a 640 KiB capture partition
@@ -355,15 +358,14 @@ by the boot ID and dump digest. HTTP download reads bounded chunks under the
 shared flash lock and releases the lock before sending each chunk. The raw
 archive requires Admin unlock because task stacks may contain secrets.
 
-The shot-curve sidecar writes schema 3: delta-encoded observations (its
+Shot curves use schema 3: delta-encoded observations (its
 extension event marks the cut line leaving the target) plus per-observation
 break and held bitmaps. Each point is one time byte and one weight byte
 relative to the previous point; a step outside one byte stores a marker
 (`0xFF` time, `0x80` weight) and the little-endian absolute value. The
 observations stay in this one stream end to end: capture appends to it,
-the PSRAM cache, flash blocks and the Web UI curve JSON carry it unchanged,
-and only the browser decodes it. Earlier absolute schemas (1 and 2) no longer
-load. Each accepted extraction or drip weight, and each reading the accidental-touch
+the PSRAM cache, the pool's curve section and the Web UI curve JSON carry it
+unchanged, and only the browser decodes it. Each accepted extraction or drip weight, and each reading the accidental-touch
 classifier held, is paired with its relative reception time in milliseconds;
 repeated weights and equal timestamps remain observations. Held readings are
 flagged, never control weight, and never start a segment. The 1201-observation capacity covers a 60 s
@@ -374,26 +376,21 @@ segment. Overflow preserves the prefix, marks it incomplete and leaves control
 and scalar history running.
 
 The 5608-byte RAM record (header, the stream reserved for the valid-record
-worst case of 5274 bytes, and both bitmaps) and the 2,804,004-byte 500-record
-cache live in PSRAM; copies move only the used stream and bitmap bytes.
-Curve events also preserve elapsed milliseconds in 16-bit fields, with
-`UINT16_MAX` reserved for unavailable values. Sidecar schema 0 distinguishes
-these fields from previous decisecond events; older curve records are discarded
-without changing scalar history, settings, partition addresses or OTA slots.
+worst case of 5274 bytes, and both bitmaps) and the 2,804,004-byte cache of
+the newest 500 curves live in PSRAM; copies move only the used stream and
+bitmap bytes. Curve events also preserve elapsed milliseconds in 16-bit
+fields, with `UINT16_MAX` reserved for unavailable values.
 Curve JSON keeps the seconds-based `dropS`, `extendedS`, `atmS`, `atmClearedS`
 and `endS` fields with three decimal places; scalar shot metrics retain their
 existing precision and meaning.
-A 4,016 KiB dedicated partition holds 501 reserved 8 KiB data blocks and two
-4 KiB clear-epoch sectors. A maximum-size record occupies 5632 bytes. Writes
-erase only its one or two used physical sectors, transfer only the used record
-through the existing internal 1 KiB scratch, and commit the checksum-bearing
-header last. A replacement uses the spare block, retaining the previous 500
-records until commit. Startup scans only block starts, checks schema, lengths,
-counts, times and checksums, and reconstructs the newest retained records.
-Deletion clears a validity bit; the committed retention floor prevents old
-evicted curves from returning after deletion. Alternating clear epochs prevent
-curves from returning when shot IDs are reused. Immutable worker acknowledgement
-carries physical progress forward while newer RAM mutations stay dirty.
+On flash a curve is the curve section of its shot's
+[pool record](SHOT_TRACE.md#record) (22 to 5,598 bytes), written with the
+shot's trace once the shot is over; the legacy store of fixed 8 KiB blocks in
+`shotcurve` is retired, and the pool's ring now covers that partition except
+its two legacy epoch sectors. Deleting a shot drops its summary and cached
+curve; its record is reclaimed when the ring recycles its sector. A clear or
+factory reset clears the pool, so a reused shot ID never reaches an older
+curve, and the record identity (shot ID, boot ID, end time) protects the rest.
 
 Capture performs no flash I/O. After cutoff, control appends valid same-connection
 drip observations to the pending curve until finalization or cup discontinuity.
@@ -415,8 +412,8 @@ Post-cutoff endpoint estimates with midpoints before cutoff do not alter the
 earlier solid trace. Extraction Max flow excludes post-cutoff endpoints, while
 the plot range includes drip rates. Scalar shot metrics,
 independent Stats eligibility windows, sorting and exact-ID joins remain owned
-by ShotLog. Other curve schemas start empty. OTA remains supported after the
-one-time preserving USB layout transition.
+by ShotLog. This firmware is installed over USB with `--erase-all`; OTA
+updates remain supported from then on.
 
 Decoding checks the supplied length before reading record CRCs and copies only
 that validated length; compact inputs do not require a full-store allocation.

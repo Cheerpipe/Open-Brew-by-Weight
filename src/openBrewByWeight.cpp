@@ -482,14 +482,14 @@ LogLevel serialLogLevel = LogLevel::NONE;
 LogLevel ringRetainLogLevel = LogLevel::NONE;
 // Working copies: NVS/partition I/O copies through internal flash scratch
 // first. Safe in PSRAM BSS because putBytes/erase/write never DMA these.
-// ActivationStores is the single owner of the three activation ring stores;
+// ActivationStores is the single owner of the two activation ring stores;
 // the aliases below keep every existing call site and test working against
 // that owner. Static-init order is safe: PSRAM BSS plus references bound to
-// constant addresses.
+// constant addresses. The curve cache is RAM only, under the same mutex.
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS ActivationStores activationStores;
 ShotLog &shotLog = activationStores.shotLog;
-ShotCurveLog &shotCurves = activationStores.shotCurves;
 HistoryLog &historyLog = activationStores.historyLog;
+OPEN_BREW_BY_WEIGHT_PSRAM_BSS ShotCurveCache shotCurves;
 // Serializes complete RAM-store operations across control and NetworkService;
 // every durable write remains owned by the existing store/flash path.
 TaskMutex shotStoreMutex;
@@ -687,7 +687,7 @@ uint32_t settingsPersistResultStorageRevision = 0;
 QueueHandle_t settingsPersistQueue = nullptr;
 TaskHandle_t settingsPersistTaskHandle = nullptr;
 bool settingsPersistenceReady = false;
-ActivationStoresPersistImage *shotStorePersistImage = nullptr;
+ActivationStores *shotStorePersistImage = nullptr;
 LastShotStore *lastShotPersistImage = nullptr;
 TaskMutex shotStorePersistMux;
 bool shotStorePersistInFlight = false;

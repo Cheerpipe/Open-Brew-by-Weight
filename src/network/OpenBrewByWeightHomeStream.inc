@@ -1102,8 +1102,8 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   auto &snapshot = cache.snapshot;
   // Only a record-epoch move reloads the cache: sort/dir toggles rebuild a
   // requested-order index permutation over the untouched newest-first
-  // records, so the ~10.8 KB records copy (formerly ~509 KB with every
-  // curve) happens only when the store actually changed.
+  // records, so the records copy (128 KB at 1000 summaries; curves are
+  // fetched per row) happens only when the store actually changed.
   const bool reload = !cache.valid || snapshot.epoch != epoch;
   if (reload) {
     if (!callbacks_.copyShotStatsRecords) return false;
@@ -1179,10 +1179,21 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
       if (cachedHash != nullptr) {
         rowHash = *cachedHash;
       } else {
-        const bool haveCurve = callbacks_.copyShotCurveById != nullptr &&
-            callbacks_.copyShotCurveById(record.id, cache.fetchCurve);
+        // Curves past the PSRAM cache come from flash: a quarter of the
+        // dispatch budget goes to them (hashes already taken stay cached),
+        // and none is read while a shot runs. Either way this window is
+        // rebuilt by a later dispatch.
+        const bool spent = uiStreamDeadlineLeft() < kUiStreamDispatchBudgetMs * 3U / 4U;
+        const ShotCurveRead read = spent || callbacks_.copyShotCurveById == nullptr
+            ? ShotCurveRead::NONE : callbacks_.copyShotCurveById(record.id, cache.fetchCurve);
+        if (spent || read == ShotCurveRead::BUSY) {
+          if (spent) uiStreamUrgent_.store(true, std::memory_order_release);
+          cache.valid = true;
+          cache.limit = 0;
+          return true;
+        }
         rowHash = uiStreamCurveHash(cache.fetchCurve,
-                                    haveCurve ? cache.fetchCurve.count : 0);
+                                    read == ShotCurveRead::FOUND ? cache.fetchCurve.count : 0);
         cache.curveHashes.insert(record.id, rowHash);
       }
       const uint32_t row[2] = {record.id, record.sideFlags};
@@ -1258,6 +1269,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     return false;
   const size_t rowsBase = used;
   auto &held = workBuf_->uiFingerprints[&session - uiStreams_];
+  bool busy = false;
   while (session.statsSent < pageCount) {
     const ShotLogRecord &record = snapshot.records[cache.order[start + session.statsSent]];
     // Only the packed rating byte changes after commit; curves are immutable.
@@ -1273,10 +1285,13 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
                                               static_cast<unsigned long>(record.id)));
     } else {
       // Fetch only the curve of the row being framed; short store-lock holds
-      // paced across dispatches replace the former whole-store copy.
-      const bool haveCurve = callbacks_.copyShotCurveById != nullptr &&
-          callbacks_.copyShotCurveById(record.id, cache.fetchCurve);
-      rowBytes = formatShotStatsRow(work, record, haveCurve ? &cache.fetchCurve : nullptr);
+      // paced across dispatches replace the former whole-store copy. A curve
+      // flash may not give now (a shot runs) holds the page at this row.
+      const ShotCurveRead read = callbacks_.copyShotCurveById != nullptr
+          ? callbacks_.copyShotCurveById(record.id, cache.fetchCurve) : ShotCurveRead::NONE;
+      if ((busy = read == ShotCurveRead::BUSY)) break;
+      rowBytes = formatShotStatsRow(work, record,
+                                    read == ShotCurveRead::FOUND ? &cache.fetchCurve : nullptr);
     }
     if (!rowBytes) return false;
     // Close the frame before this row unless the frame is empty; a single
@@ -1292,6 +1307,8 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
       held.statsNext[session.statsSent] = row;
     ++session.statsSent;
   }
+  // Nothing to send yet: the next dispatch tries the row again.
+  if (busy && used == rowsBase) return true;
   const bool more = session.statsSent < pageCount;
   if (!statusJsonAppend(&used, "],\"rowBase\":%u,\"more\":%s}",
           static_cast<unsigned>(sentBase), more ? "true" : "false"))

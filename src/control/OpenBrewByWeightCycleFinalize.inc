@@ -561,7 +561,7 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
     static OPEN_BREW_BY_WEIGHT_PSRAM_BSS ShotCurveRecord curve;
     copyShotCurve(curve, snapshot.curve);
     curve.shotId = newId;
-    if (!shotCurves.append(curve, false)) {
+    if (!shotCurves.append(curve)) {
       addDebugEvent(DebugCategory::CONFIG, DebugCode::SHOT_LOG_PERSIST_FAILED,
                     static_cast<int32_t>(sizeof(ShotCurveStore)),
                     static_cast<int32_t>(shotCurves.count()));

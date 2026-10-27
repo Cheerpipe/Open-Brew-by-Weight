@@ -53,9 +53,9 @@ constexpr size_t SHOT_TRACE_POOL_RECORD_ALIGN = 16;
 constexpr size_t SHOT_TRACE_POOL_MAX_SECTIONS = 4;
 // Records indexed in RAM; the oldest is dropped when full. A record is only
 // reachable through a shot log summary, so twice the summary capacity is
-// ample; checked against SHOT_LOG_CAPACITY itself so that raising it (B7:
-// 1000) re-checks the bound. A power of two keeps serial % capacity
-// continuous across the 32-bit serial wrap.
+// ample; checked against SHOT_LOG_CAPACITY itself so that raising it
+// re-checks the bound. A power of two keeps serial % capacity continuous
+// across the 32-bit serial wrap.
 constexpr size_t SHOT_TRACE_POOL_INDEX_CAPACITY = 2048;
 static_assert(SHOT_TRACE_POOL_INDEX_CAPACITY >= 2U * SHOT_LOG_CAPACITY &&
                   (SHOT_TRACE_POOL_INDEX_CAPACITY & (SHOT_TRACE_POOL_INDEX_CAPACITY - 1U)) == 0,
@@ -297,14 +297,17 @@ class ShotTracePool {
  public:
   using LiveFn = bool (*)(void *context, const ShotTracePoolEntry &entry);
 
-  explicit ShotTracePool(ShotTracePoolIndex &index) : index_(index) {}
+  // `sectors` of the logical space form the ring (see setLogicalEnd).
+  explicit ShotTracePool(ShotTracePoolIndex &index,
+                         size_t sectors = SHOT_TRACE_POOL_RESERVED_SECTORS)
+      : index_(index), end_(sectors <= SHOT_TRACE_POOL_SECTORS ? sectors : SHOT_TRACE_POOL_SECTORS) {}
   ShotTracePool(const ShotTracePool &) = delete;
   ShotTracePool &operator=(const ShotTracePool &) = delete;
 
-  // Logical sectors in the ring: `reserved` alone until the legacy curve
-  // store is retired and shotcurve opens. It only grows, and a recover()
-  // must follow: a record that wrapped from the old last sector to sector 0
-  // is dropped by that walk.
+  // Logical sectors in the ring: the firmware opens the whole space (the
+  // legacy curve store is retired); `reserved` alone is the default. It only
+  // grows, and a recover() must follow: a record that wrapped from the old
+  // last sector to sector 0 is dropped by that walk.
   bool setLogicalEnd(size_t sectors) {
     if (op_ != Op::IDLE || sectors < end() || sectors > SHOT_TRACE_POOL_SECTORS) return false;
     TaskLockGuard lock(mux_);
@@ -951,7 +954,7 @@ class ShotTracePool {
   size_t count_ = 0;
   uint32_t dropped_ = 0;
   bool ready_ = false;
-  std::atomic<size_t> end_{SHOT_TRACE_POOL_RESERVED_SECTORS};
+  std::atomic<size_t> end_;
   // Writer state, settings_persist worker only.
   uint32_t nextSequence_ = 1, floor_ = 1;
   size_t sector_ = 0, offset_ = kDataStart, firstOffset_ = 0;

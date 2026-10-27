@@ -148,9 +148,14 @@ unavailable. The rest of the shot curve is retained. **Late cup** records
 successful command completion, so it can also appear when zero was not
 confirmed and the earlier first-drop record was kept.
 
-The log holds up to **500** shots, good and bad alike. When it is full, the
+The log holds up to **1,000** shots, good and bad alike. When it is full, the
 newest shot replaces the oldest one, so a run of bad shots can push out older
-good shots. The following are never stored:
+good shots. The curves of the newest 500 shots load instantly; an older shot's
+curve is fetched from the controller's storage when you scroll to it or export,
+which waits while a shot is brewing. The controller keeps curves for roughly
+the last thousand shots, fewer if your shots are long: the oldest curves make
+room for new ones, so a very old shot can appear without its curve. The
+following are never stored:
 
 - Rinses and starts that were not confirmed
 - Brews started without a scale, unless a scale connected during the brew and
@@ -255,7 +260,9 @@ qualify as shots. Deleting or clearing shot history never changes that diary.
 New rows appear after the configured drip delay. If flash saving is still
 pending, the API reports `savePending`; a failed write remains pending for retry.
 Once saving completes, the newest shot and its curve survive a restart.
-Power loss before saving completes can still lose pending changes.
+Power loss before saving completes can still lose pending changes, including
+the curve of a shot that just ended. Right after a restart, Home may show the
+last shot without its curve for a moment while the curves load back.
 
 When you first open **Shots**, both **Stats** and **Shot history** show a loading
 wave. They fade away together once the summaries and history are ready. The

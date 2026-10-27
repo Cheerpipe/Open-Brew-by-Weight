@@ -9,7 +9,8 @@ weight stream was.
 
 The trace is captured in PSRAM that survives panics, watchdog and software
 resets, and each completed trace is then saved to the [flash pool](#flash-pool)
-once the shot is over ([saving](#saving-completed-traces)). The newest
+once the shot is over, in the same record as the shot's curve
+([saving](#saving-completed-traces), [curves](#curves-in-the-pool)). The newest
 completed trace downloads from RAM through
 [`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace);
 a per-shot download from the pool and a Web UI view are planned.
@@ -264,11 +265,12 @@ when the ring comes back to them. All fields are little-endian.
 | 335–1336 | `shotcurve` (0x8C5000, 4016 KiB) | (sector − 333) × 4 KiB |
 
 `reserved` comes first although it is physically after `shotcurve`.
-`shotcurve` sectors 0 and 1 keep the legacy curve epoch and are never part of
-the ring. Both partitions are found by label, subtype 0x40 and exact size. The
-ring ends at sector 335 (`reserved` only) while the legacy curve store still
-owns `shotcurve`; retiring that store opens the rest. The end only grows, and
-a recovery follows. A logical address is
+`shotcurve` sectors 0 and 1 keep the retired legacy curve store's epoch and are
+never part of the ring. Both partitions are found by label, subtype 0x40 and
+exact size. The firmware's ring covers the whole space from boot (1,337
+sectors, about 5.2 MB of records); the engine also supports a ring of
+`reserved` alone whose end only grows (`setLogicalEnd`, followed by a
+recovery). A logical address is
 sector × 4096 + offset; every flash call stays inside one sector, so none
 spans the partition boundary.
 
@@ -314,9 +316,27 @@ sector header.
 | 28 | `commit` u32 | `0x54494D43` ("CMIT"), programmed last; anything else is uncommitted and ignored |
 
 Each section is a 4-byte header, `tag` u8, `flags` u8 (0), `bytes` u16,
-followed by its payload and zero padding to 4 bytes. Tags: 1 curve, 2 trace (a
-record of the [layout above](#record-layout)); tag 0 ends the list and only
-padding follows. Readers skip unknown tags.
+followed by its payload and zero padding to 4 bytes. Tags: 1 curve (below), 2
+trace (a record of the [layout above](#record-layout)); tag 0 ends the list
+and only padding follows. Readers skip unknown tags. A record holds the curve
+first, then the trace; either may be missing.
+
+The curve section is the PSRAM curve record's own bytes, so the delta stream
+travels unchanged from capture to the browser:
+
+| Offset | Field | Meaning |
+| --- | --- | --- |
+| 0 | `count` u16 | Points, at most 1,201 |
+| 2 | `flags` u8 | 0x1 truncated (points past the capacity were dropped) |
+| 3 | `reserved` u8 | 0 |
+| 4 | `atmClearedMs` u16, then `firstDrop`, `extended`, `atm`, `ended` | 18 bytes; each event is `atMs` u16 and `weightCg` i16, `0xFFFF` / `INT16_MIN` when missing |
+| 22 | stream | The schema-3 delta stream (see [architecture](ARCHITECTURE.md)); its length is the section length minus 22 and the two bitmaps |
+| 22 + stream | `breakBefore`, `held` | `count` bits each, LSB first, zero padded to whole bytes |
+
+A curve section is 22 to 5,598 bytes; with a full 16 KiB trace a record stays
+under 22 KB. Decoders reject a count over 1,201, unknown flags, a stream that
+does not hold exactly `count` points, and times that go backwards or past
+60 s.
 
 ### Saving completed traces
 
@@ -326,11 +346,17 @@ The settings_persist worker owns the pool:
    recovers the pool and logs "Shot trace pool ready" with the record count,
    unused sectors and duration. Until then the pool answers not ready and
    nothing reads or writes it; boot readiness and the relay never wait for it.
-2. Each idle pass (about once a second) takes the newest completed trace that
-   was not saved yet, with its export CRC, and appends it as one record whose
-   identity is the summary's shot id, boot id and end time, its raw end reason
-   and the firmware that wrote it. The trace section holds the export bytes;
-   the curve section is added with curves from the pool (planned).
+2. Each idle pass (about once a second) appends one record per stored shot,
+   oldest first. Its identity is the summary's shot id, boot id and end time,
+   with the raw end reason and the firmware that wrote it. It holds the shot's
+   curve and, when that shot's trace is the newest completed one, the trace
+   (its export bytes, with the export CRC). A trace whose shot the log refused,
+   and an interrupted one, go alone; a shot whose trace a newer one replaced,
+   or that had none, gets a record with its curve alone (end reason 0). A
+   curve is stored at finalize while the shot's capture is still open and the
+   trace completes right after, so the worker only takes curves while no
+   capture is open: a curve never leaves without the trace that belongs with
+   it.
 3. Steps run only while the gate stays open, which excludes the whole capture
    window (cycle start to drip finalize), an active machine, a scale being
    connected and a maintenance lease. When it closes the append pauses and
@@ -339,26 +365,59 @@ The settings_persist worker owns the pool:
    trace was saved replaces it (newest wins): the paused append is abandoned,
    and the log counts the traces that were never saved.
 5. A failed write is retried with the whole record up to three times, with one
-   warning; a record that is already on flash (a commit reported as failed
-   that landed) is never written again.
+   warning ("Shot record save failed"); a record that is already on flash (a
+   commit reported as failed that landed) is never written again. A record
+   given up after three attempts is logged as "Shot record of shot N not saved
+   after 3 attempts", and the next shot goes on.
 
 An interrupted trace recovered after a crash is saved the same way. It has no
 summary: its record is shot 0, end time 0, under the boot that crashed. A
 completed trace whose summary the shot log refused is shot 0 with its boot and
 end time.
 
-Clear all marks the pool for clearing and drops the unsaved trace of a cleared
-shot; the worker clears the pool before it persists the cleared shot log, so a
+Clear all marks the pool for clearing and drops the unsaved trace and curves
+of the cleared shots; the worker clears the pool before it persists the cleared shot log, so a
 power loss leaves both cleared, neither, or only the pool, and an id reused
 after a clear never reaches an older record. Factory reset clears the pool and
 verifies it with a fresh recovery under the same writer lock. A pool that
 cannot be recovered never holds the shot log back.
 
-The pool starts as the `reserved` partition alone, about 1.36 MB of record
-space: roughly 700 shots of 2 KB traces, or 350 of 4 KB. When curves move to
-the pool, the legacy curve store is retired without migrating its curves and
-the ring opens `shotcurve`. Its legacy blocks are never read as records: they
-fail the sector magic, version or CRC and are holes the ring overwrites.
+The legacy curve store (fixed 8 KiB blocks in `shotcurve`) is retired without
+migrating its curves; an installation over USB with `--erase-all` starts
+empty. Its blocks, if any remain, are never read as records: they fail the
+sector magic, version or CRC and are holes the ring overwrites. A typical
+record (a 2–3 KB curve and a 1–4 KB trace) is about 4–6 KB, so the pool keeps
+roughly the last 900–1,300 shots, more than the shot log's 1,000 summaries
+for short shots and somewhat fewer for long ones; FIFO recycling decides,
+never the shot's quality.
+
+### Curves in the pool
+
+The newest 500 curves stay in a PSRAM cache (`ShotCurveCache`,
+`src/OpenBrewByWeightShotCurve.h`, about 2.8 MB, under `shotStoreMutex`), so
+Home, the Stats charts and the last 10, 50 or 100 shots never touch flash. The
+curves not in the pool yet are always the newest ones in the cache; the worker
+saves them oldest first.
+
+- **After boot** the cache is empty. Once the pool is recovered, the worker
+  fills the cache's older end from the pool, newest summary first, until it
+  holds 500 curves or every summary was tried, and logs "Shot curves loaded:
+  N in RAM". It reads with no store lock, pauses with the write gate and
+  never displaces a curve stored since boot. Until a shot's curve is back,
+  Home shows that shot without a curve.
+- **Older curves** (the shot list past the newest 500, its pages and exports)
+  are read from the shot's record on demand: the summary's identity is looked
+  up under `shotStoreMutex`, the lock is released, and the record is opened
+  and CRC-checked under the flash lock.
+- **Busy.** While a shot runs (the write gate is closed or a capture is open)
+  and before the pool's first recovery, an older curve answers busy: the
+  Stats stream holds that row and resumes once flash may be read, sending
+  nothing meanwhile. A pool that failed to recover answers no curve.
+- **Gone.** A record whose sector the ring recycled, or that an interrupted
+  erase tore, reads as a shot without a curve, never as damage.
+
+Deleting a shot drops its summary and its cached curve; its record stays on
+flash, unreachable, until the ring recycles its sector.
 
 ### Writing
 

@@ -22,7 +22,7 @@ constexpr uint32_t SHOT_LOG_MAGIC = 0x534C4F47U;  // "SLOG"
 constexpr uint16_t SHOT_LOG_SCHEMA_VERSION = 2;
 // Record size of the first schema-2 image; never changes.
 constexpr uint16_t SHOT_LOG_MIN_RECORD_BYTES = 124;
-constexpr size_t SHOT_LOG_CAPACITY = 500;
+constexpr size_t SHOT_LOG_CAPACITY = 1000;
 constexpr size_t SHOT_LOG_PAGE_DEFAULT = 10;
 // Maximum number of records in each independent read-time Stats window.
 constexpr size_t SHOT_LOG_STATS_WINDOW = 10;
