@@ -164,7 +164,7 @@ int main(){
     document:{hidden:false,addEventListener(){}},window:{addEventListener(){}},
     setTimeout:(fn,delay)=>{timers.set(++nextTimer,{fn,delay});return nextTimer;},clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:()=>1,webUiPollingActive:()=>true,webUiClientId:'owner',webUiPowerSeconds:()=>0,
-    activeView:'diagnostic',diagnosticUnlocked:true,developmentMode:false,lastLog:0,viewReady:Promise.resolve(),homeResolve(){},invalidateHomeStream(){},noteReachFail(){},
+    activeView:'diagnostic',diagnosticUnlocked:true,developmentMode:false,lastLog:0,viewReady:Promise.resolve(),homeResolve(){},invalidateHomeStream(){},noteReachFail(){},$:()=>null,
     // The Diagnostic view restarts the log subscription from its status paint.
     viewStatusHandlers:{diagnostic:s=>{assert(s.health);assert(s.tasks);paints.push(s);context.startLogStream();}}});
   vm.runInContext(runtimeStateDecl+'let homeFrame=null;'+runtimeJs.slice(runtimeJs.indexOf('function statusStreamFrame('),runtimeJs.indexOf('function renderHomeStream('))+

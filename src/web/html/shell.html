@@ -67,6 +67,15 @@
           ><span><small>{{webui:shell.open_brew}}</small>{{webui:shell.by_weight}}</span></a
         >
       </h1>
+      <button
+        type="button"
+        id="liveShotOpen"
+        class="liveBtn"
+        aria-haspopup="dialog"
+        title="{{webui:shell.live_open}}"
+      >
+        <span class="liveDot" aria-hidden="true"></span>{{webui:shell.live}}
+      </button>
       <div
         id="headerSignals"
         class="headerSignals"
@@ -245,6 +254,45 @@
         >
       </footer>
     </main>
+    <section
+      id="liveShot"
+      class="liveShot"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="liveShotPreset"
+      hidden
+    >
+      <div class="lsTop">
+        <p class="lsChip">
+          <span class="liveDot" aria-hidden="true"></span><span id="liveShotPreset"></span>
+        </p>
+        <p id="liveShotState" class="lsState"></p>
+        <button
+          id="liveShotClose"
+          class="lsClose"
+          type="button"
+          aria-label="{{webui:home.exit_full_screen}}"
+          title="{{webui:home.exit_full_screen}}"
+        >
+          <svg viewBox="82 82 204 204" aria-hidden="true">
+            <path
+              d="M120 120 248 248M248 120 120 248"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="18"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="lsNums">
+        <p><small>{{webui:home.weight}}</small><b id="liveShotWeight">—</b></p>
+        <p><small>{{webui:shell.time}}</small><b id="liveShotTime">—</b></p>
+        <p><small>{{webui:shell.flow}}</small><b id="liveShotFlow">—</b></p>
+      </div>
+      <div id="liveShotGraph" class="lsGraph" role="img"></div>
+      <div id="liveShotLane" class="lsLane"></div>
+    </section>
     <div
       id="webUiInactive"
       class="inactiveOverlay"

@@ -208,13 +208,13 @@
   const rule={mode:'active',t1:27,t2:36,prot:3,wall:60,d:5,ceil:38.5};
   const env={liveRuleModel:null,model:null,reduce:false},ruleArgs=[];
   const paint=(d)=>new Function('$','buildShotSparkModel','formatShotEnded','ms','localStorage','document',
-    'liveRuleModel','uiState','shotRuleModel','scheduleShotPaint','sub','window','d',
+    'liveRuleModel','uiState','shotRuleModel','scheduleShotPaint','sub','window','shotFsActive','d',
     blockAt(runtimeJs,'function verdictLabel(')+
     runtimeJs.slice(runtimeJs.indexOf('function renderShotHero('),runtimeJs.indexOf('function checkFirmwareReload('))+
     ';return renderShotHero({clockMs:d.elapsedMs,...d});')(lookup,()=>env.model,()=>'',
       (v,n)=>(v/1000).toFixed(n),{getItem:()=>tintMode,setItem(){}},{createElement:()=>({})},
       env.liveRuleModel,{shotHistory:{shots:[]}},r=>(ruleArgs.push(r),null),()=>null,
-      (t,vals)=>t.replace(/\{(\d)\}/g,(_,i)=>vals[+i]),{matchMedia:()=>({matches:env.reduce})},d);
+      (t,vals)=>t.replace(/\{(\d)\}/g,(_,i)=>vals[+i]),{matchMedia:()=>({matches:env.reduce})},false,d);
   const card={live:true,weight:2,goal:36,elapsedMs:1000,firstDropMs:0,tareMs:null,averageFlowGps:null,shotType:'auto'};
   const heroEl=()=>lookup('shotHero');
   paint({...card,weight:36.2,elapsedMs:36800});

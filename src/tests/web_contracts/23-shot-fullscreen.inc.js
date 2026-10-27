@@ -1,4 +1,4 @@
-// The full-screen shot card and the shot-aware session keep-alive are the
+// The live shot view and the shot-aware session keep-alive are the
 // two behavioral contracts added with the mobile presentation mode. Both are
 // regression-prone state machines, so they get pure vm-slice coverage here:
 // the keep-alive must read fresh stream state (a frozen liveness copy once
@@ -61,7 +61,7 @@
   // Back-consume protocol: enter pushes one history entry; every exit path
   // consumes exactly one pop, and unrelated pops reach the router.
   {
-    const heroClasses = new Set(), bodyClasses = new Set();
+    const viewClasses = new Set(), bodyClasses = new Set();
     const history = {pushed: 0, back: 0};
     const stubClasses = set => ({
       add: (...c) => c.forEach(x => set.add(x)),
@@ -73,19 +73,22 @@
     const element = () => ({onclick: null, dataset: {}, focus() {},
       addEventListener: (type, fn) => { handlers[type] = fn; }, querySelector: () => null});
     const appended = [];
-    const hero = Object.assign(element(), {classList: stubClasses(heroClasses),
-      append: el => appended.push(el)});
+    const hero = element();
+    const view = Object.assign(element(), {hidden: true, classList: stubClasses(viewClasses),
+      append: el => appended.push(el), removeEventListener() {}});
+    const open = () => !view.hidden;
     const docHandlers = {}, nav = {}, video = {plays: 0, pauses: 0, attrs: {}, paused: false,
       play() { this.plays++; this.paused = false; return Promise.resolve(); },
       pause() { this.pauses++; this.paused = true; },
       setAttribute(k, v) { this.attrs[k] = v; }};
-    const els = {shotHero: hero, shotFsClose: element()};
+    const els = {shotHero: hero, liveShot: view, liveShotClose: element(),
+      liveShotOpen: element(), liveShotGraph: {}};
     const card = {closest: () => null}, link = {closest: () => ({})};
     let clock = 1000;
     const tap = (target = card, gap = 200) => handlers.pointerup({target, timeStamp: clock += gap});
     const doubleTap = () => { tap(card, 1000); tap(); };
     const api = new Function('$', 'history', 'location', 'document', 'setTimeout', 'clearTimeout',
-        'navigator',
+        'navigator', 'paintUiStream', 'renderLiveShot', 'observePresetHost',
         runtimeJs.slice(runtimeJs.search(/let\s+shotFsActive\s*=/),
             runtimeJs.indexOf('// The diagnostic stream rides')) +
         ';return{enter:enterShotFullScreen,exit:exitShotFullScreen' +
@@ -97,7 +100,7 @@
         {body: {classList: stubClasses(bodyClasses)},
           addEventListener: (type, fn) => { docHandlers[type] = fn; },
           createElement: tag => { assert.equal(tag, 'video'); return video; }},
-        () => 0, () => {}, nav);
+        () => 0, () => {}, nav, () => {}, () => {}, () => {});
     const key = (k, target) => docHandlers.keydown({key: k, target});
     const plain = {closest: () => null}, sheet = {closest: () => ({})};
 
@@ -105,33 +108,33 @@
     assert.equal(api.pop(), false, 'a pop without full screen reaches the router');
 
     tap(card, 1000); tap(card, 400);
-    assert.ok(!heroClasses.has('fs'), 'two slow taps must not open full screen');
+    assert.ok(!open(), 'two slow taps must not open full screen');
     tap(link, 1000); tap(link);
-    assert.ok(!heroClasses.has('fs'), 'taps on links and buttons keep their own action');
+    assert.ok(!open(), 'taps on links and buttons keep their own action');
     doubleTap();
-    assert.ok(heroClasses.has('fs') && bodyClasses.has('shotFs'), 'a double tap opens full screen');
+    assert.ok(open() && bodyClasses.has('shotFs'), 'a double tap on the card opens the live view');
     assert.equal(history.pushed, 1, 'entering pushes one history entry');
     assert.equal(api.pop(), true, 'the back gesture exits full screen');
-    assert.ok(!heroClasses.has('fs') && !bodyClasses.has('shotFs'));
+    assert.ok(!open() && !bodyClasses.has('shotFs'));
 
     // The X button exits via history.back(); that pop must be swallowed once.
     key('Enter', hero);
-    assert.ok(heroClasses.has('fs'), 'Enter on the focused card opens full screen');
-    els.shotFsClose.onclick();
-    assert.ok(!heroClasses.has('fs'), 'the X button exits full screen');
+    assert.ok(open(), 'Enter on the focused card opens full screen');
+    els.liveShotClose.onclick();
+    assert.ok(!open(), 'the X button exits full screen');
     assert.equal(history.back, 1, 'the X exit consumes its pushed entry');
     assert.equal(api.pop(), true, 'the X-driven pop is consumed');
     assert.equal(api.pop(), false, 'the next pop reaches the router');
     // A double tap inside full screen exits like the X.
     doubleTap();
     doubleTap();
-    assert.ok(!heroClasses.has('fs') && history.back === 2, 'a second double tap leaves full screen');
+    assert.ok(!open() && history.back === 2, 'a second double tap leaves full screen');
     assert.equal(api.pop(), true, 'the double-tap exit consumes its pushed entry');
     // Leaving full screen without Back (the card turned invalid) drops its entry
     // too, so the next Back is not a dead press.
     doubleTap();
     api.exit();
-    assert.ok(!heroClasses.has('fs') && history.back === 3, 'a programmatic exit consumes its entry');
+    assert.ok(!open() && history.back === 3, 'a programmatic exit consumes its entry');
     assert.equal(api.pop(), true, 'its pop is swallowed once');
     history.back = 2;
 
@@ -140,12 +143,12 @@
     key('Escape', plain);
     assert.equal(history.back, 2, 'Escape outside full screen does nothing');
     key('Enter', plain);
-    assert.ok(!heroClasses.has('fs'), 'Enter opens full screen only from the focused card');
+    assert.ok(!open(), 'Enter opens full screen only from the focused card');
     doubleTap();
     key('Escape', sheet);
-    assert.ok(heroClasses.has('fs'), 'Escape inside a sheet or dialog keeps full screen');
+    assert.ok(open(), 'Escape inside a sheet or dialog keeps full screen');
     key('Escape', plain);
-    assert.ok(!heroClasses.has('fs') && history.back === 3, 'Escape with focus on the page exits');
+    assert.ok(!open() && history.back === 3, 'Escape with focus on the page exits');
     assert.equal(api.pop(), true, 'the Escape exit consumes its pushed entry');
 
     // Plain HTTP has no Wake Lock API: a looping video keeps the screen on
@@ -156,7 +159,7 @@
     assert.ok(video.className === 'heroAwake' && video.muted && video.loop && video.playsInline &&
         video.attrs['aria-hidden'] === 'true' && /^data:video\/mp4;base64,/.test(video.src));
     assert.equal(video.plays, plays + 1, 'entering plays the keep-awake video');
-    els.shotFsClose.onclick();
+    els.liveShotClose.onclick();
     assert.ok(video.pauses >= 1, 'leaving pauses the keep-awake video');
     api.pop();
     // iOS resumes unmuted playback only from a gesture: a tap while full
@@ -166,7 +169,15 @@
     const resumed = video.plays;
     tap(card, 700);
     assert.equal(video.plays, resumed + 1, 'a tap in full screen resumes the paused video');
-    els.shotFsClose.onclick();
+    els.liveShotClose.onclick();
+    api.pop();
+
+    // The header pill opens the live view from any page.
+    const pushed = history.pushed;
+    handlers.click();
+    assert.ok(open() && history.pushed === pushed + 1, 'the header pill opens the live view');
+    els.liveShotClose.onclick();
+    assert.ok(!open(), 'the X closes the view opened from the pill');
     api.pop();
   }
 
@@ -184,13 +195,13 @@
     const hero = {classList: {add() {}, remove() {}}, querySelector: () => null,
       focus() {}, append() {}};
     const api = new Function('$', 'history', 'location', 'document', 'setTimeout',
-        'clearTimeout', 'navigator',
+        'clearTimeout', 'navigator', 'paintUiStream', 'renderLiveShot',
         runtimeJs.slice(runtimeJs.search(/let\s+shotFsActive\s*=/),
             runtimeJs.indexOf('// The diagnostic stream rides')) +
         ';return{enter:enterShotFullScreen}')(
         () => hero, {pushState() {}, back() {}}, {href: '/'},
         {body: {classList: {add() {}, remove() {}}}, createElement: () => video},
-        () => 0, () => {}, {userAgent: ua, maxTouchPoints: touch});
+        () => 0, () => {}, {userAgent: ua, maxTouchPoints: touch}, () => {}, () => {});
     api.enter();
     assert.equal(video.muted, !unmuted,
         `${ua} (touch ${touch}) must ${unmuted ? 'play unmuted' : 'stay muted'}`);
@@ -202,10 +213,10 @@
   (async () => {
     let requests = 0, releases = 0, grant = null;
     const lock = {release: () => { releases++; return Promise.resolve(); }};
-    const els = {shotHero: {classList: {add() {}, remove() {}}, querySelector: () => null, focus() {}},
-      shotFsClose: {focus() {}}};
+    const els = {liveShot: {classList: {add() {}, remove() {}}, focus() {}},
+      liveShotClose: {focus() {}}};
     const api = new Function('$', 'history', 'location', 'document', 'setTimeout', 'clearTimeout',
-        'navigator',
+        'navigator', 'paintUiStream', 'renderLiveShot',
         runtimeJs.slice(runtimeJs.search(/let\s+shotFsActive\s*=/),
             runtimeJs.indexOf('// The diagnostic stream rides')) +
         ';return{enter:enterShotFullScreen,exit:exitShotFullScreen,awake:keepShotFsAwake}')(
@@ -213,7 +224,8 @@
         {body: {classList: {add() {}, remove() {}}}, createElement() { throw Error('no video'); }},
         () => 0, () => {},
         {wakeLock: {request: type => { assert.equal(type, 'screen'); requests++;
-          return new Promise(resolve => { grant = () => resolve(lock); }); }}});
+          return new Promise(resolve => { grant = () => resolve(lock); }); }}},
+        () => {}, () => {});
     const settle = () => new Promise(resolve => setImmediate(resolve));
     api.enter();
     grant(); await settle();

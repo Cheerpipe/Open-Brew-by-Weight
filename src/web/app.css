@@ -2432,143 +2432,95 @@ summary::marker {
   border-color: var(--ln);
   color: var(--mu);
 }
-.heroFsBtn {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  z-index: 2;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: var(--tap);
-  height: var(--tap);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--on);
-  cursor: pointer;
-}
-.heroFsClose {
-  border: 1px solid color-mix(in srgb, var(--on) 35%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--on) 14%, transparent);
-}
-.heroFsBtn svg {
-  width: 1.3rem;
-  height: 1.3rem;
-  fill: currentColor;
-}
-.heroFsClose svg {
-  fill: none;
-  stroke: currentColor;
-}
-.heroFsBtn:not(:disabled):hover {
-  background: color-mix(in srgb, var(--on) 30%, transparent);
-}
-.heroFsBtn:not(:disabled):active {
-  transform: scale(0.93);
-}
-.shotHero.fs .heroFsClose {
+.liveBtn {
   display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  margin-left: auto;
+  padding: 0 0.8rem;
+  border: 1px solid var(--ln);
+  border-radius: 2rem;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 22;
 }
-.shotHero .heroAwake {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0.01;
-  pointer-events: none;
+.liveBtn + .headerSignals {
+  margin-left: 0;
+}
+.liveDot {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--mu);
+}
+.liveBtn.on {
+  border-color: color-mix(in srgb, var(--gCut) 55%, var(--ln));
+}
+/* The dot pulses only while a shot runs. */
+.liveBtn.on .liveDot,
+.liveShot.live .liveDot {
+  background: var(--gCut);
+  animation: livePulse 1.2s ease-in-out infinite;
+}
+@keyframes livePulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 body.shotFs {
   overflow: hidden;
 }
-.shotHero.fs {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100dvw;
-  height: 100dvh;
-  z-index: 30;
-  display: flex;
-  margin: 0;
-  padding: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-.shotHero.fs .heroBody {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(0.3rem, 1.8vmin, 1.5rem);
-  padding: var(--pt) var(--pr) max(1rem, var(--ib)) max(1.5rem, 3.4vmin, var(--il));
-  animation: heroFsIn 0.26s ease-out;
-}
-.shotHero.fs .heroChart {
-  flex: 1;
-  min-height: 6vmin;
-  margin: 0 0 clamp(1rem, 4vmin, 2rem);
-}
-@keyframes heroFsIn {
-  from {
-    opacity: 0;
-    transform: scale(0.965);
-  }
-}
-.shotHero.fs.fsOut .heroBody {
-  animation: heroFsOut 0.2s ease-in forwards;
-}
-@keyframes heroFsOut {
-  to {
-    opacity: 0;
-    transform: scale(0.965);
-  }
-}
-/* Each side keeps only its own safe-area inset (remapped while rotated); the
-   1.5rem floors clear display corners that env() does not describe. */
-.shotHero.fs {
+/* Live view: always landscape (rotated on a portrait screen). Each side keeps
+   only its own safe-area inset, remapped while rotated. */
+.liveShot {
   --it: env(safe-area-inset-top);
   --ir: env(safe-area-inset-right);
   --ib: env(safe-area-inset-bottom);
   --il: env(safe-area-inset-left);
-  --pt: max(1.5rem, 2.4vmin, var(--it));
-  --pr: max(1.5rem, 3.4vmin, var(--ir));
-  --btn: clamp(var(--tap), 8vmin, 4.2rem);
-  --hn: clamp(3rem, min(17vmin, 10vmax), 10rem);
+  --lsTone: color-mix(in srgb, var(--cf) 60%, var(--fg));
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: 100dvw;
+  height: 100dvh;
+  display: grid;
+  grid-template: auto minmax(0, 1fr) auto / clamp(7.5rem, 19vmax, 15.5rem) minmax(0, 1fr);
+  gap: clamp(0.4rem, 2vmin, 1.2rem) clamp(0.6rem, 2vmax, 1.6rem);
+  padding: max(0.6rem, 2vmin, var(--it)) max(1rem, 2vmin, var(--ir)) max(0.6rem, var(--ib))
+    max(1rem, 2vmin, var(--il));
+  background: var(--sf);
+  color: var(--fg);
+  user-select: none;
+  -webkit-user-select: none;
+  animation: liveShotIn 0.26s ease-out;
 }
-.shotHero.fs .heroFsBtn {
-  top: var(--pt);
-  right: var(--pr);
-  width: var(--btn);
-  height: var(--btn);
-  border-width: 2px;
+.liveShot[hidden] {
+  display: none;
 }
-.shotHero.fs .heroFsBtn svg {
-  width: 45%;
-  height: 45%;
+.liveShot.fsOut {
+  animation: liveShotOut 0.2s ease-in forwards;
 }
-.shotHero.fs .heroLabel {
-  min-height: var(--btn);
-  font-size: clamp(0.75rem, 3.8vmin, 2.1rem);
-  padding-right: calc(var(--btn) + 0.75rem);
+@keyframes liveShotIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
 }
-.shotHero.fs .heroDot {
-  width: clamp(0.55rem, 2.6vmin, 1.5rem);
-  height: clamp(0.55rem, 2.6vmin, 1.5rem);
+@keyframes liveShotOut {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
 }
-.shotHero.fs .heroNum span {
-  font-size: clamp(1rem, 5.2vmin, 3rem);
-}
-.shotHero.fs .heroPill,
-.shotHero.fs .heroChart .xl,
-.shotHero.fs .heroChart .hold {
-  font-size: clamp(0.66rem, 3.2vmin, 1.6rem);
-}
-/* The vh/vw fallback only matters on engines older than dvh support, which
-   already lack the :has() and color-mix() this interface requires. */
 @media (orientation: portrait) {
-  .shotHero.fs {
+  .liveShot {
     --it: env(safe-area-inset-right);
     --ir: env(safe-area-inset-bottom);
     --ib: env(safe-area-inset-left);
@@ -2578,11 +2530,178 @@ body.shotFs {
     transform-origin: top left;
     transform: rotate(90deg) translateY(-100%);
   }
+  .liveShot,
+  .liveShot.fsOut {
+    animation: none;
+  }
+}
+/* The shot colour: brown while brewing, then the forecast or verdict. */
+.liveShot[data-tint="fast"] {
+  --lsTone: var(--gFast);
+}
+.liveShot[data-tint="on_recipe"] {
+  --lsTone: var(--ok);
+}
+.liveShot[data-tint="slow"] {
+  --lsTone: var(--gSlow);
+}
+.liveShot .heroAwake {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.01;
+  pointer-events: none;
+}
+.lsTop {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: var(--tap);
+  font-size: clamp(0.85rem, 3vmin, 1.4rem);
+}
+.lsChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  margin: 0;
+  padding: 0.3em 0.85em;
+  border: 1px solid var(--ln);
+  border-radius: 2em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lsState {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lsTone);
+}
+.lsClose {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: clamp(var(--tap), 8vmin, 4rem);
+  height: clamp(var(--tap), 8vmin, 4rem);
+  padding: 0;
+  border: 1px solid var(--ln);
+  border-radius: 50%;
+  background: var(--in);
+  color: var(--fg);
+  cursor: pointer;
+}
+.lsClose svg {
+  width: 40%;
+  height: 40%;
+}
+.lsNums {
+  grid-row: 2 / span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  min-width: 0;
+}
+.lsNums p {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.lsNums p > small {
+  font-size: clamp(0.7rem, 2.4vmin, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.lsNums b {
+  font-size: min(8.5vmin, 4.4vmax);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.lsNums p:first-child b {
+  font-size: min(15vmin, 8vmax);
+}
+.lsNums b small {
+  display: inline;
+  margin-left: 0.15em;
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--mu);
+}
+.lsGraph {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+/* Flow gets its own lane only where the screen is tall enough (tablets). */
+.lsLane {
+  display: none;
+  position: relative;
+  grid-column: 2;
+}
+@media (min-width: 600px) and (min-height: 600px) {
+  .lsLane {
+    display: block;
+    height: 26vmin;
+  }
+}
+.lsGraph svg,
+.lsLane svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.liveShot .rvLast {
+  stroke: var(--lsTone);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.rvFlow {
+  fill: none;
+  stroke: var(--gFlow);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+.rvFlowA {
+  fill: var(--gFlow);
+  fill-opacity: 0.14;
+}
+.rvFlowGrid {
+  stroke-dasharray: 2 4;
+}
+.rvFc {
+  fill: none;
+  stroke: var(--lsTone);
+  stroke-width: 1.6;
+  stroke-dasharray: 1.5 4.5;
+  stroke-linecap: round;
+}
+.rvFcDot {
+  fill: var(--sf);
+  stroke: var(--lsTone);
+  stroke-width: 2.2;
+}
+.rvNow {
+  fill: var(--lsTone);
+  stroke: var(--sf);
+  stroke-width: 1.6;
 }
 @media (prefers-reduced-motion: reduce) {
-  .shotHero.fs .heroBody,
-  .shotHero.fs.fsOut .heroBody {
-    animation: none;
+  .liveShot,
+  .liveShot.fsOut,
+  .liveDot {
+    animation: none !important;
   }
 }
 #log {
@@ -5160,7 +5279,8 @@ html.theme-dark {
 @media (forced-colors: active) {
   .btnGlyph,
   .presetCard,
-  .heroFsBtn,
+  .liveBtn,
+  .lsClose,
   input,
   select,
   textarea {

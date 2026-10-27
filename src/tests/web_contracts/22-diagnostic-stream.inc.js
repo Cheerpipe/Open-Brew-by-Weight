@@ -21,7 +21,7 @@
     webUiPollingActive: () => owner, webUiClientId: '0123456789abcdef', webUiPowerSeconds: () => 30,
     activeView: 'diagnostic', viewSeq: 1, viewReady: Promise.resolve(), lastStatusAt: 0,
     performance: {now: () => 1234}, invalidateHomeStream() {}, noteReachFail() {}, homeResolve() {},
-    homeStale: false,
+    homeStale: false, $: () => null, shotFsActive: false,
     viewStatusHandlers: {diagnostic: () => {}, diagnosticLive: status => applied.push(status)},
   };
   vm.runInNewContext(source, context);

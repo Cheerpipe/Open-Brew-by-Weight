@@ -96,7 +96,6 @@ function setActiveView(name, ready = Promise.resolve()) {
   // subscriptions themselves stay standing.
   if (activeView !== name) eachStream("leave");
   activeView = name || "";
-  if (shotFsActive && activeView !== "home") exitShotFullScreen();
   viewReady = ready;
   viewSeq++;
   relayoutCharts();
@@ -2357,7 +2356,7 @@ function lockControls(root) {
       e.disabled = !webUiOwner;
       return;
     }
-    if (e.id === "shotFsClose") return;
+    if (e.id === "liveShotClose" || e.id === "liveShotOpen") return;
     if (
       e.classList.contains("taskProfilerCtl") ||
       e.classList.contains("scaleProfileCtl") ||
@@ -3297,9 +3296,11 @@ function referencePace(t, goal, tArr, t0 = 0) {
   const u = Math.max(0, t - t0) / (tArr - t0);
   return goal * (2 * PACE_SOFT * u + (1 - 2 * PACE_SOFT) * u * u);
 }
-// One preset graph for Settings (review, with scrubber) and for a Stats shot
-// (compact, no scrubber, no no-cut hatch; Stats adds 10 s ticks). Laid out in CSS pixels
-// from the measured width; null while the host is hidden.
+// One preset graph for Settings (review, with scrubber), for a Stats shot
+// (compact, no scrubber, no no-cut hatch; Stats adds 10 s ticks) and for the
+// live view (a given w × h, no scrubber; flow in the lower third, the current
+// point and the forecast cut). Laid out in CSS pixels from the measured width;
+// null while the host is hidden.
 function presetGraph(host, m, x = {}) {
   const {
       ghost,
@@ -3311,13 +3312,19 @@ function presetGraph(host, m, x = {}) {
       maxT = 0,
       compact,
       tens,
+      live,
+      flow = [],
+      now,
+      fc,
     } = x,
-    W = host.clientWidth;
+    W = x.w || host.clientWidth;
   if (!W) return null;
   const u = host.id,
-    H = Math.round(
-      compact ? Math.min(180, Math.max(140, W * 0.48)) : Math.min(220, Math.max(180, W * 0.56)),
-    ),
+    H =
+      x.h ||
+      Math.round(
+        compact ? Math.min(180, Math.max(140, W * 0.48)) : Math.min(220, Math.max(180, W * 0.56)),
+      ),
     L = 34,
     R = W - 10,
     T = 14,
@@ -3459,6 +3466,10 @@ function presetGraph(host, m, x = {}) {
     `<path class="rvCut${m.mode === "timerOnly" ? " off" : ""}" d="M${P(m.prot, m.ceil)}${fastEdge}${windowEdge}${slowEdge}"/>` +
     curves(last, "rvLast") +
     curves(drip, "rvLast rvLastDrip") +
+    (flow.length ? flowLayer(flow, X, L, R, B - (B - T) * 0.36, B) : "") +
+    (fc && now ? `<path class="rvFc" d="M${P(...now)}L${P(...fc)}"/>` : "") +
+    (fc ? `<circle class="rvFcDot" cx="${f(X(fc[0]))}" cy="${f(Y(fc[1]))}" r="5"/>` : "") +
+    (now ? `<circle class="rvNow" cx="${f(X(now[0]))}" cy="${f(Y(now[1]))}" r="4"/>` : "") +
     held
       .map(
         ([t, g]) => `<circle cx="${f(X(t))}" cy="${f(Y(g))}" r="2" fill="var(--mu)" opacity=".6"/>`,
@@ -3506,17 +3517,46 @@ function presetGraph(host, m, x = {}) {
     (compact
       ? "</g></svg>"
       : label(X(m.wall), T - 4, sub(__WEBUI_TEXT__("runtime.graph_max"), [n(m.wall)]), "", "end") +
-        `</g><g class="rvScrub" role="slider" tabindex="0" aria-label="${escHtml(__WEBUI_TEXT__("runtime.graph_scrub"))}" aria-valuemin="${m.scrubMin}" aria-valuemax="${m.wall}"><path class="rvGuide"/><path class="rvShot"/><circle class="rvHandle" r="5"/>${PILL}</g></svg>`);
+        (live
+          ? "</g></svg>"
+          : `</g><g class="rvScrub" role="slider" tabindex="0" aria-label="${escHtml(__WEBUI_TEXT__("runtime.graph_scrub"))}" aria-valuemin="${m.scrubMin}" aria-valuemax="${m.wall}"><path class="rvGuide"/><path class="rvShot"/><circle class="rvHandle" r="5"/>${PILL}</g></svg>`));
   return {
     m,
     X,
     Y,
     T,
     B,
+    L,
+    R,
     pace: (ta, end) => S + paceTo(ta, end),
     tAt: (px) => ((px - L) * tMax) / (R - L),
     arrivals: shown.length,
   };
+}
+// Live flow (g/s) between y = top and bottom on its own scale from 0 to at
+// least 4 g/s: a soft area under its line and two labelled grid lines.
+function flowLayer(flow, X, L, R, top, bottom) {
+  const max = Math.max(4, Math.ceil(Math.max(0, ...flow.flat().map((q) => q[1])))),
+    Y = (r) => (bottom - ((bottom - top) * Math.max(0, r)) / max).toFixed(2),
+    d = (p) =>
+      p
+        .filter((q) => X(q[0]) <= R + 0.5)
+        .map((q, i) => (i ? "L" : "M") + X(q[0]).toFixed(2) + " " + Y(q[1]))
+        .join("");
+  return (
+    flow
+      .map(
+        (p) =>
+          `<path class="rvFlowA" d="${d(p)}V${bottom}H${X(p[0][0]).toFixed(2)}Z"/><path class="rvFlow" d="${d(p)}"/>`,
+      )
+      .join("") +
+    [max / 2, max]
+      .map(
+        (v) =>
+          `<path class="rvGrid rvFlowGrid" d="M${L} ${Y(v)}H${R}"/><text class="rvLbl rvHalo" x="${R - 2}" y="${Y(v) - 3}" text-anchor="end">${v + __WEBUI_TEXT__("runtime.g_s")}</text>`,
+      )
+      .join("")
+  );
 }
 // While held, a pill left of the handle (clear of a right thumb) shows its point.
 const PILL =
@@ -3793,7 +3833,8 @@ function stopUiStream() {
 function paintUiStream() {
   if (shotStale) cancelShotClockFinish();
   scheduleShotClock();
-  if ("home" !== activeView) return;
+  $("liveShotOpen")?.classList.toggle("on", !!shotFrame?.card.valid && !!shotFrame.card.live);
+  if ("home" !== activeView && !shotFsActive) return;
   const e = $("shotHero");
   if (e) {
     if ((e.setAttribute("aria-busy", String(shotStale)), !shotFrame))
@@ -3808,7 +3849,7 @@ function paintUiStream() {
       return (
         clearShotHero(),
         void (shotFsActive
-          ? exitShotFullScreen()
+          ? renderLiveShot()
           : shotStale &&
             ((e.hidden = !1), setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_stale"))))
       );
@@ -4267,7 +4308,7 @@ function scheduleShotClock() {
     shotClockPaint ||
     !shotClock ||
     shotStale ||
-    activeView !== "home" ||
+    (activeView !== "home" && !shotFsActive) ||
     document.hidden ||
     !webUiPollingActive()
   )
@@ -4277,7 +4318,7 @@ function scheduleShotClock() {
     if (
       !shotClock ||
       shotStale ||
-      activeView !== "home" ||
+      (activeView !== "home" && !shotFsActive) ||
       document.hidden ||
       !webUiPollingActive()
     )
@@ -4289,10 +4330,11 @@ function scheduleShotClock() {
       return;
     }
     heroNum(shotClock.id, ms(elapsed, 1) + __WEBUI_TEXT__("runtime.s_2"));
+    if (shotFsActive) liveShotNums(true);
     scheduleShotClock();
   });
 }
-// Full-screen pushes a history entry so Back closes the card. Route changes
+// The live view pushes a history entry so Back closes it. Route changes
 // leave that entry intact; consuming it would undo the user's navigation.
 let shotFsActive = false,
   shotFsPushed = false,
@@ -4300,8 +4342,9 @@ let shotFsActive = false,
   shotFsTimer = 0,
   shotFsExitEnd = null,
   shotFsLock = null,
-  shotFsVideo = null;
-// Keeps the phone screen on while the card is full screen. Plain HTTP has no
+  shotFsVideo = null,
+  shotFsReturn = null;
+// Keeps the phone screen on while the live view is open. Plain HTTP has no
 // Wake Lock API, so a looping video covering the card stands in.
 function keepShotFsAwake(on) {
   if (!on) {
@@ -4328,26 +4371,28 @@ function keepShotFsAwake(on) {
     shotFsVideo.setAttribute("aria-hidden", "true");
     shotFsVideo.src =
       "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAMsbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAld0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAHPbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABem1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAATpzdGJsAAAAunN0c2QAAAAAAAAAAQAAAKphdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2MS4xOS4xMDEgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAAMGF2Y0MBQsAK/+EAF2dCwAqmEXsBEAAAAwAQAAADACDxImEYAQAGaMhCDxMgAAAAEHBhc3AAAAABAAAAAQAAABRidHJ0AAAAAAAAAHgAAAAAAAAAGHN0dHMAAAAAAAAAAQAAAAIAAEAAAAAAFHN0c3MAAAAAAAAAAQAAAAEAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAIAAAABAAAAHHN0c3oAAAAAAAAAAAAAAAIAAAATAAAACwAAABRzdGNvAAAAAAAAAAEAAANcAAAAYXVkdGEAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSpdG9vAAAAHGRhdGEAAAABAAAAAExhdmY2MS43LjEwMwAAAAhmcmVlAAAAJm1kYXQAAAAPZYiCAvnP//+HooAAq8/AAAAAB0GaHAXznUA=";
-    $("shotHero").append(shotFsVideo);
+    $("liveShot").append(shotFsVideo);
   }
   shotFsVideo.play().catch(() => {});
 }
 function enterShotFullScreen() {
-  const hero = $("shotHero");
-  if (!hero || shotFsActive) return;
+  const view = $("liveShot");
+  if (!view || shotFsActive) return;
   clearTimeout(shotFsTimer);
-  const body = hero.querySelector(".heroBody");
-  if (body && shotFsExitEnd) {
-    body.removeEventListener("animationend", shotFsExitEnd);
+  if (shotFsExitEnd) {
+    view.removeEventListener("animationend", shotFsExitEnd);
     shotFsExitEnd = null;
   }
   shotFsActive = true;
-  hero.classList.remove("fsOut");
-  hero.classList.add("fs");
+  shotFsReturn = document.activeElement;
+  view.classList.remove("fsOut");
+  view.hidden = false;
   document.body.classList.add("shotFs");
   keepShotFsAwake(true);
-  const close = $("shotFsClose");
-  if (close) close.focus();
+  $("liveShotClose")?.focus();
+  // Open on the active preset, then the stream's latest frame if there is one.
+  renderLiveShot();
+  paintUiStream();
   shotFsPushed = false;
   try {
     history.pushState({ obbwShotFs: 1 }, "", location.href);
@@ -4355,8 +4400,8 @@ function enterShotFullScreen() {
   } catch (_) {}
 }
 function exitShotFullScreen() {
-  const hero = $("shotHero");
-  if (!hero || !shotFsActive) return;
+  const view = $("liveShot");
+  if (!view || !shotFsActive) return;
   shotFsActive = false;
   // Leaving full screen other than by Back also drops its history entry, so
   // Back is never a dead press; a route change has already moved past it.
@@ -4367,39 +4412,39 @@ function exitShotFullScreen() {
   shotFsPushed = false;
   keepShotFsAwake(false);
   clearTimeout(shotFsTimer);
-  const body = hero.querySelector(".heroBody"),
-    finish = () => {
-      clearTimeout(shotFsTimer);
-      if (shotFsExitEnd) {
-        body && body.removeEventListener("animationend", shotFsExitEnd);
-        shotFsExitEnd = null;
-      }
-      hero.classList.remove("fs", "fsOut");
-      document.body.classList.remove("shotFs");
-      hero.focus();
-    };
+  const finish = () => {
+    clearTimeout(shotFsTimer);
+    if (shotFsExitEnd) {
+      view.removeEventListener("animationend", shotFsExitEnd);
+      shotFsExitEnd = null;
+    }
+    view.classList.remove("fsOut");
+    view.hidden = true;
+    document.body.classList.remove("shotFs");
+    shotFsReturn?.focus?.();
+  };
   if (
-    !body ||
+    !view.animate ||
     document.hidden ||
     (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)
   ) {
     finish();
     return;
   }
-  hero.classList.add("fsOut");
+  view.classList.add("fsOut");
   shotFsExitEnd = function onEnd(e) {
-    if (e.animationName !== "heroFsOut") return;
-    body.removeEventListener("animationend", shotFsExitEnd);
+    if (e.animationName !== "liveShotOut") return;
+    view.removeEventListener("animationend", shotFsExitEnd);
     shotFsExitEnd = null;
     finish();
   };
-  body.addEventListener("animationend", shotFsExitEnd);
+  view.addEventListener("animationend", shotFsExitEnd);
   shotFsTimer = setTimeout(() => {
-    if (hero.classList.contains("fs")) finish();
+    if (!view.hidden) finish();
   }, 400);
 }
 // Returns true when a popstate only closed (or had already closed) the
-// full-screen card, so the router must not re-render the current view.
+// live view, so the router must not re-render the current view.
 function exitFullScreenOnPop() {
   if (shotFsActive) {
     shotFsPushed = false;
@@ -4415,38 +4460,41 @@ function exitFullScreenOnPop() {
   return false;
 }
 function initShotFullScreen() {
-  const hero = $("shotHero");
-  if (!hero || hero.dataset.fsBound) return;
-  hero.dataset.fsBound = "1";
-  const close = $("shotFsClose");
+  const view = $("liveShot"),
+    hero = $("shotHero"),
+    close = $("liveShotClose");
+  if (!view || view.dataset.fsBound) return;
+  view.dataset.fsBound = "1";
+  $("liveShotGraph")._draw = paintUiStream;
+  observePresetHost($("liveShotGraph"));
   let tap = 0;
-  // A double tap or double click toggles full screen; Enter opens it from the keyboard.
-  hero.addEventListener("pointerup", (e) => {
+  // A double tap or double click on the shot card opens the live view and on
+  // the view closes it; the header pill and Enter on the card open it too.
+  const onTap = (e) => {
     if (e.target.closest("a,button")) return;
     if (e.timeStamp - tap > 350) {
-      // iOS resumes unmuted playback only from a gesture: a tap while full
-      // screen restarts the keep-awake video if iOS paused it in the background.
+      // iOS resumes unmuted playback only from a gesture: a tap in the live
+      // view restarts the keep-awake video if iOS paused it in the background.
       if (shotFsActive && shotFsVideo?.paused) keepShotFsAwake(true);
       return void (tap = e.timeStamp);
     }
     tap = 0;
     shotFsActive ? close.onclick() : enterShotFullScreen();
-  });
-  // Escape leaves full screen unless an open sheet or dialog takes it first.
+  };
+  hero?.addEventListener("pointerup", onTap);
+  view.addEventListener("pointerup", onTap);
+  $("liveShotOpen")?.addEventListener("click", () => enterShotFullScreen());
+  // Escape leaves the live view unless another open sheet or dialog takes it first.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target === hero) enterShotFullScreen();
-    if (e.key === "Escape" && shotFsActive && !e.target.closest("[role=dialog],dialog"))
+    if (
+      e.key === "Escape" &&
+      shotFsActive &&
+      !e.target.closest("dialog,[role=dialog]:not(#liveShot)")
+    )
       close?.onclick();
   });
   if (close) close.onclick = exitShotFullScreen;
-  hero.addEventListener(
-    "click",
-    (e) => {
-      if (shotFsActive && e.target.closest && e.target.closest("a[data-route]"))
-        exitShotFullScreen();
-    },
-    true,
-  );
 }
 // The diagnostic stream rides the owned shot socket as a view-scoped
 // subscription: subscribe when the Diagnostic page appears, unsubscribe on
@@ -4867,6 +4915,7 @@ function renderShotHero(d) {
     goal,
     label,
   );
+  if (shotFsActive) renderLiveShot(d, model, noScale ? null : m, tint);
 }
 // Hero numbers swap with a quick fade; a value arriving mid-fade replaces the pending one.
 // Numbers keep their full text; a trailing unit is set smaller. Unchanged
@@ -5081,6 +5130,80 @@ function renderHeroChart(host, model, m, goal, label) {
     `</g><line x1="0" y1="99.6" x2="100" y2="99.6" ${stroke} stroke-opacity=".3"/></svg>`;
   host.append(...over, put("end", "", X(end.t), Y(end.cg / 100)));
   if (hatch) host.prepend(hatch);
+}
+// Live view: the shot card's numbers, state and colour over the preset graph,
+// with the shot, its flow and the forecast cut drawn in. Without a shot it
+// shows the active preset, ready for the next one.
+function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
+  const host = $("liveShotGraph"),
+    name =
+      (d && d.presetName !== "—" && d.presetName) ||
+      presetState.items.find((p) => p.id === presetState.activeId)?.name ||
+      "",
+    goal = (d && d.goal) || (m && m.goal);
+  $("liveShot").dataset.tint = tint;
+  $("liveShot").classList.toggle("live", !!d?.live);
+  liveShotNums(!!d);
+  $("liveShotState").textContent = d
+    ? $("shotHeroState").textContent
+    : __WEBUI_TEXT__("runtime.ready_2");
+  $("liveShotPreset").textContent = [
+    name,
+    goal > 0 && goal.toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const lane = $("liveShotLane");
+  host._w = host.clientWidth;
+  lane.replaceChildren();
+  if (!m || m.mode === "empty") return void host.replaceChildren();
+  // Labels and strokes grow with the screen: the graph is laid out up to
+  // 2.4 times smaller than its box and scaled up to fill it.
+  const k = Math.max(1, Math.min(host.clientWidth / 560, host.clientHeight / 300, 2.4)),
+    pts = (segs) =>
+      segs.filter((s) => s.pts.length > 1).map((s) => s.pts.map((q) => [q.t, q.cg / 100])),
+    last = model ? pts(model.segs) : [],
+    end = d?.live ? last.at(-1)?.at(-1) : null,
+    at = d?.live && m.mode === "active" && d.expectedEndMs > 0 ? d.expectedEndMs / 1000 : 0,
+    flow = model
+      ? [model.flowSegs, model.dripFlowSegs].flatMap((a) =>
+          a.filter((s) => s.pts.length > 1).map(smoothFlow),
+        )
+      : [],
+    // Tablets give the flow its own lane under the graph; phones overlay it
+    // on the graph's lower third.
+    w = host.clientWidth / k,
+    h = lane.clientHeight / k,
+    view = presetGraph(host, m, {
+      w,
+      h: host.clientHeight / k,
+      live: true,
+      last,
+      drip: model ? pts(model.dripSegs) : [],
+      maxG: model ? model.maxW : 0,
+      maxT: model ? model.timeMax : 0,
+      flow: h ? [] : flow,
+      now: end,
+      fc: at ? [at, cutLine(at, m)] : null,
+    });
+  if (view && h)
+    lane.innerHTML =
+      `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true"><path class="rvWin" d="M${view.X(m.t1).toFixed(1)} 0V${h}M${view.X(m.t2).toFixed(1)} 0V${h}"/>` +
+      flowLayer(flow, view.X, view.L, view.R, 14, h - 2) +
+      "</svg>";
+}
+// The live view repeats the shot card's numbers, units included.
+function liveShotNums(on) {
+  for (const [to, from] of [
+    ["Weight", "Weight"],
+    ["Time", "Elapsed"],
+    ["Flow", "Flow"],
+  ]) {
+    const src = $("shotHero" + from);
+    $("liveShot" + to).replaceChildren(
+      ...(on && !src.hidden && src.textContent ? src.cloneNode(true).childNodes : ["—"]),
+    );
+  }
 }
 // Home cards: a grind hint when the active preset's shots drift. Dismissals
 // stay in this browser.
