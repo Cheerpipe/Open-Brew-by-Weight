@@ -17,7 +17,11 @@ Every brew-by-weight shot that started with the scale connected. It does
 (BBW off), or rinses.
 
 The scale counts as lost when Bluetooth drops or **weight notifications stop
-arriving** for about a second. A steady weight is not a loss: fresh readings
+arriving** for about a second. It also counts as lost when it keeps reading
+below minus your **Minimum cup weight** (or minus 10 g, whichever is lower)
+for a couple of seconds: no cup of coffee weighs less than nothing, so such a
+reading (for example a cup lifted with **Stop if cup is removed** off) cannot
+be trusted to stop the shot. A steady weight is not a loss: fresh readings
 still count even if the brew logic ignores one. The controller keeps trying to
 reconnect for the **whole** shot. If the scale returns with three good
 readings, weight stop resumes and the backup time is cancelled. If the scale

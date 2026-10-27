@@ -284,7 +284,10 @@ struct CycleSession {
   uint32_t appliedTareRequestId = 0;
   uint32_t tareCaptureBoundary = 0;
   float preTareWeightG = NAN;  // Control-approved load the last tare zeroed.
-  float softwareZeroG = 0.0f;  // Subtracted from shot weights if a tare failed.
+  // Subtracted from shot weights: the load a missed start tare left, or minus
+  // the coffee already weighed once that tare lands late.
+  float softwareZeroG = 0.0f;
+  uint32_t lateTareSequence = 0;  // Held first packet of a late start zero.
   uint32_t tareConnectionGeneration = 0;
   bool retareDisabled = false;
   bool firstDropsBeepSent = false;

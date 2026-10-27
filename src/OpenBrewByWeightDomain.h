@@ -2257,7 +2257,9 @@ enum class DebugCode : uint8_t {
   // argument1: loopTask stack bytes the last boot recovery never used;
   // argument2: its RecoveryOperation (1 network access, 2 factory reset).
   BOOT_RECOVERY_STACK,
-  BLE_LINK_PARAMS_OVERRIDDEN
+  BLE_LINK_PARAMS_OVERRIDDEN,
+  // argument1: the software zero dropped (cg); argument2: coffee kept (cg).
+  SCALE_LATE_TARE_RECOGNIZED
 };
 // Codes in use; a code appended above must move this (see
 // SCALE_PROFILE_EVENT_COUNT).
@@ -2591,6 +2593,7 @@ inline LogLevel debugCodeDefaultLevel(DebugCode code) {
     case DebugCode::SCHEDULED_RESTART_FIRED:
     case DebugCode::SCHEDULED_RESTART_SKIPPED:
     case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN:
+    case DebugCode::SCALE_LATE_TARE_RECOGNIZED:
       return LogLevel::WARNING;
     case DebugCode::OTA_ROLLBACK_ARMED:
     case DebugCode::OTA_ROLLBACK_FAILED:
@@ -2676,6 +2679,7 @@ inline const char *debugCodeName(DebugCode code) {
       return "scheduled restart skipped";
     case DebugCode::BOOT_RECOVERY_STACK: return "boot recovery stack";
     case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN: return "scale link interval overridden";
+    case DebugCode::SCALE_LATE_TARE_RECOGNIZED: return "late scale tare recognized";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2880,6 +2884,13 @@ inline bool formatScaleSampleDebugMessage(const DebugEvent &event, char *message
       formatWeightCentigrams(event.argument2, referenceText,
                              sizeof(referenceText));
       snprintf(message, capacity, "%s (weight=%s, reference=%s)",
+               debugCodeName(event.code), weightText, referenceText);
+      return true;
+    case DebugCode::SCALE_LATE_TARE_RECOGNIZED:
+      formatWeightCentigrams(event.argument1, weightText, sizeof(weightText));
+      formatWeightCentigrams(event.argument2, referenceText,
+                             sizeof(referenceText));
+      snprintf(message, capacity, "%s (software zero %s dropped, kept %s)",
                debugCodeName(event.code), weightText, referenceText);
       return true;
     case DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT:

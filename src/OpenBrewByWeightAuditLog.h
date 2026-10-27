@@ -16,6 +16,7 @@ constexpr DebugCode AUDIT_WARNING_ALLOWLIST[] = {
     DebugCode::HEALTH_STACK_LOW,
     DebugCode::BOOT_RECOVERY_STACK,
     DebugCode::BLE_LINK_PARAMS_OVERRIDDEN,
+    DebugCode::SCALE_LATE_TARE_RECOGNIZED,
     DebugCode::HEALTH_LOOP_GAP,
     DebugCode::SYSTEM_LOG_OVERRUN,
     DebugCode::RELAY_GPIO_DESYNC,

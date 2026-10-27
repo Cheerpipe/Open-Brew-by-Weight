@@ -20076,7 +20076,8 @@ void tr05_light_cup_pre_effect_packet_is_not_a_baseline() {
 }
 
 // A 250 g cup sits untared on the scale when the shot starts and the start
-// tare fails; grace then expires with the cup still on the scale.
+// tare, though acknowledged, has no effect; grace then expires with the cup
+// still on the scale.
 void startShotWithFailedTare(float cupG) {
   resetHarness(false, true);
   reachReadyFromBoot();
@@ -20117,16 +20118,18 @@ void tr01_failed_start_tare_uses_software_zero() {
   CHECK(session.endReason == EndReason::SCALE_THRESHOLD);
 }
 
-void tr02_late_zero_after_grace_is_ignored() {
-  // Once the software zero is applied, a later zero is only a reading: no
-  // second baseline is taken and the software zero stays in force.
+void tr02_late_zero_after_grace_is_the_late_tare() {
+  // The scale acknowledged the start tare. With stop-if-removed off no lift
+  // claims the later zero, so it is that tare landing: no second baseline
+  // window, and the shot keeps measuring from the zero.
   startShotWithFailedTare(250.0f);
   session.config.stopIfCupRemoved = false;
   publishWeight(0.0f, hostMillis + 100);
   publishWeight(0.0f, hostMillis + 100);
   CHECK(!session.awaitingPostTareBaseline);
-  CHECK(fabsf(session.softwareZeroG - 250.0f) < 0.2f);
+  CHECK(session.softwareZeroG == 0.0f);
   CHECK(session.scaleBaselineG == 0.0f);
+  CHECK(session.weightControlState == WeightControlState::ACTIVE);
   CHECK(session.active);
 }
 
@@ -20214,6 +20217,194 @@ void sk03_late_zero_after_grace_releases_cup_hold() {
   publishWeight(-80.0f, hostMillis + 100, 1, 52);
   runLoopAfter(1);
   CHECK(session.endReason == EndReason::CUP_REMOVED);
+}
+
+// The start tare write succeeds, but the scale applies the zero only after
+// grace (the acknowledgement may itself arrive after grace and re-arm it).
+// Unless cupSeen, the cup detector never saw this cup arrive, so it cannot
+// claim the drop as a lift: the field shot that ran to time below -cup.
+void startShotWithLateZero(float cupG, bool ackAfterGrace, bool cupSeen = false) {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  idleCup(cupG);
+  if (!cupSeen) resetCupPresence();
+  startCycle();
+  if (!ackAfterGrace) CHECK(executeNextScaleCommand());
+  for (int pass = ackAfterGrace ? 2 : 1; pass > 0; --pass) {
+    const uint32_t deadline = session.postTareBaselineDeadlineMs;
+    while (static_cast<int32_t>(hostMillis - deadline) < 0) idleWeight(cupG, 100);
+    runLoopAfter(1);
+    CHECK(!session.awaitingPostTareBaseline);
+    CHECK(fabsf(session.softwareZeroG - cupG) < 0.2f);
+    if (pass == 2) {
+      CHECK(executeNextScaleCommand());
+      CHECK(session.awaitingPostTareBaseline);
+      CHECK(session.softwareZeroG == 0.0f);
+    }
+  }
+  CHECK(session.appliedTareRequestId != 0);
+  CHECK(cupPresenceState() == (cupSeen ? CupPresenceState::PRESENT : CupPresenceState::ABSENT));
+}
+
+void lt01_late_start_zero_continues_and_cuts() {
+  // Field timeline: the zero lands just after grace, before the detector
+  // could qualify the untared cup, and before the first drop.
+  for (bool ackAfterGrace : {false, true}) {
+    startShotWithLateZero(250.0f, ackAfterGrace);
+    idleWeight(250.0f, 100);
+    idleWeight(0.0f, 100);
+    CHECK(!debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+    idleWeight(0.0f, 100);
+    CHECK(debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+    CHECK(session.softwareZeroG == 0.0f);
+    CHECK(session.weightControlState == WeightControlState::ACTIVE);
+    CHECK(session.firstDropMs == 0);
+    for (float w : {0.35f, 0.40f, 0.45f}) idleWeight(w, 100);
+    CHECK(session.firstDropMs != 0);
+    endBbwProtectionForTests();
+    const float threshold = effectiveStopThreshold();
+    for (float w = 1.0f; w < threshold - 0.5f; w += 0.5f) {
+      idleWeight(w, 100);
+      loop();
+      CHECK(session.active);
+    }
+    idleWeight(threshold + 0.1f, 100);
+    idleWeight(threshold + 0.2f, 100);
+    loop();
+    CHECK(session.endReason == EndReason::SCALE_THRESHOLD);
+  }
+}
+
+void lt05_late_start_zero_keeps_the_coffee_already_weighed() {
+  // The first drops reach the untared cup before the zero lands; the zero
+  // must keep that coffee and the first drop already marked.
+  startShotWithLateZero(250.0f, false);
+  for (float w : {250.35f, 250.40f, 250.45f}) idleWeight(w, 100);
+  const uint32_t firstDropMs = session.firstDropMs;
+  CHECK(firstDropMs != 0);
+  CHECK(cupPresenceState() == CupPresenceState::ABSENT);
+  const float keptG = session.lastAcceptedWeightG;
+  CHECK(fabsf(keptG - 0.45f) < 0.01f);
+  idleWeight(0.1f, 100);
+  CHECK(session.lastAcceptedWeightG == keptG);
+  idleWeight(0.2f, 100);
+  CHECK(debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+  CHECK(session.softwareZeroG == -keptG);
+  CHECK(fabsf(session.lastAcceptedWeightG - (keptG + 0.2f)) < 0.01f);
+  CHECK(session.weightControlState == WeightControlState::ACTIVE);
+  CHECK(session.firstDropMs == firstDropMs);
+}
+
+void lt02_known_cup_lift_after_acknowledged_tare_stops() {
+  // A drop the cup detector claims is a lift, even with a tare outstanding:
+  // a cup seen before the shot, or one it confirmed after grace.
+  for (bool cupSeen : {true, false}) {
+    startShotWithLateZero(250.0f, false, cupSeen);
+    for (int i = 0; i < 5; ++i) idleWeight(250.2f, 100);
+    CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+    idleWeight(0.1f, 100);
+    idleWeight(0.0f, 100);
+    runLoopAfter(1);
+    CHECK(session.endReason == EndReason::CUP_REMOVED);
+    CHECK(!debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+  }
+}
+
+void lt06_late_zero_outside_its_window_is_not_a_tare() {
+  // Past one more grace, on another connection, while suspended, or not near
+  // zero (a tilted light cup), a drop is not the late tare; the below-empty
+  // net handles what stays below zero.
+  for (int variant = 0; variant < 4; ++variant) {
+    const float cupG = variant == 3 ? 45.0f : 250.0f;
+    startShotWithLateZero(cupG, false);
+    session.config.stopIfCupRemoved = false;
+    const uint32_t generation = session.tareConnectionGeneration;
+    float rawG = 0.0f;
+    if (variant == 0) {
+      while (hostMillis - session.postTareBaselineDeadlineMs <
+             session.config.postTareBaselineGraceMs)
+        idleWeight(cupG, 100);
+    } else if (variant == 2) {
+      suspendWeightControl();
+    } else if (variant == 3) {
+      rawG = 38.0f;
+    }
+    for (uint32_t i = 0; i < 2; ++i) {
+      hostMillis += 100;
+      markScaleWorkerProgress();
+      publishWeight(rawG, hostMillis, variant == 1 ? generation + 1U : generation);
+    }
+    CHECK(!debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+    CHECK(fabsf(session.softwareZeroG - cupG) < 0.2f);
+    if (variant == 0) {
+      for (int i = 0; i < 40; ++i) idleWeight(0.0f, 100);
+      CHECK(session.weightControlState == WeightControlState::SUSPENDED);
+      CHECK(session.autoToManualGuardEnforced);
+    }
+  }
+}
+
+void lt03_unknown_cup_lift_hands_over_to_scale_loss_backup() {
+  // The tare write failed, so the scale cannot zero: the drop is a lift the
+  // detector cannot see, and the shot must not run to time below -cup.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  idleCup(250.0f);
+  resetCupPresence();
+  startCycle();
+  scale.tareStartTimerSucceeds = false;
+  CHECK(executeNextScaleCommand());
+  const uint32_t deadline = session.postTareBaselineDeadlineMs;
+  while (static_cast<int32_t>(hostMillis - deadline) < 0) idleWeight(250.0f, 100);
+  runLoopAfter(1);
+  CHECK(fabsf(session.softwareZeroG - 250.0f) < 0.2f);
+  CHECK(session.appliedTareRequestId == 0);
+  CHECK(session.autoToManualGuardArmed);
+  idleWeight(250.2f, 100);
+  for (int i = 0; i < 60 && session.active; ++i) {
+    idleWeight(0.0f, 100);
+    loop();
+    CHECK(session.lastAcceptedWeightG > -runtimeConfig.minimumCupWeightG);
+    CHECK(session.weightControlState != WeightControlState::ACTIVE);
+  }
+  CHECK(!debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+  CHECK(debugEventExists(DebugCode::SCALE_SAMPLE_REJECTED_RANGE));
+  CHECK(session.weightControlState == WeightControlState::SUSPENDED);
+  CHECK(session.autoToManualGuardEnforced);
+  for (int i = 0; i < 600 && session.active; ++i) {
+    idleWeight(0.0f, 100);
+    loop();
+  }
+  CHECK(session.endReason == EndReason::AUTO_TO_MANUAL_GUARD);
+}
+
+void lt04_negative_weight_suspends_until_the_cup_returns() {
+  // A light tared cup lifted with stop-if-removed off: the drop is within the
+  // slew allowance, yet a reading below minus a minimum cup is never accepted;
+  // control waits for the cup under the scale-loss backup.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  advanceToBrew();
+  endBbwProtectionForTests();
+  session.config.stopIfCupRemoved = false;
+  for (int i = 1; i <= 10; ++i) idleWeight(0.5f * i, 100);
+  CHECK(session.weightControlState == WeightControlState::ACTIVE);
+  for (int i = 0; i < 10; ++i) idleWeight(-15.0f, 100);
+  CHECK(session.active);
+  CHECK(session.weightControlState == WeightControlState::SUSPENDED);
+  CHECK(session.autoToManualGuardEnforced);
+  CHECK(fabsf(session.lastAcceptedWeightG - 5.0f) < 0.01f);
+  for (int i = 0; i < 4; ++i) idleWeight(5.5f, 100);
+  CHECK(session.weightControlState == WeightControlState::ACTIVE);
+  CHECK(!session.autoToManualGuardEnforced);
+  // A light minimum cup does not turn a short tilt into a lost scale.
+  runtimeConfig.minimumCupWeightG = 2.0f;
+  for (int i = 0; i < 6; ++i) idleWeight(-5.0f, 100);
+  CHECK(session.weightControlState == WeightControlState::ACTIVE);
+  for (int i = 0; i < 4; ++i) idleWeight(5.5f, 100);
+  CHECK(session.weightControlState == WeightControlState::ACTIVE);
+  CHECK(!session.autoToManualGuardEnforced);
 }
 
 // ---- Shot predictor (SAP) host tests ---------------------------------------
@@ -24717,13 +24908,19 @@ const TestCase testCases[] = {
     {"AT25", at25_real_spurt_is_accepted_as_flow},
     {"AT26", at26_first_drop_onset_is_flow_not_touch},
     {"TR01", tr01_failed_start_tare_uses_software_zero},
-    {"TR02", tr02_late_zero_after_grace_is_ignored},
+    {"TR02", tr02_late_zero_after_grace_is_the_late_tare},
     {"TR03", tr03_failed_start_tare_cup_lift_stops},
     {"TR04", tr04_light_cup_pre_effect_packet_recovers},
     {"TR05", tr05_light_cup_pre_effect_packet_is_not_a_baseline},
     {"SK01", sk01_refused_start_releases_cup_hold},
     {"SK02", sk02_overload_stops_while_touch_is_held},
     {"SK03", sk03_late_zero_after_grace_releases_cup_hold},
+    {"LT01", lt01_late_start_zero_continues_and_cuts},
+    {"LT02", lt02_known_cup_lift_after_acknowledged_tare_stops},
+    {"LT03", lt03_unknown_cup_lift_hands_over_to_scale_loss_backup},
+    {"LT04", lt04_negative_weight_suspends_until_the_cup_returns},
+    {"LT05", lt05_late_start_zero_keeps_the_coffee_already_weighed},
+    {"LT06", lt06_late_zero_outside_its_window_is_not_a_tare},
     {"SP01", sp01_phi_table_matches_erf},
     {"SP02", sp02_isqrt_exact_on_squares},
     {"SP03", sp03_plateau_flow_median},

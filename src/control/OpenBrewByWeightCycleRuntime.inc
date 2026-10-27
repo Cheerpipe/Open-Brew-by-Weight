@@ -777,6 +777,42 @@ bool cupPlacementIsStep(float weight, uint32_t placementStartedAtMs) {
          baseG < weight - session.softwareZeroG - runtimeConfig.minimumCupWeightG / 2.0f;
 }
 
+// A software zero stands in for a start tare the scale acknowledged but had
+// not applied when grace ended. If that zero lands within one more grace, on
+// the connection that acknowledged it (none without a successful tare
+// write, which cannot zero the scale), the raw reading drops to within half
+// a minimum cup of zero. Two consecutive such packets that cup removal did
+// not claim are the zero: the shot keeps the coffee already weighed and
+// continues from it. A later or suspended drop is more likely a lift, so it
+// stays with cup removal and the below-empty net. True while the first
+// packet is held.
+bool holdLateStartTare(float rawG, uint32_t receivedAtMs, uint32_t packetSequence,
+                       uint32_t connectionGeneration) {
+  if (!shouldTrackWeight() || session.softwareZeroG <= 0.0f ||
+      session.cupRemovedPending ||
+      session.weightControlState == WeightControlState::SUSPENDED ||
+      connectionGeneration != session.tareConnectionGeneration ||
+      receivedAtMs - session.postTareBaselineDeadlineMs >= session.config.postTareBaselineGraceMs ||
+      fabsf(rawG) > runtimeConfig.minimumCupWeightG / 2.0f || !postTareBaselinePlausible(rawG)) {
+    session.lateTareSequence = 0;
+    return false;
+  }
+  if (session.lateTareSequence == 0 ||
+      packetSequence != (session.lateTareSequence == UINT32_MAX ? 1U : session.lateTareSequence + 1U)) {
+    session.lateTareSequence = packetSequence;
+    shotCurveSampler.markBreak();
+    shotTrace().noteHeld();
+    return true;
+  }
+  const float keptG = session.hasWeightAnchor ? fmaxf(0.0f, session.lastAcceptedWeightG) : 0.0f;
+  addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_LATE_TARE_RECOGNIZED,
+                weightToCentigrams(session.softwareZeroG), weightToCentigrams(keptG));
+  session.softwareZeroG = -keptG;
+  session.lateTareSequence = 0;
+  markShotCurveBreak();
+  return false;
+}
+
 bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                                       uint32_t packetSequence,
                                       uint32_t connectionGeneration,
@@ -885,6 +921,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     performAutomaticRetare();
   }
 
+  if (holdLateStartTare(weight, receivedAtMs, packetSequence, connectionGeneration)) return false;
   // Shot (and its drip tail) in shot coordinates after a software zero.
   if (session.active || pendingFinalize.pending) weight -= session.softwareZeroG;
 
@@ -1002,7 +1039,13 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     }
   }
 
-  if (session.weightControlState == WeightControlState::ACTIVE && !plausible) {
+  // Cup and coffee never weigh less than minus a minimum cup (at least the
+  // default, so a tilt cannot pass for it): such a reading is an anomaly, and
+  // if it persists through recovery the weight is untrusted and the
+  // scale-loss backup takes over.
+  const float emptyFloorG = -fmaxf(runtimeConfig.minimumCupWeightG, DEFAULT_MINIMUM_CUP_WEIGHT_G);
+  const bool belowEmpty = weight < emptyFloorG;
+  if (session.weightControlState == WeightControlState::ACTIVE && (!plausible || belowEmpty)) {
     weightStreamState = WeightStreamState::ANOMALOUS;
     session.calibrationEligible = false;
     setWeightControlState(WeightControlState::VALIDATING);
@@ -1070,6 +1113,15 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
         WEIGHT_RECOVERY_CONFIRMATION_SAMPLES) {
       shotCurveSampler.markBreak();
       shotTrace().noteHeld();
+      return false;
+    }
+    if (belowEmpty) {
+      rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_RANGE, weight, emptyFloorG);
+      profileScaleWeightDecision(false, DebugCode::SCALE_SAMPLE_REJECTED_RANGE,
+                                 weight, receivedAtMs, packetSequence,
+                                 connectionGeneration, captureSequence, emptyFloorG);
+      session.recoveryConfirmations = 0;
+      suspendWeightControl();
       return false;
     }
 

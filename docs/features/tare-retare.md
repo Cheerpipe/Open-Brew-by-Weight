@@ -110,13 +110,27 @@ sent, the new zero is accepted only once the reading has clearly dropped
 from the cup's weight, so a late reading that still shows the cup is never
 mistaken for zero. First-drop detection still runs against that tare zero.
 
-If that tare does not take effect—the scale rejects it, or still shows the
-cup when post-tare grace ends—the shot keeps going and is measured from the
-weight shown just before the tare. The cup's own weight then cannot stop the
-shot or be mistaken for first drops, and lifting the cup still stops it. A
-scale that only reaches zero after the grace period looks the same as a lifted
-cup and stops the shot, so raise **Post-tare grace** if your scale is slow to
-settle.
+If that tare does not take effect in time—the scale rejects it, or still
+shows the cup when post-tare grace ends—the shot keeps going and is measured
+from the weight shown just before the tare. The cup's own weight then cannot
+stop the shot or be mistaken for first drops. Once the controller has
+recognized the cup on the scale (after a moment of steady readings), lifting
+it still stops the shot.
+
+Some scales accept the tare but only reach zero a moment after the grace
+period. If that zero arrives within about one more grace period, the
+controller recognizes it as the tare it asked for: it keeps the coffee
+already weighed and carries on to your target as usual. A sudden drop to zero
+looks exactly like lifting the cup, though, so if the controller has already
+recognized the cup and **Stop if cup is removed** is on, the shot stops as it
+would for a lift. If your scale is often slow to show zero, raise
+**Post-tare grace**.
+
+Coffee in a cup can never make the scale read below zero. If, during a shot,
+the reading stays below minus your **Minimum cup weight** (or minus 10 g,
+whichever is lower) for a couple of seconds, the controller stops trusting the
+weight and the [scale-loss backup](auto-to-manual.md) finishes the shot by
+time, instead of letting it run until the max shot time.
 
 ## Automatic late-cup retare
 
