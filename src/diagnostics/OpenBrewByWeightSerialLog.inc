@@ -430,6 +430,34 @@ void openbrewbyweight::shotTraceNoteDroppedFrame(bool stale) {
   shotTrace().noteDroppedFrame(stale);
 }
 
+#ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
+// Panic handler only: the raw ROM write-back, no locks (the other core is
+// stopped). Tasks go through esp_cache_msync and its cache spinlock.
+void IRAM_ATTR openbrewbyweight::shotTraceWriteBackForPanic() {
+  Cache_WriteBack_Addr(reinterpret_cast<uint32_t>(&shotTraceStore), sizeof(shotTraceStore));
+}
+void openbrewbyweight::shotTraceWriteBack(const void *address, size_t bytes) {
+  (void)esp_cache_msync(const_cast<void *>(address), bytes,
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+}
+void shotTraceWriteBackOnShutdown() {
+  openbrewbyweight::shotTraceWriteBack(&shotTraceStore, sizeof(shotTraceStore));
+}
+#else
+// Host spy: the magic of each header written back, in order.
+uint32_t hostShotTraceWriteBackMagic[16] = {};
+size_t hostShotTraceWriteBacks = 0;
+void openbrewbyweight::shotTraceWriteBack(const void *address, size_t) {
+  hostShotTraceWriteBackMagic[hostShotTraceWriteBacks++ % 16] =
+      *static_cast<const uint32_t *>(address);
+}
+#endif
+void openbrewbyweight::shotTraceLogRecoveryDropped(uint32_t crashedBootId) {
+  serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SYSTEM,
+                       "Interrupted shot trace of boot %lu failed verification; dropped",
+                       static_cast<unsigned long>(crashedBootId));
+}
+
 // Linea Micra WebSocket task hooks (declared in OpenBrewByWeightMicraService.cpp).
 void shotTraceNoteMicraRx(uint32_t bytes) { shotTrace().noteMicraRx(bytes); }
 void shotTraceNoteMicraSubscribed(bool subscribed) {

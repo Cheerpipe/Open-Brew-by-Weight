@@ -57,6 +57,12 @@ const externalBssBytes = symbolAddress('_ext_ram_bss_end') - symbolAddress('_ext
 if (externalBssBytes < 0 || externalBssBytes > config.maximumExternalBssBytes) {
   failures.push(`external BSS ${externalBssBytes} > budget ${config.maximumExternalBssBytes}`);
 }
+// The no-init segment (kept across resets) is outside external BSS.
+const externalNoinitBytes =
+    symbolAddress('_ext_ram_noinit_end') - symbolAddress('_ext_ram_noinit_start');
+if (externalNoinitBytes < 0 || externalNoinitBytes > config.maximumExternalNoinitBytes) {
+  failures.push(`external no-init ${externalNoinitBytes} > budget ${config.maximumExternalNoinitBytes}`);
+}
 for (const name of ['localBuzzer', 'taskProfiler', 'publishedControlStatus',
                     'controlStatusMutex', 'publishedControlGate', 'controlGateMutex']) {
   const address = symbolAddress(name);
@@ -72,6 +78,7 @@ for (const name of ['publishedControlCurve', 'taskProfilerReport']) {
   }
 }
 console.log(`external BSS: ${externalBssBytes} (budget ${config.maximumExternalBssBytes})`);
+console.log(`external no-init: ${externalNoinitBytes} (budget ${config.maximumExternalNoinitBytes})`);
 if (actual.image > slotLimits[arch]) {
   failures.push(`image ${actual.image} > OTA slot ${slotLimits[arch]}`);
 }

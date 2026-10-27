@@ -200,7 +200,14 @@ fixed 8-byte records in constant time under its leaf mutex, or bump relaxed
 atomic counters; `WEIGHT_ACCEPTED` and every closed-window call return after
 one atomic load, before any lock. The httpd export copies the immutable
 completed buffer in 4 KiB chunks through a static PSRAM buffer under that
-mutex, never across a send, and stops when a capture opens. USB application logs are emitted by the bounded
+mutex, never across a send, and stops when a capture opens. The buffers sit
+in PSRAM no-init memory: boot recovery reads their headers under the same
+mutex before any producer runs. The first export verifies a recovered trace
+under that mutex on httpd, once, hashing at most about 15.6 KB. Cache
+write-backs never run under the trace mutex: tasks call `esp_cache_msync`
+(the IDF wrapper with its own cache spinlock) after releasing it, for the
+shutdown hook and for each header whose magic changed; only the panic handler,
+with the other core stopped, calls the raw ROM write-back. USB application logs are emitted by the bounded
 `serial_log` queue on core 0. Eight short log records remain internal while a
 bounded 2.5 KiB PSRAM buffer carries the CLI reply published to that owner;
 saturation increments dropped/truncated counters instead of waiting in control.

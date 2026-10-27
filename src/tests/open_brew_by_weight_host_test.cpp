@@ -22779,7 +22779,7 @@ void trc02_rinses_abandoned_starts_and_no_scale_cycles_leave_no_trace() {
 void trc03_end_counters_are_exact() {
   shotTrace().hostReset();
   shotTrace().begin(1000);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   for (uint32_t i = 0; i < 5000; ++i)
     scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, 1000 + i, 0, i, 1.0f, i, 0);
   for (uint32_t atMs : {1100U, 1150U, 1400U, 1500U}) shotTrace().noteReading(atMs);
@@ -22834,7 +22834,7 @@ void trc04_verbose_events_truncate_first_and_time_passes_65_s() {
   shotTrace().hostReset();
   hostMillis = 600;
   shotTrace().begin(500);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   // Rejected readings stop at 75 % of the buffer.
   for (size_t i = 0; i < SHOT_TRACE_EVENT_CAPACITY; ++i)
     scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 600, 0, 0, 1.0f,
@@ -22870,7 +22870,7 @@ void trc04_verbose_events_truncate_first_and_time_passes_65_s() {
   // Times past 65 535 ms keep counting (a shot plus its drip lasts ~70 s).
   hostMillis = 500;
   shotTrace().begin(500);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   addDebugEvent(DebugCategory::STATE, DebugCode::CYCLE_ENDED, 1, 0);
   hostMillis = 500 + 70000;
   addDebugEvent(DebugCategory::STATE, DebugCode::CYCLE_ENDED, 2, 0);
@@ -22886,7 +22886,7 @@ void trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot() {
   CHECK(result == ShotTraceExport::EMPTY);
   shotTrace().noteMicraSubscribed(true);
   shotTrace().begin(100);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().note(ShotTraceKind::STOP_REQUESTED, 200, 1, 0);
   shot_trace_test::exportBytes(&result);
   CHECK(result == ShotTraceExport::BUSY);
@@ -22897,7 +22897,7 @@ void trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot() {
   CHECK(trace.snapshot.flags == SHOT_TRACE_SNAP_MICRA_CONNECTED);
   // A new shot hides the completed trace until it ends.
   shotTrace().begin(400);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shot_trace_test::exportBytes(&result);
   CHECK(result == ShotTraceExport::BUSY);
   shotTrace().complete(8, 1, 500, 1);
@@ -22905,7 +22905,7 @@ void trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot() {
   CHECK(trace.header.shotLogId == 8 && trace.header.flags == 0);
   // A discarded capture keeps the newest completed trace.
   shotTrace().begin(600);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().discard(static_cast<uint8_t>(EndReason::UNCONFIRMED_START), 650);
   CHECK(shot_trace_test::decodeCompleted(trace) && trace.header.shotLogId == 8);
   // A shot starting mid-download ends the download.
@@ -22936,7 +22936,7 @@ void trc06_pre_shot_events_keep_the_latest_per_kind() {
   shotTrace().noteState(present, 2750);  // Unchanged: no entry.
   shotTrace().noteState(absent, 2800);   // Shot-only changes are ignored.
   shotTrace().begin(3000);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().complete(1, 1, 1, 1);
   Trace trace;
   CHECK(shot_trace_test::decodeCompleted(trace));
@@ -22961,7 +22961,7 @@ void trc06_pre_shot_events_keep_the_latest_per_kind() {
   CHECK(entry(shot_trace_test::kindOf(ScaleProfileEvent::SCALE_CONNECTED)) != nullptr);
   // The ring starts over for the next shot.
   shotTrace().begin(4000);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().complete(2, 1, 1, 1);
   CHECK(shot_trace_test::decodeCompleted(trace) && trace.preShot.empty());
 }
@@ -23043,7 +23043,7 @@ void trc10_concurrent_producers_keep_counters_exact() {
   shotTrace().hostReset();
   constexpr uint32_t kRounds = 400;
   shotTrace().begin(0);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   std::thread scaleWorker([] {
     for (uint32_t i = 0; i < kRounds; ++i) {
       scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, i, 1, i, NAN, 300, 0);
@@ -23089,7 +23089,7 @@ void trc10_concurrent_producers_keep_counters_exact() {
   });
   for (uint32_t i = 0; i < 200; ++i) {
     shotTrace().begin(i);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
     shotTrace().note(ShotTraceKind::STOP_REQUESTED, i, 1, 0);
     shotTrace().complete(i + 2, 1, i, 1);
   }
@@ -23135,7 +23135,7 @@ void trc13_pre_shot_ages_never_wrap() {
   scaleProfileNoteEvent(ScaleProfileEvent::CUP_REMOVED, 1500, 1, 0, NAN, 1, 0);
   scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, 400, 1, 0, 80.0f, 2, 0);
   shotTrace().begin(1000);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().complete(1, 1, 1, 1);
   Trace trace;
   CHECK(shot_trace_test::decodeCompleted(trace));
@@ -23149,9 +23149,9 @@ void trc13_pre_shot_ages_never_wrap() {
   scaleProfileNoteEvent(ScaleProfileEvent::CUP_RESET, 2000, 1, 0, NAN, 3, 0);
   shotTrace().begin(2100);
   shotTrace().discard(static_cast<uint8_t>(EndReason::RELAY_SAFETY_FAILURE), 2100);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().begin(3000);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().complete(2, 1, 1, 1);
   CHECK(shot_trace_test::decodeCompleted(trace) && trace.preShot.size() == 2);
 }
@@ -23215,7 +23215,7 @@ void trc16_profile_arguments_keep_their_high_half() {
   shotTrace().hostReset();
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, 50, 1, 0, NAN, 0x12345, 4);
   shotTrace().begin(100);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 200, 1, 0, NAN, 70000, 0);
   scaleProfileNoteEvent(ScaleProfileEvent::SHOT_START, 200, 1, 0, NAN, 0x10002, 3600);
   scaleProfileNoteEvent(ScaleProfileEvent::FIRST_DROP, 300, 1, 0, 0.4f, 1200, 0);
@@ -23234,6 +23234,244 @@ void trc16_profile_arguments_keep_their_high_half() {
         request->arg2 == 4);
 }
 
+// --- Shot trace across resets (plan B3b): the PSRAM store keeps its bytes,
+// DRAM state starts over. ---
+
+ShotTraceBuffer *capturingTraceBuffer() {
+  for (ShotTraceBuffer &buffer : shotTraceStore.buffers)
+    if (buffer.header.magic == SHOT_TRACE_CAPTURING_MAGIC) return &buffer;
+  return nullptr;
+}
+
+bool rebootTraceAfter(uint32_t resetReason) {
+  shotTrace().hostReset();
+  uint32_t crashedBootId = 0;
+  return shotTrace().recoverAtBoot(resetReason, crashedBootId);
+}
+
+void openTestTrace(uint32_t anchorMs, uint32_t bootId) {
+  shotTrace().hostReset();
+  shotTrace().begin(anchorMs);
+  ShotTraceSnapshot snapshot = {};
+  snapshot.stabilitySamples = 5;
+  copyCString(snapshot.scaleName, sizeof(snapshot.scaleName), "Lunar");
+  shotTrace().attachStart(snapshot, bootId);
+}
+
+void trc17_crash_mid_shot_serves_an_interrupted_trace() {
+  const auto boot = [](uint32_t reason) {
+    resetHarness(false, true);
+    hostSafetyResetReasonCode = reason;
+    hostSafetyResetReasonUnsafe = reason != 1 && reason != 3;
+    hostSafetyResetReasonPowerOn = reason == 1;
+    deleteHostResources();
+    setup();
+  };
+  // Boot readiness and the relay after a plain power-on, for comparison.
+  boot(1);
+  const bool degradedAfterPowerOn = bootDegraded;
+  const bool completeAfterPowerOn = firmwareInitializationComplete;
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  advanceToBrew();
+  for (int i = 1; i <= 4; ++i) publishWeight(0.5f * i, hostMillis + 200);
+  const uint32_t crashedBoot = currentBootId();
+  const uint32_t anchorMs = session.startedAtMs;
+  const uint32_t cycleId = session.id;
+  CHECK(shotTrace().capturing());
+  boot(4);  // Panic: PSRAM kept the in-flight capture.
+  CHECK(!shotTrace().capturing());
+  CHECK(bootDegraded == degradedAfterPowerOn &&
+        firmwareInitializationComplete == completeAfterPowerOn);
+  CHECK(hostPinLevel[RELAY_GPIO] == RELAY_OPEN_LEVEL && !getRelaySafetySnapshot().closed);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.header.flags == SHOT_TRACE_INTERRUPTED && trace.header.bootId == crashedBoot &&
+        trace.header.anchorMs == anchorMs && trace.header.shotLogId == 0 &&
+        trace.header.endedAtMs == 0 && trace.header.endReason == 0);
+  const Event *start = shot_trace_test::find(trace, ScaleProfileEvent::SHOT_START);
+  CHECK(start != nullptr && start->profileArg1() == cycleId);
+  CHECK(shot_trace_test::find(trace, DebugCode::RELAY_CLOSED) != nullptr);
+  CHECK(shot_trace_test::count(trace, ShotTraceKind::FINAL_WEIGHT) == 0);
+  // Counters as of the last recorded event.
+  CHECK(trace.counters.readingsAccepted >= 1 && trace.counters.readingsReceived >= 1);
+  // The Web UI log names the boot (setup's log level comes from settings).
+  shotTrace().hostReset();
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  recoverShotTraceAtBoot(4);
+  CHECK(debugLogTextCount("recovered as interrupted") == 0);  // Already recovered.
+  // Recovered once: a second reset finds nothing to recover.
+  boot(4);
+  ShotTraceExport result = ShotTraceExport::OK;
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+}
+
+void trc22_recovery_reaches_the_web_ui_log() {
+  resetHarness(false, true);
+  openTestTrace(1000, 41);
+  shotTrace().hostReset();
+  debugLog.clear();
+  recoverShotTraceAtBoot(6);
+  CHECK(debugLogTextCount("Shot trace of boot 41 recovered as interrupted") == 1);
+  openTestTrace(1000, 41);
+  shotTrace().hostReset();
+  recoverShotTraceAtBoot(1);  // Power-on: silent.
+  CHECK(debugLogTextCount("recovered as interrupted") == 1);
+}
+
+void trc18_a_torn_last_append_is_dropped() {
+  openTestTrace(1000, 7);
+  for (int16_t i = 0; i < 3; ++i) shotTrace().note(ShotTraceKind::STOP_REQUESTED, 1100, i, 0);
+  shotTrace().note(ShotTraceKind::SLOW_WINDOW_END, 1200, 300, 340, true, 20, 2);
+  ShotTraceBuffer *buffer = capturingTraceBuffer();
+  CHECK(buffer != nullptr && buffer->header.eventCount == 5);
+  buffer->events[4].a ^= 1;  // Its continuation never reached PSRAM.
+  uint32_t crashedBootId = 0;
+  shotTrace().hostReset();
+  CHECK(shotTrace().recoverAtBoot(4, crashedBootId) && crashedBootId == 7);
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace));
+  CHECK(trace.header.flags == (SHOT_TRACE_INTERRUPTED | SHOT_TRACE_TAIL_DROPPED));
+  CHECK(trace.events.size() == 3 && trace.events[2].a == 2 &&
+        shot_trace_test::count(trace, ShotTraceKind::SLOW_WINDOW_END) == 0);
+  // Damage before the last append: the whole trace is dropped.
+  openTestTrace(1000, 7);
+  for (int16_t i = 0; i < 3; ++i) shotTrace().note(ShotTraceKind::STOP_REQUESTED, 1100, i, 0);
+  buffer = capturingTraceBuffer();
+  CHECK(buffer != nullptr);
+  buffer->events[0].b ^= 1;
+  CHECK(rebootTraceAfter(4));
+  ShotTraceExport result = ShotTraceExport::OK;
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+}
+
+void trc19_completed_or_discarded_traces_are_never_recovered() {
+  openTestTrace(1000, 7);
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, 1100, 1, 0);
+  shotTrace().complete(3, 7, 2000, 1);
+  CHECK(!rebootTraceAfter(4));
+  openTestTrace(1000, 7);
+  shotTrace().discard(static_cast<uint8_t>(EndReason::RINSE_COMPLETE), 1500);
+  CHECK(!rebootTraceAfter(4));
+  // Before the machine started the capture is not recoverable yet.
+  shotTrace().hostReset();
+  shotTrace().begin(1000);
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, 1100, 1, 0);
+  CHECK(!rebootTraceAfter(4));
+  ShotTraceExport result = ShotTraceExport::OK;
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+}
+
+void trc20_only_resets_that_keep_psram_recover() {
+  for (uint32_t reason = 0; reason <= 15; ++reason) {
+    openTestTrace(1000, 7);
+    shotTrace().note(ShotTraceKind::STOP_REQUESTED, 1100, 1, 0);
+    const bool kept = reason >= 3 && reason <= 7;  // SW, panic, int/task/other WDT.
+    CHECK(rebootTraceAfter(reason) == kept);
+  }
+  // A power-on clears the in-flight marker: a later panic finds nothing.
+  openTestTrace(1000, 7);
+  CHECK(!rebootTraceAfter(1));
+  CHECK(!rebootTraceAfter(4));
+}
+
+void trc21_corrupted_records_are_never_trusted() {
+  openTestTrace(1000, 7);
+  capturingTraceBuffer()->header.formatVersion = 99;
+  CHECK(!rebootTraceAfter(4));
+  openTestTrace(1000, 7);
+  capturingTraceBuffer()->header.eventCount = SHOT_TRACE_EVENT_CAPACITY + 1;
+  CHECK(!rebootTraceAfter(4));
+  // Another firmware's capture (the no-init address depends on the image).
+  openTestTrace(1000, 7);
+  capturingTraceBuffer()->header.firmwarePacked ^= 1;
+  CHECK(!rebootTraceAfter(4));
+  openTestTrace(1000, 7);
+  capturingTraceBuffer()->header.firmware[0] ^= 1;
+  CHECK(!rebootTraceAfter(4));
+  // A damaged snapshot passes the boot header checks, then fails its check,
+  // which the Web UI log reports.
+  openTestTrace(1000, 7);
+  capturingTraceBuffer()->snapshot.scaleName[0] = 'X';
+  CHECK(rebootTraceAfter(4));
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::INFO;
+  ShotTraceExport result = ShotTraceExport::OK;
+  shot_trace_test::exportBytes(&result);
+  CHECK(result == ShotTraceExport::EMPTY);
+  CHECK(debugLogTextCount("Interrupted shot trace of boot 7 failed verification") == 1);
+  // A healthy one passes all of them.
+  openTestTrace(1000, 7);
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, 1100, 1, 0);
+  CHECK(rebootTraceAfter(4));
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace) && trace.snapshot.stabilitySamples == 5 &&
+        trace.events.size() == 1);
+  // Two in-flight markers cannot both be right: the first is recovered and
+  // the other cleared.
+  openTestTrace(1000, 7);
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, 1100, 1, 0);
+  ShotTraceBuffer &first = shotTraceStore.buffers[0];
+  ShotTraceBuffer &second = shotTraceStore.buffers[1];
+  memcpy(&second, &first, sizeof(first));
+  second.header.bootId = 9;
+  shotTrace().hostReset();
+  uint32_t crashedBootId = 0;
+  CHECK(shotTrace().recoverAtBoot(4, crashedBootId) && crashedBootId == 7 &&
+        second.header.magic == 0);
+  // The next capture uses the other buffer: the recovered trace stays served.
+  shotTrace().begin(5000);
+  shotTrace().attachStart(ShotTraceSnapshot{}, 8);
+  shotTrace().discard(static_cast<uint8_t>(EndReason::UNCONFIRMED_START), 5100);
+  CHECK(shot_trace_test::decodeCompleted(trace) && trace.header.bootId == 7 &&
+        trace.events.size() == 1);
+}
+
+// Every magic change reaches PSRAM at once: a reset that skips the panic
+// write-back never revives a finished capture or recovers one twice.
+void trc23_magic_changes_are_written_back() {
+  const auto lastWriteBack = [] {
+    return hostShotTraceWriteBackMagic[(hostShotTraceWriteBacks - 1) % 16];
+  };
+  hostShotTraceWriteBacks = 0;
+  openTestTrace(1000, 7);
+  CHECK(hostShotTraceWriteBacks == 1 && lastWriteBack() == SHOT_TRACE_CAPTURING_MAGIC);
+  shotTrace().complete(3, 7, 2000, 1);
+  CHECK(hostShotTraceWriteBacks == 2 && lastWriteBack() == SHOT_TRACE_MAGIC);
+  openTestTrace(1000, 7);
+  shotTrace().discard(static_cast<uint8_t>(EndReason::RINSE_COMPLETE), 1500);
+  CHECK(hostShotTraceWriteBacks == 4 && lastWriteBack() == 0);
+  openTestTrace(1000, 7);
+  CHECK(rebootTraceAfter(4));
+  CHECK(hostShotTraceWriteBacks == 6 && lastWriteBack() == SHOT_TRACE_MAGIC);
+  openTestTrace(1000, 7);
+  CHECK(!rebootTraceAfter(1));  // The cleared marker is written back too.
+  CHECK(hostShotTraceWriteBacks == 8 && lastWriteBack() == 0);
+  CHECK(!rebootTraceAfter(4));
+  CHECK(hostShotTraceWriteBacks == 8);  // Nothing changed, nothing written.
+}
+
+// A recovered trace replaced before its first export is not verified as if
+// it were the new one.
+void trc24_a_new_trace_replaces_an_unverified_recovery() {
+  openTestTrace(1000, 7);
+  CHECK(rebootTraceAfter(4));
+  shotTrace().begin(5000);  // Same boot: no reset of DRAM state.
+  shotTrace().attachStart(ShotTraceSnapshot{}, 8);
+  shotTrace().note(ShotTraceKind::STOP_REQUESTED, 5100, 1, 0);
+  shotTrace().complete(4, 8, 6000, 1);
+  for (ShotTraceBuffer &buffer : shotTraceStore.buffers)
+    if (buffer.header.bootId == 8) buffer.header.startCheck ^= 1;
+  Trace trace;
+  CHECK(shot_trace_test::decodeCompleted(trace) && trace.header.bootId == 8 &&
+        trace.header.flags == 0);
+}
+
 void trc11_idle_placement_evidence_reaches_the_next_trace() {
   prepareIdleTare();
   maintenanceLease.active = true;
@@ -23241,7 +23479,7 @@ void trc11_idle_placement_evidence_reaches_the_next_trace() {
   idleCup(80.0f);  // Placed while idle tare is not eligible.
   maintenanceLease.active = false;
   shotTrace().begin(hostMillis);
-  shotTrace().attachStart(ShotTraceSnapshot{});
+  shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().complete(1, 1, 1, 1);
   Trace trace;
   CHECK(shot_trace_test::decodeCompleted(trace));
@@ -23931,6 +24169,14 @@ const TestCase testCases[] = {
     {"TRC14", trc14_discarded_trace_is_noted_in_the_next_one},
     {"TRC15", trc15_over_line_reading_that_never_confirms_is_recorded},
     {"TRC16", trc16_profile_arguments_keep_their_high_half},
+    {"TRC17", trc17_crash_mid_shot_serves_an_interrupted_trace},
+    {"TRC18", trc18_a_torn_last_append_is_dropped},
+    {"TRC19", trc19_completed_or_discarded_traces_are_never_recovered},
+    {"TRC20", trc20_only_resets_that_keep_psram_recover},
+    {"TRC21", trc21_corrupted_records_are_never_trusted},
+    {"TRC22", trc22_recovery_reaches_the_web_ui_log},
+    {"TRC23", trc23_magic_changes_are_written_back},
+    {"TRC24", trc24_a_new_trace_replaces_an_unverified_recovery},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},

@@ -50,6 +50,10 @@ CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=2048
 # Qualified value already present in generated n16r8 sdkconfig.
 CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+# A PSRAM .noinit segment for the in-flight shot trace: it survives panic,
+# watchdog and software resets. The boot PSRAM test skips it; power-on
+# contents are undefined and never trusted.
+CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY=y
 # Prefer PSRAM for Wi-Fi/lwIP buffers when the driver allows it (soak-tested
 # SoftAP+STA+BLE on n16r8). Leaves more internal DRAM for BLE controller.
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y

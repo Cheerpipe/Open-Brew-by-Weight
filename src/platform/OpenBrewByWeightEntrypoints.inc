@@ -76,6 +76,15 @@ uint32_t composeScaleProfileContext(char *text, size_t capacity) {
   return g_wallClock.synced() ? g_wallClock.nowUtcSec(millis()) : 0;
 }
 
+// The in-flight shot trace of the boot that crashed (header fields only).
+void recoverShotTraceAtBoot(uint32_t resetReason) {
+  uint32_t interruptedBootId = 0;
+  if (shotTrace().recoverAtBoot(resetReason, interruptedBootId))
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::BOOT,
+                         "Shot trace of boot %lu recovered as interrupted, pending verification",
+                         static_cast<unsigned long>(interruptedBootId));
+}
+
 void serviceScaleProfiler(uint32_t now) {
   const ScaleProfilerRequest request = scaleProfileRequest.exchange(
       ScaleProfilerRequest::NONE, std::memory_order_acq_rel);
@@ -413,6 +422,10 @@ void startAfterBootRecovery() {
   crashArchiveSetBootId(bootIdentityDurable ? activationStores.bootId() : 0);
   crashArchivePromote(bootIdentityDurable ? activationStores.bootId() : 0,
                       safetyResetStatus.reasonCode);
+  // A planned restart resets through esp_restart(): write the trace back too.
+  if (esp_register_shutdown_handler(&shotTraceWriteBackOnShutdown) != ESP_OK)
+    serialTraceCategory(LogLevel::WARNING, DebugCategory::BOOT,
+                        "Shot trace write-back on restart unavailable");
   // Read only the profiler's durable header at boot; records stay in flash
   // until a download streams them.
   scaleProfiler().bootInit();
@@ -427,6 +440,7 @@ void startAfterBootRecovery() {
     }
   }
 #endif
+  recoverShotTraceAtBoot(safetyResetStatus.reasonCode);
   scaleProfiler().setContextProvider(&composeScaleProfileContext);
 
   if (!persistenceReady) {

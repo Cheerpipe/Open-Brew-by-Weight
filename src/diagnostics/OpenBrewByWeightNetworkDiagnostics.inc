@@ -1200,7 +1200,7 @@ esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request
   if (started) return ESP_FAIL;
   if (result == ShotTraceExport::EMPTY)
     return sendError(request, STATUS_NOT_FOUND, "NO_SHOT_TRACE",
-                     "No shot trace has been captured since the last restart.");
+                     "No shot trace is available since the last restart.");
   return sendError(request, STATUS_CONFLICT, "SHOT_TRACE_BUSY",
                    "A shot is in progress; the trace is available after it ends.");
 }

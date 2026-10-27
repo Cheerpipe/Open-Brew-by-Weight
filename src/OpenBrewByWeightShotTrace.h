@@ -34,7 +34,9 @@
 
 namespace openbrewbyweight {
 
-constexpr uint32_t SHOT_TRACE_MAGIC = 0x43525453UL;  // "STRC"
+constexpr uint32_t SHOT_TRACE_MAGIC = 0x43525453UL;  // "STRC": a completed record
+// An in-flight capture, recoverable after a panic, watchdog or software reset.
+constexpr uint32_t SHOT_TRACE_CAPTURING_MAGIC = 0x49525453UL;  // "STRI"
 constexpr uint16_t SHOT_TRACE_FORMAT_VERSION = 1;
 // Bumped when ScaleProfileEvent, DebugCode or ShotTraceKind meanings change.
 constexpr uint16_t SHOT_TRACE_VOCABULARY_VERSION = 1;
@@ -76,6 +78,8 @@ constexpr uint16_t SHOT_TRACE_SLOW_OVER_LINE = 0x8;
 // Header flags.
 constexpr uint8_t SHOT_TRACE_VERBOSE_TRUNCATED = 0x1;
 constexpr uint8_t SHOT_TRACE_DECISIONS_TRUNCATED = 0x2;
+constexpr uint8_t SHOT_TRACE_INTERRUPTED = 0x4;   // Recovered after a reset.
+constexpr uint8_t SHOT_TRACE_TAIL_DROPPED = 0x8;  // Its torn last append was dropped.
 
 // Snapshot flags.
 enum : uint16_t {
@@ -119,18 +123,24 @@ struct ShotTraceHeader {
   uint32_t totalBytes;  // header through the last event
   uint32_t crc32;       // CRC-32 of totalBytes with this field zero; set on export
   uint32_t shotLogId;   // 0: the summary was not stored
-  uint32_t bootId;
+  uint32_t bootId;      // boot that captured the shot
   uint32_t anchorMs;    // millis() at cycle start; event times count from it
-  uint32_t endedAtMs;
+  uint32_t endedAtMs;   // 0 when interrupted
   uint32_t firmwarePacked;
-  char firmware[32];
+  uint32_t startCheck;  // FNV-1a of the snapshot and the valid pre-shot entries
+  char firmware[24];
+  // One aligned 16-byte group, published together after each append.
+  uint32_t eventsCheck;  // FNV-1a of events[0, eventCount)
+  uint32_t prevCheck;    // ... and of events[0, prevCount), before the last append
+  uint16_t eventCount;
+  uint16_t prevCount;
+  uint8_t flags;
+  uint8_t endReason;
+  uint16_t preShotCount;
   uint16_t snapshotBytes;
   uint16_t countersBytes;
   uint16_t preShotCapacity;
-  uint16_t preShotCount;
-  uint16_t eventCount;
-  uint8_t flags;
-  uint8_t endReason;
+  uint16_t reserved;
 };
 
 struct ShotTraceSnapshot {
@@ -192,20 +202,49 @@ struct ShotTraceBuffer {
   ShotTraceRecord events[SHOT_TRACE_EVENT_CAPACITY];
 };
 static_assert(sizeof(ShotTraceRecord) == 8 && sizeof(ShotTracePreShot) == 16 &&
-                  sizeof(ShotTraceHeader) == 80 && sizeof(ShotTraceSnapshot) == 108 &&
+                  sizeof(ShotTraceHeader) == 88 && offsetof(ShotTraceHeader, eventsCheck) == 64 &&
+                  sizeof(ShotTraceSnapshot) == 108 &&
                   sizeof(ShotTraceCounters) == 84,
               "Shot trace wire layout");
 static_assert(sizeof(ShotTraceBuffer) == SHOT_TRACE_BUFFER_BYTES &&
                   offsetof(ShotTraceBuffer, events) == SHOT_TRACE_FIXED_BYTES,
               "A shot trace buffer is exactly D2 with no padding");
 
-// Two capture buffers plus the pre-shot ring, zero-initialized PSRAM BSS.
-struct ShotTraceStore {
+// Two capture buffers plus the pre-shot ring in PSRAM that no boot clears:
+// nothing in it is trusted before recoverAtBoot() validated it, and DRAM
+// state (generation 0, empty ring) hides everything else. Line alignment
+// keeps each header's publish group in one cache line.
+struct alignas(64) ShotTraceStore {
   ShotTraceBuffer buffers[2];
   ShotTracePreShot ring[SHOT_TRACE_PRESHOT_CAPACITY];
   uint32_t ringAtMs[SHOT_TRACE_PRESHOT_CAPACITY];
 };
-inline OPEN_BREW_BY_WEIGHT_PSRAM_BSS ShotTraceStore shotTraceStore;
+inline OPEN_BREW_BY_WEIGHT_PSRAM_NOINIT ShotTraceStore shotTraceStore;
+
+// PSRAM is write-back cached and a reset invalidates the cache. The panic
+// handler writes the whole store back with the raw ROM call (target only);
+// tasks use shotTraceWriteBack() (esp_cache_msync) for the shutdown hook and
+// for each header whose magic changed, so a reset that skips both (another
+// watchdog, a direct hardware watchdog) still finds the latest magic.
+void shotTraceWriteBackForPanic();
+void shotTraceWriteBack(const void *address, size_t bytes);
+// Web UI log line when a recovered trace fails its first-use verification.
+void shotTraceLogRecoveryDropped(uint32_t crashedBootId);
+
+// Resets after which PSRAM kept its contents: software restart (3), panic
+// (4), interrupt (5), task (6) and other watchdogs (7). Power-on, brownout
+// and every other reason leave it undefined.
+inline bool shotTraceResetKeepsPsram(uint32_t resetReason) {
+  return resetReason >= 3 && resetReason <= 7;
+}
+
+// FNV-1a, chained across calls; a few cycles per byte on the append path.
+inline uint32_t shotTraceCheck(uint32_t check, const void *data, size_t bytes) {
+  const uint8_t *in = static_cast<const uint8_t *>(data);
+  for (size_t i = 0; i < bytes; ++i) check = (check ^ in[i]) * 16777619U;
+  return check;
+}
+constexpr uint32_t SHOT_TRACE_CHECK_SEED = 2166136261U;
 
 enum class ShotTraceExport : uint8_t { OK, BUSY, EMPTY, CHANGED, SINK_FAILED };
 
@@ -245,9 +284,10 @@ class ShotTrace {
   void begin(uint32_t anchorMs) {
     const TaskLockGuard lock(mux_);
     ShotTraceBuffer &buffer = *capture_;
-    memset(&buffer.header, 0, sizeof(buffer.header));
+    memset(&buffer.header, 0, sizeof(buffer.header));  // Not recoverable yet.
     memset(&buffer.counters, 0, sizeof(buffer.counters));
     buffer.header.anchorMs = anchorMs;
+    buffer.header.eventsCheck = buffer.header.prevCheck = SHOT_TRACE_CHECK_SEED;
     received_.store(0, std::memory_order_relaxed);
     accepted_.store(0, std::memory_order_relaxed);
     held_.store(0, std::memory_order_relaxed);
@@ -265,12 +305,62 @@ class ShotTrace {
     capturing_.store(true, std::memory_order_release);
   }
 
-  // After the machine started: the snapshot and the frozen pre-shot ring.
-  // The ring is not written while the window is open.
-  void attachStart(const ShotTraceSnapshot &snapshot) {
-    const TaskLockGuard lock(mux_);
-    if (!capturing_.load(std::memory_order_relaxed)) return;
+  // After the machine started: identity, the snapshot and the frozen pre-shot
+  // ring; the capture becomes recoverable last. The ring is not written while
+  // the window is open.
+  void attachStart(const ShotTraceSnapshot &snapshot, uint32_t bootId) {
+    ShotTraceHeader *changed = nullptr;
+    {
+      const TaskLockGuard lock(mux_);
+      if (!capturing_.load(std::memory_order_relaxed)) return;
+      changed = &attachLocked_(snapshot, bootId);
+    }
+    shotTraceWriteBack(changed, sizeof(*changed));
+  }
+
+  // Rinse, abandoned start or refused start: the record is dropped and the
+  // next trace's pre-shot section says so.
+  void discard(uint8_t endReason, uint32_t nowMs) {
+    ShotTraceHeader *changed = nullptr;
+    {
+      const TaskLockGuard lock(mux_);
+      if (!capturing_.load(std::memory_order_relaxed)) return;
+      const uint32_t ranMs = timeOfLocked_(nowMs);
+      changed = &capture_->header;
+      changed->magic = 0;  // Never recovered.
+      capturing_.store(false, std::memory_order_release);
+      notePreShotLocked_(static_cast<uint32_t>(ShotTraceKind::TRACE_DISCARDED) << 24,
+                         endReason,
+                         static_cast<uint16_t>(ranMs > UINT16_MAX ? UINT16_MAX : ranMs), 0,
+                         nowMs);
+    }
+    shotTraceWriteBack(changed, sizeof(*changed));
+  }
+
+  // Drip finalize or cancellation. The newest completed trace always wins.
+  void complete(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs,
+                uint8_t endReason) {
+    ShotTraceHeader *changed = nullptr;
+    {
+      const TaskLockGuard lock(mux_);
+      if (!capturing_.load(std::memory_order_relaxed)) return;
+      changed = &completeLocked_(shotLogId, bootId, endedAtMs, endReason);
+    }
+    shotTraceWriteBack(changed, sizeof(*changed));
+  }
+
+ private:
+  ShotTraceHeader &attachLocked_(const ShotTraceSnapshot &snapshot, uint32_t bootId) {
     ShotTraceBuffer &buffer = *capture_;
+    ShotTraceHeader &header = buffer.header;
+    header.formatVersion = SHOT_TRACE_FORMAT_VERSION;
+    header.vocabularyVersion = SHOT_TRACE_VOCABULARY_VERSION;
+    header.firmwarePacked = FW_VERSION_PACKED;
+    copyCString(header.firmware, sizeof(header.firmware), FW_VERSION);
+    header.snapshotBytes = sizeof(ShotTraceSnapshot);
+    header.countersBytes = sizeof(ShotTraceCounters);
+    header.preShotCapacity = SHOT_TRACE_PRESHOT_CAPACITY;
+    header.bootId = bootId;
     buffer.snapshot = snapshot;
     if (micraSubscribed_.load(std::memory_order_relaxed))
       buffer.snapshot.flags |= SHOT_TRACE_SNAP_MICRA_CONNECTED;
@@ -283,64 +373,76 @@ class ShotTrace {
           : static_cast<uint32_t>(age) > SHOT_TRACE_MS_MAX ? SHOT_TRACE_MS_MAX
                                                            : static_cast<uint32_t>(age);
     }
-    buffer.header.preShotCount = static_cast<uint16_t>(ringCount_);
+    header.preShotCount = static_cast<uint16_t>(ringCount_);
     ringCount_ = 0;
+    header.startCheck = startCheck_(buffer);
+    std::atomic_signal_fence(std::memory_order_seq_cst);  // Everything before the marker.
+    header.magic = SHOT_TRACE_CAPTURING_MAGIC;
+    return header;
   }
 
-  // Rinse, abandoned start or refused start: the record is dropped and the
-  // next trace's pre-shot section says so.
-  void discard(uint8_t endReason, uint32_t nowMs) {
-    const TaskLockGuard lock(mux_);
-    if (!capturing_.load(std::memory_order_relaxed)) return;
-    const uint32_t ranMs = timeOfLocked_(nowMs);
-    capturing_.store(false, std::memory_order_release);
-    notePreShotLocked_(static_cast<uint32_t>(ShotTraceKind::TRACE_DISCARDED) << 24,
-                       endReason, static_cast<uint16_t>(ranMs > UINT16_MAX ? UINT16_MAX : ranMs),
-                       0, nowMs);
-  }
-
-  // Drip finalize or cancellation. The newest completed trace always wins.
-  void complete(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs,
-                uint8_t endReason) {
-    const TaskLockGuard lock(mux_);
-    if (!capturing_.load(std::memory_order_relaxed)) return;
+  ShotTraceHeader &completeLocked_(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs,
+                                   uint8_t endReason) {
     ShotTraceBuffer &buffer = *capture_;
     ShotTraceHeader &header = buffer.header;
-    header.magic = SHOT_TRACE_MAGIC;
-    header.formatVersion = SHOT_TRACE_FORMAT_VERSION;
-    header.vocabularyVersion = SHOT_TRACE_VOCABULARY_VERSION;
-    header.firmwarePacked = FW_VERSION_PACKED;
-    copyCString(header.firmware, sizeof(header.firmware), FW_VERSION);
-    header.snapshotBytes = sizeof(ShotTraceSnapshot);
-    header.countersBytes = sizeof(ShotTraceCounters);
-    header.preShotCapacity = SHOT_TRACE_PRESHOT_CAPACITY;
+    header.magic = SHOT_TRACE_MAGIC;  // Completed: never recovered.
     header.shotLogId = shotLogId;
     header.bootId = bootId;
     header.endedAtMs = endedAtMs;
     header.endReason = endReason;
     header.totalBytes = static_cast<uint32_t>(
         SHOT_TRACE_FIXED_BYTES + header.eventCount * sizeof(ShotTraceRecord));
-    ShotTraceCounters &counters = buffer.counters;
-    counters.readingsReceived = received_.load(std::memory_order_relaxed);
-    counters.readingsAccepted = accepted_.load(std::memory_order_relaxed);
-    counters.readingsHeld = held_.load(std::memory_order_relaxed);
-    counters.readingGapMaxMs = gapMax_.load(std::memory_order_relaxed);
-    const uint32_t gapMin = gapMin_.load(std::memory_order_relaxed);
-    counters.readingGapMinMs = gapMin == UINT32_MAX ? 0 : gapMin;
-    counters.readingGapMeanMs = counters.readingsReceived > 1
-        ? gapSum_.load(std::memory_order_relaxed) / (counters.readingsReceived - 1) : 0;
-    counters.staleFrames = staleFrames_.load(std::memory_order_relaxed);
-    counters.undecodableFrames = undecodableFrames_.load(std::memory_order_relaxed);
-    counters.confirmationResets = confirmationResets_.load(std::memory_order_relaxed);
-    counters.loopGapMaxMs = loopGapMax_.load(std::memory_order_relaxed);
-    counters.micraRxBytes = micraRx_.load(std::memory_order_relaxed);
-    counters.uiStreamDeferrals = uiDeferrals_.load(std::memory_order_relaxed);
+    mirrorCountersLocked_();
     ShotTraceBuffer *const completed = capture_;
     capture_ = completed_;
     completed_ = completed;
     if (++generation_ == 0) generation_ = 1;
+    recoveredUnverified_ = false;  // A recovered trace was replaced.
     capturing_.store(false, std::memory_order_release);
+    return header;
   }
+
+ public:
+  // Boot, before any producer runs: constant time, header fields only. After
+  // a reset that kept PSRAM, a valid in-flight capture becomes the completed
+  // trace, flagged interrupted; its events are verified on first use. Every
+  // other in-flight marker is cleared so it is never trusted later.
+  bool recoverAtBoot(uint32_t resetReason, uint32_t &crashedBootId) {
+    bool changed[2] = {};
+    {
+      const TaskLockGuard lock(mux_);
+      recoverLocked_(resetReason, crashedBootId, changed);
+    }
+    for (size_t i = 0; i < 2; ++i)  // Without this a crash loop would recover it again.
+      if (changed[i])
+        shotTraceWriteBack(&shotTraceStore.buffers[i].header, sizeof(ShotTraceHeader));
+    return generation_ != 0;
+  }
+
+ private:
+  void recoverLocked_(uint32_t resetReason, uint32_t &crashedBootId, bool (&changed)[2]) {
+    const bool kept = shotTraceResetKeepsPsram(resetReason);
+    for (size_t i = 0; i < 2; ++i) {
+      ShotTraceBuffer &buffer = shotTraceStore.buffers[i];
+      ShotTraceHeader &header = buffer.header;
+      if (header.magic != SHOT_TRACE_CAPTURING_MAGIC) continue;
+      changed[i] = true;
+      header.magic = 0;
+      if (!kept || generation_ != 0 || !recoverableHeader_(header)) continue;
+      header.magic = SHOT_TRACE_MAGIC;  // Recovered at most once.
+      header.flags |= SHOT_TRACE_INTERRUPTED;
+      header.shotLogId = header.endedAtMs = 0;
+      header.endReason = 0;
+      completed_ = &buffer;
+      capture_ = &buffer == &shotTraceStore.buffers[0] ? &shotTraceStore.buffers[1]
+                                                     : &shotTraceStore.buffers[0];
+      generation_ = 1;
+      recoveredUnverified_ = true;
+      crashedBootId = header.bootId;
+    }
+  }
+
+ public:
 
   // ---------------------------------------------------------------------
   // Producers. Task context only, never under a portMUX; bounded and
@@ -527,16 +629,23 @@ class ShotTrace {
   // first pass that computes its CRC, which is patched into the header.
   // The mutex is held per chunk copy only, never across the sink.
   template <typename Sink>
-  ShotTraceExport exportCompleted(uint8_t *chunk, size_t capacity, Sink &&sink) const {
+  ShotTraceExport exportCompleted(uint8_t *chunk, size_t capacity, Sink &&sink) {
     uint32_t generation = 0;
     size_t total = 0;
+    bool dropped = false;
+    uint32_t droppedBootId = 0;
     {
       const TaskLockGuard lock(mux_);
       if (capturing_.load(std::memory_order_relaxed)) return ShotTraceExport::BUSY;
-      if (generation_ == 0) return ShotTraceExport::EMPTY;
+      if (recoveredUnverified_) {
+        droppedBootId = completed_->header.bootId;
+        dropped = !verifyRecoveredLocked_();
+      }
       generation = generation_;
       total = completed_->header.totalBytes;
     }
+    if (dropped) shotTraceLogRecoveryDropped(droppedBootId);
+    if (generation == 0) return ShotTraceExport::EMPTY;
     uint32_t crc = 0;
     for (size_t offset = 0; offset < total; offset += capacity) {
       const size_t bytes = total - offset < capacity ? total - offset : capacity;
@@ -553,10 +662,14 @@ class ShotTrace {
   }
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
+  // A reboot for DRAM state; the PSRAM store keeps its bytes.
   void hostReset() {
     const TaskLockGuard lock(mux_);
     capturing_.store(false);
     generation_ = 0;
+    recoveredUnverified_ = false;
+    capture_ = &shotTraceStore.buffers[0];
+    completed_ = &shotTraceStore.buffers[1];
     ringCount_ = 0;
     for (bool &known : stateKnown_) known = false;
     micraSubscribed_.store(false);
@@ -616,11 +729,92 @@ class ShotTrace {
                                      : SHOT_TRACE_DECISIONS_TRUNCATED;
       return;
     }
-    buffer.events[count++] = ShotTraceRecord{head, a, b};
-    if (more) {
-      buffer.events[count++] = ShotTraceRecord{
-          moreHead | static_cast<uint32_t>(ShotTraceKind::CONTINUATION) << 24, moreA, moreB};
+    // Records first, then the count and checks: a reset in between leaves
+    // the append unpublished, and recovery drops a torn last append.
+    const ShotTraceRecord records[2] = {
+        {head, a, b},
+        {moreHead | static_cast<uint32_t>(ShotTraceKind::CONTINUATION) << 24, moreA, moreB}};
+    const size_t added = more ? 2 : 1;
+    memcpy(&buffer.events[count], records, added * sizeof(ShotTraceRecord));
+    std::atomic_signal_fence(std::memory_order_seq_cst);  // Records before the group.
+    ShotTraceHeader &header = buffer.header;
+    header.prevCheck = header.eventsCheck;
+    header.prevCount = count;
+    header.eventsCheck =
+        shotTraceCheck(header.eventsCheck, records, added * sizeof(ShotTraceRecord));
+    count = static_cast<uint16_t>(count + added);
+    mirrorCountersLocked_();  // An interrupted trace keeps them as of its last event.
+  }
+
+  // The lock-free counters, as complete() or the last append saw them.
+  void mirrorCountersLocked_() {
+    ShotTraceCounters &counters = capture_->counters;
+    counters.readingsReceived = received_.load(std::memory_order_relaxed);
+    counters.readingsAccepted = accepted_.load(std::memory_order_relaxed);
+    counters.readingsHeld = held_.load(std::memory_order_relaxed);
+    counters.readingGapMaxMs = gapMax_.load(std::memory_order_relaxed);
+    const uint32_t gapMin = gapMin_.load(std::memory_order_relaxed);
+    counters.readingGapMinMs = gapMin == UINT32_MAX ? 0 : gapMin;
+    counters.readingGapMeanMs = counters.readingsReceived > 1
+        ? gapSum_.load(std::memory_order_relaxed) / (counters.readingsReceived - 1) : 0;
+    counters.staleFrames = staleFrames_.load(std::memory_order_relaxed);
+    counters.undecodableFrames = undecodableFrames_.load(std::memory_order_relaxed);
+    counters.confirmationResets = confirmationResets_.load(std::memory_order_relaxed);
+    counters.loopGapMaxMs = loopGapMax_.load(std::memory_order_relaxed);
+    counters.micraRxBytes = micraRx_.load(std::memory_order_relaxed);
+    counters.uiStreamDeferrals = uiDeferrals_.load(std::memory_order_relaxed);
+  }
+
+  static uint32_t startCheck_(const ShotTraceBuffer &buffer) {
+    const uint32_t check =
+        shotTraceCheck(SHOT_TRACE_CHECK_SEED, &buffer.snapshot, sizeof(buffer.snapshot));
+    return shotTraceCheck(check, buffer.preShot,
+                          buffer.header.preShotCount * sizeof(ShotTracePreShot));
+  }
+
+  // The no-init address depends on the image layout: only this firmware's
+  // own captures are trusted.
+  static bool recoverableHeader_(const ShotTraceHeader &header) {
+    char firmware[sizeof(header.firmware)];
+    copyCString(firmware, sizeof(firmware), FW_VERSION);
+    return header.firmwarePacked == FW_VERSION_PACKED &&
+           strncmp(header.firmware, firmware, sizeof(firmware)) == 0 &&
+           header.formatVersion == SHOT_TRACE_FORMAT_VERSION &&
+           header.vocabularyVersion == SHOT_TRACE_VOCABULARY_VERSION &&
+           header.snapshotBytes == sizeof(ShotTraceSnapshot) &&
+           header.countersBytes == sizeof(ShotTraceCounters) &&
+           header.preShotCapacity == SHOT_TRACE_PRESHOT_CAPACITY &&
+           header.preShotCount <= SHOT_TRACE_PRESHOT_CAPACITY &&
+           header.eventCount <= SHOT_TRACE_EVENT_CAPACITY &&
+           header.prevCount <= header.eventCount;
+  }
+
+  // First use of a recovered trace (httpd): the start check and the event
+  // checks decide what is kept. A torn last append is dropped; anything
+  // else inconsistent drops the whole trace.
+  bool verifyRecoveredLocked_() {
+    recoveredUnverified_ = false;
+    ShotTraceBuffer &buffer = *completed_;
+    ShotTraceHeader &header = buffer.header;
+    uint32_t check = SHOT_TRACE_CHECK_SEED;
+    uint32_t prevCheck = header.prevCount == 0 ? check : 0;
+    for (uint16_t i = 0; i < header.eventCount; ++i) {
+      check = shotTraceCheck(check, &buffer.events[i], sizeof(ShotTraceRecord));
+      if (i + 1 == header.prevCount) prevCheck = check;
     }
+    if (check != header.eventsCheck) {
+      if (prevCheck != header.prevCheck) header.magic = 0;
+      header.eventCount = header.prevCount;
+      header.flags |= SHOT_TRACE_TAIL_DROPPED;
+    }
+    if (header.startCheck != startCheck_(buffer)) header.magic = 0;
+    if (header.magic != SHOT_TRACE_MAGIC) {
+      generation_ = 0;
+      return false;
+    }
+    header.totalBytes = static_cast<uint32_t>(
+        SHOT_TRACE_FIXED_BYTES + header.eventCount * sizeof(ShotTraceRecord));
+    return true;
   }
 
   // Latest occurrence per kind (per signal for states) with a repeat count.
@@ -666,6 +860,7 @@ class ShotTrace {
   ShotTraceBuffer *capture_ = &shotTraceStore.buffers[0];
   ShotTraceBuffer *completed_ = &shotTraceStore.buffers[1];
   uint32_t generation_ = 0;  // 0: nothing completed since boot
+  bool recoveredUnverified_ = false;
   size_t ringCount_ = 0;
   // Control-loop-owned (noteState, noteReading).
   bool stateKnown_[SHOT_TRACE_STATE_COUNT] = {};

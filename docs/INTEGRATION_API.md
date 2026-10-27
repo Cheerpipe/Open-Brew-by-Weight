@@ -533,12 +533,15 @@ filled on export. Requires the exclusive Web UI claim like every owned route.
 
 | Status | Code | When |
 | --- | --- | --- |
-| `200` | — | The newest completed trace, 784 B to 16 KiB |
-| `404` | `NO_SHOT_TRACE` | No trace was completed since the last restart |
+| `200` | — | The newest completed trace, 792 B to 16 KiB |
+| `404` | `NO_SHOT_TRACE` | No trace was completed since the last restart, and none was recovered from it (or the recovered one failed verification) |
 | `409` | `SHOT_TRACE_BUSY` | A shot is being captured, from cycle start to the end of its drip analysis; a shot that starts mid-download ends the stream |
 
 Only the newest trace is kept; a later shot replaces it. The trace is not yet
-written to flash and does not survive a restart.
+written to flash: a completed trace is lost on restart. A shot cut short by a
+panic, a watchdog or a software restart is served after the reboot as an
+interrupted trace (header flag `0x4`, `bootId` of the boot that crashed, no
+`shotLogId`); see [interrupted traces](SHOT_TRACE.md#interrupted-traces).
 
 ## Web UI record API
 

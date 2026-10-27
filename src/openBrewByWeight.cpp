@@ -126,6 +126,10 @@ HWCDC openBrewByWeightUsbConsole;
 #include "OpenBrewByWeightTaskProfiler.h"
 #include "OpenBrewByWeightScaleProfiler.h"
 #include "OpenBrewByWeightShotTrace.h"
+#ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
+#include <esp32s3/rom/cache.h>
+#include <esp_cache.h>
+#endif
 #include "OpenBrewByWeightTaskMutex.h"
 #include "OpenBrewByWeightScheduling.h"
 #include "OpenBrewByWeightPsram.h"

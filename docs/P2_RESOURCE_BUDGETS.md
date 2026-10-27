@@ -159,7 +159,9 @@ Coexistence arbitration is radio-time based, so it does not give BLE more air
 time. Apply it when internal RAM becomes the constraint.
 
 Both linker maps must also keep external BSS at or below `maximumExternalBssBytes`
-in `config/resource-baselines.json` (currently 3,211,264 bytes) and retain
+in `config/resource-baselines.json` (currently 3,186,688 bytes), keep the
+external no-init segment at or below `maximumExternalNoinitBytes` (currently
+34,816 bytes), and retain
 `localBuzzer` and `taskProfiler` in internal DRAM: both hold synchronization
 state (mutexes, atomics) that must not live in PSRAM. The profiler's published
 report (`taskProfilerReport`) must instead reside in external BSS.
@@ -189,11 +191,14 @@ cut short or evicted by curve size. Across the 500-record bank, the worker
 image, sampler, published and finalization records it adds 237,504 bytes (about 232 KiB); the
 matched development profile measured 3,156,312 external-BSS bytes. The
 runtime PSRAM heap had 2.6 MB free before the change.
-The 3,112 KiB→3,136 KiB increase covers the per-shot decision trace
-([shot trace](SHOT_TRACE.md)): two fixed 16 KiB capture buffers, its
-640-byte pre-shot ring and a 4 KiB export chunk, 37,504 bytes in all; the
-matched development profile measured 3,206,128 external-BSS bytes. The
-runtime PSRAM heap had about 2.2 MB free before the change.
+The per-shot decision trace ([shot trace](SHOT_TRACE.md)) keeps its two fixed
+16 KiB capture buffers and pre-shot ring, 33,408 bytes, in the external
+no-init segment so a crash does not erase them; its 4 KiB export chunk stays in
+external BSS. The ceiling briefly rose to 3,136 KiB while the store lived in
+external BSS and returned to 3,112 KiB once it moved; the no-init segment has
+its own 34 KiB ceiling. The matched development profile measured 3,172,720
+external-BSS and 33,408 no-init bytes; the runtime PSRAM heap had about 2.2 MB
+free before the change.
 The immutable persistence image is separately allocated in external heap.
 It mirrors the shot and activation logs but carries at most four unpersisted
 curves (about 22 KiB) instead of a second curve bank; a larger backlog is
@@ -268,6 +273,7 @@ cases also remain pending; the successful full transfer does not qualify them.
 | Profiler processing workspace | external, at most 4 KiB, only while running |
 | Profiler published report | external BSS, 2,512 bytes; written and copied under the profiler's internal mutex by tasks only |
 | OTA state singleton | external BSS, about 1.6 KiB (identity, tags, journal bookkeeping, tag scanner); its mutex and published flags are internal statics, and chunk buffers, SHA context and tag re-reads use internal memory |
+| Shot trace | external no-init (`.ext_ram_noinit`, `CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY`), 33,408 bytes: two 16 KiB capture buffers and the pre-shot ring, kept across panic, watchdog and software resets and validated at boot; outside the external BSS measurement. The 4 KiB export chunk is external BSS |
 | Scale profiler workspace | external, only while a manual capture exists: 256 KiB record buffer, header/context and a bounded per-signal observation cache (32 bytes per signal), and a 32 KiB ordering index after stop (combined ceiling 320 KiB, enforced including the index); freed after the trace is saved and no download is streaming it; capture storage is a dedicated 260 KiB flash partition with a header-last commit |
 | Profiler kernel capture | internal, at most 4 KiB, only while running |
 | Settings handoff | one external mailbox for the 3,312-byte settings blob and revision, and one internal byte queued; no full settings copy in the queue or receiver |

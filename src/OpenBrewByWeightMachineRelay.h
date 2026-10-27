@@ -162,6 +162,7 @@ void IRAM_ATTR openBrewByWeightPanicHandler(arduino_panic_info_t *info, void *) 
   // the same direct-register path used by the independent safety timer.
   openRelayElectricalFromIsr();
   openbrewbyweight::crashArchiveRecordPanic(info);
+  openbrewbyweight::shotTraceWriteBackForPanic();
 }
 #endif
 

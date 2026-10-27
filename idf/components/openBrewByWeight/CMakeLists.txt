@@ -53,6 +53,8 @@ idf_component_register(
     esp_partition
     espcoredump
     esp_hw_support
+    # esp_cache_msync: the shot trace's PSRAM write-backs.
+    esp_mm
     log
     heap
     soc

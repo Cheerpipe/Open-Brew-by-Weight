@@ -106,7 +106,7 @@ void attachShotTraceStart(const ScaleLinkSnapshot &link) {
 #endif
   copyCString(snapshot.scaleName, sizeof(snapshot.scaleName), link.shotScaleName);
   copyCString(snapshot.scaleProtocol, sizeof(snapshot.scaleProtocol), link.protocolName);
-  shotTrace().attachStart(snapshot);
+  shotTrace().attachStart(snapshot, currentBootId());
 }
 
 void beginCycle(ControlSource source = ControlSource::PHYSICAL) {

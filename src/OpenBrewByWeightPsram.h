@@ -17,16 +17,22 @@
 #include <esp_attr.h>
 #endif
 
-// Place large BSS in PSRAM on the official IDF build
-// (CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y). Arduino-cli cores that ship
-// that Kconfig off compile EXT_RAM_BSS_ATTR as empty, so the same objects stay
-// in DRAM. Keep flash DMA sources, OTA chunks, and flash-writing task stacks
-// internal: some flash paths still disable cache, making PSRAM inaccessible.
+// Place large BSS in PSRAM (CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y,
+// checked by the build). Keep flash DMA sources, OTA chunks, and
+// flash-writing task stacks internal: some flash paths still disable cache,
+// making PSRAM inaccessible.
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                         \
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
 #define OPEN_BREW_BY_WEIGHT_PSRAM_BSS
+#define OPEN_BREW_BY_WEIGHT_PSRAM_NOINIT
 #else
 #define OPEN_BREW_BY_WEIGHT_PSRAM_BSS EXT_RAM_BSS_ATTR
+// Kept across panic, watchdog and software resets (not power loss); without
+// the Kconfig, EXT_RAM_NOINIT_ATTR would silently fall back to internal RAM.
+#if !CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY
+#error "CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY is required"
+#endif
+#define OPEN_BREW_BY_WEIGHT_PSRAM_NOINIT EXT_RAM_NOINIT_ATTR
 #endif
 
 namespace openbrewbyweight {

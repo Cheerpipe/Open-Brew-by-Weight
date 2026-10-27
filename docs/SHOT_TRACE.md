@@ -7,8 +7,9 @@ good or bad. It explains a shot after the fact: what the controller knew at the
 start, what happened just before, every decision it took, and how healthy the
 weight stream was.
 
-The trace currently lives in RAM only. The newest completed trace downloads
-from [`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace);
+The trace lives in PSRAM that survives panics, watchdog and software resets;
+it is not yet written to flash. The newest completed trace downloads from
+[`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace);
 a flash pool and a Web UI view are planned.
 
 ## Capture window
@@ -16,13 +17,53 @@ a flash pool and a Web UI view are planned.
 | Moment | Effect |
 | --- | --- |
 | Cycle start with a fresh scale reading | Opens the capture just before the relay acts, so the close is recorded; the anchor is the cycle start (`anchorMs`). Only the header and counters are reset at this point. |
-| Machine started | Adds the start snapshot and freezes the pre-shot ring into the trace, then empties the ring. |
+| Machine started | Adds identity, the start snapshot and the frozen pre-shot ring, then empties the ring; from here the capture survives a crash. |
 | Rinse classification, abandoned (unconfirmed) start, refused machine start | Discards the capture and leaves a `TRACE_DISCARDED` entry in the pre-shot ring, so the next trace shows it. |
 | Drip finalize, or drip analysis cancelled (new cycle, rinse, New coffee, cup lifted, backflush) | Completes the trace with the stored summary's id (0 if the shot log refused it). |
 
 Cycles without a scale never open a capture. While a capture is open the
 download answers `409`; nothing is exported during a shot. Only the newest
 completed trace is kept.
+
+## Interrupted traces
+
+The two capture buffers live in a PSRAM segment that no boot clears
+(`.ext_ram_noinit`). PSRAM is reached through a write-back cache that a reset
+discards, so the firmware writes it back: the whole segment from the panic
+handler (which also covers the interrupt and task watchdogs) and from a
+shutdown hook for planned restarts, and the header of a buffer each time its
+magic changes (capture in flight, completed, discarded, recovered).
+
+Recovery after a reset that skips the panic handler, an "other watchdog"
+reset (reason 7) or a hardware watchdog that resets the chip directly, is
+best-effort: the header magic is current, but events written since the last
+magic change may not have reached PSRAM, and the checks below then drop the
+torn tail or the whole trace.
+
+At boot, before anything is captured, the firmware looks at the header of
+each buffer:
+
+- After a software restart, a panic, or an interrupt, task or other watchdog
+  reset, a capture that was in flight and passes the header checks (magic,
+  versions, section sizes, counts) becomes the completed trace, flagged
+  **interrupted** (`flags` 0x4). Its `bootId` is the boot that crashed, so it
+  matches the crash archive entry of that boot. `shotLogId`, `endedAtMs` and
+  `endReason` are 0: the shot never finished. Only captures of the running
+  firmware (same packed version and version string) are trusted, because the
+  segment's address depends on the image. The Web UI log says
+  "Shot trace of boot N recovered as interrupted, pending verification".
+- After a power-on, a brownout or any other reset, PSRAM contents are
+  undefined: nothing is recovered and every in-flight marker is cleared.
+- A completed or discarded capture is never recovered, and a recovered one is
+  recovered only once.
+
+The heavier checks run on first use (the download), not at boot: the start
+check covers the snapshot and the pre-shot entries, and the event checks cover
+the events. If only the last append is inconsistent (it was cut by the reset)
+it is dropped and `flags` 0x8 is set; any other inconsistency drops the whole
+trace, and the Web UI log warns "Interrupted shot trace of boot N failed
+verification; dropped". Counters in an interrupted trace are those of its last
+recorded event.
 
 ## Record layout
 
@@ -32,35 +73,42 @@ padding. One buffer holds a whole record and is `SHOT_TRACE_BUFFER_BYTES`
 
 | Offset | Section | Bytes |
 | --- | --- | --- |
-| 0 | Header | 80 |
-| 80 | Start snapshot | `snapshotBytes` (108) |
-| 188 | End counters | `countersBytes` (84) |
-| 272 | Pre-shot entries | `preShotCapacity` × 16 (32 × 16) |
-| 784 | Events | `eventCount` × 8, at most 1,950 |
+| 0 | Header | 88 |
+| 88 | Start snapshot | `snapshotBytes` (108) |
+| 196 | End counters | `countersBytes` (84) |
+| 280 | Pre-shot entries | `preShotCapacity` × 16 (32 × 16) |
+| 792 | Events | `eventCount` × 8, at most 1,949 |
 
-A record is therefore 784 to 16,384 bytes. Decoders must take section sizes
+A record is therefore 792 to 16,384 bytes. Decoders must take section sizes
 from the header, not from this table.
 
 ### Header
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `magic` | u32 | `0x43525453` ("STRC") |
+| `magic` | u32 | `0x43525453` ("STRC") in a completed record; `0x49525453` ("STRI") marks a capture in flight in RAM |
 | `formatVersion` | u16 | 1 |
 | `vocabularyVersion` | u16 | 1; names of kinds, codes and signals |
 | `totalBytes` | u32 | Header through the last event |
 | `crc32` | u32 | CRC-32 (IEEE) of `totalBytes` with this field zero; 0 in RAM, filled on export |
 | `shotLogId` | u32 | Stored summary id; 0 when not stored |
-| `bootId` | u32 | Boot of the shot |
+| `bootId` | u32 | Boot of the shot (the crashed boot for an interrupted trace) |
 | `anchorMs` | u32 | `millis()` at cycle start; event times count from it |
-| `endedAtMs` | u32 | Shot end (`millis()`); with `bootId` and `shotLogId` links the summary |
+| `endedAtMs` | u32 | Shot end (`millis()`); with `bootId` and `shotLogId` links the summary; 0 when interrupted |
 | `firmwarePacked` | u32 | `FW_VERSION_PACKED` |
-| `firmware` | char[32] | `FW_VERSION`, NUL-terminated (version and commit) |
-| `snapshotBytes`, `countersBytes` | u16 | Section sizes |
-| `preShotCapacity`, `preShotCount` | u16 | Pre-shot slots and valid entries |
-| `eventCount` | u16 | Event records, continuations included |
-| `flags` | u8 | 0x1 verbose events truncated, 0x2 decisions truncated |
-| `endReason` | u8 | Raw `EndReason` |
+| `startCheck` | u32 | FNV-1a of the snapshot and the valid pre-shot entries |
+| `firmware` | char[24] | `FW_VERSION`, NUL-terminated (version and commit); truncated to 23 characters, so `firmwarePacked` is authoritative |
+| `eventsCheck`, `prevCheck` | u32 | FNV-1a of `events[0, eventCount)` and of `events[0, prevCount)` |
+| `eventCount`, `prevCount` | u16 | Event records (continuations included), and the count before the last append |
+| `flags` | u8 | 0x1 verbose events truncated, 0x2 decisions truncated, 0x4 interrupted, 0x8 torn last append dropped |
+| `endReason` | u8 | Raw `EndReason`; 0 when interrupted |
+| `preShotCount` | u16 | Valid pre-shot entries |
+| `snapshotBytes`, `countersBytes`, `preShotCapacity` | u16 | Section sizes and pre-shot slots |
+| `reserved` | u16 | 0 |
+
+The 16 bytes from `eventsCheck` to `preShotCount` (offsets 64–79) share one
+cache line; each append writes its records first and then the 14 bytes from
+`eventsCheck` to `endReason`.
 
 ### Start snapshot
 
@@ -187,7 +235,9 @@ matching header flag; counters stay exact.
 
 ## Ownership and memory
 
-Two 16 KiB buffers and the pre-shot ring are static PSRAM BSS (about 33 KiB);
+Two 16 KiB buffers and the pre-shot ring are static PSRAM no-init memory
+(33,408 bytes, `.ext_ram_noinit`); nothing in it is trusted before the boot
+checks;
 one buffer captures while the other keeps the newest completed trace. The
 control loop owns the window, the state-change cache and the reading
 statistics; producers on other tasks append under the trace's leaf mutex or
