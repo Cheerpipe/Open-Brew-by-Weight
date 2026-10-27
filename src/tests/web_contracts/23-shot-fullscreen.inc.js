@@ -211,7 +211,8 @@
   // With the Wake Lock API the screen lock is taken on entry, released on
   // exit, re-taken when the page returns, and never kept after a late grant.
   (async () => {
-    let requests = 0, releases = 0, grant = null;
+    let requests = 0, releases = 0;
+    const grants = [], grantAll = () => grants.splice(0).forEach(grant => grant());
     const lock = {release: () => { releases++; return Promise.resolve(); }};
     const els = {liveShot: {classList: {add() {}, remove() {}}, focus() {}},
       liveShotClose: {focus() {}}};
@@ -224,20 +225,25 @@
         {body: {classList: {add() {}, remove() {}}}, createElement() { throw Error('no video'); }},
         () => 0, () => {},
         {wakeLock: {request: type => { assert.equal(type, 'screen'); requests++;
-          return new Promise(resolve => { grant = () => resolve(lock); }); }}},
+          return new Promise(resolve => grants.push(() => resolve(lock))); }}},
         () => {}, () => {});
     const settle = () => new Promise(resolve => setImmediate(resolve));
     api.enter();
-    grant(); await settle();
+    grantAll(); await settle();
     assert.equal(requests, 1, 'entering requests a screen wake lock');
     api.exit();
     assert.equal(releases, 1, 'exiting releases the wake lock');
     api.enter();
     api.awake(true);  // The page became visible again while full screen.
     assert.equal(requests, 3, 'returning to the page re-takes the lock');
+    grantAll(); await settle();
+    assert.equal(releases, 2, 'overlapping grants keep one lock, releasing the older');
     api.exit();
-    grant(); await settle();
-    assert.equal(releases, 2, 'a lock granted after exit is released at once');
+    assert.equal(releases, 3, 'exiting releases the only lock still held');
+    api.enter();
+    api.exit();
+    grantAll(); await settle();
+    assert.equal(releases, 4, 'a lock granted after exit is released at once');
     const visibilityHandler = blockAt(runtimeJs, 'function onPageVisibility() {');
     assert.ok(codeIncludes(visibilityHandler, 'if (shotFsActive) keepShotFsAwake(true);') &&
         visibilityHandler.indexOf('if (document.hidden)') < visibilityHandler.indexOf('keepShotFsAwake(true)') &&

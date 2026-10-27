@@ -4355,7 +4355,12 @@ function keepShotFsAwake(on) {
   }
   if (navigator.wakeLock)
     return void navigator.wakeLock.request("screen").then(
-      (l) => (shotFsActive ? (shotFsLock = l) : l.release()),
+      // Overlapping requests resolve in turn; each grant replaces the last.
+      (l) => {
+        if (!shotFsActive) return l.release();
+        shotFsLock?.release().catch(() => {});
+        shotFsLock = l;
+      },
       () => {},
     );
   if (!shotFsVideo) {
