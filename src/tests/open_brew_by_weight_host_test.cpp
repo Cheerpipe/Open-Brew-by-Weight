@@ -9160,6 +9160,17 @@ bool profileHasState(ScaleProfileSignal signal, uint32_t value) {
   return false;
 }
 
+size_t debugLogTextCount(const char *needle) {
+  static DebugEvent events[DEBUG_EVENT_CAPACITY];
+  const size_t count = copyDebugEvents(0, events, DEBUG_EVENT_CAPACITY);
+  size_t matches = 0;
+  for (size_t i = 0; i < count; ++i) {
+    if (events[i].code == DebugCode::LOG_TEXT &&
+        strstr(events[i].text, needle) != nullptr) ++matches;
+  }
+  return matches;
+}
+
 void sp01_profile_explains_idle_cup_tare_and_removal() {
   prepareIdleTare();
   CHECK(scaleProfiler().hostStartNoFlash(millis()));
@@ -9232,6 +9243,7 @@ void sp03_profile_explains_settling_failure_and_config_changes() {
   serviceIdleTare();
   CHECK(profileHasState(ScaleProfileSignal::IDLE_LAST_REASON,
                         static_cast<uint32_t>(IdleTareReason::WRITE_FAILED)));
+  CHECK(debugLogTextCount("Cup tare failed: write_failed") == 1);
   bool unstable = false, failed = false;
   for (uint32_t i = 0; i < scaleProfiler().hostRecordCount(); ++i) {
     const auto row = scaleProfiler().hostRecord(i);
@@ -10141,6 +10153,7 @@ void it05_queued_tare_is_preempted_by_same_start_or_removal() {
   CHECK(localBuzzer.pendingCue == BuzzerCue::NONE);
   CHECK(idleTare.requestId == 0);
   CHECK(idleTare.lastReason == IdleTareReason::START_REQUEST);
+  CHECK(debugLogTextCount("tare not confirmed") == 0);  // Superseded, not missed.
   CHECK(idleScaleTareStatus().phase == IdleTarePhase::NONE);
   CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 1);
   CHECK(commandCount(ScaleCommandType::START_TIMER_AND_TARE) == 1);
@@ -10159,8 +10172,22 @@ void it05_queued_tare_is_preempted_by_same_start_or_removal() {
   idleWeight(0.0f);
   idleWeight(0.0f);
   CHECK(cupPresenceState() == CupPresenceState::ABSENT);
+  // The lift reads as an unstable placement before it is a removal: the
+  // queued, unwritten request is reported as cancelled, not as a failure.
+  CHECK(idleTare.lastReason == IdleTareReason::UNSTABLE);
+  CHECK(debugLogTextCount("Cup tare cancelled: unstable") == 1);
+  CHECK(debugLogTextCount("tare not confirmed") == 0);
   CHECK(executeNextScaleCommand());
   CHECK(scale.tareCalls == 0);
+
+  prepareIdleTare();  // A removal event releases silently.
+  idleCup(80.0f);
+  CHECK(idleTare.requestId != 0);
+  debugLog.clear();
+  handleIdleCupEvent(CupPresenceEvent::REMOVED);
+  CHECK(idleTare.requestId == 0);
+  CHECK(idleTare.lastReason == IdleTareReason::REMOVED);
+  CHECK(debugLogTextCount("Cup tare") == 0);
 
   prepareIdleTare();
   idleCup(80.0f);
@@ -10587,6 +10614,7 @@ void it23_unknown_effect_releases_slot_but_not_cup_guard() {
   CHECK(idleTare.requestId == 0);
   CHECK(!cupPresenceIsKnown());
   CHECK(idleTare.lastReason == IdleTareReason::EFFECT_UNCONFIRMED);
+  CHECK(debugLogTextCount("Cup tare not confirmed: effect_unconfirmed") == 1);
   idleCup(0.0f); // Cannot invent absence or confirmed tared presence.
   CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 0);
   enableCupStartGuardForTest();
@@ -10774,11 +10802,15 @@ void it32_queued_minimum_is_independent_of_tolerance() {
     }
     idleCup(emptyG + runtimeConfig.minimumCupWeightG);
     CHECK(idleTare.requestId != 0);
+    debugLog.clear();
     idleWeight(emptyG + runtimeConfig.minimumCupWeightG - 0.1f);
     CHECK(idleTare.requestId == 0);
     CHECK(idleTare.lastReason == IdleTareReason::UNSTABLE);
+    // The released request reaches the Web UI log once.
+    CHECK(debugLogTextCount("Cup tare cancelled: unstable") == 1);
     CHECK(executeNextScaleCommand());
     CHECK(scale.tareCalls == (relative ? 1U : 0U));
+    CHECK(debugLogTextCount("Cup tare") == 1);
   }
 }
 
@@ -10907,18 +10939,41 @@ void it34_final_prewrite_sample_requires_control_approval() {
   }
 }
 
+void it35b_ineligible_placement_logs_its_reason() {
+  prepareIdleTare();
+  debugLog.clear();
+  maintenanceLease.active = true;
+  serviceIdleTare();
+  CHECK(idleTare.eligibilityReason == IdleTareReason::MAINTENANCE);
+  idleCup(80.0f);
+  CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+  CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 0);
+  CHECK(debugLogTextCount("Cup placed, not tared: maintenance (empty ref known, 80.0g)") ==
+        1);
+  idleCup(80.0f); // A cup that stays put is not logged again.
+  CHECK(debugLogTextCount("not tared") == 1);
+  maintenanceLease.active = false;
+  debugLog.clear();
+}
+
 void it35_loaded_startup_and_sample_gap_need_fresh_placement() {
   resetHarness(false, true);
   reachReadyFromBoot();
   runtimeConfig.autoTareOutsideBrew = true;
+  debugLog.clear();
   idleCup(80.0f);
   CHECK(cupPresenceState() == CupPresenceState::PRESENT);
   CHECK(idleTare.lastReason == IdleTareReason::NO_ABSENCE);
   CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 0);
+  // The skipped placement reaches the Web UI log once, with its reason.
+  CHECK(debugLogTextCount("Cup placed, not tared: no_absence (empty ref unknown, 80.0g)") ==
+        1);
   idleCup(0.0f);
   idleCup(0.0f);
   idleCup(80.0f);
   CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 1);
+  CHECK(debugLogTextCount("not tared") == 1);
+  debugLog.clear();
 
   prepareIdleTare(); // Bookoo zeroed an 80 g load before first connection.
   idleCup(-80.0f);
@@ -11596,6 +11651,29 @@ void it37_accessory_retare_is_opt_in_and_once_before_shot() {
     idleCup(45.0f); // Same cup after the shot cannot rearm the option.
     CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 0);
   }
+}
+
+void it37b_accessory_retry_logs_a_full_queue_once() {
+  prepareIdleTare();
+  runtimeConfig.noScaleBbwMode |= IDLE_ACCESSORY_RETARE;
+  idleCup(80.0f);
+  CHECK(executeNextScaleCommand());
+  idleCup(0.0f);
+  CHECK(idleTare.lastReason == IdleTareReason::EFFECT_CONFIRMED);
+  ScaleCommand filler;
+  filler.type = ScaleCommandType::STOP_TIMER;
+  size_t queued = 0;
+  while (queued < SCALE_COMMAND_QUEUE_LENGTH && enqueueScaleCommand(filler)) ++queued;
+  CHECK(queued == SCALE_COMMAND_QUEUE_LENGTH);
+  debugLog.clear();
+  idleCup(40.0f);
+  for (int i = 0; i < 6; ++i) idleWeight(40.0f);  // Every sample retries.
+  CHECK(idleTare.lastReason == IdleTareReason::QUEUE_FULL);
+  CHECK(debugLogTextCount("Accessory placed, not tared: queue_full") == 1);
+  while (executeNextScaleCommand()) {}
+  idleWeight(40.0f);  // The queue drained: the retry is sent, nothing new is logged.
+  CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 1);
+  CHECK(debugLogTextCount("not tared") == 1);
 }
 
 void it72_accessory_ramp_is_not_tared() {
@@ -13418,6 +13496,86 @@ void s01d_manual_timer_and_limit_share_settled_finalize() {
     CHECK(shotLogCut(saved[0]) == sample.cut);
     CHECK(saved[0].actualWeightCg == 300);
   }
+}
+
+void s01n_unstored_cycles_log_their_reason() {
+  struct Case {
+    uint32_t durationMs;
+    bool withScale;
+    bool anchored;
+    float weightG;
+    float softwareZeroG;
+    bool keepPending;  // Offset analysis keeps a short cycle's finalize alive.
+    const char *expected;
+  };
+  const Case cases[] = {
+      {11960, true, true, 30.0f, 0.0f, false,
+       "Shot not stored: short (11.96s, stop activator)"},
+      {9000, true, true, 30.0f, 0.0f, true,
+       "Shot not stored: short (9.00s, stop activator)"},
+      {12001, true, true, 1.5f, 0.0f, false,
+       "Shot not stored: low_yield (12.0s, yield 1.5g last_known, stop "
+       "activator, zero 0.0g)"},
+      {30000, true, false, 0.0f, 300.0f, false,
+       "Shot not stored: no_yield (30.0s, yield 0.0g none, stop activator, "
+       "zero 300.0g)"},
+      {30000, false, false, 0.0f, 0.0f, false, nullptr},  // No scale: no line.
+      {9000, false, true, 30.0f, 0.0f, false, nullptr},
+      {30000, true, true, 36.0f, 0.0f, false, nullptr},  // Stored: no line.
+  };
+  for (const Case &sample : cases) {
+    resetHarness(false, true);
+    debugLog.clear();
+    shotLog.clear(false);
+    session.config = snapshotConfig(runtimeConfig);
+    session.config.dripDelayMs = 0;
+    session.config.timerOnly = false;
+    session.startedWithScale = sample.withScale;
+    session.hasWeightAnchor = sample.anchored;
+    session.lastAcceptedWeightG = sample.weightG;
+    session.softwareZeroG = sample.softwareZeroG;
+    session.calibrationEligible = sample.keepPending;
+    session.activePresetId = presetBank.activeId;
+    shot.automaticBrew = sample.keepPending;
+    stopperState = StopperState::BREW;
+    schedulePendingShotFinalize(EndReason::ACTIVATOR, sample.durationMs);
+    CHECK(pendingFinalize.pending == (sample.durationMs > 12000 || sample.keepPending));
+    if (pendingFinalize.pending) pendingShotFinalizeTask();
+    const bool stored = sample.expected == nullptr && sample.withScale;
+    CHECK(shotLog.count() == (stored ? 1U : 0U));
+    if (sample.expected == nullptr) {
+      CHECK(debugLogTextCount("Shot not stored") == 0);
+    } else {
+      CHECK(debugLogTextCount(sample.expected) == 1);
+      CHECK(debugLogTextCount("Shot not stored") == 1);
+    }
+  }
+  // A cancelled drip analysis reports through the same line.
+  resetHarness(false, true);
+  debugLog.clear();
+  shotLog.clear(false);
+  session.config = snapshotConfig(runtimeConfig);
+  session.config.dripDelayMs = 5000;
+  session.startedWithScale = true;
+  session.hasWeightAnchor = true;
+  session.lastAcceptedWeightG = 1.0f;
+  session.activePresetId = presetBank.activeId;
+  shot.automaticBrew = false;
+  stopperState = StopperState::BREW;
+  schedulePendingShotFinalize(EndReason::ACTIVATOR, 20000);
+  CHECK(pendingFinalize.pending);
+  cancelPendingFinalize(nullptr, 1);
+  CHECK(shotLog.count() == 0);
+  CHECK(debugLogTextCount("Shot not stored: low_yield (20.0s, yield 1.0g "
+                          "last_known, stop activator") == 1);
+  // A rinse is never a shot and leaves no line.
+  resetHarness(false, true);
+  debugLog.clear();
+  session.config = snapshotConfig(runtimeConfig);
+  session.startedWithScale = true;
+  schedulePendingShotFinalize(EndReason::RINSE_COMPLETE, 30000);
+  CHECK(debugLogTextCount("Shot not stored") == 0);
+  debugLog.clear();
 }
 
 void s01b_shot_log_stop_detail_names_end_reasons() {
@@ -22498,8 +22656,10 @@ const TestCase testCases[] = {
     {"IT33D", it33d_pre_cycle_weight_warning_identifies_timestamps},
     {"IT34", it34_final_prewrite_sample_requires_control_approval},
     {"IT35", it35_loaded_startup_and_sample_gap_need_fresh_placement},
+    {"IT35B", it35b_ineligible_placement_logs_its_reason},
     {"IT36", it36_bookoo_startup_zero_unload_rearms_relative_tare},
     {"IT37", it37_accessory_retare_is_opt_in_and_once_before_shot},
+    {"IT37B", it37b_accessory_retry_logs_a_full_queue_once},
     {"IT38", it38_accessory_retare_requires_continuous_confirmed_placement},
     {"IT39", it39_known_accessory_removal_retares_without_losing_cup},
     {"IT40", it40_accessory_unload_sequences_keep_next_placement_eligible},
@@ -22805,6 +22965,7 @@ const TestCase testCases[] = {
     {"S12h", s12h_capped_curve_batch_keeps_generation_dirty_until_drained},
     {"S02k", s02k_curve_continuity_uses_control_rejections_and_fifo_provenance},
     {"S01d", s01d_manual_timer_and_limit_share_settled_finalize},
+    {"S01n", s01n_unstored_cycles_log_their_reason},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},

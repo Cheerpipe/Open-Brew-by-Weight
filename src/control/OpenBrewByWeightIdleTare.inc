@@ -152,6 +152,17 @@ void releaseIdleTareRequest(IdleTareReason reason = IdleTareReason::NONE) {
                         idleTare.connectionGeneration,
                         idleTare.lastCaptureSequence, NAN,
                         idleTare.requestId, static_cast<uint32_t>(reason));
+  // A lift or a shot start supersedes the request; any other end is a miss.
+  if (reason != IdleTareReason::EFFECT_CONFIRMED &&
+      reason != IdleTareReason::REMOVED &&
+      reason != IdleTareReason::START_REQUEST) {
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE, "%s tare %s: %s",
+                         idleTare.accessoryRequest ? "Accessory" : "Cup",
+                         released.phase == IdleTarePhase::SUCCEEDED ? "not confirmed"
+                             : released.phase == IdleTarePhase::FAILED ? "failed"
+                                                                      : "cancelled",
+                         idleTareReasonName(static_cast<uint8_t>(reason)));
+  }
   idleTare.requestId = 0;
   idleTare.tareNotified = false;
   idleTare.cupStillPresent = false;
@@ -331,6 +342,20 @@ bool observeIdleTareSample(float weight, uint32_t atMs, uint32_t sequence,
   return true;
 }
 
+// Field diagnostics: a placement that is not tared must reach the Web UI log.
+// An accessory retries on every sample, so it logs only a changed reason.
+void logIdlePlacementNotTared(IdleTareReason reason, bool accessory,
+                              IdleTareReason previous = IdleTareReason::NONE) {
+  if (accessory && reason == previous) return;
+  serialTraceCategoryf(
+      LogLevel::INFO, DebugCategory::SCALE,
+      "%s placed, not tared: %s (empty ref %s, %.1fg)",
+      accessory ? "Accessory" : "Cup",
+      idleTareReasonName(static_cast<uint8_t>(reason)),
+      std::isfinite(cupPresence.emptyAnchorG) ? "known" : "unknown",
+      static_cast<double>(idleTare.lastWeightG));
+}
+
 void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
   const ProfileControlObservation profile;
   if (event == CupPresenceEvent::REMOVED) {
@@ -342,13 +367,18 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
     idleTare.knownAccessoryMassG = 0.0f;
     if (idleTare.requestId != 0) releaseIdleTareRequest(IdleTareReason::REMOVED);
   }
-  if (!idleTare.eligible) return;
+  if (!idleTare.eligible) {
+    if (event == CupPresenceEvent::PLACED)
+      logIdlePlacementNotTared(idleTare.eligibilityReason, false);
+    return;
+  }
   if (cupPresenceState() == CupPresenceState::ABSENT) {
     idleTare.absentObserved = cupPresence.weight.emptyValid || cupPresence.weight.unloadQualified;
   }
   if (event != CupPresenceEvent::PLACED && !accessory) return;
   const bool placedInIdle = accessory || idleTare.absentObserved;
   idleTare.absentObserved = false;
+  const IdleTareReason previousReason = idleTare.lastReason;
   if (!placedInIdle || idleTare.requestId != 0 ||
       !getScaleLinkSnapshot().features.has(ScaleFeatureTare)) {
     idleTare.lastReason = !placedInIdle ? IdleTareReason::NO_ABSENCE
@@ -357,6 +387,7 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
                           idleTare.connectionGeneration, idleTare.lastPacketSequence,
                           idleTare.lastWeightG, cupPresencePlacementId(),
                           static_cast<uint32_t>(idleTare.lastReason));
+    logIdlePlacementNotTared(idleTare.lastReason, accessory, previousReason);
     return;
   }
   ScaleCommand command;
@@ -376,6 +407,7 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
                           idleTare.connectionGeneration, idleTare.lastPacketSequence,
                           idleTare.lastWeightG, cupPresencePlacementId(),
                           static_cast<uint32_t>(idleTare.lastReason));
+    logIdlePlacementNotTared(idleTare.lastReason, accessory, previousReason);
     return;
   }
   idleTare.requestId = command.idleTareRequestId;

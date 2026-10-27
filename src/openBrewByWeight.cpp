@@ -339,6 +339,7 @@ struct PendingShotFinalize {
   uint16_t goalWeightDg = DEFAULT_GOAL_WEIGHT_DG;
   float weightOffsetG = DEFAULT_WEIGHT_OFFSET_G;
   float scaleBaselineG = 0.0f;
+  float softwareZeroG = 0.0f;
   bool startedWithScale = false;
   bool timerOnly = false;
   bool automaticBrew = false;

@@ -43,6 +43,34 @@ void captureLateTareCompletion(uint32_t throughMs = millis()) {
   }
 }
 
+// Field diagnostics: a brew cycle started with a scale that does not reach
+// shot history says why. Manual cycles without a scale never have a yield.
+void logShotNotStoredShort(EndReason reason, uint32_t durationMs) {
+  if (!session.startedWithScale) return;
+  serialTraceCategoryf(
+      LogLevel::INFO, DebugCategory::STATE, "Shot not stored: short (%.2fs, stop %s)",
+      static_cast<double>(durationMs) / 1000.0,
+      shotLogStopDetailName(shotLogStopDetailFromEndReason(
+          reason, session.config.fastSideEnabled, session.extractionExtended)));
+}
+
+void logShotNotStoredYield(const PendingShotFinalize &snapshot, float weightG,
+                           bool valid, ActualWeightSource source) {
+  if (!snapshot.startedWithScale) return;
+  const bool measured = valid && std::isfinite(weightG);
+  serialTraceCategoryf(
+      LogLevel::INFO, DebugCategory::STATE,
+      "Shot not stored: %s (%.1fs, yield %.1fg %s, stop %s, zero %.1fg)",
+      measured ? "low_yield" : "no_yield",
+      static_cast<double>(snapshot.durationDs) / 10.0,
+      static_cast<double>(measured ? weightG : 0.0f),
+      actualWeightSourceName(source),
+      shotLogStopDetailName(shotLogStopDetailFromEndReason(
+          snapshot.endReason, snapshot.extractionGuardEnabled,
+          snapshot.extractionExtended)),
+      static_cast<double>(snapshot.softwareZeroG));
+}
+
 void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
                                  const CycleWallTime &end = captureCycleWallTime()) {
   captureLateTareCompletion(end.endedAtMs);
@@ -56,6 +84,7 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   }
   sessionQuickSettings.shotEnded = sessionQuickSettings.mask != 0;
   const bool logEligible = shotLogEligible(reason, durationMs);
+  if (!logEligible) logShotNotStoredShort(reason, durationMs);
   const bool offsetAnalysis = shot.automaticBrew && !session.config.timerOnly &&
                               session.calibrationEligible;
   bool webhookEligible = false;
@@ -104,6 +133,7 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   pendingFinalize.scaleBaselineReady = session.scaleBaselineReady;
   pendingFinalize.scaleBaselineG =
       session.scaleBaselineReady ? session.scaleBaselineG : 0.0f;
+  pendingFinalize.softwareZeroG = session.softwareZeroG;
   pendingFinalize.startedWithScale = session.startedWithScale;
   pendingFinalize.timerOnly = session.config.timerOnly;
   pendingFinalize.automaticBrew = shot.automaticBrew;
@@ -642,6 +672,8 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
   }
   if (persistEligible && !pendingFinalizeIsRinse(snapshot))
     commitPendingShotLog(snapshot, weightG, valid, source);
+  else if (snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
+    logShotNotStoredYield(snapshot, weightG, valid, source);
   queueWebhookEnd(snapshot, weightG, valid);
 }
 
@@ -711,6 +743,8 @@ void pendingShotFinalizeTask() {
   }
   if (persistEligible && !pendingFinalizeIsRinse(snapshot))
     commitPendingShotLog(snapshot, logWeightG, logWeightValid, weightSource);
+  else if (snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
+    logShotNotStoredYield(snapshot, logWeightG, logWeightValid, weightSource);
   queueWebhookEnd(snapshot, logWeightG, logWeightValid);
 
 
