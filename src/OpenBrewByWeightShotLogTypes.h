@@ -796,8 +796,12 @@ inline bool validShotLogStore(const ShotLogStore &store) {
 }
 
 // Re-strides the records of a valid store written with shorter records to
-// the current size; appended fields read as zero.
+// the current size; appended fields read as zero. Every save compacts the
+// ring (records[0..count) oldest first), so the write index follows from the
+// count; one an image of smaller capacity wrote (500 records at index 0)
+// would otherwise point past the live records.
 inline void widenShotLogRecords(ShotLogStore &store) {
+  store.header.writeIndex = static_cast<uint16_t>(store.header.count % SHOT_LOG_CAPACITY);
   const size_t stored = store.header.recordSize;
   if (stored >= sizeof(ShotLogRecord)) return;
   const uint8_t *packed = reinterpret_cast<const uint8_t *>(store.records);

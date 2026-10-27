@@ -8,6 +8,7 @@
 #include "../OpenBrewByWeightRecoveryGesture.h"
 #include "../OpenBrewByWeightShotLog.h"
 #include "../OpenBrewByWeightShotCurve.h"
+#include "../OpenBrewByWeightShotTracePool.h"
 #include "shot_curve_test_helpers.h"
 #include "../OpenBrewByWeightHistory.h"
 #include "../OpenBrewByWeightActivationStores.h"
@@ -1882,32 +1883,6 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   CHECK(reloaded.count() == 1);
 }
 
-// Factory reset clears the shot trace pool and verifies it by a fresh
-// recovery; a pool clear that fails fails the reset.
-ShotTracePoolIndex factoryPoolIndex;
-void p58b_factory_reset_clears_and_verifies_the_shot_trace_pool() {
-  resetHostPersistence();
-  ShotTracePoolHostFlash::reset();
-  PersistedSettings settings;
-  CHECK(initializeDefaultSettings(settings));
-  ShotLog log;
-  HistoryLog history;
-  LastShotStore lastShot;
-  BleScanPersistedSettings ble;
-  CHECK(log.load() && history.load() && lastShot.load());
-  ShotTracePool pool(factoryPoolIndex);
-  CHECK(pool.recover());
-  for (uint32_t id = 1; id <= 3; ++id) CHECK(pool.append({id, 5, id * 100U, 1, 0}, nullptr, 0));
-  CHECK(resetAllDurableStores(settings, ble, log, history, lastShot, &pool));
-  CHECK(pool.ready() && pool.count() == 0);
-  ShotTracePool rebooted(factoryPoolIndex);
-  CHECK(rebooted.recover() && rebooted.count() == 0 && !rebooted.contains(1, 5, 100));
-  CHECK(pool.append({4, 6, 400, 1, 0}, nullptr, 0));
-  ShotTracePoolHostFlash::setFailAfter(0, 0, true);  // The pool's erase fails.
-  CHECK(!resetAllDurableStores(settings, ble, log, history, lastShot, &pool));
-  CHECK(rebooted.recover() && rebooted.contains(4, 6, 400));
-}
-
 void p59_deferred_shot_log_append_writes_only_on_flush() {
   resetHostPersistence();
   ShotLog log;
@@ -2625,7 +2600,7 @@ void p61c_timestamped_capacity_and_dense_sections() {
   CHECK(curvePoint(sparse, 3).cg == 200 && sparse.ended.weightCg == 300);
 }
 
-void p61c_shot_curve_held_and_break_bits_round_trip() {
+void p61b_shot_curve_held_and_break_bits_round_trip() {
   ShotCurveRecord current = emptyShotCurveRecord();
   current.shotId = 43;
   for (size_t i = 0; i < 9; ++i)  // Two bitmap bytes: 9 % 8 == 1.
@@ -2757,6 +2732,20 @@ void p61h_shot_curve_section_malformed_payloads_are_rejected() {
   }
   ShotCurveRecord out = {};
   CHECK(!decodeCurveSection(curveSection, SHOT_CURVE_SECTION_FIXED_BYTES - 1U, 1, out));
+  // A count past the capacity is refused before anything is read into the
+  // record, even with a length that frames it.
+  static ShotCurveRecord big;
+  big = curveBoundaryRecord(2);
+  size_t bytes = encodeShotCurveSection(big, curveSection);
+  curveSection[0] = static_cast<uint8_t>(SHOT_CURVE_MAX_POINTS + 1U);
+  curveSection[1] = static_cast<uint8_t>((SHOT_CURVE_MAX_POINTS + 1U) >> 8);
+  bytes = SHOT_CURVE_SECTION_FIXED_BYTES + 2U * ((SHOT_CURVE_MAX_POINTS + 8U) / 8U) + 40U;
+  size_t reads = 0;
+  CHECK(!decodeShotCurveSection(bytes, 2, out, [&](size_t at, void *to, size_t n) {
+    memcpy(to, curveSection + at, n);
+    return ++reads, true;
+  }));
+  CHECK(reads == 1);  // Only the fixed bytes.
   CHECK(!decodeCurveSection(curveSection, SHOT_CURVE_SECTION_MAX_BYTES + 4U, 1, out));
 }
 
@@ -3220,6 +3209,41 @@ void p92b_shorter_shot_log_records_widen_on_load() {
   CHECK(!validShotLogStore(store));
 }
 
+// A shot log an image of 500-record capacity saved (500 records, compacted
+// to write index 0) loads at 1000 as its 500 records, never as 1000 with
+// stale bytes past them, and keeps appending after the newest.
+struct SlotShotLog : ShotLog {
+  static ShotLogStore &slot(uint8_t i) { return hostSlots_[i]; }
+};
+void p92c_a_full_500_record_log_loads_at_1000() {
+  resetHostPersistence();
+  static ShotLog log;
+  CHECK(log.load());
+  ShotLogRecord record = {};
+  record.durationDs = 250;
+  record.actualWeightCg = 3600;
+  for (int i = 0; i < 500; ++i) CHECK(log.append(record, false));
+  CHECK(log.save());
+  for (uint8_t i = 0; i < 2; ++i) {
+    ShotLogStore &slot = SlotShotLog::slot(i);
+    if (slot.header.count != 500) continue;
+    slot.header.writeIndex = 0;  // As the 500-capacity image compacted it.
+    for (size_t n = 500; n < SHOT_LOG_CAPACITY; ++n) {
+      memset(&slot.records[n], 0x5A, sizeof(ShotLogRecord));
+      slot.records[n].id = 7777;
+    }
+    finalizeShotLogStore(slot);
+    CHECK(validShotLogStore(slot));
+  }
+  static ShotLog loaded;
+  CHECK(loaded.load() && loaded.count() == 500);
+  static ShotLogRecord rows[SHOT_LOG_CAPACITY];
+  CHECK(loaded.copyNewestFirst(rows, SHOT_LOG_CAPACITY) == 500);
+  CHECK(rows[0].id == 500 && rows[499].id == 1 && !loaded.containsId(7777));
+  CHECK(loaded.append(record, false) && loaded.copyNewestFirst(rows, 2) == 2);
+  CHECK(rows[0].id == 501 && rows[1].id == 500 && loaded.count() == 501);
+}
+
 const TestCase tests[] = {
     {"P66C", p66c_activation_capture_skips_clean_payloads},
     {"P61C", p61c_timestamped_capacity_and_dense_sections},
@@ -3232,6 +3256,7 @@ const TestCase tests[] = {
     {"P91b", p91b_settings_codec_round_trips_and_evolves},
     {"P92", p92_schema2_golden_shot_log_loads},
     {"P92b", p92b_shorter_shot_log_records_widen_on_load},
+    {"P92c", p92c_a_full_500_record_log_loads_at_1000},
     {"P82", p82_ble_scan_strict_versions_and_roundtrip},
     {"P82B", p82b_ble_scan_legacy_minute_bytes_stay_readable},
     {"P80", p80_boot_id_advances_in_its_own_nvs_key},
@@ -3288,7 +3313,6 @@ const TestCase tests[] = {
     {"P55", p55_network_access_reset_preserves_non_network_settings},
     {"P56", p56_shot_log_stale_slot_and_foreign_schema_rejected},
     {"P58", p58_reset_all_durable_stores_and_mid_fail_keeps_settings},
-    {"P58B", p58b_factory_reset_clears_and_verifies_the_shot_trace_pool},
     {"P59", p59_deferred_shot_log_append_writes_only_on_flush},
     {"P60", p60_factory_intent_survives_failed_store_reset},
     {"P67", p67_ensure_recovery_intent_skips_rewrite_when_valid},
@@ -3299,7 +3323,7 @@ const TestCase tests[] = {
     {"P73", p73_factory_intent_does_not_free_data_for_other_failures},
     {"P74", p74_factory_intent_second_failure_keeps_settings},
     {"P91C", p91c_preset_transitions_repair_out_of_range},
-    {"P61C", p61c_shot_curve_held_and_break_bits_round_trip},
+    {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},
     {"P61G", p61g_shot_curve_section_worst_case_stays_within_budget},

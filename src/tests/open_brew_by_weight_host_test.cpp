@@ -17715,7 +17715,7 @@ void sh02_stats_snapshot_captures_one_store_generation() {
   CHECK(snapshot->records[0].id == record.id);
   // Row curves are fetched on demand under one short lock each.
   ShotCurveRecord fetched = emptyShotCurveRecord();
-  CHECK(copyShotCurveById(record.id, fetched) == ShotCurveRead::FOUND);
+  CHECK(copyShotCurveById(record.id, fetched, true) == ShotCurveRead::FOUND);
   CHECK(fetched.shotId == record.id);
   CHECK(curvePoint(fetched, 0).cg == record.actualWeightCg);
   CHECK(rateShotRecord(record.id, 5));
@@ -23718,18 +23718,34 @@ void tpw06_clear_all_clears_the_pool_before_the_shot_log() {
   serviceShotTracePool();
   CHECK(shotTracePool().count() == 1 && poolTraceBytes(2, 7, 200000).empty());
   // The shot-store persist lands the pool clear first; a pool clear that
-  // fails holds the shot log clear back.
+  // fails never holds the shot log back: the request stays pending, is
+  // logged once, and is retried with a growing back-off while appends wait.
   CHECK(initializeSettingsPersistenceWorker());
   CHECK(clearShotLog());
-  PoolFlash::setFailAfter(0, 0, true);
+  PoolFlash::setFailAfter(0, 0, false);  // The erase fault stays.
   activationStores.capturePersistenceImage(*shotStorePersistImage);
   shotStorePersistImageGeneration = shotStoreDirtyGeneration.load();
   persistShotStoreImage();
-  CHECK(shotStorePersistResultReady && !shotStorePersistResultOk);
+  CHECK(shotStorePersistResultReady && shotStorePersistResultOk);
   CHECK(shotTracePoolClearRequested.load() && debugLogTextCount("Shot trace pool not cleared") == 1);
+  const size_t ops = PoolFlash::operations();
+  completePoolTestTrace(3, 7, 400000);
+  serviceShotTracePool();
   persistShotStoreImage();
-  CHECK(shotStorePersistResultOk && !shotTracePoolClearRequested.load() &&
-        shotTracePool().count() == 0);
+  CHECK(PoolFlash::operations() == ops && shotStorePersistResultOk);  // Backing off.
+  hostMillis += 1000;
+  serviceShotTracePool();
+  CHECK(PoolFlash::operations() == ops + 1U && shotTracePoolClearRequested.load());
+  hostMillis += 1000;  // The next attempt waits 2 s.
+  serviceShotTracePool();
+  CHECK(PoolFlash::operations() == ops + 1U);
+  CHECK(debugLogTextCount("Shot trace pool not cleared") == 1);
+  PoolFlash::setFailAfter(-1);
+  hostMillis += 1000;
+  serviceShotTracePool();
+  // Cleared, and the trace that waited is saved in the same pass.
+  CHECK(!shotTracePoolClearRequested.load() && shotTracePool().count() == 1 &&
+        !poolTraceBytes(3, 7, 400000).empty() && poolTraceBytes(1, 7, 300000).empty());
   releaseSettingsPersistenceWorkerForHost();
 }
 
@@ -23830,7 +23846,7 @@ uint32_t storePoolTestShot(uint32_t endedAtMs, bool traced = true, uint16_t poin
 // The curve of a stored shot as readers get it, compared with what was stored.
 ShotCurveRead poolTestRead(uint32_t id, bool *intact = nullptr, uint16_t points = 40) {
   static ShotCurveRecord read;
-  const ShotCurveRead result = copyShotCurveById(id, read);
+  const ShotCurveRead result = copyShotCurveById(id, read, true);
   const ShotCurveRecord &expected = poolTestCurveOf(id, points);
   if (intact != nullptr)
     *intact = memcmp(&read, &expected, offsetof(ShotCurveRecord, stream)) == 0 &&
@@ -23974,7 +23990,12 @@ void tpw10_the_cache_keeps_the_newest_curves_and_loads_them_back_after_boot() {
   static ShotCurveRecord homeCurve;
   homeCurve = emptyShotCurveRecord();
   CHECK(copyHomeShot(home, &homeCurve) && home.id == total && homeCurve.count == 0);
+  // One batch per pass, newest first: Home's curve comes back on the first.
   serviceShotTracePool();
+  CHECK(shotCurves.count() == SHOT_CURVE_LOAD_BATCH && shotCurves.containsShotId(total));
+  CHECK(copyHomeShot(home, &homeCurve) && homeCurve.shotId == total);
+  for (int pass = 0; pass < 100 && debugLogTextCount("Shot curves loaded: 500") == 0; ++pass)
+    serviceShotTracePool();
   PoolFlash::setReadHook(nullptr);
   TaskMutex::hostObserver = nullptr;
   CHECK(poolTestReadsUnderStoreLock == 0);
@@ -23982,17 +24003,34 @@ void tpw10_the_cache_keeps_the_newest_curves_and_loads_them_back_after_boot() {
         !shotCurves.containsShotId(10) && shotCurves.containsShotId(11));
   static ShotCurveRecord newest;
   CHECK(shotCurves.copyNewestFirst(&newest, 1) == 1 && newest.shotId == total);
-  CHECK(copyHomeShot(home, &homeCurve) && homeCurve.shotId == total &&
-        homeCurve.count == 8U + total % 30U);
+  CHECK(homeCurve.count == 8U + total % 30U);
   CHECK(poolTestRead(3, &intact, 8U + 3U) == ShotCurveRead::FOUND && intact);
   CHECK(debugLogTextCount("Shot curves loaded: 500 in RAM") == 1);
   // A shot that ends before the load keeps its place as the newest curve and
-  // is saved after it; the load fills the older end only.
+  // is saved on the first pass, without waiting for the load, which fills
+  // the older end only.
   hostRebootShotTracePool();
   const uint32_t late = storePoolTestShot(total * 1000U + 5000U, false);
   serviceShotTracePool();
+  CHECK(shotCurves.pending() == 0 && shotCurves.count() == SHOT_CURVE_LOAD_BATCH &&
+        poolRecordHas(late, total * 1000U + 5000U, ShotTracePoolSection::CURVE));
+  // A pause (the gate closes while the load reads) never skips a summary:
+  // the one being read is read again on the next pass.
+  static size_t storeLocks;
+  storeLocks = 0;
+  TaskMutex::hostObserver = [](const TaskMutex *mutex, bool acquired) {
+    if (mutex == &shotStoreMutex && acquired && ++storeLocks == 1) session.active = true;
+  };
+  const size_t before = shotCurves.count();
+  serviceShotTracePool();
+  TaskMutex::hostObserver = nullptr;
+  session.active = false;
+  CHECK(shotCurves.count() == before);
+  for (int pass = 0; pass < 100 && debugLogTextCount("Shot curves loaded: 500") < 2; ++pass)
+    serviceShotTracePool();
   CHECK(shotCurves.count() == SHOT_CURVE_CAPACITY && shotCurves.pending() == 0 &&
         !shotCurves.containsShotId(11) && shotCurves.containsShotId(12));
+  for (uint32_t id = 12; id <= total; ++id) CHECK(shotCurves.containsShotId(id));
   CHECK(shotCurves.copyNewestFirst(&newest, 1) == 1 && newest.shotId == late &&
         poolRecordHas(late, total * 1000U + 5000U, ShotTracePoolSection::CURVE));
 }
@@ -24079,6 +24117,115 @@ void tpw13_power_loss_while_saving_a_curve_loses_only_that_record() {
             poolTestRead(one) == ShotCurveRead::FOUND);
     }
   }
+}
+
+// Factory reset: the cache and the unsaved trace go whatever happens, so a
+// shot id the reset log reuses never gets the old curve; a pool that cannot
+// be cleared never fails the reset, and the worker lands its clear later.
+void tpw14_factory_reset_never_keeps_old_curves_or_fails_on_the_pool() {
+  freshPoolShotLog();
+  const uint32_t old = storePoolTestShot(100000, true, 30);
+  serviceShotTracePool();
+  storePoolTestShot(200000, true, 30);  // Pending when the reset comes.
+  for (const bool poolFails : {true, false}) {
+    PoolFlash::setFailAfter(poolFails ? 0 : -1, 0, false);
+    {
+      TaskLockGuard lock(shotStoreMutex);
+      TaskLockGuard writer(shotTracePoolWriterMutex);
+      CHECK(shotLog.clear(false));  // As resetAllDurableStores did.
+      resetShotRecordsForFactoryReset();
+    }
+    PoolFlash::setFailAfter(-1);
+    CHECK(shotCurves.count() == 0 && shotCurves.pending() == 0);
+    CHECK(shotTracePoolClearRequested.load() == poolFails);
+    CHECK(debugLogTextCount("Shot trace pool not cleared by the factory reset") == 1);
+    // Shot 1 again: its own curve, never the one shot 1 had before.
+    CHECK(storePoolTestShot(300000, false, 12) == old);
+    bool intact = false;
+    CHECK(poolTestRead(old, &intact, 12) == ShotCurveRead::FOUND && intact);
+    hostMillis += 2000;
+    serviceShotTracePool();
+    CHECK(!shotTracePoolClearRequested.load() && shotTracePool().count() == 1 &&
+          !poolRecordHas(old, 100000, ShotTracePoolSection::CURVE) &&
+          poolRecordHas(old, 300000, ShotTracePoolSection::CURVE));
+    hostRebootShotTracePool();
+    serviceShotTracePool();
+    CHECK(poolTestRead(old, &intact, 12) == ShotCurveRead::FOUND && intact);
+  }
+}
+
+// A shot that ends between the worker's cache read and its trace read: its
+// trace must not leave alone, or contains() would skip its curve.
+void tpw15_a_trace_never_leaves_before_its_shots_curve() {
+  freshPoolShotLog();
+  ShotLogRecord record = {};
+  record.durationDs = 300;
+  record.actualWeightCg = 3600;
+  record.bootId = currentBootId();
+  record.endedAtMs = 100000;
+  CHECK(shotLog.append(record, false));
+  completePoolTestTrace(1, currentBootId(), 100000);
+  static size_t storeLocks;
+  storeLocks = 0;
+  TaskMutex::hostObserver = [](const TaskMutex *mutex, bool acquired) {
+    // Second store lock of the pass: the curve was stored after the read.
+    if (mutex == &shotStoreMutex && acquired && ++storeLocks == 2)
+      (void)shotCurves.append(poolTestCurveOf(1));
+  };
+  serviceShotTracePool();
+  TaskMutex::hostObserver = nullptr;
+  CHECK(shotTracePool().count() == 0 && shotCurves.pending() == 1);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && shotCurves.pending() == 0 &&
+        poolRecordHas(1, 100000, ShotTracePoolSection::CURVE) &&
+        poolRecordHas(1, 100000, ShotTracePoolSection::TRACE));
+}
+
+// Transient failures: a busy flash lock costs no attempt, a read failure is
+// busy for readers (never cached as "no curve"), and a pool that fails to
+// recover is retried with a growing back-off and holds nothing back.
+void tpw16_transient_failures_are_retried_not_counted() {
+  freshPoolShotLog();
+  const uint32_t one = storePoolTestShot(100000, false);
+  g_hostFlashIoMutexAvailable = false;
+  for (int pass = 0; pass < 5; ++pass) serviceShotTracePool();
+  g_hostFlashIoMutexAvailable = true;
+  CHECK(shotTracePool().count() == 0 && shotCurves.pending() == 1);
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 1 && shotCurves.pending() == 0);
+  CHECK(debugLogTextCount("not saved after") == 0);
+  {
+    TaskLockGuard lock(shotStoreMutex);
+    shotCurves.clear();
+  }
+  PoolFlash::setReadsFail(true);
+  CHECK(poolTestRead(one) == ShotCurveRead::BUSY);
+  // A failed recovery: retried after 1 s, then 2 s; nothing is held back.
+  hostRebootShotTracePool();
+  storePoolTestShot(200000, false);
+  serviceShotTracePool();
+  CHECK(!shotTracePool().ready() && poolTestRead(one) == ShotCurveRead::NONE);
+  {
+    TaskLockGuard lock(shotStoreMutex);
+    CHECK(shotCurves.pending() == 1 && !shotCurvesSavePending());
+  }
+  const auto attempted = [] {
+    poolTestFlashReads = 0;
+    PoolFlash::setReadHook(poolTestReadSpy);
+    serviceShotTracePool();
+    PoolFlash::setReadHook(nullptr);
+    return poolTestFlashReads != 0;
+  };
+  CHECK(!attempted());
+  hostMillis += 1000;
+  CHECK(attempted() && debugLogTextCount("recovery failed") == 1);
+  hostMillis += 1000;
+  PoolFlash::setReadsFail(false);
+  CHECK(!attempted() && !shotTracePool().ready());
+  hostMillis += 1000;
+  serviceShotTracePool();
+  TaskLockGuard lock(shotStoreMutex);
+  CHECK(shotTracePool().ready() && shotTracePool().count() == 2 && !shotCurvesSavePending());
 }
 
 const TestCase testCases[] = {
@@ -24770,6 +24917,9 @@ const TestCase testCases[] = {
     {"TPW11", tpw11_flash_is_never_read_during_a_shot},
     {"TPW12", tpw12_a_recycled_curve_reads_as_no_curve},
     {"TPW13", tpw13_power_loss_while_saving_a_curve_loses_only_that_record},
+    {"TPW14", tpw14_factory_reset_never_keeps_old_curves_or_fails_on_the_pool},
+    {"TPW15", tpw15_a_trace_never_leaves_before_its_shots_curve},
+    {"TPW16", tpw16_transient_failures_are_retried_not_counted},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},

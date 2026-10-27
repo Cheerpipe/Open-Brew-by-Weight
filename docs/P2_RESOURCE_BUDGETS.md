@@ -209,9 +209,9 @@ The 3,120 KiB→3,156 KiB increase covers 1,000 shot summaries and curves in
 the pool: the shot log's PSRAM store grows by 500 × 128 = 64,000 bytes, the
 retired legacy curve store frees its block-header index, disk and
 verification workspaces and deletion ring (31,388 bytes), and the pool
-worker's curve staging adds 5,600 bytes, +38,212 bytes in all. The matched
-development profile measured 3,227,520 external-BSS bytes (no-init unchanged
-at 33,408, DIRAM +48 bytes, image −2,672 bytes). The two other summary
+worker's curve staging and trace CRC chunk add 5,864 bytes, +38,476 bytes in
+all. The matched development profile measured 3,227,776 external-BSS bytes
+(no-init unchanged at 33,408, DIRAM +64 bytes, image −4,784 bytes). The two other summary
 copies live in the external heap: the persistence image (144,168 bytes,
 +10,168: the larger log less the four-curve batch it no longer carries) and
 the Network work buffer (292,920 bytes, +77,288: the Stats record snapshot,
@@ -219,7 +219,9 @@ its 1,000-entry order and a 2,048-entry curve-hash table). Static and heap
 together take about 123 KiB more PSRAM; the runtime heap had about 2.2 MB
 free before the change.
 The immutable persistence image is separately allocated in external heap and
-mirrors the shot and activation logs; curves never ride it.
+mirrors the shot and activation logs; curves never ride it. Capturing it
+copies the whole 128,024-byte shot log under `shotStoreMutex` when the log is
+dirty (about once per stored shot, edit or deletion).
 
 ## Home shot stream target measurements
 
@@ -278,7 +280,7 @@ cases also remain pending; the successful full transfer does not qualify them.
 | Network work buffer | external, bounded at 640 KiB (292,920 bytes measured); includes the Stats capture's full-capacity shot-record snapshot (1,000 × 128 bytes), its 1,000-entry order and 2,048-entry curve-hash table with one-curve fetch scratch (also the empty-curve template), 19,554-byte curve JSON, 23,650-byte row JSON, 40,960-byte status JSON, the Home shot's curve copy, 3,792 bytes of session field fingerprints and a bounded page header/cache key; handlers share the work-buffer mutex. The earlier 629,376-byte measurement predates this layout; verify the current size in the matched firmware build |
 | HTTP response send | complete assets and JSON use HTTPD Content-Length responses; streamed bodies retain chunked transfer. Source buffers pass directly to HTTPD's default socket send, which copies into lwIP; no application bounce buffer or extra copy |
 | NVS metadata cache | PSRAM preferred with internal fallback; flash I/O still uses the internal scratch below |
-| Shot-curve cache | external BSS, 2,804,012 bytes: the newest 500 delta-stream records of 5,608 bytes (stream reserved for the valid-record worst case) and the pending count; copies move only used stream and bitmap bytes; older curves live only in the shot trace pool and are read on demand into the caller's record; the pool worker's 5,600-byte curve staging is external BSS |
+| Shot-curve cache | external BSS, 2,804,012 bytes: the newest 500 delta-stream records of 5,608 bytes (stream reserved for the valid-record worst case) and the pending count; copies move only used stream and bitmap bytes; older curves live only in the shot trace pool and are read on demand into the caller's record; the pool worker's 5,608-byte curve staging and 256-byte trace CRC chunk are external BSS |
 | Curve capture/finalization | external task-owned sampler (one delta-stream record) and pending/finalization snapshots; the published scalar status stays internal, bounded at 2,048 bytes; the live curve record (5,608 bytes, empty while idle) is published in PSRAM under the same mutex/version, copying only its used bytes. The full reader snapshot stays bounded at 7,432 bytes in the external HTTP workspace; no control-path allocation or large stack local |
 | Home live stream | two fixed internal session contexts and one coalesced dispatch on the existing priority-1 tasks; 128 Home, 224 Diagnostic, 42 shot-card field and curve-scalar, and 80 Settings fingerprints per session occupy 3,792 bytes in the external workspace, plus one 1,436-byte external coalescing buffer owned by httpd and a 1,000-byte external batch rollback copy; boot/clock anchors stay internal. Shared 23,650-byte external row workspace and 19,554-byte curve scratch (base64 stream plus break/held indices), with no extra TX allocation; 1201 curve points maximum, progress after every second scale sample (150 ms floor, 300 ms without samples) and no unchanged data; four HTTP sockets retained |
 | Shared flash-I/O scratch | internal heap, 3,328-byte capacity for one 3,304-byte PersistedSettings record; slots are read, written, and verified sequentially under the flash-I/O lock, with no PSRAM fallback; the larger partition stores transfer in 1 KiB chunks staged through the same scratch |
@@ -377,7 +379,7 @@ friendly, well-constructed UI takes priority over preserving the previous Web UI
 byte allowance. Per-asset caps remain independently enforced by Web contract
 tests, so one asset cannot consume all combined headroom.
 
-Both supported partition tables reserve `shotcurve` at custom subtype
+The partition table reserves `shotcurve` at custom subtype
 `0x40`, exactly `0x3EC000` (4,016 KiB), at `0x8C5000`. Its first two 4 KiB
 sectors keep the retired legacy curve store's epoch and are never written; the
 rest belongs to the [shot trace flash pool](SHOT_TRACE.md#flash-pool) ring,

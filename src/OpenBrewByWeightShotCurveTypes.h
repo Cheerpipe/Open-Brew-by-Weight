@@ -18,8 +18,9 @@ namespace openbrewbyweight {
 constexpr size_t SHOT_CURVE_CAPACITY = 500;
 static_assert(SHOT_CURVE_CAPACITY <= SHOT_LOG_CAPACITY, "Cached curves have summaries");
 // A curve lookup: BUSY when it must come from flash and flash may not be
-// read now (a shot runs, or the pool is not recovered yet).
-enum class ShotCurveRead : uint8_t { NONE, FOUND, BUSY };
+// read now (a shot runs, the pool is not recovered yet, a read failed);
+// STORED when the caller asked not to read flash and the curve may be there.
+enum class ShotCurveRead : uint8_t { NONE, FOUND, BUSY, STORED };
 // Worst case: the base64 stream plus 1201 break and 1201 held indices of up
 // to five characters each, plus the reference point, keys and events.
 constexpr size_t SHOT_CURVE_JSON_CAPACITY =

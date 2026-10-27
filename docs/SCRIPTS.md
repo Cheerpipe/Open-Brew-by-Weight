@@ -165,8 +165,8 @@ only and are never persisted.
 `./scripts/dev validate --risk R2` builds each official validation pair twice:
 a `--development` budget build and the flag-free release image that ships,
 each checked against its own size baseline and, right after it, against the
-stack-depth gate of the destructive recovery paths and the deepest httpd
-requests (see
+stack-depth gate of the destructive recovery paths, the settings_persist
+shot pool worker and the deepest httpd requests (see
 [Validation](../VALIDATION.md)). `--risk R3` also checks each pair
 with Cppcheck and a GCC warning build.
 R2 and R3 run two lanes at once: the host tests, and the firmware steps in a

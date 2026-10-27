@@ -152,10 +152,11 @@ The log holds up to **1,000** shots, good and bad alike. When it is full, the
 newest shot replaces the oldest one, so a run of bad shots can push out older
 good shots. The curves of the newest 500 shots load instantly; an older shot's
 curve is fetched from the controller's storage when you scroll to it or export,
-which waits while a shot is brewing. The controller keeps curves for roughly
-the last thousand shots, fewer if your shots are long: the oldest curves make
-room for new ones, so a very old shot can appear without its curve. The
-following are never stored:
+which waits while a shot is brewing. Curve storage is shared with each shot's
+diagnostic record, so how many curves it keeps depends on how much your shots
+record: your most recent shots always keep theirs, and when space runs out the
+oldest curves make room for new ones, so an older shot can appear without its
+curve. The following are never stored:
 
 - Rinses and starts that were not confirmed
 - Brews started without a scale, unless a scale connected during the brew and

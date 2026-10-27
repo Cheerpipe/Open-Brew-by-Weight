@@ -63,7 +63,8 @@ only the page projection. Debug export invalidates this cache before overwriting
 its record array. Each row's curve is fetched in its own short acquisition:
 from the PSRAM cache of the newest 500, or, for an older shot, its identity is
 copied under the lock, the lock is released and the pool record is read under
-the flash lock; while a shot runs that read answers busy instead. No second
+the flash lock; while a shot runs that read answers busy instead. The page
+fingerprint never reads flash (a stored curve hashes by its shot id). No second
 full curve cache or store-lock-to-network-I/O edge is introduced.
 
 Scale results, fallback mailboxes and the weight FIFO share one task mutex.
@@ -216,8 +217,9 @@ and clear run on its idle passes, one flash operation per step under the
 shared flash lock, only while the durable write gate is open and no trace
 capture is open; the pass returns as soon as either closes. One writer mutex
 (`shotTracePoolWriterMutex`) serializes that worker with a factory reset,
-which clears the pool on network_manager under the maintenance lease while
-holding `shotStoreMutex` (lock order: `shotStoreMutex`, writer mutex, flash
+which drops the curve cache and clears the pool on network_manager under the
+maintenance lease while holding `shotStoreMutex` (a pool it cannot clear is
+left requested for the worker) (lock order: `shotStoreMutex`, writer mutex, flash
 lock, then the pool or the trace mutex). The worker takes
 `shotStoreMutex` only while it does not hold the writer mutex: it stages the
 oldest unsaved curve (and checks that no capture is open) under the store

@@ -157,8 +157,9 @@ using namespace openbrewbyweight;
 constexpr uint32_t CONTROL_STATUS_REFRESH_WAIT_MS = 50;
 constexpr uint32_t LOOP_NO_SCALE_DELAY_MS = 5;
 // Persist blob is PSRAM BSS, not a 3 KiB stack local. Keep headroom for
-// Preferences / TWDT on the flash-writing task (stack stays internal).
-constexpr uint32_t SETTINGS_PERSIST_TASK_STACK_SIZE = 4096;
+// Preferences / TWDT on the flash-writing task (stack stays internal). The
+// stack-depth gate bounds its NVS and shot pool paths at about 4.6 KiB.
+constexpr uint32_t SETTINGS_PERSIST_TASK_STACK_SIZE = 5120;
 constexpr uint32_t SCALE_STOP_RETRY_INTERVAL_MS = 250;
 constexpr uint32_t SCALE_STOP_RETRY_WINDOW_MS = 5000;
 constexpr uint8_t SCALE_STOP_MAX_ATTEMPTS = 3;

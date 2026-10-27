@@ -33,13 +33,12 @@
 using namespace openbrewbyweight;
 constexpr int ESP_OK=0,HTTPD_WS_TYPE_TEXT=1;
 constexpr size_t kStatsStreamFrameBytes=20480;
-constexpr uint32_t kStatsStreamPaceMs=100,kUiStreamDispatchBudgetMs=800;
-uint32_t deadlineLeft=800;
-uint32_t uiStreamDeadlineLeft(){return deadlineLeft;}
+constexpr uint32_t kStatsStreamPaceMs=100;
 const char *uiStreamSendKind="";
 bool uiStreamSendCleanAbort=false;
-uint32_t now=1,storeEpoch=1,frozen=0,shots=3; unsigned captures=0,hashes=0,curveReads=0; int sendResult=ESP_OK;
-bool flashBusy=false;  // Curves of shot 1 come from flash, busy during a shot.
+uint32_t now=1,storeEpoch=1,frozen=0,shots=3; unsigned captures=0,hashes=0,flashReads=0; int sendResult=ESP_OK;
+// With onFlash, shot 1's curve is past the PSRAM cache: read from flash, busy during a shot.
+bool onFlash=false,flashBusy=false;
 uint32_t millis(){return now;}
 struct TaskLockGuard {explicit TaskLockGuard(int){}};
 struct httpd_ws_frame_t{int type;uint8_t *payload;size_t len;};
@@ -98,11 +97,11 @@ void historyPage(HistoryPage &page,size_t offset,size_t limit,ShotLogSortDir dir
   page.hasMore=offset+page.count<130;
   for(size_t i=0;i<page.count;++i){page.records[i]={};page.records[i].id=130-offset-i;}
 }
-ShotCurveRead curveById(uint32_t id,ShotCurveRecord &curve){
-  ++curveReads;
+ShotCurveRead curveById(uint32_t id,ShotCurveRecord &curve,bool readFlash){
   resetShotCurveRecord(curve);
   if(id==0||id>shots) return ShotCurveRead::NONE;
-  if(id==1&&flashBusy) return ShotCurveRead::BUSY;
+  if(id==1&&onFlash&&!readFlash) return ShotCurveRead::STORED;
+  if(id==1&&onFlash&&(++flashReads,flashBusy)) return ShotCurveRead::BUSY;
   appendShotCurvePoint(curve,(frozen?frozen:storeEpoch)*1000+3-id,0,false);
   return ShotCurveRead::FOUND;
 }
@@ -117,7 +116,7 @@ ${session}
   struct {
     uint32_t (*shotLogEpoch)()=+[](){return storeEpoch;};
     void (*copyShotStatsRecords)(ShotStatsRecordsSnapshot &)=capture;
-    ShotCurveRead (*copyShotCurveById)(uint32_t,ShotCurveRecord &)=curveById;
+    ShotCurveRead (*copyShotCurveById)(uint32_t,ShotCurveRecord &,bool)=curveById;
     uint32_t (*historyEpoch)()=+[](){return 77u;};
     void (*copyHistoryPage)(HistoryPage &,size_t,size_t,ShotLogSortDir,uint8_t)=historyPage;
   } callbacks_;
@@ -311,28 +310,24 @@ int main(){
     page(ShotLogSort::Date,ShotLogSortDir::Desc,3,2,1,true);
     shots=3;
   }
-  // A curve flash may not give now (a shot runs) holds the page: nothing is
-  // sent for it, and the page continues once flash reads again. A window
-  // whose curves are not hashed yet waits whole.
+  // A curve past the PSRAM cache: its row hash never reads flash; while a
+  // shot runs the page holds at its row, sending nothing, and continues
+  // once flash reads again.
   {
-    fresh.statsFilter={};fresh.statsResync=true;flashBusy=true;++storeEpoch;frames.clear();
-    assert(send(fresh)&&!fresh.statsPaging&&frames.empty());
-    assert(send(fresh)&&!fresh.statsPaging&&frames.empty());
+    onFlash=flashBusy=true;flashReads=0;fresh.statsFilter={};fresh.statsResync=true;
+    ++storeEpoch;frames.clear();
+    // Rows 3 and 2; framing 2 tries row 1, which is busy.
+    assert(send(fresh)&&send(fresh)&&frames.size()==2&&flashReads==1);
+    assert(send(fresh)&&fresh.statsPaging&&frames.size()==2&&flashReads==2);
+    assert(send(fresh)&&fresh.statsPaging&&frames.size()==2&&flashReads==3);
     flashBusy=false;
-    for(int i=0;i<3;++i)assert(send(fresh));
-    assert(!fresh.statsPaging&&frames.size()==3&&frames[2].find("\\"id\\":1")!=std::string::npos);
-    fresh.statsResync=true;frames.clear();
-    assert(send(fresh)&&send(fresh)&&frames.size()==2);
-    flashBusy=true;
-    assert(send(fresh)&&fresh.statsPaging&&frames.size()==2);
-    flashBusy=false;
-    assert(send(fresh)&&!fresh.statsPaging&&frames.size()==3);
-    // Flash reads for hashes stop at a quarter of the dispatch budget.
-    ++storeEpoch;fresh.statsResync=true;frames.clear();deadlineLeft=500;curveReads=0;
-    assert(send(fresh)&&frames.empty()&&curveReads==0&&network.uiStreamUrgent_.load());
-    deadlineLeft=800;
-    for(int i=0;i<3;++i)assert(send(fresh));
-    assert(!fresh.statsPaging&&frames.size()==3);
+    assert(send(fresh)&&!fresh.statsPaging&&frames.size()==3&&flashReads==4);
+    assert(frames[2].find("\\"id\\":1,")!=std::string::npos);
+    // Content unchanged: a standing refresh names the held rows, reading nothing.
+    frozen=storeEpoch;++storeEpoch;frames.clear();
+    assert(send(fresh)&&frames.size()==1&&flashReads==4);
+    assert(frames[0].find("\\"rows\\":[3,2,1]")!=std::string::npos);
+    onFlash=false;frozen=0;++storeEpoch;
   }
   // A full log of 1000 summaries (shots 4-1000 bad): the export window lists
   // the good shots only; with Show bad shots, a deep page and the ascending

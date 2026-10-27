@@ -376,7 +376,7 @@ segment. Overflow preserves the prefix, marks it incomplete and leaves control
 and scalar history running.
 
 The 5608-byte RAM record (header, the stream reserved for the valid-record
-worst case of 5274 bytes, and both bitmaps) and the 2,804,004-byte cache of
+worst case of 5274 bytes, and both bitmaps) and the 2,804,012-byte cache of
 the newest 500 curves live in PSRAM; copies move only the used stream and
 bitmap bytes. Curve events also preserve elapsed milliseconds in 16-bit
 fields, with `UINT16_MAX` reserved for unavailable values.

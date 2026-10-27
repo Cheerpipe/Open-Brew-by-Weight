@@ -164,6 +164,14 @@ GATES = (
          {r"processPersistedCommand": (
              r"\bresetAllDurableStoresForNetwork\(",
              r"\breleaseNvsSpaceForFactoryResetForNetwork\(")}),
+    # The shot trace pool (recovery, curve cache load, record staging and
+    # append) and the shot-store image that lands a pending pool clear.
+    Gate("settings_persist shot pool",
+         lambda _: source_constant("src/openBrewByWeight.cpp",
+                                   "SETTINGS_PERSIST_TASK_STACK_SIZE"),
+         r"\bsettingsPersistTask\(void\*\)",
+         # serviceShotTracePool is partly inlined as a $part clone.
+         (r"serviceShotTracePool", r"\bpersistShotStoreImage\(")),
     Gate("ota_worker OTA transfer and commit", http_stack, r"::otaWorkerTask\(",
          OTA_WORK, {r"::(?:otaWorkerTask|drainOtaJobs|runOtaJob)\(": OTA_WORK}),
     # Queue full or no memory: the same work runs inline on the httpd task.

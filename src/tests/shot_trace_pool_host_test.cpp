@@ -162,7 +162,7 @@ void tsp01_geometry_and_index_budget() {
 
 void tsp02_round_trip_spanning_sectors() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(!pool.beginAppend(identityOf(1), nullptr, 0));  // Not recovered yet.
   CHECK(pool.recover());
   CHECK(pool.count() == 0);
@@ -204,11 +204,11 @@ void tsp02_round_trip_spanning_sectors() {
 
 void tsp03_boot_scan_rebuilds_the_identical_index() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   for (uint32_t id = 1; id <= 9; ++id) CHECK(appendShot(pool, id));
   const std::vector<ShotTracePoolEntry> before = entries(pool);
-  ShotTracePool rebooted(indexB);
+  ShotTracePool rebooted(indexB, RESERVED);
   CHECK(rebooted.recover());
   CHECK(sameEntries(before, entries(rebooted)));
   // Appends continue right after the newest record: same placement as a
@@ -225,7 +225,7 @@ void tsp03_boot_scan_rebuilds_the_identical_index() {
 
 void tsp04_wrap_evicts_oldest_first() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   uint32_t id = 1;
   size_t peak = 0;
@@ -242,7 +242,7 @@ void tsp04_wrap_evicts_oldest_first() {
     const bool expected = n > 400U - live;
     CHECK(readable(pool, n) == expected);
   }
-  ShotTracePool rebooted(indexB);
+  ShotTracePool rebooted(indexB, RESERVED);
   CHECK(rebooted.recover());
   CHECK(sameEntries(entries(pool), entries(rebooted)));
   // Sequential wear: one erase per sector the ring advanced, every sector
@@ -261,7 +261,7 @@ void tsp04_wrap_evicts_oldest_first() {
 
 void tsp05_shotcurve_opens_and_the_ring_crosses_partitions() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   uint32_t id = fillUntil(pool, 1, RESERVED - 8U);
   for (size_t p = RESERVED; p < Flash::kSectors; ++p) CHECK(Flash::touched(p) == 0);
@@ -275,7 +275,7 @@ void tsp05_shotcurve_opens_and_the_ring_crosses_partitions() {
   CHECK(Flash::touched(RESERVED + 2U) != 0);  // shotcurve sector 2 is logical 335.
   for (uint32_t n = 1; n < id; ++n) CHECK(readable(pool, n));
   CHECK(crossesPartitions(pool));
-  ShotTracePool rebooted(indexB);
+  ShotTracePool rebooted(indexB, RESERVED);
   CHECK(rebooted.setLogicalEnd(SHOT_TRACE_POOL_SECTORS) && rebooted.recover());
   CHECK(sameEntries(entries(pool), entries(rebooted)));
   CHECK(readable(rebooted, crossing) && readable(rebooted, id - 1U));
@@ -333,7 +333,7 @@ ShotTracePoolStatus statusAfter(ShotTracePool &pool, uint32_t id, const ShotTrac
 void sweep(size_t end, const std::vector<uint32_t> &prefill, const std::vector<uint32_t> &scenario,
            bool clearFirst, const char *name) {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.setLogicalEnd(end) && pool.recover());
   for (uint32_t id : prefill) CHECK(appendShot(pool, id));
   std::vector<uint8_t> image(Flash::image(), Flash::image() + Flash::imageBytes());
@@ -439,7 +439,7 @@ void tsp06_power_loss_at_every_operation_with_wrap() {
 void tsp07_power_loss_across_the_partition_boundary() {
   // 333 sectors of prefill, then records that cross into shotcurve.
   freshFlash();
-  ShotTracePool probe(indexA);
+  ShotTracePool probe(indexA, RESERVED);
   CHECK(probe.recover());
   const uint32_t id = fillUntil(probe, 1, RESERVED - 8U);
   sweep(SHOT_TRACE_POOL_SECTORS, ids(1, id - 1U), {300, 302, 303, 304}, false, "TSP07");
@@ -455,7 +455,7 @@ void breakSectorHeader(size_t s) { Flash::sector(physicalOf(s))[offsetof(ShotTra
 
 void tsp09_corrupt_sector_headers_are_holes() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   for (uint32_t id = 1; id <= 40; ++id) CHECK(appendShot(pool, id));
   Expected expected;
@@ -515,7 +515,7 @@ void tsp09_corrupt_sector_headers_are_holes() {
 
 void tsp10_corrupt_payload_and_record_header() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   for (uint32_t id = 1; id <= 6; ++id) CHECK(appendShot(pool, id));
   ShotTracePoolEntry e;
@@ -539,7 +539,7 @@ void tsp10_corrupt_payload_and_record_header() {
 
 void tsp11_linkage_refuses_other_boots_and_times() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   CHECK(appendShot(pool, 5));
   const ShotTracePoolIdentity identity = identityOf(5);
@@ -581,7 +581,7 @@ void tsp11_linkage_refuses_other_boots_and_times() {
 
 void tsp12_clear_hides_everything_and_survives_reboot() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   for (uint32_t id = 1; id <= 30; ++id) CHECK(appendShot(pool, id));
   const size_t ops = Flash::operations();
@@ -592,7 +592,7 @@ void tsp12_clear_hides_everything_and_survives_reboot() {
   CHECK(appendShot(pool, 31) && readable(pool, 31));
   CHECK(pool.recover() && pool.count() == 1 && readable(pool, 31) && !readable(pool, 30));
   // Clear before any recover (factory reset at boot) recovers first.
-  ShotTracePool cold(indexB);
+  ShotTracePool cold(indexB, RESERVED);
   CHECK(cold.clear() && cold.count() == 0);
   CHECK(pool.recover() && pool.count() == 0);
   // A cleared pool never resurrects older sectors after the ring wraps back.
@@ -616,7 +616,7 @@ bool isLive(void *context, const ShotTracePoolEntry &entry) {
 
 void tsp13_stats() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   ShotTracePoolStats stats = pool.stats(nullptr, nullptr);
   CHECK(stats.poolBytes == RESERVED * S && stats.unusedBytes == RESERVED * S);
@@ -663,7 +663,7 @@ void tsp13_stats() {
 
 void tsp14_uncommitted_record_is_never_returned() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   CHECK(appendShot(pool, 1));
   // Write all of record 2 but its commit word, then reboot.
@@ -687,7 +687,7 @@ void tsp14_uncommitted_record_is_never_returned() {
   for (size_t n = 0; n + 1U < all; ++n) CHECK(pool.appendStep() == FlashStoreStepResult::MORE);
   CHECK(pool.appending());
   pool.cancelAppend();
-  ShotTracePool rebooted(indexB);
+  ShotTracePool rebooted(indexB, RESERVED);
   CHECK(rebooted.recover());
   CHECK(rebooted.count() == 1 && !readable(rebooted, 2) && readable(rebooted, 1));
   // The torn tail is not reused: the next record starts in the sector after
@@ -708,7 +708,7 @@ void tsp14_uncommitted_record_is_never_returned() {
 // survives the next boot.
 void tsp16_transient_errors_keep_the_pool_consistent() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   for (uint32_t id = 1; id <= 3; ++id) CHECK(appendShot(pool, id));
   std::vector<uint8_t> image(Flash::image(), Flash::image() + Flash::imageBytes());
@@ -747,7 +747,7 @@ bool tinyIndexed(ShotTracePool &pool, uint32_t id) {
 
 void tsp18_full_index_keeps_the_newest_records() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   const uint32_t cap = SHOT_TRACE_POOL_INDEX_CAPACITY, total = cap + 552U;
   for (uint32_t id = 1; id < total; ++id) CHECK(pool.append(tinyIdentity(id), nullptr, 0));
@@ -774,7 +774,7 @@ void tsp18_full_index_keeps_the_newest_records() {
         stats.poolBytes);
   // Recovery walks oldest first and keeps the same newest records.
   const std::vector<ShotTracePoolEntry> before = entries(pool);
-  ShotTracePool rebooted(indexB);
+  ShotTracePool rebooted(indexB, RESERVED);
   CHECK(rebooted.recover());
   CHECK(sameEntries(before, entries(rebooted)));
   CHECK(rebooted.stats(nullptr, nullptr).droppedRecords == oldest);
@@ -802,7 +802,7 @@ void recycleShotOne() {
 
 void tsp17_reads_revalidate_against_recycling() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   fillUntil(pool, 1, RESERVED - 8U);
   const ShotTracePoolIdentity identity = identityOf(1);
@@ -827,7 +827,7 @@ void tsp17_reads_revalidate_against_recycling() {
 void tsp19_first_record_pointer_outranks_a_stale_length() {
   for (uint16_t lowest : {uint16_t(0x10), uint16_t(0x1000)}) {  // Lands inside / past the next sector.
     freshFlash();
-    ShotTracePool pool(indexA);
+    ShotTracePool pool(indexA, RESERVED);
     CHECK(pool.recover());
     for (uint32_t id = 1; id <= 12; ++id) CHECK(appendShot(pool, id));
     Expected expected;
@@ -864,7 +864,7 @@ void spyErase(size_t physical) {
 
 void tsp20_eviction_precedes_every_erase() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   spiedPool = &pool;
   erasedIndexedSector = false;
@@ -905,7 +905,7 @@ uint32_t addressOf(ShotTracePool &pool, size_t n) {
 
 void tsp21_sector_boundaries() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   const struct {
     uint16_t total;
@@ -947,7 +947,7 @@ void tsp21_sector_boundaries() {
 // A dead reference costs no flash read.
 void tsp22_dead_reference_reads_nothing() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover() && appendShot(pool, 1));
   ShotTracePoolRef ref;
   uint8_t buffer[64];
@@ -965,7 +965,7 @@ void tsp22_dead_reference_reads_nothing() {
 // committed record and only where its first-record pointer is programmable.
 void tsp23_append_position_after_a_crash() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover() && appendShot(pool, 3));  // 12 KB: spans sectors 0-2.
   ShotTracePoolEntry r;
   CHECK(pool.entryAt(0, r));
@@ -1011,7 +1011,7 @@ void tsp23_append_position_after_a_crash() {
 // newest complete records stay, counted once.
 void tsp24_full_index_and_an_unconfirmed_span() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   const uint32_t cap = SHOT_TRACE_POOL_INDEX_CAPACITY, tiny = cap + 100U;
   for (uint32_t id = 1; id <= tiny; ++id) CHECK(pool.append(tinyIdentity(id), nullptr, 0));
@@ -1031,7 +1031,7 @@ void tsp24_full_index_and_an_unconfirmed_span() {
 // append after that recovery, with every tear model.
 void tsp25_crash_during_the_first_append_after_recovery() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   std::vector<uint32_t> prefill;
   for (uint32_t id = 8; prefill.size() < 30; ++id)
@@ -1070,7 +1070,7 @@ void tsp25_crash_during_the_first_append_after_recovery() {
 
 void tsp15_concurrent_reader_and_writer() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   std::atomic<uint32_t> newest{0};
   std::atomic<bool> done{false};
@@ -1120,7 +1120,7 @@ void tsp15_concurrent_reader_and_writer() {
 // NOT_READY, NOT_FOUND or GONE, never other data.
 void tsp26_readers_race_recovery_clear_and_end_changes() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover());
   std::atomic<bool> done{false};
   std::atomic<int> ok{0}, bad{0};
@@ -1179,7 +1179,7 @@ bool readChanging(void *context, size_t offset, uint8_t *out, size_t bytes) {
 
 void tsp27_a_changing_source_abandons_the_append() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover() && appendShot(pool, 1));
   ChangingSource changing;
   changing.id = 2;
@@ -1208,7 +1208,7 @@ void tsp27_a_changing_source_abandons_the_append() {
 // record exists once, in this boot and after the next.
 void tsp28_a_landed_commit_reported_failed_is_indexed() {
   freshFlash();
-  ShotTracePool pool(indexA);
+  ShotTracePool pool(indexA, RESERVED);
   CHECK(pool.recover() && appendShot(pool, 1));
   const size_t before = Flash::operations();
   CHECK(appendShot(pool, 2));

@@ -142,11 +142,13 @@ class ShotCurveCache {
     if (record != nullptr) copyShotCurve(out, *record);
     return record != nullptr;
   }
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   size_t copyNewestFirst(ShotCurveRecord *out, size_t capacity) const {
     const size_t count = store_.header.count < capacity ? store_.header.count : capacity;
     for (size_t n = 0; out != nullptr && n < count; ++n) copyShotCurve(out[n], newestSlot(n));
     return out == nullptr ? 0 : count;
   }
+#endif
 
  private:
   // n-th newest slot of the ring (0 = newest); n == count is the free slot

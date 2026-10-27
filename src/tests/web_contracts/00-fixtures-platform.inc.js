@@ -465,7 +465,7 @@ if (!psram.includes('#define OPEN_BREW_BY_WEIGHT_PSRAM_BSS EXT_RAM_BSS_ATTR') ||
     !firmwareCore.includes(
         'xQueueCreate(PERSISTENCE_WORK_QUEUE_DEPTH, sizeof(PersistenceWork))') ||
     !firmwareCore.includes(
-        'constexpr uint32_t SETTINGS_PERSIST_TASK_STACK_SIZE = 4096') ||
+        'constexpr uint32_t SETTINGS_PERSIST_TASK_STACK_SIZE = 5120') ||
     !network.includes(
         'static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WifiScanSnapshot g_wifiScan') ||
     !network.includes(

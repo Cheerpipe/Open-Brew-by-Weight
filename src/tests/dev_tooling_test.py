@@ -257,6 +257,7 @@ with tempfile.TemporaryDirectory(prefix="ai_temp_size_check_", dir=ROOT / "temp"
     image.write_bytes(b"x")
     (build / "openbrewbyweight.map").write_text(
         "0x3c000000 _ext_ram_bss_start\n0x3c000010 _ext_ram_bss_end\n"
+        "0x3c000010 _ext_ram_noinit_start\n0x3c000020 _ext_ram_noinit_end\n"
         "0x3fc80000 localBuzzer\n0x3fc80010 taskProfiler\n"
         "0x3fc80020 publishedControlStatus\n0x3fc80030 controlStatusMutex\n"
         "0x3fc80040 publishedControlGate\n0x3fc80050 controlGateMutex\n"
@@ -1746,9 +1747,12 @@ assert "std::atomic<uint32_t> lastTaskProgressAtMs_" in network_header
 nimble_client = (ROOT / "libraries/EspressoScaleBLE/src/EspressoScaleBLENimble.cpp").read_text()
 for capacity in ("kRxFrameCount", "kCriticalEventCount", "kEventCount"):
     assert f"drained < {capacity}" in nimble_client
-shot_curve = (ROOT / "src/OpenBrewByWeightShotCurve.h").read_text()
-assert "flashIoLockTimeouts() == lastLockTimeouts_" in shot_curve
-assert "(void)load();" in shot_curve
+# Curves live in the shot pool: a failed append never reuses its cursor, and
+# a failed recovery or clear retries with a bounded back-off.
+shot_pool = (ROOT / "src/OpenBrewByWeightShotTracePool.h").read_text()
+assert "fresh_ = true;  // Until the commit lands, the cursor is not reusable." in shot_pool
+pool_service = (ROOT / "src/persistence/OpenBrewByWeightShotTracePersistence.inc").read_text()
+assert "SHOT_TRACE_POOL_RETRY_MAX_MS" in pool_service
 persistence_runtime = (ROOT / "src/persistence/OpenBrewByWeightCommandPersistence.inc").read_text()
 checkpoint = persistence_runtime.split("SETTINGS_PERSIST_IDLE_WAIT_MS", 1)[1].split(
     "yieldSettingsNvs", 1)[0]

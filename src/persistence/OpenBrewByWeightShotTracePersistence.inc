@@ -27,6 +27,16 @@ TaskMutex shotTracePoolWriterMutex;
 std::atomic<bool> shotTracePoolClearRequested{false};
 
 constexpr uint8_t SHOT_TRACE_PERSIST_ATTEMPTS = 3;
+// Curves the cache load reads back per idle pass, so the worker's queue is
+// served between batches.
+constexpr size_t SHOT_CURVE_LOAD_BATCH = 8;
+// A failed recovery or clear is retried after 1 s, doubling up to 10 min.
+constexpr uint32_t SHOT_TRACE_POOL_RETRY_MAX_MS = 600000;
+static_assert(sizeof(ShotTracePoolRecordHeader) + 2U * sizeof(ShotTracePoolSectionHeader) +
+                      ((SHOT_CURVE_SECTION_MAX_BYTES + 3U) & ~size_t(3U)) +
+                      SHOT_TRACE_BUFFER_BYTES <=
+                  SHOT_TRACE_POOL_MAX_RECORD_BYTES,
+              "A worst-case curve and a full trace fit one record");
 
 // Worker-owned staging: the curve section of the record being appended, or
 // a curve read back while the cache loads (loading waits for no append).
@@ -35,6 +45,8 @@ union ShotCurveStaging {
   ShotCurveRecord curve;
 };
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS ShotCurveStaging shotCurveStaging;
+// The pending trace's CRC pass, off the worker's 4 KiB stack.
+OPEN_BREW_BY_WEIGHT_PSRAM_BSS uint8_t shotTraceCrcChunk[256];
 
 // Worker-owned; the trace source reads `pending` and the curve source the
 // staging until the append completes.
@@ -49,6 +61,7 @@ struct ShotTracePersistState {
   // Cache load after boot: summaries from loadCursor down are left.
   uint32_t loadCursor = UINT32_MAX, loadGeneration = 0;
   bool cacheLoaded = false;
+  uint32_t retryAtMs = 0, backoffMs = 0;  // After a failed recovery or clear.
   bool recoveryFailureLogged = false, writeFailureLogged = false, clearFailureLogged = false;
 };
 ShotTracePersistState shotTracePersist;
@@ -74,13 +87,30 @@ bool readPendingShotTrace(void *context, size_t offset, uint8_t *out, size_t byt
   return shotTrace().copyExport(pending.generation, offset, out, bytes, pending.crc);
 }
 
+// Backs the next recovery or clear attempt off after a failure.
+bool shotTracePoolBackingOff() {
+  const ShotTracePersistState &state = shotTracePersist;
+  return state.backoffMs != 0 && static_cast<int32_t>(millis() - state.retryAtMs) < 0;
+}
+void shotTracePoolAttempted(bool ok) {
+  ShotTracePersistState &state = shotTracePersist;
+  state.backoffMs = ok ? 0
+      : state.backoffMs == 0 ? 1000
+      : state.backoffMs >= SHOT_TRACE_POOL_RETRY_MAX_MS / 2 ? SHOT_TRACE_POOL_RETRY_MAX_MS
+      : 2U * state.backoffMs;
+  state.retryAtMs = millis() + state.backoffMs;
+}
+
 bool recoverShotTracePool() {
   ShotTracePool &pool = shotTracePool();
+  if (shotTracePoolBackingOff()) return false;
   const uint32_t startedAtMs = millis();
-  if (!pool.recover()) {
+  const bool recovered = pool.recover();
+  shotTracePoolAttempted(recovered);
+  if (!recovered) {
     if (!shotTracePersist.recoveryFailureLogged)
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SYSTEM,
-                           "Shot trace pool unavailable: recovery failed (error %u)",
+                           "Shot trace pool unavailable: recovery failed (error %u); retrying",
                            static_cast<unsigned>(pool.lastError()));
     shotTracePersist.recoveryFailureLogged = true;
     return false;
@@ -97,13 +127,17 @@ bool recoverShotTracePool() {
   return true;
 }
 
-// Writer mutex held. A pool that cannot be recovered never blocks the shot
-// log: the request stays pending and the linkage keeps old records apart.
+// Writer mutex held. Returns whether no clear is pending. A pool that cannot
+// be recovered or cleared never holds the shot log back: the request stays
+// pending (and appends wait for it), and the record identity keeps old
+// records apart from reused shot ids meanwhile.
 bool landShotTracePoolClear() {
   if (!shotTracePoolClearRequested.load(std::memory_order_acquire)) return true;
   ShotTracePool &pool = shotTracePool();
-  if (!pool.ready() && !recoverShotTracePool()) return true;
-  if (!pool.clear()) {
+  if ((!pool.ready() && !recoverShotTracePool()) || shotTracePoolBackingOff()) return false;
+  const bool cleared = pool.clear();
+  shotTracePoolAttempted(cleared);
+  if (!cleared) {
     if (!shotTracePersist.clearFailureLogged)
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SYSTEM,
                            "Shot trace pool not cleared (error %u); retrying",
@@ -117,9 +151,34 @@ bool landShotTracePoolClear() {
   return true;
 }
 
-bool landShotTracePoolClearForShotStores() {
+void landShotTracePoolClearForShotStores() {
   TaskLockGuard writer(shotTracePoolWriterMutex);
-  return landShotTracePoolClear();
+  (void)landShotTracePoolClear();
+}
+
+// Factory reset, with the store lock and the writer mutex held. The cache
+// and the unsaved trace go whatever else the reset did, since the shot log
+// may already restart its ids; the pool is cleared and verified by a fresh
+// recovery, or the clear stays requested for the worker. An unusable pool
+// never fails the reset.
+void resetShotRecordsForFactoryReset() {
+  shotCurves.clear();
+  shotTrace().consumeCompleted();
+  ShotTracePool &pool = shotTracePool();
+  const bool cleared = pool.clear() && pool.recover() && pool.count() == 0;
+  shotTracePoolClearRequested.store(!cleared, std::memory_order_release);
+  if (!cleared)
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SYSTEM,
+                         "Shot trace pool not cleared by the factory reset (error %u); retrying",
+                         static_cast<unsigned>(pool.lastError()));
+}
+
+// Curves the pool can still take (caller holds the store lock): a pool that
+// failed to recover holds nothing back, such as a planned restart.
+bool shotCurvesSavePending() {
+  ShotTracePool &pool = shotTracePool();
+  return shotCurves.pending() != 0 &&
+         (pool.ready() || pool.lastError() == ShotTracePoolError::NONE);
 }
 
 void noteShotTraceConsumed(uint32_t generation) {
@@ -166,13 +225,20 @@ bool stageShotRecord() {
       state.curveGeneration = shotCurves.generation();
     }
   }
-  uint8_t chunk[256];
   const ShotTracePending &pending = state.pending;
-  const bool trace = shotTrace().pendingPersist(state.pending, chunk, sizeof(chunk));
+  const bool trace =
+      shotTrace().pendingPersist(state.pending, shotTraceCrcChunk, sizeof(shotTraceCrcChunk));
   state.hasTrace = trace && (curveBytes == 0 || (pending.shotLogId == id.shotId &&
                                                  pending.bootId == id.bootId &&
                                                  pending.endedAtMs == id.endedAtMs));
   if (curveBytes == 0 && !trace) return false;
+  // A shot that ended after the cache was read: its curve goes first, with
+  // this trace, on the next pass (a trace-only record would make contains()
+  // skip that curve).
+  if (curveBytes == 0 && pending.shotLogId != 0) {
+    TaskLockGuard lock(shotStoreMutex);
+    if (shotCurves.oldestPending() != nullptr) return false;
+  }
   if (state.hasTrace)
     id = {pending.shotLogId, pending.bootId, pending.endedAtMs, pending.firmwarePacked,
           pending.endReason};
@@ -214,8 +280,10 @@ void finishShotRecordAppend(bool committed) {
     return;
   }
   // A newer shot ended meanwhile: it is next, and this trace counts as
-  // dropped (its curve goes alone).
-  if (shotTracePool().lastError() == ShotTracePoolError::SOURCE) return;
+  // dropped (its curve goes alone). A busy flash lock is retried later
+  // without costing an attempt.
+  const ShotTracePoolError error = shotTracePool().lastError();
+  if (error == ShotTracePoolError::SOURCE || error == ShotTracePoolError::LOCK) return;
   ++state.attempts;
   if (!state.writeFailureLogged)
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SYSTEM,
@@ -225,9 +293,10 @@ void finishShotRecordAppend(bool committed) {
 }
 
 // A stored shot's curve from its pool record. Flash: hold no store lock.
-// Busy while the gate is closed (a shot runs) or before the first recovery;
-// a pool that failed to recover, a record without a curve, and one gone or
-// torn with its recycled sector all read as no curve, never as damage.
+// Busy while the gate is closed (a shot runs), before the first recovery and
+// on a read or lock failure; a pool that failed to recover, a record without
+// a curve, and one gone or torn with its recycled sector all read as no
+// curve, never as damage.
 ShotCurveRead readShotCurve(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs,
                             ShotCurveRecord &curve) {
   if (!shotTracePoolGateOpen()) return ShotCurveRead::BUSY;
@@ -239,50 +308,55 @@ ShotCurveRead readShotCurve(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs
       pool.open(shotId, bootId, endedAtMs, ref, curve.stream, sizeof(curve.stream));
   if (status == ShotTracePoolStatus::OK)
     status = pool.findSection(ref, ShotTracePoolSection::CURVE, offset, bytes);
-  if (status == ShotTracePoolStatus::NOT_READY && pool.lastError() == ShotTracePoolError::NONE)
-    return ShotCurveRead::BUSY;
   if (status == ShotTracePoolStatus::OK &&
       decodeShotCurveSection(bytes, shotId, curve, [&](size_t at, void *out, size_t n) {
-        return pool.read(ref, offset + at, out, n) == ShotTracePoolStatus::OK;
+        return (status = pool.read(ref, offset + at, out, n)) == ShotTracePoolStatus::OK;
       }))
     return ShotCurveRead::FOUND;
   resetShotCurveRecord(curve);
-  return ShotCurveRead::NONE;
+  return status == ShotTracePoolStatus::IO_ERROR ||
+                 (status == ShotTracePoolStatus::NOT_READY &&
+                  pool.lastError() == ShotTracePoolError::NONE)
+             ? ShotCurveRead::BUSY
+             : ShotCurveRead::NONE;
 }
 
 // After boot: fills the cache's oldest end from the pool, newest summary
-// first, until it is full or every summary was tried. Each curve is read
-// with no store lock and joins only if no clear came in between. Returns
-// false while the gate pauses it.
-bool loadShotCurveCache() {
+// first, until it is full or every summary was tried; at most
+// SHOT_CURVE_LOAD_BATCH summaries per pass. Each curve is read with no store
+// lock and joins only if no clear came in between; the cursor passes a
+// summary only once its read was answered (found or none), so a busy flash
+// retries it on a later pass.
+void loadShotCurveCache() {
   ShotTracePersistState &state = shotTracePersist;
-  while (!state.cacheLoaded) {
-    if (!shotTracePoolGateOpen()) return false;
-    ShotLogRecord summary;
+  for (size_t n = 0; !state.cacheLoaded && n < SHOT_CURVE_LOAD_BATCH; ++n) {
+    ShotLogRecord summary = {};
+    bool cached;
+    size_t count;
     {
       TaskLockGuard lock(shotStoreMutex);
       if (state.loadCursor == UINT32_MAX) state.loadGeneration = shotCurves.generation();
       state.cacheLoaded = shotCurves.generation() != state.loadGeneration || shotCurves.full() ||
                           !shotLog.copyNewestBefore(state.loadCursor, summary);
-      if (state.cacheLoaded) {
-        serialTraceCategoryf(LogLevel::INFO, DebugCategory::SYSTEM,
-                             "Shot curves loaded: %u in RAM",
-                             static_cast<unsigned>(shotCurves.count()));
-        break;
-      }
-      state.loadCursor = summary.id;
-      if (shotCurves.containsShotId(summary.id)) continue;
+      count = shotCurves.count();
+      cached = !state.cacheLoaded && shotCurves.containsShotId(summary.id);
     }
-    if (readShotCurve(summary.id, summary.bootId, summary.endedAtMs, shotCurveStaging.curve) ==
-        ShotCurveRead::FOUND) {
+    if (state.cacheLoaded) {
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::SYSTEM, "Shot curves loaded: %u in RAM",
+                           static_cast<unsigned>(count));
+      return;
+    }
+    const ShotCurveRead read = cached ? ShotCurveRead::NONE
+        : readShotCurve(summary.id, summary.bootId, summary.endedAtMs, shotCurveStaging.curve);
+    if (read == ShotCurveRead::BUSY) return;
+    if (read == ShotCurveRead::FOUND) {
       TaskLockGuard lock(shotStoreMutex);
       if (shotCurves.generation() == state.loadGeneration)
         shotCurves.prependSaved(shotCurveStaging.curve);
     }
+    state.loadCursor = summary.id;
     feedFlashIoWatchdog();
-    yieldFlashIo();
   }
-  return true;
 }
 
 // settings_persist idle pass; no flash I/O unless the write gate is open.
@@ -298,21 +372,24 @@ void serviceShotTracePool() {
     if (!landShotTracePoolClear()) return;
     resume = pool.appending();
   }
-  if (!resume && (!loadShotCurveCache() || !stageShotRecord())) return;
-  FlashStoreStepResult result;
+  // The load only fills the cache's older end; new records need not wait.
+  if (!resume) loadShotCurveCache();
+  if (!resume && !stageShotRecord()) return;
+  FlashStoreStepResult result = FlashStoreStepResult::FAILED;
   {
     TaskLockGuard writer(shotTracePoolWriterMutex);
     ShotTracePersistState &state = shotTracePersist;
     // A factory reset in between dropped the paused append: stage again.
-    if (!pool.appending() &&
-        (resume || !shotTracePoolGateOpen() ||
-         !pool.beginAppend(state.record, state.sources, state.sourceCount)))
-      return;
-    do {
-      if (!shotTracePoolGateOpen()) return;  // Paused: the next pass resumes.
-      result = pool.appendStep();
-      if (result == FlashStoreStepResult::MORE) yieldFlashIo();
-    } while (result == FlashStoreStepResult::MORE);
+    if (!pool.appending() && (resume || !shotTracePoolGateOpen())) return;
+    // A refused begin (other than a newer trace) costs an attempt, so one
+    // record can never stall the queue.
+    if (pool.appending() || pool.beginAppend(state.record, state.sources, state.sourceCount)) {
+      do {
+        if (!shotTracePoolGateOpen()) return;  // Paused: the next pass resumes.
+        result = pool.appendStep();
+        if (result == FlashStoreStepResult::MORE) yieldFlashIo();
+      } while (result == FlashStoreStepResult::MORE);
+    }
   }
   finishShotRecordAppend(result == FlashStoreStepResult::COMPLETE);
 }

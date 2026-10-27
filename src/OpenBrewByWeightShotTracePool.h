@@ -193,6 +193,7 @@ class ShotTracePoolHostFlash {
     memset(erases_, 0, sizeof(erases_));
     failAfter_ = -1;
     dead_ = false;
+    readsFail_ = false;
     operations_ = 0;
   }
   static constexpr size_t kRandomTear = SIZE_MAX;
@@ -213,11 +214,13 @@ class ShotTracePoolHostFlash {
 
   static void setReadHook(void (*hook)()) { readHook_ = hook; }
   static void setEraseSpy(void (*spy)(size_t physical)) { eraseSpy_ = spy; }
+  static void setReadsFail(bool fail) { readsFail_ = fail; }  // Every read errors.
   static bool read(size_t physical, size_t offset, void *out, size_t bytes) {
     if (void (*hook)() = readHook_) {
       readHook_ = nullptr;
       hook();
     }
+    if (readsFail_) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     memcpy(out, sector(physical) + offset, bytes);
     return true;
@@ -285,7 +288,7 @@ class ShotTracePoolHostFlash {
   inline static uint32_t touched_[kSectors] = {}, erases_[kSectors] = {};
   inline static int failAfter_ = -1;
   inline static size_t torn_ = 0, operations_ = 0;
-  inline static bool dead_ = false, transient_ = false;
+  inline static bool dead_ = false, transient_ = false, readsFail_ = false;
   inline static std::mutex mutex_;
   inline static void (*readHook_)() = nullptr;
   inline static void (*eraseSpy_)(size_t) = nullptr;
@@ -297,17 +300,17 @@ class ShotTracePool {
  public:
   using LiveFn = bool (*)(void *context, const ShotTracePoolEntry &entry);
 
-  // `sectors` of the logical space form the ring (see setLogicalEnd).
-  explicit ShotTracePool(ShotTracePoolIndex &index,
-                         size_t sectors = SHOT_TRACE_POOL_RESERVED_SECTORS)
+  // `sectors` of the logical space form the ring: the firmware's is the
+  // whole space (the legacy curve store is retired).
+  ShotTracePool(ShotTracePoolIndex &index, size_t sectors)
       : index_(index), end_(sectors <= SHOT_TRACE_POOL_SECTORS ? sectors : SHOT_TRACE_POOL_SECTORS) {}
   ShotTracePool(const ShotTracePool &) = delete;
   ShotTracePool &operator=(const ShotTracePool &) = delete;
 
-  // Logical sectors in the ring: the firmware opens the whole space (the
-  // legacy curve store is retired); `reserved` alone is the default. It only
-  // grows, and a recover() must follow: a record that wrapped from the old
-  // last sector to sector 0 is dropped by that walk.
+  size_t logicalEnd() const { return end(); }
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+  // Tests only: grows the ring (a recover() must follow; a record that
+  // wrapped from the old last sector to sector 0 is dropped by that walk).
   bool setLogicalEnd(size_t sectors) {
     if (op_ != Op::IDLE || sectors < end() || sectors > SHOT_TRACE_POOL_SECTORS) return false;
     TaskLockGuard lock(mux_);
@@ -315,11 +318,12 @@ class ShotTracePool {
     end_.store(sectors, std::memory_order_relaxed);
     return true;
   }
-  size_t logicalEnd() const { return end(); }
+#endif
 
   // Boot scan, persistence worker only: every sector header of the ring, the
   // record headers of the valid sectors, and one blank check of the head.
   bool recover() {
+    findPartitions();
     dropIndex(false);
     op_ = Op::IDLE;
     lastError_.store(ShotTracePoolError::NONE, std::memory_order_relaxed);
@@ -429,7 +433,7 @@ class ShotTracePool {
       // A commit reported as failed may have landed: then it is committed,
       // and indexing it keeps a retry from writing the shot twice.
       uint32_t landed = 0;
-      if (!ok) ok = read(start_ / kSectorBytes, at, &landed, sizeof(landed)) && landed == kCommitted;
+      if (!ok) ok = readLocked(start_ / kSectorBytes, at, &landed, sizeof(landed)) && landed == kCommitted;
       if (ok) {
         push(header_, start_);
         op_ = Op::IDLE;
@@ -447,16 +451,18 @@ class ShotTracePool {
     return op_ == Op::IDLE ? FlashStoreStepResult::COMPLETE : FlashStoreStepResult::MORE;
   }
 
+  bool appending() const { return op_ != Op::IDLE; }
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+  // Tests only: a whole append, and abandoning one (an unfinished append
+  // leaves its bytes behind; the next starts a sector).
   bool append(const ShotTracePoolIdentity &id, const ShotTracePoolSource *sources, size_t count) {
     if (!beginAppend(id, sources, count)) return false;
     FlashStoreStepResult result;
     do { result = appendStep(); } while (result == FlashStoreStepResult::MORE);
     return result == FlashStoreStepResult::COMPLETE;
   }
-
-  // An unfinished append leaves its bytes behind; the next starts a sector.
   void cancelAppend() { op_ = Op::IDLE; }
-  bool appending() const { return op_ != Op::IDLE; }
+#endif
 
   // Clear all and factory reset: one new sector whose floor is its own
   // sequence hides every older sector (two flash operations, no full erase).
@@ -859,8 +865,10 @@ class ShotTracePool {
     }
     return true;
   }
-  bool headTailBlank(size_t head, size_t from) {
-    uint8_t chunk[256];
+  // A small chunk and its own frame: the walk runs deep on the 4 KiB
+  // settings_persist stack (stack-depth gate).
+  [[gnu::noinline]] bool headTailBlank(size_t head, size_t from) {
+    uint8_t chunk[64];
     for (size_t at = from; at < kSectorBytes; at += sizeof(chunk)) {
       const size_t piece = kSectorBytes - at < sizeof(chunk) ? kSectorBytes - at : sizeof(chunk);
       if (!read(head, at, chunk, piece) || !blank(chunk, piece)) return false;
@@ -894,19 +902,28 @@ class ShotTracePool {
   bool read(size_t sector, size_t offset, void *out, size_t bytes) const {
     return ShotTracePoolHostFlash::read(physical(sector), offset, out, bytes);
   }
+  bool readLocked(size_t sector, size_t offset, void *out, size_t bytes) const {
+    return read(sector, offset, out, bytes);
+  }
   bool program(size_t sector, size_t offset, const void *in, size_t bytes) {
     return ShotTracePoolHostFlash::program(physical(sector), offset,
                                            static_cast<const uint8_t *>(in), bytes);
   }
   bool erase(size_t sector) { return ShotTracePoolHostFlash::erase(physical(sector)); }
+  void findPartitions() {}
 #else
-  static const esp_partition_t *partition(size_t sector, size_t &offset) {
-    static const esp_partition_t *const parts[2] = {
-        find("reserved", SHOT_TRACE_POOL_RESERVED_BYTES),
-        find("shotcurve", SHOT_TRACE_POOL_SHOTCURVE_BYTES)};
+  // Looked up once, by recover() at the top of its caller's stack: the first
+  // lookup loads the partition table, a deep path (stack-depth gate) that
+  // must not run under the walk. Written before ready, never changed after.
+  const esp_partition_t *parts_[2] = {};
+  void findPartitions() {
+    if (parts_[0] == nullptr) parts_[0] = find("reserved", SHOT_TRACE_POOL_RESERVED_BYTES);
+    if (parts_[1] == nullptr) parts_[1] = find("shotcurve", SHOT_TRACE_POOL_SHOTCURVE_BYTES);
+  }
+  const esp_partition_t *partition(size_t sector, size_t &offset) const {
     const bool curve = sector >= SHOT_TRACE_POOL_RESERVED_SECTORS;
     offset = (curve ? physical(sector) - SHOT_TRACE_POOL_RESERVED_SECTORS : sector) * kSectorBytes;
-    return parts[curve];
+    return parts_[curve];
   }
   static const esp_partition_t *find(const char *label, size_t bytes) {
     const auto *part = esp_partition_find_first(
@@ -917,18 +934,24 @@ class ShotTracePool {
   // Staged through the internal scratch like flashIoReadChunked, without its
   // per-chunk yield: recovery issues thousands of small reads and paces itself.
   bool read(size_t sector, size_t offset, void *out, size_t bytes) const {
+    if (!tryLockFlashIo()) return false;
+    const bool ok = readLocked(sector, offset, out, bytes);
+    unlockFlashIo();
+    return ok;
+  }
+  // Caller holds the flash I/O lock (the commit read-back): no nested lock,
+  // so the lock-hold diagnostics see one hold.
+  bool readLocked(size_t sector, size_t offset, void *out, size_t bytes) const {
     size_t base;
     const esp_partition_t *part = partition(sector, base);
-    if (part == nullptr || !tryLockFlashIo()) return false;
     uint8_t *scratch = flashIoScratchBytes();
-    bool ok = true;
+    bool ok = part != nullptr;
     for (size_t done = 0; ok && done < bytes;) {
       const size_t piece = bytes - done < FLASH_IO_CHUNK_BYTES ? bytes - done : FLASH_IO_CHUNK_BYTES;
       ok = esp_partition_read(part, base + offset + done, scratch, piece) == ESP_OK;
       if (ok) memcpy(static_cast<uint8_t *>(out) + done, scratch, piece);
       done += piece;
     }
-    unlockFlashIo();
     return ok;
   }
   // Caller holds the flash I/O lock; the source is staged in the internal

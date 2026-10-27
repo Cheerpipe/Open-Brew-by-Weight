@@ -73,6 +73,8 @@ recompiles every unit of that build with GCC `-fcallgraph-info=su` into
 recovery paths and the deepest httpd requests against their task stacks: boot
 recovery on the Arduino loopTask (`CONFIG_ARDUINO_LOOP_STACK_SIZE`), the Web
 UI factory reset on `network_manager` (`NETWORK_MANAGER_TASK_STACK_SIZE`), the
+shot trace pool and shot-store image on `settings_persist`
+(`SETTINGS_PERSIST_TASK_STACK_SIZE`), the
 OTA transfer and commit on `ota_worker` and its inline httpd fallback, and the
 UI stream request and crash archive download on httpd
 (`HTTP_SERVER_TASK_STACK_SIZE`). Calls GCC cannot follow are charged declared

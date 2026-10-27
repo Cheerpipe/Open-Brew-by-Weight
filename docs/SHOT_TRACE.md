@@ -376,20 +376,29 @@ completed trace whose summary the shot log refused is shot 0 with its boot and
 end time.
 
 Clear all marks the pool for clearing and drops the unsaved trace and curves
-of the cleared shots; the worker clears the pool before it persists the cleared shot log, so a
-power loss leaves both cleared, neither, or only the pool, and an id reused
-after a clear never reaches an older record. Factory reset clears the pool and
-verifies it with a fresh recovery under the same writer lock. A pool that
-cannot be recovered never holds the shot log back.
+of the cleared shots; the worker tries the pool clear before it persists the
+cleared shot log, so a power loss normally leaves both cleared, neither, or
+only the pool. Factory reset drops the cached curves and the unsaved trace
+whatever else the reset reached (the shot log may already restart its ids),
+then clears the pool and verifies it with a fresh recovery under the same
+writer lock. A pool that cannot be recovered or cleared never holds the shot
+log or the factory reset back: the clear stays requested ("Shot trace pool
+not cleared … retrying", logged once), appends wait for it, and the record
+identity (shot id, boot id, end time) keeps every older record apart from a
+reused id meanwhile. A failed recovery or clear is retried after 1 s, then
+after twice the previous wait, up to 10 minutes.
 
 The legacy curve store (fixed 8 KiB blocks in `shotcurve`) is retired without
 migrating its curves; an installation over USB with `--erase-all` starts
 empty. Its blocks, if any remain, are never read as records: they fail the
-sector magic, version or CRC and are holes the ring overwrites. A typical
-record (a 2–3 KB curve and a 1–4 KB trace) is about 4–6 KB, so the pool keeps
-roughly the last 900–1,300 shots, more than the shot log's 1,000 summaries
-for short shots and somewhat fewer for long ones; FIFO recycling decides,
-never the shot's quality.
+sector magic, version or CRC and are holes the ring overwrites.
+
+How many shots the pool keeps depends on how much each shot records, which
+is not measured yet (plan B1). A record holds a curve of up to 5.6 KB (about
+2–3 KB for a typical 30 s shot) and a trace of 0.8 to 16 KB, so the pool's
+5.2 MB keep somewhere between about 240 shots of the largest records and
+more than the shot log's 1,000 summaries of small ones. FIFO recycling
+decides, never the shot's quality; the newest shots are always kept.
 
 ### Curves in the pool
 
@@ -400,19 +409,25 @@ curves not in the pool yet are always the newest ones in the cache; the worker
 saves them oldest first.
 
 - **After boot** the cache is empty. Once the pool is recovered, the worker
-  fills the cache's older end from the pool, newest summary first, until it
-  holds 500 curves or every summary was tried, and logs "Shot curves loaded:
-  N in RAM". It reads with no store lock, pauses with the write gate and
-  never displaces a curve stored since boot. Until a shot's curve is back,
-  Home shows that shot without a curve.
+  fills the cache's older end from the pool, newest summary first, eight
+  summaries per idle pass (its queue and new shots' records are served in
+  between), until it holds 500 curves or every summary was tried, and logs
+  "Shot curves loaded: N in RAM". It reads with no store lock, never
+  displaces a curve stored since boot, and moves past a summary only once
+  its read was answered: a busy read is retried on the next pass. The newest
+  shot's curve is back on the first pass; until then Home shows that shot
+  without a curve.
 - **Older curves** (the shot list past the newest 500, its pages and exports)
   are read from the shot's record on demand: the summary's identity is looked
   up under `shotStoreMutex`, the lock is released, and the record is opened
   and CRC-checked under the flash lock.
-- **Busy.** While a shot runs (the write gate is closed or a capture is open)
-  and before the pool's first recovery, an older curve answers busy: the
-  Stats stream holds that row and resumes once flash may be read, sending
-  nothing meanwhile. A pool that failed to recover answers no curve.
+- **Busy.** While a shot runs (the write gate is closed or a capture is open),
+  before the pool's first recovery and when a flash read or the flash lock
+  fails, an older curve answers busy: the Stats stream holds that row and
+  resumes once flash may be read, sending nothing meanwhile. A pool that
+  failed to recover answers no curve. The Stats page fingerprint never reads
+  flash: a curve past the cache is hashed by its shot id (curves are
+  immutable), and only the row being framed is read.
 - **Gone.** A record whose sector the ring recycled, or that an interrupted
   erase tore, reads as a shot without a curve, never as damage.
 

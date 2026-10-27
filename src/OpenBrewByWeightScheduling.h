@@ -57,7 +57,7 @@ constexpr TaskScheduleContract TASK_SCHEDULE_CONTRACTS[] = {
     {"scale_worker", 1, SCALE_WORKER_TASK_PRIORITY_OFFSET, 6656,
      TaskActivation::PERIODIC, 1,
      SCALE_SERVICE_DEADLINE_MS, SCALE_EXECUTION_BUDGET_US, 3000, 5000, true},
-    {"settings_persist", 0, 0, 4096, TaskActivation::EVENT_DRIVEN, 0, 1000,
+    {"settings_persist", 0, 0, 5120, TaskActivation::EVENT_DRIVEN, 0, 1000,
      0, 3000, 5000, true},
     {"health", 0, HEALTH_TASK_PRIORITY_OFFSET, 4096, TaskActivation::PERIODIC,
      100, 0, 0, 0, 0, false},

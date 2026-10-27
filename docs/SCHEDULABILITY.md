@@ -38,7 +38,7 @@ subscribed nor part of control. Stack values are configured bytes in ESP-IDF.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | control | periodic / 1 ms active | 10 ms | 9000 us | idle+2 | 50 ms maintenance flash take | 8192 | 1 | 5 s |
 | scale_worker | notification / 1 ms connecting or unlinked queued command, 10 ms linked/idle | 10 ms | 9000 us | idle+1 | 3000 ms GATT step | 6656 | 1 | 5 s |
-| settings_persist | event-driven | 1000 ms service | n/a | idle | 3000 ms lock acquisition; one flash primitive/step | 4096 | 0 | 5 s |
+| settings_persist | event-driven | 1000 ms service | n/a | idle | 3000 ms lock acquisition; one flash primitive/step | 5120 | 0 | 5 s |
 | health | periodic / 100 ms | diagnostic | n/a | idle+1 | none | 4096 | 0 | no |
 | network_manager | periodic / 50 ms | 250 ms | 200000 us | idle+1 | 2500 ms lifecycle/cancel | 10240 | 0 | 5 s |
 | mdns | event-driven (action queue) | n/a | n/a | 1 | freed once in network stop | 4096 | 0 | no |

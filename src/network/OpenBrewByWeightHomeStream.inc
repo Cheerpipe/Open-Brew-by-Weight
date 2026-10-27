@@ -1179,21 +1179,13 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
       if (cachedHash != nullptr) {
         rowHash = *cachedHash;
       } else {
-        // Curves past the PSRAM cache come from flash: a quarter of the
-        // dispatch budget goes to them (hashes already taken stay cached),
-        // and none is read while a shot runs. Either way this window is
-        // rebuilt by a later dispatch.
-        const bool spent = uiStreamDeadlineLeft() < kUiStreamDispatchBudgetMs * 3U / 4U;
-        const ShotCurveRead read = spent || callbacks_.copyShotCurveById == nullptr
-            ? ShotCurveRead::NONE : callbacks_.copyShotCurveById(record.id, cache.fetchCurve);
-        if (spent || read == ShotCurveRead::BUSY) {
-          if (spent) uiStreamUrgent_.store(true, std::memory_order_release);
-          cache.valid = true;
-          cache.limit = 0;
-          return true;
-        }
-        rowHash = uiStreamCurveHash(cache.fetchCurve,
-                                    read == ShotCurveRead::FOUND ? cache.fetchCurve.count : 0);
+        // A curve past the PSRAM cache is never read for its hash: an
+        // immutable stored curve hashes by its id (the row frame reads it).
+        const ShotCurveRead read = callbacks_.copyShotCurveById == nullptr
+            ? ShotCurveRead::NONE : callbacks_.copyShotCurveById(record.id, cache.fetchCurve, false);
+        rowHash = read == ShotCurveRead::STORED ? record.id ^ 0x53544F52U  // "STOR"
+            : uiStreamCurveHash(cache.fetchCurve,
+                                read == ShotCurveRead::FOUND ? cache.fetchCurve.count : 0);
         cache.curveHashes.insert(record.id, rowHash);
       }
       const uint32_t row[2] = {record.id, record.sideFlags};
@@ -1288,7 +1280,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
       // paced across dispatches replace the former whole-store copy. A curve
       // flash may not give now (a shot runs) holds the page at this row.
       const ShotCurveRead read = callbacks_.copyShotCurveById != nullptr
-          ? callbacks_.copyShotCurveById(record.id, cache.fetchCurve) : ShotCurveRead::NONE;
+          ? callbacks_.copyShotCurveById(record.id, cache.fetchCurve, true) : ShotCurveRead::NONE;
       if ((busy = read == ShotCurveRead::BUSY)) break;
       rowBytes = formatShotStatsRow(work, record,
                                     read == ShotCurveRead::FOUND ? &cache.fetchCurve : nullptr);

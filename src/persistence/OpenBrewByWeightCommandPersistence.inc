@@ -27,8 +27,9 @@ void copyShotStatsRecords(ShotStatsRecordsSnapshot &output) {
 }
 
 // The cache answers under the store lock; an older curve is read from its
-// pool record after the lock is released.
-ShotCurveRead copyShotCurveById(uint32_t shotId, ShotCurveRecord &curve) {
+// pool record after the lock is released, unless the caller only asks
+// whether it may be there (STORED).
+ShotCurveRead copyShotCurveById(uint32_t shotId, ShotCurveRecord &curve, bool readFlash) {
   uint32_t bootId = 0, endedAtMs = 0;
   {
     const uint32_t lockStartedUs = micros();
@@ -39,6 +40,7 @@ ShotCurveRead copyShotCurveById(uint32_t shotId, ShotCurveRecord &curve) {
     if (shotCurves.copyByShotId(shotId, curve)) return ShotCurveRead::FOUND;
     const ShotLogRecord *summary = shotLog.findNewestById(shotId);
     if (summary == nullptr) return ShotCurveRead::NONE;
+    if (!readFlash) return ShotCurveRead::STORED;
     bootId = summary->bootId;
     endedAtMs = summary->endedAtMs;
   }
@@ -69,7 +71,7 @@ bool copyHomeShot(ShotLogRecord &record, ShotCurveRecord *curve) {
 
 bool shotLogSavePending() {
   TaskLockGuard lock(shotStoreMutex);
-  return shotLog.dirty() || shotCurves.pending() != 0;
+  return shotLog.dirty() || shotCurvesSavePending();
 }
 
 void copyHistoryPage(HistoryPage &page, size_t offset, size_t limit,
@@ -176,13 +178,11 @@ void clearLastShotRuntimeState() {
 bool resetAllDurableStoresForNetwork(PersistedSettings &settings) {
   TaskLockGuard lock(shotStoreMutex);
   TaskLockGuard poolWriter(shotTracePoolWriterMutex);
-  if (!resetAllDurableStores(settings, bleScanPersistedSettings, shotLog,
-                             historyLog, lastShotStore, &shotTracePool())) {
-    return false;
-  }
-  shotCurves.clear();
-  shotTrace().consumeCompleted();
-  shotTracePoolClearRequested.store(false, std::memory_order_release);
+  const bool reset = resetAllDurableStores(settings, bleScanPersistedSettings, shotLog,
+                                           historyLog, lastShotStore);
+  // Whatever the reset reached: the shot log may already restart its ids.
+  resetShotRecordsForFactoryReset();
+  if (!reset) return false;
   // The wiped stores are a mutation like any other: bump so the status
   // gather guard re-fetches and the persistence fast path keeps flowing
   // until the reset state is acknowledged as persisted.
@@ -450,7 +450,7 @@ bool plannedRestartMustWait() {
   }
   if (pendingFinalize.pending) return true;
   TaskLockGuard lock(shotStoreMutex);
-  return shotLog.dirty() || shotCurves.pending() != 0 || historyLog.dirty() ||
+  return shotLog.dirty() || shotCurvesSavePending() || historyLog.dirty() ||
          lastShotNvsDirty;
 }
 
@@ -677,11 +677,9 @@ void persistShotStoreImage() {
       break;
     }
 #endif
-    // A clear all lands in the shot trace pool before the shot log's.
-    if (!landShotTracePoolClearForShotStores()) {
-      report.anyFail = true;
-      break;
-    }
+    // A clear all lands in the shot trace pool before the shot log's; a
+    // pool that cannot be cleared never holds the shot log back.
+    landShotTracePoolClearForShotStores();
     report = shotStorePersistImage->serviceStep(FLASH_IO_LOCK_TIMEOUT_MS,
                                                 addDebugEvent);
     if (!report.complete && !report.anyFail) yieldFlashIo();
