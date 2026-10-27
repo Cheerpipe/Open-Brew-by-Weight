@@ -158,6 +158,12 @@ before, without the offline copy. Through the proxy, the controller sees
 every phone as the same device, so five wrong passwords pause sign-in for
 everyone who uses that address for 30 seconds.
 
+To check how a phone or computer is reaching the Web UI, open
+**Diagnostic → Frontend**. It shows whether the page runs in a browser tab
+(**Web**) or from the home screen (**PWA**), whether it came straight from the
+controller (**Direct**) or through your **HTTPS proxy**, and whether the
+offline copy is **Active** on that device.
+
 ## Forgot the password
 
 Use the paddle recovery steps in [Emergency recovery](../EMERGENCY_RECOVERY.md#recover-wi-fi-ap-and-password).

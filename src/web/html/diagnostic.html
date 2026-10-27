@@ -61,6 +61,10 @@
   <symbol id="dg-marzocco-cloud" viewBox="0 0 24 24">
     <path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9Z" />
   </symbol>
+  <symbol id="dg-frontend" viewBox="0 0 24 24">
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9h18" />
+  </symbol>
   <symbol id="dg-misc" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" /></symbol>
   <symbol id="dg-compile-flags" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5" /></symbol>
 </svg>
@@ -660,6 +664,23 @@
         <div class="metric">
           <strong>{{webui:diagnostic.type}}</strong>
           <div id="dMt">—</div>
+        </div>
+      </div>
+    </details>
+    <details class="cfgGroup" data-g="frontend">
+      <summary>{{webui:diagnostic.frontend}}</summary>
+      <div class="statusColumn">
+        <div class="metric">
+          <strong>{{webui:diagnostic.frontend_mode}}</strong>
+          <div id="dUiMode">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.frontend_access}}</strong>
+          <div id="dUiAccess">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.frontend_offline}}</strong>
+          <div id="dUiOffline">—</div>
         </div>
       </div>
     </details>

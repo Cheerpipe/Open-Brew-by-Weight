@@ -511,7 +511,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !diagHtml.includes('<strong>Clock</strong>') ||
       !diagHtml.includes('<strong>Temp current</strong>') ||
       !diagHtml.includes('<strong>Temp peak</strong>') ||
-      (diagHtml.match(/<details/g) || []).length !== 19 ||
+      (diagHtml.match(/<details/g) || []).length !== 20 ||
       !diagHtml.includes('<details><summary>Last 10 resets</summary>') ||
       diagHtml.includes('<summary>Diagnostics</summary>') ||
       !diagHtml.includes('id="hFirmware"') ||
@@ -537,7 +537,8 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       diagHtml.indexOf('<summary>CPU profiling</summary>') > diagHtml.indexOf('<summary>RAM</summary>') ||
       diagHtml.indexOf('<summary>RAM</summary>') > diagHtml.indexOf('<summary>HEAP</summary>') ||
       diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
-      diagHtml.indexOf('<summary>Date and time</summary>') > diagHtml.indexOf('<summary>Misc</summary>') ||
+      diagHtml.indexOf('<summary>Date and time</summary>') > diagHtml.indexOf('<summary>Frontend</summary>') ||
+      diagHtml.indexOf('<summary>Frontend</summary>') > diagHtml.indexOf('<summary>Misc</summary>') ||
       diagHtml.indexOf('id="hWifiState"') > diagHtml.indexOf('id="hWifiPs"') ||
       diagHtml.indexOf('id="hWifiPs"') > diagHtml.indexOf('id="hWifiCoex"') ||
       diagHtml.indexOf('id="hWifiCoex"') > diagHtml.indexOf('id="hSsid"') ||
@@ -565,7 +566,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       css.includes('#diagnosticsPanel .metric,#statusPanel .metric,#scalePanel .metric,.shotCard>*{') ||
       css.includes('diagGroup')) {
     throw new Error(
-        'Diagnostics must be a non-collapsible fieldset at the top of Diagnostic, above Log, with States/Machine I/O/Scale/Guards/WiFi/AP/Serial/CPU/CPU Profiling/RAM/HEAP/Date and time/MISC sections and one value per label');
+        'Diagnostics must be a non-collapsible fieldset at the top of Diagnostic, above Log, with States/Machine I/O/Scale/Guards/WiFi/AP/Serial/CPU/CPU Profiling/RAM/HEAP/Date and time/Frontend/MISC sections and one value per label');
   }
 }
 {

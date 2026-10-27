@@ -437,6 +437,17 @@ function renderDiagClock() {
   renderLineaMicraDiagnostic();
 }
 let micraDiagnosticStatus = null;
+// Facts about this browser, not the controller. The firmware serves plain HTTP
+// only, so an https: page always came through a reverse proxy, and only there
+// can the service worker keep the offline copy.
+function renderFrontend() {
+  const t = __WEBUI_TEXT__("diagnostic.frontend_states").split("|"),
+    sw = navigator.serviceWorker;
+  $("dUiMode").textContent =
+    matchMedia("(display-mode: standalone)").matches || navigator.standalone ? t[1] : t[0];
+  $("dUiAccess").textContent = t[location.protocol === "https:" ? 3 : 2] + " · " + location.host;
+  $("dUiOffline").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
+}
 function renderLineaMicraDiagnostic() {
   const lm = __LINEA_MICRA__ && micraDiagnosticStatus;
   if (!lm || !$("dMicraPowerValue")) return;
@@ -1418,6 +1429,8 @@ export function init() {
   }, 1000);
   $("diagnosticControls")?.classList.remove("hidden");
   R.initGroupRows($("diagnosticsPanel"), "dg-");
+  renderFrontend();
+  navigator.serviceWorker?.addEventListener("controllerchange", renderFrontend);
   for (const section of $("diagnosticsPanel").querySelectorAll(".cfgGroup")) {
     const title = section.firstElementChild;
     // Press-and-hold copy: cancel on release, pointer exit, or a browser
