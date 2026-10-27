@@ -67,15 +67,6 @@
           ><span><small>{{webui:shell.open_brew}}</small>{{webui:shell.by_weight}}</span></a
         >
       </h1>
-      <button
-        type="button"
-        id="liveShotOpen"
-        class="liveBtn"
-        aria-haspopup="dialog"
-        title="{{webui:shell.live_open}}"
-      >
-        <span class="liveDot" aria-hidden="true"></span>{{webui:shell.live}}
-      </button>
       <div
         id="headerSignals"
         class="headerSignals"
@@ -162,6 +153,15 @@
             <g data-glyph="light"><circle cx="12" cy="12" r="7.4" /></g>
             <g data-glyph="dark"><circle cx="12" cy="12" r="7.4" fill="currentColor" /></g>
           </svg>
+        </button>
+        <button
+          type="button"
+          id="liveShotOpen"
+          class="signalIndicator liveBtn"
+          aria-haspopup="dialog"
+          title="{{webui:shell.live_open}}"
+        >
+          <span class="liveDot" aria-hidden="true"></span>{{webui:shell.live}}
         </button>
         <section id="wifiDetails" class="signalDetails" aria-labelledby="wifiDetailsTitle" hidden>
           <strong id="wifiDetailsTitle">{{webui:shell.wifi}}</strong>

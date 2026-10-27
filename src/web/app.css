@@ -3,6 +3,7 @@
   --cf: #5b3f2e;
   --gLast: #0e7490;
   --gCut: #d1101f;
+  --live: #d1101f;
   --bandFull: 0.14;
   --bandPart: 0.07;
   --bandWin: 0.26;
@@ -39,6 +40,7 @@
     --cf: #523a2c;
     --gLast: #38bdf8;
     --gCut: #9e1c22;
+    --live: #ff5c55;
     --bandFull: 0.22;
     --bandPart: 0.11;
     --bandWin: 0.32;
@@ -2432,25 +2434,26 @@ summary::marker {
   border-color: var(--ln);
   color: var(--mu);
 }
-.liveBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 2.25rem;
-  margin-left: auto;
-  padding: 0 0.8rem;
-  border: 1px solid var(--ln);
-  border-radius: 2rem;
-  background: none;
-  color: var(--fg);
+/* Live closes the header signals as one more borderless control; on a phone
+   it gives up its spacing so the header still fits one row at 360 px. */
+.headerSignals .liveBtn {
+  width: auto;
+  gap: 0.38rem;
+  margin-left: 0.25rem;
+  padding: 0 0.5rem;
   font: inherit;
   font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  z-index: 22;
+  font-weight: 700;
 }
-.liveBtn + .headerSignals {
-  margin-left: 0;
+@media (max-width: 480px) {
+  .headerSignals {
+    padding-left: 0;
+  }
+  .headerSignals .liveBtn {
+    gap: 0.25rem;
+    margin-left: 0;
+    padding: 0 0.15rem;
+  }
 }
 .liveDot {
   width: 0.55rem;
@@ -2460,12 +2463,12 @@ summary::marker {
   background: var(--mu);
 }
 .liveBtn.on {
-  border-color: color-mix(in srgb, var(--gCut) 55%, var(--ln));
+  color: var(--live);
 }
 /* The dot pulses only while a shot runs. */
 .liveBtn.on .liveDot,
 .liveShot.live .liveDot {
-  background: var(--gCut);
+  background: var(--live);
   animation: livePulse 1.2s ease-in-out infinite;
 }
 @keyframes livePulse {
@@ -5123,6 +5126,7 @@ html.theme-dark {
   --cf: #523a2c;
   --gLast: #38bdf8;
   --gCut: #9e1c22;
+  --live: #ff5c55;
   --bandFull: 0.22;
   --bandPart: 0.11;
   --bandWin: 0.32;
@@ -5279,7 +5283,6 @@ html.theme-dark {
 @media (forced-colors: active) {
   .btnGlyph,
   .presetCard,
-  .liveBtn,
   .lsClose,
   input,
   select,
