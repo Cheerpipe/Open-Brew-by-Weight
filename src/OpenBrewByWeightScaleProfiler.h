@@ -111,6 +111,11 @@ enum class ScaleProfileEvent : uint16_t {
   FIRST_DROP_SEEKING_FA,
   CUP_ANCHOR_REJECTED,
 };
+// Kinds in use; a kind appended above must move this (the shot trace
+// vocabulary lists exactly these, and its host test checks the next is
+// unnamed).
+constexpr size_t SCALE_PROFILE_EVENT_COUNT =
+    static_cast<size_t>(ScaleProfileEvent::CUP_ANCHOR_REJECTED) + 1U;
 
 // Append-only signal IDs. Values are scalars, not another control state machine.
 #define SCALE_PROFILE_SIGNALS(X) \

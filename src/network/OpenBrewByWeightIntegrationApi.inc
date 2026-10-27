@@ -243,9 +243,17 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     ShotCurveRecord &curve = work.statsCache.fetchCurve;
     const bool hasShot = self.callbacks_.copyHomeShot != nullptr &&
         self.callbacks_.copyHomeShot(latest, nullptr);
-    // The newest good shot's curve is cached; busy right after boot reads as none.
-    const bool hasCurve = hasShot && self.callbacks_.copyShotCurveById != nullptr &&
-        self.callbacks_.copyShotCurveById(latest.id, curve, true) == ShotCurveRead::FOUND;
+    // The newest good shot's curve is cached once the cache loaded after
+    // boot; until then (busy) the client keeps its copy and asks again,
+    // rather than keeping this shot without a curve.
+    const ShotCurveRead read = hasShot && self.callbacks_.copyShotCurveById != nullptr
+        ? self.callbacks_.copyShotCurveById(latest.id, curve, true) : ShotCurveRead::NONE;
+    if (read == ShotCurveRead::BUSY) {
+      self.unlockWorkBuf();
+      return sendError(request, STATUS_UNAVAILABLE, "SHOT_CURVE_BUSY",
+                       "The last shot's curve is not loaded yet; retry shortly.");
+    }
+    const bool hasCurve = read == ShotCurveRead::FOUND;
     const bool rowOk =
         !hasShot || self.formatShotStatsRow(work, latest, hasCurve ? &curve : nullptr) != 0;
     const int written = snprintf(

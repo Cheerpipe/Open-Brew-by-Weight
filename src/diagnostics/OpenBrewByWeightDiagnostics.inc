@@ -250,6 +250,7 @@ void publishControlStatus() {
   }
   next.state = stopperState;
   next.activeCycle = session.active;
+  next.traceCapturing = shotTrace().capturing();
   next.relayClosed = relay.closed;
   machineFillStatus(next, machine);
   next.virtualHoldOn = virtualHoldOn;
@@ -576,6 +577,7 @@ void serviceControlStatusPublish() {
   const bool forcePublish =
       publishedControlStatus.state != stopperState ||
       publishedControlStatus.activeCycle != session.active ||
+      publishedControlStatus.traceCapturing != shotTrace().capturing() ||
       publishedControlStatus.relayClosed != relaySnap.closed ||
       publishedControlStatus.machineRunning != machineIsRunning() ||
       publishedControlStatus.safetyGeneration != relaySnap.generation ||

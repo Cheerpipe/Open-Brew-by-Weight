@@ -409,6 +409,177 @@ ShotTracePoolStatus openShotTraceRecord(uint32_t shotId, uint32_t bootId, uint32
   return ShotTracePoolStatus::GONE;
 }
 
+// A stored shot whose record the worker has not written yet: its curve is
+// in the cache's pending (newest) suffix, or its trace is the unsaved one.
+bool shotRecordPending(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs) {
+  uint32_t traceShot = 0, traceBoot = 0, traceEnd = 0;
+  if (shotTrace().unsaved(traceShot, traceBoot, traceEnd) && traceShot == shotId &&
+      traceBoot == bootId && traceEnd == endedAtMs)
+    return true;
+  TaskLockGuard lock(shotStoreMutex);
+  const ShotCurveRecord *oldest = shotCurves.oldestPending();
+  return shotId != 0 && oldest != nullptr && shotId >= oldest->shotId;
+}
+
+ShotTraceRead shotTraceReadOf(ShotTracePoolStatus status) {
+  switch (status) {
+    case ShotTracePoolStatus::OK: return ShotTraceRead::FOUND;
+    case ShotTracePoolStatus::NOT_FOUND:
+    case ShotTracePoolStatus::GONE: return ShotTraceRead::NONE;
+    case ShotTracePoolStatus::NOT_READY:
+      return shotTracePool().lastError() == ShotTracePoolError::NONE ? ShotTraceRead::PENDING
+                                                                     : ShotTraceRead::UNAVAILABLE;
+    default: return ShotTraceRead::UNAVAILABLE;
+  }
+}
+
+// GET /api/v1/diagnostic/shot-trace?id&boot&end (B8): the trace section of a
+// shot's pool record, through the caller's chunk. A stored shot is reached
+// only through its summary (same identity); shot 0 is a trace without one:
+// interrupted (its crashed boot, end 0) or refused by the shot log. Never
+// during a shot, and PENDING until the worker wrote the record. The sink gets
+// the record CRC with each chunk (the ETag; a copy with `knownCrc` is
+// NOT_MODIFIED); a shot starting or the ring recycling the record mid-stream
+// ends it UNAVAILABLE.
+ShotTraceRead streamShotTrace(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs,
+                              uint32_t knownCrc, uint8_t *chunk, size_t capacity,
+                              ShotTraceSink sink, void *context) {
+  if (!shotTracePoolGateOpen()) return ShotTraceRead::BUSY;
+  if (shotId != 0) {
+    TaskLockGuard lock(shotStoreMutex);
+    const ShotLogRecord *summary = shotLog.findNewestById(shotId);
+    if (summary == nullptr || summary->bootId != bootId || summary->endedAtMs != endedAtMs)
+      return ShotTraceRead::NONE;
+  }
+  ShotTracePool &pool = shotTracePool();
+  ShotTracePoolRef ref;
+  size_t offset = 0, bytes = 0;
+  // Pending first: a commit landing before the lookup then reads as found,
+  // never as a spurious 404. A current copy costs one header read.
+  const bool pending = shotRecordPending(shotId, bootId, endedAtMs);
+  ShotTracePoolStatus status = pool.identify(shotId, bootId, endedAtMs, ref);
+  if (status == ShotTracePoolStatus::NOT_FOUND && pending) return ShotTraceRead::PENDING;
+  if (!shotTracePoolGateOpen()) return ShotTraceRead::BUSY;
+  if (status == ShotTracePoolStatus::OK && knownCrc != 0 && ref.header.crc == knownCrc)
+    return ShotTraceRead::NOT_MODIFIED;
+  if (status == ShotTracePoolStatus::OK)
+    status = openShotTraceRecord(shotId, bootId, endedAtMs, ref, chunk, capacity);
+  if (status == ShotTracePoolStatus::OK)
+    status = pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes);
+  if (status != ShotTracePoolStatus::OK) return shotTraceReadOf(status);
+  for (size_t at = 0; at < bytes; at += capacity) {
+    const size_t piece = bytes - at < capacity ? bytes - at : capacity;
+    if (!shotTracePoolGateOpen() || pool.read(ref, offset + at, chunk, piece) != ShotTracePoolStatus::OK ||
+        !sink(context, chunk, piece, ref.header.crc))
+      return ShotTraceRead::UNAVAILABLE;
+  }
+  return ShotTraceRead::FOUND;
+}
+
+// Shot storage's live predicate: the summaries' index tags, good ones from
+// the front of the caller's scratch and bad ones from its back, each part
+// sorted so every pool entry costs a binary search, not a scan of the log.
+struct ShotStorageLive {
+  const uint32_t *good, *bad;
+  size_t goodCount, badCount;
+  uint32_t goodRecords, badRecords, oldestTag;
+};
+bool shotStorageTagIn(const uint32_t *tags, size_t count, uint32_t tag) {
+  return std::binary_search(tags, tags + count, tag);
+}
+// Live: a summary of its identity exists, or it is a trace without one
+// (shot 0, reachable by its identity); only the former count as shots.
+bool shotStorageLive(void *context, const ShotTracePoolEntry &entry) {
+  ShotStorageLive &live = *static_cast<ShotStorageLive *>(context);
+  if ((entry.idTag & 0xFFFFFFU) == 0) return true;
+  const bool good = shotStorageTagIn(live.good, live.goodCount, entry.idTag);
+  if (!good && !shotStorageTagIn(live.bad, live.badCount, entry.idTag)) return false;
+  if (live.goodRecords + live.badRecords == 0) live.oldestTag = entry.idTag;
+  ++(good ? live.goodRecords : live.badRecords);
+  return true;
+}
+
+// GET /api/v1/diagnostic/shot-storage (B8), never during a shot. The store
+// lock covers one walk of the summaries only (their tags into `tags`, the
+// caller's scratch of `capacity` words, httpd's chunk); the sort and the RAM
+// pool statistics run without it, and a second short hold finds the oldest
+// stored shot. Then, without any store lock, one header and trace-flag read
+// per live record counts the traces. Records appended or recycled during the
+// walk can shift the counts by one: diagnostic figures, not accounting.
+ShotTraceRead copyShotStorage(ShotStorageStats &out, uint32_t *tags, size_t capacity) {
+  if (capacity < SHOT_LOG_CAPACITY) return ShotTraceRead::UNAVAILABLE;
+  if (!shotTracePoolGateOpen()) return ShotTraceRead::BUSY;
+  ShotTracePool &pool = shotTracePool();
+  out = {};
+  size_t good = 0, bad = 0;
+  {
+    TaskLockGuard lock(shotStoreMutex);
+    (void)shotLog.findNewest([&](const ShotLogRecord &r) {
+      tags[shotLogRecordEligible(r) ? good++ : capacity - ++bad] =
+          shotTracePoolIdTag(r.id, r.bootId, r.endedAtMs);
+      return false;
+    });
+    out.pendingCurves = static_cast<uint32_t>(shotCurves.pending());
+  }
+  uint32_t *badTags = tags + capacity - bad;
+  std::make_heap(tags, tags + good);
+  std::sort_heap(tags, tags + good);
+  std::make_heap(badTags, badTags + bad);
+  std::sort_heap(badTags, badTags + bad);
+  ShotStorageLive live = {tags, badTags, good, bad, 0, 0, 0};
+  const ShotTracePoolStats stats = pool.stats(shotStorageLive, &live);
+  out.good = live.goodRecords;
+  out.bad = live.badRecords;
+  if (out.good + out.bad != 0) {
+    const uint32_t oldestTag = live.oldestTag;
+    TaskLockGuard lock(shotStoreMutex);
+    const ShotLogRecord *oldest = shotLog.findNewest([oldestTag](const ShotLogRecord &r) {
+      return shotTracePoolIdTag(r.id, r.bootId, r.endedAtMs) == oldestTag;
+    });
+    if (oldest != nullptr) {
+      out.sinceShotId = oldest->id;
+      out.sinceLocalSec = oldest->hasWallTime ? oldest->endedAtLocalSec : 0;
+    }
+  }
+  out.ready = pool.ready();
+  out.lastError = static_cast<uint8_t>(stats.lastError);
+  out.poolBytes = stats.poolBytes;
+  out.liveBytes = stats.liveBytes;
+  out.reclaimableBytes = stats.reclaimableBytes;
+  out.unindexedBytes = stats.unindexedBytes;
+  out.unusedBytes = stats.unusedBytes;
+  out.records = stats.records;
+  out.meanRecordBytes = stats.meanRecordBytes;
+  out.droppedRecords = stats.droppedRecords;
+  uint32_t shot = 0, boot = 0, ended = 0;
+  out.pendingTraces = shotTrace().unsaved(shot, boot, ended) ? 1U : 0U;
+  out.tracesDropped = shotTrace().tracesDropped();
+  for (size_t n = out.records; n-- != 0;) {  // Newest first, for the interrupted list.
+    if (!shotTracePoolGateOpen()) return ShotTraceRead::BUSY;
+    if (n % 64U == 0) yieldFlashIo();
+    ShotTracePoolRef ref;
+    size_t offset = 0, bytes = 0;
+    uint8_t flags = 0;
+    if (pool.headerAt(n, ref) != ShotTracePoolStatus::OK) continue;
+    const ShotTracePoolRecordHeader &h = ref.header;
+    const uint32_t tag = shotTracePoolIdTag(h.shotId, h.bootId, h.endedAtMs);
+    if (h.shotId != 0 && !shotStorageTagIn(tags, good, tag) &&
+        !shotStorageTagIn(badTags, bad, tag))
+      continue;  // A deleted or evicted shot's record.
+    if (pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+            ShotTracePoolStatus::OK &&
+        pool.read(ref, offset + offsetof(ShotTraceHeader, flags), &flags, 1) ==
+            ShotTracePoolStatus::OK) {
+      ++out.traces;
+      if (flags & (SHOT_TRACE_VERBOSE_TRUNCATED | SHOT_TRACE_DECISIONS_TRUNCATED)) ++out.truncated;
+    }
+    if (h.shotId == 0 && h.endedAtMs != 0) ++out.traceOnly;
+    if (h.shotId == 0 && h.endedAtMs == 0 && out.interrupted++ < 4U)
+      out.interruptedBoots[out.interruptedListed++] = h.bootId;
+  }
+  return ShotTraceRead::FOUND;
+}
+
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
 // A reboot for the pool's RAM state and the curve cache; the host flash
 // keeps its bytes.

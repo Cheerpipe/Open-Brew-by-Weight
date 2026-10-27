@@ -292,7 +292,7 @@ cases also remain pending; the successful full transfer does not qualify them.
 | Profiler processing workspace | external, at most 4 KiB, only while running |
 | Profiler published report | external BSS, 2,512 bytes; written and copied under the profiler's internal mutex by tasks only |
 | OTA state singleton | external BSS, about 1.6 KiB (identity, tags, journal bookkeeping, tag scanner); its mutex and published flags are internal statics, and chunk buffers, SHA context and tag re-reads use internal memory |
-| Shot trace | external no-init (`.ext_ram_noinit`, `CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY`), 33,408 bytes: two 16 KiB capture buffers and the pre-shot ring, kept across panic, watchdog and software resets and validated at boot; outside the external BSS measurement. The 4 KiB export chunk is external BSS |
+| Shot trace | external no-init (`.ext_ram_noinit`, `CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY`), 33,408 bytes: two 16 KiB capture buffers and the pre-shot ring, kept across panic, watchdog and software resets and validated at boot; outside the external BSS measurement. The httpd-owned 4 KiB download chunk is external BSS; it streams the newest trace from RAM and any shot's trace from the pool, and also holds Shot storage's sorted summary tags (no memory of their own) |
 | Scale profiler workspace | external, only while a manual capture exists: 256 KiB record buffer, header/context and a bounded per-signal observation cache (32 bytes per signal), and a 32 KiB ordering index after stop (combined ceiling 320 KiB, enforced including the index); freed after the trace is saved and no download is streaming it; capture storage is a dedicated 260 KiB flash partition with a header-last commit |
 | Profiler kernel capture | internal, at most 4 KiB, only while running |
 | Settings handoff | one external mailbox for the 3,312-byte settings blob and revision, and one internal byte queued; no full settings copy in the queue or receiver |
@@ -319,8 +319,9 @@ The destructive paths have a whole-call-chain bound instead: the stack-depth
 gate in [Validation](../VALIDATION.md) covers boot recovery on the loopTask,
 the Web UI factory reset on `network_manager`, and the OTA transfer and commit
 on `ota_worker` and its inline httpd fallback. It also bounds the two deepest
-httpd requests, a UI stream request and the crash archive download, against
-the HTTPD stack. No `PersistedSettings` copy
+httpd requests, a UI stream request, the crash archive download, and the shot
+trace download and Shot storage (through their persistence callbacks),
+against the HTTPD stack. No `PersistedSettings` copy
 lives on those stacks: the network task edits a PSRAM working copy and NVS
 stages through the internal scratch. After every boot recovery the next boot
 writes `factory reset left N B of loopTask stack unused` (or `network access

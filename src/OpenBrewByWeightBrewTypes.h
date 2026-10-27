@@ -197,6 +197,8 @@ enum class EndReason : uint8_t {
   UNCONFIRMED_START = 19,
   TOUCH_WEIGHT_FALLBACK = 20
 };
+// Reasons in use (2 retired); a reason appended above must move this.
+constexpr size_t END_REASON_COUNT = static_cast<size_t>(EndReason::TOUCH_WEIGHT_FALLBACK) + 1U;
 
 constexpr uint32_t TOUCH_STOP_FALLBACK_MS = 1000;
 struct TouchStopEvidence {
@@ -289,5 +291,6 @@ enum class ActualWeightSource : uint8_t {
   POST_DRIP = 1,
   LAST_KNOWN = 2
 };
+constexpr size_t ACTUAL_WEIGHT_SOURCE_COUNT = static_cast<size_t>(ActualWeightSource::LAST_KNOWN) + 1U;
 
 }  // namespace openbrewbyweight

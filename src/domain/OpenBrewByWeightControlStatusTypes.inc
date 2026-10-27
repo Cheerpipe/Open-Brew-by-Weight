@@ -7,6 +7,9 @@ struct ControlStatusFields : ScaleLinkMetrics {
   uint32_t snapshotVersion = 0;
   StopperState state = StopperState::REQUIRES_OFF;
   bool activeCycle = false;
+  // A shot trace capture is open: cycle start to drip finalize. Nothing is
+  // exported and no stored trace or old curve is read meanwhile.
+  bool traceCapturing = false;
   // True only on a reader copy when its requested control refresh timed out.
   // The remaining fields still come from one complete committed snapshot.
   bool snapshotStale = false;

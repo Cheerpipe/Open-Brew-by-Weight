@@ -149,6 +149,9 @@ HTTPD_DISPATCH = {
 }
 
 
+SHOT_TRACE_ROUTES = (r"::shotTraceDownloadHandler\(", r"::shotStorageHandler\(")
+
+
 GATES = (
     Gate("loopTask boot recovery",
          lambda build: sdkconfig_value(build, "CONFIG_ARDUINO_LOOP_STACK_SIZE"),
@@ -183,6 +186,15 @@ GATES = (
     # The download verifies unverified dump digests before streaming the tar.
     Gate("httpd crash archive download", http_stack, r"^httpd_thread$",
          (r"::crashArchiveDownloadHandler\(",), HTTPD_DISPATCH),
+    # A shot trace streams its pool record through callbacks_ and a sink;
+    # Shot storage reads every record header behind a live predicate.
+    Gate("httpd shot trace download and storage", http_stack, r"^httpd_thread$",
+         SHOT_TRACE_ROUTES,
+         {**HTTPD_DISPATCH, r"::ownedApiHandler\(": SHOT_TRACE_ROUTES,
+          r"::shotTraceDownloadHandler\(": (r"\bstreamShotTrace\(",),
+          r"\bstreamShotTrace\(": (r"\bsendShotTraceChunk\(",),
+          r"::shotStorageHandler\(": (r"\bcopyShotStorage\(",),
+          r"ShotTracePool::stats\(": (r"\bshotStorageLive\(",)}),
 )
 
 

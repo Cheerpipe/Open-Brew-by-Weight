@@ -142,7 +142,8 @@
     Blob,
     URL: {createObjectURL: value => {blob = value; return 'blob:test';}, revokeObjectURL() {}},
     document: {createElement: () => ({click() {}, remove() {}}), body: {append() {}}},
-    setTimeout: () => 0,
+    setTimeout: () => 0, setInterval: () => 0, clearInterval() {}, shotRunning: () => false,
+    uiState: {},
     message: message => {throw new Error(message);}, formatCommandError: (_, e) => e.message
   });
   vm.runInContext(runtimeJs.slice(runtimeJs.indexOf('function axisLabel('),
@@ -151,7 +152,9 @@
       blockAt(viewJs.records, 'function downloadCsv('), context);
   vm.runInContext('var R = this;' + blockAt(viewJs.stats, 'function shotCut(') +
     blockAt(viewJs.stats, 'function shotFlowCurveGS('), context);
-  vm.runInContext(blockAt(viewJs.stats, 'async function exportShotsCsv('), context);
+  vm.runInContext(blockAt(viewJs.stats, 'let exportJob = null;') +
+      blockAt(viewJs.stats, 'async function exportRows(') +
+      blockAt(viewJs.stats, 'async function exportShotsCsv('), context);
   // A second click while an export window is pending saves nothing more.
   context.statsExportInFlight = Promise.resolve(records);
   await vm.runInContext('exportShotsCsv()', context);

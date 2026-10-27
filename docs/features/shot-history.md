@@ -424,6 +424,54 @@ The controller stores only the weight curve. The Flow rate chart and Max flow
 are derived locally, so viewing or reloading them does not create another
 history record or flash write.
 
+### See what the controller decided
+
+Each shot started with a scale also keeps a **shot trace**: a compact record of
+what the controller knew when the shot started and every decision it took,
+from the moment the machine started until the last drips were weighed. It is
+there for the times a shot does something you did not expect, such as
+stopping late, never stopping by weight, or ending early, so you can see why
+instead of guessing.
+
+Open a shot's **⋯** menu and choose **View trace**. The view shows:
+
+- The shot's weight curve with a thin line at every moment something
+  happened. Lines in the accent color are the controller's own decisions:
+  when the slow window ended, when the weight crossed the cut line, when it
+  asked the machine to stop and which weight it kept as the yield.
+- Those moments as a list in time order. **Show** narrows it to
+  **Decisions**, **Scale and cup** events (tares, cup placed or lifted,
+  rejected readings) or **Controller events**; **Search** finds a word in
+  the list. The curve follows what the list shows.
+- **Before the shot**: the last scale and cup events before you started,
+  such as the cup being placed or an automatic tare that did not happen.
+- **At the start**: the tare, cup and stability settings and the cup state
+  when the shot began.
+- **Readings and timing**: how many weight readings arrived, were used or
+  were rejected and why, and the longest gaps between them.
+
+**Download** saves the raw trace file, which is what to attach when you
+report a problem.
+
+A few things to know:
+
+- The trace is ready once the shot is completely over, including its drip
+  wait. Until then **View trace** is greyed out and says so. Right after a
+  shot the controller needs a moment to save it; the view waits for it on
+  its own. If the controller is busy for another reason, such as a rinse or
+  the scale connecting, the view asks you to try again in a moment.
+- If the controller restarted in the middle of a shot, that shot's trace is
+  kept and marked as interrupted, and it ends where the controller stopped.
+  It has no shot card, so you find it in **Diagnostic → Shot storage**.
+- When a shot records more events than fit, the least important ones are
+  left out first and the view tells you how many; the counts in **Readings
+  and timing** stay exact.
+- Traces share storage with the shot curves. The newest shots always keep
+  theirs; when space runs out the oldest make room, so an older shot may say
+  it has no trace. Shots from firmware before traces existed have none.
+- The copy kept for offline use holds the shots, not their traces, so
+  **View trace** needs the controller.
+
 ### With the machine off
 
 A phone or computer that opens the Web UI over HTTPS keeps a copy of every
@@ -433,22 +481,36 @@ See [Open it over HTTPS with a reverse proxy](../settings/web-access.md#open-it-
 
 ## Export and share shots
 
-**Export**, next to Filter, opens a small menu with two formats. Both always
-include every good shot, and only good shots, whatever the list's filter or
-sort:
+**Export**, next to Filter, opens a small menu with three choices. They
+include every shot whatever the list's filter or sort:
 
-- **CSV** is a table for Excel, Numbers, or Google Sheets, one row per shot.
-- **JSON** keeps everything the controller recorded about each shot, including
-  its full weight curve, in a structured file. Use it as a backup, to analyze
-  your shots in your own tools, or to bring them into other apps. Its layout is
-  published as a
-  [JSON Schema](../schemas/openbrewbyweight-shot-export-v2.schema.json), with an
-  [example file](../schemas/openbrewbyweight-shot-export-v2.example.json), so
-  other projects can read it reliably.
+- **CSV** is a table for Excel, Numbers, or Google Sheets, one row per good
+  shot.
+- **JSON** keeps everything the controller recorded about each good shot,
+  including its full weight curve, in a structured file. Use it as a backup,
+  to analyze your shots in your own tools, or to bring them into other apps.
+  Its layout is published as a
+  [JSON Schema](../schemas/openbrewbyweight-shot-export-v1.schema.json), with
+  an [example file](../schemas/openbrewbyweight-shot-export-v1.example.json),
+  so other projects can read it reliably.
+- **JSON + diagnostics** is the same file with every shot, bad ones included,
+  and each shot's trace. It is meant for troubleshooting with the
+  developers. The controller sends the traces a few at a time, so a long
+  history takes a while; the progress shows at the bottom of the page and
+  **Export → Cancel export** stops it. Browsers that can compress save it as
+  a smaller `.json.gz` file, which most archive tools open.
+
+The controller exports nothing while a shot is brewing or waiting for its
+last drips: the choices are greyed out until then, and an export that is
+running when a shot starts stops and tells you so. Export again once the shot
+is over. If a shot's trace cannot be read at that moment, the diagnostics
+file still includes the shot and marks its trace as unavailable.
 
 Each shot card has a **⋯** button in its top right corner. Its menu acts on
 that shot only:
 
+- **View trace** opens the shot's trace; see
+  [See what the controller decided](#see-what-the-controller-decided).
 - **Open in Beanconqueror** hands the shot to the Beanconqueror app on the same
   phone or tablet, ready to save as a brew with its dose, yield, time, first
   drip, target temperature, rating, and weight curve. Open the Web UI on the
@@ -456,8 +518,9 @@ that shot only:
   that accepts brews from other apps; versions up to 8.7.0 do not, and on a
   device without a suitable app nothing happens.
 - **JSON** downloads the shot in the same format as the full export, so one
-  shot and the whole log read the same way. A bad shot's file says why it is
-  bad.
+  shot and the whole log read the same way, with its trace when it has one. A
+  bad shot's file says why it is bad. Like **View trace**, it waits while a
+  shot is brewing.
 - **Gaggiuino** downloads the shot in the format Gaggiuino machines use, which
   [Visualizer](https://visualizer.coffee) can import. It carries the weight,
   flow, and target temperature over time. Open Brew by Weight measures weight

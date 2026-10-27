@@ -1281,10 +1281,8 @@ const loadMoreShots = () => {
   }
 };
 async function exportShotsCsv() {
-  if (statsExportInFlight) return;
-  try {
-    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3);
-    if (!list) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
+  return runExport(async (job) => {
+    const list = await exportRows(job, {});
     const maxW = list.reduce((m, r) => Math.max(m, r.wCg?.length || 0), 0);
     const rows = [
       [
@@ -1373,33 +1371,140 @@ async function exportShotsCsv() {
       ]);
     }
     downloadCsv("shot-history.csv", rows);
+  });
+}
+// The toolbar export running, if any: { stopped, progress, cancel(text) }.
+// While it runs the Export menu offers Cancel; a shot starting cancels it,
+// since the firmware exports nothing during a shot.
+let exportJob = null;
+async function runExport(work) {
+  if (exportJob || statsExportInFlight) return;
+  const job = (exportJob = {
+    stopped: null,
+    progress: "",
+    cancel(text) {
+      this.stopped ??= text;
+      if (R.uiState.statsExportResolve) statsSendSubscribe(); // Drops the firmware's page.
+    },
+  });
+  const watch = setInterval(
+    () => R.shotRunning() && job.cancel(__WEBUI_TEXT__("stats.export_stopped_shot")),
+    500,
+  );
+  try {
+    await work(job);
   } catch (e) {
     R.message(
-      R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_export_shot_history"), e),
-      "error",
+      job.stopped ||
+        R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_export_shot_history"), e),
+      job.stopped ? "" : "error",
     );
+  } finally {
+    clearInterval(watch);
+    exportJob = null;
   }
 }
-async function exportShotsJson() {
-  if (statsExportInFlight) return;
-  try {
-    const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3);
-    if (!list) throw new Error(__WEBUI_TEXT__("runtime.invalid_status"));
-    // Local time as YYYYMMDD-HHMM ("sv" formats dates ISO-like).
-    const stamp = new Date().toLocaleString("sv").slice(0, 16).replace(/\D/g, "");
-    downloadJson(
-      `openbrewbyweight-shots-${stamp.slice(0, 8)}-${stamp.slice(8)}.json`,
-      shotsJson(list),
-    );
-  } catch (e) {
-    R.message(
-      R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_export_shot_history"), e),
-      "error",
-    );
-  }
+// Every stored shot newest first, whatever the list filter: the good ones,
+// or with { bad: true } the bad ones too.
+async function exportRows(job, filter) {
+  const list = await statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3, filter);
+  if (job.stopped || !list)
+    throw new Error(job.stopped || __WEBUI_TEXT__("runtime.invalid_status"));
+  return list;
+}
+// The file as parts, never one string: plain JSON, or gzip streamed through
+// CompressionStream so only the compressed bytes accumulate.
+function exportSink(gzip) {
+  const parts = [];
+  if (!gzip)
+    return {
+      write: (text) => parts.push(text),
+      done: () => new Blob(parts, { type: "application/json" }),
+      abort() {},
+    };
+  const zip = new CompressionStream("gzip"),
+    writer = zip.writable.getWriter(),
+    encoder = new TextEncoder(),
+    out = new Response(zip.readable).blob();
+  out.catch(() => {});
+  return {
+    write: (text) => writer.write(encoder.encode(text)),
+    done: async () => (await writer.close(), new Blob([await out], { type: "application/gzip" })),
+    abort: () => writer.abort().catch(() => {}),
+  };
+}
+// JSON: every good shot. With diagnostics: every shot, bad ones included,
+// each with its decoded trace, fetched four at a time, as .json.gz where the
+// browser can compress.
+function exportShotsJson(diagnostics = false) {
+  return runExport(async (job) => {
+    const list = await exportRows(job, diagnostics ? { bad: true } : {}),
+      gzip = diagnostics && typeof CompressionStream === "function",
+      vocab = diagnostics && (await shotTraceVocabulary().catch(() => null)),
+      sink = exportSink(gzip);
+    try {
+      await sink.write(JSON.stringify(shotsJson([])).slice(0, -2));
+      for (let i = 0; i < list.length; i += 4) {
+        const batch = list.slice(i, i + 4),
+          traces = diagnostics
+            ? await Promise.all(batch.map((r) => shotTraceForFile(r, vocab)))
+            : [];
+        if (job.stopped) throw new Error(job.stopped);
+        for (const [k, r] of batch.entries())
+          await sink.write((i + k ? "," : "") + JSON.stringify(shotJson(r, traces[k])));
+        if (diagnostics) {
+          job.progress = R.sub(__WEBUI_TEXT__("stats.export_progress"), [
+            i + batch.length,
+            list.length,
+          ]);
+          R.message(job.progress);
+        }
+      }
+      await sink.write("]}");
+      // Local time as YYYYMMDD-HHMM ("sv" formats dates ISO-like).
+      const stamp = new Date().toLocaleString("sv").slice(0, 16).replace(/\D/g, "");
+      R.saveFile(
+        await sink.done(),
+        `openbrewbyweight-shots${diagnostics ? "-diagnostics" : ""}-${stamp.slice(0, 8)}-` +
+          `${stamp.slice(8)}.json${gzip ? ".gz" : ""}`,
+      );
+      if (diagnostics) R.message(__WEBUI_TEXT__("stats.export_done"), "ok");
+    } catch (e) {
+      sink.abort();
+      if (e.code === "SHOT_TRACE_BUSY") job.stopped ??= __WEBUI_TEXT__("stats.export_stopped_shot");
+      throw e;
+    }
+  });
 }
 function downloadJson(name, value) {
   R.saveFile(new Blob([JSON.stringify(value)], { type: "application/json" }), name);
+}
+// A shot's decoded trace for a file: null when it has none, false when it
+// could not be read now (the file goes on and says so); only a shot
+// starting stops the file.
+async function shotTraceForFile(r, vocab) {
+  try {
+    const data = await R.fetchShotTrace(r);
+    return data && decodeShotTrace(data, vocab);
+  } catch (e) {
+    if (e.code === "SHOT_TRACE_BUSY" && R.shotRunning()) throw e;
+    return false;
+  }
+}
+// One shot with its trace when it has one (the offline copy has none).
+async function downloadShotJson(r) {
+  try {
+    const vocab = R.offlineCopy ? null : await shotTraceVocabulary().catch(() => null);
+    downloadJson(
+      `openbrewbyweight-shot-${r.id}.json`,
+      shotsJson([r], [R.offlineCopy ? null : await shotTraceForFile(r, vocab)]),
+    );
+  } catch (e) {
+    R.message(
+      R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_export_shot_history"), e),
+      "error",
+    );
+  }
 }
 // ISO 8601 in the shot's own offset (minutes east of UTC).
 function isoAt(unix, offset) {
@@ -1420,24 +1525,25 @@ function shotWallTimes(r) {
       : Math.round((r.endedAtLocalSec - r.endedAtUnixSec) / 60);
   return [isoAt(r.endedAtUnixSec - r.durationS, offset), isoAt(r.endedAtUnixSec, offset), offset];
 }
-// Shot export v2 (docs/schemas/openbrewbyweight-shot-export-v2.schema.json):
-// what the firmware stored, then under `derived` what this page computes.
-function shotsJson(rows) {
+// Shot export v1 (docs/schemas/openbrewbyweight-shot-export-v1.schema.json):
+// what the firmware stored, then under `derived` what this page computes, and
+// with diagnostics each shot's decoded `trace`.
+function shotsJson(rows, traces = []) {
   return {
     $schema:
-      "https://raw.githubusercontent.com/Cheerpipe/Open-Brew-by-Weight/main/docs/schemas/openbrewbyweight-shot-export-v2.schema.json",
+      "https://raw.githubusercontent.com/Cheerpipe/Open-Brew-by-Weight/main/docs/schemas/openbrewbyweight-shot-export-v1.schema.json",
     format: "openbrewbyweight.shots",
-    version: 2,
+    version: 1,
     exportedAt: new Date().toISOString(),
     source: {
       app: "openbrewbyweight",
       firmwareVersion: R.firmwareVersion || null,
       host: location.hostname || null,
     },
-    shots: rows.map(shotJson),
+    shots: rows.map((r, i) => shotJson(r, traces[i])),
   };
 }
-function shotJson(r) {
+function shotJson(r, trace) {
   const w = Array.isArray(r.wCg) ? r.wCg : [],
     m = R.buildShotSparkModel(r),
     flow = shotFlowCurveGS(r, m),
@@ -1535,6 +1641,8 @@ function shotJson(r) {
       cut: cut.s == null ? null : { atS: cut.s, weightG: cut.g },
       dripG: n(cut.drip),
     },
+    ...(trace && { trace }),
+    ...(trace === false && { traceUnavailable: true }),
   };
 }
 // The curve's samples as the scale weighed coffee: held readings (a hand on
@@ -1703,18 +1811,395 @@ async function openInBeanconqueror(r) {
     );
   }
 }
+// Shot traces (docs/SHOT_TRACE.md): one immutable binary record per shot,
+// fetched on demand and decoded here for the trace view and the diagnostics
+// export alike. Names come from the firmware's vocabulary, fetched once per
+// firmware; a trace of another vocabulary version gets generic names.
+const TRACE_KINDS = [
+  "STOP_REQUESTED",
+  "STOP_BLOCKED",
+  "MACHINE_RUNNING",
+  "SLOW_WINDOW_END",
+  "OVER_LINE",
+  "FINAL_WEIGHT",
+  "TRACE_DISCARDED",
+];
+const TRACE_SNAPSHOT_FLAGS = [
+  "autoTare",
+  "autoRetare",
+  "idleTare",
+  "accessoryRetare",
+  "touchAvoidance",
+  "requireCup",
+  "stopIfRemoved",
+  "cupProtection",
+  "cupPresent",
+  "cupTared",
+  "emptyPanQualified",
+  "idleTareEligible",
+  "scaleSupportsTare",
+  "lineaMicraConnected",
+];
+const TRACE_COUNTERS = [
+  "readingsReceived",
+  "readingsAccepted",
+  "readingsHeld",
+  "rejectedInvalid",
+  "rejectedRange",
+  "rejectedSlew",
+  "rejectedRecovery",
+  "rejectedPreCycle",
+  "rejectedOther",
+  "readingGapMinMs",
+  "readingGapMeanMs",
+  "readingGapMaxMs",
+  "packetGaps",
+  "staleFrames",
+  "undecodableFrames",
+  "confirmationResets",
+  "loopGapMaxMs",
+  "micraRxBytes",
+  "uiStreamDeferrals",
+  "verboseDropped",
+  "decisionsDropped",
+];
+let traceVocab = null;
+function shotTraceVocabulary() {
+  traceVocab ||= R.api("/api/v1/diagnostic/shot-trace/vocabulary?v=__FW_ASSET_TAG__");
+  return traceVocab.catch((e) => {
+    traceVocab = null;
+    throw e;
+  });
+}
+// The record as the export's `trace`: header, start snapshot, end counters,
+// pre-shot entries and events in record order, continuations merged into
+// `ext` ([head bits 0-15, a, b]). Section sizes come from the header.
+function decodeShotTrace(buffer, vocab) {
+  const v = new DataView(buffer),
+    bytes = new Uint8Array(buffer),
+    u16 = (o) => v.getUint16(o, true),
+    u32 = (o) => v.getUint32(o, true),
+    text = (o, n) => {
+      const b = bytes.subarray(o, o + n),
+        end = b.indexOf(0);
+      return new TextDecoder().decode(end < 0 ? b : b.subarray(0, end));
+    };
+  if (
+    buffer.byteLength < 88 ||
+    u32(0) !== 0x43525453 ||
+    u16(4) !== 1 ||
+    u32(8) !== buffer.byteLength
+  )
+    throw new Error(__WEBUI_TEXT__("stats.trace_unreadable"));
+  const names = vocab?.version === u16(6) ? vocab : {},
+    snap = 88,
+    counters = snap + u16(80),
+    pre = counters + u16(82),
+    first = pre + u16(84) * 16,
+    flags = bytes[76],
+    snapFlags = u16(snap + 48),
+    cg = (o) => (v.getInt32(o, true) === -2147483648 ? null : v.getInt32(o, true) / 100),
+    kind = (head, a, b) => {
+      const code = head >>> 24,
+        type = head & 0x800000 ? "debug" : code >= 0xe0 ? "trace" : "profile",
+        name =
+          type === "debug"
+            ? names.debug?.[code]
+            : type === "trace"
+              ? TRACE_KINDS[code - 0xe0]
+              : names.profile?.[code];
+      return {
+        type,
+        code,
+        name: name || `${type}_${code}`,
+        a,
+        b,
+        ...(type === "profile" &&
+          name === "STATE_CHANGED" && {
+            signal: names.signals?.[b & 0x7fff] || `signal_${b & 0x7fff}`,
+            initial: !!(b & 0x8000),
+          }),
+      };
+    };
+  if (first + u16(72) * 8 !== buffer.byteLength || u16(80) < 108 || u16(82) < 84)
+    throw new Error(__WEBUI_TEXT__("stats.trace_unreadable"));
+  const events = [];
+  for (let o = first; o < buffer.byteLength; o += 8) {
+    const head = u32(o),
+      a = v.getInt16(o + 4, true),
+      b = u16(o + 6);
+    if (!(head & 0x800000) && head >>> 24 === 0xff) {
+      if (events.length) events.at(-1).ext = [head & 0xffff, a, b];
+    } else events.push({ atMs: head & 0x7fffff, ...kind(head, a, b) });
+  }
+  const preShot = [];
+  for (let i = 0, o = pre; i < u16(78); i++, o += 16)
+    preShot.push({
+      beforeMs: u32(o) & 0x7fffff,
+      ...kind(u32(o), v.getInt16(o + 4, true), u16(o + 6)),
+      arg1: ((u16(o + 12) << 16) | u16(o + 6)) >>> 0,
+      arg2: u32(o + 8),
+      repeats: u16(o + 14),
+    });
+  const counted = Object.fromEntries(
+    TRACE_COUNTERS.map((k, i) => [
+      k,
+      u32(counters + i * 4) === 0xffffffff ? null : u32(counters + i * 4),
+    ]),
+  );
+  return {
+    formatVersion: 1,
+    vocabularyVersion: u16(6),
+    firmware: text(40, 24),
+    shotId: u32(16),
+    bootId: u32(20),
+    anchorMs: u32(24),
+    endedAtMs: u32(28),
+    endReasonCode: bytes[77],
+    endReason: flags & 4 ? null : names.endReasons?.[bytes[77]] || null,
+    flags: {
+      verboseTruncated: !!(flags & 1),
+      decisionsTruncated: !!(flags & 2),
+      interrupted: !!(flags & 4),
+      tailDropped: !!(flags & 8),
+    },
+    snapshot: {
+      freeHeapBytes: u32(snap),
+      freePsramBytes: u32(snap + 4),
+      postTareGraceMs: u32(snap + 8),
+      retareWindowMs: u32(snap + 12),
+      stabilityDurationMs: u32(snap + 16),
+      stabilityGapMs: u32(snap + 20),
+      stabilitySamples: bytes[snap + 50],
+      minimumCupG: cg(snap + 24),
+      cupRemovedG: cg(snap + 28),
+      stabilityToleranceG: cg(snap + 32),
+      emptyReferenceG: cg(snap + 36),
+      occupiedReferenceG: cg(snap + 40),
+      preTareWeightG: cg(snap + 44),
+      paddleMode: bytes[snap + 51],
+      noScaleBbwMode: bytes[snap + 52],
+      idleEligibility: bytes[snap + 53],
+      idleLastReason: bytes[snap + 54],
+      wifiRssi: snapFlags & 0x4000 ? v.getInt8(snap + 55) : null,
+      scaleName: text(snap + 56, 32),
+      scaleProtocol: text(snap + 88, 20),
+      flags: Object.fromEntries(TRACE_SNAPSHOT_FLAGS.map((k, i) => [k, !!(snapFlags & (1 << i))])),
+    },
+    counters: counted,
+    preShot,
+    events,
+  };
+}
+// "CUP_PLACED" and "machine circuit closed" as list names.
+function traceName(name) {
+  const t = String(name).replace(/_/g, " ").toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+// What one event says, from its raw fields (docs/SHOT_TRACE.md "Event records").
+function traceDetail(e, vocab) {
+  const g = (dg) => (dg === -32768 ? "—" : (dg / 10).toFixed(1) + " g"),
+    [x0, x1, x2] = e.ext || [0, 0, 0],
+    reason = (n) => traceName(vocab?.endReasons?.[n] || n);
+  switch (e.type === "trace" ? e.name : e.type) {
+    case "STOP_REQUESTED":
+      return [
+        reason(e.a),
+        e.b & 1 && __WEBUI_TEXT__("stats.trace_web"),
+        e.b & 2 && __WEBUI_TEXT__("stats.trace_refused"),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    case "STOP_BLOCKED":
+      return [
+        e.a ? __WEBUI_TEXT__("stats.trace_blocked") : __WEBUI_TEXT__("stats.trace_released"),
+        (e.b & 0xff) === 1
+          ? __WEBUI_TEXT__("stats.trace_paddle")
+          : __WEBUI_TEXT__("stats.trace_protection"),
+        e.b & 0x100 && __WEBUI_TEXT__("stats.trace_stop_pending"),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    case "MACHINE_RUNNING":
+      return e.a ? __WEBUI_TEXT__("stats.trace_running") : __WEBUI_TEXT__("stats.trace_stopped");
+    case "SLOW_WINDOW_END":
+      return [
+        R.sub(__WEBUI_TEXT__("stats.trace_line"), [g(e.a), g(e.b), g(x1)]),
+        x2 & 1 && __WEBUI_TEXT__("stats.trace_flag_reached"),
+        x2 & 2 && __WEBUI_TEXT__("stats.trace_flag_slow"),
+        x2 & 4 && __WEBUI_TEXT__("stats.trace_flag_fast"),
+        x2 & 8 && __WEBUI_TEXT__("stats.trace_flag_over"),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    case "OVER_LINE":
+      return (
+        R.sub(__WEBUI_TEXT__("stats.trace_line"), [g(e.a), g(e.b), g(x1)]) +
+        " · " +
+        R.sub(__WEBUI_TEXT__("stats.trace_confirmations"), [x2])
+      );
+    case "FINAL_WEIGHT":
+      return g(e.a) + " · " + traceName(vocab?.weightSources?.[e.b] || e.b);
+    case "TRACE_DISCARDED":
+      return (
+        reason(e.a) + " · " + R.sub(__WEBUI_TEXT__("stats.trace_after"), [(e.b / 1000).toFixed(1)])
+      );
+    case "debug": {
+      const a1 = e.ext ? ((x1 & 0xffff) << 16) | (e.a & 0xffff) : e.a,
+        a2 = e.ext ? ((x2 << 16) | e.b) >>> 0 : e.b;
+      return a1 || a2 ? a1 + " · " + a2 : "";
+    }
+  }
+  if (e.signal)
+    return `${traceName(e.signal)} = ${e.a}${e.initial ? " · " + __WEBUI_TEXT__("stats.trace_initial") : ""}`;
+  const arg1 = e.arg1 ?? ((x0 << 16) | e.b) >>> 0,
+    arg2 = e.arg2 ?? (e.ext ? ((x2 << 16) | (x1 & 0xffff)) >>> 0 : 0);
+  return [e.a !== -32768 && g(e.a), (arg1 || arg2) && arg1 + " · " + arg2]
+    .filter(Boolean)
+    .join(" · ");
+}
+async function openShotTrace(r) {
+  try {
+    const [vocab, data] = await Promise.all([
+      shotTraceVocabulary().catch(() => null),
+      R.fetchShotTrace(r),
+    ]);
+    if (!data) return R.message(__WEBUI_TEXT__("stats.trace_none"));
+    showShotTrace(r, decodeShotTrace(data, vocab), vocab, data);
+  } catch (e) {
+    R.message(
+      e.code !== "SHOT_TRACE_BUSY"
+        ? R.formatCommandError(__WEBUI_TEXT__("stats.trace_failed"), e)
+        : R.shotRunning()
+          ? __WEBUI_TEXT__("stats.trace_after_shot")
+          : __WEBUI_TEXT__("runtime.controller_busy"),
+      e.code === "SHOT_TRACE_BUSY" ? "" : "error",
+    );
+  }
+}
+// The trace view: the shot's curve with a mark per shown event, the events
+// as a list that the type filter and the search narrow, then what happened
+// before the shot, the start snapshot and the end counters.
+function showShotTrace(r, t, vocab, data) {
+  vocab = vocab?.version === t.vocabularyVersion ? vocab : null;
+  const d = $("shotTraceDialog"),
+    flags = t.flags,
+    facts = (id, o) =>
+      $(id).replaceChildren(
+        ...Object.entries(o).flatMap(([k, val]) =>
+          typeof val === "object" && val
+            ? []
+            : [
+                Object.assign(document.createElement("dt"), {
+                  textContent: traceName(k.replace(/([A-Z])/g, "_$1")),
+                }),
+                Object.assign(document.createElement("dd"), {
+                  textContent:
+                    val === true
+                      ? __WEBUI_TEXT__("runtime.on_2")
+                      : val === false
+                        ? __WEBUI_TEXT__("runtime.off_2")
+                        : (val ?? "—"),
+                }),
+              ],
+        ),
+      ),
+    item = (e, at) => {
+      const li = document.createElement("li");
+      li.dataset.type = e.type;
+      li.append(
+        Object.assign(document.createElement("time"), { textContent: at }),
+        Object.assign(document.createElement("b"), { textContent: traceName(e.name) }),
+        Object.assign(document.createElement("span"), { textContent: traceDetail(e, vocab) }),
+      );
+      return li;
+    };
+  $("shotTraceMeta").textContent = [
+    formatShotTime(r),
+    t.firmware,
+    R.sub(__WEBUI_TEXT__("stats.trace_events"), [t.events.length]),
+  ].join(" · ");
+  const notes = [
+    flags.interrupted && __WEBUI_TEXT__("stats.trace_interrupted"),
+    flags.tailDropped && __WEBUI_TEXT__("stats.trace_tail_dropped"),
+    (flags.verboseTruncated || flags.decisionsTruncated) &&
+      R.sub(__WEBUI_TEXT__("stats.trace_truncated"), [
+        t.counters.verboseDropped,
+        t.counters.decisionsDropped,
+      ]),
+  ].filter(Boolean);
+  $("shotTraceFlags").textContent = notes.join(" ");
+  $("shotTraceFlags").hidden = !notes.length;
+  const events = t.events
+      .map((e, i) => ({ e, i, li: item(e, (e.atMs / 1000).toFixed(2) + " s") }))
+      .sort((x, y) => x.e.atMs - y.e.atMs || x.i - y.i),
+    filter = () => {
+      const type = $("shotTraceType").value,
+        q = $("shotTraceSearch").value.trim().toLowerCase();
+      let shown = 0;
+      for (const x of events) {
+        x.li.hidden =
+          (type && x.e.type !== type) || (q && !x.li.textContent.toLowerCase().includes(q));
+        shown += !x.li.hidden;
+      }
+      drawShotTrace(
+        r,
+        events.filter((x) => !x.li.hidden).map((x) => x.e),
+      );
+      R.setEmptyState("shotTraceEmpty", shown ? null : __WEBUI_TEXT__("stats.trace_no_match"));
+    };
+  $("shotTraceEvents").replaceChildren(...events.map((x) => x.li));
+  $("shotTracePre").replaceChildren(
+    ...t.preShot.map((e) =>
+      item(
+        e,
+        "−" + (e.beforeMs / 1000).toFixed(1) + " s" + (e.repeats ? " ×" + (e.repeats + 1) : ""),
+      ),
+    ),
+  );
+  facts("shotTraceSnapshot", { ...t.snapshot, ...t.snapshot.flags });
+  facts("shotTraceCounters", t.counters);
+  $("shotTraceType").value = "";
+  $("shotTraceSearch").value = "";
+  $("shotTraceType").onchange = $("shotTraceSearch").oninput = filter;
+  $("shotTraceDownload").onclick = () =>
+    R.saveFile(new Blob([data]), `openbrewbyweight-shot-${r.id}-trace.bin`);
+  $("shotTraceClose").onclick = () => d.close();
+  d.showModal();
+  filter();
+}
+// Weight over the shot's time with one mark per event shown; the list
+// carries the same information for assistive technology.
+function drawShotTrace(r, events) {
+  const host = $("shotTraceChart"),
+    w = r.wCg || [],
+    t = r.wAtMs || [],
+    end = Math.max(1, ...t, ...events.map((e) => e.atMs)),
+    top = Math.max(1, ...w),
+    x = (ms) => ((ms / end) * 600).toFixed(1),
+    y = (cg) => (150 - (Math.max(0, cg) / top) * 140).toFixed(1);
+  host.innerHTML =
+    '<svg viewBox="0 0 600 160" preserveAspectRatio="none">' +
+    events.map((e) => `<path class="traceMark ${e.type}" d="M${x(e.atMs)} 4V156"/>`).join("") +
+    (w.length
+      ? `<path class="traceCurve" d="M${w.map((cg, i) => x(t[i]) + " " + y(cg)).join("L")}"/>`
+      : "") +
+    "</svg>";
+}
 const ICON = {
   csv: "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14",
   json: "M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1",
   chart: "M3 20h18M4 16l4-6 4 3 4-7 4 5",
   visualizer: "M3 3v18h18M7 15l3-4 3 2 5-7",
   bean: "M17 4c3 3 2 9-2 13s-10 5-13 2 0-9 4-13 8-5 11-2zM15 5c-1 3-3 4-5 6s-3 5-4 8",
+  trace: "M3 12h4l3-7 4 14 3-7h4",
+  cancel: "M6 6l12 12M18 6L6 18",
 };
 let shotMenu;
 // The pending export window: a second export and scroll paging wait for it
 // instead of orphaning it to its timeout.
 let statsExportInFlight = null;
-function statsFrameWindow(offset, limit, sort, dir, timeoutMs) {
+function statsFrameWindow(offset, limit, sort, dir, timeoutMs, filter = {}) {
   R.uiState.statsFetchMark = null;
   R.uiState.statsExportRequest = ++R.uiState.statsNextRequest;
   const pending = (statsExportInFlight = new Promise((resolve) => {
@@ -1734,7 +2219,7 @@ function statsFrameWindow(offset, limit, sort, dir, timeoutMs) {
       limit,
       sort,
       dir,
-      filter: {},
+      filter,
     });
   }));
   pending.then(() => {
@@ -2099,15 +2584,56 @@ export function init() {
     relayoutCharts: () => chartObserver && layoutChartLabels(),
   });
   R.registerStream("stats", statsStream);
-  // The toolbar exports every good shot, whatever the filter; a card's menu
-  // acts on its own shot only, a bad one included.
-  const exportMenu = actionMenu(__WEBUI_TEXT__("stats.export_all_shots"), () => [
-    __WEBUI_TEXT__("stats.export_all_shots"),
-    [ICON.csv, "CSV", __WEBUI_TEXT__("stats.csv_hint"), exportShotsCsv],
-    [ICON.json, "JSON", __WEBUI_TEXT__("stats.json_all_hint"), exportShotsJson],
-  ]);
+  // The toolbar exports every good shot whatever the filter (diagnostics:
+  // every shot with its trace); a card's menu acts on its own shot only, a
+  // bad one included. What reads the firmware waits while a shot runs.
+  const afterShot = () => R.shotRunning() && __WEBUI_TEXT__("stats.export_after_shot");
+  const exportMenu = actionMenu(__WEBUI_TEXT__("stats.export"), () => {
+    const wait = afterShot();
+    return exportJob
+      ? [
+          [
+            ICON.cancel,
+            __WEBUI_TEXT__("stats.export_cancel"),
+            exportJob.progress,
+            () => exportJob?.cancel(__WEBUI_TEXT__("stats.export_cancelled")),
+          ],
+        ]
+      : [
+          __WEBUI_TEXT__("stats.export_all_shots"),
+          [ICON.csv, "CSV", wait || __WEBUI_TEXT__("stats.csv_hint"), exportShotsCsv, false, wait],
+          [
+            ICON.json,
+            "JSON",
+            wait || __WEBUI_TEXT__("stats.json_all_hint"),
+            () => exportShotsJson(),
+            false,
+            wait,
+          ],
+          [
+            ICON.json,
+            __WEBUI_TEXT__("stats.json_diagnostics"),
+            wait || __WEBUI_TEXT__("stats.json_diagnostics_hint"),
+            () => exportShotsJson(true),
+            false,
+            wait,
+          ],
+        ];
+  });
   $("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"));
-  shotMenu = actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r) => [
+  shotMenu = actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r, wait = afterShot()) => [
+    ...(R.offlineCopy
+      ? []
+      : [
+          [
+            ICON.trace,
+            __WEBUI_TEXT__("stats.view_trace"),
+            wait || __WEBUI_TEXT__("stats.view_trace_hint"),
+            () => openShotTrace(r),
+            false,
+            wait,
+          ],
+        ]),
     __WEBUI_TEXT__("stats.open_in"),
     [
       ICON.bean,
@@ -2119,8 +2645,10 @@ export function init() {
     [
       ICON.json,
       "JSON",
-      __WEBUI_TEXT__("stats.json_shot_hint"),
-      () => downloadJson(`openbrewbyweight-shot-${r.id}.json`, shotsJson([r])),
+      wait || __WEBUI_TEXT__("stats.json_shot_hint"),
+      () => downloadShotJson(r),
+      false,
+      wait,
     ],
     [
       ICON.chart,

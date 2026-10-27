@@ -139,30 +139,28 @@ class ShotLog
     }
     return found;
   }
+  // The newest record `match` accepts, newest first (a predicate that never
+  // accepts visits them all). Caller holds the store mutex.
+  template <typename Match>
+  const ShotLogRecord *findNewest(Match &&match) const {
+    size_t index = store_.header.writeIndex;
+    for (size_t n = 0; n < store_.header.count; ++n) {
+      if (index == 0) index = SHOT_LOG_CAPACITY;
+      if (match(store_.records[--index])) return &store_.records[index];
+    }
+    return nullptr;
+  }
   // The newest record with an id below `id`: ids grow with every append, so
   // a walk by id survives appends and deletions in between.
   bool copyNewestBefore(uint32_t id, ShotLogRecord &output) const {
-    size_t index = store_.header.writeIndex;
-    for (size_t n = 0; n < store_.header.count; ++n) {
-      if (index == 0) index = SHOT_LOG_CAPACITY;
-      if (store_.records[--index].id < id) {
-        output = store_.records[index];
-        return true;
-      }
-    }
-    return false;
+    const ShotLogRecord *found = findNewest([id](const ShotLogRecord &r) { return r.id < id; });
+    if (found != nullptr) output = *found;
+    return found != nullptr;
   }
   bool copyNewestEligible(ShotLogRecord &output) const {
-    size_t index = store_.header.writeIndex;
-    for (size_t n = 0; n < store_.header.count; ++n) {
-      if (index == 0) index = SHOT_LOG_CAPACITY;
-      const ShotLogRecord &record = store_.records[--index];
-      if (shotLogRecordEligible(record)) {
-        output = record;
-        return true;
-      }
-    }
-    return false;
+    const ShotLogRecord *found = findNewest(shotLogRecordEligible);
+    if (found != nullptr) output = *found;
+    return found != nullptr;
   }
 
   bool updateRating(uint32_t id, uint8_t rating, bool persistNow = true) {

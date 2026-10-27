@@ -61,6 +61,14 @@
       Object.keys(presetItem).some((key) => !networkCpp.includes(`\\"${key}\\"`))) {
     throw new Error('The card data routes must reuse the Web UI preset render and Stats row');
   }
+  // Right after a boot the newest curve may not be loaded back yet: the last
+  // shot answers busy (503) so the integration keeps its copy and asks again,
+  // instead of storing the shot without its curve.
+  if (!integrationApi.includes('if (read == ShotCurveRead::BUSY) {') ||
+      !integrationApi.includes('STATUS_UNAVAILABLE, "SHOT_CURVE_BUSY"') ||
+      !integrationApi.includes('const bool hasCurve = read == ShotCurveRead::FOUND;')) {
+    throw new Error('The last shot must answer busy until its curve is loaded');
+  }
   for (const fixture of [
     'integration_snapshot.json', 'integration_presets.json', 'integration_last_shot.json',
     'webhook_end_v1.json', 'webhook_presets_changed_v1.json',

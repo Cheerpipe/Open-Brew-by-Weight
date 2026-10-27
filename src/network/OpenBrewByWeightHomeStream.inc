@@ -231,6 +231,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("cupPresence.anchorDeltaG", tare.anchorDeltaG);
   delta.field("cupPresence.anchorWaitS", static_cast<unsigned long>(tare.anchorWaitMs / 1000U));
   delta.field("cycle.active", bool(control.activeCycle));
+  delta.field("cycle.capturing", bool(control.traceCapturing));
   delta.field("noScaleShotGuard.enabled", bool(control.noScaleShotGuardEnabled));
   delta.field("noScaleShotGuard.armed", bool(control.noScaleShotGuardArmed));
   if (callbacks_.copyPresetBank) callbacks_.copyPresetBank(&g_work->presetBank);
@@ -1077,6 +1078,9 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   const bool fetch = session.statsFetch && !initial &&
       (!session.statsPaging || session.statsPageFetch);
   const uint32_t request = fetch ? session.statsFetchRequest : session.statsRequest;
+  // Nothing is exported during a shot, drip included: a fetch (an export
+  // window or a scroll page) waits, sending nothing, until the capture ends.
+  if (fetch && control.traceCapturing) return true;
   // A replacement fetch or store change restarts only the affected page.
   if (session.statsPaging && (fetch != session.statsPageFetch ||
                               session.statsPageEpoch != epoch ||

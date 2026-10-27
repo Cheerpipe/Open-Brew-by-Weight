@@ -621,8 +621,8 @@ void tsp13_stats() {
   ShotTracePoolStats stats = pool.stats(nullptr, nullptr);
   CHECK(stats.poolBytes == RESERVED * S && stats.unusedBytes == RESERVED * S);
   CHECK(stats.records == 0 && stats.lastError == ShotTracePoolError::NONE);
-  ShotTracePoolRecordHeader oldest;
-  CHECK(pool.oldest(oldest) == ShotTracePoolStatus::NOT_FOUND);
+  ShotTracePoolRef oldest;
+  CHECK(pool.headerAt(0, oldest) == ShotTracePoolStatus::NOT_FOUND);
   for (uint32_t id = 1; id <= 8; ++id) CHECK(appendShot(pool, id));
   LiveSet live{{2, 3, 4, 5, 6, 7, 8}};  // Shot 1 was deleted from the log.
   stats = pool.stats(isLive, &live);
@@ -636,14 +636,17 @@ void tsp13_stats() {
   CHECK(stats.liveBytes + stats.reclaimableBytes + stats.unindexedBytes + stats.unusedBytes ==
         stats.poolBytes);
   CHECK(stats.meanRecordBytes == sum / 8U);
-  // stats() is RAM only; the oldest record's identity is a separate read.
+  // stats() is RAM only; a record's identity is a separate header read.
   flashWasRead = false;
   Flash::setReadHook(noteFlashRead);
   (void)pool.stats(isLive, &live);
   CHECK(!flashWasRead);
   Flash::setReadHook(nullptr);
-  CHECK(pool.oldest(oldest) == ShotTracePoolStatus::OK && oldest.shotId == 1 &&
-        oldest.bootId == identityOf(1).bootId && oldest.endedAtMs == identityOf(1).endedAtMs);
+  CHECK(pool.headerAt(0, oldest) == ShotTracePoolStatus::OK && oldest.header.shotId == 1 &&
+        oldest.header.bootId == identityOf(1).bootId &&
+        oldest.header.endedAtMs == identityOf(1).endedAtMs && oldest.bytes == first.bytes());
+  CHECK(pool.headerAt(7, oldest) == ShotTracePoolStatus::OK && oldest.header.shotId == 8 &&
+        pool.headerAt(8, oldest) == ShotTracePoolStatus::NOT_FOUND);
   const uint32_t used = newestEndSector(pool) + 1U;
   CHECK(stats.unusedBytes == (RESERVED - used) * S);
   // The same after a reboot.
@@ -1129,9 +1132,11 @@ void tsp26_readers_race_recovery_clear_and_end_changes() {
     for (uint32_t round = 0; !done.load(); ++round) {
       std::this_thread::yield();  // Let the writer progress under TSAN.
       ShotTracePoolEntry e;
-      ShotTracePoolRecordHeader oldest;
+      ShotTracePoolRef oldest;
       if (round % 16U == 0) (void)pool.stats(nullptr, nullptr);
-      (void)pool.oldest(oldest);
+      if (pool.headerAt(0, oldest) == ShotTracePoolStatus::OK &&
+          oldest.header.bootId != tinyIdentity(oldest.header.shotId).bootId)
+        bad.fetch_add(1);
       if (!pool.entryAt(round % 8U, e)) continue;
       const uint32_t id = e.idTag & 0xFFFFFFU;
       const ShotTracePoolIdentity identity = tinyIdentity(id);

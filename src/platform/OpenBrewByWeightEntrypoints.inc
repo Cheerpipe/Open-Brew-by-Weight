@@ -534,6 +534,8 @@ void startAfterBootRecovery() {
     callbacks.copyShotStatsRecords = copyShotStatsRecords;
     callbacks.copyShotCurveById = copyShotCurveById;
     callbacks.copyHomeShot = copyHomeShot;
+    callbacks.streamShotTrace = streamShotTrace;
+    callbacks.copyShotStorage = copyShotStorage;
     callbacks.shotLogSavePending = shotLogSavePending;
     callbacks.copyHistoryPage = copyHistoryPage;
     callbacks.historyEpoch = copyHistoryEpoch;

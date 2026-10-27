@@ -1349,6 +1349,7 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "network/OpenBrewByWeightStatus.inc"
 #include "diagnostics/OpenBrewByWeightNetworkDiagnostics.inc"
 #include "diagnostics/OpenBrewByWeightCrashRoutes.inc"
+#include "diagnostics/OpenBrewByWeightShotTraceRoutes.inc"
 #include "network/OpenBrewByWeightConfiguration.inc"
 #include "network/OpenBrewByWeightLineaMicraWeb.inc"
 #include "network/OpenBrewByWeightIntegrationApi.inc"

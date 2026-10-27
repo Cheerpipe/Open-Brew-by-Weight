@@ -61,8 +61,7 @@ enum class ShotTraceKind : uint8_t {
   TRACE_DISCARDED,        // pre-shot only: a EndReason, b ms from its anchor
   CONTINUATION = 0xFF,    // extends the previous record (see SHOT_TRACE.md)
 };
-static_assert(static_cast<uint32_t>(ScaleProfileEvent::CUP_ANCHOR_REJECTED) <
-                  static_cast<uint32_t>(ShotTraceKind::STOP_REQUESTED),
+static_assert(SCALE_PROFILE_EVENT_COUNT <= static_cast<uint32_t>(ShotTraceKind::STOP_REQUESTED),
               "Scale profile events must stay below the trace-only kinds");
 constexpr uint16_t SHOT_TRACE_STOP_WEB = 0x1;
 constexpr uint16_t SHOT_TRACE_STOP_REFUSED = 0x2;
@@ -705,6 +704,15 @@ class ShotTrace {
   uint32_t tracesDropped() const {
     const TaskLockGuard lock(mux_);
     return tracesDropped_;
+  }
+  // The identity of the completed trace the pool has not taken yet.
+  bool unsaved(uint32_t &shotLogId, uint32_t &bootId, uint32_t &endedAtMs) const {
+    const TaskLockGuard lock(mux_);
+    if (generation_ == 0 || generation_ == consumed_) return false;
+    shotLogId = completed_->header.shotLogId;
+    bootId = completed_->header.bootId;
+    endedAtMs = completed_->header.endedAtMs;
+    return true;
   }
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)

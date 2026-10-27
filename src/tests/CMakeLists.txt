@@ -74,6 +74,8 @@ else()
     DEFINITIONS OPEN_BREW_BY_WEIGHT_CRASH_HOST_TEST LABEL "host;persistence;safety")
   host_test(crash_archive_routes_host_test
     DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST LABEL "host;network;web")
+  host_test(shot_trace_routes_host_test
+    DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST LABEL "host;network;web")
   host_test(bbw_cutoff_host_test LABEL "host;control;persistence")
   host_test(safety_external_host_test LABEL "host;safety")
   host_test(remote_policy_host_test LABEL "host;safety")

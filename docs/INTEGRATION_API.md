@@ -301,7 +301,13 @@ with its weight curve:
     "atmCg":null,"atmClearedS":null,"endS":31.000,"endCg":3632}]}
 ```
 
-`shot` is `null` before the first qualifying shot. `cols` names the row's
+`shot` is `null` before the first qualifying shot. When the shot's curve
+cannot be read right now, the route answers `503 SHOT_CURVE_BUSY` instead of
+the shot without its curve: right after a boot, until the controller has
+loaded the newest curves back from storage, and, rarely, during a shot or its
+drip delay when the newest good shot is older than the curves kept in memory.
+Keep the copy you hold and read it again on your next refresh (the Home
+Assistant integration does this). `cols` names the row's
 values in order and the last element is the curve object; read values by
 column name, because later firmware may add columns. The columns and curve
 keys are the ones the Stats page and the [shot JSON export](schemas/README.md)
@@ -322,8 +328,7 @@ from 0 ms and 0 cg. `wBreakBefore` lists points that start a new segment,
 fast-shot extension, the scale-loss takeover, and the end of the shot.
 
 The newest 500 curves are kept in memory, so this route's curve is normally
-there; right after a restart, before the controller has loaded its curves
-back, it can come with an empty curve. The row
+there at once; a shot without a stored curve comes with an empty one. The row
 is a few kilobytes, so read it once per shot: after the `end` webhook, and only when the snapshot's `lastShot.shotId` differs from the
 `id` of the shot you already hold.
 
@@ -526,25 +531,88 @@ remain readable; unknown event IDs render their numeric payload safely.
 
 ### `GET /api/v1/diagnostic/shot-trace`
 
-Downloads the newest completed [shot trace](SHOT_TRACE.md) from RAM as a
-chunked `application/octet-stream` attachment
-(`openbrewbyweight-shot-trace.bin`, `Cache-Control: no-store`). A trace exists
-for every brew cycle started with a scale since the last restart; its header
-links it to the stored shot by id, boot id and end time, and carries a CRC-32
-filled on export. Requires the exclusive Web UI claim like every owned route.
+Downloads one [shot trace](SHOT_TRACE.md) as chunked
+`application/octet-stream`. Requires the exclusive Web UI claim like every
+owned route. A trace exists for every brew cycle started with a scale; its
+header links it to the stored shot by id, boot id and end time, and carries a
+CRC-32. Nothing is read or sent while a shot runs.
+
+- **Without a query**: the newest completed trace from RAM, as the attachment
+  `openbrewbyweight-shot-trace.bin` with `Cache-Control: no-store`. RAM keeps
+  only the newest trace; after a restart it has none until the next shot,
+  except an [interrupted trace](SHOT_TRACE.md#interrupted-traces) recovered
+  from the crash.
+- **`?id=<shot id>&boot=<boot id>&end=<endedAtMs>`**: that shot's trace from
+  its [flash pool](SHOT_TRACE.md#flash-pool) record, the trace section only.
+  A stored shot is reached only through its summary, so all three must match
+  the shot's Stats row (`id`, `bootId`, `endedAtMs`); a deleted shot has
+  none. `id=0&boot=<crashed boot>&end=0` is an interrupted trace, which has no
+  summary (Diagnostic Shot storage lists their boots). The URL names an
+  immutable record, so the answer carries `ETag: "<record CRC, 8 hex>"` and
+  `Cache-Control: private, max-age=31536000, immutable`; a request with that
+  `If-None-Match` gets `304` without the body.
 
 | Status | Code | When |
 | --- | --- | --- |
-| `200` | — | The newest completed trace, 792 B to 16 KiB |
-| `404` | `NO_SHOT_TRACE` | No trace was completed since the last restart, and none was recovered from it (or the recovered one failed verification) |
-| `409` | `SHOT_TRACE_BUSY` | A shot is being captured, from cycle start to the end of its drip analysis; a shot that starts mid-download ends the stream |
+| `200` | — | The trace, 792 B to 16 KiB |
+| `304` | — | `If-None-Match` names the record's current ETag |
+| `404` | `NO_SHOT_TRACE` | No query: no trace since the last restart (or the recovered one failed verification). With a query: no summary with that identity, the shot has no trace (made without one, or its trace was replaced by a newer shot before it was saved), or the pool recycled the record |
+| `409` | `SHOT_TRACE_BUSY` | The controller may not read storage now: a shot runs (cycle start to the end of its drip delay), or a rinse, a closed relay, a scale connecting or a maintenance lease holds the durable write gate |
+| `409` | `SHOT_TRACE_SAVING` | The shot's record is not written yet (its curve or trace still waits, or the pool is not recovered after the boot); ask again shortly |
+| `422` | `INVALID_SHOT_TRACE` | The query is not three whole numbers `id`, `boot` and `end` |
+| `503` | `SHOT_TRACE_UNAVAILABLE` | The pool failed to recover, or a flash read failed |
 
-RAM keeps only the newest trace; a later shot replaces it, and after a restart
-this route has none until the next shot. Every completed trace is also saved
-to flash after its shot, for a per-shot download to come. A shot cut short by a
-panic, a watchdog or a software restart is served after the reboot as an
-interrupted trace (header flag `0x4`, `bootId` of the boot that crashed, no
-`shotLogId`); see [interrupted traces](SHOT_TRACE.md#interrupted-traces).
+A shot that starts mid-download, or a record the ring recycles while it is
+sent, ends the stream without its terminating chunk, so the client sees a
+broken download, never other data.
+
+### `GET /api/v1/diagnostic/shot-trace/vocabulary`
+
+The names of a trace's numbers, from the firmware's own tables, so the Web UI
+needs no copy of them: `{"version":<vocabulary version>,"profile":[…],
+"debug":[…],"signals":[…],"endReasons":[…],"weightSources":[…]}`, each list
+indexed by the event kind, debug code, signal, end reason or yield source
+(an unused number is `""`).
+Names apply to traces whose header has the same `vocabularyVersion`. The list
+changes only with the firmware, so the Web UI asks with its asset tag as the
+query and the answer is cacheable (`Cache-Control: private,
+max-age=31536000, immutable`). About 6 KB.
+
+### `GET /api/v1/diagnostic/shot-storage`
+
+The Diagnostic **Shot storage** section, read on demand when the section opens
+(it is not in the polled status). Needs Admin or the public Diagnostic page,
+like the other Diagnostic actions. `409 SHOT_STORAGE_BUSY` while the
+controller may not read storage, as for `SHOT_TRACE_BUSY`.
+
+```json
+{"ready":true,"lastError":"none","poolBytes":5476352,"liveBytes":1212416,
+ "reclaimableBytes":20480,"unindexedBytes":61440,"unusedBytes":4182016,
+ "records":412,"meanRecordBytes":2992,"droppedRecords":0,"good":380,"bad":30,
+ "traceOnly":1,"interrupted":1,"traces":402,"truncated":3,"sinceShotId":7,
+ "sinceLocalSec":1792840364,"pendingCurves":0,"pendingTraces":0,
+ "tracesDropped":0,"shotCapacity":1000,"interruptedBoots":[41]}
+```
+
+`poolBytes` = `liveBytes` + `reclaimableBytes` + `unindexedBytes` +
+`unusedBytes`. A record is live while a summary of its identity exists, or
+when it is a trace without one (shot 0); a deleted or evicted shot's record is
+reclaimable until the ring recycles it. `good` and `bad` count the live
+records of good and bad summaries, `traceOnly` the traces of shots the log
+refused and `interrupted` the interrupted ones (`interruptedBoots`, newest
+first, at most four, reach them through the trace route). `traces` counts the
+live records holding a trace and `truncated` those whose events did not all
+fit. Records written or recycled while the section is read can shift a count
+by one.
+`sinceShotId` and `sinceLocalSec` (local Unix seconds, `0` without wall time)
+are the oldest stored shot that still has its record. `pendingCurves` and
+`pendingTraces` wait for the worker, `tracesDropped` counts traces a newer
+shot replaced before they were saved since the restart, `droppedRecords`
+those the full index dropped since the last recovery, and `lastError` is
+`none`, `read`, `erase`, `program`, `lock`, `too_large` or `source`.
+`shotCapacity` is how many summaries the history keeps (an upper bound for
+how many shots the pool can serve, whatever their size). `ready` is `false`
+until the pool is recovered after the boot.
 
 ## Web UI record API
 
@@ -934,9 +1002,15 @@ sends a standing refresh with the new header and the rows it already holds as
 bare ids.
 
 Scrolling to the page sentinel sends a one-shot fetch for the next window,
-and the CSV export asks for its own export window — up to 1,000 rows,
-newest-first by date, good shots only, regardless of the on-screen sort. A
-fetch without `filter` keeps the standing filter:
+and the CSV and JSON exports ask for their own export window — up to 1,000
+rows, newest-first by date, good shots only (the diagnostics export adds
+`"bad":true`), regardless of the on-screen sort. A fetch without `filter`
+keeps the standing filter. Nothing is exported during a shot, drip delay
+included: while the shot's trace capture is open (Home's `cycle.capturing`)
+the firmware sends no frame of a fetch, an export window or a scroll page,
+and resumes it when the capture closes. The Web UI starts no export then and
+cancels a running one when a shot starts, by subscribing again, which drops
+the pending fetch:
 
 ```json
 {"op":"stats","on":true,"fetch":true,"offset":20}

@@ -1,16 +1,22 @@
-// Shot export: the v2 JSON carries every stored Stats column and validates
-// against its published schema, the Gaggiuino file reads the way
-// Visualizer.coffee parses it, and the Beanconqueror link decodes within the
-// brew handoff's limits. The toolbar menu exports everything; a card's menu
-// acts on its own shot and now holds Delete.
+// Shot export: the v1 JSON carries every stored Stats column and validates
+// against its published schema, the diagnostics export adds bad shots and
+// each shot's decoded trace (the decoder reads the firmware's own fixture),
+// the Gaggiuino file reads the way Visualizer.coffee parses it, and the
+// Beanconqueror link decodes within the brew handoff's limits. The toolbar
+// menu exports everything; a card's menu acts on its own shot, holds Delete
+// and opens the trace view; what reads the firmware waits for a shot to end.
 (async () => {
   const assert = require('assert').strict;
   const vm = require('vm');
   const schemaDir = path.join(sketchDir, '..', 'docs', 'schemas');
   const schema = JSON.parse(fs.readFileSync(
-      path.join(schemaDir, 'openbrewbyweight-shot-export-v2.schema.json'), 'utf8'));
+      path.join(schemaDir, 'openbrewbyweight-shot-export-v1.schema.json'), 'utf8'));
   const example = JSON.parse(fs.readFileSync(
-      path.join(schemaDir, 'openbrewbyweight-shot-export-v2.example.json'), 'utf8'));
+      path.join(schemaDir, 'openbrewbyweight-shot-export-v1.example.json'), 'utf8'));
+  // One schema, version 1; the retired files are gone.
+  assert.deepEqual(fs.readdirSync(schemaDir).sort(), ['README.md',
+    'openbrewbyweight-shot-export-v1.example.json', 'openbrewbyweight-shot-export-v1.schema.json']);
+  assert.ok(example.shots.some((x) => x.trace), 'The example shows a trace');
   // The schema stays inside a keyword subset any reader can implement, and
   // every key the exporter writes must be documented in it.
   const keywords = new Set(['$schema', '$id', '$defs', '$ref', 'title', 'description', 'type',
@@ -89,6 +95,9 @@
   const doc = JSON.parse(JSON.stringify(context.shotsJson([base, lost])));
   check(schema, doc, 'export');
   check(schema, example, 'example');
+  assert.deepEqual([doc.version, doc.$schema, example.version, example.$schema],
+      [1, schema.$id, 1, schema.$id]);
+  assert.ok(doc.shots.every((x) => !('trace' in x)), 'No trace unless one is given');
   const [a, b] = doc.shots;
   assert.equal(doc.source.firmwareVersion, '1.2.3');
   assert.deepEqual(a.time, {startedAt: '2026-10-24T08:12:15-03:00',
@@ -110,21 +119,245 @@
   assert.deepEqual([b.outcome.estimatedYieldG, b.stop.scaleLossSource, b.stop.blind],
       [30.5, 'projection', true]);
 
-  // The toolbar's JSON export reads the same whole-log window as the CSV.
-  let saved;
-  Object.assign(context, {SHOTS_EXPORT_LIMIT: 1000, statsExportInFlight: null,
+  // The trace decoder reads the firmware's own export (TRC25 writes and
+  // checks the same fixture with the firmware layout).
+  const fixtureHex = fs.readFileSync(
+      path.join(sketchDir, 'tests', 'fixtures', 'shot_trace_v1_hex.txt'), 'utf8').replace(/\s/g, '');
+  const fixture = new Uint8Array(fixtureHex.match(/../g).map((h) => parseInt(h, 16))).buffer;
+  const vocab = {version: 1, profile: [], debug: [], signals: [], endReasons: [],
+    weightSources: ['none', 'post_drip', 'last_known']};
+  Object.assign(vocab.profile, {16: 'CUP_PLACED', 17: 'CUP_REMOVED', 21: 'FIRST_DROP',
+    31: 'STATE_CHANGED'});
+  Object.assign(vocab.debug, {2: 'machine circuit closed'});
+  Object.assign(vocab.signals, {12: 'IDLE_ELIGIBILITY', 19: 'WEIGHT_CONTROL'});
+  Object.assign(vocab.endReasons, {3: 'scale threshold'});
+  Object.assign(context, {TextDecoder, TextEncoder, DataView, Uint8Array, setInterval, clearInterval,
+    sub: (text, values) => values.reduce((t, v, i) => t.replace('{' + i + '}', v), text)});
+  const traceJs = viewJs.stats.slice(viewJs.stats.indexOf('const TRACE_KINDS = ['),
+      viewJs.stats.indexOf('let traceVocab = null;')) +
+      ['function decodeShotTrace(', 'function traceName(', 'function traceDetail(',
+        'function showShotTrace(', 'function drawShotTrace(']
+          .map((m) => blockAt(viewJs.stats, m)).join('\n');
+  vm.runInContext(traceJs, context);
+  const trace = JSON.parse(JSON.stringify(context.decodeShotTrace(fixture, vocab)));
+  check(schema.$defs.trace, trace, 'trace');
+  assert.deepEqual([trace.shotId, trace.bootId, trace.anchorMs, trace.endedAtMs, trace.endReasonCode,
+    trace.endReason, trace.vocabularyVersion], [12, 7, 10000, 52000, 3, 'scale threshold', 1]);
+  assert.deepEqual(trace.flags, {verboseTruncated: false, decisionsTruncated: false,
+    interrupted: false, tailDropped: false});
+  assert.deepEqual([trace.snapshot.minimumCupG, trace.snapshot.emptyReferenceG,
+    trace.snapshot.scaleName, trace.snapshot.stabilitySamples, trace.snapshot.flags.autoTare,
+    trace.snapshot.flags.cupPresent, trace.snapshot.flags.cupTared], [50, null, 'Lunar', 5, true,
+    true, false]);
+  // A pre-shot argument wider than 16 bits keeps its high half.
+  assert.deepEqual(trace.preShot.sort((x, y) => x.code - y.code), [{beforeMs: 900, type: 'profile',
+    code: 16, name: 'CUP_PLACED', a: 800, b: 3, arg1: 3, arg2: 0, repeats: 1},
+  {beforeMs: 500, type: 'profile', code: 17, name: 'CUP_REMOVED', a: 5, b: 70001 & 0xffff,
+    arg1: 70001, arg2: 9, repeats: 0}]);
+  assert.equal(trace.events.length, 11, 'Continuations merge into their record');
+  const byName = (n) => trace.events.find((e) => e.name === n);
+  assert.deepEqual(byName('FIRST_DROP'), {atMs: 6000, type: 'profile', code: 21,
+    name: 'FIRST_DROP', a: 12, b: 70000 & 0xffff, ext: [1, 5, 0]});
+  assert.deepEqual(byName('machine circuit closed'), {atMs: 8000, type: 'debug', code: 2,
+    name: 'machine circuit closed', a: (100000 << 16) >> 16, b: 7, ext: [0, 1, 0]});
+  assert.deepEqual(trace.events.filter((e) => e.signal === 'WEIGHT_CONTROL')
+      .map((e) => [e.a, e.initial]), [[1, true]]);
+  assert.deepEqual(trace.events.slice(-4).map((e) => [e.type, e.name, e.atMs]),
+      [['trace', 'SLOW_WINDOW_END', 35000], ['trace', 'OVER_LINE', 36000],
+        ['trace', 'STOP_REQUESTED', 40000], ['trace', 'FINAL_WEIGHT', 42000]]);
+  // Readable names and details for each namespace; unknown ones stay generic.
+  const detail = (e) => context.traceDetail(e, vocab);
+  assert.equal(context.traceName('FIRST_DROP'), 'First drop');
+  assert.equal(context.traceName('machine circuit closed'), 'Machine circuit closed');
+  assert.equal(detail(byName('FIRST_DROP')), '1.2 g · 70000 · 5');
+  assert.equal(detail(byName('machine circuit closed')), '100000 · 7');
+  assert.equal(detail(trace.events.find((e) => e.signal === 'WEIGHT_CONTROL')),
+      'Weight control = 1 · at the start');
+  assert.equal(detail(byName('SLOW_WINDOW_END')),
+      '35.1 g · cut line 34.0 g · offset 1.8 g · target reached');
+  assert.equal(detail(byName('OVER_LINE')),
+      '35.2 g · cut line 34.0 g · offset 1.8 g · 2 confirmations');
+  assert.equal(detail({type: 'trace', name: 'TRACE_DISCARDED', a: 8, b: 2500}),
+      '8 · after 2.5 s', 'Without a name the end reason stays a number');
+  assert.equal(detail(byName('STOP_REQUESTED')), 'Scale threshold · from the Web UI');
+  assert.equal(detail(byName('FINAL_WEIGHT')), '36.2 g · Last known');
+  const generic = JSON.parse(JSON.stringify(context.decodeShotTrace(fixture, {...vocab, version: 2})));
+  assert.deepEqual(generic.events.slice(0, 2).map((e) => e.name), ['profile_21', 'profile_31']);
+  assert.ok(!('signal' in generic.events[1]), 'Signals come from the matching vocabulary');
+  assert.equal(context.traceDetail(generic.events.at(-2), null), '3 · from the Web UI',
+      'Another vocabulary never names its end reasons');
+  assert.throws(() => context.decodeShotTrace(fixture.slice(0, 200), vocab), /could not be read/);
+  const torn = new Uint8Array(fixture.slice(0));
+  torn[0] ^= 1;
+  assert.throws(() => context.decodeShotTrace(torn.buffer, vocab), /could not be read/);
+
+  // The trace view: every event in time order with a mark on the curve, a
+  // type filter and a search that narrow both, the flags spelled out.
+  const fakeEl = (tag = 'div') => ({tag, children: [], dataset: {}, hidden: false, value: '',
+    textContent: '', innerHTML: '', open: false,
+    append(...c) {this.children.push(...c);}, replaceChildren(...c) {this.children = c;},
+    showModal() {this.open = true;}, close() {this.open = false;}});
+  const dom = {};
+  const ids = ['shotTraceDialog', 'shotTraceMeta', 'shotTraceFlags', 'shotTraceChart',
+    'shotTraceType', 'shotTraceSearch', 'shotTraceEvents', 'shotTraceEmpty', 'shotTracePre',
+    'shotTraceSnapshot', 'shotTraceCounters', 'shotTraceDownload', 'shotTraceClose'];
+  for (const id of ids) dom[id] = fakeEl();
+  Object.assign(context, {$: (id) => dom[id], document: {createElement: (tag) => {
+    const e = fakeEl(tag);
+    Object.defineProperty(e, 'textContent', {
+      get() {return this._t ?? this.children.map((c) => c.textContent).join('');},
+      set(v) {this._t = v;}});
+    return e;
+  }}, formatShotTime: () => 'today', setEmptyState: (id, text) => Object.assign(dom[id],
+    {textContent: text || '', hidden: !text})});
+  const interrupted = {...trace, flags: {...trace.flags, interrupted: true, decisionsTruncated: true},
+    counters: {...trace.counters, decisionsDropped: 4}};
+  context.showShotTrace(base, interrupted, vocab, fixture);
+  const rowText = (li) => li.children.map((c) => c.textContent).join(' ');
+  const rows = dom.shotTraceEvents.children;
+  assert.ok(dom.shotTraceDialog.open && rows.length === 11);
+  assert.deepEqual(rows.map((li) => li.children[0].textContent).slice(0, 2), ['6.00 s', '7.00 s']);
+  assert.equal(rowText(rows.find((li) => li.dataset.type === 'debug')),
+      '8.00 s Machine circuit closed 100000 · 7');
+  assert.ok(/restarted during this shot/.test(dom.shotTraceFlags.textContent) &&
+      /\(0 scale events, 4 decisions\)/.test(dom.shotTraceFlags.textContent) &&
+      !dom.shotTraceFlags.hidden);
+  assert.match(dom.shotTraceMeta.textContent, /^today · .+ · 11 events$/);
+  const marks = () => (dom.shotTraceChart.innerHTML.match(/class="traceMark/g) || []).length;
+  assert.ok(marks() === 11 && dom.shotTraceChart.innerHTML.includes('class="traceCurve"'));
+  dom.shotTraceType.value = 'trace';
+  dom.shotTraceType.onchange();
+  assert.deepEqual([rows.filter((li) => !li.hidden).length, marks()], [4, 4]);
+  dom.shotTraceType.value = '';
+  dom.shotTraceSearch.value = 'nothing like this';
+  dom.shotTraceSearch.oninput();
+  assert.ok(rows.every((li) => li.hidden) && !dom.shotTraceEmpty.hidden && marks() === 0);
+  assert.ok(dom.shotTracePre.children.some((li) => rowText(li) === '−0.9 s ×2 Cup placed 80.0 g · 3 · 0'));
+  assert.ok(dom.shotTracePre.children.some((li) => rowText(li) === '−0.5 s Cup removed 0.5 g · 70001 · 9'));
+  assert.ok(dom.shotTraceSnapshot.children.some((c) => c.textContent === 'Minimum cup g'));
+  // A vocabulary of another version names nothing: not even end reasons.
+  context.showShotTrace(base, trace, {...vocab, version: 2}, fixture);
+  assert.equal(rowText(dom.shotTraceEvents.children.find((li) =>
+    li.textContent.includes('Stop requested'))), '40.00 s Stop requested 3 · from the Web UI');
+
+  // Diagnostic Shot storage in words; the room never exceeds the shots the
+  // history keeps, and an interrupted trace downloads through the retrying
+  // fetch from a real button.
+  {
+    const ss = {};
+    const diagContext = vm.createContext({$: (id) => (ss[id] ??= fakeEl()),
+      document: {createElement: (tag) => fakeEl(tag)}, sub: context.sub,
+      formatHumanTime: () => 'today'});
+    vm.runInContext('var R = this;' + blockAt(viewJs.diagnostic, 'function renderShotStorage('),
+        diagContext);
+    const storage = {poolBytes: 5476352, liveBytes: 1048576, reclaimableBytes: 0,
+      unindexedBytes: 0, unusedBytes: 0, droppedRecords: 0, good: 3, bad: 1, traceOnly: 0,
+      interrupted: 1, traces: 4, truncated: 0, sinceShotId: 7, sinceLocalSec: 0,
+      pendingCurves: 0, pendingTraces: 0, tracesDropped: 0, lastError: 'none',
+      shotCapacity: 1000, interruptedBoots: [41]};
+    diagContext.renderShotStorage({...storage, meanRecordBytes: 2048});
+    assert.equal(ss.ssRoom.textContent, '2.0 KB · room for all 1000 shots the history keeps');
+    diagContext.renderShotStorage({...storage, meanRecordBytes: 16384});
+    assert.equal(ss.ssRoom.textContent, '16.0 KB · room for about 334 shots');
+    assert.deepEqual([ss.ssShots.textContent, ss.ssSince.textContent], ['3 good · 1 bad', '#7']);
+    const download = ss.ssInterrupted.children[0];
+    assert.deepEqual([download.tag, download.type, download.textContent], ['button', 'button',
+      'Download boot 41']);
+    assert.ok(codeIncludes(blockAt(viewJs.diagnostic, 'function downloadInterruptedTrace('),
+        'R.fetchShotTrace({ id: 0, bootId: boot, endedAtMs: 0 })'));
+  }
+
+  // Exports: CSV and JSON read the whole log of good shots; JSON +
+  // diagnostics adds the bad ones and each shot's trace, four requests at a
+  // time, gzip-streamed into the file.
+  let saved, shown = [], window = [base, lost];
+  const traced = new Set([412]);
+  Object.assign(context, {SHOTS_EXPORT_LIMIT: 1000, statsExportInFlight: null, uiState: {}, shotRunning: () => false, sleep: async () => {}, statsSendSubscribe() {},
     statsFrameWindow: async (...args) => {
-      assert.deepEqual(args, [0, 1000, 'date', 'desc', 180e3]);
-      return [base, lost];
+      assert.deepEqual(args.slice(0, 5), [0, 1000, 'date', 'desc', 180e3]);
+      context.lastFilter = JSON.stringify(args[5]);
+      return window;
     },
+    shotTraceVocabulary: async () => vocab,
+    fetchShotTrace: async (r) => (traced.has(r.id) ? fixture : null),
     saveFile: (blob, name) => (saved = {blob, name}),
-    message: (text) => {throw new Error(text);}, formatCommandError: (_, e) => e.message});
-  vm.runInContext(blockAt(viewJs.stats, 'function downloadJson(') +
-      blockAt(viewJs.stats, 'async function exportShotsJson('), context);
+    message: (text, kind = '') => shown.push([text, kind]),
+    formatCommandError: (_, e) => e.message});
+  // The `let exportJob` block runs through runExport.
+  vm.runInContext(['function downloadJson(', 'let exportJob = null;', 'async function exportRows(',
+    'async function shotTraceForFile(', 'function exportSink(', 'function exportShotsJson(']
+      .map((m) => blockAt(viewJs.stats, m)).join('\n'), context);
   await vm.runInContext('exportShotsJson()', context);
+  assert.equal(context.lastFilter, '{}', 'JSON holds good shots only');
   assert.match(saved.name, /^openbrewbyweight-shots-\d{8}-\d{4}\.json$/);
   assert.equal(saved.blob.type, 'application/json');
-  assert.deepEqual(JSON.parse(await saved.blob.text()).shots.map((x) => x.id), [412, 7]);
+  const plain = JSON.parse(await saved.blob.text());
+  check(schema, plain, 'json export');
+  assert.deepEqual([plain.version, plain.shots.map((x) => x.id), plain.shots.some((x) => x.trace)],
+      [1, [412, 7], false]);
+  const bad = {...base, id: 413, badReason: 'short', durationS: 5};
+  window = [bad, base, lost];
+  traced.add(413);
+  saved = null;
+  await vm.runInContext('exportShotsJson(true)', context);
+  assert.equal(context.lastFilter, '{"bad":true}', 'Diagnostics include bad shots');
+  assert.match(saved.name, /^openbrewbyweight-shots-diagnostics-\d{8}-\d{4}\.json\.gz$/);
+  const diag = JSON.parse(zlib.gunzipSync(Buffer.from(await saved.blob.arrayBuffer())));
+  check(schema, diag, 'diagnostics export');
+  assert.deepEqual(diag.shots.map((x) => [x.id, x.outcome.badReason, !!x.trace]),
+      [[413, 'short', true], [412, null, true], [7, null, false]]);
+  assert.deepEqual(diag.shots[1].trace, trace);
+  assert.ok(shown.some(([text]) => text === 'Exporting shots with their traces… 3 of 3'));
+  // A shot starting stops an export: the firmware exports nothing during a
+  // shot, so the file is not written and the reason is said.
+  saved = null;
+  shown = [];
+  context.shotRunning = () => true;
+  context.statsFrameWindow = () => new Promise((resolve) => setTimeout(() => resolve(window), 700));
+  await vm.runInContext('exportShotsJson(true)', context);
+  assert.equal(saved, null);
+  assert.deepEqual(shown, [['Export stopped: a shot started. Export again once it has finished.', '']]);
+  context.shotRunning = () => false;
+  // A trace that cannot be read now (a failed read, or the controller busy
+  // with a rinse or the scale) leaves that shot marked and the file goes on;
+  // only a shot starting stops it.
+  context.statsFrameWindow = async () => window;
+  shown = [];
+  context.fetchShotTrace = async (r) => {
+    if (r.id === 412) throw Object.assign(new Error('busy'), {code: 'SHOT_TRACE_BUSY'});
+    if (r.id === 413) throw Object.assign(new Error('read'), {code: 'SHOT_TRACE_UNAVAILABLE'});
+    return null;
+  };
+  context.shotTraceVocabulary = async () => {throw new Error('offline');};
+  await vm.runInContext('exportShotsJson(true)', context);
+  const partial = JSON.parse(zlib.gunzipSync(Buffer.from(await saved.blob.arrayBuffer())));
+  check(schema, partial, 'partial diagnostics export');
+  assert.deepEqual(partial.shots.map((x) => [x.id, x.traceUnavailable ?? false, 'trace' in x]),
+      [[413, true, false], [412, true, false], [7, false, false]]);
+  context.shotTraceVocabulary = async () => vocab;
+  saved = null;
+  context.shotRunning = () => true;
+  await vm.runInContext('exportShotsJson(true)', context);
+  assert.equal(saved, null);
+  assert.deepEqual(shown.at(-1), ['Export stopped: a shot started. Export again once it has finished.', '']);
+  context.shotRunning = () => false;
+  // The card's JSON never fails for its trace.
+  vm.runInContext(blockAt(viewJs.stats, 'async function downloadShotJson('), context);
+  await vm.runInContext('downloadShotJson(this.badRow)', Object.assign(context, {badRow: bad}));
+  const single = JSON.parse(await saved.blob.text());
+  assert.deepEqual([single.shots.length, single.shots[0].traceUnavailable], [1, true]);
+  vm.runInContext(blockAt(runtimeJs, 'async function fetchShotTrace('), context);
+  let calls = 0;
+  context.apiBinary = async (url, progress, cache) => {
+    assert.deepEqual([url, progress, cache],
+        ['/api/v1/diagnostic/shot-trace?id=412&boot=37&end=523311', null, 'default']);
+    if (++calls < 3) throw Object.assign(new Error('saving'), {code: 'SHOT_TRACE_SAVING', status: 409});
+    return {arrayBuffer: async () => fixture};
+  };
+  assert.equal(await context.fetchShotTrace(base), fixture);
+  assert.equal(calls, 3);
+  context.apiBinary = async () => {throw Object.assign(new Error('none'), {status: 404});};
+  assert.equal(await context.fetchShotTrace(base), null);
 
   // Gaggiuino, as Visualizer.coffee reads it: datapoints with ms times, the
   // drink weight from the last point, nothing the controller never measured.
@@ -215,9 +448,36 @@
   assert.ok(!codeIncludes(viewJs.history, 'btnGlyph btnDanger'));
   assert.ok(codeIncludes(viewJs.history, 'btn.onclick = () => entryMenu.open(btn, r)'));
   assert.ok(codeIncludes(viewJs.history, '() => deleteOneHistory(r.id), true]'));
-  assert.ok(codeIncludes(viewJs.stats, 'filter: {}'), 'Exports ignore the list filter');
-  assert.ok(codeIncludes(blockAt(viewJs.stats, 'async function exportShotsJson('),
-      'statsFrameWindow(0, R.SHOTS_EXPORT_LIMIT, "date", "desc", 180e3)'));
+  assert.ok(codeIncludes(viewJs.stats, 'filter = {}'), 'Exports ignore the list filter');
+  assert.ok(codeIncludes(blockAt(viewJs.stats, 'async function exportRows('),
+      'statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3, filter)'));
+  assert.ok(codeIncludes(blockAt(viewJs.stats, 'async function exportShotsCsv('), 'exportRows(job, {})'));
+  // While a shot runs, what reads the firmware is shown disabled with the
+  // reason; a running export offers Cancel instead.
+  assert.ok(codeIncludes(viewJs.stats, 'const afterShot = () => R.shotRunning() &&'));
+  for (const item of ['exportShotsCsv, false, wait', '() => exportShotsJson(), false, wait',
+    '() => exportShotsJson(true), false, wait', '() => openShotTrace(r), false, wait',
+    '() => downloadShotJson(r), false, wait'])
+    assert.ok(codeIncludes(viewJs.stats, item), `${item} waits for the shot`);
+  assert.ok(codeIncludes(viewJs.stats, '? [[ICON.cancel,'));
+  assert.ok(codeIncludes(blockAt(viewJs.records, 'function actionMenu('), 'b.disabled = !!off'));
+  // "A shot runs" spans the drip delay: Home publishes the firmware's open
+  // trace capture. A busy answer names the shot only when the UI knows one
+  // runs; otherwise it is the neutral busy text.
+  assert.ok(network.includes('delta.field("cycle.capturing", bool(control.traceCapturing));'));
+  assert.ok(codeIncludes(blockAt(runtimeJs, 'function shotRunning('),
+      'return sessionShotLive() || !!(s?.cycle?.active || s?.cycle?.capturing);'));
+  for (const [source, marker] of [[viewJs.stats, 'async function openShotTrace('],
+    [viewJs.diagnostic, 'async function loadShotStorage(']])
+    assert.ok(codeIncludes(blockAt(source, marker), 'R.shotRunning()') &&
+        blockAt(source, marker).includes('The controller is busy right now. Try again in a moment.'));
+  // The offline copy keeps rows only and pauses while a shot runs.
+  assert.ok(codeIncludes(blockAt(viewJs.records, 'async function syncOfflineStore('),
+      'k < offsets.length && R.webUiPollingActive() && !R.shotRunning();'));
+  assert.ok(!viewJs.records.includes('shot-trace') && !viewJs.records.includes('decodeShotTrace'));
+  // Immutable records may come from the browser cache; the vocabulary is
+  // asked once per firmware.
+  assert.ok(codeIncludes(viewJs.stats, '"/api/v1/diagnostic/shot-trace/vocabulary?v=__FW_ASSET_TAG__"'));
   assert.ok(codeIncludes(blockAt(viewJs.records, 'function createFilterMenu('), 'createPopup('));
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'function downloadJson('), 'R.saveFile('));
 })().catch((error) => {

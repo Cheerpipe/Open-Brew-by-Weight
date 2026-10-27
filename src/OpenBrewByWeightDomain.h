@@ -2259,6 +2259,9 @@ enum class DebugCode : uint8_t {
   BOOT_RECOVERY_STACK,
   BLE_LINK_PARAMS_OVERRIDDEN
 };
+// Codes in use; a code appended above must move this (see
+// SCALE_PROFILE_EVENT_COUNT).
+constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::BLE_LINK_PARAMS_OVERRIDDEN) + 1U;
 
 enum class ScheduledRestartCause : uint8_t {
   NONE = 0,

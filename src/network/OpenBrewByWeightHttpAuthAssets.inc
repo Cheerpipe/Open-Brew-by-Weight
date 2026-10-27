@@ -453,6 +453,8 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       {"/api/v1/diagnostic/scale-profile/download", HTTP_GET,
        scaleProfileDownloadHandler},
       {"/api/v1/diagnostic/shot-trace", HTTP_GET, shotTraceDownloadHandler},
+      {"/api/v1/diagnostic/shot-trace/vocabulary", HTTP_GET, shotTraceVocabularyHandler},
+      {"/api/v1/diagnostic/shot-storage", HTTP_GET, shotStorageHandler, false, false, true},
       {"/api/v1/diagnostic/loop-max/reset", HTTP_POST, loopMaxResetHandler, false, false,
        true},
       {"/api/v1/diagnostic/scale-gap-max/reset", HTTP_POST, scaleGapMaxResetHandler,

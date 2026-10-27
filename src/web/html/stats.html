@@ -143,3 +143,43 @@
     <div id="shotLogSentinel" hidden></div>
   </div>
 </fieldset>
+<dialog id="shotTraceDialog" aria-labelledby="shotTraceTitle">
+  <div class="traceHead">
+    <h2 id="shotTraceTitle">{{webui:stats.trace_title}}</h2>
+    <button id="shotTraceDownload" class="btnGlyph" type="button">
+      <span class="t">{{webui:stats.download}}</span></button
+    ><button id="shotTraceClose" class="btnGlyph btnInvert" type="button">
+      <span class="t">{{webui:shell.close}}</span>
+    </button>
+  </div>
+  <p id="shotTraceMeta" class="pairMeta"></p>
+  <p id="shotTraceFlags" class="fieldHint" hidden></p>
+  <div id="shotTraceChart" class="traceChart" aria-hidden="true"></div>
+  <div class="traceFilter">
+    <label
+      >{{webui:stats.trace_show}}
+      <select id="shotTraceType">
+        <option value="">{{webui:stats.trace_all}}</option>
+        <option value="trace">{{webui:stats.trace_decisions}}</option>
+        <option value="profile">{{webui:stats.trace_scale}}</option>
+        <option value="debug">{{webui:stats.trace_firmware}}</option>
+      </select></label
+    ><label
+      >{{webui:stats.trace_search}} <input id="shotTraceSearch" type="search" autocomplete="off"
+    /></label>
+  </div>
+  <ol id="shotTraceEvents" class="traceEvents"></ol>
+  <p id="shotTraceEmpty" class="emptyState" role="status" hidden></p>
+  <details>
+    <summary>{{webui:stats.trace_before}}</summary>
+    <ol id="shotTracePre" class="traceEvents"></ol>
+  </details>
+  <details>
+    <summary>{{webui:stats.trace_start}}</summary>
+    <dl id="shotTraceSnapshot" class="traceFacts"></dl>
+  </details>
+  <details>
+    <summary>{{webui:stats.trace_counters}}</summary>
+    <dl id="shotTraceCounters" class="traceFacts"></dl>
+  </details>
+</dialog>

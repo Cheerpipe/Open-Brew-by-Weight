@@ -76,8 +76,8 @@ UI factory reset on `network_manager` (`NETWORK_MANAGER_TASK_STACK_SIZE`), the
 shot trace pool and shot-store image on `settings_persist`
 (`SETTINGS_PERSIST_TASK_STACK_SIZE`), the
 OTA transfer and commit on `ota_worker` and its inline httpd fallback, and the
-UI stream request and crash archive download on httpd
-(`HTTP_SERVER_TASK_STACK_SIZE`). Calls GCC cannot follow are charged declared
+UI stream request, the crash archive download, and the shot trace download
+and Shot storage on httpd (`HTTP_SERVER_TASK_STACK_SIZE`). Calls GCC cannot follow are charged declared
 reserves (function pointers, ROM/libc, the kernel's per-task context); a
 function pointer that leads to a gated root must be declared in the gate.
 Recursion is charged its declared bound (for example the 32-level JSON

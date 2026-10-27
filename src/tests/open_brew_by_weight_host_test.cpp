@@ -23457,6 +23457,77 @@ void trc24_a_new_trace_replaces_an_unverified_recovery() {
         trace.header.flags == 0);
 }
 
+// The Web UI decodes traces in JavaScript (33-shot-export.inc.js) from this
+// fixture, a real export of the firmware's layout; both decoders read the
+// same bytes. SHOT_TRACE_FIXTURE_WRITE=1 regenerates it after a format change.
+std::string shotTraceFixturePath() {
+  const std::string file(__FILE__);
+  return file.substr(0, file.find_last_of('/')) + "/fixtures/shot_trace_v1_hex.txt";
+}
+
+void trc25_the_web_ui_trace_fixture_is_a_real_trace() {
+  std::vector<uint8_t> bytes;
+  if (getenv("SHOT_TRACE_FIXTURE_WRITE") != nullptr) {
+    shotTrace().hostReset();
+    for (int i = 0; i < 2; ++i)
+      shotTrace().noteProfile(ScaleProfileEvent::CUP_PLACED, 9000 + i * 100, 80.0f, 3, 0);
+    shotTrace().noteProfile(ScaleProfileEvent::CUP_REMOVED, 9500, 0.5f, 70001, 9);
+    shotTrace().begin(10000);
+    ShotTraceSnapshot snapshot = {};
+    snapshot.stabilitySamples = 5;
+    snapshot.minimumCupCg = 5000;
+    snapshot.emptyReferenceCg = INT32_MIN;
+    snapshot.flags = SHOT_TRACE_SNAP_AUTO_TARE | SHOT_TRACE_SNAP_CUP_PRESENT;
+    copyCString(snapshot.scaleName, sizeof(snapshot.scaleName), "Lunar");
+    shotTrace().attachStart(snapshot, 7);
+    shotTrace().noteProfile(ScaleProfileEvent::FIRST_DROP, 16000, 1.2f, 70000, 5);
+    uint32_t states[SHOT_TRACE_STATE_COUNT] = {};
+    states[SHOT_TRACE_STATE_WEIGHT_CONTROL] = 1;
+    shotTrace().noteState(states, 17000);
+    shotTrace().noteDebug(DebugCode::RELAY_CLOSED, 100000, 7, 18000);
+    shotTrace().note(ShotTraceKind::SLOW_WINDOW_END, 45000, 351, 340, true, 18,
+                     SHOT_TRACE_SLOW_REACHED);
+    shotTrace().note(ShotTraceKind::OVER_LINE, 46000, 352, 340, true, 18, 2);
+    shotTrace().note(ShotTraceKind::STOP_REQUESTED, 50000, 3, SHOT_TRACE_STOP_WEB);
+    shotTrace().note(ShotTraceKind::FINAL_WEIGHT, 52000, 362, 2);
+    shotTrace().complete(12, 7, 52000, 3);
+    bytes = shot_trace_test::exportBytes();
+    FILE *out = fopen(shotTraceFixturePath().c_str(), "w");
+    CHECK(out != nullptr);
+    for (size_t i = 0; out != nullptr && i < bytes.size(); ++i)
+      fprintf(out, "%02x%s", bytes[i], i % 32 == 31 || i + 1 == bytes.size() ? "\n" : "");
+    if (out != nullptr) fclose(out);
+  }
+  bytes.clear();
+  FILE *in = fopen(shotTraceFixturePath().c_str(), "r");
+  CHECK(in != nullptr);
+  for (unsigned value; in != nullptr && fscanf(in, "%2x", &value) == 1;)
+    bytes.push_back(static_cast<uint8_t>(value));
+  if (in != nullptr) fclose(in);
+  Trace t;
+  CHECK(shot_trace_test::decode(bytes, t));
+  CHECK(t.header.shotLogId == 12 && t.header.bootId == 7 && t.header.anchorMs == 10000 &&
+        t.header.endedAtMs == 52000 && t.header.endReason == 3 && t.header.flags == 0);
+  const ShotTracePreShot *placed = shot_trace_test::findPreShot(t, 16);
+  const ShotTracePreShot *removed = shot_trace_test::findPreShot(t, 17);
+  CHECK(t.preShot.size() == 2 && placed != nullptr && placed->event.a == 800 &&
+        placed->repeats == 1 && removed != nullptr && removed->arg1High == 1 &&
+        removed->event.b == (70001 & 0xFFFF) && removed->arg2 == 9);
+  CHECK(t.snapshot.minimumCupCg == 5000 && t.snapshot.emptyReferenceCg == INT32_MIN &&
+        strcmp(t.snapshot.scaleName, "Lunar") == 0);
+  const shot_trace_test::Event *drop = shot_trace_test::find(t, ScaleProfileEvent::FIRST_DROP);
+  CHECK(drop != nullptr && drop->ms == 6000 && drop->a == 12 && drop->more &&
+        drop->profileArg1() == 70000 && drop->profileArg2() == 5);
+  const shot_trace_test::Event *relay = shot_trace_test::find(t, DebugCode::RELAY_CLOSED);
+  CHECK(relay != nullptr && relay->argument1() == 100000 && relay->argument2() == 7);
+  const shot_trace_test::Event *control =
+      shot_trace_test::findState(t, ScaleProfileSignal::WEIGHT_CONTROL);
+  CHECK(control != nullptr && control->a == 1 && (control->b & SHOT_TRACE_STATE_INITIAL) != 0);
+  const shot_trace_test::Event *slow = shot_trace_test::find(t, ShotTraceKind::SLOW_WINDOW_END);
+  CHECK(slow != nullptr && slow->ms == 35000 && slow->a == 351 && slow->more && slow->moreA == 18);
+  CHECK(t.events.size() == 11);  // 5 initial states, a drop, a relay, 4 trace kinds.
+}
+
 void trc11_idle_placement_evidence_reaches_the_next_trace() {
   prepareIdleTare();
   maintenanceLease.active = true;
@@ -24184,6 +24255,222 @@ void tpw15_a_trace_never_leaves_before_its_shots_curve() {
 // Transient failures: a busy flash lock costs no attempt, a read failure is
 // busy for readers (never cached as "no curve"), and a pool that fails to
 // recover is retried with a growing back-off and holds nothing back.
+// ---------------------------------------------------------------------------
+// Per-shot trace download and Shot storage (plan B8).
+// ---------------------------------------------------------------------------
+
+uint32_t storageTags[SHOT_LOG_CAPACITY];
+struct TraceDownload {
+  std::vector<uint8_t> bytes;
+  size_t chunks = 0;
+  uint32_t crc = 0;
+  void (*onChunk)(size_t chunk) = nullptr;
+};
+bool collectTraceChunk(void *context, const uint8_t *data, size_t bytes, uint32_t crc) {
+  TraceDownload &download = *static_cast<TraceDownload *>(context);
+  download.bytes.insert(download.bytes.end(), data, data + bytes);
+  download.crc = crc;
+  if (download.onChunk != nullptr) download.onChunk(download.chunks);
+  ++download.chunks;
+  return true;
+}
+// Through a 1000-byte chunk, so a trace takes several.
+ShotTraceRead downloadTrace(uint32_t id, uint32_t endedAtMs, TraceDownload &download,
+                            uint32_t knownCrc = 0, uint32_t bootId = 0) {
+  static uint8_t chunk[1000];
+  return streamShotTrace(id, bootId != 0 ? bootId : currentBootId(), endedAtMs, knownCrc, chunk,
+                         sizeof(chunk), collectTraceChunk, &download);
+}
+
+void tpw17_a_shots_trace_downloads_from_its_record() {
+  freshPoolShotLog();
+  const uint32_t id = storePoolTestShot(100000);
+  TraceDownload pending;
+  CHECK(downloadTrace(id, 100000, pending) == ShotTraceRead::PENDING && pending.chunks == 0);
+  serviceShotTracePool();
+  TraceDownload download;
+  CHECK(downloadTrace(id, 100000, download) == ShotTraceRead::FOUND && download.chunks > 1);
+  CHECK(download.bytes == poolTraceBytes(id, currentBootId(), 100000));
+  Trace decoded;
+  CHECK(shot_trace_test::decode(download.bytes, decoded) && decoded.header.shotLogId == id);
+  ShotTracePoolRef ref;
+  uint8_t buffer[64];
+  CHECK(shotTracePool().open(id, currentBootId(), 100000, ref, buffer, sizeof(buffer)) ==
+            ShotTracePoolStatus::OK &&
+        download.crc == ref.header.crc && download.crc != 0);
+  // The browser's copy is current: nothing is sent.
+  TraceDownload cached;
+  poolTestFlashReads = 0;
+  PoolFlash::setReadHook(poolTestReadSpy);
+  CHECK(downloadTrace(id, 100000, cached, download.crc) == ShotTraceRead::NOT_MODIFIED &&
+        cached.chunks == 0 && poolTestFlashReads == 1);  // The record header only.
+  // A shot starting while the record is looked up: busy, before any CRC pass.
+  PoolFlash::setReadHook([] { session.active = true; });
+  CHECK(downloadTrace(id, 100000, cached) == ShotTraceRead::BUSY && cached.chunks == 0);
+  session.active = false;
+  PoolFlash::setReadHook(nullptr);
+  // Only through its summary's identity.
+  TraceDownload other;
+  CHECK(downloadTrace(id, 100001, other) == ShotTraceRead::NONE &&
+        downloadTrace(id, 100000, other, 0, currentBootId() + 1U) == ShotTraceRead::NONE &&
+        downloadTrace(id + 1U, 100000, other) == ShotTraceRead::NONE && other.chunks == 0);
+  // Never during a shot or its drip delay, and no flash read either.
+  poolTestFlashReads = 0;
+  PoolFlash::setReadHook(poolTestReadSpy);
+  session.active = true;
+  CHECK(downloadTrace(id, 100000, other) == ShotTraceRead::BUSY);
+  session.active = false;
+  shotTrace().begin(hostMillis);
+  CHECK(downloadTrace(id, 100000, other) == ShotTraceRead::BUSY);
+  shotTrace().complete(0, currentBootId(), hostMillis, 0);
+  CHECK(poolTestFlashReads == 0 && other.chunks == 0);
+  PoolFlash::setReadHook(nullptr);
+  serviceShotTracePool();  // Saves that refused shot's trace alone.
+  // A shot without a trace, and a deleted one: no trace.
+  const uint32_t plain = storePoolTestShot(200000, false);
+  CHECK(downloadTrace(plain, 200000, other) == ShotTraceRead::PENDING);  // Its curve waits.
+  serviceShotTracePool();
+  CHECK(downloadTrace(plain, 200000, other) == ShotTraceRead::NONE);
+  CHECK(deleteShotRecord(id) && downloadTrace(id, 100000, other) == ShotTraceRead::NONE);
+  // A record of a reused id (another boot or end time, a pool not cleared)
+  // is never reached through the new summary's id.
+  const std::vector<uint8_t> stale = poolTraceBytes(0, currentBootId(), hostMillis);
+  const ShotTracePoolSource staleTrace = {ShotTracePoolSection::TRACE, 0,
+                                          static_cast<uint16_t>(stale.size()), stale.data(),
+                                          nullptr, nullptr};
+  CHECK(!stale.empty() &&
+        shotTracePool().append({plain, currentBootId(), 150000, FW_VERSION_PACKED, 0},
+                               &staleTrace, 1));
+  CHECK(downloadTrace(plain, 150000, other) == ShotTraceRead::NONE && other.chunks == 0);
+  // A shot starting, or the ring recycling the record, mid-stream: cut short.
+  const uint32_t next = storePoolTestShot(300000);
+  serviceShotTracePool();
+  TraceDownload cut;
+  cut.onChunk = [](size_t) { session.active = true; };
+  CHECK(downloadTrace(next, 300000, cut) == ShotTraceRead::UNAVAILABLE && cut.chunks == 1);
+  session.active = false;
+  TraceDownload recycled;
+  recycled.onChunk = [](size_t) { CHECK(shotTracePool().clear()); };
+  CHECK(downloadTrace(next, 300000, recycled) == ShotTraceRead::UNAVAILABLE &&
+        recycled.chunks == 1);
+  // Before the pool is recovered after a boot: pending, not missing.
+  hostRebootShotTracePool();
+  CHECK(downloadTrace(next, 300000, other) == ShotTraceRead::PENDING);
+}
+
+void tpw18_an_interrupted_trace_downloads_by_its_crashed_boot() {
+  freshPoolShotLog();
+  openTestTrace(1000, 41);
+  shotTrace().note(ShotTraceKind::OVER_LINE, 1200, 1, 2);
+  shotTrace().hostReset();
+  recoverShotTraceAtBoot(6);
+  TraceDownload download;
+  CHECK(downloadTrace(0, 0, download, 0, 41) == ShotTraceRead::PENDING);
+  serviceShotTracePool();
+  CHECK(downloadTrace(0, 0, download, 0, 41) == ShotTraceRead::FOUND);
+  Trace decoded;
+  CHECK(shot_trace_test::decode(download.bytes, decoded) &&
+        (decoded.header.flags & SHOT_TRACE_INTERRUPTED) != 0 && decoded.header.bootId == 41);
+  ShotStorageStats storage;
+  CHECK(copyShotStorage(storage, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND && storage.interrupted == 1 &&
+        storage.interruptedListed == 1 && storage.interruptedBoots[0] == 41 &&
+        storage.traceOnly == 0 && storage.traces == 1);
+}
+
+void tpw19_shot_storage_splits_the_pool_by_what_its_records_hold() {
+  freshPoolShotLog();
+  const uint32_t first = storePoolTestShot(100000);
+  serviceShotTracePool();
+  storePoolTestShot(200000, true, 40, 50);  // Bad: 5 s.
+  serviceShotTracePool();
+  const uint32_t deleted = storePoolTestShot(300000, false);
+  serviceShotTracePool();
+  const uint32_t truncated = storePoolTestShot(400000, false);
+  completePoolTestTrace(truncated, currentBootId(), 400000, 2100);  // Past the event capacity.
+  serviceShotTracePool();
+  completePoolTestTrace(0, currentBootId(), 450000);  // The shot log refused it.
+  serviceShotTracePool();
+  CHECK(deleteShotRecord(deleted));
+  ShotStorageStats s;
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY - 1U) == ShotTraceRead::UNAVAILABLE);
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND && s.ready && s.records == 5);
+  CHECK(s.good == 2 && s.bad == 1 && s.traceOnly == 1 && s.interrupted == 0);
+  CHECK(s.traces == 4 && s.truncated == 1);
+  ShotTracePoolEntry entry;
+  CHECK(shotTracePool().entryAt(2, entry) && s.reclaimableBytes == entry.bytes());
+  CHECK(s.liveBytes + s.reclaimableBytes + s.unindexedBytes + s.unusedBytes == s.poolBytes &&
+        s.poolBytes == SHOT_TRACE_POOL_SECTORS * SHOT_TRACE_POOL_SECTOR_BYTES);
+  CHECK(s.meanRecordBytes == (s.liveBytes + s.reclaimableBytes) / 5U);
+  CHECK(s.sinceShotId == first && s.pendingCurves == 0 && s.pendingTraces == 0);
+  // Not saved yet: one curve and its trace wait.
+  storePoolTestShot(500000);
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND && s.pendingCurves == 1 &&
+        s.pendingTraces == 1 && s.records == 5);
+  // Never during a shot, and no flash read.
+  poolTestFlashReads = 0;
+  PoolFlash::setReadHook(poolTestReadSpy);
+  session.active = true;
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::BUSY && poolTestFlashReads == 0);
+  session.active = false;
+  PoolFlash::setReadHook(nullptr);
+  // A record whose commit word is gone (torn by an interrupted erase) counts
+  // as nothing.
+  CHECK(shotTracePool().entryAt(4, entry));
+  memset(PoolFlash::sector(entry.address() / 4096U) + entry.address() % 4096U + 28U, 0, 4);
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND &&
+        s.traceOnly == 0 && s.traces == 3);
+  // A deleted shot's record is reclaimable and counts in no trace figure.
+  CHECK(deleteShotRecord(truncated) &&
+        copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND &&
+        s.traces == 2 && s.truncated == 0 && s.good == 1 && s.bad == 1);
+  // The store lock covers the summary walks only: no other lock and no
+  // flash read under it (control takes it blocking when a shot starts).
+  static size_t storeHolds, nestedUnderStore;
+  storeHolds = nestedUnderStore = 0;
+  TaskMutex::hostObserver = [](const TaskMutex *mutex, bool acquired) {
+    if (mutex == &shotStoreMutex) {
+      poolTestStoreHeld = acquired;
+      storeHolds += acquired;
+    } else if (acquired && poolTestStoreHeld) {
+      ++nestedUnderStore;
+    }
+  };
+  poolTestReadsUnderStoreLock = 0;
+  PoolFlash::setReadHook(poolTestReadSpy);
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND);
+  PoolFlash::setReadHook(nullptr);
+  TaskMutex::hostObserver = nullptr;
+  CHECK(storeHolds == 2 && nestedUnderStore == 0 && poolTestReadsUnderStoreLock == 0);
+  // The whole log against the full index: every summary's record is live
+  // and the split stays exact. Busy during a shot even with nothing stored.
+  freshPoolShotLog();
+  session.active = true;
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::BUSY);
+  session.active = false;
+  for (uint32_t n = 1; n <= SHOT_LOG_CAPACITY; ++n) {
+    storePoolTestShot(n * 1000U, false, 4, n % 10U == 0 ? 50 : 300);
+    serviceShotTracePool();
+  }
+  CHECK(copyShotStorage(s, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND && s.records == SHOT_LOG_CAPACITY &&
+        s.good == SHOT_LOG_CAPACITY * 9U / 10U && s.bad == SHOT_LOG_CAPACITY / 10U &&
+        s.reclaimableBytes == 0 && s.sinceShotId == 1 && s.traces == 0);
+}
+
+// Home publishes the open capture (cycle start to drip finalize), so the Web
+// UI's "a shot runs" covers the drip delay that session.active does not.
+void tpw20_the_published_status_carries_the_open_capture() {
+  resetHarness(false, true);
+  serviceControlStatusPublish();
+  CHECK(!publishedControlStatus.traceCapturing);
+  shotTrace().begin(hostMillis);
+  CHECK(!session.active);  // As in the drip delay.
+  serviceControlStatusPublish();
+  CHECK(publishedControlStatus.traceCapturing);
+  shotTrace().complete(0, currentBootId(), hostMillis, 0);
+  serviceControlStatusPublish();
+  CHECK(!publishedControlStatus.traceCapturing);
+}
+
 void tpw16_transient_failures_are_retried_not_counted() {
   freshPoolShotLog();
   const uint32_t one = storePoolTestShot(100000, false);
@@ -24904,6 +25191,7 @@ const TestCase testCases[] = {
     {"TRC22", trc22_recovery_reaches_the_web_ui_log},
     {"TRC23", trc23_magic_changes_are_written_back},
     {"TRC24", trc24_a_new_trace_replaces_an_unverified_recovery},
+    {"TRC25", trc25_the_web_ui_trace_fixture_is_a_real_trace},
     {"TPW01", tpw01_a_finished_shot_is_saved_once_after_the_shot_and_linked},
     {"TPW02", tpw02_appends_wait_for_the_gate_and_resume_where_they_paused},
     {"TPW03", tpw03_the_newest_trace_wins_and_drops_are_counted},
@@ -24920,6 +25208,10 @@ const TestCase testCases[] = {
     {"TPW14", tpw14_factory_reset_never_keeps_old_curves_or_fails_on_the_pool},
     {"TPW15", tpw15_a_trace_never_leaves_before_its_shots_curve},
     {"TPW16", tpw16_transient_failures_are_retried_not_counted},
+    {"TPW17", tpw17_a_shots_trace_downloads_from_its_record},
+    {"TPW18", tpw18_an_interrupted_trace_downloads_by_its_crashed_boot},
+    {"TPW19", tpw19_shot_storage_splits_the_pool_by_what_its_records_hold},
+    {"TPW20", tpw20_the_published_status_carries_the_open_capture},
     {"S01b", s01b_shot_log_stop_detail_names_end_reasons},
     {"S02", s02_shot_log_appends_after_drip_delay},
     {"S02E", s02e_shot_log_appends_auto_bbw_after_drip_delay},

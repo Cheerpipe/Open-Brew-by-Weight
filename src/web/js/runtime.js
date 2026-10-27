@@ -700,6 +700,28 @@ function sessionShotLive() {
     (!homeStale && s && (s.liveShot || s.machineRunning))
   );
 }
+// A shot from cycle start to the end of its drip delay (the firmware's open
+// trace capture): it reads no stored trace or old curve and exports nothing
+// meanwhile.
+function shotRunning() {
+  const s = homeFrame?.status;
+  return sessionShotLive() || !!(s?.cycle?.active || s?.cycle?.capturing);
+}
+// A shot trace's record bytes ({id, bootId, endedAtMs}; id 0 and end 0 for an
+// interrupted one), or null when there is none; a record still being saved
+// right after its shot is asked for again a few times.
+async function fetchShotTrace(r) {
+  for (let tries = 0; ; tries++) {
+    try {
+      const url = `/api/v1/diagnostic/shot-trace?id=${r.id}&boot=${r.bootId}&end=${r.endedAtMs}`;
+      return await (await apiBinary(url, null, "default")).arrayBuffer();
+    } catch (e) {
+      if (e.status === 404) return null;
+      if (e.code !== "SHOT_TRACE_SAVING" || tries === 4) throw e;
+      await sleep(1500);
+    }
+  }
+}
 // /setup (captive portal) needs no ownership: its endpoints are authorized by
 // the SoftAP link, so it skips the claim, the UI stream and the inactivity
 // lock, and another window (CNA sheet, browser, second phone) cannot
@@ -1971,6 +1993,50 @@ function setOverlayOutOfReach() {
   if (h) h.textContent = __WEBUI_TEXT__("shell.out_of_reach_hint");
   showInactiveOverlay();
   offerOfflineCopy(!!offlineCopyState());
+}
+// A binary download through the device slot. Errors carry the HTTP status
+// and the firmware's error code; `cache` lets immutable records (shot
+// traces) come from the browser cache.
+async function apiBinary(path, onProgress, cache = "no-store") {
+  if (!webUiPollingActive())
+    throw new Error(__WEBUI_TEXT__("runtime.this_window_is_inactive_reload_to_continue"));
+  await acquireDeviceSlot();
+  const ac = new AbortController(),
+    timer = setTimeout(() => ac.abort(), 12e4);
+  try {
+    const response = await fetch(path, {
+      headers: webUiHeaders(),
+      signal: ac.signal,
+      cache,
+    });
+    if (!response.ok) {
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (_) {}
+      throw Object.assign(
+        new Error(data.message || data.error || __WEBUI_TEXT__("runtime.http") + response.status),
+        { status: response.status, code: data.error },
+      );
+    }
+    if (!onProgress || !response.body) return await response.blob();
+    const reader = response.body.getReader(),
+      chunks = [];
+    let loaded = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      loaded += value.byteLength;
+      onProgress(loaded);
+    }
+    return new Blob(chunks, {
+      type: response.headers.get("Content-Type") || "application/octet-stream",
+    });
+  } finally {
+    clearTimeout(timer);
+    releaseDeviceSlot();
+  }
 }
 async function api(path, options = {}) {
   if (!webUiPollingActive())
@@ -5950,6 +6016,9 @@ export {
   showFieldError,
   clearFieldErrors,
   api,
+  apiBinary,
+  fetchShotTrace,
+  shotRunning,
   command,
   withCommandGate,
   withBaseRev,
@@ -6041,11 +6110,8 @@ export {
   verdictLabel,
   setEmptyState,
   shotWs,
-  acquireDeviceSlot,
-  webUiHeaders,
   storeSession,
   deviceLabel,
-  releaseDeviceSlot,
   formatTzLabel,
   ms,
   statusUtcAnchorSec,

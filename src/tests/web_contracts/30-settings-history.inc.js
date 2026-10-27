@@ -511,7 +511,12 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !diagHtml.includes('<strong>Clock</strong>') ||
       !diagHtml.includes('<strong>Temp current</strong>') ||
       !diagHtml.includes('<strong>Temp peak</strong>') ||
-      (diagHtml.match(/<details/g) || []).length !== 20 ||
+      (diagHtml.match(/<details/g) || []).length !== 21 ||
+      // Shot storage is its own section after HEAP and NVS, read when opened.
+      diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Shot storage</summary>') ||
+      diagHtml.indexOf('<summary>Shot storage</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
+      !codeIncludes(ui, '$("shotStorage").addEventListener("toggle", loadShotStorage)') ||
+      !codeIncludes(ui, 'R.api("/api/v1/diagnostic/shot-storage", { timeoutMs: 15e3 })') ||
       !diagHtml.includes('<details><summary>Last 10 resets</summary>') ||
       diagHtml.includes('<summary>Diagnostics</summary>') ||
       !diagHtml.includes('id="hFirmware"') ||
@@ -952,11 +957,12 @@ if (!codeIncludes(viewJs.stats, 'SHOTS_PAGE_SIZE=10') ||
     !codeIncludes(viewJs.stats, 'function applyStatsStream(') ||
     !codeIncludes(viewJs.stats, 'subscribe:()=>(statsStreamWanted?statsSubscribeOp():null)') ||
     !codeIncludes(viewJs.stats, 'R.registerStream("stats",statsStream)') ||
-    !codeIncludes(js, 'async function exportShotsCsv(){if(statsExportInFlight)return;') ||
+    !codeIncludes(js, 'async function runExport(work){if(exportJob||statsExportInFlight)return;') ||
+    !codeIncludes(js, 'async function exportShotsCsv(){return runExport(') ||
     codeIncludes(js, 'return statsExportInFlight') ||
     !codeIncludes(statsRuntimeJs, 'statsRequest=++statsNextRequest') ||
     !codeIncludes(js, "sendUiOperation({op:'stats',on:true,fetch:true,request:statsFetchMark.request,offset:statsFetchMark.offset,limit:SHOTS_PAGE_SIZE,sort:shotSort,dir:shotSortDir,}") ||
-    !codeIncludes(js, "statsFrameWindow(0,SHOTS_EXPORT_LIMIT,'date','desc',180e3)") ||
+    !codeIncludes(js, "statsFrameWindow(0,SHOTS_EXPORT_LIMIT,'date','desc',180e3,filter)") ||
     !codeIncludes(statsRuntimeJs, 'function shotStatsViewActive(){') ||
     !codeIncludes(statsRuntimeJs, 'function renderShots(') ||
     !codeIncludes(viewJs.records, 'function armListSentinel(') ||
@@ -1240,7 +1246,8 @@ if (!statsSection ||
     !codeIncludes(viewJs.stats, '...(uiState.statsWindow!==10&&{window:uiState.statsWindow}),') ||
     !codeIncludes(viewJs.stats, '...(Object.keys(uiState.shotFilter).length&&{filter:uiState.shotFilter}),') ||
     !codeIncludes(viewJs.stats, 'R.createFilterMenu("shotFilterButton"') ||
-    !codeIncludes(viewJs.stats, 'dir,filter:{},') ||
+    !codeIncludes(viewJs.stats, 'timeoutMs,filter={}){') ||
+    !codeIncludes(viewJs.stats, 'dir,filter,});') ||
     !partialHtml.stats.includes('id="shotFilterButton"') ||
     !statsSection[1].includes('id="statsDurChart"') ||
     !codeIncludes(statsRuntimeJs, 'function renderStatsDurChart(') ||

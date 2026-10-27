@@ -234,8 +234,14 @@ release the mutex, read flash under the flash lock and check after every chunk
 that the record is still indexed. Lock order is flash lock, then pool mutex.
 Only the RAM statistics (`stats()`, whose callback runs under the pool mutex)
 may be called with `shotStoreMutex` held: `open()`, `read()`, `contains()` and
-`oldest()` read flash and run with no store lock, because control takes
-`shotStoreMutex` blocking. Control takes neither pool lock. USB application logs are emitted by the bounded
+`headerAt()` read flash and run with no store lock, because control takes
+`shotStoreMutex` blocking. Control takes neither pool lock. The httpd
+readers (the per-shot trace download and Shot storage) check the write gate
+first and again between chunks, so they never read flash during a shot; they
+look the summary up, and Shot storage sorts the summaries' index tags and
+takes the RAM statistics, under `shotStoreMutex`, then release it before any
+flash read. Their 4 KiB chunk, which also holds those tags, is static PSRAM
+owned by the httpd task, which serves one request at a time. USB application logs are emitted by the bounded
 `serial_log` queue on core 0. Eight short log records remain internal while a
 bounded 2.5 KiB PSRAM buffer carries the CLI reply published to that owner;
 saturation increments dropped/truncated counters instead of waiting in control.

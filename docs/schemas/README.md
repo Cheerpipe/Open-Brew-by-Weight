@@ -3,31 +3,38 @@
 Published formats other projects can read without depending on the firmware's
 internal wire protocol.
 
-## Shot export v2
+## Shot export v1
 
-- Schema: [`openbrewbyweight-shot-export-v2.schema.json`](openbrewbyweight-shot-export-v2.schema.json)
+- Schema: [`openbrewbyweight-shot-export-v1.schema.json`](openbrewbyweight-shot-export-v1.schema.json)
   (JSON Schema draft 2020-12).
-- Example: [`openbrewbyweight-shot-export-v2.example.json`](openbrewbyweight-shot-export-v2.example.json),
-  produced by the Web UI's own exporter.
-- Version 2 replaces `control.cutRampS`, one transition length for both
-  sides, with each side's transition: `fastRampS`, `slowRampS`, `fastCurve`,
-  `slowCurve`, `fastCurveHardness` and `slowCurveHardness`. The
-  [version 1 schema](openbrewbyweight-shot-export-v1.schema.json) and its
-  [example](openbrewbyweight-shot-export-v1.example.json) stay published for
-  files exported before.
-- `outcome.badReason`, added within version 2, says why a shot is bad
-  (`short`, `no_yield` or `low_yield`) and is `null` for a good one. The
-  whole-log export holds good shots only; a bad shot exported from its card
-  carries its reason.
-- Produced by: the Shots page, **Export → JSON** (every good shot) and a
-  card's **⋯ → JSON** (that shot). Both write the same envelope; a single-shot
-  file has one entry in `shots`. File names are
-  `openbrewbyweight-shots-YYYYMMDD-HHMM.json` and
-  `openbrewbyweight-shot-<id>.json`.
-- Source and contract: `shotsJson` in `src/web/js/stats.js`;
-  `src/tests/web_contracts/33-shot-export.inc.js` validates the output and the
-  example against the schema and fails when a Stats row field has no home in
-  the export.
+- Example: [`openbrewbyweight-shot-export-v1.example.json`](openbrewbyweight-shot-export-v1.example.json),
+  produced by the Web UI's own exporter; its first shot carries a trace.
+- Each side's transition is `control.fastRampS`, `slowRampS`, `fastCurve`,
+  `slowCurve`, `fastCurveHardness` and `slowCurveHardness`.
+- `outcome.badReason` says why a shot is bad (`short`, `no_yield` or
+  `low_yield`) and is `null` for a good one.
+- `trace` (optional) is the shot's decoded decision record: header fields,
+  `flags`, the start `snapshot`, the end `counters`, the `preShot` entries and
+  the `events`, each with its `type` (`profile`, `debug`, `trace`), `code`,
+  `name`, raw `a` and `b`, and a merged continuation in `ext`. The meaning of
+  `a` and `b` per kind is in the firmware's
+  [shot trace reference](../SHOT_TRACE.md#event-records). It is absent when
+  the shot has no stored trace. `traceUnavailable` (optional, `true`) marks a
+  shot whose trace could not be read when the file was made (the controller
+  was busy or a read failed); the file goes on without it.
+- Produced by: the Shots page, **Export → JSON** (every good shot, no traces),
+  **Export → JSON + diagnostics** (every shot, bad ones included, each with its
+  trace when it has one), and a card's **⋯ → JSON** (that shot with its trace).
+  All write the same envelope; a single-shot file has one entry in `shots`.
+  File names are `openbrewbyweight-shots-YYYYMMDD-HHMM.json`,
+  `openbrewbyweight-shots-diagnostics-YYYYMMDD-HHMM.json.gz` (`.json` where
+  the browser cannot compress) and `openbrewbyweight-shot-<id>.json`.
+- Source and contract: `shotsJson` and `decodeShotTrace` in
+  `src/web/js/stats.js`; `src/tests/web_contracts/33-shot-export.inc.js`
+  validates the output, the diagnostics export and the example against the
+  schema, decodes the firmware's own trace fixture
+  (`src/tests/fixtures/shot_trace_v1_hex.txt`, also checked by host case
+  TRC25), and fails when a Stats row field has no home in the export.
 
 Conventions:
 
@@ -47,10 +54,14 @@ Conventions:
 
 Versioning:
 
-- `version` is `2`. Adding optional properties keeps version 2; readers must
-  ignore properties they do not know.
+- `version` is `1`. This schema replaces the export formats shipped up to
+  firmware 1.1.0 (the earlier version 1 and version 2 files), which are no
+  longer supported: the project is still in development and those files are
+  not read back.
+- Adding optional properties keeps version 1; readers must ignore properties
+  they do not know.
 - Removing or renaming a property, or changing its meaning or unit, requires
-  version 2 with a new schema file; the v1 file stays published.
+  version 2 with a new schema file; the v1 file then stays published.
 
 ## Formats written for other apps
 

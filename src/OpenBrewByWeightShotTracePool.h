@@ -594,19 +594,23 @@ class ShotTracePool {
     out.lastError = lastError();
     return out;
   }
-  // Header of the oldest reachable record (its boot and end time: "history
-  // since"). Reads flash: hold no store lock.
-  ShotTracePoolStatus oldest(ShotTracePoolRecordHeader &out) {
-    ShotTracePoolRef ref = {};
+  // The n-th oldest indexed record by its address, header checked but not
+  // its CRC (statistics: identity, length, sections). Reads flash: hold no
+  // store lock.
+  ShotTracePoolStatus headerAt(size_t n, ShotTracePoolRef &ref) {
     {
       TaskLockGuard lock(mux_);
       if (!ready_) return ShotTracePoolStatus::NOT_READY;
-      if (count_ == 0) return ShotTracePoolStatus::NOT_FOUND;
-      ref.serial = firstSerial_;
-      ref.address = slot(firstSerial_).address();
+      if (n >= count_) return ShotTracePoolStatus::NOT_FOUND;
+      ref.serial = firstSerial_ + static_cast<uint32_t>(n);
+      ref.address = slot(ref.serial).address();
     }
-    ref.bytes = sizeof(out);
-    return read(ref, 0, &out, sizeof(out));
+    ref.bytes = sizeof(ref.header);
+    const ShotTracePoolStatus status = read(ref, 0, &ref.header, sizeof(ref.header));
+    if (status != ShotTracePoolStatus::OK) return status;
+    if (!validRecord(ref.header) || ref.header.commit != kCommitted) return ShotTracePoolStatus::GONE;
+    ref.bytes = ref.header.totalBytes;
+    return ShotTracePoolStatus::OK;
   }
   ShotTracePoolError lastError() const { return lastError_.load(std::memory_order_relaxed); }
 

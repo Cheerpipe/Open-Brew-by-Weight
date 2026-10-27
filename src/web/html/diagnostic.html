@@ -46,6 +46,9 @@
     <ellipse cx="12" cy="6" rx="8" ry="3" />
     <path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
   </symbol>
+  <symbol id="dg-shot-storage" viewBox="0 0 24 24">
+    <path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" />
+  </symbol>
   <symbol id="dg-date-and-time" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="9" />
     <path d="M12 7v5l3 2" />
@@ -553,6 +556,64 @@
         <div class="metric">
           <strong>{{webui:diagnostic.flash_lock_timeouts}}</strong>
           <div id="hNvsLockTimeouts">—</div>
+        </div>
+      </div>
+    </details>
+    <details id="shotStorage" class="cfgGroup" data-g="shot-storage">
+      <summary>{{webui:diagnostic.shot_storage}}</summary>
+      <p id="shotStorageState" class="emptyState" role="status" hidden></p>
+      <div class="statusColumn">
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_space}}</strong>
+          <div id="ssSpace">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_shots}}</strong>
+          <div id="ssShots">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_since}}</strong>
+          <div id="ssSince">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_room}}</strong>
+          <div id="ssRoom">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_traces}}</strong>
+          <div id="ssTraces">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_other}}</strong>
+          <div id="ssOther">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_reclaimable}}</strong>
+          <div id="ssReclaimable">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_overhead}}</strong>
+          <div id="ssOverhead">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_unused}}</strong>
+          <div id="ssUnused">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_waiting}}</strong>
+          <div id="ssWaiting">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_not_saved}}</strong>
+          <div id="ssNotSaved">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.shot_storage_error}}</strong>
+          <div id="ssError">—</div>
+        </div>
+        <div id="ssInterruptedRow" class="metric" hidden>
+          <strong>{{webui:diagnostic.shot_storage_interrupted}}</strong>
+          <div id="ssInterrupted"></div>
         </div>
       </div>
     </details>

@@ -350,6 +350,19 @@ int main(){
            frames[1].find("\\"id\\":2,")!=std::string::npos);
     shots=3;++storeEpoch;
   }
+  // Nothing is exported during a shot, drip included: a fetch (export window
+  // or scroll page) sends nothing while the trace capture is open and
+  // completes once it closes.
+  {
+    fresh.statsFetch=true;fresh.statsFetchRequest=11;fresh.statsFetchOffset=0;
+    fresh.statsFetchLimit=3;fresh.statsFetchFilter={};fresh.statsFetchSort=ShotLogSort::Date;
+    fresh.statsFetchDir=ShotLogSortDir::Desc;control.traceCapturing=true;frames.clear();
+    for(int i=0;i<3;++i)assert(send(fresh));
+    assert(frames.empty()&&fresh.statsFetch&&!fresh.statsPaging);
+    control.traceCapturing=false;
+    while(fresh.statsFetch)assert(send(fresh));
+    assert(frames.size()==3&&frames[0].find("\\"request\\":11,")!=std::string::npos);
+  }
 }
 `;
   const directory = path.resolve(sketchDir, '..', 'temp', 'ai_temp_stats_cache');

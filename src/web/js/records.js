@@ -154,7 +154,8 @@ function createPopup(label, fill) {
   return { open, close };
 }
 // An action menu on the shared popup: a string starts a group, null draws a
-// separator, and [icon path, title, hint, run, danger] is an item.
+// separator, and [icon path, title, hint, run, danger, disabled] is an item
+// (a disabled one says why in its hint).
 function actionMenu(label, items) {
   const menu = createPopup(label, (p, ...args) => {
     for (const item of items(...args)) {
@@ -171,9 +172,10 @@ function actionMenu(label, items) {
         );
         continue;
       }
-      const [icon, title, hint, run, danger] = item,
+      const [icon, title, hint, run, danger, off] = item,
         b = document.createElement("button");
       b.type = "button";
+      b.disabled = !!off;
       b.className = "histFilterItem menuAction" + (danger ? " menuDanger" : "");
       b.setAttribute("role", "menuitem");
       b.innerHTML =
@@ -274,7 +276,9 @@ function recordsIndex(store, epoch) {
 // fetchWindow(offset, count) resolves with records from `offset` in the
 // view's fetch order (falsy on failure), place(i, total) maps index position
 // i to that order, and meta() adds what the offline page shows besides rows.
-// An interrupted sync keeps what it fetched and leaves the epoch for the next.
+// An interrupted sync keeps what it fetched and leaves the epoch for the next;
+// a shot starting pauses it that way (the firmware serves no exports then).
+// The copy keeps shot rows only, never their traces.
 const offlineSyncing = {};
 async function syncOfflineStore(store, fetchWindow, place, meta = () => ({})) {
   if (offlineSyncing[store]) return;
@@ -298,7 +302,7 @@ async function syncOfflineStore(store, fetchWindow, place, meta = () => ({})) {
       offsets.push(place(i / 2, rows.length / 2));
     }
     offsets.sort((a, b) => a - b);
-    for (let k = 0; k < offsets.length && R.webUiPollingActive(); ) {
+    for (let k = 0; k < offsets.length && R.webUiPollingActive() && !R.shotRunning(); ) {
       const page = await fetchWindow(offsets[k], offsets.at(-1) - offsets[k] + 1);
       if (!page) break;
       for (const r of page)

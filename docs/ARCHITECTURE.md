@@ -312,7 +312,10 @@ persistence worker saves one record per stored shot, its curve with its
 trace, to a log-structured flash pool over `reserved` and `shotcurve` on its
 idle passes while no shot runs, recovering the pool and loading the curve
 cache back on its first pass; clear all lands in the pool before the shot
-log, and factory reset clears and verifies it.
+log, and factory reset clears and verifies it. The Web UI reads a shot's
+trace from its record on demand (its view and the diagnostics export) and the
+Diagnostic Shot storage section on demand; both answer busy while a shot
+runs, and nothing reads them on a timer.
 Only the sectors the store occupies in the
 inactive slot (32 of the shot log's 126, all four of the history slot) are
 erased, one 4 KiB sector at a time; each is programmed

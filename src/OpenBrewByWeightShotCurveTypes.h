@@ -21,6 +21,26 @@ static_assert(SHOT_CURVE_CAPACITY <= SHOT_LOG_CAPACITY, "Cached curves have summ
 // read now (a shot runs, the pool is not recovered yet, a read failed);
 // STORED when the caller asked not to read flash and the curve may be there.
 enum class ShotCurveRead : uint8_t { NONE, FOUND, BUSY, STORED };
+// A per-shot trace download (docs/SHOT_TRACE.md): BUSY while a shot runs,
+// PENDING while its record waits to be written, UNAVAILABLE when the pool
+// failed or a read failed, NOT_MODIFIED when the caller's copy is current.
+enum class ShotTraceRead : uint8_t { FOUND, NONE, BUSY, PENDING, UNAVAILABLE, NOT_MODIFIED };
+// Called with each chunk and the record CRC (the response's ETag).
+using ShotTraceSink = bool (*)(void *context, const uint8_t *data, size_t bytes, uint32_t crc);
+// Diagnostic Shot storage: the pool in bytes (pool = live + reclaimable +
+// unindexed + never written), its records (good and bad summaries, trace
+// only, interrupted), the oldest stored shot, and what still waits.
+struct ShotStorageStats {
+  bool ready;
+  uint8_t lastError;  // ShotTracePoolError
+  uint32_t poolBytes, liveBytes, reclaimableBytes, unindexedBytes, unusedBytes;
+  uint32_t records, meanRecordBytes, droppedRecords;
+  uint32_t good, bad, traceOnly, interrupted, traces, truncated;
+  uint32_t sinceShotId, sinceLocalSec;  // 0: none, or no wall time
+  uint32_t pendingCurves, pendingTraces, tracesDropped;
+  uint32_t interruptedBoots[4];  // Newest first; interruptedListed are valid.
+  uint8_t interruptedListed;
+};
 // Worst case: the base64 stream plus 1201 break and 1201 held indices of up
 // to five characters each, plus the reference point, keys and events.
 constexpr size_t SHOT_CURVE_JSON_CAPACITY =

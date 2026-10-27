@@ -193,46 +193,6 @@ function applyScaleCommands(scale) {
       ? __WEBUI_TEXT__("diagnostic.ultra_charging_note")
       : "";
 }
-async function apiBinary(path, onProgress) {
-  if (!R.webUiPollingActive())
-    throw new Error(__WEBUI_TEXT__("runtime.this_window_is_inactive_reload_to_continue"));
-  await R.acquireDeviceSlot();
-  const ac = new AbortController(),
-    timer = setTimeout(() => ac.abort(), 12e4);
-  try {
-    const response = await fetch(path, {
-      headers: R.webUiHeaders(),
-      signal: ac.signal,
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      let data = {};
-      try {
-        data = await response.json();
-      } catch (_) {}
-      throw new Error(
-        data.message || data.error || __WEBUI_TEXT__("runtime.http") + response.status,
-      );
-    }
-    if (!onProgress || !response.body) return await response.blob();
-    const reader = response.body.getReader(),
-      chunks = [];
-    let loaded = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.byteLength;
-      onProgress(loaded);
-    }
-    return new Blob(chunks, {
-      type: response.headers.get("Content-Type") || "application/octet-stream",
-    });
-  } finally {
-    clearTimeout(timer);
-    R.releaseDeviceSlot();
-  }
-}
 function formatWallTime(unixSec, tz) {
   return R.formatWallTimeLocal(unixSec + tz * 60);
 }
@@ -1061,7 +1021,7 @@ async function downloadHeapMap() {
   if (heapMapBusy) return;
   heapMapBusy = true;
   await downloadText(
-    apiBinary("/api/v1/diagnostic/heap-map"),
+    R.apiBinary("/api/v1/diagnostic/heap-map"),
     "heap-map.csv",
     __WEBUI_TEXT__("diagnostic.heap_map_download_failed"),
   );
@@ -1185,6 +1145,107 @@ function toggleAuditDetail(row, item) {
   row.after(detail);
 }
 const saveFile = (blob, name) => R.saveFile(blob, "openbrewbyweight-" + name);
+// Shot storage: read when its section opens, never polled (the firmware
+// walks every stored record for it), and refused while a shot runs.
+let shotStorageBusy = false;
+async function loadShotStorage() {
+  if (shotStorageBusy || !$("shotStorage").open) return;
+  shotStorageBusy = true;
+  try {
+    const s = await R.api("/api/v1/diagnostic/shot-storage", { timeoutMs: 15e3 });
+    renderShotStorage(s);
+    R.setEmptyState(
+      "shotStorageState",
+      s.ready ? null : __WEBUI_TEXT__("diagnostic.shot_storage_not_ready"),
+    );
+  } catch (e) {
+    R.setEmptyState(
+      "shotStorageState",
+      e.code !== "SHOT_STORAGE_BUSY"
+        ? R.formatCommandError(__WEBUI_TEXT__("diagnostic.shot_storage_failed"), e)
+        : R.shotRunning()
+          ? __WEBUI_TEXT__("diagnostic.shot_storage_after_shot")
+          : __WEBUI_TEXT__("runtime.controller_busy"),
+    );
+  } finally {
+    shotStorageBusy = false;
+  }
+}
+function renderShotStorage(s) {
+  const size = (n) =>
+      n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : (n / 1024).toFixed(1) + " KB",
+    none = __WEBUI_TEXT__("diagnostic.none"),
+    t = (id, text, values) => ($(id).textContent = values ? R.sub(text, values) : text);
+  t("ssSpace", __WEBUI_TEXT__("diagnostic.shot_storage_space_value"), [
+    size(s.liveBytes),
+    size(s.poolBytes),
+  ]);
+  t("ssShots", __WEBUI_TEXT__("diagnostic.shot_storage_shots_value"), [s.good, s.bad]);
+  t(
+    "ssSince",
+    s.sinceLocalSec
+      ? R.formatHumanTime(s.sinceLocalSec)
+      : s.sinceShotId
+        ? "#" + s.sinceShotId
+        : none,
+  );
+  // The history keeps at most shotCapacity shots, however many would fit.
+  const fit = s.meanRecordBytes && Math.floor(s.poolBytes / s.meanRecordBytes);
+  t(
+    "ssRoom",
+    !fit
+      ? "—"
+      : fit < s.shotCapacity
+        ? __WEBUI_TEXT__("diagnostic.shot_storage_room_value")
+        : __WEBUI_TEXT__("diagnostic.shot_storage_room_all"),
+    fit && [size(s.meanRecordBytes), Math.min(fit, s.shotCapacity)],
+  );
+  t("ssTraces", __WEBUI_TEXT__("diagnostic.shot_storage_traces_value"), [s.traces, s.truncated]);
+  t("ssOther", __WEBUI_TEXT__("diagnostic.shot_storage_other_value"), [s.traceOnly, s.interrupted]);
+  t("ssReclaimable", size(s.reclaimableBytes));
+  t(
+    "ssOverhead",
+    s.droppedRecords
+      ? __WEBUI_TEXT__("diagnostic.shot_storage_overhead_value")
+      : size(s.unindexedBytes),
+    s.droppedRecords && [size(s.unindexedBytes), s.droppedRecords],
+  );
+  t("ssUnused", size(s.unusedBytes));
+  t(
+    "ssWaiting",
+    s.pendingCurves || s.pendingTraces
+      ? __WEBUI_TEXT__("diagnostic.shot_storage_waiting_value")
+      : none,
+    (s.pendingCurves || s.pendingTraces) && [s.pendingCurves, s.pendingTraces],
+  );
+  t("ssNotSaved", s.tracesDropped ? String(s.tracesDropped) : none);
+  t("ssError", s.lastError === "none" ? none : s.lastError);
+  $("ssInterruptedRow").hidden = !s.interruptedBoots.length;
+  $("ssInterrupted").replaceChildren(
+    ...s.interruptedBoots.map((boot) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "inlineAction";
+      b.textContent = R.sub(__WEBUI_TEXT__("diagnostic.shot_storage_boot"), [boot]);
+      b.onclick = () => downloadInterruptedTrace(boot);
+      return b;
+    }),
+  );
+}
+// An interrupted trace has no shot: it is reached by the boot that crashed.
+function downloadInterruptedTrace(boot) {
+  R.fetchShotTrace({ id: 0, bootId: boot, endedAtMs: 0 }).then(
+    (data) =>
+      data
+        ? saveFile(new Blob([data]), `shot-trace-boot-${boot}.bin`)
+        : R.message(__WEBUI_TEXT__("stats.trace_none")),
+    (e) =>
+      R.message(
+        R.formatCommandError(__WEBUI_TEXT__("diagnostic.shot_storage_download_failed"), e),
+        "error",
+      ),
+  );
+}
 async function downloadText(load, name, failMsg) {
   R.message(__WEBUI_TEXT__("diagnostic.downloading"));
   try {
@@ -1198,7 +1259,7 @@ async function exportAudit() {
   if (auditBusy || !auditItems.length) return;
   auditBusy = true;
   await downloadText(
-    apiBinary("/api/v1/diagnostic/audit"),
+    R.apiBinary("/api/v1/diagnostic/audit"),
     "audit.txt",
     __WEBUI_TEXT__("diagnostic.audit_export_failed"),
   );
@@ -1505,6 +1566,7 @@ export function init() {
     );
   $("scaleProfileDownloadButton").onclick = () => downloadScaleProfile();
   $("heapMapDownload").onclick = () => (downloadHeapMap(), false);
+  $("shotStorage").addEventListener("toggle", loadShotStorage);
   for (const [id, path] of [
     ["loopMax", "loop-max"],
     ["scaleGapMax", "scale-gap-max"],
@@ -1614,7 +1676,7 @@ async function downloadScaleProfile() {
   if (profileBusy) return;
   profileBusy = true;
   await downloadText(
-    apiBinary("/api/v1/diagnostic/scale-profile/download"),
+    R.apiBinary("/api/v1/diagnostic/scale-profile/download"),
     "scale-profile.txt",
     __WEBUI_TEXT__("diagnostic.profile_download_failed"),
   );
@@ -1678,7 +1740,7 @@ async function downloadCrashes() {
   R.message(__WEBUI_TEXT__("diagnostic.downloading"));
   try {
     let last = 0;
-    const tar = await apiBinary("/api/v1/diagnostic/crashes", (bytes) => {
+    const tar = await R.apiBinary("/api/v1/diagnostic/crashes", (bytes) => {
         if (bytes - last >= 65536) {
           last = bytes;
           R.message(

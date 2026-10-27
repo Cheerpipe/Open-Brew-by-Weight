@@ -231,6 +231,11 @@ struct NetworkBridgeCallbacks {
   ShotCurveRead (*copyShotCurveById)(uint32_t shotId, ShotCurveRecord &curve,
                                      bool readFlash) = nullptr;
   bool (*copyHomeShot)(ShotLogRecord &record, ShotCurveRecord *curve) = nullptr;
+  ShotTraceRead (*streamShotTrace)(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs,
+                                   uint32_t knownCrc, uint8_t *chunk, size_t capacity,
+                                   ShotTraceSink sink, void *context) = nullptr;
+  ShotTraceRead (*copyShotStorage)(ShotStorageStats &out, uint32_t *tags, size_t capacity) =
+      nullptr;
   bool (*shotLogSavePending)() = nullptr;
   void (*copyHistoryPage)(HistoryPage &page, size_t offset, size_t limit,
                           ShotLogSortDir dir, uint8_t types) = nullptr;
@@ -808,6 +813,8 @@ class OpenBrewByWeightNetwork {
   static esp_err_t scaleProfileHandler(httpd_req_t *request);
   static esp_err_t scaleProfileDownloadHandler(httpd_req_t *request);
   static esp_err_t shotTraceDownloadHandler(httpd_req_t *request);
+  static esp_err_t shotTraceVocabularyHandler(httpd_req_t *request);
+  static esp_err_t shotStorageHandler(httpd_req_t *request);
   static esp_err_t scaleTareHandler(httpd_req_t *request);
   // OTA routes authenticate with the device password instead of the
   // exclusive WebUI claim, so the command line client works without stealing

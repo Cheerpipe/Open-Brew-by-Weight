@@ -287,6 +287,25 @@ connection drops, the interface reconnects and reloads current readings.
 In **NVS**, unavailable entry and namespace measurements appear as a dash,
 so a failed measurement is not mistaken for an empty store.
 
+**Diagnostic → Shot storage** shows how the space for shot curves and traces
+is used. It is read when you open the section, and not while a shot is
+brewing or waiting for its last drips; if the controller is busy for
+another reason, try again in a moment. **Used by shots** is the space your stored shots take out of the
+total, split into good and bad shots under **Shots stored**; **Oldest stored
+shot** is how far back their curves and traces go. **Average shot** is the
+typical size of one shot and roughly how many fit, never more than the 1,000
+shots the history keeps. **Traces** counts the
+stored traces and how many had events left out. **Traces without a shot** are
+traces of shots the history did not keep and of shots interrupted by a
+restart; each interrupted one is listed by its startup number under
+**Interrupted traces**, where you can download it. **Deleted shots, freed when
+recycled**, **Overhead** and **Never used** account for the rest of the
+space: deleted shots' records stay until the oldest space is reused.
+**Waiting to be saved** is a curve or trace saved right after its shot, and
+**Traces not saved since restart** counts traces replaced by a newer shot
+before they could be saved. **Last error** names the last storage failure, if
+any.
+
 **Diagnostic → Scale → Profiling** records what the scale actually sent and
 what the firmware decided about it. Press **Start** before reproducing a
 problem — for example a wrong tare or an unexpected cup event — and **Stop**

@@ -10,10 +10,10 @@ weight stream was.
 The trace is captured in PSRAM that survives panics, watchdog and software
 resets, and each completed trace is then saved to the [flash pool](#flash-pool)
 once the shot is over, in the same record as the shot's curve
-([saving](#saving-completed-traces), [curves](#curves-in-the-pool)). The newest
-completed trace downloads from RAM through
-[`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace);
-a per-shot download from the pool and a Web UI view are planned.
+([saving](#saving-completed-traces), [curves](#curves-in-the-pool)).
+[`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace)
+downloads the newest completed trace from RAM, or any stored shot's trace
+from the pool; the Web UI [decodes and shows it](#decoding-and-the-web-ui).
 
 ## Capture window
 
@@ -24,9 +24,10 @@ a per-shot download from the pool and a Web UI view are planned.
 | Rinse classification, abandoned (unconfirmed) start, refused machine start | Discards the capture and leaves a `TRACE_DISCARDED` entry in the pre-shot ring, so the next trace shows it. |
 | Drip finalize, or drip analysis cancelled (new cycle, rinse, New coffee, cup lifted, backflush) | Completes the trace with the stored summary's id (0 if the shot log refused it). |
 
-Cycles without a scale never open a capture. While a capture is open the
-download answers `409`; nothing is exported during a shot. RAM keeps only the
-newest completed trace; the flash pool keeps the history.
+Cycles without a scale never open a capture. While a capture is open every
+trace download and the Shot storage statistics answer `409`; nothing is
+exported during a shot. RAM keeps only the newest completed trace; the flash
+pool keeps the history.
 
 ## Interrupted traces
 
@@ -520,8 +521,71 @@ its record reclaimable), unindexed space (records dropped from a full index,
 sector headers, torn data and the head sector's unwritten tail) and unused
 sectors. They also report the indexed record count and mean size, how many
 records the full index dropped since the last recovery or clear, and the last
-error. They read RAM only and may be taken under the shot store lock; the
-oldest reachable record's boot and end time ("history since") is a separate
-flash read (`oldest()`) made without that lock, as are `open()` and
-`contains()`.
+error. They read RAM only and may be taken under the shot store lock; a
+record's header (`headerAt(n)`, the n-th oldest entry, its CRC unchecked) is a
+flash read made without that lock, as are `open()` and `contains()`.
+
+### Shot storage statistics
+
+`GET /api/v1/diagnostic/shot-storage` (the Diagnostic **Shot storage**
+section, read on demand, never during a shot) takes them in two steps:
+
+1. Under `shotStoreMutex`, one walk of the summaries writes their index
+   tags into the route's 4 KiB static PSRAM download chunk, the good ones
+   from the front and the bad ones from the back (no memory of their own).
+   The lock is released; each part is heap-sorted (no recursion) and one
+   statistics pass runs with a live predicate that binary-searches both
+   parts (2,048 lookups of at most 10 comparisons each instead of a scan of
+   1,000 summaries per entry), counting good and bad shots. A record of shot
+   0 (a trace without a summary) is live too. A second short hold finds the
+   summary of the first live entry, the oldest stored shot ("history
+   since"). Control takes `shotStoreMutex` blocking when a shot starts, so
+   the holds stay at one walk each.
+2. Without any store lock: for each indexed record, newest first, its header
+   (a deleted or evicted shot's record, found absent from the sorted tags, is
+   skipped) and the trace's `flags` byte (about four small reads) count the
+   traces, the truncated ones, the traces of refused shots and the
+   interrupted ones, whose boots (newest four) the section offers for
+   download. The walk yields every 64 records and stops with `409` if the
+   write gate closes. A record appended or recycled meanwhile can shift a
+   count by one; the figures are diagnostic, not accounting.
+
+A tag collision (24-bit shot id plus an 8-bit boot and end-time tag) can only
+count a record live that is not; it never affects reads.
+
+## Decoding and the Web UI
+
+The Web UI decodes a trace once, in `decodeShotTrace` (`src/web/js/stats.js`),
+for both the trace view and the **JSON + diagnostics** export, so both show
+the same fields: the header (identity, firmware, end reason, flags), the start
+snapshot and end counters by name, the pre-shot entries and the events in
+record order with each continuation merged into `ext` as
+`[head bits 0-15, a, b]`. `a` and `b` stay raw; their meaning per kind is the
+[event table](#event-records). Section sizes come from the header, and a
+record whose magic, format version, length or sections do not add up is
+refused. Its output is the export schema's
+[`trace`](schemas/README.md#shot-export-v1).
+
+Names come from `GET /api/v1/diagnostic/shot-trace/vocabulary`: the firmware's
+`ScaleProfileEvent`, `DebugCode`, `ScaleProfileSignal` and end-reason names
+and the yield sources by number, with `SHOT_TRACE_VOCABULARY_VERSION`; each
+list holds exactly `SCALE_PROFILE_EVENT_COUNT`, `DEBUG_CODE_COUNT`,
+`ScaleProfileSignal::COUNT`, `END_REASON_COUNT` and
+`ACTUAL_WEIGHT_SOURCE_COUNT` names, and the route's host test fails when a
+number past a count has a name. A trace written under another vocabulary
+version gets generic names (`profile_21`, `debug_7`), no signal names and no
+end-reason or source names; the trace-only kinds (`0xE0`–`0xE6`) are named
+by the Web UI, which also formats their arguments (the slow-window flags,
+the over-line confirmations, the yield source, a discarded trace's age).
+Bump the vocabulary version whenever a number changes meaning.
+
+The view (**⋯ → View trace** on a shot card) fetches the record by the
+shot's identity, retrying a record that is still being saved, and shows the
+shot's curve with one mark per event shown (decisions in the accent color),
+the events sorted by time with a type filter and a text search that narrow
+both, then the pre-shot entries, the start snapshot and the end counters.
+The list carries all the information; the chart is decorative. **Download**
+saves the raw record. `src/tests/fixtures/shot_trace_v1_hex.txt` is a real
+export the host case TRC25 checks with the firmware layout and the Web UI
+contract decodes, so both decoders read the same bytes.
 

@@ -4,23 +4,49 @@
   "title": "Open Brew by Weight shot export, version 1",
   "description": "Shots exported from the Open Brew by Weight Web UI, either the whole log or a single shot. Units are in the key names: G grams, S seconds, GS grams per second, C degrees Celsius, Ms milliseconds. Unknown values are null. Readers must ignore properties they do not know: new optional properties keep version 1, while removals, renames, or changes of meaning use a new version and schema file.",
   "type": "object",
-  "required": ["format", "version", "exportedAt", "source", "shots"],
+  "required": [
+    "format",
+    "version",
+    "exportedAt",
+    "source",
+    "shots"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "format": { "const": "openbrewbyweight.shots" },
-    "version": { "const": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "format": {
+      "const": "openbrewbyweight.shots"
+    },
+    "version": {
+      "const": 1
+    },
     "exportedAt": {
       "type": "string",
       "description": "When the file was made, ISO 8601 in UTC."
     },
     "source": {
       "type": "object",
-      "required": ["app", "firmwareVersion", "host"],
+      "required": [
+        "app",
+        "firmwareVersion",
+        "host"
+      ],
       "properties": {
-        "app": { "const": "openbrewbyweight" },
-        "firmwareVersion": { "type": ["string", "null"] },
+        "app": {
+          "const": "openbrewbyweight"
+        },
+        "firmwareVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "host": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Host name or address the Web UI was opened from."
         }
       }
@@ -28,7 +54,9 @@
     "shots": {
       "type": "array",
       "description": "Newest first; a single-shot export holds exactly one.",
-      "items": { "$ref": "#/$defs/shot" }
+      "items": {
+        "$ref": "#/$defs/shot"
+      }
     }
   },
   "$defs": {
@@ -62,19 +90,33 @@
         },
         "time": {
           "type": "object",
-          "required": ["startedAt", "endedAt", "utcOffsetMinutes", "endedAtUptimeMs"],
+          "required": [
+            "startedAt",
+            "endedAt",
+            "utcOffsetMinutes",
+            "endedAtUptimeMs"
+          ],
           "description": "Wall-clock times are null when the controller did not know the time yet.",
           "properties": {
             "startedAt": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "description": "ISO 8601 with the offset in force then."
             },
             "endedAt": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "description": "ISO 8601 with the offset in force then."
             },
             "utcOffsetMinutes": {
-              "type": ["integer", "null"],
+              "type": [
+                "integer",
+                "null"
+              ],
               "description": "Minutes east of UTC."
             },
             "endedAtUptimeMs": {
@@ -85,36 +127,78 @@
           }
         },
         "type": {
-          "enum": ["auto", "manual", "timer_only", "unknown"],
+          "enum": [
+            "auto",
+            "manual",
+            "timer_only",
+            "unknown"
+          ],
           "description": "auto: stopped by weight; manual: stopped by hand or without a scale; timer_only: timed without weight control."
         },
         "rating": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 1,
           "description": "Stars from 1 to 5; null when not rated."
         },
         "preset": {
           "type": "object",
-          "required": ["id", "name"],
+          "required": [
+            "id",
+            "name"
+          ],
           "properties": {
-            "id": { "type": "integer", "minimum": 0 },
-            "name": { "type": ["string", "null"] }
+            "id": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         },
         "scale": {
-          "type": ["object", "null"],
-          "required": ["name"],
-          "properties": { "name": { "type": "string" } }
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
         },
         "recipe": {
           "type": "object",
-          "required": ["targetYieldG", "doseG", "targetTemperatureC"],
+          "required": [
+            "targetYieldG",
+            "doseG",
+            "targetTemperatureC"
+          ],
           "description": "The preset as it was when the shot ran.",
           "properties": {
-            "targetYieldG": { "type": "number" },
-            "doseG": { "type": ["number", "null"] },
+            "targetYieldG": {
+              "type": "number"
+            },
+            "doseG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "targetTemperatureC": {
-              "type": ["number", "null"],
+              "type": [
+                "number",
+                "null"
+              ],
               "description": "The machine's coffee temperature target, when it reports one."
             }
           }
@@ -135,39 +219,108 @@
             "channeling"
           ],
           "properties": {
-            "durationS": { "type": "number", "minimum": 0 },
-            "yieldG": { "type": ["number", "null"], "description": "Weighed yield in the cup." },
+            "durationS": {
+              "type": "number",
+              "minimum": 0
+            },
+            "yieldG": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Weighed yield in the cup."
+            },
             "yieldSource": {
-              "enum": ["post_drip", "last_known", "none", "unknown", null],
+              "enum": [
+                "post_drip",
+                "last_known",
+                "none",
+                "unknown",
+                null
+              ],
               "description": "post_drip: settled after the drip delay; last_known: last reading before the scale went away."
             },
             "estimatedYieldG": {
-              "type": ["number", "null"],
+              "type": [
+                "number",
+                "null"
+              ],
               "description": "Estimate when the scale was lost during the shot."
             },
-            "ratio": { "type": ["number", "null"], "description": "Yield divided by dose." },
-            "averageFlowGS": { "type": ["number", "null"] },
-            "firstDropS": { "type": ["number", "null"] },
+            "ratio": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Yield divided by dose."
+            },
+            "averageFlowGS": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "firstDropS": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "tareS": {
-              "type": ["number", "null"],
+              "type": [
+                "number",
+                "null"
+              ],
               "description": "When a late tare happened, if any."
             },
             "arrivalS": {
-              "type": ["number", "null"],
+              "type": [
+                "number",
+                "null"
+              ],
               "description": "When the shot reached, or would have reached, its target."
             },
             "verdict": {
-              "enum": ["on_recipe", "fast", "slow", null],
+              "enum": [
+                "on_recipe",
+                "fast",
+                "slow",
+                null
+              ],
               "description": "Against the preset's shot time window."
             },
-            "channeling": { "type": "boolean" }
+            "channeling": {
+              "type": "boolean"
+            },
+            "badReason": {
+              "enum": [
+                "short",
+                "no_yield",
+                "low_yield",
+                null
+              ],
+              "description": "Why the shot is bad: 12 s or shorter, no yield, or a yield of 2 g or less. null for a good shot; only good shots feed statistics and the full-log export."
+            }
           }
         },
         "stop": {
           "type": "object",
-          "required": ["cut", "reason", "cutLineG", "scaleLossSource", "blind"],
+          "required": [
+            "cut",
+            "reason",
+            "cutLineG",
+            "scaleLossSource",
+            "blind"
+          ],
           "properties": {
-            "cut": { "enum": ["auto", "manual", "limit", "unknown"] },
+            "cut": {
+              "enum": [
+                "auto",
+                "manual",
+                "limit",
+                "unknown"
+              ]
+            },
             "reason": {
               "enum": [
                 "normal_target",
@@ -191,11 +344,20 @@
               ]
             },
             "cutLineG": {
-              "type": ["number", "null"],
+              "type": [
+                "number",
+                "null"
+              ],
               "description": "Planned stop weight when the stop was commanded."
             },
             "scaleLossSource": {
-              "enum": ["projection", "history", "window", "fixed", null],
+              "enum": [
+                "projection",
+                "history",
+                "window",
+                "fixed",
+                null
+              ],
               "description": "How the stop time was chosen after the scale was lost."
             },
             "blind": {
@@ -212,7 +374,12 @@
             "fastGuard",
             "slowGuard",
             "cutDelayS",
-            "cutRampS",
+            "fastRampS",
+            "slowRampS",
+            "fastCurve",
+            "slowCurve",
+            "fastCurveHardness",
+            "slowCurveHardness",
             "maxTimeS",
             "dripDelayS"
           ],
@@ -220,12 +387,38 @@
           "properties": {
             "brewByWeight": {
               "type": "object",
-              "required": ["algorithm", "algorithmVersion", "alpha", "learningApplied", "offsetG"],
+              "required": [
+                "algorithm",
+                "algorithmVersion",
+                "alpha",
+                "learningApplied",
+                "offsetG"
+              ],
               "properties": {
-                "algorithm": { "type": ["string", "null"] },
-                "algorithmVersion": { "type": ["integer", "null"] },
-                "alpha": { "type": ["number", "null"] },
-                "learningApplied": { "type": ["boolean", "null"] },
+                "algorithm": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "algorithmVersion": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "alpha": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "learningApplied": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
                 "offsetG": {
                   "type": "number",
                   "description": "Stop-early offset used for this shot."
@@ -234,18 +427,57 @@
             },
             "window": {
               "type": "object",
-              "required": ["fastBeforeS", "slowAfterS"],
+              "required": [
+                "fastBeforeS",
+                "slowAfterS"
+              ],
               "properties": {
-                "fastBeforeS": { "type": "number" },
-                "slowAfterS": { "type": "number" }
+                "fastBeforeS": {
+                  "type": "number"
+                },
+                "slowAfterS": {
+                  "type": "number"
+                }
               }
             },
-            "fastGuard": { "$ref": "#/$defs/guard" },
-            "slowGuard": { "$ref": "#/$defs/guard" },
-            "cutDelayS": { "type": "number" },
-            "cutRampS": { "type": "number" },
-            "maxTimeS": { "type": "number" },
-            "dripDelayS": { "type": ["number", "null"] }
+            "fastGuard": {
+              "$ref": "#/$defs/guard"
+            },
+            "slowGuard": {
+              "$ref": "#/$defs/guard"
+            },
+            "cutDelayS": {
+              "type": "number"
+            },
+            "fastRampS": {
+              "type": "number",
+              "description": "Fast transition length into the window start (s); 0 is a step."
+            },
+            "slowRampS": {
+              "type": "number",
+              "description": "Slow transition length after the window end (s); 0 is a step."
+            },
+            "fastCurve": {
+              "$ref": "#/$defs/transitionCurve"
+            },
+            "slowCurve": {
+              "$ref": "#/$defs/transitionCurve"
+            },
+            "fastCurveHardness": {
+              "$ref": "#/$defs/transitionHardness"
+            },
+            "slowCurveHardness": {
+              "$ref": "#/$defs/transitionHardness"
+            },
+            "maxTimeS": {
+              "type": "number"
+            },
+            "dripDelayS": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
           }
         },
         "curve": {
@@ -264,30 +496,64 @@
               "type": "boolean",
               "description": "The curve hit its sample limit before the shot ended."
             },
-            "timeS": { "type": "array", "items": { "type": "number" } },
-            "weightG": { "type": "array", "items": { "type": "number" } },
+            "timeS": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "weightG": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
             "heldIndices": {
               "type": "array",
-              "items": { "type": "integer", "minimum": 0 },
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              },
               "description": "Readings taken while something pressed on the cup; not coffee."
             },
             "gapBeforeIndices": {
               "type": "array",
-              "items": { "type": "integer", "minimum": 0 },
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              },
               "description": "Readings that follow a gap in the data; do not join them to the one before."
             },
             "events": {
               "type": "object",
-              "required": ["firstDrop", "extended", "scaleLoss", "scaleLossClearedS", "end"],
+              "required": [
+                "firstDrop",
+                "extended",
+                "scaleLoss",
+                "scaleLossClearedS",
+                "end"
+              ],
               "properties": {
-                "firstDrop": { "$ref": "#/$defs/event" },
+                "firstDrop": {
+                  "$ref": "#/$defs/event"
+                },
                 "extended": {
                   "$ref": "#/$defs/event",
                   "description": "A fast or slow guard moved the stop away from the target."
                 },
-                "scaleLoss": { "$ref": "#/$defs/event" },
-                "scaleLossClearedS": { "type": ["number", "null"] },
-                "end": { "$ref": "#/$defs/event", "description": "The stop command." }
+                "scaleLoss": {
+                  "$ref": "#/$defs/event"
+                },
+                "scaleLossClearedS": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "end": {
+                  "$ref": "#/$defs/event",
+                  "description": "The stop command."
+                }
               }
             }
           }
@@ -307,44 +573,672 @@
           "properties": {
             "flowGS": {
               "type": "array",
-              "items": { "type": ["number", "null"] },
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
               "description": "Flow at each curve reading, same length as curve.weightG; null where none is defined."
             },
-            "maxFlowGS": { "type": ["number", "null"] },
-            "errorVsTargetG": { "type": ["number", "null"] },
-            "errorVsTargetPct": { "type": ["number", "null"] },
-            "errorVsPlannedStopPct": { "type": ["number", "null"] },
+            "maxFlowGS": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "errorVsTargetG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "errorVsTargetPct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "errorVsPlannedStopPct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "cut": {
-              "type": ["object", "null"],
-              "required": ["atS", "weightG"],
+              "type": [
+                "object",
+                "null"
+              ],
+              "required": [
+                "atS",
+                "weightG"
+              ],
               "properties": {
-                "atS": { "type": "number" },
-                "weightG": { "type": "number" }
+                "atS": {
+                  "type": "number"
+                },
+                "weightG": {
+                  "type": "number"
+                }
               }
             },
-            "dripG": { "type": ["number", "null"], "description": "Yield after the stop." }
+            "dripG": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Yield after the stop."
+            }
           }
+        },
+        "trace": {
+          "$ref": "#/$defs/trace"
+        },
+        "traceUnavailable": {
+          "type": "boolean",
+          "description": "True when the shot may have a trace that could not be read for this file (the controller was busy or a read failed); absent otherwise."
         }
       }
     },
     "guard": {
       "type": "object",
-      "required": ["enabled", "marginG", "extended"],
+      "required": [
+        "enabled",
+        "marginG",
+        "extended"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "marginG": { "type": "number" },
+        "enabled": {
+          "type": "boolean"
+        },
+        "marginG": {
+          "type": "number"
+        },
         "extended": {
           "type": "boolean",
           "description": "This guard moved the stop during the shot."
         }
       }
     },
+    "transitionCurve": {
+      "enum": [
+        "early",
+        "even",
+        "late"
+      ],
+      "description": "Where the transition is steepest; every curve eases in and out."
+    },
+    "transitionHardness": {
+      "enum": [
+        "soft",
+        "medium",
+        "hard"
+      ],
+      "description": "How marked the transition curve is."
+    },
     "event": {
-      "type": ["object", "null"],
-      "required": ["atS", "weightG"],
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "atS",
+        "weightG"
+      ],
       "properties": {
-        "atS": { "type": "number" },
-        "weightG": { "type": "number" }
+        "atS": {
+          "type": "number"
+        },
+        "weightG": {
+          "type": "number"
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "description": "The controller's decision record of the shot, decoded from its binary trace (docs/SHOT_TRACE.md in the firmware repository). Present in the JSON + diagnostics export and a card's JSON when the shot has a stored trace.",
+      "required": [
+        "formatVersion",
+        "vocabularyVersion",
+        "firmware",
+        "shotId",
+        "bootId",
+        "anchorMs",
+        "endedAtMs",
+        "endReasonCode",
+        "endReason",
+        "flags",
+        "snapshot",
+        "counters",
+        "preShot",
+        "events"
+      ],
+      "properties": {
+        "formatVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Binary trace format."
+        },
+        "vocabularyVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Version of the names of kinds, codes and signals; names are generic when it is not the exporting firmware's."
+        },
+        "firmware": {
+          "type": "string",
+          "description": "Firmware that captured the shot, truncated to 23 characters."
+        },
+        "shotId": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Summary id; 0 when the shot log did not store the shot."
+        },
+        "bootId": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Boot of the shot, or the boot that crashed for an interrupted trace."
+        },
+        "anchorMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Uptime at cycle start; event times count from it."
+        },
+        "endedAtMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Uptime at the shot end; 0 when interrupted."
+        },
+        "endReasonCode": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Raw EndReason."
+        },
+        "endReason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "End reason name; null when interrupted or unknown."
+        },
+        "flags": {
+          "type": "object",
+          "required": [
+            "verboseTruncated",
+            "decisionsTruncated",
+            "interrupted",
+            "tailDropped"
+          ],
+          "properties": {
+            "verboseTruncated": {
+              "type": "boolean"
+            },
+            "decisionsTruncated": {
+              "type": "boolean"
+            },
+            "interrupted": {
+              "type": "boolean"
+            },
+            "tailDropped": {
+              "type": "boolean"
+            }
+          }
+        },
+        "snapshot": {
+          "type": "object",
+          "description": "Settings and state at the start that the shot summary lacks.",
+          "required": [
+            "freeHeapBytes",
+            "freePsramBytes",
+            "postTareGraceMs",
+            "retareWindowMs",
+            "stabilityDurationMs",
+            "stabilityGapMs",
+            "stabilitySamples",
+            "minimumCupG",
+            "cupRemovedG",
+            "stabilityToleranceG",
+            "emptyReferenceG",
+            "occupiedReferenceG",
+            "preTareWeightG",
+            "paddleMode",
+            "noScaleBbwMode",
+            "idleEligibility",
+            "idleLastReason",
+            "wifiRssi",
+            "scaleName",
+            "scaleProtocol",
+            "flags"
+          ],
+          "properties": {
+            "freeHeapBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "freePsramBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "postTareGraceMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "retareWindowMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stabilityDurationMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stabilityGapMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stabilitySamples": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minimumCupG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "cupRemovedG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "stabilityToleranceG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "emptyReferenceG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "occupiedReferenceG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "preTareWeightG": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "paddleMode": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Raw setting, accessory bits included."
+            },
+            "noScaleBbwMode": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "idleEligibility": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "IdleTareReason value."
+            },
+            "idleLastReason": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "IdleTareReason value."
+            },
+            "wifiRssi": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "dBm; null when not measured."
+            },
+            "scaleName": {
+              "type": "string"
+            },
+            "scaleProtocol": {
+              "type": "string"
+            },
+            "flags": {
+              "type": "object",
+              "required": [
+                "autoTare",
+                "autoRetare",
+                "idleTare",
+                "accessoryRetare",
+                "touchAvoidance",
+                "requireCup",
+                "stopIfRemoved",
+                "cupProtection",
+                "cupPresent",
+                "cupTared",
+                "emptyPanQualified",
+                "idleTareEligible",
+                "scaleSupportsTare",
+                "lineaMicraConnected"
+              ],
+              "properties": {
+                "autoTare": {
+                  "type": "boolean"
+                },
+                "autoRetare": {
+                  "type": "boolean"
+                },
+                "idleTare": {
+                  "type": "boolean"
+                },
+                "accessoryRetare": {
+                  "type": "boolean"
+                },
+                "touchAvoidance": {
+                  "type": "boolean"
+                },
+                "requireCup": {
+                  "type": "boolean"
+                },
+                "stopIfRemoved": {
+                  "type": "boolean"
+                },
+                "cupProtection": {
+                  "type": "boolean"
+                },
+                "cupPresent": {
+                  "type": "boolean"
+                },
+                "cupTared": {
+                  "type": "boolean"
+                },
+                "emptyPanQualified": {
+                  "type": "boolean"
+                },
+                "idleTareEligible": {
+                  "type": "boolean"
+                },
+                "scaleSupportsTare": {
+                  "type": "boolean"
+                },
+                "lineaMicraConnected": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "counters": {
+          "type": "object",
+          "description": "Exact even when events were left out; null when not measured.",
+          "required": [
+            "readingsReceived",
+            "readingsAccepted",
+            "readingsHeld",
+            "rejectedInvalid",
+            "rejectedRange",
+            "rejectedSlew",
+            "rejectedRecovery",
+            "rejectedPreCycle",
+            "rejectedOther",
+            "readingGapMinMs",
+            "readingGapMeanMs",
+            "readingGapMaxMs",
+            "packetGaps",
+            "staleFrames",
+            "undecodableFrames",
+            "confirmationResets",
+            "loopGapMaxMs",
+            "micraRxBytes",
+            "uiStreamDeferrals",
+            "verboseDropped",
+            "decisionsDropped"
+          ],
+          "properties": {
+            "readingsReceived": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "readingsAccepted": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "readingsHeld": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rejectedInvalid": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rejectedRange": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rejectedSlew": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rejectedRecovery": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rejectedPreCycle": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rejectedOther": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "readingGapMinMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "readingGapMeanMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "readingGapMaxMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "packetGaps": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "staleFrames": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "undecodableFrames": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "confirmationResets": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "loopGapMaxMs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "micraRxBytes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "uiStreamDeferrals": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "verboseDropped": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "decisionsDropped": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "preShot": {
+          "type": "array",
+          "description": "The latest occurrence of each kind before the shot.",
+          "items": {
+            "$ref": "#/$defs/traceEvent"
+          }
+        },
+        "events": {
+          "type": "array",
+          "description": "In record order; times are not monotonic, so sort by atMs to present them.",
+          "items": {
+            "$ref": "#/$defs/traceEvent"
+          }
+        }
+      }
+    },
+    "traceEvent": {
+      "type": "object",
+      "description": "One record: a and b as stored (their meaning per kind is in docs/SHOT_TRACE.md), a continuation merged into ext.",
+      "required": [
+        "type",
+        "code",
+        "name",
+        "a",
+        "b"
+      ],
+      "properties": {
+        "atMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Event: ms after the anchor."
+        },
+        "beforeMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Pre-shot entry: ms before the anchor."
+        },
+        "type": {
+          "enum": [
+            "profile",
+            "debug",
+            "trace"
+          ],
+          "description": "Scale profile event, firmware debug code, or trace-only kind."
+        },
+        "code": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Kind or debug code number."
+        },
+        "name": {
+          "type": "string",
+          "description": "Vocabulary name, or type_code when unknown."
+        },
+        "a": {
+          "type": "integer"
+        },
+        "b": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ext": {
+          "type": "array",
+          "description": "Continuation: head bits 0-15, a, b.",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "signal": {
+          "type": "string",
+          "description": "STATE_CHANGED: the signal name."
+        },
+        "initial": {
+          "type": "boolean",
+          "description": "STATE_CHANGED: first observation in the window."
+        },
+        "arg1": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Pre-shot entry: full first argument."
+        },
+        "arg2": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Pre-shot entry: second argument."
+        },
+        "repeats": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Pre-shot entry: earlier occurrences folded into it."
+        }
       }
     }
   }
