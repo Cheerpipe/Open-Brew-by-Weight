@@ -56,7 +56,11 @@ export function applyStatus(s) {
   setRowValue(
     "cupRow",
     $("cupWeight").textContent,
-    s.scale?.available ? "" : __WEBUI_TEXT__("home.needs_scale"),
+    !s.scale?.available
+      ? __WEBUI_TEXT__("home.needs_scale")
+      : R.cupNeedsRetare(s)
+        ? __WEBUI_TEXT__("home.cup_not_tared")
+        : "",
   );
   const brewing = ["BREW", "RINSE", "MANUAL_NO_SCALE"].includes(s.state);
   if (quickWeight && brewing) quickWeight.close();

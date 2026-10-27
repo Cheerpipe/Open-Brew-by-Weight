@@ -568,6 +568,7 @@
     "home.brew": "Brew",
     "home.brew_temperature": "Brew temperature",
     "home.cup": "Cup",
+    "home.cup_not_tared": "Not tared: lift it and set it back",
     "home.decrease_target": "Decrease target",
     "home.dismiss": "Dismiss",
     "home.dose_in": "%1 g in",

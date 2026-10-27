@@ -1541,6 +1541,13 @@ function formatIdleTare(s) {
     }[t] || __WEBUI_TEXT__("runtime.idle_tare_unavailable")
   );
 }
+// A present cup the idle tare left untared: lifting and replacing it tares it.
+function cupNeedsRetare(s) {
+  const t = s.cupPresence?.idleTare;
+  return (
+    !!s.scale?.available && s.scale.streamState === "FRESH" && (t === "remove" || t === "retry")
+  );
+}
 function formatScaleTimer(s) {
   if (!s.scale || typeof s.scale.timerMs !== "number") return "—";
   const totalTenths = Math.floor(Math.max(0, s.scale.timerMs) / 100);
@@ -2737,7 +2744,8 @@ function updateStateTone(s) {
   const cr = $("cupRow");
   if (cr) {
     // Mirrors cupStartGuardWouldBlock(): red only when the firmware refuses
-    // the shot, amber when a shot can start without a confirmed cup.
+    // the shot, amber when a shot can start without a confirmed cup or the
+    // cup on the scale was not zeroed.
     const cp = s.cupPresence || {},
       k = s.config || {},
       scale = !!(s.scale && s.scale.available),
@@ -2749,7 +2757,7 @@ function updateStateTone(s) {
         !!k.requireCupToStart &&
         k.brewByWeight !== false;
     cr.classList.toggle("lampBad", blocks);
-    cr.classList.toggle("lampWarn", !present && !blocks);
+    cr.classList.toggle("lampWarn", (!present && !blocks) || cupNeedsRetare(s));
   }
 }
 function updateNetworkPasswordState() {
@@ -5994,6 +6002,7 @@ export {
   initHeaderSignals,
   homeStatusCache,
   shotRecorded,
+  cupNeedsRetare,
   formatMicraCleaning,
   $,
   webUiOwner,

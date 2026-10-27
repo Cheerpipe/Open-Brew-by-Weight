@@ -29,7 +29,10 @@ shot can start. A green check means a cup is on the scale, and its weight shows
 on the right. An amber exclamation mark means no cup is detected, or the scale
 is off and the row reminds you it **Needs the scale**, but a shot can still
 start, so check before brewing. A red cross means **Require cup to start** will
-block the shot, and the row reads **Absent - cup required**.
+block the shot, and the row reads **Absent - cup required**. An amber mark
+with **Not tared: lift it and set it back** means a cup is on the scale but
+was not tared automatically; lift it and set it back before brewing (see
+[tare outside a brew](../settings/tare.md#outside-a-brew)).
 
 On Linea Micra, a recognized standby wake gesture is not a brew attempt, so
 **Require cup to start** does not block it or emit a missing-cup alert. See

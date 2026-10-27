@@ -63,6 +63,11 @@ reference. Once that reference is known, a
 [qualified brief unload](cup.md#fast-replacement-outside-a-shot) followed by stable
 placement also works without another stable-empty pause.
 Either placement path triggers another tare, even if the cup contains coffee.
+If the controller sees a cup on the scale that it could not tare (for example,
+the scale was switched on with the cup already on it, or the machine was still
+on when you placed it), Home marks the cup amber with **Not tared: lift it and
+set it back**. Lift the cup off, wait a moment, and put it back: it is tared
+then.
 With accessory retare OFF, adding coffee or a spoon while the cup stays present
 does not tare.
 
