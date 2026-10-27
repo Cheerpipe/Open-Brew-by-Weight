@@ -1,6 +1,7 @@
 // Exercise the production Stats sender with paced rows and observable store
 // captures. Session/page transitions must neither recopy immutable data nor
-// combine an old header with a new store generation.
+// combine an old header with a new store generation. The record index for the
+// browser's offline copy shares the store copy, so it runs here too.
 {
   const assert = require('assert').strict, {spawnSync} = require('child_process');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
@@ -54,6 +55,7 @@ struct NetworkWorkBuf {
   char statusJson[kStatusJson]{},jsonItem[kJsonItem]{};
   StatsStreamCache statsCache;
   UiStreamFingerprints uiFingerprints[2]{};
+  HistoryPage historyPage{};
 } work;
 auto *g_work=&work;
 ${body(networkSource, 'bool __attribute__((format(printf, 2, 3)))\nstatusJsonAppend(')}
@@ -83,6 +85,13 @@ void capture(ShotStatsRecordsSnapshot &out){
     shotLogSetPresetId(out.records[i],i==1?2:1);
   }
 }
+// 130 activations, newest first, so the index spans two history pages.
+void historyPage(HistoryPage &page,size_t offset,size_t limit,ShotLogSortDir dir,uint8_t types){
+  assert(dir==ShotLogSortDir::Desc&&!types&&limit==HISTORY_PAGE_MAX);
+  page.total=130;page.start=offset;page.count=offset<130?std::min(limit,130-offset):0;
+  page.hasMore=offset+page.count<130;
+  for(size_t i=0;i<page.count;++i){page.records[i]={};page.records[i].id=130-offset-i;}
+}
 bool curveById(uint32_t id,ShotCurveRecord &curve){
   resetShotCurveRecord(curve);
   if(id==0||id>3) return false;
@@ -101,17 +110,21 @@ ${session}
     uint32_t (*shotLogEpoch)()=+[](){return storeEpoch;};
     void (*copyShotStatsRecords)(ShotStatsRecordsSnapshot &)=capture;
     bool (*copyShotCurveById)(uint32_t,ShotCurveRecord &)=curveById;
+    uint32_t (*historyEpoch)()=+[](){return 77u;};
+    void (*copyHistoryPage)(HistoryPage &,size_t,size_t,ShotLogSortDir,uint8_t)=historyPage;
   } callbacks_;
   bool appendRecordPageUi(const ControlStatusSnapshot &,size_t *used,bool){
     return statusJsonAppend(used,"\\"ui\\":{}");
   }
   bool sendUiStreamFrame(UiStreamSession &,size_t,bool &);
   bool sendStatsStream(UiStreamSession &,const ControlStatusSnapshot &);
+  bool sendRecordsIndex(UiStreamSession &,const ControlStatusSnapshot &);
 };
 ${body(headerSource, 'bool appendStatsDensity(')}
 ${body(headerSource, 'bool formatStatsHeader(')}
 ${body(source, 'bool OpenBrewByWeightNetwork::sendUiStreamFrame(')}
 ${body(source, 'bool OpenBrewByWeightNetwork::sendStatsStream(')}
+${body(source, 'bool OpenBrewByWeightNetwork::sendRecordsIndex(')}
 int main(){
   // The header covers the newest window of eligible shots: timed arrivals
   // oldest first, a density curve per scope scaled to its peak, and the
@@ -244,6 +257,35 @@ int main(){
   for(int i=0;i<3;++i)assert(send(fresh));
   assert(frames.size()==3&&frames[0].find("\\"total\\":3,")!=std::string::npos);
   frames.clear();assert(send(fresh)&&frames.empty());
+  // The record index answers one store per dispatch: the epoch alone when
+  // the copy holds it, else [id, 24-bit revision] pairs newest first.
+  {
+    auto index=[&](){return network.sendRecordsIndex(fresh,control);};
+    fresh.recordsShots=fresh.recordsHistory=true;fresh.recordsShotsEpoch=storeEpoch;
+    fresh.recordsHistoryEpoch=0;frames.clear();
+    assert(index()&&!fresh.recordsShots&&fresh.recordsHistory&&frames.size()==1);
+    assert(frames[0]==std::string("{\\"v\\":1,\\"type\\":\\"records\\",\\"boot\\":9,\\"store\\":\\"shots\\",\\"epoch\\":")+
+           std::to_string(storeEpoch)+"}");
+    assert(index()&&!fresh.recordsHistory&&frames.size()==2);
+    assert(frames[1].find("\\"store\\":\\"history\\",\\"epoch\\":77,\\"rows\\":[130,")!=std::string::npos);
+    assert(frames[1].find(",1,")!=std::string::npos&&frames[1].find(",0,")==std::string::npos);
+    size_t pairs=0;for(char c:frames[1])pairs+=c==',';
+    assert(pairs==130*2-1+5);
+    // A moved store lists every record; content (a rating) moves its revision.
+    auto shotRows=[&](){
+      fresh.recordsShots=true;fresh.recordsShotsEpoch=0;frames.clear();assert(index());
+      const std::string f=frames[0];return f.substr(f.find("\\"rows\\":[")+8);
+    };
+    const std::string before=shotRows();
+    assert(before.rfind("3,",0)==0&&before.find(",2,")!=std::string::npos&&before.find(",1,")!=std::string::npos);
+    assert(shotRows()==before);
+    frozen=0;++storeEpoch;
+    const std::string after=shotRows();
+    assert(after!=before&&after.rfind("3,",0)==0);
+    for(const auto &r:{before,after}){
+      size_t at=0;for(int i=0;i<3;++i){at=r.find(',',at)+1;assert(std::stoul(r.substr(at))<=0xFFFFFFu);at=r.find(',',at)+1;}
+    }
+  }
 }
 `;
   const directory = path.resolve(sketchDir, '..', 'temp', 'ai_temp_stats_cache');

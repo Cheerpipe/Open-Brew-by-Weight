@@ -96,6 +96,12 @@ Delete a single entry with the ✕ on its card, or clear the whole diary with
 the Clear button. Clearing asks for an explicit confirmation and cannot be
 undone.
 
+### With the machine off
+
+Opened over HTTPS, the Web UI keeps a copy of the whole history on that phone
+or computer, so **History** still works while the controller is out of reach.
+See [Open it over HTTPS with a reverse proxy](../settings/web-access.md#open-it-over-https-with-a-reverse-proxy).
+
 ## Stats vs History
 
 The two pages record different things and never substitute for each other:

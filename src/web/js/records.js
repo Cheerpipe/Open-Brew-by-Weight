@@ -202,3 +202,120 @@ function downloadCsv(name, rows) {
     name,
   );
 }
+// The offline copy (runtime.js syncOfflineCopy): each store's records in
+// IndexedDB, tagged with the revision the firmware's record index names, and
+// the store epoch they match under "meta". The index lists [id, revision]
+// pairs, newest first, only when the epoch moved, so an unchanged store costs
+// one small frame and a changed one fetches only its new or changed records.
+let offlineDbOpen = null;
+function offlineDb() {
+  return (offlineDbOpen ||= new Promise((resolve, reject) => {
+    const q = indexedDB.open("obbw-records", 1);
+    q.onupgradeneeded = () => {
+      for (const s of ["shots", "history"]) q.result.createObjectStore(s, { keyPath: "id" });
+      q.result.createObjectStore("meta");
+    };
+    q.onsuccess = () => {
+      // Signing out deletes the database; this connection must not hold it.
+      q.result.onversionchange = () => {
+        q.result.close();
+        offlineDbOpen = null;
+      };
+      resolve(q.result);
+    };
+    q.onerror = () => {
+      offlineDbOpen = null;
+      reject(q.error);
+    };
+  }));
+}
+// One transaction; resolves with the result of the request `work` returns.
+function offlineTx(stores, mode, work) {
+  return offlineDb().then(
+    (db) =>
+      new Promise((resolve, reject) => {
+        const tx = db.transaction(stores, mode),
+          q = work(tx);
+        tx.oncomplete = () => resolve(q?.result);
+        tx.onerror = tx.onabort = () => reject(tx.error);
+      }),
+  );
+}
+function offlineRecords(store) {
+  return offlineTx(store, "readonly", (tx) => tx.objectStore(store).getAll()).then(
+    (rows) => rows.sort((a, b) => b.id - a.id),
+    () => [],
+  );
+}
+function offlineMeta(store) {
+  return offlineTx("meta", "readonly", (tx) => tx.objectStore("meta").get(store)).then(
+    (m) => m || {},
+    () => ({}),
+  );
+}
+const recordsIndexWait = {};
+function recordsIndex(store, epoch) {
+  R.registerStream("records", {
+    subscribe: () => null,
+    cursor: true,
+    frame: (d) => recordsIndexWait[d.store]?.(d),
+  });
+  return new Promise((resolve) => {
+    const done = (d) => {
+      clearTimeout(timer);
+      delete recordsIndexWait[store];
+      resolve(d);
+    };
+    const timer = setTimeout(() => done(null), 15e3);
+    recordsIndexWait[store] = done;
+    R.sendUiOperation({ op: "records", [store]: epoch });
+  });
+}
+// fetchWindow(offset, count) resolves with records from `offset` in the
+// view's fetch order (falsy on failure), place(i, total) maps index position
+// i to that order, and meta() adds what the offline page shows besides rows.
+// An interrupted sync keeps what it fetched and leaves the epoch for the next.
+const offlineSyncing = {};
+async function syncOfflineStore(store, fetchWindow, place, meta = () => ({})) {
+  if (offlineSyncing[store]) return;
+  offlineSyncing[store] = true;
+  try {
+    const held = await offlineMeta(store),
+      index = await recordsIndex(store, held.epoch || 0),
+      rows = index?.rows;
+    if (!index || index.v !== 1 || !Number.isInteger(index.epoch)) return;
+    if (!rows) return void (index.epoch === held.epoch && R.noteOfflineCopy());
+    if (!Array.isArray(rows) || rows.length % 2 || !rows.every(Number.isInteger)) return;
+    const rev = new Map(),
+      have = new Map((await offlineRecords(store)).map((r) => [r.id, r._rev])),
+      wanted = new Set(),
+      offsets = [],
+      got = [];
+    for (let i = 0; i < rows.length; i += 2) {
+      rev.set(rows[i], rows[i + 1]);
+      if (have.get(rows[i]) === rows[i + 1]) continue;
+      wanted.add(rows[i]);
+      offsets.push(place(i / 2, rows.length / 2));
+    }
+    offsets.sort((a, b) => a - b);
+    for (let k = 0; k < offsets.length && R.webUiPollingActive(); ) {
+      const page = await fetchWindow(offsets[k], offsets.at(-1) - offsets[k] + 1);
+      if (!page) break;
+      for (const r of page)
+        if (wanted.delete(r.id)) got.push(Object.assign(r, { _rev: rev.get(r.id) }));
+      const end = offsets[k] + Math.max(page.length, 1);
+      while (offsets[k] < end) k++;
+    }
+    await offlineTx([store, "meta"], "readwrite", (tx) => {
+      const s = tx.objectStore(store);
+      for (const r of got) s.put(r);
+      for (const id of have.keys()) if (!rev.has(id)) s.delete(id);
+      if (!wanted.size) tx.objectStore("meta").put({ epoch: index.epoch, ...meta() }, store);
+    });
+    if (!wanted.size) R.noteOfflineCopy();
+  } catch (_) {
+    /* the next page load or finished activation retries */
+  } finally {
+    offlineSyncing[store] = false;
+  }
+}

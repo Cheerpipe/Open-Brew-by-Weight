@@ -1320,3 +1320,57 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   }
   return true;
 }
+
+// One store per dispatch: its epoch and, when that moved from the browser's
+// copy, every record newest first as an id and a 24-bit revision (a CRC of
+// the packed record, so a rating change or an id reused after a clear reads
+// as changed). 1000 history pairs of at most 10+8 digits stay under the
+// frame budget. An epoch read ahead of a torn or newer copy only makes the
+// next request resend the index. Shots reuse the Stats cache's store copy,
+// reloaded as sendStatsStream does, whose header and order then rebuild.
+__attribute__((optimize("Os")))
+bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
+                                          const ControlStatusSnapshot &control) {
+  uiStreamSendKind = "records";
+  const bool shots = session.recordsShots;
+  uint32_t epoch = shots ? (callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0)
+                         : (callbacks_.historyEpoch ? callbacks_.historyEpoch() : 0);
+  const bool rows = epoch != (shots ? session.recordsShotsEpoch : session.recordsHistoryEpoch);
+  auto &cache = g_work->statsCache;
+  if (shots && rows && (!cache.valid || cache.snapshot.epoch != epoch)) {
+    if (!callbacks_.copyShotStatsRecords) return false;
+    callbacks_.copyShotStatsRecords(cache.snapshot);
+    epoch = cache.snapshot.epoch;
+    cache.curveHashes = {};
+  }
+  size_t used = 0;
+  if (!statusJsonAppend(&used, "{\"v\":1,\"type\":\"records\",\"boot\":%lu,"
+                               "\"store\":\"%s\",\"epoch\":%lu%s",
+                        static_cast<unsigned long>(control.bootId), shots ? "shots" : "history",
+                        static_cast<unsigned long>(epoch), rows ? ",\"rows\":[" : ""))
+    return false;
+  auto pair = [&](size_t n, uint32_t id, const void *record, size_t size) {
+    return statusJsonAppend(&used, "%s%lu,%lu", n ? "," : "", static_cast<unsigned long>(id),
+                            static_cast<unsigned long>(uiStreamRowHash(record, size) & 0xFFFFFFU));
+  };
+  if (rows && shots) {
+    for (size_t n = 0; n < cache.snapshot.count; ++n)
+      if (!pair(n, cache.snapshot.records[n].id, &cache.snapshot.records[n], sizeof(ShotLogRecord)))
+        return false;
+  } else if (rows && callbacks_.copyHistoryPage) {
+    HistoryPage &page = g_work->historyPage;
+    for (size_t offset = 0;; offset += page.count) {
+      callbacks_.copyHistoryPage(page, offset, HISTORY_PAGE_MAX, ShotLogSortDir::Desc, 0);
+      for (size_t index = 0; index < page.count; ++index)
+        if (!pair(offset + index, page.records[index].id, &page.records[index],
+                  sizeof(HistoryRecord)))
+          return false;
+      if (!page.hasMore || !page.count) break;
+    }
+  }
+  if (!statusJsonAppend(&used, rows ? "]}" : "}")) return false;
+  bool deferred;
+  if (!sendUiStreamFrame(session, used, deferred)) return false;
+  if (!deferred) (shots ? session.recordsShots : session.recordsHistory) = false;
+  return true;
+}

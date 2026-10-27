@@ -390,6 +390,12 @@ The controller stores only the weight curve. The Flow rate chart and Max flow
 are derived locally, so viewing or reloading them does not create another
 history record or flash write.
 
+### With the machine off
+
+A phone or computer that opens the Web UI over HTTPS keeps a copy of every
+saved shot, so **Shots** still works while the controller is out of reach.
+See [Open it over HTTPS with a reverse proxy](../settings/web-access.md#open-it-over-https-with-a-reverse-proxy).
+
 ## Export and share shots
 
 **Export**, next to Filter, opens a small menu with two formats. Both always

@@ -961,6 +961,33 @@ and window changes reuse that snapshot, and the header is rebuilt when the
 store, the window, or the active preset changes. This preserves chronological
 CSV order after browsing by rating without repeated store captures per frame.
 
+### Record index for the offline copy
+
+A page opened over HTTPS (where its service worker can start it with the
+controller off) keeps every Stats row and History record in IndexedDB. To
+sync, it names the store epoch its copy holds (0 for none):
+
+```json
+{"op":"records","shots":1234567}
+{"op":"records","history":0}
+```
+
+The op needs no subscription and answers each named store once, one frame per
+dispatch: `v: 1`, `type: "records"`, `boot`, `store` (`"shots"` or
+`"history"`), and `epoch`. Only when that epoch differs from the one sent does
+the frame add `rows`, a flat array of `[id, revision]` pairs for every record,
+newest first, unfiltered. The revision is the low 24 bits of a CRC over the
+stored record, so a rating change, or an id reused after a clear, reads as a
+different record. Store epochs survive restarts, so an unchanged store costs
+one small frame per sync; 1000 History pairs stay under the 20 KiB frame
+budget. The browser then fetches only the missing or changed records through
+the standing subscriptions' fetch windows (Stats: `sort: "date"`,
+`dir: "desc"`, `filter: {}`; History: `types: []`), drops records the index
+no longer lists, and keeps the new epoch only once every listed record is in
+its copy. It syncs after each view load (at most once a minute) and 30 s after
+the machine stops running, never during a live shot. Plain HTTP pages never
+send the op.
+
 
 ## Linea Micra Web API
 

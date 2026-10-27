@@ -2105,8 +2105,12 @@ export function init() {
       __WEBUI_TEXT__("stats.visualizer_hint"),
       () => downloadJson(`openbrewbyweight-shot-${r.id}-visualizer.json`, shotVisualizer(r)),
     ],
-    null,
-    [ICON_TRASH, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
+    ...(R.offlineCopy
+      ? []
+      : [
+          null,
+          [ICON_TRASH, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
+        ]),
   ]);
   $("clearShotsButton").onclick = clearShotHistory;
   if ($("shotSort")) {
@@ -2138,5 +2142,39 @@ export function init() {
   R.armStickyBar("shotStickySentinel");
   renderStatsDurChart();
 }
+// The offline copy fetches through the standing subscription, which the
+// firmware serves first, so a sync waits for that page.
+function statsReady() {
+  if (statsStreamWanted && statsSynced) return true;
+  return Promise.race([
+    new Promise((resolve) => {
+      const prev = statsResolve;
+      statsResolve = (ok) => (prev?.(ok), resolve(ok));
+      ensureStatsStream();
+    }),
+    R.sleep(15e3),
+  ]);
+}
+export function syncOffline() {
+  return syncOfflineStore(
+    "shots",
+    async (offset, count) =>
+      !statsExportInFlight &&
+      (await statsReady()) &&
+      statsFrameWindow(offset, Math.min(count, 50), "date", "desc", 3e4),
+    (i) => i,
+    () => ({ stats: R.uiState.shotStats }),
+  );
+}
+// Offline the page reads the copy: every saved shot newest first, without
+// the yields under 1 g the firmware list leaves out, and the last header.
+export const showOffline = async () => {
+  const [rows, meta] = await Promise.all([offlineRecords("shots"), offlineMeta("shots")]);
+  if (meta.stats) R.uiState.shotStats = meta.stats;
+  const shots = rows.filter((r) => r.actualG == null || r.actualG >= 1);
+  applyShotPage({ bootId: R.bootId, total: shots.length, hasMore: false, shots }, "replace");
+  R.paint(renderShots);
+  R.offlineCopyNote();
+};
 // The route opens the page: a cold entry subscribes and waits for its page.
 export const start = startStatsStream;

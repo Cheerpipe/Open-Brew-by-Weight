@@ -1819,8 +1819,10 @@ function commandMessages(path, v) {
   if (b) b.onclick = clearMessage;
 }
 {
-  const r = $("webUiReload");
+  const r = $("webUiReload"),
+    o = $("webUiOffline");
   if (r) r.onclick = () => claimWebUiOwnership();
+  if (o) o.onclick = openOfflineCopy;
 }
 function setInactiveError(text) {
   const el = $("inactiveError");
@@ -1890,6 +1892,7 @@ function beginNetworkReconnectWait() {
   setOverlayReconnectMode(true);
   if (webUiOwner) deactivateWebUi();
   else showInactiveOverlay();
+  offerOfflineCopy(!!offlineCopyState());
   updateReconnectCountdown();
   networkReconnectTimer = setInterval(updateReconnectCountdown, 1e3);
   networkReconnectPollTimer = setTimeout(pollNetworkReconnect, 2e3);
@@ -1924,6 +1927,7 @@ function hideInactiveOverlay() {
   if (!el || !el.classList.contains("isVisible")) return;
   el.classList.remove("isVisible");
   document.body.classList.remove("webUiInactive");
+  offerOfflineCopy(false);
   for (const n of el.parentElement.children) n.inert = false;
   clearTimeout(inactiveOverlayTimer);
   inactiveOverlayTimer = setTimeout(() => {
@@ -1966,6 +1970,7 @@ function setOverlayOutOfReach() {
   const h = $("inactiveHint");
   if (h) h.textContent = __WEBUI_TEXT__("shell.out_of_reach_hint");
   showInactiveOverlay();
+  offerOfflineCopy(!!offlineCopyState());
 }
 async function api(path, options = {}) {
   if (!webUiPollingActive())
@@ -2128,6 +2133,11 @@ async function claimWebUiOwnership(claimed) {
     }
     endNetworkReconnectWait();
     webUiOwner = true;
+    if (offlineCopy) {
+      offlineCopy = false;
+      document.body.classList.remove("offlineCopy");
+      clearMessage();
+    }
     resetWebUiInactivity();
     startUiStream();
     noteWebUiPowerActivity();
@@ -2168,6 +2178,7 @@ async function showSignIn(signedOut) {
   const overlay = $("webUiInactive");
   if (!overlay || !$("webUiLogin")) return;
   if (signedOut) storeSession("", false);
+  dropOfflineCopy();
   // Several requests can fail at once; one sign-in form is enough.
   if (overlay.classList.contains("isLogin") && overlay.classList.contains("isVisible")) return;
   if (webUiOwner) {
@@ -4059,6 +4070,7 @@ function startUiStream() {
           data.changes?.physicalActivatorOn === false;
         const boot = homeFrame?.boot;
         homeFrame = statusStreamFrame(shotGotHome ? homeFrame : null, data, homeFrame?.status);
+        if (data.changes?.machineRunning === false) syncOfflineCopy(3e4);
         // A rebooted device invalidates the models that name their boot.
         if (boot !== homeFrame.boot) eachStream("reboot", homeFrame.boot);
         if ("timeUtcSec" in data.changes) {
@@ -4684,6 +4696,88 @@ function diagSnapshotOk(s) {
     typeof s.scale?.controlState === "string"
   );
 }
+// The offline copy: every shot and activation, kept in this browser where a
+// service worker can open the app with the controller off (HTTPS, e.g. a
+// reverse proxy). The records bundle syncs it and the out-of-reach overlay
+// opens it. Plain HTTP never keeps one, and a password-protected controller
+// shows it only to a remembered sign-in.
+const OFFLINE_KEY = "obbwOfflineCopy";
+let offlineCopy = false,
+  offlineSyncAt = 0,
+  offlineSyncTimer = 0;
+function offlineCopyState() {
+  try {
+    const c = isSecureContext && JSON.parse(localStorage.getItem(OFFLINE_KEY) || "null");
+    return c && (!c.auth || localStorage.getItem(SESSION_KEY)) ? c : null;
+  } catch (_) {
+    return null;
+  }
+}
+function canKeepOfflineCopy() {
+  try {
+    return !!(
+      isSecureContext &&
+      navigator.serviceWorker?.controller &&
+      window.indexedDB &&
+      (!sessionToken() || localStorage.getItem(SESSION_KEY))
+    );
+  } catch (_) {
+    return false;
+  }
+}
+// The first copy also asks the browser not to evict it under storage pressure.
+function noteOfflineCopy() {
+  try {
+    if (!localStorage.getItem(OFFLINE_KEY)) navigator.storage?.persist?.().catch(() => {});
+    localStorage.setItem(OFFLINE_KEY, JSON.stringify({ at: Date.now(), auth: !!sessionToken() }));
+  } catch (_) {}
+}
+function dropOfflineCopy() {
+  try {
+    localStorage.removeItem(OFFLINE_KEY);
+    indexedDB.deleteDatabase("obbw-records");
+  } catch (_) {}
+}
+// Each page load checks the record index at most once a minute; a finished
+// activation checks again once its record has had time to commit.
+function syncOfflineCopy(delay) {
+  if (delay === undefined && Date.now() - offlineSyncAt < 6e4) return;
+  clearTimeout(offlineSyncTimer);
+  offlineSyncTimer = setTimeout(() => {
+    if (!canKeepOfflineCopy() || !webUiPollingActive() || sessionShotLive()) return;
+    offlineSyncAt = Date.now();
+    for (const v of ["stats", "history"])
+      ensureViewHook(v).then(
+        (m) => m?.syncOffline(),
+        () => {},
+      );
+  }, delay || 0);
+}
+function offerOfflineCopy(on) {
+  const b = $("webUiOffline");
+  if (b) b.hidden = !on;
+}
+function openOfflineCopy() {
+  offlineCopy = true;
+  document.body.classList.add("offlineCopy");
+  hideInactiveOverlay();
+  routeRendererHook(/^\/(stats|history)$/.test(location.pathname) ? location.pathname : "/stats");
+}
+// Offline, every page but Shots and History is out of reach again.
+function closeOfflinePage() {
+  if (networkReconnectWait) showInactiveOverlay();
+  else setOverlayOutOfReach();
+  offerOfflineCopy(!!offlineCopyState());
+}
+function offlineCopyNote() {
+  const at = offlineCopyState()?.at;
+  if (at)
+    message(
+      sub(__WEBUI_TEXT__("runtime.offline_copy_note"), [
+        new Date(at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
+      ]),
+    );
+}
 // After the first view paints, subscribe the standing Settings stream in the
 // background; compat mode has no Settings view. Stats and History subscribe
 // on their first visit (their module owns the subscription) and then stay
@@ -4691,6 +4785,7 @@ function diagSnapshotOk(s) {
 function ensureBackgroundStreams() {
   if (!webUiPollingActive() || compatMode) return;
   ensureSettingsStream();
+  syncOfflineCopy();
 }
 // A page hidden for 5 minutes drops its stream (a live shot rechecks every
 // 30 s); phones freeze hidden timers, so the return also closes after such an
@@ -5817,6 +5912,10 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
   });
 }
 export {
+  offlineCopy,
+  offlineCopyNote,
+  noteOfflineCopy,
+  closeOfflinePage,
   pad2,
   randomHex,
   sleep,

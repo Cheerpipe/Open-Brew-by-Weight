@@ -894,6 +894,23 @@ body.pageLoading :is(.view, .view *)::after {
   font-weight: 700;
   cursor: pointer;
 }
+#webUiOffline {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--pri);
+  background: none;
+  color: var(--pri);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* The offline copy is read-only: list controls that need the controller go. */
+.offlineCopy :is(#statsWindow, #shotSort, #shotFilterButton, #exportShotsButton, #clearShotsButton),
+.offlineCopy :is(#historySort, #historyFilterButton, #exportHistoryButton, #clearHistoryButton),
+.offlineCopy #historyRows .shotDel,
+.inactiveOverlay.isLogin #webUiOffline {
+  display: none;
+}
 #webUiReload:disabled,
 .setupPrimary:disabled {
   opacity: 0.4;

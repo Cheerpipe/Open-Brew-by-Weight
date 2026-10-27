@@ -497,6 +497,24 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
           if (accepted)
             self.uiStreamUrgent_.store(true, std::memory_order_release);
         }
+      } else if (cJSON_IsString(op) && session->bound &&
+                 strcmp(op->valuestring, "records") == 0 &&
+                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+        // Record index for the browser's offline copy: each named store
+        // carries the epoch that copy holds (0: none).
+        static const char *const kFields[] = {"op", "shots", "history"};
+        const cJSON *shots = cJSON_GetObjectItemCaseSensitive(message, "shots");
+        const cJSON *history = cJSON_GetObjectItemCaseSensitive(message, "history");
+        accepted = (shots || history) && uiStreamKnownFields(message, kFields, 3) &&
+                   uiStreamIntInRange(shots, 0, UINT32_MAX) &&
+                   uiStreamIntInRange(history, 0, UINT32_MAX);
+        if (accepted) {
+          if (shots) session->recordsShotsEpoch = static_cast<uint32_t>(shots->valuedouble);
+          if (history) session->recordsHistoryEpoch = static_cast<uint32_t>(history->valuedouble);
+          session->recordsShots = session->recordsShots || shots;
+          session->recordsHistory = session->recordsHistory || history;
+          self.uiStreamUrgent_.store(true, std::memory_order_release);
+        }
       } else if (cJSON_IsString(op) && !session->bound &&
                  strcmp(op->valuestring, "bind") == 0 && cJSON_IsString(client) &&
                  self.activeWebUiClientId_[0] &&
@@ -702,6 +720,8 @@ void OpenBrewByWeightNetwork::sendUiStream(UiStreamSession &session,
     open = within() && sendDiagnosticStream(session, control, network);
   if (open && session.historyOn) open = within() && sendHistoryStream(session, control);
   if (open && session.statsOn) open = within() && sendStatsStream(session, control);
+  if (open && (session.recordsShots || session.recordsHistory))
+    open = within() && sendRecordsIndex(session, control);
   if (open && session.logOn) open = within() && sendLogStream(session, control);
   if (!open) httpd_sess_trigger_close(server_, session.fd);
 }

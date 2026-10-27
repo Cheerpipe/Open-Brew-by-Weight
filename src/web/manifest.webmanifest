@@ -7,12 +7,24 @@
   "display": "standalone",
   "background_color": "#f5f5f5",
   "theme_color": "#f5f5f5",
+  "launch_handler": { "client_mode": ["focus-existing", "auto"] },
   "icons": [
     {
       "src": "/icons/icon-192.png?v=__FW_ASSET_TAG__",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png?v=__FW_ASSET_TAG__",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    { "name": "Shots", "url": "/stats" },
+    { "name": "History", "url": "/history" },
+    { "name": "Settings", "url": "/settings" }
   ]
 }

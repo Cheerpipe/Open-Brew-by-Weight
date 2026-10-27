@@ -464,6 +464,11 @@ class OpenBrewByWeightNetwork {
     size_t statsSent = 0;
     uint32_t statsPageEpoch = 0, statsPageRequest = 0, statsSentAtMs = 0;
     uint32_t statsRequest = 0, statsFetchRequest = 0;
+    // One-shot record index ("records" op) for the browser's offline copy:
+    // each pending store answers once, with rows only when its epoch moved
+    // from the one the copy holds.
+    bool recordsShots = false, recordsHistory = false;
+    uint32_t recordsShotsEpoch = 0, recordsHistoryEpoch = 0;
     char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
     bool bound = false, resync = true;
     bool homeResync = true;
@@ -736,6 +741,8 @@ class OpenBrewByWeightNetwork {
                          const ControlStatusSnapshot &control);
   bool sendStatsStream(UiStreamSession &session,
                        const ControlStatusSnapshot &control);
+  bool sendRecordsIndex(UiStreamSession &session,
+                        const ControlStatusSnapshot &control);
   // Shared stats row projection (scalars plus embedded curve fields) used by
   // the WS sender; writes into work.jsonItem and returns its length, 0 on
   // overflow.

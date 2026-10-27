@@ -493,5 +493,37 @@ export function init() {
   armListSentinel("historySentinel", loadMoreHistory);
   R.armStickyBar("historyStickySentinel");
 }
+// As in Stats: the offline copy's fetch windows wait for the standing page.
+function historyReady() {
+  if (historyStreamWanted && historySynced) return true;
+  return Promise.race([
+    new Promise((resolve) => {
+      const prev = historyResolve;
+      historyResolve = (ok) => (prev?.(ok), resolve(ok));
+      ensureHistoryStream();
+    }),
+    R.sleep(15e3),
+  ]);
+}
+export function syncOffline() {
+  return syncOfflineStore(
+    "history",
+    async (offset) =>
+      !R.uiState.historyExportWindow &&
+      (await historyReady()) &&
+      (await fetchHistoryWindow(offset))?.records,
+    (i, total) => (R.uiState.historyDir === "asc" ? total - 1 - i : i),
+  );
+}
+export const showOffline = async () => {
+  const records = await offlineRecords("history");
+  if (R.uiState.historyDir === "asc") records.reverse();
+  applyHistoryPage(
+    { bootId: R.bootId, total: records.length, hasMore: false, history: records },
+    "replace",
+  );
+  R.paint(renderHistory);
+  R.offlineCopyNote();
+};
 // The route opens the page: a cold entry subscribes and waits for its page.
 export const start = startHistoryStream;

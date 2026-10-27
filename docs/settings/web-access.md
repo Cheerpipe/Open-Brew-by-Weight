@@ -127,6 +127,22 @@ back. Everything you see and
 do still comes live from the controller. After a firmware update the phone
 picks up the new Web UI by itself.
 
+The phone also keeps its own copy of every saved shot and every entry in the
+activation history, and refreshes it about half a minute after each brew or
+rinse.
+When the controller is out of reach, for example with the machine switched
+off, tap **View saved shots** to browse that copy in **Shots** and
+**History**. It is read-only until the controller is back: to reconnect,
+open **Home** and press **Reload**, and rating, filters, exporting, and
+deleting return with it. If the Web UI
+asks for a password, the copy is kept only on devices where you chose
+**Remember this device**, and signing out erases it.
+
+Installed on the home screen, the app also offers shortcuts to **Shots**,
+**History**, and **Settings** when you press and hold its icon, and tapping
+the icon brings back the window that is already open instead of opening a
+second one.
+
 Give the controller a fixed IP address in your router first. Then, in Nginx
 Proxy Manager:
 
