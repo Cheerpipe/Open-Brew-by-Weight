@@ -64,9 +64,10 @@
   <symbol id="dg-marzocco-cloud" viewBox="0 0 24 24">
     <path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9Z" />
   </symbol>
-  <symbol id="dg-frontend" viewBox="0 0 24 24">
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <path d="M3 9h18" />
+  <symbol id="dg-companion" viewBox="0 0 24 24">
+    <rect x="4" y="4" width="16" height="7" rx="1.5" />
+    <rect x="4" y="13" width="16" height="7" rx="1.5" />
+    <path d="M8 7.5h.01M8 16.5h.01" />
   </symbol>
   <symbol id="dg-misc" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" /></symbol>
   <symbol id="dg-compile-flags" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5" /></symbol>
@@ -728,20 +729,56 @@
         </div>
       </div>
     </details>
-    <details class="cfgGroup" data-g="frontend">
-      <summary>{{webui:diagnostic.frontend}}</summary>
+    <details class="cfgGroup" data-g="companion">
+      <summary>{{webui:diagnostic.companion}}</summary>
       <div class="statusColumn">
+        <b class="blockHead">{{webui:diagnostic.this_screen}}</b>
         <div class="metric">
-          <strong>{{webui:diagnostic.frontend_mode}}</strong>
+          <strong>{{webui:diagnostic.screen_mode}}</strong>
           <div id="dUiMode">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.frontend_access}}</strong>
+          <strong>{{webui:diagnostic.screen_access}}</strong>
           <div id="dUiAccess">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.frontend_offline}}</strong>
+          <strong>{{webui:diagnostic.screen_offline}}</strong>
           <div id="dUiOffline">—</div>
+        </div>
+      </div>
+      <div class="statusColumn micraOnly">
+        <b class="blockHead">{{webui:diagnostic.companion}}</b>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_pairing}}</strong>
+          <div id="dCoName">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_address}}</strong>
+          <div id="dCoAddress">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_version}}</strong>
+          <div id="dCoVersion">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_link}}</strong>
+          <div id="dCoLink">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_link_counts}}</strong>
+          <div id="dCoLinkCounts">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_route}}</strong>
+          <div id="dCoRoute">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_lm}}</strong>
+          <div id="dCoLm">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_counts}}</strong>
+          <div id="dCoCounts">—</div>
         </div>
       </div>
     </details>

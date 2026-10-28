@@ -85,7 +85,9 @@ export function applyStatus(s) {
 }
 // Onboarding hints show one at a time, in this order, and wait while the
 // grind hint shows. Dismissals stay in this browser, except the access one,
-// which the controller keeps for every phone.
+// which the controller keeps for every phone. A companion's pairing request
+// has no dismissal: it lasts ten minutes at most, Admin's Ignore is the
+// lasting answer, and a key could not tell a new request from an old one.
 const cardKey = (id) => "obbwCard:" + id.replace(/Hint$/, "");
 function renderHints(s) {
   if (!s) return;
@@ -93,7 +95,19 @@ function renderHints(s) {
   if (recipeTag && s.presetsTag !== recipeTag) R.dismissCard(cardKey("recipeHint"));
   recipeTag = s.presetsTag;
   let free = $("grindHintCard")?.hidden !== false;
+  // Micra builds show Admin → Companion only with the cloud integration on.
+  const request =
+    __LINEA_MICRA__ && s.machineIntegration === "linea_micra_cloud" && s.companion?.requestName;
+  if (request) {
+    $("companionHintTitle").textContent = R.sub(__WEBUI_TEXT__("home.companion_hint_title"), [
+      request,
+    ]);
+    $("companionHintText").textContent = R.sub(__WEBUI_TEXT__("home.companion_hint_text"), [
+      s.companion.requestAddress,
+    ]);
+  }
   for (const [id, want] of [
+    ["companionHint", !!request],
     ["accessHint", !accessHintClosed && s.access?.notice],
     [
       "micraCloudHint",
@@ -205,7 +219,13 @@ export function init() {
   if ($("grindHintNewBeans")) $("grindHintNewBeans").onclick = () => R.startNewCoffee();
   if ($("grindHintLater"))
     $("grindHintLater").onclick = () => R.dismissCard($("grindHintCard").dataset.key);
-  for (const id of ["accessHint", "micraCloudHint", "recipeHint", "scaleOnlyHint"]) {
+  for (const id of [
+    "companionHint",
+    "accessHint",
+    "micraCloudHint",
+    "recipeHint",
+    "scaleOnlyHint",
+  ]) {
     const open = $(id + "Open"),
       dismiss = $(id + "Dismiss");
     if (open)

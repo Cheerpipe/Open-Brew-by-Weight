@@ -34,14 +34,19 @@ the cloud connection drops today.
 
 1. Install the companion on a computer on the same network (see its README).
    It finds the controller by itself.
-2. Home shows **Companion "…" wants to connect**. Tap **Review** to open
-   **Admin → Companion**.
+2. Home shows **Open Brew by Weight Companion "…" wants to connect**, with
+   the companion's address. Tap **Review** to open **Admin → Companion**.
 3. Open the companion's page on that computer: it shows a six-digit code.
-   Type that code in Admin and tap **Approve**.
+   Type that code in Admin and tap **Approve**. A request waits ten minutes;
+   after that, the companion simply asks again.
 
-You can also start from Admin → Companion with **Connect to a companion at…**
-if the companion has not found the controller. **Ignore** hides a request
-from a companion you do not want; **Stop ignoring** brings it back.
+If the companion has not found the controller, type its address in **Admin →
+Companion → Connect to a companion at…** and tap **Open its page**. The
+companion's page opens in a new tab: choose **Pair** there, then come back to
+Admin for the code.
+
+**Ignore** turns down a companion you do not want, and it stops asking.
+**Stop ignoring** lets ignored companions ask again.
 
 Pairing never sends your La Marzocco password in the clear: the controller
 hands the account over encrypted, only to the companion you approved. The
@@ -51,11 +56,14 @@ the same time.
 
 ## Switches
 
-**Admin → Companion** has one switch per job:
+**Admin → Companion** shows the paired companion, whether it is connected and
+since when, and where the La Marzocco connection runs right now: **Through the
+companion**, **Moving to the companion**, or **Directly from the controller**
+(with what it is waiting for, if anything). It has one switch per job:
 
-- **La Marzocco** (Linea Micra builds): the companion keeps the cloud
-  connection. Turn it off to go back to the controller's own connection; the
-  companion deletes the account it received.
+- **La Marzocco through the companion** (Linea Micra builds): the companion
+  keeps the cloud connection. Turn it off to go back to the controller's own
+  connection; the companion deletes the account it received.
 
 Save and Revert work like the rest of Admin.
 
@@ -68,12 +76,14 @@ companion too.
 
 ## Checking that it works
 
-**Diagnostic → Companion** shows how this screen is opened (directly or
-through the companion) and, from the controller, whether a companion is
-paired, its name, address and version, whether the link is up and since
-when, and whether the La Marzocco connection currently runs through the
-companion or directly, with the reason. Every link and route change is also
-written to the Web UI log.
+**Diagnostic → Companion** has two parts. **This screen** shows how the page
+you are looking at was opened: directly from the controller, through the
+companion (with its name), or through another HTTPS proxy. **Companion** shows
+what the controller knows: whether a companion is paired, its name, address
+and version, whether the link is up and for how long, how often it
+reconnected, and whether the La Marzocco connection currently runs through
+the companion or directly, with the reason. Every link and route change is
+also written to the Web UI log.
 
 For developers, the protocol is described in
 [Companion link protocol](../COMPANION_LINK.md).

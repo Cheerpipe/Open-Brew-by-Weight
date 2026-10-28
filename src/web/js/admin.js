@@ -11,6 +11,7 @@ const REVERT_BUTTONS = {
   saveBleButton: "revertBleButton",
   savePowerButton: "revertPowerButton",
   saveFrontendButton: "revertFrontendButton",
+  saveCompanionButton: "revertCompanionButton",
 };
 function setSaveDirty(id, hintId, dirty) {
   const b = $(id);
@@ -299,6 +300,7 @@ const DEVICE_ICONS = {
   tablet: '<rect x="4.5" y="3" width="15" height="18" rx="2.2"/><path d="M11 18h2"/>',
   laptop: '<rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/>',
   home: '<path d="m3 11 9-7 9 7v9H3z"/><circle cx="12" cy="14" r="2"/>',
+  ...(__LINEA_MICRA__ && { companion: '<use href="#g-companion"/>' }),
 };
 // Remembered sessions carry a daily stamp, so they show days; browser-only
 // sessions are tracked to the second.
@@ -568,6 +570,146 @@ async function accessQuickAction(action, okText, failText, fields) {
     R.message(R.formatCommandError(failText, e), "error");
   }
 }
+// Admin → Companion. The controller never calls out: every action is one POST,
+// and connecting by address only opens the companion's own page here.
+let companionState = null;
+async function companionAction(body, okText, button) {
+  button?.classList.add("busy");
+  try {
+    await R.api("/api/v1/companion/admin", { method: "POST", body: R.body(body) });
+    R.message(okText, "ok");
+    return true;
+  } catch (e) {
+    if (e.code === "COMPANION_CODE")
+      R.showFieldError("companionCode", __WEBUI_TEXT__("admin.companion_code_wrong"));
+    else
+      R.message(
+        R.formatCommandError(__WEBUI_TEXT__("admin.could_not_update_companion"), e),
+        "error",
+      );
+    return false;
+  } finally {
+    button?.classList.remove("busy");
+  }
+}
+function companionPairUrl(text) {
+  try {
+    const u = new URL(/^https?:\/\//i.test(text) ? text : "http://" + text);
+    return u.hostname && !u.username && !u.password ? u.origin + "/__companion/pair" : "";
+  } catch (_) {
+    return "";
+  }
+}
+// "since 14:32" today, "since 3 Nov" before that.
+function companionSince(ageS) {
+  const at = new Date(Date.now() - ageS * 1000);
+  return ageS < 86400
+    ? at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    : at.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+function companionRouteText(c) {
+  const [through, moving, direct] = __WEBUI_TEXT__("admin.companion_routes").split("|"),
+    waits = __WEBUI_TEXT__("admin.companion_waits").split("|");
+  if (c.route === "companion") return through;
+  if (c.route === "pending") return moving;
+  if (!c.lm) return direct;
+  return direct + " · " + waits[c.link !== "open" ? 0 : !c.credentials ? 1 : !c.upstream ? 2 : 3];
+}
+function applyCompanionStatus(c) {
+  if (!c || !$("companionPanel")) return;
+  companionState = c;
+  const r = !c.paired && c.request;
+  $("companionConnect").classList.toggle("hidden", c.paired || !!r);
+  $("companionRequest").classList.toggle("hidden", !r);
+  $("companionPaired").classList.toggle("hidden", !c.paired);
+  $("companionIgnored").classList.toggle("hidden", !(c.ignored > 0));
+  $("companionIgnoredText").textContent = R.sub(__WEBUI_TEXT__("admin.companion_ignored"), [
+    c.ignored,
+  ]);
+  if (r) {
+    $("companionRequestText").textContent = R.sub(__WEBUI_TEXT__("admin.companion_request"), [
+      r.name,
+      r.address,
+      r.version,
+      Math.max(1, Math.ceil(r.expiresInS / 60)),
+    ]);
+    $("companionCode").disabled = !r.codeReady;
+    $("companionCodeHint").textContent = r.codeReady
+      ? __WEBUI_TEXT__("admin.companion_code_hint")
+      : __WEBUI_TEXT__("admin.companion_code_waiting");
+    $("companionApproveButton").disabled =
+      !r.codeReady || !/^\d{6}$/.test($("companionCode").value);
+  } else $("companionCode").value = "";
+  if (!c.paired) return;
+  // Status polls keep the row fresh, except while it is asking.
+  if (!$("companionDev").querySelector(".confirm"))
+    $("companionDev").replaceChildren(
+      deviceRow(
+        "companion",
+        c.name,
+        [c.address, c.version].filter(Boolean).join(" · "),
+        false,
+        __WEBUI_TEXT__("admin.companion_forget"),
+        __WEBUI_TEXT__("admin.companion_forget_ask"),
+        () =>
+          companionAction({ action: "forget" }, __WEBUI_TEXT__("admin.companion_forgotten")).then(
+            R.refreshStatus,
+          ),
+      ),
+    );
+  const link = c.link === "open";
+  $("companionLinkState").textContent =
+    (link
+      ? __WEBUI_TEXT__("admin.companion_link_open")
+      : __WEBUI_TEXT__("admin.companion_link_down")) +
+    (c.linkAgeS >= 0
+      ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
+      : "");
+  $("companionRouteState").textContent = companionRouteText(c);
+  if (!R.uiState.companionDirty) {
+    $("companionLm").checked = !!c.lm;
+    R.uiState.companionBaseline = R.snapshotControls([$("companionLm")]);
+  }
+}
+async function saveCompanionSettings() {
+  if (!R.uiState.companionDirty) return;
+  if (
+    await companionAction(
+      { action: "switches", lm: $("companionLm").checked },
+      __WEBUI_TEXT__("admin.setting_saved"),
+      $("saveCompanionButton"),
+    )
+  )
+    sectionDirty("companion", false);
+  R.refreshStatus();
+}
+function initCompanion() {
+  $("companionConnectButton").onclick = () => {
+    const url = companionPairUrl($("companionAddress").value.trim());
+    if (!url)
+      return R.showFieldError("companionAddress", __WEBUI_TEXT__("admin.companion_address_wrong"));
+    R.clearFieldErrors();
+    window.open(url, "_blank", "noopener");
+  };
+  $("companionCode").oninput = () => applyCompanionStatus(companionState);
+  $("companionApproveButton").onclick = () =>
+    companionAction(
+      { action: "approve", code: $("companionCode").value },
+      __WEBUI_TEXT__("admin.companion_approved"),
+      $("companionApproveButton"),
+    ).then(R.refreshStatus);
+  $("companionIgnoreButton").onclick = () =>
+    companionAction({ action: "ignore" }, __WEBUI_TEXT__("admin.companion_ignored_now")).then(
+      R.refreshStatus,
+    );
+  $("companionUnignoreButton").onclick = () =>
+    companionAction({ action: "unignore" }, __WEBUI_TEXT__("admin.companion_unignored")).then(
+      R.refreshStatus,
+    );
+  $("companionLm").onchange = () => sectionDirty("companion", true);
+  $("saveCompanionButton").onclick = saveCompanionSettings;
+  $("revertCompanionButton").onclick = () => revertSection("companion");
+}
 function selectDetectedNetwork() {
   const o = $("staNetwork").selectedOptions[0];
   if (!o || !o.value) return;
@@ -828,6 +970,7 @@ function applyAdminStatus(s) {
   $("networkStatus").textContent = formatNetworkStatus(s.network);
   loadNetworkAddress(s.network);
   applyAccessStatus(s.access);
+  if (__LINEA_MICRA__) applyCompanionStatus(s.companion);
   // Deep link (Home's access note): its panel exists only once Admin is unlocked.
   const section = location.hash && $(location.hash.slice(1));
   if (section?.offsetParent) {
@@ -1449,7 +1592,7 @@ const WEBHOOK_IDS = [
 export function applyStatus(s) {
   applyAdminStatus(s);
   const compat = !!s.compatibilityMode;
-  ["blePanel", "dateTimePanel", "webhookPanel"].forEach((id) => {
+  ["blePanel", "dateTimePanel", "webhookPanel", "companionPanel"].forEach((id) => {
     const el = $(id);
     if (el) el.classList.toggle("hidden", compat);
   });
@@ -1747,6 +1890,14 @@ const ADMIN_SUMMARIES = {
       ? __WEBUI_TEXT__("admin.sum_password_required")
       : __WEBUI_TEXT__("admin.sum_no_password"),
   update: () => document.documentElement.dataset.fw,
+  ...(__LINEA_MICRA__ && {
+    companion: () =>
+      companionState?.paired
+        ? companionState.name
+        : companionState?.request
+          ? __WEBUI_TEXT__("admin.sum_companion_request")
+          : __WEBUI_TEXT__("admin.sum_not_paired"),
+  }),
 };
 const renderAdminRows = () => R.renderGroupRows($("view-admin"), ADMIN_SUMMARIES);
 export function init() {
@@ -1781,6 +1932,7 @@ export function init() {
   $("revertPowerButton").onclick = () => revertSection("power");
   $("saveFrontendButton").onclick = saveFrontendSettings;
   $("revertFrontendButton").onclick = () => revertSection("frontend");
+  if (__LINEA_MICRA__) initCompanion();
   const firmwareModeChanged = () => {
     firmwareModeDirty = true;
     setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", true);

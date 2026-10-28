@@ -399,14 +399,41 @@ function renderDiagClock() {
 let micraDiagnosticStatus = null;
 // Facts about this browser, not the controller. The firmware serves plain HTTP
 // only, so an https: page always came through a reverse proxy, and only there
-// can the service worker keep the offline copy.
-function renderFrontend() {
-  const t = __WEBUI_TEXT__("diagnostic.frontend_states").split("|"),
+// can the service worker keep the offline copy. The companion names itself at
+// a same-origin path; a direct page never asks the controller for it.
+let screenCompanion = "";
+function renderScreen() {
+  const t = __WEBUI_TEXT__("diagnostic.screen_states").split("|"),
     sw = navigator.serviceWorker;
   $("dUiMode").textContent =
     matchMedia("(display-mode: standalone)").matches || navigator.standalone ? t[1] : t[0];
-  $("dUiAccess").textContent = t[location.protocol === "https:" ? 3 : 2] + " · " + location.host;
+  $("dUiAccess").textContent =
+    (location.protocol !== "https:"
+      ? t[2]
+      : screenCompanion
+        ? R.sub(t[7], [screenCompanion])
+        : t[3]) +
+    " · " +
+    location.host;
   $("dUiOffline").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
+}
+// The paired companion as the controller sees it.
+function renderCompanionDiagnostic(c) {
+  const t = (id, v) => ($(id).textContent = (c.paired && v) || "—"),
+    pair = (a, b) => (a ?? "—") + " / " + (b ?? "—");
+  $("dCoName").textContent = c.paired ? c.name : __WEBUI_TEXT__("diagnostic.companion_not_paired");
+  t("dCoAddress", c.address);
+  t("dCoVersion", c.version + " · " + __WEBUI_TEXT__("diagnostic.companion_protocol") + c.protocol);
+  t("dCoLink", c.link + " · " + formatUptime((c.linkAgeS || 0) * 1e3));
+  t("dCoLinkCounts", pair(c.reconnects, c.authFailures));
+  t("dCoRoute", c.route + (c.reason ? " · " + c.reason.replace(/_/g, " ") : ""));
+  t(
+    "dCoLm",
+    (c.lm ? __WEBUI_TEXT__("runtime.on_2") : __WEBUI_TEXT__("runtime.off_2")) +
+      " · " +
+      __WEBUI_TEXT__("diagnostic.companion_upstream").split("|")[c.upstream ? 0 : 1],
+  );
+  t("dCoCounts", pair(c.routeSwitches, c.commands));
 }
 function renderLineaMicraDiagnostic() {
   const lm = __LINEA_MICRA__ && micraDiagnosticStatus;
@@ -1477,6 +1504,7 @@ export function applyStatus(s) {
     if ($(id) && !$(id).dataset.pending) $(id).value = logLevels?.[id] || "none";
   if (!s) return;
   if (__LINEA_MICRA__ && s.lineaMicra) renderMicraCloudDiagnostic(s.lineaMicra);
+  if (__LINEA_MICRA__ && s.companion) renderCompanionDiagnostic(s.companion);
   const sc = s.scale || {};
   applyScaleCommands(sc);
   applyDiagnosticGuards(s);
@@ -1513,8 +1541,16 @@ export function init() {
   }, 1000);
   $("diagnosticControls")?.classList.remove("hidden");
   R.initGroupRows($("diagnosticsPanel"), "dg-");
-  renderFrontend();
-  navigator.serviceWorker?.addEventListener("controllerchange", renderFrontend);
+  renderScreen();
+  navigator.serviceWorker?.addEventListener("controllerchange", renderScreen);
+  if (location.protocol === "https:")
+    fetch("/__companion/status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        screenCompanion = typeof j?.name === "string" ? j.name : "";
+        renderScreen();
+      })
+      .catch(() => {});
   for (const section of $("diagnosticsPanel").querySelectorAll(".cfgGroup")) {
     const title = section.firstElementChild;
     // Press-and-hold copy: cancel on release, pointer exit, or a browser
