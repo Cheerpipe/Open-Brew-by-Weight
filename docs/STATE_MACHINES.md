@@ -1111,6 +1111,40 @@ and maintenance do not clear the authentication failure latch. A shot with a
 connected scale or maintenance moves it through STOPPING to PAUSED after actual
 stop/destroy. Scale detection/setup/quiet only defers new setup and reconnection.
 No live paused socket or automatic SDK reconnect is retained.
+
+The La Marzocco route (`companion_.status.route`, owned by the Micra service,
+[companion link](COMPANION_LINK.md)) is DIRECT, PENDING or COMPANION. With no
+companion link it stays DIRECT and the cloud worker skips it without taking a
+lock, so every path above runs unchanged. DIRECT → PENDING is taken only by the
+cloud worker at a quiet point: link up, La Marzocco switch on, observation on,
+credentials confirmed for the current generation, upstream subscribed and `up`,
+not flapping, and no shot, scale connection or quiet interval, cleaning episode,
+queued or running command, or queued request. While PENDING the worker leaves
+the direct socket untouched (it keeps streaming). The companion's `full` frame
+moves PENDING → COMPANION on the link task in one locked step: it ends the
+socket's epoch, so later socket frames are dropped, then applies the frame as a
+new subscription plus its initial read; the worker then stops the obsolete
+socket and frees the HTTPS session. If that frame finds a shot, scale
+connection, cleaning episode or command, the route goes back to DIRECT
+(`busy`). On COMPANION the controller makes no La Marzocco request: `push`
+frames run the socket's push body, `read` frames the HTTPS read's merge (dropped
+during a scaled shot or scale connection), the post-wake and API schedules
+settle from that state, commands and Refresh become `cmd` frames and an
+accepted command is confirmed only by companion state within `kPushConfirmMs`.
+An upstream epoch change or lost subscription drops the basis (the socket stop
+steps) until the next `full` frame. COMPANION or PENDING → DIRECT on link loss,
+no ping or `up` false for 30 s, no `full` frame within 30 s, maintenance, Wi-Fi
+loss or AP entry, switch off, rejected credentials, or an account, machine,
+transport or observation change. Leaving COMPANION applies the socket stop
+steps to the feed (hold power, invalidate fence and cleaning, new epoch) and
+the direct client reconnects under its usual admission rule, so never during a
+shot with a connected scale, a scale connection or the BLE quiet interval.
+More than three losses in ten minutes keep the route DIRECT for five minutes.
+The route never changes on its own initiative during a cleaning episode or a
+command; only a loss can end it then, and cleaning supervision opens as on a
+socket loss. A command in flight when the link drops becomes a transport
+failure and its retry runs on the direct route.
+
 On resume, connection/subscription/pong or temperature-only updates do not clear
 the separate stale assumed-power hold; only current-epoch known power does.
 Machine `connected:false` is offline evidence, never power OFF. Cleaning is a

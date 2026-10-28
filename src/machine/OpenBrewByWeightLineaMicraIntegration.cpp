@@ -1,6 +1,7 @@
 #include "OpenBrewByWeightLineaMicraIntegration.h"
 
 #include "OpenBrewByWeightMachineIntegration.h"
+#include "OpenBrewByWeightMicraCompanion.h"
 #include "OpenBrewByWeightMicraMachinePower.h"
 #include "OpenBrewByWeightMicraScalePowerOn.h"
 #include "OpenBrewByWeightMicraScaleShutdown.h"
@@ -190,5 +191,46 @@ HeapLifecycleAggregate machineIntegrationHeapTelemetry() {
 LineaMicraDiscoverySnapshot machineIntegrationDiscovery() {
   return service.discovery();
 }
+
+void machineIntegrationCompanionLink(bool ready, bool lmSwitch) {
+  service.companionLink(ready, lmSwitch);
+}
+
+void machineIntegrationCompanionPing(bool upstreamAlive) { service.companionPing(upstreamAlive); }
+
+void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
+                                         uint32_t tokenRenewInS) {
+  service.companionUpstream(subscribed, epoch, tokenRenewInS);
+}
+
+void machineIntegrationCompanionCredentials(uint32_t generation, bool ok) {
+  service.companionCredentials(generation, ok);
+}
+
+bool machineIntegrationCompanionState(MicraCompanionStateKind kind, uint32_t epoch,
+                                      uint32_t afterCommand, const cJSON *dashboard) {
+  return service.companionState(kind, epoch, afterCommand, dashboard);
+}
+
+void machineIntegrationCompanionCommandResult(uint32_t id, bool accepted,
+                                              uint16_t httpStatus) {
+  service.companionCommandResult(id, accepted, httpStatus);
+}
+
+MicraCompanionOutbox machineIntegrationCompanionOutbox() { return service.companionOutbox(); }
+
+MicraCompanionRouteStatus machineIntegrationCompanionRouteStatus() {
+  return service.companionRouteStatus();
+}
+
+bool machineIntegrationCompanionCopyCredentials(uint32_t generation, char *email,
+                                                size_t emailCapacity, char *password,
+                                                size_t passwordCapacity, char *serial,
+                                                size_t serialCapacity) {
+  return service.companionCopyCredentials(generation, email, emailCapacity, password,
+                                          passwordCapacity, serial, serialCapacity);
+}
+
+void setMachineIntegrationCompanionNotify(void (*notify)()) { service.setCompanionNotify(notify); }
 
 }  // namespace openbrewbyweight

@@ -141,7 +141,9 @@ bool OpenBrewByWeightMicraService::ensureWorkBuffer() {
   if (!work_) work_ = new WorkBuffer;
   return true;
 }
+static unsigned sessionCalls = 0;
 bool OpenBrewByWeightMicraService::ensureSession(LineaMicraPersistedSettings &, bool, bool *) {
+  ++sessionCalls;
   now += sessionDelayMs;
   if (inhibitAfterSession) outboundBleQuiet.store(true);
   std::strcpy(work_->accessToken, "synthetic-token");
@@ -149,6 +151,10 @@ bool OpenBrewByWeightMicraService::ensureSession(LineaMicraPersistedSettings &, 
   return !sessionFails;
 }
 void OpenBrewByWeightMicraService::clearSession() { work_->accessToken[0] = '\0'; }
+void OpenBrewByWeightMicraService::releaseWorkBuffer() {
+  delete work_;
+  work_ = nullptr;
+}
 bool OpenBrewByWeightMicraService::applySignedHeaders(const LineaMicraPersistedSettings &, char *headers, size_t) {
   std::strcpy(headers, "synthetic-signed-upgrade\r\n");
   return true;
@@ -192,6 +198,8 @@ bool OpenBrewByWeightMicraService::readDashboard(const LineaMicraPersistedSettin
 }
 void OpenBrewByWeightMicraService::waitRetry(uint32_t) {}
 #include "micra_websocket_commands.inc"
+constexpr int ESP_FAIL = -1;
+#include "machine/OpenBrewByWeightMicraCompanionRoute.inc"
 struct MicraWebSocketTest {
   static void setupAdmissionAndBackoff() {
     for (unsigned gate = 0; gate < 4; ++gate) {
@@ -1513,6 +1521,477 @@ struct MicraWebSocketTest {
     service.stopWebSocket(true);
     delete service.work_;
   }
+  // --- Companion route (docs/COMPANION_LINK.md) ---
+  static constexpr const char *kBrewing93 = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
+  static constexpr const char *kStandby = R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})";
+  static constexpr const char *kBrewing = R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}}]})";
+  static constexpr const char *kAwaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
+  static constexpr const char *kCleaningOff = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Off"}}]})";
+  static bool frame(OpenBrewByWeightMicraService &service, MicraCompanionStateKind kind,
+                    const char *body, uint32_t afterCommand = 0, uint32_t epoch = 7) {
+    cJSON *root = cJSON_Parse(body);
+    const bool ok = service.companionState(kind, epoch, afterCommand, root);
+    cJSON_Delete(root);
+    return ok;
+  }
+  static void direct(OpenBrewByWeightMicraService &service) {
+    service.config_.accountConfigured = true;
+    service.config_.options |= LINEA_MICRA_APPLY_TEMPERATURE | LINEA_MICRA_POWER_ON_WITH_SCALE |
+        LINEA_MICRA_SHUTDOWN_WITH_SCALE;
+    std::strcpy(service.config_.selectedSerial, "synthetic");
+    service.published_.connectionFreshness = true;
+    service.staConnected_.store(true);
+    service.tokenAvailable_.store(true);
+    service.tokenIssuedAtMs_.store(millis());
+    service.serviceWebSocket();
+    subscribe(service);
+  }
+  static void link(OpenBrewByWeightMicraService &service) {
+    service.companion_.outbox.credentialsGeneration = 1;  // publishConfig's first account.
+    service.companionLink(true, true);
+    service.companionCredentials(1, true);
+    service.companionUpstream(true, 7, 3000);
+    service.companionPing(true);
+  }
+  static void route(OpenBrewByWeightMicraService &service, const char *full = kBrewing93) {
+    const auto sequence = service.companionOutbox().routeSequence;
+    assert(service.serviceCompanion());  // Pending: the owner skips the socket.
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+    assert(service.companionOutbox().routeCompanion &&
+           service.companionOutbox().routeSequence == sequence + 1);
+    assert(frame(service, MicraCompanionStateKind::FULL, full));
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    // Make before break: the socket is obsolete before its owner stops it.
+    assert(!service.websocket_ || service.websocket_->stamp.epoch != service.observationFence_.epoch);
+    assert(service.serviceCompanion());
+    assert(!service.websocket_ && !service.work_);
+  }
+  static void finish(OpenBrewByWeightMicraService &service) {
+    service.stopWebSocket(true);
+    delete service.work_;
+    service.work_ = nullptr;
+  }
+  static void companionFullFrameAndCleaning() {
+    TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locked = acquired; };
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    const auto reads = dashboardReads, sessions = sessionCalls, inits = initCalls;
+    const auto stopsBefore = stops;
+    route(service);
+    assert(stops == stopsBefore + 1 && service.companionRouteStatus().switches == 1);
+    // The full frame is a new subscription plus its initial read.
+    const auto status = service.status();
+    assert(status.powerState == LineaMicraPowerState::ON && status.targetDeciC == 930);
+    assert(status.quality == LineaMicraObservationQuality::CURRENT);
+    assert(status.powerSource == MicraObservationSource::HTTP_INITIAL);
+    assert(service.websocketStatus().subscribed && service.websocketStatus().machineConnected);
+    assert(!service.snapshotPending_ && traceSubscribed);
+    // Cleaning comes only from pushes: never from full or read frames.
+    assert(service.websocketStatus().cleaning == MicraCleaningState::UNKNOWN);
+    assert(!service.backflush().valid);
+    assert(frame(service, MicraCompanionStateKind::READ, kAwaiting));
+    assert(service.websocketStatus().cleaning == MicraCleaningState::UNKNOWN);
+    assert(!service.backflush().valid);
+    assert(frame(service, MicraCompanionStateKind::PUSH, kAwaiting));
+    assert(service.websocketStatus().cleaning == MicraCleaningState::REQUESTED);
+    const auto backflush = service.backflush();
+    assert(backflush.valid && backflush.phase == MachineBackflushPhase::AWAITING && backflush.ready);
+    // Readiness needs >210 s of the companion's token and an `up` ping < 30 s.
+    service.companionUpstream(true, 7, 200);
+    assert(!service.backflush().ready);
+    service.companionUpstream(true, 7, 3000);
+    assert(service.backflush().ready);
+    now += 30000;
+    assert(!service.backflush().valid);
+    // Another epoch or a malformed frame never feeds the fence.
+    const auto sample = service.published_.sampleAtMs;
+    assert(frame(service, MicraCompanionStateKind::PUSH, kStandby, 0, 8));
+    assert(!frame(service, MicraCompanionStateKind::PUSH, R"({"widgets":7})"));
+    assert(!frame(service, MicraCompanionStateKind::READ, R"({"connected":true})"));
+    assert(service.published_.sampleAtMs == sample);
+    // No HTTPS session, dashboard read or socket was opened on the way.
+    assert(dashboardReads == reads && sessionCalls == sessions && initCalls == inits);
+    finish(service);
+    TaskMutex::hostObserver = nullptr;
+  }
+  static void companionPushParity() {
+    const char *dashboard = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"HeatingUp","targetTemperature":94.5,"readyStartTime":1800000000000}},{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1800000000}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
+    now = 5000;
+    OpenBrewByWeightMicraService socket, feed;
+    direct(socket);
+    direct(feed);
+    link(feed);
+    route(feed, R"({"connected":false})");
+    deliver(socket, observation(socket, dashboard));
+    assert(frame(feed, MicraCompanionStateKind::PUSH, dashboard));
+    const auto a = socket.status(), b = feed.status();
+    assert(std::memcmp(&a, &b, sizeof(a)) == 0);
+    assert(a.powerSource == MicraObservationSource::WEBSOCKET && a.targetDeciC == 945);
+    const auto x = socket.websocketStatus(false), y = feed.websocketStatus(false);
+    assert(x.cleaning == y.cleaning && x.cleaningAvailable == y.cleaningAvailable &&
+           x.cleaningAtMs == y.cleaningAtMs && std::strcmp(x.cleaningLabel, y.cleaningLabel) == 0 &&
+           x.machineConnectedKnown == y.machineConnectedKnown &&
+           x.machineConnected == y.machineConnected && x.state == y.state &&
+           x.messageAtMs == y.messageAtMs && x.powerAtMs == y.powerAtMs && x.messages == y.messages);
+    const auto p = socket.backflush(), q = feed.backflush();
+    assert(p.valid && q.valid && p.phase == q.phase && p.ready && q.ready);
+    finish(socket);
+    finish(feed);
+  }
+  static void companionReadsWaitForShots() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    route(service);
+    // Reads landing in a scaled shot or a scale connection are dropped...
+    outboundScaleConnected.store(true);
+    service.shotActive_.store(true);
+    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    service.shotActive_.store(false);
+    service.scaleConnecting_.store(true);
+    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    // ...while pushes keep arriving, as on the socket.
+    assert(frame(service, MicraCompanionStateKind::PUSH, kStandby));
+    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    service.scaleConnecting_.store(false);
+    outboundScaleConnected.store(false);
+    assert(frame(service, MicraCompanionStateKind::READ, kBrewing));
+    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    finish(service);
+  }
+  static void companionHoldFollowsShotAndScale() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    // Without a link the route costs nothing: no lock, no state change.
+    static unsigned locks;
+    locks = 0;
+    TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locks += acquired; };
+    assert(!service.serviceCompanion() && locks == 0);
+    TaskMutex::hostObserver = nullptr;
+    link(service);
+    const auto sequence = service.companionOutbox().holdSequence;
+    outboundScaleConnected.store(true);
+    service.shotActive_.store(true);
+    assert(!service.serviceCompanion());
+    auto box = service.companionOutbox();
+    assert(box.hold && box.holdSequence == sequence + 1);
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+    service.shotActive_.store(false);
+    service.scaleConnecting_.store(true);
+    (void)service.serviceCompanion();
+    box = service.companionOutbox();
+    assert(box.hold && box.holdSequence == sequence + 1);
+    service.scaleConnecting_.store(false);
+    outboundScaleConnected.store(false);
+    service.shotActive_.store(true);  // An unscaled shot holds nothing.
+    (void)service.serviceCompanion();
+    box = service.companionOutbox();
+    assert(!box.hold && box.holdSequence == sequence + 2);
+    service.shotActive_.store(false);
+    finish(service);
+  }
+  static void companionSwitchesOnlyAtQuietPoints() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    for (int blocker = 0; blocker < 6; ++blocker) {
+      switch (blocker) {
+        case 0: service.shotActive_.store(true); break;
+        case 1: service.scaleConnecting_.store(true); break;
+        case 2: outboundBleQuiet.store(true); break;
+        case 3: service.desiredTemperature_.present = true; break;
+        case 4: service.powerActive_.store(true); break;
+        case 5: deliver(service, observation(service, kAwaiting)); break;
+      }
+      assert(!service.serviceCompanion());
+      const auto status = service.companionRouteStatus();
+      assert(status.route == MicraCompanionRoute::DIRECT && std::strcmp(status.reason, "busy") == 0);
+      service.shotActive_.store(false);
+      service.scaleConnecting_.store(false);
+      outboundBleQuiet.store(false);
+      service.desiredTemperature_.present = false;
+      service.powerActive_.store(false);
+      if (blocker == 5) deliver(service, observation(service, kCleaningOff));
+    }
+    // A shot or a cleaning request between `route` and the full frame keeps
+    // the direct socket: the full frame turns the route back to direct.
+    for (int late = 0; late < 2; ++late) {
+      assert(service.serviceCompanion());
+      assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+      if (late == 0) service.shotActive_.store(true);
+      else deliver(service, observation(service, kAwaiting));
+      assert(frame(service, MicraCompanionStateKind::FULL, kBrewing93));
+      const auto status = service.companionRouteStatus();
+      assert(status.route == MicraCompanionRoute::DIRECT && std::strcmp(status.reason, "busy") == 0);
+      assert(!service.companionOutbox().routeCompanion && service.websocket_->client);
+      service.shotActive_.store(false);
+      deliver(service, observation(service, kCleaningOff));
+    }
+    // The route never moves on its own while a cleaning episode is busy.
+    route(service);
+    assert(frame(service, MicraCompanionStateKind::PUSH, kAwaiting));
+    assert(service.backflush().busy());
+    assert(service.serviceCompanion());
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    // Each switch-blocking condition has its own reason.
+    service.companionLink(true, false);
+    assert(std::strcmp(service.companionRouteStatus().reason, "switch_off") == 0);
+    assert(service.companionOutbox().credentialsErase);
+    (void)service.serviceCompanion();
+    assert(std::strcmp(service.companionRouteStatus().reason, "switch_off") == 0);
+    service.companionLink(true, true);
+    assert(!service.companionOutbox().credentialsErase);
+    (void)service.serviceCompanion();
+    assert(std::strcmp(service.companionRouteStatus().reason, "credentials") == 0);
+    finish(service);
+  }
+  static void companionFailover() {
+    for (const bool scaled : {false, true}) {
+      now = 1000;
+      OpenBrewByWeightMicraService service;
+      direct(service);
+      link(service);
+      route(service);
+      assert(frame(service, MicraCompanionStateKind::PUSH, kAwaiting));
+      assert(service.backflush().valid && service.observationFence_.synchronized);
+      const auto epoch = service.observationFence_.epoch;
+      // The companion dies in the middle of a shot.
+      outboundScaleConnected.store(scaled);
+      service.shotActive_.store(true);
+      outboundShotActive.store(true);
+      service.companionLink(false, true);
+      assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+      assert(std::strcmp(service.companionRouteStatus().reason, "no_link") == 0);
+      assert(!service.backflush().valid && !service.observationFence_.synchronized);
+      assert(service.powerState_.retained() && service.observationFence_.epoch == epoch + 1);
+      assert(!service.websocketStatus().subscribed && !service.companionRoute_.load());
+      assert(service.status().quality == LineaMicraObservationQuality::STALE);
+      // Late frames from the lost feed are ignored.
+      assert(frame(service, MicraCompanionStateKind::PUSH, kStandby));
+      assert(service.published_.powerState == LineaMicraPowerState::ON);
+      const auto inits = initCalls, sessions = sessionCalls;
+      if (!service.serviceCompanion()) service.serviceWebSocket();
+      // With a scale the direct connection waits for the shot; without, it starts.
+      assert(initCalls == inits + (scaled ? 0 : 1));
+      assert(sessionCalls == sessions + (scaled ? 0 : 1));
+      if (scaled) {
+        assert(service.websocketStatus().state == MicraSocketState::PAUSED);
+        service.shotActive_.store(false);
+        outboundShotActive.store(false);
+        service.serviceWebSocket();
+        assert(initCalls == inits + 1);
+      }
+      subscribe(service);
+      service.shotActive_.store(false);
+      outboundShotActive.store(false);
+      outboundScaleConnected.store(false);
+      finish(service);
+    }
+  }
+  static void companionLossesAndFlapping() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    for (int loss = 0; loss < 4; ++loss) {
+      link(service);
+      if (loss == 3) {
+        // A route request the companion never answers is a loss as well.
+        assert(service.serviceCompanion());
+        now += 30000;
+        service.companionPing(true);
+        assert(!service.serviceCompanion());
+        assert(std::strcmp(service.companionRouteStatus().reason, "full_missing") == 0);
+        break;
+      }
+      route(service);
+      now += 1000;
+      if (loss == 0) {
+        now += 30000;  // No ping for 30 s.
+      } else if (loss == 1) {
+        service.companionPing(false);
+        now += 15000;
+        service.companionPing(false);
+        assert(service.serviceCompanion());
+        now += 15000;
+        service.companionPing(false);
+      } else {
+        service.companionLink(false, true);
+        assert(std::strcmp(service.companionRouteStatus().reason, "no_link") == 0);
+        continue;
+      }
+      assert(!service.serviceCompanion());
+      assert(std::strcmp(service.companionRouteStatus().reason,
+                         loss == 0 ? "ping_missing" : "upstream_down") == 0);
+    }
+    // Four losses in ten minutes: direct for five minutes, then retried.
+    link(service);
+    assert(!service.serviceCompanion());
+    assert(std::strcmp(service.companionRouteStatus().reason, "flapping") == 0);
+    now += 300000;
+    service.companionPing(true);
+    assert(service.serviceCompanion());
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+    finish(service);
+  }
+  static void companionBasisLoss() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    route(service);
+    // A new upstream epoch ends the basis, as a socket stop would, until its
+    // full frame arrives; the controller makes no request meanwhile.
+    service.companionUpstream(true, 8, 3000);
+    assert(!service.websocketStatus().subscribed && !service.observationFence_.synchronized);
+    assert(service.powerState_.retained() && !service.backflush().valid);
+    assert(frame(service, MicraCompanionStateKind::PUSH, kStandby, 0, 8));
+    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(service.serviceCompanion());
+    assert(frame(service, MicraCompanionStateKind::FULL, kBrewing93, 0, 8));
+    assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
+    // A full frame that never comes returns the route to direct.
+    service.companionUpstream(true, 9, 3000);
+    now += 30000;
+    service.companionPing(true);
+    assert(!service.serviceCompanion());
+    assert(std::strcmp(service.companionRouteStatus().reason, "full_missing") == 0);
+    // Wi-Fi loss ends the epoch the basis was stamped with.
+    link(service);
+    route(service, kBrewing93);
+    ++service.observationFence_.epoch;  // As publishNetworkState() on STA loss.
+    assert(!service.serviceCompanion());
+    assert(std::strcmp(service.companionRouteStatus().reason, "network") == 0);
+    finish(service);
+  }
+  static void companionCommands() {
+    TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locked = acquired; };
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    route(service);
+    service.work_ = new OpenBrewByWeightMicraService::WorkBuffer;  // As ensureWorkBuffer() before each command.
+    uint32_t requestId = 100;
+    const auto temperature = [&](uint16_t targetDeciC) {
+      LineaMicraRequest request;
+      request.type = LineaMicraRequestType::APPLY_TEMPERATURE;
+      request.presetId = 1;
+      request.targetDeciC = targetDeciC;
+      request.requestId = ++requestId;
+      service.desiredTemperature_ = {};
+      service.desiredTemperature_.request = request;
+      service.desiredTemperature_.machineConfigGeneration = service.configGeneration_;
+      service.desiredTemperature_.present = true;
+      return service.executeTemperatureApplication(request, service.configGeneration_);
+    };
+    const auto temperatureBefore = temperatureWrites, powerBefore = powerWrites;
+    const auto reads = dashboardReads, sessions = sessionCalls;
+    // Accepted by the companion, then confirmed by a forwarded push.
+    int stage = 0;
+    notifyHook = [&] {
+      const auto box = service.companionOutbox();
+      if (stage == 0 && box.commandId) {
+        assert(box.commandOp == MicraCompanionCommandOp::TEMPERATURE && box.commandValue == 940);
+        service.companionCommandResult(box.commandId, true, 0);
+        stage = 1;
+      } else if (stage == 1) {
+        assert(box.commandId == 0);
+        assert(frame(service, MicraCompanionStateKind::PUSH, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":94.0}}]})"));
+        stage = 2;
+      }
+    };
+    assert(temperature(940) && stage == 2);
+    assert(service.published_.temperatureState == LineaMicraTemperatureState::CONFIRMED);
+    assert(service.published_.appliedTargetDeciC == 940);
+    // A rejected command reports the companion's status like an HTTPS answer.
+    notifyHook = [&] {
+      const auto box = service.companionOutbox();
+      if (box.commandId) service.companionCommandResult(box.commandId, false, 422);
+    };
+    assert(!temperature(950));
+    assert(service.published_.temperatureError == LineaMicraError::REJECTED &&
+           service.published_.temperatureHttpStatus == 422);
+    // Standby: an older read cannot undo the accepted command's intent; a read
+    // ordered after the command confirms it.
+    stage = 0;
+    uint32_t sent = 0;
+    notifyHook = [&] {
+      const auto box = service.companionOutbox();
+      if (stage == 0 && box.commandId) {
+        assert(box.commandOp == MicraCompanionCommandOp::STANDBY);
+        sent = box.commandId;
+        service.companionCommandResult(sent, true, 0);
+        stage = 1;
+      } else if (stage == 1) {
+        assert(frame(service, MicraCompanionStateKind::READ, kBrewing, 0));
+        assert(service.published_.powerState == LineaMicraPowerState::ON);
+        assert(service.status().optimisticOff);
+        assert(frame(service, MicraCompanionStateKind::READ, kStandby, sent));
+        stage = 2;
+      }
+    };
+    LineaMicraRequest standby;
+    standby.type = LineaMicraRequestType::SET_STANDBY;
+    standby.requestId = ++requestId;
+    service.desiredPower_ = {};
+    service.desiredPower_.request = standby;
+    service.desiredPower_.machineConfigGeneration = service.configGeneration_;
+    service.desiredPower_.shotGeneration = service.shotGeneration_.load();
+    service.desiredPower_.present = true;
+    assert(service.executePowerApplication(standby, service.configGeneration_) && stage == 2);
+    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    assert(!service.desiredPower_.present && service.companionRouteStatus().commands == 3);
+    // Zero HTTPS on the companion route: no session, write or dashboard read.
+    assert(temperatureWrites == temperatureBefore && powerWrites == powerBefore);
+    assert(dashboardReads == reads && sessionCalls == sessions);
+    // The link drops mid-command: a transport failure, and the retry goes direct.
+    bool dropped = false;
+    notifyHook = [&] {
+      if (!dropped) service.companionLink(false, true);
+      dropped = true;
+    };
+    assert(temperature(960) && dropped);
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+    assert(temperatureWrites == temperatureBefore + 1 && sessionCalls == sessions + 1);
+    assert(dashboardReads == reads + 1 && service.companionOutbox().commandId == 0);
+    assert(service.published_.temperatureState == LineaMicraTemperatureState::CONFIRMED);
+    notifyHook = nullptr;
+    finish(service);
+    TaskMutex::hostObserver = nullptr;
+  }
+  static void companionConcurrentFeed() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    route(service);
+    std::atomic<bool> done{false};
+    std::thread linkTask([&] {
+      for (unsigned i = 0; i < 2000; ++i) {
+        (void)frame(service, MicraCompanionStateKind::PUSH, i % 2 ? kAwaiting : kStandby);
+        service.companionPing(true);
+        service.companionUpstream(true, 7, 3000);
+        (void)service.companionOutbox();
+      }
+      done.store(true);
+    });
+    while (!done.load()) {
+      (void)service.status();
+      (void)service.backflush(true);
+      (void)service.serviceCompanion();
+      (void)service.companionRouteStatus();
+    }
+    linkTask.join();
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    finish(service);
+  }
   static void backflushMissBeforeFirstPoll() {
     // A miss before any successful poll serves the untouched cache: invalid,
     // not busy, in both consume modes — the same fail-closed snapshot an
@@ -1564,4 +2043,14 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::backflushConsumeFastPathUnchanged();
   openbrewbyweight::MicraWebSocketTest::backflushMissAfterAdmission();
   openbrewbyweight::MicraWebSocketTest::backflushMissBeforeFirstPoll();
+  openbrewbyweight::MicraWebSocketTest::companionFullFrameAndCleaning();
+  openbrewbyweight::MicraWebSocketTest::companionPushParity();
+  openbrewbyweight::MicraWebSocketTest::companionReadsWaitForShots();
+  openbrewbyweight::MicraWebSocketTest::companionHoldFollowsShotAndScale();
+  openbrewbyweight::MicraWebSocketTest::companionSwitchesOnlyAtQuietPoints();
+  openbrewbyweight::MicraWebSocketTest::companionFailover();
+  openbrewbyweight::MicraWebSocketTest::companionLossesAndFlapping();
+  openbrewbyweight::MicraWebSocketTest::companionBasisLoss();
+  openbrewbyweight::MicraWebSocketTest::companionCommands();
+  openbrewbyweight::MicraWebSocketTest::companionConcurrentFeed();
 }

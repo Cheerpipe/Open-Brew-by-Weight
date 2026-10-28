@@ -35,9 +35,10 @@ output.mkdir(parents=True, exist_ok=True)
     "namespace openbrewbyweight {\nconstexpr size_t kTokenCapacity = 2048;\n"
     + definition("OpenBrewByWeightMicraService::WorkBuffer") + "\n}\n")
 (output / "micra_websocket_status.inc").write_text(
-    definition("powerOptionBit") + "\n" +
+    definition("powerOptionBit") + "\n" + definition("secureCopy") + "\n" +
     "\n".join(definition("OpenBrewByWeightMicraService::" + name) for name in
               ("status", "statusLocked", "liveSubscriptionLocked", "statusPoll", "statusPollStale",
+               "mergeReadLocked",
                "queue", "queueLocked", "muxWaitAnomalyDue",
                "qualifyBackflushLocked", "backflushReadyLocked", "backflush",
                "reportMuxWaitAnomaly", "finishBackflush", "physicalStart",

@@ -69,6 +69,12 @@ feedback, lost diagnostics, or weaker reliability. When an exception is
 necessary, document the reason with the change. Modem sleep stays enabled;
 these rules reduce wakeups rather than disabling power saving.
 
+On Linea Micra builds with a companion on the La Marzocco route, the
+controller's own La Marzocco traffic stops entirely: no TLS socket, no 15 s
+WebSocket pings, no HTTPS reads or polling. It receives filtered state frames
+and a 15 s ping over the companion link and sends only its commands and route
+and hold changes; frames go out only when the service's outbox changes.
+
 Documented exception: the Admin page reads its own status by REST every 10
 seconds while visible and owned. Live and shared state (machine, scale,
 presets, command results, configuration revision) reaches every page on the

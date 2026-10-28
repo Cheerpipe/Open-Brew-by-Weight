@@ -349,6 +349,21 @@ A discovery-owned atomic acquisition latch is published under the existing
 NimBLE discovery critical section before Candidate becomes consumable. Its
 callback performs atomic stores and notifications only: no task mutex, heap,
 network API or wait. HTTP/webhook/NTP owners close their transports independently;
+The companion route adds one producer of Micra state: the companion link calls
+the service's `companion*` entry points from the HTTP or network task. Each
+decodes outside the facade mutex, takes it once, and logs only after releasing
+it, exactly like the socket callback; a push samples the cleaning ingress
+attempt before any mutex. The socket and the companion feed publish through the
+same locked bodies (`applyPushLocked`, `mergeReadLocked`) and the same fence,
+and only one of them is the source: the `full` frame ends the socket's epoch in
+the same locked step that installs the companion basis. While the route is
+pending the cloud worker does not service the socket, so that switch never
+races a reconnection; `stopWebSocket()` leaves the feed's subscription and
+supervision alone once the companion is the source. Command paths read the
+route through a lock-free mirror; a companion command waits on the worker's
+task notification, which the result, a link loss or a cancellation sends. The
+outbox notifier is called outside the mutex.
+
 An established Micra WSS connection stays open and subscribed through scale
 acquisition.
 New WSS setup and reconnection wait for acquisition, setup, BLE quiet and scale
