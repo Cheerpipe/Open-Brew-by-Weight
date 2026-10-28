@@ -5058,10 +5058,11 @@ function webUiPwaClass() {
 // re-establishes ownership before anything else — the claim attaches while
 // this screen still holds it and takes the slot back after a reboot or a
 // takeover took it while hidden, so no return can end on a locked, silent
-// page. A socket still open (a quick look) sends nothing.
+// page. A socket still alive (a quick look, or one just connecting) sends
+// nothing: the stream machinery owns recovery until the socket is gone.
 function webUiClaimFirst() {
   if (setupSession || !webUiPwaClass() || activeView === "admin") return false;
-  if (shotWs && shotWs.readyState === 1) return false;
+  if (shotWs) return false;
   if (!webUiPollingActive() && webUiInactiveReason !== "takeover") return false;
   claimWebUiOwnership();
   return true;

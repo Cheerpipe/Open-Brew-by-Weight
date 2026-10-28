@@ -185,6 +185,7 @@
     );
     const cases = [
       [{}, true, "a returning app page claims first"],
+      [{ ws: { readyState: 0 } }, false, "a connecting socket sends nothing"],
       [{ ws: { readyState: 1 } }, false, "an open socket sends nothing"],
       [{ owner: false, reason: "takeover" }, true, "a takeover lost while hidden re-claims"],
       [{ owner: false, reason: "inactivity" }, false, "inactivity never re-claims"],
