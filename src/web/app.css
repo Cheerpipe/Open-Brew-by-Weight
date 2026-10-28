@@ -98,13 +98,24 @@ body {
   justify-content: space-between;
   gap: 0.6rem 0.75rem;
   margin: 0 -1rem 0.5rem;
-  /* The bar ends at its last row's edge: the resting gap below it is a
-     margin, so scrolling content passes under the menu itself, not under a
-     strip of reserved background. */
+  /* The painted surface is the ::before pseudo, which desktop layouts cut
+     at the menu's middle: content scrolls under the menu's rounded lower
+     half, and the bare strip neither paints nor intercepts pointer events.
+     The resting gap below the bar is a margin for the same reason. */
   padding: 0.5rem 1rem 0;
   padding-top: calc(0.5rem + env(safe-area-inset-top));
-  background: var(--bg);
+  background: none;
   color: var(--ac);
+  pointer-events: none;
+}
+.topBar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}
+.topBar > * {
+  pointer-events: auto;
 }
 .brand {
   margin: 0;
@@ -673,10 +684,12 @@ html:is([data-nav-layout="icons"], [data-nav-layout="text"]) {
   width: 100%;
   max-width: none;
   margin-top: 0.15rem;
-  /* The menu's lower half clears the bar's background: content rises to the
-     menu's middle and tucks under its rounded edge, which the pill's shadow
-     then draws on. */
-  margin-bottom: calc(var(--tap) / -2);
+}
+/* The header paints down to the menu's middle only: the menu's rounded
+   lower half floats over the scrolling content, so the pill's shadow draws
+   on the page instead of on reserved background. */
+:is([data-nav-layout="icons"], [data-nav-layout="text"]) .topBar::before {
+  bottom: calc(var(--tap) / 2);
 }
 :is([data-nav-layout="icons"], [data-nav-layout="text"]) .pageNav a {
   flex: 1 0 auto;
@@ -1531,7 +1544,7 @@ html:not(.micraTemperatureEnabled) .micraTempOpt {
 }
 #message {
   position: sticky;
-  top: var(--hdr);
+  top: var(--bar-h, var(--hdr));
   z-index: 31;
   display: flex;
   align-items: center;

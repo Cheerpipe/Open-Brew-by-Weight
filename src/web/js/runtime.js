@@ -433,12 +433,15 @@ function updateHeaderSignals(s = {}) {
 // The header's first row is the brand beside the signal icons. Once the full
 // lockup would wrap, the drawing alone stands in for it; the text returns as
 // soon as it fits again. Measured with the text restored, so the decision
-// never feeds on its own collapsed state.
+// never feeds on its own collapsed state. The same pass publishes the bar's
+// height: the message banner sticks right under the header, clear of the
+// menu's lower half.
 function updateBrandFit() {
   const bar = document.querySelector(".topBar"),
     brand = bar?.querySelector(".brand"),
     signals = bar?.querySelector(".headerSignals");
   if (!bar || !brand || !signals) return;
+  document.documentElement.style.setProperty("--bar-h", bar.offsetHeight + "px");
   delete document.documentElement.dataset.brandCompact;
   const box = getComputedStyle(bar),
     available = bar.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight),

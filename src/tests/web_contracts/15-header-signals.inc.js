@@ -159,9 +159,9 @@
 // decision starts from the restored lockup so it can recover on its own.
 {
   const assert = require('assert').strict, vm = require('vm');
-  const doc = {dataset: {}}, reads = [];
+  const doc = {dataset: {}, style: {setProperty: (name, value) => {if (name === '--bar-h') doc.barH = value;}}}, reads = [];
   const el = (width) => ({getBoundingClientRect() {reads.push(width); return {width};}});
-  const bar = {clientWidth: 120,
+  const bar = {clientWidth: 120, offsetHeight: 96,
     querySelector: (s) => s === '.brand' ? el(40) : s === '.headerSignals' ? el(90) : null};
   const context = vm.createContext({document: {querySelector: () => bar, documentElement: doc},
     getComputedStyle: () => ({paddingLeft: '10px', paddingRight: '10px', columnGap: '4px'})});
@@ -170,6 +170,7 @@
   context.updateBrandFit();
   assert.deepEqual(reads, [40, 90], 'fit is measured with the text restored');
   assert.equal(doc.dataset.brandCompact, '1', '40 + 4 + 90 does not fit 100 available');
+  assert.equal(doc.barH, '96px', 'the measured bar height anchors the sticky message banner');
   bar.clientWidth = 200;
   context.updateBrandFit();
   assert.equal(doc.dataset.brandCompact, undefined, 'a fitting row brings the text back');
@@ -297,6 +298,10 @@
   assert.equal(root.dataset.navLayout, 'text', 'A narrow desktop content area still measures header text');
   assert(css.includes('bottom:var(--nav-offset)'), 'Save and action bars follow the navigation clearance');
   assert(css.includes('position:sticky;top:0'), 'The whole header pins at the top over the scrolling content');
+  assert(css.includes('.topBar::before') && css.includes('bottom:calc(var(--tap) / 2)'),
+      'The painted header ends at the menu\u2019s middle; its lower half floats over the content');
+  assert(css.includes('#message{position:sticky;top:var(--bar-h,var(--hdr))'),
+      'The message banner sticks under the measured header height, clear of the menu');
 }
 // A disconnected Bluetooth icon dims its rune like the Wi-Fi arcs and carries
 // no slash, which only added visual noise next to the dimmed bars.
