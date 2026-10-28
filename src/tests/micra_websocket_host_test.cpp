@@ -171,10 +171,15 @@ unsigned ulTaskNotifyTake(int, int ticks) {
 }
 static uint16_t cloudTargetDeciC = 0;
 static bool cloudIgnoresTemperature = false;
+static bool cloudRefusesCommands = false;
 static LineaMicraPowerState cloudPower = LineaMicraPowerState::UNKNOWN;
 bool OpenBrewByWeightMicraService::writeTemperature(const LineaMicraPersistedSettings &,
                                                     uint16_t targetDeciC) {
   ++temperatureWrites;
+  if (cloudRefusesCommands) {
+    work_->httpStatus = 403;
+    return false;
+  }
   if (!cloudIgnoresTemperature) cloudTargetDeciC = targetDeciC;
   return true;
 }
@@ -833,6 +838,14 @@ struct MicraWebSocketTest {
     }
     assert(temperatureWrites == 3);
     cloudIgnoresTemperature = false;
+    // A 403 command answer discards the session token, as the observation
+    // lane does; ensureSession had just refilled it for this attempt.
+    cloudRefusesCommands = true;
+    const auto sessionsBefore = sessionCalls;
+    assert(!service.executeTemperatureApplication(temperature(970), service.configGeneration_));
+    assert(sessionCalls == sessionsBefore + 1 && service.work_->accessToken[0] == '\0');
+    cloudRefusesCommands = false;
+    service.work_->httpStatus = 0;
     service.stopWebSocket(true);
     delete service.work_;
   }

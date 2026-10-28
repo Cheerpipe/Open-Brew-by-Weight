@@ -1606,11 +1606,7 @@ bool OpenBrewByWeightMicraService::executeTemperatureApplication(
                        micra_timing::kGateRetryMs);
       return false;
     }
-    if (work_->httpStatus == 401) {
-      tokenAvailable_.store(false, std::memory_order_release);
-      secureWipe(work_->accessToken, sizeof(work_->accessToken));
-      work_->accessTokenIssuedAtMs = 0;
-    }
+    discardAccessToken();
     if (!commandAccepted && commandAttempted &&
         commandTransportStatus == ESP_OK && commandHttpStatus != 0 &&
         !lineaMicraHttpRetryable(commandHttpStatus)) {
@@ -1782,11 +1778,7 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
       wipeLineaMicraSettings(settings);
       return true;
     }
-    if (work_->httpStatus == 401) {
-      tokenAvailable_.store(false, std::memory_order_release);
-      secureWipe(work_->accessToken, sizeof(work_->accessToken));
-      work_->accessTokenIssuedAtMs = 0;
-    }
+    discardAccessToken();
     if (!commandAccepted && commandAttempted &&
         commandTransportStatus == ESP_OK && commandHttpStatus != 0 &&
         !lineaMicraHttpRetryable(commandHttpStatus)) {
@@ -1984,11 +1976,7 @@ bool OpenBrewByWeightMicraService::executeObservation(PendingRequest &pending) {
       deferObservation(pending, status, gateError);
       return true;
     }
-    if (work_ != nullptr && work_->httpStatus == 401) {
-      tokenAvailable_.store(false, std::memory_order_release);
-      secureWipe(work_->accessToken, sizeof(work_->accessToken));
-      work_->accessTokenIssuedAtMs = 0;
-    }
+    discardAccessToken();
     if (attempt + 1U >= micra_timing::kMaxAttempts) break;
     status.phase = LineaMicraPhase::BACKOFF;
     publish(status);
@@ -2142,6 +2130,23 @@ bool OpenBrewByWeightMicraService::generateInstallationKey(
   (void)psa_destroy_key(key);
   return exported == PSA_SUCCESS &&
          length == sizeof(settings.installationPrivateKey);
+}
+
+// A 401/403 answer rejects the token itself, not the request: discard it so
+// the next attempt re-acquires a session instead of reusing it by age. The
+// WebSocket lane reaches the same outcome through its handshake auth failure.
+void OpenBrewByWeightMicraService::discardAccessToken() {
+  if (work_ == nullptr || (work_->httpStatus != 401 && work_->httpStatus != 403))
+    return;
+  const uint32_t ageMs = work_->accessTokenIssuedAtMs != 0
+                             ? millis() - work_->accessTokenIssuedAtMs : 0;
+  tokenAvailable_.store(false, std::memory_order_release);
+  secureWipe(work_->accessToken, sizeof(work_->accessToken));
+  work_->accessTokenIssuedAtMs = 0;
+  serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                       "Micra access token discarded http=%u age=%lu ms",
+                       static_cast<unsigned>(work_->httpStatus),
+                       static_cast<unsigned long>(ageMs));
 }
 
 bool OpenBrewByWeightMicraService::ensureSession(

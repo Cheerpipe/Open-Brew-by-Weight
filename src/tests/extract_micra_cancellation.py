@@ -26,7 +26,8 @@ names += ["OpenBrewByWeightMicraService::" + name for name in
           ["WorkBuffer", "publishConfig", "publishNetworkState", "queue",
            "queueLocked", "muxWaitAnomalyDue", "reportMuxWaitAnomaly",
            "networkEligible",
-           "taskLoop", "clearSession", "deferObservation", "executeObservation",
+           "taskLoop", "clearSession", "discardAccessToken", "deferObservation",
+           "executeObservation",
            "observationCurrent", "identityCurrent", "powerRequestCurrent", "publish",
            "scheduleAutomatic", "queueRelist", "executeRelist",
            "selectDiscoveredMachine"]]
@@ -46,9 +47,10 @@ output.mkdir(parents=True, exist_ok=True)
 (output / "micra_websocket_commands.inc").write_text(
     "\n".join([definition("sameCommandRequest")] +
               [definition("OpenBrewByWeightMicraService::" + name) for name in
-               ("temperatureRequestCurrent", "powerRequestCurrent", "pushConfirms",
-                "temperatureEligible", "deferTemperature", "deferPower",
-                "executeTemperatureApplication", "executePowerApplication")])
+              ("temperatureRequestCurrent", "powerRequestCurrent", "pushConfirms",
+               "temperatureEligible", "deferTemperature", "deferPower",
+               "discardAccessToken",
+               "executeTemperatureApplication", "executePowerApplication")])
     + "\n")
 (output / "micra_cancellation_methods.inc").write_text(
     "namespace openbrewbyweight {\nconstexpr size_t kTokenCapacity = 2048;\n"

@@ -164,6 +164,7 @@ class OpenBrewByWeightMicraService {
                                uint32_t machineConfigGeneration);
   bool ensureSession(LineaMicraPersistedSettings &settings, bool registerKey,
                      bool *renewed = nullptr);
+  void discardAccessToken();
   bool generateInstallationKey(LineaMicraPersistedSettings &settings);
   bool registerInstallation(const LineaMicraPersistedSettings &settings);
   bool signIn(const LineaMicraPersistedSettings &settings);

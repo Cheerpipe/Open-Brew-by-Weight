@@ -109,7 +109,8 @@ in the controller so it can sign in again after a restart. Settings and
 Diagnostics show the saved email as a read-only value; the password, installation
 key, and short-lived access and refresh tokens are never returned by the Web UI
 or diagnostics. The access token is reused and renewed after 50
-minutes. Authentication, machine commands and the initial state read use the
+minutes; if the cloud rejects it, it is discarded and acquired again on the
+next attempt. Authentication, machine commands and the initial state read use the
 cloud API, reusing its secure HTTP connection when possible. Renewing the token
 does not interrupt live updates: the connection stays open the whole time. **Disconnect**
 removes the saved account credentials, installation key, selected machine,

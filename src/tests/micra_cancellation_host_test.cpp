@@ -118,6 +118,7 @@ struct MicraCancellationTest {
   static void unscaledShotAdmission();
   static void lateResponseAndResultLabels(OpenBrewByWeightMicraService &service);
   static void invalidAuthLatchesApiObservation();
+  static void tokenDiscardedOnCloudRefusal();
   static void relistKeepsSavedMachine();
   static void idleClosesWebSocketModeClient();
   static void postWakeSettledFromPush();
@@ -620,6 +621,51 @@ void MicraCancellationTest::invalidAuthLatchesApiObservation() {
   assert(service.observationSchedule_.automaticDue(millis()));
 }
 
+// A 401/403 dashboard answer rejects the token itself: each retry attempt
+// re-acquires a session, and a successful read leaves the session alone.
+void MicraCancellationTest::tokenDiscardedOnCloudRefusal() {
+  OpenBrewByWeightMicraService service;
+  service.config_.accountConfigured = true;
+  service.config_.options |= LINEA_MICRA_OBSERVE_STATE;
+  service.staConnected_.store(true);
+  OpenBrewByWeightMicraService::PendingRequest pending;
+  pending.request.type = LineaMicraRequestType::OBSERVE_STATE;
+  OpenBrewByWeightMicraService::WorkBuffer work;
+  service.work_ = &work;
+  const auto armSession = [&] {
+    std::strcpy(work.accessToken, "live");
+    work.accessTokenIssuedAtMs = millis() - 60000;
+    service.tokenAvailable_.store(true);
+  };
+  for (const uint16_t refused : {uint16_t(403), uint16_t(401)}) {
+    unsigned reads = 0;
+    authentications = 0;
+    dashboardHook = [&](const MicraObservationStamp *) {
+      ++reads;
+      work.httpStatus = refused;
+      return false;
+    };
+    armSession();
+    assert(!service.executeObservation(pending));
+    assert(reads == micra_timing::kMaxAttempts &&
+           authentications == micra_timing::kMaxAttempts);
+    assert(work.accessToken[0] == '\0' && work.accessTokenIssuedAtMs == 0 &&
+           !service.tokenAvailable_.load());
+  }
+  authentications = 0;
+  dashboardHook = [&](const MicraObservationStamp *) {
+    work.httpStatus = 200;
+    return true;
+  };
+  armSession();
+  assert(service.executeObservation(pending));
+  assert(authentications == 1 && std::strcmp(work.accessToken, "live") == 0 &&
+         work.accessTokenIssuedAtMs == millis() - 60000);
+  service.work_ = nullptr;
+  authentications = retries = failures = 0;
+  dashboardHook = nullptr;
+}
+
 // Changing machine re-lists on the saved key and live session; nothing
 // observable changes until the chosen machine is saved.
 void MicraCancellationTest::relistKeepsSavedMachine() {
@@ -812,6 +858,7 @@ int main() {
   MicraCancellationTest::idleClosesWebSocketModeClient();
   MicraCancellationTest::retireBackflushConfiguration();
   MicraCancellationTest::invalidAuthLatchesApiObservation();
+  MicraCancellationTest::tokenDiscardedOnCloudRefusal();
   MicraCancellationTest::run();
   MicraCancellationTest::initializationAndGates();
   MicraCancellationTest::unscaledShotAdmission();
