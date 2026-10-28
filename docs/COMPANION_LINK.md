@@ -33,16 +33,31 @@ cannot send it without a preflight the controller never answers.
 
 ```json
 {"id":"0b9f6a3c-2f4e-4d7a-9c1b-5e8f0a1d2c3b","name":"Kitchen server",
- "version":"1.0.0","protocol":1,"publicKey":"BP3…"}
+ "version":"1.0.0","protocol":1,"commitment":"OXjC…"}
 ```
 
 `id` is the companion's UUID (36 characters), `name` 1 to 32 bytes of UTF-8
-without control characters, `version` up to 24 printable bytes, `publicKey`
-the companion's long-lived pairing key.
+without control characters, `version` up to 24 printable bytes,
+`commitment` the 32-byte `SHA-256("obbw-companion-commit-v1" ‖ companionKey)`
+of the companion's long-lived pairing key. The key itself is revealed only
+after the controller's key is known (below).
+
+**Commit, then reveal.** Neither side learns the other's key before its own
+is fixed, so a device in the middle cannot search for a key pair that makes
+two different exchanges show the same code (it gets one chance in a million).
+
+1. The companion sends the commitment (this request).
+2. The controller makes its request key; `GET` returns `controllerKey`.
+3. The companion sends the same request again with `"publicKey"` (the
+   revealed key) instead of `"commitment"`. The controller accepts it only
+   for the open request of that `id`, after `controllerKey` was issued, when
+   the key hashes to the commitment and is a P-256 point (`400
+   INVALID_REQUEST` otherwise, which also denies the request). Only then does
+   Admin get the code (`codeReady`).
 
 | Status | Body | When |
 | --- | --- | --- |
-| `202` | `{"state":"pending","controllerKey":"BHk…","expiresInS":600}` | A request is open (new, or the same `id` and key asking again) |
+| `202` | `{"state":"pending","controllerKey":"BHk…","expiresInS":600}` | A request is open (new, the same `id` and commitment asking again, or an accepted reveal) |
 | `400` | `INVALID_REQUEST` | Malformed field, a key that is not a P-256 point, or a `protocol` other than 1 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | The body is not `application/json` |
 | `403` | `COMPANION_IGNORED` | The user chose **Ignore** for this `id` |
@@ -55,7 +70,7 @@ when the controller restarts. `controllerKey` is a fresh key pair the
 controller makes for this request, in the background: the answer to a new
 request usually comes before the key exists and omits `controllerKey`, which
 `GET` returns once it is ready (normally within a second). The same `id`
-asking with a different key replaces its request, as a new one.
+asking with a different commitment replaces its request, as a new one.
 
 **Verification code.** Both sides compute
 `SHA-256("obbw-companion-sas-v1" ‖ companionKey ‖ controllerKey)`, take the
@@ -106,7 +121,7 @@ Admin reads the pairing, the open request and the link state from
 `link` is `open` or `down`, `route` is `direct`, `pending` or `companion`,
 `credentials` tells whether the companion confirmed the current account, and
 `request` is `{"name","address","version","expiresInS","codeReady"}` while a
-request is open (`codeReady` once the controller's key exists). Home's stream
+request is open (`codeReady` once the companion revealed its key). Home's stream
 carries `companion.requestName` and `companion.requestAddress` (empty strings
 when no request is open). The Diagnostic stream carries `companion.paired`,
 `name`, `address`, `version`, `protocol`, `link`, `linkAgeS`, `reconnects`,
