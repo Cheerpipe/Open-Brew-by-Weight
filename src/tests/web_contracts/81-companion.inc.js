@@ -8,9 +8,16 @@
   const admin = partialHtml.admin, adminJs = viewJs.admin;
   assert.ok(admin.includes('<details id="companionPanel" data-g="companion" class="cfgGroup"><summary>Companion</summary>') &&
       admin.indexOf('id="accessPanel"') < admin.indexOf('id="companionPanel"') &&
-      admin.indexOf('id="companionPanel"') < admin.indexOf('id="scheduledRestartPanel"') &&
-      admin.includes('<symbol id="g-companion" viewBox'),
+      admin.indexOf('id="companionPanel"') < admin.indexOf('id="scheduledRestartPanel"'),
       'Admin → Companion follows Access in every build');
+  // The glyph ships once in the shell sprite defs: the header indicator draws
+  // it on every view and the Admin device list reuses it through <use>.
+  assert.ok(rawShellHtml.includes('<symbol id="g-companion" viewBox') &&
+      codeIncludes(adminJs, "companion: '<use href=\"#g-companion\"/>'") &&
+      rawShellHtml.includes('id="companionSignal"') &&
+      rawShellHtml.indexOf('id="companionSignal"') < rawShellHtml.indexOf('id="wifiSignal"') &&
+      rawShellHtml.includes('id="companionDetails"'),
+      'The shell pairs the header companion indicator with the one companion glyph');
   for (const id of ['saveCompanionButton', 'revertCompanionButton'])
     assert.ok(new RegExp(`id="${id}"[^>]*data-dirty="0"[^>]*disabled`).test(admin),
         `${id} must start visibly disabled`);

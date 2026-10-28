@@ -6,10 +6,13 @@
     getAttribute(name) { return this.attributes[name]; },
     addEventListener(name, fn) { this[name] = fn; }, focus() { this.focused = true; },
   }));
-  const elements = Object.fromEntries(['wifi', 'bluetooth'].flatMap((kind, i) => [
+  const companionButton = {dataset: {}, hidden: true, attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+    getAttribute(name) { return this.attributes[name]; }};
+  const elements = Object.fromEntries([...['wifi', 'bluetooth'].flatMap((kind, i) => [
     [kind + 'Signal', buttons[i]], [kind + 'Details', {hidden: true}],
     [kind + 'Name', {}], [kind + 'Detail', {}],
-  ]));
+  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
   assert(start >= 0, 'Shared header must render cached signal status');
   const context = vm.createContext({$: id => elements[id],
@@ -41,6 +44,34 @@
   assert.equal(elements.wifiName.textContent, 'Cafe "A"\\B', 'Connected names survive missing signal level');
   assert.equal(elements.bluetoothName.textContent, '<img src=x onerror=alert(1)>', 'Identity is rendered as text');
   assert.equal(elements.wifiDetail.textContent, 'Signal unavailable');
+  // The companion indicator exists only while a companion is paired; an open
+  // link inks it and anything else grays it like the radios' OFF states.
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}});
+  assert.equal(elements.companionSignal.hidden, true, 'No companion status shows nothing');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: false, link: 'down'}});
+  assert.equal(elements.companionSignal.hidden, true, 'An unpaired companion shows nothing');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas', peerProtocol: 0}});
+  assert.equal(elements.companionSignal.hidden, false, 'A paired companion shows even while its link is down');
+  assert.equal(elements.companionSignal.dataset.level, 'off');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Not connected');
+  assert.equal(elements.companionName.textContent, 'nas', 'The paired name stays while the link is down');
+  assert.equal(elements.companionDetail.textContent, 'Not connected');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas', peerProtocol: 2}});
+  assert.equal(elements.companionDetail.textContent,
+      'Not connected · the companion and this controller use different link versions; update the older one',
+      'A refused link version names the connection problem');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
+  assert.equal(elements.companionSignal.dataset.level, 'on');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Connected');
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, companion: {paired: true, link: 'open', name: 'nas'}});
+  assert.equal(elements.companionSignal.dataset.level, 'off', 'A stale snapshot grays the paired companion');
+  assert.equal(elements.companionSignal.hidden, false, 'A stale snapshot does not unpair the companion');
+  assert.equal(elements.companionDetail.textContent, 'Signal unavailable');
+  assert.equal(elements.companionName.textContent, 'nas', 'The stale server keeps its last known name');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
+  assert.equal(elements.companionSignal.dataset.level, 'on', 'A fresh frame re-inks the open link');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3, bluetoothConnected: true, bluetoothLevel: 2}});
+  assert.equal(elements.companionSignal.dataset.level, 'on', 'Frames without companion changes keep the indicator');
   context.initHeaderSignals();
   buttons[0].click();
   assert.equal(elements.wifiDetails.hidden, false);

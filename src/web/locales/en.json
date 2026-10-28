@@ -1891,6 +1891,8 @@
     "shell.cancel": "Cancel",
     "shell.cheerpipe": "Cheerpipe",
     "shell.close": "Close",
+    "shell.companion": "Companion",
+    "shell.companion_server": "Server",
     "shell.device_password": "Device password",
     "shell.diagnostic": "Diagnostic",
     "shell.firmware_boot": "Firmware — · Boot —",

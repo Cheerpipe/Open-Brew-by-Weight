@@ -50,6 +50,11 @@
           stroke-linejoin="round"
         />
       </symbol>
+      <symbol id="g-companion" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="7" rx="1.5" />
+        <rect x="4" y="13" width="16" height="7" rx="1.5" />
+        <path d="M8 7.5h.01M8 16.5h.01" />
+      </symbol>
     </svg>
     <div id="homeBoot" class="bootOverlay" role="status">
       <div class="brand" aria-hidden="true">
@@ -84,6 +89,26 @@
         >
           <span class="qsModeSig" id="modeSignal" data-label="{{webui:shell.how_shots_stop}}"></span
           ><span class="qsGuardSig" id="guardSignal" data-label="{{webui:shell.guards}}"></span>
+        </button>
+        <button
+          type="button"
+          class="signalIndicator"
+          id="companionSignal"
+          aria-label="{{webui:shell.companion}}"
+          aria-expanded="false"
+          aria-controls="companionDetails"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <use
+              href="#g-companion"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
         </button>
         <button
           type="button"
@@ -182,6 +207,19 @@
           <p>
             <span>{{webui:shell.signal}}</span
             ><b id="bluetoothDetail">{{webui:runtime.signal_unavailable}}</b>
+          </p>
+        </section>
+        <section
+          id="companionDetails"
+          class="signalDetails"
+          aria-labelledby="companionDetailsTitle"
+          hidden
+        >
+          <strong id="companionDetailsTitle">{{webui:shell.companion}}</strong>
+          <p><span>{{webui:shell.companion_server}}</span><b id="companionName">—</b></p>
+          <p>
+            <span>{{webui:admin.companion_link}}</span
+            ><b id="companionDetail">{{webui:runtime.signal_unavailable}}</b>
           </p>
         </section>
       </div>

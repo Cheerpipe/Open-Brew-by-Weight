@@ -193,6 +193,9 @@ body {
 .signalIndicator[data-level="unknown"] {
   color: var(--mu);
 }
+#companionSignal[data-level="off"] {
+  color: var(--mu);
+}
 .signalSlash {
   display: none;
 }

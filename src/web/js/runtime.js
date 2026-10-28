@@ -372,6 +372,29 @@ function updateHeaderSignals(s = {}) {
             : "—";
     if (detail) detail.textContent = label;
   }
+  // The paired companion: an open link keeps the icon inked, anything else
+  // grays it, and a stale snapshot reads as unknown like the radios. Without
+  // a paired companion the header shows nothing at all.
+  const companion = $("companionSignal");
+  if (companion && s.companion) {
+    const stale = !!s.snapshotStale,
+      paired = stale ? !companion.hidden : s.companion.paired === true,
+      open = paired && !stale && s.companion.link === "open";
+    companion.hidden = !paired;
+    companion.dataset.level = open ? "on" : "off";
+    const label = open
+      ? __WEBUI_TEXT__("admin.companion_link_open")
+      : paired && !stale
+        ? __WEBUI_TEXT__("admin.companion_link_down") +
+          (s.companion.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "")
+        : unavailable;
+    companion.title = __WEBUI_TEXT__("shell.companion") + ": " + label;
+    companion.setAttribute("aria-label", companion.title);
+    const identity = $("companionName"),
+      detail = $("companionDetail");
+    if (identity) identity.textContent = paired ? s.companion.name || "—" : "—";
+    if (detail) detail.textContent = label;
+  }
 }
 // Autosave: after a pause a section sends only the keys its edits changed (a
 // patch); one request in flight per section, SAVE_GAP_MS apart, later edits
