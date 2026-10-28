@@ -178,8 +178,16 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
   char origin[UI_STREAM_ORIGIN_CAPACITY] = {}, host[UI_STREAM_ORIGIN_CAPACITY] = {};
   const size_t length = httpd_req_get_hdr_value_len(request, "Origin");
   if (length == 0 || length >= sizeof(origin) ||
-      httpd_req_get_hdr_value_str(request, "Origin", origin, sizeof(origin)) != ESP_OK)
+      httpd_req_get_hdr_value_str(request, "Origin", origin, sizeof(origin)) != ESP_OK) {
+    // A refused upgrade otherwise leaves only ESP-IDF's bare
+    // ws_pre_handshake_cb failed; each reason names itself, rate-limited.
+    static RefusalLog log;
+    if (const uint32_t count = log.due())
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                           "ui-stream: refused %lu upgrade(s) without a usable Origin header",
+                           static_cast<unsigned long>(count));
     return ESP_FAIL;
+  }
   // Same origin, and that host must name this controller (the HTTP gate's
   // allowlist), so a rebound page cannot open the stream.
   if (httpd_req_get_hdr_value_str(request, "Host", host, sizeof(host)) != ESP_OK)
@@ -215,6 +223,11 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
     setsockopt(session.fd, IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay));
     return ESP_OK;
   }
+  static RefusalLog log;
+  if (const uint32_t count = log.due())
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                         "ui-stream: refused %lu upgrade(s): both sessions are busy",
+                         static_cast<unsigned long>(count));
   return ESP_FAIL;
 }
 

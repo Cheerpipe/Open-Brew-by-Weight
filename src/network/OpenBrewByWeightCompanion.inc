@@ -572,6 +572,11 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
   const int fd = httpd_req_to_sockfd(request);
   char address[COMPANION_ADDRESS_TEXT];
   if (!companionPeer(fd, address)) {
+    static RefusalLog peer;
+    if (const uint32_t count = peer.due())
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                           "companion link: refused %lu handshake(s) from outside the local network",
+                           static_cast<unsigned long>(count));
     sendError(request, STATUS_FORBIDDEN, "COMPANION_PEER",
               "Companions connect only from the local network.");
     return ESP_FAIL;
@@ -591,11 +596,21 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
     }
   }
   if (!known) {
+    static RefusalLog unpaired;
+    if (const uint32_t count = unpaired.due())
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                           "companion link: refused %lu handshake(s): not paired",
+                           static_cast<unsigned long>(count));
     sendError(request, STATUS_NOT_FOUND, "COMPANION_NOT_PAIRED",
               "This controller is not paired with a companion.");
     return ESP_FAIL;
   }
   if (slot == nullptr) {
+    static RefusalLog busy;
+    if (const uint32_t count = busy.due())
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                           "companion link: refused %lu handshake(s): another link is being opened",
+                           static_cast<unsigned long>(count));
     sendError(request, STATUS_CONFLICT, "COMPANION_BUSY",
               "Another companion link is being opened.");
     return ESP_FAIL;
@@ -609,6 +624,11 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
         TaskLockGuard lock(self.dataMux_);
         *slot = CompanionLinkSlot{};
       }
+      static RefusalLog memory;
+      if (const uint32_t count = memory.due())
+        serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                             "companion link: refused %lu handshake(s): no memory for a link",
+                             static_cast<unsigned long>(count));
       sendError(request, STATUS_UNAVAILABLE, "COMPANION_MEMORY",
                 "The controller has no memory for a companion link right now.");
       return ESP_FAIL;
