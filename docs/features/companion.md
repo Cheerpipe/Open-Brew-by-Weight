@@ -15,14 +15,16 @@ does today.
 - **Opens the Web UI over HTTPS** with a trusted certificate, so your phone
   can install it as an app and keep an offline copy of your shots. This is
   what the companion did when it was called the HTTPS gateway.
-- **Talks to La Marzocco for you** (Linea Micra). When the **La Marzocco**
-  switch is on, the companion keeps the connection to La Marzocco's cloud and
-  passes the controller only what it needs: the machine's power state, the
-  boilers, the brew temperature and automatic backflush. Temperature changes,
-  waking the machine and putting it to standby still work exactly as before;
-  they just travel through the companion. The controller then spends its
-  radio and processor on your scale and your shot instead of on secure cloud
-  connections.
+- **Talks to La Marzocco for you** (Linea Micra). Normally the controller
+  itself keeps a secure connection to La Marzocco's cloud open and reads every
+  message the cloud sends. With the **La Marzocco through the companion**
+  switch on, the companion takes over that work: it holds the cloud
+  connection and passes the controller only what it needs, namely the
+  machine's power state, the boilers, the brew temperature and automatic
+  backflush. Temperature changes, waking the machine and putting it to
+  standby still work exactly as before; they just travel through the
+  companion. The controller then spends its Wi-Fi and processor on your
+  scale and your shot instead of on the cloud.
 
 If the companion stops, the controller reconnects to La Marzocco on its own.
 During a shot with a scale it waits until the shot is over, so nothing
@@ -68,9 +70,17 @@ the companion and the controller cannot talk because one of them is much newer
 than the other, Admin says so: update the older one. It has one switch per
 job:
 
-- **La Marzocco through the companion** (Linea Micra builds): the companion
-  keeps the cloud connection. Turn it off to go back to the controller's own
-  connection; the companion deletes the account it received.
+- **La Marzocco through the companion** (Linea Micra builds).
+  - **On:** the companion connects to La Marzocco's cloud for the controller.
+    The controller no longer keeps a secure cloud connection open or decodes
+    its messages, so its Wi-Fi and processor stay free for your scale and
+    your shot. Nothing changes in what you can do: power, brew temperature
+    and backflush work the same. If the companion goes away, the controller
+    connects on its own until the companion is back, without you touching
+    anything.
+  - **Off:** the controller always connects to the cloud and does all that
+    work itself, exactly as it does without a companion. The companion
+    deletes its copy of your La Marzocco account.
 
 Save and Revert work like the rest of Admin.
 

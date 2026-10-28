@@ -1940,12 +1940,21 @@ const ADMIN_SUMMARIES = {
       : __WEBUI_TEXT__("admin.sum_no_password"),
   update: () => document.documentElement.dataset.fw,
   ...(__LINEA_MICRA__ && {
-    companion: () =>
-      companionState?.paired
-        ? companionState.name
-        : companionState?.request
-          ? __WEBUI_TEXT__("admin.sum_companion_request")
-          : __WEBUI_TEXT__("admin.sum_not_paired"),
+    companion: () => {
+      const c = companionState;
+      if (!c?.paired)
+        return c?.request
+          ? R.sub(__WEBUI_TEXT__("admin.sum_companion_request"), [c.request.name])
+          : __WEBUI_TEXT__("admin.sum_not_paired");
+      return R.sub(
+        c.link === "open"
+          ? __WEBUI_TEXT__("admin.sum_companion_connected")
+          : c.peerProtocol > 0
+            ? __WEBUI_TEXT__("admin.sum_companion_update")
+            : __WEBUI_TEXT__("admin.sum_companion_disconnected"),
+        [c.name],
+      );
+    },
   }),
 };
 const renderAdminRows = () => R.renderGroupRows($("view-admin"), ADMIN_SUMMARIES);
