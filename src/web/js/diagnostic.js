@@ -416,8 +416,7 @@ function renderScreen() {
     sw = navigator.serviceWorker,
     c = R.uiState.companionHere,
     screens = Array.isArray(c?.screens) ? c.screens.length : c?.screens;
-  $("dUiMode").textContent =
-    matchMedia("(display-mode: standalone)").matches || navigator.standalone ? t[1] : t[0];
+  $("dUiMode").textContent = R.webUiStandalone() ? t[1] : t[0];
   $("dUiAccess").textContent =
     (location.protocol !== "https:" ? t[2] : c ? R.sub(t[7], [c.name]) : t[3]) +
     (screens > 0 ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.screen_count"), [screens]) : "") +

@@ -46,7 +46,9 @@ reads, and hands the cloud back to the companion once it recovers.
 Open the companion's HTTPS address on each phone, tablet or computer. Every
 screen works on its own: it can show a different page, scroll History or
 Shots with its own filters, and keep its own sign-in when the Web UI asks for
-a password.
+a password. Install that address as an app and it stays out of your way: an
+installed app keeps its place and reconnects by itself every time you open
+it, without the Reload button a browser page shows after sitting unused.
 
 A few things stay one at a time, on purpose:
 

@@ -69,7 +69,12 @@ recovery.
 **Claim / Reload** gives one browser control of Home and Settings. Another client
 can take the claim, and 15 minutes without using a control locks the page and
 stops live updates. Scrolling does not keep it active; use Reload to resume.
-The page stays active while a shot is running, so it never locks mid-shot.
+The page stays active while a shot is running, so it never locks mid-shot. An
+app installed from the companion's address behaves like an app instead: it
+keeps its place and picks the session back up by itself every time you open
+it, with no Reload button. The Admin page still locks after 15 idle minutes
+there too, and a page opened directly at the controller's own address always
+follows the Reload rule above.
 
 Each row in **Equipment** shows the device's icon with a small mark: a green
 check when it's ready, an amber exclamation mark when it needs a look, and a red

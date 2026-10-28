@@ -99,6 +99,7 @@ function setActiveView(name, ready = Promise.resolve()) {
   viewReady = ready;
   viewSeq++;
   relayoutCharts();
+  refreshWebUiHold();
 }
 let stopExtraPollsHook = () => {};
 let startViewHook = () => {};
@@ -825,13 +826,34 @@ function startSetupSession() {
   setupSession = webUiOwner = true;
   webUiActiveUntil = Infinity;
 }
+// An installed-app page over the companion holds its claim instead of arming
+// the idle lock; any other device can still take the claim at any moment.
+// The Admin view keeps today's lock, bounding its unlock slide.
+function webUiHoldClaim() {
+  return webUiPwaClass() && activeView !== "admin";
+}
+// Re-evaluates the hold at every class or view transition, both directions.
+function refreshWebUiHold() {
+  if (!webUiOwner || setupSession) return;
+  if (webUiHoldClaim()) {
+    webUiActiveUntil = Infinity;
+    clearTimeout(webUiInactivityTimer);
+    webUiInactivityTimer = 0;
+  } else if (webUiActiveUntil === Infinity) resetWebUiInactivity();
+}
 function resetWebUiInactivity() {
   if (!webUiOwner || setupSession) return;
+  if (webUiHoldClaim()) {
+    webUiActiveUntil = Infinity;
+    clearTimeout(webUiInactivityTimer);
+    webUiInactivityTimer = 0;
+    return;
+  }
   webUiActiveUntil = Date.now() + WEB_UI_INACTIVITY_MS;
   clearTimeout(webUiInactivityTimer);
   webUiInactivityTimer = setTimeout(() => {
     if (webUiOwner && Date.now() >= webUiActiveUntil)
-      sessionShotLive() ? resetWebUiInactivity() : deactivateWebUi();
+      sessionShotLive() ? resetWebUiInactivity() : deactivateWebUi("inactivity");
   }, WEB_UI_INACTIVITY_MS);
 }
 function webUiPollingActive() {
@@ -841,7 +863,7 @@ function webUiPollingActive() {
     resetWebUiInactivity();
     return true;
   }
-  deactivateWebUi();
+  deactivateWebUi("inactivity");
   return false;
 }
 function noteWebUiInteraction(event) {
@@ -2021,7 +2043,7 @@ function beginNetworkReconnectWait() {
   networkReconnectWait = true;
   networkReconnectDeadline = Date.now() + NETWORK_RECONNECT_WAIT_MS;
   setOverlayReconnectMode(true);
-  if (webUiOwner) deactivateWebUi();
+  if (webUiOwner) deactivateWebUi("reconnect");
   else showInactiveOverlay();
   offerOfflineCopy(!!offlineCopyState());
   updateReconnectCountdown();
@@ -2186,7 +2208,7 @@ async function api(path, options = {}) {
     });
   }
   if (!response.ok) {
-    if (data.error === "UI_TAKEN_OVER") deactivateWebUi();
+    if (data.error === "UI_TAKEN_OVER") deactivateWebUi("takeover");
     if (data.error === "AUTH_REQUIRED") showSignIn(true);
     const err = new Error(
       data.message || data.error || __WEBUI_TEXT__("runtime.http") + response.status,
@@ -2247,10 +2269,19 @@ function lockAdminUi() {
   });
   resetNetworkAddressLoaded();
 }
-// "direct": the companion stepped its screens aside for a direct page.
+// "direct": the companion stepped its screens aside for a direct page. The
+// firmware's takeover close carries no reason text, so an empty reason
+// defaults to "takeover". An installed-app page holds its overlay while
+// hidden for a reclaimable loss — its return re-claims first — and while a
+// visible takeover's epoch re-claim runs; every visible loss, "direct" and
+// Admin keep today's explanation.
 function deactivateWebUi(reason) {
+  const heldOverlay = webUiEpochClaimPending;
+  webUiEpochClaimPending = false;
   if (!webUiOwner || setupSession) return;
+  reason ||= "takeover";
   webUiOwner = false;
+  webUiInactiveReason = reason;
   stopUiStream();
   webUiActiveUntil = 0;
   clearTimeout(webUiInactivityTimer);
@@ -2258,8 +2289,15 @@ function deactivateWebUi(reason) {
   stopViewPolls();
   lockAdminUi();
   setMutable(false);
-  if (reason === "direct") setInactiveHint(__WEBUI_TEXT__("runtime.opened_directly"));
-  showInactiveOverlay();
+  if (
+    !(
+      heldOverlay ||
+      (document.hidden && webUiHoldClaim() && (reason === "inactivity" || reason === "takeover"))
+    )
+  ) {
+    if (reason === "direct") setInactiveHint(__WEBUI_TEXT__("runtime.opened_directly"));
+    showInactiveOverlay();
+  }
 }
 // Bounded like api(); null data means a non-JSON body.
 async function fetchJson(path, options, ms = 8e3) {
@@ -2344,6 +2382,7 @@ async function claimWebUiOwnership(claimed) {
     }
     endNetworkReconnectWait();
     webUiOwner = true;
+    webUiInactiveReason = "";
     if (offlineCopy) {
       offlineCopy = false;
       document.body.classList.remove("offlineCopy");
@@ -4356,7 +4395,9 @@ function startUiStream() {
     resetUiStream();
     scheduleShotPaint();
     if (event?.code === 4001) {
+      const held = webUiTakeoverVisible();
       deactivateWebUi(event.reason);
+      if (held) claimWebUiOwnership();
       return;
     }
     // 4002: the firmware closed a page it stopped hearing from; reconnect
@@ -4999,6 +5040,44 @@ function ensureBackgroundStreams() {
   ensureSettingsStream();
   syncOfflineCopy();
 }
+// The installed-app class: an https page served by the paired companion.
+// Only such a page holds its claim across idle time; plain http, a browser
+// tab and an unresolved companion status keep the standard 15-minute lock.
+let webUiInactiveReason = "",
+  webUiEpochClaimUsed = false,
+  webUiEpochClaimPending = false;
+function webUiStandalone() {
+  return matchMedia("(display-mode: standalone)").matches || !!navigator.standalone;
+}
+function webUiPwaClass() {
+  return (
+    location.protocol === "https:" && webUiStandalone() && uiState.companionHere?.paired === true
+  );
+}
+// Claim-first: an installed-app page returning with its stream down
+// re-establishes ownership before anything else — the claim attaches while
+// this screen still holds it and takes the slot back after a reboot or a
+// takeover took it while hidden, so no return can end on a locked, silent
+// page. A socket still open (a quick look) sends nothing.
+function webUiClaimFirst() {
+  if (setupSession || !webUiPwaClass() || activeView === "admin") return false;
+  if (shotWs && shotWs.readyState === 1) return false;
+  if (!webUiPollingActive() && webUiInactiveReason !== "takeover") return false;
+  claimWebUiOwnership();
+  return true;
+}
+// One silent re-claim per visibility epoch for a takeover close an
+// installed-app page actually sees: deactivateWebUi holds the overlay while
+// the claim runs, so winning the UI back never flashes; the overlay paints
+// only when the claim fails. A hidden page spends nothing — its return
+// re-claims instead. The bound keeps two installed pages from steal-flapping.
+function webUiTakeoverVisible() {
+  if (document.hidden || webUiEpochClaimUsed || !webUiPwaClass() || activeView === "admin")
+    return false;
+  webUiEpochClaimUsed = true;
+  webUiEpochClaimPending = true;
+  return true;
+}
 // A page hidden for 5 minutes drops its stream (a live shot rechecks every
 // 30 s); phones freeze hidden timers, so the return also closes after such an
 // absence. An open socket delivered every frame in order: coming back needs
@@ -5034,13 +5113,18 @@ function onPageVisibility() {
     missed = away - (performance.now() - hiddenPerf);
   if (hiddenAt && statusUtcAnchorAt && missed > 1e3) statusUtcAnchorAt -= missed;
   hiddenAt = 0;
+  webUiEpochClaimUsed = false;
   if (shotFsActive) keepShotFsAwake(true);
+  if (webUiClaimFirst()) return;
   if (!webUiPollingActive() || setupSession) return;
   if (away >= HIDDEN_CLOSE_MS && !sessionShotLive()) stopUiStream();
   shotWs && shotWs.readyState === 1 ? shotActivity() : startUiStream();
 }
 document.addEventListener("visibilitychange", onPageVisibility);
 if (document.hidden) onPageVisibility();
+// Every https page knows its companion from load on, whatever view it opens
+// on (the manifest shortcuts included); resolving it re-evaluates the hold.
+if (location.protocol === "https:") companionHere().then(refreshWebUiHold);
 window.addEventListener("pagehide", stopUiStream);
 // Unloading the page drops every unsaved Save/Revert section (setSaveDirty
 // marks them) and an autosave still pending or in flight.
@@ -5059,6 +5143,7 @@ window.addEventListener("beforeunload", (e) => {
 window.addEventListener("pageshow", () => {
   // A restored page starts fresh here; its visibility return must not redo it.
   hiddenAt = 0;
+  if (webUiClaimFirst()) return;
   if (webUiPollingActive() && !setupSession) startUiStream();
 });
 function setHomeSub(id, v) {
@@ -6275,6 +6360,7 @@ export {
   webUiOverrideFor,
   companionHere,
   companionPairable,
+  webUiStandalone,
   pairCompanionHere,
   refreshTimezonePreview,
   updateTimezoneControls,
