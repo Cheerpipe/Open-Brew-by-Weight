@@ -49,6 +49,7 @@ struct MicraCompanionIngress {
 struct MicraCompanionRouteStatus {
   MicraCompanionRoute route = MicraCompanionRoute::DIRECT;
   bool upstreamSubscribed = false;
+  bool upstreamRefused = false;
   bool credentialsConfirmed = false;
   uint32_t upstreamEpoch = 0;
   uint32_t routeSinceMs = 0;
@@ -62,7 +63,7 @@ struct MicraCompanionRouteStatus {
 void machineIntegrationCompanionLink(bool ready, bool lmSwitch);
 void machineIntegrationCompanionPing(bool upstreamAlive);
 void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
-                                         uint32_t tokenRenewInS);
+                                         uint32_t tokenRenewInS, bool refused = false);
 void machineIntegrationCompanionCredentials(uint32_t generation, bool ok);
 MicraCompanionIngress machineIntegrationCompanionIngress();
 // `dashboard` is the `d` object of an `st` frame. False rejects a push (the

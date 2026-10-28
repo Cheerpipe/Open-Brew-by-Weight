@@ -3,10 +3,10 @@
   "maximumExternalBssBytes": 3231744,
   "maximumExternalNoinitBytes": 34816,
   "allowedGrowthBytes": {
-    "image": 220480,
-    "total_size": 220480,
+    "image": 220592,
+    "total_size": 220588,
     "used_diram": 8192,
-    "flash_code": 145352,
+    "flash_code": 145488,
     "flash_rodata": 75696
   },
   "updateHeadroomBytes": 64,

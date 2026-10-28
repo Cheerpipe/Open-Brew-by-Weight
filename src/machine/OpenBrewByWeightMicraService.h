@@ -69,7 +69,8 @@ class OpenBrewByWeightMicraService {
   // HTTP or network task; each takes mux_ briefly and never logs under it.
   void companionLink(bool ready, bool lmSwitch);
   void companionPing(bool upstreamAlive);
-  void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS);
+  void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS,
+                         bool refused = false);
   void companionCredentials(uint32_t generation, bool ok);
   MicraCompanionIngress companionIngress();
   bool companionState(MicraCompanionStateKind kind, uint32_t epoch, uint32_t afterCommand,

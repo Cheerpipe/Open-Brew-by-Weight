@@ -227,7 +227,7 @@ secrets directory and never in logs.
 | Frame | Meaning |
 | --- | --- |
 | `{"t":"ping","up":true}` | Liveness; `up` is true while its La Marzocco subscription is open and alive. Every 15 s while the route is `companion`, every 120 s otherwise |
-| `{"t":"lm","sub":true,"ep":12,"tok":2400}` | Its La Marzocco state: subscribed, its subscription epoch, seconds until its next token renewal. Sent on every change and after `cfg` |
+| `{"t":"lm","sub":true,"ep":12,"tok":2400,"err":"auth"}` | Its La Marzocco state: subscribed, its subscription epoch, seconds until its next token renewal, and `"err":"auth"` while the cloud refuses its dashboard reads or commands (401/403) with the subscription still open. Sent on every change and after `cfg` |
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
@@ -284,7 +284,9 @@ valid `full` frame follows.
 The controller alone decides the route. It asks for `companion` only at a
 quiet point (no shot, scale connection, backflush or machine command in
 progress) once the companion has confirmed the current credentials and reports
-`sub` with `up`; it switches its source when the `full` frame arrives and then
+`sub` with `up`; while the companion reports `err:"auth"` it stays on its
+direct connection instead, without counting that as a lost route. It switches
+its source when the `full` frame arrives and then
 closes its own La Marzocco connection. On link loss, a missing ping, `up`
 false for 30 s, or the switch turned off, it returns to its direct connection
 under the same rules as any reconnection (never during a shot with a scale, a

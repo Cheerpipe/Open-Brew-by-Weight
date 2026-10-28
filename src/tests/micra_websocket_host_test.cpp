@@ -1898,6 +1898,28 @@ struct MicraWebSocketTest {
       finish(service);
     }
   }
+  // A companion whose cloud reads are refused (lm err:auth) reports healthy
+  // otherwise: the controller stays direct without counting a loss.
+  static void companionUpstreamRefusal() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    service.companionUpstream(true, 7, 3000, true);
+    assert(service.companionRouteStatus().upstreamRefused);
+    const auto sequence = service.companionOutbox().routeSequence;
+    assert(!service.serviceCompanion());
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+    assert(std::strcmp(service.companionRouteStatus().reason, "upstream_auth") == 0);
+    assert(!service.companionOutbox().routeCompanion &&
+           service.companionOutbox().routeSequence == sequence);
+    // The refusal clearing re-arms routing.
+    service.companionUpstream(true, 7, 3000);
+    assert(!service.companionRouteStatus().upstreamRefused);
+    assert(service.serviceCompanion());
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+    finish(service);
+  }
   static void companionLossesAndFlapping() {
     now = 1000;
     OpenBrewByWeightMicraService service;
@@ -2155,6 +2177,7 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::companionPushIntentAtIngress();
   openbrewbyweight::MicraWebSocketTest::companionSwitchesOnlyAtQuietPoints();
   openbrewbyweight::MicraWebSocketTest::companionFailover();
+  openbrewbyweight::MicraWebSocketTest::companionUpstreamRefusal();
   openbrewbyweight::MicraWebSocketTest::companionLossesAndFlapping();
   openbrewbyweight::MicraWebSocketTest::companionBasisLoss();
   openbrewbyweight::MicraWebSocketTest::companionCommands();

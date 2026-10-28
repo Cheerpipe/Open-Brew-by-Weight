@@ -69,6 +69,7 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
           : !observing ? "not_observing"
           : !feed.status.credentialsConfirmed ? "credentials"
           : !feed.status.upstreamSubscribed || !feed.up ? "upstream"
+          : feed.status.upstreamRefused ? "upstream_auth"
           : feed.flapping ? "flapping"
           : !quiet || backflush_.status().busy() || desiredTemperature_.present ||
                   desiredPower_.present || pending_.present || active_ ? "busy"
@@ -288,7 +289,8 @@ void OpenBrewByWeightMicraService::companionLink(bool ready, bool lmSwitch) {
     from = feed.status.route;
     feed.lmSwitch = lmSwitch;
     if (!ready || !lmSwitch) leaveCompanionLocked(ready ? "switch_off" : "link_lost", !ready);
-    if (!ready) feed.up = feed.status.upstreamSubscribed = feed.status.credentialsConfirmed = false;
+    if (!ready) feed.up = feed.status.upstreamSubscribed = feed.status.upstreamRefused =
+                     feed.status.credentialsConfirmed = false;
     refreshCompanionConfigLocked();
     companionLink_.store(ready, std::memory_order_release);
     to = feed.status.route;
@@ -310,12 +312,13 @@ void OpenBrewByWeightMicraService::companionPing(bool upstreamAlive) {
 }
 
 void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t epoch,
-                                                     uint32_t tokenRenewInS) {
+                                                     uint32_t tokenRenewInS, bool refused) {
   bool reset = false;
   {
     TaskLockGuard lock(mux_);
     auto &feed = companion_;
     feed.status.upstreamSubscribed = subscribed;
+    feed.status.upstreamRefused = refused;
     feed.status.upstreamEpoch = epoch;
     feed.tokenRenewAtMs = (millis() + std::min<uint32_t>(tokenRenewInS, 86400) * 1000U) | 1U;
     // A new upstream epoch or a lost subscription ends the basis of the last

@@ -912,7 +912,9 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
     machineIntegrationCompanionPing(flag);
   } else if (!strcmp(type, "lm") && jsonBoolean(frame, "sub", flag) &&
              jsonUint32(frame, "ep", first) && jsonUint32(frame, "tok", second)) {
-    machineIntegrationCompanionUpstream(flag, first, second);
+    machineIntegrationCompanionUpstream(flag, first, second,
+                                        jsonString(frame, "err", text, sizeof(text), false) &&
+                                            !strcmp(text, "auth"));
   } else if (!strcmp(type, "creds") && jsonUint32(frame, "gen", first) &&
              jsonBoolean(frame, "ok", flag)) {
     machineIntegrationCompanionCredentials(first, flag);

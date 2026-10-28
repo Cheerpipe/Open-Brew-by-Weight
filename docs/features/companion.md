@@ -37,7 +37,9 @@ If the companion stops, the controller reconnects to La Marzocco on its own.
 During a shot with a scale it waits until the shot is over, so nothing
 competes with your scale; without a scale it reconnects right away. A
 backflush that loses its supervision stops safely, exactly as it does when
-the cloud connection drops today.
+the cloud connection drops today. The controller also keeps its own
+connection while the companion reports that La Marzocco is refusing its
+reads, and hands the cloud back to the companion once it recovers.
 
 ## Several screens at once
 

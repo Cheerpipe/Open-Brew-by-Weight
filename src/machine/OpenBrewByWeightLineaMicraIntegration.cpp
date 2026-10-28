@@ -199,8 +199,8 @@ void machineIntegrationCompanionLink(bool ready, bool lmSwitch) {
 void machineIntegrationCompanionPing(bool upstreamAlive) { service.companionPing(upstreamAlive); }
 
 void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
-                                         uint32_t tokenRenewInS) {
-  service.companionUpstream(subscribed, epoch, tokenRenewInS);
+                                         uint32_t tokenRenewInS, bool refused) {
+  service.companionUpstream(subscribed, epoch, tokenRenewInS, refused);
 }
 
 void machineIntegrationCompanionCredentials(uint32_t generation, bool ok) {
