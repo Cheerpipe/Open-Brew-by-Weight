@@ -363,6 +363,9 @@ async function generate(options = {}) {
   for (const name of JS_FILES) viewJsRaw[name] = localized.sources[at++].content;
   const localizedCss = localized.sources[at].content;
   const excluded = excludedClasses(options);
+  // The shell may carry build-gated markup too (the header's Micra cloud
+  // indicator); typed builds strip it exactly like the view partials.
+  shellHtmlRaw = stripClassMarkup(shellHtmlRaw, excluded);
   for (const name of VIEW_NAMES) {
     partialsRaw[name] = stripClassMarkup(partialsRaw[name], excluded);
   }

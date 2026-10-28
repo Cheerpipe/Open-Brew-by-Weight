@@ -2,7 +2,8 @@
 // reads that the Home frame does not carry. Home owns config.revision, the
 // shared config.* keys (effective, overrides included), presets, lastCommand,
 // quickRevert.{after,overrides,remainingS}, connections, scale.preferred* and
-// its lineaMicra.* keys; the page composes both models.
+// its lineaMicra.* keys — the account email and machine name included, for
+// the shared header's cloud indicator; the page composes both models.
 // The standing subscription rides the Home + shot-card batch. One source
 // fingerprint gates the evaluation, so an idle dispatch formats nothing, and
 // a reconnecting page whose tag still matches gets no snapshot.
@@ -43,16 +44,13 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   gate = gateOver(gate, readback, sizeof(readback));
   gate = gateOver(gate, g_work->quickSaved, strlen(g_work->quickSaved));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-  char email[LINEA_MICRA_USERNAME_CAPACITY] = {}, serial[LINEA_MICRA_SERIAL_CAPACITY] = {},
-       name[LINEA_MICRA_NAME_CAPACITY] = {};
+  char serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
   uint8_t options, scaleOptions;
   {
     TaskLockGuard lock(dataMux_);
     options = settings_.lineaMicra.options;
     scaleOptions = settings_.lineaMicra.scaleOptions;
-    sanitizeJsonEmbed(settings_.lineaMicra.username, email, sizeof(email));
     sanitizeJsonEmbed(settings_.lineaMicra.selectedSerial, serial, sizeof(serial));
-    sanitizeJsonEmbed(settings_.lineaMicra.selectedName, name, sizeof(name));
   }
   const LineaMicraStatus micra = machineIntegrationStatus();
   const LineaMicraDiscoverySnapshot discovery = machineIntegrationDiscovery();
@@ -63,9 +61,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
                                 ws.machineConnectedKnown && !ws.machineConnected};
   gate = gateOver(gate, micraState, sizeof(micraState));
   gate = gateOver(gate, &discovery, sizeof(discovery));
-  gate = gateOver(gate, email, sizeof(email));
   gate = gateOver(gate, serial, sizeof(serial));
-  gate = gateOver(gate, name, sizeof(name));
 #endif
   if (!initial && gate == session.settingsGate) return true;
   auto &hashes = workBuf_->uiFingerprints[&session - uiStreams_];
@@ -152,9 +148,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("scaleLoss.source", "%s",
                shotLogScaleLossSourceJson(static_cast<uint8_t>(control.scaleLossProjectedSource << 3)));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-  fields.field("lineaMicra.email", "\"%s\"", email);
   fields.field("lineaMicra.selectedSerial", "\"%s\"", serial);
-  fields.field("lineaMicra.selectedName", "\"%s\"", name);
   fields.field("lineaMicra.applyTemperature", bool(options & LINEA_MICRA_APPLY_TEMPERATURE));
   fields.field("lineaMicra.recognizeWakeGesture", bool(options & LINEA_MICRA_RECOGNIZE_WAKE));
   fields.field("lineaMicra.powerOnWithScale", bool(options & LINEA_MICRA_POWER_ON_WITH_SCALE));

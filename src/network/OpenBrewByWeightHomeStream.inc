@@ -288,7 +288,13 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   const auto micra = machineIntegrationStatus();
   const auto ws = machineIntegrationWebSocketStatus(false);
   uint8_t options, connection;
-  { TaskLockGuard lock(dataMux_); options = settings_.lineaMicra.options; connection = settings_.lineaMicra.connectionType; }
+  char safeEmail[LINEA_MICRA_USERNAME_CAPACITY * 2] = {},
+       safeName[LINEA_MICRA_NAME_CAPACITY * 2] = {};
+  { TaskLockGuard lock(dataMux_);
+    options = settings_.lineaMicra.options;
+    connection = settings_.lineaMicra.connectionType;
+    sanitizeJsonEmbed(settings_.lineaMicra.username, safeEmail, sizeof(safeEmail));
+    sanitizeJsonEmbed(settings_.lineaMicra.selectedName, safeName, sizeof(safeName)); }
   delta.field("machineIntegration", "\"linea_micra_cloud\"");
   delta.field("lineaMicra.powerState", "\"%s\"", lineaMicraPowerStateName(micra.powerState));
   delta.field("lineaMicra.quality", "\"%s\"", lineaMicraObservationQualityName(micra.quality));
@@ -297,6 +303,10 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("lineaMicra.accountConfigured", bool(micra.accountConfigured));
   delta.field("lineaMicra.observeState", bool(options & LINEA_MICRA_OBSERVE_STATE));
   delta.field("lineaMicra.connectionType", "\"%s\"", micraConnectionTypeName(connection));
+  // The shared header's cloud indicator names the account and machine, so
+  // Home owns these two; Settings and Diagnostic compose them from Home.
+  delta.field("lineaMicra.email", "\"%s\"", safeEmail);
+  delta.field("lineaMicra.selectedName", "\"%s\"", safeName);
   delta.field("lineaMicra.websocket.cleaningAvailable", bool(ws.cleaningAvailable));
   delta.field("lineaMicra.websocket.cleaning", "\"%s\"", ws.cleaning == MicraCleaningState::OFF ? "inactive" :
       ws.cleaning == MicraCleaningState::REQUESTED ? "waiting_for_paddle" :
@@ -505,19 +515,13 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("lineaMicra.phase", "\"%s\"", lineaMicraPhaseName(micra.phase));
     delta.field("lineaMicra.temperatureState", "\"%s\"", lineaMicraTemperatureStateName(micra.temperatureState));
     delta.field("lineaMicra.temperatureError", "\"%s\"", lineaMicraErrorName(micra.temperatureError));
-    char safeEmail[LINEA_MICRA_USERNAME_CAPACITY * 2] = {};
     char safeSerial[LINEA_MICRA_SERIAL_CAPACITY * 2] = {};
-    char safeName[LINEA_MICRA_NAME_CAPACITY * 2] = {};
     { TaskLockGuard lock(dataMux_);
-      sanitizeJsonEmbed(settings_.lineaMicra.username, safeEmail, sizeof(safeEmail));
-      sanitizeJsonEmbed(settings_.lineaMicra.selectedSerial, safeSerial, sizeof(safeSerial));
-      sanitizeJsonEmbed(settings_.lineaMicra.selectedName, safeName, sizeof(safeName)); }
-    delta.skipNext = session.settingsOn;
-    delta.field("lineaMicra.email", "\"%s\"", safeEmail);
+      sanitizeJsonEmbed(settings_.lineaMicra.selectedSerial, safeSerial, sizeof(safeSerial)); }
+    // The account and machine names ride the Home stream; this page composes
+    // them with its own report.
     delta.skipNext = session.settingsOn;
     delta.field("lineaMicra.selectedSerial", "\"%s\"", safeSerial);
-    delta.skipNext = session.settingsOn;
-    delta.field("lineaMicra.selectedName", "\"%s\"", safeName);
     const LineaMicraCloudCall call = machineIntegrationCloudCall();
     if (call.api == nullptr)
       delta.field("lineaMicra.cloudCall", "null");

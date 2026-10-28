@@ -321,7 +321,7 @@ const micraStatusFailures = [
   micraStatus.includes('\"password\"') && 'password exposed',
   micraStatus.includes('\"username\"') && 'username exposed',
   !micraStatus.includes('delta.field("lineaMicra.accountConfigured"') && 'account status missing',
-  !micraStatus.includes('fields.field("lineaMicra.email"') && 'account email missing',
+  !micraStatus.includes('delta.field("lineaMicra.email"') && 'account email missing',
   !micraStatus.includes('fields.field("lineaMicra.machines"') && 'machine list missing',
   micraStatus.includes('accountMachineCount') && 'unread account machine count streamed',
   !micraStatus.includes('OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD') && 'compile gate missing',
@@ -329,6 +329,30 @@ const micraStatusFailures = [
 ].filter(Boolean);
 if (micraStatusFailures.length) {
   throw new Error('Linea Micra status contract: ' + micraStatusFailures.join(', '));
+}
+// The shared header's cloud indicator: its identity fields ride the Home
+// stream alone (one owner per path), and the shell ships the button, popup
+// and glyph as micra-only markup the generator strips from other builds.
+{
+  const fail = (what) => { throw new Error('Linea Micra header indicator: ' + what); };
+  const homeRegion = micraStatus.slice(micraStatus.indexOf('bool OpenBrewByWeightNetwork::sendHomeStream'),
+      micraStatus.indexOf('bool OpenBrewByWeightNetwork::sendUiStreamFrame'));
+  for (const path of ['lineaMicra.email', 'lineaMicra.selectedName'])
+    if (!homeRegion.includes(`delta.field("${path}"`)) fail(`the Home stream carries ${path}`);
+  const settingsRegion = micraStatus.slice(micraStatus.indexOf('bool OpenBrewByWeightNetwork::sendSettingsStream'));
+  for (const path of ['fields.field("lineaMicra.email"', 'fields.field("lineaMicra.selectedName"'])
+    if (settingsRegion.includes(path)) fail(`Settings drops ${path}: Home owns it`);
+  const diagRegion = micraStatus.slice(micraStatus.indexOf('bool OpenBrewByWeightNetwork::sendDiagnosticStream'),
+      micraStatus.indexOf('bool OpenBrewByWeightNetwork::sendLogStream'));
+  if (diagRegion.includes('delta.field("lineaMicra.email"') ||
+      diagRegion.includes('delta.field("lineaMicra.selectedName"'))
+    fail('Diagnostic drops the identity fields: Home owns them');
+  if (!(rawShellHtml.includes('<symbol id="dg-marzocco-cloud" class="micraOnly" viewBox') &&
+        rawShellHtml.indexOf('id="companionSignal"') < rawShellHtml.indexOf('id="micraSignal"') &&
+        rawShellHtml.indexOf('id="micraSignal"') < rawShellHtml.indexOf('id="wifiSignal"') &&
+        rawShellHtml.includes('id="micraDetails"') &&
+        !micraDiagnosticHtml.includes('<symbol id="dg-marzocco-cloud"')))
+    fail('the header cloud indicator sits right of companion with the one cloud glyph');
 }
 if (micraService.includes('save_client_session')) {
   throw new Error('Async Micra client must not resume TLS sessions: ESP-IDF re-applies them per handshake step');

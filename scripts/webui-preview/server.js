@@ -57,6 +57,9 @@ function renderHome() {
 // Header signals and Quick Settings run against an in-memory controller: the
 // preview never connects to a device, so writes only change these values.
 const PREVIEW_HEADER_PRELUDE = `window.$ ??= id => document.getElementById(id);
+// The design preview serves raw sources, so the build constants Terser folds
+// into the shipped bundle stand in for themselves here.
+const __LINEA_MICRA__ = true, __REMOTE_CONTROL__ = true;
 let controlsMutable = true, configRevision = 1;
 const previewStatus = {config: {revision: 1, brewByWeight: true, noScaleBbwMode: 'warn_once',
   fastExtractionGuardEnabled: true, slowExtractionGuardEnabled: true, autoToManualGuardEnabled: true,

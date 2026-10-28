@@ -176,7 +176,7 @@
       codeIncludes(diagJs, 'R.companionHere(true).then(renderScreen)') &&
       codeIncludes(diagJs, 'screens=Array.isArray(c?.screens)?c.screens.length:c?.screens') &&
       codeIncludes(rawViewJs.diagnostic, "screens>0?' · '+R.sub(__WEBUI_TEXT__('diagnostic.screen_count'),[screens]):''") &&
-      codeIncludes(diagJs, 'if(s.companion)renderCompanionDiagnostic({...R.homeStatusCache()?.companion,...s.companion})') &&
+      codeIncludes(diagJs, 'if(s.companion)renderCompanionDiagnostic(s.companion)') &&
       codeIncludes(diagJs, "c.paired?c.name:'Not paired'") &&
       codeIncludes(diagJs, "c.linkAgeS>=0?' · '+formatUptime(c.linkAgeS*1e3):''") &&
       codeIncludes(diagJs, "on(c.ui!==false)+(c.relay?' · '+c.relay:'')") &&
@@ -197,7 +197,7 @@
     const out = [noMicra.html, noMicra.js, noMicra.runtimeJs, ...Object.values(noMicra.partials),
       ...Object.values(noMicra.modules)].join('\n');
     const leaked = ['id="companionLm"', 'id="companionApproveLm"', 'id="companionRouteState"', 'id="dCoRoute"',
-      'id="dCoLm"', 'id="dCoCounts"'].filter((s) => out.includes(s));
+      'id="dCoLm"', 'id="dCoCounts"', 'id="micraSignal"', 'id="micraDetails"', 'dg-marzocco-cloud'].filter((s) => out.includes(s));
     assert.deepEqual(leaked, [], 'The La Marzocco companion parts stay out of builds without Linea Micra');
     const missing = ['id="companionPanel"', 'id="companionHint"', 'id="companionPairHint"', 'id="companionUi"',
       'id="g-companion"', 'id="dCoName"', 'id="dCoUi"', 'id="dUiAccess"', '/api/v1/companion/admin',

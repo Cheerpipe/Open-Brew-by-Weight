@@ -1530,11 +1530,12 @@ export function applyStatus(s) {
   for (const id of LOG_LEVELS)
     if ($(id) && !$(id).dataset.pending) $(id).value = logLevels?.[id] || "none";
   if (!s) return;
+  // The account email and machine name ride the Home stream beside the
+  // header's cloud indicator; diagnosticStatus() merges every model, so each
+  // renderer reads one composed status.
   if (__LINEA_MICRA__ && s.lineaMicra)
     renderMicraCloudDiagnostic(s.lineaMicra, s.companion?.route === "companion");
-  // Pairing, name, link and refused protocol ride the Home stream beside the
-  // header indicator; the rest of the report is this page's own.
-  if (s.companion) renderCompanionDiagnostic({ ...R.homeStatusCache()?.companion, ...s.companion });
+  if (s.companion) renderCompanionDiagnostic(s.companion);
   const sc = s.scale || {};
   applyScaleCommands(sc);
   applyDiagnosticGuards(s);

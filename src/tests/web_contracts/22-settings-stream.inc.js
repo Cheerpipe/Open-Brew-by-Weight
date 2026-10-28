@@ -81,7 +81,10 @@
   const overlaps = (a, b) => a.filter((p) => b.some((q) => p === q || p.startsWith(q + '.') || q.startsWith(p + '.')));
   assert.deepEqual(overlaps(settingsPaths, homePaths), [], 'Home and Settings paths must be disjoint');
   assert.deepEqual(overlaps(diagPaths, homePaths), [], 'Diagnostic must not repeat Home paths');
-  const shared = ['lineaMicra.phase', 'lineaMicra.email', 'lineaMicra.selectedSerial', 'lineaMicra.selectedName'];
+  // The account email and machine name ride Home now (the header's cloud
+  // indicator owns them), so the compatibility fallback covers only the
+  // machine state and serial.
+  const shared = ['lineaMicra.phase', 'lineaMicra.selectedSerial'];
   assert.deepEqual(overlaps(diagPaths, settingsPaths).sort(), [...shared].sort(),
       'Diagnostic shares only the compatibility-mode Micra paths with Settings');
   for (const p of shared)

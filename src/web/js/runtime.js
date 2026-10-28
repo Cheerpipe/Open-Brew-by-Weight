@@ -395,6 +395,60 @@ function updateHeaderSignals(s = {}) {
     if (identity) identity.textContent = paired ? s.companion.name || "—" : "—";
     if (detail) detail.textContent = label;
   }
+  // The La Marzocco cloud link, Micra builds only: the feed's observation
+  // quality decides — live (current, or a command the cloud has yet to
+  // confirm) keeps the icon inked, anything else grays it. Envelopes without
+  // a lineaMicra model (the Admin poll) leave the icon on its last Home
+  // frame, and other builds fold this branch away entirely.
+  const micra = $("micraSignal");
+  if (micra && __LINEA_MICRA__ && s.machineIntegration === "linea_micra_cloud" && s.lineaMicra) {
+    const lm = s.lineaMicra,
+      stale = !!s.snapshotStale,
+      quality = lm.quality,
+      live = !stale && (quality === "current" || quality === "optimistic");
+    micra.hidden = false;
+    micra.dataset.level = live ? "on" : "off";
+    const label = live
+      ? __WEBUI_TEXT__("admin.companion_link_open")
+      : stale
+        ? unavailable
+        : quality === "unconfigured"
+          ? __WEBUI_TEXT__("runtime.not_connected")
+          : quality === "disabled"
+            ? __WEBUI_TEXT__("runtime.disabled")
+            : __WEBUI_TEXT__("shell.micra_link_trouble");
+    micra.title = __WEBUI_TEXT__("diagnostic.marzocco_cloud") + ": " + label;
+    micra.setAttribute("aria-label", micra.title);
+    const account = $("micraName"),
+      machine = $("micraMachine"),
+      detail = $("micraDetail");
+    if (account) account.textContent = lm.email || __WEBUI_TEXT__("diagnostic.cloud_no_account");
+    if (machine)
+      machine.textContent = lm.selectedName || __WEBUI_TEXT__("diagnostic.cloud_no_machine");
+    if (detail) detail.textContent = label;
+  }
+  updateBrandFit();
+}
+// The header's first row is the brand beside the signal icons. Once the full
+// lockup would wrap, the drawing alone stands in for it; the text returns as
+// soon as it fits again. Measured with the text restored, so the decision
+// never feeds on its own collapsed state.
+function updateBrandFit() {
+  const bar = document.querySelector(".topBar"),
+    brand = bar?.querySelector(".brand"),
+    signals = bar?.querySelector(".headerSignals");
+  if (!bar || !brand || !signals) return;
+  delete document.documentElement.dataset.brandCompact;
+  const box = getComputedStyle(bar),
+    available = bar.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight),
+    gap = parseFloat(box.columnGap) || 0;
+  // Fractional widths: the row wraps the moment the need passes the space,
+  // so the slop stays under a sub-pixel.
+  if (
+    brand.getBoundingClientRect().width + gap + signals.getBoundingClientRect().width >
+    available + 0.5
+  )
+    document.documentElement.dataset.brandCompact = "1";
 }
 // Autosave: after a pause a section sends only the keys its edits changed (a
 // patch); one request in flight per section, SAVE_GAP_MS apart, later edits
@@ -6085,6 +6139,7 @@ export {
   compatibilityModeOn,
   noteWebUiPowerActivity,
   initHeaderSignals,
+  updateBrandFit,
   homeStatusCache,
   shotRecorded,
   cupNeedsRetare,

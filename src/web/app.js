@@ -240,6 +240,7 @@ function updateNavigationLayout() {
     if (nav.scrollWidth <= nav.clientWidth) break;
   }
   sizeHeader();
+  R.updateBrandFit();
 }
 function sizeHeader() {
   root.style.setProperty("--menu-offset", nav.offsetTop + "px");

@@ -119,8 +119,8 @@ body {
   gap: var(--brandGap);
 }
 .brandMark {
-  width: 2.35rem;
-  height: 3.1rem;
+  width: 1.65rem;
+  height: 2.17rem;
   flex: 0 0 auto;
   display: block;
   overflow: visible;
@@ -143,6 +143,11 @@ body {
   font-weight: 300;
   letter-spacing: 0.01em;
   color: var(--fg);
+}
+/* The measured fallback: the drawing alone stands in for the lockup while
+   the header's first row would otherwise wrap. */
+[data-brand-compact] .topBar .brand span {
+  display: none;
 }
 .spriteDefs {
   position: absolute;
@@ -193,7 +198,8 @@ body {
 .signalIndicator[data-level="unknown"] {
   color: var(--mu);
 }
-#companionSignal[data-level="off"] {
+#companionSignal[data-level="off"],
+#micraSignal[data-level="off"] {
   color: var(--mu);
 }
 .signalSlash {
@@ -746,8 +752,8 @@ body.devBuild #adminLockPanel {
     --brandGap: 0.65rem;
   }
   .brandMark {
-    width: 2.55rem;
-    height: 3.35rem;
+    width: 1.79rem;
+    height: 2.35rem;
   }
   .brand span {
     font-size: 1.5rem;
@@ -5324,8 +5330,8 @@ html.theme-dark {
 }
 @media (max-width: 699px) {
   .topBar {
-    --logo-w: 2.35rem;
-    --logo-h: 3.1rem;
+    --logo-w: 1.65rem;
+    --logo-h: 2.17rem;
     --brand-font: 1.4rem;
     --brand-small: 1rem;
     --compact: var(--header-progress, 0);
@@ -5366,8 +5372,8 @@ html.theme-dark {
 @media (max-width: 380px) {
   .topBar {
     gap: 0.15rem;
-    --logo-w: 1.85rem;
-    --logo-h: 2.5rem;
+    --logo-w: 1.3rem;
+    --logo-h: 1.75rem;
     --brand-font: 1.15rem;
     --brand-small: 0.83rem;
   }

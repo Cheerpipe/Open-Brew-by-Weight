@@ -9,14 +9,19 @@
   const companionButton = {dataset: {}, hidden: true, attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
     getAttribute(name) { return this.attributes[name]; }};
+  const micraButton = {dataset: {}, hidden: true, attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+    getAttribute(name) { return this.attributes[name]; }};
   const elements = Object.fromEntries([...['wifi', 'bluetooth'].flatMap((kind, i) => [
     [kind + 'Signal', buttons[i]], [kind + 'Details', {hidden: true}],
     [kind + 'Name', {}], [kind + 'Detail', {}],
-  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}]]);
+  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}],
+    ['micraSignal', micraButton], ['micraName', {}], ['micraMachine', {}], ['micraDetail', {}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
   assert(start >= 0, 'Shared header must render cached signal status');
-  const context = vm.createContext({$: id => elements[id],
-    document: {querySelectorAll: () => buttons, addEventListener: (name, fn) => {events[name] = fn;}},
+  const context = vm.createContext({$: id => elements[id], __LINEA_MICRA__: true,
+    document: {querySelectorAll: () => buttons, querySelector: () => null,
+      addEventListener: (name, fn) => {events[name] = fn;}},
     window: {addEventListener: (name, fn) => {events[name] = fn;}},
   });
   const regionEnd = runtimeJs.slice(start).search(/\nlet\s+homeBootDone\s*=/);
@@ -72,6 +77,42 @@
   assert.equal(elements.companionSignal.dataset.level, 'on', 'A fresh frame re-inks the open link');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3, bluetoothConnected: true, bluetoothLevel: 2}});
   assert.equal(elements.companionSignal.dataset.level, 'on', 'Frames without companion changes keep the indicator');
+  // The La Marzocco cloud indicator exists only on the micra integration and
+  // follows the feed's observation quality: live inks, everything else grays.
+  const micraFrame = (lineaMicra) => context.updateHeaderSignals(
+      {connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud', lineaMicra});
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}});
+  assert.equal(elements.micraSignal.hidden, true, 'Other integrations show no cloud icon');
+  micraFrame({quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
+  assert.equal(elements.micraSignal.hidden, false, 'The micra integration shows the cloud icon');
+  assert.equal(elements.micraSignal.dataset.level, 'on');
+  assert.equal(elements.micraSignal.attributes['aria-label'], 'La Marzocco cloud: Connected');
+  assert.equal(elements.micraName.textContent, 'barista@example.test');
+  assert.equal(elements.micraMachine.textContent, 'Kitchen Micra');
+  assert.equal(elements.micraDetail.textContent, 'Connected');
+  micraFrame({quality: 'optimistic', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
+  assert.equal(elements.micraSignal.dataset.level, 'on', 'A commanded wake-up the cloud has yet to confirm stays inked');
+  for (const [quality, label] of [['stale', 'Connection problems'],
+      ['communication_error', 'Connection problems'], ['unconfigured', 'Not connected'],
+      ['disabled', 'Disabled'], ['unsupported', 'Connection problems']]) {
+    micraFrame({quality, email: '', selectedName: ''});
+    assert.equal(elements.micraSignal.dataset.level, 'off', quality);
+    assert.equal(elements.micraDetail.textContent, label, quality);
+  }
+  assert.equal(elements.micraName.textContent, 'No account saved', 'No account says so');
+  assert.equal(elements.micraMachine.textContent, 'No machine selected', 'No machine says so');
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'linea_micra_cloud',
+    lineaMicra: {quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'}});
+  assert.equal(elements.micraSignal.dataset.level, 'off', 'A stale snapshot grays the cloud icon');
+  assert.equal(elements.micraDetail.textContent, 'Signal unavailable');
+  assert.equal(elements.micraName.textContent, 'barista@example.test', 'The stale account keeps its last known email');
+  micraFrame({quality: 'current'});
+  assert.equal(elements.micraSignal.dataset.level, 'on', 'A fresh frame re-inks the cloud icon');
+  // The Admin poll names the integration but carries no micra model; it must
+  // leave the indicator on its last Home frame instead of graying it.
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud'});
+  assert.equal(elements.micraSignal.dataset.level, 'on', 'A model-less envelope keeps the cloud icon');
+  assert.equal(elements.micraDetail.textContent, 'Connected');
   context.initHeaderSignals();
   buttons[0].click();
   assert.equal(elements.wifiDetails.hidden, false);
@@ -113,6 +154,27 @@
   const network = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.cpp'), 'utf8');
   assert(network.replace(/\s+/g, ' ').includes('entry.friendlyName[0] ? entry.friendlyName : scaleDefaultFriendlyName(entry.name)'), 'Friendly name precedes the advertised BLE name and its derived default');
   assert(network.includes('preferredScaleMacEqual(entry.mac, control.connectedScaleMac)'), 'Name must match the connected scale');
+}
+// The brand drops its text only while the measured row would wrap, and every
+// decision starts from the restored lockup so it can recover on its own.
+{
+  const assert = require('assert').strict, vm = require('vm');
+  const doc = {dataset: {}}, reads = [];
+  const el = (width) => ({getBoundingClientRect() {reads.push(width); return {width};}});
+  const bar = {clientWidth: 120,
+    querySelector: (s) => s === '.brand' ? el(40) : s === '.headerSignals' ? el(90) : null};
+  const context = vm.createContext({document: {querySelector: () => bar, documentElement: doc},
+    getComputedStyle: () => ({paddingLeft: '10px', paddingRight: '10px', columnGap: '4px'})});
+  vm.runInContext(blockAt(runtimeJs, 'function updateBrandFit('), context);
+  doc.dataset.brandCompact = '1';
+  context.updateBrandFit();
+  assert.deepEqual(reads, [40, 90], 'fit is measured with the text restored');
+  assert.equal(doc.dataset.brandCompact, '1', '40 + 4 + 90 does not fit 100 available');
+  bar.clientWidth = 200;
+  context.updateBrandFit();
+  assert.equal(doc.dataset.brandCompact, undefined, 'a fitting row brings the text back');
+  assert(codeIncludes(appJsSource, 'sizeHeader();R.updateBrandFit();'),
+      'resize, fonts and breakpoint changes re-measure the brand fit');
 }
 {
   const assert = require('assert').strict, vm = require('vm'), hidden = new Set(['hidden']);
@@ -183,6 +245,7 @@
   const svg = () => ({attrs: {}, setAttribute(name, value) {this.attrs[name] = value;}, appendChild: child => child});
   const still = {matches: false};
   const context = vm.createContext({root, nav, mobile, still, __WEBUI_TEXT__: key => key,
+    R: {updateBrandFit() {}},
     document: {documentElement: root, createElementNS: (ns, tag) => (assert.equal(ns, 'http://www.w3.org/2000/svg'), svg()),
       querySelector: selector => {assert.equal(selector, '.topBar'); return header;}, getElementById: id => {assert.equal(id, 'app'); return app;},
       fonts: {ready: {then: fn => {callbacks.fonts = fn;}}}},

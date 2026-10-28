@@ -55,6 +55,9 @@
         <rect x="4" y="13" width="16" height="7" rx="1.5" />
         <path d="M8 7.5h.01M8 16.5h.01" />
       </symbol>
+      <symbol id="dg-marzocco-cloud" class="micraOnly" viewBox="0 0 24 24">
+        <path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9Z" />
+      </symbol>
     </svg>
     <div id="homeBoot" class="bootOverlay" role="status">
       <div class="brand" aria-hidden="true">
@@ -66,7 +69,7 @@
     </div>
     <header class="topBar">
       <h1 class="brand">
-        <a href="/" data-route="/"
+        <a href="/" data-route="/" aria-label="{{webui:shell.open_brew_by_weight}}"
           ><svg class="brandMark" viewBox="0 0 40 56" aria-hidden="true">
             <use href="#brandMark" /></svg
           ><span><small>{{webui:shell.open_brew}}</small>{{webui:shell.by_weight}}</span></a
@@ -106,6 +109,25 @@
               stroke="currentColor"
               stroke-width="2"
               stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="signalIndicator micraOnly"
+          id="micraSignal"
+          aria-label="{{webui:diagnostic.marzocco_cloud}}"
+          aria-expanded="false"
+          aria-controls="micraDetails"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <use
+              href="#dg-marzocco-cloud"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
               stroke-linejoin="round"
             />
           </svg>
@@ -220,6 +242,20 @@
           <p>
             <span>{{webui:admin.companion_link}}</span
             ><b id="companionDetail">{{webui:runtime.signal_unavailable}}</b>
+          </p>
+        </section>
+        <section
+          id="micraDetails"
+          class="signalDetails micraOnly"
+          aria-labelledby="micraDetailsTitle"
+          hidden
+        >
+          <strong id="micraDetailsTitle">{{webui:diagnostic.marzocco_cloud}}</strong>
+          <p><span>{{webui:settings.account}}</span><b id="micraName">—</b></p>
+          <p><span>{{webui:settings.micra_machine}}</span><b id="micraMachine">—</b></p>
+          <p>
+            <span>{{webui:admin.companion_link}}</span
+            ><b id="micraDetail">{{webui:runtime.signal_unavailable}}</b>
           </p>
         </section>
       </div>
