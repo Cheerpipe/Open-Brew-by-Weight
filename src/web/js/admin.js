@@ -630,7 +630,11 @@ function companionRouteText(c) {
   if (c.route === "companion") return through;
   if (c.route === "pending") return moving;
   if (!c.lm) return direct;
-  return direct + " · " + waits[c.link !== "open" ? 0 : !c.credentials ? 1 : !c.upstream ? 2 : 3];
+  return (
+    direct +
+    " · " +
+    waits[c.link !== "open" ? 0 : !c.credentials ? 1 : !c.upstream || c.refused ? 2 : 3]
+  );
 }
 function showCompanionPairing(c) {
   const p = companionPairing;

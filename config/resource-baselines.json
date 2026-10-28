@@ -7,7 +7,7 @@
     "total_size": 220588,
     "used_diram": 8192,
     "flash_code": 145488,
-    "flash_rodata": 75696
+    "flash_rodata": 75776
   },
   "updateHeadroomBytes": 64,
   "targets": {

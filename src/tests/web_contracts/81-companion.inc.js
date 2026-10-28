@@ -97,6 +97,12 @@
         "Directly from the controller · the companion isn't connected");
     assert.equal(route({route: 'direct', lm: true, link: 'open', credentials: true, upstream: false}),
         'Directly from the controller · the companion is connecting to La Marzocco');
+    assert.equal(route({route: 'direct', lm: true, link: 'open', credentials: true, upstream: true,
+      refused: true}),
+    'Directly from the controller · the companion is connecting to La Marzocco');
+    assert.equal(route({route: 'direct', lm: true, link: 'open', credentials: true, upstream: true,
+      refused: false}),
+    'Directly from the controller · it moves over when the machine is idle');
   }
 
   // Entry point (c): an https: page asks its companion's same-origin status;

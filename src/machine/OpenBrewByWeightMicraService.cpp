@@ -1883,6 +1883,7 @@ void OpenBrewByWeightMicraService::executeRelist(PendingRequest &pending) {
       break;
     }
     error = classifyFailure();
+    discardAccessToken();
     const uint16_t http = work_ == nullptr ? 0 : work_->httpStatus;
     if (attempt + 1U >= micra_timing::kMaxAttempts || http == 401 ||
         !lineaMicraHttpRetryable(http) ||

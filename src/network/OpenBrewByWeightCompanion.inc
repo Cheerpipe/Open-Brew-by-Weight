@@ -1361,9 +1361,10 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
       static_cast<unsigned long>(g_companion.relay.rejects));
   if (kCompanionLm)
     ok = ok && statusJsonAppend(
-        used, "\"route\":\"%s\",\"lm\":%s,\"upstream\":%s,\"credentials\":%s,",
+        used, "\"route\":\"%s\",\"lm\":%s,\"upstream\":%s,\"refused\":%s,\"credentials\":%s,",
         companionRouteName(route.route), stored.lmSwitch ? "true" : "false",
-        route.upstreamSubscribed ? "true" : "false", route.credentialsConfirmed ? "true" : "false");
+        route.upstreamSubscribed ? "true" : "false",
+        route.upstreamRefused ? "true" : "false", route.credentialsConfirmed ? "true" : "false");
   ok = ok && statusJsonAppend(used, "\"request\":");
   const CompanionRequest &request = g_companion.pairing.request;
   if (request.state == CompanionPairState::PENDING)
