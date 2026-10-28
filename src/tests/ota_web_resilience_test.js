@@ -53,6 +53,7 @@ async function harness(mode) {
   const R = {uiState: {}, controlsMutable: true,
     message: text => messages.push(text), clearFieldErrors() {}, showFieldError() {},
     formatCommandError: (text, error) => text + ' ' + error.message, refreshStatus() {},
+    sleep: async (ms) => { delays.push(ms); },
     sub: (text, values) => text.replace(/\{(\d)\}/g, (_, i) => values[i])};
   const context = vm.createContext({console, crypto: crypto.webcrypto,
   __WEBUI_TEXT__: key => locale[key] || key, localStorage: {
@@ -61,7 +62,7 @@ async function harness(mode) {
   $: key => {
     if (!nodes.has(key)) nodes.set(key, {files: [uploadFile], value: 0, classList: {add() {}, remove() {}}});
     return nodes.get(key);
-  }, confirm: () => true, R, wait: async (ms) => { delays.push(ms); }});
+  }, confirm: () => true, R});
   vm.runInContext(otaSource, context);
   context.otaFileIdentity = parser;
   const send = async (url, body, timeout, method = 'POST', headers = {}) => {
