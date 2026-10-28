@@ -4,6 +4,32 @@ Notable changes for people who install and use Open Brew by Weight. Version
 numbers follow `MAJOR.MINOR.PATCH`; the firmware reports the same number in the
 Web UI footer.
 
+## Unreleased
+
+Install this version over USB with a full erase: earlier shot curves and
+exported JSON formats are not carried over.
+
+- **Every shot is kept:** each shot pulled with a scale is stored, even one
+  that ran short or never reached a usable yield. Those are marked as bad
+  shots: they never count in statistics, charts, grind hints or learning,
+  and **Show bad shots** in the Shots filter lists them with their reason.
+- **Shot trace:** each shot also records what the controller saw and
+  decided, from the tare to the last drip. Open it from a shot's menu with
+  **View trace**, or export everything with **JSON + diagnostics** (also as
+  a compressed `.json.gz`). A shot cut short by a crash or restart is kept
+  as an interrupted trace.
+- **More history:** up to 1,000 shots, with curves kept on flash and the
+  most recent ones always at hand. Diagnostic gains a **Shot storage**
+  section that shows how the space is used.
+- **Late tare fix:** when the scale applies the shot-start tare late, the
+  controller now recognizes it, so the shot still stops at its target
+  instead of running to the time limit; a weight that drops below an empty
+  scale hands over to the timed backup.
+- **Cup not tared:** Home tells you when the cup on the scale was not tared
+  so you can lift it and place it again, and the Diagnostic log says why.
+- **JSON export:** one format, version 1, replaces the formats shipped up to
+  1.1.0.
+
 ## 1.1.0 — 2026-10-26
 
 The first published stable release; it supersedes the unpublished 1.0.0 tag.

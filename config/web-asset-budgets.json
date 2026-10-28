@@ -6,16 +6,16 @@
     "raw": 0
   },
   "limits": {
-    "source.html": 117977,
-    "source.js": 606433,
-    "source.htmlJs": 724410,
+    "source.html": 120732,
+    "source.js": 631143,
+    "source.htmlJs": 751875,
     "gzip.shellHtml": 5494,
-    "gzip.shellJs": 8206,
-    "gzip.css": 19089,
+    "gzip.shellJs": 8240,
+    "gzip.css": 19295,
     "gzip.runtime": 44467,
     "gzip.otaImage": 3072,
-    "gzip.module.records": 22566,
-    "gzip.module.diagnostic": 15902,
+    "gzip.module.records": 27115,
+    "gzip.module.diagnostic": 16692,
     "gzip.module.admin": 18920,
     "gzip.module.settings": 23291,
     "gzip.module.setup": 9172,
@@ -23,6 +23,6 @@
     "raw.icon192": 31500,
     "raw.icon48": 3500,
     "gzip.coldHome": 75782,
-    "gzip.combined": 173362
+    "gzip.combined": 179370
   }
 }
