@@ -11,9 +11,7 @@
 #include "OpenBrewByWeightCrashArchive.h"
 #include "OpenBrewByWeightAuditStore.h"
 #include "OpenBrewByWeightWebAccessStore.h"
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
 #include "network/OpenBrewByWeightCompanionStore.h"
-#endif
 
 namespace openbrewbyweight {
 
@@ -131,9 +129,7 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
     return false;
   }
 #endif
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   if (!eraseCompanionStored()) return false;
-#endif
 
   yieldFlashIo();
   feedFlashIoWatchdog();

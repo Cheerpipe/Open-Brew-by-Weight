@@ -654,15 +654,18 @@ esp_err_t OpenBrewByWeightNetwork::webhookHandler(httpd_req_t *request) {
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   static const char *const fields[] = {
       "action", "enabled", "url", "brewState", "firstDrop", "end",
-      "deferDuringShot"};
+      "deferDuringShot", "baseRevision"};
   char action[8] = {};
   WebhookConfig candidate = self.webhooks_.config();
+  bool stale = false;
   const bool known = root != nullptr &&
       jsonHasOnlyUniqueFields(root, fields, sizeof(fields) / sizeof(fields[0]));
   const bool actionOk = known &&
       jsonString(root, "action", action, sizeof(action), false);
   bool parsed = actionOk;
   if (parsed && strcmp(action, "save") == 0) {
+    // A form filled before another screen saved is refused (Admin's revision).
+    stale = !baseRevisionCurrent(root, webhookRevision(candidate));
     parsed = jsonBoolean(root, "enabled", candidate.enabled) &&
              jsonString(root, "url", candidate.url, sizeof(candidate.url), true) &&
              jsonBoolean(root, "brewState", candidate.brewState) &&
@@ -681,6 +684,9 @@ esp_err_t OpenBrewByWeightNetwork::webhookHandler(httpd_req_t *request) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_WEBHOOK",
                      "Use an http:// URL without embedded credentials; HTTPS is not supported.");
   }
+  if (stale)
+    return sendError(request, STATUS_CONFLICT, "STALE_REVISION",
+                     "Webhook settings changed; refresh and retry.");
 
   if (strcmp(action, "test") == 0) {
     WebhookEvent event;

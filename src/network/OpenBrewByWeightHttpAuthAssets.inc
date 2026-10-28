@@ -71,12 +71,21 @@ esp_err_t OpenBrewByWeightNetwork::claimHandler(httpd_req_t *request) {
     return sendError(request, STATUS_UNAUTHORIZED, "AUTH_REQUIRED",
                      "Sign in with the device password.");
   }
+  // A companion screen claiming while the companion holds control attaches
+  // to that claim: it takes nothing from the other screens and drops only
+  // the unlock and override it held itself. Anything else takes control.
+  CompanionPrincipal screen;
+  const bool relayed = self.webUiPrincipal(request, screen) && screen.relayed;
   self.dataMux_.lock();
-  memcpy(self.activeWebUiClientId_, clientId, sizeof(clientId));
-  self.webUiOverrideActive_ = false;
-  self.webUiOverrideUntilMs_ = 0;
+  const bool attach = relayed && strcmp(self.activeWebUiClientId_, clientId) == 0;
+  if (!attach || companionPrincipalHolds(self.webUiOverride_, screen)) {
+    self.webUiOverrideActive_ = false;
+    self.webUiOverrideUntilMs_ = 0;
+    self.webUiOverride_ = CompanionPrincipal{};
+  }
+  if (!attach) memcpy(self.activeWebUiClientId_, clientId, sizeof(clientId));
   self.dataMux_.unlock();
-  self.clearAdminUnlock();
+  self.clearAdminUnlock(attach ? &screen : nullptr);
   memset(clientId, 0, sizeof(clientId));
   return sendJson(request, STATUS_OK,
          firmwareCompatibilityMode()
@@ -99,45 +108,44 @@ esp_err_t OpenBrewByWeightNetwork::unlockHandler(httpd_req_t *request) {
     return sendError(request, STATUS_UNPROCESSABLE, "UNLOCK_NOT_CONFIRMED",
                      "The unsafe WebUI override was not explicitly confirmed.");
   }
+  CompanionPrincipal holder;
+  (void)self.webUiPrincipal(request, holder);
   const uint32_t now = millis();
   self.dataMux_.lock();
   self.webUiOverrideActive_ = true;
   self.webUiOverrideUntilMs_ = now + WEB_UI_OVERRIDE_MS;
+  self.webUiOverride_ = holder;
   self.dataMux_.unlock();
   return sendJson(request, STATUS_OK, "{\"unlocked\":true}");
 }
 #endif
 
 bool OpenBrewByWeightNetwork::webUiOverrideAllowed(httpd_req_t *request) {
-  char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
-  if (!readWebUiClientId(request, clientId, sizeof(clientId))) return false;
-  const uint32_t now = millis();
-  bool allowed = false;
-  dataMux_.lock();
-  if (webUiOverrideActive_ && activeWebUiClientId_[0] != '\0' &&
-      strcmp(activeWebUiClientId_, clientId) == 0) {
-    if (static_cast<int32_t>(now - webUiOverrideUntilMs_) >= 0) {
-      webUiOverrideActive_ = false;
-      webUiOverrideUntilMs_ = 0;
-    } else {
-      allowed = true;
-    }
-  }
-  dataMux_.unlock();
-  memset(clientId, 0, sizeof(clientId));
-  return allowed;
+  return webUiOverrideRemainingMs(request) != 0;
 }
 
+// The active window holds the override; through the companion, only the
+// screen that turned it on.
 uint32_t OpenBrewByWeightNetwork::webUiOverrideRemainingMs(httpd_req_t *request) {
   char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
   if (!readWebUiClientId(request, clientId, sizeof(clientId))) return 0;
+  CompanionPrincipal caller;
+  char addr[COMPANION_RELAY_ADDR_TEXT];
+  caller.relayed = relayIdentity(request, caller.id, addr);
   const uint32_t now = millis();
   uint32_t remaining = 0;
   dataMux_.lock();
   if (webUiOverrideActive_ && activeWebUiClientId_[0] != '\0' &&
       strcmp(activeWebUiClientId_, clientId) == 0 &&
-      static_cast<int32_t>(now - webUiOverrideUntilMs_) < 0) {
-    remaining = webUiOverrideUntilMs_ - now;
+      (caller.relayed ? companionPrincipalHolds(webUiOverride_, caller)
+                      : !webUiOverride_.relayed)) {
+    if (static_cast<int32_t>(now - webUiOverrideUntilMs_) >= 0) {
+      webUiOverrideActive_ = false;
+      webUiOverrideUntilMs_ = 0;
+      webUiOverride_ = CompanionPrincipal{};
+    } else {
+      remaining = webUiOverrideUntilMs_ - now;
+    }
   }
   dataMux_.unlock();
   memset(clientId, 0, sizeof(clientId));
@@ -160,20 +168,20 @@ bool OpenBrewByWeightNetwork::historyMutationAllowed(
   return webUiConfigurationAllowed(request, status);
 }
 
-void OpenBrewByWeightNetwork::clearAdminUnlock() {
+void OpenBrewByWeightNetwork::clearAdminUnlock(const CompanionPrincipal *holder) {
   dataMux_.lock();
-  adminUnlocked_ = false;
-  adminUnlockClientId_[0] = '\0';
-  adminUnlockUntilMs_ = 0;
+  if (holder == nullptr || companionPrincipalHolds(adminUnlock_, *holder)) {
+    adminUnlocked_ = false;
+    adminUnlock_ = CompanionPrincipal{};
+    adminUnlockUntilMs_ = 0;
+  }
   dataMux_.unlock();
 }
 
-void OpenBrewByWeightNetwork::grantAdminUnlock(const char *clientId, uint32_t now) {
-  if (clientId == nullptr) {
-    return;
-  }
+// One holder: unlocking on another screen or window replaces this one.
+void OpenBrewByWeightNetwork::grantAdminUnlock(const CompanionPrincipal &holder, uint32_t now) {
   dataMux_.lock();
-  memcpy(adminUnlockClientId_, clientId, sizeof(adminUnlockClientId_));
+  adminUnlock_ = holder;
   adminUnlocked_ = true;
   adminUnlockUntilMs_ = now + ADMIN_UNLOCK_IDLE_MS;
   dataMux_.unlock();
@@ -231,26 +239,26 @@ bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {
   (void)request;
   return true;
 #else
-  char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
-  const bool hasClient =
-      readWebUiClientId(request, clientId, sizeof(clientId));
+  // Through the companion the unlock belongs to the screen that typed the
+  // password, never to the companion's shared client id.
+  CompanionPrincipal caller;
+  const bool hasClient = webUiPrincipal(request, caller);
   const uint32_t now = millis();
   bool allowed = false;
   bool apActive = false;
   dataMux_.lock();
   apActive = status_.apActive;
-  if (hasClient && adminUnlocked_ && adminUnlockClientId_[0] != '\0' &&
-      strcmp(adminUnlockClientId_, clientId) == 0) {
+  if (hasClient && adminUnlocked_ && companionPrincipalHolds(adminUnlock_, caller)) {
     if (static_cast<int32_t>(now - adminUnlockUntilMs_) >= 0) {
       adminUnlocked_ = false;
-      adminUnlockClientId_[0] = '\0';
+      adminUnlock_ = CompanionPrincipal{};
       adminUnlockUntilMs_ = 0;
     } else {
       allowed = true;
     }
   }
   dataMux_.unlock();
-  memset(clientId, 0, sizeof(clientId));
+  memset(caller.id, 0, sizeof(caller.id));
   // SoftAP onboarding bypass: whoever joined the device network already
   // proved the WPA2 passphrase, which is the device password.
   if (!allowed && apActive &&
@@ -306,7 +314,9 @@ esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
   }
 
   char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
-  if (!readWebUiClientId(request, clientId, sizeof(clientId))) {
+  CompanionPrincipal holder;
+  if (!readWebUiClientId(request, clientId, sizeof(clientId)) ||
+      !self.webUiPrincipal(request, holder)) {
     memset(password, 0, sizeof(password));
     return sendError(request, STATUS_BAD_REQUEST, "UI_CLIENT_INVALID",
                      "X-WebUI-Client must be a 16-24 character lowercase hex id.");
@@ -314,8 +324,8 @@ esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
 
   const PasswordCheck check = self.checkDevicePassword(request, password);
   memset(password, 0, sizeof(password));
+  memset(clientId, 0, sizeof(clientId));
   if (check != PasswordCheck::OK) {
-    memset(clientId, 0, sizeof(clientId));
     return check == PasswordCheck::COOLDOWN
                ? sendError(request, STATUS_TOO_MANY, "ADMIN_UNLOCK_COOLDOWN",
                            "Too many failed unlock attempts. Try again shortly.")
@@ -323,8 +333,8 @@ esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
                            "Device password is incorrect.");
   }
 
-  self.grantAdminUnlock(clientId, millis());
-  memset(clientId, 0, sizeof(clientId));
+  self.grantAdminUnlock(holder, millis());
+  memset(holder.id, 0, sizeof(holder.id));
   return sendJson(request, STATUS_OK, "{\"unlocked\":true}");
 }
 
@@ -336,7 +346,10 @@ esp_err_t OpenBrewByWeightNetwork::adminLockHandler(httpd_req_t *request) {
     return bodyStatus;
   }
   self.unlockJsonBody();
-  self.clearAdminUnlock();
+  // A companion screen locks only its own unlock.
+  CompanionPrincipal caller;
+  if (self.webUiPrincipal(request, caller) && caller.relayed) self.clearAdminUnlock(&caller);
+  else self.clearAdminUnlock();
   return sendJson(request, STATUS_OK, "{\"unlocked\":false}");
 }
 #endif
@@ -439,12 +452,13 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       {"/api/v1/auth/access", HTTP_POST, authAccessHandler},
       {"/api/v1/auth/notice", HTTP_POST, authNoticeHandler},
       {"/api/v1/auth/pairing", HTTP_POST, authPairingHandler},
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
       // The companion pairs without a claim or a login; Admin approves.
       {"/api/v1/companion/pair", HTTP_POST, companionPairHandler, false, true},
       {"/api/v1/companion/pair", HTTP_GET, companionPairHandler, false, true},
       {"/api/v1/companion/admin", HTTP_POST, companionAdminHandler},
-#endif
+      // The relay handshake proves the pairing secret instead (companion only).
+      {"/api/v1/companion/relay", HTTP_GET, companionRelayHandler, false, true},
+      {"/api/v1/companion/relay", HTTP_POST, companionRelayHandler, false, true},
 #if OPEN_BREW_BY_WEIGHT_DEVELOPMENT == 1
 // Unlock routes are not served in development builds; administration is
 // public there and the UI never calls these endpoints.

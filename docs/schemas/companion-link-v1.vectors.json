@@ -1,5 +1,5 @@
 {
-  "description": "Companion link v1 test vectors (docs/COMPANION_LINK.md). Private scalars are test-only.",
+  "description": "Companion link v1 test vectors (docs/COMPANION_LINK.md), relay included. Private scalars are test-only.",
   "companionPrivate": "2e81dffcbc3a2d1b5cc74347ec38bbd731eb73244cfdd70cc1ce063a7c1fb508",
   "controllerPrivate": "2b80d0771d0754ad6827e5424ca8bd0866bd04e3e870f2bcf31aa527970411f8",
   "companionKey": "BGj34BgnnHxylAr96pvcuEFJlqzfUCJaYwY0z+vwhmxNnW7szp6gW5NVvrzNOaIE7TsBVM0cC2zm5Ik+kipaE34=",
@@ -22,5 +22,39 @@
     "iv": "ICEiIyQlJicoKSor",
     "plaintext": "{\"email\":\"barista@example.com\",\"password\":\"correct horse\",\"serial\":\"MR012345\"}",
     "ct": "640SoZajkEzuVzZyvBa8WKwnY6NcZPiYL5sLMRP6/JveA6BzVC8P43WciOAwP1HJuSyxn7TfOmWYnw+zW+S96xrl5m2nd+sMVTYqFgjEH+Ur8rEWY+T7+FD2C9bYWw=="
+  },
+  "relay": {
+    "challenge": "ICEiIyQlJicoKSorLC0uLw==",
+    "nonce": "AAECAwQFBgcICQoLDA0ODw==",
+    "request": "IqXJyme9N+4Itdktq5/Ivh5ZjHoTV8H7bTMJpmg1/98=",
+    "reply": "ZJpZnhNrg1HoYeWHaaRJzbL9eytVr4ondnimvmsNBmE=",
+    "erase": "FIlKLyITh/HIf1ZDQZbvg7aUTSoqAnq7PIFCwQsVbT8=",
+    "key": "40d887e5f1028a2cabca249e0a8d3acc1c095231ab8ed3461a0798f8bffda696",
+    "requests": [
+      {
+        "method": "POST",
+        "uri": "/api/v1/config?x=1",
+        "screen": "0123456789abcdef",
+        "session": "token",
+        "canonical": "obbw-relay-v1\nPOST\n/api/v1/config?x=1\n7\n192.168.1.50\n0123456789abcdef\ntoken\n",
+        "header": "1 7 192.168.1.50 0123456789abcdef 99d273f03f13381fca548696321e402c"
+      },
+      {
+        "method": "GET",
+        "uri": "/api/v1/ui/ui-stream",
+        "screen": "00112233445566778899aabb",
+        "session": "",
+        "canonical": "obbw-relay-v1\nGET\n/api/v1/ui/ui-stream\n8\n0.0.0.0\n00112233445566778899aabb\n\n",
+        "header": "1 8 0.0.0.0 00112233445566778899aabb 537c556eb0a92e2bca19a5c04cb34918"
+      },
+      {
+        "method": "GET",
+        "uri": "/api/v1/status/admin",
+        "screen": "0123456789abcdef01234567",
+        "session": "00112233445566778899aabbccddeeff",
+        "canonical": "obbw-relay-v1\nGET\n/api/v1/status/admin\n9\nfe80::1\n0123456789abcdef01234567\n00112233445566778899aabbccddeeff\n",
+        "header": "1 9 fe80::1 0123456789abcdef01234567 e7af16c12490a2b6c9f03f7a9b569eb3"
+      }
+    ]
   }
 }

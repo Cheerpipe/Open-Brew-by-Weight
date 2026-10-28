@@ -7,8 +7,10 @@ away, behaves exactly as it does without this feature. Everything here is
 opened by the companion; the controller never connects to the companion,
 never browses mDNS, and never retries.
 
-Version 1 covers pairing and the La Marzocco route on Linea Micra builds.
-Other builds do not register these routes.
+Version 1 covers pairing, the [relay](#relay) that lets the companion serve
+the Web UI to several screens, and, on Linea Micra builds, the La Marzocco
+route. Every build registers these routes; a controller that is not paired
+answers them and does nothing else.
 
 ## Common rules
 
@@ -103,7 +105,7 @@ public key; it discards its request key.
 | `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids) |
 | `{"action":"unignore"}` | Forgets the ignored ids |
 | `{"action":"forget"}` | Removes the pairing and closes the link; the next link attempt receives `erase` |
-| `{"action":"switches","lm":true}` | Sets the La Marzocco switch (Web UI is always the companion's own choice) |
+| `{"action":"switches","ui":false,"lm":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere). An open link receives a new `cfg` |
 
 Every action answers `{"ok":true}`. Approve and Ignore without an open request
 answer `409 PAIRING_NOT_PENDING`; Forget and Switches without a pairing answer
@@ -115,6 +117,7 @@ Admin reads the pairing, the open request and the link state from
 ```json
 "companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
  "version":"1.0.0","link":"open","linkAgeS":3600,"peerProtocol":0,
+ "ui":true,"relay":"ready","relayRejects":0,
  "route":"companion","lm":true,"upstream":true,"credentials":true,
  "request":null,"ignored":0}
 ```
@@ -122,23 +125,32 @@ Admin reads the pairing, the open request and the link state from
 `link` is `open` or `down`, `linkAgeS` the seconds since the link last came
 up or went down (`-1` when neither happened since the controller started),
 `peerProtocol` the protocol of the paired companion's last hello that this
-controller refused with `PROTOCOL` (0 when none, or once a link opens), `route`
-is `direct`, `pending` or `companion`, `credentials` tells whether the
-companion confirmed the current account, and `request` is
+controller refused with `PROTOCOL` (0 when none, or once a link opens), `ui`
+the Web UI switch, `relay` `ready` once a [relay handshake](#relay) succeeded
+since the controller started (`down` before and after Forget), `relayRejects`
+the relayed requests refused since then; on Linea Micra builds `route` is
+`direct`, `pending` or `companion`, `credentials` tells whether the
+companion confirmed the current account (other builds omit `route`, `lm`,
+`upstream` and `credentials`), and `request` is
 `{"name","address","version","expiresInS","codeReady"}` while a request is
 open (`codeReady` once the companion revealed its key and the controller's key
 exists). Home's stream carries `companion.requestName` and
 `companion.requestAddress` (empty strings when no request is open). The
 Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
 `protocol` (the open link's, 0 while down), `peerProtocol`, `link`,
-`linkAgeS`, `reconnects`, `authFailures`, `route`, `reason` (why the route is
-direct; `protocol` while `peerProtocol` is set), `lm`, `upstream`,
+`linkAgeS`, `reconnects`, `authFailures` (link and relay handshakes), `ui`,
+`relay`, `relayRejects` and, on Linea Micra builds, `route`, `reason` (why the
+route is direct; `protocol` while `peerProtocol` is set), `lm`, `upstream`,
 `routeSwitches` and `commands`. Names, versions and addresses are stored
 without quotes, backslashes or angle brackets; the name and version follow the
-companion's authenticated `hello`. Builds other than Linea Micra have none of
-these fields.
+companion's authenticated `hello`.
 
 ## Link
+
+The companion opens the link only while a feature needs it: the [relay
+handshake](#relay) answers `link` (today `true` only on Linea Micra builds with
+the La Marzocco switch on). A companion that finds no relay route (an older
+controller) opens it as before.
 
 `GET /api/v1/companion/link` upgrades to a WebSocket. Only text frames are
 used, each at most 4,096 bytes including a signed frame's MAC prefix. One
@@ -188,7 +200,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 
 | Frame | Meaning |
 | --- | --- |
-| `{"t":"cfg","lm":true,"conn":"ws","observe":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`). Sent after `ready` and on every change |
+| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true}`. Sent after `ready` and on every change |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
 | `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` frames until `on` is `false` |
@@ -219,6 +231,9 @@ secrets directory and never in logs.
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
+
+Builds without La Marzocco know only `ping` (its `up` is ignored there); the
+other four are types they do not know and ignore.
 
 The controller closes a link that sends nothing for two ping intervals: 35
 seconds while the La Marzocco route is `companion`, 250 seconds otherwise. A
@@ -276,3 +291,117 @@ under the same rules as any reconnection (never during a shot with a scale, a
 scale connection or the BLE quiet interval). Two La Marzocco sessions for a
 moment are harmless: the companion has its own installation. Commands go only
 through the route active when they are sent.
+
+## Relay
+
+With **Web UI through the companion** on, the companion serves the Web UI to
+any number of screens while the controller keeps one claim and one ui-stream
+session, held by the companion. The companion forwards each screen's REST
+calls and its own ui-stream upgrade with a signed header. The relay works
+without the link, uses no clock and writes nothing to flash. A request without
+the header takes exactly the path it takes without a companion.
+
+The source address of a request is never trusted: a Docker host can run the
+companion and Home Assistant behind one address. Only a valid signature makes
+a request relayed; the local-peer rule still applies on top of it.
+
+### Handshake
+
+`GET /api/v1/companion/relay` answers
+`{"challenge":"<16 bytes>","protocol":1}`, or `404 COMPANION_NOT_PAIRED`.
+The challenge `rb` is random per controller start and changes only after a
+successful `POST`, so a device that reads it cannot replace it.
+
+`POST /api/v1/companion/relay` (`Content-Type: application/json`, `415`
+otherwise) with `{"id":"…","nonce":"<16 bytes>","mac":"<32 bytes>"}`, where
+`mac = HMAC(S, "R" ‖ rb ‖ nc)` and `nc` is the companion's fresh nonce:
+
+| Status | Body | When |
+| --- | --- | --- |
+| `200` | `{"mac":"…","ui":true,"link":false}` | `mac = HMAC(S, "Q" ‖ rb ‖ nc)` (the companion checks it); `ui` the Web UI switch; `link` whether a feature needs the link |
+| `400` | `INVALID_REQUEST` | Malformed fields |
+| `401` | `COMPANION_AUTH` | Wrong `mac` (counted in `authFailures`, one rate-limited log line) |
+| `404` | `COMPANION_NOT_PAIRED`, plus `"erase":"<HMAC(S, "E" ‖ nc)>"` for a forgotten companion | Unknown or forgotten `id`, decided before `mac` is checked: a companion whose `GET` was answered `404` sends any `mac` (for example over 16 zero bytes as `rb`) to learn whether to erase |
+
+On success both sides derive
+`Kr = HKDF-SHA256(ikm = S, salt = rb ‖ nc, info = "obbw-relay-v1", L = 32)`,
+the controller resets the replay window and draws a new `rb`. A replayed
+handshake fails because `rb` changed. Forget and a factory reset end the
+relay session, and so does a change of either switch in Admin → Companion:
+the companion's next relayed request is `RELAY_STALE`, and its new handshake
+carries the new `ui` and `link`. A missing `ui` reads as `true` and a missing
+`link` as `false`.
+
+### Signed requests
+
+```text
+X-OBBW-Relay: 1 <q> <addr> <screen> <mac>
+```
+
+- `q`: the request counter of this relay session, from 1, decimal without
+  leading zeros, at most 4294967295; the companion makes a new handshake
+  before it would wrap;
+- `addr`: the browser's address as the companion's gateway saw it (IPv4 or
+  IPv6 text, at most 45 characters);
+- `screen`: the browser's own `X-WebUI-Client` (16 to 24 lowercase hex
+  digits);
+- `mac`: the first 16 bytes of `HMAC-SHA256(Kr, canonical)` as 32 lowercase
+  hex digits, where `canonical` is
+  `obbw-relay-v1\nMETHOD\nURI\nq\naddr\nscreen\nsession\n`: the HTTP method,
+  the request target exactly as sent (path and query), and the
+  `X-WebUI-Session` value or nothing.
+
+The body is not covered: the signature protects what only a relayed request
+may do. The controller accepts `q` above the highest seen, or one of the 63
+below it not seen yet. The companion rewrites `X-WebUI-Client` to its own
+random relay id (24 hex digits, one per companion process) and forwards
+`X-WebUI-Session`, `X-WebUI-Activity`, `X-Device-Password`, `Content-Type`,
+`Content-Length` and, for firmware updates, `X-OTA-Transfer`, `X-OTA-Offset`,
+`X-OTA-Length`, `X-OTA-Allow-Downgrade` and `Content-Range`. Its shared
+ui-stream upgrade (`GET /api/v1/ui/ui-stream`) carries the header too, with
+`addr` `0.0.0.0`, the relay id as `screen`, no session, and the controller's
+own `Host` and `Origin` (`http://<host>`); that identity names no screen and
+holds nothing. Its gateway relays `POST /api/v1/companion/admin` (Admin →
+Companion on a companion screen, with that screen's Admin unlock) and no
+other `/api/v1/companion/` route.
+
+A request with the header is refused before any handler runs; after
+`RELAY_STALE` alone the companion makes a new handshake and retries once:
+
+| Status | Code | When |
+| --- | --- | --- |
+| `403` | `COMPANION_PEER` | The companion's socket is outside the local ranges |
+| `400` | `RELAY_INVALID` | The header is malformed |
+| `401` | `RELAY_STALE` | No relay session, or the signature does not match it |
+| `401` | `RELAY_REPLAY` | `q` was used or is too old |
+| `403` | `RELAY_DISABLED` | **Web UI through the companion** is off |
+
+Refusals count in `relayRejects` and share one rate-limited log line.
+
+### What a relayed request changes
+
+Any route a browser may call works through the relay, with the same sessions,
+claim and safety gates. The signature adds only this:
+
+- **Claim attach.** `POST /api/v1/ui/claim` from a companion screen while the
+  relay id already holds control joins that claim: it validates the
+  forwarded session, keeps the other screens' Admin unlock and override, and
+  drops only the ones this screen held. Otherwise the claim takes control as
+  usual, so a newly opened companion screen takes control from a browser
+  that opened the controller directly, and a direct claim takes it back
+  (relayed requests then get `409 UI_TAKEN_OVER` and the companion's stream
+  closes with 4001).
+- **Admin unlock and the unsafe override belong to the screen.** Unlocking
+  Admin, signing in, the unsafe override, Admin lock and the OTA password
+  check act on the `screen` of the request, not on the relay id. One screen or
+  window holds Admin at a time: unlocking on another replaces it.
+- **Sign-in and sign-out.** Signing in through the relay claims for the relay
+  id (attaching like a claim) and unlocks Admin for that screen. Signing out
+  ends that screen's session and its Admin unlock; the companion keeps
+  control for its other screens.
+- **Password attempts** count against `addr`, the browser, not the companion.
+- **Home** on the relayed ui-stream carries `relay.adminScreen` and
+  `relay.overrideScreen`: the screen holding Admin or the override as 8 hex
+  digits of FNV-1a over its `X-WebUI-Client`, or `""`. `adminUnlocked` and
+  `webUiOverrideActive` on that stream stay `false` for a screen's unlock or
+  override, so each screen compares the tag with its own id.

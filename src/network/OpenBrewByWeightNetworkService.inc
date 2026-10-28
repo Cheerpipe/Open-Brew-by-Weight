@@ -29,9 +29,7 @@ bool OpenBrewByWeightNetwork::begin(const PersistedSettings &settings,
   g_webAccess.stored = access;
   if (passwordIsFactoryDefault(settings_)) webAccessDisable(g_webAccess);
   memset(&access, 0, sizeof(access));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   beginCompanion();
-#endif
   stopRequested_.store(false, std::memory_order_release);
   acceptedCommandQueue_.reset(
       xQueueCreate(WEB_COMMAND_QUEUE_LENGTH, sizeof(WebCommand)));
@@ -673,9 +671,7 @@ void OpenBrewByWeightNetwork::service() {
   applyWifiPowerSave();
   serviceWifiScan(now);
   serviceUiStream(now);
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   serviceCompanion(now);
-#endif
 
   const NetworkStatusSnapshot networkSnapshot = snapshot();
   // serviceStaState already reconciled staState against the WiFi driver

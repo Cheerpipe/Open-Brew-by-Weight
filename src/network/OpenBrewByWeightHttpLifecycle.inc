@@ -522,9 +522,7 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
     publishMachineIntegrationConfig(next, next.storageRevision);
     log(DebugCategory::CONFIG, DebugCode::CONFIG_PERSISTED,
         static_cast<int32_t>(next.runtime.revision));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     resetCompanion();
-#endif
   }
 
   if (restartPending_ || apRestartPending_) {
@@ -1177,10 +1175,8 @@ bool OpenBrewByWeightNetwork::startHttpServer() {
   // CONFIG_LWIP_MAX_SOCKETS), so a deeper backlog would starve other sockets.
   config.backlog_conn = 4;
   config.lru_purge_enable = true;
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   // Names why a companion link closed (an LRU purge among them) before close().
   config.close_fn = companionSocketClose;
-#endif
   // Keep stuck clients from occupying sockets under BLE/Wi-Fi coex stalls.
   config.recv_wait_timeout = 5;
   config.send_wait_timeout = 5;
@@ -1220,12 +1216,10 @@ bool OpenBrewByWeightNetwork::startHttpServer() {
       registerHandler(server_, "/api/v1/ui/claim", HTTP_POST, claimHandler) &&
       registerHandler(server_, "/api/v1/ui/ui-stream", HTTP_GET,
                       uiStreamHandler, true, uiStreamHandshake) &&
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
       // The companion link: its own pre-handshake, the pairing secret instead
       // of a Web UI session (docs/COMPANION_LINK.md).
       registerHandler(server_, "/api/v1/companion/link", HTTP_GET,
                       companionLinkHandler, true, companionLinkHandshake) &&
-#endif
 #if OPEN_BREW_BY_WEIGHT_DEVELOPMENT == 1
       // Unlock routes are not served in development builds; administration
       // is public there and the UI never calls this endpoint.

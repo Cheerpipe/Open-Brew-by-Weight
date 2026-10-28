@@ -218,7 +218,7 @@ if (!network.includes('restoreLkgToActive(next)') ||
       !codeIncludes(ui, 'R.resetNetworkAddressLoaded()') ||
       !codeIncludes(ui, 'Wi-Fi sleep saved.') ||
       !network.includes('\\"wifiSleep\\":%s') ||
-      !network.includes('jsonHasOnlyUniqueFields(root, saveFields, 13)') ||
+      !network.includes('jsonHasOnlyUniqueFields(root, saveFields, 14)') ||
       !network.includes('jsonBoolean(root, "wifiSleep", command.network.wifiSleep)') ||
       !network.includes('command.network.wifiSleepSpecified = true') ||
       !network.includes('void OpenBrewByWeightNetwork::applyWifiPowerSave(bool apStarting)') ||

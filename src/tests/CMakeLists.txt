@@ -163,6 +163,10 @@ find_library(CJSON_LIBRARY cjson)
 if(NOT CJSON_INCLUDE_DIR OR NOT CJSON_LIBRARY)
   message(FATAL_ERROR "libcjson is required for host tests")
 endif()
+if(TARGET persistence_host_test)
+  # The durable stores erase the companion pairing, whose header declares cJSON.
+  target_include_directories(persistence_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
+endif()
 host_test(json_arena_host_test LABEL "host;concurrency")
 host_test(micra_observation_host_test
   SOURCES "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightMicraObservation.cpp"
