@@ -179,21 +179,57 @@
   assert.equal(context.sessionStorage.values.get('obbwSession'), 't2');
   context.storeSession('', false);
   assert.deepEqual({...context.webUiHeaders()}, {'X-WebUI-Client': 'abc'});
-  // Home onboarding hints show one at a time: access, La Marzocco Cloud,
-  // recipe, scale; each waits while the grind hint shows. Dismissals other
-  // than access stay in the browser under the legacy card keys.
+  // Through the companion every screen shares one session: Home names the
+  // screen holding the Admin unlock or the override by the 8-hex FNV-1a of
+  // its client id, and only that screen unlocks; the direct flags still win.
+  vm.runInContext(rawRuntimeJs.slice(rawRuntimeJs.indexOf('const webUiScreen ='),
+      rawRuntimeJs.indexOf('let webUiOwner =')).replace(/^const /gm, 'var '), context);
+  assert.equal(context.webUiScreen, '1a47e90b', 'FNV-1a of "abc", lowercase and zero-padded');
+  for (const [s, admin, override] of [
+    [{adminUnlocked: true, webUiOverrideActive: true}, true, true],
+    [{relay: {adminScreen: '1a47e90b', overrideScreen: ''}}, true, false],
+    [{relay: {adminScreen: '00000000', overrideScreen: '1a47e90b'}}, false, true],
+    [{relay: {adminScreen: '', overrideScreen: ''}}, false, false],
+    [{}, false, false],
+  ]) {
+    assert.equal(context.adminUnlockedFor(s), admin, JSON.stringify(s));
+    assert.equal(context.webUiOverrideFor(s), override, JSON.stringify(s));
+  }
+  for (const [source, needle] of [
+    [rawRuntimeJs, 'const admin=adminUnlockedFor(s),'],
+    [rawRuntimeJs, '(adminUnlockedFor(s)?s.bleScan'],
+    [rawRuntimeJs, "if(v==='admin'&&adminUnlockedFor(s)){"],
+    [viewJs.admin, 'const unlocked=R.adminUnlockedFor(s);'],
+    [viewJs.admin, 'a=R.webUiOverrideFor(s)&&r>0,'],
+    [viewJs.diagnostic, 'const u=R.adminUnlockedFor(s);'],
+    [viewJs.diagnostic, '(R.adminUnlockedFor(s)||!!s.development)&&'],
+  ])
+    assert.ok(codeIncludes(source, needle), 'Admin unlock follows this screen: ' + needle);
+  // A companion screen set aside for a direct page says so, with Reload.
+  assert.ok(codeIncludes(rawRuntimeJs, 'deactivateWebUi(event.reason);') &&
+      codeIncludes(blockAt(rawRuntimeJs, 'function deactivateWebUi(reason) {'),
+          "if(reason==='direct')setInactiveHint(__WEBUI_TEXT__('runtime.opened_directly'));showInactiveOverlay();") &&
+      codeIncludes(blockAt(rawRuntimeJs, 'function setInactiveHint(text) {'), 'h.dataset.d||=h.textContent'),
+      'The direct takeover explains itself and the overlay keeps its own text');
+  // Home onboarding hints show one at a time: a companion request, a pairing
+  // offer, access, La Marzocco Cloud, recipe, scale; each waits while the
+  // grind hint shows. Dismissals other than access stay in the browser under
+  // the legacy card keys.
+  const order = ['companionHint', 'companionPairHint', 'accessHint', 'micraCloudHint', 'recipeHint',
+    'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
-  for (const id of ['accessHint', 'micraCloudHint', 'recipeHint', 'scaleOnlyHint']) nodes[id] = {hidden: true};
+  for (const id of order) nodes[id] = {hidden: true};
   const $ = (id) => nodes[id] ||= {textContent: '', hidden: false,
     classList: {toggle() {}, add() {}, remove() {}, contains: () => false}};
-  const cards = new Map();
-  let recorded = false;
+  const cards = new Map(), here = {companionHere: null};
+  let recorded = false, pairable = false;
   const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, presetState: {items: []},
     cardDismissed: (k) => cards.get(k) || '', dismissCard: (k) => cards.set(k, '1'), shotRecorded: () => recorded,
-    controlsMutable: true}, document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
+    controlsMutable: true, uiState: here, companionHere: () => Promise.resolve(here.companionHere),
+    companionPairable: () => pairable, sub: (t, a) => t + ':' + a.join(',')},
+    document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
   vm.runInNewContext(viewJs.home.replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];?/, '')
       .replace(/export /g, ''), home);
-  const order = ['accessHint', 'micraCloudHint', 'recipeHint', 'scaleOnlyHint'];
   const fresh = {access: {notice: true}, machineIntegration: 'linea_micra_cloud', presetsTag: 7,
     lineaMicra: {accountConfigured: false}, config: {scaleMacCacheMode: 'prefer'}, scale: {preferredMac: 'AA'}};
   const shown = (s) => (home.applyStatus(s), order.filter((id) => !nodes[id].hidden));
@@ -211,6 +247,21 @@
   assert.equal(cards.get('obbwCard:recipe'), '1');
   cards.set('obbwCard:scaleOnly', '1');
   assert.deepEqual(shown({...noCloud, presetsTag: 8}), []);
+  // A page that came through an unpaired companion offers to pair it, ahead of
+  // access; the request it sends then shows instead, with the code typed in Admin.
+  pairable = true;
+  here.companionHere = {name: 'nas', paired: false, pairing: {state: 'unpaired'}};
+  assert.deepEqual(shown(fresh), ['companionPairHint']);
+  assert.match(nodes.companionPairHintText.textContent, /^This page comes through the companion .*:nas$/);
+  const asking = {...fresh, companion: {requestName: 'nas', requestAddress: '192.168.1.20'}};
+  assert.deepEqual(shown(asking), ['companionHint']);
+  assert.match(nodes.companionHintText.textContent, /^It is asking from .*:192\.168\.1\.20$/);
+  here.companionHere = {name: 'nas', paired: false, pairing: {state: 'pending', code: '123456'}};
+  assert.deepEqual(shown(asking), ['companionHint']);
+  assert.match(nodes.companionHintText.textContent, /^Its code is .*:123456$/);
+  cards.set('obbwCard:companionPair', '1');
+  assert.deepEqual(shown(fresh), ['accessHint'], 'the pairing offer can be dismissed in this browser');
+  pairable = false;
   nodes.grindHintCard.hidden = false;
   assert.deepEqual(shown(fresh), []);
   assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&

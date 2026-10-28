@@ -293,7 +293,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
       viewSeq: 1, viewReady: statusMarkup.promise,
       document: {hidden: false}, webUiPollingActive: () => true,
       statusPageOk: () => true,
-      api: async () => ({adminUnlocked: true}), applyCommonStatus() {},
+      api: async () => ({adminUnlocked: true}), applyCommonStatus() {}, adminUnlockedFor: (s) => !!s.adminUnlocked,
       viewStatusHandlers: {admin: () => applied.push('status')},
       timezoneCatalogPromise: catalog.promise, timezonePreviewLoad: preview.promise,
       noteReachOk: () => applied.push('ready'), noteReachFail() {}, armStatusTimer() {}});

@@ -34,7 +34,8 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   let lastStatus = null;
   const rowSlots = {};
   const context = {R: {applyHomeStatus() {}, formatMicraCleaning:()=>'', deviceUtcSec: () => 60,
-      homeStatusCache: () => lastStatus, shotRecorded: () => null,
+      homeStatusCache: () => lastStatus, shotRecorded: () => null, uiState: {companionHere: null},
+      companionPairable: () => false, companionHere: () => Promise.resolve(null),
       $: id => ({homeMicraCleaning: cleaning, homeMicraPower: power, machineRowState: rowState, state: brew, machineRow,
         homeMicraBrewBoiler: brewBoiler, homeMicraSteamBoiler: steamBoiler}[id] ||
         (/Row(Value|Hint)$|^(scaleWeight|preferredScale|cupWeight)$/.test(id) ? (rowSlots[id] ||= el()) : null))},

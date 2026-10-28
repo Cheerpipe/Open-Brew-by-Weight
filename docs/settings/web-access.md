@@ -49,6 +49,14 @@ Only one window controls the controller at a time, as before. Opening the Web
 UI on another device moves control there, and the first window offers
 **Reload** to take it back without signing in again.
 
+Through an [Open Brew by Weight Companion](../features/companion.md), your
+phone, tablet and computer can all use the Web UI at the same time, each on
+its own page. Each screen signs in on its own, and Admin unlocks for one
+screen at a time: unlocking it on the tablet locks it again on the phone.
+Opening the Web UI directly on the controller's own address still takes
+control: every companion screen pauses and explains why, and **Reload** on any
+of them brings control back to the companion.
+
 ## What it protects, and what it doesn't
 
 The password keeps casual visitors out of the Web UI and stops them from
@@ -73,11 +81,13 @@ controller through a look-alike web address. Opening it by any other name, such
 as a custom name you set up in your own DNS, sends the page to the
 controller's IP address, and apps or scripts using that name get an error.
 
-On a Linea Micra controller, an
-[Open Brew by Weight Companion](../features/companion.md) asks to pair and
+An [Open Brew by Weight Companion](../features/companion.md) asks to pair and
 connects without the password: its request only asks, approving it needs
 Admin unlocked, and from then on it proves the secret it shares with this
-controller. The companion only connects from your local network.
+controller. The companion only connects from your local network. The
+password still applies to every screen that opens the Web UI through it, and
+the controller still tells those screens apart: five wrong passwords pause
+only the phone or computer that typed them.
 
 ## Home Assistant
 
@@ -185,8 +195,9 @@ To check how a phone or computer is reaching the Web UI, open
 browser tab (**Web**) or from the home screen (**PWA**), whether it came
 straight from the controller (**Direct**), through
 [Open Brew by Weight Companion](../features/companion.md) (with the
-companion's name), or through another **HTTPS proxy**, and whether the
-offline copy is **Active** on that device.
+companion's name and how many screens it serves right now), or through
+another **HTTPS proxy**, and whether the offline copy is **Active** on that
+device.
 
 ## Forgot the password
 

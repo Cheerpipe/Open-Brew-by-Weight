@@ -43,12 +43,24 @@
     </button>
   </div>
 </section>
-<section id="companionHint" class="homeCard infoHint micraOnly" hidden>
+<section id="companionHint" class="homeCard infoHint" hidden>
   <p><strong id="companionHintTitle"></strong> <span id="companionHintText"></span></p>
   <div class="btnBar">
     <a id="companionHintOpen" class="btnGlyph btnInvert" href="/admin#companionPanel"
       ><span class="t">{{webui:home.companion_hint_open}}</span></a
     >
+  </div>
+</section>
+<section id="companionPairHint" class="homeCard infoHint" hidden>
+  <p>
+    <strong>{{webui:home.companion_pair_title}}</strong> <span id="companionPairHintText"></span>
+  </p>
+  <div class="btnBar">
+    <button id="companionPairHintPair" class="btnGlyph btnInvert" type="button">
+      <span class="t">{{webui:home.companion_pair}}</span></button
+    ><button id="companionPairHintDismiss" class="btnGlyph ghost" type="button">
+      <span class="t">{{webui:home.dismiss}}</span>
+    </button>
   </div>
 </section>
 <section id="accessHint" class="homeCard infoHint" hidden>

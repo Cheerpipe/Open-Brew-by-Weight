@@ -26,6 +26,16 @@ function setSaveDirty(id, hintId, dirty) {
   }
   if (hintId) $(hintId)?.classList.toggle("hidden", !dirty);
 }
+// Sections saved whole carry the revision their form was filled from: a save
+// over a change made meanwhile (another screen through the companion) is
+// refused, and the form shows the saved values again.
+const formRevisions = {};
+function formStale(e, clean) {
+  if (e?.status !== 409 || !/REVISION/.test(e.code || "")) return false;
+  clean();
+  R.message(__WEBUI_TEXT__("admin.changed_elsewhere"), "error");
+  return true;
+}
 function timeZoneSelectionChanged() {
   markDateTimeDirty();
   R.refreshTimezonePreview();
@@ -231,6 +241,7 @@ function networkSavePayload() {
     wifiSleep: R.uiState.savedStaWifiSleep,
     name: $("deviceName") ? $("deviceName").value.trim() : "",
     ipMode: $("staIpMode").value,
+    baseRevision: formRevisions.network,
   };
   if (p.ipMode === "static") {
     p.ip = $("staStaticIp").value.trim();
@@ -300,7 +311,7 @@ const DEVICE_ICONS = {
   tablet: '<rect x="4.5" y="3" width="15" height="18" rx="2.2"/><path d="M11 18h2"/>',
   laptop: '<rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/>',
   home: '<path d="m3 11 9-7 9 7v9H3z"/><circle cx="12" cy="14" r="2"/>',
-  ...(__LINEA_MICRA__ && { companion: '<use href="#g-companion"/>' }),
+  companion: '<use href="#g-companion"/>',
 };
 // Remembered sessions carry a daily stamp, so they show days; browser-only
 // sessions are tracked to the second.
@@ -571,8 +582,11 @@ async function accessQuickAction(action, okText, failText, fields) {
   }
 }
 // Admin → Companion. The controller never calls out: every action is one POST,
-// and connecting by address only opens the companion's own page here.
-let companionState = null;
+// and connecting by address only opens the companion's own page here. A page
+// that came through an unpaired companion can ask it to pair from here.
+let companionState = null,
+  companionAsked = false,
+  companionDirect = "";
 // Approval runs in the background on the controller: show its three steps
 // until the link opens instead of a form that looks untouched.
 let companionPairing = null;
@@ -621,7 +635,7 @@ function companionRouteText(c) {
 function showCompanionPairing(c) {
   const p = companionPairing;
   if (p && p.stage > 0 && c) {
-    p.stage = !c.paired ? 1 : c.link !== "open" ? 2 : 3;
+    p.stage = !c.paired ? 1 : c.link !== "open" && c.relay !== "ready" ? 2 : 3;
     if (p.stage === 3 || Date.now() - p.startedAt > 45000) {
       companionPairing = null;
       R.message(
@@ -642,7 +656,18 @@ function applyCompanionStatus(c) {
   if (!c || !$("companionPanel")) return;
   companionState = c;
   const busy = showCompanionPairing(c);
-  const r = !c.paired && c.request;
+  const r = !c.paired && c.request,
+    here = R.uiState.companionHere,
+    code = here?.pairing?.state === "pending" && here.pairing.code;
+  if (!!r !== companionAsked) {
+    companionAsked = !!r;
+    R.companionHere(true).then(() => applyCompanionStatus(companionState));
+  }
+  $("companionHere").hidden = !R.companionPairable();
+  if (here)
+    $("companionHereText").textContent = R.sub(__WEBUI_TEXT__("home.companion_pair_text"), [
+      here.name,
+    ]);
   $("companionConnect").classList.toggle("hidden", busy || c.paired || !!r);
   $("companionRequest").classList.toggle("hidden", busy || !r);
   $("companionPaired").classList.toggle("hidden", busy || !c.paired);
@@ -658,14 +683,17 @@ function applyCompanionStatus(c) {
       Math.max(1, Math.ceil(r.expiresInS / 60)),
     ]);
     $("companionCode").disabled = !r.codeReady;
-    $("companionCodeHint").textContent = r.codeReady
-      ? __WEBUI_TEXT__("admin.companion_code_hint")
-      : __WEBUI_TEXT__("admin.companion_code_waiting");
+    // The code this page's companion shows is typed, never filled in.
+    $("companionCodeHint").textContent = !r.codeReady
+      ? __WEBUI_TEXT__("admin.companion_code_waiting")
+      : code
+        ? R.sub(__WEBUI_TEXT__("admin.companion_code_here"), [code])
+        : __WEBUI_TEXT__("admin.companion_code_hint");
     $("companionApproveButton").disabled =
       !r.codeReady || !/^\d{6}$/.test($("companionCode").value);
   } else {
     $("companionCode").value = "";
-    $("companionApproveLm").checked = true;
+    if (__LINEA_MICRA__) $("companionApproveLm").checked = true;
   }
   if (!c.paired) return;
   // Status polls keep the row fresh, except while it is asking.
@@ -693,17 +721,29 @@ function applyCompanionStatus(c) {
       ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
       : "") +
     (!link && c.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "");
-  $("companionRouteState").textContent = companionRouteText(c);
+  if (__LINEA_MICRA__) $("companionRouteState").textContent = companionRouteText(c);
   if (!R.uiState.companionDirty) {
-    $("companionLm").checked = !!c.lm;
-    R.uiState.companionBaseline = R.snapshotControls([$("companionLm")]);
+    $("companionUi").checked = c.ui !== false;
+    if (__LINEA_MICRA__) $("companionLm").checked = !!c.lm;
+    R.uiState.companionBaseline = R.snapshotControls(companionSwitches());
   }
 }
+const companionSwitches = () => document.querySelectorAll("#companionPaired input");
 async function saveCompanionSettings() {
   if (!R.uiState.companionDirty) return;
+  const ui = $("companionUi").checked;
+  // Turning it off from a screen that came through the companion cuts this
+  // screen off too: say where the controller answers directly.
+  if (
+    !ui &&
+    companionState?.ui !== false &&
+    R.uiState.companionHere &&
+    !confirm(R.sub(__WEBUI_TEXT__("admin.companion_ui_off_ask"), ["http://" + companionDirect]))
+  )
+    return;
   if (
     await companionAction(
-      { action: "switches", lm: $("companionLm").checked },
+      { action: "switches", ui, ...(__LINEA_MICRA__ && { lm: $("companionLm").checked }) },
       __WEBUI_TEXT__("admin.setting_saved"),
       $("saveCompanionButton"),
     )
@@ -712,6 +752,13 @@ async function saveCompanionSettings() {
   R.refreshStatus();
 }
 function initCompanion() {
+  R.companionHere().then(() => companionState && applyCompanionStatus(companionState));
+  $("companionPairButton").onclick = async ({ currentTarget: b }) => {
+    b.disabled = true;
+    await R.pairCompanionHere().catch((e) => R.message(e.message, "error"));
+    b.disabled = false;
+    R.refreshStatus();
+  };
   $("companionConnectButton").onclick = () => {
     const url = companionPairUrl($("companionAddress").value.trim());
     if (!url)
@@ -731,7 +778,7 @@ function initCompanion() {
         body: R.body({
           action: "approve",
           code: $("companionCode").value,
-          lm: $("companionApproveLm").checked,
+          ...(__LINEA_MICRA__ && { lm: $("companionApproveLm").checked }),
         }),
       });
       companionPairing.stage = 1;
@@ -755,7 +802,7 @@ function initCompanion() {
     companionAction({ action: "unignore" }, __WEBUI_TEXT__("admin.companion_unignored")).then(
       R.refreshStatus,
     );
-  $("companionLm").onchange = () => sectionDirty("companion", true);
+  for (const el of companionSwitches()) el.onchange = () => sectionDirty("companion", true);
   $("saveCompanionButton").onclick = saveCompanionSettings;
   $("revertCompanionButton").onclick = () => revertSection("companion");
 }
@@ -842,6 +889,7 @@ async function startWifiScan() {
 function loadNetworkAddress(n) {
   if (!n || R.uiState.networkAddressLoaded) return;
   R.uiState.networkAddressLoaded = true;
+  formRevisions.network = n.revision;
   R.uiState.savedStaSsid = n.wifiConfigured && n.ssid ? n.ssid : "";
   R.uiState.savedStaOpen = !!(n.wifiConfigured && n.open);
   R.uiState.savedStaWifiSleep = !!n.wifiSleep;
@@ -894,6 +942,8 @@ async function setWifiSleep() {
     __WEBUI_TEXT__("runtime.wi_fi_sleep_saved"),
   );
   if (!ok) el.checked = R.uiState.savedStaWifiSleep;
+  // The save moved the network revision: a clean form takes it up again.
+  else if ($("saveNetworkButton").dataset.dirty !== "1") R.resetNetworkAddressLoaded();
   return ok;
 }
 function formatNetworkStatus(n) {
@@ -930,7 +980,7 @@ async function saveDateTimeConfig() {
   try {
     await R.command(
       "/api/v1/config",
-      R.withBaseRev({ ...payload }),
+      { ...payload, baseRevision: formRevisions.dateTime },
       1,
       __WEBUI_TEXT__("runtime.date_and_time_settings_saved"),
       fail,
@@ -942,7 +992,8 @@ async function saveDateTimeConfig() {
     }
     await R.refreshStatus();
   } catch (e) {
-    R.message(R.formatCommandError(fail, e), "error");
+    if (!formStale(e, () => sectionDirty("dateTime", false)))
+      R.message(R.formatCommandError(fail, e), "error");
     await R.refreshStatus();
   }
 }
@@ -966,6 +1017,7 @@ function loadAdminConfig(c) {
     $("timezoneAutomatic").checked = !!c.timezoneAutomatic;
     $("ntpSyncEnabled").checked = c.ntpSyncEnabled !== false;
     setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
+    formRevisions.dateTime = c.revision;
   }
   const state = $("timezoneSaveState");
   if (state)
@@ -981,7 +1033,7 @@ function loadAdminConfig(c) {
   R.updateTimezoneControls();
 }
 function applyAdminStatus(s) {
-  const unlocked = !!s.adminUnlocked;
+  const unlocked = R.adminUnlockedFor(s);
   R.syncAdminSessionUi(unlocked);
   const hint = $("adminConfirmHint");
   if (hint) {
@@ -1003,7 +1055,7 @@ function applyAdminStatus(s) {
     if (op) op.classList.toggle("hidden", !!s.configMutable);
     if (ob) {
       const r = typeof s.webUiOverrideRemainingMs === "number" ? s.webUiOverrideRemainingMs : 0,
-        a = !!s.webUiOverrideActive && r > 0,
+        a = R.webUiOverrideFor(s) && r > 0,
         n = a ? Math.ceil(r / 1e3) : 0,
         t = ob.querySelector(".t");
       if (t)
@@ -1019,7 +1071,8 @@ function applyAdminStatus(s) {
   $("networkStatus").textContent = formatNetworkStatus(s.network);
   loadNetworkAddress(s.network);
   applyAccessStatus(s.access);
-  if (__LINEA_MICRA__) applyCompanionStatus(s.companion);
+  companionDirect = s.network.staIp || s.network.mdnsHost + ".local";
+  applyCompanionStatus(s.companion);
   // Deep link (Home's access note): its panel exists only once Admin is unlocked.
   const section = location.hash && $(location.hash.slice(1));
   if (section?.offsetParent) {
@@ -1681,6 +1734,7 @@ export function applyStatus(s) {
     $("webhookDeferDuringShot").checked = !!w.deferDuringShot;
     webhookBaseline = R.snapshotControls(WEBHOOK_IDS.map((id) => $(id)));
     setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
+    formRevisions.webhooks = w.revision;
   }
   const result = w.sending
     ? __WEBUI_TEXT__("admin.sending")
@@ -1866,6 +1920,7 @@ function loadScheduledRestart(c) {
     R.uiState.scheduledRestartBaseline = R.snapshotControls(
       document.querySelectorAll("#scheduledRestartPanel input"),
     );
+    formRevisions.scheduledRestart = c.revision;
   }
   $("scheduledRestartStatus").textContent = R.uiState.scheduledRestartDirty
     ? ""
@@ -1885,10 +1940,11 @@ async function saveScheduledRestart() {
   b.classList.add("busy");
   try {
     await R.withCommandGate(async () => {
-      const p = R.withBaseRev({
+      const p = {
           scheduledRestartEnabled: $("scheduledRestartEnabled").checked,
           scheduledRestartMinuteOfDay: restartMinute(),
-        }),
+          baseRevision: formRevisions.scheduledRestart,
+        },
         a = await R.api("/api/v1/config", { method: "POST", body: R.body(p) });
       await waitSaved(
         a.requestId,
@@ -1901,7 +1957,7 @@ async function saveScheduledRestart() {
     sectionDirty("scheduledRestart", false);
     return true;
   } catch (e) {
-    R.message(e.message, "error");
+    if (!formStale(e, () => sectionDirty("scheduledRestart", false))) R.message(e.message, "error");
     return false;
   } finally {
     b.classList.remove("busy");
@@ -1939,14 +1995,12 @@ const ADMIN_SUMMARIES = {
       ? __WEBUI_TEXT__("admin.sum_password_required")
       : __WEBUI_TEXT__("admin.sum_no_password"),
   update: () => document.documentElement.dataset.fw,
-  ...(__LINEA_MICRA__ && {
-    companion: () =>
-      companionState?.paired
-        ? companionState.name
-        : companionState?.request
-          ? __WEBUI_TEXT__("admin.sum_companion_request")
-          : __WEBUI_TEXT__("admin.sum_not_paired"),
-  }),
+  companion: () =>
+    companionState?.paired
+      ? companionState.name
+      : companionState?.request
+        ? __WEBUI_TEXT__("admin.sum_companion_request")
+        : __WEBUI_TEXT__("admin.sum_not_paired"),
 };
 const renderAdminRows = () => R.renderGroupRows($("view-admin"), ADMIN_SUMMARIES);
 export function init() {
@@ -1981,7 +2035,7 @@ export function init() {
   $("revertPowerButton").onclick = () => revertSection("power");
   $("saveFrontendButton").onclick = saveFrontendSettings;
   $("revertFrontendButton").onclick = () => revertSection("frontend");
-  if (__LINEA_MICRA__) initCompanion();
+  initCompanion();
   const firmwareModeChanged = () => {
     firmwareModeDirty = true;
     setSaveDirty("saveFirmwareModeButton", "firmwareModeDirtyHint", true);
@@ -2115,6 +2169,7 @@ export function init() {
             brewState: $("webhookBrewState").checked,
             firstDrop: $("webhookFirstDrop").checked,
             end: $("webhookEnd").checked,
+            baseRevision: formRevisions.webhooks,
           }),
         });
         await waitSaved(accepted.requestId);
@@ -2122,10 +2177,11 @@ export function init() {
         setSaveDirty("saveWebhookButton", "webhookDirtyHint", false);
         R.message(__WEBUI_TEXT__("admin.webhook_settings_saved"), "ok");
       } catch (e) {
-        R.message(
-          R.formatCommandError(__WEBUI_TEXT__("admin.could_not_save_webhook_settings"), e),
-          "error",
-        );
+        if (!formStale(e, () => (webhookDirty = false)))
+          R.message(
+            R.formatCommandError(__WEBUI_TEXT__("admin.could_not_save_webhook_settings"), e),
+            "error",
+          );
         await R.refreshStatus();
       } finally {
         webhookSaving = false;

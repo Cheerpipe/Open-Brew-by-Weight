@@ -226,7 +226,7 @@
   const setupJs = viewJs.setup || '';
   const setupHtml = partialHtml.setup || '';
   if (!codeIncludes(appJsSource, 'if(bootView==="setup"){R.startSetupSession();renderRoute(location.pathname);}else R.claimWebUiOwnership();') ||
-      !codeIncludes(blockAt(runtimeJs, 'function deactivateWebUi() {'), 'if(!webUiOwner||setupSession)return;') ||
+      !codeIncludes(blockAt(runtimeJs, 'function deactivateWebUi(reason) {'), 'if(!webUiOwner||setupSession)return;') ||
       !codeIncludes(blockAt(runtimeJs, 'function resetWebUiInactivity() {'), 'if(!webUiOwner||setupSession)return;') ||
       !codeIncludes(runtimeJs, 'if(!webUiPollingActive()||setupSession)return;') ||
       !codeIncludes(runtimeJs, 'if(webUiPollingActive()&&!setupSession)startUiStream();') ||

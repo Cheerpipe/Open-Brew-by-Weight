@@ -526,7 +526,7 @@ if (!firmwareCore.includes('if (brewEndIsAbandonedStart(reason) || endingRinseCy
   throw new Error('Abandoned starts and rinses must not emit misleading brew-state webhooks');
 }
 if (!codeIncludes(ui, 'function claimWebUiOwnership(claimed)') ||
-    !codeIncludes(ui, 'function deactivateWebUi()') ||
+    !codeIncludes(ui, 'function deactivateWebUi(reason)') ||
     !codeIncludes(ui, 'function showInactiveOverlay()') ||
     !codeIncludes(ui, 'function hideInactiveOverlay()') ||
     !codeIncludes(ui, 'id="webUiReload"') ||
@@ -593,7 +593,7 @@ if (!codeIncludes(ui, 'clearTimeout(webUiInactivityTimer)') ||
     !codeIncludes(ui, 'if(!webUiPollingActive())throw new Error')) {
   throw new Error('WebUI inactivity must cancel poll timers and block further API calls');
 }
-if (!codeIncludes(ui, 'setMutable(!!s.configMutable||!!s.webUiOverrideActive)') ||
+if (!codeIncludes(ui, 'setMutable(!!s.configMutable||webUiOverrideFor(s))') ||
     !codeIncludes(ui, 'webUiOverrideActive') ||
     !codeIncludes(ui, 'webUiOverrideRemainingMs') ||
     !codeIncludes(ui, "uiOverridePanel") ||

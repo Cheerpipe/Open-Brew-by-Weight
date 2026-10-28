@@ -59,7 +59,8 @@
       // module namespace does.
       slice('async function populateTimezoneOptions(', 'function setEmptyState(')
           .replace(/^let /gm, 'var ') +
-      ['function timeZoneSelectionChanged(', 'async function changeTimezoneMode(',
+      'var formRevisions = {};\n' +
+      ['function formStale(', 'function timeZoneSelectionChanged(', 'async function changeTimezoneMode(',
         'function loadAdminConfig(', 'async function saveDateTimeConfig(']
           .map((marker) => blockAt(rawViewJs.admin, marker)).join('\n');
   const flush = async () => { for (let i = 0; i < 12; ++i) await Promise.resolve(); };
@@ -76,7 +77,8 @@
       Intl: {DateTimeFormat: () => { ++state.detections; return {resolvedOptions: () => ({timeZone: state.zone})}; }},
       __WEBUI_TEXT__: key => key, formatWallTimeLocal: String, formatTzLabel: String,
       formatCommandError: (_, error) => error.message, body: JSON.stringify,
-      setSaveDirty() {}, message() {}, clearFieldErrors() {}, showFieldError() {},
+      setSaveDirty() {}, message(text) { state.message = text; }, clearFieldErrors() {}, showFieldError() {},
+      sectionDirty(name, on) { c[name + 'Dirty'] = on; },
       validateDateTimeClient: () => null, withBaseRev: p => p,
       dateTimePayload: () => ({timezoneId: select.value, ntpServerPreset: 'pool', ntpServerCustom: ''}),
       markDateTimeDirty() { c.dateTimeDirty = true; }, refreshStatus: async () => {},
@@ -202,6 +204,22 @@
       h.els.timezoneAutomatic.checked = false; await h.c.changeTimezoneMode();
       h.select.value = 'Asia/Tokyo'; gate.resolve(); await detection;
       assert.equal(h.select.value, 'Asia/Tokyo'); assert.equal(h.state.detections, 0);
+    }],
+    // The form saves against the revision it was filled from; a change made
+    // meanwhile elsewhere is refused and the form takes the saved values again.
+    ['a stale date and time form is not saved over', async () => {
+      const h = harness(); await h.c.populateTimezoneOptions(); await flush();
+      h.c.loadAdminConfig({timezoneId: 'Asia/Tokyo', revision: 5});
+      h.c.dateTimeDirty = true; h.c.loadAdminConfig({timezoneId: 'Asia/Tokyo', revision: 6});
+      h.c.command = async (_, payload) => {
+        h.state.payloads.push(payload);
+        throw Object.assign(new Error('Config changed; refresh and retry.'),
+            {status: 409, code: 'CONFIG_REVISION_STALE'});
+      };
+      await h.c.saveDateTimeConfig();
+      assert.equal(h.state.payloads.at(-1).baseRevision, 5);
+      assert.equal(h.c.dateTimeDirty, false);
+      assert.equal(h.state.message, 'admin.changed_elsewhere');
     }],
     ['saving a prior draft retains edits made while it was pending', async () => {
       const h = harness(), gate = deferred(); h.c.command = () => gate.promise;

@@ -193,7 +193,8 @@ int main(){
   };
   const action = {inert: true};
   const context = {$, __WEBUI_TEXT__: key => key, document: {querySelectorAll: () => [action]},
-    R: {syncAdminSessionUi(){}, message(){}, uiState: {diagnosticPublicView: false}, diagnosticVisible: false},
+    R: {syncAdminSessionUi(){}, message(){}, uiState: {diagnosticPublicView: false}, diagnosticVisible: false,
+      adminUnlockedFor: (s) => !!s.adminUnlocked},
     updH(){},ntpStateLabel(){},formatDiagnosticTimezoneOffset(){},renderDiagClock(){}};
   vm.createContext(context);
   vm.runInContext(blockAt(fs.readFileSync(path.join(sketchDir, 'web/js/diagnostic.js'), 'utf8'),

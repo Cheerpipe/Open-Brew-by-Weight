@@ -227,6 +227,20 @@ function randomHex(bytes) {
   return [...b].map((v) => v.toString(16).padStart(2, "0")).join("");
 }
 const webUiClientId = randomHex(12);
+// Through the companion every screen shares one controller session: Home names
+// the screen holding the Admin unlock or the override by the 8-hex FNV-1a of
+// its client id.
+const webUiScreen = [...webUiClientId]
+  .reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261)
+  .toString(16)
+  .padStart(8, "0");
+const heldHere = (s, key) => !!s.relay?.[key] && s.relay[key] === webUiScreen;
+function adminUnlockedFor(s) {
+  return !!s.adminUnlocked || heldHere(s, "adminScreen");
+}
+function webUiOverrideFor(s) {
+  return !!s.webUiOverrideActive || heldHere(s, "overrideScreen");
+}
 let webUiOwner = false,
   setupSession = false,
   webUiClaiming = false,
@@ -290,6 +304,8 @@ const uiState = {
   otaBusy: false,
   shotHistory: { bootId: 0, total: 0, hasMore: false, shots: [] },
   shotStats: {},
+  // The companion this page came through: its own status, or null.
+  companionHere: null,
 };
 let bootId = 0,
   configRevision = 0,
@@ -1861,6 +1877,13 @@ function setInactiveError(text) {
   el.textContent = text || "";
   el.hidden = !text;
 }
+// The overlay's own text comes back when it closes.
+function setInactiveHint(text) {
+  const h = $("inactiveHint");
+  if (!h) return;
+  h.dataset.d ||= h.textContent;
+  h.textContent = text;
+}
 function setOverlayReconnectMode(on) {
   if (on && !$("reconnectWait")) {
     const b = $("webUiReload");
@@ -1998,8 +2021,7 @@ function hideHomeBoot(seq = bootSeq) {
 function setOverlayOutOfReach() {
   if (networkReconnectWait) return;
   outOfReachOverlay = true;
-  const h = $("inactiveHint");
-  if (h) h.textContent = __WEBUI_TEXT__("shell.out_of_reach_hint");
+  setInactiveHint(__WEBUI_TEXT__("shell.out_of_reach_hint"));
   showInactiveOverlay();
   offerOfflineCopy(!!offlineCopyState());
 }
@@ -2148,7 +2170,8 @@ function lockAdminUi() {
   });
   resetNetworkAddressLoaded();
 }
-function deactivateWebUi() {
+// "direct": the companion stepped its screens aside for a direct page.
+function deactivateWebUi(reason) {
   if (!webUiOwner || setupSession) return;
   webUiOwner = false;
   stopUiStream();
@@ -2158,6 +2181,7 @@ function deactivateWebUi() {
   stopViewPolls();
   lockAdminUi();
   setMutable(false);
+  if (reason === "direct") setInactiveHint(__WEBUI_TEXT__("runtime.opened_directly"));
   showInactiveOverlay();
 }
 // Bounded like api(); null data means a non-JSON body.
@@ -2174,6 +2198,41 @@ async function fetchJson(path, options, ms = 8e3) {
     }
   } finally {
     clearTimeout(to);
+  }
+}
+// The firmware serves plain HTTP, so only an https: page may have come through
+// the companion; its status answers at a same-origin path.
+let companionHereLoad = null;
+function companionHere(fresh) {
+  if (location.protocol !== "https:") return Promise.resolve(null);
+  if (fresh || !companionHereLoad)
+    companionHereLoad = fetchJson("/__companion/status", { cache: "no-store" }, 4e3)
+      .then(([r, j]) => (uiState.companionHere = r.ok && typeof j?.paired === "boolean" ? j : null))
+      .catch(() => null);
+  return companionHereLoad;
+}
+// It may ask to pair unless it is paired, already asking, paired with another
+// controller, or ignored here.
+function companionPairable() {
+  const c = uiState.companionHere;
+  return (
+    !!c &&
+    !c.paired &&
+    !["requesting", "pending", "already_paired", "ignored"].includes(c.pairing?.state)
+  );
+}
+// The companion asks the controller; Admin approves with the code it shows.
+async function pairCompanionHere() {
+  const [r] = await fetchJson("/__companion/pair", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  }).catch(() => [{}]);
+  if (!r.ok) throw new Error(__WEBUI_TEXT__("runtime.companion_pair_failed"));
+  for (let i = 0; i < 10; i++) {
+    await sleep(1e3);
+    const p = (await companionHere(true))?.pairing;
+    if (p?.state !== "requesting" && (p?.state !== "pending" || p.code)) return;
   }
 }
 // `claimed` is a sign-in response, which already claimed this window.
@@ -4220,7 +4279,7 @@ function startUiStream() {
     resetUiStream();
     scheduleShotPaint();
     if (event?.code === 4001) {
-      deactivateWebUi();
+      deactivateWebUi(event.reason);
       return;
     }
     // 4002: the firmware closed a page it stopped hearing from; reconnect
@@ -5580,7 +5639,7 @@ function applyCommonStatus(s) {
     compatMode = !!s.compatibilityMode;
     applyCompatibilityChrome();
   }
-  setMutable(!!s.configMutable || !!s.webUiOverrideActive);
+  setMutable(!!s.configMutable || webUiOverrideFor(s));
   if (s.firmwareVersion) {
     firmwareVersion = s.firmwareVersion;
     checkFirmwareReload(s.firmwareVersion);
@@ -5762,7 +5821,7 @@ function formatBackflushState(s) {
     : "";
 }
 function applyHomeStatus(s) {
-  const admin = !!s.adminUnlocked,
+  const admin = adminUnlockedFor(s),
     canControl = controlsMutable,
     remoteReady = !!s.remoteControlEnabled,
     relayStartReady = s.safety.state !== "LOCKOUT",
@@ -5855,7 +5914,7 @@ function statusPageOk(v, s) {
       ? !!(
           typeof s.adminUnlocked === "boolean" &&
           s.network &&
-          (s.adminUnlocked
+          (adminUnlockedFor(s)
             ? s.bleScan &&
               typeof s.bleScan.scanIntensity === "string" &&
               typeof c.timezoneId === "string" &&
@@ -5895,7 +5954,7 @@ async function loadStatus() {
     // Presets reach Settings only with a Home frame that changes them, so a
     // view mounted after that frame applies the model it already holds.
     if (v === "settings") ingestPresets(s);
-    if (v === "admin" && s.adminUnlocked) {
+    if (v === "admin" && adminUnlockedFor(s)) {
       await timezoneCatalogPromise;
       await timezonePreviewLoad?.catch(() => {});
     }
@@ -6134,6 +6193,11 @@ export {
   formatScaleWeight,
   formatScaleTimer,
   syncAdminSessionUi,
+  adminUnlockedFor,
+  webUiOverrideFor,
+  companionHere,
+  companionPairable,
+  pairCompanionHere,
   refreshTimezonePreview,
   updateTimezoneControls,
   browserTimezone,
