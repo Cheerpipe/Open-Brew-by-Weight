@@ -14,6 +14,18 @@ namespace openbrewbyweight {
 constexpr bool constexprTextEquals(const char *a, const char *b) {
   return *a == *b && (*a == '\0' || constexprTextEquals(a + 1, b + 1));
 }
+// Compile-time prefix and substring tests over the same text.
+constexpr bool constexprTextStartsWith(const char *text, const char *prefix) {
+  return *prefix == '\0' ||
+         (*text == *prefix && constexprTextStartsWith(text + 1, prefix + 1));
+}
+constexpr bool constexprTextContains(const char *text, const char *needle) {
+  return constexprTextStartsWith(text, needle) ||
+         (*text != '\0' && constexprTextContains(text + 1, needle));
+}
+static_assert(constexprTextContains("1.1.0+abc-dirty", "-dirty") &&
+              !constexprTextContains("1.1.0+abc", "-dirty") &&
+              constexprTextContains("x", ""), "constexprTextContains");
 
 // Single source of truth for scale disconnect reason labels, mirroring the
 // BLE library's ScaleDisconnectReason by code without coupling the domain,
