@@ -1532,7 +1532,9 @@ export function applyStatus(s) {
   if (!s) return;
   if (__LINEA_MICRA__ && s.lineaMicra)
     renderMicraCloudDiagnostic(s.lineaMicra, s.companion?.route === "companion");
-  if (s.companion) renderCompanionDiagnostic(s.companion);
+  // Pairing, name, link and refused protocol ride the Home stream beside the
+  // header indicator; the rest of the report is this page's own.
+  if (s.companion) renderCompanionDiagnostic({ ...R.homeStatusCache()?.companion, ...s.companion });
   const sc = s.scale || {};
   applyScaleCommands(sc);
   applyDiagnosticGuards(s);

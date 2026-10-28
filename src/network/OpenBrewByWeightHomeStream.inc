@@ -234,6 +234,17 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("connections.wifiName", "\"%s\"", g_work->historyJson);
   escapeConnectedScaleName(control, g_work->scaleHistory, g_work->historyJson, NetworkWorkBuf::kHistoryJson);
   delta.field("connections.bluetoothName", "\"%s\"", g_work->historyJson);
+  // The shared header's companion indicator rides the same rows the Wi-Fi and
+  // scale links do; every view reads it from this stream. Only the fields the
+  // header paints are projected here — the full link report stays diagnostic.
+  {
+    CompanionSnapshot companion;
+    companionSnapshot(companion);
+    delta.field("companion.paired", bool(companion.paired));
+    delta.field("companion.name", "\"%s\"", companion.name);
+    delta.field("companion.link", "\"%s\"", companion.linkOpen ? "open" : "down");
+    delta.field("companion.peerProtocol", static_cast<unsigned long>(companion.peerProtocol));
+  }
   const auto &tare = control.cupTare;
   const uint8_t idleCode = idleTarePresentationCode(tare, control.cupPresent);
   delta.field("cupPresence.state", "\"%s\"", control.scaleAvailable
@@ -524,17 +535,15 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
 #endif
   {
     // Companion: the pairing, its link, the relay and (Linea Micra) the La
-    // Marzocco route. The link age rides the sampled frame below.
+    // Marzocco route. The link age rides the sampled frame below. The four
+    // fields the shared header paints ride the Home stream instead; the page
+    // merges them with this report.
     CompanionSnapshot companion;
     companionSnapshot(companion);
     companionLinkAgeS = companion.linkAgeS;
-    delta.field("companion.paired", bool(companion.paired));
-    delta.field("companion.name", "\"%s\"", companion.name);
     delta.field("companion.address", "\"%s\"", companion.address);
     delta.field("companion.version", "\"%s\"", companion.version);
     delta.field("companion.protocol", static_cast<unsigned long>(companion.protocol));
-    delta.field("companion.peerProtocol", static_cast<unsigned long>(companion.peerProtocol));
-    delta.field("companion.link", "\"%s\"", companion.linkOpen ? "open" : "down");
     delta.field("companion.reconnects", static_cast<unsigned long>(companion.reconnects));
     delta.field("companion.authFailures", static_cast<unsigned long>(companion.authFailures));
     delta.field("companion.ui", bool(companion.ui));
