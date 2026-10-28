@@ -239,11 +239,7 @@ function updateNavigationLayout() {
     data.navLayout = mode;
     if (nav.scrollWidth <= nav.clientWidth) break;
   }
-  sizeHeader();
   R.updateBrandFit();
-}
-function sizeHeader() {
-  root.style.setProperty("--menu-offset", nav.offsetTop + "px");
 }
 // The selection pill is a drop of mercury: one spring carries its centre and
 // width, it stretches into a teardrop while moving and squashes as it brakes.
@@ -399,7 +395,6 @@ if (nav) {
     true,
   );
   new ResizeObserver(updateNavigationLayout).observe(document.getElementById("app"));
-  new ResizeObserver(sizeHeader).observe(document.querySelector(".topBar"));
   const pillAnchor = new ResizeObserver(() => {
     const a = nav.querySelector("a.active"); // Bold active labels resize their links; placement already targets the post-toggle geometry, so only real resizes re-anchor
     if (
@@ -431,12 +426,6 @@ if (msgEl) {
   msgEl.setAttribute("aria-live", "polite");
 }
 R.initHeaderSignals();
-function scrollHeader() {
-  root.toggleAttribute("data-scrolled", window.scrollY > 0);
-}
-window.addEventListener("scroll", scrollHeader, { passive: true });
-mobile.addEventListener("change", scrollHeader);
-scrollHeader();
 window.addEventListener("popstate", () => {
   if (R.exitFullScreenOnPop()) return;
   renderRoute(location.pathname, true);

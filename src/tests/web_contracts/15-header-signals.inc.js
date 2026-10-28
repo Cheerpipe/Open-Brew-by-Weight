@@ -173,7 +173,7 @@
   bar.clientWidth = 200;
   context.updateBrandFit();
   assert.equal(doc.dataset.brandCompact, undefined, 'a fitting row brings the text back');
-  assert(codeIncludes(appJsSource, 'sizeHeader();R.updateBrandFit();'),
+  assert(codeIncludes(appJsSource, 'R.updateBrandFit();'),
       'resize, fonts and breakpoint changes re-measure the brand fit');
 }
 {
@@ -201,27 +201,12 @@
   assert.equal((nav.match(/aria-hidden="true"/g) || []).length, 6, 'Every icon retains a translated text label');
   assert(nav.includes('data-route="/diagnostic" class="hidden"'), 'Hidden until device configuration is known');
 
-  const events = {}, mobile = {matches: true, addEventListener: (name, fn) => {events.resize = fn;}};
-  let scrolled = false;
-  const header = vm.createContext({root: {toggleAttribute: (name, value) => {assert.equal(name, 'data-scrolled'); scrolled = value;}},
-    window: {scrollY: 0, matchMedia: () => mobile, addEventListener: (name, fn) => {events[name] = fn;}}});
-  const headerStart = appJsSource.indexOf('function scrollHeader()');
-  header.mobile = mobile;
-  vm.runInContext(appJsSource.slice(headerStart, (() => { const at = appJsSource.slice(headerStart).search(/window\.addEventListener\(\s*['"]popstate['"]/); return at < 0 ? undefined : at + headerStart; })()), header);
-  // The phone header holds its compact size; only the floating surface state
-  // follows the scroll.
-  for (const scroll of [0, 30, 60, 120, 300, -20]) {
-    header.window.scrollY = scroll; events.scroll();
-    assert.equal(scrolled, scroll > 0, 'Gray surface returns exactly at the top, including overscroll');
-  }
-  mobile.matches = false; header.window.scrollY = 60; events.scroll();
-  assert.equal(scrolled, true, 'Desktop scrolling still floats header navigation');
-  header.window.scrollY = 0; events.scroll(); assert.equal(scrolled, false, 'Returning to the top restores desktop chrome');
-  header.window.scrollY = 60;
-  mobile.matches = true; events.resize();
-  assert.equal(scrolled, true, 'Switching to mobile keeps the scrolled surface state');
+  // Scrolling no longer restyles the header: phones hold their compact size
+  // and desktops keep the full bar pinned and opaque over the content.
   assert(!css.includes('--header-progress') && !css.includes('--compact'),
       'The phone header keeps a fixed compact size with no scroll-driven shrink');
+  assert(!css.includes('data-scrolled') && !css.includes('--menu-offset'),
+      'The desktop header stays pinned and opaque with no scroll-driven float');
 }
 {
   const assert = require('assert').strict, vm = require('vm');
@@ -253,8 +238,8 @@
       fonts: {ready: {then: fn => {callbacks.fonts = fn;}}}},
     requestAnimationFrame() {},
     ResizeObserver: class {constructor(fn) {this.fn = fn;} observe(target) {
-      assert(target === app || target === header || target === nav || links.includes(target));
-      callbacks[target === app ? 'resize' : target === header ? 'geometry' : 'pill'] = this.fn;
+      assert(target === app || target === nav || links.includes(target));
+      callbacks[target === app ? 'resize' : 'pill'] = this.fn;
     }},
     MutationObserver: class {constructor(fn) {callbacks.visibility = fn;} observe(target, options) {
       assert.equal(target, nav); assert.equal(options.subtree, true);
@@ -265,7 +250,6 @@
   const msgElAt = appJsSource.slice(start).search(/const\s+msgEl\s*=/);
   vm.runInContext(appJsSource.slice(start, msgElAt < 0 ? undefined : msgElAt + start), context);
   assert.equal(root.dataset.navLayout, 'icons', 'Wide header retains section icons and names');
-  assert.equal(geometry['--menu-offset'], '72px', 'Initial header measures its actual menu row');
   assert.deepEqual(nav.appended.map(el => el.attrs.class), ['pill'], 'Script enhancement adds the liquid selection pill');
   assert.deepEqual(nav.classes, ['pillNav'], 'Pill navigation takes over the active background');
   assert.deepEqual(Object.keys(nav.listeners).sort(),
@@ -281,8 +265,6 @@
   assert.deepEqual(goo(), [67, 130, 590], 'Animated placement springs toward the active destination');
   still.matches = true; context.placePill(true);
   assert.deepEqual(goo(), [590, 130, 590], 'Reduced motion places the pill without the liquid travel');
-  nav.offsetTop = 80; callbacks.geometry();
-  assert.equal(geometry['--menu-offset'], '80px', 'Header resizing updates the floating offset');
   for (const [width, expected] of [[602, 'icons'], [601, 'text'], [410, 'text'], [409, 'bottom'], [760, 'icons']]) {
     app.clientWidth = width; callbacks.resize();
     assert.equal(root.dataset.navLayout, expected, 'No wrapping at width ' + width);
@@ -303,8 +285,6 @@
   for (const width of [320, 390, 440, 699]) {
     app.clientWidth = width; mobile.matches = true; callbacks.breakpoint();
     assert.equal(root.dataset.navLayout, 'bottom', 'Phone width ' + width + ' always uses bottom icons');
-    nav.offsetTop = 999; callbacks.geometry();
-    assert.equal(root.dataset.navLayout, 'bottom', 'Geometry observation cannot promote phone navigation');
     links.forEach((link, index) => {link.suppressed = index !== 5;}); callbacks.visibility();
     assert.equal(root.dataset.navLayout, 'bottom', 'Only Admin visible still uses bottom icons');
     callbacks.fonts(); callbacks.resize();
@@ -316,10 +296,7 @@
   app.clientWidth = 440; callbacks.resize();
   assert.equal(root.dataset.navLayout, 'text', 'A narrow desktop content area still measures header text');
   assert(css.includes('bottom:var(--nav-offset)'), 'Save and action bars follow the navigation clearance');
-  assert(!css.includes('top:-3.85rem'), 'Floating header avoids a fixed branding-height assumption');
-  assert(css.includes('top:calc(.5rem - var(--menu-offset))'), 'Sticky top follows measured geometry');
-  assert(css.includes('[data-scrolled] .topBar{background:transparent;pointer-events:none}'), 'Floating surroundings expose and do not intercept content');
-  assert(css.includes('[data-scrolled] .pageNav{pointer-events:auto}'), 'Floating links remain interactive');
+  assert(css.includes('position:sticky;top:0'), 'The whole header pins at the top over the scrolling content');
 }
 // A disconnected Bluetooth icon dims its rune like the Wi-Fi arcs and carries
 // no slash, which only added visual noise next to the dimmed bars.

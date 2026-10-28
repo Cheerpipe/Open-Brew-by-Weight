@@ -687,16 +687,6 @@ html:is([data-nav-layout="icons"], [data-nav-layout="text"]) {
 [data-nav-layout="text"] .pageNav svg {
   display: none;
 }
-:is([data-nav-layout="icons"], [data-nav-layout="text"]) .topBar {
-  top: calc(0.5rem - var(--menu-offset));
-}
-:is([data-nav-layout="icons"], [data-nav-layout="text"])[data-scrolled] .topBar {
-  background: transparent;
-  pointer-events: none;
-}
-[data-scrolled] .pageNav {
-  pointer-events: auto;
-}
 .textLock {
   min-width: var(--tap);
   min-height: var(--tap);

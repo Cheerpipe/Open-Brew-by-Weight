@@ -142,15 +142,15 @@ when you let go. The highlight moves like a drop of liquid: it stretches as it
 travels and settles with a gentle bounce. If your device is set to reduce
 motion, it jumps straight to the new section instead.
 With navigation in the header, the gray area is visible at the top of the page.
-As you scroll, the logo and connection indicators move out of view while the
-menu floats over the content near the top of the screen. Return to the top to
-restore the complete header.
+The whole header stays in place while you scroll: the logo, the connection
+indicators and the menu remain visible and the page's content passes
+underneath them.
 Diagnostics appears only when **Show diagnostic page** is enabled in
 **Admin → Frontend**; hiding it gives the other buttons more room. While it is
 hidden, its actions (profilers, resets, tare, heap map) also need Admin
 unlocked and stay dimmed until you unlock it.
-The phone header shrinks gradually as you scroll, keeping the logo and connection
-icons visible. Return to the top to restore its full size.
+The phone header keeps its compact size at all times, with the logo and
+connection icons always visible.
 
 **While a page loads**: Home, Settings, Stats, History, Diagnostics, and Admin
 show a loading view with the Open Brew by Weight mark, a moving wave, and
