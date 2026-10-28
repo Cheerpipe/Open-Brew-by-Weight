@@ -174,7 +174,8 @@ up. When your shots run clearly fast or slow, Home shows a card:
 - **Grind hint**: the coffee was dialled in and has drifted, for example as the
   beans age. This card waits until several shots agree.
 - **Checking your change**: your last shot moved the way the card suggested. No
-  new advice until the next shot confirms the new setting.
+  new advice until the next shot confirms the new setting. **Ignore** hides
+  this waiting card in this browser until the advice changes.
 - **Shots vary**: your shots spread more than this window allows. A grind
   change can't fix that; weigh each dose, check your puck prep, or widen the
   window.

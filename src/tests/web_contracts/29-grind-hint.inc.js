@@ -16,7 +16,7 @@
 
   const maintenance = view(preset(hint()));
   assert.deepEqual([maintenance.cls, maintenance.tag, maintenance.conf, maintenance.shots,
-    maintenance.dir, maintenance.mag, maintenance.actions],
+    maintenance.dir, maintenance.mag, maintenance.relearn],
   ['isSlow', 'Grind hint', 'Likely', '4 shots', 'Grind a touch coarser', 'about 3 s slow', true]);
   assert.equal(maintenance.text,
       'Your last 4 shots on this setting average 34.5 s; the middle of your 27–36 s window is 31.5 s.');
@@ -34,7 +34,7 @@
 
   const checking = view(preset(hint({state: 'checking', offsetS: 1})));
   assert.deepEqual([checking.cls, checking.tag, checking.conf, checking.shots, checking.dir,
-    checking.mag, checking.actions],
+    checking.mag, checking.relearn],
   ['isCheck', 'Checking your change', 'Next shot tells', '', 'Moving the right way', 'now 32.5 s', false]);
 
   const vary = view(preset(hint({state: 'vary', direction: null, tier: null, bin: null, shots: 6,
@@ -57,7 +57,8 @@
       !codeIncludes(viewJs.home, '$("grindHintNewBeans").onclick = () => R.startNewCoffee()') ||
       !partialHtml.home.includes('<button id="grindHintLater" class="btnGlyph ghost" type="button"><span class="t">Ignore</span>') ||
       !partialHtml.home.includes('<span class="t">Relearn</span>') ||
-      !codeIncludes(runtimeJs, 'reveal(card, !!v && !cardDismissed(v.key))'))
+      !codeIncludes(runtimeJs, 'reveal(card, !!v && !cardDismissed(v.key))') ||
+      !codeIncludes(runtimeJs, '$("grindHintNewBeans").hidden = !v.relearn'))
     throw new Error('Grind hint card must offer Relearn and Ignore, and Ignore must hold per advice (D6)');
 }
 // Inline preset rename: the 4 s Settings poll leaves a card being renamed alone,

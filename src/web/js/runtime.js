@@ -5646,7 +5646,7 @@ function grindHintView(p) {
         h.shots === 1
           ? __WEBUI_TEXT__("runtime.grind_shots_one")
           : sub(__WEBUI_TEXT__("runtime.grind_shots"), [h.shots]),
-      actions: h.state !== "checking",
+      relearn: h.state !== "checking",
     };
   if (h.state === "vary")
     return Object.assign(v, {
@@ -5727,7 +5727,8 @@ function renderHomeCards() {
       $("ghAxis").replaceChildren(
         ...v.axis.map((t) => Object.assign(document.createElement("span"), { textContent: t })),
       );
-      $("ghActions").hidden = !v.actions;
+      // Checking is advice in wait, not advice: Ignore stays, Relearn waits.
+      $("grindHintNewBeans").hidden = !v.relearn;
     }
   }
 }
