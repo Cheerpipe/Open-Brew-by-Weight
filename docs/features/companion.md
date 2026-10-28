@@ -37,8 +37,9 @@ the cloud connection drops today.
 2. Home shows **Open Brew by Weight Companion "…" wants to connect**, with
    the companion's address. Tap **Review** to open **Admin → Companion**.
 3. Open the companion's page on that computer: it shows a six-digit code.
-   Type that code in Admin and tap **Approve**. A request waits ten minutes;
-   after that, the companion simply asks again.
+   Type that code in Admin and tap **Approve**. Admin shows the steps while
+   the controller and the companion connect. A request waits ten minutes; if
+   it runs out, choose **Pair** on the companion's page to ask again.
 
 If the companion has not found the controller, type its address in **Admin →
 Companion → Connect to a companion at…** and tap **Open its page**. The

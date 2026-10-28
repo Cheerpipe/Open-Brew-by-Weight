@@ -665,6 +665,14 @@
         </button>
       </div>
     </form>
+    <div id="companionBusy" hidden>
+      <p>{{webui:admin.companion_connecting}}</p>
+      <ol id="companionSteps" class="micraSteps">
+        <li>{{webui:admin.companion_step_code}}</li>
+        <li>{{webui:admin.companion_step_pair}}</li>
+        <li>{{webui:admin.companion_step_link}}</li>
+      </ol>
+    </div>
     <div id="companionPaired" class="hidden">
       <ul id="companionDev" class="devList"></ul>
       <div class="accessRow">

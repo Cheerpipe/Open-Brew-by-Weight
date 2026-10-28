@@ -11,8 +11,6 @@ namespace {
 // Network task only: the open request's key pair and the request it serves.
 mbedtls_svc_key_id_t g_companionRequestKey = MBEDTLS_SVC_KEY_ID_INIT;
 uint32_t g_companionRequestSerial = 0;
-// httpd only: one received frame, then each signed send.
-OPEN_BREW_BY_WEIGHT_PSRAM_BSS char g_companionFrame[COMPANION_FRAME_BYTES + 1];
 // Network task → httpd: unsigned frame bodies, NUL-separated; httpd owns it
 // while companionSendPending_ is set.
 struct CompanionSendJob {
@@ -20,10 +18,19 @@ struct CompanionSendJob {
   uint8_t count;
   char bodies[COMPANION_FRAME_BYTES];
 };
-OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionSendJob g_companionJob;
-// Network task only: credentials plaintext, then ciphertext; wiped after use.
 constexpr size_t kCompanionPlainBytes = 1408;  // every field escaped at worst
-OPEN_BREW_BY_WEIGHT_PSRAM_BSS uint8_t g_companionCrypt[2 * kCompanionPlainBytes + 16];
+// Allocated by the first link handshake and kept, so a controller that never
+// pairs reserves nothing. frame: httpd only, one received frame, then each
+// signed send. crypt: network task only, credentials plaintext, then
+// ciphertext; wiped after use.
+struct CompanionWorkspace {
+  char frame[COMPANION_FRAME_BYTES + 1];
+  CompanionSendJob job;
+  uint8_t crypt[2 * kCompanionPlainBytes + 16];
+};
+std::atomic<CompanionWorkspace *> g_companionWorkspace{nullptr};
+// Valid on every path after a handshake, the only place that allocates it.
+CompanionWorkspace &companionWs() { return *g_companionWorkspace.load(std::memory_order_acquire); }
 // A frame's JSON nests to d.widgets[].output.status; keep httpd recursion short.
 constexpr size_t kCompanionFrameDepth = 8;
 constexpr const char *STATUS_UNSUPPORTED_MEDIA = "415 Unsupported Media Type";
@@ -100,7 +107,9 @@ bool companionPeer(int fd, char address[COMPANION_ADDRESS_TEXT]) {
   if (peer.ss_family != AF_INET6) return false;
   const in6_addr &v6 = reinterpret_cast<const sockaddr_in6 &>(peer).sin6_addr;
   const uint8_t *bytes = reinterpret_cast<const uint8_t *>(&v6);
-  if (IN6_IS_ADDR_V4MAPPED(&v6)) (void)inet_ntop(AF_INET, bytes + 12, address, COMPANION_ADDRESS_TEXT);
+  static const uint8_t kV4Mapped[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
+  if (memcmp(bytes, kV4Mapped, sizeof(kV4Mapped)) == 0)
+    (void)inet_ntop(AF_INET, bytes + 12, address, COMPANION_ADDRESS_TEXT);
   else (void)inet_ntop(AF_INET6, &v6, address, COMPANION_ADDRESS_TEXT);
   return companionPeerAllowedV6(bytes);
 }
@@ -121,16 +130,16 @@ bool __attribute__((format(printf, 2, 3)))
 companionAddBody(uint8_t &count, const char *format, ...) {
   size_t used = 0;
   for (uint8_t index = 0; index < count; ++index)
-    used += strlen(g_companionJob.bodies + used) + 1;
+    used += strlen(companionWs().job.bodies + used) + 1;
   va_list args;
   va_start(args, format);
-  const int length = vsnprintf(g_companionJob.bodies + used, sizeof(g_companionJob.bodies) - used,
+  const int length = vsnprintf(companionWs().job.bodies + used, sizeof(companionWs().job.bodies) - used,
                                format, args);
   va_end(args);
   // Each body must also fit a signed frame: MAC, separator and sequence.
-  if (length < 0 || used + static_cast<size_t>(length) >= sizeof(g_companionJob.bodies) ||
+  if (length < 0 || used + static_cast<size_t>(length) >= sizeof(companionWs().job.bodies) ||
       static_cast<size_t>(length) + COMPANION_MAC_HEX + 20 > COMPANION_FRAME_BYTES) {
-    g_companionJob.bodies[used] = '\0';
+    companionWs().job.bodies[used] = '\0';
     return false;
   }
   ++count;
@@ -500,6 +509,17 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
               "Companions connect only from the local network.");
     return ESP_FAIL;
   }
+  if (g_companionWorkspace.load(std::memory_order_acquire) == nullptr) {
+    auto *workspace = static_cast<CompanionWorkspace *>(
+        allocExternal(sizeof(CompanionWorkspace), AllocationOwner::NETWORK));
+    if (workspace == nullptr) {
+      sendError(request, STATUS_UNAVAILABLE, "COMPANION_MEMORY",
+                "The controller has no memory for a companion link right now.");
+      return ESP_FAIL;
+    }
+    memset(workspace, 0, sizeof(*workspace));
+    g_companionWorkspace.store(workspace, std::memory_order_release);
+  }
   CompanionLinkSlot *slot = nullptr;
   bool known;
   {
@@ -582,11 +602,11 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandler(httpd_req_t *request) {
   if (httpd_ws_recv_frame(request, &frame, 0) != ESP_OK || frame.type != HTTPD_WS_TYPE_TEXT ||
       !frame.final || frame.len == 0 || frame.len > COMPANION_FRAME_BYTES)
     return self.companionLinkRefuse(*slot, "a frame was not one text message of at most 4 KB", false);
-  frame.payload = reinterpret_cast<uint8_t *>(g_companionFrame);
+  frame.payload = reinterpret_cast<uint8_t *>(companionWs().frame);
   if (httpd_ws_recv_frame(request, &frame, frame.len) != ESP_OK ||
-      memchr(g_companionFrame, '\0', frame.len) != nullptr)
+      memchr(companionWs().frame, '\0', frame.len) != nullptr)
     return self.companionLinkRefuse(*slot, "a frame could not be read", false);
-  g_companionFrame[frame.len] = '\0';
+  companionWs().frame[frame.len] = '\0';
   const int fd = httpd_req_to_sockfd(request);
   // Every frame proves the link alive to the LRU purge and to liveness.
   httpd_sess_update_lru_counter(request->handle, fd);
@@ -605,8 +625,8 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkFrame(httpd_req_t *request,
     phase = slot.phase;
     memcpy(key, slot.key, sizeof(key));
   }
-  const char *json = g_companionFrame;
-  if (phase == CompanionLinkPhase::READY) json = companionOpenFrame(key, g_companionFrame, length);
+  const char *json = companionWs().frame;
+  if (phase == CompanionLinkPhase::READY) json = companionOpenFrame(key, companionWs().frame, length);
   memset(key, 0, sizeof(key));
   if (json == nullptr) return companionLinkRefuse(slot, "a frame signature did not match", true);
   cJSON *frame = parseJsonDocumentWithinLimits(json, COMPANION_FRAME_BYTES,
@@ -936,8 +956,8 @@ bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t 
        serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
   bool ok = machineIntegrationCompanionCopyCredentials(generation, email, sizeof(email), password,
                                                        sizeof(password), serial, sizeof(serial));
-  char *plain = reinterpret_cast<char *>(g_companionCrypt);
-  uint8_t *sealed = g_companionCrypt + kCompanionPlainBytes;
+  char *plain = reinterpret_cast<char *>(companionWs().crypt);
+  uint8_t *sealed = companionWs().crypt + kCompanionPlainBytes;
   size_t used = 0;
   const auto put = [&](const char *text, bool escape) {
     if (!ok) return;
@@ -961,22 +981,22 @@ bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t 
   esp_fill_random(iv, sizeof(iv));
   snprintf(aad, sizeof(aad), "obbw-creds|%lu", static_cast<unsigned long>(generation));
   ok = ok && companionCredentialsKey(secret, key) &&
-       companionAeadSeal(key, iv, aad, g_companionCrypt, used, sealed,
-                         sizeof(g_companionCrypt) - kCompanionPlainBytes, sealedLength) &&
+       companionAeadSeal(key, iv, aad, companionWs().crypt, used, sealed,
+                         sizeof(companionWs().crypt) - kCompanionPlainBytes, sealedLength) &&
        appendBase64(ivText, sizeof(ivText), ivUsed, iv, sizeof(iv));
   memset(key, 0, sizeof(key));
-  memset(g_companionCrypt, 0, kCompanionPlainBytes);
+  memset(companionWs().crypt, 0, kCompanionPlainBytes);
   // The ciphertext is base64'd straight into the body after its prefix.
   char *bodyStart = nullptr;
   if (ok) {
     size_t start = 0;
-    for (uint8_t index = 0; index < count; ++index) start += strlen(g_companionJob.bodies + start) + 1;
-    bodyStart = g_companionJob.bodies + start;
+    for (uint8_t index = 0; index < count; ++index) start += strlen(companionWs().job.bodies + start) + 1;
+    bodyStart = companionWs().job.bodies + start;
     size_t bodyUsed = static_cast<size_t>(snprintf(
-        bodyStart, sizeof(g_companionJob.bodies) - start, "\"t\":\"creds\",\"gen\":%lu,\"iv\":\"%s\",\"ct\":\"",
+        bodyStart, sizeof(companionWs().job.bodies) - start, "\"t\":\"creds\",\"gen\":%lu,\"iv\":\"%s\",\"ct\":\"",
         static_cast<unsigned long>(generation), ivText));
-    ok = start + bodyUsed < sizeof(g_companionJob.bodies) &&
-         appendBase64(bodyStart, sizeof(g_companionJob.bodies) - start - 3, bodyUsed, sealed,
+    ok = start + bodyUsed < sizeof(companionWs().job.bodies) &&
+         appendBase64(bodyStart, sizeof(companionWs().job.bodies) - start - 3, bodyUsed, sealed,
                       sealedLength) &&
          bodyUsed + COMPANION_MAC_HEX + 20 <= COMPANION_FRAME_BYTES;
     if (ok) {
@@ -986,7 +1006,7 @@ bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t 
       bodyStart[0] = '\0';
     }
   }
-  memset(sealed, 0, sizeof(g_companionCrypt) - kCompanionPlainBytes);
+  memset(sealed, 0, sizeof(companionWs().crypt) - kCompanionPlainBytes);
   return ok;
 }
 
@@ -1010,7 +1030,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     memcpy(secret, g_companion.stored.secret, sizeof(secret));
   }
   memset(sent.key, 0, sizeof(sent.key));
-  memset(&g_companionJob, 0, sizeof(g_companionJob));
+  memset(&companionWs().job, 0, sizeof(companionWs().job));
   uint8_t count = 0;
   bool credentials = false, command = false;
   if (snapshot || outbox.configSequence != sent.sentConfig)
@@ -1039,8 +1059,8 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
         : companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\"}",
                            static_cast<unsigned long>(outbox.commandId), op);
   if (count == 0) return;
-  g_companionJob.generation = generation;
-  g_companionJob.count = count;
+  companionWs().job.generation = generation;
+  companionWs().job.count = count;
   companionSendPending_.store(true, std::memory_order_release);
   if (httpd_queue_work(server_, companionSendWork, this) != ESP_OK) {
     companionSendPending_.store(false, std::memory_order_release);
@@ -1069,7 +1089,7 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
     TaskLockGuard lock(self.dataMux_);
     for (const auto &slot : g_companion.links) {
       if (slot.fd < 0 || slot.closing || slot.phase != CompanionLinkPhase::READY ||
-          slot.generation != g_companionJob.generation)
+          slot.generation != companionWs().job.generation)
         continue;
       fd = slot.fd;
       memcpy(key, slot.key, sizeof(key));
@@ -1077,22 +1097,22 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
     }
   }
   bool sent = fd >= 0;
-  const char *body = g_companionJob.bodies;
+  const char *body = companionWs().job.bodies;
   uiStreamSendKind = "companion";
-  for (uint8_t index = 0; sent && index < g_companionJob.count; ++index) {
+  for (uint8_t index = 0; sent && index < companionWs().job.count; ++index) {
     const size_t length =
-        companionSealFrame(key, ++sequence, body, g_companionFrame, sizeof(g_companionFrame));
+        companionSealFrame(key, ++sequence, body, companionWs().frame, sizeof(companionWs().frame));
     httpd_ws_frame_t frame = {};
     frame.type = HTTPD_WS_TYPE_TEXT;
     frame.final = true;
-    frame.payload = reinterpret_cast<uint8_t *>(g_companionFrame);
+    frame.payload = reinterpret_cast<uint8_t *>(companionWs().frame);
     frame.len = length;
     sent = length != 0 && httpd_ws_send_frame_async(self.server_, fd, &frame) == ESP_OK;
     body += strlen(body) + 1;
   }
   uiStreamSendKind = "control";
   memset(key, 0, sizeof(key));
-  memset(&g_companionJob, 0, sizeof(g_companionJob));
+  memset(&companionWs().job, 0, sizeof(companionWs().job));
   if (fd >= 0) {
     {
       TaskLockGuard lock(self.dataMux_);

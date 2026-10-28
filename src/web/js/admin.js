@@ -573,6 +573,9 @@ async function accessQuickAction(action, okText, failText, fields) {
 // Admin → Companion. The controller never calls out: every action is one POST,
 // and connecting by address only opens the companion's own page here.
 let companionState = null;
+// Approval runs in the background on the controller: show its three steps
+// until the link opens instead of a form that looks untouched.
+let companionPairing = null;
 async function companionAction(body, okText, button) {
   button?.classList.add("busy");
   try {
@@ -615,13 +618,34 @@ function companionRouteText(c) {
   if (!c.lm) return direct;
   return direct + " · " + waits[c.link !== "open" ? 0 : !c.credentials ? 1 : !c.upstream ? 2 : 3];
 }
+function showCompanionPairing(c) {
+  const p = companionPairing;
+  if (p && p.stage > 0 && c) {
+    p.stage = !c.paired ? 1 : c.link !== "open" ? 2 : 3;
+    if (p.stage === 3 || Date.now() - p.startedAt > 45000) {
+      companionPairing = null;
+      R.message(
+        p.stage === 3
+          ? __WEBUI_TEXT__("admin.companion_approved")
+          : __WEBUI_TEXT__("admin.companion_paired_waiting"),
+        "ok",
+      );
+    } else setTimeout(R.refreshStatus, 1000);
+  }
+  [...$("companionSteps").children].forEach(
+    (li, i) => (li.className = !p ? "" : i < p.stage ? "ok" : i > p.stage ? "" : "on"),
+  );
+  $("companionBusy").hidden = !companionPairing;
+  return !!companionPairing;
+}
 function applyCompanionStatus(c) {
   if (!c || !$("companionPanel")) return;
   companionState = c;
+  const busy = showCompanionPairing(c);
   const r = !c.paired && c.request;
-  $("companionConnect").classList.toggle("hidden", c.paired || !!r);
-  $("companionRequest").classList.toggle("hidden", !r);
-  $("companionPaired").classList.toggle("hidden", !c.paired);
+  $("companionConnect").classList.toggle("hidden", busy || c.paired || !!r);
+  $("companionRequest").classList.toggle("hidden", busy || !r);
+  $("companionPaired").classList.toggle("hidden", busy || !c.paired);
   $("companionIgnored").classList.toggle("hidden", !(c.ignored > 0));
   $("companionIgnoredText").textContent = R.sub(__WEBUI_TEXT__("admin.companion_ignored"), [
     c.ignored,
@@ -692,12 +716,29 @@ function initCompanion() {
     window.open(url, "_blank", "noopener");
   };
   $("companionCode").oninput = () => applyCompanionStatus(companionState);
-  $("companionApproveButton").onclick = () =>
-    companionAction(
-      { action: "approve", code: $("companionCode").value },
-      __WEBUI_TEXT__("admin.companion_approved"),
-      $("companionApproveButton"),
-    ).then(R.refreshStatus);
+  $("companionApproveButton").onclick = async (event) => {
+    event.preventDefault();
+    if (companionPairing) return;
+    companionPairing = { stage: 0, startedAt: Date.now() };
+    applyCompanionStatus(companionState);
+    try {
+      await R.api("/api/v1/companion/admin", {
+        method: "POST",
+        body: R.body({ action: "approve", code: $("companionCode").value }),
+      });
+      companionPairing.stage = 1;
+    } catch (e) {
+      companionPairing = null;
+      if (e.code === "COMPANION_CODE")
+        R.showFieldError("companionCode", __WEBUI_TEXT__("admin.companion_code_wrong"));
+      else
+        R.message(
+          R.formatCommandError(__WEBUI_TEXT__("admin.could_not_update_companion"), e),
+          "error",
+        );
+    }
+    R.refreshStatus();
+  };
   $("companionIgnoreButton").onclick = () =>
     companionAction({ action: "ignore" }, __WEBUI_TEXT__("admin.companion_ignored_now")).then(
       R.refreshStatus,
