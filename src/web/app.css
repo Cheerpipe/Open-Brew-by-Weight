@@ -97,10 +97,12 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem 0.75rem;
-  margin: 0 -1rem;
-  padding: 0.5rem 1rem;
+  margin: 0 -1rem 0.5rem;
+  /* The bar ends at its last row's edge: the resting gap below it is a
+     margin, so scrolling content passes under the menu itself, not under a
+     strip of reserved background. */
+  padding: 0.5rem 1rem 0;
   padding-top: calc(0.5rem + env(safe-area-inset-top));
-  min-height: calc(var(--hdr) + env(safe-area-inset-top));
   background: var(--bg);
   color: var(--ac);
 }
@@ -671,6 +673,10 @@ html:is([data-nav-layout="icons"], [data-nav-layout="text"]) {
   width: 100%;
   max-width: none;
   margin-top: 0.15rem;
+  /* The menu's lower half clears the bar's background: content rises to the
+     menu's middle and tucks under its rounded edge, which the pill's shadow
+     then draws on. */
+  margin-bottom: calc(var(--tap) / -2);
 }
 :is([data-nav-layout="icons"], [data-nav-layout="text"]) .pageNav a {
   flex: 1 0 auto;
@@ -5321,9 +5327,6 @@ html.theme-dark {
 @media (max-width: 699px) {
   /* Phones keep the header at its compact size: the logo and wordmark hold
      still instead of shrinking as the page scrolls. */
-  .topBar {
-    min-height: calc(3.75rem + env(safe-area-inset-top));
-  }
   .topBar .brandMark {
     width: 1.65rem;
     height: 2.17rem;
