@@ -37,6 +37,7 @@ static unsigned waits = 0;
 static unsigned websocketStops = 0;
 static bool lastRegisterKey = false;
 static std::function<bool(openbrewbyweight::LineaMicraDiscoverySnapshot &)> listHook;
+static std::function<void()> notifyTakeHook;
 int esp_http_client_perform(void *) {
   const int result = performHook();
   testNowMs += performAdvanceMs;
@@ -47,6 +48,7 @@ unsigned ulTaskNotifyTake(int, uint32_t ticks) {
   if (ticks == 250) throw WorkerStopped{};
   lastWaitTicks = ticks;
   ++waits;
+  if (notifyTakeHook) notifyTakeHook();
   return 0;
 }
 namespace openbrewbyweight {
@@ -94,6 +96,13 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
 #define gettimeofday testGettimeofday
 #include "micra_cancellation_methods.inc"
 #undef gettimeofday
+// The companion route runs unchanged; observation publication is out of scope.
+namespace openbrewbyweight {
+bool decodeMicraDashboard(const cJSON *, MicraObservation &) { return false; }
+void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &, uint32_t) {}
+bool OpenBrewByWeightMicraService::mergeReadLocked(const MicraObservation &) { return false; }
+#include "machine/OpenBrewByWeightMicraCompanionRoute.inc"
+}
 
 using namespace openbrewbyweight;
 namespace openbrewbyweight {
@@ -112,6 +121,7 @@ struct MicraCancellationTest {
   static void relistKeepsSavedMachine();
   static void idleClosesWebSocketModeClient();
   static void postWakeSettledFromPush();
+  static void companionRouteNeverReads();
   static void run();
 };
 }
@@ -742,7 +752,61 @@ void MicraCancellationTest::postWakeSettledFromPush() {
   liveSubscription = false;
 }
 
+// On the companion route the task never reads or polls: wakes settle from the
+// companion's state and a user refresh becomes one `refresh` command.
+void MicraCancellationTest::companionRouteNeverReads() {
+  for (const bool live : {true, false}) {
+    OpenBrewByWeightMicraService service;
+    service.config_.accountConfigured = true;
+    service.config_.options |= LINEA_MICRA_OBSERVE_STATE;
+    service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
+    service.staConnected_.store(true);
+    service.companionLink_.store(true);
+    service.companionRoute_.store(true);
+    service.companion_.status.route = MicraCompanionRoute::COMPANION;
+    service.companion_.lmSwitch = service.companion_.up = true;
+    service.companion_.pingAtMs = millis();
+    service.websocketStatus_.subscribed = true;  // The full frame's basis.
+    service.published_.sampleAtMs = millis();
+    service.published_.powerState = LineaMicraPowerState::OFF;
+    service.published_.quality = LineaMicraObservationQuality::CURRENT;
+    service.observationFence_.powerTrusted = true;
+    assert(service.powerState_.notePowerOnCommandAccepted(service.published_, true, millis()));
+    testNowMs += micra_timing::kPostWakeObservationDelayMs;
+    service.companion_.pingAtMs = millis();
+    service.observationSchedule_.armPostEvent(millis() - micra_timing::kPostWakeObservationDelayMs);
+    service.observationSchedule_.dueNow(millis());  // API polling would be due too.
+    liveSubscription = live;
+    unsigned calls = 0;
+    executeHook = [&] { ++calls; };
+    try { service.taskLoop(); } catch (const WorkerStopped &) {}
+    assert(calls == 0 && service.companion_.status.route == MicraCompanionRoute::COMPANION);
+    assert(service.powerState_.effectiveStatus(service.published_, true, millis()).optimisticOn == !live);
+    // A refresh is one companion command: no session, no dashboard read.
+    OpenBrewByWeightMicraService::WorkBuffer work;
+    service.work_ = &work;
+    OpenBrewByWeightMicraService::PendingRequest refresh;
+    refresh.request.type = LineaMicraRequestType::OBSERVE_STATE;
+    refresh.identityGeneration = service.identityGeneration_;
+    const unsigned sessions = authentications;
+    dashboardHook = [](const MicraObservationStamp *) { assert(false && "no read"); return false; };
+    notifyTakeHook = [&] {
+      const auto box = service.companionOutbox();
+      assert(box.commandId != 0 && box.commandOp == MicraCompanionCommandOp::REFRESH);
+      service.companionCommandResult(box.commandId, live, live ? 0 : 503);
+    };
+    assert(service.executeObservation(refresh) == live);
+    notifyTakeHook = nullptr;
+    dashboardHook = nullptr;
+    assert(authentications == sessions && service.companionOutbox().commandId == 0);
+    assert(work.httpStatus == (live ? 200 : 503) && !work.transportFailure);
+    service.work_ = nullptr;
+  }
+  liveSubscription = false;
+}
+
 int main() {
+  MicraCancellationTest::companionRouteNeverReads();
   MicraCancellationTest::postWakeSettledFromPush();
   MicraCancellationTest::relistKeepsSavedMachine();
   MicraCancellationTest::idleClosesWebSocketModeClient();

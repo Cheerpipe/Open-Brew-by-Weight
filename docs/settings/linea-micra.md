@@ -201,6 +201,39 @@ unavailable. A cloud cleaning update never starts the machine or turns an
 existing shot into backflush. Transitions while the stream is paused for
 maintenance or waiting to reconnect may be missed.
 
+### Through a companion
+
+With [Open Brew by Weight Companion](../features/companion.md) connected and
+its La Marzocco switch on, the companion can keep the La Marzocco connection
+for the controller. Everything above works the same way: Home, power, boiler
+readiness, cleaning, wake gestures, preset temperatures and scale-driven power
+commands. The difference is that the controller itself no longer talks to the
+La Marzocco cloud; it receives the machine's state from the companion and
+sends its commands through it, which leaves more of its Wi-Fi and memory for
+your scale.
+
+You do not need to do anything. The controller hands over only when nothing
+is happening: no shot, no scale connecting, no cleaning cycle and no machine
+command on the way. If the companion goes away, the controller reconnects to
+La Marzocco on its own. During a shot with a scale it waits until the shot is
+over, exactly as it does today; otherwise it reconnects right away. Either
+way, the companion takes over again at the next quiet moment. If the
+companion keeps dropping, the controller stays on its own connection for five
+minutes before trying again.
+
+Signing in, choosing a machine and **Disconnect** always happen on the
+controller. The companion receives the new account automatically, encrypted,
+and forgets it when you disconnect or turn its La Marzocco switch off.
+
+Automatic backflush keeps every safety limit when the companion carries the
+cleaning updates: if the companion or its La Marzocco connection is lost
+during a cleaning cycle, the cycle stops just as it does when the controller
+loses its own connection.
+
+The Web UI log records each change of route and why the controller is using
+its own connection, for example **Micra route companion -> direct
+reason=link_lost**.
+
 ## Boiler readiness
 
 While the machine is on, La Marzocco's cloud reports whether each boiler is

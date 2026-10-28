@@ -70,13 +70,17 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
           config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET))
         websocketUnexpectedReconnect_ = websocketUnexpectedReconnect_ || buffer->failed.load() ||
             (!staConnected_.load() && !apActive_.load());
-      if (buffer->stamp.identity == identityGeneration_)
-        powerState_.hold(published_, config_.accountConfigured &&
-            (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0, millis());
-      websocketStatus_.state = MicraSocketState::STOPPING;
-      websocketStatus_.subscribed = false;
-      shotTraceNoteMicraSubscribed(false);
-      backflush_.invalidate();
+      // On the companion route this socket is already obsolete; the feed
+      // that replaced it keeps its own subscription and supervision.
+      if (companion_.status.route != MicraCompanionRoute::COMPANION) {
+        if (buffer->stamp.identity == identityGeneration_)
+          powerState_.hold(published_, config_.accountConfigured &&
+              (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0, millis());
+        websocketStatus_.state = MicraSocketState::STOPPING;
+        websocketStatus_.subscribed = false;
+        shotTraceNoteMicraSubscribed(false);
+        backflush_.invalidate();
+      }
       if (buffer->heap.pending) finishHeapLifecycle(buffer->heap, HeapLifecycleResult::FAILURE, before);
       beginHeapLifecycle(buffer->stopHeap, HeapLifecycleEvent::HTTP_STOP, before);
     }
@@ -88,8 +92,10 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
     buffer->client = nullptr;
     const auto after = sampleHeapCaps();
     TaskLockGuard lock(mux_);
-    snapshotPending_ = false;
-    observationFence_.invalidate();
+    if (companion_.status.route != MicraCompanionRoute::COMPANION) {
+      snapshotPending_ = false;
+      observationFence_.invalidate();
+    }
     finishHeapLifecycle(buffer->stopHeap, HeapLifecycleResult::SUCCESS, after);
     websocketStatus_.heap = buffer->heap.aggregate;
     websocketStatus_.stopHeap = buffer->stopHeap.aggregate;
@@ -218,25 +224,33 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   TaskLockGuard lock(self.mux_);
   if (buffer.stamp.epoch != self.observationFence_.epoch ||
       buffer.stamp.identity != self.identityGeneration_) return true;
-  if (!self.observationFence_.merge(self.published_, self.powerState_, update,
-                                    true)) return true;
-  self.mirrorPowerLocked();
+  self.applyPushLocked(update, frame.ingressAttempt);
+  return true;
+}
+
+// Publishes one decoded dashboard push under mux_. The direct socket and the
+// companion feed share this body, so both routes publish identically.
+void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &update,
+                                                   uint32_t ingressAttempt) {
+  const uint32_t receivedAt = update.receivedAtMs;
+  if (!observationFence_.merge(published_, powerState_, update, true)) return;
+  mirrorPowerLocked();
   // The broker's online push carries the full dashboard, so going back online
   // needs no HTTPS read; an offline machine makes a pending one useless.
-  if (self.observationFence_.offline) self.snapshotPending_ = false;
-  auto &status = self.websocketStatus_;
+  if (observationFence_.offline) snapshotPending_ = false;
+  auto &status = websocketStatus_;
   status.state = MicraSocketState::STREAMING;
   status.reason = "none";
   status.messageAtMs = receivedAt;
   ++status.messages;
-  if (update.powerPresent && !self.observationFence_.offline) status.powerAtMs = receivedAt;
+  if (update.powerPresent && !observationFence_.offline) status.powerAtMs = receivedAt;
   if (update.connectedPresent) {
     status.machineConnectedKnown = true;
     status.machineConnected = update.connected;
   }
-  if (self.observationFence_.offline ||
+  if (observationFence_.offline ||
       (update.powerPresent && update.mode != LineaMicraObservedMode::BREWING))
-    self.backflush_.invalidate();
+    backflush_.invalidate();
   if (update.cleaningPresent) {
     status.cleaning = update.cleaning;
     status.cleaningAvailable = update.cleaningAvailable;
@@ -246,20 +260,19 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
         ? MachineBackflushPhase::INACTIVE : update.cleaning == MicraCleaningState::REQUESTED
         ? MachineBackflushPhase::AWAITING : update.cleaning == MicraCleaningState::CLEANING
         ? MachineBackflushPhase::ACTIVE : MachineBackflushPhase::UNKNOWN;
-    if (!self.observationFence_.offline && status.machineConnectedKnown &&
+    if (!observationFence_.offline && status.machineConnectedKnown &&
         status.machineConnected)
-      self.backflush_.observe(phase, frame.ingressAttempt);
+      backflush_.observe(phase, ingressAttempt);
     else if (phase != MachineBackflushPhase::INACTIVE)
-      self.backflush_.observe(MachineBackflushPhase::UNKNOWN, frame.ingressAttempt);
-    if (self.backflush_.status().busy()) {
-      self.desiredPower_ = {};
-      if (self.temperatureActive_.load() || self.powerActive_.load())
-        self.abortRequested_.store(true, std::memory_order_release);
+      backflush_.observe(MachineBackflushPhase::UNKNOWN, ingressAttempt);
+    if (backflush_.status().busy()) {
+      desiredPower_ = {};
+      if (temperatureActive_.load() || powerActive_.load())
+        abortRequested_.store(true, std::memory_order_release);
     }
   }
   status.publishLatencyMs = millis() - receivedAt;
   status.maxPublishLatencyMs = std::max(status.maxPublishLatencyMs, status.publishLatencyMs);
-  return true;
 }
 
 void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,

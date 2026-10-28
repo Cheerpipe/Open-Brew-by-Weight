@@ -3,6 +3,7 @@
 #include "OpenBrewByWeightLineaMicraSettings.h"
 #include "OpenBrewByWeightLineaMicraTypes.h"
 #include "OpenBrewByWeightMachineIntegration.h"
+#include "OpenBrewByWeightMicraCompanion.h"
 #include "OpenBrewByWeightMicraPowerState.h"
 #include "OpenBrewByWeightMicraObservation.h"
 #include "OpenBrewByWeightMicraWebSocket.h"
@@ -64,6 +65,21 @@ class OpenBrewByWeightMicraService {
   MachinePhysicalStartDisposition physicalStart(MachineBackflushPermit *permit = nullptr);
   MachineBackflushSnapshot backflush(bool consume = false);
   void finishBackflush(uint32_t attempt);
+  // Companion route (docs/COMPANION_LINK.md): the link calls these from the
+  // HTTP or network task; each takes mux_ briefly and never logs under it.
+  void companionLink(bool ready, bool lmSwitch);
+  void companionPing(bool upstreamAlive);
+  void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS);
+  void companionCredentials(uint32_t generation, bool ok);
+  bool companionState(MicraCompanionStateKind kind, uint32_t epoch,
+                      uint32_t afterCommand, const cJSON *dashboard);
+  void companionCommandResult(uint32_t id, bool accepted, uint16_t httpStatus);
+  MicraCompanionOutbox companionOutbox() const;
+  MicraCompanionRouteStatus companionRouteStatus() const;
+  bool companionCopyCredentials(uint32_t generation, char *email, size_t emailCapacity,
+                                char *password, size_t passwordCapacity, char *serial,
+                                size_t serialCapacity);
+  void setCompanionNotify(void (*notify)()) { companionNotify_.store(notify); }
 
  private:
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
@@ -112,8 +128,23 @@ class OpenBrewByWeightMicraService {
          shotActive_.load(std::memory_order_acquire));
   }
   bool sendSubscription();
+  void applyPushLocked(const MicraObservation &update, uint32_t ingressAttempt);
+  bool mergeReadLocked(const MicraObservation &update);
   void serviceWebSocket();
   void stopWebSocket(bool release = false);
+  bool serviceCompanion();
+  bool companionCommand(MicraCompanionCommandOp op, uint16_t value);
+  void leaveCompanionLocked(const char *reason, bool loss);
+  void dropCompanionFeedLocked();
+  bool companionFeedLiveLocked() const;
+  uint32_t companionIntentLocked(uint32_t afterCommand) const;
+  void recordCompanionIntentLocked(uint32_t command);
+  void refreshCompanionConfigLocked();
+  void notifyCompanion() const {
+    if (auto notify = companionNotify_.load()) notify();
+  }
+  static void logCompanionRoute(MicraCompanionRoute from, MicraCompanionRoute to,
+                                const char *reason);
   void waitRetry(uint32_t delayMs);
   void execute(PendingRequest &pending);
   bool executeConnect(PendingRequest &pending);
@@ -255,6 +286,27 @@ class OpenBrewByWeightMicraService {
   std::atomic<uint32_t> shotGeneration_{0};
   std::atomic<bool> clearSessionRequested_{false};
   bool wasNetworkReady_ = false;
+  // Companion route. Protected by mux_; the cloud task alone moves DIRECT to
+  // PENDING, the full frame moves PENDING to COMPANION, and any side returns
+  // to DIRECT. Without a link the route stays DIRECT and nothing here runs.
+  struct CompanionFeed {
+    MicraCompanionOutbox outbox;
+    MicraCompanionRouteStatus status;
+    MicraObservationStamp stamp;  // Basis set by the last full frame.
+    struct Intent { uint32_t command = 0, generation = 0; } intents[8];
+    uint32_t losses[4] = {};
+    uint32_t routeIntent = 0, epoch = 0, requestedAtMs = 0, pingAtMs = 0;
+    uint32_t upAtMs = 0, downSinceMs = 0, tokenRenewAtMs = 0, flapUntilMs = 0;
+    uint32_t lastCommand = 0, resultId = 0;
+    uint16_t resultHttp = 0;
+    uint8_t nextIntent = 0, nextLoss = 0, lossCount = 0;
+    bool lmSwitch = false, up = false, resultAccepted = false, flapping = false;
+  } companion_;
+  // Lock-free mirrors: no link means the cloud task skips the route entirely,
+  // and command paths read the route without taking mux_.
+  std::atomic<bool> companionLink_{false};
+  std::atomic<bool> companionRoute_{false};
+  std::atomic<void (*)()> companionNotify_{nullptr};
 };
 
 }  // namespace openbrewbyweight

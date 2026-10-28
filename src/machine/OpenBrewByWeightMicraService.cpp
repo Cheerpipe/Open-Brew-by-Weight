@@ -361,6 +361,7 @@ struct OpenBrewByWeightMicraService::RequestStateGuard {
 };
 
 #include "OpenBrewByWeightMicraWebSocket.inc"
+#include "OpenBrewByWeightMicraCompanionRoute.inc"
 
 bool OpenBrewByWeightMicraService::begin() {
   initJsonParser();
@@ -390,6 +391,7 @@ void OpenBrewByWeightMicraService::publishConfig(
   bool cancelObservation = false;
   bool identityChanged = false;
   bool transportChanged = false;
+  MicraCompanionRoute companionFrom = MicraCompanionRoute::DIRECT, companionTo = companionFrom;
   {
     TaskLockGuard lock(mux_);
     const bool wasObserving =
@@ -399,6 +401,13 @@ void OpenBrewByWeightMicraService::publishConfig(
         memcmp(&config_, &effective, sizeof(effective)) != 0;
     identityChanged = !sameSessionIdentity(config_, effective);
     transportChanged = config_.connectionType != effective.connectionType;
+    // A new account, machine or transport, or no observation, ends the
+    // companion route before the direct state below is reset.
+    companionFrom = companion_.status.route;
+    if (identityChanged || transportChanged || !effective.accountConfigured ||
+        (effective.options & LINEA_MICRA_OBSERVE_STATE) == 0)
+      leaveCompanionLocked(identityChanged ? "account" : "settings", false);
+    companionTo = companion_.status.route;
     if (identityChanged || transportChanged ||
         (effective.options & LINEA_MICRA_OBSERVE_STATE) == 0)
       websocketUnexpectedReconnect_ = false;
@@ -428,6 +437,8 @@ void OpenBrewByWeightMicraService::publishConfig(
       desiredPower_ = {};
       cancelTemperature = true;
       cancelPowerOff = true;
+      ++companion_.outbox.credentialsGeneration;
+      companion_.status.credentialsConfirmed = false;
     } else {
       if (desiredTemperature_.present) {
         desiredTemperature_.machineConfigGeneration = configGeneration;
@@ -438,6 +449,7 @@ void OpenBrewByWeightMicraService::publishConfig(
         desiredPower_.machineConfigGeneration = configGeneration;
       }
     }
+    refreshCompanionConfigLocked();
     published_.configGeneration = configGeneration;
     published_.connectionFreshness = effective.connectionType ==
         static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
@@ -534,6 +546,9 @@ void OpenBrewByWeightMicraService::publishConfig(
               powerActive_.load(std::memory_order_acquire))) {
     abortRequested_.store(true, std::memory_order_release);
   }
+  if (companionFrom != companionTo)
+    logCompanionRoute(companionFrom, companionTo, identityChanged ? "account" : "settings");
+  notifyCompanion();
   if (task_ != nullptr) xTaskNotifyGive(task_);
 }
 
@@ -795,6 +810,7 @@ LineaMicraStatus OpenBrewByWeightMicraService::status() const {
 }
 
 bool OpenBrewByWeightMicraService::liveSubscriptionLocked() const {
+  if (companion_.status.route == MicraCompanionRoute::COMPANION) return companionFeedLiveLocked();
   return websocketStatus_.subscribed && websocket_ && !websocket_->failed.load() &&
          websocket_->stamp.epoch == observationFence_.epoch && staConnected_.load() &&
          !apActive_.load() && !outboundMaintenance.load();
@@ -808,8 +824,9 @@ bool OpenBrewByWeightMicraService::pushConfirms(uint16_t targetDeciC,
   do {
     {
       TaskLockGuard lock(mux_);
-      if (!published_.connectionFreshness || observationFence_.offline ||
-          !liveSubscriptionLocked()) return false;
+      // The companion delivers verification reads as well as pushes.
+      if ((!published_.connectionFreshness && !companionRoute_.load()) ||
+          observationFence_.offline || !liveSubscriptionLocked()) return false;
       if (targetDeciC ? observationFence_.temperatureTrusted && published_.targetValid &&
                             published_.targetDeciC == targetDeciC
                       : observationFence_.powerTrusted && published_.powerState == power)
@@ -869,12 +886,18 @@ void OpenBrewByWeightMicraService::qualifyBackflushLocked() {
                                                    : websocketStatus_.connectedAtMs;
   if (!config_.accountConfigured || !(config_.options & LINEA_MICRA_OBSERVE_STATE) ||
       config_.connectionType != static_cast<uint8_t>(MicraConnectionType::WEBSOCKET) ||
-      !websocket_ || websocket_->failed.load() || !websocketStatus_.subscribed ||
-      !tokenAvailable_.load(std::memory_order_acquire) ||
-      websocket_->stamp.identity != identityGeneration_ ||
-      websocket_->stamp.epoch != observationFence_.epoch ||
+      // The companion feed qualifies like the socket: subscribed on the current
+      // identity and epoch, an `up` ping within 30 s and a known token.
+      (companion_.status.route == MicraCompanionRoute::COMPANION
+           ? !companionFeedLiveLocked() || now - companion_.upAtMs >= 30000 ||
+                 companion_.tokenRenewAtMs == 0
+           : !websocket_ || websocket_->failed.load() || !websocketStatus_.subscribed ||
+                 !tokenAvailable_.load(std::memory_order_acquire) ||
+                 websocket_->stamp.identity != identityGeneration_ ||
+                 websocket_->stamp.epoch != observationFence_.epoch ||
+                 now - aliveAt >= 30000) ||
       !websocketStatus_.machineConnectedKnown || !websocketStatus_.machineConnected ||
-      observationFence_.offline || now - aliveAt >= 30000 ||
+      observationFence_.offline ||
       !staConnected_.load() || apActive_.load() || shotActive_.load() ||
       outboundShotActive.load() || outboundMaintenance.load())
     backflush_.invalidate();
@@ -883,9 +906,13 @@ void OpenBrewByWeightMicraService::qualifyBackflushLocked() {
 bool OpenBrewByWeightMicraService::backflushReadyLocked() const {
   const auto &state = backflush_.status();
   return state.valid && state.phase == MachineBackflushPhase::AWAITING &&
-      !state.consumed && tokenAvailable_.load(std::memory_order_acquire) &&
-      millis() - tokenIssuedAtMs_.load(std::memory_order_acquire) <
-          micra_timing::kAccessTokenRefreshAgeMs - 210000 &&
+      !state.consumed &&
+      (companion_.status.route == MicraCompanionRoute::COMPANION
+           ? companion_.tokenRenewAtMs != 0 &&
+                 static_cast<int32_t>(companion_.tokenRenewAtMs - millis()) > 210000
+           : tokenAvailable_.load(std::memory_order_acquire) &&
+                 millis() - tokenIssuedAtMs_.load(std::memory_order_acquire) <
+                     micra_timing::kAccessTokenRefreshAgeMs - 210000) &&
       observationFence_.synchronized && published_.powerState == LineaMicraPowerState::ON &&
       !temperatureActive_.load() && !powerActive_.load();
 }
@@ -1087,7 +1114,7 @@ void OpenBrewByWeightMicraService::taskLoop() {
       }
       releaseWorkBuffer();
     }
-    serviceWebSocket();
+    if (!serviceCompanion()) serviceWebSocket();
     if (outboundMaintenance.load()) releaseWorkBuffer();
     const bool scaleInhibited = outboundScaleInhibited();
     bool websocketMode;
@@ -1133,7 +1160,10 @@ void OpenBrewByWeightMicraService::taskLoop() {
     bool settledFromPush = false;
     {
       TaskLockGuard lock(mux_);
-      if (config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET))
+      // The companion feed keeps the state current: no polling and no reads.
+      const bool companion = companion_.status.route == MicraCompanionRoute::COMPANION;
+      if (config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET) ||
+          companion)
         observationSchedule_.suspendPeriodic();
       if (desiredPower_.present && desiredPower_.shotGeneration != shotGeneration_.load(std::memory_order_acquire))
         desiredPower_ = {};
@@ -1182,15 +1212,15 @@ void OpenBrewByWeightMicraService::taskLoop() {
       } else if (observationReady && config_.accountConfigured &&
                  (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0 &&
                  !snapshotPending_ && observationSchedule_.automaticDue(now) &&
-                 published_.connectionFreshness && observationFence_.powerTrusted &&
-                 liveSubscriptionLocked()) {
+                 (published_.connectionFreshness || companion) &&
+                 observationFence_.powerTrusted && liveSubscriptionLocked()) {
         // A live subscription would already have pushed the wake: settle the
         // post-wake optimism from pushed evidence; HTTPS stays the fallback.
         (void)observationSchedule_.observationStarted(now);
         (void)powerState_.noteEvidence(powerState_.generation(), published_.powerState,
                                        now, true);
         settledFromPush = true;
-      } else if (observationReady && config_.accountConfigured &&
+      } else if (!companion && observationReady && config_.accountConfigured &&
                  (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0 &&
                  (snapshotPending_ || observationSchedule_.automaticDue(now))) {
         pending.request.requestId = nextAutomaticRequestId_++;
@@ -1520,12 +1550,17 @@ bool OpenBrewByWeightMicraService::executeTemperatureApplication(
       TaskLockGuard lock(mux_);
       verification = published_;
     }
+    // On the companion route the companion signs and sends the command and
+    // its state confirms it: no session, write or read from here.
+    const bool companion = companionRoute_.load();
     bool success = false;
-    if (ensureSession(settings, false) &&
+    if ((companion || ensureSession(settings, false)) &&
         temperatureRequestCurrent(request, machineConfigGeneration)) {
       if (!commandAccepted) {
         commandAttempted = true;
-        commandAccepted = writeTemperature(settings, request.targetDeciC);
+        commandAccepted = companion
+            ? companionCommand(MicraCompanionCommandOp::TEMPERATURE, request.targetDeciC)
+            : writeTemperature(settings, request.targetDeciC);
         commandTransportStatus = work_->transportStatus;
         commandHttpStatus = work_->httpStatus;
         if (commandAccepted) {
@@ -1540,7 +1575,7 @@ bool OpenBrewByWeightMicraService::executeTemperatureApplication(
       success = commandAccepted &&
                 temperatureRequestCurrent(request, machineConfigGeneration) &&
                 (pushConfirms(request.targetDeciC, LineaMicraPowerState::UNKNOWN) ||
-                 (readDashboard(settings, verification) &&
+                 (!companion && readDashboard(settings, verification) &&
                   verification.targetValid &&
                   verification.targetDeciC == request.targetDeciC));
     }
@@ -1683,13 +1718,16 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
       TaskLockGuard lock(mux_);
       verification = published_;
     }
+    const bool companion = companionRoute_.load();
     bool success = false;
-    if (ensureSession(settings, false) &&
+    if ((companion || ensureSession(settings, false)) &&
         powerRequestCurrent(request, machineConfigGeneration)) {
       if (!commandAccepted) {
         commandAttempted = true;
-        commandAccepted =
-            standby ? writeStandby(settings) : writePowerOn(settings);
+        commandAccepted = companion
+            ? companionCommand(standby ? MicraCompanionCommandOp::STANDBY
+                                       : MicraCompanionCommandOp::POWER_ON, 0)
+            : standby ? writeStandby(settings) : writePowerOn(settings);
         commandTransportStatus = work_->transportStatus;
         commandHttpStatus = work_->httpStatus;
         if (commandAccepted) {
@@ -1712,6 +1750,8 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
                                                              millis());
             if (overlaid) {
               observationSchedule_.armPostEvent(millis());
+              // Companion reads ordered after this command carry its intent.
+              if (companion) recordCompanionIntentLocked(companion_.lastCommand);
             }
           }
         }
@@ -1719,7 +1759,7 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
       success = commandAccepted &&
                 powerRequestCurrent(request, machineConfigGeneration) &&
                 (pushConfirms(0, wantedState) ||
-                 (readDashboard(settings, verification) &&
+                 (!companion && readDashboard(settings, verification) &&
                   verification.powerState == wantedState));
     }
     if (success) {
@@ -1921,7 +1961,10 @@ bool OpenBrewByWeightMicraService::executeObservation(PendingRequest &pending) {
       deferObservation(pending, status, gateError);
       return true;
     }
-    success = ensureSession(settings, false, &sessionRenewed) &&
+    // On the companion route a refresh asks the companion for one read.
+    success = companionRoute_.load()
+        ? companionCommand(MicraCompanionCommandOp::REFRESH, 0)
+        : ensureSession(settings, false, &sessionRenewed) &&
               ((sessionRenewed && !dashboardRequired) ||
                readDashboard(settings, status,
                    pending.initialSnapshot ? &pending.snapshotStamp : nullptr));
@@ -2302,6 +2345,14 @@ bool OpenBrewByWeightMicraService::readDashboard(
       shotTransportPaused() || scaleConnecting_.load(std::memory_order_acquire) ||
       acquisitionGeneration != outboundAcquisitionGeneration.load(std::memory_order_acquire) ||
       disconnectGeneration != disconnectGeneration_.load(std::memory_order_acquire)) return false;
+  if (!mergeReadLocked(update)) return false;
+  result = published_;
+  return snapshot != nullptr || !observationFence_.offline;
+}
+
+// Merges one dashboard read under mux_ with post-wake reconciliation. The
+// direct HTTPS read and the companion's full and read frames share this body.
+bool OpenBrewByWeightMicraService::mergeReadLocked(const MicraObservation &update) {
   const bool observing = config_.accountConfigured &&
       (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0;
   const uint32_t onlineRevision = observationFence_.onlineRevision;
@@ -2313,8 +2364,7 @@ bool OpenBrewByWeightMicraService::readDashboard(
   }
   if (observationFence_.offline || published_.powerState == LineaMicraPowerState::OFF)
     backflush_.invalidate();
-  result = published_;
-  return snapshot != nullptr || !observationFence_.offline;
+  return true;
 }
 
 bool OpenBrewByWeightMicraService::writeTemperature(
