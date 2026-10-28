@@ -1232,6 +1232,13 @@ label:has(> input[type="checkbox"]) .fieldHint {
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem 0.75rem;
 }
+.statusColumn + .statusColumn {
+  margin-top: 1rem;
+}
+.blockHead {
+  grid-column: 1/-1;
+  font-size: 0.8125rem;
+}
 .metric,
 .shotCard > * {
   min-width: 0;
