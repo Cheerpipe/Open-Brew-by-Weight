@@ -207,9 +207,12 @@ void machineIntegrationCompanionCredentials(uint32_t generation, bool ok) {
   service.companionCredentials(generation, ok);
 }
 
+MicraCompanionIngress machineIntegrationCompanionIngress() { return service.companionIngress(); }
+
 bool machineIntegrationCompanionState(MicraCompanionStateKind kind, uint32_t epoch,
-                                      uint32_t afterCommand, const cJSON *dashboard) {
-  return service.companionState(kind, epoch, afterCommand, dashboard);
+                                      uint32_t afterCommand, const cJSON *dashboard,
+                                      MicraCompanionIngress ingress) {
+  return service.companionState(kind, epoch, afterCommand, dashboard, ingress);
 }
 
 void machineIntegrationCompanionCommandResult(uint32_t id, bool accepted,

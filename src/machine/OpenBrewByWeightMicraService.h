@@ -71,8 +71,9 @@ class OpenBrewByWeightMicraService {
   void companionPing(bool upstreamAlive);
   void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS);
   void companionCredentials(uint32_t generation, bool ok);
-  bool companionState(MicraCompanionStateKind kind, uint32_t epoch,
-                      uint32_t afterCommand, const cJSON *dashboard);
+  MicraCompanionIngress companionIngress();
+  bool companionState(MicraCompanionStateKind kind, uint32_t epoch, uint32_t afterCommand,
+                      const cJSON *dashboard, MicraCompanionIngress ingress);
   void companionCommandResult(uint32_t id, bool accepted, uint16_t httpStatus);
   MicraCompanionOutbox companionOutbox() const;
   MicraCompanionRouteStatus companionRouteStatus() const;
@@ -126,6 +127,13 @@ class OpenBrewByWeightMicraService {
     return outboundScaleConnected.load(std::memory_order_acquire) &&
         (outboundShotActive.load(std::memory_order_acquire) ||
          shotActive_.load(std::memory_order_acquire));
+  }
+  // The companion holds its reads, and the controller drops them, while the
+  // scale needs the radio: one rule, so a read held through a shot is not
+  // released into the BLE quiet interval that follows it.
+  bool companionHold() const {
+    return shotTransportPaused() || scaleConnecting_.load(std::memory_order_acquire) ||
+        outboundScaleInhibited();
   }
   bool sendSubscription();
   void applyPushLocked(const MicraObservation &update, uint32_t ingressAttempt);
@@ -301,6 +309,7 @@ class OpenBrewByWeightMicraService {
     uint16_t resultHttp = 0;
     uint8_t nextIntent = 0, nextLoss = 0, lossCount = 0;
     bool lmSwitch = false, up = false, resultAccepted = false, flapping = false;
+    bool release = false;  // the cloud worker frees the direct session once per switch
   } companion_;
   // Lock-free mirrors: no link means the cloud task skips the route entirely,
   // and command paths read the route without taking mux_.

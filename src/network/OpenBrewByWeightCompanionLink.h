@@ -9,6 +9,7 @@
 
 #include "OpenBrewByWeightShotCurveTypes.h"  // appendBase64
 #include "OpenBrewByWeightWebAccess.h"       // webAccessFnv, copyWebAccessLabel
+#include "machine/OpenBrewByWeightMicraCompanion.h"  // MicraCompanionRoute
 #include <cJSON.h>
 #include <cstddef>
 #include <cstdint>
@@ -26,6 +27,7 @@ constexpr uint8_t COMPANION_IGNORED_IDS = 4;
 constexpr size_t COMPANION_FRAME_BYTES = 4096;
 constexpr size_t COMPANION_KEY_BYTES = 65;  // uncompressed P-256 point
 constexpr size_t COMPANION_SECRET_BYTES = 32;
+constexpr size_t COMPANION_COMMITMENT_BYTES = 32;
 constexpr size_t COMPANION_NONCE_BYTES = 16;
 constexpr size_t COMPANION_MAC_HEX = 32;  // first 16 bytes of the frame HMAC
 constexpr size_t COMPANION_ID_TEXT = 37, COMPANION_NAME_TEXT = 33,
@@ -160,6 +162,14 @@ inline bool companionSame(const uint8_t *a, const uint8_t *b, size_t size) {
   return difference == 0;
 }
 
+// What the first pair request carries instead of the companion's key.
+inline bool companionCommitment(const uint8_t companionKey[COMPANION_KEY_BYTES],
+                                uint8_t commitment[COMPANION_COMMITMENT_BYTES]) {
+  static const char kLabel[] = "obbw-companion-commit-v1";
+  const CompanionBytes parts[] = {{kLabel, sizeof(kLabel) - 1}, {companionKey, COMPANION_KEY_BYTES}};
+  return companionSha256(parts, 2, commitment);
+}
+
 // The six-digit verification code both sides show.
 inline bool companionSas(const uint8_t companionKey[COMPANION_KEY_BYTES],
                          const uint8_t controllerKey[COMPANION_KEY_BYTES], uint32_t &code) {
@@ -266,6 +276,8 @@ enum class CompanionApproveResult : uint8_t { OK, WRONG_CODE, DENIED, NOT_PENDIN
 struct CompanionRequest {
   CompanionPairState state = CompanionPairState::NONE;
   bool keyReady = false;   // controllerKey holds this request's key
+  bool keyIssued = false;  // controllerKey reached the companion in a response
+  bool revealed = false;   // companionKey holds the key matching the commitment
   bool approving = false;  // the code matched; the network task derives S
   bool lmSwitch = true;    // the switch chosen in the approval panel
   uint8_t wrongCodes = 0;
@@ -275,9 +287,15 @@ struct CompanionRequest {
   char name[COMPANION_NAME_TEXT] = {};
   char version[COMPANION_VERSION_TEXT] = {};
   char address[COMPANION_ADDRESS_TEXT] = {};
+  uint8_t commitment[COMPANION_COMMITMENT_BYTES] = {};
   uint8_t companionKey[COMPANION_KEY_BYTES] = {};
   uint8_t controllerKey[COMPANION_KEY_BYTES] = {};
 };
+
+// Admin may take the code once both keys are fixed.
+inline bool companionCodeReady(const CompanionRequest &request) {
+  return request.state == CompanionPairState::PENDING && request.keyReady && request.revealed;
+}
 
 struct CompanionPairing {
   CompanionRequest request = {};
@@ -310,7 +328,7 @@ inline uint8_t companionIgnoredCount(const CompanionPairing &pairing) {
 inline CompanionPairResult companionPairRequest(CompanionPairing &pairing, bool paired,
                                                 const char *id, const char *name,
                                                 const char *version, const char *address,
-                                                const uint8_t key[COMPANION_KEY_BYTES],
+                                                const uint8_t commitment[COMPANION_COMMITMENT_BYTES],
                                                 uint32_t now) {
   companionPairTick(pairing, now);
   CompanionRequest &request = pairing.request;
@@ -318,8 +336,8 @@ inline CompanionPairResult companionPairRequest(CompanionPairing &pairing, bool 
   if (paired) return CompanionPairResult::ALREADY_PAIRED;
   if (request.state == CompanionPairState::PENDING) {
     if (strcmp(request.id, id) != 0 || request.approving) return CompanionPairResult::BUSY;
-    // The same companion asking again: its request stands unless its key changed.
-    if (memcmp(request.companionKey, key, COMPANION_KEY_BYTES) == 0)
+    // The same companion asking again: its request stands unless its commitment changed.
+    if (memcmp(request.commitment, commitment, COMPANION_COMMITMENT_BYTES) == 0)
       return CompanionPairResult::PENDING;
   }
   if (pairing.newSeen && now - pairing.newAtMs < COMPANION_NEW_REQUEST_MS)
@@ -333,10 +351,33 @@ inline CompanionPairResult companionPairRequest(CompanionPairing &pairing, bool 
   copyWebAccessLabel(request.name, name);
   copyWebAccessLabel(request.version, version);
   snprintf(request.address, sizeof(request.address), "%s", address);
-  memcpy(request.companionKey, key, COMPANION_KEY_BYTES);
+  memcpy(request.commitment, commitment, COMPANION_COMMITMENT_BYTES);
   pairing.newSeen = true;
   pairing.newAtMs = now;
   return CompanionPairResult::NEW;
+}
+
+// The companion's key, revealed once its request received controllerKey. A key
+// that is not a P-256 point (`onCurve`, checked by the caller) or does not
+// hash to the commitment denies the request; repeating the accepted key is
+// harmless. False answers 400.
+inline bool companionPairReveal(CompanionPairing &pairing, const char *id,
+                                const uint8_t key[COMPANION_KEY_BYTES], bool onCurve,
+                                uint32_t now) {
+  companionPairTick(pairing, now);
+  CompanionRequest &request = pairing.request;
+  if (request.state != CompanionPairState::PENDING || strcmp(request.id, id) != 0) return false;
+  if (request.revealed && companionSame(request.companionKey, key, COMPANION_KEY_BYTES)) return true;
+  if (request.approving) return false;
+  uint8_t digest[COMPANION_COMMITMENT_BYTES];
+  if (!onCurve || request.revealed || !request.keyIssued || !companionCommitment(key, digest) ||
+      !companionSame(digest, request.commitment, sizeof(digest))) {
+    request.state = CompanionPairState::DENIED;
+    return false;
+  }
+  memcpy(request.companionKey, key, COMPANION_KEY_BYTES);
+  request.revealed = true;
+  return true;
 }
 
 inline const char *companionPairPoll(CompanionPairing &pairing, const char *id, uint32_t now) {
@@ -360,7 +401,7 @@ inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, ui
   CompanionRequest &request = pairing.request;
   if (request.state != CompanionPairState::PENDING || request.approving)
     return CompanionApproveResult::NOT_PENDING;
-  if (!request.keyReady) return CompanionApproveResult::NOT_READY;
+  if (!companionCodeReady(request)) return CompanionApproveResult::NOT_READY;
   if (code != expected) {
     if (++request.wrongCodes < COMPANION_CODE_ATTEMPTS) return CompanionApproveResult::WRONG_CODE;
     request.state = CompanionPairState::DENIED;
@@ -445,7 +486,7 @@ struct CompanionLinkSlot {
   uint32_t inSequence = 0, outSequence = 0;
   uint8_t nc[COMPANION_NONCE_BYTES] = {}, ns[COMPANION_NONCE_BYTES] = {};
   uint8_t key[32] = {};
-  char version[COMPANION_VERSION_TEXT] = {};
+  char name[COMPANION_NAME_TEXT] = {}, version[COMPANION_VERSION_TEXT] = {};
   const char *closeReason = nullptr;
   // Outbox sequences already sent in this session; the first send is the
   // whole snapshot.
@@ -459,6 +500,8 @@ struct CompanionState {
   CompanionLinkSlot links[2] = {};  // the link, and a newcomer authenticating
   uint32_t generation = 0, active = 0;  // active: the ready session, 0 when down
   uint32_t ups = 0, authFailures = 0;
+  uint32_t changedAtMs = 0;   // the link last came up or went down; 0: not since boot
+  uint32_t peerProtocol = 0;  // the paired companion's refused protocol; 0: none
   uint32_t lastCommandSent = 0;  // a command id is sent once, across sessions
   bool dirty = false;
 };
@@ -466,16 +509,26 @@ struct CompanionState {
 // Diagnostic → Companion; strings are sanitized on store.
 struct CompanionSnapshot {
   bool paired = false, lmSwitch = false, linkOpen = false, upstream = false;
-  uint8_t protocol = 0;
-  uint32_t linkAgeS = 0, reconnects = 0, authFailures = 0, routeSwitches = 0, commands = 0;
+  uint8_t protocol = 0;   // the open link's; 0 while down
+  int32_t linkAgeS = -1;  // since the link came up or went down; -1: not since boot
+  uint32_t peerProtocol = 0, reconnects = 0, authFailures = 0, routeSwitches = 0, commands = 0;
   const char *route = "direct", *reason = "none";
   char name[COMPANION_NAME_TEXT] = {}, address[COMPANION_ADDRESS_TEXT] = {},
        version[COMPANION_VERSION_TEXT] = {};
 };
 
-// Handshake 10 s; then two ping intervals of silence (15 s or 120 s pings).
-inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, bool routeDirect) {
-  return slot.phase != CompanionLinkPhase::READY ? 10000U : routeDirect ? 250000U : 35000U;
+// Handshake 10 s; then two ping intervals of silence, 15 s pings only once the
+// route is the companion's. A route request (pending) keeps the long limit:
+// the companion answers it on its own cadence, and the La Marzocco service
+// gives up on it after 30 s without a ping or the full frame.
+inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, MicraCompanionRoute route) {
+  return slot.phase != CompanionLinkPhase::READY ? 10000U
+         : route == MicraCompanionRoute::COMPANION ? 35000U : 250000U;
+}
+
+// Seconds since the link came up or went down; -1 before either since boot.
+inline int32_t companionLinkAgeS(const CompanionState &state, uint32_t now) {
+  return state.changedAtMs == 0 ? -1 : static_cast<int32_t>((now - state.changedAtMs) / 1000U);
 }
 
 }  // namespace openbrewbyweight

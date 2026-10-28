@@ -1124,11 +1124,16 @@ the direct socket untouched (it keeps streaming). The companion's `full` frame
 moves PENDING → COMPANION on the link task in one locked step: it ends the
 socket's epoch, so later socket frames are dropped, then applies the frame as a
 new subscription plus its initial read; the worker then stops the obsolete
-socket and frees the HTTPS session. If that frame finds a shot, scale
-connection, cleaning episode or command, the route goes back to DIRECT
-(`busy`). On COMPANION the controller makes no La Marzocco request: `push`
-frames run the socket's push body, `read` frames the HTTPS read's merge (dropped
-during a scaled shot or scale connection), the post-wake and API schedules
+socket and frees the HTTPS session, once, in either connection type. If that
+frame finds a shot, scale connection, cleaning episode or command, the route
+goes back to DIRECT (`busy`). On COMPANION the controller makes no La Marzocco request: `push`
+frames run the socket's push body with the power intent sampled when the frame
+arrived, `read` frames the HTTPS read's merge (dropped while `hold` is on: a
+scaled shot, scale connection or setup, acquisition or the BLE quiet interval,
+the same rule that tells the companion to hold them; `hold` changes are sent
+only while the route is not DIRECT, and each route request carries the current
+value), a rejected `full` or `read` frame is ignored as a failed read is, a
+rejected `push` closes the link, the post-wake and API schedules
 settle from that state, commands and Refresh become `cmd` frames and an
 accepted command is confirmed only by companion state within `kPushConfirmMs`.
 An upstream epoch change or lost subscription drops the basis (the socket stop
@@ -1206,8 +1211,8 @@ NetworkService owns both machines under `dataMux_`.
 
 | State | Meaning | Leaves when |
 | --- | --- | --- |
-| none | no request since boot | a valid `POST …/pair` from a local peer (one new request per 5 s) |
-| pending | waiting for Admin; the network task makes the request's key, then the code can be checked | approve with the right code (the network task derives and keeps `S`, then approved), Ignore or three wrong codes (denied), 10 minutes (expired) |
+| none | no request since boot | a valid `POST …/pair` with a commitment from a local peer (one new request per 5 s) |
+| pending | waiting for Admin; the network task makes the request's key, the companion receives it and then reveals its own key, and only then can the code be checked | approve with the right code (the network task derives and keeps `S`, then approved), Ignore, three wrong codes, or a revealed key that misses the commitment, is not a P-256 point or comes before the controller's key was issued (denied), 10 minutes (expired) |
 | approved, denied, expired | final; `GET …/pair` reports it | a new request replaces it |
 
 **Link session** (one authenticated link plus one opening link):
@@ -1216,10 +1221,13 @@ NetworkService owns both machines under `dataMux_`.
 | --- | --- | --- |
 | hello | `hello` within 10 s | `challenge`, or `error`/`erase` and close (`RETRY_LATER` during a shot with a scale, a scale connection or the BLE quiet interval) |
 | proof | `proof` within 10 s | `ready` (the link is up and replaces an older one), or close on a wrong proof |
-| ready | signed frames in sequence; one at least every two ping intervals (35 s while the La Marzocco route is not direct, 250 s otherwise) | close on a bad MAC or sequence, an unknown frame, silence, Forget, a newer link or factory reset |
+| ready | signed frames in sequence; one at least every two ping intervals (35 s while the La Marzocco route is the companion's, 250 s otherwise, a pending route request included) | close on a bad MAC or sequence, a malformed frame of a known type, a rejected `push`, a send httpd could not complete, silence, Forget, a newer link, factory reset, or the peer, the network or an LRU eviction closing the socket; a frame of an unknown type is ignored |
 
 Ready and close tell the La Marzocco service through
-`machineIntegrationCompanionLink`; every link up and down is a Web UI log line.
+`machineIntegrationCompanionLink`; every link up and down is a Web UI log line
+with its cause, and the time of the last change is kept for Admin and
+Diagnostic. A refused `PROTOCOL` hello of the paired companion is kept until a
+link opens, so Admin and Diagnostic can say which side needs an update.
 
 ---
 

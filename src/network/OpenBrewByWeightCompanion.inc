@@ -16,13 +16,18 @@ uint32_t g_companionRequestSerial = 0;
 struct CompanionSendJob {
   uint32_t generation;
   uint8_t count;
+  uint8_t retries;  // clean aborts httpd deferred to the network task
   char bodies[COMPANION_FRAME_BYTES];
 };
 constexpr size_t kCompanionPlainBytes = 1408;  // every field escaped at worst
-// Allocated by the first link handshake and kept, so a controller that never
-// pairs reserves nothing. frame: httpd only, one received frame, then each
-// signed send. crypt: network task only, credentials plaintext, then
-// ciphertext; wiped after use.
+// A frame httpd could not start writing goes again from the next network pass,
+// at most this often, before the link closes.
+constexpr uint8_t kCompanionSendRetries = 5;
+// Allocated from PSRAM by the first link handshake that claims a slot (only a
+// paired or forgotten controller) and kept, so a controller that never pairs
+// reserves nothing. frame: httpd only, one received frame, then each signed
+// send. crypt: network task only, credentials plaintext, then ciphertext;
+// wiped after use.
 struct CompanionWorkspace {
   char frame[COMPANION_FRAME_BYTES + 1];
   CompanionSendJob job;
@@ -273,9 +278,10 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
   const uint32_t now = millis();
   char json[192] = {};
   size_t used = 0;
-  const auto appendControllerKey = [&](const CompanionRequest &pending) {
+  const auto appendControllerKey = [&](CompanionRequest &pending) {
     // The key is public: the companion needs it for the code and the secret.
     if (!pending.keyReady) return;
+    pending.keyIssued = true;
     memcpy(json + used, ",\"controllerKey\":\"", 18);
     used += 18;
     (void)appendBase64(json, sizeof(json), used, pending.controllerKey, COMPANION_KEY_BYTES);
@@ -289,7 +295,7 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
     {
       TaskLockGuard lock(self.dataMux_);
       const char *state = companionPairPoll(g_companion.pairing, id, now);
-      const CompanionRequest &pending = g_companion.pairing.request;
+      CompanionRequest &pending = g_companion.pairing.request;
       used = static_cast<size_t>(snprintf(json, sizeof(json), "{\"state\":\"%s\"", state));
       if (!strcmp(state, "pending") || !strcmp(state, "approved")) appendControllerKey(pending);
       if (!strcmp(state, "pending"))
@@ -304,40 +310,59 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
                      "Send the pairing request as application/json.");
   const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.");
   if (body != ESP_OK) return body;
-  static const char *const fields[] = {"id", "name", "version", "protocol", "publicKey"};
+  // The first request commits to the companion's key; the same request with
+  // `publicKey` instead reveals it once controllerKey was issued.
+  static const char *const fields[] = {"id", "name", "version", "protocol", "commitment", "publicKey"};
   char id[COMPANION_ID_TEXT] = {}, name[COMPANION_NAME_TEXT] = {},
        version[COMPANION_VERSION_TEXT] = {}, keyText[96] = {};
-  uint8_t key[COMPANION_KEY_BYTES] = {};
+  uint8_t key[COMPANION_KEY_BYTES] = {}, commitment[COMPANION_COMMITMENT_BYTES] = {};
   uint32_t protocol = 0;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 5) &&
+  const bool reveal = root != nullptr && jsonFieldPresent(root, "publicKey");
+  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 6) &&
+               jsonFieldPresent(root, "commitment") != reveal &&
                jsonString(root, "id", id, sizeof(id), false) && companionIdValid(id) &&
                jsonString(root, "name", name, sizeof(name), false) &&
                companionTextValid(name, 1, COMPANION_NAME_TEXT - 1, false) &&
                jsonString(root, "version", version, sizeof(version), true) &&
                companionTextValid(version, 0, COMPANION_VERSION_TEXT - 1, true) &&
                jsonUint32(root, "protocol", protocol) && protocol == COMPANION_PROTOCOL &&
-               jsonString(root, "publicKey", keyText, sizeof(keyText), false) &&
-               companionBase64Decode(keyText, key, COMPANION_KEY_BYTES) && key[0] == 0x04;
+               (reveal ? jsonString(root, "publicKey", keyText, sizeof(keyText), false) &&
+                             companionBase64Decode(keyText, key, COMPANION_KEY_BYTES)
+                       : jsonString(root, "commitment", keyText, sizeof(keyText), false) &&
+                             companionBase64Decode(keyText, commitment, sizeof(commitment)));
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
-  valid = valid && companionPublicKeyValid(key);
   if (!valid)
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
                      "The pairing request fields are invalid.");
-  CompanionPairResult result;
+  const bool onCurve = reveal && key[0] == 0x04 && companionPublicKeyValid(key);
+  CompanionPairResult result = CompanionPairResult::PENDING;
+  bool accepted = true, denied = false;
   char label[COMPANION_NAME_TEXT] = {};
   {
     TaskLockGuard lock(self.dataMux_);
-    result = companionPairRequest(g_companion.pairing, g_companion.stored.paired != 0, id, name,
-                                  version, address, key, now);
-    const CompanionRequest &pending = g_companion.pairing.request;
+    CompanionRequest &pending = g_companion.pairing.request;
+    if (reveal) {
+      const bool open = pending.state == CompanionPairState::PENDING;
+      accepted = companionPairReveal(g_companion.pairing, id, key, onCurve, now);
+      denied = open && pending.state == CompanionPairState::DENIED;
+    } else {
+      result = companionPairRequest(g_companion.pairing, g_companion.stored.paired != 0, id, name,
+                                    version, address, commitment, now);
+    }
     memcpy(label, pending.name, sizeof(label));
     used = static_cast<size_t>(snprintf(json, sizeof(json), "{\"state\":\"pending\""));
     appendControllerKey(pending);
     snprintf(json + used, sizeof(json) - used, ",\"expiresInS\":%lu}",
              static_cast<unsigned long>((pending.untilMs - now + 999U) / 1000U));
   }
+  if (denied)
+    self.lifecycleLogf("Companion pairing request from '%s' denied: its key did not match its request",
+                       label);
+  if (!accepted)
+    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
+                     "The key does not match an open pairing request.");
   switch (result) {
     case CompanionPairResult::IGNORED:
       return sendError(request, STATUS_FORBIDDEN, "COMPANION_IGNORED",
@@ -395,7 +420,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     {
       TaskLockGuard lock(self.dataMux_);
       const CompanionRequest &pending = g_companion.pairing.request;
-      ready = pending.state == CompanionPairState::PENDING && pending.keyReady;
+      ready = companionCodeReady(pending);
       serial = pending.serial;
       memcpy(companionKey, pending.companionKey, sizeof(companionKey));
       memcpy(controllerKey, pending.controllerKey, sizeof(controllerKey));
@@ -404,10 +429,16 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     CompanionApproveResult result = CompanionApproveResult::NOT_PENDING;
     {
       TaskLockGuard lock(self.dataMux_);
-      if (g_companion.pairing.request.serial == serial)
-        result = companionPairApprove(g_companion.pairing, static_cast<uint32_t>(atol(code)),
-                                      expected, lm, now);
-      memcpy(name, g_companion.pairing.request.name, sizeof(name));
+      const CompanionRequest &pending = g_companion.pairing.request;
+      // A code that became checkable after the first look is not counted wrong.
+      if (pending.serial == serial)
+        result = expected != UINT32_MAX
+            ? companionPairApprove(g_companion.pairing, static_cast<uint32_t>(atol(code)),
+                                   expected, lm, now)
+            : pending.state == CompanionPairState::PENDING && !pending.approving
+                ? CompanionApproveResult::NOT_READY
+                : CompanionApproveResult::NOT_PENDING;
+      memcpy(name, pending.name, sizeof(name));
     }
     switch (result) {
       case CompanionApproveResult::OK:
@@ -454,6 +485,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       memcpy(name, g_companion.stored.name, sizeof(name));
       forgotten = companionForget(g_companion.stored);
       g_companion.dirty |= forgotten;
+      if (forgotten) g_companion.peerProtocol = 0;
       for (size_t index = 0; forgotten && index < 2; ++index) {
         CompanionLinkSlot &slot = g_companion.links[index];
         if (slot.fd < 0 || slot.closing) continue;
@@ -509,17 +541,6 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
               "Companions connect only from the local network.");
     return ESP_FAIL;
   }
-  if (g_companionWorkspace.load(std::memory_order_acquire) == nullptr) {
-    auto *workspace = static_cast<CompanionWorkspace *>(
-        allocExternal(sizeof(CompanionWorkspace), AllocationOwner::NETWORK));
-    if (workspace == nullptr) {
-      sendError(request, STATUS_UNAVAILABLE, "COMPANION_MEMORY",
-                "The controller has no memory for a companion link right now.");
-      return ESP_FAIL;
-    }
-    memset(workspace, 0, sizeof(*workspace));
-    g_companionWorkspace.store(workspace, std::memory_order_release);
-  }
   CompanionLinkSlot *slot = nullptr;
   bool known;
   {
@@ -544,6 +565,22 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
               "Another companion link is being opened.");
     return ESP_FAIL;
   }
+  // httpd is the only allocator, so this check and store cannot race.
+  if (g_companionWorkspace.load(std::memory_order_acquire) == nullptr) {
+    auto *workspace = static_cast<CompanionWorkspace *>(
+        allocExternal(sizeof(CompanionWorkspace), AllocationOwner::NETWORK));
+    if (workspace == nullptr) {
+      {
+        TaskLockGuard lock(self.dataMux_);
+        *slot = CompanionLinkSlot{};
+      }
+      sendError(request, STATUS_UNAVAILABLE, "COMPANION_MEMORY",
+                "The controller has no memory for a companion link right now.");
+      return ESP_FAIL;
+    }
+    memset(workspace, 0, sizeof(*workspace));
+    g_companionWorkspace.store(workspace, std::memory_order_release);
+  }
   request->sess_ctx = slot;
   request->free_ctx = companionLinkFree;
   // Bound incomplete frames, and send each frame without waiting for an ACK.
@@ -563,7 +600,10 @@ void OpenBrewByWeightNetwork::companionLinkFree(void *context) {
   {
     TaskLockGuard lock(self.dataMux_);
     down = slot.phase == CompanionLinkPhase::READY && slot.generation == g_companion.active;
-    if (down) g_companion.active = 0;
+    if (down) {
+      g_companion.active = 0;
+      g_companion.changedAtMs = millis() | 1U;
+    }
     reason = slot.closeReason != nullptr ? slot.closeReason : "connection closed";
     lm = g_companion.stored.lmSwitch != 0;
     slot = CompanionLinkSlot{};
@@ -625,6 +665,10 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkFrame(httpd_req_t *request,
     phase = slot.phase;
     memcpy(key, slot.key, sizeof(key));
   }
+  // A state frame's power intent is its arrival, as on the direct socket.
+  const MicraCompanionIngress ingress = phase == CompanionLinkPhase::READY
+                                            ? machineIntegrationCompanionIngress()
+                                            : MicraCompanionIngress{};
   const char *json = companionWs().frame;
   if (phase == CompanionLinkPhase::READY) json = companionOpenFrame(key, companionWs().frame, length);
   memset(key, 0, sizeof(key));
@@ -636,7 +680,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkFrame(httpd_req_t *request,
   const char *type = cJSON_IsString(typeItem) ? typeItem->valuestring : "";
   const esp_err_t result = phase == CompanionLinkPhase::HELLO   ? companionLinkHello(request, slot, frame, type)
                            : phase == CompanionLinkPhase::PROOF ? companionLinkProof(request, slot, frame, type)
-                                                                : companionLinkInbound(slot, frame, type);
+                                                                : companionLinkInbound(slot, frame, type, ingress);
   cJSON_Delete(frame);
   return result;
 }
@@ -663,6 +707,13 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
     verdict = companionHelloVerdict(g_companion.stored, id, protocol->valuedouble);
     if (verdict == CompanionHello::ERASE)
       memcpy(secret, g_companion.stored.forgottenSecret, sizeof(secret));
+    // Admin and Diagnostic say which side needs an update.
+    const double asked = protocol->valuedouble;
+    if (verdict == CompanionHello::PROTOCOL)
+      g_companion.peerProtocol = asked >= 0 && asked <= UINT16_MAX &&
+                                         asked == static_cast<double>(static_cast<uint32_t>(asked))
+                                     ? static_cast<uint32_t>(asked)
+                                     : 0;
   }
   // Like the Micra socket's admission: no new link during a scaled shot or
   // a scale connection. The companion retries with its backoff.
@@ -684,6 +735,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
       TaskLockGuard lock(dataMux_);
       memcpy(slot.nc, nc, sizeof(nc));
       memcpy(slot.ns, ns, sizeof(ns));
+      copyWebAccessLabel(slot.name, name);
       copyWebAccessLabel(slot.version, version);
       slot.protocol = static_cast<uint8_t>(COMPANION_PROTOCOL);
       slot.phase = CompanionLinkPhase::PROOF;
@@ -759,10 +811,14 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkProof(httpd_req_t *request,
     slot.generation = ++g_companion.generation;
     g_companion.active = slot.generation;
     ++g_companion.ups;
-    // A new peer address (and companion version) is kept only once proven.
+    g_companion.changedAtMs = slot.readyAtMs | 1U;
+    g_companion.peerProtocol = 0;
+    // A new peer address, name or version is kept only once proven.
     CompanionStored &stored = g_companion.stored;
-    if (strcmp(stored.address, address) != 0 || strcmp(stored.companionVersion, slot.version) != 0) {
+    if (strcmp(stored.address, address) != 0 || strcmp(stored.name, slot.name) != 0 ||
+        strcmp(stored.companionVersion, slot.version) != 0) {
       snprintf(stored.address, sizeof(stored.address), "%s", address);
+      memcpy(stored.name, slot.name, sizeof(stored.name));
       memcpy(stored.companionVersion, slot.version, sizeof(stored.companionVersion));
       g_companion.dirty = true;
     }
@@ -787,7 +843,8 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkProof(httpd_req_t *request,
 }
 
 esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(CompanionLinkSlot &slot, cJSON *frame,
-                                                        const char *type) {
+                                                        const char *type,
+                                                        MicraCompanionIngress ingress) {
   uint32_t expected;
   {
     TaskLockGuard lock(dataMux_);
@@ -798,6 +855,16 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(CompanionLinkSlot &slot,
   {
     TaskLockGuard lock(dataMux_);
     slot.inSequence = expected;
+  }
+  // A type this controller does not know is a later addition: ignored, so a
+  // newer companion keeps its link. Known types must be well formed.
+  if (strcmp(type, "ping") != 0 && strcmp(type, "lm") != 0 && strcmp(type, "creds") != 0 &&
+      strcmp(type, "res") != 0 && strcmp(type, "st") != 0) {
+    static RefusalLog unknown;
+    if (const uint32_t count = unknown.due())
+      lifecycleLogf("Companion link ignored %lu frame(s) of a type this controller does not know",
+                    static_cast<unsigned long>(count));
+    return ESP_OK;
   }
   bool flag = false, flag2 = false;
   uint32_t first = 0, second = 0, third = 0;
@@ -817,17 +884,19 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(CompanionLinkSlot &slot,
               ((flag2 = jsonUint32(frame, "http", second)) && second <= UINT16_MAX))) {
     machineIntegrationCompanionCommandResult(first, flag, static_cast<uint16_t>(flag2 ? second : 0));
   } else if (!strcmp(type, "st") && jsonString(frame, "k", text, sizeof(text), false) &&
-             jsonUint32(frame, "ep", first) && jsonUint32(frame, "ac", third) &&
-             cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(frame, "d")) &&
-             (!strcmp(text, "full") || !strcmp(text, "push") || !strcmp(text, "read"))) {
+             (!strcmp(text, "full") || !strcmp(text, "push") || !strcmp(text, "read")) &&
+             jsonUint32(frame, "ep", first) &&
+             // A push takes its intent at ingress; reads order by `ac`.
+             (!strcmp(text, "push") || jsonUint32(frame, "ac", third)) &&
+             cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(frame, "d"))) {
     const MicraCompanionStateKind kind = !strcmp(text, "full")   ? MicraCompanionStateKind::FULL
                                          : !strcmp(text, "push") ? MicraCompanionStateKind::PUSH
                                                                  : MicraCompanionStateKind::READ;
     if (!machineIntegrationCompanionState(kind, first, third,
-                                          cJSON_GetObjectItemCaseSensitive(frame, "d")))
-      return companionLinkRefuse(slot, "the machine state was rejected", false);
+                                          cJSON_GetObjectItemCaseSensitive(frame, "d"), ingress))
+      return companionLinkRefuse(slot, "a machine state push was rejected", false);
   } else {
-    return companionLinkRefuse(slot, "an unknown or malformed frame arrived", false);
+    return companionLinkRefuse(slot, "a malformed frame arrived", false);
   }
   return ESP_OK;
 }
@@ -905,15 +974,14 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
       lifecycleLogf(derived ? "Companion '%s' paired" : "Companion '%s' could not be paired", name);
   }
   if (linkOpen && server_ != nullptr) {
-    const bool routeDirect =
-        machineIntegrationCompanionRouteStatus().route == MicraCompanionRoute::DIRECT;
+    const MicraCompanionRoute route = machineIntegrationCompanionRouteStatus().route;
     int silent[2] = {-1, -1};
     {
       TaskLockGuard lock(dataMux_);
       for (size_t index = 0; index < 2; ++index) {
         CompanionLinkSlot &slot = g_companion.links[index];
         if (slot.fd < 0 || slot.closing ||
-            now - slot.heardAtMs < companionSilenceLimitMs(slot, routeDirect))
+            now - slot.heardAtMs < companionSilenceLimitMs(slot, route))
           continue;
         slot.closing = true;
         slot.closeReason = "the companion went silent";
@@ -922,9 +990,24 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     }
     for (const int fd : silent)
       if (fd >= 0) (void)httpd_sess_trigger_close(server_, fd);
+    // As often as ui-stream's dispatch, keep the link the most recently used
+    // session, so httpd's LRU purge evicts an idle asset socket instead.
+    if (now - companionLruAtMs_ >= kUiStreamFallbackMs &&
+        !companionLruPending_.exchange(true, std::memory_order_acq_rel)) {
+      companionLruAtMs_ = now;
+      if (httpd_queue_work(server_, companionLruWork, this) != ESP_OK)
+        companionLruPending_.store(false, std::memory_order_release);
+    }
     if (companionNotified_.load(std::memory_order_acquire) &&
         !companionSendPending_.load(std::memory_order_acquire))
       companionPrepareSends();
+  }
+  // httpd deferred a send it could not start writing: it goes again from here
+  // (and is dropped there if its link closed meanwhile).
+  if (server_ != nullptr && companionSendRetry_.load(std::memory_order_acquire)) {
+    companionSendRetry_.store(false, std::memory_order_release);
+    if (httpd_queue_work(server_, companionSendWork, this) != ESP_OK)
+      companionSendRetry_.store(true, std::memory_order_release);
   }
   if (dirty && (companionRetryAtMs_ == 0 || static_cast<int32_t>(now - companionRetryAtMs_) >= 0) &&
       networkFlashWriteAllowed()) {
@@ -1032,32 +1115,39 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   memset(sent.key, 0, sizeof(sent.key));
   memset(&companionWs().job, 0, sizeof(companionWs().job));
   uint8_t count = 0;
-  bool credentials = false, command = false;
-  if (snapshot || outbox.configSequence != sent.sentConfig)
-    (void)companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s}",
-                           outbox.lmSwitch ? "true" : "false",
-                           outbox.websocketConnection ? "ws" : "api",
-                           outbox.observe ? "true" : "false");
-  if (outbox.credentialsGeneration != 0 &&
-      (snapshot || outbox.credentialsGeneration != sent.sentCredentials))
-    credentials = outbox.credentialsErase
-        ? companionAddBody(count, "\"t\":\"creds\",\"gen\":%lu,\"erase\":true}",
-                           static_cast<unsigned long>(outbox.credentialsGeneration))
-        : companionCredentialsBody(count, outbox.credentialsGeneration, secret);
+  const bool configDue = snapshot || outbox.configSequence != sent.sentConfig;
+  const bool config =
+      configDue && companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s}",
+                                    outbox.lmSwitch ? "true" : "false",
+                                    outbox.websocketConnection ? "ws" : "api",
+                                    outbox.observe ? "true" : "false");
+  const bool credentialsDue = outbox.credentialsGeneration != 0 &&
+      (snapshot || outbox.credentialsGeneration != sent.sentCredentials);
+  const bool credentials = credentialsDue &&
+      (outbox.credentialsErase
+           ? companionAddBody(count, "\"t\":\"creds\",\"gen\":%lu,\"erase\":true}",
+                              static_cast<unsigned long>(outbox.credentialsGeneration))
+           : companionCredentialsBody(count, outbox.credentialsGeneration, secret));
   memset(secret, 0, sizeof(secret));
-  if (snapshot || outbox.routeSequence != sent.sentRoute)
-    (void)companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
-                           outbox.routeCompanion ? "companion" : "direct");
-  if (snapshot || outbox.holdSequence != sent.sentHold)
-    (void)companionAddBody(count, "\"t\":\"hold\",\"on\":%s}", outbox.hold ? "true" : "false");
+  const bool routeDue = snapshot || outbox.routeSequence != sent.sentRoute;
+  const bool route = routeDue && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
+                                                  outbox.routeCompanion ? "companion" : "direct");
+  const bool holdDue = snapshot || outbox.holdSequence != sent.sentHold;
+  const bool hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s}",
+                                                outbox.hold ? "true" : "false");
   const char *op = companionCommandName(outbox.commandOp);
-  if (outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr)
-    command = outbox.commandOp == MicraCompanionCommandOp::TEMPERATURE
-        ? companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\",\"v\":%u}",
-                           static_cast<unsigned long>(outbox.commandId), op,
-                           static_cast<unsigned>(outbox.commandValue))
-        : companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\"}",
-                           static_cast<unsigned long>(outbox.commandId), op);
+  const bool commandDue = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
+  const bool command = commandDue &&
+      (outbox.commandOp == MicraCompanionCommandOp::TEMPERATURE
+           ? companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\",\"v\":%u}",
+                              static_cast<unsigned long>(outbox.commandId), op,
+                              static_cast<unsigned>(outbox.commandValue))
+           : companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\"}",
+                              static_cast<unsigned long>(outbox.commandId), op));
+  // A body that could not be built stays due and is tried on the next pass.
+  const bool complete = config == configDue && credentials == credentialsDue &&
+      route == routeDue && hold == holdDue && command == commandDue;
+  if (!complete) companionNotified_.store(true, std::memory_order_release);
   if (count == 0) return;
   companionWs().job.generation = generation;
   companionWs().job.count = count;
@@ -1070,10 +1160,10 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   TaskLockGuard lock(dataMux_);
   for (auto &slot : g_companion.links) {
     if (slot.fd < 0 || slot.generation != generation) continue;
-    slot.snapshotSent = true;
-    slot.sentConfig = outbox.configSequence;
-    slot.sentRoute = outbox.routeSequence;
-    slot.sentHold = outbox.holdSequence;
+    slot.snapshotSent = slot.snapshotSent || complete;
+    if (config) slot.sentConfig = outbox.configSequence;
+    if (route) slot.sentRoute = outbox.routeSequence;
+    if (hold) slot.sentHold = outbox.holdSequence;
     if (credentials) slot.sentCredentials = outbox.credentialsGeneration;
   }
   if (command) g_companion.lastCommandSent = outbox.commandId;
@@ -1096,39 +1186,97 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
       sequence = slot.outSequence;
     }
   }
-  bool sent = fd >= 0;
-  const char *body = companionWs().job.bodies;
+  CompanionSendJob &job = companionWs().job;
+  const char *body = job.bodies;
+  uint8_t done = 0;
+  bool deferred = false;
   uiStreamSendKind = "companion";
-  for (uint8_t index = 0; sent && index < companionWs().job.count; ++index) {
+  for (; fd >= 0 && done < job.count; ++done) {
     const size_t length =
-        companionSealFrame(key, ++sequence, body, companionWs().frame, sizeof(companionWs().frame));
+        companionSealFrame(key, sequence + 1, body, companionWs().frame, sizeof(companionWs().frame));
     httpd_ws_frame_t frame = {};
     frame.type = HTTPD_WS_TYPE_TEXT;
     frame.final = true;
     frame.payload = reinterpret_cast<uint8_t *>(companionWs().frame);
     frame.len = length;
-    sent = length != 0 && httpd_ws_send_frame_async(self.server_, fd, &frame) == ESP_OK;
+    if (length == 0 || httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK) {
+      // Nothing of this frame reached the wire (the socket was not writable
+      // yet): like ui-stream, defer it and the rest instead of closing.
+      deferred = length != 0 && uiStreamSendCleanAbort && ++job.retries <= kCompanionSendRetries;
+      break;
+    }
+    ++sequence;
     body += strlen(body) + 1;
   }
   uiStreamSendKind = "control";
   memset(key, 0, sizeof(key));
-  memset(&companionWs().job, 0, sizeof(companionWs().job));
+  const bool sent = fd >= 0 && done == job.count;
   if (fd >= 0) {
     {
       TaskLockGuard lock(self.dataMux_);
       for (auto &slot : g_companion.links) {
         if (slot.fd != fd) continue;
-        if (sent) slot.outSequence = sequence;
+        if (sent || deferred) slot.outSequence = sequence;
         else {
           slot.closing = true;
           slot.closeReason = "a frame could not be sent";
         }
       }
     }
-    if (sent) httpd_sess_update_lru_counter(self.server_, fd);
-    else (void)httpd_sess_trigger_close(self.server_, fd);
+    if (done != 0) httpd_sess_update_lru_counter(self.server_, fd);
+    if (!sent && !deferred) (void)httpd_sess_trigger_close(self.server_, fd);
   }
+  if (deferred) {
+    // The unsent bodies move to the front, in order; the job stays pending.
+    size_t rest = 0;
+    for (uint8_t index = done; index < job.count; ++index) rest += strlen(body + rest) + 1;
+    memmove(job.bodies, body, rest);
+    memset(job.bodies + rest, 0, sizeof(job.bodies) - rest);
+    job.count = static_cast<uint8_t>(job.count - done);
+    self.companionSendRetry_.store(true, std::memory_order_release);
+    return;
+  }
+  memset(&job, 0, sizeof(job));
   self.companionSendPending_.store(false, std::memory_order_release);
+}
+
+// httpd: the ui-stream refresh, for the link sockets.
+void OpenBrewByWeightNetwork::companionLruWork(void *context) {
+  auto &self = *static_cast<OpenBrewByWeightNetwork *>(context);
+  int fds[2] = {-1, -1};
+  {
+    TaskLockGuard lock(self.dataMux_);
+    for (size_t index = 0; index < 2; ++index)
+      if (!g_companion.links[index].closing) fds[index] = g_companion.links[index].fd;
+  }
+  for (const int fd : fds)
+    if (fd >= 0) (void)httpd_sess_update_lru_counter(self.server_, fd);
+  self.companionLruPending_.store(false, std::memory_order_release);
+}
+
+// httpd's close_fn (Linea Micra builds): before the socket goes, an
+// authenticated link closed by no decision of ours gets its cause for the
+// Web UI log. httpd closes a peer that is still there only for its LRU purge.
+void OpenBrewByWeightNetwork::companionSocketClose(httpd_handle_t, int fd) {
+  OpenBrewByWeightNetwork *self = instance_;
+  bool unexplained = false;
+  if (self != nullptr && self->companionLinkUp_.load(std::memory_order_acquire)) {
+    TaskLockGuard lock(self->dataMux_);
+    for (const auto &slot : g_companion.links)
+      unexplained |= slot.fd == fd && slot.closeReason == nullptr;
+  }
+  if (unexplained) {
+    char byte;
+    const int got = static_cast<int>(recv(fd, &byte, 1, MSG_PEEK | MSG_DONTWAIT));
+    const bool open = got > 0 || (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK));
+    const char *reason = got == 0 ? "the companion closed the connection"
+                         : open   ? "evicted to make room for another connection"
+                                  : "the connection was lost";
+    TaskLockGuard lock(self->dataMux_);
+    for (auto &slot : g_companion.links)
+      if (slot.fd == fd && slot.closeReason == nullptr) slot.closeReason = reason;
+  }
+  close(fd);
 }
 
 // --- Status ----------------------------------------------------------------------
@@ -1144,11 +1292,11 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
   bool ok = statusJsonAppend(
       used,
       ",\"companion\":{\"paired\":%s,\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\","
-      "\"link\":\"%s\",\"linkAgeS\":%lu,\"route\":\"%s\",\"lm\":%s,\"upstream\":%s,"
-      "\"credentials\":%s,\"request\":",
+      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"route\":\"%s\",\"lm\":%s,"
+      "\"upstream\":%s,\"credentials\":%s,\"request\":",
       stored.paired ? "true" : "false", stored.name, stored.address, stored.companionVersion,
-      link != nullptr ? "open" : "down",
-      static_cast<unsigned long>(link != nullptr ? (now - link->readyAtMs) / 1000U : 0),
+      link != nullptr ? "open" : "down", static_cast<long>(companionLinkAgeS(g_companion, now)),
+      static_cast<unsigned long>(link != nullptr ? 0 : g_companion.peerProtocol),
       companionRouteName(route.route), stored.lmSwitch ? "true" : "false",
       route.upstreamSubscribed ? "true" : "false", route.credentialsConfirmed ? "true" : "false");
   const CompanionRequest &request = g_companion.pairing.request;
@@ -1158,7 +1306,7 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
               "\"codeReady\":%s}",
         request.name, request.address, request.version,
         static_cast<unsigned long>((request.untilMs - now + 999U) / 1000U),
-        request.keyReady ? "true" : "false");
+        companionCodeReady(request) ? "true" : "false");
   else
     ok = ok && statusJsonAppend(used, "null");
   return ok && statusJsonAppend(used, ",\"ignored\":%u}",
@@ -1181,7 +1329,9 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
   out.lmSwitch = stored.lmSwitch != 0;
   out.linkOpen = link != nullptr;
   out.protocol = link != nullptr ? link->protocol : 0;
-  out.linkAgeS = link != nullptr ? (now - link->readyAtMs) / 1000U : 0;
+  out.linkAgeS = companionLinkAgeS(g_companion, now);
+  out.peerProtocol = link != nullptr ? 0 : g_companion.peerProtocol;
+  if (out.peerProtocol != 0) out.reason = "protocol";
   out.reconnects = g_companion.ups > 1 ? g_companion.ups - 1 : 0;
   out.authFailures = g_companion.authFailures;
   memcpy(out.name, stored.name, sizeof(out.name));

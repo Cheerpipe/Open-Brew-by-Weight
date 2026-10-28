@@ -1,7 +1,7 @@
 "use strict";
 import * as R from "./runtime.js?v=__FW_ASSET_TAG__";
 const $ = R.$;
-function renderMicraCloudDiagnostic(lm) {
+function renderMicraCloudDiagnostic(lm, viaCompanion) {
   ensureMicraRows();
   const set = (id, value) => {
     const el = $("dMicra" + id);
@@ -45,35 +45,44 @@ function renderMicraCloudDiagnostic(lm) {
       : none,
   );
   set("CloudDuration", call ? call.durationMs + __WEBUI_TEXT__("runtime.ms_2") : none);
-  renderMicraWebSocket(lm, set);
+  renderMicraWebSocket(lm, set, viaCompanion);
 }
 
-function renderMicraWebSocket(lm, set) {
+// On the companion route the state comes from the companion's feed: the row
+// says so, and the controller's own socket figures (traffic, pong, heap) hide.
+function renderMicraWebSocket(lm, set, via) {
   const ws = lm.websocket || {},
     unknown = "—",
     api = lm.connectionType === "api",
-    link = api ? 0 : ws.subscribed ? 1 : ws.state === "paused" ? 2 : 0;
+    link = api ? 0 : ws.live ? 1 : ws.state === "paused" ? 2 : 0;
   const age = (value) =>
     value && ws.nowMs != null
       ? (((ws.nowMs - value) >>> 0) / 1000).toFixed(1) + __WEBUI_TEXT__("runtime.s_2")
       : unknown;
   set(
     "WsState",
-    (api ? "API" : (ws.state || unknown).replace(/_/g, " ")) +
-      (ws.reason && ws.reason !== "none" ? " · " + ws.reason.replace(/_/g, " ") : "") +
+    (via
+      ? __WEBUI_TEXT__("diagnostic.ws_via_companion")
+      : (api ? "API" : (ws.state || unknown).replace(/_/g, " ")) +
+        (ws.reason && ws.reason !== "none" ? " · " + ws.reason.replace(/_/g, " ") : "")) +
       (link ? " · " + __WEBUI_TEXT__("diagnostic.ws_links").split("|")[link - 1] : ""),
   );
+  const times = via ? ["message", "power"] : ["message", "power", "pong"];
   set(
     "WsTiming",
-    ["message", "power", "pong"].map((k) => k + " " + age(ws[k + "AtMs"])).join(" · ") +
-      __WEBUI_TEXT__("diagnostic.retry_prefix") +
-      (ws.retryRemainingMs || 0) +
-      __WEBUI_TEXT__("diagnostic.ms_stop") +
-      (ws.stoppedLatencyMs ?? "—") +
-      " / " +
-      (ws.maxStoppedLatencyMs ?? "—") +
-      " ms",
+    times.map((k) => k + " " + age(ws[k + "AtMs"])).join(" · ") +
+      (via
+        ? ""
+        : __WEBUI_TEXT__("diagnostic.retry_prefix") +
+          (ws.retryRemainingMs || 0) +
+          __WEBUI_TEXT__("diagnostic.ms_stop") +
+          (ws.stoppedLatencyMs ?? "—") +
+          " / " +
+          (ws.maxStoppedLatencyMs ?? "—") +
+          " ms"),
   );
+  for (const el of [$("dMicraWsTraffic")?.parentElement, $("dMicraWsHeap")])
+    if (el) el.hidden = !!via;
   set(
     "WsTraffic",
     ["rx", "tx"]
@@ -105,7 +114,7 @@ function renderMicraWebSocket(lm, set) {
           " " +
           age(ws.cleaningAtMs) +
           __WEBUI_TEXT__("diagnostic.websocket_suffix") +
-          (ws.state !== "streaming" || (ws.machineConnectedKnown && !ws.machineConnected)
+          (!ws.live || (ws.machineConnectedKnown && !ws.machineConnected)
             ? " · " + __WEBUI_TEXT__("diagnostic.stale")
             : "")
       : "",
@@ -423,8 +432,16 @@ function renderCompanionDiagnostic(c) {
     pair = (a, b) => (a ?? "—") + " / " + (b ?? "—");
   $("dCoName").textContent = c.paired ? c.name : __WEBUI_TEXT__("diagnostic.companion_not_paired");
   t("dCoAddress", c.address);
-  t("dCoVersion", c.version + " · " + __WEBUI_TEXT__("diagnostic.companion_protocol") + c.protocol);
-  t("dCoLink", c.link + " · " + formatUptime((c.linkAgeS || 0) * 1e3));
+  // The protocol is known only while linked, or when this controller refused it.
+  t(
+    "dCoVersion",
+    c.version +
+      (c.protocol > 0 ? " · " + __WEBUI_TEXT__("diagnostic.companion_protocol") + c.protocol : "") +
+      (c.peerProtocol > 0
+        ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.companion_protocol_refused"), [c.peerProtocol])
+        : ""),
+  );
+  t("dCoLink", c.link + (c.linkAgeS >= 0 ? " · " + formatUptime(c.linkAgeS * 1e3) : ""));
   t("dCoLinkCounts", pair(c.reconnects, c.authFailures));
   t("dCoRoute", c.route + (c.reason ? " · " + c.reason.replace(/_/g, " ") : ""));
   t(
@@ -1503,7 +1520,8 @@ export function applyStatus(s) {
   for (const id of LOG_LEVELS)
     if ($(id) && !$(id).dataset.pending) $(id).value = logLevels?.[id] || "none";
   if (!s) return;
-  if (__LINEA_MICRA__ && s.lineaMicra) renderMicraCloudDiagnostic(s.lineaMicra);
+  if (__LINEA_MICRA__ && s.lineaMicra)
+    renderMicraCloudDiagnostic(s.lineaMicra, s.companion?.route === "companion");
   if (__LINEA_MICRA__ && s.companion) renderCompanionDiagnostic(s.companion);
   const sc = s.scale || {};
   applyScaleCommands(sc);

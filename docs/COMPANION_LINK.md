@@ -114,21 +114,29 @@ Admin reads the pairing, the open request and the link state from
 
 ```json
 "companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
- "version":"1.0.0","link":"open","linkAgeS":3600,"route":"companion",
- "lm":true,"upstream":true,"credentials":true,"request":null,"ignored":0}
+ "version":"1.0.0","link":"open","linkAgeS":3600,"peerProtocol":0,
+ "route":"companion","lm":true,"upstream":true,"credentials":true,
+ "request":null,"ignored":0}
 ```
 
-`link` is `open` or `down`, `route` is `direct`, `pending` or `companion`,
-`credentials` tells whether the companion confirmed the current account, and
-`request` is `{"name","address","version","expiresInS","codeReady"}` while a
-request is open (`codeReady` once the companion revealed its key). Home's stream
-carries `companion.requestName` and `companion.requestAddress` (empty strings
-when no request is open). The Diagnostic stream carries `companion.paired`,
-`name`, `address`, `version`, `protocol`, `link`, `linkAgeS`, `reconnects`,
-`authFailures`, `route`, `reason` (why the route is direct), `lm`,
-`upstream`, `routeSwitches` and `commands`. Names, versions and addresses are
-stored without quotes, backslashes or angle brackets. Builds other than
-Linea Micra have none of these fields.
+`link` is `open` or `down`, `linkAgeS` the seconds since the link last came
+up or went down (`-1` when neither happened since the controller started),
+`peerProtocol` the protocol of the paired companion's last hello that this
+controller refused with `PROTOCOL` (0 when none, or once a link opens), `route`
+is `direct`, `pending` or `companion`, `credentials` tells whether the
+companion confirmed the current account, and `request` is
+`{"name","address","version","expiresInS","codeReady"}` while a request is
+open (`codeReady` once the companion revealed its key and the controller's key
+exists). Home's stream carries `companion.requestName` and
+`companion.requestAddress` (empty strings when no request is open). The
+Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
+`protocol` (the open link's, 0 while down), `peerProtocol`, `link`,
+`linkAgeS`, `reconnects`, `authFailures`, `route`, `reason` (why the route is
+direct; `protocol` while `peerProtocol` is set), `lm`, `upstream`,
+`routeSwitches` and `commands`. Names, versions and addresses are stored
+without quotes, backslashes or angle brackets; the name and version follow the
+companion's authenticated `hello`. Builds other than Linea Micra have none of
+these fields.
 
 ## Link
 
@@ -139,7 +147,10 @@ The upgrade answers `403 COMPANION_PEER` from a peer outside the local ranges,
 `404 COMPANION_NOT_PAIRED` when the controller is not paired (a forgotten
 companion is still let in, to receive `erase`), and `409 COMPANION_BUSY` while
 a link and another opening link already exist. The opening must finish within
-10 seconds.
+10 seconds. The controller keeps the link ahead of idle Web UI connections when
+its HTTP server needs a free socket, and the Web UI log names why a link went
+down (silence, a frame that could not be sent, the companion closing it, a lost
+connection, or an eviction for another connection).
 
 ### Opening
 
@@ -147,7 +158,8 @@ a link and another opening link already exist. The opening must finish within
    "nonce":"<16 bytes>"}`.
 2. Controller: `{"t":"challenge","nonce":"<16 bytes>"}`, or
    `{"t":"error","code":…}` and close: `NOT_PAIRED` (unknown id),
-   `PROTOCOL` (unsupported version), `RETRY_LATER` (a shot with a scale, a
+   `PROTOCOL` (unsupported version; Admin and Diagnostic then say that the two
+   sides use different link versions), `RETRY_LATER` (a shot with a scale, a
    scale connection or the scale's quiet interval is in progress; the same
    rule as the controller's own La Marzocco connection), or a forgotten companion's
    `{"t":"erase","mac":HMAC(S, "E" ‖ nc)}`, after which the companion deletes
@@ -167,7 +179,10 @@ After `ready`, every frame is `<mac>.<json>`: `mac` is the first 16 bytes of
 `HMAC-SHA256(K, dir ‖ json)` as 32 lowercase hex digits, `dir` the single byte
 `c` (companion to controller) or `f` (controller to companion), and `json`
 carries `"q"`, a sequence number that starts at 1 in each direction and grows
-by exactly one. A bad MAC, a wrong `q` or an unknown `t` closes the link.
+by exactly one. A bad MAC, a wrong `q` or a known `t` with malformed fields
+closes the link. A frame with a `t` the receiver does not know is ignored (it
+still takes its `q`), so a later version can add messages without breaking an
+older peer; the controller counts them in one rate-limited Web UI log line.
 
 ### Controller to companion
 
@@ -176,14 +191,18 @@ by exactly one. A bad MAC, a wrong `q` or an unknown `t` closes the link.
 | `{"t":"cfg","lm":true,"conn":"ws","observe":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`). Sent after `ready` and on every change |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
-| `{"t":"hold","on":true}` | A shot with a scale or a scale connection is in progress; hold `read` frames until `on` is `false` |
+| `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` frames until `on` is `false` |
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 
 After `ready` the controller sends `cfg`, `route` and `hold` with their current
 values, and `creds` when it has an account generation; afterwards each one
-again only when it changes. A command id is sent once: a command that was in
-flight when a link closed is not repeated on the next link (the controller has
-already counted it as failed).
+again only when it changes. `hold` changes are sent only while the route is
+`pending` or `companion` (the companion forwards nothing otherwise); each
+request for the `companion` route carries the current `hold`. A command id is
+sent once: a command that was in flight when a link closed is not repeated on
+the next link (the controller has already counted it as failed). A frame the
+controller's socket was not ready to take is sent again a moment later, in
+order.
 
 The credentials are AES-256-GCM with
 `key = HKDF-SHA256(ikm = S, salt = "", info = "obbw-creds-v1", L = 32)`,
@@ -197,13 +216,17 @@ secrets directory and never in logs.
 | --- | --- |
 | `{"t":"ping","up":true}` | Liveness; `up` is true while its La Marzocco subscription is open and alive. Every 15 s while the route is `companion`, every 120 s otherwise |
 | `{"t":"lm","sub":true,"ep":12,"tok":2400}` | Its La Marzocco state: subscribed, its subscription epoch, seconds until its next token renewal. Sent on every change and after `cfg` |
-| `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false,"code":"AUTH"` when La Marzocco rejected them |
-| `{"t":"st","k":"push","ep":12,"ac":7,"d":{…}}` | Machine state (below) |
+| `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
+| `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
 
 The controller closes a link that sends nothing for two ping intervals: 35
-seconds while the La Marzocco route is `pending` or `companion`, 250 seconds
-otherwise.
+seconds while the La Marzocco route is `companion`, 250 seconds otherwise. A
+route request (`pending`) keeps the long limit, since the companion may still
+be on its 120 s cadence; the request itself fails after 30 s without a ping or
+the `full` frame. Liveness is one-sided: the controller sends nothing
+periodically, so the companion notices a half-open link when one of its own
+pings goes unacknowledged.
 
 ### Machine state
 
@@ -227,12 +250,19 @@ state came from:
 - `push`: a La Marzocco WebSocket push, forwarded at once, also during shots.
 - `read`: the companion's own read (after a token renewal, a `refresh`, a
   command's verification, or API-mode polling every 30 s). Held while `hold`
-  is on and sent once when it ends.
+  is on and sent once when it ends; the controller drops a `read` that arrives
+  while it would hold one.
 
-`ac` is the id of the last command the companion had sent to La Marzocco when
-it took the observation (0 for none). The controller uses it, where a direct
-read uses its request time, so an older observation never undoes a newer
-power command.
+In `full` and `read` frames, `ac` is the id of the last command the companion
+had sent to La Marzocco when it took the observation (0 for none). The
+controller uses it, where a direct read uses its request time, so an older
+observation never undoes a newer power command. A `push` carries no `ac`: like
+a push on the controller's own socket, it is ordered by the moment it arrives.
+
+A `push` the controller cannot decode closes the link, as it fails the
+controller's own socket. A `full` or `read` frame it cannot decode is logged
+and ignored, as a failed direct read is; a route request then fails if no
+valid `full` frame follows.
 
 ### Route and failover
 

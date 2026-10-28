@@ -25,24 +25,27 @@ void OpenBrewByWeightMicraService::logCompanionRoute(MicraCompanionRoute from,
 bool OpenBrewByWeightMicraService::serviceCompanion() {
   if (!companionLink_.load(std::memory_order_acquire)) return false;
   const uint32_t now = millis();
-  const bool hold = shotTransportPaused() || scaleConnecting_.load(std::memory_order_acquire);
+  const bool hold = companionHold();
   // A quiet point: no shot, scale connection, maintenance or command, and a
   // usable network; cleaning and queued work are checked under the lock.
   LineaMicraError gate = LineaMicraError::NONE;
-  const bool quiet = !hold && networkEligible(gate, true) && !outboundScaleInhibited() &&
-      !shotActive_.load() && !outboundShotActive.load() && !temperatureActive_.load() &&
-      !powerActive_.load();
+  const bool quiet = !hold && networkEligible(gate, true) && !shotActive_.load() &&
+      !outboundShotActive.load() && !temperatureActive_.load() && !powerActive_.load();
   MicraCompanionRoute from, to;
   const char *reason;
-  bool changed = false;
+  bool changed = false, release = false;
   {
     TaskLockGuard lock(mux_);
     auto &feed = companion_;
     from = feed.status.route;
+    // The companion forwards nothing while the route is direct, so `hold`
+    // goes out only with a route request (below) and while it stands.
     if (feed.outbox.hold != hold) {
       feed.outbox.hold = hold;
-      ++feed.outbox.holdSequence;
-      changed = true;
+      if (from != MicraCompanionRoute::DIRECT) {
+        ++feed.outbox.holdSequence;
+        changed = true;
+      }
     }
     if (feed.flapping && micra_timing::deadlineReached(now, feed.flapUntilMs))
       feed.flapping = false;
@@ -74,6 +77,7 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
         feed.status.route = MicraCompanionRoute::PENDING;
         feed.outbox.routeCompanion = true;
         ++feed.outbox.routeSequence;
+        ++feed.outbox.holdSequence;
         feed.requestedAtMs = feed.pingAtMs = now;
         feed.routeIntent = powerState_.generation();
       }
@@ -81,6 +85,8 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
     to = feed.status.route;
     reason = feed.status.reason;
     changed = changed || from != to;
+    release = to == MicraCompanionRoute::COMPANION && feed.release;
+    feed.release = false;
   }
   if (from != to) logCompanionRoute(from, to, reason);
   if (changed) notifyCompanion();
@@ -88,9 +94,10 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
   // While the request is pending the owner leaves the direct socket as it is
   // (it keeps streaming on its own task), so the full frame can retire it
   // from the link task without racing a reconnection. Make before break:
-  // once the full frame moved the source, the obsolete socket and its
-  // session close; the client stays in flash for the next failover.
-  if (to == MicraCompanionRoute::COMPANION && websocket_) {
+  // once the full frame moved the source, the obsolete socket (WebSocket
+  // mode) and the HTTPS session (both modes) close once; the client stays in
+  // flash for the next failover, and a command re-allocates only its buffer.
+  if (release) {
     stopWebSocket(true);
     releaseWorkBuffer();
     TaskLockGuard lock(mux_);
@@ -168,6 +175,7 @@ void OpenBrewByWeightMicraService::leaveCompanionLocked(const char *reason, bool
   auto &feed = companion_;
   const uint32_t now = millis();
   feed.status.reason = reason;
+  feed.release = false;
   if (feed.status.route == MicraCompanionRoute::DIRECT) return;
   if (feed.status.route == MicraCompanionRoute::COMPANION) {
     // The direct socket's stop steps, applied to the feed; the direct client
@@ -342,13 +350,21 @@ void OpenBrewByWeightMicraService::companionCredentials(uint32_t generation, boo
   if (from != to) notifyCompanion();
 }
 
-bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
-                                                  uint32_t epoch, uint32_t afterCommand,
-                                                  const cJSON *dashboard) {
-  static std::atomic<uint32_t> lastRejectAtMs{0};
+MicraCompanionIngress OpenBrewByWeightMicraService::companionIngress() {
+  MicraCompanionIngress ingress;
   // Sampled before any mutex, like the socket callback, so contention cannot
   // retag a push taken before a cleaning edge.
-  const uint32_t ingressAttempt = backflush_.ingressAttempt();
+  ingress.attempt = backflush_.ingressAttempt();
+  TaskLockGuard lock(mux_);
+  ingress.intent = powerState_.generation();
+  return ingress;
+}
+
+bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
+                                                  uint32_t epoch, uint32_t afterCommand,
+                                                  const cJSON *dashboard,
+                                                  MicraCompanionIngress ingress) {
+  static std::atomic<uint32_t> lastRejectAtMs{0};
   const bool push = kind == MicraCompanionStateKind::PUSH;
   MicraObservation update;
   // Cleaning is decoded only from pushes, exactly as on the direct socket.
@@ -361,18 +377,20 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
     if (now - lastRejectAtMs.load() >= kCompanionLogPeriodMs) {
       lastRejectAtMs.store(now);
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                           "Micra companion state rejected kind=%u",
-                           static_cast<unsigned>(kind));
+                           "Micra companion state rejected kind=%s",
+                           push ? "push" : kind == MicraCompanionStateKind::FULL ? "full" : "read");
     }
-    return false;
+    // Like a failed direct read, a rejected full or read frame is ignored (a
+    // missing full frame then times out as full_missing); a rejected push
+    // fails the feed, as it fails the socket.
+    return !push;
   }
   update.receivedAtMs = millis();
   const bool admitted = staConnected_.load() && !apActive_.load() &&
       !outboundMaintenance.load() && !clearSessionRequested_.load();
-  // Like a direct read, a read landing in a scaled shot or scale connection
+  // Like a direct read, a read landing while the companion is told to hold
   // is dropped; pushes keep arriving as they do on the socket.
-  const bool readDropped = kind == MicraCompanionStateKind::READ &&
-      (outboundScaleInhibited() || shotTransportPaused() || scaleConnecting_.load());
+  const bool readDropped = kind == MicraCompanionStateKind::READ && companionHold();
   const bool quiet = !shotActive_.load() && !outboundShotActive.load() &&
       !scaleConnecting_.load() && !outboundScaleInhibited() &&
       !temperatureActive_.load() && !powerActive_.load();
@@ -399,6 +417,7 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
           ++feed.status.switches;
           companionRoute_.store(true, std::memory_order_release);
           ++observationFence_.epoch;
+          feed.release = true;
         }
         // A new subscription (as sendSubscription()) plus its initial read.
         backflush_.invalidate();
@@ -422,8 +441,8 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
                feed.stamp.identity == identityGeneration_) {
       if (push) {
         update.stamp = feed.stamp;
-        update.stamp.intent = powerState_.generation();  // Ingress time, as on the socket.
-        applyPushLocked(update, ingressAttempt);
+        update.stamp.intent = ingress.intent;  // At ingress, as on the socket.
+        applyPushLocked(update, ingress.attempt);
       } else {
         update.stamp = observationFence_.stamp(identityGeneration_,
                                                companionIntentLocked(afterCommand));

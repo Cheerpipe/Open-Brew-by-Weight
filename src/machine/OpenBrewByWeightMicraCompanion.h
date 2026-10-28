@@ -37,6 +37,14 @@ struct MicraCompanionOutbox {
   uint16_t commandValue = 0;  // tenths of a degree for TEMPERATURE
 };
 
+// Sampled when a link frame arrives, before it is verified or parsed, the
+// way the direct socket stamps a push at its first byte: a power command
+// issued while the frame is decoded must not make it look newer.
+struct MicraCompanionIngress {
+  uint32_t intent = 0;   // power generation
+  uint32_t attempt = 0;  // backflush ingress attempt
+};
+
 // Published by the service for Admin and Diagnostic.
 struct MicraCompanionRouteStatus {
   MicraCompanionRoute route = MicraCompanionRoute::DIRECT;
@@ -56,11 +64,13 @@ void machineIntegrationCompanionPing(bool upstreamAlive);
 void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
                                          uint32_t tokenRenewInS);
 void machineIntegrationCompanionCredentials(uint32_t generation, bool ok);
-// `dashboard` is the `d` object of an `st` frame; false rejects the frame
-// (the link closes on a malformed frame, as the direct socket does).
+MicraCompanionIngress machineIntegrationCompanionIngress();
+// `dashboard` is the `d` object of an `st` frame. False rejects a push (the
+// link closes, as the direct socket does on a rejected push); a rejected
+// `full` or `read` is logged and ignored, as a failed direct read is.
 bool machineIntegrationCompanionState(MicraCompanionStateKind kind,
                                       uint32_t epoch, uint32_t afterCommand,
-                                      const cJSON *dashboard);
+                                      const cJSON *dashboard, MicraCompanionIngress ingress);
 void machineIntegrationCompanionCommandResult(uint32_t id, bool accepted,
                                               uint16_t httpStatus);
 // Service → link.

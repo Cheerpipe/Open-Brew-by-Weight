@@ -663,7 +663,10 @@ function applyCompanionStatus(c) {
       : __WEBUI_TEXT__("admin.companion_code_waiting");
     $("companionApproveButton").disabled =
       !r.codeReady || !/^\d{6}$/.test($("companionCode").value);
-  } else $("companionCode").value = "";
+  } else {
+    $("companionCode").value = "";
+    $("companionApproveLm").checked = true;
+  }
   if (!c.paired) return;
   // Status polls keep the row fresh, except while it is asking.
   if (!$("companionDev").querySelector(".confirm"))
@@ -688,7 +691,8 @@ function applyCompanionStatus(c) {
       : __WEBUI_TEXT__("admin.companion_link_down")) +
     (c.linkAgeS >= 0
       ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
-      : "");
+      : "") +
+    (!link && c.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "");
   $("companionRouteState").textContent = companionRouteText(c);
   if (!R.uiState.companionDirty) {
     $("companionLm").checked = !!c.lm;
@@ -724,7 +728,11 @@ function initCompanion() {
     try {
       await R.api("/api/v1/companion/admin", {
         method: "POST",
-        body: R.body({ action: "approve", code: $("companionCode").value }),
+        body: R.body({
+          action: "approve",
+          code: $("companionCode").value,
+          lm: $("companionApproveLm").checked,
+        }),
       });
       companionPairing.stage = 1;
     } catch (e) {

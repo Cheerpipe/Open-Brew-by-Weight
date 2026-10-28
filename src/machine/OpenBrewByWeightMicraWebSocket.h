@@ -33,6 +33,7 @@ struct MicraWebSocketStatus {
   MicraCleaningState cleaning = MicraCleaningState::UNKNOWN;
   char cleaningLabel[33] = {};
   bool subscribed = false, machineConnectedKnown = false, machineConnected = false;
+  bool live = false;  // the active route's subscription supervises cleaning
   bool cleaningAvailable = false, workspaceExternal = false;
   HeapLifecycleAggregate heap = {};
   HeapLifecycleAggregate stopHeap = {};
