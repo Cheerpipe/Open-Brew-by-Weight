@@ -71,6 +71,16 @@ Versioning:
 - Removing or renaming a property, or changing its meaning or unit, requires
   version 2 with a new schema file; the v1 file then stays published.
 
+## Companion link test vectors v1
+
+- [`companion-link-v1.vectors.json`](companion-link-v1.vectors.json): fixed
+  inputs and expected outputs for the [companion link](../COMPANION_LINK.md)
+  (verification code, pairing secret, session key, handshake MACs, one signed
+  frame each way, and the credentials key and ciphertext with a fixed `iv`).
+  The private scalars are for testing only.
+- Consumed by the firmware host test `src/tests/companion_link_host_test.cpp`
+  and by the companion's own tests.
+
 ## Formats written for other apps
 
 The Shots card menu also writes three third-party formats. They follow those

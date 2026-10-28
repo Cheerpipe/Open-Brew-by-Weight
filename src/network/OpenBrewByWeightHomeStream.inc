@@ -126,6 +126,15 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     delta.field("access.pairCode", "\"%s\"", pairCode);
     delta.field("access.pairRemainingS", static_cast<unsigned long>(pairRemainingS));
   }
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+  {
+    // A companion asking to pair: every view offers to review it in Admin.
+    char name[COMPANION_NAME_TEXT], address[COMPANION_ADDRESS_TEXT];
+    companionRequestLabels(name, address);
+    delta.field("companion.requestName", "\"%s\"", name);
+    delta.field("companion.requestAddress", "\"%s\"", address);
+  }
+#endif
   delta.field("lastCommand.requestId", static_cast<unsigned long>(network.lastCommandRequestId));
   delta.field("lastCommand.state", "\"%s\"", commandResultStateName(network.lastCommandState));
   const auto &config = control.config;
@@ -443,6 +452,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("scale.supportedCommands", "%s", commandsJson);
   }
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+  uint32_t companionLinkAgeS = 0;
   {
     const auto micra = machineIntegrationStatus();
     const bool sampleValid = micra.sampleAtMs != 0 &&
@@ -500,6 +510,27 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                   static_cast<unsigned long>(call.durationMs),
                   static_cast<unsigned>(call.httpStatus),
                   static_cast<long>(call.transportStatus));
+  }
+  {
+    // Companion: the pairing, its link and the La Marzocco route. The link
+    // age rides the sampled frame below.
+    CompanionSnapshot companion;
+    companionSnapshot(companion);
+    companionLinkAgeS = companion.linkAgeS;
+    delta.field("companion.paired", bool(companion.paired));
+    delta.field("companion.name", "\"%s\"", companion.name);
+    delta.field("companion.address", "\"%s\"", companion.address);
+    delta.field("companion.version", "\"%s\"", companion.version);
+    delta.field("companion.protocol", static_cast<unsigned long>(companion.protocol));
+    delta.field("companion.link", "\"%s\"", companion.linkOpen ? "open" : "down");
+    delta.field("companion.reconnects", static_cast<unsigned long>(companion.reconnects));
+    delta.field("companion.authFailures", static_cast<unsigned long>(companion.authFailures));
+    delta.field("companion.route", "\"%s\"", companion.route);
+    delta.field("companion.reason", "\"%s\"", companion.reason);
+    delta.field("companion.lm", bool(companion.lmSwitch));
+    delta.field("companion.upstream", bool(companion.upstream));
+    delta.field("companion.routeSwitches", static_cast<unsigned long>(companion.routeSwitches));
+    delta.field("companion.commands", static_cast<unsigned long>(companion.commands));
   }
 #endif
   // Event-driven sections migrated from the REST diagnostic payload; paths
@@ -647,6 +678,9 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     telemetry.field("health.psramLargestFreeBlockBytes",
                     static_cast<unsigned long>(control.psramLargestFreeBlockBytes));
     telemetry.field("safety.resetReasonCode", static_cast<unsigned long>(control.resetReasonCode));
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+    telemetry.field("companion.linkAgeS", static_cast<unsigned long>(companionLinkAgeS));
+#endif
     {
       const NetworkHeapTelemetrySnapshot networkHeap = heapTelemetrySnapshot();
       const HeapLifecycleAggregate webhookHeap = webhooks_.heapTelemetry();

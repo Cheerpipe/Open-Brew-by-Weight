@@ -24,6 +24,9 @@
 #include "OpenBrewByWeightTaskProfiler.h"
 #include "OpenBrewByWeightScaleProfiler.h"
 #include "OpenBrewByWeightWebhook.h"
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#include "network/OpenBrewByWeightCompanionLink.h"
+#endif
 
 #include <atomic>
 
@@ -942,6 +945,36 @@ class OpenBrewByWeightNetwork {
   static esp_err_t authPairingHandler(httpd_req_t *request);
   bool integrationAccessRoute(httpd_req_t *request, esp_err_t &result);
   bool appendWebAccessStatus(httpd_req_t *request, size_t *used);
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+  // Companion link (network/OpenBrewByWeightCompanion.inc, docs/COMPANION_LINK.md).
+  static esp_err_t companionPairHandler(httpd_req_t *request);
+  static esp_err_t companionAdminHandler(httpd_req_t *request);
+  static esp_err_t companionLinkHandshake(httpd_req_t *request);
+  static esp_err_t companionLinkHandler(httpd_req_t *request);
+  static void companionLinkFree(void *context);
+  static void companionSendWork(void *context);
+  static void companionOutboxChanged();
+  esp_err_t companionLinkRefuse(CompanionLinkSlot &slot, const char *reason, bool authentication);
+  esp_err_t companionLinkFrame(httpd_req_t *request, CompanionLinkSlot &slot, size_t length);
+  esp_err_t companionLinkHello(httpd_req_t *request, CompanionLinkSlot &slot, cJSON *frame,
+                               const char *type);
+  esp_err_t companionLinkProof(httpd_req_t *request, CompanionLinkSlot &slot, cJSON *frame,
+                               const char *type);
+  esp_err_t companionLinkInbound(CompanionLinkSlot &slot, cJSON *frame, const char *type);
+  void beginCompanion();
+  void resetCompanion();
+  void serviceCompanion(uint32_t now);
+  void companionPrepareSends();
+  bool companionCredentialsBody(uint8_t &count, uint32_t generation,
+                                const uint8_t secret[COMPANION_SECRET_BYTES]);
+  bool appendCompanionStatus(size_t *used);
+  void companionSnapshot(CompanionSnapshot &out);
+  void companionRequestLabels(char (&name)[COMPANION_NAME_TEXT],
+                              char (&address)[COMPANION_ADDRESS_TEXT]);
+  std::atomic<bool> companionNotified_{false}, companionSendPending_{false},
+      companionLinkUp_{false};
+  uint32_t companionRetryAtMs_ = 0;  // 0 = no failed save waiting
+#endif
   bool diagnosticPageEnabled();
   bool webUiOverrideAllowed(httpd_req_t *request);
   uint32_t webUiOverrideRemainingMs(httpd_req_t *request);

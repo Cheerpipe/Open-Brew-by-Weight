@@ -34,6 +34,7 @@ enum class NvsSubsystem : uint8_t {
   OTA_JOURNAL,
   FIRMWARE_MODE,
   WEB_ACCESS,
+  COMPANION,
 };
 
 enum class NvsOperation : uint8_t {
@@ -78,6 +79,7 @@ inline const char *nvsSubsystemName(NvsSubsystem subsystem) {
     case NvsSubsystem::OTA_JOURNAL: return "otaJournal";
     case NvsSubsystem::FIRMWARE_MODE: return "firmwareMode";
     case NvsSubsystem::WEB_ACCESS: return "webAccess";
+    case NvsSubsystem::COMPANION: return "companion";
     default: return "unknown";
   }
 }

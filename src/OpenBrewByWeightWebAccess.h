@@ -113,14 +113,15 @@ inline bool validWebAccessStored(const WebAccessStored &stored) {
 // Copies a browser-supplied label: control characters, quotes, backslashes and
 // angle brackets are dropped, and only whole UTF-8 characters fit, so the
 // result is safe to embed in JSON and HTML text as is.
-inline void copyWebAccessLabel(char label[WEB_ACCESS_LABEL_BYTES], const char *text) {
+template <size_t N>
+inline void copyWebAccessLabel(char (&label)[N], const char *text) {
   size_t used = 0;
   for (size_t index = 0; text != nullptr && text[index] != '\0'; ++index) {
     const unsigned char c = static_cast<unsigned char>(text[index]);
     if (c < 0x20 || c == 0x7F || c == '"' || c == '\\' || c == '<' || c == '>') continue;
     const size_t width = c < 0x80 ? 1 : c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 0;
     if (width == 0) continue;  // a stray continuation byte
-    if (used + width >= WEB_ACCESS_LABEL_BYTES) break;
+    if (used + width >= N) break;
     size_t next = 1;
     while (next < width && (static_cast<unsigned char>(text[index + next]) & 0xC0) == 0x80) ++next;
     if (next < width) continue;  // a truncated sequence
@@ -128,7 +129,7 @@ inline void copyWebAccessLabel(char label[WEB_ACCESS_LABEL_BYTES], const char *t
     used += width;
     index += width - 1;
   }
-  memset(label + used, 0, WEB_ACCESS_LABEL_BYTES - used);
+  memset(label + used, 0, N - used);
 }
 
 // Tokens travel as exactly 32 lowercase hex digits.

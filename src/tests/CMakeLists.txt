@@ -178,6 +178,10 @@ target_link_libraries(micra_websocket_host_test PRIVATE "${CJSON_LIBRARY}")
 target_include_directories(json_arena_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
 target_link_libraries(json_arena_host_test PRIVATE "${CJSON_LIBRARY}")
 host_test(integration_request_host_test LABEL "host;network;safety")
+host_test(companion_link_host_test LABEL "host;network" DEFINITIONS
+  "COMPANION_VECTORS=\"${CMAKE_SOURCE_DIR}/docs/schemas/companion-link-v1.vectors.json\"")
+target_include_directories(companion_link_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
+target_link_libraries(companion_link_host_test PRIVATE "${CJSON_LIBRARY}")
 target_include_directories(integration_request_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
 target_link_libraries(integration_request_host_test PRIVATE "${CJSON_LIBRARY}")
 host_test(corridor_host_test LABEL "host;control"

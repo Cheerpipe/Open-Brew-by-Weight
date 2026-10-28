@@ -42,8 +42,9 @@ the companion's long-lived pairing key.
 
 | Status | Body | When |
 | --- | --- | --- |
-| `202` | `{"state":"pending","controllerKey":"BHk…","expiresInS":600}` | A request is open (new, or the same `id` asking again) |
-| `400` | `INVALID_REQUEST` | Malformed field or key |
+| `202` | `{"state":"pending","controllerKey":"BHk…","expiresInS":600}` | A request is open (new, or the same `id` and key asking again) |
+| `400` | `INVALID_REQUEST` | Malformed field, a key that is not a P-256 point, or a `protocol` other than 1 |
+| `415` | `UNSUPPORTED_MEDIA_TYPE` | The body is not `application/json` |
 | `403` | `COMPANION_IGNORED` | The user chose **Ignore** for this `id` |
 | `409` | `ALREADY_PAIRED` | The controller is paired (Forget it in Admin first) |
 | `409` | `PAIRING_BUSY` | Another companion's request is open |
@@ -51,7 +52,10 @@ the companion's long-lived pairing key.
 
 Only one request exists at a time, in RAM. It expires after 10 minutes or
 when the controller restarts. `controllerKey` is a fresh key pair the
-controller makes for this request.
+controller makes for this request, in the background: the answer to a new
+request usually comes before the key exists and omits `controllerKey`, which
+`GET` returns once it is ready (normally within a second). The same `id`
+asking with a different key replaces its request, as a new one.
 
 **Verification code.** Both sides compute
 `SHA-256("obbw-companion-sas-v1" ‖ companionKey ‖ controllerKey)`, take the
@@ -61,8 +65,12 @@ types it in Admin → Companion. Three wrong codes deny the request.
 
 ### `GET /api/v1/companion/pair?id=<id>`
 
-`{"state":"pending"}`, `approved`, `denied`, `expired`, or `unknown`. Poll
-about once a second while `pending`.
+`{"state":"pending","controllerKey":"BHk…","expiresInS":540}` (with
+`controllerKey` once the controller has made it),
+`{"state":"approved","controllerKey":"BHk…"}`, or `{"state":…}` with
+`denied`, `expired` or `unknown` (no open request for this `id`). Poll about
+once a second while `pending`. A request stays `pending` until the controller
+has derived and kept `S`, a moment after the user approves it.
 
 **Pairing secret.** On approval both sides derive
 `S = HKDF-SHA256(ikm = ECDH x-coordinate, salt = SHA-256(companionKey ‖
@@ -76,22 +84,47 @@ public key; it discards its request key.
 
 | Body | Effect |
 | --- | --- |
-| `{"action":"approve","code":"123456"}` | Approves the open request (`422 COMPANION_CODE` for a wrong code) |
-| `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** |
+| `{"action":"approve","code":"123456","lm":true}` | Approves the open request; `lm` (optional, `true` when absent) is the La Marzocco switch chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
+| `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids) |
 | `{"action":"unignore"}` | Forgets the ignored ids |
-| `{"action":"forget"}` | Removes the pairing; the next link attempt receives `erase` |
+| `{"action":"forget"}` | Removes the pairing and closes the link; the next link attempt receives `erase` |
 | `{"action":"switches","lm":true}` | Sets the La Marzocco switch (Web UI is always the companion's own choice) |
 
+Every action answers `{"ok":true}`. Approve and Ignore without an open request
+answer `409 PAIRING_NOT_PENDING`; Forget and Switches without a pairing answer
+`409 COMPANION_NOT_PAIRED`.
+
 Admin reads the pairing, the open request and the link state from
-`GET /api/v1/status/admin` (`companion` object); Home's stream carries
-`companion.request` (`name`, `address`) while a request is open.
+`GET /api/v1/status/admin`:
+
+```json
+"companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
+ "version":"1.0.0","link":"open","linkAgeS":3600,"route":"companion",
+ "lm":true,"upstream":true,"credentials":true,"request":null,"ignored":0}
+```
+
+`link` is `open` or `down`, `route` is `direct`, `pending` or `companion`,
+`credentials` tells whether the companion confirmed the current account, and
+`request` is `{"name","address","version","expiresInS","codeReady"}` while a
+request is open (`codeReady` once the controller's key exists). Home's stream
+carries `companion.requestName` and `companion.requestAddress` (empty strings
+when no request is open). The Diagnostic stream carries `companion.paired`,
+`name`, `address`, `version`, `protocol`, `link`, `linkAgeS`, `reconnects`,
+`authFailures`, `route`, `reason` (why the route is direct), `lm`,
+`upstream`, `routeSwitches` and `commands`. Names, versions and addresses are
+stored without quotes, backslashes or angle brackets. Builds other than
+Linea Micra have none of these fields.
 
 ## Link
 
 `GET /api/v1/companion/link` upgrades to a WebSocket. Only text frames are
-used, each one JSON object of at most 4,096 bytes. One link exists at a time:
-a newly authenticated link replaces the previous one. A controller that is not
-paired answers the upgrade with `404 COMPANION_NOT_PAIRED`.
+used, each at most 4,096 bytes including a signed frame's MAC prefix. One
+link exists at a time: a newly authenticated link replaces the previous one.
+The upgrade answers `403 COMPANION_PEER` from a peer outside the local ranges,
+`404 COMPANION_NOT_PAIRED` when the controller is not paired (a forgotten
+companion is still let in, to receive `erase`), and `409 COMPANION_BUSY` while
+a link and another opening link already exist. The opening must finish within
+10 seconds.
 
 ### Opening
 
@@ -99,8 +132,9 @@ paired answers the upgrade with `404 COMPANION_NOT_PAIRED`.
    "nonce":"<16 bytes>"}`.
 2. Controller: `{"t":"challenge","nonce":"<16 bytes>"}`, or
    `{"t":"error","code":…}` and close: `NOT_PAIRED` (unknown id),
-   `PROTOCOL` (unsupported version), `RETRY_LATER` (a shot with a scale or a
-   scale connection is in progress), or a forgotten companion's
+   `PROTOCOL` (unsupported version), `RETRY_LATER` (a shot with a scale, a
+   scale connection or the scale's quiet interval is in progress; the same
+   rule as the controller's own La Marzocco connection), or a forgotten companion's
    `{"t":"erase","mac":HMAC(S, "E" ‖ nc)}`, after which the companion deletes
    its pairing and credentials.
 3. Companion: `{"t":"proof","mac":HMAC(S, "C" ‖ nc ‖ ns)}`.
@@ -130,6 +164,12 @@ by exactly one. A bad MAC, a wrong `q` or an unknown `t` closes the link.
 | `{"t":"hold","on":true}` | A shot with a scale or a scale connection is in progress; hold `read` frames until `on` is `false` |
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 
+After `ready` the controller sends `cfg`, `route` and `hold` with their current
+values, and `creds` when it has an account generation; afterwards each one
+again only when it changes. A command id is sent once: a command that was in
+flight when a link closed is not repeated on the next link (the controller has
+already counted it as failed).
+
 The credentials are AES-256-GCM with
 `key = HKDF-SHA256(ikm = S, salt = "", info = "obbw-creds-v1", L = 32)`,
 a random 12-byte `iv`, additional data `"obbw-creds|" + gen` and plaintext
@@ -146,7 +186,9 @@ secrets directory and never in logs.
 | `{"t":"st","k":"push","ep":12,"ac":7,"d":{…}}` | Machine state (below) |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
 
-The controller closes a link that sends nothing for two ping intervals.
+The controller closes a link that sends nothing for two ping intervals: 35
+seconds while the La Marzocco route is `pending` or `companion`, 250 seconds
+otherwise.
 
 ### Machine state
 

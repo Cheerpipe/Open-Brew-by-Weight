@@ -73,6 +73,12 @@ controller through a look-alike web address. Opening it by any other name, such
 as a custom name you set up in your own DNS, sends the page to the
 controller's IP address, and apps or scripts using that name get an error.
 
+On a Linea Micra controller, an
+[Open Brew by Weight Companion](../features/companion.md) asks to pair and
+connects without the password: its request only asks, approving it needs
+Admin unlocked, and from then on it proves the secret it shares with this
+controller. The companion only connects from your local network.
+
 ## Home Assistant
 
 While the password is off, Home Assistant connects as before. While it is on,
