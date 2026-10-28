@@ -433,11 +433,6 @@ if (msgEl) {
 R.initHeaderSignals();
 function scrollHeader() {
   root.toggleAttribute("data-scrolled", window.scrollY > 0);
-  if (mobile.matches)
-    document.body.style.setProperty(
-      "--header-progress",
-      Math.min(1, Math.max(0, window.scrollY / 120)),
-    );
 }
 window.addEventListener("scroll", scrollHeader, { passive: true });
 mobile.addEventListener("change", scrollHeader);

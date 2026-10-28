@@ -201,25 +201,27 @@
   assert.equal((nav.match(/aria-hidden="true"/g) || []).length, 6, 'Every icon retains a translated text label');
   assert(nav.includes('data-route="/diagnostic" class="hidden"'), 'Hidden until device configuration is known');
 
-  const values = {}, events = {}, mobile = {matches: true, addEventListener: (name, fn) => {events.resize = fn;}};
+  const events = {}, mobile = {matches: true, addEventListener: (name, fn) => {events.resize = fn;}};
   let scrolled = false;
-  const header = vm.createContext({root: {toggleAttribute: (name, value) => {assert.equal(name, 'data-scrolled'); scrolled = value;}}, document: {body: {style: {setProperty: (name, value) => {values[name] = value;}}}},
+  const header = vm.createContext({root: {toggleAttribute: (name, value) => {assert.equal(name, 'data-scrolled'); scrolled = value;}},
     window: {scrollY: 0, matchMedia: () => mobile, addEventListener: (name, fn) => {events[name] = fn;}}});
   const headerStart = appJsSource.indexOf('function scrollHeader()');
   header.mobile = mobile;
   vm.runInContext(appJsSource.slice(headerStart, (() => { const at = appJsSource.slice(headerStart).search(/window\.addEventListener\(\s*['"]popstate['"]/); return at < 0 ? undefined : at + headerStart; })()), header);
-  for (const [scroll, progress] of [[0, 0], [30, .25], [60, .5], [120, 1], [300, 1], [-20, 0]]) {
+  // The phone header holds its compact size; only the floating surface state
+  // follows the scroll.
+  for (const scroll of [0, 30, 60, 120, 300, -20]) {
     header.window.scrollY = scroll; events.scroll();
-    assert.equal(values['--header-progress'], progress, 'Header shrinks continuously within scroll bounds');
     assert.equal(scrolled, scroll > 0, 'Gray surface returns exactly at the top, including overscroll');
   }
   mobile.matches = false; header.window.scrollY = 60; events.scroll();
-  assert.equal(values['--header-progress'], 0, 'Desktop scrolling does not drive the mobile header');
   assert.equal(scrolled, true, 'Desktop scrolling still floats header navigation');
   header.window.scrollY = 0; events.scroll(); assert.equal(scrolled, false, 'Returning to the top restores desktop chrome');
   header.window.scrollY = 60;
   mobile.matches = true; events.resize();
-  assert.equal(values['--header-progress'], .5, 'Switching to mobile applies the current scroll position');
+  assert.equal(scrolled, true, 'Switching to mobile keeps the scrolled surface state');
+  assert(!css.includes('--header-progress') && !css.includes('--compact'),
+      'The phone header keeps a fixed compact size with no scroll-driven shrink');
 }
 {
   const assert = require('assert').strict, vm = require('vm');

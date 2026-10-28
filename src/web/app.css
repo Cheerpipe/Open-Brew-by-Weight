@@ -5329,29 +5329,20 @@ html.theme-dark {
   filter: brightness(0.95);
 }
 @media (max-width: 699px) {
+  /* Phones keep the header at its compact size: the logo and wordmark hold
+     still instead of shrinking as the page scrolls. */
   .topBar {
-    --logo-w: 1.65rem;
-    --logo-h: 2.17rem;
-    --brand-font: 1.4rem;
-    --brand-small: 1rem;
-    --compact: var(--header-progress, 0);
-    min-height: calc(5rem + env(safe-area-inset-top) - 1.25rem * var(--compact));
-    transition: min-height 0.12s linear;
+    min-height: calc(3.75rem + env(safe-area-inset-top));
   }
   .topBar .brandMark {
-    width: calc(var(--logo-w) - (var(--logo-w) - 1.65rem) * var(--compact));
-    height: calc(var(--logo-h) - (var(--logo-h) - 2.2rem) * var(--compact));
-    transition:
-      width 0.12s linear,
-      height 0.12s linear;
+    width: 1.65rem;
+    height: 2.17rem;
   }
   .topBar .brand span {
-    font-size: calc(var(--brand-font) - (var(--brand-font) - 1.05rem) * var(--compact));
-    transition: font-size 0.12s linear;
+    font-size: 1.05rem;
   }
   .topBar .brand small {
-    font-size: calc(var(--brand-small) - (var(--brand-small) - 0.76rem) * var(--compact));
-    transition: font-size 0.12s linear;
+    font-size: 0.76rem;
   }
   .configSaveBar {
     padding-bottom: 0.65rem;
@@ -5372,10 +5363,10 @@ html.theme-dark {
 @media (max-width: 380px) {
   .topBar {
     gap: 0.15rem;
-    --logo-w: 1.3rem;
-    --logo-h: 1.75rem;
-    --brand-font: 1.15rem;
-    --brand-small: 0.83rem;
+  }
+  .topBar .brandMark {
+    width: 1.3rem;
+    height: 1.75rem;
   }
   .headerSignals {
     padding-left: 0.25rem;
