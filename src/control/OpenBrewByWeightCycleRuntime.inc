@@ -784,16 +784,24 @@ bool cupPlacementIsStep(float weight, uint32_t placementStartedAtMs) {
 // a minimum cup of zero. Two consecutive such packets that cup removal did
 // not claim are the zero: the shot keeps the coffee already weighed and
 // continues from it. A later or suspended drop is more likely a lift, so it
-// stays with cup removal and the below-empty net. True while the first
-// packet is held.
+// stays with cup removal and the below-empty net. A lift of a cup the
+// detector never saw reads the same; only its return tells them apart: two
+// consecutive raw packets within half a minimum cup of the dropped zero
+// plus the shot weight (the cup and the coffee it held, which a real scale
+// zero never adds back) restore that zero, and the shot no longer learns.
+// True while the first packet is held.
 bool holdLateStartTare(float rawG, uint32_t receivedAtMs, uint32_t packetSequence,
                        uint32_t connectionGeneration) {
-  if (!shouldTrackWeight() || session.softwareZeroG <= 0.0f ||
-      session.cupRemovedPending ||
-      session.weightControlState == WeightControlState::SUSPENDED ||
-      connectionGeneration != session.tareConnectionGeneration ||
-      receivedAtMs - session.postTareBaselineDeadlineMs >= session.config.postTareBaselineGraceMs ||
-      fabsf(rawG) > runtimeConfig.minimumCupWeightG / 2.0f || !postTareBaselinePlausible(rawG)) {
+  const float halfCupG = runtimeConfig.minimumCupWeightG / 2.0f;
+  const bool undo = session.lateTareDroppedZeroG > 0.0f;
+  if (!shouldTrackWeight() || connectionGeneration != session.tareConnectionGeneration ||
+      (undo ? !session.hasWeightAnchor ||
+                  fabsf(rawG - session.lastAcceptedWeightG - session.lateTareDroppedZeroG) > halfCupG
+            : session.softwareZeroG <= 0.0f || session.cupRemovedPending ||
+                  session.weightControlState == WeightControlState::SUSPENDED ||
+                  receivedAtMs - session.postTareBaselineDeadlineMs >=
+                      session.config.postTareBaselineGraceMs ||
+                  fabsf(rawG) > halfCupG || !postTareBaselinePlausible(rawG))) {
     session.lateTareSequence = 0;
     return false;
   }
@@ -804,10 +812,20 @@ bool holdLateStartTare(float rawG, uint32_t receivedAtMs, uint32_t packetSequenc
     shotTrace().noteHeld();
     return true;
   }
-  const float keptG = session.hasWeightAnchor ? fmaxf(0.0f, session.lastAcceptedWeightG) : 0.0f;
-  addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_LATE_TARE_RECOGNIZED,
-                weightToCentigrams(session.softwareZeroG), weightToCentigrams(keptG));
-  session.softwareZeroG = -keptG;
+  if (undo) {
+    addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_LATE_TARE_UNDONE,
+                  weightToCentigrams(session.lateTareDroppedZeroG),
+                  weightToCentigrams(session.lastAcceptedWeightG));
+    session.softwareZeroG = session.lateTareDroppedZeroG;
+    session.lateTareDroppedZeroG = 0.0f;
+    session.calibrationEligible = false;
+  } else {
+    const float keptG = session.hasWeightAnchor ? fmaxf(0.0f, session.lastAcceptedWeightG) : 0.0f;
+    addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_LATE_TARE_RECOGNIZED,
+                  weightToCentigrams(session.softwareZeroG), weightToCentigrams(keptG));
+    session.lateTareDroppedZeroG = session.softwareZeroG;
+    session.softwareZeroG = -keptG;
+  }
   session.lateTareSequence = 0;
   markShotCurveBreak();
   return false;
@@ -1052,12 +1070,14 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     session.recoveryConfirmations = 0;
     session.recoveryLastAtMs = 0;
     session.recoveryLastPacketSequence = 0;
-    rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_SLEW, weight,
-                      session.lastAcceptedWeightG);
-    profileScaleWeightDecision(false, DebugCode::SCALE_SAMPLE_REJECTED_SLEW,
-                               weight, receivedAtMs, packetSequence,
-                               connectionGeneration, captureSequence,
-                               session.lastAcceptedWeightG);
+    // A plausible step below the floor is a range rejection, not a slew.
+    const bool range = plausible && belowEmpty;
+    const DebugCode code = range ? DebugCode::SCALE_SAMPLE_REJECTED_RANGE
+                                 : DebugCode::SCALE_SAMPLE_REJECTED_SLEW;
+    const float referenceG = range ? emptyFloorG : session.lastAcceptedWeightG;
+    rejectScaleSample(code, weight, referenceG);
+    profileScaleWeightDecision(false, code, weight, receivedAtMs, packetSequence,
+                               connectionGeneration, captureSequence, referenceG);
     return false;
   }
 

@@ -21,10 +21,18 @@ internal wire protocol.
   [shot trace reference](../SHOT_TRACE.md#event-records). It is absent when
   the shot has no stored trace. `traceUnavailable` (optional, `true`) marks a
   shot whose trace could not be read when the file was made (the controller
-  was busy or a read failed); the file goes on without it.
+  stayed busy after a few retries, or a read failed); the file goes on
+  without it.
+- `orphanTraces` (optional, top level, diagnostics export only) holds the
+  newest 16 traces that have no shot, newest first: each with `bootId`,
+  `endedAtMs` (0 for an interrupted one), `interrupted` (`true` when a
+  restart cut its shot short, `false` when the history did not keep the
+  shot) and `trace`, the decoded record as above, or `traceUnavailable`
+  (`true`) instead when it could not be read. It is absent when Shot storage
+  could not be read.
 - Produced by: the Shots page, **Export → JSON** (every good shot, no traces),
   **Export → JSON + diagnostics** (every shot, bad ones included, each with its
-  trace when it has one), and a card's **⋯ → JSON** (that shot with its trace).
+  trace when it has one, plus `orphanTraces`), and a card's **⋯ → JSON** (that shot with its trace).
   All write the same envelope; a single-shot file has one entry in `shots`.
   File names are `openbrewbyweight-shots-YYYYMMDD-HHMM.json`,
   `openbrewbyweight-shots-diagnostics-YYYYMMDD-HHMM.json.gz` (`.json` where

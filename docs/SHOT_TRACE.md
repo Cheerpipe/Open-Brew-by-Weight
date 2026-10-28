@@ -12,8 +12,8 @@ resets, and each completed trace is then saved to the [flash pool](#flash-pool)
 once the shot is over, in the same record as the shot's curve
 ([saving](#saving-completed-traces), [curves](#curves-in-the-pool)).
 [`GET /api/v1/diagnostic/shot-trace`](INTEGRATION_API.md#get-apiv1diagnosticshot-trace)
-downloads the newest completed trace from RAM, or any stored shot's trace
-from the pool; the Web UI [decodes and shows it](#decoding-and-the-web-ui).
+downloads the newest completed trace still in RAM, or any stored shot's
+trace from the pool; the Web UI [decodes and shows it](#decoding-and-the-web-ui).
 
 ## Capture window
 
@@ -26,8 +26,8 @@ from the pool; the Web UI [decodes and shows it](#decoding-and-the-web-ui).
 
 Cycles without a scale never open a capture. While a capture is open every
 trace download and the Shot storage statistics answer `409`; nothing is
-exported during a shot. RAM keeps only the newest completed trace; the flash
-pool keeps the history.
+exported during a shot. RAM keeps at most the last two completed traces until
+the flash pool takes them; the pool keeps the history.
 
 ## Interrupted traces
 
@@ -242,8 +242,9 @@ matching header flag; counters stay exact.
 Two 16 KiB buffers and the pre-shot ring are static PSRAM no-init memory
 (33,408 bytes, `.ext_ram_noinit`); nothing in it is trusted before the boot
 checks;
-one buffer captures while the other keeps the newest completed trace. The
-control loop owns the window, the state-change cache and the reading
+between shots both buffers can hold a completed trace waiting for the flash
+pool, and a new capture takes one of them (see
+[saving](#saving-completed-traces)). The control loop owns the window, the state-change cache and the reading
 statistics; producers on other tasks append under the trace's leaf mutex or
 through relaxed atomics. The export copies 4 KiB chunks through a static PSRAM
 buffer. See [concurrency](CONCURRENCY.md) and
@@ -350,10 +351,11 @@ The settings_persist worker owns the pool:
 2. Each idle pass (about once a second) appends one record per stored shot,
    oldest first. Its identity is the summary's shot id, boot id and end time,
    with the raw end reason and the firmware that wrote it. It holds the shot's
-   curve and, when that shot's trace is the newest completed one, the trace
-   (its export bytes, with the export CRC). A trace whose shot the log refused,
-   and an interrupted one, go alone; a shot whose trace a newer one replaced,
-   or that had none, gets a record with its curve alone (end reason 0). A
+   curve and, while that shot's trace still waits in one of the two RAM
+   buffers, the trace (its export bytes, with the export CRC). A trace whose
+   shot the log refused, and an interrupted one, go alone, after the pending
+   curves, oldest first; a shot whose trace was overwritten, or that had none,
+   gets a record with its curve alone (end reason 0). A
    curve is stored at finalize while the shot's capture is still open and the
    trace completes right after, so the worker only takes curves while no
    capture is open: a curve never leaves without the trace that belongs with
@@ -361,10 +363,20 @@ The settings_persist worker owns the pool:
 3. Steps run only while the gate stays open, which excludes the whole capture
    window (cycle start to drip finalize), an active machine, a scale being
    connected and a maintenance lease. When it closes the append pauses and
-   the next pass resumes it.
-4. The trace is copied by generation, so a shot that ends before the previous
-   trace was saved replaces it (newest wins): the paused append is abandoned,
-   and the log counts the traces that were never saved.
+   the next pass resumes it; a flash lock timeout leaves the staged append in
+   place, and the next step resumes it at the same address.
+4. Both buffers' completed traces wait until the pool takes them. A capture
+   opens over a buffer whose trace is saved (or empty); with two unsaved
+   traces it overwrites the older one, unless only that one is interrupted,
+   whose trace it keeps and overwrites the newer instead. Each overwrite is
+   counted (`tracesDropped`, "Traces not saved since restart") and logged
+   ("Shot trace of an earlier shot not saved: this shot started first"). The
+   trace is copied by generation, so a paused append whose buffer a capture
+   overwrote is abandoned instead of mixing two shots; one paused under a
+   shot that took the other buffer resumes after it. In practice only a third
+   shot started with no idle pass since the first ended loses a trace (a
+   drip analysis cancelled by the next shot completes one trace and opens the
+   next capture in the same loop). Power loss loses the traces still in RAM.
 5. A failed write is retried with the whole record up to three times, with one
    warning ("Shot record save failed"); a record that is already on flash (a
    commit reported as failed that landed) is never written again. A record
@@ -376,10 +388,12 @@ summary: its record is shot 0, end time 0, under the boot that crashed. A
 completed trace whose summary the shot log refused is shot 0 with its boot and
 end time.
 
-Clear all marks the pool for clearing and drops the unsaved trace and curves
+Clear all marks the pool for clearing and drops the unsaved traces and curves
 of the cleared shots; the worker tries the pool clear before it persists the
 cleared shot log, so a power loss normally leaves both cleared, neither, or
-only the pool. Factory reset drops the cached curves and the unsaved trace
+only the pool. A clear requested while a capture is open (a drip delay) waits
+for it to close: the shot log is persisted meanwhile, and the record identity
+keeps the old records apart. Factory reset drops the cached curves and the unsaved traces
 whatever else the reset reached (the shot log may already restart its ids),
 then clears the pool and verifies it with a fresh recovery under the same
 writer lock. A pool that cannot be recovered or cleared never holds the shot
@@ -399,7 +413,7 @@ is not measured yet (plan B1). A record holds a curve of up to 5.6 KB (about
 2–3 KB for a typical 30 s shot) and a trace of 0.8 to 16 KB, so the pool's
 5.2 MB keep somewhere between about 240 shots of the largest records and
 more than the shot log's 1,000 summaries of small ones. FIFO recycling
-decides, never the shot's quality; the newest shots are always kept.
+decides, never the shot's quality; the newest saved records are always kept.
 
 ### Curves in the pool
 
@@ -442,14 +456,17 @@ between steps: erase the next sector (after dropping the records that start
 in it from the index), program its header, program `firstRecord` when needed,
 write at most 1 KiB, and finally program the commit word. Writes are strictly
 sequential, one erase per sector the ring advances. A failed step abandons the
-record; the next one starts in a new sector.
+record; the next one starts in a new sector. A flash lock timeout is not a
+failure: nothing was written, so the append stays staged.
 
 A record being written when the power goes is lost, by design: the machine is
 often switched off right after a shot. Recovery never returns it as data,
 always completes, keeps every older committed record outside the sector being
-recycled, and appends continue. A commit that reported a failure but landed
-does reappear after a reboot, so a writer checks `contains()` before writing
-the same shot again; until then the statistics may count one duplicate.
+recycled, and appends continue. A commit word whose program reports a failure
+is read back: if it landed, the record is committed and indexed at once, and
+the writer's `contains()` check keeps a retry from writing the shot twice;
+only a commit that did not land leaves the record uncommitted, and the whole
+record is retried as a new one in the next sector.
 
 Clearing (clear all, factory reset) empties the RAM index, erases the next
 sector and writes a header whose `floor` is its own sequence: two operations,
@@ -510,7 +527,8 @@ after a clear or factory reset never reaches an older record. Opening a record
 finds the newest matching entry, checks the full identity in its flash header
 (trying older entries when an 8-bit tag collides) and verifies the CRC;
 `contains()` answers with the same identity check, so it never reports a
-record of another boot or end time. Reads then take any chunk size; the index is looked up under
+record of another boot or end time. A section whose length runs past its
+record reads as corrupt, never as bytes beyond the record. Reads then take any chunk size; the index is looked up under
 the pool's mutex, flash is read without it, and the record is checked again
 after every chunk, so one the writer recycled meanwhile reads as gone rather
 than as other data.
@@ -545,8 +563,9 @@ section, read on demand, never during a shot) takes them in two steps:
    (a deleted or evicted shot's record, found absent from the sorted tags, is
    skipped) and the trace's `flags` byte (about four small reads) count the
    traces, the truncated ones, the traces of refused shots and the
-   interrupted ones, whose boots (newest four) the section offers for
-   download. The walk yields every 64 records and stops with `409` if the
+   interrupted ones; the newest 16 of these traces without a shot are listed
+   by boot and end time (end 0: interrupted), and the section offers each
+   for download. The walk yields every 64 records and stops with `409` if the
    write gate closes. A record appended or recycled meanwhile can shift a
    count by one; the figures are diagnostic, not accounting.
 
@@ -562,8 +581,8 @@ snapshot and end counters by name, the pre-shot entries and the events in
 record order with each continuation merged into `ext` as
 `[head bits 0-15, a, b]`. `a` and `b` stay raw; their meaning per kind is the
 [event table](#event-records). Section sizes come from the header, and a
-record whose magic, format version, length or sections do not add up is
-refused. Its output is the export schema's
+record whose magic, format version, length or sections do not add up, or
+whose pre-shot count exceeds its capacity, is refused. Its output is the export schema's
 [`trace`](schemas/README.md#shot-export-v1).
 
 Names come from `GET /api/v1/diagnostic/shot-trace/vocabulary`: the firmware's
@@ -571,13 +590,22 @@ Names come from `GET /api/v1/diagnostic/shot-trace/vocabulary`: the firmware's
 and the yield sources by number, with `SHOT_TRACE_VOCABULARY_VERSION`; each
 list holds exactly `SCALE_PROFILE_EVENT_COUNT`, `DEBUG_CODE_COUNT`,
 `ScaleProfileSignal::COUNT`, `END_REASON_COUNT` and
-`ACTUAL_WEIGHT_SOURCE_COUNT` names, and the route's host test fails when a
-number past a count has a name. A trace written under another vocabulary
+`ACTUAL_WEIGHT_SOURCE_COUNT` names. Each count is `static_assert`ed next to
+its name table: the build fails when the number past a count has a name or
+the last one counted has none. The Web UI asks with the firmware identity in
+the query (`?fw=` the version string), so a firmware update, even one that
+leaves the Web UI unchanged, fetches the new names; the answer is cached
+immutable for a unique identity (`x.y.z+sha`) and revalidated (`no-cache`)
+for a build with uncommitted changes (`-dirty`) or without Git (`+unknown`). A trace written under another vocabulary
 version gets generic names (`profile_21`, `debug_7`), no signal names and no
 end-reason or source names; the trace-only kinds (`0xE0`–`0xE6`) are named
 by the Web UI, which also formats their arguments (the slow-window flags,
 the over-line confirmations, the yield source, a discarded trace's age).
-Bump the vocabulary version whenever a number changes meaning.
+Bump the vocabulary version only when an existing number changes meaning or
+argument encoding: a code, kind, signal, end reason or yield source
+renumbered or reused, or a trace-only kind's arguments or continuation layout
+changed. Appending one keeps the version: older traces never use the new
+number, and the firmware-keyed vocabulary URL brings its name.
 
 The view (**⋯ → View trace** on a shot card) fetches the record by the
 shot's identity, retrying a record that is still being saved, and shows the

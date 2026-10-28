@@ -64,10 +64,15 @@ reference. Once that reference is known, a
 placement also works without another stable-empty pause.
 Either placement path triggers another tare, even if the cup contains coffee.
 If the controller sees a cup on the scale that it could not tare (for example,
-the scale was switched on with the cup already on it, or the machine was still
-on when you placed it), Home marks the cup amber with **Not tared: lift it and
-set it back**. Lift the cup off, wait a moment, and put it back: it is tared
-then.
+the scale was switched on with the cup already on it and shows the cup's
+weight, or the machine was still on when you placed it), Home marks the cup
+amber with **Not tared: lift it and set it back** once the scale is sending
+readings and an automatic tare would be allowed (not while the machine is
+on). Lift the cup off, wait a moment, and put it back: it is tared then.
+Some scales zero themselves when switched on; with the cup already on such a
+scale, it reads 0 g and the controller takes it for an empty pan, so no amber
+mark appears. Weights are then measured from the cup, but the controller does
+not know a cup is there: lift it and set it back to let it see the cup.
 With accessory retare OFF, adding coffee or a spoon while the cup stays present
 does not tare.
 

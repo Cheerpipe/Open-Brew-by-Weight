@@ -1047,11 +1047,12 @@ function renderShots() {
         planned = r.cutLineG > 0 ? r.cutLineG : r.goalG;
       const errN = bad || actual === null || !planned ? null : ((actual - planned) / planned) * 100;
       const err = errN === null ? "—" : errN.toFixed(1) + "%";
-      // Drip: the settled yield minus the reading at the stop.
+      // Drip: the settled yield minus the reading at the stop. A bad row
+      // reads nothing from its curve: no max flow, drip or cut point.
       const flow = bad ? (r.avgFlowGS ?? null) : shotDisplayFlowGS(r),
         m = R.buildShotSparkModel(r),
-        maxFlow = m ? m.maxFlow : null,
-        cut = shotCut(r, m, actual),
+        maxFlow = m && !bad ? m.maxFlow : null,
+        cut = bad ? {} : shotCut(r, m, actual),
         drip = cut.drip ?? null;
       // Without a machine-reported target the temp cell is skipped outright,
       // so Dose and Ratio slide into its slot.
@@ -1434,8 +1435,10 @@ function exportSink(gzip) {
   };
 }
 // JSON: every good shot. With diagnostics: every shot, bad ones included,
-// each with its decoded trace, fetched four at a time, as .json.gz where the
-// browser can compress.
+// each with its decoded trace, then the newest traces without a shot that
+// Shot storage lists; fetched one at a time (the Web UI talks to the
+// controller one request at a time), as .json.gz where the browser can
+// compress.
 function exportShotsJson(diagnostics = false) {
   return runExport(async (job) => {
     const list = await exportRows(job, diagnostics ? { bad: true } : {}),
@@ -1444,23 +1447,17 @@ function exportShotsJson(diagnostics = false) {
       sink = exportSink(gzip);
     try {
       await sink.write(JSON.stringify(shotsJson([])).slice(0, -2));
-      for (let i = 0; i < list.length; i += 4) {
-        const batch = list.slice(i, i + 4),
-          traces = diagnostics
-            ? await Promise.all(batch.map((r) => shotTraceForFile(r, vocab)))
-            : [];
+      for (const [i, r] of list.entries()) {
+        const trace = diagnostics ? await shotTraceForFile(r, vocab) : undefined;
         if (job.stopped) throw new Error(job.stopped);
-        for (const [k, r] of batch.entries())
-          await sink.write((i + k ? "," : "") + JSON.stringify(shotJson(r, traces[k])));
+        await sink.write((i ? "," : "") + JSON.stringify(shotJson(r, trace)));
         if (diagnostics) {
-          job.progress = R.sub(__WEBUI_TEXT__("stats.export_progress"), [
-            i + batch.length,
-            list.length,
-          ]);
+          job.progress = R.sub(__WEBUI_TEXT__("stats.export_progress"), [i + 1, list.length]);
           R.message(job.progress);
         }
       }
-      await sink.write("]}");
+      const orphans = diagnostics && (await orphanTracesJson(job, vocab));
+      await sink.write(orphans ? `],"orphanTraces":${JSON.stringify(orphans)}}` : "]}");
       // Local time as YYYYMMDD-HHMM ("sv" formats dates ISO-like).
       const stamp = new Date().toLocaleString("sv").slice(0, 16).replace(/\D/g, "");
       R.saveFile(
@@ -1490,6 +1487,26 @@ async function shotTraceForFile(r, vocab) {
     if (e.code === "SHOT_TRACE_BUSY" && R.shotRunning()) throw e;
     return false;
   }
+}
+// The traces without a shot Shot storage lists (newest first, at most 16),
+// or null when it cannot be read.
+async function orphanTracesJson(job, vocab) {
+  const storage = await R.api("/api/v1/diagnostic/shot-storage", { timeoutMs: 15e3 }).catch(
+    () => null,
+  );
+  if (!storage) return null;
+  const out = [];
+  for (const { boot, end } of storage.orphanTraces) {
+    const trace = await shotTraceForFile({ id: 0, bootId: boot, endedAtMs: end }, vocab);
+    if (job.stopped) throw new Error(job.stopped);
+    out.push({
+      bootId: boot,
+      endedAtMs: end,
+      interrupted: !end,
+      ...(trace ? { trace } : { traceUnavailable: true }),
+    });
+  }
+  return out;
 }
 // One shot with its trace when it has one (the offline copy has none).
 async function downloadShotJson(r) {
@@ -1863,9 +1880,12 @@ const TRACE_COUNTERS = [
   "verboseDropped",
   "decisionsDropped",
 ];
+// The names change only with the firmware: asked once per firmware identity.
 let traceVocab = null;
 function shotTraceVocabulary() {
-  traceVocab ||= R.api("/api/v1/diagnostic/shot-trace/vocabulary?v=__FW_ASSET_TAG__");
+  traceVocab ||= R.api(
+    "/api/v1/diagnostic/shot-trace/vocabulary?fw=" + encodeURIComponent(R.SHELL_FW_VERSION),
+  );
   return traceVocab.catch((e) => {
     traceVocab = null;
     throw e;
@@ -1888,7 +1908,8 @@ function decodeShotTrace(buffer, vocab) {
     buffer.byteLength < 88 ||
     u32(0) !== 0x43525453 ||
     u16(4) !== 1 ||
-    u32(8) !== buffer.byteLength
+    u32(8) !== buffer.byteLength ||
+    u16(78) > u16(84)
   )
     throw new Error(__WEBUI_TEXT__("stats.trace_unreadable"));
   const names = vocab?.version === u16(6) ? vocab : {},

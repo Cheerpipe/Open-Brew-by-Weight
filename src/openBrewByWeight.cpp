@@ -288,6 +288,7 @@ struct CycleSession {
   // the coffee already weighed once that tare lands late.
   float softwareZeroG = 0.0f;
   uint32_t lateTareSequence = 0;  // Held first packet of a late start zero.
+  float lateTareDroppedZeroG = 0.0f;  // Restored if the "late zero" was a lift.
   uint32_t tareConnectionGeneration = 0;
   bool retareDisabled = false;
   bool firstDropsBeepSent = false;
@@ -1114,7 +1115,7 @@ uint32_t currentBootId() { return activationStores.bootId(); }
 
 void persistLastShotSnapshot(const PersistedLastShot &snapshot) {
   TaskLockGuard lock(shotStoreMutex);
-  lastShotStore.advance(snapshot, runtimeConfig.bbwProtectionMs);
+  lastShotStore.advance(snapshot);
   lastShotNvsDirty = true;
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_relaxed);
 }

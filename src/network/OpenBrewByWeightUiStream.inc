@@ -752,9 +752,7 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
     phase = control.activeCycle ? "active" : control.homePending ? "pending" : "transient";
     source = &control.shotCurve;
   } else if (eligible) {
-    const auto &linked = control.lastShot.shotLogId == latest.id
-        ? control.lastShot : control.lastGoodShot;
-    card = shotLogProjectLastShot(latest, linked);
+    card = shotLogProjectLastShot(latest, control.lastShot, control.lastGoodShot);
   } else resetShotCurveRecord(workBuf_->homeCurve);
   const ShotCurveRecord &curve = *source;
   char preset[sizeof(card.presetName) * 6];

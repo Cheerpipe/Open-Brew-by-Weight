@@ -202,7 +202,7 @@ ring freeze follow once the machine started. Its producers (scale worker, contro
 httpd, the Linea Micra WebSocket task and any `addDebugEvent` caller) append
 fixed 8-byte records in constant time under its leaf mutex, or bump relaxed
 atomic counters; `WEIGHT_ACCEPTED` and every closed-window call return after
-one atomic load, before any lock. The httpd export copies the immutable
+one atomic load, before any lock. The httpd export copies an immutable
 completed buffer in 4 KiB chunks through a static PSRAM buffer under that
 mutex, never across a send, and stops when a capture opens. The buffers sit
 in PSRAM no-init memory: boot recovery reads their headers under the same
@@ -225,10 +225,12 @@ lock, then the pool or the trace mutex). The worker takes
 oldest unsaved curve (and checks that no capture is open) under the store
 lock, reads the trace and loads the curve cache back after boot with no lock
 held, then appends under the writer mutex, and marks the curve saved under
-the store lock again after releasing it. The worker reads the completed trace
-by generation under the trace mutex, one bounded copy per step, so a newer
-completion fails the copy instead of mixing two shots; clear all only sets an
-atomic request the worker lands before it persists the shot log. Its leaf mutex guards only the RAM index; the writer drops
+the store lock again after releasing it. The worker reads a completed trace
+by generation under the trace mutex, one bounded copy per step, so a capture
+opened over its buffer fails the copy instead of mixing two shots; the control
+loop's `begin()` picks that buffer and counts an overwritten unsaved trace
+under the same mutex. Clear all only sets an atomic request the worker lands,
+once no capture is open, before it persists the shot log. Its leaf mutex guards only the RAM index; the writer drops
 the entries of a sector before erasing it, and readers look the index up,
 release the mutex, read flash under the flash lock and check after every chunk
 that the record is still indexed. Lock order is flash lock, then pool mutex.

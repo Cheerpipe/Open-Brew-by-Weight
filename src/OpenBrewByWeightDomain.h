@@ -1982,10 +1982,6 @@ struct PersistedLastShot {
   uint32_t arrivalMs = 0;  // Arrival at the target; 0 = unknown.
 };
 
-inline bool qualifyingGoodShot(const PersistedLastShot &shot, uint32_t protectionMs) {
-  return shot.valid && shot.durationMs > protectionMs && shot.weightValid && std::isfinite(shot.currentWeightG) && shot.currentWeightG > 2.0f;
-}
-
 inline bool publishableLastShot(const PersistedLastShot &shot) { return shot.valid && shot.presetId != 0 && static_cast<LastShotType>(shot.shotType) <= LastShotType::MANUAL; }
 
 struct RecipeSnapshot {
@@ -2259,11 +2255,13 @@ enum class DebugCode : uint8_t {
   BOOT_RECOVERY_STACK,
   BLE_LINK_PARAMS_OVERRIDDEN,
   // argument1: the software zero dropped (cg); argument2: coffee kept (cg).
-  SCALE_LATE_TARE_RECOGNIZED
+  SCALE_LATE_TARE_RECOGNIZED,
+  // argument1: the software zero restored (cg); argument2: shot weight (cg).
+  SCALE_LATE_TARE_UNDONE
 };
-// Codes in use; a code appended above must move this (see
-// SCALE_PROFILE_EVENT_COUNT).
-constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::SCALE_LATE_TARE_RECOGNIZED) + 1U;
+// Codes in use; a code appended above must move this (asserted after
+// debugCodeName).
+constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::SCALE_LATE_TARE_UNDONE) + 1U;
 
 enum class ScheduledRestartCause : uint8_t {
   NONE = 0,
@@ -2594,6 +2592,7 @@ inline LogLevel debugCodeDefaultLevel(DebugCode code) {
     case DebugCode::SCHEDULED_RESTART_SKIPPED:
     case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN:
     case DebugCode::SCALE_LATE_TARE_RECOGNIZED:
+    case DebugCode::SCALE_LATE_TARE_UNDONE:
       return LogLevel::WARNING;
     case DebugCode::OTA_ROLLBACK_ARMED:
     case DebugCode::OTA_ROLLBACK_FAILED:
@@ -2668,7 +2667,7 @@ inline const char *bootSubsystemName(int32_t subsystem) {
   return "unknown";
 }
 
-inline const char *debugCodeName(DebugCode code) {
+constexpr const char *debugCodeName(DebugCode code) {
   switch (code) {
     case DebugCode::LOG_TEXT: return "log text";
     case DebugCode::SCHEDULED_RESTART_ARMED: return "scheduled restart armed";
@@ -2680,6 +2679,7 @@ inline const char *debugCodeName(DebugCode code) {
     case DebugCode::BOOT_RECOVERY_STACK: return "boot recovery stack";
     case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN: return "scale link interval overridden";
     case DebugCode::SCALE_LATE_TARE_RECOGNIZED: return "late scale tare recognized";
+    case DebugCode::SCALE_LATE_TARE_UNDONE: return "late scale tare was a cup lift";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2856,6 +2856,10 @@ inline const char *debugCodeName(DebugCode code) {
   }
   return "unknown";
 }
+static_assert(constexprTextEquals(debugCodeName(static_cast<DebugCode>(DEBUG_CODE_COUNT)), "unknown") &&
+                  !constexprTextEquals(debugCodeName(static_cast<DebugCode>(DEBUG_CODE_COUNT - 1U)),
+                                       "unknown"),
+              "DEBUG_CODE_COUNT must follow the last named DebugCode");
 
 inline bool formatScaleSampleDebugMessage(const DebugEvent &event, char *message,
                                           size_t capacity) {
@@ -2891,6 +2895,13 @@ inline bool formatScaleSampleDebugMessage(const DebugEvent &event, char *message
       formatWeightCentigrams(event.argument2, referenceText,
                              sizeof(referenceText));
       snprintf(message, capacity, "%s (software zero %s dropped, kept %s)",
+               debugCodeName(event.code), weightText, referenceText);
+      return true;
+    case DebugCode::SCALE_LATE_TARE_UNDONE:
+      formatWeightCentigrams(event.argument1, weightText, sizeof(weightText));
+      formatWeightCentigrams(event.argument2, referenceText,
+                             sizeof(referenceText));
+      snprintf(message, capacity, "%s (cup back: software zero %s restored at %s)",
                debugCodeName(event.code), weightText, referenceText);
       return true;
     case DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT:

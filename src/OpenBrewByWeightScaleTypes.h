@@ -10,6 +10,11 @@
 
 namespace openbrewbyweight {
 
+// Compile-time string equality, for the *_COUNT checks of the name tables.
+constexpr bool constexprTextEquals(const char *a, const char *b) {
+  return *a == *b && (*a == '\0' || constexprTextEquals(a + 1, b + 1));
+}
+
 // Single source of truth for scale disconnect reason labels, mirroring the
 // BLE library's ScaleDisconnectReason by code without coupling the domain,
 // network, or serial layers to the NimBLE implementation. API consumers get

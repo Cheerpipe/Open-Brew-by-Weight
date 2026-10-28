@@ -150,7 +150,10 @@ preset revision, and the complete Quick Settings snapshot.
 confirmed non-rinse cycle longer than 12 seconds with a valid final yield over
 2 g. Shot history also stores the other cycles started with a scale as bad
 shots, which no integration field reports; other completed activations appear
-only in `lastActivation`.
+only in `lastActivation`. A bad cycle never changes `lastShot`: its cycle
+fields (`cycleId`, `stopDetail` and the like) come from the last cycle when
+that cycle is this shot, otherwise from the last good shot, exactly as Home
+shows it.
 When present, `lastShot` contains
 `cycleId`, `shotId` (the shot's id in shot history, the `id` column of
 [the last shot route](#get-apiv1integrationshotslast)), `uptimeMs`, `durationMs`, `targetWeightG`, `presetId`, `presetName`,
@@ -537,17 +540,19 @@ owned route. A trace exists for every brew cycle started with a scale; its
 header links it to the stored shot by id, boot id and end time, and carries a
 CRC-32. Nothing is read or sent while a shot runs.
 
-- **Without a query**: the newest completed trace from RAM, as the attachment
-  `openbrewbyweight-shot-trace.bin` with `Cache-Control: no-store`. RAM keeps
-  only the newest trace; after a restart it has none until the next shot,
-  except an [interrupted trace](SHOT_TRACE.md#interrupted-traces) recovered
-  from the crash.
+- **Without a query**: the newest completed trace still in RAM, as the
+  attachment `openbrewbyweight-shot-trace.bin` with `Cache-Control: no-store`.
+  RAM keeps at most the last two traces until they are saved; after a
+  restart it has none until the next shot, except an
+  [interrupted trace](SHOT_TRACE.md#interrupted-traces) recovered from the
+  crash.
 - **`?id=<shot id>&boot=<boot id>&end=<endedAtMs>`**: that shot's trace from
   its [flash pool](SHOT_TRACE.md#flash-pool) record, the trace section only.
   A stored shot is reached only through its summary, so all three must match
   the shot's Stats row (`id`, `bootId`, `endedAtMs`); a deleted shot has
-  none. `id=0&boot=<crashed boot>&end=0` is an interrupted trace, which has no
-  summary (Diagnostic Shot storage lists their boots). The URL names an
+  none. `id=0&boot=<boot>&end=<end>` is a trace without a summary: an
+  interrupted one (`end=0`, the boot that crashed) or one whose shot the log
+  refused (Diagnostic Shot storage lists the newest 16 by boot and end). The URL names an
   immutable record, so the answer carries `ETag: "<record CRC, 8 hex>"` and
   `Cache-Control: private, max-age=31536000, immutable`; a request with that
   `If-None-Match` gets `304` without the body.
@@ -556,7 +561,7 @@ CRC-32. Nothing is read or sent while a shot runs.
 | --- | --- | --- |
 | `200` | — | The trace, 792 B to 16 KiB |
 | `304` | — | `If-None-Match` names the record's current ETag |
-| `404` | `NO_SHOT_TRACE` | No query: no trace since the last restart (or the recovered one failed verification). With a query: no summary with that identity, the shot has no trace (made without one, or its trace was replaced by a newer shot before it was saved), or the pool recycled the record |
+| `404` | `NO_SHOT_TRACE` | No query: no trace since the last restart (or the recovered one failed verification). With a query: no summary with that identity, the shot has no trace (made without one, or a later shot's capture overwrote it before it was saved), or the pool recycled the record |
 | `409` | `SHOT_TRACE_BUSY` | The controller may not read storage now: a shot runs (cycle start to the end of its drip delay), or a rinse, a closed relay, a scale connecting or a maintenance lease holds the durable write gate |
 | `409` | `SHOT_TRACE_SAVING` | The shot's record is not written yet (its curve or trace still waits, or the pool is not recovered after the boot); ask again shortly |
 | `422` | `INVALID_SHOT_TRACE` | The query is not three whole numbers `id`, `boot` and `end` |
@@ -574,9 +579,11 @@ needs no copy of them: `{"version":<vocabulary version>,"profile":[…],
 indexed by the event kind, debug code, signal, end reason or yield source
 (an unused number is `""`).
 Names apply to traces whose header has the same `vocabularyVersion`. The list
-changes only with the firmware, so the Web UI asks with its asset tag as the
-query and the answer is cacheable (`Cache-Control: private,
-max-age=31536000, immutable`). About 6 KB.
+changes only with the firmware, so the Web UI asks with the firmware version
+string as the query (`?fw=1.1.0%2Babc1234`): for a unique build identity
+(`x.y.z+sha`) the answer is cacheable (`Cache-Control: private,
+max-age=31536000, immutable`); a build with uncommitted changes (`-dirty`) or
+without Git (`+unknown`) answers `Cache-Control: no-cache`. About 6 KB.
 
 ### `GET /api/v1/diagnostic/shot-storage`
 
@@ -591,7 +598,8 @@ controller may not read storage, as for `SHOT_TRACE_BUSY`.
  "records":412,"meanRecordBytes":2992,"droppedRecords":0,"good":380,"bad":30,
  "traceOnly":1,"interrupted":1,"traces":402,"truncated":3,"sinceShotId":7,
  "sinceLocalSec":1792840364,"pendingCurves":0,"pendingTraces":0,
- "tracesDropped":0,"shotCapacity":1000,"interruptedBoots":[41]}
+ "tracesDropped":0,"shotCapacity":1000,
+ "orphanTraces":[{"boot":43,"end":918204},{"boot":41,"end":0}]}
 ```
 
 `poolBytes` = `liveBytes` + `reclaimableBytes` + `unindexedBytes` +
@@ -599,15 +607,16 @@ controller may not read storage, as for `SHOT_TRACE_BUSY`.
 when it is a trace without one (shot 0); a deleted or evicted shot's record is
 reclaimable until the ring recycles it. `good` and `bad` count the live
 records of good and bad summaries, `traceOnly` the traces of shots the log
-refused and `interrupted` the interrupted ones (`interruptedBoots`, newest
-first, at most four, reach them through the trace route). `traces` counts the
+refused and `interrupted` the interrupted ones. `orphanTraces` lists these
+traces without a shot, newest first, at most 16, by `boot` and `end` (`end` 0
+is interrupted); each is reached through the trace route with `id=0`. `traces` counts the
 live records holding a trace and `truncated` those whose events did not all
 fit. Records written or recycled while the section is read can shift a count
 by one.
 `sinceShotId` and `sinceLocalSec` (local Unix seconds, `0` without wall time)
 are the oldest stored shot that still has its record. `pendingCurves` and
-`pendingTraces` wait for the worker, `tracesDropped` counts traces a newer
-shot replaced before they were saved since the restart, `droppedRecords`
+`pendingTraces` (0 to 2) wait for the worker, `tracesDropped` counts traces a
+later shot's capture overwrote before they were saved since the restart, `droppedRecords`
 those the full index dropped since the last recovery, and `lastError` is
 `none`, `read`, `erase`, `program`, `lock`, `too_large` or `source`.
 `shotCapacity` is how many summaries the history keeps (an upper bound for

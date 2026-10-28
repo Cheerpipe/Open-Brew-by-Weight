@@ -43,6 +43,7 @@
 #include <float.h>
 #include <new>
 #include <stdarg.h>
+#include <string_view>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

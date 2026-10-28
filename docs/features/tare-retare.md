@@ -126,10 +126,18 @@ recognized the cup and **Stop if cup is removed** is on, the shot stops as it
 would for a lift. If your scale is often slow to show zero, raise
 **Post-tare grace**.
 
+A cup the controller has not recognized yet looks the same when you lift it
+during that moment: the reading drops to zero, and the controller takes it for
+the late tare. When you put the same cup back, the controller sees the cup and
+its coffee return, measures the shot from the cup again and carries on to your
+target; the Web UI log says "late scale tare was a cup lift". Because the
+cup was off the scale for a while, that shot does not teach drip learning.
+
 Coffee in a cup can never make the scale read below zero. If, during a shot,
 the reading stays below minus your **Minimum cup weight** (or minus 10 g,
-whichever is lower) for a couple of seconds, the controller stops trusting the
-weight and the [scale-loss backup](auto-to-manual.md) finishes the shot by
+whichever is lower), the controller stops trusting the weight after about
+four readings for a light cup, or after up to about 2.5 seconds and three more
+readings when a heavy cup (around 250 g) was lifted, and the [scale-loss backup](auto-to-manual.md) finishes the shot by
 time, instead of letting it run until the max shot time.
 
 ## Automatic late-cup retare

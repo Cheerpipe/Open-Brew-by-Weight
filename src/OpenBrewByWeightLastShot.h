@@ -1,6 +1,7 @@
 #pragma once
 
 #include "OpenBrewByWeightDomain.h"
+#include "OpenBrewByWeightShotLogTypes.h"
 #include "OpenBrewByWeightFlashIoScratch.h"
 #include "OpenBrewByWeightPreferences.h"
 
@@ -138,15 +139,17 @@ class LastShotStore {
     finalizeLastShotBlob(blob_);
   }
 
-  void advance(const PersistedLastShot &shot,
-               uint32_t protectionMs = DEFAULT_BBW_PROTECTION_MS) {
-    if (qualifyingGoodShot(shot, protectionMs)) blob_.lastGoodShot = shot;
+  // The last good shot follows the shot log's good rule
+  // (shotLogRecordEligible), so a bad cycle never becomes it.
+  void advance(const PersistedLastShot &shot) {
+    if (shot.valid && shotLogEligible(shot.endReason, shot.durationMs) &&
+        shotLogWeightEligible(shot.currentWeightG, shot.weightValid))
+      blob_.lastGoodShot = shot;
     adopt(shot);
   }
 
-  bool persist(const PersistedLastShot &shot,
-               uint32_t protectionMs = DEFAULT_BBW_PROTECTION_MS) {
-    advance(shot, protectionMs);
+  bool persist(const PersistedLastShot &shot) {
+    advance(shot);
     return save();
   }
 

@@ -38,8 +38,13 @@ struct ShotStorageStats {
   uint32_t good, bad, traceOnly, interrupted, traces, truncated;
   uint32_t sinceShotId, sinceLocalSec;  // 0: none, or no wall time
   uint32_t pendingCurves, pendingTraces, tracesDropped;
-  uint32_t interruptedBoots[4];  // Newest first; interruptedListed are valid.
-  uint8_t interruptedListed;
+  // Traces without a shot, newest first: interrupted (end 0) or refused by
+  // the shot log. The first orphansListed are valid; traceOnly + interrupted
+  // counts them all.
+  struct {
+    uint32_t bootId, endedAtMs;
+  } orphans[16];
+  uint8_t orphansListed;
 };
 // Worst case: the base64 stream plus 1201 break and 1201 held indices of up
 // to five characters each, plus the reference point, keys and events.

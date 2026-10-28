@@ -15,8 +15,8 @@
 //       Micra WebSocket task and any addDebugEvent caller) append through one
 //       leaf mutex that nests nothing, or through relaxed atomics; no path
 //       allocates, formats or touches flash. Both buffers and the pre-shot
-//       ring are static PSRAM BSS with a fixed, pointer-free layout. The
-//       completed buffer is immutable until the next completion replaces it.
+//       ring are static PSRAM BSS with a fixed, pointer-free layout. A
+//       completed buffer is immutable until a capture opens over it.
 //
 // BOUNDARY: Observes only: no control decisions, no machine access.
 
@@ -287,9 +287,23 @@ class ShotTrace {
   // ---------------------------------------------------------------------
 
   // Cycle start with a scale, before the relay acts so the window catches
-  // the close: only the header and counters are reset here.
-  void begin(uint32_t anchorMs) {
+  // the close: only the header and counters are reset here. The capture
+  // takes the buffer worth less to the flash pool: one already saved (or
+  // empty), else the older unsaved trace unless only it is interrupted (the
+  // one record of a crash). True when an unsaved trace is overwritten.
+  bool begin(uint32_t anchorMs) {
     const TaskLockGuard lock(mux_);
+    if (keepRank_(*completed_) < keepRank_(*capture_)) {
+      ShotTraceBuffer *const older = capture_;
+      capture_ = completed_;
+      completed_ = older;
+    }
+    const size_t slot = slotOf_(*capture_);
+    const bool dropped = unsaved_[slot];
+    if (dropped) ++tracesDropped_;
+    generationOf_[slot] = 0;
+    unsaved_[slot] = false;
+    if (unverified_ == capture_) unverified_ = nullptr;
     ShotTraceBuffer &buffer = *capture_;
     memset(&buffer.header, 0, sizeof(buffer.header));  // Not recoverable yet.
     memset(&buffer.counters, 0, sizeof(buffer.counters));
@@ -310,6 +324,7 @@ class ShotTrace {
     for (size_t i = SHOT_TRACE_STATE_IDLE_ELIGIBILITY; i < SHOT_TRACE_STATE_COUNT; ++i)
       stateKnown_[i] = false;  // Recorded as initial.
     capturing_.store(true, std::memory_order_release);
+    return dropped;
   }
 
   // After the machine started: identity, the snapshot and the frozen pre-shot
@@ -344,7 +359,7 @@ class ShotTrace {
     shotTraceWriteBack(changed, sizeof(*changed));
   }
 
-  // Drip finalize or cancellation. The newest completed trace always wins.
+  // Drip finalize or cancellation: the trace waits for the flash pool.
   void complete(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs,
                 uint8_t endReason) {
     ShotTraceHeader *changed = nullptr;
@@ -400,11 +415,11 @@ class ShotTrace {
     header.totalBytes = static_cast<uint32_t>(
         SHOT_TRACE_FIXED_BYTES + header.eventCount * sizeof(ShotTraceRecord));
     mirrorCountersLocked_();
-    ShotTraceBuffer *const completed = capture_;
-    capture_ = completed_;
-    completed_ = completed;
     if (++generation_ == 0) generation_ = 1;
-    recoveredUnverified_ = false;  // A recovered trace was replaced.
+    generationOf_[slotOf_(buffer)] = generation_;
+    unsaved_[slotOf_(buffer)] = true;
+    capture_ = completed_;
+    completed_ = &buffer;
     capturing_.store(false, std::memory_order_release);
     return header;
   }
@@ -441,10 +456,10 @@ class ShotTrace {
       header.shotLogId = header.endedAtMs = 0;
       header.endReason = 0;
       completed_ = &buffer;
-      capture_ = &buffer == &shotTraceStore.buffers[0] ? &shotTraceStore.buffers[1]
-                                                     : &shotTraceStore.buffers[0];
-      generation_ = 1;
-      recoveredUnverified_ = true;
+      capture_ = &shotTraceStore.buffers[1 - i];
+      generation_ = generationOf_[i] = 1;
+      unsaved_[i] = true;
+      unverified_ = &buffer;
       crashedBootId = header.bootId;
     }
   }
@@ -639,7 +654,7 @@ class ShotTrace {
   ShotTraceExport exportCompleted(uint8_t *chunk, size_t capacity, Sink &&sink) {
     uint32_t generation = 0, crc = 0;
     size_t total = 0;
-    const ShotTraceExport state = completedTrace_(generation, total);
+    const ShotTraceExport state = completedTrace_(Pick::NEWEST, generation, total);
     if (state != ShotTraceExport::OK) return state;
     if (!crcOf_(generation, total, chunk, capacity, crc)) return ShotTraceExport::CHANGED;
     for (size_t offset = 0; offset < total; offset += capacity) {
@@ -651,7 +666,7 @@ class ShotTrace {
   }
 
   // Export bytes [offset, offset + bytes) of `generation`, its CRC set;
-  // false once a newer completion (or a capture) replaced it.
+  // false while a capture is open or once one opened over it.
   bool copyExport(uint32_t generation, size_t offset, uint8_t *out, size_t bytes,
                   uint32_t crc) const {
     if (!copyCompleted_(generation, offset, out, bytes)) return false;
@@ -663,18 +678,22 @@ class ShotTrace {
   }
 
   // ---------------------------------------------------------------------
-  // Flash pool (settings_persist worker). The newest completed trace waits
-  // until consumed; a newer completion replaces an unsaved one (newest
-  // wins), and the next consume() counts it as dropped.
+  // Flash pool (settings_persist worker). Both buffers' completed traces
+  // wait until consumed, oldest first; begin() counts one it overwrites
+  // unsaved as dropped.
   // ---------------------------------------------------------------------
 
-  bool pendingPersist(ShotTracePending &out, uint8_t *chunk, size_t capacity) {
+  // The unsaved trace of `out`'s identity when `match`, else the oldest.
+  bool pendingPersist(ShotTracePending &out, uint8_t *chunk, size_t capacity, bool match) {
     size_t total = 0;
-    if (completedTrace_(out.generation, total) != ShotTraceExport::OK) return false;
+    if (completedTrace_(match ? Pick::IDENTITY : Pick::OLDEST_UNSAVED, out.generation, total,
+                        out.shotLogId, out.bootId, out.endedAtMs) != ShotTraceExport::OK)
+      return false;
     {
       const TaskLockGuard lock(mux_);
-      if (out.generation != generation_ || out.generation == consumed_) return false;
-      const ShotTraceHeader &header = completed_->header;
+      const ShotTraceBuffer *buffer = bufferOf_(out.generation);
+      if (buffer == nullptr || !unsaved_[slotOf_(*buffer)]) return false;
+      const ShotTraceHeader &header = buffer->header;
       out.shotLogId = header.shotLogId;
       out.bootId = header.bootId;
       out.endedAtMs = header.endedAtMs;
@@ -685,34 +704,39 @@ class ShotTrace {
     return crcOf_(out.generation, total, chunk, capacity, out.crc);
   }
 
-  // Saved, already on flash or given up; returns how many completions
-  // before it were never consumed (dropped).
-  uint32_t consume(uint32_t generation) {
+  // Saved, already on flash or given up. A generation a capture or a clear
+  // already took is ignored.
+  void consume(uint32_t generation) {
     const TaskLockGuard lock(mux_);
-    const uint32_t dropped = generation - consumed_ - 1U;
-    consumed_ = generation;
-    tracesDropped_ += dropped;
-    return dropped;
+    const ShotTraceBuffer *buffer = bufferOf_(generation);
+    if (buffer != nullptr) unsaved_[slotOf_(*buffer)] = false;
   }
 
-  // Clear all and factory reset: the completed trace's summary is gone.
+  // Clear all and factory reset: the completed traces' summaries are gone.
   void consumeCompleted() {
     const TaskLockGuard lock(mux_);
-    consumed_ = generation_;
+    unsaved_[0] = unsaved_[1] = false;
   }
 
   uint32_t tracesDropped() const {
     const TaskLockGuard lock(mux_);
     return tracesDropped_;
   }
-  // The identity of the completed trace the pool has not taken yet.
-  bool unsaved(uint32_t &shotLogId, uint32_t &bootId, uint32_t &endedAtMs) const {
+  // Completed traces the pool has not taken yet: how many, and whether one
+  // has this identity.
+  uint32_t unsavedCount() const {
     const TaskLockGuard lock(mux_);
-    if (generation_ == 0 || generation_ == consumed_) return false;
-    shotLogId = completed_->header.shotLogId;
-    bootId = completed_->header.bootId;
-    endedAtMs = completed_->header.endedAtMs;
-    return true;
+    return (unsaved_[0] ? 1U : 0U) + (unsaved_[1] ? 1U : 0U);
+  }
+  bool unsaved(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs) const {
+    const TaskLockGuard lock(mux_);
+    for (size_t i = 0; i < 2; ++i) {
+      const ShotTraceHeader &header = shotTraceStore.buffers[i].header;
+      if (unsaved_[i] && header.shotLogId == shotLogId && header.bootId == bootId &&
+          header.endedAtMs == endedAtMs)
+        return true;
+    }
+    return false;
   }
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
@@ -720,11 +744,12 @@ class ShotTrace {
   void hostReset() {
     const TaskLockGuard lock(mux_);
     capturing_.store(false);
-    generation_ = 0;
-    recoveredUnverified_ = false;
+    generation_ = generationOf_[0] = generationOf_[1] = 0;
+    unsaved_[0] = unsaved_[1] = false;
+    unverified_ = nullptr;
     capture_ = &shotTraceStore.buffers[0];
     completed_ = &shotTraceStore.buffers[1];
-    consumed_ = tracesDropped_ = 0;
+    tracesDropped_ = 0;
     ringCount_ = 0;
     for (bool &known : stateKnown_) known = false;
     micraSubscribed_.store(false);
@@ -844,12 +869,12 @@ class ShotTrace {
            header.prevCount <= header.eventCount;
   }
 
-  // First use of a recovered trace (httpd): the start check and the event
-  // checks decide what is kept. A torn last append is dropped; anything
-  // else inconsistent drops the whole trace.
+  // First use of a recovered trace: the start check and the event checks
+  // decide what is kept. A torn last append is dropped; anything else
+  // inconsistent drops the whole trace.
   bool verifyRecoveredLocked_() {
-    recoveredUnverified_ = false;
-    ShotTraceBuffer &buffer = *completed_;
+    ShotTraceBuffer &buffer = *unverified_;
+    unverified_ = nullptr;
     ShotTraceHeader &header = buffer.header;
     uint32_t check = SHOT_TRACE_CHECK_SEED;
     uint32_t prevCheck = header.prevCount == 0 ? check : 0;
@@ -864,7 +889,8 @@ class ShotTrace {
     }
     if (header.startCheck != startCheck_(buffer)) header.magic = 0;
     if (header.magic != SHOT_TRACE_MAGIC) {
-      generation_ = 0;
+      generationOf_[slotOf_(buffer)] = 0;
+      unsaved_[slotOf_(buffer)] = false;
       return false;
     }
     header.totalBytes = static_cast<uint32_t>(
@@ -899,20 +925,53 @@ class ShotTrace {
     shotTraceStore.ringAtMs[slot] = nowMs;
   }
 
-  // The newest completed trace (a recovered one verified first): BUSY while
-  // a capture is open, EMPTY when there is none.
-  ShotTraceExport completedTrace_(uint32_t &generation, size_t &total) {
+  enum class Pick : uint8_t { NEWEST, OLDEST_UNSAVED, IDENTITY };
+
+  static size_t slotOf_(const ShotTraceBuffer &buffer) {
+    return &buffer == &shotTraceStore.buffers[0] ? 0 : 1;
+  }
+  // begin()'s choice: an unsaved interrupted trace outranks an unsaved one.
+  int keepRank_(const ShotTraceBuffer &buffer) const {
+    const size_t slot = slotOf_(buffer);
+    return !unsaved_[slot] ? 0 : (buffer.header.flags & SHOT_TRACE_INTERRUPTED) ? 2 : 1;
+  }
+  const ShotTraceBuffer *bufferOf_(uint32_t generation) const {
+    for (size_t i = 0; i < 2; ++i)
+      if (generation != 0 && generationOf_[i] == generation) return &shotTraceStore.buffers[i];
+    return nullptr;
+  }
+
+  // A completed trace (a recovered one verified first): the newest, the
+  // oldest unsaved, or the unsaved one of an identity. BUSY while a capture
+  // is open, EMPTY when there is none.
+  ShotTraceExport completedTrace_(Pick pick, uint32_t &generation, size_t &total,
+                                  uint32_t shotLogId = 0, uint32_t bootId = 0,
+                                  uint32_t endedAtMs = 0) {
     bool dropped = false;
     uint32_t droppedBootId = 0;
     {
       const TaskLockGuard lock(mux_);
       if (capturing_.load(std::memory_order_relaxed)) return ShotTraceExport::BUSY;
-      if (recoveredUnverified_) {
-        droppedBootId = completed_->header.bootId;
+      if (unverified_ != nullptr) {
+        droppedBootId = unverified_->header.bootId;
         dropped = !verifyRecoveredLocked_();
       }
-      generation = generation_;
-      total = completed_->header.totalBytes;
+      const ShotTraceBuffer *found = nullptr;
+      for (size_t i = 0; i < 2; ++i) {
+        const ShotTraceBuffer &buffer = shotTraceStore.buffers[i];
+        const ShotTraceHeader &header = buffer.header;
+        if (generationOf_[i] == 0 ||
+            (pick != Pick::NEWEST && !unsaved_[i]) ||
+            (pick == Pick::IDENTITY &&
+             (header.shotLogId != shotLogId || header.bootId != bootId ||
+              header.endedAtMs != endedAtMs)))
+          continue;
+        const bool newer = found != nullptr &&
+            static_cast<int32_t>(generationOf_[i] - generationOf_[slotOf_(*found)]) > 0;
+        if (found == nullptr || newer == (pick == Pick::NEWEST)) found = &buffer;
+      }
+      generation = found != nullptr ? generationOf_[slotOf_(*found)] : 0;
+      total = found != nullptr ? found->header.totalBytes : 0;
     }
     if (dropped) shotTraceLogRecoveryDropped(droppedBootId);
     return generation == 0 ? ShotTraceExport::EMPTY : ShotTraceExport::OK;
@@ -933,10 +992,11 @@ class ShotTrace {
   bool copyCompleted_(uint32_t generation, size_t offset, uint8_t *out,
                       size_t bytes) const {
     const TaskLockGuard lock(mux_);
-    if (capturing_.load(std::memory_order_relaxed) || generation != generation_ ||
-        offset + bytes > completed_->header.totalBytes)
+    const ShotTraceBuffer *buffer = bufferOf_(generation);
+    if (capturing_.load(std::memory_order_relaxed) || buffer == nullptr ||
+        offset + bytes > buffer->header.totalBytes)
       return false;
-    memcpy(out, reinterpret_cast<const uint8_t *>(completed_) + offset, bytes);
+    memcpy(out, reinterpret_cast<const uint8_t *>(buffer) + offset, bytes);
     return true;
   }
 
@@ -945,9 +1005,13 @@ class ShotTrace {
   std::atomic<bool> micraSubscribed_{false};
   ShotTraceBuffer *capture_ = &shotTraceStore.buffers[0];
   ShotTraceBuffer *completed_ = &shotTraceStore.buffers[1];
-  uint32_t generation_ = 0;  // 0: nothing completed since boot
-  uint32_t consumed_ = 0, tracesDropped_ = 0;  // Flash pool bookkeeping.
-  bool recoveredUnverified_ = false;
+  uint32_t generation_ = 0;  // The last completion's; 0: none since boot.
+  // Per buffer: its completion's generation (0: none, or a capture opened
+  // over it) and whether the flash pool still has to take it.
+  uint32_t generationOf_[2] = {};
+  bool unsaved_[2] = {};
+  uint32_t tracesDropped_ = 0;
+  ShotTraceBuffer *unverified_ = nullptr;  // A recovered trace not yet checked.
   size_t ringCount_ = 0;
   // Control-loop-owned (noteState, noteReading).
   bool stateKnown_[SHOT_TRACE_STATE_COUNT] = {};

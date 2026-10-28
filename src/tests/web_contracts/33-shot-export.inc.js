@@ -190,6 +190,10 @@
   const torn = new Uint8Array(fixture.slice(0));
   torn[0] ^= 1;
   assert.throws(() => context.decodeShotTrace(torn.buffer, vocab), /could not be read/);
+  // More pre-shot entries than the record has room for is damage, not data.
+  const overfull = new Uint8Array(fixture.slice(0));
+  new DataView(overfull.buffer).setUint16(78, new DataView(fixture).getUint16(84, true) + 1, true);
+  assert.throws(() => context.decodeShotTrace(overfull.buffer, vocab), /could not be read/);
 
   // The trace view: every event in time order with a mark on the curve, a
   // type filter and a search that narrow both, the flags spelled out.
@@ -241,37 +245,61 @@
     li.textContent.includes('Stop requested'))), '40.00 s Stop requested 3 · from the Web UI');
 
   // Diagnostic Shot storage in words; the room never exceeds the shots the
-  // history keeps, and an interrupted trace downloads through the retrying
-  // fetch from a real button.
+  // history keeps, each listed trace without a shot (interrupted or refused)
+  // downloads through the retrying fetch from a real button, the rest are
+  // counted, and a failed read leaves no stale figure.
   {
     const ss = {};
-    const diagContext = vm.createContext({$: (id) => (ss[id] ??= fakeEl()),
+    const diagContext = vm.createContext({$: (id) => (ss[id] ??= Object.assign(fakeEl(), {
+      querySelectorAll: () => Object.entries(ss).filter(([k]) => k !== 'shotStorage' &&
+          k !== 'ssOrphans' && k !== 'ssOrphansRow').map(([, e]) => e)})),
       document: {createElement: (tag) => fakeEl(tag)}, sub: context.sub,
       formatHumanTime: () => 'today'});
     vm.runInContext('var R = this;' + blockAt(viewJs.diagnostic, 'function renderShotStorage('),
         diagContext);
     const storage = {poolBytes: 5476352, liveBytes: 1048576, reclaimableBytes: 0,
-      unindexedBytes: 0, unusedBytes: 0, droppedRecords: 0, good: 3, bad: 1, traceOnly: 0,
-      interrupted: 1, traces: 4, truncated: 0, sinceShotId: 7, sinceLocalSec: 0,
+      unindexedBytes: 0, unusedBytes: 0, droppedRecords: 0, good: 3, bad: 1, traceOnly: 16,
+      interrupted: 2, traces: 4, truncated: 0, sinceShotId: 7, sinceLocalSec: 0,
       pendingCurves: 0, pendingTraces: 0, tracesDropped: 0, lastError: 'none',
-      shotCapacity: 1000, interruptedBoots: [41]};
+      shotCapacity: 1000, orphanTraces: [{boot: 41, end: 0}, {boot: 40, end: 52000}]};
     diagContext.renderShotStorage({...storage, meanRecordBytes: 2048});
     assert.equal(ss.ssRoom.textContent, '2.0 KB · room for all 1000 shots the history keeps');
     diagContext.renderShotStorage({...storage, meanRecordBytes: 16384});
     assert.equal(ss.ssRoom.textContent, '16.0 KB · room for about 334 shots');
     assert.deepEqual([ss.ssShots.textContent, ss.ssSince.textContent], ['3 good · 1 bad', '#7']);
-    const download = ss.ssInterrupted.children[0];
-    assert.deepEqual([download.tag, download.type, download.textContent], ['button', 'button',
-      'Download boot 41']);
-    assert.ok(codeIncludes(blockAt(viewJs.diagnostic, 'function downloadInterruptedTrace('),
-        'R.fetchShotTrace({ id: 0, bootId: boot, endedAtMs: 0 })'));
+    const [crashed, refused, more] = ss.ssOrphans.children;
+    assert.deepEqual([crashed.tag, crashed.type, crashed.textContent, refused.textContent, more],
+        ['button', 'button', 'Startup 41 · interrupted', 'Startup 40 · not in history',
+          '16 older not listed']);
+    assert.ok(!ss.ssOrphansRow.hidden);
+    assert.ok(codeIncludes(blockAt(viewJs.diagnostic, 'function downloadOrphanTrace('),
+        'R.fetchShotTrace({ id: 0, bootId: boot, endedAtMs: end })'));
+    diagContext.renderShotStorage(null);
+    assert.deepEqual([ss.ssRoom.textContent, ss.ssShots.textContent, ss.ssOrphansRow.hidden],
+        ['—', '—', true]);
+    // Opened during a shot, the section reads itself once the shot ends.
+    const load = blockAt(viewJs.diagnostic, 'async function loadShotStorage(');
+    assert.ok(codeIncludes(load, 'renderShotStorage(null);') && codeIncludes(load,
+        'if (e.code === "SHOT_STORAGE_BUSY" && R.shotRunning()) loadShotStorageAfterShot();'));
+    const waits = [];
+    let running = true, loads = 0;
+    const waitContext = vm.createContext({R: {shotRunning: () => running},
+      setTimeout: (fn, ms) => waits.push([fn, ms]), loadShotStorage: () => loads++});
+    vm.runInContext(blockAt(viewJs.diagnostic, 'function loadShotStorageAfterShot('), waitContext);
+    waitContext.loadShotStorageAfterShot();
+    waits.shift()[0]();
+    running = false;
+    waits.shift()[0]();
+    assert.deepEqual([loads, waits.length], [1, 0]);
   }
 
   // Exports: CSV and JSON read the whole log of good shots; JSON +
-  // diagnostics adds the bad ones and each shot's trace, four requests at a
-  // time, gzip-streamed into the file.
-  let saved, shown = [], window = [base, lost];
+  // diagnostics adds the bad ones and each shot's trace, then the traces
+  // without a shot Shot storage lists, one request at a time (the device
+  // slot), gzip-streamed into the file.
+  let saved, shown = [], window = [base, lost], inFlight = 0, maxInFlight = 0;
   const traced = new Set([412]);
+  const storageWith = {orphanTraces: [{boot: 41, end: 0}, {boot: 40, end: 52000}]};
   Object.assign(context, {SHOTS_EXPORT_LIMIT: 1000, statsExportInFlight: null, uiState: {}, shotRunning: () => false, sleep: async () => {}, statsSendSubscribe() {},
     statsFrameWindow: async (...args) => {
       assert.deepEqual(args.slice(0, 5), [0, 1000, 'date', 'desc', 180e3]);
@@ -279,13 +307,20 @@
       return window;
     },
     shotTraceVocabulary: async () => vocab,
-    fetchShotTrace: async (r) => (traced.has(r.id) ? fixture : null),
+    api: async (url) => (assert.equal(url, '/api/v1/diagnostic/shot-storage'), storageWith),
+    fetchShotTrace: async (r) => {
+      maxInFlight = Math.max(maxInFlight, ++inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight--;
+      return traced.has(r.id) || (r.id === 0 && r.endedAtMs === 0) ? fixture : null;
+    },
     saveFile: (blob, name) => (saved = {blob, name}),
     message: (text, kind = '') => shown.push([text, kind]),
     formatCommandError: (_, e) => e.message});
   // The `let exportJob` block runs through runExport.
   vm.runInContext(['function downloadJson(', 'let exportJob = null;', 'async function exportRows(',
-    'async function shotTraceForFile(', 'function exportSink(', 'function exportShotsJson(']
+    'async function shotTraceForFile(', 'async function orphanTracesJson(', 'function exportSink(',
+    'function exportShotsJson(']
       .map((m) => blockAt(viewJs.stats, m)).join('\n'), context);
   await vm.runInContext('exportShotsJson()', context);
   assert.equal(context.lastFilter, '{}', 'JSON holds good shots only');
@@ -293,8 +328,8 @@
   assert.equal(saved.blob.type, 'application/json');
   const plain = JSON.parse(await saved.blob.text());
   check(schema, plain, 'json export');
-  assert.deepEqual([plain.version, plain.shots.map((x) => x.id), plain.shots.some((x) => x.trace)],
-      [1, [412, 7], false]);
+  assert.deepEqual([plain.version, plain.shots.map((x) => x.id), plain.shots.some((x) => x.trace),
+    'orphanTraces' in plain], [1, [412, 7], false, false]);
   const bad = {...base, id: 413, badReason: 'short', durationS: 5};
   window = [bad, base, lost];
   traced.add(413);
@@ -307,6 +342,9 @@
   assert.deepEqual(diag.shots.map((x) => [x.id, x.outcome.badReason, !!x.trace]),
       [[413, 'short', true], [412, null, true], [7, null, false]]);
   assert.deepEqual(diag.shots[1].trace, trace);
+  assert.equal(maxInFlight, 1, 'Traces are fetched one at a time');
+  assert.deepEqual(diag.orphanTraces.map((x) => [x.bootId, x.endedAtMs, x.interrupted, !!x.trace,
+    x.traceUnavailable ?? false]), [[41, 0, true, true, false], [40, 52000, false, false, true]]);
   assert.ok(shown.some(([text]) => text === 'Exporting shots with their traces… 3 of 3'));
   // A shot starting stops an export: the firmware exports nothing during a
   // shot, so the file is not written and the reason is said.
@@ -329,9 +367,11 @@
     return null;
   };
   context.shotTraceVocabulary = async () => {throw new Error('offline');};
+  context.api = async () => {throw new Error('busy');};
   await vm.runInContext('exportShotsJson(true)', context);
   const partial = JSON.parse(zlib.gunzipSync(Buffer.from(await saved.blob.arrayBuffer())));
   check(schema, partial, 'partial diagnostics export');
+  assert.ok(!('orphanTraces' in partial), 'Without Shot storage there is no orphan list');
   assert.deepEqual(partial.shots.map((x) => [x.id, x.traceUnavailable ?? false, 'trace' in x]),
       [[413, true, false], [412, true, false], [7, false, false]]);
   context.shotTraceVocabulary = async () => vocab;
@@ -358,6 +398,20 @@
   assert.equal(calls, 3);
   context.apiBinary = async () => {throw Object.assign(new Error('none'), {status: 404});};
   assert.equal(await context.fetchShotTrace(base), null);
+  // A controller briefly busy without a shot is asked again, a bounded number
+  // of times; a shot running ends it at once.
+  calls = 0;
+  context.apiBinary = async () => {
+    calls++;
+    throw Object.assign(new Error('busy'), {code: 'SHOT_TRACE_BUSY', status: 409});
+  };
+  await assert.rejects(context.fetchShotTrace(base), /busy/);
+  assert.equal(calls, 5);
+  calls = 0;
+  context.shotRunning = () => true;
+  await assert.rejects(context.fetchShotTrace(base), /busy/);
+  assert.equal(calls, 1);
+  context.shotRunning = () => false;
 
   // Gaggiuino, as Visualizer.coffee reads it: datapoints with ms times, the
   // drink weight from the last point, nothing the controller never measured.
@@ -476,8 +530,17 @@
       'k < offsets.length && R.webUiPollingActive() && !R.shotRunning();'));
   assert.ok(!viewJs.records.includes('shot-trace') && !viewJs.records.includes('decodeShotTrace'));
   // Immutable records may come from the browser cache; the vocabulary is
-  // asked once per firmware.
-  assert.ok(codeIncludes(viewJs.stats, '"/api/v1/diagnostic/shot-trace/vocabulary?v=__FW_ASSET_TAG__"'));
+  // asked once per firmware identity (a firmware-only update changes it),
+  // and the route keeps it for good only under an identity no other build
+  // shares.
+  assert.ok(codeIncludes(viewJs.stats,
+      '"/api/v1/diagnostic/shot-trace/vocabulary?fw=" + encodeURIComponent(R.SHELL_FW_VERSION)'));
+  assert.ok(codeIncludes(runtimeJs, 'export { SHELL_FW_VERSION,'));
+  assert.ok(network.includes('unique ? "private, max-age=31536000, immutable" : "no-cache"'));
+  // A bad row in Stats shows only what it stored: nothing read from its curve.
+  const statsRow = blockAt(viewJs.stats, 'function renderShots(');
+  assert.ok(codeIncludes(statsRow, 'maxFlow = m && !bad ? m.maxFlow : null,') &&
+      codeIncludes(statsRow, 'cut = bad ? {} : shotCut(r, m, actual),'));
   assert.ok(codeIncludes(blockAt(viewJs.records, 'function createFilterMenu('), 'createPopup('));
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'function downloadJson('), 'R.saveFile('));
 })().catch((error) => {

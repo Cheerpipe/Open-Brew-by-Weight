@@ -57,6 +57,41 @@
       "items": {
         "$ref": "#/$defs/shot"
       }
+    },
+    "orphanTraces": {
+      "type": "array",
+      "description": "JSON + diagnostics only: the newest traces without a stored shot (at most 16, newest first) as Diagnostic → Shot storage lists them; absent from the plain JSON export and when Shot storage could not be read.",
+      "items": {
+        "type": "object",
+        "required": [
+          "bootId",
+          "endedAtMs",
+          "interrupted"
+        ],
+        "properties": {
+          "bootId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The startup the trace was recorded in."
+          },
+          "endedAtMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Uptime at the end of its cycle; 0 for an interrupted trace."
+          },
+          "interrupted": {
+            "type": "boolean",
+            "description": "True when a restart (crash, watchdog or software reset) interrupted the shot; false when the shot history did not keep it."
+          },
+          "trace": {
+            "$ref": "#/$defs/trace"
+          },
+          "traceUnavailable": {
+            "type": "boolean",
+            "description": "True when the listed trace could not be read for this file; then `trace` is absent."
+          }
+        }
+      }
     }
   },
   "$defs": {

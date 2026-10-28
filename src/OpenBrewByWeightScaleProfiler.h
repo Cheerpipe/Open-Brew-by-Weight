@@ -112,8 +112,7 @@ enum class ScaleProfileEvent : uint16_t {
   CUP_ANCHOR_REJECTED,
 };
 // Kinds in use; a kind appended above must move this (the shot trace
-// vocabulary lists exactly these, and its host test checks the next is
-// unnamed).
+// vocabulary lists exactly these; asserted after scaleProfileEventName).
 constexpr size_t SCALE_PROFILE_EVENT_COUNT =
     static_cast<size_t>(ScaleProfileEvent::CUP_ANCHOR_REJECTED) + 1U;
 
@@ -242,7 +241,7 @@ inline const char *scaleProfilerErrorName(ScaleProfilerError error) {
   return "none";
 }
 
-inline const char *scaleProfileEventName(ScaleProfileEvent kind) {
+constexpr const char *scaleProfileEventName(ScaleProfileEvent kind) {
   switch (kind) {
     case ScaleProfileEvent::WEIGHT: return "WEIGHT";
     case ScaleProfileEvent::PROFILE_START: return "PROFILE_START";
@@ -286,6 +285,11 @@ inline const char *scaleProfileEventName(ScaleProfileEvent kind) {
   }
   return "UNKNOWN";
 }
+static_assert(constexprTextEquals(scaleProfileEventName(static_cast<ScaleProfileEvent>(
+                                      SCALE_PROFILE_EVENT_COUNT)), "UNKNOWN") &&
+                  !constexprTextEquals(scaleProfileEventName(static_cast<ScaleProfileEvent>(
+                                           SCALE_PROFILE_EVENT_COUNT - 1U)), "UNKNOWN"),
+              "SCALE_PROFILE_EVENT_COUNT must follow the last named ScaleProfileEvent");
 
 // Fixed-size capture record. Source time is session-relative milliseconds;
 // ordinal breaks equal-timestamp ties and makes deferred decisions

@@ -298,7 +298,8 @@ house preset lists that preset's good and bad shots. Each bad shot carries a
 grey **Bad** label beside its time with the reason: **short** (12 seconds or
 less), **no yield**, or **low yield** (2 g or less). A bad shot shows only what
 the controller stored, so a missing yield, flow or ratio reads **—** instead of
-being estimated from its curve. The preset and scale choices in the checklist
+being estimated from its curve, and **Max flow**, **Drip** and **Cut at**,
+which come from the curve, always read **—**. The preset and scale choices in the checklist
 come from your good shots.
 
 Changes arrive automatically while the
@@ -426,7 +427,7 @@ history record or flash write.
 
 ### See what the controller decided
 
-Each shot started with a scale also keeps a **shot trace**: a compact record of
+Each shot started with a scale also records a **shot trace**: a compact record of
 what the controller knew when the shot started and every decision it took,
 from the moment the machine started until the last drips were weighed. It is
 there for the times a shot does something you did not expect, such as
@@ -459,16 +460,25 @@ A few things to know:
   wait. Until then **View trace** is greyed out and says so. Right after a
   shot the controller needs a moment to save it; the view waits for it on
   its own. If the controller is busy for another reason, such as a rinse or
-  the scale connecting, the view asks you to try again in a moment.
-- If the controller restarted in the middle of a shot, that shot's trace is
-  kept and marked as interrupted, and it ends where the controller stopped.
-  It has no shot card, so you find it in **Diagnostic → Shot storage**.
+  the scale connecting, the view tries again a few times before asking you
+  to try again in a moment.
+- The controller holds the traces of the last two shots until it has saved
+  them, which takes it well under a second once a shot is over. Starting
+  shots back to back is fine, but if three shots follow each other with no
+  pause at all, the oldest unsaved trace is lost; **Diagnostic → Shot
+  storage** counts it under **Traces not saved since restart**. A power cut
+  loses any trace that was not saved yet.
+- If the controller crashed or restarted itself in the middle of a shot,
+  that shot's trace is kept and marked as interrupted, and it ends where the
+  controller stopped. A power cut during a shot keeps no trace. An
+  interrupted trace has no shot card, so you find it in **Diagnostic → Shot
+  storage**.
 - When a shot records more events than fit, the least important ones are
   left out first and the view tells you how many; the counts in **Readings
   and timing** stay exact.
-- Traces share storage with the shot curves. The newest shots always keep
-  theirs; when space runs out the oldest make room, so an older shot may say
-  it has no trace. Shots from firmware before traces existed have none.
+- Traces share storage with the shot curves. Once saved, a recent shot keeps
+  its trace; when space runs out the oldest make room, so an older shot may
+  say it has no trace. Shots from firmware before traces existed have none.
 - The copy kept for offline use holds the shots, not their traces, so
   **View trace** needs the controller.
 
@@ -494,17 +504,19 @@ include every shot whatever the list's filter or sort:
   an [example file](../schemas/openbrewbyweight-shot-export-v1.example.json),
   so other projects can read it reliably.
 - **JSON + diagnostics** is the same file with every shot, bad ones included,
-  and each shot's trace. It is meant for troubleshooting with the
-  developers. The controller sends the traces a few at a time, so a long
-  history takes a while; the progress shows at the bottom of the page and
+  and each shot's trace, plus the newest 16 traces that have no shot (shots
+  interrupted by a restart, or not kept by the history). It is meant for
+  troubleshooting with the developers. The controller sends the traces one
+  at a time, so a long history takes a while; the progress shows at the bottom of the page and
   **Export → Cancel export** stops it. Browsers that can compress save it as
   a smaller `.json.gz` file, which most archive tools open.
 
 The controller exports nothing while a shot is brewing or waiting for its
 last drips: the choices are greyed out until then, and an export that is
 running when a shot starts stops and tells you so. Export again once the shot
-is over. If a shot's trace cannot be read at that moment, the diagnostics
-file still includes the shot and marks its trace as unavailable.
+is over. If the controller is briefly busy, the export waits a few seconds
+and tries again; if a shot's trace still cannot be read, the diagnostics file
+includes the shot and marks its trace as unavailable.
 
 Each shot card has a **⋯** button in its top right corner. Its menu acts on
 that shot only:

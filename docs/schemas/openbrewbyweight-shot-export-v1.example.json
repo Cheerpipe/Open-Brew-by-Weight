@@ -435,5 +435,155 @@
         ]
       }
     }
+  ],
+  "orphanTraces": [
+    {
+      "bootId": 36,
+      "endedAtMs": 0,
+      "interrupted": true,
+      "trace": {
+        "formatVersion": 1,
+        "vocabularyVersion": 1,
+        "firmware": "1.0.0",
+        "shotId": 0,
+        "bootId": 36,
+        "anchorMs": 491311,
+        "endedAtMs": 0,
+        "endReasonCode": 0,
+        "endReason": "none",
+        "flags": {
+          "verboseTruncated": false,
+          "decisionsTruncated": false,
+          "interrupted": true,
+          "tailDropped": false
+        },
+        "snapshot": {
+          "freeHeapBytes": 0,
+          "freePsramBytes": 0,
+          "postTareGraceMs": 0,
+          "retareWindowMs": 0,
+          "stabilityDurationMs": 0,
+          "stabilityGapMs": 0,
+          "stabilitySamples": 5,
+          "minimumCupG": 50,
+          "cupRemovedG": 0,
+          "stabilityToleranceG": 0,
+          "emptyReferenceG": null,
+          "occupiedReferenceG": 0,
+          "preTareWeightG": 0,
+          "paddleMode": 0,
+          "noScaleBbwMode": 0,
+          "idleEligibility": 0,
+          "idleLastReason": 0,
+          "wifiRssi": null,
+          "scaleName": "Lunar",
+          "scaleProtocol": "",
+          "flags": {
+            "autoTare": true,
+            "autoRetare": false,
+            "idleTare": false,
+            "accessoryRetare": false,
+            "touchAvoidance": false,
+            "requireCup": false,
+            "stopIfRemoved": false,
+            "cupProtection": false,
+            "cupPresent": true,
+            "cupTared": false,
+            "emptyPanQualified": false,
+            "idleTareEligible": false,
+            "scaleSupportsTare": false,
+            "lineaMicraConnected": false
+          }
+        },
+        "counters": {
+          "readingsReceived": 0,
+          "readingsAccepted": 0,
+          "readingsHeld": 0,
+          "rejectedInvalid": 0,
+          "rejectedRange": 0,
+          "rejectedSlew": 0,
+          "rejectedRecovery": 0,
+          "rejectedPreCycle": 0,
+          "rejectedOther": 0,
+          "readingGapMinMs": 0,
+          "readingGapMeanMs": 0,
+          "readingGapMaxMs": 0,
+          "packetGaps": 0,
+          "staleFrames": 0,
+          "undecodableFrames": 0,
+          "confirmationResets": 0,
+          "loopGapMaxMs": 0,
+          "micraRxBytes": 0,
+          "uiStreamDeferrals": 0,
+          "verboseDropped": 0,
+          "decisionsDropped": 0
+        },
+        "preShot": [
+          {
+            "beforeMs": 900,
+            "type": "profile",
+            "code": 16,
+            "name": "CUP_PLACED",
+            "a": 800,
+            "b": 3,
+            "arg1": 3,
+            "arg2": 0,
+            "repeats": 1
+          },
+          {
+            "beforeMs": 500,
+            "type": "profile",
+            "code": 17,
+            "name": "CUP_REMOVED",
+            "a": 5,
+            "b": 4465,
+            "arg1": 70001,
+            "arg2": 9,
+            "repeats": 0
+          }
+        ],
+        "events": [
+          {
+            "atMs": 6000,
+            "type": "profile",
+            "code": 21,
+            "name": "FIRST_DROP",
+            "a": 12,
+            "b": 4464,
+            "ext": [
+              1,
+              5,
+              0
+            ]
+          },
+          {
+            "atMs": 7000,
+            "type": "profile",
+            "code": 31,
+            "name": "STATE_CHANGED",
+            "a": 0,
+            "b": 32780,
+            "signal": "IDLE_ELIGIBILITY",
+            "initial": true
+          },
+          {
+            "atMs": 7000,
+            "type": "profile",
+            "code": 31,
+            "name": "STATE_CHANGED",
+            "a": 1,
+            "b": 32787,
+            "signal": "WEIGHT_CONTROL",
+            "initial": true
+          }
+        ]
+      }
+    },
+    {
+      "bootId": 35,
+      "endedAtMs": 182044,
+      "interrupted": false,
+      "traceUnavailable": true
+    }
   ]
 }

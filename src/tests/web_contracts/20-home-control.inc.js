@@ -1105,8 +1105,8 @@ if (!codeIncludes(ui, 'id="autoToManualGuardEnabled"') ||
 if (!network.includes('callbacks_.copyHomeShot(latest, control.activeCycle || control.homePending') ||
     !network.includes('? nullptr : &self.workBuf_->homeCurve') ||
     !network.includes('callbacks_.copyHomeShot(latestShot, nullptr)') ||
-    !network.includes('shotLogProjectLastShot(latest, linked)') ||
-    !network.includes('shotLogProjectLastShot(latestShot, control.lastShot)') ||
+    !network.includes('shotLogProjectLastShot(latest, control.lastShot, control.lastGoodShot)') ||
+    !network.includes('shotLogProjectLastShot(latestShot, control.lastShot, control.lastGoodShot)') ||
     network.includes('\"lastGoodShot\":%s') ||
     !firmwareCore.includes('shotLog.copyNewestEligible(record)') ||
     !network.includes('session.cycle = card.cycleId;') ||

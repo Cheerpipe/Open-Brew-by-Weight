@@ -1227,6 +1227,79 @@ void tsp28_a_landed_commit_reported_failed_is_indexed() {
   CHECK(pool.recover() && pool.count() == 2 && readable(pool, 2));
 }
 
+// A flash lock timeout does nothing: the staged append resumes where it
+// was, with no erase wasted on a new sector.
+void tsp30_a_lock_timeout_resumes_the_staged_append() {
+  std::vector<ShotTracePoolEntry> expected;
+  size_t erases = 0;
+  for (bool timeout : {false, true}) {
+    freshFlash();
+    ShotTracePool pool(indexA, RESERVED);
+    CHECK(pool.recover() && appendShot(pool, 1) && appendShot(pool, 3));
+    const Sizes sizes = sizesOf(2);
+    for (size_t i = 0; i < sizes.trace; ++i) traceBuffer[i] = contentByte(2, 2, i);
+    for (size_t i = 0; i < sizes.curve; ++i) curveBuffer[i] = contentByte(2, 1, i);
+    ShotTracePoolSource sources[2] = {
+        {ShotTracePoolSection::CURVE, 0, sizes.curve, curveBuffer, nullptr, nullptr},
+        {ShotTracePoolSection::TRACE, 0, sizes.trace, traceBuffer, nullptr, nullptr}};
+    CHECK(pool.beginAppend(identityOf(2), sources, 2));
+    size_t steps = 0;
+    for (FlashStoreStepResult result = FlashStoreStepResult::MORE;
+         result != FlashStoreStepResult::COMPLETE && steps < 100; ++steps) {
+      g_hostFlashIoMutexAvailable = !(timeout && steps == 2);
+      result = pool.appendStep();
+      g_hostFlashIoMutexAvailable = true;
+      if (timeout && steps == 2)
+        CHECK(result == FlashStoreStepResult::FAILED && pool.appending() &&
+              pool.lastError() == ShotTracePoolError::LOCK);
+      // The worker stages again only when nothing is staged.
+      if (!pool.appending() && result != FlashStoreStepResult::COMPLETE)
+        CHECK(pool.beginAppend(identityOf(2), sources, 2));
+    }
+    size_t total = 0;
+    for (size_t s = 0; s < Flash::kSectors; ++s) total += Flash::erases(s);
+    if (!timeout) {
+      expected = entries(pool);
+      erases = total;
+    } else {
+      CHECK(sameEntries(entries(pool), expected) && total == erases && readable(pool, 2));
+    }
+  }
+}
+
+// A section longer than its record is damage, never bytes past the record.
+void tsp31_a_section_past_its_record_is_corrupt() {
+  freshFlash();
+  ShotTracePool pool(indexA, RESERVED);
+  CHECK(pool.recover() && appendShot(pool, 3));
+  const ShotTracePoolIdentity id = identityOf(3);
+  ShotTracePoolRef ref;
+  uint8_t buffer[256];
+  size_t offset = 0, bytes = 0;
+  CHECK(pool.open(3, id.bootId, id.endedAtMs, ref, buffer, sizeof(buffer)) ==
+            ShotTracePoolStatus::OK &&
+        pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+            ShotTracePoolStatus::OK);
+  ref.bytes = static_cast<uint32_t>(offset + bytes - 1U);
+  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+        ShotTracePoolStatus::CORRUPT);
+}
+
+// A record without sections (no source array at all) is still a record.
+void tsp32_a_record_without_sections() {
+  freshFlash();
+  ShotTracePool pool(indexA, RESERVED);
+  CHECK(pool.recover() && pool.append(identityOf(5), nullptr, 0) && pool.count() == 1);
+  const ShotTracePoolIdentity id = identityOf(5);
+  ShotTracePoolRef ref;
+  uint8_t buffer[64];
+  size_t offset = 0, bytes = 0;
+  CHECK(pool.open(5, id.bootId, id.endedAtMs, ref, buffer, sizeof(buffer)) ==
+            ShotTracePoolStatus::OK &&
+        pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+            ShotTracePoolStatus::NOT_FOUND);
+}
+
 // The firmware's cutover: the ring opens all of shotcurve over what the
 // retired legacy curve store left there (its two epoch sectors and 501
 // committed 8 KiB blocks of 36-byte headers and stream bytes). None reads as
@@ -1293,6 +1366,9 @@ const TestCase tests[] = {
     {"TSP27", tsp27_a_changing_source_abandons_the_append},
     {"TSP28", tsp28_a_landed_commit_reported_failed_is_indexed},
     {"TSP29", tsp29_legacy_curve_blocks_are_holes},
+    {"TSP30", tsp30_a_lock_timeout_resumes_the_staged_append},
+    {"TSP31", tsp31_a_section_past_its_record_is_corrupt},
+    {"TSP32", tsp32_a_record_without_sections},
 };
 
 }  // namespace

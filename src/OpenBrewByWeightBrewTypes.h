@@ -197,7 +197,8 @@ enum class EndReason : uint8_t {
   UNCONFIRMED_START = 19,
   TOUCH_WEIGHT_FALLBACK = 20
 };
-// Reasons in use (2 retired); a reason appended above must move this.
+// Reasons in use (2 retired); a reason appended above must move this
+// (asserted after kEndReasonLabels).
 constexpr size_t END_REASON_COUNT = static_cast<size_t>(EndReason::TOUCH_WEIGHT_FALLBACK) + 1U;
 
 constexpr uint32_t TOUCH_STOP_FALLBACK_MS = 1000;
@@ -268,6 +269,9 @@ constexpr size_t kEndReasonLabelCount =
 // retired). Adding an enumerator without a row breaks this assert.
 static_assert(kEndReasonLabelCount == 20,
               "kEndReasonLabels must cover every EndReason enumerator");
+static_assert(kEndReasonLabels[kEndReasonLabelCount - 1U].reason ==
+                  static_cast<EndReason>(END_REASON_COUNT - 1U),
+              "END_REASON_COUNT must follow the last EndReason row");
 
 inline bool brewWeightCutSettlesMachineOff(EndReason reason) {
   switch (reason) {

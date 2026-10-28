@@ -215,7 +215,7 @@ inline const char *shotLogScaleLossSourceJson(uint8_t packed) {
   return "\"fixed\"";
 }
 
-inline const char *actualWeightSourceName(ActualWeightSource source) {
+constexpr const char *actualWeightSourceName(ActualWeightSource source) {
   switch (source) {
     case ActualWeightSource::NONE: return "none";
     case ActualWeightSource::POST_DRIP: return "post_drip";
@@ -223,6 +223,11 @@ inline const char *actualWeightSourceName(ActualWeightSource source) {
   }
   return "unknown";
 }
+static_assert(constexprTextEquals(actualWeightSourceName(static_cast<ActualWeightSource>(
+                                      ACTUAL_WEIGHT_SOURCE_COUNT)), "unknown") &&
+                  !constexprTextEquals(actualWeightSourceName(static_cast<ActualWeightSource>(
+                                           ACTUAL_WEIGHT_SOURCE_COUNT - 1U)), "unknown"),
+              "ACTUAL_WEIGHT_SOURCE_COUNT must follow the last named ActualWeightSource");
 
 inline ShotLogStopDetail shotLogStopDetailFromEndReason(
     EndReason reason, bool extractionGuardEnabled, bool extractionExtended) {
@@ -493,10 +498,14 @@ inline corridor::ArrivalRecord shotLogArrivalRecord(const ShotLogRecord &record)
   return out;
 }
 
+// A stored shot with the cycle metadata of the last (or last good) shot
+// linked to it, as Home and the integration show it.
 inline PersistedLastShot shotLogProjectLastShot(
-    const ShotLogRecord &record, const PersistedLastShot &linked) {
-  PersistedLastShot shot = linked.shotLogId == record.id
-                               ? linked : PersistedLastShot{};
+    const ShotLogRecord &record, const PersistedLastShot &linked,
+    const PersistedLastShot &linkedGood = PersistedLastShot{}) {
+  PersistedLastShot shot = linked.shotLogId == record.id       ? linked
+                           : linkedGood.shotLogId == record.id ? linkedGood
+                                                               : PersistedLastShot{};
   shot.valid = true;
   shot.shotLogId = record.id;
   shot.endedAtUptimeMs = record.endedAtMs;

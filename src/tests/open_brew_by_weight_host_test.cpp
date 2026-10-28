@@ -13509,6 +13509,38 @@ void s01d_manual_timer_and_limit_share_settled_finalize() {
   }
 }
 
+void s01r_a_bad_cycle_never_becomes_the_last_good_shot() {
+  // A short cycle with a yield is bad: Home and the integration keep showing
+  // the newest good shot with its own cycle.
+  resetHarness(false, true);
+  shotLog.clear(false);
+  runtimeConfig.bbwProtectionMs = minimumBbwProtectionMs(runtimeConfig);
+  const auto cycle = [](uint32_t id, uint32_t durationMs, float weightG) {
+    session.id = id;
+    session.config = snapshotConfig(runtimeConfig);
+    session.config.dripDelayMs = 0;
+    session.startedWithScale = true;
+    session.hasWeightAnchor = true;
+    session.lastAcceptedWeightG = weightG;
+    session.activePresetId = presetBank.activeId;
+    stopperState = StopperState::BREW;
+    schedulePendingShotFinalize(EndReason::ACTIVATOR, durationMs);
+    pendingShotFinalizeTask();
+  };
+  cycle(41, 30000, 36.0f);
+  cycle(42, 9000, 20.0f);
+  CHECK(shotLog.count() == 2 && persistedLastShot.cycleId == 42 &&
+        persistedLastGoodShot.cycleId == 41);
+  ShotLogRecord latest = {};
+  CHECK(copyHomeShot(latest, nullptr));
+  uint32_t bootId = 0;
+  PersistedLastShot last = {}, good = {};
+  HistoryRecord newestActivation = {};
+  bool hasNewestActivation = false;
+  CHECK(copyShotStoreStatus(bootId, last, good, newestActivation, hasNewestActivation, true));
+  CHECK(shotLogProjectLastShot(latest, last, good).cycleId == 41);
+}
+
 void s01n_bad_scale_cycles_are_stored_with_their_reason() {
   struct Case {
     uint32_t durationMs;
@@ -13521,9 +13553,9 @@ void s01n_bad_scale_cycles_are_stored_with_their_reason() {
   };
   const Case cases[] = {
       {11960, true, true, 30.0f, 0.0f, false,
-       "Shot stored as bad: short (11.96s, stop activator)"},
+       "Shot stored as bad: short (11.9s, yield 30.0g last_known, stop activator, zero 0.0g)"},
       {9000, true, true, 30.0f, 0.0f, true,
-       "Shot stored as bad: short (9.00s, stop activator)"},
+       "Shot stored as bad: short (9.0s, yield 30.0g last_known, stop activator, zero 0.0g)"},
       {12001, true, true, 1.5f, 0.0f, false,
        "Shot stored as bad: low_yield (12.0s, yield 1.5g last_known, stop "
        "activator, zero 0.0g)"},
@@ -13550,6 +13582,7 @@ void s01n_bad_scale_cycles_are_stored_with_their_reason() {
     shot.automaticBrew = sample.keepPending;
     stopperState = StopperState::BREW;
     schedulePendingShotFinalize(EndReason::ACTIVATOR, sample.durationMs);
+    CHECK(debugLogTextCount("Shot stored as bad") == 0);  // Said once stored.
     // Every cycle started with a scale is stored; without one, as before,
     // only a good one is (and none of these has a yield).
     CHECK(pendingFinalize.pending ==
@@ -20293,6 +20326,29 @@ void lt05_late_start_zero_keeps_the_coffee_already_weighed() {
   CHECK(fabsf(session.lastAcceptedWeightG - (keptG + 0.2f)) < 0.01f);
   CHECK(session.weightControlState == WeightControlState::ACTIVE);
   CHECK(session.firstDropMs == firstDropMs);
+
+  // Under a standing software zero the shot's end and a post-drip reading
+  // with no tail sample are both in shot coordinates, never cup plus coffee.
+  startShotWithLateZero(250.0f, false);
+  endBbwProtectionForTests();
+  const float threshold = effectiveStopThreshold();
+  for (float w = 0.5f; w < threshold - 0.5f; w += 0.5f) idleWeight(250.0f + w, 100);
+  idleWeight(250.0f + threshold + 0.1f, 100);
+  idleWeight(250.0f + threshold + 0.2f, 100);
+  loop();
+  CHECK(session.endReason == EndReason::SCALE_THRESHOLD);
+  CHECK(fabsf(homeCycleResult.currentWeightG - (threshold + 0.2f)) < 0.01f);
+  CHECK(pendingFinalize.pending && pendingFinalize.tailCount == 0);
+  hostMillis += pendingFinalize.dripDelayMs + 100U;
+  markScaleWorkerProgress();
+  currentWeight = 250.0f + threshold + 0.4f;
+  currentWeightReceivedAtMs = hostMillis;
+  ++currentWeightSequence;
+  pendingShotFinalizeTask();
+  ShotLogRecord saved[1] = {};
+  CHECK(shotLog.copyNewestFirst(saved, 1) == 1);
+  CHECK(saved[0].actualWeightSource == static_cast<uint8_t>(ActualWeightSource::POST_DRIP));
+  CHECK(fabsf(saved[0].actualWeightCg / 100.0f - (threshold + 0.4f)) < 0.02f);
 }
 
 void lt02_known_cup_lift_after_acknowledged_tare_stops() {
@@ -20390,7 +20446,11 @@ void lt04_negative_weight_suspends_until_the_cup_returns() {
   session.config.stopIfCupRemoved = false;
   for (int i = 1; i <= 10; ++i) idleWeight(0.5f * i, 100);
   CHECK(session.weightControlState == WeightControlState::ACTIVE);
-  for (int i = 0; i < 10; ++i) idleWeight(-15.0f, 100);
+  idleWeight(-15.0f, 100);
+  CHECK(debugEventExists(DebugCode::SCALE_SAMPLE_REJECTED_RANGE, weightToCentigrams(-15.0f),
+                         weightToCentigrams(-DEFAULT_MINIMUM_CUP_WEIGHT_G)));
+  CHECK(!debugEventExists(DebugCode::SCALE_SAMPLE_REJECTED_SLEW));
+  for (int i = 0; i < 9; ++i) idleWeight(-15.0f, 100);
   CHECK(session.active);
   CHECK(session.weightControlState == WeightControlState::SUSPENDED);
   CHECK(session.autoToManualGuardEnforced);
@@ -20405,6 +20465,67 @@ void lt04_negative_weight_suspends_until_the_cup_returns() {
   for (int i = 0; i < 4; ++i) idleWeight(5.5f, 100);
   CHECK(session.weightControlState == WeightControlState::ACTIVE);
   CHECK(!session.autoToManualGuardEnforced);
+}
+
+void lt07_unseen_cup_lift_in_the_window_is_undone_when_it_returns() {
+  // A lift of a cup the detector never saw reads like the late zero. Its
+  // return (cup plus the coffee it held) restores the software zero, so the
+  // cup neither cuts the shot nor becomes its yield, and the shot does not
+  // learn; a genuine late zero followed by coffee stays recognized, and a
+  // step that is not cup plus coffee is no return.
+  for (int variant = 0; variant < 3; ++variant) {
+    const bool lift = variant != 1;
+    startShotWithLateZero(250.0f, false);
+    for (float w : {250.35f, 250.40f, 250.45f}) idleWeight(w, 100);
+    const float keptG = session.lastAcceptedWeightG;
+    const float zeroG = session.softwareZeroG;
+    idleWeight(0.0f, 100);
+    idleWeight(0.0f, 100);
+    CHECK(debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+    while (retareWindowOpen()) idleWeight(lift ? 0.0f : keptG, 100);
+    endBbwProtectionForTests();
+    CHECK(session.calibrationEligible);
+    if (variant == 2) {
+      for (int i = 0; i < 6; ++i) idleWeight(zeroG + keptG + runtimeConfig.minimumCupWeightG, 100);
+      CHECK(!debugEventExists(DebugCode::SCALE_LATE_TARE_UNDONE));
+      CHECK(session.softwareZeroG == -keptG);
+      armPostTareBaselineWindow();  // A new tare forgets the dropped zero.
+      CHECK(session.lateTareDroppedZeroG == 0.0f);
+      continue;
+    }
+    if (lift) {
+      idleWeight(zeroG + keptG, 100);
+      CHECK(session.softwareZeroG == -keptG);
+      idleWeight(zeroG + keptG, 100);
+      CHECK(debugEventExists(DebugCode::SCALE_LATE_TARE_UNDONE));
+      CHECK(session.softwareZeroG == zeroG);
+      CHECK(!session.calibrationEligible);
+      for (int i = 0; i < 3; ++i) idleWeight(zeroG + keptG, 100);
+      CHECK(session.weightControlState == WeightControlState::ACTIVE);
+      CHECK(fabsf(session.lastAcceptedWeightG - keptG) < 0.01f);
+    }
+    const float rawZeroG = lift ? zeroG : -keptG;
+    const float threshold = effectiveStopThreshold();
+    for (float w = keptG + 0.5f; w < threshold - 0.5f; w += 0.5f) {
+      idleWeight(rawZeroG + w, 100);
+      loop();
+      CHECK(session.active);
+      CHECK(session.lastAcceptedWeightG < threshold);
+    }
+    CHECK(debugEventExists(DebugCode::SCALE_LATE_TARE_UNDONE) == lift);
+    idleWeight(rawZeroG + threshold + 0.1f, 100);
+    idleWeight(rawZeroG + threshold + 0.2f, 100);
+    loop();
+    CHECK(session.endReason == EndReason::SCALE_THRESHOLD);
+    for (int i = 0; i < 200 && pendingFinalize.pending; ++i) {
+      idleWeight(rawZeroG + threshold + 0.3f, 100);
+      pendingShotFinalizeTask();
+    }
+    ShotLogRecord saved[1] = {};
+    CHECK(shotLog.copyNewestFirst(saved, 1) == 1);
+    CHECK(saved[0].actualWeightSource == static_cast<uint8_t>(ActualWeightSource::POST_DRIP));
+    CHECK(fabsf(saved[0].actualWeightCg / 100.0f - threshold) < 1.0f);
+  }
 }
 
 // ---- Shot predictor (SAP) host tests ---------------------------------------
@@ -23873,21 +23994,23 @@ void tpw02_appends_wait_for_the_gate_and_resume_where_they_paused() {
   CHECK(poolTraceBytes(5, 7, 100000) == exported);
 }
 
-void tpw03_the_newest_trace_wins_and_drops_are_counted() {
+void tpw03_back_to_back_traces_are_both_saved_and_drops_are_counted() {
   freshShotTracePool();
   resetHarness(false, true);
   debugLog.clear();
   ringRetainLogLevel = LogLevel::INFO;
   serviceShotTracePool();
+  // A shot started in the previous drip delay: no worker pass in between.
   completePoolTestTrace(1, 7, 100000);
   completePoolTestTrace(2, 7, 200000);
+  CHECK(shotTrace().unsavedCount() == 2);
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 1 && poolTraceBytes(1, 7, 100000).empty() &&
-        !poolTraceBytes(2, 7, 200000).empty());
-  CHECK(shotTrace().tracesDropped() == 1 &&
-        debugLogTextCount("1 shot trace(s) not saved: a newer shot ended first") == 1);
-  // A newer shot ends while an append is paused (at its first erase; 8 KiB
-  // need one): that append is abandoned.
+  CHECK(shotTracePool().count() == 1 && !poolTraceBytes(1, 7, 100000).empty());
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 2 && !poolTraceBytes(2, 7, 200000).empty() &&
+        shotTrace().tracesDropped() == 0 && shotTrace().unsavedCount() == 0);
+  // A shot starts while an append is paused (at its first erase; 8 KiB need
+  // one): its buffer is the saved one, so the append resumes after it.
   completePoolTestTrace(3, 7, 300000, 900);
   PoolFlash::setEraseSpy([](size_t) { session.active = true; });
   serviceShotTracePool();
@@ -23896,12 +24019,53 @@ void tpw03_the_newest_trace_wins_and_drops_are_counted() {
   session.active = false;
   completePoolTestTrace(4, 7, 400000);
   serviceShotTracePool();
-  CHECK(!shotTracePool().appending() && shotTracePool().count() == 1);
-  CHECK(shotTracePool().lastError() == ShotTracePoolError::SOURCE);
+  CHECK(!shotTracePool().appending() && shotTracePool().count() == 3 &&
+        !poolTraceBytes(3, 7, 300000).empty());
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 2 && poolTraceBytes(3, 7, 300000).empty() &&
-        !poolTraceBytes(4, 7, 400000).empty() && shotTrace().tracesDropped() == 2);
+  CHECK(shotTracePool().count() == 4 && !poolTraceBytes(4, 7, 400000).empty() &&
+        shotTrace().tracesDropped() == 0);
+  // A capture that opens over an unsaved trace drops it, counted once; a
+  // stale consume of it changes nothing.
+  completePoolTestTrace(5, 7, 500000);
+  ShotTracePending pending = {};
+  uint8_t chunk[256];
+  CHECK(shotTrace().pendingPersist(pending, chunk, sizeof(chunk), false) &&
+        pending.shotLogId == 5);
+  completePoolTestTrace(6, 7, 600000);
+  CHECK(shotTrace().begin(700000) && shotTrace().tracesDropped() == 1);
+  shotTrace().complete(7, 7, 730000, static_cast<uint8_t>(EndReason::ACTIVATOR));
+  shotTrace().consume(pending.generation);
+  CHECK(shotTrace().unsavedCount() == 2 && shotTrace().tracesDropped() == 1);
+  serviceShotTracePool();
+  serviceShotTracePool();
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 6 && poolTraceBytes(5, 7, 500000).empty() &&
+        !poolTraceBytes(6, 7, 600000).empty() && !poolTraceBytes(7, 7, 730000).empty() &&
+        shotTrace().tracesDropped() == 1);
   CHECK(debugLogTextCount("Shot record save failed") == 0);
+  // Clear all while an append is in flight: its late consume changes nothing.
+  completePoolTestTrace(10, 7, 1000000);
+  CHECK(shotTrace().pendingPersist(pending, chunk, sizeof(chunk), false) &&
+        pending.shotLogId == 10);
+  shotTrace().consumeCompleted();
+  shotTrace().consume(pending.generation);
+  CHECK(shotTrace().unsavedCount() == 0 && shotTrace().tracesDropped() == 1);
+  // A discarded capture leaves nothing behind to drop.
+  completePoolTestTrace(11, 7, 1100000);
+  completePoolTestTrace(12, 7, 1200000);
+  CHECK(shotTrace().begin(1300000) && shotTrace().tracesDropped() == 2);
+  shotTrace().discard(static_cast<uint8_t>(EndReason::RINSE_COMPLETE), 1300100);
+  CHECK(!shotTrace().begin(1400000) && shotTrace().tracesDropped() == 2);
+  shotTrace().complete(14, 7, 1430000, static_cast<uint8_t>(EndReason::ACTIVATOR));
+  CHECK(shotTrace().unsavedCount() == 2);
+  // The control loop says so in the log when a shot overwrites one.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  debugLog.clear();
+  completePoolTestTrace(8, 7, hostMillis);
+  completePoolTestTrace(9, 7, hostMillis + 1U);
+  startCycle();
+  CHECK(debugLogTextCount("Shot trace of an earlier shot not saved: this shot started first") == 1);
 }
 
 void tpw04_failed_saves_retry_without_duplicates() {
@@ -23957,6 +24121,19 @@ void tpw05_an_interrupted_trace_is_saved_under_its_crashed_boot() {
   if (saved.size() >= sizeof(header)) memcpy(&header, saved.data(), sizeof(header));
   CHECK((header.flags & SHOT_TRACE_INTERRUPTED) != 0 && header.bootId == 41 &&
         header.shotLogId == 0 && header.eventCount == 1);
+  // Shots that end before the worker's first pass do not cost it: one is
+  // saved with it; of two, the newer is dropped, never the interrupted one.
+  for (int shots = 1; shots <= 2; ++shots) {
+    freshShotTracePool();
+    openTestTrace(1000, 41);
+    shotTrace().hostReset();
+    recoverShotTraceAtBoot(6);
+    for (int n = 1; n <= shots; ++n) completePoolTestTrace(n, 7, n * 100000U);
+    for (int pass = 0; pass < 3; ++pass) serviceShotTracePool();
+    CHECK(shotTracePool().count() == 2 && !poolTraceBytes(0, 41, 0).empty() &&
+          !poolTraceBytes(1, 7, 100000).empty() == (shots == 1) &&
+          shotTrace().tracesDropped() == static_cast<uint32_t>(shots - 1));
+  }
 }
 
 void tpw06_clear_all_clears_the_pool_before_the_shot_log() {
@@ -24008,6 +24185,19 @@ void tpw06_clear_all_clears_the_pool_before_the_shot_log() {
   // Cleared, and the trace that waited is saved in the same pass.
   CHECK(!shotTracePoolClearRequested.load() && shotTracePool().count() == 1 &&
         !poolTraceBytes(3, 7, 400000).empty() && poolTraceBytes(1, 7, 300000).empty());
+  // A clear all during a drip delay (a capture still open) waits for its end:
+  // the shot log persists, the pool sees no flash I/O until then.
+  CHECK(clearShotLog());
+  shotTrace().begin(hostMillis);
+  const size_t dripOps = PoolFlash::operations();
+  activationStores.capturePersistenceImage(*shotStorePersistImage);
+  shotStorePersistImageGeneration = shotStoreDirtyGeneration.load();
+  persistShotStoreImage();
+  CHECK(shotStorePersistResultOk && PoolFlash::operations() == dripOps &&
+        shotTracePoolClearRequested.load() && shotTracePool().count() == 1);
+  shotTrace().complete(0, 7, hostMillis, static_cast<uint8_t>(EndReason::ACTIVATOR));
+  landShotTracePoolClearForShotStores();
+  CHECK(!shotTracePoolClearRequested.load() && shotTracePool().count() == 0);
   releaseSettingsPersistenceWorkerForHost();
 }
 
@@ -24148,26 +24338,30 @@ void tpw09_each_stored_shot_is_one_record_with_its_curve() {
   CHECK(poolRecordHas(one, 100000, ShotTracePoolSection::CURVE) &&
         poolRecordHas(one, 100000, ShotTracePoolSection::TRACE));
   CHECK(poolTraceBytes(one, currentBootId(), 100000) == shot_trace_test::exportBytes());
-  // A shot whose trace a newer one replaced (newest wins) is saved with its
-  // curve alone, before the newer shot's record.
+  // Two shots stored before a worker pass each keep their own trace, oldest
+  // first; an older unsaved trace (shot 0) waits for the pending curves,
+  // and a capture opens over a saved buffer rather than over it.
+  completePoolTestTrace(0, currentBootId(), 150000);
   const uint32_t two = storePoolTestShot(200000);
-  const uint32_t three = storePoolTestShot(300000);
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 2 && shotCurves.pending() == 1);
-  CHECK(poolRecordHas(two, 200000, ShotTracePoolSection::CURVE) &&
-        !poolRecordHas(two, 200000, ShotTracePoolSection::TRACE));
+  CHECK(shotTracePool().count() == 2 && shotCurves.pending() == 0 &&
+        poolRecordHas(two, 200000, ShotTracePoolSection::CURVE) &&
+        poolRecordHas(two, 200000, ShotTracePoolSection::TRACE));
+  const uint32_t three = storePoolTestShot(300000);
   serviceShotTracePool();
   CHECK(shotTracePool().count() == 3 && shotCurves.pending() == 0 &&
         poolRecordHas(three, 300000, ShotTracePoolSection::CURVE) &&
-        poolRecordHas(three, 300000, ShotTracePoolSection::TRACE) &&
-        shotTrace().tracesDropped() == 1);
+        poolRecordHas(three, 300000, ShotTracePoolSection::TRACE));
+  serviceShotTracePool();
+  CHECK(shotTracePool().count() == 4 && shotTrace().tracesDropped() == 0 &&
+        poolRecordHas(0, 150000, ShotTracePoolSection::TRACE));
   // A shot stored without a trace gets its curve; a trace without a stored
   // shot (the log refused it) goes alone.
   const uint32_t four = storePoolTestShot(400000, false);
   completePoolTestTrace(0, currentBootId(), 450000);
   serviceShotTracePool();
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 5 && shotCurves.pending() == 0 &&
+  CHECK(shotTracePool().count() == 6 && shotCurves.pending() == 0 &&
         poolRecordHas(four, 400000, ShotTracePoolSection::CURVE) &&
         !poolRecordHas(four, 400000, ShotTracePoolSection::TRACE) &&
         poolRecordHas(0, 450000, ShotTracePoolSection::TRACE) &&
@@ -24182,10 +24376,10 @@ void tpw09_each_stored_shot_is_one_record_with_its_curve() {
   };
   serviceShotTracePool();
   TaskMutex::hostObserver = nullptr;
-  CHECK(shotTracePool().count() == 5 && shotCurves.pending() == 1 && shotTrace().capturing());
+  CHECK(shotTracePool().count() == 6 && shotCurves.pending() == 1 && shotTrace().capturing());
   shotTrace().complete(six, currentBootId(), 600000, 1);
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 6 && shotCurves.pending() == 0 &&
+  CHECK(shotTracePool().count() == 7 && shotCurves.pending() == 0 &&
         poolRecordHas(six, 600000, ShotTracePoolSection::CURVE) &&
         poolRecordHas(six, 600000, ShotTracePoolSection::TRACE));
   // A deleted shot's pending curve is never written, nor one whose summary
@@ -24199,7 +24393,7 @@ void tpw09_each_stored_shot_is_one_record_with_its_curve() {
     CHECK(shotLog.removeById(seven, false) && shotCurves.pending() == 2);
   }
   serviceShotTracePool();
-  CHECK(shotTracePool().count() == 7 && shotCurves.pending() == 0 &&
+  CHECK(shotTracePool().count() == 8 && shotCurves.pending() == 0 &&
         poolRecordHas(eight, 800000, ShotTracePoolSection::CURVE) &&
         !poolRecordHas(seven, 700000, ShotTracePoolSection::CURVE));
   CHECK(deleteShotRecord(eight));
@@ -24564,8 +24758,19 @@ void tpw18_an_interrupted_trace_downloads_by_its_crashed_boot() {
         (decoded.header.flags & SHOT_TRACE_INTERRUPTED) != 0 && decoded.header.bootId == 41);
   ShotStorageStats storage;
   CHECK(copyShotStorage(storage, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND && storage.interrupted == 1 &&
-        storage.interruptedListed == 1 && storage.interruptedBoots[0] == 41 &&
-        storage.traceOnly == 0 && storage.traces == 1);
+        storage.orphansListed == 1 && storage.orphans[0].bootId == 41 &&
+        storage.orphans[0].endedAtMs == 0 && storage.traceOnly == 0 && storage.traces == 1);
+  // A refused shot's trace is listed too, by its boot and end, newest first;
+  // the list stops at 16 while the counts keep every one.
+  for (uint32_t n = 1; n <= 17; ++n) {
+    completePoolTestTrace(0, currentBootId(), n * 1000000U);
+    serviceShotTracePool();
+  }
+  CHECK(downloadTrace(0, 17000000, download, 0, currentBootId()) == ShotTraceRead::FOUND);
+  CHECK(copyShotStorage(storage, storageTags, SHOT_LOG_CAPACITY) == ShotTraceRead::FOUND &&
+        storage.interrupted == 1 && storage.traceOnly == 17 && storage.orphansListed == 16 &&
+        storage.orphans[0].bootId == currentBootId() && storage.orphans[0].endedAtMs == 17000000 &&
+        storage.orphans[15].endedAtMs == 2000000);
 }
 
 void tpw19_shot_storage_splits_the_pool_by_what_its_records_hold() {
@@ -24921,6 +25126,7 @@ const TestCase testCases[] = {
     {"LT04", lt04_negative_weight_suspends_until_the_cup_returns},
     {"LT05", lt05_late_start_zero_keeps_the_coffee_already_weighed},
     {"LT06", lt06_late_zero_outside_its_window_is_not_a_tare},
+    {"LT07", lt07_unseen_cup_lift_in_the_window_is_undone_when_it_returns},
     {"SP01", sp01_phi_table_matches_erf},
     {"SP02", sp02_isqrt_exact_on_squares},
     {"SP03", sp03_plateau_flow_median},
@@ -25364,6 +25570,7 @@ const TestCase testCases[] = {
     {"S01o", s01o_bad_shots_feed_no_statistic_or_learning_input},
     {"S01p", s01p_bad_cycles_never_train_and_no_scale_keeps_its_rule},
     {"S01q", s01q_overflow_yield_and_new_coffee_keep_bad_shots_out},
+    {"S01r", s01r_a_bad_cycle_never_becomes_the_last_good_shot},
     {"TRC01", trc01_scale_shot_is_traced_from_cycle_start_to_drip_finalize},
     {"TRC02", trc02_rinses_abandoned_starts_and_no_scale_cycles_leave_no_trace},
     {"TRC03", trc03_end_counters_are_exact},
@@ -25391,7 +25598,7 @@ const TestCase testCases[] = {
     {"TRC25", trc25_the_web_ui_trace_fixture_is_a_real_trace},
     {"TPW01", tpw01_a_finished_shot_is_saved_once_after_the_shot_and_linked},
     {"TPW02", tpw02_appends_wait_for_the_gate_and_resume_where_they_paused},
-    {"TPW03", tpw03_the_newest_trace_wins_and_drops_are_counted},
+    {"TPW03", tpw03_back_to_back_traces_are_both_saved_and_drops_are_counted},
     {"TPW04", tpw04_failed_saves_retry_without_duplicates},
     {"TPW05", tpw05_an_interrupted_trace_is_saved_under_its_crashed_boot},
     {"TPW06", tpw06_clear_all_clears_the_pool_before_the_shot_log},

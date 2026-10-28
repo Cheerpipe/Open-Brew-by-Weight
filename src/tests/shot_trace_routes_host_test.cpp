@@ -11,6 +11,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using esp_err_t = int;
@@ -230,23 +231,17 @@ void withoutAQueryTheNewestTraceComesFromRam() {
         r.headers.at("Content-Disposition").find("attachment") == 0);
 }
 
-// Every list holds exactly the numbers in use: a kind, code or reason
-// appended without moving its count would be named past the count.
+// Every list holds exactly the numbers in use (each *_COUNT is
+// static_asserted next to its name table).
 void theVocabularyNamesEveryNumber() {
-  CHECK(strcmp(scaleProfileEventName(static_cast<ScaleProfileEvent>(SCALE_PROFILE_EVENT_COUNT)),
-               "UNKNOWN") == 0);
-  CHECK(strcmp(scaleProfileEventName(static_cast<ScaleProfileEvent>(SCALE_PROFILE_EVENT_COUNT - 1)),
-               "UNKNOWN") != 0);
-  CHECK(strcmp(debugCodeName(static_cast<DebugCode>(DEBUG_CODE_COUNT)), "unknown") == 0);
-  CHECK(strcmp(debugCodeName(static_cast<DebugCode>(DEBUG_CODE_COUNT - 1)), "unknown") != 0);
-  CHECK(findEndReasonLabel(static_cast<EndReason>(END_REASON_COUNT)) == nullptr &&
-        findEndReasonLabel(static_cast<EndReason>(END_REASON_COUNT - 1)) != nullptr);
-  CHECK(strcmp(actualWeightSourceName(static_cast<ActualWeightSource>(ACTUAL_WEIGHT_SOURCE_COUNT)),
-               "unknown") == 0);
   httpd_req_t r;
-  r.query = "v=abc";
+  r.query = "fw=1.1.0%2Babc1234";
   CHECK(OpenBrewByWeightNetwork::shotTraceVocabularyHandler(&r) == ESP_OK && r.ended);
-  CHECK(r.headers.at("Cache-Control") == "private, max-age=31536000, immutable");
+  // Kept for good only under an identity no other build shares.
+  const std::string id(FW_VERSION);
+  const bool unique = id.find("-dirty") == id.npos && id.find("+unknown") == id.npos;
+  CHECK(r.headers.at("Cache-Control") ==
+        (unique ? "private, max-age=31536000, immutable" : "no-cache"));
   const auto list = [&](const std::string &key) {
     const size_t at = r.body.find("\"" + key + "\":[");
     const size_t end = r.body.find(']', at);
@@ -272,9 +267,9 @@ void shotStorageIsOneJsonObject() {
   fakeStorage.poolBytes = 5476352;
   fakeStorage.good = 7;
   fakeStorage.interrupted = 5;
-  fakeStorage.interruptedListed = 2;
-  fakeStorage.interruptedBoots[0] = 41;
-  fakeStorage.interruptedBoots[1] = 40;
+  fakeStorage.orphansListed = 2;
+  fakeStorage.orphans[0] = {41, 0};
+  fakeStorage.orphans[1] = {40, 52000};
   fakeStorage.sinceLocalSec = 1792840364;
   httpd_req_t r;
   CHECK(OpenBrewByWeightNetwork::shotStorageHandler(&r) == ESP_OK && r.status == "200");
@@ -282,7 +277,8 @@ void shotStorageIsOneJsonObject() {
   CHECK(r.body.find("\"good\":7,") != std::string::npos &&
         r.body.find("\"sinceLocalSec\":1792840364,") != std::string::npos &&
         r.body.find("\"interrupted\":5,") != std::string::npos);
-  CHECK(r.body.find("\"shotCapacity\":1000,\"interruptedBoots\":[41,40]}") != std::string::npos);
+  CHECK(r.body.find("\"shotCapacity\":1000,\"orphanTraces\":[{\"boot\":41,\"end\":0},"
+                    "{\"boot\":40,\"end\":52000}]}") != std::string::npos);
   fakeStorageResult = ShotTraceRead::BUSY;
   httpd_req_t busy;
   (void)OpenBrewByWeightNetwork::shotStorageHandler(&busy);

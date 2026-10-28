@@ -138,7 +138,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     const bool hasLastShot = self.callbacks_.copyHomeShot != nullptr &&
         self.callbacks_.copyHomeShot(latestShot, nullptr);
     const PersistedLastShot shot = hasLastShot
-        ? shotLogProjectLastShot(latestShot, control.lastShot)
+        ? shotLogProjectLastShot(latestShot, control.lastShot, control.lastGoodShot)
         : PersistedLastShot{};
     const bool lastShotOk = buildIntegrationLastShot(
         shot, hasLastShot ? shotLogStopDetailName(

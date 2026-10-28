@@ -4,14 +4,15 @@
 // The worker's first idle pass with the write gate open recovers the pool;
 // until then it reports not ready and nothing reads or writes it. Each idle
 // pass then lands a requested clear, loads the curve cache back after boot,
-// and appends one record per stored shot: its curve and, when it is the
-// newest completed one, its trace (a trace without a stored shot goes
-// alone). Appends run one flash operation per step and return as soon as a
-// shot or a maintenance lease closes the gate; the next pass resumes them.
-// The trace is copied by generation, so a newer completion abandons the
-// append (newest wins) instead of mixing two shots. A record being written
-// when power is lost is lost. Factory reset clears the pool under the same
-// writer mutex; control takes neither lock. Format: docs/SHOT_TRACE.md.
+// and appends one record per stored shot: its curve and its trace while that
+// waits in one of the two RAM buffers (a trace without a stored shot goes
+// alone, after the pending curves). Appends run one flash operation per step
+// and return as soon as a shot or a maintenance lease closes the gate; the
+// next pass resumes them. The trace is copied by generation, so a capture
+// opened over its buffer abandons the append instead of mixing two shots. A
+// record being written when power is lost is lost. Factory reset clears the
+// pool under the same writer mutex; control takes neither lock. Format:
+// docs/SHOT_TRACE.md.
 
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS ShotTracePoolIndex shotTracePoolIndex;
 // The legacy curve store is retired: the ring owns all of shotcurve but its
@@ -45,7 +46,7 @@ union ShotCurveStaging {
   ShotCurveRecord curve;
 };
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS ShotCurveStaging shotCurveStaging;
-// The pending trace's CRC pass, off the worker's 4 KiB stack.
+// The pending trace's CRC pass, off the worker's 5,120 B stack.
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS uint8_t shotTraceCrcChunk[256];
 
 // Worker-owned; the trace source reads `pending` and the curve source the
@@ -128,11 +129,13 @@ bool recoverShotTracePool() {
 }
 
 // Writer mutex held. Returns whether no clear is pending. A pool that cannot
-// be recovered or cleared never holds the shot log back: the request stays
+// be recovered or cleared, or a capture open (no pool flash I/O during a
+// shot or its drip), never holds the shot log back: the request stays
 // pending (and appends wait for it), and the record identity keeps old
 // records apart from reused shot ids meanwhile.
 bool landShotTracePoolClear() {
   if (!shotTracePoolClearRequested.load(std::memory_order_acquire)) return true;
+  if (shotTrace().capturing()) return false;
   ShotTracePool &pool = shotTracePool();
   if ((!pool.ready() && !recoverShotTracePool()) || shotTracePoolBackingOff()) return false;
   const bool cleared = pool.clear();
@@ -181,14 +184,6 @@ bool shotCurvesSavePending() {
          (pool.ready() || pool.lastError() == ShotTracePoolError::NONE);
 }
 
-void noteShotTraceConsumed(uint32_t generation) {
-  const uint32_t dropped = shotTrace().consume(generation);
-  if (dropped != 0)
-    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SYSTEM,
-                         "%lu shot trace(s) not saved: a newer shot ended first",
-                         static_cast<unsigned long>(dropped));
-}
-
 // The record is on flash, or given up: its curve stops pending (unless a
 // clear came in between) and its trace is consumed.
 void retireShotRecord() {
@@ -197,15 +192,15 @@ void retireShotRecord() {
     TaskLockGuard lock(shotStoreMutex);
     if (shotCurves.generation() == state.curveGeneration) shotCurves.markSaved(state.curveId);
   }
-  if (state.hasTrace) noteShotTraceConsumed(state.pending.generation);
+  if (state.hasTrace) shotTrace().consume(state.pending.generation);
 }
 
 // Stages the next record: the oldest curve not in the pool yet, joined by
-// its shot's trace when that is the newest completed one; else that trace
-// alone. A curve is stored at finalize while its shot's capture is open, and
-// the trace completes right after: with no capture open under the store
-// lock, the trace of every curve seen here is already completed (or never
-// will be), so a curve never leaves without a trace that could join it.
+// its shot's trace while that is unsaved in RAM; else the oldest unsaved
+// trace alone. A curve is stored at finalize while its shot's capture is
+// open, and the trace completes right after: with no capture open under the
+// store lock, the trace of every curve seen here is already completed (or
+// never will be), so a curve never leaves without a trace that could join it.
 bool stageShotRecord() {
   ShotTracePersistState &state = shotTracePersist;
   ShotTracePoolIdentity id = {};
@@ -225,13 +220,13 @@ bool stageShotRecord() {
       state.curveGeneration = shotCurves.generation();
     }
   }
-  const ShotTracePending &pending = state.pending;
-  const bool trace =
-      shotTrace().pendingPersist(state.pending, shotTraceCrcChunk, sizeof(shotTraceCrcChunk));
-  state.hasTrace = trace && (curveBytes == 0 || (pending.shotLogId == id.shotId &&
-                                                 pending.bootId == id.bootId &&
-                                                 pending.endedAtMs == id.endedAtMs));
-  if (curveBytes == 0 && !trace) return false;
+  ShotTracePending &pending = state.pending;
+  pending.shotLogId = id.shotId;
+  pending.bootId = id.bootId;
+  pending.endedAtMs = id.endedAtMs;
+  state.hasTrace = shotTrace().pendingPersist(pending, shotTraceCrcChunk,
+                                              sizeof(shotTraceCrcChunk), curveBytes != 0);
+  if (curveBytes == 0 && !state.hasTrace) return false;
   // A shot that ended after the cache was read: its curve goes first, with
   // this trace, on the next pass (a trace-only record would make contains()
   // skip that curve).
@@ -279,8 +274,8 @@ void finishShotRecordAppend(bool committed) {
     retireShotRecord();
     return;
   }
-  // A newer shot ended meanwhile: it is next, and this trace counts as
-  // dropped (its curve goes alone). A busy flash lock is retried later
+  // A capture opened over the trace's buffer (begin() counted it dropped):
+  // the next record is staged afresh. A busy flash lock is retried later
   // without costing an attempt.
   const ShotTracePoolError error = shotTracePool().lastError();
   if (error == ShotTracePoolError::SOURCE || error == ShotTracePoolError::LOCK) return;
@@ -412,10 +407,7 @@ ShotTracePoolStatus openShotTraceRecord(uint32_t shotId, uint32_t bootId, uint32
 // A stored shot whose record the worker has not written yet: its curve is
 // in the cache's pending (newest) suffix, or its trace is the unsaved one.
 bool shotRecordPending(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs) {
-  uint32_t traceShot = 0, traceBoot = 0, traceEnd = 0;
-  if (shotTrace().unsaved(traceShot, traceBoot, traceEnd) && traceShot == shotId &&
-      traceBoot == bootId && traceEnd == endedAtMs)
-    return true;
+  if (shotTrace().unsaved(shotId, bootId, endedAtMs)) return true;
   TaskLockGuard lock(shotStoreMutex);
   const ShotCurveRecord *oldest = shotCurves.oldestPending();
   return shotId != 0 && oldest != nullptr && shotId >= oldest->shotId;
@@ -551,10 +543,9 @@ ShotTraceRead copyShotStorage(ShotStorageStats &out, uint32_t *tags, size_t capa
   out.records = stats.records;
   out.meanRecordBytes = stats.meanRecordBytes;
   out.droppedRecords = stats.droppedRecords;
-  uint32_t shot = 0, boot = 0, ended = 0;
-  out.pendingTraces = shotTrace().unsaved(shot, boot, ended) ? 1U : 0U;
+  out.pendingTraces = shotTrace().unsavedCount();
   out.tracesDropped = shotTrace().tracesDropped();
-  for (size_t n = out.records; n-- != 0;) {  // Newest first, for the interrupted list.
+  for (size_t n = out.records; n-- != 0;) {  // Newest first, for the orphan list.
     if (!shotTracePoolGateOpen()) return ShotTraceRead::BUSY;
     if (n % 64U == 0) yieldFlashIo();
     ShotTracePoolRef ref;
@@ -573,9 +564,10 @@ ShotTraceRead copyShotStorage(ShotStorageStats &out, uint32_t *tags, size_t capa
       ++out.traces;
       if (flags & (SHOT_TRACE_VERBOSE_TRUNCATED | SHOT_TRACE_DECISIONS_TRUNCATED)) ++out.truncated;
     }
-    if (h.shotId == 0 && h.endedAtMs != 0) ++out.traceOnly;
-    if (h.shotId == 0 && h.endedAtMs == 0 && out.interrupted++ < 4U)
-      out.interruptedBoots[out.interruptedListed++] = h.bootId;
+    if (h.shotId != 0) continue;
+    ++(h.endedAtMs != 0 ? out.traceOnly : out.interrupted);
+    if (out.orphansListed < sizeof(out.orphans) / sizeof(out.orphans[0]))
+      out.orphans[out.orphansListed++] = {h.bootId, h.endedAtMs};
   }
   return ShotTraceRead::FOUND;
 }

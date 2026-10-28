@@ -1,7 +1,7 @@
 # Name,   Type, SubType, Offset,  Size, Flags
 #
 # Layout for 16 MiB flash. Data stores sit contiguously after app1; the
-# `reserved` partition is unused space kept for future firmware. Every store
+# `reserved` partition stores the shot pool together with `shotcurve`. Every store
 # is opened by label. The table cannot change by OTA: any other installed
 # table requires a USB installation with --erase-all.
 # nvs is 0x65000 (101 pages) for settings headroom. The two 3.5 MiB OTA app

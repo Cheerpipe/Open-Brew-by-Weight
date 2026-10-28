@@ -1148,6 +1148,12 @@ const saveFile = (blob, name) => R.saveFile(blob, "openbrewbyweight-" + name);
 // Shot storage: read when its section opens, never polled (the firmware
 // walks every stored record for it), and refused while a shot runs.
 let shotStorageBusy = false;
+// Opened during a shot (or its drip), the section reads itself once it ends;
+// the wait looks at Home's state only, no request.
+function loadShotStorageAfterShot() {
+  if (R.shotRunning()) setTimeout(loadShotStorageAfterShot, 1000);
+  else loadShotStorage();
+}
 async function loadShotStorage() {
   if (shotStorageBusy || !$("shotStorage").open) return;
   shotStorageBusy = true;
@@ -1159,6 +1165,8 @@ async function loadShotStorage() {
       s.ready ? null : __WEBUI_TEXT__("diagnostic.shot_storage_not_ready"),
     );
   } catch (e) {
+    renderShotStorage(null);
+    if (e.code === "SHOT_STORAGE_BUSY" && R.shotRunning()) loadShotStorageAfterShot();
     R.setEmptyState(
       "shotStorageState",
       e.code !== "SHOT_STORAGE_BUSY"
@@ -1171,7 +1179,13 @@ async function loadShotStorage() {
     shotStorageBusy = false;
   }
 }
+// Without an answer (null) every figure goes back to "—".
 function renderShotStorage(s) {
+  if (!s) {
+    for (const e of $("shotStorage").querySelectorAll(".metric > div")) e.textContent = "—";
+    $("ssOrphansRow").hidden = true;
+    return;
+  }
   const size = (n) =>
       n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : (n / 1024).toFixed(1) + " KB",
     none = __WEBUI_TEXT__("diagnostic.none"),
@@ -1220,24 +1234,33 @@ function renderShotStorage(s) {
   );
   t("ssNotSaved", s.tracesDropped ? String(s.tracesDropped) : none);
   t("ssError", s.lastError === "none" ? none : s.lastError);
-  $("ssInterruptedRow").hidden = !s.interruptedBoots.length;
-  $("ssInterrupted").replaceChildren(
-    ...s.interruptedBoots.map((boot) => {
+  // Traces without a shot, newest first; the firmware lists at most 16.
+  const more = s.traceOnly + s.interrupted - s.orphanTraces.length;
+  $("ssOrphansRow").hidden = !s.orphanTraces.length;
+  $("ssOrphans").replaceChildren(
+    ...s.orphanTraces.map(({ boot, end }) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "inlineAction";
-      b.textContent = R.sub(__WEBUI_TEXT__("diagnostic.shot_storage_boot"), [boot]);
-      b.onclick = () => downloadInterruptedTrace(boot);
+      b.textContent = R.sub(
+        end
+          ? __WEBUI_TEXT__("diagnostic.shot_storage_orphan_refused")
+          : __WEBUI_TEXT__("diagnostic.shot_storage_orphan_interrupted"),
+        [boot],
+      );
+      b.onclick = () => downloadOrphanTrace(boot, end);
       return b;
     }),
+    ...(more > 0 ? [R.sub(__WEBUI_TEXT__("diagnostic.shot_storage_orphans_more"), [more])] : []),
   );
 }
-// An interrupted trace has no shot: it is reached by the boot that crashed.
-function downloadInterruptedTrace(boot) {
-  R.fetchShotTrace({ id: 0, bootId: boot, endedAtMs: 0 }).then(
+// A trace without a shot is reached by its boot and end time: 0 when a
+// restart interrupted it, the shot's end when the history refused the shot.
+function downloadOrphanTrace(boot, end) {
+  R.fetchShotTrace({ id: 0, bootId: boot, endedAtMs: end }).then(
     (data) =>
       data
-        ? saveFile(new Blob([data]), `shot-trace-boot-${boot}.bin`)
+        ? saveFile(new Blob([data]), `shot-trace-boot-${boot}${end ? "-" + end : ""}.bin`)
         : R.message(__WEBUI_TEXT__("stats.trace_none")),
     (e) =>
       R.message(

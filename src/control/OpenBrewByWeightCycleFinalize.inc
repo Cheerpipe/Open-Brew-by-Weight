@@ -44,27 +44,17 @@ void captureLateTareCompletion(uint32_t throughMs = millis()) {
 }
 
 // Field diagnostics: a brew cycle started with a scale is always stored, and
-// one stored as a bad shot says why. A cycle without a scale is stored only
-// when good, so it leaves no line.
-void logBadShotShort(EndReason reason, uint32_t durationMs) {
-  if (!session.startedWithScale) return;
-  serialTraceCategoryf(
-      LogLevel::INFO, DebugCategory::STATE, "Shot stored as bad: short (%.2fs, stop %s)",
-      static_cast<double>(durationMs) / 1000.0,
-      shotLogStopDetailName(shotLogStopDetailFromEndReason(
-          reason, session.config.fastSideEnabled, session.extractionExtended)));
-}
-
-void logBadShotYield(const PendingShotFinalize &snapshot, float weightG,
-                     bool valid, ActualWeightSource source) {
-  if (!snapshot.startedWithScale) return;
+// one stored as a bad shot says why, once its record exists. A cycle without
+// a scale is stored only when good, so it leaves no line.
+void logBadShot(const PendingShotFinalize &snapshot, float weightG, bool valid,
+                ActualWeightSource source) {
   // Same reason the stored record reads: a yield it cannot hold is missing.
   const bool measured = valid && std::isfinite(weightG);
   const bool stored = measured && !shotLogWeightIsMissing(shotLogWeightToCentigrams(weightG));
   serialTraceCategoryf(
       LogLevel::INFO, DebugCategory::STATE,
       "Shot stored as bad: %s (%.1fs, yield %.1fg %s, stop %s, zero %.1fg)",
-      stored ? "low_yield" : "no_yield",
+      !snapshot.logEligible ? "short" : stored ? "low_yield" : "no_yield",
       static_cast<double>(snapshot.durationDs) / 10.0,
       static_cast<double>(measured ? weightG : 0.0f),
       actualWeightSourceName(source),
@@ -88,7 +78,6 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   }
   sessionQuickSettings.shotEnded = sessionQuickSettings.mask != 0;
   const bool logEligible = shotLogEligible(reason, durationMs);
-  if (!logEligible) logBadShotShort(reason, durationMs);
   const bool offsetAnalysis = shot.automaticBrew && !session.config.timerOnly &&
                               session.calibrationEligible;
   bool webhookEligible = false;
@@ -354,7 +343,7 @@ PersistedLastShot lastShotFromEndedCycle(EndReason reason, uint32_t durationMs,
     last.hasWallTime = 1;
   }
   last.weightValid = endedCycleWeightValid();
-  last.currentWeightG = last.weightValid ? currentWeight : 0.0f;
+  last.currentWeightG = last.weightValid ? currentWeight - session.softwareZeroG : 0.0f;
   const bool lastAcceptedValid =
       session.hasWeightAnchor && std::isfinite(session.lastAcceptedWeightG);
   if (lastAcceptedValid &&
@@ -554,7 +543,7 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
   if (good && persistedLastShot.valid && persistedLastShot.cycleId == snapshot.cycleId) {
     PersistedLastShot linked = persistedLastShot;
     linked.shotLogId = newId;
-    lastShotStore.advance(linked, runtimeConfig.bbwProtectionMs);
+    lastShotStore.advance(linked);
     lastShotNvsDirty = true;
   }
   if (snapshot.curve.count > 0) {
@@ -695,8 +684,7 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
   uint32_t shotLogId = 0;
   if ((good || snapshot.startedWithScale) && !pendingFinalizeIsRinse(snapshot))
     shotLogId = commitPendingShotLog(snapshot, weightG, valid, source);
-  if (!good && snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
-    logBadShotYield(snapshot, weightG, valid, source);
+  if (!good && shotLogId != 0) logBadShot(snapshot, weightG, valid, source);
   completeShotTrace(snapshot, shotLogId, weightG, valid, source);
   queueWebhookEnd(snapshot, weightG, valid);
 }
@@ -715,7 +703,8 @@ void pendingShotFinalizeTask() {
   snapshot = pendingFinalize;
   pendingFinalize.pending = false;
 
-  const float finalWeightG = postStopFinalWeightG(snapshot, currentWeight);
+  const float finalWeightG =
+      postStopFinalWeightG(snapshot, currentWeight - snapshot.softwareZeroG);
   bool postDripWeightValid = false;
   if (scaleAvailable() && std::isfinite(currentWeight) &&
       currentWeightSequence != snapshot.endedWeightSequence &&
@@ -769,8 +758,7 @@ void pendingShotFinalizeTask() {
   uint32_t shotLogId = 0;
   if ((good || snapshot.startedWithScale) && !pendingFinalizeIsRinse(snapshot))
     shotLogId = commitPendingShotLog(snapshot, logWeightG, logWeightValid, weightSource);
-  if (!good && snapshot.logEligible && !pendingFinalizeIsRinse(snapshot))
-    logBadShotYield(snapshot, logWeightG, logWeightValid, weightSource);
+  if (!good && shotLogId != 0) logBadShot(snapshot, logWeightG, logWeightValid, weightSource);
   completeShotTrace(snapshot, shotLogId, logWeightG, logWeightValid, weightSource);
   queueWebhookEnd(snapshot, logWeightG, logWeightValid);
 

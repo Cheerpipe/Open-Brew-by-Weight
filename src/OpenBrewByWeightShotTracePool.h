@@ -10,9 +10,10 @@
 //       next 4 KiB sector before using it, and the records that start there
 //       are gone. On-flash format and recovery: docs/SHOT_TRACE.md.
 //
-// OWNERSHIP: the settings_persist worker recovers, appends and clears, one
-//       flash operation per step, and only outside a shot (its caller's
-//       gate). Readers look the RAM index up under the pool's leaf mutex,
+// OWNERSHIP: the settings_persist worker recovers, clears and appends (one
+//       flash operation per append step), only outside a shot (its
+//       caller's gate); a factory reset clears and recovers it under the
+//       same writer mutex. Readers look the RAM index up under the pool's leaf mutex,
 //       release it, read flash under the flash I/O lock and revalidate the
 //       record after every chunk, so a recycled sector is reported as GONE.
 //       The control loop takes neither lock.
@@ -27,6 +28,8 @@
 #include <string.h>
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+#include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #else
 #include <esp_partition.h>
@@ -182,7 +185,8 @@ struct ShotTracePoolStats {
 // an erase leaves each byte unerased, erased or with a random subset of its
 // bits set. A transient failure tears that one operation and goes on.
 // A read hook runs once, before the next read, as a concurrent writer would;
-// an erase spy sees every erase before it happens.
+// an erase spy sees every erase before it happens. A read or program that
+// leaves its 4 KiB sector aborts the test (no flash call may span sectors).
 class ShotTracePoolHostFlash {
  public:
   static constexpr size_t kSectors = SHOT_TRACE_POOL_RESERVED_SECTORS +
@@ -221,11 +225,13 @@ class ShotTracePoolHostFlash {
       hook();
     }
     if (readsFail_) return false;
+    inSector(physical, offset, bytes);
     std::lock_guard<std::mutex> lock(mutex_);
     memcpy(out, sector(physical) + offset, bytes);
     return true;
   }
   static bool program(size_t physical, size_t offset, const uint8_t *in, size_t bytes) {
+    inSector(physical, offset, bytes);
     std::lock_guard<std::mutex> lock(mutex_);
     uint8_t *at = sector(physical) + offset;
     size_t landed = bytes;
@@ -265,6 +271,14 @@ class ShotTracePoolHostFlash {
   }
 
  private:
+  static void inSector(size_t physical, size_t offset, size_t bytes) {
+    if (physical < kSectors && offset <= SHOT_TRACE_POOL_SECTOR_BYTES &&
+        bytes <= SHOT_TRACE_POOL_SECTOR_BYTES - offset)
+      return;
+    fprintf(stderr, "flash call spans sectors: sector %zu offset %zu bytes %zu\n", physical,
+            offset, bytes);
+    abort();
+  }
   static bool operate(size_t physical) {
     ++operations_;
     ++touched_[physical];
@@ -369,7 +383,7 @@ class ShotTracePool {
       return false;
     }
     total = (total + SHOT_TRACE_POOL_RECORD_ALIGN - 1U) & ~(SHOT_TRACE_POOL_RECORD_ALIGN - 1U);
-    memcpy(sources_, sources, count * sizeof(*sources));
+    if (count != 0) memcpy(sources_, sources, count * sizeof(*sources));
     sourceCount_ = count;
     header_ = {kRecordMagic, static_cast<uint8_t>(SHOT_TRACE_POOL_FORMAT_VERSION),
                id.endReason, static_cast<uint16_t>(total), id.shotId, id.bootId,
@@ -398,10 +412,8 @@ class ShotTracePool {
 
   FlashStoreStepResult appendStep(uint32_t timeoutMs = FLASH_IO_LOCK_TIMEOUT_MS) {
     if (op_ != Op::APPEND) return FlashStoreStepResult::FAILED;
-    if (!tryLockFlashIo(timeoutMs)) {
-      op_ = Op::IDLE;
-      return fail(ShotTracePoolError::LOCK), FlashStoreStepResult::FAILED;
-    }
+    // Nothing done: the append stays staged and the next step resumes it.
+    if (!tryLockFlashIo(timeoutMs)) return fail(ShotTracePoolError::LOCK), FlashStoreStepResult::FAILED;
     bool ok;
     ShotTracePoolError error = ShotTracePoolError::PROGRAM;
     if (needErase_) {
@@ -565,6 +577,7 @@ class ShotTracePool {
       if (status != ShotTracePoolStatus::OK) return status;
       if (section.tag == static_cast<uint8_t>(ShotTracePoolSection::END)) break;
       at += sizeof(section);
+      if (at + section.bytes > ref.bytes) return ShotTracePoolStatus::CORRUPT;
       if (section.tag == static_cast<uint8_t>(tag)) {
         offset = at;
         bytes = section.bytes;
@@ -869,7 +882,7 @@ class ShotTracePool {
     }
     return true;
   }
-  // A small chunk and its own frame: the walk runs deep on the 4 KiB
+  // A small chunk and its own frame: the walk runs deep on the 5,120 B
   // settings_persist stack (stack-depth gate).
   [[gnu::noinline]] bool headTailBlank(size_t head, size_t from) {
     uint8_t chunk[64];

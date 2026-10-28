@@ -161,10 +161,14 @@ esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request
 
 // The names the Web UI shows for the trace's kinds, codes, signals and end
 // reasons, by number. They change only with the firmware, so the Web UI asks
-// with its asset tag in the query and the answer is kept.
+// with the firmware identity in the query and the answer is kept; a build
+// whose identity is not unique (uncommitted changes, no Git) is revalidated.
 esp_err_t OpenBrewByWeightNetwork::shotTraceVocabularyHandler(httpd_req_t *request) {
   httpd_resp_set_type(request, JSON_CONTENT_TYPE);
-  httpd_resp_set_hdr(request, "Cache-Control", "private, max-age=31536000, immutable");
+  const std::string_view id(FW_VERSION);
+  const bool unique = id.find("-dirty") == id.npos && id.find("+unknown") == id.npos;
+  httpd_resp_set_hdr(request, "Cache-Control",
+                     unique ? "private, max-age=31536000, immutable" : "no-cache");
   httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
   ShotTraceJson json = {request, 0, true};
   char version[48];
@@ -207,19 +211,15 @@ esp_err_t OpenBrewByWeightNetwork::shotStorageHandler(httpd_req_t *request) {
                      "Shot storage could not be read.");
   static const char *const errors[] = {"none", "read", "erase", "program", "lock", "too_large",
                                        "source"};
-  char boots[48] = "";
-  for (uint8_t i = 0, used = 0; i < s.interruptedListed; ++i)
-    used += snprintf(boots + used, sizeof(boots) - used, "%s%lu", i ? "," : "",
-                     static_cast<unsigned long>(s.interruptedBoots[i]));
   char *json = reinterpret_cast<char *>(shotTraceDownloadChunk);
-  snprintf(json, sizeof(shotTraceDownloadChunk),
+  int used = snprintf(json, sizeof(shotTraceDownloadChunk),
            "{\"ready\":%s,\"lastError\":\"%s\",\"poolBytes\":%lu,\"liveBytes\":%lu,"
            "\"reclaimableBytes\":%lu,\"unindexedBytes\":%lu,\"unusedBytes\":%lu,"
            "\"records\":%lu,\"meanRecordBytes\":%lu,\"droppedRecords\":%lu,\"good\":%lu,"
            "\"bad\":%lu,\"traceOnly\":%lu,\"interrupted\":%lu,\"traces\":%lu,"
            "\"truncated\":%lu,\"sinceShotId\":%lu,\"sinceLocalSec\":%lu,"
            "\"pendingCurves\":%lu,\"pendingTraces\":%lu,\"tracesDropped\":%lu,"
-           "\"shotCapacity\":%u,\"interruptedBoots\":[%s]}",
+           "\"shotCapacity\":%u,\"orphanTraces\":[",
            s.ready ? "true" : "false",
            errors[s.lastError < sizeof(errors) / sizeof(errors[0]) ? s.lastError : 0],
            static_cast<unsigned long>(s.poolBytes), static_cast<unsigned long>(s.liveBytes),
@@ -232,6 +232,13 @@ esp_err_t OpenBrewByWeightNetwork::shotStorageHandler(httpd_req_t *request) {
            static_cast<unsigned long>(s.truncated), static_cast<unsigned long>(s.sinceShotId),
            static_cast<unsigned long>(s.sinceLocalSec), static_cast<unsigned long>(s.pendingCurves),
            static_cast<unsigned long>(s.pendingTraces), static_cast<unsigned long>(s.tracesDropped),
-           static_cast<unsigned>(SHOT_LOG_CAPACITY), boots);
+           static_cast<unsigned>(SHOT_LOG_CAPACITY));
+  // At most 16 entries of two 10-digit numbers: well inside the chunk.
+  for (uint8_t i = 0; i < s.orphansListed; ++i)
+    used += snprintf(json + used, sizeof(shotTraceDownloadChunk) - used,
+                     "%s{\"boot\":%lu,\"end\":%lu}", i ? "," : "",
+                     static_cast<unsigned long>(s.orphans[i].bootId),
+                     static_cast<unsigned long>(s.orphans[i].endedAtMs));
+  snprintf(json + used, sizeof(shotTraceDownloadChunk) - used, "]}");
   return sendJson(request, STATUS_OK, json);
 }

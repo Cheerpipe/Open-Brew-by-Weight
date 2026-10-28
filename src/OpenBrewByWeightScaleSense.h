@@ -32,6 +32,7 @@ void armPostTareBaselineWindow() {
   markShotCurveBreak();
   session.awaitingPostTareBaseline = true;
   session.softwareZeroG = 0.0f;
+  session.lateTareDroppedZeroG = 0.0f;
   session.postTareBaselineDeadlineMs =
       millis() + session.config.postTareBaselineGraceMs;
   session.hasWeightAnchor = false;

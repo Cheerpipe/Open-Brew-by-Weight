@@ -709,7 +709,8 @@ function shotRunning() {
 }
 // A shot trace's record bytes ({id, bootId, endedAtMs}; id 0 and end 0 for an
 // interrupted one), or null when there is none; a record still being saved
-// right after its shot is asked for again a few times.
+// right after its shot, or a controller briefly busy with no shot running,
+// is asked for again a few times.
 async function fetchShotTrace(r) {
   for (let tries = 0; ; tries++) {
     try {
@@ -717,7 +718,8 @@ async function fetchShotTrace(r) {
       return await (await apiBinary(url, null, "default")).arrayBuffer();
     } catch (e) {
       if (e.status === 404) return null;
-      if (e.code !== "SHOT_TRACE_SAVING" || tries === 4) throw e;
+      const busy = e.code === "SHOT_TRACE_BUSY" && !shotRunning();
+      if ((e.code !== "SHOT_TRACE_SAVING" && !busy) || tries === 4) throw e;
       await sleep(1500);
     }
   }
@@ -5986,6 +5988,7 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
   });
 }
 export {
+  SHELL_FW_VERSION,
   offlineCopy,
   offlineCopyNote,
   noteOfflineCopy,

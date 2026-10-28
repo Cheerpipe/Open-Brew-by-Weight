@@ -201,7 +201,9 @@ void beginCycle(ControlSource source = ControlSource::PHYSICAL) {
       session.scaleBaselineG = currentWeight;
       session.scaleBaselineReady = true;
     }
-    shotTrace().begin(session.startedAtMs);  // Before the relay closes.
+    if (shotTrace().begin(session.startedAtMs))  // Before the relay closes.
+      serialTraceCategory(LogLevel::INFO, DebugCategory::SYSTEM,
+                          "Shot trace of an earlier shot not saved: this shot started first");
   }
   resetShotTrajectory(session.startedAtMs);
   initializeBbwProtection();
