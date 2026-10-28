@@ -220,6 +220,129 @@ static void testVectors() {
   cJSON_Delete(vectors);
 }
 
+// The relay handshake, Kr and signed headers against the shared vectors.
+static void testRelayVectors() {
+  cJSON *vectors = loadVectors();
+  const auto secret = fromHex(field(vectors, "pairingSecret"));
+  const cJSON *relay = cJSON_GetObjectItemCaseSensitive(vectors, "relay");
+  CHECK(cJSON_IsObject(relay));
+  const auto rb = fromBase64(field(relay, "challenge"), 16);
+  const auto nc = fromBase64(field(relay, "nonce"), 16);
+  uint8_t mac[32], key[32];
+  CHECK(companionHandshakeMac(secret.data(), 'R', rb.data(), nc.data(), mac));
+  CHECK(toBase64(mac, 32) == field(relay, "request"));
+  CHECK(companionHandshakeMac(secret.data(), 'Q', rb.data(), nc.data(), mac));
+  CHECK(toBase64(mac, 32) == field(relay, "reply"));
+  CHECK(companionHandshakeMac(secret.data(), 'E', nc.data(), nullptr, mac));
+  CHECK(toBase64(mac, 32) == field(relay, "erase"));
+  CHECK(companionSessionKey(secret.data(), rb.data(), nc.data(), key, "obbw-relay-v1"));
+  CHECK(fromHex(field(relay, "key")) == std::vector<uint8_t>(key, key + 32));
+  const cJSON *requests = cJSON_GetObjectItemCaseSensitive(relay, "requests");
+  // A screen's call, the companion's shared ui-stream (its relay id, 0.0.0.0)
+  // and an IPv6 browser.
+  CHECK(cJSON_GetArraySize(requests) == 3);
+  for (const cJSON *item = requests->child; item != nullptr; item = item->next) {
+    char text[COMPANION_RELAY_HEADER_TEXT];
+    std::snprintf(text, sizeof(text), "%s", field(item, "header"));
+    CompanionRelayHeader header;
+    CHECK(companionRelayParse(text, header));
+    CHECK(!strcmp(header.screen, field(item, "screen")));
+    CHECK(companionRelayMac(key, field(item, "method"), field(item, "uri"), header,
+                            field(item, "session"), mac));
+    CHECK(companionSame(mac, header.mac, COMPANION_RELAY_MAC_BYTES));
+    // The canonical string is exactly what the MAC covers.
+    const std::string canonical = field(item, "canonical");
+    const CompanionBytes whole = {canonical.data(), canonical.size()};
+    uint8_t reference[32];
+    CHECK(companionHmacSha256(key, 32, &whole, 1, reference) && !memcmp(reference, mac, 32));
+    // Any other method, path, query or session is another request.
+    CHECK(companionRelayMac(key, field(item, "method"), "/api/v1/control/stop", header,
+                            field(item, "session"), mac));
+    CHECK(!companionSame(mac, header.mac, COMPANION_RELAY_MAC_BYTES));
+    CHECK(companionRelayMac(key, field(item, "method"), field(item, "uri"), header, "x", mac));
+    CHECK(!companionSame(mac, header.mac, COMPANION_RELAY_MAC_BYTES));
+  }
+  cJSON_Delete(vectors);
+}
+
+static void testRelayHeader() {
+  const auto parse = [](const char *value, CompanionRelayHeader &header) {
+    char text[COMPANION_RELAY_HEADER_TEXT];
+    std::snprintf(text, sizeof(text), "%s", value);
+    return companionRelayParse(text, header);
+  };
+  const std::string mac(32, 'a'), screen = "0123456789abcdef";
+  CompanionRelayHeader header;
+  CHECK(parse(("1 4294967295 10.0.0.2 " + screen + " " + mac).c_str(), header) &&
+        header.sequence == UINT32_MAX && header.mac[0] == 0xAA);
+  CHECK(parse(("1 1 2001:db8::a:1 " + screen + " " + mac).c_str(), header) && header.sequence == 1);
+  const std::string bad[] = {
+      "2 1 10.0.0.2 " + screen + " " + mac,                 // version
+      "1 0 10.0.0.2 " + screen + " " + mac,                 // q from 1
+      "1 01 10.0.0.2 " + screen + " " + mac,                // canonical q
+      "1 4294967296 10.0.0.2 " + screen + " " + mac,        // q is 32-bit
+      "1 1x 10.0.0.2 " + screen + " " + mac,
+      "1 1 10.0.0.2\" " + screen + " " + mac,               // address characters
+      "1 1 1 " + screen + " " + mac,                        // address too short
+      "1 1 " + std::string(46, '1') + " " + screen + " " + mac,
+      "1 1 10.0.0.2 0123456789ABCDEF " + mac,               // lowercase screen
+      "1 1 10.0.0.2 0123456789abcde " + mac,                // 15 digits
+      "1 1 10.0.0.2 " + std::string(25, 'a') + " " + mac,   // 25 digits
+      "1 1 10.0.0.2 " + screen + " " + mac.substr(1),       // short MAC
+      "1 1 10.0.0.2 " + screen + " " + mac + "a",
+      "1 1 10.0.0.2 " + screen + " " + mac + " ",           // trailing field
+      "1  1 10.0.0.2 " + screen + " " + mac,                // double space
+      "1 1 10.0.0.2 " + screen,
+  };
+  for (const std::string &value : bad) CHECK(!parse(value.c_str(), header));
+}
+
+static void testRelayWindow() {
+  CompanionRelayWindow window;
+  CHECK(!companionRelayAccept(window, 0));
+  CHECK(companionRelayAccept(window, 1) && !companionRelayAccept(window, 1));
+  CHECK(companionRelayAccept(window, 3) && companionRelayAccept(window, 2));  // out of order
+  CHECK(!companionRelayAccept(window, 2) && !companionRelayAccept(window, 3));
+  CHECK(companionRelayAccept(window, 66) && window.high == 66);
+  CHECK(!companionRelayAccept(window, 2));  // older than the window
+  CHECK(companionRelayAccept(window, 4));   // 66 - 62: still inside, never seen
+  CHECK(!companionRelayAccept(window, 4) && !companionRelayAccept(window, 66));
+  CHECK(companionRelayAccept(window, 1000) && window.mask == 1);  // a jump clears the bitmap
+  CHECK(!companionRelayAccept(window, 936) && companionRelayAccept(window, 937));
+  CHECK(companionRelayAccept(window, UINT32_MAX) && !companionRelayAccept(window, UINT32_MAX));
+  CompanionRelay relay;
+  relay.ready = true;
+  relay.key[0] = 9;
+  relay.window = window;
+  relay.rejects = 4;
+  companionRelayDrop(relay);
+  CHECK(!relay.ready && relay.key[0] == 0 && relay.window.high == 0 && relay.rejects == 4);
+}
+
+// Admin unlock and the override belong to one principal; a companion screen
+// and a direct window never stand in for each other, even with the same id.
+static void testPrincipals() {
+  CompanionPrincipal direct, screen, other, empty;
+  std::snprintf(direct.id, sizeof(direct.id), "0123456789abcdef");
+  screen = direct;
+  screen.relayed = true;
+  other = screen;
+  other.id[0] = '1';
+  CHECK(companionPrincipalHolds(direct, direct) && companionPrincipalHolds(screen, screen));
+  CHECK(!companionPrincipalHolds(direct, screen) && !companionPrincipalHolds(screen, direct));
+  CHECK(!companionPrincipalHolds(screen, other) && !companionPrincipalHolds(empty, empty));
+  char tag[9];
+  companionScreenTag(direct, tag);
+  CHECK(tag[0] == '\0');
+  companionScreenTag(empty, tag);
+  CHECK(tag[0] == '\0');
+  companionScreenTag(screen, tag);
+  char expected[9];
+  std::snprintf(expected, sizeof(expected), "%08lx",
+                static_cast<unsigned long>(webAccessFnv(screen.id, strlen(screen.id))));
+  CHECK(strlen(tag) == 8 && !strcmp(tag, expected));
+}
+
 static void testFrameCodec() {
   uint8_t key[32];
   for (int i = 0; i < 32; ++i) key[i] = uint8_t(i * 7 + 1);
@@ -494,6 +617,16 @@ static void testStoredBlob() {
   copy.structureSize = 1;
   copy.checksum = companionChecksum(copy);
   CHECK(!validCompanionStored(copy));
+  // The Web UI switch lives in the former reserved byte: older blobs read as on.
+  CHECK(stored.uiOff == 0);
+  copy = stored;
+  copy.uiOff = 1;
+  finalizeCompanionStored(copy);
+  CHECK(validCompanionStored(copy));
+  copy.uiOff = 2;
+  copy.checksum = companionChecksum(copy);
+  CHECK(!validCompanionStored(copy));
+  CHECK(offsetof(CompanionStored, uiOff) == 11);
 }
 
 static void testLiveness() {
@@ -516,6 +649,10 @@ static void testLiveness() {
 
 int main() {
   testVectors();
+  testRelayVectors();
+  testRelayHeader();
+  testRelayWindow();
+  testPrincipals();
   testFrameCodec();
   testBase64AndValidation();
   testCommitThenReveal();

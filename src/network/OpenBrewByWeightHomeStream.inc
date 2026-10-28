@@ -84,11 +84,19 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
             static_cast<unsigned long>(control.bootId))
       : statusJsonAppend(&delta.used, "{\"type\":\"home\",\"changes\":{");
   bool unlocked = DEVELOPMENT_BUILD, override = false;
+  // Through the companion, which of its screens holds Admin and the override.
+  char adminScreen[9] = "", overrideScreen[9] = "";
   {
     TaskLockGuard lock(dataMux_);
-    unlocked |= adminUnlocked_ && strcmp(adminUnlockClientId_, session.clientId) == 0 &&
-        static_cast<int32_t>(millis() - adminUnlockUntilMs_) < 0;
+    const bool unlock = adminUnlocked_ && static_cast<int32_t>(millis() - adminUnlockUntilMs_) < 0;
+    CompanionPrincipal window;
+    copyCString(window.id, sizeof(window.id), session.clientId);
+    unlocked |= unlock && companionPrincipalHolds(adminUnlock_, window);
     override = webUiOverrideActive_ && static_cast<int32_t>(millis() - webUiOverrideUntilMs_) < 0;
+    if (session.relayed && unlock) companionScreenTag(adminUnlock_, adminScreen);
+    if (session.relayed && override) companionScreenTag(webUiOverride_, overrideScreen);
+    // A companion screen's override shows only through relay.overrideScreen.
+    override = override && !session.relayed && !webUiOverride_.relayed;
   }
   unlocked |= session.fromSoftAp;
   delta.field("firmwareVersion", "\"%s\"", FW_VERSION);
@@ -101,6 +109,10 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("diagnosticPageVisible", bool(diagnosticPageEnabled()));
   delta.field("compatibilityMode", bool(firmwareCompatibilityMode()));
   delta.field("adminUnlocked", bool(unlocked));
+  if (session.relayed) {
+    delta.field("relay.adminScreen", "\"%s\"", adminScreen);
+    delta.field("relay.overrideScreen", "\"%s\"", overrideScreen);
+  }
   delta.field("development", bool(DEVELOPMENT_BUILD));
   {
     // Optional login: the Home notice and a pending Home Assistant pairing
@@ -126,7 +138,6 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     delta.field("access.pairCode", "\"%s\"", pairCode);
     delta.field("access.pairRemainingS", static_cast<unsigned long>(pairRemainingS));
   }
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   {
     // A companion asking to pair: every view offers to review it in Admin.
     char name[COMPANION_NAME_TEXT], address[COMPANION_ADDRESS_TEXT];
@@ -134,7 +145,6 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     delta.field("companion.requestName", "\"%s\"", name);
     delta.field("companion.requestAddress", "\"%s\"", address);
   }
-#endif
   delta.field("lastCommand.requestId", static_cast<unsigned long>(network.lastCommandRequestId));
   delta.field("lastCommand.state", "\"%s\"", commandResultStateName(network.lastCommandState));
   const auto &config = control.config;
@@ -451,8 +461,8 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     commandsJson[commandBytes] = '\0';
     delta.field("scale.supportedCommands", "%s", commandsJson);
   }
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   int32_t companionLinkAgeS = -1;
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   {
     const auto micra = machineIntegrationStatus();
     const bool sampleValid = micra.sampleAtMs != 0 &&
@@ -511,9 +521,10 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                   static_cast<unsigned>(call.httpStatus),
                   static_cast<long>(call.transportStatus));
   }
+#endif
   {
-    // Companion: the pairing, its link and the La Marzocco route. The link
-    // age rides the sampled frame below.
+    // Companion: the pairing, its link, the relay and (Linea Micra) the La
+    // Marzocco route. The link age rides the sampled frame below.
     CompanionSnapshot companion;
     companionSnapshot(companion);
     companionLinkAgeS = companion.linkAgeS;
@@ -526,14 +537,18 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.link", "\"%s\"", companion.linkOpen ? "open" : "down");
     delta.field("companion.reconnects", static_cast<unsigned long>(companion.reconnects));
     delta.field("companion.authFailures", static_cast<unsigned long>(companion.authFailures));
+    delta.field("companion.ui", bool(companion.ui));
+    delta.field("companion.relay", "\"%s\"", companion.relayReady ? "ready" : "down");
+    delta.field("companion.relayRejects", static_cast<unsigned long>(companion.relayRejects));
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     delta.field("companion.route", "\"%s\"", companion.route);
     delta.field("companion.reason", "\"%s\"", companion.reason);
     delta.field("companion.lm", bool(companion.lmSwitch));
     delta.field("companion.upstream", bool(companion.upstream));
     delta.field("companion.routeSwitches", static_cast<unsigned long>(companion.routeSwitches));
     delta.field("companion.commands", static_cast<unsigned long>(companion.commands));
-  }
 #endif
+  }
   // Event-driven sections migrated from the REST diagnostic payload; paths
   // keep their REST names so the shared painters apply unchanged.
   const auto &config = control.config;
@@ -679,9 +694,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     telemetry.field("health.psramLargestFreeBlockBytes",
                     static_cast<unsigned long>(control.psramLargestFreeBlockBytes));
     telemetry.field("safety.resetReasonCode", static_cast<unsigned long>(control.resetReasonCode));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     telemetry.field("companion.linkAgeS", "%ld", static_cast<long>(companionLinkAgeS));
-#endif
     {
       const NetworkHeapTelemetrySnapshot networkHeap = heapTelemetrySnapshot();
       const HeapLifecycleAggregate webhookHeap = webhooks_.heapTelemetry();
@@ -984,14 +997,15 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
   if (initial) session.historyFetch = false;
   const bool fetch = session.historyFetch;
   if (!initial && !fetch && epoch == session.historyEpoch) return true;
-  const size_t offset =
-      fetch ? session.historyFetchOffset : session.historyOffset;
+  const size_t offset = fetch ? session.historyFetchOffset : session.historyOffset,
+               limit = fetch ? session.historyFetchLimit : session.historyLimit;
+  const ShotLogSortDir dir = fetch ? session.historyFetchDir : session.historyDir;
   // The page is copied under the store mutex by the bridge callback, so a
   // torn multi-word record is never observed. The union member is exclusive
   // to this dispatch; the shot-card tail rebuilds jsonItem only afterwards.
   HistoryPage &page = g_work->historyPage;
   if (callbacks_.copyHistoryPage) {
-    callbacks_.copyHistoryPage(page, offset, session.historyLimit, session.historyDir,
+    callbacks_.copyHistoryPage(page, offset, limit, dir,
                                fetch ? session.historyFetchTypes : session.historyTypes);
   } else {
     page.total = page.start = page.count = 0;
@@ -1006,8 +1020,8 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
   uint32_t fingerprint = crc32Update(0xFFFFFFFFU,
       reinterpret_cast<const uint8_t *>(&epoch), sizeof(epoch));
   const uint32_t window[4] = {static_cast<uint32_t>(page.start),
-                              static_cast<uint32_t>(session.historyLimit),
-                              static_cast<uint32_t>(session.historyDir),
+                              static_cast<uint32_t>(limit),
+                              static_cast<uint32_t>(dir),
                               session.historyTypes};
   fingerprint = crc32Update(fingerprint,
       reinterpret_cast<const uint8_t *>(window), sizeof(window));
@@ -1043,7 +1057,7 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
           "\"total\":%u,\"offset\":%u,\"limit\":%u,"
           "\"hasMore\":%s,\"records\":[",
           static_cast<unsigned>(page.total), static_cast<unsigned>(page.start),
-          static_cast<unsigned>(session.historyLimit),
+          static_cast<unsigned>(limit),
           page.hasMore ? "true" : "false"))
     return false;
   auto &held = workBuf_->uiFingerprints[&session - uiStreams_];
@@ -1136,6 +1150,9 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   const ShotLogSort sort = fetch ? session.statsFetchSort : session.statsSort;
   const ShotLogSortDir dir = fetch ? session.statsFetchDir : session.statsDir;
   const ShotListFilter &filter = fetch ? session.statsFetchFilter : session.statsFilter;
+  // A fetch's header covers its own window; the standing gate above keeps
+  // following the subscription's.
+  const size_t statsWindow = fetch ? session.statsFetchWindow : session.statsWindow;
   const uint32_t filterHash = shotListFilterHash(filter);
   NetworkWorkBuf &work = *g_work;
   auto &cache = work.statsCache;
@@ -1154,12 +1171,12 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   // The header follows the store, the selected window, and the active
   // preset of its "This preset" chart.
   const bool header = !cache.valid || cache.headerEpoch != epoch ||
-      cache.headerWindow != session.statsWindow ||
+      cache.headerWindow != statsWindow ||
       cache.headerPresetId != control.bbwPresetId;
   if (header) {
-    cache.statsOk = formatStatsHeader(cache, session.statsWindow, control.bbwPresetId);
+    cache.statsOk = formatStatsHeader(cache, statsWindow, control.bbwPresetId);
     cache.headerEpoch = epoch;
-    cache.headerWindow = session.statsWindow;
+    cache.headerWindow = statsWindow;
     cache.headerPresetId = control.bbwPresetId;
   }
   const size_t count = snapshot.count;

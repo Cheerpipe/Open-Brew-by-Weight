@@ -76,8 +76,10 @@ Versioning:
 - [`companion-link-v1.vectors.json`](companion-link-v1.vectors.json): fixed
   inputs and expected outputs for the [companion link](../COMPANION_LINK.md)
   (verification code, pairing secret, session key, handshake MACs, one signed
-  frame each way, and the credentials key and ciphertext with a fixed `iv`).
-  The private scalars are for testing only.
+  frame each way, the credentials key and ciphertext with a fixed `iv`, and
+  under `relay` the relay handshake MACs, its key `Kr` and three signed relay
+  headers with their canonical strings). The private scalars are for testing
+  only.
 - Consumed by the firmware host test `src/tests/companion_link_host_test.cpp`
   and by the companion's own tests.
 

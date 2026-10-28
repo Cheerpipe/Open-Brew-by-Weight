@@ -125,6 +125,16 @@ RECURSION_BOUNDS: tuple[tuple[str, Callable[[], int]], ...] = (
     (r"JsonStructureScanner::scanValue\(|^(?:parse_value|cJSON_Delete)$",
      lambda: source_constant("src/OpenBrewByWeightJsonArena.h",
                              "JSON_DOCUMENT_MAX_DEPTH") + 1),
+    # PSA's key and algorithm dispatch makes these mbedTLS recursions reachable
+    # from every PSA call (the companion's HMAC and HKDF run none of them): a
+    # GCM or CCM context drives its block cipher once, the AES DMA path
+    # re-enters once for a buffer it stages in internal memory, and the
+    # hardware bignum splits a factor wider than its multiplier at most twice
+    # (4096-bit RSA, the widest key the firmware's TLS accepts).
+    (r"^(?:gcm_mask|mbedtls_ccm_(?:crypt|update)|mbedtls_cipher_update|mbedtls_gcm_update)$",
+     lambda: 2),
+    (r"^esp_aes_process_dma", lambda: 2),
+    (r"^(?:mbedtls_mpi_mul_mpi|mpi_mult_mpi_overlong)", lambda: 3),
     # An abandoned tag capture is replayed at most kMaxBodyReplays times.
     (r"OtaImageTagScanner::(?:feedByte|replayAbandonedBody)\(",
      lambda: source_constant("src/OpenBrewByWeightOtaImage.h", "kMaxBodyReplays") + 2),
@@ -183,6 +193,14 @@ GATES = (
     # A stream request keeps its frame buffer live through the parse and ops.
     Gate("httpd UI stream request", http_stack, r"^httpd_thread$",
          (r"::uiStreamHandler\(",), HTTPD_DISPATCH),
+    # The companion's signed relay: admission hashes the request on every
+    # handler call and on the ui-stream handshake; the relay handshake
+    # derives Kr. Both run HMAC/HKDF on the httpd stack.
+    Gate("httpd companion relay", http_stack, r"^httpd_thread$",
+         (r"::relayAdmit\(", r"::companionRelayHandler\("),
+         {**HTTPD_DISPATCH,
+          r"^httpd_uri$": (r"\btimedHandler\(", r"::uiStreamHandshake\("),
+          r"::ownedApiHandler\(": (r"::companionRelayHandler\(",)}),
     # The download verifies unverified dump digests before streaming the tar.
     Gate("httpd crash archive download", http_stack, r"^httpd_thread$",
          (r"::crashArchiveDownloadHandler\(",), HTTPD_DISPATCH),

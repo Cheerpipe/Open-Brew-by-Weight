@@ -54,12 +54,9 @@
 #include <sys/socket.h>
 
 #include "OpenBrewByWeightIntegrationRequest.h"
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-#include "machine/OpenBrewByWeightMicraCompanion.h"
 #include "network/OpenBrewByWeightCompanionStore.h"
 #include <arpa/inet.h>
 #include <psa/crypto.h>
-#endif
 
 // The application logger is owned by openBrewByWeight.cpp. Network diagnostics use
 // it so they reach both the ESP-IDF serial backend and the optional RAM ring.
@@ -230,10 +227,11 @@ static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkSettings;
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkWorkingSettings;
 // Web UI login state; dataMux_ guards it and the network task persists it.
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebAccessState g_webAccess;
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-// Companion pairing and link; dataMux_ guards it (network/OpenBrewByWeightCompanion.inc).
+// Companion pairing, link and relay; dataMux_ guards it (network/OpenBrewByWeightCompanion.inc).
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionState g_companion;
-#endif
+// Relayed requests' browser identities by socket: httpd writes them at
+// admission, handlers and the OTA worker read them; dataMux_ guards them.
+static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionRelayIdentity g_relayIdentities[COMPANION_RELAY_SOCKETS];
 
 namespace {
 
@@ -791,6 +789,34 @@ void formatIp(const IPAddress &ip, char output[16]) {
   formatIpv4(octets, output);
 }
 
+// Admin's webhook and network forms send back the `revision` they were
+// filled from as `baseRevision`, so a save from a stale form (another
+// screen saved meanwhile) is refused. An opaque hash of what each form shows.
+uint32_t webhookRevision(const WebhookConfig &config) {
+  const bool flags[] = {config.enabled, config.brewState, config.firstDrop, config.end,
+                        config.deferDuringShot};
+  return webAccessFnv(flags, sizeof(flags)) ^ webAccessFnv(config.url, strlen(config.url));
+}
+
+uint32_t networkRevision(const PersistedSettings &settings, TaskMutex &mux) {
+  TaskLockGuard lock(mux);
+  const uint8_t shape[] = {settings.staOpen, settings.staWifiSleep, settings.staIpMode};
+  const uint8_t *addresses[] = {settings.staIp, settings.staNetmask, settings.staGateway,
+                                settings.staDns1, settings.staDns2};
+  uint32_t revision = webAccessFnv(shape, sizeof(shape)) ^
+                      webAccessFnv(settings.staSsid, strlen(settings.staSsid)) * 3U ^
+                      webAccessFnv(settings.deviceName, strlen(settings.deviceName)) * 5U;
+  for (const uint8_t *address : addresses) revision = revision * 16777619U ^ webAccessFnv(address, 4);
+  return revision;
+}
+
+// A save without baseRevision is current; one with it must name `revision`.
+bool baseRevisionCurrent(cJSON *root, uint32_t revision) {
+  uint32_t base = revision;
+  return !jsonFieldPresent(root, "baseRevision") ||
+         (jsonUint32(root, "baseRevision", base) && base == revision);
+}
+
 // Every handler shares the one httpd task, so a slow one delays the Web UI
 // stream, Home Assistant and OTA polls. Report those in the Web UI log, with
 // the path only: query strings are never logged. CPU time (esp_timer run-time
@@ -808,7 +834,8 @@ esp_err_t timedHandler(httpd_req_t *request) {
   const uint32_t startedAtMs = millis();
   const uint32_t startedCpuUs = httpdCpuUs();
   const esp_err_t result =
-      OpenBrewByWeightNetwork::rejectForeignHost(request)
+      OpenBrewByWeightNetwork::rejectForeignHost(request) ||
+              !OpenBrewByWeightNetwork::relayAdmit(request)
           ? ESP_OK
           : reinterpret_cast<esp_err_t (*)(httpd_req_t *)>(request->user_ctx)(request);
   const uint32_t elapsedMs = millis() - startedAtMs;
@@ -1364,6 +1391,5 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "network/OpenBrewByWeightLineaMicraWeb.inc"
 #include "network/OpenBrewByWeightIntegrationApi.inc"
 #include "network/OpenBrewByWeightNetworkOta.inc"
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
 #include "network/OpenBrewByWeightCompanion.inc"
-#endif
+#include "network/OpenBrewByWeightCompanionRelay.inc"

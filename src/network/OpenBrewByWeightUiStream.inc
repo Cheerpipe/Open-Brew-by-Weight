@@ -190,6 +190,10 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
     logRefusedHost(origin, network.mdnsHost);
     return ESP_FAIL;
   }
+  // The companion's upstream session arrives signed, like its REST calls.
+  if (!relayAdmit(request)) return ESP_FAIL;
+  char screen[COMPANION_RELAY_SCREEN_TEXT], address[COMPANION_RELAY_ADDR_TEXT];
+  const bool relayed = self.relayIdentity(request, screen, address);
   TaskLockGuard lock(self.dataMux_);
   for (auto &session : self.uiStreams_) {
     if (session.fd != -1) continue;
@@ -197,6 +201,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
     new (&self.workBuf_->uiFingerprints[&session - self.uiStreams_]) UiStreamFingerprints{};
     session.fd = httpd_req_to_sockfd(request);
     session.fromSoftAp = socketServedBySoftAp(session.fd);
+    session.relayed = relayed;
     session.openedAtMs = millis();
     self.uiStreamOpen_.store(true, std::memory_order_release);
     request->sess_ctx = &session;
@@ -346,7 +351,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
                  strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
         // View-scoped History page subscription: the standing window tracks the
         // page; a one-shot fetch serves sentinel appends without disturbing it.
-        // `types` filters both; a fetch without it keeps the standing filter.
+        // `types`, `limit` and `dir` shape both; a fetch keeps the standing
+        // value of each one it omits.
         // A subscribe's `tag` names the standing page the browser still holds.
         static const char *const kFields[] = {"op", "on", "offset", "limit", "dir",
                                               "fetch", "request", "types", "tag"};
@@ -384,6 +390,11 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
               session->historyFetchOffset =
                   static_cast<size_t>(offset->valueint);
               session->historyFetchTypes = types ? typeMask : session->historyTypes;
+              session->historyFetchLimit =
+                  limit ? static_cast<size_t>(limit->valueint) : session->historyLimit;
+              session->historyFetchDir = !dir ? session->historyDir
+                                         : !strcmp(dir->valuestring, "asc") ? ShotLogSortDir::Asc
+                                                                            : ShotLogSortDir::Desc;
               session->historyFetch = true;
               session->historyFetchRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
             }
@@ -411,8 +422,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
                  strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
         // View-scoped Stats page subscription on the same contract; one-shot
         // fetches also serve the CSV export window (date/desc, good shots).
-        // `filter` works like History's `types`; `window` (subscribe only)
-        // picks the newest shots the aggregate and charts cover.
+        // `filter` works like History's `types`; `window` picks the newest
+        // shots the aggregate and charts cover (a fetch's own header too).
         static const char *const kFields[] = {"op",    "on",      "offset",
                                               "limit", "sort",    "dir",
                                               "fetch", "request", "filter",
@@ -455,9 +466,11 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
               session->statsPaging = false;
             }
           } else if (fetch && cJSON_IsTrue(fetch)) {
-            accepted = session->statsOn && offset != nullptr && !window && !tag;
+            accepted = session->statsOn && offset != nullptr && !tag;
             if (accepted) {
               session->statsFetchFilter = filter ? shotFilter : session->statsFilter;
+              session->statsFetchWindow =
+                  window ? static_cast<size_t>(window->valueint) : session->statsWindow;
               session->statsFetchOffset =
                   static_cast<size_t>(offset->valueint);
               session->statsFetchLimit = limit

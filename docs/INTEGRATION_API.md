@@ -633,6 +633,16 @@ the public integration routes described above. Mutations stay confirmed REST
 commands: `POST /api/v1/stats/clear|delete|rate`,
 `POST /api/v1/history/clear|delete`.
 
+A save may name the state its form was filled from, so a form left open on
+one screen cannot silently undo another screen's save: `POST /api/v1/config`
+takes `baseRevision` (the config `revision`), and the webhook and Wi-Fi
+saves (`POST /api/v1/webhooks` and `POST /api/v1/network` with
+`"action":"save"`) may send `baseRevision` set to `webhooks.revision` or
+`network.revision` from `GET /api/v1/status/admin`, an opaque number that
+changes whenever those settings do. A stale one answers `409`
+(`CONFIG_REVISION_STALE` for the config, `STALE_REVISION` for webhooks and
+Wi-Fi) and nothing is saved; without `baseRevision` nothing changes.
+
 Stats and History frames both carry `boot`, `total`, `offset`, `limit`, and
 `hasMore`. Stats frames also
 carry `stats` (the firmware-computed aggregate, without the integration
@@ -750,6 +760,19 @@ boiler's `readyAtUtcSec` estimate. `readyAtUtcSec` is an absolute UTC second
 timestamp (0 when the machine gave no estimate), and the browser derives the
 ticking countdown locally, so a stable estimate emits no frames. Readiness is
 never evidence for control; power stays ON/OFF-only.
+
+Every build streams `companion.requestName` and `companion.requestAddress`
+while a companion asks to pair (empty strings otherwise). When the Web UI runs
+through [Open Brew by Weight Companion](features/companion.md), the companion
+holds the one claim and ui-stream session for all its screens through the
+signed [relay](COMPANION_LINK.md#relay): a companion screen's claim attaches to
+that claim instead of taking control, and Admin unlock and the unsafe override
+belong to the screen that opened them. Only that relayed stream carries
+`relay.adminScreen` and `relay.overrideScreen`, each the holding screen's
+`X-WebUI-Client` as 8 hex digits of FNV-1a or `""`; a screen is unlocked when
+`adminUnlocked` is true or `relay.adminScreen` names its own id, and the same
+applies to the override banner with `webUiOverrideActive`. A direct page never
+receives these fields.
 
 Reconnect and `{"op":"resync"}` request fresh snapshots; the resync op also
 forces a fresh History snapshot for subscribed sessions. The browser sends a
@@ -949,7 +972,9 @@ without it shows every type. The session keeps this standing window and
 filter. Scrolling to the page sentinel sends a one-shot append fetch for the
 next window without disturbing the subscription; a fetch without `types`
 keeps the standing filter, and the CSV export sends `"types":[]` to read
-every record:
+every record. A fetch may also name its own `limit` and `dir` (the standing
+ones apply when omitted), which lets one session serve pages of another
+window, as the companion does for its screens:
 
 ```json
 {"op":"history","on":true,"fetch":true,"offset":20}
@@ -1014,7 +1039,9 @@ Scrolling to the page sentinel sends a one-shot fetch for the next window,
 and the CSV and JSON exports ask for their own export window — up to 1,000
 rows, newest-first by date, good shots only (the diagnostics export adds
 `"bad":true`), regardless of the on-screen sort. A fetch without `filter`
-keeps the standing filter. Nothing is exported during a shot, drip delay
+keeps the standing filter, and one without `window` heads its first frame
+with the standing window's `stats`; a fetch with `window` heads it with that
+window's instead, without changing the subscription. Nothing is exported during a shot, drip delay
 included: while the shot's trace capture is open (Home's `cycle.capturing`)
 the firmware sends no frame of a fetch, an export window or a scroll page,
 and resumes it when the capture closes. The Web UI starts no export then and

@@ -24,9 +24,7 @@
 #include "OpenBrewByWeightTaskProfiler.h"
 #include "OpenBrewByWeightScaleProfiler.h"
 #include "OpenBrewByWeightWebhook.h"
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
 #include "network/OpenBrewByWeightCompanionLink.h"
-#endif
 
 #include <atomic>
 
@@ -325,6 +323,10 @@ class OpenBrewByWeightNetwork {
   // Gate shared by every registered handler: answers the request and returns
   // true when its Host does not name this controller (DNS rebinding).
   static bool rejectForeignHost(httpd_req_t *request);
+  // Gate after it: a request signed by the companion's relay session records
+  // its browser identity for the socket; an unsigned one clears it. False:
+  // refused and answered (docs/COMPANION_LINK.md#relay).
+  static bool relayAdmit(httpd_req_t *request);
 
   private:
   void mergePreferredScaleMac(PersistedSettings &settings);
@@ -442,9 +444,9 @@ class OpenBrewByWeightNetwork {
     // masks (HistoryType bits, 0 = all) filter the standing and fetch pages.
     bool historyOn = false, historyResync = true, historyFetch = false;
     size_t historyOffset = 0, historyLimit = HISTORY_PAGE_DEFAULT,
-           historyFetchOffset = 0;
+           historyFetchOffset = 0, historyFetchLimit = HISTORY_PAGE_DEFAULT;
     uint8_t historyTypes = 0, historyFetchTypes = 0;
-    ShotLogSortDir historyDir = ShotLogSortDir::Desc;
+    ShotLogSortDir historyDir = ShotLogSortDir::Desc, historyFetchDir = ShotLogSortDir::Desc;
     uint32_t historyEpoch = 0, historyFingerprint = 0, historyBoot = 0;
     uint32_t historyRequest = 0, historyFetchRequest = 0;
     // Fingerprint of the standing page a resubscribing browser still holds
@@ -457,7 +459,7 @@ class OpenBrewByWeightNetwork {
     bool statsOn = false, statsResync = true, statsFetch = false;
     size_t statsOffset = 0, statsLimit = SHOT_LOG_PAGE_DEFAULT,
            statsFetchOffset = 0, statsFetchLimit = SHOT_LOG_PAGE_DEFAULT;
-    size_t statsWindow = SHOT_LOG_STATS_WINDOW;
+    size_t statsWindow = SHOT_LOG_STATS_WINDOW, statsFetchWindow = SHOT_LOG_STATS_WINDOW;
     ShotLogSort statsSort = ShotLogSort::Date, statsFetchSort = ShotLogSort::Date;
     ShotLogSortDir statsDir = ShotLogSortDir::Desc, statsFetchDir = ShotLogSortDir::Desc;
     ShotListFilter statsFilter, statsFetchFilter;
@@ -487,6 +489,9 @@ class OpenBrewByWeightNetwork {
     // the session reports admin unlocked for its lifetime (the WPA2
     // passphrase is the device password).
     bool fromSoftAp = false;
+    // Opened through the companion's signed relay: Home names which of its
+    // screens holds Admin and the override (relay.*).
+    bool relayed = false;
   };
   UiStreamSession uiStreams_[2];
   std::atomic<bool> uiStreamWorkPending_{false};
@@ -500,7 +505,10 @@ class OpenBrewByWeightNetwork {
   char activeWebUiClientId_[WEB_UI_CLIENT_ID_CAPACITY] = {};
   bool webUiOverrideActive_ = false;
   uint32_t webUiOverrideUntilMs_ = 0;
-  char adminUnlockClientId_[WEB_UI_CLIENT_ID_CAPACITY] = {};
+  // One holder each (a companion screen or a direct window): a newer unlock
+  // or override replaces the previous holder's.
+  CompanionPrincipal webUiOverride_ = {};
+  CompanionPrincipal adminUnlock_ = {};
   bool adminUnlocked_ = false;
   uint32_t adminUnlockUntilMs_ = 0;
   WebAccessPasswordPeer passwordPeers_[WEB_ACCESS_PASSWORD_PEERS] = {};
@@ -900,8 +908,14 @@ class OpenBrewByWeightNetwork {
   void clearNetworkFailureStatus(bool staDisconnected);
   esp_err_t workBufBusy(httpd_req_t *request);
   bool requireActiveWebUiClient(httpd_req_t *request);
-  void clearAdminUnlock();
-  void grantAdminUnlock(const char *clientId, uint32_t now);
+  // `holder`: only when it holds the unlock (a companion screen's own).
+  void clearAdminUnlock(const CompanionPrincipal *holder = nullptr);
+  void grantAdminUnlock(const CompanionPrincipal &holder, uint32_t now);
+  // The caller: a relayed request's screen, else its X-WebUI-Client.
+  bool webUiPrincipal(httpd_req_t *request, CompanionPrincipal &principal);
+  bool relayIdentity(httpd_req_t *request, char (&screen)[COMPANION_RELAY_SCREEN_TEXT],
+                     char (&addr)[COMPANION_RELAY_ADDR_TEXT]);
+  void relayIdentityClear(int fd);
   void touchAdminUnlock();
   // True when the socket is served by the SoftAP interface address with a
   // peer on the SoftAP subnet (local-address match keeps a LAN that happens
@@ -945,10 +959,10 @@ class OpenBrewByWeightNetwork {
   static esp_err_t authPairingHandler(httpd_req_t *request);
   bool integrationAccessRoute(httpd_req_t *request, esp_err_t &result);
   bool appendWebAccessStatus(httpd_req_t *request, size_t *used);
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   // Companion link (network/OpenBrewByWeightCompanion.inc, docs/COMPANION_LINK.md).
   static esp_err_t companionPairHandler(httpd_req_t *request);
   static esp_err_t companionAdminHandler(httpd_req_t *request);
+  static esp_err_t companionRelayHandler(httpd_req_t *request);
   static esp_err_t companionLinkHandshake(httpd_req_t *request);
   static esp_err_t companionLinkHandler(httpd_req_t *request);
   static void companionLinkFree(void *context);
@@ -976,9 +990,13 @@ class OpenBrewByWeightNetwork {
                               char (&address)[COMPANION_ADDRESS_TEXT]);
   std::atomic<bool> companionNotified_{false}, companionSendPending_{false},
       companionLinkUp_{false}, companionSendRetry_{false}, companionLruPending_{false};
+  // Sockets whose current request came through the relay (httpd writes).
+  std::atomic<uint8_t> relayIdentities_{0};
+  // Paired, forgotten, or asked to pair since boot; until then the network
+  // task skips the companion service entirely.
+  std::atomic<bool> companionAwake_{false};
   uint32_t companionRetryAtMs_ = 0;  // 0 = no failed save waiting
   uint32_t companionLruAtMs_ = 0;  // network task: the last LRU refresh queued
-#endif
   bool diagnosticPageEnabled();
   bool webUiOverrideAllowed(httpd_req_t *request);
   uint32_t webUiOverrideRemainingMs(httpd_req_t *request);

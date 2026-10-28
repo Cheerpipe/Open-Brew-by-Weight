@@ -1,12 +1,25 @@
-// Companion link, controller side (docs/COMPANION_LINK.md), Linea Micra builds.
-// httpd owns the link sockets, the frame codec and every send; the network
-// task owns the request key pair, the pairing derivation, the NVS write,
-// liveness and the outbox. g_companion is guarded by dataMux_. Until a
-// companion asks, nothing here runs, connects, writes or logs: the controller
-// only answers, and it never connects to the companion.
+// Companion link, controller side (docs/COMPANION_LINK.md), every build; the
+// La Marzocco route only on Linea Micra builds. httpd owns the link sockets,
+// the frame codec, every send and the relay; the network task owns the
+// request key pair, the pairing derivation, the NVS write, liveness and the
+// outbox. g_companion is guarded by dataMux_. Until a companion asks, nothing
+// here runs, connects, writes or logs: the controller only answers, and it
+// never connects to the companion.
 
 namespace openbrewbyweight {
 namespace {
+
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+constexpr bool kCompanionLm = true;
+#else
+// Without La Marzocco the route stays direct and the outbox empty, so the
+// link shares one path and carries only the switches.
+constexpr bool kCompanionLm = false;
+MicraCompanionRouteStatus machineIntegrationCompanionRouteStatus() { return {}; }
+MicraCompanionOutbox machineIntegrationCompanionOutbox() { return {}; }
+MicraCompanionIngress machineIntegrationCompanionIngress() { return {}; }
+void machineIntegrationCompanionLink(bool, bool) {}
+#endif
 
 // Network task only: the open request's key pair and the request it serves.
 mbedtls_svc_key_id_t g_companionRequestKey = MBEDTLS_SVC_KEY_ID_INIT;
@@ -85,9 +98,10 @@ void companionDropRequestKey() {
   g_companionRequestKey = MBEDTLS_SVC_KEY_ID_INIT;
 }
 
-bool companionAeadSeal(const uint8_t key[32], const uint8_t iv[12], const char *aad,
-                       const uint8_t *plain, size_t plainSize, uint8_t *out, size_t capacity,
-                       size_t &length) {
+// The credentials frame's sealing (Linea Micra builds).
+[[maybe_unused]] bool companionAeadSeal(const uint8_t key[32], const uint8_t iv[12],
+                                        const char *aad, const uint8_t *plain, size_t plainSize,
+                                        uint8_t *out, size_t capacity, size_t &length) {
   const mbedtls_svc_key_id_t id =
       companionImportKey(key, 32, PSA_KEY_TYPE_AES, PSA_ALG_GCM, PSA_KEY_USAGE_ENCRYPT);
   if (mbedtls_svc_key_id_is_null(id)) return false;
@@ -156,7 +170,7 @@ const char *companionRouteName(MicraCompanionRoute route) {
          : route == MicraCompanionRoute::PENDING ? "pending" : "direct";
 }
 
-const char *companionCommandName(MicraCompanionCommandOp op) {
+[[maybe_unused]] const char *companionCommandName(MicraCompanionCommandOp op) {
   switch (op) {
     case MicraCompanionCommandOp::TEMPERATURE: return "temp";
     case MicraCompanionCommandOp::STANDBY: return "standby";
@@ -234,8 +248,11 @@ void OpenBrewByWeightNetwork::beginCompanion() {
     lifecycleLog("Companion pairing unreadable; pair the companion again");
   g_companion = CompanionState{};
   g_companion.stored = stored;
+  companionAwake_.store(stored.paired != 0 || stored.forgotten != 0, std::memory_order_release);
   memset(&stored, 0, sizeof(stored));
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   setMachineIntegrationCompanionNotify(companionOutboxChanged);
+#endif
 }
 
 // The durable reset erased the record; drop the RAM copy and any link.
@@ -252,6 +269,7 @@ void OpenBrewByWeightNetwork::resetCompanion() {
     }
     g_companion.stored = CompanionStored{};
     g_companion.pairing = CompanionPairing{};
+    companionRelayDrop(g_companion.relay);
     g_companion.dirty = false;
   }
   for (const int fd : fds)
@@ -378,6 +396,7 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
                        "Wait a few seconds before asking again.");
     case CompanionPairResult::NEW:
       // The network task makes this request's key pair.
+      self.companionAwake_.store(true, std::memory_order_release);
       self.lifecycleLogf("Companion pairing request from '%s' at %s", label, address);
       if (self.taskHandle_ != nullptr) xTaskNotifyGive(self.taskHandle_);
       break;
@@ -392,15 +411,17 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.");
   if (body != ESP_OK) return body;
-  static const char *const fields[] = {"action", "code", "lm"};
+  static const char *const fields[] = {"action", "code", "lm", "ui"};
   char action[12] = {}, code[8] = {};
-  bool lm = true;
+  bool lm = true, ui = true;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 3) &&
+  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 4) &&
                jsonString(root, "action", action, sizeof(action), false);
   if (valid && jsonFieldPresent(root, "code")) valid = jsonString(root, "code", code, sizeof(code), false);
   const bool hasLm = valid && jsonFieldPresent(root, "lm");
   if (hasLm) valid = jsonBoolean(root, "lm", lm);
+  const bool hasUi = valid && jsonFieldPresent(root, "ui");
+  if (hasUi) valid = jsonBoolean(root, "ui", ui);
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   if (!valid)
@@ -485,7 +506,10 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       memcpy(name, g_companion.stored.name, sizeof(name));
       forgotten = companionForget(g_companion.stored);
       g_companion.dirty |= forgotten;
-      if (forgotten) g_companion.peerProtocol = 0;
+      if (forgotten) {
+        g_companion.peerProtocol = 0;
+        companionRelayDrop(g_companion.relay);
+      }
       for (size_t index = 0; forgotten && index < 2; ++index) {
         CompanionLinkSlot &slot = g_companion.links[index];
         if (slot.fd < 0 || slot.closing) continue;
@@ -500,25 +524,36 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     for (const int fd : fds)
       if (fd >= 0) (void)httpd_sess_trigger_close(request->handle, fd);
     self.lifecycleLogf("Companion '%s' forgotten", name);
-  } else if (!strcmp(action, "switches") && hasLm) {
-    bool paired, changed = false, linkUp = false;
+  } else if (!strcmp(action, "switches") && (hasLm || hasUi) && (kCompanionLm || !hasLm)) {
+    bool paired, lmChanged = false, uiChanged = false, linkUp = false;
     {
       TaskLockGuard lock(self.dataMux_);
-      paired = g_companion.stored.paired != 0;
+      CompanionStored &stored = g_companion.stored;
+      paired = stored.paired != 0;
       if (paired) {
-        changed = (g_companion.stored.lmSwitch != 0) != lm;
-        g_companion.stored.lmSwitch = lm ? 1 : 0;
-        g_companion.dirty |= changed;
+        lmChanged = hasLm && (stored.lmSwitch != 0) != lm;
+        uiChanged = hasUi && (stored.uiOff == 0) != ui;
+        if (hasLm) stored.lmSwitch = lm ? 1 : 0;
+        if (hasUi) stored.uiOff = ui ? 0 : 1;
+        g_companion.dirty |= lmChanged || uiChanged;
         linkUp = g_companion.active != 0;
+        // Its next relayed request is stale, and the new handshake carries ui and link.
+        if (lmChanged || uiChanged) companionRelayDrop(g_companion.relay);
       }
     }
     if (!paired)
       return sendError(request, STATUS_CONFLICT, "COMPANION_NOT_PAIRED",
                        "This controller is not paired with a companion.");
-    if (changed) {
+    if (lmChanged) {
       machineIntegrationCompanionLink(linkUp, lm);
       self.lifecycleLog(lm ? "Companion: La Marzocco through the companion turned on"
                            : "Companion: La Marzocco through the companion turned off");
+    }
+    if (uiChanged) {
+      // An open link learns it from the next cfg frame.
+      companionOutboxChanged();
+      self.lifecycleLog(ui ? "Companion: Web UI through the companion turned on"
+                           : "Companion: Web UI through the companion turned off");
     }
   } else {
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "Unknown companion action.");
@@ -842,9 +877,9 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkProof(httpd_req_t *request,
   return ESP_OK;
 }
 
-esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(CompanionLinkSlot &slot, cJSON *frame,
-                                                        const char *type,
-                                                        MicraCompanionIngress ingress) {
+esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
+    CompanionLinkSlot &slot, cJSON *frame, const char *type,
+    [[maybe_unused]] MicraCompanionIngress ingress) {
   uint32_t expected;
   {
     TaskLockGuard lock(dataMux_);
@@ -857,19 +892,23 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(CompanionLinkSlot &slot,
     slot.inSequence = expected;
   }
   // A type this controller does not know is a later addition: ignored, so a
-  // newer companion keeps its link. Known types must be well formed.
-  if (strcmp(type, "ping") != 0 && strcmp(type, "lm") != 0 && strcmp(type, "creds") != 0 &&
-      strcmp(type, "res") != 0 && strcmp(type, "st") != 0) {
+  // newer companion keeps its link. Known types must be well formed; the La
+  // Marzocco ones exist only on Linea Micra builds.
+  if (strcmp(type, "ping") != 0 &&
+      (!kCompanionLm || (strcmp(type, "lm") != 0 && strcmp(type, "creds") != 0 &&
+                         strcmp(type, "res") != 0 && strcmp(type, "st") != 0))) {
     static RefusalLog unknown;
     if (const uint32_t count = unknown.due())
       lifecycleLogf("Companion link ignored %lu frame(s) of a type this controller does not know",
                     static_cast<unsigned long>(count));
     return ESP_OK;
   }
-  bool flag = false, flag2 = false;
-  uint32_t first = 0, second = 0, third = 0;
-  char text[12] = {};
+  // The La Marzocco frames use the rest only on Linea Micra builds.
+  [[maybe_unused]] bool flag = false, flag2 = false;
+  [[maybe_unused]] uint32_t first = 0, second = 0, third = 0;
+  [[maybe_unused]] char text[12] = {};
   if (!strcmp(type, "ping") && jsonBoolean(frame, "up", flag)) {
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     machineIntegrationCompanionPing(flag);
   } else if (!strcmp(type, "lm") && jsonBoolean(frame, "sub", flag) &&
              jsonUint32(frame, "ep", first) && jsonUint32(frame, "tok", second)) {
@@ -895,6 +934,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(CompanionLinkSlot &slot,
     if (!machineIntegrationCompanionState(kind, first, third,
                                           cJSON_GetObjectItemCaseSensitive(frame, "d"), ingress))
       return companionLinkRefuse(slot, "a machine state push was rejected", false);
+#endif
   } else {
     return companionLinkRefuse(slot, "a malformed frame arrived", false);
   }
@@ -904,6 +944,8 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(CompanionLinkSlot &slot,
 // --- Network task --------------------------------------------------------------
 
 void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
+  // A controller that never paired has nothing to service: not even the lock.
+  if (!companionAwake_.load(std::memory_order_acquire)) return;
   uint32_t serial = 0, makeKey = 0, derive = 0;
   bool pending = false, linkOpen = false, dirty = false;
   uint8_t companionKey[COMPANION_KEY_BYTES], controllerKey[COMPANION_KEY_BYTES];
@@ -1032,6 +1074,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
   }
 }
 
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
 // The account for the creds frame, sealed for the companion and wiped here.
 bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t generation,
                                                        const uint8_t secret[COMPANION_SECRET_BYTES]) {
@@ -1092,14 +1135,16 @@ bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t 
   memset(sealed, 0, sizeof(companionWs().crypt) - kCompanionPlainBytes);
   return ok;
 }
+#endif
 
-// Network task: queue what changed in the outbox since this session last sent
-// it (everything after a new session). httpd signs and sends.
+// Network task: queue what changed in the outbox and the switches since this
+// session last sent them (everything after a new session). httpd signs and sends.
 void OpenBrewByWeightNetwork::companionPrepareSends() {
   companionNotified_.store(false, std::memory_order_release);
   const MicraCompanionOutbox outbox = machineIntegrationCompanionOutbox();
-  uint32_t generation = 0, lastCommand = 0;
-  bool snapshot = false;
+  uint32_t generation = 0;
+  [[maybe_unused]] uint32_t lastCommand = 0;
+  bool snapshot = false, ui = true;
   CompanionLinkSlot sent;
   uint8_t secret[COMPANION_SECRET_BYTES];
   {
@@ -1110,40 +1155,49 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     snapshot = !link->snapshotSent;
     sent = *link;
     lastCommand = g_companion.lastCommandSent;
+    ui = g_companion.stored.uiOff == 0;
     memcpy(secret, g_companion.stored.secret, sizeof(secret));
   }
   memset(sent.key, 0, sizeof(sent.key));
   memset(&companionWs().job, 0, sizeof(companionWs().job));
   uint8_t count = 0;
-  const bool configDue = snapshot || outbox.configSequence != sent.sentConfig;
-  const bool config =
-      configDue && companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s}",
-                                    outbox.lmSwitch ? "true" : "false",
-                                    outbox.websocketConnection ? "ws" : "api",
-                                    outbox.observe ? "true" : "false");
-  const bool credentialsDue = outbox.credentialsGeneration != 0 &&
+  const char *uiText = ui ? "true" : "false";
+  const bool configDue =
+      snapshot || outbox.configSequence != sent.sentConfig || ui != sent.sentUi;
+  const bool config = configDue &&
+      (kCompanionLm ? companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s,"
+                                              "\"ui\":%s}",
+                                       outbox.lmSwitch ? "true" : "false",
+                                       outbox.websocketConnection ? "ws" : "api",
+                                       outbox.observe ? "true" : "false", uiText)
+                    : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s}", uiText));
+  bool credentialsDue = false, credentials = false, routeDue = false, route = false,
+       holdDue = false, hold = false, commandDue = false, command = false;
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+  credentialsDue = outbox.credentialsGeneration != 0 &&
       (snapshot || outbox.credentialsGeneration != sent.sentCredentials);
-  const bool credentials = credentialsDue &&
+  credentials = credentialsDue &&
       (outbox.credentialsErase
            ? companionAddBody(count, "\"t\":\"creds\",\"gen\":%lu,\"erase\":true}",
                               static_cast<unsigned long>(outbox.credentialsGeneration))
            : companionCredentialsBody(count, outbox.credentialsGeneration, secret));
-  memset(secret, 0, sizeof(secret));
-  const bool routeDue = snapshot || outbox.routeSequence != sent.sentRoute;
-  const bool route = routeDue && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
-                                                  outbox.routeCompanion ? "companion" : "direct");
-  const bool holdDue = snapshot || outbox.holdSequence != sent.sentHold;
-  const bool hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s}",
-                                                outbox.hold ? "true" : "false");
+  routeDue = snapshot || outbox.routeSequence != sent.sentRoute;
+  route = routeDue && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
+                                       outbox.routeCompanion ? "companion" : "direct");
+  holdDue = snapshot || outbox.holdSequence != sent.sentHold;
+  hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s}",
+                                     outbox.hold ? "true" : "false");
   const char *op = companionCommandName(outbox.commandOp);
-  const bool commandDue = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
-  const bool command = commandDue &&
+  commandDue = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
+  command = commandDue &&
       (outbox.commandOp == MicraCompanionCommandOp::TEMPERATURE
            ? companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\",\"v\":%u}",
                               static_cast<unsigned long>(outbox.commandId), op,
                               static_cast<unsigned>(outbox.commandValue))
            : companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\"}",
                               static_cast<unsigned long>(outbox.commandId), op));
+#endif
+  memset(secret, 0, sizeof(secret));
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = config == configDue && credentials == credentialsDue &&
       route == routeDue && hold == holdDue && command == commandDue;
@@ -1161,7 +1215,10 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   for (auto &slot : g_companion.links) {
     if (slot.fd < 0 || slot.generation != generation) continue;
     slot.snapshotSent = slot.snapshotSent || complete;
-    if (config) slot.sentConfig = outbox.configSequence;
+    if (config) {
+      slot.sentConfig = outbox.configSequence;
+      slot.sentUi = ui;
+    }
     if (route) slot.sentRoute = outbox.routeSequence;
     if (hold) slot.sentHold = outbox.holdSequence;
     if (credentials) slot.sentCredentials = outbox.credentialsGeneration;
@@ -1254,11 +1311,12 @@ void OpenBrewByWeightNetwork::companionLruWork(void *context) {
   self.companionLruPending_.store(false, std::memory_order_release);
 }
 
-// httpd's close_fn (Linea Micra builds): before the socket goes, an
-// authenticated link closed by no decision of ours gets its cause for the
+// httpd's close_fn: before the socket goes, its relay identity is dropped and
+// an authenticated link closed by no decision of ours gets its cause for the
 // Web UI log. httpd closes a peer that is still there only for its LRU purge.
 void OpenBrewByWeightNetwork::companionSocketClose(httpd_handle_t, int fd) {
   OpenBrewByWeightNetwork *self = instance_;
+  if (self != nullptr) self->relayIdentityClear(fd);
   bool unexplained = false;
   if (self != nullptr && self->companionLinkUp_.load(std::memory_order_acquire)) {
     TaskLockGuard lock(self->dataMux_);
@@ -1292,13 +1350,19 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
   bool ok = statusJsonAppend(
       used,
       ",\"companion\":{\"paired\":%s,\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\","
-      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"route\":\"%s\",\"lm\":%s,"
-      "\"upstream\":%s,\"credentials\":%s,\"request\":",
+      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"relay\":\"%s\","
+      "\"relayRejects\":%lu,",
       stored.paired ? "true" : "false", stored.name, stored.address, stored.companionVersion,
       link != nullptr ? "open" : "down", static_cast<long>(companionLinkAgeS(g_companion, now)),
       static_cast<unsigned long>(link != nullptr ? 0 : g_companion.peerProtocol),
-      companionRouteName(route.route), stored.lmSwitch ? "true" : "false",
-      route.upstreamSubscribed ? "true" : "false", route.credentialsConfirmed ? "true" : "false");
+      stored.uiOff ? "false" : "true", g_companion.relay.ready ? "ready" : "down",
+      static_cast<unsigned long>(g_companion.relay.rejects));
+  if (kCompanionLm)
+    ok = ok && statusJsonAppend(
+        used, "\"route\":\"%s\",\"lm\":%s,\"upstream\":%s,\"credentials\":%s,",
+        companionRouteName(route.route), stored.lmSwitch ? "true" : "false",
+        route.upstreamSubscribed ? "true" : "false", route.credentialsConfirmed ? "true" : "false");
+  ok = ok && statusJsonAppend(used, "\"request\":");
   const CompanionRequest &request = g_companion.pairing.request;
   if (request.state == CompanionPairState::PENDING)
     ok = ok && statusJsonAppend(
@@ -1327,6 +1391,9 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
   const CompanionLinkSlot *link = companionActiveLink();
   out.paired = stored.paired != 0;
   out.lmSwitch = stored.lmSwitch != 0;
+  out.ui = stored.uiOff == 0;
+  out.relayReady = g_companion.relay.ready;
+  out.relayRejects = g_companion.relay.rejects;
   out.linkOpen = link != nullptr;
   out.protocol = link != nullptr ? link->protocol : 0;
   out.linkAgeS = companionLinkAgeS(g_companion, now);

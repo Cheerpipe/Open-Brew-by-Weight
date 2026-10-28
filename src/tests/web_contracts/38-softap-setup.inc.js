@@ -97,7 +97,7 @@
 
   // Live apply: /setup saves connect without a restart on the network task.
   if (!domainCore.includes('bool applyLive = false;') ||
-      !codeIncludes(networkHandlerBlock, 'jsonHasOnlyUniqueFields(root,saveFields,13)') ||
+      !codeIncludes(networkHandlerBlock, 'jsonHasOnlyUniqueFields(root,saveFields,14)') ||
       !networkHandlerBlock.includes('"apply"') ||
       !codeIncludes(networkHandlerBlock, 'strcmp(applyMode,"live")!=0') ||
       !codeIncludes(networkHandlerBlock, '!self.snapshot().apActive') ||

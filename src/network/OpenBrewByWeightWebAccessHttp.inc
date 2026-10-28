@@ -31,12 +31,16 @@ OpenBrewByWeightNetwork::PasswordCheck OpenBrewByWeightNetwork::checkDevicePassw
     httpd_req_t *request, const char *password) {
   const uint32_t now = millis();
   // The cooldown is keyed by the peer address, never the port; odd ids keep
-  // 0 free for an empty slot.
+  // 0 free for an empty slot. Through the companion's signed relay the peer
+  // is the browser's address, never the companion's own.
   sockaddr_storage address = {};
   socklen_t addressLength = sizeof(address);
   uint32_t peer = 1;
-  if (getpeername(httpd_req_to_sockfd(request), reinterpret_cast<sockaddr *>(&address),
-                  &addressLength) == 0)
+  char screen[COMPANION_RELAY_SCREEN_TEXT], relayed[COMPANION_RELAY_ADDR_TEXT];
+  if (relayIdentity(request, screen, relayed))
+    peer = webAccessFnv(relayed, strlen(relayed)) | 1U;
+  else if (getpeername(httpd_req_to_sockfd(request), reinterpret_cast<sockaddr *>(&address),
+                       &addressLength) == 0)
     peer = (address.ss_family == AF_INET6
                 ? webAccessFnv(&reinterpret_cast<const sockaddr_in6 &>(address).sin6_addr, 16)
                 : webAccessFnv(&reinterpret_cast<const sockaddr_in &>(address).sin_addr, 4)) | 1U;
@@ -96,7 +100,7 @@ void OpenBrewByWeightNetwork::webAccessSignOut(const uint8_t *keep, bool everyth
   if (keep == nullptr && g_webAccess.stored.enabled != 0) {
     activeWebUiClientId_[0] = '\0';
     adminUnlocked_ = false;
-    adminUnlockClientId_[0] = '\0';
+    adminUnlock_ = CompanionPrincipal{};
     adminUnlockUntilMs_ = 0;
   }
 }
@@ -219,17 +223,23 @@ esp_err_t OpenBrewByWeightNetwork::authLoginHandler(httpd_req_t *request) {
                           body.device);
   }
   // Signing in also claims control for this window, and the password typed
-  // just now opens Admin for it; a later claim clears that as usual.
+  // just now opens Admin for it; a later claim clears that as usual. A
+  // companion screen signs in on the companion's claim, as its claim attaches.
   char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
-  const bool claimed = readWebUiClientId(request, clientId, sizeof(clientId));
+  CompanionPrincipal holder;
+  const bool claimed = readWebUiClientId(request, clientId, sizeof(clientId)) &&
+                       self.webUiPrincipal(request, holder);
   if (claimed) {
     {
       TaskLockGuard lock(self.dataMux_);
-      memcpy(self.activeWebUiClientId_, clientId, sizeof(clientId));
-      self.webUiOverrideActive_ = false;
-      self.webUiOverrideUntilMs_ = 0;
+      if (!holder.relayed || strcmp(self.activeWebUiClientId_, clientId) != 0) {
+        memcpy(self.activeWebUiClientId_, clientId, sizeof(clientId));
+        self.webUiOverrideActive_ = false;
+        self.webUiOverrideUntilMs_ = 0;
+        self.webUiOverride_ = CompanionPrincipal{};
+      }
     }
-    self.grantAdminUnlock(clientId, now);
+    self.grantAdminUnlock(holder, now);
   }
   char json[128] = {};
   char text[WEB_ACCESS_TOKEN_TEXT] = {};
@@ -255,16 +265,19 @@ esp_err_t OpenBrewByWeightNetwork::authLogoutHandler(httpd_req_t *request) {
   uint8_t token[WEB_ACCESS_TOKEN_BYTES] = {};
   char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
   const bool hasToken = readWebAccessToken(request, WEB_UI_SESSION_HEADER, "", token);
-  const bool hasClient = readWebUiClientId(request, clientId, sizeof(clientId));
+  // A companion screen signs out alone: the companion's claim stays for the others.
+  CompanionPrincipal caller;
+  const bool hasClient = readWebUiClientId(request, clientId, sizeof(clientId)) &&
+                         self.webUiPrincipal(request, caller);
   {
     TaskLockGuard lock(self.dataMux_);
     if (hasToken) webAccessRevokeSessions(g_webAccess, token, true);
-    if (hasClient && strcmp(self.activeWebUiClientId_, clientId) == 0) {
+    if (hasClient && !caller.relayed && strcmp(self.activeWebUiClientId_, clientId) == 0) {
       self.activeWebUiClientId_[0] = '\0';
     }
-    if (hasClient && strcmp(self.adminUnlockClientId_, clientId) == 0) {
+    if (hasClient && companionPrincipalHolds(self.adminUnlock_, caller)) {
       self.adminUnlocked_ = false;
-      self.adminUnlockClientId_[0] = '\0';
+      self.adminUnlock_ = CompanionPrincipal{};
     }
   }
   memset(token, 0, sizeof(token));

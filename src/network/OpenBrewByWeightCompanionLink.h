@@ -1,8 +1,8 @@
 #pragma once
 
-// Companion link, controller side (docs/COMPANION_LINK.md), Linea Micra
-// builds: the pairing request, the stored pairing, the link sessions and the
-// handshake and frame codec. Pure state and arithmetic: the network owns it
+// Companion link, controller side (docs/COMPANION_LINK.md), every build: the
+// pairing request, the stored pairing, the link sessions, the handshake and
+// frame codec, and the signed relay. Pure state and arithmetic: the network owns it
 // under dataMux_, feeds times, addresses and random bytes, and supplies the
 // three hash primitives declared below (PSA on the controller, a reference
 // implementation in the host test). Secrets never reach logs or JSON.
@@ -43,7 +43,7 @@ struct CompanionStored {
   uint8_t paired = 0;
   uint8_t lmSwitch = 0;  // La Marzocco through the companion
   uint8_t forgotten = 0;  // forgottenId/forgottenSecret answer with `erase`
-  uint8_t reserved = 0;
+  uint8_t uiOff = 0;  // "Web UI through the companion" off; 0 (on) in older blobs
   uint8_t secret[COMPANION_SECRET_BYTES] = {};
   uint8_t publicKey[COMPANION_KEY_BYTES] = {};
   char id[COMPANION_ID_TEXT] = {};
@@ -70,7 +70,7 @@ inline void finalizeCompanionStored(CompanionStored &stored) {
 inline bool validCompanionStored(const CompanionStored &stored) {
   return stored.magic == COMPANION_MAGIC && stored.version == COMPANION_STORED_VERSION &&
          stored.structureSize == sizeof(CompanionStored) && stored.paired <= 1 &&
-         stored.lmSwitch <= 1 && stored.forgotten <= 1 &&
+         stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
          stored.checksum == companionChecksum(stored);
 }
 
@@ -195,17 +195,19 @@ inline bool companionPairingSecret(const uint8_t ecdhX[32],
          companionHkdfSha256(ecdhX, 32, salt, sizeof(salt), "obbw-companion-pair-v1", secret);
 }
 
+// The link's K (nc ‖ ns), or with "obbw-relay-v1" the relay's Kr (rb ‖ nc).
 inline bool companionSessionKey(const uint8_t secret[COMPANION_SECRET_BYTES],
                                 const uint8_t nc[COMPANION_NONCE_BYTES],
-                                const uint8_t ns[COMPANION_NONCE_BYTES], uint8_t key[32]) {
+                                const uint8_t ns[COMPANION_NONCE_BYTES], uint8_t key[32],
+                                const char *info = "obbw-link-v1") {
   uint8_t salt[2 * COMPANION_NONCE_BYTES];
   memcpy(salt, nc, COMPANION_NONCE_BYTES);
   memcpy(salt + COMPANION_NONCE_BYTES, ns, COMPANION_NONCE_BYTES);
-  return companionHkdfSha256(secret, COMPANION_SECRET_BYTES, salt, sizeof(salt), "obbw-link-v1",
-                             key);
+  return companionHkdfSha256(secret, COMPANION_SECRET_BYTES, salt, sizeof(salt), info, key);
 }
 
-// HMAC(S, tag ‖ nc ‖ ns): `C` proof, `F` ready; `E` erase omits ns.
+// HMAC(S, tag ‖ nc ‖ ns): `C` proof, `F` ready; `E` erase omits ns. The relay
+// handshake signs `R` (request) and `Q` (reply) over rb ‖ nc.
 inline bool companionHandshakeMac(const uint8_t secret[COMPANION_SECRET_BYTES], char tag,
                                   const uint8_t nc[COMPANION_NONCE_BYTES],
                                   const uint8_t *ns, uint8_t mac[32]) {
@@ -265,6 +267,148 @@ inline const char *companionOpenFrame(const uint8_t key[32], const char *text, s
 inline bool companionFrameSequence(const cJSON *frame, uint32_t expected) {
   const cJSON *sequence = cJSON_GetObjectItemCaseSensitive(frame, "q");
   return cJSON_IsNumber(sequence) && sequence->valuedouble == static_cast<double>(expected);
+}
+
+// --- Signed relay: `X-OBBW-Relay: 1 <q> <addr> <screen> <mac>` -------------
+
+constexpr size_t COMPANION_RELAY_HEADER_TEXT = 128;  // the longest header and its NUL
+constexpr size_t COMPANION_RELAY_SCREEN_TEXT = 25, COMPANION_RELAY_ADDR_TEXT = 46;
+constexpr size_t COMPANION_RELAY_MAC_BYTES = 16;
+
+struct CompanionRelayHeader {
+  uint32_t sequence = 0;
+  const char *q = nullptr, *addr = nullptr, *screen = nullptr;  // inside the parsed text
+  uint8_t mac[COMPANION_RELAY_MAC_BYTES] = {};
+};
+
+inline bool companionLowerHex(const char *text, size_t minimum, size_t maximum) {
+  const size_t length = strnlen(text, maximum + 1);
+  if (length < minimum || length > maximum) return false;
+  for (size_t index = 0; index < length; ++index)
+    if (!((text[index] >= '0' && text[index] <= '9') || (text[index] >= 'a' && text[index] <= 'f')))
+      return false;
+  return true;
+}
+
+// Splits the header in place at single spaces. q: canonical decimal from 1;
+// addr: the browser's IPv4 or IPv6 text; screen: its 16-24 lowercase hex
+// X-WebUI-Client; mac: 32 lowercase hex digits.
+inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
+  char *field[5] = {text};
+  for (size_t index = 1; index < 5; ++index) {
+    char *space = strchr(field[index - 1], ' ');
+    if (space == nullptr) return false;
+    *space = '\0';
+    field[index] = space + 1;
+  }
+  const size_t qLength = strlen(field[1]), addrLength = strlen(field[2]);
+  uint64_t sequence = 0;
+  bool ok = strcmp(field[0], "1") == 0 && qLength >= 1 && qLength <= 10 && field[1][0] != '0' &&
+            addrLength >= 2 && addrLength < COMPANION_RELAY_ADDR_TEXT &&
+            strspn(field[2], "0123456789abcdefABCDEF:.") == addrLength &&
+            companionLowerHex(field[3], 16, COMPANION_RELAY_SCREEN_TEXT - 1) &&
+            companionLowerHex(field[4], 2 * COMPANION_RELAY_MAC_BYTES, 2 * COMPANION_RELAY_MAC_BYTES);
+  for (size_t index = 0; ok && index < qLength; ++index) {
+    ok = field[1][index] >= '0' && field[1][index] <= '9';
+    sequence = sequence * 10 + static_cast<uint64_t>(field[1][index] - '0');
+  }
+  if (!ok || sequence > UINT32_MAX) return false;
+  for (size_t index = 0; index < COMPANION_RELAY_MAC_BYTES; ++index) {
+    const char *pair = field[4] + 2 * index;
+    const auto nibble = [](char c) { return static_cast<uint8_t>(c <= '9' ? c - '0' : c - 'a' + 10); };
+    out.mac[index] = static_cast<uint8_t>(nibble(pair[0]) << 4 | nibble(pair[1]));
+  }
+  out.sequence = static_cast<uint32_t>(sequence);
+  out.q = field[1];
+  out.addr = field[2];
+  out.screen = field[3];
+  return true;
+}
+
+// HMAC(Kr, "obbw-relay-v1\nMETHOD\nURI\nq\naddr\nscreen\nsession\n"); the
+// header carries its first 16 bytes. `uri` is the path with its query and
+// `session` the X-WebUI-Session value or "".
+inline bool companionRelayMac(const uint8_t key[32], const char *method, const char *uri,
+                              const CompanionRelayHeader &header, const char *session,
+                              uint8_t mac[32]) {
+  const char *const fields[] = {"obbw-relay-v1", method, uri, header.q, header.addr,
+                                header.screen, session};
+  CompanionBytes parts[14];
+  for (size_t index = 0; index < 7; ++index) {
+    parts[2 * index] = {fields[index], strlen(fields[index])};
+    parts[2 * index + 1] = {"\n", 1};
+  }
+  return companionHmacSha256(key, 32, parts, 14, mac);
+}
+
+// Replay window: the highest q and a bitmap of the 64 below it (bit 0 = high).
+struct CompanionRelayWindow {
+  uint32_t high = 0;
+  uint64_t mask = 0;
+};
+
+inline bool companionRelayAccept(CompanionRelayWindow &window, uint32_t q) {
+  if (q == 0) return false;
+  if (q > window.high) {
+    const uint32_t shift = q - window.high;
+    window.mask = (shift >= 64 ? 0 : window.mask << shift) | 1U;
+    window.high = q;
+    return true;
+  }
+  const uint32_t back = window.high - q;
+  const uint64_t bit = back < 64 ? uint64_t{1} << back : 0;
+  if (bit == 0 || (window.mask & bit) != 0) return false;
+  window.mask |= bit;
+  return true;
+}
+
+// Relay session: rb is the challenge, random per boot and rotated after each
+// handshake; Kr signs relayed requests until the next one. RAM only.
+struct CompanionRelay {
+  uint8_t challenge[COMPANION_NONCE_BYTES] = {};
+  bool challengeSet = false, ready = false;
+  uint8_t key[32] = {};
+  CompanionRelayWindow window = {};
+  uint32_t generation = 0;  // names Kr for an admission that verified outside the lock
+  uint32_t rejects = 0;     // signed-relay requests refused since boot
+};
+
+// Forget and the factory reset end the relay session: relayed requests are
+// stale until a handshake with a new pairing.
+inline void companionRelayDrop(CompanionRelay &relay) {
+  relay.ready = false;
+  memset(relay.key, 0, sizeof(relay.key));
+  relay.window = CompanionRelayWindow{};
+}
+
+// The browser behind a socket's current relayed request; one per httpd socket.
+constexpr size_t COMPANION_RELAY_SOCKETS = 7;  // httpd's max_open_sockets
+struct CompanionRelayIdentity {
+  int fd = -1;
+  char screen[COMPANION_RELAY_SCREEN_TEXT] = {};  // empty: a free entry
+  char addr[COMPANION_RELAY_ADDR_TEXT] = {};
+};
+
+// Admin unlock and the unsafe override each belong to one principal: a direct
+// browser's X-WebUI-Client, or a companion screen named by a signed relay.
+struct CompanionPrincipal {
+  char id[COMPANION_RELAY_SCREEN_TEXT] = {};
+  bool relayed = false;
+};
+
+inline bool companionPrincipalHolds(const CompanionPrincipal &holder,
+                                    const CompanionPrincipal &caller) {
+  return holder.id[0] != '\0' && holder.relayed == caller.relayed &&
+         strcmp(holder.id, caller.id) == 0;
+}
+
+// Home's relay.adminScreen/overrideScreen: the holder's screen as 8 hex
+// digits of FNV-1a, or "" unless a companion screen holds it.
+inline void companionScreenTag(const CompanionPrincipal &holder, char (&tag)[9]) {
+  tag[0] = '\0';
+  if (holder.relayed && holder.id[0] != '\0')
+    snprintf(tag, sizeof(tag), "%08lx",
+             static_cast<unsigned long>(webAccessFnv(holder.id, strlen(holder.id))));
 }
 
 // --- Pairing request (RAM only) ---------------------------------------------
@@ -490,7 +634,7 @@ struct CompanionLinkSlot {
   const char *closeReason = nullptr;
   // Outbox sequences already sent in this session; the first send is the
   // whole snapshot.
-  bool snapshotSent = false;
+  bool snapshotSent = false, sentUi = true;
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
 };
 
@@ -503,12 +647,15 @@ struct CompanionState {
   uint32_t changedAtMs = 0;   // the link last came up or went down; 0: not since boot
   uint32_t peerProtocol = 0;  // the paired companion's refused protocol; 0: none
   uint32_t lastCommandSent = 0;  // a command id is sent once, across sessions
+  CompanionRelay relay = {};
   bool dirty = false;
 };
 
 // Diagnostic → Companion; strings are sanitized on store.
 struct CompanionSnapshot {
-  bool paired = false, lmSwitch = false, linkOpen = false, upstream = false;
+  bool paired = false, lmSwitch = false, linkOpen = false, upstream = false, ui = true,
+       relayReady = false;
+  uint32_t relayRejects = 0;
   uint8_t protocol = 0;   // the open link's; 0 while down
   int32_t linkAgeS = -1;  // since the link came up or went down; -1: not since boot
   uint32_t peerProtocol = 0, reconnects = 0, authFailures = 0, routeSwitches = 0, commands = 0;

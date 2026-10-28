@@ -15,11 +15,11 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   static const char *const brewFields[] = {"action", "brewByWeight", "presetId"};
   static const char *const saveFields[] = {
       "action", "ssid",    "password", "open", "wifiSleep", "ipMode", "ip",
-      "netmask", "gateway", "dns1",    "dns2", "name",      "apply"};
+      "netmask", "gateway", "dns1",    "dns2", "name",      "apply", "baseRevision"};
   const char *networkError = nullptr;
   SetupBrew brew = SetupBrew::NONE;
   uint8_t brewPresetId = 0;
-  bool brewSaveFailed = false;
+  bool brewSaveFailed = false, networkStale = false;
   bool parsed = root != nullptr &&
                 jsonString(root, "action", action, sizeof(action), false);
   // skip, discard, and brew act only for a peer on the running setup network.
@@ -175,22 +175,12 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
                        "Network settings are locked while a cycle is active.");
     }
     command.setNetworkType(WebCommandType::SAVE_NETWORK);
-    char ipMode[16] = {};
-    char ipText[16] = {};
-    char netmaskText[16] = {};
-    char gatewayText[16] = {};
-    char dns1Text[16] = {};
-    char dns2Text[16] = {};
-    const bool hasIp = cJSON_GetObjectItemCaseSensitive(root, "ip") != nullptr;
-    const bool hasNetmask =
-        cJSON_GetObjectItemCaseSensitive(root, "netmask") != nullptr;
-    const bool hasGateway =
-        cJSON_GetObjectItemCaseSensitive(root, "gateway") != nullptr;
-    const bool hasDns1 =
-        cJSON_GetObjectItemCaseSensitive(root, "dns1") != nullptr;
-    const bool hasDns2 =
-        cJSON_GetObjectItemCaseSensitive(root, "dns2") != nullptr;
-    if (!jsonHasOnlyUniqueFields(root, saveFields, 13) ||
+    char ipMode[16] = {}, ipText[16] = {}, netmaskText[16] = {}, gatewayText[16] = {},
+         dns1Text[16] = {}, dns2Text[16] = {};
+    const bool hasIp = jsonFieldPresent(root, "ip"), hasNetmask = jsonFieldPresent(root, "netmask"),
+               hasGateway = jsonFieldPresent(root, "gateway"),
+               hasDns1 = jsonFieldPresent(root, "dns1"), hasDns2 = jsonFieldPresent(root, "dns2");
+    if (!jsonHasOnlyUniqueFields(root, saveFields, 14) ||
         !jsonString(root, "ssid", command.network.ssid, sizeof(command.network.ssid), false) ||
         !jsonString(root, "password", command.network.password,
                     sizeof(command.network.password), true) ||
@@ -243,8 +233,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
           "Device name must be 1-32 letters, digits, spaces, or hyphens, "
           "without a leading or trailing space or hyphen.";
     }
-    const bool hasApply =
-        cJSON_GetObjectItemCaseSensitive(root, "apply") != nullptr;
+    const bool hasApply = jsonFieldPresent(root, "apply");
     if (parsed && hasApply) {
       char applyMode[8] = {};
       if (!jsonString(root, "apply", applyMode, sizeof(applyMode), false) ||
@@ -258,6 +247,10 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
         command.network.applyLive = true;
       }
     }
+    // A form filled before another screen saved is refused (Admin's revision).
+    networkStale = parsed &&
+        !baseRevisionCurrent(root, networkRevision(self.settings_, self.dataMux_));
+    parsed = parsed && !networkStale;
     if (parsed) {
       command.network.wifiSleepSpecified = true;
     }
@@ -303,6 +296,10 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     if (brewSaveFailed) {
       return sendError(request, STATUS_UNAVAILABLE, "SETUP_BREW_SAVE_FAILED",
                        "Could not save the brewing choice.");
+    }
+    if (networkStale) {
+      return sendError(request, STATUS_CONFLICT, "STALE_REVISION",
+                       "Network settings changed; refresh and retry.");
     }
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_NETWORK",
                      networkError != nullptr

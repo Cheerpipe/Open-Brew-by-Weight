@@ -214,6 +214,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
     } else if (ok) {
       // Admin page: Wi-Fi/AP status + STA address form hydration only.
       // Diagnostics metrics ride the owned UI WebSocket stream.
+      const uint32_t networkRev = networkRevision(self.settings_, self.dataMux_);
       ok = statusJsonAppend(
           &used,
           ",\"network\":{\"apActive\":%s,\"apSsid\":\"%s\",\"apIp\":\"%s\",\"apClients\":%u,"
@@ -226,7 +227,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
           "\"configuredIp\":\"%s\",\"configuredNetmask\":\"%s\","
           "\"configuredGateway\":\"%s\",\"configuredDns1\":\"%s\","
           "\"configuredDns2\":\"%s\","
-          "\"deviceName\":\"%s\",\"mdnsHost\":\"%s\"},"
+          "\"deviceName\":\"%s\",\"mdnsHost\":\"%s\",\"revision\":%lu},"
           "\"bleScan\":{\"scanIntensity\":\"%s\",\"enabled\":%s}",
           network.apActive ? "true" : "false", safeApSsid, network.iface.apIp,
           static_cast<unsigned>(network.apClients),
@@ -242,17 +243,16 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
           staSignalQualityJson, network.iface.configuredIp, network.iface.configuredNetmask,
           network.iface.configuredGateway, network.iface.configuredDns1,
           network.iface.configuredDns2, safeDeviceName, safeMdnsHost,
+          static_cast<unsigned long>(networkRev),
           bleScanIntensityName(clampBleScanIntensity(
               control.bleScanIntensity)),
           control.bleScanEnabled ? "true" : "false");
       if (ok) ok = self.appendWebAccessStatus(request, &used);
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
       if (ok) ok = self.appendCompanionStatus(&used);
-#endif
       if (ok) {
         ok = statusJsonAppend(
             &used,
-            ",\"webhooks\":{\"enabled\":%s,\"url\":\"%s\","
+            ",\"webhooks\":{\"enabled\":%s,\"url\":\"%s\",\"revision\":%lu,"
             "\"brewState\":%s,\"firstDrop\":%s,\"end\":%s,"
             "\"deferDuringShot\":%s,"
             "\"workerReady\":%s,\"sending\":%s,\"lastSuccess\":%s,"
@@ -271,6 +271,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
             "\"psramLargestBefore\":%lu,\"psramLargestAfter\":%lu},"
             "\"lastCommand\":{\"requestId\":%lu,\"state\":\"%s\"}",
             webhookConfig.enabled ? "true" : "false", safeWebhookUrl,
+            static_cast<unsigned long>(webhookRevision(webhookConfig)),
             webhookConfig.brewState ? "true" : "false",
             webhookConfig.firstDrop ? "true" : "false",
             webhookConfig.end ? "true" : "false",
