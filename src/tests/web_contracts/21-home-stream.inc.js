@@ -6,12 +6,12 @@
   const validator = runtimeJs.slice(runtimeJs.indexOf('function statusPageOk('),
     runtimeJs.indexOf('async function loadStatus('));
   const sockets = [], timers = new Map(), rendered = [], common = [];
-  let timer = 0, mutable = false, owner = true, reachOk = 0;
+  let timer = 0, mutable = false, owner = true, reachOk = 0, takenBy;
   class Socket {
     static OPEN = 1;
     constructor(url) { this.url = url; this.readyState = 1; this.sent = []; sockets.push(this); }
     send(value) { const m = JSON.parse(value); this.sent.push(m, ...(m.ops || [])); }
-    close(code = 1006) { this.readyState = 3; this.onclose?.({code}); }
+    close(code = 1006, reason = "") { this.readyState = 3; this.onclose?.({code, reason}); }
   }
   const context = {
     WebSocket: Socket, location: {protocol: 'http:', host: 'device.local'},
@@ -26,7 +26,7 @@
     applyPairingPrompt() {},
     setMutable: value => { mutable = value; }, noteReachOk: () => { reachOk++; }, noteReachFail() {}, hideHomeBoot() {},
     clearCupWeights() {}, updateHeaderSignals() {}, updateHomeAdminActions() {}, setHomeSub() {},
-    deactivateWebUi: () => { owner = false; }, $: () => null, console: {error() {}}, ingestPresets() {},
+    deactivateWebUi: (reason) => { owner = false; takenBy = reason; }, $: () => null, console: {error() {}}, ingestPresets() {},
   };
   vm.runInNewContext(validator + source, context);
   const status = {firmwareVersion: 'test', bootId: 7, configMutable: true, timeUtcSec: 1700000000,
@@ -55,6 +55,11 @@
     changes: {'scale.available': false, 'scale.observedWeightG': null, 'scale.timerMs': null}});
   assert.equal(lost.status.scale.timerMs, null);
   assert.equal(second.boot, 7, 'an increment keeps the snapshot boot');
+  // A relayed session names the screens holding the Admin unlock and the
+  // override; the Home cache keeps them like any other nested field.
+  const relayed = context.statusStreamFrame(second, {...patch,
+    changes: {'relay.adminScreen': '1a47e90b', 'relay.overrideScreen': ''}});
+  assert.deepEqual({...relayed.status.relay}, {adminScreen: '1a47e90b', overrideScreen: ''});
   for (const [previous, bad] of [[null, patch],
     [first, {...patch, changes: {'scale.timerMs': Infinity}}],
     [first, {...patch, changes: {'config.constructor.prototype': {poisoned: true}}}],
@@ -114,7 +119,8 @@
   assert.equal(sockets[1].readyState, Socket.OPEN, 'queued Home/shot deltas must be discarded during resync');
   sockets[1].onmessage({data: JSON.stringify(initial)});
   assert(mutable);
-  sockets[1].close(4001); assert.equal(owner, false, 'takeover must deactivate the old Home without REST');
+  sockets[1].close(4001, 'direct'); assert.equal(owner, false, 'takeover must deactivate the old Home without REST');
+  assert.equal(takenBy, 'direct', 'the companion\'s reason reaches the takeover text');
   const polling = runtimeJs.slice(runtimeJs.indexOf('function armStatusTimer('), runtimeJs.indexOf('function pad2('));
   assert(!polling.includes("activeView!=='home'"), 'Home must not arm the REST polling timer');
   assert(codeIncludes(runtimeJs, "s=v==='home'?await loadHomeStatus():v==='diagnostic'?await loadDiagnosticStatus():v==='settings'?await loadSettingsStatus():await api('/api/v1/status/admin')"),

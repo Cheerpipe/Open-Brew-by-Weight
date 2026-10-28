@@ -112,6 +112,36 @@
          codeIncludes(adminUi, "finally{webhookSaving=false;$('saveWebhookButton').classList.remove('busy')}") &&
          codeIncludes(adminUi, 'if(webhookSaving)return;'),
     'Webhook saving must keep its dedicated busy feedback');
+  // Admin sections saved whole carry the revision their form was filled from
+  // (several screens through the companion): never the latest one, never one
+  // the browser made up, and a refused save shows the saved values again.
+  for (const [fill, send, clean] of [
+    ['formRevisions.dateTime=c.revision', '{...payload,baseRevision:formRevisions.dateTime}',
+      "formStale(e,()=>sectionDirty('dateTime',false))"],
+    ['formRevisions.scheduledRestart=c.revision', 'baseRevision:formRevisions.scheduledRestart,',
+      "formStale(e,()=>sectionDirty('scheduledRestart',false))"],
+    ['formRevisions.webhooks=w.revision', 'baseRevision:formRevisions.webhooks,',
+      'formStale(e,()=>(webhookDirty=false))'],
+    ['formRevisions.network=n.revision', 'baseRevision:formRevisions.network,', ''],
+  ])
+    assert(codeIncludes(adminUi, fill) && codeIncludes(adminUi, send) && codeIncludes(adminUi, clean),
+        'Admin form revision: ' + send);
+  assert(!codeIncludes(adminUi, 'withBaseRev({...payload})') &&
+         !codeIncludes(adminUi, 'withBaseRev({scheduledRestartEnabled') &&
+         codeIncludes(blockAt(adminUi, 'function loadNetworkAddress('), 'formRevisions.network=n.revision') &&
+         codeIncludes(adminUi, "elseif($('saveNetworkButton').dataset.dirty!=='1')R.resetNetworkAddressLoaded()"),
+    'Admin forms save against their own revision, and a Wi-Fi sleep save reloads a clean network form');
+  {
+    const run = vm.createContext({R: {message: (text, kind) => { run.shown = [text, kind]; }},
+      __WEBUI_TEXT__: (key) => key});
+    vm.runInContext(blockAt(rawViewJs.admin, 'function formStale('), run);
+    let cleaned = 0;
+    assert.equal(run.formStale({status: 409, code: 'CONFIG_REVISION_STALE'}, () => cleaned++), true);
+    assert.deepEqual([cleaned, ...run.shown], [1, 'admin.changed_elsewhere', 'error']);
+    assert.equal(run.formStale({status: 409, code: 'UI_TAKEN_OVER'}, () => cleaned++), false);
+    assert.equal(run.formStale({status: 400, code: 'INVALID_FIELD'}, () => cleaned++), false);
+    assert.equal(cleaned, 1, 'only a stale revision drops the edits');
+  }
 }
 
 // Execute the Settings autosave with the preferred-scale choice: only the

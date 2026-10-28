@@ -49,12 +49,13 @@ Only one window controls the controller at a time, as before. Opening the Web
 UI on another device moves control there, and the first window offers
 **Reload** to take it back without signing in again.
 
-Through [Open Brew by Weight Companion](../features/companion.md), every phone,
-tablet or computer that uses the companion shares that control, and each one
-signs in on its own. Admin stays unlocked only on the screen where you typed
-the password: unlocking it on another screen locks it on the first. Opening
-the controller's own address on any device still takes control from all of
-them.
+Through an [Open Brew by Weight Companion](../features/companion.md), your
+phone, tablet and computer can all use the Web UI at the same time, each on
+its own page. Each screen signs in on its own, and Admin unlocks for one
+screen at a time: unlocking it on the tablet locks it again on the phone.
+Opening the Web UI directly on the controller's own address still takes
+control: every companion screen pauses and explains why, and **Reload** on any
+of them brings control back to the companion.
 
 ## What it protects, and what it doesn't
 
@@ -83,7 +84,10 @@ controller's IP address, and apps or scripts using that name get an error.
 An [Open Brew by Weight Companion](../features/companion.md) asks to pair and
 connects without the password: its request only asks, approving it needs
 Admin unlocked, and from then on it proves the secret it shares with this
-controller. The companion only connects from your local network.
+controller. The companion only connects from your local network. The
+password still applies to every screen that opens the Web UI through it, and
+the controller still tells those screens apart: five wrong passwords pause
+only the phone or computer that typed them.
 
 ## Home Assistant
 
@@ -193,8 +197,9 @@ To check how a phone or computer is reaching the Web UI, open
 browser tab (**Web**) or from the home screen (**PWA**), whether it came
 straight from the controller (**Direct**), through
 [Open Brew by Weight Companion](../features/companion.md) (with the
-companion's name), or through another **HTTPS proxy**, and whether the
-offline copy is **Active** on that device.
+companion's name and how many screens it serves right now), or through
+another **HTTPS proxy**, and whether the offline copy is **Active** on that
+device.
 
 ## Forgot the password
 

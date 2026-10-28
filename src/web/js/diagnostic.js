@@ -409,19 +409,18 @@ let micraDiagnosticStatus = null;
 // Facts about this browser, not the controller. The firmware serves plain HTTP
 // only, so an https: page always came through a reverse proxy, and only there
 // can the service worker keep the offline copy. The companion names itself at
-// a same-origin path; a direct page never asks the controller for it.
-let screenCompanion = "";
+// a same-origin path, with the screens it serves; a direct page never asks the
+// controller for it.
 function renderScreen() {
   const t = __WEBUI_TEXT__("diagnostic.screen_states").split("|"),
-    sw = navigator.serviceWorker;
+    sw = navigator.serviceWorker,
+    c = R.uiState.companionHere,
+    screens = Array.isArray(c?.screens) ? c.screens.length : c?.screens;
   $("dUiMode").textContent =
     matchMedia("(display-mode: standalone)").matches || navigator.standalone ? t[1] : t[0];
   $("dUiAccess").textContent =
-    (location.protocol !== "https:"
-      ? t[2]
-      : screenCompanion
-        ? R.sub(t[7], [screenCompanion])
-        : t[3]) +
+    (location.protocol !== "https:" ? t[2] : c ? R.sub(t[7], [c.name]) : t[3]) +
+    (screens > 0 ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.screen_count"), [screens]) : "") +
     " · " +
     location.host;
   $("dUiOffline").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
@@ -443,10 +442,21 @@ function renderCompanionDiagnostic(c) {
   );
   t("dCoLink", c.link + (c.linkAgeS >= 0 ? " · " + formatUptime(c.linkAgeS * 1e3) : ""));
   t("dCoLinkCounts", pair(c.reconnects, c.authFailures));
+  const on = (v) => (v ? __WEBUI_TEXT__("runtime.on_2") : __WEBUI_TEXT__("runtime.off_2"));
+  // The relay serves the screens; refused relayed requests count separately.
+  t(
+    "dCoUi",
+    on(c.ui !== false) +
+      (c.relay ? " · " + c.relay : "") +
+      (c.relayRejects > 0
+        ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.companion_rejects"), [c.relayRejects])
+        : ""),
+  );
+  if (!__LINEA_MICRA__) return;
   t("dCoRoute", c.route + (c.reason ? " · " + c.reason.replace(/_/g, " ") : ""));
   t(
     "dCoLm",
-    (c.lm ? __WEBUI_TEXT__("runtime.on_2") : __WEBUI_TEXT__("runtime.off_2")) +
+    on(c.lm) +
       " · " +
       __WEBUI_TEXT__("diagnostic.companion_upstream").split("|")[c.upstream ? 0 : 1],
   );
@@ -639,7 +649,7 @@ function applyDiagnosticLive(s) {
 let lastCmdFailShown = 0;
 function applyDiagnosticStatus(s) {
   if (!s) return;
-  const u = !!s.adminUnlocked;
+  const u = R.adminUnlockedFor(s);
   R.syncAdminSessionUi(u);
   // Reads stay public; actions follow the firmware gate.
   for (const e of document.querySelectorAll(".diagGate"))
@@ -1522,7 +1532,7 @@ export function applyStatus(s) {
   if (!s) return;
   if (__LINEA_MICRA__ && s.lineaMicra)
     renderMicraCloudDiagnostic(s.lineaMicra, s.companion?.route === "companion");
-  if (__LINEA_MICRA__ && s.companion) renderCompanionDiagnostic(s.companion);
+  if (s.companion) renderCompanionDiagnostic(s.companion);
   const sc = s.scale || {};
   applyScaleCommands(sc);
   applyDiagnosticGuards(s);
@@ -1561,14 +1571,7 @@ export function init() {
   R.initGroupRows($("diagnosticsPanel"), "dg-");
   renderScreen();
   navigator.serviceWorker?.addEventListener("controllerchange", renderScreen);
-  if (location.protocol === "https:")
-    fetch("/__companion/status", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        screenCompanion = typeof j?.name === "string" ? j.name : "";
-        renderScreen();
-      })
-      .catch(() => {});
+  R.companionHere(true).then(renderScreen);
   for (const section of $("diagnosticsPanel").querySelectorAll(".cfgGroup")) {
     const title = section.firstElementChild;
     // Press-and-hold copy: cancel on release, pointer exit, or a browser
@@ -1781,7 +1784,7 @@ function updateCrashRow(s) {
     supported = s.crashState !== 1,
     usable =
       !!R.webUiOwner &&
-      (!!s.adminUnlocked || !!s.development) &&
+      (R.adminUnlockedFor(s) || !!s.development) &&
       supported &&
       count > 0 &&
       !crashBusy;

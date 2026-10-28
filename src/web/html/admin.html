@@ -28,7 +28,7 @@
     <circle cx="8" cy="15" r="4" />
     <path d="m11 12 9-9m-4 4 3 3m-6 0 2 2" />
   </symbol>
-  <symbol id="g-companion" class="micraOnly" viewBox="0 0 24 24">
+  <symbol id="g-companion" viewBox="0 0 24 24">
     <rect x="4" y="4" width="16" height="7" rx="1.5" />
     <rect x="4" y="13" width="16" height="7" rx="1.5" />
     <path d="M8 7.5h.01M8 16.5h.01" />
@@ -622,10 +622,16 @@
       </div>
     </form>
   </details>
-  <details id="companionPanel" data-g="companion" class="cfgGroup micraOnly">
+  <details id="companionPanel" data-g="companion" class="cfgGroup">
     <summary>{{webui:admin.companion}}</summary>
     <form id="companionConnect" class="enterForm" novalidate>
       <p class="fieldHint">{{webui:admin.companion_intro}}</p>
+      <div id="companionHere" class="accessRow" hidden>
+        <span id="companionHereText"></span>
+        <button id="companionPairButton" class="btnGlyph btnInvert" type="button">
+          <span class="t">{{webui:home.companion_pair}}</span>
+        </button>
+      </div>
       <label
         >{{webui:admin.companion_connect_at}}
         <input
@@ -656,7 +662,7 @@
           maxlength="6"
           autocomplete="one-time-code" /><small id="companionCodeHint" class="fieldHint"></small
       ></label>
-      <label
+      <label class="micraOnly"
         ><input id="companionApproveLm" type="checkbox" role="switch" checked />
         {{webui:admin.companion_lm}}<small class="fieldHint"
           >{{webui:admin.companion_lm_approve_hint}}</small
@@ -684,10 +690,16 @@
       <div class="accessRow">
         <span><b>{{webui:admin.companion_link}}</b> <span id="companionLinkState"></span></span>
       </div>
-      <div class="accessRow">
+      <div class="accessRow micraOnly">
         <span><b>{{webui:admin.companion_route}}</b> <span id="companionRouteState"></span></span>
       </div>
       <label
+        ><input id="companionUi" type="checkbox" role="switch" checked />
+        {{webui:admin.companion_ui}}<small class="fieldHint"
+          >{{webui:admin.companion_ui_hint}}</small
+        ></label
+      >
+      <label class="micraOnly"
         ><input id="companionLm" type="checkbox" role="switch" /> {{webui:admin.companion_lm}}<small
           class="fieldHint"
           >{{webui:admin.companion_lm_hint}}</small

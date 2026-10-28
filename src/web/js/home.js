@@ -88,26 +88,38 @@ export function applyStatus(s) {
 // which the controller keeps for every phone. A companion's pairing request
 // has no dismissal: it lasts ten minutes at most, Admin's Ignore is the
 // lasting answer, and a key could not tell a new request from an old one.
+// A page that came through an unpaired companion offers to pair it; a request
+// coming or going refreshes that companion's own status (its code, its state).
 const cardKey = (id) => "obbwCard:" + id.replace(/Hint$/, "");
+let companionAsked = false;
 function renderHints(s) {
   if (!s) return;
   // A preset change means the recipe has been looked at.
   if (recipeTag && s.presetsTag !== recipeTag) R.dismissCard(cardKey("recipeHint"));
   recipeTag = s.presetsTag;
   let free = $("grindHintCard")?.hidden !== false;
-  // Micra builds show Admin → Companion only with the cloud integration on.
-  const request =
-    __LINEA_MICRA__ && s.machineIntegration === "linea_micra_cloud" && s.companion?.requestName;
+  const request = s.companion?.requestName,
+    here = R.uiState.companionHere,
+    code = here?.pairing?.state === "pending" && here.pairing.code;
+  if (!!request !== companionAsked) {
+    companionAsked = !!request;
+    R.companionHere(true).then(() => renderHints(R.homeStatusCache()));
+  }
   if (request) {
     $("companionHintTitle").textContent = R.sub(__WEBUI_TEXT__("home.companion_hint_title"), [
       request,
     ]);
-    $("companionHintText").textContent = R.sub(__WEBUI_TEXT__("home.companion_hint_text"), [
-      s.companion.requestAddress,
-    ]);
+    $("companionHintText").textContent = code
+      ? R.sub(__WEBUI_TEXT__("home.companion_hint_code"), [code])
+      : R.sub(__WEBUI_TEXT__("home.companion_hint_text"), [s.companion.requestAddress]);
   }
+  if (here)
+    $("companionPairHintText").textContent = R.sub(__WEBUI_TEXT__("home.companion_pair_text"), [
+      here.name,
+    ]);
   for (const [id, want] of [
     ["companionHint", !!request],
+    ["companionPairHint", !request && R.companionPairable()],
     ["accessHint", !accessHintClosed && s.access?.notice],
     [
       "micraCloudHint",
@@ -221,6 +233,7 @@ export function init() {
     $("grindHintLater").onclick = () => R.dismissCard($("grindHintCard").dataset.key);
   for (const id of [
     "companionHint",
+    "companionPairHint",
     "accessHint",
     "micraCloudHint",
     "recipeHint",
@@ -253,6 +266,13 @@ export function init() {
         "",
         __WEBUI_TEXT__("runtime.could_not_save_shared_settings"),
       );
+  $("companionPairHintPair").onclick = async ({ currentTarget: b }) => {
+    b.disabled = true;
+    await R.pairCompanionHere().catch((e) => R.message(e.message, "error"));
+    b.disabled = false;
+    renderHints(R.homeStatusCache());
+  };
+  R.companionHere().then(() => renderHints(R.homeStatusCache()));
   R.registerViewStatus("homeHints", renderHints);
   quickWeight = initQuickWeight();
   quickWeightWanted = new URLSearchParams(location.search).has("edit_weight");

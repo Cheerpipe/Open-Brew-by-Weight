@@ -731,7 +731,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     id => id === 'crashArchiveValue' ? value
         : id === 'crashArchiveRow' ? {} : {closest: () => misc},
     key => key,
-    {webUiOwner: true}, busy,
+    {webUiOwner: true, adminUnlockedFor: (s) => !!s.adminUnlocked}, busy,
     () => { downloads++; }, () => { empties++; },
     {createElement: tag => ({tag, className: '', _text: '',
         get textContent() { return this._text; },
@@ -1521,7 +1521,7 @@ if (!statsSection ||
     assert.ok(network.includes('requestPendingNetworkConfirm()'),
         'Accepted socket ops keep confirming pending station settings');
     // The edit gate and override flag reach record pages through Home.
-    assert.ok(codeIncludes(rawRuntimeJs, 'setMutable(!!s.configMutable||!!s.webUiOverrideActive);'));
+    assert.ok(codeIncludes(rawRuntimeJs, 'setMutable(!!s.configMutable||webUiOverrideFor(s));'));
   })().catch(error => {console.error(error); process.exitCode = 1;});
 }
 {
