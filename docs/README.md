@@ -22,6 +22,7 @@ needed rather than reading the entire directory.
   [activation history](features/activation-history.md)
 - [Home Assistant integration](features/home-assistant.md) ([integration repository](https://github.com/Cheerpipe/ha-open-brew-by-weight))
 - [Generic webhooks](features/webhooks.md)
+- [Open Brew by Weight Companion](features/companion.md) ([companion repository](https://github.com/Cheerpipe/open-brew-by-weight-companion))
 
 ## Settings
 
@@ -70,6 +71,7 @@ risk gate in [VALIDATION.md](../VALIDATION.md).
 | BLE protocols | library README, `CONCURRENCY.md` | `libraries/EspressoScaleBLE/src/`, `src/OpenBrewByWeightScaleWorker.cpp` | library tests, main host BLE-scan cases | `./scripts/dev test ble` |
 | Network/Webhooks | feature docs, `RESOURCE_OWNERSHIP.md` | `src/OpenBrewByWeightNetwork*`, `src/OpenBrewByWeightWebhook*` | `webhook_error_host_test.cpp`, Web contract tests | `./scripts/dev validate --risk R2` |
 | Integration API | [`INTEGRATION_API.md`](INTEGRATION_API.md) | network/webhook sources | shared JSON fixtures and integration tests | `./scripts/dev validate --risk R3` |
+| Companion link protocol | [`COMPANION_LINK.md`](COMPANION_LINK.md) | `src/machine/OpenBrewByWeightMicraCompanion.h`, `src/network/OpenBrewByWeightCompanion*` | `docs/schemas/companion-link-v1.vectors.json`, companion link host tests | `./scripts/dev validate --risk R3` |
 | Shot trace format and flash pool | [`SHOT_TRACE.md`](SHOT_TRACE.md) | `src/OpenBrewByWeightShotTrace.h`, `src/OpenBrewByWeightShotTracePool.h`, `src/diagnostics/OpenBrewByWeightShotTraceRoutes.inc` | `TRC*`/`TPW*` host cases, `src/tests/shot_trace_test_decoder.h`, `shot_trace_pool_host_test.cpp`, `shot_trace_routes_host_test.cpp` | `./scripts/dev test normal` |
 | Shot export formats and the trace view | [`schemas/README.md`](schemas/README.md) | `src/web/js/stats.js` (`shotsJson`, `decodeShotTrace`, `shotGaggiuino`, `shotVisualizer`, `shotBeanconquerorLink`) | `33-shot-export.inc.js` | `./scripts/dev test web` |
 | Firmware OTA | `features/ota.md`, `features/ota-image-identity.md`, `EMERGENCY_RECOVERY.md` | `scripts/internal/ota-idf`, `src/OpenBrewByWeightOta*` | OTA host, CLI, and Web resilience tests | `./scripts/dev test ota` |

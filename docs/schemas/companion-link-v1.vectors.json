@@ -1,0 +1,25 @@
+{
+  "description": "Companion link v1 test vectors (docs/COMPANION_LINK.md). Private scalars are test-only.",
+  "companionPrivate": "2e81dffcbc3a2d1b5cc74347ec38bbd731eb73244cfdd70cc1ce063a7c1fb508",
+  "controllerPrivate": "2b80d0771d0754ad6827e5424ca8bd0866bd04e3e870f2bcf31aa527970411f8",
+  "companionKey": "BGj34BgnnHxylAr96pvcuEFJlqzfUCJaYwY0z+vwhmxNnW7szp6gW5NVvrzNOaIE7TsBVM0cC2zm5Ik+kipaE34=",
+  "controllerKey": "BD9995t/HMtQbQe7O+8nEepWL2oVeRfUiSgS+45DO4MJJfCDXSuakWTs041/gj/0r1QhGL3rZnoEfSIpyNuWgsk=",
+  "sas": "679708",
+  "ecdhX": "e54750e10ed74254fea8fb22a8ce5d49fac585f02404ed9c400bcd2493af8522",
+  "pairingSecret": "9aa6a19229c432333eeae2b4e254d5cf7f86d0fca472517809c29a804b5baa53",
+  "companionNonce": "AAECAwQFBgcICQoLDA0ODw==",
+  "controllerNonce": "EBESExQVFhcYGRobHB0eHw==",
+  "sessionKey": "4aa78a337e1f1508d2117167f27bcf49dbbd2d9288b144831b07deace530633c",
+  "proof": "bE5ZsIu/hJaGL5e825vSJR2JEghkFeJ3vJivGV8/aWk=",
+  "ready": "rHiqPz77e2YUez0mDKJ78FKntdjtv7HY5LQSEU8/ad0=",
+  "erase": "FIlKLyITh/HIf1ZDQZbvg7aUTSoqAnq7PIFCwQsVbT8=",
+  "companionFrame": "dd1b71ac4f18a1a7cd7a27697afce9c5.{\"q\":1,\"t\":\"ping\",\"up\":true}",
+  "controllerFrame": "5d9f48aea3d1e95b37652b9dd3cdb5db.{\"q\":1,\"t\":\"cfg\",\"lm\":true,\"conn\":\"ws\",\"observe\":true}",
+  "credentialsKey": "84702b299e7937de5a49726d1355358bbe0c4b358a53352e56c766464618fc19",
+  "credentials": {
+    "gen": 3,
+    "iv": "ICEiIyQlJicoKSor",
+    "plaintext": "{\"email\":\"barista@example.com\",\"password\":\"correct horse\",\"serial\":\"MR012345\"}",
+    "ct": "640SoZajkEzuVzZyvBa8WKwnY6NcZPiYL5sLMRP6/JveA6BzVC8P43WciOAwP1HJuSyxn7TfOmWYnw+zW+S96xrl5m2nd+sMVTYqFgjEH+Ur8rEWY+T7+FD2C9bYWw=="
+  }
+}
