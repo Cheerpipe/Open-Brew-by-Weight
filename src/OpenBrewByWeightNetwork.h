@@ -953,6 +953,8 @@ class OpenBrewByWeightNetwork {
   static esp_err_t companionLinkHandler(httpd_req_t *request);
   static void companionLinkFree(void *context);
   static void companionSendWork(void *context);
+  static void companionLruWork(void *context);
+  static void companionSocketClose(httpd_handle_t handle, int fd);
   static void companionOutboxChanged();
   esp_err_t companionLinkRefuse(CompanionLinkSlot &slot, const char *reason, bool authentication);
   esp_err_t companionLinkFrame(httpd_req_t *request, CompanionLinkSlot &slot, size_t length);
@@ -960,7 +962,8 @@ class OpenBrewByWeightNetwork {
                                const char *type);
   esp_err_t companionLinkProof(httpd_req_t *request, CompanionLinkSlot &slot, cJSON *frame,
                                const char *type);
-  esp_err_t companionLinkInbound(CompanionLinkSlot &slot, cJSON *frame, const char *type);
+  esp_err_t companionLinkInbound(CompanionLinkSlot &slot, cJSON *frame, const char *type,
+                                 MicraCompanionIngress ingress);
   void beginCompanion();
   void resetCompanion();
   void serviceCompanion(uint32_t now);
@@ -972,8 +975,9 @@ class OpenBrewByWeightNetwork {
   void companionRequestLabels(char (&name)[COMPANION_NAME_TEXT],
                               char (&address)[COMPANION_ADDRESS_TEXT]);
   std::atomic<bool> companionNotified_{false}, companionSendPending_{false},
-      companionLinkUp_{false};
+      companionLinkUp_{false}, companionSendRetry_{false}, companionLruPending_{false};
   uint32_t companionRetryAtMs_ = 0;  // 0 = no failed save waiting
+  uint32_t companionLruAtMs_ = 0;  // network task: the last LRU refresh queued
 #endif
   bool diagnosticPageEnabled();
   bool webUiOverrideAllowed(httpd_req_t *request);

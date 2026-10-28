@@ -1530,7 +1530,8 @@ struct MicraWebSocketTest {
   static bool frame(OpenBrewByWeightMicraService &service, MicraCompanionStateKind kind,
                     const char *body, uint32_t afterCommand = 0, uint32_t epoch = 7) {
     cJSON *root = cJSON_Parse(body);
-    const bool ok = service.companionState(kind, epoch, afterCommand, root);
+    const bool ok =
+        service.companionState(kind, epoch, afterCommand, root, service.companionIngress());
     cJSON_Delete(root);
     return ok;
   }
@@ -1605,12 +1606,16 @@ struct MicraWebSocketTest {
     assert(service.backflush().ready);
     now += 30000;
     assert(!service.backflush().valid);
-    // Another epoch or a malformed frame never feeds the fence.
+    // Another epoch or a malformed frame never feeds the fence. A rejected
+    // push fails the feed (the link closes); a rejected read or full frame is
+    // ignored, as a failed direct read is.
     const auto sample = service.published_.sampleAtMs;
     assert(frame(service, MicraCompanionStateKind::PUSH, kStandby, 0, 8));
     assert(!frame(service, MicraCompanionStateKind::PUSH, R"({"widgets":7})"));
-    assert(!frame(service, MicraCompanionStateKind::READ, R"({"connected":true})"));
+    assert(frame(service, MicraCompanionStateKind::READ, R"({"connected":true})"));
+    assert(frame(service, MicraCompanionStateKind::FULL, R"({"widgets":7})"));
     assert(service.published_.sampleAtMs == sample);
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
     // No HTTPS session, dashboard read or socket was opened on the way.
     assert(dashboardReads == reads && sessionCalls == sessions && initCalls == inits);
     finish(service);
@@ -1627,7 +1632,14 @@ struct MicraWebSocketTest {
     deliver(socket, observation(socket, dashboard));
     assert(frame(feed, MicraCompanionStateKind::PUSH, dashboard));
     const auto a = socket.status(), b = feed.status();
-    assert(std::memcmp(&a, &b, sizeof(a)) == 0);
+    // Every member, not the two padding gaps: those bytes are indeterminate.
+    const auto *bytesA = reinterpret_cast<const unsigned char *>(&a);
+    const auto *bytesB = reinterpret_cast<const unsigned char *>(&b);
+    const size_t head = offsetof(LineaMicraStatus, appliedTargetDeciC) + sizeof(a.appliedTargetDeciC),
+                 body = offsetof(LineaMicraStatus, transportStatus),
+                 end = offsetof(LineaMicraStatus, temperatureRetryable) + sizeof(bool);
+    assert(std::memcmp(bytesA, bytesB, head) == 0 &&
+           std::memcmp(bytesA + body, bytesB + body, end - body) == 0);
     assert(a.powerSource == MicraObservationSource::WEBSOCKET && a.targetDeciC == 945);
     const auto x = socket.websocketStatus(false), y = feed.websocketStatus(false);
     assert(x.cleaning == y.cleaning && x.cleaningAvailable == y.cleaningAvailable &&
@@ -1675,13 +1687,29 @@ struct MicraWebSocketTest {
     assert(!service.serviceCompanion() && locks == 0);
     TaskMutex::hostObserver = nullptr;
     link(service);
-    const auto sequence = service.companionOutbox().holdSequence;
+    // While the route is direct the companion forwards nothing: the hold is
+    // tracked but not sent, and the route request carries it.
+    auto sequence = service.companionOutbox().holdSequence;
     outboundScaleConnected.store(true);
     service.shotActive_.store(true);
     assert(!service.serviceCompanion());
     auto box = service.companionOutbox();
-    assert(box.hold && box.holdSequence == sequence + 1);
+    assert(box.hold && box.holdSequence == sequence);
     assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+    service.shotActive_.store(false);
+    outboundScaleConnected.store(false);
+    assert(service.serviceCompanion());
+    box = service.companionOutbox();
+    assert(!box.hold && box.holdSequence == sequence + 1 && box.routeCompanion);
+    assert(frame(service, MicraCompanionStateKind::FULL, kBrewing93));
+    assert(service.serviceCompanion());
+    // On the companion route each change goes out.
+    sequence = service.companionOutbox().holdSequence;
+    outboundScaleConnected.store(true);
+    service.shotActive_.store(true);
+    (void)service.serviceCompanion();
+    box = service.companionOutbox();
+    assert(box.hold && box.holdSequence == sequence + 1);
     service.shotActive_.store(false);
     service.scaleConnecting_.store(true);
     (void)service.serviceCompanion();
@@ -1694,6 +1722,68 @@ struct MicraWebSocketTest {
     box = service.companionOutbox();
     assert(!box.hold && box.holdSequence == sequence + 2);
     service.shotActive_.store(false);
+    finish(service);
+  }
+  // The read the companion held through a scaled shot is released only after
+  // the BLE quiet interval that follows it, so it is applied, not dropped.
+  static void companionHeldReadSurvivesQuietInterval() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    route(service);
+    const auto sequence = service.companionOutbox().holdSequence;
+    outboundScaleConnected.store(true);
+    service.shotActive_.store(true);
+    (void)service.serviceCompanion();
+    assert(service.companionOutbox().hold);
+    // The shot ends into the quiet interval: the hold stands, and a read the
+    // companion sent anyway is dropped under the same rule.
+    service.shotActive_.store(false);
+    outboundBleQuiet.store(true);
+    (void)service.serviceCompanion();
+    assert(service.companionOutbox().hold && service.companionOutbox().holdSequence == sequence + 1);
+    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    // The interval ends: hold off, and the released read is applied.
+    outboundBleQuiet.store(false);
+    (void)service.serviceCompanion();
+    assert(!service.companionOutbox().hold && service.companionOutbox().holdSequence == sequence + 2);
+    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    outboundScaleConnected.store(false);
+    finish(service);
+  }
+  // With the API connection type there is no socket: the switch still frees
+  // the HTTPS session, once, and a command's buffer is not freed again.
+  static void companionReleasesApiSession() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    service.stopWebSocket(true);
+    service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
+    assert(service.ensureWorkBuffer() && !service.websocket_);
+    route(service);  // Asserts the work buffer was released.
+    assert(service.ensureWorkBuffer());  // As a command does.
+    assert(service.serviceCompanion() && service.work_);
+    service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
+    finish(service);
+  }
+  // A push takes its power intent when it arrives: a command issued while it
+  // is being decoded makes it older, not newer, as on the socket.
+  static void companionPushIntentAtIngress() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    route(service);
+    const MicraCompanionIngress ingress = service.companionIngress();
+    assert(service.powerState_.noteStandbyCommandAccepted(service.published_, true, millis()));
+    cJSON *root = cJSON_Parse(kStandby);
+    assert(service.companionState(MicraCompanionStateKind::PUSH, 7, 0, root, ingress));
+    cJSON_Delete(root);
+    assert(service.published_.powerState == LineaMicraPowerState::ON);
     finish(service);
   }
   static void companionSwitchesOnlyAtQuietPoints() {
@@ -2047,6 +2137,9 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::companionPushParity();
   openbrewbyweight::MicraWebSocketTest::companionReadsWaitForShots();
   openbrewbyweight::MicraWebSocketTest::companionHoldFollowsShotAndScale();
+  openbrewbyweight::MicraWebSocketTest::companionHeldReadSurvivesQuietInterval();
+  openbrewbyweight::MicraWebSocketTest::companionReleasesApiSession();
+  openbrewbyweight::MicraWebSocketTest::companionPushIntentAtIngress();
   openbrewbyweight::MicraWebSocketTest::companionSwitchesOnlyAtQuietPoints();
   openbrewbyweight::MicraWebSocketTest::companionFailover();
   openbrewbyweight::MicraWebSocketTest::companionLossesAndFlapping();

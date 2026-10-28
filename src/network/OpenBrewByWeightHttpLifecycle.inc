@@ -1177,6 +1177,10 @@ bool OpenBrewByWeightNetwork::startHttpServer() {
   // CONFIG_LWIP_MAX_SOCKETS), so a deeper backlog would starve other sockets.
   config.backlog_conn = 4;
   config.lru_purge_enable = true;
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+  // Names why a companion link closed (an LRU purge among them) before close().
+  config.close_fn = companionSocketClose;
+#endif
   // Keep stuck clients from occupying sockets under BLE/Wi-Fi coex stalls.
   config.recv_wait_timeout = 5;
   config.send_wait_timeout = 5;

@@ -452,7 +452,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("scale.supportedCommands", "%s", commandsJson);
   }
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-  uint32_t companionLinkAgeS = 0;
+  int32_t companionLinkAgeS = -1;
   {
     const auto micra = machineIntegrationStatus();
     const bool sampleValid = micra.sampleAtMs != 0 &&
@@ -522,6 +522,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.address", "\"%s\"", companion.address);
     delta.field("companion.version", "\"%s\"", companion.version);
     delta.field("companion.protocol", static_cast<unsigned long>(companion.protocol));
+    delta.field("companion.peerProtocol", static_cast<unsigned long>(companion.peerProtocol));
     delta.field("companion.link", "\"%s\"", companion.linkOpen ? "open" : "down");
     delta.field("companion.reconnects", static_cast<unsigned long>(companion.reconnects));
     delta.field("companion.authFailures", static_cast<unsigned long>(companion.authFailures));
@@ -679,7 +680,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                     static_cast<unsigned long>(control.psramLargestFreeBlockBytes));
     telemetry.field("safety.resetReasonCode", static_cast<unsigned long>(control.resetReasonCode));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-    telemetry.field("companion.linkAgeS", static_cast<unsigned long>(companionLinkAgeS));
+    telemetry.field("companion.linkAgeS", "%ld", static_cast<long>(companionLinkAgeS));
 #endif
     {
       const NetworkHeapTelemetrySnapshot networkHeap = heapTelemetrySnapshot();
@@ -788,6 +789,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
       telemetry.field("lineaMicra.websocket.state", "\"%s\"", micraSocketStateName(ws.state));
       telemetry.field("lineaMicra.websocket.reason", "\"%s\"", safeReason);
       telemetry.field("lineaMicra.websocket.subscribed", bool(ws.subscribed));
+      telemetry.field("lineaMicra.websocket.live", bool(ws.live));
       telemetry.field("lineaMicra.websocket.machineConnectedKnown", bool(ws.machineConnectedKnown));
       telemetry.field("lineaMicra.websocket.machineConnected", bool(ws.machineConnected));
       telemetry.field("lineaMicra.websocket.messageAtMs", "%u",

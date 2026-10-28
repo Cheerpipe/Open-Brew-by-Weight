@@ -14,7 +14,9 @@
         `${id} must start visibly disabled`);
   for (const needle of [
     "R.api('/api/v1/companion/admin',{method:'POST',body:R.body(body)})",
-    "{action:'approve',code:$('companionCode').value}",
+    "{action:'approve',code:$('companionCode').value,lm:$('companionApproveLm').checked,}",
+    "$('companionCode').value='';$('companionApproveLm').checked=true",
+    "!link&&c.peerProtocol>0?' · '+",
     "{action:'ignore'}",
     "{action:'unignore'}",
     "{action:'forget'}",
@@ -30,6 +32,8 @@
     "['blePanel','dateTimePanel','webhookPanel','companionPanel']",
   ])
     assert.ok(codeIncludes(adminJs, needle), 'Admin → Companion wiring: ' + needle);
+  assert.ok(/<form id="companionRequest"[^]*<input id="companionApproveLm" type="checkbox" role="switch" checked[^]*id="companionApproveButton"/.test(admin),
+      'The approval panel chooses the La Marzocco switch before the account is handed over, on by default');
   assert.ok(admin.includes('Connect to a companion at…') &&
       codeIncludes(adminJs, 'That code does not match.'),
       'A wrong code says so at the code field');
@@ -70,8 +74,17 @@
       codeIncludes(diagJs, "if(location.protocol==='https:')fetch('/__companion/status',{cache:'no-store'})") &&
       codeIncludes(diagJs, "screenCompanion=typeof j?.name==='string'?j.name:''") &&
       codeIncludes(diagJs, 'if(__LINEA_MICRA__&&s.companion)renderCompanionDiagnostic(s.companion)') &&
-      codeIncludes(diagJs, "c.paired?c.name:'Not paired'"),
+      codeIncludes(diagJs, "c.paired?c.name:'Not paired'") &&
+      codeIncludes(diagJs, "c.linkAgeS>=0?' · '+formatUptime(c.linkAgeS*1e3):''") &&
+      codeIncludes(diagJs, "c.protocol>0?") && codeIncludes(diagJs, "c.peerProtocol>0?"),
       'Diagnostic → Companion shows this screen and the controller\'s companion link');
+  // On the companion route the WebSocket row names its source and drops the
+  // direct socket's figures; cleaning is "not live" only without supervision.
+  assert.ok(codeIncludes(diagJs, "renderMicraCloudDiagnostic(s.lineaMicra,s.companion?.route==='companion')") &&
+      codeIncludes(diagJs, "link=api?0:ws.live?1:") &&
+      codeIncludes(diagJs, "if(el)el.hidden=!!via") &&
+      codeIncludes(diagJs, "(!ws.live||(ws.machineConnectedKnown&&!ws.machineConnected)"),
+      'The WebSocket row tells the companion feed from the controller\'s own socket');
 
   // Other builds keep this screen and drop everything else.
   (async () => {

@@ -656,6 +656,12 @@
           maxlength="6"
           autocomplete="one-time-code" /><small id="companionCodeHint" class="fieldHint"></small
       ></label>
+      <label
+        ><input id="companionApproveLm" type="checkbox" role="switch" checked />
+        {{webui:admin.companion_lm}}<small class="fieldHint"
+          >{{webui:admin.companion_lm_approve_hint}}</small
+        ></label
+      >
       <div class="btnBar">
         <button id="companionApproveButton" class="btnGlyph btnInvert" type="submit" disabled>
           <span class="g" aria-hidden="true">✓</span

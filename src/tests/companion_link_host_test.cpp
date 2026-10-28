@@ -172,6 +172,9 @@ static void testVectors() {
   cJSON *vectors = loadVectors();
   const auto companionKey = fromBase64(field(vectors, "companionKey"), COMPANION_KEY_BYTES);
   const auto controllerKey = fromBase64(field(vectors, "controllerKey"), COMPANION_KEY_BYTES);
+  uint8_t commitment[COMPANION_COMMITMENT_BYTES];
+  CHECK(companionCommitment(companionKey.data(), commitment));
+  CHECK(toBase64(commitment, sizeof(commitment)) == field(vectors, "commitment"));
   uint32_t code = 0;
   CHECK(companionSas(companionKey.data(), controllerKey.data(), code));
   char sas[8];
@@ -303,69 +306,123 @@ static void testBase64AndValidation() {
         !companionPeerAllowedV6(global) && !companionPeerAllowedV6(unique));
 }
 
+// The controller's key went out, then the companion revealed `key`.
+static void reveal(CompanionPairing &pairing, const uint8_t key[COMPANION_KEY_BYTES], uint32_t now) {
+  pairing.request.keyReady = pairing.request.keyIssued = true;
+  CHECK(companionPairReveal(pairing, pairing.request.id, key, true, now));
+}
+
+static void testCommitThenReveal() {
+  uint8_t key[COMPANION_KEY_BYTES] = {0x04, 7, 7, 7}, commitment[COMPANION_COMMITMENT_BYTES];
+  CHECK(companionCommitment(key, commitment));
+  uint32_t now = 1000;
+  CompanionPairing pairing;
+  CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
+                             commitment, now) == CompanionPairResult::NEW);
+  // Nothing to reveal for another id; no code before the companion's key.
+  CHECK(!companionPairReveal(pairing, kOtherId, key, true, now));
+  pairing.request.keyReady = true;
+  CHECK(!companionCodeReady(pairing.request));
+  CHECK(companionPairApprove(pairing, 1, 1, true, now) == CompanionApproveResult::NOT_READY);
+  // Revealing before controllerKey was issued shows a device in the middle.
+  CHECK(!companionPairReveal(pairing, kCompanionId, key, true, now));
+  CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
+  // A key that does not match the commitment, or is off the curve, denies too.
+  for (int variant = 0; variant < 2; ++variant) {
+    now += COMPANION_NEW_REQUEST_MS;
+    CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
+                               commitment, now) == CompanionPairResult::NEW);
+    pairing.request.keyReady = pairing.request.keyIssued = true;
+    uint8_t other[COMPANION_KEY_BYTES];
+    memcpy(other, key, sizeof(other));
+    other[1] ^= variant == 0 ? 1 : 0;
+    CHECK(!companionPairReveal(pairing, kCompanionId, other, variant == 0, now));
+    CHECK(pairing.request.state == CompanionPairState::DENIED && !pairing.request.revealed);
+  }
+  // The matching key opens the code; asking or revealing again changes nothing.
+  now += COMPANION_NEW_REQUEST_MS;
+  CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
+                             commitment, now) == CompanionPairResult::NEW);
+  reveal(pairing, key, now);
+  CHECK(companionCodeReady(pairing.request) && !memcmp(pairing.request.companionKey, key, sizeof(key)));
+  CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
+                             commitment, now + 1) == CompanionPairResult::PENDING);
+  CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 2) && companionCodeReady(pairing.request));
+  CHECK(companionPairApprove(pairing, 5, 5, true, now) == CompanionApproveResult::OK);
+  // A retry while the secret is derived is harmless; another key is refused, not denied.
+  CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 3));
+  uint8_t other[COMPANION_KEY_BYTES];
+  memcpy(other, key, sizeof(other));
+  other[2] ^= 1;
+  CHECK(!companionPairReveal(pairing, kCompanionId, other, true, now + 3));
+  CHECK(pairing.request.state == CompanionPairState::PENDING && pairing.request.approving);
+}
+
 static void testPairing() {
   CompanionPairing pairing;
   CompanionStored stored;
-  uint8_t key[COMPANION_KEY_BYTES] = {0x04, 1, 2, 3};
+  uint8_t key[COMPANION_KEY_BYTES] = {0x04, 1, 2, 3}, commitment[COMPANION_COMMITMENT_BYTES];
+  CHECK(companionCommitment(key, commitment));
   uint32_t now = 1000;
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "unknown"));
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen \"server\"", "1.0.0",
-                             "192.168.1.9", key, now) == CompanionPairResult::NEW);
+                             "192.168.1.9", commitment, now) == CompanionPairResult::NEW);
   CHECK(!strcmp(pairing.request.name, "Kitchen server"));  // display copy is sanitized
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "pending"));
   CHECK(!strcmp(companionPairPoll(pairing, kOtherId, now), "unknown"));
   // The same companion polling with POST again keeps its request.
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
-                             key, now + 100) == CompanionPairResult::PENDING);
+                             commitment, now + 100) == CompanionPairResult::PENDING);
   CHECK(pairing.request.serial == 1);
-  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", key,
+  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
-  // The code waits for the controller's key, then three wrong codes deny it.
+  // The code waits for both keys, then three wrong codes deny it.
   CHECK(companionPairApprove(pairing, 1, 1, true, now) == CompanionApproveResult::NOT_READY);
-  pairing.request.keyReady = true;
+  reveal(pairing, key, now);
   CHECK(companionPairApprove(pairing, 1, 2, true, now) == CompanionApproveResult::WRONG_CODE);
   CHECK(companionPairApprove(pairing, 1, 2, true, now) == CompanionApproveResult::WRONG_CODE);
   CHECK(companionPairApprove(pairing, 1, 2, true, now) == CompanionApproveResult::DENIED);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
   CHECK(companionPairApprove(pairing, 2, 2, true, now) == CompanionApproveResult::NOT_PENDING);
   // One new request per 5 s.
-  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", key,
+  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 4999) == CompanionPairResult::RATE_LIMITED);
   now += 6000;
-  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", key, now) ==
-        CompanionPairResult::NEW);
+  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
+                             now) == CompanionPairResult::NEW);
   CHECK(pairing.request.serial == 2 && !pairing.request.keyReady);
   // Ignore denies the request and refuses the id until Stop ignoring.
   CHECK(companionPairIgnore(pairing, now));
   CHECK(!companionPairIgnore(pairing, now));
   CHECK(companionIgnoredCount(pairing) == 1);
-  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", key,
+  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 10000) == CompanionPairResult::IGNORED);
   companionUnignore(pairing);
   CHECK(companionIgnoredCount(pairing) == 0);
   // Expiry after ten minutes.
   now += 10000;
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
-                             key, now) == CompanionPairResult::NEW);
+                             commitment, now) == CompanionPairResult::NEW);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now + COMPANION_REQUEST_MS - 1), "pending"));
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now + COMPANION_REQUEST_MS), "expired"));
   now += COMPANION_REQUEST_MS + 1;
-  // A changed key from the same companion is a new request.
+  // A changed commitment from the same companion is a new request.
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
-                             key, now) == CompanionPairResult::NEW);
+                             commitment, now) == CompanionPairResult::NEW);
   key[5] = 9;
+  CHECK(companionCommitment(key, commitment));
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
-                             key, now + 1000) == CompanionPairResult::RATE_LIMITED);
+                             commitment, now + 1000) == CompanionPairResult::RATE_LIMITED);
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
-                             key, now + 5000) == CompanionPairResult::NEW);
+                             commitment, now + 5000) == CompanionPairResult::NEW);
   now += 5000;
   // Approval: the network task derives S, which makes the pairing.
-  pairing.request.keyReady = true;
+  reveal(pairing, key, now);
   CHECK(companionPairApprove(pairing, 7, 7, false, now) == CompanionApproveResult::OK);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now + COMPANION_REQUEST_MS + 5), "pending"));
   CHECK(companionPairApprove(pairing, 7, 7, false, now) == CompanionApproveResult::NOT_PENDING);
   CHECK(!companionPairIgnore(pairing, now));
-  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", key,
+  CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
   uint8_t secret[COMPANION_SECRET_BYTES];
   memset(secret, 0x5A, sizeof(secret));
@@ -376,7 +433,7 @@ static void testPairing() {
   CHECK(stored.paired == 1 && stored.lmSwitch == 0 && stored.forgotten == 0 &&
         !strcmp(stored.id, kCompanionId) && !strcmp(stored.address, "192.168.1.9") &&
         !strcmp(stored.name, "Kitchen") && stored.publicKey[5] == 9 && stored.secret[0] == 0x5A);
-  CHECK(companionPairRequest(pairing, true, kOtherId, "Other", "", "192.168.1.10", key,
+  CHECK(companionPairRequest(pairing, true, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 60000) == CompanionPairResult::ALREADY_PAIRED);
 
   // Hello verdicts, then Forget leaves {id, secret} for the signed erase.
@@ -390,9 +447,9 @@ static void testPairing() {
   CHECK(companionHelloVerdict(stored, kOtherId, 1) == CompanionHello::NOT_PAIRED);
   // Pairing another companion keeps the erase for the forgotten one.
   CompanionPairing next;
-  CHECK(companionPairRequest(next, false, kOtherId, "Other", "", "192.168.1.10", key, now) ==
+  CHECK(companionPairRequest(next, false, kOtherId, "Other", "", "192.168.1.10", commitment, now) ==
         CompanionPairResult::NEW);
-  next.request.keyReady = true;
+  reveal(next, key, now);
   CHECK(companionPairApprove(next, 3, 3, true, now) == CompanionApproveResult::OK);
   companionPairComplete(next, stored, secret);
   CHECK(stored.paired == 1 && stored.forgotten == 1 &&
@@ -404,7 +461,7 @@ static void testPairing() {
   char id[COMPANION_ID_TEXT];
   for (int i = 0; i < COMPANION_IGNORED_IDS + 1; ++i) {
     std::snprintf(id, sizeof(id), "%08d-2f4e-4d7a-9c1b-5e8f0a1d2c3b", i);
-    CHECK(companionPairRequest(many, false, id, "n", "", "10.0.0.2", key, 100000u * (i + 1)) ==
+    CHECK(companionPairRequest(many, false, id, "n", "", "10.0.0.2", commitment, 100000u * (i + 1)) ==
           CompanionPairResult::NEW);
     CHECK(companionPairIgnore(many, 100000u * (i + 1)));
   }
@@ -441,16 +498,27 @@ static void testStoredBlob() {
 
 static void testLiveness() {
   CompanionLinkSlot slot;
-  CHECK(companionSilenceLimitMs(slot, true) == 10000);
+  CHECK(companionSilenceLimitMs(slot, MicraCompanionRoute::DIRECT) == 10000);
   slot.phase = CompanionLinkPhase::READY;
-  CHECK(companionSilenceLimitMs(slot, true) == 250000);
-  CHECK(companionSilenceLimitMs(slot, false) == 35000);
+  CHECK(companionSilenceLimitMs(slot, MicraCompanionRoute::DIRECT) == 250000);
+  CHECK(companionSilenceLimitMs(slot, MicraCompanionRoute::COMPANION) == 35000);
+  // A route request on a link idle for 100 s (pings every 120 s while direct)
+  // keeps the link: only the companion route pings every 15 s.
+  const uint32_t now = 500000;
+  slot.heardAtMs = now - 100000;
+  CHECK(now - slot.heardAtMs < companionSilenceLimitMs(slot, MicraCompanionRoute::PENDING));
+  // "Since" covers both states, and is unknown until the first change.
+  CompanionState state;
+  CHECK(companionLinkAgeS(state, now) == -1);
+  state.changedAtMs = now - 61000;
+  CHECK(companionLinkAgeS(state, now) == 61);
 }
 
 int main() {
   testVectors();
   testFrameCodec();
   testBase64AndValidation();
+  testCommitThenReveal();
   testPairing();
   testStoredBlob();
   testLiveness();

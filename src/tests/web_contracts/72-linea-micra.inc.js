@@ -190,8 +190,11 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   domContext.R.formatMicraCleaning = new Function('__WEBUI_TEXT__', cleaningSource + ';return formatMicraCleaning;')(domContext.__WEBUI_TEXT__);
   vm.runInContext(cloudUi.slice(cloudUi.indexOf('function renderMicraCloudDiagnostic('),
       cloudUi.indexOf('function applyScaleCommands(')), domContext);
-  const show = lm => { domContext.lm = lm; vm.runInContext('renderMicraCloudDiagnostic(lm)', domContext); };
-  const socket = {state: 'streaming', nowMs: 5000, cleaningAvailable: true, cleaning: 'waiting_for_paddle', cleaningAtMs: 3000,
+  const show = (lm, via = false) => {
+    Object.assign(domContext, {lm, via});
+    vm.runInContext('renderMicraCloudDiagnostic(lm, via)', domContext);
+  };
+  const socket = {state: 'streaming', live: true, nowMs: 5000, cleaningAvailable: true, cleaning: 'waiting_for_paddle', cleaningAtMs: 3000,
     rxBytes: 120, rxBytesPerSecond: 20, rxBytesPerMinute: 100, messages: 2,
     plannedConnections: 7, unexpectedConnections: 3};
   const linked = {accountConfigured: true, observeState: true, connectionType: 'websocket', websocket: socket};
@@ -204,11 +207,20 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert(dom.dMicraCleaningHint.textContent.includes('2.0 s'));
   assert(!dom.dMicraCleaningHint.textContent.includes('diagnostic.stale'));
   assert(dom.dMicraWsTraffic.textContent.includes('RX 20 B/s · 100 B/60s · 120 B'));
-  show({...linked, websocket: {...socket, subscribed: true}});
   assert.strictEqual(dom.dMicraWsState.textContent, 'streaming · live');
-  show({...linked, websocket: {...socket, state: 'paused', reason: 'maintenance'}});
+  show({...linked, websocket: {...socket, live: false, state: 'paused', reason: 'maintenance'}});
   assert.strictEqual(dom.dMicraWsState.textContent, 'paused · maintenance · closed');
-  show({...linked, websocket: {...socket, state: 'paused', cleaning: 'unknown', cleaningLabel: '<b>Future</b>'}});
+  // On the companion route the row names its source, drops the controller's
+  // own socket figures, and cleaning stays live while it is supervised, even
+  // while the feed waits for its first push.
+  show({...linked, websocket: {...socket, state: 'waiting_for_data'}}, true);
+  assert.strictEqual(dom.dMicraWsState.textContent, 'diagnostic.ws_via_companion · live');
+  assert(!dom.dMicraWsTiming.textContent.includes('pong') && dom.dMicraWsTraffic.parentElement.hidden &&
+      dom.dMicraWsHeap.hidden);
+  assert(!dom.dMicraCleaningHint.textContent.includes('diagnostic.stale'));
+  show(linked);
+  assert(!dom.dMicraWsTraffic.parentElement.hidden && !dom.dMicraWsHeap.hidden);
+  show({...linked, websocket: {...socket, live: false, state: 'paused', cleaning: 'unknown', cleaningLabel: '<b>Future</b>'}});
   assert.strictEqual(dom.dMicraCleaning.textContent, 'runtime.unknown_4 · <b>Future</b>');
   assert(dom.dMicraCleaningHint.textContent.includes('diagnostic.stale'));
   show({...linked, connectionType: 'api'});
@@ -269,7 +281,7 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert.strictEqual(nodes.dMicraCloudDuration.textContent, 'diagnostic.cloud_no_call');
   assert(!micraStatus.includes('page == StatusPage::Settings ? safeMicraUsername : ""'));
   assert(micraStatus.includes('machineIntegrationCloudCall()'));
-  assert(cloudUi.includes('renderMicraCloudDiagnostic(s.lineaMicra)'));
+  assert(cloudUi.includes('renderMicraCloudDiagnostic(s.lineaMicra, s.companion?.route === "companion")'));
   const complete = micraService.slice(micraService.indexOf('void OpenBrewByWeightMicraService::releaseIoBuffer('),
       micraService.indexOf('void OpenBrewByWeightMicraService::releaseWorkBuffer('));
   assert(complete.includes('serialTraceCategoryf(success ? LogLevel::INFO'));

@@ -25,6 +25,7 @@ struct OpenBrewByWeightMicraService::WebSocketBuffer {
 MicraWebSocketStatus OpenBrewByWeightMicraService::websocketStatus(bool includeTraffic) const {
   TaskLockGuard lock(mux_);
   MicraWebSocketStatus result = websocketStatus_;
+  result.live = liveSubscriptionLocked();
   if (includeTraffic && websocket_ != nullptr) {
     const uint64_t second = static_cast<uint64_t>(esp_timer_get_time()) / 1000000;
     for (const auto &bin : websocket_->rates) {

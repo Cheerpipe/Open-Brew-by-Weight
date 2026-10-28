@@ -37,9 +37,12 @@ the cloud connection drops today.
 2. Home shows **Open Brew by Weight Companion "…" wants to connect**, with
    the companion's address. Tap **Review** to open **Admin → Companion**.
 3. Open the companion's page on that computer: it shows a six-digit code.
-   Type that code in Admin and tap **Approve**. Admin shows the steps while
-   the controller and the companion connect. A request waits ten minutes; if
-   it runs out, choose **Pair** on the companion's page to ask again.
+   Type that code in Admin. **La Marzocco through the companion** is on: leave
+   it on to let the companion take over the cloud connection right away, or
+   turn it off to keep the controller's own connection for now. Tap
+   **Approve**. Admin shows the steps while the controller and the companion
+   connect. A request waits ten minutes; if it runs out, choose **Pair** on
+   the companion's page to ask again.
 
 If the companion has not found the controller, type its address in **Admin →
 Companion → Connect to a companion at…** and tap **Open its page**. The
@@ -58,9 +61,12 @@ the same time.
 ## Switches
 
 **Admin → Companion** shows the paired companion, whether it is connected and
-since when, and where the La Marzocco connection runs right now: **Through the
-companion**, **Moving to the companion**, or **Directly from the controller**
-(with what it is waiting for, if anything). It has one switch per job:
+since when (or since when it is not), and where the La Marzocco connection runs
+right now: **Through the companion**, **Moving to the companion**, or
+**Directly from the controller** (with what it is waiting for, if anything). If
+the companion and the controller cannot talk because one of them is much newer
+than the other, Admin says so: update the older one. It has one switch per
+job:
 
 - **La Marzocco through the companion** (Linea Micra builds): the companion
   keeps the cloud connection. Turn it off to go back to the controller's own
@@ -72,8 +78,11 @@ Save and Revert work like the rest of Admin.
 
 **Forget** in Admin → Companion removes the pairing. The companion learns it
 the next time it tries to connect and deletes the La Marzocco account it
-holds, even if it was off when you tapped Forget. A factory reset forgets the
-companion too.
+holds, even if it was off when you tapped Forget.
+
+A factory reset forgets the companion on the controller only. The companion
+can no longer connect, but it keeps the La Marzocco account it received until
+you erase its pairing on the companion's own page.
 
 ## Checking that it works
 
@@ -81,10 +90,13 @@ companion too.
 you are looking at was opened: directly from the controller, through the
 companion (with its name), or through another HTTPS proxy. **Companion** shows
 what the controller knows: whether a companion is paired, its name, address
-and version, whether the link is up and for how long, how often it
+and version, whether the link is up or down and for how long, how often it
 reconnected, and whether the La Marzocco connection currently runs through
-the companion or directly, with the reason. Every link and route change is
-also written to the Web UI log.
+the companion or directly, with the reason. While it runs through the
+companion, **La Marzocco cloud → WebSocket** says **Through the companion**
+and leaves out the figures of the controller's own connection. Every link and
+route change is also written to the Web UI log, with the reason a link went
+down.
 
 For developers, the protocol is described in
 [Companion link protocol](../COMPANION_LINK.md).
