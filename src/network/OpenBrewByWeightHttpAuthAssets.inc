@@ -439,6 +439,12 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       {"/api/v1/auth/access", HTTP_POST, authAccessHandler},
       {"/api/v1/auth/notice", HTTP_POST, authNoticeHandler},
       {"/api/v1/auth/pairing", HTTP_POST, authPairingHandler},
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+      // The companion pairs without a claim or a login; Admin approves.
+      {"/api/v1/companion/pair", HTTP_POST, companionPairHandler, false, true},
+      {"/api/v1/companion/pair", HTTP_GET, companionPairHandler, false, true},
+      {"/api/v1/companion/admin", HTTP_POST, companionAdminHandler},
+#endif
 #if OPEN_BREW_BY_WEIGHT_DEVELOPMENT == 1
 // Unlock routes are not served in development builds; administration is
 // public there and the UI never calls these endpoints.

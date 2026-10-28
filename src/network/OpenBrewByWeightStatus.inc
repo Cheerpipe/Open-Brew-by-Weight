@@ -246,6 +246,9 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
               control.bleScanIntensity)),
           control.bleScanEnabled ? "true" : "false");
       if (ok) ok = self.appendWebAccessStatus(request, &used);
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+      if (ok) ok = self.appendCompanionStatus(&used);
+#endif
       if (ok) {
         ok = statusJsonAppend(
             &used,

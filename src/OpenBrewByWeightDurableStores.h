@@ -2,6 +2,7 @@
 
 #include "OpenBrewByWeightBbwQuickStart.h"
 #include "OpenBrewByWeightBleScanPersistence.h"
+#include "OpenBrewByWeightBuildProfile.h"
 #include "OpenBrewByWeightFirmwareMode.h"
 #include "OpenBrewByWeightHistory.h"
 #include "OpenBrewByWeightLastShot.h"
@@ -10,6 +11,9 @@
 #include "OpenBrewByWeightCrashArchive.h"
 #include "OpenBrewByWeightAuditStore.h"
 #include "OpenBrewByWeightWebAccessStore.h"
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#include "network/OpenBrewByWeightCompanionStore.h"
+#endif
 
 namespace openbrewbyweight {
 
@@ -126,6 +130,9 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, QUICK_START_KEY)) {
     return false;
   }
+#endif
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+  if (!eraseCompanionStored()) return false;
 #endif
 
   yieldFlashIo();

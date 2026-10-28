@@ -29,7 +29,7 @@ Related product docs: [Brew by weight](features/brew-by-weight.md),
 | --- | --- |
 | Brew and electrical safety | [Brew orchestrator](#1-brew-orchestrator-brewstate), [relay](#2-relay-safety-relaysafetystate) |
 | Physical controls | [Machine state](#3-machine-run-state-machinerunstate), [user intent](#4-user-intent-userintent) |
-| Optional machine integration | [Linea Micra observer](#linea-micra-power-observer-and-wake-qualification) |
+| Optional machine integration | [Linea Micra observer](#linea-micra-power-observer-and-wake-qualification), [companion pairing and link](#companion-pairing-and-link-linea-micra-builds) |
 | Weight and cup sensing | [Weight control](#5-weight-control-weightcontrolstate), [stream](#6-weight-stream-weightstreamstate), [cup](#7-cup-presence-cuppresencestate), [first flow](#8-first-flow-firstflowphase--firstflowclass), [touch](#9-accidental-touch-accidentaltouchphase--accidentaltouchclass) |
 | Scale connection | [Link and commands](#10-scale-link-scalelinkstate), [no-scale guard](#11-no-scale-bbw-guard) |
 | Access and updates | [Recovery](#12-recovery-gesture), [Wi-Fi](#13-station-wi-fi-stastate), [scan](#14-wi-fi-scan-wifiscanstate), [clock](#15-wall-clock-timesyncstate), [OTA](#16-ota-otastate), [Web commands](#17-web-command-pipeline-commandresultstate) |
@@ -1159,6 +1159,33 @@ to a generic normal/wake disposition. Open Brew by Weight owns the wake passthro
 it mirrors only the physical paddle through the existing relay safety authority
 and consumes the entire ON/OFF interaction before brew, rinse, guards, scale,
 alerts, webhooks, or history. No guard or scale component knows Micra state.
+
+---
+
+## Companion pairing and link (Linea Micra builds)
+
+Only a companion starts any of this ([protocol](COMPANION_LINK.md)); a
+controller that never paired keeps every state below at rest and only answers.
+NetworkService owns both machines under `dataMux_`.
+
+**Pairing request** (RAM only, one at a time):
+
+| State | Meaning | Leaves when |
+| --- | --- | --- |
+| none | no request since boot | a valid `POST …/pair` from a local peer (one new request per 5 s) |
+| pending | waiting for Admin; the network task makes the request's key, then the code can be checked | approve with the right code (the network task derives and keeps `S`, then approved), Ignore or three wrong codes (denied), 10 minutes (expired) |
+| approved, denied, expired | final; `GET …/pair` reports it | a new request replaces it |
+
+**Link session** (one authenticated link plus one opening link):
+
+| Phase | Waits for | Then |
+| --- | --- | --- |
+| hello | `hello` within 10 s | `challenge`, or `error`/`erase` and close (`RETRY_LATER` during a shot with a scale, a scale connection or the BLE quiet interval) |
+| proof | `proof` within 10 s | `ready` (the link is up and replaces an older one), or close on a wrong proof |
+| ready | signed frames in sequence; one at least every two ping intervals (35 s while the La Marzocco route is not direct, 250 s otherwise) | close on a bad MAC or sequence, an unknown frame, silence, Forget, a newer link or factory reset |
+
+Ready and close tell the La Marzocco service through
+`machineIntegrationCompanionLink`; every link up and down is a Web UI log line.
 
 ---
 

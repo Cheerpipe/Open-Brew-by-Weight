@@ -54,6 +54,12 @@
 #include <sys/socket.h>
 
 #include "OpenBrewByWeightIntegrationRequest.h"
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#include "machine/OpenBrewByWeightMicraCompanion.h"
+#include "network/OpenBrewByWeightCompanionStore.h"
+#include <arpa/inet.h>
+#include <psa/crypto.h>
+#endif
 
 // The application logger is owned by openBrewByWeight.cpp. Network diagnostics use
 // it so they reach both the ESP-IDF serial backend and the optional RAM ring.
@@ -224,6 +230,10 @@ static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkSettings;
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkWorkingSettings;
 // Web UI login state; dataMux_ guards it and the network task persists it.
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebAccessState g_webAccess;
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+// Companion pairing and link; dataMux_ guards it (network/OpenBrewByWeightCompanion.inc).
+static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionState g_companion;
+#endif
 
 namespace {
 
@@ -1354,3 +1364,6 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "network/OpenBrewByWeightLineaMicraWeb.inc"
 #include "network/OpenBrewByWeightIntegrationApi.inc"
 #include "network/OpenBrewByWeightNetworkOta.inc"
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#include "network/OpenBrewByWeightCompanion.inc"
+#endif
