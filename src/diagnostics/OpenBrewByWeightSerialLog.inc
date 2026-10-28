@@ -81,8 +81,10 @@ int openBrewByWeightEspLogVprintf(const char *format, va_list args) {
   // Benign IDF lines. BLE_INIT warns that light sleep is blocked, but this
   // firmware never enters light sleep. A client resetting its socket
   // (ECONNRESET: tab closed, phone asleep) is a normal disconnect that httpd
-  // already closes, as is the WS header-byte read that follows it on a live
-  // WebSocket, so both stay DEBUG traces on both sinks. A bound UI
+  // already closes, on the read side and mid-write of a response, as is the
+  // WS header-byte read that follows it on a live WebSocket; the generic
+  // uri-handler echo joins them because every real handler failure carries
+  // its own obbw.* line. All stay DEBUG traces on both sinks. A bound UI
   // stream sends through uiStreamSend, whose rate-limited ui_stream warning
   // already reports each failed WS send with size, timing, and errno.
   if (strstr(line.text,
@@ -92,7 +94,10 @@ int openBrewByWeightEspLogVprintf(const char *format, va_list args) {
           nullptr) {
     return 0;
   }
-  if (strstr(line.text, "httpd_sock_err: error in recv : 104") != nullptr ||
+  if (strstr(line.text, "httpd_sock_err: error in send : 104") != nullptr ||
+      strstr(line.text, "httpd_sock_err: error in recv : 104") != nullptr ||
+      strstr(line.text, "httpd_uri: uri handler execution failed") !=
+          nullptr ||
       strstr(line.text, "httpd_ws_get_frame_type: Failed to read header") !=
           nullptr ||
       strstr(line.text, "httpd_ws_send_frame_async: Failed to send WS") !=
