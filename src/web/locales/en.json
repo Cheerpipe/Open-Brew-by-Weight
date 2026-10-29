@@ -1399,7 +1399,7 @@
     "settings.app_offline_since": "Kept since {0}.",
     "settings.app_orientation": "Hold the live view upright",
     "settings.app_orientation_hint": "The live view stays upright however you turn the phone. Android only.",
-    "settings.app_scope_note": "These settings live in this app, not in the controller. Other phones and browsers keep their own.",
+    "settings.app_scope_note": "These settings are saved only in this browser or device, not in the controller. Each phone and browser keeps its own.",
     "settings.app_vibrate": "Vibrate when a shot ends",
     "settings.app_vibrate_hint": "A short buzz when the extraction finishes. Android only.",
     "settings.assume_idle_when_the_scale_connects": "Assume idle when the scale connects",
