@@ -1197,3 +1197,51 @@
     </details>
   </fieldset>
 </div>
+<fieldset id="appPanel" class="pwaOnly">
+  <legend>{{webui:settings.app}}</legend>
+  <p class="scopeNote">{{webui:settings.app_scope_note}}</p>
+  <label
+    ><input id="appKeepAwake" type="checkbox" /> {{webui:settings.app_keep_awake}}<small
+      class="fieldHint"
+      >{{webui:settings.app_keep_awake_hint}}</small
+    ></label
+  >
+  <label
+    ><input id="appAutoLive" type="checkbox" /> {{webui:settings.app_auto_live}}<small
+      class="fieldHint"
+      >{{webui:settings.app_auto_live_hint}}</small
+    ></label
+  >
+  <label
+    ><input id="appVibrate" type="checkbox" /> {{webui:settings.app_vibrate}}<small
+      class="fieldHint"
+      >{{webui:settings.app_vibrate_hint}}</small
+    ></label
+  >
+  <label
+    ><input id="appOrient" type="checkbox" /> {{webui:settings.app_orientation}}<small
+      class="fieldHint"
+      >{{webui:settings.app_orientation_hint}}</small
+    ></label
+  >
+  <label
+    >{{webui:settings.app_hero_colors}}
+    <select id="appHeroTint">
+      <option value="forecast" selected>{{webui:settings.app_hero_colors_forecast}}</option>
+      <option value="window">{{webui:settings.app_hero_colors_window}}</option>
+      <option value="brand">{{webui:settings.app_hero_colors_brand}}</option></select
+    ><small class="fieldHint">{{webui:settings.app_hero_colors_hint}}</small></label
+  >
+  <div id="appOfflineBox" class="hidden">
+    <label
+      >{{webui:settings.app_offline_copy}}<small class="fieldHint" id="appOfflineSince"></small
+      ><small class="fieldHint">{{webui:settings.app_offline_hint}}</small></label
+    >
+    <div class="btnBar">
+      <button id="appOfflineDelete" class="btnGlyph btnDanger" type="button">
+        <span class="g" aria-hidden="true">✕</span
+        ><span class="t">{{webui:settings.app_offline_delete}}</span>
+      </button>
+    </div>
+  </div>
+</fieldset>

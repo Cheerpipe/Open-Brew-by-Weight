@@ -4070,6 +4070,7 @@ let shotWs = null,
   shotTry = 0,
   shotFrame = null,
   shotSeen = null,
+  autoLiveCycle = null,
   shotResync = !1,
   shotResyncStrikes = 0,
   shotStale = !0,
@@ -4374,6 +4375,14 @@ function startUiStream() {
         if (["active", "pending"].includes(next.phase))
           shotSeen = { cycle: next.cycle, boot: next.boot };
         else if (shotSeen && shotSeen.boot !== next.boot) shotSeen = null;
+        // The installed app can raise the live view by itself at shot start.
+        if (next.card.valid && next.card.live) {
+          if (next.cycle !== autoLiveCycle) {
+            autoLiveCycle = next.cycle;
+            if (appSetting("live") && !shotFsActive && activeView === "home" && !document.hidden)
+              enterShotFullScreen();
+          }
+        } else autoLiveCycle = null;
         scheduleShotPaint();
       }
       if (shotGotHome && shotGotShot) clearTimeout(shotSetup);
@@ -4505,6 +4514,7 @@ function syncShotClock(frame) {
       seen: now,
       shown: card.elapsedMs,
     };
+    keepShotAwake(true);
   } else {
     c.id = id;
     c.target = Math.max(c.target, card.elapsedMs - now);
@@ -4534,6 +4544,8 @@ function finishShotClock() {
   shotClock = null;
   if (shotClockPaint) cancelAnimationFrame(shotClockPaint);
   shotClockPaint = 0;
+  keepShotAwake(false);
+  if (appSetting("vibrate")) navigator.vibrate?.(120);
   if (
     activeView === "home" &&
     !document.hidden &&
@@ -4628,7 +4640,7 @@ function keepShotFsAwake(on) {
     return void navigator.wakeLock.request("screen").then(
       // Overlapping requests resolve in turn; each grant replaces the last.
       (l) => {
-        if (!shotFsActive) return l.release();
+        if (!screenAwakeWanted()) return l.release();
         shotFsLock?.release().catch(() => {});
         shotFsLock = l;
       },
@@ -4651,6 +4663,65 @@ function keepShotFsAwake(on) {
   }
   shotFsVideo.play().catch(() => {});
 }
+// The installed app's own settings — the "This app" group in Settings, shown
+// only in standalone mode. Plain browser-local switches the controller never
+// sees; blocked storage reads as off and writes are best-effort.
+const APP_SETTING_KEYS = {
+  awake: "obbwAppAwake",
+  live: "obbwAppLive",
+  vibrate: "obbwAppVibrate",
+  orient: "obbwAppOrient",
+};
+function appSetting(k) {
+  try {
+    return localStorage.getItem(APP_SETTING_KEYS[k]) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+function setAppSetting(k, v) {
+  try {
+    if (v) localStorage.setItem(APP_SETTING_KEYS[k], "1");
+    else localStorage.removeItem(APP_SETTING_KEYS[k]);
+  } catch (_) {}
+  if (k !== "awake") return;
+  if (v && sessionShotLive()) keepShotAwake(true);
+  else if (!v && shotAwakeUntil) {
+    clearTimeout(shotAwakeTail);
+    shotAwakeUntil = 0;
+    if (!shotFsActive) keepShotFsAwake(false);
+  }
+}
+// The keep-awake setting holds the screen from shot start to a minute past
+// the shot's end, independent of the live view (which holds it while open).
+// One lock, two reasons: the live view, or the shot hold's grace minute.
+let shotAwakeUntil = 0,
+  shotAwakeTail = 0;
+function screenAwakeWanted() {
+  return shotFsActive || Date.now() < shotAwakeUntil;
+}
+function keepShotAwake(on) {
+  on = on && appSetting("awake");
+  if (on) {
+    clearTimeout(shotAwakeTail);
+    if (shotAwakeUntil !== Infinity) {
+      shotAwakeUntil = Infinity;
+      if (!shotFsActive) keepShotFsAwake(true);
+    }
+    return;
+  }
+  if (shotAwakeUntil !== Infinity) return;
+  // The shot is over: hold the screen one more minute for the result. The
+  // timer never releases the live view's own hold while it is open.
+  shotAwakeUntil = Date.now() + 6e4;
+  clearTimeout(shotAwakeTail);
+  shotAwakeTail = setTimeout(() => {
+    if (Date.now() >= shotAwakeUntil && !shotFsActive) {
+      shotAwakeUntil = 0;
+      keepShotFsAwake(false);
+    }
+  }, 6e4 + 50);
+}
 function enterShotFullScreen() {
   const view = $("liveShot");
   if (!view || shotFsActive) return;
@@ -4665,6 +4736,10 @@ function enterShotFullScreen() {
   view.hidden = false;
   document.body.classList.add("shotFs");
   keepShotFsAwake(true);
+  // A standalone page may pin the live view upright (Android offers the
+  // lock; other platforms skip it silently).
+  if (appSetting("orient") && typeof screen !== "undefined" && screen.orientation?.lock)
+    screen.orientation.lock("portrait").catch(() => {});
   $("liveShotClose")?.focus();
   // Open on the active preset, then the stream's latest frame if there is one.
   renderLiveShot();
@@ -4686,7 +4761,10 @@ function exitShotFullScreen() {
     history.back();
   }
   shotFsPushed = false;
-  keepShotFsAwake(false);
+  keepShotAwake(false);
+  keepShotFsAwake(screenAwakeWanted() && !document.hidden);
+  if (appSetting("orient") && typeof screen !== "undefined" && screen.orientation?.unlock)
+    screen.orientation.unlock();
   clearTimeout(shotFsTimer);
   const finish = () => {
     clearTimeout(shotFsTimer);
@@ -5122,11 +5200,15 @@ function onPageVisibility() {
   hiddenAt = 0;
   webUiEpochClaimUsed = false;
   if (shotFsActive) keepShotFsAwake(true);
+  else if (Date.now() < shotAwakeUntil && appSetting("awake")) keepShotFsAwake(true);
   if (webUiClaimFirst()) return;
   if (!webUiPollingActive() || setupSession) return;
   if (away >= HIDDEN_CLOSE_MS && !sessionShotLive()) stopUiStream();
   shotWs && shotWs.readyState === 1 ? shotActivity() : startUiStream();
 }
+// The "This app" settings group exists only for the installed app; the class
+// gates it (and anything else pwaOnly) from first paint.
+document.documentElement?.classList?.toggle("pwaApp", webUiStandalone());
 document.addEventListener("visibilitychange", onPageVisibility);
 if (document.hidden) onPageVisibility();
 // Every https page knows its companion from load on, whatever view it opens
@@ -5362,6 +5444,12 @@ function heroTintMode() {
   } catch (_) {
     return "forecast";
   }
+}
+function setHeroTintMode(v) {
+  try {
+    localStorage.setItem(HERO_TINT_KEY, HERO_TINT_MODES.includes(v) ? v : "forecast");
+  } catch (_) {}
+  scheduleShotPaint();
 }
 function heroTint(d, m, kind, el, noScale, mode) {
   const v = ["fast", "on_recipe", "slow"].find((x) => x === kind || x === d.verdict);
@@ -6315,6 +6403,11 @@ export {
   themeMode,
   paintTheme,
   heroTintMode,
+  setHeroTintMode,
+  appSetting,
+  setAppSetting,
+  dropOfflineCopy,
+  offlineCopyState,
   cycleTheme,
   populateTimezoneOptions,
   cardDismissed,
@@ -6377,9 +6470,6 @@ export {
   developmentMode,
   lockAdminUi,
   updateWifiSleepState,
-  HERO_TINT_KEY,
-  HERO_TINT_MODES,
-  scheduleShotPaint,
   timezonePreviewAnchor,
   timezonePreviewPending,
   renderTimezonePreview,

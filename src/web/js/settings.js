@@ -1784,8 +1784,43 @@ export function init() {
       R.command("/api/v1/calibration/reset", { [key]: R.number(input), baseRevision: R.formRev });
     };
   }
+  // The "This app" group is browser-local: every control applies at once and
+  // nothing in it reaches the controller. The installed app is its only home.
+  for (const [id, key] of [
+    ["appKeepAwake", "awake"],
+    ["appAutoLive", "live"],
+    ["appVibrate", "vibrate"],
+    ["appOrient", "orient"],
+  ]) {
+    if (!$(id)) continue;
+    $(id).checked = R.appSetting(key);
+    $(id).onchange = () => R.setAppSetting(key, $(id).checked);
+  }
+  if ($("appHeroTint")) {
+    $("appHeroTint").value = R.heroTintMode();
+    $("appHeroTint").onchange = () => R.setHeroTintMode($("appHeroTint").value);
+  }
+  const updateAppOffline = () => {
+    const box = $("appOfflineBox");
+    if (!box) return;
+    const st = R.offlineCopyState();
+    box.classList.toggle("hidden", !st);
+    if (st && $("appOfflineSince"))
+      $("appOfflineSince").textContent = __WEBUI_TEXT__("settings.app_offline_since").replace(
+        "{0}",
+        new Date(st.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
+      );
+  };
+  if ($("appOfflineDelete"))
+    $("appOfflineDelete").onclick = () => {
+      if (!confirm(__WEBUI_TEXT__("settings.app_offline_confirm"))) return;
+      R.dropOfflineCopy();
+      updateAppOffline();
+      R.message(__WEBUI_TEXT__("settings.app_offline_deleted"));
+    };
   R.setSettingsRenderer((c) => {
     renderDripChart(c);
     R.renderGroupRows($("workflowPanel"), GROUP_SUMMARIES);
+    updateAppOffline();
   });
 }

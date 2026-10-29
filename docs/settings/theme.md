@@ -20,7 +20,8 @@ Auto, and a [factory reset](factory-reset.md) does not change it.
 
 ## Shot card colors
 
-**Admin → Frontend → Shot card colors** chooses how the Home shot card uses
+**Settings → This app → Shot card colors** — in the
+[installed app](app.md) — chooses how the Home shot card uses
 color. Every finished shot takes the color of its result: green on recipe,
 red when fast, blue when slow. The options differ in what you see while a shot
 is running:

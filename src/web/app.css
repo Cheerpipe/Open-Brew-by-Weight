@@ -1542,6 +1542,9 @@ html:not(.lineaMicraIntegration) .micraOnly,
 html:not(.micraTemperatureEnabled) .micraTempOpt {
   display: none !important;
 }
+html:not(.pwaApp) .pwaOnly {
+  display: none !important;
+}
 #message {
   position: sticky;
   top: var(--bar-h, var(--hdr));

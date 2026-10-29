@@ -1001,12 +1001,6 @@ async function saveDateTimeConfig() {
     await R.refreshStatus();
   }
 }
-function setHeroTintMode(v) {
-  try {
-    localStorage.setItem(R.HERO_TINT_KEY, R.HERO_TINT_MODES.includes(v) ? v : "forecast");
-  } catch (_) {}
-  R.scheduleShotPaint();
-}
 function developmentActive() {
   return R.developmentMode;
 }
@@ -1880,8 +1874,6 @@ async function saveFrontendSettings() {
         ok = false;
       }
     }
-    if (controlChanged("heroTint", R.uiState.frontendBaseline))
-      setHeroTintMode($("heroTint").value);
     if (ok) sectionDirty("frontend", false);
   } finally {
     b.classList.remove("busy");
@@ -1980,7 +1972,7 @@ const ADMIN_SUMMARIES = {
     onOff("powerManagementEnabled") +
     ($("staWifiSleep").checked ? " · " + __WEBUI_TEXT__("admin.wi_fi_sleep") : ""),
   clock: () => ($("timezoneId").value || R.uiState.savedTimezoneId || "").replaceAll("_", " "),
-  frontend: () => $("heroTint").selectedOptions[0].text,
+  frontend: () => onOff("showDiagnosticPage"),
   schedule: () =>
     $("scheduledRestartEnabled").checked
       ? restartTime(restartMinute())
@@ -2306,5 +2298,4 @@ export function init() {
       R.command("/api/v1/factory-reset", { confirm: "ERASE_ALL_SETTINGS" });
   };
   R.populateTimezoneOptions().catch(() => {});
-  $("heroTint").value = R.heroTintMode();
 }

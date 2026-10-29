@@ -249,6 +249,63 @@
         visibilityHandler.indexOf('if (document.hidden)') < visibilityHandler.indexOf('keepShotFsAwake(true)') &&
         codeIncludes(runtimeJs, 'document.addEventListener("visibilitychange", onPageVisibility);'),
         'the visibility handler re-takes the lock in full screen once visible');
+
+    // The "Keep the screen on" app setting holds the same lock from shot
+    // start to a minute past the end — alone, and alongside the live view.
+    {
+      let now = 0, requests = 0, releases = 0;
+      const grants = [], grantAll = () => grants.splice(0).forEach(g => g());
+      const timers = [], store = {obbwAppAwake: '1'};
+      const lock = {release: () => { releases++; return Promise.resolve(); }};
+      const els = {liveShot: {classList: {add() {}, remove() {}}, focus() {}, hidden: true},
+        liveShotClose: {focus() {}}};
+      const api = new Function('$', 'history', 'location', 'document', 'setTimeout',
+          'clearTimeout', 'navigator', 'paintUiStream', 'renderLiveShot', 'Date', 'localStorage',
+          runtimeJs.slice(runtimeJs.search(/let\s+shotFsActive\s*=/),
+              runtimeJs.indexOf('// The diagnostic stream rides')) +
+          ';return{enter:enterShotFullScreen,exit:exitShotFullScreen,shotAwake:keepShotAwake}')(
+          id => els[id], {pushState() {}, back() {}}, {href: '/'},
+          {body: {classList: {add() {}, remove() {}}}, hidden: false,
+            createElement() { throw Error('no video'); }},
+          fn => timers.push(fn), () => {},
+          {wakeLock: {request: type => { assert.equal(type, 'screen'); requests++;
+            return new Promise(resolve => grants.push(() => resolve(lock))); }}},
+          () => {}, () => {}, {now: () => now},
+          {getItem: k => store[k] || null, setItem: (k, v) => { store[k] = String(v); },
+            removeItem: k => { delete store[k]; }});
+      delete store.obbwAppAwake;
+      api.shotAwake(true);
+      assert.equal(requests, 0, 'with the setting off a shot holds nothing');
+      store.obbwAppAwake = '1';
+      api.shotAwake(true);
+      assert.equal(requests, 1, 'a shot with the setting on takes the lock');
+      grantAll(); await settle();
+      api.shotAwake(false);
+      assert.equal(releases, 0, 'the shot ending holds the screen one more minute');
+      now = 60050;
+      timers.splice(0).forEach(fire => fire());
+      assert.equal(releases, 1, 'the grace minute past, the lock is released');
+      // The live view keeps its own hold; leaving it inside the grace minute
+      // re-takes the lock instead of dropping it, and the tail still ends it.
+      requests = 0; releases = 0; timers.length = 0;
+      api.enter();
+      api.shotAwake(true);
+      assert.equal(requests, 1, 'the live view requests its own lock');
+      grantAll(); await settle();
+      api.shotAwake(false);
+      assert.equal(timers.length, 1, 'the grace tail is armed under the live view');
+      api.exit();
+      assert.equal(requests, 2, 'exiting inside the grace minute re-takes the lock');
+      grantAll(); await settle();
+      assert.equal(releases, 1, 'the re-take replaced the live view lock');
+      now = 120100;
+      timers.splice(0).forEach(fire => fire());
+      assert.equal(releases, 2, 'the tail releases the lock after the grace minute');
+      assert.ok(
+          codeIncludes(runtimeJs,
+              'else if (Date.now() < shotAwakeUntil && appSetting("awake")) keepShotFsAwake(true);'),
+          'returning visible re-takes the shot hold');
+    }
   })().catch(error => {console.error(error); process.exitCode = 1;});
 }
 // Safari only honours the prefixed property: the shot card must not select
