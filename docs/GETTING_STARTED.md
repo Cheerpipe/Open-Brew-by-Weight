@@ -186,8 +186,9 @@ to pick up the current one.
 **Out of reach**: when the page opens but the controller cannot be reached —
 for example while you are away from home — it shows the Open Brew by Weight logo with
 an out-of-reach message and a **Reload** button instead of a raw error. The same
-message appears if the connection drops while the page is open; in that case
-the page resumes on its own once the controller answers. When the page opens
+message appears if the connection drops while the page is open and stays down;
+a brief drop — say, right after unlocking the phone — reconnects on its own, and
+the page resumes by itself once the controller answers again. When the page opens
 straight into the message, check that the phone or computer is connected to the
 same network as the controller, then press **Reload**. Right after a firmware
 update the message can appear while the controller restarts; wait a moment and

@@ -250,6 +250,39 @@
     assert.equal(run.take(), false, "a standard page never holds the overlay");
   }
 
+  // The reachability budget: a stream close is evidence, not a verdict — the
+  // stale socket's close on return and the first attempt racing the phone's
+  // Wi-Fi are transient, so only the five-failure budget REST polls already
+  // share may paint the modal out-of-reach overlay.
+  {
+    const painted = [],
+      messaged = [];
+    const run = vm.createContext({
+      reachFails: 0,
+      networkReconnectWait: false,
+      clearCupWeights() {},
+      updateHeaderSignals() {},
+      setOverlayOutOfReach: () => painted.push(1),
+      message: () => messaged.push(1),
+      __WEBUI_TEXT__: (key) => key,
+    });
+    vm.runInContext(
+      blockAt(runtimeJs, "function noteReachFail(") + "this.fail=noteReachFail;",
+      run,
+    );
+    for (let i = 0; i < 4; i++) run.fail({ network: true });
+    assert.equal(painted.length, 0, "four transient failures paint nothing");
+    run.fail({ network: true });
+    assert.equal(painted.length, 1, "the fifth consecutive failure paints the overlay");
+    run.reachFails = 0;
+    painted.length = 0;
+    for (let i = 0; i < 4; i++) run.fail({ network: true });
+    assert.equal(painted.length, 0, "a reset budget starts the count again");
+    run.fail(new Error("invalid status"));
+    assert.equal(painted.length, 0, "a non-network failure never paints the overlay");
+    assert.equal(messaged.length, 1, "the budget's failure explains itself as a message");
+  }
+
   // Placement beats intent: claim-first must run before the polling gates in
   // both handlers, so a page deactivated while hidden (takeover under 5 min)
   // cannot dead-end behind webUiPollingActive() returning false.
@@ -357,6 +390,11 @@
           "} else if (webUiActiveUntil === Infinity) resetWebUiInactivity();",
         ),
       "the hold never arms the lock and both flips are symmetric",
+    );
+    assert.ok(
+      codeIncludes(runtimeJs, "noteReachFail({ network: true });") &&
+        !codeIncludes(runtimeJs, "noteReachFail({ network: true }, true);"),
+      "the stream close feeds the shared reachability budget, never a forced overlay",
     );
     assert.ok(
       codeIncludes(

@@ -104,7 +104,7 @@
       !diagnostic.includes('id="dCup"') || diagnostic.includes('id="scaleTareButton"') ||
       !codeIncludes(source, "setHomeSub('cupWeight',formatCupWeight(s))") ||
       !codeIncludes(viewJs.diagnostic, "t('dCupWeight',R.formatCupWeight(s))") ||
-      !codeIncludes(source, 'function noteReachFail(err,force){clearCupWeights();') ||
+      !codeIncludes(source, 'function noteReachFail(err){clearCupWeights();') ||
       !codeIncludes(source, 'function stopViewPolls(){clearCupWeights();')) {
     throw new Error('Home and Diagnostic cup panel contract');
   }

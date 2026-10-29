@@ -142,7 +142,7 @@
   assert(codeIncludes(appJsSource, 'R.initHeaderSignals();'));
   assert(codeIncludes(rawRuntimeJs, 'applyCommonStatus(s){if(s.connections||s.snapshotStale)updateHeaderSignals(s);'),
       'record-only envelopes must not erase live header signals');
-  assert(codeIncludes(rawRuntimeJs, 'noteReachFail(err,force){clearCupWeights();updateHeaderSignals();'));
+  assert(codeIncludes(rawRuntimeJs, 'noteReachFail(err){clearCupWeights();updateHeaderSignals();'));
   // Record pages take their header signals from the Home stream on the same socket.
   assert(!fs.readFileSync(path.join(sketchDir, 'diagnostics/OpenBrewByWeightNetworkDiagnostics.inc'), 'utf8').includes('appendRecordPageUi'));
   for (const file of ['network/OpenBrewByWeightStatus.inc']) {

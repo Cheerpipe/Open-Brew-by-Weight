@@ -2230,11 +2230,11 @@ function noteReachOk() {
     hideInactiveOverlay();
   }
 }
-function noteReachFail(err, force) {
+function noteReachFail(err) {
   clearCupWeights();
   updateHeaderSignals();
   reachFails++;
-  if (force || reachFails >= 5) {
+  if (reachFails >= 5) {
     if (err && err.network && !networkReconnectWait) setOverlayOutOfReach();
     else
       message(
@@ -4412,7 +4412,9 @@ function startUiStream() {
     // 4003: the firmware rejected an op. Clearing the free-form list views
     // makes the replayed subscriptions valid; the device is reachable.
     if (event?.code === 4003) eachStream("rejected");
-    else if (webUiPollingActive()) noteReachFail({ network: true }, true);
+    // Any other close is evidence, not a verdict: transient first failures
+    // recover through the retry loop; only the five-failure budget paints.
+    else if (webUiPollingActive()) noteReachFail({ network: true });
     if (webUiPollingActive())
       shotRetry = setTimeout(
         startUiStream,
