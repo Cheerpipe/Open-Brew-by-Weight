@@ -124,8 +124,9 @@ device password does not disconnect Home Assistant.
 - **Signed-in devices** in Access opens a list of every phone and browser
   signed in, such as "iPhone · Safari", with when it was last used. Your own
   device is marked **This device**. Tap a name to rename it, for example
-  "Ana's phone"; Enter saves and Escape cancels. Tap **Sign out** next to any other device
-  and confirm in the same row; **Sign out other devices** at the end signs
+  "Ana's phone"; Enter saves and Escape cancels. Tap **Sign out** next to any
+  other device and confirm in the same row; that device's open page closes and
+  asks for the password again. **Sign out other devices** at the end signs
   out all of them at once.
 - **Turn the password off** by switching it off and typing the device
   password. Remembered devices are forgotten and Home Assistant goes back to

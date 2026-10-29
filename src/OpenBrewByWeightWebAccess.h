@@ -209,6 +209,18 @@ inline bool webAccessSessionValid(WebAccessState &state,
   return false;
 }
 
+// The ui-stream a claim holds may keep flowing only while the session token
+// behind that claim is still valid: revoking or aging out the session must
+// close the stream, not just fail later token checks. A claim made without a
+// session (login off, SoftAP onboarding) has no token and stays live.
+inline bool webAccessClaimSessionLive(WebAccessState &state,
+                                      const uint8_t *claimToken,
+                                      bool claimTokenPresent, uint32_t nowMs,
+                                      uint32_t nowUtc) {
+  return !claimTokenPresent ||
+         webAccessSessionValid(state, claimToken, nowMs, nowUtc);
+}
+
 // Full tables evict the session closest to expiry.
 inline void webAccessIssueSession(WebAccessState &state,
                                   const uint8_t token[WEB_ACCESS_TOKEN_BYTES],

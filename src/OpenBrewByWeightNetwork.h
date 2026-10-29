@@ -503,6 +503,10 @@ class OpenBrewByWeightNetwork {
   std::atomic<bool> uiStreamOpen_{false};
   mutable TaskMutex dataMux_;
   char activeWebUiClientId_[WEB_UI_CLIENT_ID_CAPACITY] = {};
+  // Session token behind the current claim, wiped when the claim clears; a
+  // bound ui-stream ends with it (webAccessClaimSessionLive per dispatch).
+  uint8_t activeWebUiClaimToken_[WEB_ACCESS_TOKEN_BYTES] = {};
+  bool activeWebUiClaimTokenValid_ = false;
   bool webUiOverrideActive_ = false;
   uint32_t webUiOverrideUntilMs_ = 0;
   // One holder each (a companion screen or a direct window): a newer unlock
@@ -935,6 +939,9 @@ class OpenBrewByWeightNetwork {
   // Joining the SoftAP already proved the device password (WPA2 passphrase).
   bool softApPeer(httpd_req_t *request);
   bool webAccessSessionAllowed(httpd_req_t *request);
+  // Reads the caller's session header without validating it; false when the
+  // caller presents none (login off, SoftAP onboarding).
+  bool readClaimSessionToken(httpd_req_t *request, uint8_t out[WEB_ACCESS_TOKEN_BYTES]);
   // everything: login off (sessions, Home Assistant, pairing). Otherwise
   // revoke Web UI sessions except `keep`; with no `keep` the claim drops too.
   void webAccessSignOut(const uint8_t *keep, bool everything);

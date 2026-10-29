@@ -122,6 +122,28 @@ void revocationKeepsOnlyWhatItShould() {
   assert(state.pairing.state == WebAccessPairing::NONE);
 }
 
+void claimFollowsItsSession() {
+  WebAccessState state;
+  uint8_t phone[WEB_ACCESS_TOKEN_BYTES], browser[WEB_ACCESS_TOKEN_BYTES],
+      keep[WEB_ACCESS_TOKEN_BYTES];
+  token(6, phone);
+  token(7, browser);
+  token(8, keep);
+  // A claim made without a session (login off, SoftAP onboarding) stays live.
+  assert(webAccessClaimSessionLive(state, nullptr, false, 0, T0));
+  webAccessIssueSession(state, phone, true, 0, T0, "Test");
+  webAccessIssueSession(state, browser, false, 0, T0, "Test");
+  assert(webAccessClaimSessionLive(state, phone, true, 0, T0));
+  assert(webAccessClaimSessionLive(state, browser, true, 0, T0));
+  // The stream a claim holds ends with that session: idle expiry...
+  assert(!webAccessClaimSessionLive(state, browser, true, WEB_ACCESS_BROWSER_MS, 0));
+  // ...and signing out other devices revoking the phone that claimed.
+  webAccessIssueSession(state, keep, false, 0, T0, "Test");
+  webAccessRevokeSessions(state, keep);
+  assert(!webAccessClaimSessionLive(state, phone, true, 0, T0));
+  assert(webAccessClaimSessionLive(state, keep, true, 0, T0));
+}
+
 void pairingApprovesOnceDeniesAndExpires() {
   WebAccessState state;
   uint8_t issued[WEB_ACCESS_TOKEN_BYTES], out[WEB_ACCESS_TOKEN_BYTES] = {};
@@ -280,6 +302,7 @@ int main() {
   browserSessionsExpireAndWrap();
   rememberedSessionsAgeRenewAndEvict();
   revocationKeepsOnlyWhatItShould();
+  claimFollowsItsSession();
   pairingApprovesOnceDeniesAndExpires();
   storedBlobChecksum();
   labelsAreSanitizedAndWhole();

@@ -76,6 +76,8 @@ esp_err_t OpenBrewByWeightNetwork::claimHandler(httpd_req_t *request) {
   // the unlock and override it held itself. Anything else takes control.
   CompanionPrincipal screen;
   const bool relayed = self.webUiPrincipal(request, screen) && screen.relayed;
+  uint8_t claimToken[WEB_ACCESS_TOKEN_BYTES] = {};
+  const bool claimTokenPresent = self.readClaimSessionToken(request, claimToken);
   self.dataMux_.lock();
   const bool attach = relayed && strcmp(self.activeWebUiClientId_, clientId) == 0;
   if (!attach || companionPrincipalHolds(self.webUiOverride_, screen)) {
@@ -84,9 +86,14 @@ esp_err_t OpenBrewByWeightNetwork::claimHandler(httpd_req_t *request) {
     self.webUiOverride_ = CompanionPrincipal{};
   }
   if (!attach) memcpy(self.activeWebUiClientId_, clientId, sizeof(clientId));
+  // Attached or rotated, the claim carries this window's session so that
+  // revoking it also ends the stream the claim holds.
+  memcpy(self.activeWebUiClaimToken_, claimToken, sizeof(claimToken));
+  self.activeWebUiClaimTokenValid_ = claimTokenPresent;
   self.dataMux_.unlock();
   self.clearAdminUnlock(attach ? &screen : nullptr);
   memset(clientId, 0, sizeof(clientId));
+  memset(claimToken, 0, sizeof(claimToken));
   return sendJson(request, STATUS_OK,
          firmwareCompatibilityMode()
              ? "{\"active\":true,\"compatibilityMode\":true}"

@@ -671,6 +671,18 @@ void OpenBrewByWeightNetwork::uiStreamDispatch(void *context) {
   // shared by the home and diagnostic projections.
   const NetworkStatusSnapshot network = self.snapshot();
   const bool live = control.activeCycle || control.homePending || control.relayClosed;
+  // A bound stream may keep flowing only while the session behind its claim
+  // is still valid: revoking or aging out that session closes the stream on
+  // this dispatch instead of waiting for silence or a takeover.
+  const uint32_t claimNowMs = millis();
+  bool claimSessionLive = true;
+  {
+    TaskLockGuard lock(self.dataMux_);
+    claimSessionLive = webAccessClaimSessionLive(
+        g_webAccess, self.activeWebUiClaimToken_,
+        self.activeWebUiClaimTokenValid_, claimNowMs,
+        webAccessNowUtc(claimNowMs));
+  }
   uiStreamDeadlineBudgetMs = kUiStreamDispatchBudgetMs;
   for (auto &session : self.uiStreams_) {
     if (session.fd < 0) continue;
@@ -680,7 +692,8 @@ void OpenBrewByWeightNetwork::uiStreamDispatch(void *context) {
     {
       TaskLockGuard lock(self.dataMux_);
       allowed = session.bound
-          ? strcmp(session.clientId, self.activeWebUiClientId_) == 0
+          ? claimSessionLive &&
+                strcmp(session.clientId, self.activeWebUiClientId_) == 0
           : millis() - session.openedAtMs < kUiStreamBindMs;
       silent = allowed && session.bound && !live &&
           millis() - session.heardAtMs >= kUiStreamSilentMs;

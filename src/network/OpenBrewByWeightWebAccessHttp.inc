@@ -89,6 +89,11 @@ bool OpenBrewByWeightNetwork::webAccessSessionAllowed(httpd_req_t *request) {
   return valid;
 }
 
+bool OpenBrewByWeightNetwork::readClaimSessionToken(httpd_req_t *request,
+                                                    uint8_t out[WEB_ACCESS_TOKEN_BYTES]) {
+  return readWebAccessToken(request, WEB_UI_SESSION_HEADER, "", out);
+}
+
 void OpenBrewByWeightNetwork::webAccessSignOut(const uint8_t *keep, bool everything) {
   TaskLockGuard lock(dataMux_);
   if (everything) {
@@ -99,6 +104,8 @@ void OpenBrewByWeightNetwork::webAccessSignOut(const uint8_t *keep, bool everyth
   // With the login off nobody holds a session, so the window keeps control.
   if (keep == nullptr && g_webAccess.stored.enabled != 0) {
     activeWebUiClientId_[0] = '\0';
+    activeWebUiClaimTokenValid_ = false;
+    memset(activeWebUiClaimToken_, 0, sizeof(activeWebUiClaimToken_));
     adminUnlocked_ = false;
     adminUnlock_ = CompanionPrincipal{};
     adminUnlockUntilMs_ = 0;
@@ -238,6 +245,10 @@ esp_err_t OpenBrewByWeightNetwork::authLoginHandler(httpd_req_t *request) {
         self.webUiOverrideUntilMs_ = 0;
         self.webUiOverride_ = CompanionPrincipal{};
       }
+      // Attached or rotated, the claim carries the session just issued so
+      // revoking it later also ends the stream the claim holds.
+      memcpy(self.activeWebUiClaimToken_, token, sizeof(token));
+      self.activeWebUiClaimTokenValid_ = true;
     }
     self.grantAdminUnlock(holder, now);
   }
@@ -274,6 +285,8 @@ esp_err_t OpenBrewByWeightNetwork::authLogoutHandler(httpd_req_t *request) {
     if (hasToken) webAccessRevokeSessions(g_webAccess, token, true);
     if (hasClient && !caller.relayed && strcmp(self.activeWebUiClientId_, clientId) == 0) {
       self.activeWebUiClientId_[0] = '\0';
+      self.activeWebUiClaimTokenValid_ = false;
+      memset(self.activeWebUiClaimToken_, 0, sizeof(self.activeWebUiClaimToken_));
     }
     if (hasClient && companionPrincipalHolds(self.adminUnlock_, caller)) {
       self.adminUnlocked_ = false;
