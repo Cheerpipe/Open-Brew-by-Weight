@@ -21234,6 +21234,16 @@ void fw08_drip_filter_physics_outliers_and_step() {
   CHECK(fabsf(preset.bbwEwmaOffsetG - 0.62f) < 0.005f);
   CHECK(quickStartEntry(bbwQuickStart, presetBank, preset.id, false)->state ==
         static_cast<uint8_t>(QuickStartState::APPLIED));
+  // A fixed-seed noise run: thirty good shots within ±0.12 g of 0.70 g all
+  // train — the Hampel gate never false-skips bounded shot noise.
+  uint32_t noise = 0x5eed;
+  for (int i = 0; i < 30; ++i) {
+    noise = noise * 1664525U + 1013904223U;
+    const float needed =
+        0.70f + (static_cast<int32_t>((noise >> 24) % 25U) - 12) / 100.0f;
+    CHECK(shot(preset.bbwEwmaOffsetG, needed, 2000));
+  }
+  CHECK(preset.bbwEwmaOffsetG > 0.55f && preset.bbwEwmaOffsetG < 0.85f);
 }
 
 void rt24_late_cup_step_uses_shot_coordinates() {

@@ -1433,11 +1433,17 @@ function renderDripChart(c) {
       .map((g, i) => ({ g, i }))
       .reverse(),
     counted = (s) =>
-      marked && s.g != null && (afterSet < 0 || s.i < afterSet) && s.i >= Math.max(afterQuick, 0),
+      marked &&
+      s.g != null &&
+      !skip(s.i) &&
+      (afterSet < 0 || s.i < afterSet) &&
+      s.i >= Math.max(afterQuick, 0),
     old = (s) => marked && afterSet >= 0 && s.i >= afterSet,
     pad = 10 - shots.length - (armed ? 1 : 0),
-    top = Math.max(...recent.filter((g) => g != null), use, 0.5) * 1.3,
-    h = (g) => (Math.max(0, g) / top) * 100 + "%",
+    // Only trained shots size the chart; a wild skipped value would squash
+    // them, and its own bar clamps at full height instead of overflowing.
+    top = Math.max(...recent.filter((g, i) => g != null && !skip(i)), use, 0.5) * 1.3,
+    h = (g) => Math.min(100, (Math.max(0, g) / top) * 100) + "%",
     slots = [...Array(pad).fill({}), ...shots, ...(armed ? [{ next: true }] : [])],
     at = (after) => pad + shots.length - Math.min(after, shots.length),
     marks = [];

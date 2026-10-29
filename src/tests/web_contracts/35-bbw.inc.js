@@ -68,7 +68,9 @@
     bbwRecentG: [0.59, 0.72, 0.63, 3.20], bbwRecentSkipped: 8,
     bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
   const hatched = bars().find(b => b.className.includes('skip'));
-  assert(hatched && hatched.children.length === 1 && hatched.children[0].style.height.length > 0);
+  assert(hatched && hatched.children.length === 1);
+  // Wild skipped values clamp at full height and never size the chart.
+  assert.equal(hatched.children[0].style.height, '100%');
   assert(elements.get('dripBarX').innerHTML.includes('3.20'));
   assert.equal(elements.get('dripVerdict').textContent, 'On track: your last shots needed 0.59–0.72 g');
   // An edited field keeps the owner's value across refreshes.
