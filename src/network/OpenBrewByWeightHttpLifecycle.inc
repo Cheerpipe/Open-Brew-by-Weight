@@ -477,6 +477,9 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
       return false;
     }
     dataMux_.lock();
+    const bool factoryPasswordReplaced =
+        command.type == WebCommandType::CHANGE_DEVICE_PASSWORD &&
+        passwordIsFactoryDefault(settings_);
     settings_ = next;
     status_.wifiConfigured = next.staConfigured;
     status_.staConfigState = next.staConfigState;
@@ -505,6 +508,21 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
       memset(passwordKeepToken_, 0, sizeof(passwordKeepToken_));
       passwordKeepValid_ = false;
       dataMux_.unlock();
+      // The factory password is public: the first time it is replaced — setup
+      // or later — the Web UI login turns on by itself. Only this one-way
+      // transition does it, so an owner who switches the login off keeps that
+      // choice. Enabled before the sign-out, so a keeper-less change also
+      // clears the claim and the Admin unlock it held.
+      bool loginTurnedOn = false;
+      {
+        TaskLockGuard lock(dataMux_);
+        if (factoryPasswordReplaced && g_webAccess.stored.enabled == 0) {
+          g_webAccess.stored.enabled = 1;
+          g_webAccess.dirty = true;
+          loginTurnedOn = true;
+        }
+      }
+      if (loginTurnedOn) lifecycleLog("Web UI login turned on");
       webAccessSignOut(keepValid ? keep : nullptr, false);
       memset(keep, 0, sizeof(keep));
     } else if (command.type == WebCommandType::RESET_DEVICE_PASSWORD ||

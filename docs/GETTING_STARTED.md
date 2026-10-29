@@ -23,6 +23,8 @@ start with [Hardware](HARDWARE.md).
      recipe. Then you choose your own **password**, typed twice. The factory
      password is the same on every controller, so setup always replaces it;
      from now on you use yours to unlock Admin and to join the setup network.
+     Choosing it also turns on the Web UI sign-in: after setup, every phone
+     and browser signs in once with this password.
      **Save and continue** stores your brewing choice and your password right
      away, and a note confirms it. Your phone stays connected.
    - **Wi-Fi** (optional). Choose your home network, type its password, and
@@ -48,11 +50,13 @@ start with [Hardware](HARDWARE.md).
    `<name>.local`). If that name does not open, find the controller's IP
    address in the router's connected-device list or via
    [USB NET_STATUS](SERIAL_CLI.md).
-5. If the Web UI shows **Reload**, select it to claim this browser session,
-   then open **Admin** and unlock it with the device password.
-6. The password you chose during setup is shared by Admin and the setup
-   network; change it any time in **Admin → Access**. To ask for it before
-   anyone can use the Web UI, see [Web UI access](settings/web-access.md).
+5. The Web UI asks you to sign in with the device password you chose during
+   setup; leave **Remember this device** on and you stay signed in. If the
+   page shows **Reload**, select it to claim this browser session, then open
+   **Admin** and unlock it with the same password.
+6. That password is shared by the Web UI sign-in, Admin and the setup
+   network; change it any time in **Admin → Access**. How the sign-in works —
+   and how to open or close it — is in [Web UI access](settings/web-access.md).
 
 A wrong Wi-Fi password can be corrected right there: the reason appears at
 the top of the card, your entries stay in place, and **Connect** tries again.

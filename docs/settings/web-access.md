@@ -1,11 +1,20 @@
 # Web UI access
 
-Out of the box, anyone on your Wi-Fi can open the Web UI, just like before.
-If other people share your network — housemates, guests, kids — you can ask
-for a password instead. The controller uses one password for everything: the
-**device password**. There is no user name.
+Choosing your own password during setup also protects the Web UI: after
+setup, every phone and browser signs in once with it. The controller uses one
+password for everything: the **device password**. There is no user name.
+Replacing the factory password later, at any time, turns the same protection
+on by itself — the first time only, so switching the sign-in off afterwards
+is your decision and it stays yours.
+
+Controllers set up before this protection existed keep working as they were:
+anyone on your Wi-Fi can open their Web UI, and Home shows a short note about
+it, with a **Set up** button that takes you to the panel below. **Dismiss**
+hides the note on every phone.
 
 ## Turn the password on
+
+On a controller that is still open on your network:
 
 1. Open **Admin**, unlock it with the device password, and go to **Access**.
 2. Switch on **Require a password to open the Web UI**.
@@ -18,10 +27,6 @@ for a password instead. The controller uses one password for everything: the
 The phone or browser you used stays signed in. Every other device now shows
 a sign-in page. Access reminds you to keep the password somewhere safe: if
 you lose it, the only way back in is the recovery steps at the machine.
-
-The first time you open the Web UI, Home shows a short note that it is open on
-your network, with a **Set up** button that takes you to this panel. **Dismiss**
-hides the note on every phone.
 
 ## Signing in
 
