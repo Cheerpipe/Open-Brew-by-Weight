@@ -120,7 +120,6 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     memcpy(relay.bodyKey, bodyKey, sizeof(bodyKey));
     relay.ready = true;
     relay.window = CompanionRelayWindow{};
-    relay.responses = 0;
     ++relay.generation;
     esp_fill_random(relay.challenge, sizeof(relay.challenge));
     ui = g_companion.stored.uiOff == 0;
@@ -185,9 +184,12 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
       memcpy(bodyKey, g_companion.relay.bodyKey, sizeof(bodyKey));
     }
     // The seals open outside the lock; what they carry belongs to this
-    // request's q, which the replay window admits exactly once.
+    // request's q, which the replay window admits exactly once. The key that
+    // opened them stays with the request: an OTA job may run after a newer
+    // relay handshake, and its body and answer still belong to these keys.
     char sessionText[WEB_ACCESS_TOKEN_TEXT] = {}, passwordText[WIFI_PASSWORD_CAPACITY] = {};
-    uint8_t sessionToken[WEB_ACCESS_TOKEN_BYTES];
+    uint8_t sessionToken[WEB_ACCESS_TOKEN_BYTES], admitted[32];
+    memcpy(admitted, bodyKey, sizeof(admitted));
     const bool sessionSealed = sessionLength > 0, passwordSealed = passwordLength > 0;
     const bool signatureOk =
         ready && companionRelayMac(key, http_method_str(static_cast<http_method>(request->method)),
@@ -235,6 +237,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
         snprintf(slot->screen, sizeof(slot->screen), "%s", header.screen);
         snprintf(slot->addr, sizeof(slot->addr), "%s", header.addr);
         slot->sequence = header.sequence;
+        memcpy(slot->bodyKey, admitted, sizeof(slot->bodyKey));
         if (sessionSealed) {
           slot->sessionValid = true;
           memcpy(slot->session, sessionToken, sizeof(slot->session));
@@ -245,6 +248,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
         }
         memset(sessionToken, 0, sizeof(sessionToken));
         memset(passwordText, 0, sizeof(passwordText));
+        memset(admitted, 0, sizeof(admitted));
         return true;
       }
     }
@@ -330,22 +334,27 @@ bool OpenBrewByWeightNetwork::relayBodyContext(httpd_req_t *request, uint8_t key
                                                uint32_t &sequence) {
   if (relayIdentities_.load(std::memory_order_acquire) == 0) return false;
   TaskLockGuard lock(dataMux_);
-  if (!g_companion.relay.ready) return false;
   for (const auto &entry : g_relayIdentities) {
     if (entry.screen[0] == '\0' || entry.fd != httpd_req_to_sockfd(request)) continue;
-    memcpy(key, g_companion.relay.bodyKey, 32);
+    memcpy(key, entry.bodyKey, 32);  // the session that admitted this request
     sequence = entry.sequence;
     return true;
   }
   return false;
 }
 
-bool OpenBrewByWeightNetwork::relayResponseKey(uint8_t key[32], uint32_t &counter) {
+// One sealed response: the admitting session's Kb and the next response
+// counter, which never repeats within a boot (see CompanionRelay).
+bool OpenBrewByWeightNetwork::relayResponseKey(httpd_req_t *request, uint8_t key[32],
+                                               uint32_t &counter) {
   TaskLockGuard lock(dataMux_);
-  if (!g_companion.relay.ready) return false;
-  memcpy(key, g_companion.relay.bodyKey, 32);
-  counter = ++g_companion.relay.responses;
-  return true;
+  for (const auto &entry : g_relayIdentities) {
+    if (entry.screen[0] == '\0' || entry.fd != httpd_req_to_sockfd(request)) continue;
+    memcpy(key, entry.bodyKey, 32);
+    counter = ++g_companion.relay.responses;
+    return true;
+  }
+  return false;
 }
 
 // One sealed JSON response: X-OBBW-Enc names the counter it was sealed
@@ -355,7 +364,7 @@ esp_err_t OpenBrewByWeightNetwork::relaySendSealed(httpd_req_t *request,
   uint8_t key[32], nonce[12];
   uint32_t counter = 0;
   uint8_t *const cipher = static_cast<uint8_t *>(malloc(length + 16));
-  const bool keyed = cipher != nullptr && relayResponseKey(key, counter);
+  const bool keyed = cipher != nullptr && relayResponseKey(request, key, counter);
   size_t sealedLength = 0;
   if (keyed) companionRelayNonce('f', COMPANION_RELAY_CTX_RESPONSE, counter, nonce);
   const bool sealed =

@@ -419,9 +419,10 @@ static void testRelayEnvelope() {
   relay.responses = 7;
   memset(relay.bodyKey, 9, sizeof(relay.bodyKey));
   companionRelayDrop(relay);
-  bool cleared = relay.responses == 0;
+  // Keys drop with the session; the response counter orders nonces, never resets.
+  bool cleared = true;
   for (const uint8_t byte : relay.bodyKey) cleared = cleared && byte == 0;
-  CHECK(!relay.ready && cleared);
+  CHECK(!relay.ready && cleared && relay.responses == 7);
 }
 
 static void testRelayWindow() {

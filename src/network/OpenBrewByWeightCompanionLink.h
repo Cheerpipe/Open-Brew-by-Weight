@@ -444,25 +444,27 @@ inline bool companionRelayAccept(CompanionRelayWindow &window, uint32_t q) {
 
 // Relay session: rb is the challenge, random per boot and rotated after each
 // handshake; Kr signs relayed requests until the next one, and Kb seals their
-// bodies, headers and responses. RAM only.
+// bodies, headers and responses. RAM only. `responses` never resets within a
+// boot: a seal made with one session's Kb must never reuse a counter another
+// session's sealed responses used, or GCM would repeat a nonce.
 struct CompanionRelay {
   uint8_t challenge[COMPANION_NONCE_BYTES] = {};
   bool challengeSet = false, ready = false;
   uint8_t key[32] = {};
   uint8_t bodyKey[32] = {};
-  uint32_t responses = 0;  // sealed-response counter; 0 names none yet
+  uint32_t responses = 0;  // sealed-response counter since boot
   CompanionRelayWindow window = {};
   uint32_t generation = 0;  // names Kr for an admission that verified outside the lock
   uint32_t rejects = 0;     // signed-relay requests refused since boot
 };
 
 // Forget and the factory reset end the relay session: relayed requests are
-// stale until a handshake with a new pairing.
+// stale until a handshake with a new pairing. The response counter survives:
+// it orders nonces, not the session.
 inline void companionRelayDrop(CompanionRelay &relay) {
   relay.ready = false;
   memset(relay.key, 0, sizeof(relay.key));
   memset(relay.bodyKey, 0, sizeof(relay.bodyKey));
-  relay.responses = 0;
   relay.window = CompanionRelayWindow{};
 }
 
@@ -472,10 +474,12 @@ struct CompanionRelayIdentity {
   int fd = -1;
   char screen[COMPANION_RELAY_SCREEN_TEXT] = {};  // empty: a free entry
   char addr[COMPANION_RELAY_ADDR_TEXT] = {};
-  // What the admitted request's seals opened, staged for its handlers: the
-  // session token and, for firmware updates, the device password. The header
-  // values themselves stay sealed on the wire.
+  // What the admitted request's seals opened or were made with, staged for its
+  // handlers: the session token, the device password, the q, and the Kb of the
+  // session that admitted it (an OTA job may outlive a relay handshake, and
+  // its body and answer still belong to the keys that asked).
   uint32_t sequence = 0;
+  uint8_t bodyKey[32] = {};
   bool sessionValid = false;
   uint8_t session[WEB_ACCESS_TOKEN_BYTES] = {};
   bool passwordValid = false;

@@ -335,7 +335,7 @@ class OpenBrewByWeightNetwork {
                          uint8_t token[WEB_ACCESS_TOKEN_BYTES], bool &relayed);
   bool relayPassword(httpd_req_t *request, char *out, size_t capacity);
   bool relayBodyContext(httpd_req_t *request, uint8_t key[32], uint32_t &sequence);
-  bool relayResponseKey(uint8_t key[32], uint32_t &counter);
+  bool relayResponseKey(httpd_req_t *request, uint8_t key[32], uint32_t &counter);
   esp_err_t relaySendSealed(httpd_req_t *request, const char *json, size_t length);
   esp_err_t relayEnvelopeReject(httpd_req_t *request);
 

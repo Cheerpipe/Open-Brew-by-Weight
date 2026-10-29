@@ -334,7 +334,8 @@ On success both sides derive
 for signing, and from it the sealing key
 `Kb = HKDF-SHA256(ikm = Kr, salt = "", info = "obbw-relay-body-v2", L = 32)`
 for every sealed body and header value below. The controller resets the
-replay window and the response counter, and draws a new `rb`. A replayed
+replay window and draws a new `rb`; the response counter never resets
+within a boot. A replayed
 handshake fails because `rb` changed. Forget and a factory reset end the
 relay session, and so does a change of either switch in Admin → Companion:
 the companion's next relayed request is `RELAY_STALE`, and its new handshake
@@ -397,8 +398,11 @@ counter as 8 bytes little-endian:
 | `3` | the response counter | a response body |
 
 A nonce is never reused under one `Kb`: `q` is fresh by the replay window,
-and the response counter starts at 1 and grows by exactly one per sealed
-response. No random bytes and no stored state are needed.
+and the response counter grows by exactly one per sealed response without
+ever repeating within a boot, so no nonce repeats under any `Kb`. A
+request's seals and its answer use the `Kb` of the relay session that
+admitted it, even if a newer handshake has happened by the time the answer
+leaves. No random bytes and no stored state are needed.
 
 **Sealed header values.** `X-WebUI-Session` and `X-Device-Password` keep
 their names but carry standard padded base64 of the ciphertext (the 16-byte
@@ -409,6 +413,8 @@ the session value to the request it traveled on.
 **Sealed request bodies.** A relayed request with a body carries the raw
 ciphertext (tag appended, no base64); `Content-Length` includes the 16 tag
 bytes. The controller opens the body where it reads it, before any parsing.
+The exception is the firmware update range upload, `PATCH /api/v1/ota`,
+whose body travels as it is (see below).
 
 **Sealed response bodies.** Every JSON response to a relayed request is
 sealed the same way and carries `X-OBBW-Enc: <counter>` (decimal, the
