@@ -3863,6 +3863,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 .shotLegend {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 0.2rem 0.7rem;
   font-size: 0.72rem;
   color: var(--mu);
