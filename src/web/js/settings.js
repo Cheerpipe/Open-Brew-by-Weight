@@ -1748,7 +1748,7 @@ export function init() {
     .forEach((el) => {
       if (
         ["presetRenameInput", "dripSetG", "alphaSet"].includes(el.id) ||
-        el.closest("#lineaMicraSignIn,#lineaMicraChoose")
+        el.closest("#lineaMicraSignIn,#lineaMicraChoose,[data-g=app]")
       )
         return;
       // Typing waits for a pause; leaving the field (a trusted change) saves

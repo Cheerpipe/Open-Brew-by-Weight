@@ -725,7 +725,7 @@ if (!rawCss.includes('html:not(.lineaMicraIntegration) .micraOnly') ||
     codeIncludes(rawRuntimeJs, "['queued','authenticating','listing','running','backoff'].includes(m.phase)") ||
     codeIncludes(rawAllJs, 'lineaMicraConnectionType') ||
     codeIncludes(rawRuntimeJs, 'lineaMicraSaveButton') ||
-    !codeIncludes(viewJs.settings, "el.closest('#lineaMicraSignIn,#lineaMicraChoose')") ||
+    !codeIncludes(viewJs.settings, "el.closest('#lineaMicraSignIn,#lineaMicraChoose,[data-g=app]')") ||
     micraSettingsHtml.indexOf('id="lineaMicraSettings"') > micraSettingsHtml.indexOf('{{webui:settings.shared_settings}}') ||
     !micraSettingsHtml.includes('<option value="15" selected>') ||
     micraSettingsHtml.includes('id="lineaMicraPowerOnWithScale" type="checkbox" checked') ||

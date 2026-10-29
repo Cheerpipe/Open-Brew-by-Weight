@@ -1,9 +1,10 @@
 # App settings
 
 When the Web UI runs as an installed app on a phone or tablet, Settings ends
-with a **This app** group. Every choice there belongs to this one app on this
-one device: the controller never sees it, and other phones, tablets, and
-browsers keep their own. In a plain browser tab the group does not appear.
+with a collapsible **This app** group, just below **Alerts**. Every choice
+there belongs to this one app on this one device: the controller never sees it,
+and other phones, tablets, and browsers keep their own. In a plain browser tab
+the group does not appear.
 
 Like the [theme](theme.md), these choices live in the app's own storage.
 Clearing the app's browser data returns them to their defaults, and a

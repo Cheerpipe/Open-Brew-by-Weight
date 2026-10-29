@@ -58,9 +58,9 @@
   // Settings saves every edit by itself: no Save/Revert button or unsaved hint.
   assert(!/id="(saveConfigButton|saveBrewPresetButton|lineaMicraSaveButton|revert(Config|BrewPreset|LineaMicra)Button|(config|brew|lineaMicra)DirtyHint)"/
       .test(partialHtml.settings), 'Settings must not offer Save/Revert buttons or unsaved hints');
-  assert(codeIncludes(viewJs.settings, 
-      "if(['presetRenameInput','dripSetG','alphaSet'].includes(el.id)||el.closest('#lineaMicraSignIn,#lineaMicraChoose'))return"),
-      'The preset rename dialog, the drip set fields and Micra sign-in inputs must not dirty a settings section');
+  assert(codeIncludes(viewJs.settings,
+      "if(['presetRenameInput','dripSetG','alphaSet'].includes(el.id)||el.closest('#lineaMicraSignIn,#lineaMicraChoose,[data-g=app]'))return"),
+      'The preset rename dialog, the drip set fields, Micra sign-in inputs and the browser-local app group must not dirty a settings section');
   assert(codeIncludes(js, 'e.dataset.dirty!=null') &&
          codeIncludes(js, "setSaveDirty('saveDateTimeButton','dateTimeDirtyHint',false)") &&
          codeIncludes(js, 'await refreshStatus();return false') &&

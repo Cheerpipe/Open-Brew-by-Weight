@@ -2702,12 +2702,14 @@ function settingsSectionOf(id) {
   if (BREW_CONTROL_IDS.includes(id)) return "brew";
   return id.startsWith("lineaMicra") ? "micra" : "config";
 }
+// The browser-local "This app" group (data-g=app) sits inside #workflowPanel
+// but never joins a controller section sweep.
 function settingsSectionEls(section) {
   return [
     ...document.querySelectorAll(
       "#workflowPanel input,#workflowPanel select,#workflowPanel textarea",
     ),
-  ].filter((el) => el.id && settingsSectionOf(el.id) === section);
+  ].filter((el) => el.id && !el.closest("[data-g=app]") && settingsSectionOf(el.id) === section);
 }
 function snapshotControls(els) {
   const s = {};
