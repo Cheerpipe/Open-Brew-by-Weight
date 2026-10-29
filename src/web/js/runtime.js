@@ -422,11 +422,19 @@ function updateHeaderSignals(s = {}) {
     micra.setAttribute("aria-label", micra.title);
     const account = $("micraName"),
       machine = $("micraMachine"),
-      detail = $("micraDetail");
+      detail = $("micraDetail"),
+      route = $("micraRoute");
     if (account) account.textContent = lm.email || __WEBUI_TEXT__("diagnostic.cloud_no_account");
     if (machine)
       machine.textContent = lm.selectedName || __WEBUI_TEXT__("diagnostic.cloud_no_machine");
     if (detail) detail.textContent = label;
+    // The route row uses Admin's wording; a frame without a companion model
+    // keeps the last route (pending still carries the data direct).
+    if (route && s.companion?.route) {
+      const routes = __WEBUI_TEXT__("admin.companion_routes").split("|");
+      route.textContent =
+        routes[s.companion.route === "companion" ? 0 : s.companion.route === "pending" ? 1 : 2];
+    }
   }
   updateBrandFit();
 }

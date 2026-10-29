@@ -19,8 +19,9 @@
       rawShellHtml.includes('id="companionDetails"'),
       'The shell pairs the header companion indicator with the one companion glyph');
   // The header is shared by every view, and the Home stream is the one every
-  // view keeps receiving: the indicator's four fields ride it beside the
-  // Wi-Fi and scale rows, while the full link report stays diagnostic-only.
+  // view keeps receiving: the indicator's fields ride it beside the Wi-Fi and
+  // scale rows, while the full link report stays diagnostic-only (the cloud
+  // popup also names the route, so that one field rides along on Micra builds).
   {
     const homeStreamSource = fs.readFileSync(
         path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
@@ -31,11 +32,14 @@
         .map((m) => m[1]).sort();
     assert.deepEqual(companionPaths,
         ['companion.link', 'companion.name', 'companion.paired', 'companion.peerProtocol',
-         'companion.requestAddress', 'companion.requestName'],
+         'companion.requestAddress', 'companion.requestName', 'companion.route'],
         'The Home stream carries the header indicator fields, nothing more');
     assert(homeRegion.indexOf('companion.link') <
             homeRegion.indexOf('delta.field("cupPresence.state"'),
         'The companion rows sit with the connection rows the header reads');
+    assert(homeRegion.includes(
+        '#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD\n    // The header\'s cloud popup names the route the machine\'s data takes.\n    delta.field("companion.route"'),
+        'The route rides the Home stream only on Linea Micra builds');
   }
   for (const id of ['saveCompanionButton', 'revertCompanionButton'])
     assert.ok(new RegExp(`id="${id}"[^>]*data-dirty="0"[^>]*disabled`).test(admin),

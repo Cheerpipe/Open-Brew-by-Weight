@@ -16,7 +16,8 @@
     [kind + 'Signal', buttons[i]], [kind + 'Details', {hidden: true}],
     [kind + 'Name', {}], [kind + 'Detail', {}],
   ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}],
-    ['micraSignal', micraButton], ['micraName', {}], ['micraMachine', {}], ['micraDetail', {}]]);
+    ['micraSignal', micraButton], ['micraName', {}], ['micraMachine', {}], ['micraDetail', {}],
+    ['micraRoute', {textContent: '—'}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
   assert(start >= 0, 'Shared header must render cached signal status');
   const context = vm.createContext({$: id => elements[id], __LINEA_MICRA__: true,
@@ -79,8 +80,8 @@
   assert.equal(elements.companionSignal.dataset.level, 'on', 'Frames without companion changes keep the indicator');
   // The La Marzocco cloud indicator exists only on the micra integration and
   // follows the feed's observation quality: live inks, everything else grays.
-  const micraFrame = (lineaMicra) => context.updateHeaderSignals(
-      {connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud', lineaMicra});
+  const micraFrame = (lineaMicra, companion) => context.updateHeaderSignals(
+    {connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud', lineaMicra, companion});
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}});
   assert.equal(elements.micraSignal.hidden, true, 'Other integrations show no cloud icon');
   micraFrame({quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
@@ -90,6 +91,18 @@
   assert.equal(elements.micraName.textContent, 'barista@example.test');
   assert.equal(elements.micraMachine.textContent, 'Kitchen Micra');
   assert.equal(elements.micraDetail.textContent, 'Connected');
+  // The route row names where the machine's data runs, with Admin's wording;
+  // a frame without a companion model keeps the last route it named.
+  assert.equal(elements.micraRoute.textContent, '—', 'Before any companion model the row holds its placeholder');
+  micraFrame({quality: 'current'}, {route: 'direct'});
+  assert.equal(elements.micraRoute.textContent, 'Directly from the controller');
+  micraFrame({quality: 'current'}, {route: 'companion'});
+  assert.equal(elements.micraRoute.textContent, 'Through the companion');
+  micraFrame({quality: 'current'}, {route: 'pending'});
+  assert.equal(elements.micraRoute.textContent, 'Moving to the companion');
+  micraFrame({quality: 'current'});
+  assert.equal(elements.micraRoute.textContent, 'Moving to the companion',
+      'A companion-less frame keeps the last route');
   micraFrame({quality: 'optimistic', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
   assert.equal(elements.micraSignal.dataset.level, 'on', 'A commanded wake-up the cloud has yet to confirm stays inked');
   for (const [quality, label] of [['stale', 'Connection problems'],

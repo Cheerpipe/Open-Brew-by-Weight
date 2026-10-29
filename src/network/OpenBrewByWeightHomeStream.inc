@@ -244,6 +244,10 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     delta.field("companion.name", "\"%s\"", companion.name);
     delta.field("companion.link", "\"%s\"", companion.linkOpen ? "open" : "down");
     delta.field("companion.peerProtocol", static_cast<unsigned long>(companion.peerProtocol));
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+    // The header's cloud popup names the route the machine's data takes.
+    delta.field("companion.route", "\"%s\"", companion.route);
+#endif
   }
   const auto &tare = control.cupTare;
   const uint8_t idleCode = idleTarePresentationCode(tare, control.cupPresent);
@@ -539,9 +543,10 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
 #endif
   {
     // Companion: the pairing, its link, the relay and (Linea Micra) the La
-    // Marzocco route. The link age rides the sampled frame below. The four
-    // fields the shared header paints ride the Home stream instead; the page
-    // merges them with this report.
+    // Marzocco route details. The link age rides the sampled frame below. The
+    // fields the shared header paints — identity, link and, on Micra, the
+    // route — ride the Home stream instead; the page merges them with this
+    // report.
     CompanionSnapshot companion;
     companionSnapshot(companion);
     companionLinkAgeS = companion.linkAgeS;
@@ -554,7 +559,6 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.relay", "\"%s\"", companion.relayReady ? "ready" : "down");
     delta.field("companion.relayRejects", static_cast<unsigned long>(companion.relayRejects));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-    delta.field("companion.route", "\"%s\"", companion.route);
     delta.field("companion.reason", "\"%s\"", companion.reason);
     delta.field("companion.lm", bool(companion.lmSwitch));
     delta.field("companion.upstream", bool(companion.upstream));

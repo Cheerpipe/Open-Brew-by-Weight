@@ -1927,6 +1927,7 @@
     "shell.loading": "Loading…",
     "shell.made_by": "· Made by",
     "shell.micra_link_trouble": "Connection problems",
+    "shell.micra_route": "Connection type",
     "shell.missing_secondary_view": "Missing secondary view: ",
     "shell.missing_view_section": "Missing view section: ",
     "shell.network": "Network",
