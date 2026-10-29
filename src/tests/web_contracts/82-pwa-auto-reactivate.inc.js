@@ -1,9 +1,11 @@
 {
   // An installed app over the companion never shows the inactive overlay in
   // ordinary use: it holds its claim instead of arming the 15-minute lock,
-  // re-claims first when it returns with the stream down, and holds the
-  // overlay through one per-epoch takeover re-claim. Plain http, browser
-  // tabs and unknown companion state keep today's lock, overlay and Reload.
+  // re-claims first when it returns with the stream down, holds the overlay
+  // through one per-epoch takeover re-claim, and lets a transient stream
+  // failure debounce through the shared reachability budget. Plain http,
+  // browser tabs and unknown companion state keep today's lock, overlay and
+  // Reload.
   const assert = require("assert").strict;
   const vm = require("vm");
 
@@ -392,8 +394,10 @@
       "the hold never arms the lock and both flips are symmetric",
     );
     assert.ok(
-      codeIncludes(runtimeJs, "noteReachFail({ network: true });") &&
-        !codeIncludes(runtimeJs, "noteReachFail({ network: true }, true);"),
+      codeIncludes(
+        runtimeJs,
+        "else if (webUiPollingActive()) noteReachFail({ network: true });",
+      ) && !codeIncludes(runtimeJs, "noteReachFail({ network: true }, true);"),
       "the stream close feeds the shared reachability budget, never a forced overlay",
     );
     assert.ok(
