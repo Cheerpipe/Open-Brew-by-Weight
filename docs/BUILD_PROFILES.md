@@ -248,10 +248,17 @@ A machine profile adds these required identity and integration fields:
 | `interface.feedback` | `none` or `reed`. Paddle currently permits only `none`. |
 | `factory_defaults` | Defaults appropriate to the selected control topology. |
 
+One optional field may also appear:
+
+| Field | Contract |
+| --- | --- |
+| `machine_icon` | Kebab-case name of the machine's own icon in Home's Equipment row. The glyph artwork lives with the Web UI sources, and the build bakes exactly the named glyph; without the field the machine keeps the default generic icon. |
+
 The brand, model, and integration are not parsed from the file name, ID, or
 display name. Brand and model are compiled separately and shown separately in
 Diagnostic. An unknown integration fails profile resolution; adding one
-requires its own isolated implementation and build registration.
+requires its own isolated implementation and build registration. A
+`machine_icon` that names no glyph in the Web UI catalog fails the build.
 
 ### Momentary machines
 

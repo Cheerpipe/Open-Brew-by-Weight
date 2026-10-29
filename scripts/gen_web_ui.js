@@ -353,7 +353,7 @@ async function generate(options = {}) {
     {file: cssSourcePath, type: 'css', content: cssSource},
   ], {language: webUiLanguage, localesDir: options.localesDir,
     developmentMode: options.developmentMode === true,
-    machineType: options.machineType});
+    machineType: options.machineType, machineIcon: options.machineIcon});
   let at = 0;
   shellHtmlRaw = localized.sources[at++].content;
   for (const name of VIEW_NAMES) partialsRaw[name] = localized.sources[at++].content;
@@ -588,6 +588,7 @@ if (require.main === module) {
     let machineType;
     let remoteControl;
     let lineaMicra;
+    let machineIcon;
     let versionOverride;
     for (let i = 2; i < process.argv.length; i++) {
       const arg = process.argv[i];
@@ -600,6 +601,11 @@ if (require.main === module) {
         remoteControl = false;
       } else if (arg === '--no-linea-micra') {
         lineaMicra = false;
+      } else if (arg === '--machine-icon') {
+        if (++i >= process.argv.length) throw new Error('--machine-icon requires a value');
+        machineIcon = process.argv[i];
+      } else if (arg.startsWith('--machine-icon=')) {
+        machineIcon = arg.slice('--machine-icon='.length);
       } else if (arg === '--development') {
         developmentMode = true;
       } else if (arg === '--machine-type') {
@@ -617,7 +623,7 @@ if (require.main === module) {
       }
     }
     return generate({webUiLanguage, developmentMode, machineType, remoteControl,
-      lineaMicra, versionOverride});
+      lineaMicra, machineIcon, versionOverride});
   })
       .then((result) => {
         const parts = [`shell ${result.gzip.length} B`,

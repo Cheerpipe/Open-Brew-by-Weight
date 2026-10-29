@@ -28,11 +28,12 @@ def fail(message: str) -> None:
     raise ProfileError(message)
 
 
-def exact(obj: Any, required: set[str], where: str) -> dict[str, Any]:
+def exact(obj: Any, required: set[str], where: str,
+          optional: set[str] = frozenset()) -> dict[str, Any]:
     if not isinstance(obj, dict):
         fail(f"{where} must be an object")
     missing = sorted(required - obj.keys())
-    unknown = sorted(obj.keys() - required)
+    unknown = sorted(obj.keys() - required - optional)
     if missing:
         fail(f"{where} is missing: {', '.join(missing)}")
     if unknown:
@@ -255,8 +256,13 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
     where = "machine"
     exact(obj, {"schema_version", "id", "display_name", "compatibility_revision",
                 "hardware", "brand", "model", "integration_revision", "integration",
-                "interface", "factory_defaults"}, where)
+                "interface", "factory_defaults"}, where,
+          optional={"machine_icon"})
     common_profile(obj, where)
+    if "machine_icon" in obj:
+        # Names a glyph in gen_web_ui.js's catalog; absent means the default
+        # generic machine icon, so existing profiles stay valid unchanged.
+        profile_text(obj["machine_icon"], "machine.machine_icon", identifier=True)
     profile_text(obj["brand"], "machine.brand")
     profile_text(obj["model"], "machine.model")
     profile_text(obj["integration_revision"], "machine.integration_revision",
@@ -546,6 +552,10 @@ def header_for(resolved: dict[str, Any]) -> str:
     define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD", 1)
     define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION",
            {"none": 0, "linea_micra_cloud": 1}[resolved["machine_integration"]])
+    # Web UI metadata, consumed by the build's gen_web_ui.js step; the firmware
+    # itself never reads it.
+    if "machine_icon" in machine:
+        define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON", machine["machine_icon"])
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_GPIO", hardware["activator"]["gpio"])
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_ACTIVE_LEVEL", LEVELS[hardware["activator"]["active_level"]])
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_DEBOUNCE_MS", hardware["activator"]["debounce_ms"])

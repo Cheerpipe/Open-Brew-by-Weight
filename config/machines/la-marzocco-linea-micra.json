@@ -8,6 +8,7 @@
   "model": "Linea Micra",
   "integration_revision": "paddle-v1-unqualified",
   "integration": "linea_micra_cloud",
+  "machine_icon": "linea-micra",
   "interface": {
     "control": "paddle",
     "feedback": "none"

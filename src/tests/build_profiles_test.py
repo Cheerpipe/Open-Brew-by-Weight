@@ -49,10 +49,11 @@ def expect_failure(hardware=HARDWARE, machine=PRO_X, flags="", text=""):
         temporary.cleanup()
 
 
-for hardware, machine, expected_type, integration, brand, model in (
-        (HARDWARE, PRO_X, "1", "none", "Rancilio", "Silvia Pro X"),
-        (HARDWARE_REED, PRO_X_REED, "2", "none", "Rancilio", "Silvia Pro X"),
-        (HARDWARE, MICRA, "0", "linea_micra_cloud", "La Marzocco", "Linea Micra")):
+for hardware, machine, expected_type, integration, brand, model, icon in (
+        (HARDWARE, PRO_X, "1", "none", "Rancilio", "Silvia Pro X", None),
+        (HARDWARE_REED, PRO_X_REED, "2", "none", "Rancilio", "Silvia Pro X", None),
+        (HARDWARE, MICRA, "0", "linea_micra_cloud", "La Marzocco", "Linea Micra",
+         "linea-micra")):
     temporary, result = run(hardware=hardware, machine=machine)
     try:
         assert result.returncode == 0, result.stderr
@@ -67,6 +68,12 @@ for hardware, machine, expected_type, integration, brand, model in (
         expected_integration = "1" if integration == "linea_micra_cloud" else "0"
         assert (f"#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION "
                 f"{expected_integration}") in header
+        # The machine's Home icon is profile metadata the build forwards to the
+        # Web UI generator; profiles without it keep the default generic glyph.
+        if icon:
+            assert f'#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "{icon}"' in header
+        else:
+            assert "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON" not in header
         assert manifest["machine_integration"] == integration
         assert manifest["machine"]["brand"] == brand
         assert manifest["hardware"]["relay"] == {
@@ -113,6 +120,13 @@ try:
     expect_failure(machine=unknown_integration, text="machine.integration")
 finally:
     unknown_integration.unlink()
+
+bad_icon = changed(
+    MICRA, lambda value: value.update(machine_icon="Not An Icon"))
+try:
+    expect_failure(machine=bad_icon, text="machine.machine_icon")
+finally:
+    bad_icon.unlink()
 
 temporary, result = run(hardware=HARDWARE_REED, machine=PRO_X_REED)
 try:

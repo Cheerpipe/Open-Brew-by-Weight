@@ -11,6 +11,9 @@ const LANGUAGE_RE = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/;
 const HTML_MARKER_RE = /\{\{webui:([a-z0-9_.]+)\}\}/g;
 const META_MARKER_RE =
     /\{\{webui-meta:(locale|direction-attribute|development-class|machine-type-class)\}\}/g;
+const MACHINE_ICON_MARKER = '{{webui-meta:machine-icon}}';
+const MACHINE_ICON_SPRITE_RE = /<svg\b[^>]*\bdata-machine-icons\b[^>]*>([\s\S]*?)<\/svg\s*>/;
+const MACHINE_ICON_SYMBOL_RE = /<symbol\b[^>]*\bid="machine-icon-([a-z0-9-]+)"[^>]*>([\s\S]*?)<\/symbol\s*>/g;
 const JS_MARKER_RE = /__WEBUI_TEXT__\("([a-z0-9_.]+)"\)/g;
 const CSS_MARKER_RE = /__WEBUI_CSS_TEXT__\(\s*"([a-z0-9_.]+)"\s*\)/g;
 
@@ -141,9 +144,37 @@ function assertHtmlContext(source, marker, offset, meta) {
   }
 }
 
+// One glyph per machine ships: home.html carries the catalog (one hidden
+// <symbol id="machine-icon-<id>"> per machine) next to the marker that shows
+// it, the render's machineIcon option selects the glyph (default: the generic
+// machine), and both scaffolding pieces drop here.
+function bakeMachineIcon(source, file, options) {
+  const sprite = source.match(MACHINE_ICON_SPRITE_RE);
+  if (!sprite) {
+    if (source.includes(MACHINE_ICON_MARKER)) {
+      fail(`${file}: ${MACHINE_ICON_MARKER} requires the data-machine-icons catalog sprite`);
+    }
+    return source;
+  }
+  if (!source.includes(MACHINE_ICON_MARKER)) {
+    fail(`${file}: the machine-icons catalog sprite requires ${MACHINE_ICON_MARKER}`);
+  }
+  const id = options.machineIcon || 'default';
+  const glyph = [...sprite[1].matchAll(MACHINE_ICON_SYMBOL_RE)]
+      .find((match) => match[1] === id);
+  if (!glyph) fail(`${file}: no machine-icon-${id} glyph in the catalog sprite`);
+  return source.replace(MACHINE_ICON_SPRITE_RE, '')
+      .split(MACHINE_ICON_MARKER).join(glyph[2].trim());
+}
+
 function renderHtml(source, file, state) {
-  let rendered = source.replace(HTML_MARKER_RE, (marker, key, offset) => {
-    assertHtmlContext(source, marker, offset, false);
+  // The machine profile's own Home icon bakes in before marker rendering: the
+  // glyph catalog travels beside the marker in home.html's hidden
+  // data-machine-icons sprite, a build's machineIcon option selects the glyph,
+  // and the scaffolding (sprite and marker) never survives a render.
+  let rendered = bakeMachineIcon(source, file, state.options);
+  rendered = rendered.replace(HTML_MARKER_RE, (marker, key, offset) => {
+    assertHtmlContext(rendered, marker, offset, false);
     return htmlEscape(useString(file, key, state));
   });
   rendered = rendered.replace(META_MARKER_RE, (marker, name, offset) => {

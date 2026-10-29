@@ -205,12 +205,17 @@ webui_micra_flag='--no-linea-micra'
 [[ "$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION //p' \
   "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)" == 1 ]] \
   && webui_micra_flag=''
-# shellcheck disable=SC2086  # flags hold zero or one complete token
+# A machine profile that names its own icon ships it in Home's Equipment row.
+webui_machine_icon_flag=''
+webui_machine_icon="$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "\(.*\)"$/\1/p' \
+  "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"
+[[ -n "$webui_machine_icon" ]] && webui_machine_icon_flag="--machine-icon $webui_machine_icon"
+# shellcheck disable=SC2086  # each flag var holds zero or its complete tokens
 node ./scripts/gen_web_ui.js \
   --version "$(sed -n 's/^#define FW_VERSION_STRING "\(.*\)"$/\1/p' \
     "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightVersion.h")" \
   --webui-language "$(obbw_get webui_language)" $webui_dev_flag $webui_type_flag $webui_remote_flag \
-  $webui_micra_flag
+  $webui_micra_flag $webui_machine_icon_flag
 
 obbw_idf_commit_extra_flags_stamp
 

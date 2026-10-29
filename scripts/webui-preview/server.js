@@ -42,10 +42,12 @@ function fillView(html, name, content, hidden = '') {
 }
 
 function renderHome() {
+  // The preview stands in for the reference machine: its profile icon bakes
+  // into Home's Equipment row exactly as the machine's own builds do.
   const [shell, home] = renderSources(['shell', 'home'].map(name => ({
     file: `src/web/html/${name}.html`, type: 'html',
     content: read(`src/web/html/${name}.html`),
-  })), {language: 'en', allowUnused: true, machineType: 'paddle'}).sources;
+  })), {language: 'en', allowUnused: true, machineType: 'paddle', machineIcon: 'linea-micra'}).sources;
   return fillView(shell.content, 'home', home.content)
       .replace('</head>', '<link rel="stylesheet" href="/header.css"></head>')
       .replace(/<script\s+type="module"\s+src="\/app\.js\?v=__FW_ASSET_TAG__"\s*><\/script\s*>/,

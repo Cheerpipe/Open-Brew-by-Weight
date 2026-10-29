@@ -393,10 +393,35 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
     throw new Error(
         'IDF builds must bake the machine-type-exclusive Web UI by forwarding the resolved machine type to gen_web_ui.js');
   }
+  if (!buildIdf.includes('OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON') ||
+      !buildIdf.includes('--machine-icon')) {
+    throw new Error(
+        'IDF builds must forward the machine profile icon to gen_web_ui.js so Home bakes the machine row glyph');
+  }
   if (!buildIdf.includes('OPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL') ||
       !buildIdf.includes('--no-remote-control')) {
     throw new Error(
         'IDF builds without remote machine control must forward --no-remote-control to gen_web_ui.js');
+  }
+}
+// The machine profile's named icon is the only glyph baked into Home's
+// Equipment machine row: the catalog sprite and the marker are scaffolding
+// that must never ship, and an unnamed machine keeps the default glyph.
+{
+  const [defaultUi, micraUi] = await Promise.all([
+    webUi.generate({webUiLanguage: 'EN', write: false}),
+    webUi.generate({webUiLanguage: 'EN', machineIcon: 'linea-micra', write: false}),
+  ]);
+  const generic = 'M4 3h16v8H4', micra = 'M4 2.5h16a1 1 0 0 1';
+  for (const generated of [defaultUi, micraUi]) {
+    if (generated.html.includes('data-machine-icons') ||
+        generated.html.includes('{{webui-meta:machine-icon}}')) {
+      throw new Error('machine-icon scaffolding must not ship in generated markup');
+    }
+  }
+  if (!defaultUi.html.includes(generic) || defaultUi.html.includes(micra) ||
+      !micraUi.html.includes(micra) || micraUi.html.includes(generic)) {
+    throw new Error('generate() must bake exactly the machine profile icon into the Home machine row');
   }
 }
 if (!taskProfiler.includes('void copySnapshot(TaskProfilerSnapshot &out) const') ||
