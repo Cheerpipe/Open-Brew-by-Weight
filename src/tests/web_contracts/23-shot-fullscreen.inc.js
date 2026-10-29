@@ -301,10 +301,35 @@
       now = 120100;
       timers.splice(0).forEach(fire => fire());
       assert.equal(releases, 2, 'the tail releases the lock after the grace minute');
+      // A tail whose check fires under an open live view re-arms itself, so
+      // leaving the view after the grace minute still releases the lock.
+      requests = 0; releases = 0; timers.length = 0;
+      api.shotAwake(true);
+      grantAll(); await settle();
+      api.enter();
+      grantAll(); await settle();
+      assert.equal(releases, 1, 'the live view entry replaced the shot lock');
+      api.shotAwake(false);
+      now = 240300;  // the grace minute passed with the live view open
+      timers.splice(0).forEach(fire => fire());
+      assert.equal(timers.length, 1, 'a blocked tail re-arms its check');
+      assert.equal(releases, 1, 'the live view hold survives the blocked check');
+      api.exit();
+      assert.equal(releases, 2, 'leaving past the grace minute releases the lock');
+      timers.splice(0).forEach(fire => fire());
+      assert.equal(releases, 2, 'the re-armed check finds nothing left to release');
       assert.ok(
           codeIncludes(runtimeJs,
               'else if (Date.now() < shotAwakeUntil && appSetting("awake")) keepShotFsAwake(true);'),
           'returning visible re-takes the shot hold');
+      // An interrupted shot (invalid card) or a dead stream must not hold the
+      // screen forever: both paths drop the hold to its grace minute, and a
+      // new clock re-arms it.
+      assert.ok(
+          codeIncludes(blockAt(runtimeJs, 'function syncShotClock(frame) {'), 'keepShotAwake(true);') &&
+              codeIncludes(blockAt(runtimeJs, 'function syncShotClock(frame) {'), 'keepShotAwake(false);') &&
+              codeIncludes(blockAt(runtimeJs, 'function resetUiStream() {'), 'keepShotAwake(false);'),
+          'an interrupted shot or dead stream releases the shot hold');
     }
   })().catch(error => {console.error(error); process.exitCode = 1;});
 }

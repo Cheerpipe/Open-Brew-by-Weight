@@ -4082,8 +4082,11 @@ let shotWs = null,
   shotGotShot = !1;
 function resetUiStream() {
   // A closed socket ends every subscription generation: nothing stays synced
-  // until socket.onopen replays the wanted subscriptions.
+  // until socket.onopen replays the wanted subscriptions. With no frames
+  // coming, nothing guarantees a shot-finish frame either, so the keep-awake
+  // hold drops to its grace minute; a resumed live shot re-arms it at once.
   eachStream("reset");
+  keepShotAwake(false);
   shotStale = true;
   shotResync = false;
   invalidateHomeStream();
@@ -4376,9 +4379,12 @@ function startUiStream() {
           shotSeen = { cycle: next.cycle, boot: next.boot };
         else if (shotSeen && shotSeen.boot !== next.boot) shotSeen = null;
         // The installed app can raise the live view by itself at shot start.
+        // The boot pairs with the cycle so a rebooted controller's restarted
+        // cycle count still counts as a new shot.
         if (next.card.valid && next.card.live) {
-          if (next.cycle !== autoLiveCycle) {
-            autoLiveCycle = next.cycle;
+          const liveKey = next.boot + "/" + next.cycle;
+          if (liveKey !== autoLiveCycle) {
+            autoLiveCycle = liveKey;
             if (appSetting("live") && !shotFsActive && activeView === "home" && !document.hidden)
               enterShotFullScreen();
           }
@@ -4488,7 +4494,10 @@ function syncShotClock(frame) {
   if (!card.valid || !card.live) {
     if (card.valid) finishShotClock();
     else {
+      // An invalid card is an interrupted shot (reboot, takeover): no finish
+      // frame will come, so the keep-awake hold drops to its grace minute.
       shotClock = null;
+      keepShotAwake(false);
       if (shotClockPaint) cancelAnimationFrame(shotClockPaint);
       shotClockPaint = 0;
     }
@@ -4712,15 +4721,17 @@ function keepShotAwake(on) {
   }
   if (shotAwakeUntil !== Infinity) return;
   // The shot is over: hold the screen one more minute for the result. The
-  // timer never releases the live view's own hold while it is open.
+  // check re-arms while the live view holds the lock, so leaving it after the
+  // grace minute still releases; it never releases the view's own hold.
+  const tail = () => {
+    if (Date.now() < shotAwakeUntil || shotFsActive)
+      return void (shotAwakeTail = setTimeout(tail, 1e3));
+    shotAwakeUntil = 0;
+    keepShotFsAwake(false);
+  };
   shotAwakeUntil = Date.now() + 6e4;
   clearTimeout(shotAwakeTail);
-  shotAwakeTail = setTimeout(() => {
-    if (Date.now() >= shotAwakeUntil && !shotFsActive) {
-      shotAwakeUntil = 0;
-      keepShotFsAwake(false);
-    }
-  }, 6e4 + 50);
+  shotAwakeTail = setTimeout(tail, 6e4 + 50);
 }
 function enterShotFullScreen() {
   const view = $("liveShot");
@@ -4763,8 +4774,7 @@ function exitShotFullScreen() {
   shotFsPushed = false;
   keepShotAwake(false);
   keepShotFsAwake(screenAwakeWanted() && !document.hidden);
-  if (appSetting("orient") && typeof screen !== "undefined" && screen.orientation?.unlock)
-    screen.orientation.unlock();
+  if (typeof screen !== "undefined" && screen.orientation?.unlock) screen.orientation.unlock();
   clearTimeout(shotFsTimer);
   const finish = () => {
     clearTimeout(shotFsTimer);
