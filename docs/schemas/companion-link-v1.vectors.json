@@ -1,5 +1,5 @@
 {
-  "description": "Companion link v1 test vectors (docs/COMPANION_LINK.md), relay included. Private scalars are test-only.",
+  "description": "Companion link test vectors (docs/COMPANION_LINK.md): pairing and link v1, relay protocol 2. Private scalars are test-only.",
   "companionPrivate": "2e81dffcbc3a2d1b5cc74347ec38bbd731eb73244cfdd70cc1ce063a7c1fb508",
   "controllerPrivate": "2b80d0771d0754ad6827e5424ca8bd0866bd04e3e870f2bcf31aa527970411f8",
   "companionKey": "BGj34BgnnHxylAr96pvcuEFJlqzfUCJaYwY0z+vwhmxNnW7szp6gW5NVvrzNOaIE7TsBVM0cC2zm5Ik+kipaE34=",
@@ -37,25 +37,26 @@
         "uri": "/api/v1/config?x=1",
         "screen": "0123456789abcdef",
         "session": "token",
-        "canonical": "obbw-relay-v1\nPOST\n/api/v1/config?x=1\n7\n192.168.1.50\n0123456789abcdef\ntoken\n",
-        "header": "1 7 192.168.1.50 0123456789abcdef 99d273f03f13381fca548696321e402c"
+        "canonical": "obbw-relay-v2\nPOST\n/api/v1/config?x=1\n7\n192.168.1.50\n0123456789abcdef\ntoken\n",
+        "header": "2 7 192.168.1.50 0123456789abcdef abb2a51feca2d55fbd9480cb8a4448b0"
       },
       {
         "method": "GET",
         "uri": "/api/v1/ui/ui-stream",
         "screen": "00112233445566778899aabb",
         "session": "",
-        "canonical": "obbw-relay-v1\nGET\n/api/v1/ui/ui-stream\n8\n0.0.0.0\n00112233445566778899aabb\n\n",
-        "header": "1 8 0.0.0.0 00112233445566778899aabb 537c556eb0a92e2bca19a5c04cb34918"
+        "canonical": "obbw-relay-v2\nGET\n/api/v1/ui/ui-stream\n8\n0.0.0.0\n00112233445566778899aabb\n\n",
+        "header": "2 8 0.0.0.0 00112233445566778899aabb a6504ed973f9f32258c96b14fcf253c2"
       },
       {
         "method": "GET",
         "uri": "/api/v1/status/admin",
         "screen": "0123456789abcdef01234567",
         "session": "00112233445566778899aabbccddeeff",
-        "canonical": "obbw-relay-v1\nGET\n/api/v1/status/admin\n9\nfe80::1\n0123456789abcdef01234567\n00112233445566778899aabbccddeeff\n",
-        "header": "1 9 fe80::1 0123456789abcdef01234567 e7af16c12490a2b6c9f03f7a9b569eb3"
+        "canonical": "obbw-relay-v2\nGET\n/api/v1/status/admin\n9\nfe80::1\n0123456789abcdef01234567\n00112233445566778899aabbccddeeff\n",
+        "header": "2 9 fe80::1 0123456789abcdef01234567 5b4c238c77b4c7a1f755dffe650e439f"
       }
-    ]
+    ],
+    "bodyKey": "e3b8c164afe7eeeeea8f4deb2953bb00671bd0d5a73ae2d8e289d567bbe60add"
   }
 }

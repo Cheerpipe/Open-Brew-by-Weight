@@ -327,6 +327,17 @@ class OpenBrewByWeightNetwork {
   // its browser identity for the socket; an unsigned one clears it. False:
   // refused and answered (docs/COMPANION_LINK.md#relay).
   static bool relayAdmit(httpd_req_t *request);
+  // The credentials relayAdmit opened for the admitted relayed request; a
+  // relayed request never reads them from the wire. relaySessionToken
+  // reports `relayed` even without a session, so its caller does not fall
+  // back to the sealed header value.
+  bool relaySessionToken(httpd_req_t *request,
+                         uint8_t token[WEB_ACCESS_TOKEN_BYTES], bool &relayed);
+  bool relayPassword(httpd_req_t *request, char *out, size_t capacity);
+  bool relayBodyContext(httpd_req_t *request, uint8_t key[32], uint32_t &sequence);
+  bool relayResponseKey(uint8_t key[32], uint32_t &counter);
+  esp_err_t relaySendSealed(httpd_req_t *request, const char *json, size_t length);
+  esp_err_t relayEnvelopeReject(httpd_req_t *request);
 
   private:
   void mergePreferredScaleMac(PersistedSettings &settings);
@@ -879,8 +890,14 @@ class OpenBrewByWeightNetwork {
   static esp_err_t sendError(httpd_req_t *request, const char *status,
                              const char *error, const char *message);
   static bool readJsonBody(httpd_req_t *request,
-                           char body[REQUEST_BODY_CAPACITY]);
+                           char body[REQUEST_BODY_CAPACITY],
+                           bool *envelopeFailed = nullptr);
   static bool requireJsonContentType(httpd_req_t *request);
+  // Session token intake: the wire value, or the seal relayAdmit opened for
+  // a relayed request.
+  static bool readWebAccessToken(httpd_req_t *request, const char *header,
+                                 const char *prefix,
+                                 uint8_t token[WEB_ACCESS_TOKEN_BYTES]);
   bool lockWorkBuf();
   void unlockWorkBuf();
   void unlockJsonBody();

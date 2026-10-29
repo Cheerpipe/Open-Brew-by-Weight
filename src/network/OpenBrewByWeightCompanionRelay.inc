@@ -90,14 +90,16 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     return sendError(request, STATUS_NOT_FOUND, "COMPANION_NOT_PAIRED",
                      "This controller is not paired with this companion.");
   }
-  uint8_t key[32];
+  uint8_t key[32], bodyKey[32];
   const bool proven = companionHandshakeMac(secret, 'R', rb, nc, expected) &&
                       companionSame(mac, expected, sizeof(mac)) &&
                       companionHandshakeMac(secret, 'Q', rb, nc, mac) &&
-                      companionSessionKey(secret, rb, nc, key, "obbw-relay-v1");
+                      companionSessionKey(secret, rb, nc, key, "obbw-relay-v1") &&
+                      companionBodyKey(key, bodyKey);
   memset(secret, 0, sizeof(secret));
   if (!proven) {
     memset(key, 0, sizeof(key));
+    memset(bodyKey, 0, sizeof(bodyKey));
     {
       TaskLockGuard lock(self.dataMux_);
       ++g_companion.authFailures;
@@ -115,8 +117,10 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     CompanionRelay &relay = g_companion.relay;
     first = !relay.ready;
     memcpy(relay.key, key, sizeof(key));
+    memcpy(relay.bodyKey, bodyKey, sizeof(bodyKey));
     relay.ready = true;
     relay.window = CompanionRelayWindow{};
+    relay.responses = 0;
     ++relay.generation;
     esp_fill_random(relay.challenge, sizeof(relay.challenge));
     ui = g_companion.stored.uiOff == 0;
@@ -124,6 +128,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     link = kCompanionLm && g_companion.stored.lmSwitch != 0;
   }
   memset(key, 0, sizeof(key));
+  memset(bodyKey, 0, sizeof(bodyKey));
   used = static_cast<size_t>(snprintf(json, sizeof(json), "{\"mac\":\""));
   (void)appendBase64(json, sizeof(json), used, mac, sizeof(mac));
   snprintf(json + used, sizeof(json) - used, "\",\"ui\":%s,\"link\":%s}", ui ? "true" : "false",
@@ -134,9 +139,11 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
 
 // Without X-OBBW-Relay the request is direct and only clears its socket's
 // identity. With it: a local peer, a well-formed header, Kr's MAC over the
-// request, a fresh q and the Web UI switch on; the socket's identity is then
-// the header's browser until its next request. noinline: its frame is gone
-// before the handler runs.
+// request, a fresh q and the Web UI switch on; the seals on the session and
+// device-password values open under Kb, and the socket's identity becomes the
+// header's browser until its next request, with the opened credentials staged
+// for this request's handlers. noinline: its frame is gone before the handler
+// runs.
 __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const int fd = httpd_req_to_sockfd(request);
@@ -145,8 +152,10 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
     self.relayIdentityClear(fd);
     return true;
   }
-  char text[COMPANION_RELAY_HEADER_TEXT] = {}, session[48] = {}, address[COMPANION_ADDRESS_TEXT];
+  char text[COMPANION_RELAY_HEADER_TEXT] = {},
+       session[COMPANION_RELAY_SECRET_TEXT] = {}, address[COMPANION_ADDRESS_TEXT];
   const size_t sessionLength = httpd_req_get_hdr_value_len(request, "X-WebUI-Session");
+  size_t passwordLength = httpd_req_get_hdr_value_len(request, "X-Device-Password");
   CompanionRelayHeader header;
   const char *status = STATUS_BAD_REQUEST, *code = "RELAY_INVALID",
              *reason = "a malformed relay header";
@@ -159,7 +168,13 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
              companionRelayParse(text, header) && sessionLength < sizeof(session) &&
              (sessionLength == 0 || httpd_req_get_hdr_value_str(request, "X-WebUI-Session", session,
                                                                 sizeof(session)) == ESP_OK)) {
-    uint8_t key[32], mac[32];
+    char password[COMPANION_RELAY_SECRET_TEXT] = {};
+    if (passwordLength >= sizeof(password) ||
+        (passwordLength > 0 &&
+         httpd_req_get_hdr_value_str(request, "X-Device-Password", password,
+                                     sizeof(password)) != ESP_OK))
+      passwordLength = sizeof(password);  // unreadable: refuse below
+    uint8_t key[32], bodyKey[32], mac[32];
     uint32_t generation;
     bool ready;
     {
@@ -167,20 +182,40 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
       ready = g_companion.relay.ready;
       generation = g_companion.relay.generation;
       memcpy(key, g_companion.relay.key, sizeof(key));
+      memcpy(bodyKey, g_companion.relay.bodyKey, sizeof(bodyKey));
     }
-    const bool signedOk =
+    // The seals open outside the lock; what they carry belongs to this
+    // request's q, which the replay window admits exactly once.
+    char sessionText[WEB_ACCESS_TOKEN_TEXT] = {}, passwordText[WIFI_PASSWORD_CAPACITY] = {};
+    uint8_t sessionToken[WEB_ACCESS_TOKEN_BYTES];
+    const bool sessionSealed = sessionLength > 0, passwordSealed = passwordLength > 0;
+    const bool signatureOk =
         ready && companionRelayMac(key, http_method_str(static_cast<http_method>(request->method)),
                                    request->uri, header, session, mac) &&
         companionSame(mac, header.mac, COMPANION_RELAY_MAC_BYTES);
+    const bool sealsOk =
+        !signatureOk ||
+        ((!sessionSealed ||
+          (companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_SESSION, header.sequence,
+                               session, sessionText, sizeof(sessionText)) &&
+           parseWebAccessToken(sessionText, sessionToken))) &&
+         (!passwordSealed ||
+          companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_PASSWORD, header.sequence,
+                              password, passwordText, sizeof(passwordText))));
     memset(key, 0, sizeof(key));
+    memset(bodyKey, 0, sizeof(bodyKey));
     memset(session, 0, sizeof(session));
     TaskLockGuard lock(self.dataMux_);
     CompanionRelay &relay = g_companion.relay;
     status = STATUS_UNAUTHORIZED;
     code = "RELAY_STALE";
     reason = "a stale or unsigned relay";
-    if (signedOk && relay.ready && relay.generation == generation) {
-      if (!companionRelayAccept(relay.window, header.sequence)) {
+    if (signatureOk && relay.ready && relay.generation == generation) {
+      if (!sealsOk) {
+        status = STATUS_BAD_REQUEST;
+        code = "RELAY_INVALID";
+        reason = "a seal that did not open";
+      } else if (!companionRelayAccept(relay.window, header.sequence)) {
         code = "RELAY_REPLAY";
         reason = "a replayed relay";
       } else if (g_companion.stored.uiOff != 0) {
@@ -195,9 +230,21 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
           if (entry.screen[0] != '\0' ? entry.fd == fd : slot == nullptr) slot = &entry;
         if (slot == nullptr) slot = &g_relayIdentities[0];
         else if (slot->screen[0] == '\0') self.relayIdentities_.fetch_add(1, std::memory_order_acq_rel);
+        *slot = CompanionRelayIdentity{};
         slot->fd = fd;
         snprintf(slot->screen, sizeof(slot->screen), "%s", header.screen);
         snprintf(slot->addr, sizeof(slot->addr), "%s", header.addr);
+        slot->sequence = header.sequence;
+        if (sessionSealed) {
+          slot->sessionValid = true;
+          memcpy(slot->session, sessionToken, sizeof(slot->session));
+        }
+        if (passwordSealed) {
+          slot->passwordValid = true;
+          snprintf(slot->password, sizeof(slot->password), "%s", passwordText);
+        }
+        memset(sessionToken, 0, sizeof(sessionToken));
+        memset(passwordText, 0, sizeof(passwordText));
         return true;
       }
     }
@@ -244,6 +291,104 @@ bool OpenBrewByWeightNetwork::webUiPrincipal(httpd_req_t *request, CompanionPrin
   principal = CompanionPrincipal{};
   principal.relayed = relayIdentity(request, principal.id, addr);
   return principal.relayed || readWebUiClientId(request, principal.id, sizeof(principal.id));
+}
+
+// What the admitted request's seals opened, staged per socket. relayIdentity
+// above names the screen; these carry the credentials only within the
+// request whose q sealed them.
+
+bool OpenBrewByWeightNetwork::relaySessionToken(httpd_req_t *request,
+                                                uint8_t token[WEB_ACCESS_TOKEN_BYTES],
+                                                bool &relayed) {
+  relayed = false;
+  if (relayIdentities_.load(std::memory_order_acquire) == 0) return false;
+  TaskLockGuard lock(dataMux_);
+  for (const auto &entry : g_relayIdentities) {
+    if (entry.screen[0] == '\0' || entry.fd != httpd_req_to_sockfd(request)) continue;
+    relayed = true;
+    if (!entry.sessionValid) return false;
+    memcpy(token, entry.session, WEB_ACCESS_TOKEN_BYTES);
+    return true;
+  }
+  return false;
+}
+
+bool OpenBrewByWeightNetwork::relayPassword(httpd_req_t *request, char *out,
+                                            size_t capacity) {
+  if (relayIdentities_.load(std::memory_order_acquire) == 0) return false;
+  TaskLockGuard lock(dataMux_);
+  for (const auto &entry : g_relayIdentities) {
+    if (entry.screen[0] == '\0' || entry.fd != httpd_req_to_sockfd(request)) continue;
+    if (entry.passwordValid) snprintf(out, capacity, "%s", entry.password);
+    else out[0] = '\0';
+    return true;
+  }
+  return false;
+}
+
+bool OpenBrewByWeightNetwork::relayBodyContext(httpd_req_t *request, uint8_t key[32],
+                                               uint32_t &sequence) {
+  if (relayIdentities_.load(std::memory_order_acquire) == 0) return false;
+  TaskLockGuard lock(dataMux_);
+  if (!g_companion.relay.ready) return false;
+  for (const auto &entry : g_relayIdentities) {
+    if (entry.screen[0] == '\0' || entry.fd != httpd_req_to_sockfd(request)) continue;
+    memcpy(key, g_companion.relay.bodyKey, 32);
+    sequence = entry.sequence;
+    return true;
+  }
+  return false;
+}
+
+bool OpenBrewByWeightNetwork::relayResponseKey(uint8_t key[32], uint32_t &counter) {
+  TaskLockGuard lock(dataMux_);
+  if (!g_companion.relay.ready) return false;
+  memcpy(key, g_companion.relay.bodyKey, 32);
+  counter = ++g_companion.relay.responses;
+  return true;
+}
+
+// One sealed JSON response: X-OBBW-Enc names the counter it was sealed
+// under. A seal that cannot be made is never sent opened.
+esp_err_t OpenBrewByWeightNetwork::relaySendSealed(httpd_req_t *request,
+                                                   const char *json, size_t length) {
+  uint8_t key[32], nonce[12];
+  uint32_t counter = 0;
+  uint8_t *const cipher = static_cast<uint8_t *>(malloc(length + 16));
+  const bool keyed = cipher != nullptr && relayResponseKey(key, counter);
+  size_t sealedLength = 0;
+  if (keyed) companionRelayNonce('f', COMPANION_RELAY_CTX_RESPONSE, counter, nonce);
+  const bool sealed =
+      keyed && companionAeadSealBytes(key, nonce,
+                                      reinterpret_cast<const uint8_t *>(json), length,
+                                      cipher, length + 16, sealedLength);
+  memset(key, 0, sizeof(key));
+  if (!sealed) {
+    free(cipher);
+    httpd_resp_set_status(request, STATUS_SERVER_ERROR);
+    return sendBody(request, nullptr, 0);
+  }
+  char counterText[12];
+  snprintf(counterText, sizeof(counterText), "%lu",
+           static_cast<unsigned long>(counter));
+  httpd_resp_set_hdr(request, "X-OBBW-Enc", counterText);
+  const esp_err_t sent = sendBody(request, cipher, sealedLength);
+  free(cipher);
+  return sent;
+}
+
+// A body whose seal did not open: the same accounting as a refused relay.
+esp_err_t OpenBrewByWeightNetwork::relayEnvelopeReject(httpd_req_t *request) {
+  {
+    TaskLockGuard lock(dataMux_);
+    ++g_companion.relay.rejects;
+  }
+  static RefusalLog log;
+  if (const uint32_t count = log.due())
+    lifecycleLogf("Companion relay refused %lu request(s): a body seal that did not open",
+                  static_cast<unsigned long>(count));
+  return sendError(request, STATUS_BAD_REQUEST, "RELAY_INVALID",
+                   "The companion's relay was refused.");
 }
 
 }  // namespace openbrewbyweight

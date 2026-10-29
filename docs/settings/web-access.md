@@ -65,8 +65,11 @@ of them brings control back to the companion.
 ## What it protects, and what it doesn't
 
 The password keeps casual visitors out of the Web UI and stops them from
-changing presets, settings, or the machine. The connection is not encrypted,
-so it won't stop someone who can watch the traffic on your Wi-Fi. Keep the
+changing presets, settings, or the machine. Opening the controller's own
+address is not encrypted, so that path won't stop someone who can watch the
+traffic on your Wi-Fi. Signing in through a
+[companion](../features/companion.md) is protected: nobody listening on the
+network can read your password or your signed-in session. Keep the
 controller on your own network, not a guest or public one.
 
 Joining the controller's own setup network already proves the device password,

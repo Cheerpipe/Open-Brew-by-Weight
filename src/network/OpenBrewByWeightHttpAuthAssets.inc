@@ -540,11 +540,29 @@ bool OpenBrewByWeightNetwork::requireJsonContentType(httpd_req_t *request) {
 }
 
 bool OpenBrewByWeightNetwork::readJsonBody(
-    httpd_req_t *request, char body[REQUEST_BODY_CAPACITY]) {
+    httpd_req_t *request, char body[REQUEST_BODY_CAPACITY], bool *envelopeFailed) {
+  if (envelopeFailed != nullptr) *envelopeFailed = false;
   if (!requireJsonContentType(request) || request->content_len <= 0 ||
       request->content_len >= REQUEST_BODY_CAPACITY) {
     return false;
   }
+  // A relayed request's body arrives sealed under its q (protocol 2): the
+  // sealed bytes land in a scratch buffer so the opened plaintext is written
+  // straight into `body`; a direct body arrives as it is.
+  OpenBrewByWeightNetwork &self = *instance_;
+  uint8_t bodyKey[32];
+  uint32_t sequence = 0;
+  const bool sealed = self.relayBodyContext(request, bodyKey, sequence);
+  uint8_t *const scratch =
+      sealed ? static_cast<uint8_t *>(malloc(static_cast<size_t>(request->content_len)))
+             : nullptr;
+  if (sealed && (scratch == nullptr || request->content_len <= 16)) {
+    free(scratch);
+    memset(bodyKey, 0, sizeof(bodyKey));
+    if (envelopeFailed != nullptr) *envelopeFailed = true;
+    return false;
+  }
+  char *const into = scratch != nullptr ? reinterpret_cast<char *>(scratch) : body;
   // Callers hold the shared work buffer while the body arrives, so a
   // trickling peer gets one total deadline (plus at most one receive timeout).
   static RefusalLog slowBodies;
@@ -556,17 +574,38 @@ bool OpenBrewByWeightNetwork::readJsonBody(
         serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
                              "http: refused %lu request body(s) that arrived too slowly",
                              static_cast<unsigned long>(count));
+      free(scratch);
+      memset(bodyKey, 0, sizeof(bodyKey));
       return false;
     }
     const int result = httpd_req_recv(
-        request, body + received,
+        request, into + received,
         static_cast<size_t>(request->content_len) - received);
     if (result <= 0) {
+      free(scratch);
+      memset(bodyKey, 0, sizeof(bodyKey));
       return false;
     }
     received += static_cast<size_t>(result);
   }
-  body[received] = '\0';
+  if (!sealed) {
+    body[received] = '\0';
+    return true;
+  }
+  uint8_t nonce[12];
+  companionRelayNonce('c', COMPANION_RELAY_CTX_REQUEST, sequence, nonce);
+  size_t opened = 0;
+  const bool ok =
+      companionAeadOpenBytes(bodyKey, nonce, scratch, received,
+                             reinterpret_cast<uint8_t *>(body), REQUEST_BODY_CAPACITY - 1,
+                             opened);
+  free(scratch);
+  memset(bodyKey, 0, sizeof(bodyKey));
+  if (!ok) {
+    if (envelopeFailed != nullptr) *envelopeFailed = true;
+    return false;
+  }
+  body[opened] = '\0';
   return true;
 }
 

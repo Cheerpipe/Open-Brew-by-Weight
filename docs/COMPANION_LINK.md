@@ -1,16 +1,17 @@
 # Companion link protocol
 
 This is the developer reference for the LAN contract between the controller
-and [Open Brew by Weight Companion](features/companion.md), version 1. The
-companion is optional: a controller that never paired, or whose companion is
-away, behaves exactly as it does without this feature. Everything here is
-opened by the companion; the controller never connects to the companion,
-never browses mDNS, and never retries.
+and [Open Brew by Weight Companion](features/companion.md). The pairing and
+link protocol is version 1; the relay is protocol 2 (sealed bodies and
+headers). The companion is optional: a controller that never paired, or whose
+companion is away, behaves exactly as it does without this feature.
+Everything here is opened by the companion; the controller never connects to
+the companion, never browses mDNS, and never retries.
 
-Version 1 covers pairing, the [relay](#relay) that lets the companion serve
-the Web UI to several screens, and, on Linea Micra builds, the La Marzocco
-route. Every build registers these routes; a controller that is not paired
-answers them and does nothing else.
+Version 1 covers pairing and the link, and version 2 the relay that lets the
+companion serve the Web UI to several screens, plus, on Linea Micra builds,
+the La Marzocco route. Every build registers these routes; a controller that
+is not paired answers them and does nothing else.
 
 ## Common rules
 
@@ -329,8 +330,11 @@ otherwise) with `{"id":"…","nonce":"<16 bytes>","mac":"<32 bytes>"}`, where
 | `404` | `COMPANION_NOT_PAIRED`, plus `"erase":"<HMAC(S, "E" ‖ nc)>"` for a forgotten companion | Unknown or forgotten `id`, decided before `mac` is checked: a companion whose `GET` was answered `404` sends any `mac` (for example over 16 zero bytes as `rb`) to learn whether to erase |
 
 On success both sides derive
-`Kr = HKDF-SHA256(ikm = S, salt = rb ‖ nc, info = "obbw-relay-v1", L = 32)`,
-the controller resets the replay window and draws a new `rb`. A replayed
+`Kr = HKDF-SHA256(ikm = S, salt = rb ‖ nc, info = "obbw-relay-v1", L = 32)`
+for signing, and from it the sealing key
+`Kb = HKDF-SHA256(ikm = Kr, salt = "", info = "obbw-relay-body-v2", L = 32)`
+for every sealed body and header value below. The controller resets the
+replay window and the response counter, and draws a new `rb`. A replayed
 handshake fails because `rb` changed. Forget and a factory reset end the
 relay session, and so does a change of either switch in Admin → Companion:
 the companion's next relayed request is `RELAY_STALE`, and its new handshake
@@ -340,8 +344,12 @@ carries the new `ui` and `link`. A missing `ui` reads as `true` and a missing
 ### Signed requests
 
 ```text
-X-OBBW-Relay: 1 <q> <addr> <screen> <mac>
+X-OBBW-Relay: 2 <q> <addr> <screen> <mac>
 ```
+
+Relay protocol 2; the header's first field is the version, and a request
+that names any other version is `400 RELAY_INVALID`. The fields are as
+before:
 
 - `q`: the request counter of this relay session, from 1, decimal without
   leading zeros, at most 4294967295; the companion makes a new handshake
@@ -352,17 +360,17 @@ X-OBBW-Relay: 1 <q> <addr> <screen> <mac>
   digits);
 - `mac`: the first 16 bytes of `HMAC-SHA256(Kr, canonical)` as 32 lowercase
   hex digits, where `canonical` is
-  `obbw-relay-v1\nMETHOD\nURI\nq\naddr\nscreen\nsession\n`: the HTTP method,
-  the request target exactly as sent (path and query), and the
-  `X-WebUI-Session` value or nothing.
+  `obbw-relay-v2\nMETHOD\nURI\nq\naddr\nscreen\nsession\n`: the HTTP method,
+  the request target exactly as sent (path and query), and the sealed
+  `X-WebUI-Session` value as sent, or nothing. The signature still covers
+  the request's identity; the seal below covers its content.
 
-The body is not covered: the signature protects what only a relayed request
-may do. The controller accepts `q` above the highest seen, or one of the 63
+The controller accepts `q` above the highest seen, or one of the 63
 below it not seen yet. The companion rewrites `X-WebUI-Client` to its own
 random relay id (24 hex digits, one per companion process) and forwards
-`X-WebUI-Session`, `X-WebUI-Activity`, `X-Device-Password`, `Content-Type`,
-`Content-Length` and, for firmware updates, `X-OTA-Transfer`, `X-OTA-Offset`,
-`X-OTA-Length`, `X-OTA-Allow-Downgrade` and `Content-Range`. Its shared
+`X-WebUI-Activity`, `Content-Type`, `Content-Length` and, for firmware
+updates, `X-OTA-Transfer`, `X-OTA-Offset`, `X-OTA-Length`,
+`X-OTA-Allow-Downgrade` and `Content-Range` as they are. Its shared
 ui-stream upgrade (`GET /api/v1/ui/ui-stream`) carries the header too, with
 `addr` `0.0.0.0`, the relay id as `screen`, no session, and the controller's
 own `Host` and `Origin` (`http://<host>`); that identity names no screen and
@@ -370,13 +378,58 @@ holds nothing. Its gateway relays `POST /api/v1/companion/admin` (Admin →
 Companion on a companion screen, with that screen's Admin unlock) and no
 other `/api/v1/companion/` route.
 
+### Sealed bodies and headers (protocol 2)
+
+Everything that carries a credential is sealed with AES-256-GCM under `Kb`:
+no device password, session token, or sign-in body crosses the
+companion→controller hop in the clear, and a seal cannot be moved between
+requests.
+
+**Nonce.** 12 bytes: the direction byte `c` (companion to controller) or
+`f` (controller to companion), one context byte, two zero bytes, and the
+counter as 8 bytes little-endian:
+
+| Context | Counter | Covers |
+| --- | --- | --- |
+| `0` | the request's `q` | the `X-WebUI-Session` value |
+| `1` | the request's `q` | the `X-Device-Password` value |
+| `2` | the request's `q` | the request body |
+| `3` | the response counter | a response body |
+
+A nonce is never reused under one `Kb`: `q` is fresh by the replay window,
+and the response counter starts at 1 and grows by exactly one per sealed
+response. No random bytes and no stored state are needed.
+
+**Sealed header values.** `X-WebUI-Session` and `X-Device-Password` keep
+their names but carry standard padded base64 of the ciphertext (the 16-byte
+GCM tag appended), with no additional data. Moving a sealed value to another
+request fails: the nonce names that request's `q`, and the signature binds
+the session value to the request it traveled on.
+
+**Sealed request bodies.** A relayed request with a body carries the raw
+ciphertext (tag appended, no base64); `Content-Length` includes the 16 tag
+bytes. The controller opens the body where it reads it, before any parsing.
+
+**Sealed response bodies.** Every JSON response to a relayed request is
+sealed the same way and carries `X-OBBW-Enc: <counter>` (decimal, the
+response counter used as the nonce). A response without the header — web
+assets, WebSocket upgrades — is not sealed.
+
+**What is deliberately not sealed.** OTA PATCH range bodies and web assets
+carry no secret: they are the user's own firmware image and the Web UI's
+public files. Their integrity does not rest on the seal — the image is
+pinned by the session's `sha256`, which arrives in a sealed
+`/api/v1/ota/session` body and is verified over the assembled image before
+anything is committed, and assets are named by their build tag in the URL.
+The ui-stream and link frames after their handshakes carry no credentials.
+
 A request with the header is refused before any handler runs; after
 `RELAY_STALE` alone the companion makes a new handshake and retries once:
 
 | Status | Code | When |
 | --- | --- | --- |
 | `403` | `COMPANION_PEER` | The companion's socket is outside the local ranges |
-| `400` | `RELAY_INVALID` | The header is malformed |
+| `400` | `RELAY_INVALID` | The header is malformed, names another version, or a seal does not open |
 | `401` | `RELAY_STALE` | No relay session, or the signature does not match it |
 | `401` | `RELAY_REPLAY` | `q` was used or is too old |
 | `403` | `RELAY_DISABLED` | **Web UI through the companion** is off |

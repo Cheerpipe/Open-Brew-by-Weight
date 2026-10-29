@@ -1375,9 +1375,17 @@ esp_err_t OpenBrewByWeightNetwork::sendJson(httpd_req_t *request,
   // until the status line's ACK, which modem sleep delays.
   httpd_resp_set_hdr(request, "Connection", "close");
   const size_t length = json == nullptr ? 0 : strlen(json);
-  const esp_err_t sent = sendBody(request, json, length);
+  // A relayed request gets its JSON sealed (relay protocol 2); assets and
+  // upgrades, sent elsewhere, stay plain.
+  char screen[COMPANION_RELAY_SCREEN_TEXT], addr[COMPANION_RELAY_ADDR_TEXT];
+  if (!instance_->relayIdentity(request, screen, addr)) {
+    const esp_err_t sent = sendBody(request, json, length);
+    (void)httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
+    return sent;
+  }
+  const esp_err_t sealed = instance_->relaySendSealed(request, json, length);
   (void)httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
-  return sent;
+  return sealed;
 }
 
 esp_err_t OpenBrewByWeightNetwork::sendError(httpd_req_t *request,

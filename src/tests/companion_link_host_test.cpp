@@ -166,6 +166,56 @@ bool companionHkdfSha256(const uint8_t *ikm, size_t ikmSize, const uint8_t *salt
   const CompanionBytes expand[] = {{info, strlen(info)}, {&counter, 1}};
   return companionHmacSha256(prk, 32, expand, 2, out);
 }
+
+// Reference AEAD for the relay envelopes' logic only, where the controller
+// runs PSA's AES-256-GCM: an HMAC-SHA256 keystream and tag keep the
+// properties the envelopes rely on (key- and nonce-bound, tag-verified)
+// without implementing AES here. No cross-implementation vectors exist for
+// it; both ends of a real exchange use AES-256-GCM.
+namespace {
+void aeadKeystream(const uint8_t key[32], const uint8_t nonce[12], size_t block,
+                   uint8_t out[32]) {
+  const uint8_t index[4] = {uint8_t(block >> 24), uint8_t(block >> 16),
+                            uint8_t(block >> 8), uint8_t(block)};
+  const CompanionBytes parts[] = {{nonce, 12}, {"\x01", 1}, {index, 4}};
+  companionHmacSha256(key, 32, parts, 3, out);
+}
+}  // namespace
+
+bool companionAeadSealBytes(const uint8_t key[32], const uint8_t nonce[12],
+                            const uint8_t *plain, size_t plainSize, uint8_t *out,
+                            size_t capacity, size_t &length) {
+  if (plainSize + 16 > capacity) return false;
+  for (size_t base = 0; base < plainSize; base += 32) {
+    uint8_t stream[32];
+    aeadKeystream(key, nonce, base / 32, stream);
+    for (size_t i = 0; i + base < plainSize && i < 32; ++i) out[base + i] = plain[base + i] ^ stream[i];
+  }
+  const CompanionBytes tag[] = {{nonce, 12}, {"\x02", 1}, {out, plainSize}};
+  uint8_t mac[32];
+  companionHmacSha256(key, 32, tag, 3, mac);
+  memcpy(out + plainSize, mac, 16);
+  length = plainSize + 16;
+  return true;
+}
+
+bool companionAeadOpenBytes(const uint8_t key[32], const uint8_t nonce[12],
+                            const uint8_t *sealed, size_t sealedSize, uint8_t *out,
+                            size_t capacity, size_t &length) {
+  if (sealedSize < 16 || sealedSize - 16 > capacity) return false;
+  const size_t plainSize = sealedSize - 16;
+  const CompanionBytes tag[] = {{nonce, 12}, {"\x02", 1}, {sealed, plainSize}};
+  uint8_t mac[32];
+  companionHmacSha256(key, 32, tag, 3, mac);
+  if (!companionSame(mac, sealed + plainSize, 16)) return false;
+  for (size_t base = 0; base < plainSize; base += 32) {
+    uint8_t stream[32];
+    aeadKeystream(key, nonce, base / 32, stream);
+    for (size_t i = 0; i + base < plainSize && i < 32; ++i) out[base + i] = sealed[base + i] ^ stream[i];
+  }
+  length = plainSize;
+  return true;
+}
 }  // namespace openbrewbyweight
 
 static void testVectors() {
@@ -240,6 +290,9 @@ static void testRelayVectors() {
   CHECK(toBase64(mac, 32) == field(relay, "erase"));
   CHECK(companionSessionKey(secret.data(), rb.data(), nc.data(), key, "obbw-relay-v1"));
   CHECK(fromHex(field(relay, "key")) == std::vector<uint8_t>(key, key + 32));
+  uint8_t bodyKey[32];
+  CHECK(companionBodyKey(key, bodyKey));
+  CHECK(fromHex(field(relay, "bodyKey")) == std::vector<uint8_t>(bodyKey, bodyKey + 32));
   const cJSON *requests = cJSON_GetObjectItemCaseSensitive(relay, "requests");
   // A screen's call, the companion's shared ui-stream (its relay id, 0.0.0.0)
   // and an IPv6 browser.
@@ -276,28 +329,99 @@ static void testRelayHeader() {
   };
   const std::string mac(32, 'a'), screen = "0123456789abcdef";
   CompanionRelayHeader header;
-  CHECK(parse(("1 4294967295 10.0.0.2 " + screen + " " + mac).c_str(), header) &&
+  CHECK(parse(("2 4294967295 10.0.0.2 " + screen + " " + mac).c_str(), header) &&
         header.sequence == UINT32_MAX && header.mac[0] == 0xAA);
-  CHECK(parse(("1 1 2001:db8::a:1 " + screen + " " + mac).c_str(), header) && header.sequence == 1);
+  CHECK(parse(("2 1 2001:db8::a:1 " + screen + " " + mac).c_str(), header) && header.sequence == 1);
   const std::string bad[] = {
-      "2 1 10.0.0.2 " + screen + " " + mac,                 // version
-      "1 0 10.0.0.2 " + screen + " " + mac,                 // q from 1
-      "1 01 10.0.0.2 " + screen + " " + mac,                // canonical q
-      "1 4294967296 10.0.0.2 " + screen + " " + mac,        // q is 32-bit
-      "1 1x 10.0.0.2 " + screen + " " + mac,
-      "1 1 10.0.0.2\" " + screen + " " + mac,               // address characters
-      "1 1 1 " + screen + " " + mac,                        // address too short
-      "1 1 " + std::string(46, '1') + " " + screen + " " + mac,
-      "1 1 10.0.0.2 0123456789ABCDEF " + mac,               // lowercase screen
-      "1 1 10.0.0.2 0123456789abcde " + mac,                // 15 digits
-      "1 1 10.0.0.2 " + std::string(25, 'a') + " " + mac,   // 25 digits
-      "1 1 10.0.0.2 " + screen + " " + mac.substr(1),       // short MAC
-      "1 1 10.0.0.2 " + screen + " " + mac + "a",
-      "1 1 10.0.0.2 " + screen + " " + mac + " ",           // trailing field
-      "1  1 10.0.0.2 " + screen + " " + mac,                // double space
-      "1 1 10.0.0.2 " + screen,
+      "1 1 10.0.0.2 " + screen + " " + mac,                 // version
+      "2 0 10.0.0.2 " + screen + " " + mac,                 // q from 1
+      "2 01 10.0.0.2 " + screen + " " + mac,                // canonical q
+      "2 4294967296 10.0.0.2 " + screen + " " + mac,        // q is 32-bit
+      "2 1x 10.0.0.2 " + screen + " " + mac,
+      "2 1 10.0.0.2\" " + screen + " " + mac,               // address characters
+      "2 1 1 " + screen + " " + mac,                        // address too short
+      "2 1 " + std::string(46, '1') + " " + screen + " " + mac,
+      "2 1 10.0.0.2 0123456789ABCDEF " + mac,               // lowercase screen
+      "2 1 10.0.0.2 0123456789abcde " + mac,                // 15 digits
+      "2 1 10.0.0.2 " + std::string(25, 'a') + " " + mac,   // 25 digits
+      "2 1 10.0.0.2 " + screen + " " + mac.substr(1),       // short MAC
+      "2 1 10.0.0.2 " + screen + " " + mac + "a",
+      "2 1 10.0.0.2 " + screen + " " + mac + " ",           // trailing field
+      "2  1 10.0.0.2 " + screen + " " + mac,                // double space
+      "2 1 10.0.0.2 " + screen,
   };
   for (const std::string &value : bad) CHECK(!parse(value.c_str(), header));
+}
+
+// Relay protocol 2's seals: Kb, the nonce layout, and the envelope helpers
+// (docs/COMPANION_LINK.md#sealed-bodies-and-headers-protocol-2).
+static void testRelayEnvelope() {
+  uint8_t relayKey[32], bodyKey[32], other[32];
+  memset(relayKey, 7, sizeof(relayKey));
+  CHECK(companionBodyKey(relayKey, bodyKey));
+  CHECK(memcmp(bodyKey, relayKey, 32) != 0);
+  CHECK(companionBodyKey(relayKey, other) && !memcmp(bodyKey, other, 32));  // deterministic
+  relayKey[0] ^= 1;
+  CHECK(companionBodyKey(relayKey, other) && memcmp(bodyKey, other, 32) != 0);
+
+  uint8_t nonce[12];
+  companionRelayNonce('c', COMPANION_RELAY_CTX_SESSION, 0x01020304, nonce);
+  const uint8_t layout[12] = {'c', 0, 0, 0, 4, 3, 2, 1, 0, 0, 0, 0};
+  CHECK(!memcmp(nonce, layout, 12));
+  uint8_t response[12];
+  companionRelayNonce('f', COMPANION_RELAY_CTX_RESPONSE, 1, response);
+  CHECK(memcmp(nonce, response, 12) != 0);
+
+  const std::string session = "0123456789abcdef0123456789abcdef";
+  char sealed[COMPANION_RELAY_SECRET_TEXT], opened[64];
+  CHECK(companionSealSecret(bodyKey, COMPANION_RELAY_CTX_SESSION, 42, session.c_str(), sealed));
+  CHECK(companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_SESSION, 42, sealed, opened,
+                            sizeof(opened)) &&
+        session == opened);
+  CHECK(!companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_PASSWORD, 42, sealed, opened,
+                             sizeof(opened)));  // another context's seal
+  CHECK(!companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_SESSION, 43, sealed, opened,
+                             sizeof(opened)));  // another request's seal
+  CHECK(!companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_SESSION, 42, "!!!!", opened,
+                             sizeof(opened)));  // not a sealed value
+  sealed[0] = sealed[0] == 'A' ? 'B' : 'A';
+  CHECK(!companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_SESSION, 42, sealed, opened,
+                             sizeof(opened)));  // tampered
+
+  const std::string password(63, 'x');
+  CHECK(companionSealSecret(bodyKey, COMPANION_RELAY_CTX_PASSWORD, 9, password.c_str(), sealed));
+  CHECK(companionOpenSecret(bodyKey, COMPANION_RELAY_CTX_PASSWORD, 9, sealed, opened,
+                            sizeof(opened)) &&
+        password == opened);
+  const std::string tooLong(66, 'x');
+  CHECK(!companionSealSecret(bodyKey, COMPANION_RELAY_CTX_PASSWORD, 9, tooLong.c_str(), sealed));
+
+  const std::string login = "{\"password\":\"ineedacoffee\"}";
+  uint8_t sealedBody[96], openedBody[96], requestNonce[12];
+  size_t sealedLength = 0, openedLength = 0;
+  companionRelayNonce('c', COMPANION_RELAY_CTX_REQUEST, 5, requestNonce);
+  CHECK(companionAeadSealBytes(bodyKey, requestNonce,
+                               reinterpret_cast<const uint8_t *>(login.data()), login.size(),
+                               sealedBody, sizeof(sealedBody), sealedLength) &&
+        sealedLength == login.size() + 16);
+  CHECK(companionAeadOpenBytes(bodyKey, requestNonce, sealedBody, sealedLength, openedBody,
+                               sizeof(openedBody), openedLength) &&
+        openedLength == login.size() && !memcmp(openedBody, login.data(), login.size()));
+  sealedBody[0] ^= 1;
+  CHECK(!companionAeadOpenBytes(bodyKey, requestNonce, sealedBody, sealedLength, openedBody,
+                                sizeof(openedBody), openedLength));  // tampered range
+  sealedBody[0] ^= 1;
+  CHECK(!companionAeadOpenBytes(bodyKey, response, sealedBody, sealedLength, openedBody,
+                                sizeof(openedBody), openedLength));  // another nonce
+
+  CompanionRelay relay;
+  relay.ready = true;
+  relay.responses = 7;
+  memset(relay.bodyKey, 9, sizeof(relay.bodyKey));
+  companionRelayDrop(relay);
+  bool cleared = relay.responses == 0;
+  for (const uint8_t byte : relay.bodyKey) cleared = cleared && byte == 0;
+  CHECK(!relay.ready && cleared);
 }
 
 static void testRelayWindow() {
@@ -665,6 +789,7 @@ int main() {
   testVectors();
   testRelayVectors();
   testRelayHeader();
+  testRelayEnvelope();
   testRelayWindow();
   testPrincipals();
   testFrameCodec();

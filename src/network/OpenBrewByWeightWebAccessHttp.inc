@@ -10,9 +10,19 @@ uint32_t webAccessNowUtc(uint32_t nowMs) {
   return g_wallClock.synced() ? g_wallClock.nowUtcSec(nowMs) : 0;
 }
 
-// `prefix` precedes the 32 hex digits ("Bearer " for the integration).
-bool readWebAccessToken(httpd_req_t *request, const char *header,
-                        const char *prefix, uint8_t token[WEB_ACCESS_TOKEN_BYTES]) {
+}  // namespace
+
+// `prefix` precedes the 32 hex digits ("Bearer " for the integration). A
+// relayed request carries this value sealed; the token relayAdmit opened for
+// it is read instead, and never falls back to the wire.
+bool OpenBrewByWeightNetwork::readWebAccessToken(
+    httpd_req_t *request, const char *header, const char *prefix,
+    uint8_t token[WEB_ACCESS_TOKEN_BYTES]) {
+  if (strcmp(header, WEB_UI_SESSION_HEADER) == 0) {
+    bool relayed = false;
+    const bool staged = instance_->relaySessionToken(request, token, relayed);
+    if (relayed) return staged;
+  }
   char text[8 + WEB_ACCESS_TOKEN_TEXT] = {};
   const size_t prefixLength = strlen(prefix);
   const bool ok =
@@ -24,8 +34,6 @@ bool readWebAccessToken(httpd_req_t *request, const char *header,
   memset(text, 0, sizeof(text));
   return ok;
 }
-
-}  // namespace
 
 OpenBrewByWeightNetwork::PasswordCheck OpenBrewByWeightNetwork::checkDevicePassword(
     httpd_req_t *request, const char *password) {

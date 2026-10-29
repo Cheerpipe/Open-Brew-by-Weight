@@ -240,6 +240,32 @@ bool companionHkdfSha256(const uint8_t *ikm, size_t ikmSize, const uint8_t *salt
   return ok;
 }
 
+// Relay protocol 2's seals: AES-256-GCM, no additional data, the tag riding
+// with the bytes (16 appended on seal, expected on open).
+bool companionAeadSealBytes(const uint8_t key[32], const uint8_t nonce[12],
+                            const uint8_t *plain, size_t plainSize, uint8_t *out,
+                            size_t capacity, size_t &length) {
+  const mbedtls_svc_key_id_t id =
+      companionImportKey(key, 32, PSA_KEY_TYPE_AES, PSA_ALG_GCM, PSA_KEY_USAGE_ENCRYPT);
+  if (mbedtls_svc_key_id_is_null(id)) return false;
+  const bool sealed = psa_aead_encrypt(id, PSA_ALG_GCM, nonce, 12, nullptr, 0, plain,
+                                       plainSize, out, capacity, &length) == PSA_SUCCESS;
+  (void)psa_destroy_key(id);
+  return sealed;
+}
+
+bool companionAeadOpenBytes(const uint8_t key[32], const uint8_t nonce[12],
+                            const uint8_t *sealed, size_t sealedSize, uint8_t *out,
+                            size_t capacity, size_t &length) {
+  const mbedtls_svc_key_id_t id =
+      companionImportKey(key, 32, PSA_KEY_TYPE_AES, PSA_ALG_GCM, PSA_KEY_USAGE_DECRYPT);
+  if (mbedtls_svc_key_id_is_null(id)) return false;
+  const bool opened = psa_aead_decrypt(id, PSA_ALG_GCM, nonce, 12, nullptr, 0, sealed,
+                                       sealedSize, out, capacity, &length) == PSA_SUCCESS;
+  (void)psa_destroy_key(id);
+  return opened;
+}
+
 // --- Lifecycle ------------------------------------------------------------------
 
 void OpenBrewByWeightNetwork::beginCompanion() {

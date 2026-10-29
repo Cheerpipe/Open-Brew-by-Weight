@@ -1045,14 +1045,14 @@ void appendOtaTag(char *buffer, size_t capacity, size_t &used,
 
 bool OpenBrewByWeightNetwork::authorizeOtaRequest(httpd_req_t *request) {
   char password[WIFI_PASSWORD_CAPACITY] = {};
-  const size_t length =
-      httpd_req_get_hdr_value_len(request, DEVICE_PASSWORD_HEADER);
   // The header shares the sign-in failure counter and cooldown, so it cannot
-  // be used to guess the password faster than the sign-in page.
+  // be used to guess the password faster than the sign-in page. A relayed
+  // request carries it sealed: the value relayAdmit opened is used instead.
+  const bool relayed = relayPassword(request, password, sizeof(password));
   const bool passwordAuthorized =
-      length > 0 && length + 1 <= sizeof(password) &&
-      httpd_req_get_hdr_value_str(request, DEVICE_PASSWORD_HEADER, password,
-                                  sizeof(password)) == ESP_OK &&
+      (relayed || httpd_req_get_hdr_value_str(request, DEVICE_PASSWORD_HEADER,
+                                              password, sizeof(password)) == ESP_OK) &&
+      password[0] != '\0' &&
       checkDevicePassword(request, password) == PasswordCheck::OK;
   memset(password, 0, sizeof(password));
   if (passwordAuthorized) {

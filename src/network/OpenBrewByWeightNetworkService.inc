@@ -156,8 +156,10 @@ esp_err_t OpenBrewByWeightNetwork::lockJsonBody(httpd_req_t *request,
   if (!lockWorkBuf()) {
     return workBufBusy(request);
   }
-  if (!readJsonBody(request, workBuf_->requestBody)) {
+  bool envelopeFailed = false;
+  if (!readJsonBody(request, workBuf_->requestBody, &envelopeFailed)) {
     unlockJsonBody();
+    if (envelopeFailed) return relayEnvelopeReject(request);
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
                      invalidMessage);
   }

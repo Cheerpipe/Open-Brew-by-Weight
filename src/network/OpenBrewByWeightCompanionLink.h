@@ -8,6 +8,7 @@
 // implementation in the host test). Secrets never reach logs or JSON.
 
 #include "OpenBrewByWeightNetworkTypes.h"             // DEVICE_NAME_CAPACITY
+#include "OpenBrewByWeightDomain.h"           // WIFI_PASSWORD_CAPACITY
 #include "OpenBrewByWeightShotCurveTypes.h"  // appendBase64
 #include "OpenBrewByWeightWebAccess.h"       // webAccessFnv, copyWebAccessLabel
 #include "machine/OpenBrewByWeightMicraCompanion.h"  // MicraCompanionRoute
@@ -156,6 +157,15 @@ bool companionHmacSha256(const uint8_t *key, size_t keySize, const CompanionByte
                          size_t count, uint8_t out[32]);
 bool companionHkdfSha256(const uint8_t *ikm, size_t ikmSize, const uint8_t *salt,
                          size_t saltSize, const char *info, uint8_t out[32]);
+// AES-256-GCM with no additional data: `out` receives the plaintext plus the
+// 16-byte tag (seal) or the plaintext without it (open); the same reference
+// implementation contract as the hashes above.
+bool companionAeadSealBytes(const uint8_t key[32], const uint8_t nonce[12],
+                            const uint8_t *plain, size_t plainSize, uint8_t *out,
+                            size_t capacity, size_t &length);
+bool companionAeadOpenBytes(const uint8_t key[32], const uint8_t nonce[12],
+                            const uint8_t *sealed, size_t sealedSize, uint8_t *out,
+                            size_t capacity, size_t &length);
 
 inline bool companionSame(const uint8_t *a, const uint8_t *b, size_t size) {
   uint8_t difference = 0;
@@ -270,11 +280,14 @@ inline bool companionFrameSequence(const cJSON *frame, uint32_t expected) {
   return cJSON_IsNumber(sequence) && sequence->valuedouble == static_cast<double>(expected);
 }
 
-// --- Signed relay: `X-OBBW-Relay: 1 <q> <addr> <screen> <mac>` -------------
+// --- Signed relay: `X-OBBW-Relay: 2 <q> <addr> <screen> <mac>` -------------
 
 constexpr size_t COMPANION_RELAY_HEADER_TEXT = 128;  // the longest header and its NUL
 constexpr size_t COMPANION_RELAY_SCREEN_TEXT = 25, COMPANION_RELAY_ADDR_TEXT = 46;
 constexpr size_t COMPANION_RELAY_MAC_BYTES = 16;
+// A sealed X-WebUI-Session or X-Device-Password value in base64 and its NUL
+// (63 password bytes seal to 108 characters).
+constexpr size_t COMPANION_RELAY_SECRET_TEXT = 112;
 
 struct CompanionRelayHeader {
   uint32_t sequence = 0;
@@ -291,9 +304,10 @@ inline bool companionLowerHex(const char *text, size_t minimum, size_t maximum) 
   return true;
 }
 
-// Splits the header in place at single spaces. q: canonical decimal from 1;
-// addr: the browser's IPv4 or IPv6 text; screen: its 16-24 lowercase hex
-// X-WebUI-Client; mac: 32 lowercase hex digits.
+// Splits the header in place at single spaces. v: the relay protocol version,
+// always 2; q: canonical decimal from 1; addr: the browser's IPv4 or IPv6
+// text; screen: its 16-24 lowercase hex X-WebUI-Client; mac: 32 lowercase
+// hex digits.
 inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
   char *field[5] = {text};
   for (size_t index = 1; index < 5; ++index) {
@@ -304,7 +318,7 @@ inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
   }
   const size_t qLength = strlen(field[1]), addrLength = strlen(field[2]);
   uint64_t sequence = 0;
-  bool ok = strcmp(field[0], "1") == 0 && qLength >= 1 && qLength <= 10 && field[1][0] != '0' &&
+  bool ok = strcmp(field[0], "2") == 0 && qLength >= 1 && qLength <= 10 && field[1][0] != '0' &&
             addrLength >= 2 && addrLength < COMPANION_RELAY_ADDR_TEXT &&
             strspn(field[2], "0123456789abcdefABCDEF:.") == addrLength &&
             companionLowerHex(field[3], 16, COMPANION_RELAY_SCREEN_TEXT - 1) &&
@@ -326,13 +340,13 @@ inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
   return true;
 }
 
-// HMAC(Kr, "obbw-relay-v1\nMETHOD\nURI\nq\naddr\nscreen\nsession\n"); the
+// HMAC(Kr, "obbw-relay-v2\nMETHOD\nURI\nq\naddr\nscreen\nsession\n"); the
 // header carries its first 16 bytes. `uri` is the path with its query and
-// `session` the X-WebUI-Session value or "".
+// `session` the sealed X-WebUI-Session value as sent, or "".
 inline bool companionRelayMac(const uint8_t key[32], const char *method, const char *uri,
                               const CompanionRelayHeader &header, const char *session,
                               uint8_t mac[32]) {
-  const char *const fields[] = {"obbw-relay-v1", method, uri, header.q, header.addr,
+  const char *const fields[] = {"obbw-relay-v2", method, uri, header.q, header.addr,
                                 header.screen, session};
   CompanionBytes parts[14];
   for (size_t index = 0; index < 7; ++index) {
@@ -340,6 +354,71 @@ inline bool companionRelayMac(const uint8_t key[32], const char *method, const c
     parts[2 * index + 1] = {"\n", 1};
   }
   return companionHmacSha256(key, 32, parts, 14, mac);
+}
+
+// --- Sealed bodies and headers (protocol 2) ----------------------------------
+//
+// AES-256-GCM under Kb, the relay session's second key. The 12-byte nonce is
+// the direction ('c' requests, 'f' responses), the context byte, two zeros
+// and the counter little-endian; the counter is the request's q (contexts
+// 0-2) or the response counter (context 3), so a nonce never repeats under
+// one Kb and a seal names the one request it belongs to.
+
+constexpr uint8_t COMPANION_RELAY_CTX_SESSION = 0, COMPANION_RELAY_CTX_PASSWORD = 1,
+                  COMPANION_RELAY_CTX_REQUEST = 2, COMPANION_RELAY_CTX_RESPONSE = 3;
+
+inline bool companionBodyKey(const uint8_t relayKey[32], uint8_t bodyKey[32]) {
+  return companionHkdfSha256(relayKey, 32, nullptr, 0, "obbw-relay-body-v2", bodyKey);
+}
+
+inline void companionRelayNonce(char direction, uint8_t context, uint32_t counter,
+                                uint8_t nonce[12]) {
+  nonce[0] = static_cast<uint8_t>(direction);
+  nonce[1] = context;
+  nonce[2] = nonce[3] = 0;
+  const uint64_t wide = counter;
+  for (size_t index = 0; index < 8; ++index)
+    nonce[4 + index] = static_cast<uint8_t>(wide >> (8 * index));
+}
+
+// Seals `text` (a header value) as canonical base64 ciphertext under the
+// request's q; opens the same value. Opening fails on any tampering, wrong
+// context, or a value sealed for another request.
+inline bool companionSealSecret(const uint8_t bodyKey[32], uint8_t context, uint32_t q,
+                                const char *text, char out[COMPANION_RELAY_SECRET_TEXT]) {
+  // 81 sealed bytes are the most whose base64 fits the header value's 111.
+  constexpr size_t kSealed = 3 * ((COMPANION_RELAY_SECRET_TEXT - 1) / 4);
+  const size_t length = strnlen(text, COMPANION_RELAY_SECRET_TEXT);
+  if (length == COMPANION_RELAY_SECRET_TEXT || length + 16 > kSealed) return false;
+  uint8_t nonce[12], sealed[kSealed];
+  companionRelayNonce('c', context, q, nonce);
+  size_t used = 0;
+  if (!companionAeadSealBytes(bodyKey, nonce, reinterpret_cast<const uint8_t *>(text),
+                              length, sealed, sizeof(sealed), used))
+    return false;
+  size_t text2 = 0;
+  return appendBase64(out, COMPANION_RELAY_SECRET_TEXT, text2, sealed, used);
+}
+
+inline bool companionOpenSecret(const uint8_t bodyKey[32], uint8_t context, uint32_t q,
+                                const char *value, char *out, size_t capacity) {
+  constexpr size_t kSealed = 3 * ((COMPANION_RELAY_SECRET_TEXT - 1) / 4);  // 81
+  const size_t chars = strnlen(value, COMPANION_RELAY_SECRET_TEXT);
+  if (capacity == 0 || chars == 0 || chars % 4 != 0 || chars > 4 * ((kSealed + 2) / 3))
+    return false;
+  uint8_t sealed[kSealed];
+  const size_t pad = value[chars - 1] != '=' ? 0 : value[chars - 2] == '=' ? 2 : 1;
+  const size_t sealedSize = 3 * (chars / 4) - pad;  // what the base64 names
+  if (!companionBase64Decode(value, sealed, sealedSize)) return false;
+  uint8_t nonce[12];
+  companionRelayNonce('c', context, q, nonce);
+  size_t opened = 0;
+  if (sealedSize < 16 ||
+      !companionAeadOpenBytes(bodyKey, nonce, sealed, sealedSize,
+                              reinterpret_cast<uint8_t *>(out), capacity - 1, opened))
+    return false;
+  out[opened] = '\0';
+  return true;
 }
 
 // Replay window: the highest q and a bitmap of the 64 below it (bit 0 = high).
@@ -364,11 +443,14 @@ inline bool companionRelayAccept(CompanionRelayWindow &window, uint32_t q) {
 }
 
 // Relay session: rb is the challenge, random per boot and rotated after each
-// handshake; Kr signs relayed requests until the next one. RAM only.
+// handshake; Kr signs relayed requests until the next one, and Kb seals their
+// bodies, headers and responses. RAM only.
 struct CompanionRelay {
   uint8_t challenge[COMPANION_NONCE_BYTES] = {};
   bool challengeSet = false, ready = false;
   uint8_t key[32] = {};
+  uint8_t bodyKey[32] = {};
+  uint32_t responses = 0;  // sealed-response counter; 0 names none yet
   CompanionRelayWindow window = {};
   uint32_t generation = 0;  // names Kr for an admission that verified outside the lock
   uint32_t rejects = 0;     // signed-relay requests refused since boot
@@ -379,6 +461,8 @@ struct CompanionRelay {
 inline void companionRelayDrop(CompanionRelay &relay) {
   relay.ready = false;
   memset(relay.key, 0, sizeof(relay.key));
+  memset(relay.bodyKey, 0, sizeof(relay.bodyKey));
+  relay.responses = 0;
   relay.window = CompanionRelayWindow{};
 }
 
@@ -388,6 +472,14 @@ struct CompanionRelayIdentity {
   int fd = -1;
   char screen[COMPANION_RELAY_SCREEN_TEXT] = {};  // empty: a free entry
   char addr[COMPANION_RELAY_ADDR_TEXT] = {};
+  // What the admitted request's seals opened, staged for its handlers: the
+  // session token and, for firmware updates, the device password. The header
+  // values themselves stay sealed on the wire.
+  uint32_t sequence = 0;
+  bool sessionValid = false;
+  uint8_t session[WEB_ACCESS_TOKEN_BYTES] = {};
+  bool passwordValid = false;
+  char password[WIFI_PASSWORD_CAPACITY] = {};
 };
 
 // Admin unlock and the unsafe override each belong to one principal: a direct
