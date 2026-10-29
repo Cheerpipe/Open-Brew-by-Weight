@@ -182,8 +182,9 @@ four attempts with 3, 6 and 9 second delays. Regular API polling resumes its
 30-second cadence after exhaustion and reports communication-error quality and
 UNKNOWN unless a paused value is being retained. A failed WebSocket initialization does not
 start recurring API polls or discard valid power updates already received.
-WebSocket losses retain the last effective value as stale and retry with the
-same delays, followed by a 60-second cooldown after exhaustion. In both modes,
+WebSocket losses retain the last effective value as stale and reconnect right
+away, then retry after 1, 3, 6 and 9 seconds, with a 60-second cooldown after
+exhaustion. In both modes,
 rejected credentials (for example after changing the La Marzocco password)
 stop automatic sign-in attempts so the account is not locked by repeated
 failures. Reconnect the account with the new password, or use

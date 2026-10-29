@@ -486,12 +486,12 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     if (!obsolete) {
       if (auth) ++websocketAuthRecoveries_;
       ++websocket_->attempts;
-      websocketStatus_.retryAtMs = now + (websocket_->attempts < micra_timing::kMaxAttempts
-          ? micra_timing::kRetryDelaysMs[websocket_->attempts - 1]
+      websocketStatus_.retryAtMs = now + (websocket_->attempts < micra_timing::kWsMaxAttempts
+          ? micra_timing::kWsReconnectDelaysMs[websocket_->attempts - 1]
           : micra_timing::kExhaustedCooldownMs);
       websocketStatus_.state = websocketAuthRecoveries_ > 1
           ? MicraSocketState::AUTH_ERROR : MicraSocketState::BACKOFF;
-      if (websocket_->attempts >= micra_timing::kMaxAttempts) websocket_->attempts = 0;
+      if (websocket_->attempts >= micra_timing::kWsMaxAttempts) websocket_->attempts = 0;
     } else {
       websocketStatus_.retryAtMs = 0;
       websocketStatus_.state = MicraSocketState::BACKOFF;
@@ -549,9 +549,9 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
         ? MicraSocketState::AUTH_ERROR : MicraSocketState::BACKOFF;
     websocketStatus_.reason = "session_unavailable";
     const uint8_t attempt = ++websocket_->attempts;
-    websocketStatus_.retryAtMs = millis() + (attempt < micra_timing::kMaxAttempts
-        ? micra_timing::kRetryDelaysMs[attempt - 1] : micra_timing::kExhaustedCooldownMs);
-    if (attempt >= micra_timing::kMaxAttempts) websocket_->attempts = 0;
+    websocketStatus_.retryAtMs = millis() + (attempt < micra_timing::kWsMaxAttempts
+        ? micra_timing::kWsReconnectDelaysMs[attempt - 1] : micra_timing::kExhaustedCooldownMs);
+    if (attempt >= micra_timing::kWsMaxAttempts) websocket_->attempts = 0;
     wipeLineaMicraSettings(settings);
     return;
   }
@@ -615,9 +615,9 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     websocketStatus_.state = MicraSocketState::BACKOFF;
     websocketStatus_.reason = "start_failed";
     const uint8_t attempt = ++buffer.attempts;
-    websocketStatus_.retryAtMs = millis() + (attempt < micra_timing::kMaxAttempts
-        ? micra_timing::kRetryDelaysMs[attempt - 1] : micra_timing::kExhaustedCooldownMs);
-    if (attempt >= micra_timing::kMaxAttempts) buffer.attempts = 0;
+    websocketStatus_.retryAtMs = millis() + (attempt < micra_timing::kWsMaxAttempts
+        ? micra_timing::kWsReconnectDelaysMs[attempt - 1] : micra_timing::kExhaustedCooldownMs);
+    if (attempt >= micra_timing::kWsMaxAttempts) buffer.attempts = 0;
   }
   wipeLineaMicraSettings(settings);
 }

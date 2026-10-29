@@ -184,6 +184,12 @@ int main() {
   assert(micra_timing::kRetryDelaysMs[0] == 3000);
   assert(micra_timing::kRetryDelaysMs[1] == 6000);
   assert(micra_timing::kRetryDelaysMs[2] == 9000);
+  assert(micra_timing::kWsReconnectDelaysMs[0] == 0);
+  assert(micra_timing::kWsReconnectDelaysMs[1] == 1000);
+  assert(micra_timing::kWsReconnectDelaysMs[2] == 3000);
+  assert(micra_timing::kWsReconnectDelaysMs[3] == 6000);
+  assert(micra_timing::kWsReconnectDelaysMs[4] == 9000);
+  assert(micra_timing::kWsMaxAttempts == 6);
   assert(micra_timing::kStatePollMs == 30000);
   assert(micra_timing::kStateFreshnessMs == micra_timing::kStatePollMs);
   assert(micra_timing::kOptimisticOverlayMs ==

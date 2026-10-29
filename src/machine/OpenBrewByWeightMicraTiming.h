@@ -37,6 +37,11 @@ namespace openbrewbyweight::micra_timing {
 
 inline constexpr std::array<uint32_t, 3> kRetryDelaysMs{{3000, 6000, 9000}};
 inline constexpr size_t kMaxAttempts = 1U + kRetryDelaysMs.size();
+// The socket's own reconnect ladder: the retry after a lost session is
+// immediate (the peer closing a healthy connection reopens at once), then
+// the shared delays apply.
+inline constexpr std::array<uint32_t, 5> kWsReconnectDelaysMs{{0, 1000, 3000, 6000, 9000}};
+inline constexpr size_t kWsMaxAttempts = 1U + kWsReconnectDelaysMs.size();
 inline constexpr uint32_t kStatePollMs = 30000;
 // Sample freshness tracks the poll cadence: a confirmed sample stays CURRENT
 // until the next poll was due. The exhausted-cycle cooldown shares the
@@ -111,6 +116,8 @@ class ObservationSchedule {
 
 static_assert(kRetryDelaysMs[0] < kRetryDelaysMs[1] &&
                   kRetryDelaysMs[1] < kRetryDelaysMs[2]);
+static_assert(kWsReconnectDelaysMs.front() == 0 &&
+                  kWsReconnectDelaysMs.back() == kRetryDelaysMs.back());
 static_assert(kStatePollMs > 0);
 static_assert(kOptimisticOverlayMs == 2U * kStatePollMs);
 static_assert(kPostWakeObservationDelayMs < kOptimisticOverlayMs);

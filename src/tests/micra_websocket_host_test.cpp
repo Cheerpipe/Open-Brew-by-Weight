@@ -255,7 +255,7 @@ struct MicraWebSocketTest {
       delete service.work_;
     }
     for (unsigned phase = 0; phase < 3; ++phase) {
-      now = UINT32_MAX - 2000ULL;  // Cleanup and backoff cross millis rollover.
+      now = UINT32_MAX - 2000ULL;  // Cleanup and the retry ladder cross millis rollover.
       OpenBrewByWeightMicraService service;
       service.config_.accountConfigured = true;
       service.staConnected_.store(true);
@@ -263,20 +263,35 @@ struct MicraWebSocketTest {
         service.serviceWebSocket();
         service.websocket_->failed.store(true);
         stopDelayMs = 10000;
+        service.serviceWebSocket();
+        // The first retry is immediate: the loss is processed and the socket
+        // reconnects within the same worker pass.
+        assert(service.websocket_->client);
+        stopDelayMs = 2;
+        service.websocket_->failed.store(true);
+        service.serviceWebSocket();
       } else if (phase == 1) {
         sessionFails = true;
         sessionDelayMs = 10000;
+        service.serviceWebSocket();
+        assert(service.websocketStatus().retryAtMs == millis());
+        sessionDelayMs = 0;
+        service.serviceWebSocket();
       } else {
         startFails = true;
         startDelayMs = 10000;
+        service.serviceWebSocket();
+        assert(service.websocketStatus().retryAtMs == millis());
+        startDelayMs = 0;
+        startFails = false;
+        sessionFails = true;  // The immediate retry fails its session.
+        service.serviceWebSocket();
       }
-      service.serviceWebSocket();
+      // Attempt two on every path: a 1 s wait, met at the exact boundary.
       assert(service.websocket_ && !service.websocket_->client);
-      assert(service.websocketStatus().retryAtMs == millis() + 3000);
-      stopDelayMs = 2;
-      sessionDelayMs = startDelayMs = 0;
-      sessionFails = startFails = false;
-      now += 2999;
+      assert(service.websocketStatus().retryAtMs == millis() + 1000);
+      sessionFails = false;
+      now += 999;
       service.serviceWebSocket();
       assert(!service.websocket_->client);
       ++now;
@@ -473,9 +488,9 @@ struct MicraWebSocketTest {
     service.websocketEvent(&service, nullptr, WEBSOCKET_EVENT_CLOSED, &event);
     callback = false;
     service.serviceWebSocket();
-    assert(!service.websocket_->client && service.websocketStatus().state == MicraSocketState::BACKOFF);
-    now += 3000;
-    service.serviceWebSocket();
+    // The first retry is immediate: the loss is processed and the socket
+    // reconnects within the same worker pass.
+    assert(service.websocket_->client && service.websocketStatus().state == MicraSocketState::CONNECTING);
     subscribe(service);
     deliver(service, observation(service, off));
     assert(service.powerState_.notePhysicalStart(service.published_, true, true, now));
