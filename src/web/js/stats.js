@@ -338,42 +338,30 @@ function renderShotSpark(h, shot, m = R.buildShotSparkModel(shot)) {
       : shot.verdict === "fast" || shot.verdict === "slow"
         ? shot.verdict
         : "on_recipe";
-  // Compact legend (D5): the cut line, only the zone this shot ended in, the shot, and held weight.
+  // Compact legend (D5): the cut line, only the zone this shot ended in, the
+  // shot and its post-stop drip tail as separate lines, and held weight.
   const zone = preset.dataset.zone,
+    // Every entry is one swatch markup (two for the fast/slow zone) plus its text.
+    leg = (c, t, ii) =>
+      '<span class="rvLeg ' + c + '">' + (ii ? "<i></i><i></i>" : "<i></i>") + t + "</span>",
     legend = document.createElement("div");
   legend.className = "shotLegend";
   legend.innerHTML =
-    '<span class="rvLeg rvLegCut"><i></i>' +
-    __WEBUI_TEXT__("runtime.graph_legend_cut") +
-    "</span>" +
+    leg("rvLegCut", __WEBUI_TEXT__("runtime.graph_legend_cut")) +
     (zone === "fast"
-      ? '<span class="rvLeg rvLegFast"><i></i><i></i>' +
-        __WEBUI_TEXT__("runtime.graph_legend_fast") +
-        "</span>"
+      ? leg("rvLegFast", __WEBUI_TEXT__("runtime.graph_legend_fast"), 1)
       : zone === "slow"
-        ? '<span class="rvLeg rvLegSlow"><i></i><i></i>' +
-          __WEBUI_TEXT__("runtime.graph_legend_slow") +
-          "</span>"
+        ? leg("rvLegSlow", __WEBUI_TEXT__("runtime.graph_legend_slow"), 1)
         : zone === "on_recipe"
-          ? '<span class="rvLeg rvLegWindow"><i></i>' +
-            __WEBUI_TEXT__("runtime.graph_legend_corridor") +
-            "</span>"
+          ? leg("rvLegWindow", __WEBUI_TEXT__("runtime.graph_legend_corridor"))
           : "") +
-    '<span class="rvLeg rvLegLast"><i></i>' +
-    __WEBUI_TEXT__("runtime.graph_legend_last") +
-    "</span>" +
+    leg("rvLegLast", __WEBUI_TEXT__("runtime.graph_legend_last")) +
     (stop == null
       ? ""
-      : '<span class="rvLeg rvLegStop"><i></i>' +
-        __WEBUI_TEXT__("runtime.graph_legend_stopped") +
-        '</span><span class="rvLeg rvLegFinal"><i></i>' +
-        __WEBUI_TEXT__("runtime.graph_legend_final") +
-        "</span>") +
-    (m.held.length
-      ? '<span class="rvLeg rvLegHeld"><i></i>' +
-        __WEBUI_TEXT__("runtime.graph_legend_held") +
-        "</span>"
-      : "");
+      : leg("rvLegLast rvLegLastDrip", __WEBUI_TEXT__("runtime.graph_legend_drip")) +
+        leg("rvLegStop", __WEBUI_TEXT__("runtime.graph_legend_stopped")) +
+        leg("rvLegFinal", __WEBUI_TEXT__("runtime.graph_legend_final"))) +
+    (m.held.length ? leg("rvLegHeld", __WEBUI_TEXT__("runtime.graph_legend_held")) : "");
   combo.className = "shotComboHost";
   h.append(preset, readout, legend, combo);
   fillShotCharts(combo, m);

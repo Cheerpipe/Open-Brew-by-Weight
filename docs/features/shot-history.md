@@ -340,7 +340,10 @@ Below come its target, error, flow, late cup, first drop, how it ended, shot
 type, preset, scale and your star rating, which you can change right there.
 Then comes its **preset chart**: the
 preset's cut line, its on-recipe corridor, and the shot's own
-weight curve drawn over it. The chart always uses the preset as it was when that
+weight curve drawn over it. The curve is a solid line while the shot poured and
+turns dashed over the drips that kept falling after the stop, and the legend
+under the chart names the two parts **Last shot** and **Drip after the stop**.
+The chart always uses the preset as it was when that
 shot was brewed, so editing or deleting the preset later never changes it. Only
 the zone the shot ended in is colored: fast, slow, or on recipe. Timer-only
 shots show every cut line as off and no colored zone.

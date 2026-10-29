@@ -3879,14 +3879,21 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   stroke: var(--sf);
   stroke-width: 1.5;
 }
-.rvLegStop i,
-.rvLegFinal i {
+/* Scoped past .rvLeg i, which would otherwise flatten these back into squares. */
+.shotLegend .rvLegStop i,
+.shotLegend .rvLegFinal i {
   border-radius: 50%;
   background: var(--gLast);
 }
-.rvLegStop i {
-  width: 0.45rem;
-  height: 0.45rem;
+/* The chart dots at the same size: r=3 stop and r=5 cursor handle, both
+   with the 1.5px stroke that grows them to 7.5px and 11.5px. */
+.shotLegend .rvLegStop i {
+  width: 7.5px;
+  height: 7.5px;
+}
+.shotLegend .rvLegFinal i {
+  width: 11.5px;
+  height: 11.5px;
 }
 .shotCursor .rvPill rect {
   stroke: var(--c, var(--gLast));
@@ -3903,7 +3910,6 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 .shotPresetChart .rvLast {
   stroke-width: 2.5;
-  stroke-dasharray: 5 4;
 }
 .shotPresetChart .rvLastDrip {
   stroke-dasharray: 3;
@@ -4680,8 +4686,11 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 .rvLegLast i {
   height: 0;
-  border-top: 2.5px dashed var(--gLast);
+  border-top: 2.5px solid var(--gLast);
   border-radius: 0;
+}
+.rvLegLastDrip i {
+  border-top-style: dashed;
 }
 .rvLegArrivals i,
 .rvLegHeld i {
