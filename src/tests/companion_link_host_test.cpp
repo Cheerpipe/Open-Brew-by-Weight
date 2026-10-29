@@ -210,6 +210,9 @@ static void testVectors() {
   const size_t length = companionSealFrame(
       key, 1, "\"t\":\"cfg\",\"lm\":true,\"conn\":\"ws\",\"observe\":true}", out, sizeof(out));
   CHECK(length != 0 && std::string(out, length) == field(vectors, "controllerFrame"));
+  const size_t devLength = companionSealFrame(
+      key, 1, "\"t\":\"dev\",\"name\":\"openbrewbyweight\"}", out, sizeof(out));
+  CHECK(devLength != 0 && std::string(out, devLength) == field(vectors, "deviceFrame"));
   // A frame signed for the other direction is not accepted back.
   CHECK(companionOpenFrame(key, out, length) == nullptr);
 
@@ -392,6 +395,17 @@ static void testFrameCodec() {
   std::string huge(COMPANION_FRAME_BYTES + 1, 'x');
   memcpy(&huge[0], text.data(), text.size());
   CHECK(companionOpenFrame(key, huge.c_str(), huge.size()) == nullptr);
+}
+
+// The dev frame is due on every fresh session (pairing, reconnect, reboot)
+// and after a rename, and never for an unpublished (empty) name.
+static void testDeviceNameFrame() {
+  CompanionLinkSlot slot;
+  CHECK(companionDeviceNameDue(slot, "openbrewbyweight"));
+  std::snprintf(slot.sentDeviceName, sizeof(slot.sentDeviceName), "%s", "openbrewbyweight");
+  CHECK(!companionDeviceNameDue(slot, "openbrewbyweight"));
+  CHECK(companionDeviceNameDue(slot, "Kitchen Bar"));
+  CHECK(!companionDeviceNameDue(slot, ""));
 }
 
 static void testBase64AndValidation() {
@@ -654,6 +668,7 @@ int main() {
   testRelayWindow();
   testPrincipals();
   testFrameCodec();
+  testDeviceNameFrame();
   testBase64AndValidation();
   testCommitThenReveal();
   testPairing();

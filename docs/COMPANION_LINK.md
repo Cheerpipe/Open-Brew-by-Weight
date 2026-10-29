@@ -203,14 +203,15 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 | Frame | Meaning |
 | --- | --- |
 | `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true}`. Sent after `ready` and on every change |
+| `{"t":"dev","name":"Kitchen"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address. Up to 32 bytes of letters, digits, spaces and hyphens. Sent after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
 | `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` frames until `on` is `false` |
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 
-After `ready` the controller sends `cfg`, `route` and `hold` with their current
-values, and `creds` when it has an account generation; afterwards each one
-again only when it changes. `hold` changes are sent only while the route is
+After `ready` the controller sends `cfg`, `dev`, `route` and `hold` with their
+current values, and `creds` when it has an account generation; afterwards each
+one again only when it changes. `hold` changes are sent only while the route is
 `pending` or `companion` (the companion forwards nothing otherwise); each
 request for the `companion` route carries the current `hold`. A command id is
 sent once: a command that was in flight when a link closed is not repeated on

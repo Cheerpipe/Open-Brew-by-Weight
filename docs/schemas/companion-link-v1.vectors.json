@@ -16,6 +16,7 @@
   "erase": "FIlKLyITh/HIf1ZDQZbvg7aUTSoqAnq7PIFCwQsVbT8=",
   "companionFrame": "dd1b71ac4f18a1a7cd7a27697afce9c5.{\"q\":1,\"t\":\"ping\",\"up\":true}",
   "controllerFrame": "5d9f48aea3d1e95b37652b9dd3cdb5db.{\"q\":1,\"t\":\"cfg\",\"lm\":true,\"conn\":\"ws\",\"observe\":true}",
+  "deviceFrame": "41e6b32c68a114a230c18208cc8df48f.{\"q\":1,\"t\":\"dev\",\"name\":\"openbrewbyweight\"}",
   "credentialsKey": "84702b299e7937de5a49726d1355358bbe0c4b358a53352e56c766464618fc19",
   "credentials": {
     "gen": 3,

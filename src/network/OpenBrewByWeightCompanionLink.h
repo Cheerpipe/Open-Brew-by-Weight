@@ -7,6 +7,7 @@
 // three hash primitives declared below (PSA on the controller, a reference
 // implementation in the host test). Secrets never reach logs or JSON.
 
+#include "OpenBrewByWeightNetworkTypes.h"             // DEVICE_NAME_CAPACITY
 #include "OpenBrewByWeightShotCurveTypes.h"  // appendBase64
 #include "OpenBrewByWeightWebAccess.h"       // webAccessFnv, copyWebAccessLabel
 #include "machine/OpenBrewByWeightMicraCompanion.h"  // MicraCompanionRoute
@@ -636,7 +637,15 @@ struct CompanionLinkSlot {
   // whole snapshot.
   bool snapshotSent = false, sentUi = true;
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
+  char sentDeviceName[DEVICE_NAME_CAPACITY] = {};  // `dev` frame already sent
 };
+
+// The device name frame is due on every new session (an empty sent copy) and
+// again after a rename; an unpublished name (empty) is never sent.
+inline bool companionDeviceNameDue(const CompanionLinkSlot &slot, const char *deviceName) {
+  return deviceName[0] != '\0' &&
+         strncmp(slot.sentDeviceName, deviceName, DEVICE_NAME_CAPACITY) != 0;
+}
 
 struct CompanionState {
   CompanionStored stored = {};

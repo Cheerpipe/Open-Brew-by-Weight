@@ -487,8 +487,11 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
     }
     publishMachineIntegrationConfig(next, next.storageRevision);
     publishConfiguredAddressStatus();
-    if (strcmp(previousDeviceName, next.deviceName) != 0)
+    if (strcmp(previousDeviceName, next.deviceName) != 0) {
       applyMdnsName();
+      // An open companion link gets the new name as a dev frame.
+      companionOutboxChanged();
+    }
     log(DebugCategory::CONFIG, DebugCode::CONFIG_PERSISTED,
         static_cast<int32_t>(next.runtime.revision));
     if (command.type == WebCommandType::CHANGE_DEVICE_PASSWORD) {

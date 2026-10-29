@@ -1167,6 +1167,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   uint32_t generation = 0;
   [[maybe_unused]] uint32_t lastCommand = 0;
   bool snapshot = false, ui = true;
+  char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
   uint8_t secret[COMPANION_SECRET_BYTES];
   {
@@ -1178,6 +1179,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     sent = *link;
     lastCommand = g_companion.lastCommandSent;
     ui = g_companion.stored.uiOff == 0;
+    memcpy(deviceName, status_.deviceName, sizeof(deviceName));
     memcpy(secret, g_companion.stored.secret, sizeof(secret));
   }
   memset(sent.key, 0, sizeof(sent.key));
@@ -1193,6 +1195,11 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                                        outbox.websocketConnection ? "ws" : "api",
                                        outbox.observe ? "true" : "false", uiText)
                     : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s}", uiText));
+  // The companion's label for this controller; validDeviceName's charset
+  // (letters, digits, spaces, hyphens) needs no JSON escaping.
+  const bool deviceDue = companionDeviceNameDue(sent, deviceName);
+  const bool device =
+      deviceDue && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\"}", deviceName);
   bool credentialsDue = false, credentials = false, routeDue = false, route = false,
        holdDue = false, hold = false, commandDue = false, command = false;
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
@@ -1221,8 +1228,9 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
 #endif
   memset(secret, 0, sizeof(secret));
   // A body that could not be built stays due and is tried on the next pass.
-  const bool complete = config == configDue && credentials == credentialsDue &&
-      route == routeDue && hold == holdDue && command == commandDue;
+  const bool complete = config == configDue && device == deviceDue &&
+                        credentials == credentialsDue &&
+                        route == routeDue && hold == holdDue && command == commandDue;
   if (!complete) companionNotified_.store(true, std::memory_order_release);
   if (count == 0) return;
   companionWs().job.generation = generation;
@@ -1241,6 +1249,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       slot.sentConfig = outbox.configSequence;
       slot.sentUi = ui;
     }
+    if (device) memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));
     if (route) slot.sentRoute = outbox.routeSequence;
     if (hold) slot.sentHold = outbox.holdSequence;
     if (credentials) slot.sentCredentials = outbox.credentialsGeneration;
