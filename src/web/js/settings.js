@@ -1127,15 +1127,13 @@ function renderRampPreviews(m) {
         return `<path class="${lit ? cls : "rvBandOff"}" d="${d}L${f(X(z1))} ${B}L${f(X(z0))} ${B}Z" fill="url(#${side}Ramp${cls})"/>`;
       },
       fills = [
-        ["rvFastFull", "gFast", "Full"],
-        ["rvFastPart", "gFast", "Part"],
-        ["rvWindow", "ok", "Win"],
-        ["rvSlowPart", "gSlow", "Part"],
-        ["rvSlowFull", "gSlow", "Full"],
+        ["rvFastFull", "gFast", 0.36, 0],
+        ["rvFastPart", "gFast", 0.18, 0],
+        ["rvWindow", "ok", 0.42, 0.02],
+        ["rvSlowPart", "gSlow", 0.18, 0],
+        ["rvSlowFull", "gSlow", 0.36, 0],
       ]
-        .map(([c, k, z]) =>
-          R.fadeFill(side + "Ramp" + c, `var(--${k})`, `calc(var(--band${z}) * 2.2)`, 0.03),
-        )
+        .map(([c, k, top, base]) => R.fadeFill(side + "Ramp" + c, `var(--${k})`, top, base))
         .join(""),
       label = (x, y, text, cls = "", anchor = "middle") =>
         `<text class="rvLbl ${cls}" x="${f(x)}" y="${f(y)}" text-anchor="${anchor}">${text}</text>`,

@@ -3690,15 +3690,16 @@ function presetGraph(host, m, x = {}) {
   });
   host.innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">` +
-    // Each band fades from twice its flat strength at the top to almost nothing at the base.
+    // Each band fades with the weight/flow chart's stops: the window at the
+    // flow area's strength, full zones at the weight area's, part zones half.
     `<defs>${[
-      ["rvFastFull", "gFast", "Full"],
-      ["rvFastPart", "gFast", "Part"],
-      ["rvWindow", "ok", "Win"],
-      ["rvSlowPart", "gSlow", "Part"],
-      ["rvSlowFull", "gSlow", "Full"],
+      ["rvFastFull", "gFast", 0.36, 0],
+      ["rvFastPart", "gFast", 0.18, 0],
+      ["rvWindow", "ok", 0.42, 0.02],
+      ["rvSlowPart", "gSlow", 0.18, 0],
+      ["rvSlowFull", "gSlow", 0.36, 0],
     ]
-      .map(([c, k, b]) => fadeFill(u + c, `var(--${k})`, `calc(var(--band${b}) * 2.2)`, 0.03))
+      .map(([c, k, top, base]) => fadeFill(u + c, `var(--${k})`, top, base))
       .join(
         "",
       )}<pattern id="${u}Hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="rvHatchLine" d="M0 0V6"/></pattern>` +

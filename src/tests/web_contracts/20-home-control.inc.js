@@ -1584,7 +1584,9 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
       css.includes('aria-expanded=false') ||
       !css.includes('.shotComboHost{padding-top:1rem}') ||
       !css.includes('}[data-kind=fast]{--z:var(--gFast)}') || !css.includes('#shotTable .heroPill{') ||
-      !js.includes('fill="url(#${u + cls})"') || !js.includes('`calc(var(--band${b}) * 2.2)`') ||
+      !js.includes('fill="url(#${u + cls})"') ||
+      !js.includes('["rvWindow", "ok", 0.42, 0.02]') || !js.includes('["rvFastFull", "gFast", 0.36, 0]') ||
+      !js.includes('flow ? 0.42 : 0.36') ||
       !css.includes('margin:.55rem 0 0;z-index:1;background:var(--sf)}') ||
       !css.includes('--gCut:#d1101f') || !css.includes('--gCut:#9e1c22') || !css.includes('.rvCut{fill:none;stroke:var(--gCut)'))
     throw new Error('Stats preset styles must color only the verdict zone and use the red cut-line token in both themes');
