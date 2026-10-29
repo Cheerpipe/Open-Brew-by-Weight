@@ -63,19 +63,57 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   if (snapshot.bbwLearningGeneration != learning.generation)
     return false;
   const float observation = snapshot.weightOffsetG + (finalWeightG - cutLineG);
+  // Physics gate (design review 2026-10-29): flow that kept running or a
+  // scale event is never drip. It also clears a pending outlier: a step is
+  // confirmed by statistics on physically possible observations only.
+  if (!bbwEwma::physicsPlausibleDrip(observation, snapshot.rateAtStopX100)) {
+    learning.pendingOutlier = false;
+    serialTrace(LogLevel::INFO,
+                "Drip observation impossible for the flow at the stop; offset unchanged");
+    return false;
+  }
+  bool stepConfirmed = false;
+  if (bbwEwma::hampelOutlier(learning.evidence, observation)) {
+    if (learning.pendingOutlier &&
+        fabsf(observation - learning.pendingCg / 100.0f) <=
+            bbwEwma::DRIP_STEP_AGREE_G) {
+      // Two shots agree far from the history: a real change, not noise. Jump
+      // to their mean and restart the evidence for the new regime.
+      updatedOffset = bbwEwma::clampOffset(
+          (observation + learning.pendingCg / 100.0f) * 0.5f);
+      bbwLearningBank.invalidate(preset->id, presetBank);
+      stepConfirmed = true;
+      serialTracef(LogLevel::INFO,
+                   "Drip step: two shots agree on %.2fg; evidence restarted",
+                   updatedOffset);
+    } else {
+      learning.pendingOutlier = true;
+      learning.pendingCg = static_cast<int16_t>(lroundf(observation * 100.0f));
+      serialTracef(LogLevel::INFO,
+                    "Drip observation %.2fg is an outlier; offset unchanged",
+                    observation);
+      return false;
+    }
+  } else {
+    learning.pendingOutlier = false;
+  }
   // Quick start: the third shot that agrees sets the drip to the median;
   // only good shots reach here (pendingShotFinalizeTask), so the chart
   // markers line up.
   int16_t jumpCg = -1;
-  if (observeQuickStart(bbwQuickStart, presetBank, preset->id,
+  if (!stepConfirmed &&
+      observeQuickStart(bbwQuickStart, presetBank, preset->id,
                         static_cast<int16_t>(lroundf(observation * 100.0f)),
                         shotStatisticsEpochNow(), jumpCg)) {
     if (jumpCg >= 0) updatedOffset = jumpCg / 100.0f;
     stageBbwQuickStart();
   }
   preset->bbwEwmaOffsetG = updatedOffset;
-  const uint8_t nextAlpha = learning.evidence.observe(
-      observation, snapshot.weightOffsetG, snapshot.bbwAlpha);
+  const uint8_t nextAlpha =
+      stepConfirmed ? preset->bbwEwmaAlpha
+                    : learning.evidence.observe(observation,
+                                                snapshot.weightOffsetG,
+                                                snapshot.bbwAlpha);
   if (nextAlpha != preset->bbwEwmaAlpha) preset->bbwAlphaLearned = 1;
   preset->bbwEwmaAlpha = nextAlpha;
   learning.generation = bbwLearningBank.newGeneration();

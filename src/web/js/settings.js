@@ -1410,17 +1410,16 @@ function renderDripChart(c) {
   const dripText = (g) => (g > 0 ? g.toFixed(2) : "0") + __WEBUI_TEXT__("runtime.g_2"),
     dripRange = (v) =>
       (Math.min(...v) > 0 ? Math.min(...v).toFixed(2) : "0") + "–" + dripText(Math.max(...v));
-  const recent = (c && c.bbwRecentG) || [],
-    q = (c && c.bbwQuickStart) || {},
+  const recent = c?.bbwRecentG || [],
+    skip = (i) => (c?.bbwRecentSkipped >> i) & 1,
+    q = c?.bbwQuickStart || {},
     n = recent.length,
-    use = (c && c.bbwEwmaOffsetG) || 0,
+    use = c?.bbwEwmaOffsetG || 0,
     armed = q.state === "armed",
     afterSet =
-      c && c.bbwRecentAfterSet >= 0 && (c.bbwRecentAfterSet < n || n < 10)
-        ? c.bbwRecentAfterSet
-        : -1,
+      c?.bbwRecentAfterSet >= 0 && (c.bbwRecentAfterSet < n || n < 10) ? c.bbwRecentAfterSet : -1,
     afterQuick =
-      c && c.bbwRecentAfterQuick >= 0 && c.bbwRecentAfterQuick < n ? c.bbwRecentAfterQuick : -1,
+      c?.bbwRecentAfterQuick >= 0 && c.bbwRecentAfterQuick < n ? c.bbwRecentAfterQuick : -1,
     mode = armed
       ? "quick"
       : afterQuick < 0
@@ -1463,7 +1462,11 @@ function renderDripChart(c) {
     ...slots.map((s) => {
       const bar = el(
         "div",
-        "dcBar" + (old(s) ? " old" : "") + (counted(s) ? " qs" : "") + (s.next ? " next" : ""),
+        "dcBar" +
+          (old(s) ? " old" : "") +
+          (counted(s) ? " qs" : "") +
+          (skip(s.i) ? " skip" : "") +
+          (s.next ? " next" : ""),
       );
       if (s.next || s.g != null) {
         const fill = el("i", "");
@@ -1507,7 +1510,9 @@ function renderDripChart(c) {
         "</span>",
     )
     .join("");
-  const needed = recent.filter((g, i) => g != null && (mode === "learning" || counted({ g, i })));
+  const needed = recent.filter(
+    (g, i) => g != null && !skip(i) && (mode === "learning" || counted({ g, i })),
+  );
   const sorted = [...needed].sort((a, b) => a - b);
   const lead = __WEBUI_TEXT__("runtime.drip_last_needed");
   const verdict = !needed.length

@@ -2063,7 +2063,9 @@ void r11_final_shot_analysis_updates_only_valid_offset() {
       currentWeight = goalWeightDgToGrams(DEFAULT_GOAL_WEIGHT_DG) + MAX_OFFSET_G + 1.0f;
     } else {
       pendingFinalize.weightOffsetG = 3.0f;
-      currentWeight = 32.0f;
+      // A 0.2 g-real miss: a larger undershoot would need weight to fall
+      // after the stop, which the drip filter rejects as a scale event.
+      currentWeight = 32.8f;
     }
     pendingShotFinalizeTask();
     if (part == 0) {
@@ -2073,8 +2075,8 @@ void r11_final_shot_analysis_updates_only_valid_offset() {
       // Observation outside the safe range leaves the offset unchanged.
       CHECK(fabsf(runtimeConfig.weightOffsetG - (originalOffset + 0.3f)) < 0.001f);
     } else {
-      // EWMA pulls the offset down: 3.0 g + 0.3 x (32 - 36) g = 1.8 g.
-      CHECK(fabsf(runtimeConfig.weightOffsetG - 1.8f) < 0.001f);
+      // EWMA pulls the offset down: 3.0 g + 0.3 x (32.8 - 36) g = 2.04 g.
+      CHECK(fabsf(runtimeConfig.weightOffsetG - 2.04f) < 0.001f);
     }
   }
 }
@@ -20970,7 +20972,12 @@ void fw02_offset_learns_below_sensor_lag() {
   setScaleConnected(true);
   CHECK(getScaleLinkSnapshot().features.sensorLagMs == 690);
   ShotPreset &preset = mutableActiveShotPreset(presetBank);
-  for (const float finalG : {36.05f, 35.0f}) {  // 0.215 g, then clamped to 0.
+  // 0.215 g at alpha 30; then the full-gain step clamps to 0 inside the
+  // physics floor (the filter rejects larger downward errors as scale
+  // events, not drip).
+  for (const float finalG : {36.05f, 35.70f}) {
+    const bool clamp = finalG < 36.0f;
+    preset.bbwEwmaAlpha = clamp ? 100 : 30;
     preset.bbwEwmaOffsetG = 0.20f;
     preparePendingBbwForTest();
     pendingFinalize.offsetAnalysis = true;
@@ -21089,16 +21096,18 @@ void fw06_status_carries_recent_drips_and_markers() {
   ControlStatusSnapshot status;
   copyControlStatus(status);
   CHECK(status.bbwRecentCount == 6 && status.bbwRecentSkipped == 2);
-  CHECK(status.bbwRecentCg[0] == 55 && status.bbwRecentCg[2] == 53 &&
-        status.bbwRecentCg[4] == 51);
+  CHECK(status.bbwRecentCg[0] == 55 && status.bbwRecentCg[1] == 54 &&
+        status.bbwRecentCg[2] == 53 && status.bbwRecentCg[4] == 51);
   CHECK(status.bbwRecentAfterSet == 3 && status.bbwRecentAfterQuick == 0xFF);
   CHECK(status.bbwQuickState == static_cast<uint8_t>(QuickStartState::ARMED) &&
         status.bbwQuickSetCg == 120);
   char json[256];
   CHECK(formatDripChartJson(json, sizeof(json), status) > 0);
+  // The skipped fifth shot keeps its measured value and rides the mask.
   CHECK(strcmp(json, ",\"bbwQuickStart\":{\"state\":\"armed\",\"count\":0,\"setG\":1.20,"
                      "\"quickG\":0.00},\"bbwRecentAfterSet\":3,\"bbwRecentAfterQuick\":-1,"
-                     "\"bbwRecentG\":[0.55,null,0.53,0.52,0.51,0.50]") == 0);
+                     "\"bbwRecentG\":[0.55,0.54,0.53,0.52,0.51,0.50],"
+                     "\"bbwRecentSkipped\":2") == 0);
   // Another preset's shots never reach this preset's chart.
   CHECK(setActiveShotPreset(presetBank, presetBank.presets[1].id));
   publishControlStatus();
@@ -21128,6 +21137,103 @@ void fw07_quick_start_save_retries_and_reports_once() {
                sizeof(bbwQuickStart.entries)) == 0);
   serviceBbwQuickStartPersist();  // nothing staged: nothing to save
   CHECK(!bbwQuickStartPersistPending);
+}
+
+void fw08_drip_filter_physics_outliers_and_step() {
+  // Design review 2026-10-29: physics bounds what can be drip, the Hampel
+  // gate rejects what disagrees with recent accepted shots, and two
+  // rejecting shots that agree adopt a real change. Rejected shots train
+  // nothing, including the quick start.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  ShotPreset &preset = mutableActiveShotPreset(presetBank);
+  bool ok = false;
+  const auto shot = [&](float offsetUsed, float needed, int32_t rateX100) {
+    preparePendingBbwForTest();
+    pendingFinalize.offsetAnalysis = pendingFinalize.logEligible = true;
+    pendingFinalize.startedWithScale = pendingFinalize.automaticBrew = true;
+    pendingFinalize.scaleBaselineReady = true;
+    pendingFinalize.scaleConnectionGeneration =
+        getScaleLinkSnapshot().connectionGeneration;
+    pendingFinalize.weightOffsetG = offsetUsed;
+    pendingFinalize.goalWeightDg = 360;
+    pendingFinalize.cutLineDg = 360;  // 36.0 g, dg units
+    pendingFinalize.endReason = EndReason::SCALE_THRESHOLD;
+    pendingFinalize.endedAtMs = hostMillis;
+    pendingFinalize.durationDs = 300;
+    pendingFinalize.firstDropDs = 100;
+    pendingFinalize.rateAtStopX100 = rateX100;
+    currentWeight = 36.0f - offsetUsed + needed;
+    currentWeightConnectionGeneration = pendingFinalize.scaleConnectionGeneration;
+    ++currentWeightSequence;
+    currentWeightReceivedAtMs = ++hostMillis;
+    return learnPendingBbw(pendingFinalize, currentWeight, true);
+  };
+  WebCommand set;
+  set.type = WebCommandType::RESET_WEIGHT_OFFSET;
+  set.bbwSetDrip = true;
+  set.config.weightOffsetBaselineG = 0.70f;
+  // Physics: below the floor, and above the tail the flow at the stop can
+  // leave behind (2 g/s leaves at most 1.7 g, 1 g/s at most 1.1 g — the
+  // user's 3.20 g at 2 g/s). None of them moves the drip or feeds the quick
+  // start. A rate-plausible value at the tighter flow trains normally.
+  CHECK(!shot(0.50f, -0.50f, 2000));
+  CHECK(!shot(0.50f, 1.50f, 1000));
+  CHECK(!shot(0.50f, 3.20f, 2000));
+  CHECK(preset.bbwEwmaOffsetG == 0.50f);
+  ok = shot(preset.bbwEwmaOffsetG, 0.85f, 1000);
+  CHECK(ok && fabsf(preset.bbwEwmaOffsetG - 0.605f) < 0.005f);
+  processWebCommand(set);
+  CHECK(preset.bbwEwmaOffsetG == 0.70f);
+  CHECK(quickStartEntry(bbwQuickStart, presetBank, preset.id, false)->count == 0);
+  // The real series: quick start applies the median 0.72, learning walks to
+  // 0.693 with 0.63, and a 3.20 g shot error no longer doubles the drip.
+  for (const float needed : {0.59f, 0.72f, 0.88f}) {
+    ok = shot(preset.bbwEwmaOffsetG, needed, 2000);
+    CHECK(ok);
+  }
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.72f) < 0.005f);
+  ok = shot(preset.bbwEwmaOffsetG, 0.63f, 2000);
+  CHECK(ok);
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.693f) < 0.005f);
+  CHECK(!shot(preset.bbwEwmaOffsetG, 3.20f, 2000));
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.693f) < 0.005f);
+  // Statistics: 1.40 disagrees with the 0.6-0.9 window and is held; 1.44
+  // agrees with it, so the drip steps to their mean and evidence restarts.
+  CHECK(!shot(preset.bbwEwmaOffsetG, 1.40f, 2000));
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.693f) < 0.005f);
+  ok = shot(preset.bbwEwmaOffsetG, 1.44f, 2000);
+  CHECK(ok);
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 1.42f) < 0.005f);
+  // The restarted evidence learns normally at the new level.
+  ok = shot(preset.bbwEwmaOffsetG, 1.40f, 2000);
+  CHECK(ok && fabsf(preset.bbwEwmaOffsetG - 1.414f) < 0.005f);
+  ok = shot(preset.bbwEwmaOffsetG, 1.42f, 2000);
+  CHECK(ok);
+  ok = shot(preset.bbwEwmaOffsetG, 1.40f, 2000);
+  CHECK(ok);
+  // Disagreeing outliers replace the pending one instead of confirming;
+  // the next shot that agrees with the replacement confirms the step.
+  CHECK(!shot(preset.bbwEwmaOffsetG, 1.90f, 2000));
+  CHECK(!shot(preset.bbwEwmaOffsetG, 0.90f, 2000));
+  ok = shot(preset.bbwEwmaOffsetG, 0.94f, 2000);
+  CHECK(ok && fabsf(preset.bbwEwmaOffsetG - 0.92f) < 0.005f);
+  // A run of faulty shots that agree with each other is vetoed by physics
+  // before the quick start could ever install it; clean shots then decide.
+  processWebCommand(set);
+  CHECK(preset.bbwEwmaOffsetG == 0.70f);
+  for (const float needed : {2.90f, 3.10f, 3.20f}) {
+    CHECK(!shot(0.70f, needed, 2000));
+  }
+  CHECK(quickStartEntry(bbwQuickStart, presetBank, preset.id, false)->count == 0);
+  CHECK(preset.bbwEwmaOffsetG == 0.70f);
+  for (const float needed : {0.60f, 0.64f, 0.62f}) {
+    ok = shot(preset.bbwEwmaOffsetG, needed, 2000);
+    CHECK(ok);
+  }
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.62f) < 0.005f);
+  CHECK(quickStartEntry(bbwQuickStart, presetBank, preset.id, false)->state ==
+        static_cast<uint8_t>(QuickStartState::APPLIED));
 }
 
 void rt24_late_cup_step_uses_shot_coordinates() {
@@ -25353,6 +25459,7 @@ const TestCase testCases[] = {
     {"FW05", fw05_set_drip_quick_starts_and_three_shots_decide},
     {"FW06", fw06_status_carries_recent_drips_and_markers},
     {"FW07", fw07_quick_start_save_retries_and_reports_once},
+    {"FW08", fw08_drip_filter_physics_outliers_and_step},
     {"RT21", rt21_empty_pan_at_cycle_start_resyncs_stuck_present},
     {"RS01", rs01_fast_samples_wait_for_min_duration},
     {"RS02", rs02_slow_samples_meet_min_duration_at_third_sample},

@@ -119,6 +119,8 @@ class ShotLog
 
   // The drip each newest good shot of a preset needed (offset used + final −
   // cut line, cg), newest first; skipped when the shot did not train the drip.
+  // Skipped shots keep their measured value so the chart can draw them
+  // hatched; only shots without a computable value stay empty.
   size_t recentDrips(uint8_t presetId, uint32_t *ids, int16_t *neededCg,
                      uint16_t &skippedMask, size_t max) const {
     size_t found = 0;
@@ -128,12 +130,14 @@ class ShotLog
       if (index == 0) index = SHOT_LOG_CAPACITY;
       const ShotLogRecord &record = store_.records[--index];
       if (shotLogPresetId(record) != presetId || !shotLogRecordEligible(record)) continue;
-      const bool trained = ((record.extractionExtended >> 5) & 3) == 2 &&
-                           !shotLogWeightIsMissing(record.cutLineCg);
+      const bool trained = ((record.extractionExtended >> 5) & 3) == 2;
+      const bool measurable = !shotLogWeightIsMissing(record.cutLineCg) &&
+                              !shotLogWeightIsMissing(record.actualWeightCg);
       ids[found] = record.id;
-      neededCg[found] = trained ? static_cast<int16_t>(record.offsetUsedCg +
-                                    record.actualWeightCg - record.cutLineCg)
-                                : 0;
+      neededCg[found] = measurable
+          ? static_cast<int16_t>(record.offsetUsedCg + record.actualWeightCg -
+                                 record.cutLineCg)
+          : 0;
       if (!trained) skippedMask |= static_cast<uint16_t>(1U << found);
       ++found;
     }

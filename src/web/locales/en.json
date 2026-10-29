@@ -844,7 +844,7 @@
     "runtime.drip": "Drip",
     "runtime.drip_delay": "Drip delay",
     "runtime.drip_hint_applied": "From here it keeps fine-tuning gently with each shot.",
-    "runtime.drip_hint_learning": "Each bar is what one shot needed. Skipped shots, like a moved cup or a manual stop, don't count.",
+    "runtime.drip_hint_learning": "Each bar is what one shot needed. Hatched bars were ignored: a moved cup, a manual stop, an odd shot.",
     "runtime.drip_hint_none": "Pull a shot with this preset to see what it needed.",
     "runtime.drip_hint_quick": "Shots before you set the drip are faded and don't count. If your next shots agree, the drip moves there right away.",
     "runtime.drip_hint_varied": "Shots that disagree only move the drip a little each time.",

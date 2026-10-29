@@ -3248,6 +3248,11 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   border-bottom: 0;
   height: 1.4rem;
 }
+/* Shots that did not train the drip keep their bar, hatched. */
+.dcBar.skip i {
+  background: repeating-linear-gradient(45deg, transparent 0 2px, currentColor 2px 4px);
+  opacity: 0.55;
+}
 .dcBarX {
   display: flex;
   gap: 0.5rem;

@@ -10,6 +10,9 @@ struct BbwLearningBank {
   struct State {
     uint8_t id = 0;
     uint32_t generation = 0;
+    // Last gate-rejected observation: two rejects that agree adopt a step.
+    bool pendingOutlier = false;
+    int16_t pendingCg = 0;
     bbwEwma::Evidence evidence;
   } states[MAX_SHOT_PRESETS];
   uint32_t nextGeneration = 0;
@@ -37,6 +40,7 @@ struct BbwLearningBank {
   void invalidate(uint8_t id, const ShotPresetBank &bank) {
     State &state = forPreset(id, bank);
     state.generation = newGeneration();
+    state.pendingOutlier = false;
     state.evidence = bbwEwma::Evidence{};
   }
 };

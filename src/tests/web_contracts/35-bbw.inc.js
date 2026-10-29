@@ -62,6 +62,15 @@
   assert.equal(elements.get('dripSetG').value, '1.56');
   assert.equal(elements.get('alphaSet').value, '0.30');
   assert(!elements.get('dripSetButton').disabled && !elements.get('alphaSetButton').disabled);
+  // A shot ignored for learning keeps its bar, hatched with its measured
+  // value, and stays out of the verdict (the user's 3.20 g glitch).
+  refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.70, bbwAlpha: 0.3,
+    bbwRecentG: [0.59, 0.72, 0.63, 3.20], bbwRecentSkipped: 8,
+    bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
+  const hatched = bars().find(b => b.className.includes('skip'));
+  assert(hatched && hatched.children.length === 1 && hatched.children[0].style.height.length > 0);
+  assert(elements.get('dripBarX').innerHTML.includes('3.20'));
+  assert.equal(elements.get('dripVerdict').textContent, 'On track: your last shots needed 0.59–0.72 g');
   // An edited field keeps the owner's value across refreshes.
   elements.get('dripSetG').value = '0.50';
   elements.get('dripSetG').dataset.edited = '1';

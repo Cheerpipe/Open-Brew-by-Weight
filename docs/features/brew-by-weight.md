@@ -89,7 +89,7 @@ appears while you are looking at the active preset.
 | **Earliest weight stop (s)** | Time limits | 12 s | 3–30 s, and at least the retare window plus 3 s (7 s with the default 4 s window); see [Cup protection](cup-protection.md) | The scale cannot stop the shot before this, so tare and first drops cannot trigger it. |
 | **Max shot time (s)** | Time limits | 50 s | 5–60 s | The shot always stops here, target reached or not. Ignored on timer-only and no-scale shots. Cannot exceed the hard 60 s cap. |
 | **Backup stop time (s)** | Time limits | empty | Earliest weight stop to Max shot time | Leave empty to use your recent shots, or the middle of your window until there are enough. See [scale-loss backup](auto-to-manual.md). |
-| **Expected drip weight after the shot stops (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with **Set drip** | The coffee still dripping into the cup after the stop, subtracted from the cut line. It learns from every eligible weight-stopped shot, shown next to a chart of what your last five shots needed. **Set drip** uses a new value from the next shot and starts a quick start. |
+| **Expected drip weight after the shot stops (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with **Set drip** | The coffee still dripping into the cup after the stop, subtracted from the cut line. It learns from every eligible weight-stopped shot that passes its plausibility checks, shown next to a chart of what your last five shots needed. **Set drip** uses a new value from the next shot and starts a quick start. |
 | **Learning speed** | Drip compensation | 0.30 | 0.01–1.00, applied with **Set learning speed** | How strongly each shot moves the drip. It may tune itself after about 20 shots; **Set learning speed** applies a new value at once and keeps the drip. |
 | **Stop after sustained weight** | Shared settings → Cup protection | ON | ON / OFF | A backup for a weight stop blocked by **Avoid accidental touch**. Fresh readings must stay above the applicable cut threshold for 1 second. Applies to every preset; takes effect on the next shot. |
 
@@ -194,8 +194,23 @@ detected channeling, cuts made without a usable flow reading (for example right
 after the scale reconnects) and excluded shots do not train it: these stops do
 not measure normal cutoff error.
 
+Before an observation trains the drip, two plausibility checks guard it. A
+physical bound comes first: with the flow measured at the stop, only so much
+coffee can keep dripping afterwards, so an observation that would need the
+water to keep flowing — a valve problem or a scale event, not a drip — is
+discarded outright. A statistical check then compares the observation with
+your recent accepted shots: one that lands far beyond their normal spread is
+held instead of moving the drip. A held shot is not lost — if the next shot
+lands on the same new value, both were measuring a real change (a new basket,
+a different grind) and the drip moves straight to that value; if not, the odd
+shot is discarded as noise. Discarded and held shots never train the drip,
+never influence the automatic learning-speed choice, and never count toward a
+quick start.
+
 Four candidate gains (0.10, 0.30, 0.50, 1.00) score compensation predictions
-before updating them. After 20 eligible EWMA observations, evaluation occurs
+before updating them; only observations that pass the plausibility checks
+enter the scoring, so one odd shot cannot tilt the choice. After 20 eligible
+EWMA observations, evaluation occurs
 every five observations. A challenger needs at least 10% lower squared-error
 loss in two consecutive evaluations, and at least ten observations between
 switches. The first possible switch is observation 25. Ties, insufficient
@@ -219,7 +234,10 @@ offset or gain.
 In **Settings → Presets → Drip compensation** you see the drip in use, its
 status, and a small chart of what each of your last five shots with this preset
 needed, drawn against a line for the drip in use. Shots that did not train the
-drip, such as a moved cup or a manual stop, show as skipped. With brew by weight
+drip — a moved cup, a manual stop, or a shot the plausibility checks discarded
+— keep their bar but show it hatched with diagonal stripes, so you can see at
+a glance what was ignored; shots without a usable weight show as skipped. With
+brew by weight
 off the section is hidden; both Set buttons need an editable, idle
 configuration with no recipe change still being saved.
 
