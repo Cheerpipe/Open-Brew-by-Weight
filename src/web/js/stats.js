@@ -1422,38 +1422,35 @@ function exportSink(gzip) {
     abort: () => writer.abort().catch(() => {}),
   };
 }
-// JSON: every good shot. With diagnostics: every shot, bad ones included,
-// each with its decoded trace, then the newest traces without a shot that
-// Shot storage lists; fetched one at a time (the Web UI talks to the
-// controller one request at a time), as .json.gz where the browser can
-// compress.
-function exportShotsJson(diagnostics = false) {
+// Every shot, bad ones included, each with its decoded trace, then the newest
+// traces without a shot that Shot storage lists; fetched one at a time (the
+// Web UI talks to the controller one request at a time), as .json.gz where
+// the browser can compress.
+function exportShotsJson() {
   return runExport(async (job) => {
-    const list = await exportRows(job, diagnostics ? { bad: true } : {}),
-      gzip = diagnostics && typeof CompressionStream === "function",
-      vocab = diagnostics && (await shotTraceVocabulary().catch(() => null)),
+    const list = await exportRows(job, { bad: true }),
+      gzip = typeof CompressionStream === "function",
+      vocab = await shotTraceVocabulary().catch(() => null),
       sink = exportSink(gzip);
     try {
       await sink.write(JSON.stringify(shotsJson([])).slice(0, -2));
       for (const [i, r] of list.entries()) {
-        const trace = diagnostics ? await shotTraceForFile(r, vocab) : undefined;
         if (job.stopped) throw new Error(job.stopped);
+        const trace = await shotTraceForFile(r, vocab);
         await sink.write((i ? "," : "") + JSON.stringify(shotJson(r, trace)));
-        if (diagnostics) {
-          job.progress = R.sub(__WEBUI_TEXT__("stats.export_progress"), [i + 1, list.length]);
-          R.message(job.progress);
-        }
+        job.progress = R.sub(__WEBUI_TEXT__("stats.export_progress"), [i + 1, list.length]);
+        R.message(job.progress);
       }
-      const orphans = diagnostics && (await orphanTracesJson(job, vocab));
+      const orphans = await orphanTracesJson(job, vocab);
       await sink.write(orphans ? `],"orphanTraces":${JSON.stringify(orphans)}}` : "]}");
       // Local time as YYYYMMDD-HHMM ("sv" formats dates ISO-like).
       const stamp = new Date().toLocaleString("sv").slice(0, 16).replace(/\D/g, "");
       R.saveFile(
         await sink.done(),
-        `openbrewbyweight-shots${diagnostics ? "-diagnostics" : ""}-${stamp.slice(0, 8)}-` +
-          `${stamp.slice(8)}.json${gzip ? ".gz" : ""}`,
+        `openbrewbyweight-shots-diagnostics-${stamp.slice(0, 8)}-${stamp.slice(8)}.json` +
+          `${gzip ? ".gz" : ""}`,
       );
-      if (diagnostics) R.message(__WEBUI_TEXT__("stats.export_done"), "ok");
+      R.message(__WEBUI_TEXT__("stats.export_done"), "ok");
     } catch (e) {
       sink.abort();
       if (e.code === "SHOT_TRACE_BUSY") job.stopped ??= __WEBUI_TEXT__("stats.export_stopped_shot");
@@ -2593,9 +2590,9 @@ export function init() {
     relayoutCharts: () => chartObserver && layoutChartLabels(),
   });
   R.registerStream("stats", statsStream);
-  // The toolbar exports every good shot whatever the filter (diagnostics:
-  // every shot with its trace); a card's menu acts on its own shot only, a
-  // bad one included. What reads the firmware waits while a shot runs.
+  // The toolbar exports everything whatever the filter, every shot with its
+  // trace; a card's menu acts on its own shot only, a bad one included. What
+  // reads the firmware waits while a shot runs.
   const afterShot = () => R.shotRunning() && __WEBUI_TEXT__("stats.export_after_shot");
   const exportMenu = actionMenu(__WEBUI_TEXT__("stats.export"), () => {
     const wait = afterShot();
@@ -2615,15 +2612,7 @@ export function init() {
             ICON.json,
             "JSON",
             wait || __WEBUI_TEXT__("stats.json_all_hint"),
-            () => exportShotsJson(),
-            false,
-            wait,
-          ],
-          [
-            ICON.json,
-            __WEBUI_TEXT__("stats.json_diagnostics"),
-            wait || __WEBUI_TEXT__("stats.json_diagnostics_hint"),
-            () => exportShotsJson(true),
+            exportShotsJson,
             false,
             wait,
           ],

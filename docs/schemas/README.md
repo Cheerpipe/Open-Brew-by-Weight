@@ -23,23 +23,23 @@ internal wire protocol.
   shot whose trace could not be read when the file was made (the controller
   stayed busy after a few retries, or a read failed); the file goes on
   without it.
-- `orphanTraces` (optional, top level, diagnostics export only) holds the
+- `orphanTraces` (optional, top level, full-history export only) holds the
   newest 16 traces that have no shot, newest first: each with `bootId`,
   `endedAtMs` (0 for an interrupted one), `interrupted` (`true` when a
   restart cut its shot short, `false` when the history did not keep the
   shot) and `trace`, the decoded record as above, or `traceUnavailable`
   (`true`) instead when it could not be read. It is absent when Shot storage
   could not be read.
-- Produced by: the Shots page, **Export → JSON** (every good shot, no traces),
-  **Export → JSON + diagnostics** (every shot, bad ones included, each with its
-  trace when it has one, plus `orphanTraces`), and a card's **⋯ → JSON** (that shot with its trace).
+- Produced by: the Shots page, **Export → JSON** (every shot, bad ones
+  included, each with its trace when it has one, plus `orphanTraces`) and a
+  card's **⋯ → JSON** (that shot with its trace).
   All write the same envelope; a single-shot file has one entry in `shots`.
-  File names are `openbrewbyweight-shots-YYYYMMDD-HHMM.json`,
-  `openbrewbyweight-shots-diagnostics-YYYYMMDD-HHMM.json.gz` (`.json` where
-  the browser cannot compress) and `openbrewbyweight-shot-<id>.json`.
+  File names are `openbrewbyweight-shots-diagnostics-YYYYMMDD-HHMM.json.gz`
+  (`.json` where the browser cannot compress) and
+  `openbrewbyweight-shot-<id>.json`.
 - Source and contract: `shotsJson` and `decodeShotTrace` in
   `src/web/js/stats.js`; `src/tests/web_contracts/33-shot-export.inc.js`
-  validates the output, the diagnostics export and the example against the
+  validates the output and the example against the
   schema, decodes the firmware's own trace fixture
   (`src/tests/fixtures/shot_trace_v1_hex.txt`, also checked by host case
   TRC25), and fails when a Stats row field has no home in the export.

@@ -1,6 +1,6 @@
 // Shot export: the v1 JSON carries every stored Stats column and validates
-// against its published schema, the diagnostics export adds bad shots and
-// each shot's decoded trace (the decoder reads the firmware's own fixture),
+// against its published schema, with every shot, bad ones included, and each
+// one's decoded trace (the decoder reads the firmware's own fixture),
 // the Gaggiuino file reads the way Visualizer.coffee parses it, and the
 // Beanconqueror link decodes within the brew handoff's limits. The toolbar
 // menu exports everything; a card's menu acts on its own shot, holds Delete
@@ -294,10 +294,10 @@
     assert.deepEqual([loads, waits.length], [1, 0]);
   }
 
-  // Exports: CSV and JSON read the whole log of good shots; JSON +
-  // diagnostics adds the bad ones and each shot's trace, then the traces
-  // without a shot Shot storage lists, one request at a time (the device
-  // slot), gzip-streamed into the file.
+  // Exports: CSV reads the whole log of good shots; JSON carries every shot,
+  // bad ones included, each with its trace, then the traces without a shot
+  // Shot storage lists, one request at a time (the device slot),
+  // gzip-streamed into the file.
   let saved, shown = [], window = [base, lost], inFlight = 0, maxInFlight = 0;
   const traced = new Set([412]);
   const storageWith = {orphanTraces: [{boot: 41, end: 0}, {boot: 40, end: 52000}]};
@@ -323,20 +323,11 @@
     'async function shotTraceForFile(', 'async function orphanTracesJson(', 'function exportSink(',
     'function exportShotsJson(']
       .map((m) => blockAt(viewJs.stats, m)).join('\n'), context);
-  await vm.runInContext('exportShotsJson()', context);
-  assert.equal(context.lastFilter, '{}', 'JSON holds good shots only');
-  assert.match(saved.name, /^openbrewbyweight-shots-\d{8}-\d{4}\.json$/);
-  assert.equal(saved.blob.type, 'application/json');
-  const plain = JSON.parse(await saved.blob.text());
-  check(schema, plain, 'json export');
-  assert.deepEqual([plain.version, plain.shots.map((x) => x.id), plain.shots.some((x) => x.trace),
-    'orphanTraces' in plain], [1, [412, 7], false, false]);
   const bad = {...base, id: 413, badReason: 'short', durationS: 5};
   window = [bad, base, lost];
   traced.add(413);
-  saved = null;
-  await vm.runInContext('exportShotsJson(true)', context);
-  assert.equal(context.lastFilter, '{"bad":true}', 'Diagnostics include bad shots');
+  await vm.runInContext('exportShotsJson()', context);
+  assert.equal(context.lastFilter, '{"bad":true}', 'The export includes bad shots');
   assert.match(saved.name, /^openbrewbyweight-shots-diagnostics-\d{8}-\d{4}\.json\.gz$/);
   const diag = JSON.parse(zlib.gunzipSync(Buffer.from(await saved.blob.arrayBuffer())));
   check(schema, diag, 'diagnostics export');
@@ -353,7 +344,7 @@
   shown = [];
   context.shotRunning = () => true;
   context.statsFrameWindow = () => new Promise((resolve) => setTimeout(() => resolve(window), 700));
-  await vm.runInContext('exportShotsJson(true)', context);
+  await vm.runInContext('exportShotsJson()', context);
   assert.equal(saved, null);
   assert.deepEqual(shown, [['Export stopped: a shot started. Export again once it has finished.', '']]);
   context.shotRunning = () => false;
@@ -369,7 +360,7 @@
   };
   context.shotTraceVocabulary = async () => {throw new Error('offline');};
   context.api = async () => {throw new Error('busy');};
-  await vm.runInContext('exportShotsJson(true)', context);
+  await vm.runInContext('exportShotsJson()', context);
   const partial = JSON.parse(zlib.gunzipSync(Buffer.from(await saved.blob.arrayBuffer())));
   check(schema, partial, 'partial diagnostics export');
   assert.ok(!('orphanTraces' in partial), 'Without Shot storage there is no orphan list');
@@ -378,7 +369,7 @@
   context.shotTraceVocabulary = async () => vocab;
   saved = null;
   context.shotRunning = () => true;
-  await vm.runInContext('exportShotsJson(true)', context);
+  await vm.runInContext('exportShotsJson()', context);
   assert.equal(saved, null);
   assert.deepEqual(shown.at(-1), ['Export stopped: a shot started. Export again once it has finished.', '']);
   context.shotRunning = () => false;
@@ -510,9 +501,8 @@
   // While a shot runs, what reads the firmware is shown disabled with the
   // reason; a running export offers Cancel instead.
   assert.ok(codeIncludes(viewJs.stats, 'const afterShot = () => R.shotRunning() &&'));
-  for (const item of ['exportShotsCsv, false, wait', '() => exportShotsJson(), false, wait',
-    '() => exportShotsJson(true), false, wait', '() => openShotTrace(r), false, wait',
-    '() => downloadShotJson(r), false, wait'])
+  for (const item of ['exportShotsCsv, false, wait', 'exportShotsJson, false, wait',
+    '() => openShotTrace(r), false, wait', '() => downloadShotJson(r), false, wait'])
     assert.ok(codeIncludes(viewJs.stats, item), `${item} waits for the shot`);
   assert.ok(codeIncludes(viewJs.stats, '? [[ICON.cancel,'));
   assert.ok(codeIncludes(blockAt(viewJs.records, 'function actionMenu('), 'b.disabled = !!off'));

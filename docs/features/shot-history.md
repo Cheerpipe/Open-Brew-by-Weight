@@ -494,25 +494,24 @@ See [Open it over HTTPS with a reverse proxy](../settings/web-access.md#open-it-
 
 ## Export and share shots
 
-**Export**, next to Filter, opens a small menu with three choices. They
+**Export**, next to Filter, opens a small menu with two choices. They
 include every shot whatever the list's filter or sort:
 
 - **CSV** is a table for Excel, Numbers, or Google Sheets, one row per good
   shot.
-- **JSON** keeps everything the controller recorded about each good shot,
-  including its full weight curve, in a structured file. Use it as a backup,
-  to analyze your shots in your own tools, or to bring them into other apps.
-  Its layout is published as a
-  [JSON Schema](../schemas/openbrewbyweight-shot-export-v1.schema.json), with
-  an [example file](../schemas/openbrewbyweight-shot-export-v1.example.json),
-  so other projects can read it reliably.
-- **JSON + diagnostics** is the same file with every shot, bad ones included,
-  and each shot's trace, plus the newest 16 traces that have no shot (shots
-  interrupted by a restart, or not kept by the history). It is meant for
-  troubleshooting with the developers. The controller sends the traces one
-  at a time, so a long history takes a while; the progress shows at the bottom of the page and
-  **Export → Cancel export** stops it. Browsers that can compress save it as
-  a smaller `.json.gz` file, which most archive tools open.
+- **JSON** keeps everything the controller recorded about every shot, bad
+  ones included: each shot with its full weight curve and its trace, plus the
+  newest 16 traces that have no shot (shots interrupted by a restart, or not
+  kept by the history). Use it as a backup, to analyze your shots in your own
+  tools, or to share it with the developers when something went wrong. Its
+  layout is published as a
+  [JSON Schema](../schemas/openbrewbyweight-shot-export-v1.schema.json), with an
+  [example file](../schemas/openbrewbyweight-shot-export-v1.example.json),
+  so other projects can read it reliably. The controller sends the traces one
+  at a time, so a long history takes a while; the progress shows at the bottom
+  of the page and **Export → Cancel export** stops it. Browsers that can
+  compress save it as a smaller `.json.gz` file, which most archive tools
+  open.
 
 The controller exports nothing while a shot is brewing or waiting for its
 last drips: the choices are greyed out until then, and an export that is
@@ -533,9 +532,10 @@ that shot only:
   that accepts brews from other apps; versions up to 8.7.0 do not, and on a
   device without a suitable app nothing happens.
 - **JSON** downloads the shot in the same format as the full export, so one
-  shot and the whole log read the same way, with its trace when it has one. A
-  bad shot's file says why it is bad. Like **View trace**, it waits while a
-  shot is brewing.
+  shot and the whole log read the same way: everything the controller
+  recorded about it, with its trace when it has one, as a plain uncompressed
+  file. A bad shot's file says why it is bad. Like **View trace**, it waits
+  while a shot is brewing.
 - **Gaggiuino** downloads the shot in the format Gaggiuino machines use, which
   [Visualizer](https://visualizer.coffee) can import. It carries the weight,
   flow, and target temperature over time. Open Brew by Weight measures weight
