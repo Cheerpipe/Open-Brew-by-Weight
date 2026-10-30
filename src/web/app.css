@@ -2118,11 +2118,6 @@ summary::marker {
   font-size: 0.42em;
   color: var(--w78);
 }
-.shotHero .heroNum span {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--w78);
-}
 .shotHero .heroChart {
   position: relative;
   height: 7.5rem;

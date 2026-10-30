@@ -237,7 +237,7 @@
   const card={live:true,weight:2,goal:36,elapsedMs:1000,firstDropMs:0,tareMs:null,averageFlowGps:null,shotType:'auto'};
   const heroEl=()=>lookup('shotHero');
   paint({...card,weight:36.2,elapsedMs:36800});
-  if(lookup('shotHeroWeight').textContent!=='36.2 g'||lookup('shotHeroGoal').textContent!==' / 36.0 g'||
+  if(lookup('shotHeroWeight').textContent!=='36.2 g'||
       lookup('shotHeroElapsed').textContent!=='36.8 s'||!lookup('shotHeroPills').hidden)
     throw new Error('Home must label units and keep pills off a live shot');
   if(lookup('shotHeroState').textContent!=='Brewing'||heroEl().dataset.tint!=='neutral')
@@ -316,7 +316,7 @@
   if(lookup('shotHeroWeight').textContent!=='~36 g'||lookup('shotHeroCut').textContent!=='No scale')
     throw new Error('A scale-loss stop must show its estimate and the No scale pill');
   paint({...card,scaleAvailable:false,weight:null,elapsedMs:27400,firstDropMs:2000,averageFlowGps:1.5});
-  if(lookup('shotHeroWeight').textContent!=='27.4 s'||lookup('shotHeroGoal').textContent!==''||
+  if(lookup('shotHeroWeight').textContent!=='27.4 s'||
       !lookup('shotHeroElapsed').hidden||
       lookup('shotHeroMode').hidden||lookup('shotHeroMode').textContent!=='No scale')
     throw new Error('A shot started without a scale must turn the hero into a timer');
@@ -386,7 +386,7 @@
   env.model=null;
   if(flowText(brewing)!==null)throw new Error('Without a flow sample Home must hide the flow');
   paint({...card,scaleAvailable:true});
-  if(lookup('shotHeroWeight').textContent!=='2.0 g'||lookup('shotHeroGoal').textContent!==' / 36.0 g'||
+  if(lookup('shotHeroWeight').textContent!=='2.0 g'||
       lookup('shotHeroElapsed').hidden||!lookup('shotHeroMode').hidden)
     throw new Error('A scale shot must keep the weight layout and no BBW pill');
   paint({...card,touchHold:true});

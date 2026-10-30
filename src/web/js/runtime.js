@@ -5297,29 +5297,18 @@ function renderShotHero(d) {
   hero.classList.toggle("live", !!d.live);
   t("Preset", d.presetName && d.presetName !== "—" ? " · " + d.presetName : "");
   const noScale = d.scaleAvailable === false;
-  const label =
-    heroNum(
-      "Weight",
-      est !== null
-        ? "~" + est + __WEBUI_TEXT__("runtime.g_2")
-        : sl && sl.state === "finished"
-          ? __WEBUI_TEXT__("runtime.weight_unknown")
-          : noScale
-            ? ms(d.clockMs, 1) + __WEBUI_TEXT__("runtime.s_2")
-            : wt === null
-              ? "—"
-              : wt.toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
-    ) +
-    t(
-      "Goal",
-      noScale && est === null
-        ? d.live && sl && sl.state === "lost"
-          ? " / ~" + +sl.stopAtS.toFixed(1) + __WEBUI_TEXT__("runtime.s_2")
-          : ""
-        : goal > 0
-          ? " / " + goal.toFixed(1) + __WEBUI_TEXT__("runtime.g_2")
-          : "",
-    );
+  const label = heroNum(
+    "Weight",
+    est !== null
+      ? "~" + est + __WEBUI_TEXT__("runtime.g_2")
+      : sl && sl.state === "finished"
+        ? __WEBUI_TEXT__("runtime.weight_unknown")
+        : noScale
+          ? ms(d.clockMs, 1) + __WEBUI_TEXT__("runtime.s_2")
+          : wt === null
+            ? "—"
+            : wt.toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
+  );
   const chip = (id, v) => {
     const e = $("shotHero" + id);
     e.hidden = !v;
