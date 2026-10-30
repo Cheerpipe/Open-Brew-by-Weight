@@ -27,6 +27,10 @@ exported JSON formats are not carried over.
   scale hands over to the timed backup.
 - **Cup not tared:** Home tells you when the cup on the scale was not tared
   so you can lift it and place it again, and the Diagnostic log says why.
+- **Live forecast curve:** in the Live view, the dashed projection toward the
+  cut line now follows the shot's own pace. It bends upward while the flow
+  speeds up and its ring marks where the controller expects the shot to land,
+  so the estimate no longer reads late on shots that accelerate as they go.
 - **JSON export:** one format, version 1, replaces the formats shipped up to
   1.1.0.
 

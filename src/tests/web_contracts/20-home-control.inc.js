@@ -78,6 +78,25 @@
   if (Math.abs(clean.maxFlow-0.4) > 0.01 || host.innerHTML.includes('shotHeld') ||
       spurt.maxFlow < 1.7)
     throw new Error('Clean ramps and real spurts keep their measured flow');
+  // The Live forecast pace curve: presetGraph must draw the quadratic from
+  // the current point through the control point onto the dot at the streamed
+  // SAP arrival (fc = [t*, cut line, ctrl t, ctrl g]).
+  let paceMarkup = '';
+  const paceHost = {id: 'paceTest', _w: 0, style: {}, dataset: {},
+    get innerHTML() { return paceMarkup; },
+    set innerHTML(v) { paceMarkup = v; },
+    replaceChildren() { paceMarkup = ''; }, append() {}, setAttribute() {}};
+  const paceGraph = new Function('document', 'const presetState={};' + helpers + preset +
+      renderer +
+      runtimeJs.slice(runtimeJs.indexOf('const sub = '), runtimeJs.indexOf('\n', runtimeJs.indexOf('const sub = '))) +
+      ';return presetGraph;')(document);
+  paceGraph(paceHost, {mode: 'active', prot: 3, t1: 27, t2: 36, wall: 60, dFast: 6,
+      dSlow: 6, ceil: 42, goal: 36, floor: 33, fast: true, slow: true, firstDrop: 5,
+      curveFast: 3, curveSlow: 6},  // rampCurveIndex('early'/'late', 'soft')
+    {w: 300, h: 160, now: [25, 28], fc: [30, 36, 27.5, 32.5]});
+  if (!/class="rvFc" d="M[^"]*Q[^"]*"/.test(paceMarkup) ||
+      !paceMarkup.includes('class="rvFcDot"') || !paceMarkup.includes('class="rvNow"'))
+    throw new Error('The live forecast must draw the pace curve onto its dot');
   const maximum = render(host, {wCg:Array(1201).fill(100),
     wAtMs:Array.from({length:1201},(_,i)=>i*50),durationS:60});
   if (maximum?.flowCurve.length !== 1201 || maximum.maxFlow !== 0)
