@@ -2110,6 +2110,7 @@ summary::marker {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.shotHero .heroNum b,
 .shotHero .heroFlow {
   font-size: 1.64rem;
 }
