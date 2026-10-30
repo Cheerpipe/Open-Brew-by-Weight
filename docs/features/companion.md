@@ -32,8 +32,8 @@ does today.
   standby still work exactly as before; they just travel through the
   companion. The controller then spends its Wi-Fi and processor on your
   scale and your shot instead of on the cloud. During a shot with a scale it
-  stays quiet: the machine's updates wait until the shot is over — the newest
-  one arrives right after — so nothing competes with your scale.
+  holds the machine's updates back until the shot is over — the newest one
+  arrives right after — leaving the radio to your shot.
 
 If the companion stops, the controller reconnects to La Marzocco on its own.
 During a shot with a scale it waits until the shot is over, so nothing
