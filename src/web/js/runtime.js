@@ -5607,11 +5607,11 @@ function renderHeroChart(host, model, m, goal, label) {
           Y(m.floor),
         ),
       );
-    // The on-recipe stretch of the cut line carries the target, like the
-    // preset graph's right-edge label.
+    // The on-recipe stretch of the cut line carries the target above the
+    // line, right-aligned like the preset graph's label.
     over.push(
       put(
-        "hold down",
+        "hold end",
         sub(__WEBUI_TEXT__("runtime.graph_target"), [+m.goal.toFixed(1)]),
         100,
         Y(m.goal),

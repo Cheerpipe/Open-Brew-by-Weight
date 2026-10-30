@@ -2157,6 +2157,9 @@ summary::marker {
 .heroChart .hold.down {
   transform: translate(-100%, 0.15rem);
 }
+.heroChart .hold.end {
+  transform: translate(-100%, calc(-100% - 0.15rem));
+}
 .heroChart .noCut {
   position: absolute;
   top: 0;
