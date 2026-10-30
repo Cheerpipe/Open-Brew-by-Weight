@@ -2369,6 +2369,12 @@ class DebugRingBuffer {
   void add(uint32_t atMs, uint32_t wallSec, LogLevel level,
            DebugCategory category, DebugCode code, int32_t argument1 = 0,
            int32_t argument2 = 0, const char *text = nullptr) {
+    // Zero is reserved (a cursor of zero means "from the oldest"), so it is
+    // never a sequence — including the very first add on a zero-initialized
+    // ring whose constructor has not run yet (early boot logs).
+    if (nextSequence_ == 0) {
+      nextSequence_ = 1;
+    }
     if (count_ == DEBUG_EVENT_CAPACITY) {
       ++overwritten_;
     } else {

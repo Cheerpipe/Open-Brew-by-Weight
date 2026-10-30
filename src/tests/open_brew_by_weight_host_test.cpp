@@ -3657,6 +3657,19 @@ void w24_debug_ring_is_bounded_and_ordered() {
     CHECK(reusedEvents[index].text[0] == '\0');
   }
 
+  // A zero-initialized ring (PSRAM .bss before its constructor runs) still
+  // never emits sequence zero: it is reserved as the "from the oldest"
+  // cursor, and a zero row would repeat itself in the companion log pager.
+  DebugRingBuffer zeroed;
+  memset(&zeroed, 0, sizeof(zeroed));
+  zeroed.add(106, 0, LogLevel::INFO, DebugCategory::BOOT,
+             DebugCode::BOOT_RESET_REASON, 3);
+  zeroed.add(107, 0, LogLevel::INFO, DebugCategory::BOOT,
+             DebugCode::BOOT_RESET_REASON, 3);
+  DebugEvent zeroedEvents[2] = {};
+  CHECK(zeroed.copyAfter(0, zeroedEvents, 2) == 2);
+  CHECK(zeroedEvents[0].sequence == 1 && zeroedEvents[1].sequence == 2);
+
   const LogLevel previousRingLevel = ringRetainLogLevel;
   debugLog.clear();
   ringRetainLogLevel = LogLevel::INFO;

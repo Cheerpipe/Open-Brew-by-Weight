@@ -116,6 +116,10 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
   while (callbacks_.copyDebugEvents != nullptr && !full) {
     DebugEvent event;
     if (callbacks_.copyDebugEvents(cursor, &event, 1, nullptr) == 0) break;
+    // A sequence of zero cannot advance the cursor (zero means "from the
+    // oldest"): a residual zero row would repeat itself until the frame
+    // fills. The ring never assigns one; this ends its page instead.
+    if (event.sequence == 0) break;
     const char *text = event.text;
     char formatted[DEBUG_EVENT_TEXT_CAPACITY];
     if (text[0] == '\0') {
