@@ -3464,7 +3464,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   background: var(--sf);
   border: 1px solid var(--ln);
   border-radius: var(--r);
-  padding: 1rem;
+  padding: calc(1rem + 10px) 1rem 1rem;
   margin: 0 0 0.75rem;
 }
 :is(#shotTable, #historyTable) :is(th, td) {
@@ -3570,21 +3570,38 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 #shotTable .shotDel {
   position: absolute;
-  top: 0.15rem;
+  top: calc(0.15rem - 6px);
   right: 0.15rem;
   z-index: 1;
   align-items: center;
   justify-content: center;
 }
+/* The corner tag fuses to the card's top-left border; the card's deeper
+   top padding gives it a band of its own clear of the metrics. */
 #shotTable .shotNum {
   position: absolute;
-  top: 0.15rem;
-  left: 0.35rem;
-  z-index: 1;
-  font-size: 0.9rem;
-  font-weight: 750;
+  top: -1px;
+  left: -1px;
+  padding: 0.3rem 0.7rem 0.26rem;
+  border-radius: 0 var(--r) 0 var(--r);
+  background: var(--ac);
+  color: var(--on);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--mu);
+}
+/* Labeled text cells sit 4 px off the border; the centered metrics and the
+   charts keep their original alignment. */
+#shotTable td:not(.shotDur):not(.shotActual):not(.shotSparkCell):not(.shotDel) {
+  padding-left: 4px;
+}
+/* The end time rides in the same pill anatomy as the verdict, in a neutral
+   tint, and opens the row flush with the labels below. */
+#shotTable .heroPill.time {
+  --z: var(--mu);
+  margin-left: 0;
 }
 #shotTable .shotDur,
 #shotTable .shotActual,

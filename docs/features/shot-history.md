@@ -75,13 +75,15 @@ follow your chosen light or dark theme. History cards use equal left and right
 spacing for their measurements and charts, with the shot's actions menu (⋯)
 in the top right corner.
 
-The shot's **number** sits in the top left corner of its card. Counting starts
-at 1 when the log starts empty — on a fresh install, after a factory reset, or
-after clearing the log — and every stored shot counts up from there, so the
-same shot always keeps the same number: “shot 214” means that shot and no
-other. Deleting shots leaves gaps in the count rather than renumbering the
-rest, and when a full log replaces its oldest shot, that shot's number goes
-with it.
+The shot's **number** rides in a small colored tag on the top left corner of
+its card. Counting starts at 1 when the log starts empty — on a fresh install,
+after a factory reset, or after clearing the log — and every stored shot
+counts up from there, so the same shot always keeps the same number: “shot
+214” means that shot and no other. Deleting shots leaves gaps in the count
+rather than renumbering the rest, and when a full log replaces its oldest
+shot, that shot's number goes with it. Beside the tag, the shot's end time
+sits in a quiet grey pill next to the verdict's colored one, so when you
+pulled it reads with the same weight as how it landed.
 
 ## What is recorded
 
@@ -342,8 +344,9 @@ example one recorded at exactly 12.0 s or with a yield of 2 g or less, now
 counts as a bad shot.
 
 In its Stats history card, each shot shows everything at once. At the top are
-its duration and yield in large numbers, then when you pulled it, with a
-colored badge saying whether it landed **Fast**, **On recipe** or **Slow**.
+its duration and yield in large numbers, then when you pulled it and how it
+landed — the time and the **Fast**, **On recipe** or **Slow** verdict sit side
+by side as pills.
 Below come its target, error, flow, late cup, first drop, how it ended, shot
 type, preset, scale and your star rating, which you can change right there.
 Then comes its **preset chart**: the

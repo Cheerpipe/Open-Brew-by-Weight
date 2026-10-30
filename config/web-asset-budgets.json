@@ -7,11 +7,11 @@
   },
   "limits": {
     "source.html": 131910,
-    "source.js": 669212,
-    "source.htmlJs": 801122,
+    "source.js": 669402,
+    "source.htmlJs": 801312,
     "gzip.shellHtml": 5886,
     "gzip.shellJs": 8622,
-    "gzip.css": 19329,
+    "gzip.css": 19417,
     "gzip.runtime": 44467,
     "gzip.otaImage": 3072,
     "gzip.module.records": 27340,
@@ -22,7 +22,7 @@
     "gzip.manifest": 1024,
     "raw.icon192": 31500,
     "raw.icon48": 3500,
-    "gzip.coldHome": 76601,
+    "gzip.coldHome": 76675,
     "gzip.combined": 187523
   }
 }
