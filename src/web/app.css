@@ -3578,10 +3578,10 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 #shotTable .shotNum {
   position: absolute;
-  top: 0.2rem;
+  top: 0.15rem;
   left: 0.35rem;
   z-index: 1;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
   color: var(--mu);

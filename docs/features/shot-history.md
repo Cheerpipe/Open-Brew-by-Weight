@@ -75,6 +75,14 @@ follow your chosen light or dark theme. History cards use equal left and right
 spacing for their measurements and charts, with the shot's actions menu (⋯)
 in the top right corner.
 
+The shot's **number** sits in the top left corner of its card. Counting starts
+at 1 when the log starts empty — on a fresh install, after a factory reset, or
+after clearing the log — and every stored shot counts up from there, so the
+same shot always keeps the same number: “shot 214” means that shot and no
+other. Deleting shots leaves gaps in the count rather than renumbering the
+rest, and when a full log replaces its oldest shot, that shot's number goes
+with it.
+
 ## What is recorded
 
 Every confirmed, non-rinse cycle that started with a scale connected is
