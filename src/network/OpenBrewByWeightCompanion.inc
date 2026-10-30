@@ -40,11 +40,14 @@ constexpr uint8_t kCompanionSendRetries = 5;
 // paired or forgotten controller) and kept, so a controller that never pairs
 // reserves nothing. frame: httpd only, one received frame, then each signed
 // send. crypt: network task only, credentials plaintext, then ciphertext;
-// wiped after use.
+// wiped after use. escape: network task only, the log body's JSON scratch —
+// frame must never be written outside the httpd task, which receives and
+// verifies inbound frames in it.
 struct CompanionWorkspace {
   char frame[COMPANION_FRAME_BYTES + 1];
   CompanionSendJob job;
   uint8_t crypt[2 * kCompanionPlainBytes + 16];
+  char escape[DEBUG_EVENT_TEXT_CAPACITY * 6 + 1];  // worst case: every byte escaped
 };
 std::atomic<CompanionWorkspace *> g_companionWorkspace{nullptr};
 // Valid on every path after a handshake, the only place that allocates it.
