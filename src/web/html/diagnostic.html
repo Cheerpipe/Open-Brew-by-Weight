@@ -992,10 +992,6 @@
     >
     <p id="logDropped" class="fieldHint" hidden></p>
     <p id="logHistoryNote" class="fieldHint" hidden></p>
-    <button id="logOlderButton" class="btnGlyph diagCtl" type="button" hidden>
-      <span class="g" aria-hidden="true">↑</span>
-      <span class="t">{{webui:diagnostic.log_show_older}}</span>
-    </button>
     <textarea id="log" readonly aria-label="{{webui:diagnostic.log}}"></textarea>
     <div class="btnBar glassBar">
       <button
@@ -1006,6 +1002,9 @@
       >
         <span class="g" aria-hidden="true">⧉</span
         ><span class="t">{{webui:diagnostic.copy}}</span></button
+      ><button id="logOlderButton" class="btnGlyph diagCtl" type="button" hidden>
+        <span class="g" aria-hidden="true">↑</span
+        ><span class="t">{{webui:diagnostic.log_show_older}}</span></button
       ><button
         id="clearLogButton"
         class="btnGlyph diagCtl"
