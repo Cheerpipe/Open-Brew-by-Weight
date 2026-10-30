@@ -522,6 +522,49 @@ static void testFrameCodec() {
   CHECK(companionOpenFrame(key, huge.c_str(), huge.size()) == nullptr);
 }
 
+// The `log` frame's body is a member-list fragment continuing the object the
+// seal opens with `{"q":N,`. A head with a `{` of its own seals into a
+// valid-MAC frame whose JSON no parser accepts — the shape this pins.
+static void testLogFrameShape() {
+  uint8_t key[32];
+  for (int i = 0; i < 32; ++i) key[i] = uint8_t(i * 5 + 3);
+  char out[COMPANION_FRAME_BYTES + 1];
+  const struct {
+    bool reset;
+    uint32_t miss;
+  } cases[] = {{false, 0}, {false, 12}, {true, 0}, {true, 34}};
+  for (const auto &item : cases) {
+    char head[72];
+    CHECK(companionLogHead(head, 42, item.reset, item.miss) > 0);
+    CHECK(head[0] == '"');  // continues the object; never a nested one
+    std::string body = std::string(head) + "[7,89,1777000000,\"w\",\"network\",\"up\"]" + "]}";
+    const size_t length = companionSealFrame(key, 5, body.c_str(), out, sizeof(out));
+    CHECK(length > 0);
+    // The companion's two steps on any frame: the MAC (direction f to it),
+    // then the JSON. companionOpenFrame verifies direction c and cannot read
+    // the controller's own sealing, so check the MAC directly.
+    char mac[COMPANION_MAC_HEX];
+    CHECK(companionFrameMacHex(key, 'f', out + COMPANION_MAC_HEX + 1,
+                               length - COMPANION_MAC_HEX - 1, mac));
+    CHECK(std::memcmp(out, mac, COMPANION_MAC_HEX) == 0);
+    cJSON *frame = cJSON_Parse(out + COMPANION_MAC_HEX + 1);
+    CHECK(frame != nullptr);
+    CHECK(companionFrameSequence(frame, 5));
+    const cJSON *type = cJSON_GetObjectItemCaseSensitive(frame, "t");
+    CHECK(cJSON_IsString(type) && std::strcmp(type->valuestring, "log") == 0);
+    const cJSON *boot = cJSON_GetObjectItemCaseSensitive(frame, "b");
+    CHECK(cJSON_IsNumber(boot) && boot->valuedouble == 42);
+    const cJSON *events = cJSON_GetObjectItemCaseSensitive(frame, "e");
+    CHECK(cJSON_IsArray(events) && cJSON_GetArraySize(events) == 1);
+    const cJSON *reset = cJSON_GetObjectItemCaseSensitive(frame, "reset");
+    CHECK(item.reset ? cJSON_IsBool(reset) : reset == nullptr);
+    const cJSON *miss = cJSON_GetObjectItemCaseSensitive(frame, "miss");
+    CHECK(item.miss != 0 ? (cJSON_IsNumber(miss) && miss->valuedouble == item.miss)
+                         : miss == nullptr);
+    cJSON_Delete(frame);
+  }
+}
+
 // The dev frame is due on every fresh session (pairing, reconnect, reboot)
 // and after a rename, and never for an unpublished (empty) name.
 static void testDeviceNameFrame() {
@@ -872,6 +915,7 @@ int main() {
   testRelayWindow();
   testPrincipals();
   testFrameCodec();
+  testLogFrameShape();
   testDeviceNameFrame();
   testBase64AndValidation();
   testCommitThenReveal();

@@ -104,13 +104,8 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
     (void)callbacks_.copyDebugEvents(cursor, nullptr, 0, &meta);
   if (meta.cursorInvalid) cursor = 0;  // the ring was cleared: refill
   logMiss = meta.missedEvents;
-  char head[72], missText[24] = "";
-  if (logMiss != 0)
-    snprintf(missText, sizeof(missText), "%s\"miss\":%lu",
-             meta.cursorInvalid ? "," : "", static_cast<unsigned long>(logMiss));
-  snprintf(head, sizeof(head), "{\"t\":\"log\",\"b\":%lu,%s%s\"e\":[",
-           static_cast<unsigned long>(companionLogBootId_),
-           meta.cursorInvalid ? "\"reset\":true" : "", missText);
+  char head[72];
+  companionLogHead(head, companionLogBootId_, meta.cursorInvalid, logMiss);
   size_t start = 0;
   for (uint8_t index = 0; index < count; ++index)
     start += strlen(companionWs().job.bodies + start) + 1;

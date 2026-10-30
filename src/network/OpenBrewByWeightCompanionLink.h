@@ -787,6 +787,21 @@ inline char companionLogLevelLetter(LogLevel level) {
   }
 }
 
+// The `log` frame's head: a member-list fragment continuing the object
+// companionSealFrame opens with `{"q":N,` — never a `{` of its own, and every
+// member (the optional `reset` and `miss` included) comma-separated; a shape
+// slip here seals into a valid-MAC frame no JSON parser accepts.
+inline size_t companionLogHead(char out[72], uint32_t boot, bool reset, uint32_t miss) {
+  size_t used = static_cast<size_t>(snprintf(out, 72, "\"t\":\"log\",\"b\":%lu,",
+                                             static_cast<unsigned long>(boot)));
+  if (reset) used += static_cast<size_t>(snprintf(out + used, 72 - used, "\"reset\":true,"));
+  if (miss != 0)
+    used += static_cast<size_t>(snprintf(out + used, 72 - used, "\"miss\":%lu,",
+                                         static_cast<unsigned long>(miss)));
+  used += static_cast<size_t>(snprintf(out + used, 72 - used, "\"e\":["));
+  return used;
+}
+
 // Whether events wait for the link: anything the companion has not got. A
 // watermark that moved BACK counts too — the ring was cleared below the
 // companion's cursor, and until the reset frame lands its view is wrong, so
