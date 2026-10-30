@@ -207,7 +207,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 | `{"t":"dev","name":"Kitchen"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address. Up to 32 bytes of letters, digits, spaces and hyphens. Sent after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
-| `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` frames until `on` is `false` |
+| `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` and `push` frames until `on` is `false` |
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 
 After `ready` the controller sends `cfg`, `dev`, `route` and `hold` with their
@@ -264,9 +264,13 @@ fields, whether or not they changed, and drops the others. `k` says where the
 state came from:
 
 - `full`: the read after a new La Marzocco subscription. Sent once after
-  `route` and again whenever `ep` changes. The controller treats it as a new
-  subscription plus its initial read.
-- `push`: a La Marzocco WebSocket push, forwarded at once, also during shots.
+  `route` and again whenever `ep` changes, also while a hold is on: a missing
+  one is what the controller waits for on its route timer. The controller
+  treats it as a new subscription plus its initial read.
+- `push`: a La Marzocco WebSocket push. Held while `hold` is on — a shot with
+  a scale hears nothing of the machine — so only the latest held push and
+  `read` go, each in the order it was last observed, when the hold ends; a
+  held frame from an older subscription (`ep`) is dropped.
 - `read`: the companion's own read (after a token renewal, a `refresh`, a
   command's verification, or API-mode polling every 30 s). Held while `hold`
   is on and sent once when it ends; the controller drops a `read` that arrives

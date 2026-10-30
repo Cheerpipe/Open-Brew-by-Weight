@@ -212,7 +212,9 @@ readiness, cleaning, wake gestures, preset temperatures and scale-driven power
 commands. The difference is that the controller itself no longer talks to the
 La Marzocco cloud; it receives the machine's state from the companion and
 sends its commands through it, which leaves more of its Wi-Fi and memory for
-your scale.
+your scale. During a shot with a scale the companion stays quiet as well: the
+machine's updates wait out the shot and the newest one arrives right after, so
+those seconds of radio belong to your shot.
 
 You do not need to do anything. The controller hands over only when nothing
 is happening: no shot, no scale connecting, no cleaning cycle and no machine
