@@ -990,7 +990,7 @@ function renderShots() {
         '<span class="shotVal">' +
         e.innerHTML +
         '</span><svg class="shotMetricIcon" width="1.85rem" height="1.85rem" fill="currentColor" aria-hidden="true"><use href="#shotMetric' +
-        (c === "shotDur" ? "Time" : "Weight") +
+        (c === "shotDur" ? "Time" : "Yield") +
         '"/></svg>';
     p.appendChild(e);
     return e;
@@ -1086,6 +1086,12 @@ function renderShots() {
         if (v !== null) td(row, labels[i], v, cls[i]);
       });
       R.wrapTimeEl(row.cells[0], r);
+      // The corner number tells cards apart: the store's sequential shot id.
+      const num = document.createElement("span");
+      num.className = "shotNum";
+      num.textContent = r.id;
+      num.title = __WEBUI_TEXT__("runtime.shot") + " " + r.id;
+      row.cells[0].appendChild(num);
       // The verdict sits beside the time so each card says at a glance how the shot landed.
       if (!bad && r.arrivalS > 0 && ["fast", "on_recipe", "slow"].includes(r.verdict))
         row.cells[0].insertAdjacentHTML(

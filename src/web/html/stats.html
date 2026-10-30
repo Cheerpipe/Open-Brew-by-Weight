@@ -1,18 +1,32 @@
 <svg class="spriteDefs" width="0" height="0" aria-hidden="true">
   <defs>
-    <symbol id="shotMetricTime" viewBox="0 0 512 512">
-      <path
-        fill-rule="evenodd"
-        d="M256 90a211 211 0 1 0 0 422 211 211 0 0 0 0-422zm-19 79a19 19 0 0 1 38 0v132a19 19 0 0 1-38 0z"
-      />
-      <path
-        d="M232 94V64h-54q-16 0-16-32t16-28h156q16 0 16 28t-16 32h-54v30zM382 142l32-32-16-18q-10-15 15-26t16-9q22 12 72 72 5 10-6 26t-23 6l-18-17-32 32z"
-      />
+    <symbol id="shotMetricTime" viewBox="3.6 2.85 40.8 40.8">
+      <path d="M11 30Q17 27 24 30T37 30V35.07A15.3 15.3 0 0 1 11 35.07Z" />
+      <g
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.1"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="24" cy="27" r="15.5" />
+        <path d="M21 7h6v6h-6zM24 7V4M31 8l3-3M24 27V17M24 27l7-5" />
+      </g>
+      <circle cx="24" cy="27" r="2" />
     </symbol>
-    <symbol id="shotMetricWeight" viewBox="0 0 300 300">
+    <symbol id="shotMetricYield" viewBox="6.65 2.4 36.2 36.2">
+      <g
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.1"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M15 12c-3-3 3-5 0-8M25 12c-3-3 3-5 0-8" />
+        <path d="M9 15h24v15a7 7 0 0 1-7 7H16a7 7 0 0 1-7-7V15ZM33 19h2.5a5 5 0 0 1 0 10H33" />
+      </g>
       <path
-        fill-rule="evenodd"
-        d="M59 92h53a54 54 0 1 1 76 0h53q13 0 15 13l31 177q3 18-15 18H27q-18 0-14-18l31-177q2-13 15-13zM150 30a24 24 0 1 0 0 48 24 24 0 0 0 0-48zM166 163h14v67q0 29-29 29-16 0-27-9l7-11q8 7 20 7 15 0 15-16v-6q-7 8-20 8-28 0-28-35t28-35q13 0 20 9zM166 197q0-22-17-22t-17 22 17 22 17-22z"
+        d="M10.5 22Q14 19 18 22T25 22Q28 20 31.5 22v8a5.5 5.5 0 0 1-5.5 5.5H16a5.5 5.5 0 0 1-5.5-5.5v-8Z"
       />
     </symbol>
   </defs>
@@ -41,7 +55,7 @@
           fill="currentColor"
           aria-hidden="true"
         >
-          <use href="#shotMetricWeight" /></svg
+          <use href="#shotMetricYield" /></svg
         ><strong>{{webui:stats.avg_yield}}</strong>
         <div id="statsAvgWeight">—</div>
       </div>

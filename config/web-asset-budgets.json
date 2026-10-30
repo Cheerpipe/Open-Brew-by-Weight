@@ -6,9 +6,9 @@
     "raw": 0
   },
   "limits": {
-    "source.html": 131710,
+    "source.html": 131782,
     "source.js": 668911,
-    "source.htmlJs": 800621,
+    "source.htmlJs": 800692,
     "gzip.shellHtml": 5886,
     "gzip.shellJs": 8622,
     "gzip.css": 19329,

@@ -3576,6 +3576,16 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   align-items: center;
   justify-content: center;
 }
+#shotTable .shotNum {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.35rem;
+  z-index: 1;
+  font-size: 0.95rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--mu);
+}
 #shotTable .shotDur,
 #shotTable .shotActual,
 #historyTable td.shotDur,
@@ -3599,6 +3609,16 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   justify-self: center;
   text-align: left;
 }
+/* The summary card's em context is 1rem, so its icon and metric column are
+   pinned in rem to match the shot rows' 1.2em of 1.85rem exactly. */
+.shotCard .shotDur,
+.shotCard .shotActual {
+  grid-template-columns: 2.78rem auto;
+}
+/* The summary card pairs the glyph with a bigger value; lift it 3px more. */
+.shotCard .shotMetricIcon {
+  transform: translateY(-8px);
+}
 #shotTable .shotMetricIcon {
   grid-row: 1/3;
   width: 1.2em;
@@ -3608,8 +3628,10 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   grid-column: 1;
   grid-row: 2;
   align-self: center;
-  width: 1.5em;
-  height: 1.5em;
+  /* Digits sit above their line-box center; lift the glyph onto them. */
+  transform: translateY(-5px);
+  width: 2.22rem;
+  height: 2.22rem;
   color: var(--mu);
 }
 #shotTable .shotVal {
@@ -3619,7 +3641,8 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
 }
 .shotCard :is(.shotDur, .shotActual) > strong {
   grid-column: 1/-1;
-  padding-left: 2rem;
+  /* Indent to the value column: metric column (2.78rem) + column gap. */
+  padding-left: calc(2.78rem + 0.5rem);
 }
 .shotCard :is(.shotDur, .shotActual) > div {
   grid-column: 2;
