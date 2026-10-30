@@ -1848,7 +1848,6 @@
     "setup.password_required": "Enter the network password (8–63 characters).",
     "setup.password_title": "Set your password",
     "setup.passwords_differ": "The passwords don't match.",
-    "setup.progress": "Setup progress",
     "setup.recipe_double_adaptive": "Double · Adaptive",
     "setup.recipe_double_adaptive_hint": "For a double basket. Stops at your target weight and adjusts a little for fast and slow shots.",
     "setup.recipe_double_fixed": "Double · Fixed",

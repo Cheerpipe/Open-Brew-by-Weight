@@ -289,40 +289,59 @@
           <span id="fastRampColEarly" class="rampCol">{{webui:settings.ramp_steep_early}}</span
           ><span id="fastRampColEven" class="rampCol">{{webui:settings.ramp_even}}</span
           ><span id="fastRampColLate" class="rampCol">{{webui:settings.ramp_steep_late}}</span
-          ><button
-            type="button"
-            role="radio"
-            data-ramp="fastCurve"
-            value="early"
-            aria-describedby="fastRampColEarly"
-          >
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
-          ><button
-            type="button"
-            role="radio"
-            data-ramp="fastCurve"
-            value="even"
-            aria-describedby="fastRampColEven"
-          >
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
-          ><button
-            type="button"
-            role="radio"
-            data-ramp="fastCurve"
-            value="late"
-            aria-describedby="fastRampColLate"
-          >
+          ><label
+            ><input
+              type="radio"
+              name="fastCurve"
+              data-ramp="fastCurve"
+              value="early"
+              aria-describedby="fastRampColEarly" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
+          ><label
+            ><input
+              type="radio"
+              name="fastCurve"
+              data-ramp="fastCurve"
+              value="even"
+              aria-describedby="fastRampColEven" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
+          ><label
+            ><input
+              type="radio"
+              name="fastCurve"
+              data-ramp="fastCurve"
+              value="late"
+              aria-describedby="fastRampColLate"
+            />
             <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span>
-          </button>
+          </label>
         </div>
         <div class="rampStrength" role="radiogroup" aria-label="{{webui:settings.ramp_hardness}}">
-          <button type="button" role="radio" data-ramp="fastCurveHardness" value="soft">
-            {{webui:settings.ramp_soft}}</button
-          ><button type="button" role="radio" data-ramp="fastCurveHardness" value="medium">
-            {{webui:settings.ramp_medium}}</button
-          ><button type="button" role="radio" data-ramp="fastCurveHardness" value="hard">
+          <label
+            ><input
+              type="radio"
+              name="fastCurveHardness"
+              data-ramp="fastCurveHardness"
+              value="soft"
+            />
+            {{webui:settings.ramp_soft}}</label
+          ><label
+            ><input
+              type="radio"
+              name="fastCurveHardness"
+              data-ramp="fastCurveHardness"
+              value="medium"
+            />
+            {{webui:settings.ramp_medium}}</label
+          ><label
+            ><input
+              type="radio"
+              name="fastCurveHardness"
+              data-ramp="fastCurveHardness"
+              value="hard"
+            />
             {{webui:settings.ramp_hard}}
-          </button>
+          </label>
         </div>
         <select id="fastCurve" class="hidden" aria-hidden="true" tabindex="-1">
           <option value="even"></option>
@@ -374,40 +393,59 @@
           <span id="slowRampColEarly" class="rampCol">{{webui:settings.ramp_steep_early}}</span
           ><span id="slowRampColEven" class="rampCol">{{webui:settings.ramp_even}}</span
           ><span id="slowRampColLate" class="rampCol">{{webui:settings.ramp_steep_late}}</span
-          ><button
-            type="button"
-            role="radio"
-            data-ramp="slowCurve"
-            value="early"
-            aria-describedby="slowRampColEarly"
-          >
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
-          ><button
-            type="button"
-            role="radio"
-            data-ramp="slowCurve"
-            value="even"
-            aria-describedby="slowRampColEven"
-          >
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></button
-          ><button
-            type="button"
-            role="radio"
-            data-ramp="slowCurve"
-            value="late"
-            aria-describedby="slowRampColLate"
-          >
+          ><label
+            ><input
+              type="radio"
+              name="slowCurve"
+              data-ramp="slowCurve"
+              value="early"
+              aria-describedby="slowRampColEarly" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
+          ><label
+            ><input
+              type="radio"
+              name="slowCurve"
+              data-ramp="slowCurve"
+              value="even"
+              aria-describedby="slowRampColEven" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
+          ><label
+            ><input
+              type="radio"
+              name="slowCurve"
+              data-ramp="slowCurve"
+              value="late"
+              aria-describedby="slowRampColLate"
+            />
             <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span>
-          </button>
+          </label>
         </div>
         <div class="rampStrength" role="radiogroup" aria-label="{{webui:settings.ramp_hardness}}">
-          <button type="button" role="radio" data-ramp="slowCurveHardness" value="soft">
-            {{webui:settings.ramp_soft}}</button
-          ><button type="button" role="radio" data-ramp="slowCurveHardness" value="medium">
-            {{webui:settings.ramp_medium}}</button
-          ><button type="button" role="radio" data-ramp="slowCurveHardness" value="hard">
+          <label
+            ><input
+              type="radio"
+              name="slowCurveHardness"
+              data-ramp="slowCurveHardness"
+              value="soft"
+            />
+            {{webui:settings.ramp_soft}}</label
+          ><label
+            ><input
+              type="radio"
+              name="slowCurveHardness"
+              data-ramp="slowCurveHardness"
+              value="medium"
+            />
+            {{webui:settings.ramp_medium}}</label
+          ><label
+            ><input
+              type="radio"
+              name="slowCurveHardness"
+              data-ramp="slowCurveHardness"
+              value="hard"
+            />
             {{webui:settings.ramp_hard}}
-          </button>
+          </label>
         </div>
         <select id="slowCurve" class="hidden" aria-hidden="true" tabindex="-1">
           <option value="even"></option>

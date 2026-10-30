@@ -4435,7 +4435,15 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   color: var(--mu);
   text-align: center;
 }
-.rampCurves button {
+.rampChoice input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.rampCurves label {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4451,13 +4459,17 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   font-weight: 600;
   cursor: pointer;
 }
-.rampCurves button:not([aria-checked="true"]):hover {
+.rampCurves label:not(:has(input:checked)):hover {
   background: var(--in);
 }
-.rampCurves button[aria-checked="true"] {
+.rampCurves label:has(input:checked) {
   background: var(--pa);
   border-color: var(--ac);
   color: var(--ac);
+}
+.rampCurves label:has(input:focus-visible) {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 .rampCurves svg {
   width: 2.5rem;
@@ -4476,7 +4488,10 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   gap: 0.25rem;
   margin: 0.5rem 0 0;
 }
-.rampStrength button {
+.rampStrength label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1;
   margin: 0;
   min-height: 2.1rem;
@@ -4489,14 +4504,14 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   font-weight: 600;
   cursor: pointer;
 }
-.rampStrength button:hover,
-.rampStrength button[aria-checked="true"] {
+.rampStrength label:hover,
+.rampStrength label:has(input:checked) {
   background: var(--pa);
 }
-.rampStrength button[aria-checked="true"] {
+.rampStrength label:has(input:checked) {
   font-weight: 700;
 }
-.rampChoice button:disabled {
+.rampChoice label:has(input:disabled) {
   cursor: default;
 }
 .reviewGraph {

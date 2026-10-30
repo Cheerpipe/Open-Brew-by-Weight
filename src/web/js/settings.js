@@ -1008,8 +1008,8 @@ const RAMP_CURVE_NAMES = [
       late: __WEBUI_TEXT__("settings.ramp_slow_late"),
     },
   };
-// The curve and hardness buttons stand in for their hidden selects, which
-// keep the form's edit, autosave and revert behavior. Each curve button draws
+// The curve and hardness radios stand in for their hidden selects, which
+// keep the form's edit, autosave and revert behavior. Each curve label draws
 // and names the curve it picks at the current hardness.
 function rampIcon(curve) {
   let d = "M0 3H8";
@@ -1022,22 +1022,23 @@ function syncRampChoice(side) {
     box = type.closest(".rampChoice");
   if (!box._bound) {
     box._bound = true;
-    box.addEventListener("click", (e) => {
-      const b = e.target.closest("button[data-ramp]"),
-        select = b && $(b.dataset.ramp);
-      if (!select || select.disabled || select.value === b.value) return;
-      select.value = b.value;
+    box.addEventListener("change", (e) => {
+      const radio = e.target.closest("input[data-ramp]"),
+        select = radio && $(radio.dataset.ramp);
+      if (!select || select.disabled) return;
+      select.value = radio.value;
       select.dispatchEvent(new Event("change"));
     });
   }
-  for (const b of box.querySelectorAll("button[data-ramp]")) {
-    const select = $(b.dataset.ramp);
-    b.setAttribute("aria-checked", b.value === select.value);
-    b.disabled = select.disabled;
+  for (const radio of box.querySelectorAll("input[data-ramp]")) {
+    const select = $(radio.dataset.ramp);
+    radio.checked = radio.value === select.value;
+    radio.disabled = select.disabled;
     if (select !== type) continue;
-    const curve = R.rampCurveIndex(b.value, hardness.value);
-    b.querySelector("path").setAttribute("d", rampIcon(curve));
-    b.lastChild.textContent = RAMP_CURVE_NAMES[curve];
+    const curve = R.rampCurveIndex(radio.value, hardness.value),
+      label = radio.closest("label");
+    label.querySelector("path").setAttribute("d", rampIcon(curve));
+    label.lastChild.textContent = RAMP_CURVE_NAMES[curve];
   }
 }
 // The page header shrinks while scrolling on phones: its measured bottom
