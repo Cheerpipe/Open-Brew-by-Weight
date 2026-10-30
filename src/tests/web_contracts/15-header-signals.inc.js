@@ -322,3 +322,8 @@ if (!css.includes('#bluetoothSignal[data-level="0"] path{opacity:.12}') ||
     /#bluetoothSignal[^{]*svg>g/.test(css) || /id="bluetoothSignal"[^]*?signalSlash[^]*?<\/button>/.test(html)) {
   throw new Error('The disconnected Bluetooth icon must dim as a whole without a slash');
 }
+// The companion and cloud icons need the radios' OFF dimming too: the muted
+// color alone still reads as active in dark mode.
+if (!css.includes('#companionSignal[data-level=off] svg,#micraSignal[data-level=off] svg{opacity:.12}')) {
+  throw new Error('The disconnected companion and cloud icons must dim like the radios');
+}

@@ -215,6 +215,10 @@ body {
 #micraSignal[data-level="off"] {
   color: var(--mu);
 }
+#companionSignal[data-level="off"] svg,
+#micraSignal[data-level="off"] svg {
+  opacity: 0.12;
+}
 .signalSlash {
   display: none;
 }
