@@ -56,8 +56,8 @@ void OpenBrewByWeightNetwork::companionLogService() {
   TaskLockGuard lock(dataMux_);
   CompanionLinkSlot *slot = const_cast<CompanionLinkSlot *>(companionActiveLink());
   if (slot == nullptr || slot->closing) return;
-  const bool pendingLog = latest != 0 && static_cast<int32_t>(latest - slot->logSent) > 0;
-  const bool urgentPending = urgent != 0 && static_cast<int32_t>(urgent - slot->logSent) > 0;
+  const bool pendingLog = companionLogPending(latest, slot->logSent);
+  const bool urgentPending = companionLogUrgent(urgent, latest, slot->logSent);
   const bool hold = companionLogHoldActive();
   if (pendingLog && hold) {
     // Queue-and-flush: everything in order when the hold ends.
@@ -93,8 +93,8 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
   const uint32_t urgent = callbacks_.debugLogLatestAlarmSequence
                               ? callbacks_.debugLogLatestAlarmSequence()
                               : 0;
-  const bool pendingLog = latest != 0 && static_cast<int32_t>(latest - sent.logSent) > 0;
-  const bool urgentPending = urgent != 0 && static_cast<int32_t>(urgent - sent.logSent) > 0;
+  const bool pendingLog = companionLogPending(latest, sent.logSent);
+  const bool urgentPending = companionLogUrgent(urgent, latest, sent.logSent);
   if (!companionLogFlushDue(true, pendingLog, companionLogHoldActive(), urgentPending,
                             sent.logCatchUp, g_companion.logHeard))
     return false;

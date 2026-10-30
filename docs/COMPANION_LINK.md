@@ -241,7 +241,7 @@ secrets directory and never in logs.
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
-| `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the companion's newest stored `(boot, sequence)`; the controller maps a boot change to `after` 0. Sent after `ready` on every session while `cfg.log` is true |
+| `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the companion's newest stored `(boot, sequence)`; the controller maps a boot change to `after` 0. Sent after `ready` on every session while `cfg.log` is true; `on:false` asks the controller to stop the stream (the switch itself is `cfg`'s to say) |
 
 Builds without La Marzocco know only `ping` (its `up` is ignored there) and
 `logsub`; the other four are types they do not know and ignore.

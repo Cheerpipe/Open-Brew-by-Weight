@@ -787,13 +787,27 @@ inline char companionLogLevelLetter(LogLevel level) {
   }
 }
 
+// Whether events wait for the link: anything the companion has not got. A
+// watermark that moved BACK counts too — the ring was cleared below the
+// companion's cursor, and until the reset frame lands its view is wrong, so
+// it is as urgent as a warning.
+inline bool companionLogPending(uint32_t latest, uint32_t sent) {
+  return latest != 0 && latest != sent;
+}
+
+inline bool companionLogUrgent(uint32_t urgent, uint32_t latest, uint32_t sent) {
+  return (urgent != 0 && static_cast<int32_t>(urgent - sent) > 0) ||
+         (latest != 0 && static_cast<int32_t>(latest - sent) < 0);
+}
+
 // Whether the network task may flush pending log events now (plan G and
 // principle 9). A hold — a scaled shot, a scale connection or discovery, the
 // BLE quiet interval — always defers: queue-and-flush, never drop. Outside a
-// hold, an urgent event (CRITICAL/ERROR/WARNING) or a catch-up (subscribe,
-// backlog, a hold that just ended) flushes at once; plain events wait for a
-// frame to have arrived since the last flush, so they ride the companion's
-// 15/120 s ping and add no radio wakeup of their own.
+// hold, an urgent event (CRITICAL/ERROR/WARNING, or a cleared ring) or a
+// catch-up (subscribe, backlog, a hold that just ended) flushes at once;
+// plain events wait for a frame to have arrived since the last flush, so
+// they ride the companion's 15/120 s ping and add no radio wakeup of their
+// own.
 inline bool companionLogFlushDue(bool subscribed, bool pending, bool holdActive,
                                  bool urgentPending, bool catchUp, bool heardSinceFlush) {
   return subscribed && pending && !holdActive &&

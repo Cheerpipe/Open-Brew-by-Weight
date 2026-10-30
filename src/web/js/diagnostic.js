@@ -221,7 +221,7 @@ function clearLogView() {
   logHistory = [];
   logHistoryNext = null;
   logHistoryDone = false;
-  updateLogHistoryControls();
+  logHistoryControls();
   const d = $("logDropped"),
     el = $("log");
   if (d) d.hidden = true;
@@ -428,7 +428,7 @@ function renderScreen() {
     " · " +
     location.host;
   $("dUiOffline").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
-  updateLogHistoryControls();
+  logHistoryControls();
 }
 // The paired companion as the controller sees it.
 function renderCompanionDiagnostic(c) {
@@ -1508,7 +1508,7 @@ function renderLog() {
     o +=
       (e.w ? R.formatWallTimeLocal(e.w) : "+" + (e.ms / 1000).toFixed(3) + "s") +
       " " +
-      hn[e.l] +
+      (hn[e.l] || "INFO") +
       " [" +
       e.c +
       "] " +
@@ -1587,9 +1587,9 @@ async function loadLogOlder() {
   if (logHistoryBusy || !logHistoryAvailable()) return;
   logHistoryBusy = true;
   try {
+    const next = logHistoryNext;
     const url =
-      "/__companion/log?limit=100" +
-      (logHistoryNext ? `&boot=${logHistoryNext.boot}&before=${logHistoryNext.before}` : "");
+      "/__companion/log?limit=100" + (next ? `&boot=${next.boot}&before=${next.before}` : "");
     const reply = await fetch(url, { cache: "no-store" });
     if (!reply.ok) throw Error(String(reply.status));
     const page = await reply.json();
@@ -1603,10 +1603,10 @@ async function loadLogOlder() {
     logHistoryDone = true; // A store that does not answer stops offering more.
   } finally {
     logHistoryBusy = false;
-    updateLogHistoryControls();
+    logHistoryControls();
   }
 }
-function updateLogHistoryControls() {
+function logHistoryControls() {
   const here = logHistoryAvailable();
   $("logOlderButton").hidden = !here || logHistoryDone;
 }
@@ -1617,7 +1617,7 @@ function renderLogHistoryNote() {
     note = $("logHistoryNote");
   note.hidden = !(c?.paired && c.log !== false && !logHistoryAvailable());
   if (!note.hidden) note.textContent = __WEBUI_TEXT__("diagnostic.log_in_companion");
-  updateLogHistoryControls();
+  logHistoryControls();
 }
 export function applyStatus(s) {
   applyDiagnosticStatus(s);

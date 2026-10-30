@@ -816,6 +816,17 @@ static void testLogFlushDue() {
   CHECK(companionLogFlushDue(true, true, false, false, true, false));
   // An urgent event (CRITICAL/ERROR/WARNING) flushes at once outside holds.
   CHECK(companionLogFlushDue(true, true, false, true, false, false));
+  // A watermark that moved back — the ring cleared below the companion's
+  // cursor — is pending and urgent: without this, new events after a clear
+  // never look newer than the stale cursor and the stream stays silent.
+  CHECK(companionLogPending(3, 500));
+  CHECK(companionLogUrgent(0, 3, 500));
+  CHECK(companionLogUrgent(2, 3, 500));
+  CHECK(!companionLogPending(500, 500));
+  CHECK(!companionLogPending(0, 500));
+  CHECK(companionLogPending(501, 500));
+  CHECK(!companionLogUrgent(0, 501, 500));
+  CHECK(companionLogUrgent(501, 501, 500));
   CHECK(companionLogLevelLetter(LogLevel::CRITICAL) == 'c');
   CHECK(companionLogLevelLetter(LogLevel::ERROR) == 'e');
   CHECK(companionLogLevelLetter(LogLevel::WARNING) == 'w');
