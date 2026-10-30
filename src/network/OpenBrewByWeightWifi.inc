@@ -643,9 +643,8 @@ bool OpenBrewByWeightNetwork::beginStationConnect(const NetworkSettingsSnapshot 
   } else {
     lifecycleLog("WiFi STA connecting; AP disabled");
   }
-  // Do NOT pre-scan and lock a BSSID: an incomplete scan (BLE coexistence)
-  // often sees only the weak BSS and then forces sticky association to it.
-  // Let the IDF connect path scan every channel and sort by RSSI.
+  // No BSSID pre-scan lock: an incomplete scan (BLE coexistence) often sees only
+  // the weak BSS and forces sticky association; the IDF path sorts by RSSI.
   WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
   WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
   if (!feedCurrentTaskWatchdog()) {
@@ -654,8 +653,7 @@ bool OpenBrewByWeightNetwork::beginStationConnect(const NetworkSettingsSnapshot 
 
   staConnectStartedAtMs_ = millis();
   staReconnectAttemptAtMs_ = staConnectStartedAtMs_;
-  // A user action, link loss or settings change starts a fresh backoff;
-  // the automatic retry path doubles it after this call returns.
+  // A user action, link loss or settings change resets the backoff the retry path doubles.
   staReconnectIntervalMs_ = STA_RECONNECT_INTERVAL_MS;
   lifecycleLog("WiFi STA associating with all-channel RSSI sort");
   // begin(false): enable STA and wait for STA_START without connect().
@@ -667,6 +665,8 @@ bool OpenBrewByWeightNetwork::beginStationConnect(const NetworkSettingsSnapshot 
     return false;
   }
   applyWifiPowerSave();
+  // HT20: each burst leaves half the channel free for the BLE scale link.
+  (void)esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW20);
   applyStationAddressConfig(settings);
   staDisconnectDetail_.store(0);
   if (!WiFi.STA.connect(settings.staSsid,
@@ -926,6 +926,7 @@ bool OpenBrewByWeightNetwork::ensureAccessPoint(uint32_t now, bool force) {
   fillSoftApSsid(apSsid, sizeof(apSsid));
   const bool apReady =
       configured && WiFi.softAP(apSsid, settings.devicePassword);
+  if (apReady) (void)esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW20);  // HT20 like STA
   const bool httpReady =
       keepHttp || (wantHttp && apReady && startHttpServer());
   networkStartedAtMs_ = now;

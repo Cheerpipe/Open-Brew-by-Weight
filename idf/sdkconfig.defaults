@@ -107,6 +107,12 @@ CONFIG_LWIP_TCP_RECVMBOX_SIZE=16
 # Slots are allocated per open socket, and its buffers prefer PSRAM.
 CONFIG_LWIP_MAX_SOCKETS=18
 CONFIG_LWIP_DHCPS_MAX_STATION_NUM=4
+# No periodic gratuitous ARP: the 60 s broadcast was one TX wakeup per minute
+# re-flooded to the whole LAN, against the traffic-economy rule. Offline risk
+# is none: association lives at 802.11 level, and a router that aged our ARP
+# entry gets an on-demand answer (unicast requests reach the DTIM-sleeping
+# station buffered, like any unicast).
+# CONFIG_LWIP_ESP_GRATUITOUS_ARP is not set
 # mDNS advertises only (hostname + _http._tcp): two interfaces (STA + SoftAP),
 # one service, no browse/CLI/multi-instance query machinery. Arduino pulls
 # CONFIG_ETH_ENABLED in transitively, so the predefined Ethernet slot must be

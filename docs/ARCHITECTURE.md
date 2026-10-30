@@ -67,7 +67,10 @@ Apply both whenever the requirement can still be met without a functional or
 technical tradeoff, such as added latency in safety- or brew-relevant
 feedback, lost diagnostics, or weaker reliability. When an exception is
 necessary, document the reason with the change. Modem sleep stays enabled;
-these rules reduce wakeups rather than disabling power saving.
+these rules reduce wakeups rather than disabling power saving. The station
+and SoftAP stay on HT20 channel width — each burst then leaves the other
+half of the channel to the BLE scale — and the periodic gratuitous ARP
+broadcast stays off; routers that age the ARP entry get an on-demand answer.
 
 On Linea Micra builds with a companion on the La Marzocco route, the
 controller's own La Marzocco traffic stops entirely: no TLS socket, no 15 s
