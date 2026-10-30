@@ -35,9 +35,14 @@ constexpr size_t COMPANION_MAC_HEX = 32;  // first 16 bytes of the frame HMAC
 constexpr size_t COMPANION_ID_TEXT = 37, COMPANION_NAME_TEXT = 33,
                  COMPANION_VERSION_TEXT = 25, COMPANION_ADDRESS_TEXT = 48;
 constexpr uint32_t COMPANION_MAGIC = 0x434D504EU;  // "CMPN"
-constexpr uint16_t COMPANION_STORED_VERSION = 1;
+constexpr uint16_t COMPANION_STORED_VERSION = 2;
+constexpr size_t COMPANION_STORED_V1_BYTES = 328;  // version 1: no logSwitch tail
 
-// One NVS blob. Missing or invalid means "never paired".
+// One NVS blob. Missing or invalid means "never paired". The v2 tail
+// (`logSwitch`) rides after the checksum: a v1 blob is the same bytes without
+// it, so promotion is a version bump plus the default, and only that switch
+// is outside the checksum's coverage (corruption there changes a switch, not
+// the pairing).
 struct CompanionStored {
   uint32_t magic = COMPANION_MAGIC;
   uint16_t version = COMPANION_STORED_VERSION;
@@ -55,8 +60,9 @@ struct CompanionStored {
   char forgottenId[COMPANION_ID_TEXT] = {};
   uint8_t forgottenSecret[COMPANION_SECRET_BYTES] = {};
   uint32_t checksum = 0;
+  uint8_t logSwitch = 1;  // "Diagnostic log through the companion" (v2)
 };
-static_assert(sizeof(CompanionStored) == 328, "companion blob layout changed");
+static_assert(sizeof(CompanionStored) == 332, "companion blob layout changed");
 
 inline uint32_t companionChecksum(const CompanionStored &stored) {
   return webAccessFnv(&stored, offsetof(CompanionStored, checksum));
@@ -73,7 +79,25 @@ inline bool validCompanionStored(const CompanionStored &stored) {
   return stored.magic == COMPANION_MAGIC && stored.version == COMPANION_STORED_VERSION &&
          stored.structureSize == sizeof(CompanionStored) && stored.paired <= 1 &&
          stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
+         stored.logSwitch <= 1 && stored.checksum == companionChecksum(stored);
+}
+
+// A v1 blob read raw into the first COMPANION_STORED_V1_BYTES: the same
+// fields, no tail. Promotion keeps the pairing and turns the new switch on
+// (the switches default on, plan T); the caller persists the v2 layout.
+inline bool validCompanionStoredV1(const CompanionStored &stored) {
+  return stored.magic == COMPANION_MAGIC && stored.version == 1 &&
+         stored.structureSize == COMPANION_STORED_V1_BYTES && stored.paired <= 1 &&
+         stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
          stored.checksum == companionChecksum(stored);
+}
+
+inline void promoteCompanionStoredV1(CompanionStored &stored) {
+  stored.version = COMPANION_STORED_VERSION;
+  stored.structureSize = sizeof(CompanionStored);
+  stored.logSwitch = 1;
+  // version and structureSize sit inside the checksummed prefix.
+  stored.checksum = companionChecksum(stored);
 }
 
 // --- Request validation and peers -----------------------------------------
@@ -520,7 +544,8 @@ struct CompanionRequest {
   bool keyIssued = false;  // controllerKey reached the companion in a response
   bool revealed = false;   // companionKey holds the key matching the commitment
   bool approving = false;  // the code matched; the network task derives S
-  bool lmSwitch = true;    // the switch chosen in the approval panel
+  bool lmSwitch = true,    // the switches chosen in the approval panel
+       logSwitch = true;
   uint8_t wrongCodes = 0;
   uint32_t serial = 0;  // names the request key the network task made
   uint32_t untilMs = 0;
@@ -637,7 +662,7 @@ inline const char *companionPairPoll(CompanionPairing &pairing, const char *id, 
 // `expected` is the request's code (companionSas). Three wrong codes deny it.
 inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, uint32_t code,
                                                    uint32_t expected, bool lmSwitch,
-                                                   uint32_t now) {
+                                                   bool logSwitch, uint32_t now) {
   companionPairTick(pairing, now);
   CompanionRequest &request = pairing.request;
   if (request.state != CompanionPairState::PENDING || request.approving)
@@ -650,6 +675,7 @@ inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, ui
   }
   request.approving = true;
   request.lmSwitch = lmSwitch;
+  request.logSwitch = logSwitch;
   return CompanionApproveResult::OK;
 }
 
@@ -682,6 +708,7 @@ inline void companionPairComplete(CompanionPairing &pairing, CompanionStored &st
   }
   stored.paired = 1;
   stored.lmSwitch = request.lmSwitch ? 1 : 0;
+  stored.logSwitch = request.logSwitch ? 1 : 0;
   memcpy(stored.secret, secret, COMPANION_SECRET_BYTES);
   memcpy(stored.publicKey, request.companionKey, COMPANION_KEY_BYTES);
   memcpy(stored.id, request.id, sizeof(stored.id));
@@ -731,9 +758,15 @@ struct CompanionLinkSlot {
   const char *closeReason = nullptr;
   // Outbox sequences already sent in this session; the first send is the
   // whole snapshot.
-  bool snapshotSent = false, sentUi = true;
+  bool snapshotSent = false, sentUi = true, sentLog = true;
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
   char sentDeviceName[DEVICE_NAME_CAPACITY] = {};  // `dev` frame already sent
+  // Diagnostic log stream (plan 2B). httpd records the companion's `logsub`
+  // request verbatim (logWant*); the network task applies it against this
+  // boot's id and owns everything after: whether the stream runs, the sent
+  // cursor and whether a catch-up is paging a backlog across passes.
+  bool logWant = false, logApplied = true, logSubscribed = false, logCatchUp = false;
+  uint32_t logWantBoot = 0, logWantAfter = 0, logSent = 0;
 };
 
 // The device name frame is due on every new session (an empty sent copy) and
@@ -741,6 +774,30 @@ struct CompanionLinkSlot {
 inline bool companionDeviceNameDue(const CompanionLinkSlot &slot, const char *deviceName) {
   return deviceName[0] != '\0' &&
          strncmp(slot.sentDeviceName, deviceName, DEVICE_NAME_CAPACITY) != 0;
+}
+
+// The one-letter level of a link `log` frame event.
+inline char companionLogLevelLetter(LogLevel level) {
+  switch (level) {
+    case LogLevel::CRITICAL: return 'c';
+    case LogLevel::ERROR: return 'e';
+    case LogLevel::WARNING: return 'w';
+    case LogLevel::DEBUG: return 'd';
+    default: return 'i';
+  }
+}
+
+// Whether the network task may flush pending log events now (plan G and
+// principle 9). A hold — a scaled shot, a scale connection or discovery, the
+// BLE quiet interval — always defers: queue-and-flush, never drop. Outside a
+// hold, an urgent event (CRITICAL/ERROR/WARNING) or a catch-up (subscribe,
+// backlog, a hold that just ended) flushes at once; plain events wait for a
+// frame to have arrived since the last flush, so they ride the companion's
+// 15/120 s ping and add no radio wakeup of their own.
+inline bool companionLogFlushDue(bool subscribed, bool pending, bool holdActive,
+                                 bool urgentPending, bool catchUp, bool heardSinceFlush) {
+  return subscribed && pending && !holdActive &&
+         (urgentPending || catchUp || heardSinceFlush);
 }
 
 struct CompanionState {
@@ -752,6 +809,11 @@ struct CompanionState {
   uint32_t changedAtMs = 0;   // the link last came up or went down; 0: not since boot
   uint32_t peerProtocol = 0;  // the paired companion's refused protocol; 0: none
   uint32_t lastCommandSent = 0;  // a command id is sent once, across sessions
+  // Diagnostic log stream: inbound frames since the last flush (the
+  // piggyback heartbeat), when it last flushed, and the events this boot
+  // reported missing to the companion.
+  bool logHeard = false;
+  uint32_t logFlushAtMs = 0, logGaps = 0;
   CompanionRelay relay = {};
   bool dirty = false;
 };
@@ -759,11 +821,15 @@ struct CompanionState {
 // Diagnostic → Companion; strings are sanitized on store.
 struct CompanionSnapshot {
   bool paired = false, lmSwitch = false, linkOpen = false, upstream = false, ui = true,
-       relayReady = false;
+       relayReady = false, logSwitch = false;
   uint32_t relayRejects = 0;
   uint8_t protocol = 0;   // the open link's; 0 while down
   int32_t linkAgeS = -1;  // since the link came up or went down; -1: not since boot
   uint32_t peerProtocol = 0, reconnects = 0, authFailures = 0, routeSwitches = 0, commands = 0;
+  // The diagnostic log stream: the switch, the sent cursor, the age of the
+  // last flush (-1: never this boot) and the events reported missing.
+  uint32_t logCursor = 0, logGaps = 0;
+  int32_t logFlushS = -1;
   const char *route = "direct", *reason = "none";
   char name[COMPANION_NAME_TEXT] = {}, address[COMPANION_ADDRESS_TEXT] = {},
        version[COMPANION_VERSION_TEXT] = {};

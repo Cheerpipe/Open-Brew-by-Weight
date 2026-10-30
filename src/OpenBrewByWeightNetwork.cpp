@@ -27,6 +27,7 @@
 #include <OpenBrewByWeightVersion.h>
 #include "OpenBrewByWeightWatchdog.h"
 #include "OpenBrewByWeightWebAccessStore.h"
+#include "OpenBrewByWeightWebhook.h"
 
 #include "OpenBrewByWeightWebAssetsGzip.h"
 

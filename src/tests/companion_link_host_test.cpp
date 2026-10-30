@@ -585,7 +585,7 @@ static void testCommitThenReveal() {
   CHECK(!companionPairReveal(pairing, kOtherId, key, true, now));
   pairing.request.keyReady = true;
   CHECK(!companionCodeReady(pairing.request));
-  CHECK(companionPairApprove(pairing, 1, 1, true, now) == CompanionApproveResult::NOT_READY);
+  CHECK(companionPairApprove(pairing, 1, 1, true, true, now) == CompanionApproveResult::NOT_READY);
   // Revealing before controllerKey was issued shows a device in the middle.
   CHECK(!companionPairReveal(pairing, kCompanionId, key, true, now));
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
@@ -610,7 +610,7 @@ static void testCommitThenReveal() {
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
                              commitment, now + 1) == CompanionPairResult::PENDING);
   CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 2) && companionCodeReady(pairing.request));
-  CHECK(companionPairApprove(pairing, 5, 5, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(pairing, 5, 5, true, true, now) == CompanionApproveResult::OK);
   // A retry while the secret is derived is harmless; another key is refused, not denied.
   CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 3));
   uint8_t other[COMPANION_KEY_BYTES];
@@ -639,13 +639,13 @@ static void testPairing() {
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
   // The code waits for both keys, then three wrong codes deny it.
-  CHECK(companionPairApprove(pairing, 1, 1, true, now) == CompanionApproveResult::NOT_READY);
+  CHECK(companionPairApprove(pairing, 1, 1, true, true, now) == CompanionApproveResult::NOT_READY);
   reveal(pairing, key, now);
-  CHECK(companionPairApprove(pairing, 1, 2, true, now) == CompanionApproveResult::WRONG_CODE);
-  CHECK(companionPairApprove(pairing, 1, 2, true, now) == CompanionApproveResult::WRONG_CODE);
-  CHECK(companionPairApprove(pairing, 1, 2, true, now) == CompanionApproveResult::DENIED);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, now) == CompanionApproveResult::WRONG_CODE);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, now) == CompanionApproveResult::WRONG_CODE);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, now) == CompanionApproveResult::DENIED);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
-  CHECK(companionPairApprove(pairing, 2, 2, true, now) == CompanionApproveResult::NOT_PENDING);
+  CHECK(companionPairApprove(pairing, 2, 2, true, true, now) == CompanionApproveResult::NOT_PENDING);
   // One new request per 5 s.
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 4999) == CompanionPairResult::RATE_LIMITED);
@@ -680,9 +680,9 @@ static void testPairing() {
   now += 5000;
   // Approval: the network task derives S, which makes the pairing.
   reveal(pairing, key, now);
-  CHECK(companionPairApprove(pairing, 7, 7, false, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(pairing, 7, 7, false, true, now) == CompanionApproveResult::OK);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now + COMPANION_REQUEST_MS + 5), "pending"));
-  CHECK(companionPairApprove(pairing, 7, 7, false, now) == CompanionApproveResult::NOT_PENDING);
+  CHECK(companionPairApprove(pairing, 7, 7, false, true, now) == CompanionApproveResult::NOT_PENDING);
   CHECK(!companionPairIgnore(pairing, now));
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
@@ -712,7 +712,7 @@ static void testPairing() {
   CHECK(companionPairRequest(next, false, kOtherId, "Other", "", "192.168.1.10", commitment, now) ==
         CompanionPairResult::NEW);
   reveal(next, key, now);
-  CHECK(companionPairApprove(next, 3, 3, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(next, 3, 3, true, true, now) == CompanionApproveResult::OK);
   companionPairComplete(next, stored, secret);
   CHECK(stored.paired == 1 && stored.forgotten == 1 &&
         companionHelloVerdict(stored, kCompanionId, 1) == CompanionHello::ERASE &&
@@ -766,6 +766,73 @@ static void testStoredBlob() {
   copy.checksum = companionChecksum(copy);
   CHECK(!validCompanionStored(copy));
   CHECK(offsetof(CompanionStored, uiOff) == 11);
+  // The log switch rides as the v2 tail, right after the checksum; the last
+  // three bytes are alignment padding.
+  CHECK(offsetof(CompanionStored, logSwitch) == 328);
+  CHECK(sizeof(CompanionStored) == 332);
+  copy = stored;
+  copy.logSwitch = 2;
+  copy.checksum = companionChecksum(copy);
+  CHECK(!validCompanionStored(copy));
+}
+
+static void testStoredV1Promotion() {
+  // A version 1 blob: the same fields, no logSwitch tail (328 bytes).
+  CompanionStored v1;
+  v1.paired = 1;
+  memcpy(v1.id, kCompanionId, sizeof(kCompanionId));
+  memcpy(v1.secret, "0123456789abcdef0123456789abcdef", 32);
+  v1.version = 1;
+  v1.structureSize = 328;
+  v1.checksum = companionChecksum(v1);
+  CHECK(validCompanionStoredV1(v1));
+  CHECK(!validCompanionStored(v1));  // not v2 until promoted
+  CompanionStored promoted = v1;
+  promoteCompanionStoredV1(promoted);
+  CHECK(validCompanionStored(promoted));  // re-finalized as v2
+  CHECK(promoted.logSwitch == 1);        // the switches default on
+  CHECK(promoted.paired == 1 && promoted.version == COMPANION_STORED_VERSION);
+  CHECK(memcmp(promoted.secret, v1.secret, 32) == 0);  // the pairing survives
+  // A corrupted v1 blob does not promote.
+  CompanionStored bad = v1;
+  bad.secret[7] ^= 0x40;
+  CHECK(!validCompanionStoredV1(bad));
+  // A v2 blob is not v1 either.
+  CHECK(!validCompanionStoredV1(promoted));
+}
+
+static void testLogFlushDue() {
+  // (subscribed, pending, hold, urgent, catchUp, heard)
+  // Not subscribed: nothing flows even with everything else true.
+  CHECK(!companionLogFlushDue(false, true, false, true, true, true));
+  // Nothing pending: nothing to flush.
+  CHECK(!companionLogFlushDue(true, false, false, true, true, true));
+  // A hold always defers: queue-and-flush, never drop (plan G, principle 9).
+  CHECK(!companionLogFlushDue(true, true, true, true, true, true));
+  // Plain events wait for a frame since the last flush (the ping heartbeat).
+  CHECK(!companionLogFlushDue(true, true, false, false, false, false));
+  CHECK(companionLogFlushDue(true, true, false, false, false, true));
+  // A catch-up (subscribe, backlog, a hold that just ended) flushes at once.
+  CHECK(companionLogFlushDue(true, true, false, false, true, false));
+  // An urgent event (CRITICAL/ERROR/WARNING) flushes at once outside holds.
+  CHECK(companionLogFlushDue(true, true, false, true, false, false));
+  CHECK(companionLogLevelLetter(LogLevel::CRITICAL) == 'c');
+  CHECK(companionLogLevelLetter(LogLevel::ERROR) == 'e');
+  CHECK(companionLogLevelLetter(LogLevel::WARNING) == 'w');
+  CHECK(companionLogLevelLetter(LogLevel::INFO) == 'i');
+  CHECK(companionLogLevelLetter(LogLevel::DEBUG) == 'd');
+  // The ring tracks the newest urgent event for that flush.
+  DebugRingBuffer ring;
+  CHECK(ring.latestAlarmSequence() == 0);
+  ring.add(1000, 0, LogLevel::INFO, DebugCategory::STATE, DebugCode::STATE_TRANSITION);
+  CHECK(ring.latestAlarmSequence() == 0);
+  ring.add(2000, 0, LogLevel::WARNING, DebugCategory::SYSTEM, DebugCode::BOOT_BANNER);
+  CHECK(ring.latestAlarmSequence() == 2);
+  ring.add(3000, 0, LogLevel::ERROR, DebugCategory::NETWORK, DebugCode::STATE_TRANSITION);
+  ring.add(4000, 0, LogLevel::DEBUG, DebugCategory::STATE, DebugCode::STATE_TRANSITION);
+  CHECK(ring.latestAlarmSequence() == 3);
+  ring.clear();
+  CHECK(ring.latestAlarmSequence() == 0);
 }
 
 static void testLiveness() {
@@ -799,6 +866,8 @@ int main() {
   testCommitThenReveal();
   testPairing();
   testStoredBlob();
+  testStoredV1Promotion();
+  testLogFlushDue();
   testLiveness();
   std::puts("companion_link_host_test: ok");
   return 0;

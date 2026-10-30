@@ -556,6 +556,10 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.reconnects", static_cast<unsigned long>(companion.reconnects));
     delta.field("companion.authFailures", static_cast<unsigned long>(companion.authFailures));
     delta.field("companion.ui", bool(companion.ui));
+    delta.field("companion.log", bool(companion.logSwitch));
+    delta.field("companion.logCursor", static_cast<unsigned long>(companion.logCursor));
+    delta.field("companion.logFlushS", "%ld", static_cast<long>(companion.logFlushS));
+    delta.field("companion.logGaps", static_cast<unsigned long>(companion.logGaps));
     delta.field("companion.relay", "\"%s\"", companion.relayReady ? "ready" : "down");
     delta.field("companion.relayRejects", static_cast<unsigned long>(companion.relayRejects));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD

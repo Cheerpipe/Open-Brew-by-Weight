@@ -474,6 +474,11 @@ uint32_t debugLogLatestSequence() {
   return debugLog.latestSequence();
 }
 
+uint32_t debugLogLatestAlarmSequence() {
+  TaskLockGuard lock(debugLogMutex);
+  return debugLog.latestAlarmSequence();
+}
+
 size_t copyDebugEvents(uint32_t afterSequence, DebugEvent *output,
                        size_t capacity,
                        DebugLogReadMetadata *metadata = nullptr) {

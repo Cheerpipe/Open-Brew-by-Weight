@@ -69,6 +69,8 @@ const char *eventName(WebhookEventType type) {
   return "unknown";
 }
 
+}  // namespace
+
 void deviceId(char *output, size_t capacity) {
   uint8_t mac[6] = {};
   if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK) {
@@ -78,8 +80,6 @@ void deviceId(char *output, size_t capacity) {
   snprintf(output, capacity, "%02X:%02X:%02X:%02X:%02X:%02X",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
-
-}  // namespace
 
 bool WebhookDispatcher::begin(const WebhookConfig &config) {
   if (lifecycleMutex_ != nullptr || workerStopped_ != nullptr) return false;

@@ -2360,6 +2360,7 @@ class DebugRingBuffer {
     count_ = 0;
     writeIndex_ = 0;
     overwritten_ = 0;
+    alarmSequence_ = 0;
     for (DebugEvent &event : events_) {
       event = DebugEvent{};
     }
@@ -2378,6 +2379,7 @@ class DebugRingBuffer {
     if (nextSequence_ == 0) {
       nextSequence_ = 1;
     }
+    if (level <= LogLevel::WARNING) alarmSequence_ = event.sequence;
     event.atMs = atMs;
     event.wallSec = wallSec;
     event.level = level;
@@ -2466,6 +2468,9 @@ class DebugRingBuffer {
 
   uint32_t overwritten() const { return overwritten_; }
   uint32_t latestSequence() const { return count_ == 0 ? 0 : nextSequence_ - 1; }
+  // The newest CRITICAL/ERROR/WARNING event: the companion link flushes those
+  // at once instead of waiting for the next piggyback heartbeat (plan G).
+  uint32_t latestAlarmSequence() const { return alarmSequence_; }
  private:
   static bool sequenceAfter(uint32_t sequence, uint32_t reference) {
     return sequence != reference && static_cast<int32_t>(sequence - reference) > 0;
@@ -2479,6 +2484,7 @@ class DebugRingBuffer {
 
   DebugEvent events_[DEBUG_EVENT_CAPACITY] = {};
   uint32_t nextSequence_ = 1;
+  uint32_t alarmSequence_ = 0;
   size_t count_ = 0;
   size_t writeIndex_ = 0;
   uint32_t overwritten_ = 0;

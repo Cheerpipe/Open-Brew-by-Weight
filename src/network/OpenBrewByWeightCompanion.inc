@@ -270,10 +270,13 @@ bool companionAeadOpenBytes(const uint8_t key[32], const uint8_t nonce[12],
 
 void OpenBrewByWeightNetwork::beginCompanion() {
   CompanionStored stored;
-  if (loadCompanionStored(stored) == CompanionLoad::INVALID)
+  const CompanionLoad loaded = loadCompanionStored(stored);
+  if (loaded == CompanionLoad::INVALID)
     lifecycleLog("Companion pairing unreadable; pair the companion again");
   g_companion = CompanionState{};
   g_companion.stored = stored;
+  // A version 1 pairing keeps working; its next switch change writes v2.
+  g_companion.dirty = loaded == CompanionLoad::PROMOTED;
   companionAwake_.store(stored.paired != 0 || stored.forgotten != 0, std::memory_order_release);
   memset(&stored, 0, sizeof(stored));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
@@ -437,17 +440,19 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.");
   if (body != ESP_OK) return body;
-  static const char *const fields[] = {"action", "code", "lm", "ui"};
+  static const char *const fields[] = {"action", "code", "lm", "ui", "log"};
   char action[12] = {}, code[8] = {};
-  bool lm = true, ui = true;
+  bool lm = true, ui = true, log = true;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 4) &&
+  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 5) &&
                jsonString(root, "action", action, sizeof(action), false);
   if (valid && jsonFieldPresent(root, "code")) valid = jsonString(root, "code", code, sizeof(code), false);
   const bool hasLm = valid && jsonFieldPresent(root, "lm");
   if (hasLm) valid = jsonBoolean(root, "lm", lm);
   const bool hasUi = valid && jsonFieldPresent(root, "ui");
   if (hasUi) valid = jsonBoolean(root, "ui", ui);
+  const bool hasLog = valid && jsonFieldPresent(root, "log");
+  if (hasLog) valid = jsonBoolean(root, "log", log);
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   if (!valid)
@@ -481,7 +486,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       if (pending.serial == serial)
         result = expected != UINT32_MAX
             ? companionPairApprove(g_companion.pairing, static_cast<uint32_t>(atol(code)),
-                                   expected, lm, now)
+                                   expected, lm, log, now)
             : pending.state == CompanionPairState::PENDING && !pending.approving
                 ? CompanionApproveResult::NOT_READY
                 : CompanionApproveResult::NOT_PENDING;
@@ -550,8 +555,9 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     for (const int fd : fds)
       if (fd >= 0) (void)httpd_sess_trigger_close(request->handle, fd);
     self.lifecycleLogf("Companion '%s' forgotten", name);
-  } else if (!strcmp(action, "switches") && (hasLm || hasUi) && (kCompanionLm || !hasLm)) {
-    bool paired, lmChanged = false, uiChanged = false, linkUp = false;
+  } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog) &&
+             (kCompanionLm || !hasLm)) {
+    bool paired, lmChanged = false, uiChanged = false, logChanged = false, linkUp = false;
     {
       TaskLockGuard lock(self.dataMux_);
       CompanionStored &stored = g_companion.stored;
@@ -559,12 +565,14 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       if (paired) {
         lmChanged = hasLm && (stored.lmSwitch != 0) != lm;
         uiChanged = hasUi && (stored.uiOff == 0) != ui;
+        logChanged = hasLog && (stored.logSwitch != 0) != log;
         if (hasLm) stored.lmSwitch = lm ? 1 : 0;
         if (hasUi) stored.uiOff = ui ? 0 : 1;
-        g_companion.dirty |= lmChanged || uiChanged;
+        if (hasLog) stored.logSwitch = log ? 1 : 0;
+        g_companion.dirty |= lmChanged || uiChanged || logChanged;
         linkUp = g_companion.active != 0;
         // Its next relayed request is stale, and the new handshake carries ui and link.
-        if (lmChanged || uiChanged) companionRelayDrop(g_companion.relay);
+        if (lmChanged || uiChanged || logChanged) companionRelayDrop(g_companion.relay);
       }
     }
     if (!paired)
@@ -580,6 +588,13 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       companionOutboxChanged();
       self.lifecycleLog(ui ? "Companion: Web UI through the companion turned on"
                            : "Companion: Web UI through the companion turned off");
+    }
+    if (logChanged) {
+      // An open link learns it from the next cfg frame; the relay handshake
+      // re-answers whether the link is needed at all.
+      companionOutboxChanged();
+      self.lifecycleLog(log ? "Companion: Diagnostic log through the companion turned on"
+                            : "Companion: Diagnostic log through the companion turned off");
     }
   } else {
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "Unknown companion action.");
@@ -936,11 +951,13 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   {
     TaskLockGuard lock(dataMux_);
     slot.inSequence = expected;
+    // Every valid frame is a piggyback heartbeat for the log stream (2B).
+    g_companion.logHeard = true;
   }
   // A type this controller does not know is a later addition: ignored, so a
   // newer companion keeps its link. Known types must be well formed; the La
   // Marzocco ones exist only on Linea Micra builds.
-  if (strcmp(type, "ping") != 0 &&
+  if (strcmp(type, "ping") != 0 && strcmp(type, "logsub") != 0 &&
       (!kCompanionLm || (strcmp(type, "lm") != 0 && strcmp(type, "creds") != 0 &&
                          strcmp(type, "res") != 0 && strcmp(type, "st") != 0))) {
     static RefusalLog unknown;
@@ -956,6 +973,20 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   if (!strcmp(type, "ping") && jsonBoolean(frame, "up", flag)) {
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     machineIntegrationCompanionPing(flag);
+#endif
+  } else if (!strcmp(type, "logsub") && jsonBoolean(frame, "on", flag) &&
+             jsonUint32(frame, "boot", first) && jsonUint32(frame, "after", second)) {
+    // The companion's log cursor for this controller: the network task maps
+    // it against this boot's id and owns everything after (2B).
+    {
+      TaskLockGuard lock(dataMux_);
+      slot.logWant = flag;
+      slot.logWantBoot = first;
+      slot.logWantAfter = second;
+      slot.logApplied = false;
+    }
+    companionOutboxChanged();
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   } else if (!strcmp(type, "lm") && jsonBoolean(frame, "sub", flag) &&
              jsonUint32(frame, "ep", first) && jsonUint32(frame, "tok", second)) {
     machineIntegrationCompanionUpstream(flag, first, second,
@@ -991,11 +1022,21 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
 
 // --- Network task --------------------------------------------------------------
 
+// The log stream's hold predicate: exactly the link's own admission rule, so
+// no log frame is transmitted during a scaled shot, a scale connection or
+// discovery, or the BLE quiet interval (plan G, principle 9).
+bool OpenBrewByWeightNetwork::companionLogHoldActive() const {
+  return outboundScaleInhibited() ||
+         scaleConnecting_.load(std::memory_order_acquire) ||
+         (outboundScaleConnected.load(std::memory_order_acquire) &&
+          outboundShotActive.load(std::memory_order_acquire));
+}
+
 void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
   // A controller that never paired has nothing to service: not even the lock.
   if (!companionAwake_.load(std::memory_order_acquire)) return;
   uint32_t serial = 0, makeKey = 0, derive = 0;
-  bool pending = false, linkOpen = false, dirty = false;
+  bool pending = false, linkOpen = false, dirty = false, logArmed = false;
   uint8_t companionKey[COMPANION_KEY_BYTES], controllerKey[COMPANION_KEY_BYTES];
   {
     TaskLockGuard lock(dataMux_);
@@ -1087,6 +1128,40 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
       companionLruAtMs_ = now;
       if (httpd_queue_work(server_, companionLruWork, this) != ESP_OK)
         companionLruPending_.store(false, std::memory_order_release);
+    }
+    // Diagnostic log (2B): the due check runs every pass, so a hold's end
+    // flushes at once instead of waiting for the next ping. The watermarks
+    // are read outside dataMux_ (the ring's own mutex, never nested here).
+    {
+      TaskLockGuard lock(dataMux_);
+      const CompanionLinkSlot *slot = companionActiveLink();
+      logArmed = slot != nullptr && !slot->closing && slot->logSubscribed &&
+                 slot->logApplied && g_companion.stored.logSwitch != 0;
+    }
+    if (logArmed) {
+      const uint32_t latest = callbacks_.debugLogLatestSequence
+                                  ? callbacks_.debugLogLatestSequence()
+                                  : 0;
+      const uint32_t urgent = callbacks_.debugLogLatestAlarmSequence
+                                  ? callbacks_.debugLogLatestAlarmSequence()
+                                  : 0;
+      TaskLockGuard lock(dataMux_);
+      CompanionLinkSlot *slot = const_cast<CompanionLinkSlot *>(companionActiveLink());
+      if (slot != nullptr && !slot->closing) {
+        const bool pendingLog =
+            latest != 0 && static_cast<int32_t>(latest - slot->logSent) > 0;
+        const bool urgentPending =
+            urgent != 0 && static_cast<int32_t>(urgent - slot->logSent) > 0;
+        const bool hold = companionLogHoldActive();
+        if (pendingLog && hold) {
+          // Queue-and-flush: everything in order when the hold ends.
+          slot->logCatchUp = true;
+        } else if (companionLogFlushDue(slot->logSubscribed, pendingLog, hold,
+                                        urgentPending, slot->logCatchUp,
+                                        g_companion.logHeard)) {
+          companionNotified_.store(true, std::memory_order_release);
+        }
+      }
     }
     if (companionNotified_.load(std::memory_order_acquire) &&
         !companionSendPending_.load(std::memory_order_acquire))
@@ -1192,40 +1267,63 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const MicraCompanionOutbox outbox = machineIntegrationCompanionOutbox();
   uint32_t generation = 0;
   [[maybe_unused]] uint32_t lastCommand = 0;
-  bool snapshot = false, ui = true;
+  bool snapshot = false, ui = true, logSwitch = true;
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
   uint8_t secret[COMPANION_SECRET_BYTES];
   {
     TaskLockGuard lock(dataMux_);
-    const CompanionLinkSlot *link = companionActiveLink();
+    // companionActiveLink's slot, mutable: the log subscription applies here.
+    CompanionLinkSlot *link = nullptr;
+    for (auto &slot : g_companion.links)
+      if (slot.fd >= 0 && slot.phase == CompanionLinkPhase::READY &&
+          slot.generation == g_companion.active)
+        link = &slot;
     if (link == nullptr || link->closing) return;
     generation = link->generation;
     snapshot = !link->snapshotSent;
+    // Apply the companion's log subscription against this boot's id (2B):
+    // a cursor from another boot restarts from the oldest retained event.
+    if (!link->logApplied) {
+      if (companionLogBootId_ == 0 && callbacks_.debugLogBootId != nullptr)
+        companionLogBootId_ = callbacks_.debugLogBootId();
+      link->logSubscribed = link->logWant;
+      link->logSent = link->logWant && link->logWantBoot == companionLogBootId_
+                          ? link->logWantAfter
+                          : 0;
+      link->logCatchUp = link->logWant;
+      link->logApplied = true;
+    }
     sent = *link;
     lastCommand = g_companion.lastCommandSent;
     ui = g_companion.stored.uiOff == 0;
+    logSwitch = g_companion.stored.logSwitch != 0;
     memcpy(deviceName, status_.deviceName, sizeof(deviceName));
     memcpy(secret, g_companion.stored.secret, sizeof(secret));
   }
   memset(sent.key, 0, sizeof(sent.key));
   memset(&companionWs().job, 0, sizeof(companionWs().job));
   uint8_t count = 0;
-  const char *uiText = ui ? "true" : "false";
-  const bool configDue =
-      snapshot || outbox.configSequence != sent.sentConfig || ui != sent.sentUi;
+  const char *uiText = ui ? "true" : "false", *logText = logSwitch ? "true" : "false";
+  const bool configDue = snapshot || outbox.configSequence != sent.sentConfig ||
+                         ui != sent.sentUi || logSwitch != sent.sentLog;
   const bool config = configDue &&
       (kCompanionLm ? companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s,"
-                                              "\"ui\":%s}",
+                                              "\"ui\":%s,\"log\":%s}",
                                        outbox.lmSwitch ? "true" : "false",
                                        outbox.websocketConnection ? "ws" : "api",
-                                       outbox.observe ? "true" : "false", uiText)
-                    : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s}", uiText));
+                                       outbox.observe ? "true" : "false", uiText, logText)
+                    : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s}", uiText,
+                                       logText));
   // The companion's label for this controller; validDeviceName's charset
-  // (letters, digits, spaces, hyphens) needs no JSON escaping.
+  // (letters, digits, spaces, hyphens) needs no JSON escaping, and `id` is
+  // its MAC text — the log store's device key (2B).
   const bool deviceDue = companionDeviceNameDue(sent, deviceName);
+  char deviceIdText[24] = {};
+  deviceId(deviceIdText, sizeof(deviceIdText));
   const bool device =
-      deviceDue && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\"}", deviceName);
+      deviceDue && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\",\"id\":\"%s\"}",
+                                    deviceName, deviceIdText);
   bool credentialsDue = false, credentials = false, routeDue = false, route = false,
        holdDue = false, hold = false, commandDue = false, command = false;
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
@@ -1253,11 +1351,94 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                               static_cast<unsigned long>(outbox.commandId), op));
 #endif
   memset(secret, 0, sizeof(secret));
+  // The diagnostic log stream (2B): one `log` body per pass, as many events
+  // as the remaining frame budget holds; the rest pages on the next pass.
+  // The events are the formatted ones the Web UI log view renders.
+  bool logBuilt = false, logMore = false;
+  uint32_t logLast = sent.logSent, logMiss = 0;
+  if (sent.logSubscribed && logSwitch) {
+    const uint32_t latest = callbacks_.debugLogLatestSequence
+                                ? callbacks_.debugLogLatestSequence()
+                                : 0;
+    const uint32_t urgent = callbacks_.debugLogLatestAlarmSequence
+                                ? callbacks_.debugLogLatestAlarmSequence()
+                                : 0;
+    const bool pendingLog =
+        latest != 0 && static_cast<int32_t>(latest - sent.logSent) > 0;
+    const bool urgentPending =
+        urgent != 0 && static_cast<int32_t>(urgent - sent.logSent) > 0;
+    if (companionLogFlushDue(true, pendingLog, companionLogHoldActive(), urgentPending,
+                             sent.logCatchUp, g_companion.logHeard)) {
+      DebugLogReadMetadata meta{};
+      uint32_t cursor = sent.logSent;
+      if (callbacks_.copyDebugEvents != nullptr)
+        (void)callbacks_.copyDebugEvents(cursor, nullptr, 0, &meta);
+      if (meta.cursorInvalid) cursor = 0;  // the ring was cleared: refill
+      logMiss = meta.missedEvents;
+      char head[72];
+      {
+        char extra[32] = "";
+        size_t extraUsed = 0;
+        if (meta.cursorInvalid)
+          extraUsed += static_cast<size_t>(
+              snprintf(extra, sizeof(extra), "\"reset\":true"));
+        if (logMiss != 0)
+          extraUsed += static_cast<size_t>(snprintf(
+              extra + extraUsed, sizeof(extra) - extraUsed, "%s\"miss\":%lu",
+              extraUsed != 0 ? "," : "", static_cast<unsigned long>(logMiss)));
+        snprintf(head, sizeof(head), "{\"t\":\"log\",\"b\":%lu,%s\"e\":[",
+                 static_cast<unsigned long>(companionLogBootId_), extra);
+      }
+      size_t start = 0;
+      for (uint8_t index = 0; index < count; ++index)
+        start += strlen(companionWs().job.bodies + start) + 1;
+      char *out = companionWs().job.bodies + start;
+      const size_t capacity = sizeof(companionWs().job.bodies) - start;
+      size_t used = static_cast<size_t>(snprintf(out, capacity, "%s", head));
+      bool first = true, full = false;
+      while (callbacks_.copyDebugEvents != nullptr && !full) {
+        DebugEvent event;
+        if (callbacks_.copyDebugEvents(cursor, &event, 1, nullptr) == 0) break;
+        const char *text = event.text;
+        char formatted[DEBUG_EVENT_TEXT_CAPACITY];
+        if (text[0] == '\0') {
+          formatDebugEventMessage(event, formatted, sizeof(formatted), FW_VERSION);
+          text = formatted;
+        }
+        if (!escapeJsonString(text, companionWs().frame, sizeof(companionWs().frame))) break;
+        char piece[DEBUG_EVENT_TEXT_CAPACITY * 6 + 96];
+        const int written = snprintf(
+            piece, sizeof(piece), "%s[%lu,%lu,%lu,\"%c\",\"%s\",\"%s\"]",
+            first ? "" : ",", static_cast<unsigned long>(event.sequence),
+            static_cast<unsigned long>(event.atMs), static_cast<unsigned long>(event.wallSec),
+            companionLogLevelLetter(event.level), debugCategoryName(event.category),
+            companionWs().frame);
+        if (written < 0 || used + static_cast<size_t>(written) + 3 >= capacity ||
+            used + static_cast<size_t>(written) + COMPANION_MAC_HEX + 40 >
+                COMPANION_FRAME_BYTES) {
+          full = true;
+          break;
+        }
+        memcpy(out + used, piece, static_cast<size_t>(written) + 1);
+        used += static_cast<size_t>(written);
+        first = false;
+        cursor = event.sequence;
+        logLast = cursor;
+      }
+      if (!first) {
+        memcpy(out + used, "]}", 3);
+        used += 2;
+        ++count;
+        logBuilt = true;
+        logMore = latest != 0 && static_cast<int32_t>(latest - logLast) > 0;
+      }
+    }
+  }
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = config == configDue && device == deviceDue &&
                         credentials == credentialsDue &&
                         route == routeDue && hold == holdDue && command == commandDue;
-  if (!complete) companionNotified_.store(true, std::memory_order_release);
+  if (!complete || logMore) companionNotified_.store(true, std::memory_order_release);
   if (count == 0) return;
   companionWs().job.generation = generation;
   companionWs().job.count = count;
@@ -1274,11 +1455,19 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     if (config) {
       slot.sentConfig = outbox.configSequence;
       slot.sentUi = ui;
+      slot.sentLog = logSwitch;
     }
     if (device) memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));
     if (route) slot.sentRoute = outbox.routeSequence;
     if (hold) slot.sentHold = outbox.holdSequence;
     if (credentials) slot.sentCredentials = outbox.credentialsGeneration;
+    if (logBuilt) {
+      slot.logSent = logLast;
+      slot.logCatchUp = logMore;
+      g_companion.logHeard = false;  // this flush consumed the heartbeat
+      g_companion.logFlushAtMs = millis();
+      if (logMiss != 0) g_companion.logGaps += logMiss;
+    }
   }
   if (command) g_companion.lastCommandSent = outbox.commandId;
 }
@@ -1407,12 +1596,13 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
   bool ok = statusJsonAppend(
       used,
       ",\"companion\":{\"paired\":%s,\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\","
-      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"relay\":\"%s\","
-      "\"relayRejects\":%lu,",
+      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"log\":%s,"
+      "\"relay\":\"%s\",\"relayRejects\":%lu,",
       stored.paired ? "true" : "false", stored.name, stored.address, stored.companionVersion,
       link != nullptr ? "open" : "down", static_cast<long>(companionLinkAgeS(g_companion, now)),
       static_cast<unsigned long>(link != nullptr ? 0 : g_companion.peerProtocol),
-      stored.uiOff ? "false" : "true", g_companion.relay.ready ? "ready" : "down",
+      stored.uiOff ? "false" : "true", stored.logSwitch ? "true" : "false",
+      g_companion.relay.ready ? "ready" : "down",
       static_cast<unsigned long>(g_companion.relay.rejects));
   if (kCompanionLm)
     ok = ok && statusJsonAppend(
@@ -1450,6 +1640,7 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
   out.paired = stored.paired != 0;
   out.lmSwitch = stored.lmSwitch != 0;
   out.ui = stored.uiOff == 0;
+  out.logSwitch = stored.logSwitch != 0;
   out.relayReady = g_companion.relay.ready;
   out.relayRejects = g_companion.relay.rejects;
   out.linkOpen = link != nullptr;
@@ -1459,6 +1650,11 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
   if (out.peerProtocol != 0) out.reason = "protocol";
   out.reconnects = g_companion.ups > 1 ? g_companion.ups - 1 : 0;
   out.authFailures = g_companion.authFailures;
+  out.logCursor = link != nullptr ? link->logSent : 0;
+  out.logGaps = g_companion.logGaps;
+  out.logFlushS = g_companion.logFlushAtMs == 0
+                      ? -1
+                      : static_cast<int32_t>((now - g_companion.logFlushAtMs) / 1000U);
   memcpy(out.name, stored.name, sizeof(out.name));
   memcpy(out.address, stored.address, sizeof(out.address));
   memcpy(out.version, stored.companionVersion, sizeof(out.version));

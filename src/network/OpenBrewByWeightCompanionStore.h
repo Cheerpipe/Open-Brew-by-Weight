@@ -12,9 +12,11 @@ namespace openbrewbyweight {
 
 constexpr const char *COMPANION_KEY = "companion";
 
-enum class CompanionLoad : uint8_t { LOADED, MISSING, INVALID };
+enum class CompanionLoad : uint8_t { LOADED, PROMOTED, MISSING, INVALID };
 
-// A missing blob is a controller that never paired; INVALID is worth a log line.
+// A missing blob is a controller that never paired; INVALID is worth a log
+// line. A version 1 blob (before the log switch) loads as PROMOTED with the
+// new switch on; the caller marks the state dirty so the v2 layout persists.
 inline CompanionLoad loadCompanionStored(CompanionStored &stored) {
   CompanionLoad result = CompanionLoad::INVALID;
   if (lockSettingsNvs()) {
@@ -22,17 +24,27 @@ inline CompanionLoad loadCompanionStored(CompanionStored &stored) {
     result = CompanionLoad::MISSING;
     if (preferences.begin(SETTINGS_NAMESPACE, true)) {
       if (preferences.isKey(COMPANION_KEY)) {
-        const bool loaded =
-            preferences.getBytesLength(COMPANION_KEY) == sizeof(stored) &&
+        const size_t length = preferences.getBytesLength(COMPANION_KEY);
+        if (length == sizeof(stored) &&
             preferences.getBytes(COMPANION_KEY, &stored, sizeof(stored)) == sizeof(stored) &&
-            validCompanionStored(stored);
-        result = loaded ? CompanionLoad::LOADED : CompanionLoad::INVALID;
+            validCompanionStored(stored)) {
+          result = CompanionLoad::LOADED;
+        } else if (length == COMPANION_STORED_V1_BYTES) {
+          stored = CompanionStored{};
+          if (preferences.getBytes(COMPANION_KEY, &stored, COMPANION_STORED_V1_BYTES) ==
+                  COMPANION_STORED_V1_BYTES &&
+              validCompanionStoredV1(stored)) {
+            promoteCompanionStoredV1(stored);
+            result = CompanionLoad::PROMOTED;
+          }
+        }
       }
       preferences.end();
     }
     unlockSettingsNvs();
   }
-  if (result != CompanionLoad::LOADED) stored = CompanionStored{};
+  if (result != CompanionLoad::LOADED && result != CompanionLoad::PROMOTED)
+    stored = CompanionStored{};
   return result;
 }
 

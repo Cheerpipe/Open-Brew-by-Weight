@@ -123,8 +123,10 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     ++relay.generation;
     esp_fill_random(relay.challenge, sizeof(relay.challenge));
     ui = g_companion.stored.uiOff == 0;
-    // Q5: the link opens only for a feature that needs it.
-    link = kCompanionLm && g_companion.stored.lmSwitch != 0;
+    // Q5: the link opens only for a feature that needs it: the La Marzocco
+    // route (Linea Micra builds) or the diagnostic log (every build, 2B).
+    link = (kCompanionLm && g_companion.stored.lmSwitch != 0) ||
+           g_companion.stored.logSwitch != 0;
   }
   memset(key, 0, sizeof(key));
   memset(bodyKey, 0, sizeof(bodyKey));

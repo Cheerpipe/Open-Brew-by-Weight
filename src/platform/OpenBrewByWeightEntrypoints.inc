@@ -524,6 +524,8 @@ void startAfterBootRecovery() {
     callbacks.copyAuditEvents = copyAuditEvents;
     callbacks.auditLogLatestSequence = auditLogLatestSequence;
     callbacks.debugLogLatestSequence = debugLogLatestSequence;
+    callbacks.debugLogLatestAlarmSequence = debugLogLatestAlarmSequence;
+    callbacks.debugLogBootId = debugLogBootId;
     callbacks.copyAuditStoreStatus = copyAuditStoreStatus;
     callbacks.setAuditVerbose = setAuditVerbose;
     callbacks.auditVerboseDeadline = auditVerboseDeadline;

@@ -223,6 +223,9 @@ struct NetworkBridgeCallbacks {
   bool (*setAuditVerbose)(bool on) = nullptr;
   uint32_t (*auditVerboseDeadline)() = nullptr;
   uint32_t (*debugLogLatestSequence)() = nullptr;
+  // The newest CRITICAL/ERROR/WARNING event, and this boot's id (2B).
+  uint32_t (*debugLogLatestAlarmSequence)() = nullptr;
+  uint32_t (*debugLogBootId)() = nullptr;
   void (*addDebugEvent)(DebugCategory category, DebugCode code,
                         int32_t argument1, int32_t argument2) = nullptr;
   void (*reportTaskWatchdogFault)() = nullptr;
@@ -1006,6 +1009,9 @@ class OpenBrewByWeightNetwork {
   void resetCompanion();
   void serviceCompanion(uint32_t now);
   void companionPrepareSends();
+  // The log stream's hold predicate: the link's own admission rule (a scaled
+  // shot, a scale connection or discovery, the BLE quiet interval).
+  bool companionLogHoldActive() const;
   bool companionCredentialsBody(uint8_t &count, uint32_t generation,
                                 const uint8_t secret[COMPANION_SECRET_BYTES]);
   bool appendCompanionStatus(size_t *used);
@@ -1021,6 +1027,8 @@ class OpenBrewByWeightNetwork {
   std::atomic<bool> companionAwake_{false};
   uint32_t companionRetryAtMs_ = 0;  // 0 = no failed save waiting
   uint32_t companionLruAtMs_ = 0;  // network task: the last LRU refresh queued
+  // This boot's id, captured once for the link's log frames (network task).
+  uint32_t companionLogBootId_ = 0;
   bool diagnosticPageEnabled();
   bool webUiOverrideAllowed(httpd_req_t *request);
   uint32_t webUiOverrideRemainingMs(httpd_req_t *request);

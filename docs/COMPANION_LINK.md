@@ -10,7 +10,8 @@ the companion, never browses mDNS, and never retries.
 
 Version 1 covers pairing and the link, and version 2 the relay that lets the
 companion serve the Web UI to several screens, plus, on Linea Micra builds,
-the La Marzocco route. Every build registers these routes; a controller that
+the La Marzocco route. The diagnostic log stream rides version 1 frames on
+every build. Every build registers these routes; a controller that
 is not paired answers them and does nothing else.
 
 ## Common rules
@@ -102,11 +103,11 @@ public key; it discards its request key.
 
 | Body | Effect |
 | --- | --- |
-| `{"action":"approve","code":"123456","lm":true}` | Approves the open request; `lm` (optional, `true` when absent) is the La Marzocco switch chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
+| `{"action":"approve","code":"123456","lm":true,"log":true}` | Approves the open request; `lm` and `log` (optional, `true` when absent) are the La Marzocco and diagnostic log switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
 | `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids) |
 | `{"action":"unignore"}` | Forgets the ignored ids |
 | `{"action":"forget"}` | Removes the pairing and closes the link; the next link attempt receives `erase` |
-| `{"action":"switches","ui":false,"lm":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere). An open link receives a new `cfg` |
+| `{"action":"switches","ui":false,"lm":true,"log":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere) and `log` **Diagnostic log through the companion** (every build). An open link receives a new `cfg` |
 
 Every action answers `{"ok":true}`. Approve and Ignore without an open request
 answer `409 PAIRING_NOT_PENDING`; Forget and Switches without a pairing answer
@@ -118,7 +119,7 @@ Admin reads the pairing, the open request and the link state from
 ```json
 "companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
  "version":"1.0.0","link":"open","linkAgeS":3600,"peerProtocol":0,
- "ui":true,"relay":"ready","relayRejects":0,
+ "ui":true,"log":true,"relay":"ready","relayRejects":0,
  "route":"companion","lm":true,"upstream":true,"refused":false,"credentials":true,
  "request":null,"ignored":0}
 ```
@@ -127,7 +128,8 @@ Admin reads the pairing, the open request and the link state from
 up or went down (`-1` when neither happened since the controller started),
 `peerProtocol` the protocol of the paired companion's last hello that this
 controller refused with `PROTOCOL` (0 when none, or once a link opens), `ui`
-the Web UI switch, `relay` `ready` once a [relay handshake](#relay) succeeded
+the Web UI switch, `log` the diagnostic log switch, `relay` `ready` once a
+[relay handshake](#relay) succeeded
 since the controller started (`down` before and after Forget), `relayRejects`
 the relayed requests refused since then; on Linea Micra builds `route` is
 `direct`, `pending` or `companion`, `refused` mirrors the `lm` frames'
@@ -142,7 +144,9 @@ exists). Home's stream carries `companion.requestName` and
 Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
 `protocol` (the open link's, 0 while down), `peerProtocol`, `link`,
 `linkAgeS`, `reconnects`, `authFailures` (link and relay handshakes), `ui`,
-`relay`, `relayRejects` and, on Linea Micra builds, `route`, `reason` (why the
+`log`, `logCursor`, `logFlushS` (age of the last log flush, `-1` never),
+`logGaps` (events reported missing this boot), `relay`, `relayRejects` and,
+on Linea Micra builds, `route`, `reason` (why the
 route is direct; `protocol` while `peerProtocol` is set), `lm`, `upstream`,
 `routeSwitches` and `commands`. Names, versions and addresses are stored
 without quotes, backslashes or angle brackets; the name and version follow the
@@ -151,8 +155,9 @@ companion's authenticated `hello`.
 ## Link
 
 The companion opens the link only while a feature needs it: the [relay
-handshake](#relay) answers `link` (today `true` only on Linea Micra builds with
-the La Marzocco switch on). A companion that finds no relay route (an older
+handshake](#relay) answers `link` (`true` on Linea Micra builds with the La
+Marzocco switch on, and on every build while the **Diagnostic log through the
+companion** switch is on). A companion that finds no relay route (an older
 controller) opens it as before.
 
 `GET /api/v1/companion/link` upgrades to a WebSocket. Only text frames are
@@ -203,12 +208,13 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 
 | Frame | Meaning |
 | --- | --- |
-| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true}`. Sent after `ready` and on every change |
-| `{"t":"dev","name":"Kitchen"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address. Up to 32 bytes of letters, digits, spaces and hyphens. Sent after `ready` and again whenever the name changes |
+| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true}`. Sent after `ready` and on every change |
+| `{"t":"dev","name":"Kitchen","id":"AA:BB:CC:DD:EE:FF"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address, and its stable device id (the webhook's `deviceId`), the log store's key. Up to 32 bytes of letters, digits, spaces and hyphens. Sent after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
 | `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` and `push` frames until `on` is `false` |
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
+| `{"t":"log","b":42,"e":[[seq,atMs,wallSec,lvl,cat,"message"],…]}` | Diagnostic log events (below), the formatted text the Web UI log view renders, `lvl` one of `c/e/w/i/d` |
 
 After `ready` the controller sends `cfg`, `dev`, `route` and `hold` with their
 current values, and `creds` when it has an account generation; afterwards each
@@ -235,9 +241,10 @@ secrets directory and never in logs.
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
+| `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the companion's newest stored `(boot, sequence)`; the controller maps a boot change to `after` 0. Sent after `ready` on every session while `cfg.log` is true |
 
-Builds without La Marzocco know only `ping` (its `up` is ignored there); the
-other four are types they do not know and ignore.
+Builds without La Marzocco know only `ping` (its `up` is ignored there) and
+`logsub`; the other four are types they do not know and ignore.
 
 The controller closes a link that sends nothing for two ping intervals: 35
 seconds while the La Marzocco route is `companion`, 250 seconds otherwise. A
@@ -286,6 +293,34 @@ A `push` the controller cannot decode closes the link, as it fails the
 controller's own socket. A `full` or `read` frame it cannot decode is logged
 and ignored, as a failed direct read is; a route request then fails if no
 valid `full` frame follows.
+
+### Diagnostic log stream
+
+With **Diagnostic log through the companion** on, the companion subscribes
+after `ready` with its newest stored `(boot, sequence)` and the controller
+streams the ring's formatted events back, one `log` frame per send pass
+while a backlog drains. `b` is the controller's current boot id: the
+companion keys its rows by `(device id, b, sequence)`, and boot separators
+and reset reasons are the ring's own `BOOT_BANNER` and reset-reason events.
+
+- **Radio silence during a shot is absolute.** No `log` frame is transmitted
+  during a shot with a connected scale, a scale connection or discovery, or
+  the BLE quiet interval — the same windows the link's own admission
+  enforces. Events queue (they stay in the ring, the cursor stays) and are
+  sent in order when the hold ends; nothing is dropped.
+- **Plain events ride the heartbeat.** Outside a hold, `info` and `debug`
+  events flush only when a frame arrived since the last flush — the
+  companion's 15/120 s ping — so the log adds no radio wakeup of its own.
+  `warning` and noisier events flush at once outside a hold.
+- **Gaps are explicit.** `"miss":N` in a frame says the ring overwrote `N`
+  events the companion had not read (the companion stores the gap); a
+  `"reset":true` frame says the ring was cleared below the companion's
+  cursor: the frame refills from the oldest retained event, and the
+  companion drops that boot's earlier rows like a Clear history.
+- The switch off stops the frames at the next `cfg`; the companion keeps
+  what it stored. A never-paired controller, or one whose companion is away,
+  runs none of this: the producer wakes only for an authenticated,
+  subscribed link.
 
 ### Route and failover
 

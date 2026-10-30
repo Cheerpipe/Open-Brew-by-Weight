@@ -30,6 +30,10 @@
 
 namespace openbrewbyweight {
 
+// The controller's stable LAN identity (its station MAC as text): the
+// webhook's `deviceId`, and the companion log store's device key.
+void deviceId(char *output, size_t capacity);
+
 constexpr size_t WEBHOOK_URL_CAPACITY = 192;
 constexpr uint32_t WEBHOOK_START_MAX_DELAY_MS = 2000;
 constexpr uint32_t WEBHOOK_START_MIN_DELAY_MS = 500;
