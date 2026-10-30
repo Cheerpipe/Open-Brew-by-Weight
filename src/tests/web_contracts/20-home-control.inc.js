@@ -218,7 +218,7 @@
   }
   const heroElements=new Map(),lookup=id=>{
     if(!heroElements.has(id))heroElements.set(id,{hidden:false,textContent:'',dataset:{},style:{tp:null,setProperty(k,v){this[k==='--tp'?'tp':k]=v;}},
-      classList:{toggle(){},contains(){return false}},setAttribute(){},
+      classList:{toggle(){},contains(){return false}},setAttribute(){},prepend(){},
       replaceChildren(...n){this.kids=n;this.textContent=n.map(x=>typeof x==='string'?x:x.textContent).join('');},
       append(...n){this.kids.push(...n);this.textContent+=n.map(x=>typeof x==='string'?x:x.textContent).join('');}});
     return heroElements.get(id);
@@ -228,10 +228,14 @@
   const env={liveRuleModel:null,model:null,reduce:false},ruleArgs=[];
   const paint=(d)=>new Function('$','buildShotSparkModel','formatShotEnded','ms','localStorage','document',
     'liveRuleModel','uiState','shotRuleModel','scheduleShotPaint','sub','window','shotFsActive','d',
+    blockAt(runtimeJs,'function fadeFill(')+blockAt(runtimeJs,'const RAMP_CURVES =')+
+    blockAt(runtimeJs,'function rampDg(')+
+    blockAt(runtimeJs,'function cutLine(')+'const PACE_SOFT = 0.18;\n'+
+    blockAt(runtimeJs,'function referencePace(')+
     blockAt(runtimeJs,'function verdictLabel(')+
     runtimeJs.slice(runtimeJs.indexOf('function renderShotHero('),runtimeJs.indexOf('function checkFirmwareReload('))+
     ';return renderShotHero({clockMs:d.elapsedMs,...d});')(lookup,()=>env.model,()=>'',
-      (v,n)=>(v/1000).toFixed(n),{getItem:()=>tintMode,setItem(){}},{createElement:()=>({})},
+      (v,n)=>(v/1000).toFixed(n),{getItem:()=>tintMode,setItem(){}},{createElement:()=>({style:{},textContent:''})},
       env.liveRuleModel,{shotHistory:{shots:[]}},r=>(ruleArgs.push(r),null),()=>null,
       (t,vals)=>t.replace(/\{(\d)\}/g,(_,i)=>vals[+i]),{matchMedia:()=>({matches:env.reduce})},false,d);
   const card={live:true,weight:2,goal:36,elapsedMs:1000,firstDropMs:0,tareMs:null,averageFlowGps:null,shotType:'auto'};
@@ -242,6 +246,16 @@
     throw new Error('Home must label units and keep pills off a live shot');
   if(lookup('shotHeroState').textContent!=='Brewing'||heroEl().dataset.tint!=='neutral')
     throw new Error('A live shot without a cut line must read Brewing on the neutral colour');
+  // An active cut line names its target and both holds on the hero chart.
+  env.model={segs:[{pts:[{t:0,cg:0},{t:30,cg:30000}]}],dripSegs:[],flowSegs:[],
+    dripFlowSegs:[],flowCurve:[1],timeMax:30,maxW:30};
+  env.liveRuleModel={...rule,goal:36,floor:33,ceil:42,dSlow:6,firstDrop:5,curveFast:3,curveSlow:6,dFast:6};
+  paint({...card,weight:20,wCg:[5000],wAtMs:[0]});
+  const chartLabels=(lookup('shotHeroSpark').kids||[]).map(x=>x.textContent);
+  if(!chartLabels.includes('Target 36 g')||!chartLabels.includes('Up to 42 g')||
+      !chartLabels.includes('Down to 33 g'))
+    throw new Error('The hero chart must name the target and both cut holds');
+  env.model=null;env.liveRuleModel=null;
   // A finished shot reads its verdict in the label, takes its colour, and keeps a cut pill.
   const done={...card,live:false,weight:38.1,verdict:'fast',cutG:39.4};
   paint(done);

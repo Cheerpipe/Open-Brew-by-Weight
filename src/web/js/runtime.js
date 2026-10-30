@@ -5607,6 +5607,16 @@ function renderHeroChart(host, model, m, goal, label) {
           Y(m.floor),
         ),
       );
+    // The on-recipe stretch of the cut line carries the target, like the
+    // preset graph's right-edge label.
+    over.push(
+      put(
+        "hold down",
+        sub(__WEBUI_TEXT__("runtime.graph_target"), [+m.goal.toFixed(1)]),
+        100,
+        Y(m.goal),
+      ),
+    );
   }
   host.innerHTML =
     svg +
