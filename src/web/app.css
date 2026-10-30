@@ -4276,15 +4276,11 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   height: var(--tap);
   padding: 0;
   border: 0;
-  border-radius: 50%;
   background: transparent;
   color: var(--dn);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
-}
-.traceClose:not(:disabled):hover {
-  background: var(--me);
 }
 .traceClose .t {
   position: absolute;
