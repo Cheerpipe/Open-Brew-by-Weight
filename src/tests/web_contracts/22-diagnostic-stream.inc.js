@@ -311,11 +311,13 @@
     get value() { return this.v; }, set value(v) { this.v = v; this.sets++; },
     setRangeText(t, a, b) { this.v = this.v.slice(0, a) + t + this.v.slice(b); }};
   const ui = {logEvents: []}, nodes = {log: ta, logFilter: {value: ''}, logLevelFilter: {value: '4'}};
-  const makeRender = (logHistory, logBootId) => new Function('$', 'R', 'logHistory', 'logBootId',
+  const makeRender = (logHistory, logBootId, zoneOffset = () => 0, diagConfig = null) =>
+      new Function('$', 'R', 'logHistory', 'logBootId', 'logZoneOffsetMinutes', 'diagConfig',
       '__WEBUI_TEXT__',
       `${blockAt(viewJs.diagnostic, 'function renderLog(')};return renderLog;`)(
       (id) => nodes[id], {uiState: ui, sub: (t, v) => t.replace('{0}', String(v)),
-                          formatWallTimeLocal: String}, logHistory, logBootId, (key) => key);
+                          formatWallTimeLocal: String}, logHistory, logBootId, zoneOffset,
+      diagConfig, (key) => key);
   const renderLog = makeRender([], 0);
   const ev = (n) => ({sequence: n, atMs: n * 1000, wallSec: 0, level: 'info', category: 'web', message: 'm' + n});
   ui.logEvents = [ev(1), ev(2)];
@@ -354,4 +356,27 @@
       + '· 2 events could not be copied while the companion was away ·\n'
       + '+0.400s INFO [web] kept4\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6\n',
       'history pages render with markers, and the live copy of an event wins');
+  // Stored wall-clock seconds are UTC: the view shifts each stored event by
+  // the controller zone's offset at that instant before formatting, so the
+  // history reads in the same local time as the live ring.
+  const shifted = [];
+  makeRender([{b: 7, s: 8, ms: 800, w: 1793380832, l: 'i', c: 'web', m: 'utc8'}], 7,
+      (zone, w) => (shifted.push([zone, w]), -180), {timezoneId: 'America/Santiago'})();
+  assert.deepEqual(shifted, [['America/Santiago', 1793380832]],
+      'a stored event asks for its zone offset at its own instant');
+  assert.equal(ta.value, '1793370032 INFO [web] utc8\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6\n',
+      'history renders at wallSec shifted by the zone offset');
+}
+// logZoneOffsetMinutes answers the zone's offset at each instant: January and
+// July of a DST zone differ, and a missing zone or one Intl rejects falls
+// back to the last clock sync's applied offset.
+{
+  const assert = require('assert').strict;
+  const offset = new Function('R', 'logZoneFormatter', 'logZoneFormatterId',
+      `${blockAt(viewJs.diagnostic, 'function logZoneOffsetMinutes(')};return logZoneOffsetMinutes;`)(
+      {statusTimezoneOffsetMinutes: 777}, null, '');
+  assert.equal(offset('America/New_York', Date.UTC(2026, 0, 15, 12) / 1000), -300);
+  assert.equal(offset('America/New_York', Date.UTC(2026, 6, 15, 12) / 1000), -240);
+  assert.equal(offset('', 0), 777);
+  assert.equal(offset('Not/A_Zone', 0), 777);
 }

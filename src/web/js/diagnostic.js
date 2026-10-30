@@ -1405,7 +1405,7 @@ async function emptyAudit() {
   await R.refreshStatus();
 }
 const LOG_LEVELS = ["serialLogLevel", "ringRetainLogLevel"];
-let logLevels = null;
+let diagConfig = null;
 // A level being saved keeps the user's pick until its command settles, then
 // shows the device's value, which a failed save leaves unchanged.
 function saveLogLevel(id) {
@@ -1413,7 +1413,7 @@ function saveLogLevel(id) {
   el.dataset.pending = 1;
   R.command("/api/v1/config", R.withBaseRev({ [id]: el.value || "none" })).finally(() => {
     delete el.dataset.pending;
-    el.value = logLevels?.[id] || "none";
+    el.value = diagConfig?.[id] || "none";
   });
 }
 // The serial log rides the owned socket (runtime.js registerStream): subscribe
@@ -1482,6 +1482,39 @@ function applyLogFrame(m) {
   R.updateFirmwareFooter();
   if (R.activeView === "diagnostic") R.noteReachOk();
 }
+// The companion's store keeps wall-clock seconds in UTC only: shift each
+// stored event by the controller zone's offset at that instant, the same
+// per-event shift the live stream's localSec arrives with. A missing zone or
+// one the browser rejects falls back to the last clock sync's applied offset.
+let logZoneFormatter = null,
+  logZoneFormatterId = "";
+function logZoneOffsetMinutes(zone, unixSec) {
+  if (!zone) return R.statusTimezoneOffsetMinutes;
+  try {
+    if (logZoneFormatterId !== zone) {
+      logZoneFormatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: zone,
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      logZoneFormatterId = zone;
+    }
+    const p = {};
+    for (const part of logZoneFormatter.formatToParts(new Date(unixSec * 1000)))
+      p[part.type] = +part.value;
+    return Math.round(
+      (Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) - unixSec * 1000) /
+        60000,
+    );
+  } catch (_) {
+    return R.statusTimezoneOffsetMinutes;
+  }
+}
 function renderLog() {
   const f = $("logFilter").value,
     m = +$("logLevelFilter").value,
@@ -1506,7 +1539,9 @@ function renderLog() {
     if ((hr[e.l] ?? 3) > m) continue;
     if (e.b === logBootId && live.has(e.s)) continue;
     o +=
-      (e.w ? R.formatWallTimeLocal(e.w) : "+" + (e.ms / 1000).toFixed(3) + "s") +
+      (e.w
+        ? R.formatWallTimeLocal(e.w + logZoneOffsetMinutes(diagConfig?.timezoneId, e.w) * 60)
+        : "+" + (e.ms / 1000).toFixed(3) + "s") +
       " " +
       (hn[e.l] || "INFO") +
       " [" +
@@ -1621,9 +1656,9 @@ function renderLogHistoryNote() {
 }
 export function applyStatus(s) {
   applyDiagnosticStatus(s);
-  logLevels = s?.config;
+  diagConfig = s?.config;
   for (const id of LOG_LEVELS)
-    if ($(id) && !$(id).dataset.pending) $(id).value = logLevels?.[id] || "none";
+    if ($(id) && !$(id).dataset.pending) $(id).value = diagConfig?.[id] || "none";
   if (!s) return;
   // The account email and machine name ride the Home stream beside the
   // header's cloud indicator; diagnosticStatus() merges every model, so each
