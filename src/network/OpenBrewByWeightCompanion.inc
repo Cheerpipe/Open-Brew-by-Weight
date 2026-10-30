@@ -1299,6 +1299,23 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   uint32_t logLast = sent.logSent, logMiss = 0;
   const bool logBuilt =
       companionLogBody(count, sent, logSwitch, logLast, logMore, logMiss);
+  // TEMPORARY FIELD DIAGNOSTIC (remove after the log stream is verified in
+  // the field): the first bytes of each built log body, rate-limited, so the
+  // Web UI log shows exactly what went on the wire when a companion rejects
+  // a frame.
+  if (logBuilt) {
+    static uint32_t logDumpAtMs = 0;
+    const uint32_t nowMs = millis();
+    if (static_cast<int32_t>(nowMs - logDumpAtMs) >= 0) {
+      logDumpAtMs = nowMs + 15000U;
+      const char *logBody = companionWs().job.bodies;
+      for (uint8_t index = 1; index < count; ++index)
+        logBody += strlen(logBody) + 1;
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                           "logdbg sent=%lu body=%.300s",
+                           static_cast<unsigned long>(sent.logSent), logBody);
+    }
+  }
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = config == configDue && device == deviceDue &&
                         credentials == credentialsDue &&
