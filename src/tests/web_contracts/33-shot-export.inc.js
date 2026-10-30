@@ -199,9 +199,9 @@
   // The trace view: every event in time order with a type filter and a
   // search that narrow the list, the flags spelled out.
   const fakeEl = (tag = 'div') => ({tag, children: [], dataset: {}, hidden: false, value: '',
-    textContent: '', innerHTML: '', open: false,
+    textContent: '', innerHTML: '', open: false, focused: false,
     append(...c) {this.children.push(...c);}, replaceChildren(...c) {this.children = c;},
-    showModal() {this.open = true;}, close() {this.open = false;}});
+    showModal() {this.open = true;}, close() {this.open = false;}, focus() {this.focused = true;}});
   const dom = {};
   const ids = ['shotTraceDialog', 'shotTraceMeta', 'shotTraceFlags', 'shotTraceType',
     'shotTraceSearch', 'shotTraceEvents', 'shotTraceEmpty', 'shotTracePre',
@@ -220,7 +220,8 @@
   context.showShotTrace(base, interrupted, vocab);
   const rowText = (li) => li.children.map((c) => c.textContent).join(' ');
   const rows = dom.shotTraceEvents.children;
-  assert.ok(dom.shotTraceDialog.open && rows.length === 11);
+  // Opening the view focuses the dialog, never a control with a focus ring.
+  assert.ok(dom.shotTraceDialog.open && dom.shotTraceDialog.focused && rows.length === 11);
   assert.deepEqual(rows.map((li) => li.children[0].textContent).slice(0, 2), ['6.00 s', '7.00 s']);
   assert.equal(rowText(rows.find((li) => li.dataset.type === 'debug')),
       '8.00 s Machine circuit closed 100000 · 7');

@@ -2166,6 +2166,9 @@ function showShotTrace(r, t, vocab) {
   $("shotTraceType").onchange = $("shotTraceSearch").oninput = filter;
   $("shotTraceClose").onclick = () => d.close();
   d.showModal();
+  // Focus the dialog itself, or the browser focuses the close button and
+  // shows its focus ring the moment the view opens.
+  d.focus();
   filter();
 }
 const ICON = {
