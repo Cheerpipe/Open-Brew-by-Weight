@@ -137,7 +137,7 @@
   const traceJs = viewJs.stats.slice(viewJs.stats.indexOf('const TRACE_KINDS = ['),
       viewJs.stats.indexOf('let traceVocab = null;')) +
       ['function decodeShotTrace(', 'function traceName(', 'function traceDetail(',
-        'function showShotTrace(', 'function drawShotTrace(']
+        'function showShotTrace(']
           .map((m) => blockAt(viewJs.stats, m)).join('\n');
   vm.runInContext(traceJs, context);
   const trace = JSON.parse(JSON.stringify(context.decodeShotTrace(fixture, vocab)));
@@ -196,16 +196,16 @@
   new DataView(overfull.buffer).setUint16(78, new DataView(fixture).getUint16(84, true) + 1, true);
   assert.throws(() => context.decodeShotTrace(overfull.buffer, vocab), /could not be read/);
 
-  // The trace view: every event in time order with a mark on the curve, a
-  // type filter and a search that narrow both, the flags spelled out.
+  // The trace view: every event in time order with a type filter and a
+  // search that narrow the list, the flags spelled out.
   const fakeEl = (tag = 'div') => ({tag, children: [], dataset: {}, hidden: false, value: '',
     textContent: '', innerHTML: '', open: false,
     append(...c) {this.children.push(...c);}, replaceChildren(...c) {this.children = c;},
     showModal() {this.open = true;}, close() {this.open = false;}});
   const dom = {};
-  const ids = ['shotTraceDialog', 'shotTraceMeta', 'shotTraceFlags', 'shotTraceChart',
-    'shotTraceType', 'shotTraceSearch', 'shotTraceEvents', 'shotTraceEmpty', 'shotTracePre',
-    'shotTraceSnapshot', 'shotTraceCounters', 'shotTraceDownload', 'shotTraceClose'];
+  const ids = ['shotTraceDialog', 'shotTraceMeta', 'shotTraceFlags', 'shotTraceType',
+    'shotTraceSearch', 'shotTraceEvents', 'shotTraceEmpty', 'shotTracePre',
+    'shotTraceSnapshot', 'shotTraceCounters', 'shotTraceClose'];
   for (const id of ids) dom[id] = fakeEl();
   Object.assign(context, {$: (id) => dom[id], document: {createElement: (tag) => {
     const e = fakeEl(tag);
@@ -217,7 +217,7 @@
     {textContent: text || '', hidden: !text})});
   const interrupted = {...trace, flags: {...trace.flags, interrupted: true, decisionsTruncated: true},
     counters: {...trace.counters, decisionsDropped: 4}};
-  context.showShotTrace(base, interrupted, vocab, fixture);
+  context.showShotTrace(base, interrupted, vocab);
   const rowText = (li) => li.children.map((c) => c.textContent).join(' ');
   const rows = dom.shotTraceEvents.children;
   assert.ok(dom.shotTraceDialog.open && rows.length === 11);
@@ -228,20 +228,18 @@
       /\(0 scale events, 4 decisions\)/.test(dom.shotTraceFlags.textContent) &&
       !dom.shotTraceFlags.hidden);
   assert.match(dom.shotTraceMeta.textContent, /^today · .+ · 11 events$/);
-  const marks = () => (dom.shotTraceChart.innerHTML.match(/class="traceMark/g) || []).length;
-  assert.ok(marks() === 11 && dom.shotTraceChart.innerHTML.includes('class="traceCurve"'));
   dom.shotTraceType.value = 'trace';
   dom.shotTraceType.onchange();
-  assert.deepEqual([rows.filter((li) => !li.hidden).length, marks()], [4, 4]);
+  assert.equal(rows.filter((li) => !li.hidden).length, 4);
   dom.shotTraceType.value = '';
   dom.shotTraceSearch.value = 'nothing like this';
   dom.shotTraceSearch.oninput();
-  assert.ok(rows.every((li) => li.hidden) && !dom.shotTraceEmpty.hidden && marks() === 0);
+  assert.ok(rows.every((li) => li.hidden) && !dom.shotTraceEmpty.hidden);
   assert.ok(dom.shotTracePre.children.some((li) => rowText(li) === '−0.9 s ×2 Cup placed 80.0 g · 3 · 0'));
   assert.ok(dom.shotTracePre.children.some((li) => rowText(li) === '−0.5 s Cup removed 0.5 g · 70001 · 9'));
   assert.ok(dom.shotTraceSnapshot.children.some((c) => c.textContent === 'Minimum cup g'));
   // A vocabulary of another version names nothing: not even end reasons.
-  context.showShotTrace(base, trace, {...vocab, version: 2}, fixture);
+  context.showShotTrace(base, trace, {...vocab, version: 2});
   assert.equal(rowText(dom.shotTraceEvents.children.find((li) =>
     li.textContent.includes('Stop requested'))), '40.00 s Stop requested 3 · from the Web UI');
 

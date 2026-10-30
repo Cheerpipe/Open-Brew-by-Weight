@@ -146,15 +146,12 @@
 <dialog id="shotTraceDialog" aria-labelledby="shotTraceTitle">
   <div class="traceHead">
     <h2 id="shotTraceTitle">{{webui:stats.trace_title}}</h2>
-    <button id="shotTraceDownload" class="btnGlyph" type="button">
-      <span class="t">{{webui:stats.download}}</span></button
-    ><button id="shotTraceClose" class="btnGlyph btnInvert" type="button">
-      <span class="t">{{webui:shell.close}}</span>
+    <button id="shotTraceClose" class="traceClose" type="button" title="{{webui:shell.close}}">
+      <span class="g" aria-hidden="true">×</span><span class="t">{{webui:shell.close}}</span>
     </button>
   </div>
   <p id="shotTraceMeta" class="pairMeta"></p>
   <p id="shotTraceFlags" class="fieldHint" hidden></p>
-  <div id="shotTraceChart" class="traceChart" aria-hidden="true"></div>
   <div class="traceFilter">
     <label
       >{{webui:stats.trace_show}}

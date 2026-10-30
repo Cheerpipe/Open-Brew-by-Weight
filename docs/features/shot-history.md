@@ -439,14 +439,10 @@ instead of guessing.
 
 Open a shot's **⋯** menu and choose **View trace**. The view shows:
 
-- The shot's weight curve with a thin line at every moment something
-  happened. Lines in the accent color are the controller's own decisions:
-  when the slow window ended, when the weight crossed the cut line, when it
-  asked the machine to stop and which weight it kept as the yield.
-- Those moments as a list in time order. **Show** narrows it to
-  **Decisions**, **Scale and cup** events (tares, cup placed or lifted,
+- Every moment something happened, as a list in time order. **Show** narrows
+  it to **Decisions**, **Scale and cup** events (tares, cup placed or lifted,
   rejected readings) or **Controller events**; **Search** finds a word in
-  the list. The curve follows what the list shows.
+  the list.
 - **Before the shot**: the last scale and cup events before you started,
   such as the cup being placed or an automatic tare that did not happen.
 - **At the start**: the tare, cup and stability settings and the cup state
@@ -454,8 +450,9 @@ Open a shot's **⋯** menu and choose **View trace**. The view shows:
 - **Readings and timing**: how many weight readings arrived, were used or
   were rejected and why, and the longest gaps between them.
 
-**Download** saves the raw trace file, which is what to attach when you
-report a problem.
+To attach a trace when you report a problem, use **Export → JSON** in
+[Export and share shots](#export-and-share-shots): it includes every shot's
+trace.
 
 A few things to know:
 

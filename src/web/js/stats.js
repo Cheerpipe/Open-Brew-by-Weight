@@ -2071,7 +2071,7 @@ async function openShotTrace(r) {
       R.fetchShotTrace(r),
     ]);
     if (!data) return R.message(__WEBUI_TEXT__("stats.trace_none"));
-    showShotTrace(r, decodeShotTrace(data, vocab), vocab, data);
+    showShotTrace(r, decodeShotTrace(data, vocab), vocab);
   } catch (e) {
     R.message(
       e.code !== "SHOT_TRACE_BUSY"
@@ -2083,10 +2083,10 @@ async function openShotTrace(r) {
     );
   }
 }
-// The trace view: the shot's curve with a mark per shown event, the events
-// as a list that the type filter and the search narrow, then what happened
-// before the shot, the start snapshot and the end counters.
-function showShotTrace(r, t, vocab, data) {
+// The trace view: the events as a list that the type filter and the search
+// narrow, then what happened before the shot, the start snapshot and the
+// end counters.
+function showShotTrace(r, t, vocab) {
   vocab = vocab?.version === t.vocabularyVersion ? vocab : null;
   const d = $("shotTraceDialog"),
     flags = t.flags,
@@ -2148,10 +2148,6 @@ function showShotTrace(r, t, vocab, data) {
           (type && x.e.type !== type) || (q && !x.li.textContent.toLowerCase().includes(q));
         shown += !x.li.hidden;
       }
-      drawShotTrace(
-        r,
-        events.filter((x) => !x.li.hidden).map((x) => x.e),
-      );
       R.setEmptyState("shotTraceEmpty", shown ? null : __WEBUI_TEXT__("stats.trace_no_match"));
     };
   $("shotTraceEvents").replaceChildren(...events.map((x) => x.li));
@@ -2168,29 +2164,9 @@ function showShotTrace(r, t, vocab, data) {
   $("shotTraceType").value = "";
   $("shotTraceSearch").value = "";
   $("shotTraceType").onchange = $("shotTraceSearch").oninput = filter;
-  $("shotTraceDownload").onclick = () =>
-    R.saveFile(new Blob([data]), `openbrewbyweight-shot-${r.id}-trace.bin`);
   $("shotTraceClose").onclick = () => d.close();
   d.showModal();
   filter();
-}
-// Weight over the shot's time with one mark per event shown; the list
-// carries the same information for assistive technology.
-function drawShotTrace(r, events) {
-  const host = $("shotTraceChart"),
-    w = r.wCg || [],
-    t = r.wAtMs || [],
-    end = Math.max(1, ...t, ...events.map((e) => e.atMs)),
-    top = Math.max(1, ...w),
-    x = (ms) => ((ms / end) * 600).toFixed(1),
-    y = (cg) => (150 - (Math.max(0, cg) / top) * 140).toFixed(1);
-  host.innerHTML =
-    '<svg viewBox="0 0 600 160" preserveAspectRatio="none">' +
-    events.map((e) => `<path class="traceMark ${e.type}" d="M${x(e.atMs)} 4V156"/>`).join("") +
-    (w.length
-      ? `<path class="traceCurve" d="M${w.map((cg, i) => x(t[i]) + " " + y(cg)).join("L")}"/>`
-      : "") +
-    "</svg>";
 }
 const ICON = {
   csv: "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14",

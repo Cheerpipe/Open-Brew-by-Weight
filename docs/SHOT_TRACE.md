@@ -609,11 +609,11 @@ number, and the firmware-keyed vocabulary URL brings its name.
 
 The view (**⋯ → View trace** on a shot card) fetches the record by the
 shot's identity, retrying a record that is still being saved, and shows the
-shot's curve with one mark per event shown (decisions in the accent color),
-the events sorted by time with a type filter and a text search that narrow
-both, then the pre-shot entries, the start snapshot and the end counters.
-The list carries all the information; the chart is decorative. **Download**
-saves the raw record. `src/tests/fixtures/shot_trace_v1_hex.txt` is a real
+events sorted by time with a type filter and a text search that narrow the
+list, then the pre-shot entries, the start snapshot and the end counters.
+The raw record leaves the device through the **JSON + diagnostics** export
+and the orphan-trace buttons under **Diagnostic → Shot storage**.
+`src/tests/fixtures/shot_trace_v1_hex.txt` is a real
 export the host case TRC25 checks with the firmware layout and the Web UI
 contract decodes, so both decoders read the same bytes.
 
