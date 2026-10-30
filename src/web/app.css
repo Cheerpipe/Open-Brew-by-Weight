@@ -2172,6 +2172,53 @@ summary::marker {
   );
 }
 
+/* Technical hero: the normal card surface with the verdict as a left accent;
+   the shot cards' preset-weight graph replaces the monochrome spark. The
+   verdict tint (--tint) keeps driving the accent, dot and time chip. */
+.shotHero[data-hero="technical"] {
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-left: 4px solid var(--tint);
+  color: var(--fg);
+  padding-bottom: 0.6rem;
+}
+.shotHero[data-hero="technical"] .heroLabel {
+  color: var(--mu);
+}
+.shotHero[data-hero="technical"] .heroDot {
+  background: var(--tint);
+}
+.shotHero[data-hero="technical"] .heroNums small {
+  color: var(--mu);
+}
+.shotHero[data-hero="technical"] .heroPill {
+  background: color-mix(in srgb, var(--z) 13%, var(--sf));
+  color: color-mix(in srgb, var(--z) 80%, var(--fg));
+}
+/* The time rides a live-tint chip: corridor color at 30% behind it, digits
+   and unit in the same tone with air between them. */
+.shotHero[data-hero="technical"] .heroTime {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.34rem;
+  padding: 0.18rem 0.75rem 0.22rem;
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--tint) 30%, var(--sf));
+  color: color-mix(in srgb, var(--tint) 72%, var(--fg));
+}
+.shotHero[data-hero="technical"] .heroTime small {
+  color: inherit;
+}
+/* The preset graph in its tight 132 px frame, bleeding into the side padding
+   so its axis labels land where the card's padding was. */
+.shotHero[data-hero="technical"] .heroChart {
+  height: 8.25rem;
+  margin: 0.7rem -0.55rem 0;
+}
+.shotHero[data-hero="technical"] .heroChart svg {
+  height: 8.25rem;
+}
+
 .shotHero .heroPills {
   display: flex;
   flex-wrap: wrap;

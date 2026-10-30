@@ -1118,6 +1118,11 @@ function applyAdminStatus(s) {
     )
       el.checked = v;
   }
+  const heroCard = $("heroCardMode");
+  if (heroCard && !R.uiState.frontendDirty) {
+    const v = s.config && s.config.heroCardMode;
+    if (v === "technical" || v === "colorful") heroCard.value = v;
+  }
   if (!R.uiState.powerDirty)
     R.uiState.powerBaseline = R.snapshotControls(
       document.querySelectorAll("#powerPanel input,#powerPanel select"),
@@ -1814,7 +1819,7 @@ function controlChanged(id, base) {
 }
 async function saveDurableConfigKey(key, label) {
   const el = $(key),
-    wanted = el.checked;
+    wanted = el.tagName === "SELECT" ? el.value : el.checked;
   return R.withCommandGate(async () => {
     const p = R.withBaseRev({ [key]: wanted }),
       a = await R.api("/api/v1/config", { method: "POST", body: R.body(p) });
@@ -1877,6 +1882,14 @@ async function saveFrontendSettings() {
           "showDiagnosticPage",
           __WEBUI_TEXT__("admin.diagnostic_page_setting"),
         );
+      } catch (e) {
+        R.message(e.message, "error");
+        ok = false;
+      }
+    }
+    if (controlChanged("heroCardMode", R.uiState.frontendBaseline)) {
+      try {
+        await saveDurableConfigKey("heroCardMode", __WEBUI_TEXT__("admin.hero_card_mode"));
       } catch (e) {
         R.message(e.message, "error");
         ok = false;
@@ -1980,7 +1993,7 @@ const ADMIN_SUMMARIES = {
     onOff("powerManagementEnabled") +
     ($("staWifiSleep").checked ? " · " + __WEBUI_TEXT__("admin.wi_fi_sleep") : ""),
   clock: () => ($("timezoneId").value || R.uiState.savedTimezoneId || "").replaceAll("_", " "),
-  frontend: () => onOff("showDiagnosticPage"),
+  frontend: () => onOff("showDiagnosticPage") + " · " + ($("heroCardMode")?.value ?? ""),
   schedule: () =>
     $("scheduledRestartEnabled").checked
       ? restartTime(restartMinute())

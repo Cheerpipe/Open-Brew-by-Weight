@@ -3587,6 +3587,7 @@ function presetGraph(host, m, x = {}) {
       maxT = 0,
       compact,
       tens,
+      tight,
       live,
       flow = [],
       now,
@@ -3600,10 +3601,12 @@ function presetGraph(host, m, x = {}) {
       Math.round(
         compact ? Math.min(180, Math.max(140, W * 0.48)) : Math.min(220, Math.max(180, W * 0.56)),
       ),
-    L = 34,
-    R = W - 10,
-    T = 14,
-    B = H - 18,
+    // tight is the hero frame: the labels' insets shrink so the plot rides
+    // the card's content edges (shot cards keep the roomier frame).
+    L = tight ? 28 : 34,
+    R = tight ? W : W - 10,
+    T = tight ? 10 : 14,
+    B = H - (tight ? 16 : 18),
     top = Math.ceil(Math.max(m.ceil, ghost ? ghost.ceil : 0, maxG) + 2),
     step = top > 30 ? 10 : 5,
     tMax = Math.max(m.wall, ghost ? ghost.wall : 0, maxT),
@@ -5375,9 +5378,13 @@ function renderShotHero(d) {
           shotType: d.shotType,
           firstDropS: d.firstDropMs / 1e3,
         }),
-    tintMode = heroTintMode(),
+    technical = heroCardMode() === "technical",
+    // The Technical hero always speaks forecast: its zone glow and accent
+    // follow the SAP whatever tint mode the colourful card would use.
+    tintMode = technical ? "forecast" : heroTintMode(),
     tint = heroTint(d, m, kind, el, noScale, tintMode);
   hero.dataset.tint = tint;
+  hero.dataset.hero = technical ? "technical" : "colorful";
   // Live forecast fades brand brown into the predicted colour; the firmware
   // owns the blend percent, the browser just renders it.
   hero.style.setProperty(
@@ -5393,7 +5400,11 @@ function renderShotHero(d) {
           (tint === "fast"
             ? __WEBUI_TEXT__("home.hero_running_fast")
             : tint === "on_recipe"
-              ? __WEBUI_TEXT__("home.hero_in_window")
+              ? // The technical hero keeps the calm label: its lit window zone
+                // already says "in the window".
+                technical
+                ? __WEBUI_TEXT__("home.hero_brewing")
+                : __WEBUI_TEXT__("home.hero_in_window")
               : tint === "slow"
                 ? __WEBUI_TEXT__("home.hero_past_window")
                 : __WEBUI_TEXT__("home.hero_brewing"))
@@ -5403,13 +5414,20 @@ function renderShotHero(d) {
           ? verdictLabel(kind)
           : __WEBUI_TEXT__("home.hero_last_shot"),
   );
-  renderHeroChart(
-    $("shotHeroSpark"),
-    model,
-    !noScale && m && m.mode === "active" ? m : null,
-    goal,
-    label,
-  );
+  const spark = $("shotHeroSpark"),
+    rule = !noScale && m && m.mode === "active" ? m : null;
+  spark.classList.toggle("shotPresetChart", technical);
+  if (technical) renderHeroTechnicalChart(spark, d, model, rule);
+  else {
+    // Back on the colourful card the spark has no slider semantics.
+    if (spark.dataset.bound) {
+      spark.dataset.bound = "";
+      spark._draw = null;
+      spark.setAttribute("role", "img");
+      spark.removeAttribute("tabindex");
+    }
+    renderHeroChart(spark, model, rule, goal, label);
+  }
   if (shotFsActive) renderLiveShot(d, model, noScale ? null : m, tint);
 }
 // Hero numbers swap with a quick fade; a value arriving mid-fade replaces the pending one.
@@ -5457,6 +5475,31 @@ function heroTintMode() {
 function setHeroTintMode(v) {
   try {
     localStorage.setItem(HERO_TINT_KEY, HERO_TINT_MODES.includes(v) ? v : "forecast");
+  } catch (_) {}
+  scheduleShotPaint();
+}
+// Hero card style: the machine default comes from the config snapshot; a PWA
+// install may override it per device (Settings > On this device). Technical
+// is the fallback for a missing or future value.
+const HERO_CARD_KEY = "obbwHeroCard";
+function heroCardOverride() {
+  try {
+    const v = localStorage.getItem(HERO_CARD_KEY);
+    return v === "technical" || v === "colorful" ? v : null;
+  } catch (_) {
+    return null;
+  }
+}
+function heroCardMode() {
+  return (
+    heroCardOverride() ||
+    (homeStatusCache()?.config?.heroCardMode === "colorful" ? "colorful" : "technical")
+  );
+}
+function setHeroCardOverride(v) {
+  try {
+    if (v === "technical" || v === "colorful") localStorage.setItem(HERO_CARD_KEY, v);
+    else localStorage.removeItem(HERO_CARD_KEY);
   } catch (_) {}
   scheduleShotPaint();
 }
@@ -5514,6 +5557,129 @@ function smoothFlow({ pts: p }) {
     for (; p[lo].t < q.t - 1; lo++) sum -= p[lo].cg;
     return [q.t, sum / (hi - lo) / 100];
   });
+}
+// The Technical hero chart: the shot cards' preset-weight graph in the hero's
+// tight 132 px frame. An ended shot keeps its verdict zone lit and a cursor
+// that rides its curve; a live shot glows the SAP-predicted zone at the
+// firmware's blend percent and draws the forecast cut. Without a corridor
+// (no scale, no preset snapshot) the hero keeps its numbers only.
+const HERO_ZONE_BANDS = {
+  fast: ["rvFastFull", "rvFastPart"],
+  on_recipe: ["rvWindow"],
+  slow: ["rvSlowFull", "rvSlowPart"],
+};
+function renderHeroTechnicalChart(host, d, model, m) {
+  const segs = model ? model.segs.filter((s) => s.pts.length > 1) : [];
+  if (!host) return;
+  host._draw = null;
+  if (!m || !segs.length) return void host.replaceChildren();
+  const last = segs.map((s) => s.pts.map((q) => [q.t, q.cg / 100])),
+    // The forecast cut lands on the cut line at the SAP's arrival, bent by
+    // the live flow — the full-screen live view's construction.
+    end = d.live ? last.at(-1)?.at(-1) : null,
+    at = d.live && d.fcEndMs ? d.fcEndMs / 1e3 : 0,
+    liveFlow = at
+      ? [model.flowSegs, model.dripFlowSegs]
+          .flatMap((a) => a.filter((s) => s.pts.length > 1).map(smoothFlow))
+          .at(-1)
+          ?.at(-1)?.[1] || 0
+      : 0,
+    fc =
+      at && end
+        ? [at, cutLine(at, m), (at + end[0]) / 2, end[1] + ((at - end[0]) / 2) * liveFlow]
+        : null,
+    view = presetGraph(host, m, {
+      compact: true,
+      tens: true,
+      tight: true,
+      h: 132,
+      last,
+      drip: model.dripSegs
+        .filter((s) => s.pts.length > 1)
+        .map((s) => s.pts.map((q) => [q.t, q.cg / 100])),
+      held: model.held.map((p) => [p.t, p.cg / 100]),
+      maxG: model.rawMaxW,
+      maxT: Math.max(m.wall, model.timeMax),
+      now: end,
+      fc,
+    });
+  if (!view) return;
+  host._view = view;
+  // Zones: an ended shot lights the corridor it ended in (shot-card parity);
+  // live, the SAP glows its predicted zone at the streamed blend percent.
+  host.dataset.zone = d.live
+    ? "live"
+    : (d.shotType || "").toLowerCase() === "timer_only"
+      ? "none"
+      : d.verdict === "fast" || d.verdict === "slow"
+        ? d.verdict
+        : "on_recipe";
+  if (d.live) {
+    const pct = Math.max(0, Math.min(100, +d.tintPct || 0)) / 100;
+    for (const [cls, bands] of Object.entries(HERO_ZONE_BANDS)) {
+      const v = cls === d.tintClass ? pct : 0;
+      for (const b of bands)
+        host.querySelectorAll("." + b).forEach((e) => (e.style.fillOpacity = v));
+    }
+  } else {
+    // A new shot parks the cursor at its end; the ended shot scrubs like a
+    // shot card, the cursor riding this curve.
+    const key = d.shotId ?? d.elapsedMs;
+    if (host._shotKey !== key) {
+      host._shotKey = key;
+      host._cursorT = last.at(-1).at(-1)[0];
+    }
+    if (!host.dataset.bound) {
+      host.dataset.bound = "1";
+      bindScrub(
+        host,
+        (x) => host._view?.tAt(x - host.firstChild.getBoundingClientRect().left),
+        (t) => {
+          const curve = host._curve;
+          host._cursorT = Math.round(Math.max(curve[0].t, Math.min(curve.at(-1).t, t)) * 10) / 10;
+          placeHeroCursor(host);
+        },
+        () => host._cursorT,
+      );
+    }
+  }
+  host._curve = model.pts.slice().sort((a, b) => a.t - b.t);
+  if (!d.live) {
+    host
+      .querySelector("svg")
+      .insertAdjacentHTML(
+        "beforeend",
+        `<g class="shotCursor"><path class="rvGuide"/><circle class="rvHandle" r="5"/>${PILL}</g>`,
+      );
+    placeHeroCursor(host);
+  }
+  host._draw = () => renderHeroTechnicalChart(host, d, model, m);
+  observePresetHost(host);
+}
+// The scrub cursor on an ended Technical hero: guide, handle and pill at the
+// held time, reading the shot's own weight curve.
+function placeHeroCursor(host) {
+  const v = host._view,
+    g = host.querySelector(".shotCursor"),
+    c = host._curve;
+  if (!v || !g || !c) return;
+  let i = 0;
+  const t = host._cursorT;
+  while (i < c.length - 2 && c[i + 1].t < t) i++;
+  const a = c[i],
+    b = c[i + 1] ?? a,
+    k = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0,
+    w = (a.cg + (b.cg - a.cg) * k) / 100;
+  g.children[0].setAttribute("d", `M${v.X(t).toFixed(1)} ${v.T}V${v.B}`);
+  g.children[1].setAttribute("cx", v.X(t).toFixed(2));
+  g.children[1].setAttribute("cy", v.Y(w).toFixed(2));
+  placePill(
+    g.children[2],
+    sub(__WEBUI_TEXT__("runtime.shot_cursor_pill"), [t.toFixed(1), w.toFixed(1)]),
+    v.X(t),
+    v.Y(w),
+  );
+  host.setAttribute("aria-valuenow", t.toFixed(1));
 }
 // Curve, cut line and window; overlays use CSSOM (the CSP blocks inline styles).
 function renderHeroChart(host, model, m, goal, label) {
@@ -6411,6 +6577,8 @@ export {
   updateFirmwareFooter,
   noteBootId,
   buildRuleChartModel,
+  heroCardOverride,
+  setHeroCardOverride,
   shotStatsLine,
   drawPresetGraph,
   paceStartNote,

@@ -1812,6 +1812,10 @@ export function init() {
     $("appHeroTint").value = R.heroTintMode();
     $("appHeroTint").onchange = () => R.setHeroTintMode($("appHeroTint").value);
   }
+  if ($("appHeroCard")) {
+    $("appHeroCard").value = R.heroCardOverride() || "default";
+    $("appHeroCard").onchange = () => R.setHeroCardOverride($("appHeroCard").value);
+  }
   const updateAppOffline = () => {
     const box = $("appOfflineBox");
     if (!box) return;

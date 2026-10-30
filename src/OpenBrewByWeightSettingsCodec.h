@@ -98,7 +98,7 @@ inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
     SF(75, autoTareOutsideBrew), SF(76, ntpSyncEnabled),
     SF(77, scheduledRestartEnabled), SF(78, scheduledRestartMinuteOfDay),
     SF(79, fastRampMs), SF(80, slowRampMs), SF(81, fastCurve), SF(82, fastCurveHardness),
-    SF(83, slowCurve), SF(84, slowCurveHardness)};
+    SF(83, slowCurve), SF(84, slowCurveHardness), SF(85, heroCardMode)};
 #undef SF
 
 #define SF(tag, member) OBBW_SETTINGS_FIELD(tag, ShotPreset, member)
@@ -200,7 +200,7 @@ constexpr size_t settingsFieldBytes(const SettingsField (&fields)[N]) {
   return bytes;
 }
 
-static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 25 == sizeof(RuntimeConfig),
+static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 24 == sizeof(RuntimeConfig),
               "every RuntimeConfig member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 1 == sizeof(ShotPreset),
               "every ShotPreset member needs a settings field row");

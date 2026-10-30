@@ -639,6 +639,20 @@ bool jsonRampChoice(cJSON *object, const char *name, const char *(*nameOf)(uint8
   return false;
 }
 
+// The Web UI hero card style by its wire name (heroCardModeId); the index is
+// the stored value.
+bool jsonHeroCardMode(cJSON *object, const char *name, uint8_t &output) {
+  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+  if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
+  for (uint8_t mode = HERO_CARD_TECHNICAL; mode <= HERO_CARD_COLORFUL; ++mode) {
+    if (strcmp(item->valuestring, heroCardModeId(mode)) == 0) {
+      output = mode;
+      return true;
+    }
+  }
+  return false;
+}
+
 bool jsonNoScaleBbwMode(cJSON *object, const char *name, uint8_t &output) {
   cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {

@@ -22,6 +22,10 @@ Clearing the app's browser data returns them to their defaults, and a
   finishes. Android phones only.
 - **Hold the live view upright** keeps the live view portrait however you
   turn the phone. Android phones only.
+- **Hero card** picks which Home shot card this device shows — the recipe
+  graph of **Technical** or the full-color **Colorful** card — overriding the
+  machine's choice in Admin → Frontend for this device only. See
+  [Hero card](theme.md#hero-card) for what each one shows.
 - **Shot card colors** chooses how the Home shot card uses color; see
   [Shot card colors](theme.md#shot-card-colors) for what each mode does.
 

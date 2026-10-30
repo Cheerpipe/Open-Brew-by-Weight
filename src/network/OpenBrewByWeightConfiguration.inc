@@ -113,10 +113,9 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       jsonFieldPresent(root, "scheduledRestartEnabled") ||
       jsonFieldPresent(root, "scheduledRestartMinuteOfDay");
   // Log/debug fields stay public with the Diagnostic page; the visibility
-  // toggle itself always requires the Admin session.
-  const bool diagnosticPagePatch =
-      jsonFieldPresent(root, "showDiagnosticPage") ||
-      jsonFieldPresent(root, "powerManagementEnabled");
+  // toggle and the Frontend preferences always require the Admin session.
+  const bool diagnosticPagePatch = jsonFieldPresent(root, "showDiagnosticPage") ||
+      jsonFieldPresent(root, "powerManagementEnabled") || jsonFieldPresent(root, "heroCardMode");
   // Patch: seed live effective config; only present keys overwrite.
   RuntimeConfig candidate = {};
   if (self.callbacks_.copyRuntimeConfig != nullptr) {
@@ -186,7 +185,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "bookooConnectBeepLevel", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
-      "powerManagementEnabled"};
+      "powerManagementEnabled", "heroCardMode"};
   const char *parseError = nullptr;
   size_t settingFieldCount = 0;
   if (root != nullptr) {
@@ -519,9 +518,11 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
     parseError =
         "serialLogLevel must be none, critical, error, warning, info, or debug.";
   } else if (jsonFieldPresent(root, "showDiagnosticPage") &&
-             !jsonBoolean(root, "showDiagnosticPage",
-                          candidate.showDiagnosticPage)) {
+             !jsonBoolean(root, "showDiagnosticPage", candidate.showDiagnosticPage)) {
     parseError = "showDiagnosticPage must be a boolean.";
+  } else if (jsonFieldPresent(root, "heroCardMode") &&
+             !jsonHeroCardMode(root, "heroCardMode", candidate.heroCardMode)) {
+    parseError = "heroCardMode must be technical or colorful.";
   } else if (jsonFieldPresent(root, "ringRetainLogLevel") &&
              !jsonLogLevel(root, "ringRetainLogLevel",
                            candidate.ringRetainLogLevel)) {

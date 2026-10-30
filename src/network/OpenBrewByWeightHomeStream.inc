@@ -186,6 +186,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("config.noScaleBbwMode", "\"%s\"", noScaleBbwModeId(config.noScaleBbwMode));
   delta.field("config.scaleMacCacheMode", "\"%s\"", scaleMacCacheModeId(config.scaleMacCacheMode));
   delta.field("config.rinseEnabled", bool(config.rinseEnabled));
+  delta.field("config.heroCardMode", "\"%s\"", heroCardModeId(config.heroCardMode));
   delta.field("quickRevert.after", "\"%s\"", quickRevertPolicyId(control.quickRevertPolicy));
   delta.field("quickRevert.overrides", "%u", static_cast<unsigned>(control.quickOverrideMask));
   // Whole minutes, rounded up: the header panel shows ceil(remainingS / 60),

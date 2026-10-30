@@ -166,7 +166,8 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         "\"firstTimezoneAutoUtcSec\":%lu,\"firstTimezoneAutoUptimeUs\":%llu,"
         "\"firstTimezoneAutoBootId\":%lu,\"firstTimezoneAutoClockQuality\":%u,"
         "\"ntpServerPreset\":\"%s\",\"ntpSyncEnabled\":%s,"
-        "\"ntpServerCustom\":\"%s\",\"showDiagnosticPage\":%s,\"powerManagementEnabled\":%s,"
+        "\"ntpServerCustom\":\"%s\",\"showDiagnosticPage\":%s,"
+        "\"powerManagementEnabled\":%s,\"heroCardMode\":\"%s\","
         "\"persistPending\":%s,\"persistFailed\":%s,"
         "\"scheduledRestartEnabled\":%s,\"scheduledRestartMinuteOfDay\":%u,"
         "\"scheduledRestartState\":\"%s\",\"scheduledRestartCause\":\"%s\"",
@@ -179,6 +180,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         control.config.ntpSyncEnabled ? "true" : "false", safeNtpCustom,
         control.config.showDiagnosticPage ? "true" : "false",
         control.config.powerManagementEnabled ? "true" : "false",
+        heroCardModeId(control.config.heroCardMode),
         control.configPersistPending ? "true" : "false",
         control.configPersistFailed ? "true" : "false",
         control.config.scheduledRestartEnabled != 0 ? "true" : "false",

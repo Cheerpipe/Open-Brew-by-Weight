@@ -218,26 +218,35 @@
   }
   const heroElements=new Map(),lookup=id=>{
     if(!heroElements.has(id))heroElements.set(id,{hidden:false,textContent:'',dataset:{},style:{tp:null,setProperty(k,v){this[k==='--tp'?'tp':k]=v;}},
-      classList:{toggle(){},contains(){return false}},setAttribute(){},prepend(){},
+      classList:{toggle(){},contains(){return false}},setAttribute(){},removeAttribute(){},prepend(){},
       replaceChildren(...n){this.kids=n;this.textContent=n.map(x=>typeof x==='string'?x:x.textContent).join('');},
-      append(...n){this.kids.push(...n);this.textContent+=n.map(x=>typeof x==='string'?x:x.textContent).join('');}});
+      append(...n){this.kids.push(...n);this.textContent+=n.map(x=>typeof x==='string'?x:x.textContent).join('');},
+      querySelector(){return svgStub}, querySelectorAll(){return []}});
     return heroElements.get(id);
   };
-  let tintMode=null;
+  const svgStub={insertAdjacentHTML(_,markup){this.appended=(this.appended||'')+markup;},
+    children:[{setAttribute(){}},{setAttribute(){}},{}]};
+  let tintMode=null,heroOverride=null;
   const rule={mode:'active',t1:27,t2:36,prot:3,wall:60,d:5,ceil:38.5};
-  const env={liveRuleModel:null,model:null,reduce:false},ruleArgs=[];
+  const env={liveRuleModel:null,model:null,reduce:false,heroMode:'colorful'},ruleArgs=[];
   const paint=(d)=>new Function('$','buildShotSparkModel','formatShotEnded','ms','localStorage','document',
-    'liveRuleModel','uiState','shotRuleModel','scheduleShotPaint','sub','window','shotFsActive','d',
+    'homeStatusCache','liveRuleModel','uiState','shotRuleModel','scheduleShotPaint','sub','window','shotFsActive',
+    'bindScrub','placePill','PILL','observePresetHost','d',
     blockAt(runtimeJs,'function fadeFill(')+blockAt(runtimeJs,'const RAMP_CURVES =')+
     blockAt(runtimeJs,'function rampDg(')+
     blockAt(runtimeJs,'function cutLine(')+'const PACE_SOFT = 0.18;\n'+
     blockAt(runtimeJs,'function referencePace(')+
+    blockAt(runtimeJs,'function escHtml(')+blockAt(runtimeJs,'function paceStartNote(')+
+    blockAt(runtimeJs,'function flowLayer(')+blockAt(runtimeJs,'function presetGraph(')+
     blockAt(runtimeJs,'function verdictLabel(')+
     runtimeJs.slice(runtimeJs.indexOf('function renderShotHero('),runtimeJs.indexOf('function checkFirmwareReload('))+
     ';return renderShotHero({clockMs:d.elapsedMs,...d});')(lookup,()=>env.model,()=>'',
-      (v,n)=>(v/1000).toFixed(n),{getItem:()=>tintMode,setItem(){}},{createElement:()=>({style:{},textContent:''})},
-      env.liveRuleModel,{shotHistory:{shots:[]}},r=>(ruleArgs.push(r),null),()=>null,
-      (t,vals)=>t.replace(/\{(\d)\}/g,(_,i)=>vals[+i]),{matchMedia:()=>({matches:env.reduce})},false,d);
+    (v,n)=>(v/1000).toFixed(n),{getItem:(k)=>k==='obbwHeroTint'?tintMode:heroOverride,setItem(){}},
+    {createElement:()=>({style:{},textContent:''})},
+    ()=>env.heroMode?{config:{heroCardMode:env.heroMode}}:null,
+    env.liveRuleModel,{shotHistory:{shots:[]}},r=>(ruleArgs.push(r),env.shotRule||null),()=>null,
+    (t,vals)=>t.replace(/\{(\d)\}/g,(_,i)=>vals[+i]),{matchMedia:()=>({matches:env.reduce})},false,
+    ()=>{},() => {}, '', ()=>{}, d);
   const card={live:true,weight:2,goal:36,elapsedMs:1000,firstDropMs:0,tareMs:null,averageFlowGps:null,shotType:'auto'};
   const heroEl=()=>lookup('shotHero');
   paint({...card,weight:36.2,elapsedMs:36800});
@@ -414,6 +423,39 @@
   if(!lookup('shotHeroTouch').hidden)throw new Error('A shot without a scale must never claim a touch hold');
   paint({...card});
   if(!lookup('shotHeroTouch').hidden)throw new Error('The touch-hold pill needs the firmware flag');
+  // The Technical hero is the default: the preset graph under the numbers,
+  // the SAP zone glow and forecast cut from the same card fields, the calm
+  // Brewing label on a good forecast, and the verdict zone plus cursor once
+  // ended. Machine choice and device override pick between the two cards.
+  const spark=()=>lookup('shotHeroSpark');
+  spark().clientWidth=390;
+  env.model={segs:[{pts:[{t:0,cg:0},{t:15,cg:2000}]}],dripSegs:[],flowSegs:[],dripFlowSegs:[],
+    held:[],pts:[{t:0,cg:0},{t:15,cg:2000}],flowCurve:[1.4],timeMax:15,maxW:20,rawMaxW:20};
+  env.liveRuleModel={...rule,goal:36,floor:33,ceil:42,dSlow:6,firstDrop:5,curveFast:3,curveSlow:6,dFast:6};
+  env.heroMode=null;
+  paint({...card,elapsedMs:15000,tintClass:'on_recipe',tintPct:40,weight:20,wCg:[2000],wAtMs:[0],fcEndMs:29400});
+  if(heroEl().dataset.hero!=='technical'||spark().dataset.zone!=='live'||
+      !spark().innerHTML.includes('class="rvCut')||!spark().innerHTML.includes('Target 36 g')||
+      !spark().innerHTML.includes('rvFcDot'))
+    throw new Error('Without a machine choice the hero must be Technical with its graph and forecast');
+  if(lookup('shotHeroState').textContent!=='Brewing')
+    throw new Error('A technical on-recipe forecast keeps the calm Brewing label');
+  env.liveRuleModel=null;
+  env.shotRule={...rule,goal:36,floor:33,ceil:42,dSlow:6,firstDrop:5,curveFast:3,curveSlow:6,dFast:6};
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
+  if(spark().dataset.zone!=='fast'||!(svgStub.appended||'').includes('class="shotCursor"'))
+    throw new Error('An ended technical shot lights its verdict zone and keeps the cursor');
+  env.heroMode='colorful';
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
+  if(heroEl().dataset.hero!=='colorful'||spark().innerHTML.includes('rvCut'))
+    throw new Error('The colorful machine choice must render the classic card');
+  env.heroMode=null;heroOverride='colorful';
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
+  if(heroEl().dataset.hero!=='colorful')throw new Error('A device override must win over the machine default');
+  env.heroMode='colorful';heroOverride='technical';
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
+  if(heroEl().dataset.hero!=='technical')throw new Error('An explicit device override must win both ways');
+  heroOverride=null;env.shotRule=null;env.model=null;
   const chips=['Cut','Touch','Mode'].map(id=>html.indexOf('id="shotHero'+id+'"'));
   if(chips.some((pos,i)=>pos<0||(i&&pos<=chips[i-1])))throw new Error('Home shot pills must keep their reading order');
   const apply = new Function(runtimeJs.slice(runtimeJs.indexOf('function uiStreamFrame('),
