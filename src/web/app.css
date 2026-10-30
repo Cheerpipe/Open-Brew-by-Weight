@@ -2111,7 +2111,7 @@ summary::marker {
   font-variant-numeric: tabular-nums;
 }
 .shotHero .heroFlow {
-  font-size: calc(var(--hn, 2.35rem) * 0.85);
+  font-size: 1.64rem;
 }
 .heroNums small {
   display: inline;
