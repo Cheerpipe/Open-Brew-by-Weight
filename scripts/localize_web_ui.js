@@ -147,7 +147,8 @@ function assertHtmlContext(source, marker, offset, meta) {
 // One glyph per machine ships: home.html carries the catalog (one hidden
 // <symbol id="machine-icon-<id>"> per machine) next to the marker that shows
 // it, the render's machineIcon option selects the glyph (default: the generic
-// machine), and both scaffolding pieces drop here.
+// machine), and both scaffolding pieces drop here. Glyphs are flat shape
+// elements authored in the marker site's 24x24 viewBox.
 function bakeMachineIcon(source, file, options) {
   const sprite = source.match(MACHINE_ICON_SPRITE_RE);
   if (!sprite) {
@@ -159,9 +160,22 @@ function bakeMachineIcon(source, file, options) {
   if (!source.includes(MACHINE_ICON_MARKER)) {
     fail(`${file}: the machine-icons catalog sprite requires ${MACHINE_ICON_MARKER}`);
   }
+  const sprites = source.match(new RegExp(MACHINE_ICON_SPRITE_RE.source, 'g'));
+  if (sprites.length > 1) {
+    fail(`${file}: at most one data-machine-icons sprite is allowed`);
+  }
+  // The sprite capture ends at the first </svg>, so a nested <svg> inside a
+  // glyph would truncate the catalog and ship stray markup after the strip.
+  if (/<svg[\s>]/i.test(sprite[1])) {
+    fail(`${file}: machine icon glyphs must be flat shape elements without a nested svg`);
+  }
+  const symbols = [...sprite[1].matchAll(MACHINE_ICON_SYMBOL_RE)];
+  const ids = symbols.map((match) => match[1]);
+  if (new Set(ids).size !== ids.length) {
+    fail(`${file}: duplicate machine-icon-* symbol ids in the catalog sprite`);
+  }
   const id = options.machineIcon || 'default';
-  const glyph = [...sprite[1].matchAll(MACHINE_ICON_SYMBOL_RE)]
-      .find((match) => match[1] === id);
+  const glyph = symbols.find((match) => match[1] === id);
   if (!glyph) fail(`${file}: no machine-icon-${id} glyph in the catalog sprite`);
   return source.replace(MACHINE_ICON_SPRITE_RE, '')
       .split(MACHINE_ICON_MARKER).join(glyph[2].trim());

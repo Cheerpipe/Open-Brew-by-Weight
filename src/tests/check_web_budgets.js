@@ -72,7 +72,10 @@ async function authoringSources() {
 
 async function measure() {
   const {allHtml, allJs} = await authoringSources();
-  const generated = await webUi.generate({write: false});
+  // Shipped-byte budgets measure the canonical reference machine's build
+  // (AGENTS.md pair), so the machine icon a real cold Home load carries is
+  // the one counted.
+  const generated = await webUi.generate({write: false, machineIcon: 'linea-micra'});
   // The runtime bakes the build id (VERSION + short commit SHA), which moves its
   // compressed size on every commit; a fixed sentinel id keeps that noise out of
   // the runtime budget, while the combined budget measures the real assets.

@@ -227,6 +227,8 @@ expect_failure(flags="-DOPEN_BREW_BY_WEIGHT_SPEAKER_PRESENT=0",
                text="cannot change physical presence")
 expect_failure(flags='-DOPEN_BREW_BY_WEIGHT_HARDWARE_PROFILE_ID="other"',
                text="profile identity cannot be overridden")
+expect_failure(flags='-DOPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON="other"',
+               text="profile identity cannot be overridden")
 expect_failure(flags="-DOPEN_BREW_BY_WEIGHT_DEFAULT_SHOT_REACTION_TIMEOUT_S=2",
                text="must be an integer from 3 to 30")
 

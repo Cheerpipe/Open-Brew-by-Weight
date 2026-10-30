@@ -6,10 +6,10 @@
     "raw": 0
   },
   "limits": {
-    "source.html": 130151,
+    "source.html": 130682,
     "source.js": 664337,
-    "source.htmlJs": 794488,
-    "gzip.shellHtml": 5835,
+    "source.htmlJs": 794860,
+    "gzip.shellHtml": 5886,
     "gzip.shellJs": 8622,
     "gzip.css": 19329,
     "gzip.runtime": 44467,
@@ -22,7 +22,7 @@
     "gzip.manifest": 1024,
     "raw.icon192": 31500,
     "raw.icon48": 3500,
-    "gzip.coldHome": 76417,
+    "gzip.coldHome": 76473,
     "gzip.combined": 186581
   }
 }

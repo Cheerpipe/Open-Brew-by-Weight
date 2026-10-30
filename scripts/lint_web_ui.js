@@ -12,7 +12,7 @@ const webUi = require('./gen_web_ui.js');
 
 const repoRoot = path.resolve(__dirname, '..');
 
-function assembledDocument() {
+function assembledDocument(machineIcon) {
   // The localizer checks the catalog against every source, so all of them go in.
   const html = [webUi.sourcePath, ...webUi.VIEW_NAMES.map((name) =>
     path.join(webUi.htmlDir, `${name}.html`))];
@@ -20,7 +20,7 @@ function assembledDocument() {
     path.join(webUi.jsDir, `${name}.js`))];
   const read = (type) => (file) => ({file, type, content: fs.readFileSync(file, 'utf8')});
   const [shell, ...partials] = renderSources([...html.map(read('html')), ...js.map(read('js')),
-    read('css')(webUi.cssSourcePath)], {language: 'en'}).sources
+    read('css')(webUi.cssSourcePath)], {language: 'en', machineIcon}).sources
       .slice(0, html.length).map((source) => source.content);
   const views = Object.fromEntries(webUi.VIEW_NAMES.map((name, i) => [name, partials[i]]));
   return shell.split('{{webui-meta:development-class}}').join('')
@@ -29,15 +29,20 @@ function assembledDocument() {
 }
 
 async function main() {
-  const doc = assembledDocument();
   const failures = [];
   const config = JSON.parse(fs.readFileSync(
       path.join(repoRoot, 'scripts', 'lint', 'htmlvalidate.json'), 'utf8'));
-  const report = await new HtmlValidate(config).validateString(doc, 'webui.html');
-  for (const result of report.results) {
-    for (const m of result.messages) {
-      const context = doc.slice(Math.max(0, m.offset - 40), m.offset + 60).replace(/\s+/g, ' ');
-      failures.push(`${m.ruleId}: ${m.message} … ${context}`);
+  const validator = new HtmlValidate(config);
+  // The fallback glyph and the reference machine's glyph both ship in real
+  // builds, so both baked forms must validate.
+  for (const machineIcon of [undefined, 'linea-micra']) {
+    const doc = assembledDocument(machineIcon);
+    const report = await validator.validateString(doc, 'webui.html');
+    for (const result of report.results) {
+      for (const m of result.messages) {
+        const context = doc.slice(Math.max(0, m.offset - 40), m.offset + 60).replace(/\s+/g, ' ');
+        failures.push(`${machineIcon || 'default'}: ${m.ruleId}: ${m.message} … ${context}`);
+      }
     }
   }
   if (failures.length) {

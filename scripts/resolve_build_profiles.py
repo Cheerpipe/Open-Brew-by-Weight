@@ -260,8 +260,9 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
           optional={"machine_icon"})
     common_profile(obj, where)
     if "machine_icon" in obj:
-        # Names a glyph in gen_web_ui.js's catalog; absent means the default
-        # generic machine icon, so existing profiles stay valid unchanged.
+        # Names a glyph in src/web/html/home.html's data-machine-icons
+        # sprite; absent means the default generic machine icon, so existing
+        # profiles stay valid unchanged.
         profile_text(obj["machine_icon"], "machine.machine_icon", identifier=True)
     profile_text(obj["brand"], "machine.brand")
     profile_text(obj["model"], "machine.model")
@@ -380,7 +381,8 @@ def apply_overrides(hardware: dict[str, Any], machine: dict[str, Any],
                  "OPEN_BREW_BY_WEIGHT_HARDWARE_COMPATIBILITY_REVISION",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_PROFILE_ID",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_COMPATIBILITY_REVISION",
-                 "OPEN_BREW_BY_WEIGHT_MACHINE_BRAND", "OPEN_BREW_BY_WEIGHT_MACHINE_MODEL"}
+                 "OPEN_BREW_BY_WEIGHT_MACHINE_BRAND", "OPEN_BREW_BY_WEIGHT_MACHINE_MODEL",
+                 "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON"}
     selected = sorted(forbidden & definitions.keys())
     if selected:
         fail(f"profile identity cannot be overridden with --flags: {', '.join(selected)}")

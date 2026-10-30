@@ -318,6 +318,9 @@ async function generate(options = {}) {
       !MACHINE_TYPE_EXCLUSIONS[options.machineType]) {
     throw new Error(`Unknown --machine-type: ${options.machineType}`);
   }
+  if (options.machineIcon !== undefined && !options.machineIcon) {
+    throw new Error('--machine-icon requires a value');
+  }
 
   let shellHtmlRaw = source;
   const partialsRaw = {};

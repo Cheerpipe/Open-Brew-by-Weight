@@ -252,7 +252,7 @@ One optional field may also appear:
 
 | Field | Contract |
 | --- | --- |
-| `machine_icon` | Kebab-case name of the machine's own icon in Home's Equipment row. The glyph artwork lives with the Web UI sources, and the build bakes exactly the named glyph; without the field the machine keeps the default generic icon. |
+| `machine_icon` | Kebab-case name of the machine's own icon in Home's Equipment row. The glyph catalog is the hidden `data-machine-icons` sprite in `src/web/html/home.html` (`machine-icon-default` is the reserved fallback every profile without the field keeps); the build bakes exactly the named glyph — flat shape elements in the marker site's 24×24 viewBox — into the row. |
 
 The brand, model, and integration are not parsed from the file name, ID, or
 display name. Brand and model are compiled separately and shown separately in

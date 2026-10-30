@@ -424,6 +424,17 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
     throw new Error('generate() must bake exactly the machine profile icon into the Home machine row');
   }
 }
+// Adding a machine is a two-file change (a home.html symbol plus the
+// profile's machine_icon field); every declared icon must bake in CI so a
+// typo'd or stale id fails here, not at that machine's next firmware build.
+{
+  const machinesDir = path.resolve(sketchDir, '..', 'config', 'machines');
+  for (const profile of fs.readdirSync(machinesDir).filter((name) => name.endsWith('.json'))) {
+    const {machine_icon: icon} =
+        JSON.parse(fs.readFileSync(path.join(machinesDir, profile), 'utf8'));
+    if (icon) await webUi.generate({webUiLanguage: 'EN', machineIcon: icon, write: false});
+  }
+}
 if (!taskProfiler.includes('void copySnapshot(TaskProfilerSnapshot &out) const') ||
     !taskProfiler.includes('TaskLockGuard lock(reportMutex_)') ||
     taskProfiler.includes('__atomic_load_n(&seq_') ||
