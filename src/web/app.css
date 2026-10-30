@@ -3843,6 +3843,14 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   stroke-width: 36;
   stroke-linejoin: round;
 }
+.shotSparkHost {
+  cursor: ew-resize;
+  outline: none;
+}
+.shotSparkHost:focus-visible .rvHandle {
+  stroke: var(--fg);
+  stroke-width: 3.5;
+}
 .shotSpark {
   grid-area: plot;
   display: block;
