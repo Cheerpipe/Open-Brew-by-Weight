@@ -698,6 +698,7 @@ function applyCompanionStatus(c) {
   } else {
     $("companionCode").value = "";
     if (__LINEA_MICRA__) $("companionApproveLm").checked = true;
+    $("companionApproveLog").checked = true;
   }
   if (!c.paired) return;
   // Status polls keep the row fresh, except while it is asking.
@@ -729,6 +730,7 @@ function applyCompanionStatus(c) {
   if (!R.uiState.companionDirty) {
     $("companionUi").checked = c.ui !== false;
     if (__LINEA_MICRA__) $("companionLm").checked = !!c.lm;
+    $("companionLog").checked = !!c.log;
     R.uiState.companionBaseline = R.snapshotControls(companionSwitches());
   }
 }
@@ -747,7 +749,12 @@ async function saveCompanionSettings() {
     return;
   if (
     await companionAction(
-      { action: "switches", ui, ...(__LINEA_MICRA__ && { lm: $("companionLm").checked }) },
+      {
+        action: "switches",
+        ui,
+        log: $("companionLog").checked,
+        ...(__LINEA_MICRA__ && { lm: $("companionLm").checked }),
+      },
       __WEBUI_TEXT__("admin.setting_saved"),
       $("saveCompanionButton"),
     )
@@ -782,6 +789,7 @@ function initCompanion() {
         body: R.body({
           action: "approve",
           code: $("companionCode").value,
+          log: $("companionApproveLog").checked,
           ...(__LINEA_MICRA__ && { lm: $("companionApproveLm").checked }),
         }),
       });

@@ -218,6 +218,10 @@ function formatDiagnosticTimezoneOffset(c) {
 function clearLogView() {
   R.uiState.logEvents = [];
   R.uiState.logMissed = 0;
+  logHistory = [];
+  logHistoryNext = null;
+  logHistoryDone = false;
+  updateLogHistoryControls();
   const d = $("logDropped"),
     el = $("log");
   if (d) d.hidden = true;
@@ -405,7 +409,8 @@ function renderDiagClock() {
   t("ld")(local && local.slice(0, 10));
   renderLineaMicraDiagnostic();
 }
-let micraDiagnosticStatus = null;
+let micraDiagnosticStatus = null,
+  companionDiagnosticStatus = null;
 // Facts about this browser, not the controller. The firmware serves plain HTTP
 // only, so an https: page always came through a reverse proxy, and only there
 // can the service worker keep the offline copy. The companion names itself at
@@ -423,11 +428,13 @@ function renderScreen() {
     " · " +
     location.host;
   $("dUiOffline").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
+  updateLogHistoryControls();
 }
 // The paired companion as the controller sees it.
 function renderCompanionDiagnostic(c) {
   const t = (id, v) => ($(id).textContent = (c.paired && v) || "—"),
     pair = (a, b) => (a ?? "—") + " / " + (b ?? "—");
+  companionDiagnosticStatus = c;
   $("dCoName").textContent = c.paired ? c.name : __WEBUI_TEXT__("diagnostic.companion_not_paired");
   t("dCoAddress", c.address);
   // The protocol is known only while linked, or when this controller refused it.
@@ -451,6 +458,20 @@ function renderCompanionDiagnostic(c) {
         ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.companion_rejects"), [c.relayRejects])
         : ""),
   );
+  // The log stream: the switch, the sent cursor, the last flush and the
+  // events this boot reported missing to the companion.
+  t(
+    "dCoLog",
+    on(c.log !== false) +
+      (c.logFlushS >= 0
+        ? " · " +
+          R.sub(__WEBUI_TEXT__("diagnostic.companion_log_flush"), [formatUptime(c.logFlushS * 1e3)])
+        : "") +
+      (c.logGaps > 0
+        ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.companion_log_gaps"), [c.logGaps])
+        : ""),
+  );
+  renderLogHistoryNote();
   if (!__LINEA_MICRA__) return;
   t("dCoRoute", c.route + (c.reason ? " · " + c.reason.replace(/_/g, " ") : ""));
   t(
@@ -1464,8 +1485,36 @@ function applyLogFrame(m) {
 function renderLog() {
   const f = $("logFilter").value,
     m = +$("logLevelFilter").value,
-    r = { critical: 0, error: 1, warning: 2, info: 3, debug: 4 };
+    r = { critical: 0, error: 1, warning: 2, info: 3, debug: 4 },
+    hr = { c: 0, e: 1, w: 2, i: 3, d: 4 },
+    hn = { c: "CRITICAL", e: "ERROR", w: "WARNING", i: "INFO", d: "DEBUG" };
+  // The companion's stored pages, if any, sit above the live ring; an event
+  // both hold renders once (same boot, same sequence).
+  const live = new Set(R.uiState.logEvents.map((e) => e.sequence));
   let o = "";
+  for (const e of logHistory) {
+    if (e.g) {
+      o +=
+        e.g === "boot"
+          ? "· " + R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [e.boot]) + " ·\n"
+          : e.g === "gap"
+            ? "· " + R.sub(__WEBUI_TEXT__("diagnostic.log_gap_marker"), [e.count]) + " ·\n"
+            : "· " + __WEBUI_TEXT__("diagnostic.log_reset_marker") + " ·\n";
+      continue;
+    }
+    if (f && e.c !== f) continue;
+    if ((hr[e.l] ?? 3) > m) continue;
+    if (e.b === logBootId && live.has(e.s)) continue;
+    o +=
+      (e.w ? R.formatWallTimeLocal(e.w) : "+" + (e.ms / 1000).toFixed(3) + "s") +
+      " " +
+      hn[e.l] +
+      " [" +
+      e.c +
+      "] " +
+      e.m +
+      "\n";
+  }
   for (const e of R.uiState.logEvents) {
     if (f && e.category !== f) continue;
     if ((r[e.level] ?? 3) > m) continue;
@@ -1523,6 +1572,53 @@ const logStream = {
     R.sendUiOperation({ op: "log", on: true, after: 0 });
   },
 };
+// The companion's stored history, paged in on demand: only a page that came
+// through it can read the same-origin store, and the store answers even while
+// the controller is off. Pages arrive newest first and prepend, deduplicated
+// against the live ring, with boot, gap and cleared-log markers between them.
+let logHistory = [],
+  logHistoryNext = null,
+  logHistoryDone = false,
+  logHistoryBusy = false;
+function logHistoryAvailable() {
+  return !!R.uiState.companionHere?.paired;
+}
+async function loadLogOlder() {
+  if (logHistoryBusy || !logHistoryAvailable()) return;
+  logHistoryBusy = true;
+  try {
+    const url =
+      "/__companion/log?limit=100" +
+      (logHistoryNext ? `&boot=${logHistoryNext.boot}&before=${logHistoryNext.before}` : "");
+    const reply = await fetch(url, { cache: "no-store" });
+    if (!reply.ok) throw Error(String(reply.status));
+    const page = await reply.json();
+    if (!page || !Array.isArray(page.entries)) throw Error();
+    // The page is newest first: flip it onto the front of the history.
+    logHistory = page.entries.slice().reverse().concat(logHistory);
+    logHistoryNext = page.next;
+    logHistoryDone = !page.next;
+    R.paint(renderLog);
+  } catch (_) {
+    logHistoryDone = true; // A store that does not answer stops offering more.
+  } finally {
+    logHistoryBusy = false;
+    updateLogHistoryControls();
+  }
+}
+function updateLogHistoryControls() {
+  const here = logHistoryAvailable();
+  $("logOlderButton").hidden = !here || logHistoryDone;
+}
+function renderLogHistoryNote() {
+  // Opened directly, with a paired companion keeping the log: name where the
+  // older history lives.
+  const c = companionDiagnosticStatus,
+    note = $("logHistoryNote");
+  note.hidden = !(c?.paired && c.log !== false && !logHistoryAvailable());
+  if (!note.hidden) note.textContent = __WEBUI_TEXT__("diagnostic.log_in_companion");
+  updateLogHistoryControls();
+}
 export function applyStatus(s) {
   applyDiagnosticStatus(s);
   logLevels = s?.config;
@@ -1597,6 +1693,7 @@ export function init() {
   for (const id of LOG_LEVELS) $(id).onchange = () => saveLogLevel(id);
   $("logFilter").onchange = renderLog;
   $("logLevelFilter").onchange = renderLog;
+  $("logOlderButton").onclick = () => void loadLogOlder();
   $("copyLogButton").onclick = () => copyText($("log").value);
   $("clearLogButton").onclick = () => clearLogView();
   $("auditVerboseButton").onclick = () => toggleAuditHunt();

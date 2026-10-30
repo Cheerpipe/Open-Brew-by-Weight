@@ -986,7 +986,7 @@ class OpenBrewByWeightNetwork {
   static esp_err_t authPairingHandler(httpd_req_t *request);
   bool integrationAccessRoute(httpd_req_t *request, esp_err_t &result);
   bool appendWebAccessStatus(httpd_req_t *request, size_t *used);
-  // Companion link (network/OpenBrewByWeightCompanion.inc, docs/COMPANION_LINK.md).
+  // Companion link (network/OpenBrewByWeightCompanion*.inc, docs/COMPANION_LINK.md).
   static esp_err_t companionPairHandler(httpd_req_t *request);
   static esp_err_t companionAdminHandler(httpd_req_t *request);
   static esp_err_t companionRelayHandler(httpd_req_t *request);
@@ -1009,9 +1009,17 @@ class OpenBrewByWeightNetwork {
   void resetCompanion();
   void serviceCompanion(uint32_t now);
   void companionPrepareSends();
-  // The log stream's hold predicate: the link's own admission rule (a scaled
-  // shot, a scale connection or discovery, the BLE quiet interval).
+  // The diagnostic log stream (network/OpenBrewByWeightCompanionLog.inc):
+  // the logsub parse, the every-pass due check, the subscription apply (the
+  // caller holds dataMux_) and one `log` frame body per send pass. The hold
+  // predicate is the link's own admission rule (a scaled shot, a scale
+  // connection or discovery, the BLE quiet interval).
   bool companionLogHoldActive() const;
+  bool companionLinkLogSub(CompanionLinkSlot &slot, cJSON *frame);
+  void companionLogService();
+  void companionLogApplyLocked(CompanionLinkSlot &link);
+  bool companionLogBody(uint8_t &count, const CompanionLinkSlot &sent, bool logSwitch,
+                        uint32_t &logLast, bool &logMore, uint32_t &logMiss);
   bool companionCredentialsBody(uint8_t &count, uint32_t generation,
                                 const uint8_t secret[COMPANION_SECRET_BYTES]);
   bool appendCompanionStatus(size_t *used);

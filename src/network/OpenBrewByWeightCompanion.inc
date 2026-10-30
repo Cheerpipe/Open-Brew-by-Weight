@@ -974,18 +974,9 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     machineIntegrationCompanionPing(flag);
 #endif
-  } else if (!strcmp(type, "logsub") && jsonBoolean(frame, "on", flag) &&
-             jsonUint32(frame, "boot", first) && jsonUint32(frame, "after", second)) {
-    // The companion's log cursor for this controller: the network task maps
-    // it against this boot's id and owns everything after (2B).
-    {
-      TaskLockGuard lock(dataMux_);
-      slot.logWant = flag;
-      slot.logWantBoot = first;
-      slot.logWantAfter = second;
-      slot.logApplied = false;
-    }
-    companionOutboxChanged();
+  } else if (!strcmp(type, "logsub")) {
+    if (!companionLinkLogSub(slot, frame))
+      return companionLinkRefuse(slot, "a malformed frame arrived", false);
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   } else if (!strcmp(type, "lm") && jsonBoolean(frame, "sub", flag) &&
              jsonUint32(frame, "ep", first) && jsonUint32(frame, "tok", second)) {
@@ -1022,21 +1013,11 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
 
 // --- Network task --------------------------------------------------------------
 
-// The log stream's hold predicate: exactly the link's own admission rule, so
-// no log frame is transmitted during a scaled shot, a scale connection or
-// discovery, or the BLE quiet interval (plan G, principle 9).
-bool OpenBrewByWeightNetwork::companionLogHoldActive() const {
-  return outboundScaleInhibited() ||
-         scaleConnecting_.load(std::memory_order_acquire) ||
-         (outboundScaleConnected.load(std::memory_order_acquire) &&
-          outboundShotActive.load(std::memory_order_acquire));
-}
-
 void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
   // A controller that never paired has nothing to service: not even the lock.
   if (!companionAwake_.load(std::memory_order_acquire)) return;
   uint32_t serial = 0, makeKey = 0, derive = 0;
-  bool pending = false, linkOpen = false, dirty = false, logArmed = false;
+  bool pending = false, linkOpen = false, dirty = false;
   uint8_t companionKey[COMPANION_KEY_BYTES], controllerKey[COMPANION_KEY_BYTES];
   {
     TaskLockGuard lock(dataMux_);
@@ -1130,39 +1111,8 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
         companionLruPending_.store(false, std::memory_order_release);
     }
     // Diagnostic log (2B): the due check runs every pass, so a hold's end
-    // flushes at once instead of waiting for the next ping. The watermarks
-    // are read outside dataMux_ (the ring's own mutex, never nested here).
-    {
-      TaskLockGuard lock(dataMux_);
-      const CompanionLinkSlot *slot = companionActiveLink();
-      logArmed = slot != nullptr && !slot->closing && slot->logSubscribed &&
-                 slot->logApplied && g_companion.stored.logSwitch != 0;
-    }
-    if (logArmed) {
-      const uint32_t latest = callbacks_.debugLogLatestSequence
-                                  ? callbacks_.debugLogLatestSequence()
-                                  : 0;
-      const uint32_t urgent = callbacks_.debugLogLatestAlarmSequence
-                                  ? callbacks_.debugLogLatestAlarmSequence()
-                                  : 0;
-      TaskLockGuard lock(dataMux_);
-      CompanionLinkSlot *slot = const_cast<CompanionLinkSlot *>(companionActiveLink());
-      if (slot != nullptr && !slot->closing) {
-        const bool pendingLog =
-            latest != 0 && static_cast<int32_t>(latest - slot->logSent) > 0;
-        const bool urgentPending =
-            urgent != 0 && static_cast<int32_t>(urgent - slot->logSent) > 0;
-        const bool hold = companionLogHoldActive();
-        if (pendingLog && hold) {
-          // Queue-and-flush: everything in order when the hold ends.
-          slot->logCatchUp = true;
-        } else if (companionLogFlushDue(slot->logSubscribed, pendingLog, hold,
-                                        urgentPending, slot->logCatchUp,
-                                        g_companion.logHeard)) {
-          companionNotified_.store(true, std::memory_order_release);
-        }
-      }
-    }
+    // flushes at once instead of waiting for the next ping.
+    companionLogService();
     if (companionNotified_.load(std::memory_order_acquire) &&
         !companionSendPending_.load(std::memory_order_acquire))
       companionPrepareSends();
@@ -1282,18 +1232,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     if (link == nullptr || link->closing) return;
     generation = link->generation;
     snapshot = !link->snapshotSent;
-    // Apply the companion's log subscription against this boot's id (2B):
-    // a cursor from another boot restarts from the oldest retained event.
-    if (!link->logApplied) {
-      if (companionLogBootId_ == 0 && callbacks_.debugLogBootId != nullptr)
-        companionLogBootId_ = callbacks_.debugLogBootId();
-      link->logSubscribed = link->logWant;
-      link->logSent = link->logWant && link->logWantBoot == companionLogBootId_
-                          ? link->logWantAfter
-                          : 0;
-      link->logCatchUp = link->logWant;
-      link->logApplied = true;
-    }
+    companionLogApplyLocked(*link);  // the log cursor, against this boot's id
     sent = *link;
     lastCommand = g_companion.lastCommandSent;
     ui = g_companion.stored.uiOff == 0;
@@ -1351,89 +1290,12 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                               static_cast<unsigned long>(outbox.commandId), op));
 #endif
   memset(secret, 0, sizeof(secret));
-  // The diagnostic log stream (2B): one `log` body per pass, as many events
-  // as the remaining frame budget holds; the rest pages on the next pass.
-  // The events are the formatted ones the Web UI log view renders.
-  bool logBuilt = false, logMore = false;
+  // The diagnostic log stream (2B): one `log` body per pass; the rest pages
+  // on the next pass.
+  bool logMore = false;
   uint32_t logLast = sent.logSent, logMiss = 0;
-  if (sent.logSubscribed && logSwitch) {
-    const uint32_t latest = callbacks_.debugLogLatestSequence
-                                ? callbacks_.debugLogLatestSequence()
-                                : 0;
-    const uint32_t urgent = callbacks_.debugLogLatestAlarmSequence
-                                ? callbacks_.debugLogLatestAlarmSequence()
-                                : 0;
-    const bool pendingLog =
-        latest != 0 && static_cast<int32_t>(latest - sent.logSent) > 0;
-    const bool urgentPending =
-        urgent != 0 && static_cast<int32_t>(urgent - sent.logSent) > 0;
-    if (companionLogFlushDue(true, pendingLog, companionLogHoldActive(), urgentPending,
-                             sent.logCatchUp, g_companion.logHeard)) {
-      DebugLogReadMetadata meta{};
-      uint32_t cursor = sent.logSent;
-      if (callbacks_.copyDebugEvents != nullptr)
-        (void)callbacks_.copyDebugEvents(cursor, nullptr, 0, &meta);
-      if (meta.cursorInvalid) cursor = 0;  // the ring was cleared: refill
-      logMiss = meta.missedEvents;
-      char head[72];
-      {
-        char extra[32] = "";
-        size_t extraUsed = 0;
-        if (meta.cursorInvalid)
-          extraUsed += static_cast<size_t>(
-              snprintf(extra, sizeof(extra), "\"reset\":true"));
-        if (logMiss != 0)
-          extraUsed += static_cast<size_t>(snprintf(
-              extra + extraUsed, sizeof(extra) - extraUsed, "%s\"miss\":%lu",
-              extraUsed != 0 ? "," : "", static_cast<unsigned long>(logMiss)));
-        snprintf(head, sizeof(head), "{\"t\":\"log\",\"b\":%lu,%s\"e\":[",
-                 static_cast<unsigned long>(companionLogBootId_), extra);
-      }
-      size_t start = 0;
-      for (uint8_t index = 0; index < count; ++index)
-        start += strlen(companionWs().job.bodies + start) + 1;
-      char *out = companionWs().job.bodies + start;
-      const size_t capacity = sizeof(companionWs().job.bodies) - start;
-      size_t used = static_cast<size_t>(snprintf(out, capacity, "%s", head));
-      bool first = true, full = false;
-      while (callbacks_.copyDebugEvents != nullptr && !full) {
-        DebugEvent event;
-        if (callbacks_.copyDebugEvents(cursor, &event, 1, nullptr) == 0) break;
-        const char *text = event.text;
-        char formatted[DEBUG_EVENT_TEXT_CAPACITY];
-        if (text[0] == '\0') {
-          formatDebugEventMessage(event, formatted, sizeof(formatted), FW_VERSION);
-          text = formatted;
-        }
-        if (!escapeJsonString(text, companionWs().frame, sizeof(companionWs().frame))) break;
-        char piece[DEBUG_EVENT_TEXT_CAPACITY * 6 + 96];
-        const int written = snprintf(
-            piece, sizeof(piece), "%s[%lu,%lu,%lu,\"%c\",\"%s\",\"%s\"]",
-            first ? "" : ",", static_cast<unsigned long>(event.sequence),
-            static_cast<unsigned long>(event.atMs), static_cast<unsigned long>(event.wallSec),
-            companionLogLevelLetter(event.level), debugCategoryName(event.category),
-            companionWs().frame);
-        if (written < 0 || used + static_cast<size_t>(written) + 3 >= capacity ||
-            used + static_cast<size_t>(written) + COMPANION_MAC_HEX + 40 >
-                COMPANION_FRAME_BYTES) {
-          full = true;
-          break;
-        }
-        memcpy(out + used, piece, static_cast<size_t>(written) + 1);
-        used += static_cast<size_t>(written);
-        first = false;
-        cursor = event.sequence;
-        logLast = cursor;
-      }
-      if (!first) {
-        memcpy(out + used, "]}", 3);
-        used += 2;
-        ++count;
-        logBuilt = true;
-        logMore = latest != 0 && static_cast<int32_t>(latest - logLast) > 0;
-      }
-    }
-  }
+  const bool logBuilt =
+      companionLogBody(count, sent, logSwitch, logLast, logMore, logMiss);
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = config == configDue && device == deviceDue &&
                         credentials == credentialsDue &&
@@ -1581,95 +1443,6 @@ void OpenBrewByWeightNetwork::companionSocketClose(httpd_handle_t, int fd) {
       if (slot.fd == fd && slot.closeReason == nullptr) slot.closeReason = reason;
   }
   close(fd);
-}
-
-// --- Status ----------------------------------------------------------------------
-
-// Admin → Companion. Names, versions and addresses are sanitized on store.
-bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
-  const MicraCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
-  const uint32_t now = millis();
-  TaskLockGuard lock(dataMux_);
-  companionPairTick(g_companion.pairing, now);
-  const CompanionStored &stored = g_companion.stored;
-  const CompanionLinkSlot *link = companionActiveLink();
-  bool ok = statusJsonAppend(
-      used,
-      ",\"companion\":{\"paired\":%s,\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\","
-      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"log\":%s,"
-      "\"relay\":\"%s\",\"relayRejects\":%lu,",
-      stored.paired ? "true" : "false", stored.name, stored.address, stored.companionVersion,
-      link != nullptr ? "open" : "down", static_cast<long>(companionLinkAgeS(g_companion, now)),
-      static_cast<unsigned long>(link != nullptr ? 0 : g_companion.peerProtocol),
-      stored.uiOff ? "false" : "true", stored.logSwitch ? "true" : "false",
-      g_companion.relay.ready ? "ready" : "down",
-      static_cast<unsigned long>(g_companion.relay.rejects));
-  if (kCompanionLm)
-    ok = ok && statusJsonAppend(
-        used, "\"route\":\"%s\",\"lm\":%s,\"upstream\":%s,\"refused\":%s,\"credentials\":%s,",
-        companionRouteName(route.route), stored.lmSwitch ? "true" : "false",
-        route.upstreamSubscribed ? "true" : "false",
-        route.upstreamRefused ? "true" : "false", route.credentialsConfirmed ? "true" : "false");
-  ok = ok && statusJsonAppend(used, "\"request\":");
-  const CompanionRequest &request = g_companion.pairing.request;
-  if (request.state == CompanionPairState::PENDING)
-    ok = ok && statusJsonAppend(
-        used, "{\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\",\"expiresInS\":%lu,"
-              "\"codeReady\":%s}",
-        request.name, request.address, request.version,
-        static_cast<unsigned long>((request.untilMs - now + 999U) / 1000U),
-        companionCodeReady(request) ? "true" : "false");
-  else
-    ok = ok && statusJsonAppend(used, "null");
-  return ok && statusJsonAppend(used, ",\"ignored\":%u}",
-                                static_cast<unsigned>(companionIgnoredCount(g_companion.pairing)));
-}
-
-// Diagnostic → Companion: the pairing, its link and the La Marzocco route.
-void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
-  const MicraCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
-  out.route = companionRouteName(route.route);
-  out.reason = route.reason != nullptr ? route.reason : "none";
-  out.upstream = route.upstreamSubscribed;
-  out.routeSwitches = route.switches;
-  out.commands = route.commands;
-  const uint32_t now = millis();
-  TaskLockGuard lock(dataMux_);
-  const CompanionStored &stored = g_companion.stored;
-  const CompanionLinkSlot *link = companionActiveLink();
-  out.paired = stored.paired != 0;
-  out.lmSwitch = stored.lmSwitch != 0;
-  out.ui = stored.uiOff == 0;
-  out.logSwitch = stored.logSwitch != 0;
-  out.relayReady = g_companion.relay.ready;
-  out.relayRejects = g_companion.relay.rejects;
-  out.linkOpen = link != nullptr;
-  out.protocol = link != nullptr ? link->protocol : 0;
-  out.linkAgeS = companionLinkAgeS(g_companion, now);
-  out.peerProtocol = link != nullptr ? 0 : g_companion.peerProtocol;
-  if (out.peerProtocol != 0) out.reason = "protocol";
-  out.reconnects = g_companion.ups > 1 ? g_companion.ups - 1 : 0;
-  out.authFailures = g_companion.authFailures;
-  out.logCursor = link != nullptr ? link->logSent : 0;
-  out.logGaps = g_companion.logGaps;
-  out.logFlushS = g_companion.logFlushAtMs == 0
-                      ? -1
-                      : static_cast<int32_t>((now - g_companion.logFlushAtMs) / 1000U);
-  memcpy(out.name, stored.name, sizeof(out.name));
-  memcpy(out.address, stored.address, sizeof(out.address));
-  memcpy(out.version, stored.companionVersion, sizeof(out.version));
-}
-
-// Home's hint while a request waits (empty strings otherwise).
-void OpenBrewByWeightNetwork::companionRequestLabels(char (&name)[COMPANION_NAME_TEXT],
-                                                     char (&address)[COMPANION_ADDRESS_TEXT]) {
-  const uint32_t now = millis();
-  TaskLockGuard lock(dataMux_);
-  companionPairTick(g_companion.pairing, now);
-  const CompanionRequest &request = g_companion.pairing.request;
-  memcpy(name, request.name, sizeof(name));
-  memcpy(address, request.address, sizeof(address));
-  if (request.state != CompanionPairState::PENDING) name[0] = address[0] = '\0';
 }
 
 }  // namespace openbrewbyweight

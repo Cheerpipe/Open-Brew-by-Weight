@@ -34,6 +34,11 @@ does today.
   scale and your shot instead of on the cloud. During a shot with a scale it
   holds the machine's updates back until the shot is over — the newest one
   arrives right after — leaving the radio to your shot.
+- **Keeps the diagnostic log's history.** With the **Diagnostic log through
+  the companion** switch on, the companion keeps a copy of the controller's
+  log, so the Diagnostic page can page back beyond what the controller holds
+  in memory, across restarts, and even while the controller is off. See
+  [The diagnostic log's history](#the-diagnostic-logs-history) below.
 
 If the companion stops, the controller reconnects to La Marzocco on its own.
 During a shot with a scale it waits until the shot is over, so nothing
@@ -132,8 +137,43 @@ has one switch per job:
   - **Off:** the controller always connects to the cloud and does all that
     work itself, exactly as it does without a companion. The companion
     deletes its copy of your La Marzocco account.
+- **Diagnostic log through the companion** (on by default).
+  - **On:** the companion keeps a copy of the controller's diagnostic log, so
+    its history survives restarts and busy periods, and pages back beyond
+    what the controller keeps in memory. It stays readable even while the
+    controller is off. During a shot the controller sends nothing: events
+    wait and are copied when the shot ends, so the scale's radio is never
+    disturbed.
+  - **Off:** the controller's log stays in its own memory only, exactly as it
+    does without a companion. The companion keeps what it already stored.
 
 Save and Revert work like the rest of Admin.
+
+## The diagnostic log's history
+
+The controller keeps its diagnostic log in memory only: restarting it, or
+simply a busy stretch, loses the oldest lines. With **Diagnostic log through
+the companion** on, the companion keeps a copy, and the log becomes one
+continuous history:
+
+- Opened **through the companion**, the log on the Diagnostic page offers
+  **Show older**: each tap pages further back, across restarts (each marked,
+  with its reset reason in the log itself) and through gaps named as such
+  when events could not be copied while the companion was away. Clearing the
+  log on the controller clears that visit's history there too.
+- Opened **directly**, the log shows what the controller holds, with a note
+  that the older history is in the companion.
+- The companion's own page (its address, then **Companion**) shows the whole
+  stored history with a level filter and an **Export everything** download,
+  and works even while the controller is off.
+- The history is kept for about a month by default, in a size budget of
+  about 50 MB; the oldest events go first. Both can be changed with the
+  companion's `COMPANION_LOG_RETENTION_DAYS` and `COMPANION_LOG_RETENTION_MB`
+  settings, and exporting is the way to keep anything longer.
+
+Diagnostic → Companion also shows the log stream's health: whether it is on,
+when the companion last copied events, and how many events were reported
+missing while the companion was away.
 
 ## Forgetting a companion
 
@@ -154,9 +194,10 @@ you are looking at was opened: directly from the controller, through the
 companion (with its name and how many screens it serves right now), or
 through another HTTPS proxy. **Companion** shows what the controller knows:
 whether a companion is paired, its name, address and version, whether the
-link is up or down and for how long, how often it reconnected, and whether
-**Web UI relay** is on and ready, with how many relayed requests the
-controller refused. On a Linea Micra it also shows whether the La Marzocco
+link is up or down and for how long, how often it reconnected, whether
+**Web UI relay** is on and ready (with how many relayed requests the
+controller refused), and the **Diagnostic log** stream's state. On a Linea
+Micra it also shows whether the La Marzocco
 connection currently runs through the companion or directly, with the
 reason. While it runs through the companion, **La Marzocco cloud →
 WebSocket** says **Through the companion** and leaves out the figures of the

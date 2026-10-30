@@ -770,6 +770,10 @@
           <strong>{{webui:diagnostic.companion_ui}}</strong>
           <div id="dCoUi">—</div>
         </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.companion_log}}</strong>
+          <div id="dCoLog">—</div>
+        </div>
         <div class="metric micraOnly">
           <strong>{{webui:diagnostic.companion_route}}</strong>
           <div id="dCoRoute">—</div>
@@ -987,6 +991,11 @@
       ><small class="fieldHint">{{webui:diagnostic.show_one_subsystem_or_all}}</small></label
     >
     <p id="logDropped" class="fieldHint" hidden></p>
+    <p id="logHistoryNote" class="fieldHint" hidden></p>
+    <button id="logOlderButton" class="btnGlyph diagCtl" type="button" hidden>
+      <span class="g" aria-hidden="true">↑</span>
+      <span class="t">{{webui:diagnostic.log_show_older}}</span>
+    </button>
     <textarea id="log" readonly aria-label="{{webui:diagnostic.log}}"></textarea>
     <div class="btnBar glassBar">
       <button
