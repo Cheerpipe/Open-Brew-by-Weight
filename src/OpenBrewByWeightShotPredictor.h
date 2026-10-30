@@ -122,6 +122,9 @@ struct ShotPredictor {
   uint8_t tintPct = 0;
   ShotTint tintClass = ShotTint::NEUTRAL;
   ShotTintNote tintNote = ShotTintNote::NONE;
+  // Latched live (mean-basis, acceleration-aware) crossing t* for display
+  // consumers; -1 = no usable forecast this sample (young, censored, no rate).
+  int32_t fcTms = -1;
 };
 
 // Inputs assembled by the brew integration per accepted scale sample.
@@ -396,6 +399,7 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
     live.tMs = p.wallMs;
     live.sigmaMs = (p.wallMs - now) / CENSORED_SIGMA_DIV;
   }
+  pr.fcTms = !live.censored && live.tMs >= 0 && live.tMs < p.wallMs ? live.tMs : -1;
   const Forecast red = qOk ? forecastBasis(cut, now, in.weightDg, 1, 0, 0)
                            : Forecast{};
   const corridor::ArrivalStats &h = cut.history;

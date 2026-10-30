@@ -3743,7 +3743,7 @@ function presetGraph(host, m, x = {}) {
     curves(last, "rvLast") +
     curves(drip, "rvLast rvLastDrip") +
     (flow.length ? flowLayer(flow, X, L, R, B - (B - T) * 0.36, B) : "") +
-    (fc && now ? `<path class="rvFc" d="M${P(...now)}L${P(...fc)}"/>` : "") +
+    (fc && now ? `<path class="rvFc" d="M${P(...now)}Q${P(fc[2], fc[3])} ${P(...fc)}"/>` : "") +
     (fc ? `<circle class="rvFcDot" cx="${f(X(fc[0]))}" cy="${f(Y(fc[1]))}" r="5"/>` : "") +
     (now ? `<circle class="rvNow" cx="${f(X(now[0]))}" cy="${f(Y(now[1]))}" r="4"/>` : "") +
     held
@@ -5498,8 +5498,8 @@ function heroStateText(d, tint, m, el, mode) {
   const note = { recovered: __WEBUI_TEXT__("runtime.flow_rose") }[d.tintNote] || "";
   const suffix = note ? " · " + note : "";
   if (tint !== "slow") {
-    if (tint === "on_recipe" && mode === "forecast" && d.tintPct >= 50 && d.expectedEndMs > 0)
-      return "~" + ms(d.expectedEndMs, 0) + __WEBUI_TEXT__("runtime.s_2") + suffix;
+    if (tint === "on_recipe" && mode === "forecast" && d.tintPct >= 50 && d.fcEndMs > 0)
+      return "~" + ms(d.fcEndMs, 0) + __WEBUI_TEXT__("runtime.s_2") + suffix;
     return null; // caller falls back to the stock labels
   }
   const q = d.averageFlowGps,
@@ -5676,12 +5676,27 @@ function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
       segs.filter((s) => s.pts.length > 1).map((s) => s.pts.map((q) => [q.t, q.cg / 100])),
     last = model ? pts(model.segs) : [],
     end = d?.live ? last.at(-1)?.at(-1) : null,
-    at = d?.live && m.mode === "active" && d.expectedEndMs > 0 ? d.expectedEndMs / 1000 : 0,
     flow = model
       ? [model.flowSegs, model.dripFlowSegs].flatMap((a) =>
           a.filter((s) => s.pts.length > 1).map(smoothFlow),
         )
       : [],
+    // The forecast cut lands on the cut line at the SAP's acceleration-aware
+    // arrival (the UI ships inside the firmware, so fcEndMs is always native).
+    // The quadratic control point at half the horizon with the current flow as
+    // slope bends the chord into the pace parabola; without a flow read the
+    // control sits level with the current weight, and the curve still lands
+    // on the dot.
+    at = d?.live && m.mode === "active" && d.fcEndMs ? d.fcEndMs / 1000 : 0,
+    fc =
+      at && end
+        ? [
+            at,
+            cutLine(at, m),
+            (at + end[0]) / 2,
+            end[1] + ((at - end[0]) / 2) * (flow.at(-1)?.at(-1)?.[1] || 0),
+          ]
+        : null,
     // Tablets give the flow its own lane under the graph; phones overlay it
     // on the graph's lower third.
     w = host.clientWidth / k,
@@ -5696,7 +5711,7 @@ function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
       maxT: model ? model.timeMax : 0,
       flow: h ? [] : flow,
       now: end,
-      fc: at ? [at, cutLine(at, m)] : null,
+      fc,
     });
   if (view && h)
     lane.innerHTML =

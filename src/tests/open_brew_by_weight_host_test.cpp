@@ -20855,6 +20855,39 @@ void sp11_disturbance_guard_fades_to_neutral() {
   CHECK(pr.tintPct < 100);
 }
 
+void sp12_forecast_latch_tracks_the_accelerated_crossing() {
+  // The latched display forecast is the SAP's live (acceleration-aware)
+  // crossing: on the mid-ramp it beats the constant-rate crossing, and it
+  // disappears once the rate collapses below the prediction floor.
+  corridor::CorridorState cut = spArmed();
+  predictor::ShotPredictor pr;
+  predictor::armShotPredictor(pr);
+  CHECK(pr.fcTms == -1);
+  predictor::PredictorInputs in;
+  in.cut = &cut;
+  in.qPX100 = 1800;
+  in.autoMode = true;
+  in.scaleOk = true;
+  in.sampleDtMs = 100;
+  spReplay(cut, pr, spGreenW, in, 15000);
+  CHECK(pr.fcTms > 15000);
+  CHECK(pr.fcTms < 36000);
+  int32_t linear = 0;
+  CHECK(corridor::crossingMs(cut.params, 15000, spGreenW(15000), cut.rate.rateX100,
+                             cut.tauMs, cut.offsetDg, linear));
+  CHECK(pr.fcTms < linear);  // the ramp's acceleration pulls the arrival in
+  const int stallW0 = spGreenW(15000);
+  for (int t = 15100; t <= 25000; t += 100) {  // then a hard stall
+    const int32_t w = stallW0 + (t - 15000) * 42 / 100000;
+    CHECK(cut.rate.push(t, w) == corridor::RateEstimator::Result::ACCEPTED);
+    in.nowMs = t;
+    in.weightDg = w;
+    in.firstDropMs = 5200;
+    predictor::updateShotPredictor(pr, in);
+  }
+  CHECK(pr.fcTms == -1);
+}
+
 void fw01_median_final_weight_filters_dip() {
   // Post-stop drip tail with one -1.9 g dip constituent: the median of the
   // last five plausible samples swallows it, and learning consumes the
@@ -25254,6 +25287,7 @@ const TestCase testCases[] = {
     {"SP09", sp09_transient_spike_does_not_flip_fast},
     {"SP10", sp10_blend_monotone_within_class},
     {"SP11", sp11_disturbance_guard_fades_to_neutral},
+    {"SP12", sp12_forecast_latch_tracks_the_accelerated_crossing},
     {"FW01", fw01_median_final_weight_filters_dip},
     {"FW02", fw02_offset_learns_below_sensor_lag},
     {"FW03", fw03_dense_tail_decimates_to_reachable_median},

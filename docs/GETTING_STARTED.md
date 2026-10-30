@@ -111,7 +111,10 @@ computer, or select it and press Enter). The live view fills the screen,
 always in landscape, with big weight, time and flow readings beside the same
 graph as **How this preset cuts** in Settings: you watch the shot climb
 through the fast, on-recipe and slow corridors toward the red cut line, and a
-ring marks where the controller expects to stop it. The line takes the shot's
+dashed curve ending in a ring marks where the controller expects to stop it.
+The curve follows the shot's own pace — it straightens when the flow holds
+steady and bends upward as the flow speeds up, so the estimate keeps up with a
+shot that runs faster and faster. The line takes the shot's
 color as the forecast changes. Flow appears under the weight curve, in its
 own strip below the graph on a tablet. With no shot running, the view shows
 the active preset, ready for the next one, and after a shot it keeps that shot

@@ -260,7 +260,7 @@
   paint({...card,elapsedMs:15000});
   if(heroEl().dataset.tint!=='neutral')
     throw new Error('A stream without tint fields must stay neutral (legacy)');
-  paint({...card,elapsedMs:24000,tintClass:'on_recipe',tintPct:60,expectedEndMs:29400});
+  paint({...card,elapsedMs:24000,tintClass:'on_recipe',tintPct:60,fcEndMs:29400});
   if(!/^~29 s$/.test(lookup('shotHeroState').textContent))
     throw new Error('A confident green shows the landing estimate');
   paint({...card,elapsedMs:26000,tintClass:'slow',tintPct:80,weight:28,averageFlowGps:1.4,expectedEndMs:39500});
@@ -275,7 +275,7 @@
   paint({...card,elapsedMs:26000,tintClass:'fast',tintPct:100});
   if(heroEl().dataset.tint!=='fast'||lookup('shotHeroState').textContent!=='Running fast')
     throw new Error('A streamed fast tint reads Running fast');
-  paint({...card,elapsedMs:26000,tintClass:'on_recipe',tintPct:40,expectedEndMs:29400});
+  paint({...card,elapsedMs:26000,tintClass:'on_recipe',tintPct:40,fcEndMs:29400});
   // window mode ignores the stream's tint and uses the clock
   tintMode='window';
   paint({...card,elapsedMs:1500});

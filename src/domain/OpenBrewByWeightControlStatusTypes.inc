@@ -146,6 +146,8 @@ struct ControlStatusFields : ScaleLinkMetrics {
   bool cycleTargetReachedEarly = false;
   float cycleActiveStopWeightG = 0.0f;
   uint32_t cycleExpectedEndMs = 0;  // Forecast cut on the shot clock; 0 = none.
+  // SAP display forecast (acceleration-aware) on the shot clock; 0 = none.
+  uint32_t cycleForecastEndMs = 0;
   // Live hero tint from the shot predictor (0 neutral, 1 fast, 2 on_recipe,
   // 3 slow), blend percent 0..100, and note badge (ShotTintNote).
   uint8_t cycleTintClass = 0;
