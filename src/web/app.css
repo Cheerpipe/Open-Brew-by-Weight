@@ -4730,6 +4730,11 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   margin: 0;
   background: transparent;
   cursor: pointer;
+  touch-action: none;
+  /* A tap must grab the thumb, never start a text selection of the rail. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .rampHardness input[type="range"]:focus-visible {
   outline: 2px solid var(--ac);

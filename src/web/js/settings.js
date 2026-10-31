@@ -1055,10 +1055,18 @@ function syncRampChoice(side) {
     });
   }
   // The slider writes the hidden field through the shared change pipeline and
-  // paints the rail; dragging never fights a config sync (activeElement).
+  // paints the rail. A pointer drag owns the thumb: while it lasts, a config
+  // sync must not snap the value back (focus is unreliable on touch ranges).
   const range = $(side + "CurveHardnessRange");
   if (range && !range._bound) {
     range._bound = true;
+    range.addEventListener("pointerdown", () => {
+      range._dragging = true;
+    });
+    for (const end of ["pointerup", "pointercancel"])
+      range.addEventListener(end, () => {
+        range._dragging = false;
+      });
     range.addEventListener("input", () => {
       const v = Math.min(100, Math.max(0, +range.value));
       if (!hardness.disabled) {
@@ -1068,7 +1076,7 @@ function syncRampChoice(side) {
       paintHardnessSlider(side, v);
     });
   }
-  if (range && document.activeElement !== range) {
+  if (range && !range._dragging && document.activeElement !== range) {
     range.value = String(Math.round((+hardness.value || 0) * 2) / 2);
     paintHardnessSlider(side, +range.value || 0);
   }
