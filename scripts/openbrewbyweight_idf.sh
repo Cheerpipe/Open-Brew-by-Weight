@@ -474,9 +474,11 @@ obbw_idf_verify_production_profile() {
     "CONFIG_PARTITION_TABLE_CUSTOM=y"
     "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"${partition}\""
     "CONFIG_PARTITION_TABLE_FILENAME=\"${partition}\""
-    "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y"
+    "CONFIG_ESPTOOLPY_FLASHMODE_QIO=y"
+    # ESPTOOLPY_FLASHMODE stays "dio": esptool flashes the bootloader in DIO
+    # and the bootloader upgrades itself to quad while initializing.
     "CONFIG_ESPTOOLPY_FLASHMODE=\"dio\""
-    "CONFIG_ESPTOOLPY_FLASHMODE_VAL=3"
+    "CONFIG_ESPTOOLPY_FLASHMODE_VAL=1"
     "CONFIG_ESPTOOLPY_FLASHFREQ_80M=y"
     "CONFIG_ESPTOOLPY_FLASHFREQ=\"80m\""
     "CONFIG_SPIRAM_MODE_${psram_mode}=y"

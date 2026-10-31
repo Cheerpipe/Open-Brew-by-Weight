@@ -33,8 +33,10 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80=y
 # differs from the requested level.
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 
-# Qualified flash/MMU profile for the supported S3 variant.
-CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+# Qualified flash/MMU profile for the supported S3 variant. QIO doubles
+# flash read bandwidth at the same 80 MHz; the bootloader enables quad
+# mode during init (the image header stays DIO for ROM compatibility).
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 CONFIG_MMU_PAGE_SIZE_64KB=y
 

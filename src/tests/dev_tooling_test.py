@@ -1633,9 +1633,9 @@ def verify_production_profile(arch: str, selectors: list[str], integration: str 
 
 profile_common = [
     'CONFIG_PARTITION_TABLE_CUSTOM=y',
-    'CONFIG_ESPTOOLPY_FLASHMODE_DIO=y',
+    'CONFIG_ESPTOOLPY_FLASHMODE_QIO=y',
     'CONFIG_ESPTOOLPY_FLASHMODE="dio"',
-    'CONFIG_ESPTOOLPY_FLASHMODE_VAL=3',
+    'CONFIG_ESPTOOLPY_FLASHMODE_VAL=1',
     'CONFIG_ESPTOOLPY_FLASHFREQ_80M=y',
     'CONFIG_ESPTOOLPY_FLASHFREQ="80m"',
     'CONFIG_SPIRAM_SPEED_80M=y',

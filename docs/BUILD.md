@@ -347,7 +347,7 @@ their image sizes do not establish a versioned resource baseline.
 
 The final verifier also rejects drift from the qualified production profile:
 the supported build uses 16 MB flash, `partitions-n16r8.csv`, and OCT PSRAM,
-and requires DIO/80 MHz flash,
+and requires QIO/80 MHz flash,
 80 MHz PSRAM, a 32 KiB internal reserve, a 2 KiB malloc threshold above which
 `malloc()` prefers PSRAM, 64 KiB MMU pages, rollback support,
 mDNS dynamic responder allocations in PSRAM, and an internal-RAM mDNS task
