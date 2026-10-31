@@ -7,22 +7,22 @@
   },
   "limits": {
     "source.html": 133442,
-    "source.js": 679653,
-    "source.htmlJs": 813095,
+    "source.js": 680374,
+    "source.htmlJs": 813541,
     "gzip.shellHtml": 5886,
     "gzip.shellJs": 8622,
-    "gzip.css": 19552,
+    "gzip.css": 19649,
     "gzip.runtime": 44467,
     "gzip.otaImage": 3072,
     "gzip.module.records": 27340,
     "gzip.module.diagnostic": 18433,
     "gzip.module.admin": 22133,
-    "gzip.module.settings": 24599,
+    "gzip.module.settings": 24715,
     "gzip.module.setup": 9172,
     "gzip.manifest": 1024,
     "raw.icon192": 31500,
     "raw.icon48": 3500,
-    "gzip.coldHome": 77863,
-    "gzip.combined": 189461
+    "gzip.coldHome": 78010,
+    "gzip.combined": 189688
   }
 }

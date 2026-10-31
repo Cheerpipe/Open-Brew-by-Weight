@@ -1532,19 +1532,20 @@ if (rinseHeader.includes('session.') ||
 }
 if (!codeIncludes(ui, 'id="learnedOffsetG"') ||
     !codeIncludes(ui, 'id="dripSetG"') ||
-    !codeIncludes(ui, 'id="dripSetButton"') ||
+    !codeIncludes(ui, 'id="alphaSet"') ||
     html.indexOf('id="learnedOffsetG"') > html.indexOf('id="dripBars"') ||
     html.indexOf('id="dripBars"') > html.indexOf('id="dripSetG"') ||
-    html.indexOf('id="dripSetG"') > html.indexOf('id="dripSetButton"') ||
-    html.indexOf('id="dripSetButton"') > html.indexOf('id="alphaSet"') ||
+    html.indexOf('id="dripSetG"') > html.indexOf('id="alphaSet"') ||
     !codeIncludes(ui, 'Expected drip weight after the shot stops') ||
     codeIncludes(ui, 'Save new reset values first') ||
-    !css.includes('.bbwLearning .btnGlyph{flex:0 1 11rem}') ||
+    !codeIncludes(ui, 'type: "submit", className: "numSet", id: button') ||
+    !css.includes('.numBox:has(>input[data-edited])>button.numSet{width:4.6rem;border-left-color:var(--ln);opacity:1;pointer-events:auto') ||
+    !css.includes('.numBox:has(>input[data-edited])>input{padding-right:10.3rem') ||
     css.includes('#bbwAlgorithm{width:100%}') ||
     !network.includes('"dripG"') ||
     !network.includes('formatDripChartJson(drip, sizeof(drip), control)') ||
     !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightBbwQuickStart.h'), 'utf8').includes('bbwRecentG')) {
-  throw new Error('Drip compensation must show the drip, its recent shots and Set drip in order');
+  throw new Error('Drip compensation must show the drip, its recent shots and the inline Set keys in order');
 }
 if (!html.includes('<summary>Cup detection</summary>') ||
     !html.includes('<summary>Tare</summary>') ||

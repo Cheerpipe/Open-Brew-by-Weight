@@ -4,15 +4,16 @@
   // The cutoff-algorithm selector is gone: one algorithm, one alpha baseline.
   assert(!html.includes('id="bbwAlgorithm"'));
   assert(!html.includes('Linear prediction + adaptive EWMA'));
-  // Drip compensation: one value, a recent-shots chart, Set drip and Set
-  // learning speed; the starting values and the two resets are gone.
+  // Drip compensation: one value, a recent-shots chart, and the two apply
+  // keys settings.js builds inside the number fields; the starting values
+  // and the two resets are gone.
   for (const id of ['resetCalibrationButton', 'resetEwmaButton', 'weightOffsetBaselineG', 'bbwAlphaBaseline'])
     assert(!html.includes('id="' + id + '"'), id);
   for (const id of ['dripSetButton', 'alphaSetButton'])
-    assert(html.includes('id="' + id + '" class="btnGlyph mutable"'));
+    assert(!html.includes('id="' + id + '"'), id);
   assert(html.includes('id="dripSetG" type="number" min="0" max="5" step="0.01"'));
   assert(html.includes('id="alphaSet" type="number" min="0.01" max="1" step="0.01"'));
-  assert(codeIncludes(viewJs.settings, '["dripSetG", "dripSetButton", "dripG"]'));
+  assert(codeIncludes(rawViewJs.settings, '["dripSetG", "dripSetButton", "dripG", __WEBUI_TEXT__("settings.set_drip")]'));
   assert(codeIncludes(viewJs.settings, '"/api/v1/calibration/reset", { [key]: R.number(input), baseRevision: R.formRev }'));
   const node = (classes = []) => {
     const names = new Set(classes);

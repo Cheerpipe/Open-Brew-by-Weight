@@ -1149,6 +1149,51 @@ select {
   opacity: 0.65;
   pointer-events: none;
 }
+/* Fields with an inline apply key: the key sits inside the field, left of
+   the − key, and appears only while a pending edit (input[data-edited])
+   waits to be applied. It expands smoothly and leaves at once once the
+   edit is applied or dropped. */
+.numBox > button.numSet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  right: calc(5.5rem + 1px);
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-left-color: transparent;
+  border-radius: 0;
+  color: var(--ac);
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+}
+.numBox > button.numSet .g {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+}
+.numBox:has(> input[data-edited]) > button.numSet {
+  width: 4.6rem;
+  border-left-color: var(--ln);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    width 0.18s ease,
+    opacity 0.15s ease,
+    border-color 0.18s ease;
+}
+.numBox:has(> input[data-edited]) > input {
+  padding-right: 10.3rem;
+  transition: padding-right 0.18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .numBox:has(> input[data-edited]) > :is(button.numSet, input) {
+    transition: none;
+  }
+}
 textarea {
   resize: vertical;
 }
@@ -3205,9 +3250,6 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   border-right-color: transparent;
   border-radius: 50%;
   animation: busySpin 0.8s linear infinite;
-}
-.bbwLearning .btnGlyph {
-  flex: 0 1 11rem;
 }
 .dcValue {
   display: flex;

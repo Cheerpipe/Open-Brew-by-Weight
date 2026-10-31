@@ -89,8 +89,8 @@ appears while you are looking at the active preset.
 | **Earliest weight stop (s)** | Time limits | 12 s | 3–30 s, and at least the retare window plus 3 s (7 s with the default 4 s window); see [Cup protection](cup-protection.md) | The scale cannot stop the shot before this, so tare and first drops cannot trigger it. |
 | **Max shot time (s)** | Time limits | 50 s | 5–60 s | The shot always stops here, target reached or not. Ignored on timer-only and no-scale shots. Cannot exceed the hard 60 s cap. |
 | **Backup stop time (s)** | Time limits | empty | Earliest weight stop to Max shot time | Leave empty to use your recent shots, or the middle of your window until there are enough. See [scale-loss backup](auto-to-manual.md). |
-| **Expected drip weight after the shot stops (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with **Set drip** | The coffee still dripping into the cup after the stop, subtracted from the cut line. It learns from every eligible weight-stopped shot that passes its plausibility checks, shown next to a chart of what your last five shots needed. **Set drip** uses a new value from the next shot and starts a quick start. |
-| **Learning speed** | Drip compensation | 0.30 | 0.01–1.00, applied with **Set learning speed** | How strongly each shot moves the drip. It may tune itself after about 20 shots; **Set learning speed** applies a new value at once and keeps the drip. |
+| **Expected drip weight after the shot stops (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with the field's **Set** key | The coffee still dripping into the cup after the stop, subtracted from the cut line. It learns from every eligible weight-stopped shot that passes its plausibility checks, shown next to a chart of what your last five shots needed. **Set** uses a new value from the next shot and starts a quick start. |
+| **Learning speed** | Drip compensation | 0.30 | 0.01–1.00, applied with the field's **Set** key | How strongly each shot moves the drip. It may tune itself after about 20 shots; **Set** applies a new value at once and keeps the drip. |
 | **Stop after sustained weight** | Shared settings → Cup protection | ON | ON / OFF | A backup for a weight stop blocked by **Avoid accidental touch**. Fresh readings must stay above the applicable cut threshold for 1 second. Applies to every preset; takes effect on the next shot. |
 
 **Home → Presets** shows how each recipe cuts as three rows, for example
@@ -238,18 +238,20 @@ drip — a moved cup, a manual stop, or a shot the plausibility checks discarded
 — keep their bar but show it hatched with diagonal stripes, so you can see at
 a glance what was ignored; shots without a usable weight show as skipped. With
 brew by weight
-off the section is hidden; both Set buttons need an editable, idle
+off the section is hidden; each field applies through a **Set** key with a
+tick that appears inside the field, next to the − key, while your value
+differs from the one in use. The keys need an editable, idle
 configuration with no recipe change still being saved.
 
-- **Set drip** puts the value in use from your next shot and keeps it as the
+- **Set** on the drip field puts the value in use from your next shot and keeps it as the
   preset's starting point. It also starts a **quick start**: if your next three
   learning shots agree within 0.4 g, the drip moves straight to the middle one
   instead of taking the usual small step; if they don't, learning simply
   carries on. The chart marks where you set the drip and where the quick start
   decided. New presets, restored factory presets and a fresh install start the
   same way; presets kept from an earlier firmware keep their drip untouched.
-- **Set learning speed** applies a new α at once, restarts its evidence and
-  marks it as your choice; the drip stays as it is.
+- **Set** on the learning-speed field applies a new α at once, restarts its
+  evidence and marks it as your choice; the drip stays as it is.
 
 For the example above, α=0.10 gives a next offset of 1.52 g, α=0.30 gives
 1.56 g and α=0.60 gives 1.62 g. Higher α reacts faster but follows shot noise

@@ -412,7 +412,7 @@
   for (const [view, id] of [['settings', 'lineaMicraConnectButton'], ['admin', 'loginConfirmButton'],
     ['admin', 'changeDevicePasswordButton'], ['admin', 'saveNetworkButton'], ['admin', 'saveDateTimeButton'],
     ['admin', 'saveWebhookButton'], ['admin', 'saveScheduledRestartButton'],
-    ['settings', 'dripSetButton'], ['settings', 'alphaSetButton'], ['settings', 'lineaMicraSelectButton']]) {
+    ['settings', 'lineaMicraSelectButton']]) {
     const html = partialHtml[view], at = html.indexOf(`<button id="${id}"`),
       form = html.lastIndexOf('<form', at), tag = html.slice(at, html.indexOf('>', at));
     if (at < 0 || !/type="submit"/.test(tag) || html.lastIndexOf('</form>', at) > form ||
@@ -420,6 +420,12 @@
       throw new Error(`${id} must be the submit button of a novalidate .enterForm`);
     }
   }
+  // The two Drip compensation fields apply through keys settings.js builds
+  // inside their number fields; each one is its enterForm's submit button,
+  // so Enter keeps applying and the global blocker keeps the page put.
+  if (!codeIncludes(rawViewJs.settings, 'type: "submit", className: "numSet", id: button') ||
+      !codeIncludes(rawViewJs.settings, '$(input).closest(".numBox").append(apply)'))
+    throw new Error('The Drip compensation Set keys must be submit buttons inside their number fields');
   if (!codeIncludes(rawAppJsSource, 'document.addEventListener("submit", (e) => e.target.matches(".enterForm") && e.preventDefault())')) {
     throw new Error('An .enterForm must never submit or reload the page');
   }

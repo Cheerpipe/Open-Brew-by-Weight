@@ -1789,17 +1789,28 @@ export function init() {
       el.addEventListener("change", fn);
     });
   // Set drip and Set learning speed apply at once; the field keeps the
-  // owner's value until the readback confirms it.
-  for (const [input, button, key] of [
-    ["dripSetG", "dripSetButton", "dripG"],
-    ["alphaSet", "alphaSetButton", "alpha"],
+  // owner's value until the readback confirms it. The apply key lives
+  // inside the field, left of the − key, and shows only while an edit is
+  // pending (input[data-edited]); as its form's submit button it also
+  // answers Enter.
+  for (const [input, button, key, label] of [
+    ["dripSetG", "dripSetButton", "dripG", __WEBUI_TEXT__("settings.set_drip")],
+    ["alphaSet", "alphaSetButton", "alpha", __WEBUI_TEXT__("settings.set_learning_speed")],
   ]) {
+    const apply = document.createElement("button");
+    Object.assign(apply, { type: "submit", className: "numSet", id: button });
+    apply.setAttribute("aria-label", label);
+    apply.innerHTML =
+      '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l4.7 4.7L19.5 6.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">' +
+      __WEBUI_TEXT__("settings.set") +
+      "</span>";
+    $(input).closest(".numBox").append(apply);
     $(input).addEventListener("input", () => {
       $(input).dataset.edited = "1";
       R.updateBbwControls();
     });
-    $(button).onclick = () => {
-      if ($(button).disabled) return;
+    apply.onclick = () => {
+      if (apply.disabled) return;
       delete $(input).dataset.edited;
       R.command("/api/v1/calibration/reset", { [key]: R.number(input), baseRevision: R.formRev });
     };
