@@ -1255,10 +1255,16 @@ select {
   opacity: 0;
   pointer-events: none;
 }
+/* The Sure? label joins only when armed: clipping a centered label would
+   bleed a partial "Sure" into the idle key. */
 .selBox > button.selKey .t {
+  display: none;
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0;
+}
+.selBox > button.selKey.arming .t {
+  display: inline;
 }
 .selBox[data-paired] > button.selKey {
   width: 2.75rem;

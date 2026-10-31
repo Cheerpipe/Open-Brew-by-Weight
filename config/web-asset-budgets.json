@@ -6,9 +6,9 @@
     "raw": 0
   },
   "limits": {
-    "source.html": 133442,
+    "source.html": 134107,
     "source.js": 682477,
-    "source.htmlJs": 815800,
+    "source.htmlJs": 816584,
     "gzip.shellHtml": 5886,
     "gzip.shellJs": 8622,
     "gzip.css": 19893,
@@ -23,6 +23,6 @@
     "raw.icon192": 31500,
     "raw.icon48": 3500,
     "gzip.coldHome": 78296,
-    "gzip.combined": 190244
+    "gzip.combined": 190301
   }
 }
