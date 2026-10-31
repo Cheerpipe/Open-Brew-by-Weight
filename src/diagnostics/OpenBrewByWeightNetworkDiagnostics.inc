@@ -615,7 +615,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            "\"stackAlertLatched\":%s,\"loopGapAlertLatched\":%s,"
            "\"cpuLoad5s\":%.2f,\"cpuLoad1m\":%.2f,\"cpuLoad5m\":%.2f,"
            "\"cpuMhz\":%lu,\"tempC\":%.1f,\"tempPeakC\":%.1f,"
-           "\"flashReadMode\":\"%s\",\"flashReadModeBuilt\":\"%s\"},",
+           "\"flashReadMode\":\"%s\",\"flashReadModeBuilt\":\"%s\","
+           "\"flashMhz\":%lu,\"psramMhz\":%lu,\"psramMode\":\"%s\"},",
            static_cast<unsigned long>(c.uptimeMs),
            static_cast<unsigned long>(c.snapshotVersion),
            c.snapshotStale ? "true" : "false",
@@ -663,7 +664,11 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            static_cast<double>(c.hwmon.tempC),
            static_cast<double>(c.hwmon.tempPeakC),
            flashReadModeName(),
-           flashReadModeBuiltName());
+           flashReadModeBuiltName(),
+           static_cast<unsigned long>(flashClockMhz()),
+           static_cast<unsigned long>(
+               c.psramSizeBytes ? psramClockMhz() : 0U),
+           psramModeName());
 
   if (self.callbacks_.copyTaskProfiler != nullptr) {
     self.callbacks_.copyTaskProfiler(work.taskProfiler);

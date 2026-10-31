@@ -52,6 +52,56 @@ inline bool flashReadModeDegraded() {
   return strcmp(flashReadModeName(), flashReadModeBuiltName()) != 0;
 }
 
+// Live MSPI clocks. One core clock select feeds both the flash (CS0) and
+// PSRAM (CS1) dividers; mapping per the IDF flash HAL
+// (spimem_flash_ll_get_source_freq_mhz). PSRAM mode has no silent
+// degradation to detect: wrong module wiring leaves PSRAM absent, which
+// the heap metrics already show.
+inline uint32_t mspiCoreClockMhz() {
+#ifdef ARDUINO
+  switch (READ_PERI_REG(SPI_MEM_CORE_CLK_SEL_REG(0)) & SPI_MEM_CORE_CLK_SEL) {
+    case 0: return 80;
+    case 1: return 120;
+    case 2: return 160;
+    default: return 240;
+  }
+#else
+  return 0;
+#endif
+}
+
+inline uint32_t flashClockMhz() {
+#ifdef ARDUINO
+  const uint32_t clock = READ_PERI_REG(SPI_MEM_CLOCK_REG(0));
+  const uint32_t div = (clock & SPI_MEM_CLK_EQU_SYSCLK) ? 1U :
+      ((clock >> SPI_MEM_CLKCNT_N_S) & SPI_MEM_CLKCNT_N_V) + 1U;
+  return mspiCoreClockMhz() / div;
+#else
+  return 0;
+#endif
+}
+
+inline uint32_t psramClockMhz() {
+#ifdef ARDUINO
+  const uint32_t clock = READ_PERI_REG(SPI_MEM_SRAM_CLK_REG(0));
+  const uint32_t div = (clock & SPI_MEM_SCLK_EQU_SYSCLK) ? 1U :
+      ((clock >> SPI_MEM_SCLKCNT_N_S) & SPI_MEM_SCLKCNT_N_V) + 1U;
+  return mspiCoreClockMhz() / div;
+#else
+  return 0;
+#endif
+}
+
+inline const char *psramModeName() {
+#if defined(CONFIG_SPIRAM_MODE_OCT)
+  return "Octal";
+#elif defined(CONFIG_SPIRAM_MODE_QUAD)
+  return "Quad";
+#else
+  return "";
+#endif
+}
+
 // Dual-core busy load: busy_i in [0,1], total load = busy0+busy1 in [0,2].
 // 0.0 = both cores idle; 1.0 = one-core-full equivalent; 2.0 = both cores busy.
 constexpr float HWMON_CPU_LOAD_MAX = 2.0f;

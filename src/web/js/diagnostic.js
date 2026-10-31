@@ -273,12 +273,16 @@ function updH(h, s) {
     "hCpu1m",
     "hCpu5m",
     "hCpuMhz",
-    "hFlashMode",
     "hTemp",
     "hTPeak",
     "hRamT",
     "hRamU",
     "hRamF",
+    // Flash/PSRAM section: hwmon-sourced like the CPU rows above.
+    "hFlashMode",
+    "hFlashMhz",
+    "hPsramMode",
+    "hPsramClock",
   ];
   if (!h) {
     cpu
@@ -329,6 +333,9 @@ function updH(h, s) {
         : w.flashReadMode +
           __WEBUI_TEXT__("diagnostic.flash_mode_built_suffix").replace("{0}", w.flashReadModeBuilt),
   );
+  t("hFlashMhz", w.flashMhz > 0 ? w.flashMhz + __WEBUI_TEXT__("runtime.mhz") : "—");
+  t("hPsramMode", w.psramMode || "—");
+  t("hPsramClock", w.psramMhz > 0 ? w.psramMhz + __WEBUI_TEXT__("runtime.mhz") : "—");
   t("hTemp", w.tempValid ? w.tempC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");
   t("hTPeak", w.tempValid ? w.tempPeakC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");
   t("hRamT", b(w.ramTotalBytes));

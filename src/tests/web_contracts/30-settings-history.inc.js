@@ -424,14 +424,23 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !network.includes('cpuMhz') ||
       !network.includes('flashReadMode') ||
       !network.includes('flashReadModeBuilt') ||
+      !network.includes('flashMhz') ||
+      !network.includes('psramMhz') ||
+      !network.includes('psramMode') ||
       !codeIncludes(ui, 'cpuLoad5s') ||
       !codeIncludes(ui, 'cpuLoad1m') ||
       !codeIncludes(ui, 'cpuLoad5m') ||
       !codeIncludes(ui, 'cpuLoadValid') ||
       !codeIncludes(ui, 'cpuMhz') ||
       !codeIncludes(ui, 'id="hFlashMode"') ||
+      !codeIncludes(ui, 'id="hFlashMhz"') ||
+      !codeIncludes(ui, 'id="hPsramMode"') ||
+      !codeIncludes(ui, 'id="hPsramClock"') ||
       !codeIncludes(ui, 'w.flashReadMode') ||
       !codeIncludes(ui, 'w.flashReadModeBuilt') ||
+      !codeIncludes(ui, 'w.flashMhz') ||
+      !codeIncludes(ui, 'w.psramMode') ||
+      !codeIncludes(ui, 'w.psramMhz') ||
       !codeIncludes(ui, "w.cpuMhz+' MHz'") ||
       !codeIncludes(ui, 'w.cpu0Busy') ||
       !codeIncludes(ui, 'w.cpu1Busy') ||
@@ -457,6 +466,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !diagHtml.includes('<summary>WiFi</summary>') ||
       !diagHtml.includes('<summary>AP</summary>') ||
       !diagHtml.includes('<summary>CPU</summary>') ||
+      !diagHtml.includes('<summary>Flash and PSRAM</summary>') ||
       !diagHtml.includes('<summary>CPU profiling</summary>') ||
       !diagHtml.includes('<summary>RAM</summary>') ||
       !diagHtml.includes('<summary>HEAP</summary>') ||
@@ -516,7 +526,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !diagHtml.includes('<strong>Clock</strong>') ||
       !diagHtml.includes('<strong>Temp current</strong>') ||
       !diagHtml.includes('<strong>Temp peak</strong>') ||
-      (diagHtml.match(/<details/g) || []).length !== 21 ||
+      (diagHtml.match(/<details/g) || []).length !== 22 ||
       // Shot storage is its own section after HEAP and NVS, read when opened.
       diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Shot storage</summary>') ||
       diagHtml.indexOf('<summary>Shot storage</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||

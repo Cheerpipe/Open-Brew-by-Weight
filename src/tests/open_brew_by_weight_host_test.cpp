@@ -16145,6 +16145,9 @@ void sc15_status_printers_use_dump_views() {
   copyCString(health.flashReadMode, sizeof(health.flashReadMode), "QIO");
   copyCString(health.flashReadModeBuilt, sizeof(health.flashReadModeBuilt),
               "QIO");
+  health.flashMhz = 80;
+  health.psramMhz = 80;
+  copyCString(health.psramMode, sizeof(health.psramMode), "Octal");
   health.cpuLoad5s = 0.42f;
   health.cpuLoad1m = 0.55f;
   health.cpuLoad5m = 0.61f;
@@ -16173,6 +16176,9 @@ void sc15_status_printers_use_dump_views() {
   CHECK(serialTxContains("cpuMhz=80"));
   CHECK(serialTxContains("flashReadMode=QIO"));
   CHECK(serialTxContains("flashReadModeBuilt=QIO"));
+  CHECK(serialTxContains("flashMhz=80"));
+  CHECK(serialTxContains("psramMhz=80"));
+  CHECK(serialTxContains("psramMode=Octal"));
   CHECK(serialTxContains("cpuLoad5s=0.42"));
   CHECK(serialTxContains("cpuLoad1m=0.55"));
   CHECK(serialTxContains("cpuLoad5m=0.61"));
@@ -18056,6 +18062,10 @@ void h02_hwmon_cpu_load_uses_refreshed_idle_and_ema() {
   CHECK(std::string(flashReadModeName()) == "DIO");
   CHECK(std::string(flashReadModeBuiltName()) == "DIO");
   CHECK(!flashReadModeDegraded());
+  // Host stub: no MSPI registers to read; clocks report unknown.
+  CHECK(flashClockMhz() == 0U);
+  CHECK(psramClockMhz() == 0U);
+  CHECK(std::string(psramModeName()).empty());
 
   // Fully busy both cores → load 2.0
   monitor.hostSetIdleAccumUs(0, 0);

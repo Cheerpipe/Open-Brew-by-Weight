@@ -868,6 +868,9 @@ void serialCliPrintLiveHealth() {
               flashReadModeName());
   copyCString(dump.flashReadModeBuilt, sizeof(dump.flashReadModeBuilt),
               flashReadModeBuiltName());
+  dump.flashMhz = flashClockMhz();
+  dump.psramMhz = psramSizeBytes ? psramClockMhz() : 0U;
+  copyCString(dump.psramMode, sizeof(dump.psramMode), psramModeName());
   dump.cpuLoad5s = hwmonSnapshot.cpuLoad5s;
   dump.cpuLoad1m = hwmonSnapshot.cpuLoad1m;
   dump.cpuLoad5m = hwmonSnapshot.cpuLoad5m;

@@ -769,6 +769,13 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     telemetry.field("health.hwmon.flashReadMode", "\"%s\"", flashReadModeName());
     telemetry.field("health.hwmon.flashReadModeBuilt", "\"%s\"",
                     flashReadModeBuiltName());
+    // PSRAM clock only when PSRAM came up; a dead divider would lie.
+    telemetry.field("health.hwmon.flashMhz",
+                    static_cast<unsigned long>(flashClockMhz()));
+    telemetry.field("health.hwmon.psramMhz",
+                    static_cast<unsigned long>(
+                        control.psramSizeBytes ? psramClockMhz() : 0U));
+    telemetry.field("health.hwmon.psramMode", "\"%s\"", psramModeName());
     // Steady-state RSSI sits behind the 1 s sampler; 4 s display matches the
     // retired poll. Link edges still land immediately via the EVENT fields.
     if (network.staLinkMetricsValid)

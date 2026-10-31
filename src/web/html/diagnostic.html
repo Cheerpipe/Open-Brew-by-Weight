@@ -32,6 +32,10 @@
     <rect x="7" y="7" width="10" height="10" rx="1.5" />
     <path d="M10 3v4m4-4v4m-4 10v4m4-4v4M3 10h4m-4 4h4m10-4h4m-4 4h4" />
   </symbol>
+  <symbol id="dg-flash-psram" viewBox="0 0 24 24">
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <path d="M13 7l-4 5h3l-1 5 4-5h-3l1-5Z" />
+  </symbol>
   <symbol id="dg-tasks" viewBox="0 0 24 24">
     <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
   </symbol>
@@ -423,16 +427,33 @@
           <div id="hCpuMhz">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.flash_read_mode}}</strong>
-          <div id="hFlashMode">—</div>
-        </div>
-        <div class="metric">
           <strong>{{webui:diagnostic.temp_current}}</strong>
           <div id="hTemp">—</div>
         </div>
         <div class="metric">
           <strong>{{webui:diagnostic.temp_peak}}</strong>
           <div id="hTPeak">—</div>
+        </div>
+      </div>
+    </details>
+    <details class="cfgGroup" data-g="flash-psram">
+      <summary>{{webui:diagnostic.flash_and_psram}}</summary>
+      <div class="statusColumn">
+        <div class="metric">
+          <strong>{{webui:diagnostic.flash_read_mode}}</strong>
+          <div id="hFlashMode">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.flash_clock}}</strong>
+          <div id="hFlashMhz">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.psram_mode}}</strong>
+          <div id="hPsramMode">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.psram_clock}}</strong>
+          <div id="hPsramClock">—</div>
         </div>
       </div>
     </details>
