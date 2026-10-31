@@ -66,8 +66,7 @@ esp_err_t OpenBrewByWeightNetwork::timeZonePreviewHandler(httpd_req_t *request) 
   cJSON_Delete(root);
   self.unlockJsonBody();
   if (error != nullptr)
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_TIMEZONE", error,
-                     nullptr);
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_TIMEZONE", error, nullptr);
   const TimeStatusSnapshot clock = g_wallClock.snapshot(millis());
   const uint32_t utcSec = clock.utcSec != 0 ? clock.utcSec : browserUtcSec;
   int16_t offset = 0;
@@ -552,8 +551,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (parseError != nullptr) {
     memset(customNtp, 0, sizeof(customNtp));
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     parseError, nullptr);
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD", parseError, nullptr);
   }
   if (dateTimePatch && !browserTimezonePatch && !self.requireAdminUnlock(request)) {
     memset(customNtp, 0, sizeof(customNtp));
@@ -834,8 +832,7 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *requ
   }
   self.unlockJsonBody();
   if (parseError != nullptr) {
-    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", parseError,
-                     nullptr);
+    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", parseError, nullptr);
   }
 
   WebCommand command;
@@ -891,8 +888,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleFriendlyNameHandler(httpd_req_t *request
   }
   if (parseError != nullptr) {
     self.unlockJsonBody();
-    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", parseError,
-                     nullptr);
+    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", parseError, nullptr);
   }
 
   if (self.callbacks_.copyScaleHistory != nullptr) {
@@ -1094,8 +1090,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
   }
   self.unlockJsonBody();
   if (parseError != nullptr) {
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     parseError, nullptr);
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD", parseError, nullptr);
   }
 
   command.presetAction = static_cast<uint8_t>(presetAction);
