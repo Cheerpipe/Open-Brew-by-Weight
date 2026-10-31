@@ -12,8 +12,10 @@ Bookoo-specific volume / combined tare. Machine-level, under
 **Settings → Shared settings → Scale**.
 
 Choosing a **My scale** saves it right away, like every other setting on the
-page. **Forget scale** and **(rename)** are separate actions that take effect
-when confirmed.
+page. While a saved scale is the selected value, the dropdown carries a
+**Forget** key (×) inside it, left of the arrow: the first tap arms it and a
+second tap forgets the scale — discovery pauses for 30 s and your history
+stays. **(rename)** is a separate action that takes effect when confirmed.
 
 Daily defaults assume a **Bookoo** Themis Mini or Ultra. **Acaia**,
 **Felicita**, **AtomHeart Eclair**, **Decent**, **DiFluid Microbalance**,
@@ -176,7 +178,7 @@ drip learning, and the scale-loss backup's recent shots.
 | Setting | Default | Range / notes | Effect |
 | --- | --- | --- | --- |
 | **Which scale** | My scale first | Any scale / My scale first / Only my scale | **Any scale** connects whichever compatible scale appears first and never locks it. **My scale first** waits briefly for the preferred scale, then accepts another. **Only my scale** connects only to the saved preferred scale. If either selected mode has no saved scale yet, it uses the bootstrap flow below. |
-| **My scale** | First detected | First detected, No preferred, or a BLE-seen scale | **First detected** is shown only while no preferred MAC is saved and **My scale first** or **Only my scale** is active. The controller scans by compatible name and adopts the first scale that completes a successful connection; advertisements and failed connections are not enough. **Any scale** instead shows **None saved** because that mode never locks a scale. **Forget scale** pauses discovery for 30 s, keeps history, and keeps the current Scale preference. |
+| **My scale** | First detected | First detected, No preferred, or a BLE-seen scale | **First detected** is shown only while no preferred MAC is saved and **My scale first** or **Only my scale** is active. The controller scans by compatible name and adopts the first scale that completes a successful connection; advertisements and failed connections are not enough. **Any scale** instead shows **None saved** because that mode never locks a scale. The dropdown's **Forget** key pauses discovery for 30 s, keeps history, and keeps the current Scale preference. |
 | **Drip delay (s)** | 3.0 s | 0–10 s | Wait after a shot ends before capturing the final post-drip weight. `0` finalizes on the next control loop with no intentional window. |
 | **Scale timer stop delay (ms)** | 0 ms | 0–1000 ms | Pad after the scale timer catches up to circuit whole seconds, before `STOP_TIMER`. `0` stops in that same instant. Does not delay the local machine circuit beep. |
 | **Bookoo combined command** | ON | ON / OFF | Combined tare + start-timer. Requires automatic tare at shot start. Also listed under [Tare](tare.md). |
@@ -246,9 +248,9 @@ rejects readings older than 1 s, before that link timeout. Check
 
 1. Turn off other compatible scales and close phone apps connected to the one
    you want.
-2. Select the intended remembered scale (it is saved at once), or choose
-   **Forget scale** for a new one.
-   Clearing pauses discovery for 30 s; it does not erase scale history.
+2. Select the intended remembered scale (it is saved at once), or use the
+   dropdown's **Forget** key for a new one.
+   Forgetting pauses discovery for 30 s; it does not erase scale history.
 3. With **Only my scale** and no saved preference, let the intended scale
    complete its first connection. Check Home for fresh weight, not just a name.
 4. If discovery is slow, check **Admin → Power management → BLE scan mode**:

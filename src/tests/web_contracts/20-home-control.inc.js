@@ -875,6 +875,15 @@ if (!statusSection || !statusSection[1].includes('class="lamp"') ||
     !codeIncludes(ui, 'id="preferredScaleBootstrapHint"') ||
     !codeIncludes(ui, 'id="scalePreference"') ||
     !codeIncludes(ui, 'id="forgetPairedScale"') ||
+    // The Forget action is a key inside the My scale dropdown, left of the
+    // arrow segment: armed by a first tap, fired by the second.
+    !codeIncludes(ui, 'class="selKey"') ||
+    !codeIncludes(ui, 'sel.closest(".selBox").toggleAttribute("data-paired"') ||
+    !codeIncludes(ui, 'key.classList.add("arming")') ||
+    !css.includes('.selBox[data-paired]>button.selKey{width:2.75rem;border-left-color:var(--ln);opacity:1;pointer-events:auto') ||
+    !css.includes('.selBox[data-paired]>select{padding-right:calc(6.15rem + 1px)') ||
+    !css.includes('.selBox:has(>button.selKey.arming)>select{padding-right:calc(8rem + 1px)}') ||
+    !css.includes('.selBox>button.selKey.arming,.selBox>button.selKey.arming:hover{width:4.6rem;background:var(--mw)}') ||
     !codeIncludes(ui, 'Which scale') ||
     !codeIncludes(ui, 'Any scale') ||
     !codeIncludes(ui, 'First detected') ||

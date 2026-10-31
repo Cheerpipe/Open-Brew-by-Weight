@@ -866,23 +866,23 @@
         <span id="preferredScaleSelectRenameWrap" class="hidden"
           >- <a id="preferredScaleRename" href="#">{{webui:settings.rename}}</a></span
         ><br /><span id="preferredScalePauseHint" class="fieldHint"></span
-        ><select id="preferredScaleSelect" aria-label="{{webui:settings.preferred_scale}}">
-          <option value="">{{webui:settings.first_detected}}</option></select
+        ><span class="selBox"
+          ><select id="preferredScaleSelect" aria-label="{{webui:settings.preferred_scale}}">
+            <option value="">{{webui:settings.first_detected}}</option></select
+          ><button
+            id="forgetPairedScale"
+            class="selKey"
+            title="{{webui:runtime.clear_the_preferred_scale_discovery_pauses_for}}"
+            aria-label="{{webui:settings.clear_preferred}}"
+            type="button"
+          >
+            <span class="g" aria-hidden="true">×</span
+            ><span class="t" aria-hidden="true">{{webui:settings.forget_scale_sure}}</span>
+          </button></span
         ><small id="preferredScaleBootstrapHint" class="fieldHint"
           >{{webui:settings.first_detected_is_shown_until_a_compatible}}</small
         >
       </p>
-      <div class="btnBar">
-        <button
-          id="forgetPairedScale"
-          class="btnGlyph btnWarn"
-          title="{{webui:settings.clear_preferred_scale}}"
-          type="button"
-        >
-          <span class="g" aria-hidden="true">×</span
-          ><span class="t">{{webui:settings.clear_preferred}}</span>
-        </button>
-      </div>
       <details data-g="bookoo" class="cfgGroup">
         <summary>{{webui:settings.bookoo}}</summary>
         <label

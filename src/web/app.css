@@ -1217,6 +1217,104 @@ select {
     transition: none;
   }
 }
+/* The saved-scale dropdown carries its Forget key inside the control, in
+   the number-field key idiom: the key takes the segment left of the
+   select's own chevron zone (same 2.75rem width, so the × and the chevron
+   share their center line). The key exists only while a saved scale is the
+   selected value; its first tap arms (warm wash, Sure? revealed), the
+   second forgets. */
+.selBox {
+  position: relative;
+  display: block;
+  margin-top: 0.35rem;
+}
+.selBox > select {
+  margin: 0;
+}
+.selBox > button.selKey {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  right: calc(2.75rem + 1px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  border-left: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--ac);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+.selBox > button.selKey .t {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.selBox[data-paired] > button.selKey {
+  width: 2.75rem;
+  border-left-color: var(--ln);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    width 0.18s ease,
+    opacity 0.15s ease,
+    border-color 0.18s ease;
+}
+.selBox[data-paired] > select {
+  padding-right: calc(6.15rem + 1px);
+  transition: padding-right 0.18s ease;
+}
+.selBox:has(> button.selKey.arming) > select {
+  padding-right: calc(8rem + 1px);
+}
+.selBox > button.selKey:not(:disabled):hover {
+  background: var(--pa);
+}
+.selBox > button.selKey:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.selBox > button.selKey.arming,
+.selBox > button.selKey.arming:hover {
+  width: 4.6rem;
+  background: var(--mw);
+}
+@media (prefers-reduced-motion: reduce) {
+  .selBox[data-paired] > :is(button.selKey, select) {
+    transition: none;
+  }
+}
+/* The dropdown arrow: the same hollow angle as the settings groups, drawn
+   on the wrapper because <select> takes no pseudo-elements. A rotated
+   square keeps only its right and bottom borders — stroke only, no fill —
+   at the 2px weight of the − and + keys. The select keeps the 1px divider
+   of its 2.75rem arrow zone. */
+.selBox::after {
+  content: "";
+  position: absolute;
+  top: calc(50% - 0.1rem);
+  right: 1.1rem;
+  width: 0.46rem;
+  height: 0.46rem;
+  border: solid var(--fg);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-50%) rotate(45deg);
+  pointer-events: none;
+}
+.selBox:has(> select:disabled)::after {
+  opacity: 0.65;
+}
+
 textarea {
   resize: vertical;
 }
@@ -1250,29 +1348,15 @@ input[type="password"],
 input[type="url"] {
   appearance: none;
 }
-/* Hollow chevron: the filled chevron in var(--fg) with an identical one in
-   the field background var(--in) shifted straight down cuts a uniform
-   ~2px stroke — the weight of the − and + keys and the group chevrons. */
+/* Dropdowns keep the native look off and reserve a 2.75rem arrow zone on
+   the right, closed off by a 1px divider; the arrow itself is the .selBox
+   wrapper's chevron. */
 select {
   appearance: none;
   padding-right: 3.4rem;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--in) 50%),
-    linear-gradient(135deg, var(--in) 50%, transparent 50%),
-    linear-gradient(45deg, transparent 50%, var(--fg) 50%),
-    linear-gradient(135deg, var(--fg) 50%, transparent 50%), linear-gradient(var(--ln), var(--ln));
-  background-position:
-    calc(100% - 1.35rem) calc(50% + 0.06rem),
-    calc(100% - 1rem) calc(50% + 0.06rem),
-    calc(100% - 1.35rem) calc(50% - 0.12rem),
-    calc(100% - 1rem) calc(50% - 0.12rem),
-    calc(100% - 2.75rem) 0;
-  background-size:
-    0.4rem 0.4rem,
-    0.4rem 0.4rem,
-    0.4rem 0.4rem,
-    0.4rem 0.4rem,
-    1px 100%;
+  background-image: linear-gradient(var(--ln), var(--ln));
+  background-position: calc(100% - 2.75rem) 0;
+  background-size: 1px 100%;
   background-repeat: no-repeat;
 }
 ::placeholder {

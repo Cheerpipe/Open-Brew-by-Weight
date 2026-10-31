@@ -633,11 +633,7 @@ function applySettingsStatus(s) {
   R.uiState.bbwReadback = { ...s.config, ...s.config.bbwDrip };
   updatePreferredScaleSelect(s);
   const sc = s.scale || {};
-  if ($("forgetPairedScale"))
-    $("forgetPairedScale").disabled = !(
-      R.controlsMutable &&
-      (sc.preferredMac || sc.macCachePauseRemainingMs > 0)
-    );
+  syncScaleForgetKey(!(R.controlsMutable && (sc.preferredMac || sc.macCachePauseRemainingMs > 0)));
   R.loadSettingsConfig(s);
   loadBullseyeConfig(s.config);
   applyLineaMicraStatus(s);
@@ -667,8 +663,31 @@ function applySettingsStatus(s) {
       }
   refreshBrewWarnings();
 }
+// The Forget key lives inside the My scale dropdown: present only while a
+// saved scale is the selected value, armed by a first tap (warm wash) and
+// fired by the second. Outside taps, Escape, a dropdown change or a
+// status-driven disable disarm it.
+let forgetArmed;
+function disarmForgetKey() {
+  clearTimeout(forgetArmed);
+  $("forgetPairedScale")?.classList.remove("arming");
+}
+function syncScaleForgetKey(disabled) {
+  const key = $("forgetPairedScale"),
+    sel = $("preferredScaleSelect");
+  if (!key || !sel) return;
+  if (disabled !== undefined) key.disabled = disabled;
+  sel.closest(".selBox").toggleAttribute("data-paired", sel.value !== "");
+  if (key.disabled) disarmForgetKey();
+}
 async function forgetPairedScale() {
-  if (!confirm(__WEBUI_TEXT__("runtime.clear_the_preferred_scale_discovery_pauses_for"))) return;
+  const key = $("forgetPairedScale");
+  if (!key.classList.contains("arming")) {
+    key.classList.add("arming");
+    forgetArmed = setTimeout(disarmForgetKey, 2500);
+    return;
+  }
+  disarmForgetKey();
   await R.command("/api/v1/scale/preferred/clear", {});
 }
 function selectPreferredScale() {
@@ -1709,8 +1728,14 @@ export function init() {
     };
   if ($("scalePreference")) $("scalePreference").onchange = R.updateScalePreferenceOptions;
   $("forgetPairedScale").onclick = forgetPairedScale;
+  document.addEventListener("pointerdown", (e) => {
+    if (!e.target.closest(".selBox")) disarmForgetKey();
+  });
+  document.addEventListener("keydown", (e) => e.key === "Escape" && disarmForgetKey());
   if ($("preferredScaleSelect"))
     $("preferredScaleSelect").onchange = () => {
+      disarmForgetKey();
+      syncScaleForgetKey();
       selectPreferredScale();
       R.updateScalePreferenceOptions();
     };

@@ -532,7 +532,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       diagHtml.indexOf('<summary>Shot storage</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
       !codeIncludes(ui, '$("shotStorage").addEventListener("toggle", loadShotStorage)') ||
       !codeIncludes(ui, 'R.api("/api/v1/diagnostic/shot-storage", { timeoutMs: 15e3 })') ||
-      !diagHtml.includes('<details><summary>Last 10 resets</summary>') ||
+      !diagHtml.includes('<details class="fold"><summary>Last 10 resets</summary>') ||
       diagHtml.includes('<summary>Diagnostics</summary>') ||
       !diagHtml.includes('id="hFirmware"') ||
       !diagHtml.includes('id="hBoot"') ||
