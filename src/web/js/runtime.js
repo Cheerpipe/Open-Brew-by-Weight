@@ -5774,12 +5774,12 @@ function renderHeroChart(host, model, m, goal, label) {
         ),
       );
     // The on-recipe stretch of the cut line carries the target above the
-    // line, right-aligned like the preset graph's label.
+    // line, ending a breath inside the right edge like the preset graph.
     over.push(
       put(
         "hold end",
         sub(__WEBUI_TEXT__("runtime.graph_target"), [+m.goal.toFixed(1)]),
-        100,
+        96.5,
         Y(m.goal),
       ),
     );
