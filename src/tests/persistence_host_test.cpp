@@ -1015,12 +1015,6 @@ void p70_scale_history_session_consumption_is_bounded_and_reopenable() {
       entries, seq, "AA:BB:CC:DD:EE:99", "Overflow"));
   CHECK(scaleHistoryOccupiedCount(entries) == SCALE_HISTORY_CAPACITY);
 
-  reopenScaleHistorySessionConnection(entries, "aa:bb:cc:dd:ee:03");
-  CHECK(consumeScaleHistorySessionConnection(
-      entries, seq, "AA:BB:CC:DD:EE:03", "Bookoo"));
-  CHECK(!consumeScaleHistorySessionConnection(
-      entries, seq, "AA:BB:CC:DD:EE:03", "Bookoo"));
-
   for (ScaleHistoryEntry &entry : entries) {
     clearScaleHistorySessionMarker(entry);
   }

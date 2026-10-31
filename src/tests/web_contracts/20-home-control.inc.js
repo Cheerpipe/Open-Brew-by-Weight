@@ -918,7 +918,7 @@ if (!statusSection || !statusSection[1].includes('class="lamp"') ||
     codeIncludes(ui, 'Always use this scale') ||
     !codeIncludes(ui, 'function selectPreferredScale(') ||
     !codeIncludes(ui, 'function forgetPairedScale(') ||
-    !codeIncludes(ui, 'Saved scales stay in the list') ||
+    !codeIncludes(ui, 'It leaves the saved list (rename included)') ||
     !codeIncludes(ui, 'formatPreferredScale(s)') ||
     !codeIncludes(ui, 'macCachePauseRemainingMs>0') ||
     codeIncludes(ui, 'id="preferredScaleSettings"') ||

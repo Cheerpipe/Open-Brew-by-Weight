@@ -1158,19 +1158,6 @@ inline bool consumeScaleHistorySessionConnection(
   return false;
 }
 
-inline void reopenScaleHistorySessionConnection(ScaleHistoryEntry *entries,
-                                                const char *mac) {
-  if (entries == nullptr || mac == nullptr || mac[0] == '\0') {
-    return;
-  }
-  for (size_t i = 0; i < SCALE_HISTORY_CAPACITY; ++i) {
-    if (preferredScaleMacEqual(entries[i].mac, mac)) {
-      clearScaleHistorySessionMarker(entries[i]);
-      return;
-    }
-  }
-}
-
 inline void seedScaleHistoryFromPreferred(ScaleHistoryEntry *entries,
                                           uint32_t &seqCounter,
                                           const char *mac, const char *name) {

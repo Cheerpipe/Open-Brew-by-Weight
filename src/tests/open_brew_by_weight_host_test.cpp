@@ -6554,6 +6554,7 @@ void d06_forget_pauses_discovery_for_30s() {
       static_cast<uint8_t>(ScaleMacCacheMode::ONLY);
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
+  noteScaleHistory("AA:BB:CC:DD:EE:FF", "BOOKOO_SC 369041", false);
   uint32_t lastScanCycleMs = 0;
   uint32_t lastConnectLogMs = 0;
   bool connectAttemptSeriesActive = false;
@@ -6566,6 +6567,10 @@ void d06_forget_pauses_discovery_for_30s() {
   const size_t callsBeforeForget = scale.startScanCalls;
   scale.connected = true;
   clearPreferredScaleCache();
+  // Forgetting removes the learned record: the scale leaves the saved list.
+  char forgottenName[PREFERRED_SCALE_NAME_CAPACITY] = {};
+  CHECK(!findScaleHistoryFriendlyName(scaleHistory, "AA:BB:CC:DD:EE:FF",
+                                      forgottenName, sizeof(forgottenName)));
   serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
                               connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
   CHECK(!scale.connected);

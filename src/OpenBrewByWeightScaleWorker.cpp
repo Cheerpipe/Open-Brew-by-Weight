@@ -1995,7 +1995,14 @@ bool setScaleFriendlyName(const char *mac, const char *name) {
 
 void clearPreferredScaleCache() {
   scalePreferredMacMux.lock();
-  reopenScaleHistorySessionConnection(scaleHistory, scalePreferredMac);
+  // Forgetting drops the learned record too: the scale leaves the saved
+  // list and its rename, and returns unnamed if it is ever re-learned.
+  for (ScaleHistoryEntry &entry : scaleHistory) {
+    if (preferredScaleMacEqual(entry.mac, scalePreferredMac)) {
+      entry = ScaleHistoryEntry{};
+      break;
+    }
+  }
   scalePreferredMac[0] = '\0';
   scalePreferredName[0] = '\0';
   scalePreferredMacDirty = true;
@@ -2004,7 +2011,8 @@ void clearPreferredScaleCache() {
   scalePreferredResetReasonBits |= SCALE_PREFERENCE_RESET_IDENTITY;
   scalePreferredMacMux.unlock();
   serialTraceCategory(LogLevel::INFO, DebugCategory::SCALE,
-                      "Paired scale forgotten; looking paused for 30 s");
+                      "Paired scale forgotten and removed from the scale "
+                      "list; looking paused for 30 s");
 }
 
 void logScaleConnectionFailed(bool directed) {
