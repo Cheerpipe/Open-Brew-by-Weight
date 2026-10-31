@@ -196,7 +196,7 @@ esp_err_t OpenBrewByWeightNetwork::workBufBusy(httpd_req_t *request) {
   actionLogf("http: %.*s answered busy: response workspace unavailable",
              static_cast<int>(strcspn(request->uri, "?")), request->uri);
   return sendError(request, STATUS_UNAVAILABLE, "STATUS_BUSY",
-                   "Status snapshot is busy; retry shortly.");
+                   "Status snapshot is busy; retry shortly.", "STATUS_BUSY");
 }
 
 bool OpenBrewByWeightNetwork::enqueueAcceptedCommand(const WebCommand &command) {

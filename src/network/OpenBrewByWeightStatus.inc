@@ -19,7 +19,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
 
   if (!statusPageIsAdmin(request->uri)) {
     return sendError(request, "404 Not Found", "STATUS_PAGE_UNKNOWN",
-                     "Unknown status page; use /api/v1/status/admin.");
+                     "Unknown status page; use /api/v1/status/admin.", "STATUS_PAGE_UNKNOWN");
   }
 
   // JSON / snapshot work lives in one PSRAM-only blob.
@@ -326,7 +326,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
   if (!ok) {
     const esp_err_t tooLarge =
         sendError(request, "500 Internal Server Error", "STATUS_TOO_LARGE",
-                  "Status snapshot exceeds its size limit.");
+                  "Status snapshot exceeds its size limit.", "STATUS_TOO_LARGE");
     self.unlockWorkBuf();
     return tooLarge;
   }
