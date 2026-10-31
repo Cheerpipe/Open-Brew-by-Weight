@@ -6571,6 +6571,8 @@ void d06_forget_pauses_discovery_for_30s() {
   char forgottenName[PREFERRED_SCALE_NAME_CAPACITY] = {};
   CHECK(!findScaleHistoryFriendlyName(scaleHistory, "AA:BB:CC:DD:EE:FF",
                                       forgottenName, sizeof(forgottenName)));
+  CHECK(scalePreferredMac[0] == '\0');
+  CHECK(scalePreferredMacDirty);
   serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
                               connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
   CHECK(!scale.connected);
