@@ -203,7 +203,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     const esp_err_t result = ok
         ? sendJson(request, STATUS_OK, self.workBuf_->statusJson)
         : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
-                    "The integration snapshot exceeded its fixed buffer.");
+                    "The integration snapshot exceeded its fixed buffer.", "INTEGRATION_SNAPSHOT_OVERFLOW");
     self.unlockWorkBuf();
     return result;
   }
@@ -225,7 +225,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     const esp_err_t result = ok
         ? sendJson(request, STATUS_OK, self.workBuf_->presetsJson)
         : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
-                    "The preset snapshot exceeded its fixed buffer.");
+                    "The preset snapshot exceeded its fixed buffer.", "PRESET_SNAPSHOT_OVERFLOW");
     self.unlockWorkBuf();
     return result;
   }
@@ -251,7 +251,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     if (read == ShotCurveRead::BUSY) {
       self.unlockWorkBuf();
       return sendError(request, STATUS_UNAVAILABLE, "SHOT_CURVE_BUSY",
-                       "The last shot's curve is not loaded yet; retry shortly.");
+                       "The last shot's curve is not loaded yet; retry shortly.", "SHOT_CURVE_BUSY");
     }
     const bool hasCurve = read == ShotCurveRead::FOUND;
     const bool rowOk =
@@ -265,7 +265,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     const esp_err_t result = ok
         ? sendJson(request, STATUS_OK, work.statusJson)
         : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
-                    "The last shot exceeded its fixed buffer.");
+                    "The last shot exceeded its fixed buffer.", "LAST_SHOT_OVERFLOW");
     self.unlockWorkBuf();
     return result;
   }
@@ -326,7 +326,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
         written > 0 && static_cast<size_t>(written) < NetworkWorkBuf::kStatusJson
             ? sendJson(request, STATUS_OK, self.workBuf_->statusJson)
             : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
-                        "The webhook status exceeded its fixed buffer.");
+                        "The webhook status exceeded its fixed buffer.", "WEBHOOK_STATUS_OVERFLOW");
     self.unlockWorkBuf();
     return result;
   }
@@ -334,7 +334,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
   if (apiUriMatches(uri, "/api/v1/integration/webhook/test") &&
       request->method == HTTP_POST) {
     const esp_err_t bodyStatus = self.lockJsonBody(
-        request, "A bounded JSON request is required.");
+        request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
     if (bodyStatus != ESP_OK) return bodyStatus;
     cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
     char correlation[65] = {};
@@ -352,7 +352,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.unlockJsonBody();
     if (!parsed)
       return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                       "correlationId must be 1-64 URL-safe characters.");
+                       "correlationId must be 1-64 URL-safe characters.", "CORRELATION_ID_INVALID");
     WebhookEvent event;
     event.type = WebhookEventType::TEST;
     event.uptimeMs = millis();
@@ -360,7 +360,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     copyCString(event.correlationId, sizeof(event.correlationId), correlation);
     if (!self.webhooks_.enqueue(event))
       return sendError(request, STATUS_UNAVAILABLE, "WEBHOOK_UNAVAILABLE",
-                       "The test event could not be queued.");
+                       "The test event could not be queued.", "WEBHOOK_TEST_NOT_QUEUED");
     return sendJson(request, STATUS_ACCEPTED,
                     "{\"apiVersion\":1,\"queued\":true}");
   }
@@ -371,9 +371,9 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     if (!controlAllowsConfiguration(gate))
       return sendError(request, STATUS_CONFLICT,
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                       "Webhook settings are locked while a cycle is active.");
+                       "Webhook settings are locked while a cycle is active.", "WEBHOOK_SETTINGS_LOCKED_ACTIVE_CYCLE");
     const esp_err_t bodyStatus = self.lockJsonBody(
-        request, "A bounded webhook JSON request is required.");
+        request, "A bounded webhook JSON request is required.", "WEBHOOK_BOUNDED_JSON_REQUIRED");
     if (bodyStatus != ESP_OK) return bodyStatus;
     cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
     WebhookConfig candidate = {};
@@ -393,7 +393,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.unlockJsonBody();
     if (!parsed)
       return sendError(request, STATUS_UNPROCESSABLE, "INVALID_REQUEST",
-                       "A valid bounded http:// webhook configuration is required.");
+                       "A valid bounded http:// webhook configuration is required.", "WEBHOOK_CONFIG_INVALID");
     WebCommand command;
     command.type = WebCommandType::SAVE_WEBHOOK;
     command.requestId = self.allocateRequestId();
@@ -407,11 +407,11 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.dataMux_.unlock();
     if (!available)
       return sendError(request, STATUS_UNAVAILABLE, "REQUEST_BUSY",
-                       "Another webhook update is pending.");
+                       "Another webhook update is pending.", "WEBHOOK_UPDATE_PENDING");
     if (!self.callbacks_.enqueueWebCommand(command)) {
       self.clearStagedWebhook(command.requestId);
       return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                       "Control is busy; webhook settings were not saved.");
+                       "Control is busy; webhook settings were not saved.", "WEBHOOK_SAVE_BUSY");
     }
     return self.sendAccepted(request, command.requestId,
                              "\"apiVersion\":1");
@@ -423,9 +423,9 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     if (!controlAllowsConfiguration(gate))
       return sendError(request, STATUS_CONFLICT,
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                       "Quick Settings are locked while a cycle is active.");
+                       "Quick Settings are locked while a cycle is active.", "QUICK_SETTINGS_LOCKED_ACTIVE_CYCLE");
     const esp_err_t bodyStatus = self.lockJsonBody(
-        request, "A bounded Quick Settings JSON request is required.");
+        request, "A bounded Quick Settings JSON request is required.", "QUICK_SETTINGS_BOUNDED_JSON_REQUIRED");
     if (bodyStatus != ESP_OK) return bodyStatus;
     cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
     IntegrationQuickSettingRequest parsedRequest;
@@ -435,13 +435,13 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     if (!parsed)
       return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
                        "Provide baseRevision and one or more valid Quick Settings fields, "
-                       "or revertAfter or revertNow alone.");
+                       "or revertAfter or revertNow alone.", "QUICK_SETTINGS_FIELDS_INVALID");
     RecipeSnapshot recipe;
     if (self.callbacks_.copyRecipeSnapshot != nullptr)
       self.callbacks_.copyRecipeSnapshot(&recipe);
     if (parsedRequest.baseRevision != recipe.runtime.revision)
       return sendError(request, STATUS_CONFLICT, "STALE_REVISION",
-                       "Quick Settings changed; refresh and retry.");
+                       "Quick Settings changed; refresh and retry.", "QUICK_SETTINGS_CHANGED_RETRY");
     WebCommand command;
     command.type = WebCommandType::QUICK_SETTING;
     command.requestId = self.allocateRequestId();
@@ -461,14 +461,14 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.dataMux_.unlock();
     if (!available)
       return sendError(request, STATUS_CONFLICT, "REQUEST_BUSY",
-                       "Another settings update is pending.");
+                       "Another settings update is pending.", "SETTINGS_UPDATE_PENDING");
     if (!self.callbacks_.enqueueWebCommand(command)) {
       self.dataMux_.lock();
       rollbackIntegrationStagedRequest(self.stagedPresetRequestId_,
                                        command.requestId);
       self.dataMux_.unlock();
       return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                       "Control is busy; Quick Settings were not changed.");
+                       "Control is busy; Quick Settings were not changed.", "QUICK_SETTINGS_BUSY");
     }
     return self.sendAccepted(request, command.requestId,
                              "\"apiVersion\":1");
@@ -477,7 +477,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
   if (apiUriMatches(uri, "/api/v1/integration/restart") &&
       request->method == HTTP_POST) {
     const esp_err_t bodyStatus = self.lockJsonBody(
-        request, "An empty bounded JSON object is required.");
+        request, "An empty bounded JSON object is required.", "EMPTY_BOUNDED_JSON_REQUIRED");
     if (bodyStatus != ESP_OK) return bodyStatus;
     cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
     const bool parsed = parseIntegrationRestartRequest(root);
@@ -485,7 +485,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.unlockJsonBody();
     if (!parsed)
       return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                       "Restart requires an empty JSON object.");
+                       "Restart requires an empty JSON object.", "RESTART_REQUIRES_EMPTY_OBJECT");
     return self.enqueueAcceptedCommand(request, WebCommandType::RESTART, false,
                                   "Control is busy; restart was not queued.",
                                   "\"apiVersion\":1");
@@ -497,9 +497,9 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     if (!controlAllowsConfiguration(gate))
       return sendError(request, STATUS_CONFLICT,
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                       "Presets are locked while a cycle is active.");
+                       "Presets are locked while a cycle is active.", "PRESETS_LOCKED_ACTIVE_CYCLE");
     const esp_err_t bodyStatus = self.lockJsonBody(
-        request, "A bounded JSON request is required.");
+        request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
     if (bodyStatus != ESP_OK) return bodyStatus;
     cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
     uint8_t id = 0;
@@ -511,13 +511,13 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.unlockJsonBody();
     if (!parsed)
       return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                       "id must be a non-zero preset ID.");
+                       "id must be a non-zero preset ID.", "PRESET_ID_INVALID");
     RecipeSnapshot recipe;
     if (self.callbacks_.copyRecipeSnapshot != nullptr)
       self.callbacks_.copyRecipeSnapshot(&recipe);
     if (findShotPreset(recipe.presets, id) == nullptr)
       return sendError(request, STATUS_NOT_FOUND, "PRESET_NOT_FOUND",
-                       "The requested preset does not exist.");
+                       "The requested preset does not exist.", "PRESET_NOT_FOUND");
     WebCommand command;
     command.type = WebCommandType::PRESET_OP;
     command.requestId = self.allocateRequestId();
@@ -530,7 +530,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     self.dataMux_.unlock();
     if (!available)
       return sendError(request, STATUS_CONFLICT, "REQUEST_BUSY",
-                       "Another preset update is pending.");
+                       "Another preset update is pending.", "PRESET_UPDATE_PENDING");
     if (!self.callbacks_.enqueueWebCommand(command))
       {
         self.dataMux_.lock();
@@ -538,12 +538,12 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
           self.stagedPresetRequestId_ = 0;
         self.dataMux_.unlock();
         return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                         "Control is busy; the preset was not changed.");
+                         "Control is busy; the preset was not changed.", "PRESET_CHANGE_BUSY");
       }
     return self.sendAccepted(request, command.requestId,
                              "\"apiVersion\":1");
   }
 
   return sendError(request, STATUS_NOT_FOUND, "NOT_FOUND",
-                   "Unknown integration API route.");
+                   "Unknown integration API route.", "UNKNOWN_INTEGRATION_ROUTE");
 }

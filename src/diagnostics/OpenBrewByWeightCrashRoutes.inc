@@ -57,7 +57,7 @@ esp_err_t OpenBrewByWeightNetwork::crashArchiveDownloadHandler(
   const CrashArchiveStatus archive = crashArchiveStatus(true);
   if (archive.count == 0)
     return sendError(request, STATUS_NOT_FOUND, "NO_CRASHES",
-                     "No saved crash records are available.");
+                     "No saved crash records are available.", "NO_CRASHES");
   httpd_resp_set_type(request, "application/x-tar");
   httpd_resp_set_hdr(request, "Content-Disposition",
                      "attachment; filename=openbrewbyweight-crashes.tar");
@@ -127,7 +127,7 @@ esp_err_t OpenBrewByWeightNetwork::crashArchiveClearHandler(httpd_req_t *request
       request, "Stop the cycle and wait for Ready before emptying crashes.",
       "EMPTY_CRASH_ARCHIVE", "CRASH_CLEAR_NOT_CONFIRMED",
       "Confirm crash deletion explicitly.", crashArchiveClear,
-      "CRASH_CLEAR_FAILED", "Crash records could not be erased.");
+      "CRASH_CLEAR_FAILED", "Crash records could not be erased.", "CRASH_CLEAR_REQUIRES_READY", "CRASH_DELETE_NOT_CONFIRMED", "CRASH_ERASE_FAILED");
 }
 
 esp_err_t OpenBrewByWeightNetwork::auditLogClearHandler(httpd_req_t *request) {
@@ -137,5 +137,5 @@ esp_err_t OpenBrewByWeightNetwork::auditLogClearHandler(httpd_req_t *request) {
       request, "Stop the cycle and wait for Ready before emptying the audit log.",
       "EMPTY_AUDIT_LOG", "AUDIT_CLEAR_NOT_CONFIRMED",
       "Confirm audit-log deletion explicitly.", clearAuditStores,
-      "AUDIT_CLEAR_FAILED", "Audit records could not be erased.");
+      "AUDIT_CLEAR_FAILED", "Audit records could not be erased.", "AUDIT_LOG_CLEAR_REQUIRES_READY", "AUDIT_LOG_DELETE_NOT_CONFIRMED", "AUDIT_ERASE_FAILED");
 }

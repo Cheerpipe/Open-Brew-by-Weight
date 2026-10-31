@@ -17,6 +17,7 @@ struct httpd_req_t {
   int failChunk = 0;
   int chunks = 0;
   std::string status;
+  std::string error, reason, message;
   std::vector<char> body;
 };
 
@@ -57,8 +58,12 @@ class OpenBrewByWeightNetwork {
     return false;
   }
   static esp_err_t sendError(httpd_req_t *request, const char *status,
-                            const char *, const char *) {
+                            const char *error, const char *message,
+                            const char *reason = nullptr) {
     request->status = status;
+    request->error = error != nullptr ? error : "";
+    request->message = message != nullptr ? message : "";
+    request->reason = reason != nullptr ? reason : "";
     return ESP_OK;
   }
   static esp_err_t sendJson(httpd_req_t *request, const char *status,
@@ -66,11 +71,15 @@ class OpenBrewByWeightNetwork {
     request->status = status;
     return ESP_OK;
   }
-  esp_err_t runConfirmedClear(httpd_req_t *request, const char *, const char *,
-                              const char *, const char *, bool (*clearFn)(),
-                              const char *, const char *) {
-    if (!request->confirmed) return sendError(request, STATUS_UNPROCESSABLE,
-                                              "CONFIRM", "Confirm first.");
+  esp_err_t runConfirmedClear(httpd_req_t *request, const char *,
+                              const char *, const char *notConfirmedCode,
+                              const char *notConfirmedDetail,
+                              bool (*clearFn)(), const char *, const char *,
+                              const char *, const char *notConfirmedReason,
+                              const char *) {
+    if (!request->confirmed)
+      return sendError(request, STATUS_UNPROCESSABLE, notConfirmedCode,
+                       notConfirmedDetail, notConfirmedReason);
     return clearFn() ? sendJson(request, STATUS_OK, "{}") : ESP_FAIL;
   }
 };
@@ -166,6 +175,19 @@ int main() {
   check(OpenBrewByWeightNetwork::crashArchiveClearHandler(&unconfirmed) == ESP_OK &&
             unconfirmed.status == STATUS_UNPROCESSABLE && clears == 0,
         "unconfirmed deletion succeeded");
+  check(unconfirmed.error == "CRASH_CLEAR_NOT_CONFIRMED" &&
+            unconfirmed.reason == "CRASH_DELETE_NOT_CONFIRMED" &&
+            unconfirmed.message == "Confirm crash deletion explicitly.",
+        "unconfirmed crash clear error contract changed");
+  httpd_req_t auditClear;
+  auditClear.admin = true;
+  check(OpenBrewByWeightNetwork::auditLogClearHandler(&auditClear) == ESP_OK &&
+            auditClear.status == STATUS_UNPROCESSABLE && auditClears == 0,
+        "unconfirmed audit clear succeeded");
+  check(auditClear.error == "AUDIT_CLEAR_NOT_CONFIRMED" &&
+            auditClear.reason == "AUDIT_LOG_DELETE_NOT_CONFIRMED" &&
+            auditClear.message == "Confirm audit-log deletion explicitly.",
+        "unconfirmed audit clear error contract changed");
   httpd_req_t confirmed;
   confirmed.admin = confirmed.confirmed = true;
   check(OpenBrewByWeightNetwork::crashArchiveClearHandler(&confirmed) == ESP_OK &&

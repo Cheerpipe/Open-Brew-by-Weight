@@ -14,17 +14,17 @@ bool lineaMicraGraceCodeFromSeconds(int16_t seconds, uint8_t &code) {
 esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION != OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   return sendError(request, "404 Not Found", "UNSUPPORTED_MACHINE",
-                   "Linea Micra integration is not compiled in this firmware.");
+                   "Linea Micra integration is not compiled in this firmware.", "UNSUPPORTED_MACHINE");
 #else
   OpenBrewByWeightNetwork &self = *instance_;
   const ControlGateSnapshot gate = self.controlGate();
   if (!self.webUiConfigurationAllowed(request, gate)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Linea Micra settings can be changed only while Ready.");
+                     "Linea Micra settings can be changed only while Ready.", "MICRA_REQUIRES_READY");
   }
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded Linea Micra JSON request is required.");
+      request, "A bounded Linea Micra JSON request is required.", "MICRA_BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) return bodyStatus;
 
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
@@ -209,14 +209,14 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (parseError != nullptr) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     parseError);
+                     parseError, nullptr);
   }
 
   const bool relist = strcmp(action, "relist") == 0;
   const bool refresh = strcmp(action, "refresh") == 0;
   if ((relist || refresh) && !candidate.accountConfigured) {
     return sendError(request, STATUS_CONFLICT, "MICRA_NOT_READY",
-                     "Connect an account and select a machine first.");
+                     "Connect an account and select a machine first.", "MICRA_NOT_READY");
   }
   if (relist || strcmp(action, "connect") == 0) {
     const NetworkStatusSnapshot network = self.snapshot();
@@ -225,13 +225,13 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
                               network.iface.staIp[0] != '\0';
     if (!staConnected || network.apActive) {
       return sendError(request, STATUS_CONFLICT, "MICRA_STA_REQUIRED",
-                       "Connect to Wi-Fi station mode and close setup AP first.");
+                       "Connect to Wi-Fi station mode and close setup AP first.", "MICRA_STA_REQUIRED");
     }
     const uint32_t requestId = self.allocateRequestId();
     if (relist ? !queueMachineIntegrationRelist(requestId)
                : !queueMachineIntegrationConnect(requestId, username, password)) {
       return sendError(request, STATUS_UNAVAILABLE, "MICRA_BUSY",
-                       "The Linea Micra integration is busy; try again shortly.");
+                       "The Linea Micra integration is busy; try again shortly.", "MICRA_BUSY");
     }
     return self.sendAccepted(request, requestId);
   }
@@ -243,7 +243,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
     integrationRequest.type = LineaMicraRequestType::OBSERVE_STATE;
     if (!queueMachineIntegrationRequest(integrationRequest)) {
       return sendError(request, STATUS_UNAVAILABLE, "MICRA_BUSY",
-                       "The Linea Micra integration is busy; try again shortly.");
+                       "The Linea Micra integration is busy; try again shortly.", "MICRA_BUSY");
     }
     return self.sendAccepted(request, integrationRequest.requestId);
   }
@@ -254,7 +254,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   }
   if (!validLineaMicraSettings(candidate)) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_MICRA_CONFIG",
-                     "The Linea Micra settings are not valid.");
+                     "The Linea Micra settings are not valid.", "INVALID_MICRA_CONFIG");
   }
   WebCommand command;
   command.type = WebCommandType::SAVE_LINEA_MICRA;
@@ -270,12 +270,12 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   self.dataMux_.unlock();
   if (!available) {
     return sendError(request, STATUS_UNAVAILABLE, "MICRA_BUSY",
-                     "Another Linea Micra change is still being saved.");
+                     "Another Linea Micra change is still being saved.", "MICRA_CHANGE_PENDING");
   }
   if (!self.callbacks_.enqueueWebCommand(command)) {
     self.clearStagedLineaMicra(command.requestId);
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; Linea Micra settings were not saved.");
+                     "Control is busy; Linea Micra settings were not saved.", "MICRA_SAVE_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 #endif

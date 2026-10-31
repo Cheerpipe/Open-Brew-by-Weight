@@ -127,8 +127,13 @@ class OpenBrewByWeightNetwork {
     return ESP_OK;
   }
   static esp_err_t sendError(httpd_req_t *request, const char *status, const char *error,
-                             const char *) {
-    return sendJson(request, status, (std::string("{\"error\":\"") + error + "\"}").c_str());
+                             const char *message, const char *reason = nullptr) {
+    // Same body shape as the firmware's sendError: reason between error and
+    // message, omitted when null.
+    std::string body = std::string("{\"error\":\"") + error + "\"";
+    if (reason != nullptr) body += std::string(",\"reason\":\"") + reason + "\"";
+    body += std::string(",\"message\":\"") + message + "\"}";
+    return sendJson(request, status, body.c_str());
   }
 };
 OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
@@ -202,7 +207,15 @@ void refusalsMapToTheirStatus() {
     CHECK(r.status == c.second && r.headers.at("Cache-Control") == "no-store");
   }
   fakeResult = ShotTraceRead::BUSY;
-  CHECK(traceRequest("id=0&boot=41&end=0").body.find("SHOT_TRACE_BUSY") != std::string::npos);
+  // The busy refusal keeps its legacy error but names the sentence exactly:
+  // SHOT_TRACE_BUSY and SHOT_STORAGE_BUSY share one prose today.
+  CHECK(traceRequest("id=0&boot=41&end=0").body.find(
+            "\"error\":\"SHOT_TRACE_BUSY\",\"reason\":\"SHOT_STORAGE_BUSY\","
+            "\"message\":\"The controller is busy (a shot, a rinse or the scale); "
+            "try again shortly.\"") != std::string::npos);
+  fakeResult = ShotTraceRead::NONE;
+  CHECK(traceRequest("id=0&boot=41&end=0").body.find(
+            "\"error\":\"NO_SHOT_TRACE\",\"reason\":\"SHOT_HAS_NO_TRACE\"") != std::string::npos);
   fakeResult = ShotTraceRead::PENDING;
   CHECK(traceRequest("id=3&boot=41&end=9").body.find("SHOT_TRACE_SAVING") != std::string::npos);
   fakeResult = ShotTraceRead::FOUND;
