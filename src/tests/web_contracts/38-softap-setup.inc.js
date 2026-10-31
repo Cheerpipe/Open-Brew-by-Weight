@@ -411,7 +411,10 @@ if (!rawViewJs.stats.includes('R.escHtml(__WEBUI_TEXT__("runtime.stats_preset_fi
   const all = Object.values(partialHtml).join('\n') + shellHtml;
   // FE-M36: keyboard, names, states, focus and motion.
   need(codeIncludes(rawRuntimeJs, 'card.tabIndex=0;card.onkeydown=(e)=>{if(e.target===card&&(e.key===Enter||e.key=== )){'), 'preset cards by keyboard');
-  need(css.includes('.presetCard:focus-visible,.presetCardTitle:focus-visible{outline:3px solid var(--ac)'), 'preset card focus ring');
+  // Preset cards are [tabindex] hosts: the narrowed focus contract drops
+  // their outline instead of painting the accent ring (60f96901).
+  need(css.includes(':where([tabindex]):focus-visible{outline:none}') &&
+      !css.includes('.presetCard:focus'), 'preset card focus ring');
   need(partialHtml.settings.includes('<select id="preferredScaleSelect" aria-label="My scale">'), 'scale select name');
   need(codeIncludes(rawRuntimeJs, 'input.setAttribute("aria-label", __WEBUI_TEXT__("runtime.preset_name"))'), 'rename input name');
   need(codeIncludes(rawViewJs.stats, 'b.setAttribute("role", "radio");b.setAttribute("aria-checked", i === n)'), 'star radios');
