@@ -548,8 +548,8 @@ if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !codeIncludes(ui, 'buzzerSlowExtendedPulseRate') ||
     !html.includes('id="buzzerExtendedPulseRate"') ||
     !html.includes('id="buzzerSlowExtendedPulseRate"') ||
-    !html.includes('class="buzzerOpt scaleIncapableOpt">Fast-shot beeps<select id="buzzerExtendedPulseRate"') ||
-    !html.includes('class="buzzerOpt scaleIncapableOpt">Slow-shot beeps<select id="buzzerSlowExtendedPulseRate"') ||
+    !html.includes('class="buzzerOpt scaleIncapableOpt">Fast-shot beeps<span class="selBox"><select id="buzzerExtendedPulseRate"') ||
+    !html.includes('class="buzzerOpt scaleIncapableOpt">Slow-shot beeps<span class="selBox"><select id="buzzerSlowExtendedPulseRate"') ||
     !css.includes('color-scheme:light dark') ||
     // color-scheme is inherited, so the root carries it to every form control.
     !css.includes('html.theme-dark{color-scheme:dark}') ||

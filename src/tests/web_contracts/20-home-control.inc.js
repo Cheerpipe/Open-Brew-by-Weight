@@ -1505,7 +1505,7 @@ if (!html.includes('class="cfgGroup paddleOnly"><summary>Paddle</summary>') ||
     !firmware.includes('UserIntent::REQUEST_RINSE') ||
     !firmware.includes('machineBeginRinse') ||
     !html.includes('class="cfgGroup momentaryOnly"><summary>Switch</summary>') ||
-    !html.includes('Paddle-off reminder<select id="paddleReturnReminder">') ||
+    !html.includes('Paddle-off reminder<span class="selBox"><select id="paddleReturnReminder">') ||
     !html.includes('<option value="0">OFF</option><option value="15">15</option><option value="30" selected>30</option><option value="60">60</option><option value="120">120</option>') ||
     !html.includes('After an automatic stop, beeps at this interval until the paddle is back at OFF.') ||
     html.includes('id="paddleReturnReminderBeep"') ||
