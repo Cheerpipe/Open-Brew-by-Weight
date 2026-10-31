@@ -6406,6 +6406,19 @@ function updateHomeAdminActions(unlocked, remoteEnabled) {
   panel.classList.toggle("hidden", !show);
   document.body.classList.toggle("homeAdminActions", show);
 }
+// StopperState API codes rendered from the locale catalog, mirroring the
+// firmware's kStopperStateLabels; the API keeps serving stateLabel for the
+// Companion, so the two lists must stay in sync.
+const stopperStateTexts = {
+  REQUIRES_OFF: __WEBUI_TEXT__("runtime.state_requires_off"),
+  READY: __WEBUI_TEXT__("runtime.state_ready"),
+  BREW: __WEBUI_TEXT__("runtime.state_brew"),
+  RINSE: __WEBUI_TEXT__("runtime.state_rinse"),
+  MANUAL_NO_SCALE: __WEBUI_TEXT__("runtime.state_manual_no_scale"),
+  BACKFLUSH_CANDIDATE: __WEBUI_TEXT__("runtime.backflush_checking"),
+  BACKFLUSH_RUNNING: __WEBUI_TEXT__("runtime.state_backflush_running"),
+  UNKNOWN: __WEBUI_TEXT__("runtime.state_unknown"),
+};
 function formatBackflushState(s) {
   const b = s.backflush;
   if (!b) return "";
@@ -6436,7 +6449,7 @@ function applyHomeStatus(s) {
   syncAdminSessionUi(admin, remoteReady);
   // Stream frames repeat most values: unchanged text is not rewritten.
   setHomeSub("machineState", formatMachineState(s));
-  setHomeSub("state", formatBackflushState(s) || s.stateLabel || "—");
+  setHomeSub("state", formatBackflushState(s) || stopperStateTexts[s.state] || "—");
   updateStateTone(s);
   setHomeSub("cupState", formatCupState(s));
   setHomeSub("cupWeight", formatCupWeight(s));
