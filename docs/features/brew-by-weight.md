@@ -238,9 +238,11 @@ drip — a moved cup, a manual stop, or a shot the plausibility checks discarded
 — keep their bar but show it hatched with diagonal stripes, so you can see at
 a glance what was ignored; shots without a usable weight show as skipped. With
 brew by weight
-off the section is hidden; each field applies through a **Set** key with a
-tick that appears inside the field, next to the − key, while your value
-differs from the one in use. The keys need an editable, idle
+off the section is hidden; each field carries a **Set** key with a tick and
+an **undo** key that appear inside the field, next to the − key, while your
+value differs from the one in use — typing the value in use back makes both
+leave on their own. **Set** applies the change; **undo** puts the value in
+use back without changing anything. Both need an editable, idle
 configuration with no recipe change still being saved.
 
 - **Set** on the drip field puts the value in use from your next shot and keeps it as the
@@ -252,6 +254,8 @@ configuration with no recipe change still being saved.
   same way; presets kept from an earlier firmware keep their drip untouched.
 - **Set** on the learning-speed field applies a new α at once, restarts its
   evidence and marks it as your choice; the drip stays as it is.
+- **Undo** discards a pending edit and puts the value in use back; nothing
+  is sent.
 
 For the example above, α=0.10 gives a next offset of 1.52 g, α=0.30 gives
 1.56 g and α=0.60 gives 1.62 g. Higher α reacts faster but follows shot noise

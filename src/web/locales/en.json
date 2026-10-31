@@ -1760,6 +1760,7 @@
     "settings.turn_scale_off_with_machine": "Turn the scale off with the Micra",
     "settings.turn_scale_off_with_machine_hint": "When the Micra goes to standby, a supported scale switches off too.",
     "settings.turns_all_brew_alert_sounds_on_or": "Off mutes every brew sound; your choices below are kept.",
+    "settings.undo": "Undo",
     "settings.use_selected_machine": "Use this machine",
     "settings.use_the_first_scale_found_prefer_a": "Connects to the first scale it finds.",
     "settings.wait_for_drips_before_saving_final_weight": "The yield is recorded this long after the stop. Keep the cup on the scale until then.",

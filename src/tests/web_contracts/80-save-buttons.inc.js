@@ -422,9 +422,11 @@
   }
   // The two Drip compensation fields apply through keys settings.js builds
   // inside their number fields; each one is its enterForm's submit button,
-  // so Enter keeps applying and the global blocker keeps the page put.
+  // so Enter keeps applying and the global blocker keeps the page put. The
+  // undo key beside it restores the value in use without applying.
   if (!codeIncludes(rawViewJs.settings, 'type: "submit", className: "numSet", id: button') ||
-      !codeIncludes(rawViewJs.settings, '$(input).closest(".numBox").append(apply)'))
+      !codeIncludes(rawViewJs.settings, '$(input).closest(".numBox").append(apply, restore)') ||
+      !codeIncludes(rawViewJs.settings, 'className: "numUndo", id: undo'))
     throw new Error('The Drip compensation Set keys must be submit buttons inside their number fields');
   if (!codeIncludes(rawAppJsSource, 'document.addEventListener("submit", (e) => e.target.matches(".enterForm") && e.preventDefault())')) {
     throw new Error('An .enterForm must never submit or reload the page');

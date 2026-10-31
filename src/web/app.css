@@ -1149,10 +1149,10 @@ select {
   opacity: 0.65;
   pointer-events: none;
 }
-/* Fields with an inline apply key: the key sits inside the field, left of
-   the − key, and appears only while a pending edit (input[data-edited])
-   waits to be applied. It expands smoothly and leaves at once once the
-   edit is applied or dropped. */
+/* Fields with inline keys: the apply key sits inside the field, left of
+   the − key, and the undo key sits left of it. Both appear only while a
+   pending edit (input[data-edited]) waits to be applied, expand smoothly,
+   and leave at once once the edit is applied, dropped or typed back. */
 .numBox > button.numSet {
   display: inline-flex;
   align-items: center;
@@ -1170,7 +1170,20 @@ select {
   opacity: 0;
   pointer-events: none;
 }
-.numBox > button.numSet .g {
+.numBox > button.numUndo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  right: calc(10.1rem + 1px);
+  width: 0;
+  overflow: hidden;
+  border-left-color: transparent;
+  border-radius: 0;
+  color: var(--mu);
+  opacity: 0;
+  pointer-events: none;
+}
+.numBox > button:is(.numSet, .numUndo) .g {
   display: inline-flex;
   width: 1rem;
   height: 1rem;
@@ -1185,12 +1198,22 @@ select {
     opacity 0.15s ease,
     border-color 0.18s ease;
 }
+.numBox:has(> input[data-edited]) > button.numUndo {
+  width: 2.75rem;
+  border-left-color: var(--ln);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    width 0.18s ease,
+    opacity 0.15s ease,
+    border-color 0.18s ease;
+}
 .numBox:has(> input[data-edited]) > input {
-  padding-right: 10.3rem;
+  padding-right: 13rem;
   transition: padding-right 0.18s ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  .numBox:has(> input[data-edited]) > :is(button.numSet, input) {
+  .numBox:has(> input[data-edited]) > :is(button.numSet, button.numUndo, input) {
     transition: none;
   }
 }

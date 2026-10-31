@@ -204,9 +204,10 @@ to start it again.
 **Set** on the drip field uses the value you enter from the next shot and keeps
 it as the preset's starting point; if your next three shots agree on a different
 amount, the drip moves there at once. **Set** on the learning-speed field
-(0.01–1.00, step 0.01) applies a new speed at once and keeps the drip. Each key
-appears inside its field while your value differs from the one in use; pressing
-Enter does the same.
+(0.01–1.00, step 0.01) applies a new speed at once and keeps the drip. The
+**Set** and **undo** keys appear inside the field while your value differs from
+the one in use: undo puts the value in use back without applying, and typing
+that value back makes both leave. Pressing Enter applies.
 **Restore** on a factory preset returns the whole recipe, its drip and a
 learning speed of 0.30, and starts a quick start; it is available only for
 factory presets. A device factory reset additionally erases other settings and

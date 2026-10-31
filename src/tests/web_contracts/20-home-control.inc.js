@@ -1540,7 +1540,8 @@ if (!codeIncludes(ui, 'id="learnedOffsetG"') ||
     codeIncludes(ui, 'Save new reset values first') ||
     !codeIncludes(ui, 'type: "submit", className: "numSet", id: button') ||
     !css.includes('.numBox:has(>input[data-edited])>button.numSet{width:4.6rem;border-left-color:var(--ln);opacity:1;pointer-events:auto') ||
-    !css.includes('.numBox:has(>input[data-edited])>input{padding-right:10.3rem') ||
+    !css.includes('.numBox:has(>input[data-edited])>button.numUndo{width:2.75rem;border-left-color:var(--ln);opacity:1;pointer-events:auto') ||
+    !css.includes('.numBox:has(>input[data-edited])>input{padding-right:13rem') ||
     css.includes('#bbwAlgorithm{width:100%}') ||
     !network.includes('"dripG"') ||
     !network.includes('formatDripChartJson(drip, sizeof(drip), control)') ||

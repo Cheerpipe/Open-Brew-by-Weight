@@ -2822,19 +2822,26 @@ function updateBbwControls() {
     dripFieldsPresetId = c.bbwPresetId;
     for (const id of ["dripSetG", "alphaSet"]) delete $(id).dataset.edited;
   }
-  // The set fields follow the values in use until the owner edits them.
+  // The set fields follow the values in use until the owner edits them;
+  // an edit typed back to the value in use leaves nothing to apply.
   for (const [id, v] of [
     ["dripSetG", use],
     ["alphaSet", c && c.bbwAlpha],
-  ])
-    if (typeof v === "number" && document.activeElement !== $(id) && !$(id).dataset.edited)
-      $(id).value = v.toFixed(2);
+  ]) {
+    if (typeof v !== "number") continue;
+    if ($(id).dataset.edited && parseFloat($(id).value) === v) delete $(id).dataset.edited;
+    if (document.activeElement !== $(id) && !$(id).dataset.edited) $(id).value = v.toFixed(2);
+  }
   const blocked = !on || !controlsMutable || uiState.brewDirty || !c;
-  for (const [id, button] of [
-    ["dripSetG", "dripSetButton"],
-    ["alphaSet", "alphaSetButton"],
-  ])
+  for (const [id, button, undo] of [
+    ["dripSetG", "dripSetButton", "dripUndoButton"],
+    ["alphaSet", "alphaSetButton", "alphaUndoButton"],
+  ]) {
     $(button).disabled = blocked || $(id).value.trim() === "" || !$(id).validity.valid;
+    // Discarding an edit is the recovery action: it stays available for an
+    // empty or invalid field.
+    $(undo).disabled = blocked;
+  }
 }
 function soundAlertsAreOn() {
   return !!$("soundAlertsEnabled")?.checked;

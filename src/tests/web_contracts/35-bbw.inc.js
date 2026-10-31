@@ -4,16 +4,17 @@
   // The cutoff-algorithm selector is gone: one algorithm, one alpha baseline.
   assert(!html.includes('id="bbwAlgorithm"'));
   assert(!html.includes('Linear prediction + adaptive EWMA'));
-  // Drip compensation: one value, a recent-shots chart, and the two apply
-  // keys settings.js builds inside the number fields; the starting values
-  // and the two resets are gone.
+  // Drip compensation: one value, a recent-shots chart, and the apply and
+  // undo keys settings.js builds inside the number fields; the starting
+  // values and the two resets are gone.
   for (const id of ['resetCalibrationButton', 'resetEwmaButton', 'weightOffsetBaselineG', 'bbwAlphaBaseline'])
     assert(!html.includes('id="' + id + '"'), id);
-  for (const id of ['dripSetButton', 'alphaSetButton'])
+  for (const id of ['dripSetButton', 'alphaSetButton', 'dripUndoButton', 'alphaUndoButton'])
     assert(!html.includes('id="' + id + '"'), id);
   assert(html.includes('id="dripSetG" type="number" min="0" max="5" step="0.01"'));
   assert(html.includes('id="alphaSet" type="number" min="0.01" max="1" step="0.01"'));
-  assert(codeIncludes(rawViewJs.settings, '["dripSetG", "dripSetButton", "dripG", __WEBUI_TEXT__("settings.set_drip")]'));
+  assert(codeIncludes(rawViewJs.settings, '["dripSetG", "dripSetButton", "dripUndoButton", "dripG", __WEBUI_TEXT__("settings.set_drip")]'));
+  assert(codeIncludes(rawViewJs.settings, 'className: "numUndo", id: undo'));
   assert(codeIncludes(viewJs.settings, '"/api/v1/calibration/reset", { [key]: R.number(input), baseRevision: R.formRev }'));
   const node = (classes = []) => {
     const names = new Set(classes);
@@ -30,10 +31,11 @@
   };
   const elements = new Map();
   for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripBars', 'dripBarX',
-    'dripSetG', 'dripSetButton', 'alphaSet', 'alphaSetButton']) elements.set(id, node());
+    'dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton'])
+    elements.set(id, node());
   const status = node(); status.lastElementChild = node(); elements.set('dripStatus', status);
   const learning = node(['bbwLearning']);
-  learning.querySelectorAll = () => ['dripSetG', 'dripSetButton', 'alphaSet', 'alphaSetButton'].map(id => elements.get(id));
+  learning.querySelectorAll = () => ['dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton'].map(id => elements.get(id));
   const document = {activeElement: null, querySelectorAll: () => [learning],
     createElement: tag => Object.assign(node(), {tag})};
   const context = vm.createContext({$: id => elements.get(id), controlsMutable: true,
@@ -79,6 +81,11 @@
   elements.get('dripSetG').dataset.edited = '1';
   refresh();
   assert.equal(elements.get('dripSetG').value, '0.50');
+  // Editing the value in use back leaves nothing to apply.
+  elements.get('dripSetG').value = '0.70';
+  refresh();
+  assert(!elements.get('dripSetG').dataset.edited);
+  assert.equal(elements.get('dripSetG').value, '0.70');
   // A full window of ten shots fills every slot.
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 1.56, bbwAlpha: 0.3, bbwRecentG: Array(10).fill(0.5),
     bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
@@ -110,6 +117,11 @@
   refresh();
   assert(elements.get('dripSetButton').disabled && elements.get('alphaSetButton').disabled);
   context.uiState.brewDirty = false;
+  // An empty edit keeps the undo key as the way out.
+  elements.get('dripSetG').value = '';
+  elements.get('dripSetG').dataset.edited = '1';
+  refresh();
+  assert(elements.get('dripSetButton').disabled && !elements.get('dripUndoButton').disabled);
   vm.runInContext('uiState.bbwReadback.bbwPresetId=1', context);
   refresh();
   assert.equal(elements.get('learnedOffsetG').textContent, '—');

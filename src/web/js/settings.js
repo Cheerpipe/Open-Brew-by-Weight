@@ -1789,13 +1789,20 @@ export function init() {
       el.addEventListener("change", fn);
     });
   // Set drip and Set learning speed apply at once; the field keeps the
-  // owner's value until the readback confirms it. The apply key lives
-  // inside the field, left of the − key, and shows only while an edit is
-  // pending (input[data-edited]); as its form's submit button it also
-  // answers Enter.
-  for (const [input, button, key, label] of [
-    ["dripSetG", "dripSetButton", "dripG", __WEBUI_TEXT__("settings.set_drip")],
-    ["alphaSet", "alphaSetButton", "alpha", __WEBUI_TEXT__("settings.set_learning_speed")],
+  // owner's value until the readback confirms it. Two keys live inside the
+  // field, left of the − key, and show only while an edit is pending
+  // (input[data-edited]): Set applies (as the form's submit button it also
+  // answers Enter); the undo key puts the value in use back without
+  // applying anything.
+  for (const [input, button, undo, key, label] of [
+    ["dripSetG", "dripSetButton", "dripUndoButton", "dripG", __WEBUI_TEXT__("settings.set_drip")],
+    [
+      "alphaSet",
+      "alphaSetButton",
+      "alphaUndoButton",
+      "alpha",
+      __WEBUI_TEXT__("settings.set_learning_speed"),
+    ],
   ]) {
     const apply = document.createElement("button");
     Object.assign(apply, { type: "submit", className: "numSet", id: button });
@@ -1804,7 +1811,12 @@ export function init() {
       '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l4.7 4.7L19.5 6.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">' +
       __WEBUI_TEXT__("settings.set") +
       "</span>";
-    $(input).closest(".numBox").append(apply);
+    const restore = document.createElement("button");
+    Object.assign(restore, { type: "button", className: "numUndo", id: undo });
+    restore.setAttribute("aria-label", __WEBUI_TEXT__("settings.undo"));
+    restore.innerHTML =
+      '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5v6h5.5M5.2 16a8.6 8.6 0 1 0 2-9.1L2.5 11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    $(input).closest(".numBox").append(apply, restore);
     $(input).addEventListener("input", () => {
       $(input).dataset.edited = "1";
       R.updateBbwControls();
@@ -1813,6 +1825,12 @@ export function init() {
       if (apply.disabled) return;
       delete $(input).dataset.edited;
       R.command("/api/v1/calibration/reset", { [key]: R.number(input), baseRevision: R.formRev });
+    };
+    restore.onclick = () => {
+      if (restore.disabled) return;
+      delete $(input).dataset.edited;
+      $(input).blur();
+      R.updateBbwControls();
     };
   }
   // The "This app" group is browser-local: every control applies at once and
