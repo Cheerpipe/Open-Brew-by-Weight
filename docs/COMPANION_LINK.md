@@ -24,7 +24,10 @@ is not paired answers them and does nothing else.
   169.254/16, loopback) answer `403 COMPANION_PEER`. The controller records
   the peer address from the socket; an address in a request body is never
   trusted.
-- Errors use `{"error":"STABLE_CODE","message":"English diagnostic"}`.
+- Errors use `{"error":"STABLE_CODE","reason":"STABLE_REASON","message":"English diagnostic"}`.
+  `reason` is an additive per-sentence code documented in
+  [Integration API](INTEGRATION_API.md#error-reasons); `error` and `message`
+  are unchanged.
 - Byte strings are standard base64 with padding. Public keys are 65-byte
   uncompressed P-256 points.
 

@@ -17,7 +17,8 @@ or directly actuate the machine.
 - Success responses contain `apiVersion: 1`, except the integration snapshot,
   which uses `apiVersion: 2` and `minimumClientApiVersion: 2` for its unified
   `lastShot` contract. Errors use
-  `{"error":"STABLE_CODE","message":"English diagnostic"}`.
+  `{"error":"STABLE_CODE","reason":"STABLE_REASON","message":"English diagnostic"}`;
+  see [Error reasons](#error-reasons).
 - While the Web UI login is off, every route is open on the trusted LAN and
   needs no token. That includes reading and changing the webhook destination
   (with its Home Assistant webhook ID) and restarting the controller, so turn
@@ -64,6 +65,307 @@ or directly actuate the machine.
 | 500 | `PERSISTENCE_FAILED` | The durable write failed |
 | 503 | `CONTROL_QUEUE_FULL` | The bounded control queue could not accept the command |
 | 503 | `WEBHOOK_UNAVAILABLE` | Test event could not be queued or delivered |
+
+### Error reasons
+
+Every error body carries a third field between `error` and `message`:
+
+```json
+{"error":"SHOT_TRACE_BUSY","reason":"SHOT_STORAGE_BUSY",
+  "message":"The controller is busy (a shot, a rinse or the scale); try again shortly."}
+```
+
+- `error` is the original code and it is **frozen**: no existing value ever
+  changes or disappears. Keep branching on it, exactly as before.
+- `reason` names the exact sentence the controller answered with. Every
+  sentence has one unique stable code, so a `reason` is always more specific
+  than its `error` — several sentences share the coarse `error`
+  `INVALID_REQUEST`, for example, while each keeps its own `reason`.
+- `message` is the same English prose as before, unchanged byte for byte.
+  Show it, log it, or ignore it when you map `reason` to your own text.
+- A few field-validation errors whose messages are built from the request's
+  own field names still answer without a `reason`; treat a missing `reason`
+  as unmapped and use `message`.
+- Reason codes are **permanent**: they never change meaning and are never
+  reused. The controller's Web UI maps them to its own translatable catalog
+  the same way (`reason` first, then `error`, then `message`).
+
+The 240 codes, grouped by the routes that answer with them:
+
+#### Sign-in, Admin unlock, and the owned Web UI routes
+
+| Reason | `message` sentence |
+| --- | --- |
+| ``ADMIN_UNLOCK_COOLDOWN`` | Too many failed unlock attempts. Try again shortly. |
+| ``AUTH_COOLDOWN`` | Too many attempts. Try again in 30 seconds. |
+| ``AUTH_NOT_REQUIRED`` | This Web UI does not ask for a password. |
+| ``CONFIRMATION_REQUIRED`` | An explicit confirmation is required. |
+| ``DEVICE_PASSWORD_INVALID`` | Device password is incorrect. |
+| ``DEVICE_PASSWORD_REQUIRED`` | Enter the device password. |
+| ``FACTORY_PASSWORD`` | Choose a new device password before turning on the login. |
+| ``INTEGRATION_REQUEST_EXPIRED`` | This Home Assistant request is no longer waiting. |
+| ``LOGIN_PASSWORD_MISSING`` | password is required. |
+| ``NEW_PASSWORD_LENGTH_INVALID`` | New device password must be 8–63 characters. |
+| ``NEW_PASSWORD_NOT_FACTORY_DEFAULT`` | New device password cannot be the factory default. |
+| ``NEW_PASSWORD_REQUIRED`` | New device password is required. |
+| ``NOTHING_SAVED`` | Nothing was saved. |
+| ``OTA_JSON_REQUEST_REQUIRED`` | A JSON request is required. |
+| ``PASSWORD_LOCKED_ACTIVE_CYCLE`` | The password cannot be changed while a cycle is active. |
+| ``SESSION_NOT_FOUND`` | That device is no longer signed in. |
+| ``UI_CLAIM_REQUIRED`` | Claim WebUI control before using this API. |
+| ``UI_CLIENT_INVALID`` | X-WebUI-Client must be a 16-24 character lowercase hex id. |
+| ``UI_TAKEN_OVER`` | This WebUI window is inactive. Reactivate to continue. |
+| ``UNKNOWN_ACCESS_ACTION`` | Unknown access action. |
+| ``UNLOCK_NOT_CONFIRMED`` | The unsafe WebUI override was not explicitly confirmed. |
+
+#### Control and status routes
+
+| Reason | `message` sentence |
+| --- | --- |
+| ``CALIBRATION_LOCKED_ACTIVE_CYCLE`` | Calibration is locked while a cycle is active. |
+| ``CALIBRATION_RESET_BUSY`` | Control is busy; calibration was not reset. |
+| ``CONTROL_QUEUE_FULL`` | Control queue is full. |
+| ``CONTROL_STATE_CONFLICT`` | The current state does not allow that action. |
+| ``EMPTY_JSON_REQUIRED`` | An empty JSON object is required. |
+| ``FIELD_ON_MUST_BE_BOOLEAN`` | The on field must be boolean. |
+| ``FORCED_PULSE_REQUIRES_EMPTY_OBJECT`` | The forced pulse request must be an empty object. |
+| ``GUARD_SAMPLES_LOCKED_ACTIVE_CYCLE`` | Guard samples are locked while a cycle is active. |
+| ``GUARD_SAMPLES_RESET_BUSY`` | Control is busy; guard samples were not reset. |
+| ``GUARD_SAMPLES_RESET_REQUIRES_EMPTY_OBJECT`` | The guard samples reset request must be an empty object. |
+| ``JSON_BODY_REQUIRED`` | A JSON body is required. |
+| ``MACHINE_TYPE_UNSUPPORTED`` | Forced switch pulses require a momentary machine build. |
+| ``NO_ACTIVE_SHOT`` | There is no active shot to stop. |
+| ``REMOTE_CONTROL_DISABLED`` | Remote machine control actuation is disabled in this firmware build. |
+| ``RINSE_REQUIRES_READY`` | Rinse can only start from Ready. |
+| ``STATE_FIELD_INVALID`` | The state field must be "off" or "on". |
+| ``STATE_OVERRIDE_SWITCH_ONLY`` | Inferred-state override is only available on switch-only builds. |
+| ``STATUS_PAGE_UNKNOWN`` | Unknown status page; use /api/v1/status/admin. |
+| ``STATUS_TOO_LARGE`` | Status snapshot exceeds its size limit. |
+| ``STOP_PREDICTION_FIELDS_INVALID`` | Use fullEwma, dripG (0–5 g) or alpha (0.01–1.00). |
+| ``TARE_REQUIRES_EMPTY_OBJECT`` | The tare request must be an empty object. |
+| ``TARE_REQUIRES_READY`` | Stop the cycle and wait for Ready before taring. |
+
+#### Settings, presets, and setup
+
+| Reason | `message` sentence |
+| --- | --- |
+| ``ADMIN_LOCKED`` | Unlock administration with the device password first. |
+| ``BULLSEYE_RTTTL_INVALID`` | bullseyeRtttl must be valid single-line RTTTL (up to 250 notes). |
+| ``BULLSEYE_STAGE_BUSY`` | Control is busy; the Bullseye melody was not staged. |
+| ``BULLSEYE_TEST_BUSY`` | Control is busy; the Bullseye melody was not played. |
+| ``BULLSEYE_TEST_REQUEST_REQUIRED`` | A Bullseye RTTTL test request is required. |
+| ``BULLSEYE_TEST_REQUIRES_READY`` | The Bullseye melody can be tested only while Ready. |
+| ``CLOCK_SYNC_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before syncing the clock. |
+| ``CONFIG_LOCKED_DURING_ACTIVE_CYCLE`` | Configuration is locked while a cycle is active. |
+| ``CONFIG_REVISION_STALE`` | Config changed; refresh and retry. |
+| ``DATE_TIME_DISABLED`` | Date and time settings are unavailable while the firmware is disabled. |
+| ``FACTORY_RESET_BUSY`` | Control is busy; no settings were erased. |
+| ``FACTORY_RESET_CONFIRMATION_REQUIRED`` | An explicit factory-reset confirmation is required. |
+| ``FACTORY_RESET_NOT_CONFIRMED`` | The factory reset was not explicitly confirmed. |
+| ``FACTORY_RESET_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before restoring factory settings. |
+| ``FIRMWARE_MODE_REQUIRES_IDLE`` | Wait until the machine is idle, then save the firmware mode again. |
+| ``FIRMWARE_MODE_SAVE_FAILED`` | Could not persist the firmware mode. |
+| ``HOST_NOT_ALLOWED`` | Open the controller by its IP address or its .local name. |
+| ``INVALID_MICRA_CONFIG`` | The Linea Micra settings are not valid. |
+| ``INVALID_WEBHOOK`` | Use an http:// URL without embedded credentials; HTTPS is not supported. |
+| ``MICRA_BOUNDED_JSON_REQUIRED`` | A bounded Linea Micra JSON request is required. |
+| ``MICRA_BUSY`` | The Linea Micra integration is busy; try again shortly. |
+| ``MICRA_CHANGE_PENDING`` | Another Linea Micra change is still being saved. |
+| ``MICRA_NOT_READY`` | Connect an account and select a machine first. |
+| ``MICRA_REQUIRES_READY`` | Linea Micra settings can be changed only while Ready. |
+| ``MICRA_SAVE_BUSY`` | Control is busy; Linea Micra settings were not saved. |
+| ``MICRA_STA_REQUIRED`` | Connect to Wi-Fi station mode and close setup AP first. |
+| ``NETWORK_SETTINGS_CHANGED_RETRY`` | Network settings changed; refresh and retry. |
+| ``NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE`` | Network settings are locked while a cycle is active. |
+| ``NOT_FOUND`` | The requested resource was not found. |
+| ``NO_SCALE_PROFILE`` | No scale profile is available to download. |
+| ``OTA_ACTION_INVALID`` | action must be start, stop, or delete. |
+| ``OTA_SERVER_STOPPING`` | The web server is restarting; retry shortly. |
+| ``PREFERRED_SCALE_CLEAR_BUSY`` | Control is busy; nothing was cleared. |
+| ``PREFERRED_SCALE_LOCKED_ACTIVE_CYCLE`` | The preferred scale cannot be changed while a cycle is active. |
+| ``RELAY_INVALID`` | The companion's relay was refused. |
+| ``RESET_HISTORY_CLEAR_BUSY`` | Control is busy; reset history was not cleared. |
+| ``RESET_HISTORY_CONFIRMATION_REQUIRED`` | An explicit reset-history confirmation is required. |
+| ``RESET_HISTORY_NOT_CONFIRMED`` | Confirm reset-history clearing explicitly. |
+| ``SAVE_BUSY`` | Control is busy; nothing was saved. |
+| ``SCALE_FORGET_LOCKED_ACTIVE_CYCLE`` | The paired scale cannot be forgotten while a cycle is active. |
+| ``SCALE_NAME_LOCKED_ACTIVE_CYCLE`` | The scale name cannot be changed while a cycle is active. |
+| ``SCALE_NAME_SAVE_BUSY`` | Control is busy; the name was not saved. |
+| ``SCALE_PROFILE_BUSY`` | The scale profile is changing or already downloading. |
+| ``SCALE_PROFILE_CORRUPT`` | The saved scale profile failed its checksum. |
+| ``SCALE_PROFILE_UNCHANGED`` | Scale profile state was not changed. |
+| ``SCALE_SELECT_BUSY`` | Control is busy; nothing was selected. |
+| ``SCAN_FIELDS_INVALID`` | scanIntensity must be balanced, aggressive, or relaxed; enabled must be a boolean. |
+| ``SCAN_INTENSITY_UNCHANGED`` | Scan intensity was not changed. |
+| ``SETUP_BREW_SAVE_FAILED`` | Could not save the brewing choice. |
+| ``SETUP_PASSWORD_REQUIRED`` | Choose your own device password before finishing setup. |
+| ``STATUS_BUSY`` | Status snapshot is busy; retry shortly. |
+| ``TASK_PROFILER_UNCHANGED`` | Task profiler state was not changed. |
+| ``TIMEZONE_ALREADY_SET`` | The time zone was already saved. |
+| ``TIME_SYNC_DISABLED`` | Time sync is unavailable while the firmware is disabled. |
+| ``UNKNOWN_ROUTE`` | Unknown API route. |
+| ``UNKNOWN_SCALE`` | mac is not a known scale. |
+| ``UNSUPPORTED_MACHINE`` | Linea Micra integration is not compiled in this firmware. |
+| ``WEBHOOK_CONFIG_SAVE_PENDING`` | Another webhook configuration save is still pending. |
+| ``WEBHOOK_REQUIRES_READY`` | Webhooks can be changed or tested only while Ready. |
+| ``WEBHOOK_SETTINGS_CHANGED_RETRY`` | Webhook settings changed; refresh and retry. |
+| ``WEBHOOK_UNAVAILABLE`` | The webhook worker is unavailable or its queue is full. |
+| ``WIFI_SCAN_BUSY`` | Control is busy; scan was not started. |
+| ``WIFI_SCAN_REQUIRES_READY`` | Wi-Fi scanning is available only while Ready. |
+
+#### Companion pairing and relay
+
+| Reason | `message` sentence |
+| --- | --- |
+| ``ALREADY_PAIRED`` | This controller is already paired with a companion. |
+| ``AUTH_FIELDS_INVALID`` | The request fields are invalid. |
+| ``COMPANION_AUTH`` | The relay handshake did not authenticate. |
+| ``COMPANION_BUSY`` | Another companion link is being opened. |
+| ``COMPANION_CODE_DENIED`` | Three wrong codes: the request was denied. |
+| ``COMPANION_CODE_MISMATCH`` | That is not the code the companion shows. |
+| ``COMPANION_CODE`` | Enter the six-digit code the companion shows. |
+| ``COMPANION_ID_INVALID`` | The id is invalid. |
+| ``COMPANION_IGNORED`` | This companion was ignored on this controller. |
+| ``COMPANION_MEMORY`` | The controller has no memory for a companion link right now. |
+| ``COMPANION_NOT_PAIRED_WITH_PEER`` | This controller is not paired with this companion. |
+| ``COMPANION_NOT_PAIRED`` | This controller is not paired with a companion. |
+| ``COMPANION_PEER`` | Companions connect only from the local network. |
+| ``PAIRING_BUSY`` | Another companion's request is waiting. |
+| ``PAIRING_FIELDS_INVALID`` | The pairing request fields are invalid. |
+| ``PAIRING_KEY_MISMATCH`` | The key does not match an open pairing request. |
+| ``PAIRING_LOCAL_NETWORK_ONLY`` | Companions pair only from the local network. |
+| ``PAIRING_NOT_PENDING`` | No companion request is waiting. |
+| ``PAIRING_NOT_READY`` | The controller is still preparing this request. |
+| ``PAIRING_RATE_LIMITED`` | Wait a few seconds before asking again. |
+| ``RELAY_CONTENT_TYPE_REQUIRED`` | Send the relay request as application/json. |
+| ``RELAY_FIELDS_INVALID`` | The relay request fields are invalid. |
+| ``RELAY_LOCAL_NETWORK_ONLY`` | Companions relay only from the local network. |
+| ``UNKNOWN_COMPANION_ACTION`` | Unknown companion action. |
+| ``UNSUPPORTED_MEDIA_TYPE`` | Send the pairing request as application/json. |
+
+#### The public integration routes
+
+| Reason | `message` sentence |
+| --- | --- |
+| ``ACCESS_PAIRING_BUSY`` | Another pairing request is open. Try again shortly. |
+| ``AUTH_REQUIRED`` | Sign in with the device password. |
+| ``BOUNDED_JSON_REQUIRED`` | A bounded JSON request is required. |
+| ``CONTROLLER_AUTH_NOT_REQUIRED`` | This controller does not ask for a password. |
+| ``CORRELATION_ID_INVALID`` | correlationId must be 1-64 URL-safe characters. |
+| ``EMPTY_BOUNDED_JSON_REQUIRED`` | An empty bounded JSON object is required. |
+| ``INTEGRATION_AUTH_REQUIRED`` | Connect with the device password or approve this request in the Web UI. |
+| ``INTEGRATION_SNAPSHOT_OVERFLOW`` | The integration snapshot exceeded its fixed buffer. |
+| ``LAST_SHOT_OVERFLOW`` | The last shot exceeded its fixed buffer. |
+| ``PRESETS_LOCKED_ACTIVE_CYCLE`` | Presets are locked while a cycle is active. |
+| ``PRESET_CHANGE_BUSY`` | Control is busy; the preset was not changed. |
+| ``PRESET_ID_INVALID`` | id must be a non-zero preset ID. |
+| ``PRESET_NOT_FOUND`` | The requested preset does not exist. |
+| ``PRESET_SNAPSHOT_OVERFLOW`` | The preset snapshot exceeded its fixed buffer. |
+| ``PRESET_UPDATE_PENDING`` | Another preset update is pending. |
+| ``QUICK_SETTINGS_BOUNDED_JSON_REQUIRED`` | A bounded Quick Settings JSON request is required. |
+| ``QUICK_SETTINGS_BUSY`` | Control is busy; Quick Settings were not changed. |
+| ``QUICK_SETTINGS_CHANGED_RETRY`` | Quick Settings changed; refresh and retry. |
+| ``QUICK_SETTINGS_FIELDS_INVALID`` | Provide baseRevision and one or more valid Quick Settings fields, or revertAfter or revertNow alone. |
+| ``QUICK_SETTINGS_LOCKED_ACTIVE_CYCLE`` | Quick Settings are locked while a cycle is active. |
+| ``RESTART_QUEUE_BUSY`` | Control is busy; restart was not queued. |
+| ``RESTART_REQUIRES_EMPTY_OBJECT`` | Restart requires an empty JSON object. |
+| ``SETTINGS_UPDATE_PENDING`` | Another settings update is pending. |
+| ``SHOT_CURVE_BUSY`` | The last shot's curve is not loaded yet; retry shortly. |
+| ``UNKNOWN_INTEGRATION_ROUTE`` | Unknown integration API route. |
+| ``WEBHOOK_BOUNDED_JSON_REQUIRED`` | A bounded webhook JSON request is required. |
+| ``WEBHOOK_CONFIG_INVALID`` | A valid bounded http:// webhook configuration is required. |
+| ``WEBHOOK_SAVE_BUSY`` | Control is busy; webhook settings were not saved. |
+| ``WEBHOOK_SETTINGS_LOCKED_ACTIVE_CYCLE`` | Webhook settings are locked while a cycle is active. |
+| ``WEBHOOK_STATUS_OVERFLOW`` | The webhook status exceeded its fixed buffer. |
+| ``WEBHOOK_TEST_NOT_QUEUED`` | The test event could not be queued. |
+| ``WEBHOOK_UPDATE_PENDING`` | Another webhook update is pending. |
+
+#### Firmware updates (OTA)
+
+| Reason | `message` sentence |
+| --- | --- |
+| ``ARCH_MISMATCH`` | This image targets a different architecture, hardware profile, or machine profile. |
+| ``BAD_IMAGE`` | This file is not an ESP32-S3 application image. |
+| ``BAD_LENGTH`` | The upload is too small to be a firmware image. |
+| ``BUSY`` | Another firmware update is already running. |
+| ``COMMIT_FAILED`` | The bootloader refused the staged image. Nothing was changed. |
+| ``DEVICE_PASSWORD_OR_UNLOCK_REQUIRED`` | Send the device password, or unlock administration first. |
+| ``DOWNGRADE`` | This image is older than the running firmware. |
+| ``INTERNAL`` | This firmware cannot verify updates. Reflash over USB. |
+| ``NOTHING_STAGED`` | Upload and verify a firmware image first. |
+| ``NO_IDENTITY`` | The running firmware has no complete hardware and machine identity, so no image can be checked against it. Reflash once over USB before using Wi-Fi updates again. |
+| ``NO_MEMORY`` | Not enough memory to receive a firmware image right now. |
+| ``NO_TAG`` | This image is not an Open Brew by Weight build. |
+| ``OK`` | The firmware image was verified. |
+| ``OTA_ALREADY_FLASHED`` | A new firmware image is already flashed. Restart the controller to start it. |
+| ``OTA_FLASHED_WAITING_RESTART`` | The flashed image is already waiting for the restart. |
+| ``OTA_FLASH_REQUIRES_READY`` | Stop the cycle and wait for Ready before flashing. |
+| ``OTA_IMAGE_FLASHED_RESTART`` | The image is flashed. Restart the controller to use it. |
+| ``OTA_IMAGE_IDENTITY_FIELDS_INVALID`` | size, sha256, arch, hardware, machine, version, and transferId must identify one image. |
+| ``OTA_INVALID_RANGE`` | Range headers must agree; offsets and non-final lengths must be aligned to 4096 bytes. |
+| ``OTA_JOURNAL_FAILED`` | The OTA recovery journal could not be saved. Check Diagnostic → NVS; the running firmware was not replaced. |
+| ``OTA_OFFSET_MISMATCH`` | This range is not the next confirmed firmware range. |
+| ``OTA_PATCH_RANGE_MISMATCH`` | PATCH must contain matching offset, length, and Content-Range headers. |
+| ``OTA_RANGE_NOT_IN_SESSION`` | This range does not belong to the active OTA session. |
+| ``OTA_RESTART_PENDING`` | A firmware image is already flashed and waiting for restart. |
+| ``OTA_SESSION_CONFLICT`` | Another firmware transfer owns the update slot. Abort it before choosing another image. |
+| ``OTA_SESSION_CREATE_FIRST`` | Create /api/v1/ota/session, then upload PATCH ranges. |
+| ``OTA_SESSION_EXPIRED`` | The inactive firmware transfer expired. Create a new session. |
+| ``OTA_SESSION_IDENTITY_MISMATCH`` | The transfer identity does not match the declared image. |
+| ``OTA_SESSION_IDENTITY_REQUIRED`` | A JSON OTA session identity is required. |
+| ``OTA_SHA256_MISMATCH`` | The received firmware does not match its declared SHA-256. |
+| ``OTA_UPDATE_REQUIRES_READY`` | Stop the cycle and wait for Ready before updating firmware. |
+| ``PENDING_VERIFY`` | The running firmware awaits boot confirmation. Check confirmBlockReason and confirmLastError in OTA status. |
+| ``RECEIVE_FAILED`` | The upload was interrupted. Resume this session from nextOffset; the accepted firmware prefix was preserved. |
+| ``SAFETY_LOST`` | The paddle moved or a shot started during the upload, so the update was cancelled. The verified image was not kept. |
+| ``SESSION_REQUIRED`` | Create an OTA session before sending image ranges. |
+| ``TOO_LARGE`` | The firmware image does not fit in the update slot. |
+| ``UNAVAILABLE`` | This controller has no second firmware slot, so it cannot be updated over Wi-Fi. |
+| ``UNKNOWN`` | The firmware update failed. |
+| ``VERIFY_FAILED`` | The uploaded image failed its checksum. Nothing was flashed. |
+| ``WRITE_FAILED`` | The update slot could not be written. The running firmware was not touched. |
+
+#### Scales, records, and diagnostics
+
+| Reason | `message` sentence |
+| --- | --- |
+| ``ACTIVATION_HISTORY_CLEAR_FAILED`` | Activation history could not be cleared. Check the last storage error in Diagnostic. |
+| ``ACTIVATION_HISTORY_CLEAR_NOT_CONFIRMED`` | The activation-history clear was not explicitly confirmed. |
+| ``ACTIVATION_HISTORY_CLEAR_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before clearing the activation history. |
+| ``AUDIT_ERASE_FAILED`` | Audit records could not be erased. |
+| ``AUDIT_EXPORT_UNAVAILABLE`` | The audit log is not available. |
+| ``AUDIT_LOG_CLEAR_REQUIRES_READY`` | Stop the cycle and wait for Ready before emptying the audit log. |
+| ``AUDIT_LOG_DELETE_NOT_CONFIRMED`` | Confirm audit-log deletion explicitly. |
+| ``AUDIT_VERBOSE_UNAVAILABLE`` | The wall clock is not synchronized yet. |
+| ``CRASH_CLEAR_REQUIRES_READY`` | Stop the cycle and wait for Ready before emptying crashes. |
+| ``CRASH_DELETE_NOT_CONFIRMED`` | Confirm crash deletion explicitly. |
+| ``CRASH_ERASE_FAILED`` | Crash records could not be erased. |
+| ``FIELD_ENABLED_MUST_BE_BOOLEAN`` | enabled must be a boolean. |
+| ``HISTORY_DELETE_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before deleting history records. |
+| ``HISTORY_RECORD_ID_REQUIRED`` | A non-zero history record id is required. |
+| ``HISTORY_RECORD_NOT_FOUND`` | The requested history record was not found. |
+| ``LAST_SHOT_CLEAR_FAILED`` | Last shot could not be cleared. |
+| ``LAST_SHOT_CLEAR_NOT_CONFIRMED`` | The last-shot clear was not explicitly confirmed. |
+| ``LAST_SHOT_CLEAR_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before clearing the last shot. |
+| ``LAST_SHOT_NOT_FOUND`` | There is no last shot to rate. |
+| ``LOOP_TIMING_UNAVAILABLE`` | Loop timing could not be reset. |
+| ``NO_CRASHES`` | No saved crash records are available. |
+| ``NO_SHOT_TRACE`` | No shot trace is available since the last restart. |
+| ``SCALE_TIMING_UNAVAILABLE`` | Scale gap maximum could not be reset. |
+| ``SHOT_DELETE_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before deleting shot records. |
+| ``SHOT_HAS_NO_TRACE`` | This shot has no stored trace. |
+| ``SHOT_HISTORY_CLEAR_FAILED`` | Shot history could not be cleared. Check Diagnostic → NVS for capacity and the last storage error. |
+| ``SHOT_HISTORY_CLEAR_NOT_CONFIRMED`` | The shot-history clear was not explicitly confirmed. |
+| ``SHOT_HISTORY_CLEAR_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before clearing shot history. |
+| ``SHOT_ID_REQUIRED`` | A non-zero shot id is required. |
+| ``SHOT_NAME_FIELDS_INVALID`` | id, boot and end must name a shot. |
+| ``SHOT_NOT_FOUND`` | The requested shot record was not found. |
+| ``SHOT_RATING_FIELDS_REQUIRED`` | A rating 0-5 and either a shot id or lastShot is required. |
+| ``SHOT_RATING_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before rating shots. |
+| ``SHOT_STORAGE_BUSY`` | The controller is busy (a shot, a rinse or the scale); try again shortly. |
+| ``SHOT_STORAGE_UNAVAILABLE`` | Shot storage could not be read. |
+| ``SHOT_TRACE_SAVING`` | This shot's trace is still being saved; try again shortly. |
+| ``SHOT_TRACE_UNAVAILABLE`` | The shot trace could not be read. |
 
 ## Access
 
