@@ -226,7 +226,7 @@
   };
   const svgStub={insertAdjacentHTML(_,markup){this.appended=(this.appended||'')+markup;},
     children:[{setAttribute(){}},{setAttribute(){}},{}]};
-  let tintMode=null,heroOverride=null;
+  let tintMode=null,heroOverride=null,heroDefault=null;
   const rule={mode:'active',t1:27,t2:36,prot:3,wall:60,d:5,ceil:38.5};
   const env={liveRuleModel:null,model:null,reduce:false,heroMode:'colorful'},ruleArgs=[];
   const paint=(d)=>new Function('$','buildShotSparkModel','formatShotEnded','ms','localStorage','document',
@@ -241,7 +241,8 @@
     blockAt(runtimeJs,'function verdictLabel(')+
     runtimeJs.slice(runtimeJs.indexOf('function renderShotHero('),runtimeJs.indexOf('function checkFirmwareReload('))+
     ';return renderShotHero({clockMs:d.elapsedMs,...d});')(lookup,()=>env.model,()=>'',
-    (v,n)=>(v/1000).toFixed(n),{getItem:(k)=>k==='obbwHeroTint'?tintMode:heroOverride,setItem(){}},
+    (v,n)=>(v/1000).toFixed(n),{getItem:(k)=>k==='obbwHeroTint'?tintMode:
+      k==='obbwHeroCard'?heroOverride:k==='obbwHeroCardDefault'?heroDefault:null,setItem(){}},
     {createElement:()=>({style:{},textContent:''})},
     ()=>env.heroMode?{config:{heroCardMode:env.heroMode}}:null,
     env.liveRuleModel,{shotHistory:{shots:[]}},r=>(ruleArgs.push(r),env.shotRule||null),()=>null,
@@ -427,7 +428,8 @@
   // The Technical hero is the default: the preset graph under the numbers,
   // the SAP zone glow and forecast cut from the same card fields, the calm
   // Brewing label on a good forecast, and the verdict zone plus cursor once
-  // ended. Machine choice and device override pick between the two cards.
+  // ended. Machine choice, its remembered default and the device override
+  // pick between the two cards.
   const spark=()=>lookup('shotHeroSpark');
   spark().clientWidth=390;
   env.model={segs:[{pts:[{t:0,cg:0},{t:15,cg:2000}]}],dripSegs:[],flowSegs:[],dripFlowSegs:[],
@@ -456,7 +458,15 @@
   env.heroMode='colorful';heroOverride='technical';
   paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
   if(heroEl().dataset.hero!=='technical')throw new Error('An explicit device override must win both ways');
-  heroOverride=null;env.shotRule=null;env.model=null;
+  heroOverride=null;heroDefault='colorful';
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
+  if(heroEl().dataset.hero!=='colorful')
+    throw new Error('A resumed stream must paint the remembered machine default, not flash Technical');
+  env.heroMode='technical';
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
+  if(heroEl().dataset.hero!=='technical')
+    throw new Error('The live config snapshot must beat the remembered machine default');
+  heroDefault=null;env.shotRule=null;env.model=null;
   const chips=['Cut','Touch','Mode'].map(id=>html.indexOf('id="shotHero'+id+'"'));
   if(chips.some((pos,i)=>pos<0||(i&&pos<=chips[i-1])))throw new Error('Home shot pills must keep their reading order');
   const apply = new Function(runtimeJs.slice(runtimeJs.indexOf('function uiStreamFrame('),

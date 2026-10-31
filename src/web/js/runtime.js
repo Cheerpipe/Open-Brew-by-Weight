@@ -5483,6 +5483,15 @@ function setHeroTintMode(v) {
 // install may override it per device (Settings > On this device). Technical
 // is the fallback for a missing or future value.
 const HERO_CARD_KEY = "obbwHeroCard";
+// The machine default last seen in a config snapshot, kept for paints that
+// run while the Home stream is invalidated (a resumed PWA before its stream
+// reconnects): they must keep the machine's card, not flash Technical.
+const HERO_CARD_DEFAULT_KEY = "obbwHeroCardDefault";
+let heroCardDefault = null;
+try {
+  const v = localStorage.getItem(HERO_CARD_DEFAULT_KEY);
+  if (v === "technical" || v === "colorful") heroCardDefault = v;
+} catch (_) {}
 function heroCardOverride() {
   try {
     const v = localStorage.getItem(HERO_CARD_KEY);
@@ -5492,10 +5501,8 @@ function heroCardOverride() {
   }
 }
 function heroCardMode() {
-  return (
-    heroCardOverride() ||
-    (homeStatusCache()?.config?.heroCardMode === "colorful" ? "colorful" : "technical")
-  );
+  const v = heroCardOverride() || homeStatusCache()?.config?.heroCardMode || heroCardDefault;
+  return v === "colorful" ? "colorful" : "technical";
 }
 function setHeroCardOverride(v) {
   try {
@@ -6107,6 +6114,15 @@ function applyCommonStatus(s) {
   if (typeof s.bootId === "number") bootId = s.bootId;
   updateFirmwareFooter();
   const c = s.config || {};
+  if (
+    (c.heroCardMode === "colorful" || c.heroCardMode === "technical") &&
+    c.heroCardMode !== heroCardDefault
+  ) {
+    heroCardDefault = c.heroCardMode;
+    try {
+      localStorage.setItem(HERO_CARD_DEFAULT_KEY, heroCardDefault);
+    } catch (_) {}
+  }
   syncTimezone(c);
   lastCommandStatus = s.lastCommand || null;
   if (typeof c.revision === "number") configRevision = c.revision;
