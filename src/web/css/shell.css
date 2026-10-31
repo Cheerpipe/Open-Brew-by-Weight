@@ -709,6 +709,14 @@ body.devBuild #adminLockPanel {
   color: var(--ac);
   text-decoration: none;
 }
+/* Scale rename links ride inline after the scale name in Home, Settings and
+   Diagnostic: accent text actions, never browser-default anchors. */
+.inlineRename {
+  color: var(--ac);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
 body.homeAdminActions #view-home:not(.hidden) ~ .pageFooter {
   margin-bottom: calc(7rem + env(safe-area-inset-bottom));
 }

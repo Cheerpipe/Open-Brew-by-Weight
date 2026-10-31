@@ -175,14 +175,22 @@
   // (g) Rule-table completeness: three two-sided rules plus the single-sided
   // retare floor, every referenced field a real Settings input with the steps
   // the phrasing depends on, and every section a real section summary.
+  // The ramp hardness fields are hidden text mirrors of their sliders: their
+  // 0.5 grid lives on the paired range input (and in the rangeCheck literals),
+  // so the mirror carries no min/max/step — those are invalid on a text input.
+  const SV_SLIDER_MIRRORS = {
+    fastCurveHardness: 'fastCurveHardnessRange',
+    slowCurveHardness: 'slowCurveHardnessRange',
+  };
   svAssert.equal(svA.rules.length, 4);
   svAssert.ok(svA.rules.some((r) => r[1] === 'retareFloor'));
   for (const [id, [, step]] of Object.entries(svFieldSpec)) {
     if (!step || id === 'weightOffsetBaselineG' || id === 'bbwAlphaBaseline') continue;
-    const input = settingsHtml.match(new RegExp('id="' + id + '"[^>]*'));
-    svAssert.ok(input, 'Settings input missing: ' + id);
+    const target = SV_SLIDER_MIRRORS[id] || id;
+    const input = settingsHtml.match(new RegExp('id="' + target + '"[^>]*'));
+    svAssert.ok(input, 'Settings input missing: ' + target);
     svAssert.ok(input[0].includes('step="' + step + '"'),
-      id + ' must keep step ' + step + ' for message precision');
+      target + ' must keep step ' + step + ' for message precision');
   }
   for (const section of ['Recipe', 'Fast shots', 'Slow shots', 'Time limits', 'Tare'])
     svAssert.ok(settingsHtml.includes('>' + section + '</summary>'),

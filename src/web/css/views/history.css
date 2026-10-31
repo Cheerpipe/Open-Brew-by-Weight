@@ -549,7 +549,8 @@
 }
 #historyTable td.shotDur small {
   display: inline;
-  font-size: 0.62em;
+  margin-left: 0.22em;
+  font-size: 0.72em;
   font-weight: 600;
   color: var(--mu);
 }

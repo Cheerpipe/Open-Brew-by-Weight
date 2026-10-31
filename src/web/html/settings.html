@@ -325,9 +325,6 @@
           class="hidden"
           type="text"
           inputmode="decimal"
-          min="0"
-          max="100"
-          step="0.5"
           aria-hidden="true"
           tabindex="-1"
         /><small id="fastCurveHint" class="fieldHint"></small>
@@ -408,9 +405,6 @@
           class="hidden"
           type="text"
           inputmode="decimal"
-          min="0"
-          max="100"
-          step="0.5"
           aria-hidden="true"
           tabindex="-1"
         /><small id="slowCurveHint" class="fieldHint"></small>
@@ -459,6 +453,7 @@
           <div class="dcBarX" id="dripBarX" aria-hidden="true"></div>
           <small class="fieldHint" id="dripHint"></small>
         </figure>
+        <!-- [html-validate-disable-next wcag/h32 -- settings.js builds the Set key inside the number box; as a submit button it answers Enter] -->
         <form class="enterForm" novalidate>
           <label
             >{{webui:settings.drip_expected_g}}<input
@@ -470,6 +465,7 @@
             /><small class="fieldHint">{{webui:settings.drip_set_hint}}</small></label
           >
         </form>
+        <!-- [html-validate-disable-next wcag/h32 -- same runtime-built Set key] -->
         <form class="enterForm" novalidate>
           <label
             >{{webui:settings.learning_factor}}<input
@@ -830,7 +826,10 @@
       <p>
         <strong>{{webui:settings.preferred_scale}}</strong>
         <span id="preferredScaleSelectRenameWrap" class="hidden"
-          >- <a id="preferredScaleRename" href="#">{{webui:settings.rename}}</a></span
+          >-
+          <a id="preferredScaleRename" class="inlineRename" href="#"
+            >{{webui:settings.rename}}</a
+          ></span
         ><br /><span id="preferredScalePauseHint" class="fieldHint"></span
         ><span class="selBox"
           ><select id="preferredScaleSelect" aria-label="{{webui:settings.preferred_scale}}">
