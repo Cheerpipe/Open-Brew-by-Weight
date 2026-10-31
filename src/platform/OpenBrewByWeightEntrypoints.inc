@@ -298,6 +298,14 @@ void startAfterBootRecovery() {
     addDebugEvent(DebugCategory::CONFIG, DebugCode::INITIALIZATION_FAILED,
                   BOOT_SUBSYSTEM_PERSISTENCE);
   }
+  // Field-visible degradation: a QIO build whose flash chip did not accept
+  // the QE bit keeps running DIO (the bootloader logs it on USB only).
+  if (flashReadModeDegraded()) {
+    serialTraceCategoryf(
+        LogLevel::WARNING, DebugCategory::BOOT,
+        "Flash read mode is %s but the image was built for %s",
+        flashReadModeName(), flashReadModeBuiltName());
+  }
   // RTC captures the prior uptime immediately across warm resets; NVS keeps
   // the history when RTC memory is lost (for example after power loss).
   persistResetHistoryAfterBoot(safetyResetStatus);

@@ -614,7 +614,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            "\"heapAlertLatched\":%s,"
            "\"stackAlertLatched\":%s,\"loopGapAlertLatched\":%s,"
            "\"cpuLoad5s\":%.2f,\"cpuLoad1m\":%.2f,\"cpuLoad5m\":%.2f,"
-           "\"cpuMhz\":%lu,\"tempC\":%.1f,\"tempPeakC\":%.1f},",
+           "\"cpuMhz\":%lu,\"tempC\":%.1f,\"tempPeakC\":%.1f,"
+           "\"flashReadMode\":\"%s\",\"flashReadModeBuilt\":\"%s\"},",
            static_cast<unsigned long>(c.uptimeMs),
            static_cast<unsigned long>(c.snapshotVersion),
            c.snapshotStale ? "true" : "false",
@@ -660,7 +661,9 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            static_cast<double>(c.hwmon.cpuLoad5m),
            static_cast<unsigned long>(c.hwmon.cpuMhz),
            static_cast<double>(c.hwmon.tempC),
-           static_cast<double>(c.hwmon.tempPeakC));
+           static_cast<double>(c.hwmon.tempPeakC),
+           flashReadModeName(),
+           flashReadModeBuiltName());
 
   if (self.callbacks_.copyTaskProfiler != nullptr) {
     self.callbacks_.copyTaskProfiler(work.taskProfiler);

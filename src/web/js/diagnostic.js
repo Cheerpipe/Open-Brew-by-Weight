@@ -273,6 +273,7 @@ function updH(h, s) {
     "hCpu1m",
     "hCpu5m",
     "hCpuMhz",
+    "hFlashMode",
     "hTemp",
     "hTPeak",
     "hRamT",
@@ -318,6 +319,15 @@ function updH(h, s) {
   t(
     "hCpuMhz",
     typeof w.cpuMhz === "number" && w.cpuMhz > 0 ? w.cpuMhz + __WEBUI_TEXT__("runtime.mhz") : "—",
+  );
+  t(
+    "hFlashMode",
+    !w.flashReadMode
+      ? "—"
+      : w.flashReadMode === w.flashReadModeBuilt || !w.flashReadModeBuilt
+        ? w.flashReadMode
+        : w.flashReadMode +
+          __WEBUI_TEXT__("diagnostic.flash_mode_built_suffix").replace("{0}", w.flashReadModeBuilt),
   );
   t("hTemp", w.tempValid ? w.tempC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");
   t("hTPeak", w.tempValid ? w.tempPeakC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");

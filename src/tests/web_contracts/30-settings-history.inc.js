@@ -422,11 +422,16 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !network.includes('cpu1Busy') ||
       !network.includes('cpuLoadValid') ||
       !network.includes('cpuMhz') ||
+      !network.includes('flashReadMode') ||
+      !network.includes('flashReadModeBuilt') ||
       !codeIncludes(ui, 'cpuLoad5s') ||
       !codeIncludes(ui, 'cpuLoad1m') ||
       !codeIncludes(ui, 'cpuLoad5m') ||
       !codeIncludes(ui, 'cpuLoadValid') ||
       !codeIncludes(ui, 'cpuMhz') ||
+      !codeIncludes(ui, 'id="hFlashMode"') ||
+      !codeIncludes(ui, 'w.flashReadMode') ||
+      !codeIncludes(ui, 'w.flashReadModeBuilt') ||
       !codeIncludes(ui, "w.cpuMhz+' MHz'") ||
       !codeIncludes(ui, 'w.cpu0Busy') ||
       !codeIncludes(ui, 'w.cpu1Busy') ||

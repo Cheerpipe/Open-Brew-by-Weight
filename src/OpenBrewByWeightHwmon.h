@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -10,9 +11,46 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "OpenBrewByWeightPsram.h"
+#include "soc/spi_mem_reg.h"
 #endif
 
 namespace openbrewbyweight {
+
+// Flash cache read mode the bootloader left in SPI0: live hardware state, not
+// the image-header request. A QIO build runs DIO when the chip's QE bit
+// cannot be set, which is exactly the degradation Diagnostic must surface.
+// Same register mapping as bootloader_flash_get_spi_mode(), read directly so
+// the app does not link the whole bootloader_flash unit for one value.
+inline const char *flashReadModeName() {
+#ifdef ARDUINO
+  const uint32_t ctrl = READ_PERI_REG(SPI_MEM_CTRL_REG(0));
+  if (ctrl & SPI_MEM_FREAD_QIO) return "QIO";
+  if (ctrl & SPI_MEM_FREAD_QUAD) return "QOUT";
+  if (ctrl & SPI_MEM_FREAD_DIO) return "DIO";
+  if (ctrl & SPI_MEM_FREAD_DUAL) return "DOUT";
+  return "FASTRD";
+#else
+  return "DIO";
+#endif
+}
+
+// The mode the image was compiled for (esptool still writes a DIO header for
+// QIO builds; the bootloader enables quad during initialization).
+inline const char *flashReadModeBuiltName() {
+#if defined(CONFIG_ESPTOOLPY_FLASHMODE_QIO)
+  return "QIO";
+#elif defined(CONFIG_ESPTOOLPY_FLASHMODE_QOUT)
+  return "QOUT";
+#elif defined(CONFIG_ESPTOOLPY_FLASHMODE_DOUT)
+  return "DOUT";
+#else
+  return "DIO";
+#endif
+}
+
+inline bool flashReadModeDegraded() {
+  return strcmp(flashReadModeName(), flashReadModeBuiltName()) != 0;
+}
 
 // Dual-core busy load: busy_i in [0,1], total load = busy0+busy1 in [0,2].
 // 0.0 = both cores idle; 1.0 = one-core-full equivalent; 2.0 = both cores busy.

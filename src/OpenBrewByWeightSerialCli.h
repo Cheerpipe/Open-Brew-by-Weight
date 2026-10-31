@@ -626,6 +626,8 @@ struct SerialCliHealthDump {
   bool cpuLoadValid = false;
   bool tempValid = false;
   uint32_t cpuMhz = 0;
+  char flashReadMode[7] = "";
+  char flashReadModeBuilt[7] = "";
   float cpuLoad5s = 0.0f;
   float cpuLoad1m = 0.0f;
   float cpuLoad5m = 0.0f;
@@ -873,6 +875,10 @@ inline void serialCliPrintHealth(const SerialCliHealthDump &dump) {
   Serial.println(dump.cpuLoadValid ? "true" : "false");
   Serial.print("cpuMhz=");
   Serial.println(static_cast<unsigned long>(dump.cpuMhz));
+  Serial.print("flashReadMode=");
+  Serial.println(dump.flashReadMode);
+  Serial.print("flashReadModeBuilt=");
+  Serial.println(dump.flashReadModeBuilt);
   Serial.print("cpuLoad5s=");
   Serial.println(dump.cpuLoad5s, 2);
   Serial.print("cpuLoad1m=");

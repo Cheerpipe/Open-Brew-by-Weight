@@ -407,6 +407,8 @@
     "diagnostic.fault": "Fault",
     "diagnostic.firmware": "Firmware",
     "diagnostic.flash_lock_timeouts": "Flash lock timeouts",
+    "diagnostic.flash_mode_built_suffix": " (built for {0})",
+    "diagnostic.flash_read_mode": "Flash read mode",
     "diagnostic.free": "Free",
     "diagnostic.guards": "Guards",
     "diagnostic.heap": "HEAP",

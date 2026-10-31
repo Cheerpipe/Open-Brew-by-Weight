@@ -864,6 +864,10 @@ void serialCliPrintLiveHealth() {
   dump.loopGapAlertLatched = healthLoopGapAlertLatched;
   dump.cpuLoadValid = hwmonSnapshot.cpuLoadValid;
   dump.cpuMhz = hwmonSnapshot.cpuMhz;
+  copyCString(dump.flashReadMode, sizeof(dump.flashReadMode),
+              flashReadModeName());
+  copyCString(dump.flashReadModeBuilt, sizeof(dump.flashReadModeBuilt),
+              flashReadModeBuiltName());
   dump.cpuLoad5s = hwmonSnapshot.cpuLoad5s;
   dump.cpuLoad1m = hwmonSnapshot.cpuLoad1m;
   dump.cpuLoad5m = hwmonSnapshot.cpuLoad5m;

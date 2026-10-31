@@ -764,6 +764,11 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     telemetry.field("health.hwmon.ramTotalBytes", static_cast<unsigned long>(hwmon.ramTotalBytes));
     telemetry.field("health.hwmon.ramUsedBytes", static_cast<unsigned long>(hwmon.ramUsedBytes));
     telemetry.field("health.hwmon.ramFreeBytes", static_cast<unsigned long>(hwmon.ramFreeBytes));
+    // Boot constants: fingerprinted once, so they reach the wire only in the
+    // per-connection snapshot frame.
+    telemetry.field("health.hwmon.flashReadMode", "\"%s\"", flashReadModeName());
+    telemetry.field("health.hwmon.flashReadModeBuilt", "\"%s\"",
+                    flashReadModeBuiltName());
     // Steady-state RSSI sits behind the 1 s sampler; 4 s display matches the
     // retired poll. Link edges still land immediately via the EVENT fields.
     if (network.staLinkMetricsValid)
