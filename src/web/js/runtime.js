@@ -3624,6 +3624,7 @@ function presetGraph(host, m, x = {}) {
       flow = [],
       now,
       fc,
+      stop,
     } = x,
     W = x.w || host.clientWidth;
   if (!W) return null;
@@ -3778,9 +3779,9 @@ function presetGraph(host, m, x = {}) {
     curves(last, "rvLast") +
     curves(drip, "rvLast rvLastDrip") +
     (flow.length ? flowLayer(flow, X, L, R, B - (B - T) * 0.36, B) : "") +
-    (fc && now ? `<path class="rvFc" d="M${P(...now)}Q${P(fc[2], fc[3])} ${P(...fc)}"/>` : "") +
-    (fc ? `<circle class="rvFcDot" cx="${f(X(fc[0]))}" cy="${f(Y(fc[1]))}" r="5"/>` : "") +
+    (fc ? `<circle class="rvFcDot" cx="${f(X(fc[0]))}" cy="${f(Y(fc[1]))}" r="6"/>` : "") +
     (now ? `<circle class="rvNow" cx="${f(X(now[0]))}" cy="${f(Y(now[1]))}" r="4"/>` : "") +
+    (stop ? `<circle class="shotStop" cx="${f(X(stop[0]))}" cy="${f(Y(stop[1]))}" r="3"/>` : "") +
     held
       .map(
         ([t, g]) => `<circle cx="${f(X(t))}" cy="${f(Y(g))}" r="2" fill="var(--mu)" opacity=".6"/>`,
@@ -5480,7 +5481,7 @@ function renderShotHero(d) {
       spark.setAttribute("role", "img");
       spark.removeAttribute("tabindex");
     }
-    renderHeroChart(spark, model, rule, goal, label);
+    renderHeroChart(spark, model, rule, goal, label, d);
   }
   if (shotFsActive) renderLiveShot(d, model, noScale ? null : m, tint);
 }
@@ -5620,11 +5621,41 @@ function smoothFlow({ pts: p }) {
     return [q.t, sum / (hi - lo) / 100];
   });
 }
+// The landing dot's end-of-shot morph: the marker animates out of the white
+// landing dot's exact state — position as a translate (animated everywhere),
+// size and colours as explicit from/to keyframes — so the dot itself becomes
+// the card's end marker. Reduced motion lands it instantly.
+const fcMorph = (el, from, to) =>
+  el &&
+  !window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches &&
+  el.animate([from, to], { duration: 460, easing: "cubic-bezier(.4,0,.2,1)" });
+// The chart variant: an SVG marker (stop dot or scrub handle, resting radius
+// r) morphs from the recorded landing position fc towards (x, y).
+const fcMorphDot = (el, fc, x, y, r) =>
+  fcMorph(
+    el,
+    {
+      transform: `translate(${(fc.x - x).toFixed(1)}px, ${(fc.y - y).toFixed(1)}px)`,
+      r: "6px",
+      fill: "var(--sf)",
+      stroke: "var(--mu)",
+      strokeWidth: "1.8px",
+    },
+    {
+      transform: "translate(0,0)",
+      r: r + "px",
+      fill: "var(--gLast)",
+      stroke: "var(--sf)",
+      strokeWidth: "1.5px",
+    },
+  );
 // The Technical hero chart: the shot cards' preset-weight graph in the hero's
 // tight 132 px frame. An ended shot keeps its verdict zone lit and a cursor
 // that rides its curve; a live shot glows the SAP-predicted zone at the
-// firmware's blend percent and draws the forecast cut. Without a corridor
-// (no scale, no preset snapshot) the hero keeps its numbers only.
+// firmware's blend percent and marks the forecast's landing on the cut line
+// with the white dot, which becomes the parked handle when the shot ends.
+// Without a corridor (no scale, no preset snapshot) the hero keeps its
+// numbers only.
 const HERO_ZONE_BANDS = {
   fast: ["rvFastFull", "rvFastPart"],
   on_recipe: ["rvWindow"],
@@ -5636,20 +5667,11 @@ function renderHeroTechnicalChart(host, d, model, m) {
   host._draw = null;
   if (!m || !segs.length) return void host.replaceChildren();
   const last = segs.map((s) => s.pts.map((q) => [q.t, q.cg / 100])),
-    // The forecast cut lands on the cut line at the SAP's arrival, bent by
-    // the live flow — the full-screen live view's construction.
+    // The forecast lands on the cut line at the SAP's arrival: the landing
+    // dot's position, the same construction as the full-screen live view.
     end = d.live ? last.at(-1)?.at(-1) : null,
     at = d.live && d.fcEndMs ? d.fcEndMs / 1e3 : 0,
-    liveFlow = at
-      ? [model.flowSegs, model.dripFlowSegs]
-          .flatMap((a) => a.filter((s) => s.pts.length > 1).map(smoothFlow))
-          .at(-1)
-          ?.at(-1)?.[1] || 0
-      : 0,
-    fc =
-      at && end
-        ? [at, cutLine(at, m), (at + end[0]) / 2, end[1] + ((at - end[0]) / 2) * liveFlow]
-        : null,
+    fc = at && end ? [at, cutLine(at, m)] : null,
     view = presetGraph(host, m, {
       compact: true,
       hatch: true,
@@ -5668,6 +5690,7 @@ function renderHeroTechnicalChart(host, d, model, m) {
     });
   if (!view) return;
   host._view = view;
+  if (d.live && fc) host._fc = { key: d.shotId ?? d.elapsedMs, x: view.X(fc[0]), y: view.Y(fc[1]) };
   // Zones: an ended shot lights the corridor it ended in (shot-card parity);
   // live, the SAP glows its predicted zone at the streamed blend percent.
   host.dataset.zone = d.live
@@ -5715,6 +5738,14 @@ function renderHeroTechnicalChart(host, d, model, m) {
         `<g class="shotCursor"><path class="rvGuide"/><circle class="rvHandle" r="5"/>${PILL}</g>`,
       );
     placeHeroCursor(host);
+    // The landing dot becomes the cursor's handle: one morph from its last
+    // live position and shape into the parked handle.
+    const h = host.querySelector(".rvHandle");
+    if (host._fc) {
+      if (host._fc.key === (d.shotId ?? d.elapsedMs) && h)
+        fcMorphDot(h, host._fc, +h.getAttribute("cx"), +h.getAttribute("cy"), 5);
+      host._fc = null;
+    }
   }
   host._draw = () => renderHeroTechnicalChart(host, d, model, m);
   observePresetHost(host);
@@ -5745,7 +5776,7 @@ function placeHeroCursor(host) {
   host.setAttribute("aria-valuenow", t.toFixed(1));
 }
 // Curve, cut line and window; overlays use CSSOM (the CSP blocks inline styles).
-function renderHeroChart(host, model, m, goal, label) {
+function renderHeroChart(host, model, m, goal, label, d) {
   if (!host) return;
   host.setAttribute("aria-label", label);
   const segs = model && model.segs.filter((s) => s.pts.length > 1);
@@ -5868,12 +5899,53 @@ function renderHeroChart(host, model, m, goal, label) {
       ? `<path d="${path([[cut.t, cut.cg / 100]])}h0" ${stroke} stroke-width="6" stroke-linecap="round"/>`
       : "") +
     `</g><line x1="0" y1="99.6" x2="100" y2="99.6" ${stroke} stroke-opacity=".3"/></svg>`;
-  host.append(...over, put("end", "", X(end.t), Y(end.cg / 100)));
+  // The live marker: the white landing dot on the cut line while a forecast
+  // exists (replacing the tip dot — the curve's tip already marks now); the
+  // accent end dot otherwise, morphed out of the landing dot at the shot's end.
+  const at = m && d?.live && d.fcEndMs ? d.fcEndMs / 1e3 : 0,
+    key = d?.shotId ?? d?.elapsedMs;
+  host.append(
+    ...over,
+    at ? put("fcDot", "", X(at), Y(cutLine(at, m))) : put("end", "", X(end.t), Y(end.cg / 100)),
+  );
+  if (at)
+    host._fc = {
+      key,
+      left: X(at).toFixed(2) + "%",
+      top: Y(cutLine(at, m)).toFixed(2) + "%",
+    };
+  else if (host._fc && !d?.live) {
+    const e = host.lastChild;
+    if (host._fc.key === key)
+      fcMorph(
+        e,
+        {
+          left: host._fc.left,
+          top: host._fc.top,
+          width: "1rem",
+          height: "1rem",
+          margin: "-0.5rem 0 0 -0.5rem",
+          background: "var(--sf)",
+          boxShadow: "0 0 0 1.5px var(--mu)",
+        },
+        {
+          left: X(end.t).toFixed(2) + "%",
+          top: Y(end.cg / 100).toFixed(2) + "%",
+          width: "0.65rem",
+          height: "0.65rem",
+          margin: "-0.325rem 0 0 -0.325rem",
+          background: "var(--on)",
+          boxShadow: "0 0 0 3px color-mix(in srgb, var(--on) 30%, transparent)",
+        },
+      );
+    host._fc = null;
+  }
   if (hatch) host.prepend(hatch);
 }
 // Live view: the shot card's numbers, state and colour over the preset graph,
-// with the shot, its flow and the forecast cut drawn in. Without a shot it
-// shows the active preset, ready for the next one.
+// with the shot, its flow and the forecast's landing dot drawn in; an ended
+// shot keeps a stop dot at its real end, morphed out of the landing dot.
+// Without a shot it shows the active preset, ready for the next one.
 function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
   const host = $("liveShotGraph"),
     name =
@@ -5903,28 +5975,17 @@ function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
     pts = (segs) =>
       segs.filter((s) => s.pts.length > 1).map((s) => s.pts.map((q) => [q.t, q.cg / 100])),
     last = model ? pts(model.segs) : [],
-    end = d?.live ? last.at(-1)?.at(-1) : null,
+    // The curve's last point: the live tip while brewing, the real end after.
+    end = last.at(-1)?.at(-1) || null,
     flow = model
       ? [model.flowSegs, model.dripFlowSegs].flatMap((a) =>
           a.filter((s) => s.pts.length > 1).map(smoothFlow),
         )
       : [],
-    // The forecast cut lands on the cut line at the SAP's acceleration-aware
+    // The forecast lands on the cut line at the SAP's acceleration-aware
     // arrival (the UI ships inside the firmware, so fcEndMs is always native).
-    // The quadratic control point at half the horizon with the current flow as
-    // slope bends the chord into the pace parabola; without a flow read the
-    // control sits level with the current weight, and the curve still lands
-    // on the dot.
     at = d?.live && m.mode === "active" && d.fcEndMs ? d.fcEndMs / 1000 : 0,
-    fc =
-      at && end
-        ? [
-            at,
-            cutLine(at, m),
-            (at + end[0]) / 2,
-            end[1] + ((at - end[0]) / 2) * (flow.at(-1)?.at(-1)?.[1] || 0),
-          ]
-        : null,
+    fc = at && end ? [at, cutLine(at, m)] : null,
     // Tablets give the flow its own lane under the graph; phones overlay it
     // on the graph's lower third.
     w = host.clientWidth / k,
@@ -5938,9 +5999,19 @@ function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
       maxG: model ? model.maxW : 0,
       maxT: model ? model.timeMax : 0,
       flow: h ? [] : flow,
-      now: end,
+      now: d?.live ? end : null,
       fc,
+      stop: d && !d.live ? end : null,
     });
+  if (view && d?.live && fc)
+    host._fc = { key: d.shotId ?? d.elapsedMs, x: view.X(fc[0]), y: view.Y(fc[1]) };
+  else if (view && host._fc) {
+    // The landing dot settles onto the shot's real end as the stop dot.
+    const s = host.querySelector(".shotStop");
+    if (host._fc.key === (d?.shotId ?? d?.elapsedMs) && s && end)
+      fcMorphDot(s, host._fc, view.X(end[0]), view.Y(end[1]), 3);
+    host._fc = null;
+  }
   if (view && h)
     lane.innerHTML =
       `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true"><path class="rvWin" d="M${view.X(m.t1).toFixed(1)} 0V${h}M${view.X(m.t2).toFixed(1)} 0V${h}"/>` +

@@ -2300,6 +2300,17 @@ summary {
   background: var(--on);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--on) 30%, transparent);
 }
+/* The landing dot in the Colorful spark; the Technical hero's graph draws the
+   same dot as .rvFcDot inside its SVG. */
+.heroChart .fcDot {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border-radius: 50%;
+  background: var(--sf);
+  box-shadow: 0 0 0 1.5px var(--mu);
+}
 .heroChart .xl,
 .heroChart .hold {
   position: absolute;
@@ -2370,8 +2381,10 @@ summary {
   color: inherit;
 }
 /* The preset graph in its tight 132 px frame, bleeding into the side padding
-   so its axis labels land where the card's padding was. */
+   so its axis labels land where the card's padding was. The live now-dot
+   speaks the card's own accent (--tint), not the live view's tone. */
 .shotHero[data-hero="technical"] .heroChart {
+  --lsTone: var(--tint);
   height: 8.25rem;
   margin: 0.7rem -0.55rem 0;
 }
@@ -2941,17 +2954,12 @@ body.shotFs {
 .rvFlowGrid {
   stroke-dasharray: 2 4;
 }
-.rvFc {
-  fill: none;
-  stroke: var(--lsTone);
-  stroke-width: 1.6;
-  stroke-dasharray: 1.5 4.5;
-  stroke-linecap: round;
-}
+/* The forecast's landing dot: white on the cut line, its thin neutral ring
+   legible on the light card, the dark theme and the tinted zones alike. */
 .rvFcDot {
   fill: var(--sf);
-  stroke: var(--lsTone);
-  stroke-width: 2.2;
+  stroke: var(--mu);
+  stroke-width: 1.8;
 }
 .rvNow {
   fill: var(--lsTone);
