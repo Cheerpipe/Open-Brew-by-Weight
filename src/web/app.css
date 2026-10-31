@@ -1660,6 +1660,10 @@ html:not(.pwaApp) .pwaOnly {
 #lineaMicraLinkedNote:not([hidden]) + .cfgGroup {
   margin-top: 0.85rem;
 }
+/* Breathing room between the Forget scale button bar and the brand group rows. */
+.cfgGroup[data-g="scale"] > .btnBar {
+  margin-bottom: 0.85rem;
+}
 .scopeNote {
   display: flex;
   align-items: center;
