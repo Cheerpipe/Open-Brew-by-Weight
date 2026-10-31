@@ -206,8 +206,10 @@ corridor::Params pendingCutParams(const PendingShotFinalize &snapshot) {
   p.slowRampMs = static_cast<int32_t>(snapshot.slowRampMs);
   p.fastCurve = snapshot.fastCurve;
   p.slowCurve = snapshot.slowCurve;
-  p.fastCurveHardnessPct = snapshot.fastCurveHardnessPct;
-  p.slowCurveHardnessPct = snapshot.slowCurveHardnessPct;
+  p.fastCurveHardnessPct = rampHardnessPctEffective(
+      snapshot.fastCurveHardnessPct, corridor::rampCurveHardnessOf(snapshot.fastCurve));
+  p.slowCurveHardnessPct = rampHardnessPctEffective(
+      snapshot.slowCurveHardnessPct, corridor::rampCurveHardnessOf(snapshot.slowCurve));
   return p;
 }
 

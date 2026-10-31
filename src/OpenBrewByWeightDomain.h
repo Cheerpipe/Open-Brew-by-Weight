@@ -707,9 +707,7 @@ struct RuntimeConfig {
   char ntpServerCustom[NTP_SERVER_HOST_CAPACITY] = {};
   // Recipe mirror of the active preset (smooth-cut window and side margins).
   bool fastSideEnabled = true;
-  // Continuous hardness per side (hundredths, 0..200; see fastCurveHardness);
-  // placed here to fill padding bytes and keep the snapshot size unchanged.
-  uint8_t fastCurveHardnessPct = RAMP_HARDNESS_PCT_UNSET;
+  uint8_t fastCurveHardnessPct = RAMP_HARDNESS_PCT_UNSET;  // fills padding
   uint16_t fastMarginDg = DEFAULT_FAST_MARGIN_DG;
   uint32_t fastBeforeMs = DEFAULT_FAST_BEFORE_MS;
   bool slowSideEnabled = true;
@@ -1291,24 +1289,15 @@ inline ConfigValidationError validateRuntimeConfig(
     return ConfigValidationError::SLOW_AFTER;
   }
   // A side's transition, like its margin, is checked only while it is on.
-  // Hardness pct must be 0..200 or the UNSET sentinel (not yet migrated from
-  // the legacy enum; sanitize derives it, so it is valid with a valid enum).
-  const auto hardnessPctValid = [](uint8_t pct) {
-    return pct <= RAMP_HARDNESS_PCT_MAX || pct == RAMP_HARDNESS_PCT_UNSET;
-  };
   const auto rampValid = [](uint16_t ms) { return ms <= MAX_RAMP_MS && ms % RAMP_STEP_MS == 0; };
   if (config.fastSideEnabled && !rampValid(config.fastRampMs)) return ConfigValidationError::FAST_RAMP;
-  if (config.fastSideEnabled &&
-      (config.fastCurve >= RAMP_CURVE_TYPES || config.fastCurveHardness >= RAMP_HARDNESS_LEVELS ||
-       !hardnessPctValid(config.fastCurveHardnessPct))) {
+  if (config.fastSideEnabled && !rampChoiceValid(config.fastCurve, config.fastCurveHardness,
+                                                 config.fastCurveHardnessPct))
     return ConfigValidationError::FAST_CURVE;
-  }
   if (config.slowSideEnabled && !rampValid(config.slowRampMs)) return ConfigValidationError::SLOW_RAMP;
-  if (config.slowSideEnabled &&
-      (config.slowCurve >= RAMP_CURVE_TYPES || config.slowCurveHardness >= RAMP_HARDNESS_LEVELS ||
-       !hardnessPctValid(config.slowCurveHardnessPct))) {
+  if (config.slowSideEnabled && !rampChoiceValid(config.slowCurve, config.slowCurveHardness,
+                                                 config.slowCurveHardnessPct))
     return ConfigValidationError::SLOW_CURVE;
-  }
   if (config.scaleLossFixedMs != 0 &&
       (config.scaleLossFixedMs < config.bbwProtectionMs ||
        config.scaleLossFixedMs > config.operationalWallMs)) {

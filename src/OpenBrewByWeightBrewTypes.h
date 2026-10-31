@@ -111,6 +111,20 @@ inline const char *rampHardnessName(uint8_t hardness) {
          : hardness == RAMP_HARDNESS_HARD ? "hard"
                                           : "soft";
 }
+// The hardness the cut runs at: an UNSET pct (a runtime blob written before
+// continuous hardness, whose sanitize only covers presets) reads as its
+// legacy level's percent, so the corridor never sees the sentinel and the
+// cut matches the level the wire still reports.
+inline uint8_t rampHardnessPctEffective(uint8_t pct, uint8_t level) {
+  return pct > RAMP_HARDNESS_PCT_MAX ? rampHardnessPctOf(level) : pct;
+}
+// A persisted transition choice: a known curve type, a known legacy level,
+// and a pct that is valid or still UNSET (consumers derive UNSET from the
+// level, so it is valid alongside a valid level).
+inline bool rampChoiceValid(uint8_t type, uint8_t level, uint8_t pct) {
+  return type < RAMP_CURVE_TYPES && level < RAMP_HARDNESS_LEVELS &&
+         (pct <= RAMP_HARDNESS_PCT_MAX || pct == RAMP_HARDNESS_PCT_UNSET);
+}
 // The nearest legacy level of a pct/enum pair; an UNSET pct keeps its level.
 inline uint8_t rampNearestHardnessOf(uint8_t pct, uint8_t level) {
   return pct > RAMP_HARDNESS_PCT_MAX ? level : rampNearestHardness(pct);

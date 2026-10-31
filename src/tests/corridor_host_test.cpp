@@ -1,3 +1,4 @@
+#include "../OpenBrewByWeightBrewTypes.h"
 #include "../OpenBrewByWeightCorridor.h"
 
 #include <cJSON.h>
@@ -741,6 +742,15 @@ void testSmoothstepIdentity() {
 // parts do not move (A2); and the blend never leaves 1 dg of the
 // double-precision reference blend (A3).
 void testContinuousHardnessBlend() {
+  // An UNSET runtime pct (a blob written before continuous hardness) must
+  // read as its legacy level: the corridor never sees the sentinel, so the
+  // cut matches the level the wire still reports (armSmoothCut and
+  // pendingCutParams apply this through rampHardnessPctEffective).
+  CHECK(rampHardnessPctEffective(RAMP_HARDNESS_PCT_UNSET, RAMP_HARDNESS_SOFT) == 0);
+  CHECK(rampHardnessPctEffective(RAMP_HARDNESS_PCT_UNSET, RAMP_HARDNESS_MEDIUM) == 100);
+  CHECK(rampHardnessPctEffective(RAMP_HARDNESS_PCT_UNSET, RAMP_HARDNESS_HARD) == 200);
+  CHECK(rampHardnessPctEffective(137, RAMP_HARDNESS_HARD) == 137);
+  CHECK(rampHardnessPctEffective(0, RAMP_HARDNESS_HARD) == 0);
   const int32_t durations[] = {500, 1000, 2500, 5000, 7500, MAX_RAMP_MS};
   // A1: bit-identity at whole hardness, the crown property. n sweeps the ramp
   // grid including both endpoints.
