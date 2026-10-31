@@ -1,0 +1,102 @@
+/* Admin → Access: signed-in devices, each with an in-row confirmation. */
+#accessDevices,
+#accessDevices + .accessRow {
+  border-top: 0;
+}
+.dev .devName {
+  cursor: text;
+  text-decoration: underline dotted var(--bd);
+  text-underline-offset: 0.2em;
+}
+.devNameInput {
+  min-height: 2.2rem !important;
+  margin: 0 !important;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem !important;
+}
+.devCount {
+  color: var(--mu);
+  font-weight: 400;
+}
+.devList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dev {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--ln);
+}
+.dev:first-child {
+  border-top: 0;
+}
+.devIc {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--ln);
+  border-radius: 50%;
+  background: var(--in);
+  color: var(--mu);
+}
+.devIc svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.devTx {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+.devTx > :first-child {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.devTx small {
+  font-size: 0.76rem;
+}
+.dev .tag {
+  margin-left: 0.3rem;
+  padding: 0.02rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 2rem;
+  color: var(--ok);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.dev > .textLock,
+.devFoot .textLock {
+  color: var(--ac);
+}
+.dev.confirm {
+  margin: 0 -0.5rem;
+  padding: 0.6rem 0.5rem;
+  border-radius: var(--r);
+  background: var(--in);
+}
+.dev.confirm small {
+  color: var(--fg);
+}
+.devAsk {
+  display: flex;
+  flex-basis: 100%;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+.devFoot {
+  display: flex;
+  justify-content: flex-end;
+}

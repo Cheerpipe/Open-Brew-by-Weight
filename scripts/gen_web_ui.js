@@ -9,7 +9,7 @@ const {minify: htmlMinify} = require('html-minifier-terser');
 const CleanCSS = require('clean-css');
 const {transform: cssTransform} = require('lightningcss');
 const zopfli = require('@gfx/zopfli');
-const {renderSources} = require('./localize_web_ui.js');
+const {renderSources, CSS_SOURCES} = require('./localize_web_ui.js');
 
 const repoRoot = path.resolve(__dirname, '..');
 const jsDir = path.join(repoRoot, 'src', 'web', 'js');
@@ -18,7 +18,20 @@ const sourcePath = path.join(htmlDir, 'shell.html');
 const appJsPath = path.join(repoRoot, 'src', 'web', 'app.js');
 const otaImageJsPath = path.join(jsDir, 'ota-image.js');
 const swPath = path.join(repoRoot, 'src', 'web', 'sw.js');
-const cssSourcePath = path.join(repoRoot, 'src', 'web', 'app.css');
+const cssDir = path.join(repoRoot, 'src', 'web', 'css');
+// CSS_SOURCES (localize_web_ui.js) owns the layer order; this map is the
+// shipped order. The guard below fails the build when src/web/css holds a
+// file outside the list, so no stylesheet can sit in the tree yet silently
+// never ship.
+const cssSourcePaths = CSS_SOURCES.map((name) => path.join(cssDir, name));
+
+function assertCssSourcesComplete() {
+  const present = fs.readdirSync(cssDir, {recursive: true})
+      .filter((name) => name.endsWith('.css')).sort().join(',');
+  if (present !== [...CSS_SOURCES].sort().join(',')) {
+    throw new Error(`src/web/css contents [${present}] do not match the CSS_SOURCES list`);
+  }
+}
 const manifestPath = path.join(repoRoot, 'src', 'web', 'manifest.webmanifest');
 const icon192Path = path.join(repoRoot, 'resources', 'icons', 'android',
     'launchericon-192x192.png');
@@ -308,8 +321,9 @@ async function generate(options = {}) {
       process.env.OPENBREWBYWEIGHT_WEBUI_LANGUAGE || 'en';
   // Contracts pass readSource to generate from reformatted HTML and CSS.
   const read = options.readSource || ((file) => fs.readFileSync(file, 'utf8'));
+  assertCssSourcesComplete();
   const source = read(sourcePath).replace(/\r?\n$/, '');
-  const cssSource = read(cssSourcePath);
+  const cssSource = cssSourcePaths.map((file) => read(file)).join('');
   const manifestObject = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const icon192Raw = fs.readFileSync(icon192Path);
   const icon48Raw = fs.readFileSync(icon48Path);
@@ -353,7 +367,7 @@ async function generate(options = {}) {
     {file: otaImageJsPath, type: 'js', content: otaImageRaw},
     ...JS_FILES.map((name) => ({file: path.join(jsDir, `${name}.js`),
       type: 'js', content: viewJsRaw[name]})),
-    {file: cssSourcePath, type: 'css', content: cssSource},
+    {file: 'app.css', type: 'css', content: cssSource},
   ], {language: webUiLanguage, localesDir: options.localesDir,
     developmentMode: options.developmentMode === true,
     machineType: options.machineType, machineIcon: options.machineIcon});
@@ -554,7 +568,7 @@ ${rows}
     outputPath,
     sourcePath,
     appJsPath,
-    cssSourcePath,
+    cssSourcePaths,
     version,
     requestedLanguage,
     inputLanguage,
@@ -572,7 +586,7 @@ module.exports = {
   sourcePath,
   appJsPath: appJsPath,
   jsSourcePath: appJsPath,
-  cssSourcePath,
+  cssSourcePaths,
   outputPath,
   VIEW_NAMES,
   VIEW_MODULES,

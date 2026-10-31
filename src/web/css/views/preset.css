@@ -1,0 +1,989 @@
+/* Preset review graph: every mark maps to a setting; color only under the cut line */
+.presetReview {
+  margin: 0.9rem 0 0.4rem;
+}
+.presetReview h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9375rem;
+}
+/* Fast and Slow pin their header, their switch row and their preview right
+   under the page header (--rampTop), so while the rows scroll the section
+   reads as starting with its switch and graph. The preview spans the band and
+   closes it with the row line. */
+.cfgGroup:is([data-g="fast"], [data-g="slow"])[open] > summary {
+  position: sticky;
+  top: var(--rampTop, var(--hdr));
+  z-index: 8;
+  background: var(--sf);
+}
+/* Pinned, the header would cut the band square: it carries the band's
+   rounded top corners, which at rest match the real ones exactly. */
+.cfgGroup:is([data-g="fast"], [data-g="slow"])[open] > summary::before {
+  content: "";
+  position: absolute;
+  inset: 100% 0 auto;
+  height: var(--r);
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 100% 100%, transparent calc(var(--r) - 0.5px), var(--sf) var(--r))
+      left top / var(--r) var(--r) no-repeat,
+    radial-gradient(circle at 0 100%, transparent calc(var(--r) - 0.5px), var(--sf) var(--r)) right
+      top / var(--r) var(--r) no-repeat;
+}
+.cfgGroup:has(> .rampHead)[open]::details-content {
+  padding-top: 0;
+}
+.rampPin {
+  position: sticky;
+  top: calc(var(--rampTop, var(--hdr)) + var(--rampSum, 0px));
+  z-index: 7;
+  margin-inline: -0.85rem;
+  padding-inline: 0.85rem;
+  background: var(--in);
+}
+.rampPreview {
+  margin: 0.75rem -0.85rem 0.25rem;
+  padding: 0.25rem 0.85rem 0.1rem;
+  background: var(--in);
+  box-shadow: 0 1px 0 var(--ln);
+  touch-action: pan-y;
+}
+.rampPreview svg {
+  display: block;
+  overflow: visible;
+}
+.rampSpan {
+  fill: none;
+  stroke: var(--mu);
+  stroke-width: 1;
+}
+.rampGuide {
+  stroke: var(--mu);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.rampChoice {
+  margin: 0.85rem 0 0;
+}
+.rampChoiceLbl {
+  display: block;
+  font-weight: 600;
+  margin: 0 0 0.45rem;
+}
+.rampCurves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.rampChoice input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.rampCurves label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: var(--tap);
+  margin: 0;
+  padding: 0.55rem 0.2rem 0.45rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--sf);
+  color: var(--fg);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rampCurves label:not(:has(input:checked)):hover {
+  background: var(--in);
+}
+.rampCurves label:has(input:checked) {
+  background: var(--pa);
+  border-color: var(--ac);
+  color: var(--ac);
+}
+.rampCurves label:has(input:focus-visible) {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+.rampCurves svg {
+  width: 2.5rem;
+  height: 1.25rem;
+  overflow: visible;
+}
+.rampCurves path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Continuous hardness: an intensity-gradient slider (Gentle -> Firm). The
+   rail ahead paints the spectrum; the claimed fill turns solid accent. */
+.rampHardness {
+  margin: 0.6rem 0 0;
+}
+.rampHardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.rampCap {
+  color: var(--mu);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.rampPct {
+  color: var(--ac);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rampHardness input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: var(--tap);
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+  /* A tap must grab the thumb, never start a text selection of the rail. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.rampHardness input[type="range"]:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+.rampHardness input[type="range"]:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.rampHardness input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.55rem;
+  border-radius: 1rem;
+  background:
+    linear-gradient(90deg, var(--ac) var(--p), transparent var(--p)),
+    linear-gradient(90deg, #6e4a3a, var(--ac));
+}
+.rampHardness input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: -0.48rem;
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  background: var(--fg);
+}
+.rampHardness input[type="range"]::-moz-range-track {
+  height: 0.55rem;
+  border-radius: 1rem;
+  background: linear-gradient(90deg, #6e4a3a, var(--ac));
+}
+.rampHardness input[type="range"]::-moz-range-progress {
+  height: 0.55rem;
+  border-radius: 1rem;
+  background: var(--ac);
+}
+.rampHardness input[type="range"]::-moz-range-thumb {
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  background: var(--fg);
+}
+.rampChoice label:has(input:disabled) {
+  cursor: default;
+}
+.reviewGraph {
+  width: 100%;
+  touch-action: pan-y;
+}
+.reviewGraph svg {
+  display: block;
+  overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.reviewGraph path {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.windowField {
+  padding: 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.windowPair {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  font-weight: 400;
+}
+.windowPair label {
+  flex: 1;
+  margin: 0;
+}
+.windowStats {
+  margin: 0.3rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--fg);
+}
+.linkAction {
+  min-height: var(--tap);
+  padding: 0 0.3rem;
+  border: 0;
+  background: none;
+  color: var(--ac);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rvHatchLine {
+  stroke: var(--mu);
+  stroke-opacity: 0.5;
+  stroke-width: 1.1;
+}
+.rvBandOff {
+  fill: none;
+  stroke: var(--mu);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.rvPace {
+  fill: none;
+  stroke: var(--fg);
+  stroke-opacity: 0.35;
+  stroke-width: 0.8;
+}
+.rvTarget {
+  stroke: var(--fg);
+  stroke-opacity: 0.5;
+  stroke-width: 1;
+  stroke-dasharray: 5 3;
+}
+.rvMax {
+  stroke: var(--gCut);
+  stroke-width: 2.5;
+  stroke-dasharray: 0 6;
+  stroke-linecap: round;
+}
+.rvWin {
+  fill: none;
+  stroke: var(--ok);
+  stroke-opacity: 0.8;
+  stroke-width: 1.2;
+  stroke-dasharray: 0 3.5;
+  stroke-linecap: round;
+}
+.rvGhost {
+  fill: none;
+  stroke: var(--mu);
+  stroke-width: 1.6;
+  stroke-dasharray: 2 3;
+}
+.rvCut {
+  fill: none;
+  stroke: var(--gCut);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.rvCut.off {
+  stroke: var(--mu);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+.rvLbl {
+  fill: var(--mu);
+  font-size: 11px;
+  font-weight: 600;
+}
+.rvLbl.strong {
+  fill: var(--fg);
+}
+.rvLbl.rvHold {
+  fill: var(--fg);
+  fill-opacity: 0.8;
+}
+.rvHalo {
+  paint-order: stroke;
+  stroke: var(--sf);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.rvLast {
+  fill: none;
+  stroke: var(--gLast);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.rvArrival {
+  fill: var(--fg);
+  fill-opacity: 0.75;
+  stroke: var(--sf);
+  stroke-width: 1;
+}
+.rvScrub {
+  cursor: ew-resize;
+}
+.rvGuide {
+  stroke: var(--fg);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  opacity: 0.6;
+}
+.rvShot {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 1.5;
+}
+.rvHandle {
+  fill: var(--sf);
+  stroke: var(--gCut);
+  stroke-width: 2.5;
+}
+.rvScrub:focus-visible .rvHandle {
+  stroke: var(--fg);
+  stroke-width: 3.5;
+}
+.rvPill {
+  visibility: hidden;
+  pointer-events: none;
+}
+.rvHeld .rvPill {
+  visibility: visible;
+}
+.rvPill rect {
+  fill: var(--sf);
+  stroke: var(--gCut);
+  stroke-width: 1.5;
+}
+.rvPill text {
+  font-variant-numeric: tabular-nums;
+}
+.reviewReadout {
+  margin: 0.15rem 0 0.3rem;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.reviewLegend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem 0.85rem;
+  font-size: 0.75rem;
+  color: var(--mu);
+}
+.rvLeg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.rvLeg i {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 0.15rem;
+}
+.rvLegCut i {
+  height: 0.2rem;
+  border-radius: 1rem;
+  background: var(--gCut);
+}
+.rvLegWindow i {
+  background: color-mix(in srgb, var(--ok) calc(var(--bandWin) * 100%), var(--sf));
+}
+.rvLegPace i {
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 45%, var(--sf));
+  border-radius: 0;
+}
+.rvLegExample i {
+  height: 0;
+  border-top: 1.5px solid var(--fg);
+  border-radius: 0;
+}
+.rvLegLast i {
+  height: 0;
+  border-top: 2.5px solid var(--gLast);
+  border-radius: 0;
+}
+.rvLegLastDrip i {
+  border-top-style: dashed;
+}
+.rvLegArrivals i,
+.rvLegHeld i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--fg);
+  opacity: 0.75;
+}
+.rvLegHeld i {
+  background: var(--mu);
+}
+.reviewLegend:not(.hasArrivals) .rvLegArrivals,
+.reviewLegend.noFast .rvLegFast,
+.reviewLegend.noSlow .rvLegSlow {
+  display: none;
+}
+.fieldResult {
+  display: block;
+  margin: 0.3rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--fg);
+}
+.rvLegFast i:first-child {
+  background: color-mix(in srgb, var(--gFast) calc(var(--bandFull) * 100%), var(--sf));
+}
+.rvLegFast i + i {
+  background: color-mix(in srgb, var(--gFast) calc(var(--bandPart) * 100%), var(--sf));
+}
+.rvLegSlow i:first-child {
+  background: color-mix(in srgb, var(--gSlow) calc(var(--bandFull) * 100%), var(--sf));
+}
+.rvLegSlow i + i {
+  background: color-mix(in srgb, var(--gSlow) calc(var(--bandPart) * 100%), var(--sf));
+}
+.rvLegNoCut i {
+  background: repeating-linear-gradient(45deg, var(--mu) 0 1px, transparent 1px 4px);
+}
+.rvLegSaved i {
+  height: 0;
+  border-top: 2px dashed var(--mu);
+  border-radius: 0;
+}
+.reviewLegend:not(.ghosted) .rvLegSaved {
+  display: none;
+}
+.rvNote {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.presetAcc {
+  display: grid;
+  gap: 0.4rem;
+}
+.presetAcc:empty {
+  display: none;
+}
+.presetAccItem {
+  border: 1px solid var(--ln);
+  border-radius: 0.6rem;
+  background: var(--sf);
+  overflow: hidden;
+  transition: border-color 0.25s ease-out;
+}
+.presetAccItem.open {
+  border-color: var(--ac);
+}
+.presetAccHead {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+.presetAccDot {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  border: 2px solid var(--mu);
+  background: var(--sf);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.presetAccItem.open .presetAccDot {
+  border-color: var(--pri);
+  box-shadow: inset 0 0 0 3.5px var(--sf);
+  background: var(--pri);
+}
+.presetAccHead .presetAccName {
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  min-width: 0;
+}
+.presetAccItem.open .presetAccName {
+  color: var(--pri);
+}
+.presetAccBadge {
+  flex: none;
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--mu);
+  text-transform: uppercase;
+}
+.presetAccPanel,
+.presetAccMore {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s cubic-bezier(0.32, 0.72, 0.32, 1);
+}
+.presetAccItem.open .presetAccPanel,
+.presetAccItem.full .presetAccMore {
+  grid-template-rows: 1fr;
+}
+.presetAccPanelIn,
+.presetAccMore > div {
+  overflow: hidden;
+}
+.presetAccToggle {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 1.5rem;
+  margin-top: -0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mu);
+  cursor: pointer;
+}
+.presetAccToggle svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0.32, 1);
+}
+.presetAccItem.full .presetAccToggle svg {
+  transform: rotate(180deg);
+}
+.presetAccRows {
+  padding: 0.15rem 0.6rem 0.5rem;
+}
+.guardRow {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--ln);
+}
+.presetAccRows .guardRow:first-child {
+  border-top: 0;
+}
+.guardName {
+  font-weight: 700;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.guardName i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+}
+.guardRule {
+  font-size: 0.82rem;
+  color: var(--fg);
+}
+.guardFast i {
+  background: var(--gFast);
+}
+.guardBbw i {
+  background: var(--ok);
+}
+.guardSlow i {
+  background: var(--gSlow);
+}
+
+/* Quick target-weight sheet, invoked by the active preset's pencil */
+.qeditPen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  vertical-align: middle;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0.18rem;
+  margin: calc(var(--tap) / -2) calc((2rem - var(--tap)) / 2);
+  border: 0;
+  background: none;
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    opacity 0.15s;
+}
+.qeditPen:hover {
+  opacity: 1;
+}
+.qeditPen:active {
+  transform: scale(0.85);
+}
+.qeditPen:disabled {
+  display: none;
+}
+.qeditPen svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+body.qwOpen {
+  overflow: hidden;
+}
+.qwBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  background: rgba(21, 21, 21, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s;
+}
+.qwBackdrop.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.qwSheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 33;
+  display: flex;
+  flex-direction: column;
+  max-height: 46dvh;
+  transform: translateY(105%);
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0.32, 1);
+  border-top: 1px solid var(--ln);
+  border-radius: 1.35rem 1.35rem 0 0;
+  background: var(--sf);
+  box-shadow: 0 -1.1rem 2.6rem rgba(0, 0, 0, 0.3);
+}
+.qwSheet.open {
+  transform: none;
+}
+.qwSheet.nodrag {
+  transition: none;
+}
+@media (min-width: 700px) {
+  .qwSheet {
+    left: max(1rem, env(safe-area-inset-left));
+    right: max(1rem, env(safe-area-inset-right));
+    max-width: 760px;
+    margin: 0 auto;
+  }
+}
+.qwGrab {
+  position: relative;
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.7rem;
+  padding: 0.55rem 1rem 0.2rem;
+  cursor: grab;
+  touch-action: none;
+}
+.qwGrab:active {
+  cursor: grabbing;
+}
+.qwGrab i {
+  grid-column: 1/-1;
+  justify-self: center;
+  width: 2.4rem;
+  height: 0.26rem;
+  border-radius: 2rem;
+  background: var(--ln);
+  margin-bottom: 0.35rem;
+}
+.qwDone {
+  min-height: 2.1rem;
+  padding: 0 0.9rem;
+  border: 1.5px solid var(--pri);
+  background: var(--pri);
+  color: var(--on);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.qwDone:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.qwBody {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0.3rem 0.95rem calc(0.65rem + env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+.qwHead {
+  min-width: 0;
+  padding: 0 0.95rem 0.05rem;
+  cursor: grab;
+  touch-action: none;
+}
+.qwPreset {
+  margin: 0;
+  color: var(--mu);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qwLabel {
+  margin: 0.12rem 0 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.qwValRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+  padding: 0 0.95rem 0.15rem;
+}
+.qwVal {
+  margin: 0;
+  font-size: 2.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.qwVal small {
+  display: inline;
+  font-size: 0.45em;
+  font-weight: 700;
+  color: var(--mu);
+  letter-spacing: 0;
+  margin-left: 0.15rem;
+}
+.qwReset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  min-height: 2.1rem;
+  padding: 0 0.85rem;
+  border: 1.5px solid var(--ln);
+  background: var(--sf);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-0.4rem);
+  transition:
+    opacity 0.2s,
+    transform 0.2s,
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+.qwReset.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+.qwReset.show:hover {
+  border-color: var(--ac);
+  color: var(--ac);
+  background: var(--pa);
+}
+.qwReset.show:active {
+  transform: scale(0.95);
+}
+.qwReset svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.qwReset b {
+  font-variant-numeric: tabular-nums;
+}
+.qwDial {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+}
+.qwDial button {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 1.5px solid var(--ln);
+  border-radius: 50%;
+  background: var(--sf);
+  color: var(--fg);
+  font: inherit;
+  font-size: 1.3rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.qwDial button:active {
+  transform: scale(0.92);
+}
+.qwZone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.5rem 0 0.95rem;
+  touch-action: none;
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.qwScale {
+  position: relative;
+  height: 2.15rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent);
+}
+.qwScaleIn {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.qwScaleIn i {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 0.7rem;
+  background: var(--bd);
+}
+.qwScaleIn i.med {
+  width: 1.5px;
+  height: 1rem;
+  background: var(--mu);
+}
+.qwScaleIn i.big {
+  width: 1.5px;
+  height: 1.25rem;
+  background: var(--mu);
+}
+.qwScaleIn b {
+  position: absolute;
+  top: 1.32rem;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--mu);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.qwScaleIn .out {
+  opacity: 0.3;
+}
+.qwScaleIn i.now {
+  background: var(--ac);
+  width: 2.5px;
+}
+.qwLimit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.1rem;
+  margin: 0;
+  padding: 0 0.7rem;
+  border: 1.5px solid var(--ln);
+  border-radius: 2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--mu);
+  white-space: nowrap;
+}
+.qwLimit.toneSlow {
+  border-color: var(--gSlow);
+  color: var(--gSlow);
+}
+.qwLimit.toneFast {
+  border-color: var(--gFast);
+  color: var(--gFast);
+}
+
+.ruleChart {
+  margin: 0.35rem 0 0.15rem;
+}
+.ruleChartTicks {
+  position: relative;
+  height: 1.05rem;
+  margin: 0.15rem 0.1rem 0;
+  font-size: 0.68rem;
+  color: var(--mu);
+  overflow: hidden;
+}
+.ruleTick {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  top: 0;
+}
+.ruleTick:first-child {
+  transform: translateX(0);
+}
+.ruleTick:last-child {
+  transform: translateX(-100%);
+}
+@media (max-width: 420px) {
+  .ruleChartTicks {
+    font-size: 0.62rem;
+  }
+}

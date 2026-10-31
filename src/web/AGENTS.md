@@ -1,7 +1,14 @@
 # Web UI instructions
 
-- Edit `src/web/app.css`, `src/web/app.js`, `src/web/html/`, and `src/web/js/`.
+- Edit `src/web/css/`, `src/web/app.js`, `src/web/html/`, and `src/web/js/`.
   Never edit generated `src/OpenBrewByWeightWebAssetsGzip.h` by hand.
+- The stylesheet ships as one `/app.css`: `CSS_SOURCES` in
+  `scripts/localize_web_ui.js` owns the layer order — tokens, shell, shared
+  components, views, global — and the generator fails on any `src/web/css`
+  file outside that list. Place new CSS where it is owned: code shared by two
+  or more views goes in `components/`, one view's code in its `views/` file.
+  A component's states, dark-mode rules, and media queries stay with the
+  component; never add `responsive.css`, `dark.css`, or catch-all files.
 - Sources stay Prettier-formatted: run `npm run format:web` after edits. Only
   the generator compacts them, so never hand-minify markup or CSS; contracts
   match the compact form the fixtures derive, not the source text.

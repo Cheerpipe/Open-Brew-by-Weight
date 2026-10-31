@@ -29,11 +29,14 @@ path ready for installation.
 
 ## Web UI sources
 
-The Web UI sources in `src/web/` (HTML partials, `app.css`, `app.js`, and
-`js/`) are kept readable with the Prettier version pinned in `package.json`:
+The Web UI sources in `src/web/` (HTML partials, the `css/` layer tree,
+`app.js`, and `js/`) are kept readable with the Prettier version pinned in
+`package.json`:
 run `npm run format:web` after editing them. `./scripts/dev test web` starts
 with the same check as `npm run format:web:check` and fails while any source
-is out of style. The generator (`scripts/gen_web_ui.js`) alone
+is out of style. The `css/` sources concatenate in the fixed layer order
+that `CSS_SOURCES` in `scripts/localize_web_ui.js` defines, into the single
+`/app.css` asset the generator emits. The generator (`scripts/gen_web_ui.js`) alone
 compacts what ships: html-minifier-terser collapses markup whitespace, Lightning
 CSS re-serializes the stylesheet before clean-css restructures it, and Terser
 minifies the JavaScript. Reformatting a source therefore never changes the
@@ -50,7 +53,7 @@ anything and exits with 127 when they are missing. It runs three steps:
   (`scripts/lint/eslint.config.mjs`). The build-time constants and markers
   (`__WEBUI_TEXT__`, `__LINEA_MICRA__`, `__REMOTE_CONTROL__`, `__homeModule`) are
   declared there; formatting stays with `npm run format:web`.
-- **Stylelint** on `src/web/app.css` (`scripts/lint/stylelint.json`), allowing the
+- **Stylelint** on `src/web/css` (`scripts/lint/stylelint.json`), allowing the
   `__WEBUI_CSS_TEXT__()` localization marker and the vendor prefixes Safari needs.
 - **Markup** (`scripts/lint_web_ui.js`): renders the English shell with every view
   partial injected, as the browser receives it, and runs html-validate with

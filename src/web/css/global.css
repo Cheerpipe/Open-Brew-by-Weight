@@ -1,0 +1,172 @@
+.logSep {
+  border: 0;
+  border-top: 1px solid var(--ln);
+  margin: 1rem 0;
+}
+
+html.theme-light {
+  color-scheme: light;
+}
+html.theme-dark {
+  --tk: 58%;
+  --cf: #523a2c;
+  --gLast: #38bdf8;
+  --gCut: #9e1c22;
+  --live: #ff5c55;
+  --bandFull: 0.22;
+  --bandPart: 0.11;
+  --bandWin: 0.32;
+  --bg: #151515;
+  --sf: #1d1d1d;
+  --in: #242424;
+  --fg: #efefef;
+  --mu: #b2b2b2;
+  --ln: #3c3c3c;
+  --ac: #c45c38;
+  --pri: #c45c38;
+  --ok: #74d68c;
+  --lw: #f2c14e;
+  --gFast: #ff6b4a;
+  --gSlow: #6cb6e6;
+  --gFlow: #b8b8b8;
+  --dn: #ffadb5;
+  --wn: #edc17d;
+  --me: #351f23;
+  --mo: #193024;
+  --mw: #33291b;
+  --pa: #352820;
+  --ah: 0 -4px 14px rgba(0, 0, 0, 0.35);
+  --popSh: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+html.theme-dark {
+  color-scheme: dark;
+}
+@media (max-width: 480px) {
+  :root {
+    --bandFull: 0.18;
+    --bandPart: 0.08;
+    --bandWin: 0.28;
+  }
+  #shotTable tr,
+  fieldset {
+    padding-inline: 0.5rem;
+  }
+  .presetAccGraph {
+    margin-inline: 0.2rem;
+  }
+}
+@media (max-width: 480px) and (prefers-color-scheme: dark) {
+  html:not(.theme-light) {
+    --bandFull: 0.26;
+    --bandPart: 0.12;
+    --bandWin: 0.34;
+  }
+}
+@media (max-width: 480px) {
+  html.theme-dark {
+    --bandFull: 0.26;
+    --bandPart: 0.12;
+    --bandWin: 0.34;
+  }
+}
+
+#diagnosticsPanel details {
+  grid-column: 1/-1;
+}
+#diagnosticsPanel details table {
+  width: 100%;
+  border-collapse: collapse;
+}
+#diagnosticsPanel details th,
+#diagnosticsPanel details td {
+  text-align: left;
+  padding: 0.45rem;
+  border-bottom: 1px solid var(--ln);
+  overflow-wrap: anywhere;
+}
+
+/* One focus contract for the whole UI: the browser's default light-blue ring
+   never shows on any focusable element, in any focus state. The accent ring
+   is reserved for keyboard focus on native controls; [tabindex] hosts are
+   custom widgets (sliders, scrub charts, cards) that scripts also focus on
+   pointer interaction, so they never paint a ring of their own. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus,
+:where([tabindex]):focus-visible {
+  outline: none;
+}
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--ac);
+  outline-offset: 2px;
+}
+.btnGlyph:not(:disabled):hover {
+  filter: brightness(0.95);
+}
+@media (max-width: 699px) {
+  /* Phones keep the header at its compact size: the logo and wordmark hold
+     still instead of shrinking as the page scrolls. */
+  .topBar .brandMark {
+    width: 1.65rem;
+    height: 2.17rem;
+  }
+  .topBar .brand span {
+    font-size: 1.05rem;
+  }
+  .topBar .brand small {
+    font-size: 0.76rem;
+  }
+  .configSaveBar {
+    padding-bottom: 0.65rem;
+  }
+}
+@media (max-width: 340px) {
+  body {
+    padding-inline: 0.75rem;
+  }
+  .topBar {
+    margin-inline: -0.75rem;
+    padding-inline: 0.75rem;
+  }
+  .statusColumn {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 380px) {
+  .topBar {
+    gap: 0.15rem;
+  }
+  .topBar .brandMark {
+    width: 1.3rem;
+    height: 1.75rem;
+  }
+  .headerSignals {
+    padding-left: 0.25rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    scroll-behavior: auto !important;
+    transition: 0.01ms !important;
+  }
+  .bootWave i,
+  .shotHero.live .heroDot {
+    animation: none;
+  }
+  .btnGlyph.busy .g:after {
+    animation: none;
+  }
+  .micraSteps .on:before {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  .btnGlyph,
+  .presetCard,
+  .lsClose,
+  input,
+  select,
+  textarea {
+    border-color: ButtonText;
+  }
+}

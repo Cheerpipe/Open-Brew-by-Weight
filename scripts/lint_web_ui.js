@@ -20,7 +20,9 @@ function assembledDocument(machineIcon) {
     path.join(webUi.jsDir, `${name}.js`))];
   const read = (type) => (file) => ({file, type, content: fs.readFileSync(file, 'utf8')});
   const [shell, ...partials] = renderSources([...html.map(read('html')), ...js.map(read('js')),
-    read('css')(webUi.cssSourcePath)], {language: 'en', machineIcon}).sources
+    {file: 'app.css', type: 'css',
+      content: webUi.cssSourcePaths.map((file) => fs.readFileSync(file, 'utf8')).join('')}],
+    {language: 'en', machineIcon}).sources
       .slice(0, html.length).map((source) => source.content);
   const views = Object.fromEntries(webUi.VIEW_NAMES.map((name, i) => [name, partials[i]]));
   return shell.split('{{webui-meta:development-class}}').join('')

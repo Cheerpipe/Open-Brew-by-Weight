@@ -1,0 +1,392 @@
+/* Grind hint card: neutral text; the edge and the level dot carry the colour. */
+.ghCard {
+  --z: var(--bd);
+  border-left-color: var(--z);
+}
+.ghCard.isFast {
+  --z: var(--gFast);
+}
+.ghCard.isSlow {
+  --z: var(--gSlow);
+}
+.ghCard.isCheck {
+  --z: var(--ok);
+}
+.ghCard.isSpread {
+  --z: var(--wn);
+}
+.ghTop {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+.ghTag {
+  padding: 0.18rem 0.6rem;
+  border-radius: 2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--in);
+  color: var(--mu);
+  border: 1px solid var(--ln);
+}
+.ghConf {
+  margin-left: auto;
+  font-size: 0.74rem;
+  color: var(--mu);
+  white-space: nowrap;
+}
+.ghConf b {
+  color: var(--fg);
+}
+.ghCard .ghMain {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.ghMain .dir {
+  font-weight: 800;
+}
+.ghMain .mag {
+  font-weight: 600;
+  color: var(--mu);
+}
+.ghCard .ghSub {
+  margin-top: 0.2rem;
+  color: var(--mu);
+  font-size: 0.84rem;
+}
+.ghBar {
+  position: relative;
+  height: 1.35rem;
+  margin: 0.65rem 0 0.1rem;
+}
+.ghBar span {
+  position: absolute;
+  top: 0.45rem;
+  height: 0.45rem;
+}
+.ghBar .win {
+  left: 12%;
+  right: 12%;
+  background: var(--ok);
+  opacity: var(--bandPart);
+}
+.ghBar .fastZ,
+.ghBar .slowZ {
+  width: 12%;
+  opacity: var(--bandFull);
+}
+.ghBar .fastZ {
+  left: 0;
+  border-radius: 0.3rem 0 0 0.3rem;
+  background: var(--gFast);
+}
+.ghBar .slowZ {
+  right: 0;
+  border-radius: 0 0.3rem 0.3rem 0;
+  background: var(--gSlow);
+}
+.ghBar .band {
+  border-radius: 0.3rem;
+  background: var(--ok);
+  opacity: var(--bandWin);
+}
+.ghBar .lvl {
+  top: 0.1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-left: -0.55rem;
+  border-radius: 50%;
+  background: var(--z);
+  border: 2px solid var(--sf);
+  box-shadow: 0 0 0 1px var(--ln);
+}
+.ghAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.66rem;
+  color: var(--mu);
+  padding: 0 12%;
+}
+.ghAxis span:nth-child(2) {
+  font-weight: 700;
+}
+.ghCard .btnBar {
+  max-width: none;
+}
+.ghCard .ghost {
+  border-color: var(--ln);
+  color: var(--mu);
+}
+/* Live closes the header signals as one more borderless control; on a phone
+   it gives up its spacing so the header still fits one row at 360 px. */
+.headerSignals .liveBtn {
+  width: auto;
+  gap: 0.38rem;
+  margin-left: 0.25rem;
+  padding: 0 0.5rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .headerSignals {
+    padding-left: 0;
+  }
+  .headerSignals .liveBtn {
+    gap: 0.25rem;
+    margin-left: 0;
+    padding: 0 0.15rem;
+  }
+}
+.liveDot {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--mu);
+}
+.liveBtn.on {
+  color: var(--live);
+}
+/* The dot pulses only while a shot runs. */
+.liveBtn.on .liveDot,
+.liveShot.live .liveDot {
+  background: var(--live);
+  animation: livePulse 1.2s ease-in-out infinite;
+}
+@keyframes livePulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+body.shotFs {
+  overflow: hidden;
+}
+/* Live view: always landscape (rotated on a portrait screen). Each side keeps
+   only its own safe-area inset, remapped while rotated. */
+.liveShot {
+  --it: env(safe-area-inset-top);
+  --ir: env(safe-area-inset-right);
+  --ib: env(safe-area-inset-bottom);
+  --il: env(safe-area-inset-left);
+  --lsTone: color-mix(in srgb, var(--cf) 60%, var(--fg));
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: 100dvw;
+  height: 100dvh;
+  display: grid;
+  grid-template: auto minmax(0, 1fr) auto / clamp(7.5rem, 19vmax, 15.5rem) minmax(0, 1fr);
+  gap: clamp(0.4rem, 2vmin, 1.2rem) clamp(0.6rem, 2vmax, 1.6rem);
+  padding: max(0.6rem, 2vmin, var(--it)) max(1rem, 2vmin, var(--ir)) max(0.6rem, var(--ib))
+    max(1rem, 2vmin, var(--il));
+  background: var(--sf);
+  color: var(--fg);
+  user-select: none;
+  -webkit-user-select: none;
+  animation: liveShotIn 0.26s ease-out;
+}
+.liveShot[hidden] {
+  display: none;
+}
+.liveShot.fsOut {
+  animation: liveShotOut 0.2s ease-in forwards;
+}
+@keyframes liveShotIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes liveShotOut {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@media (orientation: portrait) {
+  .liveShot {
+    --it: env(safe-area-inset-right);
+    --ir: env(safe-area-inset-bottom);
+    --ib: env(safe-area-inset-left);
+    --il: env(safe-area-inset-top);
+    width: 100dvh;
+    height: 100dvw;
+    transform-origin: top left;
+    transform: rotate(90deg) translateY(-100%);
+  }
+  .liveShot,
+  .liveShot.fsOut {
+    animation: none;
+  }
+}
+/* The shot colour: brown while brewing, then the forecast or verdict. */
+.liveShot[data-tint="fast"] {
+  --lsTone: var(--gFast);
+}
+.liveShot[data-tint="on_recipe"] {
+  --lsTone: var(--ok);
+}
+.liveShot[data-tint="slow"] {
+  --lsTone: var(--gSlow);
+}
+.liveShot .heroAwake {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.01;
+  pointer-events: none;
+}
+.lsTop {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: var(--tap);
+  font-size: clamp(0.85rem, 3vmin, 1.4rem);
+}
+.lsChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  margin: 0;
+  padding: 0.3em 0.85em;
+  border: 1px solid var(--ln);
+  border-radius: 2em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lsState {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lsTone);
+}
+.lsClose {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: clamp(var(--tap), 8vmin, 4rem);
+  height: clamp(var(--tap), 8vmin, 4rem);
+  padding: 0;
+  border: 1px solid var(--ln);
+  border-radius: 50%;
+  background: var(--in);
+  color: var(--fg);
+  cursor: pointer;
+}
+.lsClose svg {
+  width: 40%;
+  height: 40%;
+}
+.lsNums {
+  grid-row: 2 / span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  min-width: 0;
+}
+.lsNums p {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.lsNums p > small {
+  font-size: clamp(0.7rem, 2.4vmin, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.lsNums b {
+  font-size: min(8.5vmin, 4.4vmax);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.lsNums p:first-child b {
+  font-size: min(15vmin, 8vmax);
+}
+.lsNums b small {
+  display: inline;
+  margin-left: 0.15em;
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--mu);
+}
+.lsGraph {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+/* Flow gets its own lane only where the screen is tall enough (tablets). */
+.lsLane {
+  display: none;
+  position: relative;
+  grid-column: 2;
+}
+@media (min-width: 600px) and (min-height: 600px) {
+  .lsLane {
+    display: block;
+    height: 26vmin;
+  }
+}
+.lsGraph svg,
+.lsLane svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.liveShot .rvLast {
+  stroke: var(--lsTone);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.rvFlow {
+  fill: none;
+  stroke: var(--gFlow);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+.rvFlowA {
+  fill: var(--gFlow);
+  fill-opacity: 0.14;
+}
+.rvFlowGrid {
+  stroke-dasharray: 2 4;
+}
+/* The forecast's landing dot: white on the cut line, its thin neutral ring
+   legible on the light card, the dark theme and the tinted zones alike. */
+.rvFcDot {
+  fill: var(--sf);
+  stroke: var(--mu);
+  stroke-width: 1.8;
+}
+.rvNow {
+  fill: var(--lsTone);
+  stroke: var(--sf);
+  stroke-width: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .liveShot,
+  .liveShot.fsOut,
+  .liveDot {
+    animation: none !important;
+  }
+}

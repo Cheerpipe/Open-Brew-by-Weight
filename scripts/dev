@@ -720,7 +720,7 @@ def main() -> int:
                                   ["Web dependencies missing; run npm ci explicitly"], 127, profile)
                 steps = [WEB_BUDGETS_STEP] if profile == "budgets" else [
                     ("web-format", ["node_modules/.bin/prettier", "--check", "src/web/html",
-                                    "src/web/app.css", "src/web/app.js", "src/web/js"]),
+                                    "src/web/css", "src/web/app.js", "src/web/js"]),
                     HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP,
                     WEB_PREVIEW_STEP]
                 return execute(command, "R1", steps, verbosity,
@@ -735,7 +735,7 @@ def main() -> int:
                 steps = [("eslint", [bins[0], "--config", "scripts/lint/eslint.config.mjs",
                                      "--max-warnings", "0", "src/web/app.js", "src/web/js"]),
                          ("stylelint", [bins[1], "--config", "scripts/lint/stylelint.json",
-                                        "--max-warnings", "0", "src/web/app.css"]),
+                                        "--max-warnings", "0", "src/web/css"]),
                          ("webui-markup", ["node", "scripts/lint_web_ui.js"])]
             elif profile == "tooling":
                 steps = [("tooling-contracts", ["python3", "src/tests/dev_tooling_test.py"]),

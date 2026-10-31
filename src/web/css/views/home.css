@@ -1,0 +1,327 @@
+/* --tint is registered so the hero gradient cross-fades between shot states;
+   the longhand transition survives the CSS minifier, the shorthand does not. */
+@property --tint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a83b21;
+}
+/* --tp is the live forecast blend: 100% = the full predicted colour, lower
+   fades it toward the brand brown (the firmware streams the percent). */
+@property --tp {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 100%;
+}
+.shotHero {
+  --w78: color-mix(in srgb, var(--on) 78%, transparent);
+  --tint: var(--ac);
+  --tp: 100%;
+  position: relative;
+  overflow: hidden;
+  margin: 1rem 0;
+  padding: 1.05rem 1.1rem;
+  border-radius: calc(var(--r) + 0.25rem);
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--tint) 82%, #000),
+    var(--tint) 55%,
+    color-mix(in srgb, var(--tint) 80%, #fff)
+  );
+  color: var(--on);
+  box-shadow: var(--ah);
+  transition-property: --tint, --tp;
+  transition-duration: 0.4s;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.shotHero[data-tint="neutral"] {
+  --tint: var(--cf);
+}
+.shotHero[data-tint="on_recipe"] {
+  --tint: color-mix(
+    in srgb,
+    var(--cf) calc(100% - var(--tp)),
+    color-mix(in srgb, var(--ok) var(--tk), #000) var(--tp)
+  );
+}
+.shotHero[data-tint="fast"] {
+  --tint: color-mix(
+    in srgb,
+    var(--cf) calc(100% - var(--tp)),
+    color-mix(in srgb, var(--gFast) var(--tk), #000) var(--tp)
+  );
+}
+.shotHero[data-tint="slow"] {
+  --tint: color-mix(
+    in srgb,
+    var(--cf) calc(100% - var(--tp)),
+    color-mix(in srgb, var(--gSlow) var(--tk), #000) var(--tp)
+  );
+}
+.shotHero p {
+  margin: 0;
+}
+.shotHero .heroLabel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--w78);
+}
+.shotHero .heroDot {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--on);
+}
+.shotHero.live .heroDot {
+  animation: hPulse 1.6s ease-in-out infinite;
+}
+@keyframes hPulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.shotHero .heroNums {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.3rem 1rem;
+  margin-top: 0.6rem;
+}
+.shotHero .heroNum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.4rem;
+  min-width: 0;
+  line-height: 1;
+}
+.shotHero .heroNum b,
+.shotHero .heroTime,
+.shotHero .heroFlow {
+  font-size: var(--hn, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.shotHero .heroNum b,
+.shotHero .heroFlow {
+  font-size: 1.64rem;
+}
+.heroNums small {
+  display: inline;
+  font-size: 0.42em;
+  color: var(--w78);
+}
+.shotHero .heroTime small {
+  font-size: 0.6em;
+}
+.shotHero .heroChart {
+  position: relative;
+  height: 7.5rem;
+  margin: 0.75rem 0 1.2rem;
+}
+.heroChart svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.heroChart .end {
+  position: absolute;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin: -0.325rem 0 0 -0.325rem;
+  border-radius: 50%;
+  background: var(--on);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--on) 30%, transparent);
+}
+/* The landing dot in the Colorful spark; the Technical hero's graph draws the
+   same dot as .rvFcDot inside its SVG. */
+.heroChart .fcDot {
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border-radius: 50%;
+  background: var(--sf);
+  box-shadow: 0 0 0 1.5px var(--mu);
+}
+.heroChart .xl,
+.heroChart .hold {
+  position: absolute;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--w78);
+  white-space: nowrap;
+}
+.heroChart .xl {
+  top: calc(100% + 0.3rem);
+  transform: translateX(-50%);
+}
+.heroChart .hold {
+  transform: translateY(calc(-100% - 0.15rem));
+}
+.heroChart .hold.down {
+  transform: translate(-100%, 0.15rem);
+}
+.heroChart .hold.mid {
+  transform: translate(-50%, calc(-100% - 0.15rem));
+}
+.heroChart .noCut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--on) 14%, transparent) 0 1px,
+    transparent 1px 6px
+  );
+}
+
+/* Technical hero: the normal card surface with the verdict as a left accent;
+   the shot cards' preset-weight graph replaces the monochrome spark. The
+   verdict tint (--tint) keeps driving the accent, dot and time chip. */
+.shotHero[data-hero="technical"] {
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-left: 4px solid var(--tint);
+  color: var(--fg);
+  padding-bottom: 0.6rem;
+}
+.shotHero[data-hero="technical"] .heroLabel {
+  color: var(--mu);
+}
+.shotHero[data-hero="technical"] .heroDot {
+  background: var(--tint);
+}
+.shotHero[data-hero="technical"] .heroNums small {
+  color: var(--mu);
+}
+.shotHero[data-hero="technical"] .heroPill {
+  background: color-mix(in srgb, var(--z) 13%, var(--sf));
+  color: color-mix(in srgb, var(--z) 80%, var(--fg));
+}
+/* The time rides a live-tint chip: corridor color at 30% behind it, digits
+   and unit in the same tone with air between them. */
+.shotHero[data-hero="technical"] .heroTime {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.34rem;
+  padding: 0.18rem 0.75rem 0.22rem;
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--tint) 30%, var(--sf));
+  color: color-mix(in srgb, var(--tint) 72%, var(--fg));
+}
+.shotHero[data-hero="technical"] .heroTime small {
+  color: inherit;
+}
+/* The preset graph in its tight 132 px frame, bleeding into the side padding
+   so its axis labels land where the card's padding was. The live now-dot
+   speaks the card's own accent (--tint), not the live view's tone. */
+.shotHero[data-hero="technical"] .heroChart {
+  --lsTone: var(--tint);
+  height: 8.25rem;
+  margin: 0.7rem -0.55rem 0;
+}
+.shotHero[data-hero="technical"] .heroChart svg {
+  height: 8.25rem;
+}
+
+.shotHero .heroPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.heroPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 2rem;
+  background: var(--on);
+  color: color-mix(in srgb, var(--z, #555) 78%, #000);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+#shotTable .heroPill:before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--z, currentColor);
+}
+[data-kind="fast"] {
+  --z: var(--gFast);
+}
+[data-kind="on_recipe"] {
+  --z: var(--ok);
+}
+[data-kind="slow"] {
+  --z: var(--gSlow);
+}
+[data-kind="bad"] {
+  --z: var(--mu);
+}
+
+.homeCard {
+  margin: 1rem 0;
+  padding: 0.8rem 1rem 0.4rem;
+  border: 1px solid var(--ln);
+  border-left: 4px solid var(--ok);
+  border-radius: var(--r);
+  background: var(--sf);
+}
+.homeCard p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.homeCard a.btnGlyph {
+  text-decoration: none;
+}
+/* Onboarding hints inform, not warn: a neutral edge. */
+.infoHint {
+  border-left-color: var(--bd);
+}
+.accessSheet {
+  margin: 0.3rem 0 0.6rem;
+  padding: 0.7rem 0.85rem 0.2rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--in);
+}
+.accessSheet p {
+  margin: 0 0 0.4rem;
+  font-size: 0.88rem;
+}
+.accessRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--ln);
+  font-size: 0.9rem;
+}
+.accessRow b {
+  font-weight: 600;
+}
+.accessRow > span > span {
+  color: var(--mu);
+}
+.accessRow > span > span.warn {
+  color: var(--wn);
+}

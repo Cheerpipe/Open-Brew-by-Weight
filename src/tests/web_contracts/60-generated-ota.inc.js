@@ -54,7 +54,7 @@ const developmentShell = await webUi.generate({developmentMode: true, write: fal
 // printing them at two widths changes nothing the generator emits.
 {
   const prettier = require('prettier');
-  const files = [webUi.sourcePath, webUi.cssSourcePath,
+  const files = [webUi.sourcePath, ...webUi.cssSourcePaths,
     ...VIEW_NAMES.map((name) => path.join(webUi.htmlDir, `${name}.html`))];
   const printed = async (printWidth) => new Map(await Promise.all(files.map(async (file) => [file,
     await prettier.format(fs.readFileSync(file, 'utf8'), {filepath: file, printWidth})])));

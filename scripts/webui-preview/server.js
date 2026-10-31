@@ -7,11 +7,14 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const {renderSources} = require('../localize_web_ui.js');
+const {renderSources, CSS_SOURCES} = require('../localize_web_ui.js');
 
 const root = path.resolve(__dirname, '..', '..');
 const mockupsDir = path.join(root, 'webui-mockups');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+// The firmware stylesheet, assembled from the same ordered layer list the
+// generator concatenates, so the preview serves identical /app.css bytes.
+const appCssBody = () => CSS_SOURCES.map((name) => read(`src/web/css/${name}`)).join('');
 const mockup = file => fs.existsSync(path.join(mockupsDir, file))
   ? fs.readFileSync(path.join(mockupsDir, file), 'utf8') : '';
 const types = {
@@ -159,7 +162,7 @@ function createServer() {
       }
       const body = micraScript ? renderMicraScript() : micra ? renderMicra() : mobileMenu ? renderMobileMenu()
           : signals ? renderSignals() + (mockup('header.js') ? '\n' + mockup('header.js') : '')
-          : appCss ? read('src/web/app.css') : file ? fs.readFileSync(file[0]) : renderHome();
+          : appCss ? appCssBody() : file ? fs.readFileSync(file[0]) : renderHome();
       res.writeHead(200, {'Content-Type': micraScript || signals ? 'text/javascript' : appCss ? 'text/css'
           : file ? file[1] : 'text/html; charset=utf-8',
         'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',

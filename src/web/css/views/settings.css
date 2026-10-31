@@ -1,0 +1,594 @@
+/* An open equipment row shows its readings on the same sunken band as an
+   open settings group, starting under the lamp. */
+.lampRow[open] .devName {
+  color: var(--ac);
+}
+.lampRow .metricRows {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--r);
+  background: var(--in);
+}
+.metricRows {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.35rem 0.25rem 0.65rem 2.45rem;
+}
+#diagnosticsPanel .cfgGroup > summary {
+  -webkit-user-select: none;
+  user-select: none;
+}
+#diagnosticsPanel [id$="Raw"] {
+  font-size: 0.8125rem;
+  color: var(--mu);
+  font-weight: 400;
+}
+#diagnosticsPanel .statusColumn > .btnBar,
+#taskTableWrap,
+#loopTimingWrap,
+#scaleCommandInventory,
+#auditPanel > .btnBar,
+#auditTableWrap {
+  grid-column: 1/-1;
+}
+#taskTable,
+#loopTimingTable,
+#scaleCommandTable,
+#auditTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86rem;
+}
+:is(#taskTable, #loopTimingTable, #scaleCommandTable, #auditTable) :is(th, td) {
+  text-align: left;
+  padding: 0.15rem 0.35rem;
+  border-bottom: 1px solid var(--ln);
+  overflow-wrap: anywhere;
+}
+:is(#taskTable, #loopTimingTable, #scaleCommandTable) :is(th, td):nth-child(n + 2) {
+  text-align: right;
+}
+#auditTable .auditRow {
+  cursor: pointer;
+}
+#auditTable .auditRow:hover td,
+#auditTable .auditRow:focus-visible td {
+  background: var(--pa);
+}
+#auditTable .auditDetailRow td {
+  white-space: normal;
+  color: var(--mu);
+  font-size: 0.8rem;
+}
+.auditPager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 0.35rem 0 0.1rem;
+  font-size: 0.8rem;
+  color: var(--mu);
+}
+.auditPageBtn {
+  margin: 0;
+  border: 0;
+  background: none;
+  color: var(--ac);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 0.4rem 0.3rem;
+  cursor: pointer;
+}
+.auditPageBtn:disabled,
+[inert] {
+  opacity: 0.4;
+  cursor: default;
+}
+.inlineAction {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.inlineAction:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.stateFault {
+  color: var(--dn);
+  font-weight: 700;
+}
+#machineStateValue .switchOnly,
+#machineStateValue a {
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+.metric a {
+  color: inherit;
+}
+.metric a[aria-disabled="true"] {
+  pointer-events: none;
+}
+.error {
+  color: var(--dn);
+}
+.ok {
+  color: var(--ok);
+}
+.warn {
+  color: var(--wn);
+}
+.hidden,
+[hidden] {
+  display: none !important;
+}
+.fieldOff {
+  opacity: 0.45;
+}
+html.momentaryMachine .paddleOnly,
+html:not(.reedMachine) .reedOnly,
+html:not(.momentaryMachine) .momentaryOnly,
+html.reedMachine .switchOnly,
+html:not(.momentaryMachine) .switchOnly {
+  display: none;
+}
+html:not(.lineaMicraIntegration) .micraOnly,
+html:not(.micraTemperatureEnabled) .micraTempOpt {
+  display: none !important;
+}
+html:not(.pwaApp) .pwaOnly {
+  display: none !important;
+}
+#message {
+  position: sticky;
+  top: var(--bar-h, var(--hdr));
+  z-index: 31;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.25rem 0.55rem 0.75rem;
+  margin: 0 0 0.75rem;
+  min-height: var(--tap);
+  border: 1px solid var(--ln);
+  border-left: 4px solid var(--bd);
+  border-radius: 0.5rem;
+  background: var(--sf);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+#message:before,
+.scopeNote:before {
+  content: __WEBUI_CSS_TEXT__("css.i");
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+#messageText {
+  flex: 1;
+  min-width: 0;
+}
+.messageClose {
+  flex: none;
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  min-width: var(--tap);
+  min-height: var(--tap);
+}
+#message:not(.error):not(.warn) {
+  display: none;
+}
+#message.error {
+  background: var(--me);
+  border-color: var(--dn);
+  color: var(--dn);
+}
+#message.error:before {
+  content: "!";
+}
+#message.ok {
+  background: var(--mo);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+#message.ok:before {
+  content: "✓";
+}
+#message.warn {
+  background: var(--mw);
+  border-color: var(--wn);
+  color: var(--wn);
+}
+#message.warn:before {
+  content: "!";
+}
+.fieldError {
+  display: block;
+  color: var(--dn);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  margin: 0.25rem 0;
+  max-width: 34rem;
+  line-height: 1.35;
+}
+.invalid {
+  border-color: var(--dn) !important;
+  outline: 2px solid var(--dn);
+}
+.fieldWarning {
+  display: block;
+  color: var(--wn);
+  background: var(--mw);
+  border-radius: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  margin: 0.25rem 0;
+  max-width: 34rem;
+  line-height: 1.35;
+}
+.fieldWarning:before {
+  content: "!";
+  margin-right: 0.35rem;
+}
+.fieldWarn {
+  border-color: var(--wn) !important;
+}
+/* Settings group rows: icon, title, summary of the current values, chevron.
+   The body lines up under the title; opening animates where supported. */
+.cfgGroup {
+  margin: 0.15rem 0;
+  border-top: 1px solid var(--ln);
+  interpolate-size: allow-keywords;
+}
+.cfgGroup[open] {
+  padding-bottom: 0.75rem;
+}
+#lineaMicraLinkedNote:not([hidden]) + .cfgGroup {
+  margin-top: 0.85rem;
+}
+/* Breathing room between the Forget scale button bar and the brand group rows. */
+.cfgGroup[data-g="scale"] > .btnBar {
+  margin-bottom: 0.85rem;
+}
+.scopeNote {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.85rem 0 0.75rem;
+  padding-inline: 0.25rem;
+  color: var(--mu);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.scopeNote:before {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%);
+  background: var(--mu);
+  color: var(--sf);
+  font:
+    italic 700 0.8rem Georgia,
+    serif;
+}
+#adminControls > .cfgGroup:last-child,
+#diagnosticsPanel > .cfgGroup:has(+ .btnBar) {
+  border-bottom: 1px solid var(--ln);
+}
+#diagnosticsPanel > .cfgGroup + .btnBar {
+  margin-top: 1.25rem;
+}
+.cfgGroup:has(> summary > .cfgIcon) {
+  padding-inline: 2.15rem 0.85rem;
+}
+.cfgGroup:has(> summary > .cfgIcon) > summary {
+  margin-inline: -2.15rem -0.85rem;
+}
+.cfgGroup::details-content,
+.lampRow::details-content {
+  block-size: 0;
+  overflow: clip;
+  margin-inline: -6px;
+  padding-inline: 6px;
+  transition-property: block-size, content-visibility;
+  transition-duration: 0.25s;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  transition-behavior: allow-discrete;
+}
+.cfgGroup[open]::details-content,
+.lampRow[open]::details-content {
+  block-size: auto;
+}
+/* Without interpolate-size these animations run in runtime.js. */
+@supports not (interpolate-size: allow-keywords) {
+  .cfgGroup::details-content,
+  .lampRow::details-content {
+    transition: none;
+  }
+}
+.cfgGroup > summary,
+.fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  list-style: none;
+}
+:is(.cfgGroup, .fold) > summary::-webkit-details-marker {
+  display: none;
+}
+:is(.cfgGroup, .fold) > summary::after {
+  content: "";
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin: 0 0.35rem 0 auto;
+  border: solid var(--mu);
+  border-width: 0 2px 2px 0;
+  transform: rotate(-45deg);
+  transition: transform 0.2s;
+}
+.cfgGroup[open] > summary {
+  color: var(--ac);
+}
+:is(.cfgGroup, .fold)[open] > summary::after {
+  transform: rotate(45deg);
+}
+.cfgIcon {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cfgGroup:not([open]) .cfgIcon {
+  color: var(--mu);
+}
+/* An open top-level group sinks its body onto a darker band across the whole
+   row, settings starting under the icon; fields stay lifted off the band. */
+.cfgGroup:has(> summary > .cfgIcon)[open]::details-content {
+  margin-inline: -2.15rem -0.85rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--r);
+  background: var(--in);
+}
+/* A setting row at either end of the band brings its own padding, so its
+   highlight meets that edge. */
+.cfgGroup:has(> label:nth-child(2 of :not(.hidden)))[open]::details-content {
+  padding-top: 0;
+}
+.cfgGroup:has(> label:nth-last-child(1 of :not(.hidden)))[open]::details-content {
+  padding-bottom: 0;
+}
+.cfgGroup:has(> summary > .cfgIcon)[open]
+  :is(input:not([type="checkbox"], [type="range"]), select, textarea) {
+  background-color: var(--sf);
+}
+/* Settings rows: a block with its own highlight and a line between
+   consecutive rows. On/off options are switches on the right, placed by the
+   grid so the markup keeps the checkbox first. The ramp curve cards are
+   buttons, not rows: their own rules size and border them. */
+.cfgGroup label:not(.windowPair label, .rampCurves label) {
+  margin: 0 -0.75rem;
+  padding: 0.75rem;
+}
+.cfgGroup
+  :is(label, .windowField, div:has(> label)):not(.rampCurves, .rampCurves label)
+  + :is(label, .windowField, div:has(> label)):not(.rampCurves, .rampCurves label) {
+  border-top: 1px solid var(--ln);
+}
+.cfgGroup label:has(> input[type="checkbox"]) {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 1rem;
+  align-items: center;
+  min-height: 0;
+  cursor: pointer;
+}
+.cfgGroup label:has(> input[type="checkbox"]):hover {
+  background: var(--pa);
+}
+.cfgGroup label:has(> input[type="checkbox"]) .fieldHint {
+  margin-left: 0;
+}
+.cfgGroup input[type="checkbox"] {
+  grid-area: 1 / 2;
+  position: relative;
+  width: 2.75rem;
+  height: 1.6rem;
+  margin: 0;
+  border: 1px solid var(--bd);
+  border-radius: 1rem;
+  background: var(--ln);
+  appearance: none;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    border-color 0.18s;
+}
+.cfgGroup input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.18s;
+}
+.cfgGroup input[type="checkbox"]:checked {
+  border-color: var(--pri);
+  background: var(--pri);
+}
+.cfgGroup input[type="checkbox"]:checked::before {
+  transform: translateX(1.15rem);
+}
+.cfgSum {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--mu);
+  font-size: 0.85rem;
+  font-weight: 400;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cfgGroup .metric + .metric {
+  margin-top: 0.75rem;
+}
+.micraDeps {
+  margin-left: 1.9rem;
+}
+.micraPill {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 1rem;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.micraPill:before {
+  content: "";
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--bd);
+}
+.micraPill[data-tone="on"] {
+  background: var(--mo);
+}
+.micraPill[data-tone="on"]:before {
+  background: var(--ok);
+}
+.micraPill[data-tone="warn"] {
+  background: var(--mw);
+}
+.micraPill[data-tone="warn"]:before {
+  background: var(--lw);
+}
+.micraPill[data-tone="error"] {
+  background: var(--me);
+}
+.micraPill[data-tone="error"]:before {
+  background: var(--dn);
+}
+.micraSteps {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.9rem 0 0.25rem;
+  padding: 0;
+  list-style: none;
+}
+.micraSteps li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--mu);
+}
+.micraSteps li:before {
+  content: "";
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid var(--ln);
+  border-radius: 50%;
+}
+.micraSteps .on {
+  color: var(--fg);
+  font-weight: 600;
+}
+.micraSteps .on:before {
+  border-color: var(--pri);
+  border-right-color: transparent;
+  animation: busySpin 0.8s linear infinite;
+}
+.micraSteps .ok {
+  color: var(--fg);
+}
+.micraSteps .ok:before {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+summary {
+  min-height: var(--tap);
+  padding: 0.65rem 0.25rem;
+  cursor: pointer;
+  font-weight: 650;
+  color: var(--fg);
+}
+.configSaveBar {
+  position: sticky;
+  bottom: var(--nav-offset);
+  z-index: 2;
+  background: var(--sf);
+  padding: 0.65rem 0 calc(0.65rem + env(safe-area-inset-bottom));
+  margin: 0.75rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.cfgGroup + .configSaveBar {
+  margin-top: 0;
+}
+.configSaveBar > .warn {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+  background: var(--mw);
+}
+.shotCard {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-areas: "dur dur dur actual actual actual" "goal goal err err avgflow avgflow";
+  gap: 0.5rem 0.4rem;
+  align-items: start;
+  margin: 0.45rem 0 0.15rem;
+}
+.shotCard .shotDur {
+  grid-area: dur;
+}
+.shotCard .shotActual {
+  grid-area: actual;
+}
+.shotCard > :nth-child(3) {
+  grid-area: goal;
+}
+.shotCard > :nth-child(4) {
+  grid-area: err;
+}
+.shotCard > :nth-child(5) {
+  grid-area: avgflow;
+}

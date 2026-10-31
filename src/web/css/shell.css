@@ -1,0 +1,1029 @@
+html {
+  background: var(--bg);
+  color-scheme: light dark;
+  --nav-space: calc(5.75rem + env(safe-area-inset-bottom));
+  --nav-offset: calc(4.25rem + env(safe-area-inset-bottom));
+  scroll-padding-bottom: var(--nav-space);
+}
+*,
+*:before,
+*:after {
+  box-sizing: border-box;
+}
+body {
+  font-family: system-ui;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 1rem var(--nav-space);
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.45;
+}
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 21;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 0.75rem;
+  margin: 0 -1rem 0.5rem;
+  /* The painted surface is the ::before pseudo, which desktop layouts cut
+     at the menu's middle: content scrolls under the menu's rounded lower
+     half, and the bare strip neither paints nor intercepts pointer events.
+     The resting gap below the bar is a margin for the same reason. */
+  padding: 0.5rem 1rem 0;
+  padding-top: calc(0.5rem + env(safe-area-inset-top));
+  background: none;
+  color: var(--ac);
+  pointer-events: none;
+}
+.topBar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}
+.topBar > * {
+  pointer-events: auto;
+}
+.brand {
+  margin: 0;
+  min-width: 0;
+  position: relative;
+  z-index: 22;
+  --brandGap: 0.55rem;
+}
+.brand a {
+  color: var(--ac);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: var(--brandGap);
+}
+.brandMark {
+  width: 1.65rem;
+  height: 2.17rem;
+  flex: 0 0 auto;
+  display: block;
+  overflow: visible;
+  fill: currentColor;
+}
+.brand span {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.08rem;
+  min-width: 0;
+  line-height: 1.05;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.brand small {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: var(--fg);
+}
+/* The measured fallback: the drawing alone stands in for the lockup while
+   the header's first row would otherwise wrap. */
+[data-brand-compact] .topBar .brand span {
+  display: none;
+}
+.spriteDefs {
+  position: absolute;
+}
+.headerSignals {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 0.5rem;
+  flex-shrink: 0;
+  z-index: 22;
+  margin-left: auto;
+}
+.signalIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+.signalIndicator svg {
+  width: 1.45rem;
+  height: 1.45rem;
+  overflow: visible;
+}
+#bluetoothSignal svg {
+  width: 1.95rem;
+}
+.signalIndicator [data-step] {
+  opacity: 0.18;
+}
+.signalIndicator[data-level="1"] [data-step="1"],
+.signalIndicator[data-level="2"] [data-step="1"],
+.signalIndicator[data-level="2"] [data-step="2"],
+.signalIndicator[data-level="3"] [data-step] {
+  opacity: 1;
+}
+.signalIndicator[data-level="1"] {
+  color: var(--wn);
+}
+.signalIndicator[data-level="0"],
+.signalIndicator[data-level="unknown"] {
+  color: var(--mu);
+}
+#companionSignal[data-level="off"],
+#micraSignal[data-level="off"] {
+  color: var(--mu);
+}
+#companionSignal[data-level="off"] svg,
+#micraSignal[data-level="off"] svg {
+  opacity: 0.12;
+}
+.signalSlash {
+  display: none;
+}
+.signalIndicator[data-level="0"] .signalSlash {
+  display: block;
+}
+.signalIndicator[data-level="0"] [data-step],
+.signalIndicator[data-level="unknown"] [data-step],
+#bluetoothSignal[data-level="0"] path {
+  opacity: 0.12;
+}
+.signalIndicator:hover,
+.signalIndicator[aria-expanded="true"] {
+  background: var(--sf);
+}
+#themeSignal [data-glyph] {
+  display: none;
+}
+#themeSignal[data-mode="auto"] [data-glyph="auto"],
+#themeSignal[data-mode="light"] [data-glyph="light"],
+#themeSignal[data-mode="dark"] [data-glyph="dark"] {
+  display: block;
+}
+.signalDetails {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  width: 17rem;
+  max-width: calc(100vw - 6rem);
+  padding: 1rem;
+  background: var(--sf);
+  color: var(--fg);
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  box-shadow: var(--popSh);
+  font-size: 0.85rem;
+}
+.signalDetails p {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.65rem 0 0;
+}
+.signalDetails span {
+  color: var(--mu);
+  flex-shrink: 0;
+}
+.signalDetails b {
+  font-weight: 550;
+  text-align: right;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.qsI {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.headerSignals:not([data-mode="manual"]) .qsM,
+.headerSignals[data-mode="manual"] .qsW {
+  display: none;
+}
+.qsModeSig {
+  color: var(--ac);
+}
+[data-mode="manual"] .qsModeSig {
+  color: var(--mu);
+  opacity: 0.55;
+}
+[data-quick="fastExtractionGuardEnabled"] {
+  --c: var(--gFast);
+}
+[data-quick="slowExtractionGuardEnabled"] {
+  --c: var(--gSlow);
+}
+.qsGuardSig[data-level="all"] {
+  color: var(--ok);
+}
+.qsGuardSig[data-level="some"] {
+  color: var(--gFast);
+}
+.qsGuardSig[data-level="none"] {
+  color: var(--mu);
+  opacity: 0.4;
+}
+.qsGuardSig[data-level="all"] .qsShield,
+.qsGuardSig[data-level="some"] .qsShield {
+  fill: color-mix(in srgb, currentColor 22%, transparent);
+}
+.qsStack {
+  display: none;
+}
+@media (max-width: 480px) {
+  .headerSignals .signalIndicator {
+    width: 1.85rem;
+  }
+}
+.headerSignals .qsSig {
+  width: auto;
+  gap: 0.15rem;
+  padding: 0 0.3rem;
+}
+.qsSig > span {
+  display: flex;
+}
+@media (min-width: 700px) {
+  .qsGuardSig > .qsShield {
+    display: none;
+  }
+  .qsStack {
+    display: flex;
+  }
+  .qsStack i,
+  .qsModeSig {
+    display: grid;
+    place-items: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    margin-left: -0.6rem;
+    border: 2.5px solid var(--bg);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--c, var(--ok)) 18%, var(--sf));
+    color: var(--c, var(--ok));
+  }
+  .qsModeSig {
+    --c: var(--ac);
+    justify-content: center;
+    flex: none;
+    width: 2.775rem;
+    height: 2.775rem;
+    margin: 0 -0.15rem 0 0;
+  }
+  .qsSig .qsI {
+    width: 1rem;
+    height: 1rem;
+    stroke-width: 2.1;
+  }
+  .qsModeSig .qsI {
+    width: 1.7rem;
+    height: 1.7rem;
+  }
+  .qsStack i.off,
+  [data-mode="manual"] .qsSig :is(i, .qsModeSig) {
+    background: var(--in);
+    color: var(--mu);
+  }
+  .qsStack i.off {
+    box-shadow: inset 0 0 0 1.5px var(--ln);
+  }
+  .qsSig:is(:hover, [aria-expanded="true"]) :is(i, .qsModeSig) {
+    border-color: var(--sf);
+  }
+}
+.quickPanel {
+  width: min(24rem, calc(100vw - 1.5rem));
+  white-space: normal;
+  max-width: none;
+  padding: 1rem 1rem 0.8rem;
+  border-radius: 1.4rem;
+  box-shadow: 0 1rem 2.6rem #0004;
+  font-size: inherit;
+}
+.quickPanel p {
+  display: block;
+}
+.quickPanel span {
+  color: inherit;
+  flex-shrink: 1;
+}
+.quickPanel header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.quickPanel .qsIc {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 0.9rem;
+  background: var(--pa);
+  color: var(--ac);
+}
+.qsIc .qsI {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+[data-mode="manual"] .qsIc {
+  background: var(--in);
+  color: var(--fg);
+}
+#quickTitle {
+  display: block;
+  font-size: 1.05rem;
+}
+#quickStatus {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--mu);
+  font-size: 0.78rem;
+}
+.qsModes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.qsModes button {
+  display: grid;
+  justify-items: start;
+  gap: 0.15rem;
+  padding: 0.75rem 0.8rem;
+  border: 1.5px solid var(--ln);
+  border-radius: 1rem;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.qsModes .qsI {
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-bottom: 0.25rem;
+  color: var(--mu);
+}
+.qsModes b {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.qsModes small {
+  color: var(--mu);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+:is(.qsModes, .qsRev) [aria-checked="true"] {
+  border-color: var(--ac);
+  background: var(--pa);
+  color: var(--ac);
+}
+.qsModes [aria-checked="true"] .qsI {
+  color: var(--ac);
+}
+[data-mode="manual"] .qsModes [aria-checked="true"] {
+  border-color: var(--fg);
+  background: var(--in);
+}
+[data-mode="manual"] .qsModes [aria-checked="true"] :is(.qsI, b) {
+  color: var(--fg);
+}
+.qsSub {
+  margin: 1rem 0 0.1rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--ln);
+  font-weight: 700;
+}
+[data-mode="manual"] .qsGuards {
+  opacity: 0.45;
+}
+.qsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 0.1rem;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.qsRow > span:nth-child(2) {
+  flex: 1;
+}
+.quickPanel .qsGi {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c, var(--ok)) 16%, var(--sf));
+  color: var(--c, var(--ok));
+}
+.qsGi .qsI {
+  width: 1rem;
+  height: 1rem;
+}
+.qsSw {
+  position: relative;
+  flex: none;
+  width: 2.4rem;
+  height: 1.4rem;
+  border-radius: 1rem;
+  background: var(--ac);
+  transition: background 0.2s;
+}
+.qsSw:after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateX(1rem);
+  transition: transform 0.2s;
+}
+.qsRow.off .qsSw {
+  background: var(--bd);
+}
+.qsRow.off .qsSw:after {
+  transform: none;
+}
+.qsRow.off .qsGi {
+  background: var(--in);
+  color: var(--mu);
+}
+.quickPanel button:disabled {
+  cursor: default;
+}
+.qsRev {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(4, 1fr);
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+  padding: 0.2rem;
+  border-radius: 0.9rem;
+  background: var(--in);
+  font-size: 0.9rem;
+}
+.qsRev button,
+.qsReset {
+  padding: 0.5rem 0;
+  border: 1.5px solid #0000;
+  border-radius: 0.7rem;
+  background: none;
+  color: var(--mu);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qsReset {
+  padding: 0;
+  color: var(--ac);
+}
+.qsNote {
+  margin: 0.6rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.7rem;
+  background: var(--in);
+  color: var(--mu);
+  font-size: 0.76rem;
+}
+.pageNav {
+  display: flex;
+  position: fixed;
+  left: 50%;
+  bottom: max(0.75rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  transform: translateX(-50%);
+  width: calc(100% - max(1.5rem, env(safe-area-inset-left) + env(safe-area-inset-right)));
+  max-width: 30rem;
+  padding: 0.125rem;
+  border: 1px solid var(--ln);
+  border-radius: 2rem;
+  background: var(--sf);
+  box-shadow: 0 0.3rem 1.5rem #0003;
+  overflow: hidden;
+  isolation: isolate;
+}
+.pageNav a {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--tap);
+  border-radius: 1.5rem;
+  color: var(--mu);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pageNav a.active {
+  font-weight: 700;
+  color: var(--ac);
+  background: var(--pa);
+}
+.pillNav {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.pillNav a.active {
+  background: 0 0;
+  touch-action: none;
+}
+.pillNav.dragging,
+.pillNav.dragging a {
+  cursor: grabbing;
+}
+.pageNav a:not(.active):hover {
+  color: var(--fg);
+}
+.pageNav svg {
+  display: block;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.3s ease-in-out;
+}
+.pageNav a:not(.active):hover svg {
+  transform: scale(1.15);
+}
+.pageNav a > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.pageNav .pill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: var(--pa);
+  stroke: none;
+  pointer-events: none;
+  z-index: -1;
+}
+html:is([data-nav-layout="icons"], [data-nav-layout="text"]) {
+  --nav-space: 1.5rem;
+  --nav-offset: 0px;
+}
+:is([data-nav-layout="icons"], [data-nav-layout="text"]) .pageNav {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  order: 2;
+  width: 100%;
+  max-width: none;
+  margin-top: 0.15rem;
+}
+/* The header paints down to the menu's middle only: the menu's rounded
+   lower half floats over the scrolling content, so the pill's shadow draws
+   on the page instead of on reserved background. */
+:is([data-nav-layout="icons"], [data-nav-layout="text"]) .topBar::before {
+  bottom: calc(var(--tap) / 2);
+}
+:is([data-nav-layout="icons"], [data-nav-layout="text"]) .pageNav a {
+  flex: 1 0 auto;
+  gap: 0.5rem;
+  padding: 0 0.5rem;
+}
+:is([data-nav-layout="icons"], [data-nav-layout="text"]) .pageNav a > span {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+}
+[data-nav-layout="text"] .pageNav svg {
+  display: none;
+}
+.textLock {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mu);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.35rem;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.textLock:hover {
+  color: var(--ac);
+  text-decoration: underline;
+}
+/* Inline in the firmware line: no tap-height growth for the footer. */
+.pageFooter .textLock {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  font-size: inherit;
+  color: var(--ac);
+}
+.adminSession {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  margin: 0 0 0.55rem;
+  color: var(--mu);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+body.devBuild .adminSession {
+  display: none;
+}
+body.devBuild #adminLockPanel {
+  display: none;
+}
+@media (min-width: 700px) {
+  :root {
+    --hdr: 4.45rem;
+  }
+  .headerSignals {
+    order: 1;
+  }
+  .brand {
+    z-index: auto;
+    flex-shrink: 0;
+    --brandGap: 0.65rem;
+  }
+  .brandMark {
+    width: 1.79rem;
+    height: 2.35rem;
+  }
+  .brand span {
+    font-size: 1.5rem;
+    gap: 0.1rem;
+  }
+  .brand small {
+    font-size: 1.08rem;
+  }
+}
+.pageFooter {
+  margin: 0.85rem 0 0.4rem;
+  color: var(--mu);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.pageFooter a {
+  color: var(--ac);
+  text-decoration: none;
+}
+body.homeAdminActions #view-home:not(.hidden) ~ .pageFooter {
+  margin-bottom: calc(7rem + env(safe-area-inset-bottom));
+}
+body.webUiInactive {
+  overflow: hidden;
+}
+.bootOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.15rem;
+  padding: 1.25rem;
+  background: var(--bg);
+  transition: opacity 0.25s;
+}
+.bootOverlay:not(.isDone) {
+  transition: none;
+}
+.bootOverlay.isDone {
+  opacity: 0;
+  pointer-events: none;
+}
+body.pageLoading :is(.view, .view *),
+body.pageLoading :is(.view, .view *)::before,
+body.pageLoading :is(.view, .view *)::after {
+  transition: none !important;
+  animation: none !important;
+}
+.bootWave {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 3.4rem;
+}
+.bootWave i {
+  width: 0.55rem;
+  height: 100%;
+  border-radius: 0.3rem;
+  background: var(--ac);
+  animation: bootWave 1.1s ease-in-out infinite;
+}
+.bootWave i:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.bootWave i:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.bootWave i:nth-child(4) {
+  animation-delay: 0.36s;
+}
+.bootWave i:nth-child(5) {
+  animation-delay: 0.48s;
+}
+@keyframes bootWave {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.bootText {
+  margin: 0;
+  color: var(--mu);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.inactiveOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.25rem 1.25rem max(1.25rem, env(safe-area-inset-bottom));
+  background: var(--bg);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.5s ease,
+    visibility 0s linear 0.5s;
+}
+.inactiveOverlay.isVisible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 0.5s ease,
+    visibility 0s;
+}
+.bootOverlay .brand,
+.inactiveOverlay .brand {
+  z-index: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--brandGap);
+  color: var(--ac);
+}
+.bootOverlay .brandMark {
+  width: 2.85rem;
+  height: 3.8rem;
+}
+.inactiveMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  max-width: 24rem;
+  width: 100%;
+  text-align: center;
+}
+#webUiReload {
+  min-height: 3rem;
+  min-width: 10rem;
+  padding: 0.65rem 1.5rem;
+  border: 1px solid var(--pri);
+  background: var(--pri);
+  color: var(--on);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+#webUiOffline {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--pri);
+  background: none;
+  color: var(--pri);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* The offline copy is read-only: list controls that need the controller go. */
+.offlineCopy :is(#statsWindow, #shotSort, #shotFilterButton, #exportShotsButton, #clearShotsButton),
+.offlineCopy :is(#historySort, #historyFilterButton, #exportHistoryButton, #clearHistoryButton),
+.offlineCopy #historyRows .shotDel,
+.inactiveOverlay.isLogin #webUiOffline {
+  display: none;
+}
+#webUiReload:disabled,
+.setupPrimary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+#inactiveHint {
+  margin: 0;
+  color: var(--mu);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  font-weight: 400;
+}
+#inactiveError {
+  margin: 0;
+  font-size: 0.86rem;
+}
+.inactiveOverlay.isReconnectWait #webUiReload {
+  display: none;
+}
+.reconnectRing {
+  --p: 100;
+  width: 7.2rem;
+  height: 7.2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--ac) calc(var(--p) * 1%), var(--ln) 0);
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--ac);
+  position: relative;
+}
+.reconnectRing::before {
+  content: "";
+  position: absolute;
+  inset: 0.62rem;
+  border-radius: 50%;
+  background: var(--bg);
+}
+#reconnectSeconds {
+  position: relative;
+  z-index: 1;
+  font-variant-numeric: tabular-nums;
+}
+.inactiveOverlay .pageFooter {
+  margin-top: auto;
+  width: 100%;
+}
+/* Optional sign-in: the inactive overlay swaps Reload for this form. */
+#webUiLogin,
+.inactiveOverlay.isLogin :is(#webUiReload, #inactiveHint, #inactiveError) {
+  display: none;
+}
+.inactiveOverlay.isLogin #webUiLogin {
+  display: block;
+  margin: 0;
+  text-align: left;
+}
+.loginDevice {
+  margin: 0 0 0.1rem;
+  color: var(--mu);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#loginForgot {
+  display: block;
+  margin: 0.6rem auto 0;
+}
+.loginHelp {
+  margin: 0.9rem 0 0;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--ln);
+  font-size: 0.86rem;
+}
+.loginHelp a {
+  color: var(--ac);
+}
+#pairDialog {
+  text-align: center;
+}
+#pairDialog h2 {
+  margin: 0 0 0.3rem;
+  font-size: 1.2rem;
+}
+.pairCode {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+}
+.pairCode span {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 3.1rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--in);
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pairMeta {
+  margin: 0.55rem 0 0.2rem;
+  color: var(--mu);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+#pairDialog .btnBar {
+  justify-content: center;
+}
+
+fieldset,
+#adminControls {
+  min-width: 0;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--sf);
+}
+legend {
+  font-size: 1.125rem;
+  font-weight: 700;
+  padding: 0 0.35rem;
+  color: var(--fg);
+}
+legend .hint {
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--mu);
+}
+label {
+  display: block;
+  margin: 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  padding: 0.65rem 0.75rem;
+  line-height: 1.25;
+}
+button {
+  appearance: none;
+  border-radius: 2rem;
+}
+input:not([type="file"], [type="checkbox"], [type="range"]),
+select,
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  border: 1px solid var(--bd);
+  border-radius: 0.5rem;
+  background: var(--in);
+  color: var(--fg);
+  font-size: 1rem;
+  font-weight: 400;
+}
+input:not([type="file"], [type="checkbox"], [type="range"]),
+select {
+  min-height: 2.25rem;
+  padding-block: 0.4rem;
+}

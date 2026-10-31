@@ -38,7 +38,7 @@ async function authoringSources() {
   const raw = {shellHtml: await compactMarkup(read(webUi.sourcePath)), partialHtml: {},
     appJs: read(webUi.appJsPath), runtimeJs: read(path.join(webUi.jsDir, 'runtime.js')),
     otaImageJs: read(path.join(webUi.jsDir, 'ota-image.js')), viewJs: {},
-    css: compactCss(read(webUi.cssSourcePath))};
+    css: compactCss(webUi.cssSourcePaths.map(read).join(''))};
   for (const name of VIEW_NAMES) {
     raw.partialHtml[name] = await compactMarkup(read(path.join(webUi.htmlDir, name + '.html')));
   }

@@ -1,0 +1,462 @@
+/* Number fields: − and + keys inside the field's border on the right, split
+   by thin lines; the field keeps its own error, warning and focus styles. */
+.numBox {
+  position: relative;
+  display: block;
+  margin-top: 0.35rem;
+}
+.numBox > input {
+  margin: 0;
+  padding-right: 5.6rem;
+  appearance: textfield;
+}
+.numBox > input::-webkit-inner-spin-button,
+.numBox > input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.numBox > button {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  right: 1px;
+  width: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--ln);
+  border-radius: 0 0.45rem 0.45rem 0;
+  background: none;
+  color: var(--fg);
+  font-size: 1.15rem;
+  line-height: 1;
+  touch-action: manipulation;
+}
+.numBox > button:first-of-type {
+  right: calc(2.75rem + 1px);
+  border-radius: 0;
+}
+.numBox > button:hover {
+  background: var(--pa);
+}
+.windowPair .numBox > input {
+  padding-inline: 0.5rem 4.6rem;
+}
+.windowPair .numBox > button {
+  width: 2.25rem;
+}
+.windowPair .numBox > button:first-of-type {
+  right: calc(2.25rem + 1px);
+}
+.numBox > input:is(:disabled, [readonly]) ~ button {
+  opacity: 0.65;
+  pointer-events: none;
+}
+/* Fields with inline keys: the apply key sits inside the field, left of
+   the − key, and the undo key sits left of it. Both appear only while a
+   pending edit (input[data-edited]) waits to be applied, expand smoothly,
+   and leave at once once the edit is applied, dropped or typed back. */
+.numBox > button.numSet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  right: calc(5.5rem + 1px);
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-left-color: transparent;
+  border-radius: 0;
+  color: var(--ac);
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+}
+.numBox > button.numUndo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  right: calc(10.1rem + 1px);
+  width: 0;
+  overflow: hidden;
+  border-left-color: transparent;
+  border-radius: 0;
+  color: var(--mu);
+  opacity: 0;
+  pointer-events: none;
+}
+.numBox > button:is(.numSet, .numUndo) .g {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+}
+.numBox:has(> input[data-edited]) > button.numSet {
+  width: 4.6rem;
+  border-left-color: var(--ln);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    width 0.18s ease,
+    opacity 0.15s ease,
+    border-color 0.18s ease;
+}
+.numBox:has(> input[data-edited]) > button.numUndo {
+  width: 2.75rem;
+  border-left-color: var(--ln);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    width 0.18s ease,
+    opacity 0.15s ease,
+    border-color 0.18s ease;
+}
+.numBox:has(> input[data-edited]) > input {
+  padding-right: 13rem;
+  transition: padding-right 0.18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .numBox:has(> input[data-edited]) > :is(button.numSet, button.numUndo, input) {
+    transition: none;
+  }
+}
+/* The saved-scale dropdown carries its Forget key inside the control, in
+   the number-field key idiom: the key takes the segment left of the
+   select's own chevron zone (same 2.75rem width, so the × and the chevron
+   share their center line). The key exists only while a saved scale is the
+   selected value; its first tap arms (warm wash, Sure? revealed), the
+   second forgets. */
+.selBox {
+  position: relative;
+  display: block;
+  margin-top: 0.35rem;
+}
+.selBox > select {
+  margin: 0;
+}
+.selBox > button.selKey {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  right: calc(2.75rem + 1px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  border-left: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--ac);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+/* The Sure? label joins only when armed: clipping a centered label would
+   bleed a partial "Sure" into the idle key. */
+.selBox > button.selKey .t {
+  display: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.selBox > button.selKey.arming .t {
+  display: inline;
+}
+.selBox[data-paired] > button.selKey {
+  width: 2.75rem;
+  border-left-color: var(--ln);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    width 0.18s ease,
+    opacity 0.15s ease,
+    border-color 0.18s ease;
+}
+.selBox[data-paired] > select {
+  padding-right: calc(6.15rem + 1px);
+  transition: padding-right 0.18s ease;
+}
+.selBox:has(> button.selKey.arming) > select {
+  padding-right: calc(8rem + 1px);
+}
+.selBox > button.selKey:not(:disabled):hover {
+  background: var(--pa);
+}
+.selBox > button.selKey:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.selBox > button.selKey.arming,
+.selBox > button.selKey.arming:hover {
+  width: 4.6rem;
+  background: var(--mw);
+}
+@media (prefers-reduced-motion: reduce) {
+  .selBox[data-paired] > :is(button.selKey, select) {
+    transition: none;
+  }
+}
+/* The dropdown arrow: the same hollow angle as the settings groups, drawn
+   on the wrapper because <select> takes no pseudo-elements. A rotated
+   square keeps only its right and bottom borders — stroke only, no fill —
+   at the 2px weight of the − and + keys. The select keeps the 1px divider
+   of its 2.75rem arrow zone. */
+.selBox::after {
+  content: "";
+  position: absolute;
+  top: calc(50% - 0.1rem);
+  right: 1.1rem;
+  width: 0.46rem;
+  height: 0.46rem;
+  border: solid var(--fg);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-50%) rotate(45deg);
+  pointer-events: none;
+}
+.selBox:has(> select:disabled)::after {
+  opacity: 0.65;
+}
+
+textarea {
+  resize: vertical;
+}
+input[type="file"] {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.25rem;
+  border: 1px solid var(--bd);
+  border-radius: 0.5rem;
+  background: var(--in);
+  color: var(--mu);
+  font-weight: 400;
+}
+input[type="file"]::file-selector-button {
+  min-height: 2.5rem;
+  margin-right: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-right: 1px solid var(--ln);
+  border-radius: 2rem;
+  background: var(--sf);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="url"] {
+  appearance: none;
+}
+/* Dropdowns keep the native look off and reserve a 2.75rem arrow zone on
+   the right, closed off by a 1px divider; the arrow itself is the .selBox
+   wrapper's chevron. */
+select {
+  appearance: none;
+  padding-right: 3.4rem;
+  background-image: linear-gradient(var(--ln), var(--ln));
+  background-position: calc(100% - 2.75rem) 0;
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+}
+::placeholder {
+  color: var(--mu);
+  opacity: 1;
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--fg);
+  caret-color: var(--fg);
+  -webkit-box-shadow: 0 0 0 3rem var(--in) inset;
+}
+input:disabled,
+select:disabled,
+textarea:disabled,
+input[readonly],
+textarea[readonly] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+input[type="checkbox"] {
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0 0.5rem 0 0;
+  accent-color: var(--pri);
+  vertical-align: -0.3rem;
+}
+label:has(> input[type="checkbox"]) {
+  min-height: var(--tap);
+  margin: 0.25rem 0;
+  padding: 0.65rem 0;
+}
+label:has(> input[type="checkbox"]) .fieldHint {
+  margin-left: 1.9rem;
+}
+.row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.row > * {
+  flex: 1 1 15rem;
+  min-width: 0;
+}
+.statusColumn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem 0.75rem;
+}
+.statusColumn + .statusColumn {
+  margin-top: 1rem;
+}
+.blockHead {
+  grid-column: 1/-1;
+  font-size: 0.8125rem;
+}
+.metric,
+.shotCard > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.metric strong,
+.shotCard strong {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--mu);
+}
+.metric > div,
+.shotCard > * > div {
+  color: var(--mu);
+  font-weight: 400;
+}
+.lampRow {
+  border-top: 1px solid var(--ln);
+  interpolate-size: allow-keywords;
+}
+.lampRow:first-of-type {
+  border-top: 0;
+}
+.lampRow summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  column-gap: 0.7rem;
+  min-height: 3.4rem;
+  padding: 0.5rem 0.25rem;
+  list-style: none;
+  font-weight: 400;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.lampRow summary::-webkit-details-marker {
+  display: none;
+}
+.lamp {
+  grid-area: 1/1/3;
+  position: relative;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.lamp svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lamp:after {
+  content: "✓";
+  position: absolute;
+  right: -0.4rem;
+  bottom: -0.3rem;
+  display: grid;
+  place-items: center;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 2px var(--sf);
+  color: var(--sf);
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.lampRow.lampWarn .lamp:after {
+  content: "!";
+  background: var(--lw);
+}
+.lampRow.lampBad .lamp:after {
+  content: "×";
+  background: var(--dn);
+}
+.lampRow .devName {
+  grid-area: 1/2;
+  align-self: end;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.lampState {
+  grid-area: 2/2;
+  align-self: start;
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.lampRow summary b {
+  grid-area: 1/3;
+  align-self: end;
+  justify-self: end;
+  max-width: 9rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.lampRow summary small {
+  grid-area: 2/3;
+  align-self: start;
+  justify-self: end;
+  max-width: 9rem;
+  text-align: right;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--mu);
+  overflow-wrap: anywhere;
+}
+.lampRow summary > :empty {
+  display: none;
+}
+.lampRow summary b:has(+ :empty) {
+  grid-row: 1/3;
+  align-self: center;
+}
+.lampRow .chev {
+  grid-area: 1/4/3;
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: none;
+  stroke: var(--mu);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s;
+}
+.lampRow[open] .chev {
+  transform: rotate(90deg);
+}

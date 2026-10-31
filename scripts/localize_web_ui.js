@@ -267,6 +267,20 @@ function renderSources(sources, options = {}) {
   return {...loaded, sources: rendered, usedKeys: [...state.used].sort()};
 }
 
+// The ordered CSS layer list is the cascade contract for the assembled
+// /app.css: tokens, shell, shared components, views, global. gen_web_ui.js
+// concatenates these in order and fails when src/web/css holds more or
+// fewer files, and src/web/AGENTS.md records the placement rules.
+const CSS_SOURCES = [
+  'tokens.css', 'shell.css',
+  'components/fields.css',
+  'views/settings.css', 'views/home.css', 'views/admin.css', 'views/live.css',
+  'views/diagnostic.css', 'views/stats.css',
+  'components/bars.css', 'components/toolbars.css',
+  'views/history.css', 'views/trace.css', 'views/preset.css',
+  'global.css', 'views/setup.css',
+];
+
 function projectSources() {
   const webDir = path.join(repoRoot, 'src', 'web');
   const files = [
@@ -275,7 +289,8 @@ function projectSources() {
     ['html/diagnostic.html', 'html'],
     ['html/settings.html', 'html'], ['html/admin.html', 'html'],
     ['html/setup.html', 'html'],
-    ['app.css', 'css'], ['app.js', 'js'], ['js/runtime.js', 'js'],
+    ...CSS_SOURCES.map((name) => [`css/${name}`, 'css']),
+    ['app.js', 'js'], ['js/runtime.js', 'js'],
     ['js/ota-image.js', 'js'], ['js/home.js', 'js'], ['js/stats.js', 'js'],
     ['js/history.js', 'js'], ['js/records.js', 'js'],
     ['js/diagnostic.js', 'js'], ['js/settings.js', 'js'], ['js/admin.js', 'js'],
@@ -302,7 +317,8 @@ function parseCli(argv) {
 }
 
 module.exports = {normalizeLanguageCode, validateCatalog, loadCatalog, htmlEscape,
-  jsLiteral, cssLiteral, renderSources, projectSources, parseCli, defaultLocalesDir};
+  jsLiteral, cssLiteral, renderSources, projectSources, parseCli, defaultLocalesDir,
+  CSS_SOURCES};
 
 if (require.main === module) {
   try {
