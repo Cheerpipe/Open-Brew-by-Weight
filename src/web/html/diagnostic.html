@@ -962,25 +962,29 @@
     <div>
       <label
         >{{webui:diagnostic.ring_log_level}}
-        <select id="ringRetainLogLevel" class="diagCtl">
-          <option value="none" selected>{{webui:diagnostic.none}}</option>
-          <option value="critical">{{webui:diagnostic.critical}}</option>
-          <option value="error">{{webui:diagnostic.error}}</option>
-          <option value="warning">{{webui:diagnostic.warning}}</option>
-          <option value="info">{{webui:diagnostic.info}}</option>
-          <option value="debug">{{webui:diagnostic.debug}}</option></select
+        <span class="selBox"
+          ><select id="ringRetainLogLevel" class="diagCtl">
+            <option value="none" selected>{{webui:diagnostic.none}}</option>
+            <option value="critical">{{webui:diagnostic.critical}}</option>
+            <option value="error">{{webui:diagnostic.error}}</option>
+            <option value="warning">{{webui:diagnostic.warning}}</option>
+            <option value="info">{{webui:diagnostic.info}}</option>
+            <option value="debug">{{webui:diagnostic.debug}}</option>
+          </select></span
         ><small class="fieldHint"
           >{{webui:diagnostic.min_level_stored_on_the_log_ring}}</small
         ></label
       ><label
         >{{webui:diagnostic.serial_log_level}}
-        <select id="serialLogLevel" class="diagCtl">
-          <option value="none" selected>{{webui:diagnostic.none}}</option>
-          <option value="critical">{{webui:diagnostic.critical}}</option>
-          <option value="error">{{webui:diagnostic.error}}</option>
-          <option value="warning">{{webui:diagnostic.warning}}</option>
-          <option value="info">{{webui:diagnostic.info}}</option>
-          <option value="debug">{{webui:diagnostic.debug}}</option></select
+        <span class="selBox"
+          ><select id="serialLogLevel" class="diagCtl">
+            <option value="none" selected>{{webui:diagnostic.none}}</option>
+            <option value="critical">{{webui:diagnostic.critical}}</option>
+            <option value="error">{{webui:diagnostic.error}}</option>
+            <option value="warning">{{webui:diagnostic.warning}}</option>
+            <option value="info">{{webui:diagnostic.info}}</option>
+            <option value="debug">{{webui:diagnostic.debug}}</option>
+          </select></span
         ><small class="fieldHint"
           >{{webui:diagnostic.esp_idf_log_output_over_usb_off}}</small
         ></label
@@ -989,30 +993,34 @@
     <hr class="logSep" />
     <label
       >{{webui:diagnostic.level}}
-      <select id="logLevelFilter" class="diagCtl">
-        <option value="0">{{webui:diagnostic.critical}}</option>
-        <option value="1">{{webui:diagnostic.error}}</option>
-        <option value="2">{{webui:diagnostic.warning}}</option>
-        <option value="3" selected>{{webui:diagnostic.info}}</option>
-        <option value="4">{{webui:diagnostic.debug}}</option></select
+      <span class="selBox"
+        ><select id="logLevelFilter" class="diagCtl">
+          <option value="0">{{webui:diagnostic.critical}}</option>
+          <option value="1">{{webui:diagnostic.error}}</option>
+          <option value="2">{{webui:diagnostic.warning}}</option>
+          <option value="3" selected>{{webui:diagnostic.info}}</option>
+          <option value="4">{{webui:diagnostic.debug}}</option>
+        </select></span
       ><small class="fieldHint"
         >{{webui:diagnostic.this_severity_and_above_view_only}}</small
       ></label
     ><label
       >{{webui:diagnostic.category}}
-      <select id="logFilter" class="diagCtl">
-        <option value="">{{webui:diagnostic.all}}</option>
-        <option value="boot">{{webui:diagnostic.boot_2}}</option>
-        <option value="system">{{webui:diagnostic.system}}</option>
-        <option value="scale">{{webui:diagnostic.scale_2}}</option>
-        <option value="ble">{{webui:diagnostic.ble}}</option>
-        <option value="state">{{webui:diagnostic.state_2}}</option>
-        <option value="relay">{{webui:diagnostic.relay_2}}</option>
-        <option value="activator">{{webui:diagnostic.activator}}</option>
-        <option value="network">{{webui:diagnostic.network}}</option>
-        <option value="config">{{webui:diagnostic.config}}</option>
-        <option value="web">{{webui:diagnostic.web}}</option>
-        <option value="security">{{webui:diagnostic.security}}</option></select
+      <span class="selBox"
+        ><select id="logFilter" class="diagCtl">
+          <option value="">{{webui:diagnostic.all}}</option>
+          <option value="boot">{{webui:diagnostic.boot_2}}</option>
+          <option value="system">{{webui:diagnostic.system}}</option>
+          <option value="scale">{{webui:diagnostic.scale_2}}</option>
+          <option value="ble">{{webui:diagnostic.ble}}</option>
+          <option value="state">{{webui:diagnostic.state_2}}</option>
+          <option value="relay">{{webui:diagnostic.relay_2}}</option>
+          <option value="activator">{{webui:diagnostic.activator}}</option>
+          <option value="network">{{webui:diagnostic.network}}</option>
+          <option value="config">{{webui:diagnostic.config}}</option>
+          <option value="web">{{webui:diagnostic.web}}</option>
+          <option value="security">{{webui:diagnostic.security}}</option>
+        </select></span
       ><small class="fieldHint">{{webui:diagnostic.show_one_subsystem_or_all}}</small></label
     >
     <p id="logDropped" class="fieldHint" hidden></p>

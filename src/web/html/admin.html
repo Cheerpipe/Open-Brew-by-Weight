@@ -167,8 +167,10 @@
       <span id="scanStatus" role="status"></span
       ><label
         >{{webui:admin.detected_network}}
-        <select id="staNetwork">
-          <option value="">{{webui:admin.select}}</option></select
+        <span class="selBox"
+          ><select id="staNetwork">
+            <option value="">{{webui:admin.select}}</option>
+          </select></span
         ><small class="fieldHint">{{webui:admin.select_to_fill_ssid_and_security}}</small></label
       ><label
         >{{webui:admin.selected_ssid_or_hidden_network}}
@@ -197,9 +199,11 @@
         ></label
       ><label
         >{{webui:admin.ip_mode}}
-        <select id="staIpMode">
-          <option value="dhcp">{{webui:admin.dhcp}}</option>
-          <option value="static">{{webui:admin.static_ip}}</option></select
+        <span class="selBox"
+          ><select id="staIpMode">
+            <option value="dhcp">{{webui:admin.dhcp}}</option>
+            <option value="static">{{webui:admin.static_ip}}</option>
+          </select></span
         ><small class="fieldHint"
           >{{webui:admin.automatic_or_fixed_address_avoid_192_168}}</small
         ></label
@@ -293,10 +297,12 @@
       ></label
     ><label
       >{{webui:admin.ble_scan_mode}}
-      <select id="bleScanIntensity">
-        <option value="aggressive">{{webui:runtime.aggressive}}</option>
-        <option value="balanced" selected>{{webui:runtime.balanced}}</option>
-        <option value="relaxed">{{webui:runtime.relaxed}}</option></select
+      <span class="selBox"
+        ><select id="bleScanIntensity">
+          <option value="aggressive">{{webui:runtime.aggressive}}</option>
+          <option value="balanced" selected>{{webui:runtime.balanced}}</option>
+          <option value="relaxed">{{webui:runtime.relaxed}}</option>
+        </select></span
       ><small class="fieldHint"
         >{{webui:admin.how_much_radio_time_is_spent_searching}}</small
       ></label
@@ -335,7 +341,7 @@
         ></label
       ><label
         >{{webui:admin.timezone}}
-        <select id="timezoneId" required></select
+        <span class="selBox"><select id="timezoneId" required></select></span
         ><small class="fieldHint">{{webui:admin.timezone_iana_hint}}</small></label
       ><small id="timezonePreview" class="fieldHint" role="status" aria-live="polite"
         >{{webui:admin.timezone_preview_waiting}}</small
@@ -347,11 +353,13 @@
         ></label
       ><label
         >{{webui:admin.ntp_server}}
-        <select id="ntpServerPreset">
-          <option value="pool">{{webui:admin.pool_ntp_org}}</option>
-          <option value="google">time.google.com</option>
-          <option value="cloudflare">time.cloudflare.com</option>
-          <option value="nist">{{webui:admin.time_nist_gov}}</option></select
+        <span class="selBox"
+          ><select id="ntpServerPreset">
+            <option value="pool">{{webui:admin.pool_ntp_org}}</option>
+            <option value="google">time.google.com</option>
+            <option value="cloudflare">time.cloudflare.com</option>
+            <option value="nist">{{webui:admin.time_nist_gov}}</option>
+          </select></span
         ><small class="fieldHint"
           >{{webui:admin.public_ntp_host_used_when_custom_ntp}}</small
         ></label
@@ -406,9 +414,11 @@
     >
     <label
       >{{webui:admin.hero_card_mode}}
-      <select id="heroCardMode">
-        <option value="technical">{{webui:admin.hero_card_mode_technical}}</option>
-        <option value="colorful">{{webui:admin.hero_card_mode_colorful}}</option></select
+      <span class="selBox"
+        ><select id="heroCardMode">
+          <option value="technical">{{webui:admin.hero_card_mode_technical}}</option>
+          <option value="colorful">{{webui:admin.hero_card_mode_colorful}}</option>
+        </select></span
       ><small class="fieldHint">{{webui:admin.hero_card_mode_hint}}</small></label
     >
     <div class="btnBar">

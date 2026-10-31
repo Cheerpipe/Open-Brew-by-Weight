@@ -343,14 +343,16 @@
             {{webui:settings.ramp_hard}}
           </label>
         </div>
-        <select id="fastCurve" class="hidden" aria-hidden="true" tabindex="-1">
-          <option value="even"></option>
-          <option value="early"></option>
-          <option value="late"></option></select
-        ><select id="fastCurveHardness" class="hidden" aria-hidden="true" tabindex="-1">
-          <option value="soft"></option>
-          <option value="medium"></option>
-          <option value="hard"></option></select
+        <span class="selBox"
+          ><select id="fastCurve" class="hidden" aria-hidden="true" tabindex="-1">
+            <option value="even"></option>
+            <option value="early"></option>
+            <option value="late"></option></select></span
+        ><span class="selBox"
+          ><select id="fastCurveHardness" class="hidden" aria-hidden="true" tabindex="-1">
+            <option value="soft"></option>
+            <option value="medium"></option>
+            <option value="hard"></option></select></span
         ><small id="fastCurveHint" class="fieldHint"></small>
       </div>
     </details>
@@ -447,14 +449,16 @@
             {{webui:settings.ramp_hard}}
           </label>
         </div>
-        <select id="slowCurve" class="hidden" aria-hidden="true" tabindex="-1">
-          <option value="even"></option>
-          <option value="early"></option>
-          <option value="late"></option></select
-        ><select id="slowCurveHardness" class="hidden" aria-hidden="true" tabindex="-1">
-          <option value="soft"></option>
-          <option value="medium"></option>
-          <option value="hard"></option></select
+        <span class="selBox"
+          ><select id="slowCurve" class="hidden" aria-hidden="true" tabindex="-1">
+            <option value="even"></option>
+            <option value="early"></option>
+            <option value="late"></option></select></span
+        ><span class="selBox"
+          ><select id="slowCurveHardness" class="hidden" aria-hidden="true" tabindex="-1">
+            <option value="soft"></option>
+            <option value="medium"></option>
+            <option value="hard"></option></select></span
         ><small id="slowCurveHint" class="fieldHint"></small>
       </div>
     </details>
@@ -676,12 +680,14 @@
             >{{webui:settings.shutdown_machine_with_scale_hint}}</small
           ></label
         ><label id="lineaMicraShutdownGraceWrap"
-          >{{webui:settings.shutdown_grace_period}}<select id="lineaMicraShutdownGrace">
-            <option value="0">{{webui:settings.shutdown_grace_off}}</option>
-            <option value="5">{{webui:settings.shutdown_grace_5s}}</option>
-            <option value="15" selected>{{webui:settings.shutdown_grace_15s}}</option>
-            <option value="30">{{webui:settings.shutdown_grace_30s}}</option>
-            <option value="60">{{webui:settings.shutdown_grace_60s}}</option></select
+          >{{webui:settings.shutdown_grace_period}}<span class="selBox"
+            ><select id="lineaMicraShutdownGrace">
+              <option value="0">{{webui:settings.shutdown_grace_off}}</option>
+              <option value="5">{{webui:settings.shutdown_grace_5s}}</option>
+              <option value="15" selected>{{webui:settings.shutdown_grace_15s}}</option>
+              <option value="30">{{webui:settings.shutdown_grace_30s}}</option>
+              <option value="60">{{webui:settings.shutdown_grace_60s}}</option>
+            </select></span
           ><small class="fieldHint">{{webui:settings.shutdown_grace_period_hint}}</small></label
         >
       </details>
@@ -703,10 +709,12 @@
       <summary>{{webui:settings.paddle}}</summary>
       <label
         >{{webui:settings.paddle_mode}}
-        <select id="paddleMode">
-          <option value="auto">{{webui:settings.auto}}</option>
-          <option value="natural">{{webui:settings.natural}}</option>
-          <option value="original">{{webui:settings.original}}</option></select
+        <span class="selBox"
+          ><select id="paddleMode">
+            <option value="auto">{{webui:settings.auto}}</option>
+            <option value="natural">{{webui:settings.natural}}</option>
+            <option value="original">{{webui:settings.original}}</option>
+          </select></span
         ><small class="fieldHint"
           ><strong>{{webui:settings.natural_2}}</strong>
           {{webui:settings.the_paddle_works_like_a_normal_brew}}</small
@@ -723,9 +731,11 @@
       <summary>{{webui:settings.switch}}</summary>
       <label
         >{{webui:settings.start_stop_on}}
-        <select id="momentaryStartEdge">
-          <option value="press" selected>{{webui:settings.button_press}}</option>
-          <option value="release">{{webui:settings.button_release}}</option></select
+        <span class="selBox"
+          ><select id="momentaryStartEdge">
+            <option value="press" selected>{{webui:settings.button_press}}</option>
+            <option value="release">{{webui:settings.button_release}}</option>
+          </select></span
         ><small class="fieldHint"
           ><strong>{{webui:settings.button_press_2}}</strong>
           {{webui:settings.button_press_hint}}<br /><strong
@@ -846,10 +856,12 @@
         ></label
       ><label
         >{{webui:settings.scale_preference}}
-        <select id="scalePreference">
-          <option value="first">{{webui:settings.first_available}}</option>
-          <option value="prefer" selected>{{webui:settings.prefer_selected}}</option>
-          <option value="only">{{webui:settings.preferred_only}}</option></select
+        <span class="selBox"
+          ><select id="scalePreference">
+            <option value="first">{{webui:settings.first_available}}</option>
+            <option value="prefer" selected>{{webui:settings.prefer_selected}}</option>
+            <option value="only">{{webui:settings.preferred_only}}</option>
+          </select></span
         ><small class="fieldHint"
           ><strong>{{webui:settings.first_available_2}}</strong>
           {{webui:settings.use_the_first_scale_found_prefer_a}}<br /><strong
@@ -867,8 +879,10 @@
           >- <a id="preferredScaleRename" href="#">{{webui:settings.rename}}</a></span
         ><br /><span id="preferredScalePauseHint" class="fieldHint"></span
         ><span class="selBox"
-          ><select id="preferredScaleSelect" aria-label="{{webui:settings.preferred_scale}}">
-            <option value="">{{webui:settings.first_detected}}</option></select
+          ><span class="selBox"
+            ><select id="preferredScaleSelect" aria-label="{{webui:settings.preferred_scale}}">
+              <option value="">{{webui:settings.first_detected}}</option>
+            </select></span
           ><button
             id="forgetPairedScale"
             class="selKey"
@@ -899,13 +913,15 @@
           ></label
         ><label
           >{{webui:settings.scale_volume}}
-          <select id="bookooConnectBeepLevel">
-            <option value="0">{{webui:settings.disabled}}</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4" selected>4</option>
-            <option value="5">5</option></select
+          <span class="selBox"
+            ><select id="bookooConnectBeepLevel">
+              <option value="0">{{webui:settings.disabled}}</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4" selected>4</option>
+              <option value="5">5</option>
+            </select></span
           ><small class="fieldHint"
             >{{webui:settings.how_loud_the_scale_is_when_it}}<strong>{{webui:settings.scale_only_or_scale_priority}}</strong>).</small
           ></label
@@ -1072,10 +1088,12 @@
     <details data-g="noScale" class="cfgGroup">
       <summary>{{webui:settings.no_scale_bbw}}</summary>
       <label
-        >{{webui:settings.when_bbw_has_no_scale}}<select id="noScaleBbwMode">
-          <option value="off">{{webui:settings.allow_manual_brewing}}</option>
-          <option value="warn_once" selected>{{webui:settings.warn_once_then_allow}}</option>
-          <option value="require_scale">{{webui:settings.require_a_scale}}</option></select
+        >{{webui:settings.when_bbw_has_no_scale}}<span class="selBox"
+          ><select id="noScaleBbwMode">
+            <option value="off">{{webui:settings.allow_manual_brewing}}</option>
+            <option value="warn_once" selected>{{webui:settings.warn_once_then_allow}}</option>
+            <option value="require_scale">{{webui:settings.require_a_scale}}</option>
+          </select></span
         ><small class="fieldHint"
           ><strong>{{webui:settings.allow_manual_brewing_2}}</strong>
           {{webui:settings.brew_without_a_scale}}<br /><strong
@@ -1124,10 +1142,12 @@
       >
       <div class="soundAlertOpt">
         <label class="buzzerOpt"
-          >{{webui:settings.output_channel}}<select id="alertOutputChannel">
-            <option value="scale_priority">{{webui:settings.scale_priority}}</option>
-            <option value="buzzer_only">{{webui:settings.buzzer_only}}</option>
-            <option value="scale_only">{{webui:settings.scale_only}}</option></select
+          >{{webui:settings.output_channel}}<span class="selBox"
+            ><select id="alertOutputChannel">
+              <option value="scale_priority">{{webui:settings.scale_priority}}</option>
+              <option value="buzzer_only">{{webui:settings.buzzer_only}}</option>
+              <option value="scale_only">{{webui:settings.scale_only}}</option>
+            </select></span
           ><small class="fieldHint"
             ><strong>{{webui:settings.scale_priority_2}}</strong>
             {{webui:settings.where_alert_sounds_play_scale_priority_uses}}<br /><strong
@@ -1144,12 +1164,14 @@
             >{{webui:settings.one_beep_when_the_first_coffee_drops}}</small
           ></label
         ><label class="paddleOnly"
-          >{{webui:settings.paddle_off_reminder}}<select id="paddleReturnReminder">
-            <option value="0">OFF</option>
-            <option value="15">15</option>
-            <option value="30" selected>30</option>
-            <option value="60">60</option>
-            <option value="120">120</option></select
+          >{{webui:settings.paddle_off_reminder}}<span class="selBox"
+            ><select id="paddleReturnReminder">
+              <option value="0">OFF</option>
+              <option value="15">15</option>
+              <option value="30" selected>30</option>
+              <option value="60">60</option>
+              <option value="120">120</option>
+            </select></span
           ><small class="fieldHint"
             >{{webui:settings.reminds_you_to_return_the_paddle_after}}</small
           ></label
@@ -1185,20 +1207,24 @@
             >{{webui:settings.beeps_when_a_scale_connects_or_reconnects}}</small
           ></label
         ><label class="buzzerOpt scaleIncapableOpt"
-          >{{webui:settings.fast_shot_pulse}}<select id="buzzerExtendedPulseRate">
-            <option value="disabled">{{webui:settings.disabled}}</option>
-            <option value="slow">{{webui:settings.slow}}</option>
-            <option value="medium">{{webui:settings.medium}}</option>
-            <option value="fast" selected>{{webui:settings.fast}}</option>
-            <option value="rapid">{{webui:settings.rapid}}</option></select
+          >{{webui:settings.fast_shot_pulse}}<span class="selBox"
+            ><select id="buzzerExtendedPulseRate">
+              <option value="disabled">{{webui:settings.disabled}}</option>
+              <option value="slow">{{webui:settings.slow}}</option>
+              <option value="medium">{{webui:settings.medium}}</option>
+              <option value="fast" selected>{{webui:settings.fast}}</option>
+              <option value="rapid">{{webui:settings.rapid}}</option>
+            </select></span
           ><small class="fieldHint">{{webui:settings.fast_shot_pulse_hint}}</small></label
         ><label class="buzzerOpt scaleIncapableOpt"
-          >{{webui:settings.slow_shot_pulse}}<select id="buzzerSlowExtendedPulseRate">
-            <option value="disabled">{{webui:settings.disabled}}</option>
-            <option value="slow">{{webui:settings.slow}}</option>
-            <option value="medium">{{webui:settings.medium}}</option>
-            <option value="fast" selected>{{webui:settings.fast}}</option>
-            <option value="rapid">{{webui:settings.rapid}}</option></select
+          >{{webui:settings.slow_shot_pulse}}<span class="selBox"
+            ><select id="buzzerSlowExtendedPulseRate">
+              <option value="disabled">{{webui:settings.disabled}}</option>
+              <option value="slow">{{webui:settings.slow}}</option>
+              <option value="medium">{{webui:settings.medium}}</option>
+              <option value="fast" selected>{{webui:settings.fast}}</option>
+              <option value="rapid">{{webui:settings.rapid}}</option>
+            </select></span
           ><small class="fieldHint">{{webui:settings.slow_shot_pulse_hint}}</small></label
         >
       </div>
@@ -1258,18 +1284,22 @@
       >
       <label
         >{{webui:settings.app_hero_card}}
-        <select id="appHeroCard">
-          <option value="default" selected>{{webui:settings.app_hero_card_default}}</option>
-          <option value="technical">{{webui:settings.app_hero_card_technical}}</option>
-          <option value="colorful">{{webui:settings.app_hero_card_colorful}}</option></select
+        <span class="selBox"
+          ><select id="appHeroCard">
+            <option value="default" selected>{{webui:settings.app_hero_card_default}}</option>
+            <option value="technical">{{webui:settings.app_hero_card_technical}}</option>
+            <option value="colorful">{{webui:settings.app_hero_card_colorful}}</option>
+          </select></span
         ><small class="fieldHint">{{webui:settings.app_hero_card_hint}}</small></label
       >
       <label
         >{{webui:settings.app_hero_colors}}
-        <select id="appHeroTint">
-          <option value="forecast" selected>{{webui:settings.app_hero_colors_forecast}}</option>
-          <option value="window">{{webui:settings.app_hero_colors_window}}</option>
-          <option value="brand">{{webui:settings.app_hero_colors_brand}}</option></select
+        <span class="selBox"
+          ><select id="appHeroTint">
+            <option value="forecast" selected>{{webui:settings.app_hero_colors_forecast}}</option>
+            <option value="window">{{webui:settings.app_hero_colors_window}}</option>
+            <option value="brand">{{webui:settings.app_hero_colors_brand}}</option>
+          </select></span
         ><small class="fieldHint">{{webui:settings.app_hero_colors_hint}}</small></label
       >
       <div id="appOfflineBox" class="hidden">

@@ -169,12 +169,14 @@
   <div class="traceFilter">
     <label
       >{{webui:stats.trace_show}}
-      <select id="shotTraceType">
-        <option value="">{{webui:stats.trace_all}}</option>
-        <option value="trace">{{webui:stats.trace_decisions}}</option>
-        <option value="profile">{{webui:stats.trace_scale}}</option>
-        <option value="debug">{{webui:stats.trace_firmware}}</option>
-      </select></label
+      <span class="selBox"
+        ><select id="shotTraceType">
+          <option value="">{{webui:stats.trace_all}}</option>
+          <option value="trace">{{webui:stats.trace_decisions}}</option>
+          <option value="profile">{{webui:stats.trace_scale}}</option>
+          <option value="debug">{{webui:stats.trace_firmware}}</option>
+        </select></span
+      ></label
     ><label
       >{{webui:stats.trace_search}} <input id="shotTraceSearch" type="search" autocomplete="off"
     /></label>
