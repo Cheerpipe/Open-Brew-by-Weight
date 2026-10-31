@@ -661,6 +661,13 @@ function applySettingsStatus(s) {
         }
         a.last = a.payload();
       }
+  // The curve picker follows every loaded frame on its own: the review graph
+  // it used to ride on returns early without shot data, which left the cards
+  // and slider stale through preset applies and factory restores.
+  for (const side of ["fast", "slow"]) {
+    syncRampChoice(side);
+    $(side + "CurveHint").textContent = RAMP_CURVE_TEXT[side][$(side + "Curve").value] || "";
+  }
   refreshBrewWarnings();
 }
 // The Forget key lives inside the My scale dropdown: present only while a
@@ -1077,8 +1084,14 @@ function syncRampChoice(side) {
     });
   }
   if (range && !range._dragging && document.activeElement !== range) {
-    range.value = String(Math.round((+hardness.value || 0) * 2) / 2);
-    paintHardnessSlider(side, +range.value || 0);
+    // A garbage or empty hidden value keeps the thumb where it is; only a
+    // real number moves it.
+    const loaded = parseFloat(hardness.value);
+    const v = Number.isFinite(loaded)
+      ? Math.min(100, Math.max(0, Math.round(loaded * 2) / 2))
+      : Math.min(100, Math.max(0, +range.value || 0));
+    range.value = String(v);
+    paintHardnessSlider(side, v);
   }
   for (const radio of box.querySelectorAll("input[data-ramp]")) {
     const select = $(radio.dataset.ramp);

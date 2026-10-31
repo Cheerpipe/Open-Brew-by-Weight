@@ -408,3 +408,18 @@
 if (!codeIncludes(runtimeJs, "querySelectorAll('#workflowPanel .fieldWarning:not(.qsOverride)')")) {
   throw new Error('Clearing brew warnings must keep the quick-override notes');
 }
+// The curve picker follows every loaded settings frame on its own: preset
+// applies and factory restores must repaint the cards and the slider even
+// when the preset review graph has no shot data to draw, and a garbage
+// hidden value must never snap the slider to zero.
+{
+  const syncSrc = blockAt(viewJs.settings, 'function syncRampChoice(');
+  if (!viewJs.settings.includes('for (const side of ["fast", "slow"]) {\n    syncRampChoice(side);') ||
+      !viewJs.settings.includes('RAMP_CURVE_TEXT[side][$(side + "Curve").value] || ""')) {
+    throw new Error('applySettingsStatus must resync the curve picker after every loaded frame');
+  }
+  if (!syncSrc.includes('parseFloat(hardness.value)') ||
+      !syncSrc.includes('Number.isFinite(loaded)')) {
+    throw new Error('syncRampChoice must keep the thumb on non-numeric hidden values');
+  }
+}
