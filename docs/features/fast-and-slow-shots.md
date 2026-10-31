@@ -100,16 +100,19 @@ weight.
   - **Steep late**: on Fast shots, most of the extra grams stay until close to
     the window; on Slow shots, the cut stays near your target for a while, so
     only clearly slow shots are shortened by the full amount.
-- **Soft**, **Medium** and **Hard** set how marked that curve is. Each button
-  shows its curve's drawing and its name (such as Smoothstep or Beta(3,2)), so
-  you can match it to the graph.
+- **Curve hardness** is a slider from **Gentle** to **Firm** that sets how
+  marked the chosen curve is. Gentle spreads the change over the whole
+  transition; firm holds most of it back, then commits. Every card shows its
+  curve's drawing at the hardness you set and names the curve it is closest
+  to (such as Smoothstep or Beta(3,2)), so you can match it to the graph.
 
 The factory **Double · Adaptive** and **Single · Adaptive** presets use a 6 s
-**Soft** transition, **Steep early** on Fast shots and **Steep late** on Slow
-shots. Both keep the cut line close to your target for the first second or two
-beside the window, because a shot's timing drifts that much from day to day on
-its own, and still give a clearly fast or slow shot the full amount. Presets
-you create start with a 5 s **Even**, **Soft** transition.
+transition at the gentle end, **Steep early** on Fast shots and **Steep late**
+on Slow shots. Both keep the cut line close to your target for the first second
+or two beside the window, because a shot's timing drifts that much from day to
+day on its own, and still give a clearly fast or slow shot the full amount.
+Presets you create start with a 5 s **Even** transition at the gentlest
+hardness.
 
 Every curve leaves and joins the levels smoothly, so a shot that reaches the
 target a moment earlier or later still stops only a fraction of a gram
@@ -136,7 +139,7 @@ While you edit, the field result shows the resulting weight and ratio, such as
 | **Shorten by up to (g)** | 3 g | 0.5–10 g in 0.1 g steps, leaving at least 5 g in the cup | The most a very slow shot stops short of the target. |
 | **Transition (s)** (Fast shots, Slow shots) | 6 s | 0–10 s in 0.5 s steps | How long the cut line takes to move between the target and the extra or reduced yield. |
 | **Transition curve** (Fast shots, Slow shots) | Steep early (Fast shots), Steep late (Slow shots) | Steep early, Even, Steep late | Where that change happens fastest. |
-| **Soft / Medium / Hard** (Fast shots, Slow shots) | Soft | Soft, Medium, Hard | How marked the transition curve is. |
+| **Curve hardness** (Fast shots, Slow shots) | Gentle | Gentle to Firm, 0.5 % steps | How marked the transition curve is. |
 
 The extra and reduced yields are amounts relative to the target, so they move
 with it when you change the target from Home or Settings. Fixed presets keep

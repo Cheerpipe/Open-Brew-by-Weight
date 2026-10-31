@@ -847,6 +847,16 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
     }
   }
   if (curvePoints < 1000) throw new Error(`Rule chart: only ${curvePoints} curve points compared`);
+  // Continuous hardness end-to-end: the wire percent (62.5 => hardness 1.25)
+  // blends the two adjacent integer curves exactly as the firmware's
+  // rampDgBlend — at u = 0.3 over a 65 dg margin, Beta(3,3) floors to 54 and
+  // Beta(4,4) to 56, so floor((54*75 + 56*25 + 50)/100) = 55 dg over target.
+  const blended = helpers.buildRuleChartModel({...base, fastCurveHardness: 62.5});
+  if (blended.curveFast !== 1.25 ||
+      helpers.cutLine(24.5, blended) !== 41.5 ||
+      helpers.cutLine(24.5, helpers.buildRuleChartModel(base)) !== 41.0 ||
+      helpers.cutLine(24.5, helpers.buildRuleChartModel({...base, fastCurveHardness: 'medium'})) !== 41.4)
+    throw new Error('Rule chart: fractional hardness must draw the firmware blend exactly');
   const empty = helpers.buildRuleChartModel(null);
   if (empty.mode !== 'empty') {
     throw new Error('Rule chart: no config must render nothing');

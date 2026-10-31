@@ -735,6 +735,96 @@ void testSmoothstepIdentity() {
   }
 }
 
+// Continuous hardness (design 2026-10-31): whole hardness (0/100/200) takes
+// the exact legacy integer path for every type, polarity, margin and ramp
+// length (A1); the blended cut line stays monotone non-increasing and its flat
+// parts do not move (A2); and the blend never leaves 1 dg of the
+// double-precision reference blend (A3).
+void testContinuousHardnessBlend() {
+  const int32_t durations[] = {500, 1000, 2500, 5000, 7500, MAX_RAMP_MS};
+  // A1: bit-identity at whole hardness, the crown property. n sweeps the ramp
+  // grid including both endpoints.
+  for (uint8_t type = 0; type < RAMP_CURVE_TYPES; ++type) {
+    for (const uint16_t pct : {0, 100, 200}) {
+      for (const bool reached : {false, true}) {
+        for (const int32_t d : durations) {
+          for (const int32_t m : {5, 37, 100}) {
+            for (int i = 0; i <= 40; ++i) {
+              const int32_t n = static_cast<int32_t>(static_cast<int64_t>(i) * d / 40);
+              CHECK(rampDgBlend(m, n, d, type, pct, reached) ==
+                    rampDg(m, n, d, rampCurveIndex(type, static_cast<uint8_t>(pct / 100)),
+                           reached));
+            }
+          }
+        }
+      }
+    }
+  }
+  // A2: the whole cut line stays monotone non-increasing for a sweep of
+  // hardness values, and the held ceiling, window target and floor do not
+  // depend on hardness at all.
+  for (uint16_t pct = 0; pct <= 200; pct += 5) {
+    Params p;
+    p.goalDg = 360;
+    p.fastMarginDg = 60;
+    p.slowMarginDg = 30;
+    p.fastOn = p.slowOn = true;
+    p.delayMs = 3000;
+    p.fastBeforeMs = 27000;
+    p.slowAfterMs = 36000;
+    p.wallMs = 60000;
+    p.fastRampMs = p.slowRampMs = MAX_RAMP_MS;
+    p.fastCurve = rampCurveIndex(RAMP_CURVE_LATE, RAMP_HARDNESS_MEDIUM);
+    p.slowCurve = rampCurveIndex(RAMP_CURVE_EARLY, RAMP_HARDNESS_SOFT);
+    p.fastCurveHardnessPct = static_cast<uint8_t>(pct);
+    p.slowCurveHardnessPct = static_cast<uint8_t>(pct);
+    int32_t previous = cutLineDg(p, p.delayMs);
+    for (int32_t t = p.delayMs; t <= p.wallMs; ++t) {
+      const int32_t f = cutLineDg(p, t);
+      CHECK(f <= previous);
+      previous = f;
+    }
+    for (const int32_t t : {p.delayMs, p.fastBeforeMs - p.fastRampMs - 1,
+                            p.fastBeforeMs, (p.fastBeforeMs + p.slowAfterMs) / 2,
+                            p.slowAfterMs, p.slowAfterMs + p.slowRampMs, p.wallMs}) {
+      Params soft = p;
+      soft.fastCurveHardnessPct = soft.slowCurveHardnessPct = 0;
+      CHECK(cutLineDg(p, t) == cutLineDg(soft, t));
+    }
+  }
+  // A3: the blend stays within 1 dg of the ideal blend on the decigram grid
+  // (floor of the double-precision blend), and within 1.5 dg of the real
+  // value itself (each term floors, one rounding).
+  long double worstReal = 0;
+  for (uint8_t type = 0; type < RAMP_CURVE_TYPES; ++type) {
+    for (uint16_t pct = 0; pct <= 200; ++pct) {
+      const int f = pct % 100;
+      const RampCurve lo = RAMP_CURVES[rampCurveIndex(type, static_cast<uint8_t>(pct / 100))];
+      const RampCurve hi = RAMP_CURVES[rampCurveIndex(type, static_cast<uint8_t>(pct / 100 + 1))];
+      for (const bool reached : {false, true}) {
+        for (const int32_t d : durations) {
+          for (const int32_t m : {5, 37, 100}) {
+            for (int i = 0; i <= 17; ++i) {
+              const int32_t n = static_cast<int32_t>(static_cast<int64_t>(i) * d / 17);
+              const long double u = static_cast<long double>(n) / d;
+              const long double share =
+                  betaReference(u, lo.a, lo.b) * (100 - f) / 100 +
+                  betaReference(u, hi.a, hi.b) * f / 100;
+              const long double ideal = m * (reached ? share : 1 - share);
+              const int32_t blend = rampDgBlend(m, n, d, type, pct, reached);
+              const long double real = blend > ideal ? blend - ideal : ideal - blend;
+              if (real > worstReal) worstReal = real;
+              CHECK(blend - static_cast<int32_t>(ideal) <= 1);
+              CHECK(static_cast<int32_t>(ideal) - blend <= 1);
+            }
+          }
+        }
+      }
+    }
+  }
+  CHECK(worstReal < 1.5L);
+}
+
 // Per-side lengths and curves: the kernel reproduces the recorded vectors (the
 // Web UI checks the same file), the line stays monotone and bounded, and the
 // solver still finds the first crossing.
@@ -765,6 +855,9 @@ void testTransitionVectors() {
     p.slowRampMs = num(item, "slowRampMs");
     p.fastCurve = static_cast<uint8_t>(num(item, "fastCurve"));
     p.slowCurve = static_cast<uint8_t>(num(item, "slowCurve"));
+    // The stored index carries the case's hardness; the blend reads the pct.
+    p.fastCurveHardnessPct = rampHardnessPctOf(rampCurveHardnessOf(p.fastCurve));
+    p.slowCurveHardnessPct = rampHardnessPctOf(rampCurveHardnessOf(p.slowCurve));
     const cJSON *point = nullptr;
     cJSON_ArrayForEach(point, cJSON_GetObjectItemCaseSensitive(item, "cutLine")) {
       CHECK(cutLineDg(p, cJSON_GetArrayItem(point, 0)->valueint) ==
@@ -833,6 +926,7 @@ int main() {
   testVectors();
   testRampCurvesExhaustive();
   testSmoothstepIdentity();
+  testContinuousHardnessBlend();
   testTransitionVectors();
   testLegacyOracle();
   testStepsAndZeroLengthSegments();

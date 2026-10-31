@@ -810,6 +810,8 @@ const BREW_FIELD_TEXT = {
     slowMarginG: [__WEBUI_TEXT__("runtime.slow_margin"), __WEBUI_TEXT__("runtime.g"), "slow"],
     fastRampS: [__WEBUI_TEXT__("settings.fast_ramp"), __WEBUI_TEXT__("runtime.s"), "fast"],
     slowRampS: [__WEBUI_TEXT__("settings.slow_ramp"), __WEBUI_TEXT__("runtime.s"), "slow"],
+    fastCurveHardness: [__WEBUI_TEXT__("settings.ramp_hardness"), "%", "fast"],
+    slowCurveHardness: [__WEBUI_TEXT__("settings.ramp_hardness"), "%", "slow"],
     scaleLossFixedS: [
       __WEBUI_TEXT__("runtime.scale_loss_override"),
       __WEBUI_TEXT__("runtime.s"),
@@ -894,6 +896,8 @@ function validateBrewClient() {
   if (slowOn) add(brewRange("slowMarginG", 0.5, 10, { step: 0.1 }));
   if (fastOn) add(brewRange("fastRampS", 0, 10, { step: 0.5 }));
   if (slowOn) add(brewRange("slowRampS", 0, 10, { step: 0.5 }));
+  if (fastOn) add(brewRange("fastCurveHardness", 0, 100, { step: 0.5 }));
+  if (slowOn) add(brewRange("slowCurveHardness", 0, 100, { step: 0.5 }));
   if (brewFieldValue("scaleLossFixedS") !== "")
     add(
       brewRange(
@@ -994,7 +998,7 @@ function brewPayload() {
       ["fast", "slow"].flatMap((s) => [
         [s + "RampS", R.number(s + "RampS")],
         [s + "Curve", $(s + "Curve").value],
-        [s + "CurveHardness", $(s + "CurveHardness").value],
+        [s + "CurveHardness", R.number(s + "CurveHardness")],
       ]),
     ),
     ...(document.documentElement.classList.contains("micraTemperatureEnabled")
@@ -1027,13 +1031,21 @@ const RAMP_CURVE_NAMES = [
       late: __WEBUI_TEXT__("settings.ramp_slow_late"),
     },
   };
-// The curve and hardness radios stand in for their hidden selects, which
-// keep the form's edit, autosave and revert behavior. Each curve label draws
-// and names the curve it picks at the current hardness.
+// The curve radios and the hardness slider stand in for their hidden fields,
+// which keep the form's edit, autosave and revert behavior. Each curve label
+// draws and names the curve it picks at the current hardness.
 function rampIcon(curve) {
   let d = "M0 3H8";
   for (let i = 1; i <= 24; i++) d += `L${8 + i} ${(3 + 14 * R.rampEase(curve, i / 24)).toFixed(2)}`;
   return d + "H40";
+}
+// The slider's live percent readout: one decimal only when the value has one.
+function paintHardnessSlider(side, value) {
+  const range = $(side + "CurveHardnessRange"),
+    pct = $(side + "CurveHardnessPct");
+  if (!range) return;
+  range.style.setProperty("--p", value + "%");
+  if (pct) pct.textContent = (value % 1 ? value.toFixed(1) : value.toFixed(0)) + "%";
 }
 function syncRampChoice(side) {
   const type = $(side + "Curve"),
@@ -1049,6 +1061,24 @@ function syncRampChoice(side) {
       select.dispatchEvent(new Event("change"));
     });
   }
+  // The slider writes the hidden field through the shared change pipeline and
+  // paints the rail; dragging never fights a config sync (activeElement).
+  const range = $(side + "CurveHardnessRange");
+  if (range && !range._bound) {
+    range._bound = true;
+    range.addEventListener("input", () => {
+      const v = Math.min(100, Math.max(0, +range.value));
+      if (!hardness.disabled) {
+        hardness.value = String(v);
+        hardness.dispatchEvent(new Event("change"));
+      }
+      paintHardnessSlider(side, v);
+    });
+  }
+  if (range && document.activeElement !== range) {
+    range.value = String(Math.round((+hardness.value || 0) * 2) / 2);
+    paintHardnessSlider(side, +range.value || 0);
+  }
   for (const radio of box.querySelectorAll("input[data-ramp]")) {
     const select = $(radio.dataset.ramp);
     radio.checked = radio.value === select.value;
@@ -1057,7 +1087,8 @@ function syncRampChoice(side) {
     const curve = R.rampCurveIndex(radio.value, hardness.value),
       label = radio.closest("label");
     label.querySelector("path").setAttribute("d", rampIcon(curve));
-    label.lastChild.textContent = RAMP_CURVE_NAMES[curve];
+    // Between levels the card names the nearest curve it blends from.
+    label.lastChild.textContent = RAMP_CURVE_NAMES[Math.round(curve)];
   }
 }
 // The page header shrinks while scrolling on phones: its measured bottom

@@ -4700,33 +4700,80 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.rampStrength {
-  display: flex;
-  gap: 0.25rem;
-  margin: 0.5rem 0 0;
+/* Continuous hardness: an intensity-gradient slider (Gentle -> Firm). The
+   rail ahead paints the spectrum; the claimed fill turns solid accent. */
+.rampHardness {
+  margin: 0.6rem 0 0;
 }
-.rampStrength label {
+.rampHardTop {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  margin: 0;
-  min-height: 2.1rem;
-  padding: 0 0.8rem;
-  border: 0;
-  border-radius: 1.6rem;
-  background: transparent;
-  color: var(--ac);
-  font-size: 0.8rem;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.rampCap {
+  color: var(--mu);
+  font-size: 0.72rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.rampPct {
+  color: var(--ac);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rampHardness input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: var(--tap);
+  margin: 0;
+  background: transparent;
   cursor: pointer;
 }
-.rampStrength label:hover,
-.rampStrength label:has(input:checked) {
-  background: var(--pa);
+.rampHardness input[type="range"]:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
 }
-.rampStrength label:has(input:checked) {
-  font-weight: 700;
+.rampHardness input[type="range"]:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.rampHardness input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.55rem;
+  border-radius: 1rem;
+  background:
+    linear-gradient(90deg, var(--ac) var(--p), transparent var(--p)),
+    linear-gradient(90deg, #6e4a3a, var(--ac));
+}
+.rampHardness input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: -0.48rem;
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  background: var(--fg);
+}
+.rampHardness input[type="range"]::-moz-range-track {
+  height: 0.55rem;
+  border-radius: 1rem;
+  background: linear-gradient(90deg, #6e4a3a, var(--ac));
+}
+.rampHardness input[type="range"]::-moz-range-progress {
+  height: 0.55rem;
+  border-radius: 1rem;
+  background: var(--ac);
+}
+.rampHardness input[type="range"]::-moz-range-thumb {
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  background: var(--fg);
 }
 .rampChoice label:has(input:disabled) {
   cursor: default;

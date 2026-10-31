@@ -98,7 +98,8 @@ inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
     SF(75, autoTareOutsideBrew), SF(76, ntpSyncEnabled),
     SF(77, scheduledRestartEnabled), SF(78, scheduledRestartMinuteOfDay),
     SF(79, fastRampMs), SF(80, slowRampMs), SF(81, fastCurve), SF(82, fastCurveHardness),
-    SF(83, slowCurve), SF(84, slowCurveHardness), SF(85, heroCardMode)};
+    SF(83, slowCurve), SF(84, slowCurveHardness), SF(85, heroCardMode),
+    SF(86, fastCurveHardnessPct), SF(87, slowCurveHardnessPct)};
 #undef SF
 
 #define SF(tag, member) OBBW_SETTINGS_FIELD(tag, ShotPreset, member)
@@ -111,7 +112,7 @@ inline constexpr SettingsField SETTINGS_PRESET_FIELDS[] = {
     SF(19, grindHintsEnabled), SF(20, bbwEwmaAlpha), SF(21, bbwAlphaLearned),
     SF(22, bbwAlphaBaseline), SF(23, lineaMicraBrewTargetDeciC), SF(24, fastRampMs),
     SF(25, slowRampMs), SF(26, fastCurve), SF(27, fastCurveHardness), SF(28, slowCurve),
-    SF(29, slowCurveHardness)};
+    SF(29, slowCurveHardness), SF(30, fastCurveHardnessPct), SF(31, slowCurveHardnessPct)};
 #undef SF
 
 // The bank's preset count is the number of preset groups.
@@ -200,9 +201,9 @@ constexpr size_t settingsFieldBytes(const SettingsField (&fields)[N]) {
   return bytes;
 }
 
-static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 24 == sizeof(RuntimeConfig),
+static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 22 == sizeof(RuntimeConfig),
               "every RuntimeConfig member needs a settings field row");
-static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 1 == sizeof(ShotPreset),
+static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 3 == sizeof(ShotPreset),
               "every ShotPreset member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_PRESET_BANK_FIELDS) +
                       sizeof(ShotPresetBank::count) + sizeof(ShotPresetBank::presets) + 1 ==

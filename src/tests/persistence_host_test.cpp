@@ -2958,11 +2958,74 @@ void p91c_preset_transitions_repair_out_of_range() {
   bank.presets[1].fastRampMs = 0;
   bank.presets[1].slowCurve = RAMP_CURVE_LATE;
   bank.presets[1].slowCurveHardness = RAMP_HARDNESS_HARD;
+  bank.presets[1].slowCurveHardnessPct = rampHardnessPctOf(RAMP_HARDNESS_HARD);
   ensureShotPresetBank(bank, DEFAULT_RETARE_WINDOW_MS, true);
   CHECK(p.fastRampMs == DEFAULT_RAMP_MS && p.slowRampMs == DEFAULT_RAMP_MS);
   CHECK(p.fastCurve == RAMP_CURVE_EVEN && p.slowCurveHardness == RAMP_HARDNESS_SOFT);
   CHECK(bank.presets[1].fastRampMs == 0 && bank.presets[1].slowCurve == RAMP_CURVE_LATE &&
         bank.presets[1].slowCurveHardness == RAMP_HARDNESS_HARD);
+  // A valid pct refreshes the legacy enum mirror to the nearest level.
+  p.fastCurveHardnessPct = 149;
+  p.fastCurveHardness = RAMP_HARDNESS_HARD;
+  ensureShotPresetBank(bank, DEFAULT_RETARE_WINDOW_MS, true);
+  CHECK(p.fastCurveHardness == RAMP_HARDNESS_MEDIUM && p.fastCurveHardnessPct == 149);
+}
+
+// A pre-continuous settings blob (no pct fields) keeps the defaults' UNSET
+// sentinel, the sanitize pass derives it from the legacy enum, and the cut
+// line is then bit-identical to the legacy integer curve the old image drew.
+void p91d_legacy_blob_derives_identical_curve() {
+  // The body a pre-continuous image wrote: enum hardness, never pct.
+  const std::vector<uint8_t> body = {
+      SETTINGS_GROUP_PRESET, 23,
+      1, 1, 7,                                    // id
+      2, 6, 'L', 'e', 'g', 'a', 'c', 'y',         // name
+      26, 1, RAMP_CURVE_LATE,                     // fastCurve
+      27, 1, RAMP_HARDNESS_HARD,                  // fastCurveHardness
+      28, 1, RAMP_CURVE_EARLY,                    // slowCurve
+      29, 1, RAMP_HARDNESS_MEDIUM};               // slowCurveHardness
+  const std::vector<uint8_t> blob = settingsBlobWithBody(body);
+  PersistedSettings settings;
+  uint32_t malformed = 0;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), settings, malformed) &&
+        malformed == 0);
+  ShotPreset &decoded = settings.presets.presets[0];
+  CHECK(decoded.fastCurveHardnessPct == RAMP_HARDNESS_PCT_UNSET &&
+        decoded.slowCurveHardnessPct == RAMP_HARDNESS_PCT_UNSET);
+  ensureShotPresetBank(settings.presets, DEFAULT_RETARE_WINDOW_MS, true);
+  CHECK(decoded.fastCurveHardnessPct == 200 && decoded.slowCurveHardnessPct == 100);
+  RuntimeConfig config;
+  applyShotPresetToConfig(decoded, config);
+  corridor::Params p;
+  p.goalDg = config.goalWeightDg;
+  p.fastMarginDg = config.fastMarginDg;
+  p.slowMarginDg = config.slowMarginDg;
+  p.fastOn = p.slowOn = true;
+  p.delayMs = config.bbwProtectionMs;
+  p.fastBeforeMs = config.fastBeforeMs;
+  p.slowAfterMs = config.slowAfterMs;
+  p.wallMs = config.operationalWallMs;
+  p.fastRampMs = p.slowRampMs = MAX_RAMP_MS;
+  p.fastCurve = corridor::rampCurveIndex(config.fastCurve, config.fastCurveHardness);
+  p.slowCurve = corridor::rampCurveIndex(config.slowCurve, config.slowCurveHardness);
+  p.fastCurveHardnessPct = config.fastCurveHardnessPct;
+  p.slowCurveHardnessPct = config.slowCurveHardnessPct;
+  // The legacy line composed straight from rampDg at the stored index.
+  const int32_t a = corridor::fastRampStartMs(p), b = corridor::slowRampEndMs(p);
+  for (int32_t t = p.delayMs; t <= p.wallMs; t += 997) {
+    int32_t legacy = p.goalDg;
+    if (t < p.fastBeforeMs) {
+      legacy = t < a ? p.goalDg + p.fastMarginDg
+                     : p.goalDg + corridor::rampDg(p.fastMarginDg, t - a,
+                                                   p.fastBeforeMs - a, p.fastCurve, false);
+    } else if (t > p.slowAfterMs && t < b) {
+      legacy = p.goalDg - corridor::rampDg(p.slowMarginDg, t - p.slowAfterMs,
+                                           b - p.slowAfterMs, p.slowCurve, true);
+    } else if (t >= b) {
+      legacy = p.goalDg - p.slowMarginDg;
+    }
+    CHECK(corridor::cutLineDg(p, t) == legacy);
+  }
 }
 
 void p91b_settings_codec_round_trips_and_evolves() {
@@ -3323,6 +3386,7 @@ const TestCase tests[] = {
     {"P73", p73_factory_intent_does_not_free_data_for_other_failures},
     {"P74", p74_factory_intent_second_failure_keeps_settings},
     {"P91C", p91c_preset_transitions_repair_out_of_range},
+    {"P91D", p91d_legacy_blob_derives_identical_curve},
     {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},

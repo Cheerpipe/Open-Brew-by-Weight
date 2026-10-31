@@ -82,7 +82,7 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
   const int bytes = snprintf(work.jsonItem, NetworkWorkBuf::kJsonItem,
       "[%lu,%lu,%lu,%s,%lu,%lu,%d,%.1f,%u,\"%s\",\"%s\",%.1f,%s,%.2f,\"%s\",%s,"
       "%s,%s,%s,%u,%.1f,%.2f,%s,%s,\"%s\",\"%s\",%s,%s,%s,%s,\"%s\",%s,%s,%s,%s,"
-      "%s,%s,%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,\"%s\",\"%s\",\"%s\",\"%s\",%s,"
+      "%s,%s,%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,\"%s\",\"%s\",%.1f,%.1f,%s,"
       "\"%s\",%u,%s,{%s}]",
       static_cast<unsigned long>(record.id),
       static_cast<unsigned long>(record.bootId),
@@ -122,8 +122,9 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
       shotLogSlowRampDs(record) / 10.0,
       rampCurveName(corridor::rampCurveTypeOf(record.fastCurve)),
       rampCurveName(corridor::rampCurveTypeOf(record.slowCurve)),
-      rampHardnessName(corridor::rampCurveHardnessOf(record.fastCurve)),
-      rampHardnessName(corridor::rampCurveHardnessOf(record.slowCurve)), dripDelay,
+      // The stored snapshot keeps the nearest curve (shot-log schema).
+      rampHardnessPctOf(corridor::rampCurveHardnessOf(record.fastCurve)) / 2.0,
+      rampHardnessPctOf(corridor::rampCurveHardnessOf(record.slowCurve)) / 2.0, dripDelay,
       actualWeightSourceName(static_cast<ActualWeightSource>(record.actualWeightSource)),
       static_cast<unsigned>(shotLogRating(record.sideFlags)), bad,
       curveJson);

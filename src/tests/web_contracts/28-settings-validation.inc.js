@@ -34,6 +34,8 @@
     slowMarginG: ['number', '0.1', '3'],
     fastRampS: ['number', '0.5', '5'],
     slowRampS: ['number', '0.5', '5'],
+    fastCurveHardness: ['number', '0.5', '62.5'],
+    slowCurveHardness: ['number', '0.5', '0'],
     scaleLossFixedS: ['number', '0.1', ''],
     retareWindowS: ['number', '0.1', '5'],
     fastExtractionGuardEnabled: ['checkbox', '', true],
@@ -139,6 +141,24 @@
   svOne(svValidate((f) => {
     f.scaleLossFixedS.value = '5';
   }), 'scaleLossFixedS', 'Backup stop time (s) must be from 12 to 45 s.');
+
+  // (f2) Continuous hardness is a 0..100 percent on the 0.5 grid the firmware
+  // stores (hundredths of hardness); the slider clamps, the field validates.
+  svAssert.deepEqual(svValidate((f) => {
+    f.fastCurveHardness.value = '87.5';
+  }).errors, []);
+  svOne(svValidate((f) => {
+    f.fastCurveHardness.value = '100.5';
+  }), 'fastCurveHardness', 'Curve hardness (%) must be from 0 to 100 %.');
+  svOne(svValidate((f) => {
+    f.fastCurveHardness.value = '62.3';
+  }), 'fastCurveHardness',
+  'Curve hardness (%) must be from 0 to 100 % in 0.5 steps.');
+  svAssert.deepEqual(svValidate((f) => {
+    f.fastExtractionGuardEnabled.checked = false;
+    f.fastCurveHardness.value = '101';
+  }).errors, [],
+  'A disabled guard stops validating its hardness, like its margin');
 
   // (h) The retare floor rule shows its computation when auto-retare is on and
   // states the bare bound when it is off.

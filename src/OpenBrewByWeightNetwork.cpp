@@ -639,6 +639,31 @@ bool jsonRampChoice(cJSON *object, const char *name, const char *(*nameOf)(uint8
   return false;
 }
 
+// Continuous hardness: a JSON number 0-100 (percent, one decimal) into the
+// level mirror and hundredths-of-hardness pct. The legacy soft/medium/hard
+// strings stay readable for one firmware cycle for older local scripts.
+bool jsonRampHardness(cJSON *object, const char *name, uint8_t &level, uint8_t &pct) {
+  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+  if (cJSON_IsString(item) && item->valuestring != nullptr) {
+    for (uint8_t i = 0; i < RAMP_HARDNESS_LEVELS; ++i) {
+      if (strcmp(item->valuestring, rampHardnessName(i)) == 0) {
+        level = i;
+        pct = rampHardnessPctOf(i);
+        return true;
+      }
+    }
+    return false;
+  }
+  if (!cJSON_IsNumber(item) || !std::isfinite(item->valuedouble) ||
+      item->valuedouble < -1e-9 || item->valuedouble > 100.0 + 1e-9) {
+    return false;
+  }
+  const long hundredths = lround(item->valuedouble * 2.0);
+  pct = static_cast<uint8_t>(hundredths < 0 ? 0 : hundredths > 200 ? 200 : hundredths);
+  level = rampNearestHardness(pct);
+  return true;
+}
+
 // The Web UI hero card style by its wire name (heroCardModeId); the index is
 // the stored value.
 bool jsonHeroCardMode(cJSON *object, const char *name, uint8_t &output) {
@@ -1294,7 +1319,7 @@ bool buildSlimPresetsJson(const char *lead = "") {
         "\"fastExtractionGuardEnabled\":%s,\"slowExtractionGuardEnabled\":%s,"
         "\"grindHintsEnabled\":%s,\"lineaMicraBrewTargetC\":%.1f,"
         "\"fastRampS\":%.1f,\"slowRampS\":%.1f,\"fastCurve\":\"%s\",\"slowCurve\":\"%s\","
-        "\"fastCurveHardness\":\"%s\",\"slowCurveHardness\":\"%s\"",
+        "\"fastCurveHardness\":%.1f,\"slowCurveHardness\":%.1f",
         i == 0 ? "" : ",", static_cast<unsigned>(p.id), safeName,
         p.isFactory ? "true" : "false", p.brewByWeight ? "true" : "false",
         static_cast<double>(goalWeightDgToGrams(p.doseDg)),
@@ -1309,7 +1334,8 @@ bool buildSlimPresetsJson(const char *lead = "") {
         p.grindHintsEnabled ? "true" : "false",
         static_cast<double>(p.lineaMicraBrewTargetDeciC) / 10.0, p.fastRampMs / 1000.0,
         p.slowRampMs / 1000.0, rampCurveName(p.fastCurve), rampCurveName(p.slowCurve),
-        rampHardnessName(p.fastCurveHardness), rampHardnessName(p.slowCurveHardness));
+        rampHardnessPercent(p.fastCurveHardnessPct, p.fastCurveHardness),
+        rampHardnessPercent(p.slowCurveHardnessPct, p.slowCurveHardness));
     if (n < 0 || static_cast<size_t>(n) >= cap - used) {
       break;
     }

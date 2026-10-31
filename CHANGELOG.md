@@ -31,6 +31,11 @@ exported JSON formats are not carried over.
   cut line now follows the shot's own pace. It bends upward while the flow
   speeds up and its ring marks where the controller expects the shot to land,
   so the estimate no longer reads late on shots that accelerate as they go.
+- **Continuous curve hardness:** the transition curve of Fast and Slow shots
+  is no longer three fixed levels. A slider from **Gentle** to **Firm** sets
+  how marked the curve is, and every graph draws the exact cut line you
+  chose. Presets saved with the old Soft, Medium or Hard levels brew exactly
+  as before.
 - **JSON export:** one format, version 1, replaces the formats shipped up to
   1.1.0.
 

@@ -2699,9 +2699,11 @@ const BREW_CONTROL_IDS = [
   "fastRampS",
   "fastCurve",
   "fastCurveHardness",
+  "fastCurveHardnessRange",
   "slowRampS",
   "slowCurve",
   "slowCurveHardness",
+  "slowCurveHardnessRange",
   "grindHintsEnabled",
   "scaleLossFixedS",
   "lineaMicraBrewTargetC",
@@ -3489,11 +3491,17 @@ function buildRuleChartModel(c) {
     ],
   };
 }
-// Index of a side's transition curve in RAMP_CURVES: type * 3 + hardness; NaN if unknown.
+// Index of a side's transition curve in RAMP_CURVES: type * 3 + hardness; NaN
+// if unknown. Hardness is the wire percent 0..100 (one decimal) or a legacy
+// level name; a fractional index means continuous hardness between the two
+// adjacent integer curves.
 function rampCurveIndex(type, hardness) {
-  const t = ["even", "early", "late"].indexOf(type),
-    h = ["soft", "medium", "hard"].indexOf(hardness);
-  return t < 0 || h < 0 ? NaN : t * 3 + h;
+  const t = ["even", "early", "late"].indexOf(type);
+  if (t < 0) return NaN;
+  const pct = +hardness;
+  if (Number.isFinite(pct)) return t * 3 + Math.min(2, Math.max(0, pct / 50));
+  const h = ["soft", "medium", "hard"].indexOf(hardness);
+  return h < 0 ? NaN : t * 3 + h;
 }
 // Transition curves e(u) = I(u; a, b), the regularized incomplete beta, as the
 // firmware's corridor::RAMP_CURVES; index 0 (even, soft) is smoothstep. Every
@@ -3509,8 +3517,16 @@ const RAMP_CURVES = [
   [4, 2],
   [6, 2],
 ];
-// e(u) for drawing (Number); the cut weights come from rampDg.
+// e(u) for drawing (Number); the cut weights come from rampDg. A fractional
+// curve index blends the two adjacent integer curves of the same type, so
+// integers keep the plain path and the endpoints stay bit-identical.
 function rampEase(curve, u) {
+  const lo = Math.floor(curve),
+    f = curve - lo;
+  if (f > 0) {
+    const e = rampEase(lo, u);
+    return e + (rampEase(lo + 1, u) - e) * f;
+  }
   const [a, b] = RAMP_CURVES[curve],
     n = a + b - 1;
   let e = 0,
@@ -3523,8 +3539,16 @@ function rampEase(curve, u) {
 }
 // The firmware's corridor::rampDg, exactly: floor(margin * e(n / d)) when
 // `reached`, else floor(margin * (1 - e)), from the Bernstein sum over d^N.
-// The products reach 2^100, hence BigInt.
+// The products reach 2^100, hence BigInt. A fractional curve index takes the
+// firmware's rampDgBlend: both integer terms, one fixed-point rounding.
 function rampDg(margin, n, d, curve, reached) {
+  const lo = Math.floor(curve),
+    f = Math.round((curve - lo) * 100);
+  if (f > 0) {
+    const a = rampDg(margin, n, d, lo, reached),
+      b = rampDg(margin, n, d, lo + 1, reached);
+    return Math.floor((a * (100 - f) + b * f + 50) / 100);
+  }
   const [a, b] = RAMP_CURVES[curve],
     deg = a + b - 1,
     big = BigInt;
@@ -6291,7 +6315,8 @@ function loadSettingsConfig({ config: c, quickRevert }) {
   for (const side of ["fast", "slow"]) {
     $(side + "RampS").value = (+(c[side + "RampS"] ?? 5)).toFixed(1);
     $(side + "Curve").value = c[side + "Curve"] || "even";
-    $(side + "CurveHardness").value = c[side + "CurveHardness"] || "soft";
+    // Wire hardness is a percent number; the hidden field holds the 0.5 grid.
+    $(side + "CurveHardness").value = String(Math.round((+c[side + "CurveHardness"] || 0) * 2) / 2);
   }
   $("scaleLossFixedS").value = c.scaleLossFixedS > 0 ? String(c.scaleLossFixedS) : "";
   // The baseline is the device; an edit the device now holds is settled.

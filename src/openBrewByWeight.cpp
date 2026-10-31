@@ -372,6 +372,7 @@ struct PendingShotFinalize {
   uint32_t wallMs = DEFAULT_OPERATIONAL_WALL_MS;
   uint32_t fastRampMs = 0, slowRampMs = 0;
   uint8_t fastCurve = 0, slowCurve = 0;  // corridor::RAMP_CURVES index
+  uint8_t fastCurveHardnessPct = 0, slowCurveHardnessPct = 0;
   int32_t rateAtStopX100 = 0;  // q-hat at the stop command; 0 = invalid.
   bool channeling = false;
   uint8_t scaleLossSource = 0;

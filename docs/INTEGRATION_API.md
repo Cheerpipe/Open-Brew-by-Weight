@@ -253,8 +253,8 @@ here to one item):
    "bbwProtectionMs":12000,"fastExtractionGuardEnabled":true,
    "slowExtractionGuardEnabled":true,"grindHintsEnabled":true,
    "lineaMicraBrewTargetC":93.0,"fastRampS":5.0,"slowRampS":5.0,
-   "fastCurve":"even","slowCurve":"even","fastCurveHardness":"soft",
-   "slowCurveHardness":"soft",
+   "fastCurve":"even","slowCurve":"even","fastCurveHardness":0.0,
+   "slowCurveHardness":0.0,
    "shotStats":{"n":5,"total":5,"minS":21.4,"maxS":34.2,"medianS":30.6},
    "firstDropS":4.9,"firstDropN":5,"arrivalsS":[21.4,29.1,30.6,32.7,34.2],
    "grindHint":null}
@@ -266,10 +266,13 @@ additive. Each side eases between the target and its extended or shortened
 cut line over its own transition: `fastRampS` before the window and
 `slowRampS` after it (0–10 s; 0 is a step), along a curve named by
 `fastCurve` / `slowCurve` (`early`, `even` or `late`: where the change is
-steepest) and `fastCurveHardness` / `slowCurveHardness` (`soft`, `medium` or
-`hard`). The curves are the regularized incomplete beta I(u; a, b) of the
-firmware's `RAMP_CURVES`, and a reader that draws the line must use the same
-exact integer law to match the stops. Earlier firmware sent one top-level
+steepest) with a continuous hardness `fastCurveHardness` /
+`slowCurveHardness`: a number 0.0–100.0 in 0.5 steps (earlier firmware sent
+the strings `soft`, `medium` or `hard`, which `SET` still accepts). The
+curves are the regularized incomplete beta I(u; a, b) of the firmware's
+`RAMP_CURVES`, blended between the two adjacent integer curves at a
+fractional hardness; a reader that draws the line must use the same exact
+integer law to match the stops. Earlier firmware sent one top-level
 `cutRampS` for both sides instead. The rule fields mirror the preset
 editor: the on-recipe window runs from `fastBeforeS` to `slowAfterS`, the
 cut line is raised by `fastMarginG` before it and lowered by `slowMarginG`

@@ -148,6 +148,8 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   pendingFinalize.slowRampMs = static_cast<uint32_t>(session.cut.params.slowRampMs);
   pendingFinalize.fastCurve = session.cut.params.fastCurve;
   pendingFinalize.slowCurve = session.cut.params.slowCurve;
+  pendingFinalize.fastCurveHardnessPct = session.cut.params.fastCurveHardnessPct;
+  pendingFinalize.slowCurveHardnessPct = session.cut.params.slowCurveHardnessPct;
   pendingFinalize.rateAtStopX100 =
       session.cut.rate.valid ? session.cut.rate.rateX100 : 0;
   pendingFinalize.channeling = session.cut.rate.channeling;
@@ -204,6 +206,8 @@ corridor::Params pendingCutParams(const PendingShotFinalize &snapshot) {
   p.slowRampMs = static_cast<int32_t>(snapshot.slowRampMs);
   p.fastCurve = snapshot.fastCurve;
   p.slowCurve = snapshot.slowCurve;
+  p.fastCurveHardnessPct = snapshot.fastCurveHardnessPct;
+  p.slowCurveHardnessPct = snapshot.slowCurveHardnessPct;
   return p;
 }
 

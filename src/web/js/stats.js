@@ -1566,7 +1566,12 @@ function shotJson(r, trace) {
     n = (v) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v * 100) / 100 : null),
     pos = (v) => (v > 0 ? v : null),
     event = (s, cg) => (s == null || cg == null ? null : { atS: s, weightG: cg / 100 }),
-    guard = (enabled, marginG, extended) => ({ enabled: !!enabled, marginG, extended: !!extended });
+    guard = (enabled, marginG, extended) => ({ enabled: !!enabled, marginG, extended: !!extended }),
+    // The v1 export keeps the legacy hardness names; the Stats row carries
+    // the wire percent (whole levels only: a stored shot keeps its nearest
+    // curve).
+    hardness = (v) =>
+      ["soft", "medium", "hard"][Math.min(2, Math.max(0, Math.round((+v || 0) / 50)))];
   return {
     id: r.id,
     bootId: r.bootId,
@@ -1622,8 +1627,8 @@ function shotJson(r, trace) {
       slowRampS: r.slowRampS,
       fastCurve: r.fastCurve,
       slowCurve: r.slowCurve,
-      fastCurveHardness: r.fastCurveHardness,
-      slowCurveHardness: r.slowCurveHardness,
+      fastCurveHardness: hardness(r.fastCurveHardness),
+      slowCurveHardness: hardness(r.slowCurveHardness),
       maxTimeS: r.wallS,
       dripDelayS: r.dripDelayS ?? null,
     },

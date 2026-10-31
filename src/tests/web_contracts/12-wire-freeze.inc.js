@@ -57,4 +57,17 @@
   const header = statsJs.match(/async function exportShotsCsv\(\)[\s\S]*?const rows = \[\s*\[([\s\S]*?)\.\.\.Array/)[1];
   same([...header.matchAll(/"([a-z0-9_ ]+)"/g)].flatMap((m) => m[1].split(" ")).filter(Boolean),
        frozen.statsCsvColumns, 'Stats CSV columns');
+
+  // Continuous hardness wire schema: GET/renders emit a percent number (one
+  // decimal) and SET parses the number, still reading the legacy
+  // soft/medium/hard strings for one firmware cycle.
+  const networkCpp = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.cpp'), 'utf8');
+  const configurationInc = fs.readFileSync(
+      path.join(sketchDir, 'network', 'OpenBrewByWeightConfiguration.inc'), 'utf8');
+  if (!networkCpp.includes('\\"fastCurveHardness\\":%.1f') ||
+      !networkCpp.includes('bool jsonRampHardness(') ||
+      !networkCpp.includes('rampHardnessName(i)) == 0') ||
+      !configurationInc.includes('jsonRampHardness(root, "fastCurveHardness"') ||
+      !configurationInc.includes('jsonRampHardness(root, "slowCurveHardness"'))
+    throw new Error('Curve hardness must be a percent number on the wire with a tolerant legacy-string SET');
 }

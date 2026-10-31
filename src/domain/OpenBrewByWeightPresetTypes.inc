@@ -34,6 +34,10 @@ struct ShotPreset {
   uint8_t fastCurveHardness = RAMP_HARDNESS_SOFT;
   uint8_t slowCurve = RAMP_CURVE_EVEN;
   uint8_t slowCurveHardness = RAMP_HARDNESS_SOFT;
+  // Continuous hardness per side (hundredths, 0..200; UNSET until migrated
+  // from the legacy enum above by the preset sanitize pass).
+  uint8_t fastCurveHardnessPct = RAMP_HARDNESS_PCT_UNSET;
+  uint8_t slowCurveHardnessPct = RAMP_HARDNESS_PCT_UNSET;
 };
 
 struct ShotPresetBank {

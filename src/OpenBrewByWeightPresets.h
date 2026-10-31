@@ -12,6 +12,8 @@ inline void fillDoubleFirmwareDefaults(ShotPreset &preset) {
   preset = ShotPreset{};
   preset.weightOffsetBaselineG = DEFAULT_WEIGHT_OFFSET_G;
   preset.bbwEwmaOffsetG = DEFAULT_WEIGHT_OFFSET_G;
+  preset.fastCurveHardnessPct = rampHardnessPctOf(RAMP_HARDNESS_SOFT);
+  preset.slowCurveHardnessPct = rampHardnessPctOf(RAMP_HARDNESS_SOFT);
 }
 
 // Cold path (seed, restore, repair, boot upgrade): kept out of line for flash.
@@ -210,8 +212,18 @@ inline void ensureShotPresetBank(ShotPresetBank &bank,
       if (*ramp > MAX_RAMP_MS || *ramp % RAMP_STEP_MS != 0) *ramp = DEFAULT_RAMP_MS;
     for (uint8_t *curve : {&preset.fastCurve, &preset.slowCurve})
       if (*curve >= RAMP_CURVE_TYPES) *curve = RAMP_CURVE_EVEN;
-    for (uint8_t *hardness : {&preset.fastCurveHardness, &preset.slowCurveHardness})
-      if (*hardness >= RAMP_HARDNESS_LEVELS) *hardness = RAMP_HARDNESS_SOFT;
+    // Continuous hardness: a pct a pre-continuous image never wrote (or a bad
+    // value) derives from its legacy enum; a valid pct refreshes the enum
+    // mirror to the nearest level, so both stay consistent and an OTA
+    // downgrade still reads a sane enum.
+    for (auto &side : {std::pair(&preset.fastCurveHardness, &preset.fastCurveHardnessPct),
+                       std::pair(&preset.slowCurveHardness, &preset.slowCurveHardnessPct)}) {
+      if (*side.first >= RAMP_HARDNESS_LEVELS) *side.first = RAMP_HARDNESS_SOFT;
+      if (*side.second > RAMP_HARDNESS_PCT_MAX)
+        *side.second = rampHardnessPctOf(*side.first);
+      else
+        *side.first = rampNearestHardness(*side.second);
+    }
     if (!std::isfinite(preset.weightOffsetBaselineG) ||
         preset.weightOffsetBaselineG < 0.0f ||
         preset.weightOffsetBaselineG > MAX_OFFSET_G) {
@@ -299,8 +311,10 @@ inline void applyShotPresetToConfig(const ShotPreset &preset,
   config.slowRampMs = preset.slowRampMs;
   config.fastCurve = preset.fastCurve;
   config.fastCurveHardness = preset.fastCurveHardness;
+  config.fastCurveHardnessPct = preset.fastCurveHardnessPct;
   config.slowCurve = preset.slowCurve;
   config.slowCurveHardness = preset.slowCurveHardness;
+  config.slowCurveHardnessPct = preset.slowCurveHardnessPct;
   config.scaleLossFixedMs = preset.scaleLossFixedMs;
   config.timerOnly = !preset.brewByWeight;
 }
@@ -342,10 +356,16 @@ inline void copyUserRecipeFromConfig(const RuntimeConfig &config,
   if (fields & PRESET_RECIPE_SCALE_LOSS_FIXED) preset.scaleLossFixedMs = config.scaleLossFixedMs;
   if (fields & PRESET_RECIPE_FAST_RAMP) preset.fastRampMs = config.fastRampMs;
   if (fields & PRESET_RECIPE_FAST_CURVE) preset.fastCurve = config.fastCurve;
-  if (fields & PRESET_RECIPE_FAST_CURVE_HARDNESS) preset.fastCurveHardness = config.fastCurveHardness;
+  if (fields & PRESET_RECIPE_FAST_CURVE_HARDNESS) {
+    preset.fastCurveHardness = config.fastCurveHardness;
+    preset.fastCurveHardnessPct = config.fastCurveHardnessPct;
+  }
   if (fields & PRESET_RECIPE_SLOW_RAMP) preset.slowRampMs = config.slowRampMs;
   if (fields & PRESET_RECIPE_SLOW_CURVE) preset.slowCurve = config.slowCurve;
-  if (fields & PRESET_RECIPE_SLOW_CURVE_HARDNESS) preset.slowCurveHardness = config.slowCurveHardness;
+  if (fields & PRESET_RECIPE_SLOW_CURVE_HARDNESS) {
+    preset.slowCurveHardness = config.slowCurveHardness;
+    preset.slowCurveHardnessPct = config.slowCurveHardnessPct;
+  }
 }
 
 inline bool allocateShotPresetId(ShotPresetBank &bank, uint8_t &outId) {

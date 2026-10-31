@@ -164,7 +164,7 @@ reported only after the Micra dashboard confirms the same temperature.
 | Shot time window | 27–36 s | 23–32 s | 27–36 s | 23–32 s |
 | Extend fast shots: extend by up to | 6 g (42 g) | 3 g (21 g) | off (6 g saved) | off (4 g saved) |
 | Shorten slow shots: shorten by up to | 3 g (33 g) | 1.5 g (16.5 g) | off (3 g saved) | off (1.5 g saved) |
-| Fast and slow transitions | 6 s, Soft: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Soft (saved) | 5 s, Even, Soft (saved) |
+| Fast and slow transitions | 6 s, Gentle: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) |
 | Expected drip weight after the shot stops | 0.5 g | 0.5 g | 0.5 g | 0.5 g |
 
 All four start with brew by weight and grind hints on, Max shot time 50 s,

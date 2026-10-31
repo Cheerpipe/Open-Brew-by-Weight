@@ -1690,6 +1690,14 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
       live.dSlow !== 2 || live.curveFast !== 8 || live.curveSlow !== 0 || live.prot !== 5 ||
       live.wall !== 30)
     throw new Error('A Stats shot must chart its own stored snapshot');
+  // Continuous hardness: the wire percent maps to a fractional curve index
+  // (percent / 50 within the side's type), legacy names still map exactly.
+  const fr = shotRuleModel({...row, fastCurveHardness: 87.5, slowCurveHardness: 50});
+  if (fr.curveFast !== 7.75 || fr.curveSlow !== 1)
+    throw new Error('A fractional hardness must chart the blended curve index');
+  if (shotRuleModel({...row, fastCurveHardness: 0}).curveFast !== 6 ||
+      shotRuleModel({...row, fastCurveHardness: 100}).curveFast !== 8)
+    throw new Error('Whole hardness percents must map to the exact integer curves');
   const timer = shotRuleModel({...row, shotType: 'timer_only'});
   if (timer.mode !== 'timerOnly' || timer.fast || timer.slow)
     throw new Error('Timer-only shots must draw every cut segment off');

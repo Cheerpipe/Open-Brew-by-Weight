@@ -94,6 +94,8 @@ void armSmoothCut(uint16_t sensorLagMs) {
       corridor::rampCurveIndex(session.config.fastCurve, session.config.fastCurveHardness);
   cut.params.slowCurve =
       corridor::rampCurveIndex(session.config.slowCurve, session.config.slowCurveHardness);
+  cut.params.fastCurveHardnessPct = session.config.fastCurveHardnessPct;
+  cut.params.slowCurveHardnessPct = session.config.slowCurveHardnessPct;
   cut.tauMs = corridor::tauMs(sensorLagMs, machineStopCommandLatencyMs());
   cut.offsetDg = gramsToDg(session.config.weightOffsetG);
 }

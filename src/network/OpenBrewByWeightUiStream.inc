@@ -819,7 +819,7 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
              "{\"fastBeforeS\":%s,\"slowAfterS\":%s,\"fastMarginG\":%s,"
              "\"slowMarginG\":%s,\"delayS\":%s,\"wallS\":%s,\"fastRampS\":%s,"
              "\"slowRampS\":%s,\"fastCurve\":\"%s\",\"slowCurve\":\"%s\","
-             "\"fastCurveHardness\":\"%s\",\"slowCurveHardness\":\"%s\","
+             "\"fastCurveHardness\":%.1f,\"slowCurveHardness\":%.1f,"
              "\"extractionGuardEnabled\":%s,\"slowExtractionGuardEnabled\":%s}",
              FixedText(latest.fastBeforeDs, 1).text, FixedText(latest.slowAfterDs, 1).text,
              FixedText(latest.fastMarginDg, 1).text, FixedText(latest.slowMarginDg, 1).text,
@@ -827,8 +827,9 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
              FixedText(latest.cutRampDs, 1).text, FixedText(shotLogSlowRampDs(latest), 1).text,
              rampCurveName(corridor::rampCurveTypeOf(latest.fastCurve)),
              rampCurveName(corridor::rampCurveTypeOf(latest.slowCurve)),
-             rampHardnessName(corridor::rampCurveHardnessOf(latest.fastCurve)),
-             rampHardnessName(corridor::rampCurveHardnessOf(latest.slowCurve)),
+             // The stored snapshot keeps the nearest curve (shot-log schema).
+             rampHardnessPctOf(corridor::rampCurveHardnessOf(latest.fastCurve)) / 2.0,
+             rampHardnessPctOf(corridor::rampCurveHardnessOf(latest.slowCurve)) / 2.0,
              shotLogFastGuardEnabled(latest.sideFlags) ? "true" : "false",
              shotLogSlowGuardEnabled(latest.sideFlags) ? "true" : "false");
     if (latest.cutLineCg > 0 &&

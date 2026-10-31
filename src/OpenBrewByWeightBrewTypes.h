@@ -90,6 +90,18 @@ constexpr uint8_t RAMP_HARDNESS_SOFT = 0;
 constexpr uint8_t RAMP_HARDNESS_MEDIUM = 1;
 constexpr uint8_t RAMP_HARDNESS_HARD = 2;
 constexpr uint8_t RAMP_HARDNESS_LEVELS = 3;
+// Continuous hardness: hundredths of hardness, 0..200 (soft 0, medium 100,
+// hard 200). UNSET marks a value not yet migrated from the legacy enum.
+constexpr uint8_t RAMP_HARDNESS_PCT_MAX = 200;
+constexpr uint8_t RAMP_HARDNESS_PCT_UNSET = 0xFF;
+inline uint8_t rampHardnessPctOf(uint8_t level) {
+  return level < RAMP_HARDNESS_LEVELS ? static_cast<uint8_t>(level * 100) : 0;
+}
+// The legacy level nearest a valid pct (0..49 soft, 50..149 medium, 150..200 hard).
+inline uint8_t rampNearestHardness(uint8_t pct) {
+  const uint16_t level = (static_cast<uint16_t>(pct) + 50) / 100;
+  return static_cast<uint8_t>(level < RAMP_HARDNESS_LEVELS ? level : RAMP_HARDNESS_HARD);
+}
 // Wire names of the transition curve type and hardness.
 inline const char *rampCurveName(uint8_t type) {
   return type == RAMP_CURVE_EARLY ? "early" : type == RAMP_CURVE_LATE ? "late" : "even";
@@ -98,6 +110,15 @@ inline const char *rampHardnessName(uint8_t hardness) {
   return hardness == RAMP_HARDNESS_MEDIUM ? "medium"
          : hardness == RAMP_HARDNESS_HARD ? "hard"
                                           : "soft";
+}
+// The nearest legacy level of a pct/enum pair; an UNSET pct keeps its level.
+inline uint8_t rampNearestHardnessOf(uint8_t pct, uint8_t level) {
+  return pct > RAMP_HARDNESS_PCT_MAX ? level : rampNearestHardness(pct);
+}
+// Wire hardness of a pct/enum pair: percent 0..100 (one decimal), an UNSET
+// pct falling back to its legacy level's percent.
+inline double rampHardnessPercent(uint8_t pct, uint8_t level) {
+  return (pct > RAMP_HARDNESS_PCT_MAX ? rampHardnessPctOf(level) : pct) / 2.0;
 }
 // Extra delay after the scale timer catches up to machine circuit time (whole seconds)
 // before sending STOP_TIMER. 0 stops in that same instant.

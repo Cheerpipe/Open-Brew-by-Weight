@@ -84,8 +84,12 @@ struct Params {
   int32_t wallMs = 0;
   int32_t fastRampMs = RAMP_MS;  // D before t1
   int32_t slowRampMs = RAMP_MS;  // D after t2
-  uint8_t fastCurve = 0;         // RAMP_CURVES index
+  uint8_t fastCurve = 0;         // RAMP_CURVES index (nearest hardness)
   uint8_t slowCurve = 0;
+  // Continuous hardness, hundredths of hardness 0..200 (0/100/200 = soft,
+  // medium, hard); above 200 reads as 200.
+  uint8_t fastCurveHardnessPct = 0;
+  uint8_t slowCurveHardnessPct = 0;
 };
 
 // Transition curves e(u), u in [0, 1]: the regularized incomplete beta
@@ -178,6 +182,25 @@ inline int32_t rampDg(int32_t marginDg, int32_t n, int32_t d, uint8_t curve, boo
   return static_cast<int32_t>(sum.w[0]);
 }
 
+// Continuous hardness pct (hundredths of hardness, 0..200) for curve `type`:
+// whole hardness (0/100/200) is bit-identical to the legacy rampDg of that
+// integer curve; between them the two adjacent integer terms blend in fixed
+// point with one rounding. A convex blend of monotone non-increasing terms is
+// monotone non-increasing, so crossingMs keeps its contract, and the result
+// never leaves [min(lo, hi), max(lo, hi)] + 1 dg of the ideal blend.
+inline int32_t rampDgBlend(int32_t marginDg, int32_t n, int32_t d, uint8_t type,
+                           uint16_t pct, bool reached) {
+  static_assert(2 * 100 * MAX_SIDE_MARGIN_DG + 50 <= INT32_MAX,
+                "the fixed-point blend cannot overflow int32");
+  if (pct > 200) pct = 200;
+  const uint8_t f = static_cast<uint8_t>(pct % 100);
+  const uint8_t lo = static_cast<uint8_t>(pct / 100);
+  if (f == 0) return rampDg(marginDg, n, d, rampCurveIndex(type, lo), reached);
+  const int32_t loTerm = rampDg(marginDg, n, d, rampCurveIndex(type, lo), reached);
+  const int32_t hiTerm = rampDg(marginDg, n, d, rampCurveIndex(type, lo + 1), reached);
+  return (loTerm * (100 - f) + hiTerm * f + 50) / 100;
+}
+
 inline int32_t ceilingDg(const Params &p) {
   return p.goalDg + (p.fastOn ? p.fastMarginDg : 0);
 }
@@ -204,13 +227,15 @@ inline int32_t cutLineDg(const Params &p, int32_t t) {
   if (t < p.fastBeforeMs) {
     if (t < a) return ceilingDg(p);
     return p.goalDg +
-           rampDg(ceilingDg(p) - p.goalDg, t - a, p.fastBeforeMs - a, p.fastCurve, false);
+           rampDgBlend(ceilingDg(p) - p.goalDg, t - a, p.fastBeforeMs - a,
+                       rampCurveTypeOf(p.fastCurve), p.fastCurveHardnessPct, false);
   }
   if (t < p.slowAfterMs || (t == p.slowAfterMs && p.slowRampMs > 0)) return p.goalDg;
   const int32_t b = slowRampEndMs(p);
   if (t >= b) return floorDg(p);
   return p.goalDg -
-         rampDg(p.goalDg - floorDg(p), t - p.slowAfterMs, b - p.slowAfterMs, p.slowCurve, true);
+         rampDgBlend(p.goalDg - floorDg(p), t - p.slowAfterMs, b - p.slowAfterMs,
+                     rampCurveTypeOf(p.slowCurve), p.slowCurveHardnessPct, true);
 }
 
 // EndReason of a weight cut = the segment of f that fired.
