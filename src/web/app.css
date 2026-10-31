@@ -5434,15 +5434,16 @@ html.theme-dark {
   overflow-wrap: anywhere;
 }
 
-/* One focus contract for the whole UI: every focusable element — native
-   control or [tabindex] host — hides the browser's default light-blue ring in
-   any focus state, and keyboard focus draws the accent ring. Component rules
-   only proxy the ring onto a visible wrapper (for example .rampCurves label)
-   or replace it with another affordance; they never redefine it. */
-:where(a, button, input, select, textarea, summary, [tabindex]):focus {
+/* One focus contract for the whole UI: the browser's default light-blue ring
+   never shows on any focusable element, in any focus state. The accent ring
+   is reserved for keyboard focus on native controls; [tabindex] hosts are
+   custom widgets (sliders, scrub charts, cards) that scripts also focus on
+   pointer interaction, so they never paint a ring of their own. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus,
+:where([tabindex]):focus-visible {
   outline: none;
 }
-:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+:where(a, button, input, select, textarea, summary):focus-visible {
   outline: 3px solid var(--ac);
   outline-offset: 2px;
 }
