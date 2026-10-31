@@ -3572,10 +3572,10 @@ function referencePace(t, goal, tArr, t0 = 0) {
   return goal * (2 * PACE_SOFT * u + (1 - 2 * PACE_SOFT) * u * u);
 }
 // One preset graph for Settings (review, with scrubber), for a Stats shot
-// (compact, no scrubber, no no-cut hatch; Stats adds 10 s ticks) and for the
-// live view (a given w × h, no scrubber; flow in the lower third, the current
-// point and the forecast cut). Laid out in CSS pixels from the measured width;
-// null while the host is hidden.
+// (compact, no scrubber, no no-cut hatch; Stats adds 10 s ticks), for the
+// live view (a given w × h, flow in the lower third, forecast cut) and for
+// the Technical hero (compact, tight, no-cut hatch kept). Laid out in CSS
+// pixels from the measured width; null while the host is hidden.
 function presetGraph(host, m, x = {}) {
   const {
       ghost,
@@ -3586,6 +3586,7 @@ function presetGraph(host, m, x = {}) {
       maxG = 0,
       maxT = 0,
       compact,
+      hatch,
       tens,
       tight,
       live,
@@ -3732,7 +3733,7 @@ function presetGraph(host, m, x = {}) {
     `<path class="rvPace" d="${[tA, m.t1, m.t2, tB].map((ta) => S + paceTo(ta)).join("")}"><title>${__WEBUI_TEXT__("runtime.graph_pace_title")}</title></path>` +
     "</g>" +
     marks +
-    (compact
+    (compact && !hatch
       ? ""
       : `<rect x="${L}" y="${T}" width="${f(X(m.prot) - L)}" height="${B - T}" fill="url(#${u}Hatch)"/>`) +
     `<path class="rvTarget" d="M${L} ${f(Y(m.goal))}H${R}"/><path class="rvMax" d="M${f(X(m.wall))} ${T}V${B}"/>` +
@@ -5590,6 +5591,7 @@ function renderHeroTechnicalChart(host, d, model, m) {
         : null,
     view = presetGraph(host, m, {
       compact: true,
+      hatch: true,
       tens: true,
       tight: true,
       h: 132,
@@ -5773,13 +5775,13 @@ function renderHeroChart(host, model, m, goal, label) {
           Y(m.floor),
         ),
       );
-    // The on-recipe stretch of the cut line carries the target above the
-    // line, ending a breath inside the right edge like the preset graph.
+    // The on-recipe stretch of the cut line carries the target, centered
+    // over that window and sitting just above the line.
     over.push(
       put(
-        "hold end",
+        "hold mid",
         sub(__WEBUI_TEXT__("runtime.graph_target"), [+m.goal.toFixed(1)]),
-        96.5,
+        X((m.t1 + m.t2) / 2),
         Y(m.goal),
       ),
     );

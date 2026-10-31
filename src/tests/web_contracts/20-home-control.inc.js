@@ -264,9 +264,9 @@
   if(!chartLabels.includes('Target 36 g')||!chartLabels.includes('Up to 42 g')||
       !chartLabels.includes('Down to 33 g'))
     throw new Error('The hero chart must name the target and both cut holds');
-  if(!(lookup('shotHeroSpark').kids||[]).some(x=>x.className==='hold end'&&
-      x.textContent==='Target 36 g'&&x.style.left==='96.50%'))
-    throw new Error('The hero chart target must sit above the line, inset from the right edge');
+  if(!(lookup('shotHeroSpark').kids||[]).some(x=>x.className==='hold mid'&&
+      x.textContent==='Target 36 g'&&x.style.left==='68.48%'))
+    throw new Error('The hero chart target must sit centered over the on-recipe window');
   env.model=null;env.liveRuleModel=null;
   // A finished shot reads its verdict in the label, takes its colour, and keeps a cut pill.
   const done={...card,live:false,weight:38.1,verdict:'fast',cutG:39.4};
