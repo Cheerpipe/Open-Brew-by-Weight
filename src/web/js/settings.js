@@ -688,6 +688,10 @@ async function forgetPairedScale() {
     return;
   }
   disarmForgetKey();
+  // A pending select draft would re-add the forgotten scale as a ghost
+  // option; the explicit forget voids it.
+  const sel = $("preferredScaleSelect");
+  if (sel) sel.dataset.pending = "0";
   await R.command("/api/v1/scale/preferred/clear", {});
 }
 function selectPreferredScale() {
