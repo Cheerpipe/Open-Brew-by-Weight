@@ -1391,10 +1391,17 @@ esp_err_t OpenBrewByWeightNetwork::sendJson(httpd_req_t *request,
 esp_err_t OpenBrewByWeightNetwork::sendError(httpd_req_t *request,
                                         const char *status,
                                         const char *error,
-                                        const char *message) {
+                                        const char *message,
+                                        const char *reason) {
   char body[256] = {};
-  snprintf(body, sizeof(body), "{\"error\":\"%s\",\"message\":\"%s\"}",
-           error, message);
+  if (reason != nullptr) {
+    snprintf(body, sizeof(body),
+             "{\"error\":\"%s\",\"reason\":\"%s\",\"message\":\"%s\"}", error,
+             reason, message);
+  } else {
+    snprintf(body, sizeof(body), "{\"error\":\"%s\",\"message\":\"%s\"}",
+             error, message);
+  }
   return sendJson(request, status, body);
 }
 

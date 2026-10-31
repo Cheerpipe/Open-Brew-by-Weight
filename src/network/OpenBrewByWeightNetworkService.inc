@@ -152,7 +152,8 @@ void OpenBrewByWeightNetwork::unlockJsonBody() {
 }
 
 esp_err_t OpenBrewByWeightNetwork::lockJsonBody(httpd_req_t *request,
-                                           const char *invalidMessage) {
+                                           const char *invalidMessage,
+                                           const char *reason) {
   if (!lockWorkBuf()) {
     return workBufBusy(request);
   }
@@ -161,7 +162,7 @@ esp_err_t OpenBrewByWeightNetwork::lockJsonBody(httpd_req_t *request,
     unlockJsonBody();
     if (envelopeFailed) return relayEnvelopeReject(request);
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                     invalidMessage);
+                     invalidMessage, reason);
   }
   return ESP_OK;
 }
@@ -171,8 +172,9 @@ esp_err_t OpenBrewByWeightNetwork::lockJsonBody(httpd_req_t *request,
 // {"confirm": expectedConfirmation}. Handlers keep their own error responses.
 bool OpenBrewByWeightNetwork::lockConfirmedBody(httpd_req_t *request,
                                            const char *invalidMessage,
-                                           const char *expectedConfirmation) {
-  if (lockJsonBody(request, invalidMessage) != ESP_OK) {
+                                           const char *expectedConfirmation,
+                                           const char *reason) {
+  if (lockJsonBody(request, invalidMessage, reason) != ESP_OK) {
     return false;
   }
   char confirmation[32] = {};
@@ -465,19 +467,23 @@ esp_err_t OpenBrewByWeightNetwork::runConfirmedClear(
     httpd_req_t *request, const char *lockedDetail,
     const char *expectedConfirmation, const char *notConfirmedCode,
     const char *notConfirmedDetail, bool (*clearFn)(),
-    const char *failedCode, const char *failedDetail) {
+    const char *failedCode, const char *failedDetail,
+    const char *lockedReason, const char *notConfirmedReason,
+    const char *failedReason) {
   const ControlGateSnapshot status = controlGate();
   if (!historyMutationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
-                     "CONFIG_LOCKED_DURING_ACTIVE_CYCLE", lockedDetail);
+                     "CONFIG_LOCKED_DURING_ACTIVE_CYCLE", lockedDetail,
+                     lockedReason);
   }
   if (!lockConfirmedBody(request, "An explicit confirmation is required.",
-                         expectedConfirmation)) {
+                         expectedConfirmation, "CONFIRMATION_REQUIRED")) {
     return sendError(request, STATUS_UNPROCESSABLE, notConfirmedCode,
-                     notConfirmedDetail);
+                     notConfirmedDetail, notConfirmedReason);
   }
   if (clearFn == nullptr || !clearFn()) {
-    return sendError(request, STATUS_UNAVAILABLE, failedCode, failedDetail);
+    return sendError(request, STATUS_UNAVAILABLE, failedCode, failedDetail,
+                     failedReason);
   }
   return sendJson(request, STATUS_OK, "{\"cleared\":true}");
 }
@@ -487,14 +493,19 @@ esp_err_t OpenBrewByWeightNetwork::runDeleteById(httpd_req_t *request,
                                             bool (*deleteFn)(uint32_t),
                                             const char *invalidDetail,
                                             const char *notFoundCode,
-                                            const char *notFoundDetail) {
+                                            const char *notFoundDetail,
+                                            const char *lockedReason,
+                                            const char *invalidReason,
+                                            const char *notFoundReason) {
   const ControlGateSnapshot status = controlGate();
   if (!historyMutationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
-                     "CONFIG_LOCKED_DURING_ACTIVE_CYCLE", lockedDetail);
+                     "CONFIG_LOCKED_DURING_ACTIVE_CYCLE", lockedDetail,
+                     lockedReason);
   }
   const esp_err_t bodyStatus =
-      lockJsonBody(request, "A bounded JSON request is required.");
+      lockJsonBody(request, "A bounded JSON request is required.",
+                   "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -510,24 +521,26 @@ esp_err_t OpenBrewByWeightNetwork::runDeleteById(httpd_req_t *request,
   unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     invalidDetail);
+                     invalidDetail, invalidReason);
   }
   if (deleteFn == nullptr || !deleteFn(id)) {
-    return sendError(request, STATUS_NOT_FOUND, notFoundCode, notFoundDetail);
+    return sendError(request, STATUS_NOT_FOUND, notFoundCode, notFoundDetail,
+                     notFoundReason);
   }
   return sendJson(request, STATUS_OK, "{\"deleted\":true}");
 }
 
 esp_err_t OpenBrewByWeightNetwork::enqueueAcceptedCommand(
     httpd_req_t *request, WebCommandType type, bool unsafeWebUiOverride,
-    const char *queueFullDetail, const char *extraJson) {
+    const char *queueFullDetail, const char *extraJson,
+    const char *queueFullReason) {
   WebCommand command;
   command.type = type;
   command.requestId = allocateRequestId();
   command.unsafeWebUiOverride = unsafeWebUiOverride;
   if (!callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     queueFullDetail);
+                     queueFullDetail, queueFullReason);
   }
   return sendAccepted(request, command.requestId, extraJson);
 }

@@ -324,7 +324,7 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
   char address[COMPANION_ADDRESS_TEXT];
   if (!companionPeer(httpd_req_to_sockfd(request), address))
     return sendError(request, STATUS_FORBIDDEN, "COMPANION_PEER",
-                     "Companions pair only from the local network.");
+                     "Companions pair only from the local network.", "PAIRING_LOCAL_NETWORK_ONLY");
   const uint32_t now = millis();
   char json[192] = {};
   size_t used = 0;
@@ -341,7 +341,7 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
     char query[64] = {}, id[COMPANION_ID_TEXT] = {};
     if (httpd_req_get_url_query_str(request, query, sizeof(query)) != ESP_OK ||
         httpd_query_key_value(query, "id", id, sizeof(id)) != ESP_OK || !companionIdValid(id))
-      return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "The id is invalid.");
+      return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "The id is invalid.", "COMPANION_ID_INVALID");
     {
       TaskLockGuard lock(self.dataMux_);
       const char *state = companionPairPoll(g_companion.pairing, id, now);
@@ -357,8 +357,8 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
   }
   if (!requireJsonContentType(request))
     return sendError(request, STATUS_UNSUPPORTED_MEDIA, "UNSUPPORTED_MEDIA_TYPE",
-                     "Send the pairing request as application/json.");
-  const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.");
+                     "Send the pairing request as application/json.", "UNSUPPORTED_MEDIA_TYPE");
+  const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
   if (body != ESP_OK) return body;
   // The first request commits to the companion's key; the same request with
   // `publicKey` instead reveals it once controllerKey was issued.
@@ -385,7 +385,7 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!valid)
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                     "The pairing request fields are invalid.");
+                     "The pairing request fields are invalid.", "PAIRING_FIELDS_INVALID");
   const bool onCurve = reveal && key[0] == 0x04 && companionPublicKeyValid(key);
   CompanionPairResult result = CompanionPairResult::PENDING;
   bool accepted = true, denied = false;
@@ -412,20 +412,20 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
                        label);
   if (!accepted)
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                     "The key does not match an open pairing request.");
+                     "The key does not match an open pairing request.", "PAIRING_KEY_MISMATCH");
   switch (result) {
     case CompanionPairResult::IGNORED:
       return sendError(request, STATUS_FORBIDDEN, "COMPANION_IGNORED",
-                       "This companion was ignored on this controller.");
+                       "This companion was ignored on this controller.", "COMPANION_IGNORED");
     case CompanionPairResult::ALREADY_PAIRED:
       return sendError(request, STATUS_CONFLICT, "ALREADY_PAIRED",
-                       "This controller is already paired with a companion.");
+                       "This controller is already paired with a companion.", "ALREADY_PAIRED");
     case CompanionPairResult::BUSY:
       return sendError(request, STATUS_CONFLICT, "PAIRING_BUSY",
-                       "Another companion's request is waiting.");
+                       "Another companion's request is waiting.", "PAIRING_BUSY");
     case CompanionPairResult::RATE_LIMITED:
       return sendError(request, STATUS_TOO_MANY, "PAIRING_RATE_LIMITED",
-                       "Wait a few seconds before asking again.");
+                       "Wait a few seconds before asking again.", "PAIRING_RATE_LIMITED");
     case CompanionPairResult::NEW:
       // The network task makes this request's key pair.
       self.companionAwake_.store(true, std::memory_order_release);
@@ -441,7 +441,7 @@ esp_err_t OpenBrewByWeightNetwork::companionPairHandler(httpd_req_t *request) {
 esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.requireAdminUnlock(request)) return ESP_OK;
-  const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.");
+  const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
   if (body != ESP_OK) return body;
   static const char *const fields[] = {"action", "code", "lm", "ui", "log"};
   char action[12] = {}, code[8] = {};
@@ -459,7 +459,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   if (!valid)
-    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "The request fields are invalid.");
+    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "The request fields are invalid.", "AUTH_FIELDS_INVALID");
   const uint32_t now = millis();
   char name[COMPANION_NAME_TEXT] = {};
   if (!strcmp(action, "approve")) {
@@ -467,7 +467,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     for (size_t index = 0; digits && index < 6; ++index) digits = code[index] >= '0' && code[index] <= '9';
     if (!digits)
       return sendError(request, STATUS_UNPROCESSABLE, "COMPANION_CODE",
-                       "Enter the six-digit code the companion shows.");
+                       "Enter the six-digit code the companion shows.", "COMPANION_CODE");
     // The expected code needs both keys; SHA-256 only, small enough for httpd.
     uint8_t companionKey[COMPANION_KEY_BYTES], controllerKey[COMPANION_KEY_BYTES];
     uint32_t serial = 0, expected = UINT32_MAX;
@@ -502,17 +502,17 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
         return sendJson(request, STATUS_OK, "{\"ok\":true}");
       case CompanionApproveResult::WRONG_CODE:
         return sendError(request, STATUS_UNPROCESSABLE, "COMPANION_CODE",
-                         "That is not the code the companion shows.");
+                         "That is not the code the companion shows.", "COMPANION_CODE_MISMATCH");
       case CompanionApproveResult::DENIED:
         self.lifecycleLogf("Companion pairing request from '%s' denied after three wrong codes", name);
         return sendError(request, STATUS_UNPROCESSABLE, "COMPANION_CODE",
-                         "Three wrong codes: the request was denied.");
+                         "Three wrong codes: the request was denied.", "COMPANION_CODE_DENIED");
       case CompanionApproveResult::NOT_READY:
         return sendError(request, STATUS_CONFLICT, "PAIRING_NOT_READY",
-                         "The controller is still preparing this request.");
+                         "The controller is still preparing this request.", "PAIRING_NOT_READY");
       default:
         return sendError(request, STATUS_CONFLICT, "PAIRING_NOT_PENDING",
-                         "No companion request is waiting.");
+                         "No companion request is waiting.", "PAIRING_NOT_PENDING");
     }
   }
   if (!strcmp(action, "ignore")) {
@@ -524,7 +524,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     }
     if (!ignored)
       return sendError(request, STATUS_CONFLICT, "PAIRING_NOT_PENDING",
-                       "No companion request is waiting.");
+                       "No companion request is waiting.", "PAIRING_NOT_PENDING");
     self.lifecycleLogf("Companion pairing request from '%s' ignored", name);
   } else if (!strcmp(action, "unignore")) {
     {
@@ -554,7 +554,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     }
     if (!forgotten)
       return sendError(request, STATUS_CONFLICT, "COMPANION_NOT_PAIRED",
-                       "This controller is not paired with a companion.");
+                       "This controller is not paired with a companion.", "COMPANION_NOT_PAIRED");
     for (const int fd : fds)
       if (fd >= 0) (void)httpd_sess_trigger_close(request->handle, fd);
     self.lifecycleLogf("Companion '%s' forgotten", name);
@@ -580,7 +580,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     }
     if (!paired)
       return sendError(request, STATUS_CONFLICT, "COMPANION_NOT_PAIRED",
-                       "This controller is not paired with a companion.");
+                       "This controller is not paired with a companion.", "COMPANION_NOT_PAIRED");
     if (lmChanged) {
       machineIntegrationCompanionLink(linkUp, lm);
       self.lifecycleLog(lm ? "Companion: La Marzocco through the companion turned on"
@@ -600,7 +600,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
                             : "Companion: Diagnostic log through the companion turned off");
     }
   } else {
-    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "Unknown companion action.");
+    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", "Unknown companion action.", "UNKNOWN_COMPANION_ACTION");
   }
   return sendJson(request, STATUS_OK, "{\"ok\":true}");
 }
@@ -622,7 +622,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
                            "companion link: refused %lu handshake(s) from outside the local network",
                            static_cast<unsigned long>(count));
     sendError(request, STATUS_FORBIDDEN, "COMPANION_PEER",
-              "Companions connect only from the local network.");
+              "Companions connect only from the local network.", "COMPANION_PEER");
     return ESP_FAIL;
   }
   CompanionLinkSlot *slot = nullptr;
@@ -646,7 +646,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
                            "companion link: refused %lu handshake(s): not paired",
                            static_cast<unsigned long>(count));
     sendError(request, STATUS_NOT_FOUND, "COMPANION_NOT_PAIRED",
-              "This controller is not paired with a companion.");
+              "This controller is not paired with a companion.", "COMPANION_NOT_PAIRED");
     return ESP_FAIL;
   }
   if (slot == nullptr) {
@@ -656,7 +656,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
                            "companion link: refused %lu handshake(s): another link is being opened",
                            static_cast<unsigned long>(count));
     sendError(request, STATUS_CONFLICT, "COMPANION_BUSY",
-              "Another companion link is being opened.");
+              "Another companion link is being opened.", "COMPANION_BUSY");
     return ESP_FAIL;
   }
   // httpd is the only allocator, so this check and store cannot race.
@@ -674,7 +674,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
                              "companion link: refused %lu handshake(s): no memory for a link",
                              static_cast<unsigned long>(count));
       sendError(request, STATUS_UNAVAILABLE, "COMPANION_MEMORY",
-                "The controller has no memory for a companion link right now.");
+                "The controller has no memory for a companion link right now.", "COMPANION_MEMORY");
       return ESP_FAIL;
     }
     memset(workspace, 0, sizeof(*workspace));
