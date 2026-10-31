@@ -2119,6 +2119,9 @@ summary::marker {
   font-size: 0.42em;
   color: var(--w78);
 }
+.shotHero .heroTime small {
+  font-size: 0.6em;
+}
 .shotHero .heroChart {
   position: relative;
   height: 7.5rem;
