@@ -435,12 +435,12 @@
   env.model={segs:[{pts:[{t:0,cg:0},{t:15,cg:2000}]}],dripSegs:[],flowSegs:[],dripFlowSegs:[],
     held:[],pts:[{t:0,cg:0},{t:15,cg:2000}],flowCurve:[1.4],timeMax:15,maxW:20,rawMaxW:20};
   env.liveRuleModel={...rule,goal:36,floor:33,ceil:42,dSlow:6,firstDrop:5,curveFast:3,curveSlow:6,dFast:6};
-  env.heroMode=null;
+  env.heroMode='technical';
   paint({...card,elapsedMs:15000,tintClass:'on_recipe',tintPct:40,weight:20,wCg:[2000],wAtMs:[0],fcEndMs:29400});
   if(heroEl().dataset.hero!=='technical'||spark().dataset.zone!=='live'||
       !spark().innerHTML.includes('class="rvCut')||!spark().innerHTML.includes('Target 36 g')||
       !spark().innerHTML.includes('rvFcDot'))
-    throw new Error('Without a machine choice the hero must be Technical with its graph and forecast');
+    throw new Error('The technical machine choice must render its graph and forecast');
   if(lookup('shotHeroState').textContent!=='Brewing')
     throw new Error('A technical on-recipe forecast keeps the calm Brewing label');
   env.liveRuleModel=null;
@@ -452,7 +452,11 @@
   paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
   if(heroEl().dataset.hero!=='colorful'||spark().innerHTML.includes('rvCut'))
     throw new Error('The colorful machine choice must render the classic card');
-  env.heroMode=null;heroOverride='colorful';
+  env.heroMode=null;
+  paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
+  if(heroEl().dataset.hero!=='colorful')
+    throw new Error('Without a machine choice the hero must be Colorful, the machine default');
+  heroOverride='colorful';
   paint({...done,rule:{fastBeforeS:27,slowAfterS:36,fastRampS:2,slowRampS:2}});
   if(heroEl().dataset.hero!=='colorful')throw new Error('A device override must win over the machine default');
   env.heroMode='colorful';heroOverride='technical';

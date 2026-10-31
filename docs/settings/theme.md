@@ -23,7 +23,7 @@ Auto, and a [factory reset](factory-reset.md) does not change it.
 The big card at the top of Home follows a shot from its first drop to its
 final weight, and it comes in two looks. Pick the one you want to see:
 
-- **Technical** (default) sits on the same quiet surface as the rest of the
+- **Technical** sits on the same quiet surface as the rest of the
   interface and puts the recipe's graph right under the numbers. The graph
   shows the corridor your recipe allows — how fast is too fast, the green
   on-recipe window, how slow is too slow — with your shot drawn over it. While
@@ -34,8 +34,8 @@ final weight, and it comes in two looks. Pick the one you want to see:
   After the shot, the zone it actually landed in stays lit, and you can drag
   the dot along the curve to read the time, the weight and the stop line at
   any point.
-- **Colorful** fills the whole card with the shot's color, and shows a
-  simpler line drawing of the weight and flow. See
+- **Colorful** (default) fills the whole card with the shot's color, and
+  shows a simpler line drawing of the weight and flow. See
   [Shot card colors](#shot-card-colors) for how its color behaves while a
   shot runs.
 

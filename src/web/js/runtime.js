@@ -5480,8 +5480,8 @@ function setHeroTintMode(v) {
   scheduleShotPaint();
 }
 // Hero card style: the machine default comes from the config snapshot; a PWA
-// install may override it per device (Settings > On this device). Technical
-// is the fallback for a missing or future value.
+// install may override it per device (Settings > On this device). Colorful is
+// the fallback for a missing value, Technical for a future one.
 const HERO_CARD_KEY = "obbwHeroCard";
 // The machine default last seen in a config snapshot, kept for paints that
 // run while the Home stream is invalidated (a resumed PWA before its stream
@@ -5502,7 +5502,8 @@ function heroCardOverride() {
 }
 function heroCardMode() {
   const v = heroCardOverride() || homeStatusCache()?.config?.heroCardMode || heroCardDefault;
-  return v === "colorful" ? "colorful" : "technical";
+  if (v === "technical" || v === "colorful") return v;
+  return v == null ? "colorful" : "technical";
 }
 function setHeroCardOverride(v) {
   try {

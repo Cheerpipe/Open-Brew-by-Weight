@@ -634,7 +634,7 @@ enum class LogLevel : uint8_t {
   NONE = 5
 };
 
-// Home hero card styles (wire names heroCardModeId); Technical is default.
+// Home hero card styles (wire names heroCardModeId); Colorful is default.
 constexpr uint8_t HERO_CARD_TECHNICAL = 0;
 constexpr uint8_t HERO_CARD_COLORFUL = 1;
 inline const char *heroCardModeId(uint8_t mode) {
@@ -757,8 +757,8 @@ struct RuntimeConfig {
   bool rinseEnabled = OPEN_BREW_BY_WEIGHT_DEFAULT_RINSE_ENABLED;
   // Read-only Diagnostic view without Admin unlock.
   bool showDiagnosticPage = false;
-  // Home hero card style (HERO_CARD_*); Technical is the machine default.
-  uint8_t heroCardMode = 0;
+  // Home hero card style (HERO_CARD_*); Colorful is the machine default.
+  uint8_t heroCardMode = HERO_CARD_COLORFUL;
   // Retare even when no brew is active.
   bool autoTareOutsideBrew = true;
   bool ntpSyncEnabled = true;  // NTP sync master switch; Sync now still works.
