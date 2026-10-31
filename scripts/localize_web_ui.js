@@ -14,7 +14,7 @@ const META_MARKER_RE =
 const MACHINE_ICON_MARKER = '{{webui-meta:machine-icon}}';
 const MACHINE_ICON_SPRITE_RE = /<svg\b[^>]*\bdata-machine-icons\b[^>]*>([\s\S]*?)<\/svg\s*>/;
 const MACHINE_ICON_SYMBOL_RE = /<symbol\b[^>]*\bid="machine-icon-([a-z0-9-]+)"[^>]*>([\s\S]*?)<\/symbol\s*>/g;
-const JS_MARKER_RE = /__WEBUI_TEXT__\("([a-z0-9_.]+)"\)/g;
+const JS_MARKER_RE = /__WEBUI_TEXT__\(\s*"([a-z0-9_.]+)"\s*,?\s*\)/g;
 const CSS_MARKER_RE = /__WEBUI_CSS_TEXT__\(\s*"([a-z0-9_.]+)"\s*\)/g;
 
 function fail(message) {

@@ -561,7 +561,9 @@ if (!codeIncludes(ui, 'Press Reload to enable this window again.') ||
     codeIncludes(ui, 'function ownershipBanner(') ||
     codeIncludes(ui, 'webUiOwnership') ||
     codeIncludes(ui, 'btnTakeControl') ||
-    codeIncludes(ui, 'Reactivate')) {
+    // The errorReasonTexts catalog legitimately quotes the frozen
+    // UI_TAKEN_OVER sentence; "Reactivate" must not appear anywhere else.
+    ui.replace(/const errorReasonTexts = \{[\s\S]*?\};/, '').includes('Reactivate')) {
   throw new Error('WebUI inactive notice must be a full-screen Reload overlay');
 }
 if (!codeIncludes(ui, "w.id='reconnectWait'") ||

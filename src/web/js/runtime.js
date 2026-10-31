@@ -1829,8 +1829,272 @@ function message(text, kind = "") {
         : 0;
   if (ms) messageTimer = setTimeout(clearMessage, ms);
 }
+// One locale key per stable API error-reason code (docs/INTEGRATION_API.md):
+// the code the controller reports, the sentence it owns. Unknown codes fall
+// through errorText() to the server's own message prose.
+const errorReasonTexts = {
+  ACCESS_PAIRING_BUSY: __WEBUI_TEXT__("err.access_pairing_busy"),
+  ACTIVATION_HISTORY_CLEAR_FAILED: __WEBUI_TEXT__("err.activation_history_clear_failed"),
+  ACTIVATION_HISTORY_CLEAR_NOT_CONFIRMED: __WEBUI_TEXT__(
+    "err.activation_history_clear_not_confirmed",
+  ),
+  ACTIVATION_HISTORY_CLEAR_REQUIRES_IDLE: __WEBUI_TEXT__(
+    "err.activation_history_clear_requires_idle",
+  ),
+  ADMIN_LOCKED: __WEBUI_TEXT__("err.admin_locked"),
+  ADMIN_UNLOCK_COOLDOWN: __WEBUI_TEXT__("err.admin_unlock_cooldown"),
+  ALREADY_PAIRED: __WEBUI_TEXT__("err.already_paired"),
+  ARCH_MISMATCH: __WEBUI_TEXT__("err.arch_mismatch"),
+  AUDIT_ERASE_FAILED: __WEBUI_TEXT__("err.audit_erase_failed"),
+  AUDIT_EXPORT_UNAVAILABLE: __WEBUI_TEXT__("err.audit_export_unavailable"),
+  AUDIT_LOG_CLEAR_REQUIRES_READY: __WEBUI_TEXT__("err.audit_log_clear_requires_ready"),
+  AUDIT_LOG_DELETE_NOT_CONFIRMED: __WEBUI_TEXT__("err.audit_log_delete_not_confirmed"),
+  AUDIT_VERBOSE_UNAVAILABLE: __WEBUI_TEXT__("err.audit_verbose_unavailable"),
+  AUTH_COOLDOWN: __WEBUI_TEXT__("err.auth_cooldown"),
+  AUTH_FIELDS_INVALID: __WEBUI_TEXT__("err.auth_fields_invalid"),
+  AUTH_NOT_REQUIRED: __WEBUI_TEXT__("err.auth_not_required"),
+  AUTH_REQUIRED: __WEBUI_TEXT__("err.auth_required"),
+  BAD_IMAGE: __WEBUI_TEXT__("err.bad_image"),
+  BAD_LENGTH: __WEBUI_TEXT__("err.bad_length"),
+  BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.bounded_json_required"),
+  BULLSEYE_RTTTL_INVALID: __WEBUI_TEXT__("err.bullseye_rtttl_invalid"),
+  BULLSEYE_STAGE_BUSY: __WEBUI_TEXT__("err.bullseye_stage_busy"),
+  BULLSEYE_TEST_BUSY: __WEBUI_TEXT__("err.bullseye_test_busy"),
+  BULLSEYE_TEST_REQUEST_REQUIRED: __WEBUI_TEXT__("err.bullseye_test_request_required"),
+  BULLSEYE_TEST_REQUIRES_READY: __WEBUI_TEXT__("err.bullseye_test_requires_ready"),
+  BUSY: __WEBUI_TEXT__("err.busy"),
+  CALIBRATION_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.calibration_locked_active_cycle"),
+  CALIBRATION_RESET_BUSY: __WEBUI_TEXT__("err.calibration_reset_busy"),
+  CLOCK_SYNC_REQUIRES_IDLE: __WEBUI_TEXT__("err.clock_sync_requires_idle"),
+  COMMIT_FAILED: __WEBUI_TEXT__("err.commit_failed"),
+  COMPANION_AUTH: __WEBUI_TEXT__("err.companion_auth"),
+  COMPANION_BUSY: __WEBUI_TEXT__("err.companion_busy"),
+  COMPANION_CODE: __WEBUI_TEXT__("err.companion_code"),
+  COMPANION_CODE_DENIED: __WEBUI_TEXT__("err.companion_code_denied"),
+  COMPANION_CODE_MISMATCH: __WEBUI_TEXT__("err.companion_code_mismatch"),
+  COMPANION_ID_INVALID: __WEBUI_TEXT__("err.companion_id_invalid"),
+  COMPANION_IGNORED: __WEBUI_TEXT__("err.companion_ignored"),
+  COMPANION_MEMORY: __WEBUI_TEXT__("err.companion_memory"),
+  COMPANION_NOT_PAIRED: __WEBUI_TEXT__("err.companion_not_paired"),
+  COMPANION_NOT_PAIRED_WITH_PEER: __WEBUI_TEXT__("err.companion_not_paired_with_peer"),
+  COMPANION_PEER: __WEBUI_TEXT__("err.companion_peer"),
+  CONFIG_LOCKED_DURING_ACTIVE_CYCLE: __WEBUI_TEXT__("err.config_locked_during_active_cycle"),
+  CONFIG_REVISION_STALE: __WEBUI_TEXT__("err.config_revision_stale"),
+  CONFIRMATION_REQUIRED: __WEBUI_TEXT__("err.confirmation_required"),
+  CONTROLLER_AUTH_NOT_REQUIRED: __WEBUI_TEXT__("err.controller_auth_not_required"),
+  CONTROL_QUEUE_FULL: __WEBUI_TEXT__("err.control_queue_full"),
+  CONTROL_STATE_CONFLICT: __WEBUI_TEXT__("err.control_state_conflict"),
+  CORRELATION_ID_INVALID: __WEBUI_TEXT__("err.correlation_id_invalid"),
+  CRASH_CLEAR_REQUIRES_READY: __WEBUI_TEXT__("err.crash_clear_requires_ready"),
+  CRASH_DELETE_NOT_CONFIRMED: __WEBUI_TEXT__("err.crash_delete_not_confirmed"),
+  CRASH_ERASE_FAILED: __WEBUI_TEXT__("err.crash_erase_failed"),
+  DATE_TIME_DISABLED: __WEBUI_TEXT__("err.date_time_disabled"),
+  DEVICE_PASSWORD_INVALID: __WEBUI_TEXT__("err.device_password_invalid"),
+  DEVICE_PASSWORD_OR_UNLOCK_REQUIRED: __WEBUI_TEXT__("err.device_password_or_unlock_required"),
+  DEVICE_PASSWORD_REQUIRED: __WEBUI_TEXT__("err.device_password_required"),
+  DOWNGRADE: __WEBUI_TEXT__("err.downgrade"),
+  EMPTY_BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.empty_bounded_json_required"),
+  EMPTY_JSON_REQUIRED: __WEBUI_TEXT__("err.empty_json_required"),
+  FACTORY_PASSWORD: __WEBUI_TEXT__("err.factory_password"),
+  FACTORY_RESET_BUSY: __WEBUI_TEXT__("err.factory_reset_busy"),
+  FACTORY_RESET_CONFIRMATION_REQUIRED: __WEBUI_TEXT__("err.factory_reset_confirmation_required"),
+  FACTORY_RESET_NOT_CONFIRMED: __WEBUI_TEXT__("err.factory_reset_not_confirmed"),
+  FACTORY_RESET_REQUIRES_IDLE: __WEBUI_TEXT__("err.factory_reset_requires_idle"),
+  FIELD_ENABLED_MUST_BE_BOOLEAN: __WEBUI_TEXT__("err.field_enabled_must_be_boolean"),
+  FIELD_ON_MUST_BE_BOOLEAN: __WEBUI_TEXT__("err.field_on_must_be_boolean"),
+  FIRMWARE_MODE_REQUIRES_IDLE: __WEBUI_TEXT__("err.firmware_mode_requires_idle"),
+  FIRMWARE_MODE_SAVE_FAILED: __WEBUI_TEXT__("err.firmware_mode_save_failed"),
+  FORCED_PULSE_REQUIRES_EMPTY_OBJECT: __WEBUI_TEXT__("err.forced_pulse_requires_empty_object"),
+  GUARD_SAMPLES_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.guard_samples_locked_active_cycle"),
+  GUARD_SAMPLES_RESET_BUSY: __WEBUI_TEXT__("err.guard_samples_reset_busy"),
+  GUARD_SAMPLES_RESET_REQUIRES_EMPTY_OBJECT: __WEBUI_TEXT__(
+    "err.guard_samples_reset_requires_empty_object",
+  ),
+  HISTORY_DELETE_REQUIRES_IDLE: __WEBUI_TEXT__("err.history_delete_requires_idle"),
+  HISTORY_RECORD_ID_REQUIRED: __WEBUI_TEXT__("err.history_record_id_required"),
+  HISTORY_RECORD_NOT_FOUND: __WEBUI_TEXT__("err.history_record_not_found"),
+  HOST_NOT_ALLOWED: __WEBUI_TEXT__("err.host_not_allowed"),
+  INTEGRATION_AUTH_REQUIRED: __WEBUI_TEXT__("err.integration_auth_required"),
+  INTEGRATION_REQUEST_EXPIRED: __WEBUI_TEXT__("err.integration_request_expired"),
+  INTEGRATION_SNAPSHOT_OVERFLOW: __WEBUI_TEXT__("err.integration_snapshot_overflow"),
+  INTERNAL: __WEBUI_TEXT__("err.internal"),
+  INVALID_MICRA_CONFIG: __WEBUI_TEXT__("err.invalid_micra_config"),
+  INVALID_WEBHOOK: __WEBUI_TEXT__("err.invalid_webhook"),
+  JSON_BODY_REQUIRED: __WEBUI_TEXT__("err.json_body_required"),
+  LAST_SHOT_CLEAR_FAILED: __WEBUI_TEXT__("err.last_shot_clear_failed"),
+  LAST_SHOT_CLEAR_NOT_CONFIRMED: __WEBUI_TEXT__("err.last_shot_clear_not_confirmed"),
+  LAST_SHOT_CLEAR_REQUIRES_IDLE: __WEBUI_TEXT__("err.last_shot_clear_requires_idle"),
+  LAST_SHOT_NOT_FOUND: __WEBUI_TEXT__("err.last_shot_not_found"),
+  LAST_SHOT_OVERFLOW: __WEBUI_TEXT__("err.last_shot_overflow"),
+  LOGIN_PASSWORD_MISSING: __WEBUI_TEXT__("err.login_password_missing"),
+  LOOP_TIMING_UNAVAILABLE: __WEBUI_TEXT__("err.loop_timing_unavailable"),
+  MACHINE_TYPE_UNSUPPORTED: __WEBUI_TEXT__("err.machine_type_unsupported"),
+  MICRA_BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.micra_bounded_json_required"),
+  MICRA_BUSY: __WEBUI_TEXT__("err.micra_busy"),
+  MICRA_CHANGE_PENDING: __WEBUI_TEXT__("err.micra_change_pending"),
+  MICRA_NOT_READY: __WEBUI_TEXT__("err.micra_not_ready"),
+  MICRA_REQUIRES_READY: __WEBUI_TEXT__("err.micra_requires_ready"),
+  MICRA_SAVE_BUSY: __WEBUI_TEXT__("err.micra_save_busy"),
+  MICRA_STA_REQUIRED: __WEBUI_TEXT__("err.micra_sta_required"),
+  NETWORK_SETTINGS_CHANGED_RETRY: __WEBUI_TEXT__("err.network_settings_changed_retry"),
+  NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.network_settings_locked_active_cycle"),
+  NEW_PASSWORD_LENGTH_INVALID: __WEBUI_TEXT__("err.new_password_length_invalid"),
+  NEW_PASSWORD_NOT_FACTORY_DEFAULT: __WEBUI_TEXT__("err.new_password_not_factory_default"),
+  NEW_PASSWORD_REQUIRED: __WEBUI_TEXT__("err.new_password_required"),
+  NOTHING_SAVED: __WEBUI_TEXT__("err.nothing_saved"),
+  NOTHING_STAGED: __WEBUI_TEXT__("err.nothing_staged"),
+  NOT_FOUND: __WEBUI_TEXT__("err.not_found"),
+  NO_ACTIVE_SHOT: __WEBUI_TEXT__("err.no_active_shot"),
+  NO_CRASHES: __WEBUI_TEXT__("err.no_crashes"),
+  NO_IDENTITY: __WEBUI_TEXT__("err.no_identity"),
+  NO_MEMORY: __WEBUI_TEXT__("err.no_memory"),
+  NO_SCALE_PROFILE: __WEBUI_TEXT__("err.no_scale_profile"),
+  NO_SHOT_TRACE: __WEBUI_TEXT__("err.no_shot_trace"),
+  NO_TAG: __WEBUI_TEXT__("err.no_tag"),
+  OK: __WEBUI_TEXT__("err.ok"),
+  OTA_ACTION_INVALID: __WEBUI_TEXT__("err.ota_action_invalid"),
+  OTA_ALREADY_FLASHED: __WEBUI_TEXT__("err.ota_already_flashed"),
+  OTA_FLASHED_WAITING_RESTART: __WEBUI_TEXT__("err.ota_flashed_waiting_restart"),
+  OTA_FLASH_REQUIRES_READY: __WEBUI_TEXT__("err.ota_flash_requires_ready"),
+  OTA_IMAGE_FLASHED_RESTART: __WEBUI_TEXT__("err.ota_image_flashed_restart"),
+  OTA_IMAGE_IDENTITY_FIELDS_INVALID: __WEBUI_TEXT__("err.ota_image_identity_fields_invalid"),
+  OTA_INVALID_RANGE: __WEBUI_TEXT__("err.ota_invalid_range"),
+  OTA_JOURNAL_FAILED: __WEBUI_TEXT__("err.ota_journal_failed"),
+  OTA_JSON_REQUEST_REQUIRED: __WEBUI_TEXT__("err.ota_json_request_required"),
+  OTA_OFFSET_MISMATCH: __WEBUI_TEXT__("err.ota_offset_mismatch"),
+  OTA_PATCH_RANGE_MISMATCH: __WEBUI_TEXT__("err.ota_patch_range_mismatch"),
+  OTA_RANGE_NOT_IN_SESSION: __WEBUI_TEXT__("err.ota_range_not_in_session"),
+  OTA_RESTART_PENDING: __WEBUI_TEXT__("err.ota_restart_pending"),
+  OTA_SERVER_STOPPING: __WEBUI_TEXT__("err.ota_server_stopping"),
+  OTA_SESSION_CONFLICT: __WEBUI_TEXT__("err.ota_session_conflict"),
+  OTA_SESSION_CREATE_FIRST: __WEBUI_TEXT__("err.ota_session_create_first"),
+  OTA_SESSION_EXPIRED: __WEBUI_TEXT__("err.ota_session_expired"),
+  OTA_SESSION_IDENTITY_MISMATCH: __WEBUI_TEXT__("err.ota_session_identity_mismatch"),
+  OTA_SESSION_IDENTITY_REQUIRED: __WEBUI_TEXT__("err.ota_session_identity_required"),
+  OTA_SHA256_MISMATCH: __WEBUI_TEXT__("err.ota_sha256_mismatch"),
+  OTA_UPDATE_REQUIRES_READY: __WEBUI_TEXT__("err.ota_update_requires_ready"),
+  PAIRING_BUSY: __WEBUI_TEXT__("err.pairing_busy"),
+  PAIRING_FIELDS_INVALID: __WEBUI_TEXT__("err.pairing_fields_invalid"),
+  PAIRING_KEY_MISMATCH: __WEBUI_TEXT__("err.pairing_key_mismatch"),
+  PAIRING_LOCAL_NETWORK_ONLY: __WEBUI_TEXT__("err.pairing_local_network_only"),
+  PAIRING_NOT_PENDING: __WEBUI_TEXT__("err.pairing_not_pending"),
+  PAIRING_NOT_READY: __WEBUI_TEXT__("err.pairing_not_ready"),
+  PAIRING_RATE_LIMITED: __WEBUI_TEXT__("err.pairing_rate_limited"),
+  PASSWORD_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.password_locked_active_cycle"),
+  PENDING_VERIFY: __WEBUI_TEXT__("err.pending_verify"),
+  PREFERRED_SCALE_CLEAR_BUSY: __WEBUI_TEXT__("err.preferred_scale_clear_busy"),
+  PREFERRED_SCALE_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.preferred_scale_locked_active_cycle"),
+  PRESETS_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.presets_locked_active_cycle"),
+  PRESET_CHANGE_BUSY: __WEBUI_TEXT__("err.preset_change_busy"),
+  PRESET_ID_INVALID: __WEBUI_TEXT__("err.preset_id_invalid"),
+  PRESET_NOT_FOUND: __WEBUI_TEXT__("err.preset_not_found"),
+  PRESET_SNAPSHOT_OVERFLOW: __WEBUI_TEXT__("err.preset_snapshot_overflow"),
+  PRESET_UPDATE_PENDING: __WEBUI_TEXT__("err.preset_update_pending"),
+  QUICK_SETTINGS_BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.quick_settings_bounded_json_required"),
+  QUICK_SETTINGS_BUSY: __WEBUI_TEXT__("err.quick_settings_busy"),
+  QUICK_SETTINGS_CHANGED_RETRY: __WEBUI_TEXT__("err.quick_settings_changed_retry"),
+  QUICK_SETTINGS_FIELDS_INVALID: __WEBUI_TEXT__("err.quick_settings_fields_invalid"),
+  QUICK_SETTINGS_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.quick_settings_locked_active_cycle"),
+  RECEIVE_FAILED: __WEBUI_TEXT__("err.receive_failed"),
+  RELAY_CONTENT_TYPE_REQUIRED: __WEBUI_TEXT__("err.relay_content_type_required"),
+  RELAY_FIELDS_INVALID: __WEBUI_TEXT__("err.relay_fields_invalid"),
+  RELAY_INVALID: __WEBUI_TEXT__("err.relay_invalid"),
+  RELAY_LOCAL_NETWORK_ONLY: __WEBUI_TEXT__("err.relay_local_network_only"),
+  REMOTE_CONTROL_DISABLED: __WEBUI_TEXT__("err.remote_control_disabled"),
+  RESET_HISTORY_CLEAR_BUSY: __WEBUI_TEXT__("err.reset_history_clear_busy"),
+  RESET_HISTORY_CONFIRMATION_REQUIRED: __WEBUI_TEXT__("err.reset_history_confirmation_required"),
+  RESET_HISTORY_NOT_CONFIRMED: __WEBUI_TEXT__("err.reset_history_not_confirmed"),
+  RESTART_QUEUE_BUSY: __WEBUI_TEXT__("err.restart_queue_busy"),
+  RESTART_REQUIRES_EMPTY_OBJECT: __WEBUI_TEXT__("err.restart_requires_empty_object"),
+  RINSE_REQUIRES_READY: __WEBUI_TEXT__("err.rinse_requires_ready"),
+  SAFETY_LOST: __WEBUI_TEXT__("err.safety_lost"),
+  SAVE_BUSY: __WEBUI_TEXT__("err.save_busy"),
+  SCALE_FORGET_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.scale_forget_locked_active_cycle"),
+  SCALE_NAME_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.scale_name_locked_active_cycle"),
+  SCALE_NAME_SAVE_BUSY: __WEBUI_TEXT__("err.scale_name_save_busy"),
+  SCALE_PROFILE_BUSY: __WEBUI_TEXT__("err.scale_profile_busy"),
+  SCALE_PROFILE_CORRUPT: __WEBUI_TEXT__("err.scale_profile_corrupt"),
+  SCALE_PROFILE_UNCHANGED: __WEBUI_TEXT__("err.scale_profile_unchanged"),
+  SCALE_SELECT_BUSY: __WEBUI_TEXT__("err.scale_select_busy"),
+  SCALE_TIMING_UNAVAILABLE: __WEBUI_TEXT__("err.scale_timing_unavailable"),
+  SCAN_FIELDS_INVALID: __WEBUI_TEXT__("err.scan_fields_invalid"),
+  SCAN_INTENSITY_UNCHANGED: __WEBUI_TEXT__("err.scan_intensity_unchanged"),
+  SESSION_NOT_FOUND: __WEBUI_TEXT__("err.session_not_found"),
+  SESSION_REQUIRED: __WEBUI_TEXT__("err.session_required"),
+  SETTINGS_UPDATE_PENDING: __WEBUI_TEXT__("err.settings_update_pending"),
+  SETUP_BREW_SAVE_FAILED: __WEBUI_TEXT__("err.setup_brew_save_failed"),
+  SETUP_PASSWORD_REQUIRED: __WEBUI_TEXT__("err.setup_password_required"),
+  SHOT_CURVE_BUSY: __WEBUI_TEXT__("err.shot_curve_busy"),
+  SHOT_DELETE_REQUIRES_IDLE: __WEBUI_TEXT__("err.shot_delete_requires_idle"),
+  SHOT_HAS_NO_TRACE: __WEBUI_TEXT__("err.shot_has_no_trace"),
+  SHOT_HISTORY_CLEAR_FAILED: __WEBUI_TEXT__("err.shot_history_clear_failed"),
+  SHOT_HISTORY_CLEAR_NOT_CONFIRMED: __WEBUI_TEXT__("err.shot_history_clear_not_confirmed"),
+  SHOT_HISTORY_CLEAR_REQUIRES_IDLE: __WEBUI_TEXT__("err.shot_history_clear_requires_idle"),
+  SHOT_ID_REQUIRED: __WEBUI_TEXT__("err.shot_id_required"),
+  SHOT_NAME_FIELDS_INVALID: __WEBUI_TEXT__("err.shot_name_fields_invalid"),
+  SHOT_NOT_FOUND: __WEBUI_TEXT__("err.shot_not_found"),
+  SHOT_RATING_FIELDS_REQUIRED: __WEBUI_TEXT__("err.shot_rating_fields_required"),
+  SHOT_RATING_REQUIRES_IDLE: __WEBUI_TEXT__("err.shot_rating_requires_idle"),
+  SHOT_STORAGE_BUSY: __WEBUI_TEXT__("err.shot_storage_busy"),
+  SHOT_STORAGE_UNAVAILABLE: __WEBUI_TEXT__("err.shot_storage_unavailable"),
+  SHOT_TRACE_SAVING: __WEBUI_TEXT__("err.shot_trace_saving"),
+  SHOT_TRACE_UNAVAILABLE: __WEBUI_TEXT__("err.shot_trace_unavailable"),
+  STATE_FIELD_INVALID: __WEBUI_TEXT__("err.state_field_invalid"),
+  STATE_OVERRIDE_SWITCH_ONLY: __WEBUI_TEXT__("err.state_override_switch_only"),
+  STATUS_BUSY: __WEBUI_TEXT__("err.status_busy"),
+  STATUS_PAGE_UNKNOWN: __WEBUI_TEXT__("err.status_page_unknown"),
+  STATUS_TOO_LARGE: __WEBUI_TEXT__("err.status_too_large"),
+  STOP_PREDICTION_FIELDS_INVALID: __WEBUI_TEXT__("err.stop_prediction_fields_invalid"),
+  TARE_REQUIRES_EMPTY_OBJECT: __WEBUI_TEXT__("err.tare_requires_empty_object"),
+  TARE_REQUIRES_READY: __WEBUI_TEXT__("err.tare_requires_ready"),
+  TASK_PROFILER_UNCHANGED: __WEBUI_TEXT__("err.task_profiler_unchanged"),
+  TIMEZONE_ALREADY_SET: __WEBUI_TEXT__("err.timezone_already_set"),
+  TIME_SYNC_DISABLED: __WEBUI_TEXT__("err.time_sync_disabled"),
+  TOO_LARGE: __WEBUI_TEXT__("err.too_large"),
+  UI_CLAIM_REQUIRED: __WEBUI_TEXT__("err.ui_claim_required"),
+  UI_CLIENT_INVALID: __WEBUI_TEXT__("err.ui_client_invalid"),
+  UI_TAKEN_OVER: __WEBUI_TEXT__("err.ui_taken_over"),
+  UNAVAILABLE: __WEBUI_TEXT__("err.unavailable"),
+  UNKNOWN: __WEBUI_TEXT__("err.unknown"),
+  UNKNOWN_ACCESS_ACTION: __WEBUI_TEXT__("err.unknown_access_action"),
+  UNKNOWN_COMPANION_ACTION: __WEBUI_TEXT__("err.unknown_companion_action"),
+  UNKNOWN_INTEGRATION_ROUTE: __WEBUI_TEXT__("err.unknown_integration_route"),
+  UNKNOWN_ROUTE: __WEBUI_TEXT__("err.unknown_route"),
+  UNKNOWN_SCALE: __WEBUI_TEXT__("err.unknown_scale"),
+  UNLOCK_NOT_CONFIRMED: __WEBUI_TEXT__("err.unlock_not_confirmed"),
+  UNSUPPORTED_MACHINE: __WEBUI_TEXT__("err.unsupported_machine"),
+  UNSUPPORTED_MEDIA_TYPE: __WEBUI_TEXT__("err.unsupported_media_type"),
+  VERIFY_FAILED: __WEBUI_TEXT__("err.verify_failed"),
+  WEBHOOK_BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.webhook_bounded_json_required"),
+  WEBHOOK_CONFIG_INVALID: __WEBUI_TEXT__("err.webhook_config_invalid"),
+  WEBHOOK_CONFIG_SAVE_PENDING: __WEBUI_TEXT__("err.webhook_config_save_pending"),
+  WEBHOOK_REQUIRES_READY: __WEBUI_TEXT__("err.webhook_requires_ready"),
+  WEBHOOK_SAVE_BUSY: __WEBUI_TEXT__("err.webhook_save_busy"),
+  WEBHOOK_SETTINGS_CHANGED_RETRY: __WEBUI_TEXT__("err.webhook_settings_changed_retry"),
+  WEBHOOK_SETTINGS_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.webhook_settings_locked_active_cycle"),
+  WEBHOOK_STATUS_OVERFLOW: __WEBUI_TEXT__("err.webhook_status_overflow"),
+  WEBHOOK_TEST_NOT_QUEUED: __WEBUI_TEXT__("err.webhook_test_not_queued"),
+  WEBHOOK_UNAVAILABLE: __WEBUI_TEXT__("err.webhook_unavailable"),
+  WEBHOOK_UPDATE_PENDING: __WEBUI_TEXT__("err.webhook_update_pending"),
+  WIFI_SCAN_BUSY: __WEBUI_TEXT__("err.wifi_scan_busy"),
+  WIFI_SCAN_REQUIRES_READY: __WEBUI_TEXT__("err.wifi_scan_requires_ready"),
+  WRITE_FAILED: __WEBUI_TEXT__("err.write_failed"),
+};
+// API error render chain: the locale text for the reason code, else the one
+// for the legacy error code, else the server message, else the fallback.
+function errorText(data, fallback = "") {
+  if (!data) return fallback;
+  return (
+    (data.reason && errorReasonTexts[data.reason]) ||
+    ((data.error || data.code) && errorReasonTexts[data.error || data.code]) ||
+    data.message ||
+    data.error ||
+    data.code ||
+    fallback
+  );
+}
 function formatCommandError(fail, e) {
-  const detail = e && e.message ? String(e.message) : "";
+  const detail = errorText(e);
   if (!fail) return detail || __WEBUI_TEXT__("runtime.request_failed");
   if (!detail || fail.indexOf(detail) >= 0) return fail;
   return fail + " " + detail;
@@ -2156,8 +2420,8 @@ async function apiBinary(path, onProgress, cache = "no-store") {
         data = await response.json();
       } catch (_) {}
       throw Object.assign(
-        new Error(data.message || data.error || __WEBUI_TEXT__("runtime.http") + response.status),
-        { status: response.status, code: data.error },
+        new Error(errorText(data, __WEBUI_TEXT__("runtime.http") + response.status)),
+        { status: response.status, code: data.error, reason: data.reason || "" },
       );
     }
     if (!onProgress || !response.body) return await response.blob();
@@ -2221,10 +2485,9 @@ async function api(path, options = {}) {
   if (!response.ok) {
     if (data.error === "UI_TAKEN_OVER") deactivateWebUi("takeover");
     if (data.error === "AUTH_REQUIRED") showSignIn(true);
-    const err = new Error(
-      data.message || data.error || __WEBUI_TEXT__("runtime.http") + response.status,
-    );
+    const err = new Error(errorText(data, __WEBUI_TEXT__("runtime.http") + response.status));
     err.code = data.error || "";
+    err.reason = data.reason || "";
     err.status = response.status;
     throw err;
   }
@@ -2389,7 +2652,7 @@ async function claimWebUiOwnership(claimed) {
         return;
       }
       if (!response.ok)
-        throw new Error(data.message || data.error || __WEBUI_TEXT__("runtime.unable_to_reload"));
+        throw new Error(errorText(data, __WEBUI_TEXT__("runtime.unable_to_reload")));
     }
     endNetworkReconnectWait();
     webUiOwner = true;
@@ -2496,7 +2759,7 @@ async function showSignIn(signedOut) {
               ? __WEBUI_TEXT__("runtime.too_many_sign_in_attempts")
               : data.error === "DEVICE_PASSWORD_INVALID"
                 ? __WEBUI_TEXT__("runtime.wrong_device_password")
-                : data.message || __WEBUI_TEXT__("runtime.unable_to_reload"),
+                : errorText(data, __WEBUI_TEXT__("runtime.unable_to_reload")),
           );
           return;
         }
