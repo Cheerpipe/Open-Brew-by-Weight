@@ -792,7 +792,7 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleClearHandler(httpd_req_t *reque
   return self.enqueueAcceptedCommand(request,
                                 WebCommandType::CLEAR_PREFERRED_SCALE,
                                 self.webUiOverrideAllowed(request),
-                                "Control is busy; nothing was cleared.");
+                                "Control is busy; nothing was cleared.", nullptr, "PREFERRED_SCALE_CLEAR_BUSY");
 }
 
 esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *request) {
@@ -1190,7 +1190,7 @@ esp_err_t OpenBrewByWeightNetwork::resetGuardSamplesHandler(httpd_req_t *request
   return self.enqueueAcceptedCommand(
       request, WebCommandType::RESET_AUTO_TO_MANUAL_GUARD_SAMPLES,
       self.webUiOverrideAllowed(request),
-      "Control is busy; guard samples were not reset.");
+      "Control is busy; guard samples were not reset.", nullptr, "GUARD_SAMPLES_RESET_BUSY");
 }
 
 esp_err_t OpenBrewByWeightNetwork::paddleHandler(httpd_req_t *request) {
@@ -1256,7 +1256,7 @@ esp_err_t OpenBrewByWeightNetwork::rinseHandler(httpd_req_t *request) {
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::RINSE,
                                 self.webUiOverrideAllowed(request),
-                                "Control queue is full.");
+                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::stopHandler(httpd_req_t *request) {
@@ -1270,7 +1270,7 @@ esp_err_t OpenBrewByWeightNetwork::stopHandler(httpd_req_t *request) {
                      "There is no active shot to stop.", "NO_ACTIVE_SHOT");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::STOP, false,
-                                "Control queue is full.");
+                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::forcePulseHandler(httpd_req_t *request) {
@@ -1306,7 +1306,7 @@ esp_err_t OpenBrewByWeightNetwork::forcePulseHandler(httpd_req_t *request) {
                      "The forced pulse request must be an empty object.", "FORCED_PULSE_REQUIRES_EMPTY_OBJECT");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::FORCE_SWITCH_PULSE,
-                                false, "Control queue is full.");
+                                false, "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::stateOverrideHandler(httpd_req_t *request) {
@@ -1354,7 +1354,7 @@ esp_err_t OpenBrewByWeightNetwork::restartHandler(httpd_req_t *request) {
   // holds it until idle instead of opening K1 to make way for the reset.
   // Override must not cut a pour.
   return self.enqueueAcceptedCommand(request, WebCommandType::RESTART, false,
-                                "Control queue is full.");
+                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::firmwareModeHandler(httpd_req_t *request) {
@@ -1395,7 +1395,7 @@ esp_err_t OpenBrewByWeightNetwork::firmwareModeHandler(httpd_req_t *request) {
                      "Could not persist the firmware mode.", "FIRMWARE_MODE_SAVE_FAILED");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::RESTART, false,
-                                "Control queue is full.");
+                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::scaleTareHandler(httpd_req_t *request) {
@@ -1438,7 +1438,7 @@ esp_err_t OpenBrewByWeightNetwork::clearResetHistoryHandler(httpd_req_t *request
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::CLEAR_RESET_HISTORY,
                                 false,
-                                "Control is busy; reset history was not cleared.");
+                                "Control is busy; reset history was not cleared.", nullptr, "RESET_HISTORY_CLEAR_BUSY");
 }
 
 esp_err_t OpenBrewByWeightNetwork::factoryResetHandler(httpd_req_t *request) {
@@ -1464,7 +1464,7 @@ esp_err_t OpenBrewByWeightNetwork::factoryResetHandler(httpd_req_t *request) {
   return self.enqueueAcceptedCommand(request, WebCommandType::FACTORY_RESET,
                                 self.webUiOverrideAllowed(request),
                                 "Control is busy; no settings were erased.",
-                                "\"state\":\"QUEUED\"");
+                                "\"state\":\"QUEUED\"", "FACTORY_RESET_BUSY");
 }
 
 // Onboarding brewing choice (the setup "brew" action), accepted only while the

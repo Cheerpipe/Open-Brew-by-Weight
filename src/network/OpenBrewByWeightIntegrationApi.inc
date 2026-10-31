@@ -488,7 +488,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
                        "Restart requires an empty JSON object.", "RESTART_REQUIRES_EMPTY_OBJECT");
     return self.enqueueAcceptedCommand(request, WebCommandType::RESTART, false,
                                   "Control is busy; restart was not queued.",
-                                  "\"apiVersion\":1");
+                                  "\"apiVersion\":1", "RESTART_QUEUE_BUSY");
   }
 
   if (apiUriMatches(uri, "/api/v1/integration/presets/active") &&

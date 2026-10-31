@@ -2,7 +2,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   ControlGateSnapshot status = self.controlGate();
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.");
+      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -41,7 +41,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     cJSON_Delete(root);
     self.unlockJsonBody();
     return sendError(request, STATUS_CONFLICT, "DEVICE_PASSWORD_REQUIRED",
-                     "Choose your own device password before finishing setup.");
+                     "Choose your own device password before finishing setup.", "SETUP_PASSWORD_REQUIRED");
   }
   if (parsed && strcmp(action, "confirm") == 0) {
     parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
@@ -158,7 +158,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       self.unlockJsonBody();
       return sendError(request, STATUS_CONFLICT,
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                       "Network settings are locked while a cycle is active.");
+                       "Network settings are locked while a cycle is active.", "NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE");
     }
     parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (parsed) {
@@ -172,7 +172,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       self.unlockJsonBody();
       return sendError(request, STATUS_CONFLICT,
                        "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                       "Network settings are locked while a cycle is active.");
+                       "Network settings are locked while a cycle is active.", "NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE");
     }
     command.setNetworkType(WebCommandType::SAVE_NETWORK);
     char ipMode[16] = {}, ipText[16] = {}, netmaskText[16] = {}, gatewayText[16] = {},
@@ -295,21 +295,22 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     command.wipePassword();
     if (brewSaveFailed) {
       return sendError(request, STATUS_UNAVAILABLE, "SETUP_BREW_SAVE_FAILED",
-                       "Could not save the brewing choice.");
+                       "Could not save the brewing choice.", "SETUP_BREW_SAVE_FAILED");
     }
     if (networkStale) {
       return sendError(request, STATUS_CONFLICT, "STALE_REVISION",
-                       "Network settings changed; refresh and retry.");
+                       "Network settings changed; refresh and retry.", "NETWORK_SETTINGS_CHANGED_RETRY");
     }
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_NETWORK",
                      networkError != nullptr
                          ? networkError
-                         : "Invalid network SSID or password.");
+                         : "Invalid network SSID or password.",
+                     nullptr);
   }
   if (!self.callbacks_.enqueueWebCommand(command)) {
     command.wipePassword();
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Nothing was saved.");
+                     "Nothing was saved.", "NOTHING_SAVED");
   }
   command.wipePassword();
   return self.sendAccepted(request, command.requestId);
@@ -324,7 +325,7 @@ esp_err_t OpenBrewByWeightNetwork::wifiScanStartHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Wi-Fi scanning is available only while Ready.");
+                     "Wi-Fi scanning is available only while Ready.", "WIFI_SCAN_REQUIRES_READY");
   }
 
   WebCommand command;
@@ -333,7 +334,7 @@ esp_err_t OpenBrewByWeightNetwork::wifiScanStartHandler(httpd_req_t *request) {
   command.unsafeWebUiOverride = self.webUiOverrideAllowed(request);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; scan was not started.");
+                     "Control is busy; scan was not started.", "WIFI_SCAN_BUSY");
   }
 
   self.dataMux_.lock();
@@ -407,10 +408,10 @@ esp_err_t OpenBrewByWeightNetwork::devicePasswordHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, self.controlGate())) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "The password cannot be changed while a cycle is active.");
+                     "The password cannot be changed while a cycle is active.", "PASSWORD_LOCKED_ACTIVE_CYCLE");
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.");
+      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -429,17 +430,17 @@ esp_err_t OpenBrewByWeightNetwork::devicePasswordHandler(httpd_req_t *request) {
   if (!parsed) {
     command.wipePassword();
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_DEVICE_PASSWORD",
-                     "New device password is required.");
+                     "New device password is required.", "NEW_PASSWORD_REQUIRED");
   }
   if (!validDevicePassword(command.network.password)) {
     command.wipePassword();
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_DEVICE_PASSWORD",
-                     "New device password must be 8–63 characters.");
+                     "New device password must be 8–63 characters.", "NEW_PASSWORD_LENGTH_INVALID");
   }
   if (isFactoryDefaultPassword(command.network.password)) {
     command.wipePassword();
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_DEVICE_PASSWORD",
-                     "New device password cannot be the factory default.");
+                     "New device password cannot be the factory default.", "NEW_PASSWORD_NOT_FACTORY_DEFAULT");
   }
   // From the setup network, keep it running (new passphrase at its next start).
   command.network.applyLive = socketServedBySoftAp(httpd_req_to_sockfd(request));
@@ -447,7 +448,7 @@ esp_err_t OpenBrewByWeightNetwork::devicePasswordHandler(httpd_req_t *request) {
   if (!self.callbacks_.enqueueWebCommand(command)) {
     command.wipePassword();
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Nothing was saved.");
+                     "Nothing was saved.", "NOTHING_SAVED");
   }
   command.wipePassword();
   return self.sendAccepted(request, command.requestId);
@@ -459,7 +460,7 @@ esp_err_t OpenBrewByWeightNetwork::bleScanHandler(httpd_req_t *request) {
     return ESP_OK;
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.");
+      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -485,7 +486,7 @@ esp_err_t OpenBrewByWeightNetwork::bleScanHandler(httpd_req_t *request) {
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_BLE_CONFIG",
                      "scanIntensity must be balanced, aggressive, or relaxed; "
-                     "enabled must be a boolean.");
+                     "enabled must be a boolean.", "SCAN_FIELDS_INVALID");
   }
   WebCommand command;
   command.type = WebCommandType::BLE_SCAN_INTENSITY;
@@ -500,7 +501,7 @@ esp_err_t OpenBrewByWeightNetwork::bleScanHandler(httpd_req_t *request) {
   command.requestId = self.allocateRequestId();
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Scan intensity was not changed.");
+                     "Scan intensity was not changed.", "SCAN_INTENSITY_UNCHANGED");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -508,7 +509,7 @@ esp_err_t OpenBrewByWeightNetwork::bleScanHandler(httpd_req_t *request) {
 esp_err_t OpenBrewByWeightNetwork::scaleProfileHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.");
+      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -529,14 +530,14 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileHandler(httpd_req_t *request) {
     type = WebCommandType::SCALE_PROFILE_DELETE;
   } else {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_PROFILE_ACTION",
-                     "action must be start, stop, or delete.");
+                     "action must be start, stop, or delete.", "OTA_ACTION_INVALID");
   }
   WebCommand command;
   command.type = type;
   command.requestId = self.allocateRequestId();
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Scale profile state was not changed.");
+                     "Scale profile state was not changed.", "SCALE_PROFILE_UNCHANGED");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -609,7 +610,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
     httpd_req_t *request) {
   if (!scaleProfiler().acquireDownloadLease()) {
     return sendError(request, STATUS_CONFLICT, "SCALE_PROFILE_BUSY",
-                     "The scale profile is changing or already downloading.");
+                     "The scale profile is changing or already downloading.", "SCALE_PROFILE_BUSY");
   }
   const bool fromRam = scaleProfiler().downloadFromRam();
   const ScaleProfilerStatus status = scaleProfiler().status(millis());
@@ -648,7 +649,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
       if (valid && !scaleProfiler().storeVerifyChecksum(header)) {
         scaleProfiler().releaseDownloadLease();
         return sendError(request, STATUS_SERVER_ERROR, "SCALE_PROFILE_CORRUPT",
-                         "The saved scale profile failed its checksum.");
+                         "The saved scale profile failed its checksum.", "SCALE_PROFILE_CORRUPT");
       }
     }
 #endif
@@ -656,7 +657,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
   if (!valid) {
     scaleProfiler().releaseDownloadLease();
     return sendError(request, STATUS_NOT_FOUND, "NO_SCALE_PROFILE",
-                     "No scale profile is available to download.");
+                     "No scale profile is available to download.", "NO_SCALE_PROFILE");
   }
   httpd_resp_set_type(request, "text/plain; charset=utf-8");
   httpd_resp_set_hdr(
@@ -748,7 +749,7 @@ esp_err_t OpenBrewByWeightNetwork::auditLogExportHandler(httpd_req_t *request) {
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   if (self.callbacks_.copyAuditEvents == nullptr) {
     return sendError(request, STATUS_SERVER_ERROR, "AUDIT_EXPORT_UNAVAILABLE",
-                     "The audit log is not available.");
+                     "The audit log is not available.", "AUDIT_EXPORT_UNAVAILABLE");
   }
   AuditStoreStatus store{};
   if (self.callbacks_.copyAuditStoreStatus != nullptr) {
@@ -1204,7 +1205,7 @@ esp_err_t OpenBrewByWeightNetwork::otaStatusHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.authorizeOtaRequest(request)) {
     return sendError(request, STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                     "Send the device password, or unlock administration first.");
+                     "Send the device password, or unlock administration first.", "DEVICE_PASSWORD_OR_UNLOCK_REQUIRED");
   }
   OpenBrewByWeightOta::instance().expireSession(
       millis(), controlAllowsConfiguration(self.controlGate()), false);
@@ -1214,10 +1215,10 @@ esp_err_t OpenBrewByWeightNetwork::otaUploadHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.authorizeOtaRequest(request)) {
     return sendError(request, STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                     "Send the device password, or unlock administration first.");
+                     "Send the device password, or unlock administration first.", "DEVICE_PASSWORD_OR_UNLOCK_REQUIRED");
   }
   return sendError(request, STATUS_CONFLICT, "OTA_SESSION_REQUIRED",
-                   "Create /api/v1/ota/session, then upload PATCH ranges.");
+                   "Create /api/v1/ota/session, then upload PATCH ranges.", "OTA_SESSION_CREATE_FIRST");
 }
 
 esp_err_t OpenBrewByWeightNetwork::otaSessionHandler(httpd_req_t *request) {
@@ -1241,7 +1242,7 @@ esp_err_t OpenBrewByWeightNetwork::otaSessionWork(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.authorizeOtaRequest(request)) {
     return sendError(request, STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                     "Send the device password, or unlock administration first.");
+                     "Send the device password, or unlock administration first.", "DEVICE_PASSWORD_OR_UNLOCK_REQUIRED");
   }
   const ControlGateSnapshot control = self.controlGate();
   if (request->method == HTTP_GET) {
@@ -1253,14 +1254,14 @@ esp_err_t OpenBrewByWeightNetwork::otaSessionWork(httpd_req_t *request) {
   }
   if (!controlAllowsConfiguration(control)) {
     return sendError(request, STATUS_CONFLICT, "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Stop the cycle and wait for Ready before updating firmware.");
+                     "Stop the cycle and wait for Ready before updating firmware.", "OTA_UPDATE_REQUIRES_READY");
   }
   if (self.otaRestartPending_.load(std::memory_order_acquire)) {
     return sendError(request, STATUS_CONFLICT, "OTA_RESTART_PENDING",
-                     "A firmware image is already flashed and waiting for restart.");
+                     "A firmware image is already flashed and waiting for restart.", "OTA_RESTART_PENDING");
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON OTA session identity is required.");
+      self.lockJsonBody(request, "A JSON OTA session identity is required.", "OTA_SESSION_IDENTITY_REQUIRED");
   if (bodyStatus != ESP_OK) return bodyStatus;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   OtaSessionIdentity identity;
@@ -1287,7 +1288,7 @@ esp_err_t OpenBrewByWeightNetwork::otaSessionWork(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_OTA_SESSION",
-                     "size, sha256, arch, hardware, machine, version, and transferId must identify one image.");
+                     "size, sha256, arch, hardware, machine, version, and transferId must identify one image.", "OTA_IMAGE_IDENTITY_FIELDS_INVALID");
   }
   OpenBrewByWeightOta &ota = OpenBrewByWeightOta::instance();
   self.beginOwnedHeapLifecycle(self.otaHeap_,
@@ -1298,7 +1299,8 @@ esp_err_t OpenBrewByWeightNetwork::otaSessionWork(httpd_req_t *request) {
                                              : HeapLifecycleResult::FAILURE);
   if (result != OtaResult::OK) {
     return sendError(request, otaResultHttpStatus(result),
-                     OpenBrewByWeightOta::resultName(result), otaResultMessage(result));
+                     OpenBrewByWeightOta::resultName(result), otaResultMessage(result),
+                     OpenBrewByWeightOta::resultName(result));
   }
   return self.sendOtaSnapshot(request, STATUS_OK);
 }
@@ -1306,8 +1308,8 @@ esp_err_t OpenBrewByWeightNetwork::otaSessionWork(httpd_req_t *request) {
 esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   auto rejectRange = [request](const char *status, const char *error,
-                               const char *message) {
-    const esp_err_t sent = sendError(request, status, error, message);
+                               const char *message, const char *reason) {
+    const esp_err_t sent = sendError(request, status, error, message, reason);
     if (request->content_len > 0) {
       httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
     }
@@ -1315,11 +1317,11 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
   };
   if (!self.authorizeOtaRequest(request)) {
     return rejectRange(STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                       "Send the device password, or unlock administration first.");
+                       "Send the device password, or unlock administration first.", "DEVICE_PASSWORD_OR_UNLOCK_REQUIRED");
   }
   if (!controlAllowsConfiguration(self.controlGate())) {
     return rejectRange(STATUS_CONFLICT, "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                       "Stop the cycle and wait for Ready before updating firmware.");
+                       "Stop the cycle and wait for Ready before updating firmware.", "OTA_UPDATE_REQUIRES_READY");
   }
   char transferId[OTA_TRANSFER_ID_CAPACITY] = {};
   char offsetText[16] = {};
@@ -1335,7 +1337,7 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
       headerOffset != offset || rangeTotal != declaredTotal || request->content_len <= 0 ||
       static_cast<uint32_t>(request->content_len) != rangeEnd - offset + 1U) {
     return rejectRange(STATUS_BAD_REQUEST, "OTA_INVALID_RANGE",
-                       "PATCH must contain matching offset, length, and Content-Range headers.");
+                       "PATCH must contain matching offset, length, and Content-Range headers.", "OTA_PATCH_RANGE_MISMATCH");
   }
   OpenBrewByWeightOta &ota = OpenBrewByWeightOta::instance();
   ota.expireSession(millis(), true);
@@ -1343,7 +1345,7 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
   if (strncmp(snapshot.session.transferId, transferId, sizeof(transferId)) != 0 ||
       snapshot.expectedBytes != declaredTotal) {
     return rejectRange(STATUS_CONFLICT, "OTA_SESSION_IDENTITY_MISMATCH",
-                       "This range does not belong to the active OTA session.");
+                       "This range does not belong to the active OTA session.", "OTA_RANGE_NOT_IN_SESSION");
   }
   const uint32_t rangeLength = static_cast<uint32_t>(request->content_len);
   if (ota.isDuplicateRange(offset, rangeLength)) {
@@ -1365,7 +1367,7 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
              static_cast<int32_t>(result),
              static_cast<int32_t>(snapshot.lastReceivedBytes / 1024U));
     return rejectRange(otaResultHttpStatus(result), OpenBrewByWeightOta::resultName(result),
-                       otaResultMessage(result));
+                       otaResultMessage(result), OpenBrewByWeightOta::resultName(result));
   }
   snapshot = ota.snapshot();
   if (snapshot.stagedValid) {
@@ -1380,18 +1382,18 @@ esp_err_t OpenBrewByWeightNetwork::otaFlashWork(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.authorizeOtaRequest(request)) {
     return sendError(request, STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                     "Send the device password, or unlock administration first.");
+                     "Send the device password, or unlock administration first.", "DEVICE_PASSWORD_OR_UNLOCK_REQUIRED");
   }
   OpenBrewByWeightOta &ota = OpenBrewByWeightOta::instance();
   const ControlGateSnapshot control = self.controlGate();
   if (!controlAllowsConfiguration(control)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Stop the cycle and wait for Ready before flashing.");
+                     "Stop the cycle and wait for Ready before flashing.", "OTA_FLASH_REQUIRES_READY");
   }
   if (self.otaRestartPending_.load(std::memory_order_acquire)) {
     return sendError(request, STATUS_CONFLICT, "OTA_RESTART_PENDING",
-                     "The flashed image is already waiting for the restart.");
+                     "The flashed image is already waiting for the restart.", "OTA_FLASHED_WAITING_RESTART");
   }
   const OtaImageTag staged = ota.stagedTag();
   self.beginOwnedHeapLifecycle(self.otaHeap_,
@@ -1404,7 +1406,7 @@ esp_err_t OpenBrewByWeightNetwork::otaFlashWork(httpd_req_t *request) {
   if (result != OtaResult::OK && result != OtaResult::COMMITTED) {
     return sendError(request, otaResultHttpStatus(result),
                      OpenBrewByWeightOta::resultName(result),
-                     otaResultMessage(result));
+                     otaResultMessage(result), OpenBrewByWeightOta::resultName(result));
   }
   if (result == OtaResult::OK) {
     self.log(DebugCategory::NETWORK, DebugCode::OTA_FLASH_COMMITTED,
@@ -1420,7 +1422,7 @@ esp_err_t OpenBrewByWeightNetwork::otaFlashWork(httpd_req_t *request) {
     // The boot slot is already switched, so the new firmware comes up on the
     // next restart however it happens.
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "The image is flashed. Restart the controller to use it.");
+                     "The image is flashed. Restart the controller to use it.", "OTA_IMAGE_FLASHED_RESTART");
   }
   self.otaRestartRequestedAtMs_.store(millis(), std::memory_order_relaxed);
   self.otaRestartPending_.store(true, std::memory_order_release);
@@ -1431,11 +1433,11 @@ esp_err_t OpenBrewByWeightNetwork::otaAbortWork(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.authorizeOtaRequest(request)) {
     return sendError(request, STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                     "Send the device password, or unlock administration first.");
+                     "Send the device password, or unlock administration first.", "DEVICE_PASSWORD_OR_UNLOCK_REQUIRED");
   }
   if (!controlAllowsConfiguration(self.controlGate())) {
     return sendError(request, STATUS_CONFLICT, "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Stop the cycle and wait for Ready before updating firmware.");
+                     "Stop the cycle and wait for Ready before updating firmware.", "OTA_UPDATE_REQUIRES_READY");
   }
   self.beginOwnedHeapLifecycle(self.otaHeap_, HeapLifecycleEvent::OTA_ABORT);
   const OtaResult result = OpenBrewByWeightOta::instance().discard();
@@ -1443,7 +1445,8 @@ esp_err_t OpenBrewByWeightNetwork::otaAbortWork(httpd_req_t *request) {
       ? HeapLifecycleResult::SUCCESS : HeapLifecycleResult::FAILURE);
   if (result != OtaResult::OK) {
     return sendError(request, otaResultHttpStatus(result),
-                     OpenBrewByWeightOta::resultName(result), otaResultMessage(result));
+                     OpenBrewByWeightOta::resultName(result), otaResultMessage(result),
+                     OpenBrewByWeightOta::resultName(result));
   }
   return self.sendOtaSnapshot(request, STATUS_OK);
 }

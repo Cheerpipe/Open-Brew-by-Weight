@@ -1031,7 +1031,7 @@ esp_err_t OpenBrewByWeightNetwork::shotsDeleteHandler(httpd_req_t *request) {
       "before deleting shot records.",
       self.callbacks_.deleteShotRecord,
       "A non-zero shot id is required.", "SHOT_NOT_FOUND",
-      "The requested shot record was not found.", "SHOT_DELETE_REQUIRES_IDLE");
+      "The requested shot record was not found.", "SHOT_DELETE_REQUIRES_IDLE", "SHOT_ID_REQUIRED", "SHOT_NOT_FOUND");
 }
 
 esp_err_t OpenBrewByWeightNetwork::shotsRateHandler(httpd_req_t *request) {
@@ -1108,7 +1108,7 @@ esp_err_t OpenBrewByWeightNetwork::historyDeleteHandler(httpd_req_t *request) {
       "before deleting history records.",
       self.callbacks_.deleteHistoryRecord,
       "A non-zero history record id is required.", "HISTORY_RECORD_NOT_FOUND",
-      "The requested history record was not found.", "HISTORY_DELETE_REQUIRES_IDLE");
+      "The requested history record was not found.", "HISTORY_DELETE_REQUIRES_IDLE", "HISTORY_RECORD_ID_REQUIRED", "HISTORY_RECORD_NOT_FOUND");
 }
 
 // Verbose audit hunt session toggle: marked DEBUG codes join the latch for

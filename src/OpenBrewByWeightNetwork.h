@@ -895,7 +895,7 @@ class OpenBrewByWeightNetwork {
   // (docs/INTEGRATION_API.md) and is omitted from the body when null.
   static esp_err_t sendError(httpd_req_t *request, const char *status,
                              const char *error, const char *message,
-                             const char *reason = nullptr);
+                             const char *reason);
   static bool readJsonBody(httpd_req_t *request,
                            char body[REQUEST_BODY_CAPACITY],
                            bool *envelopeFailed = nullptr);
@@ -909,10 +909,10 @@ class OpenBrewByWeightNetwork {
   void unlockWorkBuf();
   void unlockJsonBody();
   esp_err_t lockJsonBody(httpd_req_t *request, const char *invalidMessage,
-                         const char *reason = nullptr);
+                         const char *reason);
   bool lockConfirmedBody(httpd_req_t *request, const char *invalidMessage,
                          const char *expectedConfirmation,
-                         const char *reason = nullptr);
+                         const char *reason);
   // Shared destructive-action handler bodies: gate → confirm/parse → callback
   // → reply. Per-handler texts stay at the call sites; the response bytes are
   // identical to the previous inline implementations. Each *Reason parameter
@@ -923,21 +923,21 @@ class OpenBrewByWeightNetwork {
                               const char *notConfirmedDetail,
                               bool (*clearFn)(), const char *failedCode,
                               const char *failedDetail,
-                              const char *lockedReason = nullptr,
-                              const char *notConfirmedReason = nullptr,
-                              const char *failedReason = nullptr);
+                              const char *lockedReason,
+                              const char *notConfirmedReason,
+                              const char *failedReason);
   esp_err_t runDeleteById(httpd_req_t *request, const char *lockedDetail,
                           bool (*deleteFn)(uint32_t),
                           const char *invalidDetail, const char *notFoundCode,
                           const char *notFoundDetail,
-                          const char *lockedReason = nullptr,
-                          const char *invalidReason = nullptr,
-                          const char *notFoundReason = nullptr);
+                          const char *lockedReason,
+                          const char *invalidReason,
+                          const char *notFoundReason);
   esp_err_t enqueueAcceptedCommand(httpd_req_t *request, WebCommandType type,
                                    bool unsafeWebUiOverride,
                                    const char *queueFullDetail,
-                                   const char *extraJson = nullptr,
-                                   const char *queueFullReason = nullptr);
+                                   const char *extraJson,
+                                   const char *queueFullReason);
   // WiFi failure bookkeeping shared by the STA failure paths: bump variant
   // records a failure, schedules the retry backoff and (optionally) logs it;
   // the clear variant resets the counter and optionally publishes

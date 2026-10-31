@@ -1289,7 +1289,7 @@ esp_err_t OpenBrewByWeightNetwork::runOnOtaWorker(httpd_req_t *request,
   if (otaWorkerStopping_.load()) {
     otaJobsPending_.fetch_sub(1);
     return sendError(request, STATUS_UNAVAILABLE, "OTA_SERVER_STOPPING",
-                     "The web server is restarting; retry shortly.");
+                     "The web server is restarting; retry shortly.", "OTA_SERVER_STOPPING");
   }
   if (otaJobs_ == nullptr) {
     otaJobs_ = xQueueCreate(OTA_JOB_QUEUE_LENGTH, sizeof(OtaJob));
