@@ -229,9 +229,10 @@
   let tintMode=null,heroOverride=null,heroDefault=null;
   const rule={mode:'active',t1:27,t2:36,prot:3,wall:60,d:5,ceil:38.5};
   const env={liveRuleModel:null,model:null,reduce:false,heroMode:'colorful'},ruleArgs=[];
+  const heroLiveState={cycle:null,tint:null,flow:null};
   const paint=(d)=>new Function('$','buildShotSparkModel','formatShotEnded','ms','localStorage','document',
     'homeStatusCache','liveRuleModel','uiState','shotRuleModel','scheduleShotPaint','sub','window','shotFsActive',
-    'bindScrub','placePill','PILL','observePresetHost','d',
+    'bindScrub','placePill','PILL','observePresetHost','heroLive','d',
     blockAt(runtimeJs,'function fadeFill(')+blockAt(runtimeJs,'const RAMP_CURVES =')+
     blockAt(runtimeJs,'function rampDg(')+
     blockAt(runtimeJs,'function cutLine(')+'const PACE_SOFT = 0.18;\n'+
@@ -247,7 +248,7 @@
     ()=>env.heroMode?{config:{heroCardMode:env.heroMode}}:null,
     env.liveRuleModel,{shotHistory:{shots:[]}},r=>(ruleArgs.push(r),env.shotRule||null),()=>null,
     (t,vals)=>t.replace(/\{(\d)\}/g,(_,i)=>vals[+i]),{matchMedia:()=>({matches:env.reduce})},false,
-    ()=>{},() => {}, '', ()=>{}, d);
+    ()=>{},() => {}, '', ()=>{}, heroLiveState, d);
   const card={live:true,weight:2,goal:36,elapsedMs:1000,firstDropMs:0,tareMs:null,averageFlowGps:null,shotType:'auto'};
   const heroEl=()=>lookup('shotHero');
   paint({...card,weight:36.2,elapsedMs:36800});
@@ -385,6 +386,27 @@
   if(fx.textContent!=='1.8 g/s'||anims.length!==2)throw new Error('Reduced motion must swap the flow at once');
   env.reduce=false;
   delete fx.animate;
+  // The finalize window right after the live shot: no verdict, no stored rule,
+  // no average yet. The card keeps the colour, flow, and chart the shot ended
+  // with; a cycle this page never saw live still renders the bare ended card.
+  heroLiveState.tint=null;heroLiveState.flow=null;
+  env.liveRuleModel={...rule,goal:36,floor:33,ceil:42,dSlow:6,firstDrop:5,curveFast:3,curveSlow:6,dFast:6};
+  env.model={segs:[{pts:[{t:0,cg:0},{t:30,cg:30000}]}],dripSegs:[],flowSegs:[],
+    dripFlowSegs:[],flowCurve:[0.4,1.2,null,1.48,null],timeMax:32,maxW:36};
+  paint({...card,elapsedMs:32400,firstDropMs:4500,weight:34.3,wAtMs:[0,500,1000,1500,2000],
+    tintClass:'on_recipe',tintPct:80});
+  const finalize={...card,live:false,weight:35.9,elapsedMs:32400,firstDropMs:4500,
+    verdict:null,averageFlowGps:null,endReason:'normal_target',holdLive:true};
+  paint(finalize);
+  if(heroEl().dataset.tint!=='on_recipe'||lookup('shotHeroFlow').hidden||
+      lookup('shotHeroFlow').textContent!=='1.3 g/s'||
+      !(lookup('shotHeroSpark').kids||[]).some(x=>x.className==='hold mid'&&x.textContent==='Target 36 g'))
+    throw new Error('The finalize window must keep the end colour, flow, and chart of the live shot');
+  lookup('shotHeroSpark').replaceChildren();
+  paint({...finalize,holdLive:false});
+  if(heroEl().dataset.tint!=='neutral'||!lookup('shotHeroFlow').hidden||
+      (lookup('shotHeroSpark').kids||[]).some(x=>x.textContent==='Target 36 g'))
+    throw new Error('A cycle never watched live must render the bare ended card');
   // The chart draws the computed flow as a ±1 s mean, an unoutlined area low
   // under the weight; the drip tail is fainter.
   const chart={innerHTML:'',setAttribute(){},replaceChildren(){},append(){},prepend(){}},
@@ -663,12 +685,12 @@
   assert.equal(animations.length,0,'The correction must wait for the final firmware frame');
   const ended={...brew,phase:'pending',card:{...brew.card,live:false,elapsedMs:1800}};
   timer.sync(ended);
-  assert.equal(animations[0].options.duration,500);
+  assert.equal(animations[0].options.duration,120);
   assert.deepEqual(animations[0].keyframes,[{opacity:1},{opacity:0}]);
   assert.equal(timer.elapsed(),2100,'Final duration must remain hidden until fade out completes');
   animations[0].complete();
   assert.equal(timer.elapsed(),1800,'Swap to authoritative time at zero opacity');
-  assert.equal(animations[1].options.duration,500);
+  assert.equal(animations[1].options.duration,120);
   assert.deepEqual(animations[1].keyframes,[{opacity:0},{opacity:1}]);
   animations[1].complete();assert.equal(timer.ending(),null);
   timer.sync(ended);assert.equal(animations.length,2,'Retained updates must not repeat the fade');

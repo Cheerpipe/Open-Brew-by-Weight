@@ -4137,10 +4137,14 @@ function paintUiStream() {
           : shotStale &&
             ((e.hidden = !1), setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_stale"))))
       );
+    if (shotFrame.card.live) heroLive.cycle = shotFrame.boot + "/" + shotFrame.cycle;
     renderShotHero({
       ...shotFrame.card,
       ...shotFrame.curve,
       clockMs: shotClock || shotClockFinish ? shotClockElapsed() : shotFrame.card.elapsedMs,
+      // The finalize window of the cycle this page watched live carries no
+      // verdict, rule, or average yet: hold what the shot ended with.
+      holdLive: !shotFrame.card.live && heroLive.cycle === shotFrame.boot + "/" + shotFrame.cycle,
     }),
       shotStale
         ? setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_stale"))
@@ -4590,7 +4594,7 @@ function revealShotClockFinish() {
   if (activeView !== "home" || document.hidden || shotStale || !e) return cancelShotClockFinish();
   const fade = (from, done) => {
     f.animation = e.animate([{ opacity: from }, { opacity: 1 - from }], {
-      duration: 500,
+      duration: 120,
       fill: "forwards",
       easing: "ease-in-out",
     });
@@ -5263,6 +5267,10 @@ function setHomeSub(id, v) {
   const e = $(id);
   if (e && e.textContent !== v) e.textContent = v;
 }
+// What the hero held while the current cycle brewed live — cycle key, tint,
+// last flow text — kept so the finalize window after the shot ends shows the
+// shot that just finished, not an empty card.
+let heroLive = { cycle: null, tint: null, flow: null };
 function renderShotHero(d) {
   const hero = $("shotHero");
   if (!hero) return;
@@ -5335,10 +5343,17 @@ function renderShotHero(d) {
                 .filter((v, i) => v != null && d.wAtMs[fi] - d.wAtMs[i] <= 1000)
                 .reduce((a, v, _, n) => a + v / n.length, 0)
             : null;
-  // A finished card fades the live flow into its average.
+  // A finished card fades the live flow into its average; the finalize window,
+  // with no average yet, keeps the last live flow on the card.
   const fe = $("shotHeroFlow"),
     ft = Number.isFinite(flow) && Math.max(0, flow).toFixed(1) + __WEBUI_TEXT__("runtime.g_s");
-  heroFadeSwap(fe, () => heroNum("Flow", ft), !d.live && ft !== (!fe.hidden && fe.textContent));
+  if (d.live && ft) heroLive.flow = ft;
+  const ftHold = ft || (d.holdLive && heroLive.flow) || "";
+  heroFadeSwap(
+    fe,
+    () => heroNum("Flow", ftHold),
+    !d.live && ftHold !== (!fe.hidden && fe.textContent),
+  );
   chip("Touch", !noScale && d.live && d.touchHold && __WEBUI_TEXT__("home.hero_touch_hold"));
   // Pills say how the cut line ended the shot when not at the target.
   const kind = d.live ? "" : /wall_limit$/.test(d.endReason) ? "max_time" : d.verdict || "",
@@ -5372,18 +5387,25 @@ function renderShotHero(d) {
   $("shotHeroPills").hidden = ["Cut", "Touch", "Mode"].every((id) => $("shotHero" + id).hidden);
   const m = d.live
       ? liveRuleModel
-      : d.rule &&
-        shotRuleModel({
-          ...d.rule,
-          goalG: d.goal,
-          shotType: d.shotType,
-          firstDropS: d.firstDropMs / 1e3,
-        }),
+      : // The finalize window carries no stored rule: the live corridor of
+        // the same cycle keeps the chart until the record lands.
+        (d.rule &&
+          shotRuleModel({
+            ...d.rule,
+            goalG: d.goal,
+            shotType: d.shotType,
+            firstDropS: d.firstDropMs / 1e3,
+          })) ||
+        (d.holdLive && liveRuleModel),
     technical = heroCardMode() === "technical",
     // The Technical hero always speaks forecast: its zone glow and accent
     // follow the SAP whatever tint mode the colourful card would use.
-    tintMode = technical ? "forecast" : heroTintMode(),
-    tint = heroTint(d, m, kind, el, noScale, tintMode);
+    tintMode = technical ? "forecast" : heroTintMode();
+  let tint = heroTint(d, m, kind, el, noScale, tintMode);
+  // The finalize window has no verdict yet: keep the colour the shot ended in;
+  // the stored verdict retints the card when it lands.
+  if (d.live) heroLive.tint = tint;
+  else if (tint === "neutral" && d.holdLive && heroLive.tint) tint = heroLive.tint;
   hero.dataset.tint = tint;
   hero.dataset.hero = technical ? "technical" : "colorful";
   // Live forecast fades brand brown into the predicted colour; the firmware
