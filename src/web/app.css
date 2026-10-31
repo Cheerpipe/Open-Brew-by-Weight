@@ -1078,7 +1078,7 @@ button {
   appearance: none;
   border-radius: 2rem;
 }
-input:not([type="file"], [type="checkbox"]),
+input:not([type="file"], [type="checkbox"], [type="range"]),
 select,
 textarea {
   display: block;
@@ -1091,7 +1091,7 @@ textarea {
   font-size: 1rem;
   font-weight: 400;
 }
-input:not([type="file"], [type="checkbox"]),
+input:not([type="file"], [type="checkbox"], [type="range"]),
 select {
   min-height: 2.25rem;
   padding-block: 0.4rem;
@@ -1944,17 +1944,21 @@ html:not(.pwaApp) .pwaOnly {
 .cfgGroup:has(> label:nth-last-child(1 of :not(.hidden)))[open]::details-content {
   padding-bottom: 0;
 }
-.cfgGroup:has(> summary > .cfgIcon)[open] :is(input:not([type="checkbox"]), select, textarea) {
+.cfgGroup:has(> summary > .cfgIcon)[open]
+  :is(input:not([type="checkbox"], [type="range"]), select, textarea) {
   background-color: var(--sf);
 }
 /* Settings rows: a block with its own highlight and a line between
    consecutive rows. On/off options are switches on the right, placed by the
-   grid so the markup keeps the checkbox first. */
-.cfgGroup label:not(.windowPair label) {
+   grid so the markup keeps the checkbox first. The ramp curve cards are
+   buttons, not rows: their own rules size and border them. */
+.cfgGroup label:not(.windowPair label, .rampCurves label) {
   margin: 0 -0.75rem;
   padding: 0.75rem;
 }
-.cfgGroup :is(label, .windowField, div:has(> label)) + :is(label, .windowField, div:has(> label)) {
+.cfgGroup
+  :is(label, .windowField, div:has(> label)):not(.rampCurves, .rampCurves label)
+  + :is(label, .windowField, div:has(> label)):not(.rampCurves, .rampCurves label) {
   border-top: 1px solid var(--ln);
 }
 .cfgGroup label:has(> input[type="checkbox"]) {
@@ -4645,12 +4649,6 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
-}
-.rampCol {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--mu);
-  text-align: center;
 }
 .rampChoice input[type="radio"] {
   position: absolute;

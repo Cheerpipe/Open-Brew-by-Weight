@@ -1010,31 +1010,20 @@ function brewPayload() {
       : {}),
   };
 }
-// Each side's transition curve, named as RAMP_CURVES orders it; the hint
-// follows where the curve is steepest, which reads differently per side.
-const RAMP_CURVE_NAMES = [
-    __WEBUI_TEXT__("settings.curve_smoothstep"),
-    __WEBUI_TEXT__("settings.curve_smootherstep"),
-    __WEBUI_TEXT__("settings.curve_smootheststep"),
-    __WEBUI_TEXT__("settings.curve_beta23"),
-    __WEBUI_TEXT__("settings.curve_beta24"),
-    __WEBUI_TEXT__("settings.curve_beta26"),
-    __WEBUI_TEXT__("settings.curve_beta32"),
-    __WEBUI_TEXT__("settings.curve_beta42"),
-    __WEBUI_TEXT__("settings.curve_beta62"),
-  ],
-  RAMP_CURVE_TEXT = {
-    fast: {
-      early: __WEBUI_TEXT__("settings.ramp_fast_early"),
-      even: __WEBUI_TEXT__("settings.ramp_fast_even"),
-      late: __WEBUI_TEXT__("settings.ramp_fast_late"),
-    },
-    slow: {
-      early: __WEBUI_TEXT__("settings.ramp_slow_early"),
-      even: __WEBUI_TEXT__("settings.ramp_slow_even"),
-      late: __WEBUI_TEXT__("settings.ramp_slow_late"),
-    },
-  };
+// Each side's transition hint follows where the curve is steepest, which
+// reads differently per side; the cards themselves carry static names.
+const RAMP_CURVE_TEXT = {
+  fast: {
+    early: __WEBUI_TEXT__("settings.ramp_fast_early"),
+    even: __WEBUI_TEXT__("settings.ramp_fast_even"),
+    late: __WEBUI_TEXT__("settings.ramp_fast_late"),
+  },
+  slow: {
+    early: __WEBUI_TEXT__("settings.ramp_slow_early"),
+    even: __WEBUI_TEXT__("settings.ramp_slow_even"),
+    late: __WEBUI_TEXT__("settings.ramp_slow_late"),
+  },
+};
 // The curve radios and the hardness slider stand in for their hidden fields,
 // which keep the form's edit, autosave and revert behavior. Each curve label
 // draws and names the curve it picks at the current hardness.
@@ -1091,8 +1080,6 @@ function syncRampChoice(side) {
     const curve = R.rampCurveIndex(radio.value, hardness.value),
       label = radio.closest("label");
     label.querySelector("path").setAttribute("d", rampIcon(curve));
-    // Between levels the card names the nearest curve it blends from.
-    label.lastChild.textContent = RAMP_CURVE_NAMES[Math.round(curve)];
   }
 }
 // The page header shrinks while scrolling on phones: its measured bottom

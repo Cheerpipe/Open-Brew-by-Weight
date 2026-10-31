@@ -555,7 +555,7 @@ if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !css.includes('html.theme-dark{color-scheme:dark}') ||
     !css.includes('html.theme-light{color-scheme:light}') ||
     !css.includes('--in:#fafafa') ||
-    !css.includes('input:not([type=file],[type=checkbox]),select,textarea{') ||
+    !css.includes('input:not([type=file],[type=checkbox],[type=range]),select,textarea{') ||
     !css.includes('input[type=text],input[type=email],input[type=password],input[type=url]{appearance:none}') ||
     !css.includes('min-height:3rem') ||
     !css.includes('background:var(--in)') ||

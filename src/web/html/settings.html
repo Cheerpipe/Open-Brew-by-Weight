@@ -286,34 +286,18 @@
       <div class="rampChoice fastGuardOpt">
         <span class="rampChoiceLbl">{{webui:settings.ramp_curve}}</span>
         <div class="rampCurves" role="radiogroup" aria-label="{{webui:settings.ramp_curve}}">
-          <span id="fastRampColEarly" class="rampCol">{{webui:settings.ramp_steep_early}}</span
-          ><span id="fastRampColEven" class="rampCol">{{webui:settings.ramp_even}}</span
-          ><span id="fastRampColLate" class="rampCol">{{webui:settings.ramp_steep_late}}</span
+          <label
+            ><input type="radio" name="fastCurve" data-ramp="fastCurve" value="early" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg
+            ><span>{{webui:settings.ramp_steep_early}}</span></label
           ><label
-            ><input
-              type="radio"
-              name="fastCurve"
-              data-ramp="fastCurve"
-              value="early"
-              aria-describedby="fastRampColEarly" />
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
+            ><input type="radio" name="fastCurve" data-ramp="fastCurve" value="even" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg
+            ><span>{{webui:settings.ramp_even}}</span></label
           ><label
-            ><input
-              type="radio"
-              name="fastCurve"
-              data-ramp="fastCurve"
-              value="even"
-              aria-describedby="fastRampColEven" />
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
-          ><label
-            ><input
-              type="radio"
-              name="fastCurve"
-              data-ramp="fastCurve"
-              value="late"
-              aria-describedby="fastRampColLate"
-            />
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span>
+            ><input type="radio" name="fastCurve" data-ramp="fastCurve" value="late" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg
+            ><span>{{webui:settings.ramp_steep_late}}</span>
           </label>
         </div>
         <div class="rampHardness">
@@ -332,11 +316,10 @@
           />
           <small class="fieldHint">{{webui:settings.ramp_hardness_hint}}</small>
         </div>
-        <span class="selBox"
-          ><select id="fastCurve" class="hidden" aria-hidden="true" tabindex="-1">
-            <option value="even"></option>
-            <option value="early"></option>
-            <option value="late"></option></select></span
+        <select id="fastCurve" class="hidden" aria-hidden="true" tabindex="-1">
+          <option value="even"></option>
+          <option value="early"></option>
+          <option value="late"></option></select
         ><input
           id="fastCurveHardness"
           class="hidden"
@@ -385,34 +368,18 @@
       <div class="rampChoice slowGuardOpt">
         <span class="rampChoiceLbl">{{webui:settings.ramp_curve}}</span>
         <div class="rampCurves" role="radiogroup" aria-label="{{webui:settings.ramp_curve}}">
-          <span id="slowRampColEarly" class="rampCol">{{webui:settings.ramp_steep_early}}</span
-          ><span id="slowRampColEven" class="rampCol">{{webui:settings.ramp_even}}</span
-          ><span id="slowRampColLate" class="rampCol">{{webui:settings.ramp_steep_late}}</span
+          <label
+            ><input type="radio" name="slowCurve" data-ramp="slowCurve" value="early" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg
+            ><span>{{webui:settings.ramp_steep_early}}</span></label
           ><label
-            ><input
-              type="radio"
-              name="slowCurve"
-              data-ramp="slowCurve"
-              value="early"
-              aria-describedby="slowRampColEarly" />
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
+            ><input type="radio" name="slowCurve" data-ramp="slowCurve" value="even" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg
+            ><span>{{webui:settings.ramp_even}}</span></label
           ><label
-            ><input
-              type="radio"
-              name="slowCurve"
-              data-ramp="slowCurve"
-              value="even"
-              aria-describedby="slowRampColEven" />
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span></label
-          ><label
-            ><input
-              type="radio"
-              name="slowCurve"
-              data-ramp="slowCurve"
-              value="late"
-              aria-describedby="slowRampColLate"
-            />
-            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg><span></span>
+            ><input type="radio" name="slowCurve" data-ramp="slowCurve" value="late" />
+            <svg viewBox="0 0 40 20" aria-hidden="true"><path /></svg
+            ><span>{{webui:settings.ramp_steep_late}}</span>
           </label>
         </div>
         <div class="rampHardness">
@@ -431,11 +398,10 @@
           />
           <small class="fieldHint">{{webui:settings.ramp_hardness_hint}}</small>
         </div>
-        <span class="selBox"
-          ><select id="slowCurve" class="hidden" aria-hidden="true" tabindex="-1">
-            <option value="even"></option>
-            <option value="early"></option>
-            <option value="late"></option></select></span
+        <select id="slowCurve" class="hidden" aria-hidden="true" tabindex="-1">
+          <option value="even"></option>
+          <option value="early"></option>
+          <option value="late"></option></select
         ><input
           id="slowCurveHardness"
           class="hidden"
