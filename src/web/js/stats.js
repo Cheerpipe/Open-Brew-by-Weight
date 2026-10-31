@@ -1707,24 +1707,34 @@ function shotVisualizer(r) {
     g = (v, sign) => (sign && v >= 0 ? "+" : "") + v.toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
     error = actual !== null && r.goalG ? actual - r.goalG : null,
     notes = [
-      "Ended: " + R.formatShotEnded(r.stopDetail, r.verdict),
-      `Shot: ${r.shotType} · ${r.cutType} cut`,
-      r.channeling && "Channeling detected",
+      R.sub(__WEBUI_TEXT__("stats.note_ended"), [R.formatShotEnded(r.stopDetail, r.verdict)]),
+      R.sub(__WEBUI_TEXT__("stats.note_shot"), [r.shotType, r.cutType]),
+      r.channeling && __WEBUI_TEXT__("stats.note_channeling"),
       error !== null &&
-        `Yield vs target: ${g(error, 1)} (${error >= 0 ? "+" : ""}${((error / r.goalG) * 100).toFixed(1)} %)`,
-      estimated && "Yield estimated: " + g(r.estimatedG),
-      r.scaleLossSource && "Scale lost, stop by " + r.scaleLossSource,
-      r.firstDropS != null && `First drop: ${r.firstDropS.toFixed(1)} s`,
-      cut.s != null && `Cut at ${g(cut.g)} · ${cut.s.toFixed(1)} s`,
-      cut.drip != null && "Drip: " + g(cut.drip, 1),
-      r.scaleName && "Scale: " + r.scaleName,
+        R.sub(__WEBUI_TEXT__("stats.note_yield_vs_target"), [
+          g(error, 1),
+          (error >= 0 ? "+" : "") + ((error / r.goalG) * 100).toFixed(1),
+        ]),
+      estimated && R.sub(__WEBUI_TEXT__("stats.note_yield_estimated"), [g(r.estimatedG)]),
+      r.scaleLossSource && R.sub(__WEBUI_TEXT__("stats.note_scale_lost"), [r.scaleLossSource]),
+      r.firstDropS != null &&
+        R.sub(__WEBUI_TEXT__("stats.note_first_drop"), [r.firstDropS.toFixed(1)]),
+      cut.s != null && R.sub(__WEBUI_TEXT__("stats.note_cut_at"), [g(cut.g), cut.s.toFixed(1)]),
+      cut.drip != null && R.sub(__WEBUI_TEXT__("stats.note_drip"), [g(cut.drip, 1)]),
+      r.scaleName && R.sub(__WEBUI_TEXT__("stats.note_scale"), [r.scaleName]),
       r.bbwAlgorithm &&
         r.bbwAlgorithm !== "unknown" &&
-        `Brew by weight: ${r.bbwAlgorithm} v${r.bbwAlgorithmVersion}, offset ${g(r.offsetG)}`,
+        R.sub(__WEBUI_TEXT__("stats.note_bbw"), [
+          r.bbwAlgorithm,
+          r.bbwAlgorithmVersion,
+          g(r.offsetG),
+        ]),
       (r.extractionExtended || r.slowExtractionExtended) &&
-        `Extended by the ${r.slowExtractionExtended ? "slow" : "fast"}-shot guard`,
-      r.wTruncated && "Curve truncated",
-      ("Exported from Open Brew by Weight " + (R.firmwareVersion || "")).trim(),
+        (r.slowExtractionExtended
+          ? __WEBUI_TEXT__("stats.note_extended_slow")
+          : __WEBUI_TEXT__("stats.note_extended_fast")),
+      r.wTruncated && __WEBUI_TEXT__("stats.note_curve_truncated"),
+      R.sub(__WEBUI_TEXT__("stats.note_exported_from"), [R.firmwareVersion || ""]).trim(),
     ];
   return {
     version: 2,
