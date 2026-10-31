@@ -1669,3 +1669,22 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
       !css.includes('--gCut:#d1101f') || !css.includes('--gCut:#9e1c22') || !css.includes('.rvCut{fill:none;stroke:var(--gCut)'))
     throw new Error('Stats preset styles must color only the verdict zone and use the red cut-line token in both themes');
 }
+// Settings lists the Hero card above its colour modes, and Shot card colours
+// stay read-only unless the resolved hero is Colorful: Technical tints its
+// own graph zones, so the choice would do nothing there. The availability
+// re-syncs when the card choice changes and when a status apply refreshes
+// the machine default behind "Machine default".
+{
+  const settingsHtml = rawPartialHtml.settings,
+    cardAt = settingsHtml.indexOf('id="appHeroCard"'),
+    tintAt = settingsHtml.indexOf('id="appHeroTint"');
+  if (cardAt < 0 || tintAt < 0 || cardAt > tintAt)
+    throw new Error('Settings must list the Hero card above Shot card colours');
+  if (!codeIncludes(rawViewJs.settings,
+        '$("appHeroTint").disabled = R.heroCardMode() === "technical"') ||
+      !codeIncludes(rawViewJs.settings,
+        'setHeroCardOverride($("appHeroCard").value); syncHeroTintAvailability();') ||
+      !codeIncludes(rawViewJs.settings,
+        'applyStatus(s); syncHeroTintAvailability();'))
+    throw new Error('Shot card colours must follow the resolved hero mode and go read-only on Technical');
+}

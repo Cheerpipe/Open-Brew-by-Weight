@@ -6578,6 +6578,7 @@ export {
   noteBootId,
   buildRuleChartModel,
   heroCardOverride,
+  heroCardMode,
   setHeroCardOverride,
   shotStatsLine,
   drawPresetGraph,

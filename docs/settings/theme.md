@@ -51,7 +51,9 @@ Double-tapping the card still opens the full-screen live view in both looks.
 [installed app](app.md) — chooses how the Home shot card uses
 color while a shot runs. It shapes the **Colorful**
 [hero card](#hero-card); the Technical card always follows the forecast on
-its graph zones. Every finished shot takes the color of its result: green on recipe,
+its graph zones. So the setting is only available while the Colorful card is
+the one in use: when Technical is chosen — directly or through the machine's
+default — it switches off. Every finished shot takes the color of its result: green on recipe,
 red when fast, blue when slow. The options differ in what you see while a shot
 is running:
 

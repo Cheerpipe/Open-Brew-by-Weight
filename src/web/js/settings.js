@@ -1405,6 +1405,11 @@ function updateCupMinGuidance(s) {
       .replaceAll("{x}", observed.toFixed(1))
       .replace("{n}", min.toFixed(1));
 }
+// Shot card colors drive only the Colorful hero; Technical tints its own
+// graph zones, so the selector is read-only while Technical is resolved.
+function syncHeroTintAvailability() {
+  if ($("appHeroTint")) $("appHeroTint").disabled = R.heroCardMode() === "technical";
+}
 // What each newest shot needed against the drip in use, oldest bar first.
 // Markers show where the owner set the drip and where quick start decided.
 function renderDripChart(c) {
@@ -1649,7 +1654,10 @@ export function init() {
   if (ready) return;
   ready = true;
   R.initGroupRows($("workflowPanel"));
-  R.registerViewStatus("settings", applyStatus);
+  R.registerViewStatus("settings", (s) => {
+    applyStatus(s);
+    syncHeroTintAvailability();
+  });
   R.setSettingsForm({ validateBrewClient, renderPresetReview });
   R.registerViewStatus("settingsLive", updateCupMinGuidance);
   $("presetCards")?.addEventListener("click", () => setTimeout(updateSettingsOverrides));
@@ -1814,8 +1822,12 @@ export function init() {
   }
   if ($("appHeroCard")) {
     $("appHeroCard").value = R.heroCardOverride() || "default";
-    $("appHeroCard").onchange = () => R.setHeroCardOverride($("appHeroCard").value);
+    $("appHeroCard").onchange = () => {
+      R.setHeroCardOverride($("appHeroCard").value);
+      syncHeroTintAvailability();
+    };
   }
+  syncHeroTintAvailability();
   const updateAppOffline = () => {
     const box = $("appOfflineBox");
     if (!box) return;
