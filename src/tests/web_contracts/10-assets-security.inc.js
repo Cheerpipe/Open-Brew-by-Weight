@@ -618,7 +618,8 @@ if (!codeIncludes(ui, 'function rangeCheck(') ||
     !domainHeader.includes('validationFailure("CONFIG_FAST_MARGIN_RULES")') ||
     !/at least 2 s/.test(errorCatalog['err.config_fast_before_rules']) ||
     !domainHeader.includes('validationFailure("CONFIG_FAST_BEFORE_RULES")') ||
-    !network.includes('SSID must be 1–32 characters.') ||
+    !/1–32 characters/.test(errorCatalog['err.setup_ssid_length']) ||
+    !network.includes('SETUP_SSID_LENGTH') ||
     !network.includes('configValidationErrorName(error)')) {
   throw new Error('UI/API must expose specific validation ranges, inline errors, and field-aware config errors');
 }

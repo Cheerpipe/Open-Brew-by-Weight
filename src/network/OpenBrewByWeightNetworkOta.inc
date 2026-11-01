@@ -16,7 +16,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   static const char *const saveFields[] = {
       "action", "ssid",    "password", "open", "wifiSleep", "ipMode", "ip",
       "netmask", "gateway", "dns1",    "dns2", "name",      "apply", "baseRevision"};
-  const char *networkError = nullptr;
+  ValidationFailure networkError;
   SetupBrew brew = SetupBrew::NONE;
   uint8_t brewPresetId = 0;
   bool brewSaveFailed = false, networkStale = false;
@@ -46,7 +46,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   if (parsed && strcmp(action, "confirm") == 0) {
     parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (!parsed) {
-      networkError = "Confirm request must include only action=\"confirm\".";
+      networkError = validationFailure("SETUP_ACTION_CONFIRM_ONLY");
     } else {
       const StaJoinHints sta = self.staJoinHints();
       const NetworkStatusSnapshot network = self.snapshot();
@@ -56,7 +56,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
           !setupConfirmAllowed(network.setupPhase, network.apActive) ||
           network.staState != StaState::CONNECTED) {
         parsed = false;
-        networkError = "No pending network configuration to confirm.";
+        networkError = validationFailure("SETUP_NO_PENDING_CONFIG");
       } else {
         self.requestPendingNetworkConfirm(true);
         cJSON_Delete(root);
@@ -71,10 +71,10 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     // in" while the association — and /setup at 192.168.4.1 — stay up.
     parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (!parsed) {
-      networkError = "Skip request must include only action=\"skip\".";
+      networkError = validationFailure("SETUP_ACTION_SKIP_ONLY");
     } else if (!setupPeer) {
       parsed = false;
-      networkError = "No setup network to skip.";
+      networkError = validationFailure("SETUP_NO_NETWORK_SKIP");
     } else {
       self.portalExitRequested_.store(true, std::memory_order_release);
       cJSON_Delete(root);
@@ -89,10 +89,10 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     // window can fetch its probe-success page before the link drops.
     parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (!parsed) {
-      networkError = "Finish request must include only action=\"finish\".";
+      networkError = validationFailure("SETUP_ACTION_FINISH_ONLY");
     } else if (!socketServedBySoftAp(httpd_req_to_sockfd(request))) {
       parsed = false;
-      networkError = "No setup network to finish.";
+      networkError = validationFailure("SETUP_NO_NETWORK_FINISH");
     } else {
       const uint32_t now = millis();
       self.dataMux_.lock();
@@ -105,7 +105,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       self.dataMux_.unlock();
       if (!grace && !skipped) {
         parsed = false;
-        networkError = "No setup network to finish.";
+        networkError = validationFailure("SETUP_NO_NETWORK_FINISH");
       } else {
         if (grace) {
           self.dataMux_.lock();
@@ -125,10 +125,10 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     // session's unsaved test now; nothing to drop is not an error.
     parsed = jsonHasOnlyUniqueFields(root, actionFields, 1);
     if (!parsed) {
-      networkError = "Discard request must include only action=\"discard\".";
+      networkError = validationFailure("SETUP_ACTION_DISCARD_ONLY");
     } else if (!setupPeer) {
       parsed = false;
-      networkError = "No setup network to discard a test from.";
+      networkError = validationFailure("SETUP_NO_NETWORK_DISCARD");
     } else {
       self.requestPendingNetworkDiscard();
       cJSON_Delete(root);
@@ -139,10 +139,10 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     // Setup-context action: part one of onboarding saves the brewing choice
     // on its own, before and independent of Wi-Fi, without restarting.
     networkError = !jsonHasOnlyUniqueFields(root, brewFields, 3)
-                       ? "Brew request accepts only action=\"brew\" and the brewing choice."
-                   : !setupPeer ? "No setup network to save the brewing choice."
+                       ? validationFailure("SETUP_BREW_FIELDS_ONLY")
+                   : !setupPeer ? validationFailure("SETUP_NO_NETWORK_BREW")
                                 : parseSetupBrew(root, brew, brewPresetId);
-    if (networkError != nullptr) {
+    if (networkError.reason != nullptr) {
       parsed = false;
     } else if (!self.saveSetupBrew(brew, brewPresetId)) {
       parsed = false;
@@ -164,7 +164,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     if (parsed) {
       command.type = WebCommandType::FORGET_NETWORK;
     } else {
-      networkError = "Forget request must include only action=\"forget\".";
+      networkError = validationFailure("SETUP_ACTION_FORGET_ONLY");
     }
   } else if (parsed && strcmp(action, "save") == 0) {
     if (!self.webUiConfigurationAllowed(request, status)) {
@@ -188,13 +188,12 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
         !jsonBoolean(root, "wifiSleep", command.network.wifiSleep) ||
         !jsonString(root, "ipMode", ipMode, sizeof(ipMode), false)) {
       parsed = false;
-      networkError =
-          "Save request requires action, ssid, password, open, wifiSleep, and ipMode.";
+      networkError = validationFailure("SETUP_SAVE_FIELDS_REQUIRED");
     } else if (strcmp(ipMode, "dhcp") == 0) {
       command.network.staIpMode = static_cast<uint8_t>(StaIpMode::DHCP);
       if (hasIp || hasNetmask || hasGateway || hasDns1 || hasDns2) {
         parsed = false;
-        networkError = "DHCP save must not include static address fields.";
+        networkError = validationFailure("SETUP_DHCP_NO_STATIC_FIELDS");
       }
     } else if (strcmp(ipMode, "static") == 0) {
       command.network.staIpMode = static_cast<uint8_t>(StaIpMode::STATIC);
@@ -213,25 +212,23 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
           !parseIpv4(dns1Text, command.network.staDns1) ||
           (hasDns2 && !parseIpv4(dns2Text, command.network.staDns2))) {
         parsed = false;
-        networkError =
-            "Static IP save requires valid ip, netmask, gateway, and dns1.";
+        networkError = validationFailure("SETUP_STATIC_FIELDS_INVALID");
       }
     } else {
       parsed = false;
-      networkError = "ipMode must be \"dhcp\" or \"static\".";
+      networkError = validationFailure("FIELD_ENUM", "ipMode",
+                                    "\"dhcp\" or \"static\"");
     }
     const bool hasName = cJSON_GetObjectItemCaseSensitive(root, "name") != nullptr;
     if (parsed && hasName &&
         !jsonString(root, "name", command.network.deviceName,
                     sizeof(command.network.deviceName), false)) {
       parsed = false;
-      networkError = "Save request name must be 1-32 characters.";
+      networkError = validationFailure("SETUP_NAME_LENGTH");
     } else if (parsed && hasName &&
                !validDeviceName(command.network.deviceName)) {
       parsed = false;
-      networkError =
-          "Device name must be 1-32 letters, digits, spaces, or hyphens, "
-          "without a leading or trailing space or hyphen.";
+      networkError = validationFailure("SETUP_NAME_INVALID");
     }
     const bool hasApply = jsonFieldPresent(root, "apply");
     if (parsed && hasApply) {
@@ -239,10 +236,10 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       if (!jsonString(root, "apply", applyMode, sizeof(applyMode), false) ||
           strcmp(applyMode, "live") != 0) {
         parsed = false;
-        networkError = "apply must be \"live\" when provided.";
+        networkError = validationFailure("SETUP_APPLY_LIVE_ONLY");
       } else if (!self.snapshot().apActive) {
         parsed = false;
-        networkError = "Live apply is available only from the setup network.";
+        networkError = validationFailure("SETUP_APPLY_LIVE_SETUP_ONLY");
       } else {
         command.network.applyLive = true;
       }
@@ -259,7 +256,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
     }
     if (parsed && !validWifiSsid(command.network.ssid)) {
       parsed = false;
-      networkError = "SSID must be 1–32 characters.";
+      networkError = validationFailure("SETUP_SSID_LENGTH");
     } else if (parsed) {
       const StaJoinHints sta = self.staJoinHints();
       const bool reusePassword = shouldReuseSavedWifiCredentials(
@@ -269,25 +266,20 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
           !validWifiPassword(command.network.password, command.network.openNetwork)) {
         parsed = false;
         networkError = command.network.openNetwork
-                           ? "Open network password must be empty."
+                           ? validationFailure("SETUP_PASSWORD_OPEN_EMPTY")
                            : (sta.staConfigured
-                                  ? "Wi-Fi password must be 8–63 characters, "
-                                    "or empty to keep the saved password."
-                                  : "Wi-Fi password must be 8–63 characters for a "
-                                    "secured network.");
+                                  ? validationFailure("SETUP_PASSWORD_SAVED_OR_EMPTY")
+                                  : validationFailure("SETUP_PASSWORD_SECURED"));
       } else if (!validStaAddressConfig(command.network.staIpMode, command.network.staIp,
                                         command.network.staNetmask, command.network.staGateway,
                                         command.network.staDns1, command.network.staDns2)) {
         parsed = false;
-        networkError =
-            "Static IP, netmask, gateway, and DNS must be valid and on the "
-            "same subnet (not 192.168.4.x).";
+        networkError = validationFailure("SETUP_STATIC_SUBNET_INVALID");
       }
     }
   } else {
     parsed = false;
-    networkError =
-        "action must be \"save\", \"forget\", \"confirm\", \"skip\", \"finish\", \"brew\", or \"discard\".";
+    networkError = validationFailure("SETUP_ACTION_INVALID");
   }
   cJSON_Delete(root);
   self.unlockJsonBody();
@@ -301,11 +293,11 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       return sendError(request, STATUS_CONFLICT, "STALE_REVISION",
                        nullptr, "NETWORK_SETTINGS_CHANGED_RETRY");
     }
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_NETWORK",
-                     networkError != nullptr
-                         ? networkError
-                         : "Invalid network SSID or password.",
-                     nullptr);
+    if (networkError.reason == nullptr) {
+      networkError = validationFailure("NETWORK_SSID_PASSWORD_INVALID");
+    }
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_NETWORK", nullptr,
+                     networkError.reason, networkError.params);
   }
   if (!self.callbacks_.enqueueWebCommand(command)) {
     command.wipePassword();

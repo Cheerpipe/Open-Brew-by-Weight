@@ -161,17 +161,17 @@ if (!codeIncludes(ui, 'id="staIpMode"') ||
     !network.includes('staLinkMetricsValid') ||
     !network.includes('WiFi.RSSI()') ||
     !network.includes('shouldReuseSavedWifiCredentials') ||
-    !network.includes('or empty to keep the saved password.') ||
+    !network.includes('SETUP_PASSWORD_SAVED_OR_EMPTY') ||
     !network.includes('StaIpMode::STATIC') ||
     !network.includes('STA_CONFIRM_TIMEOUT_MS') ||
-    !network.includes('action must be \\"save\\", \\"forget\\", \\"confirm\\", \\"skip\\", \\"finish\\", \\"brew\\", or \\"discard\\".') ||
-    !network.includes('No pending network configuration to confirm.') ||
+    !network.includes('SETUP_ACTION_INVALID') ||
+    !network.includes('SETUP_NO_PENDING_CONFIG') ||
     // Skip portal exit: setup-context action (no admin unlock, like confirm),
     // action only, gated on the SoftAP being up AND the request coming
     // from the SoftAP socket, arms probe success.
     !network.includes('strcmp(action, "confirm") != 0 && strcmp(action, "skip") != 0') ||
-    !network.includes('Skip request must include only action=\\"skip\\".') ||
-    !network.includes('No setup network to skip.') ||
+    !network.includes('SETUP_ACTION_SKIP_ONLY') ||
+    !network.includes('SETUP_NO_NETWORK_SKIP') ||
     !network.includes('!socketServedBySoftAp(httpd_req_to_sockfd(request))') ||
     !network.includes('self.portalExitRequested_.store(true, std::memory_order_release)') ||
     !network.includes('sendJson(request, STATUS_OK, "{\\"skipped\\":true}")') ||
@@ -181,8 +181,8 @@ if (!codeIncludes(ui, 'id="staIpMode"') ||
     !networkHeader.includes('SOFTAP_TEARDOWN_GRACE_MS = 60000') ||
     !networkHeader.includes('SOFTAP_FINISH_LINGER_MS = 3000') ||
     !networkHeader.includes('uint32_t apTeardownAtMs = 0;') ||
-    !network.includes('Finish request must include only action=\\"finish\\".') ||
-    !network.includes('No setup network to finish.') ||
+    !network.includes('SETUP_ACTION_FINISH_ONLY') ||
+    !network.includes('SETUP_NO_NETWORK_FINISH') ||
     !network.includes('status_.apTeardownAtMs = now + SOFTAP_FINISH_LINGER_MS') ||
     !network.includes('sendJson(request, STATUS_OK, "{\\"finished\\":true}")') ||
     !network.includes('status_.apTeardownAtMs = millis() + SOFTAP_TEARDOWN_GRACE_MS') ||

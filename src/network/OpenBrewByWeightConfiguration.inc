@@ -1459,20 +1459,20 @@ esp_err_t OpenBrewByWeightNetwork::factoryResetHandler(httpd_req_t *request) {
 
 // Onboarding brewing choice (the setup "brew" action), accepted only while the
 // firmware is off: brewByWeight, plus presetId exactly when it is true.
-static const char *parseSetupBrew(cJSON *root, SetupBrew &brew,
-                                  uint8_t &presetId) {
+static ValidationFailure parseSetupBrew(cJSON *root, SetupBrew &brew,
+                                     uint8_t &presetId) {
   brew = SetupBrew::NONE;
   const bool hasPreset = jsonFieldPresent(root, "presetId");
   bool byWeight = false;
   if (!firmwareCompatibilityMode()) {
-    return "The brewing choice is part of setup only while the firmware is off.";
+    return validationFailure("SETUP_BREW_SETUP_ONLY");
   }
   if (!jsonBoolean(root, "brewByWeight", byWeight) || byWeight != hasPreset ||
       (hasPreset && (!jsonUint8(root, "presetId", presetId) || presetId == 0))) {
-    return "brewByWeight must be a boolean, with a non-zero presetId only when true.";
+    return validationFailure("SETUP_BREW_FIELDS_INVALID");
   }
   brew = byWeight ? SetupBrew::BY_WEIGHT : SetupBrew::USUAL;
-  return nullptr;
+  return ValidationFailure{};
 }
 
 // Saves the onboarding brewing choice on its own, unbound to any Wi-Fi: boot

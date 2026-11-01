@@ -42,8 +42,10 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
       jsonHasOnlyUniqueFields(root, fields, sizeof(fields) / sizeof(fields[0]));
   const bool actionOk = known &&
       jsonString(root, "action", action, sizeof(action), false);
-  const char *parseError = actionOk ? nullptr
-                                    : "action is required and all fields must be known.";
+  ValidationFailure parseError;
+  if (!actionOk) {
+    parseError = validationFailure("MICRA_ACTION_FIELDS_INVALID");
+  }
   bool applyTemperature = false;
   bool observeState = false;
   bool recognizeWakeGesture = false;
@@ -76,19 +78,20 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   self.dataMux_.unlock();
 
   uint8_t connectionType = candidate.connectionType;
-  if (parseError == nullptr && jsonFieldPresent(root, "connectionType")) {
+  if (parseError.reason == nullptr && jsonFieldPresent(root, "connectionType")) {
     char value[16] = {};
     if ((strcmp(action, "select") != 0 && strcmp(action, "save") != 0) ||
         !jsonString(root, "connectionType", value, sizeof(value), false) ||
         (strcmp(value, "websocket") != 0 && strcmp(value, "api") != 0)) {
-      parseError = "connectionType must be websocket or api on select or save.";
+      parseError = validationFailure("FIELD_ENUM", "connectionType",
+                                     "websocket or api on select or save");
     } else {
       connectionType = static_cast<uint8_t>(strcmp(value, "api") == 0
           ? MicraConnectionType::API : MicraConnectionType::WEBSOCKET);
     }
   }
 
-  if (parseError == nullptr && strcmp(action, "connect") == 0) {
+  if (parseError.reason == nullptr && strcmp(action, "connect") == 0) {
     if (!jsonString(root, "username", username, sizeof(username), false) ||
         !jsonString(root, "password", password, sizeof(password), false) ||
         jsonFieldPresent(root, "serial") ||
@@ -101,9 +104,9 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
         jsonFieldPresent(root, "scaleOffWithMachine") ||
         jsonFieldPresent(root, "boostScaleDetectionWhenOn") ||
         jsonFieldPresent(root, "reduceScaleScanningWhenOff")) {
-      parseError = "connect requires only username and password.";
+      parseError = validationFailure("MICRA_CONNECT_FIELDS_ONLY");
     }
-  } else if (parseError == nullptr && strcmp(action, "select") == 0) {
+  } else if (parseError.reason == nullptr && strcmp(action, "select") == 0) {
     if (!jsonString(root, "serial", serial, sizeof(serial), false) ||
         !jsonBoolean(root, "applyTemperature", applyTemperature) ||
         !jsonBoolean(root, "observeState", observeState) ||
@@ -120,11 +123,11 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
                                         shutdownGraceCode) ||
         jsonFieldPresent(root, "username") ||
         jsonFieldPresent(root, "password")) {
-      parseError = "select requires serial and all machine options.";
+      parseError = validationFailure("MICRA_SELECT_FIELDS_REQUIRED");
     } else {
       wipeLineaMicraSettings(candidate);
       if (!selectMachineIntegrationDevice(serial, candidate)) {
-        parseError = "Select a machine returned by the latest account connection.";
+        parseError = validationFailure("MICRA_SELECT_MACHINE_UNKNOWN");
       } else {
         candidate.connectionType = connectionType;
         setLineaMicraOptions(candidate, applyTemperature, observeState,
@@ -134,7 +137,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
                              reduceScaleScanningWhenOff);
       }
     }
-  } else if (parseError == nullptr && strcmp(action, "save") == 0) {
+  } else if (parseError.reason == nullptr && strcmp(action, "save") == 0) {
     // A save is a patch: each absent option keeps its stored value.
     const uint8_t o = candidate.options, so = candidate.scaleOptions;
     applyTemperature = o & LINEA_MICRA_APPLY_TEMPERATURE;
@@ -166,7 +169,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
         jsonFieldPresent(root, "username") ||
         jsonFieldPresent(root, "password") ||
         jsonFieldPresent(root, "serial")) {
-      parseError = "save requires a selected machine and at least one valid machine option.";
+      parseError = validationFailure("MICRA_SAVE_FIELDS_REQUIRED");
     } else {
       candidate.connectionType = connectionType;
       setLineaMicraOptions(candidate, applyTemperature, observeState,
@@ -175,7 +178,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
                            scaleOffWithMachine, boostScaleDetectionWhenOn,
                            reduceScaleScanningWhenOff);
     }
-  } else if (parseError == nullptr &&
+  } else if (parseError.reason == nullptr &&
              (strcmp(action, "disconnect") == 0 ||
               strcmp(action, "refresh") == 0 ||
               strcmp(action, "relist") == 0)) {
@@ -191,10 +194,10 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
         jsonFieldPresent(root, "scaleOffWithMachine") ||
         jsonFieldPresent(root, "boostScaleDetectionWhenOn") ||
         jsonFieldPresent(root, "reduceScaleScanningWhenOff")) {
-      parseError = "disconnect, refresh, and relist do not accept setting fields.";
+      parseError = validationFailure("MICRA_READONLY_ACTIONS");
     }
-  } else if (parseError == nullptr) {
-    parseError = "Unknown Linea Micra action.";
+  } else if (parseError.reason == nullptr) {
+    parseError = validationFailure("MICRA_ACTION_UNKNOWN");
   }
 
   cJSON *passwordField = root == nullptr
@@ -207,9 +210,9 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   if (root != nullptr) cJSON_Delete(root);
   memset(self.workBuf_->requestBody, 0, sizeof(self.workBuf_->requestBody));
   self.unlockJsonBody();
-  if (parseError != nullptr) {
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     parseError, nullptr);
+  if (parseError.reason != nullptr) {
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD", nullptr,
+                     parseError.reason, parseError.params);
   }
 
   const bool relist = strcmp(action, "relist") == 0;

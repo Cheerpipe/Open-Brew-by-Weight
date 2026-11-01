@@ -319,12 +319,12 @@
   // the setup SoftAP stops; full mode lets the activator close the SoftAP.
   const intentBlock = blockAt(network, 'bool OpenBrewByWeightNetwork::saveSetupBrew(');
   const idleBlock = blockAt(network, 'void OpenBrewByWeightNetwork::serviceSoftApIdle(');
-  if (!codeIncludes(network, 'if(!firmwareCompatibilityMode()){return"The brewing choice is part of setup only while the firmware is off.";}') ||
+  if (!codeIncludes(network, 'if (!firmwareCompatibilityMode()) { return validationFailure("SETUP_BREW_SETUP_ONLY"); }') ||
       !codeIncludes(networkHandlerBlock, 'elseif(parsed&&strcmp(action,"brew")==0){') ||
-      !codeIncludes(networkHandlerBlock, ':!setupPeer?"No setup network to save the brewing choice.":parseSetupBrew(root,brew,brewPresetId);') ||
+      !codeIncludes(networkHandlerBlock, ': !setupPeer ? validationFailure("SETUP_NO_NETWORK_BREW") : parseSetupBrew(root, brew, brewPresetId);') ||
       !codeIncludes(networkHandlerBlock, '!self.saveSetupBrew(brew,brewPresetId)') ||
-      !codeIncludes(networkHandlerBlock, 'parsed=jsonHasOnlyUniqueFields(root,actionFields,1);if(!parsed){networkError="Skip request must include only action=\\"skip\\".";}') ||
-      !codeIncludes(networkHandlerBlock, 'parsed=jsonHasOnlyUniqueFields(root,actionFields,1);if(!parsed){networkError="Finish request must include only action=\\"finish\\".";}') ||
+      !codeIncludes(networkHandlerBlock, 'parsed = jsonHasOnlyUniqueFields(root, actionFields, 1); if (!parsed) { networkError = validationFailure("SETUP_ACTION_SKIP_ONLY"); }') ||
+      !codeIncludes(networkHandlerBlock, 'parsed = jsonHasOnlyUniqueFields(root, actionFields, 1); if (!parsed) { networkError = validationFailure("SETUP_ACTION_FINISH_ONLY"); }') ||
       /persistSetupIntent|keepSetupBrew|intent\.bound = true/.test(network + networkHeader) ||
       !codeIncludes(confirmBlock, 'if(loadSetupIntent(intent)){setupRestartPending_.store(true,std::memory_order_release);') ||
       !codeIncludes(revertBlock, 'if(loadSetupIntent(intent)&&intent.bound)(void)clearSetupIntent();') ||

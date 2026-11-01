@@ -109,7 +109,7 @@ Every error body carries a third field between `error` and `message`:
   locale, `en.json`); the controller derives both its API prose and its Web
   UI text from that catalog at build time, so the two can never drift apart.
 
-The 261 codes, grouped by the routes that answer with them.
+The 295 codes, grouped by the routes that answer with them.
 
 #### Validation rule templates (parameterized)
 
@@ -215,15 +215,23 @@ params substituted in order (see the example above).
 | ``HOST_NOT_ALLOWED`` | Open the controller by its IP address or its .local name. |
 | ``INVALID_MICRA_CONFIG`` | The Linea Micra settings are not valid. |
 | ``INVALID_WEBHOOK`` | Use an http:// URL without embedded credentials; HTTPS is not supported. |
+| ``MICRA_ACTION_FIELDS_INVALID`` | action is required and all fields must be known. |
+| ``MICRA_ACTION_UNKNOWN`` | Unknown Linea Micra action. |
 | ``MICRA_BOUNDED_JSON_REQUIRED`` | A bounded Linea Micra JSON request is required. |
 | ``MICRA_BUSY`` | The Linea Micra integration is busy; try again shortly. |
 | ``MICRA_CHANGE_PENDING`` | Another Linea Micra change is still being saved. |
+| ``MICRA_CONNECT_FIELDS_ONLY`` | connect requires only username and password. |
 | ``MICRA_NOT_READY`` | Connect an account and select a machine first. |
+| ``MICRA_READONLY_ACTIONS`` | disconnect, refresh, and relist do not accept setting fields. |
 | ``MICRA_REQUIRES_READY`` | Linea Micra settings can be changed only while Ready. |
 | ``MICRA_SAVE_BUSY`` | Control is busy; Linea Micra settings were not saved. |
+| ``MICRA_SAVE_FIELDS_REQUIRED`` | save requires a selected machine and at least one valid machine option. |
+| ``MICRA_SELECT_FIELDS_REQUIRED`` | select requires serial and all machine options. |
+| ``MICRA_SELECT_MACHINE_UNKNOWN`` | Select a machine returned by the latest account connection. |
 | ``MICRA_STA_REQUIRED`` | Connect to Wi-Fi station mode and close setup AP first. |
 | ``NETWORK_SETTINGS_CHANGED_RETRY`` | Network settings changed; refresh and retry. |
 | ``NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE`` | Network settings are locked while a cycle is active. |
+| ``NETWORK_SSID_PASSWORD_INVALID`` | Invalid network SSID or password. |
 | ``NOT_FOUND`` | The requested resource was not found. |
 | ``NO_SCALE_PROFILE`` | No scale profile is available to download. |
 | ``OTA_ACTION_INVALID`` | action must be start, stop, or delete. |
@@ -244,8 +252,34 @@ params substituted in order (see the example above).
 | ``SCALE_SELECT_BUSY`` | Control is busy; nothing was selected. |
 | ``SCAN_FIELDS_INVALID`` | scanIntensity must be balanced, aggressive, or relaxed; enabled must be a boolean. |
 | ``SCAN_INTENSITY_UNCHANGED`` | Scan intensity was not changed. |
+| ``SETUP_ACTION_CONFIRM_ONLY`` | Confirm request must include only action="confirm". |
+| ``SETUP_ACTION_DISCARD_ONLY`` | Discard request must include only action="discard". |
+| ``SETUP_ACTION_FINISH_ONLY`` | Finish request must include only action="finish". |
+| ``SETUP_ACTION_FORGET_ONLY`` | Forget request must include only action="forget". |
+| ``SETUP_ACTION_INVALID`` | action must be "save", "forget", "confirm", "skip", "finish", "brew", or "discard". |
+| ``SETUP_ACTION_SKIP_ONLY`` | Skip request must include only action="skip". |
+| ``SETUP_APPLY_LIVE_ONLY`` | apply must be "live" when provided. |
+| ``SETUP_APPLY_LIVE_SETUP_ONLY`` | Live apply is available only from the setup network. |
+| ``SETUP_BREW_FIELDS_INVALID`` | brewByWeight must be a boolean, with a non-zero presetId only when true. |
+| ``SETUP_BREW_FIELDS_ONLY`` | Brew request accepts only action="brew" and the brewing choice. |
 | ``SETUP_BREW_SAVE_FAILED`` | Could not save the brewing choice. |
+| ``SETUP_BREW_SETUP_ONLY`` | The brewing choice is part of setup only while the firmware is off. |
+| ``SETUP_DHCP_NO_STATIC_FIELDS`` | DHCP save must not include static address fields. |
+| ``SETUP_NAME_INVALID`` | Device name must be 1-32 letters, digits, spaces, or hyphens, without a leading or trailing space or hyphen. |
+| ``SETUP_NAME_LENGTH`` | Save request name must be 1-32 characters. |
+| ``SETUP_NO_NETWORK_BREW`` | No setup network to save the brewing choice. |
+| ``SETUP_NO_NETWORK_DISCARD`` | No setup network to discard a test from. |
+| ``SETUP_NO_NETWORK_FINISH`` | No setup network to finish. |
+| ``SETUP_NO_NETWORK_SKIP`` | No setup network to skip. |
+| ``SETUP_NO_PENDING_CONFIG`` | No pending network configuration to confirm. |
+| ``SETUP_PASSWORD_OPEN_EMPTY`` | Open network password must be empty. |
 | ``SETUP_PASSWORD_REQUIRED`` | Choose your own device password before finishing setup. |
+| ``SETUP_PASSWORD_SAVED_OR_EMPTY`` | Wi-Fi password must be 8–63 characters, or empty to keep the saved password. |
+| ``SETUP_PASSWORD_SECURED`` | Wi-Fi password must be 8–63 characters for a secured network. |
+| ``SETUP_SAVE_FIELDS_REQUIRED`` | Save request requires action, ssid, password, open, wifiSleep, and ipMode. |
+| ``SETUP_SSID_LENGTH`` | SSID must be 1–32 characters. |
+| ``SETUP_STATIC_FIELDS_INVALID`` | Static IP save requires valid ip, netmask, gateway, and dns1. |
+| ``SETUP_STATIC_SUBNET_INVALID`` | Static IP, netmask, gateway, and DNS must be valid and on the same subnet (not 192.168.4.x). |
 | ``STATUS_BUSY`` | Status snapshot is busy; retry shortly. |
 | ``TASK_PROFILER_UNCHANGED`` | Task profiler state was not changed. |
 | ``TIMEZONE_ALREADY_SET`` | The time zone was already saved. |
