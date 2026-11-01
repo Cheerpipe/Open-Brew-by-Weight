@@ -89,9 +89,9 @@
     const group = {hidden: false, querySelectorAll: () => buttons};
     const sent = [];
     const uiState = {statsWindow: selected};
-    new Function('$', 'R', 'statsMergedGood', 'statsGood', 'statsMerged', 'statsSynced',
+    new Function('$', 'R', 'statsMergedGood', 'statsGood', 'archiveStatsReady', 'statsSynced',
         'sendStatsWindow', `${blockAt(rawViewJs.stats, 'function statsWindowChoices(')};statsWindowChoices();`)(
-        () => group, {uiState}, merged ? n : null, n, merged ? {} : null, true,
+        () => group, {uiState}, merged ? n : null, n, () => merged, true,
         () => sent.push(uiState.statsWindow));
     return {shown: group.hidden ? [] : buttons.filter((b) => !b.hidden).map((b) => +b.dataset.v),
       selected: uiState.statsWindow, sent};
@@ -105,6 +105,9 @@
   assert.deepEqual(choices(501, true, 10).shown, [10, 50, 100, 500, 1000]);
   const fallen = choices(30, true, 500);
   assert.deepEqual([fallen.selected, fallen.sent], [50, [50]], 'a hidden window falls to the largest shown');
+  // The merged count is kept while a header request fails: 500 stays chosen.
+  const kept = choices(134, true, 500);
+  assert.deepEqual([kept.selected, kept.sent], [500, []]);
 }
 // Stats and History render cost: one curve model per shot row and CSV line, a
 // rated star keeps keyboard focus, label layout sleeps off Stats, and History

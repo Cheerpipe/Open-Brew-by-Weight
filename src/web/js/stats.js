@@ -953,7 +953,7 @@ async function refreshMergedHeader() {
       ["result", "preset", "scale"].filter((k) => q[k]).map((k) => [k, q[k]]),
     );
   let reply = null;
-  if (archiveReady("shots"))
+  if (archiveStatsReady())
     reply = await companionArchive(
       "stats?" +
         new URLSearchParams({
@@ -964,8 +964,10 @@ async function refreshMergedHeader() {
         }),
     ).catch(() => null);
   if (ask !== statsHeaderAsk) return;
+  // A failed answer shows the controller's header meanwhile but keeps the
+  // last whole-history count, so the window choice never collapses.
   statsMerged = reply?.stats || null;
-  statsMergedGood = reply ? reply.good : null;
+  if (reply) statsMergedGood = reply.good;
   if (shotStatsViewActive()) R.paint(renderShots);
 }
 // S18: every window smaller than the good shots the list holds under its
@@ -973,15 +975,16 @@ async function refreshMergedHeader() {
 // companion adds 500 and 1000 over the whole history. A selection the
 // filters hide falls to the largest window still shown.
 function statsWindowChoices() {
-  const n = statsMergedGood ?? statsGood,
-    sizes = statsMerged ? [10, 50, 100, 500, 1000] : [10, 50, 100],
+  const merged = archiveStatsReady(),
+    n = merged && statsMergedGood != null ? statsMergedGood : statsGood,
+    sizes = merged ? [10, 50, 100, 500, 1000] : [10, 50, 100],
     shown = sizes.filter((v, i) => i === 0 || sizes[i - 1] < n);
   for (const b of $("statsWindow")?.querySelectorAll("button") || []) {
     b.hidden = !shown.includes(+b.dataset.v);
     b.setAttribute("aria-pressed", String(+b.dataset.v === R.uiState.statsWindow));
   }
   $("statsWindow").hidden = shown.length < 2;
-  if (!shown.includes(R.uiState.statsWindow) && (statsMerged || statsSynced)) {
+  if (!shown.includes(R.uiState.statsWindow) && (merged ? statsMergedGood != null : statsSynced)) {
     R.uiState.statsWindow = shown.at(-1);
     sendStatsWindow();
   }
@@ -2614,6 +2617,8 @@ function applyStatsStream(message) {
   }
   R.uiState.statsFetchMark = null;
   statsStreamBoot = message.boot;
+  // A moved store reloads the companion's archive rows with the next render.
+  if (statsStreamEpoch !== page.epoch && statsStreamEpoch) archiveChanged("shots");
   statsStreamEpoch = page.epoch;
   if (page.mode === "replace") {
     statsTag = page.tag;

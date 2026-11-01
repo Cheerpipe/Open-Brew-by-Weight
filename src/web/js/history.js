@@ -449,6 +449,7 @@ function applyHistoryStream(message) {
     mode,
   );
   historyStreamBoot = message.boot;
+  if (historyStreamEpoch !== message.epoch && historyStreamEpoch) archiveChanged("history");
   historyStreamEpoch = message.epoch;
   if (!fetch) historyTag = message.tag;
   historyFetchOffset = -1;

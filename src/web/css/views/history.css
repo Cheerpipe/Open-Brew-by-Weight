@@ -343,6 +343,13 @@
   background: var(--mu);
   color: var(--sf);
 }
+.archiveKept .srText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
 .histBadge.archiveKept {
   outline: 1px dashed var(--mu);
 }

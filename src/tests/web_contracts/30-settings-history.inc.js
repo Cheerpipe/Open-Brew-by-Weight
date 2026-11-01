@@ -1343,7 +1343,7 @@ if (!statsSection ||
         scheduleShotPaint() {},
         renderShots: () => events.push('render:' + context.controlsMutable), paint: (fn) => fn(),
         updateHeaderSignals() {}, updateFirmwareFooter() {}, noteReachOk() {},
-        refreshMergedHeader() {}, statsArchiveNeed: null, loadArchive() {},
+        refreshMergedHeader() {}, statsArchiveNeed: null, loadArchive() {}, archiveChanged() {},
         atob, __WEBUI_TEXT__: key => key});
       // Shared state and runtime references resolve to this harness's globals.
       const stream = runtimeStateGlobals + blockAt(rawRuntimeJs, 'function decodeCurveDeltas(') + '\n' +
