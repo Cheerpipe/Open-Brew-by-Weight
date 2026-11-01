@@ -1402,6 +1402,9 @@ esp_err_t OpenBrewByWeightNetwork::sendError(httpd_req_t *request,
     const char *resolved = errorReasonText(reason);
     prose = resolved != nullptr ? resolved : reason;
   }
+  // No caller sends both nulls (debt sites always pass prose); keep the
+  // format string free of a null %s regardless.
+  if (prose == nullptr) prose = "";
   char body[256] = {};
   if (reason != nullptr) {
     snprintf(body, sizeof(body),
