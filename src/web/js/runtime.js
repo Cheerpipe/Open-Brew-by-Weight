@@ -6080,6 +6080,7 @@ function renderHeroTechnicalChart(host, d, model, m) {
       : d.verdict === "fast" || d.verdict === "slow"
         ? d.verdict
         : "on_recipe";
+  const curve = model.pts.slice().sort((a, b) => a.t - b.t);
   if (d.live) {
     const pct = Math.max(0, Math.min(100, +d.tintPct || 0)) / 100;
     for (const [cls, bands] of Object.entries(HERO_ZONE_BANDS)) {
@@ -6094,7 +6095,7 @@ function renderHeroTechnicalChart(host, d, model, m) {
     const key = d.shotId ?? d.elapsedMs;
     if (host._shotKey !== key || host._cursorT === host._curve?.at(-1)?.t) {
       host._shotKey = key;
-      host._cursorT = model.pts.at(-1).t;
+      host._cursorT = curve.at(-1).t;
     }
     if (!host.dataset.bound) {
       host.dataset.bound = "1";
@@ -6110,7 +6111,7 @@ function renderHeroTechnicalChart(host, d, model, m) {
       );
     }
   }
-  host._curve = model.pts.slice().sort((a, b) => a.t - b.t);
+  host._curve = curve;
   if (!d.live) {
     host
       .querySelector("svg")
