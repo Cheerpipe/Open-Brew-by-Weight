@@ -107,19 +107,31 @@ requires the Micra WebSocket connection and state observation to be enabled.
 To follow a shot from a tablet or a phone propped next to the machine, tap
 **Live** in the header, on any page. The dot on it pulses red while a shot is
 running. You can also double-tap the shot card on Home (double-click it on a
-computer, or select it and press Enter). The live view fills the screen,
-always in landscape, with big weight, time and flow readings beside the same
-graph as **How this preset cuts** in Settings: you watch the shot climb
-through the fast, on-recipe and slow corridors toward the red cut line, and a
-white circle sitting on the cut line marks where the controller expects the
-shot to land. When the shot ends, the circle glides to the shot's real end
+computer, or select it and press Enter). The live view fills the screen with
+the same graph as **How this preset cuts** in Settings: you watch the shot
+climb through the fast, on-recipe and slow corridors toward the red cut line,
+and a white circle sitting on the cut line marks where the controller expects
+the shot to land. When the shot ends, the circle glides to the shot's real end
 point and settles into a small dot. Flow appears under the weight curve, in its
-own strip below the graph on a tablet. With no shot running, the view shows
-the active preset, ready for the next one, and after a shot it keeps that shot
-until the next one starts. Tap the ×, double-tap the view, press Esc on a
-keyboard, or use your device's back gesture to close it; you return to the
-page you were on. While the view is open, your phone's screen stays on, so you
-can watch the whole shot.
+own strip below the graph on a tablet.
+
+The weight leads the numbers: it takes the shot's colour, a bar fills toward
+your target yield, and you see how many grams are left and the ratio so far.
+Below it, the time shows when the shot is expected to end, and a dot on the
+window bar shows where that lands against your preset's time window. Smaller
+cards follow with the flow right now, the highest flow so far, the ratio against
+your recipe's, and when the first drops fell compared with your previous shot.
+Once the shot is over, those cards give way to its summary: average and highest
+flow, final ratio, how much dripped after the stop, first drops, and the times
+of your last shots.
+
+The view follows the way you hold your phone or tablet: numbers beside the graph
+in landscape, numbers above it when upright. With no shot running, the view
+shows the active preset, ready for the next one, and after a shot it keeps that
+shot until the next one starts. Tap the ×, double-tap the view, press Esc on a
+keyboard, or use your device's back gesture to close it; you return to the page
+you were on. While the view is open, your phone's screen stays on, so you can
+watch the whole shot.
 
 The header shows the controller's home-network Wi-Fi signal and its Bluetooth
 link to the scale. More lit arcs or bars mean a stronger signal; amber means

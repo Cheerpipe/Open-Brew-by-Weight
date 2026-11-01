@@ -167,14 +167,11 @@
 body.shotFs {
   overflow: hidden;
 }
-/* Live view: always landscape (rotated on a portrait screen). Each side keeps
-   only its own safe-area inset, remapped while rotated. */
+/* Live view: a shot dashboard — chart and flow lane beside a column of
+   numbers in landscape, numbers above the chart when held upright. */
 .liveShot {
-  --it: env(safe-area-inset-top);
-  --ir: env(safe-area-inset-right);
-  --ib: env(safe-area-inset-bottom);
-  --il: env(safe-area-inset-left);
   --lsTone: color-mix(in srgb, var(--cf) 60%, var(--fg));
+  --lsGap: clamp(0.45rem, 1.4vmin, 0.9rem);
   position: fixed;
   top: 0;
   left: 0;
@@ -182,12 +179,17 @@ body.shotFs {
   width: 100dvw;
   height: 100dvh;
   display: grid;
-  grid-template: auto minmax(0, 1fr) auto / clamp(7.5rem, 19vmax, 15.5rem) minmax(0, 1fr);
-  gap: clamp(0.4rem, 2vmin, 1.2rem) clamp(0.6rem, 2vmax, 1.6rem);
-  padding: max(0.6rem, 2vmin, var(--it)) max(1rem, 2vmin, var(--ir)) max(0.6rem, var(--ib))
-    max(1rem, 2vmin, var(--il));
-  background: var(--sf);
+  grid-template:
+    "top top" auto
+    "graph side" minmax(0, 1fr)
+    "lane side" clamp(7rem, 21vh, 11rem)
+    / minmax(0, 1fr) clamp(19rem, 32vw, 26rem);
+  gap: var(--lsGap);
+  padding: max(var(--lsGap), env(safe-area-inset-top)) max(var(--lsGap), env(safe-area-inset-right))
+    max(var(--lsGap), env(safe-area-inset-bottom)) max(var(--lsGap), env(safe-area-inset-left));
+  background: var(--bg);
   color: var(--fg);
+  font-variant-numeric: tabular-nums;
   user-select: none;
   -webkit-user-select: none;
   animation: liveShotIn 0.26s ease-out;
@@ -210,22 +212,6 @@ body.shotFs {
     transform: scale(0.98);
   }
 }
-@media (orientation: portrait) {
-  .liveShot {
-    --it: env(safe-area-inset-right);
-    --ir: env(safe-area-inset-bottom);
-    --ib: env(safe-area-inset-left);
-    --il: env(safe-area-inset-top);
-    width: 100dvh;
-    height: 100dvw;
-    transform-origin: top left;
-    transform: rotate(90deg) translateY(-100%);
-  }
-  .liveShot,
-  .liveShot.fsOut {
-    animation: none;
-  }
-}
 /* The shot colour: brown while brewing, then the forecast or verdict. */
 .liveShot[data-tint="fast"] {
   --lsTone: var(--gFast);
@@ -236,6 +222,10 @@ body.shotFs {
 .liveShot[data-tint="slow"] {
   --lsTone: var(--gSlow);
 }
+.liveShot > * {
+  min-width: 0;
+  min-height: 0;
+}
 .liveShot .heroAwake {
   position: absolute;
   inset: 0;
@@ -245,32 +235,37 @@ body.shotFs {
   pointer-events: none;
 }
 .lsTop {
-  grid-column: 1 / -1;
+  grid-area: top;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  min-width: 0;
   min-height: var(--tap);
-  font-size: clamp(0.85rem, 3vmin, 1.4rem);
+  font-size: clamp(0.85rem, 2.2vmin, 1.1rem);
+}
+.lsTop p {
+  margin: 0;
+  white-space: nowrap;
 }
 .lsChip {
   display: inline-flex;
   align-items: center;
   gap: 0.45em;
-  margin: 0;
   padding: 0.3em 0.85em;
   border: 1px solid var(--ln);
   border-radius: 2em;
+  background: var(--sf);
   font-weight: 600;
-  white-space: nowrap;
+}
+.lsRecipe {
+  color: var(--mu);
+  font-weight: 600;
 }
 .lsState {
   flex: 1;
   min-width: 0;
-  margin: 0;
   overflow: hidden;
+  text-align: right;
   font-weight: 600;
-  white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--lsTone);
 }
@@ -278,12 +273,12 @@ body.shotFs {
   flex: none;
   display: grid;
   place-items: center;
-  width: clamp(var(--tap), 8vmin, 4rem);
-  height: clamp(var(--tap), 8vmin, 4rem);
+  width: var(--tap);
+  height: var(--tap);
   padding: 0;
   border: 1px solid var(--ln);
   border-radius: 50%;
-  background: var(--in);
+  background: var(--sf);
   color: var(--fg);
   cursor: pointer;
 }
@@ -291,67 +286,264 @@ body.shotFs {
   width: 40%;
   height: 40%;
 }
-.lsNums {
-  grid-row: 2 / span 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  min-width: 0;
-}
-.lsNums p {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-}
-.lsNums p > small {
-  font-size: clamp(0.7rem, 2.4vmin, 1.1rem);
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--mu);
-}
-.lsNums b {
-  font-size: min(8.5vmin, 4.4vmax);
-  font-weight: 700;
-  line-height: 1.02;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.lsNums p:first-child b {
-  font-size: min(15vmin, 8vmax);
-}
-.lsNums b small {
-  display: inline;
-  margin-left: 0.15em;
-  font-size: 0.42em;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--mu);
+.lsCard {
+  position: relative;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--sf);
 }
 .lsGraph {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
+  grid-area: graph;
+  overflow: hidden;
 }
-/* Flow gets its own lane only where the screen is tall enough (tablets). */
 .lsLane {
-  display: none;
-  position: relative;
-  grid-column: 2;
+  grid-area: lane;
+  overflow: hidden;
 }
-@media (min-width: 600px) and (min-height: 600px) {
-  .lsLane {
-    display: block;
-    height: 26vmin;
-  }
-}
+.lsLane > div,
 .lsGraph svg,
 .lsLane svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+}
+/* Labels: small caps over every number; units trail at a smaller size. */
+.liveShot small {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--mu);
+}
+.lsLane > small {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.8rem;
+}
+.lsSide b small {
+  display: inline;
+  font-size: 0.4em;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.lsSide {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lsGap);
+}
+/* Every number sizes from its own card, so none outgrows its column. */
+.lsHero,
+.lsTime,
+.lsTiles > p {
+  container-type: inline-size;
+  margin: 0;
+  padding: 0.75rem 0.95rem 0.85rem;
+}
+.lsSide b {
+  display: block;
+  font-weight: 800;
+  color: var(--fg);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.lsHero b {
+  margin: 0.05em 0 0.2em;
+  font-size: min(27cqi, 15vh);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--lsTone);
+}
+.lsTime b {
+  font-size: min(17cqi, 4.2rem);
+}
+.lsProg {
+  display: block;
+  height: 0.45rem;
+  border-radius: 0.3rem;
+  background: var(--in);
+  box-shadow: inset 0 0 0 1px var(--ln);
+  overflow: hidden;
+}
+.lsProg i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lsTone);
+  transition: width 0.15s linear;
+}
+.lsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--mu);
+}
+.lsTime .lsRow {
+  margin: 0;
+}
+.lsRow strong,
+.lsTiles span strong {
+  font-weight: 700;
+  color: var(--fg);
+}
+.lsEnds {
+  text-align: right;
+}
+.lsEnds strong {
+  font-size: 1.15rem;
+  color: var(--lsTone);
+}
+/* The grind hint's window bar: its dot is where this shot lands. */
+.lsTime .ghBar {
+  --z: var(--lsTone);
+  margin: 0.5rem 0 0.05rem;
+}
+.lsTime .lvl {
+  transition: left 0.3s ease;
+}
+.lsTime .lvl[hidden] {
+  display: none;
+}
+.lsTiles {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: var(--lsGap);
+}
+.lsTiles > p {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 0.6rem 0.8rem;
+}
+.lsTiles b {
+  font-size: min(19cqi, 2.6rem);
+}
+.lsTiles span {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--mu);
+}
+/* A finished shot lists its facts in one card in place of the tiles. */
+.lsTiles.done {
+  flex: none;
+  grid-auto-rows: auto;
+  gap: 0.45rem 1rem;
+  padding: 0.75rem 0.95rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--sf);
+}
+.lsTiles.done > p {
+  padding: 0;
+  border: 0;
+}
+.lsTiles.done b {
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+.lsTiles.done b small {
+  font-size: 0.8em;
+}
+/* Held upright: numbers across the top, the chart full width. */
+@media (orientation: portrait) {
+  .liveShot {
+    grid-template:
+      "top" auto
+      "side" minmax(clamp(16rem, 30vh, 22rem), auto)
+      "graph" minmax(0, 1fr)
+      "lane" clamp(7rem, 15vh, 10rem)
+      / minmax(0, 1fr);
+  }
+  .lsSide {
+    display: grid;
+    grid-template: auto minmax(0, 1fr) / minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .lsHero {
+    grid-row: 1 / 3;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .lsHero b {
+    font-size: min(30cqi, 9rem);
+  }
+}
+/* Phone: compact numbers, the flow drawn into the chart's lower third. */
+@media (max-height: 520px) {
+  .liveShot {
+    grid-template:
+      "top top" auto
+      "side graph" minmax(0, 1fr)
+      / clamp(12rem, 34vw, 17rem) minmax(0, 1fr);
+  }
+}
+@media (max-height: 520px), (orientation: portrait) and (max-width: 599px) {
+  .liveShot {
+    --lsGap: 0.45rem;
+  }
+  .lsTop {
+    min-height: 2.4rem;
+    font-size: 0.8rem;
+    gap: 0.45rem;
+  }
+  .lsClose {
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+  .lsLane,
+  .lsTime .ghAxis {
+    display: none;
+  }
+  .lsHero,
+  .lsTime,
+  .lsTiles.done {
+    padding: 0.45rem 0.7rem 0.5rem;
+  }
+  .lsHero b {
+    font-size: min(29cqi, 4.6rem);
+  }
+  .lsRow {
+    margin-top: 0.3rem;
+    font-size: 0.72rem;
+  }
+  .lsTime b {
+    font-size: min(15cqi, 1.9rem);
+  }
+  .lsEnds strong {
+    font-size: 0.9rem;
+  }
+  .lsTime .ghBar {
+    margin-top: 0.3rem;
+  }
+  .lsTiles > p {
+    padding: 0.35rem 0.6rem;
+  }
+  .lsTiles > p:nth-child(n + 3) {
+    display: none;
+  }
+  .lsTiles b {
+    font-size: min(21cqi, 1.6rem);
+  }
+  .lsTiles span {
+    font-size: 0.66rem;
+  }
 }
 .liveShot .rvLast {
   stroke: var(--lsTone);
@@ -382,6 +574,25 @@ body.shotFs {
   fill: var(--lsTone);
   stroke: var(--sf);
   stroke-width: 1.6;
+}
+/* Phone held upright: the numbers stack full width, weight first. */
+@media (orientation: portrait) and (max-width: 599px) {
+  .liveShot {
+    grid-template:
+      "top" auto
+      "side" auto
+      "graph" minmax(0, 1fr)
+      / minmax(0, 1fr);
+  }
+  .lsRecipe {
+    display: none;
+  }
+  .lsSide {
+    display: flex;
+  }
+  .lsHero b {
+    font-size: min(24cqi, 5.5rem);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .liveShot,

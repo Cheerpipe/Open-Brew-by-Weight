@@ -20,8 +20,6 @@ Clearing the app's browser data returns them to their defaults, and a
   machine and the timer appears on the counter.
 - **Vibrate when a shot ends** gives a short buzz when the extraction
   finishes. Android phones only.
-- **Hold the live view upright** keeps the live view portrait however you
-  turn the phone. Android phones only.
 - **Hero card** picks which Home shot card this device shows — the recipe
   graph of **Technical** or the full-color **Colorful** card — overriding the
   machine's choice in Admin → Frontend for this device only. See

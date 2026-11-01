@@ -5108,7 +5108,6 @@ const APP_SETTING_KEYS = {
   awake: "obbwAppAwake",
   live: "obbwAppLive",
   vibrate: "obbwAppVibrate",
-  orient: "obbwAppOrient",
 };
 function appSetting(k) {
   try {
@@ -5176,10 +5175,6 @@ function enterShotFullScreen() {
   view.hidden = false;
   document.body.classList.add("shotFs");
   keepShotFsAwake(true);
-  // A standalone page may pin the live view upright (Android offers the
-  // lock; other platforms skip it silently).
-  if (appSetting("orient") && typeof screen !== "undefined" && screen.orientation?.lock)
-    screen.orientation.lock("portrait").catch(() => {});
   $("liveShotClose")?.focus();
   // Open on the active preset, then the stream's latest frame if there is one.
   renderLiveShot();
@@ -5203,7 +5198,6 @@ function exitShotFullScreen() {
   shotFsPushed = false;
   keepShotAwake(false);
   keepShotFsAwake(screenAwakeWanted() && !document.hidden);
-  if (typeof screen !== "undefined" && screen.orientation?.unlock) screen.orientation.unlock();
   clearTimeout(shotFsTimer);
   const finish = () => {
     clearTimeout(shotFsTimer);
@@ -6549,20 +6543,15 @@ function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
     name =
       (d && d.presetName !== "—" && d.presetName) ||
       presetState.items.find((p) => p.id === presetState.activeId)?.name ||
-      "",
-    goal = (d && d.goal) || (m && m.goal);
+      "";
   $("liveShot").dataset.tint = tint;
   $("liveShot").classList.toggle("live", !!d?.live);
   liveShotNums(!!d);
+  liveShotDash(d, model, m);
   $("liveShotState").textContent = d
     ? $("shotHeroState").textContent
     : __WEBUI_TEXT__("runtime.ready_2");
-  $("liveShotPreset").textContent = [
-    name,
-    goal > 0 && goal.toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  $("liveShotPreset").textContent = name;
   const lane = $("liveShotLane");
   host._w = host.clientWidth;
   lane.replaceChildren();
@@ -6617,17 +6606,106 @@ function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
       "</svg>";
 }
 // The live view repeats the shot card's numbers, units included.
+const heroCopy = (on, from) => {
+  const src = $("shotHero" + from);
+  return on && !src.hidden && src.textContent ? src.innerHTML : "—";
+};
 function liveShotNums(on) {
-  for (const [to, from] of [
-    ["Weight", "Weight"],
-    ["Time", "Elapsed"],
-    ["Flow", "Flow"],
-  ]) {
-    const src = $("shotHero" + from);
-    $("liveShot" + to).replaceChildren(
-      ...(on && !src.hidden && src.textContent ? src.cloneNode(true).childNodes : ["—"]),
-    );
-  }
+  $("liveShotWeight").innerHTML = heroCopy(on, "Weight");
+  $("liveShotTime").innerHTML = heroCopy(on, "Elapsed");
+}
+// The rest of the dashboard comes from what Home already holds: progress and
+// ratio from the preset's dose, the forecast landing on the window bar, the
+// chart's flows, and the previous shots of the hero deck. A finished shot
+// lists its facts in place of the tiles.
+function liveShotDash(d, model, m) {
+  const num = (v, u) => (Number.isFinite(v) ? v.toFixed(1) + `<small>${u}</small>` : "—"),
+    strong = (v, signed) => `<strong>${(signed && v >= 0 ? "+" : "") + v.toFixed(1)}</strong>`,
+    tile = (label, v, s = "") =>
+      `<p class="lsCard"><small>${label}</small><b>${v}</b><span>${s}</span></p>`,
+    p = presetState.items.find((x) => x.id === presetState.activeId),
+    goal = (d && d.goal) || m?.goal,
+    w = typeof d?.weight === "number" ? d.weight : null,
+    ratio = w !== null && p?.doseG > 0 ? "1:" + (w / p.doseG).toFixed(2) : "",
+    prev = heroDeck.older?.[0],
+    done = !!d && !d.live,
+    end = d?.live ? d.fcEndMs / 1e3 : d && d.elapsedMs / 1e3,
+    peak = model?.maxFlow,
+    cutCg = model?.segs.at(-1)?.pts.at(-1)?.cg,
+    drop = d?.firstDropMs != null ? d.firstDropMs / 1e3 : NaN,
+    dot = $("liveShotLanding"),
+    tiles = $("liveShotTiles");
+  $("liveShotRecipe").textContent = p ? presetSummary(p) : "";
+  $("liveShotWeightLabel").textContent = done
+    ? __WEBUI_TEXT__("runtime.yield")
+    : __WEBUI_TEXT__("home.weight");
+  $("liveShotProgress").style.width = Math.min(100, (100 * w) / goal || 0) + "%";
+  $("liveShotToGo").innerHTML = !goal
+    ? ""
+    : d?.live && w !== null
+      ? sub(__WEBUI_TEXT__("shell.live_to_go"), [strong(Math.max(0, goal - w))])
+      : sub(__WEBUI_TEXT__("runtime.graph_target"), [goal.toFixed(1)]) +
+        (done && w !== null ? " " + strong(w - goal, true) : "");
+  $("liveShotRatioNow").textContent = ratio;
+  $("liveShotEnds").innerHTML =
+    d?.live && end
+      ? sub(__WEBUI_TEXT__("shell.live_ends"), [`<strong>${Math.round(end)}</strong>`])
+      : !prev
+        ? ""
+        : done
+          ? sub(__WEBUI_TEXT__("shell.live_vs_last"), [strong(end - prev.durationS, true)])
+          : sub(__WEBUI_TEXT__("shell.live_last"), [strong(prev.durationS)]);
+  // The bar spans 6 s on each side of the window: 12% / 76% / 12%.
+  dot.hidden = !end || !m?.t1;
+  if (!dot.hidden)
+    dot.style.left =
+      Math.max(
+        2,
+        Math.min(
+          98,
+          end < m.t1
+            ? 12 - (m.t1 - end) * 2
+            : end > m.t2
+              ? 88 + (end - m.t2) * 2
+              : 12 + (76 * (end - m.t1)) / (m.t2 - m.t1),
+        ),
+      ) + "%";
+  $("liveShotWindow").innerHTML = m?.t1
+    ? `<span>${m.t1} s</span><span>${__WEBUI_TEXT__("shell.live_window")}</span><span>${m.t2} s</span>`
+    : "";
+  tiles.classList.toggle("done", done);
+  tiles.innerHTML = done
+    ? tile(__WEBUI_TEXT__("runtime.avg_flow"), num(d.averageFlowGps, " g/s")) +
+      tile(__WEBUI_TEXT__("runtime.max_flow"), num(peak, " g/s")) +
+      tile(__WEBUI_TEXT__("runtime.ratio"), ratio || "—") +
+      tile(__WEBUI_TEXT__("runtime.drip"), num(w === null ? NaN : w - cutCg / 100, " g")) +
+      tile(__WEBUI_TEXT__("admin.first_drop"), num(drop, " s")) +
+      tile(
+        __WEBUI_TEXT__("shell.live_last_shots"),
+        heroDeck.older?.map((r) => Math.round(r.durationS)).join(" · ") || "—",
+      )
+    : tile(__WEBUI_TEXT__("shell.flow"), heroCopy(!!d, "Flow")) +
+      tile(
+        __WEBUI_TEXT__("runtime.max_flow"),
+        num(peak, " g/s"),
+        peak
+          ? sub(__WEBUI_TEXT__("shell.live_at"), [
+              strong(d.wAtMs[model.flowCurve.indexOf(peak)] / 1e3 - 0.5),
+            ])
+          : "",
+      ) +
+      tile(
+        __WEBUI_TEXT__("runtime.ratio"),
+        Number.isFinite(drop) && ratio ? ratio : "—",
+        p?.doseG > 0 && goal
+          ? sub(__WEBUI_TEXT__("shell.live_target_ratio"), [(goal / p.doseG).toFixed(1)])
+          : "",
+      ) +
+      tile(
+        __WEBUI_TEXT__("admin.first_drop"),
+        num(drop, " s"),
+        prev?.firstDropS ? sub(__WEBUI_TEXT__("shell.live_last"), [strong(prev.firstDropS)]) : "",
+      );
 }
 // Home cards: a grind hint when the active preset's shots drift. Dismissals
 // stay in this browser.

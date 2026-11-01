@@ -341,6 +341,7 @@
         <p class="lsChip">
           <span class="liveDot" aria-hidden="true"></span><span id="liveShotPreset"></span>
         </p>
+        <p id="liveShotRecipe" class="lsRecipe"></p>
         <p id="liveShotState" class="lsState"></p>
         <button
           id="liveShotClose"
@@ -360,13 +361,30 @@
           </svg>
         </button>
       </div>
-      <div class="lsNums">
-        <p><small>{{webui:home.weight}}</small><b id="liveShotWeight">—</b></p>
-        <p><small>{{webui:shell.time}}</small><b id="liveShotTime">—</b></p>
-        <p><small>{{webui:shell.flow}}</small><b id="liveShotFlow">—</b></p>
+      <div id="liveShotGraph" class="lsGraph lsCard" role="img"></div>
+      <div class="lsLane lsCard">
+        <small>{{webui:shell.flow}}</small>
+        <div id="liveShotLane"></div>
       </div>
-      <div id="liveShotGraph" class="lsGraph" role="img"></div>
-      <div id="liveShotLane" class="lsLane"></div>
+      <div class="lsSide">
+        <div class="lsHero lsCard">
+          <small id="liveShotWeightLabel">{{webui:home.weight}}</small><b id="liveShotWeight">—</b>
+          <span class="lsProg"><i id="liveShotProgress"></i></span>
+          <p class="lsRow"><span id="liveShotToGo"></span><span id="liveShotRatioNow"></span></p>
+        </div>
+        <div class="lsTime lsCard">
+          <p class="lsRow">
+            <span><small>{{webui:shell.time}}</small><b id="liveShotTime">—</b></span
+            ><span id="liveShotEnds" class="lsEnds"></span>
+          </p>
+          <div class="ghBar" aria-hidden="true">
+            <span class="fastZ"></span><span class="slowZ"></span><span class="win"></span
+            ><span id="liveShotLanding" class="lvl" hidden></span>
+          </div>
+          <div id="liveShotWindow" class="ghAxis" aria-hidden="true"></div>
+        </div>
+        <div id="liveShotTiles" class="lsTiles"></div>
+      </div>
     </section>
     <div
       id="webUiInactive"
