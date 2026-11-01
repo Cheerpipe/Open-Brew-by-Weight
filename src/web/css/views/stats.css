@@ -70,7 +70,6 @@
 .consPlot {
   position: relative;
   margin: 0.35rem 2.4rem 0 0;
-  touch-action: pan-y;
 }
 .consPlot .statsDensPlot {
   height: 4.5rem;

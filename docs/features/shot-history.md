@@ -55,8 +55,8 @@ you have more shots to show. Each column starts at your average time to the targ
 the dashed line, and shows how much slower (up) or faster (down) that shot was.
 The shaded band covers 5 % of the average either side, about 1.4 seconds on a
 28-second shot; columns that go past it are drawn in a stronger color. A shot
-far outside the chart stops at its edge with a dashed cap; drag to it to read
-its real time.
+far outside the chart stops at its edge with a dashed cap; move the cursor to
+it to read its real time.
 
 The limits scale with your recipe, because one second matters more on a
 20-second ristretto than on a 45-second lungo. When the shots shown come from a
@@ -70,8 +70,10 @@ consistent** up to 5 % of your average, **Fairly consistent** up to 10 %, and
 **Varies a lot** beyond that. A single odd shot does not change the verdict on
 its own. **Spread** is the gap between your fastest and slowest shot, and
 **Shots** is how many are shown. With fewer than 5 shots the verdict reads
-**Not enough shots yet**. Drag across the chart, or focus it and use the arrow
-keys, to read each shot's time and how far it was from your average.
+**Not enough shots yet**. Drag the cursor's dot across the chart, or focus it
+and use the arrow keys, to read each shot's time and how far it was from your
+average. On a touch screen, put your finger on the dot itself to grab it;
+anywhere else, the chart scrolls the page as usual.
 
 Stopwatch and gram-weight icons sit beside the large duration and yield values
 in each shot card and beside Avg time and Avg yield in the Stats summary.

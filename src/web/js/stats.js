@@ -913,6 +913,8 @@ function renderStatsConsistency(shots) {
     },
     seek,
     () => at,
+    null,
+    ".shotCursor .rvHandle",
   );
   plot.setAttribute("aria-label", __WEBUI_TEXT__("runtime.consistency_cursor"));
   plot.setAttribute("aria-valuemin", 1);
