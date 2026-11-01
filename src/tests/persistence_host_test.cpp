@@ -2173,6 +2173,58 @@ void p69_history_log_round_trip_eviction_and_paging() {
   CHECK(page.records[0].durationDs == 103);
 }
 
+// The record index deltas (sendRecordsIndex) need both stores listed strictly
+// id-descending, through the copies the index reads, after every mutation.
+void p69b_record_index_copies_stay_strictly_id_descending() {
+  resetHostPersistence();
+  static ShotLog shots;
+  static ShotLogRecord rows[SHOT_LOG_CAPACITY];
+  HistoryLog history;
+  HistoryPage page;
+  auto shotsDescending = [&](size_t expected) {
+    const size_t count = shots.copyNewestFirst(rows, SHOT_LOG_CAPACITY);
+    bool ok = count == expected && count == shots.count();
+    for (size_t n = 1; ok && n < count; ++n) ok = rows[n].id < rows[n - 1].id;
+    return ok;
+  };
+  size_t pages = 0;
+  auto historyDescending = [&](size_t expected) {
+    size_t listed = 0;
+    uint32_t previous = 0;
+    bool ok = true;
+    for (pages = 1;; ++pages) {
+      history.copyPage(page, listed, HISTORY_PAGE_MAX, ShotLogSortDir::Desc, 0);
+      for (size_t n = 0; n < page.count; ++n, ++listed) {
+        ok = ok && (listed == 0 || page.records[n].id < previous);
+        previous = page.records[n].id;
+      }
+      if (!page.hasMore || !page.count) break;
+    }
+    return ok && listed == expected && listed == history.count();
+  };
+  CHECK(shots.load() && history.load());
+  ShotLogRecord shot = {};
+  HistoryRecord activation = {};
+  for (int i = 0; i < 5; ++i) CHECK(shots.append(shot, false) && history.append(activation, false));
+  CHECK(shotsDescending(5) && historyDescending(5));
+  CHECK(shots.updateRating(3, 4, false) && shotsDescending(5));
+  CHECK(shots.removeById(3, false) && history.removeById(3, false));
+  CHECK(shotsDescending(4) && historyDescending(4));
+  // Past capacity the ring overwrites its oldest and wraps its write index.
+  for (size_t i = 0; i < SHOT_LOG_CAPACITY + 7; ++i)
+    CHECK(shots.append(shot, false) && history.append(activation, false));
+  CHECK(shotsDescending(SHOT_LOG_CAPACITY) && historyDescending(HISTORY_CAPACITY) && pages > 1);
+  // A middle removal on the wrapped ring compacts it before the memmove.
+  CHECK(shots.removeById(500, false) && history.removeById(500, false));
+  CHECK(shotsDescending(SHOT_LOG_CAPACITY - 1) && historyDescending(HISTORY_CAPACITY - 1));
+  CHECK(shots.flush() && history.flush() && shots.load() && history.load());
+  CHECK(shotsDescending(SHOT_LOG_CAPACITY - 1) && historyDescending(HISTORY_CAPACITY - 1));
+  // Clear restarts ids at 1; the new contents still list strictly descending.
+  CHECK(shots.clear(false) && history.clear(false));
+  for (int i = 0; i < 3; ++i) CHECK(shots.append(shot, false) && history.append(activation, false));
+  CHECK(shotsDescending(3) && rows[0].id == 3 && historyDescending(3) && page.records[0].id == 3);
+}
+
 void p71_nvs_capacity_budget_keeps_compaction_margin() {
   constexpr size_t pageEntries = 126;
   constexpr size_t conservativeEntries =
@@ -3497,6 +3549,7 @@ const TestCase tests[] = {
     {"P67", p67_ensure_recovery_intent_skips_rewrite_when_valid},
     {"P68", p68_malformed_recovery_intent_is_abandoned},
     {"P69", p69_history_log_round_trip_eviction_and_paging},
+    {"P69B", p69b_record_index_copies_stay_strictly_id_descending},
     {"P71", p71_nvs_capacity_budget_keeps_compaction_margin},
     {"P72", p72_factory_intent_recovers_only_from_nvs_no_space},
     {"P73", p73_factory_intent_does_not_free_data_for_other_failures},
