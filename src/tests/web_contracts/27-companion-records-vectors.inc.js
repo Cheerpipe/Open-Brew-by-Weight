@@ -1,7 +1,10 @@
 // The companion archive's link frames (plan 2A, X1), built by the firmware's
 // own code: the record index, History and Stats senders (the fetch-only link
 // session), the Stats row formatter, the trace frame, the in-place sealer and
-// the format strings of the `rs` notice and the ping's hold answer. They are
+// the format strings of the `rs` notice and the ping's hold answer, plus a
+// browser session's good-shots index, offline-copy windows and Home's
+// rows-only hero fetch, which the companion may answer from its archive with
+// the same frames. They are
 // pinned in docs/schemas/companion-records-v1.vectors.json, which the
 // companion's sync tests replay; COMPANION_RECORDS_REGENERATE=1 rewrites it.
 {
@@ -224,7 +227,11 @@ ${header.slice(header.indexOf('  struct RecordIndexBaseline {'), header.indexOf(
   bool sendRecordsIndex(UiStreamSession &, const ControlStatusSnapshot &);
   bool companionTraceFrame();
 };
-int httpd_ws_send_frame_async(int, int, httpd_ws_frame_t *) { assert(false); return ESP_OK; }
+// A browser session's frame leaves as it is, without a link record around it.
+int httpd_ws_send_frame_async(int, int, httpd_ws_frame_t *frame) {
+  frames.emplace_back(reinterpret_cast<const char *>(frame->payload), frame->len);
+  return ESP_OK;
+}
 ${block(statsHeader, 'bool appendStatsDensity(')}
 ${block(statsHeader, 'bool formatStatsHeader(')}
 ${block(statsPage, 'size_t OpenBrewByWeightNetwork::formatShotStatsRow(')}
@@ -311,6 +318,29 @@ int main() {
     drain(offset ? "fetch_shot_9_moved" : "fetch_shot_13_moved",
           [&] { return session.statsFetch && network.sendStatsStream(session, control); });
   }
+  // A browser session on the store index_shots listed: its good-shots index,
+  // two of the offline copy's windows (date/desc, no filter) under its
+  // standing Stats page, then Home's hero fetch without one (rows only).
+  moved = false;
+  auto &browser = network.uiStreams_[0];
+  snprintf(browser.clientId, sizeof(browser.clientId), "owner");
+  browser.statsOn = true;
+  browser.statsBoot = kBoot;
+  browser.statsResync = false;
+  browser.recordsShots = true;
+  drain("browser_index_shots", [&] { return browser.recordsShots && network.sendRecordsIndex(browser, control); });
+  for (const uint32_t offset : {0u, 2u, 1u}) {
+    browser.statsOn = offset != 1;
+    browser.statsFetch = true;
+    browser.statsFetchOffset = offset;
+    browser.statsFetchLimit = offset == 0 ? kShots - 1 : offset == 2 ? 4 : 2;
+    browser.statsFetchSort = ShotLogSort::Date;
+    browser.statsFetchDir = ShotLogSortDir::Desc;
+    browser.statsFetchFilter = ShotListFilter{};
+    browser.statsFetchRequest = 11 + offset;
+    drain(offset == 0 ? "browser_fetch_shots" : offset == 2 ? "browser_fetch_window" : "browser_fetch_hero",
+          [&] { return browser.statsFetch && network.sendStatsStream(browser, control); });
+  }
 }
 `;
   const directory = path.resolve(sketchDir, '..', 'temp', 'ai_temp_companion_records');
@@ -343,13 +373,22 @@ int main() {
     index_shots_delta: {t: 'rx', s: 'shots', ep: 7001, d: 1},
     fetch_shot_9_moved: {t: 'rf', s: 'shots', o: 4, n: 1, r: 9},
     fetch_shot_13_moved: {t: 'rf', s: 'shots', o: 0, n: 1, r: 10},
+    browser_index_shots: {op: 'records', shots: 0},
+    browser_fetch_shots: {op: 'stats', on: true, fetch: true, request: 11, offset: 0, limit: 11,
+      sort: 'date', dir: 'desc', filter: {}},
+    browser_fetch_window: {op: 'stats', on: true, fetch: true, request: 13, offset: 2, limit: 4,
+      sort: 'date', dir: 'desc', filter: {}},
+    browser_fetch_hero: {op: 'stats', on: true, fetch: true, request: 12, offset: 1, limit: 2,
+      sort: 'date', dir: 'desc', filter: {}},
   };
   assert.deepEqual(Object.keys(produced), Object.keys(requests));
   const vectors = {
     version: 1,
     note: 'Controller frames as the firmware builds them (q kept, MAC and dot removed), ' +
         'each a JSON text exactly as sent; request is the companion frame that asked (without q), ' +
-        'null for a notice. Regenerate with COMPANION_RECORDS_REGENERATE=1.',
+        'null for a notice. browser_ cases are a browser ui-stream session: request is the screen ' +
+        'op and the frames are sent as they are (browser_fetch_hero with no standing Stats page). ' +
+        'Regenerate with COMPANION_RECORDS_REGENERATE=1.',
     cases: Object.entries(requests).map(([name, request]) => ({name, request, frames: produced[name]})),
   };
   for (const item of vectors.cases) {
@@ -390,6 +429,21 @@ int main() {
   assert.deepEqual(['ok', 'none', 'busy'].map((r, i) => frameOf(['trace_ok', 'trace_none', 'trace_busy'][i]).r),
       ['ok', 'none', 'busy']);
   assert.equal(Buffer.from(frameOf('trace_ok').d, 'base64').length, 5000);
+  // The browser's index lists the good shots only (12 is the bad one), and
+  // its windows are the same rows, under the 8 KiB frame budget, with the
+  // Stats header on the first frame only under a standing Stats page.
+  const browserIndex = frameOf('browser_index_shots');
+  assert.deepEqual(browserIndex.rows, full.rows.slice(2));
+  assert.equal(browserIndex.sum, sum(browserIndex.rows));
+  const browserPage = vectors.cases.find((c) => c.name === 'browser_fetch_shots').frames.map(JSON.parse);
+  for (const item of vectors.cases.filter((c) => c.name.startsWith('browser_fetch')))
+    assert(item.frames.every((f) => f.length <= 8192), item.name);
+  assert(browserPage.length > 1 && browserPage.every((f) => !('q' in f) && f.type === 'stats'));
+  assert(browserPage[0].stats && browserPage[0].cols && !('cols' in browserPage[1]));
+  assert.deepEqual(browserPage.flatMap((f) => f.rows.map((r) => r[0])), browserIndex.rows.filter((_, i) => i % 2 === 0));
+  assert.deepEqual([frameOf('browser_fetch_window').offset, frameOf('browser_fetch_window').hasMore], [2, true]);
+  const hero = frameOf('browser_fetch_hero');
+  assert(!('stats' in hero) && hero.cols && hero.rows.length === 2 && hero.offset === 1);
   const file = path.join(sketchDir, '..', 'docs', 'schemas', 'companion-records-v1.vectors.json');
   const text = JSON.stringify(vectors, null, 2) + '\n';
   if (process.env.COMPANION_RECORDS_REGENERATE === '1') fs.writeFileSync(file, text);
