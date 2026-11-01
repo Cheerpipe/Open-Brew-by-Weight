@@ -858,7 +858,7 @@ enum class CompanionRecordKind : uint8_t { INDEX, FETCH, TRACE };
 // `rx` (a store's index from `epoch`), `rf` (a fetch window), `rt` (a trace).
 struct CompanionRecordRequest {
   CompanionRecordKind kind = CompanionRecordKind::INDEX;
-  bool shots = false;
+  bool shots = false, delta = false;  // delta: `rx` carried `d`
   uint32_t epoch = 0, offset = 0, count = 0, request = 0;
   uint32_t id = 0, boot = 0, end = 0;
 };
@@ -885,7 +885,11 @@ inline bool companionParseRecordRequest(const cJSON *frame, const char *type,
       (strcmp(store->valuestring, "shots") != 0 && strcmp(store->valuestring, "history") != 0))
     return false;
   out.shots = !strcmp(store->valuestring, "shots");
-  if (!strcmp(type, "rx")) return number("ep", 0, UINT32_MAX, out.epoch);
+  if (!strcmp(type, "rx")) {
+    uint32_t one = 1;
+    out.delta = cJSON_GetObjectItemCaseSensitive(frame, "d") != nullptr;
+    return number("ep", 0, UINT32_MAX, out.epoch) && (!out.delta || number("d", 1, 1, one));
+  }
   out.kind = CompanionRecordKind::FETCH;
   return number("o", 0, COMPANION_FETCH_OFFSET_MAX, out.offset) &&
          number("n", 1, out.shots ? COMPANION_FETCH_SHOTS_MAX : COMPANION_FETCH_HISTORY_MAX,

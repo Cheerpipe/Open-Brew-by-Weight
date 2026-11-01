@@ -211,6 +211,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
     session.fd = httpd_req_to_sockfd(request);
     session.fromSoftAp = socketServedBySoftAp(session.fd);
     session.relayed = relayed;
+    if (relayed) session.recordsKey = self.nextRecordsKey();
     session.openedAtMs = millis();
     self.uiStreamOpen_.store(true, std::memory_order_release);
     request->sess_ctx = &session;
@@ -531,16 +532,25 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
                  strcmp(op->valuestring, "records") == 0 &&
                  strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
         // Record index for the browser's offline copy: each named store
-        // carries the epoch that copy holds (0: none).
-        static const char *const kFields[] = {"op", "shots", "history"};
+        // carries the epoch that copy holds (0: none); `delta` (the
+        // companion's) accepts, for the stores named, a delta against the
+        // session's baseline.
+        static const char *const kFields[] = {"op", "shots", "history", "delta"};
         const cJSON *shots = cJSON_GetObjectItemCaseSensitive(message, "shots");
         const cJSON *history = cJSON_GetObjectItemCaseSensitive(message, "history");
-        accepted = (shots || history) && uiStreamKnownFields(message, kFields, 3) &&
+        const cJSON *delta = cJSON_GetObjectItemCaseSensitive(message, "delta");
+        accepted = (shots || history) && uiStreamKnownFields(message, kFields, 4) &&
                    uiStreamIntInRange(shots, 0, UINT32_MAX) &&
-                   uiStreamIntInRange(history, 0, UINT32_MAX);
+                   uiStreamIntInRange(history, 0, UINT32_MAX) && (!delta || cJSON_IsTrue(delta));
         if (accepted) {
-          if (shots) session->recordsShotsEpoch = static_cast<uint32_t>(shots->valuedouble);
-          if (history) session->recordsHistoryEpoch = static_cast<uint32_t>(history->valuedouble);
+          if (shots) {
+            session->recordsShotsEpoch = static_cast<uint32_t>(shots->valuedouble);
+            session->recordsShotsDelta = delta != nullptr;
+          }
+          if (history) {
+            session->recordsHistoryEpoch = static_cast<uint32_t>(history->valuedouble);
+            session->recordsHistoryDelta = delta != nullptr;
+          }
           session->recordsShots = session->recordsShots || shots;
           session->recordsHistory = session->recordsHistory || history;
           self.uiStreamUrgent_.store(true, std::memory_order_release);

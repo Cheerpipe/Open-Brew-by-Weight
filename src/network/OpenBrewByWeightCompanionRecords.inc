@@ -29,6 +29,7 @@ bool OpenBrewByWeightNetwork::companionLinkRecordRequest(CompanionLinkSlot &slot
       const uint32_t sentAtMs = records->sentAtMs;
       *records = CompanionRecords{};
       records->generation = slot.generation;
+      records->session.recordsKey = nextRecordsKey();
       records->sentAtMs = sentAtMs;
     }
     UiStreamSession &session = records->session;
@@ -41,6 +42,7 @@ bool OpenBrewByWeightNetwork::companionLinkRecordRequest(CompanionLinkSlot &slot
       records->subscribed = true;
       (request.shots ? session.recordsShots : session.recordsHistory) = true;
       (request.shots ? session.recordsShotsEpoch : session.recordsHistoryEpoch) = request.epoch;
+      (request.shots ? session.recordsShotsDelta : session.recordsHistoryDelta) = request.delta;
     } else if (request.shots) {
       // Newest first by date over every shot, bad ones included.
       session.statsFetch = true;

@@ -18,6 +18,8 @@
   const session = header.slice(sessionStart, header.indexOf('\n  };', sessionStart) + 5);
   const uiStream = read('network/OpenBrewByWeightUiStream.inc');
   const heldRows = body(uiStream, 'uint32_t uiStreamRowHash(') + '\n' + body(uiStream, 'bool uiStreamHeld(');
+  const deltaStart = header.indexOf('  struct RecordIndexBaseline {');
+  const deltaTypes = header.slice(deltaStart, header.indexOf('  RecordIndexWork *recordIndexWork_', deltaStart));
   const native = `
 #include <algorithm>
 #include <cassert>
@@ -25,6 +27,8 @@
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 #include "OpenBrewByWeightDomain.h"
@@ -91,12 +95,15 @@ void capture(ShotStatsRecordsSnapshot &out){
     shotLogSetPresetId(out.records[i],i==1?2:1);
   }
 }
-// 130 activations, newest first, so the index spans two history pages.
+// 130 activations, newest first, so the index spans two history pages;
+// each one more moves the epoch from 77.
+size_t activations=130;
 void historyPage(HistoryPage &page,size_t offset,size_t limit,ShotLogSortDir dir,uint8_t types){
   assert(dir==ShotLogSortDir::Desc&&!types&&limit==HISTORY_PAGE_MAX);
-  page.total=130;page.start=offset;page.count=offset<130?std::min(limit,130-offset):0;
-  page.hasMore=offset+page.count<130;
-  for(size_t i=0;i<page.count;++i){page.records[i]={};page.records[i].id=130-offset-i;}
+  page.total=activations;page.start=offset;
+  page.count=offset<activations?std::min(limit,activations-offset):0;
+  page.hasMore=offset+page.count<activations;
+  for(size_t i=0;i<page.count;++i){page.records[i]={};page.records[i].id=activations-offset-i;}
 }
 ShotCurveRead curveById(uint32_t id,ShotCurveRecord &curve,bool readFlash){
   resetShotCurveRecord(curve);
@@ -106,11 +113,46 @@ ShotCurveRead curveById(uint32_t id,ShotCurveRecord &curve,bool readFlash){
   appendShotCurvePoint(curve,(frozen?frozen:storeEpoch)*1000+3-id,0,false);
   return ShotCurveRead::FOUND;
 }
+// The delta property's store, newest first, and the frame fields a
+// companion reads.
+struct DeltaRow{uint32_t id;uint8_t rating;bool bad;};
+std::vector<DeltaRow> deltaStore;
+ShotLogRecord deltaRecord(const DeltaRow &row){
+  ShotLogRecord r={};r.id=row.id;r.durationDs=row.bad?110:300;r.actualWeightCg=3600;
+  r.sideFlags=shotLogPackRating(0,row.rating);return r;
+}
+void captureDelta(ShotStatsRecordsSnapshot &out){
+  out.epoch=storeEpoch;out.count=deltaStore.size();
+  for(size_t i=0;i<out.count;++i)out.records[i]=deltaRecord(deltaStore[i]);
+}
+bool frameHas(const std::string &f,const char *key){
+  return f.find(std::string("\\"")+key+"\\":")!=std::string::npos;
+}
+uint32_t frameNumber(const std::string &f,const char *key){
+  const size_t at=f.find(std::string("\\"")+key+"\\":");
+  assert(at!=std::string::npos);
+  return std::stoul(f.substr(at+strlen(key)+3));
+}
+std::vector<uint32_t> frameList(const std::string &f,const char *key){
+  std::vector<uint32_t> out;const size_t at=f.find(std::string("\\"")+key+"\\":[");
+  if(at==std::string::npos)return out;
+  for(const char *p=f.c_str()+at+strlen(key)+4;*p!=']';){
+    char *end;out.push_back(strtoul(p,&end,10));p=*end==','?end+1:end;
+  }
+  return out;
+}
 struct OpenBrewByWeightNetwork {
   static constexpr size_t WEB_UI_CLIENT_ID_CAPACITY=25;
 ${session}
   NetworkWorkBuf *workBuf_=&work;
   UiStreamSession uiStreams_[2];
+${deltaTypes}
+  // Counts the delta work made: a session without a key never makes it.
+  RecordIndexWork *recordIndexWork_=nullptr;unsigned deltaAllocations=0;bool deltaMemory=true;
+  RecordIndexWork *recordIndexWork(){
+    if(!recordIndexWork_&&deltaMemory){++deltaAllocations;recordIndexWork_=new RecordIndexWork{};}
+    return recordIndexWork_;
+  }
   int dataMux_=0,server_=1;bool webUiOverrideActive_=false;uint32_t webUiOverrideUntilMs_=0;
   char activeWebUiClientId_[WEB_UI_CLIENT_ID_CAPACITY]="owner";
   std::atomic<bool> uiStreamUrgent_{false};
@@ -118,7 +160,7 @@ ${session}
     uint32_t (*shotLogEpoch)()=+[](){return storeEpoch;};
     void (*copyShotStatsRecords)(ShotStatsRecordsSnapshot &)=capture;
     ShotCurveRead (*copyShotCurveById)(uint32_t,ShotCurveRecord &,bool)=curveById;
-    uint32_t (*historyEpoch)()=+[](){return 77u;};
+    uint32_t (*historyEpoch)()=+[](){return uint32_t(activations-53);};
     void (*copyHistoryPage)(HistoryPage &,size_t,size_t,ShotLogSortDir,uint8_t)=historyPage;
     void (*recordStoreCounters)(bool,uint32_t &,uint32_t &)=
         +[](bool,uint32_t &generation,uint32_t &next){generation=storeEpoch+40;next=shots+1;};
@@ -290,7 +332,7 @@ int main(){
     assert(frames[1].find("\\"store\\":\\"history\\",\\"epoch\\":77,\\"rows\\":[130,")!=std::string::npos);
     assert(frames[1].find(",1,")!=std::string::npos&&frames[1].find(",0,")==std::string::npos);
     size_t pairs=0;for(char c:frames[1])pairs+=c==',';
-    assert(pairs==130*2-1+5);
+    assert(pairs==130*2-1+6);  // 5 header commas and the one before sum
     // A moved store lists every record; content (a rating) moves its revision.
     auto shotRows=[&](){
       fresh.recordsShots=true;fresh.recordsShotsEpoch=0;frames.clear();assert(index());
@@ -309,7 +351,7 @@ int main(){
     // unless the filter asks for it; the good shots keep their order.
     shots=4;++storeEpoch;
     const std::string goodRows=shotRows();
-    assert(goodRows.rfind("3,",0)==0&&std::count(goodRows.begin(),goodRows.end(),',')==5);
+    assert(goodRows.rfind("3,",0)==0&&std::count(goodRows.begin(),goodRows.end(),',')==6);
     fresh.statsFilter={};fresh.statsSort=ShotLogSort::Date;fresh.statsDir=ShotLogSortDir::Desc;
     fresh.statsResync=true;frames.clear();
     for(int i=0;i<3;++i)assert(send(fresh));
@@ -326,7 +368,7 @@ int main(){
     link.statsResync=true;assert(network.sendStatsStream(link,control)&&frames.empty());
     link.recordsShots=true;assert(network.sendRecordsIndex(link,control)&&frames.size()==1);
     const std::string all=frames[0].substr(frames[0].find("\\"rows\\":[")+8);
-    assert(all.rfind("4,",0)==0&&std::count(all.begin(),all.end(),',')==7);
+    assert(all.rfind("4,",0)==0&&std::count(all.begin(),all.end(),',')==8);
     // S19: the link's index names the store header counters.
     assert(frames[0].find(",\\"gen\\":"+std::to_string(storeEpoch+40)+",\\"next\\":5,")!=std::string::npos);
     link.statsFetch=true;link.statsFetchRequest=9;link.statsFetchOffset=0;link.statsFetchLimit=50;
@@ -348,6 +390,121 @@ int main(){
     assert(newest().find("\\"id\\":4")!=std::string::npos);
     network.linkSession=nullptr;
     shots=3;
+    // Sessions without a companion key never make the delta work.
+    assert(network.deltaAllocations==0);
+  }
+  // Record index deltas: a companion's ui-stream session (good shots) and
+  // its link session (every shot) follow a randomized store through their
+  // own mirrors. Every answer must rebuild exactly the store's index and its
+  // sum; a new session key, a deferred send or a Clear never leaves a stale
+  // or partial mirror; and most changes leave as deltas.
+  {
+    const uint32_t epochBefore=storeEpoch;  // the later blocks' weights scale with it
+    network.callbacks_.copyShotStatsRecords=captureDelta;work.statsCache.valid=false;++storeEpoch;
+    OpenBrewByWeightNetwork::UiStreamSession link;network.linkSession=&link;
+    OpenBrewByWeightNetwork::UiStreamSession *sessions[2]={&network.uiStreams_[0],&link};
+    struct Mirror{std::vector<std::pair<uint32_t,uint32_t>> pairs;uint32_t epoch=0;bool known=false,fresh=false;};
+    Mirror mirrors[2];
+    uint32_t key=100,next=1,seed=12345;size_t deltas=0,wholes=0;
+    for(auto *s:sessions)s->recordsKey=++key;
+    auto rnd=[&](uint32_t n){seed=seed*1103515245u+12345u;return (seed>>8)%n;};
+    auto ask=[&](int c){
+      auto &s=*sessions[c];Mirror &m=mirrors[c];
+      s.recordsShots=true;s.recordsShotsEpoch=m.known?m.epoch:0;s.recordsShotsDelta=m.known;
+      frames.clear();
+      assert(network.sendRecordsIndex(s,control));
+      if(frames.empty())return;  // deferred: nothing reached the mirror
+      assert(frames.size()==1&&!s.recordsShots);
+      const std::string f=frames[0];
+      if(frameHas(f,"rows")){
+        const auto rows=frameList(f,"rows");m.pairs.clear();
+        for(size_t i=0;i<rows.size();i+=2)m.pairs.emplace_back(rows[i],rows[i+1]);
+        ++wholes;m.fresh=false;
+      }else if(frameHas(f,"up")){
+        assert(s.recordsShotsDelta&&!m.fresh&&frameNumber(f,"base")==m.epoch&&!frameHas(f,"rows"));
+        const auto up=frameList(f,"up"),gone=frameList(f,"del");
+        auto at=[&](uint32_t id){
+          return std::find_if(m.pairs.begin(),m.pairs.end(),[&](const auto &p){return p.first==id;});
+        };
+        for(uint32_t id:gone){assert(at(id)!=m.pairs.end());m.pairs.erase(at(id));}
+        for(size_t i=0;i<up.size();i+=2){
+          if(at(up[i])!=m.pairs.end())at(up[i])->second=up[i+1];else m.pairs.emplace_back(up[i],up[i+1]);
+        }
+        std::sort(m.pairs.begin(),m.pairs.end(),[](const auto &a,const auto &b){return a.first>b.first;});
+        ++deltas;
+      }else{
+        assert(frameNumber(f,"epoch")==m.epoch&&!frameHas(f,"sum"));
+        return;
+      }
+      uint32_t crc=0xFFFFFFFFu;
+      for(const auto &p:m.pairs){
+        const uint32_t words[2]={p.first,p.second};
+        crc=crc32Update(crc,reinterpret_cast<const uint8_t *>(words),sizeof(words));
+      }
+      assert(frameNumber(f,"sum")==~crc);
+      m.epoch=frameNumber(f,"epoch");m.known=true;
+      std::vector<std::pair<uint32_t,uint32_t>> want;
+      for(const auto &row:deltaStore){
+        if(c==0&&row.bad)continue;
+        const ShotLogRecord r=deltaRecord(row);
+        want.emplace_back(row.id,uiStreamRowHash(&r,sizeof(r))&0xFFFFFFu);
+      }
+      assert(m.pairs==want);
+    };
+    for(int step=0;step<600;++step){
+      const uint32_t what=rnd(10);
+      if(what<4){
+        deltaStore.insert(deltaStore.begin(),DeltaRow{next++,uint8_t(rnd(6)),rnd(5)==0});
+        if(deltaStore.size()>40)deltaStore.pop_back();  // the ring rotates its oldest out
+      }else if(what<6&&!deltaStore.empty()){
+        deltaStore[rnd(deltaStore.size())].rating=uint8_t(rnd(6));
+      }else if(what<7&&!deltaStore.empty()){
+        deltaStore.erase(deltaStore.begin()+rnd(deltaStore.size()));
+      }else if(what==7&&rnd(6)==0){
+        deltaStore.clear();next=1;  // Clear history: ids start again
+      }
+      if(what<8)++storeEpoch;
+      const int c=rnd(2);
+      if(what==8){sessions[c]->recordsKey=++key;mirrors[c].fresh=true;}
+      if(what==9){sendResult=-1;uiStreamSendCleanAbort=true;}
+      ask(c);
+      if(what==9){sendResult=ESP_OK;uiStreamSendCleanAbort=false;ask(c);}
+    }
+    assert(deltas>wholes&&wholes>2);
+    // At 1000 shots, a new one rotating the oldest out costs a small delta
+    // instead of the whole index.
+    deltaStore.clear();
+    for(uint32_t id=101000;id>100000;--id)deltaStore.push_back(DeltaRow{id,uint8_t(id%6),false});
+    mirrors[1]=Mirror{};++storeEpoch;ask(1);
+    const size_t whole=frames.at(0).size();
+    deltaStore.pop_back();deltaStore.insert(deltaStore.begin(),DeltaRow{101001,3,false});
+    ++storeEpoch;ask(1);
+    assert(whole>14000&&frameHas(frames.at(0),"up")&&frames[0].size()<200);
+    // History keeps its own baseline, and each store's delta flag is its
+    // own: the shots flag leaves history whole, then a new activation leaves
+    // as one pair whose sum is the whole index's.
+    auto &h=*sessions[0];
+    auto history=[&](uint32_t held,bool delta){
+      h.recordsHistory=h.recordsShotsDelta=true;h.recordsHistoryEpoch=held;h.recordsHistoryDelta=delta;
+      frames.clear();assert(network.sendRecordsIndex(h,control)&&frames.size()==1&&!h.recordsHistory);
+      return frames[0];
+    };
+    assert(frameHas(history(0,false),"rows"));
+    activations=131;assert(frameHas(history(77,false),"rows"));
+    activations=132;const std::string moved=history(78,true);
+    assert(frameNumber(moved,"base")==78&&frameList(moved,"up").size()==2&&frameList(moved,"up")[0]==132&&
+           frameList(moved,"del").empty()&&!frameHas(moved,"rows"));
+    assert(frameNumber(moved,"sum")==frameNumber(history(0,false),"sum"));
+    activations=130;
+    // Without the memory, whole indexes keep the session working.
+    network.deltaMemory=false;delete network.recordIndexWork_;network.recordIndexWork_=nullptr;
+    deltaStore.pop_back();deltaStore.insert(deltaStore.begin(),DeltaRow{101002,1,false});
+    ++storeEpoch;ask(1);
+    assert(frameHas(frames.at(0),"rows"));
+    network.deltaMemory=true;
+    for(auto *s:sessions)s->recordsKey=0;
+    network.linkSession=nullptr;deltaStore.clear();
+    network.callbacks_.copyShotStatsRecords=capture;work.statsCache.valid=false;storeEpoch=epochBefore+1;
   }
   // A curve past the PSRAM cache: its row hash never reads flash; while a
   // shot runs the page holds at its row, sending nothing, and continues
@@ -411,6 +568,6 @@ int main(){
     '-I' + sketchDir, '-x', 'c++', '-', '-o', binary], {input: native, encoding: 'utf8'});
   assert.equal(compiled.status, 0, compiled.stderr);
   const run = spawnSync(binary, [], {encoding: 'utf8'});
-  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.status, 0, String(run.signal) + ' ' + run.stderr);
   fs.unlinkSync(binary);
 }

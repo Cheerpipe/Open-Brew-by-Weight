@@ -5,7 +5,7 @@
 // pinned in docs/schemas/companion-records-v1.vectors.json, which the
 // companion's sync tests replay; COMPANION_RECORDS_REGENERATE=1 rewrites it.
 {
-  const assert = require('assert').strict, {spawnSync} = require('child_process');
+  const assert = require('assert').strict, {spawnSync} = require('child_process'), zlib = require('zlib');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
   const records = read('network/OpenBrewByWeightRecordStreams.inc');
   const home = read('network/OpenBrewByWeightHomeStream.inc');
@@ -101,11 +101,14 @@ ${block(statsHeader, 'bool jsonScratchAppend(')}
 ${line(statsPage, /constexpr char kStatsRowColumns\[\] =[^;]*;/)}
 // Fixture store: fixed epochs and counters, shots newest first (one bad,
 // short), each with a small curve, and five activations.
-constexpr uint32_t kShotsEpoch = 7001, kHistoryEpoch = 7002, kBoot = 43;
+// moved: the delta case's store, a new good shot 13, shot 9 rated
+// again and shot 6 deleted.
+constexpr uint32_t kShotsEpoch = 7001, kMovedEpoch = 7003, kHistoryEpoch = 7002, kBoot = 43;
 constexpr size_t kShots = 12, kActivations = 5;
-ShotLogRecord shotAt(size_t i) {
+bool moved = false;
+ShotLogRecord shotAt(uint32_t id) {
   ShotLogRecord r = {};
-  r.id = static_cast<uint32_t>(kShots - i);
+  r.id = id;
   r.bootId = kBoot;
   r.endedAtMs = 600000 + r.id * 1000;
   r.hasWallTime = r.id % 4 != 0;
@@ -123,16 +126,17 @@ ShotLogRecord shotAt(size_t i) {
   r.cutLineCg = SHOT_LOG_METRIC_MISSING;
   r.firstDropDs = SHOT_LOG_METRIC_MISSING;
   r.tareAtDs = SHOT_LOG_METRIC_MISSING;
-  r.sideFlags = shotLogPackRating(0, static_cast<uint8_t>(r.id % 6));
+  r.sideFlags = shotLogPackRating(0, static_cast<uint8_t>(moved && id == 9 ? 5 : r.id % 6));
   shotLogSetPresetId(r, r.id % 2 ? 1 : 2);
   snprintf(r.presetName, sizeof(r.presetName), "%s", r.id % 2 ? "House" : "Decaf \"Night\"");
   snprintf(r.scaleName, sizeof(r.scaleName), "%s", r.id % 4 ? "Lunar" : "");
   return r;
 }
 void capture(ShotStatsRecordsSnapshot &out) {
-  out.epoch = kShotsEpoch;
-  out.count = kShots;
-  for (size_t i = 0; i < kShots; ++i) out.records[i] = shotAt(i);
+  out.epoch = moved ? kMovedEpoch : kShotsEpoch;
+  out.count = 0;
+  for (uint32_t id = moved ? kShots + 1 : kShots; id > 0; --id)
+    if (!moved || id != 6) out.records[out.count++] = shotAt(id);
 }
 ShotCurveRead curveById(uint32_t id, ShotCurveRecord &curve, bool) {
   resetShotCurveRecord(curve);
@@ -177,6 +181,9 @@ struct OpenBrewByWeightNetwork {
   static constexpr size_t WEB_UI_CLIENT_ID_CAPACITY = 25;
 ${nested(header, '  struct UiStreamSession {')}
 ${nested(header, '  struct CompanionRecords {')}
+${header.slice(header.indexOf('  struct RecordIndexBaseline {'), header.indexOf('  RecordIndexWork *recordIndexWork_'))}
+  RecordIndexWork *recordIndexWork_ = nullptr;
+  RecordIndexWork *recordIndexWork() { return recordIndexWork_ ? recordIndexWork_ : recordIndexWork_ = new RecordIndexWork{}; }
   NetworkWorkBuf *workBuf_ = &work;
   UiStreamSession uiStreams_[2];
   CompanionRecords records;
@@ -185,7 +192,7 @@ ${nested(header, '  struct CompanionRecords {')}
   char activeWebUiClientId_[WEB_UI_CLIENT_ID_CAPACITY] = "owner";
   std::atomic<bool> uiStreamUrgent_{false};
   struct {
-    uint32_t (*shotLogEpoch)() = +[] { return kShotsEpoch; };
+    uint32_t (*shotLogEpoch)() = +[] { return moved ? kMovedEpoch : kShotsEpoch; };
     void (*copyShotStatsRecords)(ShotStatsRecordsSnapshot &) = capture;
     ShotCurveRead (*copyShotCurveById)(uint32_t, ShotCurveRecord &, bool) = curveById;
     uint32_t (*historyEpoch)() = +[] { return kHistoryEpoch; };
@@ -193,7 +200,7 @@ ${nested(header, '  struct CompanionRecords {')}
     void (*recordStoreCounters)(bool, uint32_t &, uint32_t &) =
         +[](bool shots, uint32_t &generation, uint32_t &next) {
           generation = shots ? 2400 : 1300;
-          next = shots ? kShots + 1 : kActivations + 1;
+          next = shots ? kShots + 1 + moved : kActivations + 1;
         };
     ShotTraceRead (*streamShotTrace)(uint32_t, uint32_t, uint32_t, uint32_t, uint8_t *, size_t,
                                      ShotTraceSink, void *) = streamTrace;
@@ -241,6 +248,7 @@ int main() {
   // Each request sets what companionLinkRecordRequest records for it (its
   // parsing is host-tested in companion_link_host_test).
   auto &session = network.records.session;
+  session.recordsKey = 1;  // a link session keys its baselines
   auto drain = [&](const char *name, auto send) {
     frames.clear();
     for (int i = 0; i < 20 && send(); ++i) now += 100;
@@ -287,6 +295,22 @@ int main() {
   drain("notice", [&] { static bool done; return !done && (plain(body), done = true); });
   snprintf(body, sizeof(body), ${holdFormat}, "false");
   drain("ping_answer", [&] { static bool done; return !done && (plain(body), done = true); });
+  // The store moved after index_shots: an opted-in request from its epoch
+  // gets only the difference.
+  moved = true;
+  session.recordsShots = true;
+  session.recordsShotsEpoch = kShotsEpoch;
+  session.recordsShotsDelta = true;
+  drain("index_shots_delta", [&] { return session.recordsShots && network.sendRecordsIndex(session, control); });
+  // The two windows the companion's archive then fetches: shot 9 at position 4, new shot 13 at 0.
+  for (const uint32_t offset : {4u, 0u}) {
+    session.statsFetch = true;
+    session.statsFetchOffset = offset;
+    session.statsFetchLimit = 1;
+    session.statsFetchRequest = 9 + !offset;
+    drain(offset ? "fetch_shot_9_moved" : "fetch_shot_13_moved",
+          [&] { return session.statsFetch && network.sendStatsStream(session, control); });
+  }
 }
 `;
   const directory = path.resolve(sketchDir, '..', 'temp', 'ai_temp_companion_records');
@@ -316,6 +340,9 @@ int main() {
     trace_busy: {t: 'rt', id: 3, b: 43, e: 603000},
     notice: null,
     ping_answer: {t: 'ping', up: false},
+    index_shots_delta: {t: 'rx', s: 'shots', ep: 7001, d: 1},
+    fetch_shot_9_moved: {t: 'rf', s: 'shots', o: 4, n: 1, r: 9},
+    fetch_shot_13_moved: {t: 'rf', s: 'shots', o: 0, n: 1, r: 10},
   };
   assert.deepEqual(Object.keys(produced), Object.keys(requests));
   const vectors = {
@@ -333,7 +360,30 @@ int main() {
   // The pieces the companion relies on.
   assert.deepEqual([frameOf('index_shots').f.gen, frameOf('index_shots').f.next], [2400, 13]);
   assert.equal(frameOf('index_shots').f.rows.length, 24, 'every shot, the bad one included');
-  assert(!('rows' in frameOf('index_shots_unchanged').f));
+  assert(!('rows' in frameOf('index_shots_unchanged').f) && !('sum' in frameOf('index_shots_unchanged').f));
+  // `sum` is zlib's CRC-32 of the whole index as little-endian id/revision
+  // pairs; the delta rebuilds the moved store's index from index_shots.
+  const sum = (rows) => {
+    const bytes = Buffer.alloc(rows.length * 4);
+    rows.forEach((value, i) => bytes.writeUInt32LE(value, i * 4));
+    return zlib.crc32(bytes);
+  };
+  const full = frameOf('index_shots').f, delta = frameOf('index_shots_delta').f;
+  assert.equal(full.sum, sum(full.rows));
+  assert.equal(frameOf('index_history').f.sum, sum(frameOf('index_history').f.rows));
+  assert(!('rows' in delta) && delta.base === 7001 && delta.epoch === 7003 && delta.next === 14);
+  assert.deepEqual([delta.up.filter((_, i) => i % 2 === 0), delta.del], [[13, 9], [6]]);
+  const pairs = new Map();
+  for (let i = 0; i < full.rows.length; i += 2) pairs.set(full.rows[i], full.rows[i + 1]);
+  assert.notEqual(delta.up[3], pairs.get(9), 'the new rating moves the revision');
+  for (const id of delta.del) pairs.delete(id);
+  for (let i = 0; i < delta.up.length; i += 2) pairs.set(delta.up[i], delta.up[i + 1]);
+  assert.equal(delta.sum, sum([...pairs].sort((a, b) => b[0] - a[0]).flat()));
+  for (const [name, id, rating] of [['fetch_shot_9_moved', 9, 5], ['fetch_shot_13_moved', 13, 1]]) {
+    const page = frameOf(name).f, cols = page.cols.split(',');
+    assert.deepEqual([page.epoch, page.rows.length, page.rows[0][cols.indexOf('id')],
+      page.rows[0][cols.indexOf('rating')]], [7003, 1, id, rating], name);
+  }
   assert(vectors.cases.find((c) => c.name === 'fetch_shots').frames.length > 1, 'the page spans frames');
   assert(frameOf('fetch_shots').f.cols && Number.isInteger(frameOf('fetch_shots').f.good));
   assert(!('stats' in frameOf('fetch_shots').f), 'the link never gets the Stats header');

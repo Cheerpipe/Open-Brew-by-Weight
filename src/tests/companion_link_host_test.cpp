@@ -872,8 +872,12 @@ static void testRecordRequests() {
   };
   CompanionRecordRequest r;
   CHECK(parse("{\"t\":\"rx\",\"s\":\"shots\",\"ep\":4294967295}", "rx", r));
-  CHECK(r.kind == CompanionRecordKind::INDEX && r.shots && r.epoch == 4294967295U);
-  CHECK(parse("{\"t\":\"rx\",\"s\":\"history\",\"ep\":0}", "rx", r) && !r.shots);
+  CHECK(r.kind == CompanionRecordKind::INDEX && r.shots && r.epoch == 4294967295U && !r.delta);
+  // `d` (a delta is welcome) is optional, and only 1 when present.
+  CHECK(parse("{\"t\":\"rx\",\"s\":\"shots\",\"ep\":7,\"d\":1}", "rx", r) && r.delta && r.epoch == 7);
+  for (const char *d : {"0", "2", "true", "1.5", "\"1\"", "null"})
+    CHECK(!parse(("{\"s\":\"shots\",\"ep\":7,\"d\":" + std::string(d) + "}").c_str(), "rx", r));
+  CHECK(parse("{\"t\":\"rx\",\"s\":\"history\",\"ep\":0}", "rx", r) && !r.shots && !r.delta);
   CHECK(!parse("{\"s\":\"logs\",\"ep\":0}", "rx", r));
   CHECK(!parse("{\"s\":\"shots\"}", "rx", r));
   CHECK(!parse("{\"s\":\"shots\",\"ep\":-1}", "rx", r));

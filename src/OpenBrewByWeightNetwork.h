@@ -497,8 +497,12 @@ class OpenBrewByWeightNetwork {
     // One-shot record index ("records" op) for the browser's offline copy:
     // each pending store answers once, with rows only when its epoch moved
     // from the one the copy holds.
+    // A companion session (relayed, or the link's) keys the baselines its
+    // index answers leave (RecordIndexWork; 0: no companion, no baseline),
+    // and a store's delta flag lets its next answer be a delta against them.
     bool recordsShots = false, recordsHistory = false;
-    uint32_t recordsShotsEpoch = 0, recordsHistoryEpoch = 0;
+    bool recordsShotsDelta = false, recordsHistoryDelta = false;
+    uint32_t recordsShotsEpoch = 0, recordsHistoryEpoch = 0, recordsKey = 0;
     char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
     bool bound = false, resync = true;
     bool homeResync = true;
@@ -531,6 +535,25 @@ class OpenBrewByWeightNetwork {
     uint32_t sentAtMs = 0;  // the last `rec`/`trc` frame; 0: none this boot
   };
   CompanionRecords *companionRecords_ = nullptr;
+  // Record index deltas (sendRecordsIndex, docs/INTEGRATION_API.md): per
+  // companion consumer (the two ui-stream slots, then the link) and store,
+  // the index its session last received, and the scratch the next answer is
+  // listed into. PSRAM, made by the first companion index answer, so a
+  // never-paired controller reserves nothing; only the work-buffer holder
+  // touches it, and a baseline counts only for the key that wrote it.
+  struct RecordIndexBaseline {
+    uint32_t key = 0, epoch = 0;
+    uint16_t count = 0;
+    uint32_t id[SHOT_LOG_CAPACITY] = {}, rev[SHOT_LOG_CAPACITY] = {};
+  };
+  static_assert(HISTORY_CAPACITY == SHOT_LOG_CAPACITY, "one baseline size fits both stores");
+  struct RecordIndexWork {
+    RecordIndexBaseline baselines[3][2], scratch;
+  };
+  RecordIndexWork *recordIndexWork_ = nullptr;
+  RecordIndexWork *recordIndexWork();
+  uint32_t recordsKeyNext_ = 0;  // under dataMux_
+  uint32_t nextRecordsKey() { return ++recordsKeyNext_ ? recordsKeyNext_ : ++recordsKeyNext_; }
   std::atomic<bool> companionRecordsDue_{false}, companionRecordsPending_{false};
   uint32_t companionRecordsAtMs_ = 0;  // network task: the last records work queued
   std::atomic<bool> uiStreamWorkPending_{false};

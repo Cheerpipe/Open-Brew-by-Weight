@@ -262,7 +262,7 @@ secrets directory and never in logs.
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
-| `{"t":"rx","s":"shots","ep":12}` | A store's record index (`s` `shots` or `history`); `ep` is the epoch the companion holds (0: none). The session's first `rx` subscribes it to `rs` |
+| `{"t":"rx","s":"shots","ep":12,"d":1}` | A store's record index (`s` `shots` or `history`); `ep` is the epoch the companion holds (0: none). Optional `d` (only `1`) accepts a delta against that epoch (below). The session's first `rx` subscribes it to `rs` |
 | `{"t":"rf","s":"shots","o":0,"n":50,"r":7}` | A fetch window: offset `o` 0–1000, `n` 1–50 shots or 1–120 activations, `r` echoed as the page's `request` |
 | `{"t":"rt","id":12,"b":43,"e":918204}` | One shot's trace by its Stats identity (`id` ≥ 1, `bootId`, `endedAtMs`) |
 | `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the boot the companion stored last and its last stored sequence; the controller maps another boot to `after` 0. Sent once per session, after `cfg.log` is true and `dev` named the controller (so the cursor is that controller's), and again from the same cursor when the companion could not store a frame; `on:false` asks the controller to stop the stream (the switch itself is `cfg`'s to say) |
@@ -353,9 +353,9 @@ reset reasons are the ring's own `BOOT_BANNER` and reset-reason events.
 
 With **Shot archive in the companion** on, the companion keeps a copy of
 every shot and activation through the same records the Web UI shows. The
-controller keeps no state for it beyond the open link and writes nothing to
-flash; the companion infers ratings, deletions and restarted histories from
-the index.
+controller keeps no state for it beyond the open link and the index each store
+last sent on it (in PSRAM, for deltas), and writes nothing to flash; the
+companion infers ratings, deletions and restarted histories from the index.
 
 - **Requests.** `rx`, `rf` and `rt` each replace the pending request of
   their kind. The controller answers one frame per pass, paced like a Stats
@@ -375,6 +375,17 @@ the index.
   `stats` header member. A Stats page's first frame carries `good`, as for the
   browser. History and index frames reach about 21 KiB, which is why record
   answers may exceed 4,096 bytes.
+- **Index deltas.** A listed index carries `sum`, and the companion sends
+  `d:1` only after an index answer in the same link session carried it, so a
+  controller without deltas never sees `d`. With `d`, an `rx` whose `ep` is
+  the epoch this link session last received for that store gets `base`, `up`
+  and `del` instead of `rows` whenever that is smaller, as the
+  [Integration API](INTEGRATION_API.md#record-index-for-the-offline-copy)
+  describes; `gen` and `next` stay. The companion applies it to its own copy
+  of that index (kept in memory, never on disk), checks `sum`, and on any
+  mismatch asks `ep` 0 without `d`, which returns the whole index. A new link
+  session, a controller restart or a companion restart starts again from a
+  whole index.
 - **`trc` answers.** `r` is `ok` (with `d`, the trace section the
   [trace route](INTEGRATION_API.md#get-apiv1diagnosticshot-trace) sends, base64),
   `none` (no summary with that identity, no trace, or the record was

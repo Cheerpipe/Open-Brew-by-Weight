@@ -10,7 +10,7 @@
         "ep": 0
       },
       "frames": [
-        "{\"q\":1,\"t\":\"rec\",\"f\":{\"v\":1,\"type\":\"records\",\"boot\":43,\"store\":\"shots\",\"epoch\":7001,\"gen\":2400,\"next\":13,\"rows\":[12,6234188,11,6346754,10,7997339,9,15072450,8,2424607,7,15403568,6,4196195,5,14138353,4,3148060,3,14819993,2,6195568,1,11549671]}}"
+        "{\"q\":1,\"t\":\"rec\",\"f\":{\"v\":1,\"type\":\"records\",\"boot\":43,\"store\":\"shots\",\"epoch\":7001,\"gen\":2400,\"next\":13,\"rows\":[12,6234188,11,6346754,10,7997339,9,15072450,8,2424607,7,15403568,6,4196195,5,14138353,4,3148060,3,14819993,2,6195568,1,11549671],\"sum\":3638422159}}"
       ]
     },
     {
@@ -32,7 +32,7 @@
         "ep": 0
       },
       "frames": [
-        "{\"q\":3,\"t\":\"rec\",\"f\":{\"v\":1,\"type\":\"records\",\"boot\":43,\"store\":\"history\",\"epoch\":7002,\"gen\":1300,\"next\":6,\"rows\":[5,3297274,4,7128062,3,13827042,2,2522329,1,11803767]}}"
+        "{\"q\":3,\"t\":\"rec\",\"f\":{\"v\":1,\"type\":\"records\",\"boot\":43,\"store\":\"history\",\"epoch\":7002,\"gen\":1300,\"next\":6,\"rows\":[5,3297274,4,7128062,3,13827042,2,2522329,1,11803767],\"sum\":386363135}}"
       ]
     },
     {
@@ -113,6 +113,44 @@
       },
       "frames": [
         "{\"q\":11,\"t\":\"hold\",\"on\":false,\"sync\":false}"
+      ]
+    },
+    {
+      "name": "index_shots_delta",
+      "request": {
+        "t": "rx",
+        "s": "shots",
+        "ep": 7001,
+        "d": 1
+      },
+      "frames": [
+        "{\"q\":12,\"t\":\"rec\",\"f\":{\"v\":1,\"type\":\"records\",\"boot\":43,\"store\":\"shots\",\"epoch\":7003,\"gen\":2400,\"next\":14,\"base\":7001,\"up\":[13,8030445,9,6235294],\"del\":[6],\"sum\":687970994}}"
+      ]
+    },
+    {
+      "name": "fetch_shot_9_moved",
+      "request": {
+        "t": "rf",
+        "s": "shots",
+        "o": 4,
+        "n": 1,
+        "r": 9
+      },
+      "frames": [
+        "{\"q\":13,\"t\":\"rec\",\"f\":{\"v\":1,\"type\":\"stats\",\"boot\":43,\"snapshot\":false,\"epoch\":7003,\"seq\":2,\"request\":9,\"cols\":\"id,bootId,endedAtMs,hasWallTime,endedAtLocalSec,endedAtUnixSec,timezoneOffsetMinutesAtCommit,durationS,presetId,presetName,scaleName,goalG,actualG,offsetG,bbwAlgorithm,bbwAlgorithmVersion,bbwAlpha,bbwLearningApplied,avgFlowGS,targetTempDeciC,doseG,ratio,firstDropS,tareS,shotType,cutType,extractionGuardEnabled,extractionExtended,slowExtractionGuardEnabled,slowExtractionExtended,stopDetail,cutLineG,arrivalS,verdict,channeling,scaleLossSource,estimatedG,blind,fastBeforeS,slowAfterS,fastMarginG,slowMarginG,delayS,wallS,fastRampS,slowRampS,fastCurve,slowCurve,fastCurveHardness,slowCurveHardness,dripDelayS,actualWeightSource,rating,badReason\",\"tag\":3167451611,\"good\":11,\"total\":12,\"offset\":4,\"limit\":1,\"hasMore\":true,\"rows\":[[9,43,609000,true,1792994600,1793005400,-180,28.9,1,\"House\",\"Lunar\",36.0,36.13,0.00,\"unknown\",null,null,null,null,0,0.0,0.00,null,null,\"auto\",\"auto\",false,false,false,false,\"normal_target\",-0.01,27.9,\"on_recipe\",false,null,null,false,25.0,32.0,0.0,0.0,0.0,0.0,0.0,0.0,\"even\",\"even\",0.0,0.0,null,\"none\",5,null,{\"wD\":\"/4QDCfp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6ePp4+nj6eA==\",\"wBreakBefore\":[3],\"wHeld\":[],\"wTruncated\":false,\"dropS\":null,\"dropCg\":null,\"extendedS\":null,\"extCg\":null,\"atmS\":null,\"atmCg\":null,\"atmClearedS\":null,\"endS\":null,\"endCg\":null}]],\"rowBase\":0,\"more\":false}}"
+      ]
+    },
+    {
+      "name": "fetch_shot_13_moved",
+      "request": {
+        "t": "rf",
+        "s": "shots",
+        "o": 0,
+        "n": 1,
+        "r": 10
+      },
+      "frames": [
+        "{\"q\":14,\"t\":\"rec\",\"f\":{\"v\":1,\"type\":\"stats\",\"boot\":43,\"snapshot\":false,\"epoch\":7003,\"seq\":3,\"request\":10,\"cols\":\"id,bootId,endedAtMs,hasWallTime,endedAtLocalSec,endedAtUnixSec,timezoneOffsetMinutesAtCommit,durationS,presetId,presetName,scaleName,goalG,actualG,offsetG,bbwAlgorithm,bbwAlgorithmVersion,bbwAlpha,bbwLearningApplied,avgFlowGS,targetTempDeciC,doseG,ratio,firstDropS,tareS,shotType,cutType,extractionGuardEnabled,extractionExtended,slowExtractionGuardEnabled,slowExtractionExtended,stopDetail,cutLineG,arrivalS,verdict,channeling,scaleLossSource,estimatedG,blind,fastBeforeS,slowAfterS,fastMarginG,slowMarginG,delayS,wallS,fastRampS,slowRampS,fastCurve,slowCurve,fastCurveHardness,slowCurveHardness,dripDelayS,actualWeightSource,rating,badReason\",\"tag\":1417066858,\"good\":11,\"total\":12,\"offset\":0,\"limit\":1,\"hasMore\":true,\"rows\":[[13,43,613000,true,1792997000,1793007800,-180,29.3,1,\"House\",\"Lunar\",36.0,36.41,0.00,\"unknown\",null,null,null,1.33,0,0.0,0.00,null,null,\"auto\",\"auto\",false,false,false,false,\"normal_target\",-0.01,28.3,\"fast\",false,null,null,false,25.0,32.0,0.0,0.0,0.0,0.0,0.0,0.0,\"even\",\"even\",0.0,0.0,null,\"none\",1,null,{\"wD\":\"\",\"wBreakBefore\":[],\"wHeld\":[],\"wTruncated\":false,\"dropS\":null,\"dropCg\":null,\"extendedS\":null,\"extCg\":null,\"atmS\":null,\"atmCg\":null,\"atmClearedS\":null,\"endS\":null,\"endCg\":null}]],\"rowBase\":0,\"more\":false}}"
       ]
     }
   ]

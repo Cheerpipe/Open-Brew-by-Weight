@@ -424,6 +424,19 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   return true;
 }
 
+// Made by the first companion index; without the memory every answer is a
+// whole index (said in the Web UI log, rate-limited) and a later answer
+// retries.
+OpenBrewByWeightNetwork::RecordIndexWork *OpenBrewByWeightNetwork::recordIndexWork() {
+  if (recordIndexWork_ != nullptr) return recordIndexWork_;
+  if (void *memory = allocExternal(sizeof(RecordIndexWork), AllocationOwner::NETWORK))
+    return recordIndexWork_ = new (memory) RecordIndexWork{};
+  static RefusalLog noMemory;
+  if (noMemory.due() != 0)
+    lifecycleLog("Record index: no memory for deltas; the companion gets whole indexes");
+  return nullptr;
+}
+
 // One store per dispatch: its epoch and, when that moved from the browser's
 // copy, every record (every good one for shots, the only ones the offline
 // copy keeps) newest first as an id and a 24-bit revision (a CRC of
@@ -432,6 +445,10 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
 // frame budget. An epoch read ahead of a torn or newer copy only makes the
 // next request resend the index. Shots reuse the Stats cache's store copy,
 // reloaded as sendStatsStream does, whose header and order then rebuild.
+// A listed index carries `sum`, the CRC-32 of its id/revision pairs. For a
+// companion session it also becomes that session's baseline once sent, and
+// an opted-in request holding the baseline's epoch gets only the difference
+// (`base`, `up`, `del`) when that is smaller.
 __attribute__((optimize("Os")))
 bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
                                           const ControlStatusSnapshot &control) {
@@ -439,7 +456,8 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
   const bool shots = session.recordsShots;
   uint32_t epoch = shots ? (callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0)
                          : (callbacks_.historyEpoch ? callbacks_.historyEpoch() : 0);
-  const bool rows = epoch != (shots ? session.recordsShotsEpoch : session.recordsHistoryEpoch);
+  const uint32_t held = shots ? session.recordsShotsEpoch : session.recordsHistoryEpoch;
+  const bool rows = epoch != held;
   auto &cache = g_work->statsCache;
   if (shots && rows && (!cache.valid || cache.snapshot.epoch != epoch)) {
     if (!callbacks_.copyShotStatsRecords) return false;
@@ -460,13 +478,34 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
                         static_cast<unsigned long>(epoch)) ||
       (link && !statusJsonAppend(&used, ",\"gen\":%lu,\"next\":%lu",
                                  static_cast<unsigned long>(generation),
-                                 static_cast<unsigned long>(next))) ||
-      (rows && !statusJsonAppend(&used, ",\"rows\":[")))
+                                 static_cast<unsigned long>(next))))
     return false;
+  RecordIndexWork *const work = rows && session.recordsKey ? recordIndexWork() : nullptr;
+  RecordIndexBaseline *const base =
+      work ? &work->baselines[link ? 2 : &session - uiStreams_][shots ? 0 : 1] : nullptr;
+  RecordIndexBaseline *const list = work ? &work->scratch : nullptr;
+  if (list != nullptr) list->count = 0;
+  // Pairs leave newest first, which is id-descending in both stores; a list
+  // out of that order (or a scratch overflow) only forgoes the baseline.
+  bool ordered = true;
+  uint32_t crc = 0xFFFFFFFFU;
   auto pair = [&](size_t n, uint32_t id, const void *record, size_t size) {
+    const uint32_t words[2] = {id, uiStreamRowHash(record, size) & 0xFFFFFFU};
+    // Both builds are little-endian: the bytes are id then revision, LE.
+    crc = crc32Update(crc, reinterpret_cast<const uint8_t *>(words), sizeof(words));
+    if (list != nullptr) {
+      ordered = ordered && list->count < SHOT_LOG_CAPACITY &&
+                (list->count == 0 || id < list->id[list->count - 1]);
+      if (ordered) {
+        list->id[list->count] = id;
+        list->rev[list->count++] = words[1];
+      }
+    }
     return statusJsonAppend(&used, "%s%lu,%lu", n ? "," : "", static_cast<unsigned long>(id),
-                            static_cast<unsigned long>(uiStreamRowHash(record, size) & 0xFFFFFFU));
+                            static_cast<unsigned long>(words[1]));
   };
+  const size_t head = used;
+  if (rows && !statusJsonAppend(&used, ",\"rows\":[")) return false;
   if (rows && shots) {
     for (size_t n = 0, listed = 0; n < cache.snapshot.count; ++n)
       if ((link || shotLogRecordEligible(cache.snapshot.records[n])) &&
@@ -484,9 +523,57 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
       if (!page.hasMore || !page.count) break;
     }
   }
-  if (!statusJsonAppend(&used, rows ? "]}" : "}")) return false;
+  const unsigned long sum = ~crc;
+  if (rows && !statusJsonAppend(&used, "],\"sum\":%lu", sum)) return false;
+  if (rows && base != nullptr && ordered &&
+      (shots ? session.recordsShotsDelta : session.recordsHistoryDelta) &&
+      base->key == session.recordsKey && base->epoch == held) {
+    // Merge walk of the two id-descending lists: `emit(true, i)` for a new
+    // or re-revised scratch entry, `emit(false, j)` for a gone baseline one.
+    auto walk = [&](auto emit) {
+      for (size_t i = 0, j = 0; i < list->count || j < base->count;) {
+        if (j == base->count || (i < list->count && list->id[i] > base->id[j])) {
+          if (!emit(true, i++)) return false;
+        } else if (i == list->count || base->id[j] > list->id[i]) {
+          if (!emit(false, j++)) return false;
+        } else {
+          if (list->rev[i] != base->rev[j] && !emit(true, i)) return false;
+          ++i, ++j;
+        }
+      }
+      return true;
+    };
+    size_t ups = 0, dels = 0;
+    walk([&](bool up, size_t) { return ++(up ? ups : dels); });
+    if (2 * ups + dels < 2 * list->count) {
+      used = head;
+      size_t upCount = 0, goneCount = 0;
+      const auto upPair = [&](bool up, size_t i) {
+        return !up || statusJsonAppend(&used, "%s%lu,%lu", upCount++ ? "," : "",
+                                       static_cast<unsigned long>(list->id[i]),
+                                       static_cast<unsigned long>(list->rev[i]));
+      };
+      const auto gone = [&](bool up, size_t j) {
+        return up || statusJsonAppend(&used, "%s%lu", goneCount++ ? "," : "",
+                                      static_cast<unsigned long>(base->id[j]));
+      };
+      if (!statusJsonAppend(&used, ",\"base\":%lu,\"up\":[", static_cast<unsigned long>(held)) ||
+          !walk(upPair) || !statusJsonAppend(&used, "],\"del\":[") || !walk(gone) ||
+          !statusJsonAppend(&used, "],\"sum\":%lu", sum))
+        return false;
+    }
+  }
+  if (!statusJsonAppend(&used, "}")) return false;
   bool deferred;
   if (!sendUiStreamFrame(session, used, deferred)) return false;
-  if (!deferred) (shots ? session.recordsShots : session.recordsHistory) = false;
+  if (!deferred) {
+    (shots ? session.recordsShots : session.recordsHistory) = false;
+    // What the session now holds is the listed index, whichever form left.
+    if (rows && base != nullptr && ordered) {
+      *base = *list;
+      base->key = session.recordsKey;
+      base->epoch = epoch;
+    }
+  }
   return true;
 }
