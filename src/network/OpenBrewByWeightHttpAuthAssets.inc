@@ -65,11 +65,11 @@ esp_err_t OpenBrewByWeightNetwork::claimHandler(httpd_req_t *request) {
   char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
   if (!readWebUiClientId(request, clientId, sizeof(clientId))) {
     return sendError(request, STATUS_BAD_REQUEST, "UI_CLIENT_INVALID",
-                     "X-WebUI-Client must be a 16-24 character lowercase hex id.", "UI_CLIENT_INVALID");
+                     nullptr, "UI_CLIENT_INVALID");
   }
   if (!self.webAccessSessionAllowed(request)) {
     return sendError(request, STATUS_UNAUTHORIZED, "AUTH_REQUIRED",
-                     "Sign in with the device password.", "AUTH_REQUIRED");
+                     nullptr, "AUTH_REQUIRED");
   }
   // A companion screen claiming while the companion holds control attaches
   // to that claim: it takes nothing from the other screens and drops only
@@ -110,10 +110,10 @@ esp_err_t OpenBrewByWeightNetwork::unlockHandler(httpd_req_t *request) {
   if (!self.requireActiveWebUiClient(request)) return ESP_OK;
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   if (!self.lockConfirmedBody(request,
-                              "An explicit confirmation is required.",
+                              nullptr,
                               "UNSAFE_WEBUI_OVERRIDE", "CONFIRMATION_REQUIRED")) {
     return sendError(request, STATUS_UNPROCESSABLE, "UNLOCK_NOT_CONFIRMED",
-                     "The unsafe WebUI override was not explicitly confirmed.", "UNLOCK_NOT_CONFIRMED");
+                     nullptr, "UNLOCK_NOT_CONFIRMED");
   }
   CompanionPrincipal holder;
   (void)self.webUiPrincipal(request, holder);
@@ -279,7 +279,7 @@ bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {
 bool OpenBrewByWeightNetwork::requireAdminUnlock(httpd_req_t *request) {
   if (!adminUnlockAllowed(request)) {
     sendError(request, STATUS_UNAUTHORIZED, "ADMIN_LOCKED",
-              "Unlock administration with the device password first.", "ADMIN_LOCKED");
+              nullptr, "ADMIN_LOCKED");
     return false;
   }
   touchAdminUnlock();
@@ -300,7 +300,7 @@ bool OpenBrewByWeightNetwork::diagnosticPageEnabled() {
 esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
+      self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -317,7 +317,7 @@ esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
   if (!parsed) {
     memset(password, 0, sizeof(password));
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_DEVICE_PASSWORD",
-                     "password is required.", "LOGIN_PASSWORD_MISSING");
+                     nullptr, "LOGIN_PASSWORD_MISSING");
   }
 
   char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
@@ -326,7 +326,7 @@ esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
       !self.webUiPrincipal(request, holder)) {
     memset(password, 0, sizeof(password));
     return sendError(request, STATUS_BAD_REQUEST, "UI_CLIENT_INVALID",
-                     "X-WebUI-Client must be a 16-24 character lowercase hex id.", "UI_CLIENT_INVALID");
+                     nullptr, "UI_CLIENT_INVALID");
   }
 
   const PasswordCheck check = self.checkDevicePassword(request, password);
@@ -335,9 +335,9 @@ esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
   if (check != PasswordCheck::OK) {
     return check == PasswordCheck::COOLDOWN
                ? sendError(request, STATUS_TOO_MANY, "ADMIN_UNLOCK_COOLDOWN",
-                           "Too many failed unlock attempts. Try again shortly.", "ADMIN_UNLOCK_COOLDOWN")
+                           nullptr, "ADMIN_UNLOCK_COOLDOWN")
                : sendError(request, STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                           "Device password is incorrect.", "DEVICE_PASSWORD_INVALID");
+                           nullptr, "DEVICE_PASSWORD_INVALID");
   }
 
   self.grantAdminUnlock(holder, millis());
@@ -348,7 +348,7 @@ esp_err_t OpenBrewByWeightNetwork::adminUnlockHandler(httpd_req_t *request) {
 esp_err_t OpenBrewByWeightNetwork::adminLockHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
+      self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -364,13 +364,13 @@ esp_err_t OpenBrewByWeightNetwork::adminLockHandler(httpd_req_t *request) {
 bool OpenBrewByWeightNetwork::requireActiveWebUiClient(httpd_req_t *request) {
   if (!webAccessSessionAllowed(request)) {
     sendError(request, STATUS_UNAUTHORIZED, "AUTH_REQUIRED",
-              "Sign in with the device password.", "AUTH_REQUIRED");
+              nullptr, "AUTH_REQUIRED");
     return false;
   }
   char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
   if (!readWebUiClientId(request, clientId, sizeof(clientId))) {
     sendError(request, STATUS_CONFLICT, "UI_CLAIM_REQUIRED",
-              "Claim WebUI control before using this API.", "UI_CLAIM_REQUIRED");
+              nullptr, "UI_CLAIM_REQUIRED");
     return false;
   }
   bool active = false;
@@ -385,7 +385,7 @@ bool OpenBrewByWeightNetwork::requireActiveWebUiClient(httpd_req_t *request) {
   memset(clientId, 0, sizeof(clientId));
   if (!active) {
     sendError(request, STATUS_CONFLICT, "UI_TAKEN_OVER",
-              "This WebUI window is inactive. Reactivate to continue.", "UI_TAKEN_OVER");
+              nullptr, "UI_TAKEN_OVER");
     return false;
   }
   char activity[3] = {};
@@ -498,7 +498,7 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
   }
   if (matched == nullptr) {
     return sendError(request, STATUS_NOT_FOUND, "NOT_FOUND",
-                     "Unknown API route.", "UNKNOWN_ROUTE");
+                     nullptr, "UNKNOWN_ROUTE");
   }
   if (matched->open) return matched->handler(request);
   // /setup holds no UI claim: joining the SoftAP already proved the device
@@ -795,7 +795,7 @@ esp_err_t OpenBrewByWeightNetwork::notFoundHandler(httpd_req_t *request,
   // Keep API 404s as JSON; browser paths bounce to Home.
   if (strncmp(request->uri, "/api/", 5) == 0) {
     return sendError(request, STATUS_NOT_FOUND, "NOT_FOUND",
-                     "The requested resource was not found.", "NOT_FOUND");
+                     nullptr, "NOT_FOUND");
   }
   const char *probe =
       instance_->snapshot().apActive ? captiveProbeHost(request) : nullptr;
@@ -828,7 +828,7 @@ bool OpenBrewByWeightNetwork::rejectForeignHost(httpd_req_t *request) {
   logRefusedHost(host, network.mdnsHost);
   if (strncmp(request->uri, "/api/", 5) == 0) {
     sendError(request, STATUS_FORBIDDEN, "HOST_NOT_ALLOWED",
-              "Open the controller by its IP address or its .local name.", "HOST_NOT_ALLOWED");
+              nullptr, "HOST_NOT_ALLOWED");
     return true;
   }
   // Pages bounce to the address the browser actually reached.

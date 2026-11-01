@@ -13,7 +13,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
   char address[COMPANION_ADDRESS_TEXT];
   if (!companionPeer(httpd_req_to_sockfd(request), address))
     return sendError(request, STATUS_FORBIDDEN, "COMPANION_PEER",
-                     "Companions relay only from the local network.", "RELAY_LOCAL_NETWORK_ONLY");
+                     nullptr, "RELAY_LOCAL_NETWORK_ONLY");
   uint8_t rb[COMPANION_NONCE_BYTES];
   char json[176] = {};
   size_t used = 0;
@@ -29,7 +29,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     }
     if (!paired)
       return sendError(request, STATUS_NOT_FOUND, "COMPANION_NOT_PAIRED",
-                       "This controller is not paired with a companion.", "COMPANION_NOT_PAIRED");
+                       nullptr, "COMPANION_NOT_PAIRED");
     used = static_cast<size_t>(snprintf(json, sizeof(json), "{\"challenge\":\""));
     (void)appendBase64(json, sizeof(json), used, rb, sizeof(rb));
     snprintf(json + used, sizeof(json) - used, "\",\"protocol\":%lu}",
@@ -38,8 +38,8 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
   }
   if (!requireJsonContentType(request))
     return sendError(request, STATUS_UNSUPPORTED_MEDIA, "UNSUPPORTED_MEDIA_TYPE",
-                     "Send the relay request as application/json.", "RELAY_CONTENT_TYPE_REQUIRED");
-  const esp_err_t body = self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
+                     nullptr, "RELAY_CONTENT_TYPE_REQUIRED");
+  const esp_err_t body = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (body != ESP_OK) return body;
   static const char *const fields[] = {"id", "nonce", "mac"};
   char id[COMPANION_ID_TEXT] = {}, nonceText[32] = {}, macText[48] = {};
@@ -55,7 +55,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!valid)
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                     "The relay request fields are invalid.", "RELAY_FIELDS_INVALID");
+                     nullptr, "RELAY_FIELDS_INVALID");
   uint8_t secret[COMPANION_SECRET_BYTES] = {};
   CompanionHello verdict;
   {
@@ -88,7 +88,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
   if (verdict != CompanionHello::CHALLENGE) {
     memset(secret, 0, sizeof(secret));
     return sendError(request, STATUS_NOT_FOUND, "COMPANION_NOT_PAIRED",
-                     "This controller is not paired with this companion.", "COMPANION_NOT_PAIRED_WITH_PEER");
+                     nullptr, "COMPANION_NOT_PAIRED_WITH_PEER");
   }
   uint8_t key[32], bodyKey[32];
   const bool proven = companionHandshakeMac(secret, 'R', rb, nc, expected) &&
@@ -109,7 +109,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
       self.lifecycleLogf("Companion relay refused %lu handshake(s): authentication failed",
                          static_cast<unsigned long>(count));
     return sendError(request, STATUS_UNAUTHORIZED, "COMPANION_AUTH",
-                     "The relay handshake did not authenticate.", "COMPANION_AUTH");
+                     nullptr, "COMPANION_AUTH");
   }
   bool first, ui, link;
   {
@@ -263,7 +263,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
   if (const uint32_t count = log.due())
     self.lifecycleLogf("Companion relay refused %lu request(s): %s",
                        static_cast<unsigned long>(count), reason);
-  sendError(request, status, code, "The companion's relay was refused.", "RELAY_INVALID");
+  sendError(request, status, code, nullptr, "RELAY_INVALID");
   return false;
 }
 
@@ -399,7 +399,7 @@ esp_err_t OpenBrewByWeightNetwork::relayEnvelopeReject(httpd_req_t *request) {
     lifecycleLogf("Companion relay refused %lu request(s): a body seal that did not open",
                   static_cast<unsigned long>(count));
   return sendError(request, STATUS_BAD_REQUEST, "RELAY_INVALID",
-                   "The companion's relay was refused.", "RELAY_INVALID");
+                   nullptr, "RELAY_INVALID");
 }
 
 }  // namespace openbrewbyweight

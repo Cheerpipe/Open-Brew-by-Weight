@@ -548,6 +548,12 @@ if (!codeIncludes(ui, 'const WEB_UI_INACTIVITY_MS=15*60*1000') ||
     codeIncludes(ui, "addEventListener('scroll', R.noteWebUiInteraction")) {
   throw new Error('WebUI inactivity must expire after 15 minutes of direct control interaction, never scrolling');
 }
+// The UI_TAKEN_OVER sentence itself lives in the locale catalog
+// (err.ui_taken_over) and reaches both the wire and the toast from there;
+// the network sources only route its stable reason code.
+const uiTakenOverCatalog = JSON.parse(
+    fs.readFileSync(path.join(sketchDir, 'web', 'locales', 'en.json'), 'utf8'))
+    .strings['err.ui_taken_over'];
 if (!codeIncludes(ui, 'Press Reload to enable this window again.') ||
     !codeIncludes(ui, 'id="webUiInactive"') ||
     !codeIncludes(ui, 'id="inactiveHint"') ||
@@ -555,7 +561,8 @@ if (!codeIncludes(ui, 'Press Reload to enable this window again.') ||
     !css.includes('.inactiveOverlay') ||
     !css.includes('.inactiveOverlay.isVisible') ||
     !css.includes('opacity .5s') ||
-    !network.includes('This WebUI window is inactive. Reactivate to continue.') ||
+    !network.includes('"UI_TAKEN_OVER"') ||
+    !uiTakenOverCatalog ||
     codeIncludes(ui, 'Another WebUI window controls this device.') ||
     network.includes('Another WebUI window has taken control.') ||
     codeIncludes(ui, 'function ownershipBanner(') ||

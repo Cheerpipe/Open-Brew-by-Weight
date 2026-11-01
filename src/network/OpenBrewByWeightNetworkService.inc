@@ -196,7 +196,7 @@ esp_err_t OpenBrewByWeightNetwork::workBufBusy(httpd_req_t *request) {
   actionLogf("http: %.*s answered busy: response workspace unavailable",
              static_cast<int>(strcspn(request->uri, "?")), request->uri);
   return sendError(request, STATUS_UNAVAILABLE, "STATUS_BUSY",
-                   "Status snapshot is busy; retry shortly.", "STATUS_BUSY");
+                   nullptr, "STATUS_BUSY");
 }
 
 bool OpenBrewByWeightNetwork::enqueueAcceptedCommand(const WebCommand &command) {
@@ -476,7 +476,7 @@ esp_err_t OpenBrewByWeightNetwork::runConfirmedClear(
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE", lockedDetail,
                      lockedReason);
   }
-  if (!lockConfirmedBody(request, "An explicit confirmation is required.",
+  if (!lockConfirmedBody(request, nullptr,
                          expectedConfirmation, "CONFIRMATION_REQUIRED")) {
     return sendError(request, STATUS_UNPROCESSABLE, notConfirmedCode,
                      notConfirmedDetail, notConfirmedReason);
@@ -504,7 +504,7 @@ esp_err_t OpenBrewByWeightNetwork::runDeleteById(httpd_req_t *request,
                      lockedReason);
   }
   const esp_err_t bodyStatus =
-      lockJsonBody(request, "A bounded JSON request is required.",
+      lockJsonBody(request, nullptr,
                    "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;

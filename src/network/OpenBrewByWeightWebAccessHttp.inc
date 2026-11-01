@@ -165,7 +165,7 @@ void OpenBrewByWeightNetwork::serviceWebAccess() {
 bool OpenBrewByWeightNetwork::readWebAccessBody(httpd_req_t *request,
                                                 WebAccessBody &body,
                                                 esp_err_t &sent) {
-  sent = lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
+  sent = lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (sent != ESP_OK) return false;
   cJSON *root = parseJsonDocument(workBuf_->requestBody);
   static const char *const fields[] = {"password", "remember", "action", "id", "allow", "device"};
@@ -187,7 +187,7 @@ bool OpenBrewByWeightNetwork::readWebAccessBody(httpd_req_t *request,
   unlockJsonBody();
   if (!parsed) {
     sent = sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST",
-                     "The request fields are invalid.", "AUTH_FIELDS_INVALID");
+                     nullptr, "AUTH_FIELDS_INVALID");
   }
   return parsed;
 }
@@ -196,9 +196,9 @@ esp_err_t OpenBrewByWeightNetwork::sendPasswordCheckError(httpd_req_t *request,
                                                           PasswordCheck check) {
   return check == PasswordCheck::COOLDOWN
              ? sendError(request, STATUS_TOO_MANY, "AUTH_COOLDOWN",
-                         "Too many attempts. Try again in 30 seconds.", "AUTH_COOLDOWN")
+                         nullptr, "AUTH_COOLDOWN")
              : sendError(request, STATUS_UNAUTHORIZED, "DEVICE_PASSWORD_INVALID",
-                         "Device password is incorrect.", "DEVICE_PASSWORD_INVALID");
+                         nullptr, "DEVICE_PASSWORD_INVALID");
 }
 
 esp_err_t OpenBrewByWeightNetwork::authStatusHandler(httpd_req_t *request) {
@@ -222,7 +222,7 @@ esp_err_t OpenBrewByWeightNetwork::authLoginHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.webAccessActive()) {
     return sendError(request, STATUS_CONFLICT, "AUTH_NOT_REQUIRED",
-                     "This Web UI does not ask for a password.", "AUTH_NOT_REQUIRED");
+                     nullptr, "AUTH_NOT_REQUIRED");
   }
   WebAccessBody body;
   esp_err_t sent = ESP_OK;
@@ -323,11 +323,11 @@ esp_err_t OpenBrewByWeightNetwork::authAccessHandler(httpd_req_t *request) {
     }
     if (enable && factory) {
       return sendError(request, STATUS_CONFLICT, "FACTORY_PASSWORD",
-                       "Choose a new device password before turning on the login.", "FACTORY_PASSWORD");
+                       nullptr, "FACTORY_PASSWORD");
     }
     if (!body.hasPassword) {
       return sendError(request, STATUS_UNPROCESSABLE, "DEVICE_PASSWORD_REQUIRED",
-                       "Enter the device password.", "DEVICE_PASSWORD_REQUIRED");
+                       nullptr, "DEVICE_PASSWORD_REQUIRED");
     }
     const PasswordCheck check = self.checkDevicePassword(request, body.password);
     if (check != PasswordCheck::OK) return sendPasswordCheckError(request, check);
@@ -367,7 +367,7 @@ esp_err_t OpenBrewByWeightNetwork::authAccessHandler(httpd_req_t *request) {
     }
     return renamed ? sendJson(request, STATUS_OK, "{\"ok\":true}")
                    : sendError(request, STATUS_CONFLICT, "SESSION_NOT_FOUND",
-                               "That device is no longer signed in.", "SESSION_NOT_FOUND");
+                               nullptr, "SESSION_NOT_FOUND");
   }
   if (strcmp(body.action, "signOut") == 0) {
     bool revoked = false;
@@ -377,7 +377,7 @@ esp_err_t OpenBrewByWeightNetwork::authAccessHandler(httpd_req_t *request) {
     }
     if (!revoked) {
       return sendError(request, STATUS_CONFLICT, "SESSION_NOT_FOUND",
-                       "That device is no longer signed in.", "SESSION_NOT_FOUND");
+                       nullptr, "SESSION_NOT_FOUND");
     }
     self.lifecycleLog("Web UI signed out one device");
     return sendJson(request, STATUS_OK, "{\"ok\":true}");
@@ -402,7 +402,7 @@ esp_err_t OpenBrewByWeightNetwork::authAccessHandler(httpd_req_t *request) {
     return sendJson(request, STATUS_OK, "{\"ok\":true}");
   }
   return sendError(request, STATUS_UNPROCESSABLE, "INVALID_REQUEST",
-                   "Unknown access action.", "UNKNOWN_ACCESS_ACTION");
+                   nullptr, "UNKNOWN_ACCESS_ACTION");
 }
 
 esp_err_t OpenBrewByWeightNetwork::authNoticeHandler(httpd_req_t *request) {
@@ -437,7 +437,7 @@ esp_err_t OpenBrewByWeightNetwork::authPairingHandler(httpd_req_t *request) {
   memset(token, 0, sizeof(token));
   if (!decided) {
     return sendError(request, STATUS_CONFLICT, "PAIRING_NOT_PENDING",
-                     "This Home Assistant request is no longer waiting.", "INTEGRATION_REQUEST_EXPIRED");
+                     nullptr, "INTEGRATION_REQUEST_EXPIRED");
   }
   self.lifecycleLog(body.allow ? "Home Assistant pairing approved"
                                : "Home Assistant pairing denied");
@@ -519,7 +519,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
   const bool pair = apiUriMatches(uri, "/api/v1/integration/pair");
   if ((exchange || pair) && !active) {
     result = sendError(request, STATUS_CONFLICT, "AUTH_NOT_REQUIRED",
-                       "This controller does not ask for a password.", "CONTROLLER_AUTH_NOT_REQUIRED");
+                       nullptr, "CONTROLLER_AUTH_NOT_REQUIRED");
     return true;
   }
   const uint32_t now = millis();
@@ -564,7 +564,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
     }
     if (!started) {
       result = sendError(request, STATUS_TOO_MANY, "PAIRING_BUSY",
-                         "Another pairing request is open. Try again shortly.", "ACCESS_PAIRING_BUSY");
+                         nullptr, "ACCESS_PAIRING_BUSY");
       return true;
     }
     char json[96] = {};
@@ -616,7 +616,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
   if (webUi) {
     if (webAccessSessionAllowed(request)) return false;
     result = sendError(request, STATUS_UNAUTHORIZED, "AUTH_REQUIRED",
-                       "Sign in with the device password.", "AUTH_REQUIRED");
+                       nullptr, "AUTH_REQUIRED");
     return true;
   }
   uint8_t token[WEB_ACCESS_TOKEN_BYTES] = {};
@@ -628,6 +628,6 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
   memset(token, 0, sizeof(token));
   if (valid) return false;
   result = sendError(request, STATUS_UNAUTHORIZED, "INTEGRATION_AUTH_REQUIRED",
-                     "Connect with the device password or approve this request in the Web UI.", "INTEGRATION_AUTH_REQUIRED");
+                     nullptr, "INTEGRATION_AUTH_REQUIRED");
   return true;
 }
