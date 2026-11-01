@@ -5457,12 +5457,16 @@ registerStream("heroDeck", {
   subscribe: () => null,
   claim: (d) => d.type === "stats" && heroDeck.request > 0 && d.request === heroDeck.request,
   frame: heroDeckFrame,
-  reset: () => (heroDeck.request = heroDeck.sentAt = 0),
+  reset: () => (heroDeck.request = 0),
   reboot: resetHeroDeck,
   hero: syncHeroDeck,
 });
+// The send time outlives a close: a refused fetch retries every five seconds.
 function heroDeckFetch() {
-  if (heroDeck.older || Date.now() - heroDeck.sentAt < 5e3 || shotWs?.readyState !== 1) return;
+  const wait = heroDeck.sentAt + 5e3 - Date.now();
+  clearTimeout(heroDeck.retry);
+  if (heroDeck.older || !heroDeck.last || shotWs?.readyState !== 1) return;
+  if (wait > 0) return void (heroDeck.retry = setTimeout(heroDeckFetch, wait));
   Object.assign(heroDeck, {
     request: ++uiState.statsNextRequest,
     sentAt: Date.now(),
