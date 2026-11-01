@@ -145,7 +145,8 @@
 // single-field, disconnect, resync and capacity-failure cases.
 {
   const assert = require('assert').strict, {spawnSync} = require('child_process');
-  const stream = fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
+  const stream = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   const writer = stream.slice(0, stream.indexOf('// This bounded presentation'));
   const network = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.h'), 'utf8');
   const networkTypes = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetworkTypes.h'), 'utf8');
@@ -392,7 +393,8 @@ int main(){
       stream.includes('silent = allowed && session.bound &&'));
   // Bind reports the presets the page holds; only the first Home snapshot may
   // leave them out, and only for the same tag.
-  const home = fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
+  const home = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   assert(stream.includes('cJSON_GetObjectItemCaseSensitive(message, "presetsTag")'));
   assert(home.includes('delta.skipNext = initial && session.knownPresetsTag != 0 &&') &&
       home.includes('session.knownPresetsTag == renderedPresetsHash;') &&

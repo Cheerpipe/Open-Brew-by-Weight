@@ -213,7 +213,8 @@
   const assert = require('assert').strict;
   const stream = fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightUiStream.inc'), 'utf8') +
       fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightUiStreamTransport.inc'), 'utf8');
-  const homeStream = fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
+  const homeStream = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   assert(stream.includes('strcmp(op->valuestring, "diagnostic")'));
   assert(stream.includes('session->diagnostic = cJSON_IsTrue(on)'));
   assert(stream.includes('if (open && session.diagnostic)') &&

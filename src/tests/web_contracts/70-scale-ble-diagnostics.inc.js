@@ -118,8 +118,8 @@
       !network.includes('idleTarePresentationName(idleCode)')) {
     throw new Error('Idle tare Web projection must preserve its public labels');
   }
-  const homeStream = fs.readFileSync(
-      path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
+  const homeStream = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   const diagSender = homeStream.slice(
       homeStream.indexOf('bool OpenBrewByWeightNetwork::sendDiagnosticStream'),
       homeStream.indexOf('bool OpenBrewByWeightNetwork::sendLogStream'));

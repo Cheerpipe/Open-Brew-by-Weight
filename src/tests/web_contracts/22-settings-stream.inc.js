@@ -7,8 +7,8 @@
       path.join(sketchDir, 'network/OpenBrewByWeightSettingsStream.inc'), 'utf8');
   const uiStreamSource = fs.readFileSync(
       path.join(sketchDir, 'network/OpenBrewByWeightUiStream.inc'), 'utf8');
-  const homeStreamSource = fs.readFileSync(
-      path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
+  const homeStreamSource = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   const homeRegion = homeStreamSource.slice(homeStreamSource.indexOf('bool OpenBrewByWeightNetwork::sendHomeStream'),
       homeStreamSource.indexOf('bool OpenBrewByWeightNetwork::sendUiStreamFrame'));
   const homePaths = [...homeRegion.matchAll(/delta\.(?:hashed)?[fF]ield\("([^"]+)"/g)].map((m) => m[1]);

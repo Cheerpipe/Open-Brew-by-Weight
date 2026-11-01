@@ -3,8 +3,8 @@ const micraWeb = fs.readFileSync(
 const micraStatus = fs.readFileSync(
     path.join(sketchDir, 'network/OpenBrewByWeightStatus.inc'), 'utf8') + fs.readFileSync(
     path.join(sketchDir, 'network/OpenBrewByWeightSettingsStream.inc'), 'utf8') +
-    fs.readFileSync(
-        path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
+    (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
 const micraService = fs.readFileSync(
     path.join(sketchDir, 'machine/OpenBrewByWeightMicraService.cpp'), 'utf8');
 const micraTiming = fs.readFileSync(

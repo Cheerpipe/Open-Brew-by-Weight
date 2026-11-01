@@ -204,8 +204,8 @@ if (network.includes('page == StatusPage::Diagnostic')) {
   throw new Error('diagnostic metrics must not ride the REST status pages');
 }
 {
-  const homeStreamSource = fs.readFileSync(
-      path.join(sketchDir, 'network', 'OpenBrewByWeightHomeStream.inc'), 'utf8');
+  const homeStreamSource = (fs.readFileSync(path.join(sketchDir, 'network', 'OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network', 'OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   const diagStart = homeStreamSource.indexOf('sendDiagnosticStream');
   const diagEnd = homeStreamSource.indexOf('sendLogStream', diagStart);
   const diagRegion = homeStreamSource.slice(diagStart, diagEnd);

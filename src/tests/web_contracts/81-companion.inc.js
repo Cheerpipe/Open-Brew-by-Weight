@@ -23,8 +23,8 @@
   // scale rows, while the full link report stays diagnostic-only (the cloud
   // popup also names the route, so that one field rides along on Micra builds).
   {
-    const homeStreamSource = fs.readFileSync(
-        path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8');
+    const homeStreamSource = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
+      fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
     const homeRegion = homeStreamSource.slice(
         homeStreamSource.indexOf('bool OpenBrewByWeightNetwork::sendHomeStream'),
         homeStreamSource.indexOf('bool OpenBrewByWeightNetwork::sendUiStreamFrame'));

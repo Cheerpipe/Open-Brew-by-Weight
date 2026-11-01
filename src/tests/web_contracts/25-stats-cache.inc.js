@@ -5,7 +5,7 @@
 {
   const assert = require('assert').strict, {spawnSync} = require('child_process');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
-  const source = read('network/OpenBrewByWeightHomeStream.inc');
+  const source = read('network/OpenBrewByWeightHomeStream.inc') + read('network/OpenBrewByWeightRecordStreams.inc');
   const headerSource = read('network/OpenBrewByWeightStatsHeader.inc');
   const networkSource = read('OpenBrewByWeightNetwork.cpp');
   const header = read('OpenBrewByWeightNetwork.h');

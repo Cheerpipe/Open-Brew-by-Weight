@@ -42,6 +42,7 @@ const network = readSources([
   'network/OpenBrewByWeightUiStream.inc',
   'network/OpenBrewByWeightUiStreamTransport.inc',
   'network/OpenBrewByWeightHomeStream.inc',
+  'network/OpenBrewByWeightRecordStreams.inc',
   'network/OpenBrewByWeightStatsPage.inc',
   'network/OpenBrewByWeightStatsHeader.inc',
   'network/OpenBrewByWeightAuditStream.inc',

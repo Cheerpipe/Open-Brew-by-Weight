@@ -1326,6 +1326,7 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "network/OpenBrewByWeightIntegrationApi.inc"
 #include "network/OpenBrewByWeightNetworkOta.inc"
 #include "network/OpenBrewByWeightCompanion.inc"
+#include "network/OpenBrewByWeightCompanionAdmin.inc"
 #include "network/OpenBrewByWeightCompanionLog.inc"
 #include "network/OpenBrewByWeightCompanionRecords.inc"
 #include "network/OpenBrewByWeightCompanionStatus.inc"

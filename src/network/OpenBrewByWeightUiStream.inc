@@ -170,6 +170,7 @@ void sendUiStreamClose(httpd_handle_t server, int fd, uint16_t reason) {
 
 #include "OpenBrewByWeightStatsPage.inc"
 #include "OpenBrewByWeightHomeStream.inc"
+#include "OpenBrewByWeightRecordStreams.inc"
 #include "OpenBrewByWeightAuditStream.inc"
 #include "OpenBrewByWeightSettingsStream.inc"
 
