@@ -1225,8 +1225,14 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
       throw new Error('OTA busy must not disable Start or Rinse');
     }
   }
-  if (!network.includes(
-          'The paddle moved or a shot started during the upload')) {
+  // SAFETY_LOST reaches the operator through its stable reason code
+  // (OpenBrewByWeightOta::resultName): the sentence lives in the locale
+  // catalog (err.safety_lost) and the wire prose resolves from the
+  // generated table at send time.
+  if (!otaSource.includes('"SAFETY_LOST"') ||
+      !JSON.parse(fs.readFileSync(
+             path.join(sketchDir, 'web', 'locales', 'en.json'), 'utf8'))
+           .strings['err.safety_lost']) {
     throw new Error(
         'SAFETY_LOST must tell the operator the paddle aborted the upload');
   }
