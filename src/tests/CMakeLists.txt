@@ -226,6 +226,14 @@ host_test(companion_link_host_test LABEL "host;network" DEFINITIONS
   "COMPANION_VECTORS=\"${CMAKE_SOURCE_DIR}/docs/schemas/companion-link-v1.vectors.json\"")
 target_include_directories(companion_link_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
 target_link_libraries(companion_link_host_test PRIVATE "${CJSON_LIBRARY}")
+# The Stats header over the golden vectors the companion's port reproduces.
+host_test(stats_header_host_test LABEL "host;network;web" DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
+  "STATS_HEADER_VECTORS=\"${CMAKE_SOURCE_DIR}/docs/schemas/stats-header-v1.vectors.json\"")
+target_include_directories(stats_header_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
+# Clang has no optimize("Os") attribute, which the firmware's GCC honours.
+target_compile_options(stats_header_host_test PRIVATE
+  $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-unknown-attributes>)
+target_link_libraries(stats_header_host_test PRIVATE "${CJSON_LIBRARY}")
 host_test(companion_log_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST LABEL "host;network")
 target_include_directories(companion_log_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
 target_link_libraries(companion_log_host_test PRIVATE "${CJSON_LIBRARY}")

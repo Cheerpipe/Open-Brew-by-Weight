@@ -249,6 +249,8 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     delta.field("companion.name", "\"%s\"", companion.name);
     delta.field("companion.link", "\"%s\"", companion.linkOpen ? "open" : "down");
     delta.field("companion.peerProtocol", static_cast<unsigned long>(companion.peerProtocol));
+    // History and Stats say where older records are kept (paired, switch on).
+    delta.field("companion.archive", bool(companion.paired && companion.archiveSwitch));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     // The header's cloud popup names the route the machine's data takes.
     delta.field("companion.route", "\"%s\"", companion.route);
@@ -369,6 +371,7 @@ constexpr uint32_t kDiagSlowMs = 4000;
 // caller's retry flag instead of tearing down the owned socket.
 bool OpenBrewByWeightNetwork::sendUiStreamFrame(UiStreamSession &session,
                                            size_t used, bool &deferArm) {
+  if (companionRecordsSession(session)) return companionRecordsSend(used, true, deferArm);
   bool owner;
   { TaskLockGuard lock(dataMux_); owner = strcmp(session.clientId, activeWebUiClientId_) == 0; }
   if (!owner) return false;
@@ -565,6 +568,8 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.logCursor", static_cast<unsigned long>(companion.logCursor));
     delta.field("companion.logFlushS", "%ld", static_cast<long>(companion.logFlushS));
     delta.field("companion.logGaps", static_cast<unsigned long>(companion.logGaps));
+    delta.field("companion.archiveSwitch", bool(companion.archiveSwitch));
+    delta.field("companion.archiveSyncS", "%ld", static_cast<long>(companion.archiveSyncS));
     delta.field("companion.relay", "\"%s\"", companion.relayReady ? "ready" : "down");
     delta.field("companion.relayRejects", static_cast<unsigned long>(companion.relayRejects));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
@@ -1028,8 +1033,11 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
                                            const ControlStatusSnapshot &control) {
   uiStreamSendKind = "history";
   const uint32_t epoch = callbacks_.historyEpoch ? callbacks_.historyEpoch() : 0;
+  // The companion archive's link session only fetches: no snapshot, no standing page.
+  const bool link = companionRecordsSession(session);
+  if (link && !session.historyFetch) return true;
   const bool initial =
-      session.historyResync || session.historyBoot != control.bootId;
+      !link && (session.historyResync || session.historyBoot != control.bootId);
   // A snapshot supersedes any pending append fetch: the client resets its
   // in-flight marker when a replace lands.
   if (initial) session.historyFetch = false;
@@ -1082,7 +1090,7 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
   const bool kept = initial && session.historyKnownTag != 0 &&
                     fingerprint == session.historyKnownTag;
   // Page-level UI state (ownership, edit gate, clock) rides the Home stream.
-  size_t used = 0;
+  size_t used = link ? COMPANION_RECORD_ORIGIN : 0;
   if (!statusJsonAppend(&used,
           "{\"v\":1,\"type\":\"history\",\"boot\":%lu,\"snapshot\":%s,"
           "\"epoch\":%lu,\"request\":%lu,\"tag\":%lu,",
@@ -1098,7 +1106,7 @@ bool OpenBrewByWeightNetwork::sendHistoryStream(UiStreamSession &session,
           static_cast<unsigned>(limit),
           page.hasMore ? "true" : "false"))
     return false;
-  auto &held = workBuf_->uiFingerprints[&session - uiStreams_];
+  auto &held = workBuf_->uiFingerprints[link ? 0 : &session - uiStreams_];
   for (size_t index = 0; index < page.count; ++index) {
     const HistoryRecord &record = page.records[index];
     // A standing refresh names the records the page already holds by id.
@@ -1159,8 +1167,11 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   uiStreamSendKind = "stats";
   uint32_t epoch =
       callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0;
+  // As in History, the archive's link session only fetches (and needs no header).
+  const bool link = companionRecordsSession(session);
+  if (link && !session.statsFetch) return true;
   const bool initial =
-      session.statsResync || session.statsBoot != control.bootId;
+      !link && (session.statsResync || session.statsBoot != control.bootId);
   // Finish the standing page before a later accepted fetch. Cancellation
   // belongs to subscribe/resync handling, never a delayed dispatch.
   const bool fetch = session.statsFetch && !initial &&
@@ -1208,9 +1219,9 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   }
   // The header follows the store, the selected window, and the active
   // preset of its "This preset" chart.
-  const bool header = !cache.valid || cache.headerEpoch != epoch ||
+  const bool header = !link && (!cache.valid || cache.headerEpoch != epoch ||
       cache.headerWindow != statsWindow ||
-      cache.headerPresetId != control.bbwPresetId;
+      cache.headerPresetId != control.bbwPresetId);
   if (header) {
     cache.statsOk = formatStatsHeader(cache, statsWindow, control.bbwPresetId);
     cache.headerEpoch = epoch;
@@ -1245,10 +1256,12 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
         cache.order[count - 1U - index] = swapped;
       }
     }
-    cache.matched = 0;
+    cache.matched = cache.good = 0;
     for (size_t index = 0; index < count; ++index)
-      if (shotListFilterMatches(filter, snapshot.records[cache.order[index]]))
+      if (shotListFilterMatches(filter, snapshot.records[cache.order[index]])) {
+        cache.good += shotLogRecordEligible(snapshot.records[cache.order[index]]);
         cache.order[cache.matched++] = cache.order[index];
+      }
     cache.hasMore = shotLogPageSlice(cache.matched, offset, limit, cache.start, cache.pageCount);
     uint32_t fingerprint = crc32Update(0xFFFFFFFFU,
         reinterpret_cast<const uint8_t *>(&epoch), sizeof(epoch));
@@ -1332,7 +1345,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   }
   const bool first = session.statsSent == 0;
   const size_t sentBase = session.statsSent;
-  size_t used = 0;
+  size_t used = link ? COMPANION_RECORD_ORIGIN : 0;
   if (!statusJsonAppend(&used,
           "{\"v\":1,\"type\":\"stats\",\"boot\":%lu,\"snapshot\":%s,"
           "\"epoch\":%lu,\"seq\":%lu,\"request\":%lu,",
@@ -1342,11 +1355,12 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
           static_cast<unsigned long>(session.statsSeq),
           static_cast<unsigned long>(request)))
       return false;
-  if (first && cache.statsOk &&
+  if (first && cache.statsOk && !link &&
       !statusJsonAppend(&used, "\"stats\":%s,", cache.header))
     return false;
-  if (first && !statusJsonAppend(&used, "\"cols\":\"%s\",\"tag\":%lu,", kStatsRowColumns,
-                                 static_cast<unsigned long>(fingerprint)))
+  if (first && !statusJsonAppend(&used, "\"cols\":\"%s\",\"tag\":%lu,\"good\":%u,", kStatsRowColumns,
+                                 static_cast<unsigned long>(fingerprint),
+                                 static_cast<unsigned>(cache.good)))
     return false;
   if (!statusJsonAppend(&used,
           "\"total\":%u,\"offset\":%u,\"limit\":%u,"
@@ -1355,7 +1369,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
           static_cast<unsigned>(limit), cache.hasMore ? "true" : "false"))
     return false;
   const size_t rowsBase = used;
-  auto &held = workBuf_->uiFingerprints[&session - uiStreams_];
+  auto &held = workBuf_->uiFingerprints[link ? 0 : &session - uiStreams_];
   bool busy = false;
   while (session.statsSent < pageCount) {
     const ShotLogRecord &record = snapshot.records[cache.order[start + session.statsSent]];
@@ -1448,7 +1462,9 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
     epoch = cache.snapshot.epoch;
     cache.curveHashes = {};
   }
-  size_t used = 0;
+  // The companion archive's index lists every shot, bad ones included.
+  const bool link = companionRecordsSession(session);
+  size_t used = link ? COMPANION_RECORD_ORIGIN : 0;
   if (!statusJsonAppend(&used, "{\"v\":1,\"type\":\"records\",\"boot\":%lu,"
                                "\"store\":\"%s\",\"epoch\":%lu%s",
                         static_cast<unsigned long>(control.bootId), shots ? "shots" : "history",
@@ -1460,7 +1476,7 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
   };
   if (rows && shots) {
     for (size_t n = 0, listed = 0; n < cache.snapshot.count; ++n)
-      if (shotLogRecordEligible(cache.snapshot.records[n]) &&
+      if ((link || shotLogRecordEligible(cache.snapshot.records[n])) &&
           !pair(listed++, cache.snapshot.records[n].id, &cache.snapshot.records[n],
                 sizeof(ShotLogRecord)))
         return false;

@@ -60,6 +60,8 @@ struct OpenBrewByWeightNetwork {
     size_t (*copyDebugEvents)(uint32_t,DebugEvent*,size_t,DebugLogReadMetadata*)=
       +[](uint32_t cursor,DebugEvent *events,size_t capacity,DebugLogReadMetadata *metadata){return ring.copyAfter(cursor,events,capacity,metadata);};
   } callbacks_;
+  bool companionRecordsSession(const UiStreamSession &) const {return false;}
+  bool companionRecordsSend(size_t,bool,bool &){return false;}
   bool sendUiStreamFrame(UiStreamSession &,size_t,bool &);
   bool sendLogStream(UiStreamSession &,const ControlStatusSnapshot &);
 };
@@ -68,6 +70,7 @@ ${body(webhook, 'inline bool escapeJsonString(')}
 ${body(stream, 'bool OpenBrewByWeightNetwork::sendUiStreamFrame(')}
 ${body(stream, 'bool OpenBrewByWeightNetwork::sendLogStream(')}
 bool selectStatsFetch(UiStreamSession &session,const ControlStatusSnapshot &control,uint32_t epoch){
+  const bool link=false;
 ${selectStats}
   return fetch;
 }

@@ -1186,7 +1186,9 @@ ticking countdown locally, so a stable estimate emits no frames. Readiness is
 never evidence for control; power stays ON/OFF-only.
 
 Every build streams `companion.requestName` and `companion.requestAddress`
-while a companion asks to pair (empty strings otherwise). When the Web UI runs
+while a companion asks to pair (empty strings otherwise), and
+`companion.archive` while a paired companion keeps the
+[shot archive](COMPANION_LINK.md#archive-sync). When the Web UI runs
 through [Open Brew by Weight Companion](features/companion.md), the companion
 holds the one claim and ui-stream session for all its screens through the
 signed [relay](COMPANION_LINK.md#relay): a companion screen's claim attaches to
@@ -1454,7 +1456,10 @@ good shots only (longer than 12 s with a settled yield over 2 g); `"bad":true`
 also lists the bad shots, combined with the other lists as usual, and each row
 names why it is bad in `badReason` (`short`, `no_yield`, `low_yield`, or
 `null` for a good shot). `window` (`10`, `50`, or `100`, default `10`) picks
-how many of the newest good shots the `stats` header covers. A subscribe
+how many of the newest good shots the `stats` header covers; a page opened
+through the companion with its archive may show 500 or 1,000, still subscribes
+with `100` and draws the header the companion builds over the whole history
+(the controller's when the companion cannot answer). A subscribe
 carrying only `window` (no `request`) changes the header alone: the firmware
 sends a standing refresh with the new header and the rows it already holds as
 bare ids.
@@ -1488,8 +1493,12 @@ History, a subscribe may name the standing page the browser still holds with
 rows are bare ids (the header is sent again).
 
 Stats frames have `v: 1`, `type: "stats"`, `boot`, `snapshot`, `epoch`,
-`seq`, `request`, the `stats` aggregate, `cols` and the page's `tag` (first
-frame of a page only), `total`, `offset`, `limit`, `hasMore`, `rows`, `rowBase`, and `more`.
+`seq`, `request`, the `stats` aggregate, `cols`, the page's `tag` and `good`
+(first frame of a page only), `total`, `offset`, `limit`, `hasMore`, `rows`,
+`rowBase`, and `more`. `good` counts the good shots among the filter's
+matches (`total` also counts bad ones when the filter lists them); the Web UI
+offers each window smaller than `good` plus the smallest one covering it, and
+no choice at all up to ten shots.
 In this stream the aggregate covers the subscribed `window` (and leaves out
 `durationsS`), and it also carries what the Stats charts draw, so they match
 the averages whatever the sort, filter, or scroll:

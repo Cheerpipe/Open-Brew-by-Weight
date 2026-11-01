@@ -84,6 +84,9 @@ struct Callbacks {
 class OpenBrewByWeightNetwork {
  public:
   bool companionLogHoldActive() const;
+  bool companionSyncHold() const;
+  bool networkFlashWriteAllowed() const { return !flashGateClosed; }
+  bool flashGateClosed = false;
   bool companionLinkLogSub(CompanionLinkSlot &slot, cJSON *frame);
   void companionLogService();
   void companionLogApplyLocked(CompanionLinkSlot &link);
@@ -265,6 +268,18 @@ void testHoldsAndHeartbeat() {
   add(1);
   CHECK(!page().built);
   g_companion.logHeard = true;
+  p = page();
+  CHECK(p.built && p.sequences.size() == 1);
+  // S17: the flash-write gate's states (an unscaled shot, its drip, a rinse)
+  // hold the log too, even for a warning; it all goes once the gate opens.
+  network.flashGateClosed = true;
+  add(1, "a rinse", LogLevel::WARNING);
+  network.companionNotified_.store(false);
+  network.companionLogService();
+  CHECK(link.logCatchUp && !network.companionNotified_.load() && !page().built);
+  network.flashGateClosed = false;
+  network.companionLogService();
+  CHECK(network.companionNotified_.load());
   p = page();
   CHECK(p.built && p.sequences.size() == 1);
   // The switch off sends nothing, whatever waits.

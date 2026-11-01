@@ -31,7 +31,7 @@
     const companionPaths = [...homeRegion.matchAll(/delta\.(?:hashed)?[fF]ield\("(companion\.[^"]+)"/g)]
         .map((m) => m[1]).sort();
     assert.deepEqual(companionPaths,
-        ['companion.link', 'companion.name', 'companion.paired', 'companion.peerProtocol',
+        ['companion.archive', 'companion.link', 'companion.name', 'companion.paired', 'companion.peerProtocol',
          'companion.requestAddress', 'companion.requestName', 'companion.route'],
         'The Home stream carries the header indicator fields, nothing more');
     assert(homeRegion.indexOf('companion.link') <

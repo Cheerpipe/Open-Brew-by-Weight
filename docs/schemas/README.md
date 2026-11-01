@@ -83,6 +83,32 @@ Versioning:
 - Consumed by the firmware host test `src/tests/companion_link_host_test.cpp`
   and by the companion's own tests.
 
+## Stats header test vectors v1
+
+- [`stats-header-v1.vectors.json`](stats-header-v1.vectors.json): the Web UI
+  Stats header (the aggregate, both density charts, the consistency series
+  and the filter facets) as the firmware's `formatStatsHeader` builds it over
+  fixed sets of shots. The companion builds the same header over the whole
+  history and must reproduce every case. Each case gives `window`, the active
+  `presetId` of the "This preset" chart, `rows` (newest first) and the
+  expected `header`; headers compare as parsed JSON, field for field.
+- The rows are Stats rows in the units the Web UI and the companion store,
+  limited to the columns the header reads. Back to the stored record:
+  `durationDs = round(durationS × 10)`, `goalWeightDg = round(goalG × 10)`,
+  `fastBeforeDs`, `slowAfterDs` and `arrivalDs` = the seconds × 10,
+  `actualWeightCg`, `cutLineCg` and `avgFlowCgS` = the grams × 100 (`null` is
+  the missing value), `verdict` `on_recipe`/`fast`/`slow` is 0/1/2 and `null`
+  3, `shotType` and `stopDetail` are their wire names, `presetId`,
+  `presetName`, `scaleName`, `hasWallTime` and `endedAtLocalSec` as they are.
+  `badReason` is the reason that record derives (a check, not an input).
+- Regenerate after a deliberate change to the header with
+  `STATS_HEADER_REGENERATE=1 build-host/normal/src/tests/stats_header_host_test`
+  (from `./scripts/dev test normal`'s build), then update the companion's copy.
+  SHA-256 of the current file:
+  `ad46e4e9d0acc434d37a72b3f60e2dc2f4b7a1b713f37c0410f316d8188de547`.
+- Consumed by the firmware host test `src/tests/stats_header_host_test.cpp`
+  and by the companion's tests.
+
 ## Formats written for other apps
 
 The Shots card menu also writes three third-party formats. They follow those

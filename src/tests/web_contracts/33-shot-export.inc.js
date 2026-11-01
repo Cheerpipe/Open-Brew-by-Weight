@@ -13,10 +13,11 @@
       path.join(schemaDir, 'openbrewbyweight-shot-export-v1.schema.json'), 'utf8'));
   const example = JSON.parse(fs.readFileSync(
       path.join(schemaDir, 'openbrewbyweight-shot-export-v1.example.json'), 'utf8'));
-  // One schema, version 1, and the companion link's shared vectors; the
+  // One schema, version 1, and the vectors shared with the companion; the
   // retired files are gone.
   assert.deepEqual(fs.readdirSync(schemaDir).sort(), ['README.md', 'companion-link-v1.vectors.json',
-    'openbrewbyweight-shot-export-v1.example.json', 'openbrewbyweight-shot-export-v1.schema.json']);
+    'openbrewbyweight-shot-export-v1.example.json', 'openbrewbyweight-shot-export-v1.schema.json',
+    'stats-header-v1.vectors.json']);
   assert.ok(example.shots.some((x) => x.trace), 'The example shows a trace');
   // The schema stays inside a keyword subset any reader can implement, and
   // every key the exporter writes must be documented in it.

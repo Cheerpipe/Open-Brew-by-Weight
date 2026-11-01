@@ -26,7 +26,7 @@ struct NetworkWorkBuf {
 } work;
 auto *g_work=&work;
 ${body(networkSource, 'void sanitizeJsonEmbed(')}
-${body(networkSource, 'bool jsonScratchAppend(')}
+${body(read('network/OpenBrewByWeightStatsHeader.inc'), 'bool jsonScratchAppend(')}
 ${body(networkSource, 'bool __attribute__((format(printf, 2, 3)))\nstatusJsonAppend(')}
 ${body(networkSource, 'bool formatTaskProfilerObject(')}
 ${body(networkSource, 'bool statusJsonAppendScaleProfiler(')}

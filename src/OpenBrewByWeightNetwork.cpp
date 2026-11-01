@@ -110,8 +110,10 @@ struct StatsCurveHashCache {
   }
 };
 
-struct StatsStreamCache {
-  ShotStatsRecordsSnapshot snapshot{};
+#include "network/OpenBrewByWeightStatsHeader.inc"
+
+// The Stats header's inputs and buffer (formatStatsHeader) come first.
+struct StatsStreamCache : StatsHeaderWork {
   // Fetch scratch for the row curve currently being hashed or formatted, and
   // formatShotStatsRow's empty curve once a fetch found none.
   ShotCurveRecord fetchCurve{};
@@ -124,21 +126,14 @@ struct StatsStreamCache {
   bool valid = false, statsOk = false, hasMore = false;
   ShotLogSort sort = ShotLogSort::Date;
   ShotLogSortDir dir = ShotLogSortDir::Desc;
-  size_t offset = 0, limit = 0, start = 0, pageCount = 0, matched = 0;
+  // `good` of the matches are good shots (the Stats window choice).
+  size_t offset = 0, limit = 0, start = 0, pageCount = 0, matched = 0, good = 0;
   uint32_t fingerprint = 0, filterHash = 0;
   // Header identity: store epoch, selected window, and the active preset of
   // its "This preset" chart.
   uint32_t headerEpoch = 0;
   size_t headerWindow = 0;
   uint8_t headerPresetId = 0;
-  // The selected window's timed shots, newest first, and the density
-  // chart's working values, off the dispatch stack.
-  const ShotLogRecord *timed[SHOT_LOG_STATS_WINDOW_MAX] = {};
-  const ShotLogRecord *scope[SHOT_LOG_STATS_WINDOW_MAX] = {};
-  float mapped[SHOT_LOG_STATS_WINDOW_MAX] = {}, heights[121] = {};
-  // Aggregate (~0.3 KB), two density charts (~1.2 KB), the consistency
-  // series (~0.6 KB at 100 shots), and the filter facets (~0.6 KB typical).
-  char header[5120]{};
 };
 
 struct NetworkWorkBuf {
@@ -929,22 +924,6 @@ statusJsonAppend(size_t *used, const char *fmt, ...) {
 }
 
 
-bool jsonScratchAppend(char *buf, size_t cap, size_t *used, const char *fmt,
-                       ...) {
-  if (buf == nullptr || used == nullptr || *used >= cap) {
-    return false;
-  }
-  va_list args;
-  va_start(args, fmt);
-  const int n = vsnprintf(buf + *used, cap - *used, fmt, args);
-  va_end(args);
-  if (n < 0 || static_cast<size_t>(n) >= cap - *used) {
-    return false;
-  }
-  *used += static_cast<size_t>(n);
-  return true;
-}
-
 bool formatTaskProfilerObject(char *buf, size_t cap, size_t *used,
                               const TaskProfilerSnapshot &tasks, bool full = true) {
   if (!jsonScratchAppend(
@@ -1348,5 +1327,6 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "network/OpenBrewByWeightNetworkOta.inc"
 #include "network/OpenBrewByWeightCompanion.inc"
 #include "network/OpenBrewByWeightCompanionLog.inc"
+#include "network/OpenBrewByWeightCompanionRecords.inc"
 #include "network/OpenBrewByWeightCompanionStatus.inc"
 #include "network/OpenBrewByWeightCompanionRelay.inc"

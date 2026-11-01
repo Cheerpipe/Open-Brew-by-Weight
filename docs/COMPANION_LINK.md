@@ -109,11 +109,11 @@ public key; it discards its request key.
 
 | Body | Effect |
 | --- | --- |
-| `{"action":"approve","code":"123456","lm":true,"log":true}` | Approves the open request; `lm` and `log` (optional, `true` when absent) are the La Marzocco and diagnostic log switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
+| `{"action":"approve","code":"123456","lm":true,"log":true,"archive":true}` | Approves the open request; `lm`, `log` and `archive` (optional, `true` when absent) are the La Marzocco, diagnostic log and shot archive switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
 | `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids) |
 | `{"action":"unignore"}` | Forgets the ignored ids |
 | `{"action":"forget"}` | Removes the pairing and closes the link; the next link attempt receives `erase` |
-| `{"action":"switches","ui":false,"lm":true,"log":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere) and `log` **Diagnostic log through the companion** (every build). An open link receives a new `cfg` |
+| `{"action":"switches","ui":false,"lm":true,"log":true,"archive":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere), `log` **Diagnostic log through the companion** and `archive` **Shot archive in the companion** (every build). An open link receives a new `cfg` |
 
 Every action answers `{"ok":true}`. Approve and Ignore without an open request
 answer `409 PAIRING_NOT_PENDING`; Forget and Switches without a pairing answer
@@ -125,7 +125,7 @@ Admin reads the pairing, the open request and the link state from
 ```json
 "companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
  "version":"1.0.0","link":"open","linkAgeS":3600,"peerProtocol":0,
- "ui":true,"log":true,"relay":"ready","relayRejects":0,
+ "ui":true,"log":true,"archive":true,"relay":"ready","relayRejects":0,
  "route":"companion","lm":true,"upstream":true,"refused":false,"credentials":true,
  "request":null,"ignored":0}
 ```
@@ -134,7 +134,8 @@ Admin reads the pairing, the open request and the link state from
 up or went down (`-1` when neither happened since the controller started),
 `peerProtocol` the protocol of the paired companion's last hello that this
 controller refused with `PROTOCOL` (0 when none, or once a link opens), `ui`
-the Web UI switch, `log` the diagnostic log switch, `relay` `ready` once a
+the Web UI switch, `log` the diagnostic log switch, `archive` the shot archive
+switch, `relay` `ready` once a
 [relay handshake](#relay) succeeded
 since the controller started (`down` before and after Forget), `relayRejects`
 the relayed requests refused since then; on Linea Micra builds `route` is
@@ -146,12 +147,16 @@ companion confirmed the current account (other builds omit `route`, `lm`,
 `{"name","address","version","expiresInS","codeReady"}` while a request is
 open (`codeReady` once the companion revealed its key and the controller's key
 exists). Home's stream carries `companion.requestName` and
-`companion.requestAddress` (empty strings when no request is open). The
+`companion.requestAddress` (empty strings when no request is open) and
+`companion.archive` (paired with the shot archive switch on, so History and
+Stats opened directly can say the companion keeps a copy). The
 Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
 `protocol` (the open link's, 0 while down), `peerProtocol`, `link`,
 `linkAgeS`, `reconnects`, `authFailures` (link and relay handshakes), `ui`,
 `log`, `logCursor`, `logFlushS` (age of the last log flush, `-1` never),
-`logGaps` (events reported missing this boot), `relay`, `relayRejects` and,
+`logGaps` (events reported missing this boot), `archiveSwitch`,
+`archiveSyncS` (age of the last `rec` or `trc` frame, `-1` never this boot),
+`relay`, `relayRejects` and,
 on Linea Micra builds, `route`, `reason` (why the
 route is direct; `protocol` while `peerProtocol` is set), `lm`, `upstream`,
 `routeSwitches` and `commands`. Names, versions and addresses are stored
@@ -163,11 +168,14 @@ companion's authenticated `hello`.
 The companion opens the link only while a feature needs it: the [relay
 handshake](#relay) answers `link` (`true` on Linea Micra builds with the La
 Marzocco switch on, and on every build while the **Diagnostic log through the
-companion** switch is on). A companion that finds no relay route (an older
-controller) opens it as before.
+companion** or the **Shot archive in the companion** switch is on). A
+companion that finds no relay route (an older controller) opens it as before.
 
 `GET /api/v1/companion/link` upgrades to a WebSocket. Only text frames are
-used, each at most 4,096 bytes including a signed frame's MAC prefix. One
+used, each at most 4,096 bytes including a signed frame's MAC prefix, except
+the controller's `rec` and `trc` answers (below), which may reach 28,672
+bytes; the companion's receive limit is that size, and everything it sends
+stays within 4,096. One
 link exists at a time: a newly authenticated link replaces the previous one.
 The upgrade answers `403 COMPANION_PEER` from a peer outside the local ranges,
 `404 COMPANION_NOT_PAIRED` when the controller is not paired (a forgotten
@@ -214,19 +222,26 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 
 | Frame | Meaning |
 | --- | --- |
-| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true}`. Sent after `ready` and on every change |
+| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true,"archive":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true,"archive":true}`. Sent after `ready` and on every change. A `cfg` without `archive` comes from a controller older than the archive |
 | `{"t":"dev","name":"Kitchen","id":"AA:BB:CC:DD:EE:FF"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address, and its stable device id (the webhook's `deviceId`), the log store's key. Up to 32 bytes of letters, digits, spaces and hyphens, empty while no name is published yet. Sent first after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
-| `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` and `push` frames until `on` is `false` |
+| `{"t":"hold","on":true,"sync":true}` | `on`: a shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` and `push` frames until `on` is `false`. `sync`: a [sync hold](#sync-holds) is active. Also the answer to a `ping` (below) |
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 | `{"t":"log","b":42,"e":[[seq,atMs,wallSec,lvl,cat,"message"],…]}` | Diagnostic log events (below), the formatted text the Web UI log view renders, `lvl` one of `c/e/w/i/d` |
+| `{"t":"rs","sh":E1,"hi":E2}` | The shot and activation store epochs, when either moved since the companion last learned them ([archive sync](#archive-sync)) |
+| `{"t":"rec","f":{…}}` | A record answer: `f` is a ui-stream `records`, `history` or `stats` frame ([archive sync](#archive-sync)) |
+| `{"t":"trc","id":12,"b":43,"e":918204,"r":"ok","d":"…"}` | One shot's trace, or why there is none ([archive sync](#archive-sync)) |
 
 After `ready` the controller sends `dev`, `cfg`, `route` and `hold` with their
 current values, and `creds` when it has an account generation; afterwards each
 one again only when it changes. `hold` changes are sent only while the route is
 `pending` or `companion` (the companion forwards nothing otherwise); each
-request for the `companion` route carries the current `hold`. A command id is
+request for the `companion` route carries the current `hold`. While the log or
+archive switch is on, the controller also answers each `ping` with
+`{"t":"hold","on":…,"sync":false}`, but only when no sync hold is active: it
+leaves in the same segment as the ping's ACK, and during a hold the ping is not
+answered at all. A command id is
 sent once: a command that was in flight when a link closed is not repeated on
 the next link (the controller has already counted it as failed). A frame the
 controller's socket was not ready to take is sent again a moment later, in
@@ -247,10 +262,14 @@ secrets directory and never in logs.
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
+| `{"t":"rx","s":"shots","ep":12}` | A store's record index (`s` `shots` or `history`); `ep` is the epoch the companion holds (0: none). The session's first `rx` subscribes it to `rs` |
+| `{"t":"rf","s":"shots","o":0,"n":50,"r":7}` | A fetch window: offset `o` 0–1000, `n` 1–50 shots or 1–120 activations, `r` echoed as the page's `request` |
+| `{"t":"rt","id":12,"b":43,"e":918204}` | One shot's trace by its Stats identity (`id` ≥ 1, `bootId`, `endedAtMs`) |
 | `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the boot the companion stored last and its last stored sequence; the controller maps another boot to `after` 0. Sent once per session, after `cfg.log` is true and `dev` named the controller (so the cursor is that controller's), and again from the same cursor when the companion could not store a frame; `on:false` asks the controller to stop the stream (the switch itself is `cfg`'s to say) |
 
-Builds without La Marzocco know only `ping` (its `up` is ignored there) and
-`logsub`; the other four are types they do not know and ignore.
+Builds without La Marzocco know only `ping` (its `up` is ignored there),
+`logsub`, `rx`, `rf` and `rt`; the other four are types they do not know and
+ignore. A malformed `rx`, `rf` or `rt` closes the link like any known frame.
 
 The controller closes a link that sends nothing for two ping intervals: 35
 seconds while the La Marzocco route is `companion`, 250 seconds otherwise. A
@@ -311,10 +330,8 @@ arrive, so a repeated id never merges two boots, and boot separators and
 reset reasons are the ring's own `BOOT_BANNER` and reset-reason events.
 
 - **Radio silence during a shot is absolute.** No `log` frame is transmitted
-  during a shot with a connected scale, a scale connection or discovery, or
-  the BLE quiet interval — the same windows the link's own admission
-  enforces. Events queue (they stay in the ring, the cursor stays) and are
-  sent in order when the hold ends. Only a hold long enough for the
+  during a [sync hold](#sync-holds). Events queue (they stay in the ring, the
+  cursor stays) and are sent in order when the hold ends. Only a hold long enough for the
   512-event ring to wrap loses events, and those are reported as a `miss`.
 - **Plain events ride the heartbeat.** Outside a hold, `info` and `debug`
   events flush only when a frame arrived since the last flush — the
@@ -331,6 +348,53 @@ reset reasons are the ring's own `BOOT_BANNER` and reset-reason events.
   what it stored. A never-paired controller, or one whose companion is away,
   runs none of this: the producer wakes only for an authenticated,
   subscribed link.
+
+### Archive sync
+
+With **Shot archive in the companion** on, the companion keeps a copy of
+every shot and activation through the same records the Web UI shows. The
+controller keeps no state for it beyond the open link and writes nothing to
+flash; the companion infers ratings, deletions and restarted histories from
+the index.
+
+- **Requests.** `rx`, `rf` and `rt` each replace the pending request of
+  their kind. The controller answers one frame per pass, paced like a Stats
+  page, and keeps a request through a hold, a busy workspace or a socket that
+  cannot take a frame yet, never dropping it.
+- **`rec` answers.** `f` is the ui-stream frame byte for byte, as the
+  [Integration API](INTEGRATION_API.md#record-index-for-the-offline-copy)
+  documents it, with three differences: the index lists every shot, bad ones
+  included; fetch windows are newest first by date and unfiltered (every
+  shot with `badReason`, every activation type); and Stats pages carry no
+  `stats` header member. A Stats page's first frame carries `good`, as for the
+  browser. History and index frames reach about 21 KiB, which is why record
+  answers may exceed 4,096 bytes.
+- **`trc` answers.** `r` is `ok` (with `d`, the trace section the
+  [trace route](INTEGRATION_API.md#get-apiv1diagnosticshot-trace) sends, base64),
+  `none` (no summary with that identity, no trace, or the record was
+  recycled), `busy`, `saving` or `error`. Traces of shots the log refused
+  (`id` 0) are not archived.
+- **`rs` notices.** After the session's first `rx`, the controller sends
+  `rs` when either store epoch moved from the one the companion last learned
+  (from an `rs` or an index answer) and then held still for 30 seconds,
+  outside every sync hold, and only once a frame arrived since its last
+  flush: it rides the companion's ping in the same send as a `log` flush, so
+  it adds no radio wakeup. There is no `rs` at the session start, since each
+  `rx` answer already names its store's epoch.
+
+### Sync holds
+
+No synchronization frame crosses Wi-Fi in either direction while a sync
+hold is active: a shot with a connected scale, a scale connection or
+discovery, the BLE quiet interval, or any state that closes the flash-write
+gate (a brew cycle and its drip delay, a rinse, a closed relay, a running
+machine, the physical activator on, a maintenance lease, a scale
+connecting). The controller sends no `log`, `rs`, `rec` or `trc` and does not
+answer a `ping`; the companion sends `logsub`, `rx`, `rf`, `rt`, retries and
+re-asks only right after a frame that showed no hold (a `hold` with `sync`
+false, or a `log`, `rs`, `rec` or `trc`) and otherwise keeps them armed for
+the next one. A request that still arrives during a hold is answered after
+it. The link's own keepalive is not affected.
 
 ### Route and failover
 

@@ -17,6 +17,15 @@ bool OpenBrewByWeightNetwork::companionLogHoldActive() const {
           outboundShotActive.load(std::memory_order_acquire));
 }
 
+// Every sync stream's hold (plan S17): the link's admission rule plus the
+// flash-write gate's states (a cycle and its drip, a rinse, a closed relay, a
+// running machine, the activator on, a maintenance lease, a scale
+// connecting). No `log`, `rs`, `rec` or `trc` frame and no answer to a ping
+// cross Wi-Fi meanwhile. Callers hold no dataMux_ (the gate reads control).
+bool OpenBrewByWeightNetwork::companionSyncHold() const {
+  return companionLogHoldActive() || !networkFlashWriteAllowed();
+}
+
 // httpd: record the companion's log cursor for this controller. False (and the
 // link closes) on a malformed frame; the network task applies it later.
 bool OpenBrewByWeightNetwork::companionLinkLogSub(CompanionLinkSlot &slot, cJSON *frame) {
@@ -53,12 +62,12 @@ void OpenBrewByWeightNetwork::companionLogService() {
   const uint32_t urgent = callbacks_.debugLogLatestAlarmSequence
                               ? callbacks_.debugLogLatestAlarmSequence()
                               : 0;
+  const bool hold = companionSyncHold();
   TaskLockGuard lock(dataMux_);
   CompanionLinkSlot *slot = const_cast<CompanionLinkSlot *>(companionActiveLink());
   if (slot == nullptr || slot->closing) return;
   const bool pendingLog = companionLogPending(latest, slot->logSent);
   const bool urgentPending = companionLogUrgent(urgent, latest, slot->logSent);
-  const bool hold = companionLogHoldActive();
   if (pendingLog && hold) {
     // Queue-and-flush: everything in order when the hold ends.
     slot->logCatchUp = true;
@@ -94,7 +103,7 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
                               : 0;
   const bool pendingLog = companionLogPending(latest, sent.logSent);
   const bool urgentPending = companionLogUrgent(urgent, latest, sent.logSent);
-  if (!companionLogFlushDue(true, pendingLog, companionLogHoldActive(), urgentPending,
+  if (!companionLogFlushDue(true, pendingLog, companionSyncHold(), urgentPending,
                             sent.logCatchUp, g_companion.logHeard))
     return false;
   DebugLogReadMetadata meta{};

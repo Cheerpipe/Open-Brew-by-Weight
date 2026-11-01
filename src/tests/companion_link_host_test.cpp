@@ -631,7 +631,7 @@ static void testCommitThenReveal() {
   CHECK(!companionPairReveal(pairing, kOtherId, key, true, now));
   pairing.request.keyReady = true;
   CHECK(!companionCodeReady(pairing.request));
-  CHECK(companionPairApprove(pairing, 1, 1, true, true, now) == CompanionApproveResult::NOT_READY);
+  CHECK(companionPairApprove(pairing, 1, 1, true, true, true, now) == CompanionApproveResult::NOT_READY);
   // Revealing before controllerKey was issued shows a device in the middle.
   CHECK(!companionPairReveal(pairing, kCompanionId, key, true, now));
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
@@ -656,7 +656,7 @@ static void testCommitThenReveal() {
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
                              commitment, now + 1) == CompanionPairResult::PENDING);
   CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 2) && companionCodeReady(pairing.request));
-  CHECK(companionPairApprove(pairing, 5, 5, true, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(pairing, 5, 5, true, true, true, now) == CompanionApproveResult::OK);
   // A retry while the secret is derived is harmless; another key is refused, not denied.
   CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 3));
   uint8_t other[COMPANION_KEY_BYTES];
@@ -685,13 +685,13 @@ static void testPairing() {
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
   // The code waits for both keys, then three wrong codes deny it.
-  CHECK(companionPairApprove(pairing, 1, 1, true, true, now) == CompanionApproveResult::NOT_READY);
+  CHECK(companionPairApprove(pairing, 1, 1, true, true, true, now) == CompanionApproveResult::NOT_READY);
   reveal(pairing, key, now);
-  CHECK(companionPairApprove(pairing, 1, 2, true, true, now) == CompanionApproveResult::WRONG_CODE);
-  CHECK(companionPairApprove(pairing, 1, 2, true, true, now) == CompanionApproveResult::WRONG_CODE);
-  CHECK(companionPairApprove(pairing, 1, 2, true, true, now) == CompanionApproveResult::DENIED);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, now) == CompanionApproveResult::WRONG_CODE);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, now) == CompanionApproveResult::WRONG_CODE);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, now) == CompanionApproveResult::DENIED);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
-  CHECK(companionPairApprove(pairing, 2, 2, true, true, now) == CompanionApproveResult::NOT_PENDING);
+  CHECK(companionPairApprove(pairing, 2, 2, true, true, true, now) == CompanionApproveResult::NOT_PENDING);
   // One new request per 5 s.
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 4999) == CompanionPairResult::RATE_LIMITED);
@@ -726,9 +726,9 @@ static void testPairing() {
   now += 5000;
   // Approval: the network task derives S, which makes the pairing.
   reveal(pairing, key, now);
-  CHECK(companionPairApprove(pairing, 7, 7, false, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(pairing, 7, 7, false, true, true, now) == CompanionApproveResult::OK);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now + COMPANION_REQUEST_MS + 5), "pending"));
-  CHECK(companionPairApprove(pairing, 7, 7, false, true, now) == CompanionApproveResult::NOT_PENDING);
+  CHECK(companionPairApprove(pairing, 7, 7, false, true, true, now) == CompanionApproveResult::NOT_PENDING);
   CHECK(!companionPairIgnore(pairing, now));
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
@@ -758,7 +758,7 @@ static void testPairing() {
   CHECK(companionPairRequest(next, false, kOtherId, "Other", "", "192.168.1.10", commitment, now) ==
         CompanionPairResult::NEW);
   reveal(next, key, now);
-  CHECK(companionPairApprove(next, 3, 3, true, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(next, 3, 3, true, true, true, now) == CompanionApproveResult::OK);
   companionPairComplete(next, stored, secret);
   CHECK(stored.paired == 1 && stored.forgotten == 1 &&
         companionHelloVerdict(stored, kCompanionId, 1) == CompanionHello::ERASE &&
@@ -812,12 +812,17 @@ static void testStoredBlob() {
   copy.checksum = companionChecksum(copy);
   CHECK(!validCompanionStored(copy));
   CHECK(offsetof(CompanionStored, uiOff) == 11);
-  // The log switch rides as the v2 tail, right after the checksum; the last
-  // three bytes are alignment padding.
+  // The log switch rides as the v2 tail, right after the checksum, and the
+  // archive switch in the next byte, formerly padding (v3).
   CHECK(offsetof(CompanionStored, logSwitch) == 328);
+  CHECK(offsetof(CompanionStored, archiveSwitch) == 329);
   CHECK(sizeof(CompanionStored) == 332);
   copy = stored;
   copy.logSwitch = 2;
+  copy.checksum = companionChecksum(copy);
+  CHECK(!validCompanionStored(copy));
+  copy = stored;
+  copy.archiveSwitch = 2;
   copy.checksum = companionChecksum(copy);
   CHECK(!validCompanionStored(copy));
 }
@@ -831,20 +836,136 @@ static void testStoredV1Promotion() {
   v1.version = 1;
   v1.structureSize = 328;
   v1.checksum = companionChecksum(v1);
-  CHECK(validCompanionStoredV1(v1));
-  CHECK(!validCompanionStored(v1));  // not v2 until promoted
+  CHECK(validCompanionStoredOlder(v1));
+  CHECK(!validCompanionStored(v1));  // not v3 until promoted
   CompanionStored promoted = v1;
-  promoteCompanionStoredV1(promoted);
-  CHECK(validCompanionStored(promoted));  // re-finalized as v2
-  CHECK(promoted.logSwitch == 1);        // the switches default on
+  promoteCompanionStored(promoted);
+  CHECK(validCompanionStored(promoted));  // re-finalized as v3
+  CHECK(promoted.logSwitch == 1 && promoted.archiveSwitch == 1);  // the switches default on
   CHECK(promoted.paired == 1 && promoted.version == COMPANION_STORED_VERSION);
   CHECK(memcmp(promoted.secret, v1.secret, 32) == 0);  // the pairing survives
   // A corrupted v1 blob does not promote.
   CompanionStored bad = v1;
   bad.secret[7] ^= 0x40;
-  CHECK(!validCompanionStoredV1(bad));
-  // A v2 blob is not v1 either.
-  CHECK(!validCompanionStoredV1(promoted));
+  CHECK(!validCompanionStoredOlder(bad));
+  // A current blob is not an older one.
+  CHECK(!validCompanionStoredOlder(promoted));
+  // A v2 blob keeps its log switch, whatever its padding byte held.
+  CompanionStored v2 = v1;
+  v2.version = 2;
+  v2.structureSize = sizeof(CompanionStored);
+  v2.logSwitch = 0;
+  v2.archiveSwitch = 0xA5;
+  v2.checksum = companionChecksum(v2);
+  CHECK(validCompanionStoredOlder(v2) && !validCompanionStored(v2));
+  promoteCompanionStored(v2);
+  CHECK(validCompanionStored(v2) && v2.logSwitch == 0 && v2.archiveSwitch == 1);
+}
+
+// The archive's record requests (2A): every field present and in range.
+static void testRecordRequests() {
+  const auto parse = [](const char *json, const char *type, CompanionRecordRequest &out) {
+    cJSON *frame = cJSON_Parse(json);
+    const bool ok = frame != nullptr && companionParseRecordRequest(frame, type, out);
+    cJSON_Delete(frame);
+    return ok;
+  };
+  CompanionRecordRequest r;
+  CHECK(parse("{\"t\":\"rx\",\"s\":\"shots\",\"ep\":4294967295}", "rx", r));
+  CHECK(r.kind == CompanionRecordKind::INDEX && r.shots && r.epoch == 4294967295U);
+  CHECK(parse("{\"t\":\"rx\",\"s\":\"history\",\"ep\":0}", "rx", r) && !r.shots);
+  CHECK(!parse("{\"s\":\"logs\",\"ep\":0}", "rx", r));
+  CHECK(!parse("{\"s\":\"shots\"}", "rx", r));
+  CHECK(!parse("{\"s\":\"shots\",\"ep\":-1}", "rx", r));
+  CHECK(!parse("{\"s\":\"shots\",\"ep\":1.5}", "rx", r));
+  CHECK(parse("{\"s\":\"shots\",\"o\":1000,\"n\":50,\"r\":7}", "rf", r));
+  CHECK(r.kind == CompanionRecordKind::FETCH && r.offset == 1000 && r.count == 50 && r.request == 7);
+  CHECK(!parse("{\"s\":\"shots\",\"o\":0,\"n\":51,\"r\":7}", "rf", r));
+  CHECK(parse("{\"s\":\"history\",\"o\":0,\"n\":120,\"r\":0}", "rf", r));
+  CHECK(!parse("{\"s\":\"history\",\"o\":0,\"n\":121,\"r\":0}", "rf", r));
+  CHECK(!parse("{\"s\":\"history\",\"o\":1001,\"n\":1,\"r\":0}", "rf", r));
+  CHECK(!parse("{\"s\":\"history\",\"o\":0,\"n\":0,\"r\":0}", "rf", r));
+  CHECK(!parse("{\"s\":\"history\",\"o\":0,\"n\":1}", "rf", r));
+  CHECK(parse("{\"id\":12,\"b\":43,\"e\":918204}", "rt", r));
+  CHECK(r.kind == CompanionRecordKind::TRACE && r.id == 12 && r.boot == 43 && r.end == 918204);
+  CHECK(!parse("{\"id\":0,\"b\":43,\"e\":918204}", "rt", r));  // orphan traces are not archived
+  CHECK(!parse("{\"id\":12,\"b\":43}", "rt", r));
+}
+
+// A record frame sealed in place behind the reserved prefix: `rec` wraps a
+// whole ui-stream frame, `trc` continues the object; both parse and verify.
+static void testRecordSeal() {
+  uint8_t key[32];
+  for (int i = 0; i < 32; ++i) key[i] = uint8_t(i * 7 + 1);
+  std::vector<char> buffer(COMPANION_RECORD_FRAME_BYTES + COMPANION_RECORD_ORIGIN + 8);
+  const auto seal = [&](bool wrap, const std::string &body, uint32_t q, size_t &length) {
+    memcpy(buffer.data() + COMPANION_RECORD_ORIGIN, body.data(), body.size());
+    return companionSealRecord(key, q, wrap, buffer.data(), COMPANION_RECORD_ORIGIN + body.size(),
+                               buffer.size(), length);
+  };
+  size_t length = 0;
+  const std::string inner = "{\"v\":1,\"type\":\"records\",\"store\":\"shots\",\"epoch\":9}";
+  for (const uint32_t q : {1U, 4294967295U}) {
+    const size_t start = seal(true, inner, q, length);
+    CHECK(start != SIZE_MAX && start + length == COMPANION_RECORD_ORIGIN + inner.size() + 1);
+    const char *text = buffer.data() + start;
+    char mac[COMPANION_MAC_HEX];
+    CHECK(text[COMPANION_MAC_HEX] == '.');
+    CHECK(companionFrameMacHex(key, 'f', text + COMPANION_MAC_HEX + 1, length - COMPANION_MAC_HEX - 1, mac));
+    CHECK(std::memcmp(text, mac, COMPANION_MAC_HEX) == 0);
+    cJSON *frame = cJSON_Parse(text + COMPANION_MAC_HEX + 1);
+    CHECK(frame != nullptr && companionFrameSequence(frame, q));
+    const cJSON *f = cJSON_GetObjectItemCaseSensitive(frame, "f");
+    CHECK(std::strcmp(cJSON_GetObjectItemCaseSensitive(frame, "t")->valuestring, "rec") == 0);
+    CHECK(cJSON_IsObject(f) && cJSON_GetObjectItemCaseSensitive(f, "epoch")->valuedouble == 9);
+    cJSON_Delete(frame);
+  }
+  const size_t start = seal(false, "\"t\":\"trc\",\"id\":3,\"r\":\"none\"", 2, length);
+  cJSON *frame = cJSON_Parse(buffer.data() + start + COMPANION_MAC_HEX + 1);
+  CHECK(frame != nullptr && std::strcmp(cJSON_GetObjectItemCaseSensitive(frame, "r")->valuestring, "none") == 0);
+  cJSON_Delete(frame);
+  // Up to the record frame cap, not one byte more; never past the buffer.
+  const size_t room = COMPANION_RECORD_FRAME_BYTES - (COMPANION_MAC_HEX + 1 + 21 + 1);
+  std::string big = "{\"p\":\"" + std::string(room - 9, 'x') + "\"}";
+  CHECK(big.size() == room - 1 && seal(true, big + " ", 1, length) != SIZE_MAX);
+  CHECK(length == COMPANION_RECORD_FRAME_BYTES);
+  CHECK(seal(true, big + "  ", 1, length) == SIZE_MAX);
+  CHECK(companionSealRecord(key, 1, true, buffer.data(), buffer.size() - 1, buffer.size(), length) ==
+        SIZE_MAX);
+}
+
+// A trace's chunks become one base64 string, whatever their sizes.
+static void testBase64Stream() {
+  uint8_t data[100];
+  for (int i = 0; i < 100; ++i) data[i] = uint8_t(i * 37 + 11);
+  char whole[200];
+  size_t used = 0;
+  CHECK(appendBase64(whole, sizeof(whole), used, data, sizeof(data)));
+  for (const size_t piece : {size_t(1), size_t(2), size_t(4), size_t(7), size_t(99)}) {
+    char out[200];
+    CompanionBase64Stream stream;
+    stream.out = out;
+    stream.capacity = sizeof(out);
+    for (size_t at = 0; at < sizeof(data); at += piece)
+      stream.add(data + at, at + piece < sizeof(data) ? piece : sizeof(data) - at);
+    CHECK(stream.finish() && stream.used == used && std::strcmp(out, whole) == 0);
+  }
+  char small[8];
+  CompanionBase64Stream full;
+  full.out = small;
+  full.capacity = sizeof(small);
+  full.add(data, 9);
+  CHECK(!full.finish());  // a trace larger than its frame fails, never overruns
+}
+
+// The `rs` notice rides the companion's ping once the epochs held still.
+static void testNoticeDue() {
+  CHECK(companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS, true, true));
+  CHECK(!companionNoticeDue(false, true, COMPANION_NOTICE_SETTLE_MS, true, true));  // no rx yet
+  CHECK(!companionNoticeDue(true, false, COMPANION_NOTICE_SETTLE_MS, true, true));  // nothing moved
+  CHECK(!companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS - 1, true, true));
+  CHECK(!companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS, false, true));  // hold or shot
+  CHECK(!companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS, true, false));  // no ping since
 }
 
 static void testLogFlushDue() {
@@ -925,6 +1046,10 @@ int main() {
   testPairing();
   testStoredBlob();
   testStoredV1Promotion();
+  testRecordRequests();
+  testRecordSeal();
+  testBase64Stream();
+  testNoticeDue();
   testLogFlushDue();
   testLiveness();
   std::puts("companion_link_host_test: ok");

@@ -443,11 +443,11 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   const esp_err_t body = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (body != ESP_OK) return body;
-  static const char *const fields[] = {"action", "code", "lm", "ui", "log"};
+  static const char *const fields[] = {"action", "code", "lm", "ui", "log", "archive"};
   char action[12] = {}, code[8] = {};
-  bool lm = true, ui = true, log = true;
+  bool lm = true, ui = true, log = true, archive = true;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 5) &&
+  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 6) &&
                jsonString(root, "action", action, sizeof(action), false);
   if (valid && jsonFieldPresent(root, "code")) valid = jsonString(root, "code", code, sizeof(code), false);
   const bool hasLm = valid && jsonFieldPresent(root, "lm");
@@ -456,6 +456,8 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (hasUi) valid = jsonBoolean(root, "ui", ui);
   const bool hasLog = valid && jsonFieldPresent(root, "log");
   if (hasLog) valid = jsonBoolean(root, "log", log);
+  const bool hasArchive = valid && jsonFieldPresent(root, "archive");
+  if (hasArchive) valid = jsonBoolean(root, "archive", archive);
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   if (!valid)
@@ -489,7 +491,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       if (pending.serial == serial)
         result = expected != UINT32_MAX
             ? companionPairApprove(g_companion.pairing, static_cast<uint32_t>(atol(code)),
-                                   expected, lm, log, now)
+                                   expected, lm, log, archive, now)
             : pending.state == CompanionPairState::PENDING && !pending.approving
                 ? CompanionApproveResult::NOT_READY
                 : CompanionApproveResult::NOT_PENDING;
@@ -558,9 +560,10 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     for (const int fd : fds)
       if (fd >= 0) (void)httpd_sess_trigger_close(request->handle, fd);
     self.lifecycleLogf("Companion '%s' forgotten", name);
-  } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog) &&
+  } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog || hasArchive) &&
              (kCompanionLm || !hasLm)) {
-    bool paired, lmChanged = false, uiChanged = false, logChanged = false, linkUp = false;
+    bool paired, lmChanged = false, uiChanged = false, logChanged = false, archiveChanged = false,
+         linkUp = false;
     {
       TaskLockGuard lock(self.dataMux_);
       CompanionStored &stored = g_companion.stored;
@@ -572,10 +575,13 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
         if (hasLm) stored.lmSwitch = lm ? 1 : 0;
         if (hasUi) stored.uiOff = ui ? 0 : 1;
         if (hasLog) stored.logSwitch = log ? 1 : 0;
-        g_companion.dirty |= lmChanged || uiChanged || logChanged;
+        archiveChanged = hasArchive && (stored.archiveSwitch != 0) != archive;
+        if (hasArchive) stored.archiveSwitch = archive ? 1 : 0;
+        g_companion.dirty |= lmChanged || uiChanged || logChanged || archiveChanged;
         linkUp = g_companion.active != 0;
         // Its next relayed request is stale, and the new handshake carries ui and link.
-        if (lmChanged || uiChanged || logChanged) companionRelayDrop(g_companion.relay);
+        if (lmChanged || uiChanged || logChanged || archiveChanged)
+          companionRelayDrop(g_companion.relay);
       }
     }
     if (!paired)
@@ -592,13 +598,15 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       self.lifecycleLog(ui ? "Companion: Web UI through the companion turned on"
                            : "Companion: Web UI through the companion turned off");
     }
-    if (logChanged) {
-      // An open link learns it from the next cfg frame; the relay handshake
-      // re-answers whether the link is needed at all.
-      companionOutboxChanged();
+    // An open link learns these from the next cfg frame; the relay handshake
+    // re-answers whether the link is needed at all.
+    if (logChanged || archiveChanged) companionOutboxChanged();
+    if (logChanged)
       self.lifecycleLog(log ? "Companion: Diagnostic log through the companion turned on"
                             : "Companion: Diagnostic log through the companion turned off");
-    }
+    if (archiveChanged)
+      self.lifecycleLog(archive ? "Companion: Shot archive in the companion turned on"
+                                : "Companion: Shot archive in the companion turned off");
   } else {
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", nullptr, "UNKNOWN_COMPANION_ACTION");
   }
@@ -679,6 +687,11 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
     }
     memset(workspace, 0, sizeof(*workspace));
     g_companionWorkspace.store(workspace, std::memory_order_release);
+    // The archive's record sync state; without the memory there is no archive.
+    if (void *memory = allocExternal(sizeof(CompanionRecords), AllocationOwner::NETWORK)) {
+      TaskLockGuard lock(self.dataMux_);
+      self.companionRecords_ = new (memory) CompanionRecords{};
+    }
   }
   request->sess_ctx = slot;
   request->free_ctx = companionLinkFree;
@@ -960,7 +973,8 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   // A type this controller does not know is a later addition: ignored, so a
   // newer companion keeps its link. Known types must be well formed; the La
   // Marzocco ones exist only on Linea Micra builds.
-  if (strcmp(type, "ping") != 0 && strcmp(type, "logsub") != 0 &&
+  const bool record = !strcmp(type, "rx") || !strcmp(type, "rf") || !strcmp(type, "rt");
+  if (strcmp(type, "ping") != 0 && strcmp(type, "logsub") != 0 && !record &&
       (!kCompanionLm || (strcmp(type, "lm") != 0 && strcmp(type, "creds") != 0 &&
                          strcmp(type, "res") != 0 && strcmp(type, "st") != 0))) {
     static RefusalLog unknown;
@@ -974,11 +988,16 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   [[maybe_unused]] uint32_t first = 0, second = 0, third = 0;
   [[maybe_unused]] char text[12] = {};
   if (!strcmp(type, "ping") && jsonBoolean(frame, "up", flag)) {
+    {
+      TaskLockGuard lock(dataMux_);
+      g_companion.pingReply = true;
+    }
+    companionOutboxChanged();
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     machineIntegrationCompanionPing(flag);
 #endif
-  } else if (!strcmp(type, "logsub")) {
-    if (!companionLinkLogSub(slot, frame))
+  } else if (!strcmp(type, "logsub") || record) {
+    if (!(record ? companionLinkRecordRequest(slot, frame, type) : companionLinkLogSub(slot, frame)))
       return companionLinkRefuse(slot, "a malformed frame arrived", false);
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   } else if (!strcmp(type, "lm") && jsonBoolean(frame, "sub", flag) &&
@@ -1116,6 +1135,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     // Diagnostic log (2B): the due check runs every pass, so a hold's end
     // flushes at once instead of waiting for the next ping.
     companionLogService();
+    companionRecordsService(now);  // the archive (2A), under the same rules
     if (companionNotified_.load(std::memory_order_acquire) &&
         !companionSendPending_.load(std::memory_order_acquire))
       companionPrepareSends();
@@ -1220,7 +1240,9 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const MicraCompanionOutbox outbox = machineIntegrationCompanionOutbox();
   uint32_t generation = 0;
   [[maybe_unused]] uint32_t lastCommand = 0;
-  bool snapshot = false, ui = true, logSwitch = true;
+  bool snapshot = false, ui = true, logSwitch = true, archive = true, heard = false,
+       pingReply = false;
+  const bool syncHold = companionSyncHold();
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
   uint8_t secret[COMPANION_SECRET_BYTES];
@@ -1240,6 +1262,10 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     lastCommand = g_companion.lastCommandSent;
     ui = g_companion.stored.uiOff == 0;
     logSwitch = g_companion.stored.logSwitch != 0;
+    archive = g_companion.stored.archiveSwitch != 0;
+    heard = g_companion.logHeard;
+    pingReply = g_companion.pingReply;
+    g_companion.pingReply = false;
     memcpy(deviceName, status_.deviceName, sizeof(deviceName));
     memcpy(secret, g_companion.stored.secret, sizeof(secret));
   }
@@ -1257,17 +1283,18 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const bool device =
       deviceDue && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\",\"id\":\"%s\"}",
                                     deviceName, deviceIdText);
-  const char *uiText = ui ? "true" : "false", *logText = logSwitch ? "true" : "false";
+  const char *uiText = ui ? "true" : "false", *logText = logSwitch ? "true" : "false",
+             *archiveText = archive ? "true" : "false";
   const bool configDue = snapshot || outbox.configSequence != sent.sentConfig ||
-                         ui != sent.sentUi || logSwitch != sent.sentLog;
+                         ui != sent.sentUi || logSwitch != sent.sentLog || archive != sent.sentArchive;
   const bool config = configDue &&
       (kCompanionLm ? companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s,"
-                                              "\"ui\":%s,\"log\":%s}",
+                                              "\"ui\":%s,\"log\":%s,\"archive\":%s}",
                                        outbox.lmSwitch ? "true" : "false",
                                        outbox.websocketConnection ? "ws" : "api",
-                                       outbox.observe ? "true" : "false", uiText, logText)
-                    : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s}", uiText,
-                                       logText));
+                                       outbox.observe ? "true" : "false", uiText, logText, archiveText)
+                    : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s,\"archive\":%s}",
+                                       uiText, logText, archiveText));
   bool credentialsDue = false, credentials = false, routeDue = false, route = false,
        holdDue = false, hold = false, commandDue = false, command = false;
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
@@ -1282,8 +1309,8 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   route = routeDue && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
                                        outbox.routeCompanion ? "companion" : "direct");
   holdDue = snapshot || outbox.holdSequence != sent.sentHold;
-  hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s}",
-                                     outbox.hold ? "true" : "false");
+  hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":%s}",
+                                     outbox.hold ? "true" : "false", syncHold ? "true" : "false");
   const char *op = companionCommandName(outbox.commandOp);
   commandDue = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
   command = commandDue &&
@@ -1295,12 +1322,21 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                               static_cast<unsigned long>(outbox.commandId), op));
 #endif
   memset(secret, 0, sizeof(secret));
+  // S17: a ping is answered while no sync hold is active, with the `hold`
+  // frame (one segment with its ACK), so the companion sends sync requests
+  // only then; during a hold it is not answered at all.
+  if (pingReply && (logSwitch || archive) && !syncHold && !hold)
+    (void)companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":false}",
+                           outbox.hold ? "true" : "false");
   // The diagnostic log stream (2B): one `log` body per pass; the rest pages
   // on the next pass.
   bool logMore = false;
   uint32_t logLast = sent.logSent, logMiss = 0;
   const bool logBuilt =
       companionLogBody(count, sent, logSwitch, logLast, logMore, logMiss);
+  // The archive's epoch notice (2A) rides the same heartbeat.
+  uint32_t told[2] = {};
+  const bool notice = companionRecordsNoticeBody(count, heard, told);
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = config == configDue && device == deviceDue &&
                         credentials == credentialsDue &&
@@ -1323,6 +1359,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       slot.sentConfig = outbox.configSequence;
       slot.sentUi = ui;
       slot.sentLog = logSwitch;
+      slot.sentArchive = archive;
     }
     if (device) {
       memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));
@@ -1340,6 +1377,11 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     }
   }
   if (command) g_companion.lastCommandSent = outbox.commandId;
+  if (notice && companionRecords_ != nullptr) {
+    companionRecords_->toldShots = told[0];
+    companionRecords_->toldHistory = told[1];
+    g_companion.logHeard = false;  // this notice consumed the heartbeat too
+  }
 }
 
 // httpd: sign the queued bodies with the session key and send them in order.

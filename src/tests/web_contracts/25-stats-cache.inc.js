@@ -6,7 +6,7 @@
   const assert = require('assert').strict, {spawnSync} = require('child_process');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
   const source = read('network/OpenBrewByWeightHomeStream.inc');
-  const headerSource = read('network/OpenBrewByWeightStatsPage.inc');
+  const headerSource = read('network/OpenBrewByWeightStatsHeader.inc');
   const networkSource = read('OpenBrewByWeightNetwork.cpp');
   const header = read('OpenBrewByWeightNetwork.h');
   const body = (text, signature) => {
@@ -32,7 +32,7 @@
 #include "OpenBrewByWeightShotCurveTypes.h"
 using namespace openbrewbyweight;
 constexpr int ESP_OK=0,HTTPD_WS_TYPE_TEXT=1;
-constexpr size_t kStatsStreamFrameBytes=20480;
+constexpr size_t kStatsStreamFrameBytes=20480,COMPANION_RECORD_ORIGIN=72;
 constexpr uint32_t kStatsStreamPaceMs=100;
 const char *uiStreamSendKind="";
 bool uiStreamSendCleanAbort=false;
@@ -48,7 +48,8 @@ int httpd_ws_send_frame_async(int,int,httpd_ws_frame_t *frame){
   return sendResult;
 }
 ${body(networkSource, 'struct StatsCurveHashCache {')};
-${body(networkSource, 'struct StatsStreamCache {')};
+${body(headerSource, 'struct StatsHeaderWork {')};
+${body(networkSource, 'struct StatsStreamCache : StatsHeaderWork {')};
 ${body(header, 'struct UiStreamFingerprints {')};
 using HeldRow = UiStreamFingerprints::HeldRow;
 constexpr size_t kHeldRows = UiStreamFingerprints::kHeldRows;
@@ -62,7 +63,7 @@ struct NetworkWorkBuf {
 } work;
 auto *g_work=&work;
 ${body(networkSource, 'bool __attribute__((format(printf, 2, 3)))\nstatusJsonAppend(')}
-${body(networkSource, 'bool jsonScratchAppend(')}
+${body(headerSource, 'bool jsonScratchAppend(')}
 bool escapeJsonString(const char *in,char *out,size_t cap){snprintf(out,cap,"%s",in);return true;}
 // The aggregate names the store generation it was built from.
 bool buildIntegrationStats(const ShotStatsView &,char *out,size_t cap,size_t window,bool durations){
@@ -122,6 +123,15 @@ ${session}
   } callbacks_;
   bool appendRecordPageUi(const ControlStatusSnapshot &,size_t *used,bool){
     return statusJsonAppend(used,"\\"ui\\":{}");
+  }
+  // The companion archive's fetch-only link session: its frames start after
+  // the reserved prefix and are recorded without it.
+  UiStreamSession *linkSession=nullptr;
+  bool companionRecordsSession(const UiStreamSession &s) const {return &s==linkSession;}
+  bool companionRecordsSend(size_t used,bool wrap,bool &deferArm){
+    assert(wrap&&used>COMPANION_RECORD_ORIGIN);deferArm=false;
+    frames.emplace_back(work.statusJson+COMPANION_RECORD_ORIGIN,used-COMPANION_RECORD_ORIGIN);
+    return true;
   }
   bool sendUiStreamFrame(UiStreamSession &,size_t,bool &);
   bool sendStatsStream(UiStreamSession &,const ControlStatusSnapshot &);
@@ -308,6 +318,19 @@ int main(){
     assert(!fresh.statsPaging&&frames.size()==4&&frames[0].find("\\"total\\":4,")!=std::string::npos);
     for(size_t i=0;i<4;++i)assert(frames[i].find("\\"id\\":"+std::to_string(4-i))!=std::string::npos);
     page(ShotLogSort::Date,ShotLogSortDir::Desc,3,2,1,true);
+    // The archive's link session: no standing page or header ever, every
+    // shot in its index (the bad one too), fetches newest first by date.
+    OpenBrewByWeightNetwork::UiStreamSession link;network.linkSession=&link;frames.clear();
+    link.statsResync=true;assert(network.sendStatsStream(link,control)&&frames.empty());
+    link.recordsShots=true;assert(network.sendRecordsIndex(link,control)&&frames.size()==1);
+    const std::string all=frames[0].substr(frames[0].find("\\"rows\\":[")+8);
+    assert(all.rfind("4,",0)==0&&std::count(all.begin(),all.end(),',')==7);
+    link.statsFetch=true;link.statsFetchRequest=9;link.statsFetchOffset=0;link.statsFetchLimit=50;
+    link.statsFetchFilter={};link.statsFetchFilter.includeBad=true;frames.clear();
+    for(int i=0;i<10&&link.statsFetch;++i){now+=100;assert(network.sendStatsStream(link,control));}
+    assert(frames.size()==4&&!link.statsFetch&&frames[0].find("\\"stats\\":")==std::string::npos);
+    assert(frames[0].find("\\"request\\":9")!=std::string::npos&&frames[0].find("\\"good\\":3,")!=std::string::npos);
+    network.linkSession=nullptr;
     shots=3;
   }
   // A curve past the PSRAM cache: its row hash never reads flash; while a

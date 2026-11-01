@@ -35,13 +35,14 @@ constexpr size_t COMPANION_MAC_HEX = 32;  // first 16 bytes of the frame HMAC
 constexpr size_t COMPANION_ID_TEXT = 37, COMPANION_NAME_TEXT = 33,
                  COMPANION_VERSION_TEXT = 25, COMPANION_ADDRESS_TEXT = 48;
 constexpr uint32_t COMPANION_MAGIC = 0x434D504EU;  // "CMPN"
-constexpr uint16_t COMPANION_STORED_VERSION = 2;
+constexpr uint16_t COMPANION_STORED_VERSION = 3;
 constexpr size_t COMPANION_STORED_V1_BYTES = 328;  // version 1: no logSwitch tail
 
-// One NVS blob. Missing or invalid means "never paired". The v2 tail
-// (`logSwitch`) rides after the checksum: a v1 blob is the same bytes without
-// it, so promotion is a version bump plus the default, and only that switch
-// is outside the checksum's coverage (corruption there changes a switch, not
+// One NVS blob. Missing or invalid means "never paired". The tail switches
+// (`logSwitch` from v2, `archiveSwitch` from v3, in what was padding) ride
+// after the checksum: an older blob is the same bytes without them, so
+// promotion is a version bump plus the defaults, and only those switches are
+// outside the checksum's coverage (corruption there changes a switch, not
 // the pairing).
 struct CompanionStored {
   uint32_t magic = COMPANION_MAGIC;
@@ -61,6 +62,7 @@ struct CompanionStored {
   uint8_t forgottenSecret[COMPANION_SECRET_BYTES] = {};
   uint32_t checksum = 0;
   uint8_t logSwitch = 1;  // "Diagnostic log through the companion" (v2)
+  uint8_t archiveSwitch = 1;  // "Shot archive in the companion" (v3)
 };
 static_assert(sizeof(CompanionStored) == 332, "companion blob layout changed");
 
@@ -79,23 +81,28 @@ inline bool validCompanionStored(const CompanionStored &stored) {
   return stored.magic == COMPANION_MAGIC && stored.version == COMPANION_STORED_VERSION &&
          stored.structureSize == sizeof(CompanionStored) && stored.paired <= 1 &&
          stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
-         stored.logSwitch <= 1 && stored.checksum == companionChecksum(stored);
+         stored.logSwitch <= 1 && stored.archiveSwitch <= 1 &&
+         stored.checksum == companionChecksum(stored);
 }
 
-// A v1 blob read raw into the first COMPANION_STORED_V1_BYTES: the same
-// fields, no tail. Promotion keeps the pairing and turns the new switch on
-// (the switches default on, plan T); the caller persists the v2 layout.
-inline bool validCompanionStoredV1(const CompanionStored &stored) {
-  return stored.magic == COMPANION_MAGIC && stored.version == 1 &&
-         stored.structureSize == COMPANION_STORED_V1_BYTES && stored.paired <= 1 &&
+// An older blob: v1 read raw into its first COMPANION_STORED_V1_BYTES (no
+// tail), or v2 (logSwitch, then padding). Promotion keeps the pairing and
+// turns the newer switches on (the switches default on, plan T); the caller
+// persists the v3 layout.
+inline bool validCompanionStoredOlder(const CompanionStored &stored) {
+  const bool v1 = stored.version == 1 && stored.structureSize == COMPANION_STORED_V1_BYTES,
+             v2 = stored.version == 2 && stored.structureSize == sizeof(CompanionStored) &&
+                  stored.logSwitch <= 1;
+  return stored.magic == COMPANION_MAGIC && (v1 || v2) && stored.paired <= 1 &&
          stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
          stored.checksum == companionChecksum(stored);
 }
 
-inline void promoteCompanionStoredV1(CompanionStored &stored) {
+inline void promoteCompanionStored(CompanionStored &stored) {
+  if (stored.version == 1) stored.logSwitch = 1;
   stored.version = COMPANION_STORED_VERSION;
   stored.structureSize = sizeof(CompanionStored);
-  stored.logSwitch = 1;
+  stored.archiveSwitch = 1;
   // version and structureSize sit inside the checksummed prefix.
   stored.checksum = companionChecksum(stored);
 }
@@ -545,7 +552,7 @@ struct CompanionRequest {
   bool revealed = false;   // companionKey holds the key matching the commitment
   bool approving = false;  // the code matched; the network task derives S
   bool lmSwitch = true,    // the switches chosen in the approval panel
-       logSwitch = true;
+       logSwitch = true, archiveSwitch = true;
   uint8_t wrongCodes = 0;
   uint32_t serial = 0;  // names the request key the network task made
   uint32_t untilMs = 0;
@@ -662,7 +669,8 @@ inline const char *companionPairPoll(CompanionPairing &pairing, const char *id, 
 // `expected` is the request's code (companionSas). Three wrong codes deny it.
 inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, uint32_t code,
                                                    uint32_t expected, bool lmSwitch,
-                                                   bool logSwitch, uint32_t now) {
+                                                   bool logSwitch, bool archiveSwitch,
+                                                   uint32_t now) {
   companionPairTick(pairing, now);
   CompanionRequest &request = pairing.request;
   if (request.state != CompanionPairState::PENDING || request.approving)
@@ -676,6 +684,7 @@ inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, ui
   request.approving = true;
   request.lmSwitch = lmSwitch;
   request.logSwitch = logSwitch;
+  request.archiveSwitch = archiveSwitch;
   return CompanionApproveResult::OK;
 }
 
@@ -709,6 +718,7 @@ inline void companionPairComplete(CompanionPairing &pairing, CompanionStored &st
   stored.paired = 1;
   stored.lmSwitch = request.lmSwitch ? 1 : 0;
   stored.logSwitch = request.logSwitch ? 1 : 0;
+  stored.archiveSwitch = request.archiveSwitch ? 1 : 0;
   memcpy(stored.secret, secret, COMPANION_SECRET_BYTES);
   memcpy(stored.publicKey, request.companionKey, COMPANION_KEY_BYTES);
   memcpy(stored.id, request.id, sizeof(stored.id));
@@ -758,7 +768,7 @@ struct CompanionLinkSlot {
   const char *closeReason = nullptr;
   // Outbox sequences already sent in this session; the first send is the
   // whole snapshot.
-  bool snapshotSent = false, sentUi = true, sentLog = true;
+  bool snapshotSent = false, sentUi = true, sentLog = true, sentArchive = true;
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
   bool deviceSent = false;  // this session's `dev` frame
   char sentDeviceName[DEVICE_NAME_CAPACITY] = {};  // the name it carried
@@ -829,6 +839,129 @@ inline bool companionLogFlushDue(bool subscribed, bool pending, bool holdActive,
          (urgentPending || catchUp || heardSinceFlush);
 }
 
+// --- Archive record sync (plan 2A) -----------------------------------------
+
+// Controller → companion record frames (`rec`, `trc`) answer a request and may
+// exceed COMPANION_FRAME_BYTES, up to the ui-stream client's guard. They are
+// sealed in place in the HTTP workspace behind a reserved prefix.
+constexpr size_t COMPANION_RECORD_FRAME_BYTES = 28672;
+constexpr size_t COMPANION_RECORD_ORIGIN = 72;
+static_assert(COMPANION_MAC_HEX + 1 + sizeof("{\"q\":4294967295,\"t\":\"rec\",\"f\":") - 1 <=
+                  COMPANION_RECORD_ORIGIN,
+              "the reserved prefix holds the MAC, the sequence and the rec wrapper");
+constexpr uint32_t COMPANION_NOTICE_SETTLE_MS = 30000;
+constexpr uint32_t COMPANION_FETCH_OFFSET_MAX = 1000, COMPANION_FETCH_SHOTS_MAX = 50,
+                   COMPANION_FETCH_HISTORY_MAX = 120;
+
+enum class CompanionRecordKind : uint8_t { INDEX, FETCH, TRACE };
+
+// `rx` (a store's index from `epoch`), `rf` (a fetch window), `rt` (a trace).
+struct CompanionRecordRequest {
+  CompanionRecordKind kind = CompanionRecordKind::INDEX;
+  bool shots = false;
+  uint32_t epoch = 0, offset = 0, count = 0, request = 0;
+  uint32_t id = 0, boot = 0, end = 0;
+};
+
+// Strict: every field present, whole and in range; false closes the link.
+inline bool companionParseRecordRequest(const cJSON *frame, const char *type,
+                                        CompanionRecordRequest &out) {
+  const auto number = [frame](const char *name, uint32_t low, uint32_t high, uint32_t &value) {
+    const cJSON *item = cJSON_GetObjectItemCaseSensitive(frame, name);
+    if (!cJSON_IsNumber(item) || item->valuedouble < low || item->valuedouble > high ||
+        static_cast<double>(static_cast<uint32_t>(item->valuedouble)) != item->valuedouble)
+      return false;
+    value = static_cast<uint32_t>(item->valuedouble);
+    return true;
+  };
+  out = CompanionRecordRequest{};
+  if (!strcmp(type, "rt")) {
+    out.kind = CompanionRecordKind::TRACE;
+    return number("id", 1, UINT32_MAX, out.id) && number("b", 0, UINT32_MAX, out.boot) &&
+           number("e", 0, UINT32_MAX, out.end);
+  }
+  const cJSON *store = cJSON_GetObjectItemCaseSensitive(frame, "s");
+  if (!cJSON_IsString(store) ||
+      (strcmp(store->valuestring, "shots") != 0 && strcmp(store->valuestring, "history") != 0))
+    return false;
+  out.shots = !strcmp(store->valuestring, "shots");
+  if (!strcmp(type, "rx")) return number("ep", 0, UINT32_MAX, out.epoch);
+  out.kind = CompanionRecordKind::FETCH;
+  return number("o", 0, COMPANION_FETCH_OFFSET_MAX, out.offset) &&
+         number("n", 1, out.shots ? COMPANION_FETCH_SHOTS_MAX : COMPANION_FETCH_HISTORY_MAX,
+                out.count) &&
+         number("r", 0, UINT32_MAX, out.request);
+}
+
+// Seals a record frame in place. `buffer[COMPANION_RECORD_ORIGIN, end)` holds
+// the body: with `wrap` a whole ui-stream frame, which becomes
+// `"t":"rec","f":<frame>`; otherwise a member list continuing `{"q":N,`
+// (`"t":"trc",…`). The MAC, the dot and `{"q":N,` go right-aligned into the
+// reserved prefix and `}` closes the body. Returns the frame's offset (its
+// length in `length`), or SIZE_MAX when it does not fit.
+inline size_t companionSealRecord(const uint8_t key[32], uint32_t sequence, bool wrap, char *buffer,
+                                  size_t end, size_t capacity, size_t &length) {
+  char head[40];
+  const int headLength = snprintf(head, sizeof(head), "{\"q\":%lu,%s",
+                                  static_cast<unsigned long>(sequence),
+                                  wrap ? "\"t\":\"rec\",\"f\":" : "");
+  const size_t prefix = COMPANION_MAC_HEX + 1;
+  if (headLength < 0 || prefix + static_cast<size_t>(headLength) > COMPANION_RECORD_ORIGIN ||
+      end <= COMPANION_RECORD_ORIGIN || end + 2 > capacity)
+    return SIZE_MAX;
+  const size_t start = COMPANION_RECORD_ORIGIN - static_cast<size_t>(headLength) - prefix;
+  memcpy(buffer + start + prefix, head, static_cast<size_t>(headLength));
+  buffer[end] = '}';
+  buffer[end + 1] = '\0';
+  length = end + 1 - start;
+  if (length > COMPANION_RECORD_FRAME_BYTES ||
+      !companionFrameMacHex(key, 'f', buffer + start + prefix, length - prefix, buffer + start))
+    return SIZE_MAX;
+  buffer[start + COMPANION_MAC_HEX] = '.';
+  return start;
+}
+
+// Base64 of a byte stream that arrives in pieces (a trace's chunks): whole
+// triples go out as they come, up to two bytes carry to the next piece, and
+// finish() pads the rest.
+struct CompanionBase64Stream {
+  char *out = nullptr;
+  size_t capacity = 0, used = 0;
+  uint8_t carry[3] = {};
+  uint8_t carried = 0;
+  bool ok = true;
+  void add(const uint8_t *data, size_t size) {
+    while (size != 0 && carried != 0 && carried < 3) {
+      carry[carried++] = *data++;
+      --size;
+    }
+    if (carried == 3) {
+      ok = ok && appendBase64(out, capacity, used, carry, 3);
+      carried = 0;
+    }
+    const size_t whole = size - size % 3;
+    ok = ok && appendBase64(out, capacity, used, data, whole);
+    for (size_t index = whole; index < size; ++index) carry[carried++] = data[index];
+  }
+  bool finish() {
+    ok = ok && appendBase64(out, capacity, used, carry, carried);
+    carried = 0;
+    return ok;
+  }
+};
+
+// Whether the store-epoch notice (`rs`) goes now: the companion asked in this
+// session (an `rx`), the epochs moved from what it was last told and then held
+// still for COMPANION_NOTICE_SETTLE_MS (the record and its trace are saved by
+// then), the gate is open (no hold, no shot, flash writes allowed), and a
+// frame arrived since the last flush, so the notice rides the companion's
+// ping and adds no radio wakeup of its own.
+inline bool companionNoticeDue(bool subscribed, bool moved, uint32_t stillMs, bool gateOpen,
+                               bool heardSinceFlush) {
+  return subscribed && moved && gateOpen && heardSinceFlush &&
+         stillMs >= COMPANION_NOTICE_SETTLE_MS;
+}
+
 struct CompanionState {
   CompanionStored stored = {};
   CompanionPairing pairing = {};
@@ -842,6 +975,7 @@ struct CompanionState {
   // piggyback heartbeat), when it last flushed, and the events this boot
   // reported missing to the companion.
   bool logHeard = false;
+  bool pingReply = false;  // a ping waits for its `hold` answer (S17)
   uint32_t logFlushAtMs = 0, logGaps = 0;
   CompanionRelay relay = {};
   bool dirty = false;
@@ -850,7 +984,7 @@ struct CompanionState {
 // Diagnostic → Companion; strings are sanitized on store.
 struct CompanionSnapshot {
   bool paired = false, lmSwitch = false, linkOpen = false, upstream = false, ui = true,
-       relayReady = false, logSwitch = false;
+       relayReady = false, logSwitch = false, archiveSwitch = false;
   uint32_t relayRejects = 0;
   uint8_t protocol = 0;   // the open link's; 0 while down
   int32_t linkAgeS = -1;  // since the link came up or went down; -1: not since boot
@@ -859,6 +993,7 @@ struct CompanionSnapshot {
   // last flush (-1: never this boot) and the events reported missing.
   uint32_t logCursor = 0, logGaps = 0;
   int32_t logFlushS = -1;
+  int32_t archiveSyncS = -1;  // since the last archive record frame; -1: never this boot
   const char *route = "direct", *reason = "none";
   char name[COMPANION_NAME_TEXT] = {}, address[COMPANION_ADDRESS_TEXT] = {},
        version[COMPANION_VERSION_TEXT] = {};

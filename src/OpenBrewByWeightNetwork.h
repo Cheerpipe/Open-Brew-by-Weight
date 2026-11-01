@@ -511,6 +511,26 @@ class OpenBrewByWeightNetwork {
     bool relayed = false;
   };
   UiStreamSession uiStreams_[2];
+  // The companion archive's record sync (network/OpenBrewByWeightCompanionRecords.inc):
+  // PSRAM, allocated with the link workspace by the first handshake, so a
+  // never-paired controller reserves nothing. httpd records the companion's
+  // requests under dataMux_ and serves them through `session`, a fetch-only
+  // ui-stream session (never a standing page); the network task schedules
+  // that work and the `rs` notice.
+  struct CompanionRecords {
+    UiStreamSession session;
+    uint32_t generation = 0;  // the link session the state belongs to
+    bool subscribed = false;  // an `rx` arrived in it: `rs` notices flow
+    bool trace = false;       // a trace request waits
+    uint32_t traceId = 0, traceBoot = 0, traceEnd = 0;
+    // Epochs the companion was told (its index or `rs`), the latest seen and
+    // when they last moved (the notice's settle).
+    uint32_t toldShots = 0, toldHistory = 0, seenShots = 0, seenHistory = 0, movedAtMs = 0;
+    uint32_t sentAtMs = 0;  // the last `rec`/`trc` frame; 0: none this boot
+  };
+  CompanionRecords *companionRecords_ = nullptr;
+  std::atomic<bool> companionRecordsDue_{false}, companionRecordsPending_{false};
+  uint32_t companionRecordsAtMs_ = 0;  // network task: the last records work queued
   std::atomic<bool> uiStreamWorkPending_{false};
   std::atomic<bool> uiStreamUrgent_{false};
   uint32_t uiStreamDispatchAtMs_ = 0;
@@ -1036,6 +1056,7 @@ class OpenBrewByWeightNetwork {
   // predicate is the link's own admission rule (a scaled shot, a scale
   // connection or discovery, the BLE quiet interval).
   bool companionLogHoldActive() const;
+  bool companionSyncHold() const;
   bool companionLinkLogSub(CompanionLinkSlot &slot, cJSON *frame);
   void companionLogService();
   void companionLogApplyLocked(CompanionLinkSlot &link);
@@ -1043,6 +1064,16 @@ class OpenBrewByWeightNetwork {
                         uint32_t &logLast, bool &logMore, uint32_t &logMiss);
   bool companionCredentialsBody(uint8_t &count, uint32_t generation,
                                 const uint8_t secret[COMPANION_SECRET_BYTES]);
+  // The archive record sync (network/OpenBrewByWeightCompanionRecords.inc).
+  bool companionRecordsSession(const UiStreamSession &session) const {
+    return companionRecords_ != nullptr && &session == &companionRecords_->session;
+  }
+  bool companionLinkRecordRequest(CompanionLinkSlot &slot, cJSON *frame, const char *type);
+  void companionRecordsService(uint32_t now);
+  bool companionRecordsNoticeBody(uint8_t &count, bool heard, uint32_t (&told)[2]);
+  static void companionRecordsWork(void *context);
+  bool companionRecordsSend(size_t used, bool wrap, bool &deferArm);
+  bool companionTraceFrame();
   bool appendCompanionStatus(size_t *used);
   void companionSnapshot(CompanionSnapshot &out);
   void companionRequestLabels(char (&name)[COMPANION_NAME_TEXT],

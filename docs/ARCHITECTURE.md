@@ -78,6 +78,16 @@ WebSocket pings, no HTTPS reads or polling. It receives filtered state frames
 and a 15 s ping over the companion link and sends only its commands and route
 and hold changes; frames go out only when the service's outbox changes.
 
+The companion's log and shot archive add no radio wakeup of their own. Plain
+log events and the archive's store-epoch notice (`rs`, sent once the stores
+held still for 30 s) leave with the next companion ping; the controller's
+answer to that ping rides the same segment as its ACK. No synchronization
+frame crosses Wi-Fi in either direction during a sync hold — a shot with a
+scale, a scale connection or discovery, the BLE quiet interval, or any state
+that closes the flash-write gate — and record answers are paced at 100 ms.
+An unchanged store costs one small index frame per sync; a new shot about
+40 KiB in one burst (two indexes, its row, its trace).
+
 Documented exception: the Admin page reads its own status by REST every 10
 seconds while visible and owned. Live and shared state (machine, scale,
 presets, command results, configuration revision) reaches every page on the

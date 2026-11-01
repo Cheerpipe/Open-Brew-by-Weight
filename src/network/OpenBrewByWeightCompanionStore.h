@@ -15,8 +15,9 @@ constexpr const char *COMPANION_KEY = "companion";
 enum class CompanionLoad : uint8_t { LOADED, PROMOTED, MISSING, INVALID };
 
 // A missing blob is a controller that never paired; INVALID is worth a log
-// line. A version 1 blob (before the log switch) loads as PROMOTED with the
-// new switch on; the caller marks the state dirty so the v2 layout persists.
+// line. An older blob (v1 before the log switch, v2 before the archive
+// switch) loads as PROMOTED with the newer switches on; the caller marks the
+// state dirty so the v3 layout persists.
 inline CompanionLoad loadCompanionStored(CompanionStored &stored) {
   CompanionLoad result = CompanionLoad::INVALID;
   if (lockSettingsNvs()) {
@@ -24,17 +25,15 @@ inline CompanionLoad loadCompanionStored(CompanionStored &stored) {
     result = CompanionLoad::MISSING;
     if (preferences.begin(SETTINGS_NAMESPACE, true)) {
       if (preferences.isKey(COMPANION_KEY)) {
+        // v2 and v3 share the size; v1 lacks the tail (read over the defaults).
         const size_t length = preferences.getBytesLength(COMPANION_KEY);
-        if (length == sizeof(stored) &&
-            preferences.getBytes(COMPANION_KEY, &stored, sizeof(stored)) == sizeof(stored) &&
-            validCompanionStored(stored)) {
-          result = CompanionLoad::LOADED;
-        } else if (length == COMPANION_STORED_V1_BYTES) {
-          stored = CompanionStored{};
-          if (preferences.getBytes(COMPANION_KEY, &stored, COMPANION_STORED_V1_BYTES) ==
-                  COMPANION_STORED_V1_BYTES &&
-              validCompanionStoredV1(stored)) {
-            promoteCompanionStoredV1(stored);
+        stored = CompanionStored{};
+        if ((length == sizeof(stored) || length == COMPANION_STORED_V1_BYTES) &&
+            preferences.getBytes(COMPANION_KEY, &stored, length) == length) {
+          if (length == sizeof(stored) && validCompanionStored(stored)) {
+            result = CompanionLoad::LOADED;
+          } else if (validCompanionStoredOlder(stored)) {
+            promoteCompanionStored(stored);
             result = CompanionLoad::PROMOTED;
           }
         }

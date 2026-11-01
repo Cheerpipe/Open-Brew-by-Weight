@@ -14,13 +14,13 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
   bool ok = statusJsonAppend(
       used,
       ",\"companion\":{\"paired\":%s,\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\","
-      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"log\":%s,"
+      "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"log\":%s,\"archive\":%s,"
       "\"relay\":\"%s\",\"relayRejects\":%lu,",
       stored.paired ? "true" : "false", stored.name, stored.address, stored.companionVersion,
       link != nullptr ? "open" : "down", static_cast<long>(companionLinkAgeS(g_companion, now)),
       static_cast<unsigned long>(link != nullptr ? 0 : g_companion.peerProtocol),
       stored.uiOff ? "false" : "true", stored.logSwitch ? "true" : "false",
-      g_companion.relay.ready ? "ready" : "down",
+      stored.archiveSwitch ? "true" : "false", g_companion.relay.ready ? "ready" : "down",
       static_cast<unsigned long>(g_companion.relay.rejects));
   if (kCompanionLm)
     ok = ok && statusJsonAppend(
@@ -59,6 +59,7 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
   out.lmSwitch = stored.lmSwitch != 0;
   out.ui = stored.uiOff == 0;
   out.logSwitch = stored.logSwitch != 0;
+  out.archiveSwitch = stored.archiveSwitch != 0;
   out.relayReady = g_companion.relay.ready;
   out.relayRejects = g_companion.relay.rejects;
   out.linkOpen = link != nullptr;
@@ -73,6 +74,8 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
   out.logFlushS = g_companion.logFlushAtMs == 0
                       ? -1
                       : static_cast<int32_t>((now - g_companion.logFlushAtMs) / 1000U);
+  const uint32_t archiveAt = companionRecords_ != nullptr ? companionRecords_->sentAtMs : 0;
+  out.archiveSyncS = archiveAt == 0 ? -1 : static_cast<int32_t>((now - archiveAt) / 1000U);
   memcpy(out.name, stored.name, sizeof(out.name));
   memcpy(out.address, stored.address, sizeof(out.address));
   memcpy(out.version, stored.companionVersion, sizeof(out.version));
