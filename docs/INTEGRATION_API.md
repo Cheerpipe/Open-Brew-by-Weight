@@ -102,14 +102,11 @@ Every error body carries a third field between `error` and `message`:
   the sentence yourself, ignore it when you map `reason` to your own text.
   Parameters appear exactly as `message` shows them, without JSON escaping
   beyond the body's own quoting.
-- A few field-validation errors whose messages are built from the request's
-  own field names still answer without a `reason`; treat a missing `reason`
-  as unmapped and use `message`.
 - The sentence behind each `reason` lives in one editable catalog (the Web UI
   locale, `en.json`); the controller derives both its API prose and its Web
   UI text from that catalog at build time, so the two can never drift apart.
 
-The 295 codes, grouped by the routes that answer with them.
+The 328 codes, grouped by the routes that answer with them.
 
 #### Validation rule templates (parameterized)
 
@@ -118,9 +115,19 @@ params substituted in order (see the example above).
 
 | Reason | Template | `params`, in order |
 | --- | --- | --- |
+| ``FIELD_BOOLEAN`` | {0} must be a boolean. | field |
 | ``FIELD_ENUM`` | {0} must be {1}. | field, accepted values |
+| ``FIELD_GRAMS`` | {0} must be a number of grams. | field |
+| ``FIELD_INTEGER`` | {0} must be an integer. | field |
+| ``FIELD_INTEGER_MS`` | {0} must be an integer (milliseconds). | field |
+| ``FIELD_NONZERO_INTEGER`` | {0} must be a non-zero integer. | field |
+| ``FIELD_NUMBER`` | {0} must be a number. | field |
 | ``FIELD_RANGE`` | {0} must be from {1} to {2}. | field, minimum, maximum |
 | ``FIELD_RANGE_INT`` | {0} must be an integer from {1} to {2}. | field, minimum, maximum |
+| ``FIELD_RANGE_NUMBER`` | {0} must be a number from {1} to {2}. | field, minimum, maximum |
+| ``FIELD_REQUIRED`` | {0} is required. | field |
+| ``FIELD_SECONDS`` | {0} must be a number of seconds. | field |
+| ``FIELD_STRING_MAX`` | {0} must be a string of at most {1} characters. | field, maximum |
 
 #### Sign-in, Admin unlock, and the owned Web UI routes
 
@@ -180,6 +187,10 @@ params substituted in order (see the example above).
 | Reason | `message` sentence |
 | --- | --- |
 | ``ADMIN_LOCKED`` | Unlock administration with the device password first. |
+| ``BBW_ALGORITHM_INVALID`` | bbwAlgorithm must be corridor. |
+| ``BBW_ALPHA_BASELINE_INVALID`` | bbwAlphaBaseline must be 0.01–1.00 in steps of 0.01. |
+| ``BBW_LEARNING_READ_ONLY`` | BBW learning state is read-only. |
+| ``BULLSEYE_MELODY_TUNE_REQUIRED`` | Bullseye melody needs an RTTTL tune when enabled. |
 | ``BULLSEYE_RTTTL_INVALID`` | bullseyeRtttl must be valid single-line RTTTL (up to 250 notes). |
 | ``BULLSEYE_STAGE_BUSY`` | Control is busy; the Bullseye melody was not staged. |
 | ``BULLSEYE_TEST_BUSY`` | Control is busy; the Bullseye melody was not played. |
@@ -192,10 +203,12 @@ params substituted in order (see the example above).
 | ``CONFIG_FAST_BEFORE_RULES`` | The shot time window must start at least 2 s after the earliest weight stop, end at least 1 s later, and use 0.5 s steps. |
 | ``CONFIG_FAST_MARGIN_RULES`` | Extra yield for fast shots must be 0.5 to 10 g, at most a quarter of the target, and keep the target plus extra within 200 g. |
 | ``CONFIG_FAST_RAMP_STEPS`` | Fast transition must be from 0 to 10 s in 0.5 s steps. |
+| ``CONFIG_FIELDS_INVALID`` | Config must be a JSON object with known fields and correct types. |
 | ``CONFIG_INVALID`` | Invalid configuration. |
 | ``CONFIG_LOCKED_DURING_ACTIVE_CYCLE`` | Configuration is locked while a cycle is active. |
 | ``CONFIG_NTP_CUSTOM_INVALID`` | Custom NTP hostname is invalid (letters, digits, '.', '-'; max 63 chars). |
 | ``CONFIG_PADDLE_REMINDER_RELATION`` | Paddle reminder limit must be from 1 to 60 min and at least the reminder interval. |
+| ``CONFIG_PATCH_EMPTY`` | Config patch must include at least one setting field. |
 | ``CONFIG_RETARE_STABILITY_RELATION`` | Retare min stable time must be ≤ retare window and ≤ samples × sample gap. |
 | ``CONFIG_REVISION_STALE`` | Config changed; refresh and retry. |
 | ``CONFIG_SCALE_LOSS_WINDOW`` | The scale-loss stop time must be empty or between the earliest weight stop and the max shot time. |
@@ -215,6 +228,9 @@ params substituted in order (see the example above).
 | ``HOST_NOT_ALLOWED`` | Open the controller by its IP address or its .local name. |
 | ``INVALID_MICRA_CONFIG`` | The Linea Micra settings are not valid. |
 | ``INVALID_WEBHOOK`` | Use an http:// URL without embedded credentials; HTTPS is not supported. |
+| ``JSON_TOO_LARGE`` | JSON too large for device buffer |
+| ``LINEA_MICRA_PRESET_TARGET_RANGE`` | lineaMicraBrewTargetC must be 80.0–100.0 in 0.1 degree steps. |
+| ``LINEA_MICRA_PRESET_TARGET_UNSUPPORTED`` | Linea Micra preset temperature is not supported by this firmware. |
 | ``MICRA_ACTION_FIELDS_INVALID`` | action is required and all fields must be known. |
 | ``MICRA_ACTION_UNKNOWN`` | Unknown Linea Micra action. |
 | ``MICRA_BOUNDED_JSON_REQUIRED`` | A bounded Linea Micra JSON request is required. |
@@ -238,13 +254,24 @@ params substituted in order (see the example above).
 | ``OTA_SERVER_STOPPING`` | The web server is restarting; retry shortly. |
 | ``PREFERRED_SCALE_CLEAR_BUSY`` | Control is busy; nothing was cleared. |
 | ``PREFERRED_SCALE_LOCKED_ACTIVE_CYCLE`` | The preferred scale cannot be changed while a cycle is active. |
+| ``PREFERRED_SCALE_MAC_INVALID`` | preferredScaleMac must be empty or a BLE address AA:BB:CC:DD:EE:FF. |
+| ``PREFERRED_SCALE_MAC_STRING`` | mac must be a string (empty clears the preferred scale). |
+| ``PREFERRED_SCALE_NAME_INVALID`` | name contains unsupported characters. |
+| ``PRESET_ACTION_UNKNOWN`` | Unknown preset action. |
+| ``PRESET_SAVE_FIELDS_REQUIRED`` | save requires at least one preset recipe field. |
+| ``PRESET_SAVE_FIELD_INVALID`` | save has an invalid preset recipe field. |
 | ``RELAY_INVALID`` | The companion's relay was refused. |
 | ``RESET_HISTORY_CLEAR_BUSY`` | Control is busy; reset history was not cleared. |
 | ``RESET_HISTORY_CONFIRMATION_REQUIRED`` | An explicit reset-history confirmation is required. |
 | ``RESET_HISTORY_NOT_CONFIRMED`` | Confirm reset-history clearing explicitly. |
 | ``SAVE_BUSY`` | Control is busy; nothing was saved. |
 | ``SCALE_FORGET_LOCKED_ACTIVE_CYCLE`` | The paired scale cannot be forgotten while a cycle is active. |
+| ``SCALE_JSON_BODY_REQUIRED`` | JSON body is required. |
+| ``SCALE_MAC_EMPTY_OR_BLE`` | mac must be empty or a BLE address AA:BB:CC:DD:EE:FF. |
+| ``SCALE_MAC_INVALID`` | mac must be a BLE address AA:BB:CC:DD:EE:FF. |
+| ``SCALE_MAC_STRING_REQUIRED`` | mac must be a string with the scale's BLE address. |
 | ``SCALE_NAME_LOCKED_ACTIVE_CYCLE`` | The scale name cannot be changed while a cycle is active. |
+| ``SCALE_NAME_RANGE`` | name must be 1-30 letters, digits, spaces, or hyphens (empty clears the friendly name). |
 | ``SCALE_NAME_SAVE_BUSY`` | Control is busy; the name was not saved. |
 | ``SCALE_PROFILE_BUSY`` | The scale profile is changing or already downloading. |
 | ``SCALE_PROFILE_CORRUPT`` | The saved scale profile failed its checksum. |
@@ -280,10 +307,12 @@ params substituted in order (see the example above).
 | ``SETUP_SSID_LENGTH`` | SSID must be 1–32 characters. |
 | ``SETUP_STATIC_FIELDS_INVALID`` | Static IP save requires valid ip, netmask, gateway, and dns1. |
 | ``SETUP_STATIC_SUBNET_INVALID`` | Static IP, netmask, gateway, and DNS must be valid and on the same subnet (not 192.168.4.x). |
+| ``SHOT_REACT_TIMEOUT_FIELD_INVALID`` | shotReactTimeoutS must be 0 (compiled default) or an integer from 3 to 30. |
 | ``STATUS_BUSY`` | Status snapshot is busy; retry shortly. |
 | ``TASK_PROFILER_UNCHANGED`` | Task profiler state was not changed. |
 | ``TIMEZONE_ALREADY_SET`` | The time zone was already saved. |
 | ``TIMEZONE_ID_CHOOSE`` | Choose a supported IANA time zone. |
+| ``TIMEZONE_ID_INVALID`` | timezoneId must be a supported IANA zone name. |
 | ``TIME_SYNC_DISABLED`` | Time sync is unavailable while the firmware is disabled. |
 | ``UNKNOWN_ROUTE`` | Unknown API route. |
 | ``UNKNOWN_SCALE`` | mac is not a known scale. |
@@ -294,6 +323,7 @@ params substituted in order (see the example above).
 | ``WEBHOOK_UNAVAILABLE`` | The webhook worker is unavailable or its queue is full. |
 | ``WIFI_SCAN_BUSY`` | Control is busy; scan was not started. |
 | ``WIFI_SCAN_REQUIRES_READY`` | Wi-Fi scanning is available only while Ready. |
+| ``ZONE_DETECTION_REQUIRES_TIMEZONE_ID`` | Zone detection requires timezoneId. |
 #### Companion pairing and relay
 
 | Reason | `message` sentence |

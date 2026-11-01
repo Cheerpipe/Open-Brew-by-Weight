@@ -18,7 +18,7 @@
   }
   if (html.indexOf(`id="${childId}"`) < html.indexOf('id="avoidAccidentalTouchEnabled"') ||
       !html.includes(`id="${childId}" type="checkbox" checked`) ||
-      !network.includes('touchStopFallbackEnabled must be a boolean.')) {
+      !network.includes('FIELD_BOOLEAN", "touchStopFallbackEnabled"')) {
     throw new Error('Touch fallback must be a default-ON subordinate setting');
   }
   const groups = runtimeJs.slice(runtimeJs.search(/function\s+updateConfigGroups\(\)\s*\{/),
@@ -107,8 +107,8 @@
           html.indexOf('id="autoTareOutsideBrew"') ||
       html.indexOf('id="retareAccessoryOutsideBrew"') >
           html.indexOf('id="autoTare"') ||
-      !network.includes('autoTareOutsideBrew must be a boolean.') ||
-      !network.includes('retareAccessoryOutsideBrew must be a boolean.') ||
+      !network.includes('FIELD_BOOLEAN", "autoTareOutsideBrew"') ||
+      !network.includes('FIELD_BOOLEAN", "retareAccessoryOutsideBrew"') ||
       !network.includes('"retareAccessoryOutsideBrew"') ||
       !firmwareCore.includes('candidate.autoTareOutsideBrew = command.config.autoTareOutsideBrew;')) {
     throw new Error('Idle tare must have an independent default-ON machine setting');

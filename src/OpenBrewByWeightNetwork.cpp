@@ -288,9 +288,9 @@ void fillSoftApSsid(char *out, size_t cap) {
   snprintf(out, cap, "%s", SOFT_AP_SSID_PREFIX);
 }
 
-const char *jsonParseFailureMessage(const char *fallback) {
+ValidationFailure jsonParseFailure(const ValidationFailure &fallback) {
   if (jsonArenaExhaustedRecently()) {
-    return "JSON too large for device buffer";
+    return validationFailure("JSON_TOO_LARGE");
   }
   return fallback;
 }

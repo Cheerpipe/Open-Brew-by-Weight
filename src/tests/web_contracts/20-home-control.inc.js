@@ -937,7 +937,7 @@ if (!statusSection || !statusSection[1].includes('class="lamp"') ||
     !domainHeader.includes('"first, prefer, or only"') ||
     network.includes('Always use this scale must be on or off.') ||
     network.includes('scaleMacCacheMode must be disabled or full.') ||
-    !network.includes('scaleMacCacheMode must be first, prefer, or only.') ||
+    !network.includes('FIELD_ENUM", "scaleMacCacheMode", "first, prefer, or only"') ||
     firmwareCore.includes('scaleMacCacheModeRequiresPreferred(candidate.scaleMacCacheMode)') ||
     scaleWorker.includes('coerceScalePreferenceModeToFirst') ||
     !scaleWorker.includes('First detected scale adopted: %s — %s') ||
@@ -1275,7 +1275,7 @@ if (!html.includes('<summary>Paddle</summary>') ||
     !codeIncludes(ui, "paddleMode:$('paddleMode')?['auto','natural','original']") ||
     !codeIncludes(ui, "if($('paddleMode'))$('paddleMode').value=") ||
     !network.includes('"paddleMode"') ||
-    !network.includes('paddleMode must be auto, natural or original.') ||
+    !network.includes('FIELD_ENUM", "paddleMode", "auto, natural or original"') ||
     !network.includes('jsonPaddleMode') ||
     !firmware.includes('machineApplyWorkflowConfig') ||
     !firmwareCore.includes('machineApplyWorkflowConfig(candidate, command.config)') ||
@@ -1427,15 +1427,13 @@ if (!html.includes('<summary>Switch</summary>') ||
     !network.includes('"stopPulseMs"') ||
     !network.includes('"momentaryStartEdge"') ||
     !network.includes('"reedConfirmTimeoutMs"') ||
-    !network.includes('stopPulseMs must be an integer from 50 to 1000.') ||
-    !network.includes('maxSinglePressMs must be an integer from 100 to 5000.') ||
-    !network.includes('momentaryStartEdge must be press or release.') ||
-    !network.includes(
-        'reedConfirmTimeoutMs must be an integer from 200 to 5000.') ||
+    !network.includes('FIELD_RANGE_INT", "stopPulseMs", "50", "1000"') ||
+    !network.includes('FIELD_RANGE_INT", "maxSinglePressMs", "100", "5000"') ||
+    !network.includes('FIELD_ENUM", "momentaryStartEdge", "press or release"') ||
+    !network.includes('FIELD_RANGE_INT", "reedConfirmTimeoutMs", "200", "5000"') ||
     !errorCatalog['err.config_shot_react_timeout_range'] ||
     !domainHeader.includes('validationFailure("CONFIG_SHOT_REACT_TIMEOUT_RANGE")') ||
-    !network.includes(
-        'shotReactTimeoutS must be 0 (compiled default) or an integer from 3 to 30.') ||
+    !network.includes('SHOT_REACT_TIMEOUT_FIELD_INVALID') ||
     !network.includes('jsonStopPulseMs') ||
     !network.includes('jsonMomentaryStartEdge') ||
     !network.includes('jsonReedConfirmTimeoutMs') ||
@@ -1504,7 +1502,7 @@ if (!html.includes('class="cfgGroup paddleOnly"><summary>Paddle</summary>') ||
     !codeIncludes(ui, 's.config.rinseEnabled===true') ||
     !codeIncludes(ui, 'rinseEnabled:$(\'rinseEnabled\').checked') ||
     !network.includes('"rinseEnabled"') ||
-    !network.includes('rinseEnabled must be a boolean.') ||
+    !network.includes('FIELD_BOOLEAN", "rinseEnabled"') ||
     !firmwareCore.includes('candidate.rinseEnabled = command.config.rinseEnabled') ||
     !firmware.includes('uint32_t rinseBegin(') ||
     !firmware.includes('UserIntent::REQUEST_RINSE') ||

@@ -54,7 +54,7 @@ esp_err_t OpenBrewByWeightNetwork::timeZonePreviewHandler(httpd_req_t *request) 
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   char zoneId[TIMEZONE_ID_CAPACITY] = {};
   uint32_t browserUtcSec = 0;
-  const char *error = nullptr;
+  ValidationFailure error;
   static const char *const fields[] = {"timezoneId", "browserUtcSec"};
   if (root == nullptr ||
       !jsonHasOnlyUniqueFields(root, fields, 2) ||
@@ -62,11 +62,12 @@ esp_err_t OpenBrewByWeightNetwork::timeZonePreviewHandler(httpd_req_t *request) 
       (jsonFieldPresent(root, "browserUtcSec") &&
        !jsonUint32(root, "browserUtcSec", browserUtcSec)) ||
       findTimeZone(zoneId) == nullptr)
-    error = "Choose a supported IANA time zone.";
+    error = validationFailure("TIMEZONE_ID_CHOOSE");
   cJSON_Delete(root);
   self.unlockJsonBody();
-  if (error != nullptr)
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_TIMEZONE", error, nullptr);
+  if (error.reason != nullptr)
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_TIMEZONE", nullptr,
+                     error.reason, error.params);
   const TimeStatusSnapshot clock = g_wallClock.snapshot(millis());
   const uint32_t utcSec = clock.utcSec != 0 ? clock.utcSec : browserUtcSec;
   int16_t offset = 0;
@@ -186,7 +187,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
       "powerManagementEnabled", "heroCardMode"};
-  const char *parseError = nullptr;
+  ValidationFailure parseError;
   size_t settingFieldCount = 0;
   if (root != nullptr) {
     for (cJSON *item = root->child; item != nullptr; item = item->next) {
@@ -199,344 +200,337 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   if (root == nullptr ||
       !jsonHasOnlyUniqueFields(root, fields,
                                sizeof(fields) / sizeof(fields[0]))) {
-    parseError = jsonParseFailureMessage(
-        "Config must be a JSON object with known fields and correct types.");
+    parseError = jsonParseFailure(validationFailure("CONFIG_FIELDS_INVALID"));
   } else if (settingFieldCount == 0) {
-    parseError = "Config patch must include at least one setting field.";
+    parseError = validationFailure("CONFIG_PATCH_EMPTY");
   } else if (jsonFieldPresent(root, "baseRevision") &&
              !jsonUint32(root, "baseRevision", baseRevision)) {
-    parseError = "baseRevision must be an integer.";
+    parseError = validationFailure("FIELD_INTEGER", "baseRevision");
   } else if (jsonFieldPresent(root, "goalWeightG") &&
              !jsonGoalWeightDg(root, "goalWeightG", candidate.goalWeightDg)) {
-    parseError = "goalWeightG must be a number from 10 to 200.";
+    parseError = validationFailure("FIELD_RANGE_NUMBER", "goalWeightG", "10", "200");
   } else if (jsonFieldPresent(root, "rinseEnabled") &&
              !jsonBoolean(root, "rinseEnabled", candidate.rinseEnabled)) {
-    parseError = "rinseEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "rinseEnabled");
   } else if (jsonFieldPresent(root, "rinseGestureMs") &&
              !jsonUint32(root, "rinseGestureMs", candidate.rinseGestureMs)) {
-    parseError = "rinseGestureMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "rinseGestureMs");
   } else if (jsonFieldPresent(root, "rinseDurationMs") &&
              !jsonUint32(root, "rinseDurationMs", candidate.rinseDurationMs)) {
-    parseError = "rinseDurationMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "rinseDurationMs");
   } else if (jsonFieldPresent(root, "operationalWallMs") &&
              !jsonUint32(root, "operationalWallMs",
                          candidate.operationalWallMs)) {
-    parseError = "operationalWallMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "operationalWallMs");
   } else if (jsonFieldPresent(root, "autoTare") &&
              !jsonBoolean(root, "autoTare", candidate.autoTare)) {
-    parseError = "autoTare must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "autoTare");
   } else if (jsonFieldPresent(root, "autoTareOutsideBrew") &&
              !jsonBoolean(root, "autoTareOutsideBrew", candidate.autoTareOutsideBrew)) {
-    parseError = "autoTareOutsideBrew must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "autoTareOutsideBrew");
   } else if (jsonFieldPresent(root, "retareAccessoryOutsideBrew") &&
              !jsonBoolean(root, "retareAccessoryOutsideBrew", parsedAccessoryRetare)) {
-    parseError = "retareAccessoryOutsideBrew must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "retareAccessoryOutsideBrew");
   } else if (jsonFieldPresent(root, "postTareBaselineGraceMs") &&
              !jsonUint32(root, "postTareBaselineGraceMs",
                          candidate.postTareBaselineGraceMs)) {
-    parseError = "postTareBaselineGraceMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "postTareBaselineGraceMs");
   } else if (jsonFieldPresent(root, "canTareStartTimer") &&
              !jsonBoolean(root, "canTareStartTimer",
                           candidate.canTareStartTimer)) {
-    parseError = "canTareStartTimer must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "canTareStartTimer");
   } else if (jsonFieldPresent(root, "scaleTimerStopExtraDelayMs") &&
              !jsonUint32(root, "scaleTimerStopExtraDelayMs",
                          candidate.scaleTimerStopExtraDelayMs)) {
-    parseError = "scaleTimerStopExtraDelayMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "scaleTimerStopExtraDelayMs");
   } else if (jsonFieldPresent(root, "dripDelayMs") &&
              !jsonUint32(root, "dripDelayMs", candidate.dripDelayMs)) {
-    parseError = "dripDelayMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "dripDelayMs");
   } else if (jsonFieldPresent(root, "soundAlertsEnabled") &&
              !jsonBoolean(root, "soundAlertsEnabled", soundAlertsEnabled)) {
-    parseError = "soundAlertsEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "soundAlertsEnabled");
   } else if (jsonFieldPresent(root, "firstDropBeep") &&
              !jsonBoolean(root, "firstDropBeep", candidate.firstDropBeep)) {
-    parseError = "firstDropBeep must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "firstDropBeep");
   } else if (bullseyeEnabledPresent &&
              !jsonBoolean(root, "bullseyeMelodyEnabled",
                           candidateBullseye.enabled)) {
-    parseError = "bullseyeMelodyEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "bullseyeMelodyEnabled");
   } else if (bullseyeRtttlPresent &&
              !jsonString(root, "bullseyeRtttl", candidateBullseye.rtttl,
                          sizeof(candidateBullseye.rtttl), true)) {
-    parseError = "bullseyeRtttl must be a string of at most 500 characters.";
+    parseError = validationFailure("FIELD_STRING_MAX", "bullseyeRtttl", "500");
   } else if (bullseyeConfigSpecified &&
              !validBullseyeMelodyConfig(candidateBullseye)) {
     parseError = candidateBullseye.enabled && candidateBullseye.rtttl[0] == '\0'
-                     ? "Bullseye melody needs an RTTTL tune when enabled."
-                     : "bullseyeRtttl must be valid single-line RTTTL (up to 250 notes).";
+                         ? validationFailure("BULLSEYE_MELODY_TUNE_REQUIRED")
+                         : validationFailure("BULLSEYE_RTTTL_INVALID");
   } else if (jsonFieldPresent(root, "scaleConnectedLed") &&
              !jsonBoolean(root, "scaleConnectedLed",
                           candidate.scaleConnectedLed)) {
-    parseError = "scaleConnectedLed must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "scaleConnectedLed");
   } else if (jsonFieldPresent(root, "paddleReturnReminderBeep") &&
              !jsonBoolean(root, "paddleReturnReminderBeep",
                           candidate.paddleReturnReminderBeep)) {
-    parseError = "paddleReturnReminderBeep must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "paddleReturnReminderBeep");
   } else if (jsonFieldPresent(root, "paddleReturnReminderIntervalMs") &&
              !jsonUint32(root, "paddleReturnReminderIntervalMs",
                          candidate.paddleReturnReminderIntervalMs)) {
-    parseError =
-        "paddleReturnReminderIntervalMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "paddleReturnReminderIntervalMs");
   } else if (jsonFieldPresent(root, "paddleReturnReminderMaxDurationMs") &&
              !jsonUint32(root, "paddleReturnReminderMaxDurationMs",
                          candidate.paddleReturnReminderMaxDurationMs)) {
-    parseError =
-        "paddleReturnReminderMaxDurationMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "paddleReturnReminderMaxDurationMs");
   } else if (jsonFieldPresent(root, "paddleMode") &&
              !jsonPaddleMode(root, "paddleMode", candidate.paddleMode)) {
-    parseError = "paddleMode must be auto, natural or original.";
+    parseError = validationFailure("FIELD_ENUM", "paddleMode", "auto, natural or original");
   } else if (jsonFieldPresent(root, "stopPulseMs") &&
              !jsonStopPulseMs(root, candidate)) {
-    parseError = "stopPulseMs must be an integer from 50 to 1000.";
+    parseError = validationFailure("FIELD_RANGE_INT", "stopPulseMs", "50", "1000");
   } else if (jsonFieldPresent(root, "maxSinglePressMs") &&
              !jsonMaxSinglePressMs(root, candidate)) {
-    parseError = "maxSinglePressMs must be an integer from 100 to 5000.";
+    parseError = validationFailure("FIELD_RANGE_INT", "maxSinglePressMs", "100", "5000");
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE != 0
   } else if (jsonFieldPresent(root, "momentaryStartEdge") &&
              !jsonMomentaryStartEdge(root, candidate)) {
-    parseError = "momentaryStartEdge must be press or release.";
+    parseError = validationFailure("FIELD_ENUM", "momentaryStartEdge", "press or release");
 #endif
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 2
   } else if (jsonFieldPresent(root, "reedConfirmTimeoutMs") &&
              !jsonReedConfirmTimeoutMs(root, candidate)) {
-    parseError = "reedConfirmTimeoutMs must be an integer from 200 to 5000.";
+    parseError = validationFailure("FIELD_RANGE_INT", "reedConfirmTimeoutMs", "200", "5000");
 #endif
   } else if (jsonFieldPresent(root, "assumeIdleWhenScaleConnects") &&
              !jsonAssumeIdleWhenScaleConnects(root, candidate)) {
-    parseError = "assumeIdleWhenScaleConnects must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "assumeIdleWhenScaleConnects");
   } else if (jsonFieldPresent(root, "shotReactTimeoutS") &&
              !jsonShotReactTimeoutS(root, candidate)) {
-    parseError =
-        "shotReactTimeoutS must be 0 (compiled default) or an integer from 3 to 30.";
+    parseError = validationFailure("SHOT_REACT_TIMEOUT_FIELD_INVALID");
   } else if (jsonFieldPresent(root, "buzzerScaleLostBeep") &&
              !jsonBoolean(root, "buzzerScaleLostBeep",
                           candidate.buzzerScaleLostBeep)) {
-    parseError = "buzzerScaleLostBeep must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleLostBeep");
   } else if (jsonFieldPresent(root, "buzzerAutoToManualGuardEndBeep") &&
              !jsonBoolean(root, "buzzerAutoToManualGuardEndBeep",
                           candidate.buzzerAutoToManualGuardEndBeep)) {
-    parseError = "buzzerAutoToManualGuardEndBeep must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "buzzerAutoToManualGuardEndBeep");
   } else if (jsonFieldPresent(root, "buzzerManualNoScaleBeep") &&
              !jsonBoolean(root, "buzzerManualNoScaleBeep",
                           candidate.buzzerManualNoScaleBeep)) {
-    parseError = "buzzerManualNoScaleBeep must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "buzzerManualNoScaleBeep");
   } else if (jsonFieldPresent(root, "buzzerScaleConnectedBeep") &&
              !jsonBoolean(root, "buzzerScaleConnectedBeep",
                           candidate.buzzerScaleConnectedBeep)) {
-    parseError = "buzzerScaleConnectedBeep must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleConnectedBeep");
   } else if (jsonFieldPresent(root, "buzzerExtendedPulseRate") &&
              !jsonExtendedPulseRate(root, "buzzerExtendedPulseRate",
                                     candidate.buzzerExtendedPulseRate)) {
-    parseError =
-        "buzzerExtendedPulseRate must be disabled, slow, medium, fast, or rapid.";
+    parseError = validationFailure("FIELD_ENUM", "buzzerExtendedPulseRate",
+                                   "disabled, slow, medium, fast, or rapid");
   } else if (jsonFieldPresent(root, "buzzerSlowExtendedPulseRate") &&
              !jsonExtendedPulseRate(root, "buzzerSlowExtendedPulseRate",
                                     candidate.buzzerSlowExtendedPulseRate)) {
-    parseError =
-        "buzzerSlowExtendedPulseRate must be disabled, slow, medium, fast, or "
-        "rapid.";
+    parseError = validationFailure("FIELD_ENUM", "buzzerSlowExtendedPulseRate",
+                                   "disabled, slow, medium, fast, or rapid");
   } else if (jsonFieldPresent(root, "alertOutputChannel") &&
              !jsonAlertOutputChannel(root, "alertOutputChannel",
                                      candidate.alertOutputChannel,
                                      /*optional=*/false)) {
-    parseError =
-        "alertOutputChannel must be scale_only, buzzer_only, or scale_priority.";
+    parseError = validationFailure("FIELD_ENUM", "alertOutputChannel",
+                                   "scale_only, buzzer_only, or scale_priority");
   } else if (jsonFieldPresent(root, "autoRetare") &&
              !jsonBoolean(root, "autoRetare", candidate.autoRetare)) {
-    parseError = "autoRetare must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "autoRetare");
   } else if (jsonFieldPresent(root, "retareWindowMs") &&
              !jsonUint32(root, "retareWindowMs", candidate.retareWindowMs)) {
-    parseError = "retareWindowMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "retareWindowMs");
   } else if (jsonFieldPresent(root, "minimumCupWeightG") &&
              !jsonFloat(root, "minimumCupWeightG",
                         candidate.minimumCupWeightG)) {
-    parseError = "minimumCupWeightG must be a number.";
+    parseError = validationFailure("FIELD_NUMBER", "minimumCupWeightG");
   } else if (jsonFieldPresent(root, "cupRemovedWeightG") &&
              !jsonFloat(root, "cupRemovedWeightG",
                         candidate.cupRemovedWeightG)) {
-    parseError = "cupRemovedWeightG must be a number.";
+    parseError = validationFailure("FIELD_NUMBER", "cupRemovedWeightG");
   } else if (jsonFieldPresent(root, "retareStabilitySamples") &&
              !jsonUint8(root, "retareStabilitySamples",
                         candidate.retareStabilitySamples)) {
-    parseError = "retareStabilitySamples must be an integer from 2 to 10.";
+    parseError = validationFailure("FIELD_RANGE_INT", "retareStabilitySamples", "2", "10");
   } else if (jsonFieldPresent(root, "retareStabilityToleranceG") &&
              !jsonFloat(root, "retareStabilityToleranceG",
                         candidate.retareStabilityToleranceG)) {
-    parseError = "retareStabilityToleranceG must be a number.";
+    parseError = validationFailure("FIELD_NUMBER", "retareStabilityToleranceG");
   } else if (jsonFieldPresent(root, "retareStabilityMaxGapMs") &&
              !jsonUint32(root, "retareStabilityMaxGapMs",
                          candidate.retareStabilityMaxGapMs)) {
-    parseError = "retareStabilityMaxGapMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "retareStabilityMaxGapMs");
   } else if (jsonFieldPresent(root, "retareStabilityMinDurationMs") &&
              !jsonUint32(root, "retareStabilityMinDurationMs",
                          candidate.retareStabilityMinDurationMs)) {
-    parseError =
-        "retareStabilityMinDurationMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "retareStabilityMinDurationMs");
   } else if (jsonFieldPresent(root, "bbwProtectionMs") &&
              !jsonUint32(root, "bbwProtectionMs", candidate.bbwProtectionMs)) {
-    parseError = "bbwProtectionMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "bbwProtectionMs");
   } else if (jsonFieldPresent(root, "fastExtractionGuardEnabled") &&
              !jsonBoolean(root, "fastExtractionGuardEnabled",
                           candidate.fastSideEnabled)) {
-    parseError = "fastExtractionGuardEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "fastExtractionGuardEnabled");
   } else if (jsonFieldPresent(root, "avoidAccidentalTouchEnabled") &&
              !jsonBoolean(root, "avoidAccidentalTouchEnabled",
                           candidate.avoidAccidentalTouchEnabled)) {
-    parseError = "avoidAccidentalTouchEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "avoidAccidentalTouchEnabled");
   } else if (jsonFieldPresent(root, "touchStopFallbackEnabled") &&
              !jsonBoolean(root, "touchStopFallbackEnabled",
                           candidate.touchStopFallbackEnabled)) {
-    parseError = "touchStopFallbackEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "touchStopFallbackEnabled");
   } else if (jsonFieldPresent(root, "cupProtectionEnabled") &&
              !jsonBoolean(root, "cupProtectionEnabled",
                           candidate.cupProtectionEnabled)) {
-    parseError = "cupProtectionEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "cupProtectionEnabled");
   } else if (jsonFieldPresent(root, "stopIfCupRemoved") &&
              !jsonBoolean(root, "stopIfCupRemoved", candidate.stopIfCupRemoved)) {
-    parseError = "stopIfCupRemoved must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "stopIfCupRemoved");
   } else if (jsonFieldPresent(root, "requireCupToStart") &&
              !jsonBoolean(root, "requireCupToStart", candidate.requireCupToStart)) {
-    parseError = "requireCupToStart must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "requireCupToStart");
   } else if (jsonFieldPresent(root, "fastBeforeS") &&
              !jsonSecondsMs(root, "fastBeforeS", candidate.fastBeforeMs)) {
-    parseError = "fastBeforeS must be a number of seconds.";
+    parseError = validationFailure("FIELD_SECONDS", "fastBeforeS");
   } else if (jsonFieldPresent(root, "fastMarginG") &&
              !jsonGramsDg(root, "fastMarginG", candidate.fastMarginDg)) {
-    parseError = "fastMarginG must be a number of grams.";
+    parseError = validationFailure("FIELD_GRAMS", "fastMarginG");
   } else if (jsonFieldPresent(root, "slowExtractionGuardEnabled") &&
              !jsonBoolean(root, "slowExtractionGuardEnabled",
                           candidate.slowSideEnabled)) {
-    parseError = "slowExtractionGuardEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "slowExtractionGuardEnabled");
   } else if (jsonFieldPresent(root, "slowAfterS") &&
              !jsonSecondsMs(root, "slowAfterS", candidate.slowAfterMs)) {
-    parseError = "slowAfterS must be a number of seconds.";
+    parseError = validationFailure("FIELD_SECONDS", "slowAfterS");
   } else if (jsonFieldPresent(root, "slowMarginG") &&
              !jsonGramsDg(root, "slowMarginG", candidate.slowMarginDg)) {
-    parseError = "slowMarginG must be a number of grams.";
+    parseError = validationFailure("FIELD_GRAMS", "slowMarginG");
   } else if (jsonFieldPresent(root, "fastRampS") &&
              !jsonRampMs(root, "fastRampS", candidate.fastRampMs)) {
-    parseError = "fastRampS must be a number of seconds.";
+    parseError = validationFailure("FIELD_SECONDS", "fastRampS");
   } else if (jsonFieldPresent(root, "fastCurve") &&
              !jsonRampChoice(root, "fastCurve", rampCurveName, RAMP_CURVE_TYPES,
                              candidate.fastCurve)) {
-    parseError = "fastCurve must be early, even or late.";
+    parseError = validationFailure("FIELD_ENUM", "fastCurve", "early, even or late");
   } else if (jsonFieldPresent(root, "fastCurveHardness") &&
              !jsonRampHardness(root, "fastCurveHardness", candidate.fastCurveHardness,
                                candidate.fastCurveHardnessPct)) {
-    parseError = "fastCurveHardness must be a number from 0 to 100.";
+    parseError = validationFailure("FIELD_RANGE_NUMBER", "fastCurveHardness", "0", "100");
   } else if (jsonFieldPresent(root, "slowRampS") &&
              !jsonRampMs(root, "slowRampS", candidate.slowRampMs)) {
-    parseError = "slowRampS must be a number of seconds.";
+    parseError = validationFailure("FIELD_SECONDS", "slowRampS");
   } else if (jsonFieldPresent(root, "slowCurve") &&
              !jsonRampChoice(root, "slowCurve", rampCurveName, RAMP_CURVE_TYPES,
                              candidate.slowCurve)) {
-    parseError = "slowCurve must be early, even or late.";
+    parseError = validationFailure("FIELD_ENUM", "slowCurve", "early, even or late");
   } else if (jsonFieldPresent(root, "slowCurveHardness") &&
              !jsonRampHardness(root, "slowCurveHardness", candidate.slowCurveHardness,
                                candidate.slowCurveHardnessPct)) {
-    parseError = "slowCurveHardness must be a number from 0 to 100.";
+    parseError = validationFailure("FIELD_RANGE_NUMBER", "slowCurveHardness", "0", "100");
   } else if (jsonFieldPresent(root, "autoToManualGuardEnabled") &&
              !jsonBoolean(root, "autoToManualGuardEnabled",
                           candidate.scaleLossEnabled)) {
-    parseError = "autoToManualGuardEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "autoToManualGuardEnabled");
   } else if (jsonFieldPresent(root, "scaleLossFixedS") &&
              !jsonSecondsMs(root, "scaleLossFixedS", candidate.scaleLossFixedMs)) {
-    parseError = "scaleLossFixedS must be a number of seconds.";
+    parseError = validationFailure("FIELD_SECONDS", "scaleLossFixedS");
   } else if (jsonFieldPresent(root, "weightOffsetBaselineG") &&
              !jsonFloat(root, "weightOffsetBaselineG",
                         candidate.weightOffsetBaselineG)) {
-    parseError = "weightOffsetBaselineG must be a number.";
+    parseError = validationFailure("FIELD_NUMBER", "weightOffsetBaselineG");
   } else if (timezoneIdPresent &&
              (!jsonString(root, "timezoneId", candidate.timezoneId,
                           sizeof(candidate.timezoneId), false) ||
               findTimeZone(candidate.timezoneId) == nullptr)) {
-    parseError = "timezoneId must be a supported IANA zone name.";
+    parseError = validationFailure("TIMEZONE_ID_INVALID");
   } else if (jsonFieldPresent(root, "timezoneAutoInit") &&
              !jsonBoolean(root, "timezoneAutoInit", timezoneAutoInit)) {
-    parseError = "timezoneAutoInit must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "timezoneAutoInit");
   } else if (jsonFieldPresent(root, "timezoneDetected") &&
              !jsonBoolean(root, "timezoneDetected", timezoneDetected)) {
-    parseError = "timezoneDetected must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "timezoneDetected");
   } else if (jsonFieldPresent(root, "timezoneAutomatic") &&
              !jsonBoolean(root, "timezoneAutomatic", timezoneAutomatic)) {
-    parseError = "timezoneAutomatic must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "timezoneAutomatic");
   } else if (jsonFieldPresent(root, "ntpSyncEnabled") &&
              !jsonBoolean(root, "ntpSyncEnabled", candidate.ntpSyncEnabled)) {
-    parseError = "ntpSyncEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "ntpSyncEnabled");
   } else if (jsonFieldPresent(root, "scheduledRestartEnabled") &&
              !jsonBoolean(root, "scheduledRestartEnabled",
                           scheduledRestartEnabled)) {
-    parseError = "scheduledRestartEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "scheduledRestartEnabled");
   } else if (jsonFieldPresent(root, "scheduledRestartMinuteOfDay") &&
              (!jsonUint32(root, "scheduledRestartMinuteOfDay",
                           scheduledRestartMinute) ||
               scheduledRestartMinute >= 24 * 60)) {
-    parseError =
-        "scheduledRestartMinuteOfDay must be an integer from 0 to 1439.";
+    parseError = validationFailure("FIELD_RANGE_INT", "scheduledRestartMinuteOfDay", "0", "1439");
   } else if (jsonFieldPresent(root, "ntpServerPreset") &&
              !jsonNtpPreset(root, "ntpServerPreset",
                             candidate.ntpServerPreset)) {
-    parseError = "ntpServerPreset must be pool, google, cloudflare, or nist.";
+    parseError = validationFailure("FIELD_ENUM", "ntpServerPreset",
+                                   "pool, google, cloudflare, or nist");
   } else if (jsonFieldPresent(root, "ntpServerCustom") &&
              !jsonString(root, "ntpServerCustom", customNtp, sizeof(customNtp),
                          true)) {
-    parseError = "ntpServerCustom must be a string of at most 63 characters.";
+    parseError = validationFailure("FIELD_STRING_MAX", "ntpServerCustom", "63");
   } else if (jsonFieldPresent(root, "scaleMacCacheMode") &&
              !jsonScaleMacCacheMode(root, "scaleMacCacheMode",
                                     candidate.scaleMacCacheMode)) {
-    parseError = "scaleMacCacheMode must be first, prefer, or only.";
+    parseError = validationFailure("FIELD_ENUM", "scaleMacCacheMode", "first, prefer, or only");
   } else if (preferredScaleSpecified &&
              (!jsonString(root, "preferredScaleMac", preferredScaleMac,
                           sizeof(preferredScaleMac), true) ||
               (preferredScaleMac[0] != '\0' &&
                !validPreferredScaleMac(preferredScaleMac)))) {
-    parseError = "preferredScaleMac must be empty or a BLE address AA:BB:CC:DD:EE:FF.";
+    parseError = validationFailure("PREFERRED_SCALE_MAC_INVALID");
   } else if (jsonFieldPresent(root, "bookooMuteOnBuzzerOnly") &&
              !jsonBoolean(root, "bookooMuteOnBuzzerOnly",
                           candidate.bookooMuteOnBuzzerOnly)) {
-    parseError = "bookooMuteOnBuzzerOnly must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "bookooMuteOnBuzzerOnly");
   } else if (jsonFieldPresent(root, "bookooConnectBeepLevel") &&
              (!jsonUint8(root, "bookooConnectBeepLevel",
                          candidate.bookooConnectBeepLevel) ||
               candidate.bookooConnectBeepLevel > BOOKOO_BEEP_LEVEL_MAX)) {
-    parseError = "bookooConnectBeepLevel must be an integer from 0 to 5.";
+    parseError = validationFailure("FIELD_RANGE_INT", "bookooConnectBeepLevel", "0", "5");
   } else if (jsonFieldPresent(root, "noScaleBbwMode") &&
              !jsonNoScaleBbwMode(root, "noScaleBbwMode", parsedNoScaleMode)) {
-    parseError =
-        "noScaleBbwMode must be off, warn_once, or require_scale.";
+    parseError = validationFailure("FIELD_ENUM", "noScaleBbwMode",
+                                   "off, warn_once, or require_scale");
   } else if (jsonFieldPresent(root, "noScaleAllowRinseWhileArmed") &&
              !jsonBoolean(root, "noScaleAllowRinseWhileArmed",
                           parsedAllowRinseWhileArmed)) {
-    parseError = "noScaleAllowRinseWhileArmed must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "noScaleAllowRinseWhileArmed");
   } else if (jsonFieldPresent(root, "lastShotCooldownMs") &&
              !jsonUint32(root, "lastShotCooldownMs",
                          candidate.lastShotCooldownMs)) {
-    parseError = "lastShotCooldownMs must be an integer (milliseconds).";
+    parseError = validationFailure("FIELD_INTEGER_MS", "lastShotCooldownMs");
   } else if (jsonFieldPresent(root, "serialLogLevel") &&
              !jsonLogLevel(root, "serialLogLevel", candidate.serialLogLevel)) {
-    parseError =
-        "serialLogLevel must be none, critical, error, warning, info, or debug.";
+    parseError = validationFailure("FIELD_ENUM", "serialLogLevel",
+                                   "none, critical, error, warning, info, or debug");
   } else if (jsonFieldPresent(root, "showDiagnosticPage") &&
              !jsonBoolean(root, "showDiagnosticPage", candidate.showDiagnosticPage)) {
-    parseError = "showDiagnosticPage must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "showDiagnosticPage");
   } else if (jsonFieldPresent(root, "heroCardMode") &&
              !jsonHeroCardMode(root, "heroCardMode", candidate.heroCardMode)) {
-    parseError = "heroCardMode must be technical or colorful.";
+    parseError = validationFailure("FIELD_ENUM", "heroCardMode", "technical or colorful");
   } else if (jsonFieldPresent(root, "ringRetainLogLevel") &&
              !jsonLogLevel(root, "ringRetainLogLevel",
                            candidate.ringRetainLogLevel)) {
-    parseError =
-        "ringRetainLogLevel must be none, critical, error, warning, info, or "
-        "debug.";
+    parseError = validationFailure("FIELD_ENUM", "ringRetainLogLevel",
+                                   "none, critical, error, warning, info, or debug");
   }
-  if (parseError == nullptr && jsonFieldPresent(root, "powerManagementEnabled") &&
+  if (parseError.reason == nullptr && jsonFieldPresent(root, "powerManagementEnabled") &&
       !jsonBoolean(root, "powerManagementEnabled", candidate.powerManagementEnabled)) {
-    parseError = "powerManagementEnabled must be a boolean.";
+    parseError = validationFailure("FIELD_BOOLEAN", "powerManagementEnabled");
   }
-  if (parseError == nullptr &&
+  if (parseError.reason == nullptr &&
       ((timezoneAutoInit || timezoneDetected) && !timezoneIdPresent)) {
-    parseError = "Zone detection requires timezoneId.";
+    parseError = validationFailure("ZONE_DETECTION_REQUIRES_TIMEZONE_ID");
   }
   if (root != nullptr) {
     static const char *const browserFields[] = {
@@ -549,9 +543,10 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
     cJSON_Delete(root);
   }
   self.unlockJsonBody();
-  if (parseError != nullptr) {
+  if (parseError.reason != nullptr) {
     memset(customNtp, 0, sizeof(customNtp));
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD", parseError, nullptr);
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD", nullptr,
+                   parseError.reason, parseError.params);
   }
   if (dateTimePatch && !browserTimezonePatch && !self.requireAdminUnlock(request)) {
     memset(customNtp, 0, sizeof(customNtp));
@@ -807,19 +802,19 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *requ
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   char mac[PREFERRED_SCALE_MAC_CAPACITY] = {};
   char name[PREFERRED_SCALE_NAME_CAPACITY] = {};
-  const char *parseError = nullptr;
+  ValidationFailure parseError;
   if (root == nullptr) {
-    parseError = jsonParseFailureMessage("JSON body is required.");
+    parseError = jsonParseFailure(validationFailure("SCALE_JSON_BODY_REQUIRED"));
   } else if (!jsonString(root, "mac", mac, sizeof(mac), true)) {
-    parseError = "mac must be a string (empty clears the preferred scale).";
+    parseError = validationFailure("PREFERRED_SCALE_MAC_STRING");
   } else if (mac[0] != '\0' && !validPreferredScaleMac(mac)) {
-    parseError = "mac must be empty or a BLE address AA:BB:CC:DD:EE:FF.";
+    parseError = validationFailure("SCALE_MAC_EMPTY_OR_BLE");
   } else {
     cJSON *nameItem = cJSON_GetObjectItemCaseSensitive(root, "name");
     if (nameItem != nullptr) {
       if (!jsonString(root, "name", name, sizeof(name), true) ||
           !validPreferredScaleName(name)) {
-        parseError = "name contains unsupported characters.";
+        parseError = validationFailure("PREFERRED_SCALE_NAME_INVALID");
       }
     }
   }
@@ -827,8 +822,9 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *requ
     cJSON_Delete(root);
   }
   self.unlockJsonBody();
-  if (parseError != nullptr) {
-    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", parseError, nullptr);
+  if (parseError.reason != nullptr) {
+    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", nullptr,
+                 parseError.reason, parseError.params);
   }
 
   WebCommand command;
@@ -861,29 +857,28 @@ esp_err_t OpenBrewByWeightNetwork::scaleFriendlyNameHandler(httpd_req_t *request
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   char mac[PREFERRED_SCALE_MAC_CAPACITY] = {};
   char name[PREFERRED_SCALE_NAME_CAPACITY] = {};
-  const char *parseError = nullptr;
+  ValidationFailure parseError;
   if (root == nullptr) {
-    parseError = jsonParseFailureMessage("JSON body is required.");
+    parseError = jsonParseFailure(validationFailure("SCALE_JSON_BODY_REQUIRED"));
   } else if (!jsonString(root, "mac", mac, sizeof(mac), true)) {
-    parseError = "mac must be a string with the scale's BLE address.";
+    parseError = validationFailure("SCALE_MAC_STRING_REQUIRED");
   } else if (!validPreferredScaleMac(mac) || mac[0] == '\0') {
-    parseError = "mac must be a BLE address AA:BB:CC:DD:EE:FF.";
+    parseError = validationFailure("SCALE_MAC_INVALID");
   } else {
     cJSON *nameItem = cJSON_GetObjectItemCaseSensitive(root, "name");
     if (nameItem != nullptr &&
         (!jsonString(root, "name", name, sizeof(name), true) ||
          !validScaleFriendlyName(name))) {
-      parseError =
-          "name must be 1-30 letters, digits, spaces, or hyphens "
-          "(empty clears the friendly name).";
+      parseError = validationFailure("SCALE_NAME_RANGE");
     }
   }
   if (root != nullptr) {
     cJSON_Delete(root);
   }
-  if (parseError != nullptr) {
+  if (parseError.reason != nullptr) {
     self.unlockJsonBody();
-    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", parseError, nullptr);
+    return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", nullptr,
+                 parseError.reason, parseError.params);
   }
 
   if (self.callbacks_.copyScaleHistory != nullptr) {
@@ -929,7 +924,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
   char action[24] = {};
   uint8_t presetId = 0;
   char presetName[SHOT_PRESET_NAME_CAPACITY] = {};
-  const char *parseError = nullptr;
+  ValidationFailure parseError;
   PresetAction presetAction = PresetAction::APPLY;
   WebCommand command;
   command.type = WebCommandType::PRESET_OP;
@@ -941,46 +936,46 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
 
   if (root == nullptr || !jsonString(root, "action", action, sizeof(action),
                                      false)) {
-    parseError = "action is required.";
+    parseError = validationFailure("FIELD_REQUIRED", "action");
   } else if (strcmp(action, "apply") == 0 || strcmp(action, "load") == 0) {
     presetAction = PresetAction::APPLY;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
-      parseError = "id must be a non-zero integer.";
+      parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "create") == 0 || strcmp(action, "new") == 0) {
     presetAction = PresetAction::CREATE;
   } else if (strcmp(action, "delete") == 0) {
     presetAction = PresetAction::DELETE;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
-      parseError = "id must be a non-zero integer.";
+      parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "duplicate") == 0) {
     presetAction = PresetAction::DUPLICATE;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
-      parseError = "id must be a non-zero integer.";
+      parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "rename") == 0) {
     presetAction = PresetAction::RENAME;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
-      parseError = "id must be a non-zero integer.";
+      parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     } else if (!jsonString(root, "name", presetName, sizeof(presetName),
                            false)) {
-      parseError = "name is required.";
+      parseError = validationFailure("FIELD_REQUIRED", "name");
     }
   } else if (strcmp(action, "restore_factory_values") == 0) {
     presetAction = PresetAction::RESTORE_FACTORY_VALUES;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
-      parseError = "id must be a non-zero integer.";
+      parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "new_coffee") == 0) {
     presetAction = PresetAction::NEW_COFFEE;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
-      parseError = "id must be a non-zero integer.";
+      parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "save") == 0 || strcmp(action, "update") == 0) {
     presetAction = PresetAction::SAVE;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
-      parseError = "id must be a non-zero integer.";
+      parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     } else {
       // A save is a patch: absent fields keep the stored preset value. Keys follow PresetRecipeField.
       static const char *const recipeKeys[] = {
@@ -998,7 +993,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
       bool brewByWeight = true, grindHints = true;
       RuntimeConfig &c = command.config;
       if (present == 0) {
-        parseError = "save requires at least one preset recipe field.";
+        parseError = validationFailure("PRESET_SAVE_FIELDS_REQUIRED");
       } else if (!((absent("brewByWeight") || jsonBoolean(root, "brewByWeight", brewByWeight)) &&
                    (absent("goalWeightG") || jsonGoalWeightDg(root, "goalWeightG", c.goalWeightDg)) &&
                    (absent("operationalWallMs") || jsonUint32(root, "operationalWallMs", c.operationalWallMs)) &&
@@ -1031,7 +1026,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
                                      c.slowCurveHardnessPct)) &&
                    (absent("doseG") || jsonGramsDg(root, "doseG", command.presetDoseDg)) &&
                    (absent("grindHintsEnabled") || jsonBoolean(root, "grindHintsEnabled", grindHints)))) {
-        parseError = "save has an invalid preset recipe field.";
+        parseError = validationFailure("PRESET_SAVE_FIELD_INVALID");
       } else {
         if (!absent("brewByWeight")) c.timerOnly = !brewByWeight;
         if (jsonFieldPresent(root, "grindHintsEnabled"))
@@ -1040,21 +1035,21 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
         const cJSON *alphaBase = cJSON_GetObjectItemCaseSensitive(root, "bbwAlphaBaseline");
         if (alphaBase && (!cJSON_IsNumber(alphaBase) ||
             !parseBbwAlphaBaseline(alphaBase->valuedouble, command.bbwAlphaBaseline)))
-          parseError = "bbwAlphaBaseline must be 0.01–1.00 in steps of 0.01.";
+          parseError = validationFailure("BBW_ALPHA_BASELINE_INVALID");
         uint8_t algorithm = 0;
         char algorithmName[20] = {};
         if (jsonFieldPresent(root, "bbwAlgorithm") &&
             (!jsonString(root, "bbwAlgorithm", algorithmName, sizeof(algorithmName), false) ||
              !parseBbwAlgorithm(algorithmName, algorithm)))
-          parseError = "bbwAlgorithm must be corridor.";
+          parseError = validationFailure("BBW_ALGORITHM_INVALID");
         if (jsonFieldPresent(root, "bbwAlpha") ||
             jsonFieldPresent(root, "bbwEwmaAlpha") ||
             jsonFieldPresent(root, "bbwAlphaLearned") ||
             jsonFieldPresent(root, "bbwEwmaOffsetG"))
-          parseError = "BBW learning state is read-only.";
+          parseError = validationFailure("BBW_LEARNING_READ_ONLY");
         const cJSON *micraTarget =
             cJSON_GetObjectItemCaseSensitive(root, "lineaMicraBrewTargetC");
-        if (parseError == nullptr && micraTarget != nullptr) {
+        if (parseError.reason == nullptr && micraTarget != nullptr) {
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
           const double scaled = cJSON_IsNumber(micraTarget)
                                     ? micraTarget->valuedouble * 10.0
@@ -1063,29 +1058,29 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
           if (!std::isfinite(scaled) || fabs(scaled - rounded) > 0.0001 ||
               rounded < LINEA_MICRA_BREW_TARGET_MIN_DECI_C ||
               rounded > LINEA_MICRA_BREW_TARGET_MAX_DECI_C) {
-            parseError =
-                "lineaMicraBrewTargetC must be 80.0–100.0 in 0.1 degree steps.";
+            parseError = validationFailure("LINEA_MICRA_PRESET_TARGET_RANGE");
           } else {
             command.lineaMicraBrewTargetSpecified = true;
             command.lineaMicraBrewTargetDeciC =
                 static_cast<uint16_t>(rounded);
           }
 #else
-          parseError = "Linea Micra preset temperature is not supported by this firmware.";
+          parseError = validationFailure("LINEA_MICRA_PRESET_TARGET_UNSUPPORTED");
 #endif
         }
       }
     }
   } else {
-    parseError = "Unknown preset action.";
+    parseError = validationFailure("PRESET_ACTION_UNKNOWN");
   }
 
   if (root != nullptr) {
     cJSON_Delete(root);
   }
   self.unlockJsonBody();
-  if (parseError != nullptr) {
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD", parseError, nullptr);
+  if (parseError.reason != nullptr) {
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD", nullptr,
+                   parseError.reason, parseError.params);
   }
 
   command.presetAction = static_cast<uint8_t>(presetAction);
