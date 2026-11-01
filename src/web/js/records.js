@@ -142,7 +142,10 @@ function createPopup(label, fill) {
     anchor = trigger;
     anchor.setAttribute("aria-expanded", "true");
     place();
-    panel.querySelector('[role^="menuitem"]')?.focus();
+    // Focus the panel host, not an item: an item focused by script matches
+    // :focus-visible after any keyboard use, ringing a pointer-opened menu.
+    panel.tabIndex = -1;
+    panel.focus();
   };
   document.addEventListener("click", (e) => {
     if (shown() && !panel.contains(e.target) && !anchor.contains(e.target)) close();
