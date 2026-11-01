@@ -20,7 +20,8 @@ const repoRoot = path.resolve(__dirname, '..');
 const catalogPath = path.join(repoRoot, 'src', 'web', 'locales', 'en.json');
 const runtimeJsPath = path.join(repoRoot, 'src', 'web', 'js', 'runtime.js');
 const networkHeaderPath = path.join(repoRoot, 'src', 'OpenBrewByWeightNetwork.h');
-const domainHeaderPath = path.join(repoRoot, 'src', 'OpenBrewByWeightDomain.h');
+const validationHeaderPath =
+    path.join(repoRoot, 'src', 'OpenBrewByWeightValidationFailure.h');
 const otaIncPath = path.join(repoRoot, 'src', 'network',
     'OpenBrewByWeightNetworkOta.inc');
 
@@ -44,7 +45,7 @@ function fail(message) {
 
 function scannedSources() {
   const dirs = ['src/network', 'src/diagnostics'];
-  const files = [networkHeaderPath, domainHeaderPath];
+  const files = [networkHeaderPath, validationHeaderPath];
   for (const dir of dirs) {
     for (const name of fs.readdirSync(path.join(repoRoot, dir))) {
       if (name.endsWith('.inc')) files.push(path.join(repoRoot, dir, name));

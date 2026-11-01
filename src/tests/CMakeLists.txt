@@ -25,7 +25,7 @@ add_custom_command(
           "${CMAKE_SOURCE_DIR}/src/web/locales/en.json"
           "${CMAKE_SOURCE_DIR}/src/web/js/runtime.js"
           "${CMAKE_SOURCE_DIR}/src/OpenBrewByWeightNetwork.h"
-          "${CMAKE_SOURCE_DIR}/src/OpenBrewByWeightDomain.h"
+          "${CMAKE_SOURCE_DIR}/src/OpenBrewByWeightValidationFailure.h"
           ${ERROR_REASON_TEXT_SOURCES}
   VERBATIM)
 add_custom_target(generate_error_reason_texts

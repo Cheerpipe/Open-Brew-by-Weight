@@ -1,6 +1,8 @@
 #pragma once
 
 #include "OpenBrewByWeightDomain.h"
+
+#include "OpenBrewByWeightValidationFailure.h"
 #include "OpenBrewByWeightAuditLog.h"
 #include "OpenBrewByWeightAuditStore.h"
 #include "OpenBrewByWeightDebugExport.h"
@@ -59,6 +61,7 @@ enum class WifiScanState : uint8_t {
 
 constexpr size_t MAX_WIFI_SCAN_RESULTS = 12;
 constexpr size_t kNetworkLogBatchSize = 32;
+
 
 struct WifiScanNetwork {
   char ssid[WIFI_SSID_CAPACITY] = {};

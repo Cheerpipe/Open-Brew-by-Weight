@@ -1,5 +1,6 @@
 #define OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST
 #include "../OpenBrewByWeightPersistence.h"
+#include "../OpenBrewByWeightValidationFailure.h"
 #include "../OpenBrewByWeightBleScanPersistence.h"
 #include "../OpenBrewByWeightWebAccessStore.h"
 #include "../OpenBrewByWeightDurableStores.h"
