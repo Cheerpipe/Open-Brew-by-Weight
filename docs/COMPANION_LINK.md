@@ -26,8 +26,9 @@ is not paired answers them and does nothing else.
   trusted.
 - Errors use `{"error":"STABLE_CODE","reason":"STABLE_REASON","message":"English diagnostic"}`.
   `reason` is an additive per-sentence code documented in
-  [Integration API](INTEGRATION_API.md#error-reasons); `error` and `message`
-  are unchanged.
+  [Integration API](INTEGRATION_API.md#error-reasons); `error` and `reason`
+  are the stable contract, while `message` is a non-normative debugging aid
+  whose wording may change in any release.
 - Byte strings are standard base64 with padding. Public keys are 65-byte
   uncompressed P-256 points.
 

@@ -81,14 +81,18 @@ Every error body carries a third field between `error` and `message`:
   sentence has one unique stable code, so a `reason` is always more specific
   than its `error` — several sentences share the coarse `error`
   `INVALID_REQUEST`, for example, while each keeps its own `reason`.
-- `message` is the same English prose as before, unchanged byte for byte.
-  Show it, log it, or ignore it when you map `reason` to your own text.
+  Reason codes are **permanent**: they never change meaning and are never
+  reused.
+- `message` is **non-normative**: a human debugging aid only. Its wording may
+  change in any release, so never parse, match on, or present it as stable
+  output — the contract is the HTTP status plus the `error` and `reason`
+  codes. Map `reason` to your own text for anything a person will read.
 - A few field-validation errors whose messages are built from the request's
   own field names still answer without a `reason`; treat a missing `reason`
   as unmapped and use `message`.
-- Reason codes are **permanent**: they never change meaning and are never
-  reused. The controller's Web UI maps them to its own translatable catalog
-  the same way (`reason` first, then `error`, then `message`).
+- The sentence behind each `reason` lives in one editable catalog (the Web UI
+  locale, `en.json`); the controller derives both its API prose and its Web
+  UI text from that catalog at build time, so the two can never drift apart.
 
 The 240 codes, grouped by the routes that answer with them:
 
