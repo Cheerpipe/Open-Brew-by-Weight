@@ -109,6 +109,27 @@ Versioning:
 - Consumed by the firmware host test `src/tests/stats_header_host_test.cpp`
   and by the companion's tests.
 
+## Companion record frames v1
+
+- [`companion-records-v1.vectors.json`](companion-records-v1.vectors.json):
+  the archive sync's link frames ([Companion link](../COMPANION_LINK.md)) as
+  the firmware builds them for a fixed store: each case names the companion's
+  `request` (`rx`, `rf`, `rt` or `ping`, without `q`; `null` for the `rs`
+  notice) and the controller's `frames` in send order, each the exact JSON
+  text after the MAC and the dot, `q` kept. Cases: both indexes (with and
+  without rows; the shots index lists the bad shot), a Stats fetch paged over
+  two frames, a History fetch, traces `ok`/`none`/`busy`, `rs` and the ping's
+  `hold` answer. The senders, the row formatter, the trace frame and the
+  sealer are the firmware's own; the store, its curves and the trace bytes
+  are fixtures, and the MAC is zeros (the link vectors cover it).
+- Regenerate after a deliberate frame change with
+  `COMPANION_RECORDS_REGENERATE=1 node src/tests/check_web_assets.js`, then
+  update the companion's copy. SHA-256 of the current file:
+  `57d33548e81a1f285f88d14120778370d68a58ef37948254c0a3ca734d21f64b`.
+- Produced and checked byte for byte by the web contract
+  `src/tests/web_contracts/27-companion-records-vectors.inc.js`; replayed by
+  the companion's sync tests.
+
 ## Formats written for other apps
 
 The Shots card menu also writes three third-party formats. They follow those
