@@ -699,6 +699,7 @@ function applyCompanionStatus(c) {
     $("companionCode").value = "";
     if (__LINEA_MICRA__) $("companionApproveLm").checked = true;
     $("companionApproveLog").checked = true;
+    $("companionApproveArchive").checked = true;
   }
   if (!c.paired) return;
   // Status polls keep the row fresh, except while it is asking.
@@ -731,6 +732,7 @@ function applyCompanionStatus(c) {
     $("companionUi").checked = c.ui !== false;
     if (__LINEA_MICRA__) $("companionLm").checked = !!c.lm;
     $("companionLog").checked = !!c.log;
+    $("companionArchive").checked = !!c.archive;
     R.uiState.companionBaseline = R.snapshotControls(companionSwitches());
   }
 }
@@ -753,6 +755,7 @@ async function saveCompanionSettings() {
         action: "switches",
         ui,
         log: $("companionLog").checked,
+        archive: $("companionArchive").checked,
         ...(__LINEA_MICRA__ && { lm: $("companionLm").checked }),
       },
       __WEBUI_TEXT__("admin.setting_saved"),
@@ -790,6 +793,7 @@ function initCompanion() {
           action: "approve",
           code: $("companionCode").value,
           log: $("companionApproveLog").checked,
+          archive: $("companionApproveArchive").checked,
           ...(__LINEA_MICRA__ && { lm: $("companionApproveLm").checked }),
         }),
       });
@@ -2315,7 +2319,14 @@ export function init() {
   $("otaFlashButton").onclick = otaFlash;
   $("otaDiscardButton").onclick = otaDiscard;
   $("factoryResetButton").onclick = () => {
-    if (confirm(__WEBUI_TEXT__("admin.restore_all_factory_settings_this_erases_wi")))
+    if (
+      confirm(
+        __WEBUI_TEXT__("admin.restore_all_factory_settings_this_erases_wi") +
+          (R.homeStatusCache()?.companion?.archive
+            ? " " + __WEBUI_TEXT__("admin.factory_reset_archive_kept")
+            : ""),
+      )
+    )
       R.command("/api/v1/factory-reset", { confirm: "ERASE_ALL_SETTINGS" });
   };
   R.populateTimezoneOptions().catch(() => {});

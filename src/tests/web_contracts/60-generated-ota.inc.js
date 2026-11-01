@@ -708,7 +708,8 @@ if (wifiScanStatusStart < 0 ||
 }
 if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive())return;scanBusy=true') ||
     !codeIncludes(js, "withCommandGate(async()=>{try{await api('/api/v1/stats/clear'") ||
-    !codeIncludes(js, "withCommandGate(async()=>{try{await api('/api/v1/stats/delete'") ||
+    !codeIncludes(js, "withCommandGate(async()=>{try{await removeRecord('shots',r,scope,'/api/v1/stats/delete'") ||
+    !codeIncludes(js, "await api(path,{method:'POST',body:body({id:r.id})})") ||
     !codeIncludes(js, "await api('/api/v1/stats/rate'") ||
     codeIncludes(js, "withCommandGate(async()=>{try{await api('/api/v1/logout'")) {
   throw new Error('Wi-Fi scan and shot clear/delete must use poll/command gates without login');

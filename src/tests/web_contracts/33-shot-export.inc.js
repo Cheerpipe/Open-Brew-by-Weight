@@ -489,11 +489,11 @@
   assert.ok(partialHtml.stats.includes('id="exportShotsButton" class="btnGlyph" type="button" aria-haspopup="true" aria-expanded="false"'));
   assert.ok(codeIncludes(viewJs.stats, '$("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"))'));
   assert.ok(codeIncludes(viewJs.stats, 'btn.onclick = () => shotMenu.open(btn, r)'));
-  assert.ok(codeIncludes(viewJs.stats, '() => deleteOneShot(r.id), true]'));
+  assert.ok(codeIncludes(viewJs.stats, '(scope) => deleteOneShot(r, scope)'));
   assert.ok(!codeIncludes(viewJs.stats, 'btnGlyph btnDanger'));
   assert.ok(!codeIncludes(viewJs.history, 'btnGlyph btnDanger'));
   assert.ok(codeIncludes(viewJs.history, 'btn.onclick = () => entryMenu.open(btn, r)'));
-  assert.ok(codeIncludes(viewJs.history, '() => deleteOneHistory(r.id), true]'));
+  assert.ok(codeIncludes(viewJs.history, '(scope) => deleteOneHistory(r, scope)'));
   assert.ok(codeIncludes(viewJs.stats, 'filter = {}'), 'Exports ignore the list filter');
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'async function exportRows('),
       'statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3, filter)'));

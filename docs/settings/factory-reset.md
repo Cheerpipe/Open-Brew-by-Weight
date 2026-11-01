@@ -16,6 +16,10 @@ calibration (including the learned offset), preferred scale,
 shot history, activation history, and saved crash records on 16 MB controllers.
 The saved time zone and its first-detection record are also erased; the next
 authorized Web UI setup can detect a zone again.
+A paired [companion](../features/companion.md) is forgotten on the controller,
+but it keeps everything it copied, including its shot archive: pair the
+controller with it again and the archive carries on, with your history from
+before the reset kept as an earlier history.
 On Linea Micra firmware it also erases
 the cloud account credentials, installation key, selected machine, and session.
 Presets return to the five factory presets (Double · Adaptive, Single · Adaptive,

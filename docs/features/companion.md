@@ -39,6 +39,12 @@ does today.
   log, so the Diagnostic page can page back beyond what the controller holds
   in memory, across restarts, and even while the controller is off. See
   [The diagnostic log's history](#the-diagnostic-logs-history) below.
+- **Keeps every shot and activation.** With the **Shot archive in the
+  companion** switch on, the companion copies each shot and activation,
+  including the ones made while it was away, and keeps them after the
+  controller lets them go. Opened through the companion, Stats and History
+  show your whole history. See [Your whole history](#your-whole-history)
+  below.
 
 If the companion stops, the controller reconnects to La Marzocco on its own.
 During a shot with a scale it waits until the shot is over, so nothing
@@ -146,6 +152,11 @@ has one switch per job:
     disturbed.
   - **Off:** the controller's log stays in its own memory only, exactly as it
     does without a companion. The companion keeps what it already stored.
+- **Shot archive in the companion** (on by default).
+  - **On:** the companion copies every shot and activation and keeps them
+    when the controller no longer does. Stats and History opened through the
+    companion show them all.
+  - **Off:** the companion stops copying and keeps what it already has.
 
 Save and Revert work like the rest of Admin.
 
@@ -181,17 +192,91 @@ Diagnostic → Companion also shows the log stream's health: whether it is on,
 when the companion last copied events, and how many events were reported
 missing while the companion was away.
 
+## Your whole history
+
+The controller keeps your newest 1,000 shots and 1,000 activations. With
+**Shot archive in the companion** on, the companion keeps a copy of all of
+them, and keeps them when the controller no longer does:
+
+- shots and activations older than the controller's newest 1,000;
+- your earlier history after **Clear history** or a factory reset: the
+  controller starts counting again from #1, and the companion keeps what came
+  before;
+- records you removed from the controller but chose to keep.
+
+The companion catches up by itself whenever it connects, so shots made while
+it was off are copied too. Only one thing can be missed: if the controller
+records more than 1,000 shots before the companion is back, the oldest of
+them are gone before it can copy them, and the list says so where the gap
+is. Nothing is copied during a shot, nor while the machine is busy (a rinse,
+a backflush, a scale connecting): the copying waits until it is over, so it
+never competes with your scale.
+
+**Through the companion**, Stats and History are one list. Sorting and
+filters work on the whole history, newest or oldest first, by rating, by
+preset, by scale and by result. Records only the companion keeps have a grey
+number badge: hover or long-press it to read **Kept by the companion**. Since
+numbers restart after a Clear or a factory reset, a list sorted by date shows
+a line such as **History restarted on 3 Mar 2026** where an earlier history
+begins; in other orders the badge's description names that date.
+
+The averages and charts at the top of Stats also cover your whole history,
+built by the companion. You can pick how many of your newest shots they
+cover: 10, 50 and 100, plus 500 and 1,000 through the companion. Only the
+choices that make a difference are offered: every size smaller than the
+number of shots in the list, plus the first one that covers them all, and no
+choice at all with ten shots or fewer. Filtering the list down to fewer
+shots moves the selection to the largest size still offered. Opened
+directly, the controller offers 10, 50 and 100 by the same rule. Home
+Assistant's statistics stay the controller's own: its newest ten shots.
+
+**Opened directly**, Stats and History show what the controller holds, and
+end with a note that the companion keeps a copy, including older records.
+
+### Deleting records
+
+A shot or activation's **⋯** menu offers, through the companion:
+
+- **Delete everywhere**: from the controller and from the companion.
+- **Remove from the controller only**: the companion keeps its copy.
+- **Remove from the archive only**: the controller keeps it, and the
+  companion does not copy it again.
+
+A record only the companion keeps offers **Delete from the archive**, which
+cannot be undone. Opened directly, **Delete** removes the record from the
+controller, and the companion deletes its copy at its next sync, unless its
+**Keep records deleted on the controller** setting is on.
+
+**Clear history** through the companion offers **Also delete the companion's
+copy**, unchecked: left alone, the companion keeps everything, and your
+earlier history stays in the list. Opened directly, Clear history and a
+factory reset leave the companion's copy as it is.
+
+The companion's own page (its address, then **Companion**) has an **Archive**
+section: how many records it keeps and how much space they use, each earlier
+history with the date it restarted, any gaps, **Export** (a download of
+everything), the **Keep records deleted on the controller** setting, and
+deletes for one earlier history, a date range, shots or activations only, or
+everything. Each asks first and suggests exporting before you delete.
+
+The archive opens only for a browser the controller lets open the Web UI, as
+the log's history does, and never over plain HTTP.
+
 ## Forgetting a companion
 
 **Forget** in Admin → Companion removes the pairing. The companion learns it
 the next time it tries to connect and deletes everything it received from
-the controller, including any La Marzocco account, even if it was off when
-you tapped Forget. Its screens can still open the Web UI, one at a time, the
-way any HTTPS proxy does.
+the controller, including any La Marzocco account, the diagnostic log's
+history and the shot archive, even if it was off when you tapped Forget. To
+keep your records, export the archive from the companion's page first. Its
+screens can still open the Web UI, one at a time, the way any HTTPS proxy
+does.
 
 A factory reset forgets the companion on the controller only. The companion
-can no longer connect, but it keeps anything it received until you erase its
-pairing on the companion's own page.
+can no longer connect, but it keeps everything it received, the archive
+included. Pair the controller with it again and the companion picks up its
+archive where it left off, with the history before the reset kept as an
+earlier history.
 
 ## Checking that it works
 
@@ -202,7 +287,8 @@ through another HTTPS proxy. **Companion** shows what the controller knows:
 whether a companion is paired, its name, address and version, whether the
 link is up or down and for how long, how often it reconnected, whether
 **Web UI relay** is on and ready (with how many relayed requests the
-controller refused), and the **Diagnostic log** stream's state. On a Linea
+controller refused), the **Diagnostic log** stream's state, and the **Shot
+archive**: whether it is on and when the controller last sent records. On a Linea
 Micra it also shows whether the La Marzocco
 connection currently runs through the companion or directly, with the
 reason. While it runs through the companion, **La Marzocco cloud →

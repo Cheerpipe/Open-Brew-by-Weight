@@ -819,7 +819,9 @@ function shotRunning() {
 async function fetchShotTrace(r) {
   for (let tries = 0; ; tries++) {
     try {
-      const url = `/api/v1/diagnostic/shot-trace?id=${r.id}&boot=${r.bootId}&end=${r.endedAtMs}`;
+      const url =
+        (r._archive ? "/__companion/archive/trace" : "/api/v1/diagnostic/shot-trace") +
+        `?id=${r.id}&boot=${r.bootId}&end=${r.endedAtMs}`;
       return await (await apiBinary(url, null, "default")).arrayBuffer();
     } catch (e) {
       if (e.status === 404) return null;
@@ -6538,18 +6540,27 @@ async function startNewCoffee(id = presetState.activeId) {
   if (p && (await askConfirm(text, __WEBUI_TEXT__("settings.new_coffee"))))
     command("/api/v1/presets", { action: "new_coffee", id });
 }
-// [Cancel][<ok>] confirmation in the shell dialog; resolves true on <ok>.
-function askConfirm(text, ok, danger = false) {
+// [Cancel][<ok>] confirmation in the shell dialog; resolves true on <ok>,
+// or "option" when the optional, unchecked box was ticked.
+function askConfirm(text, ok, danger = false, option = "") {
   const d = $("confirmDialog"),
     b = $("confirmOk");
   $("confirmText").textContent = text;
+  $("confirmOptionRow").hidden = !option;
+  $("confirmOptionText").textContent = option;
+  $("confirmOption").checked = false;
   b.firstChild.textContent = ok;
   b.classList.toggle("btnInvert", !danger);
   b.classList.toggle("btnDanger", danger);
   d.returnValue = "";
   d.showModal();
   return new Promise((done) =>
-    d.addEventListener("close", () => done(d.returnValue === "ok"), { once: true }),
+    d.addEventListener(
+      "close",
+      () =>
+        done(d.returnValue === "ok" && (option && $("confirmOption").checked ? "option" : true)),
+      { once: true },
+    ),
   );
 }
 // "Last 10 shots: 28–33 s, median 30.4 s": arrival times since the preset's

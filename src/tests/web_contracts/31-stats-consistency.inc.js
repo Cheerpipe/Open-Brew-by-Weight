@@ -68,14 +68,43 @@
 {
   const assert = require('assert');
   const filled = [];
-  new Function('$', 'R', '__WEBUI_TEXT__', 'renderStatsDurChart',
+  const header = {avgDurationS: 1, avgYieldG: 2, shotsPerDay: 3, avgErrorPct: 4, avgFlowGps: 5,
+    shotCount: 10};
+  new Function('$', 'R', '__WEBUI_TEXT__', 'renderStatsDurChart', 'statsHeader', 'statsWindowChoices',
       `${blockAt(rawViewJs.stats, 'function renderShotStats(')};renderShotStats();`)(
       (id) => (filled.push(id), {classList: {toggle() {}}, querySelectorAll: () => []}),
-      {uiState: {shotStats: {avgDurationS: 1, avgYieldG: 2, shotsPerDay: 3, avgErrorPct: 4,
-        avgFlowGps: 5, shotCount: 10}, statsWindow: 10}, sub: (t, v) => t + v},
-      (key) => 'translated ' + key, () => {});
+      {uiState: {shotStats: header, statsWindow: 10}, sub: (t, v) => t + v},
+      (key) => 'translated ' + key, () => {}, () => header, () => {});
   assert.deepEqual(filled, ['statsAvgDur', 'statsAvgWeight', 'statsAvgDaily', 'statsAvgErr',
-    'statsAvgFlow', 'statsWindowHint', 'statsWindow']);
+    'statsAvgFlow', 'statsWindowHint']);
+}
+// S18: the window choices are every window smaller than the good shots the
+// list holds, plus the smallest one covering them; none up to ten. The
+// companion's merged header adds 500 and 1000; a hidden selection falls back.
+{
+  const assert = require('assert');
+  const choices = (n, merged, selected) => {
+    const buttons = [10, 50, 100, 500, 1000].map((v) => ({dataset: {v: String(v)}, hidden: false,
+      setAttribute() {}}));
+    const group = {hidden: false, querySelectorAll: () => buttons};
+    const sent = [];
+    const uiState = {statsWindow: selected};
+    new Function('$', 'R', 'statsMergedGood', 'statsGood', 'statsMerged', 'statsSynced',
+        'sendStatsWindow', `${blockAt(rawViewJs.stats, 'function statsWindowChoices(')};statsWindowChoices();`)(
+        () => group, {uiState}, merged ? n : null, n, merged ? {} : null, true,
+        () => sent.push(uiState.statsWindow));
+    return {shown: group.hidden ? [] : buttons.filter((b) => !b.hidden).map((b) => +b.dataset.v),
+      selected: uiState.statsWindow, sent};
+  };
+  assert.deepEqual(choices(1, false, 10).shown, []);
+  assert.deepEqual(choices(10, false, 10).shown, []);
+  assert.deepEqual(choices(11, false, 10).shown, [10, 50]);
+  assert.deepEqual(choices(51, false, 10).shown, [10, 50, 100]);
+  assert.deepEqual(choices(134, false, 10).shown, [10, 50, 100]);
+  assert.deepEqual(choices(134, true, 10).shown, [10, 50, 100, 500]);
+  assert.deepEqual(choices(501, true, 10).shown, [10, 50, 100, 500, 1000]);
+  const fallen = choices(30, true, 500);
+  assert.deepEqual([fallen.selected, fallen.sent], [50, [50]], 'a hidden window falls to the largest shown');
 }
 // Stats and History render cost: one curve model per shot row and CSV line, a
 // rated star keeps keyboard focus, label layout sleeps off Stats, and History

@@ -77,7 +77,9 @@
       <div id="statsWindow" class="shotSort" role="group" aria-label="{{webui:stats.stats_window}}">
         <span class="sortLbl">{{webui:stats.last}}</span
         ><button type="button" data-v="10">10</button><button type="button" data-v="50">50</button
-        ><button type="button" data-v="100">100</button>
+        ><button type="button" data-v="100">100</button
+        ><button type="button" data-v="500" hidden>500</button
+        ><button type="button" data-v="1000" hidden>1000</button>
       </div>
     </div>
     <div id="statsDurChart"></div>
@@ -155,6 +157,7 @@
       <tbody id="shotRows"></tbody>
     </table>
     <div id="shotLogSentinel" hidden></div>
+    <p id="shotArchiveNote" class="fieldHint" hidden>{{webui:records.archive_direct}}</p>
   </div>
 </fieldset>
 <dialog id="shotTraceDialog" aria-labelledby="shotTraceTitle">

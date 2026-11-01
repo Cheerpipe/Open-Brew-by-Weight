@@ -326,3 +326,224 @@ async function syncOfflineStore(store, fetchWindow, place, meta = () => ({})) {
     offlineSyncing[store] = false;
   }
 }
+// The companion archive (plan 2A). Through the companion a list is one
+// history: the controller's rows and the records only the companion keeps
+// (older ones, earlier histories before a Clear or a factory reset, records
+// removed from the controller but kept), filtered and ordered alike on both
+// sides and merged page by page. The companion answers only a screen the
+// controller lets in.
+const archiveSources = {};
+function archiveReady(store) {
+  const a = R.uiState.companionHere?.archive;
+  return !!(a?.available && a[store] > 0);
+}
+async function companionArchive(path, body) {
+  const reply = await fetch("/__companion/archive/" + path, {
+    cache: "no-store",
+    ...(body && { method: "POST", body: JSON.stringify(body) }),
+    headers: R.webUiHeaders(body && { "Content-Type": "application/json" }),
+  });
+  const data = await reply.json().catch(() => null);
+  if (!reply.ok) throw Object.assign(Error(data?.message || String(reply.status)), data);
+  return data;
+}
+// The archive's rows for this view's filter and order (a change starts over).
+function archiveSource(store, query) {
+  if (!archiveReady(store)) return null;
+  const key = JSON.stringify(query);
+  if (archiveSources[store]?.key !== key)
+    archiveSources[store] = { key, query, rows: [], next: null, done: false };
+  return archiveSources[store];
+}
+async function loadArchive(store, render) {
+  const s = archiveSources[store];
+  if (!s || s.busy || s.done) return;
+  s.busy = true;
+  try {
+    const q = new URLSearchParams({ limit: store === "shots" ? 20 : 50, ...s.query });
+    if (s.next) q.set("cursor", s.next);
+    const j = await companionArchive(store + "?" + q);
+    if (archiveSources[store] !== s) return;
+    // Not enumerable: exports and the offline copy never see it.
+    s.rows.push(...j.rows.map((r) => Object.defineProperty(r, "_archive", { value: s })));
+    Object.assign(s, { next: j.next, done: !j.next, holes: j.holes || [] });
+    Object.assign(s, { gens: j.generations || [], presets: j.presets || [] });
+  } catch (_) {
+    s.done = true;
+  } finally {
+    s.busy = false;
+  }
+  render();
+}
+// The view's order over both sources, the controller's own: by date the
+// history generation and then the id (ids restart with a generation); by
+// rating unrated last, the rating in `dir`, then generation and id newest
+// first. Controller rows belong to the companion's open generation.
+function recordOrder(s, sort, dir) {
+  const open = s?.gens?.find((g) => g.current)?.generation ?? Infinity,
+    gen = (r) => (r._archive ? r.archiveGeneration : open),
+    newest = (a, b) => gen(b) - gen(a) || b.id - a.id;
+  if (sort !== "rating") return dir === "asc" ? (a, b) => newest(b, a) : newest;
+  return (a, b) =>
+    !a.rating - !b.rating ||
+    (dir === "asc" ? a.rating - b.rating : b.rating - a.rating) ||
+    newest(a, b);
+}
+// The merged list: every row up to the first one a source still has to send,
+// and which source pages next (`need`).
+function mergeRecords(own, ownMore, s, order) {
+  if (!s || (!s.rows.length && !s.done))
+    return { list: own, need: s && !s.done ? "archive" : null };
+  const list = own.concat(s.rows).sort(order),
+    cut = (more, rows) => (more && rows.length ? list.indexOf(rows.at(-1)) + 1 : list.length),
+    ownCut = cut(ownMore, own),
+    archiveCut = cut(!s.done, s.rows);
+  return {
+    list: list.slice(0, Math.min(ownCut, archiveCut)),
+    need: ownMore && ownCut <= archiveCut ? "own" : s.done ? null : "archive",
+  };
+}
+// Rows kept only by the companion are marked so, never by colour alone.
+function archiveMark(el, r) {
+  if (!r._archive) return;
+  // A closed history ended when the next one opened (its restartedAt).
+  const before = r._archive.gens?.find(
+    (g) => g.generation === r.archiveGeneration + 1,
+  )?.restartedAt;
+  el.classList.add("archiveKept");
+  el.title =
+    __WEBUI_TEXT__("records.archive_kept") +
+    (before ? " · " + R.sub(__WEBUI_TEXT__("records.archive_before"), [archiveDate(before)]) : "");
+  el.setAttribute("aria-label", el.textContent + ", " + el.title);
+}
+const archiveDate = (at) => new Date(at * 1e3).toLocaleDateString([], { dateStyle: "medium" });
+// Date-ordered lists: a line where an earlier history begins and where the
+// companion could not copy records. Returns whether it added one.
+function archiveHeadings(body, list, i, columns, s, byDate) {
+  const r = list[i],
+    prev = list[i - 1],
+    gen = (x) => (x._archive ? x.archiveGeneration : s?.gens?.find((g) => g.current)?.generation),
+    head = (text) => {
+      const row = body.insertRow();
+      row.className = "histDay";
+      row.append(
+        Object.assign(document.createElement("th"), { colSpan: columns, textContent: text }),
+      );
+      return true;
+    };
+  if (!s || !byDate || !prev) return false;
+  let added = false;
+  if (gen(prev) !== gen(r)) {
+    const newer = Math.max(gen(prev), gen(r)),
+      at = s.gens?.find((g) => g.generation === newer)?.restartedAt;
+    added = head(
+      at
+        ? R.sub(__WEBUI_TEXT__("records.archive_restarted"), [archiveDate(at)])
+        : __WEBUI_TEXT__("records.archive_earlier"),
+    );
+  }
+  for (const h of s.holes || [])
+    if (
+      Math.min(prev.id, r.id) <= h.below &&
+      Math.max(prev.id, r.id) >= h.above &&
+      gen(r) === h.generation &&
+      gen(prev) === h.generation
+    )
+      added = head(R.sub(__WEBUI_TEXT__("records.archive_hole"), [h.count]));
+  return added;
+}
+// The archive's switch as this screen sees it: through the companion, its
+// own status; opened directly, the controller's Home model.
+const archiveHere = () => !!R.uiState.companionHere?.archive?.on;
+const archiveDirect = () => !R.uiState.companionHere && !!R.homeStatusCache()?.companion?.archive;
+// One record's deletion scopes for its row menu: an archive row is the
+// companion's alone; through the companion a record the controller holds can
+// also leave one place only (S5).
+function deleteScopes(r, label, run) {
+  if (r._archive)
+    return [
+      [ICON_TRASH, __WEBUI_TEXT__("records.delete_archive_row"), "", () => run("archive"), true],
+    ];
+  if (!archiveHere()) return [[ICON_TRASH, label, "", () => run("everywhere"), true]];
+  return [
+    [ICON_TRASH, __WEBUI_TEXT__("records.delete_everywhere"), "", () => run("everywhere"), true],
+    [
+      ICON_TRASH,
+      __WEBUI_TEXT__("records.delete_keep"),
+      __WEBUI_TEXT__("records.delete_keep_hint"),
+      () => run("controller"),
+      true,
+    ],
+    [
+      ICON_TRASH,
+      __WEBUI_TEXT__("records.delete_archive_only"),
+      __WEBUI_TEXT__("records.delete_archive_only_hint"),
+      () => run("archive"),
+      true,
+    ],
+  ];
+}
+function confirmRemoval(r, scope, plain) {
+  const text = r._archive
+    ? __WEBUI_TEXT__("records.delete_archive_row_confirm")
+    : scope === "archive"
+      ? __WEBUI_TEXT__("records.delete_archive_only_confirm")
+      : scope === "controller"
+        ? __WEBUI_TEXT__("records.delete_keep_confirm")
+        : plain +
+          (archiveHere()
+            ? " " + __WEBUI_TEXT__("records.delete_everywhere_note")
+            : archiveDirect()
+              ? " " + __WEBUI_TEXT__("records.delete_direct_note")
+              : "");
+  return R.askConfirm(text, __WEBUI_TEXT__("records.delete"), true);
+}
+// Runs a scope on a record. The controller goes first, so a refused delete (a
+// shot running) leaves the archive as it was; `drop()` removes the row from
+// the controller's list, `render()` repaints.
+async function removeRecord(store, r, scope, path, drop, render) {
+  const archive = (action) =>
+    companionArchive(action, {
+      store,
+      id: r.id,
+      ...(r._archive && action === "delete" && { generation: r.archiveGeneration }),
+    });
+  if (scope === "archive")
+    try {
+      await archive("delete");
+      if (r._archive) r._archive.rows = r._archive.rows.filter((x) => x !== r);
+      render();
+      return R.message(__WEBUI_TEXT__("records.archive_removed"), "ok");
+    } catch (e) {
+      return R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error");
+    }
+  if (scope === "controller") await archive("keep");
+  await R.api(path, { method: "POST", body: R.body({ id: r.id }) });
+  if (scope === "everywhere" && archiveHere()) await archive("delete").catch(() => {});
+  drop();
+  render();
+}
+// Clear history's confirmation: through the companion it may also delete the
+// companion's copy of the current history (unchecked); opened directly it
+// says the companion keeps its copy (S7). Resolves false, true or "option".
+function confirmClear(plain) {
+  if (archiveHere())
+    return R.askConfirm(
+      plain + " " + __WEBUI_TEXT__("records.clear_kept_here"),
+      __WEBUI_TEXT__("records.clear"),
+      true,
+      __WEBUI_TEXT__("records.clear_with_copy"),
+    );
+  return R.askConfirm(
+    plain + (archiveDirect() ? " " + __WEBUI_TEXT__("records.clear_kept_direct") : ""),
+    __WEBUI_TEXT__("records.clear"),
+    true,
+  );
+}
+const clearArchiveCopy = (store, answer) =>
+  answer === "option" &&
+  companionArchive("erase", { store, current: true }).catch((e) =>
+    R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
+  );
+// Opened directly, the end of the list says the companion keeps a copy (S11).
+const archiveListNote = (id, more) => ($(id).hidden = more || !archiveDirect());

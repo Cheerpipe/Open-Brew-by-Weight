@@ -1257,8 +1257,10 @@ if (!statsSection ||
     !statsSection[1].includes('id="statsWindowHint" class="fieldHint"') ||
     !statsSection[1].includes('id="statsWindow" class="shotSort" role="group"') ||
     !['10', '50', '100'].every((n) => statsSection[1].includes(`data-v="${n}">${n}</button`)) ||
-    !codeIncludes(viewJs.stats, 'R.sendUiOperation({op:"stats",on:true,window:R.uiState.statsWindow});') ||
-    !codeIncludes(viewJs.stats, '...(uiState.statsWindow!==10&&{window:uiState.statsWindow}),') ||
+    !codeIncludes(viewJs.stats, 'R.sendUiOperation({op:"stats",on:true,window:Math.min(R.uiState.statsWindow,100)});') ||
+    !codeIncludes(viewJs.stats, '...(uiState.statsWindow!==10&&{window:Math.min(uiState.statsWindow,100)}),') ||
+    !['500', '1000'].every((n) => statsSection[1].includes(`data-v="${n}" hidden>${n}</button`)) ||
+    !codeIncludes(viewJs.stats, 'shown=sizes.filter((v,i)=>i===0||sizes[i-1]<n);') ||
     !codeIncludes(viewJs.stats, '...(Object.keys(uiState.shotFilter).length&&{filter:uiState.shotFilter}),') ||
     !codeIncludes(viewJs.stats, 'R.createFilterMenu("shotFilterButton"') ||
     !codeIncludes(viewJs.stats, 'timeoutMs,filter={}){') ||
@@ -1294,7 +1296,7 @@ if (!statsSection ||
     shotLogTypes.includes('updateShotLogStats') ||
     !shotLogTypes.includes('shotLogBbwErrorEligible')) {
   throw new Error(
-      'Stats view must be a 2+3 shotCard, arrival-time density curve, and firmware-computed stats aggregate (no client recompute or second fetch)');
+      'Stats view must be a 2+3 shotCard, arrival-time density curve, and stats aggregate computed by the firmware or, over the whole history, by the companion (never in the browser), with the window choices that apply');
 }
 
 {
@@ -1341,6 +1343,7 @@ if (!statsSection ||
         scheduleShotPaint() {},
         renderShots: () => events.push('render:' + context.controlsMutable), paint: (fn) => fn(),
         updateHeaderSignals() {}, updateFirmwareFooter() {}, noteReachOk() {},
+        refreshMergedHeader() {}, statsArchiveNeed: null, loadArchive() {},
         atob, __WEBUI_TEXT__: key => key});
       // Shared state and runtime references resolve to this harness's globals.
       const stream = runtimeStateGlobals + blockAt(rawRuntimeJs, 'function decodeCurveDeltas(') + '\n' +

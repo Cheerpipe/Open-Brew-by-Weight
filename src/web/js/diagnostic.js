@@ -488,6 +488,17 @@ function renderCompanionDiagnostic(c) {
         ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.companion_log_gaps"), [c.logGaps])
         : ""),
   );
+  // The archive: the switch and the last record frame sent to the companion.
+  t(
+    "dCoArchive",
+    on(c.archiveSwitch !== false) +
+      (c.archiveSyncS >= 0
+        ? " · " +
+          R.sub(__WEBUI_TEXT__("diagnostic.companion_log_flush"), [
+            formatUptime(c.archiveSyncS * 1e3),
+          ])
+        : ""),
+  );
   renderLogHistoryNote();
   if (!__LINEA_MICRA__) return;
   t("dCoRoute", c.route + (c.reason ? " · " + c.reason.replace(/_/g, " ") : ""));

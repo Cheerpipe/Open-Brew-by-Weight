@@ -47,17 +47,31 @@ const toggleHistoryDir = () => {
 const updateHistorySentinel = () => {
   const el = $("historySentinel");
   if (el) {
-    el.hidden = !R.uiState.historyData.hasMore;
-    el.textContent = R.uiState.historyData.hasMore ? "…" : "";
+    const more = R.uiState.historyData.hasMore || historyArchiveNeed === "archive";
+    el.hidden = !more;
+    el.textContent = more ? "…" : "";
   }
 };
+// The companion's archive rows in this view's order and type filter.
+let historyArchiveNeed = null;
+const historyArchiveQuery = () => ({
+  dir: R.uiState.historyDir,
+  ...(R.uiState.historyTypes.length && { types: R.uiState.historyTypes.join(",") }),
+});
 function renderHistory() {
   const body = $("historyRows");
   if (!body || !historyLoaded) return;
   body.replaceChildren();
-  const rows = R.uiState.historyData.records;
+  const rows = R.uiState.historyData.records,
+    source = archiveSource("history", historyArchiveQuery()),
+    order = recordOrder(source, "date", R.uiState.historyDir),
+    merged = mergeRecords(rows, R.uiState.historyData.hasMore, source, order),
+    list = merged.list;
+  historyArchiveNeed = merged.need;
+  if (source && !source.rows.length && !source.done) loadArchive("history", renderHistory);
   let day;
-  for (const r of rows) {
+  for (const [i, r] of list.entries()) {
+    if (archiveHeadings(body, list, i, 5, source, true)) day = undefined;
     const time = document.createElement("td");
     time.className = "histTime";
     time.textContent = formatHistoryTime(r);
@@ -104,12 +118,14 @@ function renderHistory() {
       icon.append(histIcons[r.type].cloneNode(true));
       row.append(icon);
     }
+    archiveMark(badge, r);
     row.append(time, dur, type, del);
   }
   R.lockControls(body);
+  archiveListNote("historyArchiveNote", R.uiState.historyData.hasMore);
   R.setEmptyState(
     "historyTableState",
-    rows.length
+    list.length
       ? null
       : R.uiState.historyTypes.length
         ? __WEBUI_TEXT__("runtime.no_activations_match_filter")
@@ -118,17 +134,28 @@ function renderHistory() {
   updateHistorySentinel();
 }
 let entryMenu;
-async function deleteOneHistory(id) {
-  if (!id || !confirm(__WEBUI_TEXT__("runtime.delete_this_history_record"))) return;
+async function deleteOneHistory(r, scope = "everywhere") {
+  if (!(await confirmRemoval(r, scope, __WEBUI_TEXT__("runtime.delete_this_history_record"))))
+    return;
+  if (scope === "archive") return removeRecord("history", r, scope, null, null, renderHistory);
   return R.withCommandGate(async () => {
     try {
-      await R.api("/api/v1/history/delete", { method: "POST", body: R.body({ id }) });
-      R.uiState.historyData.records = R.uiState.historyData.records.filter((r) => r.id !== id);
-      if (typeof R.uiState.historyData.total === "number" && R.uiState.historyData.total > 0)
-        R.uiState.historyData.total--;
-      R.uiState.historyData.hasMore =
-        R.uiState.historyData.records.length < R.uiState.historyData.total;
-      renderHistory();
+      await removeRecord(
+        "history",
+        r,
+        scope,
+        "/api/v1/history/delete",
+        () => {
+          R.uiState.historyData.records = R.uiState.historyData.records.filter(
+            (x) => x.id !== r.id,
+          );
+          if (typeof R.uiState.historyData.total === "number" && R.uiState.historyData.total > 0)
+            R.uiState.historyData.total--;
+          R.uiState.historyData.hasMore =
+            R.uiState.historyData.records.length < R.uiState.historyData.total;
+        },
+        renderHistory,
+      );
       R.message(__WEBUI_TEXT__("runtime.history_record_deleted"), "ok");
     } catch (e) {
       R.message(
@@ -148,13 +175,17 @@ const HISTORY_TYPE_KEYS = [
   "no_scale_guard_aborted",
 ];
 async function clearActivationHistory() {
-  if (!confirm(__WEBUI_TEXT__("runtime.clear_all_recorded_activation_history_this"))) return;
+  const answer = await confirmClear(
+    __WEBUI_TEXT__("runtime.clear_all_recorded_activation_history_this"),
+  );
+  if (!answer) return;
   return R.withCommandGate(async () => {
     try {
       await R.api("/api/v1/history/clear", {
         method: "POST",
         body: R.body({ confirm: "CLEAR_HISTORY" }),
       });
+      await clearArchiveCopy("history", answer);
       R.uiState.historyData = {
         bootId: R.uiState.historyData.bootId || 0,
         total: 0,
@@ -260,6 +291,7 @@ function applyHistoryPage(d, mode) {
 }
 const historyViewActive = () => R.activeView === "history" && R.webUiPollingActive();
 const loadMoreHistory = () => {
+  if (historyArchiveNeed === "archive") return loadArchive("history", renderHistory);
   if (
     R.uiState.historyData.hasMore &&
     historyViewActive() &&
@@ -467,7 +499,9 @@ export function init() {
   ready = true;
   R.registerStream("history", historyStream);
   entryMenu = actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) => [
-    [ICON_TRASH, __WEBUI_TEXT__("history.delete_entry"), "", () => deleteOneHistory(r.id), true],
+    ...deleteScopes(r, __WEBUI_TEXT__("history.delete_entry"), (scope) =>
+      deleteOneHistory(r, scope),
+    ),
   ]);
   historyFilterReset = createFilterMenu(
     "historyFilterButton",

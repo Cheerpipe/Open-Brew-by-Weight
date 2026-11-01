@@ -14,8 +14,13 @@ the page always opens instantly with the latest shots.
 
 Choose how far back Stats looks with **Last 10**, **50**, or **100** under the
 averages. The averages and both charts follow your choice, and the note beside
-it says how many shots they actually cover — fewer when you have not pulled
-that many yet. Every time you open the Web UI it starts again at 10.
+it says how many shots they actually cover. Only the choices that make a
+difference appear: every size smaller than the number of good shots in the
+list, plus the first one that covers them all, and none with ten shots or
+fewer. Filtering the list down to fewer shots moves the selection to the
+largest size still shown. Every time you open the Web UI it starts again at
+10. Through [the companion](companion.md#your-whole-history) with its archive,
+Stats covers your whole history and also offers 500 and 1,000.
 
 The Stats chart shows how those shots, the same ones behind the averages, land
 against the shot time window. Each
@@ -260,12 +265,20 @@ weight alone cannot establish that the final reading belongs to another cup.
 
 Open the shot history table to browse rows, export or delete one shot from
 its ⋯ menu, clear the whole log, or export every good shot as CSV or JSON.
-Clearing requires an explicit confirm.
+Clearing requires an explicit confirm. With a companion keeping a shot
+archive, opened directly, deleting a shot also deletes the companion's copy
+at its next sync (unless it is set to keep records deleted on the
+controller), and clearing leaves the companion's copy as it is; the list ends
+with a note that the companion keeps a copy, including older shots. Through
+the companion, the ⋯ menu also lets you remove a shot from one place only;
+see [Deleting records](companion.md#deleting-records).
 
 Home and Stats read the same shot history. Deleting the newest good shot
 shows the next newest good shot on Home; clearing the log empties the idle
 card.
-Factory reset clears both histories. The [activation history](activation-history.md)
+Factory reset clears both histories on the controller; a
+[companion](companion.md#your-whole-history) keeping a shot archive keeps its
+copy. The [activation history](activation-history.md)
 records every confirmed activation, including rinses and cycles that do not
 qualify as shots. Deleting or clearing shot history never changes that diary.
 New rows appear after the configured drip delay. If flash saving is still

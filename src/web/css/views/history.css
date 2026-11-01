@@ -338,6 +338,14 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+/* A shot only the companion keeps: grey, and named in its label and tooltip. */
+#shotTable .shotNum.archiveKept {
+  background: var(--mu);
+  color: var(--sf);
+}
+.histBadge.archiveKept {
+  outline: 1px dashed var(--mu);
+}
 /* Labeled text cells sit 4 px off the border; the centered metrics and the
    charts keep their original alignment. */
 #shotTable td:not(.shotDur):not(.shotActual):not(.shotSparkCell):not(.shotDel) {

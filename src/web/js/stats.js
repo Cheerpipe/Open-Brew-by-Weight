@@ -605,6 +605,14 @@ function fillShotCharts(h, m) {
   return m;
 }
 let statsPresetFilter = "all";
+// The Stats header: through the companion with the archive on, the one it
+// builds over the whole history (S13) for any window; the controller's
+// meanwhile, and whenever the companion cannot answer (S16), silently.
+let statsMerged = null,
+  statsMergedGood = null,
+  statsGood = 0,
+  statsHeaderAsk = 0;
+const statsHeader = () => statsMerged || R.uiState.shotStats || {};
 function renderStatsDurChart() {
   const root = $("statsDurChart");
   if (!root) return;
@@ -630,7 +638,7 @@ function renderStatsDurChart() {
   }
   const host = $("statsDurChartPlot");
   if (!host) return;
-  const st = R.uiState.shotStats || {},
+  const st = statsHeader(),
     presets = R.homeStatusCache()?.presets || R.presetState,
     only = statsPresetFilter === "all" ? 0 : presets.activeId,
     // The firmware's charts over the panel's window, whatever the table's
@@ -909,7 +917,7 @@ function renderStatsConsistency(shots) {
 }
 function renderShotStats() {
   const z = "—",
-    s = R.uiState.shotStats || {},
+    s = statsHeader(),
     q = (i, v, c) => {
       const e = $("statsAvg" + i);
       if (e) {
@@ -935,15 +943,64 @@ function renderShotStats() {
         ? __WEBUI_TEXT__("runtime.stats_window_one")
         : R.sub(__WEBUI_TEXT__("runtime.stats_window_hint"), [c]);
   }
-  for (const b of $("statsWindow")?.querySelectorAll("button") || [])
-    b.setAttribute("aria-pressed", String(+b.dataset.v === R.uiState.statsWindow));
+  statsWindowChoices();
   renderStatsDurChart();
+}
+async function refreshMergedHeader() {
+  const ask = ++statsHeaderAsk,
+    q = statsArchiveQuery(),
+    filter = Object.fromEntries(
+      ["result", "preset", "scale"].filter((k) => q[k]).map((k) => [k, q[k]]),
+    );
+  let reply = null;
+  if (archiveReady("shots"))
+    reply = await companionArchive(
+      "stats?" +
+        new URLSearchParams({
+          ...filter,
+          window: R.uiState.statsWindow,
+          active: (R.homeStatusCache()?.presets || R.presetState)?.activeId ?? 0,
+          epoch: statsStreamEpoch,
+        }),
+    ).catch(() => null);
+  if (ask !== statsHeaderAsk) return;
+  statsMerged = reply?.stats || null;
+  statsMergedGood = reply ? reply.good : null;
+  if (shotStatsViewActive()) R.paint(renderShots);
+}
+// S18: every window smaller than the good shots the list holds under its
+// filters, plus the smallest one that covers them; no choice up to ten. The
+// companion adds 500 and 1000 over the whole history. A selection the
+// filters hide falls to the largest window still shown.
+function statsWindowChoices() {
+  const n = statsMergedGood ?? statsGood,
+    sizes = statsMerged ? [10, 50, 100, 500, 1000] : [10, 50, 100],
+    shown = sizes.filter((v, i) => i === 0 || sizes[i - 1] < n);
+  for (const b of $("statsWindow")?.querySelectorAll("button") || []) {
+    b.hidden = !shown.includes(+b.dataset.v);
+    b.setAttribute("aria-pressed", String(+b.dataset.v === R.uiState.statsWindow));
+  }
+  $("statsWindow").hidden = shown.length < 2;
+  if (!shown.includes(R.uiState.statsWindow) && (statsMerged || statsSynced)) {
+    R.uiState.statsWindow = shown.at(-1);
+    sendStatsWindow();
+  }
+}
+function sendStatsWindow() {
+  // Only the header changes: the firmware refreshes it and keeps the rows;
+  // past 100 the controller keeps its largest window and the companion's
+  // header covers the rest.
+  R.sendUiOperation({ op: "stats", on: true, window: Math.min(R.uiState.statsWindow, 100) });
 }
 // Results always; scales and presets only when the log holds more than one;
 // bad shots last, which the list leaves out unless asked.
 function shotFilterGroups() {
-  const f = R.uiState.shotStats?.facets || {},
+  const f = statsHeader().facets || {},
     presets = R.homeStatusCache()?.presets || R.presetState,
+    // Presets found only in the companion's archive are offered too.
+    facetPresets = (f.presets || []).concat(
+      (archiveSources.shots?.presets || []).filter(([id]) => !f.presets?.some((p) => p[0] === id)),
+    ),
     dot = (k) =>
       '<svg class="histFilterDot" data-kind="' +
       k +
@@ -959,10 +1016,10 @@ function shotFilterGroups() {
       label: __WEBUI_TEXT__("runtime.scale"),
       options: f.scales,
     },
-    f.presets?.length > 1 && {
+    facetPresets.length > 1 && {
       key: "preset",
       label: __WEBUI_TEXT__("runtime.preset"),
-      options: f.presets.map(([id, name]) => [
+      options: facetPresets.map(([id, name]) => [
         id,
         presets.items?.find((p) => p.id === id)?.name || name,
       ]),
@@ -995,8 +1052,15 @@ function renderShots() {
     p.appendChild(e);
     return e;
   };
-  const rows = R.uiState.shotHistory.shots;
-  if (rows.length) {
+  const rows = R.uiState.shotHistory.shots,
+    source = archiveSource("shots", statsArchiveQuery()),
+    order = recordOrder(source, R.uiState.shotSort, R.uiState.shotSortDir),
+    merged = mergeRecords(rows, R.uiState.shotHistory.hasMore, source, order),
+    list = merged.list,
+    columns = $("shotRows").closest("table").tHead.rows[0].cells.length;
+  statsArchiveNeed = merged.need;
+  if (source && !source.rows.length && !source.done) loadArchive("shots", renderShots);
+  if (list.length) {
     const labels = [
       __WEBUI_TEXT__("runtime.time"),
       __WEBUI_TEXT__("runtime.dur"),
@@ -1020,7 +1084,8 @@ function renderShots() {
     ];
     const G = __WEBUI_TEXT__("runtime.g"),
       S = __WEBUI_TEXT__("runtime.s");
-    for (const r of rows) {
+    for (const [i, r] of list.entries()) {
+      archiveHeadings(body, list, i, columns, source, R.uiState.shotSort === "date");
       const row = document.createElement("tr");
       row.dataset.id = r.id;
       // A scale-loss shot has no weighed yield: only its estimate, no error.
@@ -1094,6 +1159,7 @@ function renderShots() {
       num.className = "shotNum";
       num.textContent = "#" + r.id;
       num.title = __WEBUI_TEXT__("runtime.shot") + " " + r.id;
+      archiveMark(num, r);
       row.cells[0].prepend(num);
       // The verdict sits beside the time so each card says at a glance how the shot landed.
       if (!bad && r.arrivalS > 0 && ["fast", "on_recipe", "slow"].includes(r.verdict))
@@ -1127,7 +1193,7 @@ function renderShots() {
       const rateHost = document.createElement("div");
       rate.appendChild(rateHost);
       fillStarRate(rateHost, r.rating || 0, !R.controlsMutable, (n, star) =>
-        rateHistoryShot(r.id, n, star),
+        r._archive ? rateArchivedShot(r, n) : rateHistoryShot(r.id, n, star),
       );
       row.appendChild(rate);
       const spark = document.createElement("td");
@@ -1152,9 +1218,10 @@ function renderShots() {
     }
   }
   R.lockControls(body);
+  archiveListNote("shotArchiveNote", R.uiState.shotHistory.hasMore);
   R.setEmptyState(
     "shotTableState",
-    rows.length
+    list.length
       ? null
       : Object.keys(R.uiState.shotFilter).length
         ? __WEBUI_TEXT__("runtime.no_shots_match_filter")
@@ -1165,21 +1232,44 @@ function renderShots() {
 function updateShotLogSentinel() {
   const el = $("shotLogSentinel");
   if (el) {
-    el.hidden = !R.uiState.shotHistory.hasMore;
-    el.textContent = R.uiState.shotHistory.hasMore ? "…" : "";
+    const more = R.uiState.shotHistory.hasMore || statsArchiveNeed === "archive";
+    el.hidden = !more;
+    el.textContent = more ? "…" : "";
   }
 }
-async function deleteOneShot(id) {
-  if (!id || !confirm(__WEBUI_TEXT__("runtime.delete_this_shot_record"))) return;
+// The companion's archive rows in this view's order and filter.
+let statsArchiveNeed = null;
+function statsArchiveQuery() {
+  const q = { sort: R.uiState.shotSort, dir: R.uiState.shotSortDir };
+  for (const [k, v] of Object.entries(R.uiState.shotFilter))
+    if (k === "bad") q.bad = 1;
+    else if (v.length) q[k] = v.join(",");
+  return q;
+}
+const rateArchivedShot = (r, n) =>
+  companionArchive("rate", { id: r.id, generation: r.archiveGeneration, rating: n }).then(
+    () => ((r.rating = n), renderShots()),
+    (e) => R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
+  );
+async function deleteOneShot(r, scope = "everywhere") {
+  if (!(await confirmRemoval(r, scope, __WEBUI_TEXT__("runtime.delete_this_shot_record")))) return;
+  if (scope === "archive") return removeRecord("shots", r, scope, null, null, renderShots);
   return R.withCommandGate(async () => {
     try {
-      await R.api("/api/v1/stats/delete", { method: "POST", body: R.body({ id }) });
-      R.uiState.shotHistory.shots = R.uiState.shotHistory.shots.filter((s) => s.id !== id);
-      if (typeof R.uiState.shotHistory.total === "number" && R.uiState.shotHistory.total > 0)
-        R.uiState.shotHistory.total--;
-      R.uiState.shotHistory.hasMore =
-        R.uiState.shotHistory.shots.length < R.uiState.shotHistory.total;
-      renderShots();
+      await removeRecord(
+        "shots",
+        r,
+        scope,
+        "/api/v1/stats/delete",
+        () => {
+          R.uiState.shotHistory.shots = R.uiState.shotHistory.shots.filter((s) => s.id !== r.id);
+          if (typeof R.uiState.shotHistory.total === "number" && R.uiState.shotHistory.total > 0)
+            R.uiState.shotHistory.total--;
+          R.uiState.shotHistory.hasMore =
+            R.uiState.shotHistory.shots.length < R.uiState.shotHistory.total;
+        },
+        renderShots,
+      );
       R.message(__WEBUI_TEXT__("runtime.shot_deleted"), "ok");
     } catch (e) {
       R.message(R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_delete_shot"), e), "error");
@@ -1256,6 +1346,7 @@ function setShotSort(field) {
   statsSendSubscribe();
 }
 const loadMoreShots = () => {
+  if (statsArchiveNeed === "archive") return loadArchive("shots", renderShots);
   if (
     R.uiState.shotHistory.hasMore &&
     shotStatsViewActive() &&
@@ -2237,13 +2328,17 @@ function statsFrameWindow(offset, limit, sort, dir, timeoutMs, filter = {}) {
   return pending;
 }
 async function clearShotHistory() {
-  if (!confirm(__WEBUI_TEXT__("runtime.clear_all_recorded_shot_history_this_cannot"))) return;
+  const answer = await confirmClear(
+    __WEBUI_TEXT__("runtime.clear_all_recorded_shot_history_this_cannot"),
+  );
+  if (!answer) return;
   return R.withCommandGate(async () => {
     try {
       await R.api("/api/v1/stats/clear", {
         method: "POST",
         body: R.body({ confirm: "CLEAR_SHOT_LOG" }),
       });
+      await clearArchiveCopy("shots", answer);
       R.uiState.shotHistory = {
         bootId: R.uiState.shotHistory.bootId || 0,
         total: 0,
@@ -2330,7 +2425,7 @@ function statsSubscribeOp() {
     sort: R.uiState.shotSort,
     dir: R.uiState.shotSortDir,
     ...(Object.keys(R.uiState.shotFilter).length && { filter: R.uiState.shotFilter }),
-    ...(R.uiState.statsWindow !== 10 && { window: R.uiState.statsWindow }),
+    ...(R.uiState.statsWindow !== 10 && { window: Math.min(R.uiState.statsWindow, 100) }),
     ...(statsTag && { tag: statsTag }),
   };
 }
@@ -2502,6 +2597,7 @@ function applyStatsStream(message) {
       limit: message.limit,
       hasMore: message.hasMore,
       stats: message.stats || null,
+      good: message.good,
       cols: message.cols,
       tag: message.tag,
       rows: [],
@@ -2519,7 +2615,11 @@ function applyStatsStream(message) {
   R.uiState.statsFetchMark = null;
   statsStreamBoot = message.boot;
   statsStreamEpoch = page.epoch;
-  if (page.mode === "replace") statsTag = page.tag;
+  if (page.mode === "replace") {
+    statsTag = page.tag;
+    if (Number.isInteger(page.good)) statsGood = page.good;
+    refreshMergedHeader();
+  }
   applyShotPage(
     {
       bootId: message.boot,
@@ -2667,7 +2767,9 @@ export function init() {
       ? []
       : [
           null,
-          [ICON_TRASH, __WEBUI_TEXT__("stats.delete_shot"), "", () => deleteOneShot(r.id), true],
+          ...deleteScopes(r, __WEBUI_TEXT__("stats.delete_shot"), (scope) =>
+            deleteOneShot(r, scope),
+          ),
         ]),
   ]);
   $("clearShotsButton").onclick = clearShotHistory;
@@ -2678,10 +2780,10 @@ export function init() {
   }
   for (const b of $("statsWindow").querySelectorAll("button"))
     b.onclick = () => {
-      // Only the header changes: the firmware refreshes it and keeps the rows.
       R.uiState.statsWindow = +b.dataset.v;
       renderShotStats();
-      R.sendUiOperation({ op: "stats", on: true, window: R.uiState.statsWindow });
+      sendStatsWindow();
+      refreshMergedHeader();
     };
   shotFilterReset = createFilterMenu(
     "shotFilterButton",
