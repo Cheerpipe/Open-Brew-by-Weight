@@ -1878,8 +1878,25 @@ const errorReasonTexts = {
   COMPANION_NOT_PAIRED: __WEBUI_TEXT__("err.companion_not_paired"),
   COMPANION_NOT_PAIRED_WITH_PEER: __WEBUI_TEXT__("err.companion_not_paired_with_peer"),
   COMPANION_PEER: __WEBUI_TEXT__("err.companion_peer"),
+  CONFIG_BBW_RETARE_RELATION: __WEBUI_TEXT__("err.config_bbw_retare_relation"),
+  CONFIG_BOOKOO_VOLUME_RANGE: __WEBUI_TEXT__("err.config_bookoo_volume_range"),
+  CONFIG_COMBINED_TARE_REQUIRES_AUTOTARE: __WEBUI_TEXT__("err.config_combined_tare_requires_autotare"),
+  CONFIG_FAST_BEFORE_RULES: __WEBUI_TEXT__("err.config_fast_before_rules"),
+  CONFIG_FAST_MARGIN_RULES: __WEBUI_TEXT__("err.config_fast_margin_rules"),
+  CONFIG_FAST_RAMP_STEPS: __WEBUI_TEXT__("err.config_fast_ramp_steps"),
+  CONFIG_INVALID: __WEBUI_TEXT__("err.config_invalid"),
   CONFIG_LOCKED_DURING_ACTIVE_CYCLE: __WEBUI_TEXT__("err.config_locked_during_active_cycle"),
+  CONFIG_NTP_CUSTOM_INVALID: __WEBUI_TEXT__("err.config_ntp_custom_invalid"),
+  CONFIG_PADDLE_REMINDER_RELATION: __WEBUI_TEXT__("err.config_paddle_reminder_relation"),
+  CONFIG_RETARE_STABILITY_RELATION: __WEBUI_TEXT__("err.config_retare_stability_relation"),
   CONFIG_REVISION_STALE: __WEBUI_TEXT__("err.config_revision_stale"),
+  CONFIG_SCALE_LOSS_WINDOW: __WEBUI_TEXT__("err.config_scale_loss_window"),
+  CONFIG_SHOT_REACT_TIMEOUT_RANGE: __WEBUI_TEXT__("err.config_shot_react_timeout_range"),
+  CONFIG_SLOW_AFTER_RULES: __WEBUI_TEXT__("err.config_slow_after_rules"),
+  CONFIG_SLOW_MARGIN_RULES: __WEBUI_TEXT__("err.config_slow_margin_rules"),
+  CONFIG_SLOW_RAMP_STEPS: __WEBUI_TEXT__("err.config_slow_ramp_steps"),
+  CONFIG_TIMING_RELATION: __WEBUI_TEXT__("err.config_timing_relation"),
+  CONFIG_WEIGHT_OFFSET_INTERNAL: __WEBUI_TEXT__("err.config_weight_offset_internal"),
   CONFIRMATION_REQUIRED: __WEBUI_TEXT__("err.confirmation_required"),
   CONTROLLER_AUTH_NOT_REQUIRED: __WEBUI_TEXT__("err.controller_auth_not_required"),
   CONTROL_QUEUE_FULL: __WEBUI_TEXT__("err.control_queue_full"),
@@ -1901,7 +1918,10 @@ const errorReasonTexts = {
   FACTORY_RESET_NOT_CONFIRMED: __WEBUI_TEXT__("err.factory_reset_not_confirmed"),
   FACTORY_RESET_REQUIRES_IDLE: __WEBUI_TEXT__("err.factory_reset_requires_idle"),
   FIELD_ENABLED_MUST_BE_BOOLEAN: __WEBUI_TEXT__("err.field_enabled_must_be_boolean"),
+  FIELD_ENUM: __WEBUI_TEXT__("err.field_enum"),
   FIELD_ON_MUST_BE_BOOLEAN: __WEBUI_TEXT__("err.field_on_must_be_boolean"),
+  FIELD_RANGE: __WEBUI_TEXT__("err.field_range"),
+  FIELD_RANGE_INT: __WEBUI_TEXT__("err.field_range_int"),
   FIRMWARE_MODE_REQUIRES_IDLE: __WEBUI_TEXT__("err.firmware_mode_requires_idle"),
   FIRMWARE_MODE_SAVE_FAILED: __WEBUI_TEXT__("err.firmware_mode_save_failed"),
   FORCED_PULSE_REQUIRES_EMPTY_OBJECT: __WEBUI_TEXT__("err.forced_pulse_requires_empty_object"),
@@ -2049,6 +2069,7 @@ const errorReasonTexts = {
   TARE_REQUIRES_READY: __WEBUI_TEXT__("err.tare_requires_ready"),
   TASK_PROFILER_UNCHANGED: __WEBUI_TEXT__("err.task_profiler_unchanged"),
   TIMEZONE_ALREADY_SET: __WEBUI_TEXT__("err.timezone_already_set"),
+  TIMEZONE_ID_CHOOSE: __WEBUI_TEXT__("err.timezone_id_choose"),
   TIME_SYNC_DISABLED: __WEBUI_TEXT__("err.time_sync_disabled"),
   TOO_LARGE: __WEBUI_TEXT__("err.too_large"),
   UI_CLAIM_REQUIRED: __WEBUI_TEXT__("err.ui_claim_required"),
@@ -2080,12 +2101,14 @@ const errorReasonTexts = {
   WIFI_SCAN_REQUIRES_READY: __WEBUI_TEXT__("err.wifi_scan_requires_ready"),
   WRITE_FAILED: __WEBUI_TEXT__("err.write_failed"),
 };
-// API error render chain: the locale text for the reason code, else the one
-// for the legacy error code, else the server message, else the fallback.
+// API error render chain: the locale text for the reason code (with the
+// wire params substituted into its {0}.. placeholders), else the one for the
+// legacy error code, else the server message, else the fallback.
 function errorText(data, fallback = "") {
   if (!data) return fallback;
+  const reasonText = data.reason && errorReasonTexts[data.reason];
+  if (reasonText) return data.params ? sub(reasonText, data.params) : reasonText;
   return (
-    (data.reason && errorReasonTexts[data.reason]) ||
     ((data.error || data.code) && errorReasonTexts[data.error || data.code]) ||
     data.message ||
     data.error ||
@@ -2421,7 +2444,12 @@ async function apiBinary(path, onProgress, cache = "no-store") {
       } catch (_) {}
       throw Object.assign(
         new Error(errorText(data, __WEBUI_TEXT__("runtime.http") + response.status)),
-        { status: response.status, code: data.error, reason: data.reason || "" },
+        {
+          status: response.status,
+          code: data.error,
+          reason: data.reason || "",
+          params: data.params || null,
+        },
       );
     }
     if (!onProgress || !response.body) return await response.blob();
@@ -2488,6 +2516,7 @@ async function api(path, options = {}) {
     const err = new Error(errorText(data, __WEBUI_TEXT__("runtime.http") + response.status));
     err.code = data.error || "";
     err.reason = data.reason || "";
+    err.params = data.params || null;
     err.status = response.status;
     throw err;
   }

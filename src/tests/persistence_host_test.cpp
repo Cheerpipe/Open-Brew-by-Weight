@@ -14,11 +14,14 @@
 #include "../OpenBrewByWeightActivationStores.h"
 #include "../OpenBrewByWeightLastShot.h"
 #include "../machine/OpenBrewByWeightLineaMicraSettings.h"
+#include <OpenBrewByWeightErrorReasonTexts.h>
+#include <cJSON.h>
 
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <string>
 #include <vector>
 
 using namespace openbrewbyweight;
@@ -777,6 +780,123 @@ void p10_auto_to_manual_guard_trend_and_validation() {
         ConfigValidationError::WEIGHT_OFFSET_BASELINE);
   config.weightOffsetBaselineG = 2.25f;
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);
+}
+
+void p11_config_validation_catalog_agreement() {
+  // The INVALID_CONFIG failure for every validation error resolves from the
+  // err.* locale catalog: parameterized rules format their message with the
+  // generated printf form, plain codes resolve the catalog sentence. This is
+  // the permanent guard that an emitted message equals the catalog template
+  // with the failure's params substituted (docs/INTEGRATION_API.md).
+  CHECK(configValidationFailure(ConfigValidationError::NONE).reason == nullptr);
+  FILE *catalogFile = fopen(ERROR_REASON_CATALOG_PATH, "rb");
+  CHECK(catalogFile != nullptr);
+  if (catalogFile == nullptr) return;
+  std::string catalogJson;
+  char chunk[4096];
+  size_t read = 0;
+  while ((read = fread(chunk, 1, sizeof(chunk), catalogFile)) > 0) {
+    catalogJson.append(chunk, read);
+  }
+  fclose(catalogFile);
+  cJSON *catalog = cJSON_Parse(catalogJson.c_str());
+  CHECK(catalog != nullptr);
+  if (catalog == nullptr) return;
+  const cJSON *strings = cJSON_GetObjectItemCaseSensitive(catalog, "strings");
+  CHECK(strings != nullptr);
+  if (strings == nullptr) {
+    cJSON_Delete(catalog);
+    return;
+  }
+  const ConfigValidationError values[] = {
+      ConfigValidationError::GOAL_WEIGHT,
+      ConfigValidationError::WEIGHT_OFFSET,
+      ConfigValidationError::RINSE_GESTURE,
+      ConfigValidationError::RINSE_DURATION,
+      ConfigValidationError::RETARE_WINDOW,
+      ConfigValidationError::MINIMUM_CUP_WEIGHT,
+      ConfigValidationError::RETARE_STABILITY_SAMPLES,
+      ConfigValidationError::RETARE_STABILITY_TOLERANCE,
+      ConfigValidationError::RETARE_STABILITY_MAX_GAP,
+      ConfigValidationError::RETARE_STABILITY_MIN_DURATION,
+      ConfigValidationError::RETARE_STABILITY_RELATION,
+      ConfigValidationError::BBW_PROTECTION_TIMEOUT,
+      ConfigValidationError::BBW_PROTECTION_RETARE_RELATION,
+      ConfigValidationError::OPERATIONAL_WALL,
+      ConfigValidationError::PADDLE_REMINDER_INTERVAL,
+      ConfigValidationError::PADDLE_REMINDER_MAX_DURATION,
+      ConfigValidationError::TIMING_RELATION,
+      ConfigValidationError::COMBINED_TARE_REQUIRES_AUTOTARE,
+      ConfigValidationError::POST_TARE_BASELINE_GRACE,
+      ConfigValidationError::SCALE_TIMER_STOP_EXTRA_DELAY,
+      ConfigValidationError::TIMEZONE_ID,
+      ConfigValidationError::NTP_SERVER_PRESET,
+      ConfigValidationError::NTP_SERVER_CUSTOM,
+      ConfigValidationError::FAST_MARGIN,
+      ConfigValidationError::FAST_BEFORE,
+      ConfigValidationError::SLOW_MARGIN,
+      ConfigValidationError::SLOW_AFTER,
+      ConfigValidationError::SCALE_LOSS_FIXED,
+      ConfigValidationError::WEIGHT_OFFSET_BASELINE,
+      ConfigValidationError::SCALE_MAC_CACHE_MODE,
+      ConfigValidationError::ALERT_OUTPUT_CHANNEL,
+      ConfigValidationError::EXTENDED_PULSE_RATE,
+      ConfigValidationError::SLOW_EXTENDED_PULSE_RATE,
+      ConfigValidationError::BOOKOO_CONNECT_BEEP_LEVEL,
+      ConfigValidationError::NO_SCALE_BBW_MODE,
+      ConfigValidationError::LAST_SHOT_COOLDOWN,
+      ConfigValidationError::DRIP_DELAY,
+      ConfigValidationError::SERIAL_LOG_LEVEL,
+      ConfigValidationError::RING_RETAIN_LOG_LEVEL,
+      ConfigValidationError::PADDLE_MODE,
+      ConfigValidationError::CUP_REMOVED_WEIGHT,
+      ConfigValidationError::STOP_PULSE,
+      ConfigValidationError::MAX_SINGLE_PRESS,
+      ConfigValidationError::REED_CONFIRM_TIMEOUT,
+      ConfigValidationError::SHOT_REACT_TIMEOUT,
+      ConfigValidationError::SCHEDULED_RESTART,
+      ConfigValidationError::FAST_RAMP,
+      ConfigValidationError::FAST_CURVE,
+      ConfigValidationError::SLOW_RAMP,
+      ConfigValidationError::SLOW_CURVE,
+  };
+  for (const ConfigValidationError value : values) {
+    const ValidationFailure failure = configValidationFailure(value);
+    CHECK(failure.reason != nullptr);
+    if (failure.reason == nullptr) continue;
+    std::string key = "err.";
+    for (const char *at = failure.reason; *at != '\0'; ++at) {
+      key += *at >= 'A' && *at <= 'Z'
+                 ? static_cast<char>(*at - 'A' + 'a')
+                 : *at;
+    }
+    const cJSON *entry =
+        cJSON_GetObjectItemCaseSensitive(strings, key.c_str());
+    CHECK(entry != nullptr && cJSON_IsString(entry));
+    if (entry == nullptr || !cJSON_IsString(entry)) continue;
+    const char *catalogText = entry->valuestring;
+    if (failure.params[0] == nullptr) {
+      const char *plain = errorReasonText(failure.reason);
+      CHECK(plain != nullptr && strcmp(plain, catalogText) == 0);
+      continue;
+    }
+    char message[160] = {};
+    CHECK(formatErrorReason(message, sizeof(message), failure.reason,
+                            failure.params));
+    std::string expected;
+    for (const char *at = catalogText; *at != '\0'; ++at) {
+      if (at[0] == '{' && at[1] >= '0' && at[1] <= '2' && at[2] == '}') {
+        const char *param = failure.params[at[1] - '0'];
+        CHECK(param != nullptr);
+        if (param != nullptr) expected += param;
+        at += 2;
+      } else {
+        expected += *at;
+      }
+    }
+    CHECK(strcmp(message, expected.c_str()) == 0);
+  }
+  cJSON_Delete(catalog);
 }
 
 void p12_shot_log_persists_compact_blob() {
@@ -3305,6 +3425,7 @@ const TestCase tests[] = {
     {"P66C", p66c_activation_capture_skips_clean_payloads},
     {"P61C", p61c_timestamped_capacity_and_dense_sections},
     {"P90", p90_firmware_mode_store_round_trip_and_factory_reset},
+    {"P11", p11_config_validation_catalog_agreement},
     {"P91", p91_web_access_store_round_trip_and_corruption},
     {"P90b", p90b_setup_intent_commits_with_its_wifi},
     {"P86", p86_timezone_preference_and_durable_initialization},

@@ -893,9 +893,13 @@ class OpenBrewByWeightNetwork {
   // Every API error body carries the frozen `error` code and the English
   // `message` prose verbatim; `reason` adds the per-sentence stable code
   // (docs/INTEGRATION_API.md) and is omitted from the body when null.
+  // `params` carries a parameterized rule's pre-formatted params (see
+  // ValidationFailure): the message is then formatted from the generated
+  // catalog form and the params join the body between reason and message.
   static esp_err_t sendError(httpd_req_t *request, const char *status,
                              const char *error, const char *message,
-                             const char *reason);
+                             const char *reason,
+                             const char *const *params = nullptr);
   static bool readJsonBody(httpd_req_t *request,
                            char body[REQUEST_BODY_CAPACITY],
                            bool *envelopeFailed = nullptr);

@@ -53,6 +53,7 @@ const network = readSources([
   'network/OpenBrewByWeightNetworkOta.inc',
 ]);
 const networkHeader = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.h'), 'utf8');
+const domainHeader = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightDomain.h'), 'utf8');
 const otaSource = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightOta.cpp'), 'utf8');
 const otaHeader = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightOta.h'), 'utf8');
 const webhookSource = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebhook.cpp'), 'utf8');

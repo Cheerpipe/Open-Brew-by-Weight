@@ -25,6 +25,7 @@ add_custom_command(
           "${CMAKE_SOURCE_DIR}/src/web/locales/en.json"
           "${CMAKE_SOURCE_DIR}/src/web/js/runtime.js"
           "${CMAKE_SOURCE_DIR}/src/OpenBrewByWeightNetwork.h"
+          "${CMAKE_SOURCE_DIR}/src/OpenBrewByWeightDomain.h"
           ${ERROR_REASON_TEXT_SOURCES}
   VERBATIM)
 add_custom_target(generate_error_reason_texts
@@ -197,6 +198,14 @@ endif()
 if(TARGET persistence_host_test)
   # The durable stores erase the companion pairing, whose header declares cJSON.
   target_include_directories(persistence_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
+  target_link_libraries(persistence_host_test PRIVATE "${CJSON_LIBRARY}")
+  # P11 checks every INVALID_CONFIG failure against the locale catalog and
+  # the generated rule formats.
+  add_dependencies(persistence_host_test generate_error_reason_texts)
+  target_include_directories(persistence_host_test PRIVATE
+    "${CMAKE_BINARY_DIR}/generated")
+  target_compile_definitions(persistence_host_test PRIVATE
+    "ERROR_REASON_CATALOG_PATH=\"${CMAKE_SOURCE_DIR}/src/web/locales/en.json\"")
 endif()
 host_test(json_arena_host_test LABEL "host;concurrency")
 host_test(micra_observation_host_test

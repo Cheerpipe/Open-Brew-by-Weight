@@ -85,6 +85,7 @@ add_custom_command(
     "${OPEN_BREW_BY_WEIGHT_DIR}/web/locales/en.json"
     "${OPEN_BREW_BY_WEIGHT_DIR}/web/js/runtime.js"
     "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightNetwork.h"
+    "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightDomain.h"
     ${OBBW_ERROR_TEXT_SCANNED}
   VERBATIM)
 add_custom_target(openbrewbyweight_error_reason_texts

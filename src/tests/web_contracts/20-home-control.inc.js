@@ -933,7 +933,8 @@ if (!statusSection || !statusSection[1].includes('class="lamp"') ||
     !network.includes('preferredScaleSelectHandler') ||
     !network.includes('/api/v1/scale/preferred/clear') ||
     !network.includes('/api/v1/scale/preferred/select') ||
-    !network.includes('Scale preference must be first, prefer, or only.') ||
+    !domainHeader.includes('"FIELD_ENUM", "Scale preference"') ||
+    !domainHeader.includes('"first, prefer, or only"') ||
     network.includes('Always use this scale must be on or off.') ||
     network.includes('scaleMacCacheMode must be disabled or full.') ||
     !network.includes('scaleMacCacheMode must be first, prefer, or only.') ||
@@ -1431,8 +1432,8 @@ if (!html.includes('<summary>Switch</summary>') ||
     !network.includes('momentaryStartEdge must be press or release.') ||
     !network.includes(
         'reedConfirmTimeoutMs must be an integer from 200 to 5000.') ||
-    !network.includes(
-        'Shot reaction timeout must be 0 (compiled default) or from 3 to 30 s.') ||
+    !errorCatalog['err.config_shot_react_timeout_range'] ||
+    !domainHeader.includes('validationFailure("CONFIG_SHOT_REACT_TIMEOUT_RANGE")') ||
     !network.includes(
         'shotReactTimeoutS must be 0 (compiled default) or an integer from 3 to 30.') ||
     !network.includes('jsonStopPulseMs') ||
@@ -1639,7 +1640,7 @@ if (!html.includes('id="postTareBaselineGraceS" type="number" min="0.5" max="10"
     // Tare switches go through the shared #workflowPanel field listener.
     !codeIncludes(viewJs.settings, 'noteEdit(autosave[sec],!typed?300:e.type===change&&e.isTrusted?0:1200);updateConfigGroups();') ||
     !network.includes('fields.field("config.postTareBaselineGraceMs",') ||
-    !network.includes('Post-tare grace must be from 0.5 to 10 s.') ||
+    !domainHeader.includes('validationFailure("FIELD_RANGE", "Post-tare grace", "0.5", "10 s")') ||
     !network.includes('candidate.postTareBaselineGraceMs') ||
     !firmware.includes('session.config.postTareBaselineGraceMs')) {
   throw new Error('Post-tare grace must be wired through Tare settings, the Settings stream, and firmware');
@@ -1649,7 +1650,7 @@ if (!codeIncludes(ui, "rangeCheck('dripDelayS',0,10,'Drip delay',{unit:'s',}") |
     !codeIncludes(ui, "$('dripDelayS').value=String((c.dripDelayMs??3000)/1000)") ||
     !codeIncludes(ui, 'The yield is recorded this long after the stop.') ||
     !network.includes('fields.field("config.dripDelayMs",') ||
-    !network.includes('Drip delay must be from 0 to 10 s.') ||
+    !domainHeader.includes('validationFailure("FIELD_RANGE", "Drip delay", "0", "10 s")') ||
     !network.includes('candidate.dripDelayMs')) {
   throw new Error('Drip delay must be wired through Settings, the Settings stream, and config validation');
 }

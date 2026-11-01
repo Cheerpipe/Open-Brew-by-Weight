@@ -469,126 +469,39 @@ bool jsonHasOnlyUniqueFields(cJSON *object, const char *const *allowed,
   return true;
 }
 
-const char *configValidationMessage(ConfigValidationError error) {
-  switch (error) {
-    case ConfigValidationError::NONE:
-      return "Configuration is valid.";
-    case ConfigValidationError::GOAL_WEIGHT:
-      return "Target must be an integer from 10 to 200 g.";
-    case ConfigValidationError::WEIGHT_OFFSET:
-      return "Internal offset is invalid; it cannot be edited from the Web UI.";
-    case ConfigValidationError::RINSE_GESTURE:
-      return "Rinse gesture must be from 0.1 to 5 s.";
-    case ConfigValidationError::RINSE_DURATION:
-      return "Rinse duration must be from 0.5 to 10 s.";
-    case ConfigValidationError::RETARE_WINDOW:
-      return "Retare window must be from 0.5 to 10 s.";
-    case ConfigValidationError::MINIMUM_CUP_WEIGHT:
-      return "Minimum cup weight must be from 1 to 500 g.";
-    case ConfigValidationError::RETARE_STABILITY_SAMPLES:
-      return "Retare stable samples must be from 2 to 10.";
-    case ConfigValidationError::RETARE_STABILITY_TOLERANCE:
-      return "Retare stability tolerance must be from 0.1 to 20 g.";
-    case ConfigValidationError::RETARE_STABILITY_MAX_GAP:
-      return "Retare sample gap must be from 0.1 to 5 s.";
-    case ConfigValidationError::RETARE_STABILITY_MIN_DURATION:
-      return "Retare min stable time must be from 0 to 2 s.";
-    case ConfigValidationError::RETARE_STABILITY_RELATION:
-      return "Retare min stable time must be ≤ retare window and ≤ "
-             "samples × sample gap.";
-    case ConfigValidationError::BBW_PROTECTION_TIMEOUT:
-      return "Earliest weight stop must be from 0.5 to 30 s.";
-    case ConfigValidationError::BBW_PROTECTION_RETARE_RELATION:
-      return "Earliest weight stop must be at least the effective retare "
-             "window + 3 s.";
-    case ConfigValidationError::OPERATIONAL_WALL:
-      return "Max shot time must be from 5 to 60 s.";
-    case ConfigValidationError::PADDLE_REMINDER_INTERVAL:
-      return "Paddle reminder interval must be from 5 to 60 s.";
-    case ConfigValidationError::PADDLE_REMINDER_MAX_DURATION:
-      return "Paddle reminder limit must be from 1 to 60 min and at least "
-             "the reminder interval.";
-    case ConfigValidationError::TIMING_RELATION:
-      return "Required: rinse gesture < max shot time; rinse duration, retare "
-             "window, and earliest weight stop each ≤ max shot time.";
-    case ConfigValidationError::COMBINED_TARE_REQUIRES_AUTOTARE:
-      return "The Bookoo combined command requires automatic tare.";
-    case ConfigValidationError::POST_TARE_BASELINE_GRACE:
-      return "Post-tare grace must be from 0.5 to 10 s.";
-    case ConfigValidationError::SCALE_TIMER_STOP_EXTRA_DELAY:
-      return "Scale timer stop extra delay must be from 0 to 1000 ms.";
-    case ConfigValidationError::TIMEZONE_ID:
-      return "Choose a supported IANA time zone.";
-    case ConfigValidationError::NTP_SERVER_PRESET:
-      return "NTP server preset must be pool, google, cloudflare, or nist.";
-    case ConfigValidationError::NTP_SERVER_CUSTOM:
-      return "Custom NTP hostname is invalid (letters, digits, '.', '-'; "
-             "max 63 chars).";
-    case ConfigValidationError::FAST_MARGIN:
-      return "Extra yield for fast shots must be 0.5 to 10 g, at most a quarter "
-             "of the target, and keep the target plus extra within 200 g.";
-    case ConfigValidationError::FAST_BEFORE:
-      return "The shot time window must start at least 2 s after the earliest "
-             "weight stop, end at least 1 s later, and use 0.5 s steps.";
-    case ConfigValidationError::SLOW_MARGIN:
-      return "Less yield for slow shots must be 0.5 to 10 g and leave at least 5 g.";
-    case ConfigValidationError::SLOW_AFTER:
-      return "The shot time window must end at least 1 s before the max shot "
-             "time, in 0.5 s steps.";
-    case ConfigValidationError::SCALE_LOSS_FIXED:
-      return "The scale-loss stop time must be empty or between the earliest "
-             "weight stop and the max shot time.";
-    case ConfigValidationError::WEIGHT_OFFSET_BASELINE:
-      return "Offset baseline must be from 0 to 5.0 g.";
-    case ConfigValidationError::SCALE_MAC_CACHE_MODE:
-      return "Scale preference must be first, prefer, or only.";
-    case ConfigValidationError::ALERT_OUTPUT_CHANNEL:
-      return "Alert output channel must be scale_only, buzzer_only, or "
-             "scale_priority.";
-    case ConfigValidationError::EXTENDED_PULSE_RATE:
-      return "Fast-shot pulse must be disabled, slow, medium, fast, or "
-             "rapid.";
-    case ConfigValidationError::SLOW_EXTENDED_PULSE_RATE:
-      return "Slow-shot pulse must be disabled, slow, medium, fast, or "
-             "rapid.";
-    case ConfigValidationError::BOOKOO_CONNECT_BEEP_LEVEL:
-      return "Bookoo scale volume must be disabled (0) or 1 to 5.";
-    case ConfigValidationError::NO_SCALE_BBW_MODE:
-      return "No-scale BBW mode must be off, warn_once, or require_scale.";
-    case ConfigValidationError::LAST_SHOT_COOLDOWN:
-      return "Last shot cooldown must be from 5 to 240 min.";
-    case ConfigValidationError::DRIP_DELAY:
-      return "Drip delay must be from 0 to 10 s.";
-    case ConfigValidationError::SERIAL_LOG_LEVEL:
-      return "Serial log level must be none, critical, error, warning, info, "
-             "or debug.";
-    case ConfigValidationError::RING_RETAIN_LOG_LEVEL:
-      return "Ring log level must be none, critical, error, warning, info, or "
-             "debug.";
-    case ConfigValidationError::PADDLE_MODE:
-      return "Paddle mode must be auto, natural or original.";
-    case ConfigValidationError::CUP_REMOVED_WEIGHT:
-      return "Cup-removed threshold must be from -50 to -0.1 g.";
-    case ConfigValidationError::STOP_PULSE:
-      return "Auto-stop pulse must be from 50 to 1000 ms.";
-    case ConfigValidationError::MAX_SINGLE_PRESS:
-      return "Single-press limit must be from 100 to 5000 ms.";
-    case ConfigValidationError::REED_CONFIRM_TIMEOUT:
-      return "Reed confirm timeout must be from 0.2 to 5 s.";
-    case ConfigValidationError::SHOT_REACT_TIMEOUT:
-      return "Shot reaction timeout must be 0 (compiled default) or from 3 to 30 s.";
-    case ConfigValidationError::SCHEDULED_RESTART:
-      return "Scheduled restart time must be from 00:00 to 23:59.";
-    case ConfigValidationError::FAST_RAMP:
-      return "Fast transition must be from 0 to 10 s in 0.5 s steps.";
-    case ConfigValidationError::FAST_CURVE:
-      return "Fast transition curve must be early, even or late, soft, medium or hard.";
-    case ConfigValidationError::SLOW_RAMP:
-      return "Slow transition must be from 0 to 10 s in 0.5 s steps.";
-    case ConfigValidationError::SLOW_CURVE:
-      return "Slow transition curve must be early, even or late, soft, medium or hard.";
+// The INVALID_CONFIG error body: rule + params + message (resolved from the
+// generated catalog table) + the failing field name.
+void configValidationErrorBody(ConfigValidationError error, char *body,
+                                size_t capacity) {
+  const ValidationFailure failure = configValidationFailure(error);
+  if (failure.reason == nullptr || capacity == 0) return;
+  char message[160] = {};
+  const char *const *params =
+      failure.params[0] != nullptr ? failure.params : nullptr;
+  const char *prose =
+      errorReasonProse(failure.reason, params, message, sizeof(message));
+  size_t at = 0;
+  if (params != nullptr) {
+    at = static_cast<size_t>(snprintf(
+        body, capacity,
+        "{\"error\":\"INVALID_CONFIG\",\"reason\":\"%s\",\"params\":[\"%s\"",
+        failure.reason, failure.params[0]));
+    if (at >= capacity) at = capacity - 1;
+    for (size_t i = 1; i < 3 && failure.params[i] != nullptr; ++i) {
+      const int added =
+          snprintf(body + at, capacity - at, ",\"%s\"", failure.params[i]);
+      if (added < 0 || at + static_cast<size_t>(added) >= capacity) break;
+      at += static_cast<size_t>(added);
+    }
+    snprintf(body + at, capacity - at,
+             "],\"message\":\"%s\",\"field\":\"%s\"}", prose,
+             configValidationErrorName(error));
+  } else {
+    snprintf(body, capacity,
+             "{\"error\":\"INVALID_CONFIG\",\"reason\":\"%s\",\"message\":\"%s\","
+             "\"field\":\"%s\"}",
+             failure.reason, prose, configValidationErrorName(error));
   }
-  return "Invalid configuration.";
 }
 
 // Recipe fields arrive in grams and seconds with tenths and are stored as

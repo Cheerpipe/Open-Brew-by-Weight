@@ -1392,21 +1392,39 @@ esp_err_t OpenBrewByWeightNetwork::sendError(httpd_req_t *request,
                                         const char *status,
                                         const char *error,
                                         const char *message,
-                                        const char *reason) {
+                                        const char *reason,
+                                        const char *const *params) {
   // Reason-coded sentences carry no prose argument: the sentence lives in the
-  // generated catalog table (en.json err.*). A table miss (the build's checks
-  // prevent one) falls back to the reason code, never empty. Debt sites pass
-  // their own prose with a null reason and keep it verbatim.
+  // generated catalog table (en.json err.*). A parameterized rule formats its
+  // message from the generated form (one snprintf) and its params join the
+  // body; a table miss (the build's checks prevent one) falls back to the
+  // reason code, never empty. Debt sites pass their own prose with a null
+  // reason and keep it verbatim.
   const char *prose = message;
   if (prose == nullptr && reason != nullptr) {
-    const char *resolved = errorReasonText(reason);
-    prose = resolved != nullptr ? resolved : reason;
+    char formatted[160];
+    prose = errorReasonProse(reason, params, formatted, sizeof(formatted));
+  } else {
+    params = nullptr;
   }
   // No caller sends both nulls (debt sites always pass prose); keep the
   // format string free of a null %s regardless.
   if (prose == nullptr) prose = "";
   char body[256] = {};
-  if (reason != nullptr) {
+  if (reason != nullptr && params != nullptr && params[0] != nullptr) {
+    size_t at = static_cast<size_t>(snprintf(
+        body, sizeof(body),
+        "{\"error\":\"%s\",\"reason\":\"%s\",\"params\":[\"%s\"", error, reason,
+        params[0]));
+    if (at >= sizeof(body)) at = sizeof(body) - 1;
+    for (size_t i = 1; i < 3 && params[i] != nullptr; ++i) {
+      const int added =
+          snprintf(body + at, sizeof(body) - at, ",\"%s\"", params[i]);
+      if (added < 0 || at + static_cast<size_t>(added) >= sizeof(body)) break;
+      at += static_cast<size_t>(added);
+    }
+    snprintf(body + at, sizeof(body) - at, "],\"message\":\"%s\"}", prose);
+  } else if (reason != nullptr) {
     snprintf(body, sizeof(body),
              "{\"error\":\"%s\",\"reason\":\"%s\",\"message\":\"%s\"}", error,
              reason, prose);

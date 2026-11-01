@@ -87,6 +87,21 @@ Every error body carries a third field between `error` and `message`:
   change in any release, so never parse, match on, or present it as stable
   output — the contract is the HTTP status plus the `error` and `reason`
   codes. Map `reason` to your own text for anything a person will read.
+- Some reasons are **validation rules**, not one fixed sentence: their body
+  carries a `params` array between `reason` and `message`, and the sentence
+  is the rule's template with the params substituted in order. Validation of
+  a saved config, for example, answers:
+
+  ```json
+  {"error":"INVALID_CONFIG","reason":"FIELD_RANGE",
+    "params":["Max shot time","5","60 s"],
+    "message":"Max shot time must be from 5 to 60 s.","field":"operationalWallMs"}
+  ```
+
+  `params` is purely additive: substitute it into the template when you render
+  the sentence yourself, ignore it when you map `reason` to your own text.
+  Parameters appear exactly as `message` shows them, without JSON escaping
+  beyond the body's own quoting.
 - A few field-validation errors whose messages are built from the request's
   own field names still answer without a `reason`; treat a missing `reason`
   as unmapped and use `message`.
@@ -94,7 +109,18 @@ Every error body carries a third field between `error` and `message`:
   locale, `en.json`); the controller derives both its API prose and its Web
   UI text from that catalog at build time, so the two can never drift apart.
 
-The 240 codes, grouped by the routes that answer with them:
+The 261 codes, grouped by the routes that answer with them.
+
+#### Validation rule templates (parameterized)
+
+These codes carry a `params` array; the sentence is the template with the
+params substituted in order (see the example above).
+
+| Reason | Template | `params`, in order |
+| --- | --- | --- |
+| ``FIELD_ENUM`` | {0} must be {1}. | field, accepted values |
+| ``FIELD_RANGE`` | {0} must be from {1} to {2}. | field, minimum, maximum |
+| ``FIELD_RANGE_INT`` | {0} must be an integer from {1} to {2}. | field, minimum, maximum |
 
 #### Sign-in, Admin unlock, and the owned Web UI routes
 
@@ -160,8 +186,25 @@ The 240 codes, grouped by the routes that answer with them:
 | ``BULLSEYE_TEST_REQUEST_REQUIRED`` | A Bullseye RTTTL test request is required. |
 | ``BULLSEYE_TEST_REQUIRES_READY`` | The Bullseye melody can be tested only while Ready. |
 | ``CLOCK_SYNC_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before syncing the clock. |
+| ``CONFIG_BBW_RETARE_RELATION`` | Earliest weight stop must be at least the effective retare window + 3 s. |
+| ``CONFIG_BOOKOO_VOLUME_RANGE`` | Bookoo scale volume must be disabled (0) or 1 to 5. |
+| ``CONFIG_COMBINED_TARE_REQUIRES_AUTOTARE`` | The Bookoo combined command requires automatic tare. |
+| ``CONFIG_FAST_BEFORE_RULES`` | The shot time window must start at least 2 s after the earliest weight stop, end at least 1 s later, and use 0.5 s steps. |
+| ``CONFIG_FAST_MARGIN_RULES`` | Extra yield for fast shots must be 0.5 to 10 g, at most a quarter of the target, and keep the target plus extra within 200 g. |
+| ``CONFIG_FAST_RAMP_STEPS`` | Fast transition must be from 0 to 10 s in 0.5 s steps. |
+| ``CONFIG_INVALID`` | Invalid configuration. |
 | ``CONFIG_LOCKED_DURING_ACTIVE_CYCLE`` | Configuration is locked while a cycle is active. |
+| ``CONFIG_NTP_CUSTOM_INVALID`` | Custom NTP hostname is invalid (letters, digits, '.', '-'; max 63 chars). |
+| ``CONFIG_PADDLE_REMINDER_RELATION`` | Paddle reminder limit must be from 1 to 60 min and at least the reminder interval. |
+| ``CONFIG_RETARE_STABILITY_RELATION`` | Retare min stable time must be ≤ retare window and ≤ samples × sample gap. |
 | ``CONFIG_REVISION_STALE`` | Config changed; refresh and retry. |
+| ``CONFIG_SCALE_LOSS_WINDOW`` | The scale-loss stop time must be empty or between the earliest weight stop and the max shot time. |
+| ``CONFIG_SHOT_REACT_TIMEOUT_RANGE`` | Shot reaction timeout must be 0 (compiled default) or from 3 to 30 s. |
+| ``CONFIG_SLOW_AFTER_RULES`` | The shot time window must end at least 1 s before the max shot time, in 0.5 s steps. |
+| ``CONFIG_SLOW_MARGIN_RULES`` | Less yield for slow shots must be 0.5 to 10 g and leave at least 5 g. |
+| ``CONFIG_SLOW_RAMP_STEPS`` | Slow transition must be from 0 to 10 s in 0.5 s steps. |
+| ``CONFIG_TIMING_RELATION`` | Required: rinse gesture < max shot time; rinse duration, retare window, and earliest weight stop each ≤ max shot time. |
+| ``CONFIG_WEIGHT_OFFSET_INTERNAL`` | Internal offset is invalid; it cannot be edited from the Web UI. |
 | ``DATE_TIME_DISABLED`` | Date and time settings are unavailable while the firmware is disabled. |
 | ``FACTORY_RESET_BUSY`` | Control is busy; no settings were erased. |
 | ``FACTORY_RESET_CONFIRMATION_REQUIRED`` | An explicit factory-reset confirmation is required. |
@@ -206,6 +249,7 @@ The 240 codes, grouped by the routes that answer with them:
 | ``STATUS_BUSY`` | Status snapshot is busy; retry shortly. |
 | ``TASK_PROFILER_UNCHANGED`` | Task profiler state was not changed. |
 | ``TIMEZONE_ALREADY_SET`` | The time zone was already saved. |
+| ``TIMEZONE_ID_CHOOSE`` | Choose a supported IANA time zone. |
 | ``TIME_SYNC_DISABLED`` | Time sync is unavailable while the firmware is disabled. |
 | ``UNKNOWN_ROUTE`` | Unknown API route. |
 | ``UNKNOWN_SCALE`` | mac is not a known scale. |
@@ -216,7 +260,6 @@ The 240 codes, grouped by the routes that answer with them:
 | ``WEBHOOK_UNAVAILABLE`` | The webhook worker is unavailable or its queue is full. |
 | ``WIFI_SCAN_BUSY`` | Control is busy; scan was not started. |
 | ``WIFI_SCAN_REQUIRES_READY`` | Wi-Fi scanning is available only while Ready. |
-
 #### Companion pairing and relay
 
 | Reason | `message` sentence |

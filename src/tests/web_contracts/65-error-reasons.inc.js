@@ -11,7 +11,7 @@
   const catalog = JSON.parse(
       fs.readFileSync(path.join(sketchDir, 'web', 'locales', 'en.json'), 'utf8')).strings;
   const errKeys = Object.keys(catalog).filter((key) => key.startsWith('err.'));
-  assert.equal(errKeys.length, 240, 'the err.* section holds the 240 frozen reason codes');
+  assert.equal(errKeys.length, 261, 'the err.* section holds the 261 reason codes');
 
   // The map in runtime.js references each err.* key exactly once, and every
   // referenced key exists (the localize check enforces the same at build).
@@ -24,6 +24,9 @@
   // The render chain itself, executed against the authoring source.
   const run = vm.createContext({
     __WEBUI_TEXT__: (key) => catalog[key],
+    // The substitution convention runtime.js owns; mirrored here so the
+    // chain below executes standalone.
+    sub: (text, values) => text.replace(/\{(\d)\}/g, (_, i) => values[+i]),
   });
   vm.runInContext(
       blockAt(rawRuntimeJs, 'const errorReasonTexts = {') + '\n' +
@@ -31,6 +34,20 @@
       run);
   assert.equal(run.errorText({reason: 'CRASH_DELETE_NOT_CONFIRMED', message: 'anything'}),
       catalog['err.crash_delete_not_confirmed'], 'a mapped reason renders the locale text');
+  // Parameterized rules: the wire params substitute into the template's
+  // {0}.. placeholders; nothing else about the render changes.
+  assert.ok(/\{0\}/.test(catalog['err.field_range']),
+      'rule templates carry {n} placeholders');
+  assert.equal(run.errorText({reason: 'FIELD_RANGE',
+    params: ['Max shot time', '5', '60 s'], message: 'anything'}),
+      catalog['err.field_range']
+          .replace('{0}', 'Max shot time').replace('{1}', '5').replace('{2}', '60 s'),
+      'a mapped reason with params renders the substituted template');
+  assert.equal(run.errorText({reason: 'FIELD_ENUM',
+    params: ['No-scale BBW mode', 'off, warn_once, or require_scale'], message: 'anything'}),
+      catalog['err.field_enum']
+          .replace('{0}', 'No-scale BBW mode').replace('{1}', 'off, warn_once, or require_scale'),
+      'an enum rule substitutes its field and accepted list');
   assert.equal(run.errorText({reason: 'SHOT_STORAGE_BUSY', error: 'SHOT_TRACE_BUSY',
     message: catalog['err.shot_storage_busy']}),
       catalog['err.shot_storage_busy'], 'the reason tier wins over error and message');
@@ -51,6 +68,12 @@
       'api() carries the reason on the error object');
   assert.ok(codeIncludes(runtimeJs, 'reason: data.reason || ""'),
       'apiBinary() carries the reason on the error object');
+  assert.ok(codeIncludes(runtimeJs, 'sub(reasonText, data.params)'),
+      'errorText() substitutes wire params into the reason template');
+  assert.ok(codeIncludes(runtimeJs, 'err.params = data.params || null'),
+      'api() carries the params on the error object');
+  assert.ok(codeIncludes(runtimeJs, 'params: data.params || null'),
+      'apiBinary() carries the params on the error object');
   assert.ok(codeIncludes(runtimeJs, 'const detail = errorText(e)'),
       'formatCommandError renders through the chain');
 }

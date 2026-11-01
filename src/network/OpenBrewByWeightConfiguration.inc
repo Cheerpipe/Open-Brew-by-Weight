@@ -608,9 +608,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
     self.log(DebugCategory::CONFIG, DebugCode::CONFIG_REJECTED,
              static_cast<int32_t>(error));
     char errorBody[320] = {};
-    snprintf(errorBody, sizeof(errorBody),
-             "{\"error\":\"INVALID_CONFIG\",\"message\":\"%s\",\"field\":\"%s\"}",
-             configValidationMessage(error), configValidationErrorName(error));
+    configValidationErrorBody(error, errorBody, sizeof(errorBody));
     return sendJson(request, STATUS_UNPROCESSABLE, errorBody);
   }
   WebCommand command;

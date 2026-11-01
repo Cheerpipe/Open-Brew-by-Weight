@@ -1,4 +1,7 @@
 const VIEW_NAMES = webUi.VIEW_NAMES;
+const errorCatalog = JSON.parse(
+    fs.readFileSync(path.join(sketchDir, 'web', 'locales', 'en.json'), 'utf8'))
+    .strings;
 
 (async () => {
   const assert = require('assert').strict, generated = await webUi.generate();
@@ -600,7 +603,7 @@ if (!codeIncludes(ui, 'id="operationalWallS" type="number" min="5" max="60"') ||
     !codeIncludes(ui, 'Max shot time (s)') ||
     !codeIncludes(ui, 'sToMs(') ||
     !codeIncludes(ui, 'rinseGestureMs:sToMs') ||
-    !network.includes('Max shot time must be from 5 to 60 s.')) {
+    !domainHeader.includes('validationFailure("FIELD_RANGE", "Max shot time", "5", "60 s")')) {
   throw new Error('Max shot time must be capped at 60 s in the UI and API messages');
 }
 if (!codeIncludes(ui, 'function rangeCheck(') ||
@@ -611,8 +614,10 @@ if (!codeIncludes(ui, 'function rangeCheck(') ||
     !codeIncludes(ui, 'id="goalWeightG" type="number" min="10" max="200" step="0.1"') ||
     !codeIncludes(ui, 'validateNetworkClient') ||
     !codeIncludes(ui, 'validateDevicePasswordClient') ||
-    !network.includes('Extra yield for fast shots must be 0.5 to 10 g') ||
-    !network.includes('The shot time window must start at least 2 s') ||
+    !/0\.5 to 10 g/.test(errorCatalog['err.config_fast_margin_rules']) ||
+    !domainHeader.includes('validationFailure("CONFIG_FAST_MARGIN_RULES")') ||
+    !/at least 2 s/.test(errorCatalog['err.config_fast_before_rules']) ||
+    !domainHeader.includes('validationFailure("CONFIG_FAST_BEFORE_RULES")') ||
     !network.includes('SSID must be 1–32 characters.') ||
     !network.includes('configValidationErrorName(error)')) {
   throw new Error('UI/API must expose specific validation ranges, inline errors, and field-aware config errors');
