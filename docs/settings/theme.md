@@ -33,7 +33,9 @@ final weight, and it comes in two looks. Pick the one you want to see:
   color of that expectation, so you can read the pace from across the counter.
   After the shot, the zone it actually landed in stays lit, and you can drag
   the dot along the curve to read the time, the weight and the stop line at
-  any point.
+  any point. The dot starts at the last reading, drips included; when drips
+  kept falling after the machine stopped, a smaller dot marks where the shot
+  was actually cut.
 - **Colorful** (default) fills the whole card with the shot's color, and
   shows a simpler line drawing of the weight and flow. See
   [Shot card colors](#shot-card-colors) for how its color behaves while a

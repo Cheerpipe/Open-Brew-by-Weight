@@ -5935,6 +5935,9 @@ function renderHeroTechnicalChart(host, d, model, m) {
     end = d.live ? last.at(-1)?.at(-1) : null,
     at = d.live && d.fcEndMs ? d.fcEndMs / 1e3 : 0,
     fc = at && end ? [at, cutLine(at, m)] : null,
+    // The shot cards' small stop dot: with a drip tail past the real stop, it
+    // marks where the machine actually cut the shot (the curve's junction).
+    stop = !d.live ? model.dripSegs[0]?.pts[0] : null,
     view = presetGraph(host, m, {
       compact: true,
       hatch: true,
@@ -5950,6 +5953,7 @@ function renderHeroTechnicalChart(host, d, model, m) {
       maxT: Math.max(m.wall, model.timeMax),
       now: end,
       fc,
+      stop: stop && [stop.t, stop.cg / 100],
     });
   if (!view) return;
   host._view = view;
@@ -5971,12 +5975,13 @@ function renderHeroTechnicalChart(host, d, model, m) {
         host.querySelectorAll("." + b).forEach((e) => (e.style.fillOpacity = v));
     }
   } else {
-    // A new shot parks the cursor at its end; the ended shot scrubs like a
-    // shot card, the cursor riding this curve.
+    // A new shot parks the cursor at its curve's end, drip tail included;
+    // while that tail still grows the cursor keeps riding the end. Once
+    // scrubbed it stays put: the ended shot scrubs like a shot card.
     const key = d.shotId ?? d.elapsedMs;
-    if (host._shotKey !== key) {
+    if (host._shotKey !== key || host._cursorT === host._curve?.at(-1)?.t) {
       host._shotKey = key;
-      host._cursorT = last.at(-1).at(-1)[0];
+      host._cursorT = model.pts.at(-1).t;
     }
     if (!host.dataset.bound) {
       host.dataset.bound = "1";
