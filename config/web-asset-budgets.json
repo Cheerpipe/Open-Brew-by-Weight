@@ -7,8 +7,8 @@
   },
   "limits": {
     "source.html": 135412,
-    "source.js": 740687,
-    "source.htmlJs": 876099,
+    "source.js": 740706,
+    "source.htmlJs": 876118,
     "gzip.shellHtml": 5886,
     "gzip.shellJs": 8622,
     "gzip.css": 20228,
@@ -23,6 +23,6 @@
     "raw.icon192": 31500,
     "raw.icon48": 3500,
     "gzip.coldHome": 87302,
-    "gzip.combined": 203114
+    "gzip.combined": 203152
   }
 }
