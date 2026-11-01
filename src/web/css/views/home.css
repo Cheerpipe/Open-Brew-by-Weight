@@ -304,32 +304,39 @@
   gap: 0.45rem;
   margin-top: 0.65rem;
 }
-/* One dot per card in its verdict colour; the shown card's dot grows. */
+/* One pill per card with its time, tinted by its verdict; the shown card's
+   pill widens and turns solid. */
 .deckDots button {
   position: relative;
-  width: 0.55rem;
-  height: 0.55rem;
-  padding: 0;
+  width: 3.9rem;
+  padding: 0.3rem 0;
   border: 0;
-  border-radius: 1rem;
-  background: var(--tint);
-  opacity: 0.45;
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
+  color: color-mix(in srgb, var(--tint) 85%, var(--fg));
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  opacity: 0.7;
   cursor: pointer;
-  transition:
-    width 0.25s,
-    opacity 0.25s;
+  transition-property: width, background, color, opacity;
+  transition-duration: 0.25s;
 }
 .deckDots button::after {
   content: "";
   position: absolute;
-  inset: -0.7rem -0.25rem;
+  inset: -0.45rem -0.2rem;
 }
 .deckDots button[aria-selected="true"] {
-  width: 1.6rem;
+  width: 6.4rem;
+  background: var(--tint);
+  color: var(--on);
   opacity: 1;
 }
 .heroDeck.pinned .deckDots button:not([aria-selected="true"]) {
-  opacity: 0.2;
+  opacity: 0.35;
   cursor: default;
 }
 

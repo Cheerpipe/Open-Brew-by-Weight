@@ -43,12 +43,13 @@ final weight, and it comes in two looks. Pick the one you want to see:
   shot runs.
 
 Whichever look you pick, the card also keeps your two shots before the latest
-one. Swipe sideways anywhere on the card, or tap the dots under it, to step back
-through them; the line above the card says which one you are looking at, when
-it was pulled and its place out of three, and each dot takes that shot's
-color. On the Technical card, a swipe that starts on the graph's dot moves the
-dot instead. The older shots load together with Home, and while a shot
-is running the card stays on it until it ends.
+one. Swipe sideways anywhere on the card, or tap the pills under it, to step
+back through them; the line above the card says which one you are looking at,
+when it was pulled and its place out of three. Each pill shows that shot's time
+in its color, so you can compare all three at a glance, and the one you are
+looking at is wider. On the Technical card, a swipe that starts on the graph's
+dot moves the dot instead. The older shots load together with Home, and while a
+shot is running the card stays on it until it ends.
 
 The machine's default is chosen in **Admin → Frontend**, and every browser
 and installed app follows it. An [installed app](app.md) can pick its own in

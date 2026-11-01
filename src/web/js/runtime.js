@@ -5591,6 +5591,8 @@ function renderHeroDeck() {
         b = dots.appendChild(document.createElement("button"));
       b.type = "button";
       b.setAttribute("role", "tab");
+      // Each pill names its shot by time; heroNum keeps the hero's ticking.
+      b.textContent = s.querySelector(".heroTime")?.textContent || "";
       b.onclick = () => deck.classList.contains("pinned") || scrollHeroDeck(i, true);
       const host = r !== hero && s.querySelector(".heroChart");
       if (!host) return;
@@ -5627,7 +5629,7 @@ function scrollHeroDeck(i, smooth) {
   });
   markHeroDeck(i);
 }
-// Header, dots and slide labels follow the shown card.
+// Header, pills and slide labels follow the shown card.
 function markHeroDeck(i) {
   const slides = $("heroDeckTrack").children,
     n = slides.length;
@@ -5642,8 +5644,7 @@ function markHeroDeck(i) {
   $("heroDeckCount").textContent = sub(__WEBUI_TEXT__("home.deck_count"), [i + 1, n]);
   [...$("heroDeckDots").children].forEach((b, k) => {
     b.setAttribute("aria-selected", k === i);
-    b.setAttribute("aria-label", sub(__WEBUI_TEXT__("home.deck_count"), [k + 1, n]));
-    slides[k]?.setAttribute("aria-label", b.getAttribute("aria-label"));
+    slides[k]?.setAttribute("aria-label", sub(__WEBUI_TEXT__("home.deck_count"), [k + 1, n]));
   });
 }
 function ensureSettingsStream() {
@@ -6100,6 +6101,8 @@ function heroNum(id, v) {
     [, n, u = ""] = /^(.*\d)(\s?(?:g\/s|[gs]))$/.exec(v || "") || [0, v || ""];
   e.hidden = !v;
   if (e.textContent === n + u) return v;
+  const pill = id === "Elapsed" && $("heroDeckDots")?.firstChild;
+  if (pill) pill.textContent = n + u;
   e.replaceChildren(n);
   if (u) e.append(Object.assign(document.createElement("small"), { textContent: u }));
   return v;
