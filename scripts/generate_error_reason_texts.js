@@ -388,7 +388,7 @@ function main() {
       fs.renameSync(temporary, output);
     }
   }
-  console.log(`Error reason texts: ${codes.size} catalog codes, ` +
+  console.log(`Generated error reason texts: ${codes.size} catalog codes, ` +
       `${referenced.size} referenced at call sites, ` +
       `${arities.size - [...arities.values()].filter((a) => !a).length} ` +
       `rule templates at ${ruleSites} validation sites` +
