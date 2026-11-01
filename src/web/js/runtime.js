@@ -2699,8 +2699,14 @@ function companionHere(fresh) {
   if (location.protocol !== "https:") return Promise.resolve(null);
   if (fresh || !companionHereLoad)
     companionHereLoad = fetchJson("/__companion/status", { cache: "no-store" }, 4e3)
-      .then(([r, j]) => (uiState.companionHere = r.ok && typeof j?.paired === "boolean" ? j : null))
-      .catch(() => null);
+      // A reply that did not come keeps the last good answer (I12): the
+      // archive rows and a 500/1000 selection never vanish for one failure.
+      .then(
+        ([r, j]) =>
+          (uiState.companionHere =
+            r.ok && typeof j?.paired === "boolean" ? j : uiState.companionHere),
+      )
+      .catch(() => uiState.companionHere);
   return companionHereLoad;
 }
 // It may ask to pair unless it is paired, already asking, paired with another

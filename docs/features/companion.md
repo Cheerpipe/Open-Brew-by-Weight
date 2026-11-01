@@ -177,7 +177,8 @@ continuous history:
   that the older history is in the companion.
 - The companion's own page (its address, then **Companion**) shows the whole
   stored history with a level filter, an **Export everything** download and
-  **Delete the log history**.
+  **Delete the log history** (which needs the controller on, to confirm your
+  sign-in).
 - The history opens only for a browser the controller lets open the Web UI:
   with the Web UI password on, one that signed in through the companion.
   That browser keeps reading it while the controller is off, and even after
@@ -214,8 +215,10 @@ never competes with your scale.
 
 **Through the companion**, Stats and History are one list. Sorting and
 filters work on the whole history, newest or oldest first, by rating, by
-preset, by scale and by result. Records only the companion keeps have a grey
-number badge: hover or long-press it to read **Kept by the companion**. Since
+preset, by scale and by result. Records only the companion keeps are marked:
+in Stats their number badge is grey, in History their type badge has a
+dashed outline. Hovering the badge, or a screen reader, says **Kept by the
+companion**. Since
 numbers restart after a Clear or a factory reset, a list sorted by date shows
 a line such as **History restarted on 3 Mar 2026** where an earlier history
 begins; in other orders the badge's description names that date.
@@ -238,7 +241,10 @@ end with a note that the companion keeps a copy, including older records.
 A shot or activation's **⋯** menu offers, through the companion:
 
 - **Delete everywhere**: from the controller and from the companion.
-- **Remove from the controller only**: the companion keeps its copy.
+- **Remove from the controller only**: the companion keeps its copy. The
+  newest record may not be copied yet (the companion copies a few minutes
+  after each shot); a message then says so, and the record stays on the
+  controller until you try again.
 - **Remove from the archive only**: the controller keeps it, and the
   companion does not copy it again.
 
@@ -249,7 +255,8 @@ controller, and the companion deletes its copy at its next sync, unless its
 
 **Clear history** through the companion offers **Also delete the companion's
 copy**, unchecked: left alone, the companion keeps everything, and your
-earlier history stays in the list. Opened directly, Clear history and a
+earlier history stays in the list (it appears once the companion has caught
+up, usually within a couple of minutes). Opened directly, Clear history and a
 factory reset leave the companion's copy as it is.
 
 The companion's own page (its address, then **Companion**) has an **Archive**

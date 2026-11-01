@@ -1656,19 +1656,26 @@ async function companionLog(path) {
 async function loadLogOlder() {
   if (logHistoryBusy || !logHistoryAvailable()) return;
   logHistoryBusy = true;
+  // The newest stored events are usually still in the live ring, which shows
+  // them already: one tap pages on until it brings a line the view lacks.
+  const live = new Set(R.uiState.logEvents.map((e) => e.sequence)),
+    shown = (e) => e.g || !(e.b === logBootId && live.has(e.s));
   try {
-    const next = logHistoryNext;
-    const url =
-      "/__companion/log?limit=100" + (next ? `&boot=${next.boot}&before=${next.before}` : "");
-    const page = await (await companionLog(url)).json();
-    if (!page || !Array.isArray(page.entries)) throw Error();
-    // The page is newest first: flip it onto the front of the history.
-    logHistory = page.entries.slice().reverse().concat(logHistory);
-    logHistoryNext = page.next;
-    logHistoryDone = !page.next;
+    for (let pages = 0, added = false; !added && !logHistoryDone && pages < 8; pages++) {
+      const next = logHistoryNext;
+      const url =
+        "/__companion/log?limit=100" + (next ? `&boot=${next.boot}&before=${next.before}` : "");
+      const page = await (await companionLog(url)).json();
+      if (!page || !Array.isArray(page.entries)) throw Error();
+      // The page is newest first: flip it onto the front of the history.
+      logHistory = page.entries.slice().reverse().concat(logHistory);
+      logHistoryNext = page.next;
+      logHistoryDone = !page.next;
+      added = page.entries.some(shown);
+    }
     R.paint(renderLog);
   } catch (_) {
-    logHistoryDone = true; // A store that does not answer stops offering more.
+    // A page that did not come: Show older stays offered for another try.
   } finally {
     logHistoryBusy = false;
     logHistoryControls();

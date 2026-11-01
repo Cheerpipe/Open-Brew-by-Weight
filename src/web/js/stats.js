@@ -987,6 +987,9 @@ function statsWindowChoices() {
   if (!shown.includes(R.uiState.statsWindow) && (merged ? statsMergedGood != null : statsSynced)) {
     R.uiState.statsWindow = shown.at(-1);
     sendStatsWindow();
+    // 500→100 or 1000→500 may leave the controller's window as it was: the
+    // whole-history header follows the new choice itself.
+    if (merged) refreshMergedHeader();
   }
 }
 function sendStatsWindow() {
@@ -1249,9 +1252,15 @@ function statsArchiveQuery() {
     else if (v.length) q[k] = v.join(",");
   return q;
 }
+// In rating order a new rating moves the row: the archive rows reload in
+// place, so the merge stays a prefix of the companion's order.
 const rateArchivedShot = (r, n) =>
   companionArchive("rate", { id: r.id, generation: r.archiveGeneration, rating: n }).then(
-    () => ((r.rating = n), renderShots()),
+    () => {
+      r.rating = n;
+      if (R.uiState.shotSort === "rating") archiveChanged("shots", renderShots);
+      renderShots();
+    },
     (e) => R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
   );
 async function deleteOneShot(r, scope = "everywhere") {
@@ -2333,6 +2342,7 @@ function statsFrameWindow(offset, limit, sort, dir, timeoutMs, filter = {}) {
 async function clearShotHistory() {
   const answer = await confirmClear(
     __WEBUI_TEXT__("runtime.clear_all_recorded_shot_history_this_cannot"),
+    "shots",
   );
   if (!answer) return;
   return R.withCommandGate(async () => {
@@ -2341,7 +2351,7 @@ async function clearShotHistory() {
         method: "POST",
         body: R.body({ confirm: "CLEAR_SHOT_LOG" }),
       });
-      await clearArchiveCopy("shots", answer);
+      await clearArchiveCopy("shots", answer, renderShots);
       R.uiState.shotHistory = {
         bootId: R.uiState.shotHistory.bootId || 0,
         total: 0,
@@ -2617,8 +2627,9 @@ function applyStatsStream(message) {
   }
   R.uiState.statsFetchMark = null;
   statsStreamBoot = message.boot;
-  // A moved store reloads the companion's archive rows with the next render.
-  if (statsStreamEpoch !== page.epoch && statsStreamEpoch) archiveChanged("shots");
+  // A moved store reloads the companion's archive rows in place.
+  if (statsStreamEpoch !== page.epoch && statsStreamEpoch)
+    archiveChanged("shots", () => shotStatsViewActive() && R.paint(renderShots));
   statsStreamEpoch = page.epoch;
   if (page.mode === "replace") {
     statsTag = page.tag;

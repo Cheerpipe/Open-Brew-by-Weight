@@ -343,12 +343,27 @@ function archiveStatsReady() {
   const a = R.uiState.companionHere?.archive;
   return !!(a?.available && a.on && (a.shotsTotal || a.shots) > 0);
 }
-// After an archive change (a removal, an erase, a Clear) or a moved store
-// epoch: the store's archive rows and the companion's facts load again.
-function archiveChanged(store) {
-  delete archiveSources[store];
-  R.companionHere(true);
+// After an archive change (a removal, an erase, a Clear, a rating in rating
+// order) or a moved store epoch: the companion's facts and the store's
+// archive rows load again, in place, and once more when the companion's next
+// sync pass has ended, since it copies a change only after the controller's
+// next frame (D5, S17).
+function archiveChanged(store, render) {
+  const since = R.uiState.companionHere?.archive?.syncedAt ?? 0;
+  R.companionHere(true).then(() => reloadArchive(store, render));
+  if (archiveWatch[store]) return;
+  // Polls the companion (never the controller) until its pass ended; the
+  // notice that starts one comes within about 2.5 minutes (D5).
+  let tries = 36;
+  archiveWatch[store] = setInterval(async () => {
+    const a = (await R.companionHere(true))?.archive;
+    if (--tries > 0 && !(a && !a.syncing && (a.syncedAt ?? 0) > since)) return;
+    clearInterval(archiveWatch[store]);
+    delete archiveWatch[store];
+    if (a) reloadArchive(store, render);
+  }, 5e3);
 }
+const archiveWatch = {};
 async function companionArchive(path, body) {
   const reply = await fetch("/__companion/archive/" + path, {
     cache: "no-store",
@@ -356,36 +371,68 @@ async function companionArchive(path, body) {
     headers: R.webUiHeaders(body && { "Content-Type": "application/json" }),
   });
   const data = await reply.json().catch(() => null);
-  if (!reply.ok) throw Object.assign(Error(data?.message || String(reply.status)), data);
+  if (!reply.ok)
+    throw Object.assign(Error(data?.message || __WEBUI_TEXT__("records.archive_try_again")), data);
   return data;
 }
 // The archive's rows for this view's filter and order (a change starts over).
+const archiveFresh = (key, query) => ({
+  key,
+  query,
+  rows: [],
+  next: null,
+  done: false,
+  failures: 0,
+});
 function archiveSource(store, query) {
   if (!archiveReady(store)) return null;
   const key = JSON.stringify(query);
-  if (archiveSources[store]?.key !== key)
-    archiveSources[store] = { key, query, rows: [], next: null, done: false };
+  if (archiveSources[store]?.key !== key) archiveSources[store] = archiveFresh(key, query);
   return archiveSources[store];
+}
+async function archivePage(store, s) {
+  const q = new URLSearchParams({ limit: store === "shots" ? 20 : 50, ...s.query });
+  if (s.next) q.set("cursor", s.next);
+  const j = await companionArchive(store + "?" + q);
+  // Not enumerable: exports and the offline copy never see it.
+  s.rows.push(...j.rows.map((r) => Object.defineProperty(r, "_archive", { value: s })));
+  Object.assign(s, { next: j.next, done: !j.next, holes: j.holes || [] });
+  Object.assign(s, { gens: j.generations || [], presets: j.presets || [] });
 }
 async function loadArchive(store, render) {
   const s = archiveSources[store];
   if (!s || s.busy || s.done) return;
   s.busy = true;
   try {
-    const q = new URLSearchParams({ limit: store === "shots" ? 20 : 50, ...s.query });
-    if (s.next) q.set("cursor", s.next);
-    const j = await companionArchive(store + "?" + q);
-    if (archiveSources[store] !== s) return;
-    // Not enumerable: exports and the offline copy never see it.
-    s.rows.push(...j.rows.map((r) => Object.defineProperty(r, "_archive", { value: s })));
-    Object.assign(s, { next: j.next, done: !j.next, holes: j.holes || [] });
-    Object.assign(s, { gens: j.generations || [], presets: j.presets || [] });
+    await archivePage(store, s);
+    s.failures = 0;
   } catch (_) {
-    s.done = true;
+    // What is loaded stays; the page is asked again a little later each
+    // time, and after a few tries the list ends there.
+    if (++s.failures >= 4) s.done = true;
+    else setTimeout(() => loadArchive(store, render), 2e3 * 2 ** s.failures);
   } finally {
     s.busy = false;
   }
-  render();
+  if (archiveSources[store] === s) render();
+}
+// The store's archive rows again, as deep as the list had loaded them; the
+// loaded rows stay on screen until the new ones are whole, so the list never
+// jumps back. A source that is gone (or new) loads with the next render.
+async function reloadArchive(store, render) {
+  const old = archiveSources[store];
+  if (old && archiveReady(store)) {
+    const s = archiveFresh(old.key, old.query);
+    try {
+      do await archivePage(store, s);
+      while (!s.done && s.rows.length < old.rows.length);
+    } catch (_) {
+      return;
+    }
+    if (archiveSources[store] !== old) return;
+    archiveSources[store] = s;
+  } else delete archiveSources[store];
+  render?.();
 }
 // The view's order over both sources, the controller's own: by date the
 // history generation and then the id (ids restart with a generation); by
@@ -406,10 +453,15 @@ function recordOrder(s, sort, dir) {
 function mergeRecords(own, ownMore, s, order) {
   if (!s || (!s.rows.length && !s.done))
     return { list: own, need: s && !s.done ? "archive" : null };
-  const list = own.concat(s.rows).sort(order),
-    cut = (more, rows) => (more && rows.length ? list.indexOf(rows.at(-1)) + 1 : list.length),
+  // A kept record is archive-only from the moment it is kept; while the
+  // controller still lists it (its delete on the way), its own row stands.
+  const open = s.gens?.find((g) => g.current)?.generation,
+    held = new Set(own.map((r) => r.id)),
+    rows = s.rows.filter((r) => r.archiveGeneration !== open || !held.has(r.id)),
+    list = own.concat(rows).sort(order),
+    cut = (more, part) => (more && part.length ? list.indexOf(part.at(-1)) + 1 : list.length),
     ownCut = cut(ownMore, own),
-    archiveCut = cut(!s.done, s.rows);
+    archiveCut = cut(!s.done, rows);
   return {
     list: list.slice(0, Math.min(ownCut, archiveCut)),
     need: ownMore && ownCut <= archiveCut ? "own" : s.done ? null : "archive",
@@ -422,15 +474,16 @@ function archiveMark(el, r) {
   const before = (r._archive.gens || [])
     .filter((g) => g.generation > r.archiveGeneration)
     .sort((a, b) => a.generation - b.generation)[0]?.restartedAt;
-  el.classList.add("archiveKept");
-  el.title =
+  const kept =
     __WEBUI_TEXT__("records.archive_kept") +
     (before ? " · " + R.sub(__WEBUI_TEXT__("records.archive_before"), [archiveDate(before)]) : "");
+  el.classList.add("archiveKept");
+  el.title = (el.title ? el.title + " · " : "") + kept;
   // Read aloud too: who keeps it, never only its colour.
   el.append(
     Object.assign(document.createElement("span"), {
       className: "srText",
-      textContent: ", " + el.title,
+      textContent: ", " + kept,
     }),
   );
 }
@@ -531,42 +584,62 @@ async function removeRecord(store, r, scope, path, drop, render) {
   if (scope === "archive")
     try {
       await archive("delete");
-      archiveChanged(store);
+      archiveChanged(store, render);
       render();
       return R.message(__WEBUI_TEXT__("records.archive_removed"), "ok");
     } catch (e) {
       return R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error");
     }
+  // Kept first, so the archive never infers a deletion; a record it has not
+  // copied yet cannot be kept and stays on the controller (the refusal says so).
   if (scope === "controller") await archive("keep");
-  await R.api(path, { method: "POST", body: R.body({ id: r.id }) });
+  try {
+    await R.api(path, { method: "POST", body: R.body({ id: r.id }) });
+  } catch (e) {
+    if (scope === "controller")
+      await companionArchive("keep", { store, id: r.id, kept: false }).catch(() => {});
+    throw e;
+  }
   if (scope === "everywhere" && archiveHere()) await archive("delete").catch(() => {});
-  if (archiveHere()) archiveChanged(store);
+  if (archiveHere()) archiveChanged(store, render);
   drop();
   render();
 }
 // Clear history's confirmation: through the companion it may also delete the
 // companion's copy of the current history (unchecked); opened directly it
-// says the companion keeps its copy (S7). Resolves false, true or "option".
-function confirmClear(plain) {
-  if (archiveHere())
-    return R.askConfirm(
-      plain + " " + __WEBUI_TEXT__("records.clear_kept_here"),
-      __WEBUI_TEXT__("records.clear"),
-      true,
-      __WEBUI_TEXT__("records.clear_with_copy"),
-    );
+// says the companion keeps its copy (S7). Resolves false, true, or with the
+// option the copy to delete: the companion's history open at this moment, so
+// a restart the companion notes before the erase arrives cannot redirect it.
+async function confirmClear(plain, store) {
+  if (archiveHere()) {
+    const open = (R.uiState.companionHere?.archive?.generations?.[store] || []).find(
+        (g) => g.current,
+      ),
+      answer = await R.askConfirm(
+        plain + " " + __WEBUI_TEXT__("records.clear_kept_here"),
+        __WEBUI_TEXT__("records.clear"),
+        true,
+        __WEBUI_TEXT__("records.clear_with_copy"),
+      );
+    return answer === "option" ? { copy: true, generation: open?.generation } : answer;
+  }
   return R.askConfirm(
     plain + (archiveDirect() ? " " + __WEBUI_TEXT__("records.clear_kept_direct") : ""),
     __WEBUI_TEXT__("records.clear"),
     true,
   );
 }
-async function clearArchiveCopy(store, answer) {
-  if (answer === "option")
-    await companionArchive("erase", { store, current: true }).catch((e) =>
+async function clearArchiveCopy(store, answer, render) {
+  if (answer?.copy)
+    await companionArchive(
+      "erase",
+      Number.isInteger(answer.generation)
+        ? { store, generation: answer.generation }
+        : { store, current: true },
+    ).catch((e) =>
       R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
     );
-  if (archiveHere()) archiveChanged(store);
+  if (archiveHere()) archiveChanged(store, render);
 }
 // Opened directly, the end of the list says the companion keeps a copy (S11).
 const archiveListNote = (id, more) => ($(id).hidden = more || !archiveDirect());

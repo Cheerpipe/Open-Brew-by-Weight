@@ -542,11 +542,16 @@
   border-radius: var(--r);
   padding: 0.45rem 0.1rem 0.45rem 0.85rem;
 }
-#historyTable tr.histDay {
+/* Day, earlier-history and gap lines in both lists: a plain caption, never a
+   card (the Stats card grid would otherwise frame it). */
+:is(#shotTable, #historyTable) tr.histDay {
   display: block;
   margin: 0.9rem 0.2rem 0.3rem;
+  padding: 0;
+  border: 0;
+  background: none;
 }
-#historyTable tr.histDay th {
+:is(#shotTable, #historyTable) tr.histDay th {
   font-size: 0.6875rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;

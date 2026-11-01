@@ -1155,7 +1155,7 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     css.includes('.panelState{') ||
     css.includes('.panelState.isOver{') ||
     !css.includes('#historyTable tr{display:grid;grid-template-columns:1.75rem minmax(0,1fr) auto auto;grid-template-areas:"icon type dur del" "icon time dur del"') ||
-    !css.includes('#historyTable tr.histDay{display:block') ||
+    !css.includes(':is(#shotTable,#historyTable) tr.histDay{display:block') ||
     !codeIncludes(viewJs.history, 'time.textContent.split(" at ")[0]') ||
     !codeIncludes(viewJs.history, 'head.className="histDay"') ||
     !codeIncludes(viewJs.history, 'HISTORY_PAGE_SIZE=20') ||

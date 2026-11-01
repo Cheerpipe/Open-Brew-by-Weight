@@ -177,6 +177,7 @@ const HISTORY_TYPE_KEYS = [
 async function clearActivationHistory() {
   const answer = await confirmClear(
     __WEBUI_TEXT__("runtime.clear_all_recorded_activation_history_this"),
+    "history",
   );
   if (!answer) return;
   return R.withCommandGate(async () => {
@@ -185,7 +186,7 @@ async function clearActivationHistory() {
         method: "POST",
         body: R.body({ confirm: "CLEAR_HISTORY" }),
       });
-      await clearArchiveCopy("history", answer);
+      await clearArchiveCopy("history", answer, renderHistory);
       R.uiState.historyData = {
         bootId: R.uiState.historyData.bootId || 0,
         total: 0,
@@ -449,7 +450,8 @@ function applyHistoryStream(message) {
     mode,
   );
   historyStreamBoot = message.boot;
-  if (historyStreamEpoch !== message.epoch && historyStreamEpoch) archiveChanged("history");
+  if (historyStreamEpoch !== message.epoch && historyStreamEpoch)
+    archiveChanged("history", () => historyViewActive() && R.paint(renderHistory));
   historyStreamEpoch = message.epoch;
   if (!fetch) historyTag = message.tag;
   historyFetchOffset = -1;
