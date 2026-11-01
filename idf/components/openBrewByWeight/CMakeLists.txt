@@ -64,3 +64,29 @@ idf_component_register(
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-missing-field-initializers)
+
+# API error prose for reason-coded responses is generated from the Web UI
+# locale catalog (en.json err.*) — the single editable copy of the sentences —
+# into the build tree. The same generator runs in the host test build and
+# fails the build on any catalog/map/reason disagreement.
+find_program(OBBW_NODE_EXECUTABLE node REQUIRED)
+set(OBBW_ERROR_TEXTS_HEADER
+  "${CMAKE_BINARY_DIR}/generated/OpenBrewByWeightErrorReasonTexts.h")
+file(GLOB CONFIGURE_DEPENDS OBBW_ERROR_TEXT_SCANNED
+  "${OPEN_BREW_BY_WEIGHT_DIR}/network/*.inc"
+  "${OPEN_BREW_BY_WEIGHT_DIR}/diagnostics/*.inc")
+add_custom_command(
+  OUTPUT "${OBBW_ERROR_TEXTS_HEADER}"
+  COMMAND "${OBBW_NODE_EXECUTABLE}"
+          "${CMAKE_CURRENT_LIST_DIR}/../../../scripts/generate_error_reason_texts.js"
+          --output "${OBBW_ERROR_TEXTS_HEADER}"
+  DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/../../../scripts/generate_error_reason_texts.js"
+    "${OPEN_BREW_BY_WEIGHT_DIR}/web/locales/en.json"
+    "${OPEN_BREW_BY_WEIGHT_DIR}/web/js/runtime.js"
+    "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightNetwork.h"
+    ${OBBW_ERROR_TEXT_SCANNED}
+  VERBATIM)
+add_custom_target(openbrewbyweight_error_reason_texts
+  DEPENDS "${OBBW_ERROR_TEXTS_HEADER}")
+add_dependencies(${COMPONENT_LIB} openbrewbyweight_error_reason_texts)

@@ -1393,14 +1393,23 @@ esp_err_t OpenBrewByWeightNetwork::sendError(httpd_req_t *request,
                                         const char *error,
                                         const char *message,
                                         const char *reason) {
+  // Reason-coded sentences carry no prose argument: the sentence lives in the
+  // generated catalog table (en.json err.*). A table miss (the build's checks
+  // prevent one) falls back to the reason code, never empty. Debt sites pass
+  // their own prose with a null reason and keep it verbatim.
+  const char *prose = message;
+  if (prose == nullptr && reason != nullptr) {
+    const char *resolved = errorReasonText(reason);
+    prose = resolved != nullptr ? resolved : reason;
+  }
   char body[256] = {};
   if (reason != nullptr) {
     snprintf(body, sizeof(body),
              "{\"error\":\"%s\",\"reason\":\"%s\",\"message\":\"%s\"}", error,
-             reason, message);
+             reason, prose);
   } else {
     snprintf(body, sizeof(body), "{\"error\":\"%s\",\"message\":\"%s\"}",
-             error, message);
+             error, prose);
   }
   return sendJson(request, status, body);
 }

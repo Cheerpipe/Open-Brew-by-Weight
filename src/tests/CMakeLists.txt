@@ -5,6 +5,31 @@ execute_process(
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   COMMAND_ERROR_IS_FATAL ANY)
 
+# The firmware error-prose table is generated from the Web UI locale catalog
+# (en.json err.*) — the single editable copy of the reason-coded API error
+# sentences. The same generator runs in the ESP-IDF component build; it fails
+# on any catalog/map/reason disagreement.
+find_program(NODE_EXECUTABLE node REQUIRED)
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated")
+set(ERROR_REASON_TEXTS_HEADER
+  "${CMAKE_BINARY_DIR}/generated/OpenBrewByWeightErrorReasonTexts.h")
+file(GLOB CONFIGURE_DEPENDS ERROR_REASON_TEXT_SOURCES
+  "${CMAKE_SOURCE_DIR}/src/network/*.inc"
+  "${CMAKE_SOURCE_DIR}/src/diagnostics/*.inc")
+add_custom_command(
+  OUTPUT "${ERROR_REASON_TEXTS_HEADER}"
+  COMMAND "${NODE_EXECUTABLE}"
+          "${CMAKE_SOURCE_DIR}/scripts/generate_error_reason_texts.js"
+          --output "${ERROR_REASON_TEXTS_HEADER}"
+  DEPENDS "${CMAKE_SOURCE_DIR}/scripts/generate_error_reason_texts.js"
+          "${CMAKE_SOURCE_DIR}/src/web/locales/en.json"
+          "${CMAKE_SOURCE_DIR}/src/web/js/runtime.js"
+          "${CMAKE_SOURCE_DIR}/src/OpenBrewByWeightNetwork.h"
+          ${ERROR_REASON_TEXT_SOURCES}
+  VERBATIM)
+add_custom_target(generate_error_reason_texts
+  DEPENDS "${ERROR_REASON_TEXTS_HEADER}")
+
 set(OPENBREWBYWEIGHT_SANITIZER "" CACHE STRING "Host sanitizer")
 # Host tests rely on assert(); keep it active in every build type.
 set(common_options -Wall -Wextra -Werror -pedantic -UNDEBUG)
@@ -74,8 +99,14 @@ else()
     DEFINITIONS OPEN_BREW_BY_WEIGHT_CRASH_HOST_TEST LABEL "host;persistence;safety")
   host_test(crash_archive_routes_host_test
     DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST LABEL "host;network;web")
+  add_dependencies(crash_archive_routes_host_test generate_error_reason_texts)
+  target_include_directories(crash_archive_routes_host_test PRIVATE
+    "${CMAKE_BINARY_DIR}/generated")
   host_test(shot_trace_routes_host_test
     DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST LABEL "host;network;web")
+  add_dependencies(shot_trace_routes_host_test generate_error_reason_texts)
+  target_include_directories(shot_trace_routes_host_test PRIVATE
+    "${CMAKE_BINARY_DIR}/generated")
   host_test(bbw_cutoff_host_test LABEL "host;control;persistence")
   host_test(safety_external_host_test LABEL "host;safety")
   host_test(remote_policy_host_test LABEL "host;safety")

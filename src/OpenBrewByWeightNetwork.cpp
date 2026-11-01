@@ -30,6 +30,7 @@
 #include "OpenBrewByWeightWebhook.h"
 
 #include "OpenBrewByWeightWebAssetsGzip.h"
+#include "OpenBrewByWeightErrorReasonTexts.h"
 
 #include <Arduino.h>
 #include <cJSON.h>
