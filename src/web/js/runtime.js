@@ -3524,21 +3524,25 @@ function updatePresetActionButtons() {
 async function applyPreset(id) {
   id = +id;
   if (!id) return;
-  if (id === presetState.activeId) {
+  // An apply still in flight has not moved activeId yet, so a click on the
+  // card the device still shows is a revert of that apply, not a no-op
+  // reselect: fall through and queue the real apply behind it.
+  if (id === presetState.activeId && (!homeAccPendingId || homeAccPendingId === id)) {
     presetState.selectedId = id;
     renderAllPresetUi();
     return;
   }
+  const seq = ++homeAccApplySeq;
+  homeAccPendingId = id;
   if (uiState.brewDirty && !(await uiState.flushSettings())) {
     presetState.selectedId = presetState.activeId;
+    if (seq === homeAccApplySeq) homeAccPendingId = 0;
     renderAllPresetUi();
     return;
   }
   presetState.selectedId = id;
   configLoaded = false;
   formRev = 0;
-  const seq = ++homeAccApplySeq;
-  homeAccPendingId = id;
   renderAllPresetUi();
   await command("/api/v1/presets", { action: "apply", id });
   if (seq === homeAccApplySeq) {
