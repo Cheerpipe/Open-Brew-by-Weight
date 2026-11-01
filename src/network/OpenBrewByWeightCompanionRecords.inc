@@ -144,6 +144,13 @@ bool OpenBrewByWeightNetwork::companionRecordsSend(size_t used, bool wrap, bool 
       sequence = link->outSequence + 1;
     }
   }
+  // A hold that began while the frame was built: nothing leaves, the
+  // serializer keeps its state (a clean deferral) and the work re-arms.
+  if (fd >= 0 && companionSyncHold()) {
+    memset(key, 0, sizeof(key));
+    deferArm = true;
+    return true;
+  }
   size_t length = 0;
   const size_t start = fd < 0 ? SIZE_MAX
       : companionSealRecord(key, sequence, wrap, g_work->statusJson, used,
@@ -248,8 +255,11 @@ void OpenBrewByWeightNetwork::companionRecordsWork(void *context) {
             link->generation == self.companionRecords_->generation &&
             g_companion.stored.archiveSwitch != 0;
   }
-  bool more = false;
-  if (armed) {
+  // S17 on httpd too: a hold that began after the network task queued this
+  // job sends nothing; the request waits for the hold's end.
+  const bool held = armed && self.companionSyncHold();
+  bool more = held;
+  if (armed && !held) {
     self.callbacks_.refreshControlStatus();
     ControlStatusSnapshot &control = self.workBuf_->control;
     self.loadControlStatus(control);

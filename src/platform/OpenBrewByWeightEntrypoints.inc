@@ -550,6 +550,7 @@ void startAfterBootRecovery() {
     callbacks.copyHistoryPage = copyHistoryPage;
     callbacks.historyEpoch = copyHistoryEpoch;
     callbacks.shotLogEpoch = copyShotLogEpoch;
+    callbacks.recordStoreCounters = copyRecordStoreCounters;
     callbacks.copyShotStats = copyShotStats;
     callbacks.deleteHistoryRecord = deleteHistoryRecord;
     callbacks.clearHistoryLog = clearHistoryLog;

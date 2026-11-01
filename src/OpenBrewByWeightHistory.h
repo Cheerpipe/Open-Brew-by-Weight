@@ -55,6 +55,8 @@ class HistoryLog
   // mutation moves. On a full ring an append only advances nextRecordId, so
   // generation+count alone would miss it. Caller holds the store mutex.
   uint32_t epoch() const { return dualSlotHeaderEpoch(store_.header); }
+  // The write counter: it only grows, Clear keeps it (nextRecordId restarts).
+  uint32_t generation() const { return store_.header.generation; }
 
   // Fills one bounded page (see HistoryPage) of the records whose HistoryType
   // bit is set in `types` (0 = every type); total, offset, and hasMore count

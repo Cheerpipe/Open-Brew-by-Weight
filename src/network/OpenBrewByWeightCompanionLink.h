@@ -962,6 +962,16 @@ inline bool companionNoticeDue(bool subscribed, bool moved, uint32_t stillMs, bo
          stillMs >= COMPANION_NOTICE_SETTLE_MS;
 }
 
+// Whether httpd drops send-job body `index` because a sync hold began after
+// the network task built it (S17): only the sync bodies (the log page, the
+// `rs` notice, the ping's hold answer; 0xFF names none), never the La
+// Marzocco or configuration frames.
+inline bool companionSyncBodyHeld(bool hold, uint8_t index, uint8_t logBody, uint8_t noticeBody,
+                                  uint8_t replyBody) {
+  return hold && index != 0xFF &&
+         (index == logBody || index == noticeBody || index == replyBody);
+}
+
 struct CompanionState {
   CompanionStored stored = {};
   CompanionPairing pairing = {};

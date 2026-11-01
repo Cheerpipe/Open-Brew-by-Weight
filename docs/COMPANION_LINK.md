@@ -360,11 +360,17 @@ the index.
 - **Requests.** `rx`, `rf` and `rt` each replace the pending request of
   their kind. The controller answers one frame per pass, paced like a Stats
   page, and keeps a request through a hold, a busy workspace or a socket that
-  cannot take a frame yet, never dropping it.
+  cannot take a frame yet, never dropping it. A hold that begins after a
+  frame was scheduled still stops it: the controller checks again just
+  before sealing, and drops a queued `log`, `rs` or ping answer (rewinding
+  the log cursor), sending it after the hold.
 - **`rec` answers.** `f` is the ui-stream frame byte for byte, as the
   [Integration API](INTEGRATION_API.md#record-index-for-the-offline-copy)
-  documents it, with three differences: the index lists every shot, bad ones
-  included; fetch windows are newest first by date and unfiltered (every
+  documents it, with four differences: the index lists every shot, bad ones
+  included, and always carries `gen` and `next`, the store header's write
+  counter and next record id (both only grow; `next` returns to 1 on Clear
+  history, both on a factory reset, so a decrease tells the companion its
+  history restarted); fetch windows are newest first by date and unfiltered (every
   shot with `badReason`, every activation type); and Stats pages carry no
   `stats` header member. A Stats page's first frame carries `good`, as for the
   browser. History and index frames reach about 21 KiB, which is why record

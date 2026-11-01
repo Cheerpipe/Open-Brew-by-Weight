@@ -171,7 +171,8 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
       control.bbwPresetId == session.statsPresetId &&
       session.statsWindow == session.statsShownWindow)
     return true;
-  if (session.statsPaging && millis() - session.statsSentAtMs < kStatsStreamPaceMs) {
+  // The link's records work keeps its own pace (companionRecordsService).
+  if (!link && session.statsPaging && millis() - session.statsSentAtMs < kStatsStreamPaceMs) {
     uiStreamUrgent_.store(true, std::memory_order_release);
     return true;
   }
@@ -210,7 +211,9 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     cache.headerPresetId = control.bbwPresetId;
   }
   const size_t count = snapshot.count;
-  if (reload || header || cache.offset != offset || cache.limit != limit ||
+  // The order follows the store copy too: another session (or the record
+  // index) may have reloaded it since, and the link never rebuilds a header.
+  if (reload || header || cache.orderEpoch != epoch || cache.offset != offset || cache.limit != limit ||
       cache.sort != sort || cache.dir != dir || cache.filterHash != filterHash) {
     // Materialize the requested order as an index permutation over the
     // newest-first cache: date/desc is the store order, date/asc its
@@ -237,6 +240,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
         cache.order[count - 1U - index] = swapped;
       }
     }
+    cache.orderEpoch = epoch;
     cache.matched = cache.good = 0;
     for (size_t index = 0; index < count; ++index)
       if (shotListFilterMatches(filter, snapshot.records[cache.order[index]])) {
@@ -406,7 +410,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   if (more) {
     // Give ACKs time to free TCP credit without delaying live Home updates.
     session.statsSentAtMs = millis();
-    uiStreamUrgent_.store(true, std::memory_order_release);
+    if (!link) uiStreamUrgent_.store(true, std::memory_order_release);
     return true;
   }
   session.statsPaging = false;
@@ -446,10 +450,18 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
   // The companion archive's index lists every shot, bad ones included.
   const bool link = companionRecordsSession(session);
   size_t used = link ? COMPANION_RECORD_ORIGIN : 0;
+  // The link adds the header counters (S19), read before the rows: only a
+  // Clear or a factory reset makes nextRecordId (or generation) go back.
+  uint32_t generation = 0, next = 0;
+  if (link && callbacks_.recordStoreCounters) callbacks_.recordStoreCounters(shots, generation, next);
   if (!statusJsonAppend(&used, "{\"v\":1,\"type\":\"records\",\"boot\":%lu,"
-                               "\"store\":\"%s\",\"epoch\":%lu%s",
+                               "\"store\":\"%s\",\"epoch\":%lu",
                         static_cast<unsigned long>(control.bootId), shots ? "shots" : "history",
-                        static_cast<unsigned long>(epoch), rows ? ",\"rows\":[" : ""))
+                        static_cast<unsigned long>(epoch)) ||
+      (link && !statusJsonAppend(&used, ",\"gen\":%lu,\"next\":%lu",
+                                 static_cast<unsigned long>(generation),
+                                 static_cast<unsigned long>(next))) ||
+      (rows && !statusJsonAppend(&used, ",\"rows\":[")))
     return false;
   auto pair = [&](size_t n, uint32_t id, const void *record, size_t size) {
     return statusJsonAppend(&used, "%s%lu,%lu", n ? "," : "", static_cast<unsigned long>(id),

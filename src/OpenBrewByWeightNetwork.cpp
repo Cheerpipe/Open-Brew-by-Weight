@@ -128,7 +128,8 @@ struct StatsStreamCache : StatsHeaderWork {
   ShotLogSortDir dir = ShotLogSortDir::Desc;
   // `good` of the matches are good shots (the Stats window choice).
   size_t offset = 0, limit = 0, start = 0, pageCount = 0, matched = 0, good = 0;
-  uint32_t fingerprint = 0, filterHash = 0;
+  // The store epoch `order` was built from.
+  uint32_t fingerprint = 0, filterHash = 0, orderEpoch = 0;
   // Header identity: store epoch, selected window, and the active preset of
   // its "This preset" chart.
   uint32_t headerEpoch = 0;

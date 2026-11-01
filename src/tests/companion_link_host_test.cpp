@@ -959,6 +959,16 @@ static void testBase64Stream() {
 }
 
 // The `rs` notice rides the companion's ping once the epochs held still.
+// S17: a hold that began after the job was built drops only its sync bodies.
+static void testSyncBodiesHeld() {
+  CHECK(companionSyncBodyHeld(true, 2, 2, 0xFF, 0xFF));
+  CHECK(companionSyncBodyHeld(true, 3, 0xFF, 3, 0xFF));
+  CHECK(companionSyncBodyHeld(true, 0, 0xFF, 0xFF, 0));
+  CHECK(!companionSyncBodyHeld(true, 1, 2, 3, 0));      // cfg, route, a command: always sent
+  CHECK(!companionSyncBodyHeld(false, 2, 2, 3, 0));     // no hold: everything goes
+  CHECK(!companionSyncBodyHeld(true, 0xFF, 0xFF, 0xFF, 0xFF));
+}
+
 static void testNoticeDue() {
   CHECK(companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS, true, true));
   CHECK(!companionNoticeDue(false, true, COMPANION_NOTICE_SETTLE_MS, true, true));  // no rx yet
@@ -1050,6 +1060,7 @@ int main() {
   testRecordSeal();
   testBase64Stream();
   testNoticeDue();
+  testSyncBodiesHeld();
   testLogFlushDue();
   testLiveness();
   std::puts("companion_link_host_test: ok");

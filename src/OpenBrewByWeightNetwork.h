@@ -252,6 +252,8 @@ struct NetworkBridgeCallbacks {
   // Same cheap gate for the shot log (record store header digest; curve
   // stores only mutate alongside records).
   uint32_t (*shotLogEpoch)() = nullptr;
+  // A store's header generation and nextRecordId (companion archive, S19).
+  void (*recordStoreCounters)(bool shots, uint32_t &generation, uint32_t &next) = nullptr;
   ShotStatsView (*copyShotStats)() = nullptr;
   bool (*deleteHistoryRecord)(uint32_t id) = nullptr;
   bool (*clearHistoryLog)() = nullptr;

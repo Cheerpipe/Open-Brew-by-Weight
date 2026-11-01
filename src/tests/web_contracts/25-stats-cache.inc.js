@@ -120,6 +120,8 @@ ${session}
     ShotCurveRead (*copyShotCurveById)(uint32_t,ShotCurveRecord &,bool)=curveById;
     uint32_t (*historyEpoch)()=+[](){return 77u;};
     void (*copyHistoryPage)(HistoryPage &,size_t,size_t,ShotLogSortDir,uint8_t)=historyPage;
+    void (*recordStoreCounters)(bool,uint32_t &,uint32_t &)=
+        +[](bool,uint32_t &generation,uint32_t &next){generation=storeEpoch+40;next=shots+1;};
   } callbacks_;
   bool appendRecordPageUi(const ControlStatusSnapshot &,size_t *used,bool){
     return statusJsonAppend(used,"\\"ui\\":{}");
@@ -325,11 +327,25 @@ int main(){
     link.recordsShots=true;assert(network.sendRecordsIndex(link,control)&&frames.size()==1);
     const std::string all=frames[0].substr(frames[0].find("\\"rows\\":[")+8);
     assert(all.rfind("4,",0)==0&&std::count(all.begin(),all.end(),',')==7);
+    // S19: the link's index names the store header counters.
+    assert(frames[0].find(",\\"gen\\":"+std::to_string(storeEpoch+40)+",\\"next\\":5,")!=std::string::npos);
     link.statsFetch=true;link.statsFetchRequest=9;link.statsFetchOffset=0;link.statsFetchLimit=50;
     link.statsFetchFilter={};link.statsFetchFilter.includeBad=true;frames.clear();
     for(int i=0;i<10&&link.statsFetch;++i){now+=100;assert(network.sendStatsStream(link,control));}
     assert(frames.size()==4&&!link.statsFetch&&frames[0].find("\\"stats\\":")==std::string::npos);
     assert(frames[0].find("\\"request\\":9")!=std::string::npos&&frames[0].find("\\"good\\":3,")!=std::string::npos);
+    // F2: a store copy reloaded by the index (same window shape) rebuilds the
+    // link's order: the newest row follows an append and a delete.
+    auto newest=[&](){
+      link.statsFetch=true;link.statsFetchOffset=0;link.statsFetchLimit=1;++link.statsFetchRequest;
+      frames.clear();for(int i=0;i<10&&link.statsFetch;++i){now+=100;assert(network.sendStatsStream(link,control));}
+      return frames.at(0);
+    };
+    assert(newest().find("\\"id\\":4")!=std::string::npos);
+    shots=5;++storeEpoch;link.recordsShots=true;assert(network.sendRecordsIndex(link,control));
+    assert(newest().find("\\"id\\":5")!=std::string::npos);
+    shots=4;++storeEpoch;link.recordsShots=true;assert(network.sendRecordsIndex(link,control));
+    assert(newest().find("\\"id\\":4")!=std::string::npos);
     network.linkSession=nullptr;
     shots=3;
   }

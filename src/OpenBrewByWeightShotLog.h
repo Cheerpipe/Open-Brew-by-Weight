@@ -56,6 +56,8 @@ class ShotLog
   // see updateRating; a full-ring append only advances nextRecordId). Curve
   // stores mutate only alongside these words. Caller holds the store mutex.
   uint32_t epoch() const { return dualSlotHeaderEpoch(store_.header); }
+  // The write counter: it only grows, Clear keeps it (nextRecordId restarts).
+  uint32_t generation() const { return store_.header.generation; }
 
   // The stored shots as corridor statistics rows, oldest first; a bad shot
   // reads as an empty row that no statistic admits.

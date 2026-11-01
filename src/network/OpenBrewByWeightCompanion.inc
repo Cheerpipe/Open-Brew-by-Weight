@@ -30,6 +30,11 @@ struct CompanionSendJob {
   uint32_t generation;
   uint8_t count;
   uint8_t retries;  // clean aborts httpd deferred to the network task
+  // The sync bodies (S17: log, rs, the ping's hold answer), 0xFF for none,
+  // and the log cursor before this job: a hold that begins before httpd
+  // sends them drops them and rewinds, so they go again after it.
+  uint8_t logBody, noticeBody, replyBody;
+  uint32_t logFrom;
   char bodies[COMPANION_FRAME_BYTES];
 };
 constexpr size_t kCompanionPlainBytes = 1408;  // every field escaped at worst
@@ -391,10 +396,17 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
     }
     memset(workspace, 0, sizeof(*workspace));
     g_companionWorkspace.store(workspace, std::memory_order_release);
-    // The archive's record sync state; without the memory there is no archive.
+  }
+  // The archive's record sync state, kept once made; without the memory the
+  // archive waits (said once in the Web UI log) and a later handshake retries.
+  if (self.companionRecords_ == nullptr) {
     if (void *memory = allocExternal(sizeof(CompanionRecords), AllocationOwner::NETWORK)) {
       TaskLockGuard lock(self.dataMux_);
       self.companionRecords_ = new (memory) CompanionRecords{};
+    } else {
+      static RefusalLog noArchive;
+      if (noArchive.due() != 0)
+        self.lifecycleLog("Companion archive: no memory for its record sync; it retries at the next link");
     }
   }
   request->sess_ctx = slot;
@@ -975,6 +987,8 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   }
   memset(sent.key, 0, sizeof(sent.key));
   memset(&companionWs().job, 0, sizeof(companionWs().job));
+  CompanionSendJob &job = companionWs().job;
+  job.logBody = job.noticeBody = job.replyBody = 0xFF;
   uint8_t count = 0;
   // The companion's label for this controller and its id (the MAC text, the
   // log store's key), first: the companion subscribes to the log only once
@@ -1029,18 +1043,24 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   // S17: a ping is answered while no sync hold is active, with the `hold`
   // frame (one segment with its ACK), so the companion sends sync requests
   // only then; during a hold it is not answered at all.
-  if (pingReply && (logSwitch || archive) && !syncHold && !hold)
-    (void)companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":false}",
-                           outbox.hold ? "true" : "false");
+  if (pingReply && (logSwitch || archive) && !syncHold && !hold &&
+      companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":false}",
+                       outbox.hold ? "true" : "false"))
+    job.replyBody = static_cast<uint8_t>(count - 1);
   // The diagnostic log stream (2B): one `log` body per pass; the rest pages
   // on the next pass.
   bool logMore = false;
   uint32_t logLast = sent.logSent, logMiss = 0;
   const bool logBuilt =
       companionLogBody(count, sent, logSwitch, logLast, logMore, logMiss);
+  if (logBuilt) {
+    job.logBody = static_cast<uint8_t>(count - 1);
+    job.logFrom = sent.logSent;
+  }
   // The archive's epoch notice (2A) rides the same heartbeat.
   uint32_t told[2] = {};
   const bool notice = companionRecordsNoticeBody(count, heard, told);
+  if (notice) job.noticeBody = static_cast<uint8_t>(count - 1);
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = config == configDue && device == deviceDue &&
                         credentials == credentialsDue &&
@@ -1108,9 +1128,16 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
   CompanionSendJob &job = companionWs().job;
   const char *body = job.bodies;
   uint8_t done = 0;
-  bool deferred = false;
+  bool deferred = false, logDropped = false, noticeDropped = false;
+  const bool held = fd >= 0 && self.companionSyncHold();
   uiStreamSendKind = "companion";
   for (; fd >= 0 && done < job.count; ++done) {
+    if (companionSyncBodyHeld(held, done, job.logBody, job.noticeBody, job.replyBody)) {
+      logDropped = logDropped || done == job.logBody;
+      noticeDropped = noticeDropped || done == job.noticeBody;
+      body += strlen(body) + 1;
+      continue;
+    }
     const size_t length =
         companionSealFrame(key, sequence + 1, body, companionWs().frame, sizeof(companionWs().frame));
     httpd_ws_frame_t frame = {};
@@ -1140,7 +1167,15 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
           slot.closing = true;
           slot.closeReason = "a frame could not be sent";
         }
+        // Dropped for a hold: the log rewinds and catches up after it; a
+        // notice told nothing, so the epochs read as untold again.
+        if (logDropped) {
+          slot.logSent = job.logFrom;
+          slot.logCatchUp = true;
+        }
       }
+      if (noticeDropped && self.companionRecords_ != nullptr)
+        self.companionRecords_->toldShots = self.companionRecords_->toldHistory = 0;
     }
     if (done != 0) httpd_sess_update_lru_counter(self.server_, fd);
     if (!sent && !deferred) (void)httpd_sess_trigger_close(self.server_, fd);
@@ -1152,6 +1187,8 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
     memmove(job.bodies, body, rest);
     memset(job.bodies + rest, 0, sizeof(job.bodies) - rest);
     job.count = static_cast<uint8_t>(job.count - done);
+    for (uint8_t *index : {&job.logBody, &job.noticeBody, &job.replyBody})
+      *index = *index == 0xFF || *index < done ? 0xFF : static_cast<uint8_t>(*index - done);
     self.companionSendRetry_.store(true, std::memory_order_release);
     return;
   }

@@ -88,6 +88,14 @@ uint32_t copyHistoryEpoch() {
   return historyLog.epoch();
 }
 
+// A store's header counters for the companion archive's reset detection
+// (plan S19): both only grow, and nextRecordId returns to 1 on a Clear.
+void copyRecordStoreCounters(bool shots, uint32_t &generation, uint32_t &next) {
+  TaskLockGuard lock(shotStoreMutex);
+  generation = shots ? shotLog.generation() : historyLog.generation();
+  next = shots ? shotLog.nextRecordId() : historyLog.nextRecordId();
+}
+
 uint32_t copyShotLogEpoch() {
   TaskLockGuard lock(shotStoreMutex);
   return shotLog.epoch();
