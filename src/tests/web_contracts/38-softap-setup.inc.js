@@ -418,6 +418,16 @@ if (!rawViewJs.stats.includes('R.escHtml(__WEBUI_TEXT__("runtime.stats_preset_fi
   need(partialHtml.settings.includes('<select id="preferredScaleSelect" aria-label="My scale">'), 'scale select name');
   need(codeIncludes(rawRuntimeJs, 'input.setAttribute("aria-label", __WEBUI_TEXT__("runtime.preset_name"))'), 'rename input name');
   need(codeIncludes(rawViewJs.stats, 'b.setAttribute("role", "radio");b.setAttribute("aria-checked", i === n)'), 'star radios');
+  // After a rating the rebuilt row's star takes keyboard focus; an archive row,
+  // whose number may repeat a controller row's, is named by its generation.
+  const starFocus = [];
+  const focusShotStar = new Function('$', `${blockAt(rawViewJs.stats, 'function focusShotStar(')};return focusShotStar;`)(
+      () => ({querySelector: (s) => (starFocus.push(s), {children: [{}, {focus: () => starFocus.push('focus')}]})}));
+  focusShotStar({id: 7, _archive: true, archiveGeneration: 2}, 2);
+  focusShotStar({id: 7}, 2);
+  need(starFocus.join('|') === 'tr[data-id="7"][data-gen="2"] .starRate|focus|tr[data-id="7"]:not([data-gen]) .starRate|focus' &&
+      codeIncludes(rawViewJs.stats, 'if (r._archive) row.dataset.gen = r.archiveGeneration;') &&
+      codeIncludes(rawViewJs.stats, 'const render = () => (renderShots(), focusShotStar(r, star));'), 'rating focus by row identity');
   // RV-12: the stars are one tab stop, and arrow keys move to and select a star.
   const fillStars = new Function('document', 'R', '__WEBUI_TEXT__',
       `${blockAt(rawViewJs.stats, 'function fillStarRate(')};return fillStarRate;`)(

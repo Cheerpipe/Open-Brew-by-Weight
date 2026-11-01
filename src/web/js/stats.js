@@ -1094,6 +1094,7 @@ function renderShots() {
       archiveHeadings(body, list, i, columns, source, R.uiState.shotSort === "date");
       const row = document.createElement("tr");
       row.dataset.id = r.id;
+      if (r._archive) row.dataset.gen = r.archiveGeneration;
       // A scale-loss shot has no weighed yield: only its estimate, no error.
       // A bad shot shows what it stored, never a yield or flow from its curve.
       const bad = r.badReason,
@@ -1199,7 +1200,7 @@ function renderShots() {
       const rateHost = document.createElement("div");
       rate.appendChild(rateHost);
       fillStarRate(rateHost, r.rating || 0, !R.controlsMutable, (n, star) =>
-        r._archive ? rateArchivedShot(r, n) : rateHistoryShot(r.id, n, star),
+        r._archive ? rateArchivedShot(r, n, star) : rateHistoryShot(r.id, n, star),
       );
       row.appendChild(rate);
       const spark = document.createElement("td");
@@ -1254,12 +1255,13 @@ function statsArchiveQuery() {
 }
 // In rating order a new rating moves the row: the archive rows reload in
 // place, so the merge stays a prefix of the companion's order.
-const rateArchivedShot = (r, n) =>
+const rateArchivedShot = (r, n, star) =>
   companionArchive("rate", { id: r.id, generation: r.archiveGeneration, rating: n }).then(
     () => {
       r.rating = n;
-      if (R.uiState.shotSort === "rating") archiveChanged("shots", renderShots);
-      renderShots();
+      const render = () => (renderShots(), focusShotStar(r, star));
+      if (R.uiState.shotSort === "rating") archiveChanged("shots", render);
+      render();
     },
     (e) => R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
   );
@@ -1304,13 +1306,20 @@ async function postShotRating(p, undo) {
     }
   });
 }
+// The rebuilt row replaces the clicked star: keyboard focus moves to its twin.
+// An archive row may repeat a controller row's number, so its generation names it.
+function focusShotStar(r, star) {
+  const row = r._archive ? `[data-gen="${r.archiveGeneration}"]` : ":not([data-gen])";
+  $("shotRows")
+    ?.querySelector(`tr[data-id="${r.id}"]${row} .starRate`)
+    ?.children[star - 1]?.focus();
+}
 function rateHistoryShot(id, n, star) {
   const s = R.uiState.shotHistory.shots.find((x) => x && x.id === id),
     p = s && s.rating;
   if (s) s.rating = n;
   renderShots();
-  // The rebuilt row replaces the clicked star: keyboard focus moves to its twin.
-  $("shotRows")?.querySelector(`tr[data-id="${id}"] .starRate`)?.children[star - 1]?.focus();
+  focusShotStar({ id }, star);
   return postShotRating({ id, rating: n }, () => {
     if (s) s.rating = p;
     renderShots();
