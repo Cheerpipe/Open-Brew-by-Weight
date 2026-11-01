@@ -2,8 +2,10 @@
   // API error rendering: every error body carries a stable `reason` code
   // (docs/INTEGRATION_API.md); the Web UI renders locale[reason] first, then
   // locale[error], then the server `message` prose, so unmapped sentences
-  // keep today's bytes. The err.* catalog holds the sentences verbatim and
-  // the runtime map references every key exactly once.
+  // keep today's bytes. The err.* catalog is the single editable copy of the
+  // sentences (the firmware table is generated from it at build time), so
+  // this contract pins map<->catalog agreement and the render chain — never
+  // the sentence values themselves.
   const assert = require('assert').strict;
   const vm = require('vm');
   const catalog = JSON.parse(
@@ -19,19 +21,6 @@
   assert.deepEqual([...new Set(referenced)].sort(), [...errKeys].sort(),
       'the runtime map and the err.* catalog agree');
 
-  // Verbatim prose samples across families, including the sentence two wire
-  // errors share (its reason names it unambiguously).
-  assert.equal(catalog['err.shot_storage_busy'],
-      'The controller is busy (a shot, a rinse or the scale); try again shortly.');
-  assert.equal(catalog['err.admin_locked'],
-      'Unlock administration with the device password first.');
-  assert.equal(catalog['err.ota_session_identity_required'],
-      'A JSON OTA session identity is required.');
-  assert.equal(catalog['err.companion_code_mismatch'], 'That is not the code the companion shows.');
-  assert.equal(catalog['err.no_identity'],
-      'The running firmware has no complete hardware and machine identity, so no ' +
-      'image can be checked against it. Reflash once over USB before using Wi-Fi updates again.');
-
   // The render chain itself, executed against the authoring source.
   const run = vm.createContext({
     __WEBUI_TEXT__: (key) => catalog[key],
@@ -41,11 +30,11 @@
           blockAt(rawRuntimeJs, 'function errorText(data'),
       run);
   assert.equal(run.errorText({reason: 'CRASH_DELETE_NOT_CONFIRMED', message: 'anything'}),
-      'Confirm crash deletion explicitly.', 'a mapped reason renders the locale text');
+      catalog['err.crash_delete_not_confirmed'], 'a mapped reason renders the locale text');
   assert.equal(run.errorText({reason: 'SHOT_STORAGE_BUSY', error: 'SHOT_TRACE_BUSY',
-    message: 'The controller is busy (a shot, a rinse or the scale); try again shortly.'}),
+    message: catalog['err.shot_storage_busy']}),
       catalog['err.shot_storage_busy'], 'the reason tier wins over error and message');
-  assert.equal(run.errorText({error: 'AUTH_COOLDOWN', message: 'Too many attempts. Try again in 30 seconds.'}),
+  assert.equal(run.errorText({error: 'AUTH_COOLDOWN', message: 'server prose'}),
       catalog['err.auth_cooldown'], 'without a reason the legacy error tier applies');
   assert.equal(run.errorText({reason: 'SOME_FUTURE_CODE', message: 'Plain server prose.'}),
       'Plain server prose.', 'an unknown code falls back to the message');
