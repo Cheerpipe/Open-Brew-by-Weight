@@ -461,7 +461,6 @@
   grid-template-areas: "y plot f" ". x .";
   gap: 0 4px;
   min-height: 3.55rem;
-  touch-action: pan-y;
 }
 .shotSparkY {
   grid-area: y;
@@ -673,7 +672,6 @@
 }
 .presetAccGraph {
   margin: 0 0.6rem;
-  touch-action: pan-y;
 }
 .presetAccReadout {
   margin: 0.35rem 0.6rem 0.6rem;
@@ -730,9 +728,6 @@
   stroke-opacity: 0.5;
   stroke-width: 1;
   fill: none;
-}
-.shotPresetChart {
-  touch-action: pan-y;
 }
 .shotPresetChart .rvLast {
   stroke-width: 2.5;

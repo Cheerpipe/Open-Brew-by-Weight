@@ -372,10 +372,12 @@ shot was brewed, so editing or deleting the preset later never changes it. Only
 the zone the shot ended in is colored: fast, slow, or on recipe. Timer-only
 shots show every cut line as off and no colored zone.
 
-Tap or drag anywhere on the chart, or use the arrow keys when it has focus, to
-move a cursor along the shot's curve. The line under the chart reads the time,
-the weight at that moment, and the cut line at that time. While your finger or
-mouse is on the chart, a small bubble beside the cursor shows the same time and
+Drag the cursor's dot along the shot's curve, or use the arrow keys when the
+chart has focus. On a touch screen, put your finger on the dot itself to grab
+it; anywhere else, the chart scrolls the page as usual. With a mouse, you can
+also click or drag anywhere on the chart. The line under the chart reads the
+time, the weight at that moment, and the cut line at that time. While you
+hold the cursor, a small bubble beside the cursor shows the same time and
 weight. The cursor starts at the last reading, the **Final weight, after
 drips**. When drips kept falling after the machine stopped, a smaller dot
 labelled **Shot stopped** marks the moment the shot was actually cut, with its
@@ -394,10 +396,10 @@ Both fill with a soft shade that fades toward the bottom. The chart is as
 tall as the preset chart above it, so grams look the same size in both. Shots
 without a preset chart show only this chart below their details.
 
-This chart has a cursor too, and it works the same way: tap or drag anywhere
-on it, or use the arrow keys. Two dots move together, one on the weight curve
-and one on the flow curve, so you can read both at the same moment. While your
-finger or mouse is on the chart, a bubble shows the time, the weight and the
+This chart has a cursor too, and it works the same way: grab either of its
+dots, or use the arrow keys. Two dots move together, one on the weight curve
+and one on the flow curve, so you can read both at the same moment. While you
+hold the cursor, a bubble shows the time, the weight and the
 flow rate, each value marked with its line's color. Where there is no flow
 reading, such as before the first drops, the flow dot hides and the bubble
 shows a dash instead. The cursor starts at the shot's stop point.

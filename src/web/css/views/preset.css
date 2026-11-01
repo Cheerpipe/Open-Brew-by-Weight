@@ -46,7 +46,6 @@
   padding: 0.25rem 0.85rem 0.1rem;
   background: var(--in);
   box-shadow: 0 1px 0 var(--ln);
-  touch-action: pan-y;
 }
 .rampPreview svg {
   display: block;
@@ -208,7 +207,6 @@
 }
 .reviewGraph {
   width: 100%;
-  touch-action: pan-y;
 }
 .reviewGraph svg {
   display: block;

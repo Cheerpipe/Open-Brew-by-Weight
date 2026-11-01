@@ -226,7 +226,7 @@
     return heroElements.get(id);
   };
   const svgStub={insertAdjacentHTML(_,markup){this.appended=(this.appended||'')+markup;},
-    children:[{setAttribute(){}},{setAttribute(){}},{},{setAttribute(){}}]};
+    children:[{setAttribute(){}},{setAttribute(){}},{}]};
   let tintMode=null,heroOverride=null,heroDefault=null;
   const rule={mode:'active',t1:27,t2:36,prot:3,wall:60,d:5,ceil:38.5};
   const env={liveRuleModel:null,model:null,reduce:false,heroMode:'colorful'},ruleArgs=[];

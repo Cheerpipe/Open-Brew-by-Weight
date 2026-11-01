@@ -1264,6 +1264,7 @@ function renderRampPreviews(m) {
         },
         () => host._s,
         ".rvScrub",
+        ".rvScrub .rvHandle",
       );
     }
     positionRampScrub(host);

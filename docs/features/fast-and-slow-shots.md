@@ -34,8 +34,9 @@ fraction of a second earlier or later therefore never changes your cup by more
 than a fraction of a gram.
 
 **Settings → Presets → How this preset cuts** draws this line for the selected
-preset. Drag the example shot to see where a shot reaching the target at a
-given time would stop.
+preset. Drag the dot along the cut line to see where a shot reaching the
+target at a given time would stop. On a touch screen, put your finger on the
+dot itself to grab it; anywhere else, the chart scrolls the page as usual.
 
 The example shot and the colored zones begin when coffee usually starts
 dripping for that preset, taken from its recent shots, so a single and a
@@ -85,8 +86,8 @@ Both **Fast shots** and **Slow shots** open with a small graph of their part of
 the cut line: the extra or reduced yield on one side, your target on the other,
 and the transition between them. It updates as you change the settings below
 it, and it stays at the top of the section while you scroll through them.
-Drag the marker along the line to read when a shot would be cut and at what
-weight.
+Drag the marker along the line, grabbing the marker itself on a touch screen,
+to read when a shot would be cut and at what weight.
 
 - **Transition (s)** sets how long the change takes. A longer transition is
   gentler: shots close to the window get only part of the extra or reduced

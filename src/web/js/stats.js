@@ -326,6 +326,8 @@ function renderShotSpark(h, shot, m = R.buildShotSparkModel(shot)) {
     (x) => preset._view?.tAt(x - preset.firstChild.getBoundingClientRect().left),
     seek,
     () => cursorT,
+    null,
+    ".shotCursor .rvHandle",
   );
   preset.className = "shotPresetChart";
   preset.setAttribute("aria-valuemin", curve[0].t.toFixed(1));
@@ -596,6 +598,8 @@ function fillShotCharts(h, m) {
       m.timeMax,
     seek,
     () => cursorT,
+    null,
+    ".rvHandle:not([visibility=hidden])",
   );
   attrs(c, {
     "aria-valuemin": weight[0].t.toFixed(1),

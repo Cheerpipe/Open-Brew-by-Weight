@@ -274,9 +274,6 @@
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
-.deckTrack .shotPresetChart {
-  touch-action: auto;
-}
 .heroDeck.pinned .deckTrack {
   overflow-x: hidden;
 }
