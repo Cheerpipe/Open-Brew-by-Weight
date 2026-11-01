@@ -668,6 +668,7 @@
     "err.companion_code": "Enter the six-digit code the companion shows.",
     "err.companion_code_denied": "Three wrong codes: the request was denied.",
     "err.companion_code_mismatch": "That is not the code the companion shows.",
+    "err.companion_forgotten": "This companion was forgotten.",
     "err.companion_id_invalid": "The id is invalid.",
     "err.companion_ignored": "This companion was ignored on this controller.",
     "err.companion_memory": "The controller has no memory for a companion link right now.",

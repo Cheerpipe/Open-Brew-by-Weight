@@ -105,12 +105,13 @@ Every error body carries a third field between `error` and `message`:
 - The sentence behind each `reason` lives in one editable catalog (the Web UI
   locale, `en.json`); the controller derives both its API prose and its Web
   UI text from that catalog at build time, so the two can never drift apart.
-- One deliberate exception: the companion relay handshake's signed erase
-  reply keeps its own frozen
-  `{"error":"COMPANION_NOT_PAIRED","message":"This companion was forgotten.","erase":...}`
-  body (see [Companion link](COMPANION_LINK.md)). It is a companion-native
-  protocol surface with its own `erase` member rather than a Web UI error,
-  and whether it ever adopts `{error, reason, message}` is a separate
+- One remaining exception: the companion relay handshake's signed erase
+  reply (see [Companion link](COMPANION_LINK.md)) keeps its frozen
+  `{"error":"COMPANION_NOT_PAIRED","message":...,"erase":...}` body shape
+  without a `reason` member — it is a companion-native protocol surface
+  with its own `erase` member rather than a Web UI error. Its sentence is
+  catalog-sourced like every other (`COMPANION_FORGOTTEN`), and whether
+  the body ever adopts `{error, reason, message}` is a separate
   companion-protocol decision.
 
 The 328 codes, grouped by the routes that answer with them.

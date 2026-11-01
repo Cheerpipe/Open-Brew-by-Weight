@@ -1876,6 +1876,7 @@ const errorReasonTexts = {
   COMPANION_CODE: __WEBUI_TEXT__("err.companion_code"),
   COMPANION_CODE_DENIED: __WEBUI_TEXT__("err.companion_code_denied"),
   COMPANION_CODE_MISMATCH: __WEBUI_TEXT__("err.companion_code_mismatch"),
+  COMPANION_FORGOTTEN: __WEBUI_TEXT__("err.companion_forgotten"),
   COMPANION_ID_INVALID: __WEBUI_TEXT__("err.companion_id_invalid"),
   COMPANION_IGNORED: __WEBUI_TEXT__("err.companion_ignored"),
   COMPANION_MEMORY: __WEBUI_TEXT__("err.companion_memory"),

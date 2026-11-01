@@ -267,6 +267,17 @@ function referencedReasons(codes) {
       }
     }
   }
+  // Direct table lookups (e.g. the relay handshake's custom body) are
+  // reason literals too: a catalog miss fails the build.
+  for (const file of scannedSources()) {
+    const source = fs.readFileSync(file, 'utf8');
+    for (const match of source.matchAll(/errorReasonText\(\s*"([A-Z][A-Z0-9_]*)"/g)) {
+      if (!codes.has(match[1])) {
+        fail(`${file}: reason ${match[1]} has no err.${match[1].toLowerCase()} catalog entry`);
+      }
+      referenced.add(match[1]);
+    }
+  }
   if (!referenced.size) fail('no reason literals found at call sites');
   return referenced;
 }

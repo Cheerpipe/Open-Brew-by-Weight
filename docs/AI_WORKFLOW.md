@@ -20,6 +20,10 @@ contains the full log and a redacted `summary.json`; `latest.json` points to the
 most recent summary. Reuse a recorded result only when its SHA and inputs are
 unchanged. Runtime firmware log level is independent of `scripts/dev`
 verbosity.
+User-facing API error text is born in the locale catalog
+(`src/web/locales/en.json`, `err.*`): the generator fails the build when a
+reason code lacks its catalog entry, so no new error prose may be written
+inline in firmware or Web UI sources.
 
 <a id="temporary-working-state"></a>
 

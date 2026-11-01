@@ -76,10 +76,15 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     const bool signedErase = companionHandshakeMac(secret, 'E', nc, nullptr, expected);
     memset(secret, 0, sizeof(secret));
     if (signedErase) {
+      // The sentence lives in the generated catalog table like every
+      // other reason-coded prose (docs/INTEGRATION_API.md); a miss (the
+      // build prevents one) falls back to the reason code, never null.
+      const char *forgotten = errorReasonText("COMPANION_FORGOTTEN");
+      if (forgotten == nullptr) forgotten = "COMPANION_FORGOTTEN";
       used = static_cast<size_t>(snprintf(
           json, sizeof(json),
-          "{\"error\":\"COMPANION_NOT_PAIRED\",\"message\":\"This companion was forgotten.\","
-          "\"erase\":\""));
+          "{\"error\":\"COMPANION_NOT_PAIRED\",\"message\":\"%s\","
+          "\"erase\":\"", forgotten));
       (void)appendBase64(json, sizeof(json), used, expected, sizeof(expected));
       snprintf(json + used, sizeof(json) - used, "\"}");
       return sendJson(request, STATUS_NOT_FOUND, json);
