@@ -1635,6 +1635,13 @@ let logHistory = [],
 function logHistoryAvailable() {
   return !!R.uiState.companionHere?.paired;
 }
+// The companion answers only a browser the controller lets open the Web UI,
+// so the history goes out with this screen's session.
+async function companionLog(path) {
+  const reply = await fetch(path, { cache: "no-store", headers: R.webUiHeaders() });
+  if (!reply.ok) throw Error(String(reply.status));
+  return reply;
+}
 async function loadLogOlder() {
   if (logHistoryBusy || !logHistoryAvailable()) return;
   logHistoryBusy = true;
@@ -1642,9 +1649,7 @@ async function loadLogOlder() {
     const next = logHistoryNext;
     const url =
       "/__companion/log?limit=100" + (next ? `&boot=${next.boot}&before=${next.before}` : "");
-    const reply = await fetch(url, { cache: "no-store" });
-    if (!reply.ok) throw Error(String(reply.status));
-    const page = await reply.json();
+    const page = await (await companionLog(url)).json();
     if (!page || !Array.isArray(page.entries)) throw Error();
     // The page is newest first: flip it onto the front of the history.
     logHistory = page.entries.slice().reverse().concat(logHistory);
@@ -1661,6 +1666,15 @@ async function loadLogOlder() {
 function logHistoryControls() {
   const here = logHistoryAvailable();
   $("logOlderButton").hidden = !here || logHistoryDone;
+  $("logExportButton").hidden = !here;
+}
+function exportLogHistory() {
+  if (!logHistoryAvailable()) return;
+  downloadText(
+    companionLog("/__companion/log/export").then((reply) => reply.text()),
+    "log-history.json",
+    __WEBUI_TEXT__("diagnostic.log_export_failed"),
+  );
 }
 function renderLogHistoryNote() {
   // Opened directly, with a paired companion keeping the log: name where the
@@ -1747,6 +1761,7 @@ export function init() {
   $("logLevelFilter").onchange = renderLog;
   $("logOlderButton").onclick = () => void loadLogOlder();
   $("copyLogButton").onclick = () => copyText($("log").value);
+  $("logExportButton").onclick = () => exportLogHistory();
   $("clearLogButton").onclick = () => clearLogView();
   $("auditVerboseButton").onclick = () => toggleAuditHunt();
   $("auditClearButton").onclick = () => emptyAudit();

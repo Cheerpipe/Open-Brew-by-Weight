@@ -760,7 +760,8 @@ struct CompanionLinkSlot {
   // whole snapshot.
   bool snapshotSent = false, sentUi = true, sentLog = true;
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
-  char sentDeviceName[DEVICE_NAME_CAPACITY] = {};  // `dev` frame already sent
+  bool deviceSent = false;  // this session's `dev` frame
+  char sentDeviceName[DEVICE_NAME_CAPACITY] = {};  // the name it carried
   // Diagnostic log stream (plan 2B). httpd records the companion's `logsub`
   // request verbatim (logWant*); the network task applies it against this
   // boot's id and owns everything after: whether the stream runs, the sent
@@ -769,11 +770,10 @@ struct CompanionLinkSlot {
   uint32_t logWantBoot = 0, logWantAfter = 0, logSent = 0;
 };
 
-// The device name frame is due on every new session (an empty sent copy) and
-// again after a rename; an unpublished name (empty) is never sent.
-inline bool companionDeviceNameDue(const CompanionLinkSlot &slot, const char *deviceName) {
-  return deviceName[0] != '\0' &&
-         strncmp(slot.sentDeviceName, deviceName, DEVICE_NAME_CAPACITY) != 0;
+// The `dev` frame is due once on every new session, whatever the name (its id
+// keys the companion's log store), and again after a rename.
+inline bool companionDeviceDue(const CompanionLinkSlot &slot, const char *deviceName) {
+  return !slot.deviceSent || strncmp(slot.sentDeviceName, deviceName, DEVICE_NAME_CAPACITY) != 0;
 }
 
 // The one-letter level of a link `log` frame event.

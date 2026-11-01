@@ -215,14 +215,14 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 | Frame | Meaning |
 | --- | --- |
 | `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true}`. Sent after `ready` and on every change |
-| `{"t":"dev","name":"Kitchen","id":"AA:BB:CC:DD:EE:FF"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address, and its stable device id (the webhook's `deviceId`), the log store's key. Up to 32 bytes of letters, digits, spaces and hyphens. Sent after `ready` and again whenever the name changes |
+| `{"t":"dev","name":"Kitchen","id":"AA:BB:CC:DD:EE:FF"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address, and its stable device id (the webhook's `deviceId`), the log store's key. Up to 32 bytes of letters, digits, spaces and hyphens, empty while no name is published yet. Sent first after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
 | `{"t":"hold","on":true}` | A shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` and `push` frames until `on` is `false` |
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 | `{"t":"log","b":42,"e":[[seq,atMs,wallSec,lvl,cat,"message"],…]}` | Diagnostic log events (below), the formatted text the Web UI log view renders, `lvl` one of `c/e/w/i/d` |
 
-After `ready` the controller sends `cfg`, `dev`, `route` and `hold` with their
+After `ready` the controller sends `dev`, `cfg`, `route` and `hold` with their
 current values, and `creds` when it has an account generation; afterwards each
 one again only when it changes. `hold` changes are sent only while the route is
 `pending` or `companion` (the companion forwards nothing otherwise); each
@@ -247,7 +247,7 @@ secrets directory and never in logs.
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |
-| `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the companion's newest stored `(boot, sequence)`; the controller maps a boot change to `after` 0. Sent after `ready` on every session while `cfg.log` is true; `on:false` asks the controller to stop the stream (the switch itself is `cfg`'s to say) |
+| `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the boot the companion stored last and its last stored sequence; the controller maps another boot to `after` 0. Sent once per session, after `cfg.log` is true and `dev` named the controller (so the cursor is that controller's), and again from the same cursor when the companion could not store a frame; `on:false` asks the controller to stop the stream (the switch itself is `cfg`'s to say) |
 
 Builds without La Marzocco know only `ping` (its `up` is ignored there) and
 `logsub`; the other four are types they do not know and ignore.
@@ -303,26 +303,30 @@ valid `full` frame follows.
 ### Diagnostic log stream
 
 With **Diagnostic log through the companion** on, the companion subscribes
-after `ready` with its newest stored `(boot, sequence)` and the controller
-streams the ring's formatted events back, one `log` frame per send pass
-while a backlog drains. `b` is the controller's current boot id: the
-companion keys its rows by `(device id, b, sequence)`, and boot separators
-and reset reasons are the ring's own `BOOT_BANNER` and reset-reason events.
+once `dev` named the controller, with the boot it stored last and that
+boot's last sequence, and the controller streams the ring's formatted events
+back, one `log` frame per send pass while a backlog drains. `b` is the
+controller's current boot id; the companion numbers boots in the order they
+arrive, so a repeated id never merges two boots, and boot separators and
+reset reasons are the ring's own `BOOT_BANNER` and reset-reason events.
 
 - **Radio silence during a shot is absolute.** No `log` frame is transmitted
   during a shot with a connected scale, a scale connection or discovery, or
   the BLE quiet interval — the same windows the link's own admission
   enforces. Events queue (they stay in the ring, the cursor stays) and are
-  sent in order when the hold ends; nothing is dropped.
+  sent in order when the hold ends. Only a hold long enough for the
+  512-event ring to wrap loses events, and those are reported as a `miss`.
 - **Plain events ride the heartbeat.** Outside a hold, `info` and `debug`
   events flush only when a frame arrived since the last flush — the
   companion's 15/120 s ping — so the log adds no radio wakeup of its own.
   `warning` and noisier events flush at once outside a hold.
 - **Gaps are explicit.** `"miss":N` in a frame says the ring overwrote `N`
   events the companion had not read (the companion stores the gap); a
-  `"reset":true` frame says the ring was cleared below the companion's
-  cursor: the frame refills from the oldest retained event, and the
-  companion drops that boot's earlier rows like a Clear history.
+  `"reset":true` frame says the companion's cursor is ahead of this boot's
+  ring, so the frame refills from the oldest retained event. The ring is
+  never cleared while running, so this happens only when a boot id repeats
+  (one the controller could not save, or a counter a full flash erase
+  restarted): the companion stores it as a new boot and keeps every row.
 - The switch off stops the frames at the next `cfg`; the companion keeps
   what it stored. A never-paired controller, or one whose companion is away,
   runs none of this: the producer wakes only for an authenticated,

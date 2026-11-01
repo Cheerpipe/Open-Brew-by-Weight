@@ -73,8 +73,7 @@ void OpenBrewByWeightNetwork::companionLogService() {
 // another boot restarts from the oldest retained event.
 void OpenBrewByWeightNetwork::companionLogApplyLocked(CompanionLinkSlot &link) {
   if (link.logApplied) return;
-  if (companionLogBootId_ == 0 && callbacks_.debugLogBootId != nullptr)
-    companionLogBootId_ = callbacks_.debugLogBootId();
+  companionLogBootId_ = callbacks_.debugLogBootId != nullptr ? callbacks_.debugLogBootId() : 0;
   link.logSubscribed = link.logWant;
   link.logSent = link.logWant && link.logWantBoot == companionLogBootId_ ? link.logWantAfter : 0;
   link.logCatchUp = link.logWant;
@@ -127,18 +126,18 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
       text = formatted;
     }
     if (!escapeJsonString(text, companionWs().escape, sizeof(companionWs().escape))) break;
-    char piece[DEBUG_EVENT_TEXT_CAPACITY * 6 + 96];
+    // Straight into the frame; a row that does not fit is cut off again.
     const int written = snprintf(
-        piece, sizeof(piece), "%s[%lu,%lu,%lu,\"%c\",\"%s\",\"%s\"]", first ? "" : ",",
+        out + used, capacity - used, "%s[%lu,%lu,%lu,\"%c\",\"%s\",\"%s\"]", first ? "" : ",",
         static_cast<unsigned long>(event.sequence), static_cast<unsigned long>(event.atMs),
         static_cast<unsigned long>(event.wallSec), companionLogLevelLetter(event.level),
         debugCategoryName(event.category), companionWs().escape);
     if (written < 0 || used + static_cast<size_t>(written) + 3 >= capacity ||
         used + static_cast<size_t>(written) + COMPANION_MAC_HEX + 40 > COMPANION_FRAME_BYTES) {
+      out[used] = '\0';
       full = true;
       break;
     }
-    memcpy(out + used, piece, static_cast<size_t>(written) + 1);
     used += static_cast<size_t>(written);
     first = false;
     cursor = event.sequence;

@@ -340,19 +340,20 @@
   renderLog();
   assert.equal(ta.scrollTop, 80, 'a reader at the end follows new lines');
   // The companion's stored history renders above the ring, deduplicated against
-  // it, with its markers as lines: an older boot, a gap, and the same boot's
-  // overlap with the live events shown once.
+  // it, with its markers as lines where the companion placed them: the
+  // restart into this boot, a gap, and the same boot's overlap with the live
+  // events shown once.
   ui.logEvents = [ev(5), ev(6)];
   makeRender([
     {b: 6, s: 9, ms: 900, w: 0, l: 'i', c: 'web', m: 'old9'},
-    {g: 'boot', boot: 6},
+    {g: 'boot', boot: 7},
     {b: 7, s: 1, ms: 100, w: 0, l: 'i', c: 'web', m: 'kept1'},
-    {g: 'gap', after: 1, count: 2},
+    {g: 'gap', count: 2},
     {b: 7, s: 4, ms: 400, w: 0, l: 'i', c: 'web', m: 'kept4'},
     {b: 7, s: 5, ms: 500, w: 0, l: 'i', c: 'web', m: 'overlap5'},
   ], 7)();
   assert.equal(ta.value,
-      '+0.900s INFO [web] old9\n· restart, boot 6 ·\n+0.100s INFO [web] kept1\n'
+      '+0.900s INFO [web] old9\n· restart, boot 7 ·\n+0.100s INFO [web] kept1\n'
       + '· 2 events could not be copied while the companion was away ·\n'
       + '+0.400s INFO [web] kept4\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6\n',
       'history pages render with markers, and the live copy of an event wins');
@@ -366,6 +367,20 @@
       'a stored event asks for its zone offset at its own instant');
   assert.equal(ta.value, '1793370032 INFO [web] utc8\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6\n',
       'history renders at wallSec shifted by the zone offset');
+}
+// The stored history goes out with this screen's Web UI session (the companion
+// answers only a browser the controller lets open the Web UI), for paging and
+// for Export, which shows only when the page came through the companion.
+{
+  const assert = require('assert').strict;
+  assert(codeIncludes(viewJs.diagnostic, 'fetch(path,{cache:"no-store",headers:R.webUiHeaders()})'),
+      'history requests carry the Web UI session');
+  assert(codeIncludes(viewJs.diagnostic, 'await(await companionLog(url)).json()') &&
+         codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export")'),
+      'paging and Export both read the companion through that request');
+  assert(codeIncludes(viewJs.diagnostic, '$("logExportButton").hidden=!here'),
+      'Export shows only through a paired companion');
+  assert(partialHtml.diagnostic.includes('id="logExportButton"'));
 }
 // logZoneOffsetMinutes answers the zone's offset at each instant: January and
 // July of a DST zone differ, and a missing zone or one Intl rejects falls

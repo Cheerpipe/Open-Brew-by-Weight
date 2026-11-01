@@ -565,15 +565,18 @@ static void testLogFrameShape() {
   }
 }
 
-// The dev frame is due on every fresh session (pairing, reconnect, reboot)
-// and after a rename, and never for an unpublished (empty) name.
+// The dev frame is due on every fresh session (pairing, reconnect, reboot),
+// even before a name is published (its id keys the companion's log store),
+// and after a rename.
 static void testDeviceNameFrame() {
   CompanionLinkSlot slot;
-  CHECK(companionDeviceNameDue(slot, "openbrewbyweight"));
+  CHECK(companionDeviceDue(slot, ""));
+  CHECK(companionDeviceDue(slot, "openbrewbyweight"));
+  slot.deviceSent = true;
+  CHECK(!companionDeviceDue(slot, ""));
   std::snprintf(slot.sentDeviceName, sizeof(slot.sentDeviceName), "%s", "openbrewbyweight");
-  CHECK(!companionDeviceNameDue(slot, "openbrewbyweight"));
-  CHECK(companionDeviceNameDue(slot, "Kitchen Bar"));
-  CHECK(!companionDeviceNameDue(slot, ""));
+  CHECK(!companionDeviceDue(slot, "openbrewbyweight"));
+  CHECK(companionDeviceDue(slot, "Kitchen Bar"));
 }
 
 static void testBase64AndValidation() {

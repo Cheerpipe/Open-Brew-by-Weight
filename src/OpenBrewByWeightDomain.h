@@ -2439,17 +2439,17 @@ class DebugRingBuffer {
         metadata->cursorInvalid = true;
       }
     }
+    // Sequences run on from the oldest (zero skipped on wrap): the cursor's
+    // offset is computed, so a one-event read never scans the whole ring.
+    const size_t start = afterSequence == 0 || sequenceAfter(oldestEvent.sequence, afterSequence)
+        ? 0 : afterSequence - oldestEvent.sequence + (afterSequence < oldestEvent.sequence ? 0 : 1);
     size_t copied = 0;
-    for (size_t index = 0; index < count_; ++index) {
-      const DebugEvent &event =
-          events_[(oldest + index) % DEBUG_EVENT_CAPACITY];
-      if (afterSequence == 0 || sequenceAfter(event.sequence, afterSequence)) {
-        if (output == nullptr || copied == outputCapacity) {
-          if (metadata != nullptr) metadata->hasMore = true;
-          continue;
-        }
-        output[copied++] = event;
+    for (size_t index = start; index < count_; ++index) {
+      if (output == nullptr || copied == outputCapacity) {
+        if (metadata != nullptr) metadata->hasMore = true;
+        break;
       }
+      output[copied++] = events_[(oldest + index) % DEBUG_EVENT_CAPACITY];
     }
     return copied;
   }

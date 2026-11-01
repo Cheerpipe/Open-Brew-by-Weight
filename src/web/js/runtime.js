@@ -7045,6 +7045,7 @@ export {
   sleep,
   diagnosticVisible,
   saveFile,
+  webUiHeaders,
   resetWebUiInactivity,
   activeView,
   compatibilityModeOn,

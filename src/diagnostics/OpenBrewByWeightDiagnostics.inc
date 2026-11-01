@@ -165,11 +165,9 @@ uint32_t statusStoreCacheGeneration = 0;
 bool statusStoreCacheIncludeGoodHistory = false;
 uint32_t statusShotBootId = 0;
 
-// This boot's id for the companion link's log frames (2B); set during boot
-// before the network task can ask for it.
-uint32_t debugLogBootId() {
-  return statusShotBootId;
-}
+// This boot's id for the companion link's log frames (2B): the activation
+// stores' own, written once by their begin() before the network task starts.
+uint32_t debugLogBootId() { return activationStores.bootId(); }
 PersistedLastShot statusLastShot = {};
 PersistedLastShot statusLastGoodShot = {};
 bool statusLastGoodLinked = false;

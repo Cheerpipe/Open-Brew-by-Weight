@@ -159,17 +159,23 @@ continuous history:
 - Opened **through the companion**, the log on the Diagnostic page offers
   **Show older**: each tap pages further back, across restarts (each marked,
   with its reset reason in the log itself) and through gaps named as such
-  when events could not be copied while the companion was away. Clearing the
-  log on the controller clears that visit's history there too.
+  when events could not be copied while the companion was away. **Export**
+  downloads the whole history. **Clear** only clears what this screen
+  shows; the history stays.
 - Opened **directly**, the log shows what the controller holds, with a note
   that the older history is in the companion.
 - The companion's own page (its address, then **Companion**) shows the whole
-  stored history with a level filter and an **Export everything** download,
-  and works even while the controller is off.
+  stored history with a level filter, an **Export everything** download and
+  **Delete the log history**.
+- The history opens only for a browser the controller lets open the Web UI:
+  with the Web UI password on, one that signed in through the companion.
+  That browser keeps reading it while the controller is off, and even after
+  the companion restarts. It is never shown over plain HTTP.
 - The history is kept for about a month by default, in a size budget of
   about 50 MB; the oldest events go first. Both can be changed with the
   companion's `COMPANION_LOG_RETENTION_DAYS` and `COMPANION_LOG_RETENTION_MB`
   settings, and exporting is the way to keep anything longer.
+- Forgetting the companion deletes its copy of the history too.
 
 Diagnostic → Companion also shows the log stream's health: whether it is on,
 when the companion last copied events, and how many events were reported

@@ -1246,6 +1246,17 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   memset(sent.key, 0, sizeof(sent.key));
   memset(&companionWs().job, 0, sizeof(companionWs().job));
   uint8_t count = 0;
+  // The companion's label for this controller and its id (the MAC text, the
+  // log store's key), first: the companion subscribes to the log only once
+  // it knows whose cursor to send. validDeviceName's charset (letters,
+  // digits, spaces, hyphens) needs no JSON escaping; an unpublished name
+  // goes empty.
+  const bool deviceDue = companionDeviceDue(sent, deviceName);
+  char deviceIdText[24] = {};
+  deviceId(deviceIdText, sizeof(deviceIdText));
+  const bool device =
+      deviceDue && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\",\"id\":\"%s\"}",
+                                    deviceName, deviceIdText);
   const char *uiText = ui ? "true" : "false", *logText = logSwitch ? "true" : "false";
   const bool configDue = snapshot || outbox.configSequence != sent.sentConfig ||
                          ui != sent.sentUi || logSwitch != sent.sentLog;
@@ -1257,15 +1268,6 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                                        outbox.observe ? "true" : "false", uiText, logText)
                     : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s}", uiText,
                                        logText));
-  // The companion's label for this controller; validDeviceName's charset
-  // (letters, digits, spaces, hyphens) needs no JSON escaping, and `id` is
-  // its MAC text — the log store's device key (2B).
-  const bool deviceDue = companionDeviceNameDue(sent, deviceName);
-  char deviceIdText[24] = {};
-  deviceId(deviceIdText, sizeof(deviceIdText));
-  const bool device =
-      deviceDue && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\",\"id\":\"%s\"}",
-                                    deviceName, deviceIdText);
   bool credentialsDue = false, credentials = false, routeDue = false, route = false,
        holdDue = false, hold = false, commandDue = false, command = false;
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
@@ -1322,7 +1324,10 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       slot.sentUi = ui;
       slot.sentLog = logSwitch;
     }
-    if (device) memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));
+    if (device) {
+      memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));
+      slot.deviceSent = true;
+    }
     if (route) slot.sentRoute = outbox.routeSequence;
     if (hold) slot.sentHold = outbox.holdSequence;
     if (credentials) slot.sentCredentials = outbox.credentialsGeneration;
