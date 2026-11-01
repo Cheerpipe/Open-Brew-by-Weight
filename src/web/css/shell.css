@@ -857,7 +857,10 @@ body.pageLoading :is(.view, .view *)::after {
   font-weight: 600;
   cursor: pointer;
 }
-/* The offline copy is read-only: list controls that need the controller go. */
+/* The offline copy is read-only: list controls that need the controller go,
+   and so do the header signals and the bars they leave empty. */
+.offlineCopy :is(#wifiSignal, #bluetoothSignal, #liveShotOpen),
+.offlineCopy :is(#shotLogPanel, #historyPanel) .glassBar,
 .offlineCopy :is(#statsWindow, #shotSort, #shotFilterButton, #exportShotsButton, #clearShotsButton),
 .offlineCopy :is(#historySort, #historyFilterButton, #exportHistoryButton, #clearHistoryButton),
 .offlineCopy #historyRows .shotDel,
