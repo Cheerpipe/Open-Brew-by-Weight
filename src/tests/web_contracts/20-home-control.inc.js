@@ -940,7 +940,10 @@ if (!statusSection || !statusSection[1].includes('class="lamp"') ||
     firmwareCore.includes('scaleMacCacheModeRequiresPreferred(candidate.scaleMacCacheMode)') ||
     scaleWorker.includes('coerceScalePreferenceModeToFirst') ||
     !scaleWorker.includes('First detected scale adopted: %s — %s') ||
-    !network.includes('The paired scale cannot be forgotten while a cycle') ||
+    // The locked-while-active sentences live in the locale catalog and reach
+    // the wire through their stable reason codes; the sources only route
+    // those codes.
+    !network.includes('"SCALE_FORGET_LOCKED_ACTIVE_CYCLE"') ||
     !network.includes('\\"history\\"') ||
     network.includes('Preferred scale cache cannot be cleared') ||
     !network.includes('\\"timerMs\\"')) {
@@ -967,7 +970,7 @@ if (!codeIncludes(ui, 'id="renameScaleLink"') ||
     !network.includes('scaleFriendlyNameHandler') ||
     !network.includes('/api/v1/scale/friendly-name') ||
     !network.includes('UNKNOWN_SCALE') ||
-    !network.includes('The scale name cannot be changed while a cycle') ||
+    !network.includes('"SCALE_NAME_LOCKED_ACTIVE_CYCLE"') ||
     !network.includes('connectedFriendlyName') ||
     !network.includes('connectedMac') ||
     !codeIncludes(viewJs.diagnostic, "R.updateScaleRenameUi('dScaleNameRenameWrap',sc.connectedMac||'',sc.connectedFriendlyName||''") ||

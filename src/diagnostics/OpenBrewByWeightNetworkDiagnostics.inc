@@ -1002,36 +1002,32 @@ esp_err_t OpenBrewByWeightNetwork::shotsClearHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   return self.runConfirmedClear(
       request,
-      "Stop the cycle, switch the physical activator OFF, and wait for Ready "
-      "before clearing shot history.",
+      nullptr,
       "CLEAR_SHOT_LOG", "SHOT_LOG_CLEAR_NOT_CONFIRMED",
-      "The shot-history clear was not explicitly confirmed.",
+      nullptr,
       self.callbacks_.clearShotLog, "SHOT_LOG_CLEAR_FAILED",
-      "Shot history could not be cleared. Check Diagnostic → NVS for "
-      "capacity and the last storage error.", "SHOT_HISTORY_CLEAR_REQUIRES_IDLE", "SHOT_HISTORY_CLEAR_NOT_CONFIRMED", "SHOT_HISTORY_CLEAR_FAILED");
+      nullptr, "SHOT_HISTORY_CLEAR_REQUIRES_IDLE", "SHOT_HISTORY_CLEAR_NOT_CONFIRMED", "SHOT_HISTORY_CLEAR_FAILED");
 }
 
 esp_err_t OpenBrewByWeightNetwork::lastShotClearHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   return self.runConfirmedClear(
       request,
-      "Stop the cycle, switch the physical activator OFF, and wait for Ready "
-      "before clearing the last shot.",
+      nullptr,
       "CLEAR_LAST_SHOT", "LAST_SHOT_CLEAR_NOT_CONFIRMED",
-      "The last-shot clear was not explicitly confirmed.",
+      nullptr,
       self.callbacks_.clearLastShot, "LAST_SHOT_CLEAR_FAILED",
-      "Last shot could not be cleared.", "LAST_SHOT_CLEAR_REQUIRES_IDLE", "LAST_SHOT_CLEAR_NOT_CONFIRMED", "LAST_SHOT_CLEAR_FAILED");
+      nullptr, "LAST_SHOT_CLEAR_REQUIRES_IDLE", "LAST_SHOT_CLEAR_NOT_CONFIRMED", "LAST_SHOT_CLEAR_FAILED");
 }
 
 esp_err_t OpenBrewByWeightNetwork::shotsDeleteHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   return self.runDeleteById(
       request,
-      "Stop the cycle, switch the physical activator OFF, and wait for Ready "
-      "before deleting shot records.",
+      nullptr,
       self.callbacks_.deleteShotRecord,
-      "A non-zero shot id is required.", "SHOT_NOT_FOUND",
-      "The requested shot record was not found.", "SHOT_DELETE_REQUIRES_IDLE", "SHOT_ID_REQUIRED", "SHOT_NOT_FOUND");
+      nullptr, "SHOT_NOT_FOUND",
+      nullptr, "SHOT_DELETE_REQUIRES_IDLE", "SHOT_ID_REQUIRED", "SHOT_NOT_FOUND");
 }
 
 esp_err_t OpenBrewByWeightNetwork::shotsRateHandler(httpd_req_t *request) {
@@ -1040,11 +1036,11 @@ esp_err_t OpenBrewByWeightNetwork::shotsRateHandler(httpd_req_t *request) {
   if (!self.historyMutationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Stop the cycle, switch the physical activator OFF, and wait for Ready before rating shots.", "SHOT_RATING_REQUIRES_IDLE");
+                     nullptr, "SHOT_RATING_REQUIRES_IDLE");
   }
 
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
+      request, nullptr, "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1067,19 +1063,19 @@ esp_err_t OpenBrewByWeightNetwork::shotsRateHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     "A rating 0-5 and either a shot id or lastShot is required.", "SHOT_RATING_FIELDS_REQUIRED");
+                     nullptr, "SHOT_RATING_FIELDS_REQUIRED");
   }
 
   if (hasLastShot) {
     if (self.callbacks_.rateLastShot == nullptr ||
         !self.callbacks_.rateLastShot(rating)) {
       return sendError(request, STATUS_NOT_FOUND, "LAST_SHOT_NOT_FOUND",
-                       "There is no last shot to rate.", "LAST_SHOT_NOT_FOUND");
+                       nullptr, "LAST_SHOT_NOT_FOUND");
     }
   } else if (self.callbacks_.rateShotRecord == nullptr ||
              !self.callbacks_.rateShotRecord(shotId, rating)) {
     return sendError(request, STATUS_NOT_FOUND, "SHOT_NOT_FOUND",
-                     "The requested shot record was not found.", "SHOT_NOT_FOUND");
+                     nullptr, "SHOT_NOT_FOUND");
   }
   char json[48] = {};
   snprintf(json, sizeof(json), "{\"rated\":true,\"rating\":%u}",
@@ -1091,24 +1087,21 @@ esp_err_t OpenBrewByWeightNetwork::historyClearHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   return self.runConfirmedClear(
       request,
-      "Stop the cycle, switch the physical activator OFF, and wait for Ready "
-      "before clearing the activation history.",
+      nullptr,
       "CLEAR_HISTORY", "HISTORY_CLEAR_NOT_CONFIRMED",
-      "The activation-history clear was not explicitly confirmed.",
+      nullptr,
       self.callbacks_.clearHistoryLog, "HISTORY_CLEAR_FAILED",
-      "Activation history could not be cleared. Check the last storage "
-      "error in Diagnostic.", "ACTIVATION_HISTORY_CLEAR_REQUIRES_IDLE", "ACTIVATION_HISTORY_CLEAR_NOT_CONFIRMED", "ACTIVATION_HISTORY_CLEAR_FAILED");
+      nullptr, "ACTIVATION_HISTORY_CLEAR_REQUIRES_IDLE", "ACTIVATION_HISTORY_CLEAR_NOT_CONFIRMED", "ACTIVATION_HISTORY_CLEAR_FAILED");
 }
 
 esp_err_t OpenBrewByWeightNetwork::historyDeleteHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   return self.runDeleteById(
       request,
-      "Stop the cycle, switch the physical activator OFF, and wait for Ready "
-      "before deleting history records.",
+      nullptr,
       self.callbacks_.deleteHistoryRecord,
-      "A non-zero history record id is required.", "HISTORY_RECORD_NOT_FOUND",
-      "The requested history record was not found.", "HISTORY_DELETE_REQUIRES_IDLE", "HISTORY_RECORD_ID_REQUIRED", "HISTORY_RECORD_NOT_FOUND");
+      nullptr, "HISTORY_RECORD_NOT_FOUND",
+      nullptr, "HISTORY_DELETE_REQUIRES_IDLE", "HISTORY_RECORD_ID_REQUIRED", "HISTORY_RECORD_NOT_FOUND");
 }
 
 // Verbose audit hunt session toggle: marked DEBUG codes join the latch for
@@ -1116,7 +1109,7 @@ esp_err_t OpenBrewByWeightNetwork::historyDeleteHandler(httpd_req_t *request) {
 esp_err_t OpenBrewByWeightNetwork::auditVerboseHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
+      self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1132,12 +1125,12 @@ esp_err_t OpenBrewByWeightNetwork::auditVerboseHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_AUDIT_VERBOSE",
-                     "enabled must be a boolean.", "FIELD_ENABLED_MUST_BE_BOOLEAN");
+                     nullptr, "FIELD_ENABLED_MUST_BE_BOOLEAN");
   }
   if (self.callbacks_.setAuditVerbose == nullptr ||
       !self.callbacks_.setAuditVerbose(enabled)) {
     return sendError(request, STATUS_CONFLICT, "AUDIT_VERBOSE_UNAVAILABLE",
-                     "The wall clock is not synchronized yet.", "AUDIT_VERBOSE_UNAVAILABLE");
+                     nullptr, "AUDIT_VERBOSE_UNAVAILABLE");
   }
   return sendJson(request, STATUS_OK, "{\"accepted\":true}");
 }
@@ -1145,7 +1138,7 @@ esp_err_t OpenBrewByWeightNetwork::auditVerboseHandler(httpd_req_t *request) {
 esp_err_t OpenBrewByWeightNetwork::taskProfilerHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
+      self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1161,7 +1154,7 @@ esp_err_t OpenBrewByWeightNetwork::taskProfilerHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_PROFILER_CONFIG",
-                     "enabled must be a boolean.", "FIELD_ENABLED_MUST_BE_BOOLEAN");
+                     nullptr, "FIELD_ENABLED_MUST_BE_BOOLEAN");
   }
   WebCommand command;
   command.type = enabled ? WebCommandType::TASK_PROFILER_START
@@ -1169,7 +1162,7 @@ esp_err_t OpenBrewByWeightNetwork::taskProfilerHandler(httpd_req_t *request) {
   command.requestId = self.allocateRequestId();
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Task profiler state was not changed.", "TASK_PROFILER_UNCHANGED");
+                     nullptr, "TASK_PROFILER_UNCHANGED");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -1178,7 +1171,7 @@ esp_err_t OpenBrewByWeightNetwork::loopMaxResetHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (self.callbacks_.requestLoopMaxReset == nullptr) {
     return sendError(request, STATUS_UNAVAILABLE, "LOOP_TIMING_UNAVAILABLE",
-                     "Loop timing could not be reset.", "LOOP_TIMING_UNAVAILABLE");
+                     nullptr, "LOOP_TIMING_UNAVAILABLE");
   }
   self.callbacks_.requestLoopMaxReset();
   return sendJson(request, STATUS_OK, "{\"reset\":true}");
@@ -1188,7 +1181,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleGapMaxResetHandler(httpd_req_t *request)
   OpenBrewByWeightNetwork &self = *instance_;
   if (self.callbacks_.requestScaleGapMaxReset == nullptr) {
     return sendError(request, STATUS_UNAVAILABLE, "SCALE_TIMING_UNAVAILABLE",
-                     "Scale gap maximum could not be reset.", "SCALE_TIMING_UNAVAILABLE");
+                     nullptr, "SCALE_TIMING_UNAVAILABLE");
   }
   self.callbacks_.requestScaleGapMaxReset();
   return sendJson(request, STATUS_OK, "{\"reset\":true}");

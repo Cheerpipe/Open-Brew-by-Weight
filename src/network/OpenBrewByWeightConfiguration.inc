@@ -5,13 +5,13 @@ esp_err_t OpenBrewByWeightNetwork::timeSyncHandler(httpd_req_t *request) {
   }
   if (firmwareCompatibilityMode()) {
     return sendError(request, STATUS_UNAVAILABLE, "TIME_SYNC_DISABLED",
-                     "Time sync is unavailable while the firmware is disabled.", "TIME_SYNC_DISABLED");
+                     nullptr, "TIME_SYNC_DISABLED");
   }
   ControlGateSnapshot status = self.controlGate();
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Stop the cycle, switch the physical activator OFF, and wait for Ready before syncing the clock.", "CLOCK_SYNC_REQUIRES_IDLE");
+                     nullptr, "CLOCK_SYNC_REQUIRES_IDLE");
   }
   self.ntpManualSyncPending_ = true;
   return self.sendAccepted(request, self.allocateRequestId());
@@ -49,7 +49,7 @@ esp_err_t OpenBrewByWeightNetwork::timeZonePreviewHandler(httpd_req_t *request) 
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
+      request, nullptr, "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) return bodyStatus;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   char zoneId[TIMEZONE_ID_CAPACITY] = {};
@@ -94,10 +94,10 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Configuration is locked while a cycle is active.", "CONFIG_LOCKED_DURING_ACTIVE_CYCLE");
+                     nullptr, "CONFIG_LOCKED_DURING_ACTIVE_CYCLE");
   }
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
+      request, nullptr, "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -562,7 +562,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   if (dateTimePatch && firmwareCompatibilityMode()) {
     memset(customNtp, 0, sizeof(customNtp));
     return sendError(request, STATUS_UNAVAILABLE, "DATE_TIME_DISABLED",
-                     "Date and time settings are unavailable while the firmware is disabled.", "DATE_TIME_DISABLED");
+                     nullptr, "DATE_TIME_DISABLED");
   }
   if (diagnosticPagePatch && !self.requireAdminUnlock(request)) {
     memset(customNtp, 0, sizeof(customNtp));
@@ -571,11 +571,11 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   if (baseRevisionPresent && baseRevision != candidate.revision) {
     memset(customNtp, 0, sizeof(customNtp));
     return sendError(request, STATUS_CONFLICT, "CONFIG_REVISION_STALE",
-                     "Config changed; refresh and retry.", "CONFIG_REVISION_STALE");
+                     nullptr, "CONFIG_REVISION_STALE");
   }
   if (timezoneAutoInit && durableTimezoneSaved().load()) {
     return sendError(request, STATUS_CONFLICT, "TIMEZONE_ALREADY_SET",
-                     "The time zone was already saved.", "TIMEZONE_ALREADY_SET");
+                     nullptr, "TIMEZONE_ALREADY_SET");
   }
   candidate.timezoneAutomatic = timezoneAutomatic;
   candidate.scheduledRestartEnabled = scheduledRestartEnabled ? 1 : 0;
@@ -627,13 +627,13 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
         !self.callbacks_.stageBullseyeConfig(candidateBullseye,
                                               command.requestId)) {
       return sendError(request, STATUS_UNAVAILABLE, "CONTROL_BUSY",
-                       "Control is busy; the Bullseye melody was not staged.", "BULLSEYE_STAGE_BUSY");
+                       nullptr, "BULLSEYE_STAGE_BUSY");
     }
     command.bullseyeStageRequestId = command.requestId;
   }
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; nothing was saved.", "SAVE_BUSY");
+                     nullptr, "SAVE_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -644,11 +644,11 @@ esp_err_t OpenBrewByWeightNetwork::webhookHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, gate)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Webhooks can be changed or tested only while Ready.", "WEBHOOK_REQUIRES_READY");
+                     nullptr, "WEBHOOK_REQUIRES_READY");
   }
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded webhook JSON request is required.", "WEBHOOK_BOUNDED_JSON_REQUIRED");
+      request, nullptr, "WEBHOOK_BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) return bodyStatus;
 
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
@@ -682,11 +682,11 @@ esp_err_t OpenBrewByWeightNetwork::webhookHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_WEBHOOK",
-                     "Use an http:// URL without embedded credentials; HTTPS is not supported.", "INVALID_WEBHOOK");
+                     nullptr, "INVALID_WEBHOOK");
   }
   if (stale)
     return sendError(request, STATUS_CONFLICT, "STALE_REVISION",
-                     "Webhook settings changed; refresh and retry.", "WEBHOOK_SETTINGS_CHANGED_RETRY");
+                     nullptr, "WEBHOOK_SETTINGS_CHANGED_RETRY");
 
   if (strcmp(action, "test") == 0) {
     WebhookEvent event;
@@ -695,7 +695,7 @@ esp_err_t OpenBrewByWeightNetwork::webhookHandler(httpd_req_t *request) {
     event.unixSec = g_wallClock.synced() ? g_wallClock.nowUtcSec(millis()) : 0;
     if (!self.webhooks_.enqueue(event)) {
       return sendError(request, STATUS_UNAVAILABLE, "WEBHOOK_UNAVAILABLE",
-                       "The webhook worker is unavailable or its queue is full.", "WEBHOOK_UNAVAILABLE");
+                       nullptr, "WEBHOOK_UNAVAILABLE");
     }
     return sendJson(request, STATUS_ACCEPTED, "{\"queued\":true}");
   }
@@ -714,12 +714,12 @@ esp_err_t OpenBrewByWeightNetwork::webhookHandler(httpd_req_t *request) {
   self.dataMux_.unlock();
   if (!stageAvailable) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_BUSY",
-                     "Another webhook configuration save is still pending.", "WEBHOOK_CONFIG_SAVE_PENDING");
+                     nullptr, "WEBHOOK_CONFIG_SAVE_PENDING");
   }
   if (!self.callbacks_.enqueueWebCommand(command)) {
     self.clearStagedWebhook(command.requestId);
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; webhook settings were not saved.", "WEBHOOK_SAVE_BUSY");
+                     nullptr, "WEBHOOK_SAVE_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -730,10 +730,10 @@ esp_err_t OpenBrewByWeightNetwork::bullseyeTestHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "The Bullseye melody can be tested only while Ready.", "BULLSEYE_TEST_REQUIRES_READY");
+                     nullptr, "BULLSEYE_TEST_REQUIRES_READY");
   }
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A Bullseye RTTTL test request is required.", "BULLSEYE_TEST_REQUEST_REQUIRED");
+      request, nullptr, "BULLSEYE_TEST_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -754,7 +754,7 @@ esp_err_t OpenBrewByWeightNetwork::bullseyeTestHandler(httpd_req_t *request) {
   if (!parsed) {
     self.unlockJsonBody();
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_BULLSEYE_RTTTL",
-                     "bullseyeRtttl must be valid single-line RTTTL (up to 250 notes).", "BULLSEYE_RTTTL_INVALID");
+                     nullptr, "BULLSEYE_RTTTL_INVALID");
   }
 
   WebCommand command;
@@ -769,11 +769,11 @@ esp_err_t OpenBrewByWeightNetwork::bullseyeTestHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!staged) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_BUSY",
-                     "Control is busy; the Bullseye melody was not staged.", "BULLSEYE_STAGE_BUSY");
+                     nullptr, "BULLSEYE_STAGE_BUSY");
   }
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; the Bullseye melody was not played.", "BULLSEYE_TEST_BUSY");
+                     nullptr, "BULLSEYE_TEST_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -784,13 +784,12 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleClearHandler(httpd_req_t *reque
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "The paired scale cannot be forgotten while a cycle "
-                     "is active.", "SCALE_FORGET_LOCKED_ACTIVE_CYCLE");
+                     nullptr, "SCALE_FORGET_LOCKED_ACTIVE_CYCLE");
   }
   return self.enqueueAcceptedCommand(request,
                                 WebCommandType::CLEAR_PREFERRED_SCALE,
                                 self.webUiOverrideAllowed(request),
-                                "Control is busy; nothing was cleared.", nullptr, "PREFERRED_SCALE_CLEAR_BUSY");
+                                nullptr, nullptr, "PREFERRED_SCALE_CLEAR_BUSY");
 }
 
 esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *request) {
@@ -799,12 +798,11 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *requ
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "The preferred scale cannot be changed while a cycle "
-                     "is active.", "PREFERRED_SCALE_LOCKED_ACTIVE_CYCLE");
+                     nullptr, "PREFERRED_SCALE_LOCKED_ACTIVE_CYCLE");
   }
 
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
+      request, nullptr, "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -843,7 +841,7 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *requ
   copyCString(command.network.scaleSelectName, sizeof(command.network.scaleSelectName), name);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; nothing was selected.", "SCALE_SELECT_BUSY");
+                     nullptr, "SCALE_SELECT_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -854,12 +852,11 @@ esp_err_t OpenBrewByWeightNetwork::scaleFriendlyNameHandler(httpd_req_t *request
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "The scale name cannot be changed while a cycle "
-                     "is active.", "SCALE_NAME_LOCKED_ACTIVE_CYCLE");
+                     nullptr, "SCALE_NAME_LOCKED_ACTIVE_CYCLE");
   }
 
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
+      request, nullptr, "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -898,7 +895,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleFriendlyNameHandler(httpd_req_t *request
                               sizeof(known))) {
       self.unlockJsonBody();
       return sendError(request, STATUS_UNPROCESSABLE, "UNKNOWN_SCALE",
-                       "mac is not a known scale.", "UNKNOWN_SCALE");
+                       nullptr, "UNKNOWN_SCALE");
     }
   }
   self.unlockJsonBody();
@@ -911,7 +908,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleFriendlyNameHandler(httpd_req_t *request
   copyCString(command.network.scaleSelectName, sizeof(command.network.scaleSelectName), name);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; the name was not saved.", "SCALE_NAME_SAVE_BUSY");
+                     nullptr, "SCALE_NAME_SAVE_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -922,11 +919,11 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Presets are locked while a cycle is active.", "PRESETS_LOCKED_ACTIVE_CYCLE");
+                     nullptr, "PRESETS_LOCKED_ACTIVE_CYCLE");
   }
 
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, "A bounded JSON request is required.", "BOUNDED_JSON_REQUIRED");
+      request, nullptr, "BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1098,7 +1095,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
   copyCString(command.presetName, sizeof(command.presetName), presetName);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; nothing was saved.", "SAVE_BUSY");
+                     nullptr, "SAVE_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -1109,10 +1106,10 @@ esp_err_t OpenBrewByWeightNetwork::resetCalibrationHandler(httpd_req_t *request)
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Calibration is locked while a cycle is active.", "CALIBRATION_LOCKED_ACTIVE_CYCLE");
+                     nullptr, "CALIBRATION_LOCKED_ACTIVE_CYCLE");
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "An empty JSON object is required.", "EMPTY_JSON_REQUIRED");
+      self.lockJsonBody(request, nullptr, "EMPTY_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1138,7 +1135,7 @@ esp_err_t OpenBrewByWeightNetwork::resetCalibrationHandler(httpd_req_t *request)
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_REQUEST",
-                     "Use fullEwma, dripG (0–5 g) or alpha (0.01–1.00).", "STOP_PREDICTION_FIELDS_INVALID");
+                     nullptr, "STOP_PREDICTION_FIELDS_INVALID");
   }
   WebCommand command;
   command.type = WebCommandType::RESET_WEIGHT_OFFSET;
@@ -1152,7 +1149,7 @@ esp_err_t OpenBrewByWeightNetwork::resetCalibrationHandler(httpd_req_t *request)
   command.unsafeWebUiOverride = self.webUiOverrideAllowed(request);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control is busy; calibration was not reset.", "CALIBRATION_RESET_BUSY");
+                     nullptr, "CALIBRATION_RESET_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -1163,10 +1160,10 @@ esp_err_t OpenBrewByWeightNetwork::resetGuardSamplesHandler(httpd_req_t *request
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Guard samples are locked while a cycle is active.", "GUARD_SAMPLES_LOCKED_ACTIVE_CYCLE");
+                     nullptr, "GUARD_SAMPLES_LOCKED_ACTIVE_CYCLE");
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "An empty JSON object is required.", "EMPTY_JSON_REQUIRED");
+      self.lockJsonBody(request, nullptr, "EMPTY_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1180,12 +1177,12 @@ esp_err_t OpenBrewByWeightNetwork::resetGuardSamplesHandler(httpd_req_t *request
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_REQUEST",
-                     "The guard samples reset request must be an empty object.", "GUARD_SAMPLES_RESET_REQUIRES_EMPTY_OBJECT");
+                     nullptr, "GUARD_SAMPLES_RESET_REQUIRES_EMPTY_OBJECT");
   }
   return self.enqueueAcceptedCommand(
       request, WebCommandType::RESET_AUTO_TO_MANUAL_GUARD_SAMPLES,
       self.webUiOverrideAllowed(request),
-      "Control is busy; guard samples were not reset.", nullptr, "GUARD_SAMPLES_RESET_BUSY");
+      nullptr, nullptr, "GUARD_SAMPLES_RESET_BUSY");
 }
 
 esp_err_t OpenBrewByWeightNetwork::paddleHandler(httpd_req_t *request) {
@@ -1194,7 +1191,7 @@ esp_err_t OpenBrewByWeightNetwork::paddleHandler(httpd_req_t *request) {
     return ESP_OK;
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON body is required.", "JSON_BODY_REQUIRED");
+      self.lockJsonBody(request, nullptr, "JSON_BODY_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1210,19 +1207,19 @@ esp_err_t OpenBrewByWeightNetwork::paddleHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     "The on field must be boolean.", "FIELD_ON_MUST_BE_BOOLEAN");
+                     nullptr, "FIELD_ON_MUST_BE_BOOLEAN");
   }
   ControlGateSnapshot status = self.controlGate();
   if (on && !REMOTE_MACHINE_CONTROL_ENABLED) {
     return sendError(request, "403 Forbidden", "REMOTE_CONTROL_DISABLED",
-                     "Remote machine control actuation is disabled in this firmware build.", "REMOTE_CONTROL_DISABLED");
+                     nullptr, "REMOTE_CONTROL_DISABLED");
   }
   const bool allowed = on ? self.webUiConfigurationAllowed(request, status)
                           : (status.activeCycle &&
                              status.source == ControlSource::WEB);
   if (!allowed) {
     return sendError(request, STATUS_CONFLICT, "CONTROL_STATE_CONFLICT",
-                     "The current state does not allow that action.", "CONTROL_STATE_CONFLICT");
+                     nullptr, "CONTROL_STATE_CONFLICT");
   }
   WebCommand command;
   command.type = on ? WebCommandType::REMOTE_ON : WebCommandType::REMOTE_OFF;
@@ -1230,7 +1227,7 @@ esp_err_t OpenBrewByWeightNetwork::paddleHandler(httpd_req_t *request) {
   command.unsafeWebUiOverride = self.webUiOverrideAllowed(request);
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control queue is full.", "CONTROL_QUEUE_FULL");
+                     nullptr, "CONTROL_QUEUE_FULL");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -1243,15 +1240,15 @@ esp_err_t OpenBrewByWeightNetwork::rinseHandler(httpd_req_t *request) {
   ControlGateSnapshot status = self.controlGate();
   if (!REMOTE_MACHINE_CONTROL_ENABLED) {
     return sendError(request, "403 Forbidden", "REMOTE_CONTROL_DISABLED",
-                     "Remote machine control actuation is disabled in this firmware build.", "REMOTE_CONTROL_DISABLED");
+                     nullptr, "REMOTE_CONTROL_DISABLED");
   }
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT, "CONTROL_STATE_CONFLICT",
-                     "Rinse can only start from Ready.", "RINSE_REQUIRES_READY");
+                     nullptr, "RINSE_REQUIRES_READY");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::RINSE,
                                 self.webUiOverrideAllowed(request),
-                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
+                                nullptr, nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::stopHandler(httpd_req_t *request) {
@@ -1262,10 +1259,10 @@ esp_err_t OpenBrewByWeightNetwork::stopHandler(httpd_req_t *request) {
   ControlGateSnapshot status = self.controlGate();
   if (!status.activeCycle || !status.machineRunning) {
     return sendError(request, STATUS_CONFLICT, "CONTROL_STATE_CONFLICT",
-                     "There is no active shot to stop.", "NO_ACTIVE_SHOT");
+                     nullptr, "NO_ACTIVE_SHOT");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::STOP, false,
-                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
+                                nullptr, nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::forcePulseHandler(httpd_req_t *request) {
@@ -1275,16 +1272,16 @@ esp_err_t OpenBrewByWeightNetwork::forcePulseHandler(httpd_req_t *request) {
   }
   if (!REMOTE_MACHINE_CONTROL_ENABLED) {
     return sendError(request, "403 Forbidden", "REMOTE_CONTROL_DISABLED",
-                     "Remote machine control actuation is disabled in this firmware build.", "REMOTE_CONTROL_DISABLED");
+                     nullptr, "REMOTE_CONTROL_DISABLED");
   }
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 0
   if (OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 0) {
     return sendError(request, STATUS_CONFLICT, "MACHINE_TYPE_UNSUPPORTED",
-                     "Forced switch pulses require a momentary machine build.", "MACHINE_TYPE_UNSUPPORTED");
+                     nullptr, "MACHINE_TYPE_UNSUPPORTED");
   }
 #endif
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "An empty JSON object is required.", "EMPTY_JSON_REQUIRED");
+      self.lockJsonBody(request, nullptr, "EMPTY_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1298,20 +1295,20 @@ esp_err_t OpenBrewByWeightNetwork::forcePulseHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_REQUEST",
-                     "The forced pulse request must be an empty object.", "FORCED_PULSE_REQUIRES_EMPTY_OBJECT");
+                     nullptr, "FORCED_PULSE_REQUIRES_EMPTY_OBJECT");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::FORCE_SWITCH_PULSE,
-                                false, "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
+                                false, nullptr, nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::stateOverrideHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (OPEN_BREW_BY_WEIGHT_MACHINE_TYPE != 1) {
     return sendError(request, STATUS_CONFLICT, "MACHINE_TYPE_UNSUPPORTED",
-                     "Inferred-state override is only available on switch-only builds.", "STATE_OVERRIDE_SWITCH_ONLY");
+                     nullptr, "STATE_OVERRIDE_SWITCH_ONLY");
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON body is required.", "JSON_BODY_REQUIRED");
+      self.lockJsonBody(request, nullptr, "JSON_BODY_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1327,7 +1324,7 @@ esp_err_t OpenBrewByWeightNetwork::stateOverrideHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed || (strcmp(state, "off") != 0 && strcmp(state, "on") != 0)) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIELD",
-                     "The state field must be \"off\" or \"on\".", "STATE_FIELD_INVALID");
+                     nullptr, "STATE_FIELD_INVALID");
   }
   WebCommand command;
   command.type = strcmp(state, "off") == 0 ? WebCommandType::STATE_OVERRIDE_OFF
@@ -1335,7 +1332,7 @@ esp_err_t OpenBrewByWeightNetwork::stateOverrideHandler(httpd_req_t *request) {
   command.requestId = self.allocateRequestId();
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control queue is full.", "CONTROL_QUEUE_FULL");
+                     nullptr, "CONTROL_QUEUE_FULL");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -1349,7 +1346,7 @@ esp_err_t OpenBrewByWeightNetwork::restartHandler(httpd_req_t *request) {
   // holds it until idle instead of opening K1 to make way for the reset.
   // Override must not cut a pour.
   return self.enqueueAcceptedCommand(request, WebCommandType::RESTART, false,
-                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
+                                nullptr, nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::firmwareModeHandler(httpd_req_t *request) {
@@ -1360,10 +1357,10 @@ esp_err_t OpenBrewByWeightNetwork::firmwareModeHandler(httpd_req_t *request) {
   if (!self.networkFlashWriteAllowed()) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Wait until the machine is idle, then save the firmware mode again.", "FIRMWARE_MODE_REQUIRES_IDLE");
+                     nullptr, "FIRMWARE_MODE_REQUIRES_IDLE");
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "A JSON request is required.", "OTA_JSON_REQUEST_REQUIRED");
+      self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (bodyStatus != ESP_OK) {
     return bodyStatus;
   }
@@ -1379,7 +1376,7 @@ esp_err_t OpenBrewByWeightNetwork::firmwareModeHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_FIRMWARE_MODE",
-                     "enabled must be a boolean.", "FIELD_ENABLED_MUST_BE_BOOLEAN");
+                     nullptr, "FIELD_ENABLED_MUST_BE_BOOLEAN");
   }
   // The mode is boot-scoped: persist under the durable-write gate checked
   // above, then queue the same idle-safe restart the Restart button uses.
@@ -1387,20 +1384,20 @@ esp_err_t OpenBrewByWeightNetwork::firmwareModeHandler(httpd_req_t *request) {
           enabled ? openbrewbyweight::FirmwareMode::FULL
                   : openbrewbyweight::FirmwareMode::COMPATIBILITY)) {
     return sendError(request, STATUS_UNAVAILABLE, "FIRMWARE_MODE_SAVE_FAILED",
-                     "Could not persist the firmware mode.", "FIRMWARE_MODE_SAVE_FAILED");
+                     nullptr, "FIRMWARE_MODE_SAVE_FAILED");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::RESTART, false,
-                                "Control queue is full.", nullptr, "CONTROL_QUEUE_FULL");
+                                nullptr, nullptr, "CONTROL_QUEUE_FULL");
 }
 
 esp_err_t OpenBrewByWeightNetwork::scaleTareHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!controlAllowsConfiguration(self.controlGate())) {
     return sendError(request, STATUS_CONFLICT, "CONTROL_STATE_CONFLICT",
-                     "Stop the cycle and wait for Ready before taring.", "TARE_REQUIRES_READY");
+                     nullptr, "TARE_REQUIRES_READY");
   }
   const esp_err_t bodyStatus =
-      self.lockJsonBody(request, "An empty JSON object is required.", "EMPTY_JSON_REQUIRED");
+      self.lockJsonBody(request, nullptr, "EMPTY_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) return bodyStatus;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   static const char *const noFields[] = {nullptr};
@@ -1410,7 +1407,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleTareHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   if (!parsed) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_REQUEST",
-                     "The tare request must be an empty object.", "TARE_REQUIRES_EMPTY_OBJECT");
+                     nullptr, "TARE_REQUIRES_EMPTY_OBJECT");
   }
   WebCommand command;
   command.type = WebCommandType::BOOKOO_DEBUG;
@@ -1418,7 +1415,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleTareHandler(httpd_req_t *request) {
   command.requestId = self.allocateRequestId();
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     "Control queue is full.", "CONTROL_QUEUE_FULL");
+                     nullptr, "CONTROL_QUEUE_FULL");
   }
   return self.sendAccepted(request, command.requestId);
 }
@@ -1426,14 +1423,14 @@ esp_err_t OpenBrewByWeightNetwork::scaleTareHandler(httpd_req_t *request) {
 esp_err_t OpenBrewByWeightNetwork::clearResetHistoryHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.lockConfirmedBody(
-          request, "An explicit reset-history confirmation is required.",
+          request, nullptr,
           "CLEAR_RESET_HISTORY", "RESET_HISTORY_CONFIRMATION_REQUIRED")) {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_CONFIRMATION",
-                     "Confirm reset-history clearing explicitly.", "RESET_HISTORY_NOT_CONFIRMED");
+                     nullptr, "RESET_HISTORY_NOT_CONFIRMED");
   }
   return self.enqueueAcceptedCommand(request, WebCommandType::CLEAR_RESET_HISTORY,
                                 false,
-                                "Control is busy; reset history was not cleared.", nullptr, "RESET_HISTORY_CLEAR_BUSY");
+                                nullptr, nullptr, "RESET_HISTORY_CLEAR_BUSY");
 }
 
 esp_err_t OpenBrewByWeightNetwork::factoryResetHandler(httpd_req_t *request) {
@@ -1445,20 +1442,20 @@ esp_err_t OpenBrewByWeightNetwork::factoryResetHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, status)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     "Stop the cycle, switch the physical activator OFF, and wait for Ready before restoring factory settings.", "FACTORY_RESET_REQUIRES_IDLE");
+                     nullptr, "FACTORY_RESET_REQUIRES_IDLE");
   }
 
   if (!self.lockConfirmedBody(
-          request, "An explicit factory-reset confirmation is required.",
+          request, nullptr,
           "ERASE_ALL_SETTINGS", "FACTORY_RESET_CONFIRMATION_REQUIRED")) {
     return sendError(request, STATUS_UNPROCESSABLE,
                      "FACTORY_RESET_NOT_CONFIRMED",
-                     "The factory reset was not explicitly confirmed.", "FACTORY_RESET_NOT_CONFIRMED");
+                     nullptr, "FACTORY_RESET_NOT_CONFIRMED");
   }
 
   return self.enqueueAcceptedCommand(request, WebCommandType::FACTORY_RESET,
                                 self.webUiOverrideAllowed(request),
-                                "Control is busy; no settings were erased.",
+                                nullptr,
                                 "\"state\":\"QUEUED\"", "FACTORY_RESET_BUSY");
 }
 

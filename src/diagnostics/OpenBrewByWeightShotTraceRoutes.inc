@@ -114,13 +114,13 @@ esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request
     if (response.started) return ESP_FAIL;
     if (exported == ShotTraceExport::EMPTY)
       return sendError(request, STATUS_NOT_FOUND, "NO_SHOT_TRACE",
-                       "No shot trace is available since the last restart.", "NO_SHOT_TRACE");
+                       nullptr, "NO_SHOT_TRACE");
     result = ShotTraceRead::BUSY;
   } else {
     uint32_t identity[3] = {};
     if (queried != ESP_OK || !parseShotTraceIdentity(query, identity))
       return sendError(request, STATUS_UNPROCESSABLE, "INVALID_SHOT_TRACE",
-                       "id, boot and end must name a shot.", "SHOT_NAME_FIELDS_INVALID");
+                       nullptr, "SHOT_NAME_FIELDS_INVALID");
     // If-None-Match: the ETag this route sent, "xxxxxxxx" (else ignored).
     char tag[16] = {};
     char *end = tag;
@@ -146,16 +146,16 @@ esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request
       return httpd_resp_send(request, nullptr, 0);
     case ShotTraceRead::NONE:
       return sendError(request, STATUS_NOT_FOUND, "NO_SHOT_TRACE",
-                       "This shot has no stored trace.", "SHOT_HAS_NO_TRACE");
+                       nullptr, "SHOT_HAS_NO_TRACE");
     case ShotTraceRead::BUSY:
       return sendError(request, STATUS_CONFLICT, "SHOT_TRACE_BUSY",
-                       "The controller is busy (a shot, a rinse or the scale); try again shortly.", "SHOT_STORAGE_BUSY");
+                       nullptr, "SHOT_STORAGE_BUSY");
     case ShotTraceRead::PENDING:
       return sendError(request, STATUS_CONFLICT, "SHOT_TRACE_SAVING",
-                       "This shot's trace is still being saved; try again shortly.", "SHOT_TRACE_SAVING");
+                       nullptr, "SHOT_TRACE_SAVING");
     default:
       return sendError(request, STATUS_UNAVAILABLE, "SHOT_TRACE_UNAVAILABLE",
-                       "The shot trace could not be read.", "SHOT_TRACE_UNAVAILABLE");
+                       nullptr, "SHOT_TRACE_UNAVAILABLE");
   }
 }
 
@@ -205,10 +205,10 @@ esp_err_t OpenBrewByWeightNetwork::shotStorageHandler(httpd_req_t *request) {
                                    : ShotTraceRead::UNAVAILABLE;
   if (result == ShotTraceRead::BUSY)
     return sendError(request, STATUS_CONFLICT, "SHOT_STORAGE_BUSY",
-                     "The controller is busy (a shot, a rinse or the scale); try again shortly.", "SHOT_STORAGE_BUSY");
+                     nullptr, "SHOT_STORAGE_BUSY");
   if (result != ShotTraceRead::FOUND)
     return sendError(request, STATUS_UNAVAILABLE, "SHOT_STORAGE_UNAVAILABLE",
-                     "Shot storage could not be read.", "SHOT_STORAGE_UNAVAILABLE");
+                     nullptr, "SHOT_STORAGE_UNAVAILABLE");
   static const char *const errors[] = {"none", "read", "erase", "program", "lock", "too_large",
                                        "source"};
   char *json = reinterpret_cast<char *>(shotTraceDownloadChunk);

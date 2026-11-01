@@ -5,6 +5,7 @@
 
 #include "../OpenBrewByWeightShotCurveTypes.h"
 #include "../OpenBrewByWeightShotTrace.h"
+#include "OpenBrewByWeightErrorReasonTexts.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -129,7 +130,12 @@ class OpenBrewByWeightNetwork {
   static esp_err_t sendError(httpd_req_t *request, const char *status, const char *error,
                              const char *message, const char *reason = nullptr) {
     // Same body shape as the firmware's sendError: reason between error and
-    // message, omitted when null.
+    // message, omitted when null. Reason-coded sites pass no prose; it
+    // resolves from the generated catalog table, as in the firmware.
+    if (message == nullptr && reason != nullptr) {
+      const char *const resolved = errorReasonText(reason);
+      message = resolved != nullptr ? resolved : reason;
+    }
     std::string body = std::string("{\"error\":\"") + error + "\"";
     if (reason != nullptr) body += std::string(",\"reason\":\"") + reason + "\"";
     body += std::string(",\"message\":\"") + message + "\"}";

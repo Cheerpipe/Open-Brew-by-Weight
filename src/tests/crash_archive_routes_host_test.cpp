@@ -1,4 +1,5 @@
 #include "../OpenBrewByWeightCrashArchive.h"
+#include "OpenBrewByWeightErrorReasonTexts.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -60,6 +61,12 @@ class OpenBrewByWeightNetwork {
   static esp_err_t sendError(httpd_req_t *request, const char *status,
                             const char *error, const char *message,
                             const char *reason = nullptr) {
+    // Reason-coded sites pass no prose; it resolves from the generated
+    // catalog table, as in the firmware's sendError.
+    if (message == nullptr && reason != nullptr) {
+      const char *const resolved = errorReasonText(reason);
+      message = resolved != nullptr ? resolved : reason;
+    }
     request->status = status;
     request->error = error != nullptr ? error : "";
     request->message = message != nullptr ? message : "";
