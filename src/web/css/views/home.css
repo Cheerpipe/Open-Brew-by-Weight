@@ -35,24 +35,28 @@
   user-select: none;
   -webkit-user-select: none;
 }
-.shotHero[data-tint="neutral"] {
+.shotHero[data-tint="neutral"],
+.deckDots [data-tint="neutral"] {
   --tint: var(--cf);
 }
-.shotHero[data-tint="on_recipe"] {
+.shotHero[data-tint="on_recipe"],
+.deckDots [data-tint="on_recipe"] {
   --tint: color-mix(
     in srgb,
     var(--cf) calc(100% - var(--tp)),
     color-mix(in srgb, var(--ok) var(--tk), #000) var(--tp)
   );
 }
-.shotHero[data-tint="fast"] {
+.shotHero[data-tint="fast"],
+.deckDots [data-tint="fast"] {
   --tint: color-mix(
     in srgb,
     var(--cf) calc(100% - var(--tp)),
     color-mix(in srgb, var(--gFast) var(--tk), #000) var(--tp)
   );
 }
-.shotHero[data-tint="slow"] {
+.shotHero[data-tint="slow"],
+.deckDots [data-tint="slow"] {
   --tint: color-mix(
     in srgb,
     var(--cf) calc(100% - var(--tp)),
@@ -236,6 +240,100 @@
 }
 .shotHero[data-hero="technical"] .heroChart svg {
   height: 8.25rem;
+}
+/* The Technical hero's deck: the latest shot and the two before it on a
+   scroll-snap track. A swipe on a card's header or numbers moves the deck;
+   the chart keeps horizontal drags for its scrub. A live shot pins the deck
+   to the latest card. */
+.heroDeck {
+  margin: 1rem 0;
+}
+.heroDeck:has(#shotHero[hidden]) {
+  display: none;
+}
+.deckTrack {
+  display: flex;
+  /* The scroller clips its content: the padding gives the cards' shadow
+     (--ah blurs 14 px, 18 px upward) room up to the page gutter, and the gap
+     keeps the next card and its shadow out of view. */
+  gap: 2rem;
+  margin: -1.25rem -1rem;
+  padding: 1.25rem 1rem;
+  scroll-padding-inline: 1rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.deckTrack::-webkit-scrollbar {
+  display: none;
+}
+.deckTrack > .shotHero {
+  flex: 0 0 100%;
+  margin: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.deckTrack .shotPresetChart {
+  touch-action: pan-y;
+}
+.heroDeck.pinned .deckTrack {
+  overflow-x: hidden;
+}
+.deckHead,
+.deckDots {
+  display: none;
+}
+.heroDeck.multi .deckHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0.2rem 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--mu);
+}
+.deckHead b {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+.heroDeck.multi .deckDots {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+/* One dot per card in its verdict colour; the shown card's dot grows. */
+.deckDots button {
+  position: relative;
+  width: 0.55rem;
+  height: 0.55rem;
+  padding: 0;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--tint);
+  opacity: 0.45;
+  cursor: pointer;
+  transition:
+    width 0.25s,
+    opacity 0.25s;
+}
+.deckDots button::after {
+  content: "";
+  position: absolute;
+  inset: -0.7rem -0.25rem;
+}
+.deckDots button[aria-selected="true"] {
+  width: 1.6rem;
+  opacity: 1;
+}
+.heroDeck.pinned .deckDots button:not([aria-selected="true"]) {
+  opacity: 0.2;
+  cursor: default;
 }
 
 .shotHero .heroPills {

@@ -1277,6 +1277,7 @@ async function deleteOneShot(r, scope = "everywhere") {
         "/api/v1/stats/delete",
         () => {
           R.uiState.shotHistory.shots = R.uiState.shotHistory.shots.filter((s) => s.id !== r.id);
+          R.resetHeroDeck();
           if (typeof R.uiState.shotHistory.total === "number" && R.uiState.shotHistory.total > 0)
             R.uiState.shotHistory.total--;
           R.uiState.shotHistory.hasMore =
@@ -2361,6 +2362,7 @@ async function clearShotHistory() {
         body: R.body({ confirm: "CLEAR_SHOT_LOG" }),
       });
       await clearArchiveCopy("shots", answer, renderShots);
+      R.resetHeroDeck();
       R.uiState.shotHistory = {
         bootId: R.uiState.shotHistory.bootId || 0,
         total: 0,

@@ -4554,6 +4554,7 @@ function paintUiStream() {
       // verdict, rule, or average yet: hold what the shot ended with.
       holdLive: !shotFrame.card.live && heroLive.cycle === shotFrame.boot + "/" + shotFrame.cycle,
     }),
+      eachStream("hero", shotFrame),
       shotStale
         ? setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_stale"))
         : "pending" === shotFrame.phase &&
@@ -4741,9 +4742,11 @@ function startUiStream() {
       uiFrameAt = Date.now();
       clearTimeout(shotDeadline);
       if (data.type === "alive") return;
-      // A subscribed type's frames go to its handler; a pending resync drops
+      // A subscribed type's frames go to its handler (or to one that claims a
+      // request of its own, as the hero deck's Stats fetch); a pending resync drops
       // all but snapshots and cursor-carrying frames (the log) until then.
-      const stream = streamHandlers[data.type];
+      const stream =
+        Object.values(streamHandlers).find((h) => h.claim?.(data)) || streamHandlers[data.type];
       if (stream) {
         if (stream.cursor || !shotResync || data.snapshot) stream.frame(data);
         return;
@@ -5415,6 +5418,219 @@ registerStream("settings", {
     if (settingsFrame && settingsFrame.boot !== boot) settingsFrame = null;
   },
 });
+// The Technical hero's deck: the hero card is the latest shot and two cards
+// show the shots before it, as Stats rows. One rows-only Stats fetch brings
+// them on the first move to them; a new shot shifts the deck here instead.
+const heroDeck = { older: null, last: null, key: "", request: 0, sentAt: 0, rows: [], shown: null },
+  HERO_DECK_WAIT = [null, null];
+// A stored hero card as a Stats row, so every deck card draws from one shape.
+function heroDeckRow({ card: c, curve }) {
+  return {
+    ...c.rule,
+    ...curve,
+    ...c,
+    goalG: c.goal,
+    actualG: c.weight,
+    avgFlowGS: c.averageFlowGps,
+    durationS: c.elapsedMs / 1e3,
+    firstDropS: c.firstDropMs != null ? c.firstDropMs / 1e3 : null,
+    tareS: c.tareMs != null ? c.tareMs / 1e3 : null,
+    stopDetail: c.endReason,
+    cutLineG: c.cutG,
+  };
+}
+// Each paint: a new shot pushes the stored card it replaces onto the deck.
+function syncHeroDeck(f) {
+  const key = f.boot + "/" + f.cycle;
+  if (key !== heroDeck.key) {
+    if (heroDeck.last && heroDeck.older)
+      heroDeck.older = [heroDeckRow(heroDeck.last), ...heroDeck.older].slice(0, 2);
+    heroDeck.key = key;
+    heroDeck.last = null;
+  }
+  if (f.phase === "idle" && !f.card.live) heroDeck.last = f;
+  renderHeroDeck();
+}
+function resetHeroDeck() {
+  Object.assign(heroDeck, { older: null, last: null, key: "", request: 0 });
+  renderHeroDeck();
+}
+registerStream("heroDeck", {
+  subscribe: () => null,
+  claim: (d) => d.type === "stats" && heroDeck.request > 0 && d.request === heroDeck.request,
+  frame: heroDeckFrame,
+  reset: () => (heroDeck.request = 0),
+  reboot: resetHeroDeck,
+  hero: syncHeroDeck,
+});
+function heroDeckFetch() {
+  if (heroDeck.older || Date.now() - heroDeck.sentAt < 5e3 || shotWs?.readyState !== 1) return;
+  Object.assign(heroDeck, {
+    request: ++uiState.statsNextRequest,
+    sentAt: Date.now(),
+    rows: [],
+    at: heroDeck.key,
+  });
+  sendUiOperation({
+    op: "stats",
+    on: true,
+    fetch: true,
+    request: heroDeck.request,
+    offset: heroDeck.last ? 1 : 0,
+    limit: 2,
+    sort: "date",
+    dir: "desc",
+    filter: {},
+  });
+}
+// Rows as Stats sends them: values in its column order, then the curve.
+function heroDeckFrame(m) {
+  try {
+    if (!m.rowBase) heroDeck.cols = m.cols.split(",");
+    for (const a of m.rows) {
+      const r = { ...Object.fromEntries(heroDeck.cols.map((k, i) => [k, a[i]])), ...a.at(-1) };
+      heroDeck.rows.push(r.wD === undefined ? r : Object.assign(r, decodeCurveDeltas(r.wD)));
+    }
+  } catch (_) {
+    return void (heroDeck.request = 0);
+  }
+  if (m.more) return;
+  heroDeck.request = 0;
+  // A shot that started meanwhile moved the deck: the next move refetches.
+  if (heroDeck.at === heroDeck.key) heroDeck.older = heroDeck.rows;
+  renderHeroDeck();
+}
+function heroSlide(r, mode) {
+  const s = document.createElement("section"),
+    kind = r && (/wall_limit$/.test(r.stopDetail) ? "max_time" : r.verdict || ""),
+    cut = !r
+      ? ""
+      : r.channeling
+        ? __WEBUI_TEXT__("runtime.cut_channeling")
+        : r.cutLineG > r.goalG
+          ? __WEBUI_TEXT__("runtime.cut_extended")
+          : r.cutLineG > 0 && r.cutLineG < r.goalG
+            ? __WEBUI_TEXT__("runtime.cut_stopped_early")
+            : "",
+    num = (v, u, c = "") =>
+      Number.isFinite(v)
+        ? `<b class="${c}">${Math.max(0, v).toFixed(1)}<small>${u}</small></b>`
+        : "";
+  s.className = "shotHero heroSlide";
+  // The deck's cards take the hero's own look and colour rules.
+  s.dataset.hero = mode;
+  s.dataset.tint = !r
+    ? "neutral"
+    : heroTint(r, null, kind, 0, false, mode === "technical" ? "forecast" : heroTintMode());
+  s.setAttribute("role", "group");
+  s.setAttribute("aria-roledescription", __WEBUI_TEXT__("home.deck_slide"));
+  s.innerHTML = `<div class="heroBody"><p class="heroLabel"><span class="heroDot" aria-hidden="true"></span><span>${
+    !r
+      ? __WEBUI_TEXT__("home.hero_loading")
+      : kind === "max_time"
+        ? __WEBUI_TEXT__("runtime.max_time")
+        : kind
+          ? verdictLabel(kind)
+          : __WEBUI_TEXT__("home.hero_last_shot")
+  }</span><span>${r?.presetName ? " · " + escHtml(r.presetName) : ""}</span>${
+    cut ? `<span class="heroPills"><span class="heroPill">${cut}</span></span>` : ""
+  }</p>${
+    r
+      ? `<div class="heroNums">${num(r.durationS, __WEBUI_TEXT__("runtime.s_2"), "heroTime")}${num(
+          r.avgFlowGS,
+          __WEBUI_TEXT__("runtime.g_s"),
+          "heroFlow",
+        )}<p class="heroNum">${num(r.actualG, __WEBUI_TEXT__("runtime.g_2"))}</p></div><div class="heroChart${mode === "technical" ? " shotPresetChart" : ""}" role="img"></div>`
+      : ""
+  }</div>`;
+  return s;
+}
+function renderHeroDeck() {
+  const deck = $("heroDeck"),
+    hero = $("shotHero"),
+    track = $("heroDeckTrack");
+  if (!deck || !hero) return;
+  const rows = heroDeck.older || HERO_DECK_WAIT,
+    mode = hero.dataset.hero,
+    look = mode + heroTintMode(),
+    dots = $("heroDeckDots");
+  deck.classList.toggle("multi", rows.length > 0);
+  deck.classList.toggle("pinned", hero.classList.contains("live"));
+  if (!track.dataset.bound) {
+    track.dataset.bound = "1";
+    track.addEventListener("scroll", () => {
+      const s = track.children,
+        i = s[1] ? Math.round(track.scrollLeft / (s[1].offsetLeft - s[0].offsetLeft)) : 0;
+      if (i !== heroDeck.i) markHeroDeck(i);
+    });
+  }
+  if (heroDeck.shown !== rows || heroDeck.look !== look) {
+    heroDeck.shown = rows;
+    heroDeck.look = look;
+    track.querySelectorAll(".heroSlide").forEach((e) => e.remove());
+    dots.replaceChildren();
+    [hero, ...rows].forEach((r, i) => {
+      const s = r === hero ? hero : track.appendChild(heroSlide(r, mode)),
+        b = dots.appendChild(document.createElement("button"));
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.onclick = () => deck.classList.contains("pinned") || scrollHeroDeck(i, true);
+      const host = r && r !== hero && s.querySelector(".heroChart");
+      if (!host) return;
+      const m = shotRuleModel(r),
+        model = buildShotSparkModel(r),
+        rule = r.actualG != null && m.mode === "active" ? m : null,
+        d = { live: false, shotId: r.id, verdict: r.verdict, shotType: r.shotType };
+      if (mode !== "technical")
+        return renderHeroChart(
+          host,
+          model,
+          rule,
+          r.goalG,
+          host.previousSibling.lastChild.textContent,
+          d,
+        );
+      // Drawn once the deck has a width; the shared observer redraws it.
+      host._draw = () => renderHeroTechnicalChart(host, d, model, rule);
+      observePresetHost(host);
+    });
+    if (heroDeck.i > rows.length) scrollHeroDeck(0);
+  }
+  [hero, ...track.querySelectorAll(".heroSlide")].forEach(
+    (s, i) => dots.children[i] && (dots.children[i].dataset.tint = s.dataset.tint),
+  );
+  if (deck.classList.contains("pinned") && heroDeck.i) scrollHeroDeck(0);
+  markHeroDeck(heroDeck.i || 0);
+}
+function scrollHeroDeck(i, smooth) {
+  const s = $("heroDeckTrack").children;
+  $("heroDeckTrack").scrollTo({
+    left: s[i].offsetLeft - s[0].offsetLeft,
+    behavior: smooth ? "smooth" : "instant",
+  });
+  markHeroDeck(i);
+}
+// Header, dots and slide labels follow the shown card; moving past the hero
+// card brings the older shots.
+function markHeroDeck(i) {
+  const slides = $("heroDeckTrack").children,
+    n = slides.length;
+  heroDeck.i = i = Math.min(i, n - 1);
+  const r = heroDeck.shown?.[i - 1];
+  if (i) heroDeckFetch();
+  $("heroDeckWhich").textContent = [
+    __WEBUI_TEXT__("home.deck_latest"),
+    __WEBUI_TEXT__("home.deck_previous"),
+    __WEBUI_TEXT__("home.deck_earlier"),
+  ][i];
+  $("heroDeckAge").textContent = r?.hasWallTime ? "· " + formatHumanTime(r.endedAtLocalSec) : "";
+  $("heroDeckCount").textContent = sub(__WEBUI_TEXT__("home.deck_count"), [i + 1, n]);
+  [...$("heroDeckDots").children].forEach((b, k) => {
+    b.setAttribute("aria-selected", k === i);
+    b.setAttribute("aria-label", sub(__WEBUI_TEXT__("home.deck_count"), [k + 1, n]));
+    slides[k]?.setAttribute("aria-label", b.getAttribute("aria-label"));
+  });
+}
 function ensureSettingsStream() {
   if (settingsStreamWanted || compatMode) return;
   settingsStreamWanted = true;
@@ -7123,6 +7339,7 @@ export {
   viewReady,
   shotResync,
   decodeCurveDeltas,
+  resetHeroDeck,
   updateFirmwareFooter,
   noteBootId,
   buildRuleChartModel,

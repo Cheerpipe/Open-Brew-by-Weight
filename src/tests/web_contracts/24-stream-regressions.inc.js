@@ -71,7 +71,7 @@ ${body(webhook, 'inline bool escapeJsonString(')}
 ${body(stream, 'bool OpenBrewByWeightNetwork::sendUiStreamFrame(')}
 ${body(stream, 'bool OpenBrewByWeightNetwork::sendLogStream(')}
 bool selectStatsFetch(UiStreamSession &session,const ControlStatusSnapshot &control,uint32_t epoch){
-  const bool link=false;
+  const bool rowsOnly=false;
 ${selectStats}
   return fetch;
 }

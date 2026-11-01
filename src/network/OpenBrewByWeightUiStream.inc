@@ -481,7 +481,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
               session->statsPaging = false;
             }
           } else if (fetch && cJSON_IsTrue(fetch)) {
-            accepted = session->statsOn && offset != nullptr && !tag;
+            // Without a standing page this is Home's rows-only fetch.
+            accepted = offset != nullptr && !tag;
             if (accepted) {
               session->statsFetchFilter = filter ? shotFilter : session->statsFilter;
               session->statsFetchWindow =
@@ -773,7 +774,8 @@ void OpenBrewByWeightNetwork::sendUiStream(UiStreamSession &session,
   if (open && session.diagnostic)
     open = within() && sendDiagnosticStream(session, control, network);
   if (open && session.historyOn) open = within() && sendHistoryStream(session, control);
-  if (open && session.statsOn) open = within() && sendStatsStream(session, control);
+  if (open && (session.statsOn || session.statsFetch))
+    open = within() && sendStatsStream(session, control);
   if (open && (session.recordsShots || session.recordsHistory))
     open = within() && sendRecordsIndex(session, control);
   if (open && session.logOn) open = within() && sendLogStream(session, control);

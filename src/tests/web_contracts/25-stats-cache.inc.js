@@ -246,6 +246,17 @@ int main(){
   session.statsFetchLimit=1;
   assert(send(session)&&captures==1&&hashes==3);
   assert(!session.statsFetch&&frames.back().find("\\"id\\":2")!=std::string::npos);
+  // Home's hero fetch has no standing page: rows only, no header, no page state.
+  {
+    auto &home=network.uiStreams_[1];strcpy(home.clientId,"owner");home.fd=2;
+    assert(send(home)&&frames.size()==4);
+    home.statsFetch=true;home.statsFetchRequest=7;home.statsFetchOffset=1;home.statsFetchLimit=1;
+    assert(send(home)&&!home.statsFetch&&!home.statsOn&&frames.size()==5);
+    assert(frames.back().find("\\"request\\":7")!=std::string::npos&&
+           frames.back().find("\\"stats\\":")==std::string::npos&&
+           frames.back().find("\\"cols\\":")!=std::string::npos);
+    home={};
+  }
   // A debug export can borrow records: invalidation must refill the cache.
   work.statsCache.valid=false;work.statsCache.snapshot.records[0].actualWeightCg=999;
   session.statsResync=true;
@@ -267,7 +278,7 @@ int main(){
   assert(send(session)&&session.statsSent==2);
   assert(captures==copied&&hashes==hashed);
   // A new session owns its cursor; immutable cache contents may be shared.
-  auto &fresh=network.uiStreams_[1];strcpy(fresh.clientId,"owner");fresh.fd=2;
+  auto &fresh=network.uiStreams_[1];strcpy(fresh.clientId,"owner");fresh.fd=2;fresh.statsOn=true;
   assert(send(fresh)&&fresh.statsSent==1&&captures==copied);
   strcpy(fresh.clientId,"superseded");
   assert(!send(fresh));

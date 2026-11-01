@@ -20,31 +20,51 @@
   </symbol>
 </svg>
 <p id="homeReadyMsg" class="readyMsg" role="status" hidden></p>
-<section
-  id="shotHero"
-  class="shotHero"
-  tabindex="0"
-  title="{{webui:home.full_screen_hint}}"
-  aria-keyshortcuts="Enter"
-  hidden
->
-  <div class="heroBody">
-    <p class="heroLabel">
-      <span class="heroDot" aria-hidden="true"></span><span id="shotHeroState"></span
-      ><span id="shotHeroPreset"></span
-      ><span id="shotHeroPills" class="heroPills" hidden
-        ><span id="shotHeroCut" class="heroPill" hidden></span
-        ><span id="shotHeroTouch" class="heroPill" hidden></span
-        ><span id="shotHeroMode" class="heroPill" hidden></span
-      ></span>
-    </p>
-    <div class="heroNums">
-      <b id="shotHeroElapsed" class="heroTime"></b><b id="shotHeroFlow" class="heroFlow" hidden></b>
-      <p class="heroNum"><b id="shotHeroWeight">—</b></p>
-    </div>
-    <div id="shotHeroSpark" class="heroChart" role="img"></div>
+<div id="heroDeck" class="heroDeck">
+  <p class="deckHead" aria-hidden="true">
+    <span><b id="heroDeckWhich"></b> <span id="heroDeckAge"></span></span
+    ><span id="heroDeckCount"></span>
+  </p>
+  <div
+    id="heroDeckTrack"
+    class="deckTrack"
+    aria-roledescription="carousel"
+    aria-label="{{webui:home.deck_label}}"
+  >
+    <section
+      id="shotHero"
+      class="shotHero"
+      tabindex="0"
+      title="{{webui:home.full_screen_hint}}"
+      aria-keyshortcuts="Enter"
+      hidden
+    >
+      <div class="heroBody">
+        <p class="heroLabel">
+          <span class="heroDot" aria-hidden="true"></span><span id="shotHeroState"></span
+          ><span id="shotHeroPreset"></span
+          ><span id="shotHeroPills" class="heroPills" hidden
+            ><span id="shotHeroCut" class="heroPill" hidden></span
+            ><span id="shotHeroTouch" class="heroPill" hidden></span
+            ><span id="shotHeroMode" class="heroPill" hidden></span
+          ></span>
+        </p>
+        <div class="heroNums">
+          <b id="shotHeroElapsed" class="heroTime"></b
+          ><b id="shotHeroFlow" class="heroFlow" hidden></b>
+          <p class="heroNum"><b id="shotHeroWeight">—</b></p>
+        </div>
+        <div id="shotHeroSpark" class="heroChart" role="img"></div>
+      </div>
+    </section>
   </div>
-</section>
+  <div
+    id="heroDeckDots"
+    class="deckDots"
+    role="tablist"
+    aria-label="{{webui:home.deck_label}}"
+  ></div>
+</div>
 <section id="grindHintCard" class="homeCard ghCard" hidden>
   <div class="ghTop">
     <span id="ghTag" class="ghTag"></span><span id="ghConf" class="ghConf"></span>

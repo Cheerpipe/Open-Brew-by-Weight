@@ -148,11 +148,12 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   uiStreamSendKind = "stats";
   uint32_t epoch =
       callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0;
-  // As in History, the archive's link session only fetches (and needs no header).
-  const bool link = companionRecordsSession(session);
-  if (link && !session.statsFetch) return true;
+  // As in History, the archive's link session only fetches (and needs no
+  // header); so does Home's fetch of its hero shots, with no standing page.
+  const bool link = companionRecordsSession(session), rowsOnly = link || !session.statsOn;
+  if (rowsOnly && !session.statsFetch) return true;
   const bool initial =
-      !link && (session.statsResync || session.statsBoot != control.bootId);
+      !rowsOnly && (session.statsResync || session.statsBoot != control.bootId);
   // Finish the standing page before a later accepted fetch. Cancellation
   // belongs to subscribe/resync handling, never a delayed dispatch.
   const bool fetch = session.statsFetch && !initial &&
@@ -201,7 +202,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   }
   // The header follows the store, the selected window, and the active
   // preset of its "This preset" chart.
-  const bool header = !link && (!cache.valid || cache.headerEpoch != epoch ||
+  const bool header = !rowsOnly && (!cache.valid || cache.headerEpoch != epoch ||
       cache.headerWindow != statsWindow ||
       cache.headerPresetId != control.bbwPresetId);
   if (header) {
@@ -340,7 +341,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
           static_cast<unsigned long>(session.statsSeq),
           static_cast<unsigned long>(request)))
       return false;
-  if (first && cache.statsOk && !link &&
+  if (first && cache.statsOk && !rowsOnly &&
       !statusJsonAppend(&used, "\"stats\":%s,", cache.header))
     return false;
   if (first && !statusJsonAppend(&used, "\"cols\":\"%s\",\"tag\":%lu,\"good\":%u,", kStatsRowColumns,
