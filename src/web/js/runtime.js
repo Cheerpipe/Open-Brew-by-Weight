@@ -5415,8 +5415,9 @@ registerStream("settings", {
 // The Technical hero's deck: the hero card is the latest shot and two cards
 // show the shots before it, as Stats rows. One rows-only Stats fetch brings
 // them with Home once the hero is stored; a new shot shifts the deck instead.
+// Until they arrive the deck is the hero card alone, with nothing to swipe to.
 const heroDeck = { older: null, last: null, key: "", request: 0, sentAt: 0, rows: [], shown: null },
-  HERO_DECK_WAIT = [null, null];
+  HERO_DECK_NONE = [];
 // A stored hero card as a Stats row, so every deck card draws from one shape.
 function heroDeckRow({ card: c, curve }) {
   return {
@@ -5499,16 +5500,14 @@ function heroDeckFrame(m) {
 }
 function heroSlide(r, mode) {
   const s = document.createElement("section"),
-    kind = r && (/wall_limit$/.test(r.stopDetail) ? "max_time" : r.verdict || ""),
-    cut = !r
-      ? ""
-      : r.channeling
-        ? __WEBUI_TEXT__("runtime.cut_channeling")
-        : r.cutLineG > r.goalG
-          ? __WEBUI_TEXT__("runtime.cut_extended")
-          : r.cutLineG > 0 && r.cutLineG < r.goalG
-            ? __WEBUI_TEXT__("runtime.cut_stopped_early")
-            : "",
+    kind = /wall_limit$/.test(r.stopDetail) ? "max_time" : r.verdict || "",
+    cut = r.channeling
+      ? __WEBUI_TEXT__("runtime.cut_channeling")
+      : r.cutLineG > r.goalG
+        ? __WEBUI_TEXT__("runtime.cut_extended")
+        : r.cutLineG > 0 && r.cutLineG < r.goalG
+          ? __WEBUI_TEXT__("runtime.cut_stopped_early")
+          : "",
     num = (v, u, c = "") =>
       Number.isFinite(v)
         ? `<b class="${c}">${Math.max(0, v).toFixed(1)}<small>${u}</small></b>`
@@ -5516,30 +5515,29 @@ function heroSlide(r, mode) {
   s.className = "shotHero heroSlide";
   // The deck's cards take the hero's own look and colour rules.
   s.dataset.hero = mode;
-  s.dataset.tint = !r
-    ? "neutral"
-    : heroTint(r, null, kind, 0, false, mode === "technical" ? "forecast" : heroTintMode());
+  s.dataset.tint = heroTint(
+    r,
+    null,
+    kind,
+    0,
+    false,
+    mode === "technical" ? "forecast" : heroTintMode(),
+  );
   s.setAttribute("role", "group");
   s.setAttribute("aria-roledescription", __WEBUI_TEXT__("home.deck_slide"));
   s.innerHTML = `<div class="heroBody"><p class="heroLabel"><span class="heroDot" aria-hidden="true"></span><span>${
-    !r
-      ? __WEBUI_TEXT__("home.hero_loading")
-      : kind === "max_time"
-        ? __WEBUI_TEXT__("runtime.max_time")
-        : kind
-          ? verdictLabel(kind)
-          : __WEBUI_TEXT__("home.hero_last_shot")
-  }</span><span>${r?.presetName ? " · " + escHtml(r.presetName) : ""}</span>${
+    kind === "max_time"
+      ? __WEBUI_TEXT__("runtime.max_time")
+      : kind
+        ? verdictLabel(kind)
+        : __WEBUI_TEXT__("home.hero_last_shot")
+  }</span><span>${r.presetName ? " · " + escHtml(r.presetName) : ""}</span>${
     cut ? `<span class="heroPills"><span class="heroPill">${cut}</span></span>` : ""
-  }</p>${
-    r
-      ? `<div class="heroNums">${num(r.durationS, __WEBUI_TEXT__("runtime.s_2"), "heroTime")}${num(
-          r.avgFlowGS,
-          __WEBUI_TEXT__("runtime.g_s"),
-          "heroFlow",
-        )}<p class="heroNum">${num(r.actualG, __WEBUI_TEXT__("runtime.g_2"))}</p></div><div class="heroChart${mode === "technical" ? " shotPresetChart" : ""}" role="img"></div>`
-      : ""
-  }</div>`;
+  }</p><div class="heroNums">${num(r.durationS, __WEBUI_TEXT__("runtime.s_2"), "heroTime")}${num(
+    r.avgFlowGS,
+    __WEBUI_TEXT__("runtime.g_s"),
+    "heroFlow",
+  )}<p class="heroNum">${num(r.actualG, __WEBUI_TEXT__("runtime.g_2"))}</p></div><div class="heroChart${mode === "technical" ? " shotPresetChart" : ""}" role="img"></div></div>`;
   return s;
 }
 function renderHeroDeck() {
@@ -5547,7 +5545,7 @@ function renderHeroDeck() {
     hero = $("shotHero"),
     track = $("heroDeckTrack");
   if (!deck || !hero) return;
-  const rows = heroDeck.older || HERO_DECK_WAIT,
+  const rows = heroDeck.older || HERO_DECK_NONE,
     mode = hero.dataset.hero,
     look = mode + heroTintMode(),
     dots = $("heroDeckDots");
@@ -5572,7 +5570,7 @@ function renderHeroDeck() {
       b.type = "button";
       b.setAttribute("role", "tab");
       b.onclick = () => deck.classList.contains("pinned") || scrollHeroDeck(i, true);
-      const host = r && r !== hero && s.querySelector(".heroChart");
+      const host = r !== hero && s.querySelector(".heroChart");
       if (!host) return;
       const m = shotRuleModel(r),
         model = buildShotSparkModel(r),
