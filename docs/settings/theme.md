@@ -33,7 +33,8 @@ final weight, and it comes in two looks. Pick the one you want to see:
   color of that expectation, so you can read the pace from across the counter.
   After the shot, the zone it actually landed in stays lit, and you can drag
   the dot along the curve to read the time, the weight and the stop line at
-  any point. The dot starts at the last reading, drips included; when drips
+  any point. On a touch screen, put your finger on the dot itself to grab
+  it; it has a generous grip, so you don't need to hit it exactly. The dot starts at the last reading, drips included; when drips
   kept falling after the machine stopped, a smaller dot marks where the shot
   was actually cut.
 - **Colorful** (default) fills the whole card with the shot's color, and
@@ -42,11 +43,11 @@ final weight, and it comes in two looks. Pick the one you want to see:
   shot runs.
 
 Whichever look you pick, the card also keeps your two shots before the latest
-one. Swipe sideways on the card's numbers or title, or tap the dots under it,
-to step back through them; the line above the card says which one you are
-looking at, when it was pulled and its place out of three, and each dot takes
-that shot's color. On the Technical card, dragging on the graph still moves
-its dot instead. The older shots load together with Home, and while a shot
+one. Swipe sideways anywhere on the card, or tap the dots under it, to step back
+through them; the line above the card says which one you are looking at, when
+it was pulled and its place out of three, and each dot takes that shot's
+color. On the Technical card, a swipe that starts on the graph's dot moves the
+dot instead. The older shots load together with Home, and while a shot
 is running the card stays on it until it ends.
 
 The machine's default is chosen in **Admin → Frontend**, and every browser

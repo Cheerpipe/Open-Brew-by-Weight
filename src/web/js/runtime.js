@@ -4263,11 +4263,14 @@ function placePill(pill, text, x, y) {
 // Every chart cursor scrubs alike: any pointer grabs it at once and drags it
 // anywhere on the chart, and arrow keys step it once focused. A vertical swipe
 // still scrolls the page (touch-action: pan-y) and the browser cancels the
-// pointer. The node is the slider unless a selector names one inside it.
-function bindScrub(node, tAt, seek, now, slider) {
+// pointer. The node is the slider unless a selector names one inside it. With
+// a grab selector, touch scrubs only from that hitbox and leaves every other
+// gesture on the chart to the page; the mouse still grabs anywhere.
+function bindScrub(node, tAt, seek, now, slider, grab) {
   const move = (e) => seek(tAt(e.clientX));
   node.addEventListener("pointerdown", (e) => {
-    if (tAt(e.clientX) == null) return;
+    if (tAt(e.clientX) == null || (grab && e.pointerType !== "mouse" && !e.target.closest(grab)))
+      return;
     e.preventDefault();
     node.setPointerCapture(e.pointerId);
     (slider ? node.querySelector(slider) : node)?.focus({ preventScroll: true });
@@ -4276,6 +4279,11 @@ function bindScrub(node, tAt, seek, now, slider) {
   });
   node.addEventListener("pointermove", (e) => node.hasPointerCapture(e.pointerId) && move(e));
   node.addEventListener("lostpointercapture", () => node.classList.remove("rvHeld"));
+  // touch-action is unreliable on SVG shapes: cancel the pan from the hitbox.
+  if (grab)
+    node.addEventListener("touchstart", (e) => e.target.closest(grab) && e.preventDefault(), {
+      passive: false,
+    });
   node.addEventListener("keydown", (e) => {
     const step = {
       ArrowRight: 0.5,
@@ -6321,6 +6329,8 @@ function renderHeroTechnicalChart(host, d, model, m) {
           placeHeroCursor(host);
         },
         () => host._cursorT,
+        null,
+        ".rvGrab",
       );
     }
   }
@@ -6330,7 +6340,7 @@ function renderHeroTechnicalChart(host, d, model, m) {
       .querySelector("svg")
       .insertAdjacentHTML(
         "beforeend",
-        `<g class="shotCursor"><path class="rvGuide"/><circle class="rvHandle" r="5"/>${PILL}</g>`,
+        `<g class="shotCursor"><path class="rvGuide"/><circle class="rvHandle" r="5"/>${PILL}<circle class="rvGrab" r="22" fill="transparent"/></g>`,
       );
     placeHeroCursor(host);
     // The landing dot becomes the cursor's handle: one morph from its last
@@ -6360,8 +6370,10 @@ function placeHeroCursor(host) {
     k = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0,
     w = (a.cg + (b.cg - a.cg) * k) / 100;
   g.children[0].setAttribute("d", `M${v.X(t).toFixed(1)} ${v.T}V${v.B}`);
-  g.children[1].setAttribute("cx", v.X(t).toFixed(2));
-  g.children[1].setAttribute("cy", v.Y(w).toFixed(2));
+  for (const e of [g.children[1], g.children[3]]) {
+    e.setAttribute("cx", v.X(t).toFixed(2));
+    e.setAttribute("cy", v.Y(w).toFixed(2));
+  }
   placePill(
     g.children[2],
     sub(__WEBUI_TEXT__("runtime.shot_cursor_pill"), [t.toFixed(1), w.toFixed(1)]),

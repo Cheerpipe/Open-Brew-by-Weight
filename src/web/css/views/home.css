@@ -242,9 +242,9 @@
   height: 8.25rem;
 }
 /* The Technical hero's deck: the latest shot and the two before it on a
-   scroll-snap track. A swipe on a card's header or numbers moves the deck;
-   the chart keeps horizontal drags for its scrub. A live shot pins the deck
-   to the latest card. */
+   scroll-snap track. A swipe anywhere on a card moves the deck or scrolls
+   the page, chart included; only the cursor's handle scrubs. A live shot
+   pins the deck to the latest card. */
 .heroDeck {
   margin: 1rem 0;
 }
@@ -275,7 +275,7 @@
   scroll-snap-stop: always;
 }
 .deckTrack .shotPresetChart {
-  touch-action: pan-y;
+  touch-action: auto;
 }
 .heroDeck.pinned .deckTrack {
   overflow-x: hidden;
