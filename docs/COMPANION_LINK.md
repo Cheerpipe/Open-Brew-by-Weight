@@ -28,7 +28,9 @@ is not paired answers them and does nothing else.
   `reason` is an additive per-sentence code documented in
   [Integration API](INTEGRATION_API.md#error-reasons); `error` and `reason`
   are the stable contract, while `message` is a non-normative debugging aid
-  whose wording may change in any release.
+  whose wording may change in any release. Exception: the relay handshake's
+  signed erase reply keeps its own frozen `{"error","message","erase"}`
+  body (a companion-native surface outside the reason catalog).
 - Byte strings are standard base64 with padding. Public keys are 65-byte
   uncompressed P-256 points.
 
