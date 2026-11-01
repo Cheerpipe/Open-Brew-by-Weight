@@ -46,8 +46,8 @@ one. Swipe sideways on the card's numbers or title, or tap the dots under it,
 to step back through them; the line above the card says which one you are
 looking at, when it was pulled and its place out of three, and each dot takes
 that shot's color. On the Technical card, dragging on the graph still moves
-its dot instead. The older shots load the first time you swipe, and while a
-shot is running the card stays on it until it ends.
+its dot instead. The older shots load together with Home, and while a shot
+is running the card stays on it until it ends.
 
 The machine's default is chosen in **Admin → Frontend**, and every browser
 and installed app follows it. An [installed app](app.md) can pick its own in

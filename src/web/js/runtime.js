@@ -5414,7 +5414,7 @@ registerStream("settings", {
 });
 // The Technical hero's deck: the hero card is the latest shot and two cards
 // show the shots before it, as Stats rows. One rows-only Stats fetch brings
-// them on the first move to them; a new shot shifts the deck here instead.
+// them with Home once the hero is stored; a new shot shifts the deck instead.
 const heroDeck = { older: null, last: null, key: "", request: 0, sentAt: 0, rows: [], shown: null },
   HERO_DECK_WAIT = [null, null];
 // A stored hero card as a Stats row, so every deck card draws from one shape.
@@ -5442,7 +5442,10 @@ function syncHeroDeck(f) {
     heroDeck.key = key;
     heroDeck.last = null;
   }
-  if (f.phase === "idle" && !f.card.live) heroDeck.last = f;
+  if (f.phase === "idle" && !f.card.live) {
+    heroDeck.last = f;
+    heroDeckFetch();
+  }
   renderHeroDeck();
 }
 function resetHeroDeck() {
@@ -5453,7 +5456,7 @@ registerStream("heroDeck", {
   subscribe: () => null,
   claim: (d) => d.type === "stats" && heroDeck.request > 0 && d.request === heroDeck.request,
   frame: heroDeckFrame,
-  reset: () => (heroDeck.request = 0),
+  reset: () => (heroDeck.request = heroDeck.sentAt = 0),
   reboot: resetHeroDeck,
   hero: syncHeroDeck,
 });
@@ -5470,7 +5473,7 @@ function heroDeckFetch() {
     on: true,
     fetch: true,
     request: heroDeck.request,
-    offset: heroDeck.last ? 1 : 0,
+    offset: 1,
     limit: 2,
     sort: "date",
     dir: "desc",
@@ -5604,14 +5607,12 @@ function scrollHeroDeck(i, smooth) {
   });
   markHeroDeck(i);
 }
-// Header, dots and slide labels follow the shown card; moving past the hero
-// card brings the older shots.
+// Header, dots and slide labels follow the shown card.
 function markHeroDeck(i) {
   const slides = $("heroDeckTrack").children,
     n = slides.length;
   heroDeck.i = i = Math.min(i, n - 1);
   const r = heroDeck.shown?.[i - 1];
-  if (i) heroDeckFetch();
   $("heroDeckWhich").textContent = [
     __WEBUI_TEXT__("home.deck_latest"),
     __WEBUI_TEXT__("home.deck_previous"),
