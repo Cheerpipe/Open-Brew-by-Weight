@@ -244,6 +244,7 @@ struct CycleSession {
   bool hasWeightAnchor = false;
   bool directStopPending = false;
   bool awaitingPostTareBaseline = false;
+  bool postTareReadingSeen = false;  // A reading arrived after the tare write.
   TimerStopResult timerStopResult = TimerStopResult::NOT_REQUIRED;
   WeightControlState weightControlState = WeightControlState::INACTIVE;
   EndReason directStopReason = EndReason::NONE;

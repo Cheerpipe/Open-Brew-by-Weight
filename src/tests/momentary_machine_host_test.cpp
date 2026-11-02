@@ -1532,7 +1532,8 @@ void t_cup_removed_event_settles_idle_unconfirmed_after_stop() {
   CHECK(machineRunState() == MachineRunState::IDLE_UNCONFIRMED);
   CHECK(momentaryStopSettling);
   CHECK(cupPresenceState() == CupPresenceState::PRESENT);
-  runLoopAfter(runtimeConfig.postTareBaselineGraceMs + 50);
+  // No packet since the tare write: grace waits one more grace for one.
+  runLoopAfter(2U * runtimeConfig.postTareBaselineGraceMs + 50);
   CHECK(machineRunState() == MachineRunState::IDLE_UNCONFIRMED);
   liftPresentCup();
   CHECK(machineRunState() == MachineRunState::IDLE);

@@ -31,6 +31,7 @@ void rejectScaleSample(DebugCode code, float weightG, float referenceG = 0.0f) {
 void armPostTareBaselineWindow() {
   markShotCurveBreak();
   session.awaitingPostTareBaseline = true;
+  session.postTareReadingSeen = false;
   session.softwareZeroG = 0.0f;
   session.lateTareDroppedZeroG = 0.0f;
   session.postTareBaselineDeadlineMs =
@@ -49,10 +50,15 @@ bool expirePostTareBaselineIfNeeded(float softwareZeroG = NAN) {
   if (!session.awaitingPostTareBaseline) {
     return false;
   }
-  if (static_cast<int32_t>(millis() - session.postTareBaselineDeadlineMs) <
-      0) {
+  // Without a reading since the tare write (a BLE gap), wait up to one more
+  // grace for evidence; the late-tare window then counts from this expiry.
+  const int32_t overdueMs =
+      static_cast<int32_t>(millis() - session.postTareBaselineDeadlineMs);
+  if (overdueMs < 0 || (!session.postTareReadingSeen &&
+                        overdueMs < static_cast<int32_t>(session.config.postTareBaselineGraceMs))) {
     return false;
   }
+  session.postTareBaselineDeadlineMs = millis();
   session.awaitingPostTareBaseline = false;
   session.retareEffectPending = false;
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_TIMEOUT, millis(),

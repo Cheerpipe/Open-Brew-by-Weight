@@ -837,6 +837,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                                       uint32_t captureSequence = 0) {
   const ProfileControlObservation profile(captureSequence, connectionGeneration);
   shotTrace().noteReading(receivedAtMs);
+  session.postTareReadingSeen = true;  // Pre-write readings were dropped upstream.
   const bool touchProvenanceValid = packetSequence != 0 && connectionGeneration != 0;
   const TouchStopEvidence previousTouchStop = session.touchStop;
   session.touchStop = {};  // Only a qualifying touch sample may retain evidence.

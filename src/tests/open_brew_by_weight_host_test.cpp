@@ -12947,7 +12947,10 @@ void rs06_late_retare_corrects_only_confirmed_first_drop() {
     }
     if (mode != 5 && mode != 11) CHECK(session.firstDropMs == original);
     if (mode == 3 || mode == 14) {
+      // No reading since the write: grace waits one more grace for one.
       hostMillis = result.receivedAtMs + session.config.postTareBaselineGraceMs;
+      CHECK(!expirePostTareBaselineIfNeeded());
+      hostMillis += session.config.postTareBaselineGraceMs;
       CHECK(expirePostTareBaselineIfNeeded());
     }
     if (mode != 3 && mode != 5 && mode != 11) {
@@ -20201,6 +20204,27 @@ void tr06_combined_start_tare_opens_grace_at_completion() {
   CHECK(stopperState == StopperState::BREW);
 }
 
+void tr07_tare_grace_waits_for_a_reading_after_the_write() {
+  // A BLE gap swallows grace: expiring then would software-zero the stale
+  // pre-tare cup and read the zero that follows as a lift of the seen cup.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  idleCup(37.7f);
+  CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+  startCycle();
+  CHECK(executeNextScaleCommand());
+  const uint32_t deadline = session.postTareBaselineDeadlineMs;
+  while (static_cast<int32_t>(hostMillis - deadline) < 500) runLoopAfter(100);
+  CHECK(session.awaitingPostTareBaseline);
+  CHECK(session.softwareZeroG == 0.0f);
+  for (int i = 0; i < 3; ++i) idleWeight(0.0f, 100);
+  runLoopAfter(1);
+  CHECK(!session.awaitingPostTareBaseline);
+  CHECK(session.softwareZeroG == 0.0f);
+  CHECK(!debugEventExists(DebugCode::CUP_REMOVED_CONFIRMED));
+  CHECK(stopperState == StopperState::BREW);
+}
+
 // A 250 g cup sits untared on the scale when the shot starts and the start
 // tare, though acknowledged, has no effect; grace then expires with the cup
 // still on the scale.
@@ -25381,6 +25405,7 @@ const TestCase testCases[] = {
     {"TR04", tr04_light_cup_pre_effect_packet_recovers},
     {"TR05", tr05_light_cup_pre_effect_packet_is_not_a_baseline},
     {"TR06", tr06_combined_start_tare_opens_grace_at_completion},
+    {"TR07", tr07_tare_grace_waits_for_a_reading_after_the_write},
     {"SK01", sk01_refused_start_releases_cup_hold},
     {"SK02", sk02_overload_stops_while_touch_is_held},
     {"SK03", sk03_late_zero_after_grace_releases_cup_hold},
