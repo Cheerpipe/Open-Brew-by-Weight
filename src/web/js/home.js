@@ -284,6 +284,18 @@ function renderReadyMsg(s, lm) {
     g = s?.noScaleShotGuard || {},
     idle = !!s && !["BREW", "RINSE", "MANUAL_NO_SCALE"].includes(s.state);
   if (!msg) return;
+  // Priority: no scale, an empty or critical battery (red), the Micra
+  // warming up, then a low battery.
+  const batt = sc.available ? R.scaleBatteryLevel(sc.batteryPct) : null,
+    urgent =
+      batt === "empty" || batt === "critical"
+        ? R.sub(
+            batt === "empty"
+              ? __WEBUI_TEXT__("home.battery_empty")
+              : __WEBUI_TEXT__("home.battery_critical"),
+            [sc.batteryPct],
+          )
+        : "";
   const text = !idle
     ? ""
     : cfg.brewByWeight && !(sc.available && sc.streamState === "FRESH")
@@ -292,13 +304,17 @@ function renderReadyMsg(s, lm) {
         : cfg.noScaleBbwMode === "require_scale"
           ? __WEBUI_TEXT__("home.no_scale_required")
           : __WEBUI_TEXT__("home.no_scale_warn")
-      : s.machineIntegration === "linea_micra_cloud" &&
-          lm?.accountConfigured &&
-          lm.observeState &&
-          lm.readiness === "warming_up"
-        ? __WEBUI_TEXT__("home.machine_warming") + readyIn(minsLeft(lm.boiler?.coffee))
-        : "";
+      : urgent ||
+        (s.machineIntegration === "linea_micra_cloud" &&
+        lm?.accountConfigured &&
+        lm.observeState &&
+        lm.readiness === "warming_up"
+          ? __WEBUI_TEXT__("home.machine_warming") + readyIn(minsLeft(lm.boiler?.coffee))
+          : batt === "low"
+            ? R.sub(__WEBUI_TEXT__("home.battery_low"), [sc.batteryPct])
+            : "");
   if (text && msg.textContent !== text) msg.textContent = text;
+  if (text) msg.classList.toggle("isErr", text === urgent);
   R.reveal(msg, !!text);
 }
 function initQuickWeight() {

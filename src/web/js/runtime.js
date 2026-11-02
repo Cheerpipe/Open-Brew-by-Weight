@@ -375,6 +375,31 @@ function updateHeaderSignals(s = {}) {
             : "—";
     if (detail) detail.textContent = label;
   }
+  // The scale battery joins the Bluetooth indicator: a cell after the bars
+  // whose fill follows the percent, coloured only once it needs attention.
+  // The percent itself lives in the popover and the label.
+  const bt = $("bluetoothSignal"),
+    pct = c.bluetoothConnected === true ? s.scale?.batteryPct : null,
+    batt = scaleBatteryLevel(pct),
+    fill = $("bluetoothBatteryFill"),
+    line = $("bluetoothBatteryLine");
+  if (bt) {
+    if (batt) bt.dataset.batt = batt;
+    else delete bt.dataset.batt;
+    bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "5.2 0 38.4 24" : "5.2 0 26.1 24");
+    if (batt) {
+      bt.title +=
+        " · " + __WEBUI_TEXT__("runtime.scale_battery").replace("{0}", scaleBatteryText(pct));
+      bt.setAttribute("aria-label", bt.title);
+    }
+  }
+  if (fill && batt) {
+    const h = Math.max(1.2, (12.4 * pct) / 100);
+    fill.setAttribute("height", h.toFixed(2));
+    fill.setAttribute("y", (18.4 - h).toFixed(2));
+  }
+  if (line) line.hidden = !batt;
+  if (batt && $("bluetoothBattery")) $("bluetoothBattery").textContent = scaleBatteryText(pct);
   // The paired companion: an open link keeps the icon inked, anything else
   // grays it, and a stale snapshot reads as unknown like the radios. Without
   // a paired companion the header shows nothing at all.
@@ -720,6 +745,29 @@ async function revertQuickSettingsNow() {
   while (a.busy) await a.busy;
   await (a.busy = saveQuickSettings({ revertNow: true }));
   a.busy = null;
+}
+// One rule for every scale battery surface: null hides the value, then
+// ok, low (15 % or less), critical (10 % or less) and empty (5 % or less).
+function scaleBatteryLevel(pct) {
+  return !Number.isInteger(pct) || pct < 0 || pct > 100
+    ? null
+    : pct <= 5
+      ? "empty"
+      : pct <= 10
+        ? "critical"
+        : pct <= 15
+          ? "low"
+          : "ok";
+}
+// "62%", or "12% · very low" once the level needs attention; "" when hidden.
+function scaleBatteryText(pct) {
+  const level = scaleBatteryLevel(pct),
+    words = {
+      low: __WEBUI_TEXT__("runtime.battery_low"),
+      critical: __WEBUI_TEXT__("runtime.battery_critical"),
+      empty: __WEBUI_TEXT__("runtime.battery_empty"),
+    };
+  return level ? pct + "%" + (words[level] ? " · " + words[level] : "") : "";
 }
 function initHeaderSignals() {
   if ($("modeSignal")) buildQuickSettings();
@@ -4457,6 +4505,7 @@ function invalidateHomeStream() {
   for (const id of [
     "scaleWeight",
     "scaleTimer",
+    "scaleBattery",
     "machineState",
     "state",
     "homeMicraPower",
@@ -5079,7 +5128,8 @@ let shotFsActive = false,
   shotFsExitEnd = null,
   shotFsLock = null,
   shotFsVideo = null,
-  shotFsReturn = null;
+  shotFsReturn = null,
+  shotFsSignalsHome = null;
 // Keeps the phone screen on while the live view is open. Plain HTTP has no
 // Wake Lock API, so a looping video covering the card stands in.
 function keepShotFsAwake(on) {
@@ -5176,6 +5226,20 @@ function keepShotAwake(on) {
   clearTimeout(shotAwakeTail);
   shotAwakeTail = setTimeout(tail, 6e4 + 50);
 }
+// The live view carries the header's own signals node, so one renderer and
+// its popovers serve both; it goes back to the header when the view closes.
+function moveHeaderSignals(live) {
+  const signals = $("headerSignals"),
+    top = signals && $("liveShot").querySelector(".lsTop");
+  if (!signals || !top) return;
+  if (live) {
+    shotFsSignalsHome ??= [signals.parentNode, signals.nextSibling];
+    top.insertBefore(signals, $("liveShotClose"));
+  } else if (shotFsSignalsHome) {
+    shotFsSignalsHome[0].insertBefore(signals, shotFsSignalsHome[1]);
+    shotFsSignalsHome = null;
+  }
+}
 function enterShotFullScreen() {
   const view = $("liveShot");
   if (!view || shotFsActive) return;
@@ -5188,6 +5252,7 @@ function enterShotFullScreen() {
   shotFsReturn = document.activeElement;
   view.classList.remove("fsOut");
   view.hidden = false;
+  moveHeaderSignals(true);
   document.body.classList.add("shotFs");
   keepShotFsAwake(true);
   $("liveShotClose")?.focus();
@@ -5222,6 +5287,7 @@ function exitShotFullScreen() {
     }
     view.classList.remove("fsOut");
     view.hidden = true;
+    moveHeaderSignals(false);
     document.body.classList.remove("shotFs");
     shotFsReturn?.focus?.();
   };
@@ -7132,6 +7198,9 @@ function applyHomeStatus(s) {
   );
   setHomeSub("scaleWeight", formatScaleWeight(s));
   setHomeSub("scaleTimer", formatScaleTimer(s));
+  const battery = scaleBatteryText(s.scale?.available ? s.scale.batteryPct : null);
+  setHomeSub("scaleBattery", battery || "—");
+  if ($("scaleBatteryRow")) $("scaleBatteryRow").hidden = !battery;
   // Painted on the next frame, once this status has set the new cut model.
   scheduleShotPaint();
   const rinseButton = $("rinseButton");
@@ -7367,6 +7436,8 @@ export {
   number,
   message,
   reveal,
+  scaleBatteryLevel,
+  scaleBatteryText,
   formatCommandError,
   showFieldError,
   clearFieldErrors,

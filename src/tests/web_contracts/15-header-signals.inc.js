@@ -126,6 +126,52 @@
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud'});
   assert.equal(elements.micraSignal.dataset.level, 'on', 'A model-less envelope keeps the cloud icon');
   assert.equal(elements.micraDetail.textContent, 'Connected');
+  // The scale battery rides the Bluetooth button under one level rule; the
+  // header shows only the cell, the percent goes to the popover and label.
+  for (const [pct, level] of [[100, 'ok'], [16, 'ok'], [15, 'low'], [11, 'low'], [10, 'critical'],
+      [6, 'critical'], [5, 'empty'], [0, 'empty'], [null, null], [undefined, null], [-1, null],
+      [101, null], [1.5, null], ['50', null], [NaN, null]])
+    assert.equal(context.scaleBatteryLevel(pct), level, String(pct));
+  const attrs = () => ({attrs: {}, setAttribute(name, value) { this.attrs[name] = value; }});
+  const fill = attrs(), glyph = attrs();
+  Object.assign(elements, {bluetoothBatteryFill: fill, bluetoothBatteryLine: {hidden: true}, bluetoothBattery: {}});
+  buttons[1].querySelector = selector => (assert.equal(selector, 'svg'), glyph);
+  const battery = (batteryPct, extra) => context.updateHeaderSignals(
+    {scale: {available: true, batteryPct}, connections: {bluetoothLevel: 3}, ...extra});
+  battery(62);
+  assert.equal(buttons[1].dataset.batt, 'ok');
+  assert.equal(glyph.attrs.viewBox, '5.2 0 38.4 24', 'The cell widens the glyph');
+  assert.equal(fill.attrs.height, '7.69');
+  assert.equal(fill.attrs.y, '10.71', 'The fill rises from the cell floor');
+  assert.equal(buttons[1].attributes['aria-label'], 'Bluetooth: Strong · battery 62%');
+  assert.equal(elements.bluetoothBatteryLine.hidden, false);
+  assert.equal(elements.bluetoothBattery.textContent, '62%');
+  battery(12);
+  assert.equal(buttons[1].dataset.batt, 'low');
+  assert.equal(elements.bluetoothBattery.textContent, '12% · low');
+  assert.equal(buttons[1].attributes['aria-label'], 'Bluetooth: Strong · battery 12% · low');
+  battery(9);
+  assert.equal(buttons[1].dataset.batt, 'critical');
+  battery(0);
+  assert.equal(buttons[1].dataset.batt, 'empty');
+  assert.equal(fill.attrs.height, '1.20', 'An empty cell keeps a visible sliver');
+  assert.equal(elements.bluetoothBattery.textContent, '0% · almost empty');
+  for (const hidden of [() => battery(null), () => battery(40, {snapshotStale: true}),
+      () => context.updateHeaderSignals({scale: {available: false, batteryPct: 40}, connections: {bluetoothLevel: 3}})]) {
+    battery(40);
+    hidden();
+    assert.equal(buttons[1].dataset.batt, undefined, 'No reading, a stale frame or no scale hides the cell');
+    assert.equal(glyph.attrs.viewBox, '5.2 0 26.1 24');
+    assert.equal(elements.bluetoothBatteryLine.hidden, true);
+    assert(!buttons[1].attributes['aria-label'].includes('battery'));
+  }
+  assert(rawShellHtml.includes('id="bluetoothBatteryFill" class="battFill"') &&
+      rawShellHtml.includes('id="bluetoothBatteryLine" hidden'), 'The cell and its popover line ship hidden');
+  assert(css.includes('#bluetoothSignal[data-batt=low] .battGlyph{color:var(--lw)}') &&
+      css.includes('#bluetoothSignal:is([data-batt=critical],[data-batt=empty]) .battGlyph{color:var(--live)}'),
+      'Only the cell takes the level colour');
+  assert(/prefers-reduced-motion:reduce\)\{#bluetoothSignal\[data-batt=empty\] \.battFill\{animation:none\}/.test(css),
+      'The empty blink stops under reduced motion');
   context.initHeaderSignals();
   buttons[0].click();
   assert.equal(elements.wifiDetails.hidden, false);

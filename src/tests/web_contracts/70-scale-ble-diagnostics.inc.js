@@ -148,7 +148,8 @@
     id => elements[id] || (elements[id] = {textContent: ''}),
     key => ({'diagnostic.none_2': 'NONE', 'diagnostic.none_3': 'none'}[key] || key),
     {formatBackflushState: () => '', formatCupWeight: () => '', formatScaleWeight: () => '',
-      formatScaleTimer: () => '', updateScaleRenameUi() {}}, () => {});
+      formatScaleTimer: () => '', updateScaleRenameUi() {},
+      scaleBatteryText: pct => (Number.isInteger(pct) ? pct + '%' : '')}, () => {});
   const record = lastDisconnect => live({lineaMicra: null, safety: {}, scale: {
     lastDisconnect, lastDisconnectReasonName: lastDisconnect ? undefined : 'NONE',
     lastCommandFailure: {sequence: 1, summary: 'volume · status 15 · 0ms'},
@@ -166,4 +167,10 @@
     throw new Error('Command failure must be separate from disconnect');
   live({lineaMicra: null, safety: {}, scale: {lastCommandFailure: {sequence: 0}, cupPresence: {}}, cupPresence: {}});
   if (elements.hScaleCommandFailure.textContent !== 'none') throw new Error('Missing-event rendering');
+  if (!elements.dScaleBatteryRow.hidden) throw new Error('A scale without a battery reading hides the row');
+  live({lineaMicra: null, safety: {}, scale: {available: true, batteryPct: 62, cupPresence: {}}, cupPresence: {}});
+  if (elements.dScaleBatteryRow.hidden || elements.dScaleBattery.textContent !== '62%')
+    throw new Error('Diagnostic shows the connected scale battery');
+  live({lineaMicra: null, safety: {}, scale: {available: false, batteryPct: 62, cupPresence: {}}, cupPresence: {}});
+  if (!elements.dScaleBatteryRow.hidden) throw new Error('A disconnected scale hides its battery');
 }

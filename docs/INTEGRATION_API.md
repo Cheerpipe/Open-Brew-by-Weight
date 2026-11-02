@@ -1157,6 +1157,11 @@ subscription requests) are sent immediately.
 Unchanged displayed values produce no Home data frames. Weight
 and timer are inspected only while the scale is connected, at the displayed
 precision (0.1 g and 0.1 s); unavailable readings become `null` once.
+`scale.batteryPct` is the connected scale's battery as a whole percent (0–100)
+when its protocol reports one, otherwise `null`. It is display-only: the
+firmware publishes a drop at once and a rise only from 3 points up, and the
+field changes only with that published value, so it adds no frames of its own
+during a shot.
 
 A Home snapshot has `v: 1`, `type: "home"`, `boot`, `snapshot: true`, and
 `changes`; a Home increment carries only `type` and `changes`, and continues

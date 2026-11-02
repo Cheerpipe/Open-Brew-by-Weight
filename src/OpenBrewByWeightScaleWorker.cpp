@@ -207,6 +207,8 @@ ScaleModel scaleLinkModel = ScaleModel::Unknown;
 ScaleFeatureSet scaleLinkFeatures = {};
 bool scaleLinkRssiValid = false;
 int8_t scaleLinkRssi = 0;
+bool scaleBatteryValid = false;
+uint8_t scaleBatteryPct = 0;
 uint32_t lastScaleLinkRssiSampleMs = 0;
 char scalePreferredMac[PREFERRED_SCALE_MAC_CAPACITY] = {};
 char scalePreferredName[PREFERRED_SCALE_NAME_CAPACITY] = {};
@@ -551,6 +553,8 @@ ScaleLinkSnapshot getScaleLinkSnapshot() {
   snapshot.features = scaleLinkFeatures;
   snapshot.rssiValid = scaleLinkRssiValid;
   snapshot.rssi = scaleLinkRssi;
+  snapshot.batteryValid = scaleBatteryValid;
+  snapshot.batteryPct = scaleBatteryPct;
   portEXIT_CRITICAL(&scaleLinkMux);
   return snapshot;
 }
@@ -602,6 +606,8 @@ void setScaleLinkState(ScaleLinkState state) {
     scaleLinkRssiValid = false;
     scaleLinkRssi = 0;
     lastScaleLinkRssiSampleMs = 0;
+    scaleBatteryValid = false;
+    scaleBatteryPct = 0;
   }
   portEXIT_CRITICAL(&scaleLinkMux);
   if (disconnectedGeneration != 0 &&
@@ -964,7 +970,18 @@ void updateWorkerLinkState() {
   const uint32_t timerAgeMs = timerValid ? scale.lastTimerAgeMs() : 0;
   const bool connecting = scale.isConnecting() && !scale.isLinkUp();
   const ScaleBleDiagnostics diagnostics = scale.diagnostics();
+  const ScaleBatteryReading battery = linkUp ? scale.battery() : ScaleBatteryReading{};
   portENTER_CRITICAL(&scaleLinkMux);
+  // Display-only, like the flow: a drop publishes at once and a rise only
+  // from 3 points up, so a noisy level never flickers a Home notice.
+  const bool batteryFirst = battery.valid && !scaleBatteryValid;
+  const uint8_t batteryBefore = scaleBatteryPct;
+  const bool batteryPublish = battery.valid && (batteryFirst || battery.percent < batteryBefore ||
+                                                battery.percent >= batteryBefore + 3);
+  if (batteryPublish) {
+    scaleBatteryValid = true;
+    scaleBatteryPct = battery.percent;
+  }
   scaleConnecting = connecting;
   scaleRejectedPackets = scale.rejectedPacketCount();
   scaleReconnects = scale.reconnectCount();
@@ -983,6 +1000,10 @@ void updateWorkerLinkState() {
   scaleTimerMs = timerMs;
   scaleTimerAgeMs = timerAgeMs;
   portEXIT_CRITICAL(&scaleLinkMux);
+  // The first reading of a connection and every new 5-point step down.
+  if (batteryPublish && (batteryFirst || battery.percent / 5 < batteryBefore / 5))
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE, "Scale battery %u%%",
+                         static_cast<unsigned>(battery.percent));
   setScaleLinkState(linkUp ? ScaleLinkState::CONNECTED
                                         : ScaleLinkState::DISCONNECTED);
 }

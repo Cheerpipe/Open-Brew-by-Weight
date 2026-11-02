@@ -588,6 +588,9 @@ class EspressoScaleBLE {
   }
   uint32_t notificationSequence() const { return weightCaptureSequence; }
   bool hasTimer() const { return connected && timerValid; }
+  ScaleBatteryReading battery() const {
+    return connected ? batteryReading : ScaleBatteryReading{};
+  }
   uint32_t getTimerMs() const { return timerValid ? timerMs : 0; }
   uint32_t lastTimerAgeMs() const { return timerValid ? timerAgeMs : 0xffffffffUL; }
   bool heartbeatRequired() const { return heartbeatRequiredValue; }
@@ -770,6 +773,7 @@ class EspressoScaleBLE {
   uint32_t rejectedPackets = 0;
   uint32_t reconnects = 0;
   int linkRssiValue = SCALE_LINK_RSSI_UNAVAILABLE;
+  ScaleBatteryReading batteryReading = {};
   mutable size_t isConnectedCalls = 0;
   size_t disconnectCalls = 0;
   size_t tareCalls = 0;

@@ -88,6 +88,39 @@ It is recorded when the next reading arrives, so it does not measure an ongoing
 silence. Use it alongside Stream, Control and Reconnects when investigating
 delayed readings; the duration alone does not establish the effect on a shot.
 
+## Scale battery
+
+Some scales report how much charge they have left: Bookoo Themis Mini and
+Ultra, Felicita Arc, and Acaia scales that connect through Acaia's newer
+protocol. While one of them is connected, the controller shows its battery
+in a few places:
+
+- **Header:** the Bluetooth icon gains a small upright battery after the
+  signal bars, filled to the current charge. It stays quiet while the charge
+  is healthy, turns amber at 15 % or less, red at 10 % or less, and blinks at
+  5 % or less. Tap the icon to see the exact percentage.
+- **Live shot view:** the same header icons sit at the top of the view, so
+  you can keep an eye on the battery during a shot.
+- **Home → Equipment → Scale** and **Diagnostic → Scale** show a
+  **Battery** row.
+- **Home notice**, while no shot is running: at 15 % or less a reminder to
+  charge the scale soon; at 10 % or less a red notice; at 5 % or less a red
+  notice to charge it before your next shot. A missing scale is always
+  reported first. On La Marzocco Linea Micra builds, a very low or almost
+  empty battery comes before the "Micra heating up" notice, while a simple
+  low-battery reminder waits until the machine is ready.
+
+A charge reading can wobble by a point or two. The controller shows a drop
+right away but waits for a rise of at least 3 points, for example after
+charging, so the notices never flicker. The log on **Diagnostic** records the
+first reading after each connection and every further drop of 5 points.
+
+The battery is only shown, never used: it does not change how shots start,
+stop, or tare. Scales that do not report a battery, including Acaia scales on
+the older protocol, simply show no battery icon, row, or notice. Battery
+reporting has not yet been confirmed on every model; see
+[Scale compatibility](../../libraries/EspressoScaleBLE/README.md#scale-compatibility).
+
 ## Bluetooth on/off
 
 **Admin → BLE → Enable Bluetooth** is the master switch for Bluetooth scales.

@@ -668,6 +668,9 @@ function applyDiagnosticLive(s) {
   t("dStream", sc.streamState);
   t("dControl", sc.controlState);
   t("dScaleRssi", typeof sc.rssi === "number" ? sc.rssi + __WEBUI_TEXT__("runtime.dbm") : "");
+  const battery = R.scaleBatteryText(sc.available ? sc.batteryPct : null);
+  t("dScaleBattery", battery);
+  if ($("dScaleBatteryRow")) $("dScaleBatteryRow").hidden = !battery;
   t("hRecoveredStales", String(sc.recoveredStaleCount));
   t(
     "hStaleTime",

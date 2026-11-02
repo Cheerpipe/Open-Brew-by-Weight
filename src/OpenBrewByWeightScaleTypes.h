@@ -119,6 +119,8 @@ struct ScaleLinkMetrics {
   bool scaleRssiValid = false;
   int8_t scaleRssi = 0;
   uint8_t scaleSignalLevel = 0;
+  bool scaleBatteryValid = false;
+  uint8_t scaleBatteryPct = 0;
 };
 
 // =============================================================================

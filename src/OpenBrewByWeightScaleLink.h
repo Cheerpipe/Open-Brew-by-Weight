@@ -179,6 +179,9 @@ struct ScaleLinkSnapshot {
   ScaleFeatureSet features = {};
   bool rssiValid = false;
   int8_t rssi = 0;
+  // Display-only scale battery (ScaleFeatureBatteryLevel), never a control input.
+  bool batteryValid = false;
+  uint8_t batteryPct = 0;
 };
 
 }  // namespace openbrewbyweight

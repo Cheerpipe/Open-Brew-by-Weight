@@ -246,6 +246,27 @@ body.shotFs {
   margin: 0;
   white-space: nowrap;
 }
+/* The header's own signals node sits here while the view is open, before
+   Close; Theme and Live stay with the header. */
+.lsTop .headerSignals {
+  order: 0;
+  margin-left: 0;
+  padding-left: 0;
+  font-size: 1rem;
+}
+.lsTop .headerSignals :is(#liveShotOpen, #themeSignal) {
+  display: none;
+}
+.lsTop .headerSignals .signalIndicator {
+  height: 2.5rem;
+}
+.lsTop .headerSignals::after {
+  content: "";
+  width: 1px;
+  height: 1.6rem;
+  margin: 0 0.15rem 0 0.35rem;
+  background: var(--ln);
+}
 .lsChip {
   display: inline-flex;
   align-items: center;
@@ -584,7 +605,8 @@ body.shotFs {
       "graph" minmax(0, 1fr)
       / minmax(0, 1fr);
   }
-  .lsRecipe {
+  .lsRecipe,
+  .lsTop #quickSignal {
     display: none;
   }
   .lsSide {

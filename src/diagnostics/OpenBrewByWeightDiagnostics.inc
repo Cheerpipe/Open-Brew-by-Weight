@@ -340,6 +340,8 @@ void publishControlStatus() {
   next.scaleBleDiagnostics = scaleLink.bleDiagnostics;
   next.scaleRssiValid = scaleLink.rssiValid;
   next.scaleRssi = scaleLink.rssi;
+  next.scaleBatteryValid = next.scaleAvailable && scaleLink.batteryValid;
+  next.scaleBatteryPct = next.scaleBatteryValid ? scaleLink.batteryPct : 0;
   next.scaleSignalLevel = connectionSignalLevel(scaleSignalLevel, scaleLink.rssiValid, scaleLink.rssi);
   next.uptimeMs = elapsedMs(bootStartedAtMs);
   next.loopIntervalGapMs =

@@ -124,7 +124,45 @@ body {
   overflow: visible;
 }
 #bluetoothSignal svg {
-  width: 1.95rem;
+  width: 1.6rem;
+}
+/* The scale battery rides the Bluetooth button: a vertical cell after the
+   bars, drawn only while the scale reports it. Quiet while healthy; only the
+   cell takes the level colour, so the header never changes width. */
+.battGlyph {
+  display: none;
+}
+#bluetoothSignal[data-batt] {
+  width: auto;
+  padding: 0 0.3rem;
+}
+#bluetoothSignal[data-batt] svg {
+  width: 2.35rem;
+}
+#bluetoothSignal[data-batt] .battGlyph {
+  display: inline;
+}
+#bluetoothSignal[data-batt="ok"] .battGlyph rect:not(.battFill) {
+  opacity: 0.55;
+}
+#bluetoothSignal[data-batt="low"] .battGlyph {
+  color: var(--lw);
+}
+#bluetoothSignal:is([data-batt="critical"], [data-batt="empty"]) .battGlyph {
+  color: var(--live);
+}
+#bluetoothSignal[data-batt="empty"] .battFill {
+  animation: battBlink 1.4s ease-in-out infinite;
+}
+@keyframes battBlink {
+  50% {
+    opacity: 0.15;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #bluetoothSignal[data-batt="empty"] .battFill {
+    animation: none;
+  }
 }
 .signalIndicator [data-step] {
   opacity: 0.18;
@@ -249,6 +287,13 @@ body {
 @media (max-width: 480px) {
   .headerSignals .signalIndicator {
     width: 1.85rem;
+  }
+  .headerSignals #bluetoothSignal[data-batt] {
+    width: auto;
+    padding: 0 0.1rem;
+  }
+  #bluetoothSignal[data-batt] svg {
+    width: 2.1rem;
   }
 }
 .headerSignals .qsSig {

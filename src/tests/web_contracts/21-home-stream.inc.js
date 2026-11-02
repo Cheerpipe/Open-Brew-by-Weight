@@ -243,6 +243,9 @@ int main(){
   } finally { fs.rmSync(binary, {force: true}); }
   assert(stream.includes('control.scaleAvailable && control.observedWeightValid'));
   assert(stream.includes('control.scaleAvailable && control.currentTimerValid'));
+  // The scale battery rides Home as a number or null; the control snapshot
+  // already limits it to an available scale.
+  assert(stream.includes('if (control.scaleBatteryValid)\n    delta.field("scale.batteryPct", static_cast<unsigned long>(control.scaleBatteryPct));\n  else delta.field("scale.batteryPct", "null");'));
   assert(stream.includes('if (!delta.changed) return true;'));
   // Only snapshots name v/boot/snapshot; increments carry type and changes.
   assert(stream.includes('statusJsonAppend(&delta.used, "{\\"type\\":\\"home\\",\\"changes\\":{")'));

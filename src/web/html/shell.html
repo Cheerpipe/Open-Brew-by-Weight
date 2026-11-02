@@ -160,20 +160,34 @@
           aria-controls="bluetoothDetails"
           data-level="unknown"
         >
-          <svg viewBox="0 0 32 24" aria-hidden="true">
+          <svg viewBox="5.2 0 26.1 24" aria-hidden="true">
             <g
               fill="none"
               stroke="currentColor"
-              stroke-width="1.8"
+              stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <path d="m3 8.5 8 7-4 3.5V5l4 3.5L3 15.5" />
+              <path d="M6.5 8.2 14.5 15.6 10.5 19.6V4.4l4 4L6.5 15.8" />
             </g>
             <g fill="currentColor">
               <rect data-step="1" x="17" y="15" width="3.5" height="5" rx="1" />
               <rect data-step="2" x="22" y="10" width="3.5" height="10" rx="1" />
               <rect data-step="3" x="27" y="4" width="3.5" height="16" rx="1" />
+            </g>
+            <g class="battGlyph" fill="currentColor">
+              <rect x="36.2" y="2.4" width="3.8" height="2" rx=".6" />
+              <rect
+                x="34"
+                y="4.4"
+                width="8.2"
+                height="15.6"
+                rx="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <rect id="bluetoothBatteryFill" class="battFill" x="36" width="4.2" rx=".9" />
             </g>
           </svg>
         </button>
@@ -229,6 +243,9 @@
           <p>
             <span>{{webui:shell.signal}}</span
             ><b id="bluetoothDetail">{{webui:runtime.signal_unavailable}}</b>
+          </p>
+          <p id="bluetoothBatteryLine" hidden>
+            <span>{{webui:shell.battery}}</span><b id="bluetoothBattery">—</b>
           </p>
         </section>
         <section

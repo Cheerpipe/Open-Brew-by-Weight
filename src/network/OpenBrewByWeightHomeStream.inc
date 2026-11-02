@@ -219,6 +219,9 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   if (control.scaleAvailable && control.currentTimerValid)
     delta.field("scale.timerMs", static_cast<unsigned long>(control.currentTimerMs / 100 * 100));
   else delta.field("scale.timerMs", "null");
+  if (control.scaleBatteryValid)
+    delta.field("scale.batteryPct", static_cast<unsigned long>(control.scaleBatteryPct));
+  else delta.field("scale.batteryPct", "null");
   if (callbacks_.copyScaleHistory) callbacks_.copyScaleHistory(g_work->scaleHistory);
   else memset(&g_work->scaleHistory, 0, sizeof(g_work->scaleHistory));
   char friendly[PREFERRED_SCALE_NAME_CAPACITY] = {};

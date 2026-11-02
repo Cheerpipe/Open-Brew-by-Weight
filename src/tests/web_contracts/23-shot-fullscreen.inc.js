@@ -180,6 +180,43 @@
     api.pop();
   }
 
+  // The live view borrows the header's one signals node, before its close
+  // button, and hands it back to the same place when the view closes.
+  {
+    const parent = () => ({kids: [], insertBefore(node, ref) {
+      const from = node.parentNode;
+      if (from) from.kids.splice(from.kids.indexOf(node), 1);
+      this.kids.splice(ref ? this.kids.indexOf(ref) : this.kids.length, 0, node);
+      node.parentNode = this;
+      for (const p of new Set([from, this])) p?.kids.forEach((k, i) => { k.nextSibling = p.kids[i + 1] || null; });
+    }});
+    const bar = parent(), top = parent(), brand = {}, signals = {}, menu = {}, chip = {},
+      close = {focus() {}};
+    for (const node of [brand, signals, menu]) bar.insertBefore(node, null);
+    for (const node of [chip, close]) top.insertBefore(node, null);
+    const els = {headerSignals: signals, liveShotClose: close, liveShot: {classList: {add() {}, remove() {}},
+      querySelector: selector => (assert.equal(selector, '.lsTop'), top)}};
+    const api = new Function('$', 'history', 'location', 'document', 'setTimeout', 'clearTimeout',
+        'navigator', 'paintUiStream', 'renderLiveShot',
+        runtimeJs.slice(runtimeJs.search(/let\s+shotFsActive\s*=/),
+            runtimeJs.indexOf('// The diagnostic stream rides')) +
+        ';return{enter:enterShotFullScreen,exit:exitShotFullScreen}')(
+        id => els[id], {pushState() {}, back() {}}, {href: '/'},
+        {body: {classList: {add() {}, remove() {}}}, createElement() { throw Error('no video'); }},
+        () => 0, () => {}, {wakeLock: {request: () => new Promise(() => {})}}, () => {}, () => {});
+    for (let round = 0; round < 2; ++round) {
+      api.enter();
+      assert.deepEqual(top.kids, [chip, signals, close], 'the signals sit in the live bar before Close');
+      assert.deepEqual(bar.kids, [brand, menu]);
+      api.exit();
+      assert.deepEqual(bar.kids, [brand, signals, menu], 'closing returns the signals to the header');
+      assert.deepEqual(top.kids, [chip, close]);
+    }
+    assert(css.includes('.lsTop .headerSignals{order:0;') &&
+        css.includes('.lsTop .headerSignals :is(#liveShotOpen,#themeSignal){display:none}'),
+        'the live bar hides Live and Theme and keeps the signals before Close');
+  }
+
   // iOS WebKit ignores muted video for display sleep: the silent keep-awake
   // track plays unmuted on iPhone/iPad (and the desktop-class iPadOS UA),
   // muted everywhere else.

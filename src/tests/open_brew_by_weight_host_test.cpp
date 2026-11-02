@@ -2437,6 +2437,47 @@ void r12c_connected_link_rssi_samples_and_clears() {
   CHECK(!status.scaleRssiValid);
 }
 
+// The scale battery is display-only: a drop publishes at once, a rise only
+// from 3 points up, a disconnect clears it, and the log names the first
+// reading of a connection and each new 5-point step down.
+void r12k_scale_battery_publishes_steps_and_clears() {
+  resetHarness(false, true);
+  debugLog.clear();
+  ringRetainLogLevel = LogLevel::DEBUG;
+  ControlStatusSnapshot status;
+  const auto published = [&](int pct) {
+    scale.batteryReading = {pct >= 0, static_cast<uint8_t>(pct < 0 ? 0 : pct), hostMillis};
+    updateWorkerLinkState();
+    publishControlStatus();
+    copyControlStatus(status);
+    if (getScaleLinkSnapshot().batteryValid != status.scaleBatteryValid) return -2;
+    return status.scaleBatteryValid ? static_cast<int>(status.scaleBatteryPct) : -1;
+  };
+  CHECK(published(-1) == -1);
+  CHECK(published(62) == 62);
+  CHECK(published(61) == 61);
+  CHECK(published(63) == 61);
+  CHECK(published(64) == 64);
+  CHECK(published(59) == 59);
+  CHECK(published(58) == 58);
+  CHECK(published(54) == 54);
+  setScaleConnected(false);
+  CHECK(!getScaleLinkSnapshot().batteryValid);
+  publishControlStatus();
+  copyControlStatus(status);
+  CHECK(!status.scaleBatteryValid && status.scaleBatteryPct == 0);
+  setScaleConnected(true);
+  CHECK(published(54) == 54);
+  DebugEvent events[DEBUG_EVENT_CAPACITY] = {};
+  const size_t count = copyDebugEvents(0, events, DEBUG_EVENT_CAPACITY);
+  std::vector<std::string> lines;
+  for (size_t i = 0; i < count; ++i)
+    if (events[i].code == DebugCode::LOG_TEXT && strncmp(events[i].text, "Scale battery", 13) == 0)
+      lines.emplace_back(events[i].text);
+  CHECK((lines == std::vector<std::string>{"Scale battery 62%", "Scale battery 59%",
+                                          "Scale battery 54%", "Scale battery 54%"}));
+}
+
 void r13_full_queue_prevents_stop_without_delaying_relay_open() {
   resetHarness(false, true);
   reachReadyFromBoot();
@@ -25184,6 +25225,7 @@ const TestCase testCases[] = {
     {"R12d", r12d_command_does_not_drain_buffered_weight},
     {"R12b", r12b_discovery_clears_stale_connected_link_snapshot},
     {"R12c", r12c_connected_link_rssi_samples_and_clears},
+    {"R12k", r12k_scale_battery_publishes_steps_and_clears},
     {"R12d", r12d_scale_signal_level_keeps_hysteresis_across_publishes},
     {"R13", r13_full_queue_prevents_stop_without_delaying_relay_open},
     {"R14", r14_invalid_runtime_configuration_is_transactionally_rejected},

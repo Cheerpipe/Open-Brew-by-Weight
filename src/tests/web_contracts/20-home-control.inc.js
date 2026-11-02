@@ -847,7 +847,8 @@ if (!statusSection || !statusSection[1].includes('class="lamp"') ||
     statusSection[1].includes('id="safety"') ||
     statusSection[1].includes('id="statusExtractionGuard"') ||
     !scaleSection || !scaleSection[1].includes('class="lampState"') ||
-    (scaleSection[1].match(/class="metric"/g) || []).length !== 3 ||
+    (scaleSection[1].match(/class="metric"/g) || []).length !== 4 ||
+    !scaleSection[1].includes('id="scaleBatteryRow" class="metric" hidden') ||
     !scaleSection[1].includes('<strong>My scale</strong>') ||
     !scaleSection[1].includes('<strong>Weight</strong>') ||
     !scaleSection[1].includes('<strong>Timer</strong>') ||
@@ -1664,7 +1665,7 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
 }
 {
   const at = viewJs.home.indexOf('function renderReadyMsg(');
-  const msg = {hidden: true, textContent: ''};
+  const msg = {hidden: true, textContent: '', classList: {toggle() {}}};
   const render = new Function('$', 'R', viewJs.home.slice(at, viewJs.home.indexOf('\n}', at) + 2) +
     ';return renderReadyMsg;')(() => msg, {reveal: (el, show) => { el.hidden = !show; }});
   const show = (mode, enabled, armed) => (render({state: 'IDLE', config: {brewByWeight: true, noScaleBbwMode: mode},
@@ -1673,6 +1674,34 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
       !/Connect a scale/.test(show('require_scale', true, true)) || /Connect a scale/.test(show('require_scale', true, false)) ||
       !/yourself/.test(show('off', false, false)))
     throw new Error('Home no-scale notice must follow the live guard: armed warns or requires, disarmed is manual');
+}
+{
+  // Battery notices: no scale > empty > critical > Micra warming up > low;
+  // empty and critical use the red notice.
+  const assert = require('assert').strict;
+  const at = viewJs.home.indexOf('function renderReadyMsg(');
+  const classes = new Set(), msg = {hidden: true, textContent: '',
+    classList: {toggle: (name, on) => on ? classes.add(name) : classes.delete(name)}};
+  const R = new Function(blockAt(runtimeJs, 'function scaleBatteryLevel(') +
+    runtimeJs.match(/const sub\s*=[^;]+;/)[0] + ';return {scaleBatteryLevel, sub};')();
+  R.reveal = (el, show) => { el.hidden = !show; };
+  const render = new Function('$', 'R', 'readyIn', 'minsLeft', viewJs.home.slice(at, viewJs.home.indexOf('\n}', at) + 2) +
+    ';return renderReadyMsg;')(() => msg, R, () => '', () => 0);
+  const warming = {accountConfigured: true, observeState: true, readiness: 'warming_up', boiler: {coffee: {}}};
+  const show = (batteryPct, {state = 'IDLE', stream = 'FRESH', lm} = {}) => {
+    render({state, config: {brewByWeight: true}, machineIntegration: lm ? 'linea_micra_cloud' : 'none',
+      scale: {available: true, streamState: stream, batteryPct}, noScaleShotGuard: {}}, lm);
+    return msg.hidden ? '' : (classes.has('isErr') ? 'red: ' : '') + msg.textContent;
+  };
+  assert.equal(show(50), '');
+  assert.equal(show(null), '', 'A scale without a battery reading shows nothing');
+  assert.match(show(15), /^Scale battery low \(15%\)/);
+  assert.match(show(10), /^red: Scale battery very low \(10%\)/);
+  assert.match(show(5), /^red: Scale battery almost empty \(5%\)/);
+  assert.match(show(15, {lm: warming}), /^Micra heating up/, 'A low battery yields to the Micra warming up');
+  assert.match(show(10, {lm: warming}), /^red: Scale battery very low/, 'A critical battery outranks the Micra');
+  assert.match(show(5, {stream: 'STALE'}), /^No scale connected/, 'No scale outranks the battery');
+  assert.equal(show(5, {state: 'BREW'}), '', 'Notices stay idle-only');
 }
 {
   // Stats shot preset chart (plan AC1-AC3, AC5, AC8-AC9): the model comes from the
