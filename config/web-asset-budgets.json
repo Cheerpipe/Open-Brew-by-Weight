@@ -6,7 +6,7 @@
     "raw": 0
   },
   "limits": {
-    "source.html": 136232,
+    "source.html": 137006,
     "source.js": 752912,
     "source.htmlJs": 889144,
     "gzip.shellHtml": 6127,
@@ -15,8 +15,8 @@
     "gzip.runtime": 55132,
     "gzip.otaImage": 3072,
     "gzip.module.records": 30154,
-    "gzip.module.diagnostic": 18664,
-    "gzip.module.admin": 22421,
+    "gzip.module.diagnostic": 19492,
+    "gzip.module.admin": 22853,
     "gzip.module.settings": 25202,
     "gzip.module.setup": 9172,
     "gzip.manifest": 1024,
