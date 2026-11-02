@@ -404,11 +404,14 @@ struct ShotLogRecord {
   // smoothstep both sides used.
   uint8_t fastCurve;
   uint8_t slowCurve;
+  // Good shots count 1, 2, 3… in the order stored; 0 = a bad shot, which
+  // takes no number. The id stays the record's identity.
+  uint32_t shotNumber;
 };
 
 // Appended fields read as zero in records widened from an earlier image, so
 // zero must mean "missing" for them, or the widening must set their default.
-static_assert(sizeof(ShotLogRecord) == 128, "Shot-log schema 2 record size");
+static_assert(sizeof(ShotLogRecord) == 132, "Shot-log schema 2 record size");
 static_assert(offsetof(ShotLogRecord, verdict) == 27, "schema 1 verdict byte");
 static_assert(offsetof(ShotLogRecord, slowAfterDs) == 108, "schema 1 snapshot tail");
 static_assert(offsetof(ShotLogRecord, dripDelayCode) == 117, "schema 1 drip delay byte");
@@ -416,6 +419,7 @@ static_assert(offsetof(ShotLogRecord, targetTempDeciC) == 118,
               "schema 2 snapshot tail");
 static_assert(offsetof(ShotLogRecord, ratioX100) == 122, "schema 2 ratio");
 static_assert(offsetof(ShotLogRecord, slowCurve) == 127, "schema 2 per-side transitions");
+static_assert(offsetof(ShotLogRecord, shotNumber) == 128, "schema 2 shot number");
 
 inline uint16_t shotLogSlowRampDs(const ShotLogRecord &record) {
   return record.slowRampCode == 0 ? record.cutRampDs
@@ -825,23 +829,29 @@ inline bool validShotLogStore(const ShotLogStore &store) {
 }
 
 // Re-strides the records of a valid store written with shorter records to
-// the current size; appended fields read as zero. Every save compacts the
-// ring (records[0..count) oldest first), so the write index follows from the
-// count; one an image of smaller capacity wrote (500 records at index 0)
-// would otherwise point past the live records. Marks an earlier image did
-// not write read as none.
+// the current size; appended fields read as zero, and the good shots take
+// their numbers oldest first. Every save compacts the ring (records[0..count)
+// oldest first), so the write index follows from the count; one an image of
+// smaller capacity wrote (500 records at index 0) would otherwise point past
+// the live records. The marks follow that image's records; marks it did not
+// write read as none.
 inline void widenShotLogRecords(ShotLogStore &store) {
-  recordMarksLoaded(store.marks, store.header.generation);
   store.header.writeIndex = static_cast<uint16_t>(store.header.count % SHOT_LOG_CAPACITY);
   const size_t stored = store.header.recordSize;
-  if (stored >= sizeof(ShotLogRecord)) return;
-  const uint8_t *packed = reinterpret_cast<const uint8_t *>(store.records);
-  for (size_t i = store.header.count; i-- > 0;) {
-    auto *record = reinterpret_cast<uint8_t *>(&store.records[i]);
-    memmove(record, packed + i * stored, stored);
-    memset(record + stored, 0, sizeof(ShotLogRecord) - stored);
+  if (stored < sizeof(ShotLogRecord)) {
+    const uint8_t *packed = reinterpret_cast<const uint8_t *>(store.records);
+    memcpy(&store.marks, packed + SHOT_LOG_CAPACITY * stored, sizeof(store.marks));
+    uint32_t number = 0;
+    for (size_t i = store.header.count; i-- > 0;) {
+      auto *record = reinterpret_cast<uint8_t *>(&store.records[i]);
+      memmove(record, packed + i * stored, stored);
+      memset(record + stored, 0, sizeof(ShotLogRecord) - stored);
+    }
+    for (size_t i = 0; i < store.header.count; ++i)
+      if (shotLogRecordEligible(store.records[i])) store.records[i].shotNumber = ++number;
+    store.header.recordSize = sizeof(ShotLogRecord);
   }
-  store.header.recordSize = sizeof(ShotLogRecord);
+  recordMarksLoaded(store.marks, store.header.generation);
 }
 
 inline void resetShotLogStore(ShotLogStore &store) {

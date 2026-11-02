@@ -338,7 +338,9 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-/* A shot only the companion keeps: grey, and named in its label and tooltip. */
+/* A bad shot takes no number, and a shot only the companion keeps: grey,
+   named in its label and tooltip. */
+#shotTable .shotNum.bad,
 #shotTable .shotNum.archiveKept {
   background: var(--mu);
   color: var(--sf);

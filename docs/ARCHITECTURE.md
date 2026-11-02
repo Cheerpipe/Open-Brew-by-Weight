@@ -346,13 +346,15 @@ while that owner holds the flash lock. Each keeps two slots in its own data
 partition — 2×504 KiB for `shotlog` (room for 1,000 records of up to 516 bytes), 2×16 KiB for `history` — with generation
 and checksum selection preserving the atomic whole-store update; a failed
 write never erases the last-good slot. Writes remain deferred until the shot
-has ended. The shot log uses schema 2 in its dedicated partition (128-byte records, each
+has ended. The shot log uses schema 2 in its dedicated partition (132-byte records, each
 a self-contained snapshot of the cut parameters in force: target, window,
 side switches, margins, delay, max shot time, each side's ramp length and
 curve (a 124-byte record widens to one ramp length for both sides and
 smoothstep), plus the cut
 line at the stop, arrival time, packed verdict byte, the machine integration's
-target temperature, the preset's dose and the shot's brew ratio); any other
+target temperature, the preset's dose, the shot's brew ratio and its good-shot
+number, which a 128-byte store assigns to its good records oldest first when
+it widens, carrying its deletion marks along); any other
 schema is discarded and the shot history starts empty. Within schema 2,
 records grow only by appending fields: the header stores the record size, and
 an image with longer records widens a store of shorter ones on load (appended
@@ -361,7 +363,7 @@ sets an explicit default). History and the statistics replayed from it
 therefore survive an OTA update that grows the record. The reverse is not
 supported: an earlier image discards a store written with longer records.
 Each slot leaves room for 516-byte records at 1,000 records, but every save
-rewrites the whole store (32 sector erases and 128 KB at today's 128-byte
+rewrites the whole store (33 sector erases and 132 KB at today's 132-byte
 records), so the per-shot write cost grows with the record size. The boot
 ID lives in its own small NVS key, so a boot never rewrites the shot log.
 

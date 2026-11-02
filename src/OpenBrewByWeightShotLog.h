@@ -15,7 +15,7 @@ namespace openbrewbyweight {
 // Two 504 KiB slots fill the dedicated shotlog data partition; each slot
 // leaves room for 1000 records of up to 516 bytes, so later schema growth
 // never touches the partition table again. A save erases and rewrites only
-// the sectors the store occupies (32 at 1000 records of 128 bytes).
+// the sectors the store occupies (33 at 1000 records of 132 bytes).
 constexpr size_t SHOT_LOG_FLASH_SLOT_BYTES = 516096;
 constexpr size_t SHOT_LOG_FLASH_SLOT_COUNT = 2;
 static_assert(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES,
@@ -162,6 +162,11 @@ class ShotLog
     const ShotLogRecord *found = findNewest([id](const ShotLogRecord &r) { return r.id < id; });
     if (found != nullptr) output = *found;
     return found != nullptr;
+  }
+  // The number the next good shot takes: one past the newest one stored.
+  uint32_t nextShotNumber() const {
+    const ShotLogRecord *found = findNewest([](const ShotLogRecord &r) { return r.shotNumber != 0; });
+    return found != nullptr ? found->shotNumber + 1U : 1U;
   }
   bool copyNewestEligible(ShotLogRecord &output) const {
     const ShotLogRecord *found = findNewest(shotLogRecordEligible);

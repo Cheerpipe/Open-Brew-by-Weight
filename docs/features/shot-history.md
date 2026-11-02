@@ -91,11 +91,14 @@ in the top right corner.
 
 The shot's **number** rides in a small colored tag on the top left corner of
 its card. Counting starts at 1 when the log starts empty — on a fresh install,
-after a factory reset, or after clearing the log — and every stored shot
-counts up from there, so the same shot always keeps the same number: “shot
-214” means that shot and no other. Deleting shots leaves gaps in the count
-rather than renumbering the rest, and when a full log replaces its oldest
-shot, that shot's number goes with it. Beside the tag, the shot's end time
+after a factory reset, or after clearing the log — and every good shot counts
+up from there, so the same shot always keeps the same number: “shot 214” means
+that shot and no other. A [bad shot](#what-is-recorded) takes no number, so a
+quick purge or a short pull with the scale on never makes the count jump; its
+tag says it is bad instead. Deleting older shots leaves gaps in the count
+rather than renumbering the rest; deleting your newest shot hands its number
+to the next good one. When a full log replaces its oldest shot, that shot's
+number goes with it. Beside the tag, the shot's end time
 sits in a quiet grey pill next to the verdict's colored one, so when you
 pulled it reads with the same weight as how it landed.
 
@@ -327,8 +330,8 @@ checklist, to add the bad ones; it counts in the Filter badge like any other
 tick, Reset clears it, and it is off again whenever you reopen the Web UI. It
 works with the other ticks and either sort order: Show bad shots plus your
 house preset lists that preset's good and bad shots. Each bad shot carries a
-grey **Bad** label beside its time with the reason: **short** (12 seconds or
-less), **no yield**, or **low yield** (2 g or less). A bad shot shows only what
+grey **Bad** tag where a good shot shows its number, with the reason: **short**
+(12 seconds or less), **no yield**, or **low yield** (2 g or less). A bad shot shows only what
 the controller stored, so a missing yield, flow or ratio reads **—** instead of
 being estimated from its curve, and **Max flow**, **Drip** and **Cut at**,
 which come from the curve, always read **—**. The preset and scale choices in the checklist

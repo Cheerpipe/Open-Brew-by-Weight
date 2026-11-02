@@ -118,6 +118,11 @@
           "minimum": 1,
           "description": "Record number on this controller."
         },
+        "number": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "The shot's number on its card, counting good shots only; null for a bad shot or one stored before numbering."
+        },
         "bootId": {
           "type": "integer",
           "minimum": 0,

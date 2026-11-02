@@ -524,6 +524,11 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
       scaleLoss && snapshot.scaleLossBlind);
   if (verdict.verdict != corridor::Verdict::UNCLASSIFIED)
     record.arrivalDs = static_cast<uint16_t>(verdict.arrivalMs / 100);
+  // A bad shot is only listed: it takes no number, and Home and the last-shot
+  // links keep pointing at the newest good one, exactly as when such a cycle
+  // was not stored.
+  const bool good = shotLogRecordEligible(record);
+  record.shotNumber = good ? shotLog.nextShotNumber() : 0;
   const uint32_t newId = shotLog.nextRecordId();
   if (!shotLog.append(record, false)) {
     const size_t nextCount =
@@ -537,9 +542,6 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
     return 0;
   }
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_relaxed);
-  // A bad shot is only listed: Home and the last-shot links keep pointing at
-  // the newest good one, exactly as when such a cycle was not stored.
-  const bool good = shotLogRecordEligible(record);
   if (good && homeCycleResult.cycleId == snapshot.cycleId) {
     record.id = newId;
     homeCycleResult.shotLogId = newId;

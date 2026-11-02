@@ -13,6 +13,9 @@ exported JSON formats are not carried over.
   that ran short or never reached a usable yield. Those are marked as bad
   shots: they never count in statistics, charts, grind hints or learning,
   and **Show bad shots** in the Shots filter lists them with their reason.
+  Only good shots are numbered, so a quick purge never makes the count jump:
+  a bad shot's card shows a grey **Bad** tag instead of a number, and the
+  shots you already have are renumbered once when you update.
 - **Shot trace:** each shot also records what the controller saw and
   decided, from the tare to the last drip. Open it from a shot's menu with
   **View trace**, or export everything with **JSON + diagnostics** (also as

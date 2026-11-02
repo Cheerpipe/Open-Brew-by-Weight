@@ -11,6 +11,7 @@
   "shots": [
     {
       "id": 412,
+      "number": 398,
       "bootId": 37,
       "time": {
         "startedAt": "2026-10-24T08:12:15-03:00",

@@ -13542,6 +13542,14 @@ void s01r_a_bad_cycle_never_becomes_the_last_good_shot() {
   bool hasNewestActivation = false;
   CHECK(copyShotStoreStatus(bootId, last, good, newestActivation, hasNewestActivation, true));
   CHECK(shotLogProjectLastShot(latest, last, good).cycleId == 41);
+  // Only good shots count: the bad one takes no number, the next good one
+  // follows the last good one, and deleting the newest frees its number.
+  cycle(43, 30000, 36.0f);
+  ShotLogRecord stored[3] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 3) == 3);
+  CHECK(stored[0].shotNumber == 2 && stored[1].shotNumber == 0 && stored[2].shotNumber == 1);
+  CHECK(stored[0].id == 3);
+  CHECK(shotLog.removeById(stored[0].id, false) && shotLog.nextShotNumber() == 2);
 }
 
 void s01n_bad_scale_cycles_are_stored_with_their_reason() {
@@ -17282,7 +17290,7 @@ void s08_shot_log_without_sync_has_no_wall_time() {
 }
 
 void s11_shot_log_record_includes_preset_snapshot() {
-  CHECK(sizeof(ShotLogRecord) == 128);
+  CHECK(sizeof(ShotLogRecord) == 132);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   // A fast weight cut records its own cut parameters, cut line and verdict.
   resetHarness(false, true);

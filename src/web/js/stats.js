@@ -1192,11 +1192,21 @@ function renderShots() {
       // The end time rides in a neutral pill with the verdict's anatomy.
       const timeEl = row.cells[0].querySelector("time");
       if (timeEl) timeEl.classList.add("heroPill", "time");
-      // The corner tag tells cards apart: the store's sequential shot id.
+      // The corner tag tells cards apart: a good shot's number (a row from
+      // before numbering keeps its id), or a bad shot's grey reason, since
+      // statistics and learning leave it out.
       const num = document.createElement("span");
-      num.className = "shotNum";
-      num.textContent = "#" + r.id;
-      num.title = __WEBUI_TEXT__("runtime.shot") + " " + r.id;
+      num.className = bad ? "shotNum bad" : "shotNum";
+      num.textContent = bad
+        ? {
+            short: __WEBUI_TEXT__("stats.bad_short"),
+            no_yield: __WEBUI_TEXT__("stats.bad_no_yield"),
+            low_yield: __WEBUI_TEXT__("stats.bad_low_yield"),
+          }[bad] || bad
+        : "#" + (r.number ?? r.id);
+      num.title = bad
+        ? __WEBUI_TEXT__("stats.bad_hint")
+        : __WEBUI_TEXT__("runtime.shot") + " " + (r.number ?? r.id);
       archiveMark(num, r);
       row.cells[0].prepend(num);
       // The verdict sits beside the time so each card says at a glance how the shot landed.
@@ -1207,22 +1217,6 @@ function renderShots() {
             r.verdict +
             '">' +
             R.verdictLabel(r.verdict) +
-            "</span>",
-        );
-      // A bad shot says why: statistics and learning leave it out.
-      if (bad)
-        row.cells[0].insertAdjacentHTML(
-          "beforeend",
-          '<span class="heroPill" data-kind="bad" title="' +
-            R.escHtml(__WEBUI_TEXT__("stats.bad_hint")) +
-            '">' +
-            R.escHtml(
-              {
-                short: __WEBUI_TEXT__("stats.bad_short"),
-                no_yield: __WEBUI_TEXT__("stats.bad_no_yield"),
-                low_yield: __WEBUI_TEXT__("stats.bad_low_yield"),
-              }[bad] || bad,
-            ) +
             "</span>",
         );
       const rate = document.createElement("td");
@@ -1723,6 +1717,7 @@ function shotJson(r, trace) {
       ["soft", "medium", "hard"][Math.min(2, Math.max(0, Math.round((+v || 0) / 50)))];
   return {
     id: r.id,
+    number: r.number ?? null,
     bootId: r.bootId,
     time: {
       startedAt: time?.[0] ?? null,

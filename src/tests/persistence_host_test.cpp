@@ -578,10 +578,10 @@ void p65_factory_settings_survives_second_slot_write_fail() {
 
 void p66_shot_log_dual_slot_generation_flip() {
   resetHostPersistence();
-  // The user deletion marks follow the 128,024 bytes an older image reads,
-  // so its header, records and checksum stay where they were.
-  CHECK(offsetof(ShotLogStore, marks) == 128024);
-  CHECK(sizeof(ShotLogStore) == 128104);
+  // The user deletion marks follow the records; widening a shorter image's
+  // records carries them over from where that image wrote them.
+  CHECK(offsetof(ShotLogStore, marks) == 132024);
+  CHECK(sizeof(ShotLogStore) == 132104);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   CHECK(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES);
   CHECK(SHOT_LOG_FLASH_SLOT_COUNT * SHOT_LOG_FLASH_SLOT_BYTES <= 0xFC000);
@@ -593,9 +593,9 @@ void p66_shot_log_dual_slot_generation_flip() {
   record.actualWeightCg = 3600;
   CHECK(log.append(record));
   CHECK(log.count() == 1);
-  // A save erases only the 32 sectors the 128,104-byte store of 1000
+  // A save erases only the 33 sectors the 132,104-byte store of 1000
   // records occupies, not the 504 KiB slot.
-  CHECK(ShotLog::kEraseBytes == 32 * FLASH_IO_SECTOR_BYTES);
+  CHECK(ShotLog::kEraseBytes == 33 * FLASH_IO_SECTOR_BYTES);
   CHECK(ShotLog::hostEraseBytes() == ShotLog::kEraseBytes);
 
   // A failed inactive-slot write leaves the last-good slot active and the
@@ -3394,7 +3394,8 @@ void p92_schema2_golden_shot_log_loads() {
 }
 
 // Records stored by an image with shorter records keep their bytes at the
-// new stride; the appended tail reads as zero.
+// new stride; the appended tail reads as zero, the good shots take their
+// numbers oldest first, and the marks that image wrote after its records stay.
 void p92b_shorter_shot_log_records_widen_on_load() {
   static ShotLogStore store, packed;
   resetShotLogStore(store);
@@ -3402,22 +3403,31 @@ void p92b_shorter_shot_log_records_widen_on_load() {
     memset(&store.records[i], 0x40 + i, sizeof(ShotLogRecord));
     store.records[i].id = 10U + i;
   }
+  store.records[1].durationDs = 50;  // A short, bad shot takes no number.
   store.header.count = 3;
   store.header.writeIndex = 3;
+  store.marks.clears = 7;
+  recordMarksGone(store.marks, 9);
   constexpr size_t shorter = 100;
   memcpy(&packed, &store, sizeof(packed));
   auto *bytes = reinterpret_cast<uint8_t *>(packed.records);
   for (size_t i = 0; i < 3; ++i) memcpy(bytes + i * shorter, &store.records[i], shorter);
+  memcpy(bytes + SHOT_LOG_CAPACITY * shorter, &store.marks, sizeof(store.marks));
+  packed.marks = {};
   packed.header.recordSize = shorter;
   widenShotLogRecords(packed);
   CHECK(packed.header.recordSize == sizeof(ShotLogRecord));
-  const uint8_t zeros[sizeof(ShotLogRecord) - shorter] = {};
+  constexpr size_t tail = offsetof(ShotLogRecord, shotNumber) - shorter;
+  const uint8_t zeros[tail] = {};
   for (size_t i = 0; i < 3; ++i) {
     const auto *record = reinterpret_cast<const uint8_t *>(&packed.records[i]);
     CHECK(memcmp(record, &store.records[i], shorter) == 0);
     CHECK(memcmp(record + shorter, zeros, sizeof(zeros)) == 0);
   }
   CHECK(packed.records[2].id == 12);
+  CHECK(packed.records[0].shotNumber == 1 && packed.records[1].shotNumber == 0 &&
+        packed.records[2].shotNumber == 2);
+  CHECK(packed.marks.clears == 7 && packed.marks.goneCount == 1 && packed.marks.gone[0] == 9);
   // The current size is left alone; a shorter size than any image wrote is
   // never valid.
   widenShotLogRecords(store);
