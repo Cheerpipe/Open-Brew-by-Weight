@@ -28,6 +28,20 @@ function readSources(files) {
   return files.map((file) => fs.readFileSync(path.join(sketchDir, file), 'utf8'))
     .join('\n');
 }
+// Builds a host program from C++ source written beside its binary. The
+// compiler reads a file, never a stdin pipe: a pipe whose EOF never arrived
+// left clang -cc1 blocked in read() and hung a whole gate. The timeout turns
+// any other stuck build into a failure that names itself.
+function buildHostProgram(binary, native, flags) {
+  const file = binary + '.cpp';
+  fs.writeFileSync(file, native);
+  try {
+    return require('child_process').spawnSync(process.env.CXX || 'c++',
+      ['-std=c++17', ...flags, file, '-o', binary], {encoding: 'utf8', timeout: 300e3});
+  } finally {
+    fs.rmSync(file, {force: true});
+  }
+}
 // The size-budget step reads the same compact, localized authoring sources.
 const authoring = await require('./check_web_budgets.js').authoringSources();
 const rawShellHtml = authoring.raw.shellHtml;

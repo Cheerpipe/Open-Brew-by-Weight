@@ -138,8 +138,8 @@ int main(){
 }
 `;
   try {
-    const compiled = spawnSync(process.env.CXX || 'c++', ['-std=c++17', '-Wall', '-Wextra', '-Werror',
-      '-DOPEN_BREW_BY_WEIGHT_HOST_TEST=1', '-I', sketchDir, '-x', 'c++', '-', '-o', binary], {input: native, encoding: 'utf8'});
+    const compiled = buildHostProgram(binary, native, ['-Wall', '-Wextra', '-Werror',
+      '-DOPEN_BREW_BY_WEIGHT_HOST_TEST=1', '-I', sketchDir]);
     assert.equal(compiled.status, 0, compiled.error?.message || compiled.stderr);
     const result = spawnSync(binary, [], {encoding: 'utf8'});
     assert.equal(result.status, 0, result.error?.message || result.stderr);

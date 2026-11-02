@@ -409,10 +409,9 @@ int main() {
   const directory = path.resolve(sketchDir, '..', 'temp', 'ai_temp_companion_records');
   fs.mkdirSync(directory, {recursive: true});
   const binary = path.join(directory, 'vectors-' + process.pid);
-  const compiled = spawnSync('c++', ['-std=c++17', '-DOPEN_BREW_BY_WEIGHT_HOST_TEST',
-    '-Wno-unknown-attributes', '-I' + sketchDir, '-x', 'c++', '-', '-o', binary],
-  {input: native, encoding: 'utf8'});
-  assert.equal(compiled.status, 0, compiled.stderr);
+  const compiled = buildHostProgram(binary, native,
+    ['-DOPEN_BREW_BY_WEIGHT_HOST_TEST', '-Wno-unknown-attributes', '-I' + sketchDir]);
+  assert.equal(compiled.status, 0, compiled.error?.message || compiled.stderr);
   const run = spawnSync(binary, [], {encoding: 'utf8'});
   fs.unlinkSync(binary);
   assert.equal(run.status, 0, run.stderr);

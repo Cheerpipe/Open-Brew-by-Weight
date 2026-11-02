@@ -801,7 +801,7 @@ int main(){
 }
 `;
   try{
-    const compiled=spawnSync(process.env.CXX||'c++',['-std=c++17','-Wall','-Wextra','-Werror','-x','c++','-','-o',binary],{input:native,encoding:'utf8'});
+    const compiled=buildHostProgram(binary,native,['-Wall','-Wextra','-Werror']);
     assert.equal(compiled.status,0,compiled.error?.message||compiled.stderr);
     const run=spawnSync(binary,[],{encoding:'utf8'});
     assert.equal(run.status,0,run.error?.message||run.stderr);
