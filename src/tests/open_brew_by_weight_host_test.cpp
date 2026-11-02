@@ -20225,6 +20225,27 @@ void tr07_tare_grace_waits_for_a_reading_after_the_write() {
   CHECK(stopperState == StopperState::BREW);
 }
 
+void tr08_rinse_before_the_start_tare_result_keeps_the_cup_untared() {
+  // A quick rinse closes the tare window before the start tare result: the
+  // untared cup must not be believed tared until a successful result lands.
+  for (bool succeeds : {false, true}) {
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    runtimeConfig.rinseEnabled = true;
+    idleCup(80.0f);
+    CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+    CHECK(!cupPresenceIsTared());
+    startCycle();
+    setRawPaddle(false);
+    runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+    CHECK(stopperState == StopperState::RINSE);
+    CHECK(!cupPresenceIsTared());
+    scale.tareStartTimerSucceeds = succeeds;
+    CHECK(executeNextScaleCommand());
+    CHECK(cupPresenceIsTared() == succeeds);
+  }
+}
+
 // A 250 g cup sits untared on the scale when the shot starts and the start
 // tare, though acknowledged, has no effect; grace then expires with the cup
 // still on the scale.
@@ -25406,6 +25427,7 @@ const TestCase testCases[] = {
     {"TR05", tr05_light_cup_pre_effect_packet_is_not_a_baseline},
     {"TR06", tr06_combined_start_tare_opens_grace_at_completion},
     {"TR07", tr07_tare_grace_waits_for_a_reading_after_the_write},
+    {"TR08", tr08_rinse_before_the_start_tare_result_keeps_the_cup_untared},
     {"SK01", sk01_refused_start_releases_cup_hold},
     {"SK02", sk02_overload_stops_while_touch_is_held},
     {"SK03", sk03_late_zero_after_grace_releases_cup_hold},

@@ -444,6 +444,7 @@ bool finalizeCycle(EndReason reason, StopperState nextState,
   }
   session.active = false;
   outboundShotActive.store(false, std::memory_order_release);
+  if (session.awaitingPostTareBaseline && session.appliedTareRequestId == 0) markCupTareReferenceUncertain();
   session.awaitingPostTareBaseline = false;
   holdCupPresenceTransitions(false);
   virtualHoldOn = false;
@@ -598,6 +599,9 @@ bool enterRinse() {
   session.calibrationEligible = false;
   session.autoToManualGuardArmed = false;
   session.autoToManualGuardEnforced = false;
+  // Closing the window before any start tare result: the cup is no longer
+  // known tared (a late successful result restores it).
+  if (session.awaitingPostTareBaseline && session.appliedTareRequestId == 0) markCupTareReferenceUncertain();
   session.awaitingPostTareBaseline = false;
   holdCupPresenceTransitions(false);
   addDebugEvent(DebugCategory::STATE, DebugCode::RINSE_CLASSIFIED);

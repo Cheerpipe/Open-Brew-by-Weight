@@ -505,7 +505,9 @@ void processScaleWorkerEvents() {
         if (event.cycleId == session.id) {
           session.remoteTimerStarted = event.writeSucceeded;
           session.remoteTimerStartSettled = true;
-          if (event.tareSucceeded) applyShotTareResult(event);
+          // After a rinse or early end closed the window, the cup is now tared.
+          if (event.tareSucceeded && stopperState != StopperState::BREW) notifyCupPresenceTare();
+          else if (event.tareSucceeded) applyShotTareResult(event);
         }
         if (!event.discardedStaleConnection) {
           emitCommandAlert(event.usedCombinedTareStart ? AlertEvent::TARE_START
