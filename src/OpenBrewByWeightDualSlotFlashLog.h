@@ -35,8 +35,8 @@ uint32_t dualSlotHeaderEpoch(const Header &header) {
       sizeof(header.count));
 }
 
-// Per-store hooks; `widen`, when not null, upgrades a loaded store whose
-// records an earlier image wrote at a shorter size.
+// Per-store hooks; `widen`, when not null, runs after every load and upgrades
+// what an earlier image wrote (shorter records, no RecordStoreMarks).
 template <typename StoreT>
 struct DualSlotFlashLogTraits;
 
