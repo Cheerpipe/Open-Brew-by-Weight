@@ -466,7 +466,7 @@
     "diagnostic.log_export_failed": "Could not download the log history.",
     "diagnostic.log_export_from": "Export from",
     "diagnostic.log_export_range_hint": "Leave both empty to export the whole log history.",
-    "diagnostic.log_export_title": "Download the whole log history the companion keeps",
+    "diagnostic.log_export_title": "Download the log history the companion keeps",
     "diagnostic.log_export_to": "Export to",
     "diagnostic.log_gap_marker": "{0} events could not be copied while the companion was away",
     "diagnostic.log_in_companion": "The companion keeps the older history; open the Web UI through it to page back.",
