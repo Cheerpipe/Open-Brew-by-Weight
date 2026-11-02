@@ -609,14 +609,18 @@ function fillShotCharts(h, m) {
   return m;
 }
 let statsPresetFilter = "all";
-// The Stats header: through the companion with the archive on, the one it
-// builds over the whole history (S13) for any window; the controller's
-// meanwhile, and whenever the companion cannot answer (S16), silently.
+// The Stats header (D10-D12): through the companion with the archive on, the
+// one it builds over the whole history (S13) for any window; meanwhile, and
+// whenever the companion cannot answer, the controller's, labelled and with
+// its own windows only. The read-only archive view has no controller header
+// to fall back to and says so. It stays here: Home and presets read only the
+// controller's (AC15).
 let statsMerged = null,
   statsMergedGood = null,
+  statsMergedRetry = 0,
   statsGood = 0,
   statsHeaderAsk = 0;
-const statsHeader = () => statsMerged || R.uiState.shotStats || {};
+const statsHeader = () => statsMerged || (R.archiveView ? {} : R.uiState.shotStats || {});
 function renderStatsDurChart() {
   const root = $("statsDurChart");
   if (!root) return;
@@ -941,7 +945,12 @@ function renderShotStats() {
   q("Err", f(s.avgErrorPct, 1, "%"), s.avgErrorPct);
   q("Flow", f(s.avgFlowGps, 2, __WEBUI_TEXT__("runtime.g_s")));
   const hint = $("statsWindowHint"),
+    note = $("statsHeaderNote"),
     c = s.shotCount || 0;
+  note.hidden = !!statsMerged || !(R.archiveView || archiveStatsReady());
+  note.textContent = R.archiveView
+    ? __WEBUI_TEXT__("stats.header_unavailable")
+    : __WEBUI_TEXT__("stats.header_controller_only");
   if (hint) {
     hint.hidden = !c;
     hint.textContent =
@@ -970,27 +979,32 @@ async function refreshMergedHeader() {
         }),
     ).catch(() => null);
   if (ask !== statsHeaderAsk) return;
-  // A failed answer shows the controller's header meanwhile but keeps the
-  // last whole-history count, so the window choice never collapses.
+  // A failed answer shows the controller's header, labelled, and asks the
+  // companion again a little later while Stats stay open.
   statsMerged = reply?.stats || null;
   if (reply) statsMergedGood = reply.good;
+  clearTimeout(statsMergedRetry);
+  if (!reply && archiveStatsReady())
+    statsMergedRetry = setTimeout(() => shotStatsViewActive() && refreshMergedHeader(), 15e3);
   if (shotStatsViewActive()) R.paint(renderShots);
 }
 // S18: every window smaller than the good shots the list holds under its
 // filters, plus the smallest one that covers them; no choice up to ten. The
-// companion adds 500 and 1000 over the whole history. A selection the
-// filters hide falls to the largest window still shown.
+// companion's header adds 500 and 1000 over the whole history; the pressed
+// window is always the one the shown header covers. A selection the filters
+// hide falls to the largest window still shown.
 function statsWindowChoices() {
-  const merged = archiveStatsReady(),
-    n = merged && statsMergedGood != null ? statsMergedGood : statsGood,
+  const merged = !!statsMerged,
+    n = merged ? (statsMergedGood ?? statsGood) : statsGood,
     sizes = merged ? [10, 50, 100, 500, 1000] : [10, 50, 100],
-    shown = sizes.filter((v, i) => i === 0 || sizes[i - 1] < n);
+    shown = sizes.filter((v, i) => i === 0 || sizes[i - 1] < n),
+    pressed = merged ? R.uiState.statsWindow : Math.min(R.uiState.statsWindow, 100);
   for (const b of $("statsWindow")?.querySelectorAll("button") || []) {
     b.hidden = !shown.includes(+b.dataset.v);
-    b.setAttribute("aria-pressed", String(+b.dataset.v === R.uiState.statsWindow));
+    b.setAttribute("aria-pressed", String(+b.dataset.v === pressed));
   }
   $("statsWindow").hidden = shown.length < 2;
-  if (!shown.includes(R.uiState.statsWindow) && (merged ? statsMergedGood != null : statsSynced)) {
+  if (!shown.includes(pressed) && (merged ? statsMergedGood != null : statsSynced)) {
     R.uiState.statsWindow = shown.at(-1);
     sendStatsWindow();
     // 500→100 or 1000→500 may leave the controller's window as it was: the

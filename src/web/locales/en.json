@@ -2386,6 +2386,8 @@
     "stats.filter_quality": "Quality",
     "stats.gaggiuino_hint": "The curve only, for Gaggiuino tools and Visualizer.coffee",
     "stats.goal": "Goal",
+    "stats.header_controller_only": "For now these figures cover only the shots on the controller. Your whole history returns as soon as the companion catches up.",
+    "stats.header_unavailable": "These figures are not available right now. They return when the companion can read its copy again.",
     "stats.json_all_hint": "Every shot, bad ones included, with each one\u2019s trace, for backups and troubleshooting",
     "stats.json_shot_hint": "This shot with its full curve and its trace when it has one, for backups and troubleshooting",
     "stats.last": "Last",
