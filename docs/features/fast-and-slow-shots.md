@@ -227,8 +227,10 @@ runs past the window without having stopped. That same moment is where the
 shot's weight takes the fast or slow color on its chart and what makes the shot
 count as extended in its history, so the beeps, the chart and the card always
 agree. A shot that is only slightly early may give just one short beep before
-it stops. The **Bullseye melody** plays only after an On recipe shot. See
-[Alerts](../alerts.md).
+it stops. A shot that was extended or stopped sooner always counts as Fast or
+Slow, even when it landed within a moment of the window, so the **Bullseye
+melody**, which plays only after an On recipe shot, never follows fast- or
+slow-shot beeps. See [Alerts](../alerts.md).
 
 Related: [Brew by weight](brew-by-weight.md), [Presets](presets.md),
 [Shot history](shot-history.md).

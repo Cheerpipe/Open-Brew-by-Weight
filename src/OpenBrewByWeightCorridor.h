@@ -476,6 +476,16 @@ inline ArrivalVerdict arrivalVerdict(const Params &p, int32_t cutMs, int32_t rat
   return out;
 }
 
+// An extended shot takes its side's verdict: the controller already treated it
+// as fast or slow, so the arrival dead band does not apply. The arrival time,
+// and an unclassified arrival, stay as measured.
+inline ArrivalVerdict extendedVerdict(ArrivalVerdict v, bool fastExtended,
+                                      bool slowExtended) {
+  if (v.verdict != Verdict::UNCLASSIFIED && (fastExtended || slowExtended))
+    v.verdict = fastExtended ? Verdict::FAST : Verdict::SLOW;
+  return v;
+}
+
 // Persisted verdict byte: bits 0-1 verdict, bit 2 channeling, bits 3-4
 // scale-loss source, bit 5 blind (scale-loss shot without a valid weight).
 enum class LossSource : uint8_t { PROJECTION = 0, HISTORY = 1, WINDOW = 2, FIXED = 3 };
