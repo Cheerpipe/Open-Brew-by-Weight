@@ -20560,6 +20560,27 @@ void lt04_negative_weight_suspends_until_the_cup_returns() {
   CHECK(!session.autoToManualGuardEnforced);
 }
 
+void lt08_zero_stamped_before_the_deadline_is_the_late_tare() {
+  // The tick expires grace first; the zero captured just before the deadline
+  // drains after it and still belongs to the late-tare window.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  idleCup(250.0f);
+  resetCupPresence();
+  startCycle();
+  CHECK(executeNextScaleCommand());
+  const uint32_t deadline = session.postTareBaselineDeadlineMs;
+  while (static_cast<int32_t>(hostMillis + 100U - deadline) < 0) idleWeight(250.0f, 100);
+  hostMillis = deadline + 5U;
+  runLoopAfter(1);
+  CHECK(fabsf(session.softwareZeroG - 250.0f) < 0.2f);
+  const uint32_t generation = session.tareConnectionGeneration;
+  publishWeight(0.0f, deadline - 2U, generation);
+  publishWeight(0.0f, deadline - 1U, generation);
+  CHECK(debugEventExists(DebugCode::SCALE_LATE_TARE_RECOGNIZED));
+  CHECK(session.softwareZeroG == 0.0f);
+}
+
 void lt07_unseen_cup_lift_in_the_window_is_undone_when_it_returns() {
   // A lift of a cup the detector never saw reads like the late zero. Its
   // return (cup plus the coffee it held) restores the software zero, so the
@@ -25370,6 +25391,7 @@ const TestCase testCases[] = {
     {"LT05", lt05_late_start_zero_keeps_the_coffee_already_weighed},
     {"LT06", lt06_late_zero_outside_its_window_is_not_a_tare},
     {"LT07", lt07_unseen_cup_lift_in_the_window_is_undone_when_it_returns},
+    {"LT08", lt08_zero_stamped_before_the_deadline_is_the_late_tare},
     {"SP01", sp01_phi_table_matches_erf},
     {"SP02", sp02_isqrt_exact_on_squares},
     {"SP03", sp03_plateau_flow_median},

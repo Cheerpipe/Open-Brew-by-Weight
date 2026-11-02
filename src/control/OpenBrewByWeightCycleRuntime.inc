@@ -799,8 +799,8 @@ bool holdLateStartTare(float rawG, uint32_t receivedAtMs, uint32_t packetSequenc
                   fabsf(rawG - session.lastAcceptedWeightG - session.lateTareDroppedZeroG) > halfCupG
             : session.softwareZeroG <= 0.0f || session.cupRemovedPending ||
                   session.weightControlState == WeightControlState::SUSPENDED ||
-                  receivedAtMs - session.postTareBaselineDeadlineMs >=
-                      session.config.postTareBaselineGraceMs ||
+                  static_cast<int32_t>(receivedAtMs - session.postTareBaselineDeadlineMs) >=
+                      static_cast<int32_t>(session.config.postTareBaselineGraceMs) ||
                   fabsf(rawG) > halfCupG || !postTareBaselinePlausible(rawG))) {
     session.lateTareSequence = 0;
     return false;
