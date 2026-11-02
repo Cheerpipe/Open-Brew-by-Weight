@@ -593,10 +593,10 @@ if (!network.includes('sendBody(request, OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP') ||
     network.includes('g_httpSendBounce') ||
     // The bounded write override is exclusive to authenticated WS sessions.
     !network.includes('httpd_sess_set_send_override(request->handle, session->fd, uiStreamSend)') ||
-    !network.includes('allocExternal(sizeof(NetworkWorkBuf), AllocationOwner::NETWORK)') ||
-    !psram.includes('inline void *allocExternal(size_t bytes,') ||
+    !network.includes('allocExternal(sizeof(NetworkWorkBuf))') ||
+    !psram.includes('inline void *allocExternal(size_t bytes)') ||
     !jsonArena.includes('parseJsonDocument') ||
-    !jsonArena.includes('AllocationOwner::JSON')) {
+    !jsonArena.includes('return allocExternal(bytes);')) {
   throw new Error(
       'Complete HTTP bodies must use HTTPD Content-Length responses; streamed bodies retain chunks and large work buffers live in PSRAM heap');
 }

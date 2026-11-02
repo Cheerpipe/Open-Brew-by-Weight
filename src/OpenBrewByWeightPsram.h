@@ -37,23 +37,9 @@
 
 namespace openbrewbyweight {
 
-enum class AllocationOwner : uint8_t {
-  OTHER, NETWORK, WEBHOOK, PROFILER, FLASH_IO, OTA, BUZZER, JSON,
-  SERIAL_LOG, COUNT
-};
-
-struct AllocationMetrics {
-  std::atomic<uint32_t> successes{0};
-  std::atomic<uint32_t> failures{0};
-  std::atomic<uint32_t> largestRequestBytes{0};
-  std::atomic<uint32_t> lastFailureBytes{0};
-};
-
 namespace detail {
 
-inline std::atomic<uint32_t> g_allocExternalFallback{0};
 inline std::atomic<bool> g_workBufExternal{false};
-inline AllocationMetrics g_allocations[static_cast<size_t>(AllocationOwner::COUNT)];
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
 // Deterministic allocation-failure injection; never compiled into firmware.
 inline std::atomic<int32_t> g_hostAllocationsUntilFailure{-1};
@@ -69,24 +55,6 @@ inline bool hostAllocationFails() {
 #endif
 
 }  // namespace detail
-
-inline void noteAllocation(AllocationOwner owner, size_t bytes, bool success) {
-  auto &metrics = detail::g_allocations[static_cast<size_t>(owner)];
-  const uint32_t size = bytes > UINT32_MAX ? UINT32_MAX : static_cast<uint32_t>(bytes);
-  uint32_t largest = metrics.largestRequestBytes.load(std::memory_order_relaxed);
-  while (size > largest && !metrics.largestRequestBytes.compare_exchange_weak(
-             largest, size, std::memory_order_relaxed)) {}
-  if (success) {
-    metrics.successes.fetch_add(1, std::memory_order_relaxed);
-  } else {
-    metrics.failures.fetch_add(1, std::memory_order_relaxed);
-    metrics.lastFailureBytes.store(size, std::memory_order_relaxed);
-  }
-}
-
-inline uint32_t allocExternalFallbackCount() {
-  return detail::g_allocExternalFallback.load(std::memory_order_relaxed);
-}
 
 inline bool workBufIsExternal() {
   return detail::g_workBufExternal.load(std::memory_order_acquire);
@@ -111,15 +79,13 @@ inline bool pointerIsExternal(const void *block) {
 // SPIRAM only. Large blobs that must not punch a hole in internal DRAM
 // (NetworkWorkBuf, Wi-Fi AP records). Returns nullptr if SPIRAM cannot
 // satisfy — callers fail closed.
-inline void *allocExternal(size_t bytes, AllocationOwner owner = AllocationOwner::OTHER) {
+inline void *allocExternal(size_t bytes) {
   if (bytes == 0) {
     return nullptr;
   }
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                         \
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
-  void *block = detail::hostAllocationFails() ? nullptr : malloc(bytes);
-  noteAllocation(owner, bytes, block != nullptr);
-  return block;
+  return detail::hostAllocationFails() ? nullptr : malloc(bytes);
 #else
   void *block = nullptr;
 #if defined(BOARD_HAS_PSRAM)
@@ -127,29 +93,23 @@ inline void *allocExternal(size_t bytes, AllocationOwner owner = AllocationOwner
     block = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   }
 #endif
-  if (block != nullptr && pointerIsExternal(block)) {
-    noteAllocation(owner, bytes, true);
-    return block;
-  }
-  if (block != nullptr) {
+  if (block != nullptr && !pointerIsExternal(block)) {
     heap_caps_free(block);
+    block = nullptr;
   }
-  noteAllocation(owner, bytes, false);
-  return nullptr;
+  return block;
 #endif
 }
 
-inline void *allocInternal(size_t bytes, AllocationOwner owner = AllocationOwner::OTHER) {
+inline void *allocInternal(size_t bytes) {
   if (bytes == 0) {
     return nullptr;
   }
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
-  void *block = detail::hostAllocationFails() ? nullptr : malloc(bytes);
+  return detail::hostAllocationFails() ? nullptr : malloc(bytes);
 #else
-  void *block = heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  return heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 #endif
-  noteAllocation(owner, bytes, block != nullptr);
-  return block;
 }
 
 inline void heapCapsFree(void *block) {

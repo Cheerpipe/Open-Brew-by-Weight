@@ -214,7 +214,7 @@ inline void initJsonParser() {
   static const bool initialized = [] {
     cJSON_Hooks hooks{};
     hooks.malloc_fn = [](size_t bytes) -> void * {
-      return allocExternal(bytes, AllocationOwner::JSON);
+      return allocExternal(bytes);
     };
     hooks.free_fn = heapCapsFree;
     cJSON_InitHooks(&hooks);

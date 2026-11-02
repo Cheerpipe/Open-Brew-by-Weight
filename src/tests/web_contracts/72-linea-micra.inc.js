@@ -755,8 +755,8 @@ if (micraService.includes('keep_alive_enable = true') ||
     !micraService.includes('config.buffer_size_tx = 4096;') ||
     !micraService.includes('struct OpenBrewByWeightMicraService::IoBuffer') ||
     !micraService.includes('union {') ||
-    !micraService.includes('allocExternal(sizeof(WorkBuffer), AllocationOwner::NETWORK)') ||
-    !micraService.includes('allocExternal(sizeof(IoBuffer), AllocationOwner::NETWORK)') ||
+    !micraService.includes('allocExternal(sizeof(WorkBuffer))') ||
+    !micraService.includes('allocExternal(sizeof(IoBuffer))') ||
     !micraService.includes('if (connecting) releaseWorkBuffer();') ||
     !micraService.includes('if (!staConnected || apActive) {') ||
     !micraService.includes('releaseIoBuffer();') ||

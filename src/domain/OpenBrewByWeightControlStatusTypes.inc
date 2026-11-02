@@ -97,7 +97,6 @@ struct ControlStatusFields : ScaleLinkMetrics {
   uint32_t bleRuntimeHostStackMinBytes = UINT32_MAX;
   bool workBufExternal = false;
   bool jsonArenaExternal = false;
-  uint32_t allocExternalFallbackCount = 0;
   uint32_t scaleEventsDropped = 0;
   RuntimeConfig config = {};
   uint8_t bbwPresetId = 0;

@@ -410,7 +410,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
 // retries.
 OpenBrewByWeightNetwork::RecordIndexWork *OpenBrewByWeightNetwork::recordIndexWork() {
   if (recordIndexWork_ != nullptr) return recordIndexWork_;
-  if (void *memory = allocExternal(sizeof(RecordIndexWork), AllocationOwner::NETWORK))
+  if (void *memory = allocExternal(sizeof(RecordIndexWork)))
     return recordIndexWork_ = new (memory) RecordIndexWork{};
   static RefusalLog noMemory;
   if (noMemory.due() != 0)

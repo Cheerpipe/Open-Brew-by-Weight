@@ -32,7 +32,7 @@ uint32_t composeScaleProfileContext(char *text, size_t capacity) {
   // budget as a static, so stage it in PSRAM for this once-per-Start call.
   // An empty context is the accepted degradation when PSRAM is exhausted.
   auto *control = static_cast<ControlStatusSnapshot *>(allocExternal(
-      sizeof(ControlStatusSnapshot), AllocationOwner::PROFILER));
+      sizeof(ControlStatusSnapshot)));
   if (control == nullptr) return 0;
   copyControlStatus(*control);
   const ScaleLinkSnapshot link = getScaleLinkSnapshot();

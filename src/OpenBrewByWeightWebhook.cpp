@@ -173,9 +173,9 @@ bool WebhookDispatcher::startWorker() {
   const size_t queueStorageBytes =
       kWebhookQueueDepth * sizeof(QueuedWebhook);
   uint8_t *queueStorage =
-      static_cast<uint8_t *>(allocInternal(queueStorageBytes, AllocationOwner::WEBHOOK));
+      static_cast<uint8_t *>(allocInternal(queueStorageBytes));
   char *payload =
-      static_cast<char *>(allocExternal(kWebhookPayloadCapacity, AllocationOwner::WEBHOOK));
+      static_cast<char *>(allocExternal(kWebhookPayloadCapacity));
   QueueHandle_t queue = nullptr;
   if (queueStorage != nullptr) {
     queue = xQueueCreateStatic(kWebhookQueueDepth, sizeof(QueuedWebhook),

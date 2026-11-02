@@ -194,7 +194,7 @@ if (firmware.includes('ble_gatts_add_svcs(') ||
     firmware.includes('BLE_COMPAT_')) {
   throw new Error('Firmware must not register Companion GATTS or Companion command paths');
 }
-if (!taskProfiler.includes('allocExternal(sizeof(ActiveWorkspace), AllocationOwner::PROFILER)') ||
+if (!taskProfiler.includes('allocExternal(sizeof(ActiveWorkspace))') ||
     !taskProfiler.includes('heapCapsFree(workspace_)') ||
     taskProfiler.includes('allocExternalOrInternal(sizeof(ActiveWorkspace))') ||
     taskProfiler.includes('calloc(') ||
@@ -518,7 +518,7 @@ if (!psram.includes('#define OPEN_BREW_BY_WEIGHT_PSRAM_BSS EXT_RAM_BSS_ATTR') ||
     !firmwareCore.includes(
         'OPEN_BREW_BY_WEIGHT_PSRAM_BSS ShotPresetBank publishedPresetBank') ||
     firmwareCore.includes('stagingControlStatus') ||
-    !flashIoScratch.includes('allocInternal(FLASH_IO_SCRATCH_BYTES, AllocationOwner::FLASH_IO)') ||
+    !flashIoScratch.includes('allocInternal(FLASH_IO_SCRATCH_BYTES)') ||
     !firmwareCore.includes('OPEN_BREW_BY_WEIGHT_PSRAM_BSS ControlStatusCurve publishedControlCurve') ||
     firmwareCore.includes('OPEN_BREW_BY_WEIGHT_PSRAM_BSS ControlStatusFields') ||
     firmwareCore.includes('OPEN_BREW_BY_WEIGHT_PSRAM_BSS ControlStatusSnapshot')) {
@@ -527,7 +527,7 @@ if (!psram.includes('#define OPEN_BREW_BY_WEIGHT_PSRAM_BSS EXT_RAM_BSS_ATTR') ||
 }
 if (!firmwareCore.includes('uint8_t *serialLogQueueBytes = nullptr') ||
     !firmwareCore.includes(
-      'allocInternal(queueBytes, AllocationOwner::SERIAL_LOG)') ||
+      'allocInternal(queueBytes)') ||
     !firmwareCore.includes('esp_ptr_internal(serialLogQueueBytes)') ||
     !firmwareCore.includes('SERIAL_LOG_QUEUE_DEPTH = 8') ||
     !serialCli.includes('SERIAL_CLI_OUTPUT_CAPACITY = 2880') ||
@@ -556,7 +556,7 @@ if (!flashIoScratch.includes('FlashStoreTransaction') ||
 }
 if (!buzzer.includes('struct RtttlCatalog') ||
     !buzzer.includes('RtttlCatalog *rtttlCatalog') ||
-    !buzzer.includes('allocInternal(sizeof(RtttlCatalog), AllocationOwner::BUZZER)') ||
+    !buzzer.includes('allocInternal(sizeof(RtttlCatalog))') ||
     !buzzer.includes('RtttlNote rtttlBuf[BULLSEYE_RTTTL_MAX_NOTES]') ||
     !firmwareCore.includes('TaskMutex debugLogMutex') ||
     !firmwareCore.includes(

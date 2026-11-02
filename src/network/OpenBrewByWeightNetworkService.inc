@@ -48,7 +48,7 @@ bool OpenBrewByWeightNetwork::begin(const PersistedSettings &settings,
     return false;
   }
   workBuf_ = static_cast<NetworkWorkBuf *>(
-      allocExternal(sizeof(NetworkWorkBuf), AllocationOwner::NETWORK));
+      allocExternal(sizeof(NetworkWorkBuf)));
   if (workBuf_ == nullptr) {
     taskStopped_.reset();
     statusResponseMux_.reset();

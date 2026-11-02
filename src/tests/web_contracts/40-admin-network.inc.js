@@ -472,7 +472,7 @@ const networkWebhookBegin = network.indexOf('webhooks_.begin(settings.webhook)')
 const networkPassiveInit = [
   network.indexOf('xQueueCreate(WEB_COMMAND_QUEUE_LENGTH'),
   network.indexOf('xSemaphoreCreateMutex()'),
-  network.indexOf('allocExternal(sizeof(NetworkWorkBuf), AllocationOwner::NETWORK)'),
+  network.indexOf('allocExternal(sizeof(NetworkWorkBuf))'),
 ];
 if (networkWebhookBegin < 0 ||
     networkPassiveInit.some(index => index < 0 || index > networkWebhookBegin) ||
@@ -484,8 +484,8 @@ if (networkWebhookBegin < 0 ||
   throw new Error(
       'Network/Webhook initialization must acquire passive resources first and provide joined rollback');
 }
-if (!webhookSource.includes('allocInternal(queueStorageBytes, AllocationOwner::WEBHOOK)') ||
-    !webhookSource.includes('allocExternal(kWebhookPayloadCapacity, AllocationOwner::WEBHOOK)') ||
+if (!webhookSource.includes('allocInternal(queueStorageBytes)') ||
+    !webhookSource.includes('allocExternal(kWebhookPayloadCapacity)') ||
     !webhookSource.includes('xQueueCreateStatic') ||
     !webhookSource.includes('tskIDLE_PRIORITY') ||
     !webhookSource.includes('dispatchAllowed()') ||
@@ -717,7 +717,7 @@ if (sendJsonBody.indexOf('httpd_sess_trigger_close(') < sendJsonBody.indexOf('se
 }
 const otaSnapshotStart = network.indexOf('esp_err_t OpenBrewByWeightNetwork::sendOtaSnapshot(');
 const otaSnapshotBody = network.slice(otaSnapshotStart, network.indexOf('\n}\n', otaSnapshotStart));
-if (!otaSnapshotBody.includes('AllocationOwner::OTA') ||
+if (!otaSnapshotBody.includes('allocExternal(sizeof(workBuf_->otaJson))') ||
     otaSnapshotBody.indexOf('if (reply != nullptr) unlockWorkBuf();') >
         otaSnapshotBody.indexOf('sendJson(')) {
   throw new Error('sendOtaSnapshot must release the shared status lock before sending its private reply');

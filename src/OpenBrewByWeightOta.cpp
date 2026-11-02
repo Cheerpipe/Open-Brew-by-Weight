@@ -35,7 +35,7 @@ struct OtaChunkBuffer {
   uint8_t *bytes = nullptr;
 
   explicit OtaChunkBuffer(size_t capacity)
-      : bytes(static_cast<uint8_t *>(allocInternal(capacity, AllocationOwner::OTA))) {}
+      : bytes(static_cast<uint8_t *>(allocInternal(capacity))) {}
 
   ~OtaChunkBuffer() { heapCapsFree(bytes); }
 
@@ -697,7 +697,7 @@ bool OpenBrewByWeightOta::verifySessionSha256() {
 
 bool OpenBrewByWeightOta::startSessionSha256() {
   clearSessionSha256();
-  sessionSha256_.reset(allocInternal(sizeof(psa_hash_operation_t), AllocationOwner::OTA));
+  sessionSha256_.reset(allocInternal(sizeof(psa_hash_operation_t)));
   if (!sessionSha256_) return false;
   auto *hash = static_cast<psa_hash_operation_t *>(sessionSha256_.get());
   *hash = PSA_HASH_OPERATION_INIT;

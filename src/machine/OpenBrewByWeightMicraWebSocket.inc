@@ -521,7 +521,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     return;
   }
   if (!websocket_) {
-    auto *buffer = static_cast<WebSocketBuffer *>(allocExternal(sizeof(WebSocketBuffer), AllocationOwner::NETWORK));
+    auto *buffer = static_cast<WebSocketBuffer *>(allocExternal(sizeof(WebSocketBuffer)));
     if (!buffer) {
       TaskLockGuard lock(mux_);
       ++websocketStatus_.allocationFailures;

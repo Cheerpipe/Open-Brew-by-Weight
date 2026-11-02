@@ -11,6 +11,9 @@
 namespace {
 
 int failures = 0;
+// Failure-injection budget large enough that a probe never fails; the amount
+// it drops by is the number of allocations made.
+constexpr int32_t kAllocationProbe = 1000000;
 
 #define CHECK(condition)                                              \
   do {                                                                \
@@ -164,12 +167,11 @@ void testStringsEscapesAndInvalidDocuments() {
 // cJSON tolerates raw control characters; the stricter scanner must not hand
 // such a document over, or its trailing array escapes the value budget.
 void testMalformedDocumentCannotBypassValueBudget() {
-  const auto owner = static_cast<size_t>(openbrewbyweight::AllocationOwner::JSON);
-  const uint32_t before = openbrewbyweight::detail::g_allocations[owner].successes.load();
+  openbrewbyweight::detail::g_hostAllocationsUntilFailure.store(kAllocationProbe);
   const std::string body = "{\"a\":\"\t\",\"b\":" + repeatedArrayValues(400) + "}";
   CHECK(openbrewbyweight::parseJsonDocument(body.c_str()) == nullptr);
   CHECK(openbrewbyweight::parseJsonDocument("[01]") == nullptr);
-  CHECK(openbrewbyweight::detail::g_allocations[owner].successes.load() == before);
+  CHECK(openbrewbyweight::detail::g_hostAllocationsUntilFailure.exchange(-1) == kAllocationProbe);
   CHECK(!openbrewbyweight::jsonDocumentLimitRejectedRecently());
   CHECK(openbrewbyweight::parseJsonDocumentWithinLimits(
             repeatedArrayValues(8).c_str(), 2047, 8) == nullptr);
@@ -179,11 +181,11 @@ void testMalformedDocumentCannotBypassValueBudget() {
 void testAllocationFailureLeavesOtherDocumentsAlive() {
   cJSON *prior = openbrewbyweight::parseJsonDocument("{\"keep\":17}");
   CHECK(prior != nullptr);
-  const auto owner = static_cast<size_t>(openbrewbyweight::AllocationOwner::JSON);
-  const uint32_t before = openbrewbyweight::detail::g_allocations[owner].successes.load();
+  openbrewbyweight::detail::g_hostAllocationsUntilFailure.store(kAllocationProbe);
   cJSON *probe = openbrewbyweight::parseJsonDocument("{\"text\":\"escaped\\u00e9\",\"n\":[1,2]}");
   CHECK(probe != nullptr);
-  const uint32_t allocations = openbrewbyweight::detail::g_allocations[owner].successes.load() - before;
+  const uint32_t allocations = static_cast<uint32_t>(
+      kAllocationProbe - openbrewbyweight::detail::g_hostAllocationsUntilFailure.exchange(-1));
   cJSON_Delete(probe);
   CHECK(allocations > 0);
   for (uint32_t failAt = 0; failAt < allocations; ++failAt) {

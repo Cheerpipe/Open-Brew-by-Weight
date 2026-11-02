@@ -1069,7 +1069,7 @@ esp_err_t OpenBrewByWeightNetwork::sendOtaSnapshot(httpd_req_t *request,
   // OTA worker never holds httpd handlers for its network time. Without
   // PSRAM it falls back to sending from the shared buffer under the lock.
   char *const reply = static_cast<char *>(
-      allocExternal(sizeof(workBuf_->otaJson), AllocationOwner::OTA));
+      allocExternal(sizeof(workBuf_->otaJson)));
   if (!lockWorkBuf()) {
     heapCapsFree(reply);
     return workBufBusy(request);

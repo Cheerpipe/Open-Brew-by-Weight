@@ -811,7 +811,7 @@ class ScaleProfiler {
         workspace_ != nullptr) {
       if (index_ == nullptr) {
         index_ = static_cast<uint32_t *>(
-            allocExternal(SCALE_PROFILE_INDEX_BYTES, AllocationOwner::PROFILER));
+            allocExternal(SCALE_PROFILE_INDEX_BYTES));
       }
       if (index_ != nullptr) {
         buildIndexLocked_();
@@ -1386,7 +1386,7 @@ class ScaleProfiler {
         records_ != nullptr) {
       if (index_ == nullptr) {
         index_ = static_cast<uint32_t *>(
-            allocExternal(SCALE_PROFILE_INDEX_BYTES, AllocationOwner::PROFILER));
+            allocExternal(SCALE_PROFILE_INDEX_BYTES));
       }
       if (index_ != nullptr) {
         buildIndexLocked_();
@@ -1479,7 +1479,7 @@ class ScaleProfiler {
 
   bool allocateWorkspaceLocked_() {
     if (workspace_ != nullptr) return true;
-    void *block = allocExternal(sizeof(Workspace), AllocationOwner::PROFILER);
+    void *block = allocExternal(sizeof(Workspace));
     if (block == nullptr) return false;
     workspace_ = static_cast<Workspace *>(block);
     records_ = workspace_->records;

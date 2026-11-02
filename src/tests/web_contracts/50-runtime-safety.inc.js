@@ -517,10 +517,9 @@ if (!network.includes('staBssid') ||
   throw new Error('Associated AP BSSID must be exposed on status and WIFI_STATUS');
 }
 if (!serialCli.includes('workBufExternal=') ||
-    !serialCli.includes('jsonArenaExternal=') ||
-    !serialCli.includes('allocExternalFallback=')) {
+    !serialCli.includes('jsonArenaExternal=')) {
   throw new Error(
-      'Serial HEALTH must report WorkBuf/JSON arena placement and allocExternalFallback');
+      'Serial HEALTH must report WorkBuf/JSON arena placement');
 }
 if (!network.includes('WiFi.scanNetworks(true, false, false, 120)') ||
     !network.includes('esp_wifi_scan_stop()') ||

@@ -381,7 +381,6 @@ void publishControlStatus() {
 #else
   next.jsonArenaExternal = false;
 #endif
-  next.allocExternalFallbackCount = allocExternalFallbackCount();
   next.hwmon = hwmonSnapshot;
   next.scaleEventsDropped = scaleWorkerDroppedEventCount();
   next.config = effectiveRuntimeConfig();
@@ -847,7 +846,6 @@ void serialCliPrintLiveHealth() {
 #else
   dump.jsonArenaExternal = false;
 #endif
-  dump.allocExternalFallbackCount = allocExternalFallbackCount();
   dump.loopMaxGapMs = loopMaxGapMs;
   dump.healthIntervalMaxGapMs =
       healthIntervalMaxGapMs > loopIntervalGapMs ? healthIntervalMaxGapMs

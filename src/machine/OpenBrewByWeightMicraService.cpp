@@ -2752,7 +2752,7 @@ void OpenBrewByWeightMicraService::clearRequestState() {
 bool OpenBrewByWeightMicraService::ensureWorkBuffer() {
   if (work_ != nullptr) return true;
   work_ = static_cast<WorkBuffer *>(
-      allocExternal(sizeof(WorkBuffer), AllocationOwner::NETWORK));
+      allocExternal(sizeof(WorkBuffer)));
   if (work_ == nullptr) return false;
   new (work_) WorkBuffer{};
   return true;
@@ -2761,7 +2761,7 @@ bool OpenBrewByWeightMicraService::ensureWorkBuffer() {
 bool OpenBrewByWeightMicraService::ensureIoBuffer() {
   if (io_ != nullptr) return true;
   io_ = static_cast<IoBuffer *>(
-      allocExternal(sizeof(IoBuffer), AllocationOwner::NETWORK));
+      allocExternal(sizeof(IoBuffer)));
   if (io_ == nullptr) return false;
   new (io_) IoBuffer{};
   return true;

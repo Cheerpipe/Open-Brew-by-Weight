@@ -379,7 +379,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
   // httpd is the only allocator, so this check and store cannot race.
   if (g_companionWorkspace.load(std::memory_order_acquire) == nullptr) {
     auto *workspace = static_cast<CompanionWorkspace *>(
-        allocExternal(sizeof(CompanionWorkspace), AllocationOwner::NETWORK));
+        allocExternal(sizeof(CompanionWorkspace)));
     if (workspace == nullptr) {
       {
         TaskLockGuard lock(self.dataMux_);
@@ -400,7 +400,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
   // The archive's record sync state, kept once made; without the memory the
   // archive waits (said once in the Web UI log) and a later handshake retries.
   if (self.companionRecords_ == nullptr) {
-    if (void *memory = allocExternal(sizeof(CompanionRecords), AllocationOwner::NETWORK)) {
+    if (void *memory = allocExternal(sizeof(CompanionRecords))) {
       TaskLockGuard lock(self.dataMux_);
       self.companionRecords_ = new (memory) CompanionRecords{};
     } else {

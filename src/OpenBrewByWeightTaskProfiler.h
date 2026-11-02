@@ -491,7 +491,7 @@ class TaskProfiler {
     }
 #if defined(ARDUINO) && !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
     ActiveWorkspace *next = static_cast<ActiveWorkspace *>(
-        allocExternal(sizeof(ActiveWorkspace), AllocationOwner::PROFILER));
+        allocExternal(sizeof(ActiveWorkspace)));
     if (next == nullptr) {
       noteStartFailure_(TaskProfilerStopReason::ALLOCATION_FAILED);
       return false;
@@ -499,7 +499,7 @@ class TaskProfiler {
     memset(next, 0, sizeof(*next));
     // uxTaskGetSystemState writes its output while holding the kernel lock.
     next->capture = static_cast<TaskStatus_t *>(
-        allocInternal(sizeof(TaskStatus_t) * TASK_PROFILER_MAX_TRACKED, AllocationOwner::PROFILER));
+        allocInternal(sizeof(TaskStatus_t) * TASK_PROFILER_MAX_TRACKED));
     if (next->capture == nullptr) {
       heapCapsFree(next);
       noteStartFailure_(TaskProfilerStopReason::ALLOCATION_FAILED);

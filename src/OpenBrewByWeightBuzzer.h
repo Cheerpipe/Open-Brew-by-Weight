@@ -264,7 +264,7 @@ inline void LocalBuzzer::begin(uint8_t gpioPin) {
 #if OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER == 1
   if (rtttlCatalog == nullptr) {
     rtttlCatalog =
-        static_cast<RtttlCatalog *>(allocInternal(sizeof(RtttlCatalog), AllocationOwner::BUZZER));
+        static_cast<RtttlCatalog *>(allocInternal(sizeof(RtttlCatalog)));
   }
   if (rtttlCatalog == nullptr) {
     return;

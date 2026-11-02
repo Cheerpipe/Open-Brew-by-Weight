@@ -622,7 +622,7 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            "\"bleRuntimeLastResetReason\":%ld,"
            "\"bleRuntimeSyncGeneration\":%lu,\"bleRuntimeResetCount\":%lu,"
            "\"bleRuntimeHostStackMinWords\":%lu,\"workBufExternal\":%s,"
-           "\"jsonArenaExternal\":%s,\"allocExternalFallback\":%lu,"
+           "\"jsonArenaExternal\":%s,"
            "\"heapAlertLatched\":%s,"
            "\"stackAlertLatched\":%s,\"loopGapAlertLatched\":%s,"
            "\"cpuLoad5s\":%.2f,\"cpuLoad1m\":%.2f,\"cpuLoad5m\":%.2f,"
@@ -665,7 +665,6 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            static_cast<unsigned long>(c.bleRuntimeHostStackMinBytes),
            c.workBufExternal ? "true" : "false",
            c.jsonArenaExternal ? "true" : "false",
-           static_cast<unsigned long>(c.allocExternalFallbackCount),
            x.healthHeapAlertLatched ? "true" : "false",
            x.healthStackAlertLatched ? "true" : "false",
            x.healthLoopGapAlertLatched ? "true" : "false",

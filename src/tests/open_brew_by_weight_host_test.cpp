@@ -16096,7 +16096,6 @@ void sc15_status_printers_use_dump_views() {
   CHECK(serialTxContains("psramLargest=0"));
   CHECK(serialTxContains("workBufExternal=false"));
   CHECK(serialTxContains("jsonArenaExternal=false"));
-  CHECK(serialTxContains("allocExternalFallback=0"));
   CHECK(serialTxContains("stackNetwork=400"));
   CHECK(serialTxContains("cpuMhz=80"));
   CHECK(serialTxContains("flashReadMode=QIO"));
