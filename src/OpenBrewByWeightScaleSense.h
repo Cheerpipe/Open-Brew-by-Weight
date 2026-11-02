@@ -67,8 +67,8 @@ bool expirePostTareBaselineIfNeeded(float softwareZeroG = NAN) {
                         static_cast<uint32_t>(IdleTareReason::EFFECT_UNCONFIRMED));
   addDebugEvent(DebugCategory::SCALE,
                 DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT,
-                static_cast<int32_t>(session.id),
-                static_cast<int32_t>(session.config.postTareBaselineGraceMs));
+                overdueMs + static_cast<int32_t>(session.config.postTareBaselineGraceMs),
+                std::isfinite(softwareZeroG) ? weightToCentigrams(softwareZeroG) : INT32_MIN);
   return true;
 }
 

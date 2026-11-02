@@ -166,6 +166,18 @@ The calculated mass itself does not control brewing. The optional accessory
 retare requires a known cup reference but uses the added live weight, not the
 calculated mass, to qualify its one outside-shot tare.
 
+## In the Diagnostic log
+
+Every cup decision leaves a line in the Web UI log with the weight the scale
+showed at that moment: "cup placed", "cup lifted", or "cup kept: settled dip is
+the new zero" when letting go of a steadied cup does not count as a lift. A
+stopped shot reads "shot stopped: cup removed" with the weight and how long
+after the start it happened. The shot-start tare reports "scale tare confirmed"
+with the reading it accepted and how long the scale took, or a timeout line
+saying how long it waited and whether the shot is being measured from the
+weight before the tare (the software zero). Together these lines let you tell a
+real lift from a tare or a hand on the cup after the fact.
+
 ## Parameters
 
 | Setting | Default | Range / notes | Effect on the shot |

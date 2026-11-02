@@ -20291,8 +20291,45 @@ void tr09_hand_released_after_the_start_tare_is_not_a_lift() {
     }
     CHECK(debugEventExists(DebugCode::CUP_REMOVED_CONFIRMED) == (variant == 2));
     CHECK(session.active == (variant != 2));
+    CHECK(debugEventExists(DebugCode::CUP_PRESENCE_CHANGED,
+                           static_cast<int32_t>(variant == 2 ? CupPresenceEvent::REMOVED
+                                                             : CupPresenceEvent::REZEROED)));
     if (variant != 2) CHECK(fabsf(session.lastAcceptedWeightG) < 0.5f);
   }
+}
+
+void tr10_tare_and_cup_log_lines_carry_their_values() {
+  // Field diagnosis reads these lines alone: each prints the values it used.
+  const struct {
+    DebugCode code;
+    int32_t argument1, argument2;
+    const char *text;
+  } cases[] = {
+      {DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT, 2000, 3770,
+       "scale post-tare baseline timeout after 2000 ms, software zero 37.70g"},
+      {DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT, 4000, INT32_MIN,
+       "scale post-tare baseline timeout after 4000 ms, software zero none"},
+      {DebugCode::SCALE_TARE_BASELINE_CONFIRMED, -500, 120,
+       "scale tare confirmed at -5.00g after 120 ms"},
+      {DebugCode::CUP_REMOVED_CONFIRMED, -3770, 500,
+       "shot stopped: cup removed (-37.70g, 500 ms after start)"},
+      {DebugCode::CUP_PRESENCE_CHANGED, 1, 8000, "cup placed (80.00g)"},
+      {DebugCode::CUP_PRESENCE_CHANGED, 2, -24000, "cup lifted (-240.00g)"},
+      {DebugCode::CUP_PRESENCE_CHANGED, 3, -500,
+       "cup kept: settled dip is the new zero (-5.00g)"},
+  };
+  for (const auto &item : cases) {
+    DebugEvent event{};
+    event.code = item.code;
+    event.argument1 = item.argument1;
+    event.argument2 = item.argument2;
+    char message[128] = {};
+    formatDebugEventMessage(event, message, sizeof(message), FW_VERSION);
+    CHECK(strcmp(message, item.text) == 0);
+  }
+  tr06_combined_start_tare_opens_grace_at_completion();
+  CHECK(debugEventExists(DebugCode::SCALE_TARE_BASELINE_CONFIRMED));
+  CHECK(!debugEventExists(DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT));
 }
 
 // A 250 g cup sits untared on the scale when the shot starts and the start
@@ -25478,6 +25515,7 @@ const TestCase testCases[] = {
     {"TR07", tr07_tare_grace_waits_for_a_reading_after_the_write},
     {"TR08", tr08_rinse_before_the_start_tare_result_keeps_the_cup_untared},
     {"TR09", tr09_hand_released_after_the_start_tare_is_not_a_lift},
+    {"TR10", tr10_tare_and_cup_log_lines_carry_their_values},
     {"SK01", sk01_refused_start_releases_cup_hold},
     {"SK02", sk02_overload_stops_while_touch_is_held},
     {"SK03", sk03_late_zero_after_grace_releases_cup_hold},

@@ -909,6 +909,9 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     session.hasWeightAnchor = false;
     markShotCurveBreak();
   }
+  if (cupEvent != CupPresenceEvent::NONE)
+    addDebugEvent(DebugCategory::SCALE, DebugCode::CUP_PRESENCE_CHANGED,
+                  static_cast<int32_t>(cupEvent), weightToCentigrams(weight));
   if (cupEvent == CupPresenceEvent::PLACED) {
     scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, millis(),
                           connectionGeneration, packetSequence, weight,
@@ -1039,6 +1042,10 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
       scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_CONFIRMED,
                             millis(), connectionGeneration, captureSequence,
                             weight, session.appliedTareRequestId, 0);
+      addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_TARE_BASELINE_CONFIRMED,
+                    weightToCentigrams(weight),
+                    static_cast<int32_t>(millis() - (session.postTareBaselineDeadlineMs -
+                                                     session.config.postTareBaselineGraceMs)));
       return acceptWeightIntoTrajectory(weight, receivedAtMs, packetSequence);
     }
     rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_SLEW, weight,

@@ -2025,6 +2025,7 @@ enum class DebugCode : uint8_t {
   SCALE_SAMPLE_REJECTED_SLEW,
   SCALE_SAMPLE_REJECTED_RECOVERY,
   SCALE_SAMPLE_REJECTED_PRE_CYCLE,
+  // argument1: ms since the tare; argument2: software zero (cg), INT32_MIN if none.
   SCALE_POST_TARE_BASELINE_TIMEOUT,
   SCALE_STREAM_STALE,
   SCALE_CONTROL_SUSPENDED,
@@ -2107,11 +2108,15 @@ enum class DebugCode : uint8_t {
   // argument1: the software zero dropped (cg); argument2: coffee kept (cg).
   SCALE_LATE_TARE_RECOGNIZED,
   // argument1: the software zero restored (cg); argument2: shot weight (cg).
-  SCALE_LATE_TARE_UNDONE
+  SCALE_LATE_TARE_UNDONE,
+  // argument1: baseline weight (cg); argument2: ms since the tare.
+  SCALE_TARE_BASELINE_CONFIRMED,
+  // argument1: CupPresenceEvent; argument2: raw weight (cg).
+  CUP_PRESENCE_CHANGED
 };
 // Codes in use; a code appended above must move this (asserted after
 // debugCodeName).
-constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::SCALE_LATE_TARE_UNDONE) + 1U;
+constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::CUP_PRESENCE_CHANGED) + 1U;
 
 enum class ScheduledRestartCause : uint8_t {
   NONE = 0,
@@ -2510,6 +2515,8 @@ constexpr const char *debugCodeName(DebugCode code) {
     case DebugCode::BLE_LINK_PARAMS_OVERRIDDEN: return "scale link interval overridden";
     case DebugCode::SCALE_LATE_TARE_RECOGNIZED: return "late scale tare recognized";
     case DebugCode::SCALE_LATE_TARE_UNDONE: return "late scale tare was a cup lift";
+    case DebugCode::SCALE_TARE_BASELINE_CONFIRMED: return "scale tare confirmed";
+    case DebugCode::CUP_PRESENCE_CHANGED: return "cup presence changed";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2735,10 +2742,27 @@ inline bool formatScaleSampleDebugMessage(const DebugEvent &event, char *message
                debugCodeName(event.code), weightText, referenceText);
       return true;
     case DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT:
-      snprintf(message, capacity, "%s (cycle=%ld, graceMs=%ld)",
-               debugCodeName(event.code),
-               static_cast<long>(event.argument1),
-               static_cast<long>(event.argument2));
+      formatWeightCentigrams(event.argument2, weightText, sizeof(weightText));
+      snprintf(message, capacity, "%s after %ld ms, software zero %s",
+               debugCodeName(event.code), static_cast<long>(event.argument1),
+               event.argument2 == INT32_MIN ? "none" : weightText);
+      return true;
+    case DebugCode::SCALE_TARE_BASELINE_CONFIRMED:
+      formatWeightCentigrams(event.argument1, weightText, sizeof(weightText));
+      snprintf(message, capacity, "%s at %s after %ld ms", debugCodeName(event.code),
+               weightText, static_cast<long>(event.argument2));
+      return true;
+    case DebugCode::CUP_REMOVED_CONFIRMED:
+      formatWeightCentigrams(event.argument1, weightText, sizeof(weightText));
+      snprintf(message, capacity, "shot stopped: cup removed (%s, %ld ms after start)",
+               weightText, static_cast<long>(event.argument2));
+      return true;
+    case DebugCode::CUP_PRESENCE_CHANGED:
+      formatWeightCentigrams(event.argument2, weightText, sizeof(weightText));
+      snprintf(message, capacity, "%s (%s)",
+               event.argument1 == static_cast<int32_t>(CupPresenceEvent::PLACED) ? "cup placed"
+               : event.argument1 == static_cast<int32_t>(CupPresenceEvent::REMOVED) ? "cup lifted"
+               : "cup kept: settled dip is the new zero", weightText);
       return true;
     default:
       return false;
@@ -2899,9 +2923,6 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
       return true;
     case DebugCode::CUP_START_GUARD_BLOCKED:
       snprintf(message, capacity, "brew blocked: cup required");
-      return true;
-    case DebugCode::CUP_REMOVED_CONFIRMED:
-      snprintf(message, capacity, "shot stopped: cup removed");
       return true;
     case DebugCode::CYCLE_ENDED:
       snprintf(message, capacity, "cycle ended by %s",
