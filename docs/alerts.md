@@ -64,8 +64,8 @@ changed. On momentary machines, check the actual group and its state feedback.
 | **Manual without scale (BBW on)** | (buzzer builds) | ON / OFF | Warns on the local buzzer that Brew by weight cannot start normally because the scale is missing, including the first blocked attempt. See [No-scale BBW](settings/no-scale-bbw.md). |
 | **Scale connected** | ON (Buzzer only or Scale first) | ON / OFF | Rising RTTTL when a scale connects or reconnects. Always the local buzzer. |
 | **Blue light while connected** | ON | ON / OFF | Onboard light on GPIO 1: steady while a scale is connected, fast blink while it connects, slow blink when a connected scale stops sending weight. Independent of Sound alerts. |
-| **Fast-shot beeps** | Fast | Disabled / Slow / Medium / Fast / Rapid | Local-buzzer pulses while a fast shot continues past its target. Disabled when Play alerts on is Scale only. |
-| **Slow-shot beeps** | Fast | Same rates | Pulses while a shot runs past your shot time window. |
+| **Fast-shot beeps** | Fast | Disabled / Slow / Medium / Fast / Rapid | Local-buzzer pulses from the moment a fast shot would have stopped at the target but keeps going for its extra yield. Disabled when Play alerts on is Scale only. |
+| **Slow-shot beeps** | Fast | Same rates | Pulses from the moment a shot runs past your shot time window without having stopped. |
 | **Bullseye melody** | OFF | ON / OFF; Buzzer only | Plays the saved custom RTTTL tune once when a shot stopped by weight **On recipe** remains exactly at its target weight for at least 1 full second. Important alerts, such as a lost scale, interrupt the melody so you never miss them. The text is retained when disabled. |
 | **Custom RTTTL** | empty | Up to 500 ASCII characters / 250 notes | Editable once Bullseye melody is on; otherwise it stays visible and read-only. Bullseye melody and its tune are saved together: switching it on saves nothing until you paste a tune, and a valid tune then saves both by itself. A tune that isn't valid RTTTL is marked and neither is saved. |
 

@@ -237,7 +237,7 @@ inline int32_t cutLineDg(const Params &p, int32_t t) {
                      rampCurveTypeOf(p.slowCurve), p.slowCurveHardnessPct, true);
 }
 
-// EndReason of a weight cut = the segment of f that fired.
+// Segment of f at a line value: raised (13), target (3) or lowered (16).
 inline EndReason cutReason(const Params &p, int32_t lineDg) {
   if (lineDg > p.goalDg) return EndReason::FAST_EXTRACTION_MAX_WEIGHT;
   if (lineDg < p.goalDg) return EndReason::SLOW_EXTRACTION_MIN_WEIGHT;
@@ -438,6 +438,15 @@ inline bool crossingMs(const Params &p, int32_t tk, int32_t weightDgAtK,
 // Backstop direct-law threshold (no prediction lead).
 inline int32_t backstopThresholdDg(const Params &p, int32_t t, int32_t offsetDg) {
   return cutLineDg(p, t) - offsetDg;
+}
+
+// The cut law against the flat target at a sample: weight plus in-flight lead
+// (when the rate predicts) plus drip offset reaches the target.
+inline bool targetCutDue(const Params &p, int32_t weightDg, int32_t rateX100,
+                         int32_t tau, int32_t offsetDg) {
+  const int32_t lead =
+      rateX100 < MIN_PREDICTION_RATE_X100 ? 0 : leadDg(rateX100, tau);
+  return weightDg + lead + offsetDg >= p.goalDg;
 }
 
 enum class Verdict : uint8_t { ON_RECIPE = 0, FAST = 1, SLOW = 2, UNCLASSIFIED = 3 };

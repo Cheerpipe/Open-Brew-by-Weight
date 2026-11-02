@@ -221,9 +221,14 @@ guaranteed yield.
 ## Alerts
 
 With a local buzzer, **Settings → Shared settings → Alerts → Fast-shot beeps**
-pulses while a fast shot continues past its target, and **Slow-shot beeps**
-pulses while a slow shot is being stopped sooner. The **Bullseye melody** plays only
-after an On recipe shot. See [Alerts](../alerts.md).
+pulses from the moment a fast shot would have stopped at the target but keeps
+going for its extra yield, and **Slow-shot beeps** pulse from the moment a shot
+runs past the window without having stopped. That same moment is where the
+shot's weight takes the fast or slow color on its chart and what makes the shot
+count as extended in its history, so the beeps, the chart and the card always
+agree. A shot that is only slightly early may give just one short beep before
+it stops. The **Bullseye melody** plays only after an On recipe shot. See
+[Alerts](../alerts.md).
 
 Related: [Brew by weight](brew-by-weight.md), [Presets](presets.md),
 [Shot history](shot-history.md).
