@@ -168,8 +168,8 @@ companion's authenticated `hello`.
 The companion opens the link only while a feature needs it: the [relay
 handshake](#relay) answers `link` (`true` on Linea Micra builds with the La
 Marzocco switch on, and on every build while the **Diagnostic log through the
-companion** or the **Shot archive in the companion** switch is on). A
-companion that finds no relay route (an older controller) opens it as before.
+companion** or the **Shot archive in the companion** switch is on). While the
+relay handshake fails, the companion keeps the link open.
 
 `GET /api/v1/companion/link` upgrades to a WebSocket. Only text frames are
 used, each at most 4,096 bytes including a signed frame's MAC prefix, except
@@ -222,7 +222,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 
 | Frame | Meaning |
 | --- | --- |
-| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true,"archive":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true,"archive":true}`. Sent after `ready` and on every change. A `cfg` without `archive` comes from a controller older than the archive |
+| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true,"archive":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true,"archive":true}`. Sent after `ready` and on every change |
 | `{"t":"dev","name":"Kitchen","id":"AA:BB:CC:DD:EE:FF"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address, and its stable device id (the webhook's `deviceId`), the log store's key. Up to 32 bytes of letters, digits, spaces and hyphens, empty while no name is published yet. Sent first after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
@@ -400,10 +400,9 @@ infers ratings, deletions and restarted histories from the index.
   in `gone` that the index no longer lists is deleted from the companion's
   current history even below the controller's oldest id; an id at or above
   the oldest that the index no longer lists is a deletion too, and one below
-  it that `gone` does not name rotated out and stays. Both members are
-  additive: an older companion ignores them and infers as before, and a
-  companion that finds no `clr` treats a fall of `next` as a restarted
-  history, keeping its copy. After more than 16 deletions below the oldest
+  it that `gone` does not name rotated out and stays. The companion treats
+  an index without `gen`, `next`, `clr` or `gone` as malformed. After more
+  than 16 deletions below the oldest
   while the companion is away, the earlier ones read as rotation.
 
   ```json
@@ -411,8 +410,7 @@ infers ratings, deletions and restarted histories from the index.
   ```
 
 - **Index deltas.** The companion sends `d:1` only after an index answer in
-  the same link session carried `sum`, so a controller without deltas never
-  sees `d`. The controller keeps, per store, the index this link session last
+  the same link session listed the index. The controller keeps, per store, the index this link session last
   received (its baseline, recorded once the frame actually left, in PSRAM).
   With `d`, an `rx` whose `ep` is that baseline's epoch gets the difference
   instead of `rows` whenever that is smaller than the whole index:
