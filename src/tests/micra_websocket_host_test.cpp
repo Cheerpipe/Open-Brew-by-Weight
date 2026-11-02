@@ -1935,6 +1935,27 @@ struct MicraWebSocketTest {
     assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
     finish(service);
   }
+  // During a sync hold (a shot) the companion does not ping and the route
+  // trusts it; the 30 s limit counts again from the hold's end.
+  static void companionSyncHoldSilence() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    direct(service);
+    link(service);
+    route(service);
+    service.companionPing(true);
+    service.companionSyncHold(true);
+    now += 240000;  // a long shot without a single ping
+    assert(service.serviceCompanion());
+    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    service.companionSyncHold(false);
+    now += 29999;
+    assert(service.serviceCompanion());
+    now += 1;
+    assert(!service.serviceCompanion());
+    assert(std::strcmp(service.companionRouteStatus().reason, "ping_missing") == 0);
+    finish(service);
+  }
   static void companionLossesAndFlapping() {
     now = 1000;
     OpenBrewByWeightMicraService service;
@@ -2194,6 +2215,7 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::companionFailover();
   openbrewbyweight::MicraWebSocketTest::companionUpstreamRefusal();
   openbrewbyweight::MicraWebSocketTest::companionLossesAndFlapping();
+  openbrewbyweight::MicraWebSocketTest::companionSyncHoldSilence();
   openbrewbyweight::MicraWebSocketTest::companionBasisLoss();
   openbrewbyweight::MicraWebSocketTest::companionCommands();
   openbrewbyweight::MicraWebSocketTest::companionConcurrentFeed();

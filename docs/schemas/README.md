@@ -119,19 +119,29 @@ Versioning:
   text after the MAC and the dot, `q` kept. Cases: both indexes (with rows
   and `sum`, and unchanged; the shots index lists the bad shot), a Stats
   fetch paged over two frames, a History fetch, traces `ok`/`none`/`busy`,
-  `rs`, the ping's `hold` answer and, last, the store moved (a new shot, a
-  rating change and a deletion): a shots index delta (`rx` with `d`) against
-  the first case and the two one-shot fetch windows the companion's archive
-  then asks. The senders, the row formatter, the trace frame and the
-  sealer are the firmware's own; the store, its curves and the trace bytes
-  are fixtures, and the MAC is zeros (the link vectors cover it).
+  `rs`, the ping's `hold` answer (with both store epochs), the `page_*`
+  cases and, last, the store moved (a new shot, a rating change and a
+  deletion): a shots index delta (`rx` with `d`) against the first case and
+  the two one-shot fetch windows the companion's archive then asks. The
+  `page_*` cases are a screen's own Stats and History pages over the same
+  records (`request` is the ui-stream op, with `active`, the active preset,
+  and for a fetch `view`, whether the screen holds Stats): date and rating
+  orders both ways, result, preset, bad and scale filters, windows 10, 50
+  and 100, another active preset, a scrolled page, an export window over two
+  frames, Home's rows-only fetch, and History in both orders, by type and as
+  a fetch. The companion's replica must serve each frame for frame, every
+  member but `tag`, `seq` and `request`. The senders, the row formatter, the
+  header, the trace frame and the sealer are the firmware's own; the store,
+  its curves and the trace bytes are fixtures (the History store pages as
+  `HistoryLog::copyPage` does), and the MAC is zeros (the link vectors cover
+  it).
 - Regenerate after a deliberate frame change with
   `COMPANION_RECORDS_REGENERATE=1 node src/tests/check_web_assets.js`, then
   update the companion's copy. SHA-256 of the current file:
-  `a285700c7ecc4e33b664d05e21186fc62a76e546baf472fed9c5579c9493a63c`.
+  `bf6e49994641a7975933f8c4370012ab4b36023648433c8910776287c931a0f4`.
 - Produced and checked byte for byte by the web contract
   `src/tests/web_contracts/27-companion-records-vectors.inc.js`; replayed by
-  the companion's sync tests.
+  the companion's sync and replica tests.
 
 ## Formats written for other apps
 

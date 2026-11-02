@@ -20,7 +20,10 @@
 
 namespace openbrewbyweight {
 
-constexpr uint32_t COMPANION_PROTOCOL = 1;
+// Pairing and the relay handshake stay at 1, so a controller and companion
+// of different releases keep the Web UI relay (and OTA through it); only the
+// link refuses a hello of another version (`PROTOCOL`).
+constexpr uint32_t COMPANION_PROTOCOL = 1, COMPANION_LINK_PROTOCOL = 2;
 constexpr uint32_t COMPANION_REQUEST_MS = 600000;
 constexpr uint32_t COMPANION_NEW_REQUEST_MS = 5000;
 constexpr uint8_t COMPANION_CODE_ATTEMPTS = 3;
@@ -731,7 +734,8 @@ enum class CompanionHello : uint8_t { CHALLENGE, NOT_PAIRED, PROTOCOL, ERASE };
 inline CompanionHello companionHelloVerdict(const CompanionStored &stored, const char *id,
                                             double protocol) {
   if (stored.paired && strcmp(stored.id, id) == 0)
-    return protocol == COMPANION_PROTOCOL ? CompanionHello::CHALLENGE : CompanionHello::PROTOCOL;
+    return protocol == COMPANION_LINK_PROTOCOL ? CompanionHello::CHALLENGE
+                                               : CompanionHello::PROTOCOL;
   if (stored.forgotten && strcmp(stored.forgottenId, id) == 0) return CompanionHello::ERASE;
   return CompanionHello::NOT_PAIRED;
 }
@@ -754,6 +758,7 @@ struct CompanionLinkSlot {
   // whole snapshot.
   bool snapshotSent = false, sentUi = true, sentLog = true, sentArchive = true;
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
+  bool sentSync = false;  // the sync hold the last `hold` frame carried
   bool deviceSent = false;  // this session's `dev` frame
   char sentDeviceName[DEVICE_NAME_CAPACITY] = {};  // the name it carried
   // Diagnostic log stream (plan 2B). httpd records the companion's `logsub`
@@ -833,7 +838,7 @@ constexpr size_t COMPANION_RECORD_ORIGIN = 72;
 static_assert(COMPANION_MAC_HEX + 1 + sizeof("{\"q\":4294967295,\"t\":\"rec\",\"f\":") - 1 <=
                   COMPANION_RECORD_ORIGIN,
               "the reserved prefix holds the MAC, the sequence and the rec wrapper");
-constexpr uint32_t COMPANION_NOTICE_SETTLE_MS = 30000;
+constexpr uint32_t COMPANION_NOTICE_COALESCE_MS = 1000;
 constexpr uint32_t COMPANION_FETCH_OFFSET_MAX = 1000, COMPANION_FETCH_SHOTS_MAX = 50,
                    COMPANION_FETCH_HISTORY_MAX = 120;
 
@@ -939,15 +944,16 @@ struct CompanionBase64Stream {
 };
 
 // Whether the store-epoch notice (`rs`) goes now: the companion asked in this
-// session (an `rx`), the epochs moved from what it was last told and then held
-// still for COMPANION_NOTICE_SETTLE_MS (the record and its trace are saved by
-// then), the gate is open (no hold, no shot, flash writes allowed), and a
-// frame arrived since the last flush, so the notice rides the companion's
-// ping and adds no radio wakeup of its own.
-inline bool companionNoticeDue(bool subscribed, bool moved, uint32_t stillMs, bool gateOpen,
-                               bool heardSinceFlush) {
-  return subscribed && moved && gateOpen && heardSinceFlush &&
-         stillMs >= COMPANION_NOTICE_SETTLE_MS;
+// session (an `rx`), the epochs moved from what it was last told, the change
+// is committed (records, curves and the shot's trace saved), and the gate is
+// open (no sync hold: never during a shot). A change made across a hold (a
+// shot) goes the moment it is committed, since a later wakeup could fall
+// into the next shot; any other change coalesces for
+// COMPANION_NOTICE_COALESCE_MS.
+inline bool companionNoticeDue(bool subscribed, bool moved, bool committed, bool gateOpen,
+                               bool afterHold, uint32_t stillMs) {
+  return subscribed && moved && committed && gateOpen &&
+         (afterHold || stillMs >= COMPANION_NOTICE_COALESCE_MS);
 }
 
 // Whether httpd drops send-job body `index` because a sync hold began after
@@ -1004,6 +1010,15 @@ struct CompanionSnapshot {
 inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, MicraCompanionRoute route) {
   return slot.phase != CompanionLinkPhase::READY ? 10000U
          : route == MicraCompanionRoute::COMPANION ? 35000U : 250000U;
+}
+
+// Whether an open slot went silent. During a sync hold both sides trust the
+// link: the companion stops pinging, so an authenticated link's silence
+// restarts from the hold's end, when the companion pings at once.
+inline bool companionLinkSilent(CompanionLinkSlot &slot, MicraCompanionRoute route, uint32_t now,
+                                bool syncHold) {
+  if (syncHold && slot.phase == CompanionLinkPhase::READY) slot.heardAtMs = now;
+  return now - slot.heardAtMs >= companionSilenceLimitMs(slot, route);
 }
 
 // Seconds since the link came up or went down; -1 before either since boot.

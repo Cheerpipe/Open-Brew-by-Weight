@@ -69,6 +69,7 @@ class OpenBrewByWeightMicraService {
   // HTTP or network task; each takes mux_ briefly and never logs under it.
   void companionLink(bool ready, bool lmSwitch);
   void companionPing(bool upstreamAlive);
+  void companionSyncHold(bool on);
   void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS,
                          bool refused = false);
   void companionCredentials(uint32_t generation, bool ok);
@@ -311,6 +312,7 @@ class OpenBrewByWeightMicraService {
     uint16_t resultHttp = 0;
     uint8_t nextIntent = 0, nextLoss = 0, lossCount = 0;
     bool lmSwitch = false, up = false, resultAccepted = false, flapping = false;
+    bool syncHold = false;  // the companion is silent: no ping to miss
     bool release = false;  // the cloud worker frees the direct session once per switch
   } companion_;
   // Lock-free mirrors: no link means the cloud task skips the route entirely,

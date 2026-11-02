@@ -244,6 +244,8 @@ struct NetworkBridgeCallbacks {
   ShotTraceRead (*copyShotStorage)(ShotStorageStats &out, uint32_t *tags, size_t capacity) =
       nullptr;
   bool (*shotLogSavePending)() = nullptr;
+  // A record, curve or shot trace not saved yet (the companion's `rs` waits).
+  bool (*recordStoresSavePending)() = nullptr;
   void (*copyHistoryPage)(HistoryPage &page, size_t offset, size_t limit,
                           ShotLogSortDir dir, uint8_t types) = nullptr;
   // Cheap change epoch (store header digest) so idle dispatches skip the
@@ -529,8 +531,11 @@ class OpenBrewByWeightNetwork {
     bool trace = false;       // a trace request waits
     uint32_t traceId = 0, traceBoot = 0, traceEnd = 0;
     // Epochs the companion was told (its index or `rs`), the latest seen and
-    // when they last moved (the notice's settle).
+    // when they last moved (the notice's coalescing); whether a sync hold
+    // came since the last `rs` (a shot's notice does not coalesce) and
+    // whether one is due now.
     uint32_t toldShots = 0, toldHistory = 0, seenShots = 0, seenHistory = 0, movedAtMs = 0;
+    bool heldSinceTold = false, noticeDue = false;
     uint32_t sentAtMs = 0;  // the last `rec`/`trc` frame; 0: none this boot
   };
   CompanionRecords *companionRecords_ = nullptr;
@@ -1092,8 +1097,8 @@ class OpenBrewByWeightNetwork {
     return companionRecords_ != nullptr && &session == &companionRecords_->session;
   }
   bool companionLinkRecordRequest(CompanionLinkSlot &slot, cJSON *frame, const char *type);
-  void companionRecordsService(uint32_t now);
-  bool companionRecordsNoticeBody(uint8_t &count, bool heard, uint32_t (&told)[2]);
+  void companionRecordsService(uint32_t now, bool syncHold);
+  bool companionRecordsNoticeBody(uint8_t &count, bool syncHold, uint32_t (&told)[2]);
   static void companionRecordsWork(void *context);
   bool companionRecordsSend(size_t used, bool wrap, bool &deferArm);
   bool companionTraceFrame();
@@ -1110,6 +1115,7 @@ class OpenBrewByWeightNetwork {
   std::atomic<bool> companionAwake_{false};
   uint32_t companionRetryAtMs_ = 0;  // 0 = no failed save waiting
   uint32_t companionLruAtMs_ = 0;  // network task: the last LRU refresh queued
+  bool companionSyncHeld_ = false;  // network task: the sync hold the route last heard
   // This boot's id, captured once for the link's log frames (network task).
   uint32_t companionLogBootId_ = 0;
   bool diagnosticPageEnabled();

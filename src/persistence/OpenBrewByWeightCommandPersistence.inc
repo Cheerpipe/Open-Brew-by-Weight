@@ -74,6 +74,13 @@ bool shotLogSavePending() {
   return shotLog.dirty() || shotCurvesSavePending();
 }
 
+// Both stores, the curves and a finished shot's trace (the companion's `rs`).
+bool recordStoresSavePending() {
+  if (shotTrace().unsavedCount() != 0) return true;
+  TaskLockGuard lock(shotStoreMutex);
+  return shotLog.dirty() || historyLog.dirty() || shotCurvesSavePending();
+}
+
 void copyHistoryPage(HistoryPage &page, size_t offset, size_t limit,
                      ShotLogSortDir dir, uint8_t types) {
   const uint32_t lockStartedUs = micros();

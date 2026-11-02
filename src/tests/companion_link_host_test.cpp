@@ -763,9 +763,12 @@ static void testPairing() {
                              now + 60000) == CompanionPairResult::ALREADY_PAIRED);
 
   // Hello verdicts, then Forget leaves {id, secret} for the signed erase.
-  CHECK(companionHelloVerdict(stored, kCompanionId, 1) == CompanionHello::CHALLENGE);
-  CHECK(companionHelloVerdict(stored, kCompanionId, 2) == CompanionHello::PROTOCOL);
-  CHECK(companionHelloVerdict(stored, kOtherId, 1) == CompanionHello::NOT_PAIRED);
+  // The link is version 2 (the record cache); pairing and the relay stay 1,
+  // so a companion of the previous release still relays the Web UI.
+  CHECK(COMPANION_LINK_PROTOCOL == 2 && COMPANION_PROTOCOL == 1);
+  CHECK(companionHelloVerdict(stored, kCompanionId, 2) == CompanionHello::CHALLENGE);
+  CHECK(companionHelloVerdict(stored, kCompanionId, 1) == CompanionHello::PROTOCOL);
+  CHECK(companionHelloVerdict(stored, kOtherId, 2) == CompanionHello::NOT_PAIRED);
   CHECK(companionForget(stored) && !companionForget(stored));
   CHECK(stored.paired == 0 && stored.secret[0] == 0 && stored.id[0] == '\0' &&
         stored.forgotten == 1 && stored.forgottenSecret[0] == 0x5A);
@@ -780,7 +783,7 @@ static void testPairing() {
   companionPairComplete(next, stored, secret);
   CHECK(stored.paired == 1 && stored.forgotten == 1 &&
         companionHelloVerdict(stored, kCompanionId, 1) == CompanionHello::ERASE &&
-        companionHelloVerdict(stored, kOtherId, 1) == CompanionHello::CHALLENGE);
+        companionHelloVerdict(stored, kOtherId, 2) == CompanionHello::CHALLENGE);
 
   // The ignore list keeps the newest ids.
   CompanionPairing many;
@@ -992,12 +995,18 @@ static void testSyncBodiesHeld() {
 }
 
 static void testNoticeDue() {
-  CHECK(companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS, true, true));
-  CHECK(!companionNoticeDue(false, true, COMPANION_NOTICE_SETTLE_MS, true, true));  // no rx yet
-  CHECK(!companionNoticeDue(true, false, COMPANION_NOTICE_SETTLE_MS, true, true));  // nothing moved
-  CHECK(!companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS - 1, true, true));
-  CHECK(!companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS, false, true));  // hold or shot
-  CHECK(!companionNoticeDue(true, true, COMPANION_NOTICE_SETTLE_MS, true, false));  // no ping since
+  // (subscribed, moved, committed, gateOpen, afterHold, stillMs)
+  CHECK(companionNoticeDue(true, true, true, true, false, COMPANION_NOTICE_COALESCE_MS));
+  CHECK(COMPANION_NOTICE_COALESCE_MS == 1000);
+  CHECK(!companionNoticeDue(false, true, true, true, true, 60000));  // no rx yet
+  CHECK(!companionNoticeDue(true, false, true, true, true, 60000));  // nothing moved
+  CHECK(!companionNoticeDue(true, true, false, true, true, 60000));  // record or trace not saved
+  CHECK(!companionNoticeDue(true, true, true, false, true, 60000));  // a sync hold: a shot
+  // Outside a shot, changes coalesce for a second (a run of ratings).
+  CHECK(!companionNoticeDue(true, true, true, true, false, COMPANION_NOTICE_COALESCE_MS - 1));
+  // A shot's notice leaves the moment it is committed after the hold: no
+  // settle, no waiting for a ping (the 30 s settle and heartbeat are gone).
+  CHECK(companionNoticeDue(true, true, true, true, true, 0));
 }
 
 static void testLogFlushDue() {
@@ -1056,6 +1065,20 @@ static void testLiveness() {
   const uint32_t now = 500000;
   slot.heardAtMs = now - 100000;
   CHECK(now - slot.heardAtMs < companionSilenceLimitMs(slot, MicraCompanionRoute::PENDING));
+  // A long shot: the companion stops pinging at the hold and the link is
+  // trusted throughout; its silence counts again only from the hold's end,
+  // so the companion's first ping after it is the one that must arrive.
+  slot.heardAtMs = now;
+  uint32_t at = now;
+  for (; at <= now + 600000; at += 1000)
+    CHECK(!companionLinkSilent(slot, MicraCompanionRoute::COMPANION, at, true));
+  at -= 1000;  // the hold's last pass
+  CHECK(!companionLinkSilent(slot, MicraCompanionRoute::COMPANION, at + 34999, false));
+  CHECK(companionLinkSilent(slot, MicraCompanionRoute::COMPANION, at + 35000, false));
+  // An opening link keeps its 10 s handshake limit through a hold.
+  CompanionLinkSlot opening;
+  opening.heardAtMs = now;
+  CHECK(companionLinkSilent(opening, MicraCompanionRoute::DIRECT, now + 10000, true));
   // "Since" covers both states, and is unknown until the first change.
   CompanionState state;
   CHECK(companionLinkAgeS(state, now) == -1);

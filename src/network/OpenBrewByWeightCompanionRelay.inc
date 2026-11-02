@@ -61,7 +61,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
   {
     TaskLockGuard lock(self.dataMux_);
     CompanionRelay &relay = g_companion.relay;
-    verdict = companionHelloVerdict(g_companion.stored, id, COMPANION_PROTOCOL);
+    verdict = companionHelloVerdict(g_companion.stored, id, COMPANION_LINK_PROTOCOL);
     if (verdict == CompanionHello::CHALLENGE && !relay.challengeSet) {
       esp_fill_random(relay.challenge, sizeof(relay.challenge));
       relay.challengeSet = true;

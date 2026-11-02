@@ -1,9 +1,13 @@
 // The companion archive's link frames (plan 2A, X1), built by the firmware's
 // own code: the record index, History and Stats senders (the fetch-only link
 // session), the Stats row formatter, the trace frame, the in-place sealer and
-// the format strings of the `rs` notice and the ping's hold answer. They are
-// pinned in docs/schemas/companion-records-v1.vectors.json, which the
-// companion's sync tests replay; COMPANION_RECORDS_REGENERATE=1 rewrites it.
+// the format strings of the `rs` notice and the ping's hold answer. The
+// `page_*` cases are the same senders on a browser's session: the Stats and
+// History pages (sorts, filters, windows, paging, export and Home's fetch)
+// the companion's replica must serve frame for frame over the same records
+// (every member but its own tag, seq and request). They are pinned in
+// docs/schemas/companion-records-v1.vectors.json, which the companion's sync
+// and serving tests replay; COMPANION_RECORDS_REGENERATE=1 rewrites it.
 {
   const assert = require('assert').strict, {spawnSync} = require('child_process'), zlib = require('zlib');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
@@ -37,7 +41,8 @@
   // The bodies the controller sends outside a record frame, as its code
   // spells them (a changed format string changes the vectors).
   const rsFormat = line(recordsWork, /"\\"t\\":\\"rs\\",[^\n]*?}"/);
-  const holdFormat = line(companion, /"\\"t\\":\\"hold\\",\\"on\\":%s,\\"sync\\":false}"/);
+  const holdFormat = line(companion,
+      /"\\"t\\":\\"hold\\",\\"on\\":%s,\\"sync\\":false,\\"sh\\":%lu,\\"hi\\":%lu}"/);
   const native = String.raw`
 #include <cassert>
 #include <atomic>
@@ -145,21 +150,29 @@ ShotCurveRead curveById(uint32_t id, ShotCurveRecord &curve, bool) {
     appendShotCurvePoint(curve, static_cast<int16_t>(k * 120 + id), 900 + k * 250, k == 3);
   return ShotCurveRead::FOUND;
 }
-void historyPage(HistoryPage &page, size_t offset, size_t limit, ShotLogSortDir, uint8_t) {
-  page.total = kActivations;
-  page.start = offset;
-  page.count = offset < kActivations ? std::min(limit, kActivations - offset) : 0;
-  page.hasMore = offset + page.count < kActivations;
-  for (size_t i = 0; i < page.count; ++i) {
-    HistoryRecord &r = page.records[i];
-    r = {};
-    r.id = static_cast<uint32_t>(kActivations - offset - i);
-    r.type = static_cast<uint8_t>(r.id % 3);
-    r.durationDs = static_cast<uint16_t>(40 + r.id * 11);
-    r.flags = r.id == 2 ? 0 : HISTORY_FLAG_WALL_TIME;
-    r.endedAtUnixSec = r.flags ? 1793000000 + r.id * 900 : 0;
-    r.endedAtLocalSec = r.flags ? r.endedAtUnixSec - 10800 : 0;
+HistoryRecord activationAt(uint32_t id) {
+  HistoryRecord r = {};
+  r.id = id;
+  r.type = static_cast<uint8_t>(id % 3);
+  r.durationDs = static_cast<uint16_t>(40 + id * 11);
+  r.flags = static_cast<uint8_t>((id == 2 ? 0 : HISTORY_FLAG_WALL_TIME) |
+                                 (id == 4 ? HISTORY_FLAG_NO_WEIGHT : 0));
+  r.endedAtUnixSec = r.flags & HISTORY_FLAG_WALL_TIME ? 1793000000 + id * 900 : 0;
+  r.endedAtLocalSec = r.endedAtUnixSec ? r.endedAtUnixSec - 10800 : 0;
+  return r;
+}
+// HistoryLog::copyPage over the fixture's activations (ids 1 oldest .. 5).
+void historyPage(HistoryPage &page, size_t offset, size_t limit, ShotLogSortDir dir, uint8_t types) {
+  page.total = page.count = 0;
+  for (size_t step = 0; step < kActivations; ++step) {
+    const HistoryRecord r = activationAt(static_cast<uint32_t>(
+        dir == ShotLogSortDir::Desc ? kActivations - step : step + 1));
+    if (types && !((types >> r.type) & 1U)) continue;
+    if (page.total >= offset && page.count < limit) page.records[page.count++] = r;
+    ++page.total;
   }
+  page.start = offset < page.total ? offset : page.total;
+  page.hasMore = page.start + page.count < page.total;
 }
 // Trace 1 is a deterministic 5,000-byte record (two chunks); 2 has none, 3 is busy.
 ShotTraceRead streamTrace(uint32_t id, uint32_t, uint32_t, uint32_t, uint8_t *chunk, size_t capacity,
@@ -300,8 +313,81 @@ int main() {
   snprintf(body, sizeof(body), ${rsFormat}, static_cast<unsigned long>(kShotsEpoch),
            static_cast<unsigned long>(kHistoryEpoch));
   drain("notice", [&] { static bool done; return !done && (plain(body), done = true); });
-  snprintf(body, sizeof(body), ${holdFormat}, "false");
+  snprintf(body, sizeof(body), ${holdFormat}, "false", static_cast<unsigned long>(kShotsEpoch),
+           static_cast<unsigned long>(kHistoryEpoch));
   drain("ping_answer", [&] { static bool done; return !done && (plain(body), done = true); });
+  // Browser pages (a screen's own session): what the companion's replica
+  // serves from the same records. Each case starts a fresh session.
+  auto &screen = network.uiStreams_[0];
+  auto fresh = [&] {
+    screen = OpenBrewByWeightNetwork::UiStreamSession{};
+    snprintf(screen.clientId, sizeof(screen.clientId), "owner");
+  };
+  auto stats = [&](const char *name, size_t offset, size_t limit, ShotLogSort sort, ShotLogSortDir dir,
+                   ShotListFilter filter, size_t window, uint8_t active) {
+    fresh();
+    control.bbwPresetId = active;
+    screen.statsOn = true;
+    screen.statsOffset = offset;
+    screen.statsLimit = limit;
+    screen.statsSort = sort;
+    screen.statsDir = dir;
+    screen.statsFilter = filter;
+    screen.statsWindow = window;
+    screen.statsRequest = 1;
+    drain(name, [&] { network.sendStatsStream(screen, control); return screen.statsPaging; });
+  };
+  ShotListFilter none, fast, presetBad, lunar, bad;
+  fast.results = 1U << 1;
+  presetBad.presetCount = 1;
+  presetBad.presets[0] = 2;
+  presetBad.includeBad = true;
+  lunar.scaleCount = 1;
+  lunar.scales[0] = shotLogScaleKey(shotAt(1));
+  bad.includeBad = true;
+  stats("page_stats", 0, 10, ShotLogSort::Date, ShotLogSortDir::Desc, none, 10, 1);
+  stats("page_stats_rating_asc", 2, 5, ShotLogSort::Rating, ShotLogSortDir::Asc, none, 10, 1);
+  stats("page_stats_fast_window_50", 0, 10, ShotLogSort::Date, ShotLogSortDir::Desc, fast, 50, 1);
+  stats("page_stats_preset_bad", 0, 10, ShotLogSort::Rating, ShotLogSortDir::Desc, presetBad, 10, 1);
+  stats("page_stats_scale", 0, 10, ShotLogSort::Date, ShotLogSortDir::Asc, lunar, 100, 1);
+  stats("page_stats_active_2", 0, 10, ShotLogSort::Date, ShotLogSortDir::Desc, none, 10, 2);
+  stats("page_stats_scroll", 10, 10, ShotLogSort::Date, ShotLogSortDir::Desc, none, 10, 1);
+  // Fetches: a scroll or export window on a screen holding Stats (its header
+  // follows the fetch's window) and Home's rows-only hero fetch.
+  auto statsFetch = [&](const char *name, bool view, size_t offset, size_t limit, ShotListFilter filter,
+                        size_t window) {
+    fresh();
+    control.bbwPresetId = 1;
+    screen.statsOn = view;
+    screen.statsResync = false;
+    screen.statsBoot = kBoot;
+    screen.statsFetch = true;
+    screen.statsFetchOffset = offset;
+    screen.statsFetchLimit = limit;
+    screen.statsFetchFilter = filter;
+    screen.statsFetchWindow = window;
+    screen.statsFetchRequest = 3;
+    drain(name, [&] { network.sendStatsStream(screen, control); return screen.statsFetch; });
+  };
+  statsFetch("page_stats_export", true, 0, 50, bad, 50);
+  statsFetch("page_stats_home_fetch", false, 0, 2, none, 10);
+  auto history = [&](const char *name, bool fetch, size_t offset, size_t limit, ShotLogSortDir dir,
+                     uint8_t types) {
+    fresh();
+    screen.historyOn = !fetch;
+    screen.historyResync = !fetch;
+    screen.historyBoot = fetch ? kBoot : 0;
+    screen.historyFetch = fetch;
+    (fetch ? screen.historyFetchOffset : screen.historyOffset) = offset;
+    (fetch ? screen.historyFetchLimit : screen.historyLimit) = limit;
+    (fetch ? screen.historyFetchDir : screen.historyDir) = dir;
+    (fetch ? screen.historyFetchTypes : screen.historyTypes) = types;
+    (fetch ? screen.historyFetchRequest : screen.historyRequest) = 4;
+    drain(name, [&] { network.sendHistoryStream(screen, control); return false; });
+  };
+  history("page_history", false, 0, 20, ShotLogSortDir::Desc, 0);
+  history("page_history_asc_types", false, 1, 2, ShotLogSortDir::Asc, (1U << 1) | (1U << 0));
+  history("page_history_fetch", true, 2, 2, ShotLogSortDir::Desc, 0);
   // The store moved after index_shots: an opted-in request from its epoch
   // gets only the difference.
   moved = true;
@@ -347,6 +433,28 @@ int main() {
     trace_busy: {t: 'rt', id: 3, b: 43, e: 603000},
     notice: null,
     ping_answer: {t: 'ping', up: false},
+    page_stats: {op: 'stats', on: true, request: 1, offset: 0, limit: 10, sort: 'date', dir: 'desc', active: 1},
+    page_stats_rating_asc: {op: 'stats', on: true, request: 1, offset: 2, limit: 5, sort: 'rating', dir: 'asc',
+      active: 1},
+    page_stats_fast_window_50: {op: 'stats', on: true, request: 1, offset: 0, limit: 10, sort: 'date',
+      dir: 'desc', filter: {result: ['fast']}, window: 50, active: 1},
+    page_stats_preset_bad: {op: 'stats', on: true, request: 1, offset: 0, limit: 10, sort: 'rating',
+      dir: 'desc', filter: {preset: [2], bad: true}, active: 1},
+    page_stats_scale: {op: 'stats', on: true, request: 1, offset: 0, limit: 10, sort: 'date', dir: 'asc',
+      filter: {scale: [(zlib.crc32(Buffer.from('Lunar')) ^ 0xFFFFFFFF) >>> 0]}, window: 100, active: 1},
+    page_stats_active_2: {op: 'stats', on: true, request: 1, offset: 0, limit: 10, sort: 'date', dir: 'desc',
+      active: 2},
+    page_stats_scroll: {op: 'stats', on: true, request: 1, offset: 10, limit: 10, sort: 'date', dir: 'desc',
+      active: 1},
+    page_stats_export: {op: 'stats', on: true, fetch: true, request: 3, offset: 0, limit: 50, sort: 'date',
+      dir: 'desc', filter: {bad: true}, window: 50, view: true, active: 1},
+    page_stats_home_fetch: {op: 'stats', on: true, fetch: true, request: 3, offset: 0, limit: 2, sort: 'date',
+      dir: 'desc', view: false, active: 1},
+    page_history: {op: 'history', on: true, request: 4, offset: 0, limit: 20, dir: 'desc'},
+    page_history_asc_types: {op: 'history', on: true, request: 4, offset: 1, limit: 2, dir: 'asc',
+      types: ['shot', 'rinse']},
+    page_history_fetch: {op: 'history', on: true, fetch: true, request: 4, offset: 2, limit: 2, dir: 'desc',
+      types: []},
     index_shots_delta: {t: 'rx', s: 'shots', ep: 7001, d: 1},
     fetch_shot_9_moved: {t: 'rf', s: 'shots', o: 4, n: 1, r: 9},
     fetch_shot_13_moved: {t: 'rf', s: 'shots', o: 0, n: 1, r: 10},
@@ -356,7 +464,9 @@ int main() {
     version: 1,
     note: 'Controller frames as the firmware builds them (q kept, MAC and dot removed), ' +
         'each a JSON text exactly as sent; request is the companion frame that asked (without q), ' +
-        'null for a notice. Regenerate with COMPANION_RECORDS_REGENERATE=1.',
+        'null for a notice. page_* cases are a screen\'s ui-stream frames for the ui-stream op in ' +
+        'request (active: the active preset; view: the screen holds Stats), over the records of ' +
+        'fetch_shots and fetch_history. Regenerate with COMPANION_RECORDS_REGENERATE=1.',
     cases: Object.entries(requests).map(([name, request]) => ({name, request, frames: produced[name]})),
   };
   for (const item of vectors.cases) {
@@ -399,6 +509,16 @@ int main() {
   assert.deepEqual(['ok', 'none', 'busy'].map((r, i) => frameOf(['trace_ok', 'trace_none', 'trace_busy'][i]).r),
       ['ok', 'none', 'busy']);
   assert.equal(Buffer.from(frameOf('trace_ok').d, 'base64').length, 5000);
+  assert.deepEqual([frameOf('ping_answer').sh, frameOf('ping_answer').hi], [7001, 7002],
+      'the ping answer carries both store epochs (the replica heartbeat)');
+  const page = (name) => vectors.cases.find((c) => c.name === name).frames.map((f) => JSON.parse(f));
+  assert(page('page_stats')[0].stats && page('page_stats')[0].snapshot, 'a standing Stats page has its header');
+  assert(!('stats' in page('page_stats_home_fetch')[0]), 'Home\'s rows-only fetch has no header');
+  assert.notDeepEqual(page('page_stats')[0].stats.dens, page('page_stats_active_2')[0].stats.dens,
+      'the header\'s second density follows the active preset');
+  assert(page('page_stats_export').length > 1 && page('page_stats_export').at(-1).more === false);
+  assert.deepEqual(page('page_history_asc_types')[0].records.map((r) => r.id), [3, 4]);
+  assert(page('page_history')[0].records.some((r) => r.noWeight === true));
   const file = path.join(sketchDir, '..', 'docs', 'schemas', 'companion-records-v1.vectors.json');
   const text = JSON.stringify(vectors, null, 2) + '\n';
   if (process.env.COMPANION_RECORDS_REGENERATE === '1') fs.writeFileSync(file, text);

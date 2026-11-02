@@ -19,6 +19,7 @@ MicraCompanionRouteStatus machineIntegrationCompanionRouteStatus() { return {}; 
 MicraCompanionOutbox machineIntegrationCompanionOutbox() { return {}; }
 MicraCompanionIngress machineIntegrationCompanionIngress() { return {}; }
 void machineIntegrationCompanionLink(bool, bool) {}
+void machineIntegrationCompanionSyncHold(bool) {}
 #endif
 
 // Network task only: the open request's key pair and the request it serves.
@@ -565,7 +566,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
       memcpy(slot.ns, ns, sizeof(ns));
       copyWebAccessLabel(slot.name, name);
       copyWebAccessLabel(slot.version, version);
-      slot.protocol = static_cast<uint8_t>(COMPANION_PROTOCOL);
+      slot.protocol = static_cast<uint8_t>(COMPANION_LINK_PROTOCOL);
       slot.phase = CompanionLinkPhase::PROOF;
     }
     used = static_cast<size_t>(snprintf(reply, sizeof(reply), "{\"t\":\"challenge\",\"nonce\":\""));
@@ -825,19 +826,27 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
   }
   if (linkOpen && server_ != nullptr) {
     const MicraCompanionRoute route = machineIntegrationCompanionRouteStatus().route;
+    // A sync hold silences the link both ways: the companion stops pinging,
+    // so neither the link's nor the La Marzocco route's liveness counts it.
+    const bool syncHold = companionSyncHold();
+    if (syncHold != companionSyncHeld_) machineIntegrationCompanionSyncHold(syncHold);
+    companionSyncHeld_ = syncHold;
     int silent[2] = {-1, -1};
+    bool holdChanged = false;
     {
       TaskLockGuard lock(dataMux_);
       for (size_t index = 0; index < 2; ++index) {
         CompanionLinkSlot &slot = g_companion.links[index];
-        if (slot.fd < 0 || slot.closing ||
-            now - slot.heardAtMs < companionSilenceLimitMs(slot, route))
+        holdChanged |= slot.fd >= 0 && slot.snapshotSent && slot.sentSync != syncHold;
+        if (slot.fd < 0 || slot.closing || !companionLinkSilent(slot, route, now, syncHold))
           continue;
         slot.closing = true;
         slot.closeReason = "the companion went silent";
         silent[index] = slot.fd;
       }
     }
+    // Every build tells the companion when a sync hold starts and ends.
+    if (holdChanged) companionNotified_.store(true, std::memory_order_release);
     for (const int fd : silent)
       if (fd >= 0) (void)httpd_sess_trigger_close(server_, fd);
     // As often as ui-stream's dispatch, keep the link the most recently used
@@ -851,7 +860,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     // Diagnostic log (2B): the due check runs every pass, so a hold's end
     // flushes at once instead of waiting for the next ping.
     companionLogService();
-    companionRecordsService(now);  // the archive (2A), under the same rules
+    companionRecordsService(now, syncHold);  // the archive (2A), under the same rules
     if (companionNotified_.load(std::memory_order_acquire) &&
         !companionSendPending_.load(std::memory_order_acquire))
       companionPrepareSends();
@@ -956,8 +965,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const MicraCompanionOutbox outbox = machineIntegrationCompanionOutbox();
   uint32_t generation = 0;
   [[maybe_unused]] uint32_t lastCommand = 0;
-  bool snapshot = false, ui = true, logSwitch = true, archive = true, heard = false,
-       pingReply = false;
+  bool snapshot = false, ui = true, logSwitch = true, archive = true, pingReply = false;
   const bool syncHold = companionSyncHold();
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
@@ -979,7 +987,6 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     ui = g_companion.stored.uiOff == 0;
     logSwitch = g_companion.stored.logSwitch != 0;
     archive = g_companion.stored.archiveSwitch != 0;
-    heard = g_companion.logHeard;
     pingReply = g_companion.pingReply;
     g_companion.pingReply = false;
     memcpy(deviceName, status_.deviceName, sizeof(deviceName));
@@ -1026,9 +1033,6 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   routeDue = snapshot || outbox.routeSequence != sent.sentRoute;
   route = routeDue && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
                                        outbox.routeCompanion ? "companion" : "direct");
-  holdDue = snapshot || outbox.holdSequence != sent.sentHold;
-  hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":%s}",
-                                     outbox.hold ? "true" : "false", syncHold ? "true" : "false");
   const char *op = companionCommandName(outbox.commandOp);
   commandDue = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
   command = commandDue &&
@@ -1040,12 +1044,21 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                               static_cast<unsigned long>(outbox.commandId), op));
 #endif
   memset(secret, 0, sizeof(secret));
+  // `hold` on every build: the La Marzocco hold (Linea Micra, while the
+  // route is not direct) and every start and end of a sync hold, which
+  // starts and ends the companion's silence.
+  holdDue = snapshot || outbox.holdSequence != sent.sentHold || syncHold != sent.sentSync;
+  hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":%s}",
+                                     outbox.hold ? "true" : "false", syncHold ? "true" : "false");
   // S17: a ping is answered while no sync hold is active, with the `hold`
-  // frame (one segment with its ACK), so the companion sends sync requests
-  // only then; during a hold it is not answered at all.
+  // frame (one segment with its ACK) and the store epochs (the replica's
+  // heartbeat), so the companion sends sync requests only then; during a
+  // hold it is not answered at all.
   if (pingReply && (logSwitch || archive) && !syncHold && !hold &&
-      companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":false}",
-                       outbox.hold ? "true" : "false"))
+      companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":false,\"sh\":%lu,\"hi\":%lu}",
+                       outbox.hold ? "true" : "false",
+                       static_cast<unsigned long>(callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0),
+                       static_cast<unsigned long>(callbacks_.historyEpoch ? callbacks_.historyEpoch() : 0)))
     job.replyBody = static_cast<uint8_t>(count - 1);
   // The diagnostic log stream (2B): one `log` body per pass; the rest pages
   // on the next pass.
@@ -1057,9 +1070,9 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     job.logBody = static_cast<uint8_t>(count - 1);
     job.logFrom = sent.logSent;
   }
-  // The archive's epoch notice (2A) rides the same heartbeat.
+  // The archive's epoch notice (2A), once its change is committed.
   uint32_t told[2] = {};
-  const bool notice = companionRecordsNoticeBody(count, heard, told);
+  const bool notice = companionRecordsNoticeBody(count, syncHold, told);
   if (notice) job.noticeBody = static_cast<uint8_t>(count - 1);
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = config == configDue && device == deviceDue &&
@@ -1090,7 +1103,10 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       slot.deviceSent = true;
     }
     if (route) slot.sentRoute = outbox.routeSequence;
-    if (hold) slot.sentHold = outbox.holdSequence;
+    if (hold) {
+      slot.sentHold = outbox.holdSequence;
+      slot.sentSync = syncHold;
+    }
     if (credentials) slot.sentCredentials = outbox.credentialsGeneration;
     if (logBuilt) {
       slot.logSent = logLast;
@@ -1104,7 +1120,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   if (notice && companionRecords_ != nullptr) {
     companionRecords_->toldShots = told[0];
     companionRecords_->toldHistory = told[1];
-    g_companion.logHeard = false;  // this notice consumed the heartbeat too
+    companionRecords_->heldSinceTold = companionRecords_->noticeDue = false;
   }
 }
 

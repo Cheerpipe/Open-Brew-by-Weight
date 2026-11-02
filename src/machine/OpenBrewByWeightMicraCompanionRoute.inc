@@ -53,7 +53,7 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
       // A basis is the full frame's subscription; without one the route
       // waits for a full frame (after `route` or an upstream reset).
       const bool basis = from == MicraCompanionRoute::COMPANION && websocketStatus_.subscribed;
-      const char *lost = now - feed.pingAtMs >= kCompanionAliveMs ? "ping_missing"
+      const char *lost = !feed.syncHold && now - feed.pingAtMs >= kCompanionAliveMs ? "ping_missing"
           : !feed.up && now - feed.downSinceMs >= kCompanionAliveMs ? "upstream_down"
           : !basis && now - feed.requestedAtMs >= kCompanionPendingMs ? "full_missing"
           : nullptr;
@@ -309,6 +309,14 @@ void OpenBrewByWeightMicraService::companionPing(bool upstreamAlive) {
   if (upstreamAlive) feed.upAtMs = now;
   else if (feed.up) feed.downSinceMs = now;
   feed.up = upstreamAlive;
+}
+
+// The ping clock restarts at both ends of a sync hold, so the first ping
+// after it (sent at once) is the one that has to arrive.
+void OpenBrewByWeightMicraService::companionSyncHold(bool on) {
+  TaskLockGuard lock(mux_);
+  companion_.syncHold = on;
+  companion_.pingAtMs = millis();
 }
 
 void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t epoch,

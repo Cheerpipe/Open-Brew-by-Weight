@@ -62,6 +62,8 @@ struct MicraCompanionRouteStatus {
 // Link side → service. All may run on the HTTP or network task.
 void machineIntegrationCompanionLink(bool ready, bool lmSwitch);
 void machineIntegrationCompanionPing(bool upstreamAlive);
+// A sync hold started or ended: the companion pings neither during it.
+void machineIntegrationCompanionSyncHold(bool on);
 void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
                                          uint32_t tokenRenewInS, bool refused = false);
 void machineIntegrationCompanionCredentials(uint32_t generation, bool ok);

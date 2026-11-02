@@ -66,13 +66,13 @@ bool OpenBrewByWeightNetwork::companionLinkRecordRequest(CompanionLinkSlot &slot
   return true;
 }
 
-// Network task, every pass with a link: the epochs' settle clock, the notice
-// (through the shared send job) and the records work, both behind the gate.
-void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now) {
+// Network task, every pass with a link: the notice (through the shared send
+// job) once a change is committed, and the records work, both behind the gate.
+void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now, bool syncHold) {
   const uint32_t shots = callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0,
                  history = callbacks_.historyEpoch ? callbacks_.historyEpoch() : 0;
-  const bool gate = !companionSyncHold();
-  bool notice = false;
+  const bool gate = !syncHold;
+  bool moved = false, notice = false;
   {
     TaskLockGuard lock(dataMux_);
     if (companionRecords_ == nullptr) return;  // no link has opened yet
@@ -82,15 +82,23 @@ void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now) {
       records.seenHistory = history;
       records.movedAtMs = now;
     }
+    records.heldSinceTold |= syncHold;
     const CompanionLinkSlot *link = companionActiveLink();
-    const bool armed = link != nullptr && !link->closing && link->generation == records.generation &&
-                       g_companion.stored.archiveSwitch != 0;
-    notice = armed && companionNoticeDue(records.subscribed,
-                                         shots != records.toldShots || history != records.toldHistory,
-                                         now - records.movedAtMs, gate, g_companion.logHeard);
+    moved = link != nullptr && !link->closing && link->generation == records.generation &&
+            g_companion.stored.archiveSwitch != 0 && records.subscribed && gate &&
+            (shots != records.toldShots || history != records.toldHistory);
+  }
+  // Committed: the store lock only while a notice could be due.
+  const bool committed = moved && (callbacks_.recordStoresSavePending == nullptr ||
+                                   !callbacks_.recordStoresSavePending());
+  {
+    TaskLockGuard lock(dataMux_);
+    CompanionRecords &records = *companionRecords_;
+    notice = records.noticeDue = companionNoticeDue(true, moved, committed, gate,
+                                                    records.heldSinceTold, now - records.movedAtMs);
   }
   if (notice) companionNotified_.store(true, std::memory_order_release);
-  if (!gate || now - companionRecordsAtMs_ < kStatsStreamPaceMs ||
+  if (syncHold || now - companionRecordsAtMs_ < kStatsStreamPaceMs ||
       !companionRecordsDue_.load(std::memory_order_acquire) ||
       companionRecordsPending_.exchange(true, std::memory_order_acq_rel))
     return;
@@ -102,23 +110,19 @@ void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now) {
   }
 }
 
-// Network task, from companionPrepareSends: the `rs` body when it is due.
-// The caller marks the epochs told once the job is queued.
-bool OpenBrewByWeightNetwork::companionRecordsNoticeBody(uint8_t &count, bool heard,
+// Network task, from companionPrepareSends: the `rs` body when
+// companionRecordsService found it due and no hold began since. The caller
+// marks the epochs told once the job is queued.
+bool OpenBrewByWeightNetwork::companionRecordsNoticeBody(uint8_t &count, bool syncHold,
                                                          uint32_t (&told)[2]) {
   uint32_t &shots = told[0], &history = told[1];
-  const bool gate = !companionSyncHold();
   bool due = false;
   {
     TaskLockGuard lock(dataMux_);
     const CompanionRecords *records = companionRecords_;
     const CompanionLinkSlot *link = companionActiveLink();
-    due = records != nullptr && link != nullptr && link->generation == records->generation &&
-          g_companion.stored.archiveSwitch != 0 &&
-          companionNoticeDue(records->subscribed,
-                             records->seenShots != records->toldShots ||
-                                 records->seenHistory != records->toldHistory,
-                             millis() - records->movedAtMs, gate, heard);
+    due = !syncHold && records != nullptr && records->noticeDue && link != nullptr &&
+          link->generation == records->generation && g_companion.stored.archiveSwitch != 0;
     if (due) {
       shots = records->seenShots;
       history = records->seenHistory;
