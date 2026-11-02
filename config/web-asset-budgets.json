@@ -7,8 +7,8 @@
   },
   "limits": {
     "source.html": 139248,
-    "source.js": 753874,
-    "source.htmlJs": 893122,
+    "source.js": 753979,
+    "source.htmlJs": 893227,
     "gzip.shellHtml": 6419,
     "gzip.shellJs": 8824,
     "gzip.css": 22356,
