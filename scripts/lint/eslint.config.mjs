@@ -3,7 +3,12 @@
 import js from "@eslint/js";
 import globals from "globals";
 
-const RECORDS_PRELUDE = ["downloadCsv", "actionMenu", "ICON_TRASH", "createFilterMenu", "armListSentinel", "offlineRecords", "offlineMeta", "syncOfflineStore"];
+const RECORDS_PRELUDE = [
+  "downloadCsv", "actionMenu", "ICON_TRASH", "createFilterMenu", "armListSentinel",
+  "archiveSources", "archiveStatsReady", "archiveChanged", "companionArchive", "archiveSource",
+  "loadArchive", "recordOrder", "mergeRecords", "archiveMark", "archiveHeadings", "deleteScopes",
+  "confirmRemoval", "removeRecord", "confirmClear", "clearArchiveCopy", "archiveListNote",
+];
 
 export default [
   {
