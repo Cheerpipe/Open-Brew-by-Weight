@@ -14884,7 +14884,6 @@ void s20_last_good_shot_advances_independently() {
   CHECK(persistedLastGoodShot.durationMs == 13000);
   CHECK(persistedLastGoodShot.shotLogId == 91);
   CHECK(persistedLastGoodShot.rating == 4);
-  CHECK(!clearLastShot());
   CHECK(persistedLastShot.valid);
   CHECK(persistedLastGoodShot.durationMs == 13000);
   CHECK(lastShotStore.getGood().shotLogId == 91);
@@ -15223,16 +15222,45 @@ void s15_last_shot_persists_after_drip_when_eligible() {
   CHECK(fabsf(persistedLastShot.currentWeightG - 36.4f) < 0.001f);
 }
 
-void s16_last_shot_clear_empties_snapshot() {
+// D8: each record store keeps the user's Clear count and the newest ids the
+// user deleted, for the companion's copy. A save carries them, a factory
+// reset's clear keeps the count, the list holds the newest 16, and marks
+// bound to another save's generation (an older image wrote the store) read
+// as none.
+void s16_user_deletions_mark_the_store() {
   resetHarness(false, false);
   ShotLogRecord record = {};
   record.durationDs = 130;
   record.actualWeightCg = 3600;
-  CHECK(shotLog.append(record));
-  CHECK(clearLastShot());
-  CHECK(shotLog.count() == 0);
-  ShotCurveRecord curve = emptyShotCurveRecord();
-  CHECK(!copyHomeShot(record, &curve));
+  for (int i = 0; i < 3; ++i) CHECK(shotLog.append(record));
+  CHECK(deleteShotRecord(1));
+  CHECK(deleteShotRecord(3));
+  CHECK(!deleteShotRecord(42));
+  CHECK(shotLog.marks().goneCount == 2);
+  CHECK(shotLog.marks().gone[0] == 3 && shotLog.marks().gone[1] == 1);
+  CHECK(shotLog.save());
+  CHECK(shotLog.load());
+  CHECK(shotLog.marks().goneCount == 2 && shotLog.marks().gone[0] == 3);
+  RecordStoreMarks stale = shotLog.marks();
+  recordMarksLoaded(stale, stale.generation + 1);
+  CHECK(stale.magic == 0 && stale.clears == 0 && stale.goneCount == 0);
+  CHECK(clearShotLog());
+  CHECK(shotLog.marks().clears == 1 && shotLog.marks().goneCount == 0);
+  CHECK(shotLog.nextRecordId() == 1);
+  CHECK(shotLog.clear());
+  CHECK(shotLog.marks().clears == 1);
+  for (uint32_t n = 0; n < RECORD_MARKS_GONE + 2; ++n) CHECK(shotLog.append(record));
+  for (uint32_t id = 1; id <= RECORD_MARKS_GONE + 2; ++id) CHECK(deleteShotRecord(id));
+  CHECK(shotLog.marks().goneCount == RECORD_MARKS_GONE);
+  CHECK(shotLog.marks().gone[0] == RECORD_MARKS_GONE + 2);
+  CHECK(shotLog.marks().gone[RECORD_MARKS_GONE - 1] == 3);
+  HistoryRecord entry = {};
+  entry.durationDs = 50;
+  CHECK(historyLog.append(entry) && historyLog.append(entry));
+  CHECK(deleteHistoryRecord(1));
+  CHECK(historyLog.marks().goneCount == 1 && historyLog.marks().gone[0] == 1);
+  CHECK(clearHistoryLog());
+  CHECK(historyLog.marks().clears == 1 && historyLog.marks().goneCount == 0);
 }
 
 void s16b_factory_reset_hides_last_shot_on_status() {
@@ -25722,7 +25750,7 @@ const TestCase testCases[] = {
     {"S15", s15_last_shot_persists_after_drip_when_eligible},
     {"S15b", s15b_cup_off_after_end_keeps_last_known_actual},
     {"S15c", s15c_last_shot_prefers_last_accepted_over_cup_off},
-    {"S16", s16_last_shot_clear_empties_snapshot},
+    {"S16", s16_user_deletions_mark_the_store},
     {"S16b", s16b_factory_reset_hides_last_shot_on_status},
     {"S18", s18_last_shot_keeps_no_scale_guard_from_cycle},
     {"S20", s20_last_good_shot_advances_independently},

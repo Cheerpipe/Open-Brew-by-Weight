@@ -578,7 +578,10 @@ void p65_factory_settings_survives_second_slot_write_fail() {
 
 void p66_shot_log_dual_slot_generation_flip() {
   resetHostPersistence();
-  CHECK(sizeof(ShotLogStore) == 128024);
+  // The user deletion marks follow the 128,024 bytes an older image reads,
+  // so its header, records and checksum stay where they were.
+  CHECK(offsetof(ShotLogStore, marks) == 128024);
+  CHECK(sizeof(ShotLogStore) == 128104);
   CHECK(sizeof(ShotLogStore) % 4 == 0);
   CHECK(sizeof(ShotLogStore) <= SHOT_LOG_FLASH_SLOT_BYTES);
   CHECK(SHOT_LOG_FLASH_SLOT_COUNT * SHOT_LOG_FLASH_SLOT_BYTES <= 0xFC000);
@@ -590,7 +593,7 @@ void p66_shot_log_dual_slot_generation_flip() {
   record.actualWeightCg = 3600;
   CHECK(log.append(record));
   CHECK(log.count() == 1);
-  // A save erases only the 32 sectors the 128,024-byte store of 1000
+  // A save erases only the 32 sectors the 128,104-byte store of 1000
   // records occupies, not the 504 KiB slot.
   CHECK(ShotLog::kEraseBytes == 32 * FLASH_IO_SECTOR_BYTES);
   CHECK(ShotLog::hostEraseBytes() == ShotLog::kEraseBytes);
@@ -2058,7 +2061,8 @@ void p68_malformed_recovery_intent_is_abandoned() {
 void p69_history_log_round_trip_eviction_and_paging() {
   resetHostPersistence();
   CHECK(sizeof(HistoryRecord) == 16);
-  CHECK(sizeof(HistoryStore) == 16024);
+  CHECK(offsetof(HistoryStore, marks) == 16024);
+  CHECK(sizeof(HistoryStore) == 16104);
   CHECK(sizeof(HistoryStore) % 4 == 0);
   CHECK(sizeof(HistoryStore) <= HISTORY_FLASH_SLOT_BYTES);
   CHECK(HISTORY_FLASH_SLOT_COUNT * HISTORY_FLASH_SLOT_BYTES == 0x8000);

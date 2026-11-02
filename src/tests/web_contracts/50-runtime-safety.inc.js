@@ -151,13 +151,12 @@ for (const [route, handler] of expected) {
     const lazyAsset = uri.match(/^\/(partials|js)\//);
     const browserIcon = uri === '/favicon.ico' ||
         uri.startsWith('/apple-touch-icon');
-    const rawLastShotApi = uri === '/api/v1/last-shot/clear';
     const directScaleSelectionApi = uri === '/api/v1/scale/preferred/select';
     // Kept for integrations: "new coffee" on the active preset.
     const newCoffeeAlias = uri === '/api/v1/calibration/reset-guard-samples';
     if (!(statusPage && codeIncludes(ui, 'async function loadStatus(') && codeIncludes(ui, '/api/v1/status/')) &&
         !(lazyAsset && (codeIncludes(ui, '/partials/') || codeIncludes(ui, '/js/'))) &&
-        !browserIcon && !rawLastShotApi && !directScaleSelectionApi && !newCoffeeAlias) {
+        !browserIcon && !directScaleSelectionApi && !newCoffeeAlias) {
       throw new Error(`Registered API is not referenced by the UI: ${uri}`);
     }
   }

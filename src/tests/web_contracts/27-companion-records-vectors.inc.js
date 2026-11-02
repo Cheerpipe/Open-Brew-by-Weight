@@ -197,10 +197,13 @@ ${header.slice(header.indexOf('  struct RecordIndexBaseline {'), header.indexOf(
     ShotCurveRead (*copyShotCurveById)(uint32_t, ShotCurveRecord &, bool) = curveById;
     uint32_t (*historyEpoch)() = +[] { return kHistoryEpoch; };
     void (*copyHistoryPage)(HistoryPage &, size_t, size_t, ShotLogSortDir, uint8_t) = historyPage;
-    void (*recordStoreCounters)(bool, uint32_t &, uint32_t &) =
-        +[](bool shots, uint32_t &generation, uint32_t &next) {
+    void (*recordStoreCounters)(bool, uint32_t &, uint32_t &, RecordStoreMarks &) =
+        +[](bool shots, uint32_t &generation, uint32_t &next, RecordStoreMarks &marks) {
           generation = shots ? 2400 : 1300;
           next = shots ? kShots + 1 + moved : kActivations + 1;
+          marks.clears = shots ? 1 : 0;
+          marks.goneCount = shots ? 1 : 0;
+          marks.gone[0] = shots ? 999 : 0;
         };
     ShotTraceRead (*streamShotTrace)(uint32_t, uint32_t, uint32_t, uint32_t, uint8_t *, size_t,
                                      ShotTraceSink, void *) = streamTrace;
@@ -363,6 +366,8 @@ int main() {
   const frameOf = (name, i = 0) => JSON.parse(vectors.cases.find((c) => c.name === name).frames[i]);
   // The pieces the companion relies on.
   assert.deepEqual([frameOf('index_shots').f.gen, frameOf('index_shots').f.next], [2400, 13]);
+  assert.deepEqual([frameOf('index_shots').f.clr, frameOf('index_shots').f.gone], [1, [999]],
+      'D8: the index names the Clear count and the ids the user deleted');
   assert.equal(frameOf('index_shots').f.rows.length, 24, 'every shot, the bad one included');
   assert(!('rows' in frameOf('index_shots_unchanged').f) && !('sum' in frameOf('index_shots_unchanged').f));
   // `sum` is zlib's CRC-32 of the whole index as little-endian id/revision

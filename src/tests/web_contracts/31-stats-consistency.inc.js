@@ -70,13 +70,33 @@
   const filled = [];
   const header = {avgDurationS: 1, avgYieldG: 2, shotsPerDay: 3, avgErrorPct: 4, avgFlowGps: 5,
     shotCount: 10};
-  new Function('$', 'R', '__WEBUI_TEXT__', 'renderStatsDurChart', 'statsHeader', 'statsWindowChoices',
-      `${blockAt(rawViewJs.stats, 'function renderShotStats(')};renderShotStats();`)(
-      (id) => (filled.push(id), {classList: {toggle() {}}, querySelectorAll: () => []}),
-      {uiState: {shotStats: header, statsWindow: 10}, sub: (t, v) => t + v},
-      (key) => 'translated ' + key, () => {}, () => header, () => {});
+  const nodes = {};
+  const render = (statsMerged, ready, archiveView = false) =>
+    new Function('$', 'R', '__WEBUI_TEXT__', 'renderStatsDurChart', 'statsHeader', 'statsWindowChoices',
+        'statsMerged', 'archiveStatsReady',
+        `${blockAt(rawViewJs.stats, 'function renderShotStats(')};renderShotStats();`)(
+        (id) => (filled.push(id), nodes[id] ??= {classList: {toggle() {}}, querySelectorAll: () => []}),
+        {uiState: {shotStats: header, statsWindow: 10}, sub: (t, v) => t + v, archiveView},
+        (key) => 'translated ' + key, () => {}, () => header, () => {}, statsMerged, () => ready);
+  render(null, false);
   assert.deepEqual(filled, ['statsAvgDur', 'statsAvgWeight', 'statsAvgDaily', 'statsAvgErr',
-    'statsAvgFlow', 'statsWindowHint']);
+    'statsAvgFlow', 'statsWindowHint', 'statsHeaderNote']);
+  // D12: opened directly no note; through the companion without its header the
+  // controller's figures are labelled; the archive view says none are there.
+  assert.equal(nodes.statsHeaderNote.hidden, true, 'opened directly, Stats need no note');
+  render(null, true);
+  assert.deepEqual([nodes.statsHeaderNote.hidden, nodes.statsHeaderNote.textContent],
+      [false, 'translated stats.header_controller_only']);
+  render(header, true);
+  assert.equal(nodes.statsHeaderNote.hidden, true, 'the note leaves when the merged header arrives');
+  render(null, false, true);
+  assert.deepEqual([nodes.statsHeaderNote.hidden, nodes.statsHeaderNote.textContent],
+      [false, 'translated stats.header_unavailable']);
+  const shown = new Function('R', 'statsMerged',
+      `${rawViewJs.stats.match(/const statsHeader = .*\n/)[0]};return statsHeader();`);
+  assert.deepEqual(shown({archiveView: true, uiState: {shotStats: header}}, null), {},
+      'the archive view never shows a stale controller header');
+  assert.equal(shown({archiveView: false, uiState: {shotStats: header}}, null), header);
 }
 // S18: the window choices are every window smaller than the good shots the
 // list holds, plus the smallest one covering them; none up to ten. The
@@ -84,19 +104,20 @@
 {
   const assert = require('assert');
   const choices = (n, merged, selected) => {
+    const pressed = [];
     const buttons = [10, 50, 100, 500, 1000].map((v) => ({dataset: {v: String(v)}, hidden: false,
-      setAttribute() {}}));
+      setAttribute: (k, on) => on === 'true' && pressed.push(v)}));
     const group = {hidden: false, querySelectorAll: () => buttons};
     const sent = [];
     const uiState = {statsWindow: selected};
     let headers = 0;
-    new Function('$', 'R', 'statsMergedGood', 'statsGood', 'archiveStatsReady', 'statsSynced',
+    new Function('$', 'R', 'statsMergedGood', 'statsGood', 'statsMerged', 'statsSynced',
         'sendStatsWindow', 'refreshMergedHeader',
         `${blockAt(rawViewJs.stats, 'function statsWindowChoices(')};statsWindowChoices();`)(
-        () => group, {uiState}, merged ? n : null, n, () => merged, true,
+        () => group, {uiState}, merged ? n : null, n, merged ? {} : null, true,
         () => sent.push(uiState.statsWindow), () => headers++);
     return {shown: group.hidden ? [] : buttons.filter((b) => !b.hidden).map((b) => +b.dataset.v),
-      selected: uiState.statsWindow, sent, headers};
+      selected: uiState.statsWindow, sent, headers, pressed};
   };
   assert.deepEqual(choices(1, false, 10).shown, []);
   assert.deepEqual(choices(10, false, 10).shown, []);
@@ -119,15 +140,20 @@
   const deep = choices(300, true, 1000);
   assert.deepEqual([deep.selected, deep.sent, deep.headers], [500, [500], 1]);
   assert.equal(choices(30, false, 100).headers, 0, 'the direct path rebuilds no merged header');
-  // The merged count is kept while a header request fails: 500 stays chosen.
-  const kept = choices(134, true, 500);
-  assert.deepEqual([kept.selected, kept.sent], [500, []]);
+  // D12: while the merged header is missing the controller's windows show, the
+  // pressed one is the window that header covers, and the choice of 500 is
+  // kept for when the merged header returns.
+  const fallback = choices(134, false, 500);
+  assert.deepEqual([fallback.shown, fallback.pressed, fallback.selected, fallback.sent],
+      [[10, 50, 100], [100], 500, []]);
+  assert.deepEqual(choices(134, true, 500).pressed, [500]);
 }
 // The companion archive merge (S9, S12): one comparator over both sources, a
-// cut at the first row a source still has to send, a kept record the
-// controller still lists shown once, live inserts re-merged; a failed page
-// keeps what is loaded and is retried; a reload keeps the loaded depth; Clear's
-// copy option deletes the history that was open when the user confirmed.
+// cut at the first row a source still has to send, a record both hold shown
+// once, live inserts re-merged; a failed page keeps what is loaded and is
+// retried; a reload keeps the loaded depth. One Delete (D6): the controller
+// deletes its own records, the companion only those it alone holds, and
+// Delete shows only with Admin unlocked outside the archive view (D2).
 {
   const assert = require('assert');
   const merge = new Function(`${blockAt(rawViewJs.records, 'function recordOrder(')}
@@ -145,10 +171,10 @@
   assert.deepEqual(m.list.map((r) => [r.archiveGeneration ?? 2, r.id]), [[2, 9], [2, 8], [2, 7], [2, 3], [1, 40],
     [1, 39]]);
   assert.equal(m.need, 'archive', 'the archive pages on when the controller is done');
-  const kept = source([archived(2, 8, {kept: true}), archived(1, 5)], true);
+  const kept = source([archived(2, 8), archived(1, 5)], true);
   m = merge.mergeRecords(own, false, kept, merge.recordOrder(kept, 'date', 'desc'));
-  assert.deepEqual(m.list.map((r) => r.id), [9, 8, 7, 5], 'a kept record the controller still lists shows once');
-  assert(!m.list[1]._archive, 'the controller\'s row stands while its delete is on the way');
+  assert.deepEqual(m.list.map((r) => r.id), [9, 8, 7, 5], 'a record both hold shows once');
+  assert(!m.list[1]._archive, 'the controller\'s row stands for a record both hold');
   m = merge.mergeRecords([{id: 10}, ...own], false, kept, merge.recordOrder(kept, 'date', 'desc'));
   assert.equal(m.list[0].id, 10, 'a live insert merges in');
   const rated = source([archived(1, 2, {rating: 5}), archived(1, 4, {rating: 0})], true);
@@ -174,14 +200,32 @@
       async (_, next) => { next.rows.push(1, 2); next.done = next.rows.length >= 6; });
   await reload('shots', () => rendered++);
   assert.deepEqual([live.shots.rows.length, rendered], [6, 1], 'a reload keeps the loaded depth');
-  const erased = [];
-  const clear = new Function('companionArchive', 'archiveHere', 'archiveChanged', 'R', '__WEBUI_TEXT__',
-      `${blockAt(rawViewJs.records, 'async function clearArchiveCopy(')}; return clearArchiveCopy;`)(
-      async (path, body) => erased.push([path, body]), () => true, () => {}, {}, (k) => k);
-  await clear('shots', {copy: true, generation: 3});
-  await clear('shots', {copy: true});
-  await clear('shots', true);
-  assert.deepEqual(erased, [['erase', {store: 'shots', generation: 3}], ['erase', {store: 'shots', current: true}]]);
+  const calls = [];
+  let refuse = false;
+  const remove = new Function('companionArchive', 'archiveHere', 'archiveChanged', 'R',
+      `${blockAt(rawViewJs.records, 'async function removeRecord(')}; return removeRecord;`)(
+      async (path, body) => calls.push([path, body]), () => true, (store) => calls.push(['changed', store]),
+      {api: async (path, options) => {
+        if (refuse) throw Object.assign(Error('locked'), {code: 'ADMIN_LOCKED'});
+        calls.push([path, options.body]);
+      }, body: (b) => JSON.stringify(b)});
+  let dropped = 0, renders = 0;
+  await remove('shots', {id: 4}, '/api/v1/stats/delete', () => dropped++, () => renders++);
+  await remove('shots', archived(1, 40), '/api/v1/stats/delete', () => dropped++, () => renders++);
+  assert.deepEqual(calls, [['/api/v1/stats/delete', '{"id":4}'], ['changed', 'shots'],
+    ['delete', {store: 'shots', id: 40, generation: 1}], ['changed', 'shots']]);
+  assert.deepEqual([dropped, renders], [1, 2], 'only the controller\'s row drops at once');
+  refuse = true;
+  await assert.rejects(remove('shots', {id: 3}, '/api/v1/stats/delete', () => dropped++, () => renders++));
+  assert.deepEqual([dropped, renders, calls.length], [1, 2, 4], 'a refusal leaves the list as it was');
+  const itemSource = rawViewJs.records.slice(rawViewJs.records.indexOf('const deleteItem ='),
+      rawViewJs.records.indexOf(';\n', rawViewJs.records.indexOf('const deleteItem =')) + 1);
+  const item = (archiveView, unlocked) => new Function('R', 'ICON_TRASH',
+      `${itemSource}return deleteItem('Delete shot', () => {});`)(
+      {archiveView, adminUnlockedHere: () => unlocked}, 'icon');
+  assert.equal(item(false, false).length, 0, 'locked: no Delete');
+  assert.equal(item(true, true).length, 0, 'the archive view never deletes');
+  assert.deepEqual(item(false, true).map((i) => [i[1], i[4]]), [['Delete shot', true]]);
 }
 // Stats and History render cost: one curve model per shot row and CSV line, a
 // rated star keeps keyboard focus, label layout sleeps off Stats, and History
@@ -195,4 +239,46 @@ if (!codeIncludes(viewJs.stats, 'renderShotSpark(spark,r,m)') ||
     !codeIncludes(viewJs.history, 'icon.append(histIcons[r.type].cloneNode(true))') ||
     codeIncludes(viewJs.history, 'icon.innerHTML=typeSvg')) {
   throw new Error('Stats and History must not rebuild per-row work they can reuse');
+}
+// AC15 (D13): the whole-history header stays in Stats. No other module asks
+// the companion for it, and Stats never writes it into the shared models
+// Home and the presets read.
+{
+  const assert = require('assert');
+  const others = Object.entries(rawViewJs).filter(([name]) => name !== 'stats')
+      .concat([['runtime', rawRuntimeJs], ['app', rawAppJsSource]]);
+  for (const [name, source] of others)
+    assert(!source.includes('statsMerged') && !source.includes('"stats?"'),
+        `${name} must not read the companion's whole-history header`);
+  assert(!/(uiState|presetState)[\w.]*\s*=\s*statsMerged/.test(rawViewJs.stats) &&
+         !/=\s*reply\?\.stats[^;]*;[^\n]*uiState/.test(rawViewJs.stats),
+      'Stats keeps the merged header to itself');
+}
+// D1, AC5: Admin holds both Clears in a records group right before Factory
+// reset; opened directly with a companion keeping a copy, the confirmation
+// says its older records go too, and the shared record models empty.
+{
+  const assert = require('assert');
+  const admin = partialHtml.admin;
+  assert(admin.indexOf('id="clearShotHistoryButton"') > 0 &&
+         admin.indexOf('id="clearActivationHistoryButton"') > admin.indexOf('id="clearShotHistoryButton"') &&
+         admin.indexOf('data-g="records"') < admin.indexOf('data-g="reset"') &&
+         admin.indexOf('id="factoryResetButton"') > admin.indexOf('id="clearActivationHistoryButton"'));
+  const asked = [], sent = [];
+  let reset = 0;
+  const clear = new Function('R', 'location', '__WEBUI_TEXT__',
+      `${blockAt(rawViewJs.admin, 'async function clearRecords(')};return clearRecords;`);
+  const run = (protocol, archive) => clear({
+    homeStatusCache: () => ({companion: {archive}}),
+    askConfirm: async (text) => (asked.push(text), true),
+    withCommandGate: (fn) => fn(),
+    api: async (path, options) => sent.push([path, options.body]),
+    body: (b) => JSON.stringify(b), message() {}, formatCommandError: (f) => f,
+  }, {protocol}, (k) => k)('/api/v1/stats/clear', 'CLEAR_SHOT_LOG', 'Clear?', 'done', 'fail', () => reset++);
+  await run('http:', true);
+  await run('https:', true);
+  await run('http:', false);
+  assert.deepEqual(asked, ['Clear? records.clear_companion_too', 'Clear?', 'Clear?']);
+  assert.deepEqual(sent[0], ['/api/v1/stats/clear', '{"confirm":"CLEAR_SHOT_LOG"}']);
+  assert.equal(reset, 3);
 }

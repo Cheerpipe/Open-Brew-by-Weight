@@ -407,7 +407,6 @@ const expected = new Map([
   ['POST /api/v1/stats/clear', 'ownedApiHandler'],
   ['POST /api/v1/stats/delete', 'ownedApiHandler'],
   ['POST /api/v1/stats/rate', 'ownedApiHandler'],
-  ['POST /api/v1/last-shot/clear', 'ownedApiHandler'],
   ['POST /api/v1/time/sync', 'ownedApiHandler'],
   ['POST /api/v1/webhooks', 'ownedApiHandler'],
   ['POST /api/v1/network', 'ownedApiHandler'],

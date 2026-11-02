@@ -319,13 +319,14 @@
     get value() { return this.v; }, set value(v) { this.v = v; this.sets++; },
     setRangeText(t, a, b) { this.v = this.v.slice(0, a) + t + this.v.slice(b); }};
   const ui = {logEvents: []}, nodes = {log: ta, logFilter: {value: ''}, logLevelFilter: {value: '4'}};
-  const makeRender = (logHistory, logBootId, zoneOffset = () => 0, diagConfig = null) =>
+  const makeRender = (logHistory, logBootId, zoneOffset = () => 0, diagConfig = null,
+                      logJumpAt = null, logAnchor = null, nearLogTop = () => {}) =>
       new Function('$', 'R', 'logHistory', 'logBootId', 'logZoneOffsetMinutes', 'diagConfig',
-      '__WEBUI_TEXT__',
+      '__WEBUI_TEXT__', 'logJumpAt', 'logAnchor', 'nearLogTop',
       `${blockAt(viewJs.diagnostic, 'function renderLog(')};return renderLog;`)(
       (id) => nodes[id], {uiState: ui, sub: (t, v) => t.replace('{0}', String(v)),
                           formatWallTimeLocal: String}, logHistory, logBootId, zoneOffset,
-      diagConfig, (key) => key);
+      diagConfig, (key) => key, logJumpAt, logAnchor, nearLogTop);
   const renderLog = makeRender([], 0);
   const ev = (n) => ({sequence: n, atMs: n * 1000, wallSec: 0, level: 'info', category: 'web', message: 'm' + n});
   ui.logEvents = [ev(1), ev(2)];
@@ -375,20 +376,58 @@
       'a stored event asks for its zone offset at its own instant');
   assert.equal(ta.value, '1793370032 INFO [web] utc8\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6\n',
       'history renders at wallSec shifted by the zone offset');
+  // D16: an older page prepends with the lines in view held in place, every
+  // render asks whether the reader is near the top, and a jump hides the
+  // live ring so the moment shows alone, at the end of the view.
+  let asked = 0;
+  ta.value = '';
+  makeRender([{b: 7, s: 4, ms: 400, w: 0, l: 'i', c: 'web', m: 'kept4'}], 7)();
+  ta.scrollTop = 30;
+  const before = ta.scrollHeight;
+  makeRender([{b: 7, s: 2, ms: 200, w: 0, l: 'i', c: 'web', m: 'kept2'},
+              {b: 7, s: 4, ms: 400, w: 0, l: 'i', c: 'web', m: 'kept4'}], 7, () => 0, null, null,
+             {h: before, top: 30}, () => asked++)();
+  assert.equal(ta.scrollTop, 30 + ta.scrollHeight - before, 'a prepended page keeps the view in place');
+  assert.equal(asked, 1, 'each render checks whether older history should load');
+  makeRender([{b: 7, s: 2, ms: 200, w: 0, l: 'i', c: 'web', m: 'kept2'}], 7, () => 0, null, 1793380832,
+             'end')();
+  assert.equal(ta.value, '+0.200s INFO [web] kept2\n', 'a jump shows the stored moment without the live ring');
+  assert.equal(ta.scrollTop, ta.scrollHeight, 'a jump opens at the moment, at the end of the view');
 }
 // The stored history goes out with this screen's Web UI session (the companion
 // answers only a browser the controller lets open the Web UI), for paging and
 // for Export, which shows only when the page came through the companion.
 {
   const assert = require('assert').strict;
-  assert(codeIncludes(viewJs.diagnostic, 'fetch(path,{cache:"no-store",headers:R.webUiHeaders()})'),
+  assert(codeIncludes(viewJs.diagnostic, 'headers:R.webUiHeaders(body&&{"Content-Type":"application/json"})'),
       'history requests carry the Web UI session');
-  assert(codeIncludes(viewJs.diagnostic, 'await(await companionLog(url)).json()') &&
-         codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export")'),
+  assert(codeIncludes(viewJs.diagnostic, 'await(await companionLog(logHistoryQuery())).json()') &&
+         codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export"+(range?"?"+range:""))'),
       'paging and Export both read the companion through that request');
-  assert(codeIncludes(viewJs.diagnostic, '$("logExportButton").hidden=!here'),
-      'Export shows only through a paired companion');
-  assert(partialHtml.diagnostic.includes('id="logExportButton"'));
+  assert(codeIncludes(viewJs.diagnostic, '$("logExportButton").hidden=!here') &&
+         codeIncludes(viewJs.diagnostic, '$("logHistoryTools").hidden=!here'),
+      'Export, Go to and the range show only through a paired companion');
+  assert(partialHtml.diagnostic.includes('id="logExportButton"') &&
+         !partialHtml.diagnostic.includes('id="logOlderButton"'),
+      'older history loads near the top: Show older is gone');
+  // D16: pages of 500 carry the level and subsystem filters and the jump, and
+  // the cap points to Export.
+  const query = new Function('$', 'LOG_HISTORY_PAGE', 'logHistoryNext', 'logJumpAt',
+      `${blockAt(viewJs.diagnostic, 'function logHistoryQuery(')};return logHistoryQuery;`);
+  const controls = {logLevelFilter: {value: '2'}, logFilter: {value: 'ble'}};
+  assert.equal(query((id) => controls[id], 500, null, 1793380832)(),
+      '/__companion/log?limit=500&level=cew&category=ble&at=1793380832');
+  assert.equal(query((id) => controls[id], 500, {boot: 3, before: 9}, 1793380832)(),
+      '/__companion/log?limit=500&level=cew&category=ble&boot=3&before=9', 'a cursor continues the jump');
+  assert(codeIncludes(viewJs.diagnostic, 'LOG_HISTORY_PAGE=500,LOG_HISTORY_CAP=20000') &&
+         codeIncludes(viewJs.diagnostic, 'logHistory.length>=LOG_HISTORY_CAP'),
+      'the view stops loading past the cap');
+  // D14: Delete the log history shows only through the companion with Admin
+  // unlocked here, follows the unlock, and posts through the same helper.
+  assert(codeIncludes(viewJs.diagnostic, '$("logDeleteButton").hidden=!here||!R.adminUnlockedHere()') &&
+         codeIncludes(viewJs.diagnostic, 'admin:()=>R.activeView==="diagnostic"&&logHistoryControls()') &&
+         codeIncludes(viewJs.diagnostic, 'await companionLog("/__companion/log/delete",{})'),
+      'Delete the log history follows the Admin unlock');
 }
 // logZoneOffsetMinutes answers the zone's offset at each instant: January and
 // July of a DST zone differ, and a missing zone or one Intl rejects falls

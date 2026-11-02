@@ -486,15 +486,21 @@
   assert.equal(el.brew.beverageOut.value, 30.5);
 
   // The toolbar menu exports every shot; a card's ⋯ menu acts on its own shot
-  // and holds Delete, as does an Activation history entry's.
+  // and, with Admin unlocked, holds Delete, as does an Activation history
+  // entry's, whose ⋯ button exists only then.
   assert.ok(partialHtml.stats.includes('id="exportShotsButton" class="btnGlyph" type="button" aria-haspopup="true" aria-expanded="false"'));
   assert.ok(codeIncludes(viewJs.stats, '$("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"))'));
   assert.ok(codeIncludes(viewJs.stats, 'btn.onclick = () => shotMenu.open(btn, r)'));
-  assert.ok(codeIncludes(viewJs.stats, '(scope) => deleteOneShot(r, scope)'));
+  assert.ok(codeIncludes(rawViewJs.stats, 'deleteItem(__WEBUI_TEXT__("stats.delete_shot"), () => deleteOneShot(r))'));
   assert.ok(!codeIncludes(viewJs.stats, 'btnGlyph btnDanger'));
   assert.ok(!codeIncludes(viewJs.history, 'btnGlyph btnDanger'));
   assert.ok(codeIncludes(viewJs.history, 'btn.onclick = () => entryMenu.open(btn, r)'));
-  assert.ok(codeIncludes(viewJs.history, '(scope) => deleteOneHistory(r, scope)'));
+  assert.ok(codeIncludes(rawViewJs.history, 'deleteItem(__WEBUI_TEXT__("history.delete_entry"), () => deleteOneHistory(r))'));
+  assert.ok(codeIncludes(viewJs.history, 'if (R.adminUnlockedHere()) {'), 'locked History rows show no button');
+  assert.ok(codeIncludes(viewJs.stats, 'admin: () => shotStatsViewActive() && R.paint(renderShots)') &&
+            codeIncludes(viewJs.history, 'admin: () => historyViewActive() && R.paint(renderHistory)') &&
+            codeIncludes(runtimeJs, 'adminHereState = adminUnlockedFor(s);eachStream("admin")'),
+      'both lists repaint when this screen\'s Admin state changes');
   assert.ok(codeIncludes(viewJs.stats, 'filter = {}'), 'Exports ignore the list filter');
   assert.ok(codeIncludes(blockAt(viewJs.stats, 'async function exportRows('),
       'statsFrameWindow(0, SHOTS_EXPORT_LIMIT, "date", "desc", 180e3, filter)'));

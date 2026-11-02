@@ -162,8 +162,9 @@ ${deltaTypes}
     ShotCurveRead (*copyShotCurveById)(uint32_t,ShotCurveRecord &,bool)=curveById;
     uint32_t (*historyEpoch)()=+[](){return uint32_t(activations-53);};
     void (*copyHistoryPage)(HistoryPage &,size_t,size_t,ShotLogSortDir,uint8_t)=historyPage;
-    void (*recordStoreCounters)(bool,uint32_t &,uint32_t &)=
-        +[](bool,uint32_t &generation,uint32_t &next){generation=storeEpoch+40;next=shots+1;};
+    void (*recordStoreCounters)(bool,uint32_t &,uint32_t &,RecordStoreMarks &)=
+        +[](bool,uint32_t &generation,uint32_t &next,RecordStoreMarks &marks){
+          generation=storeEpoch+40;next=shots+1;marks.clears=3;marks.goneCount=2;marks.gone[0]=8;marks.gone[1]=6;};
   } callbacks_;
   bool appendRecordPageUi(const ControlStatusSnapshot &,size_t *used,bool){
     return statusJsonAppend(used,"\\"ui\\":{}");
@@ -345,7 +346,7 @@ int main(){
            frames[1].find(",\\"rows\\":[130,")!=std::string::npos);
     assert(frames[1].find(",1,")!=std::string::npos&&frames[1].find(",0,")==std::string::npos);
     size_t pairs=0;for(char c:frames[1])pairs+=c==',';
-    assert(pairs==130*2-1+8);  // 7 header commas and the one before sum
+    assert(pairs==130*2-1+11);  // 10 header commas (two gone ids) and the one before sum
     // A moved store lists every record; content (a rating) moves its revision.
     auto shotRows=[&](){
       link.recordsShots=true;link.recordsShotsEpoch=0;frames.clear();assert(index());
@@ -380,8 +381,10 @@ int main(){
     link.recordsShots=true;assert(network.sendRecordsIndex(link,control)&&frames.size()==1);
     const std::string all=frames[0].substr(frames[0].find("\\"rows\\":[")+8);
     assert(all.rfind("4,",0)==0&&std::count(all.begin(),all.end(),',')==8);
-    // S19: the link's index names the store header counters.
-    assert(frames[0].find(",\\"gen\\":"+std::to_string(storeEpoch+40)+",\\"next\\":5,")!=std::string::npos);
+    // S19, D8: the link's index names the store header counters, the user's
+    // Clear count and the ids the user deleted last.
+    assert(frames[0].find(",\\"gen\\":"+std::to_string(storeEpoch+40)+
+                          ",\\"next\\":5,\\"clr\\":3,\\"gone\\":[8,6],")!=std::string::npos);
     link.statsFetch=true;link.statsFetchRequest=9;link.statsFetchOffset=0;link.statsFetchLimit=50;
     link.statsFetchFilter={};link.statsFetchFilter.includeBad=true;frames.clear();
     for(int i=0;i<10&&link.statsFetch;++i){now+=100;assert(network.sendStatsStream(link,control));}

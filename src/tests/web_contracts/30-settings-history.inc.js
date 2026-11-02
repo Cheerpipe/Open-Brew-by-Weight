@@ -266,12 +266,12 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     !network.includes('\\"lastShot\\"') ||
     !network.includes('\\"curve\\":{"') ||
     !network.includes('formatShotCurveJsonBody') ||
-    !network.includes('lastShotClearHandler') ||
-    !network.includes('LAST_SHOT_CLEAR_NOT_CONFIRMED') ||
+    network.includes('lastShotClearHandler') ||
+    network.includes('LAST_SHOT_CLEAR_NOT_CONFIRMED') ||
     !firmware.includes('lastShotFromEndedCycle') ||
     !firmware.includes('endedCycleDurationMs') ||
     firmware.includes('elapsedMs(relayBeforeOpen.closedAtMs)') ||
-    !firmware.includes('clearLastShot') ||
+    firmware.includes('bool clearLastShot()') ||
     !firmware.includes('clearLastShotRuntimeState') ||
     !firmware.includes('serviceShotStorePersistence') ||
     !firmware.includes('durableFlashWriteAllowed(') ||
@@ -799,12 +799,12 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
 }
 if (!codeIncludes(ui, 'id="shotTable"') ||
     !codeIncludes(ui, 'id="exportShotsButton"') ||
-    !codeIncludes(ui, 'id="clearShotsButton"') ||
-    !html.includes('id="clearShotsButton" class="btnGlyph btnInvert"') ||
-    html.includes('id="clearShotsButton" class="btnGlyph btnDanger"') ||
+    // D1: Clear lives in Admin, not on Stats.
+    codeIncludes(ui, 'id="clearShotsButton"') ||
+    !html.includes('id="clearShotHistoryButton" class="btnGlyph mutable btnInvert"') ||
     // The generic invert rule follows the glass-bar button rule, so it wins there too.
     !(css.indexOf('.btnGlyph.btnInvert{background:var(--pri)') > css.indexOf('.glassBar>.btnGlyph{')) ||
-    !codeIncludes(ui, "confirm:'CLEAR_SHOT_LOG'") ||
+    !codeIncludes(ui, '"/api/v1/stats/clear","CLEAR_SHOT_LOG"') ||
     !codeIncludes(runtimeJs, 'function setEmptyState(') ||
     !codeIncludes(ui, 'refreshShots()') ||
     !codeIncludes(js, "'shotDur'") ||
@@ -1138,7 +1138,7 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     codeIncludes(appJsSource, 'R.stopHistoryStream()') ||
     codeIncludes(appJsSource, 'R.stopStatsStream()') ||
     !codeIncludes(viewJs.history, 'R.armListSentinel("historySentinel", R.loadMoreHistory)') ||
-    !codeIncludes(viewJs.history, 'R.clearActivationHistory') ||
+    codeIncludes(viewJs.history, 'clearActivationHistory') ||
     !codeIncludes(viewJs.history, '.onclick=toggleHistoryDir') ||
     !codeIncludes(viewJs.history, 'syncHistoryDirButton()') ||
     !partialHtml.history.includes('id="historyPanel"') ||
@@ -1148,8 +1148,9 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !partialHtml.history.includes('id="historySentinel"') ||
     !partialHtml.history.includes('id="historyDirButton"') ||
     !partialHtml.history.includes('class="shotSort"') ||
-    !partialHtml.history.includes('id="clearHistoryButton"') ||
-    !partialHtml.history.includes('btnGlyph btnInvert') ||
+    // D1: Clear lives in Admin, not on History.
+    partialHtml.history.includes('id="clearHistoryButton"') ||
+    !partialHtml.admin.includes('id="clearActivationHistoryButton" class="btnGlyph mutable btnInvert"') ||
     !css.includes('#historyTable{') ||
     !css.includes('#historySentinel{min-height:1px') ||
     css.includes('.panelState{') ||
@@ -1170,14 +1171,14 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !codeIncludes(viewJs.history, 'function applyHistoryPage(') ||
     !codeIncludes(historyRuntimeJs, 'function renderHistory(') ||
     !codeIncludes(historyRuntimeJs, 'function deleteOneHistory(') ||
-    !codeIncludes(js, 'function clearActivationHistory(') ||
+    !codeIncludes(js, 'function clearRecords(path,confirm,ask,done,fail,reset)') ||
     !codeIncludes(historyRuntimeJs, "power_on:'Power ON'") ||
     !codeIncludes(historyRuntimeJs, 'HIST_TYPE_SVG.power_on=\'<svg class="o"><use href="#hPW"/></svg>\'') ||
     !codeIncludes(historyRuntimeJs, 'Blocked: no scale') ||
     !codeIncludes(historyRuntimeJs, 'HIST_TYPE_SVG.no_scale_guard_aborted=') ||
     !partialHtml.history.includes('id="hNS" viewBox="0 0 24 24"') ||
     !historyTypesIo.includes('NO_SCALE_GUARD_ABORTED') ||
-    !codeIncludes(js, "confirm:'CLEAR_HISTORY'") ||
+    !codeIncludes(js, '"/api/v1/history/clear","CLEAR_HISTORY"') ||
     !codeIncludes(historyRuntimeJs, "'/api/v1/history/delete'") ||
     !codeIncludes(js, "'/api/v1/history/clear'") ||
     !codeIncludes(historyRuntimeJs, 'const toggleHistoryDir=()=>{') ||
@@ -1346,7 +1347,7 @@ if (!statsSection ||
           rawViewJs.stats.slice(rawViewJs.stats.indexOf('// Stats pages assemble atomically;'),
           rawViewJs.stats.indexOf('const statsStream = {')) + '\n' +
           rawViewJs.stats.slice(rawViewJs.stats.indexOf('let statsExportInFlight'),
-              rawViewJs.stats.indexOf('async function clearShotHistory(')) + '\n' +
+              rawViewJs.stats.indexOf('// The Stats page rides the owned socket')) + '\n' +
           blockAt(rawViewJs.stats, 'const loadMoreShots') +
           '\nthis.loadMoreShots=loadMoreShots;';
       vm.runInContext(stream, context);

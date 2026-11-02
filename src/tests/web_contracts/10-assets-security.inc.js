@@ -118,7 +118,7 @@ const recordsStreamJs = viewRuntimeAlias +
         viewJs.history.indexOf('let ready = false;')) +
     'registerStream("stats", statsStream);registerStream("history", historyStream);\n';
 const statsExportJs = viewJs.stats.slice(viewJs.stats.indexOf('let statsExportInFlight'),
-    viewJs.stats.indexOf('async function clearShotHistory('));
+    viewJs.stats.indexOf('// The Stats page rides the owned socket'));
 // The log stream lives in the Diagnostic module.
 const logStreamJs = viewJs.diagnostic.slice(viewJs.diagnostic.indexOf('const LOG_EVENTS_CAPACITY'),
     viewJs.diagnostic.indexOf('export function applyStatus(')) + 'registerStream("log", logStream);\n';

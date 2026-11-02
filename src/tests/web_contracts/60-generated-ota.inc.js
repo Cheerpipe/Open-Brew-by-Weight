@@ -707,8 +707,8 @@ if (wifiScanStatusStart < 0 ||
   throw new Error('Chunked Wi-Fi scan status responses must send Connection: close');
 }
 if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive())return;scanBusy=true') ||
-    !codeIncludes(js, "withCommandGate(async()=>{try{await api('/api/v1/stats/clear'") ||
-    !codeIncludes(js, "withCommandGate(async()=>{try{await removeRecord('shots',r,scope,'/api/v1/stats/delete'") ||
+    !codeIncludes(js, "withCommandGate(async()=>{try{await api(path,{method:'POST',body:body({confirm})})") ||
+    !codeIncludes(js, "withCommandGate(async()=>{try{await removeRecord('shots',r,'/api/v1/stats/delete'") ||
     !codeIncludes(js, "await api(path,{method:'POST',body:body({id:r.id})})") ||
     !codeIncludes(js, "await api('/api/v1/stats/rate'") ||
     codeIncludes(js, "withCommandGate(async()=>{try{await api('/api/v1/logout'")) {
@@ -1369,6 +1369,27 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
           !network.slice(start, start + 500).includes('requireAdminUnlock(request)')) {
         throw new Error(label + ' must require admin unlock');
       }
+    }
+    // D1, AC1: record deletion needs the caller's Admin unlock before any body
+    // parse or store mutation; GET /api/v1/auth reports it without touching it.
+    for (const handler of ['shotsClearHandler', 'shotsDeleteHandler', 'historyClearHandler',
+                           'historyDeleteHandler']) {
+      const body = blockAt(network, `esp_err_t OpenBrewByWeightNetwork::${handler}(`);
+      const gate = body.indexOf('if (!self.requireAdminUnlock(request)) return ESP_OK;');
+      if (gate < 0 || gate > body.search(/runConfirmedClear|runDeleteById/)) {
+        throw new Error(handler + ' must require the Admin unlock first');
+      }
+    }
+    {
+      const auth = blockAt(network, 'esp_err_t OpenBrewByWeightNetwork::authStatusHandler(');
+      if (!auth.includes('const bool adminUnlocked = self.adminUnlockAllowed(request);') ||
+          !auth.includes('\\"adminUnlocked\\":%s') || auth.includes('requireAdminUnlock') ||
+          auth.includes('touchAdminUnlock')) {
+        throw new Error('GET /api/v1/auth must report adminUnlocked without extending the unlock');
+      }
+    }
+    if (network.includes('/api/v1/last-shot/clear') || network.includes('lastShotClearHandler')) {
+      throw new Error('POST /api/v1/last-shot/clear is removed');
     }
     const unlockFnStart = network.indexOf('OpenBrewByWeightNetwork::unlockHandler');
     if (unlockFnStart < 0 ||
