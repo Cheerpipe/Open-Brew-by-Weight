@@ -90,7 +90,8 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   Serial.reset();
   resetSerialCliState();
 
-  hostMillis = 0;
+  // A field uptime, not 0: an unstamped event (time 0) must look stale.
+  hostMillis = 1000000U;
   outboundShotActive.store(false);
   outboundScaleConnected.store(false);
   hostMachineCloudInhibitCount = 0;
@@ -246,7 +247,7 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   healthProfilerRequest.store(HealthProfilerRequest::NONE,
                               std::memory_order_relaxed);
   healthSnapshotVersion = 0;
-  healthSnapshotAtMs = 0;
+  healthSnapshotAtMs = hostMillis;
   healthSnapshotValid = false;
   publishedControlGate = ControlGateSnapshot{};
   controlStatusPublishRequested = false;
