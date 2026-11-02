@@ -218,9 +218,12 @@ function formatDiagnosticTimezoneOffset(c) {
 function clearLogView() {
   R.uiState.logEvents = [];
   R.uiState.logMissed = 0;
+  // The history stays away until a jump or a filter change asks for it.
   logHistory = [];
   logHistoryNext = null;
-  logHistoryDone = false;
+  logHistoryDone = true;
+  logJumpAt = null;
+  $("logJumpAt").value = "";
   logHistoryControls();
   const d = $("logDropped"),
     el = $("log");
@@ -1578,7 +1581,7 @@ function renderLog() {
       e.m +
       "\n";
   }
-  for (const e of R.uiState.logEvents) {
+  for (const e of logJumpAt == null ? R.uiState.logEvents : []) {
     if (f && e.category !== f) continue;
     if ((r[e.level] ?? 3) > m) continue;
     o += e.line ??=
@@ -1593,19 +1596,25 @@ function renderLog() {
   }
   // New lines append (and the oldest drop) in place, so a selection or a
   // scrolled-back view survives; only a reader already at the end follows it.
+  // Older history prepends with the lines in view held where they were.
   const el = $("log"),
     old = el.value,
     cut = old.indexOf(o.slice(0, o.indexOf("\n") + 1)),
     top = el.scrollTop,
     h = el.scrollHeight,
-    stick = top + el.clientHeight >= h - 8;
-  if (o === old) return;
-  if (cut >= 0 && o.startsWith(old.slice(cut))) {
-    el.setRangeText("", 0, cut);
-    if (!stick) el.scrollTop = top - h + el.scrollHeight;
-    el.setRangeText(o.slice(old.length - cut), el.value.length, el.value.length);
-  } else el.value = o;
-  if (stick) el.scrollTop = el.scrollHeight;
+    stick = top + el.clientHeight >= h - 8,
+    anchor = logAnchor;
+  logAnchor = null;
+  if (o !== old) {
+    if (cut >= 0 && o.startsWith(old.slice(cut))) {
+      el.setRangeText("", 0, cut);
+      if (!stick) el.scrollTop = top - h + el.scrollHeight;
+      el.setRangeText(o.slice(old.length - cut), el.value.length, el.value.length);
+    } else el.value = o;
+    if (anchor?.h) el.scrollTop = anchor.top + el.scrollHeight - anchor.h;
+    else if (stick || anchor) el.scrollTop = el.scrollHeight;
+  }
+  nearLogTop();
 }
 function updateLogHealth(d) {
   const a = [],
@@ -1622,6 +1631,8 @@ function updateLogHealth(d) {
 const logStream = {
   // Log frames carry their own cursor: a pending resync must not drop them.
   cursor: true,
+  // Delete the log history follows this screen's Admin unlock.
+  admin: () => R.activeView === "diagnostic" && logHistoryControls(),
   subscribe: () => (logStreamWanted ? { op: "log", on: true, after: lastLog } : null),
   frame(data) {
     if (logStreamWanted) applyLogFrame(logStreamFrame(data));
@@ -1635,37 +1646,69 @@ const logStream = {
     R.sendUiOperation({ op: "log", on: true, after: 0 });
   },
 };
-// The companion's stored history, paged in on demand: only a page that came
-// through it can read the same-origin store, and the store answers even while
-// the controller is off. Pages arrive newest first and prepend, deduplicated
-// against the live ring, with boot, gap and cleared-log markers between them.
+// The companion's stored history (D16): only a page that came through it can
+// read the same-origin store, and the store answers even while the controller
+// is off. Pages arrive newest first whenever the reader nears the top of the
+// log and prepend with the view held in place, deduplicated against the live
+// ring, with boot, gap and cleared-log markers between them. The companion
+// applies the level and subsystem filters, so every page adds matching lines.
+// A jump starts the history at a moment (`logJumpAt`, wall seconds) and hides
+// the live ring until Latest.
+const LOG_HISTORY_PAGE = 500,
+  LOG_HISTORY_CAP = 20000;
 let logHistory = [],
   logHistoryNext = null,
   logHistoryDone = false,
-  logHistoryBusy = false;
+  logHistoryBusy = false,
+  logHistoryRetryAt = 0,
+  logJumpAt = null,
+  logAnchor = null;
 function logHistoryAvailable() {
   return !!R.uiState.companionHere?.paired;
 }
+const logHistoryFull = () => logHistory.length >= LOG_HISTORY_CAP;
 // The companion answers only a browser the controller lets open the Web UI,
 // so the history goes out with this screen's session.
-async function companionLog(path) {
-  const reply = await fetch(path, { cache: "no-store", headers: R.webUiHeaders() });
-  if (!reply.ok) throw Error(String(reply.status));
+async function companionLog(path, body) {
+  const reply = await fetch(path, {
+    cache: "no-store",
+    ...(body && { method: "POST", body: JSON.stringify(body) }),
+    headers: R.webUiHeaders(body && { "Content-Type": "application/json" }),
+  });
+  if (!reply.ok)
+    throw Object.assign(Error(String(reply.status)), await reply.json().catch(() => null));
   return reply;
 }
+// A datetime-local value read on the controller's clock, as the log shows it.
+function logWallSec(value) {
+  const at = Date.parse(value + "Z") / 1000;
+  if (!Number.isFinite(at)) return null;
+  const zone = diagConfig?.timezoneId;
+  return Math.round(at - logZoneOffsetMinutes(zone, at - logZoneOffsetMinutes(zone, at) * 60) * 60);
+}
+function logHistoryQuery() {
+  const q = new URLSearchParams({
+    limit: LOG_HISTORY_PAGE,
+    level: "cewid".slice(0, +$("logLevelFilter").value + 1),
+  });
+  if ($("logFilter").value) q.set("category", $("logFilter").value);
+  if (logHistoryNext) {
+    q.set("boot", logHistoryNext.boot);
+    q.set("before", logHistoryNext.before);
+  } else if (logJumpAt != null) q.set("at", logJumpAt);
+  return "/__companion/log?" + q;
+}
 async function loadLogOlder() {
-  if (logHistoryBusy || !logHistoryAvailable()) return;
+  if (logHistoryBusy || logHistoryDone || logHistoryFull() || !logHistoryAvailable()) return;
   logHistoryBusy = true;
   // The newest stored events are usually still in the live ring, which shows
-  // them already: one tap pages on until it brings a line the view lacks.
+  // them already: paging goes on until a page brings a line the view lacks.
   const live = new Set(R.uiState.logEvents.map((e) => e.sequence)),
-    shown = (e) => e.g || !(e.b === logBootId && live.has(e.s));
+    shown = (e) => e.g || logJumpAt != null || !(e.b === logBootId && live.has(e.s)),
+    jumped = logJumpAt != null && !logHistory.length;
   try {
     for (let pages = 0, added = false; !added && !logHistoryDone && pages < 8; pages++) {
-      const next = logHistoryNext;
-      const url =
-        "/__companion/log?limit=100" + (next ? `&boot=${next.boot}&before=${next.before}` : "");
-      const page = await (await companionLog(url)).json();
+      const page = await (await companionLog(logHistoryQuery())).json();
       if (!page || !Array.isArray(page.entries)) throw Error();
       // The page is newest first: flip it onto the front of the history.
       logHistory = page.entries.slice().reverse().concat(logHistory);
@@ -1673,35 +1716,98 @@ async function loadLogOlder() {
       logHistoryDone = !page.next;
       added = page.entries.some(shown);
     }
+    const el = $("log");
+    logAnchor = jumped ? "end" : { h: el.scrollHeight, top: el.scrollTop };
     R.paint(renderLog);
   } catch (_) {
-    // A page that did not come: Show older stays offered for another try.
+    // A page that did not come is asked again a little later.
+    logHistoryRetryAt = performance.now() + 10e3;
   } finally {
     logHistoryBusy = false;
     logHistoryControls();
   }
 }
+// Near the top of the log, the next older page loads by itself.
+function nearLogTop() {
+  if (logHistoryAvailable() && $("log").scrollTop < 160 && performance.now() >= logHistoryRetryAt)
+    void loadLogOlder();
+}
+// A jump, Latest or a filter change starts the history over.
+function restartLogHistory() {
+  logHistory = [];
+  logHistoryNext = null;
+  logHistoryDone = false;
+  logHistoryRetryAt = 0;
+  logAnchor = "end";
+  R.paint(renderLog);
+  void loadLogOlder();
+}
+function jumpLog(at) {
+  logJumpAt = at;
+  if (at == null) $("logJumpAt").value = "";
+  restartLogHistory();
+}
 function logHistoryControls() {
-  const here = logHistoryAvailable();
-  $("logOlderButton").hidden = !here || logHistoryDone;
+  const here = logHistoryAvailable(),
+    empty = logJumpAt != null && logHistoryDone && !logHistory.some((e) => !e.g);
+  $("logHistoryTools").hidden = !here;
+  $("logLatestButton").hidden = !here || logJumpAt == null;
   $("logExportButton").hidden = !here;
+  $("logDeleteButton").hidden = !here || !R.adminUnlockedHere();
+  if (!here) return;
+  const note = $("logHistoryNote");
+  note.hidden = !(empty || logHistoryFull());
+  note.textContent = empty
+    ? __WEBUI_TEXT__("diagnostic.log_jump_none")
+    : __WEBUI_TEXT__("diagnostic.log_cap");
 }
 function exportLogHistory() {
   if (!logHistoryAvailable()) return;
+  const q = new URLSearchParams();
+  for (const [key, id] of [
+    ["from", "logExportFrom"],
+    ["to", "logExportTo"],
+  ]) {
+    const at = $(id).value ? logWallSec($(id).value) : null;
+    if (at != null) q.set(key, at);
+  }
+  const range = q.toString();
   downloadText(
-    companionLog("/__companion/log/export").then((reply) => reply.text()),
+    companionLog("/__companion/log/export" + (range ? "?" + range : "")).then((reply) =>
+      reply.text(),
+    ),
     "log-history.json",
     __WEBUI_TEXT__("diagnostic.log_export_failed"),
   );
+}
+// The companion's copy of the log goes; the controller keeps its own recent
+// log, which the view shows as before.
+async function deleteLogHistory() {
+  if (
+    !(await R.askConfirm(
+      __WEBUI_TEXT__("diagnostic.log_delete_confirm"),
+      __WEBUI_TEXT__("records.delete"),
+      true,
+    ))
+  )
+    return;
+  try {
+    await companionLog("/__companion/log/delete", {});
+    jumpLog(null);
+    R.message(__WEBUI_TEXT__("diagnostic.log_deleted"), "ok");
+  } catch (e) {
+    R.message(R.formatCommandError(__WEBUI_TEXT__("diagnostic.log_delete_failed"), e), "error");
+  }
 }
 function renderLogHistoryNote() {
   // Opened directly, with a paired companion keeping the log: name where the
   // older history lives.
   const c = companionDiagnosticStatus,
     note = $("logHistoryNote");
-  note.hidden = !(c?.paired && c.log !== false && !logHistoryAvailable());
-  if (!note.hidden) note.textContent = __WEBUI_TEXT__("diagnostic.log_in_companion");
   logHistoryControls();
+  if (logHistoryAvailable()) return;
+  note.hidden = !(c?.paired && c.log !== false);
+  if (!note.hidden) note.textContent = __WEBUI_TEXT__("diagnostic.log_in_companion");
 }
 export function applyStatus(s) {
   applyDiagnosticStatus(s);
@@ -1775,11 +1881,15 @@ export function init() {
     title.onclick = (e) => void (copied && e.preventDefault());
   }
   for (const id of LOG_LEVELS) $(id).onchange = () => saveLogLevel(id);
-  $("logFilter").onchange = renderLog;
-  $("logLevelFilter").onchange = renderLog;
-  $("logOlderButton").onclick = () => void loadLogOlder();
+  $("logFilter").onchange = $("logLevelFilter").onchange = () =>
+    logHistoryAvailable() ? restartLogHistory() : renderLog();
+  $("log").onscroll = nearLogTop;
+  $("logJumpAt").onchange = () =>
+    jumpLog($("logJumpAt").value ? logWallSec($("logJumpAt").value) : null);
+  $("logLatestButton").onclick = () => jumpLog(null);
   $("copyLogButton").onclick = () => copyText($("log").value);
   $("logExportButton").onclick = () => exportLogHistory();
+  $("logDeleteButton").onclick = () => void deleteLogHistory();
   $("clearLogButton").onclick = () => clearLogView();
   $("auditVerboseButton").onclick = () => toggleAuditHunt();
   $("auditClearButton").onclick = () => emptyAudit();

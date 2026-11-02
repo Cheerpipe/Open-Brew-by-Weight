@@ -94,16 +94,19 @@ function renderHistory() {
     type.append(badge);
     const del = document.createElement("td");
     del.className = "shotDel";
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btnGlyph";
-    btn.title = __WEBUI_TEXT__("history.entry_actions");
-    btn.setAttribute("aria-label", __WEBUI_TEXT__("history.entry_actions"));
-    btn.setAttribute("aria-haspopup", "true");
-    btn.setAttribute("aria-expanded", "false");
-    btn.innerHTML = '<span class="g" aria-hidden="true">' + "⋯" + "</span>";
-    btn.onclick = () => entryMenu.open(btn, r);
-    del.append(btn);
+    // The menu holds only Delete: no button while Admin is locked.
+    if (R.adminUnlockedHere()) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btnGlyph";
+      btn.title = __WEBUI_TEXT__("history.entry_actions");
+      btn.setAttribute("aria-label", __WEBUI_TEXT__("history.entry_actions"));
+      btn.setAttribute("aria-haspopup", "true");
+      btn.setAttribute("aria-expanded", "false");
+      btn.innerHTML = '<span class="g" aria-hidden="true">' + "⋯" + "</span>";
+      btn.onclick = () => entryMenu.open(btn, r);
+      del.append(btn);
+    }
     const typeSvg = HIST_TYPE_SVG[r.type];
     if (typeSvg) {
       const icon = document.createElement("td");
@@ -134,16 +137,20 @@ function renderHistory() {
   updateHistorySentinel();
 }
 let entryMenu;
-async function deleteOneHistory(r, scope = "everywhere") {
-  if (!(await confirmRemoval(r, scope, __WEBUI_TEXT__("runtime.delete_this_history_record"))))
+async function deleteOneHistory(r) {
+  if (
+    !(await R.askConfirm(
+      __WEBUI_TEXT__("runtime.delete_this_history_record"),
+      __WEBUI_TEXT__("records.delete"),
+      true,
+    ))
+  )
     return;
-  if (scope === "archive") return removeRecord("history", r, scope, null, null, renderHistory);
   return R.withCommandGate(async () => {
     try {
       await removeRecord(
         "history",
         r,
-        scope,
         "/api/v1/history/delete",
         () => {
           R.uiState.historyData.records = R.uiState.historyData.records.filter(
@@ -174,35 +181,6 @@ const HISTORY_TYPE_KEYS = [
   "other",
   "no_scale_guard_aborted",
 ];
-async function clearActivationHistory() {
-  const answer = await confirmClear(
-    __WEBUI_TEXT__("runtime.clear_all_recorded_activation_history_this"),
-    "history",
-  );
-  if (!answer) return;
-  return R.withCommandGate(async () => {
-    try {
-      await R.api("/api/v1/history/clear", {
-        method: "POST",
-        body: R.body({ confirm: "CLEAR_HISTORY" }),
-      });
-      await clearArchiveCopy("history", answer, renderHistory);
-      R.uiState.historyData = {
-        bootId: R.uiState.historyData.bootId || 0,
-        total: 0,
-        hasMore: false,
-        records: [],
-      };
-      renderHistory();
-      R.message(__WEBUI_TEXT__("runtime.activation_history_cleared"), "ok");
-    } catch (e) {
-      R.message(
-        R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_clear_history"), e),
-        "error",
-      );
-    }
-  });
-}
 // CSV export rides the standing subscription's one-shot fetch windows, like
 // the Stats export: one window at a time, superseded (resolved empty) whenever
 // a re-subscribe claims the session fetch slot.
@@ -495,17 +473,17 @@ const historyStream = {
   },
   rejected: () => historyFilterReset(),
   refresh: refreshHistory,
+  // Delete follows this screen's Admin unlock.
+  admin: () => historyViewActive() && R.paint(renderHistory),
 };
 let ready = false;
 export function init() {
   if (ready) return;
   ready = true;
   R.registerStream("history", historyStream);
-  entryMenu = actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) => [
-    ...deleteScopes(r, __WEBUI_TEXT__("history.delete_entry"), (scope) =>
-      deleteOneHistory(r, scope),
-    ),
-  ]);
+  entryMenu = actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) =>
+    deleteItem(__WEBUI_TEXT__("history.delete_entry"), () => deleteOneHistory(r)),
+  );
   historyFilterReset = createFilterMenu(
     "historyFilterButton",
     __WEBUI_TEXT__("history.filter_types"),
@@ -520,7 +498,6 @@ export function init() {
       historySendSubscribe();
     },
   );
-  $("clearHistoryButton").onclick = clearActivationHistory;
   $("exportHistoryButton").onclick = exportActivationHistory;
   const h = $("historySort");
   if (h) {

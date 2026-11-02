@@ -1030,6 +1030,24 @@
         </select></span
       ><small class="fieldHint">{{webui:diagnostic.show_one_subsystem_or_all}}</small></label
     >
+    <div id="logHistoryTools" hidden>
+      <label
+        >{{webui:diagnostic.log_jump}}
+        <input id="logJumpAt" class="diagCtl" type="datetime-local" step="1" /><small
+          class="fieldHint"
+          >{{webui:diagnostic.log_jump_hint}}</small
+        ></label
+      ><label
+        >{{webui:diagnostic.log_export_from}}
+        <input id="logExportFrom" class="diagCtl" type="datetime-local" step="1" /></label
+      ><label
+        >{{webui:diagnostic.log_export_to}}
+        <input id="logExportTo" class="diagCtl" type="datetime-local" step="1" /><small
+          class="fieldHint"
+          >{{webui:diagnostic.log_export_range_hint}}</small
+        ></label
+      >
+    </div>
     <p id="logDropped" class="fieldHint" hidden></p>
     <p id="logHistoryNote" class="fieldHint" hidden></p>
     <textarea id="log" readonly aria-label="{{webui:diagnostic.log}}"></textarea>
@@ -1042,9 +1060,9 @@
       >
         <span class="g" aria-hidden="true">⧉</span
         ><span class="t">{{webui:diagnostic.copy}}</span></button
-      ><button id="logOlderButton" class="btnGlyph diagCtl" type="button" hidden>
-        <span class="g" aria-hidden="true">↑</span
-        ><span class="t">{{webui:diagnostic.log_show_older}}</span></button
+      ><button id="logLatestButton" class="btnGlyph diagCtl" type="button" hidden>
+        <span class="g" aria-hidden="true">↓</span
+        ><span class="t">{{webui:diagnostic.log_latest}}</span></button
       ><button
         id="logExportButton"
         class="btnGlyph diagCtl"
@@ -1054,6 +1072,9 @@
       >
         <span class="g" aria-hidden="true">⤓</span
         ><span class="t">{{webui:diagnostic.log_export}}</span></button
+      ><button id="logDeleteButton" class="btnGlyph diagCtl btnInvert" type="button" hidden>
+        <span class="g" aria-hidden="true">×</span
+        ><span class="t">{{webui:diagnostic.log_delete}}</span></button
       ><button
         id="clearLogButton"
         class="btnGlyph diagCtl"

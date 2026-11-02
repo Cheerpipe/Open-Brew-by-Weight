@@ -37,6 +37,9 @@
   <symbol id="g-update" viewBox="0 0 24 24">
     <path d="M12 15V3m-4 8 4 4 4-4M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
   </symbol>
+  <symbol id="g-records" viewBox="0 0 24 24">
+    <path d="M4 6h16M4 12h16M4 18h10" />
+  </symbol>
   <symbol id="g-reset" viewBox="0 0 24 24">
     <path d="M4 7h16m-10 4v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
   </symbol>
@@ -876,6 +879,19 @@
       </button>
     </div>
     <small>{{webui:admin.the_upload_goes_to_the_spare_slot}}</small>
+  </details>
+  <details data-g="records" class="cfgGroup">
+    <summary>{{webui:admin.records}}</summary>
+    <p>{{webui:admin.records_hint}}</p>
+    <div class="btnBar">
+      <button id="clearShotHistoryButton" class="btnGlyph mutable btnInvert" type="button">
+        <span class="g" aria-hidden="true">×</span
+        ><span class="t">{{webui:admin.clear_shot_history}}</span></button
+      ><button id="clearActivationHistoryButton" class="btnGlyph mutable btnInvert" type="button">
+        <span class="g" aria-hidden="true">×</span
+        ><span class="t">{{webui:admin.clear_activation_history}}</span>
+      </button>
+    </div>
   </details>
   <details data-g="reset" class="cfgGroup">
     <summary>{{webui:admin.factory_reset}}</summary>

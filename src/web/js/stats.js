@@ -1271,15 +1271,20 @@ const rateArchivedShot = (r, n, star) =>
     },
     (e) => R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
   );
-async function deleteOneShot(r, scope = "everywhere") {
-  if (!(await confirmRemoval(r, scope, __WEBUI_TEXT__("runtime.delete_this_shot_record")))) return;
-  if (scope === "archive") return removeRecord("shots", r, scope, null, null, renderShots);
+async function deleteOneShot(r) {
+  if (
+    !(await R.askConfirm(
+      __WEBUI_TEXT__("runtime.delete_this_shot_record"),
+      __WEBUI_TEXT__("records.delete"),
+      true,
+    ))
+  )
+    return;
   return R.withCommandGate(async () => {
     try {
       await removeRecord(
         "shots",
         r,
-        scope,
         "/api/v1/stats/delete",
         () => {
           R.uiState.shotHistory.shots = R.uiState.shotHistory.shots.filter((s) => s.id !== r.id);
@@ -2355,37 +2360,6 @@ function statsFrameWindow(offset, limit, sort, dir, timeoutMs, filter = {}) {
   });
   return pending;
 }
-async function clearShotHistory() {
-  const answer = await confirmClear(
-    __WEBUI_TEXT__("runtime.clear_all_recorded_shot_history_this_cannot"),
-    "shots",
-  );
-  if (!answer) return;
-  return R.withCommandGate(async () => {
-    try {
-      await R.api("/api/v1/stats/clear", {
-        method: "POST",
-        body: R.body({ confirm: "CLEAR_SHOT_LOG" }),
-      });
-      await clearArchiveCopy("shots", answer, renderShots);
-      R.resetHeroDeck();
-      R.uiState.shotHistory = {
-        bootId: R.uiState.shotHistory.bootId || 0,
-        total: 0,
-        hasMore: false,
-        shots: [],
-      };
-      R.uiState.shotStats = {};
-      renderShots();
-      R.message(__WEBUI_TEXT__("runtime.shot_history_cleared"), "ok");
-    } catch (e) {
-      R.message(
-        R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_clear_shot_history"), e),
-        "error",
-      );
-    }
-  });
-}
 // The Stats page rides the owned socket (runtime.js registerStream): the
 // standing subscription is session-long once ensured, and these handlers run
 // from the runtime's socket callbacks.
@@ -2715,6 +2689,8 @@ const statsStream = {
     R.uiState.statsWindow = 10;
   },
   refresh: refreshShots,
+  // Delete follows this screen's Admin unlock.
+  admin: () => shotStatsViewActive() && R.paint(renderShots),
 };
 let ready = false;
 export function init() {
@@ -2796,16 +2772,12 @@ export function init() {
       __WEBUI_TEXT__("stats.visualizer_hint"),
       () => downloadJson(`openbrewbyweight-shot-${r.id}-visualizer.json`, shotVisualizer(r)),
     ],
-    ...(R.archiveView
-      ? []
-      : [
-          null,
-          ...deleteScopes(r, __WEBUI_TEXT__("stats.delete_shot"), (scope) =>
-            deleteOneShot(r, scope),
-          ),
-        ]),
+    // Delete, while Admin is unlocked, sits apart after a separator.
+    ...deleteItem(__WEBUI_TEXT__("stats.delete_shot"), () => deleteOneShot(r)).flatMap((item) => [
+      null,
+      item,
+    ]),
   ]);
-  $("clearShotsButton").onclick = clearShotHistory;
   if ($("shotSort")) {
     $("sortDateButton").onclick = () => setShotSort("date");
     $("sortRatingButton").onclick = () => setShotSort("rating");

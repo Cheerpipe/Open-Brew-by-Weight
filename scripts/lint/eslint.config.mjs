@@ -6,8 +6,8 @@ import globals from "globals";
 const RECORDS_PRELUDE = [
   "downloadCsv", "actionMenu", "ICON_TRASH", "createFilterMenu", "armListSentinel",
   "archiveSources", "archiveStatsReady", "archiveChanged", "companionArchive", "archiveSource",
-  "loadArchive", "recordOrder", "mergeRecords", "archiveMark", "archiveHeadings", "deleteScopes",
-  "confirmRemoval", "removeRecord", "confirmClear", "clearArchiveCopy", "archiveListNote",
+  "loadArchive", "recordOrder", "mergeRecords", "archiveMark", "archiveHeadings", "deleteItem",
+  "removeRecord", "archiveListNote",
 ];
 
 export default [

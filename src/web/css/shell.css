@@ -861,8 +861,8 @@ body.pageLoading :is(.view, .view *)::after {
    controller go, and so do the header signals and the bars they leave empty. */
 .archiveView :is(#wifiSignal, #bluetoothSignal, #liveShotOpen),
 .archiveView :is(#shotLogPanel, #historyPanel) .glassBar,
-.archiveView :is(#statsWindow, #shotSort, #shotFilterButton, #exportShotsButton, #clearShotsButton),
-.archiveView :is(#historySort, #historyFilterButton, #exportHistoryButton, #clearHistoryButton),
+.archiveView :is(#statsWindow, #shotSort, #shotFilterButton, #exportShotsButton),
+.archiveView :is(#historySort, #historyFilterButton, #exportHistoryButton),
 .archiveView #historyRows .shotDel,
 .inactiveOverlay.isLogin #webUiArchive {
   display: none;

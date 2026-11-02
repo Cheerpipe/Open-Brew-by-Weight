@@ -209,9 +209,9 @@ function downloadCsv(name, rows) {
 }
 // The companion archive (plan 2A). Through the companion a list is one
 // history: the controller's rows and the records only the companion keeps
-// (older ones, earlier histories before a Clear or a factory reset, records
-// removed from the controller but kept), filtered and ordered alike on both
-// sides and merged page by page. The companion answers only a screen the
+// (older ones the controller let go, and earlier histories from before a
+// factory reset), filtered and ordered alike on both sides and merged page
+// by page. The companion answers only a screen the
 // controller lets in. With the controller off (R.archiveView) the list is
 // the archive alone: every record it copied, read-only.
 const archiveSources = {};
@@ -230,8 +230,8 @@ function archiveStatsReady() {
   const a = R.uiState.companionHere?.archive;
   return !!(a?.available && a.on && (a.shotsTotal || a.shots) > 0);
 }
-// After an archive change (a removal, an erase, a Clear, a rating in rating
-// order) or a moved store epoch: the companion's facts and the store's
+// After an archive change (a deletion, a rating in rating order) or a moved
+// store epoch: the companion's facts and the store's
 // archive rows load again, in place, and once more when the companion's next
 // sync pass has ended, since it copies a change only after the controller's
 // next frame (D5, S17).
@@ -345,8 +345,7 @@ function recordOrder(s, sort, dir) {
 function mergeRecords(own, ownMore, s, order) {
   if (!s || (!s.rows.length && !s.done))
     return { list: own, need: s && !s.done ? "archive" : null };
-  // A kept record is archive-only from the moment it is kept; while the
-  // controller still lists it (its delete on the way), its own row stands.
+  // A record both hold shows the controller's row.
   const open = s.gens?.find((g) => g.current)?.generation,
     held = new Set(own.map((r) => r.id)),
     rows = s.rows.filter((r) => r.archiveGeneration !== open || !held.has(r.id)),
@@ -423,117 +422,24 @@ const archiveHere = () => !!R.uiState.companionHere?.archive?.on;
 // Direct as companionHere decides it: the controller serves plain HTTP only.
 const archiveDirect = () =>
   location.protocol !== "https:" && !!R.homeStatusCache()?.companion?.archive;
-// One record's deletion scopes for its row menu: an archive row is the
-// companion's alone; through the companion a record the controller holds can
-// also leave one place only (S5).
-function deleteScopes(r, label, run) {
+// A record's Delete, offered only while Admin is unlocked for this screen and
+// never in the read-only archive view: one action wherever the record is kept.
+const deleteItem = (label, run) =>
+  R.archiveView || !R.adminUnlockedHere() ? [] : [[ICON_TRASH, label, "", run, true]];
+// Deletes a record, after one confirmation. The controller deletes its own
+// records and the companion's copy follows on its next sync; a record only
+// the companion keeps (`_archive`) is deleted there. `drop()` removes the row
+// from the controller's list, `render()` repaints; a refusal (Admin locked, a
+// shot running) throws and leaves the list as it was.
+async function removeRecord(store, r, path, drop, render) {
   if (r._archive)
-    return [
-      [ICON_TRASH, __WEBUI_TEXT__("records.delete_archive_row"), "", () => run("archive"), true],
-    ];
-  if (!archiveHere()) return [[ICON_TRASH, label, "", () => run("everywhere"), true]];
-  return [
-    [ICON_TRASH, __WEBUI_TEXT__("records.delete_everywhere"), "", () => run("everywhere"), true],
-    [
-      ICON_TRASH,
-      __WEBUI_TEXT__("records.delete_keep"),
-      __WEBUI_TEXT__("records.delete_keep_hint"),
-      () => run("controller"),
-      true,
-    ],
-    [
-      ICON_TRASH,
-      __WEBUI_TEXT__("records.delete_archive_only"),
-      __WEBUI_TEXT__("records.delete_archive_only_hint"),
-      () => run("archive"),
-      true,
-    ],
-  ];
-}
-function confirmRemoval(r, scope, plain) {
-  const text = r._archive
-    ? __WEBUI_TEXT__("records.delete_archive_row_confirm")
-    : scope === "archive"
-      ? __WEBUI_TEXT__("records.delete_archive_only_confirm")
-      : scope === "controller"
-        ? __WEBUI_TEXT__("records.delete_keep_confirm")
-        : plain +
-          (archiveHere()
-            ? " " + __WEBUI_TEXT__("records.delete_everywhere_note")
-            : archiveDirect()
-              ? " " + __WEBUI_TEXT__("records.delete_direct_note")
-              : "");
-  return R.askConfirm(text, __WEBUI_TEXT__("records.delete"), true);
-}
-// Runs a scope on a record. The controller goes first, so a refused delete (a
-// shot running) leaves the archive as it was; `drop()` removes the row from
-// the controller's list, `render()` repaints.
-async function removeRecord(store, r, scope, path, drop, render) {
-  const archive = (action) =>
-    companionArchive(action, {
-      store,
-      id: r.id,
-      ...(r._archive && action === "delete" && { generation: r.archiveGeneration }),
-    });
-  if (scope === "archive")
-    try {
-      await archive("delete");
-      archiveChanged(store, render);
-      render();
-      return R.message(__WEBUI_TEXT__("records.archive_removed"), "ok");
-    } catch (e) {
-      return R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error");
-    }
-  // Kept first, so the archive never infers a deletion; a record it has not
-  // copied yet cannot be kept and stays on the controller (the refusal says so).
-  if (scope === "controller") await archive("keep");
-  try {
+    await companionArchive("delete", { store, id: r.id, generation: r.archiveGeneration });
+  else {
     await R.api(path, { method: "POST", body: R.body({ id: r.id }) });
-  } catch (e) {
-    if (scope === "controller")
-      await companionArchive("keep", { store, id: r.id, kept: false }).catch(() => {});
-    throw e;
+    drop();
   }
-  if (scope === "everywhere" && archiveHere()) await archive("delete").catch(() => {});
   if (archiveHere()) archiveChanged(store, render);
-  drop();
   render();
-}
-// Clear history's confirmation: through the companion it may also delete the
-// companion's copy of the current history (unchecked); opened directly it
-// says the companion keeps its copy (S7). Resolves false, true, or with the
-// option the copy to delete: the companion's history open at this moment, so
-// a restart the companion notes before the erase arrives cannot redirect it.
-async function confirmClear(plain, store) {
-  if (archiveHere()) {
-    const open = (R.uiState.companionHere?.archive?.generations?.[store] || []).find(
-        (g) => g.current,
-      ),
-      answer = await R.askConfirm(
-        plain + " " + __WEBUI_TEXT__("records.clear_kept_here"),
-        __WEBUI_TEXT__("records.clear"),
-        true,
-        __WEBUI_TEXT__("records.clear_with_copy"),
-      );
-    return answer === "option" ? { copy: true, generation: open?.generation } : answer;
-  }
-  return R.askConfirm(
-    plain + (archiveDirect() ? " " + __WEBUI_TEXT__("records.clear_kept_direct") : ""),
-    __WEBUI_TEXT__("records.clear"),
-    true,
-  );
-}
-async function clearArchiveCopy(store, answer, render) {
-  if (answer?.copy)
-    await companionArchive(
-      "erase",
-      Number.isInteger(answer.generation)
-        ? { store, generation: answer.generation }
-        : { store, current: true },
-    ).catch((e) =>
-      R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
-    );
-  if (archiveHere()) archiveChanged(store, render);
 }
 // Opened directly, the end of the list says the companion keeps a copy (S11).
 const archiveListNote = (id, more) => ($(id).hidden = more || !archiveDirect());

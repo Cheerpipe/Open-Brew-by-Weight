@@ -2033,6 +2033,23 @@ const ADMIN_SUMMARIES = {
   },
 };
 const renderAdminRows = () => R.renderGroupRows($("view-admin"), ADMIN_SUMMARIES);
+// Clear empties a whole list as this screen shows it; opened directly with a
+// companion keeping a copy, the confirmation says its older records go too.
+// The record views' models empty here and their pages follow the store.
+async function clearRecords(path, confirm, ask, done, fail, reset) {
+  const direct = location.protocol !== "https:" && !!R.homeStatusCache()?.companion?.archive;
+  const text = ask + (direct ? " " + __WEBUI_TEXT__("records.clear_companion_too") : "");
+  if (!(await R.askConfirm(text, __WEBUI_TEXT__("admin.clear"), true))) return;
+  return R.withCommandGate(async () => {
+    try {
+      await R.api(path, { method: "POST", body: R.body({ confirm }) });
+      reset();
+      R.message(done, "ok");
+    } catch (e) {
+      R.message(R.formatCommandError(fail, e), "error");
+    }
+  });
+}
 export function init() {
   if (ready) return;
   ready = true;
@@ -2318,6 +2335,40 @@ export function init() {
   $("otaVerifyButton").onclick = otaUpload;
   $("otaFlashButton").onclick = otaFlash;
   $("otaDiscardButton").onclick = otaDiscard;
+  $("clearShotHistoryButton").onclick = () =>
+    clearRecords(
+      "/api/v1/stats/clear",
+      "CLEAR_SHOT_LOG",
+      __WEBUI_TEXT__("runtime.clear_all_recorded_shot_history_this_cannot"),
+      __WEBUI_TEXT__("runtime.shot_history_cleared"),
+      __WEBUI_TEXT__("runtime.could_not_clear_shot_history"),
+      () => {
+        R.resetHeroDeck();
+        R.uiState.shotHistory = {
+          bootId: R.uiState.shotHistory.bootId || 0,
+          total: 0,
+          hasMore: false,
+          shots: [],
+        };
+        R.uiState.shotStats = {};
+      },
+    );
+  $("clearActivationHistoryButton").onclick = () =>
+    clearRecords(
+      "/api/v1/history/clear",
+      "CLEAR_HISTORY",
+      __WEBUI_TEXT__("runtime.clear_all_recorded_activation_history_this"),
+      __WEBUI_TEXT__("runtime.activation_history_cleared"),
+      __WEBUI_TEXT__("runtime.could_not_clear_history"),
+      () => {
+        R.uiState.historyData = {
+          bootId: R.uiState.historyData.bootId || 0,
+          total: 0,
+          hasMore: false,
+          records: [],
+        };
+      },
+    );
   $("factoryResetButton").onclick = () => {
     if (
       confirm(

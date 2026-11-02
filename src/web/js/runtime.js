@@ -239,6 +239,7 @@ const heldHere = (s, key) => !!s.relay?.[key] && s.relay[key] === webUiScreen;
 function adminUnlockedFor(s) {
   return !!s.adminUnlocked || heldHere(s, "adminScreen");
 }
+const adminUnlockedHere = () => adminHereState || developmentMode;
 function webUiOverrideFor(s) {
   return !!s.webUiOverrideActive || heldHere(s, "overrideScreen");
 }
@@ -327,6 +328,7 @@ let bootId = 0,
   deviceInFlight = 0,
   deviceWaiters = [],
   diagnosticUnlocked = false,
+  adminHereState = false,
   developmentMode = false,
   outOfReachOverlay = false;
 
@@ -6888,6 +6890,11 @@ function applyCommonStatus(s) {
   if (s.connections || s.snapshotStale) updateHeaderSignals(s);
   applyDiagnosticNavigation(s);
   if ("development" in s) developmentMode = !!s.development;
+  // Record rows offer Delete only while Admin is unlocked for this screen.
+  if (typeof s.adminUnlocked === "boolean" && adminUnlockedFor(s) !== adminHereState) {
+    adminHereState = adminUnlockedFor(s);
+    eachStream("admin");
+  }
   if ("compatibilityMode" in s && !!s.compatibilityMode !== compatMode) {
     compatMode = !!s.compatibilityMode;
     applyCompatibilityChrome();
@@ -7478,6 +7485,7 @@ export {
   formatScaleTimer,
   syncAdminSessionUi,
   adminUnlockedFor,
+  adminUnlockedHere,
   webUiOverrideFor,
   companionHere,
   companionPairable,
