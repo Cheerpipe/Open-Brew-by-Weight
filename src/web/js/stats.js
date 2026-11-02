@@ -992,13 +992,17 @@ async function refreshMergedHeader() {
 // filters, plus the smallest one that covers them; no choice up to ten. The
 // companion's header adds 500 and 1000 over the whole history; the pressed
 // window is always the one the shown header covers. A selection the filters
-// hide falls to the largest window still shown.
+// hide falls to the largest window still shown. While the controller's header
+// stands in for the companion's, the choice stays for its return: the largest
+// button shown covers the same shots.
 function statsWindowChoices() {
   const merged = !!statsMerged,
     n = merged ? (statsMergedGood ?? statsGood) : statsGood,
     sizes = merged ? [10, 50, 100, 500, 1000] : [10, 50, 100],
     shown = sizes.filter((v, i) => i === 0 || sizes[i - 1] < n),
-    pressed = merged ? R.uiState.statsWindow : Math.min(R.uiState.statsWindow, 100);
+    chosen = merged ? R.uiState.statsWindow : Math.min(R.uiState.statsWindow, 100),
+    standIn = !merged && (R.archiveView || archiveStatsReady()),
+    pressed = standIn && !shown.includes(chosen) ? shown.at(-1) : chosen;
   for (const b of $("statsWindow")?.querySelectorAll("button") || []) {
     b.hidden = !shown.includes(+b.dataset.v);
     b.setAttribute("aria-pressed", String(+b.dataset.v === pressed));

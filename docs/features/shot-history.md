@@ -23,7 +23,8 @@ largest size still shown. Every time you open the Web UI it starts again at
 Stats covers your whole history and also offers 500 and 1,000. While the
 companion is still catching up with the controller's newest shots, or cannot
 answer, Stats show the controller's own figures instead, with a note saying so,
-and offer only 10, 50 and 100 until the whole-history figures return. Opened
+and offer only 10, 50 and 100 until the whole-history figures return with
+the size you picked. Opened
 directly, Stats always cover the shots on the controller. Preset figures, such
 as a preset's arrival line and grind hint, always come from the controller's
 own shots, with or without the companion.

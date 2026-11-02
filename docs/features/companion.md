@@ -251,7 +251,8 @@ choice at all with ten shots or fewer. Filtering the list down to fewer
 shots moves the selection to the largest size still offered. The figures
 cover your whole history only once the companion holds the controller's
 newest shot; until then, or while it cannot answer, Stats show the
-controller's own figures with a note saying so, and offer 10, 50 and 100 only.
+controller's own figures with a note saying so, and offer 10, 50 and 100 only;
+the size you picked comes back with the whole-history figures.
 With the controller off they come from the companion's copy, or say they are
 not available right now. Opened directly, the controller offers 10, 50 and
 100 by the same rule. Preset figures, such as a preset's arrival line and

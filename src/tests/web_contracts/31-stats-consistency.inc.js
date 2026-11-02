@@ -103,7 +103,7 @@
 // companion's merged header adds 500 and 1000; a hidden selection falls back.
 {
   const assert = require('assert');
-  const choices = (n, merged, selected) => {
+  const choices = (n, merged, selected, standIn = false) => {
     const pressed = [];
     const buttons = [10, 50, 100, 500, 1000].map((v) => ({dataset: {v: String(v)}, hidden: false,
       setAttribute: (k, on) => on === 'true' && pressed.push(v)}));
@@ -112,10 +112,10 @@
     const uiState = {statsWindow: selected};
     let headers = 0;
     new Function('$', 'R', 'statsMergedGood', 'statsGood', 'statsMerged', 'statsSynced',
-        'sendStatsWindow', 'refreshMergedHeader',
+        'sendStatsWindow', 'refreshMergedHeader', 'archiveStatsReady',
         `${blockAt(rawViewJs.stats, 'function statsWindowChoices(')};statsWindowChoices();`)(
         () => group, {uiState}, merged ? n : null, n, merged ? {} : null, true,
-        () => sent.push(uiState.statsWindow), () => headers++);
+        () => sent.push(uiState.statsWindow), () => headers++, () => standIn);
     return {shown: group.hidden ? [] : buttons.filter((b) => !b.hidden).map((b) => +b.dataset.v),
       selected: uiState.statsWindow, sent, headers, pressed};
   };
@@ -147,6 +147,10 @@
   assert.deepEqual([fallback.shown, fallback.pressed, fallback.selected, fallback.sent],
       [[10, 50, 100], [100], 500, []]);
   assert.deepEqual(choices(134, true, 500).pressed, [500]);
+  // A controller holding few shots (after a factory reset) presses the largest
+  // window shown and keeps the 500 for when the merged header returns.
+  const few = choices(30, false, 500, true);
+  assert.deepEqual([few.shown, few.pressed, few.selected, few.sent], [[10, 50], [50], 500, []]);
 }
 // The companion archive merge (S9, S12): one comparator over both sources, a
 // cut at the first row a source still has to send, a record both hold shown
