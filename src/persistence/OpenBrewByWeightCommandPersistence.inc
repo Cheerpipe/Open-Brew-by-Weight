@@ -89,11 +89,14 @@ uint32_t copyHistoryEpoch() {
 }
 
 // A store's header counters for the companion archive's reset detection
-// (plan S19): both only grow, and nextRecordId returns to 1 on a Clear.
-void copyRecordStoreCounters(bool shots, uint32_t &generation, uint32_t &next) {
+// (plan S19): both only grow, and nextRecordId returns to 1 on a Clear or a
+// factory reset; the marks tell a user's Clear and deletions apart.
+void copyRecordStoreCounters(bool shots, uint32_t &generation, uint32_t &next,
+                             RecordStoreMarks &marks) {
   TaskLockGuard lock(shotStoreMutex);
   generation = shots ? shotLog.generation() : historyLog.generation();
   next = shots ? shotLog.nextRecordId() : historyLog.nextRecordId();
+  marks = shots ? shotLog.marks() : historyLog.marks();
 }
 
 uint32_t copyShotLogEpoch() {
@@ -103,14 +106,15 @@ uint32_t copyShotLogEpoch() {
 
 bool deleteHistoryRecord(uint32_t id) {
   TaskLockGuard lock(shotStoreMutex);
-  const bool changed = historyLog.removeById(id, false);
-  if (changed) shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
-  return changed;
+  if (!historyLog.removeById(id, false)) return false;
+  historyLog.noteDeleted(id);
+  shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
+  return true;
 }
 
 bool clearHistoryLog() {
   TaskLockGuard lock(shotStoreMutex);
-  const bool changed = historyLog.clear(false);
+  const bool changed = historyLog.clear(false, true);
   if (changed) shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return changed;
 }
@@ -151,29 +155,21 @@ bool copyShotStoreStatus(uint32_t &bootId, PersistedLastShot &last,
 bool deleteShotRecord(uint32_t id) {
   TaskLockGuard lock(shotStoreMutex);
   const bool hadCurve = shotCurves.removeById(id);
-  if (!shotLog.removeById(id, false) && !hadCurve) return false;
+  const bool removed = shotLog.removeById(id, false);
+  if (removed) shotLog.noteDeleted(id);
+  else if (!hadCurve) return false;
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return true;
 }
 
 bool clearShotLog() {
   TaskLockGuard lock(shotStoreMutex);
-  if (!shotLog.clear(false)) return false;
+  if (!shotLog.clear(false, true)) return false;
   shotCurves.clear();
   // The pool clears before this clear is persisted; the unsaved trace of a
   // cleared shot is not written.
   shotTrace().consumeCompleted();
   shotTracePoolClearRequested.store(true, std::memory_order_release);
-  shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
-  return true;
-}
-
-bool clearLastShot() {
-  TaskLockGuard lock(shotStoreMutex);
-  ShotLogRecord latest = {};
-  if (!shotLog.copyNewestEligible(latest)) return false;
-  if (!shotLog.removeById(latest.id, false)) return false;
-  shotCurves.removeById(latest.id);
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return true;
 }

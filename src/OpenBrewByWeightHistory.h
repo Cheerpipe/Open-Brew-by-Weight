@@ -26,7 +26,7 @@ struct DualSlotFlashLogTraits<HistoryStore> {
   static constexpr size_t kSlotCount = HISTORY_FLASH_SLOT_COUNT;
   static constexpr size_t kHeaderBytes = sizeof(HistoryHeader);
   static constexpr void (*reset)(HistoryStore &) = resetHistoryStore;
-  static constexpr void (*widen)(HistoryStore &) = nullptr;
+  static constexpr void (*widen)(HistoryStore &) = loadedHistoryStore;
   using Record = HistoryRecord;
   static constexpr size_t kCapacity = HISTORY_CAPACITY;
   static constexpr uint32_t (*recordIdOf)(const HistoryRecord &) =
@@ -38,12 +38,16 @@ class HistoryLog
                               compactHistoryStore, finalizeHistoryStore> {
  public:
 
-  bool clear(bool persistNow = true) {
+  // `user`: a Clear the user asked for, which the clear count records (a
+  // factory reset keeps the count).
+  bool clear(bool persistNow = true, bool user = false) {
     // Keep the monotonic generation: a regressed generation would make the
     // pre-clear slot look newer on the next load.
     const uint32_t generation = store_.header.generation;
+    const uint32_t clears = store_.marks.clears + (user ? 1U : 0U);
     resetHistoryStore(store_);
     store_.header.generation = generation;
+    store_.marks.clears = clears;
     return persistMutation(persistNow);
   }
 

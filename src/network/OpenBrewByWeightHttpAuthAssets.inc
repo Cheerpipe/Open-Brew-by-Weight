@@ -278,6 +278,12 @@ bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {
 
 bool OpenBrewByWeightNetwork::requireAdminUnlock(httpd_req_t *request) {
   if (!adminUnlockAllowed(request)) {
+    // Field diagnosis reads the Web UI log: one line per quiet window.
+    static RefusalLog log;
+    if (const uint32_t count = log.due())
+      lifecycleLogf("Admin is locked: refused %lu request(s), the last to %.*s",
+                    static_cast<unsigned long>(count),
+                    static_cast<int>(strcspn(request->uri, "?")), request->uri);
     sendError(request, STATUS_UNAUTHORIZED, "ADMIN_LOCKED",
               nullptr, "ADMIN_LOCKED");
     return false;
@@ -424,7 +430,6 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       {"/api/v1/stats/rate", HTTP_POST, shotsRateHandler},
       {"/api/v1/history/clear", HTTP_POST, historyClearHandler},
       {"/api/v1/history/delete", HTTP_POST, historyDeleteHandler},
-      {"/api/v1/last-shot/clear", HTTP_POST, lastShotClearHandler},
       {"/api/v1/time/sync", HTTP_POST, timeSyncHandler},
       {"/api/v1/time/zones", HTTP_GET, timeZoneCatalogHandler},
       {"/api/v1/time/preview", HTTP_POST, timeZonePreviewHandler},

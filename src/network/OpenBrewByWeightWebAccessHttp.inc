@@ -205,6 +205,10 @@ esp_err_t OpenBrewByWeightNetwork::authStatusHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const bool signedIn = self.webAccessSessionAllowed(request);
   const bool required = self.webAccessActive() && !self.softApPeer(request);
+  // This caller's own unlock (a companion screen's, never the companion's
+  // shared client), read without extending it: the companion asks it before
+  // deleting a record only it keeps.
+  const bool adminUnlocked = self.adminUnlockAllowed(request);
   // Device names hold only letters, digits, spaces and hyphens: no escaping.
   char name[DEVICE_NAME_CAPACITY] = {};
   {
@@ -213,8 +217,9 @@ esp_err_t OpenBrewByWeightNetwork::authStatusHandler(httpd_req_t *request) {
   }
   char json[DEVICE_NAME_CAPACITY + 80] = {};
   snprintf(json, sizeof(json),
-           "{\"loginRequired\":%s,\"signedIn\":%s,\"deviceName\":\"%s\"}",
-           required ? "true" : "false", signedIn ? "true" : "false", name);
+           "{\"loginRequired\":%s,\"signedIn\":%s,\"adminUnlocked\":%s,\"deviceName\":\"%s\"}",
+           required ? "true" : "false", signedIn ? "true" : "false",
+           adminUnlocked ? "true" : "false", name);
   return sendJson(request, STATUS_OK, json);
 }
 

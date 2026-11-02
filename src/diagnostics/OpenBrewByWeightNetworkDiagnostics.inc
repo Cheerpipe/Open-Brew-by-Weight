@@ -999,6 +999,7 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
 
 esp_err_t OpenBrewByWeightNetwork::shotsClearHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
+  if (!self.requireAdminUnlock(request)) return ESP_OK;
   return self.runConfirmedClear(
       request,
       nullptr,
@@ -1008,19 +1009,9 @@ esp_err_t OpenBrewByWeightNetwork::shotsClearHandler(httpd_req_t *request) {
       nullptr, "SHOT_HISTORY_CLEAR_REQUIRES_IDLE", "SHOT_HISTORY_CLEAR_NOT_CONFIRMED", "SHOT_HISTORY_CLEAR_FAILED");
 }
 
-esp_err_t OpenBrewByWeightNetwork::lastShotClearHandler(httpd_req_t *request) {
-  OpenBrewByWeightNetwork &self = *instance_;
-  return self.runConfirmedClear(
-      request,
-      nullptr,
-      "CLEAR_LAST_SHOT", "LAST_SHOT_CLEAR_NOT_CONFIRMED",
-      nullptr,
-      self.callbacks_.clearLastShot, "LAST_SHOT_CLEAR_FAILED",
-      nullptr, "LAST_SHOT_CLEAR_REQUIRES_IDLE", "LAST_SHOT_CLEAR_NOT_CONFIRMED", "LAST_SHOT_CLEAR_FAILED");
-}
-
 esp_err_t OpenBrewByWeightNetwork::shotsDeleteHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
+  if (!self.requireAdminUnlock(request)) return ESP_OK;
   return self.runDeleteById(
       request,
       nullptr,
@@ -1084,6 +1075,7 @@ esp_err_t OpenBrewByWeightNetwork::shotsRateHandler(httpd_req_t *request) {
 
 esp_err_t OpenBrewByWeightNetwork::historyClearHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
+  if (!self.requireAdminUnlock(request)) return ESP_OK;
   return self.runConfirmedClear(
       request,
       nullptr,
@@ -1095,6 +1087,7 @@ esp_err_t OpenBrewByWeightNetwork::historyClearHandler(httpd_req_t *request) {
 
 esp_err_t OpenBrewByWeightNetwork::historyDeleteHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
+  if (!self.requireAdminUnlock(request)) return ESP_OK;
   return self.runDeleteById(
       request,
       nullptr,

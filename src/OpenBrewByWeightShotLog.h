@@ -192,12 +192,16 @@ class ShotLog
     return true;
   }
 
-  bool clear(bool persistNow = true) {
+  // `user`: a Clear the user asked for, which the clear count records (a
+  // factory reset keeps the count).
+  bool clear(bool persistNow = true, bool user = false) {
     // Keep the monotonic generation: a regressed generation would make the
     // pre-clear slot look newer on the next load.
     const uint32_t generation = store_.header.generation;
+    const uint32_t clears = store_.marks.clears + (user ? 1U : 0U);
     resetShotLogStore(store_);
     store_.header.generation = generation;
+    store_.marks.clears = clears;
     return persistMutation(persistNow);
   }
 

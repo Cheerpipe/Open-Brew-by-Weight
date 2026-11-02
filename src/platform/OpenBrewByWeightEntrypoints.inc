@@ -558,7 +558,6 @@ void startAfterBootRecovery() {
     callbacks.rateShotRecord = rateShotRecord;
     callbacks.rateLastShot = rateLastShot;
     callbacks.clearShotLog = clearShotLog;
-    callbacks.clearLastShot = clearLastShot;
     callbacks.clearResetHistory = clearPersistedResetHistory;
     callbacks.resetAllDurableStores = resetAllDurableStoresForNetwork;
     callbacks.releaseNvsSpaceForFactoryReset =

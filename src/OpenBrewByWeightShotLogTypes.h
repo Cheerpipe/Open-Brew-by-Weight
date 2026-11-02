@@ -695,6 +695,37 @@ struct ShotLogHeader {
 };
 static_assert(sizeof(ShotLogHeader) == 24, "shot-log header layout changed");
 
+// What the companion's copy follows of the user's deletions in a record
+// store (docs/COMPANION_LINK.md, "Record index"): how many times the user
+// cleared it (only grows; a factory reset keeps the count) and the ids the
+// user deleted since the store was last emptied, newest first. It follows
+// the records, outside the header and its checksum, so an earlier image
+// still reads the store; it is bound to the header generation of the save
+// that wrote it, so whatever an earlier image left there reads as none.
+constexpr uint32_t RECORD_MARKS_MAGIC = 0x4B52414DU;  // "MARK"
+constexpr size_t RECORD_MARKS_GONE = 16;
+struct RecordStoreMarks {
+  uint32_t magic;
+  uint32_t generation;
+  uint32_t clears;
+  uint32_t goneCount;
+  uint32_t gone[RECORD_MARKS_GONE];
+};
+static_assert(sizeof(RecordStoreMarks) == 80, "record marks layout changed");
+
+inline void recordMarksLoaded(RecordStoreMarks &marks, uint32_t generation) {
+  if (marks.magic != RECORD_MARKS_MAGIC || marks.generation != generation ||
+      marks.goneCount > RECORD_MARKS_GONE)
+    marks = {};
+}
+
+inline void recordMarksGone(RecordStoreMarks &marks, uint32_t id) {
+  const uint32_t kept = marks.goneCount < RECORD_MARKS_GONE ? marks.goneCount : RECORD_MARKS_GONE - 1;
+  memmove(&marks.gone[1], &marks.gone[0], kept * sizeof(marks.gone[0]));
+  marks.gone[0] = id;
+  marks.goneCount = kept + 1;
+}
+
 // Read-time view; stats are derived from shot records and never persisted.
 struct ShotStatsView {
   uint32_t shotCount = 0;
@@ -751,6 +782,7 @@ inline ShotStatsView shotLogStatsView(size_t count, size_t window, At at) {
 struct ShotLogStore {
   ShotLogHeader header;
   ShotLogRecord records[SHOT_LOG_CAPACITY];
+  RecordStoreMarks marks;
 };
 
 inline uint32_t shotLogLocalSecFromUtc(uint32_t utcSec, int16_t offsetMinutes) {
@@ -775,6 +807,8 @@ inline void finalizeShotLogStore(ShotLogStore &store) {
   store.header.recordSize = sizeof(ShotLogRecord);
   store.header.checksum = 0;
   store.header.checksum = shotLogChecksum(store);
+  store.marks.magic = RECORD_MARKS_MAGIC;
+  store.marks.generation = store.header.generation;
 }
 
 inline bool validShotLogStore(const ShotLogStore &store) {
@@ -794,8 +828,10 @@ inline bool validShotLogStore(const ShotLogStore &store) {
 // the current size; appended fields read as zero. Every save compacts the
 // ring (records[0..count) oldest first), so the write index follows from the
 // count; one an image of smaller capacity wrote (500 records at index 0)
-// would otherwise point past the live records.
+// would otherwise point past the live records. Marks an earlier image did
+// not write read as none.
 inline void widenShotLogRecords(ShotLogStore &store) {
+  recordMarksLoaded(store.marks, store.header.generation);
   store.header.writeIndex = static_cast<uint16_t>(store.header.count % SHOT_LOG_CAPACITY);
   const size_t stored = store.header.recordSize;
   if (stored >= sizeof(ShotLogRecord)) return;

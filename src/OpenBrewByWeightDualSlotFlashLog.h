@@ -250,6 +250,10 @@ class DualSlotFlashLog {
     if (clearDirty) dirty_ = false;
   }
 
+  // The shot and activation stores' RecordStoreMarks; the user deleted `id`.
+  const RecordStoreMarks &marks() const { return store_.marks; }
+  void noteDeleted(uint32_t id) { recordMarksGone(store_.marks, id); }
+
   // Record-level ring API shared by the stores. The per-store traits supply
   // the record type, ring capacity, and the record field that carries the
   // record id (ShotLog/History use `id`, ShotCurve uses `shotId`).

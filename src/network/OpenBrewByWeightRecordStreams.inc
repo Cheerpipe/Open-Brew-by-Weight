@@ -448,15 +448,23 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
   }
   size_t used = COMPANION_RECORD_ORIGIN;
   // The header counters (S19), read before the rows: only a Clear or a
-  // factory reset makes nextRecordId (or generation) go back.
+  // factory reset makes nextRecordId go back; the user's Clear count and
+  // newest deleted ids tell the companion which removals were deletions.
   uint32_t generation = 0, next = 0;
-  if (callbacks_.recordStoreCounters) callbacks_.recordStoreCounters(shots, generation, next);
+  RecordStoreMarks marks = {};
+  if (callbacks_.recordStoreCounters)
+    callbacks_.recordStoreCounters(shots, generation, next, marks);
   if (!statusJsonAppend(&used, "{\"v\":1,\"type\":\"records\",\"boot\":%lu,"
-                               "\"store\":\"%s\",\"epoch\":%lu,\"gen\":%lu,\"next\":%lu",
+                               "\"store\":\"%s\",\"epoch\":%lu,\"gen\":%lu,\"next\":%lu,"
+                               "\"clr\":%lu,\"gone\":[",
                         static_cast<unsigned long>(control.bootId), shots ? "shots" : "history",
                         static_cast<unsigned long>(epoch), static_cast<unsigned long>(generation),
-                        static_cast<unsigned long>(next)))
+                        static_cast<unsigned long>(next), static_cast<unsigned long>(marks.clears)))
     return false;
+  for (uint32_t n = 0; n < marks.goneCount; ++n)
+    if (!statusJsonAppend(&used, "%s%lu", n ? "," : "", static_cast<unsigned long>(marks.gone[n])))
+      return false;
+  if (!statusJsonAppend(&used, "]")) return false;
   RecordIndexWork *const work = rows && session.recordsKey ? recordIndexWork() : nullptr;
   RecordIndexBaseline *const base = work ? &work->baselines[shots ? 0 : 1] : nullptr;
   RecordIndexBaseline *const list = work ? &work->scratch : nullptr;

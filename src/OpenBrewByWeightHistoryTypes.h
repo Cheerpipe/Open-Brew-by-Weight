@@ -85,9 +85,10 @@ static_assert(sizeof(HistoryHeader) == 24,
 struct HistoryStore {
   HistoryHeader header;
   HistoryRecord records[HISTORY_CAPACITY];
+  RecordStoreMarks marks;
 };
 
-static_assert(sizeof(HistoryStore) == 16024,
+static_assert(sizeof(HistoryStore) == 16104,
               "HistoryStore must stay 4-byte aligned for chunked flash I/O and fit one 16 KiB slot");
 
 inline size_t historyClampPageLimit(size_t limit) {
@@ -118,6 +119,13 @@ inline void finalizeHistoryStore(HistoryStore &store) {
   store.header.recordSize = sizeof(HistoryRecord);
   store.header.checksum = 0;
   store.header.checksum = historyChecksum(store);
+  store.marks.magic = RECORD_MARKS_MAGIC;
+  store.marks.generation = store.header.generation;
+}
+
+// Marks an earlier image did not write read as none.
+inline void loadedHistoryStore(HistoryStore &store) {
+  recordMarksLoaded(store.marks, store.header.generation);
 }
 
 inline bool validHistoryStore(const HistoryStore &store) {

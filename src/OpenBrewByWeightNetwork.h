@@ -253,7 +253,8 @@ struct NetworkBridgeCallbacks {
   // stores only mutate alongside records).
   uint32_t (*shotLogEpoch)() = nullptr;
   // A store's header generation and nextRecordId (companion archive, S19).
-  void (*recordStoreCounters)(bool shots, uint32_t &generation, uint32_t &next) = nullptr;
+  void (*recordStoreCounters)(bool shots, uint32_t &generation, uint32_t &next,
+                              RecordStoreMarks &marks) = nullptr;
   ShotStatsView (*copyShotStats)() = nullptr;
   bool (*deleteHistoryRecord)(uint32_t id) = nullptr;
   bool (*clearHistoryLog)() = nullptr;
@@ -261,7 +262,6 @@ struct NetworkBridgeCallbacks {
   bool (*rateShotRecord)(uint32_t id, uint8_t rating) = nullptr;
   bool (*rateLastShot)(uint8_t rating) = nullptr;
   bool (*clearShotLog)() = nullptr;
-  bool (*clearLastShot)() = nullptr;
   bool (*clearResetHistory)(uint32_t unsafeResetCount) = nullptr;
   bool (*releaseNvsSpaceForFactoryReset)() = nullptr;
   bool (*resetAllDurableStores)(PersistedSettings &settings) = nullptr;
@@ -854,7 +854,6 @@ class OpenBrewByWeightNetwork {
   static esp_err_t shotsRateHandler(httpd_req_t *request);
   static esp_err_t historyClearHandler(httpd_req_t *request);
   static esp_err_t historyDeleteHandler(httpd_req_t *request);
-  static esp_err_t lastShotClearHandler(httpd_req_t *request);
   static esp_err_t timeSyncHandler(httpd_req_t *request);
   static esp_err_t timeZoneCatalogHandler(httpd_req_t *request);
   static esp_err_t timeZonePreviewHandler(httpd_req_t *request);
