@@ -50,7 +50,7 @@
     "admin.companion_connecting": "Connecting the companion\u2026",
     "admin.companion_copy": "Shot copy",
     "admin.companion_copy_catching": "catching up",
-    "admin.companion_copy_counts": "Pages it answered itself: {0}. Pages it left to the controller: {1}. Times it asked the controller for missing records: {2}.",
+    "admin.companion_copy_counts": "Pages answered from the copy: {0} · Pages passed to the controller: {1} · Requests for missing records: {2}",
     "admin.companion_copy_current": "up to date",
     "admin.companion_copy_off": "off",
     "admin.companion_copy_state": "Shots {0} \u00b7 History {1}",

@@ -117,13 +117,15 @@
     vm.runInContext(blockAt(adminJs, 'function companionCopy('), run);
     run.companionCopy(null);
     assert.equal(els.companionCopyRow.hidden, true, 'opened directly: no row');
-    run.companionCopy({archive: {replica: {shots: 'current', history: 'catchingUp'}, served: 12, fallbacks: 1,
-      catchUpFetches: 3}});
+    run.companionCopy({archive: {on: false, replica: {shots: 'off', history: 'off'}}});
+    assert.equal(els.companionCopyRow.hidden, true, 'archive off: no row');
+    run.companionCopy({archive: {on: true, replica: {shots: 'current', history: 'catchingUp'}, served: 12,
+      fallbacks: 1, catchUpFetches: 3}});
     assert.equal(els.companionCopyRow.hidden, false);
     assert.equal(els.companionCopyState.textContent, 'Shots up to date · History catching up');
     assert.equal(els.companionCopyCounts.textContent,
-        'Pages it answered itself: 12. Pages it left to the controller: 1. Times it asked the controller for missing records: 3.');
-    run.companionCopy({archive: {replica: {shots: 'off', history: 'off'}}});
+        'Pages answered from the copy: 12 · Pages passed to the controller: 1 · Requests for missing records: 3');
+    run.companionCopy({archive: {on: true, replica: {shots: 'off', history: 'off'}}});
     assert.equal(els.companionCopyState.textContent, 'Shots off · History off');
     assert.ok(codeIncludes(adminJs, 'R.companionHere(true).then(companionCopy)'));
     assert.ok(/<div id="companionPaired"[^]*<div id="companionCopyRow" class="accessRow" hidden>/.test(admin));

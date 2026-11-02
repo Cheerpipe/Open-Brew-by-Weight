@@ -743,7 +743,7 @@ function companionCopy(here) {
   const a = here?.archive,
     row = $("companionCopyRow");
   if (!row) return;
-  row.hidden = !a?.replica;
+  row.hidden = !a?.on || !a.replica;
   if (row.hidden) return;
   const state = (s) =>
     s === "current"
