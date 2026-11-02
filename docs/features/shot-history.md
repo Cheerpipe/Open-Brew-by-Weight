@@ -275,7 +275,7 @@ weight alone cannot establish that the final reading belongs to another cup.
 Open the shot history table to browse rows, export one shot from its ⋯
 menu, or export every good shot as CSV or JSON. Deleting needs
 [Admin](../settings/factory-reset.md#clear-a-history) unlocked on the screen you
-use: then the ⋯ menu also offers **Delete shot**, and Admin offers **Clear shot
+use: then the ⋯ menu also offers **Delete**, and Admin offers **Clear shot
 history** for the whole list. Both ask you to confirm and cannot be undone. A
 deleted shot is gone everywhere, including the copy a
 [companion](companion.md#deleting-records) keeps, however you opened the Web UI.
@@ -582,7 +582,7 @@ that shot only:
   landed from the target. Grinder, beans, and roast stay empty for you to fill
   in on Visualizer. A shot recorded before the controller knew the time is
   dated when you download it.
-- **Delete shot**, at the bottom of the menu while Admin is unlocked, removes
+- **Delete**, at the bottom of the menu while Admin is unlocked, removes
   the shot after you confirm.
 
 Exporting never changes your shots, so it also works while settings are locked.

@@ -225,11 +225,11 @@
   const itemSource = rawViewJs.records.slice(rawViewJs.records.indexOf('const deleteItem ='),
       rawViewJs.records.indexOf(';\n', rawViewJs.records.indexOf('const deleteItem =')) + 1);
   const item = (archiveView, unlocked) => new Function('R', 'ICON_TRASH',
-      `${itemSource}return deleteItem('Delete shot', () => {});`)(
+      `${itemSource}return deleteItem('Delete', () => {});`)(
       {archiveView, adminUnlockedHere: () => unlocked}, 'icon');
   assert.equal(item(false, false).length, 0, 'locked: no Delete');
   assert.equal(item(true, true).length, 0, 'the archive view never deletes');
-  assert.deepEqual(item(false, true).map((i) => [i[1], i[4]]), [['Delete shot', true]]);
+  assert.deepEqual(item(false, true).map((i) => [i[1], i[4]]), [['Delete', true]]);
   // S1: the companion's pages carry the rows only it keeps; each is marked
   // kept by it (and deleted, rated or charted there), and the page's
   // histories and gaps feed the lines between them.

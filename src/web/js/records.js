@@ -113,9 +113,15 @@ function createPopup(label, fill) {
     const r = anchor.getBoundingClientRect(),
       below = innerHeight - r.bottom;
     panel.style.top =
-      (below >= panel.offsetHeight || below >= r.top
-        ? r.bottom + 8
-        : Math.max(8, r.top - panel.offsetHeight - 8)) + "px";
+      Math.max(
+        8,
+        Math.min(
+          below >= panel.offsetHeight || below >= r.top
+            ? r.bottom + 8
+            : r.top - panel.offsetHeight - 8,
+          innerHeight - panel.offsetHeight - 8,
+        ),
+      ) + "px";
     panel.style.left =
       Math.min(
         Math.max(8, r.left + r.width / 2 - panel.offsetWidth / 2),
