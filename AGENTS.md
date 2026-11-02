@@ -106,6 +106,14 @@ failures, not silent skips. Tests must not install packages, use the network, or
 touch hardware implicitly. Static analysis is run only when explicitly requested
 or required by the requested validation gate.
 
+A gate run in the background reports only when it exits, so a hung gate never
+reports. Check its progress once it passes its usual duration (R3 about 11
+minutes, `test web` about 3). A stall means neither
+`artifacts/runs/<id>/run.log` nor the gate's process tree (its newest process
+and that process's CPU time) changes for several minutes; a quiet log alone is
+not one, since some steps, such as ESP-IDF builds, write only when they finish.
+Inspect a stall with `ps` and `sample` and report it before the user asks.
+
 Parallel agents work in separate worktrees, validate with `--budget-report`,
 and never edit budget numbers in a change still in development. The change
 that lands last rebases on `main`, runs the full gate once, and accepts
