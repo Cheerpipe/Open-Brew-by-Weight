@@ -8966,16 +8966,31 @@ void startShotWithKnownCupMass(float cupG) {
 
 void cp24_cup_tilt_does_not_abort() {
   // A 250 g cup tilted by a hand reads -8 g for 300 ms: shallower than half
-  // its mass, so it must persist 400 ms before it counts as a lift.
-  startShotWithKnownCupMass(250.0f);
-  for (int i = 0; i < 3; ++i) idleWeight(-8.0f, 100);
-  idleWeight(0.0f, 100);
-  runLoopAfter(1);
-  CHECK(session.active);
-  CHECK(cupPresenceState() == CupPresenceState::PRESENT);
-  for (int i = 0; i < 5; ++i) idleWeight(-8.0f, 100);
-  runLoopAfter(1);
-  CHECK(session.endReason == EndReason::CUP_REMOVED);
+  // its mass, so it must persist 400 ms before it counts. Before any coffee a
+  // settled dip is a released hand the tare zeroed (a new zero, and a full
+  // lift from it still stops); after the first drop it is a lift.
+  for (bool afterFirstDrop : {false, true}) {
+    startShotWithKnownCupMass(250.0f);
+    if (afterFirstDrop) for (float w : {0.35f, 0.40f, 0.45f}) idleWeight(w, 100);
+    CHECK((session.firstDropMs != 0) == afterFirstDrop);
+    for (int i = 0; i < 3; ++i) idleWeight(-8.0f, 100);
+    idleWeight(0.0f, 100);
+    runLoopAfter(1);
+    CHECK(session.active);
+    CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+    for (int i = 0; i < 5; ++i) idleWeight(-8.0f, 100);
+    runLoopAfter(1);
+    CHECK(session.active == !afterFirstDrop);
+    if (afterFirstDrop) {
+      CHECK(session.endReason == EndReason::CUP_REMOVED);
+      continue;
+    }
+    CHECK(session.softwareZeroG == -8.0f);
+    idleWeight(-240.0f, 100);
+    idleWeight(-240.0f, 100);
+    runLoopAfter(1);
+    CHECK(session.endReason == EndReason::CUP_REMOVED);
+  }
 }
 
 void cp25_full_lift_stops_fast() {
@@ -11913,7 +11928,10 @@ void it46_accessory_removal_never_uses_idle_tare_during_shot() {
   idleWeight(-40.0f);
   idleCup(-40.0f);
   CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 0);
-  CHECK(cupPresenceState() == CupPresenceState::ABSENT);
+  // Before any coffee, a settled unload below half the known load is a new
+  // zero for the shot, not a lift: the cup stays.
+  CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+  CHECK(session.softwareZeroG == -40.0f);
 }
 
 void it47_stale_or_disabled_accessory_evidence_never_tares_removal() {
@@ -20246,6 +20264,37 @@ void tr08_rinse_before_the_start_tare_result_keeps_the_cup_untared() {
   }
 }
 
+void tr09_hand_released_after_the_start_tare_is_not_a_lift() {
+  // A hand steadying a known 80 g cup adds 5 g that the start tare zeroes.
+  // Its release, before or after the baseline, is a new zero, not a lift; a
+  // real lift of the cup still stops the shot.
+  for (int variant = 0; variant < 3; ++variant) {
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    idleCup(0.0f);
+    idleCup(80.0f);
+    CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+    CHECK(cupPresence.weight.valid);
+    const float handG = variant == 2 ? 0.0f : 5.0f;
+    idleCup(80.0f + handG);
+    startCycle();
+    CHECK(executeNextScaleCommand());
+    if (variant != 1) {
+      idleWeight(0.0f, 100);
+      idleWeight(0.0f, 100);
+      CHECK(!session.awaitingPostTareBaseline);
+    }
+    const float releasedG = variant == 2 ? -80.0f : -handG;
+    for (int i = 0; i < 8; ++i) {
+      idleWeight(releasedG, 100);
+      runLoopAfter(1);
+    }
+    CHECK(debugEventExists(DebugCode::CUP_REMOVED_CONFIRMED) == (variant == 2));
+    CHECK(session.active == (variant != 2));
+    if (variant != 2) CHECK(fabsf(session.lastAcceptedWeightG) < 0.5f);
+  }
+}
+
 // A 250 g cup sits untared on the scale when the shot starts and the start
 // tare, though acknowledged, has no effect; grace then expires with the cup
 // still on the scale.
@@ -25428,6 +25477,7 @@ const TestCase testCases[] = {
     {"TR06", tr06_combined_start_tare_opens_grace_at_completion},
     {"TR07", tr07_tare_grace_waits_for_a_reading_after_the_write},
     {"TR08", tr08_rinse_before_the_start_tare_result_keeps_the_cup_untared},
+    {"TR09", tr09_hand_released_after_the_start_tare_is_not_a_lift},
     {"SK01", sk01_refused_start_releases_cup_hold},
     {"SK02", sk02_overload_stops_while_touch_is_held},
     {"SK03", sk03_late_zero_after_grace_releases_cup_hold},

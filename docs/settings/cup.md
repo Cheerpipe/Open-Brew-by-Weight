@@ -22,7 +22,10 @@ it arrives as a drop: at least the threshold's size (or half **Minimum cup
 weight**, if smaller) below the previous reading. A slow drift across the
 threshold does not count. During a shot, if the cup's weight is known, a dip of
 less than half of it—a tilted cup, for example—must last at least 0.4 s; a full
-lift still counts after two readings. Placement also requires a short run of
+lift still counts after two readings. Before the first drops of coffee, such a
+lasting dip is not a lift: it usually means a hand was steadying the cup when
+the scale tared, so the shot keeps going and measures from the new level. A
+full lift from there still stops it. Placement also requires a short run of
 stable samples.
 After a known tare, a cup at 0 g stays present; **Require cup to start** does
 not require positive net weight. Replacement into a negative tare offset can

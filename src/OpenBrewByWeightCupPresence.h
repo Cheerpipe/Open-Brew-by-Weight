@@ -338,7 +338,8 @@ CupPresenceEvent feedCupPresence(float weight, uint32_t receivedAtMs,
                                  uint32_t packetSequence, bool allowPlacement = true,
                                  bool allowFastReplacement = false,
                                  bool protectedPartialUnload = false,
-                                 bool removalWhileAbsent = false) {
+                                 bool removalWhileAbsent = false,
+                                 bool partialDipRezeroes = false) {
   if (!std::isfinite(weight)) {
     return CupPresenceEvent::NONE;
   }
@@ -419,6 +420,12 @@ CupPresenceEvent feedCupPresence(float weight, uint32_t receivedAtMs,
             (partial ? CUP_PARTIAL_REMOVAL_SAMPLES : DIRECT_STOP_CONFIRMATION_SAMPLES) ||
         (partial && receivedAtMs - cupPresence.removedStartedAtMs < CUP_PARTIAL_REMOVAL_MS)) {
       return CupPresenceEvent::NONE;
+    }
+    if (partial && partialDipRezeroes) {
+      // The cup stays: its settled dip becomes the reference a lift steps from.
+      cupPresence.occupiedReferenceG = cupPresence.lastPresentWeightG = weight;
+      cupPresence.removedConfirmations = 0;
+      return CupPresenceEvent::REZEROED;
     }
 
     cupPresence.state = CupPresenceState::ABSENT;

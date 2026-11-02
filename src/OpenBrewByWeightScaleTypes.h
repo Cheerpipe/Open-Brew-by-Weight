@@ -394,7 +394,8 @@ inline const char *cupPresenceStateName(CupPresenceState state) {
 enum class CupPresenceEvent : uint8_t {
   NONE = 0,
   PLACED = 1,
-  REMOVED = 2
+  REMOVED = 2,
+  REZEROED = 3  // A partial dip the caller declared a new zero (released hand).
 };
 
 enum class WeightStreamState : uint8_t {

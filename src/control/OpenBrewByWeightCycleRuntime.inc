@@ -899,8 +899,16 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                       session.active && session.config.cupProtectionEnabled &&
                           session.config.stopIfCupRemoved && session.scaleBaselineReady &&
                           !session.awaitingPostTareBaseline &&
-                          fabsf(session.preTareWeightG) < runtimeConfig.minimumCupWeightG)
+                          fabsf(session.preTareWeightG) < runtimeConfig.minimumCupWeightG,
+                      // A hand the shot's tare zeroed, released before any coffee.
+                      session.active && stopperState == StopperState::BREW &&
+                          session.appliedTareRequestId != 0 && session.firstDropMs == 0)
       : CupPresenceEvent::NONE;
+  if (cupEvent == CupPresenceEvent::REZEROED) {
+    session.softwareZeroG = weight;
+    session.hasWeightAnchor = false;
+    markShotCurveBreak();
+  }
   if (cupEvent == CupPresenceEvent::PLACED) {
     scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, millis(),
                           connectionGeneration, packetSequence, weight,
