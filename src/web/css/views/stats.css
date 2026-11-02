@@ -137,6 +137,10 @@
   background: var(--me);
   border-left-color: var(--dn);
 }
+/* The battery notice shares the header battery cell's red. */
+#homeReadyMsg.isErr {
+  border-left-color: var(--live);
+}
 .qwRatio {
   display: flex;
   gap: 0.35rem;
