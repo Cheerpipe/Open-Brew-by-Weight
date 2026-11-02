@@ -1158,8 +1158,23 @@ void OpenBrewByWeightMicraService::taskLoop() {
     }
     const bool localActivity = shotTransportPaused();
     bool settledFromPush = false;
+    LineaMicraBoilerState coffee, steam;
+    uint32_t coffeeReadyAt, steamReadyAt;
+    bool boilersChanged;
     {
       TaskLockGuard lock(mux_);
+      // Boiler readiness is gathered here and logged after the lock, once per
+      // change of a state or of the cloud's ready estimate.
+      coffee = published_.coffeeBoiler;
+      steam = published_.steamBoiler;
+      coffeeReadyAt = published_.coffeeReadyAtUtcSec;
+      steamReadyAt = published_.steamReadyAtUtcSec;
+      boilersChanged = coffee != loggedCoffee_ || steam != loggedSteam_ ||
+          coffeeReadyAt != loggedCoffeeReadyAt_ || steamReadyAt != loggedSteamReadyAt_;
+      loggedCoffee_ = coffee;
+      loggedSteam_ = steam;
+      loggedCoffeeReadyAt_ = coffeeReadyAt;
+      loggedSteamReadyAt_ = steamReadyAt;
       // The companion feed keeps the state current: no polling and no reads.
       const bool companion = companion_.status.route == MicraCompanionRoute::COMPANION;
       if (config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET) ||
@@ -1244,6 +1259,19 @@ void OpenBrewByWeightMicraService::taskLoop() {
     if (settledFromPush)
       serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                            "Micra post-wake state settled from WebSocket, read skipped");
+    if (boilersChanged) {
+      // Seconds until each cloud estimate; "none" without one or a clock.
+      const time_t utcNow = time(nullptr);
+      char coffeeEta[16] = "none", steamEta[16] = "none";
+      if (utcNow >= 1700000000 && coffeeReadyAt)
+        snprintf(coffeeEta, sizeof(coffeeEta), "%lds", long(coffeeReadyAt - utcNow));
+      if (utcNow >= 1700000000 && steamReadyAt)
+        snprintf(steamEta, sizeof(steamEta), "%lds", long(steamReadyAt - utcNow));
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                           "Micra boilers brew=%s ready_in=%s steam=%s ready_in=%s",
+                           lineaMicraBoilerStateName(coffee), coffeeEta,
+                           lineaMicraBoilerStateName(steam), steamEta);
+    }
     if (haveRequest) {
       if (haveTemperature) {
         executeTemperatureApplication(pending.request,

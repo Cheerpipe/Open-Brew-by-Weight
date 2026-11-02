@@ -274,6 +274,11 @@ readiness, power state, observed mode, both boilers (with the brew target
 temperature and remaining estimate), water, cleaning, and observation quality.
 Connection and account details stay in **La Marzocco cloud**.
 
+The ready time is La Marzocco's estimate, and a machine that is still warm can
+be ready well before it. To check what the cloud reported, the Web UI log
+records every change of either boiler's state or estimate, for example
+**Micra boilers brew=heating_up ready_in=1140s steam=off ready_in=none**.
+
 These states are informational. Nothing about paddle handling, guards, brew
 control, or how the machine is turned on and off changes with them. In API
 mode the same states arrive with each dashboard read instead of as live

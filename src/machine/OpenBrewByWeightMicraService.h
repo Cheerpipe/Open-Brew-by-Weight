@@ -256,6 +256,10 @@ class OpenBrewByWeightMicraService {
   LineaMicraRequest postedTemperature_ = {}, postedPower_ = {};
   uint32_t postedFinishAttempt_ = 0;  // 0: no release pending
   bool postedTemperaturePresent_ = false, postedPowerPresent_ = false;
+  // Micra task only: the boiler readiness the log last reported.
+  LineaMicraBoilerState loggedCoffee_ = LineaMicraBoilerState::UNKNOWN,
+                        loggedSteam_ = LineaMicraBoilerState::UNKNOWN;
+  uint32_t loggedCoffeeReadyAt_ = 0, loggedSteamReadyAt_ = 0;
   bool postedPending() const {
     return postedTemperaturePresent_ || postedPowerPresent_ ||
            postedFinishAttempt_ != 0;
