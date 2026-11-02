@@ -290,8 +290,10 @@ pings goes unacknowledged. During a [sync hold](#sync-holds) both sides trust
 the link: the companion does not ping, and neither the controller's close
 timer nor the La Marzocco route's 30 s ping limit counts; both count again from
 the hold's end, when the companion pings at once, so only a missing answer to
-that ping finds a link that dropped during the shot. Neither side uses TCP
-keepalive on the link socket.
+that ping finds a link that dropped during the shot. The one ping a hold
+does not stop follows a controller announcement or relay handshake, since a
+controller that restarted mid-shot never sends the `hold` that ends it.
+Neither side uses TCP keepalive on the link socket.
 
 ### Machine state
 

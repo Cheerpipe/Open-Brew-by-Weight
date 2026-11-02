@@ -240,17 +240,19 @@
 }
 // S2: through the companion, Shots and History stand ready before their first
 // visit; never while a shot runs (they start right after it), and a page
-// opened directly, or the archive view, preloads nothing.
+// opened directly, the archive view, compatibility mode or a hidden page
+// preloads nothing.
 {
   const assert = require('assert').strict, vm = require('vm');
   const source = appJsSource.slice(appJsSource.indexOf('let preloadTimer'),
       appJsSource.indexOf('function navigate('));
-  const run = (protocol, view, shot = false, archiveView = false) => {
+  const run = (protocol, view, shot = false, archiveView = false, compat = false, hidden = false) => {
     const events = [], timers = [];
     const context = vm.createContext({BUNDLES: {stats: 'records', history: 'records'}, activeView: view,
-      location: {protocol}, clearTimeout() {}, setTimeout: (fn) => timers.push(fn),
+      location: {protocol}, document: {hidden}, clearTimeout() {}, setTimeout: (fn) => timers.push(fn),
       ensureView: (name) => { events.push('load ' + name); return Promise.resolve({preload: () => events.push('preload ' + name)}); },
-      R: {archiveView, webUiPollingActive: () => true, shotRunning: () => shot}});
+      R: {archiveView, compatibilityModeOn: () => compat, webUiPollingActive: () => true,
+        shotRunning: () => shot}});
     vm.runInContext(source, context);
     context.preloadRecords();
     return {events, timers, context};
@@ -264,6 +266,8 @@
     assert.deepEqual(onStats.events, ['load history', 'preload history'], 'the open page starts itself');
     assert.deepEqual(run('http:', 'home').events, [], 'opened directly: nothing is preloaded');
     assert.deepEqual(run('https:', 'home', false, true).events, [], 'the archive view preloads nothing');
+    assert.deepEqual(run('https:', 'home', false, false, true).events, [], 'compatibility mode preloads nothing');
+    assert.deepEqual(run('https:', 'home', false, false, false, true).events, [], 'a hidden page preloads nothing');
     const shot = run('https:', 'home', true);
     assert.deepEqual([shot.events, shot.timers.length], [[], 1], 'deferred while a shot runs');
     shot.context.R.shotRunning = () => false;

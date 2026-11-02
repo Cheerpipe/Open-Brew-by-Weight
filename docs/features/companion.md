@@ -141,8 +141,8 @@ Web UI still opens through the companion meanwhile, so you can update the
 controller from there. Opened through the companion with **Shot archive in
 the companion** on, Admin also shows its **Shot copy**: whether its copy of
 your shots and of History is up to date or catching up, how many pages it
-answered itself, how many it left to the controller, and how many records it
-asked the controller for. It has one switch per job:
+answered itself, how many it left to the controller, and how many times it
+asked the controller for missing records. It has one switch per job:
 
 - **Web UI through the companion** (on by default): phones, tablets and
   computers can open the Web UI through the companion, several at once. Turn

@@ -122,7 +122,7 @@
     assert.equal(els.companionCopyRow.hidden, false);
     assert.equal(els.companionCopyState.textContent, 'Shots up to date · History catching up');
     assert.equal(els.companionCopyCounts.textContent,
-        'Pages it answered itself: 12. Pages it left to the controller: 1. Records it asked the controller for: 3.');
+        'Pages it answered itself: 12. Pages it left to the controller: 1. Times it asked the controller for missing records: 3.');
     run.companionCopy({archive: {replica: {shots: 'off', history: 'off'}}});
     assert.equal(els.companionCopyState.textContent, 'Shots off · History off');
     assert.ok(codeIncludes(adminJs, 'R.companionHere(true).then(companionCopy)'));

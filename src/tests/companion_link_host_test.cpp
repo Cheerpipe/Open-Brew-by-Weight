@@ -1079,6 +1079,9 @@ static void testLiveness() {
   CompanionLinkSlot opening;
   opening.heardAtMs = now;
   CHECK(companionLinkSilent(opening, MicraCompanionRoute::DIRECT, now + 10000, true));
+  // A ping httpd heard after the pass took its `now` is not silence.
+  slot.heardAtMs = now + 5;
+  CHECK(!companionLinkSilent(slot, MicraCompanionRoute::COMPANION, now, false));
   // "Since" covers both states, and is unknown until the first change.
   CompanionState state;
   CHECK(companionLinkAgeS(state, now) == -1);

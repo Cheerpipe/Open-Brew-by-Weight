@@ -1014,11 +1014,13 @@ inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, MicraComp
 
 // Whether an open slot went silent. During a sync hold both sides trust the
 // link: the companion stops pinging, so an authenticated link's silence
-// restarts from the hold's end, when the companion pings at once.
+// restarts from the hold's end, when the companion pings at once. `now` is
+// the pass's start: a frame httpd heard after it is not silence.
 inline bool companionLinkSilent(CompanionLinkSlot &slot, MicraCompanionRoute route, uint32_t now,
                                 bool syncHold) {
   if (syncHold && slot.phase == CompanionLinkPhase::READY) slot.heardAtMs = now;
-  return now - slot.heardAtMs >= companionSilenceLimitMs(slot, route);
+  return static_cast<int32_t>(now - slot.heardAtMs) >=
+         static_cast<int32_t>(companionSilenceLimitMs(slot, route));
 }
 
 // Seconds since the link came up or went down; -1 before either since boot.

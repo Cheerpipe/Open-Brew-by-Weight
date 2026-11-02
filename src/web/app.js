@@ -212,11 +212,19 @@ function settleView(ok, boot) {
 // Through the companion, Shots and History stand ready before their first
 // visit: the records bundle loads and both keep their pages current, which
 // the companion serves from its copy of the history. Never while a shot runs
-// (it starts right after it); a page opened directly preloads nothing.
+// (it starts right after it); a page opened directly, in compatibility mode
+// or hidden (it preloads once shown again) preloads nothing.
 let preloadTimer = 0;
 function preloadRecords() {
   clearTimeout(preloadTimer);
-  if (location.protocol !== "https:" || R.archiveView || !R.webUiPollingActive()) return;
+  if (
+    location.protocol !== "https:" ||
+    R.archiveView ||
+    R.compatibilityModeOn() ||
+    document.hidden ||
+    !R.webUiPollingActive()
+  )
+    return;
   if (R.shotRunning()) {
     preloadTimer = setTimeout(preloadRecords, 1e3);
     return;

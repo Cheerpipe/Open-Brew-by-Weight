@@ -74,11 +74,14 @@ bool shotLogSavePending() {
   return shotLog.dirty() || shotCurvesSavePending();
 }
 
-// Both stores, the curves and a finished shot's trace (the companion's `rs`).
+// Both stores, the curves and a finished shot's trace (the companion's `rs`);
+// like the curves, a trace the failed pool cannot take holds nothing back.
 bool recordStoresSavePending() {
-  if (shotTrace().unsavedCount() != 0) return true;
+  const bool trace = shotTrace().unsavedCount() != 0;
   TaskLockGuard lock(shotStoreMutex);
-  return shotLog.dirty() || historyLog.dirty() || shotCurvesSavePending();
+  const ShotTracePool &pool = shotTracePool();
+  return shotLog.dirty() || historyLog.dirty() || shotCurvesSavePending() ||
+         (trace && (pool.ready() || pool.lastError() == ShotTracePoolError::NONE));
 }
 
 void copyHistoryPage(HistoryPage &page, size_t offset, size_t limit,
