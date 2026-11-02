@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Enforce the F-20 firmware service boundaries without compiling sources.
 
-Also rejects the legacy project name anywhere in the repository.
+Also rejects discarded critical OTA, NimBLE and buzzer results, task watchdog
+reconfiguration outside its owner, and the legacy project name anywhere in the
+repository.
 """
 
 from __future__ import annotations
@@ -153,6 +155,28 @@ def main() -> int:
                     f"service implementation exceeds cap: "
                     f"{implementation.relative_to(ROOT)} {lines}>1500"
                 )
+
+    # Critical results are never discarded with a (void) cast, and only the
+    # watchdog owner reconfigures the task watchdog.
+    for relative, pattern, description in (
+            ("src/OpenBrewByWeightBuzzer.h",
+             r"\(void\)esp_timer_(?:stop|start_once)\s*\(", "buzzer timer result"),
+            ("src/OpenBrewByWeightOta.cpp",
+             r"\(void\)esp_ota_abort\s*\(", "OTA abort result"),
+            ("libraries/EspressoScaleBLE/src/EspressoScaleBLENimble.cpp",
+             r"\(void\)ble_gap_(?:disc_cancel|conn_cancel|terminate)\s*\(",
+             "NimBLE teardown result")):
+        if re.search(pattern, text(relative)):
+            failures.append(f"discarded {description}: {relative}")
+    watchdog = text("src/OpenBrewByWeightWatchdog.h")
+    if "TASK_WATCHDOG_OTA_TIMEOUT_MS" in watchdog or "TaskWatchdogOtaWindow" in watchdog:
+        failures.append("obsolete global OTA TWDT window in OpenBrewByWeightWatchdog.h")
+    for path in (ROOT / "src").rglob("*"):
+        if (path.suffix in {".h", ".cpp", ".inc"}
+                and path.name != "OpenBrewByWeightWatchdog.h"
+                and "esp_task_wdt_reconfigure" in path.read_text(encoding="utf-8")):
+            failures.append(
+                f"task watchdog reconfigured outside its owner: {path.relative_to(ROOT)}")
 
     # Legacy project names must not return; only the README inspiration credit
     # keeps them. Untracked files are checked before they are added.
