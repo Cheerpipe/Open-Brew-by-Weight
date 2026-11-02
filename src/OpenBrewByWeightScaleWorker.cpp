@@ -2850,7 +2850,7 @@ void scaleWorkerTask(void *) {
     finishScaleSection(ScaleWorkerPhase::LINK);
 
     // GAP/GATT setup must not wait behind tare/beep/debug: connecting is not
-    // linked, so those would otherwise skip advanceConnection() for a tick.
+    // linked, so those would otherwise skip the connection step for a tick.
     const bool connecting =
         scale.isConnecting() || scaleLoggedGattConnecting;
     if (connecting) {

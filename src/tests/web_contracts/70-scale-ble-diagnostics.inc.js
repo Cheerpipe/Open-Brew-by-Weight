@@ -108,8 +108,6 @@
       !codeIncludes(source, 'function stopViewPolls(){clearCupWeights();')) {
     throw new Error('Home and Diagnostic cup panel contract');
   }
-  // Parse the actual adjacent C++ format literals for both status paths.
-  const status = fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightStatus.inc'), 'utf8');
   // The shared C++ projection is exercised natively by scale_profiler_host_test.
   // Keep the Web-specific legacy labels and shared projection binding explicit.
   if (!network.includes('idleTarePresentationCode(tare, control.cupPresent)') ||

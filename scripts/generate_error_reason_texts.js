@@ -395,14 +395,9 @@ function main() {
       (output ? ` -> ${output}` : ' (check only)'));
 }
 
-if (require.main === module) {
-  try {
-    main();
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 1;
-  }
+try {
+  main();
+} catch (error) {
+  console.error(error.message);
+  process.exitCode = 1;
 }
-
-module.exports = {callArguments, callsOf, loadCatalogCodes, checkRuntimeMap,
-  referencedReasons, checkValidationRuleSites, printfForm, render};

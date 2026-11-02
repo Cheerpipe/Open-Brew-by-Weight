@@ -579,15 +579,12 @@ ${rows}
 }
 
 module.exports = {
-  minifyHtml,
   minifyJs,
   minifyCss,
   generate,
   sourcePath,
-  appJsPath: appJsPath,
-  jsSourcePath: appJsPath,
+  appJsPath,
   cssSourcePaths,
-  outputPath,
   VIEW_NAMES,
   VIEW_MODULES,
   JS_FILES,
@@ -595,7 +592,6 @@ module.exports = {
   SHELL_PATHS,
   htmlDir,
   jsDir,
-  gzipBuffer,
 };
 
 if (require.main === module) {

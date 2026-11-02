@@ -567,8 +567,7 @@ additional SDK tasks requires selecting them and reviewing their own margin.
 The profiler stops after five minutes, so qualify those tasks in separate
 bounded captures and retain their evidence with the long soak. A long capture
 of the three always-exported stacks alone does not qualify every task.
-`--min-stack-bytes` controls the stack gate; the deprecated `--min-stack-words`
-alias also takes bytes for compatibility. Capture schema 2 and summary schema 3
+`--min-stack-bytes` controls the stack gate. Capture schema 2 and summary schema 3
 use explicit byte names and add block topology plus per-lifecycle recovery
 metrics. Review allocation-failure counter deltas for every exercised owner.
 

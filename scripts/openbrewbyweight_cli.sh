@@ -142,8 +142,8 @@ Named parameters (long and short):
   -H, --host <ip|name>     Controller address for OTA
   -f, --flags "<flags>"    Extra compile flags (single string; not persisted)
   -i, --image <path>       Firmware .bin to flash or upload (not persisted)
-  -b, --build-dir <path>   Build directory (static / static-idf only)
-  -o, --output-dir <path>  Reports directory (static / static-idf only)
+  -b, --build-dir <path>   Build directory (static analysis only; not persisted)
+  -o, --output-dir <path>  Reports directory (static analysis only; not persisted)
       --webui-language <code>
                            Compile-time WebUI language (default: en; not persisted)
       --hardware <id|json> Exact hardware profile ID or JSON path (not persisted)
@@ -191,16 +191,6 @@ EOF
 }
 
 OBBW_CLI_HELP_REQUESTED=0
-OBBW_CLI_YES=0
-OBBW_CLI_WAIT_FOR_CONFIRMATION=0
-OBBW_CLI_NO_CHECK=0
-OBBW_CLI_ERASE_ALL=0
-OBBW_CLI_DISCARD_OTA_SESSION=0
-OBBW_CLI_RELEASE=0
-OBBW_CLI_DEVELOPMENT=0
-OBBW_CLI_NO_AUTH_ADMIN=0
-OBBW_CLI_JTAG=0
-OBBW_CLI_FORCE_SDKCONFIG_REGENERATE=0
 OBBW_CLI_OPT_LEVEL=""
 
 obbw_cli_die() {
@@ -617,9 +607,6 @@ obbw_prompt_text() {
     host) printf 'Controller address (IP or hostname)' ;;
     password) printf 'Device password' ;;
     flags) printf 'Extra compile flags' ;;
-    build_dir) printf 'Build directory' ;;
-    output_dir) printf 'Reports directory' ;;
-    webui_language) printf 'WebUI language' ;;
     hardware_config) printf 'Hardware profile JSON' ;;
     machine_config) printf 'Machine profile JSON' ;;
     *) printf '%s' "$1" ;;
@@ -668,10 +655,7 @@ obbw_prompt_suggestion() {
     arch) printf 'n16r8' ;;
     speed) printf '115200' ;;
     host) printf '192.168.4.1' ;;
-    password) return 0 ;;
     flags) printf '%s' "$OBBW_CLI_DEFAULT_FLAGS" ;;
-    output_dir) printf 'reports/static-analysis' ;;
-    webui_language) printf 'en' ;;
     *) printf '' ;;
   esac
 }
@@ -757,7 +741,7 @@ obbw_validate_key() {
         return 1
       fi
       ;;
-    password|image|build_dir|output_dir|hardware_config|machine_config)
+    password|hardware_config|machine_config)
       if [[ -z "$value" ]]; then
         obbw_cli_die "Parameter --$(printf '%s' "$key" | tr '_' '-') cannot be empty."
         return 1
@@ -997,8 +981,6 @@ obbw_cli_flags_for() {
       # through `ps` for as long as the child runs, which for an OTA is
       # minutes. Use obbw_cli_export_secrets instead.
       flags) OBBW_CLI_FORWARD+=(--flags "$(obbw_get flags)") ;;
-      build_dir) OBBW_CLI_FORWARD+=(--build-dir "$(obbw_get build_dir)") ;;
-      output_dir) OBBW_CLI_FORWARD+=(--output-dir "$(obbw_get output_dir)") ;;
       webui_language) OBBW_CLI_FORWARD+=(--webui-language "$(obbw_get webui_language)") ;;
       hardware_config) OBBW_CLI_FORWARD+=(--hardware "$(obbw_get hardware_config)") ;;
       machine_config) OBBW_CLI_FORWARD+=(--machine "$(obbw_get machine_config)") ;;

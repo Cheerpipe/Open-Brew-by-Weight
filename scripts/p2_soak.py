@@ -381,9 +381,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--max-fragmentation-growth", type=int, default=50)
     result.add_argument("--max-lifecycle-largest-loss", type=int, default=4096)
     result.add_argument("--max-psram-largest-drop", type=int, default=64 * 1024)
-    result.add_argument("--min-stack-bytes", "--min-stack-words",
-                        dest="min_stack_bytes", type=int, default=1536,
-                        help="Minimum stack bytes; --min-stack-words is a legacy byte-valued alias")
+    result.add_argument("--min-stack-bytes", type=int, default=1536,
+                        help="Minimum free stack bytes per required task")
     result.add_argument("--min-psram-free", type=int, default=128 * 1024)
     # Must stay at or above sizeof(NetworkWorkBuf), the largest single PSRAM
     # allocation, so the largest free block always covers it.

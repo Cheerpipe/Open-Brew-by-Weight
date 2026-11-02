@@ -46,7 +46,6 @@ fi
 
 obbw_cli_resolve "arch" || exit $?
 openbrewbyweight_resolve_board "$(obbw_get arch)" || exit 2
-obbw_idf_resolve_paths
 obbw_idf_static_paths reports/iwyu || exit $?
 
 if [[ -n "${IWYU_BINARY:-}" ]]; then
@@ -104,7 +103,6 @@ patterns = [
     "libraries/EspressoScaleBLE/src/*.cpp",
     "libraries/EspressoScaleBLE/src/protocols/*.cpp",
     "idf/main/*.cpp",
-    "idf/components/EspressoScaleBLE/*.cpp",
 ]
 drop_prefixes = ("-m", "-fno-tree-", "-fstrict-volatile-bitfields",
                  "-fuse-ld=", "-Wl,", "--sysroot", "--param=", "--target=",

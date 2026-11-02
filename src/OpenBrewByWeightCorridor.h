@@ -43,7 +43,6 @@ constexpr uint8_t CHANNELING_CONFIRM_SAMPLES = 2;
 constexpr uint8_t STATS_MAX_SHOTS = 10;
 constexpr int32_t STATS_SIGMA_FLOOR_MS = 750;
 constexpr uint8_t SCALE_LOSS_MIN_SHOTS = 3;
-constexpr uint8_t SHOT_STATS_MIN_SHOTS = 3;
 constexpr int32_t PROJECTION_HORIZON_MS = 3000;
 constexpr int32_t HISTORY_MARGIN_MS = 500;
 // Grind hint (times in ms, ratios in permille): the level averages the newest

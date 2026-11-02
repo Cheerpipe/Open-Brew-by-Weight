@@ -468,8 +468,6 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
         cand = C_BLUE;
         k = 1000;
         tBlend = p.wallMs;
-        sigmaF = live.sigmaMs;
-        pr.stalledCandidate = true;
       }
     }
   }

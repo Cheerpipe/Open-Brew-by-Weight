@@ -5,7 +5,7 @@
 namespace openbrewbyweight {
 
 // Stages 1–3: mute gate, configured channel, then Scale / Buzzer / None.
-// Never both sinks. Matches emitAlert / commandAlertUsesBuzzer / emitCommandAlert.
+// Never both sinks. Matches emitAlert / emitCommandAlert.
 inline AlertSink selectAlertSink(AlertKind kind, AlertEvent event,
                                  const AlertChannelContext &ctx) {
   if (kind == AlertKind::Recovery) {

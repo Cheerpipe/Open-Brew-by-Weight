@@ -17,7 +17,7 @@
 // - The activator owns GPIO sampling, debounce, edge interpretation, and
 //   translation to UserIntent. Stopper / brew / cup / scale / guards
 //   talk ONLY to this abstract machine. They must NOT include paddle or
-//   momentary headers, branch on MachineType, read paddleMode / reed /
+//   momentary headers, branch on machine type, read paddleMode / reed /
 //   momentary GPIO, or know how a specialization drives K1.
 // - Paddle code lives only under OpenBrewByWeightMachinePaddle*. Momentary under
 //   OpenBrewByWeightMachineMomentary*. Never mix paddle logic into momentary files

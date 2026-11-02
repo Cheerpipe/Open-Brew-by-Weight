@@ -5,14 +5,13 @@
   const source = runtimeStateDecl + 'let homeFrame=null;' + runtimeJs.slice(runtimeJs.indexOf('function statusStreamFrame('), runtimeJs.indexOf('function renderHomeStream(')) + runtimeJs.slice(runtimeJs.search(/let\s+shotWs\s*=/),
     runtimeJs.indexOf('function setHomeSub('));
   const sockets = [], timers = new Map(); let timer = 0, owner = true;
-  const applied = [], frames = [];
+  const applied = [];
   class Socket {
     static OPEN = 1;
     constructor(url) { this.url = url; this.readyState = 1; this.sent = []; sockets.push(this); }
     send(value) { const m = JSON.parse(value); this.sent.push(m, ...(m.ops || [])); }
     close() { this.readyState = 3; this.onclose?.({}); }
   }
-  const listeners = {};
   const context = {
     WebSocket: Socket, location: {protocol: 'http:', host: 'device.local'},
     document: {hidden: false, addEventListener() {}}, window: {addEventListener() {}},

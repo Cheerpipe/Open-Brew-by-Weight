@@ -118,18 +118,18 @@ case "${OBBW_CLI_OPT_LEVEL:-}" in
 esac
 export OBBW_IDF_OPT_LEVEL_KCONFIG
 
-obbw_idf_py_args
-
 command -v node >/dev/null 2>&1 || {
   echo "node not found on PATH (needed for the Web UI and OTA marker)." >&2
   exit 127
 }
 
-echo "Building ${OPENBREWBYWEIGHT_VARIANT:-$OPENBREWBYWEIGHT_ARCH} (IDF, BLE=nimble, allocator=external)"
+echo "Building $OPENBREWBYWEIGHT_VARIANT (IDF, BLE=nimble, allocator=external)"
 
 export OPENBREWBYWEIGHT_EXTRA_FLAGS
 OPENBREWBYWEIGHT_EXTRA_FLAGS="$effective_flags"
 echo "Extra compile flags: ${OPENBREWBYWEIGHT_EXTRA_FLAGS:-(none)}"
+# The JTAG defaults overlay follows the extra flags exported above.
+obbw_idf_py_args
 
 mkdir -p "$IDF_BUILD_DIR"
 # A tree configured for another project or toolchain needs a full clean;
@@ -144,7 +144,6 @@ if [[ -f "$IDF_BUILD_DIR/CMakeCache.txt" ]] &&
 fi
 
 echo "Building IDF firmware $OPENBREWBYWEIGHT_ARCH → $IDF_BUILD_DIR"
-obbw_idf_py_args
 target_ready=1
 if [[ ! -f "$IDF_SDKCONFIG" && ! -f "$IDF_BUILD_DIR/CMakeCache.txt" ]] ||
    { [[ -f "$IDF_SDKCONFIG" ]] && ! grep -q '^CONFIG_IDF_TARGET="esp32s3"$' "$IDF_SDKCONFIG"; } ||
@@ -258,9 +257,7 @@ else
   trap - EXIT
 fi
 echo "Firmware archive: $archive"
-if [[ -n "${OPENBREWBYWEIGHT_VARIANT:-}" ]]; then
-  artifact="$IDF_BUILD_DIR/${IDF_PROJECT_NAME}-${OPENBREWBYWEIGHT_VARIANT}.bin"
-  cp "$IDF_IMAGE" "$artifact"
-  echo "Named firmware artifact: $artifact"
-fi
+artifact="$IDF_BUILD_DIR/${IDF_PROJECT_NAME}-${OPENBREWBYWEIGHT_VARIANT}.bin"
+cp "$IDF_IMAGE" "$artifact"
+echo "Named firmware artifact: $artifact"
 obbw_cli_save

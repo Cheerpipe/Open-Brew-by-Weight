@@ -724,7 +724,7 @@ async function saveWifi() {
   setFieldError(
     "setupConnectedError",
     error
-      ? R.formatCommandError(__WEBUI_TEXT__("setup.save_wifi_failed"), error)
+      ? R.formatCommandError(__WEBUI_TEXT__("setup.save_failed"), error)
       : __WEBUI_TEXT__("setup.wifi_not_saved"),
   );
 }

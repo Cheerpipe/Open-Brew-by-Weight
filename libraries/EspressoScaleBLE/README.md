@@ -44,10 +44,10 @@ tare if present, local buzzer for alerts, no combined tare+start.
 advertised name only on a ready Bookoo connection; ambiguous or nameless
 connections remain `ScaleModel::Unknown`. Mini names use `BOOKOO_SC <digits>`;
 Ultra names use `BOOKOO_SC_U <digits>` (the spaced `BOOKOO_SC U <digits>` form
-is also recognized). `defaultFriendlyName()` provides the
-model's display name, and `supportedCommandAt()` enumerates implemented
-commands and their wire codes for identified models. The pure advertisement
-helper also lets an owner display the proposed name before connection.
+is also recognized). The pure helper `scaleDefaultFriendlyName()` derives the
+model's display name from an advertised name, so an owner can show it before
+connecting, and `scaleBookooCommandAt()` enumerates implemented commands and
+their wire codes for identified models.
 
 `EspressoScaleBLE::powerOff()` sends command `0x15`
 (`03 0A 15 00 00 1C`) to a recognized Ultra. The Mini has no shutdown
@@ -240,7 +240,6 @@ Useful diagnostics are available through:
 
 - `isScanning()`
 - `lastDisconnectReason()` / `lastDisconnectReasonName()`
-- `lastValidPacketAgeMs()` (`UINT32_MAX` until the first valid packet)
 - `rejectedPacketCount()`
 - `reconnectCount()`
 
@@ -267,7 +266,6 @@ reserved and skipped on wrap. Native notification callbacks only copy bounded
 frames into the RX ring; the bundled owner processes that ring on a 10 ms
 cadence and never from an ATT command-yield path. Its final pre-tare safety
 harvest runs in that post-spacing admission callback, before tare submission.
-`getWeight()` remains available.
 Neither write
 completion nor these metadata certify unobservable physical cup motion.
 

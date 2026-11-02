@@ -137,8 +137,6 @@ class EspressoScaleBLE {
         bool supportsTareStartTimer() const;
 
         ScaleCommandResult beep();
-        bool supportsIndependentBeep() const;
-        bool supportsCommandFeedback() const;
         ScaleCommandResult beepWithoutStateChange();
         ScaleCommandResult beepWithoutStateChange(const ScaleCommandAdmission *admission);
         ScaleCommandResult setBeepLevel(uint8_t level);
@@ -149,7 +147,6 @@ class EspressoScaleBLE {
         // drops from the remote side.
         ScaleCommandResult powerOff();
         bool supportsPowerOff();
-        float getWeight() const;
         ScaleWeightSample getWeightSample() const;
         uint32_t notificationSequence() const;
         bool hasTimer() const;
@@ -177,8 +174,6 @@ class EspressoScaleBLE {
         ScaleFeatureSet features() const;
         ScaleModel model() const;
         // Borrowed until the connection changes; copy if retained.
-        const char* defaultFriendlyName() const;
-        bool supportedCommandAt(size_t index, ScaleCommandInfo *out) const;
         const char* connectedProtocolName() const;
         const char* address() const;
         const char* localName() const;
@@ -190,10 +185,8 @@ class EspressoScaleBLE {
         const char* lastDisconnectReasonName() const;
         uint8_t connectAttemptCount() const;
         uint8_t connectStepId() const;
-        uint32_t lastValidPacketAgeMs() const;
         uint32_t rejectedPacketCount() const;
         uint32_t reconnectCount() const;
-        ScaleBleTimingSnapshot timingSnapshot() const;
         // Native NimBLE status for diagnostics. Preserve the last ble_hs/HCI
         // value without collapsing it into a domain reason.
         int32_t lastBackendStatus() const;

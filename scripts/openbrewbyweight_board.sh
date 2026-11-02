@@ -5,11 +5,6 @@
 # There is deliberately no default architecture and no automatic port pick.
 # Every caller resolves those through scripts/openbrewbyweight_cli.sh.
 
-# N16R8: 16 MB flash + 8 MB OPI PSRAM with two 3.5 MiB OTA app slots
-# (idf/partitions-n16r8.csv). Usable bytes of a single OTA app slot, used by
-# the OTA client for a local size pre-check before uploading anything.
-OPENBREWBYWEIGHT_SLOT_BYTES_N16R8=3670016
-
 openbrewbyweight_arch_help() {
   cat <<'EOF'
 Supported architecture (ESP32-S3 with PSRAM only):
@@ -40,13 +35,12 @@ openbrewbyweight_detect_ports() {
   return $found
 }
 
-# Sets OPENBREWBYWEIGHT_ARCH and OPENBREWBYWEIGHT_SLOT_BYTES.
+# Sets OPENBREWBYWEIGHT_ARCH.
 openbrewbyweight_resolve_board() {
   local arch="${1:-}"
   case "$arch" in
     n16r8|esp32s3-n16r8|esp32s3)
       OPENBREWBYWEIGHT_ARCH="n16r8"
-      OPENBREWBYWEIGHT_SLOT_BYTES="$OPENBREWBYWEIGHT_SLOT_BYTES_N16R8"
       ;;
     esp32|esp32c3|nanoesp32|"")
       echo "Unsupported architecture: ${arch:-<empty>}." >&2

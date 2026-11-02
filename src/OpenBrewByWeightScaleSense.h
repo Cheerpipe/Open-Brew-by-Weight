@@ -12,7 +12,7 @@
 //
 // BOUNDARY: Weight stream only. Does not call brew or cup — the stopper
 // applies those effects. Must not include or know paddle/momentary/reed or
-// machine actuators. Never branch on MachineType or PaddleMode.
+// machine actuators. Never branch on machine type or PaddleMode.
 
 void resetShotTrajectory(uint32_t startedAtMs) {
   shot.startMs = startedAtMs;

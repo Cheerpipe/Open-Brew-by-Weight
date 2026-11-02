@@ -317,12 +317,6 @@ static_assert(OPEN_BREW_BY_WEIGHT_REED_CONFIRM_TIMEOUT_MS >= 200 &&
                   OPEN_BREW_BY_WEIGHT_REED_CONFIRM_TIMEOUT_MS <= 5000,
               "OPEN_BREW_BY_WEIGHT_REED_CONFIRM_TIMEOUT_MS must be 200–5000");
 
-enum class MachineType : uint8_t {
-  PADDLE = 0,
-  MOMENTARY = 1,
-  MOMENTARY_REED = 2
-};
-
 constexpr uint32_t COMPILED_STOP_PULSE_MS =
     static_cast<uint32_t>(OPEN_BREW_BY_WEIGHT_STOP_PULSE_MS);
 constexpr uint32_t COMPILED_MAX_SINGLE_PRESS_MS =
@@ -387,69 +381,6 @@ inline bool buzzerPatternIsSequence(BuzzerPattern pattern) {
          pattern == BuzzerPattern::RECOVERY_ERROR;
 }
 
-inline bool parseBuzzerPatternId(const char *id, BuzzerPattern &out) {
-  if (id == nullptr || id[0] == '\0') {
-    return false;
-  }
-  if (strcmp(id, "short") == 0) {
-    out = BuzzerPattern::SINGLE;
-    return true;
-  }
-  if (strcmp(id, "long") == 0) {
-    out = BuzzerPattern::LONG;
-    return true;
-  }
-  if (strcmp(id, "double") == 0) {
-    out = BuzzerPattern::DOUBLE;
-    return true;
-  }
-  if (strcmp(id, "triple") == 0) {
-    out = BuzzerPattern::TRIPLE;
-    return true;
-  }
-  if (strcmp(id, "pulse") == 0 || strcmp(id, "pulse2") == 0) {
-    out = BuzzerPattern::PULSE_TRAIN;
-    return true;
-  }
-  if (strcmp(id, "pulse3") == 0) {
-    out = BuzzerPattern::PULSE_3HZ;
-    return true;
-  }
-  if (strcmp(id, "pulse4") == 0) {
-    out = BuzzerPattern::PULSE_4HZ;
-    return true;
-  }
-  if (strcmp(id, "pulse5") == 0) {
-    out = BuzzerPattern::PULSE_5HZ;
-    return true;
-  }
-  if (strcmp(id, "chime") == 0) {
-    out = BuzzerPattern::CHIME;
-    return true;
-  }
-  if (strcmp(id, "swing") == 0) {
-    out = BuzzerPattern::SWING;
-    return true;
-  }
-  if (strcmp(id, "echo") == 0) {
-    out = BuzzerPattern::ECHO;
-    return true;
-  }
-  if (strcmp(id, "echoinv") == 0) {
-    out = BuzzerPattern::ECHO_INVERTED;
-    return true;
-  }
-  if (strcmp(id, "morse") == 0) {
-    out = BuzzerPattern::MORSE;
-    return true;
-  }
-  if (strcmp(id, "snap") == 0) {
-    out = BuzzerPattern::SNAP;
-    return true;
-  }
-  return false;
-}
-
 constexpr uint8_t BOOKOO_BEEP_LEVEL_MAX = 5;
 constexpr uint8_t DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL = 3;
 
@@ -461,37 +392,6 @@ enum class BookooDebugAction : uint8_t {
   BEEP,
   VOLUME
 };
-
-inline bool parseBookooDebugActionId(const char *id, BookooDebugAction &out) {
-  if (id == nullptr || id[0] == '\0') {
-    return false;
-  }
-  if (strcmp(id, "start") == 0) {
-    out = BookooDebugAction::START;
-    return true;
-  }
-  if (strcmp(id, "stop") == 0) {
-    out = BookooDebugAction::STOP;
-    return true;
-  }
-  if (strcmp(id, "tare") == 0) {
-    out = BookooDebugAction::TARE;
-    return true;
-  }
-  if (strcmp(id, "combined") == 0) {
-    out = BookooDebugAction::COMBINED;
-    return true;
-  }
-  if (strcmp(id, "beep") == 0) {
-    out = BookooDebugAction::BEEP;
-    return true;
-  }
-  if (strcmp(id, "volume") == 0) {
-    out = BookooDebugAction::VOLUME;
-    return true;
-  }
-  return false;
-}
 
 // Where alert sounds are routed when local buzzer support is compiled in.
 enum class AlertOutputChannel : uint8_t {
@@ -607,22 +507,6 @@ inline bool parseExtendedPulseRate(const char *text, uint8_t &rate) {
     return true;
   }
   return false;
-}
-
-inline BuzzerPattern buzzerPatternForExtendedPulseRate(uint8_t rate) {
-  switch (static_cast<ExtendedPulseRate>(rate)) {
-    case ExtendedPulseRate::SLOW:
-      return BuzzerPattern::PULSE_TRAIN;
-    case ExtendedPulseRate::MEDIUM:
-      return BuzzerPattern::PULSE_3HZ;
-    case ExtendedPulseRate::FAST:
-      return BuzzerPattern::PULSE_4HZ;
-    case ExtendedPulseRate::RAPID:
-      return BuzzerPattern::PULSE_5HZ;
-    case ExtendedPulseRate::OFF:
-      break;
-  }
-  return BuzzerPattern::NONE;
 }
 
 enum class LogLevel : uint8_t {
@@ -2037,10 +1921,6 @@ struct BootCapabilities {
 
   bool mandatoryControlReady() const { return scaleWorker; }
 
-  bool optionalConnectivityReady() const {
-    return webCommandQueue && network && psram;
-  }
-
   BootState state() const {
     if (!evaluated) {
       return BootState::BOOTING;
@@ -2452,38 +2332,6 @@ class DebugRingBuffer {
       output[copied++] = events_[(oldest + index) % DEBUG_EVENT_CAPACITY];
     }
     return copied;
-  }
-  size_t countAfter(uint32_t afterSequence) const {
-    if (count_ == 0) {
-      return 0;
-    }
-    const size_t oldest =
-        (writeIndex_ + DEBUG_EVENT_CAPACITY - count_) % DEBUG_EVENT_CAPACITY;
-    size_t matching = 0;
-    for (size_t index = 0; index < count_; ++index) {
-      const DebugEvent &event =
-          events_[(oldest + index) % DEBUG_EVENT_CAPACITY];
-      if (static_cast<int32_t>(event.sequence - afterSequence) > 0) {
-        ++matching;
-      }
-    }
-    return matching;
-  }
-  bool copyFirstAfter(uint32_t afterSequence, DebugEvent &output) const {
-    if (count_ == 0) {
-      return false;
-    }
-    const size_t oldest =
-        (writeIndex_ + DEBUG_EVENT_CAPACITY - count_) % DEBUG_EVENT_CAPACITY;
-    for (size_t index = 0; index < count_; ++index) {
-      const DebugEvent &event =
-          events_[(oldest + index) % DEBUG_EVENT_CAPACITY];
-      if (static_cast<int32_t>(event.sequence - afterSequence) > 0) {
-        output = event;
-        return true;
-      }
-    }
-    return false;
   }
 
   uint32_t overwritten() const { return overwritten_; }

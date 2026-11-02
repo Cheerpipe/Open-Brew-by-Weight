@@ -97,12 +97,6 @@ bool emitAlert(AlertEvent event, uint32_t cycleId) {
                        false);
 }
 
-bool commandAlertUsesBuzzer() {
-  AlertChannelContext ctx = currentAlertChannelContext();
-  return selectAlertSink(AlertKind::CommandImmediate, AlertEvent::START_TIMER,
-                         ctx) == AlertSink::Buzzer;
-}
-
 // Tare/start/stop replacement sounds: fire at the local circuit/paddle/retare
 // moment when the buzzer is the routed output. Never wait for BLE.
 void emitImmediateCommandAlertIfBuzzer(AlertEvent event) {

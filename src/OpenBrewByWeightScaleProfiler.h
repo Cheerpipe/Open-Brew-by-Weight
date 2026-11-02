@@ -578,8 +578,8 @@ class ScaleProfiler {
   }
 
   // Returns the persistence work the caller must enqueue on the
-  // settings_persist worker; noteWorkDispatched()/noteWorkDispatchFailed()
-  // report the enqueue outcome.
+  // settings_persist worker; a returned job counts as dispatched, and
+  // noteWorkDispatchFailed() reports a failed enqueue.
   ScaleProfilerWork service(ScaleProfilerRequest request, uint32_t nowMs) {
     consumeFlashResult_(nowMs);
     ScaleProfilerWork work = ScaleProfilerWork::NONE;
@@ -963,17 +963,6 @@ class ScaleProfiler {
     captureMux_.unlock();
     stateAtomic_.store(state_, std::memory_order_release);
     downloadLease_.store(0, std::memory_order_release);
-  }
-  void hostBootSaved(uint32_t recordCount, uint32_t sessionId) {
-    captureMux_.lock();
-    state_ = ScaleProfilerState::SAVED;
-    persistence_ = ScaleProfilerPersistence::SAVED;
-    savedRecordCount_ = recordCount;
-    sessionId_ = sessionId;
-    partitionAvailable_ = true;
-    ++generation_;
-    captureMux_.unlock();
-    stateAtomic_.store(state_, std::memory_order_release);
   }
   bool hostStartNoFlash(uint32_t nowMs) {
     captureMux_.lock();

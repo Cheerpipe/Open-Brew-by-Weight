@@ -243,4 +243,4 @@ if (require.main === module) {
   process.exit(main(process.argv.slice(2)));
 }
 
-module.exports = {findImageTag, inspectImage, TAG_PREFIX, TAG_TERMINATOR};
+module.exports = {findImageTag, inspectImage};

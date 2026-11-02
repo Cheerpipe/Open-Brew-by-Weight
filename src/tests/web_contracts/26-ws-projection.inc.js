@@ -186,8 +186,6 @@ int main(){
 // the firmware's lowercase stop reason. Zero remains a legitimate NVS value.
 {
   const assert = require('assert').strict, vm = require('vm');
-  const source = fs.readFileSync(path.join(sketchDir, 'web/js/runtime.js'), 'utf8');
-  const section = (a, b) => source.slice(source.indexOf(a), source.indexOf(b, source.indexOf(a)));
   const nodes = new Map(), $ = id => {
     if (!nodes.has(id)) nodes.set(id, {textContent: ''});return nodes.get(id);
   };

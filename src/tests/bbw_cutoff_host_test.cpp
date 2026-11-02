@@ -17,8 +17,6 @@ int main() {
   assert(!parseBbwAlgorithm("regression", parsedAlgorithm));
   assert(!parseBbwAlgorithm(nullptr, parsedAlgorithm));
   assert(parseBbwAlgorithm("corridor", parsedAlgorithm) && parsedAlgorithm == 1);
-  assert(strcmp(bbwAlgorithmName(1), "corridor") == 0);
-  assert(strcmp(bbwAlgorithmName(0), "unknown") == 0);
   assert(bbwAlgorithmVersion(0) == BBW_PROFILE_VERSION &&
          bbwAlgorithmVersion(1) == BBW_PROFILE_VERSION);
   float next = 0;

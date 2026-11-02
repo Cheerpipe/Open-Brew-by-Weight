@@ -1315,10 +1315,6 @@ if (!statsSection ||
     // touching view state, and invalid frames fail closed.
     {
       const events = [], sent = [];
-      const ui = {firmwareVersion: '2.0', configMutable: true, webUiOverrideActive: false,
-        compatibilityMode: false, timeUtcSec: 1790809185, lastCommand: {requestId: 7, state: 'PERSISTED'},
-        config: {revision: 8, timezoneId: 'America/Santiago', appliedTimezoneOffsetMinutes: -180,
-          timezoneAutomatic: true, timezoneInitialized: true}};
       const row = id => ({id, bootId: 9, endedAtMs: 30000 + id, hasWallTime: true,
         endedAtLocalSec: 1790794385, endedAtUnixSec: 1790809185,
         timezoneOffsetMinutesAtCommit: -180, durationS: 28.5,

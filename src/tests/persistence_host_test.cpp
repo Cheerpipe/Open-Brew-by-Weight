@@ -379,18 +379,6 @@ void p29_last_shot_persists_and_clears() {
   CHECK(reloaded.getGood().averageFlowValid);
   CHECK(fabs(reloaded.getGood().averageFlowGps - 1.57f) < 0.001f);
 
-  g_hostFlashIoMutexAvailable = false;
-  CHECK(!reloaded.clearLast());
-  CHECK(reloaded.get().cycleId == 42);
-  g_hostFlashIoMutexAvailable = true;
-  LastShotStore afterFailedClear;
-  CHECK(afterFailedClear.load());
-  CHECK(afterFailedClear.get().cycleId == 42);
-
-  CHECK(reloaded.clearLast());
-  CHECK(!reloaded.get().valid);
-  CHECK(reloaded.getGood().cycleId == 42);
-
   CHECK(reloaded.clear());
   LastShotStore emptied;
   CHECK(emptied.load());
@@ -2453,14 +2441,13 @@ void p85_schema1_is_strict_and_micra_defaults_round_trip() {
   CHECK(strcmp(settings.deviceName, "Cafe Bar 2") == 0);
 
   ShotPresetBank bank = settings.presets;
-  CHECK(setShotPresetLineaMicraBrewTarget(bank, bank.activeId, 947));
+  mutableShotPreset(bank, bank.activeId)->lineaMicraBrewTargetDeciC = 947;
   uint8_t duplicateId = 0;
   CHECK(duplicateShotPreset(bank, bank.activeId, duplicateId));
   CHECK(findShotPreset(bank, duplicateId)->lineaMicraBrewTargetDeciC == 947);
   uint8_t createdId = 0;
   CHECK(createUntitledShotPreset(bank, createdId));
   CHECK(findShotPreset(bank, createdId)->lineaMicraBrewTargetDeciC == 930);
-  CHECK(!setShotPresetLineaMicraBrewTarget(bank, createdId, 799));
   CHECK(resetPersistedSettingsToFactory(settings));
   CHECK(settings.lineaMicra.options == LINEA_MICRA_DEFAULT_OPTIONS);
   CHECK(settings.lineaMicra.scaleOptions == LINEA_MICRA_KNOWN_SCALE_OPTIONS);

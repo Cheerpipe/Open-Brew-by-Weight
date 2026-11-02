@@ -35,8 +35,6 @@ bool gPortInitialized = false;
 TaskHandle_t gHostTask = nullptr;
 StaticSemaphore_t gHostTaskMutexStorage;
 SemaphoreHandle_t gHostTaskMutex = xSemaphoreCreateMutexStatic(&gHostTaskMutexStorage);
-OpenBrewByWeightBleGattRegistration gGattRegistration = nullptr;
-void *gGattRegistrationContext = nullptr;
 
 struct MemorySnapshot {
   uint32_t internalFreeBytes;
@@ -129,19 +127,6 @@ TickType_t timeoutTicks(uint32_t timeoutMs) {
 
 }  // namespace
 
-bool openBrewByWeightBleRuntimeConfigureGattProfile(
-    OpenBrewByWeightBleGattRegistration registration, void *context) {
-  portENTER_CRITICAL(&gMux);
-  const bool configurable = !gPortInitialized &&
-                            gHealth.state == OpenBrewByWeightBleRuntimeState::Stopped;
-  if (configurable) {
-    gGattRegistration = registration;
-    gGattRegistrationContext = context;
-  }
-  portEXIT_CRITICAL(&gMux);
-  return configurable;
-}
-
 bool openBrewByWeightBleRuntimeStart(uint32_t timeoutMs) {
   if (gEvents == nullptr) {
     gEvents = xEventGroupCreateStatic(&gEventStorage);
@@ -184,26 +169,6 @@ bool openBrewByWeightBleRuntimeStart(uint32_t timeoutMs) {
     ble_hs_cfg.sync_cb = onSync;
     ble_svc_gap_init();
     ble_svc_gatt_init();
-    if (gGattRegistration != nullptr) {
-      const int registrationRc =
-          gGattRegistration(gGattRegistrationContext);
-      if (registrationRc != 0) {
-        const MemorySnapshot failedMemory = captureMemory();
-        const esp_err_t deinitError = nimble_port_deinit();
-        portENTER_CRITICAL(&gMux);
-        gPortInitialized = false;
-        gHealth.state = OpenBrewByWeightBleRuntimeState::Failed;
-        gHealth.lastError = registrationRc;
-        if (deinitError != ESP_OK && gHealth.lastError == 0) {
-          gHealth.lastError = static_cast<int32_t>(deinitError);
-        }
-        storeMemoryLocked(failedMemory);
-        portEXIT_CRITICAL(&gMux);
-        ESP_LOGE(kTag, "GATT profile registration failed: %d",
-                 registrationRc);
-        return false;
-      }
-    }
     nimble_port_freertos_init(hostTask);
   }
 

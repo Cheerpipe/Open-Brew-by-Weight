@@ -23,7 +23,7 @@ const errorCatalog = JSON.parse(
   }
 })().catch(error => {console.error(error); process.exitCode = 1;});
 const {partialHtml: rawPartialHtml, appJs: rawAppJsSource, runtimeJs: rawRuntimeJs,
-  otaImageJs: rawOtaImageJs, viewJs: rawViewJs, css: rawCss} = authoring.raw;
+  viewJs: rawViewJs, css: rawCss} = authoring.raw;
 const runtimeConsumers = rawAppJsSource + '\n' + Object.values(rawViewJs).join('\n');
 // Raw (unlocalized) JS of every module, for presence checks that do not
 // care which module owns the code.

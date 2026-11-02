@@ -187,16 +187,6 @@ class LastShotStore {
     return false;
   }
 
-  bool clearLast(bool persistNow = true) {
-    const LastShotBlob previous = blob_;
-    blob_.lastShot = PersistedLastShot{};
-    finalizeLastShotBlob(blob_);
-    if (!persistNow) return true;
-    if (save()) return true;
-    blob_ = previous;
-    return false;
-  }
-
   const PersistedLastShot &get() const { return blob_.lastShot; }
   const PersistedLastShot &getGood() const { return blob_.lastGoodShot; }
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)

@@ -697,7 +697,6 @@ if (!firmware.includes('emitAlert(AlertEvent::FIRST_DROP') ||
     !firmware.includes('emitCommandAlert') ||
     !firmware.includes('emitImmediateCommandAlertIfBuzzer') ||
     !firmware.includes('emitCircuitCycleAlert') ||
-    !firmware.includes('commandAlertUsesBuzzer') ||
     /enum class ScaleCommandType[\s\S]*BEEP/.test(
       firmware.slice(firmware.indexOf('enum class ScaleCommandType'),
                      firmware.indexOf('enum class ScaleEventType')))) {

@@ -717,9 +717,6 @@ class NimbleScaleClient {
   }
   uint8_t connectAttempts() const { return connectAttempts_; }
   uint8_t stateId() const { return static_cast<uint8_t>(state_); }
-  uint32_t lastPacketAgeMs() const {
-    return hasValidPacket_ ? elapsedMs(lastPacket_) : 0xffffffffUL;
-  }
   uint32_t rejectedPackets() const {
     portENTER_CRITICAL(&mux_);
     const uint32_t result = rejectedPackets_;
@@ -727,13 +724,6 @@ class NimbleScaleClient {
     return result;
   }
   uint32_t reconnects() const { return reconnects_; }
-  ScaleBleTimingSnapshot timing() const {
-    portENTER_CRITICAL(&mux_);
-    const ScaleBleTimingSnapshot snapshot = timing_;
-    portEXIT_CRITICAL(&mux_);
-    return snapshot;
-  }
-  float weight() const { return currentWeightSample_.weightG; }
   ScaleWeightSample weightSample() const { return currentWeightSample_; }
   uint32_t notificationSequence() const {
     portENTER_CRITICAL(&mux_);
@@ -3087,14 +3077,6 @@ bool EspressoScaleBLE::supportsTareStartTimer() const {
 
 ScaleCommandResult EspressoScaleBLE::beep() { return beepWithoutStateChange(); }
 
-bool EspressoScaleBLE::supportsIndependentBeep() const {
-  return features().has(ScaleFeatureIndependentBeep);
-}
-
-bool EspressoScaleBLE::supportsCommandFeedback() const {
-  return features().has(ScaleFeatureCommandAudibleFeedback);
-}
-
 ScaleCommandResult EspressoScaleBLE::beepWithoutStateChange() {
   return beepWithoutStateChange(nullptr);
 }
@@ -3137,10 +3119,6 @@ ScaleCommandResult EspressoScaleBLE::powerOff() {
 
 bool EspressoScaleBLE::supportsPowerOff() {
   return isConnected() && features().has(ScaleFeaturePowerOff);
-}
-
-float EspressoScaleBLE::getWeight() const {
-  return clientFromStorage(g_clientStorage).weight();
 }
 
 ScaleWeightSample EspressoScaleBLE::getWeightSample() const {
@@ -3212,16 +3190,6 @@ ScaleModel EspressoScaleBLE::model() const {
   return clientFromStorage(g_clientStorage).model();
 }
 
-const char *EspressoScaleBLE::defaultFriendlyName() const {
-  const NimbleScaleClient &client = clientFromStorage(g_clientStorage);
-  return client.isLinkUp() ? scaleDefaultFriendlyName(client.name()) : "";
-}
-
-bool EspressoScaleBLE::supportedCommandAt(size_t index,
-                                          ScaleCommandInfo *out) const {
-  return scaleBookooCommandAt(model(), index, out);
-}
-
 const char *EspressoScaleBLE::connectedProtocolName() const {
   return clientFromStorage(g_clientStorage).protocolName();
 }
@@ -3261,20 +3229,12 @@ uint8_t EspressoScaleBLE::connectStepId() const {
   return clientFromStorage(g_clientStorage).stateId();
 }
 
-uint32_t EspressoScaleBLE::lastValidPacketAgeMs() const {
-  return clientFromStorage(g_clientStorage).lastPacketAgeMs();
-}
-
 uint32_t EspressoScaleBLE::rejectedPacketCount() const {
   return clientFromStorage(g_clientStorage).rejectedPackets();
 }
 
 uint32_t EspressoScaleBLE::reconnectCount() const {
   return clientFromStorage(g_clientStorage).reconnects();
-}
-
-ScaleBleTimingSnapshot EspressoScaleBLE::timingSnapshot() const {
-  return clientFromStorage(g_clientStorage).timing();
 }
 
 int32_t EspressoScaleBLE::lastBackendStatus() const {

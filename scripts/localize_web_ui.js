@@ -316,9 +316,8 @@ function parseCli(argv) {
   return {language: language || process.env.OPENBREWBYWEIGHT_WEBUI_LANGUAGE || 'en'};
 }
 
-module.exports = {normalizeLanguageCode, validateCatalog, loadCatalog, htmlEscape,
-  jsLiteral, cssLiteral, renderSources, projectSources, parseCli, defaultLocalesDir,
-  CSS_SOURCES};
+module.exports = {normalizeLanguageCode, loadCatalog, jsLiteral, cssLiteral, renderSources,
+  projectSources, CSS_SOURCES};
 
 if (require.main === module) {
   try {

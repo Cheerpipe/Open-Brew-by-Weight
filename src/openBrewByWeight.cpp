@@ -19,7 +19,7 @@
     The stopper talks to Machine only through that abstract façade
     (machinePollIntention, machineRequestStart/Stop, machineRunState,
     MachineSense, machineSetActivatorDriveAllowed). It must NOT include
-    paddle/momentary specialization headers, branch on MachineType, or know
+    paddle/momentary specialization headers, branch on machine type, or know
     reed/pulse/PaddleMode internals.
   - Paddle logic stays in OpenBrewByWeightMachinePaddle*; momentary in
     OpenBrewByWeightMachineMomentary*. Run state is owned only by each type's

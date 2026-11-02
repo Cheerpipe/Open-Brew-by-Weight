@@ -2251,7 +2251,6 @@
     "setup.save_password": "Save password",
     "setup.save_stores": "This step saves:",
     "setup.save_wifi": "Save Wi-Fi",
-    "setup.save_wifi_failed": "Could not save the network. ",
     "setup.saved": "Saved",
     "setup.saved_choice": "Saved.",
     "setup.saved_join_hint": "Next time you join {x}, use your new password.",

@@ -169,7 +169,7 @@ enum class ControlSource : uint8_t {
 
 // Snapshot the stopper builds once per loop. Brew/guards never poll machine,
 // scale link, or cup presence themselves — and never see paddle/momentary
-// internals (no PaddleMode, reed, pulse state, MachineType, or rinseGestureMs).
+// internals (no PaddleMode, reed, pulse state, machine type, or rinseGestureMs).
 struct GuardInputs {
   bool holdActive = false;
   bool physicalOn = false;

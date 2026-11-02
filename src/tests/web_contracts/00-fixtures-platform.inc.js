@@ -111,7 +111,6 @@ const firmware = [
 const activationStoresIo = fs.readFileSync(
     path.join(sketchDir, 'OpenBrewByWeightActivationStores.h'), 'utf8');
 const shotLogIo = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightShotLog.h'), 'utf8');
-const shotCurveIo = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightShotCurve.h'), 'utf8');
 const dualSlotFlashIo = fs.readFileSync(
     path.join(sketchDir, 'OpenBrewByWeightDualSlotFlashLog.h'), 'utf8');
 const lastShotIo = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightLastShot.h'), 'utf8');

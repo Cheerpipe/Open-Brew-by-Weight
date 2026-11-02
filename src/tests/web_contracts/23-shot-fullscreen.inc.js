@@ -6,7 +6,6 @@
 // exactly one history pop per exit.
 {
   const assert = require('assert').strict;
-  const vm = require('vm');
 
   // Session keep-alive: resetWebUiInactivity / webUiPollingActive /
   // sessionShotLive over controllable time, timers, and stream state.

@@ -538,12 +538,6 @@ class EspressoScaleBLE {
   bool supportsTareStartTimer() const {
     return features().has(ScaleFeatureCombinedTareStart);
   }
-  bool supportsIndependentBeep() const {
-    return features().has(ScaleFeatureIndependentBeep);
-  }
-  bool supportsCommandFeedback() const {
-    return features().has(ScaleFeatureCommandAudibleFeedback);
-  }
   ScaleCommandResult beepWithoutStateChange(const ScaleCommandAdmission *admission = nullptr) {
     if (!approveCommand(admission)) return ScaleCommandResult::Deferred;
     commandLog.push_back("beepWithoutStateChange");
@@ -588,7 +582,6 @@ class EspressoScaleBLE {
     silenceStartedAtMs = hostMillis;
     return runCommand(powerOffSucceeds);
   }
-  float getWeight() const { return weight; }
   ScaleWeightSample getWeightSample() const {
     return {weight, weightCapturedAtMs == UINT32_MAX ? hostMillis : weightCapturedAtMs,
             weightCaptureSequence, flowRateValid, flowRateGps};

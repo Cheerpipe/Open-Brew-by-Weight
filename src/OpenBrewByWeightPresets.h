@@ -280,17 +280,6 @@ inline bool setActiveShotPreset(ShotPresetBank &bank, uint8_t id) {
   return true;
 }
 
-inline bool setShotPresetLineaMicraBrewTarget(ShotPresetBank &bank, uint8_t id,
-                                              uint16_t targetDeciC) {
-  ShotPreset *preset = mutableShotPreset(bank, id);
-  if (preset == nullptr || targetDeciC < LINEA_MICRA_BREW_TARGET_MIN_DECI_C ||
-      targetDeciC > LINEA_MICRA_BREW_TARGET_MAX_DECI_C) {
-    return false;
-  }
-  preset->lineaMicraBrewTargetDeciC = targetDeciC;
-  return true;
-}
-
 // Overlays the active preset's recipe on the device config. Device-level
 // fields (cup protection, touch, scale-loss switch) are never overlaid; the
 // stop mode comes only from the preset (Manual is a preset, not a session).

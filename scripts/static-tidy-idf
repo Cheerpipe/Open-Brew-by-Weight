@@ -46,7 +46,6 @@ fi
 
 obbw_cli_resolve "arch" || exit $?
 openbrewbyweight_resolve_board "$(obbw_get arch)" || exit 2
-obbw_idf_resolve_paths
 
 obbw_idf_static_paths reports/static-tidy || exit $?
 
@@ -99,12 +98,10 @@ import json, os, shlex, subprocess, sys
 cc_path, out_dir, repo_root = sys.argv[1], sys.argv[2], sys.argv[3]
 patterns = [
     "src/*.cpp",
-    "src/ble/*.cpp",
     "libraries/EspressoScaleBLE/src/*.cpp",
     "libraries/EspressoScaleBLE/src/nimble/*.cpp",
     "libraries/EspressoScaleBLE/src/protocols/*.cpp",
     "idf/main/*.cpp",
-    "idf/components/EspressoScaleBLE/*.cpp",
     "idf/components/OpenBrewByWeightBleRuntime/*.cpp",
 ]
 drop_prefixes = ("-fno-tree-", "-fstrict-volatile-bitfields", "-fuse-ld=",

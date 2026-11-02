@@ -480,7 +480,7 @@ static void run() {
         if (stale) CHECK(c.lastReason()==(first
             ? ScaleDisconnectReason::FIRST_PACKET_TIMEOUT
             : ScaleDisconnectReason::PACKET_TIMEOUT));
-        else CHECK(c.lastPacketAgeMs()==1);
+        else CHECK(c.hasValidPacket_ && elapsedMs(c.lastPacket_)==1);
       }
     }
   }
@@ -519,7 +519,7 @@ static void run() {
       if (!invalid) b.data[19]^=1;
     }
     c.onNotification(1,10,&b,c.linkOperationId_);
-    CHECK(c.newWeightAvailable()); CHECK(c.weight()==-80.0f);
+    CHECK(c.newWeightAvailable()); CHECK(c.weightSample().weightG==-80.0f);
     CHECK(c.currentTimerMs_==0x1234);
     CHECK(c.rejectedPackets()==2);
     const uint8_t codes[]={1,4,5,6,7,2,0x15}; unsigned command=0;

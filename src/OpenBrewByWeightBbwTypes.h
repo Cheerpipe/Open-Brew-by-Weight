@@ -31,12 +31,6 @@ inline bool parseBbwAlphaBaseline(double value, uint8_t &out) {
   return true;
 }
 
-inline const char *bbwAlgorithmName(uint8_t algorithm) {
-  return algorithm == static_cast<uint8_t>(BbwAlgorithm::LINEAR_EWMA)
-             ? "corridor"
-             : "unknown";
-}
-
 inline bool parseBbwAlgorithm(const char *name, uint8_t &algorithm) {
   if (name == nullptr) return false;
   if (strcmp(name, "corridor") == 0) {

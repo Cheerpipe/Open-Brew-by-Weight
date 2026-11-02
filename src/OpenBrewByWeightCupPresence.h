@@ -10,7 +10,7 @@
 //
 // BOUNDARY: Scale-weight sensing only. Must not talk to machine, paddle,
 // momentary, reed, or brew actuators. Emits CupPresenceEvent; the stopper
-// decides whether REMOVED cuts the shot. No MachineType / paddle details.
+// decides whether REMOVED cuts the shot. No machine type / paddle details.
 
 namespace {
 

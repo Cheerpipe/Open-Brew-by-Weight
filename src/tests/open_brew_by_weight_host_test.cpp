@@ -2801,10 +2801,6 @@ void w01_default_runtime_configuration_is_valid() {
   CHECK(config.buzzerSlowExtendedPulseRate ==
         static_cast<uint8_t>(DEFAULT_EXTENDED_PULSE_RATE));
   CHECK(DEFAULT_EXTENDED_PULSE_RATE == ExtendedPulseRate::FAST);
-  CHECK(buzzerPatternForExtendedPulseRate(config.buzzerExtendedPulseRate) ==
-        BuzzerPattern::PULSE_4HZ);
-  CHECK(buzzerPatternForExtendedPulseRate(config.buzzerSlowExtendedPulseRate) ==
-        BuzzerPattern::PULSE_4HZ);
   CHECK(config.alertOutputChannel ==
         static_cast<uint8_t>(DEFAULT_ALERT_OUTPUT_CHANNEL));
   CHECK(DEFAULT_ALERT_OUTPUT_CHANNEL ==
@@ -3619,13 +3615,6 @@ void w24_debug_ring_is_bounded_and_ordered() {
   CHECK(events[0].argument1 == 5);
   CHECK(events[copied - 1].argument1 ==
         static_cast<int32_t>(DEBUG_EVENT_CAPACITY + 4));
-  CHECK(ring.countAfter(0) == DEBUG_EVENT_CAPACITY);
-  DebugEvent first = {};
-  CHECK(ring.copyFirstAfter(0, first));
-  CHECK(first.argument1 == 5);
-  DebugEvent second = {};
-  CHECK(ring.copyFirstAfter(first.sequence, second));
-  CHECK(second.argument1 == 6);
 
   DebugEvent page[4] = {};
   DebugLogReadMetadata laggedRead;
@@ -4809,11 +4798,6 @@ void w82_pulse_train_loops_until_deadline_or_stopIf() {
 void w83_web_buzzer_test_pulse_uses_same_train_for_3s() {
   resetHarness(false, false);
   reachReadyFromBoot();
-  BuzzerPattern parsed = BuzzerPattern::NONE;
-  CHECK(parseBuzzerPatternId("pulse2", parsed));
-  CHECK(parsed == BuzzerPattern::PULSE_TRAIN);
-  CHECK(parseBuzzerPatternId("pulse", parsed));
-  CHECK(parsed == BuzzerPattern::PULSE_TRAIN);
   WebCommand command = webControlCommand(WebCommandType::BUZZER_TEST);
   command.buzzerPattern = BuzzerPattern::PULSE_TRAIN;
   const uint32_t before = localBuzzer.acceptedRequests;
@@ -4857,30 +4841,6 @@ void w84b_echo_inverted_upgrades_weak_pending() {
 void w85_debug_pulse_rates_use_same_on_ms_and_3s() {
   resetHarness(false, false);
   reachReadyFromBoot();
-  BuzzerPattern parsed = BuzzerPattern::NONE;
-  CHECK(parseBuzzerPatternId("pulse2", parsed));
-  CHECK(parsed == BuzzerPattern::PULSE_TRAIN);
-  CHECK(parseBuzzerPatternId("pulse3", parsed));
-  CHECK(parsed == BuzzerPattern::PULSE_3HZ);
-  CHECK(parseBuzzerPatternId("pulse4", parsed));
-  CHECK(parsed == BuzzerPattern::PULSE_4HZ);
-  CHECK(parseBuzzerPatternId("pulse5", parsed));
-  CHECK(parsed == BuzzerPattern::PULSE_5HZ);
-  CHECK(buzzerPatternForExtendedPulseRate(
-            static_cast<uint8_t>(ExtendedPulseRate::OFF)) ==
-        BuzzerPattern::NONE);
-  CHECK(buzzerPatternForExtendedPulseRate(
-            static_cast<uint8_t>(ExtendedPulseRate::SLOW)) ==
-        BuzzerPattern::PULSE_TRAIN);
-  CHECK(buzzerPatternForExtendedPulseRate(
-            static_cast<uint8_t>(ExtendedPulseRate::MEDIUM)) ==
-        BuzzerPattern::PULSE_3HZ);
-  CHECK(buzzerPatternForExtendedPulseRate(
-            static_cast<uint8_t>(ExtendedPulseRate::FAST)) ==
-        BuzzerPattern::PULSE_4HZ);
-  CHECK(buzzerPatternForExtendedPulseRate(
-            static_cast<uint8_t>(ExtendedPulseRate::RAPID)) ==
-        BuzzerPattern::PULSE_5HZ);
 
   WebCommand command = webControlCommand(WebCommandType::BUZZER_TEST);
   command.buzzerPattern = BuzzerPattern::PULSE_3HZ;
@@ -4938,22 +4898,6 @@ void w91_chime_sequence_uses_irregular_note_timings() {
   hostServiceEspTimer(localBuzzer.phaseTimer);
   CHECK(hostPinLevel[BUZZER_GPIO] == LOW);
   CHECK(!localBuzzer.busy());
-}
-
-void w92_parse_sequence_pattern_ids() {
-  BuzzerPattern parsed = BuzzerPattern::NONE;
-  CHECK(parseBuzzerPatternId("chime", parsed));
-  CHECK(parsed == BuzzerPattern::CHIME);
-  CHECK(parseBuzzerPatternId("swing", parsed));
-  CHECK(parsed == BuzzerPattern::SWING);
-  CHECK(parseBuzzerPatternId("echo", parsed));
-  CHECK(parsed == BuzzerPattern::ECHO);
-  CHECK(parseBuzzerPatternId("echoinv", parsed));
-  CHECK(parsed == BuzzerPattern::ECHO_INVERTED);
-  CHECK(parseBuzzerPatternId("morse", parsed));
-  CHECK(parsed == BuzzerPattern::MORSE);
-  CHECK(parseBuzzerPatternId("snap", parsed));
-  CHECK(parsed == BuzzerPattern::SNAP);
 }
 
 void w93_scale_connected_echo_on_rising_edge() {
@@ -5121,9 +5065,6 @@ void f01_worker_uses_only_published_policy() {
 void w95_web_buzzer_test_plays_chime_sequence() {
   resetHarness(false, false);
   reachReadyFromBoot();
-  BuzzerPattern parsed = BuzzerPattern::NONE;
-  CHECK(parseBuzzerPatternId("chime", parsed));
-  CHECK(parsed == BuzzerPattern::CHIME);
   WebCommand command = webControlCommand(WebCommandType::BUZZER_TEST);
   command.buzzerPattern = BuzzerPattern::CHIME;
   const uint32_t before = localBuzzer.acceptedRequests;
@@ -5174,9 +5115,6 @@ void w96_echo_inverted_uses_long_bookend_tones() {
   CHECK(!localBuzzer.busy());
 
   reachReadyFromBoot();
-  BuzzerPattern parsed = BuzzerPattern::NONE;
-  CHECK(parseBuzzerPatternId("echoinv", parsed));
-  CHECK(parsed == BuzzerPattern::ECHO_INVERTED);
   WebCommand command = webControlCommand(WebCommandType::BUZZER_TEST);
   command.buzzerPattern = BuzzerPattern::ECHO_INVERTED;
   const uint32_t before = localBuzzer.acceptedRequests;
@@ -5202,9 +5140,6 @@ void w98_buzzer_sequences_start_and_end_with_sound() {
 void w60_web_buzzer_test_plays_requested_pattern() {
   resetHarness(false, false);
   reachReadyFromBoot();
-  BuzzerPattern parsed = BuzzerPattern::NONE;
-  CHECK(parseBuzzerPatternId("triple", parsed));
-  CHECK(parsed == BuzzerPattern::TRIPLE);
   WebCommand command = webControlCommand(WebCommandType::BUZZER_TEST);
   command.buzzerPattern = BuzzerPattern::TRIPLE;
   const uint32_t before = localBuzzer.acceptedRequests;
@@ -5237,24 +5172,20 @@ bool executePendingScaleDebugCommand() {
 
 void w66_web_bookoo_debug_dispatches_actions() {
   static const struct {
-    const char *id;
     BookooDebugAction action;
     uint8_t level;
     const char *expected;
   } cases[] = {
-      {"start", BookooDebugAction::START, 0, "startTimer"},
-      {"stop", BookooDebugAction::STOP, 0, "stopTimer"},
-      {"tare", BookooDebugAction::TARE, 0, "tare"},
-      {"combined", BookooDebugAction::COMBINED, 0, "tareStartTimer"},
-      {"beep", BookooDebugAction::BEEP, 0, "beepWithoutStateChange"},
-      {"volume", BookooDebugAction::VOLUME, 0, "setBeepLevel:0"},
-      {"volume", BookooDebugAction::VOLUME, 3, "setBeepLevel:3"},
-      {"volume", BookooDebugAction::VOLUME, 5, "setBeepLevel:5"},
+      {BookooDebugAction::START, 0, "startTimer"},
+      {BookooDebugAction::STOP, 0, "stopTimer"},
+      {BookooDebugAction::TARE, 0, "tare"},
+      {BookooDebugAction::COMBINED, 0, "tareStartTimer"},
+      {BookooDebugAction::BEEP, 0, "beepWithoutStateChange"},
+      {BookooDebugAction::VOLUME, 0, "setBeepLevel:0"},
+      {BookooDebugAction::VOLUME, 3, "setBeepLevel:3"},
+      {BookooDebugAction::VOLUME, 5, "setBeepLevel:5"},
   };
   for (const auto &entry : cases) {
-    BookooDebugAction parsed = BookooDebugAction::START;
-    CHECK(parseBookooDebugActionId(entry.id, parsed));
-    CHECK(parsed == entry.action);
     resetHarness(false, true);
     reachReadyFromBoot();
     scale.commandLog.clear();
@@ -16857,7 +16788,6 @@ void f06_boot_capability_policy_is_fail_closed() {
   offline.network = false;
   offline.psram = false;
   CHECK(offline.state() == BootState::READY);
-  CHECK(!offline.optionalConnectivityReady());
 
   BootCapabilities faulted = healthy;
   faulted.criticalFaultLatched = true;
@@ -25701,7 +25631,6 @@ const TestCase testCases[] = {
     {"W88", w88_save_network_flush_includes_live_runtime},
     {"W89", w89_restart_flush_is_best_effort},
     {"W91", w91_chime_sequence_uses_irregular_note_timings},
-    {"W92", w92_parse_sequence_pattern_ids},
     {"W93", w93_scale_connected_echo_on_rising_edge},
     {"W93B", w93b_buzzer_phase_uses_current_time_and_wraps},
     {"W94", w94_scale_connected_silent_when_flag_off_or_scale_only},
