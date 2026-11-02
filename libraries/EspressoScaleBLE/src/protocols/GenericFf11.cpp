@@ -11,7 +11,8 @@ static const ScaleFeatureSet kGenericFeatures = {
     SCALE_CORE_FEATURES | ScaleFeatureCombinedTareStart |
         ScaleFeatureIndependentBeep | ScaleFeatureVolume |
         ScaleFeatureCommandAudibleFeedback | ScaleFeaturePowerOff |
-        ScaleFeatureFlowRate | ScaleFeatureTimerInWeightFrame,
+        ScaleFeatureFlowRate | ScaleFeatureTimerInWeightFrame |
+        ScaleFeatureBatteryLevel,
     0,
     5,
     0,
@@ -71,6 +72,14 @@ bool parseGenericFlowRate(const uint8_t *data, int length, float *gramsPerSecond
     return true;
 }
 
+// Byte 13 is the battery percent of a frame parseWeight accepted.
+bool parseGenericBattery(const uint8_t *data, int length, bool weightFrame,
+                         uint8_t *percent) {
+    if (!weightFrame || length != 20 || data[13] > 100) return false;
+    *percent = data[13];
+    return true;
+}
+
 bool encodeGenericCommand(ScaleOp op, uint8_t arg, uint8_t *out, int *length) {
     const uint8_t code = scaleBookooOpcode(op);
     if (code == 0) return false;
@@ -94,6 +103,7 @@ const ScaleProtocol kScaleProtocolGenericFf11 = {
     &parseGenericWeight,
     &parseGenericTimer,
     &parseGenericFlowRate,
+    &parseGenericBattery,
     &encodeGenericCommand,
     nullptr,
     0,

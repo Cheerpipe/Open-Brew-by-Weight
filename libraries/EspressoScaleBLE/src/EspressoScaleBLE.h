@@ -149,6 +149,9 @@ class EspressoScaleBLE {
         bool supportsPowerOff();
         ScaleWeightSample getWeightSample() const;
         uint32_t notificationSequence() const;
+        // Latest battery reading on this connection; only with
+        // ScaleFeatureBatteryLevel. Display-only, never a control input.
+        ScaleBatteryReading battery() const;
         bool hasTimer() const;
         uint32_t getTimerMs() const;
         uint32_t lastTimerAgeMs() const;

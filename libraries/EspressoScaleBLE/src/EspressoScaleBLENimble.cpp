@@ -537,7 +537,14 @@ class NimbleScaleClient {
                              !features().has(ScaleFeatureTimerInWeightFrame)) &&
                             protocol_->parseTimer(frame.data, frame.length,
                                                   &timerMs);
-      if (!hasWeight && !hasTimer) {
+      // Like a timer, a battery-only frame keeps the link but not a silent
+      // weight stream alive.
+      uint8_t batteryPct = 0;
+      const bool hasBattery = protocol_->parseBattery != nullptr &&
+                              features().has(ScaleFeatureBatteryLevel) &&
+                              protocol_->parseBattery(frame.data, frame.length,
+                                                      hasWeight, &batteryPct);
+      if (!hasWeight && !hasTimer && !hasBattery) {
         notifyDroppedFrame(frame, ScaleFrameDropReason::Undecodable);
         rejectPacket();
         continue;
@@ -553,6 +560,7 @@ class NimbleScaleClient {
         lastTimerPacket_ = frame.receivedAtMs;
         hasTimer_ = true;
       }
+      if (hasBattery) battery_ = {true, batteryPct, frame.receivedAtMs};
       if (hasWeight) {
         lastWeightPacket_ = frame.receivedAtMs;
         hasWeightPacket_ = true;
@@ -662,6 +670,9 @@ class NimbleScaleClient {
   }
 
   bool hasTimer() const { return state_ == State::Ready && hasTimer_; }
+  ScaleBatteryReading battery() const {
+    return state_ == State::Ready ? battery_ : ScaleBatteryReading{};
+  }
   uint32_t timerMs() const { return hasTimer_ ? currentTimerMs_ : 0; }
 
   uint32_t timerAgeMs() const {
@@ -2524,6 +2535,7 @@ class NimbleScaleClient {
     hasTimer_ = false;
     currentTimerMs_ = 0;
     lastTimerPacket_ = 0;
+    battery_ = {};
     if (successfulConnections_ != 0) {
       ++reconnects_;
     }
@@ -2663,6 +2675,7 @@ class NimbleScaleClient {
     hasTimer_ = false;
     currentTimerMs_ = 0;
     lastTimerPacket_ = 0;
+    battery_ = {};
     TaskHandle_t waiterToWake = nullptr;
     portENTER_CRITICAL(&mux_);
     invalidNotificationStreak_ = 0;
@@ -2949,6 +2962,7 @@ class NimbleScaleClient {
   uint32_t lastWeightPacket_ = 0;
   uint32_t currentTimerMs_ = 0;
   ScaleWeightSample currentWeightSample_ = {};
+  ScaleBatteryReading battery_ = {};
   uint32_t notificationSequence_ = 0;
   uint32_t rejectedPackets_ = 0;
   uint8_t consecutiveRejectedPackets_ = 0;
@@ -3126,6 +3140,10 @@ ScaleWeightSample EspressoScaleBLE::getWeightSample() const {
 
 uint32_t EspressoScaleBLE::notificationSequence() const {
   return clientFromStorage(g_clientStorage).notificationSequence();
+}
+
+ScaleBatteryReading EspressoScaleBLE::battery() const {
+  return clientFromStorage(g_clientStorage).battery();
 }
 
 bool EspressoScaleBLE::hasTimer() const {

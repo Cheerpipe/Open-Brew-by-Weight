@@ -13,23 +13,23 @@ protocol is implemented but target validation remains incomplete; **Untested**
 means no result is recorded for that capability. For daily setup, use
 [Scales](../../docs/settings/scales.md).
 
-| Mfr    | Model   | Submodel | Firmware | Connection Performance | Auto-Tare | Auto-Start/Stop Timer | Auto-Reset Timer |
-| ------ | ------- | ------- |------- |------ | ------ |------ |------ |
-| Acaia  | Lunar   | USB-Micro <br>(Pre-2021) | v2.6.019 | Great | Yes | Yes | Untested |
-| Acaia  | Lunar   | USB-C <br> (2021 version)  | v1.0.016 | Hit or Miss    | Yes | Yes | Yes |
-| Acaia  | Pearl S | USB-Micro                  | v1.0.056 | Ok    | Yes | Yes | Yes |
-| Acaia  | Pearl S | USB-C                      | ----     | Ok    | Yes | Yes  | Yes |
-| Acaia  | Pyxis   | ----                       | v1.0.022 | Good  | Not Recommended (too sensitive) | Yes | Yes |
-| Bookoo | Themis  Mini | ----                       | v1.0.5   | Great | Yes | Yes | Yes |
-| Bookoo | Themis Ultra  | ----                 | ----   | Great | Yes | Yes | Yes |
-| Felicita | Arc   | ----                       | ----   | ---- | Yes | Yes | Yes |
-| AtomHeart | Eclair | ----                      | v2.1.0 | Testing | Yes | Yes | Yes |
-| Decent | Scale / EspressiScale | ----              | ----   | Testing | Yes | No | No |
-| DiFluid | Microbalance / Ti | ----                 | ----   | Testing | Yes | No | No |
-| MyScale | KP2048B | ----                      | ----   | Testing | Yes | No | No |
-| Varia | AKU / Mini / Pro | ----                   | ----   | Testing | Yes | Yes | Yes |
-| Eureka | Precisa (`CFS-9002`, `LSJ-001`) | named GAP only | ---- | Testing | Yes | Yes | Yes |
-| WeighMyBru | ---- | ----                      | ----   | Testing | Yes | No | No |
+| Mfr    | Model   | Submodel | Firmware | Connection Performance | Auto-Tare | Auto-Start/Stop Timer | Auto-Reset Timer | Battery |
+| ------ | ------- | ------- |------- |------ | ------ |------ |------ |------ |
+| Acaia  | Lunar   | USB-Micro <br>(Pre-2021) | v2.6.019 | Great | Yes | Yes | Untested | New protocol only |
+| Acaia  | Lunar   | USB-C <br> (2021 version)  | v1.0.016 | Hit or Miss    | Yes | Yes | Yes | New protocol only |
+| Acaia  | Pearl S | USB-Micro                  | v1.0.056 | Ok    | Yes | Yes | Yes | New protocol only |
+| Acaia  | Pearl S | USB-C                      | ----     | Ok    | Yes | Yes  | Yes | New protocol only |
+| Acaia  | Pyxis   | ----                       | v1.0.022 | Good  | Not Recommended (too sensitive) | Yes | Yes | New protocol only |
+| Bookoo | Themis  Mini | ----                       | v1.0.5   | Great | Yes | Yes | Yes | Testing |
+| Bookoo | Themis Ultra  | ----                 | ----   | Great | Yes | Yes | Yes | Testing |
+| Felicita | Arc   | ----                       | ----   | ---- | Yes | Yes | Yes | Testing |
+| AtomHeart | Eclair | ----                      | v2.1.0 | Testing | Yes | Yes | Yes | No |
+| Decent | Scale / EspressiScale | ----              | ----   | Testing | Yes | No | No | No |
+| DiFluid | Microbalance / Ti | ----                 | ----   | Testing | Yes | No | No | No |
+| MyScale | KP2048B | ----                      | ----   | Testing | Yes | No | No | No |
+| Varia | AKU / Mini / Pro | ----                   | ----   | Testing | Yes | Yes | Yes | No |
+| Eureka | Precisa (`CFS-9002`, `LSJ-001`) | named GAP only | ---- | Testing | Yes | Yes | Yes | No |
+| WeighMyBru | ---- | ----                      | ----   | Testing | Yes | No | No | No |
 
 Not supported: Timemore Black Mirror DUO, Timemore Dot, Acaia Umbra, Eureka
 Precisa units that advertise no GAP name (manufacturer-data only). Weight is
@@ -84,6 +84,29 @@ rides inside the weight frame (Bookoo/generic FF11, Felicita, Eclair) declare
 and `parseFlowRate` only on frames `parseWeight` accepted, so those hooks
 decode without repeating the checksum. Protocols with standalone timer frames
 (Acaia, Varia) keep validating them in `parseTimer`.
+
+## Scale battery level
+
+A protocol whose scale reports its battery in frames it already sends declares
+`ScaleFeatureBatteryLevel` and supplies `parseBattery`, which returns a whole
+percent from 0 to 100; host tests require the flag and the hook to come
+together. Brand-specific conversion stays inside the protocol file, and a raw
+value outside the expected range is rejected rather than turned into a reading.
+`battery()` returns the latest reading of the current connection (`valid`,
+`percent`, `receivedAtMs`) and is cleared on every new connection. Enabling it
+adds no command or initialization write.
+
+Bookoo (byte 13 of the weight frame) and Felicita (byte 15, raw about 129 to
+158 mapped onto 0–100 %) carry the level inside the weight frame, so the client
+passes `weightFrame` and their hooks skip the checksum. New-protocol Acaia
+reports it in its own event (`EF DD 0C`, event `06`, percent in the first
+payload byte), which the existing notification request already subscribes;
+that hook validates its own frame and checksum. Like a timer-only frame, a
+battery-only frame is a valid packet but not a weight packet: it is never a
+rejected packet and never keeps a silent weight stream alive. Legacy Acaia and
+the other protocols report no battery. The offsets are not yet confirmed on
+hardware, which is why the compatibility table lists them as Testing; an Acaia
+scale reports its battery only when it connects through the new protocol.
 
 ## Requirements
 
@@ -248,7 +271,8 @@ legacy `beep()` method no longer substitutes tare for sound; it now behaves
 like `beepWithoutStateChange()` and succeeds only on Bookoo/generic scales.
 
 The current `ScaleProtocol` contract parses weight and timer readings, plus
-the scale's own flow rate when the protocol declares `ScaleFeatureFlowRate`;
+the scale's own flow rate when the protocol declares `ScaleFeatureFlowRate`
+and its battery when it declares `ScaleFeatureBatteryLevel`;
 it has no verified physical-button tare notification. Consumers must not interpret a
 weight drop to zero as proof of tare: removing an untared cup can produce the
 same trace. Firmware-issued tare and its known cup reference are handled by

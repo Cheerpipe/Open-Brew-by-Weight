@@ -17,7 +17,7 @@ static const ScalePayload kFelicitaInitWrites[] = {
 
 static const ScaleFeatureSet kFelicitaFeatures = {
     SCALE_CORE_FEATURES | ScaleFeatureCommandAudibleFeedback |
-        ScaleFeatureTimerInWeightFrame,
+        ScaleFeatureTimerInWeightFrame | ScaleFeatureBatteryLevel,
     0,
     0,
     0,
@@ -69,6 +69,19 @@ bool parseFelicitaTimer(const uint8_t *data, int length, uint32_t *timerMs) {
     return false;
 }
 
+// Byte 15 of a frame parseWeight accepted is a raw battery level from about
+// 129 (empty) to 158 (full). Values below the range are rejected; a value
+// above it reads as full.
+bool parseFelicitaBattery(const uint8_t *data, int length, bool weightFrame,
+                          uint8_t *percent) {
+    static const uint8_t kEmpty = 129, kFull = 158;
+    if (!weightFrame || length != 18 || data[15] < kEmpty) return false;
+    const unsigned raw = data[15] > kFull ? kFull : data[15];
+    *percent = static_cast<uint8_t>(((raw - kEmpty) * 100U + (kFull - kEmpty) / 2) /
+                                    (kFull - kEmpty));
+    return true;
+}
+
 bool encodeFelicitaCommand(ScaleOp op, uint8_t arg, uint8_t *out, int *length) {
     (void)arg;
     switch (op) {
@@ -104,6 +117,7 @@ const ScaleProtocol kScaleProtocolFelicita = {
     &parseFelicitaWeight,
     &parseFelicitaTimer,
     nullptr,
+    &parseFelicitaBattery,
     &encodeFelicitaCommand,
     kFelicitaInitWrites,
     sizeof(kFelicitaInitWrites) / sizeof(kFelicitaInitWrites[0]),

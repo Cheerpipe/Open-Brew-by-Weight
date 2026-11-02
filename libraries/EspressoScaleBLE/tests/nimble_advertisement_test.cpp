@@ -165,6 +165,54 @@ void testBookooFlowRateFrame() {
   CHECK(!bookoo.parseTimer(frame, sizeof(frame) - 1, &timerMs));
 }
 
+// Byte offsets follow the vendors' published layouts (see the README);
+// these are parser-contract fixtures, not hardware captures.
+void testBatteryFrames() {
+  for (size_t index = 0; index < scaleProtocolCount(); ++index) {
+    const ScaleProtocol *protocol = scaleProtocolAt(index);
+    CHECK((protocol->parseBattery != nullptr) ==
+          protocol->features.has(ScaleFeatureBatteryLevel));
+  }
+  uint8_t percent = 0;
+  uint8_t bookoo[20] = {3, 0x0b};
+  bookoo[13] = 62;  // Percent in byte 13 of an accepted weight frame.
+  const ScaleProtocol &generic = kScaleProtocolGenericFf11;
+  CHECK(generic.parseBattery(bookoo, 20, true, &percent) && percent == 62);
+  CHECK(!generic.parseBattery(bookoo, 20, false, &percent));
+  CHECK(!generic.parseBattery(bookoo, 19, true, &percent));
+  bookoo[13] = 101;
+  CHECK(!generic.parseBattery(bookoo, 20, true, &percent));
+  uint8_t felicita[18] = {};  // Raw byte 15: 129 empty to 158 full.
+  const int curve[][2] = {{129, 0}, {143, 48}, {158, 100}, {200, 100}};
+  for (const auto &point : curve) {
+    felicita[15] = static_cast<uint8_t>(point[0]);
+    CHECK(kScaleProtocolFelicita.parseBattery(felicita, 18, true, &percent) &&
+          percent == point[1]);
+  }
+  CHECK(!kScaleProtocolFelicita.parseBattery(felicita, 18, false, &percent));
+  felicita[15] = 128;
+  CHECK(!kScaleProtocolFelicita.parseBattery(felicita, 18, true, &percent));
+  felicita[15] = 0;  // A frame without the level never reads as empty.
+  CHECK(!kScaleProtocolFelicita.parseBattery(felicita, 18, true, &percent));
+  // Acaia event 0x06, a standalone frame with its own checksum.
+  const ScaleProtocol &acaia = kScaleProtocolAcaia;
+  uint8_t event[] = {0xef, 0xdd, 0x0c, 3, 6, 47, 50, 6};
+  const uint8_t longer[] = {0xef, 0xdd, 0x0c, 4, 6, 80, 0, 84, 6};
+  const uint8_t weight[] = {0xef, 0xdd, 0x0c, 8, 5, 0x68, 1, 0, 0, 1, 0, 0x71, 6};
+  CHECK(acaia.supportedPacketLength(8) && acaia.supportedPacketLength(9));
+  CHECK(acaia.parseBattery(event, 8, false, &percent) && percent == 47);
+  CHECK(acaia.parseBattery(longer, 9, false, &percent) && percent == 80);
+  CHECK(!acaia.parseBattery(event, 8, true, &percent));
+  CHECK(!acaia.parseBattery(weight, 13, false, &percent));
+  event[7] ^= 1;
+  CHECK(!acaia.parseBattery(event, 8, false, &percent));
+  event[5] = 101;
+  event[6] = 104;
+  event[7] = 6;
+  CHECK(!acaia.parseBattery(event, 8, false, &percent));
+  CHECK(kScaleProtocolAcaiaLegacy.parseBattery == nullptr);
+}
+
 void fuzzProtocolPacketBounds() {
   for (size_t index = 0; index < scaleProtocolCount(); ++index) {
     const ScaleProtocol *protocol = scaleProtocolAt(index);
@@ -192,6 +240,13 @@ void fuzzProtocolPacketBounds() {
         if (protocol->parseFlowRate != nullptr &&
             protocol->parseFlowRate(frame.data(), length, &flow) && hasWeight) {
           CHECK(std::isfinite(flow));
+        }
+        uint8_t percent = 0;
+        for (const bool weightFrame : {false, true}) {
+          if (protocol->parseBattery != nullptr &&
+              protocol->parseBattery(frame.data(), length, weightFrame, &percent)) {
+            CHECK(percent <= 100);
+          }
         }
       }
     }
@@ -277,6 +332,7 @@ int main() {
   testProtocolInitializationContracts();
   testEurekaWeightFrame();
   testBookooFlowRateFrame();
+  testBatteryFrames();
   fuzzProtocolPacketBounds();
   mutateAcceptedProtocolFrames();
   std::cout << "NimBLE advertisement tests passed: " << checks << " checks\n";

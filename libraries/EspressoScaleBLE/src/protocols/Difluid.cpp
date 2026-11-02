@@ -93,6 +93,7 @@ const ScaleProtocol kScaleProtocolDifluid = {
     &parseDifluidWeight,
     nullptr,
     nullptr,
+    nullptr,
     &encodeDifluidCommand,
     kDifluidInitWrites,
     sizeof(kDifluidInitWrites) / sizeof(kDifluidInitWrites[0]),

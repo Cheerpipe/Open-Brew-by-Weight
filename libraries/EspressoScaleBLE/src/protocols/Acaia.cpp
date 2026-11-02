@@ -42,6 +42,18 @@ static const ScaleFeatureSet kAcaiaFeatures = {
     690
 };
 
+// The new protocol also reports the battery (legacy 2a80 does not).
+static const ScaleFeatureSet kAcaiaNewFeatures = {
+    SCALE_CORE_FEATURES | ScaleFeatureHeartbeat |
+        ScaleFeatureCommandAudibleFeedback | ScaleFeatureBatteryLevel,
+    0,
+    0,
+    2750,
+    5000,
+    0,
+    690
+};
+
 bool encodeAcaiaCommand(ScaleOp op, uint8_t arg, uint8_t *out, int *length) {
     (void)arg;
     switch (op) {
@@ -65,8 +77,10 @@ bool acaiaOldSupportedPacketLength(int length) {
     return length == 10 || length == 14;
 }
 
+// 8 and 9 bytes carry the battery event NOTIFICATION_REQUEST subscribes.
 bool acaiaNewSupportedPacketLength(int length) {
-    return length == 10 || length == 13 || length == 17;
+    return length == 8 || length == 9 || length == 10 || length == 13 ||
+           length == 17;
 }
 
 bool parseAcaiaOldWeight(const uint8_t *data, int length, float *weight) {
@@ -131,6 +145,20 @@ bool parseAcaiaNewTimer(const uint8_t *data, int length, uint32_t *timerMs) {
     return false;
 }
 
+// Battery event 0x06: its first payload byte is the percent. A standalone
+// frame, so it validates its own envelope and checksum like the timer does.
+bool parseAcaiaNewBattery(const uint8_t *data, int length, bool weightFrame,
+                          uint8_t *percent) {
+    if (weightFrame || (length != 8 && length != 9) || data[0] != 0xef ||
+        data[1] != 0xdd || data[2] != 0x0c ||
+        static_cast<int>(data[3]) + 5 != length || data[4] != 0x06 ||
+        data[5] > 100 || !scaleValidAcaiaChecksum(data, length)) {
+        return false;
+    }
+    *percent = data[5];
+    return true;
+}
+
 } // namespace
 
 const ScaleProtocol kScaleProtocolAcaiaLegacy = {
@@ -145,6 +173,7 @@ const ScaleProtocol kScaleProtocolAcaiaLegacy = {
     &parseAcaiaOldWeight,
     &parseAcaiaOldTimer,
     nullptr,
+    nullptr,
     &encodeAcaiaCommand,
     kAcaiaInitWrites,
     sizeof(kAcaiaInitWrites) / sizeof(kAcaiaInitWrites[0]),
@@ -158,11 +187,12 @@ const ScaleProtocol kScaleProtocolAcaia = {
     "49535343-8841-43f4-a8d4-ecbe34729bb3",
     kAcaiaPrefixes,
     sizeof(kAcaiaPrefixes) / sizeof(kAcaiaPrefixes[0]),
-    kAcaiaFeatures,
+    kAcaiaNewFeatures,
     &acaiaNewSupportedPacketLength,
     &parseAcaiaNewWeight,
     &parseAcaiaNewTimer,
     nullptr,
+    &parseAcaiaNewBattery,
     &encodeAcaiaCommand,
     kAcaiaInitWrites,
     sizeof(kAcaiaInitWrites) / sizeof(kAcaiaInitWrites[0]),

@@ -19,7 +19,9 @@ enum ScaleFeature {
     ScaleFeatureFlowRate = 1u << 11,
     // The timer rides inside the weight frame: parseTimer is called only on
     // frames parseWeight accepted and skips its own integrity check.
-    ScaleFeatureTimerInWeightFrame = 1u << 12
+    ScaleFeatureTimerInWeightFrame = 1u << 12,
+    // The scale reports its battery in frames it already sends (parseBattery).
+    ScaleFeatureBatteryLevel = 1u << 13
 };
 
 struct ScaleFeatureSet {

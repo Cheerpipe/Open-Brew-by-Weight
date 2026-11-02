@@ -19,6 +19,14 @@ struct ScalePayload {
     const char *label;
 };
 
+// Display-only battery state of the connected scale, already normalized by
+// its protocol. Cleared on every new connection.
+struct ScaleBatteryReading {
+    bool valid;
+    uint8_t percent;
+    uint32_t receivedAtMs;
+};
+
 struct ScaleProtocol {
     const char *id;
     const char *debugLabel;
@@ -37,6 +45,12 @@ struct ScaleProtocol {
     // Signed grams per second from a frame parseWeight accepted; set only by
     // protocols that declare ScaleFeatureFlowRate.
     bool (*parseFlowRate)(const uint8_t *data, int length, float *gramsPerSecond);
+    // Battery percent 0-100, set only by protocols that declare
+    // ScaleFeatureBatteryLevel. weightFrame is true when parseWeight accepted
+    // the frame; otherwise the hook validates its own standalone frame.
+    // Out-of-range raw values are rejected, never clamped into an alarm.
+    bool (*parseBattery)(const uint8_t *data, int length, bool weightFrame,
+                         uint8_t *percent);
     bool (*encodeCommand)(ScaleOp op, uint8_t arg, uint8_t *out, int *length);
     const ScalePayload *initWrites;
     size_t initWriteCount;

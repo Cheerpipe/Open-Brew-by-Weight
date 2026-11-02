@@ -96,6 +96,7 @@ const ScaleProtocol kScaleProtocolVaria = {
     &parseVariaWeight,
     &parseVariaTimer,
     nullptr,
+    nullptr,
     &encodeVariaCommand,
     nullptr,
     0,

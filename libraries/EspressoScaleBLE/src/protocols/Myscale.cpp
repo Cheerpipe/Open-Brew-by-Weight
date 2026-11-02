@@ -66,6 +66,7 @@ const ScaleProtocol kScaleProtocolMyscale = {
     &parseMyscaleWeight,
     nullptr,
     nullptr,
+    nullptr,
     &encodeMyscaleCommand,
     nullptr,
     0,

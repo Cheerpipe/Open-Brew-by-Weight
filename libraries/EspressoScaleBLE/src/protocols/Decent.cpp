@@ -74,6 +74,7 @@ const ScaleProtocol kScaleProtocolDecent = {
     &parseDecentWeight,
     nullptr,
     nullptr,
+    nullptr,
     &encodeDecentCommand,
     nullptr,
     0,

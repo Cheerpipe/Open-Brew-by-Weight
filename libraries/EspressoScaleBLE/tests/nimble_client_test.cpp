@@ -465,6 +465,51 @@ static void run() {
     CHECK(!c.isConnected());
     CHECK(c.lastReason()==ScaleDisconnectReason::PACKET_TIMEOUT);
   }
+  {
+    // Acaia's battery event is a valid packet but not weight: it is never a
+    // rejected packet and never keeps a silent weight stream alive.
+    testNowMs=100;
+    NimbleScaleClient c(false); ready(c);
+    c.protocol_=&kScaleProtocolAcaia;
+    const uint8_t weightFrame[]={0xef,0xdd,0x0c,8,5,0x68,1,0,0,1,0,0x71,6};
+    const uint8_t batteryFrame[]={0xef,0xdd,0x0c,3,6,47,50,6};
+    os_mbuf weight={}; weight.length=sizeof(weightFrame);
+    memcpy(weight.data,weightFrame,sizeof(weightFrame));
+    os_mbuf battery={}; battery.length=sizeof(batteryFrame);
+    memcpy(battery.data,batteryFrame,sizeof(batteryFrame));
+    CHECK(!c.battery().valid);
+    c.onNotification(1,10,&battery,c.linkOperationId_);
+    CHECK(!c.newWeightAvailable());
+    CHECK(c.battery().valid && c.battery().percent==47 && c.rejectedPackets()==0);
+    CHECK(c.battery().receivedAtMs==testNowMs && c.hasValidPacket_);
+    ready(c);  // A new connection forgets the previous scale's battery.
+    CHECK(!c.battery().valid);
+    c.protocol_=&kScaleProtocolAcaia;
+    c.onNotification(1,10,&weight,c.linkOperationId_);
+    CHECK(c.newWeightAvailable());
+    for (uint32_t waited=0; waited<c.maxPacketPeriodMs(); waited+=500) {
+      testNowMs+=500;
+      c.onNotification(1,10,&battery,c.linkOperationId_);
+      CHECK(!c.newWeightAvailable());
+    }
+    CHECK(!c.isConnected() && !c.battery().valid);
+    CHECK(c.lastReason()==ScaleDisconnectReason::PACKET_TIMEOUT);
+    CHECK(c.rejectedPackets()==0);
+  }
+  {
+    // Bookoo carries the battery in its weight frame; without the capability
+    // (WeighMyBru shares the envelope) the same frame reports none.
+    NimbleScaleClient c(false); ready(c);
+    os_mbuf b={}; b.length=20; b.data[0]=3; b.data[1]=0x0b; b.data[13]=62;
+    for (unsigned i=0;i<19;++i) b.data[19]^=b.data[i];
+    c.onNotification(1,10,&b,c.linkOperationId_);
+    CHECK(c.newWeightAvailable());
+    CHECK(c.battery().valid && c.battery().percent==62);
+    ready(c);
+    c.protocol_=&kScaleProtocolWeighMyBru;
+    c.onNotification(1,10,&b,c.linkOperationId_);
+    CHECK(c.newWeightAvailable() && !c.battery().valid);
+  }
   for (bool first : {false, true}) {
     for (bool stale : {false, true}) {
       for (bool wrap : {false, true}) {
