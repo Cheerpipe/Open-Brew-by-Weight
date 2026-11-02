@@ -64,6 +64,12 @@ a password. Install that address as an app and it stays out of your way: an
 installed app keeps its place and reconnects by itself every time you open
 it, without the Reload button a browser page shows after sitting unused.
 
+Shots and History also open faster after the first visit. The companion
+remembers the last page it showed; when you open it again, it only asks the
+controller whether anything changed, and the controller answers with one small
+message when nothing did. You never see an outdated list: it appears once the
+controller has confirmed it.
+
 A few things stay one at a time, on purpose:
 
 - **Admin unlocks for one screen at a time.** Unlocking Admin on the tablet
