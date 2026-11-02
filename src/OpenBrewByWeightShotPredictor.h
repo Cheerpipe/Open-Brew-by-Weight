@@ -12,6 +12,7 @@
 // (SPEC_v4.md, BLEND_FREEZE.md); this header is that spec in integer form.
 
 #include "OpenBrewByWeightCorridor.h"
+#include "OpenBrewByWeightEtaSmoother.h"
 
 #include <stdint.h>
 
@@ -125,6 +126,9 @@ struct ShotPredictor {
   // Latched live (mean-basis, acceleration-aware) crossing t* for display
   // consumers; -1 = no usable forecast this sample (young, censored, no rate).
   int32_t fcTms = -1;
+  // fcTms smoothed for display (fcSmoother.shownMs, -1 = hidden): shown from
+  // the plateau on, so the dot glides instead of jumping on the early ramp.
+  eta::Smoother fcSmoother;
 };
 
 // Inputs assembled by the brew integration per accepted scale sample.
@@ -400,6 +404,8 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
     live.sigmaMs = (p.wallMs - now) / CENSORED_SIGMA_DIV;
   }
   pr.fcTms = !live.censored && live.tMs >= 0 && live.tMs < p.wallMs ? live.tMs : -1;
+  (void)eta::smooth(pr.fcSmoother, eta::SmootherConfig{}, now, pr.fcTms, plateau,
+                    in.sampleDtMs);
   const Forecast red = qOk ? forecastBasis(cut, now, in.weightDg, 1, 0, 0)
                            : Forecast{};
   const corridor::ArrivalStats &h = cut.history;

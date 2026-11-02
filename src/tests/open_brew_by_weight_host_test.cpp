@@ -21139,6 +21139,43 @@ void sp12_forecast_latch_tracks_the_accelerated_crossing() {
   CHECK(pr.fcTms == -1);
 }
 
+void sp13_display_forecast_waits_for_plateau_and_meets_the_raw_one() {
+  // The smoothed display forecast stays hidden before the plateau floor, then
+  // tracks the raw forecast (which it never changes) and meets it near the end.
+  corridor::CorridorState cut = spArmed();
+  predictor::ShotPredictor pr;
+  predictor::armShotPredictor(pr);
+  predictor::PredictorInputs in;
+  in.cut = &cut;
+  in.qPX100 = 1800;
+  in.autoMode = true;
+  in.scaleOk = true;
+  in.sampleDtMs = 100;
+  bool hiddenEarly = true;
+  int64_t rawMove = 0, shownMove = 0;
+  int32_t lastRaw = -1, lastShown = -1;
+  for (int t = 5000; t <= 27000; t += 100) {  // this shape crosses at ~27.5 s
+    const int32_t w = spGreenW(t);
+    if (cut.rate.push(t, w) != corridor::RateEstimator::Result::ACCEPTED) continue;
+    in.nowMs = t;
+    in.weightDg = w;
+    in.firstDropMs = 5200;
+    predictor::updateShotPredictor(pr, in);
+    const int32_t shown = pr.fcSmoother.shownMs;
+    if (t < predictor::PLATEAU_MIN_MS && shown >= 0) hiddenEarly = false;
+    if (shown >= 0 && lastShown >= 0) {
+      shownMove += std::abs(shown - lastShown);
+      if (pr.fcTms >= 0 && lastRaw >= 0) rawMove += std::abs(pr.fcTms - lastRaw);
+    }
+    lastRaw = pr.fcTms;
+    lastShown = shown;
+  }
+  CHECK(hiddenEarly);
+  CHECK(lastRaw > 27000 && lastShown > 27000);
+  CHECK(std::abs(lastShown - lastRaw) <= 300);
+  CHECK(shownMove <= rawMove + 500);
+}
+
 void fw01_median_final_weight_filters_dip() {
   // Post-stop drip tail with one -1.9 g dip constituent: the median of the
   // last five plausible samples swallows it, and learning consumes the
@@ -25547,6 +25584,7 @@ const TestCase testCases[] = {
     {"SP10", sp10_blend_monotone_within_class},
     {"SP11", sp11_disturbance_guard_fades_to_neutral},
     {"SP12", sp12_forecast_latch_tracks_the_accelerated_crossing},
+    {"SP13", sp13_display_forecast_waits_for_plateau_and_meets_the_raw_one},
     {"FW01", fw01_median_final_weight_filters_dip},
     {"FW02", fw02_offset_learns_below_sensor_lag},
     {"FW03", fw03_dense_tail_decimates_to_reachable_median},

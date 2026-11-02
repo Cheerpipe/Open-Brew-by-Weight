@@ -34,6 +34,10 @@ exported JSON formats are not carried over.
   cut line now follows the shot's own pace. It bends upward while the flow
   speeds up and its ring marks where the controller expects the shot to land,
   so the estimate no longer reads late on shots that accelerate as they go.
+- **Steadier landing point:** the point where the controller expects the shot
+  to land, on Home and in the Live view, now appears once the flow has
+  settled and glides toward its estimate instead of jumping between the fast,
+  on-recipe and slow zones early in the shot.
 - **Continuous curve hardness:** the transition curve of Fast and Slow shots
   is no longer three fixed levels. A slider from **Gentle** to **Firm** sets
   how marked the curve is, and every graph draws the exact cut line you

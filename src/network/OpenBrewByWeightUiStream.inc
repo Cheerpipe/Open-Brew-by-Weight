@@ -901,7 +901,7 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
   // The cut forecast on the shot clock while brewing; 0 = none.
   delta.field("expectedEndMs", "%lu",
               static_cast<unsigned long>(control.activeCycle ? control.cycleExpectedEndMs : 0U));
-  // The SAP's acceleration-aware display forecast; 0 = none. The timed law
+  // The SAP's smoothed display forecast; 0 = none. The timed law
   // above stays on expectedEndMs; this only paints the Live curve.
   delta.field("fcEndMs", "%lu",
               static_cast<unsigned long>(control.activeCycle ? control.cycleForecastEndMs : 0U));

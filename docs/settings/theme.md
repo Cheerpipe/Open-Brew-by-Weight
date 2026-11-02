@@ -29,7 +29,9 @@ final weight, and it comes in two looks. Pick the one you want to see:
   on-recipe window, how slow is too slow — with your shot drawn over it. While
   the shot runs, the zone the controller expects lights up and grows stronger
   as its forecast firms up, and a dotted arc points at the weight and moment
-  it expects to stop at. The number of seconds sits in a chip that takes the
+  it expects to stop at. That landing point appears once the flow has settled,
+  about a dozen seconds into the shot, and then glides as the forecast firms
+  up instead of jumping around. The number of seconds sits in a chip that takes the
   color of that expectation, so you can read the pace from across the counter.
   After the shot, the zone it actually landed in stays lit, and you can drag
   the dot along the curve to read the time, the weight and the stop line at
