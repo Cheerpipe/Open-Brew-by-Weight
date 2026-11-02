@@ -232,15 +232,17 @@ int32_t pendingCutLineDg(const PendingShotFinalize &snapshot) {
       : corridor::cutLineDg(pendingCutParams(snapshot), pendingCutMs(snapshot));
 }
 
-// Verdict of a weight cut by its arrival time (plan §4.6); every other end
-// is not classified.
+// Verdict of a weight cut by its arrival time (plan §4.6), or by its
+// extension; every other end is not classified.
 corridor::ArrivalVerdict pendingShotVerdict(const PendingShotFinalize &snapshot,
                                             int32_t rateX100) {
   if (!pendingShotScaleCut(snapshot) ||
       !brewWeightCutSettlesMachineOff(snapshot.endReason))
     return corridor::ArrivalVerdict{};
-  return corridor::arrivalVerdict(pendingCutParams(snapshot), pendingCutMs(snapshot),
-                                  rateX100);
+  return corridor::extendedVerdict(
+      corridor::arrivalVerdict(pendingCutParams(snapshot), pendingCutMs(snapshot),
+                               rateX100),
+      snapshot.extractionExtended, snapshot.slowExtractionExtended);
 }
 
 void persistLastShotFromFinalize(const PendingShotFinalize &snapshot,

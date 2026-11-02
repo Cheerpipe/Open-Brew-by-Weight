@@ -445,6 +445,15 @@ void testNegativeArrival() {
   p.slowAfterMs = 36000;
   p.wallMs = 50000;
   CHECK(arrivalVerdict(p, 2000, 2000).verdict == Verdict::UNCLASSIFIED);
+  // An extension sets its side's verdict but never classifies a lost arrival.
+  ArrivalVerdict onRecipe;
+  onRecipe.verdict = Verdict::ON_RECIPE;
+  onRecipe.arrivalMs = 26800;
+  CHECK(extendedVerdict(onRecipe, true, false).verdict == Verdict::FAST);
+  CHECK(extendedVerdict(onRecipe, false, true).verdict == Verdict::SLOW);
+  CHECK(extendedVerdict(onRecipe, false, false).verdict == Verdict::ON_RECIPE);
+  CHECK(extendedVerdict(onRecipe, true, false).arrivalMs == 26800);
+  CHECK(extendedVerdict(ArrivalVerdict{}, true, false).verdict == Verdict::UNCLASSIFIED);
   const ArrivalVerdict later = arrivalVerdict(p, 6000, 2000);
   CHECK(later.verdict == Verdict::FAST && later.arrivalMs == 3000);
 }

@@ -72,8 +72,9 @@ changed. On momentary machines, check the actual group and its state feedback.
 ## Bullseye timing
 
 Bullseye applies only to automatic shots stopped by weight whose verdict is
-**On recipe** (they reached the target inside the shot time window); fast,
-slow, manual, timer-only and limit endings never play it, nor do rinses.
+**On recipe** (they reached the target inside the shot time window and were
+neither extended nor stopped sooner); fast, slow, manual, timer-only and limit
+endings never play it, nor do rinses.
 It is active only when **Sound alerts** is on, **Play alerts on** is **Buzzer
 only**, and a local buzzer is compiled in.
 

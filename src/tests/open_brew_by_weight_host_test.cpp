@@ -17295,6 +17295,28 @@ void s11_shot_log_record_includes_preset_snapshot() {
   CHECK(stored[0].cutLineCg > 3600 && stored[0].cutLineCg < 4000);
   snapshot.fastRampMs = snapshot.slowRampMs = 0;
   snapshot.fastCurve = snapshot.slowCurve = 0;
+  // A cut at the end of the fast transition arrives inside the verdict dead
+  // band: On recipe by arrival alone, Fast once the shot was extended.
+  snapshot.fastRampMs = 6000;
+  snapshot.cutStopMs = 26950;
+  snapshot.cutLineDg = 360;
+  snapshot.rateAtStopX100 = 2000;
+  snapshot.extractionExtended = false;
+  shotLog.clear();
+  commitPendingShotLog(snapshot, 36.5f, true, ActualWeightSource::POST_DRIP);
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  CHECK(corridor::verdictOf(stored[0].verdict) == corridor::Verdict::ON_RECIPE);
+  const uint16_t arrivalDs = stored[0].arrivalDs;
+  snapshot.extractionExtended = true;
+  shotLog.clear();
+  commitPendingShotLog(snapshot, 36.5f, true, ActualWeightSource::POST_DRIP);
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  CHECK(corridor::verdictOf(stored[0].verdict) == corridor::Verdict::FAST);
+  CHECK(stored[0].arrivalDs == arrivalDs);
+  snapshot.fastRampMs = 0;
+  snapshot.cutStopMs = 0;
+  snapshot.cutLineDg = 0;
+  snapshot.rateAtStopX100 = 2108;
   // A wall stop is not classified.
   shotLog.clear();
   snapshot.endReason = EndReason::CONFIGURED_WALL_LIMIT;
