@@ -5,7 +5,7 @@ Web UI shot log. Use it to see how long a shot ran, why it ended, and how
 close it landed to the target when brew by weight was in use.
 
 When you open **Shots**, the Stats section, including its chart, and the
-Shot history section, including its sort, export, and clear controls, normally
+Shot history section, including its sort and export controls, normally
 appear at once with their data. A brief loading animation covers them only
 while the device has not sent the shot data yet — for example right after the
 interface starts or after a dropped connection. From then on the data keeps
@@ -20,7 +20,13 @@ list, plus the first one that covers them all, and none with ten shots or
 fewer. Filtering the list down to fewer shots moves the selection to the
 largest size still shown. Every time you open the Web UI it starts again at
 10. Through [the companion](companion.md#your-whole-history) with its archive,
-Stats covers your whole history and also offers 500 and 1,000.
+Stats covers your whole history and also offers 500 and 1,000. While the
+companion is still catching up with the controller's newest shots, or cannot
+answer, Stats show the controller's own figures instead, with a note saying so,
+and offer only 10, 50 and 100 until the whole-history figures return. Opened
+directly, Stats always cover the shots on the controller. Preset figures, such
+as a preset's arrival line and grind hint, always come from the controller's
+own shots, with or without the companion.
 
 The Stats chart shows how those shots, the same ones behind the averages, land
 against the shot time window. Each
@@ -265,19 +271,19 @@ weight alone cannot establish that the final reading belongs to another cup.
 
 ## In the Web UI
 
-Open the shot history table to browse rows, export or delete one shot from
-its ⋯ menu, clear the whole log, or export every good shot as CSV or JSON.
-Clearing requires an explicit confirm. With a companion keeping a shot
-archive, opened directly, deleting a shot also deletes the companion's copy
-at its next sync (unless it is set to keep records deleted on the
-controller), and clearing leaves the companion's copy as it is; the list ends
-with a note that the companion keeps a copy, including older shots. Through
-the companion, the ⋯ menu also lets you remove a shot from one place only;
-see [Deleting records](companion.md#deleting-records).
+Open the shot history table to browse rows, export one shot from its ⋯
+menu, or export every good shot as CSV or JSON. Deleting needs
+[Admin](../settings/factory-reset.md#clear-a-history) unlocked on the screen you
+use: then the ⋯ menu also offers **Delete shot**, and Admin offers **Clear shot
+history** for the whole list. Both ask you to confirm and cannot be undone. A
+deleted shot is gone everywhere, including the copy a
+[companion](companion.md#deleting-records) keeps, however you opened the Web UI.
+Opened directly with a companion keeping a shot archive, the list ends with a
+note that the companion keeps a copy, including older shots.
 
 Home and Stats read the same shot history. Deleting the newest good shot
-shows the next newest good shot on Home; clearing the log empties the idle
-card.
+shows the next newest good shot on Home; clearing the history empties the
+idle card.
 Factory reset clears both histories on the controller; a
 [companion](companion.md#your-whole-history) keeping a shot archive keeps its
 copy. The [activation history](activation-history.md)
@@ -575,8 +581,8 @@ that shot only:
   landed from the target. Grinder, beans, and roast stay empty for you to fill
   in on Visualizer. A shot recorded before the controller knew the time is
   dated when you download it.
-- **Delete shot**, at the bottom of the menu, removes the shot after you
-  confirm, as before.
+- **Delete shot**, at the bottom of the menu while Admin is unlocked, removes
+  the shot after you confirm.
 
 Exporting never changes your shots, so it also works while settings are locked.
 
@@ -711,7 +717,8 @@ reason before resetting learned offset. A live 2 s cycle can appear on Home,
 but once completed it is excluded from shot history and does not replace the
 idle last-shot card. An unrated shot uses rating 0.
 
-USB: `CLEAR_SHOTS` (see [USB serial CLI](../SERIAL_CLI.md)).
+USB: `CLEAR_SHOTS` (see [USB serial CLI](../SERIAL_CLI.md)) clears the shot
+history like **Clear shot history** in Admin.
 
 Related: [Brew by weight](brew-by-weight.md), [FAQ](../FAQ.md),
 [Wi-Fi](../settings/wifi.md) (timezone for wall-clock labels).

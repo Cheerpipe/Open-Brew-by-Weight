@@ -36,7 +36,7 @@ needed rather than reading the entire directory.
 | Energy | [Power management](settings/power-management.md) |
 | Interface | [Theme](settings/theme.md) / [shot card colors](settings/theme.md#shot-card-colors) / [app settings](settings/app.md) |
 | Maintenance | [Scheduled restart](settings/scheduled-restart.md) |
-| Reset | [Factory reset](settings/factory-reset.md) / [firmware mode](settings/firmware-mode.md) |
+| Reset | [Factory reset](settings/factory-reset.md) / [clear a history](settings/factory-reset.md#clear-a-history) / [firmware mode](settings/firmware-mode.md) |
 
 ## Developer map
 

@@ -9,6 +9,20 @@ so a rollback can recover the prior settings.
 Erases saved configuration and returns the controller to first-boot
 credentials. Firmware on the flash is not erased.
 
+## Clear a history
+
+To start a shot or activation history over without resetting anything else,
+unlock Admin and open **Shot and activation history**: **Clear shot history**
+empties Stats and **Clear activation history** empties History. Each asks you
+to confirm, cannot be undone, and leaves the other history, your settings and
+presets as they are. Export what you want to keep from Stats or History first.
+
+Clearing empties the whole list, including the copy a
+[companion](../features/companion.md#deleting-records) keeps, older records it
+alone holds and histories from before a factory reset. Opened directly on the
+controller, the confirmation says so, since that screen cannot show the older
+records. The controller must be idle, as for a single delete.
+
 ## What is erased
 
 Wi-Fi (STA and last-known-good network), workflow settings, presets,

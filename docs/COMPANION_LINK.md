@@ -353,9 +353,10 @@ reset reasons are the ring's own `BOOT_BANNER` and reset-reason events.
 
 With **Shot archive in the companion** on, the companion keeps a copy of
 every shot and activation through the same records the Web UI shows. The
-controller keeps no state for it beyond the open link and the index each store
-last sent on it (in PSRAM, for deltas), and writes nothing to flash; the
-companion infers ratings, deletions and restarted histories from the index.
+controller keeps no state for it beyond the open link, the index each store
+last sent on it (in PSRAM, for deltas) and the user deletion marks it saves
+with each store anyway, so syncing writes nothing to flash; the companion
+infers ratings, deletions and restarted histories from the index.
 
 - **Requests.** `rx`, `rf` and `rt` each replace the pending request of
   their kind. The controller answers one frame per pass, paced like a Stats
@@ -373,9 +374,9 @@ companion infers ratings, deletions and restarted histories from the index.
   which is why record answers may exceed 4,096 bytes.
 - **Record index.** An `rx` answers one frame: `v: 1`, `type: "records"`,
   `boot`, `store` (`"shots"` or `"history"`), `epoch`, and `gen` and `next`,
-  the store header's write counter and next record id (both only grow;
-  `next` returns to 1 on Clear history, both on a factory reset, so a
-  decrease tells the companion its history restarted). Only when `epoch`
+  the store header's write counter and next record id (`gen` only grows;
+  `next` returns to 1 on a Clear or a factory reset, so a decrease tells the
+  companion its history restarted), then `clr` and `gone` (below). Only when `epoch`
   differs from the `ep` asked does the frame add `rows`, a flat array of
   `[id, revision]` pairs for every record, bad shots included, newest first
   (ids descending). The revision is the low 24 bits of a CRC over the stored
@@ -386,16 +387,35 @@ companion infers ratings, deletions and restarted histories from the index.
   (the zlib one, as Python's `zlib.crc32`) of the whole resulting index
   serialized as little-endian `u32 id, u32 revision` pairs in index order;
   an unchanged answer carries neither `rows` nor `sum`.
+- **User deletions.** Every index frame, whole, delta or unchanged, carries
+  `clr`, how many times the user cleared that store (Clear in the Web UI or
+  USB `CLEAR_SHOTS`), and `gone`, the ids the user deleted since the store
+  was last emptied, newest first, at most 16. The controller keeps both with
+  the store, in the same save as its records: `clr` only grows, a factory
+  reset never raises it (and keeps it), and both read as `0` and `[]` after a
+  store written by an older image. `clr` above the value the companion stored
+  is a user Clear: it deletes its copy of every history of that store and
+  starts a new one; a lower value only restarts the count (rolled-back
+  firmware, a store the controller had to reset) and deletes nothing. An id
+  in `gone` that the index no longer lists is deleted from the companion's
+  current history even below the controller's oldest id; an id at or above
+  the oldest that the index no longer lists is a deletion too, and one below
+  it that `gone` does not name rotated out and stays. Both members are
+  additive: an older companion ignores them and infers as before, and a
+  companion that finds no `clr` treats a fall of `next` as a restarted
+  history, keeping its copy. After more than 16 deletions below the oldest
+  while the companion is away, the earlier ones read as rotation.
+
+  ```json
+  {"v":1,"type":"records","boot":42,"store":"shots","epoch":1239999,"gen":7,"next":1003,"clr":2,"gone":[3],"base":1234567,"up":[1002,789],"del":[3],"sum":2864434397}
+  ```
+
 - **Index deltas.** The companion sends `d:1` only after an index answer in
   the same link session carried `sum`, so a controller without deltas never
   sees `d`. The controller keeps, per store, the index this link session last
   received (its baseline, recorded once the frame actually left, in PSRAM).
   With `d`, an `rx` whose `ep` is that baseline's epoch gets the difference
   instead of `rows` whenever that is smaller than the whole index:
-
-  ```json
-  {"v":1,"type":"records","boot":42,"store":"shots","epoch":1239999,"gen":7,"next":1003,"base":1234567,"up":[1002,789],"del":[3],"sum":2864434397}
-  ```
 
   `base` is the epoch the delta applies to (the `ep` asked), `up` the
   `[id, revision]` pairs that are new or changed, and `del` the ids gone.
@@ -609,6 +629,10 @@ claim and safety gates. The signature adds only this:
   Admin, signing in, the unsafe override, Admin lock and the OTA password
   check act on the `screen` of the request, not on the relay id. One screen or
   window holds Admin at a time: unlocking on another replaces it.
+  `GET /api/v1/auth` reports `adminUnlocked` for that `screen` too: the
+  companion asks it signing the requesting browser's own `X-WebUI-Client` as
+  `screen` before deleting a record or the log history it alone keeps, and
+  treats an answer without a relay session as locked.
 - **Sign-in and sign-out.** Signing in through the relay claims for the relay
   id (attaching like a claim) and unlocks Admin for that screen. Signing out
   ends that screen's session and its Admin unlock; the companion keeps

@@ -176,18 +176,26 @@ simply a busy stretch, loses the oldest lines. With **Diagnostic log through
 the companion** on, the companion keeps a copy, and the log becomes one
 continuous history:
 
-- Opened **through the companion**, the log on the Diagnostic page offers
-  **Show older**: each tap pages further back, across restarts (each marked,
-  with its reset reason in the log itself) and through gaps named as such
-  when events could not be copied while the companion was away. **Export**
-  downloads the whole history. **Clear** only clears what this screen
-  shows; the history stays.
+- Opened **through the companion**, the log on the Diagnostic page reaches
+  back as far as the companion keeps it. Scroll up and older events load by
+  themselves, across restarts (each marked, with its reset reason in the log
+  itself) and through gaps named as such when events could not be copied
+  while the companion was away. The **Level** and **Category** filters apply
+  to the whole history, so every page that loads shows matching lines.
+  **Go to** jumps to a date and time, read on the controller's clock as the
+  log shows it, and **Latest** brings you back to the newest events. After
+  about 20,000 lines the view stops loading and points you to **Export**,
+  which downloads the whole history, or only the events between **Export
+  from** and **Export to**. **Clear** only clears what this screen shows; the
+  history stays.
+- Also through the companion, while Admin is unlocked, **Delete the log
+  history** deletes the companion's copy after you confirm. The controller
+  keeps its own recent log, which the view keeps showing. It needs the
+  controller on, to confirm that Admin is unlocked on your screen.
 - Opened **directly**, the log shows what the controller holds, with a note
   that the older history is in the companion.
 - The companion's own page (its address, then **Companion**) shows the whole
-  stored history with a level filter, an **Export everything** download and
-  **Delete the log history** (which needs the controller on, to confirm your
-  sign-in).
+  stored history with a level filter and an **Export everything** download.
 - The history opens only for a browser the controller lets open the Web UI:
   with the Web UI password on, one that signed in through the companion.
   That browser keeps reading it while the controller is off, and even after
@@ -209,10 +217,12 @@ The controller keeps your newest 1,000 shots and 1,000 activations. With
 them, and keeps them when the controller no longer does:
 
 - shots and activations older than the controller's newest 1,000;
-- your earlier history after **Clear history** or a factory reset: the
-  controller starts counting again from #1, and the companion keeps what came
-  before;
-- records you removed from the controller but chose to keep.
+- your earlier history after a factory reset: the controller starts counting
+  again from #1, and the companion keeps what came before.
+
+Everything the controller holds is also on the companion, once it has copied
+it. What you delete is gone from both: the companion never keeps a record you
+deleted (see [Deleting records](#deleting-records)).
 
 The companion catches up by itself whenever it connects, so shots made while
 it was off are copied too. Only one thing can be missed: if the controller
@@ -228,9 +238,9 @@ preset, by scale and by result. Records only the companion keeps are marked:
 in Stats their number badge is grey, in History their type badge has a
 dashed outline. Hovering the badge, or a screen reader, says **Kept by the
 companion**. Since
-numbers restart after a Clear or a factory reset, a list sorted by date shows
-a line such as **History restarted on 3 Mar 2026** where an earlier history
-begins; in other orders the badge's description names that date.
+numbers restart after a factory reset, a list sorted by date shows a line such
+as **History restarted on 3 Mar 2026** where an earlier history begins; in
+other orders the badge's description names that date.
 
 The averages and charts at the top of Stats also cover your whole history,
 built by the companion. You can pick how many of your newest shots they
@@ -238,42 +248,46 @@ cover: 10, 50 and 100, plus 500 and 1,000 through the companion. Only the
 choices that make a difference are offered: every size smaller than the
 number of shots in the list, plus the first one that covers them all, and no
 choice at all with ten shots or fewer. Filtering the list down to fewer
-shots moves the selection to the largest size still offered. Opened
-directly, the controller offers 10, 50 and 100 by the same rule. Home
-Assistant's statistics stay the controller's own: its newest ten shots.
+shots moves the selection to the largest size still offered. The figures
+cover your whole history only once the companion holds the controller's
+newest shot; until then, or while it cannot answer, Stats show the
+controller's own figures with a note saying so, and offer 10, 50 and 100 only.
+With the controller off they come from the companion's copy, or say they are
+not available right now. Opened directly, the controller offers 10, 50 and
+100 by the same rule. Preset figures, such as a preset's arrival line and
+grind hint, and Home Assistant's statistics stay the controller's own.
 
 **Opened directly**, Stats and History show what the controller holds, and
 end with a note that the companion keeps a copy, including older records.
 
 ### Deleting records
 
-A shot or activation's **⋯** menu offers, through the companion:
+Deleting is the same everywhere: one **Delete** in a record's **⋯** menu,
+offered while Admin is unlocked on the screen you use, and **Clear shot
+history** and **Clear activation history** in Admin (see
+[Clear a history](../settings/factory-reset.md#clear-a-history)). Each asks you
+to confirm and cannot be undone. A deleted record is gone from the controller
+and from the companion alike; a record only the companion keeps is deleted
+from the companion with the same **Delete**. Clearing a history empties all of
+it, the older records only the companion keeps and histories from before a
+factory reset included. Export first what you may want back.
 
-- **Delete everywhere**: from the controller and from the companion.
-- **Remove from the controller only**: the companion keeps its copy. The
-  newest record may not be copied yet (the companion copies a few minutes
-  after each shot); a message then says so, and the record stays on the
-  controller until you try again.
-- **Remove from the archive only**: the controller keeps it, and the
-  companion does not copy it again.
+However you opened the Web UI, the companion follows: a record deleted or a
+history cleared with the Web UI opened directly leaves the companion's copy
+the next time it copies from the controller, also after it was away. A record
+deleted before the companion copied it is never copied. Records older than
+the controller's newest 1,000 that left it by themselves are never taken for
+deleted ones. A factory reset deletes nothing on the companion.
 
-A record only the companion keeps offers **Delete from the archive**, which
-cannot be undone. Opened directly, **Delete** removes the record from the
-controller, and the companion deletes its copy at its next sync, unless its
-**Keep records deleted on the controller** setting is on.
-
-**Clear history** through the companion offers **Also delete the companion's
-copy**, unchecked: left alone, the companion keeps everything, and your
-earlier history stays in the list (it appears once the companion has caught
-up, usually within a couple of minutes). Opened directly, Clear history and a
-factory reset leave the companion's copy as it is.
+Through the companion, it deletes a record it alone keeps only after the
+controller confirms, at that moment, that Admin is unlocked on the screen
+asking; with the controller off, nothing can be deleted. The companion's own
+page has no delete controls.
 
 The companion's own page (its address, then **Companion**) has an **Archive**
 section: how many records it keeps and how much space they use, each earlier
-history with the date it restarted, any gaps, **Export** (a download of
-everything), the **Keep records deleted on the controller** setting, and
-deletes for one earlier history, a date range, shots or activations only, or
-everything. Each asks first and suggests exporting before you delete.
+history with the date it restarted, any gaps, and **Export** (a download of
+everything).
 
 The archive opens only for a browser the controller lets open the Web UI, as
 the log's history does, and never over plain HTTP.

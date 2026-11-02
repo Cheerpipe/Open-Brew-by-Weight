@@ -463,9 +463,6 @@ params substituted in order (see the example above).
 | ``HISTORY_DELETE_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before deleting history records. |
 | ``HISTORY_RECORD_ID_REQUIRED`` | A non-zero history record id is required. |
 | ``HISTORY_RECORD_NOT_FOUND`` | The requested history record was not found. |
-| ``LAST_SHOT_CLEAR_FAILED`` | Last shot could not be cleared. |
-| ``LAST_SHOT_CLEAR_NOT_CONFIRMED`` | The last-shot clear was not explicitly confirmed. |
-| ``LAST_SHOT_CLEAR_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before clearing the last shot. |
 | ``LAST_SHOT_NOT_FOUND`` | There is no last shot to rate. |
 | ``LOOP_TIMING_UNAVAILABLE`` | Loop timing could not be reset. |
 | ``NO_CRASHES`` | No saved crash records are available. |
@@ -1055,7 +1052,19 @@ the owned WebSocket (see [History live updates](#history-live-updates) and
 `X-WebUI-Client` obtained from `POST /api/v1/ui/claim`. They are separate from
 the public integration routes described above. Mutations stay confirmed REST
 commands: `POST /api/v1/stats/clear|delete|rate`,
-`POST /api/v1/history/clear|delete`.
+`POST /api/v1/history/clear|delete`. The four clear and delete commands also
+need the Admin unlock of the caller (a companion screen's own, through the
+relay): without it they answer `401 ADMIN_LOCKED` before reading the body or
+touching a store, and a successful one refreshes the unlock like the other
+Admin routes. Development builds keep them public. `POST /api/v1/stats/rate`
+needs no unlock. The former `POST /api/v1/last-shot/clear` is removed.
+
+`GET /api/v1/auth` answers `{"loginRequired":…,"signedIn":…,
+"adminUnlocked":…,"deviceName":"…"}`. `adminUnlocked` is the caller's own
+Admin unlock (always `true` on development builds and on the setup network);
+reading it never extends the unlock. The companion asks it, as the
+requesting screen, before deleting a record or the log history it alone
+keeps.
 
 A save may name the state its form was filled from, so a form left open on
 one screen cannot silently undo another screen's save: `POST /api/v1/config`
@@ -1361,7 +1370,8 @@ The former `/api/v1/shots` route family was renamed to `/api/v1/stats` and its
 GET read has since moved to the owned WebSocket: external Web UI API callers
 must use the stream described below for reads and keep the POST URLs
 `/api/v1/stats/clear`, `/api/v1/stats/delete`, and `/api/v1/stats/rate`
-(request bodies and mutation safety checks are unchanged).
+(request bodies and mutation safety checks are unchanged; clear and delete
+now also need the Admin unlock).
 The public `/api/v1/integration` endpoints are unchanged.
 
 Stats shot records and Home's WebSocket `curve` carry the observations as

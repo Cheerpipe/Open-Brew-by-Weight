@@ -50,7 +50,7 @@ a brew.
 ## In the Web UI
 
 Open the **History** page (next to Stats) to browse the diary. The entries and
-the sort and Clear controls normally appear at once with their data; a brief
+the sort and export controls normally appear at once with their data; a brief
 loading animation covers them only while the device has not sent the initial
 data yet — for example right after the interface starts or after a dropped
 connection. From then on the diary keeps refreshing in the background while
@@ -92,19 +92,19 @@ Take the diary into a spreadsheet with the Export button. It downloads an
 timestamp, the duration, and the type — in the current sort order, newest or
 oldest first, exactly as the page is set.
 
-Delete a single entry from the ⋯ menu on its card, or clear the whole diary
-with the Clear button. Clearing asks for an explicit confirmation and cannot
-be undone on the controller.
+Deleting needs Admin unlocked on the screen you use: then each card's ⋯ menu
+offers **Delete entry**, and Admin offers **Clear activation history** for the
+whole diary (see [Clear a history](../settings/factory-reset.md#clear-a-history)).
+Both ask you to confirm and cannot be undone. While Admin is locked, the cards
+show no ⋯ menu.
 
 With a [companion](companion.md#your-whole-history) keeping a shot archive,
 the companion keeps every activation too, also after it leaves the
 controller. Opened directly, the diary ends with a note that the companion
-keeps a copy, including older entries; deleting an entry also deletes the
-companion's copy at its next sync (unless it is set to keep records deleted
-on the controller), and clearing leaves the companion's copy as it is.
-Through the companion the diary shows the whole history, with earlier
-histories after a Clear or a factory reset marked by a **History restarted
-on** line, and the ⋯ menu can remove an entry from one place only; see
+keeps a copy, including older entries. A deleted or cleared entry is gone from
+the companion's copy too, however you opened the Web UI. Through the
+companion the diary shows the whole history, with histories from before a
+factory reset marked by a **History restarted on** line; see
 [Deleting records](companion.md#deleting-records).
 
 ### With the machine off

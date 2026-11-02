@@ -38,6 +38,18 @@ exported JSON formats are not carried over.
   as before.
 - **JSON export:** one format, version 1, replaces the formats shipped up to
   1.1.0.
+- **Deleting needs Admin:** deleting a shot or activation, and clearing a
+  whole history, now need Admin unlocked; **Clear** moved from Stats and
+  History to Admin. With a companion, a deleted record or a cleared history
+  is gone from its copy too, however you open the Web UI, and its own page no
+  longer deletes anything.
+- **Log history through the companion:** Diagnostic loads older events as
+  you scroll, applies its filters to the whole history, jumps to a date and
+  time, exports a date range, and deletes the companion's log history while
+  Admin is unlocked.
+- **Stats through the companion:** when the companion is still catching up,
+  Stats say they show only the controller's shots, instead of switching
+  silently.
 
 ## 1.1.0 — 2026-10-26
 
