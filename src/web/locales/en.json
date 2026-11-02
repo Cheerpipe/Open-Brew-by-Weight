@@ -1806,6 +1806,8 @@
     "settings.app_keep_awake": "Keep the screen on while a shot runs",
     "settings.app_keep_awake_hint": "The screen stays on from the start of an extraction until a minute after it ends, even outside the live view.",
     "settings.app_scope_note": "These settings are saved only in this browser or device, not in the controller. Each phone and browser keeps its own.",
+    "settings.app_splash": "Show splash screen",
+    "settings.app_splash_hint": "Plays a short animation of the logo each time you open the app. Tap it to skip.",
     "settings.app_vibrate": "Vibrate when a shot ends",
     "settings.app_vibrate_hint": "A short buzz when the extraction finishes. Android only.",
     "settings.assume_idle_when_the_scale_connects": "Assume idle when the scale connects",

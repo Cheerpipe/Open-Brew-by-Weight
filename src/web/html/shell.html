@@ -19,6 +19,7 @@
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon.ico?v=__FW_ASSET_TAG__" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png?v=__FW_ASSET_TAG__" />
     <title>{{webui:shell.open_brew_by_weight}}</title>
+    <script src="/js/launch.js?v=__FW_ASSET_TAG__"></script>
     <link rel="stylesheet" href="/app.css?v=__FW_ASSET_TAG__" />
     <link rel="modulepreload" href="/js/runtime.js?v=__FW_ASSET_TAG__" />
   </head>
@@ -59,6 +60,42 @@
         <path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9Z" />
       </symbol>
     </svg>
+    <div id="launchIntro" aria-hidden="true">
+      <span class="launchWord"
+        ><small>{{webui:shell.open_brew}}</small> {{webui:shell.by_weight}}</span
+      >
+      <svg class="launchMark" viewBox="12 4 40 56">
+        <mask id="launchCut" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+          <rect width="64" height="64" fill="#fff" />
+          <path fill="none" stroke="#000" stroke-width="7.13" d="M32 0v27.55m0 20.9V64" />
+          <path
+            class="launchLever"
+            fill="none"
+            stroke="#000"
+            stroke-width="7.6"
+            stroke-linecap="round"
+            d="M32 48.45 21.62 36.08"
+          />
+          <circle cx="32" cy="27.55" r="6.27" fill="#000" />
+          <circle cx="31.34" cy="48.45" r="6.27" fill="#000" />
+        </mask>
+        <path mask="url(#launchCut)" d="M32 5s20 16 20 34a20 20 0 0 1-40 0C12 21 32 5 32 5z" />
+      </svg>
+      <svg class="launchBead" viewBox="12 4 40 56">
+        <path d="M32 5s20 16 20 34a20 20 0 0 1-40 0C12 21 32 5 32 5z" />
+      </svg>
+      <svg class="launchBead hold" viewBox="12 4 40 56">
+        <path d="M32 5s20 16 20 34a20 20 0 0 1-40 0C12 21 32 5 32 5z" />
+      </svg>
+      <div class="launchPool">
+        <svg class="back" viewBox="0 0 48 8" preserveAspectRatio="none">
+          <path d="M0 4q3-2.5 6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0V8H0z" />
+        </svg>
+        <svg viewBox="0 0 48 8" preserveAspectRatio="none">
+          <path d="M0 4q3-2.5 6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0V8H0z" />
+        </svg>
+      </div>
+    </div>
     <div id="homeBoot" class="bootOverlay" role="status">
       <div class="brand" aria-hidden="true">
         <svg class="brandMark" viewBox="0 0 40 56" aria-hidden="true"><use href="#brandMark" /></svg

@@ -17,6 +17,7 @@ const htmlDir = path.join(repoRoot, 'src', 'web', 'html');
 const sourcePath = path.join(htmlDir, 'shell.html');
 const appJsPath = path.join(repoRoot, 'src', 'web', 'app.js');
 const otaImageJsPath = path.join(jsDir, 'ota-image.js');
+const launchJsPath = path.join(jsDir, 'launch.js');
 const swPath = path.join(repoRoot, 'src', 'web', 'sw.js');
 const cssDir = path.join(repoRoot, 'src', 'web', 'css');
 // CSS_SOURCES (localize_web_ui.js) owns the layer order; this map is the
@@ -63,7 +64,7 @@ const JS_FILES = [...VIEW_NAMES, ...SHARED_JS];
 const JS_TYPE = 'application/javascript; charset=utf-8';
 // Served paths of the WEB_ASSETS rows, in table order; the firmware registers
 // one exact route per path.
-const ASSET_PATHS = ['/app.js', '/app.css', '/js/runtime.js', '/js/ota-image.js',
+const ASSET_PATHS = ['/app.js', '/app.css', '/js/runtime.js', '/js/ota-image.js', '/js/launch.js',
   ...Object.keys(VIEW_MODULES).map((file) => `/js/${file}.js`), '/sw.js',
   '/manifest.webmanifest', '/icons/icon-192.png', '/favicon.ico', '/apple-touch-icon*'];
 // Paths the firmware answers with the shell: the keys of app.js ROUTES, which
@@ -403,6 +404,8 @@ async function generate(options = {}) {
     appJs: await minifyJs(inlineHomeModule(localizedAppJs, viewJsRaw.home), options),
     runtimeJs: await minifyJs(localizedRuntime, options),
     otaImageJs: await minifyJs(localizedOtaImage, options),
+    // The launch gate carries no strings, so it skips localization.
+    launchJs: await minifyJs(fs.readFileSync(launchJsPath, 'utf8'), options),
     css: minifyCss(stripClassCss(options.remoteControl === false
         ? stripRemoteControlCss(localizedCss) : localizedCss, excluded)),
     manifest: JSON.stringify(manifestObject),
@@ -453,7 +456,7 @@ async function generate(options = {}) {
 
 // Every asset except the shell is one row of the WEB_ASSETS table the
 // firmware serves from. PNG artwork is already compressed, so it ships raw.
-async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, modules, swJs,
+async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, launchJs, modules, swJs,
                        css, manifest, icon192Raw, icon48Raw, assetTag,
                        version, inputLanguage, requestedLanguage,
                        resolvedLanguage, write}) {
@@ -464,6 +467,7 @@ async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, module
     text('/app.css', 'text/css; charset=utf-8', css),
     text('/js/runtime.js', JS_TYPE, runtimeJs),
     text('/js/ota-image.js', JS_TYPE, otaImageJs),
+    text('/js/launch.js', JS_TYPE, launchJs),
     ...Object.entries(modules).map(([file, js]) => text(`/js/${file}.js`, JS_TYPE, js)),
     text('/sw.js', JS_TYPE, swJs),
     text('/manifest.webmanifest', 'application/manifest+json', manifest),
@@ -545,6 +549,7 @@ ${rows}
     js: appJs,
     runtimeJs,
     otaImageJs,
+    launchJs,
     modules,
     swJs,
     css,

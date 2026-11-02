@@ -2532,6 +2532,8 @@ function hideHomeBoot(seq = bootSeq) {
   const el = $("homeBoot");
   if (!el) return;
   homeBootDone = true;
+  // js/launch.js holds its intro until the page is ready, then reveals it.
+  document.dispatchEvent(new Event("obbwpageready"));
   void el.offsetWidth;
   el.classList.add("isDone");
   bootTimer = setTimeout(() => {
@@ -5179,6 +5181,8 @@ const APP_SETTING_KEYS = {
   awake: "obbwAppAwake",
   live: "obbwAppLive",
   vibrate: "obbwAppVibrate",
+  // Stored as an opt-out so the splash is on by default; js/launch.js reads it.
+  noSplash: "obbwAppNoSplash",
 };
 function appSetting(k) {
   try {

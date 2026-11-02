@@ -1913,6 +1913,10 @@ export function init() {
     $(id).checked = R.appSetting(key);
     $(id).onchange = () => R.setAppSetting(key, $(id).checked);
   }
+  if ($("appSplash")) {
+    $("appSplash").checked = !R.appSetting("noSplash");
+    $("appSplash").onchange = () => R.setAppSetting("noSplash", !$("appSplash").checked);
+  }
   if ($("appHeroTint")) {
     $("appHeroTint").value = R.heroTintMode();
     $("appHeroTint").onchange = () => R.setHeroTintMode($("appHeroTint").value);

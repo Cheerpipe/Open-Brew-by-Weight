@@ -1185,7 +1185,7 @@ bool OpenBrewByWeightNetwork::startHttpServer() {
   // Exact special routes precede wildcard dispatchers so claim, integration,
   // and OTA retain their distinct authentication boundaries. Keep ten spare
   // slots; exhausting this tears down the whole Web UI at startup.
-  config.max_uri_handlers = 49;
+  config.max_uri_handlers = 50;
   config.uri_match_fn = httpd_uri_match_wildcard;
   // Safari sends a long UA + Accept-Language + optional Cookie/Sec-Fetch-*;
   // the IDF default (1024) is enough most of the time but intermittent
@@ -1224,6 +1224,7 @@ bool OpenBrewByWeightNetwork::startHttpServer() {
       registerHandler(server_, "/app.css", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/js/runtime.js", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/js/ota-image.js", HTTP_GET, assetHandler) &&
+      registerHandler(server_, "/js/launch.js", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/js/records.js", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/js/diagnostic.js", HTTP_GET, assetHandler) &&
       registerHandler(server_, "/js/admin.js", HTTP_GET, assetHandler) &&

@@ -253,7 +253,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
   const hooksSource = appJsSource.slice(appJsSource.indexOf('R.setViewPollHooks('),
     appJsSource.search(/document\.querySelectorAll\(\s*['"]a\[data-route\]['"]\s*\)/));
   (async () => {
-    const classes = new Set(['hidden', 'isDone']), bodyClasses = new Set(), timers = [];
+    const classes = new Set(['hidden', 'isDone']), bodyClasses = new Set(), timers = [], events = [];
     const classList = set => ({add: (...names) => names.forEach(n => set.add(n)),
       remove: (...names) => names.forEach(n => set.delete(n)),
       toggle: (name, enabled) => enabled ? set.add(name) : set.delete(name)});
@@ -262,7 +262,8 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
       get offsetWidth() {assert.equal(bodyClasses.has('pageLoading'), true); layouts++; return 1;}};
     const context = vm.createContext({bootSeq: 0, homeBootDone: false,
       bootTimer: 0, fwReloading: false,
-      document: {body: {classList: classList(bodyClasses)}},
+      document: {body: {classList: classList(bodyClasses)}, dispatchEvent: e => events.push(e.type)},
+      Event: class { constructor(type) { this.type = type; } },
       $: id => {assert.equal(id, 'homeBoot', 'Do not query or await control animations'); return overlay;},
       requestAnimationFrame: () => {throw Error('Fade must not wait for render frames');},
       setTimeout: (fn, ms) => {assert.equal(ms, 250); timers.push(fn); return timers.length;},
@@ -274,6 +275,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
     assert.equal(bodyClasses.has('pageLoading'), true, 'Suppress control animations before loading');
     context.hideHomeBoot(token);
     assert.equal(classes.has('isDone'), true, 'Start fading synchronously when data is ready');
+    assert.deepEqual(events, ['obbwpageready'], 'Tell the launch intro the page is ready');
     assert.equal(layouts, 1, 'Apply static control positions before fading');
     assert.equal(bodyClasses.has('pageLoading'), true, 'Keep controls static throughout the fade');
     context.showPageBoot(); timers.shift()();

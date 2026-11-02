@@ -834,6 +834,274 @@ body.pageLoading :is(.view, .view *)::after {
   font-size: 0.95rem;
   font-weight: 600;
 }
+/* Launch intro: js/launch.js sets html.launchIntro on a fresh launch of the
+   installed app. The logo lands, its relay closes and droplets fall at 0.15 g
+   into a small pool that fills over three droplets and sloshes while the page
+   loads. On readiness (html.introGo) the pool rushes up; at 80% of its rise
+   (0.19 s) the splash fades out while the page fades in on the same curve,
+   so the page arrives exactly as the splash leaves. Dark themes turn it black with
+   a coffee foreground. */
+#launchIntro {
+  --m: min(31vw, 30vh, 9rem);
+  /* Centres the drop and wordmark as one block, then raises it to the
+     optical centre (about 46% of the height). */
+  --lift: calc(1.25rem + 4vh);
+  /* The pool's top level: the third droplet leaves its waves just below the
+     wordmark on any screen (wordmark offset and height, plus the back crest,
+     the droplet jolt and a small margin). */
+  --top: max(6%, calc(50% + var(--lift) - var(--m) * 0.7 - 3.2rem - 28px));
+  --introBg: var(--ac);
+  --introFg: var(--bg);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  place-items: center;
+  overflow: hidden;
+  background: var(--introBg);
+  color: var(--introFg);
+  fill: var(--introFg);
+}
+@media (prefers-color-scheme: dark) {
+  html:not(.theme-light) #launchIntro {
+    --introBg: #000;
+    --introFg: var(--ac);
+  }
+}
+html.theme-dark #launchIntro {
+  --introBg: #000;
+  --introFg: var(--ac);
+}
+.launchIntro #launchIntro {
+  display: grid;
+}
+.launchIntro body > :not(#launchIntro, .bootOverlay, .inactiveOverlay) {
+  opacity: 0;
+}
+.introGo body > :not(#launchIntro, .bootOverlay, .inactiveOverlay) {
+  animation: launchPageIn 0.2s cubic-bezier(0.5, 0, 1, 1) 0.19s both;
+}
+.introGo #launchIntro {
+  animation: launchOut 0.2s cubic-bezier(0.5, 0, 1, 1) 0.19s forwards;
+}
+.launchMark {
+  width: var(--m);
+  margin-bottom: calc(var(--lift) * 2);
+  overflow: visible;
+  transform-origin: 50% 100%;
+  animation: launchFall 0.9s both;
+}
+.launchLever {
+  transform-box: view-box;
+  transform-origin: 32px 48.45px;
+  animation:
+    launchRelay 0.22s ease-out 0.7s both,
+    launchRelayHold 1.2s linear 1.23s infinite;
+}
+.launchWord {
+  position: absolute;
+  inset: calc(50% - var(--lift) + var(--m) * 0.7 + 1rem) 0 auto;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  animation: launchWord 0.35s ease-out 0.504s both;
+}
+.launchWord small {
+  display: inline;
+  color: inherit;
+  font-size: 1em;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+}
+.launchBead {
+  position: absolute;
+  left: calc(50% - var(--m) * 0.08);
+  top: calc(50% - var(--lift) - var(--m) * 0.875);
+  width: calc(var(--m) * 0.16);
+  opacity: 0;
+  animation: launchBead 0.33s cubic-bezier(0.333, 0, 0.667, 0.333) 0.9s forwards;
+}
+.launchBead.hold {
+  animation: launchBeadHold 1.2s linear 1.23s infinite;
+}
+.introGo .launchBead {
+  visibility: hidden;
+}
+.launchPool {
+  position: absolute;
+  inset: auto 0 -14px;
+  height: 0;
+  background: var(--introFg);
+  animation:
+    launchPoolRise 0.25s ease-out 1.23s forwards,
+    launchPoolBump 1.2s ease-out 1.23s infinite,
+    launchPoolFill 1.45s linear 2.304s forwards;
+}
+.introGo .launchPool {
+  animation:
+    launchPoolRise 0.25s ease-out 1.23s forwards,
+    launchPoolBump 1.2s ease-out 1.23s infinite,
+    launchPoolFill 1.45s linear 2.304s forwards,
+    launchPoolUp 0.2s cubic-bezier(0.55, 0, 0.9, 0.45) forwards;
+}
+.launchPool svg {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% - 2px);
+  width: 200%;
+  height: 14px;
+  animation:
+    launchCrest 1.1s linear infinite,
+    launchBob 0.9s ease-in-out infinite alternate;
+}
+.launchPool .back {
+  height: 18px;
+  opacity: 0.55;
+  animation:
+    launchCrest 1.7s linear infinite reverse,
+    launchBob 1.3s ease-in-out infinite alternate;
+}
+@keyframes launchFall {
+  0% {
+    transform: translateY(-330%) scale(0.88, 1.14);
+    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 0.333);
+  }
+  56% {
+    transform: translateY(0) scale(0.88, 1.14);
+    animation-timing-function: ease-out;
+  }
+  68% {
+    transform: scale(1.16, 0.82);
+  }
+  84% {
+    transform: scale(0.95, 1.06);
+  }
+}
+@keyframes launchRelay {
+  60% {
+    transform: rotate(44deg);
+  }
+  100% {
+    transform: rotate(40deg);
+  }
+}
+@keyframes launchRelayHold {
+  0% {
+    transform: rotate(40deg);
+  }
+  8%,
+  50% {
+    transform: rotate(0);
+  }
+  55% {
+    transform: rotate(44deg);
+  }
+  59%,
+  100% {
+    transform: rotate(40deg);
+  }
+}
+@keyframes launchWord {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes launchBead {
+  0%,
+  99% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(50vh + var(--lift) + var(--m) * 0.875)) scaleY(1.25);
+  }
+}
+@keyframes launchBeadHold {
+  0%,
+  61% {
+    opacity: 0;
+    transform: none;
+  }
+  62% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 0.333);
+  }
+  89.5% {
+    opacity: 1;
+    transform: translateY(calc(50vh + var(--lift) + var(--m) * 0.875)) scaleY(1.25);
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: translateY(calc(50vh + var(--lift) + var(--m) * 0.875)) scaleY(1.25);
+  }
+}
+@keyframes launchPoolRise {
+  to {
+    height: calc(var(--top) / 3 + 14px);
+  }
+}
+@keyframes launchPoolBump {
+  0%,
+  88% {
+    transform: none;
+  }
+  92% {
+    transform: translateY(-4px) scaleY(1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes launchPoolFill {
+  0% {
+    height: calc(var(--top) / 3 + 14px);
+    animation-timing-function: ease-out;
+  }
+  17.24%,
+  82.76% {
+    height: calc(var(--top) * 2 / 3 + 14px);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    height: calc(var(--top) + 14px);
+  }
+}
+@keyframes launchPoolUp {
+  to {
+    height: calc(100% + 30px);
+  }
+}
+@keyframes launchCrest {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes launchBob {
+  from {
+    translate: 0 5px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes launchOut {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@keyframes launchPageIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .inactiveOverlay {
   position: fixed;
   inset: 0;
