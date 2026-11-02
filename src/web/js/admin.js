@@ -728,6 +728,7 @@ function applyCompanionStatus(c) {
       : "") +
     (!link && c.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "");
   if (__LINEA_MICRA__) $("companionRouteState").textContent = companionRouteText(c);
+  R.companionHere(true).then(companionCopy);
   if (!R.uiState.companionDirty) {
     $("companionUi").checked = c.ui !== false;
     if (__LINEA_MICRA__) $("companionLm").checked = !!c.lm;
@@ -735,6 +736,30 @@ function applyCompanionStatus(c) {
     $("companionArchive").checked = !!c.archive;
     R.uiState.companionBaseline = R.snapshotControls(companionSwitches());
   }
+}
+// Through the companion: how far its copy of the history is, and how many
+// pages it answered itself or left to the controller.
+function companionCopy(here) {
+  const a = here?.archive,
+    row = $("companionCopyRow");
+  if (!row) return;
+  row.hidden = !a?.replica;
+  if (row.hidden) return;
+  const state = (s) =>
+    s === "current"
+      ? __WEBUI_TEXT__("admin.companion_copy_current")
+      : s === "catchingUp"
+        ? __WEBUI_TEXT__("admin.companion_copy_catching")
+        : __WEBUI_TEXT__("admin.companion_copy_off");
+  $("companionCopyState").textContent = R.sub(__WEBUI_TEXT__("admin.companion_copy_state"), [
+    state(a.replica.shots),
+    state(a.replica.history),
+  ]);
+  $("companionCopyCounts").textContent = R.sub(__WEBUI_TEXT__("admin.companion_copy_counts"), [
+    a.served ?? 0,
+    a.fallbacks ?? 0,
+    a.catchUpFetches ?? 0,
+  ]);
 }
 const companionSwitches = () => document.querySelectorAll("#companionPaired input");
 async function saveCompanionSettings() {

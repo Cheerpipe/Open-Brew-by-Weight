@@ -71,7 +71,7 @@ function renderHistory() {
   if (source && !source.rows.length && !source.done) loadArchive("history", renderHistory);
   let day;
   for (const [i, r] of list.entries()) {
-    if (archiveHeadings(body, list, i, 5, source, true)) day = undefined;
+    if (archiveHeadings(body, list, i, 5, source || streamArchives.history, true)) day = undefined;
     const time = document.createElement("td");
     time.className = "histTime";
     time.textContent = formatHistoryTime(r);
@@ -386,6 +386,7 @@ function historyStreamFrame(message) {
   message.records = message.records.map(
     (r) => (Number.isInteger(r) && held && held.find((x) => x.id === r)) || r,
   );
+  streamArchive("history", message, message.records);
   if (
     message.offset + message.records.length > message.total ||
     message.hasMore !== message.offset + message.records.length < message.total
@@ -428,8 +429,6 @@ function applyHistoryStream(message) {
     mode,
   );
   historyStreamBoot = message.boot;
-  if (historyStreamEpoch !== message.epoch && historyStreamEpoch)
-    archiveChanged("history", () => historyViewActive() && R.paint(renderHistory));
   historyStreamEpoch = message.epoch;
   if (!fetch) historyTag = message.tag;
   historyFetchOffset = -1;
@@ -516,3 +515,5 @@ export const showArchive = () => {
 };
 // The route opens the page: a cold entry subscribes and waits for its page.
 export const start = startHistoryStream;
+// Through the companion the page stands ready before its first visit (app.js).
+export const preload = () => ensureHistoryStream();

@@ -207,13 +207,14 @@ function downloadCsv(name, rows) {
     name,
   );
 }
-// The companion archive (plan 2A). Through the companion a list is one
-// history: the controller's rows and the records only the companion keeps
-// (older ones the controller let go, and earlier histories from before a
-// factory reset), filtered and ordered alike on both sides and merged page
-// by page. The companion answers only a screen the
-// controller lets in. With the controller off (R.archiveView) the list is
-// the archive alone: every record it copied, read-only.
+// The companion archive (plan 2A). Through the companion with the shot
+// archive on, the companion's own pages are one history: the controller's
+// rows and the records only the companion keeps (older ones the controller
+// let go, and earlier histories from before a factory reset) arrive in one
+// list, the latter marked archiveOnly (streamArchive). With the controller
+// off (R.archiveView) the list is the archive alone, read here page by page:
+// every record it copied, read-only. The companion answers only a screen
+// the controller lets in.
 const archiveSources = {};
 // The archive answers for a store (its archive-only rows feed the list or,
 // with the controller off and Shot archive in the companion on, every copied
@@ -230,27 +231,26 @@ function archiveStatsReady() {
   const a = R.uiState.companionHere?.archive;
   return !!(a?.available && a.on && (a.shotsTotal || a.shots) > 0);
 }
-// After an archive change (a deletion, a rating in rating order) or a moved
-// store epoch: the companion's facts and the store's
-// archive rows load again, in place, and once more when the companion's next
-// sync pass has ended, since it copies a change only after the controller's
-// next frame (D5, S17).
+// After an archive change (a deletion, a rating): the companion's facts load
+// again; its pages follow on their own, since the companion sends the open
+// lists again once its copy caught up.
 function archiveChanged(store, render) {
-  const since = R.uiState.companionHere?.archive?.syncedAt ?? 0;
   R.companionHere(true).then(() => reloadArchive(store, render));
-  if (archiveWatch[store]) return;
-  // Polls the companion (never the controller) until its pass ended; the
-  // notice that starts one comes within about 2.5 minutes (D5).
-  let tries = 36;
-  archiveWatch[store] = setInterval(async () => {
-    const a = (await R.companionHere(true))?.archive;
-    if (--tries > 0 && !(a && !a.syncing && (a.syncedAt ?? 0) > since)) return;
-    clearInterval(archiveWatch[store]);
-    delete archiveWatch[store];
-    if (a) reloadArchive(store, render);
-  }, 5e3);
 }
-const archiveWatch = {};
+// Rows the companion alone keeps, on its pages: each is marked as kept by it
+// (archiveMark) and the page names its histories and gaps (`archive`) for the
+// lines between them (archiveHeadings).
+const streamArchives = {};
+function streamArchive(store, message, rows) {
+  if (message.archive)
+    streamArchives[store] = {
+      gens: message.archive.generations || [],
+      holes: message.archive.holes || [],
+    };
+  for (const r of rows)
+    if (r?.archiveOnly && !r._archive)
+      Object.defineProperty(r, "_archive", { value: streamArchives[store] || {} });
+}
 async function companionArchive(path, body) {
   const reply = await fetch("/__companion/archive/" + path, {
     cache: "no-store",
@@ -272,8 +272,8 @@ const archiveFresh = (key, query) => ({
   failures: 0,
 });
 function archiveSource(store, query) {
-  if (!archiveReady(store)) return null;
-  if (R.archiveView) query = { ...query, all: 1 };
+  if (!R.archiveView || !archiveReady(store)) return null;
+  query = { ...query, all: 1 };
   const key = JSON.stringify(query);
   if (archiveSources[store]?.key !== key) archiveSources[store] = archiveFresh(key, query);
   return archiveSources[store];

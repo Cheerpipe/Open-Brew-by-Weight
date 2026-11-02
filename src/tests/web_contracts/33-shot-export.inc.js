@@ -532,8 +532,10 @@
   assert.ok(codeIncludes(blockAt(viewJs.records, 'function archiveReady('),
       'a[R.archiveView ? store + "Total" : store] > 0') &&
       codeIncludes(blockAt(viewJs.records, 'function archiveReady('), '(!R.archiveView || a.on) &&'));
+  // S1: through the companion its own pages are already one history; only
+  // the archive view (controller off) reads the archive's rows here.
   assert.ok(codeIncludes(blockAt(viewJs.records, 'function archiveSource('),
-      'if (R.archiveView) query = { ...query, all: 1 };'));
+      'if (!R.archiveView || !archiveReady(store)) return null; query = { ...query, all: 1 };'));
   assert.ok(codeIncludes(blockAt(rawViewJs.records, 'async function loadArchive('),
       'if (e.error === "AUTH_REQUIRED") { s.done = true; R.message(__WEBUI_TEXT__("records.archive_sign_in"), "error");'));
   assert.ok(codeIncludes(blockAt(runtimeJs, 'function offerArchiveView('),

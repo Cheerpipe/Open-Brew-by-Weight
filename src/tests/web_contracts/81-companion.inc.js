@@ -108,6 +108,26 @@
       refused: false}),
     'Directly from the controller · it moves over when the machine is idle');
   }
+  {
+    // S3: through the companion, Admin → Companion shows how far its copy of
+    // the history is and how many pages it answered itself.
+    const els = {companionCopyRow: {hidden: true}, companionCopyState: {}, companionCopyCounts: {}};
+    const run = vm.createContext({$: (id) => els[id],
+      R: {sub: (text, args) => text.replace(/\{(\d)\}/g, (_, i) => args[i])}});
+    vm.runInContext(blockAt(adminJs, 'function companionCopy('), run);
+    run.companionCopy(null);
+    assert.equal(els.companionCopyRow.hidden, true, 'opened directly: no row');
+    run.companionCopy({archive: {replica: {shots: 'current', history: 'catchingUp'}, served: 12, fallbacks: 1,
+      catchUpFetches: 3}});
+    assert.equal(els.companionCopyRow.hidden, false);
+    assert.equal(els.companionCopyState.textContent, 'Shots up to date · History catching up');
+    assert.equal(els.companionCopyCounts.textContent,
+        'Pages it answered itself: 12. Pages it left to the controller: 1. Records it asked the controller for: 3.');
+    run.companionCopy({archive: {replica: {shots: 'off', history: 'off'}}});
+    assert.equal(els.companionCopyState.textContent, 'Shots off · History off');
+    assert.ok(codeIncludes(adminJs, 'R.companionHere(true).then(companionCopy)'));
+    assert.ok(/<div id="companionPaired"[^]*<div id="companionCopyRow" class="accessRow" hidden>/.test(admin));
+  }
 
   // Entry point (c): an https: page asks its companion's same-origin status;
   // an unpaired one may be asked to pair (JSON POST), then the code it shows

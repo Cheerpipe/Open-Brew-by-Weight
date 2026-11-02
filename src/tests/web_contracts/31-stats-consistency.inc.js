@@ -230,6 +230,20 @@
   assert.equal(item(false, false).length, 0, 'locked: no Delete');
   assert.equal(item(true, true).length, 0, 'the archive view never deletes');
   assert.deepEqual(item(false, true).map((i) => [i[1], i[4]]), [['Delete shot', true]]);
+  // S1: the companion's pages carry the rows only it keeps; each is marked
+  // kept by it (and deleted, rated or charted there), and the page's
+  // histories and gaps feed the lines between them.
+  const stream = new Function(`const streamArchives = {};
+      ${blockAt(rawViewJs.records, 'function streamArchive(')}; return {streamArchives, streamArchive};`)();
+  const held = {id: 9}, only = {id: 40, archiveOnly: true, archiveGeneration: 1};
+  stream.streamArchive('shots', {archive: {generations: [{generation: 2, current: true}, {generation: 1}],
+    holes: [{generation: 2, below: 3, above: 7, count: 3}]}}, [held, only]);
+  assert(!held._archive && only._archive === stream.streamArchives.shots, 'only the companion\'s rows');
+  assert.deepEqual(Object.keys(only), ['id', 'archiveOnly', 'archiveGeneration'], 'never in an export');
+  assert.equal(stream.streamArchives.shots.holes[0].count, 3);
+  const later = {id: 41, archiveOnly: true, archiveGeneration: 1};
+  stream.streamArchive('shots', {}, [later]);
+  assert.equal(later._archive, stream.streamArchives.shots, 'a continuation frame keeps the page\'s histories');
 }
 // Stats and History render cost: one curve model per shot row and CSV line, a
 // rated star keeps keyboard focus, label layout sleeps off Stats, and History

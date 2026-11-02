@@ -64,11 +64,17 @@ a password. Install that address as an app and it stays out of your way: an
 installed app keeps its place and reconnects by itself every time you open
 it, without the Reload button a browser page shows after sitting unused.
 
-Shots and History also open faster after the first visit. The companion
-remembers the last page it showed; when you open it again, it only asks the
-controller whether anything changed, and the controller answers with one small
-message when nothing did. You never see an outdated list: it appears once the
-controller has confirmed it.
+Shots and History are ready before you open them. With **Shot archive in the
+companion** on, the companion answers them from its own copy of your history:
+scrolling, sorting, filtering, exporting and opening a shot's chart ask the
+controller for nothing. The controller tells the companion about a new shot,
+a rating or a deletion as soon as it is saved, and the companion copies just
+that. If its copy is behind (right after you rate a shot, for example), the
+page waits a moment for it; if the copy cannot catch up within about three
+seconds, that page comes from the controller instead, so a list is never out
+of date. With the switch off, the pages come from the controller, which
+remembers the last page it showed and answers with one small message when
+nothing changed.
 
 A few things stay one at a time, on purpose:
 
@@ -130,8 +136,13 @@ since when (or since when it is not), and, on a Linea Micra, where the La
 Marzocco connection runs right now: **Through the companion**, **Moving to the
 companion**, or **Directly from the controller** (with what it is waiting for,
 if anything). If the companion and the controller cannot talk because one of
-them is much newer than the other, Admin says so: update the older one. It
-has one switch per job:
+them is much newer than the other, Admin says so: update the older one. The
+Web UI still opens through the companion meanwhile, so you can update the
+controller from there. Opened through the companion with **Shot archive in
+the companion** on, Admin also shows its **Shot copy**: whether its copy of
+your shots and of History is up to date or catching up, how many pages it
+answered itself, how many it left to the controller, and how many records it
+asked the controller for. It has one switch per job:
 
 - **Web UI through the companion** (on by default): phones, tablets and
   computers can open the Web UI through the companion, several at once. Turn
@@ -229,8 +240,10 @@ it was off are copied too. Only one thing can be missed: if the controller
 records more than 1,000 shots before the companion is back, the oldest of
 them are gone before it can copy them, and the list says so where the gap
 is. Nothing is copied during a shot, nor while the machine is busy (a rinse,
-a backflush, a scale connecting): the copying waits until it is over, so it
-never competes with your scale.
+a backflush, a scale connecting): the controller and the companion do not
+talk to each other at all until it is over, so the scale has the radio to
+itself. A new shot is copied the moment the shot and its drip delay end, and
+pages opened meanwhile come from the companion's copy.
 
 **Through the companion**, Stats and History are one list. Sorting and
 filters work on the whole history, newest or oldest first, by rating, by

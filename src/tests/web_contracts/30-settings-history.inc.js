@@ -1340,7 +1340,7 @@ if (!statsSection ||
         scheduleShotPaint() {},
         renderShots: () => events.push('render:' + context.controlsMutable), paint: (fn) => fn(),
         updateHeaderSignals() {}, updateFirmwareFooter() {}, noteReachOk() {},
-        refreshMergedHeader() {}, statsArchiveNeed: null, loadArchive() {}, archiveChanged() {},
+        refreshMergedHeader() {}, statsArchiveNeed: null, loadArchive() {}, archiveChanged() {}, streamArchive() {},
         atob, __WEBUI_TEXT__: key => key});
       // Shared state and runtime references resolve to this harness's globals.
       const stream = runtimeStateGlobals + blockAt(rawRuntimeJs, 'function decodeCurveDeltas(') + '\n' +
@@ -1474,7 +1474,7 @@ if (!statsSection ||
         applyCommonStatus: () => events.push('state'),
         applyHistoryPage: (data, mode) => {context.historyLoaded = true; events.push('records:' + mode);},
         renderHistory: () => events.push('render:' + context.controlsMutable), paint: (fn) => fn(),
-        updateHeaderSignals() {}, updateFirmwareFooter() {}, noteReachOk() {},
+        updateHeaderSignals() {}, updateFirmwareFooter() {}, noteReachOk() {}, streamArchive() {},
         __WEBUI_TEXT__: key => key});
       const stream = runtimeStateGlobals + rawViewJs.history.slice(rawViewJs.history.indexOf('function historyStreamFrame('),
           rawViewJs.history.indexOf('const historyStream = {'));

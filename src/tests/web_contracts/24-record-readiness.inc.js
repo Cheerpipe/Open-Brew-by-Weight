@@ -238,3 +238,40 @@
     assert(!socket.sent.some(message => message.op === 'resync'));
   })().catch(error => { console.error(error); process.exitCode = 1; });
 }
+// S2: through the companion, Shots and History stand ready before their first
+// visit; never while a shot runs (they start right after it), and a page
+// opened directly, or the archive view, preloads nothing.
+{
+  const assert = require('assert').strict, vm = require('vm');
+  const source = appJsSource.slice(appJsSource.indexOf('let preloadTimer'),
+      appJsSource.indexOf('function navigate('));
+  const run = (protocol, view, shot = false, archiveView = false) => {
+    const events = [], timers = [];
+    const context = vm.createContext({BUNDLES: {stats: 'records', history: 'records'}, activeView: view,
+      location: {protocol}, clearTimeout() {}, setTimeout: (fn) => timers.push(fn),
+      ensureView: (name) => { events.push('load ' + name); return Promise.resolve({preload: () => events.push('preload ' + name)}); },
+      R: {archiveView, webUiPollingActive: () => true, shotRunning: () => shot}});
+    vm.runInContext(source, context);
+    context.preloadRecords();
+    return {events, timers, context};
+  };
+  (async () => {
+    const companion = run('https:', 'home');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(companion.events, ['load stats', 'load history', 'preload stats', 'preload history']);
+    const onStats = run('https:', 'stats');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(onStats.events, ['load history', 'preload history'], 'the open page starts itself');
+    assert.deepEqual(run('http:', 'home').events, [], 'opened directly: nothing is preloaded');
+    assert.deepEqual(run('https:', 'home', false, true).events, [], 'the archive view preloads nothing');
+    const shot = run('https:', 'home', true);
+    assert.deepEqual([shot.events, shot.timers.length], [[], 1], 'deferred while a shot runs');
+    shot.context.R.shotRunning = () => false;
+    shot.timers[0]();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(shot.events, ['load stats', 'load history', 'preload stats', 'preload history'],
+        'started right after the shot');
+  })().catch(error => { console.error(error); process.exitCode = 1; });
+  assert.ok(codeIncludes(viewJs.stats, 'export const preload = () => ensureStatsStream();') &&
+      codeIncludes(viewJs.history, 'export const preload = () => ensureHistoryStream();'));
+}

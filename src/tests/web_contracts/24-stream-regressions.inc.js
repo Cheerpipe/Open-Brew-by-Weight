@@ -242,21 +242,22 @@ int main(){
   assert(codeIncludes(appJsSource, 'if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'));
   const calls = [], loading = new Set(['pageLoading']),
     doc = {hidden: true, body: {classList: {contains: (c) => loading.has(c)}}};
-  const settle = new Function('R', 'document', '__WEBUI_TEXT__', 'activeView',
+  const settle = new Function('R', 'document', '__WEBUI_TEXT__', 'activeView', 'preloadRecords',
       `${blockAt(appJsSource, 'function settleView(')};return settleView;`)(
       {hideHomeBoot: () => calls.push('boot'), ensureBackgroundStreams: () => calls.push('streams'),
-        webUiPollingActive: () => true, message: (m) => calls.push(m)}, doc, (k) => k, 'home');
+        webUiPollingActive: () => true, message: (m) => calls.push(m)}, doc, (k) => k, 'home',
+      () => calls.push('preload'));
   settle(undefined, 1);
   assert.deepEqual(calls, [], 'a hidden tab that loaded nothing reports no failure');
   doc.hidden = false;
   settle(true, 1);
-  assert.deepEqual(calls, ['boot', 'streams'], 'showing the tab finishes the view');
+  assert.deepEqual(calls, ['boot', 'streams', 'preload'], 'showing the tab finishes the view');
   settle(false, 1);
   assert.equal(calls.at(-1), 'Unable to load view');
   // RV-04: a loaded page shown again leaves one failed refresh to the debounce.
   loading.clear();
   settle(false, 1);
-  assert.equal(calls.length, 3, 'a loaded page reports no view failure on return');
+  assert.equal(calls.length, 4, 'a loaded page reports no view failure on return');
   assert(/visibilitychange[\s\S]*?startView\(activeView, seq\)\.then\(\(ok\) => seq === routeSeq && settleView\(ok\)\)/.test(appJsSource));
   (async () => {
     const urls = [];

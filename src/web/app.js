@@ -198,13 +198,35 @@ async function renderRoute(pathname, focus) {
 function settleView(ok, boot) {
   if (ok) {
     R.hideHomeBoot(boot);
-    if (activeView !== "setup") R.ensureBackgroundStreams();
+    if (activeView !== "setup") {
+      R.ensureBackgroundStreams();
+      preloadRecords();
+    }
   } else if (
     R.webUiPollingActive() &&
     !document.hidden &&
     document.body.classList.contains("pageLoading")
   )
     R.message(__WEBUI_TEXT__("shell.unable_to_load_view"), "error");
+}
+// Through the companion, Shots and History stand ready before their first
+// visit: the records bundle loads and both keep their pages current, which
+// the companion serves from its copy of the history. Never while a shot runs
+// (it starts right after it); a page opened directly preloads nothing.
+let preloadTimer = 0;
+function preloadRecords() {
+  clearTimeout(preloadTimer);
+  if (location.protocol !== "https:" || R.archiveView || !R.webUiPollingActive()) return;
+  if (R.shotRunning()) {
+    preloadTimer = setTimeout(preloadRecords, 1e3);
+    return;
+  }
+  for (const view of Object.keys(BUNDLES))
+    if (view !== activeView)
+      ensureView(view).then(
+        (m) => m.preload?.(),
+        () => {},
+      );
 }
 function navigate(path, replace) {
   const target = knownPath(path) || "/";

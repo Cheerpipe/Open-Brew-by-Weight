@@ -50,6 +50,15 @@ exported JSON formats are not carried over.
 - **Stats through the companion:** when the companion is still catching up,
   Stats say they show only the controller's shots, instead of switching
   silently.
+- **Shots and History from the companion's copy:** with **Shot archive in
+  the companion** on, the companion answers Shots and History itself, one
+  list over your whole history, ready before you open them, so scrolling,
+  filtering, exporting and shot charts ask the controller for nothing. A new
+  shot reaches the companion right after its drip delay, and during a shot
+  the controller and the companion do not talk at all. Admin → Companion
+  shows how up to date the copy is. Update the controller and the companion
+  together: until both are updated their link waits, while the Web UI (and
+  firmware updates) still open through the companion.
 
 ## 1.1.0 — 2026-10-26
 

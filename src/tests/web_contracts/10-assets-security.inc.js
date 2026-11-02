@@ -233,7 +233,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
     !codeIncludes(runtimeJs, "location.replace(location.pathname+'?fw='+version)") ||
     !codeIncludes(appJsSource, 'boot=R.showPageBoot();R.stopViewPolls();') ||
     !codeIncludes(appJsSource, 'if(ok){R.hideHomeBoot(boot);') ||
-    !codeIncludes(appJsSource, 'if(activeView!=="setup")R.ensureBackgroundStreams();')) {
+    !codeIncludes(appJsSource, 'if(activeView!=="setup"){R.ensureBackgroundStreams();preloadRecords();}')) {
   throw new Error(
       'Every view must reuse the Home splash and fade immediately after data loads, preserving firmware reload and inactive overlay handoff');
 }
@@ -432,6 +432,7 @@ if (!shellHtml.includes('<div id="homeBoot" class="bootOverlay" role="status">')
         location: {pathname: path}, history: {}, stopExtraPolls() {}, placePill() {}, markNavActive() {},
         ensureView: () => {events.push('markup'); return markup.promise;},
         document: {hidden: false, querySelectorAll: () => [], body: {classList: classList(bodyClasses)}}, setInterval: () => 1, setTimeout: () => 1,
+        clearTimeout() {},
         __WEBUI_TEXT__: key => key,
         R: {showPageBoot: () => {events.push('show'); return 1;}, stopViewPolls() {},
           api: async () => {throw new Error('record views must not probe REST status');}, compatibilityModeOn: () => false,

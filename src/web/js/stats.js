@@ -1115,7 +1115,14 @@ function renderShots() {
     const G = __WEBUI_TEXT__("runtime.g"),
       S = __WEBUI_TEXT__("runtime.s");
     for (const [i, r] of list.entries()) {
-      archiveHeadings(body, list, i, columns, source, R.uiState.shotSort === "date");
+      archiveHeadings(
+        body,
+        list,
+        i,
+        columns,
+        source || streamArchives.shots,
+        R.uiState.shotSort === "date",
+      );
       const row = document.createElement("tr");
       row.dataset.id = r.id;
       if (r._archive) row.dataset.gen = r.archiveGeneration;
@@ -2569,6 +2576,7 @@ function statsStreamFrame(message) {
     if (!c || typeof c !== "object" || Array.isArray(c)) throw Error();
     return { ...Object.fromEntries(cols.map((k, i) => [k, a[i]])), ...c };
   });
+  streamArchive("shots", message, message.rows);
   for (const r of message.rows) if (!statsRowOk(r)) throw Error();
   if (message.offset + message.rowBase + message.rows.length > message.total) throw Error();
   const buffered = statsPage && statsPage.seq === message.seq;
@@ -2636,9 +2644,6 @@ function applyStatsStream(message) {
   }
   R.uiState.statsFetchMark = null;
   statsStreamBoot = message.boot;
-  // A moved store reloads the companion's archive rows in place.
-  if (statsStreamEpoch !== page.epoch && statsStreamEpoch)
-    archiveChanged("shots", () => shotStatsViewActive() && R.paint(renderShots));
   statsStreamEpoch = page.epoch;
   if (page.mode === "replace") {
     statsTag = page.tag;
@@ -2837,3 +2842,5 @@ export const showArchive = () => {
 };
 // The route opens the page: a cold entry subscribes and waits for its page.
 export const start = startStatsStream;
+// Through the companion the page stands ready before its first visit (app.js).
+export const preload = () => ensureStatsStream();
