@@ -139,6 +139,7 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   pendingFinalize.extractionExtended = session.extractionExtended;
   pendingFinalize.slowExtractionGuardEnabled =
       session.config.slowSideEnabled;
+  pendingFinalize.slowExtractionExtended = session.slowExtractionExtended;
   pendingFinalize.fastMarginDg = session.config.fastMarginDg;
   pendingFinalize.slowMarginDg = session.config.slowMarginDg;
   pendingFinalize.fastBeforeMs = session.config.fastBeforeMs;
@@ -262,10 +263,8 @@ void persistLastShotFromFinalize(const PendingShotFinalize &snapshot,
   last.weightValid = finalWeightValid;
   last.currentWeightG = finalWeightValid ? finalWeightG : 0.0f;
   last.goalWeightDg = snapshot.goalWeightDg;
-  last.extractionExtended =
-      snapshot.endReason == EndReason::FAST_EXTRACTION_MAX_WEIGHT;
-  last.slowExtractionExtended =
-      snapshot.endReason == EndReason::SLOW_EXTRACTION_MIN_WEIGHT;
+  last.extractionExtended = snapshot.extractionExtended;
+  last.slowExtractionExtended = snapshot.slowExtractionExtended;
   last.activeStopWeightG = goalWeightDgToGrams(
       last.extractionExtended ? snapshot.goalWeightDg + snapshot.fastMarginDg
       : last.slowExtractionExtended ? snapshot.goalWeightDg - snapshot.slowMarginDg
@@ -449,10 +448,8 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
   copyCString(record.scaleName, sizeof(record.scaleName), snapshot.scaleName);
   record.sideFlags = shotLogPackGuardFlags(
       snapshot.extractionGuardEnabled, snapshot.slowExtractionGuardEnabled);
-  // Cut line above / below the target at the stop: the segment that fired.
   record.extractionExtended = shotLogPackExtendedFlags(
-      snapshot.endReason == EndReason::FAST_EXTRACTION_MAX_WEIGHT,
-      snapshot.endReason == EndReason::SLOW_EXTRACTION_MIN_WEIGHT);
+      snapshot.extractionExtended, snapshot.slowExtractionExtended);
   record.stopDetail = static_cast<uint8_t>(shotLogStopDetailFromEndReason(
       snapshot.endReason, snapshot.extractionGuardEnabled,
       snapshot.extractionExtended));

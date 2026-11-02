@@ -364,6 +364,7 @@ struct PendingShotFinalize {
   bool extractionGuardEnabled = false;
   bool extractionExtended = false;
   bool slowExtractionGuardEnabled = false;
+  bool slowExtractionExtended = false;
   // Cut parameters in force for the shot (the record's snapshot).
   uint16_t fastMarginDg = DEFAULT_FAST_MARGIN_DG;
   uint16_t slowMarginDg = DEFAULT_SLOW_MARGIN_DG;

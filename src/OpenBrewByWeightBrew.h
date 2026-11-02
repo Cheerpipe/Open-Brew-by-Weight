@@ -54,14 +54,22 @@ int32_t cutLineNowDg() {
   return cutLineAtDg(shotTimeAtMs(millis(), shotMs) ? shotMs : 0);
 }
 
-// A weight cut reports the segment of f that fired (13 raised, 3 target,
-// 16 lowered).
+void noteExtension(int32_t shotMs, bool targetDue, uint32_t atMs, int32_t weightDg);
+
+// A weight cut reports the extension it ends (13 fast, 3 none, 16 slow). The
+// cut law fired against f, so it is due against the target wherever f is
+// raised: the cut itself latches an extension the last sample missed.
 // Latches the exact shot time and line, which the record and learning use.
 EndReason weightCutReasonNow() {
   corridor::CorridorState &cut = session.cut;
-  if (!shotTimeAtMs(millis(), cut.stopMs)) cut.stopMs = 0;
+  if (shotTimeAtMs(millis(), cut.stopMs))
+    noteExtension(cut.stopMs, true, millis(), gramsToDg(session.lastAcceptedWeightG));
+  else
+    cut.stopMs = 0;
   cut.stopLineDg = cutLineAtDg(cut.stopMs);
-  return corridor::cutReason(cut.params, cut.stopLineDg);
+  return session.extractionExtended       ? EndReason::FAST_EXTRACTION_MAX_WEIGHT
+         : session.slowExtractionExtended ? EndReason::SLOW_EXTRACTION_MIN_WEIGHT
+                                          : EndReason::SCALE_THRESHOLD;
 }
 
 // Snapshot of the shot's cut parameters; the control task owns this state.
@@ -461,13 +469,14 @@ void serviceBbwProtectionPhases() {
     resetDirectStopConfirmation();
   }
 }
-// Latches when the cut line leaves the target: raised once the shot reaches
-// the target while f is above it, lowered once f has dropped below it.
-void noteCutLineSegment(int32_t weightDg, int32_t shotMs, uint32_t atMs) {
+// The one definition of an extended shot, shared by the pulses, the curve,
+// the cut reason and the record. Fast: the cut law against the target is due
+// while the raised f keeps the shot running. Slow: the shot still runs once f
+// has dropped below the target (it would have cut at the target otherwise).
+void noteExtension(int32_t shotMs, bool targetDue, uint32_t atMs, int32_t weightDg) {
   const corridor::Params &p = session.cut.params;
   const int32_t line = cutLineAtDg(shotMs);
-  const bool reached = weightDg >= p.goalDg - session.cut.offsetDg;
-  if (!session.extractionExtended && reached && line > p.goalDg) {
+  if (!session.extractionExtended && targetDue && line > p.goalDg) {
     session.extractionExtended = true;
     session.targetReachedEarly = true;
     session.targetReachedAtMs = atMs;
@@ -479,7 +488,7 @@ void noteCutLineSegment(int32_t weightDg, int32_t shotMs, uint32_t atMs) {
       emitAlert(AlertEvent::EXTENDED_PULSE, session.id);
     }
   } else if (!session.extractionExtended && !session.slowExtractionExtended &&
-             !reached && line < p.goalDg) {
+             line < p.goalDg) {
     session.slowExtractionExtended = true;
     shotCurveSampler.latchExtended(atMs, weightDg / 10.0f);
     addDebugEvent(DebugCategory::SCALE, DebugCode::SLOW_EXTRACTION_ENTERED,
@@ -526,7 +535,13 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
   int32_t shotMs = 0;
   const bool timed = shotTimeAtMs(receivedAtMs, shotMs);
   const int32_t weightDg = gramsToDg(weight);
-  if (timed && !overload) noteCutLineSegment(weightDg, shotMs, receivedAtMs);
+  const corridor::CorridorState &cut = session.cut;
+  if (timed && !overload)
+    noteExtension(shotMs,
+                  corridor::targetCutDue(cut.params, weightDg,
+                                         cut.rate.valid ? cut.rate.rateX100 : 0,
+                                         cut.tauMs, cut.offsetDg),
+                  receivedAtMs, weightDg);
   const bool overThreshold = timed && weightDg >= corridor::backstopThresholdDg(
                                            session.cut.params, shotMs, session.cut.offsetDg);
   if (timed && !overload && !(session.traceLatches & TRACE_LATCH_SLOW_WINDOW) &&

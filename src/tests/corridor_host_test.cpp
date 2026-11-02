@@ -324,6 +324,8 @@ void testSolverAgainstBruteForce() {
   const Params p = doubleAdaptive();
   int32_t none = 0;
   CHECK(!crossingMs(p, 20000, 200, 299, 790, 15, none));
+  // Below the prediction rate the target law is the direct one: no lead.
+  CHECK(!targetCutDue(p, 340, 299, 790, 15) && targetCutDue(p, 345, 299, 790, 15));
   uint32_t seed = 12345;
   auto next = [&](uint32_t mod) {
     seed = seed * 1103515245u + 12345u;
@@ -336,6 +338,8 @@ void testSolverAgainstBruteForce() {
     CHECK(crossingMs(p, tk, w, q, tau, r, out));
     CHECK(out == bruteCrossing(p, tk, w, q, tau, r));
     CHECK(out >= tk && out <= p.wallMs);
+    // A cut due now against a raised f is due against the target too.
+    if (out == tk && cutLineDg(p, tk) >= p.goalDg) CHECK(targetCutDue(p, w, q, tau, r));
   }
 }
 

@@ -18611,6 +18611,58 @@ void r61b_slow_extended_pulse_uses_slow_rate_setting() {
         static_cast<uint8_t>(ExtendedPulseRate::RAPID));
 }
 
+void r61e_extension_shares_the_cut_law() {
+  // Fast: the flow lead counts as in the cut law, so a sample still below
+  // goal - r latches once weight + lead + r reaches the target under a raised
+  // f, and the shot keeps running.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.fastSideEnabled = true;
+  runtimeConfig.fastMarginDg = 65;  // 42.5 g at the 36 g target
+  runtimeConfig.fastBeforeMs = 30000;
+  runtimeConfig.goalWeightDg = 360;
+  startCycle();
+  advanceToBrew();
+  endBbwProtectionForTests();
+  const corridor::CorridorState &cut = session.cut;
+  float weight = 0.0f;
+  while (!session.extractionExtended && weight < 36.0f) {
+    hostMillis += 100;
+    publishWeight(weight += 0.25f);
+  }
+  CHECK(session.extractionExtended && cut.rate.valid);
+  CHECK(gramsToDg(weight) < cut.params.goalDg - cut.offsetDg);
+  CHECK(getRelaySafetySnapshot().closed);
+  CHECK(localBuzzer.activeCue == BuzzerCue::ABNORMAL_FAST);
+
+  // Slow: a sample already past goal - r still latches once f has dropped
+  // below the target; the cut it confirms and the record report the same.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.slowSideEnabled = true;
+  startCycle();
+  advanceToBrew();
+  endBbwProtectionForTests();
+  publishWeight(20.0f);
+  reachSessionElapsed(session.config.slowAfterMs + 1000);
+  const float reached = (cut.params.goalDg - cut.offsetDg) / 10.0f;
+  publishWeight(reached + 0.1f);
+  CHECK(session.slowExtractionExtended);
+  publishWeight(reached + 0.2f);
+  loop();
+  CHECK(stopperState == StopperState::REQUIRES_OFF);
+  CHECK(session.endReason == EndReason::SLOW_EXTRACTION_MIN_WEIGHT);
+  CHECK(pendingFinalize.slowExtractionExtended);
+  // A shot that ends on its time limit keeps the slow extension it ran in.
+  shotLog.clear();
+  PendingShotFinalize wall = pendingFinalize;
+  wall.endReason = EndReason::CONFIGURED_WALL_LIMIT;
+  commitPendingShotLog(wall, 30.0f, true, ActualWeightSource::POST_DRIP);
+  ShotLogRecord stored[1] = {};
+  CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
+  CHECK(shotLogSlowExtended(stored[0].extractionExtended));
+}
+
 void tt01_smooth_cut_truth_table() {
   // Plan §4.6: a weight cut reports the segment of f at the stop command:
   // raised (13), target (3) or lowered (16), for both the direct backstop
@@ -25170,6 +25222,7 @@ const TestCase testCases[] = {
     {"SL01", sl01_scale_loss_regimes},
     {"SL02", sl02_new_coffee_restarts_the_statistics_epoch},
     {"R61c", r61c_extended_pulse_resumes_after_scale_lost_alert},
+    {"R61e", r61e_extension_shares_the_cut_law},
     {"R61d", r61d_extended_pulse_pending_cleared_when_unwanted},
     {"R61e", r61e_extended_pulse_restarts_when_rate_setting_changes},
     {"R63", r63_slow_guard_disabled_continues_past_max_time},
