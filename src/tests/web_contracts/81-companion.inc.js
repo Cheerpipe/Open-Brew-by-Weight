@@ -179,7 +179,7 @@
   const diag = partialHtml.diagnostic, diagJs = viewJs.diagnostic;
   assert.ok(diag.includes('<details class="cfgGroup" data-g="companion"><summary>Companion</summary><div class="statusColumn"><b class="blockHead">This screen</b>') &&
       diag.includes('<div class="statusColumn"><b class="blockHead">Companion</b>') &&
-      ['dUiMode', 'dUiAccess', 'dUiOffline', 'dCoName', 'dCoAddress', 'dCoVersion', 'dCoLink',
+      ['dUiMode', 'dUiAccess', 'dUiWorker', 'dCoName', 'dCoAddress', 'dCoVersion', 'dCoLink',
         'dCoLinkCounts', 'dCoUi', 'dCoRoute', 'dCoLm', 'dCoCounts'].every((id) => diag.includes(`id="${id}"`)) &&
       ['dCoRoute', 'dCoLm', 'dCoCounts'].every((id) =>
         new RegExp(`<div class="metric micraOnly"><strong>[^<]*</strong><div id="${id}">`).test(diag)) &&

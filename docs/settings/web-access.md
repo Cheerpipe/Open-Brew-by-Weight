@@ -152,16 +152,10 @@ back. Everything you see and
 do still comes live from the controller. After a firmware update the phone
 picks up the new Web UI by itself.
 
-The phone also keeps its own copy of every saved shot and every entry in the
-activation history, and refreshes it about half a minute after each brew or
-rinse.
-When the controller is out of reach, for example with the machine switched
-off, tap **View saved shots** to browse that copy in **Shots** and
-**History**. It is read-only until the controller is back: to reconnect,
-open **Home** and press **Reload**, and rating, filters, exporting, and
-deleting return with it. If the Web UI
-asks for a password, the copy is kept only on devices where you chose
-**Remember this device**, and signing out erases it.
+Your shots and activations stay on the controller, so through your own
+proxy **Shots** and **History** need the controller to be on. Through
+[Open Brew by Weight Companion](../features/companion.md#with-the-controller-off)
+you can still browse them with the machine switched off.
 
 Installed on the home screen, the app also offers shortcuts to **Shots**,
 **History**, and **Settings** when you press and hold its icon, and tapping
@@ -195,7 +189,7 @@ Proxy Manager:
    has to present them that way.
 
 Opening the controller's plain address on your Wi-Fi keeps working as
-before, without the offline copy. Through the proxy, the controller sees
+before, without the installed app. Through the proxy, the controller sees
 every phone as the same device, so five wrong passwords pause sign-in for
 everyone who uses that address for 30 seconds. Open Brew by Weight Companion
 tells the controller which device each request comes from, so wrong
@@ -207,8 +201,8 @@ browser tab (**Web**) or from the home screen (**PWA**), whether it came
 straight from the controller (**Direct**), through
 [Open Brew by Weight Companion](../features/companion.md) (with the
 companion's name and how many screens it serves right now), or through
-another **HTTPS proxy**, and whether the offline copy is **Active** on that
-device.
+another **HTTPS proxy**, and whether the **Service worker** that keeps the
+installed app on that device is **Active**.
 
 ## Forgot the password
 

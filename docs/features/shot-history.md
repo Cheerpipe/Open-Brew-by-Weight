@@ -507,15 +507,15 @@ A few things to know:
 - Traces share storage with the shot curves. Once saved, a recent shot keeps
   its trace; when space runs out the oldest make room, so an older shot may
   say it has no trace. Shots from firmware before traces existed have none.
-- The copy kept for offline use holds the shots, not their traces, so
-  **View trace** needs the controller.
+- **View trace** needs the controller: with the controller off, the shots
+  the companion shows offer no trace.
 
 ### With the machine off
 
-A phone or computer that opens the Web UI over HTTPS keeps a copy of every
-good shot, so **Shots** still works while the controller is out of reach. The
-copy leaves bad shots out, so **Show bad shots** needs the controller.
-See [Open it over HTTPS with a reverse proxy](../settings/web-access.md#open-it-over-https-with-a-reverse-proxy).
+Your shots live on the controller, so **Shots** needs it to be on. With
+[Open Brew by Weight Companion](companion.md#with-the-controller-off), the app
+installed through it can still show the shots the companion keeps, read-only,
+while the controller is out of reach.
 
 ## Export and share shots
 

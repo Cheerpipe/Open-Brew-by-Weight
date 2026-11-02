@@ -207,137 +207,24 @@ function downloadCsv(name, rows) {
     name,
   );
 }
-// The offline copy (runtime.js syncOfflineCopy): each store's records in
-// IndexedDB, tagged with the revision the firmware's record index names, and
-// the store epoch they match under "meta". The index lists [id, revision]
-// pairs, newest first, only when the epoch moved, so an unchanged store costs
-// one small frame and a changed one fetches only its new or changed records.
-let offlineDbOpen = null;
-function offlineDb() {
-  return (offlineDbOpen ||= new Promise((resolve, reject) => {
-    const q = indexedDB.open("obbw-records", 1);
-    q.onupgradeneeded = () => {
-      for (const s of ["shots", "history"]) q.result.createObjectStore(s, { keyPath: "id" });
-      q.result.createObjectStore("meta");
-    };
-    q.onsuccess = () => {
-      // Signing out deletes the database; this connection must not hold it.
-      q.result.onversionchange = () => {
-        q.result.close();
-        offlineDbOpen = null;
-      };
-      resolve(q.result);
-    };
-    q.onerror = () => {
-      offlineDbOpen = null;
-      reject(q.error);
-    };
-  }));
-}
-// One transaction; resolves with the result of the request `work` returns.
-function offlineTx(stores, mode, work) {
-  return offlineDb().then(
-    (db) =>
-      new Promise((resolve, reject) => {
-        const tx = db.transaction(stores, mode),
-          q = work(tx);
-        tx.oncomplete = () => resolve(q?.result);
-        tx.onerror = tx.onabort = () => reject(tx.error);
-      }),
-  );
-}
-function offlineRecords(store) {
-  return offlineTx(store, "readonly", (tx) => tx.objectStore(store).getAll()).then(
-    (rows) => rows.sort((a, b) => b.id - a.id),
-    () => [],
-  );
-}
-function offlineMeta(store) {
-  return offlineTx("meta", "readonly", (tx) => tx.objectStore("meta").get(store)).then(
-    (m) => m || {},
-    () => ({}),
-  );
-}
-const recordsIndexWait = {};
-function recordsIndex(store, epoch) {
-  R.registerStream("records", {
-    subscribe: () => null,
-    cursor: true,
-    frame: (d) => recordsIndexWait[d.store]?.(d),
-  });
-  return new Promise((resolve) => {
-    const done = (d) => {
-      clearTimeout(timer);
-      delete recordsIndexWait[store];
-      resolve(d);
-    };
-    const timer = setTimeout(() => done(null), 15e3);
-    recordsIndexWait[store] = done;
-    R.sendUiOperation({ op: "records", [store]: epoch });
-  });
-}
-// fetchWindow(offset, count) resolves with records from `offset` in the
-// view's fetch order (falsy on failure), place(i, total) maps index position
-// i to that order, and meta() adds what the offline page shows besides rows.
-// An interrupted sync keeps what it fetched and leaves the epoch for the next;
-// a shot starting pauses it that way (the firmware serves no exports then).
-// The copy keeps shot rows only, never their traces.
-const offlineSyncing = {};
-async function syncOfflineStore(store, fetchWindow, place, meta = () => ({})) {
-  if (offlineSyncing[store]) return;
-  offlineSyncing[store] = true;
-  try {
-    const held = await offlineMeta(store),
-      index = await recordsIndex(store, held.epoch || 0),
-      rows = index?.rows;
-    if (!index || index.v !== 1 || !Number.isInteger(index.epoch)) return;
-    if (!rows) return void (index.epoch === held.epoch && R.noteOfflineCopy());
-    if (!Array.isArray(rows) || rows.length % 2 || !rows.every(Number.isInteger)) return;
-    const rev = new Map(),
-      have = new Map((await offlineRecords(store)).map((r) => [r.id, r._rev])),
-      wanted = new Set(),
-      offsets = [],
-      got = [];
-    for (let i = 0; i < rows.length; i += 2) {
-      rev.set(rows[i], rows[i + 1]);
-      if (have.get(rows[i]) === rows[i + 1]) continue;
-      wanted.add(rows[i]);
-      offsets.push(place(i / 2, rows.length / 2));
-    }
-    offsets.sort((a, b) => a - b);
-    for (let k = 0; k < offsets.length && R.webUiPollingActive() && !R.shotRunning(); ) {
-      const page = await fetchWindow(offsets[k], offsets.at(-1) - offsets[k] + 1);
-      if (!page) break;
-      for (const r of page)
-        if (wanted.delete(r.id)) got.push(Object.assign(r, { _rev: rev.get(r.id) }));
-      const end = offsets[k] + Math.max(page.length, 1);
-      while (offsets[k] < end) k++;
-    }
-    await offlineTx([store, "meta"], "readwrite", (tx) => {
-      const s = tx.objectStore(store);
-      for (const r of got) s.put(r);
-      for (const id of have.keys()) if (!rev.has(id)) s.delete(id);
-      if (!wanted.size) tx.objectStore("meta").put({ epoch: index.epoch, ...meta() }, store);
-    });
-    if (!wanted.size) R.noteOfflineCopy();
-  } catch (_) {
-    /* the next page load or finished activation retries */
-  } finally {
-    offlineSyncing[store] = false;
-  }
-}
 // The companion archive (plan 2A). Through the companion a list is one
 // history: the controller's rows and the records only the companion keeps
 // (older ones, earlier histories before a Clear or a factory reset, records
 // removed from the controller but kept), filtered and ordered alike on both
 // sides and merged page by page. The companion answers only a screen the
-// controller lets in.
+// controller lets in. With the controller off (R.archiveView) the list is
+// the archive alone: every record it copied, read-only.
 const archiveSources = {};
-// The archive answers for a store (its archive-only rows feed the list) and
-// for the whole-history Stats header (any copied shot).
+// The archive answers for a store (its archive-only rows feed the list or,
+// with the controller off and Shot archive in the companion on, every copied
+// row) and for the whole-history Stats header (any copied shot).
 function archiveReady(store) {
   const a = R.uiState.companionHere?.archive;
-  return !!(a?.available && a[store] > 0);
+  return !!(
+    a?.available &&
+    (!R.archiveView || a.on) &&
+    a[R.archiveView ? store + "Total" : store] > 0
+  );
 }
 function archiveStatsReady() {
   const a = R.uiState.companionHere?.archive;
@@ -386,6 +273,7 @@ const archiveFresh = (key, query) => ({
 });
 function archiveSource(store, query) {
   if (!archiveReady(store)) return null;
+  if (R.archiveView) query = { ...query, all: 1 };
   const key = JSON.stringify(query);
   if (archiveSources[store]?.key !== key) archiveSources[store] = archiveFresh(key, query);
   return archiveSources[store];
@@ -394,7 +282,7 @@ async function archivePage(store, s) {
   const q = new URLSearchParams({ limit: store === "shots" ? 20 : 50, ...s.query });
   if (s.next) q.set("cursor", s.next);
   const j = await companionArchive(store + "?" + q);
-  // Not enumerable: exports and the offline copy never see it.
+  // Not enumerable: exports never see it.
   s.rows.push(...j.rows.map((r) => Object.defineProperty(r, "_archive", { value: s })));
   Object.assign(s, { next: j.next, done: !j.next, holes: j.holes || [] });
   Object.assign(s, { gens: j.generations || [], presets: j.presets || [] });
@@ -406,10 +294,14 @@ async function loadArchive(store, render) {
   try {
     await archivePage(store, s);
     s.failures = 0;
-  } catch (_) {
-    // What is loaded stays; the page is asked again a little later each
-    // time, and after a few tries the list ends there.
-    if (++s.failures >= 4) s.done = true;
+  } catch (e) {
+    // A browser the companion has not seen signed in is told how to get in.
+    // Otherwise what is loaded stays; the page is asked again a little later
+    // each time, and after a few tries the list ends there.
+    if (e.error === "AUTH_REQUIRED") {
+      s.done = true;
+      R.message(__WEBUI_TEXT__("records.archive_sign_in"), "error");
+    } else if (++s.failures >= 4) s.done = true;
     else setTimeout(() => loadArchive(store, render), 2e3 * 2 ** s.failures);
   } finally {
     s.busy = false;
@@ -467,9 +359,11 @@ function mergeRecords(own, ownMore, s, order) {
     need: ownMore && ownCut <= archiveCut ? "own" : s.done ? null : "archive",
   };
 }
-// Rows kept only by the companion are marked so, never by colour alone.
+// Rows kept only by the companion are marked so, never by colour alone; in the
+// archive view the companion names them (archiveOnly) among the rows the
+// controller holds.
 function archiveMark(el, r) {
-  if (!r._archive) return;
+  if (!r._archive || r.archiveOnly === false) return;
   // A closed history ended when the next existing one opened (its restartedAt).
   const before = (r._archive.gens || [])
     .filter((g) => g.generation > r.archiveGeneration)

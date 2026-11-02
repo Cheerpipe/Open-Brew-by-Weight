@@ -1925,27 +1925,8 @@ export function init() {
     };
   }
   syncHeroTintAvailability();
-  const updateAppOffline = () => {
-    const box = $("appOfflineBox");
-    if (!box) return;
-    const st = R.offlineCopyState();
-    box.classList.toggle("hidden", !st);
-    if (st && $("appOfflineSince"))
-      $("appOfflineSince").textContent = __WEBUI_TEXT__("settings.app_offline_since").replace(
-        "{0}",
-        new Date(st.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
-      );
-  };
-  if ($("appOfflineDelete"))
-    $("appOfflineDelete").onclick = () => {
-      if (!confirm(__WEBUI_TEXT__("settings.app_offline_confirm"))) return;
-      R.dropOfflineCopy();
-      updateAppOffline();
-      R.message(__WEBUI_TEXT__("settings.app_offline_deleted"));
-    };
   R.setSettingsRenderer((c) => {
     renderDripChart(c);
     R.renderGroupRows($("workflowPanel"), GROUP_SUMMARIES);
-    updateAppOffline();
   });
 }

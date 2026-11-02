@@ -430,7 +430,7 @@ let micraDiagnosticStatus = null,
   companionDiagnosticStatus = null;
 // Facts about this browser, not the controller. The firmware serves plain HTTP
 // only, so an https: page always came through a reverse proxy, and only there
-// can the service worker keep the offline copy. The companion names itself at
+// can the service worker open the app with the controller off. The companion names itself at
 // a same-origin path, with the screens it serves; a direct page never asks the
 // controller for it.
 function renderScreen() {
@@ -444,7 +444,7 @@ function renderScreen() {
     (screens > 0 ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.screen_count"), [screens]) : "") +
     " · " +
     location.host;
-  $("dUiOffline").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
+  $("dUiWorker").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
   logHistoryControls();
 }
 // The paired companion as the controller sees it.

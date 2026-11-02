@@ -122,20 +122,13 @@ Versioning:
   `rs`, the ping's `hold` answer and, last, the store moved (a new shot, a
   rating change and a deletion): a shots index delta (`rx` with `d`) against
   the first case and the two one-shot fetch windows the companion's archive
-  then asks. The `browser_` cases come from a browser's ui-stream session
-  on the store the first cases list: the screen's op is the `request`, and
-  the frames are sent as they are, without the link's wrapping. They are the
-  good-shots index (with `sum`), two offline-copy windows (`sort` date,
-  `dir` desc, `filter` `{}`) under a standing Stats page, one paged over two
-  frames, and Home's two-shot hero fetch without one (rows only, no Stats
-  header), which the companion's tests compare with the page it builds from
-  its archive. The senders, the row formatter, the trace frame and the
+  then asks. The senders, the row formatter, the trace frame and the
   sealer are the firmware's own; the store, its curves and the trace bytes
   are fixtures, and the MAC is zeros (the link vectors cover it).
 - Regenerate after a deliberate frame change with
   `COMPANION_RECORDS_REGENERATE=1 node src/tests/check_web_assets.js`, then
   update the companion's copy. SHA-256 of the current file:
-  `2673dc53c2275df5853d02c77f55b721e9ac8d226b0ffbc22b9d9f1336649437`.
+  `a285700c7ecc4e33b664d05e21186fc62a76e546baf472fed9c5579c9493a63c`.
 - Produced and checked byte for byte by the web contract
   `src/tests/web_contracts/27-companion-records-vectors.inc.js`; replayed by
   the companion's sync tests.

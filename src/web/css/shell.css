@@ -847,7 +847,7 @@ body.pageLoading :is(.view, .view *)::after {
   font-weight: 700;
   cursor: pointer;
 }
-#webUiOffline {
+#webUiArchive {
   min-height: 2.75rem;
   padding: 0.5rem 1.25rem;
   border: 1px solid var(--pri);
@@ -857,14 +857,14 @@ body.pageLoading :is(.view, .view *)::after {
   font-weight: 600;
   cursor: pointer;
 }
-/* The offline copy is read-only: list controls that need the controller go,
-   and so do the header signals and the bars they leave empty. */
-.offlineCopy :is(#wifiSignal, #bluetoothSignal, #liveShotOpen),
-.offlineCopy :is(#shotLogPanel, #historyPanel) .glassBar,
-.offlineCopy :is(#statsWindow, #shotSort, #shotFilterButton, #exportShotsButton, #clearShotsButton),
-.offlineCopy :is(#historySort, #historyFilterButton, #exportHistoryButton, #clearHistoryButton),
-.offlineCopy #historyRows .shotDel,
-.inactiveOverlay.isLogin #webUiOffline {
+/* The archive view is read-only: list controls that need the
+   controller go, and so do the header signals and the bars they leave empty. */
+.archiveView :is(#wifiSignal, #bluetoothSignal, #liveShotOpen),
+.archiveView :is(#shotLogPanel, #historyPanel) .glassBar,
+.archiveView :is(#statsWindow, #shotSort, #shotFilterButton, #exportShotsButton, #clearShotsButton),
+.archiveView :is(#historySort, #historyFilterButton, #exportHistoryButton, #clearHistoryButton),
+.archiveView #historyRows .shotDel,
+.inactiveOverlay.isLogin #webUiArchive {
   display: none;
 }
 #webUiReload:disabled,

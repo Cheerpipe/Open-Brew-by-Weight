@@ -1621,13 +1621,13 @@ async function orphanTracesJson(job, vocab) {
   }
   return out;
 }
-// One shot with its trace when it has one (the offline copy has none).
+// One shot with its trace when it has one (none in the archive view).
 async function downloadShotJson(r) {
   try {
-    const vocab = R.offlineCopy ? null : await shotTraceVocabulary().catch(() => null);
+    const vocab = R.archiveView ? null : await shotTraceVocabulary().catch(() => null);
     downloadJson(
       `openbrewbyweight-shot-${r.id}.json`,
-      shotsJson([r], [R.offlineCopy ? null : await shotTraceForFile(r, vocab)]),
+      shotsJson([r], [R.archiveView ? null : await shotTraceForFile(r, vocab)]),
     );
   } catch (e) {
     R.message(
@@ -2756,7 +2756,7 @@ export function init() {
   });
   $("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"));
   shotMenu = actionMenu(__WEBUI_TEXT__("stats.shot_actions"), (r, wait = afterShot()) => [
-    ...(R.offlineCopy
+    ...(R.archiveView
       ? []
       : [
           [
@@ -2796,7 +2796,7 @@ export function init() {
       __WEBUI_TEXT__("stats.visualizer_hint"),
       () => downloadJson(`openbrewbyweight-shot-${r.id}-visualizer.json`, shotVisualizer(r)),
     ],
-    ...(R.offlineCopy
+    ...(R.archiveView
       ? []
       : [
           null,
@@ -2835,39 +2835,15 @@ export function init() {
   R.armStickyBar("shotStickySentinel");
   renderStatsDurChart();
 }
-// The offline copy fetches through the standing subscription, which the
-// firmware serves first, so a sync waits for that page.
-function statsReady() {
-  if (statsStreamWanted && statsSynced) return true;
-  return Promise.race([
-    new Promise((resolve) => {
-      const prev = statsResolve;
-      statsResolve = (ok) => (prev?.(ok), resolve(ok));
-      ensureStatsStream();
-    }),
-    R.sleep(15e3),
-  ]);
-}
-export function syncOffline() {
-  return syncOfflineStore(
-    "shots",
-    async (offset, count) =>
-      !statsExportInFlight &&
-      (await statsReady()) &&
-      statsFrameWindow(offset, Math.min(count, 50), "date", "desc", 3e4),
-    (i) => i,
-    () => ({ stats: R.uiState.shotStats }),
-  );
-}
-// Offline the page reads the copy: every saved shot newest first, good shots
-// only (the record index lists no others, so a sync drops any other row),
-// and the last header.
-export const showOffline = async () => {
-  const [shots, meta] = await Promise.all([offlineRecords("shots"), offlineMeta("shots")]);
-  if (meta.stats) R.uiState.shotStats = meta.stats;
-  applyShotPage({ bootId: R.bootId, total: shots.length, hasMore: false, shots }, "replace");
+// With the controller off the page lists the companion's archive alone (records.js) under its
+// whole-history header, unfiltered (the filter button is hidden); rows offer no trace, which
+// needs the controller.
+export const showArchive = () => {
+  shotFilterReset();
+  applyShotPage({ bootId: R.bootId, total: 0, hasMore: false, shots: [] }, "replace");
+  refreshMergedHeader();
   R.paint(renderShots);
-  R.offlineCopyNote();
+  R.archiveViewNote();
 };
 // The route opens the page: a cold entry subscribes and waits for its page.
 export const start = startStatsStream;

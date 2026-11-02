@@ -2338,9 +2338,9 @@ function commandMessages(path, v) {
 }
 {
   const r = $("webUiReload"),
-    o = $("webUiOffline");
+    o = $("webUiArchive");
   if (r) r.onclick = () => claimWebUiOwnership();
-  if (o) o.onclick = openOfflineCopy;
+  if (o) o.onclick = openArchiveView;
 }
 function setInactiveError(text) {
   const el = $("inactiveError");
@@ -2417,7 +2417,7 @@ function beginNetworkReconnectWait() {
   setOverlayReconnectMode(true);
   if (webUiOwner) deactivateWebUi("reconnect");
   else showInactiveOverlay();
-  offerOfflineCopy(!!offlineCopyState());
+  offerArchiveView(true);
   updateReconnectCountdown();
   networkReconnectTimer = setInterval(updateReconnectCountdown, 1e3);
   networkReconnectPollTimer = setTimeout(pollNetworkReconnect, 2e3);
@@ -2452,7 +2452,7 @@ function hideInactiveOverlay() {
   if (!el || !el.classList.contains("isVisible")) return;
   el.classList.remove("isVisible");
   document.body.classList.remove("webUiInactive");
-  offerOfflineCopy(false);
+  offerArchiveView(false);
   for (const n of el.parentElement.children) n.inert = false;
   clearTimeout(inactiveOverlayTimer);
   inactiveOverlayTimer = setTimeout(() => {
@@ -2494,7 +2494,7 @@ function setOverlayOutOfReach() {
   outOfReachOverlay = true;
   setInactiveHint(__WEBUI_TEXT__("shell.out_of_reach_hint"));
   showInactiveOverlay();
-  offerOfflineCopy(!!offlineCopyState());
+  offerArchiveView(true);
 }
 // A binary download through the device slot. Errors carry the HTTP status
 // and the firmware's error code; `cache` lets immutable records (shot
@@ -2766,9 +2766,9 @@ async function claimWebUiOwnership(claimed) {
     endNetworkReconnectWait();
     webUiOwner = true;
     webUiInactiveReason = "";
-    if (offlineCopy) {
-      offlineCopy = false;
-      document.body.classList.remove("offlineCopy");
+    if (archiveView) {
+      archiveView = false;
+      document.body.classList.remove("archiveView");
       clearMessage();
     }
     resetWebUiInactivity();
@@ -2811,7 +2811,6 @@ async function showSignIn(signedOut) {
   const overlay = $("webUiInactive");
   if (!overlay || !$("webUiLogin")) return;
   if (signedOut) storeSession("", false);
-  dropOfflineCopy();
   // Several requests can fail at once; one sign-in form is enough.
   if (overlay.classList.contains("isLogin") && overlay.classList.contains("isVisible")) return;
   if (webUiOwner) {
@@ -4776,7 +4775,6 @@ function startUiStream() {
           data.changes?.physicalActivatorOn === false;
         const boot = homeFrame?.boot;
         homeFrame = statusStreamFrame(shotGotHome ? homeFrame : null, data, homeFrame?.status);
-        if (data.changes?.machineRunning === false) syncOfflineCopy(3e4);
         // A rebooted device invalidates the models that name their boot.
         if (boot !== homeFrame.boot) eachStream("reboot", homeFrame.boot);
         if ("timeUtcSec" in data.changes) {
@@ -5701,88 +5699,44 @@ function diagSnapshotOk(s) {
     typeof s.scale?.controlState === "string"
   );
 }
-// The offline copy: every shot and activation, kept in this browser where a
-// service worker can open the app with the controller off (HTTPS, e.g. a
-// reverse proxy). The records bundle syncs it and the out-of-reach overlay
-// opens it. Plain HTTP never keeps one, and a password-protected controller
-// shows it only to a remembered sign-in.
-const OFFLINE_KEY = "obbwOfflineCopy";
-let offlineCopy = false,
-  offlineSyncAt = 0,
-  offlineSyncTimer = 0;
-function offlineCopyState() {
-  try {
-    const c = isSecureContext && JSON.parse(localStorage.getItem(OFFLINE_KEY) || "null");
-    return c && (!c.auth || localStorage.getItem(SESSION_KEY)) ? c : null;
-  } catch (_) {
-    return null;
-  }
+// With the controller off, an installed app reached through a paired
+// companion opens Shots and History read-only from the companion's archive
+// (records.js); the companion answers a browser it has seen signed in.
+let archiveView = false;
+// Removes the record copy that older versions kept in this browser.
+try {
+  localStorage.removeItem("obbwOfflineCopy");
+  indexedDB.deleteDatabase("obbw-records");
+} catch (_) {}
+// The out-of-reach overlay offers it once the companion answers now that its
+// archive is on and holds records (the last good answer that stands in for
+// a failed request does not count); `on` false withdraws the offer.
+function offerArchiveView(on) {
+  const b = $("webUiArchive"),
+    last = uiState.companionHere;
+  if (!b) return;
+  b.hidden = true;
+  if (on)
+    companionHere(true).then((c) => {
+      const a = c !== last && c?.paired && c.archive;
+      b.hidden =
+        !document.body.classList.contains("webUiInactive") ||
+        !(a?.on && a.available && (a.shotsTotal > 0 || a.historyTotal > 0));
+    });
 }
-function canKeepOfflineCopy() {
-  try {
-    return !!(
-      isSecureContext &&
-      navigator.serviceWorker?.controller &&
-      window.indexedDB &&
-      (!sessionToken() || localStorage.getItem(SESSION_KEY))
-    );
-  } catch (_) {
-    return false;
-  }
-}
-// The first copy also asks the browser not to evict it under storage pressure.
-function noteOfflineCopy() {
-  try {
-    if (!localStorage.getItem(OFFLINE_KEY)) navigator.storage?.persist?.().catch(() => {});
-    localStorage.setItem(OFFLINE_KEY, JSON.stringify({ at: Date.now(), auth: !!sessionToken() }));
-  } catch (_) {}
-}
-function dropOfflineCopy() {
-  try {
-    localStorage.removeItem(OFFLINE_KEY);
-    indexedDB.deleteDatabase("obbw-records");
-  } catch (_) {}
-}
-// Each page load checks the record index at most once a minute; a finished
-// activation checks again once its record has had time to commit.
-function syncOfflineCopy(delay) {
-  if (delay === undefined && Date.now() - offlineSyncAt < 6e4) return;
-  clearTimeout(offlineSyncTimer);
-  offlineSyncTimer = setTimeout(() => {
-    if (!canKeepOfflineCopy() || !webUiPollingActive() || sessionShotLive()) return;
-    offlineSyncAt = Date.now();
-    for (const v of ["stats", "history"])
-      ensureViewHook(v).then(
-        (m) => m?.syncOffline(),
-        () => {},
-      );
-  }, delay || 0);
-}
-function offerOfflineCopy(on) {
-  const b = $("webUiOffline");
-  if (b) b.hidden = !on;
-}
-function openOfflineCopy() {
-  offlineCopy = true;
-  document.body.classList.add("offlineCopy");
+function openArchiveView() {
+  archiveView = true;
+  document.body.classList.add("archiveView");
   hideInactiveOverlay();
   routeRendererHook(/^\/(stats|history)$/.test(location.pathname) ? location.pathname : "/stats");
 }
-// Offline, every page but Shots and History is out of reach again.
-function closeOfflinePage() {
-  if (networkReconnectWait) showInactiveOverlay();
-  else setOverlayOutOfReach();
-  offerOfflineCopy(!!offlineCopyState());
+// With the controller off, every page but Shots and History is out of reach again.
+function closeArchivePage() {
+  if (!networkReconnectWait) return setOverlayOutOfReach();
+  showInactiveOverlay();
+  offerArchiveView(true);
 }
-function offlineCopyNote() {
-  const at = offlineCopyState()?.at;
-  if (at)
-    message(
-      sub(__WEBUI_TEXT__("runtime.offline_copy_note"), [
-        new Date(at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
-      ]),
-    );
-}
+const archiveViewNote = () => message(__WEBUI_TEXT__("runtime.archive_view_note"));
 // After the first view paints, subscribe the standing Settings stream in the
 // background; compat mode has no Settings view. Stats and History subscribe
 // on their first visit (their module owns the subscription) and then stay
@@ -5790,7 +5744,6 @@ function offlineCopyNote() {
 function ensureBackgroundStreams() {
   if (!webUiPollingActive() || compatMode) return;
   ensureSettingsStream();
-  syncOfflineCopy();
 }
 // The installed-app class: an https page served by the paired companion.
 // Only such a page holds its claim across idle time; plain http, a browser
@@ -7374,10 +7327,9 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
 }
 export {
   SHELL_FW_VERSION,
-  offlineCopy,
-  offlineCopyNote,
-  noteOfflineCopy,
-  closeOfflinePage,
+  archiveView,
+  archiveViewNote,
+  closeArchivePage,
   pad2,
   randomHex,
   sleep,
@@ -7479,8 +7431,6 @@ export {
   setHeroTintMode,
   appSetting,
   setAppSetting,
-  dropOfflineCopy,
-  offlineCopyState,
   cycleTheme,
   populateTimezoneOptions,
   cardDismissed,

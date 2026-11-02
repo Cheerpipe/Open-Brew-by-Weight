@@ -175,12 +175,13 @@ async function renderRoute(pathname, focus) {
   });
   R.setActiveView(view, ready);
   try {
-    // Offline, the record pages show the saved copy; every other page is out of reach.
-    if (R.offlineCopy) {
+    // With the controller off, the record pages show the companion's archive;
+    // every other page is out of reach.
+    if (R.archiveView) {
       await ready;
       if (seq !== routeSeq) return;
       R.hideHomeBoot(boot);
-      return BUNDLES[view] ? (await ensureView(view)).showOffline() : R.closeOfflinePage();
+      return BUNDLES[view] ? (await ensureView(view)).showArchive() : R.closeArchivePage();
     }
     const [, ok] = await Promise.all([ready, startView(view)]);
     if (seq === routeSeq) settleView(ok, boot);

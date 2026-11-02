@@ -1,7 +1,7 @@
 // Exercise the production Stats sender with paced rows and observable store
 // captures. Session/page transitions must neither recopy immutable data nor
-// combine an old header with a new store generation. The record index for the
-// browser's offline copy shares the store copy, so it runs here too.
+// combine an old header with a new store generation. The companion link's
+// record index shares the store copy, so it runs here too.
 {
   const assert = require('assert').strict, {spawnSync} = require('child_process');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
@@ -330,23 +330,25 @@ int main(){
   for(int i=0;i<3;++i)assert(send(fresh));
   assert(frames.size()==3&&frames[0].find("\\"total\\":3,")!=std::string::npos);
   frames.clear();assert(send(fresh)&&frames.empty());
-  // The record index answers one store per dispatch: the epoch alone when
-  // the copy holds it, else [id, 24-bit revision] pairs newest first.
+  // The link's record index answers one store per dispatch: the epoch alone
+  // when the archive holds it, else [id, 24-bit revision] pairs newest first.
   {
-    auto index=[&](){return network.sendRecordsIndex(fresh,control);};
-    fresh.recordsShots=fresh.recordsHistory=true;fresh.recordsShotsEpoch=storeEpoch;
-    fresh.recordsHistoryEpoch=0;frames.clear();
-    assert(index()&&!fresh.recordsShots&&fresh.recordsHistory&&frames.size()==1);
-    assert(frames[0]==std::string("{\\"v\\":1,\\"type\\":\\"records\\",\\"boot\\":9,\\"store\\":\\"shots\\",\\"epoch\\":")+
-           std::to_string(storeEpoch)+"}");
-    assert(index()&&!fresh.recordsHistory&&frames.size()==2);
-    assert(frames[1].find("\\"store\\":\\"history\\",\\"epoch\\":77,\\"rows\\":[130,")!=std::string::npos);
+    OpenBrewByWeightNetwork::UiStreamSession link;network.linkSession=&link;
+    auto index=[&](){return network.sendRecordsIndex(link,control);};
+    link.recordsShots=link.recordsHistory=true;link.recordsShotsEpoch=storeEpoch;
+    link.recordsHistoryEpoch=0;frames.clear();
+    assert(index()&&!link.recordsShots&&link.recordsHistory&&frames.size()==1);
+    assert(frames[0].rfind(std::string("{\\"v\\":1,\\"type\\":\\"records\\",\\"boot\\":9,\\"store\\":\\"shots\\",\\"epoch\\":")+
+           std::to_string(storeEpoch)+",\\"gen\\":",0)==0&&frames[0].find("rows")==std::string::npos);
+    assert(index()&&!link.recordsHistory&&frames.size()==2);
+    assert(frames[1].find("\\"store\\":\\"history\\",\\"epoch\\":77,")!=std::string::npos&&
+           frames[1].find(",\\"rows\\":[130,")!=std::string::npos);
     assert(frames[1].find(",1,")!=std::string::npos&&frames[1].find(",0,")==std::string::npos);
     size_t pairs=0;for(char c:frames[1])pairs+=c==',';
-    assert(pairs==130*2-1+6);  // 5 header commas and the one before sum
+    assert(pairs==130*2-1+8);  // 7 header commas and the one before sum
     // A moved store lists every record; content (a rating) moves its revision.
     auto shotRows=[&](){
-      fresh.recordsShots=true;fresh.recordsShotsEpoch=0;frames.clear();assert(index());
+      link.recordsShots=true;link.recordsShotsEpoch=0;frames.clear();assert(index());
       const std::string f=frames[0];return f.substr(f.find("\\"rows\\":[")+8);
     };
     const std::string before=shotRows();
@@ -358,11 +360,9 @@ int main(){
     for(const auto &r:{before,after}){
       size_t at=0;for(int i=0;i<3;++i){at=r.find(',',at)+1;assert(std::stoul(r.substr(at))<=0xFFFFFFu);at=r.find(',',at)+1;}
     }
-    // A bad shot: left out of every page, the export and the offline index
-    // unless the filter asks for it; the good shots keep their order.
+    // A bad shot: left out of every page and the export unless the filter
+    // asks for it; the good shots keep their order.
     shots=4;++storeEpoch;
-    const std::string goodRows=shotRows();
-    assert(goodRows.rfind("3,",0)==0&&std::count(goodRows.begin(),goodRows.end(),',')==6);
     fresh.statsFilter={};fresh.statsSort=ShotLogSort::Date;fresh.statsDir=ShotLogSortDir::Desc;
     fresh.statsResync=true;frames.clear();
     for(int i=0;i<3;++i)assert(send(fresh));
@@ -375,7 +375,7 @@ int main(){
     page(ShotLogSort::Date,ShotLogSortDir::Desc,3,2,1,true);
     // The archive's link session: no standing page or header ever, every
     // shot in its index (the bad one too), fetches newest first by date.
-    OpenBrewByWeightNetwork::UiStreamSession link;network.linkSession=&link;frames.clear();
+    frames.clear();
     link.statsResync=true;assert(network.sendStatsStream(link,control)&&frames.empty());
     link.recordsShots=true;assert(network.sendRecordsIndex(link,control)&&frames.size()==1);
     const std::string all=frames[0].substr(frames[0].find("\\"rows\\":[")+8);
@@ -401,26 +401,24 @@ int main(){
     assert(newest().find("\\"id\\":4")!=std::string::npos);
     network.linkSession=nullptr;
     shots=3;
-    // Sessions without a companion key never make the delta work.
+    // A link session without a key never makes the delta work.
     assert(network.deltaAllocations==0);
   }
-  // Record index deltas: a companion's ui-stream session (good shots) and
-  // its link session (every shot) follow a randomized store through their
-  // own mirrors. Every answer must rebuild exactly the store's index and its
+  // Record index deltas: the link session follows a randomized store through
+  // its mirror. Every answer must rebuild exactly the store's index and its
   // sum; a new session key, a deferred send or a Clear never leaves a stale
   // or partial mirror; and most changes leave as deltas.
   {
     const uint32_t epochBefore=storeEpoch;  // the later blocks' weights scale with it
     network.callbacks_.copyShotStatsRecords=captureDelta;work.statsCache.valid=false;++storeEpoch;
     OpenBrewByWeightNetwork::UiStreamSession link;network.linkSession=&link;
-    OpenBrewByWeightNetwork::UiStreamSession *sessions[2]={&network.uiStreams_[0],&link};
     struct Mirror{std::vector<std::pair<uint32_t,uint32_t>> pairs;uint32_t epoch=0;bool known=false,fresh=false;};
-    Mirror mirrors[2];
+    Mirror m;
     uint32_t key=100,next=1,seed=12345;size_t deltas=0,wholes=0;
-    for(auto *s:sessions)s->recordsKey=++key;
+    link.recordsKey=++key;
     auto rnd=[&](uint32_t n){seed=seed*1103515245u+12345u;return (seed>>8)%n;};
-    auto ask=[&](int c){
-      auto &s=*sessions[c];Mirror &m=mirrors[c];
+    auto ask=[&](){
+      auto &s=link;
       s.recordsShots=true;s.recordsShotsEpoch=m.known?m.epoch:0;s.recordsShotsDelta=m.known;
       frames.clear();
       assert(network.sendRecordsIndex(s,control));
@@ -456,7 +454,6 @@ int main(){
       m.epoch=frameNumber(f,"epoch");m.known=true;
       std::vector<std::pair<uint32_t,uint32_t>> want;
       for(const auto &row:deltaStore){
-        if(c==0&&row.bad)continue;
         const ShotLogRecord r=deltaRecord(row);
         want.emplace_back(row.id,uiStreamRowHash(&r,sizeof(r))&0xFFFFFFu);
       }
@@ -475,26 +472,25 @@ int main(){
         deltaStore.clear();next=1;  // Clear history: ids start again
       }
       if(what<8)++storeEpoch;
-      const int c=rnd(2);
-      if(what==8){sessions[c]->recordsKey=++key;mirrors[c].fresh=true;}
+      if(what==8){link.recordsKey=++key;m.fresh=true;}
       if(what==9){sendResult=-1;uiStreamSendCleanAbort=true;}
-      ask(c);
-      if(what==9){sendResult=ESP_OK;uiStreamSendCleanAbort=false;ask(c);}
+      ask();
+      if(what==9){sendResult=ESP_OK;uiStreamSendCleanAbort=false;ask();}
     }
     assert(deltas>wholes&&wholes>2);
     // At 1000 shots, a new one rotating the oldest out costs a small delta
     // instead of the whole index.
     deltaStore.clear();
     for(uint32_t id=101000;id>100000;--id)deltaStore.push_back(DeltaRow{id,uint8_t(id%6),false});
-    mirrors[1]=Mirror{};++storeEpoch;ask(1);
+    m=Mirror{};++storeEpoch;ask();
     const size_t whole=frames.at(0).size();
     deltaStore.pop_back();deltaStore.insert(deltaStore.begin(),DeltaRow{101001,3,false});
-    ++storeEpoch;ask(1);
+    ++storeEpoch;ask();
     assert(whole>14000&&frameHas(frames.at(0),"up")&&frames[0].size()<200);
     // History keeps its own baseline, and each store's delta flag is its
     // own: the shots flag leaves history whole, then a new activation leaves
     // as one pair whose sum is the whole index's.
-    auto &h=*sessions[0];
+    auto &h=link;
     auto history=[&](uint32_t held,bool delta){
       h.recordsHistory=h.recordsShotsDelta=true;h.recordsHistoryEpoch=held;h.recordsHistoryDelta=delta;
       frames.clear();assert(network.sendRecordsIndex(h,control)&&frames.size()==1&&!h.recordsHistory);
@@ -510,10 +506,10 @@ int main(){
     // Without the memory, whole indexes keep the session working.
     network.deltaMemory=false;delete network.recordIndexWork_;network.recordIndexWork_=nullptr;
     deltaStore.pop_back();deltaStore.insert(deltaStore.begin(),DeltaRow{101002,1,false});
-    ++storeEpoch;ask(1);
+    ++storeEpoch;ask();
     assert(frameHas(frames.at(0),"rows"));
     network.deltaMemory=true;
-    for(auto *s:sessions)s->recordsKey=0;
+    link.recordsKey=0;
     network.linkSession=nullptr;deltaStore.clear();
     network.callbacks_.copyShotStatsRecords=capture;work.statsCache.valid=false;storeEpoch=epochBefore+1;
   }

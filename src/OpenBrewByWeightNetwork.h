@@ -494,12 +494,11 @@ class OpenBrewByWeightNetwork {
     size_t statsSent = 0;
     uint32_t statsPageEpoch = 0, statsPageRequest = 0, statsSentAtMs = 0;
     uint32_t statsRequest = 0, statsFetchRequest = 0;
-    // One-shot record index ("records" op) for the browser's offline copy:
-    // each pending store answers once, with rows only when its epoch moved
-    // from the one the copy holds.
-    // A companion session (relayed, or the link's) keys the baselines its
-    // index answers leave (RecordIndexWork; 0: no companion, no baseline),
-    // and a store's delta flag lets its next answer be a delta against them.
+    // One-shot record index (the companion link's `rx`): each pending store
+    // answers once, with rows only when its epoch moved from the one the
+    // archive holds. The link session keys the baselines its answers leave
+    // (RecordIndexWork; 0: no baseline), and a store's delta flag lets its
+    // next answer be a delta against them.
     bool recordsShots = false, recordsHistory = false;
     bool recordsShotsDelta = false, recordsHistoryDelta = false;
     uint32_t recordsShotsEpoch = 0, recordsHistoryEpoch = 0, recordsKey = 0;
@@ -535,12 +534,12 @@ class OpenBrewByWeightNetwork {
     uint32_t sentAtMs = 0;  // the last `rec`/`trc` frame; 0: none this boot
   };
   CompanionRecords *companionRecords_ = nullptr;
-  // Record index deltas (sendRecordsIndex, docs/INTEGRATION_API.md): per
-  // companion consumer (the two ui-stream slots, then the link) and store,
-  // the index its session last received, and the scratch the next answer is
-  // listed into. PSRAM, made by the first companion index answer, so a
-  // never-paired controller reserves nothing; only the work-buffer holder
-  // touches it, and a baseline counts only for the key that wrote it.
+  // Record index deltas (sendRecordsIndex, docs/COMPANION_LINK.md): per
+  // store, the index the link session last received, and the scratch the
+  // next answer is listed into. PSRAM, made by the first companion index
+  // answer, so a never-paired controller reserves nothing; only the
+  // work-buffer holder touches it, and a baseline counts only for the key
+  // that wrote it.
   struct RecordIndexBaseline {
     uint32_t key = 0, epoch = 0;
     uint16_t count = 0;
@@ -548,7 +547,7 @@ class OpenBrewByWeightNetwork {
   };
   static_assert(HISTORY_CAPACITY == SHOT_LOG_CAPACITY, "one baseline size fits both stores");
   struct RecordIndexWork {
-    RecordIndexBaseline baselines[3][2], scratch;
+    RecordIndexBaseline baselines[2], scratch;
   };
   RecordIndexWork *recordIndexWork_ = nullptr;
   RecordIndexWork *recordIndexWork();

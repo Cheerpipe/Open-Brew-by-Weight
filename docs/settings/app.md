@@ -27,11 +27,11 @@ Clearing the app's browser data returns them to their defaults, and a
 - **Shot card colors** chooses how the Home shot card uses color; see
   [Shot card colors](theme.md#shot-card-colors) for what each mode does.
 
-## Offline copy
+## Shots with the controller off
 
-An app installed over HTTPS (for example through the
-[companion](../features/companion.md)) can keep a copy of your shots so it
-opens Shots and History with the controller off. When such a copy exists, the
-**This app** group shows it with the date it was kept since, and **Delete the
-copy in this app** removes it. The copy comes back the next time you open
-Shots or History while the controller is on.
+The app keeps no copy of your shots on the device. Opened through the
+[companion](../features/companion.md#with-the-controller-off), it can show
+the shots and activations the companion keeps while the controller is off,
+as long as **Shot archive in the companion** is on in Admin → Companion.
+Copies that earlier versions of the app kept on the device are deleted the
+first time the new version opens.

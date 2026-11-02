@@ -1215,7 +1215,8 @@ once visible, without the out-of-reach notice. Neither close affects the
 closes the previous socket with code 4001. An op from the owning page that
 fails validation closes the stream with code 4003 and a Web UI log warning; the
 page clears its list filters and Stats window before it reconnects, so the
-rejected subscription is not repeated. The browser's bounded
+rejected subscription is not repeated. A `records` op, with which earlier pages
+asked for a record index, is ignored without an answer or a close. The browser's bounded
 `{"op":"activity","seconds":0-30,"hidden":bool}` message, answered with
 `{"type":"alive"}`, only fills gaps in the traffic the page already has: every
 received frame proves the socket and clears the liveness deadline, and every
@@ -1541,62 +1542,6 @@ refreshes its cached records only when the store epoch moves; sort, filter,
 and window changes reuse that snapshot, and the header is rebuilt when the
 store, the window, or the active preset changes. This preserves chronological
 CSV order after browsing by rating without repeated store captures per frame.
-
-### Record index for the offline copy
-
-A page opened over HTTPS (where its service worker can start it with the
-controller off) keeps every Stats row and History record in IndexedDB. To
-sync, it names the store epoch its copy holds (0 for none):
-
-```json
-{"op":"records","shots":1234567}
-{"op":"records","history":0}
-```
-
-The op needs no subscription and answers each named store once, one frame per
-dispatch: `v: 1`, `type: "records"`, `boot`, `store` (`"shots"` or
-`"history"`), and `epoch`. Only when that epoch differs from the one sent does
-the frame add `rows`, a flat array of `[id, revision]` pairs for every record
-(for shots, every good shot: the offline copy keeps no bad ones), newest
-first. The revision is the low 24 bits of a CRC over the
-stored record, so a rating change, or an id reused after a clear, reads as a
-different record. Store epochs survive restarts, so an unchanged store costs
-one small frame per sync; 1000 History pairs stay under the 20 KiB frame
-budget. The browser then fetches only the missing or changed records through
-the standing subscriptions' fetch windows (Stats: `sort: "date"`,
-`dir: "desc"`, `filter: {}`; History: `types: []`), drops records the index
-no longer lists, and keeps the new epoch only once every listed record is in
-its copy. It syncs after each view load (at most once a minute) and 30 s after
-the machine stops running, never during a live shot. Plain HTTP pages never
-send the op.
-
-Every frame that lists the index also carries `sum`, the CRC-32 (the zlib
-one, as Python's `zlib.crc32`) of the whole resulting index serialized as
-little-endian `u32 id, u32 revision` pairs in index order; an unchanged
-answer is the same frame as before, without `sum`. A companion's upstream
-session may add `"delta": true` (the only accepted value; it applies to the
-stores that op names until another op names them), and only once an answer
-in that same session carried `sum`, so a firmware without deltas never sees
-the field. The firmware keeps, per companion session and store, the
-index that session last received (its baseline, recorded once the frame
-actually left), and a `delta` request naming that baseline's epoch gets only
-the difference when it is smaller than the whole index:
-
-```json
-{"v":1,"type":"records","boot":42,"store":"shots","epoch":1239999,"base":1234567,"up":[1002,789],"del":[3],"sum":2864434397}
-```
-
-`base` is the epoch the delta applies to (the one the request named), `up`
-the `[id, revision]` pairs that are new or changed, and `del` the ids gone;
-`rows` is absent. The receiver drops `del`, upserts `up`, keeps the result
-newest first (ids descending) and must check it against `sum`; on a mismatch,
-or a `base` it does not hold, it asks again with epoch 0 and without `delta`,
-which always returns the whole index. Any other case (no baseline, another
-epoch, a new session or boot, no memory for baselines, or a delta not
-smaller) answers with the whole index, so `delta` is a hint, never a
-requirement. Browser sessions never get a baseline; the companion relays the
-whole `rows` frame to its screens.
-
 
 ## Linea Micra Web API
 

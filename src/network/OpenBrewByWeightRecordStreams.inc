@@ -438,18 +438,18 @@ OpenBrewByWeightNetwork::RecordIndexWork *OpenBrewByWeightNetwork::recordIndexWo
   return nullptr;
 }
 
-// One store per dispatch: its epoch and, when that moved from the browser's
-// copy, every record (every good one for shots, the only ones the offline
-// copy keeps) newest first as an id and a 24-bit revision (a CRC of
-// the packed record, so a rating change or an id reused after a clear reads
-// as changed). 1000 history pairs of at most 10+8 digits stay under the
-// frame budget. An epoch read ahead of a torn or newer copy only makes the
-// next request resend the index. Shots reuse the Stats cache's store copy,
+// The companion link's record index (`rx`), one store per dispatch: its
+// epoch and, when that moved from the archive's, every record (bad shots
+// included) newest first as an id and a 24-bit revision (a CRC of the packed
+// record, so a rating change or an id reused after a clear reads as
+// changed). 1000 history pairs of at most 10+8 digits stay under the frame
+// budget. An epoch read ahead of a torn or newer copy only makes the next
+// request resend the index. Shots reuse the Stats cache's store copy,
 // reloaded as sendStatsStream does, whose header and order then rebuild.
-// A listed index carries `sum`, the CRC-32 of its id/revision pairs. For a
-// companion session it also becomes that session's baseline once sent, and
-// an opted-in request holding the baseline's epoch gets only the difference
-// (`base`, `up`, `del`) when that is smaller.
+// A listed index carries `sum`, the CRC-32 of its id/revision pairs. It also
+// becomes the link session's baseline once sent, and an opted-in request
+// holding the baseline's epoch gets only the difference (`base`, `up`,
+// `del`) when that is smaller.
 __attribute__((optimize("Os")))
 bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
                                           const ControlStatusSnapshot &control) {
@@ -466,24 +466,19 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
     epoch = cache.snapshot.epoch;
     cache.curveHashes = {};
   }
-  // The companion archive's index lists every shot, bad ones included.
-  const bool link = companionRecordsSession(session);
-  size_t used = link ? COMPANION_RECORD_ORIGIN : 0;
-  // The link adds the header counters (S19), read before the rows: only a
-  // Clear or a factory reset makes nextRecordId (or generation) go back.
+  size_t used = COMPANION_RECORD_ORIGIN;
+  // The header counters (S19), read before the rows: only a Clear or a
+  // factory reset makes nextRecordId (or generation) go back.
   uint32_t generation = 0, next = 0;
-  if (link && callbacks_.recordStoreCounters) callbacks_.recordStoreCounters(shots, generation, next);
+  if (callbacks_.recordStoreCounters) callbacks_.recordStoreCounters(shots, generation, next);
   if (!statusJsonAppend(&used, "{\"v\":1,\"type\":\"records\",\"boot\":%lu,"
-                               "\"store\":\"%s\",\"epoch\":%lu",
+                               "\"store\":\"%s\",\"epoch\":%lu,\"gen\":%lu,\"next\":%lu",
                         static_cast<unsigned long>(control.bootId), shots ? "shots" : "history",
-                        static_cast<unsigned long>(epoch)) ||
-      (link && !statusJsonAppend(&used, ",\"gen\":%lu,\"next\":%lu",
-                                 static_cast<unsigned long>(generation),
-                                 static_cast<unsigned long>(next))))
+                        static_cast<unsigned long>(epoch), static_cast<unsigned long>(generation),
+                        static_cast<unsigned long>(next)))
     return false;
   RecordIndexWork *const work = rows && session.recordsKey ? recordIndexWork() : nullptr;
-  RecordIndexBaseline *const base =
-      work ? &work->baselines[link ? 2 : &session - uiStreams_][shots ? 0 : 1] : nullptr;
+  RecordIndexBaseline *const base = work ? &work->baselines[shots ? 0 : 1] : nullptr;
   RecordIndexBaseline *const list = work ? &work->scratch : nullptr;
   if (list != nullptr) list->count = 0;
   // Pairs leave newest first, which is id-descending in both stores; a list
@@ -508,9 +503,8 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
   const size_t head = used;
   if (rows && !statusJsonAppend(&used, ",\"rows\":[")) return false;
   if (rows && shots) {
-    for (size_t n = 0, listed = 0; n < cache.snapshot.count; ++n)
-      if ((link || shotLogRecordEligible(cache.snapshot.records[n])) &&
-          !pair(listed++, cache.snapshot.records[n].id, &cache.snapshot.records[n],
+    for (size_t n = 0; n < cache.snapshot.count; ++n)
+      if (!pair(n, cache.snapshot.records[n].id, &cache.snapshot.records[n],
                 sizeof(ShotLogRecord)))
         return false;
   } else if (rows && callbacks_.copyHistoryPage) {

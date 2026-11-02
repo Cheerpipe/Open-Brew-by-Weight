@@ -13,7 +13,8 @@ does today.
 ## What it does today
 
 - **Opens the Web UI over HTTPS** with a trusted certificate, so your phone
-  can install it as an app and keep an offline copy of your shots. This is
+  can install it as an app. With the machine off, Shots and History stay
+  available from the companion. This is
   what the companion did when it was called the HTTPS gateway.
 - **Lets several screens use the Web UI at once.** Once paired, your phone,
   your tablet and your computer can each keep the Web UI open through the
@@ -43,8 +44,8 @@ does today.
   companion** switch on, the companion copies each shot and activation,
   including the ones made while it was away, and keeps them after the
   controller lets them go. Opened through the companion, Stats and History
-  show your whole history. See [Your whole history](#your-whole-history)
-  below.
+  show your whole history, even with the controller off. See
+  [Your whole history](#your-whole-history) below.
 
 If the companion stops, the controller reconnects to La Marzocco on its own.
 During a shot with a scale it waits until the shot is over, so nothing
@@ -155,8 +156,10 @@ has one switch per job:
 - **Shot archive in the companion** (on by default).
   - **On:** the companion copies every shot and activation and keeps them
     when the controller no longer does. Stats and History opened through the
-    companion show them all.
+    companion show them all, and the app installed through it can show your
+    shots and activations while the controller is off.
   - **Off:** the companion stops copying and keeps what it already has.
+    With the controller off, the app offers no shots.
 
 Save and Revert work like the rest of Admin.
 
@@ -268,6 +271,24 @@ everything. Each asks first and suggests exporting before you delete.
 
 The archive opens only for a browser the controller lets open the Web UI, as
 the log's history does, and never over plain HTTP.
+
+### With the controller off
+
+With the machine switched off, the app installed through the companion still
+opens. Next to **Reload**, the screen that says the controller is out of
+reach offers **Browse shots and activations** while **Shot archive in the
+companion** is on (Admin → Companion) and the companion holds records; with
+the switch off it offers nothing. The button opens **Shots** and **History**
+read-only, with every record the companion keeps and the averages over your
+whole history. Filters, sorting, rating, exporting, traces and
+deleting come back with the controller: open **Home** and press **Reload**.
+
+If the Web UI asks for a password, this works on a phone or computer that
+signed in through the companion while the controller was on; the companion
+remembers that sign-in and never asks for a password itself. A device it has
+not seen signed in is told to sign in once with the controller on. With the
+password off, every device can look. When your phone reaches neither the
+companion nor the controller, the app has nothing to show until one is back.
 
 ## Forgetting a companion
 

@@ -230,7 +230,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 | `{"t":"log","b":42,"e":[[seq,atMs,wallSec,lvl,cat,"message"],…]}` | Diagnostic log events (below), the formatted text the Web UI log view renders, `lvl` one of `c/e/w/i/d` |
 | `{"t":"rs","sh":E1,"hi":E2}` | The shot and activation store epochs, when either moved since the companion last learned them ([archive sync](#archive-sync)) |
-| `{"t":"rec","f":{…}}` | A record answer: `f` is a ui-stream `records`, `history` or `stats` frame ([archive sync](#archive-sync)) |
+| `{"t":"rec","f":{…}}` | A record answer: `f` is a record index (`records`) or a ui-stream `history` or `stats` frame ([archive sync](#archive-sync)) |
 | `{"t":"trc","id":12,"b":43,"e":918204,"r":"ok","d":"…"}` | One shot's trace, or why there is none ([archive sync](#archive-sync)) |
 
 After `ready` the controller sends `dev`, `cfg`, `route` and `hold` with their
@@ -364,28 +364,48 @@ companion infers ratings, deletions and restarted histories from the index.
   frame was scheduled still stops it: the controller checks again just
   before sealing, and drops a queued `log`, `rs` or ping answer (rewinding
   the log cursor), sending it after the hold.
-- **`rec` answers.** `f` is the ui-stream frame byte for byte, as the
-  [Integration API](INTEGRATION_API.md#record-index-for-the-offline-copy)
-  documents it, with four differences: the index lists every shot, bad ones
-  included, and always carries `gen` and `next`, the store header's write
-  counter and next record id (both only grow; `next` returns to 1 on Clear
-  history, both on a factory reset, so a decrease tells the companion its
-  history restarted); fetch windows are newest first by date and unfiltered (every
-  shot with `badReason`, every activation type); and Stats pages carry no
-  `stats` header member. A Stats page's first frame carries `good`, as for the
-  browser. History and index frames reach about 21 KiB, which is why record
-  answers may exceed 4,096 bytes.
-- **Index deltas.** A listed index carries `sum`, and the companion sends
-  `d:1` only after an index answer in the same link session carried it, so a
-  controller without deltas never sees `d`. With `d`, an `rx` whose `ep` is
-  the epoch this link session last received for that store gets `base`, `up`
-  and `del` instead of `rows` whenever that is smaller, as the
-  [Integration API](INTEGRATION_API.md#record-index-for-the-offline-copy)
-  describes; `gen` and `next` stay. The companion applies it to its own copy
-  of that index (kept in memory, never on disk), checks `sum`, and on any
-  mismatch asks `ep` 0 without `d`, which returns the whole index. A new link
-  session, a controller restart or a companion restart starts again from a
-  whole index.
+- **`rec` answers.** `f` is a ui-stream frame byte for byte: a Stats or
+  History page as the [Integration API](INTEGRATION_API.md) documents it, or
+  the record index below. Fetch windows are newest first by date and
+  unfiltered (every shot with `badReason`, every activation type), and Stats
+  pages carry no `stats` header member. A Stats page's first frame carries
+  `good`, as for the browser. History and index frames reach about 21 KiB,
+  which is why record answers may exceed 4,096 bytes.
+- **Record index.** An `rx` answers one frame: `v: 1`, `type: "records"`,
+  `boot`, `store` (`"shots"` or `"history"`), `epoch`, and `gen` and `next`,
+  the store header's write counter and next record id (both only grow;
+  `next` returns to 1 on Clear history, both on a factory reset, so a
+  decrease tells the companion its history restarted). Only when `epoch`
+  differs from the `ep` asked does the frame add `rows`, a flat array of
+  `[id, revision]` pairs for every record, bad shots included, newest first
+  (ids descending). The revision is the low 24 bits of a CRC over the stored
+  record, so a rating change, or an id reused after a clear, reads as a
+  different record. Store epochs survive restarts, so an unchanged store
+  costs one small frame; 1000 History pairs stay under the 20 KiB frame
+  budget. Every frame that lists the index also carries `sum`, the CRC-32
+  (the zlib one, as Python's `zlib.crc32`) of the whole resulting index
+  serialized as little-endian `u32 id, u32 revision` pairs in index order;
+  an unchanged answer carries neither `rows` nor `sum`.
+- **Index deltas.** The companion sends `d:1` only after an index answer in
+  the same link session carried `sum`, so a controller without deltas never
+  sees `d`. The controller keeps, per store, the index this link session last
+  received (its baseline, recorded once the frame actually left, in PSRAM).
+  With `d`, an `rx` whose `ep` is that baseline's epoch gets the difference
+  instead of `rows` whenever that is smaller than the whole index:
+
+  ```json
+  {"v":1,"type":"records","boot":42,"store":"shots","epoch":1239999,"gen":7,"next":1003,"base":1234567,"up":[1002,789],"del":[3],"sum":2864434397}
+  ```
+
+  `base` is the epoch the delta applies to (the `ep` asked), `up` the
+  `[id, revision]` pairs that are new or changed, and `del` the ids gone.
+  The companion applies it to its own copy of that index (kept in memory,
+  never on disk): it drops `del`, upserts `up`, keeps the result newest
+  first, checks `sum`, and on any mismatch, or a `base` it does not hold,
+  asks `ep` 0 without `d`, which returns the whole index. Any other case (no
+  baseline, another epoch, a new link session, a controller or companion
+  restart, no memory for baselines, or a delta not smaller) answers with the
+  whole index, so `d` is a hint, never a requirement.
 - **`trc` answers.** `r` is `ok` (with `d`, the trace section the
   [trace route](INTEGRATION_API.md#get-apiv1diagnosticshot-trace) sends, base64),
   `none` (no summary with that identity, no trace, or the record was

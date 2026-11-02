@@ -107,6 +107,14 @@
   assert(rejected.includes('if (bindRejected || owner) sendUiStreamClose(request->handle, session->fd, ' +
       'bindRejected ? kUiStreamCloseTakeover : kUiStreamCloseRejected);'),
       'a rejected bind must close with 4001 so the page deactivates; a rejected owner op with 4003');
+  // A `records` op from an older cached page is accepted and ignored, never
+  // closed: mixed versions cannot loop on 4003, and no session asks for a
+  // record index any more.
+  assert(uiStreamSrc.replace(/\s+/g, ' ').includes('} else if (cJSON_IsString(op) && session->bound && ' +
+      'strcmp(op->valuestring, "records") == 0) { // Older pages asked for a record index here: the request is ' +
+      '// ignored, never closed, so mixed versions cannot loop on 4003. accepted = true; }') &&
+      !uiStreamSrc.includes('sendRecordsIndex') && !uiStreamSrc.includes('recordsKey'),
+      'a stray records op must be ignored without a 4003 close or an index answer');
   // The rejection reaches the Web UI log as a warning (" failed" sets the level).
   assert(uiStreamSrc.includes('owner = session->bound && strcmp(session->clientId, self.activeWebUiClientId_) == 0;') &&
       uiStreamSrc.includes('"UI stream op %.12s failed validation; the page resets its list views"'));

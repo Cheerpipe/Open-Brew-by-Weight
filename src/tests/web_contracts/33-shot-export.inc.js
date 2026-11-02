@@ -517,9 +517,27 @@
     [viewJs.diagnostic, 'async function loadShotStorage(']])
     assert.ok(codeIncludes(blockAt(source, marker), 'R.shotRunning()') &&
         blockAt(source, marker).includes('The controller is busy right now. Try again in a moment.'));
-  // The offline copy keeps rows only and pauses while a shot runs.
-  assert.ok(codeIncludes(blockAt(viewJs.records, 'async function syncOfflineStore('),
-      'k < offsets.length && R.webUiPollingActive() && !R.shotRunning();'));
+  // With the controller off, Shots and History list the companion's archive
+  // alone (every copied row, unfiltered), offered only while its archive is
+  // on and holds records (Shot archive in the companion on, in the overlay
+  // and in the list, which the companion also refuses with it off); a refused
+  // browser is told to sign in. No browser keeps records: an earlier page's
+  // copy is deleted on load, and no page asks for an index.
+  assert.ok(codeIncludes(blockAt(viewJs.records, 'function archiveReady('),
+      'a[R.archiveView ? store + "Total" : store] > 0') &&
+      codeIncludes(blockAt(viewJs.records, 'function archiveReady('), '(!R.archiveView || a.on) &&'));
+  assert.ok(codeIncludes(blockAt(viewJs.records, 'function archiveSource('),
+      'if (R.archiveView) query = { ...query, all: 1 };'));
+  assert.ok(codeIncludes(blockAt(rawViewJs.records, 'async function loadArchive('),
+      'if (e.error === "AUTH_REQUIRED") { s.done = true; R.message(__WEBUI_TEXT__("records.archive_sign_in"), "error");'));
+  assert.ok(codeIncludes(blockAt(runtimeJs, 'function offerArchiveView('),
+      '!(a?.on && a.available && (a.shotsTotal > 0 || a.historyTotal > 0))'));
+  assert.ok(codeIncludes(viewJs.stats, 'shotFilterReset(); applyShotPage({ bootId: R.bootId, total: 0, hasMore: false, shots: [] }, "replace"); refreshMergedHeader();'));
+  assert.ok(codeIncludes(viewJs.history, 'historyFilterReset(); applyHistoryPage({ bootId: R.bootId, total: 0, hasMore: false, history: [] }, "replace");'));
+  assert.ok(codeIncludes(runtimeJs, 'try { localStorage.removeItem("obbwOfflineCopy"); indexedDB.deleteDatabase("obbw-records"); } catch (_) {}'));
+  for (const source of [runtimeJs, appJsSource, ...Object.values(viewJs)])
+    assert.ok(!source.includes('indexedDB.open') && !codeIncludes(source, 'op: "records"') &&
+        !source.includes('registerStream("records"') && !codeIncludes(source, 'offlineCopy,'));
   assert.ok(!viewJs.records.includes('shot-trace') && !viewJs.records.includes('decodeShotTrace'));
   // Immutable records may come from the browser cache; the vocabulary is
   // asked once per firmware identity (a firmware-only update changes it),
