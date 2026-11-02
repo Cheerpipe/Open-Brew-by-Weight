@@ -136,9 +136,12 @@ that used it keeps it until you next choose **Save La Marzocco settings**,
 which switches it to live updates.
 
 Both wait for station Wi-Fi, a synchronized clock and a closed setup access
-point. Once open, the live connection stays subscribed through shots and while
-the controller finds and connects to a scale, so La Marzocco updates keep
-arriving during a shot. If monitoring needs a new connection during a shot
+point. Once open, the live connection stays open through shots and while the
+controller finds and connects to a scale. During a shot with a connected
+scale, it goes quiet so the scale has the radio to itself: La Marzocco updates
+pause from the start of the shot until the pump stops, then resume at once, and
+the machine's state arrives within a few seconds. Shots without a scale keep
+receiving updates throughout. If monitoring needs a new connection during a shot
 with a scale or while a scale connects, it waits until that activity and the
 scale's communication pause have ended. Wi-Fi and the local Web UI remain
 available.

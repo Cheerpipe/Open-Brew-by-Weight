@@ -1076,9 +1076,14 @@ dashboard read.
 All API purposes, including sign-in and manual requests, remain deferred during
 scale acquisition/setup/quiet and shots with a connected scale; active requests
 cancel through the owner. Unscaled shots keep API observation and WSS active.
-An established WSS subscription stays subscribed through connected-scale shots
-and scale acquisition/setup/quiet: no UNSUBSCRIBE is sent and no dashboard read
-follows, because pushes keep arriving. Rinse classification or scale loss
+An established WSS subscription parks for a connected-scale shot
+(`shotTransportPaused()`, shot start to relay open): the owner sends
+UNSUBSCRIBE on the open socket, raises the WebSocket ping interval to an hour,
+skips token renewal and the pong frame timeout, and drops pushes already in
+flight. When the relay opens it sends SUBSCRIBE at once and restores the 15 s
+ping with a fresh liveness baseline; no dashboard read follows, since the
+cloud sends the machine's state within seconds of a shot. Scale
+acquisition/setup/quiet keep the subscription. Rinse classification or scale loss
 clears the shot transport pause for HTTP. Wake and
 backflush gestures keep both transports available regardless of scale presence.
 New WSS setup and reconnection wait for the shot and scale gates. A due access

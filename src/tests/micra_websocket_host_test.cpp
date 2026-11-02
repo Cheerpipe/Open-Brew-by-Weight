@@ -80,6 +80,7 @@ static bool initFails = false, startFails = false;
 static bool sessionFails = false, inhibitAfterSession = false, inhibitAfterInit = false;
 static uint32_t stopDelayMs = 2, sessionDelayMs = 0, startDelayMs = 0;
 static unsigned initCalls = 0, startCalls = 0;
+static int pingInterval = 0;
 constexpr int ESP_OK = 0;
 constexpr int WEBSOCKET_EVENT_ANY = 0, WEBSOCKET_EVENT_CONNECTED = 1;
 constexpr int WEBSOCKET_EVENT_DATA = 2, WEBSOCKET_EVENT_ERROR = 3, WEBSOCKET_EVENT_DISCONNECTED = 4;
@@ -111,8 +112,14 @@ void *esp_websocket_client_init(const esp_websocket_client_config_t *config) {
   assert(config->task_core_id == 0 && config->task_prio == 1 && config->buffer_size == 4096);
   assert(config->network_timeout_ms == 10000);
   ++initCalls;
+  pingInterval = config->ping_interval_sec;
   if (inhibitAfterInit) openbrewbyweight::outboundBleQuiet.store(true);
   return initFails ? nullptr : reinterpret_cast<void *>(1);
+}
+int esp_websocket_client_set_ping_interval_sec(void *, size_t seconds) {
+  assert(!locked && !callback);
+  pingInterval = static_cast<int>(seconds);
+  return ESP_OK;
 }
 int esp_websocket_register_events(void *, int, Handler, void *) { assert(!locked); return ESP_OK; }
 int esp_websocket_unregister_events(void *, int, Handler) { assert(!locked && !callback); return ESP_OK; }
@@ -660,21 +667,34 @@ struct MicraWebSocketTest {
     assert(service.observationFence_.epoch == epoch);
     assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
     assert(!service.status().shotPaused && !service.abortRequested_.load());
-    // A live scale keeps the subscription through the shot: pushes stay
-    // evidence, and nothing is resent or re-read afterwards.
+    // A live scale parks the subscription from the shot's start until its
+    // relay opens: an UNSUBSCRIBE, pings stopped, socket and fence kept, no
+    // frame timeout; a push still in flight is dropped without failing.
+    assert(pingInterval == 15);
     outboundScaleConnected.store(true);
     service.serviceWebSocket();
+    assert(transmitted.rfind("UNSUBSCRIBE\nid:", 0) == 0 && pingInterval == 3600);
     assert(stops == stopsBeforeShot && service.websocketStatus().subscribed);
-    const auto sentBeforeShot = transmitted;
     deliver(service, observation(service, off));
     assert(!service.websocket_->failed.load() && service.status().shotPaused);
-    assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
-    assert(service.published_.powerState == LineaMicraPowerState::OFF);
-    outboundScaleConnected.store(false);
+    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    now += 40000;
+    service.serviceWebSocket();
+    assert(stops == stopsBeforeShot && service.websocket_->parked.load());
+    // The relay opens with the scale still connected: SUBSCRIBE and pings
+    // resume at once, nothing is re-read, and liveness counts from now.
     service.shotActive_.store(false);
     outboundShotActive.store(false);
     service.serviceWebSocket();
-    assert(stops == stopsBeforeShot && transmitted == sentBeforeShot);
+    assert(transmitted.rfind("SUBSCRIBE\ndestination:", 0) == 0 && pingInterval == 15);
+    assert(!service.websocket_->parked.load() && !service.snapshotPending_);
+    assert(stops == stopsBeforeShot && service.observationFence_.epoch == epoch);
+    deliver(service, observation(service, off));
+    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    now += 20000;
+    service.serviceWebSocket();
+    assert(stops == stopsBeforeShot);
+    const auto sentBeforeShot = transmitted;
     // A whole shot elapsing between owner turns needs no resync either.
     outboundScaleConnected.store(true);
     outboundShotActive.store(true);

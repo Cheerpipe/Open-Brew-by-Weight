@@ -59,6 +59,11 @@ exported JSON formats are not carried over.
   shows how up to date the copy is. Update the controller and the companion
   together: until both are updated their link waits, while the Web UI (and
   firmware updates) still open through the companion.
+- **Quiet La Marzocco connection during scaled shots:** when the controller
+  follows the Linea Micra itself over the live connection, a shot with a
+  connected scale pauses La Marzocco updates from its start until the pump
+  stops, so the scale has the radio to itself. The connection stays open and
+  updates resume the moment the pump stops.
 
 ## 1.1.0 — 2026-10-26
 

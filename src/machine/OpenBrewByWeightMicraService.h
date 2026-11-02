@@ -137,7 +137,7 @@ class OpenBrewByWeightMicraService {
     return shotTransportPaused() || scaleConnecting_.load(std::memory_order_acquire) ||
         outboundScaleInhibited();
   }
-  bool sendSubscription();
+  bool sendSubscription(bool on = true);
   void applyPushLocked(const MicraObservation &update, uint32_t ingressAttempt);
   bool mergeReadLocked(const MicraObservation &update);
   void serviceWebSocket();

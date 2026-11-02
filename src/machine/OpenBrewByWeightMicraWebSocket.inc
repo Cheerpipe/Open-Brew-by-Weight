@@ -1,4 +1,7 @@
 // Included inside the facade's namespace after its session buffer definition.
+// The IDF client cannot switch pings off (0 means its default), so a parked
+// subscription pings once an hour: never within a shot.
+constexpr size_t kPingSec = 15, kParkedPingSec = 3600;
 struct OpenBrewByWeightMicraService::WebSocketBuffer {
   MicraStompDecoder decoder;
   MicraObservationStamp stamp;
@@ -14,6 +17,7 @@ struct OpenBrewByWeightMicraService::WebSocketBuffer {
   std::atomic<bool> authFailed{false};
   std::atomic<uint32_t> partialAtMs{0};
   std::atomic<bool> partialPending{false};
+  std::atomic<bool> parked{false};  // UNSUBSCRIBEd for a scaled shot, socket kept
   uint32_t setupAtMs = 0, renewRetryAtMs = 0;
   uint32_t frameIntent = 0;
   int payloadOffset = 0;
@@ -129,14 +133,17 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
   }
 }
 
-// One SUBSCRIBE per connection, kept through shots and scale setup: the broker
-// pushes only changes, so the subscription queues one initial dashboard read.
-bool OpenBrewByWeightMicraService::sendSubscription() {
+// One SUBSCRIBE per connection: the broker pushes only changes, so the first
+// queues one initial dashboard read. A scaled shot parks it (`on` false: an
+// UNSUBSCRIBE, socket kept) until the relay opens; that resumed SUBSCRIBE
+// reads nothing, since the cloud sends the machine's state seconds after a shot.
+bool OpenBrewByWeightMicraService::sendSubscription(bool on) {
   WebSocketBuffer &buffer = *websocket_;
   char frame[256];
-  const int length = snprintf(frame, sizeof(frame),
+  const int length = on ? snprintf(frame, sizeof(frame),
       "SUBSCRIBE\ndestination:%s\nack:auto\nid:%s\ncontent-length:0\n\n",
-      buffer.destination, buffer.subscription);
+      buffer.destination, buffer.subscription)
+      : snprintf(frame, sizeof(frame), "UNSUBSCRIBE\nid:%s\n\n", buffer.subscription);
   if (length < 0 || static_cast<size_t>(length + 1) >= sizeof(frame)) return false;
   const int sent = esp_websocket_client_send_text(buffer.client, frame, length + 1,
                                                   pdMS_TO_TICKS(1000));
@@ -149,6 +156,11 @@ bool OpenBrewByWeightMicraService::sendSubscription() {
   if (bin.second != second) bin = {second, 0, 0};
   bin.tx += std::max(0, sent);
   if (sent != length + 1) return false;
+  if (status.subscribed) {  // Park or resume: liveness counts from now.
+    buffer.parked.store(!on, std::memory_order_release);
+    status.pongAtMs = millis();
+    return true;
+  }
   if (!admitted || buffer.stamp.epoch != observationFence_.epoch ||
       buffer.stamp.identity != identityGeneration_) return true;
   backflush_.invalidate();
@@ -192,6 +204,8 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   if (strcmp(frame.command, "MESSAGE") != 0) return false;
   if (strcmp(frame.destination, buffer.destination) != 0 ||
       strcmp(frame.subscription, buffer.subscription) != 0) return false;
+  // A push already in flight when a scaled shot parked the subscription.
+  if (buffer.parked.load(std::memory_order_acquire)) return true;
   if (!subscribed) return false;
   // JSON cannot contain an embedded raw NUL, even with STOMP content-length.
   if (memchr(frame.body, '\0', frame.bodyLength)) return false;
@@ -449,16 +463,26 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
       obsolete = websocket_->stamp.epoch != observationFence_.epoch;
     }
     now = millis();  // Callback timestamps in the snapshot can postdate the first sample.
+    const bool parked = websocket_->parked.load(std::memory_order_acquire);
     // The STOMP handshake gets 10 s from transport connect; before that the
     // SDK's own 10 s network timeout plus DNS bounds the connect itself.
     const bool timeout = (!subscribed && (connectedAtMs
         ? now - connectedAtMs >= 10000 : now - websocket_->setupAtMs >= 25000)) ||
         (partialPending && now - partial >= 10000) ||
-        (subscribed && now - (pongAtMs ? pongAtMs : connectedAtMs) >= 30000);
+        (subscribed && !parked && now - (pongAtMs ? pongAtMs : connectedAtMs) >= 30000);
     if (!websocket_->failed.load(std::memory_order_acquire) && !timeout && !obsolete) {
+      // From a scaled shot's start until its relay opens the radio is the
+      // scale's: the subscription parks and pings stop, the socket stays, and
+      // both resume at once so the cloud's post-shot state frame lands.
+      const bool park = shotTransportPaused();
+      if (subscribed && park != parked) {
+        (void)esp_websocket_client_set_ping_interval_sec(websocket_->client,
+                                                         park ? kParkedPingSec : kPingSec);
+        if (!sendSubscription(!park)) websocket_->failed.store(true, std::memory_order_release);
+      }
       // The open subscription survives token renewal: only HTTPS needs the new
       // token, so renew in place instead of reconnecting and re-reading.
-      if (work_ && micra_timing::accessTokenRefreshDue(now - work_->accessTokenIssuedAtMs) &&
+      if (!park && work_ && micra_timing::accessTokenRefreshDue(now - work_->accessTokenIssuedAtMs) &&
           micra_timing::deadlineReached(now, websocket_->renewRetryAtMs) &&
           !ensureSession(settings, false))
         websocket_->renewRetryAtMs = millis() + micra_timing::kExhaustedCooldownMs;
@@ -558,6 +582,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
   auto &buffer = *websocket_;
   buffer.failed.store(false);
   buffer.authFailed.store(false);
+  buffer.parked.store(false);
   buffer.setupAtMs = millis();
   {
     TaskLockGuard lock(mux_);
@@ -587,7 +612,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
   config.task_core_id_set = true;
   config.task_core_id = 0;
   config.network_timeout_ms = 10000;  // SDK default; includes the initial TLS handshake.
-  config.ping_interval_sec = 15;
+  config.ping_interval_sec = kPingSec;
   config.pingpong_timeout_sec = 30;
   const auto before = sampleHeapCaps();
   recordBootHeap(BootHeapStage::WS_START, BootHeapResult::OK, millis(), before);
