@@ -20176,6 +20176,30 @@ void tr05_light_cup_pre_effect_packet_is_not_a_baseline() {
   CHECK(session.firstDropMs != 0);
 }
 
+void tr06_combined_start_tare_opens_grace_at_completion() {
+  // Field shot: the combined tare_start result reached control unstamped, so
+  // grace had already expired; the scale's own zero of the untared cup then
+  // read as a lift and stopped the shot 0.5 s in.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  hostMillis += 60000U;
+  idleCup(37.7f);
+  startCycle();
+  CHECK(executeNextScaleCommand());
+  CHECK(scale.tareStartTimerCalls == 1);
+  CHECK(session.postTareBaselineDeadlineMs ==
+        hostMillis + session.config.postTareBaselineGraceMs);
+  for (float w : {37.7f, 0.0f, 0.0f}) {
+    runLoopAfter(100);
+    publishWeight(w);
+  }
+  runLoopAfter(1);
+  CHECK(!session.awaitingPostTareBaseline);
+  CHECK(session.softwareZeroG == 0.0f);
+  CHECK(!debugEventExists(DebugCode::CUP_REMOVED_CONFIRMED));
+  CHECK(stopperState == StopperState::BREW);
+}
+
 // A 250 g cup sits untared on the scale when the shot starts and the start
 // tare, though acknowledged, has no effect; grace then expires with the cup
 // still on the scale.
@@ -25334,6 +25358,7 @@ const TestCase testCases[] = {
     {"TR03", tr03_failed_start_tare_cup_lift_stops},
     {"TR04", tr04_light_cup_pre_effect_packet_recovers},
     {"TR05", tr05_light_cup_pre_effect_packet_is_not_a_baseline},
+    {"TR06", tr06_combined_start_tare_opens_grace_at_completion},
     {"SK01", sk01_refused_start_releases_cup_hold},
     {"SK02", sk02_overload_stops_while_touch_is_held},
     {"SK03", sk03_late_zero_after_grace_releases_cup_hold},

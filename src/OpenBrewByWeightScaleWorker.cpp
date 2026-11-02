@@ -1168,6 +1168,7 @@ void executeScaleStartCommand(const ScaleCommand &command) {
   }
 
   updateWorkerLinkState();
+  event.receivedAtMs = millis();
   if (event.tareAttempted) {
     scaleProfileNoteEvent(
         event.tareSucceeded ? ScaleProfileEvent::TARE_WRITE_OK
