@@ -26,7 +26,7 @@
     window: {addEventListener: (name, fn) => {events[name] = fn;}},
   });
   const regionEnd = runtimeJs.slice(start).search(/\nlet\s+homeBootDone\s*=/);
-  vm.runInContext(runtimeStateDecl + runtimeJs.slice(start, regionEnd < 0 ? undefined : regionEnd + start).replace(/^export /gm, ''), context);
+  vm.runInContext(runtimeStateDecl + runtimeJs.match(/const sub\s*=[^;]+;/)[0] + runtimeJs.slice(start, regionEnd < 0 ? undefined : regionEnd + start).replace(/^export /gm, ''), context);
   for (const [signal, level] of [[1, '1'], [2, '2'], [3, '3'], [null, 'unknown'], [NaN, 'unknown'], [Infinity, 'unknown'], [-1, 'unknown'], [0, 'unknown'], [4, 'unknown'], [1.5, 'unknown'], ['3', 'unknown']]) {
     context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: signal, bluetoothConnected: true, bluetoothLevel: signal}});
     for (const kind of ['wifi', 'bluetooth']) assert.equal(elements[kind + 'Signal'].dataset.level, level, String(signal));
@@ -156,6 +156,9 @@
   assert.equal(buttons[1].dataset.batt, 'empty');
   assert.equal(fill.attrs.height, '1.20', 'An empty cell keeps a visible sliver');
   assert.equal(elements.bluetoothBattery.textContent, '0% · almost empty');
+  context.updateHeaderSignals({connections: {bluetoothConnected: true, bluetoothLevel: 3}});
+  assert.equal(buttons[1].dataset.batt, 'empty', 'An envelope without a scale model (Admin) keeps the cell');
+  assert.equal(buttons[1].attributes['aria-label'], 'Bluetooth: Strong · battery 0% · almost empty');
   for (const hidden of [() => battery(null), () => battery(40, {snapshotStale: true}),
       () => context.updateHeaderSignals({scale: {available: false, batteryPct: 40}, connections: {bluetoothLevel: 3}})]) {
     battery(40);
@@ -186,9 +189,12 @@
   context.updateHeaderSignals({connections: {bluetoothConnected: false, bluetoothName: 'Old scale', bluetoothLevel: 3}});
   assert.equal(elements.bluetoothName.textContent, 'None');
   assert.equal(elements.bluetoothDetail.textContent, 'Scale disconnected', 'Open popup refreshes on disconnect');
-  events.keydown({key: 'Escape'});
+  let prevented = 0;
+  events.keydown({key: 'Escape', preventDefault: () => ++prevented});
   assert.equal(elements.bluetoothDetails.hidden, true);
   assert.equal(buttons[1].focused, true, 'Escape returns focus to the trigger');
+  events.keydown({key: 'Escape', preventDefault: () => ++prevented});
+  assert.equal(prevented, 1, 'Only an Escape that closed a popover is consumed, so the live view stays open');
   buttons[0].click();buttons[0].click();
   assert.equal(elements.wifiDetails.hidden, true, 'Repeated tap closes the popup');
   buttons[0].click();events.click({target: {closest: () => null}});

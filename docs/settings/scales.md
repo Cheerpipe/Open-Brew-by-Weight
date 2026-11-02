@@ -112,8 +112,9 @@ in a few places:
 
 A charge reading can wobble by a point or two. The controller shows a drop
 right away but waits for a rise of at least 3 points, for example after
-charging, so the notices never flicker. The log on **Diagnostic** records the
-first reading after each connection and every further drop of 5 points.
+charging, so the notices never flicker. With **Diagnostic → Log → Ring log
+level** set to **Info** or **Debug**, the log records the first reading after
+each connection and every further drop of 5 points.
 
 The battery is only shown, never used: it does not change how shots start,
 stop, or tare. Scales that do not report a battery, including Acaia scales on

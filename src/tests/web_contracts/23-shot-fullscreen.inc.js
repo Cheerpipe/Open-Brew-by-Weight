@@ -146,6 +146,8 @@
     doubleTap();
     key('Escape', sheet);
     assert.ok(open(), 'Escape inside a sheet or dialog keeps full screen');
+    docHandlers.keydown({key: 'Escape', target: plain, defaultPrevented: true});
+    assert.ok(open(), 'Escape that closed a header popover keeps full screen');
     key('Escape', plain);
     assert.ok(!open() && history.back === 3, 'Escape with focus on the page exits');
     assert.equal(api.pop(), true, 'the Escape exit consumes its pushed entry');

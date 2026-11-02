@@ -377,9 +377,12 @@ function updateHeaderSignals(s = {}) {
   }
   // The scale battery joins the Bluetooth indicator: a cell after the bars
   // whose fill follows the percent, coloured only once it needs attention.
-  // The percent itself lives in the popover and the label.
+  // The percent itself lives in the popover and the label. An envelope
+  // without a scale model (the Admin poll) keeps the last Home frame's.
+  if (c.bluetoothConnected !== true || s.scale)
+    headerBatteryPct = c.bluetoothConnected === true ? s.scale.batteryPct : null;
   const bt = $("bluetoothSignal"),
-    pct = c.bluetoothConnected === true ? s.scale?.batteryPct : null,
+    pct = headerBatteryPct,
     batt = scaleBatteryLevel(pct),
     fill = $("bluetoothBatteryFill"),
     line = $("bluetoothBatteryLine");
@@ -388,8 +391,7 @@ function updateHeaderSignals(s = {}) {
     else delete bt.dataset.batt;
     bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "5.2 0 38.4 24" : "5.2 0 26.1 24");
     if (batt) {
-      bt.title +=
-        " · " + __WEBUI_TEXT__("runtime.scale_battery").replace("{0}", scaleBatteryText(pct));
+      bt.title += " · " + sub(__WEBUI_TEXT__("runtime.scale_battery"), [scaleBatteryText(pct)]);
       bt.setAttribute("aria-label", bt.title);
     }
   }
@@ -465,6 +467,7 @@ function updateHeaderSignals(s = {}) {
   }
   updateBrandFit();
 }
+let headerBatteryPct = null;
 // The header's first row is the brand beside the signal icons. Once the full
 // lockup would wrap, the drawing alone stands in for it; the text returns as
 // soon as it fits again. Measured with the text restored, so the decision
@@ -794,7 +797,10 @@ function initHeaderSignals() {
     if (e.key === "Escape") {
       const button = buttons.find((b) => b.getAttribute("aria-expanded") === "true");
       close();
-      if (button) button.focus();
+      if (button) {
+        e.preventDefault(); // Closing a popover is all it does, also in the live view.
+        button.focus();
+      }
     }
   });
   window.addEventListener("popstate", close);
@@ -5352,12 +5358,13 @@ function initShotFullScreen() {
   hero?.addEventListener("pointerup", onTap);
   view.addEventListener("pointerup", onTap);
   $("liveShotOpen")?.addEventListener("click", () => enterShotFullScreen());
-  // Escape leaves the live view unless another open sheet or dialog takes it first.
+  // Escape leaves the live view unless a header popover, sheet or dialog takes it first.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target === hero) enterShotFullScreen();
     if (
       e.key === "Escape" &&
       shotFsActive &&
+      !e.defaultPrevented &&
       !e.target.closest("dialog,[role=dialog]:not(#liveShot)")
     )
       close?.onclick();
