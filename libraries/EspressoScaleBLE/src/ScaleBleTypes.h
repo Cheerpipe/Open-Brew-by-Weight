@@ -123,7 +123,6 @@ enum ScaleBleTimingFlag : uint8_t {
 // across millis() wraparound. recordedFlags distinguishes a real zero timestamp
 // from a milestone that has not happened.
 struct ScaleBleTimingSnapshot {
-    uint32_t scanStartedMs;
     uint32_t firstCompatibleAdvertisementMs;
     uint32_t connectIssuedMs;
     uint32_t readyMs;

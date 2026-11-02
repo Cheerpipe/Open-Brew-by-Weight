@@ -76,6 +76,12 @@ void latchCutLineForTest(bool raised, float weightG, uint32_t atMs) {
 float ceilingStopThresholdForTest() {
   return (corridor::ceilingDg(session.cut.params) - session.cut.offsetDg) / 10.0f;
 }
+// The backstop threshold f(t) - r now, as the touch stop policy reads it.
+float effectiveStopThreshold() {
+  float threshold = 0.0f;
+  (void)touchStopPolicy(threshold, millis());
+  return threshold;
+}
 
 void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   deleteHostResources();
@@ -3161,29 +3167,6 @@ void w04c_setup_onboarding_phase_scenarios() {
         !setupDiscardAllowed(P::NONE) && !setupDiscardAllowed(P::KEEP));
 }
 
-void w04b_select_best_sta_ap_prefers_strongest_matching_bssid() {
-  const uint8_t weakBssid[6] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-  const uint8_t strongBssid[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
-  const uint8_t otherBssid[6] = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60};
-  const StaApScanEntry entries[] = {
-      {"CafeLAN", weakBssid, 1, -80, false},
-      {"OtherNet", strongBssid, 6, -40, false},
-      {"CafeLAN", strongBssid, 11, -55, false},
-      {"CafeLAN", otherBssid, 6, -50, true},
-  };
-  size_t bestIndex = 99;
-  CHECK(selectBestStaAp(entries, 4, "CafeLAN", false, bestIndex));
-  CHECK(bestIndex == 2);
-  CHECK(entries[bestIndex].rssi == -55);
-  CHECK(entries[bestIndex].bssid[0] == 0xAA);
-
-  bestIndex = 99;
-  CHECK(!selectBestStaAp(entries, 4, "Missing", false, bestIndex));
-  CHECK(!selectBestStaAp(nullptr, 0, "CafeLAN", false, bestIndex));
-  CHECK(selectBestStaAp(entries, 4, "CafeLAN", true, bestIndex));
-  CHECK(bestIndex == 3);
-}
-
 void attemptActiveConfigUpdate() {
   const RuntimeConfig before = runtimeConfig;
   char preferredBefore[PREFERRED_SCALE_MAC_CAPACITY] = {};
@@ -4773,7 +4756,7 @@ void w59_local_buzzer_plays_short_long_and_double_patterns() {
   drainLocalBuzzer();
 }
 
-void w82_pulse_train_loops_until_deadline_or_stopIf() {
+void w82_pulse_train_loops_until_deadline_or_stop() {
   resetHarness(false, false);
   CHECK(localBuzzer.ready);
   CHECK(startPulseTrain(BuzzerPattern::PULSE_TRAIN, 0));
@@ -4790,7 +4773,7 @@ void w82_pulse_train_loops_until_deadline_or_stopIf() {
   localBuzzer.service();
   CHECK(localBuzzer.active == BuzzerPattern::PULSE_TRAIN);
   CHECK(hostPinLevel[BUZZER_GPIO] == HIGH);
-  localBuzzer.stopIf(BuzzerPattern::PULSE_TRAIN);
+  localBuzzer.stopPulseTrains();
   CHECK(!localBuzzer.busy());
   CHECK(hostPinLevel[BUZZER_GPIO] == LOW);
 }
@@ -4815,7 +4798,7 @@ void w83_web_buzzer_test_pulse_uses_same_train_for_3s() {
 
 void w84_pulse_train_yields_to_triple() {
   resetHarness(false, false);
-  CHECK(startExtendedPulseTrain(0));
+  CHECK(emitAlert(AlertEvent::EXTENDED_PULSE));
   CHECK(localBuzzer.activeCue == BuzzerCue::ABNORMAL_FAST);
   CHECK(localBuzzer.activePulseRate ==
         static_cast<uint8_t>(ExtendedPulseRate::FAST));
@@ -6813,18 +6796,19 @@ void w62_local_buzzer_drive_matches_compile_flag() {
 }
 
 void w99_rtttl_parser_decodes_notes_and_rests() {
-  RtttlNote notes[RTTTL_MAX_NOTES];
+  constexpr uint8_t kNotes = RtttlCatalog::kFixedNoteCapacity;
+  RtttlNote notes[kNotes];
   uint8_t count = 0;
-  CHECK(parseRtttl(RTTTL_TARE, notes, count));
+  CHECK(parseRtttlBounded(RTTTL_TARE, notes, kNotes, count));
   CHECK(count == 1);
   CHECK(notes[0].freqHz >= 780 && notes[0].freqHz <= 790);
   CHECK(notes[0].durationMs >= 60 && notes[0].durationMs <= 80);
-  CHECK(parseRtttl(RTTTL_PADDLE_OFF, notes, count));
+  CHECK(parseRtttlBounded(RTTTL_PADDLE_OFF, notes, kNotes, count));
   CHECK(count == 3);
   CHECK(notes[0].freqHz >= 780 && notes[0].freqHz <= 790);
   CHECK(notes[1].freqHz == 0);
   CHECK(notes[2].freqHz >= 780 && notes[2].freqHz <= 790);
-  CHECK(parseRtttl(RTTTL_START_TIMER, notes, count));
+  CHECK(parseRtttlBounded(RTTTL_START_TIMER, notes, kNotes, count));
   CHECK(count == 1);
   CHECK(notes[0].freqHz >= 1040 && notes[0].freqHz <= 1055);
   for (uint8_t i = 1; i <= static_cast<uint8_t>(BuzzerCue::RECOVERY_ERROR);
@@ -6835,23 +6819,23 @@ void w99_rtttl_parser_decodes_notes_and_rests() {
       CHECK(buzzerCueIsLooping(cue) || cue == BuzzerCue::BULLSEYE);
       continue;
     }
-    CHECK(parseRtttl(rtttl, notes, count));
+    CHECK(parseRtttlBounded(rtttl, notes, kNotes, count));
     CHECK(count > 0);
   }
-  CHECK(parseRtttl(RTTTL_EXTENDED_PULSE_SLOW, notes, count));
+  CHECK(parseRtttlBounded(RTTTL_EXTENDED_PULSE_SLOW, notes, kNotes, count));
   CHECK(count == 3);
   CHECK(notes[0].freqHz >= 490 && notes[0].freqHz <= 498);
   CHECK(notes[0].durationMs == 20);
   CHECK(notes[1].freqHz == 0 && notes[1].durationMs == 320);
   CHECK(notes[2].freqHz == 0 && notes[2].durationMs == 160);
-  CHECK(parseRtttl(RTTTL_EXTENDED_PULSE_MEDIUM, notes, count));
+  CHECK(parseRtttlBounded(RTTTL_EXTENDED_PULSE_MEDIUM, notes, kNotes, count));
   CHECK(count == 2);
   CHECK(notes[0].durationMs == 20 && notes[1].durationMs == 320);
-  CHECK(parseRtttl(RTTTL_EXTENDED_PULSE_FAST, notes, count));
+  CHECK(parseRtttlBounded(RTTTL_EXTENDED_PULSE_FAST, notes, kNotes, count));
   CHECK(count == 3);
   CHECK(notes[0].durationMs == 20 && notes[1].durationMs == 213);
   CHECK(notes[2].durationMs == 20);
-  CHECK(parseRtttl(RTTTL_EXTENDED_PULSE_RAPID, notes, count));
+  CHECK(parseRtttlBounded(RTTTL_EXTENDED_PULSE_RAPID, notes, kNotes, count));
   CHECK(count == 3);
   CHECK(notes[0].durationMs == 20 && notes[1].durationMs == 160);
   CHECK(notes[2].durationMs == 20);
@@ -6913,10 +6897,11 @@ void w99f_bullseye_rtttl_is_bounded_and_plays_without_allocation() {
     CHECK(!parseRtttlBounded(badHeader, nullptr, BULLSEYE_RTTTL_MAX_NOTES,
                              count));
   }
-  RtttlNote notes[RTTTL_MAX_NOTES];
-  CHECK(parseRtttl("x::c", notes, count) && count == 1);
+  constexpr uint8_t kNotes = RtttlCatalog::kFixedNoteCapacity;
+  RtttlNote notes[kNotes];
+  CHECK(parseRtttlBounded("x::c", notes, kNotes, count) && count == 1);
   CHECK(notes[0].durationMs == 952);
-  CHECK(parseRtttl("x: D=8 , o=5 ,B=120 :c", notes, count) && count == 1);
+  CHECK(parseRtttlBounded("x: D=8 , o=5 ,B=120 :c", notes, kNotes, count) && count == 1);
   CHECK(notes[0].durationMs == 250);
 
   // A repeated pitch keeps a short break; a pitch change stays legato.
@@ -13390,16 +13375,18 @@ void s01f_curve_rollover_keeps_stats_windows_and_sorted_joins() {
   CHECK(before.errorPctTenthsSum == 1000 && before.flowCount == 5);
   const size_t poolOperations = ShotTracePoolHostFlash::operations();
   static ShotLogRecord rows[SHOT_LOG_CAPACITY];
+  static uint16_t order[SHOT_LOG_CAPACITY];
   for (const auto sort : {ShotLogSort::Date, ShotLogSort::Rating})
     for (const auto dir : {ShotLogSortDir::Asc, ShotLogSortDir::Desc}) {
       const size_t count = copyShotRecords(rows, SHOT_LOG_CAPACITY);
       CHECK(count == SHOT_LOG_CAPACITY);
-      shotLogSortRecords(rows, count, sort, dir);
+      shotLogSortOrder(rows, order, count, sort, dir);
       for (size_t page = 0; page < count; page += 10)
         for (size_t n = page; n < page + 10 && n < count; ++n) {
-          const bool cached = shotCurves.copyByShotId(rows[n].id, curve);
-          CHECK(cached == (rows[n].id >= oldestCached));
-          if (cached) CHECK(curvePoint(curve, 1).cg == static_cast<int16_t>(rows[n].id));
+          const ShotLogRecord &row = rows[order[n]];
+          const bool cached = shotCurves.copyByShotId(row.id, curve);
+          CHECK(cached == (row.id >= oldestCached));
+          if (cached) CHECK(curvePoint(curve, 1).cg == static_cast<int16_t>(row.id));
         }
       const auto stats = copyShotStats();
       CHECK(stats.shotCount == before.shotCount && stats.bbwCount == before.bbwCount);
@@ -16272,10 +16259,10 @@ void s04c_delete_shot_record_removes_log_and_curve() {
   CHECK(copyShotStoreStatus(bootId, last, publishedGood, newestActivation,
                             hasNewestActivation, true));
   CHECK(publishedGood.rating == 4);
-  CHECK(shotLog.containsId(id));
+  CHECK(shotLog.findNewestById(id) != nullptr);
   CHECK(shotCurves.containsShotId(id));
   CHECK(deleteShotRecord(id));
-  CHECK(!shotLog.containsId(id));
+  CHECK(shotLog.findNewestById(id) == nullptr);
   CHECK(!shotCurves.containsShotId(id));
   CHECK(shotLog.count() == 0);
   CHECK(shotCurves.count() == 0);
@@ -16298,7 +16285,7 @@ void s04d_delete_shot_record_ok_without_curve() {
   const uint32_t id = stored[0].id;
   CHECK(!shotCurves.containsShotId(id));
   CHECK(deleteShotRecord(id));
-  CHECK(!shotLog.containsId(id));
+  CHECK(shotLog.findNewestById(id) == nullptr);
   CHECK(shotLog.count() == 0);
 }
 
@@ -16319,7 +16306,7 @@ void s04e_delete_shot_record_is_ram_only_when_flash_is_busy() {
   const bool deleted = deleteShotRecord(id);
   g_hostFlashIoMutexAvailable = true;
   CHECK(deleted);
-  CHECK(!shotLog.containsId(id));
+  CHECK(shotLog.findNewestById(id) == nullptr);
   CHECK(!shotCurves.containsShotId(id));
   CHECK(shotLog.dirty());
   CHECK(shotCurves.pending() == 0);
@@ -17008,7 +16995,6 @@ void f13b_status_curve_publishes_live_samples_and_clears_tail() {
 void f17_health_counters_are_atomic_and_monotonic() {
   constexpr uint32_t kWriters = 4;
   constexpr uint32_t kIterations = 500;
-  const uint32_t allocBefore = allocExternalOkCount();
   const uint32_t flashBefore = flashIoLockTimeouts();
   std::atomic<bool> start{false};
   std::atomic<uint32_t> finished{0};
@@ -17017,13 +17003,10 @@ void f17_health_counters_are_atomic_and_monotonic() {
   std::thread reader([&]() {
     while (!start.load(std::memory_order_acquire)) {
     }
-    uint32_t lastAlloc = allocBefore;
     uint32_t lastFlash = flashBefore;
     while (finished.load(std::memory_order_acquire) != kWriters) {
-      const uint32_t alloc = allocExternalOkCount();
       const uint32_t flash = flashIoLockTimeouts();
-      if (alloc < lastAlloc || flash < lastFlash) monotonic = false;
-      lastAlloc = alloc;
+      if (flash < lastFlash) monotonic = false;
       lastFlash = flash;
     }
   });
@@ -17033,8 +17016,6 @@ void f17_health_counters_are_atomic_and_monotonic() {
       while (!start.load(std::memory_order_acquire)) {
       }
       for (uint32_t i = 0; i < kIterations; ++i) {
-        void *block = allocExternal(8);
-        heapCapsFree(block);
         flashIoLockTimeoutCount().fetch_add(1, std::memory_order_relaxed);
       }
       finished.fetch_add(1, std::memory_order_release);
@@ -17044,7 +17025,6 @@ void f17_health_counters_are_atomic_and_monotonic() {
   for (std::thread &writer : writers) writer.join();
   reader.join();
   CHECK(monotonic.load());
-  CHECK(allocExternalOkCount() == allocBefore + kWriters * kIterations);
   CHECK(flashIoLockTimeouts() == flashBefore + kWriters * kIterations);
 }
 
@@ -17150,50 +17130,25 @@ void s04f_shot_log_sort_date_and_rating() {
   recs[4].id = 1;
   recs[4].sideFlags = shotLogPackRating(0, 1);
 
-  ShotLogRecord dateDesc[5];
-  memcpy(dateDesc, recs, sizeof(recs));
-  shotLogSortRecords(dateDesc, 5, ShotLogSort::Date, ShotLogSortDir::Desc);
-  CHECK(dateDesc[0].id == 5);
-  CHECK(dateDesc[4].id == 1);
-
-  ShotLogRecord dateAsc[5];
-  memcpy(dateAsc, recs, sizeof(recs));
-  shotLogSortRecords(dateAsc, 5, ShotLogSort::Date, ShotLogSortDir::Asc);
-  CHECK(dateAsc[0].id == 1);
-  CHECK(dateAsc[4].id == 5);
-
-  ShotLogRecord ratingDesc[5];
-  memcpy(ratingDesc, recs, sizeof(recs));
-  shotLogSortRecords(ratingDesc, 5, ShotLogSort::Rating, ShotLogSortDir::Desc);
-  CHECK(ratingDesc[0].id == 4);
-  CHECK(shotLogRating(ratingDesc[0].sideFlags) == 5);
-  CHECK(ratingDesc[1].id == 2);
-  CHECK(shotLogRating(ratingDesc[1].sideFlags) == 5);
-  CHECK(ratingDesc[2].id == 5);
-  CHECK(shotLogRating(ratingDesc[2].sideFlags) == 3);
-  CHECK(ratingDesc[3].id == 1);
-  CHECK(shotLogRating(ratingDesc[3].sideFlags) == 1);
-  CHECK(ratingDesc[4].id == 3);
-  CHECK(shotLogRating(ratingDesc[4].sideFlags) == 0);
-
-  ShotLogRecord ratingAsc[5];
-  memcpy(ratingAsc, recs, sizeof(recs));
-  shotLogSortRecords(ratingAsc, 5, ShotLogSort::Rating, ShotLogSortDir::Asc);
-  CHECK(ratingAsc[0].id == 1);
-  CHECK(shotLogRating(ratingAsc[0].sideFlags) == 1);
-  CHECK(ratingAsc[1].id == 5);
-  CHECK(shotLogRating(ratingAsc[1].sideFlags) == 3);
-  CHECK(ratingAsc[2].id == 4);
-  CHECK(shotLogRating(ratingAsc[2].sideFlags) == 5);
-  CHECK(ratingAsc[3].id == 2);
-  CHECK(shotLogRating(ratingAsc[3].sideFlags) == 5);
-  CHECK(ratingAsc[4].id == 3);
-  CHECK(shotLogRating(ratingAsc[4].sideFlags) == 0);
-
-  shotLogSortRecords(nullptr, 5, ShotLogSort::Rating, ShotLogSortDir::Desc);
-  shotLogSortRecords(recs, 0, ShotLogSort::Rating, ShotLogSortDir::Desc);
-  shotLogSortRecords(recs, 1, ShotLogSort::Rating, ShotLogSortDir::Desc);
-  CHECK(recs[0].id == 5);
+  // Each row lists the expected ids in order.
+  struct Case {
+    ShotLogSort sort;
+    ShotLogSortDir dir;
+    uint32_t ids[5];
+  };
+  const Case cases[] = {
+      {ShotLogSort::Date, ShotLogSortDir::Desc, {5, 4, 3, 2, 1}},
+      {ShotLogSort::Date, ShotLogSortDir::Asc, {1, 2, 3, 4, 5}},
+      {ShotLogSort::Rating, ShotLogSortDir::Desc, {4, 2, 5, 1, 3}},
+      {ShotLogSort::Rating, ShotLogSortDir::Asc, {1, 5, 4, 2, 3}},
+  };
+  uint16_t order[5];
+  for (const Case &c : cases) {
+    shotLogSortOrder(recs, order, 5, c.sort, c.dir);
+    for (size_t i = 0; i < 5; ++i) CHECK(recs[order[i]].id == c.ids[i]);
+  }
+  shotLogSortOrder(recs, order, 1, ShotLogSort::Rating, ShotLogSortDir::Desc);
+  CHECK(order[0] == 0);
 }
 
 void s06_shot_log_local_sec_from_utc() {
@@ -18725,7 +18680,7 @@ void r61d_extended_pulse_pending_cleared_when_unwanted() {
       deriveBuzzerTone(AlertEvent::TARE, false, 0, 0);
   CHECK(localBuzzer.requestTone(tare));
   CHECK(localBuzzer.activeCue == BuzzerCue::TARE);
-  CHECK(startExtendedPulseTrain(0));
+  CHECK(emitAlert(AlertEvent::EXTENDED_PULSE));
   CHECK(localBuzzer.pendingCue == BuzzerCue::ABNORMAL_FAST);
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::SCALE_ONLY);
@@ -18740,7 +18695,7 @@ void r61d_extended_pulse_pending_cleared_when_unwanted() {
 
   resetHarness(false, false);
   CHECK(localBuzzer.requestTone(tare));
-  CHECK(startExtendedPulseTrain(0));
+  CHECK(emitAlert(AlertEvent::EXTENDED_PULSE));
   CHECK(localBuzzer.pendingCue == BuzzerCue::ABNORMAL_FAST);
   runtimeConfig.buzzerExtendedPulseRate =
       static_cast<uint8_t>(ExtendedPulseRate::OFF);
@@ -18754,7 +18709,7 @@ void r61d_extended_pulse_pending_cleared_when_unwanted() {
 
 void r61e_extended_pulse_restarts_when_rate_setting_changes() {
   resetHarness(false, false);
-  CHECK(startExtendedPulseTrain(0));
+  CHECK(emitAlert(AlertEvent::EXTENDED_PULSE));
   CHECK(localBuzzer.activeCue == BuzzerCue::ABNORMAL_FAST);
   CHECK(localBuzzer.activePulseRate ==
         static_cast<uint8_t>(ExtendedPulseRate::FAST));
@@ -25489,7 +25444,6 @@ const TestCase testCases[] = {
     {"W02", w02_each_runtime_field_is_validated},
     {"W03", w03_runtime_timing_relations_are_transactional},
     {"W04", w04_wifi_credentials_have_strict_bounds},
-    {"W04b", w04b_select_best_sta_ap_prefers_strongest_matching_bssid},
     {"W04c", w04c_setup_onboarding_phase_scenarios},
     {"W05", w05_config_is_blocked_while_brewing_early},
     {"W06", w06_config_is_blocked_while_brewing},
@@ -25618,7 +25572,7 @@ const TestCase testCases[] = {
     {"W94", w94_eclair_scale_priority_uses_local_alerts},
     {"W95", w95_eclair_scale_only_omits_unsupported_alerts},
     {"W97", w97_eclair_buzzer_only_never_queues_scale_beeps},
-    {"W82", w82_pulse_train_loops_until_deadline_or_stopIf},
+    {"W82", w82_pulse_train_loops_until_deadline_or_stop},
     {"W83", w83_web_buzzer_test_pulse_uses_same_train_for_3s},
     {"W84", w84_pulse_train_yields_to_triple},
     {"W84b", w84b_echo_inverted_upgrades_weak_pending},

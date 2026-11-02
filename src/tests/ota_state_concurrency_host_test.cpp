@@ -34,7 +34,7 @@ int main() {
     std::cerr << "OTA status read blocked behind the OTA mutex\n";
     return EXIT_FAILURE;
   }
-  const OtaResult invalidIdentity = otaArchIsUsable(ota.runningTag().arch)
+  const OtaResult invalidIdentity = otaArchIsUsable(ota.snapshot(false).running.arch)
       ? OtaResult::SESSION_IDENTITY_MISMATCH : OtaResult::NO_IDENTITY;
 
   std::atomic<bool> start{false};
@@ -56,7 +56,7 @@ int main() {
         failures.fetch_add(1, std::memory_order_relaxed);
       }
       ota.discard();
-      (void)ota.confirmRunningImage();
+      (void)ota.serviceBoot(static_cast<uint32_t>(iteration), true, false, false, true, 0, 0);
     }
   });
 

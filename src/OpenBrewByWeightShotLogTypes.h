@@ -636,22 +636,6 @@ inline void shotLogSetBbw(ShotLogRecord &record, uint8_t algorithm,
       ((alpha & 7) << 2) | ((applied ? 2 : 1) << 5);
 }
 
-// Input must be newest-first (copyNewestFirst). Date+desc is a no-op.
-inline void shotLogReverseRecords(ShotLogRecord *records, size_t count) {
-  if (records == nullptr || count < 2U) {
-    return;
-  }
-  size_t i = 0;
-  size_t j = count - 1U;
-  while (i < j) {
-    const ShotLogRecord tmp = records[i];
-    records[i] = records[j];
-    records[j] = tmp;
-    ++i;
-    --j;
-  }
-}
-
 inline int shotLogCompareRatingOrder(const ShotLogRecord &left,
                                      const ShotLogRecord &right,
                                      ShotLogSortDir dir) {
@@ -674,26 +658,28 @@ inline int shotLogCompareRatingOrder(const ShotLogRecord &left,
   return 0;
 }
 
-inline void shotLogSortRecords(ShotLogRecord *records, size_t count,
-                               ShotLogSort sort, ShotLogSortDir dir) {
-  if (records == nullptr || count < 2U) {
-    return;
-  }
-  if (sort != ShotLogSort::Rating) {
-    if (dir == ShotLogSortDir::Asc) {
-      shotLogReverseRecords(records, count);
+// The requested order as an index permutation over newest-first records
+// (copyNewestFirst): date/desc is the store order, date/asc its reverse,
+// rating a stable insertion sort of indices.
+inline void shotLogSortOrder(const ShotLogRecord *records, uint16_t *order, size_t count,
+                             ShotLogSort sort, ShotLogSortDir dir) {
+  for (size_t index = 0; index < count; ++index) order[index] = static_cast<uint16_t>(index);
+  if (sort == ShotLogSort::Rating) {
+    for (size_t i = 1; i < count; ++i) {
+      const uint16_t key = order[i];
+      size_t j = i;
+      while (j > 0 && shotLogCompareRatingOrder(records[order[j - 1U]], records[key], dir) > 0) {
+        order[j] = order[j - 1U];
+        --j;
+      }
+      order[j] = key;
     }
-    return;
-  }
-  for (size_t i = 1; i < count; ++i) {
-    const ShotLogRecord key = records[i];
-    size_t j = i;
-    while (j > 0 &&
-           shotLogCompareRatingOrder(records[j - 1U], key, dir) > 0) {
-      records[j] = records[j - 1U];
-      --j;
+  } else if (dir == ShotLogSortDir::Asc) {
+    for (size_t index = 0; index < count / 2; ++index) {
+      const uint16_t swapped = order[index];
+      order[index] = order[count - 1U - index];
+      order[count - 1U - index] = swapped;
     }
-    records[j] = key;
   }
 }
 

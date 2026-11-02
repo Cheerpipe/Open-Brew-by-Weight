@@ -988,7 +988,7 @@ if (!codeIncludes(viewJs.stats, 'SHOTS_PAGE_SIZE=10') ||
     !network.includes('sendStatsStream') ||
     !network.includes('formatShotStatsRow') ||
     !network.includes('shotLogPageSlice') ||
-    !network.includes('shotLogCompareRatingOrder') ||
+    !network.includes('shotLogSortOrder(snapshot.records') ||
     !networkHeader.includes('SHOT_LOG_PAGE_DEFAULT') ||
     !networkHeader.includes('shotLogEpoch') ||
     !networkHeader.includes('sendStatsStream') ||
@@ -1037,7 +1037,7 @@ if (!partialHtml.stats.includes('id="shotSort"') ||
     !codeIncludes(viewJs.stats, "R.setShotSort('rating')") ||
     codeIncludes(viewJs.stats, 'R.toggleShotSortDir') ||
     !codeIncludes(viewJs.stats, 'R.syncShotSortButtons()') ||
-    !shotLogTypes.includes('shotLogSortRecords') ||
+    !shotLogTypes.includes('shotLogSortOrder') ||
     !shotLogTypes.includes('ShotLogSort::Rating') ||
     !network.includes('shotLogSortFromName') ||
     !network.includes('strcmp(sort->valuestring, "date")') ||

@@ -60,8 +60,8 @@ static void notify(NimbleScaleClient &c,uint16_t length) {
   c.onNotification(1,10,&b,c.linkOperationId_);
 }
 static void advertise(NimbleScaleClient &c, uint8_t eventType,
-                      const char *name = "BOOKOO Mini") {
-  testAdvertisementParseStatus = 0;
+                      const char *name = "BOOKOO Mini", int parseStatus = 0) {
+  testAdvertisementParseStatus = parseStatus;
   testAdvertisementFields = {
       reinterpret_cast<uint8_t *>(const_cast<char *>(name)),
       static_cast<uint8_t>(strlen(name)), 1, 0, nullptr};
@@ -594,6 +594,10 @@ static void run() {
     advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND);
     CHECK(!c.candidatePending_);
     c.enterState(NimbleScaleClient::State::Scanning);
+    // A payload NimBLE cannot parse is counted and never becomes a candidate.
+    const uint32_t malformed = c.malformedAdvertisements_;
+    advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND, "BOOKOO Mini", BLE_HS_EINVAL);
+    CHECK(!c.candidatePending_ && c.malformedAdvertisements_ == malformed + 1);
     advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_NONCONN_IND);
     CHECK(!c.candidatePending_);
 

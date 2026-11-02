@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cJSON.h>
-#include <atomic>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -21,7 +20,6 @@ constexpr size_t JSON_DOCUMENT_MAX_VALUES = 128;
 
 namespace detail {
 
-inline std::atomic<uint32_t> g_jsonLimitRejections{0};
 inline thread_local bool g_jsonLimitRejectedRecently = false;
 
 struct JsonStructureScanner {
@@ -204,7 +202,6 @@ inline bool jsonStructureAccepted(const char *body, size_t length,
 
 inline void noteJsonLimitRejection() {
   g_jsonLimitRejectedRecently = true;
-  g_jsonLimitRejections.fetch_add(1, std::memory_order_relaxed);
 }
 
 }  // namespace detail
@@ -245,10 +242,6 @@ inline cJSON *parseJsonDocumentWithinLimits(const char *body, size_t maxBytes,
 inline cJSON *parseJsonDocument(const char *body) {
   return parseJsonDocumentWithinLimits(body, JSON_DOCUMENT_MAX_BYTES,
                                        JSON_DOCUMENT_MAX_VALUES);
-}
-
-inline uint32_t jsonDocumentLimitRejections() {
-  return detail::g_jsonLimitRejections.load(std::memory_order_relaxed);
 }
 
 inline bool jsonDocumentLimitRejectedRecently() {

@@ -306,7 +306,7 @@ void startSectors(const ShotTracePool &pool, const std::vector<uint32_t> &ids, E
   for (const ShotTracePoolEntry &e : entries(pool))
     for (uint32_t id : ids) {
       const ShotTracePoolIdentity identity = identityOf(id);
-      if (!shotTracePoolMatches(e, id, identity.bootId, identity.endedAtMs)) continue;
+      if (e.idTag != shotTracePoolIdTag(id, identity.bootId, identity.endedAtMs)) continue;
       expected.entry[id] = e;
       std::vector<size_t> &list = expected.sectors[id];
       list.clear();
@@ -609,7 +609,7 @@ struct LiveSet {
 bool isLive(void *context, const ShotTracePoolEntry &entry) {
   for (uint32_t id : static_cast<LiveSet *>(context)->ids) {
     const ShotTracePoolIdentity identity = identityOf(id);
-    if (shotTracePoolMatches(entry, id, identity.bootId, identity.endedAtMs)) return true;
+    if (entry.idTag == shotTracePoolIdTag(id, identity.bootId, identity.endedAtMs)) return true;
   }
   return false;
 }

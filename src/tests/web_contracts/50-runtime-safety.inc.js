@@ -512,10 +512,6 @@ if (!network.includes('WiFi.mode(WIFI_STA)') ||
         'SNTP must be callback-driven one-shot work, wake promptly for gates, stop after sync, and rearm only through gated service');
   }
 }
-if (!domain.includes('selectBestStaAp') ||
-    !domain.includes('StaApScanEntry')) {
-  throw new Error('Strongest-AP selection helpers must live in Domain for host tests');
-}
 if (!network.includes('staBssid') ||
     !serialCli.includes('staBssid=')) {
   throw new Error('Associated AP BSSID must be exposed on status and WIFI_STATUS');

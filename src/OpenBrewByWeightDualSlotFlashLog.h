@@ -275,8 +275,6 @@ class DualSlotFlashLog {
         static_cast<const DualSlotFlashLog *>(this)->findNewestById(id));
   }
 
-  bool containsId(uint32_t id) const { return findNewestById(id) != nullptr; }
-
   size_t copyNewestFirst(Record *output, size_t capacity) const {
     if (output == nullptr || capacity == 0 || store_.header.count == 0) {
       return 0;

@@ -217,30 +217,10 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   if (reload || header || cache.orderEpoch != epoch || cache.offset != offset || cache.limit != limit ||
       cache.sort != sort || cache.dir != dir || cache.filterHash != filterHash) {
     // Materialize the requested order as an index permutation over the
-    // newest-first cache: date/desc is the store order, date/asc its
-    // reverse, rating an insertion sort of indices, then compacted to the
-    // filter's matches. The records themselves never move, so toggles
-    // re-slice without recopying or re-sorting data.
-    for (size_t index = 0; index < count; ++index) cache.order[index] = static_cast<uint16_t>(index);
-    if (sort == ShotLogSort::Rating) {
-      for (size_t i = 1; i < count; ++i) {
-        const uint16_t key = cache.order[i];
-        size_t j = i;
-        while (j > 0 && shotLogCompareRatingOrder(
-                            snapshot.records[cache.order[j - 1U]],
-                            snapshot.records[key], dir) > 0) {
-          cache.order[j] = cache.order[j - 1U];
-          --j;
-        }
-        cache.order[j] = key;
-      }
-    } else if (dir == ShotLogSortDir::Asc) {
-      for (size_t index = 0; index < count / 2; ++index) {
-        const uint16_t swapped = cache.order[index];
-        cache.order[index] = cache.order[count - 1U - index];
-        cache.order[count - 1U - index] = swapped;
-      }
-    }
+    // newest-first cache, then compact it to the filter's matches. The
+    // records themselves never move, so toggles re-slice without recopying
+    // or re-sorting data.
+    shotLogSortOrder(snapshot.records, cache.order, count, sort, dir);
     cache.orderEpoch = epoch;
     cache.matched = cache.good = 0;
     for (size_t index = 0; index < count; ++index)

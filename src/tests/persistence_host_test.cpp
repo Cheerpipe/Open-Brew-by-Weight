@@ -2131,7 +2131,7 @@ void p69_history_log_round_trip_eviction_and_paging() {
   CHECK(page.total == 0 && page.start == 0 && page.count == 0 && !page.hasMore);
 
   CHECK(reloaded.removeById(2));
-  CHECK(!reloaded.containsId(2));
+  CHECK(reloaded.findNewestById(2) == nullptr);
   CHECK(reloaded.count() == 2);
   HistoryLog afterDelete;
   CHECK(afterDelete.load());
@@ -3456,7 +3456,7 @@ void p92c_a_full_500_record_log_loads_at_1000() {
   CHECK(loaded.load() && loaded.count() == 500);
   static ShotLogRecord rows[SHOT_LOG_CAPACITY];
   CHECK(loaded.copyNewestFirst(rows, SHOT_LOG_CAPACITY) == 500);
-  CHECK(rows[0].id == 500 && rows[499].id == 1 && !loaded.containsId(7777));
+  CHECK(rows[0].id == 500 && rows[499].id == 1 && loaded.findNewestById(7777) == nullptr);
   CHECK(loaded.append(record, false) && loaded.copyNewestFirst(rows, 2) == 2);
   CHECK(rows[0].id == 501 && rows[1].id == 500 && loaded.count() == 501);
 }

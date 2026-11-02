@@ -288,20 +288,16 @@ class OpenBrewByWeightOta {
 
   bool runningImageConfirmed() const;
   bool runningImageRejected() const;
-  // Cancels the pending rollback: the running image becomes permanent.
-  bool confirmRunningImage();
-  // Selects the previous slot without rebooting, so the caller can restart
-  // through the normal machine circuit-safe path. Returns false when no other slot holds a
-  // bootable application, in which case staying on this image is the only
-  // option that keeps the machine usable. After a successful reject, both
-  // confirmRunningImage() and a second reject are no-ops, so a later tick
-  // cannot silently cancel the armed rollback.
-  bool rejectRunningImage();
+  // Confirms a pending image (the running image becomes permanent) or rejects
+  // it: selects the previous slot without rebooting, so the caller can restart
+  // through the normal machine circuit-safe path. Without another bootable
+  // slot, staying on this image is the only option that keeps the machine
+  // usable, so it is confirmed. After a confirm or reject every later call is
+  // a no-op, so a later tick cannot silently cancel the armed rollback.
   OtaBootStatus serviceBoot(uint32_t now, bool httpReady, bool activeCycle,
                            bool relayClosed, bool bleUp,
                            uint32_t minUptimeMs, uint32_t deadlineMs);
 
-  OtaImageTag runningTag() const;
   OtaImageTag stagedTag() const;
 
   static const char *resultName(OtaResult result);

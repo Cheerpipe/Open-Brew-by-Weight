@@ -104,7 +104,7 @@ struct LocalBuzzer {
   // slot; a weaker request is rejected while a high-priority slot is
   // pending. A finite pattern interrupts an active looping pulse so a
   // looping cue cannot block alarms. durationMs is used only for pulse
-  // trains (0 = until stopIf). Returns false if unsupported, not ready,
+  // trains (0 = until stopped). Returns false if unsupported, not ready,
   // or not accepted.
   bool request(BuzzerPattern pattern, uint32_t durationMs = 0);
   bool requestTone(const BuzzerToneCommand &cmd);
@@ -114,7 +114,6 @@ struct LocalBuzzer {
   bool requestBullseye(bool allowQueue = true);
   // True when a request would start now instead of waiting in the pending slot.
   bool canStartNow() const;
-  void stopIf(BuzzerPattern pattern);
   void stopIfCue(BuzzerCue cue);
   void stopAll();
   // Drop a queued extended pulse and an infinite operational/debug pulse.
@@ -672,26 +671,6 @@ inline void LocalBuzzer::stopAll() {
   stopTone();
   clearPlayback();
   cancelPhaseTimer();
-}
-
-inline void LocalBuzzer::stopIf(BuzzerPattern pattern) {
-  if (!BUZZER_SUPPORT_ENABLED || !ready || pattern == BuzzerPattern::NONE) {
-    return;
-  }
-  TaskLockGuard lock(mutex);
-  if (pending == pattern && pendingCue == BuzzerCue::NONE) {
-    pending = BuzzerPattern::NONE;
-    pendingCue = BuzzerCue::NONE;
-    pendingPulseRate = 0;
-    pendingDurationMs = 0;
-  }
-  if (active != pattern || activeCue != BuzzerCue::NONE) {
-    return;
-  }
-  const uint32_t nowMs = millis();
-  stopTone();
-  clearPlayback();
-  startPendingDrainedLocked(nowMs);
 }
 
 inline void LocalBuzzer::stopIfCue(BuzzerCue cue) {

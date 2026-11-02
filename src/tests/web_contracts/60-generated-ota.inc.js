@@ -1069,7 +1069,7 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
   if (!ota.includes('rejected_ = true') ||
       !/if \(rejected_\) \{\s*return false;/.test(ota)) {
     throw new Error(
-      'rejectRunningImage must record the rejection so confirmRunningImage cannot cancel it');
+      'rejectRunningImageLocked must record the rejection so confirmRunningImageLocked cannot cancel it');
   }
   if (!css.includes('.hidden,[hidden]{display:none!important}')) {
     throw new Error('The shared hidden rule must override displayed controls including OTA progress');

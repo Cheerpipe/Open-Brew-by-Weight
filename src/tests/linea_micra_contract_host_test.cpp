@@ -309,9 +309,10 @@ int main() {
   assert(effective.quality == LineaMicraObservationQuality::OPTIMISTIC);
   assert(!power.notePhysicalStart(authoritative, true, true, 201));
   assert(power.generation() == edgeGeneration);
-  assert(!power.acceptAuthoritative(preEdgeGeneration));
+  assert(!power.noteEvidence(preEdgeGeneration, LineaMicraPowerState::ON, 202, false));
   assert(power.effectiveStatus(authoritative, true, 202).optimisticOn);
-  assert(power.acceptAuthoritative(edgeGeneration));
+  assert(power.noteEvidence(edgeGeneration, LineaMicraPowerState::ON, 203, false));
+  assert(!power.effectiveStatus(authoritative, true, 203).optimisticOn);
   assert(power.effectiveStatus(authoritative, true, 203).powerState ==
          LineaMicraPowerState::OFF);
 
@@ -381,9 +382,9 @@ int main() {
   assert(effective.quality == LineaMicraObservationQuality::OPTIMISTIC);
   assert(!power.noteStandbyCommandAccepted(authoritative, true, 2101));
   assert(power.generation() == shutdownGeneration);
-  assert(!power.acceptAuthoritative(preShutdownGeneration));
+  assert(!power.noteEvidence(preShutdownGeneration, LineaMicraPowerState::OFF, 2102, false));
   assert(power.effectiveStatus(authoritative, true, 2102).optimisticOff);
-  assert(power.acceptAuthoritative(shutdownGeneration));
+  assert(power.noteEvidence(shutdownGeneration, LineaMicraPowerState::OFF, 2103, false));
   effective = power.effectiveStatus(authoritative, true, 2103);
   assert(effective.powerState == LineaMicraPowerState::ON);
   assert(!effective.optimisticOff);
@@ -418,7 +419,7 @@ int main() {
   // A confirmed ON no longer accepts a second ON-direction overlay.
   authoritative.powerState = LineaMicraPowerState::ON;
   assert(!power.notePowerOnCommandAccepted(authoritative, true, 3102));
-  assert(power.acceptAuthoritative(powerOnGeneration));
+  assert(power.noteEvidence(powerOnGeneration, LineaMicraPowerState::ON, 3102, false));
   power.reset();
 
   authoritative.sampleAtMs = 0;

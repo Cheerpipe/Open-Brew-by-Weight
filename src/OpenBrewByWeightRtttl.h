@@ -7,7 +7,6 @@
 
 namespace openbrewbyweight {
 
-constexpr uint8_t RTTTL_MAX_NOTES = 16;
 constexpr size_t RTTTL_MAX_INPUT_CHARS = 500;
 constexpr size_t RTTTL_INPUT_CAPACITY = RTTTL_MAX_INPUT_CHARS + 1;
 
@@ -152,10 +151,6 @@ inline bool parseRtttlBounded(const char *rtttl, RtttlNote *out,
     i = next;
   }
   return count > 0;
-}
-
-inline bool parseRtttl(const char *rtttl, RtttlNote *out, uint8_t &count) {
-  return parseRtttlBounded(rtttl, out, RTTTL_MAX_NOTES, count);
 }
 
 }  // namespace openbrewbyweight

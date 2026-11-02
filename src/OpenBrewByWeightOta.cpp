@@ -315,11 +315,6 @@ void OpenBrewByWeightOta::publishState() {
   publishSnapshotLocked();
 }
 
-OtaImageTag OpenBrewByWeightOta::runningTag() const {
-  TaskLockGuard lock(mutex_);
-  return runningTag_;
-}
-
 OtaImageTag OpenBrewByWeightOta::stagedTag() const {
   TaskLockGuard lock(mutex_);
   return stagedTag_;
@@ -1070,11 +1065,6 @@ OtaResult OpenBrewByWeightOta::discard() {
   return OtaResult::OK;
 }
 
-bool OpenBrewByWeightOta::confirmRunningImage() {
-  TaskLockGuard lock(mutex_);
-  return confirmRunningImageLocked();
-}
-
 bool OpenBrewByWeightOta::readBootState() {
   FlashIoGuard flash(0);
   esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
@@ -1126,11 +1116,6 @@ bool OpenBrewByWeightOta::confirmRunningImageLocked() {
   settingsSchemaWritesAdmitted.store(true, std::memory_order_release);
   publishState();
   return true;
-}
-
-bool OpenBrewByWeightOta::rejectRunningImage() {
-  TaskLockGuard lock(mutex_);
-  return rejectRunningImageLocked() == RejectResult::REJECTED;
 }
 
 OpenBrewByWeightOta::RejectResult OpenBrewByWeightOta::rejectRunningImageLocked() {

@@ -892,7 +892,7 @@ if (!domain.includes('BUZZER_SUPPORT_ENABLED = OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER
     !domain.includes('static_cast<uint8_t>(DEFAULT_ALERT_OUTPUT_CHANNEL)') ||
     !buzzer.includes('requestTone') ||
     !buzzerPassive.includes('ledcAttach') ||
-    !rtttlParser.includes('parseRtttl') ||
+    !rtttlParser.includes('parseRtttlBounded') ||
     !buzzerPatterns.includes('BUZZER_ECHO_INVERTED_NOTES') ||
     buzzerPatterns.includes('buzzerActiveSetTone') ||
     !buzzerRtttl.includes('RTTTL_TARE') ||
@@ -931,7 +931,7 @@ if (!domain.includes('BUZZER_SUPPORT_ENABLED = OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER
     !buzzer.includes('memcpy(rtttlBuf') ||
     !buzzer.includes('stopExtendedPulse') ||
     !domain.includes('ECHO_INVERTED') ||
-    !firmware.includes('startExtendedPulseTrain') ||
+    !firmware.includes('emitAlert(AlertEvent::EXTENDED_PULSE, session.id)') ||
     !firmware.includes('startPulseTrain') ||
     !firmware.includes('stopPulseTrains') ||
     !firmware.includes('serviceExtendedPulseAlert') ||

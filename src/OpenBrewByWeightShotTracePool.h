@@ -131,18 +131,13 @@ static_assert(SHOT_TRACE_POOL_SECTORS * SHOT_TRACE_POOL_SECTOR_BYTES / 4U <= 0x2
                   SHOT_TRACE_POOL_MAX_RECORD_BYTES / 16U < 0x800U,
               "Index entries address the whole space");
 
+// Summary linkage: id reuse after a clear or factory reset never matches a
+// record of another boot or end time (exactly checked again on open).
 inline uint32_t shotTracePoolIdTag(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs) {
   uint32_t mix = bootId * 0x9E3779B1U ^ endedAtMs;
   mix ^= mix >> 16;
   mix ^= mix >> 8;
   return (shotId & 0xFFFFFFU) | (mix & 0xFFU) << 24;
-}
-
-// Summary linkage: id reuse after a clear or factory reset never matches a
-// record of another boot or end time (exactly checked again on open).
-inline bool shotTracePoolMatches(const ShotTracePoolEntry &entry, uint32_t shotId,
-                                 uint32_t bootId, uint32_t endedAtMs) {
-  return entry.idTag == shotTracePoolIdTag(shotId, bootId, endedAtMs);
 }
 
 // Static PSRAM storage of one pool: the FIFO index of the newest records
@@ -503,7 +498,7 @@ class ShotTracePool {
     TaskLockGuard lock(mux_);
     return count_;
   }
-  // n-th oldest entry, for diagnostics and tests.
+  // n-th oldest entry; tests inspect the index through it.
   bool entryAt(size_t n, ShotTracePoolEntry &out) const {
     TaskLockGuard lock(mux_);
     if (n >= count_) return false;

@@ -412,25 +412,9 @@ inline void companionRelayNonce(char direction, uint8_t context, uint32_t counte
     nonce[4 + index] = static_cast<uint8_t>(wide >> (8 * index));
 }
 
-// Seals `text` (a header value) as canonical base64 ciphertext under the
-// request's q; opens the same value. Opening fails on any tampering, wrong
-// context, or a value sealed for another request.
-inline bool companionSealSecret(const uint8_t bodyKey[32], uint8_t context, uint32_t q,
-                                const char *text, char out[COMPANION_RELAY_SECRET_TEXT]) {
-  // 81 sealed bytes are the most whose base64 fits the header value's 111.
-  constexpr size_t kSealed = 3 * ((COMPANION_RELAY_SECRET_TEXT - 1) / 4);
-  const size_t length = strnlen(text, COMPANION_RELAY_SECRET_TEXT);
-  if (length == COMPANION_RELAY_SECRET_TEXT || length + 16 > kSealed) return false;
-  uint8_t nonce[12], sealed[kSealed];
-  companionRelayNonce('c', context, q, nonce);
-  size_t used = 0;
-  if (!companionAeadSealBytes(bodyKey, nonce, reinterpret_cast<const uint8_t *>(text),
-                              length, sealed, sizeof(sealed), used))
-    return false;
-  size_t text2 = 0;
-  return appendBase64(out, COMPANION_RELAY_SECRET_TEXT, text2, sealed, used);
-}
-
+// Opens a header value the companion sealed as canonical base64 ciphertext
+// under the request's q. Opening fails on any tampering, wrong context, or a
+// value sealed for another request.
 inline bool companionOpenSecret(const uint8_t bodyKey[32], uint8_t context, uint32_t q,
                                 const char *value, char *out, size_t capacity) {
   constexpr size_t kSealed = 3 * ((COMPANION_RELAY_SECRET_TEXT - 1) / 4);  // 81

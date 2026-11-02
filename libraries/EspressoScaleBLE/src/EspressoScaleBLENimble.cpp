@@ -1807,7 +1807,6 @@ class NimbleScaleClient {
     enterState(initialState, stateTimeoutMs);
     scanStartedAt_ = stateEnteredAtMs_;
     portENTER_CRITICAL(&mux_);
-    timing_.scanStartedMs = scanStartedAt_;
     timing_.recordedFlags = ScaleBleTimingScanStarted;
     portEXIT_CRITICAL(&mux_);
     ++scanStarts_;

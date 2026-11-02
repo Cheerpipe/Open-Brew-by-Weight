@@ -1110,9 +1110,9 @@ if (codeIncludes(ui, 'id="shotPanel"') ||
   throw new Error('Web UI must enforce remote policy, maintenance, durable command state, and live shot status');
 }
 {
-  const curveTypes = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightShotCurveTypes.h'), 'utf8');
-  const record = curveTypes.slice(curveTypes.indexOf('struct ShotCurveRecord'),
-      curveTypes.indexOf('inline ShotCurveRecord emptyShotCurveRecord'));
+  const curveRecord = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightShotCurveRecord.h'), 'utf8');
+  const record = curveRecord.slice(curveRecord.indexOf('struct ShotCurveRecord {'),
+      curveRecord.indexOf('static_assert(offsetof(ShotCurveRecord'));
   if (!codeIncludes(statsRuntimeJs, "spark.className='shotSparkCell'") ||
       !codeIncludes(statsRuntimeJs, "renderShotSpark(spark,r,m)") ||
       /flow/i.test(record) || network.includes('\"flowCg\"') || network.includes('\"flowDtS\"')) {

@@ -54,11 +54,6 @@ int32_t cutLineNowDg() {
   return cutLineAtDg(shotTimeAtMs(millis(), shotMs) ? shotMs : 0);
 }
 
-// Backstop direct-law threshold now: f(t) - r, without the prediction lead.
-float effectiveStopThreshold() {
-  return static_cast<float>(cutLineNowDg() - session.cut.offsetDg) / 10.0f;
-}
-
 // A weight cut reports the segment of f that fired (13 raised, 3 target,
 // 16 lowered).
 // Latches the exact shot time and line, which the record and learning use.
@@ -508,7 +503,8 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
     int32_t shotMs = 0;
     if (shotTrace().capturing() && !(session.traceLatches & TRACE_LATCH_PROTECTION) &&
         shotTimeAtMs(receivedAtMs, shotMs) &&
-        gramsToDg(weight) >= cutLineAtDg(shotMs) - session.cut.offsetDg) {
+        gramsToDg(weight) >=
+            corridor::backstopThresholdDg(session.cut.params, shotMs, session.cut.offsetDg)) {
       session.traceLatches |= TRACE_LATCH_PROTECTION;
       shotTrace().note(ShotTraceKind::STOP_BLOCKED, millis(), 1,
                        SHOT_TRACE_BLOCKED_PROTECTION);
@@ -531,8 +527,8 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
   const bool timed = shotTimeAtMs(receivedAtMs, shotMs);
   const int32_t weightDg = gramsToDg(weight);
   if (timed && !overload) noteCutLineSegment(weightDg, shotMs, receivedAtMs);
-  const int32_t lineDg = timed ? cutLineAtDg(shotMs) : 0;
-  const bool overThreshold = timed && weightDg >= lineDg - session.cut.offsetDg;
+  const bool overThreshold = timed && weightDg >= corridor::backstopThresholdDg(
+                                           session.cut.params, shotMs, session.cut.offsetDg);
   if (timed && !overload && !(session.traceLatches & TRACE_LATCH_SLOW_WINDOW) &&
       shotMs >= session.cut.params.slowAfterMs) {
     // The slow-window end decides between the target and a slow extension.
@@ -543,7 +539,7 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
         (session.extractionExtended ? SHOT_TRACE_SLOW_FAST_EXTENDED : 0) |
         (overThreshold ? SHOT_TRACE_SLOW_OVER_LINE : 0);
     shotTrace().note(ShotTraceKind::SLOW_WINDOW_END, millis(), shotTraceSaturate16(weightDg),
-                     static_cast<uint16_t>(lineDg), true,
+                     static_cast<uint16_t>(cutLineAtDg(shotMs)), true,
                      shotTraceSaturate16(session.cut.offsetDg), flags);
   }
   if (!overThreshold && !overload) {
@@ -566,7 +562,7 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
     // The first reading over the line, whether or not it ever confirms.
     session.traceLatches |= TRACE_LATCH_OVER_LINE;
     shotTrace().note(ShotTraceKind::OVER_LINE, millis(), shotTraceSaturate16(weightDg),
-                     static_cast<uint16_t>(lineDg), true,
+                     static_cast<uint16_t>(cutLineAtDg(shotMs)), true,
                      shotTraceSaturate16(session.cut.offsetDg),
                      session.thresholdConfirmations);
   }

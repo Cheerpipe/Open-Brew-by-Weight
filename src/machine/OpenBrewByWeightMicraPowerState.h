@@ -98,13 +98,6 @@ class LineaMicraPowerStateTracker {
     return true;
   }
 
-  bool acceptAuthoritative(uint32_t observationGeneration) {
-    if (observationGeneration != generation_) return false;
-    direction_ = OptimisticDirection::NONE;
-    held_ = false;
-    return true;
-  }
-
   void reset() {
     direction_ = OptimisticDirection::NONE;
     held_ = false;

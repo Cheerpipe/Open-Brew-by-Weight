@@ -87,9 +87,8 @@ void testDepthLimitRejectsWithoutDamagingPriorDocument() {
   deep += '0';
   for (size_t i = 0; i <= openbrewbyweight::JSON_DOCUMENT_MAX_DEPTH; ++i)
     deep.push_back(']');
-  const uint32_t before = openbrewbyweight::jsonDocumentLimitRejections();
   CHECK(openbrewbyweight::parseJsonDocument(deep.c_str()) == nullptr);
-  CHECK(openbrewbyweight::jsonDocumentLimitRejections() == before + 1);
+  CHECK(openbrewbyweight::jsonDocumentLimitRejectedRecently());
   // A 160-byte UI frame can still exceed the parser's recursion budget.
   CHECK(deep.size() <= 160);
   CHECK(openbrewbyweight::parseJsonDocumentWithinLimits(
@@ -145,14 +144,12 @@ void testValueLimitAtBoundaryForArraysAndObjects() {
   CHECK(object != nullptr);
   cJSON_Delete(object);
 
-  const uint32_t before = openbrewbyweight::jsonDocumentLimitRejections();
   CHECK(openbrewbyweight::parseJsonDocument(
             repeatedArrayValues(children + 1).c_str()) == nullptr);
-  CHECK(openbrewbyweight::jsonDocumentLimitRejections() == before + 1);
   CHECK(openbrewbyweight::jsonDocumentLimitRejectedRecently());
   CHECK(openbrewbyweight::parseJsonDocument(
             repeatedObjectValues(children + 1).c_str()) == nullptr);
-  CHECK(openbrewbyweight::jsonDocumentLimitRejections() == before + 2);
+  CHECK(openbrewbyweight::jsonDocumentLimitRejectedRecently());
 }
 
 void testStringsEscapesAndInvalidDocuments() {

@@ -51,7 +51,6 @@ struct AllocationMetrics {
 
 namespace detail {
 
-inline std::atomic<uint32_t> g_allocExternalOk{0};
 inline std::atomic<uint32_t> g_allocExternalFallback{0};
 inline std::atomic<bool> g_workBufExternal{false};
 inline AllocationMetrics g_allocations[static_cast<size_t>(AllocationOwner::COUNT)];
@@ -83,10 +82,6 @@ inline void noteAllocation(AllocationOwner owner, size_t bytes, bool success) {
     metrics.failures.fetch_add(1, std::memory_order_relaxed);
     metrics.lastFailureBytes.store(size, std::memory_order_relaxed);
   }
-}
-
-inline uint32_t allocExternalOkCount() {
-  return detail::g_allocExternalOk.load(std::memory_order_relaxed);
 }
 
 inline uint32_t allocExternalFallbackCount() {
@@ -124,9 +119,6 @@ inline void *allocExternal(size_t bytes, AllocationOwner owner = AllocationOwner
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   void *block = detail::hostAllocationFails() ? nullptr : malloc(bytes);
   noteAllocation(owner, bytes, block != nullptr);
-  if (block != nullptr) {
-    detail::g_allocExternalOk.fetch_add(1, std::memory_order_relaxed);
-  }
   return block;
 #else
   void *block = nullptr;
@@ -137,7 +129,6 @@ inline void *allocExternal(size_t bytes, AllocationOwner owner = AllocationOwner
 #endif
   if (block != nullptr && pointerIsExternal(block)) {
     noteAllocation(owner, bytes, true);
-    detail::g_allocExternalOk.fetch_add(1, std::memory_order_relaxed);
     return block;
   }
   if (block != nullptr) {

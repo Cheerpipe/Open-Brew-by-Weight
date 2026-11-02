@@ -34,18 +34,6 @@ bool startPulseTrain(BuzzerPattern pattern, uint32_t durationMs) {
   return localBuzzer.request(pattern, durationMs);
 }
 
-bool startExtendedPulseTrain(uint32_t durationMs) {
-  BuzzerToneCommand cmd =
-      deriveBuzzerTone(AlertEvent::EXTENDED_PULSE, session.slowExtractionExtended,
-                       runtimeConfig.buzzerExtendedPulseRate,
-                       runtimeConfig.buzzerSlowExtendedPulseRate);
-  if (!cmd.valid) {
-    return false;
-  }
-  cmd.durationMs = durationMs;
-  return playLocalAlertTone(cmd, false);
-}
-
 void stopPulseTrains() {
   localBuzzer.stopPulseTrains();
 }

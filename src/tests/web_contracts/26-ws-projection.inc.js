@@ -92,7 +92,7 @@ int main(){
   uint32_t seed=0x2545F491u;
   auto rnd=[&]{return seed=seed*1664525u+1013904223u;};
   for(int c=0;c<40;++c){
-    ShotCurveRecord curve=emptyShotCurveRecord();
+    ShotCurveRecord curve{};resetShotCurveRecord(curve);
     std::string line="{\\"pts\\":[";
     uint32_t at=0;int cg=0;
     const int wanted=c==0?9:static_cast<int>(rnd()%300);

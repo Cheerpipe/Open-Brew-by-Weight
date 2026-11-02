@@ -84,12 +84,6 @@ inline void resetShotCurveRecord(ShotCurveRecord &curve) {
   curve.ended = missingShotCurveEvent();
 }
 
-inline ShotCurveRecord emptyShotCurveRecord() {
-  ShotCurveRecord curve{};
-  resetShotCurveRecord(curve);
-  return curve;
-}
-
 inline void copyShotCurve(ShotCurveRecord &out, const ShotCurveRecord &in) {
   if (&out == &in) return;
   memcpy(&out, &in, offsetof(ShotCurveRecord, stream));

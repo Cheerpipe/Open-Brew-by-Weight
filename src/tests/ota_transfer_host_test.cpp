@@ -20,6 +20,11 @@ struct OtaHostTestAccess {
     std::strcpy(ota->runningTag_.machine, FW_MACHINE_COMPAT_STRING);
     return ota;
   }
+  // serviceBoot stops before this once rejected; the guard inside stays covered.
+  static bool confirm(OpenBrewByWeightOta &ota) {
+    TaskLockGuard lock(ota.mutex_);
+    return ota.confirmRunningImageLocked();
+  }
 };
 }  // namespace openbrewbyweight
 
@@ -335,8 +340,9 @@ void testRollbackDoesNotConfirmOnFailure() {
     ota_host::rollbackError = ESP_OK;
     CHECK(service(*ota, 180999, false).attempts == 1);
     CHECK(service(*ota, 181000, false).state == ESP_OTA_IMG_INVALID);
-    CHECK(ota->snapshot().rejected && !ota->confirmRunningImage());
-    CHECK(ota_host::confirms == 0);
+    CHECK(ota->snapshot().rejected && !OtaHostTestAccess::confirm(*ota));
+    CHECK(service(*ota, 200000).state == ESP_OTA_IMG_INVALID);
+    CHECK(ota_host::confirms == 0 && ota->snapshot().rejected);
   }
   reset(ESP_OTA_IMG_PENDING_VERIFY);
   ota_host::rollbackPossible = false;
