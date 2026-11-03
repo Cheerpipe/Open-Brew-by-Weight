@@ -63,7 +63,6 @@ idf_component_register(
     espressif__network_provisioning
 )
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-missing-field-initializers)
 
 # API error prose for reason-coded responses is generated from the Web UI
 # locale catalog (en.json err.*) — the single editable copy of the sentences —

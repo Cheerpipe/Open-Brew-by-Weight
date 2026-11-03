@@ -3,6 +3,9 @@
 #include "OpenBrewByWeightPsram.h"
 #include "OpenBrewByWeightHttpDiagnostics.h"
 
+#include <cstdarg>
+#include <cstdio>
+
 #if defined(OPEN_BREW_BY_WEIGHT_WEBHOOK_TEST_PLATFORM) || \
     (!defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
      !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST))
@@ -69,6 +72,20 @@ const char *eventName(WebhookEventType type) {
   return "unknown";
 }
 
+// Appends formatted text at output[used, capacity) and advances used; false
+// when it does not fit. The format attribute checks every call site.
+__attribute__((format(printf, 4, 5))) bool appendFormat(char *output, size_t capacity,
+                                                        size_t &used, const char *format,
+                                                        ...) {
+  if (used >= capacity) return false;
+  va_list args;
+  va_start(args, format);
+  const int count = vsnprintf(output + used, capacity - used, format, args);
+  va_end(args);
+  if (count <= 0 || static_cast<size_t>(count) >= capacity - used) return false;
+  used += static_cast<size_t>(count);
+  return true;
+}
 }  // namespace
 
 void deviceId(char *output, size_t capacity) {
@@ -581,25 +598,10 @@ bool WebhookDispatcher::buildPayload(const WebhookEvent &event, char *output,
       static_cast<unsigned long>(millis()));
   if (written <= 0 || static_cast<size_t>(written) >= capacity) return false;
   size_t used = static_cast<size_t>(written);
-  auto append = [&](const char *format, auto... args) {
-    if (used >= capacity) return false;
-    // The lambda always receives a string literal at every call site; the
-    // non-literal parameter is what makes -Wformat-security fire. Suppress it
-    // here only: NOLINT is not honored for compiler diagnostics, and the
-    // GCC-style pragma is the form both GCC and clang accept.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-security"
-    const int count =
-        snprintf(output + used, capacity - used, format, args...);
-#pragma GCC diagnostic pop
-    if (count <= 0 || static_cast<size_t>(count) >= capacity - used) return false;
-    used += static_cast<size_t>(count);
-    return true;
-  };
   switch (event.type) {
     case WebhookEventType::BREWING:
     case WebhookEventType::IDLE:
-      if (!append(",\"state\":\"%s\",\"durationMs\":%lu,"
+      if (!appendFormat(output, capacity, used, ",\"state\":\"%s\",\"durationMs\":%lu,"
                   "\"targetWeightG\":%.1f,\"presetId\":%u,\"presetName\":\"%s\","
                   "\"stopDetail\":\"%s\"",
                   event.type == WebhookEventType::BREWING ? "brewing" : "idle",
@@ -609,7 +611,7 @@ bool WebhookDispatcher::buildPayload(const WebhookEvent &event, char *output,
                   event.stopDetail)) return false;
       break;
     case WebhookEventType::FIRST_DROP:
-      if (!append(",\"firstDropMs\":%lu,\"weightG\":%.2f,"
+      if (!appendFormat(output, capacity, used, ",\"firstDropMs\":%lu,\"weightG\":%.2f,"
                   "\"targetWeightG\":%.1f,\"presetId\":%u,\"presetName\":\"%s\"",
                   static_cast<unsigned long>(event.firstDropMs), event.weightG,
                   event.targetWeightG, static_cast<unsigned>(event.presetId),
@@ -618,43 +620,43 @@ bool WebhookDispatcher::buildPayload(const WebhookEvent &event, char *output,
       }
       break;
     case WebhookEventType::END:
-      if (!append(",\"durationMs\":%lu,\"targetWeightG\":%.1f,"
+      if (!appendFormat(output, capacity, used, ",\"durationMs\":%lu,\"targetWeightG\":%.1f,"
                   "\"presetId\":%u,\"presetName\":\"%s\",\"shotType\":\"%s\","
                   "\"stopDetail\":\"%s\"",
                   static_cast<unsigned long>(event.durationMs),
                   event.targetWeightG, static_cast<unsigned>(event.presetId),
                   presetName, event.shotType, event.stopDetail)) return false;
       if (event.firstDropValid &&
-          !append(",\"firstDropMs\":%lu",
+          !appendFormat(output, capacity, used, ",\"firstDropMs\":%lu",
                   static_cast<unsigned long>(event.firstDropMs))) return false;
-      if (event.weightValid && !append(",\"weightG\":%.2f", event.weightG))
+      if (event.weightValid && !appendFormat(output, capacity, used, ",\"weightG\":%.2f", event.weightG))
         return false;
       if (event.averageFlowValid &&
-          !append(",\"averageFlowGps\":%.2f", event.averageFlowGps))
+          !appendFormat(output, capacity, used, ",\"averageFlowGps\":%.2f", event.averageFlowGps))
         return false;
       break;
     case WebhookEventType::TEST:
       if (event.correlationId[0] != '\0' &&
-          !append(",\"correlationId\":\"%s\"", event.correlationId))
+          !appendFormat(output, capacity, used, ",\"correlationId\":\"%s\"", event.correlationId))
         return false;
       break;
     case WebhookEventType::PRESETS_CHANGED:
-      if (!append(",\"activeId\":%u,\"revision\":%lu,\"items\":[",
+      if (!appendFormat(output, capacity, used, ",\"activeId\":%u,\"revision\":%lu,\"items\":[",
                   static_cast<unsigned>(event.presetId),
                   static_cast<unsigned long>(event.presetRevision))) return false;
       for (uint8_t i = 0; i < event.presetCount && i < 8; ++i) {
         const WebhookPresetItem &item = event.presets[i];
         char itemName[sizeof(item.name) * 6] = {};
         if (!escapeJsonString(item.name, itemName, sizeof(itemName))) return false;
-        if (!append("%s{\"id\":%u,\"name\":\"%s\",\"isFactory\":%s}",
+        if (!appendFormat(output, capacity, used, "%s{\"id\":%u,\"name\":\"%s\",\"isFactory\":%s}",
                     i == 0 ? "" : ",", static_cast<unsigned>(item.id),
                     itemName, item.isFactory ? "true" : "false")) return false;
       }
-      if (!append("]")) return false;
+      if (!appendFormat(output, capacity, used, "]")) return false;
       break;
     case WebhookEventType::QUICK_SETTINGS_CHANGED: {
       const QuickSettingsSnapshot &quick = event.quickSettings;
-      if (!append(",\"revision\":%lu,\"activePresetId\":%u,"
+      if (!appendFormat(output, capacity, used, ",\"revision\":%lu,\"activePresetId\":%u,"
                   "\"brewByWeight\":%s,\"noScaleBbwMode\":\"%s\","
                   "\"autoToManualGuardEnabled\":%s,"
                   "\"slowExtractionGuardEnabled\":%s,"
@@ -673,11 +675,11 @@ bool WebhookDispatcher::buildPayload(const WebhookEvent &event, char *output,
       break;
     }
     case WebhookEventType::CONTROLLER_STARTED:
-      if (!append(",\"revision\":%lu",
+      if (!appendFormat(output, capacity, used, ",\"revision\":%lu",
                   static_cast<unsigned long>(event.presetRevision))) return false;
       break;
     case WebhookEventType::ACTIVATION_HISTORY:
-      if (!append(",\"id\":%lu,\"type\":\"%s\",\"durationS\":%.1f,"
+      if (!appendFormat(output, capacity, used, ",\"id\":%lu,\"type\":\"%s\",\"durationS\":%.1f,"
                   "\"hasWallTime\":%s,\"endedAtUnixSec\":%lu,"
                   "\"endedAtLocalSec\":%lu",
                   static_cast<unsigned long>(event.activationId),
@@ -692,11 +694,11 @@ bool WebhookDispatcher::buildPayload(const WebhookEvent &event, char *output,
       char address[sizeof(event.ipAddress) * 6] = {};
       if (!escapeJsonString(event.ipAddress, address, sizeof(address)))
         return false;
-      if (!append(",\"ip\":\"%s\"", address)) return false;
+      if (!appendFormat(output, capacity, used, ",\"ip\":\"%s\"", address)) return false;
       break;
     }
   }
-  return append("}");
+  return appendFormat(output, capacity, used, "}");
 }
 
 WebhookDispatcher::SendOutcome WebhookDispatcher::send(

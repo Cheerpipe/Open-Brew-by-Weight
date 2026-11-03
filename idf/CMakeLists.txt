@@ -71,9 +71,7 @@ if(NOT _obbw_extra_raw STREQUAL "")
       # re-enabling this warning globally breaks the SDK build. Attach it
       # below only to project-owned components.
       set(_obbw_enable_unused_parameter ON)
-      # Project components inherit -Werror=all/-Werror=deprecated-copy, so
-      # the re-enabled warning must stay a diagnostic, not a build break.
-      set(_obbw_unused_parameter_options "-Wunused-parameter" "-Wno-error=unused-parameter")
+      set(_obbw_unused_parameter_options "-Wunused-parameter")
     elseif(_opt MATCHES "^-D(.+)$")
       idf_build_set_property(COMPILE_DEFINITIONS "${CMAKE_MATCH_1}" APPEND)
     elseif(_opt MATCHES "^-W")
