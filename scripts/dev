@@ -126,9 +126,10 @@ def budget_gate(evidence: bool, firmware: bool) -> dict[str, object]:
     """Gate options that measure budgets: every check records instead of
     failing, and one final verdict judges all of them together. Only the
     quality gate is budget evidence; every other gate reports overruns."""
-    # Up to three pair lanes build at once, so each IDF build gets a third of
-    # the CPUs instead of all of them.
-    jobs = {"IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // 3))} if firmware else {}
+    # Every pair's development and release lanes build at once, so each IDF
+    # build gets its share of the CPUs instead of all of them.
+    jobs = {"IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // (2 * len(BUILD_PROFILES))))
+            } if firmware else {}
     return {"env_extra": {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1", **jobs},
             "final": [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict",
                                           *([] if evidence else ["--report"])])],
@@ -791,8 +792,8 @@ def main() -> int:
                          [("dead-code", ["./scripts/dead-code-idf",
                                          "--webui-language", webui_language])]]
                 for hardware, machine in BUILD_PROFILES:
-                    variant, builds = pair_steps(hardware, machine)
-                    lanes.append([*builds, cppcheck(variant)])
+                    variant, (development, release) = pair_steps(hardware, machine)
+                    lanes += [[development, cppcheck(variant)], [release]]
                 return execute(command, "quality", [s for lane in lanes for s in lane],
                                verbosity, lanes=lanes,
                                **budget_gate(evidence=True, firmware=True))
@@ -814,8 +815,9 @@ def main() -> int:
                 return record(command, risk, verbosity, doc_errors, 1, "docs-and-paths")
             if risk == "R0":
                 return record(command, risk, verbosity, prelude + ["documentation links and context paths: OK"])
-            # Host tests, Web checks, and each profile pair share no outputs, so
-            # they run as parallel lanes; each pair builds in its own trees.
+            # Host tests, Web checks, and each build tree share no outputs, so
+            # they run as parallel lanes: a tree's stack and Cppcheck steps wait
+            # only for that tree's build.
             host = cmake_steps("normal")
             lanes = [host]
             if risk in {"R2", "R3"}:
@@ -828,12 +830,12 @@ def main() -> int:
                 stack = ["python3", "scripts/check_stack_depth.py", "--build-dir"]
                 for hardware, machine in BUILD_PROFILES:
                     variant, (development, release) = pair_steps(hardware, machine)
-                    lanes.append([development, (f"stack-{variant}", [*stack, f"build-idf/{variant}"]),
-                                  release, (f"stack-release-{variant}",
-                                            [*stack, f"build-idf/release/{variant}"])])
+                    lanes.append([development, (f"stack-{variant}", [*stack, f"build-idf/{variant}"])])
                     if risk == "R3":
                         lanes[-1].append(cppcheck(variant, "OPENBREWBYWEIGHT_CPPCHECK_RISK=1",
                                                   f"OPENBREWBYWEIGHT_CPPCHECK_CHANGED={changed}"))
+                    lanes.append([release, (f"stack-release-{variant}",
+                                            [*stack, f"build-idf/release/{variant}"])])
             manual = ["Complete and attach applicable HIL/manual evidence"] if risk == "R3" else []
             firmware = len(lanes) > 1
             return execute(command, risk, [s for lane in lanes for s in lane], verbosity, manual,

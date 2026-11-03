@@ -190,11 +190,12 @@ that the design preview renders, and ends with the only budget verdict that
 fails on an overrun.
 
 R2 and R3 run parallel lanes: the host tests; the Web checks (route
-capacity, Web UI budgets, Web contracts); and one lane per profile pair
-(development build and stack depth, release build and stack depth, then
-Cppcheck on R3). The quality gate runs the Web UI budgets with the design
-preview, the dead-code check, and one lane per pair. The pairs build in
-parallel, each IDF build with a third of the CPUs (`IDF_PY_BUILD_JOBS`).
+capacity, Web UI budgets, Web contracts); and, for each profile pair, a
+development lane (build, stack depth, Cppcheck on R3) and a release lane
+(build, stack depth). The quality gate runs the Web UI budgets with the design
+preview, the dead-code check, and the same two lanes per pair (build and
+Cppcheck, release build). All six builds run in parallel, each with its share
+of the CPUs (`IDF_PY_BUILD_JOBS`).
 Each step's output appears in the log as one
 block when the step finishes. After any failure no lane starts another step;
 steps already running finish first. When every lane passes, a final

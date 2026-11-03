@@ -1146,9 +1146,9 @@ assert [name for name, _ in host_lane] == [
 assert [name for name, _ in web_lane] == ["http-route-capacity", "web-budgets",
                                           "web-contracts"], web_lane
 assert [[name for name, _ in lane] for lane in pair_lanes] == [
-    [f"{kind}-{hardware}--{machine}"
-     for kind in ("idf", "stack", "release", "stack-release", "cppcheck")]
-    for hardware, machine in dev_module["BUILD_PROFILES"]], pair_lanes
+    [f"{kind}-{hardware}--{machine}" for kind in kinds]
+    for hardware, machine in dev_module["BUILD_PROFILES"]
+    for kinds in (("idf", "stack", "cppcheck"), ("release", "stack-release"))], pair_lanes
 assert all("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv and
            "OPENBREWBYWEIGHT_CPPCHECK_CHANGED=src/web/app.js" in argv
            for lane in pair_lanes for name, argv in lane if name.startswith("cppcheck-"))
@@ -1162,7 +1162,7 @@ validate_language_steps(["src/web/app.js"], risk="R2")
 report_gate = validate_language_steps.captured
 assert report_gate["env_extra"] == {
     "OPENBREWBYWEIGHT_BUDGET_DEFER": "1",
-    "IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // 3))}, report_gate
+    "IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // 6))}, report_gate
 assert report_gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets",
                                                     "verdict", "--report"])]
 assert report_gate["summary_extra"]["budget"]["evidence"] is False
@@ -1172,8 +1172,9 @@ gate = validate_language_steps.captured
 assert [name for name, _ in quality_web] == ["web-budgets", "web-preview"], quality_web
 assert [name for name, _ in quality_dead_code] == ["dead-code"], quality_dead_code
 assert [[name for name, _ in lane] for lane in quality_pairs] == [
-    [f"{kind}-{hardware}--{machine}" for kind in ("idf", "release", "cppcheck")]
-    for hardware, machine in dev_module["BUILD_PROFILES"]], quality_pairs
+    [f"{kind}-{hardware}--{machine}" for kind in kinds]
+    for hardware, machine in dev_module["BUILD_PROFILES"]
+    for kinds in (("idf", "cppcheck"), ("release",))], quality_pairs
 assert not any("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv
                for lane in quality_pairs for _, argv in lane)
 assert gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict"])]
