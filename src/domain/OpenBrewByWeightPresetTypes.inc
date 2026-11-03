@@ -38,6 +38,8 @@ struct ShotPreset {
   // from the legacy enum above by the preset sanitize pass).
   uint8_t fastCurveHardnessPct = RAMP_HARDNESS_PCT_UNSET;
   uint8_t slowCurveHardnessPct = RAMP_HARDNESS_PCT_UNSET;
+
+  bool operator==(const ShotPreset &) const = default;
 };
 
 struct ShotPresetBank {
@@ -45,4 +47,6 @@ struct ShotPresetBank {
   uint8_t activeId = 0;
   uint8_t nextId = FACTORY_PRESET_COUNT + 1;
   ShotPreset presets[MAX_SHOT_PRESETS] = {};
+
+  bool operator==(const ShotPresetBank &) const = default;
 };

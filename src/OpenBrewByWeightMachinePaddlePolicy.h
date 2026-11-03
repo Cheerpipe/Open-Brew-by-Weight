@@ -119,10 +119,8 @@ MachineIntention machinePollIntention() {
   out.stablyOff = activatorIsStablyOff();
 
   const bool swallowStop = activatorTurnedOff && !machineReportsStopOnRelease();
-  if (activatorTurnedOn && !machineCycleActive) {
-    out.intent = UserIntent::REQUEST_START;
-  } else if (activatorTurnedOn && machineCycleActive) {
-    out.intent = UserIntent::HOLD_ACTIVE;
+  if (activatorTurnedOn) {
+    out.intent = machineCycleActive ? UserIntent::HOLD_ACTIVE : UserIntent::REQUEST_START;
   } else if (activatorTurnedOff && paddleHoldIsRinseGesture()) {
     out.intent = UserIntent::REQUEST_RINSE;
   } else if (activatorTurnedOff && !swallowStop) {

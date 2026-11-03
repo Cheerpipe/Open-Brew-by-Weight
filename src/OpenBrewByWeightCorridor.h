@@ -540,6 +540,8 @@ struct ArrivalStats {
   int32_t medianMs = 0;
   int32_t sigmaMs = 0;
   uint16_t total = 0;  // admissible shots since the epoch
+
+  bool operator==(const ArrivalStats &) const = default;
 };
 
 // Slot for recordId among the newest STATS_MAX_SHOTS kept ids: a free slot
@@ -663,6 +665,8 @@ inline ArrivalStats arrivalStats(const ArrivalRecord *records, size_t count,
 struct FirstDropStats {
   uint8_t n = 0;
   int32_t medianMs = 0;  // 0 = none
+
+  bool operator==(const FirstDropStats &) const = default;
 };
 
 template <typename RowAt>
@@ -802,6 +806,8 @@ struct GrindHintV2 {
   int32_t offsetMs = 0;   // level - c
   int32_t bandMs = 0;     // comfort band half-width b
   uint32_t segmentStartId = 0;
+
+  bool operator==(const GrindHintV2 &) const = default;
 };
 
 // Replays one preset's hint-admissible shots, oldest first, through change

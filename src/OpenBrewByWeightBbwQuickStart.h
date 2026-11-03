@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <type_traits>
+
 #include "OpenBrewByWeightPresets.h"
 
 namespace openbrewbyweight {
@@ -31,6 +33,7 @@ struct QuickStartEntry {
   int16_t observedCg[QUICK_START_SHOTS] = {};
   int16_t setCg = 0;    // Drip the owner set; meaningful with setAtId.
   int16_t quickCg = 0;  // Drip the quick start chose.
+  uint16_t reserved2 = 0;  // Names the alignment gap: every stored byte is defined.
   uint32_t setAtId = 0;    // First shot-log id after the set; 0 = no marker.
   uint32_t quickAtId = 0;  // Shot-log id of the deciding shot.
 };
@@ -43,6 +46,8 @@ struct QuickStartRecord {
   uint32_t checksum = 0;
 };
 static_assert(sizeof(QuickStartRecord) == 204, "quick start record layout changed");
+// The write check compares the stored bytes, so the record has no padding.
+static_assert(std::has_unique_object_representations_v<QuickStartRecord>);
 
 inline uint32_t quickStartChecksum(const QuickStartRecord &record) {
   const uint8_t *bytes = reinterpret_cast<const uint8_t *>(&record);

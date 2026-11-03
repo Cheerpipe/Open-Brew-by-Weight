@@ -194,6 +194,8 @@ struct PresetShotStats {
   // The preset's own first drops; without any, medianMs is the other presets'.
   corridor::FirstDropStats firstDrop;
   corridor::GrindHintV2 grindHint;  // NONE while the preset's hints are off
+
+  bool operator==(const PresetShotStats &) const = default;
 };
 
 // JSON values (quoted, or null) of the packed corridor verdict byte.

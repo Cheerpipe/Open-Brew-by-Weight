@@ -41,7 +41,9 @@
 #include <esp_wifi.h>
 #include <mdns.h>
 #include "OpenBrewByWeightRfCoex.h"
+#include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <float.h>
 #include <new>
 #include <stdarg.h>
@@ -1127,13 +1129,13 @@ bool statusJsonAppendScaleProfiler(size_t *used,
 void refreshRenderedPresets(const NetworkBridgeCallbacks &callbacks,
                             const ShotPresetBank &bank) {
   const uint32_t epoch = callbacks.shotLogEpoch ? callbacks.shotLogEpoch() : 0;
-  const bool bankMoved = memcmp(&g_work->renderedPresets, &bank, sizeof(bank)) != 0;
+  const bool bankMoved = g_work->renderedPresets != bank;
   if (!bankMoved && epoch == g_work->renderedShotLogEpoch) return;
   memset(g_work->presetStats, 0, sizeof(g_work->presetStats));
   if (callbacks.copyPresetShotStats) callbacks.copyPresetShotStats(bank, g_work->presetStats);
   g_work->renderedShotLogEpoch = epoch;
-  if (!bankMoved &&
-      memcmp(g_work->renderedStats, g_work->presetStats, sizeof(g_work->renderedStats)) == 0)
+  if (!bankMoved && std::equal(std::begin(g_work->renderedStats), std::end(g_work->renderedStats),
+                               std::begin(g_work->presetStats)))
     return;
   g_work->renderedPresets = bank;
   memcpy(g_work->renderedStats, g_work->presetStats, sizeof(g_work->renderedStats));

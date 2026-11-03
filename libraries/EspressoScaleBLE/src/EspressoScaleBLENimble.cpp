@@ -1399,7 +1399,7 @@ class NimbleScaleClient {
     if (!current) {
       return;
     }
-    const uint16_t length = OS_MBUF_PKTLEN(buffer);
+    const uint16_t length = os_mbuf_len(buffer);
     if (length == 0 || length > MAX_BLE_PACKET_LENGTH) {
       portENTER_CRITICAL(&mux_);
       ++rejectedPackets_;
@@ -2708,10 +2708,8 @@ class NimbleScaleClient {
                                generation_ << 8;
       const uint32_t delayMs = backoff_.schedule(nowMs(), entropy);
       ++backoffCount_;
-      if (reason == ScaleDisconnectReason::SCAN_START_FAILED) {
-        backoffScanActive_ = false;
-        enterState(State::Backoff, delayMs);
-      } else if (communicationSilenced() || linkCleanupPending()) {
+      if (reason == ScaleDisconnectReason::SCAN_START_FAILED || communicationSilenced() ||
+          linkCleanupPending()) {
         backoffScanActive_ = false;
         enterState(State::Backoff, delayMs);
       } else {

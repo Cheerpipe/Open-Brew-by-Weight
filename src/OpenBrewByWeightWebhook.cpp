@@ -56,7 +56,7 @@ int stateSlot(WebhookEventType type) {
 
 const char *eventName(WebhookEventType type) {
   switch (type) {
-    case WebhookEventType::BREWING: return "brew_state";
+    case WebhookEventType::BREWING:
     case WebhookEventType::IDLE: return "brew_state";
     case WebhookEventType::FIRST_DROP: return "first_drop";
     case WebhookEventType::END: return "end";
@@ -531,11 +531,12 @@ void WebhookDispatcher::task() {
       failures = 0;
     }
     // The gate may change while xQueueReceive is blocked. Keep the dequeued
-    // item locally and recheck so no request starts after the critical edge.
-    if (haveQueued && queued.event.type == WebhookEventType::CONTROLLER_STARTED &&
-        WiFi.status() != WL_CONNECTED) {
-      vTaskDelay(pdMS_TO_TICKS(25));
-    } else if (haveQueued && dispatchAllowed() && (failures == 0 ||
+    // item locally and recheck so no request starts after the critical edge;
+    // the controller-started event also waits for Wi-Fi.
+    const bool waitForWifi = haveQueued &&
+                             queued.event.type == WebhookEventType::CONTROLLER_STARTED &&
+                             WiFi.status() != WL_CONNECTED;
+    if (!waitForWifi && haveQueued && dispatchAllowed() && (failures == 0 ||
                millis() - failedAt >= kWebhookRetryDelaysMs[failures - 1])) {
       const SendOutcome outcome = send(queued, failures);
       haveQueued = outcome == SendOutcome::HELD || outcome == SendOutcome::RETRY;

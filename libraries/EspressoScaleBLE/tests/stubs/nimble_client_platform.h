@@ -96,7 +96,7 @@ inline int ble_uuid_from_str(ble_uuid_any_t *u, const char *s) {
 inline int ble_uuid_cmp(const ble_uuid_t *a,const ble_uuid_t *b) { return a->value != b->value; }
 inline uint16_t ble_uuid_u16(const ble_uuid_t *u) { return u->value; }
 struct os_mbuf { uint16_t length; uint8_t data[32]; };
-#define OS_MBUF_PKTLEN(b) ((b)->length)
+inline uint16_t os_mbuf_len(const os_mbuf *b) { return b->length; }
 inline int os_mbuf_copydata(os_mbuf *b,int offset,int length,void *out) {
   memcpy(out,b->data+offset,length); return 0;
 }
