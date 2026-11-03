@@ -1776,3 +1776,18 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
         'applyStatus(s); syncHeroTintAvailability();'))
     throw new Error('Shot card colours must follow the resolved hero mode and go read-only on Technical');
 }
+{
+  // Every deck card says when its shot ended, the latest one included.
+  const els={heroDeckTrack:{children:[{},{},{}].map(()=>({setAttribute(){}}))},heroDeckDots:{children:[]},
+    heroDeckWhich:{},heroDeckAge:{},heroDeckCount:{}};
+  const heroDeck={last:{card:{endedAtLocalSec:300}},shown:[{endedAtLocalSec:200},{endedAtLocalSec:0}]};
+  const mark=new Function('$','__WEBUI_TEXT__','sub','formatHumanTime','heroDeck',
+    blockAt(runtimeJs,'function markHeroDeck(')+';return markHeroDeck;')(
+    (id)=>els[id],(k)=>k,(t)=>t,(l)=>'t'+l,heroDeck);
+  const age=(i)=>(mark(i),els.heroDeckAge.textContent);
+  if(age(0)!=='· t300'||age(1)!=='· t200'||age(2)!=='')
+    throw new Error('Deck cards must show their stored end time and nothing without a clock');
+  heroDeck.last=null;
+  if(age(0)!=='')
+    throw new Error('A running or unstored hero shot has no end time to show');
+}

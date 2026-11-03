@@ -880,6 +880,9 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
   delta.field("weight", "%s", weight);
   delta.field("goal", "%s", FixedText(card.goalWeightDg, 1).text);
   delta.field("elapsedMs", "%lu", static_cast<unsigned long>(card.durationMs));
+  // When the stored shot ended on the local clock; 0 = not stored or no clock.
+  delta.field("endedAtLocalSec", "%lu",
+              static_cast<unsigned long>(canonical && latest.hasWallTime ? latest.endedAtLocalSec : 0U));
   delta.field("firstDropMs", "%s", drop);
   delta.field("tareMs", "%s", tare);
   delta.field("presetName", "\"%s\"", preset);

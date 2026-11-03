@@ -5757,13 +5757,13 @@ function markHeroDeck(i) {
   const slides = $("heroDeckTrack").children,
     n = slides.length;
   heroDeck.i = i = Math.min(i, n - 1);
-  const r = heroDeck.shown?.[i - 1];
+  const at = (i ? heroDeck.shown?.[i - 1] : heroDeck.last?.card)?.endedAtLocalSec;
   $("heroDeckWhich").textContent = [
     __WEBUI_TEXT__("home.deck_latest"),
     __WEBUI_TEXT__("home.deck_previous"),
     __WEBUI_TEXT__("home.deck_earlier"),
   ][i];
-  $("heroDeckAge").textContent = r?.hasWallTime ? "· " + formatHumanTime(r.endedAtLocalSec) : "";
+  $("heroDeckAge").textContent = at ? "· " + formatHumanTime(at) : "";
   $("heroDeckCount").textContent = sub(__WEBUI_TEXT__("home.deck_count"), [i + 1, n]);
   [...$("heroDeckDots").children].forEach((b, k) => {
     b.setAttribute("aria-selected", k === i);
