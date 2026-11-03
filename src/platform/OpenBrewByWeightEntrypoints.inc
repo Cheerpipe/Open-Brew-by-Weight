@@ -382,7 +382,8 @@ void startAfterBootRecovery() {
   publishRecipeState();
   publishScaleWorkerPolicy(runtimeConfig, false);
 
-  logEmit(LogLevel::INFO, DebugCategory::BOOT, DebugCode::BOOT_RESET_REASON,
+  logEmit(safetyResetStatus.unsafeReset ? LogLevel::WARNING : LogLevel::INFO,
+          DebugCategory::BOOT, DebugCode::BOOT_RESET_REASON,
           static_cast<int32_t>(safetyResetStatus.reasonCode));
   logEmit(relaySafetyTimersReady ? LogLevel::INFO : LogLevel::CRITICAL,
           DebugCategory::BOOT, DebugCode::BOOT_SUBSYSTEM,

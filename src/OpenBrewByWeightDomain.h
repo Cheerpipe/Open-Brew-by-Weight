@@ -2403,7 +2403,6 @@ inline LogLevel debugCodeDefaultLevel(DebugCode code) {
     case DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT:
     case DebugCode::SCALE_EVENT_DROPPED:
     case DebugCode::SCALE_PACKET_GAP:
-    case DebugCode::SCALE_STALE_EVENT_REJECTED:
     case DebugCode::CONFIG_REJECTED:
     case DebugCode::NETWORK_RETRY:
     case DebugCode::WIFI_SCAN_ERROR:

@@ -266,8 +266,9 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
   }
   static RefusalLog log;
   if (const uint32_t count = log.due())
-    self.lifecycleLogf("Companion relay refused %lu request(s): %s",
-                       static_cast<unsigned long>(count), reason);
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                         "Companion relay refused %lu request(s): %s",
+                         static_cast<unsigned long>(count), reason);
   sendError(request, status, code, nullptr, "RELAY_INVALID");
   return false;
 }

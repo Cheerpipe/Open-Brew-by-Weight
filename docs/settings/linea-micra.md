@@ -239,7 +239,8 @@ loses its own connection.
 
 The Web UI log records each change of route and why the controller is using
 its own connection, for example **Micra route companion -> direct
-reason=link_lost**.
+reason=link_lost**. Only an unexpected loss of the companion is a warning;
+planned switches, such as before a firmware update, are informational.
 
 ## Boiler readiness
 

@@ -381,11 +381,12 @@ ends on its own and never changes how the machine is controlled. Never
 include passwords or webhook secrets. [USB HEALTH](SERIAL_CLI.md#diagnostics)
 and [shot history](features/shot-history.md) help explain the observed result.
 
-A `stale scale event rejected` warning means an old weight update or scale
+A `stale scale event rejected` entry means an old weight update or scale
 command was ignored. Its detail names the rejected item and reason; `gen(e/n)`
 and `disc(e/n)` compare the event's link identifiers (`e`) with the current
 link (`n`).
-This can happen briefly after a scale disconnects or reconnects.
+This is routine briefly after a scale disconnects or reconnects, so it is
+logged as information rather than a warning.
 
 ## Where to change it
 

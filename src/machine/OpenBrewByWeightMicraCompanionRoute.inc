@@ -16,7 +16,11 @@ void OpenBrewByWeightMicraService::logCompanionRoute(MicraCompanionRoute from,
                                                      MicraCompanionRoute to,
                                                      const char *reason) {
   static constexpr const char *names[] = {"direct", "pending", "companion"};
-  serialTraceCategoryf(to == MicraCompanionRoute::DIRECT ? LogLevel::WARNING : LogLevel::INFO,
+  // Only a lost companion warns; maintenance, settings or Wi-Fi fallbacks are routine.
+  const bool lost = to == MicraCompanionRoute::DIRECT &&
+      (!strcmp(reason, "link_lost") || !strcmp(reason, "ping_missing") ||
+       !strcmp(reason, "upstream_down") || !strcmp(reason, "full_missing"));
+  serialTraceCategoryf(lost ? LogLevel::WARNING : LogLevel::INFO,
                        DebugCategory::NETWORK, "Micra route %s -> %s reason=%s",
                        names[static_cast<uint8_t>(from)], names[static_cast<uint8_t>(to)],
                        reason);
@@ -335,8 +339,10 @@ void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t e
         websocketStatus_.subscribed && (!subscribed || epoch != feed.epoch);
     if (reset) dropCompanionFeedLocked();
   }
+  // La Marzocco ends each upstream session after about 30 min; the next full
+  // frame rebuilds the basis, so a reset is routine.
   if (reset)
-    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                          "Micra companion feed reset subscribed=%u epoch=%lu",
                          static_cast<unsigned>(subscribed), static_cast<unsigned long>(epoch));
 }
