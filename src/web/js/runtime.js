@@ -402,23 +402,37 @@ function updateHeaderSignals(s = {}) {
   }
   if (line) line.hidden = !batt;
   if (batt && $("bluetoothBattery")) $("bluetoothBattery").textContent = scaleBatteryText(pct);
-  // The paired companion: an open link keeps the icon inked, anything else
-  // grays it, and a stale snapshot reads as unknown like the radios. Without
-  // a paired companion the header shows nothing at all.
+  // The paired companion: an open link lights both racks, a closed link
+  // grays them, and a page the companion itself serves keeps one rack lit
+  // (its Web UI relay works without the link). A stale snapshot reads as
+  // unknown like the radios. Without a paired companion the header shows
+  // nothing at all.
   const companion = $("companionSignal");
   if (companion && s.companion) {
     const stale = !!s.snapshotStale,
       paired = stale ? !companion.hidden : s.companion.paired === true,
-      open = paired && !stale && s.companion.link === "open";
+      open = paired && !stale && s.companion.link === "open",
+      through = paired && !stale && uiState.companionHere?.paired === true;
     companion.hidden = !paired;
-    companion.dataset.level = open ? "on" : "off";
+    companion.dataset.level = open ? "on" : through ? "partial" : "off";
     const label = open
       ? __WEBUI_TEXT__("admin.companion_link_open")
       : paired && !stale
         ? __WEBUI_TEXT__("admin.companion_link_down") +
           (s.companion.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "")
         : unavailable;
-    companion.title = __WEBUI_TEXT__("shell.companion") + ": " + label;
+    companion.title =
+      __WEBUI_TEXT__("shell.companion") +
+      ": " +
+      (paired && !stale
+        ? sub(__WEBUI_TEXT__("shell.companion_link_state"), [label]) +
+          " · " +
+          sub(__WEBUI_TEXT__("shell.companion_web_state"), [
+            through
+              ? __WEBUI_TEXT__("shell.companion_web_through")
+              : __WEBUI_TEXT__("shell.companion_web_direct"),
+          ])
+        : label);
     companion.setAttribute("aria-label", companion.title);
     const identity = $("companionName"),
       detail = $("companionDetail");

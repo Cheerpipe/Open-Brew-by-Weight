@@ -358,6 +358,11 @@ WebSocket** says **Through the companion** and leaves out the figures of the
 controller's own connection. Every link and route change is also written to
 the Web UI log, with the reason a link went down.
 
+The server icon in the header shows the companion at a glance, as two racks.
+Both lit means the connection is open. One lit means you are viewing this
+page through the companion but its connection to the controller is down; the
+Web UI keeps working. Both dimmed means the companion is not connected.
+
 For a quicker glance, tap the cloud icon in the header on any page: under
 **Connection type**, its popup says **Directly from the controller**,
 **Through the companion**, or **Moving to the companion** while the handover

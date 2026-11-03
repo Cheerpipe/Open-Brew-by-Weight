@@ -188,6 +188,15 @@ body {
 #micraSignal[data-level="off"] svg {
   opacity: 0.12;
 }
+.rackTop {
+  opacity: var(--rackTop, 1);
+}
+.rackBottom {
+  opacity: var(--rackBottom, 1);
+}
+#companionSignal[data-level="partial"] svg {
+  --rackTop: 0.18;
+}
 .signalSlash {
   display: none;
 }

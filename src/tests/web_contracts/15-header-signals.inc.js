@@ -59,7 +59,7 @@
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas', peerProtocol: 0}});
   assert.equal(elements.companionSignal.hidden, false, 'A paired companion shows even while its link is down');
   assert.equal(elements.companionSignal.dataset.level, 'off');
-  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Not connected');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Not connected \u00b7 Web UI: Direct');
   assert.equal(elements.companionName.textContent, 'nas', 'The paired name stays while the link is down');
   assert.equal(elements.companionDetail.textContent, 'Not connected');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas', peerProtocol: 2}});
@@ -68,7 +68,16 @@
       'A refused link version names the connection problem');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
   assert.equal(elements.companionSignal.dataset.level, 'on');
-  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Connected');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Connected \u00b7 Web UI: Direct');
+  vm.runInContext('uiState.companionHere = {paired: true}', context);
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas'}});
+  assert.equal(elements.companionSignal.dataset.level, 'partial', 'A page served by the companion keeps one rack lit while the link is down');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Not connected \u00b7 Web UI: Through the companion');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
+  assert.equal(elements.companionSignal.dataset.level, 'on', 'An open link lights both racks even through the companion');
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, companion: {paired: true, link: 'down', name: 'nas'}});
+  assert.equal(elements.companionSignal.dataset.level, 'off', 'A stale snapshot grays the companion even when it serves the page');
+  vm.runInContext('uiState.companionHere = null', context);
   context.updateHeaderSignals({snapshotStale: true, connections: {}, companion: {paired: true, link: 'open', name: 'nas'}});
   assert.equal(elements.companionSignal.dataset.level, 'off', 'A stale snapshot grays the paired companion');
   assert.equal(elements.companionSignal.hidden, false, 'A stale snapshot does not unpair the companion');
