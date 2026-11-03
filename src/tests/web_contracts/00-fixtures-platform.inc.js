@@ -37,7 +37,7 @@ function buildHostProgram(binary, native, flags) {
   fs.writeFileSync(file, native);
   try {
     return require('child_process').spawnSync(process.env.CXX || 'c++',
-      ['-std=c++17', ...flags, file, '-o', binary], {encoding: 'utf8', timeout: 300e3});
+      ['-std=c++20', ...flags, file, '-o', binary], {encoding: 'utf8', timeout: 300e3});
   } finally {
     fs.rmSync(file, {force: true});
   }

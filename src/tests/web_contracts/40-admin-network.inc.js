@@ -490,7 +490,7 @@ if (!webhookSource.includes('allocInternal(queueStorageBytes)') ||
     !webhookSource.includes('dispatchAllowed()') ||
     !webhookSource.includes('setControlCritical') ||
     !webhookSource.includes('bool haveQueued = false') ||
-    !webhookSource.includes('if (haveQueued && dispatchAllowed() &&') ||
+    !webhookSource.includes('if (!waitForWifi && haveQueued && dispatchAllowed() &&') ||
     !webhookSource.includes('ensureHttpClient(live.url)') ||
     !webhookSource.includes('sampleHeapCaps()') ||
     !webhookSource.includes('webhookClientMustRecreate') ||

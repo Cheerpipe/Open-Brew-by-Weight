@@ -592,9 +592,9 @@ if (!network.includes('sendBody(request, OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP') ||
     !network.includes('return sendBody(request, asset.data, asset.length)') ||
     !network.includes('const esp_err_t sent = sendBody(request, json, length)') ||
     !network.includes(
-        'return httpd_resp_send(request, static_cast<const char *>(data), length)') ||
+        'return httpd_resp_send(request, static_cast<const char *>(data), static_cast<ssize_t>(length))') ||
     !network.includes(
-        'return httpd_resp_send_chunk(request, static_cast<const char *>(data), length)') ||
+        'return httpd_resp_send_chunk(request, static_cast<const char *>(data), static_cast<ssize_t>(length))') ||
     network.includes('HTTP_DRAM_BOUNCE_BYTES') ||
     network.includes('g_httpSendBounce') ||
     // The bounded write override is exclusive to authenticated WS sessions.
