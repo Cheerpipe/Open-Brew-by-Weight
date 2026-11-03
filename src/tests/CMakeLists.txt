@@ -40,7 +40,7 @@ if(OPENBREWBYWEIGHT_SANITIZER)
 endif()
 
 function(host_test name)
-  cmake_parse_arguments(ARG "" "LABEL;SOURCE" "SOURCES;DEFINITIONS;ARGS" ${ARGN})
+  cmake_parse_arguments(ARG "" "LABEL;SOURCE" "SOURCES;DEFINITIONS;ARGS;CASES" ${ARGN})
   if(NOT ARG_SOURCE)
     set(ARG_SOURCE ${name}.cpp)
   endif()
@@ -50,8 +50,15 @@ function(host_test name)
   target_compile_definitions(${name} PRIVATE ${ARG_DEFINITIONS})
   target_include_directories(${name} PRIVATE "${CMAKE_SOURCE_DIR}/src")
   target_link_libraries(${name} PRIVATE Threads::Threads)
-  add_test(NAME ${name} COMMAND ${name} ${ARG_ARGS})
-  set_tests_properties(${name} PROPERTIES LABELS "${ARG_LABEL}")
+  # CASES runs one binary once per named case, as test <name>_<case>.
+  if(NOT ARG_CASES)
+    add_test(NAME ${name} COMMAND ${name} ${ARG_ARGS})
+    set_tests_properties(${name} PROPERTIES LABELS "${ARG_LABEL}")
+  endif()
+  foreach(case IN LISTS ARG_CASES)
+    add_test(NAME ${name}_${case} COMMAND ${name} ${case})
+    set_tests_properties(${name}_${case} PROPERTIES LABELS "${ARG_LABEL}")
+  endforeach()
 endfunction()
 
 host_test(power_policy_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
@@ -82,17 +89,11 @@ host_test(boot_heap_host_test LABEL "host;resources;network;concurrency")
 host_test(ui_stream_transport_host_test LABEL "host;network")
 
 if(OPENBREWBYWEIGHT_SANITIZER STREQUAL "thread")
-  foreach(case M09 R25c F03 F04 F17 IT10 IT28 SH01 RACE06 TRC10)
-    host_test(open_brew_by_weight_tsan_${case}
-      SOURCE open_brew_by_weight_host_test.cpp ARGS ${case} LABEL "host;concurrency")
-    set_target_properties(open_brew_by_weight_tsan_${case} PROPERTIES
-      OUTPUT_NAME open_brew_by_weight_tsan_${case})
-  endforeach()
+  host_test(open_brew_by_weight_tsan SOURCE open_brew_by_weight_host_test.cpp
+    CASES M09 R25c F03 F04 F17 IT10 IT28 SH01 RACE06 TRC10 LABEL "host;concurrency")
   host_test(ota_state_concurrency_host_test LABEL "host;ota;concurrency")
-  foreach(case TSP15 TSP26)
-    host_test(shot_trace_pool_tsan_${case} SOURCE shot_trace_pool_host_test.cpp ARGS ${case}
-      LABEL "host;persistence;concurrency")
-  endforeach()
+  host_test(shot_trace_pool_tsan SOURCE shot_trace_pool_host_test.cpp CASES TSP15 TSP26
+    LABEL "host;persistence;concurrency")
 else()
   host_test(open_brew_by_weight_host_test LABEL "host;control")
   host_test(persistence_host_test LABEL "host;persistence")
