@@ -2649,7 +2649,7 @@ async function api(path, options = {}) {
     clearTimeout(to);
     releaseDeviceSlot();
   }
-  let data = {};
+  let data;
   try {
     data = JSON.parse(txt);
   } catch (_) {

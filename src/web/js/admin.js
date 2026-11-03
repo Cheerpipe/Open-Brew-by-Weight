@@ -1403,7 +1403,7 @@ async function otaUpload() {
   bar.classList.remove("hidden");
   otaBeginBusy();
   let session = null,
-    status = null;
+    status;
   try {
     R.message(__WEBUI_TEXT__("runtime.checking_firmware_identity"));
     const identity = await otaFileIdentity(file),
