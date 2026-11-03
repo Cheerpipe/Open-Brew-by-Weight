@@ -559,6 +559,7 @@ GrindHintReplay replayVector(const cJSON *root, const cJSON *item, AfterShot aft
     if (static_cast<int32_t>(log.size()) == numOr(item, "adviseAfter", -1)) {
       replay.advised = enumOf<HintDirection>(item, "advised", DIRECTIONS);
       replay.candidate = replay.pushed;
+      replay.sinceAnnounce = 0;
     }
     if (numOr(item, "adviseAfter", -1) < 0)
       CHECK(sameHint(replay.out,
