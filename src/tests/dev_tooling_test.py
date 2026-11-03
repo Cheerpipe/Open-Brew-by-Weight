@@ -1208,8 +1208,10 @@ with tempfile.TemporaryDirectory(prefix="openbrewbyweight-budget-runs-") as temp
 # already running finishes and its whole output stays one contiguous block.
 with tempfile.TemporaryDirectory(prefix="openbrewbyweight-lanes-") as temporary:
     marker = Path(temporary) / "late"
-    with patch.dict(dev_module["execute"].__globals__,
-                    ROOT=Path(temporary), write_summary=lambda *a: Path(temporary) / "s.json"), \
+    recorded_checks: list = []
+    with patch.dict(dev_module["execute"].__globals__, ROOT=Path(temporary),
+                    write_summary=lambda *a: recorded_checks.extend(a[4]) or
+                    Path(temporary) / "s.json"), \
             patch("builtins.print"):
         (Path(temporary) / "artifacts/runs").mkdir(parents=True)
         slow = ("slow", ["sh", "-c", "echo one; sleep 1; echo two"])
@@ -1220,6 +1222,11 @@ with tempfile.TemporaryDirectory(prefix="openbrewbyweight-lanes-") as temporary:
     assert code == 1 and not marker.exists()
     log = next(Path(temporary).glob("artifacts/runs/*/run.log")).read_text()
     assert "==> slow: sh -c echo one; sleep 1; echo two\none\ntwo\n" in log, log
+    # Every check records its lane, start offset, and duration for gate profiling.
+    timed = {check["name"]: check for check in recorded_checks}
+    assert timed["slow"]["lane"] == "0" and timed["fail"]["lane"] == "1", timed
+    assert timed["slow"]["durationSeconds"] >= 1 > timed["fail"]["durationSeconds"], timed
+    assert all(check["startedSeconds"] >= 0 for check in recorded_checks), timed
 
 
 FAKE_RESOLVER = (

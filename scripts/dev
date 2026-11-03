@@ -308,7 +308,7 @@ def safe_args(args: list[str]) -> list[str]:
 
 
 def write_summary(command: list[str], risk: str, status: str, started: float,
-                  checks: list[dict[str, str]], log_path: Path,
+                  checks: list[dict[str, object]], log_path: Path,
                   manual: list[str], inputs: dict[str, object],
                   extra: dict[str, object] | None = None) -> Path:
     summary = {
@@ -352,7 +352,7 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
     final = final or []
     order = {name: i for i, (name, _) in
              enumerate(s for lane in [*lanes, final] for s in lane)}
-    checks: list[dict[str, str]] = []
+    checks: list[dict[str, object]] = []
     failures: list[tuple[int, list[str]]] = []
     lock = threading.Lock()
     live = len(lanes) == 1
@@ -367,8 +367,9 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
                 if verbosity != "compact":
                     print(painted(clean), flush=True)
 
-        def run_lane(lane: list[tuple[str, list[str]]]) -> None:
+        def run_lane(lane: list[tuple[str, list[str]]], label: str) -> None:
             for name, argv in lane:
+                step_started = time.monotonic()
                 with lock:
                     if failures:
                         return
@@ -395,19 +396,22 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
                     if not live:
                         emit(block)
                     checks.append({"name": name,
-                                   "status": "passed" if child_code == 0 else "failed"})
+                                   "status": "passed" if child_code == 0 else "failed",
+                                   "lane": label,
+                                   "startedSeconds": round(step_started - started, 3),
+                                   "durationSeconds": round(time.monotonic() - step_started, 3)})
                     if child_code:
                         failures.append((child_code, block))
                         return
 
-        threads = [threading.Thread(target=run_lane, args=(lane,), daemon=True)
-                   for lane in lanes]
+        threads = [threading.Thread(target=run_lane, args=(lane, str(index)), daemon=True)
+                   for index, lane in enumerate(lanes)]
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join()
         if not failures:
-            run_lane(final)
+            run_lane(final, "final")
     checks.sort(key=lambda check: order[check["name"]])
     child_code = failures[0][0] if failures else 0
     code = child_code if child_code in {0, 2, 127} else 1
@@ -419,6 +423,9 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
         shown = (failures[0][1] if failures else lines)[-max(0, limit - 3):]
         headline = f"{status.upper()}: {' '.join(safe_args(command))}"
         print(painted(headline))
+        slowest = sorted(checks, key=lambda check: -check["durationSeconds"])[:5]
+        print("slowest: " + ", ".join(f"{check['name']} {check['durationSeconds']:.0f}s"
+                                      for check in slowest))
         if code:
             print(painted(failed_check_line(checks, lines, status)))
         for line in shown:
@@ -438,7 +445,7 @@ def record(command: list[str], risk: str, verbosity: str, lines: list[str],
     return execute(command, risk, [step], verbosity, prelude=lines)
 
 
-def failed_check_line(checks: list[dict[str, str]], lines: list[str],
+def failed_check_line(checks: list[dict[str, object]], lines: list[str],
                       status: str) -> str:
     """Compact-mode hint: the failed check plus the likeliest cause, drawn
     from the same captured output the run summary records."""

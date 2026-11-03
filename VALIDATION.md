@@ -137,7 +137,9 @@ External URLs and example contents are not certified by this offline check.
 
 A zero exit code means the automated profile passed, not that hardware is
 qualified. Use the printed `artifacts/runs/<run-id>/summary.json` and full log
-to inspect which steps ran. Exit 127 means a required dependency is missing;
+to inspect which steps ran. Each check records its lane, its start offset,
+and its duration in seconds, and the compact output names the five slowest
+steps, so a slower gate shows which step grew. Exit 127 means a required dependency is missing;
 record the gate as failed and prepare the dependency explicitly.
 
 Failed runs keep their evidence: only steps that started can produce
