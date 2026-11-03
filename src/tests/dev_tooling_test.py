@@ -1098,7 +1098,8 @@ assert len(r2_release) == 3 and all(
 # Host tests and firmware work run as two parallel lanes. Every step that
 # touches IDF trees, the shared Web UI header, or the CLI store stays serial in
 # the firmware lane: route capacity before Web contracts, then per variant the
-# budget build, cppcheck over its database, and the separate warnings build.
+# budget build, cppcheck over its database, and the separate warnings build,
+# then one dead-code check over every variant.
 host_lane, firmware_lane = validate_language_steps(["src/web/app.js"], lanes=True)
 assert [name for name, _ in host_lane] == [
     f"{stage}-{preset}" for preset in ("normal", "asan-ubsan", "tsan")
@@ -1109,7 +1110,7 @@ assert firmware_names[:4] == ["http-route-capacity", "web-budgets", "web-contrac
 assert firmware_names[4:] == [f"{kind}-{hardware}--{machine}"
                               for hardware, machine in dev_module["BUILD_PROFILES"]
                               for kind in ("idf", "stack", "release", "stack-release",
-                                           "cppcheck", "warnings")], firmware_names
+                                           "cppcheck", "warnings")] + ["dead-code"], firmware_names
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for name, argv in host_lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None

@@ -303,7 +303,8 @@ dead-code check below replaces it.
 ./scripts/dead-code-idf
 ```
 
-The check answers which project functions no firmware image uses. A normal
+The check answers which project functions no firmware image uses, and runs
+in every R3 validation (`./scripts/dev validate`). A normal
 build cannot tell: it inlines small functions and discards their out-of-line
 copies even though their code runs. So the script compiles every profile pair
 that R2/R3 validation builds twice, each in its own tree under
