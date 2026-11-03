@@ -76,15 +76,6 @@ struct ScaleBleAddress {
     ScaleBleAddressType type;
 };
 
-struct ScaleBleConnectionRef {
-    uint16_t handle;
-    uint32_t generation;
-
-    bool valid() const {
-        return handle != SCALE_BLE_INVALID_CONNECTION_HANDLE;
-    }
-};
-
 enum class ScaleBleEventType : uint8_t {
     StartRequested,
     ScanStarted,

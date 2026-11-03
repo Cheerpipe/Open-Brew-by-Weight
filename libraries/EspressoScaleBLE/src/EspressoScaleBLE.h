@@ -15,7 +15,6 @@
 #define HEARTBEAT_PERIOD_MS              2750UL
 #define FIRST_PACKET_TIMEOUT_MS          5000UL
 #define MAX_PACKET_PERIOD_MS             5000UL
-#define SCALE_SCAN_TIMEOUT_MS            3000UL
 #define BLE_OPERATION_TIMEOUT_MS          1000UL
 #define BLE_CONNECT_TIMEOUT_MS            2000UL
 #define BLE_DISCOVER_TIMEOUT_MS           3000UL
@@ -112,8 +111,6 @@ class EspressoScaleBLE {
         EspressoScaleBLE(const EspressoScaleBLE&) = delete;
         EspressoScaleBLE& operator=(const EspressoScaleBLE&) = delete;
 
-        bool init(const char *mac = nullptr);
-
         bool startScan(const char *mac = nullptr, bool forceRestart = false,
                        uint16_t interval = BLE_SCAN_BALANCED_INTERVAL,
                        uint16_t window = BLE_SCAN_BALANCED_WINDOW,
@@ -124,22 +121,14 @@ class EspressoScaleBLE {
 
         void disconnect();
 
-        ScaleCommandResult tare();
         ScaleCommandResult tare(const ScaleCommandAdmission *admission);
-        ScaleCommandResult startTimer();
         ScaleCommandResult startTimer(const ScaleCommandAdmission *admission);
-        ScaleCommandResult stopTimer();
         ScaleCommandResult stopTimer(const ScaleCommandAdmission *admission);
-        ScaleCommandResult resetTimer();
         ScaleCommandResult resetTimer(const ScaleCommandAdmission *admission);
-        ScaleCommandResult tareStartTimer();
         ScaleCommandResult tareStartTimer(const ScaleCommandAdmission *admission);
         bool supportsTareStartTimer() const;
 
-        ScaleCommandResult beep();
-        ScaleCommandResult beepWithoutStateChange();
         ScaleCommandResult beepWithoutStateChange(const ScaleCommandAdmission *admission);
-        ScaleCommandResult setBeepLevel(uint8_t level);
         ScaleCommandResult setBeepLevel(uint8_t level, const ScaleCommandAdmission *admission);
 
         ScaleCommandResult heartbeat();
@@ -159,7 +148,6 @@ class EspressoScaleBLE {
         bool isConnected();
         bool isLinkUp() const;
         bool communicationSilenced() const;
-        uint32_t communicationSilenceRemainingMs() const;
         bool newWeightAvailable();
         void setDroppedFrameObserver(ScaleDroppedFrameObserver observer);
         // Registered before scanning. Runs outside critical sections, possibly

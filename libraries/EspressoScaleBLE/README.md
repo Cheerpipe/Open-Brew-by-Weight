@@ -157,9 +157,8 @@ admission point covers writes, RSSI, scan/cancel, connect/cancel, discovery,
 subscription, initialization, and termination. Blocked commands are not replayed;
 pending link cleanup remains the owner's responsibility. In-memory callback
 cleanup may continue, while old-link RX frames
-and results are discarded. `communicationSilenced()` and
-`communicationSilenceRemainingMs()` expose read-only state so an owner can
-avoid futile work but cannot shorten or bypass the barrier.
+and results are discarded. `communicationSilenced()` exposes read-only state
+so an owner can avoid futile work but cannot shorten or bypass the barrier.
 
 The owner consumes bounded queued RX evidence before deciding packet silence.
 Only frames captured before the relevant deadline and still fresh when serviced
@@ -199,15 +198,15 @@ Each protocol may define a minimum application-command interval. Bookoo uses
 disconnect evidence while waiting and revalidates the connection generation
 at the common NimBLE admission point immediately before submission. Other
 protocols keep their existing timing.
-The guarded overloads of `tare()`, `tareStartTimer()`, `resetTimer()`,
-`startTimer()`, `stopTimer()`, `beepWithoutStateChange()`, and `setBeepLevel()`
-accept `ScaleCommandAdmission`. Its owner-only callback runs after
-spacing, outside BLE locks, and can reject a command before transmission. For
-tare operations it supplies a notification capture boundary, rechecked under
-the existing final radio-admission lock. A rejected callback or changed boundary
-returns `ScaleCommandResult::Deferred` without sending the command. Existing
-no-argument calls retain their API and behavior. The owner decides whether to
-retry a command known not to have been sent; uncertain writes are never replayed.
+`tare()`, `tareStartTimer()`, `resetTimer()`, `startTimer()`, `stopTimer()`,
+`beepWithoutStateChange()`, and `setBeepLevel()` take a `ScaleCommandAdmission`
+(`nullptr` skips the owner check). Its owner-only callback runs
+after spacing, outside BLE locks, and can reject a command before transmission.
+For tare operations it supplies a notification capture boundary, rechecked
+under the existing final radio-admission lock. A rejected callback or changed
+boundary returns `ScaleCommandResult::Deferred` without sending the command.
+The owner decides whether to retry a command known not to have been sent;
+uncertain writes are never replayed.
 The optional log bridge emits one INFO `ble tx` line for each command accepted
 by NimBLE and each subscription or initialization write attempt, with its label,
 response mode, and full hexadecimal payload. A separate `command done` line
@@ -266,9 +265,9 @@ Useful diagnostics are available through:
 - `rejectedPacketCount()`
 - `reconnectCount()`
 
-Every command validates connection and protocol capability internally. The
-legacy `beep()` method no longer substitutes tare for sound; it now behaves
-like `beepWithoutStateChange()` and succeeds only on Bookoo/generic scales.
+Every command validates connection and protocol capability internally.
+`beepWithoutStateChange()` never substitutes tare for sound and succeeds only
+on Bookoo/generic scales.
 
 The current `ScaleProtocol` contract parses weight and timer readings, plus
 the scale's own flow rate when the protocol declares `ScaleFeatureFlowRate`

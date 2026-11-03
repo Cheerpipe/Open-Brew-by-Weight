@@ -120,7 +120,7 @@ static void run() {
     for (unsigned operation = 0; operation < 3; ++operation) {
       ready(c);
       c.writeProperties_ = BLE_GATT_CHR_PROP_WRITE_NO_RSP;
-      CHECK(facade.stopTimer() == ScaleCommandResult::Ok);
+      CHECK(facade.stopTimer(nullptr) == ScaleCommandResult::Ok);
       bool shutdown = false;
       testOnDelay = [&] { shutdown = true; };
       const ScaleCommandAdmission admission{
@@ -666,7 +666,7 @@ static void run() {
     CHECK(capturedScaleLogs.back().second.find("ble error op=link") == 0);
     CHECK(capturedScaleLogs.back().second.find("reason=remote disconnected") !=
           std::string::npos);
-    testNowMs = c.backoff_.deadlineMs();
+    testNowMs += c.backoff_.remainingMs(testNowMs);
     c.service();
     CHECK(c.state_ == NimbleScaleClient::State::Scanning);
     CHECK(c.connectAttemptsTotal_ == 0);
@@ -685,7 +685,7 @@ static void run() {
     CHECK(c.beginConfiguredScan(false));
     for (unsigned attempt = 0; attempt < 12; ++attempt) {
       if (c.state_ == NimbleScaleClient::State::Backoff) {
-        testNowMs = c.backoff_.deadlineMs();
+        testNowMs += c.backoff_.remainingMs(testNowMs);
         c.service();
       }
       advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND);
@@ -696,7 +696,7 @@ static void run() {
     }
     CHECK(c.connectAttemptsTotal_ == 12);
     CHECK(c.backoff_.failureCount() == 12);
-    testNowMs = c.backoff_.deadlineMs();
+    testNowMs += c.backoff_.remainingMs(testNowMs);
     c.service();
     advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND);
     c.service();

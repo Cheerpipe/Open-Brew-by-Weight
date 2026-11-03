@@ -1,5 +1,4 @@
 EspressoScaleBLE KEYWORD1
-init    KEYWORD2
 tare    KEYWORD2
 heartbeat   KEYWORD2
 heartbeatRequired   KEYWORD2

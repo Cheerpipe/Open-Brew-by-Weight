@@ -111,11 +111,6 @@ void NimbleNegativeCache::erase(const NimblePeerKey &key) {
   }
 }
 
-void NimbleNegativeCache::clear() {
-  memset(entries_, 0, sizeof(entries_));
-  sequence_ = 0;
-}
-
 size_t NimbleNegativeCache::activeCount(uint32_t nowMs) const {
   return static_cast<size_t>(
       std::count_if(std::begin(entries_), std::end(entries_),

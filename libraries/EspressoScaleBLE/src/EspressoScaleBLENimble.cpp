@@ -910,18 +910,6 @@ class NimbleScaleClient {
     if (g_linkParamsObserver != nullptr) g_linkParamsObserver(desc.conn_itvl, peerUnits);
   }
 
-  uint16_t rxHighWater() const {
-    portENTER_CRITICAL(&mux_);
-    const uint16_t result = rxHighWater_;
-    portEXIT_CRITICAL(&mux_);
-    return result;
-  }
-  uint32_t rxDrops() const {
-    portENTER_CRITICAL(&mux_);
-    const uint32_t result = rxDrops_;
-    portEXIT_CRITICAL(&mux_);
-    return result;
-  }
 
   ScaleBleBackendHealth health() const {
     ScaleBleBackendHealth result = {};
@@ -3200,25 +3188,6 @@ EspressoScaleBLE::~EspressoScaleBLE() {
   clientFromStorage(g_clientStorage).~NimbleScaleClient();
 }
 
-bool EspressoScaleBLE::init(const char *mac) {
-  NimbleScaleClient &client = clientFromStorage(g_clientStorage);
-  client.disconnect();
-  if (!client.startScan(mac, false, BLE_SCAN_BALANCED_INTERVAL,
-                        BLE_SCAN_BALANCED_WINDOW, false)) {
-    return false;
-  }
-  const uint32_t startedAt = nowMs();
-  while (elapsedMs(startedAt) < SCALE_SCAN_TIMEOUT_MS ||
-         client.isConnecting()) {
-    if (client.poll()) {
-      return true;
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-  client.disconnect();
-  return false;
-}
-
 bool EspressoScaleBLE::startScan(const char *mac, bool forceRestart,
                                  uint16_t interval, uint16_t window,
                                  bool addressScan) {
@@ -3242,31 +3211,21 @@ void EspressoScaleBLE::disconnect() {
   clientFromStorage(g_clientStorage).disconnect();
 }
 
-ScaleCommandResult EspressoScaleBLE::tare() { return tare(nullptr); }
-
 ScaleCommandResult EspressoScaleBLE::tare(const ScaleCommandAdmission *admission) {
   return clientFromStorage(g_clientStorage).writeOp(ScaleOp::Tare, 0, admission);
 }
-
-ScaleCommandResult EspressoScaleBLE::startTimer() { return startTimer(nullptr); }
 
 ScaleCommandResult EspressoScaleBLE::startTimer(const ScaleCommandAdmission *admission) {
   return clientFromStorage(g_clientStorage).writeOp(ScaleOp::StartTimer, 0, admission);
 }
 
-ScaleCommandResult EspressoScaleBLE::stopTimer() { return stopTimer(nullptr); }
-
 ScaleCommandResult EspressoScaleBLE::stopTimer(const ScaleCommandAdmission *admission) {
   return clientFromStorage(g_clientStorage).writeOp(ScaleOp::StopTimer, 0, admission);
 }
 
-ScaleCommandResult EspressoScaleBLE::resetTimer() { return resetTimer(nullptr); }
-
 ScaleCommandResult EspressoScaleBLE::resetTimer(const ScaleCommandAdmission *admission) {
   return clientFromStorage(g_clientStorage).writeOp(ScaleOp::ResetTimer, 0, admission);
 }
-
-ScaleCommandResult EspressoScaleBLE::tareStartTimer() { return tareStartTimer(nullptr); }
 
 ScaleCommandResult EspressoScaleBLE::tareStartTimer(const ScaleCommandAdmission *admission) {
   if (!supportsTareStartTimer()) {
@@ -3280,18 +3239,8 @@ bool EspressoScaleBLE::supportsTareStartTimer() const {
   return features().has(ScaleFeatureCombinedTareStart);
 }
 
-ScaleCommandResult EspressoScaleBLE::beep() { return beepWithoutStateChange(); }
-
-ScaleCommandResult EspressoScaleBLE::beepWithoutStateChange() {
-  return beepWithoutStateChange(nullptr);
-}
-
 ScaleCommandResult EspressoScaleBLE::beepWithoutStateChange(const ScaleCommandAdmission *admission) {
   return setBeepLevel(1, admission);
-}
-
-ScaleCommandResult EspressoScaleBLE::setBeepLevel(uint8_t level) {
-  return setBeepLevel(level, nullptr);
 }
 
 ScaleCommandResult EspressoScaleBLE::setBeepLevel(uint8_t level, const ScaleCommandAdmission *admission) {
@@ -3366,10 +3315,6 @@ bool EspressoScaleBLE::communicationSilenced() const {
   return clientFromStorage(g_clientStorage).communicationSilenced();
 }
 
-uint32_t EspressoScaleBLE::communicationSilenceRemainingMs() const {
-  return clientFromStorage(g_clientStorage)
-      .communicationSilenceRemainingMs();
-}
 
 bool EspressoScaleBLE::newWeightAvailable() {
   return clientFromStorage(g_clientStorage).newWeightAvailable();

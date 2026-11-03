@@ -652,14 +652,13 @@ if (network.includes('\\"passwordChangeRequired\\"') ||
   throw new Error('Factory password change gate must remain removed from status/UI/API');
 }
 
-const safeBeepStart = bleLibrary.indexOf('EspressoScaleBLE::beepWithoutStateChange()');
+const safeBeepStart = bleLibrary.indexOf('EspressoScaleBLE::beepWithoutStateChange(');
 const safeBeepEnd = bleLibrary.indexOf('EspressoScaleBLE::setBeepLevel(', safeBeepStart);
 if (safeBeepStart < 0 || safeBeepEnd < 0) {
   throw new Error('State-safe BLE beep implementation not found');
 }
 const safeBeep = bleLibrary.slice(safeBeepStart, safeBeepEnd);
-if (!safeBeep.includes('return beepWithoutStateChange(nullptr)') ||
-    !safeBeep.includes('return setBeepLevel(1, admission)') ||
+if (!safeBeep.includes('return setBeepLevel(1, admission)') ||
     !bleLibrary.includes('case ScaleOp::SetVolume: return 0x02;') ||
     !bleLibrary.includes('fillGenericCommand') ||
     safeBeep.includes('BEEP_LEVEL_1_BOOKOO') ||

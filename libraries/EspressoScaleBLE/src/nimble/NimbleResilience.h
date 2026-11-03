@@ -30,7 +30,6 @@ class NimbleBackoffPolicy {
   bool active(uint32_t nowMs) const;
   uint32_t remainingMs(uint32_t nowMs) const;
   uint8_t failureCount() const { return failureCount_; }
-  uint32_t deadlineMs() const { return deadlineMs_; }
 
  private:
   uint32_t nextRandom();
@@ -47,7 +46,6 @@ class NimbleNegativeCache {
   void insert(const NimblePeerKey &key, uint32_t nowMs,
               uint32_t cooldownMs);
   void erase(const NimblePeerKey &key);
-  void clear();
   size_t activeCount(uint32_t nowMs) const;
 
  private:
