@@ -163,10 +163,9 @@ class AuditLogLatch {
   }
 
   // Returns false when the per-code rate limit suppressed the event.
-  bool add(uint32_t atMs, uint32_t wallSec, LogLevel level,
-           DebugCategory category, DebugCode code, int32_t argument1,
-           int32_t argument2, const char *detail) {
-    if (!admitRate(static_cast<uint8_t>(code), atMs)) {
+  bool add(Instant at, LogLevel level, DebugCategory category, DebugCode code,
+           int32_t argument1, int32_t argument2, const char *detail) {
+    if (!admitRate(static_cast<uint8_t>(code), at.monotonicMs)) {
       ++rateLimited_;
       return false;
     }
@@ -178,8 +177,8 @@ class AuditLogLatch {
     AuditRecord &record = events_[writeIndex_];
     record = AuditRecord{};
     record.sequence = nextSequence_++;
-    record.atMs = atMs;
-    record.wallSec = wallSec;
+    record.atMs = at.monotonicMs;
+    record.wallSec = at.utcSec;
     record.level = static_cast<uint8_t>(level);
     record.category = static_cast<uint8_t>(category);
     record.code = static_cast<uint8_t>(code);

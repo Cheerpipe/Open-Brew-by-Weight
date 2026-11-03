@@ -39,8 +39,8 @@ inline uint32_t scheduledRestartLocalToUtc(const char *zone, int64_t localSec) {
   return actual == after ? static_cast<uint32_t>(second) : transition;
 }
 
-// First instant strictly after nowUtc whose local time is minuteOfDay.
-inline uint32_t scheduledRestartNextUtc(const char *zone, uint32_t nowUtc,
+// First instant strictly after nowUtc whose local time in zone is minuteOfDay.
+inline uint32_t scheduledRestartNextUtc(uint32_t nowUtc, const char *zone,
                                         uint16_t minuteOfDay) {
   int16_t offset = 0;
   if (!scheduledRestartOffsetAt(zone, nowUtc, offset)) return 0;
@@ -124,7 +124,7 @@ class ScheduledRestartPlanner {
                    ScheduledRestartCause::NO_CLOCK);
     }
     if (targetUtc_ == 0) {
-      targetUtc_ = scheduledRestartNextUtc(zone_, in.utcSec, minute_);
+      targetUtc_ = scheduledRestartNextUtc(in.utcSec, zone_, minute_);
       if (targetUtc_ == 0) {
         return enter(ScheduledRestartState::NO_TIMEZONE,
                      ScheduledRestartCause::NO_TIMEZONE);
@@ -207,7 +207,7 @@ class ScheduledRestartPlanner {
   // Gives up on this occurrence and arms the next one.
   ScheduledRestartLog skip(const ScheduledRestartInput &in,
                            ScheduledRestartCause cause) {
-    targetUtc_ = scheduledRestartNextUtc(zone_, in.utcSec, minute_);
+    targetUtc_ = scheduledRestartNextUtc(in.utcSec, zone_, minute_);
     state_ = targetUtc_ != 0 ? ScheduledRestartState::ARMED
                              : ScheduledRestartState::NO_TIMEZONE;
     cause_ = ScheduledRestartCause::NONE;

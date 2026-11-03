@@ -41,53 +41,53 @@ void browserSessionsExpireAndWrap() {
   token(1, a);
   token(2, b);
   const uint32_t start = 0xFFFFFF00UL;  // millis wraps during the session
-  webAccessIssueSession(state, a, false, start, 0, "Test");
+  webAccessIssueSession(state, a, false, {start, 0}, "Test");
   assert(!state.dirty);  // RAM only
-  assert(webAccessSessionValid(state, a, start + WEB_ACCESS_BROWSER_MS - 1, 0));
-  assert(!webAccessSessionValid(state, b, start, 0));
-  assert(!webAccessSessionValid(state, a, start + WEB_ACCESS_BROWSER_MS, 0));
-  assert(!webAccessSessionValid(state, a, start, 0));  // expired slot cleared
+  assert(webAccessSessionValid(state, a, {start + WEB_ACCESS_BROWSER_MS - 1, 0}));
+  assert(!webAccessSessionValid(state, b, {start, 0}));
+  assert(!webAccessSessionValid(state, a, {start + WEB_ACCESS_BROWSER_MS, 0}));
+  assert(!webAccessSessionValid(state, a, {start, 0}));  // expired slot cleared
   for (uint8_t seed = 10; seed < 10 + WEB_ACCESS_BROWSER_SLOTS + 1; ++seed) {
     uint8_t t[WEB_ACCESS_TOKEN_BYTES];
     token(seed, t);
-    webAccessIssueSession(state, t, false, seed, 0, "Test");
+    webAccessIssueSession(state, t, false, {seed, 0}, "Test");
   }
   uint8_t first[WEB_ACCESS_TOKEN_BYTES], last[WEB_ACCESS_TOKEN_BYTES];
   token(10, first);
   token(10 + WEB_ACCESS_BROWSER_SLOTS, last);
-  assert(!webAccessSessionValid(state, first, 20, 0));  // closest to expiry evicted
-  assert(webAccessSessionValid(state, last, 20, 0));
+  assert(!webAccessSessionValid(state, first, {20, 0}));  // closest to expiry evicted
+  assert(webAccessSessionValid(state, last, {20, 0}));
 }
 
 void rememberedSessionsAgeRenewAndEvict() {
   WebAccessState state;
   uint8_t a[WEB_ACCESS_TOKEN_BYTES];
   token(1, a);
-  webAccessIssueSession(state, a, true, 0, T0, "Test");
+  webAccessIssueSession(state, a, true, {0, T0}, "Test");
   assert(state.dirty && state.stored.rememberedMask == 1);
   state.dirty = false;
-  assert(webAccessSessionValid(state, a, 0, T0 + 3600));
+  assert(webAccessSessionValid(state, a, {0, T0 + 3600}));
   assert(!state.dirty);  // renewal at most daily
-  assert(webAccessSessionValid(state, a, 0, T0 + DAY));
+  assert(webAccessSessionValid(state, a, {0, T0 + DAY}));
   assert(state.dirty && state.stored.remembered[0].usedUtc == T0 + DAY);
   // Without a synced clock a remembered session never ages out.
-  assert(webAccessSessionValid(state, a, 0, 0));
-  assert(!webAccessSessionValid(state, a, 0, T0 + DAY + WEB_ACCESS_REMEMBER_SEC));
+  assert(webAccessSessionValid(state, a, {0, 0}));
+  assert(!webAccessSessionValid(state, a, {0, T0 + DAY + WEB_ACCESS_REMEMBER_SEC}));
   assert(state.stored.rememberedMask == 0);
 
   WebAccessState full;
   for (uint8_t slot = 0; slot < WEB_ACCESS_REMEMBERED_SLOTS; ++slot) {
     uint8_t t[WEB_ACCESS_TOKEN_BYTES];
     token(static_cast<uint8_t>(20 + slot), t);
-    webAccessIssueSession(full, t, true, 0, T0 + slot, "Test");
+    webAccessIssueSession(full, t, true, {0, T0 + slot}, "Test");
   }
   assert(full.stored.rememberedMask == 0xFF);
   uint8_t newest[WEB_ACCESS_TOKEN_BYTES], oldest[WEB_ACCESS_TOKEN_BYTES];
   token(99, newest);
   token(20, oldest);
-  webAccessIssueSession(full, newest, true, 0, T0 + 100, "Test");
-  assert(!webAccessSessionValid(full, oldest, 0, T0 + 100));
-  assert(webAccessSessionValid(full, newest, 0, T0 + 100));
+  webAccessIssueSession(full, newest, true, {0, T0 + 100}, "Test");
+  assert(!webAccessSessionValid(full, oldest, {0, T0 + 100}));
+  assert(webAccessSessionValid(full, newest, {0, T0 + 100}));
   assert(full.stored.rememberedMask == 0xFF);
 }
 
@@ -99,22 +99,22 @@ void revocationKeepsOnlyWhatItShould() {
   token(2, other);
   token(3, browser);
   token(4, ha);
-  webAccessIssueSession(state, keep, true, 0, T0, "Test");
-  webAccessIssueSession(state, other, true, 0, T0, "Test");
-  webAccessIssueSession(state, browser, false, 0, T0, "Test");
+  webAccessIssueSession(state, keep, true, {0, T0}, "Test");
+  webAccessIssueSession(state, other, true, {0, T0}, "Test");
+  webAccessIssueSession(state, browser, false, {0, T0}, "Test");
   webAccessSetHomeAssistant(state, ha, T0);
   webAccessRevokeSessions(state, keep);
-  assert(webAccessSessionValid(state, keep, 1, T0));
-  assert(!webAccessSessionValid(state, other, 1, T0));
-  assert(!webAccessSessionValid(state, browser, 1, T0));
+  assert(webAccessSessionValid(state, keep, {1, T0}));
+  assert(!webAccessSessionValid(state, other, {1, T0}));
+  assert(!webAccessSessionValid(state, browser, {1, T0}));
   assert(webAccessHomeAssistantValid(state, ha));  // separate from sessions
   webAccessRevokeSessions(state, keep, true);
-  assert(!webAccessSessionValid(state, keep, 1, T0));
+  assert(!webAccessSessionValid(state, keep, {1, T0}));
 
   state.stored.enabled = 1;
   state.stored.noticeDismissed = 1;
-  webAccessIssueSession(state, keep, true, 0, T0, "Test");
-  assert(webAccessStartPairing(state, 7, 1234, 0));
+  webAccessIssueSession(state, keep, true, {0, T0}, "Test");
+  assert(webAccessStartPairing(state, {7, 1234}, {0}));
   webAccessDisable(state);
   assert(state.stored.enabled == 0 && state.stored.noticeDismissed == 1);
   assert(state.stored.rememberedMask == 0 && state.stored.homeAssistant == 0);
@@ -130,57 +130,57 @@ void claimFollowsItsSession() {
   token(7, browser);
   token(8, keep);
   // A claim made without a session (login off, SoftAP onboarding) stays live.
-  assert(webAccessClaimSessionLive(state, nullptr, false, 0, T0));
-  webAccessIssueSession(state, phone, true, 0, T0, "Test");
-  webAccessIssueSession(state, browser, false, 0, T0, "Test");
-  assert(webAccessClaimSessionLive(state, phone, true, 0, T0));
-  assert(webAccessClaimSessionLive(state, browser, true, 0, T0));
+  assert(webAccessClaimSessionLive(state, nullptr, false, {0, T0}));
+  webAccessIssueSession(state, phone, true, {0, T0}, "Test");
+  webAccessIssueSession(state, browser, false, {0, T0}, "Test");
+  assert(webAccessClaimSessionLive(state, phone, true, {0, T0}));
+  assert(webAccessClaimSessionLive(state, browser, true, {0, T0}));
   // The stream a claim holds ends with that session: idle expiry...
-  assert(!webAccessClaimSessionLive(state, browser, true, WEB_ACCESS_BROWSER_MS, 0));
+  assert(!webAccessClaimSessionLive(state, browser, true, {WEB_ACCESS_BROWSER_MS, 0}));
   // ...and signing out other devices revoking the phone that claimed.
-  webAccessIssueSession(state, keep, false, 0, T0, "Test");
+  webAccessIssueSession(state, keep, false, {0, T0}, "Test");
   webAccessRevokeSessions(state, keep);
-  assert(!webAccessClaimSessionLive(state, phone, true, 0, T0));
-  assert(webAccessClaimSessionLive(state, keep, true, 0, T0));
+  assert(!webAccessClaimSessionLive(state, phone, true, {0, T0}));
+  assert(webAccessClaimSessionLive(state, keep, true, {0, T0}));
 }
 
 void pairingApprovesOnceDeniesAndExpires() {
   WebAccessState state;
   uint8_t issued[WEB_ACCESS_TOKEN_BYTES], out[WEB_ACCESS_TOKEN_BYTES] = {};
   token(5, issued);
-  assert(!webAccessStartPairing(state, 0, 1, 0));  // id 0 is reserved
-  assert(webAccessStartPairing(state, 42, 7, 1000));
+  assert(!webAccessStartPairing(state, {0, 1}, {0}));  // id 0 is reserved
+  assert(webAccessStartPairing(state, {42, 7}, {1000}));
   assert(std::strcmp(state.pairing.code, "0007") == 0);
-  assert(!webAccessStartPairing(state, 43, 8, 1001));  // one at a time
-  assert(webAccessPairingStatus(state, 43, 1002, out) == WebAccessPairing::NONE);
-  assert(webAccessPairingStatus(state, 42, 1002, out) == WebAccessPairing::PENDING);
-  assert(!webAccessDecidePairing(state, 43, true, issued, 1003, T0));
-  assert(webAccessDecidePairing(state, 42, true, issued, 1003, T0));
+  assert(!webAccessStartPairing(state, {43, 8}, {1001}));  // one at a time
+  assert(webAccessPairingStatus(state, 43, {1002}, out) == WebAccessPairing::NONE);
+  assert(webAccessPairingStatus(state, 42, {1002}, out) == WebAccessPairing::PENDING);
+  assert(!webAccessDecidePairing(state, 43, true, issued, {1003, T0}));
+  assert(webAccessDecidePairing(state, 42, true, issued, {1003, T0}));
   assert(webAccessHomeAssistantValid(state, issued));
   assert(state.stored.homeAssistantSinceUtc == T0 && state.dirty);
-  assert(webAccessPairingStatus(state, 42, 1004, out) == WebAccessPairing::APPROVED);
+  assert(webAccessPairingStatus(state, 42, {1004}, out) == WebAccessPairing::APPROVED);
   assert(webAccessTokenEqual(out, issued));
-  assert(webAccessPairingStatus(state, 42, 1005, out) == WebAccessPairing::NONE);
+  assert(webAccessPairingStatus(state, 42, {1005}, out) == WebAccessPairing::NONE);
 
-  assert(webAccessStartPairing(state, 50, 9999, 2000));
-  assert(webAccessDecidePairing(state, 50, false, issued, 2001, T0));
-  assert(webAccessPairingStatus(state, 50, 2002, out) == WebAccessPairing::DENIED);
-  assert(!webAccessStartPairing(state, 51, 1, 2003));  // result window
-  assert(webAccessStartPairing(state, 51, 1, 2001 + WEB_ACCESS_PAIRING_RESULT_MS));
+  assert(webAccessStartPairing(state, {50, 9999}, {2000}));
+  assert(webAccessDecidePairing(state, 50, false, issued, {2001, T0}));
+  assert(webAccessPairingStatus(state, 50, {2002}, out) == WebAccessPairing::DENIED);
+  assert(!webAccessStartPairing(state, {51, 1}, {2003}));  // result window
+  assert(webAccessStartPairing(state, {51, 1}, {2001 + WEB_ACCESS_PAIRING_RESULT_MS}));
 
   const uint32_t started = 2001 + WEB_ACCESS_PAIRING_RESULT_MS;
   const uint32_t expired = started + WEB_ACCESS_PAIRING_MS;
-  assert(webAccessPairingStatus(state, 51, expired, out) == WebAccessPairing::EXPIRED);
-  assert(!webAccessDecidePairing(state, 51, true, issued, expired + 1, T0));
-  assert(!webAccessStartPairing(state, 52, 1, expired + 1));
-  assert(webAccessStartPairing(state, 52, 1, expired + WEB_ACCESS_PAIRING_RESULT_MS));
+  assert(webAccessPairingStatus(state, 51, {expired}, out) == WebAccessPairing::EXPIRED);
+  assert(!webAccessDecidePairing(state, 51, true, issued, {expired + 1, T0}));
+  assert(!webAccessStartPairing(state, {52, 1}, {expired + 1}));
+  assert(webAccessStartPairing(state, {52, 1}, {expired + WEB_ACCESS_PAIRING_RESULT_MS}));
 
   // A password exchange closes the open request: approving it later must not
   // replace the token Home Assistant just received.
   token(6, out);
   webAccessSetHomeAssistant(state, out, T0);
   assert(state.pairing.state == WebAccessPairing::NONE);
-  assert(!webAccessDecidePairing(state, 52, true, issued, expired + 1, T0));
+  assert(!webAccessDecidePairing(state, 52, true, issued, {expired + 1, T0}));
   assert(webAccessHomeAssistantValid(state, out));
 }
 
@@ -219,22 +219,22 @@ void sessionsAreListedAndRevokedById() {
   token(1, mac);
   token(2, ipad);
   token(3, other);
-  webAccessIssueSession(state, mac, true, 0, T0, "MacBook \xC2\xB7 Chrome");
-  webAccessIssueSession(state, ipad, false, 500, T0, "iPad");
+  webAccessIssueSession(state, mac, true, {0, T0}, "MacBook \xC2\xB7 Chrome");
+  webAccessIssueSession(state, ipad, false, {500, T0}, "iPad");
   const int macId = webAccessSessionId(state, mac), ipadId = webAccessSessionId(state, ipad);
   assert(macId == 0 && ipadId == WEB_ACCESS_REMEMBERED_SLOTS);
   assert(webAccessSessionId(state, other) == -1);
   assert(std::strcmp(state.stored.remembered[0].label, "MacBook \xC2\xB7 Chrome") == 0);
   assert(std::strcmp(state.browser[0].label, "iPad") == 0 && state.browser[0].seenMs == 500);
-  assert(webAccessSessionValid(state, ipad, 900, T0) && state.browser[0].seenMs == 900);
+  assert(webAccessSessionValid(state, ipad, {900, T0}) && state.browser[0].seenMs == 900);
   state.dirty = false;
   assert(webAccessRevokeId(state, static_cast<uint32_t>(macId)) && state.dirty);
-  assert(!webAccessSessionValid(state, mac, 901, T0));
+  assert(!webAccessSessionValid(state, mac, {901, T0}));
   assert(!webAccessRevokeId(state, static_cast<uint32_t>(macId)));
   assert(webAccessRevokeId(state, static_cast<uint32_t>(ipadId)));
-  assert(!webAccessSessionValid(state, ipad, 902, T0));
+  assert(!webAccessSessionValid(state, ipad, {902, T0}));
   assert(!webAccessRevokeId(state, WEB_ACCESS_SESSION_IDS));
-  webAccessIssueSession(state, mac, true, 0, T0, "Mac");
+  webAccessIssueSession(state, mac, true, {0, T0}, "Mac");
   assert(webAccessRenameId(state, 0, "Kitchen <iPad>") && state.dirty);
   assert(std::strcmp(state.stored.remembered[0].label, "Kitchen iPad") == 0);
   assert(!webAccessRenameId(state, 1, "x") && !webAccessRenameId(state, WEB_ACCESS_SESSION_IDS, "x"));

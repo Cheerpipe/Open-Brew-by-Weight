@@ -359,9 +359,7 @@ void processScaleWorkerEvents() {
     // so a drained-events phase maximum can blame lock contention.
     const uint32_t criticalLockStartedUs = micros();
     scaleCriticalEventMux.lock();
-    noteMutexWaitUs(scaleCriticalEventWaitLastUsStat(),
-                    scaleCriticalEventWaitMaxUsStat(),
-                    micros() - criticalLockStartedUs);
+    scaleCriticalEventWaitStat().note(micros() - criticalLockStartedUs);
     if (scaleReferenceChangedEventPending) {
       event = scaleReferenceChangedEvent;
       scaleReferenceChangedEventPending = false;

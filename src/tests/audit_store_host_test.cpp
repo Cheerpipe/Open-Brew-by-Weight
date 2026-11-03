@@ -77,7 +77,7 @@ static void testBootBackfill() {
         "backfilled records must be marked already durable");
   check(latch.latestSequence() == 20,
         "the latch sequence must continue from the store");
-  check(latch.add(999, 999, LogLevel::WARNING, DebugCategory::NETWORK,
+  check(latch.add({999, 999}, LogLevel::WARNING, DebugCategory::NETWORK,
                   DebugCode::MACHINE_MUX_WAIT, 5, 0, nullptr),
         "post-boot add must be admitted");
   check(latch.latestSequence() == 21, "new records continue the sequence");

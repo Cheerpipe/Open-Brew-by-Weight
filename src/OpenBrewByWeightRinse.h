@@ -13,26 +13,29 @@
 //
 // BOUNDARY: Duration only. Does not detect gestures, read GPIO, know paddle vs
 // switch, call machine, or write CycleSession. The stopper copies
-// rinseClockStartedAtMs into the cycle session if tests need a mirror.
+// rinseClock.startedAtMs into the cycle session if tests need a mirror.
 
-uint32_t rinseClockDurationMs = 0;
-uint32_t rinseClockStartedAtMs = 0;
+// Water runs durationMs from startedAtMs.
+struct RinseClock {
+  uint32_t startedAtMs = 0;
+  uint32_t durationMs = 0;
+};
+
+RinseClock rinseClock;
 bool rinseTimerActive = false;
 
-uint32_t rinseBegin(uint32_t durationMs, uint32_t startedAtMs) {
-  rinseClockDurationMs = durationMs;
-  rinseClockStartedAtMs = startedAtMs;
+uint32_t rinseBegin(RinseClock clock) {
+  rinseClock = clock;
   rinseTimerActive = true;
-  return rinseClockStartedAtMs;
+  return rinseClock.startedAtMs;
 }
 
 bool rinseDeadlineReached() {
   return rinseTimerActive &&
-         elapsedMs(rinseClockStartedAtMs) >= rinseClockDurationMs;
+         elapsedMs(rinseClock.startedAtMs) >= rinseClock.durationMs;
 }
 
 void rinseClear() {
   rinseTimerActive = false;
-  rinseClockDurationMs = 0;
-  rinseClockStartedAtMs = 0;
+  rinseClock = {};
 }

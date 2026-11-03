@@ -58,6 +58,7 @@
 #include "OpenBrewByWeightNetworkTypes.h"
 #include "OpenBrewByWeightOtaResult.h"
 #include "OpenBrewByWeightTimeZone.h"
+#include "OpenBrewByWeightTimingTypes.h"
 
 namespace openbrewbyweight {
 
@@ -2222,9 +2223,9 @@ class DebugRingBuffer {
     }
   }
 
-  void add(uint32_t atMs, uint32_t wallSec, LogLevel level,
-           DebugCategory category, DebugCode code, int32_t argument1 = 0,
-           int32_t argument2 = 0, const char *text = nullptr) {
+  void add(Instant at, LogLevel level, DebugCategory category, DebugCode code,
+           int32_t argument1 = 0, int32_t argument2 = 0,
+           const char *text = nullptr) {
     // Zero is reserved (a cursor of zero means "from the oldest"), so it is
     // never a sequence — including the very first add on a zero-initialized
     // ring whose constructor has not run yet (early boot logs).
@@ -2242,8 +2243,8 @@ class DebugRingBuffer {
       nextSequence_ = 1;
     }
     if (level <= LogLevel::WARNING) alarmSequence_ = event.sequence;
-    event.atMs = atMs;
-    event.wallSec = wallSec;
+    event.atMs = at.monotonicMs;
+    event.wallSec = at.utcSec;
     event.level = level;
     event.category = category;
     event.code = code;

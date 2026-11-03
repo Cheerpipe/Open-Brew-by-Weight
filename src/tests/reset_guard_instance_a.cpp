@@ -13,6 +13,5 @@ const volatile void *resetGuardAddressA() {
 }
 
 void resetGuardWriteFromA() {
-  openbrewbyweight::initializeSafetyResetRecord(
-      openbrewbyweight::SAFETY_RELAY_OPEN_MARKER, 7);
+  openbrewbyweight::initializeSafetyResetRecord(7);
 }

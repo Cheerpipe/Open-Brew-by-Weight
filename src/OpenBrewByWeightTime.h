@@ -183,13 +183,13 @@ class WallClock {
 #endif
   }
 
-  void markFailed(uint32_t monotonicMs, uint8_t maxConsecutiveFailures) {
+  void markFailed(uint32_t monotonicMs) {
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
     !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
     portENTER_CRITICAL(&mux_);
 #endif
     state_ = TimeSyncState::FAILED;
-    if (consecutiveFailures_ < maxConsecutiveFailures) {
+    if (consecutiveFailures_ < NTP_MAX_CONSECUTIVE_FAILURES) {
       ++consecutiveFailures_;
     }
     const uint32_t delayMs = ntpRetryDelayMs(consecutiveFailures_);

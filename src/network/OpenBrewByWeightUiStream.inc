@@ -669,8 +669,7 @@ void OpenBrewByWeightNetwork::uiStreamDispatch(void *context) {
     TaskLockGuard lock(self.dataMux_);
     claimSessionLive = webAccessClaimSessionLive(
         g_webAccess, self.activeWebUiClaimToken_,
-        self.activeWebUiClaimTokenValid_, claimNowMs,
-        webAccessNowUtc(claimNowMs));
+        self.activeWebUiClaimTokenValid_, webAccessNow(claimNowMs));
   }
   uiStreamDeadlineBudgetMs = kUiStreamDispatchBudgetMs;
   for (auto &session : self.uiStreams_) {

@@ -259,7 +259,7 @@ void testNewSessionClearsStaleJournal() {
   ota.reset();  // The next boot cannot restore before confirmation.
   ota_host::state = ESP_OTA_IMG_PENDING_VERIFY;
   ota = OtaHostTestAccess::fresh();
-  CHECK(ota->serviceBoot(15000, true, false, false, false, 15000, 180000).state ==
+  CHECK(ota->serviceBoot(15000, true, false, false, false, {15000, 180000}).state ==
         ESP_OTA_IMG_VALID);
   Image second;
   std::strcpy(second.identity.transferId, "second-transfer-0123");
@@ -273,7 +273,7 @@ void testNewSessionClearsStaleJournal() {
 
 OtaBootStatus service(OpenBrewByWeightOta &ota, uint32_t now, bool http = true,
                       bool cycle = false, bool relay = false, bool ble = false) {
-  return ota.serviceBoot(now, http, cycle, relay, ble, 15000, 180000);
+  return ota.serviceBoot(now, http, cycle, relay, ble, {15000, 180000});
 }
 
 void testConfirmationGatesAndDiagnostics() {

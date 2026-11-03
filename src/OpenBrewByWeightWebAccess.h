@@ -2,7 +2,8 @@
 
 // Optional Web UI login: browser sessions, the Home Assistant token and its
 // pairing request. Pure state with no I/O, clock or randomness of its own:
-// the network task owns it under dataMux_, feeds times and random bytes, and
+// the network task owns it under dataMux_, feeds times (an Instant, whose
+// utcSec is 0 while the wall clock is not synced) and random bytes, and
 // persists `stored`. The login is effective only while the device password is
 // not the published factory default; the network applies that rule.
 
@@ -11,6 +12,8 @@
 #include <cstring>
 #include <initializer_list>
 #include <strings.h>
+
+#include "OpenBrewByWeightTimingTypes.h"
 
 namespace openbrewbyweight {
 
@@ -166,21 +169,21 @@ inline bool webAccessTokenEqual(const uint8_t *left, const uint8_t *right) {
 }
 
 inline bool webAccessRememberedLive(const WebAccessStored &stored, uint8_t slot,
-                                    uint32_t nowUtc) {
+                                    Instant now) {
   if ((stored.rememberedMask & (1U << slot)) == 0) return false;
   // A stamp ahead of the clock (NTP moved it back) counts as fresh.
   const uint32_t used = stored.remembered[slot].usedUtc;
-  return nowUtc == 0 || nowUtc <= used || nowUtc - used < WEB_ACCESS_REMEMBER_SEC;
+  return now.utcSec == 0 || now.utcSec <= used ||
+         now.utcSec - used < WEB_ACCESS_REMEMBER_SEC;
 }
 
-// nowUtc is 0 while the wall clock is not synced.
 inline bool webAccessSessionValid(WebAccessState &state,
                                   const uint8_t token[WEB_ACCESS_TOKEN_BYTES],
-                                  uint32_t nowMs, uint32_t nowUtc) {
+                                  Instant now) {
   for (auto &browser : state.browser) {
     if (browser.live && webAccessTokenEqual(browser.token, token)) {
-      if (static_cast<int32_t>(nowMs - browser.untilMs) < 0) {
-        browser.seenMs = nowMs;
+      if (static_cast<int32_t>(now.monotonicMs - browser.untilMs) < 0) {
+        browser.seenMs = now.monotonicMs;
         return true;
       }
       browser = WebAccessState::Browser{};
@@ -193,15 +196,16 @@ inline bool webAccessSessionValid(WebAccessState &state,
         !webAccessTokenEqual(stored.remembered[slot].token, token)) {
       continue;
     }
-    if (!webAccessRememberedLive(stored, slot, nowUtc)) {
+    if (!webAccessRememberedLive(stored, slot, now)) {
       stored.rememberedMask &= static_cast<uint8_t>(~(1U << slot));
       stored.remembered[slot] = WebAccessRemembered{};
       state.dirty = true;
       return false;
     }
     uint32_t &used = stored.remembered[slot].usedUtc;
-    if (nowUtc != 0 && (used == 0 || (nowUtc > used && nowUtc - used >= WEB_ACCESS_RENEW_SEC))) {
-      used = nowUtc;
+    if (now.utcSec != 0 &&
+        (used == 0 || (now.utcSec > used && now.utcSec - used >= WEB_ACCESS_RENEW_SEC))) {
+      used = now.utcSec;
       state.dirty = true;
     }
     return true;
@@ -215,17 +219,15 @@ inline bool webAccessSessionValid(WebAccessState &state,
 // session (login off, SoftAP onboarding) has no token and stays live.
 inline bool webAccessClaimSessionLive(WebAccessState &state,
                                       const uint8_t *claimToken,
-                                      bool claimTokenPresent, uint32_t nowMs,
-                                      uint32_t nowUtc) {
-  return !claimTokenPresent ||
-         webAccessSessionValid(state, claimToken, nowMs, nowUtc);
+                                      bool claimTokenPresent, Instant now) {
+  return !claimTokenPresent || webAccessSessionValid(state, claimToken, now);
 }
 
 // Full tables evict the session closest to expiry.
 inline void webAccessIssueSession(WebAccessState &state,
                                   const uint8_t token[WEB_ACCESS_TOKEN_BYTES],
-                                  bool remember, uint32_t nowMs,
-                                  uint32_t nowUtc, const char *label) {
+                                  bool remember, Instant now,
+                                  const char *label) {
   if (!remember) {
     WebAccessState::Browser *target = &state.browser[0];
     for (auto &browser : state.browser) {
@@ -233,8 +235,8 @@ inline void webAccessIssueSession(WebAccessState &state,
       if (static_cast<int32_t>(browser.untilMs - target->untilMs) < 0) target = &browser;
     }
     memcpy(target->token, token, WEB_ACCESS_TOKEN_BYTES);
-    target->untilMs = nowMs + WEB_ACCESS_BROWSER_MS;
-    target->seenMs = nowMs;
+    target->untilMs = now.monotonicMs + WEB_ACCESS_BROWSER_MS;
+    target->seenMs = now.monotonicMs;
     copyWebAccessLabel(target->label, label);
     target->live = true;
     return;
@@ -242,11 +244,11 @@ inline void webAccessIssueSession(WebAccessState &state,
   WebAccessStored &stored = state.stored;
   uint8_t target = 0;
   for (uint8_t slot = 0; slot < WEB_ACCESS_REMEMBERED_SLOTS; ++slot) {
-    if (!webAccessRememberedLive(stored, slot, nowUtc)) { target = slot; break; }
+    if (!webAccessRememberedLive(stored, slot, now)) { target = slot; break; }
     if (stored.remembered[slot].usedUtc < stored.remembered[target].usedUtc) target = slot;
   }
   memcpy(stored.remembered[target].token, token, WEB_ACCESS_TOKEN_BYTES);
-  stored.remembered[target].usedUtc = nowUtc;
+  stored.remembered[target].usedUtc = now.utcSec;
   copyWebAccessLabel(stored.remembered[target].label, label);
   stored.rememberedMask |= static_cast<uint8_t>(1U << target);
   state.dirty = true;
@@ -359,19 +361,26 @@ inline void webAccessTickPairing(WebAccessState &state, uint32_t nowMs) {
   pairing = WebAccessState::Pairing{};
 }
 
-// One request at a time; `code` is shown both in Home Assistant and in the
-// Web UI prompt so the person approves the request they started.
-inline bool webAccessStartPairing(WebAccessState &state, uint32_t id,
-                                  uint16_t code, uint32_t nowMs) {
-  webAccessTickPairing(state, nowMs);
-  if (state.pairing.state != WebAccessPairing::NONE || id == 0) return false;
+// A pairing request as Home Assistant starts it: `code` is shown both in Home
+// Assistant and in the Web UI prompt so the person approves the request they
+// started. Id 0 is reserved.
+struct WebAccessPairingRequest {
+  uint32_t id = 0;
+  uint16_t code = 0;
+};
+
+// One request at a time.
+inline bool webAccessStartPairing(WebAccessState &state,
+                                  WebAccessPairingRequest request, Instant now) {
+  webAccessTickPairing(state, now.monotonicMs);
+  if (state.pairing.state != WebAccessPairing::NONE || request.id == 0) return false;
   auto &pairing = state.pairing;
   pairing.state = WebAccessPairing::PENDING;
-  pairing.id = id;
-  pairing.untilMs = nowMs + WEB_ACCESS_PAIRING_MS;
+  pairing.id = request.id;
+  pairing.untilMs = now.monotonicMs + WEB_ACCESS_PAIRING_MS;
   for (int index = 3; index >= 0; --index) {
-    pairing.code[index] = static_cast<char>('0' + code % 10);
-    code = static_cast<uint16_t>(code / 10);
+    pairing.code[index] = static_cast<char>('0' + request.code % 10);
+    request.code = static_cast<uint16_t>(request.code / 10);
   }
   pairing.code[4] = '\0';
   return true;
@@ -379,24 +388,24 @@ inline bool webAccessStartPairing(WebAccessState &state, uint32_t id,
 
 inline bool webAccessDecidePairing(WebAccessState &state, uint32_t id, bool allow,
                                    const uint8_t token[WEB_ACCESS_TOKEN_BYTES],
-                                   uint32_t nowMs, uint32_t nowUtc) {
-  webAccessTickPairing(state, nowMs);
+                                   Instant now) {
+  webAccessTickPairing(state, now.monotonicMs);
   auto &pairing = state.pairing;
   if (pairing.state != WebAccessPairing::PENDING || pairing.id != id) return false;
   pairing.state = allow ? WebAccessPairing::APPROVED : WebAccessPairing::DENIED;
-  pairing.untilMs = nowMs + WEB_ACCESS_PAIRING_RESULT_MS;
+  pairing.untilMs = now.monotonicMs + WEB_ACCESS_PAIRING_RESULT_MS;
   if (allow) {
     memcpy(pairing.token, token, WEB_ACCESS_TOKEN_BYTES);
-    webAccessSetHomeAssistant(state, token, nowUtc);
+    webAccessSetHomeAssistant(state, token, now.utcSec);
   }
   return true;
 }
 
 // An approved token is handed out once; the slot then clears.
 inline WebAccessPairing webAccessPairingStatus(
-    WebAccessState &state, uint32_t id, uint32_t nowMs,
+    WebAccessState &state, uint32_t id, Instant now,
     uint8_t token[WEB_ACCESS_TOKEN_BYTES]) {
-  webAccessTickPairing(state, nowMs);
+  webAccessTickPairing(state, now.monotonicMs);
   auto &pairing = state.pairing;
   if (pairing.state == WebAccessPairing::NONE || pairing.id != id) {
     return WebAccessPairing::NONE;

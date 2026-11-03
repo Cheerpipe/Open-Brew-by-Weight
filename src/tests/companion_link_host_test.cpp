@@ -1043,12 +1043,12 @@ static void testLogFlushDue() {
   // The ring tracks the newest urgent event for that flush.
   DebugRingBuffer ring;
   CHECK(ring.latestAlarmSequence() == 0);
-  ring.add(1000, 0, LogLevel::INFO, DebugCategory::STATE, DebugCode::STATE_TRANSITION);
+  ring.add({1000, 0}, LogLevel::INFO, DebugCategory::STATE, DebugCode::STATE_TRANSITION);
   CHECK(ring.latestAlarmSequence() == 0);
-  ring.add(2000, 0, LogLevel::WARNING, DebugCategory::SYSTEM, DebugCode::BOOT_BANNER);
+  ring.add({2000, 0}, LogLevel::WARNING, DebugCategory::SYSTEM, DebugCode::BOOT_BANNER);
   CHECK(ring.latestAlarmSequence() == 2);
-  ring.add(3000, 0, LogLevel::ERROR, DebugCategory::NETWORK, DebugCode::STATE_TRANSITION);
-  ring.add(4000, 0, LogLevel::DEBUG, DebugCategory::STATE, DebugCode::STATE_TRANSITION);
+  ring.add({3000, 0}, LogLevel::ERROR, DebugCategory::NETWORK, DebugCode::STATE_TRANSITION);
+  ring.add({4000, 0}, LogLevel::DEBUG, DebugCategory::STATE, DebugCode::STATE_TRANSITION);
   CHECK(ring.latestAlarmSequence() == 3);
   ring.clear();
   CHECK(ring.latestAlarmSequence() == 0);

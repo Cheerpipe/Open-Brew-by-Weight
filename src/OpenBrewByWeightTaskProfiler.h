@@ -6,6 +6,7 @@
 
 #include "OpenBrewByWeightScaleTypes.h"
 #include "OpenBrewByWeightTaskMutex.h"
+#include "OpenBrewByWeightTimingTypes.h"
 
 #if defined(ARDUINO) && !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 #include "OpenBrewByWeightPsram.h"
@@ -171,18 +172,37 @@ struct PhaseProfilerSnapshot {
 
 using LoopPhaseProfilerSnapshot = PhaseProfilerSnapshot<LOOP_PHASE_COUNT>;
 
+// When a profiled iteration starts: micros() drives the timeline, millis()
+// stamps retained peaks so they can be matched against log timestamps.
+struct ProfilerStamp {
+  uint32_t us = 0;
+  uint32_t ms = 0;
+};
+
+// One control-loop gap, start to start: its wall time, the requested delay
+// and dispatch latency inside it, and the loop task's CPU and the loop core's
+// idle time over it.
+struct LoopGap {
+  uint32_t ms = 0;
+  uint32_t us = 0;
+  uint32_t delayUs = 0;
+  uint32_t dispatchUs = 0;
+  uint32_t cpuUs = 0;
+  uint32_t idleUs = 0;
+};
+
 template <uint8_t PHASE_COUNT>
 class PhaseProfiler {
  public:
   explicit PhaseProfiler(const char *(*nameFor)(uint8_t) = loopPhaseNameFor)
       : nameFor_(nameFor) {}
-  void beginIteration(bool enabled, uint32_t nowUs, uint32_t nowMs = 0) {
+  void beginIteration(bool enabled, ProfilerStamp now) {
     memset(iterationUs_, 0, sizeof(iterationUs_));
-    iterationAtMs_ = nowMs;
+    iterationAtMs_ = now.ms;
     if (enabled && !active_) {
-      reset_(nowUs);
+      reset_(now.us);
     } else if (!enabled && active_) {
-      publish_(nowUs);
+      publish_(now.us);
       active_ = false;
     }
   }
@@ -190,15 +210,15 @@ class PhaseProfiler {
   bool active() const { return active_; }
 
   template <typename Phase>
-  void record(Phase phase, uint32_t durationUs, uint32_t nowUs) {
-    record(phase, durationUs, nowUs, durationUs);
+  void record(uint32_t nowUs, Phase phase, uint32_t durationUs) {
+    record(nowUs, phase, durationUs, durationUs);
   }
 
   // cpuUs is the acquiring task's own-CPU delta over the same interval
   // (runtime-stats clock); it defaults to the wall duration for callers
   // without a counter read. A new wall maximum stores the paired cpuUs.
   template <typename Phase>
-  void record(Phase phase, uint32_t durationUs, uint32_t nowUs,
+  void record(uint32_t nowUs, Phase phase, uint32_t durationUs,
               uint32_t cpuUs) {
     const uint8_t index = static_cast<uint8_t>(phase);
     if (index >= PHASE_COUNT) return;
@@ -250,25 +270,23 @@ class PhaseProfiler {
     return true;
   }
 
-  void capturePeakGap(uint32_t gapMs, uint32_t gapUs, uint32_t delayUs,
-                      uint32_t dispatchUs, uint32_t cpuUs = 0,
-                      uint32_t idleUs = 0) {
+  void capturePeakGap(const LoopGap &gap) {
     memcpy(peakGapUs_, iterationUs_, sizeof(peakGapUs_));
-    peakGapMs_ = gapMs;
-    peakGapDurationUs_ = gapUs;
-    peakGapCpuUs_ = cpuUs;
-    peakGapIdleUs_ = idleUs;
+    peakGapMs_ = gap.ms;
+    peakGapDurationUs_ = gap.us;
+    peakGapCpuUs_ = gap.cpuUs;
+    peakGapIdleUs_ = gap.idleUs;
     peakGapAtMs_ = iterationAtMs_;  // The gap opened at the previous iteration's start.
-    peakDelayUs_ = delayUs;
-    peakDispatchUs_ = dispatchUs;
+    peakDelayUs_ = gap.delayUs;
+    peakDispatchUs_ = gap.dispatchUs;
   }
 
-  void captureIntervalGap(uint32_t gapUs, uint32_t delayUs,
-                          uint32_t dispatchUs) {
+  // The interval's gap length in ms is published by publishIntervalGap.
+  void captureIntervalGap(const LoopGap &gap) {
     memcpy(intervalGapUs_, iterationUs_, sizeof(intervalGapUs_));
-    intervalDelayUs_ = delayUs;
-    intervalDispatchUs_ = dispatchUs;
-    intervalGapDurationUs_ = gapUs;
+    intervalDelayUs_ = gap.delayUs;
+    intervalDispatchUs_ = gap.dispatchUs;
+    intervalGapDurationUs_ = gap.us;
   }
 
   void publishIntervalGap(uint32_t gapMs) {
@@ -387,18 +405,6 @@ class PhaseProfiler {
 };
 
 using LoopPhaseProfiler = PhaseProfiler<LOOP_PHASE_COUNT>;
-
-// Last/max acquisition wait for a blocking mutex, updated from the acquiring
-// task; read by the task-profiler serializer via the snapshot fields below.
-inline void noteMutexWaitUs(std::atomic<uint32_t> &lastUs,
-                            std::atomic<uint32_t> &maxUs, uint32_t waitedUs) {
-  lastUs.store(waitedUs, std::memory_order_relaxed);
-  uint32_t known = maxUs.load(std::memory_order_relaxed);
-  while (waitedUs > known &&
-         !maxUs.compare_exchange_weak(known, waitedUs,
-                                      std::memory_order_relaxed)) {
-  }
-}
 
 enum class TaskProfilerState : uint8_t { NEVER, RUNNING, STOPPED, FAILED };
 enum class TaskProfilerStopReason : uint8_t {

@@ -258,7 +258,7 @@ struct CycleSession {
   uint32_t ownedConnectionGeneration = 0;
   uint32_t startedAtMs = 0;
   uint32_t circuitClosedAtMs = 0;
-  // Mirror of rinseClockStartedAtMs after the stopper accepts. Tests only.
+  // Mirror of rinseClock.startedAtMs after the stopper accepts. Tests only.
   uint32_t rinseStartedAtMs = 0;
   uint32_t postTareBaselineDeadlineMs = 0;
   uint32_t stopTimerRetryDeadlineMs = 0;
@@ -833,14 +833,14 @@ static void finishLoopPhase(LoopPhase phase) {
   // keeps wall - cpu a valid, zero lower bound of preemption).
   if (loopPhaseProfiler.active()) {
     const uint32_t cpuEndedUs = loopTaskCpuUs();
-    loopPhaseProfiler.record(phase, endedAtUs - loopPhaseStartedAtUs, endedAtUs,
+    loopPhaseProfiler.record(endedAtUs, phase, endedAtUs - loopPhaseStartedAtUs,
                              cpuEndedUs - loopPhaseCpuStartedUs);
     loopPhaseCpuStartedUs = cpuEndedUs;
   } else {
-    loopPhaseProfiler.record(phase, endedAtUs - loopPhaseStartedAtUs, endedAtUs);
+    loopPhaseProfiler.record(endedAtUs, phase, endedAtUs - loopPhaseStartedAtUs);
   }
 #else
-  loopPhaseProfiler.record(phase, endedAtUs - loopPhaseStartedAtUs, endedAtUs);
+  loopPhaseProfiler.record(endedAtUs, phase, endedAtUs - loopPhaseStartedAtUs);
 #endif
   loopPhaseStartedAtUs = endedAtUs;
 }
@@ -848,10 +848,8 @@ static void finishLoopPhase(LoopPhase phase) {
 // Lock-wait accounting for the status publish's shot-store and control-status
 // acquisitions on the control task: the acquire path updates these, the
 // task-profiler snapshot reads them.
-std::atomic<uint32_t> shotStoreWaitLastUs{0};
-std::atomic<uint32_t> shotStoreWaitMaxUs{0};
-std::atomic<uint32_t> controlStatusWaitLastUs{0};
-std::atomic<uint32_t> controlStatusWaitMaxUs{0};
+MutexWaitStat shotStoreWait;
+MutexWaitStat controlStatusWait;
 bool platformClockReady = false;
 bool persistenceReady = false;
 bool firmwareInitializationComplete = false;
@@ -1039,24 +1037,24 @@ void copyTaskProfiler(TaskProfilerSnapshot &output) {
   loopPhaseProfiler.copySnapshot(output.loopPhases);
   copyScaleWorkerPhaseProfilerSnapshot(output.scaleWorkerPhases);
   output.micraBackflushWaitLastUs =
-      micraBackflushWaitLastUsStat().load(std::memory_order_relaxed);
+      micraBackflushWaitStat().lastUs.load(std::memory_order_relaxed);
   output.micraBackflushWaitMaxUs =
-      micraBackflushWaitMaxUsStat().load(std::memory_order_relaxed);
+      micraBackflushWaitStat().maxUs.load(std::memory_order_relaxed);
   output.micraBackflushHoldLastUs =
-      micraBackflushHoldLastUsStat().load(std::memory_order_relaxed);
+      micraBackflushHoldStat().lastUs.load(std::memory_order_relaxed);
   output.micraBackflushHoldMaxUs =
-      micraBackflushHoldMaxUsStat().load(std::memory_order_relaxed);
+      micraBackflushHoldStat().maxUs.load(std::memory_order_relaxed);
   output.scaleEventsWaitLastUs =
-      scaleCriticalEventWaitLastUsStat().load(std::memory_order_relaxed);
+      scaleCriticalEventWaitStat().lastUs.load(std::memory_order_relaxed);
   output.scaleEventsWaitMaxUs =
-      scaleCriticalEventWaitMaxUsStat().load(std::memory_order_relaxed);
+      scaleCriticalEventWaitStat().maxUs.load(std::memory_order_relaxed);
   output.shotStoreWaitLastUs =
-      shotStoreWaitLastUs.load(std::memory_order_relaxed);
-  output.shotStoreWaitMaxUs = shotStoreWaitMaxUs.load(std::memory_order_relaxed);
+      shotStoreWait.lastUs.load(std::memory_order_relaxed);
+  output.shotStoreWaitMaxUs = shotStoreWait.maxUs.load(std::memory_order_relaxed);
   output.controlStatusWaitLastUs =
-      controlStatusWaitLastUs.load(std::memory_order_relaxed);
+      controlStatusWait.lastUs.load(std::memory_order_relaxed);
   output.controlStatusWaitMaxUs =
-      controlStatusWaitMaxUs.load(std::memory_order_relaxed);
+      controlStatusWait.maxUs.load(std::memory_order_relaxed);
 }
 
 void copyScaleProfilerStatus(ScaleProfilerStatus &output) {

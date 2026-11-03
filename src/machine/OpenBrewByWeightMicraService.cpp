@@ -924,8 +924,8 @@ MachineBackflushSnapshot OpenBrewByWeightMicraService::backflush(bool consume) {
   // a change or the power mirror flips back on.
   if (consume && !backflush_.changed() && !postedPending() &&
       (!idleBackflush_.valid || powerOff_.load(std::memory_order_acquire))) {
-    noteMutexWaitUs(micraBackflushWaitLastUsStat(), micraBackflushWaitMaxUsStat(), 0);
-    noteMutexWaitUs(micraBackflushHoldLastUsStat(), micraBackflushHoldMaxUsStat(), 0);
+    micraBackflushWaitStat().note(0);
+    micraBackflushHoldStat().note(0);
     return idleBackflush_;
   }
   // The control loop polls this every iteration and must not wait behind a
@@ -933,9 +933,8 @@ MachineBackflushSnapshot OpenBrewByWeightMicraService::backflush(bool consume) {
   // (microseconds uncontended), the hold stat the locked section.
   const uint32_t muxLockStartedUs = micros();
   if (!mux_.tryLock()) {
-    noteMutexWaitUs(micraBackflushWaitLastUsStat(), micraBackflushWaitMaxUsStat(),
-                    micros() - muxLockStartedUs);
-    noteMutexWaitUs(micraBackflushHoldLastUsStat(), micraBackflushHoldMaxUsStat(), 0);
+    micraBackflushWaitStat().note(micros() - muxLockStartedUs);
+    micraBackflushHoldStat().note(0);
     // Busy, no new edges: transitions keep accumulating in the bounded ring
     // while validity and permits stay the last locked resolution's. The
     // idle handoff is never served here; mid-episode it is stale and would
@@ -945,8 +944,7 @@ MachineBackflushSnapshot OpenBrewByWeightMicraService::backflush(bool consume) {
     return missed;
   }
   const uint32_t lockedAtUs = micros();
-  noteMutexWaitUs(micraBackflushWaitLastUsStat(), micraBackflushWaitMaxUsStat(),
-                  lockedAtUs - muxLockStartedUs);
+  micraBackflushWaitStat().note(lockedAtUs - muxLockStartedUs);
   applyPostedLocked();
   qualifyBackflushLocked();
   auto result = consume ? backflush_.take() : backflush_.status();
@@ -956,8 +954,7 @@ MachineBackflushSnapshot OpenBrewByWeightMicraService::backflush(bool consume) {
     idleBackflush_ = result;
     backflush_.settle();
   }
-  noteMutexWaitUs(micraBackflushHoldLastUsStat(), micraBackflushHoldMaxUsStat(),
-                  micros() - lockedAtUs);
+  micraBackflushHoldStat().note(micros() - lockedAtUs);
   lastPollSnapshot_ = result;
   mux_.unlock();
   return result;

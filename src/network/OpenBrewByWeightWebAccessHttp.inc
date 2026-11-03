@@ -6,8 +6,8 @@ namespace {
 
 constexpr const char *WEB_UI_SESSION_HEADER = "X-WebUI-Session";
 
-uint32_t webAccessNowUtc(uint32_t nowMs) {
-  return g_wallClock.synced() ? g_wallClock.nowUtcSec(nowMs) : 0;
+Instant webAccessNow(uint32_t nowMs) {
+  return {nowMs, g_wallClock.synced() ? g_wallClock.nowUtcSec(nowMs) : 0};
 }
 
 }  // namespace
@@ -91,7 +91,7 @@ bool OpenBrewByWeightNetwork::webAccessSessionAllowed(httpd_req_t *request) {
   bool valid = false;
   {
     TaskLockGuard lock(dataMux_);
-    valid = webAccessSessionValid(g_webAccess, token, now, webAccessNowUtc(now));
+    valid = webAccessSessionValid(g_webAccess, token, webAccessNow(now));
   }
   memset(token, 0, sizeof(token));
   return valid;
@@ -239,8 +239,7 @@ esp_err_t OpenBrewByWeightNetwork::authLoginHandler(httpd_req_t *request) {
   const uint32_t now = millis();
   {
     TaskLockGuard lock(self.dataMux_);
-    webAccessIssueSession(g_webAccess, token, body.remember, now, webAccessNowUtc(now),
-                          body.device);
+    webAccessIssueSession(g_webAccess, token, body.remember, webAccessNow(now), body.device);
   }
   // Signing in also claims control for this window, and the password typed
   // just now opens Admin for it; a later claim clears that as usual. A
@@ -346,7 +345,7 @@ esp_err_t OpenBrewByWeightNetwork::authAccessHandler(httpd_req_t *request) {
       TaskLockGuard lock(self.dataMux_);
       g_webAccess.stored.enabled = 1;
       g_webAccess.dirty = true;
-      webAccessIssueSession(g_webAccess, token, true, now, webAccessNowUtc(now), body.device);
+      webAccessIssueSession(g_webAccess, token, true, webAccessNow(now), body.device);
     }
     char text[WEB_ACCESS_TOKEN_TEXT] = {};
     char json[80] = {};
@@ -436,8 +435,8 @@ esp_err_t OpenBrewByWeightNetwork::authPairingHandler(httpd_req_t *request) {
   bool decided = false;
   {
     TaskLockGuard lock(self.dataMux_);
-    decided = webAccessDecidePairing(g_webAccess, body.id, body.allow, token, now,
-                                     webAccessNowUtc(now));
+    decided = webAccessDecidePairing(g_webAccess, body.id, body.allow, token,
+                                     webAccessNow(now));
   }
   memset(token, 0, sizeof(token));
   if (!decided) {
@@ -454,7 +453,8 @@ esp_err_t OpenBrewByWeightNetwork::authPairingHandler(httpd_req_t *request) {
 bool OpenBrewByWeightNetwork::appendWebAccessStatus(httpd_req_t *request, size_t *used) {
   uint8_t own[WEB_ACCESS_TOKEN_BYTES] = {};
   const bool hasOwn = readWebAccessToken(request, WEB_UI_SESSION_HEADER, "", own);
-  const uint32_t now = millis(), nowUtc = webAccessNowUtc(now);
+  const Instant clock = webAccessNow(millis());
+  const uint32_t now = clock.monotonicMs, nowUtc = clock.utcSec;
   TaskLockGuard lock(dataMux_);
   const bool factory = passwordIsFactoryDefault(settings_);
   const int ownId = hasOwn ? webAccessSessionId(g_webAccess, own) : -1;
@@ -480,7 +480,7 @@ bool OpenBrewByWeightNetwork::appendWebAccessStatus(httpd_req_t *request, size_t
     first = false;
   };
   for (uint8_t slot = 0; slot < WEB_ACCESS_REMEMBERED_SLOTS; ++slot) {
-    if (!webAccessRememberedLive(stored, slot, nowUtc)) continue;
+    if (!webAccessRememberedLive(stored, slot, clock)) continue;
     const uint32_t usedUtc = stored.remembered[slot].usedUtc;
     // Daily stamps: -1 when the clock is not synced or never stamped.
     session(slot, stored.remembered[slot].label, true,
@@ -540,7 +540,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
     esp_fill_random(token, sizeof(token));
     {
       TaskLockGuard lock(dataMux_);
-      webAccessSetHomeAssistant(g_webAccess, token, webAccessNowUtc(now));
+      webAccessSetHomeAssistant(g_webAccess, token, webAccessNow(now).utcSec);
     }
     char text[WEB_ACCESS_TOKEN_TEXT] = {};
     char json[80] = {};
@@ -563,8 +563,8 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
     char code[5] = {};
     {
       TaskLockGuard lock(dataMux_);
-      started = webAccessStartPairing(g_webAccess, id,
-                                      static_cast<uint16_t>(random[1] % 10000U), now);
+      started = webAccessStartPairing(
+          g_webAccess, {id, static_cast<uint16_t>(random[1] % 10000U)}, webAccessNow(now));
       memcpy(code, g_webAccess.pairing.code, sizeof(code));
     }
     if (!started) {
@@ -592,7 +592,8 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
     WebAccessPairing state = WebAccessPairing::NONE;
     if (hasId && end != value && *end == '\0') {
       TaskLockGuard lock(dataMux_);
-      state = webAccessPairingStatus(g_webAccess, static_cast<uint32_t>(id), now, token);
+      state = webAccessPairingStatus(g_webAccess, static_cast<uint32_t>(id), webAccessNow(now),
+                                     token);
     }
     char text[WEB_ACCESS_TOKEN_TEXT] = {};
     char json[96] = {};

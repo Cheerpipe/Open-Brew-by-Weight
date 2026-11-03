@@ -2756,7 +2756,7 @@ void r20e_uptime_forced_invalid_and_wrapped_checkpoints() {
   for (const uint32_t historyCount : {0U, uint32_t(RESET_HISTORY_CAPACITY)}) {
     ResetHistoryEntry history[RESET_HISTORY_CAPACITY] = {};
     for (uint32_t i = 0; i < historyCount; ++i) history[i] = {i + 1U, i * 10U};
-    initializeSafetyResetRecord(SAFETY_RELAY_OPEN_MARKER, 0, history, historyCount);
+    initializeSafetyResetRecord(0, history, historyCount);
     detail::resetUptimeLastCheckpointMs = 0;
     const uint32_t checksum = detail::safetyResetRecord.historyChecksum;
     recordResetUptime(17, true);
@@ -3624,7 +3624,7 @@ void w23_combined_tare_command_uses_cycle_snapshot() {
 void w24_debug_ring_is_bounded_and_ordered() {
   DebugRingBuffer ring;
   for (size_t index = 0; index < DEBUG_EVENT_CAPACITY + 5; ++index) {
-    ring.add(static_cast<uint32_t>(index), 0, LogLevel::INFO, DebugCategory::WEB,
+    ring.add({static_cast<uint32_t>(index), 0}, LogLevel::INFO, DebugCategory::WEB,
              DebugCode::WEB_COMMAND_ACCEPTED, static_cast<int32_t>(index));
   }
   CHECK(ring.overwritten() == 5);
@@ -3656,10 +3656,10 @@ void w24_debug_ring_is_bounded_and_ordered() {
   CHECK(invalidRead.cursorInvalid);
 
   DebugRingBuffer reused;
-  reused.add(1, 0, LogLevel::INFO, DebugCategory::SYSTEM,
+  reused.add({1, 0}, LogLevel::INFO, DebugCategory::SYSTEM,
              DebugCode::LOG_TEXT, 0, 0, "old text");
   for (size_t index = 0; index < DEBUG_EVENT_CAPACITY; ++index) {
-    reused.add(static_cast<uint32_t>(index + 2), 0, LogLevel::INFO,
+    reused.add({static_cast<uint32_t>(index + 2), 0}, LogLevel::INFO,
                DebugCategory::SYSTEM, DebugCode::BOOT_SUBSYSTEM,
                static_cast<int32_t>(index));
   }
@@ -3676,9 +3676,9 @@ void w24_debug_ring_is_bounded_and_ordered() {
   // cursor, and a zero row would repeat itself in the companion log pager.
   DebugRingBuffer zeroed;
   memset(&zeroed, 0, sizeof(zeroed));
-  zeroed.add(106, 0, LogLevel::INFO, DebugCategory::BOOT,
+  zeroed.add({106, 0}, LogLevel::INFO, DebugCategory::BOOT,
              DebugCode::BOOT_RESET_REASON, 3);
-  zeroed.add(107, 0, LogLevel::INFO, DebugCategory::BOOT,
+  zeroed.add({107, 0}, LogLevel::INFO, DebugCategory::BOOT,
              DebugCode::BOOT_RESET_REASON, 3);
   DebugEvent zeroedEvents[2] = {};
   CHECK(zeroed.copyAfter(0, zeroedEvents, 2) == 2);
@@ -15422,7 +15422,7 @@ void n01c_wall_clock_cancel_syncing_restores_anchor() {
   CHECK(!g_wallClock.applyPendingSync(5001));
   CHECK(g_wallClock.synced());
   CHECK(g_wallClock.nowUtcSec(5001) == 1'700'000'004U);
-  g_wallClock.markFailed(5001, 5);
+  g_wallClock.markFailed(5001);
   CHECK(g_wallClock.snapshot(5001).lastSyncUtcSec == 1'700'000'000U);
 
   g_wallClock.reset();
@@ -15439,7 +15439,7 @@ void n01d_wall_clock_keeps_time_through_failures_and_rebase() {
   CHECK(g_wallClock.applyPendingSync(1000));
   g_wallClock.setSyncing("pool.ntp.org", 3601000);
   CHECK(g_wallClock.nowUtcSec(3601000) == 1'700'003'600U);
-  g_wallClock.markFailed(3611000, 5);
+  g_wallClock.markFailed(3611000);
   CHECK(g_wallClock.synced());
   CHECK(g_wallClock.snapshot(3611000).utcSec == 1'700'003'610U);
   CHECK(g_wallClock.snapshot(3611000).state == TimeSyncState::FAILED);
@@ -15471,7 +15471,7 @@ void n01b_wall_clock_survives_millis_wrap() {
   CHECK(snap.state == TimeSyncState::STALE);
 
   g_wallClock.reset();
-  g_wallClock.markFailed(UINT32_MAX - 1000U, 5);
+  g_wallClock.markFailed(UINT32_MAX - 1000U);
   CHECK(g_wallClock.snapshot(UINT32_MAX - 500U).nextRetryInMs == 14500U);
   CHECK(g_wallClock.snapshot(100U).nextRetryInMs == 13899U);
 }
@@ -18141,14 +18141,14 @@ void h03_task_profiler_start_stop_updates_snapshot() {
 void h04_loop_phase_profiler_publishes_window_and_session_totals() {
   LoopPhaseProfiler profiler;
   LoopPhaseProfilerSnapshot snap;
-  profiler.beginIteration(false, 1000U);
-  profiler.record(LoopPhase::CONTROL_STATE_MACHINE, 150U, 1150U);
-  profiler.capturePeakGap(8U, 8050U, 7000U, 400U);
-  profiler.captureIntervalGap(8050U, 7000U, 400U);
+  profiler.beginIteration(false, {1000U});
+  profiler.record(1150U, LoopPhase::CONTROL_STATE_MACHINE, 150U);
+  profiler.capturePeakGap({.ms = 8U, .us = 8050U, .delayUs = 7000U, .dispatchUs = 400U});
+  profiler.captureIntervalGap({.us = 8050U, .delayUs = 7000U, .dispatchUs = 400U});
   profiler.publishIntervalGap(8U);
-  profiler.beginIteration(false, 2000U);
-  profiler.record(LoopPhase::CONTROL_STATE_MACHINE, 90U, 1002000U);
-  profiler.captureIntervalGap(5100U, 4200U, 300U);
+  profiler.beginIteration(false, {2000U});
+  profiler.record(1002000U, LoopPhase::CONTROL_STATE_MACHINE, 90U);
+  profiler.captureIntervalGap({.us = 5100U, .delayUs = 4200U, .dispatchUs = 300U});
   profiler.publishIntervalGap(5U);
   profiler.copySnapshot(snap);
   CHECK(snap.recentGapMs == 5U);
@@ -18157,8 +18157,8 @@ void h04_loop_phase_profiler_publishes_window_and_session_totals() {
   CHECK(snap.recentDispatchUs == 300U);
   CHECK(snap.rows[static_cast<uint8_t>(LoopPhase::CONTROL_STATE_MACHINE)]
             .recentGapExecutionUs == 90U);
-  profiler.beginIteration(false, 1003000U);
-  profiler.record(LoopPhase::DIAGNOSTICS, 10U, 2003000U);
+  profiler.beginIteration(false, {1003000U});
+  profiler.record(2003000U, LoopPhase::DIAGNOSTICS, 10U);
   profiler.copySnapshot(snap);
   CHECK(snap.peakGapMs == 8U);
   CHECK(snap.peakGapUs == 8050U);
@@ -18187,20 +18187,20 @@ void h04_loop_phase_profiler_publishes_window_and_session_totals() {
         90U);
   CHECK(snap.rows[static_cast<uint8_t>(LoopPhase::CONTROL_STATE_MACHINE)]
             .recentGapExecutionUs == 90U);
-  profiler.beginIteration(true, 1000U);
+  profiler.beginIteration(true, {1000U});
   profiler.copySnapshot(snap);
   CHECK(snap.rows[static_cast<uint8_t>(LoopPhase::CONTROL_STATE_MACHINE)].lastExecutionUs ==
         90U);
   CHECK(snap.rows[static_cast<uint8_t>(LoopPhase::CONTROL_STATE_MACHINE)].sampleCount == 0U);
-  profiler.record(LoopPhase::SAFETY_HEALTH, 100U, 1100U);
-  profiler.record(LoopPhase::CONTROL_STATE_MACHINE, 200U, 1300U);
+  profiler.record(1100U, LoopPhase::SAFETY_HEALTH, 100U);
+  profiler.record(1300U, LoopPhase::CONTROL_STATE_MACHINE, 200U);
   // Housekeeping only records on iterations that run the gated block. The
   // status publish splits into three contiguous sub-phases.
-  profiler.record(LoopPhase::HOUSEKEEPING_SHOT_PERSISTENCE, 70U, 1400U);
-  profiler.record(LoopPhase::HOUSEKEEPING_STATUS_GATHER, 12U, 1412U);
-  profiler.record(LoopPhase::HOUSEKEEPING_STATUS_STORE_COPY, 10U, 1422U);
-  profiler.record(LoopPhase::HOUSEKEEPING_STATUS_COMMIT, 8U, 1430U);
-  profiler.record(LoopPhase::DIAGNOSTICS, 50U, 1001000U);
+  profiler.record(1400U, LoopPhase::HOUSEKEEPING_SHOT_PERSISTENCE, 70U);
+  profiler.record(1412U, LoopPhase::HOUSEKEEPING_STATUS_GATHER, 12U);
+  profiler.record(1422U, LoopPhase::HOUSEKEEPING_STATUS_STORE_COPY, 10U);
+  profiler.record(1430U, LoopPhase::HOUSEKEEPING_STATUS_COMMIT, 8U);
+  profiler.record(1001000U, LoopPhase::DIAGNOSTICS, 50U);
   profiler.copySnapshot(snap);
   CHECK(snap.rowCount == LOOP_PHASE_COUNT);
   CHECK(strcmp(snap.rows[0].name, "safety/health") == 0);
@@ -18246,12 +18246,12 @@ void h04_loop_phase_profiler_publishes_window_and_session_totals() {
             .averageExecutionUs == 50U);
   CHECK(snap.rows[static_cast<uint8_t>(LoopPhase::FINAL_SCALE_DRAIN)]
             .averageExecutionUs == 0U);
-  profiler.captureIntervalGap(1500U, 900U, 150U);
+  profiler.captureIntervalGap({.us = 1500U, .delayUs = 900U, .dispatchUs = 150U});
   profiler.publishIntervalGap(2U);
-  profiler.beginIteration(true, 1002000U, 1002U);
-  profiler.record(LoopPhase::DIAGNOSTICS, 10U, 2002000U);
-  profiler.capturePeakGap(1U, 1000U, 900U, 80U);
-  profiler.record(LoopPhase::DIAGNOSTICS, 10U, 3002000U);
+  profiler.beginIteration(true, {1002000U, 1002U});
+  profiler.record(2002000U, LoopPhase::DIAGNOSTICS, 10U);
+  profiler.capturePeakGap({.ms = 1U, .us = 1000U, .delayUs = 900U, .dispatchUs = 80U});
+  profiler.record(3002000U, LoopPhase::DIAGNOSTICS, 10U);
   profiler.copySnapshot(snap);
   CHECK(snap.peakGapAtMs == 1002U);  // The gap opened at that iteration's start.
   CHECK(snap.rows[static_cast<uint8_t>(LoopPhase::HOUSEKEEPING_STATUS_COMMIT)]
@@ -18261,7 +18261,7 @@ void h04_loop_phase_profiler_publishes_window_and_session_totals() {
   CHECK(snap.rows[static_cast<uint8_t>(LoopPhase::CONTROL_STATE_MACHINE)]
             .averageExecutionUs == 200U);
 
-  profiler.beginIteration(false, 3501000U);
+  profiler.beginIteration(false, {3501000U});
   profiler.copySnapshot(snap);
   CHECK(snap.rows[0].averageCpuPct > 0.002f);
   CHECK(snap.rows[0].averageCpuPct < 0.003f);
@@ -18271,11 +18271,11 @@ void h05_loop_phase_profiler_pairs_cpu_with_wall_maxima() {
   LoopPhaseProfiler profiler;
   LoopPhaseProfilerSnapshot snap;
   // Default cpuUs equals the wall duration (callers without a counter read).
-  profiler.beginIteration(true, 1000U, 5U);
-  profiler.record(LoopPhase::INPUT_SCALE_EVENTS, 500U, 1500U);
-  profiler.record(LoopPhase::INPUT_SCALE_EVENTS, 300U, 1800U);
+  profiler.beginIteration(true, {1000U, 5U});
+  profiler.record(1500U, LoopPhase::INPUT_SCALE_EVENTS, 500U);
+  profiler.record(1800U, LoopPhase::INPUT_SCALE_EVENTS, 300U);
   // Cross the 1 s window so the snapshot actually publishes.
-  profiler.record(LoopPhase::DIAGNOSTICS, 0U, 1001000U);
+  profiler.record(1001000U, LoopPhase::DIAGNOSTICS, 0U);
   profiler.copySnapshot(snap);
   const auto &scaleEvents =
       snap.rows[static_cast<uint8_t>(LoopPhase::INPUT_SCALE_EVENTS)];
@@ -18285,10 +18285,10 @@ void h05_loop_phase_profiler_pairs_cpu_with_wall_maxima() {
   // A larger wall sample with a SMALLER cpu share replaces the pair: the
   // stored cpu time and iteration uptime belong to the iteration that set
   // the maximum.
-  profiler.beginIteration(true, 2000U, 9U);
-  profiler.record(LoopPhase::INPUT_SCALE_EVENTS, 900U, 2200U, 120U);
-  profiler.record(LoopPhase::INPUT_SCALE_EVENTS, 400U, 2600U, 390U);
-  profiler.record(LoopPhase::DIAGNOSTICS, 0U, 2001000U);
+  profiler.beginIteration(true, {2000U, 9U});
+  profiler.record(2200U, LoopPhase::INPUT_SCALE_EVENTS, 900U, 120U);
+  profiler.record(2600U, LoopPhase::INPUT_SCALE_EVENTS, 400U, 390U);
+  profiler.record(2001000U, LoopPhase::DIAGNOSTICS, 0U);
   profiler.copySnapshot(snap);
   CHECK(scaleEvents.maxExecutionUs == 900U);
   CHECK(scaleEvents.maxCpuUs == 120U);
@@ -18296,8 +18296,8 @@ void h05_loop_phase_profiler_pairs_cpu_with_wall_maxima() {
   // The kernel folds own-CPU at switch-out: a fold that lands in this phase
   // can exceed its wall time, and the stored pair must clamp to the wall so
   // wall - cpu never goes negative.
-  profiler.record(LoopPhase::INPUT_MACHINE_SERVICE, 250U, 3000000U, 900U);
-  profiler.record(LoopPhase::DIAGNOSTICS, 0U, 3001000U);
+  profiler.record(3000000U, LoopPhase::INPUT_MACHINE_SERVICE, 250U, 900U);
+  profiler.record(3001000U, LoopPhase::DIAGNOSTICS, 0U);
   profiler.copySnapshot(snap);
   const auto &machineService =
       snap.rows[static_cast<uint8_t>(LoopPhase::INPUT_MACHINE_SERVICE)];
@@ -18315,12 +18315,12 @@ void h05_loop_phase_profiler_pairs_cpu_with_wall_maxima() {
 void h06_loop_phase_input_subphases_report_individually() {
   LoopPhaseProfiler profiler;
   LoopPhaseProfilerSnapshot snap;
-  profiler.beginIteration(true, 1000U);
-  profiler.record(LoopPhase::INPUT_BACKFLUSH, 100U, 1100U);
-  profiler.record(LoopPhase::INPUT_DRIVE_PERMISSION, 50U, 1150U);
-  profiler.record(LoopPhase::INPUT_SCALE_EVENTS, 700U, 1850U);
-  profiler.record(LoopPhase::INPUT_MACHINE_SERVICE, 200U, 2050U);
-  profiler.record(LoopPhase::DIAGNOSTICS, 0U, 1001000U);
+  profiler.beginIteration(true, {1000U});
+  profiler.record(1100U, LoopPhase::INPUT_BACKFLUSH, 100U);
+  profiler.record(1150U, LoopPhase::INPUT_DRIVE_PERMISSION, 50U);
+  profiler.record(1850U, LoopPhase::INPUT_SCALE_EVENTS, 700U);
+  profiler.record(2050U, LoopPhase::INPUT_MACHINE_SERVICE, 200U);
+  profiler.record(1001000U, LoopPhase::DIAGNOSTICS, 0U);
   profiler.copySnapshot(snap);
   const auto sub = [&](LoopPhase phase) -> const LoopPhaseProfilerRow & {
     return snap.rows[static_cast<uint8_t>(phase)];
@@ -18347,12 +18347,10 @@ void h06_loop_phase_input_subphases_report_individually() {
 
 void h08_lock_wait_stats_flow_into_the_profiler_snapshot() {
   resetHarness(false, false);
-  noteMutexWaitUs(scaleCriticalEventWaitLastUsStat(),
-                 scaleCriticalEventWaitMaxUsStat(), 650U);
-  noteMutexWaitUs(micraBackflushWaitLastUsStat(),
-                  micraBackflushWaitMaxUsStat(), 25U);
-  noteMutexWaitUs(shotStoreWaitLastUs, shotStoreWaitMaxUs, 700U);
-  noteMutexWaitUs(controlStatusWaitLastUs, controlStatusWaitMaxUs, 150U);
+  scaleCriticalEventWaitStat().note(650U);
+  micraBackflushWaitStat().note(25U);
+  shotStoreWait.note(700U);
+  controlStatusWait.note(150U);
   TaskProfilerSnapshot snap;
   copyTaskProfiler(snap);
   CHECK(snap.scaleEventsWaitLastUs == 650U);
@@ -18489,17 +18487,16 @@ void h12_persistence_fast_path_skips_clean_store_mutex() {
 }
 
 void h07_mutex_wait_accounting_tracks_last_and_max() {
-  std::atomic<uint32_t> lastUs{0};
-  std::atomic<uint32_t> maxUs{0};
-  noteMutexWaitUs(lastUs, maxUs, 40U);
-  noteMutexWaitUs(lastUs, maxUs, 90U);
-  noteMutexWaitUs(lastUs, maxUs, 10U);
-  CHECK(lastUs.load() == 10U);
-  CHECK(maxUs.load() == 90U);
+  MutexWaitStat stat;
+  stat.note(40U);
+  stat.note(90U);
+  stat.note(10U);
+  CHECK(stat.lastUs.load() == 10U);
+  CHECK(stat.maxUs.load() == 90U);
   // The live stats are readable from the profiler snapshot's side (the
   // Micra backflush accessor is exercised by the micra host tests).
-  CHECK(scaleCriticalEventWaitLastUsStat().load() == 0U);
-  CHECK(micraBackflushWaitLastUsStat().load() == 0U);
+  CHECK(scaleCriticalEventWaitStat().lastUs.load() == 0U);
+  CHECK(micraBackflushWaitStat().lastUs.load() == 0U);
 }
 
 void r51_auto_to_manual_guard_fires_while_scale_lost() {

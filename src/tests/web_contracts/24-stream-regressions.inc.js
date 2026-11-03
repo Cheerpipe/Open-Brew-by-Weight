@@ -117,7 +117,7 @@ int main(){
   assert(!session.statsFetch&&session.statsFingerprint==42);
   assert(held.statsHeld[0].id==7);  // a fetch page never replaces the held standing rows
   const char *texts[]={"NimBLE runtime state=2", "quotes \\\" slash \\\\ newline\\n", "", "café"};
-  for(const auto *text:texts)ring.add(10,0,LogLevel::INFO,DebugCategory::SYSTEM,DebugCode::BOOT_BANNER,1,2,text);
+  for(const auto *text:texts)ring.add({10,0},LogLevel::INFO,DebugCategory::SYSTEM,DebugCode::BOOT_BANNER,1,2,text);
   assert(network.sendLogStream(session,control));
   assert(session.logAfter==4&&!session.logPush);
   assert(network.sendLogStream(session,control)&&delivered.size()==1);
@@ -128,7 +128,7 @@ int main(){
   for(const auto &frame:delivered)puts(frame.c_str());
   ring.clear();session.logAfter=0;session.logPush=true;delivered.clear();
   char large[128];memset(large,1,127);large[127]=0;
-  for(int i=0;i<32;++i)ring.add(10,0,LogLevel::INFO,DebugCategory::SYSTEM,DebugCode::BOOT_BANNER,0,0,large);
+  for(int i=0;i<32;++i)ring.add({10,0},LogLevel::INFO,DebugCategory::SYSTEM,DebugCode::BOOT_BANNER,0,0,large);
   sendResult=-1;uiStreamSendCleanAbort=true;
   assert(network.sendLogStream(session,control)&&session.logAfter==0&&session.logPush);
   sendResult=ESP_OK;

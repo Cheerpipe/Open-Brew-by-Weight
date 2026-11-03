@@ -60,7 +60,9 @@ void crashArchiveSetBootId(uint32_t bootId);
 #if defined(OPEN_BREW_BY_WEIGHT_CRASH_HOST_TEST) || (!defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST))
 void crashArchiveRecordPanic(const arduino_panic_info_t *info);
 #endif
-void crashArchivePromote(uint32_t currentBootId, uint32_t resetReason);
+// Promotes a pending core dump of the previous boot; call it after
+// crashArchiveSetBootId has recorded the current boot.
+void crashArchivePromote(uint32_t resetReason);
 // verifyDumps re-checks each listed dump against its stored SHA-256 (reading
 // it chunk by chunk under the flash lock) and drops records that fail; call it
 // before serving dumps, never from the periodic streams.

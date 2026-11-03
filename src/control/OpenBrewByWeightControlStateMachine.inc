@@ -592,8 +592,7 @@ bool enterRinse() {
     return false;
   }
   const uint32_t rinseStartMs = continueSessionRun ? runStartedAtMs : millis();
-  session.rinseStartedAtMs = rinseBegin(session.config.rinseDurationMs,
-                                        rinseStartMs);
+  session.rinseStartedAtMs = rinseBegin({rinseStartMs, session.config.rinseDurationMs});
   session.automaticEnabled = false;
   shot.automaticBrew = false;
   session.calibrationEligible = false;

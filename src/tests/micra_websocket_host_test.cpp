@@ -978,11 +978,11 @@ struct MicraWebSocketTest {
     poll(service, true);  // First poll always reads under the lock.
     // The stub clock advances 1 ms per micros() call, so a locked poll owns
     // the mutex for a measurable hold; the shortcut records none.
-    assert(micraBackflushHoldLastUsStat().load() > 0);
-    assert(micraBackflushHoldMaxUsStat().load() >= micraBackflushHoldLastUsStat().load());
+    assert(micraBackflushHoldStat().lastUs.load() > 0);
+    assert(micraBackflushHoldStat().maxUs.load() >= micraBackflushHoldStat().lastUs.load());
     poll(service, false);
     (void)service.backflush(true);  // The shortcut alone records no hold.
-    assert(micraBackflushHoldLastUsStat().load() == 0);
+    assert(micraBackflushHoldStat().lastUs.load() == 0);
     deliver(service, observation(service, requested));
     assert(poll(service, true).count == 1);  // Consumed exactly once.
     assert(poll(service, true).count == 0);  // Valid state keeps qualifying.

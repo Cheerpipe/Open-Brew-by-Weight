@@ -429,8 +429,7 @@ void startAfterBootRecovery() {
             BOOT_SUBSYSTEM_RECOVERY, 0);
   publishBootRecoveryStack();
   crashArchiveSetBootId(bootIdentityDurable ? activationStores.bootId() : 0);
-  crashArchivePromote(bootIdentityDurable ? activationStores.bootId() : 0,
-                      safetyResetStatus.reasonCode);
+  crashArchivePromote(safetyResetStatus.reasonCode);
   // A planned restart resets through esp_restart(): write the trace back too.
   if (esp_register_shutdown_handler(&shotTraceWriteBackOnShutdown) != ESP_OK)
     serialTraceCategory(LogLevel::WARNING, DebugCategory::BOOT,
@@ -726,51 +725,50 @@ void loop() {
   static uint32_t lastLoopStartedAtUs = 0, requestedDelayMs = 0;
   const uint32_t loopStartedAtMs = millis();
   const uint32_t loopStartedAtUs = micros();
-  const uint32_t gapUs = loopStartedAtUs - lastLoopStartedAtUs;
+  LoopGap gap;
+  gap.us = loopStartedAtUs - lastLoopStartedAtUs;
   lastLoopStartedAtUs = loopStartedAtUs;
-  const uint32_t delayUs = delayReturnedAtUs - delayStartedAtUs;
-  const uint32_t dispatchUs = delayStartedAtUs == 0
-                                  ? 0 : loopStartedAtUs - delayReturnedAtUs;
+  gap.delayUs = delayReturnedAtUs - delayStartedAtUs;
+  gap.dispatchUs = delayStartedAtUs == 0
+                       ? 0 : loopStartedAtUs - delayReturnedAtUs;
   const bool resetLoopMax = loopPhaseProfiler.consumeReset();
   if (resetLoopMax) loopMaxGapMs = 0;
   const bool profileLoopPhases = taskProfiler.loopPhaseProfilingEnabled();
   loopPhaseStartedAtUs = loopStartedAtUs;
-  uint32_t gapCpuUs = 0, gapIdleUs = 0;
 #if defined(ARDUINO) && !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
   static uint32_t lastLoopCpuUs = 0, lastLoopIdleUs = 0;
   loopPhaseCpuStartedUs = loopTaskCpuUs();
   const uint32_t loopIdleUs = loopCoreIdleUs();
-  gapCpuUs = loopPhaseCpuStartedUs - lastLoopCpuUs;
-  gapIdleUs = loopIdleUs - lastLoopIdleUs;
+  gap.cpuUs = loopPhaseCpuStartedUs - lastLoopCpuUs;
+  gap.idleUs = loopIdleUs - lastLoopIdleUs;
   lastLoopCpuUs = loopPhaseCpuStartedUs;
   lastLoopIdleUs = loopIdleUs;
 #endif
   recordResetUptime(loopStartedAtMs);
   if (lastLoopAtMs != 0) {
-    const uint32_t gap = loopStartedAtMs - lastLoopAtMs;
-    shotTrace().noteLoopGap(gap);
-    if (!resetLoopMax && gap > loopMaxGapMs) {
-      loopMaxGapMs = gap;
-      loopPhaseProfiler.capturePeakGap(gap, gapUs, delayUs, dispatchUs,
-                                       gapCpuUs, gapIdleUs);
+    gap.ms = loopStartedAtMs - lastLoopAtMs;
+    shotTrace().noteLoopGap(gap.ms);
+    if (!resetLoopMax && gap.ms > loopMaxGapMs) {
+      loopMaxGapMs = gap.ms;
+      loopPhaseProfiler.capturePeakGap(gap);
     }
     // The deadline bounds lateness beyond the requested delay; early-return
     // iterations request none.
-    if (gap > requestedDelayMs + CONTROL_SERVICE_DEADLINE_MS) {
+    if (gap.ms > requestedDelayMs + CONTROL_SERVICE_DEADLINE_MS) {
       ++loopDeadlineMisses;
     }
-    if (gap > healthIntervalMaxGapMs) {
-      healthIntervalMaxGapMs = gap;
-      healthIntervalGapCpuUs = gapCpuUs;
-      healthIntervalGapIdleUs = gapIdleUs;
+    if (gap.ms > healthIntervalMaxGapMs) {
+      healthIntervalMaxGapMs = gap.ms;
+      healthIntervalGapCpuUs = gap.cpuUs;
+      healthIntervalGapIdleUs = gap.idleUs;
       healthIntervalGapFlash = flashIoActiveSince(lastLoopAtMs);
-      loopPhaseProfiler.captureIntervalGap(gapUs, delayUs, dispatchUs);
+      loopPhaseProfiler.captureIntervalGap(gap);
     }
   }
   lastLoopAtMs = loopStartedAtMs;
   requestedDelayMs = 0;
-  loopPhaseProfiler.beginIteration(profileLoopPhases, loopStartedAtUs,
-                                   loopStartedAtMs);
+  loopPhaseProfiler.beginIteration(profileLoopPhases,
+                                   {loopStartedAtUs, loopStartedAtMs});
   // Relay and paddle control never wait for BLE. The worker owns every scale,
   // heartbeat, packet, timer and connection operation. Restart before heap
   // walks: a failed Wi-Fi stop can leave TLSF unwalkable.

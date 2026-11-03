@@ -32,10 +32,10 @@ static void testLatchCaptureAndPaging() {
   AuditLogLatch latch;
   assert(latch.count() == 0);
   assert(latch.latestSequence() == 0);
-  assert(latch.add(100, 1000, LogLevel::WARNING, DebugCategory::NETWORK,
+  assert(latch.add({100, 1000}, LogLevel::WARNING, DebugCategory::NETWORK,
                    DebugCode::MACHINE_MUX_WAIT, 850000, 12000,
                    "micra mutex wait while backflush poll held it"));
-  assert(latch.add(400, 1300, LogLevel::ERROR, DebugCategory::CONFIG,
+  assert(latch.add({400, 1300}, LogLevel::ERROR, DebugCategory::CONFIG,
                    DebugCode::CONFIG_REJECTED, 7, 0, nullptr));
   AuditRecord page[8];
   assert(latch.copyAfter(0, page, 8) == 2);
@@ -59,7 +59,7 @@ static void testExcerptTruncation() {
   AuditLogLatch latch;
   const char *longDetail =
       "0123456789012345678901234567890123456789012345678901234567890123";
-  assert(latch.add(10, 10, LogLevel::ERROR, DebugCategory::SYSTEM,
+  assert(latch.add({10, 10}, LogLevel::ERROR, DebugCategory::SYSTEM,
                    DebugCode::INITIALIZATION_FAILED, 0, 0, longDetail));
   AuditRecord record;
   assert(latch.copyAfter(0, &record, 1) == 1);
@@ -71,21 +71,21 @@ static void testPerCodeRateLimit() {
   AuditLogLatch latch;
   uint32_t atMs = 5000;
   for (uint8_t i = 0; i < AUDIT_RATE_LIMIT; ++i) {
-    assert(latch.add(atMs, 100, LogLevel::WARNING, DebugCategory::NETWORK,
+    assert(latch.add({atMs, 100}, LogLevel::WARNING, DebugCategory::NETWORK,
                      DebugCode::MACHINE_MUX_WAIT, i, 0, nullptr));
   }
   assert(latch.count() == AUDIT_RATE_LIMIT);
   // The 11th event of the same code inside the window is suppressed.
-  assert(!latch.add(atMs + 100, 100, LogLevel::WARNING, DebugCategory::NETWORK,
+  assert(!latch.add({atMs + 100, 100}, LogLevel::WARNING, DebugCategory::NETWORK,
                     DebugCode::MACHINE_MUX_WAIT, 10, 0, nullptr));
   assert(latch.count() == AUDIT_RATE_LIMIT);
   assert(latch.rateLimited() == 1);
   // A different code is unaffected by the saturated slot.
-  assert(latch.add(atMs + 100, 100, LogLevel::WARNING, DebugCategory::RELAY,
+  assert(latch.add({atMs + 100, 100}, LogLevel::WARNING, DebugCategory::RELAY,
                    DebugCode::RELAY_GPIO_DESYNC, 1, 0, nullptr));
   // After the window rolls over the same code is admitted again.
   atMs += AUDIT_RATE_WINDOW_MS + 1;
-  assert(latch.add(atMs, 100, LogLevel::WARNING, DebugCategory::NETWORK,
+  assert(latch.add({atMs, 100}, LogLevel::WARNING, DebugCategory::NETWORK,
                    DebugCode::MACHINE_MUX_WAIT, 20, 0, nullptr));
   assert(latch.rateLimited() == 1);
 }
@@ -94,7 +94,7 @@ static void testRingWrapAndClear() {
   AuditLogLatch latch;
   // Spacing stays under ten events per rate window so every add is admitted.
   for (uint32_t i = 0; i < AUDIT_RECORD_CAPACITY + 10; ++i) {
-    assert(latch.add(i * 6010, i, LogLevel::ERROR, DebugCategory::SYSTEM,
+    assert(latch.add({i * 6010, i}, LogLevel::ERROR, DebugCategory::SYSTEM,
                      DebugCode::INITIALIZATION_FAILED, static_cast<int32_t>(i),
                      0, nullptr));
   }

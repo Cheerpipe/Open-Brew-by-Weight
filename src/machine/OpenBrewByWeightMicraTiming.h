@@ -5,30 +5,24 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "OpenBrewByWeightTimingTypes.h"
+
 namespace openbrewbyweight {
 
 // Lock-wait accounting for the Micra service's backflush poll (the control
-// loop's input/backflush phase): the poll updates these atomics, the
+// loop's input/backflush phase): the poll updates these stats, the
 // task-profiler snapshot reads them. Inline with function-local storage so
 // every host-test harness that compiles only fragments links the same
 // instance; this header is Micra-specific, keeping the concrete feature out
 // of the common machine lifecycle.
-inline std::atomic<uint32_t> &micraBackflushWaitLastUsStat() {
-  static std::atomic<uint32_t> value{0};
-  return value;
-}
-inline std::atomic<uint32_t> &micraBackflushWaitMaxUsStat() {
-  static std::atomic<uint32_t> value{0};
-  return value;
+inline MutexWaitStat &micraBackflushWaitStat() {
+  static MutexWaitStat stat;
+  return stat;
 }
 // Ownership time of the same mutex by the control task inside the poll.
-inline std::atomic<uint32_t> &micraBackflushHoldLastUsStat() {
-  static std::atomic<uint32_t> value{0};
-  return value;
-}
-inline std::atomic<uint32_t> &micraBackflushHoldMaxUsStat() {
-  static std::atomic<uint32_t> value{0};
-  return value;
+inline MutexWaitStat &micraBackflushHoldStat() {
+  static MutexWaitStat stat;
+  return stat;
 }
 
 }  // namespace openbrewbyweight

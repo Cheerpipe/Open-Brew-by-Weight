@@ -34,8 +34,7 @@ ShotCurveRead copyShotCurveById(uint32_t shotId, ShotCurveRecord &curve, bool re
   {
     const uint32_t lockStartedUs = micros();
     TaskLockGuard lock(shotStoreMutex);
-    noteMutexWaitUs(shotStoreWaitLastUs, shotStoreWaitMaxUs,
-                    micros() - lockStartedUs);
+    shotStoreWait.note(micros() - lockStartedUs);
     resetShotCurveRecord(curve);
     if (shotCurves.copyByShotId(shotId, curve)) return ShotCurveRead::FOUND;
     const ShotLogRecord *summary = shotLog.findNewestById(shotId);
@@ -88,8 +87,7 @@ void copyHistoryPage(HistoryPage &page, size_t offset, size_t limit,
                      ShotLogSortDir dir, uint8_t types) {
   const uint32_t lockStartedUs = micros();
   TaskLockGuard lock(shotStoreMutex);
-  noteMutexWaitUs(shotStoreWaitLastUs, shotStoreWaitMaxUs,
-                  micros() - lockStartedUs);
+  shotStoreWait.note(micros() - lockStartedUs);
   historyLog.copyPage(page, offset, limit, dir, types);
 }
 
@@ -139,8 +137,7 @@ bool copyShotStoreStatus(uint32_t &bootId, PersistedLastShot &last,
                          bool &hasNewestActivation, bool includeGoodHistory) {
   const uint32_t lockStartedUs = micros();
   TaskLockGuard lock(shotStoreMutex);
-  noteMutexWaitUs(shotStoreWaitLastUs, shotStoreWaitMaxUs,
-                  micros() - lockStartedUs);
+  shotStoreWait.note(micros() - lockStartedUs);
   bootId = activationStores.bootId();
   // Newest activation record rides the same critical section so the status
   // publish needs no second shotStoreMutex acquisition.

@@ -16,6 +16,7 @@ using openbrewbyweight::OtaImageHeaderResult;
 using openbrewbyweight::OtaImageTag;
 using openbrewbyweight::OtaImageTagScanner;
 using openbrewbyweight::OtaPendingVerifyAction;
+using openbrewbyweight::OtaPendingVerifyInput;
 using openbrewbyweight::decideOtaPendingVerify;
 using openbrewbyweight::parseOtaImageTagBody;
 using openbrewbyweight::validateOtaImageHeader;
@@ -372,61 +373,68 @@ void testScannerFindsIdentityPastLegacyWebLimit() {
   CHECK(scanner.tag().packed == 16909056U);
 }
 
+// A pending image with a rollback slot, at uptimeMs inside the default window.
+OtaPendingVerifyInput pendingVerifyAt(uint32_t uptimeMs, bool httpReady) {
+  OtaPendingVerifyInput input;
+  input.pendingVerify = true;
+  input.httpReady = httpReady;
+  input.uptimeMs = uptimeMs;
+  input.window = {kConfirmMinMs, kConfirmDeadlineMs};
+  input.rollbackPossible = true;
+  return input;
+}
+
 void testPendingVerifyKeepRunningWhenRollbackImpossible() {
-  CHECK(decideOtaPendingVerify(true, false, false, kConfirmDeadlineMs,
-                               kConfirmMinMs, kConfirmDeadlineMs, false) ==
-        OtaPendingVerifyAction::KEEP_RUNNING);
+  OtaPendingVerifyInput input = pendingVerifyAt(kConfirmDeadlineMs, false);
+  input.rollbackPossible = false;
+  CHECK(decideOtaPendingVerify(input) == OtaPendingVerifyAction::KEEP_RUNNING);
 }
 
 void testPendingVerifyRejectWhenRollbackPossible() {
-  CHECK(decideOtaPendingVerify(true, false, false, kConfirmDeadlineMs,
-                               kConfirmMinMs, kConfirmDeadlineMs, true) ==
+  CHECK(decideOtaPendingVerify(pendingVerifyAt(kConfirmDeadlineMs, false)) ==
         OtaPendingVerifyAction::REJECT);
 }
 
 void testPendingVerifyConfirmAfterHttpUptime() {
-  CHECK(decideOtaPendingVerify(true, false, true, kConfirmMinMs, kConfirmMinMs,
-                               kConfirmDeadlineMs, true) ==
+  CHECK(decideOtaPendingVerify(pendingVerifyAt(kConfirmMinMs, true)) ==
         OtaPendingVerifyAction::CONFIRM);
 }
 
 void testPendingVerifyWaitsWithoutHttp() {
-  CHECK(decideOtaPendingVerify(true, false, false, kConfirmMinMs, kConfirmMinMs,
-                               kConfirmDeadlineMs, true) ==
+  CHECK(decideOtaPendingVerify(pendingVerifyAt(kConfirmMinMs, false)) ==
         OtaPendingVerifyAction::WAIT);
 }
 
 void testPendingVerifyWaitsBeforeConfirmUptime() {
-  CHECK(decideOtaPendingVerify(true, false, true, kConfirmMinMs - 1,
-                               kConfirmMinMs, kConfirmDeadlineMs, true) ==
+  CHECK(decideOtaPendingVerify(pendingVerifyAt(kConfirmMinMs - 1, true)) ==
         OtaPendingVerifyAction::WAIT);
 }
 
 void testPendingVerifyNoneWhenSettledOrNotPending() {
-  CHECK(decideOtaPendingVerify(true, true, true, kConfirmMinMs, kConfirmMinMs,
-                               kConfirmDeadlineMs, true) ==
-        OtaPendingVerifyAction::NONE);
-  CHECK(decideOtaPendingVerify(false, false, true, kConfirmMinMs, kConfirmMinMs,
-                               kConfirmDeadlineMs, true) ==
-        OtaPendingVerifyAction::NONE);
+  OtaPendingVerifyInput settled = pendingVerifyAt(kConfirmMinMs, true);
+  settled.alreadySettled = true;
+  CHECK(decideOtaPendingVerify(settled) == OtaPendingVerifyAction::NONE);
+  OtaPendingVerifyInput notPending = pendingVerifyAt(kConfirmMinMs, true);
+  notPending.pendingVerify = false;
+  CHECK(decideOtaPendingVerify(notPending) == OtaPendingVerifyAction::NONE);
 }
 
 void testPendingVerifyHttpReadyAfterDeadlineStillConfirms() {
-  CHECK(decideOtaPendingVerify(true, false, true, kConfirmDeadlineMs,
-                               kConfirmMinMs, kConfirmDeadlineMs, false) ==
-        OtaPendingVerifyAction::CONFIRM);
+  OtaPendingVerifyInput input = pendingVerifyAt(kConfirmDeadlineMs, true);
+  input.rollbackPossible = false;
+  CHECK(decideOtaPendingVerify(input) == OtaPendingVerifyAction::CONFIRM);
 }
 
 void testPendingVerifyDefersConfirmWhileFlashUnsafe() {
-  CHECK(decideOtaPendingVerify(true, false, true, kConfirmMinMs, kConfirmMinMs,
-                               kConfirmDeadlineMs, true, false) ==
-        OtaPendingVerifyAction::WAIT);
+  OtaPendingVerifyInput input = pendingVerifyAt(kConfirmMinMs, true);
+  input.flashWriteSafe = false;
+  CHECK(decideOtaPendingVerify(input) == OtaPendingVerifyAction::WAIT);
 }
 
 void testPendingVerifyConfirmsAtDeadlineEvenIfFlashUnsafe() {
-  CHECK(decideOtaPendingVerify(true, false, true, kConfirmDeadlineMs,
-                               kConfirmMinMs, kConfirmDeadlineMs, true, false) ==
-        OtaPendingVerifyAction::CONFIRM);
+  OtaPendingVerifyInput input = pendingVerifyAt(kConfirmDeadlineMs, true);
+  input.flashWriteSafe = false;
+  CHECK(decideOtaPendingVerify(input) == OtaPendingVerifyAction::CONFIRM);
 }
 
 void testOtaJournalUsesBoundedCheckpoints() {

@@ -59,13 +59,13 @@ inline uint32_t resetUptimeLastCheckpointMs = 0;
 inline bool safetyResetRecordValid() {
   volatile SafetyResetRecord &safetyResetRecord = detail::safetyResetRecord;
   uint32_t checksum =
-      resetHistoryChecksum(safetyResetRecord.history,
+      resetHistoryChecksum(SAFETY_RESET_RECORD_MAGIC ^
+                               safetyResetRecord.historyCount,
+                           safetyResetRecord.history,
                            safetyResetRecord.historyCount <
                                    RESET_HISTORY_CAPACITY
                                ? safetyResetRecord.historyCount
-                               : RESET_HISTORY_CAPACITY,
-                           SAFETY_RESET_RECORD_MAGIC ^
-                               safetyResetRecord.historyCount);
+                               : RESET_HISTORY_CAPACITY);
   return safetyResetRecord.magic == SAFETY_RESET_RECORD_MAGIC &&
          safetyResetRecord.magicInverse == ~SAFETY_RESET_RECORD_MAGIC &&
          safetyResetRecord.relayMarkerInverse ==
@@ -79,14 +79,15 @@ inline bool safetyResetRecordValid() {
           safetyResetRecord.relayMarker == SAFETY_RELAY_CLOSED_MARKER);
 }
 
+// A fresh record always starts with the relay commanded open.
 inline void initializeSafetyResetRecord(
-    uint32_t relayMarker, uint32_t unsafeResetCount,
-    const ResetHistoryEntry *history = nullptr, uint32_t historyCount = 0) {
+    uint32_t unsafeResetCount, const ResetHistoryEntry *history = nullptr,
+    uint32_t historyCount = 0) {
   volatile SafetyResetRecord &safetyResetRecord = detail::safetyResetRecord;
   safetyResetRecord.magic = 0;
   safetyResetRecord.magicInverse = 0;
-  safetyResetRecord.relayMarker = relayMarker;
-  safetyResetRecord.relayMarkerInverse = ~relayMarker;
+  safetyResetRecord.relayMarker = SAFETY_RELAY_OPEN_MARKER;
+  safetyResetRecord.relayMarkerInverse = ~SAFETY_RELAY_OPEN_MARKER;
   safetyResetRecord.unsafeResetCount = unsafeResetCount;
   safetyResetRecord.unsafeResetCountInverse = ~unsafeResetCount;
   safetyResetRecord.historyCount = historyCount > RESET_HISTORY_CAPACITY ? RESET_HISTORY_CAPACITY : historyCount;
@@ -101,10 +102,10 @@ inline void initializeSafetyResetRecord(
                                                        : 0;
   }
   safetyResetRecord.historyChecksum =
-      resetHistoryChecksum(safetyResetRecord.history,
-                           safetyResetRecord.historyCount,
-                           SAFETY_RESET_RECORD_MAGIC ^
-                               safetyResetRecord.historyCount);
+      resetHistoryChecksum(SAFETY_RESET_RECORD_MAGIC ^
+                               safetyResetRecord.historyCount,
+                           safetyResetRecord.history,
+                           safetyResetRecord.historyCount);
   safetyResetRecord.currentUptimeMs = 0;
   safetyResetRecord.currentUptimeMsInverse = UINT32_MAX;
   safetyResetRecord.magicInverse = ~SAFETY_RESET_RECORD_MAGIC;
@@ -116,7 +117,7 @@ inline void recordRelayCommandedClosed(bool closed) {
   // setup() initializes the record before machine circuit can close. The fallback keeps
   // host/fault-injection calls deterministic without adding work to the ISR.
   if (!safetyResetRecordValid()) {
-    initializeSafetyResetRecord(SAFETY_RELAY_OPEN_MARKER, 0);
+    initializeSafetyResetRecord(0);
   }
   const uint32_t marker = closed ? SAFETY_RELAY_CLOSED_MARKER
                                  : SAFETY_RELAY_OPEN_MARKER;
@@ -248,7 +249,7 @@ inline SafetyResetSnapshot beginSafetyResetGuard() {
   // OPEN, so a panic or reset during close never latches the next boot or
   // requires a local recovery gesture. Publish that safe fact while retaining
   // the crash count.
-  initializeSafetyResetRecord(SAFETY_RELAY_OPEN_MARKER, snapshot.unsafeResetCount,
+  initializeSafetyResetRecord(snapshot.unsafeResetCount,
                               snapshot.resetHistory, snapshot.resetHistoryCount);
   return snapshot;
 }

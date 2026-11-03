@@ -20,8 +20,8 @@ static_assert(sizeof(ResetHistoryStoreBlob) == 96, "reset history blob layout ch
 
 inline uint32_t resetHistoryStoreChecksum(const ResetHistoryStoreBlob &blob) {
   const uint32_t value =
-      resetHistoryChecksum(blob.entries, blob.count,
-                           RESET_HISTORY_STORE_MAGIC ^ blob.count);
+      resetHistoryChecksum(RESET_HISTORY_STORE_MAGIC ^ blob.count, blob.entries,
+                           blob.count);
   return (value * 16777619UL) ^ blob.currentUptimeMs;
 }
 
@@ -95,9 +95,7 @@ inline void persistResetHistoryAfterBoot(SafetyResetSnapshot &snapshot) {
 
   snapshot.resetHistoryCount = next.count;
   for (uint8_t i = 0; i < next.count; ++i) snapshot.resetHistory[i] = next.entries[i];
-  initializeSafetyResetRecord(SAFETY_RELAY_OPEN_MARKER,
-                              snapshot.unsafeResetCount,
-                              snapshot.resetHistory,
+  initializeSafetyResetRecord(snapshot.unsafeResetCount, snapshot.resetHistory,
                               snapshot.resetHistoryCount);
   resetHistoryStoreLive = next;
   resetHistoryStoreLastCheckpointMs.store(0, std::memory_order_relaxed);
@@ -146,7 +144,7 @@ inline bool persistResetUptimeCheckpoint(uint32_t uptimeMs) {
 // list never removes the "Last reset" diagnostic value.
 inline bool clearPersistedResetHistory(uint32_t unsafeResetCount) {
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
-  initializeSafetyResetRecord(SAFETY_RELAY_OPEN_MARKER, unsafeResetCount);
+  initializeSafetyResetRecord(unsafeResetCount);
   return true;
 #else
   ResetHistoryStoreBlob next = {};
@@ -159,7 +157,7 @@ inline bool clearPersistedResetHistory(uint32_t unsafeResetCount) {
     preferences.end();
   }
   if (ok) {
-    initializeSafetyResetRecord(SAFETY_RELAY_OPEN_MARKER, unsafeResetCount);
+    initializeSafetyResetRecord(unsafeResetCount);
     resetHistoryStoreLive = next;
     resetHistoryStoreLastCheckpointMs.store(0, std::memory_order_relaxed);
   }

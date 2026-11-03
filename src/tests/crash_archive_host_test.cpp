@@ -41,7 +41,8 @@ void stageCrash(uint32_t bootId, uint8_t signature) {
 
 void boot(uint32_t bootId) {
   crashArchivePrepareBoot();
-  crashArchivePromote(bootId, 7);
+  crashArchiveSetBootId(bootId);
+  crashArchivePromote(7);
 }
 
 int main() {

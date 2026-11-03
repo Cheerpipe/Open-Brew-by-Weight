@@ -118,7 +118,7 @@ CompanionLinkSlot &link = g_companion.links[0];
 
 void add(uint32_t count, const char *text = "an event", LogLevel level = LogLevel::INFO) {
   for (uint32_t i = 0; i < count; ++i)
-    ring.add(1000 + i, 1789000000 + i, level, DebugCategory::STATE, DebugCode::STATE_TRANSITION, 0, 0, text);
+    ring.add({1000 + i, 1789000000 + i}, level, DebugCategory::STATE, DebugCode::STATE_TRANSITION, 0, 0, text);
 }
 
 bool subscribe(const char *json) {

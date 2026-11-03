@@ -240,8 +240,7 @@ void publishControlStatus() {
     finishLoopPhase(LoopPhase::HOUSEKEEPING_STATUS_STORE_COPY);
   const uint32_t statusLockStartedUs = micros();
   TaskLockGuard lock(controlStatusMutex);
-  noteMutexWaitUs(controlStatusWaitLastUs, controlStatusWaitMaxUs,
-                  micros() - statusLockStartedUs);
+  controlStatusWait.note(micros() - statusLockStartedUs);
   ControlStatusFields &next = publishedControlStatus;
   // The signal level's hysteresis needs the published level the reset clears.
   const uint8_t scaleSignalLevel = next.scaleSignalLevel;

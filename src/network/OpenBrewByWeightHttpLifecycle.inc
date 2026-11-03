@@ -1040,7 +1040,7 @@ void OpenBrewByWeightNetwork::handleNtpFailure(uint32_t now) {
   if (ntpFailoverIndex_ < 3) {
     ++ntpFailoverIndex_;
   }
-  g_wallClock.markFailed(now, NTP_MAX_CONSECUTIVE_FAILURES);
+  g_wallClock.markFailed(now);
   recordBootHeap(BootHeapStage::NTP_DONE, BootHeapResult::FAILED, millis());
   log(DebugCategory::NETWORK, DebugCode::TIME_SYNC_FAIL, ntpFailoverIndex_, 0);
 }

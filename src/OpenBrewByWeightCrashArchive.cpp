@@ -192,7 +192,7 @@ void IRAM_ATTR crashArchiveRecordPanic(const arduino_panic_info_t *info) {
   g_panicRecord.magic = kAddressMagic;
 }
 
-void crashArchivePromote(uint32_t currentBootId, uint32_t resetReason) {
+void crashArchivePromote(uint32_t resetReason) {
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
   const esp_partition_t *history = historyPartition();
   const esp_partition_t *capture = capturePartition();
@@ -227,6 +227,7 @@ void crashArchivePromote(uint32_t currentBootId, uint32_t resetReason) {
   }
   const bool hasPanicRecord =
       validRecord(g_panicRecord) && g_panicRecord.bootId != 0;
+  const uint32_t currentBootId = g_activeBootId;
   const uint32_t crashBootId = hasPanicRecord
                                    ? g_panicRecord.bootId
                                    : currentBootId > 1 ? currentBootId - 1 : 0;
@@ -316,7 +317,6 @@ void crashArchivePromote(uint32_t currentBootId, uint32_t resetReason) {
   if (!ok) g_status.state = CrashArchiveState::IO_ERROR;
   unlockFlashIo();
 #else
-  (void)currentBootId;
   (void)resetReason;
 #endif
 }

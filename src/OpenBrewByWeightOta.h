@@ -126,24 +126,39 @@ enum class OtaPendingVerifyAction : uint8_t {
   KEEP_RUNNING  // deadline; rollback would leave no bootable app
 };
 
+// Uptime window for settling a pending image: confirm once HTTP has served
+// from minUptimeMs on; at deadlineMs the image settles regardless.
+struct OtaConfirmWindow {
+  uint32_t minUptimeMs = 0;
+  uint32_t deadlineMs = 0;
+};
+
+struct OtaPendingVerifyInput {
+  bool pendingVerify = false;
+  bool alreadySettled = false;
+  bool httpReady = false;
+  uint32_t uptimeMs = 0;
+  OtaConfirmWindow window;
+  bool rollbackPossible = false;
+  bool flashWriteSafe = true;
+};
+
 inline OtaPendingVerifyAction decideOtaPendingVerify(
-    bool pendingVerify, bool alreadySettled, bool httpReady, uint32_t uptimeMs,
-    uint32_t confirmMinUptimeMs, uint32_t confirmDeadlineMs,
-    bool rollbackPossible, bool flashWriteSafe = true) {
-  if (alreadySettled || !pendingVerify) {
+    const OtaPendingVerifyInput &in) {
+  if (in.alreadySettled || !in.pendingVerify) {
     return OtaPendingVerifyAction::NONE;
   }
-  if (httpReady && uptimeMs >= confirmMinUptimeMs) {
-    if (!flashWriteSafe && uptimeMs < confirmDeadlineMs) {
+  if (in.httpReady && in.uptimeMs >= in.window.minUptimeMs) {
+    if (!in.flashWriteSafe && in.uptimeMs < in.window.deadlineMs) {
       return OtaPendingVerifyAction::WAIT;
     }
     return OtaPendingVerifyAction::CONFIRM;
   }
-  if (uptimeMs < confirmDeadlineMs) {
+  if (in.uptimeMs < in.window.deadlineMs) {
     return OtaPendingVerifyAction::WAIT;
   }
-  return rollbackPossible ? OtaPendingVerifyAction::REJECT
-                          : OtaPendingVerifyAction::KEEP_RUNNING;
+  return in.rollbackPossible ? OtaPendingVerifyAction::REJECT
+                             : OtaPendingVerifyAction::KEEP_RUNNING;
 }
 
 struct OtaStatusSnapshot {
@@ -261,8 +276,7 @@ class OpenBrewByWeightOta {
   // usable, so it is confirmed. After a confirm or reject every later call is
   // a no-op, so a later tick cannot silently cancel the armed rollback.
   OtaBootStatus serviceBoot(uint32_t now, bool httpReady, bool activeCycle,
-                           bool relayClosed, bool bleUp,
-                           uint32_t minUptimeMs, uint32_t deadlineMs);
+                           bool relayClosed, bool bleUp, OtaConfirmWindow window);
 
   OtaImageTag stagedTag() const;
 

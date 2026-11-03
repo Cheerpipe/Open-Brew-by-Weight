@@ -2709,16 +2709,16 @@ static void finishScaleSection(ScaleWorkerPhase section) {
   if (scaleWorkerPhaseProfiler.active()) {
     const uint32_t cpuEndedUs = scaleWorkerTaskCpuUs();
     scaleWorkerPhaseProfiler.record(
-        section, endedAtUs - scaleSectionStartedAtUs, endedAtUs,
+        endedAtUs, section, endedAtUs - scaleSectionStartedAtUs,
         cpuEndedUs - scaleSectionCpuStartedUs);
     scaleSectionCpuStartedUs = cpuEndedUs;
   } else {
-    scaleWorkerPhaseProfiler.record(section, endedAtUs - scaleSectionStartedAtUs,
-                                    endedAtUs);
+    scaleWorkerPhaseProfiler.record(endedAtUs, section,
+                                    endedAtUs - scaleSectionStartedAtUs);
   }
 #else
-  scaleWorkerPhaseProfiler.record(section, endedAtUs - scaleSectionStartedAtUs,
-                                  endedAtUs);
+  scaleWorkerPhaseProfiler.record(endedAtUs, section,
+                                  endedAtUs - scaleSectionStartedAtUs);
 #endif
   scaleSectionStartedAtUs = endedAtUs;
 }
@@ -2795,8 +2795,8 @@ void scaleWorkerTask(void *) {
     }
     sectionsEnabledPreviously = sectionsEnabled;
     (void)scaleWorkerPhaseProfiler.consumeReset();
-    scaleWorkerPhaseProfiler.beginIteration(sectionsEnabled, executionStartedUs,
-                                            millis());
+    scaleWorkerPhaseProfiler.beginIteration(sectionsEnabled,
+                                            {executionStartedUs, millis()});
     scaleSectionStartedAtUs = executionStartedUs;
 #if defined(ARDUINO) && !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
     if (scaleWorkerPhaseProfiler.active()) scaleSectionCpuStartedUs = scaleWorkerTaskCpuUs();

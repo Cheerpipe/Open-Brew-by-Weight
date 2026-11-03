@@ -43,22 +43,22 @@ bool is(const ScheduledRestartLog &log, DebugCode code,
 }
 
 void next_occurrence_follows_local_time() {
-  assert(scheduledRestartNextUtc("Etc/UTC", NOON - MINUTE, 720) == NOON);
-  assert(scheduledRestartNextUtc("Etc/UTC", NOON, 720) == NOON + 24 * HOUR);
-  assert(scheduledRestartNextUtc("Etc/UTC", NOON, 0) == JAN10 + 24 * HOUR);
+  assert(scheduledRestartNextUtc(NOON - MINUTE, "Etc/UTC", 720) == NOON);
+  assert(scheduledRestartNextUtc(NOON, "Etc/UTC", 720) == NOON + 24 * HOUR);
+  assert(scheduledRestartNextUtc(NOON, "Etc/UTC", 0) == JAN10 + 24 * HOUR);
   // Santiago is UTC-3 in January.
-  assert(scheduledRestartNextUtc("America/Santiago", JAN10, 720) ==
+  assert(scheduledRestartNextUtc(JAN10, "America/Santiago", 720) ==
          NOON + 3 * HOUR);
-  assert(scheduledRestartNextUtc("", NOON, 720) == 0);
-  assert(scheduledRestartNextUtc("Invalid/Zone", NOON, 720) == 0);
+  assert(scheduledRestartNextUtc(NOON, "", 720) == 0);
+  assert(scheduledRestartNextUtc(NOON, "Invalid/Zone", 720) == 0);
   // Spring forward: 02:30 does not exist, the transition (03:00) stands in.
-  assert(scheduledRestartNextUtc("America/New_York", 1772946000U, 150) ==
+  assert(scheduledRestartNextUtc(1772946000U, "America/New_York", 150) ==
          1772953200U);
   // Fall back: 01:30 happens twice; only the first counts, and the second
   // pass already looks ahead to tomorrow.
-  assert(scheduledRestartNextUtc("America/New_York", 1793509200U, 90) ==
+  assert(scheduledRestartNextUtc(1793509200U, "America/New_York", 90) ==
          1793511000U);
-  assert(scheduledRestartNextUtc("America/New_York", 1793513100U, 90) ==
+  assert(scheduledRestartNextUtc(1793513100U, "America/New_York", 90) ==
          1793601000U);
 }
 

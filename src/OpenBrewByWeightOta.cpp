@@ -1150,7 +1150,7 @@ OpenBrewByWeightOta::RejectResult OpenBrewByWeightOta::rejectRunningImageLocked(
 
 OtaBootStatus OpenBrewByWeightOta::serviceBoot(
     uint32_t now, bool httpReady, bool activeCycle, bool relayClosed,
-    bool bleUp, uint32_t minUptimeMs, uint32_t deadlineMs) {
+    bool bleUp, OtaConfirmWindow window) {
   TaskLockGuard lock(mutex_);
   if (confirmed_ || rejected_) return bootStatus_;
   // These gates always outrank the deadline and retry policy.
@@ -1169,10 +1169,16 @@ OtaBootStatus OpenBrewByWeightOta::serviceBoot(
     publishState();
     if (confirmed_ || rejected_) return bootStatus_;
   }
-  const auto action = decideOtaPendingVerify(pendingVerify_, false, httpReady,
-      now, minUptimeMs, deadlineMs, true, !bleUp);
+  OtaPendingVerifyInput verify;
+  verify.pendingVerify = pendingVerify_;
+  verify.httpReady = httpReady;
+  verify.uptimeMs = now;
+  verify.window = window;
+  verify.rollbackPossible = true;
+  verify.flashWriteSafe = !bleUp;
+  const auto action = decideOtaPendingVerify(verify);
   if (action == OtaPendingVerifyAction::WAIT) {
-    bootStatus_.reason = !httpReady ? "WAIT_HTTP" : now < minUptimeMs ? "WAIT_UPTIME" : "WAIT_BLE";
+    bootStatus_.reason = !httpReady ? "WAIT_HTTP" : now < window.minUptimeMs ? "WAIT_UPTIME" : "WAIT_BLE";
     return bootStatus_;
   }
   if (action == OtaPendingVerifyAction::NONE) return bootStatus_;

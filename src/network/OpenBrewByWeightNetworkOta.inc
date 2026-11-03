@@ -1415,7 +1415,7 @@ void OpenBrewByWeightNetwork::serviceOtaRollback(uint32_t now) {
       control.activeCycle || control.machineRunning || control.physicalActivatorOn,
       control.relayClosed,
       scaleConnectingOrUp_.load(std::memory_order_relaxed),
-      OTA_CONFIRM_MIN_UPTIME_MS, OTA_CONFIRM_DEADLINE_MS);
+      {OTA_CONFIRM_MIN_UPTIME_MS, OTA_CONFIRM_DEADLINE_MS});
   if (strcmp(otaBootReason_, boot.reason) != 0 || otaBootLastError_ != boot.lastError) {
     actionLogf("ota: boot=%ld reason=%s attempts=%lu error=%ld",
         static_cast<long>(boot.state), boot.reason,

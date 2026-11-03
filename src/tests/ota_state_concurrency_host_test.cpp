@@ -56,7 +56,7 @@ int main() {
         failures.fetch_add(1, std::memory_order_relaxed);
       }
       ota.discard();
-      (void)ota.serviceBoot(static_cast<uint32_t>(iteration), true, false, false, true, 0, 0);
+      (void)ota.serviceBoot(static_cast<uint32_t>(iteration), true, false, false, true, {0, 0});
     }
   });
 

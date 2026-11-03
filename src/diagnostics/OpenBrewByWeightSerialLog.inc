@@ -7,10 +7,9 @@
 void retainLogText(LogLevel level, DebugCategory category, const char *message) {
   if (!logLevelAtMost(level, currentRingRetainLogLevel())) return;
   const uint32_t atMs = millis();
-  const uint32_t wallSec = g_wallClock.nowUtcSec(atMs);
+  const Instant at{atMs, g_wallClock.nowUtcSec(atMs)};
   TaskLockGuard lock(debugLogMutex);
-  debugLog.add(atMs, wallSec, level, category, DebugCode::LOG_TEXT, 0, 0,
-               message);
+  debugLog.add(at, level, category, DebugCode::LOG_TEXT, 0, 0, message);
   __atomic_store_n(&debugLogDroppedSnapshot, debugLog.overwritten(),
                    __ATOMIC_RELAXED);
 }
@@ -370,19 +369,17 @@ void logEmitDetail(LogLevel level, DebugCategory category, DebugCode code,
     return;
   }
   const uint32_t atMs = millis();
-  const uint32_t wallSec = g_wallClock.nowUtcSec(atMs);
+  const Instant at{atMs, g_wallClock.nowUtcSec(atMs)};
 
   {
     TaskLockGuard lock(debugLogMutex);
     if (toRing) {
-      debugLog.add(atMs, wallSec, level, category, code, argument1, argument2,
-                   detail);
+      debugLog.add(at, level, category, code, argument1, argument2, detail);
       __atomic_store_n(&debugLogDroppedSnapshot, debugLog.overwritten(),
                        __ATOMIC_RELAXED);
     }
     if (toAudit) {
-      auditLog.add(atMs, wallSec, level, category, code, argument1, argument2,
-                   detail);
+      auditLog.add(at, level, category, code, argument1, argument2, detail);
     }
   }
 
@@ -390,8 +387,8 @@ void logEmitDetail(LogLevel level, DebugCategory category, DebugCode code,
   // synchronously into the test stub.
   if (toSerial && serialApplicationLogAllowed()) {
     DebugEvent event;
-    event.atMs = atMs;
-    event.wallSec = wallSec;
+    event.atMs = at.monotonicMs;
+    event.wallSec = at.utcSec;
     event.level = level;
     event.category = category;
     event.code = code;
