@@ -285,6 +285,9 @@ obbw_idf_py_args() {
   if [[ -z "${IDF_CCACHE_ENABLE:-}" ]] && command -v ccache >/dev/null 2>&1; then
     export IDF_CCACHE_ENABLE=1
   fi
+  # The locked components never change during a build; the component
+  # manager's new-version check would query the registry on every configure.
+  export IDF_COMPONENT_CHECK_NEW_VERSION="${IDF_COMPONENT_CHECK_NEW_VERSION:-0}"
   # Read by obbw_idf_py and by wrappers that exec idf.py themselves.
   IDF_PY_ARGS=(
     -C "$IDF_PROJECT"
@@ -348,7 +351,11 @@ obbw_idf_sync_extra_flags() {
 obbw_idf_commit_extra_flags_stamp() {
   obbw_idf_resolve_paths
   mkdir -p "$IDF_BUILD_DIR"
-  printf '%s\n' "${OPENBREWBYWEIGHT_EXTRA_FLAGS-}" > "$IDF_BUILD_DIR/open_brew_by_weight_extra_flags"
+  local stamp="$IDF_BUILD_DIR/open_brew_by_weight_extra_flags"
+  # The stamp is a CMake configure input: rewriting an unchanged value would
+  # re-run CMake on every build.
+  [[ -f "$stamp" && "$(cat "$stamp")" == "${OPENBREWBYWEIGHT_EXTRA_FLAGS-}" ]] ||
+    printf '%s\n' "${OPENBREWBYWEIGHT_EXTRA_FLAGS-}" > "$stamp"
 }
 
 obbw_idf_config_fingerprint() {
