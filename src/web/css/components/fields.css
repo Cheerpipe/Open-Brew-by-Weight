@@ -268,6 +268,104 @@ input[type="url"] {
   appearance: none;
 }
 
+/* Date and time fields take their column's width: iOS otherwise sizes them
+   to their own content and pushes them out of a narrow column. */
+input:is([type="date"], [type="time"]) {
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+
+input:is([type="date"], [type="time"])::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+/* A field with a clear key: the × sits inside the field's right edge, clear
+   of the native picker icon, with a hit area larger than the key. */
+.clearField {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.clearField > input {
+  padding-inline: 0.6rem 2.4rem;
+}
+
+.clearField > input::-webkit-calendar-picker-indicator {
+  margin: 0;
+}
+
+.clearField > .clearKey {
+  position: absolute;
+  top: calc(50% + 0.175rem);
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mu) 22%, transparent);
+  color: var(--fg);
+  font-size: 0.8rem;
+  line-height: 1;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.clearField > .clearKey::before {
+  content: "";
+  position: absolute;
+  inset: -0.65rem;
+}
+
+.clearField > .clearKey:hover {
+  background: color-mix(in srgb, var(--mu) 38%, transparent);
+}
+
+/* Choice cards: a radio per card, the checked one outlined (Setup, the
+   Diagnostic log's Export). */
+.setupChoices {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  border: 0;
+}
+
+.setupChoice {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--in);
+}
+
+.setupChoice:has(:checked) {
+  border-color: var(--ac);
+  background: var(--pa);
+}
+
+.setupChoice input {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.15rem 0 0;
+  accent-color: var(--ac);
+}
+
+.setupChoice small {
+  display: block;
+  font-weight: 400;
+  color: var(--mu);
+  font-size: 0.85rem;
+}
+
 /* Dropdowns keep the native look off and reserve a 2.75rem arrow zone on
    the right, closed off by a 1px divider; the arrow itself is the .selBox
    wrapper's chevron. */

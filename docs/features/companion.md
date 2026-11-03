@@ -191,14 +191,19 @@ continuous history:
   back as far as the companion keeps it. Scroll up and older events load by
   themselves, across restarts (each marked, with its reset reason in the log
   itself) and through gaps named as such when events could not be copied
-  while the companion was away. The **Level** and **Category** filters apply
-  to the whole history, so every page that loads shows matching lines.
-  **Go to** jumps to a date and time, read on the controller's clock as the
-  log shows it, and **Latest** brings you back to the newest events. After
-  about 20,000 lines the view stops loading and points you to **Export**,
-  which downloads the whole history, or only the events between **Export
-  from** and **Export to**. **Clear** only clears what this screen shows; the
-  history stays.
+  while the companion was away. A divider marks each new day, and the
+  **Level** and **Subsystem** filters apply to the whole history, so every
+  page that loads shows matching lines.
+- **Jump to a time** picks a date and time, read on the controller's clock as
+  the log shows it, or one of the shortcuts (15 minutes or an hour ago, the
+  start of today or yesterday). The log then shows everything up to that
+  moment, live updates pause, and **Back to live** returns to the newest
+  events. After about 20,000 lines the view stops loading and points you to
+  **Export**.
+- **Export…** downloads a file with every level and subsystem, whatever the
+  filters show. It offers what you're viewing (the default), the last 24
+  hours, the whole history, or a custom range where the start, the end or
+  both can be left open.
 - Also through the companion, Admin's **Shot, activation and log history**
   offers **Clear log history**, which deletes the companion's copy after you
   confirm. The controller keeps its own recent log, which the Diagnostic log

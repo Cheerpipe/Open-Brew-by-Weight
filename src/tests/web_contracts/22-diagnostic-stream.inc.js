@@ -310,44 +310,72 @@
       path.join(sketchDir, 'web', 'locales', 'en.json'), 'utf8'))
       .strings['diagnostic.weight'] === 'Weight');
 }
-// The Diagnostic log appends new lines in place: a selection or a scrolled-back
-// reader keeps their place, and only a reader at the end follows new lines.
+// The Diagnostic log renders one element per line and appends new lines in
+// place: a selection or a scrolled-back reader keeps their place, and only a
+// reader at the end follows new lines. Copy takes the shown lines' text.
 {
   const assert = require('assert').strict;
-  const ta = {v: '', sets: 0, scrollTop: 0, clientHeight: 20,
-    get scrollHeight() { return (this.v.split('\n').length - 1) * 20; },
-    get value() { return this.v; }, set value(v) { this.v = v; this.sets++; },
-    setRangeText(t, a, b) { this.v = this.v.slice(0, a) + t + this.v.slice(b); }};
-  const ui = {logEvents: []}, nodes = {log: ta, logFilter: {value: ''}, logLevelFilter: {value: '4'}};
+  const rows = (v) => v.match(/<div[^>]*>.*?<\/div>/g) || [];
+  const box = {rows: [], sets: 0, scrollTop: 0, clientHeight: 20,
+    get scrollHeight() { return this.rows.length * 20; },
+    get firstChild() { return {remove: () => this.rows.shift()}; },
+    set innerHTML(v) { this.rows = rows(v); this.sets++; },
+    insertAdjacentHTML(at, v) { this.rows[at === 'afterbegin' ? 'unshift' : 'push'](...rows(v)); }};
+  const ui = {logEvents: []}, count = {}, state = {shown: []},
+    nodes = {log: box, logCount: count, logFilter: {value: ''}, logLevelFilter: {value: '4'}};
+  const lineOf = viewJs.diagnostic.slice(viewJs.diagnostic.indexOf('const logLineOf'),
+      viewJs.diagnostic.indexOf('];\n', viewJs.diagnostic.indexOf('const logLineOf')) + 2);
   const makeRender = (logHistory, logBootId, zoneOffset = () => 0, diagConfig = null,
-                      logJumpAt = null, logAnchor = null, nearLogTop = () => {}) =>
+                      logJumpAt = null, logAnchor = null, nearLogTop = () => {}, logMarks = []) =>
       new Function('$', 'R', 'logHistory', 'logBootId', 'logZoneOffsetMinutes', 'diagConfig',
-      '__WEBUI_TEXT__', 'logJumpAt', 'logAnchor', 'nearLogTop',
-      `${blockAt(viewJs.diagnostic, 'function renderLog(')};return renderLog;`)(
-      (id) => nodes[id], {uiState: ui, sub: (t, v) => t.replace('{0}', String(v)),
-                          formatWallTimeLocal: String}, logHistory, logBootId, zoneOffset,
-      diagConfig, (key) => key, logJumpAt, logAnchor, nearLogTop);
+      '__WEBUI_TEXT__', 'logJumpAt', 'logAnchor', 'nearLogTop', 'logMarks', 'state',
+      `${blockAt(viewJs.diagnostic, 'function logWallText(')};${lineOf};let logShown=state.shown;
+      ${blockAt(viewJs.diagnostic, 'function renderLog(')};
+      return () => { renderLog(); state.shown = logShown; };`)(
+      (id) => nodes[id], {uiState: ui, sub: (t, v) => t.replace('{0}', String(v[0])),
+                          formatWallTimeLocal: String,
+                          escHtml: (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')},
+      logHistory, logBootId, zoneOffset, diagConfig, (key) => key, logJumpAt, logAnchor,
+      nearLogTop, logMarks, state);
+  const text = () => state.shown.join('\n');
   const renderLog = makeRender([], 0);
-  const ev = (n) => ({sequence: n, atMs: n * 1000, wallSec: 0, level: 'info', category: 'web', message: 'm' + n});
+  const ev = (n, level = 'info') =>
+    ({sequence: n, atMs: n * 1000, wallSec: 0, level, category: 'web', message: 'm' + n});
   ui.logEvents = [ev(1), ev(2)];
   renderLog();
-  assert.equal(ta.value, '+1.000s INFO [web] m1\n+2.000s INFO [web] m2\n');
-  ta.scrollTop = 0;
+  assert.equal(text(), '· restart, boot 0 ·\n+1.000s INFO [web] m1\n+2.000s INFO [web] m2',
+      "the boot's first event follows a restart marker");
+  assert.equal(count.textContent, '2 lines');
+  box.scrollTop = 0;
   ui.logEvents.push(ev(3));
   renderLog();
-  assert.equal(ta.sets, 1, 'new lines must append without replacing the text');
-  assert.equal(ta.scrollTop, 0, 'a scrolled-back reader keeps their place');
-  ta.scrollTop = 20;
+  assert.equal(box.sets, 1, 'new lines must append without replacing the log');
+  assert.equal(box.rows.length, 4);
+  assert.equal(box.scrollTop, 0, 'a scrolled-back reader keeps their place');
+  box.scrollTop = 40;
   ui.logEvents.shift();
   ui.logEvents.push(ev(4));
   renderLog();
-  assert.equal(ta.value, '+2.000s INFO [web] m2\n+3.000s INFO [web] m3\n+4.000s INFO [web] m4\n');
-  assert.equal(ta.sets, 1, 'dropping the oldest line must not replace the text');
-  assert.equal(ta.scrollTop, 0, 'RV-07: dropping the oldest line keeps the reader on the same lines');
-  ta.scrollTop = 40;
+  assert.equal(text(), '+2.000s INFO [web] m2\n+3.000s INFO [web] m3\n+4.000s INFO [web] m4');
+  assert.equal(box.sets, 1, 'dropping the oldest line must not replace the log');
+  assert.equal(box.scrollTop, 0, 'RV-07: dropping the oldest line keeps the reader on the same lines');
+  box.scrollTop = 40;
   ui.logEvents.push(ev(5));
   renderLog();
-  assert.equal(ta.scrollTop, 80, 'a reader at the end follows new lines');
+  assert.equal(box.scrollTop, 80, 'a reader at the end follows new lines');
+  // D5: the severity is a tag the view colours, and a message cannot inject
+  // markup.
+  ui.logEvents = [{...ev(6, 'error'), message: '<b>x</b>'}];
+  renderLog();
+  assert.equal(box.rows.at(-1), '<div>+6.000s <b class="lve">ERROR</b> [web] &lt;b>x&lt;/b></div>');
+  // A mark sits after the newest event when it was made, in this boot only,
+  // and Copy takes its text; it does not count as a log line.
+  ui.logEvents = [ev(5), ev(6)];
+  makeRender([], 7, () => 0, null, null, null, () => {},
+      [{after: 5, boot: 7, text: 'Mark · t'}, {after: 6, boot: 3, text: 'old boot'}])();
+  assert.equal(text(), '+5.000s INFO [web] m5\n· Mark · t ·\n+6.000s INFO [web] m6');
+  assert.equal(box.rows[1], '<div class="logMark">Mark · t</div>');
+  assert.equal(count.textContent, '2 lines');
   // The companion's stored history renders above the ring, deduplicated against
   // it, with its markers as lines where the companion placed them: the
   // restart into this boot, a gap, and the same boot's overlap with the live
@@ -361,11 +389,24 @@
     {b: 7, s: 4, ms: 400, w: 0, l: 'i', c: 'web', m: 'kept4'},
     {b: 7, s: 5, ms: 500, w: 0, l: 'i', c: 'web', m: 'overlap5'},
   ], 7)();
-  assert.equal(ta.value,
+  assert.equal(text(),
       '+0.900s INFO [web] old9\n· restart, boot 7 ·\n+0.100s INFO [web] kept1\n'
       + '· 2 events could not be copied while the companion was away ·\n'
-      + '+0.400s INFO [web] kept4\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6\n',
+      + '+0.400s INFO [web] kept4\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6',
       'history pages render with markers, and the live copy of an event wins');
+  assert.equal(box.rows[1], '<div class="logMk logBoot">restart, boot 7</div>',
+      'a restart is a boot row the view pins while its lines scroll');
+  ui.logEvents = [ev(1), ev(2)];
+  makeRender([{g: 'boot', boot: 7}], 7)();
+  assert.equal(text(), '· restart, boot 7 ·\n+1.000s INFO [web] m1\n+2.000s INFO [web] m2',
+      'a restart the history already marks is not marked twice');
+  // A new day on the controller's clock starts with a divider, never at the
+  // top of the view.
+  ui.logEvents = [];
+  makeRender([{b: 7, s: 1, ms: 1, w: 1000000000, l: 'i', c: 'web', m: 'a'},
+              {b: 7, s: 2, ms: 2, w: 1000000001, l: 'i', c: 'web', m: 'b'}], 7)();
+  assert.equal(text(), '1000000000 INFO [web] a\n· New day · 1000000001 ·\n1000000001 INFO [web] b');
+  ui.logEvents = [ev(5), ev(6)];
   // Stored wall-clock seconds are UTC: the view shifts each stored event by
   // the controller zone's offset at that instant before formatting, so the
   // history reads in the same local time as the live ring.
@@ -374,25 +415,27 @@
       (zone, w) => (shifted.push([zone, w]), -180), {timezoneId: 'America/Santiago'})();
   assert.deepEqual(shifted, [['America/Santiago', 1793380832]],
       'a stored event asks for its zone offset at its own instant');
-  assert.equal(ta.value, '1793370032 INFO [web] utc8\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6\n',
+  assert.equal(text(), '1793370032 INFO [web] utc8\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6',
       'history renders at wallSec shifted by the zone offset');
   // D16: an older page prepends with the lines in view held in place, every
   // render asks whether the reader is near the top, and a jump hides the
   // live ring so the moment shows alone, at the end of the view.
   let asked = 0;
-  ta.value = '';
   makeRender([{b: 7, s: 4, ms: 400, w: 0, l: 'i', c: 'web', m: 'kept4'}], 7)();
-  ta.scrollTop = 30;
-  const before = ta.scrollHeight;
+  box.scrollTop = 30;
+  const before = box.scrollHeight, sets = box.sets;
   makeRender([{b: 7, s: 2, ms: 200, w: 0, l: 'i', c: 'web', m: 'kept2'},
               {b: 7, s: 4, ms: 400, w: 0, l: 'i', c: 'web', m: 'kept4'}], 7, () => 0, null, null,
              {h: before, top: 30}, () => asked++)();
-  assert.equal(ta.scrollTop, 30 + ta.scrollHeight - before, 'a prepended page keeps the view in place');
+  assert.equal(box.sets, sets, 'an older page prepends without replacing the log');
+  assert.equal(box.scrollTop, 30 + box.scrollHeight - before, 'a prepended page keeps the view in place');
   assert.equal(asked, 1, 'each render checks whether older history should load');
   makeRender([{b: 7, s: 2, ms: 200, w: 0, l: 'i', c: 'web', m: 'kept2'}], 7, () => 0, null, 1793380832,
-             'end')();
-  assert.equal(ta.value, '+0.200s INFO [web] kept2\n', 'a jump shows the stored moment without the live ring');
-  assert.equal(ta.scrollTop, ta.scrollHeight, 'a jump opens at the moment, at the end of the view');
+             'end', () => {}, [{after: 5, boot: 7, text: 'Mark · t'}])();
+  assert.equal(text(), '+0.200s INFO [web] kept2', 'a jump shows the stored moment without the live ring or marks');
+  assert.equal(box.scrollTop, box.scrollHeight, 'a jump opens at the moment, at the end of the view');
+  assert(codeIncludes(viewJs.diagnostic, '$("copyLogButton").onclick=()=>copyText(logShown.join("\\n"))'),
+      'Copy takes the lines the view shows');
 }
 // The stored history goes out with this screen's Web UI session (the companion
 // answers only a browser the controller lets open the Web UI), for paging and
@@ -406,8 +449,67 @@
          codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export"+(range?"?"+range:""))'),
       'paging and Export both read the companion through that request');
   assert(codeIncludes(viewJs.diagnostic, '$("logExportButton").hidden=!here') &&
-         codeIncludes(viewJs.diagnostic, '$("logHistoryTools").hidden=!here'),
-      'Export, Go to and the range show only through a paired companion');
+         codeIncludes(viewJs.diagnostic, '$("logJumpButton").hidden=!here'),
+      'Export and Jump to a time show only through a paired companion');
+  // The strip names what the view shows: live, up to a moment (Back to live,
+  // Mark hidden), or nothing at that moment, with the cap or the companion
+  // note; a live chip shows its filter and a × away from the default.
+  {
+    const el = (extra = {}) => ({hidden: false, textContent: '', className: '', ...extra});
+    const n = {logStrip: el(), logStripTitle: el(), logStripNote: el(), logLiveButton: el(),
+      logExportButton: el(), logMarkButton: el(), logJumpButton: el({lastElementChild: el()})};
+    const controls = (logJumpAt, logHistory, logHistoryDone, here, c = null) =>
+      new Function('$', 'R', '__WEBUI_TEXT__', 'logHistoryAvailable', 'logHistoryFull', 'logJumpAt',
+          'logHistory', 'logHistoryDone', 'companionDiagnosticStatus', 'logWallText',
+          `${blockAt(viewJs.diagnostic, 'function logHistoryControls(')};logHistoryControls();`)(
+          (id) => n[id], {sub: (t, v) => t.replace('{0}', v[0])}, (k) => k, () => here, () => false,
+          logJumpAt, logHistory, logHistoryDone, c, String);
+    controls(null, [], false, true);
+    assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent, n.logStripNote.textContent,
+      n.logJumpButton.hidden, n.logLiveButton.hidden, n.logMarkButton.hidden],
+      ['logStrip', 'Live · newest at the bottom', 'Scroll up for older events.', false, true, false]);
+    controls(1793380832, [{s: 1}], false, true);
+    assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent, n.logJumpButton.lastElementChild.textContent,
+      n.logLiveButton.hidden, n.logMarkButton.hidden],
+      ['logStrip past', 'Showing up to 1793380832', 'Change', false, true]);
+    controls(1793380832, [{g: 'boot'}], true, true);
+    assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent],
+      ['logStrip warn', 'Nothing logged at or before 1793380832']);
+    controls(null, [], false, false, {paired: true, log: true});
+    assert.equal(n.logJumpButton.hidden && n.logExportButton.hidden, true);
+    assert.match(n.logStripNote.textContent, /companion keeps the older history/);
+  }
+  // A jump in the future is refused inline; a custom export range that ends
+  // before it starts disables Download, and an empty end means until now.
+  {
+    const f = {logJumpDate: {value: '2999-01-01'}, logJumpTime: {value: ''}, logJumpError: {}, logJumpGo: {},
+      logFromDate: {value: '2026-11-03'}, logFromTime: {value: '10:00'}, logToDate: {value: '2026-11-03'},
+      logToTime: {value: '09:00'}, logCustom: {}, logRangeError: {}, logExportGo: {}};
+    let pick = 'custom';
+    f.logExportDialog = {id: 'logExportDialog', querySelectorAll: () => [],
+      querySelector: () => ({value: pick})};
+    f.logJumpDialog = {id: 'logJumpDialog', querySelectorAll: () => []};
+    const run = new Function('$', 'diagConfig', 'logZoneOffsetMinutes', 'logViewRange',
+        ['function logWallSec(', 'function logFieldsSec(', 'function checkLogDialog(', 'function logExportRange(']
+          .map((m) => blockAt(viewJs.diagnostic, m)).join(';') +
+        ';return {checkLogDialog, logExportRange};')((id) => f[id], null, () => 0, [5, null]);
+    assert.equal(run.checkLogDialog(f.logJumpDialog), Date.parse('2999-01-01T23:59:59Z') / 1000,
+        'an empty time reads as the end of that day');
+    assert.equal(f.logJumpError.hidden, false);
+    assert.equal(f.logJumpGo.disabled, true, 'a future moment cannot be shown');
+    run.checkLogDialog(f.logExportDialog);
+    assert.equal(f.logRangeError.hidden, false);
+    assert.equal(f.logExportGo.disabled, true, 'an end before the start blocks Download');
+    f.logToTime.value = '';
+    run.checkLogDialog(f.logExportDialog);
+    assert.equal(f.logExportGo.disabled, false);
+    assert.deepEqual(run.logExportRange(), [Date.parse('2026-11-03T10:00Z') / 1000,
+        Date.parse('2026-11-03T23:59:59Z') / 1000]);
+    pick = 'view';
+    assert.deepEqual(run.logExportRange(), [5, null], 'the default range is what the view shows');
+    pick = 'all';
+    assert.deepEqual(run.logExportRange(), [null, null]);
+  }
   assert(partialHtml.diagnostic.includes('id="logExportButton"') &&
          !partialHtml.diagnostic.includes('id="logOlderButton"'),
       'older history loads near the top: Show older is gone');

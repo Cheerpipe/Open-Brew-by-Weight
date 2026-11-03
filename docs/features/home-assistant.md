@@ -75,8 +75,8 @@ Open `http://<controller-address>/api/v1/integration/webhook` in a browser: the
 and the reason. While the Web UI password is on, that page needs Home
 Assistant's key, so check the Web UI log under **Diagnostic → Log** instead. A failed update is retried after 3, 6, and 9 seconds.
 
-To keep a record of failed attempts, set **Ring log level** to **Warning**
-under **Diagnostic → Log** in the Web UI; **Error** keeps only updates that
+To keep a record of failed attempts, set **Kept in memory** to **Warning**
+under **Diagnostic → Log → Logging settings** in the Web UI; **Error** keeps only updates that
 were finally dropped.
 
 For the Home Assistant side, see the integration's

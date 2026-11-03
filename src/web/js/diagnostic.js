@@ -215,21 +215,6 @@ function formatDiagnosticTimezoneOffset(c) {
   }[c.timezoneResolution];
   return R.formatTzLabel(0) + (reason ? " — " + reason : "");
 }
-function clearLogView() {
-  R.uiState.logEvents = [];
-  R.uiState.logMissed = 0;
-  // The history stays away until a jump or a filter change asks for it.
-  logHistory = [];
-  logHistoryNext = null;
-  logHistoryDone = true;
-  logJumpAt = null;
-  $("logJumpAt").value = "";
-  logHistoryControls();
-  const d = $("logDropped"),
-    el = $("log");
-  if (d) d.hidden = true;
-  if (el) el.value = "";
-}
 function ntpStateLabel(t) {
   if (!t) return __WEBUI_TEXT__("runtime.not_available");
   return (
@@ -502,7 +487,7 @@ function renderCompanionDiagnostic(c) {
           ])
         : ""),
   );
-  renderLogHistoryNote();
+  logHistoryControls();
   if (!__LINEA_MICRA__) return;
   t("dCoRoute", c.route + (c.reason ? " · " + c.reason.replace(/_/g, " ") : ""));
   t(
@@ -1554,74 +1539,118 @@ function logZoneOffsetMinutes(zone, unixSec) {
     return R.statusTimezoneOffsetMinutes;
   }
 }
+// A stored wall-clock second in the controller's local time, as the log shows it.
+function logWallText(w) {
+  return R.formatWallTimeLocal(w + logZoneOffsetMinutes(diagConfig?.timezoneId, w) * 60);
+}
+// Each shown line is its text (what Copy takes, and what tells lines apart)
+// and its markup, with the severity as a tag; an event keeps its pair.
+let logShown = [];
+const logLineOf = (at, level, rest) => [
+  at + " " + level + " " + rest,
+  `<div>${at} <b class="lv${level[0].toLowerCase()}">${R.escHtml(level)}</b> ${R.escHtml(rest)}</div>`,
+];
 function renderLog() {
   const f = $("logFilter").value,
     m = +$("logLevelFilter").value,
     r = { critical: 0, error: 1, warning: 2, info: 3, debug: 4 },
     hr = { c: 0, e: 1, w: 2, i: 3, d: 4 },
-    hn = { c: "CRITICAL", e: "ERROR", w: "WARNING", i: "INFO", d: "DEBUG" };
+    hn = { c: "CRITICAL", e: "ERROR", w: "WARNING", i: "INFO", d: "DEBUG" },
+    t = [],
+    h = [],
+    add = ([text, html]) => (t.push(text), h.push(html)),
+    marker = (text, cls) => (
+      markers++,
+      add(["· " + text + " ·", `<div class="${cls}">${R.escHtml(text)}</div>`])
+    );
+  // A new day on the controller's clock starts with a divider; lines on
+  // uptime only carry no date.
+  let markers = 0,
+    day = "";
+  const line = (pair) => {
+    const d = pair[0][0] === "+" ? day : pair[0].slice(0, 10);
+    if (day && d !== day) marker(R.sub(__WEBUI_TEXT__("diagnostic.log_day_marker"), [d]), "logMk");
+    day = d;
+    add(pair);
+  };
   // The companion's stored pages, if any, sit above the live ring; an event
   // both hold renders once (same boot, same sequence).
   const live = new Set(R.uiState.logEvents.map((e) => e.sequence));
-  let o = "";
   for (const e of logHistory) {
     if (e.g) {
-      o +=
+      marker(
         e.g === "boot"
-          ? "· " + R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [e.boot]) + " ·\n"
+          ? R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [e.boot])
           : e.g === "gap"
-            ? "· " + R.sub(__WEBUI_TEXT__("diagnostic.log_gap_marker"), [e.count]) + " ·\n"
-            : "· " + __WEBUI_TEXT__("diagnostic.log_reset_marker") + " ·\n";
+            ? R.sub(__WEBUI_TEXT__("diagnostic.log_gap_marker"), [e.count])
+            : __WEBUI_TEXT__("diagnostic.log_reset_marker"),
+        e.g === "boot" ? "logMk logBoot" : "logMk",
+      );
       continue;
     }
     if (f && e.c !== f) continue;
     if ((hr[e.l] ?? 3) > m) continue;
     if (e.b === logBootId && live.has(e.s)) continue;
-    o +=
-      (e.w
-        ? R.formatWallTimeLocal(e.w + logZoneOffsetMinutes(diagConfig?.timezoneId, e.w) * 60)
-        : "+" + (e.ms / 1000).toFixed(3) + "s") +
-      " " +
-      (hn[e.l] || "INFO") +
-      " [" +
-      e.c +
-      "] " +
-      e.m +
-      "\n";
+    line(
+      (e.v ??= logLineOf(
+        e.w ? logWallText(e.w) : "+" + (e.ms / 1000).toFixed(3) + "s",
+        hn[e.l] || "INFO",
+        "[" + e.c + "] " + e.m,
+      )),
+    );
   }
+  // This boot's marks sit after the newest event when each was made; its
+  // first event follows a restart marker unless the history already has one.
+  const marks = logMarks.filter((k) => k.boot === logBootId);
+  if (
+    logJumpAt == null &&
+    R.uiState.logEvents[0]?.sequence === 1 &&
+    !logHistory.some((e) => e.g === "boot" && e.boot === logBootId)
+  )
+    marker(R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [logBootId]), "logMk logBoot");
   for (const e of logJumpAt == null ? R.uiState.logEvents : []) {
+    while (marks.length && ((e.sequence - marks[0].after) | 0) > 0)
+      marker(marks.shift().text, "logMark");
     if (f && e.category !== f) continue;
     if ((r[e.level] ?? 3) > m) continue;
-    o += e.line ??=
-      (e.wallSec ? R.formatWallTimeLocal(e.localSec) : "+" + (e.atMs / 1000).toFixed(3) + "s") +
-      " " +
-      e.level.toUpperCase() +
-      " [" +
-      e.category +
-      "] " +
-      e.message +
-      "\n";
+    line(
+      (e.v ??= logLineOf(
+        e.wallSec ? R.formatWallTimeLocal(e.localSec) : "+" + (e.atMs / 1000).toFixed(3) + "s",
+        e.level.toUpperCase(),
+        "[" + e.category + "] " + e.message,
+      )),
+    );
   }
-  // New lines append (and the oldest drop) in place, so a selection or a
-  // scrolled-back view survives; only a reader already at the end follows it.
-  // Older history prepends with the lines in view held where they were.
+  if (logJumpAt == null) for (const k of marks) marker(k.text, "logMark");
+  // New lines append (and the oldest drop) in place, and an older page
+  // prepends, so a selection or a scrolled-back view survives; only a reader
+  // already at the end follows new lines.
   const el = $("log"),
-    old = el.value,
-    cut = old.indexOf(o.slice(0, o.indexOf("\n") + 1)),
+    old = logShown,
     top = el.scrollTop,
-    h = el.scrollHeight,
-    stick = top + el.clientHeight >= h - 8,
-    anchor = logAnchor;
+    sh = el.scrollHeight,
+    stick = top + el.clientHeight >= sh - 8,
+    anchor = logAnchor,
+    same = (i, j, n) => old.slice(i, i + n).every((x, k) => x === t[j + k]),
+    cut = old.indexOf(t[0]);
+  let pre;
   logAnchor = null;
-  if (o !== old) {
-    if (cut >= 0 && o.startsWith(old.slice(cut))) {
-      el.setRangeText("", 0, cut);
-      if (!stick) el.scrollTop = top - h + el.scrollHeight;
-      el.setRangeText(o.slice(old.length - cut), el.value.length, el.value.length);
-    } else el.value = o;
-    if (anchor?.h) el.scrollTop = anchor.top + el.scrollHeight - anchor.h;
-    else if (stick || anchor) el.scrollTop = el.scrollHeight;
-  }
+  logShown = t;
+  if (cut >= 0 && old.length - cut <= t.length && same(cut, 0, old.length - cut)) {
+    for (let i = 0; i < cut; i++) el.firstChild.remove();
+    if (cut && !stick) el.scrollTop = top - sh + el.scrollHeight;
+    el.insertAdjacentHTML("beforeend", h.slice(old.length - cut).join(""));
+  } else if (
+    (pre = t.indexOf(old[0])) >= 0 &&
+    pre + old.length <= t.length &&
+    same(0, pre, old.length)
+  ) {
+    el.insertAdjacentHTML("afterbegin", h.slice(0, pre).join(""));
+    el.insertAdjacentHTML("beforeend", h.slice(pre + old.length).join(""));
+  } else el.innerHTML = h.join("");
+  if (anchor?.h) el.scrollTop = anchor.top + el.scrollHeight - anchor.h;
+  else if (stick || anchor) el.scrollTop = el.scrollHeight;
+  $("logCount").textContent = R.sub(__WEBUI_TEXT__("diagnostic.log_lines"), [t.length - markers]);
   nearLogTop();
 }
 function updateLogHealth(d) {
@@ -1659,7 +1688,7 @@ const logStream = {
 // ring, with boot, gap and cleared-log markers between them. The companion
 // applies the level and subsystem filters, so every page adds matching lines.
 // A jump starts the history at a moment (`logJumpAt`, wall seconds) and hides
-// the live ring until Latest.
+// the live ring until Back to live.
 const LOG_HISTORY_PAGE = 500,
   LOG_HISTORY_CAP = 20000;
 let logHistory = [],
@@ -1726,7 +1755,7 @@ function nearLogTop() {
   if (logHistoryAvailable() && $("log").scrollTop < 160 && performance.now() >= logHistoryRetryAt)
     void loadLogOlder();
 }
-// A jump, Latest or a filter change starts the history over.
+// A jump, Back to live or a filter change starts the history over.
 function restartLogHistory() {
   logHistory = [];
   logHistoryNext = null;
@@ -1738,32 +1767,146 @@ function restartLogHistory() {
 }
 function jumpLog(at) {
   logJumpAt = at;
-  if (at == null) $("logJumpAt").value = "";
+  logHistoryControls();
   restartLogHistory();
 }
+// The strip says what the log shows, live or up to a jumped-to moment, and
+// what that means: paging, the cap, or where the older history lives.
 function logHistoryControls() {
   const here = logHistoryAvailable(),
-    empty = logJumpAt != null && logHistoryDone && !logHistory.some((e) => !e.g);
-  $("logHistoryTools").hidden = !here;
-  $("logLatestButton").hidden = !here || logJumpAt == null;
+    past = logJumpAt != null,
+    empty = past && logHistoryDone && !logHistory.some((e) => !e.g),
+    c = companionDiagnosticStatus,
+    note = empty
+      ? __WEBUI_TEXT__("diagnostic.log_jump_none")
+      : logHistoryFull()
+        ? __WEBUI_TEXT__("diagnostic.log_cap")
+        : past
+          ? __WEBUI_TEXT__("diagnostic.log_paused")
+          : here
+            ? __WEBUI_TEXT__("diagnostic.log_scroll_up")
+            : c?.paired && c.log !== false
+              ? __WEBUI_TEXT__("diagnostic.log_in_companion")
+              : "";
+  $("logStrip").className = "logStrip" + (empty ? " warn" : past ? " past" : "");
+  $("logStripTitle").textContent = past
+    ? R.sub(
+        empty
+          ? __WEBUI_TEXT__("diagnostic.log_nothing_at")
+          : __WEBUI_TEXT__("diagnostic.log_up_to"),
+        [logWallText(logJumpAt)],
+      )
+    : __WEBUI_TEXT__("diagnostic.log_live");
+  $("logStripNote").textContent = note;
+  $("logStripNote").hidden = !note;
+  $("logJumpButton").hidden = !here;
+  $("logJumpButton").lastElementChild.textContent = past
+    ? __WEBUI_TEXT__("diagnostic.log_change")
+    : __WEBUI_TEXT__("diagnostic.log_jump");
+  $("logLiveButton").hidden = !past;
   $("logExportButton").hidden = !here;
-  if (!here) return;
-  const note = $("logHistoryNote");
-  note.hidden = !(empty || logHistoryFull());
-  note.textContent = empty
-    ? __WEBUI_TEXT__("diagnostic.log_jump_none")
-    : __WEBUI_TEXT__("diagnostic.log_cap");
+  $("logMarkButton").hidden = past;
 }
-function exportLogHistory() {
-  if (!logHistoryAvailable()) return;
-  const q = new URLSearchParams();
-  for (const [key, id] of [
-    ["from", "logExportFrom"],
-    ["to", "logExportTo"],
-  ]) {
-    const at = $(id).value ? logWallSec($(id).value) : null;
-    if (at != null) q.set(key, at);
+// A chip shows its filter's choice; away from the default (its × button's
+// value) it is highlighted and its × brings the default back.
+function renderLogChips() {
+  for (const s of [$("logLevelFilter"), $("logFilter")]) {
+    const chip = s.parentElement;
+    chip.querySelector(".v").textContent = s.selectedOptions[0]?.text || "";
+    chip.className =
+      "logChip" +
+      (s.id === "logFilter" ? "" : " lv" + "cewid"[s.value]) +
+      (s.value === chip.lastElementChild.value ? "" : " on");
   }
+}
+// Marks are this screen's own dividers in the live log, each after the
+// newest event when it was made, kept with the boot it was made in.
+let logMarks = [];
+function markLog() {
+  const now = Math.floor(Date.now() / 1e3);
+  logMarks.push({
+    after: lastLog,
+    boot: logBootId,
+    text: R.sub(__WEBUI_TEXT__("diagnostic.log_mark_line"), [logWallText(now)]),
+  });
+  logAnchor = "end";
+  R.paint(renderLog);
+}
+// The dialogs' date and time fields read the controller's clock; an empty
+// time stands for `fill`.
+function logLocalIso(w) {
+  return new Date((w + logZoneOffsetMinutes(diagConfig?.timezoneId, w) * 60) * 1e3).toISOString();
+}
+function logFieldsSec(date, time, fill) {
+  return $(date).value ? logWallSec($(date).value + "T" + ($(time).value || fill)) : null;
+}
+function openLogDialog(d) {
+  const zone = diagConfig?.timezoneId || R.formatTzLabel(R.statusTimezoneOffsetMinutes);
+  for (const z of d.querySelectorAll(".logZone"))
+    z.textContent = R.sub(__WEBUI_TEXT__("diagnostic.log_zone"), [zone]);
+  d.returnValue = "";
+  checkLogDialog(d);
+  d.showModal();
+}
+// The dialogs check as they are filled in: a jump cannot be in the future,
+// and a custom export range cannot end before it starts.
+function checkLogDialog(d) {
+  for (const k of d.querySelectorAll(".clearKey")) k.hidden = !k.previousElementSibling.value;
+  if (d.id === "logJumpDialog") {
+    const at = logFieldsSec("logJumpDate", "logJumpTime", "23:59:59"),
+      future = at > Date.now() / 1e3;
+    $("logJumpError").hidden = !future;
+    $("logJumpGo").disabled = at == null || future;
+    return at;
+  }
+  const custom = d.querySelector(":checked").value === "custom",
+    [a, b] = logExportRange();
+  $("logCustom").hidden = !custom;
+  $("logRangeError").hidden = !(custom && a != null && b != null && b <= a);
+  $("logExportGo").disabled = !$("logRangeError").hidden;
+}
+function openLogJump() {
+  const iso = logLocalIso(logJumpAt ?? Date.now() / 1e3);
+  $("logJumpDate").value = iso.slice(0, 10);
+  $("logJumpTime").value = iso.slice(11, 16);
+  openLogDialog($("logJumpDialog"));
+}
+// Export defaults to what the view shows: from its oldest line on the clock
+// to the jumped-to moment, or now.
+let logViewRange = [null, null];
+function logRangeText([a, b]) {
+  return R.sub(__WEBUI_TEXT__("diagnostic.log_range"), [
+    a == null ? __WEBUI_TEXT__("diagnostic.log_range_start") : logWallText(Math.floor(a)),
+    b == null ? __WEBUI_TEXT__("diagnostic.log_range_now") : logWallText(b),
+  ]);
+}
+function openLogExport() {
+  const oldest =
+    logHistory.find((e) => e.w)?.w ??
+    (logJumpAt == null ? R.uiState.logEvents.find((e) => e.wallSec)?.wallSec : null);
+  logViewRange = [oldest ?? null, logJumpAt];
+  $("logRangeView").textContent = logRangeText(logViewRange);
+  $("logRangeDay").textContent = logRangeText([Date.now() / 1e3 - 86400, null]);
+  $("logExportDialog").querySelector('[value="view"]').checked = true;
+  openLogDialog($("logExportDialog"));
+}
+function logExportRange() {
+  const v = $("logExportDialog").querySelector(":checked").value;
+  return v === "view"
+    ? logViewRange
+    : v === "day"
+      ? [Date.now() / 1e3 - 86400, null]
+      : v === "all"
+        ? [null, null]
+        : [
+            logFieldsSec("logFromDate", "logFromTime", "00:00"),
+            logFieldsSec("logToDate", "logToTime", "23:59:59"),
+          ];
+}
+function exportLogHistory([from, to]) {
+  const q = new URLSearchParams();
+  if (from != null) q.set("from", Math.floor(from));
+  if (to != null) q.set("to", Math.ceil(to));
   const range = q.toString();
   downloadText(
     R.companionLog("/__companion/log/export" + (range ? "?" + range : "")).then((reply) =>
@@ -1772,16 +1915,6 @@ function exportLogHistory() {
     "log-history.json",
     __WEBUI_TEXT__("diagnostic.log_export_failed"),
   );
-}
-function renderLogHistoryNote() {
-  // Opened directly, with a paired companion keeping the log: name where the
-  // older history lives.
-  const c = companionDiagnosticStatus,
-    note = $("logHistoryNote");
-  logHistoryControls();
-  if (logHistoryAvailable()) return;
-  note.hidden = !(c?.paired && c.log !== false);
-  if (!note.hidden) note.textContent = __WEBUI_TEXT__("diagnostic.log_in_companion");
 }
 export function applyStatus(s) {
   applyDiagnosticStatus(s);
@@ -1855,15 +1988,46 @@ export function init() {
     title.onclick = (e) => void (copied && e.preventDefault());
   }
   for (const id of LOG_LEVELS) $(id).onchange = () => saveLogLevel(id);
-  $("logFilter").onchange = $("logLevelFilter").onchange = () =>
+  $("logFilter").onchange = $("logLevelFilter").onchange = () => {
+    renderLogChips();
     logHistoryAvailable() ? restartLogHistory() : renderLog();
+  };
+  for (const x of $("logPanel").querySelectorAll(".logChip > .x"))
+    x.onclick = () => {
+      x.previousElementSibling.value = x.value;
+      x.previousElementSibling.onchange();
+    };
+  renderLogChips();
   $("log").onscroll = nearLogTop;
-  $("logJumpAt").onchange = () =>
-    jumpLog($("logJumpAt").value ? logWallSec($("logJumpAt").value) : null);
-  $("logLatestButton").onclick = () => jumpLog(null);
-  $("copyLogButton").onclick = () => copyText($("log").value);
-  $("logExportButton").onclick = () => exportLogHistory();
-  $("clearLogButton").onclick = () => clearLogView();
+  $("logWrapButton").onclick = (e) =>
+    e.currentTarget.setAttribute("aria-pressed", $("log").classList.toggle("wrap"));
+  $("logJumpButton").onclick = openLogJump;
+  $("logLiveButton").onclick = () => jumpLog(null);
+  $("copyLogButton").onclick = () => copyText(logShown.join("\n"));
+  $("logExportButton").onclick = openLogExport;
+  $("logMarkButton").onclick = markLog;
+  for (const d of [$("logJumpDialog"), $("logExportDialog")]) {
+    d.oninput = d.onchange = () => checkLogDialog(d);
+    d.onclick = (e) => {
+      const k = e.target.closest(".clearKey");
+      if (!k) return;
+      k.previousElementSibling.value = "";
+      k.previousElementSibling.focus();
+      checkLogDialog(d);
+    };
+  }
+  $("logJumpDialog").querySelector(".logQuick").onclick = (e) => {
+    const v = e.target.closest("button")?.value,
+      now = Math.floor(Date.now() / 1e3),
+      day = (n) => logWallSec(logLocalIso(now - n * 86400).slice(0, 10) + "T00:00");
+    if (!v) return;
+    $("logJumpDialog").close();
+    jumpLog(v === "today" ? day(0) : v === "yesterday" ? day(1) : now - v);
+  };
+  $("logJumpDialog").onclose = () =>
+    $("logJumpDialog").returnValue === "go" && jumpLog(checkLogDialog($("logJumpDialog")));
+  $("logExportDialog").onclose = () =>
+    $("logExportDialog").returnValue === "dl" && exportLogHistory(logExportRange());
   $("auditVerboseButton").onclick = () => toggleAuditHunt();
   $("auditClearButton").onclick = () => emptyAudit();
   $("auditExportButton").onclick = () => exportAudit();

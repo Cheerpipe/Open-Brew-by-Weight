@@ -971,55 +971,44 @@
   </fieldset>
   <fieldset id="logPanel">
     <legend>{{webui:diagnostic.log}}</legend>
-    <div>
-      <label
-        >{{webui:diagnostic.ring_log_level}}
-        <span class="selBox"
-          ><select id="ringRetainLogLevel" class="diagCtl">
-            <option value="none" selected>{{webui:diagnostic.none}}</option>
-            <option value="critical">{{webui:diagnostic.critical}}</option>
-            <option value="error">{{webui:diagnostic.error}}</option>
-            <option value="warning">{{webui:diagnostic.warning}}</option>
-            <option value="info">{{webui:diagnostic.info}}</option>
-            <option value="debug">{{webui:diagnostic.debug}}</option>
-          </select></span
-        ><small class="fieldHint"
-          >{{webui:diagnostic.min_level_stored_on_the_log_ring}}</small
-        ></label
-      ><label
-        >{{webui:diagnostic.serial_log_level}}
-        <span class="selBox"
-          ><select id="serialLogLevel" class="diagCtl">
-            <option value="none" selected>{{webui:diagnostic.none}}</option>
-            <option value="critical">{{webui:diagnostic.critical}}</option>
-            <option value="error">{{webui:diagnostic.error}}</option>
-            <option value="warning">{{webui:diagnostic.warning}}</option>
-            <option value="info">{{webui:diagnostic.info}}</option>
-            <option value="debug">{{webui:diagnostic.debug}}</option>
-          </select></span
-        ><small class="fieldHint"
-          >{{webui:diagnostic.esp_idf_log_output_over_usb_off}}</small
-        ></label
-      >
+    <div id="logStrip" class="logStrip">
+      <span class="logDot" aria-hidden="true"></span
+      ><svg class="cfgIcon" aria-hidden="true"><use href="#dg-date-and-time" /></svg>
+      <p role="status">
+        <b id="logStripTitle">{{webui:diagnostic.log_live}}</b
+        ><small id="logStripNote" hidden></small>
+      </p>
+      <button id="logJumpButton" class="logGo" type="button" hidden>
+        <svg class="cfgIcon" aria-hidden="true"><use href="#dg-date-and-time" /></svg
+        ><span>{{webui:diagnostic.log_jump}}</span></button
+      ><button id="logLiveButton" class="logGo" type="button" hidden>
+        {{webui:diagnostic.log_back_live}}
+      </button>
     </div>
-    <hr class="logSep" />
-    <label
-      >{{webui:diagnostic.level}}
-      <span class="selBox"
-        ><select id="logLevelFilter" class="diagCtl">
-          <option value="0">{{webui:diagnostic.critical}}</option>
-          <option value="1">{{webui:diagnostic.error}}</option>
-          <option value="2">{{webui:diagnostic.warning}}</option>
-          <option value="3" selected>{{webui:diagnostic.info}}</option>
-          <option value="4">{{webui:diagnostic.debug}}</option>
-        </select></span
-      ><small class="fieldHint"
-        >{{webui:diagnostic.this_severity_and_above_view_only}}</small
-      ></label
-    ><label
-      >{{webui:diagnostic.category}}
-      <span class="selBox"
-        ><select id="logFilter" class="diagCtl">
+    <div class="logChips">
+      <div class="logChip lvi">
+        <span class="logSw" aria-hidden="true"></span
+        ><span class="k">{{webui:diagnostic.level}}</span><span class="v"></span
+        ><span class="cv" aria-hidden="true">▾</span
+        ><select id="logLevelFilter" class="diagCtl" aria-label="{{webui:diagnostic.level}}">
+          <option value="0">{{webui:diagnostic.log_show_critical}}</option>
+          <option value="1">{{webui:diagnostic.log_show_error}}</option>
+          <option value="2">{{webui:diagnostic.log_show_warning}}</option>
+          <option value="3" selected>{{webui:diagnostic.log_show_info}}</option>
+          <option value="4">{{webui:diagnostic.log_show_debug}}</option></select
+        ><button
+          class="x"
+          type="button"
+          value="3"
+          aria-label="{{webui:diagnostic.log_level_reset}}"
+        >
+          ×
+        </button>
+      </div>
+      <div class="logChip">
+        <span class="k">{{webui:diagnostic.subsystem}}</span><span class="v"></span
+        ><span class="cv" aria-hidden="true">▾</span
+        ><select id="logFilter" class="diagCtl" aria-label="{{webui:diagnostic.subsystem}}">
           <option value="">{{webui:diagnostic.all}}</option>
           <option value="boot">{{webui:diagnostic.boot_2}}</option>
           <option value="system">{{webui:diagnostic.system}}</option>
@@ -1031,31 +1020,25 @@
           <option value="network">{{webui:diagnostic.network}}</option>
           <option value="config">{{webui:diagnostic.config}}</option>
           <option value="web">{{webui:diagnostic.web}}</option>
-          <option value="security">{{webui:diagnostic.security}}</option>
-        </select></span
-      ><small class="fieldHint">{{webui:diagnostic.show_one_subsystem_or_all}}</small></label
-    >
-    <div id="logHistoryTools" hidden>
-      <label
-        >{{webui:diagnostic.log_jump}}
-        <input id="logJumpAt" class="diagCtl" type="datetime-local" step="1" /><small
-          class="fieldHint"
-          >{{webui:diagnostic.log_jump_hint}}</small
-        ></label
-      ><label
-        >{{webui:diagnostic.log_export_from}}
-        <input id="logExportFrom" class="diagCtl" type="datetime-local" step="1" /></label
-      ><label
-        >{{webui:diagnostic.log_export_to}}
-        <input id="logExportTo" class="diagCtl" type="datetime-local" step="1" /><small
-          class="fieldHint"
-          >{{webui:diagnostic.log_export_range_hint}}</small
-        ></label
-      >
+          <option value="security">{{webui:diagnostic.security}}</option></select
+        ><button
+          class="x"
+          type="button"
+          value=""
+          aria-label="{{webui:diagnostic.log_all_subsystems}}"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+    <div id="log" tabindex="0" role="region" aria-label="{{webui:diagnostic.log}}"></div>
+    <div class="logMeta">
+      <span id="logCount"></span
+      ><button id="logWrapButton" type="button" aria-pressed="false">
+        {{webui:diagnostic.log_wrap}}
+      </button>
     </div>
     <p id="logDropped" class="fieldHint" hidden></p>
-    <p id="logHistoryNote" class="fieldHint" hidden></p>
-    <textarea id="log" readonly aria-label="{{webui:diagnostic.log}}"></textarea>
     <div class="btnBar glassBar">
       <button
         id="copyLogButton"
@@ -1066,29 +1049,204 @@
       >
         <span class="g" aria-hidden="true">⧉</span
         ><span class="t">{{webui:diagnostic.copy}}</span></button
-      ><button id="logLatestButton" class="btnGlyph diagCtl" type="button" hidden data-p="1">
-        <span class="g" aria-hidden="true">↓</span
-        ><span class="t">{{webui:diagnostic.log_latest}}</span></button
       ><button
         id="logExportButton"
         class="btnGlyph diagCtl"
         title="{{webui:diagnostic.log_export_title}}"
         type="button"
         hidden
-        data-p="3"
+        data-p="1"
       >
         <span class="g" aria-hidden="true">⤓</span
         ><span class="t">{{webui:diagnostic.log_export}}</span></button
       ><button
-        id="clearLogButton"
+        id="logMarkButton"
         class="btnGlyph diagCtl"
-        title="{{webui:diagnostic.clear_view}}"
+        title="{{webui:diagnostic.log_mark_title}}"
         type="button"
-        data-p="5"
+        data-p="3"
       >
-        <span class="g" aria-hidden="true">×</span
-        ><span class="t">{{webui:diagnostic.clear_view}}</span>
+        <span class="g" aria-hidden="true">⌖</span
+        ><span class="t">{{webui:diagnostic.log_mark}}</span>
       </button>
     </div>
+    <details class="cfgGroup logSettings">
+      <summary>{{webui:diagnostic.log_settings}}</summary>
+      <small class="fieldHint">{{webui:diagnostic.log_settings_hint}}</small>
+      <label
+        >{{webui:diagnostic.log_kept}}
+        <span class="selBox"
+          ><select id="ringRetainLogLevel" class="diagCtl">
+            <option value="none" selected>{{webui:diagnostic.none}}</option>
+            <option value="critical">{{webui:diagnostic.critical}}</option>
+            <option value="error">{{webui:diagnostic.error}}</option>
+            <option value="warning">{{webui:diagnostic.warning}}</option>
+            <option value="info">{{webui:diagnostic.info}}</option>
+            <option value="debug">{{webui:diagnostic.debug}}</option>
+          </select></span
+        ><small class="fieldHint">{{webui:diagnostic.log_kept_hint}}</small></label
+      ><label
+        >{{webui:diagnostic.log_usb}}
+        <span class="selBox"
+          ><select id="serialLogLevel" class="diagCtl">
+            <option value="none" selected>{{webui:diagnostic.none}}</option>
+            <option value="critical">{{webui:diagnostic.critical}}</option>
+            <option value="error">{{webui:diagnostic.error}}</option>
+            <option value="warning">{{webui:diagnostic.warning}}</option>
+            <option value="info">{{webui:diagnostic.info}}</option>
+            <option value="debug">{{webui:diagnostic.debug}}</option>
+          </select></span
+        ><small class="fieldHint">{{webui:diagnostic.log_usb_hint}}</small></label
+      >
+    </details>
+    <dialog id="logJumpDialog" class="logSheet" aria-labelledby="logJumpTitle">
+      <form method="dialog">
+        <h2 id="logJumpTitle">{{webui:diagnostic.log_jump}}</h2>
+        <p class="fieldHint">{{webui:diagnostic.log_jump_hint}}</p>
+        <div class="logQuick">
+          <button type="button" value="900">{{webui:diagnostic.log_15_min_ago}}</button
+          ><button type="button" value="3600">{{webui:diagnostic.log_1_hour_ago}}</button
+          ><button type="button" value="today">{{webui:diagnostic.log_today}}</button
+          ><button type="button" value="yesterday">{{webui:diagnostic.log_yesterday}}</button>
+        </div>
+        <div class="logWhen">
+          <span class="clearField"
+            ><input
+              id="logJumpDate"
+              type="date"
+              aria-label="{{webui:diagnostic.log_date}}"
+            /><button
+              class="clearKey"
+              type="button"
+              aria-label="{{webui:diagnostic.log_clear_date}}"
+              hidden
+            >
+              ×
+            </button></span
+          ><span class="clearField"
+            ><input
+              id="logJumpTime"
+              type="time"
+              aria-label="{{webui:diagnostic.log_time}}"
+            /><button
+              class="clearKey"
+              type="button"
+              aria-label="{{webui:diagnostic.log_clear_time}}"
+              hidden
+            >
+              ×
+            </button></span
+          >
+        </div>
+        <small class="fieldHint logZone"></small>
+        <p id="logJumpError" class="logErr" hidden>{{webui:diagnostic.log_jump_future}}</p>
+        <div class="btnBar">
+          <button class="btnGlyph" type="submit" value="cancel" formnovalidate>
+            <span class="t">{{webui:shell.cancel}}</span></button
+          ><button id="logJumpGo" class="btnGlyph btnInvert" type="submit" value="go">
+            <span class="t">{{webui:diagnostic.log_show}}</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="logExportDialog" class="logSheet" aria-labelledby="logExportTitle">
+      <form method="dialog">
+        <h2 id="logExportTitle">{{webui:diagnostic.log_export_title_dialog}}</h2>
+        <p class="fieldHint">{{webui:diagnostic.log_export_hint}}</p>
+        <div class="setupChoices" role="radiogroup" aria-labelledby="logExportTitle">
+          <label class="setupChoice"
+            ><input type="radio" name="logRange" value="view" checked /><span
+              ><b>{{webui:diagnostic.log_range_view}}</b><small id="logRangeView"></small></span
+          ></label>
+          <label class="setupChoice"
+            ><input type="radio" name="logRange" value="day" /><span
+              ><b>{{webui:diagnostic.log_range_day}}</b><small id="logRangeDay"></small></span
+          ></label>
+          <label class="setupChoice"
+            ><input type="radio" name="logRange" value="all" /><span
+              ><b>{{webui:diagnostic.log_range_all}}</b
+              ><small>{{webui:diagnostic.log_range_all_hint}}</small></span
+            ></label
+          >
+          <label class="setupChoice"
+            ><input type="radio" name="logRange" value="custom" /><span
+              ><b>{{webui:diagnostic.log_range_custom}}</b
+              ><small>{{webui:diagnostic.log_range_custom_hint}}</small></span
+            ></label
+          >
+        </div>
+        <div id="logCustom" hidden>
+          <span class="logFl">{{webui:diagnostic.log_from}}</span>
+          <div class="logWhen">
+            <span class="clearField"
+              ><input
+                id="logFromDate"
+                type="date"
+                aria-label="{{webui:diagnostic.log_date}}"
+              /><button
+                class="clearKey"
+                type="button"
+                aria-label="{{webui:diagnostic.log_clear_date}}"
+                hidden
+              >
+                ×
+              </button></span
+            ><span class="clearField"
+              ><input
+                id="logFromTime"
+                type="time"
+                aria-label="{{webui:diagnostic.log_time}}"
+              /><button
+                class="clearKey"
+                type="button"
+                aria-label="{{webui:diagnostic.log_clear_time}}"
+                hidden
+              >
+                ×
+              </button></span
+            >
+          </div>
+          <span class="logFl">{{webui:diagnostic.log_to}}</span>
+          <div class="logWhen">
+            <span class="clearField"
+              ><input
+                id="logToDate"
+                type="date"
+                aria-label="{{webui:diagnostic.log_date}}"
+              /><button
+                class="clearKey"
+                type="button"
+                aria-label="{{webui:diagnostic.log_clear_date}}"
+                hidden
+              >
+                ×
+              </button></span
+            ><span class="clearField"
+              ><input
+                id="logToTime"
+                type="time"
+                aria-label="{{webui:diagnostic.log_time}}"
+              /><button
+                class="clearKey"
+                type="button"
+                aria-label="{{webui:diagnostic.log_clear_time}}"
+                hidden
+              >
+                ×
+              </button></span
+            >
+          </div>
+          <p id="logRangeError" class="logErr" hidden>{{webui:diagnostic.log_range_bad}}</p>
+        </div>
+        <small class="fieldHint logZone"></small>
+        <div class="btnBar">
+          <button class="btnGlyph" type="submit" value="cancel" formnovalidate>
+            <span class="t">{{webui:shell.cancel}}</span></button
+          ><button id="logExportGo" class="btnGlyph btnInvert" type="submit" value="dl">
+            <span class="t">{{webui:diagnostic.log_download}}</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
   </fieldset>
 </div>

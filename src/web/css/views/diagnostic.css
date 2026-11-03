@@ -1,12 +1,418 @@
-#log {
+/* The log: a status strip, removable filter chips, the log with severity
+   pills, its meta row and toolbar, then the logging settings. */
+.logStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  margin: 0.15rem 0 0.7rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--ln);
+  border-radius: 0.7rem;
+  background: var(--in);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.logStrip p {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.logStrip small {
+  font-size: 0.75rem;
+}
+
+.logDot {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.logStrip > .cfgIcon {
+  color: var(--ac);
+}
+
+.logStrip:not(.past, .warn) > .cfgIcon,
+.logStrip:is(.past, .warn) > .logDot {
+  display: none;
+}
+
+.logStrip.past {
+  border-color: color-mix(in srgb, var(--ac) 30%, var(--ln));
+  background: var(--pa);
+}
+
+.logStrip.warn {
+  border-color: color-mix(in srgb, var(--wn) 35%, var(--ln));
+  background: var(--mw);
+}
+
+.logStrip.warn > .cfgIcon {
+  color: var(--wn);
+}
+
+.logGo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--ac) 45%, var(--ln));
+  background: transparent;
+  color: var(--ac);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.logGo .cfgIcon {
+  width: 1rem;
+  height: 1rem;
+}
+
+#logLiveButton {
+  border-color: var(--ac);
+  background: var(--ac);
+  color: var(--on);
+}
+
+/* Severity colours, shared by the Level chip and the log's tags. */
+.lvc {
+  --sv: var(--dn);
+  --so: var(--sf);
+}
+
+.lve {
+  --sv: var(--gFast);
+  --so: var(--sf);
+}
+
+.lvw {
+  --sv: var(--lw);
+  --so: #242424;
+}
+
+.lvi {
+  --sv: var(--gSlow);
+}
+
+.lvd {
+  --sv: var(--mu);
+}
+
+.logChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+}
+
+.logChip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--ln);
+  border-radius: 2rem;
+  background: var(--sf);
+  color: var(--fg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.logChip .k {
+  color: var(--mu);
+}
+
+.logChip .v {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logChip .cv {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.logChip > select {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 14rem;
-  white-space: pre;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.logChip:has(> select:focus-visible) {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.logChip > .x {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0 -0.45rem 0 0.05rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.logChip > .x:hover {
+  background: color-mix(in srgb, currentcolor 16%, transparent);
+}
+
+.logChip:not(.on) > .x,
+.logChip.on > .cv {
+  display: none;
+}
+
+.logChip.on {
+  border-color: color-mix(in srgb, var(--ac) 55%, var(--ln));
+  background: color-mix(in srgb, var(--ac) 9%, var(--sf));
+  color: var(--ac);
+}
+
+.logChip:is(.on, .lvc, .lve, .lvw, .lvi, .lvd) .k {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.logChip:is(.lvi, .lvd) {
+  border-color: color-mix(in srgb, var(--sv) 50%, var(--ln));
+  background: color-mix(in srgb, var(--sv) 10%, var(--sf));
+  color: var(--sv);
+}
+
+.logChip:is(.lvc, .lve, .lvw) {
+  border-color: var(--sv);
+  background: var(--sv);
+  color: var(--so);
+}
+
+.logSw {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+#log {
+  height: 19rem;
+  padding: 0.55rem 0.65rem;
   overflow: auto;
   border: 1px solid var(--bd);
   border-radius: 0.5rem;
   background: var(--in);
   color: var(--fg);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+#log.wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Up to 20,000 lines: lines out of view skip rendering. */
+#log > div {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1.125rem;
+}
+
+#log b {
+  color: var(--sv);
+}
+
+#log :is(.lvc, .lve, .lvw) {
+  padding: 0 0.3rem;
+  border-radius: 0.3rem;
+  background: var(--sv);
+  color: var(--so);
+}
+
+#log .lvd {
+  font-weight: 400;
+}
+
+#log .logMk {
+  color: var(--mu);
+  font-style: italic;
+  text-align: center;
+}
+
+/* A restart stays pinned at the top while its boot's lines scroll under
+   it, so the reader always sees which boot they are in. */
+#log .logBoot {
+  position: sticky;
+  top: -0.55rem;
+  left: -0.65rem;
+  z-index: 1;
+  margin: 0 -0.65rem;
+  padding: 0.15rem 0.65rem;
+  border-bottom: 1px solid var(--ln);
+  background: var(--in);
+  color: var(--fg);
+  font-style: normal;
+  font-weight: 600;
+  content-visibility: visible;
+}
+
+#log .logMark {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ac);
+  font-weight: 700;
+}
+
+#log .logMark::before,
+#log .logMark::after {
+  content: "";
+  flex: 1;
+  border-top: 1px dashed currentcolor;
+  opacity: 0.6;
+}
+
+.logMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--mu);
+}
+
+.logMeta button {
+  margin: 0;
+  padding: 0.4rem 0;
+  border: 0;
+  background: none;
+  color: var(--ac);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#logWrapButton[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+.logSettings {
+  margin-top: 1rem;
+}
+
+/* The jump and export dialogs: centred, and a bottom sheet on phones. */
+.logSheet {
+  width: min(27rem, calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--sf);
+  color: var(--fg);
+  box-shadow: var(--popSh);
+}
+
+.logSheet::backdrop {
+  background: rgb(21 21 21 / 65%);
+}
+
+.logSheet h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.logSheet .btnBar {
+  justify-content: flex-end;
+}
+
+@media (width <= 699px) {
+  .logSheet {
+    width: 100%;
+    max-height: 92dvh;
+    margin: auto 0 0;
+    border-width: 1px 0 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+.logQuick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0.9rem;
+}
+
+.logQuick button {
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--ln);
+  background: var(--in);
+  color: var(--fg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logQuick button:hover {
+  border-color: var(--ac);
+  color: var(--ac);
+}
+
+.logWhen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+@media (width <= 359px) {
+  .logWhen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.logFl {
+  display: block;
+  margin: 0.6rem 0 -0.1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.logErr {
+  margin: 0.4rem 0 0;
+  color: var(--dn);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+#logExportDialog .setupChoices {
+  margin: 0.75rem 0;
 }
 
 #log,

@@ -526,7 +526,8 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !diagHtml.includes('<strong>Clock</strong>') ||
       !diagHtml.includes('<strong>Temp current</strong>') ||
       !diagHtml.includes('<strong>Temp peak</strong>') ||
-      (diagHtml.match(/<details/g) || []).length !== 22 ||
+      // 22 Diagnostics sections and folds, plus the log's Logging settings.
+      (diagHtml.match(/<details/g) || []).length !== 23 ||
       // Shot storage is its own section after HEAP and NVS, read when opened.
       diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Shot storage</summary>') ||
       diagHtml.indexOf('<summary>Shot storage</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
@@ -1721,14 +1722,15 @@ if (!/<fieldset[^>]*><legend>Log<\/legend>/.test(html) ||
     html.includes('id="navLogWrap"') ||
     codeIncludes(ui, 'function ringLogEnabled(') ||
     codeIncludes(ui, 'function updateLogNavVisibility(') ||
-    !html.includes('<hr class="logSep">') ||
-    html.indexOf('<hr class="logSep">') < html.indexOf('id="serialLogLevel"') ||
-    html.indexOf('<hr class="logSep">') > html.indexOf('id="logLevelFilter"') ||
-    !css.includes('.logSep') ||
+    // The logging settings change the controller, not the view: they close
+    // the panel, collapsed, after the log and its toolbar.
+    html.indexOf('<details class="cfgGroup logSettings">') < html.indexOf('id="logMarkButton"') ||
+    html.indexOf('id="ringRetainLogLevel"') < html.indexOf('<details class="cfgGroup logSettings">') ||
+    html.includes('class="logSep"') ||
     html.includes('data-route="/debug"') ||
     html.includes('id="view-debug"') ||
     html.includes('id="view-log"')) {
-  throw new Error('Diagnostic tab must host always-visible Log with ring/serial controls and separator');
+  throw new Error('Diagnostic tab must host always-visible Log with ring/serial controls in Logging settings');
 }
 if (!network.includes('historyOverwritten') ||
     !network.includes('missedEvents') ||
