@@ -44,7 +44,6 @@ set(_obbw_extra_flags_file "${CMAKE_BINARY_DIR}/open_brew_by_weight_extra_flags"
 set(_obbw_extra_raw "")
 set(_obbw_cdc_on_boot 0)
 set(_obbw_enable_gcc_analyzer OFF)
-set(_obbw_enable_unused_parameter OFF)
 if(DEFINED ENV{OPENBREWBYWEIGHT_EXTRA_FLAGS})
   set(_obbw_extra_raw "$ENV{OPENBREWBYWEIGHT_EXTRA_FLAGS}")
 endif()
@@ -66,12 +65,9 @@ if(NOT _obbw_extra_raw STREQUAL "")
       # the firmware can be examined.
       set(_obbw_enable_gcc_analyzer ON)
     elseif(_opt STREQUAL "-Wunused-parameter")
-      # Same scoping as -fanalyzer: ESP-IDF builds its C++ components with
-      # -Werror (e.g. cxx_exception_stubs.cpp has unused parameters), so
-      # re-enabling this warning globally breaks the SDK build. Attach it
-      # below only to project-owned components.
-      set(_obbw_enable_unused_parameter ON)
-      set(_obbw_unused_parameter_options "-Wunused-parameter")
+      # Project-owned components always build with it (below). ESP-IDF's own
+      # -Werror components have unused parameters (e.g.
+      # cxx_exception_stubs.cpp), so it is never applied globally.
     elseif(_opt MATCHES "^-D(.+)$")
       idf_build_set_property(COMPILE_DEFINITIONS "${CMAKE_MATCH_1}" APPEND)
     elseif(_opt MATCHES "^-W")
@@ -106,27 +102,36 @@ idf_component_get_property(_obbw_arduino_lib espressif__arduino-esp32 COMPONENT_
 target_compile_options(${_obbw_arduino_lib} PRIVATE
   -Wno-deprecated-declarations -Wno-missing-field-initializers)
 
+set(_obbw_project_components main openBrewByWeight EspressoScaleBLE OpenBrewByWeightBleRuntime)
+
+# SDK and managed-component headers are third-party code: project components
+# include them as system directories (GCC drops the duplicate -I), so the
+# strict warnings below apply to project code only. The SDK components'
+# own compilation is unchanged.
+idf_build_get_property(_obbw_build_components BUILD_COMPONENTS)
+set(_obbw_sdk_include_dirs "")
+foreach(_obbw_component IN LISTS _obbw_build_components)
+  if(NOT _obbw_component IN_LIST _obbw_project_components)
+    idf_component_get_property(_obbw_component_lib ${_obbw_component} COMPONENT_LIB)
+    list(APPEND _obbw_sdk_include_dirs
+      "$<TARGET_PROPERTY:${_obbw_component_lib},INTERFACE_INCLUDE_DIRECTORIES>")
+  endif()
+endforeach()
+
 # Analyze only code maintained in this repository. SDK and managed-component
 # diagnostics are neither hidden nor downgraded; they are simply outside this
 # firmware-focused analyzer pass.
-if(_obbw_enable_gcc_analyzer)
-  foreach(_obbw_analyzer_component IN ITEMS
-      main openBrewByWeight EspressoScaleBLE OpenBrewByWeightBleRuntime)
-    idf_component_get_property(_obbw_analyzer_component_lib
-      ${_obbw_analyzer_component} COMPONENT_LIB)
-    target_compile_options(${_obbw_analyzer_component_lib} PRIVATE -fanalyzer)
-  endforeach()
-endif()
-
-# Extra parameter warnings behave like -fanalyzer: ESP-IDF disables them
-# project-wide (-Wno-unused-parameter) and its own -Werror components cannot
-# tolerate them, so only project-owned components see them.
-if(_obbw_enable_unused_parameter)
-  foreach(_obbw_unused_parameter_component IN ITEMS
-      main openBrewByWeight EspressoScaleBLE OpenBrewByWeightBleRuntime)
-    idf_component_get_property(_obbw_unused_parameter_component_lib
-      ${_obbw_unused_parameter_component} COMPONENT_LIB)
-    target_compile_options(${_obbw_unused_parameter_component_lib} PRIVATE
-      ${_obbw_unused_parameter_options})
-  endforeach()
-endif()
+# ESP-IDF relaxes several warnings for every component (tools/cmake/build.cmake:
+# -Wno-unused-parameter and -Wno-error=...). Project-owned components restore
+# them as errors; component options follow the global ones, so they win.
+foreach(_obbw_component IN LISTS _obbw_project_components)
+  idf_component_get_property(_obbw_component_lib ${_obbw_component} COMPONENT_LIB)
+  if(_obbw_enable_gcc_analyzer)
+    target_compile_options(${_obbw_component_lib} PRIVATE -fanalyzer)
+  endif()
+  target_include_directories(${_obbw_component_lib} SYSTEM PRIVATE ${_obbw_sdk_include_dirs})
+  target_compile_options(${_obbw_component_lib} PRIVATE
+    -Wunused-parameter -Werror=unused-parameter -Werror=unused-function
+    -Werror=unused-variable -Werror=unused-but-set-variable
+    -Werror=deprecated-declarations -Werror=extra)
+endforeach()
