@@ -2246,7 +2246,7 @@ void serviceScaleLinkRssi(uint32_t nowMs) {
                      raw <= 126;
   portENTER_CRITICAL(&scaleLinkMux);
   scaleLinkRssiValid = valid;
-  scaleLinkRssi = valid ? static_cast<int8_t>(raw) : 0;
+  scaleLinkRssi = valid ? static_cast<int8_t>(raw) : int8_t{0};
   portEXIT_CRITICAL(&scaleLinkMux);
 }
 

@@ -204,8 +204,8 @@ inline const char *shotLogVerdictJson(uint8_t packed) {
     case 0: return "\"on_recipe\"";
     case 1: return "\"fast\"";
     case 2: return "\"slow\"";
+    default: return "null";
   }
-  return "null";
 }
 
 inline const char *shotLogScaleLossSourceJson(uint8_t packed) {
@@ -213,8 +213,8 @@ inline const char *shotLogScaleLossSourceJson(uint8_t packed) {
     case 0: return "\"projection\"";
     case 1: return "\"history\"";
     case 2: return "\"window\"";
+    default: return "\"fixed\"";
   }
-  return "\"fixed\"";
 }
 
 constexpr const char *actualWeightSourceName(ActualWeightSource source) {
@@ -519,7 +519,7 @@ inline PersistedLastShot shotLogProjectLastShot(
   shot.endedAtLocalSec = record.endedAtLocalSec;
   shot.hasWallTime = record.hasWallTime;
   shot.durationMs = static_cast<uint32_t>(record.durationDs) * 100U;
-  shot.currentWeightG = record.actualWeightCg / 100.0f;
+  shot.currentWeightG = static_cast<float>(record.actualWeightCg) / 100.0f;
   shot.weightValid = true;
   // Only good shots are projected: a measured yield, so every one had a scale.
   shot.scaleAvailable = true;
@@ -534,7 +534,7 @@ inline PersistedLastShot shotLogProjectLastShot(
   copyCString(shot.scaleName, sizeof(shot.scaleName), record.scaleName);
   shot.averageFlowValid = record.avgFlowCgS != SHOT_LOG_METRIC_MISSING;
   shot.averageFlowGps = shot.averageFlowValid
-      ? record.avgFlowCgS / 100.0f : 0.0f;
+      ? static_cast<float>(record.avgFlowCgS) / 100.0f : 0.0f;
   shot.fastExtractionGuardEnabled =
       shotLogFastGuardEnabled(record.sideFlags);
   shot.slowExtractionGuardEnabled =
@@ -546,7 +546,7 @@ inline PersistedLastShot shotLogProjectLastShot(
   shot.arrivalMs = record.arrivalDs == SHOT_LOG_METRIC_MISSING
       ? 0U : static_cast<uint32_t>(record.arrivalDs) * 100U;
   if (!shotLogWeightIsMissing(record.cutLineCg))
-    shot.activeStopWeightG = record.cutLineCg / 100.0f;
+    shot.activeStopWeightG = static_cast<float>(record.cutLineCg) / 100.0f;
   return shot;
 }
 

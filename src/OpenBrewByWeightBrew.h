@@ -132,7 +132,7 @@ void updateCutPrediction(float weight, uint32_t receivedAtMs) {
                                           cut.rate.rateX100, cut.tauMs,
                                           cut.offsetDg, cut.crossingMs);
   if (cut.crossingValid && cut.crossingMs < cut.params.wallMs) {
-    shot.expectedEndS = cut.crossingMs / 1000.0f;
+    shot.expectedEndS = static_cast<float>(cut.crossingMs) / 1000.0f;
   }
   // Read-only shot-end prediction for the hero tint (never actuates).
   {
@@ -285,7 +285,7 @@ void noteAccidentalTouchClass(AccidentalTouchClass classified, float weight,
   if (classified == AccidentalTouchClass::SUSTAINED) {
     // An accepted level shift starts a new trend epoch and a curve segment.
     session.accidentalTouchEpochS =
-        static_cast<int32_t>(atMs - shot.startMs) / 1000.0f;
+        static_cast<float>(static_cast<int32_t>(atMs - shot.startMs)) / 1000.0f;
     shotCurveSampler.markBreak();
     session.calibrationEligible = false;
     addDebugEvent(DebugCategory::SCALE, DebugCode::ACCIDENTAL_TOUCH_SUSTAINED,
@@ -303,9 +303,9 @@ void noteAccidentalTouchClass(AccidentalTouchClass classified, float weight,
 AccidentalTouchClass evaluateAccidentalTouchSample(float weight,
                                                    uint32_t receivedAtMs) {
   const float nowS =
-      static_cast<int32_t>(receivedAtMs - shot.startMs) / 1000.0f;
+      static_cast<float>(static_cast<int32_t>(receivedAtMs - shot.startMs)) / 1000.0f;
   const float lastS =
-      static_cast<int32_t>(session.lastAcceptedWeightAtMs - shot.startMs) /
+      static_cast<float>(static_cast<int32_t>(session.lastAcceptedWeightAtMs - shot.startMs)) /
       1000.0f;
   const AccidentalTouchResidual trend = accidentalTouchResidual(
       shot.timeS, shot.weight, session.hasWeightAnchor ? shot.datapoints : 0,
@@ -400,7 +400,7 @@ void onFirstDropsDetected(const FirstFlowObservation &observation) {
   if (shotTimeAtMs(observation.atMs, onsetMs)) session.cut.rate.onsetMs = onsetMs;
   // Flow onset ends the flat pre-flow trend: a touch epoch starts with it.
   session.accidentalTouchEpochS = fmaxf(session.accidentalTouchEpochS,
-      static_cast<int32_t>(observation.atMs - shot.startMs) / 1000.0f);
+      static_cast<float>(static_cast<int32_t>(observation.atMs - shot.startMs)) / 1000.0f);
   const uint32_t firstDropAnchorMs = session.circuitClosedAtMs != 0U
                                          ? session.circuitClosedAtMs
                                          : session.startedAtMs;
@@ -480,7 +480,7 @@ void noteExtension(int32_t shotMs, bool targetDue, uint32_t atMs, int32_t weight
     session.extractionExtended = true;
     session.targetReachedEarly = true;
     session.targetReachedAtMs = atMs;
-    shotCurveSampler.latchExtended(atMs, weightDg / 10.0f);
+    shotCurveSampler.latchExtended(atMs, static_cast<float>(weightDg) / 10.0f);
     addDebugEvent(DebugCategory::SCALE, DebugCode::FAST_EXTRACTION_ENTERED,
                   weightDg * 10, shotMs);
     if (runtimeConfig.buzzerExtendedPulseRate !=
@@ -490,7 +490,7 @@ void noteExtension(int32_t shotMs, bool targetDue, uint32_t atMs, int32_t weight
   } else if (!session.extractionExtended && !session.slowExtractionExtended &&
              line < p.goalDg) {
     session.slowExtractionExtended = true;
-    shotCurveSampler.latchExtended(atMs, weightDg / 10.0f);
+    shotCurveSampler.latchExtended(atMs, static_cast<float>(weightDg) / 10.0f);
     addDebugEvent(DebugCategory::SCALE, DebugCode::SLOW_EXTRACTION_ENTERED,
                   weightDg * 10, shotMs);
     if (runtimeConfig.buzzerSlowExtendedPulseRate !=

@@ -911,7 +911,7 @@ struct GrindHintReplay {
       armedPending = advisedR >= R_MOVED;
       armedLeft = static_cast<uint8_t>(armedLeft > 1 ? armedLeft - 1 : armedPending ? 1 : 0);
     }
-    const int8_t side = ref.n < 4 ? 0 : r >= R_UNARMED ? 1 : r <= -R_UNARMED ? -1 : 0;
+    const int8_t side = ref.n < 4 ? int8_t{0} : r >= R_UNARMED ? int8_t{1} : r <= -R_UNARMED ? int8_t{-1} : int8_t{0};
     if (side != 0 && side == unarmedSide) {
       startSegment(k - 1);
       return;

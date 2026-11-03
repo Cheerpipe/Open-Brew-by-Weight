@@ -139,7 +139,7 @@ class ShotLog
       neededCg[found] = measurable
           ? static_cast<int16_t>(record.offsetUsedCg + record.actualWeightCg -
                                  record.cutLineCg)
-          : 0;
+          : int16_t{0};
       if (!trained) skippedMask |= static_cast<uint16_t>(1U << found);
       ++found;
     }

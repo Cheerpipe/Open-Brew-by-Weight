@@ -25,7 +25,7 @@ inline uint8_t bbwAlgorithmVersion(uint8_t algorithm) {
 
 inline bool parseBbwAlphaBaseline(double value, uint8_t &out) {
   if (!(value >= 0.01 && value <= 1.0)) return false;
-  const unsigned hundredths = static_cast<unsigned>(value * 100.0 + 0.5);
+  const unsigned hundredths = static_cast<unsigned>(std::lround(value * 100.0));
   if (fabs(value * 100.0 - hundredths) > 1e-9) return false;
   out = static_cast<uint8_t>(hundredths);
   return true;

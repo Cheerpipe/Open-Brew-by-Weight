@@ -383,7 +383,7 @@ bool jsonGoalWeightDg(cJSON *object, const char *name, uint16_t &output) {
   }
   const float clipped = fmaxf(0.1f * MIN_GOAL_WEIGHT_DG,
                               fminf(0.1f * MAX_GOAL_WEIGHT_DG, grams));
-  output = static_cast<uint16_t>(clipped * 10.0f + 0.5f);
+  output = static_cast<uint16_t>(std::lround(clipped * 10.0f));
   return true;
 }
 
@@ -820,14 +820,14 @@ bool registerHandler(httpd_handle_t server, const char *uri,
 // HTTPD's socket send copies source bytes into lwIP; callers retain ownership
 // of PSRAM and embedded-asset data until this synchronous call returns.
 esp_err_t sendChunk(httpd_req_t *request, const void *data, size_t length) {
-  return httpd_resp_send_chunk(request, static_cast<const char *>(data), length);
+  return httpd_resp_send_chunk(request, static_cast<const char *>(data), static_cast<ssize_t>(length));
 }
 
 esp_err_t sendBody(httpd_req_t *request, const void *data, size_t length) {
   if (length == 0) {
     return httpd_resp_send(request, nullptr, 0);
   }
-  return httpd_resp_send(request, static_cast<const char *>(data), length);
+  return httpd_resp_send(request, static_cast<const char *>(data), static_cast<ssize_t>(length));
 }
 
 esp_err_t sendJsonStringChunk(httpd_req_t *request, const char *value) {

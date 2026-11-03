@@ -27,7 +27,7 @@ inline uint16_t rtttlMidiHz(int midi) {
   const double hz = 440.0 * pow(2.0, (static_cast<double>(midi) - 69.0) / 12.0);
   if (hz < 1.0) return 0;
   if (hz > 20000.0) return 20000;
-  return static_cast<uint16_t>(hz + 0.5);
+  return static_cast<uint16_t>(std::lround(hz));
 }
 
 // Parses a Nokia RTTTL string into timed notes. freqHz 0 is a rest. Bounded

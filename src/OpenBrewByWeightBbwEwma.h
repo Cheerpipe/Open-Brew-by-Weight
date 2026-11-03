@@ -30,7 +30,7 @@ inline bool learn(float offsetG, float finalWeightG, float goalG, uint8_t alpha,
   if (!acceptedFreshObservation || !validBbwAlpha(alpha) ||
       !std::isfinite(offsetG) || !std::isfinite(observation) ||
       fabsf(observation) > MAX_OFFSET_G) return false;
-  updatedOffset = clampOffset(offsetG + (alpha / 100.0f) * (finalWeightG - goalG));
+  updatedOffset = clampOffset(offsetG + (static_cast<float>(alpha) / 100.0f) * (finalWeightG - goalG));
   return true;
 }
 
@@ -41,7 +41,7 @@ inline bool learn(float offsetG, float finalWeightG, float goalG, uint8_t alpha,
 inline bool physicsPlausibleDrip(float observationG, int32_t rateAtStopX100) {
   if (!std::isfinite(observationG) || rateAtStopX100 <= 0) return false;
   return observationG >= DRIP_PHYSICS_FLOOR_G &&
-         observationG <= DRIP_PHYSICS_TAU_S * (rateAtStopX100 / 1000.0f) +
+         observationG <= DRIP_PHYSICS_TAU_S * (static_cast<float>(rateAtStopX100) / 1000.0f) +
                              DRIP_PHYSICS_ALLOWANCE_G;
 }
 
@@ -82,7 +82,7 @@ struct Evidence {
       for (uint8_t i = 0; i < 5; ++i) {
         const uint8_t gain = i < 4 ? BBW_ALPHA_CANDIDATES[i] : initialAlpha;
         anchors[i] = clampOffset(anchors[i] +
-            (gain / 100.0f) * (observations[position] - anchors[i]));
+            (static_cast<float>(gain) / 100.0f) * (observations[position] - anchors[i]));
       }
     }
     observations[position] = observation;
@@ -99,7 +99,7 @@ struct Evidence {
       for (uint8_t j = 0; j < WINDOW; ++j) {
         const float error = observations[(position + j) % WINDOW] - prediction;
         scores[i] += error * error;  // Score before updating.
-        prediction = clampOffset(prediction + (gain / 100.0f) * error);
+        prediction = clampOffset(prediction + (static_cast<float>(gain) / 100.0f) * error);
       }
       if (!std::isfinite(scores[i])) { wins = 0; return alpha; }
       if (i < 4 && gain == alpha) incumbent = i;

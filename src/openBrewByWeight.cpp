@@ -1306,7 +1306,7 @@ void requestRemoteTimerStop();
 uint32_t cycleShotElapsedMs() { return session.active ? machineElapsedMs() : 0U; }
 
 float cycleElapsedSeconds() {
-  return cycleShotElapsedMs() / 1000.0f;
+  return static_cast<float>(cycleShotElapsedMs()) / 1000.0f;
 }
 
 void captureCycleCircuitStart() {

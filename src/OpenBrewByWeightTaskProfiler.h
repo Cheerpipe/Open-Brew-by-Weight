@@ -669,7 +669,7 @@ class TaskProfiler {
   }
 
   static int8_t coreFor_(BaseType_t core) {
-    return core == 0 || core == 1 ? static_cast<int8_t>(core) : -1;
+    return core == 0 || core == 1 ? static_cast<int8_t>(core) : int8_t{-1};
   }
 
   // TaskStatus_t only has a core field when FREERTOS_VTASKLIST_INCLUDE_COREID
@@ -677,7 +677,7 @@ class TaskProfiler {
   // (handle and name) may be freed by IDLE after the snapshot: never read it.
   static int8_t coreOf_(const TaskStatus_t &task) {
     return task.eCurrentState == eDeleted
-               ? -1
+               ? int8_t{-1}
                : coreFor_(xTaskGetCoreID(task.xHandle));
   }
 

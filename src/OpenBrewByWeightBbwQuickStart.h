@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <algorithm>
+#include <cmath>
 #include <type_traits>
 
 #include "OpenBrewByWeightPresets.h"
@@ -96,7 +98,7 @@ inline void armQuickStart(QuickStartRecord &record, const ShotPresetBank &bank,
   *entry = QuickStartEntry{};
   entry->presetId = presetId;
   entry->state = static_cast<uint8_t>(QuickStartState::ARMED);
-  entry->setCg = static_cast<int16_t>(dripG * 100.0f + 0.5f);
+  entry->setCg = static_cast<int16_t>(std::lround(dripG * 100.0f));
   entry->setAtId = setAtId;
 }
 
@@ -143,7 +145,7 @@ inline bool observeQuickStart(QuickStartRecord &record, const ShotPresetBank &ba
   }
   const int16_t median = static_cast<int16_t>(o[0] + o[1] + o[2] - lo - hi);
   const int16_t maxCg = static_cast<int16_t>(MAX_OFFSET_G * 100.0f);
-  jumpCg = median < 0 ? 0 : median > maxCg ? maxCg : median;
+  jumpCg = std::clamp(median, int16_t{0}, maxCg);
   entry->quickCg = jumpCg;
   entry->state = static_cast<uint8_t>(QuickStartState::APPLIED);
   return true;

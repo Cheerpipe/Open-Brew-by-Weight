@@ -666,7 +666,7 @@ inline FirstFlowClass stepFirstFlow(
     // gap is coffee that accumulated while the stream was silent.
     const uint32_t stepMs = receivedAtMs - state.lastAtMs;
     if ((step >= FIRST_DROP_FINGER_STEP_G &&
-         (!state.hasLastSample || step * 125.0f > (stepMs > 100U ? stepMs : 100U))) ||
+         (!state.hasLastSample || step * 125.0f > static_cast<float>(stepMs > 100U ? stepMs : 100U))) ||
         delta >= objectMinG) {
       const FirstFlowClass classified =
           enterFirstFlowTouch(state, weight, receivedAtMs);

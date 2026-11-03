@@ -16,6 +16,8 @@
 
 #include <stdint.h>
 
+#include <algorithm>
+
 namespace openbrewbyweight {
 
 // Hero tint class streamed to the Web UI ("tintClass" JSON field).
@@ -284,8 +286,8 @@ inline Forecast forecastBasis(const corridor::CorridorState &cut, int32_t nowMs,
     const int32_t h0 = tPlain - nowMs;
     const int32_t lever = 1500 + h0 / 2 < LEVER_CAP_MS ? 1500 + h0 / 2
                                                        : LEVER_CAP_MS;
-    int32_t qEff = qBasis + static_cast<int64_t>(aX100) * lever / 1000;
-    if (qEff > corridor::MAX_RATE_X100) qEff = corridor::MAX_RATE_X100;
+    const int32_t qEff = static_cast<int32_t>(std::min<int64_t>(
+        qBasis + static_cast<int64_t>(aX100) * lever / 1000, corridor::MAX_RATE_X100));
     int32_t tEff = 0;
     if (qEff < corridor::MIN_PREDICTION_RATE_X100 ||
         !corridor::crossingMs(p, nowMs, weightDg, qEff, cut.tauMs,
@@ -492,17 +494,16 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
                                           : ShotTintNote::NONE)));
   if (cand == C_NONE) {
     if (young || (!qOk && !collapse)) {
-      const int32_t down = SLEW_DOWN_PCT_S * dt / 1000;
+      const int32_t down = static_cast<int32_t>(SLEW_DOWN_PCT_S * dt / 1000);
       pr.tintPct = pr.tintPct > down ? pr.tintPct - down : 0;
       if (pr.tintPct == 0) pr.tintClass = ShotTint::NEUTRAL;
     }  // else: valid forecast outside every region — hold class and pct
     return;
   }
   // ramp toward the T-5 s anchor; acceleration only post-plateau.
-  int32_t rampX = static_cast<int64_t>(now) * 1000 /
-                  (tBlend - T_LOCK_MS > 1000 ? tBlend - T_LOCK_MS : 1000);
-  if (rampX > 1000) rampX = 1000;
-  if (rampX < 0) rampX = 0;
+  const int32_t rampX = static_cast<int32_t>(std::clamp<int64_t>(
+      static_cast<int64_t>(now) * 1000 / (tBlend - T_LOCK_MS > 1000 ? tBlend - T_LOCK_MS : 1000),
+      0, 1000));
   int32_t kk = plateau ? (k - K_LO_PERMILLE) * 1000 /
                              (K_HI_PERMILLE - K_LO_PERMILLE)
                        : 0;
@@ -516,13 +517,13 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
   }
   const int32_t targetX = rampX > accelX ? rampX : accelX;  // 0..1000
   const int32_t rise =
-      (k >= K_HI_PERMILLE ? SLEW_EVIDENCE_PCT_S : SLEW_UP_PCT_S) * 10 * dt / 1000;
+      static_cast<int32_t>((k >= K_HI_PERMILLE ? SLEW_EVIDENCE_PCT_S : SLEW_UP_PCT_S) * 10 * dt / 1000);
   int32_t pct = pr.tintPct * 10;
   if (targetX >= pct) {
     pct += rise;
     if (pct > targetX) pct = targetX;
   } else {
-    pct -= SLEW_DOWN_PCT_S * 10 * dt / 1000;
+    pct -= static_cast<int32_t>(SLEW_DOWN_PCT_S * 10 * dt / 1000);
     if (pct < targetX) pct = targetX;
   }
   if (pct > 1000) pct = 1000;

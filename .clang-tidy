@@ -14,11 +14,6 @@
 # Checks currently disabled, with the reason:
 #   bugprone-easily-swappable-parameters  intentionally untyped hardware-style
 #                                         APIs; would need hundreds of NOLINTs
-#   bugprone-narrowing-conversions        ~25 findings pending review; enable
-#                                         once fixed
-#   bugprone-incorrect-roundings          8 findings of the (x + 0.5f) pattern;
-#                                         needs a deliberate lround migration
-#   bugprone-switch-missing-default-case  11 findings pending review
 #   performance-enum-size                 fires throughout ESP-IDF headers;
 #                                         revisit per enum with a fixed width
 #   performance-no-int-to-ptr             fires in ESP-IDF headers and a few
@@ -28,9 +23,6 @@ Checks: >
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
-  -bugprone-narrowing-conversions,
-  -bugprone-incorrect-roundings,
-  -bugprone-switch-missing-default-case,
   performance-*,
   -performance-enum-size,
   -performance-no-int-to-ptr,

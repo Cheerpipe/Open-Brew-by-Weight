@@ -2660,7 +2660,7 @@ bool OpenBrewByWeightMicraService::request(
   if (body != nullptr &&
       (esp_http_client_set_header(work_->client, "Content-Type",
                                   "application/json") != ESP_OK ||
-       esp_http_client_set_post_field(work_->client, body, strlen(body)) !=
+       esp_http_client_set_post_field(work_->client, body, static_cast<int>(strlen(body))) !=
            ESP_OK)) {
     return false;
   }

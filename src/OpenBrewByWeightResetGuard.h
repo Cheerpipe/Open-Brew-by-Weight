@@ -200,8 +200,8 @@ inline const char *safetyResetReasonName(uint32_t code) {
     case 13: return "eFuse";
     case 14: return "Power glitch";
     case 15: return "CPU lockup";
+    default: return "Unknown";
   }
-  return "Unknown";
 }
 
 inline SafetyResetSnapshot beginSafetyResetGuard() {

@@ -95,7 +95,7 @@ bool acceptWeightIntoTrajectory(float weight, uint32_t receivedAtMs,
     index = MAX_SHOT_DATAPOINTS - 1U;
   }
   shot.timeS[index] =
-      static_cast<uint32_t>(receivedAtMs - shot.startMs) / 1000.0f;
+      static_cast<float>(receivedAtMs - shot.startMs) / 1000.0f;
   shot.weight[index] = weight;
   shotCurveSampler.accept(weight, receivedAtMs);
   session.receivedFreshWeightInCycle = true;

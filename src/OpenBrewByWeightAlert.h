@@ -51,7 +51,7 @@ inline int8_t bookooDesiredVolume(bool alertsEnabled,
   if (!alertsEnabled) return 0;
   if (channel == AlertOutputChannel::BUZZER_ONLY)
     return muteOnBuzzerOnly ? 0 : -1;
-  return level <= BOOKOO_BEEP_LEVEL_MAX ? static_cast<int8_t>(level) : -1;
+  return level <= BOOKOO_BEEP_LEVEL_MAX ? static_cast<int8_t>(level) : int8_t{-1};
 }
 
 inline bool alertEventScaleCapable(AlertEvent event) {

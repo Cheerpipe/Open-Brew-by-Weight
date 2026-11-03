@@ -2498,8 +2498,8 @@ inline const char *bootSubsystemName(int32_t subsystem) {
     case BOOT_SUBSYSTEM_MACHINE_INTEGRATION: return "machine_integration";
     case BOOT_SUBSYSTEM_PSRAM: return "psram";
     case BOOT_SUBSYSTEM_RECOVERY: return "recovery";
+    default: return "unknown";
   }
-  return "unknown";
 }
 
 constexpr const char *debugCodeName(DebugCode code) {
@@ -2827,8 +2827,8 @@ inline const char *wifiStatusName(int32_t status) {
     case 4: return "connect failed";
     case 5: return "connection lost";
     case 6: return "disconnected";
+    default: return "unknown";
   }
-  return "unknown";
 }
 
 // STA_FAILED argument2: 802.11 disconnect reason (bits 0-7) and the driver's
@@ -2848,8 +2848,8 @@ inline const char *wifiDisconnectReasonName(uint32_t reason) {
     case 201: return "no AP found";
     case 202: return "auth failed";
     case 204: return "handshake timeout";
+    default: return "";
   }
-  return "";
 }
 
 inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,

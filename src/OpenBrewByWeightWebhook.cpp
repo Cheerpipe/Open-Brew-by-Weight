@@ -575,7 +575,8 @@ int8_t WebhookDispatcher::queuedStates(WebhookEventType type, int8_t delta) {
   if (slot < 0) return 0;
   mux_.lock();
   // Signed: the worker may receive an event before enqueue() counts it.
-  const int8_t count = queuedStates_[slot] += delta;
+  queuedStates_[slot] = static_cast<int8_t>(queuedStates_[slot] + delta);
+  const int8_t count = queuedStates_[slot];
   mux_.unlock();
   return count;
 }
@@ -766,7 +767,7 @@ WebhookDispatcher::SendOutcome WebhookDispatcher::send(
           },
           [&]() {
             return static_cast<int32_t>(esp_http_client_set_post_field(
-                client, payload_, strlen(payload_)));
+                client, payload_, static_cast<int>(strlen(payload_))));
           }));
       if (error == ESP_OK) {
         phase = WebhookRequestPhase::PERFORM;
