@@ -5,23 +5,28 @@
   margin: 0.5rem 0 0.25rem;
   width: 100%;
 }
+
 .btnBar {
   flex-wrap: wrap;
   align-items: center;
 }
+
 .presetActions {
   flex-wrap: nowrap;
   margin-bottom: 0.75rem;
 }
+
 .barSep {
   flex: 0 0 1px;
   height: 1.5rem;
   background: var(--ln);
 }
+
 dialog .btnBar {
   padding: 0;
   margin: 0.75rem 0 0;
 }
+
 .btnGlyph {
   display: inline-flex;
   align-items: center;
@@ -40,6 +45,7 @@ dialog .btnBar {
   white-space: normal;
   flex: 1;
 }
+
 .btnGlyph .g {
   display: inline-flex;
   align-items: center;
@@ -52,6 +58,7 @@ dialog .btnBar {
   line-height: 1;
   font-variant-emoji: text;
 }
+
 .btnGlyph .t {
   font-size: 0.86rem;
   font-weight: 600;

@@ -96,9 +96,9 @@
          !codeIncludes(js, 'function busyBtn') &&
          codeIncludes(js, "classList.remove('busy')") &&
          css.includes('.btnGlyph.busy{pointer-events:none}') &&
-         css.includes('.btnGlyph.busy .g:after') &&
+         css.includes('.btnGlyph.busy .g::after') &&
          css.includes('@keyframes busySpin') &&
-         css.includes('.btnGlyph.busy .g:after{animation:none}'),
+         css.includes('.btnGlyph.busy .g::after{animation:none}'),
     'Busy save buttons must spin in the glyph slot, block repeat clicks, and respect reduced motion');
   const busyCalls = [
     [adminUi, '/api/v1/config', 'saveDateTimeButton'],

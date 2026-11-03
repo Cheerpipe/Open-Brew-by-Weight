@@ -118,7 +118,7 @@
       combined.indexOf('class="shotGrid"') > combined.indexOf('class="shotTrace"') ||
       !combined.includes('M1.5 1.5V34.5M238.5 1.5V34.5') ||
       fills() !== 3 || (combined.match(/<linearGradient /g) || []).length !== 3 || combined.includes('fill-opacity') ||
-      plot.style['--shot-plot-min'] !== '1.10rem' ||
+      plot.style['--shotPlotMin'] !== '1.10rem' ||
       keys[0].style.background !== 'var(--ok)' || keys[1].style.background !== 'var(--gFlow)' ||
       ticks.map(item=>item.textContent).join('|')!=='0 s|10 s') {
     throw new Error('The combined shot chart must keep both axes, draw flow under weight with fading fills, and plot measured rates at window midpoints');
@@ -197,12 +197,12 @@
     durationS:15.1,goalG:36});
   if(rounded.timeMax!==20 || rounded.maxW!==40 || rounded.flowMax!==4 ||
       rounded.maxFlow<=3.7 || rounded.maxFlow>=3.8 ||
-      plot.style['--shot-plot-min']!=='4.40rem' ||
+      plot.style['--shotPlotMin']!=='4.40rem' ||
       !host.innerHTML.includes('<span class="shotYTick">4 g/s</span><span class="shotYTick">3 g/s</span>'))
     throw new Error('Non-multiple domains must round up; flow takes the step that fits the shared weight grid');
   const exact=render(host,{wCg:[1000,2000,3000,4000],wAtMs:[0,10000,20000,30000],durationS:40});
   if(exact.timeMax!==40 || exact.maxW!==40 || exact.flowMax!==1 ||
-      plot.style['--shot-plot-min']!=='4.40rem' ||
+      plot.style['--shotPlotMin']!=='4.40rem' ||
       !host.innerHTML.includes('<span class="shotYTick">1 g/s</span><span class="shotYTick">0.75 g/s</span>'))
     throw new Error('Exact axis boundaries must retain compact minimums and a quarter-step flow axis');
   render(host, null);
@@ -1025,8 +1025,7 @@ if (codeIncludes(ui, 'id="shotPanel"') ||
     !css.includes('.shotSpark{grid-area:plot;display:block;width:100%;height:100%;color:var(--ok);overflow:visible}') ||
     !css.includes('.shotGrid,.rvGrid{stroke:var(--ln);stroke-width:.8;opacity:.7}') ||
     !css.includes('.shotGrid,.shotTrace{vector-effect:non-scaling-stroke}') ||
-    !css.includes('grid-template-rows:var(--shot-plot-h,max(7rem,var(--shot-plot-min,0rem))) auto') ||
-    !css.includes('grid-template-areas:"y plot f" ". x ."') ||
+    !css.includes('grid-template:"y plot f" var(--shotPlotH,max(7rem,var(--shotPlotMin,0rem))) ". x ." auto / auto 1fr auto') ||
     css.includes('.shotEventTicks') ||
     !css.includes('.shotYTick{position:absolute;right:0;white-space:nowrap;transform:translateY(-50%)}') ||
     css.includes('.shotYTick:first-child') || css.includes('.shotYTick:last-child') ||
@@ -1037,7 +1036,7 @@ if (codeIncludes(ui, 'id="shotPanel"') ||
     !codeIncludes(statsRuntimeJs, 'function fillChartTicks(') ||
     codeIncludes(statsRuntimeJs, 's[a=') ||
     !codeIncludes(statsRuntimeJs, 'style.left=') ||
-    !codeIncludes(statsRuntimeJs, "style.setProperty('--shot-plot-min'") ||
+    !codeIncludes(statsRuntimeJs, "style.setProperty('--shotPlotMin'") ||
     !codeIncludes(statsRuntimeJs, '.style.top=') ||
     // The firmware CSP (style-src 'self') drops style attributes parsed from markup.
     codeIncludes(statsRuntimeJs, 'style="') ||
@@ -1422,7 +1421,8 @@ if (!html.includes('<summary>Switch</summary>') ||
     !css.includes('html.reedMachine .switchOnly') ||
     !css.includes('html:not(.momentaryMachine) .switchOnly') ||
     !css.includes('#machineStateValue .switchOnly') ||
-    !css.includes('#machineStateValue .switchOnly,#machineStateValue a{font-size:.78rem;font-weight:400}') ||
+    !css.includes('#machineStateValue .switchOnly{font-size:.78rem;font-weight:400}') ||
+    !css.includes('#machineStateValue a{font-size:.78rem;font-weight:400}') ||
     !css.includes('.momentaryOnly') ||
     !css.includes('html:not(.reedMachine) .reedOnly') ||
     !network.includes('"stopPulseMs"') ||
@@ -1741,7 +1741,7 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
       !cardSrc.includes('R.bindScrub(') || !/"role",\s*"slider"/.test(runtimeJs) || !cardSrc.includes('dataset.zone') ||
       !cardSrc.includes('observePresetHost(preset)') || cardSrc.includes('hatch') ||
       !cardSrc.includes('h.append(preset, readout, legend, combo);') || !cardSrc.includes('fillShotCharts(combo, m);') ||
-      !cardSrc.includes('if (preset._view) h.style.setProperty("--shot-plot-h", preset._view.B - preset._view.T + "px");') ||
+      !cardSrc.includes('if (preset._view) h.style.setProperty("--shotPlotH", preset._view.B - preset._view.T + "px");') ||
       !cardSrc.includes('m.timeMax = Math.max(rule.wall, m.dur);') || !cardSrc.includes('maxT: m.timeMax,') ||
       !js.includes('rate.className = "shotRateCell";') || runtimeJs.includes('shotInfo') ||
       !js.includes('<span class="heroPill" data-kind="'))

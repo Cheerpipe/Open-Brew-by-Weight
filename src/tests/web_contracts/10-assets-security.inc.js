@@ -201,7 +201,7 @@ if (!shellHtml.includes('class="pageNav"') ||
     shellHtml.includes('id="navToggle"') ||
     shellHtml.indexOf('class="pageNav"') > shellHtml.indexOf('id="app"') ||
     shellHtml.indexOf('class="topBar"') > shellHtml.indexOf('class="pageNav"') ||
-    !css.includes('@media(min-width:700px)') ||
+    !css.includes('@media(width>= 700px)') ||
     !css.includes('[data-nav-layout=text] .pageNav svg{display:none}') ||
     !codeIncludes(appJsSource, 'function updateNavigationLayout()') ||
     !codeIncludes(appJsSource, "matchMedia('(max-width: 699px)')")) {
@@ -558,15 +558,15 @@ if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !html.includes('class="buzzerOpt scaleIncapableOpt">Slow-shot beeps<span class="selBox"><select id="buzzerSlowExtendedPulseRate"') ||
     !css.includes('color-scheme:light dark') ||
     // color-scheme is inherited, so the root carries it to every form control.
-    !css.includes('html.theme-dark{color-scheme:dark}') ||
-    !css.includes('html.theme-light{color-scheme:light}') ||
+    !/html\.themeDark\{[^}]*color-scheme:dark[;}]/.test(css) ||
+    !css.includes('html.themeLight{color-scheme:light}') ||
     !css.includes('--in:#fafafa') ||
     !css.includes('input:not([type=file],[type=checkbox],[type=range]),select,textarea{') ||
     !css.includes('input[type=text],input[type=email],input[type=password],input[type=url]{appearance:none}') ||
     !css.includes('min-height:3rem') ||
     !css.includes('background:var(--in)') ||
     !css.includes('input:-webkit-autofill') ||
-    !css.includes('-webkit-box-shadow:0 0 0 3rem var(--in) inset') ||
+    !css.includes('box-shadow:0 0 0 3rem var(--in) inset') ||
     css.includes('input[type=text],input[type=password],select{-webkit-appearance:none') ||
     html.includes('id="staSsid" type="number"') ||
     html.includes('id="ntpServerCustom" type="number"') ||

@@ -5,32 +5,39 @@ body.setupView {
   min-height: 100dvh;
   padding-bottom: 1rem;
 }
+
 body.setupView .topBar,
 body.setupView .pageNav {
   display: none;
 }
+
 body.setupView #app {
   display: flex;
   flex: 1;
   flex-direction: column;
 }
+
 .setupBrand {
   margin: 1.25rem auto 0.75rem;
   color: var(--ac);
 }
+
 .setupBrand .brandMark {
   width: 2.55rem;
   height: 3.35rem;
 }
+
 .setupBrand span {
   font-size: 1.5rem;
   font-weight: 800;
   line-height: 1.05;
 }
+
 .setupBrand small {
   font-size: 0.9rem;
   font-weight: 600;
 }
+
 .setupCard {
   margin: auto;
   width: 100%;
@@ -41,15 +48,18 @@ body.setupView #app {
   border-radius: var(--r);
   box-shadow: var(--ah);
 }
+
 .setupCard h1 {
   margin: 0 0 0.35rem;
   font-size: 1.35rem;
 }
+
 .setupIntro {
   margin: 0 0 1rem;
   color: var(--mu);
   font-size: 0.95rem;
 }
+
 .setupState {
   display: flex;
   flex-direction: column;
@@ -58,22 +68,27 @@ body.setupView #app {
   text-align: center;
   margin: 0.5rem 0;
 }
+
 .setupState .bootWave {
   height: 2.4rem;
 }
+
 .setupState a {
   color: var(--ac);
 }
+
 .setupHiddenToggle {
   display: flex;
   align-items: center;
   min-height: var(--tap);
   margin: 0.25rem 0;
 }
+
 .setupHiddenToggle span {
   font-size: 0.875rem;
   color: var(--mu);
 }
+
 .setupPrimary {
   display: block;
   width: 100%;
@@ -85,6 +100,7 @@ body.setupView #app {
   font-weight: 700;
   cursor: pointer;
 }
+
 .setupChoices {
   display: grid;
   gap: 0.6rem;
@@ -92,6 +108,7 @@ body.setupView #app {
   padding: 0;
   border: 0;
 }
+
 .setupChoice {
   display: flex;
   gap: 0.75rem;
@@ -101,10 +118,12 @@ body.setupView #app {
   border-radius: var(--r);
   background: var(--in);
 }
+
 .setupChoice:has(:checked) {
   border-color: var(--ac);
   background: var(--pa);
 }
+
 .setupChoice input {
   flex: none;
   width: 1.15rem;
@@ -112,17 +131,20 @@ body.setupView #app {
   margin: 0.15rem 0 0;
   accent-color: var(--ac);
 }
+
 .setupChoice small {
   display: block;
   font-weight: 400;
   color: var(--mu);
   font-size: 0.85rem;
 }
+
 .setupSummary {
   margin: 0;
   width: 100%;
   text-align: left;
 }
+
 .setupSummary div {
   display: flex;
   align-items: baseline;
@@ -130,26 +152,31 @@ body.setupView #app {
   padding: 0.55rem 0;
   border-bottom: 1px solid var(--ln);
 }
+
 .setupSummary dt {
   width: 5.5rem;
   color: var(--mu);
   font-size: 0.85rem;
 }
+
 .setupSummary dd {
   flex: 1;
   margin: 0;
   font-weight: 650;
 }
+
 .setupNote {
   margin: 0;
   width: 100%;
   text-align: left;
 }
+
 .setupSummary [data-saved="true"] dd::before {
   content: "✓ ";
   color: var(--ac);
   font-weight: 800;
 }
+
 .setupProgress {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -158,6 +185,7 @@ body.setupView #app {
   list-style: none;
   border-bottom: 1px solid var(--ln);
 }
+
 .setupProgress li {
   position: relative;
   display: grid;
@@ -168,22 +196,19 @@ body.setupView #app {
   line-height: 1.2;
   text-align: center;
 }
-.setupProgress li:not(:first-child)::before,
+
 .setupProgress li:not(:first-child)::after {
   content: "";
   position: absolute;
   top: 0.75rem;
   left: calc(-50% + 0.75rem);
-  width: calc(100% - 1.5rem);
   height: 2px;
   margin-top: -1px;
-  background: var(--ln);
-}
-.setupProgress li:not(:first-child)::after {
   width: calc((100% - 1.5rem) * var(--fill, 0));
   background: var(--ac);
   transition: width 0.45s ease;
 }
+
 .setupProgress i,
 .setupParts li::before {
   display: grid;
@@ -197,31 +222,32 @@ body.setupView #app {
   font-style: normal;
   font-weight: 700;
 }
+
 .setupProgress i {
   position: relative;
   z-index: 1;
   background: var(--sf);
 }
+
 .setupProgress [data-state="done"] i {
   border-color: var(--ac);
   background: var(--ac);
   color: var(--on);
 }
+
 .setupProgress [data-state="current"] i {
   border-color: var(--ac);
   color: var(--ac);
   box-shadow: 0 0 0 3px var(--pa);
 }
-.setupProgress [data-state="current"] span {
-  color: var(--fg);
-  font-weight: 700;
-}
+
 .setupStep {
   margin: 0 0 0.3rem;
   color: var(--mu);
   font-size: 0.78rem;
   font-weight: 600;
 }
+
 .setupSaved {
   display: flex;
   gap: 0.55rem;
@@ -232,11 +258,13 @@ body.setupView #app {
   background: var(--pa);
   font-size: 0.85rem;
 }
+
 .setupSaved::before {
   content: "✓";
   color: var(--ac);
   font-weight: 800;
 }
+
 .setupParts {
   display: grid;
   gap: 0.9rem;
@@ -245,6 +273,7 @@ body.setupView #app {
   list-style: none;
   counter-reset: part;
 }
+
 .setupParts li {
   position: relative;
   display: grid;
@@ -252,11 +281,13 @@ body.setupView #app {
   column-gap: 0.7rem;
   counter-increment: part;
 }
+
 .setupParts li::before {
   content: counter(part);
   grid-row: span 2;
   color: var(--mu);
 }
+
 .setupParts li:not(:last-child)::after {
   content: "";
   position: absolute;
@@ -266,15 +297,18 @@ body.setupView #app {
   width: 1.5px;
   background: var(--ln);
 }
+
 .setupParts small {
   display: inline;
   color: var(--mu);
   font-weight: 500;
 }
+
 .setupParts span {
   color: var(--mu);
   font-size: 0.85rem;
 }
+
 .setupRules {
   display: grid;
   gap: 0.2rem;
@@ -284,18 +318,33 @@ body.setupView #app {
   color: var(--mu);
   font-size: 0.82rem;
 }
+
 .setupRules li::before {
   content: "○";
   display: inline-block;
   width: 1.2rem;
 }
+
+.setupProgress li:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 0.75rem;
+  left: calc(-50% + 0.75rem);
+  width: calc(100% - 1.5rem);
+  height: 2px;
+  margin-top: -1px;
+  background: var(--ln);
+}
+
 .setupRules [data-ok="true"] {
   color: var(--fg);
 }
+
 .setupRules [data-ok="true"]::before {
   content: "✓";
   color: var(--ac);
 }
+
 .setupCallout {
   margin: 0.25rem 0 0.6rem;
   padding: 0.7rem 0.85rem;
@@ -304,50 +353,62 @@ body.setupView #app {
   font-size: 0.85rem;
   text-align: left;
 }
+
 .setupCallout b {
   display: block;
   margin-bottom: 0.2rem;
 }
+
 .setupCallout p {
   margin: 0.35rem 0 0;
 }
+
 .setupSaveList {
   display: grid;
   gap: 0.15rem;
   margin: 0.35rem 0;
 }
+
 .setupSaveList div {
   display: flex;
   gap: 0.6rem;
 }
+
 .setupSaveList dt {
   width: 4.8rem;
   color: var(--mu);
 }
+
 .setupSaveList dd {
   margin: 0;
   font-weight: 650;
 }
+
 .setupLead {
   margin: 0;
 }
+
 #setupSkip,
 .setupBack {
   display: block;
   margin: 0.45rem auto 0;
 }
+
 #setupSearchAgain {
   display: block;
   margin-left: auto;
 }
+
 .setupPassRow {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
 }
+
 .setupPassRow label {
   flex: 1;
 }
+
 .setupPassToggle {
   padding: 0.15rem 0;
   border: 0;
@@ -360,15 +421,18 @@ body.setupView #app {
   text-underline-offset: 0.15em;
   cursor: pointer;
 }
+
 .setupPassToggle:hover {
   color: var(--ac);
 }
+
 .setupCountdown {
   margin: 0;
   color: var(--mu);
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
+
 .setupCheck {
   width: 3.4rem;
   height: 3.4rem;
@@ -381,17 +445,25 @@ body.setupView #app {
   font-size: 1.8rem;
   font-weight: 800;
 }
+
 .setupLinks {
   display: grid;
   gap: 0.5rem;
   width: 100%;
 }
+
 .setupAddress {
   display: flex;
   gap: 0.5rem;
 }
+
 .setupAddress span {
   flex: 1;
   align-self: center;
   overflow-wrap: anywhere;
+}
+
+.setupProgress [data-state="current"] span {
+  color: var(--fg);
+  font-weight: 700;
 }

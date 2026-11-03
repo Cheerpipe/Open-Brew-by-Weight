@@ -235,7 +235,7 @@
 // decision starts from the restored lockup so it can recover on its own.
 {
   const assert = require('assert').strict, vm = require('vm');
-  const doc = {dataset: {}, style: {setProperty: (name, value) => {if (name === '--bar-h') doc.barH = value;}}}, reads = [];
+  const doc = {dataset: {}, style: {setProperty: (name, value) => {if (name === '--barH') doc.barH = value;}}}, reads = [];
   const el = (width) => ({getBoundingClientRect() {reads.push(width); return {width};}});
   const bar = {clientWidth: 120, offsetHeight: 96,
     querySelector: (s) => s === '.brand' ? el(40) : s === '.headerSignals' ? el(90) : null};
@@ -372,11 +372,11 @@
   assert.equal(root.dataset.navLayout, 'icons', 'Leaving the mobile breakpoint restores header navigation');
   app.clientWidth = 440; callbacks.resize();
   assert.equal(root.dataset.navLayout, 'text', 'A narrow desktop content area still measures header text');
-  assert(css.includes('bottom:var(--nav-offset)'), 'Save and action bars follow the navigation clearance');
+  assert(css.includes('bottom:var(--navOffset)'), 'Save and action bars follow the navigation clearance');
   assert(css.includes('position:sticky;top:0'), 'The whole header pins at the top over the scrolling content');
   assert(css.includes('.topBar::before') && css.includes('bottom:calc(var(--tap) / 2)'),
       'The painted header ends at the menu\u2019s middle; its lower half floats over the content');
-  assert(css.includes('#message{position:sticky;top:var(--bar-h,var(--hdr))'),
+  assert(css.includes('#message{position:sticky;top:var(--barH,var(--hdr))'),
       'The message banner sticks under the measured header height, clear of the menu');
 }
 // A disconnected Bluetooth icon dims its rune like the Wi-Fi arcs and carries

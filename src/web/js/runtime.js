@@ -499,7 +499,7 @@ function updateBrandFit() {
     brand = bar?.querySelector(".brand"),
     signals = bar?.querySelector(".headerSignals");
   if (!bar || !brand || !signals) return;
-  document.documentElement.style.setProperty("--bar-h", bar.offsetHeight + "px");
+  document.documentElement.style.setProperty("--barH", bar.offsetHeight + "px");
   delete document.documentElement.dataset.brandCompact;
   const box = getComputedStyle(bar),
     available = bar.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight),
@@ -842,8 +842,8 @@ function themeMode() {
 function paintTheme(m) {
   const h = document.documentElement,
     c = m === "auto" ? "light dark" : m;
-  h.classList.toggle("theme-dark", m === "dark");
-  h.classList.toggle("theme-light", m === "light");
+  h.classList.toggle("themeDark", m === "dark");
+  h.classList.toggle("themeLight", m === "light");
   h.style.colorScheme = c;
   const e = document.querySelector('meta[name="color-scheme"]');
   if (e) e.content = c;

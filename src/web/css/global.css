@@ -4,10 +4,11 @@
   margin: 1rem 0;
 }
 
-html.theme-light {
+html.themeLight {
   color-scheme: light;
 }
-html.theme-dark {
+
+html.themeDark {
   --tk: 58%;
   --cf: #523a2c;
   --gLast: #38bdf8;
@@ -35,35 +36,39 @@ html.theme-dark {
   --mo: #193024;
   --mw: #33291b;
   --pa: #352820;
-  --ah: 0 -4px 14px rgb(0, 0, 0, 0.35);
-  --popSh: 0 8px 28px rgb(0, 0, 0, 0.45);
-}
-html.theme-dark {
+  --ah: 0 -4px 14px rgb(0 0 0 / 35%);
+  --popSh: 0 8px 28px rgb(0 0 0 / 45%);
+
   color-scheme: dark;
 }
-@media (max-width: 480px) {
+
+@media (width <= 480px) {
   :root {
     --bandFull: 0.18;
     --bandPart: 0.08;
     --bandWin: 0.28;
   }
+
   #shotTable tr,
   fieldset {
     padding-inline: 0.5rem;
   }
+
   .presetAccGraph {
     margin-inline: 0.2rem;
   }
 }
-@media (max-width: 480px) and (prefers-color-scheme: dark) {
-  html:not(.theme-light) {
+
+@media (width <= 480px) and (prefers-color-scheme: dark) {
+  html:not(.themeLight) {
     --bandFull: 0.26;
     --bandPart: 0.12;
     --bandWin: 0.34;
   }
 }
-@media (max-width: 480px) {
-  html.theme-dark {
+
+@media (width <= 480px) {
+  html.themeDark {
     --bandFull: 0.26;
     --bandPart: 0.12;
     --bandWin: 0.34;
@@ -73,10 +78,12 @@ html.theme-dark {
 #diagnosticsPanel details {
   grid-column: 1/-1;
 }
+
 #diagnosticsPanel details table {
   width: 100%;
   border-collapse: collapse;
 }
+
 #diagnosticsPanel details th,
 #diagnosticsPanel details td {
   text-align: left;
@@ -94,72 +101,89 @@ html.theme-dark {
 :where([tabindex]):focus-visible {
   outline: none;
 }
+
 :where(a, button, input, select, textarea, summary):focus-visible {
   outline: 3px solid var(--ac);
   outline-offset: 2px;
 }
+
 .btnGlyph:not(:disabled):hover {
   filter: brightness(0.95);
 }
-@media (max-width: 699px) {
+
+@media (width <= 699px) {
   /* Phones keep the header at its compact size: the logo and wordmark hold
      still instead of shrinking as the page scrolls. */
   .topBar .brandMark {
     width: 1.65rem;
     height: 2.17rem;
   }
+
   .topBar .brand span {
     font-size: 1.05rem;
   }
+
   .topBar .brand small {
     font-size: 0.76rem;
   }
+
   .configSaveBar {
     padding-bottom: 0.65rem;
   }
 }
-@media (max-width: 340px) {
+
+@media (width <= 340px) {
   body {
     padding-inline: 0.75rem;
   }
+
   .topBar {
     margin-inline: -0.75rem;
     padding-inline: 0.75rem;
   }
+
   .statusColumn {
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 380px) {
+
+@media (width <= 380px) {
   .topBar {
     gap: 0.15rem;
   }
+
   .topBar .brandMark {
     width: 1.3rem;
     height: 1.75rem;
   }
+
   .headerSignals {
     padding-left: 0.25rem;
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   *,
-  *:before,
-  *:after {
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
     transition: 0.01ms !important;
   }
+
   .bootWave i,
   .shotHero.live .heroDot {
     animation: none;
   }
-  .btnGlyph.busy .g:after {
+
+  .btnGlyph.busy .g::after {
     animation: none;
   }
-  .micraSteps .on:before {
+
+  .micraSteps .on::before {
     animation: none;
   }
 }
+
 @media (forced-colors: active) {
   .btnGlyph,
   .presetCard,

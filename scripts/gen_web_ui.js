@@ -183,13 +183,19 @@ async function minifyHtml(html) {
   });
 }
 
+// The oldest browsers the Web UI supports are the first with :has(). For them
+// Lightning CSS adds the vendor prefixes the sources leave out and lowers newer
+// syntax (range media queries, light-dark()).
+const CSS_TARGETS = {safari: (15 << 16) | (4 << 8), ios_saf: (15 << 16) | (4 << 8),
+  chrome: 105 << 16, firefox: 121 << 16};
+
 // Lightning CSS re-serializes every token, so the shipped bytes do not depend
-// on how the source is formatted (no targets: vendor prefixes stay as
-// authored); clean-css level 2 then restructures that canonical form. Values
-// it cannot parse (custom properties, var() math) keep a formatter's space
-// after commas, which is never significant outside strings.
+// on how the source is formatted; clean-css level 2 then restructures that
+// canonical form. Values it cannot parse (custom properties, var() math) keep
+// a formatter's space after commas, which is never significant outside strings.
 function minifyCss(css) {
-  const {code, warnings} = cssTransform({filename: 'app.css', code: Buffer.from(css), minify: true});
+  const {code, warnings} = cssTransform({filename: 'app.css', code: Buffer.from(css), minify: true,
+    targets: CSS_TARGETS});
   const tight = code.toString().replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|,\s+/g,
       (match, string) => string || ',');
   const out = new CleanCSS({level: 2}).minify(tight);

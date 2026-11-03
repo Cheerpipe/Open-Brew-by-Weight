@@ -8,16 +8,19 @@
   background: var(--sf);
   color: var(--fg);
 }
+
 .traceHead {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
+
 .traceHead h2 {
   flex: 1;
   margin: 0;
   font-size: 1.2rem;
 }
+
 .traceClose {
   flex: 0 0 auto;
   width: var(--tap);
@@ -30,6 +33,7 @@
   line-height: 1;
   cursor: pointer;
 }
+
 .traceClose .t {
   position: absolute;
   width: 1px;
@@ -37,18 +41,21 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
+
 .traceFilter {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   margin: 0.75rem 0 0.5rem;
 }
+
 .traceEvents {
   margin: 0;
   padding: 0;
   list-style: none;
   font-size: 0.875rem;
 }
+
 .traceEvents li {
   display: grid;
   grid-template-columns: 5rem 1fr;
@@ -56,23 +63,28 @@
   padding: 0.3rem 0;
   border-top: 1px solid var(--ln);
 }
+
 .traceEvents time {
   grid-row: span 2;
   color: var(--mu);
   font-variant-numeric: tabular-nums;
 }
+
 .traceEvents li[data-type="trace"] b {
   color: var(--ac);
 }
+
 .traceEvents span {
   color: var(--mu);
 }
+
 .traceFacts {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.2rem 1rem;
   font-size: 0.875rem;
 }
+
 .traceFacts dd {
   margin: 0;
   font-variant-numeric: tabular-nums;

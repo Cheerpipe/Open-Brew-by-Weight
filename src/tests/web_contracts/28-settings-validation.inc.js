@@ -405,7 +405,7 @@
         .includes('small.fieldError'),
       'The scoped red clear must remove the brew smalls, not just the class');
     svAssert.ok(css.includes('.fieldWarning{') && css.includes('.fieldWarn{') &&
-                rawCss.includes('.fieldWarning:before{content:"!"'),
+                rawCss.includes('.fieldWarning::before{content:"!"'),
       'Warning twins must exist with the shared alert glyph');
     svAssert.ok(settingsHtml.includes('id="brewConflictChip"'),
       'The brew save bar must carry the conflict chip');

@@ -329,7 +329,7 @@ function renderShotSpark(h, shot, m = R.buildShotSparkModel(shot)) {
       maxT: m.timeMax,
     });
     // The weight/flow chart below matches this plot's height, so grams read alike in both.
-    if (preset._view) h.style.setProperty("--shot-plot-h", preset._view.B - preset._view.T + "px");
+    if (preset._view) h.style.setProperty("--shotPlotH", preset._view.B - preset._view.T + "px");
     const v = preset._view;
     preset
       .querySelector("svg")
@@ -528,7 +528,7 @@ function fillShotCharts(h, m) {
       ? `linear-gradient(90deg,${colors[0]} 50%,${colors.at(-1)} 50%)`
       : colors[0] || "var(--ok)";
   kf.style.background = "var(--gFlow)";
-  c.style.setProperty("--shot-plot-min", (n * 1.1).toFixed(2) + "rem");
+  c.style.setProperty("--shotPlotMin", (n * 1.1).toFixed(2) + "rem");
   for (const axis of c.querySelectorAll(".shotSparkY")) {
     const y = axis.querySelectorAll(".shotYTick");
     // Each axis is as wide as its longest label (about .85ch per glyph), at least the preset chart's 30px.

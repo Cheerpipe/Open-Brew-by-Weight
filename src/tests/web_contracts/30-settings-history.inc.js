@@ -1051,8 +1051,8 @@ if (!partialHtml.stats.includes('id="shotSort"') ||
     css.includes('#shotLogPanel .btnGlyph:not(.btnInvert){background:transparent') ||
     css.includes('#message,.configSaveBar,#shotLogPanel .btnBar{background:var(--bg)}') ||
     css.includes('#message,.configSaveBar{background:var(--bg)}') ||
-    css.includes('html.theme-dark #message,html.theme-dark .configSaveBar,html.theme-dark #shotLogPanel .btnBar{background:var(--bg)}') ||
-    css.includes('html.theme-dark #message,html.theme-dark .configSaveBar{background:var(--bg)}')) {
+    css.includes('html.themeDark #message,html.themeDark .configSaveBar,html.themeDark #shotLogPanel .btnBar{background:var(--bg)}') ||
+    css.includes('html.themeDark #message,html.themeDark .configSaveBar{background:var(--bg)}')) {
   throw new Error('Shot history must sort by date or rating with unrated last and keep stats on newest shots');
 }
 {
@@ -1625,10 +1625,10 @@ if (!codeIncludes(ui, 'id="firmwareFooter"') ||
     !codeIncludes(ui, 'firmwareVersion') ||
     !codeIncludes(ui, 'updateFirmwareFooter()') ||
     !codeIncludes(ui, "const inactive=$('inactiveFirmware')") ||
-    !css.includes('body.homeAdminActions #view-home:not(.hidden)~.pageFooter{margin-bottom:calc(7rem + env(safe-area-inset-bottom))}') ||
-    css.includes('body.homeAdminActions #view-home:not(.hidden)~.pageFooter{display:none}') ||
+    !css.includes('body.homeAdminActions .view[data-view=home]:not(.hidden)~.pageFooter{margin-bottom:calc(7rem + env(safe-area-inset-bottom))}') ||
+    css.includes('body.homeAdminActions .view[data-view=home]:not(.hidden)~.pageFooter{display:none}') ||
     !css.includes('#actionsPanel{position:fixed;left:0;right:0') ||
-    !css.includes('@media(min-width:700px){#actionsPanel{left:1rem;right:1rem') ||
+    !css.includes('@media(width>= 700px){#actionsPanel{left:1rem;right:1rem') ||
     !network.includes('delta.field("firmwareVersion"') ||
     !network.includes('\\"bootId\\":%lu') ||
     !network.includes('FW_VERSION')) {
@@ -1650,7 +1650,7 @@ if (!shellHtml.includes('id="message"') ||
     !codeIncludes(runtimeJs, "kind==='ok'?5e3") ||
     !codeIncludes(runtimeJs, "kind==='warn'&&!e.querySelector('button:not(#messageClose)')?15e3") ||
     !codeIncludes(runtimeJs, 'setTimeout(clearMessage,ms)') ||
-    !css.includes('#message:not(.error):not(.warn){display:none}') ||
+    !css.includes('#message:not(.error,.warn){display:none}') ||
     !css.includes('.messageClose')) {
   throw new Error('Status message bar must auto-hide ok/warn and stay for errors');
 }

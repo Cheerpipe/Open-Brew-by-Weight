@@ -22,6 +22,12 @@ if (firmware.includes('maybeCaptureScaleStartLag') ||
 
 (async () => {
 const generated = await webUi.generate();
+// Safari only honours the prefixed property, which the build adds for its
+// supported browsers: the shot card must not select text while it is held
+// for scrubbing or full screen.
+if (!/\.shotHero\{[^}]*-webkit-user-select:none/.test(generated.css)) {
+  throw new Error('The shot card must disable text selection in Safari too');
+}
 if (!generated.modules.diagnostic.includes('new CompressionStream("gzip")') ||
     !generated.modules.diagnostic.includes('"crashes.tar"') ||
     !generated.modules.diagnostic.includes('"openbrewbyweight-"+') ||
@@ -146,7 +152,7 @@ for (const [machineType, remoteControl, kept] of [
   ['momentary_reed', true, ['html:not(.reedMachine) .reedOnly']],
   ['momentary', false, ['html:not(.momentaryMachine) .switchOnly']],
   ['paddle', false, ['html.momentaryMachine .paddleOnly',
-    'html.theme-dark .qwSheet{box-shadow:0 -8px']]]) {
+    'html.themeDark .qwSheet{box-shadow:0 -8px']]]) {
   const {css: typedCss} = await webUi.generate({machineType, remoteControl, write: false});
   const lost = kept.filter((needle) => !typedCss.includes(needle));
   if (lost.length) {
@@ -171,9 +177,9 @@ for (const remoteControl of [false, true]) {
   const uiText =
       [variant.html, ...Object.values(variant.partials), variant.css].join('\n');
   const forbidden = ['id="actionsPanel"', '#actionsPanel', 'homeAdminActions'];
-  if (!/\.configSaveBar\{[^}]*bottom:var\(--nav-offset\)/.test(variant.css) ||
-      !variant.css.includes('--nav-offset:calc(4.25rem + env(safe-area-inset-bottom))') ||
-      !variant.css.includes('--nav-offset:0px')) {
+  if (!/\.configSaveBar\{[^}]*bottom:var\(--navOffset\)/.test(variant.css) ||
+      !variant.css.includes('--navOffset:calc(4.25rem + env(safe-area-inset-bottom))') ||
+      !variant.css.includes('--navOffset:0px')) {
     throw new Error('Every build must move save controls above bottom navigation and reset their offset for header navigation');
   }
   const leaked = forbidden.filter((n) => uiText.includes(n));

@@ -371,8 +371,3 @@
     }
   })().catch(error => {console.error(error); process.exitCode = 1;});
 }
-// Safari only honours the prefixed property: the shot card must not select
-// text while it is held for scrubbing or full screen.
-if (!/\.shotHero\{[^}]*-webkit-user-select:none/.test(css)) {
-  throw new Error('The shot card must disable text selection in Safari too');
-}

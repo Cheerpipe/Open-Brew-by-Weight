@@ -8,14 +8,17 @@
   background: var(--in);
   color: var(--fg);
 }
+
 #log,
 #bullseyeRtttl {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
 small {
   display: block;
   color: var(--mu);
 }
+
 .fieldHint {
   display: block;
   font-size: 0.8125rem;
@@ -25,6 +28,7 @@ small {
   max-width: 38rem;
   font-weight: 400;
 }
+
 .rtttlTest {
   display: inline-block;
   color: var(--ac);
@@ -33,6 +37,7 @@ small {
   text-decoration: none;
   cursor: pointer;
 }
+
 .rtttlTest[aria-disabled="true"] {
   color: var(--mu);
   pointer-events: none;

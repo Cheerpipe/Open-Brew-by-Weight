@@ -356,15 +356,15 @@ if (!shellHtml.includes('name="color-scheme" content="light dark"')) {
 if (shellHtml.includes('class="themeSel"') ||
     css.includes('.themeSel{') ||
     css.includes('.themeOpt') ||
-    !css.includes('html.theme-light{') ||
-    !css.includes('html.theme-dark{') ||
+    !css.includes('html.themeLight{') ||
+    !css.includes('html.themeDark{') ||
     !codeIncludes(runtimeJs, "THEME_KEY='obbwTh'") ||
     !codeIncludes(runtimeJs, "THEME_MODES=['auto','light','dark']") ||
     runtimeJs.includes('uiTheme') ||
     !codeIncludes(runtimeJs, 'localStorage.getItem(THEME_KEY)') ||
     !codeIncludes(runtimeJs, 'localStorage.setItem(THEME_KEY,m)') ||
-    !codeIncludes(runtimeJs, "classList.toggle('theme-dark'") ||
-    !codeIncludes(runtimeJs, "classList.toggle('theme-light'") ||
+    !codeIncludes(runtimeJs, "classList.toggle('themeDark'") ||
+    !codeIncludes(runtimeJs, "classList.toggle('themeLight'") ||
     !codeIncludes(appJsSource, 'R.paintTheme(R.themeMode())') ||
     !codeIncludes(appJsSource, "closest('#themeSignal'))R.cycleTheme()") ||
     appJsSource.includes('uiTheme') ||

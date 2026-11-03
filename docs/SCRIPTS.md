@@ -39,7 +39,10 @@ that `CSS_SOURCES` in `scripts/localize_web_ui.js` defines, into the single
 `/app.css` asset the generator emits. The generator (`scripts/gen_web_ui.js`) alone
 compacts what ships: html-minifier-terser collapses markup whitespace, Lightning
 CSS re-serializes the stylesheet before clean-css restructures it, and Terser
-minifies the JavaScript. Reformatting a source therefore never changes the
+minifies the JavaScript. Lightning CSS targets the oldest supported browsers,
+the first releases with `:has()` (Safari and iOS 15.4, Chrome 105, Firefox 121):
+it adds the vendor prefixes they need and rewrites newer syntax such as range
+media queries, so the CSS sources stay unprefixed and modern. Reformatting a source therefore never changes the
 embedded bytes; the Web contracts print the sources at two widths and require
 identical generator output.
 
@@ -49,17 +52,19 @@ identical generator output.
 `package.json`, so install them once with `npm ci`; the command never installs
 anything and exits with 127 when they are missing. It runs three steps:
 
-- **ESLint** on `src/web/app.js` and `src/web/js/` with correctness rules only
-  (`scripts/lint/eslint.config.mjs`). The build-time constants and markers
+- **ESLint** on `src/web/app.js` and `src/web/js/` with its full recommended
+  rule set (`scripts/lint/eslint.config.mjs`). The build-time constants and markers
   (`__WEBUI_TEXT__`, `__LINEA_MICRA__`, `__REMOTE_CONTROL__`, `__homeModule`) are
   declared there; formatting stays with `npm run format:web`.
-- **Stylelint** on `src/web/css` (`scripts/lint/stylelint.json`), allowing the
-  vendor prefixes Safari needs.
+- **Stylelint** on `src/web/css` (`scripts/lint/stylelint.json`) with the
+  standard config; class, id, custom property and keyframe names must be
+  lowerCamelCase.
 - **Markup** (`scripts/lint_web_ui.js`): renders the English shell with every view
   partial injected, as the browser receives it, and runs html-validate with
-  `scripts/lint/htmlvalidate.json`, which also fails on any id used twice
-  across views. The Web contracts check duplicate ids too, so every Web gate
-  catches them without the lint.
+  every recommended and accessibility rule (`scripts/lint/htmlvalidate.json`,
+  which only sets the Prettier styles for void elements and the doctype). It
+  also fails on any id used twice across views. The Web contracts check
+  duplicate ids too, so every Web gate catches them without the lint.
 
 Warnings fail the run like errors. The lint is static analysis, so
 `./scripts/dev validate` does not run it; use it while editing the Web UI or
