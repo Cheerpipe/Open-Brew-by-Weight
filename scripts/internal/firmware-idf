@@ -34,7 +34,7 @@ case "${stages[*]}" in
 esac
 
 obbw_cli_parse "$@" || exit $?
-if [[ "$OBBW_CLI_HELP_REQUESTED" == "1" ]]; then
+if obbw_cli_help_requested; then
   usage
   exit 0
 fi

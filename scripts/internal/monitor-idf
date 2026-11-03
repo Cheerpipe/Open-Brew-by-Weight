@@ -31,7 +31,7 @@ EOF
 }
 
 obbw_cli_parse "$@" || exit $?
-if [[ "$OBBW_CLI_HELP_REQUESTED" == "1" ]]; then
+if obbw_cli_help_requested; then
   usage
   exit 0
 fi
@@ -55,7 +55,7 @@ obbw_cli_save
 
 echo "Serial monitor on $port ($speed)"
 if obbw_is_set arch; then
-  openbrewbyweight_resolve_board "$(obbw_get arch)" || exit 2
+  OPENBREWBYWEIGHT_ARCH="$(openbrewbyweight_resolve_board "$(obbw_get arch)")" || exit 2
   obbw_idf_py_args
   exec idf.py "${IDF_PY_ARGS[@]}" -p "$port" -b "$speed" monitor
 fi

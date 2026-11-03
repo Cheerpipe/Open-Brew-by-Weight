@@ -221,7 +221,8 @@ obbw_ota_upload() {
     return 1
   fi
   OBBW_OTA_CONTENT_TYPE=application/octet-stream
-  local offset="$(obbw_ota_field nextOffset)"
+  local offset
+  offset="$(obbw_ota_field nextOffset)"
   if ! obbw_ota_offset_valid "$offset"; then
     printf 'The controller returned invalid nextOffset=%s for image size %s.\n' \
         "${offset:-missing}" "$OBBW_OTA_IMAGE_SIZE" >&2
@@ -244,7 +245,8 @@ obbw_ota_upload() {
           "X-OTA-Length: $OBBW_OTA_IMAGE_SIZE" \
           "Content-Range: bytes $offset-$((end - 1))/$OBBW_OTA_IMAGE_SIZE" &&
           [[ "$OBBW_OTA_HTTP_STATUS" =~ ^(200|208)$ ]]; then
-        local next="$(obbw_ota_field nextOffset)"
+        local next
+        next="$(obbw_ota_field nextOffset)"
         if ! obbw_ota_offset_valid "$next" || (( next != end )); then
           printf 'The controller returned invalid nextOffset=%s after byte %s.\n' \
               "${next:-missing}" "$offset" >&2
@@ -260,7 +262,9 @@ obbw_ota_upload() {
         break
       fi
       local failed_curl="$OBBW_OTA_CURL_EXIT" failed_http="$OBBW_OTA_HTTP_STATUS"
-      local failed_error="$(obbw_ota_field error)" failed_message="$(obbw_ota_field message)"
+      local failed_error failed_message
+      failed_error="$(obbw_ota_field error)"
+      failed_message="$(obbw_ota_field message)"
       case "$failed_error" in
         SAFETY_LOST|OTA_SHA256_MISMATCH|OTA_SESSION_IDENTITY_MISMATCH|OTA_INVALID_RANGE)
           obbw_ota_report_values 'Uploading the firmware range' \
@@ -276,7 +280,8 @@ obbw_ota_upload() {
           echo 'OTA session disappeared or changed identity; upload stopped.' >&2
           return 1
         fi
-        local next="$(obbw_ota_field nextOffset)"
+        local next
+        next="$(obbw_ota_field nextOffset)"
         if ! obbw_ota_offset_valid "$next" || (( next > end )); then
           echo 'The controller returned an invalid recovery offset.' >&2
           return 1
@@ -331,8 +336,10 @@ obbw_ota_commit() {
       return 0
     fi
     local curl_exit="$OBBW_OTA_CURL_EXIT" http_status="$OBBW_OTA_HTTP_STATUS"
-    local error="$(obbw_ota_field error)"
-    local message="$(obbw_ota_field message)"
+    local error
+    error="$(obbw_ota_field error)"
+    local message
+    message="$(obbw_ota_field message)"
     obbw_ota_report_values "Commit attempt $attempt" "$curl_exit" \
         "$http_status" "$error" "$message"
 
@@ -360,14 +367,17 @@ obbw_ota_commit() {
 }
 
 obbw_ota_new_boot() {
-  local boot="$(obbw_ota_field bootId)"
+  local boot
+  boot="$(obbw_ota_field bootId)"
   [[ "${OBBW_OTA_PRE_BOOT_ID:-}" =~ ^[0-9]+$ ]] &&
       [[ "$boot" =~ ^[0-9]+$ ]] && [[ "$boot" != "$OBBW_OTA_PRE_BOOT_ID" ]]
 }
 
 obbw_ota_boot_result() {
   # A matching version (or matching image alone) cannot prove a new boot.
-  local boot="$(obbw_ota_field bootId)" digest="$(obbw_ota_field running.imageSha256)"
+  local boot digest
+  boot="$(obbw_ota_field bootId)"
+  digest="$(obbw_ota_field running.imageSha256)"
   if [[ ! "${OBBW_OTA_PRE_BOOT_ID:-}" =~ ^[0-9]+$ ]] ||
       [[ ! "$boot" =~ ^[0-9]+$ ]] || [[ ! "$digest" =~ ^[a-f0-9]{64}$ ]]; then
     OBBW_OTA_BOOT_RESULT=unverified
@@ -537,7 +547,9 @@ obbw_ota_run() {
             echo 'Update result unverified: firmware lacks bootId or running.imageSha256.' >&2
             return 1 ;;
         esac
-        local last_reason="$(obbw_ota_field confirmBlockReason)" last_error="$(obbw_ota_field confirmLastError)"
+        local last_reason last_error
+        last_reason="$(obbw_ota_field confirmBlockReason)"
+        last_error="$(obbw_ota_field confirmLastError)"
       fi
       sleep 2
     done

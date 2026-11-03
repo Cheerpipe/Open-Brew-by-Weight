@@ -614,7 +614,7 @@ def static_paths_probe(*args: str, output_dir: str | None = None,
             f'source "{ROOT / "scripts/openbrewbyweight_cli.sh"}"; '
             f'source "{ROOT / "scripts/openbrewbyweight_idf.sh"}"; '
             'obbw_cli_parse "$@" || exit $?; '
-            'openbrewbyweight_resolve_board "$(obbw_get arch)" || exit 2; '
+            'OPENBREWBYWEIGHT_ARCH="$(openbrewbyweight_resolve_board "$(obbw_get arch)")" || exit 2; '
             'obbw_idf_static_paths reports/static-tidy || exit $?; '
             'printf "build_dir=%s\\nbuild_path=%s\\noutput_dir=%s\\n" '
             '"$build_dir" "$build_path" "$output_dir"')

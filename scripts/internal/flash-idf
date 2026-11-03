@@ -57,7 +57,7 @@ fi
 obbw_cli_resolve "port hardware_config machine_config" || exit $?
 obbw_cli_resolve_profiles "" check || exit $?
 obbw_cli_normalize_image || exit $?
-openbrewbyweight_resolve_board "$(obbw_get arch)"
+OPENBREWBYWEIGHT_ARCH="$(openbrewbyweight_resolve_board "$(obbw_get arch)")"
 obbw_idf_source
 obbw_idf_py_args
 

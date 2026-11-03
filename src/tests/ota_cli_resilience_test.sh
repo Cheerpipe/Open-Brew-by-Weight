@@ -2,7 +2,7 @@
 # Exercises retry/reconciliation policy without a controller or curl.
 set -euo pipefail
 
-repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+repo_root="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 # shellcheck source=scripts/openbrewbyweight_ota.sh
 source "$repo_root/scripts/openbrewbyweight_ota.sh"
 

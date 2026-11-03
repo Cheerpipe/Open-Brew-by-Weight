@@ -35,12 +35,13 @@ openbrewbyweight_detect_ports() {
   return $found
 }
 
-# Sets OPENBREWBYWEIGHT_ARCH.
+# Prints the canonical board for an --arch value; callers assign it to
+# OPENBREWBYWEIGHT_ARCH.
 openbrewbyweight_resolve_board() {
   local arch="${1:-}"
   case "$arch" in
     n16r8|esp32s3-n16r8|esp32s3)
-      OPENBREWBYWEIGHT_ARCH="n16r8"
+      printf 'n16r8'
       ;;
     esp32|esp32c3|nanoesp32|"")
       echo "Unsupported architecture: ${arch:-<empty>}." >&2

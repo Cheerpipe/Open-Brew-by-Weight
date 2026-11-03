@@ -10,7 +10,7 @@
 # "unknown" arch never matches a real controller, which is the safe outcome.
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 version_file="$root/VERSION"
 output=${4:-$root/src/OpenBrewByWeightVersion.h}
 

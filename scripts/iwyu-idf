@@ -5,7 +5,7 @@
 # tooling itself is missing or every translation unit failed to parse.
 set -uo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=scripts/openbrewbyweight_board.sh
 source "$SCRIPT_DIR/openbrewbyweight_board.sh"
 # shellcheck source=scripts/openbrewbyweight_cli.sh
@@ -13,7 +13,8 @@ source "$SCRIPT_DIR/openbrewbyweight_cli.sh"
 # shellcheck source=scripts/openbrewbyweight_idf.sh
 source "$SCRIPT_DIR/openbrewbyweight_idf.sh"
 
-readonly ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+readonly ROOT
 readonly MAPPINGS_FILE="$ROOT/scripts/iwyu-openbrewbyweight.imp"
 
 usage() {
@@ -39,13 +40,13 @@ EOF
 }
 
 obbw_cli_parse "$@" || exit $?
-if [[ "$OBBW_CLI_HELP_REQUESTED" == "1" ]]; then
+if obbw_cli_help_requested; then
   usage
   exit 0
 fi
 
 obbw_cli_resolve "arch" || exit $?
-openbrewbyweight_resolve_board "$(obbw_get arch)" || exit 2
+OPENBREWBYWEIGHT_ARCH="$(openbrewbyweight_resolve_board "$(obbw_get arch)")" || exit 2
 obbw_idf_static_paths reports/iwyu || exit $?
 
 if [[ -n "${IWYU_BINARY:-}" ]]; then
@@ -81,10 +82,12 @@ if [[ "$(uname -s)" == "Darwin" && -z "${SDKROOT:-}" ]] && command -v xcrun >/de
   SDKROOT="$(xcrun --show-sdk-path 2>/dev/null)" && export SDKROOT
 fi
 
-printf 'Tool: %s\n' "$("$iwyu_bin" --version 2>&1 | head -n1)" > "$output_path/README.txt"
-printf 'Build database: %s\n' "$compile_commands" >> "$output_path/README.txt"
-printf 'Mappings: %s\n' "$MAPPINGS_FILE" >> "$output_path/README.txt"
-printf 'Generated: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >> "$output_path/README.txt"
+{
+  printf 'Tool: %s\n' "$("$iwyu_bin" --version 2>&1 | head -n1)"
+  printf 'Build database: %s\n' "$compile_commands"
+  printf 'Mappings: %s\n' "$MAPPINGS_FILE"
+  printf 'Generated: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')"
+} > "$output_path/README.txt"
 
 # The stock IWYU binary runs with the host clang, which does not know the
 # xtensa target. Rewrite the GCC database for the host:
@@ -183,12 +186,13 @@ total=0
 while IFS=$'\t' read -r src flags; do
   total=$((total + 1))
   printf '[%d] %s\n' "$total" "$src"
-  # shellcheck disable=SC2086  # flags is a space-separated list by design
+  flag_args=()
+  read -r -d '' -a flag_args <<<"$flags" || true
   if "$iwyu_bin" \
       -Xiwyu --no_fwd_decls \
       -Xiwyu --max_line_length=160 \
       -Xiwyu --mapping_file="$MAPPINGS_FILE" \
-      $flags "$src" >> "$output_path/iwyu.txt" 2>&1; then
+      ${flag_args[@]+"${flag_args[@]}"} "$src" >> "$output_path/iwyu.txt" 2>&1; then
     parsed=$((parsed + 1))
   else
     skipped=$((skipped + 1))

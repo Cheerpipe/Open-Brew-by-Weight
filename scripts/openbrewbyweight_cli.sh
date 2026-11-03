@@ -36,7 +36,7 @@ OBBW_CLI_DEFAULT_FLAGS='-Werror=deprecated-copy'
 OBBW_CLI_TRANSIENT_KEYS="flags image build_dir output_dir webui_language hardware_config machine_config"
 
 if [[ -z "${OBBW_CLI_ROOT:-}" ]]; then
-  OBBW_CLI_ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  OBBW_CLI_ROOT="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 fi
 OBBW_CLI_STORE="$OBBW_CLI_ROOT/.openbrewbyweight"
 # Analysis builds (warnings-idf) point this at their own tree so toggling
@@ -114,6 +114,11 @@ obbw_cli_reset() {
     obbw_set "$key" ""
     obbw_origin_set "$key" ""
   done
+}
+
+# True when the parsed arguments asked for the command's help.
+obbw_cli_help_requested() {
+  [[ "$OBBW_CLI_HELP_REQUESTED" == "1" ]]
 }
 
 obbw_env_name() {
@@ -391,9 +396,10 @@ obbw_cli_parse() {
 # OPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL=1 is a define, not a missing file.
 obbw_normalize_compiler_flags() {
   local raw="$1" out="" tok
-  # Word-splitting is intentional: extra_flags is a space-separated list.
-  # shellcheck disable=SC2086
-  set -- $raw
+  local toks=()
+  # Split on whitespace without glob expansion.
+  read -r -d '' -a toks <<<"$raw" || true
+  set -- ${toks[@]+"${toks[@]}"}
   for tok in "$@"; do
     case "$tok" in
       [A-Za-z_]*=*) tok="-D$tok" ;;
@@ -426,9 +432,10 @@ obbw_cli_apply_env() {
 obbw_cli_effective_flags() {
   local raw token found=0 jtag=0
   raw="$(obbw_get flags)"
-  # Word-splitting is intentional: flags are a space-separated list.
-  # shellcheck disable=SC2086
-  set -- $raw
+  local toks=()
+  # Split on whitespace without glob expansion.
+  read -r -d '' -a toks <<<"$raw" || true
+  set -- ${toks[@]+"${toks[@]}"}
   for token in "$@"; do
     case "${token#-D}" in
       OPEN_BREW_BY_WEIGHT_DEVELOPMENT=0)
@@ -709,7 +716,7 @@ obbw_validate_key() {
   case "$key" in
     arch)
       # openbrewbyweight_resolve_board prints its own diagnostics.
-      openbrewbyweight_resolve_board "$value" || return 1
+      openbrewbyweight_resolve_board "$value" >/dev/null || return 1
       ;;
     speed)
       case "$value" in
@@ -908,7 +915,7 @@ obbw_cli_normalize_image() {
   fi
   dir="$(dirname -- "$image")"
   base="$(basename -- "$image")"
-  dir="$(CDPATH= cd -- "$dir" && pwd -P)" || return 2
+  dir="$(CDPATH='' cd -- "$dir" && pwd -P)" || return 2
   origin="$(obbw_origin image)"
   obbw_put image "$dir/$base" "$origin"
 }

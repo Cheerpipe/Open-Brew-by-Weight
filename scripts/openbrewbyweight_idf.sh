@@ -114,7 +114,7 @@ obbw_idf_source() {
         ! -x "${IDF_PYTHON_ENV_PATH}/bin/python" ]]; then
     obbw_idf_select_python_env "${idf_root}" || true
   fi
-  # shellcheck disable=SC1091
+  # shellcheck source=/dev/null
   . "${idf_root}/export.sh" >/dev/null
   command -v idf.py >/dev/null 2>&1 || {
     echo "export.sh from ${idf_root} did not put idf.py on PATH." >&2
@@ -172,9 +172,10 @@ obbw_idf_require_version() {
 # True when extra flags request USB Serial/JTAG at boot.
 obbw_idf_jtag_enabled() {
   local tok
-  # Word-splitting is intentional: extra flags is a space-separated list.
-  # shellcheck disable=SC2086
-  set -- ${OPENBREWBYWEIGHT_EXTRA_FLAGS-}
+  local toks=()
+  # Split on whitespace without glob expansion.
+  read -r -d '' -a toks <<<"${OPENBREWBYWEIGHT_EXTRA_FLAGS-}" || true
+  set -- ${toks[@]+"${toks[@]}"}
   for tok in "$@"; do
     case "$tok" in
       -DOPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1|OPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1)
@@ -284,8 +285,7 @@ obbw_idf_py_args() {
   if [[ -z "${IDF_CCACHE_ENABLE:-}" ]] && command -v ccache >/dev/null 2>&1; then
     export IDF_CCACHE_ENABLE=1
   fi
-  # Exported to the wrapper that sources this helper.
-  # shellcheck disable=SC2034
+  # Read by obbw_idf_py and by wrappers that exec idf.py themselves.
   IDF_PY_ARGS=(
     -C "$IDF_PROJECT"
     -B "$IDF_BUILD_DIR"
@@ -294,6 +294,12 @@ obbw_idf_py_args() {
     -D "IDF_TARGET=esp32s3"
     -D "OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION=${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}"
   )
+}
+
+# Runs idf.py on the project, build directory and sdkconfig inputs that
+# obbw_idf_py_args resolved.
+obbw_idf_py() {
+  idf.py "${IDF_PY_ARGS[@]}" "$@"
 }
 
 obbw_idf_probe_in_psram() {

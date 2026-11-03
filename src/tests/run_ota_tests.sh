@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+test_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 test_tmp=$(mktemp -d "${TMPDIR:-/tmp}/ai_temp_ota_tests.XXXXXX")
 trap 'rm -rf "$test_tmp"' EXIT HUP INT TERM
 cxx=${CXX:-c++}
