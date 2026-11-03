@@ -469,7 +469,7 @@
         </button>
         <p id="inactiveHint">{{webui:shell.this_window_was_deactivated_due_to_inactivity}}</p>
         <p id="inactiveError" class="error" hidden></p>
-        <form id="webUiLogin" class="setupCard" novalidate>
+        <form id="webUiLogin" class="setupCard" autocapitalize="off" novalidate>
           <p id="loginDevice" class="loginDevice"></p>
           <h1>{{webui:shell.sign_in}}</h1>
           <p id="loginIntro" class="setupIntro">{{webui:shell.sign_in_intro}}</p>
@@ -485,7 +485,6 @@
             type="password"
             maxlength="63"
             autocomplete="current-password"
-            autocapitalize="off"
             spellcheck="false"
           />
           <p id="loginError" class="fieldError" role="alert" hidden></p>

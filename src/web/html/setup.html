@@ -94,7 +94,7 @@
       {{webui:setup.back}}
     </button>
   </div>
-  <form id="setupProtect" novalidate hidden>
+  <form id="setupProtect" autocapitalize="off" novalidate hidden>
     <div id="setupNewPassWrap">
       <div class="setupPassRow">
         <label for="setupNewPassword">{{webui:setup.new_password}}</label>
@@ -106,7 +106,6 @@
         type="password"
         id="setupNewPassword"
         autocomplete="new-password"
-        autocapitalize="off"
         autocorrect="off"
         spellcheck="false"
         maxlength="63"
@@ -117,7 +116,6 @@
         type="password"
         id="setupConfirmPassword"
         autocomplete="new-password"
-        autocapitalize="off"
         autocorrect="off"
         spellcheck="false"
         maxlength="63"
@@ -162,7 +160,7 @@
     <span class="bootWave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
     <p>{{webui:setup.searching_networks}}</p>
   </div>
-  <form id="setupForm" hidden>
+  <form id="setupForm" autocapitalize="off" hidden>
     <label for="setupNetwork">{{webui:setup.network}}</label>
     <span class="selBox"><select id="setupNetwork" autocomplete="off"></select></span>
     <button type="button" id="setupSearchAgain" class="textLock">
@@ -193,7 +191,6 @@
         type="password"
         id="setupPassword"
         autocomplete="current-password"
-        autocapitalize="off"
         autocorrect="off"
         spellcheck="false"
         maxlength="63"
