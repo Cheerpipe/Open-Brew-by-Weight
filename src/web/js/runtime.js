@@ -2739,12 +2739,10 @@ function deactivateWebUi(reason) {
   stopViewPolls();
   lockAdminUi();
   setMutable(false);
-  if (
-    !(
-      heldOverlay ||
-      (document.hidden && webUiHoldClaim() && (reason === "inactivity" || reason === "takeover"))
-    )
-  ) {
+  if (!(
+    heldOverlay ||
+    (document.hidden && webUiHoldClaim() && (reason === "inactivity" || reason === "takeover"))
+  )) {
     if (reason === "direct") setInactiveHint(__WEBUI_TEXT__("runtime.opened_directly"));
     showInactiveOverlay();
   }
@@ -4605,13 +4603,13 @@ function resetUiStream() {
   invalidateHomeStream();
 }
 function stopUiStream() {
-  clearTimeout(shotRetry),
+  (clearTimeout(shotRetry),
     (shotRetry = 0),
     clearTimeout(shotSetup),
     clearTimeout(shotAlive),
-    clearTimeout(shotDeadline);
+    clearTimeout(shotDeadline));
   const e = shotWs;
-  (shotWs = null), resetUiStream(), e && e.close(), paintUiStream();
+  ((shotWs = null), resetUiStream(), e && e.close(), paintUiStream());
 }
 function paintUiStream() {
   if (shotStale) cancelShotClockFinish();
@@ -4637,7 +4635,7 @@ function paintUiStream() {
             ((e.hidden = !1), setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_stale"))))
       );
     if (shotFrame.card.live) heroLive.cycle = shotFrame.boot + "/" + shotFrame.cycle;
-    renderShotHero({
+    (renderShotHero({
       ...shotFrame.card,
       ...shotFrame.curve,
       clockMs: shotClock || shotClockFinish ? shotClockElapsed() : shotFrame.card.elapsedMs,
@@ -4649,13 +4647,13 @@ function paintUiStream() {
       shotStale
         ? setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_stale"))
         : "pending" === shotFrame.phase &&
-          setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_pending"));
+          setHomeSub("shotHeroState", __WEBUI_TEXT__("home.hero_pending")));
   }
 }
 function scheduleShotPaint() {
   shotPaint ||
     (shotPaint = requestAnimationFrame(() => {
-      (shotPaint = 0), paintUiStream();
+      ((shotPaint = 0), paintUiStream());
     }));
 }
 function uiStreamFrame(e, t) {
@@ -4677,27 +4675,25 @@ function uiStreamFrame(e, t) {
     };
   } else if (t) t = { ...t, curveBase: 0 };
   const n = t?.snapshot ? t.card : e && t?.card && { ...e.card, ...t.card };
-  if (
-    !(
-      t &&
-      1 === t.v &&
-      o(t.boot) &&
-      o(t.seq) &&
-      o(t.cycle) &&
-      o(t.cursor, 1201) &&
-      o(t.curveBase, 1201) &&
-      "boolean" == typeof t.snapshot &&
-      ["idle", "active", "pending", "transient"].includes(t.phase) &&
-      n &&
-      "boolean" == typeof n.valid &&
-      "boolean" == typeof n.live &&
-      o(n.elapsedMs) &&
-      (null === n.weight || Number.isFinite(n.weight)) &&
-      (null === n.averageFlowGps || Number.isFinite(n.averageFlowGps)) &&
-      (void 0 === n.scaleAvailable || "boolean" == typeof n.scaleAvailable) &&
-      [n.firstDropMs, n.tareMs].every((e) => null === e || o(e, 6e4))
-    )
-  )
+  if (!(
+    t &&
+    1 === t.v &&
+    o(t.boot) &&
+    o(t.seq) &&
+    o(t.cycle) &&
+    o(t.cursor, 1201) &&
+    o(t.curveBase, 1201) &&
+    "boolean" == typeof t.snapshot &&
+    ["idle", "active", "pending", "transient"].includes(t.phase) &&
+    n &&
+    "boolean" == typeof n.valid &&
+    "boolean" == typeof n.live &&
+    o(n.elapsedMs) &&
+    (null === n.weight || Number.isFinite(n.weight)) &&
+    (null === n.averageFlowGps || Number.isFinite(n.averageFlowGps)) &&
+    (void 0 === n.scaleAvailable || "boolean" == typeof n.scaleAvailable) &&
+    [n.firstDropMs, n.tareMs].every((e) => null === e || o(e, 6e4))
+  ))
     throw Error();
   if (e && t.boot === e.boot && t.seq <= e.seq) return e;
   // A fragment leaves out an index list it has nothing to add to.
@@ -4761,7 +4757,7 @@ function decodeCurveDeltas(text, ref) {
     wCg = [],
     u = (i) => (i + 2 > b.length ? NaN : b.charCodeAt(i) | (b.charCodeAt(i + 1) << 8));
   let [t, w] = ref || [0, 0];
-  for (let i = 0, x; i < b.length; ) {
+  for (let i = 0, x; i < b.length;) {
     x = b.charCodeAt(i++);
     t = x === 255 ? u((i += 2) - 2) : t + x;
     x = b.charCodeAt(i++);
