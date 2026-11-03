@@ -166,7 +166,7 @@
       !codeIncludes(revertBlock, 'status_.staState=StaState::NOT_CONFIGURED') ||
       !codeIncludes(staStateBlock,
                     'status.apActive&&setupKeepsSoftAp(status.setupPhase)&&staConfirmArmed_') ||
-      !codeIncludes(staStateBlock, 'revertPendingNetwork(now,"confirm timeout")')) {
+      !codeIncludes(staStateBlock, 'revertPendingNetwork("confirm timeout")')) {
     throw new Error(
         'Live-apply confirm must be bound to the joined attempt, saved only by the owner, and revert to the SoftAP fallback');
   }

@@ -714,7 +714,7 @@ void OpenBrewByWeightNetwork::uiStreamDispatch(void *context) {
 }
 
 void OpenBrewByWeightNetwork::sendUiStream(UiStreamSession &session,
-                                      ControlStatusSnapshot &control,
+                                      const ControlStatusSnapshot &control,
                                       const NetworkStatusSnapshot &network,
                                       const ShotLogRecord &latest, bool eligible) {
   // Home first, then the shot card: the client's setup window waits for both

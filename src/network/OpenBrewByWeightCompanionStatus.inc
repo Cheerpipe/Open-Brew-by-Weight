@@ -4,7 +4,7 @@
 
 namespace openbrewbyweight {
 
-bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
+bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) const {
   const MicraCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
   const uint32_t now = millis();
   TaskLockGuard lock(dataMux_);
@@ -44,7 +44,7 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) {
 }
 
 // Diagnostic → Companion: the pairing, its link and the La Marzocco route.
-void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
+void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) const {
   const MicraCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
   out.route = companionRouteName(route.route);
   out.reason = route.reason != nullptr ? route.reason : "none";
@@ -83,7 +83,7 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) {
 
 // Home's hint while a request waits (empty strings otherwise).
 void OpenBrewByWeightNetwork::companionRequestLabels(char (&name)[COMPANION_NAME_TEXT],
-                                                     char (&address)[COMPANION_ADDRESS_TEXT]) {
+                                                     char (&address)[COMPANION_ADDRESS_TEXT]) const {
   const uint32_t now = millis();
   TaskLockGuard lock(dataMux_);
   companionPairTick(g_companion.pairing, now);

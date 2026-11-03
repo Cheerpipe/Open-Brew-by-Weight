@@ -354,7 +354,7 @@ bool OpenBrewByWeightNetwork::relayBodyContext(httpd_req_t *request, uint8_t key
 // One sealed response: the admitting session's Kb and the next response
 // counter, which never repeats within a boot (see CompanionRelay).
 bool OpenBrewByWeightNetwork::relayResponseKey(httpd_req_t *request, uint8_t key[32],
-                                               uint32_t &counter) {
+                                               uint32_t &counter) const {
   TaskLockGuard lock(dataMux_);
   for (const auto &entry : g_relayIdentities) {
     if (entry.screen[0] == '\0' || entry.fd != httpd_req_to_sockfd(request)) continue;
@@ -368,7 +368,7 @@ bool OpenBrewByWeightNetwork::relayResponseKey(httpd_req_t *request, uint8_t key
 // One sealed JSON response: X-OBBW-Enc names the counter it was sealed
 // under. A seal that cannot be made is never sent opened.
 esp_err_t OpenBrewByWeightNetwork::relaySendSealed(httpd_req_t *request,
-                                                   const char *json, size_t length) {
+                                                   const char *json, size_t length) const {
   uint8_t key[32], nonce[12];
   uint32_t counter = 0;
   uint8_t *const cipher = static_cast<uint8_t *>(malloc(length + 16));
@@ -395,13 +395,13 @@ esp_err_t OpenBrewByWeightNetwork::relaySendSealed(httpd_req_t *request,
 }
 
 // A body whose seal did not open: the same accounting as a refused relay.
-esp_err_t OpenBrewByWeightNetwork::relayEnvelopeReject(httpd_req_t *request) {
+esp_err_t OpenBrewByWeightNetwork::relayEnvelopeReject(httpd_req_t *request) const {
   {
     TaskLockGuard lock(dataMux_);
     ++g_companion.relay.rejects;
   }
-  static RefusalLog log;
-  if (const uint32_t count = log.due())
+  static RefusalLog refusals;
+  if (const uint32_t count = refusals.due())
     lifecycleLogf("Companion relay refused %lu request(s): a body seal that did not open",
                   static_cast<unsigned long>(count));
   return sendError(request, STATUS_BAD_REQUEST, "RELAY_INVALID",

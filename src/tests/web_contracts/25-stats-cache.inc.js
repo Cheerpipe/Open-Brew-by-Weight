@@ -178,7 +178,7 @@ ${deltaTypes}
     frames.emplace_back(work.statusJson+COMPANION_RECORD_ORIGIN,used-COMPANION_RECORD_ORIGIN);
     return true;
   }
-  bool sendUiStreamFrame(UiStreamSession &,size_t,bool &);
+  bool sendUiStreamFrame(const UiStreamSession &,size_t,bool &);
   bool sendStatsStream(UiStreamSession &,const ControlStatusSnapshot &);
   bool sendRecordsIndex(UiStreamSession &,const ControlStatusSnapshot &);
 };

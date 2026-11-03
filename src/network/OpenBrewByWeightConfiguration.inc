@@ -190,7 +190,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   ValidationFailure parseError;
   size_t settingFieldCount = 0;
   if (root != nullptr) {
-    for (cJSON *item = root->child; item != nullptr; item = item->next) {
+    for (const cJSON *item = root->child; item != nullptr; item = item->next) {
       if (item->string != nullptr &&
           strcmp(item->string, "baseRevision") != 0) {
         ++settingFieldCount;
@@ -810,7 +810,7 @@ esp_err_t OpenBrewByWeightNetwork::preferredScaleSelectHandler(httpd_req_t *requ
   } else if (mac[0] != '\0' && !validPreferredScaleMac(mac)) {
     parseError = validationFailure("SCALE_MAC_EMPTY_OR_BLE");
   } else {
-    cJSON *nameItem = cJSON_GetObjectItemCaseSensitive(root, "name");
+    const cJSON *nameItem = cJSON_GetObjectItemCaseSensitive(root, "name");
     if (nameItem != nullptr) {
       if (!jsonString(root, "name", name, sizeof(name), true) ||
           !validPreferredScaleName(name)) {
@@ -865,7 +865,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleFriendlyNameHandler(httpd_req_t *request
   } else if (!validPreferredScaleMac(mac) || mac[0] == '\0') {
     parseError = validationFailure("SCALE_MAC_INVALID");
   } else {
-    cJSON *nameItem = cJSON_GetObjectItemCaseSensitive(root, "name");
+    const cJSON *nameItem = cJSON_GetObjectItemCaseSensitive(root, "name");
     if (nameItem != nullptr &&
         (!jsonString(root, "name", name, sizeof(name), true) ||
          !validScaleFriendlyName(name))) {
@@ -1454,7 +1454,7 @@ esp_err_t OpenBrewByWeightNetwork::factoryResetHandler(httpd_req_t *request) {
 
 // Onboarding brewing choice (the setup "brew" action), accepted only while the
 // firmware is off: brewByWeight, plus presetId exactly when it is true.
-static ValidationFailure parseSetupBrew(cJSON *root, SetupBrew &brew,
+static ValidationFailure parseSetupBrew(const cJSON *root, SetupBrew &brew,
                                      uint8_t &presetId) {
   brew = SetupBrew::NONE;
   const bool hasPreset = jsonFieldPresent(root, "presetId");

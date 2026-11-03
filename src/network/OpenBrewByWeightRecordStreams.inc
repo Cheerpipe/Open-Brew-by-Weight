@@ -188,16 +188,16 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   const uint32_t filterHash = shotListFilterHash(filter);
   NetworkWorkBuf &work = *g_work;
   auto &cache = work.statsCache;
-  auto &snapshot = cache.snapshot;
+  auto &stored = cache.snapshot;
   // Only a record-epoch move reloads the cache: sort/dir toggles rebuild a
   // requested-order index permutation over the untouched newest-first
   // records, so the records copy (128 KB at 1000 summaries; curves are
   // fetched per row) happens only when the store actually changed.
-  const bool reload = !cache.valid || snapshot.epoch != epoch;
+  const bool reload = !cache.valid || stored.epoch != epoch;
   if (reload) {
     if (!callbacks_.copyShotStatsRecords) return false;
-    callbacks_.copyShotStatsRecords(snapshot);
-    epoch = snapshot.epoch;
+    callbacks_.copyShotStatsRecords(stored);
+    epoch = stored.epoch;
     cache.curveHashes = {};
   }
   // The header follows the store, the selected window, and the active
@@ -211,7 +211,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     cache.headerWindow = statsWindow;
     cache.headerPresetId = control.bbwPresetId;
   }
-  const size_t count = snapshot.count;
+  const size_t count = stored.count;
   // The order follows the store copy too: another session (or the record
   // index) may have reloaded it since, and the link never rebuilds a header.
   if (reload || header || cache.orderEpoch != epoch || cache.offset != offset || cache.limit != limit ||
@@ -220,12 +220,12 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     // newest-first cache, then compact it to the filter's matches. The
     // records themselves never move, so toggles re-slice without recopying
     // or re-sorting data.
-    shotLogSortOrder(snapshot.records, cache.order, count, sort, dir);
+    shotLogSortOrder(stored.records, cache.order, count, sort, dir);
     cache.orderEpoch = epoch;
     cache.matched = cache.good = 0;
     for (size_t index = 0; index < count; ++index)
-      if (shotListFilterMatches(filter, snapshot.records[cache.order[index]])) {
-        cache.good += shotLogRecordEligible(snapshot.records[cache.order[index]]);
+      if (shotListFilterMatches(filter, stored.records[cache.order[index]])) {
+        cache.good += shotLogRecordEligible(stored.records[cache.order[index]]);
         cache.order[cache.matched++] = cache.order[index];
       }
     cache.hasMore = shotLogPageSlice(cache.matched, {offset, limit}, cache.start, cache.pageCount);
@@ -244,7 +244,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
       fingerprint = crc32Update(fingerprint,
           reinterpret_cast<const uint8_t *>(cache.header), strlen(cache.header));
     for (size_t index = cache.start; index < cache.start + cache.pageCount; ++index) {
-      const ShotLogRecord &record = snapshot.records[cache.order[index]];
+      const ShotLogRecord &record = stored.records[cache.order[index]];
       // Curves are immutable once committed: an id-keyed hash lets window
       // changes re-fingerprint rows without re-fetching their curves, and
       // a missing curve hashes over zero points exactly as before.
@@ -338,7 +338,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   auto &held = workBuf_->uiFingerprints[link ? 0 : &session - uiStreams_];
   bool busy = false;
   while (session.statsSent < pageCount) {
-    const ShotLogRecord &record = snapshot.records[cache.order[start + session.statsSent]];
+    const ShotLogRecord &record = stored.records[cache.order[start + session.statsSent]];
     // Only the packed rating byte changes after commit; curves are immutable.
     const uint32_t *curveHash = cache.curveHashes.find(record.id);
     const uint32_t key[3] = {record.id, record.sideFlags, curveHash ? *curveHash : 0U};
@@ -356,7 +356,8 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
       // flash may not give now (a shot runs) holds the page at this row.
       const ShotCurveRead read = callbacks_.copyShotCurveById != nullptr
           ? callbacks_.copyShotCurveById(record.id, cache.fetchCurve, true) : ShotCurveRead::NONE;
-      if ((busy = read == ShotCurveRead::BUSY)) break;
+      busy = read == ShotCurveRead::BUSY;
+      if (busy) break;
       rowBytes = formatShotStatsRow(work, record,
                                     read == ShotCurveRead::FOUND ? &cache.fetchCurve : nullptr);
     }

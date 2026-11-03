@@ -17,8 +17,8 @@ static_assert(COMPANION_RECORD_FRAME_BYTES + COMPANION_RECORD_ORIGIN <= NetworkW
 
 // httpd: one request, replacing the pending one of its kind. False (and the
 // link closes) on a malformed frame. A new link session starts clean.
-bool OpenBrewByWeightNetwork::companionLinkRecordRequest(CompanionLinkSlot &slot, cJSON *frame,
-                                                         const char *type) {
+bool OpenBrewByWeightNetwork::companionLinkRecordRequest(const CompanionLinkSlot &slot,
+                                                         const cJSON *frame, const char *type) {
   CompanionRecordRequest request;
   if (!companionParseRecordRequest(frame, type, request)) return false;
   {
@@ -114,7 +114,7 @@ void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now, bool syncHol
 // companionRecordsService found it due and no hold began since. The caller
 // marks the epochs told once the job is queued.
 bool OpenBrewByWeightNetwork::companionRecordsNoticeBody(uint8_t &count, bool syncHold,
-                                                         uint32_t (&told)[2]) {
+                                                         uint32_t (&told)[2]) const {
   uint32_t &shots = told[0], &history = told[1];
   bool due = false;
   {

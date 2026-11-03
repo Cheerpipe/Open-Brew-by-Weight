@@ -63,7 +63,7 @@ struct OpenBrewByWeightNetwork {
   } callbacks_;
   bool companionRecordsSession(const UiStreamSession &) const {return false;}
   bool companionRecordsSend(size_t,bool,bool &){return false;}
-  bool sendUiStreamFrame(UiStreamSession &,size_t,bool &);
+  bool sendUiStreamFrame(const UiStreamSession &,size_t,bool &);
   bool sendLogStream(UiStreamSession &,const ControlStatusSnapshot &);
 };
 ${body(networkSource, 'bool __attribute__((format(printf, 2, 3)))\nstatusJsonAppend(')}

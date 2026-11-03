@@ -28,7 +28,7 @@ bool OpenBrewByWeightNetwork::companionSyncHold() const {
 
 // httpd: record the companion's log cursor for this controller. False (and the
 // link closes) on a malformed frame; the network task applies it later.
-bool OpenBrewByWeightNetwork::companionLinkLogSub(CompanionLinkSlot &slot, cJSON *frame) {
+bool OpenBrewByWeightNetwork::companionLinkLogSub(CompanionLinkSlot &slot, const cJSON *frame) const {
   bool on = false;
   uint32_t boot = 0, after = 0;
   if (!jsonBoolean(frame, "on", on) || !jsonUint32(frame, "boot", boot) ||
@@ -120,8 +120,8 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
   char *out = companionWs().job.bodies + start;
   const size_t capacity = sizeof(companionWs().job.bodies) - start;
   size_t used = static_cast<size_t>(snprintf(out, capacity, "%s", head));
-  bool first = true, full = false;
-  while (callbacks_.copyDebugEvents != nullptr && !full) {
+  bool first = true;
+  while (callbacks_.copyDebugEvents != nullptr) {
     DebugEvent event;
     if (callbacks_.copyDebugEvents(cursor, &event, 1, nullptr) == 0) break;
     // A sequence of zero cannot advance the cursor (zero means "from the
@@ -144,7 +144,6 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
     if (written < 0 || used + static_cast<size_t>(written) + 3 >= capacity ||
         used + static_cast<size_t>(written) + COMPANION_MAC_HEX + 40 > COMPANION_FRAME_BYTES) {
       out[used] = '\0';
-      full = true;
       break;
     }
     used += static_cast<size_t>(written);

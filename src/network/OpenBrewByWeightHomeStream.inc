@@ -372,7 +372,7 @@ constexpr uint32_t kDiagSlowMs = 4000;
 // Frame delivery shared by every diagnostic/log pass: ownership is re-checked
 // immediately before the send, and a clean header abort defers by arming the
 // caller's retry flag instead of tearing down the owned socket.
-bool OpenBrewByWeightNetwork::sendUiStreamFrame(UiStreamSession &session,
+bool OpenBrewByWeightNetwork::sendUiStreamFrame(const UiStreamSession &session,
                                            size_t used, bool &deferArm) {
   if (companionRecordsSession(session)) return companionRecordsSend(used, true, deferArm);
   bool owner;
@@ -497,7 +497,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     commandsJson[commandBytes] = '\0';
     delta.field("scale.supportedCommands", "%s", commandsJson);
   }
-  int32_t companionLinkAgeS = -1;
+  int32_t linkAgeS = -1;
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   {
     const auto micra = machineIntegrationStatus();
@@ -560,7 +560,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     // report.
     CompanionSnapshot companion;
     companionSnapshot(companion);
-    companionLinkAgeS = companion.linkAgeS;
+    linkAgeS = companion.linkAgeS;
     delta.field("companion.address", "\"%s\"", companion.address);
     delta.field("companion.version", "\"%s\"", companion.version);
     delta.field("companion.protocol", static_cast<unsigned long>(companion.protocol));
@@ -728,13 +728,14 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     telemetry.field("health.psramLargestFreeBlockBytes",
                     static_cast<unsigned long>(control.psramLargestFreeBlockBytes));
     telemetry.field("safety.resetReasonCode", static_cast<unsigned long>(control.resetReasonCode));
-    telemetry.field("companion.linkAgeS", "%ld", static_cast<long>(companionLinkAgeS));
+    telemetry.field("companion.linkAgeS", "%ld", static_cast<long>(linkAgeS));
     {
       const NetworkHeapTelemetrySnapshot networkHeap = heapTelemetrySnapshot();
       const HeapLifecycleAggregate webhookHeap = webhooks_.heapTelemetry();
-      HeapLifecycleAggregate micraHeap = {};
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-      micraHeap = machineIntegrationHeapTelemetry();
+      const HeapLifecycleAggregate micraHeap = machineIntegrationHeapTelemetry();
+#else
+      const HeapLifecycleAggregate micraHeap = {};
 #endif
       char heapSummary[224] = {};
       snprintf(heapSummary, sizeof(heapSummary),
@@ -822,19 +823,13 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
       if (n > 0 && static_cast<size_t>(n) < NetworkWorkBuf::kHistoryJson)
         used = static_cast<size_t>(n);
       if (nvs.lastFailure.present) {
-        const int m = snprintf(g_work->historyJson + used,
-                               NetworkWorkBuf::kHistoryJson - used,
-                               "{\"subsystem\":\"%s\",\"operation\":\"%s\",\"errorName\":\"%s\"}}",
-                               nvsSubsystemName(nvs.lastFailure.subsystem),
-                               nvsOperationName(nvs.lastFailure.operation),
-                               nvsErrorName(nvs.lastFailure.errorCode));
-        if (m > 0 && static_cast<size_t>(m) < NetworkWorkBuf::kHistoryJson - used)
-          used += static_cast<size_t>(m);
+        snprintf(g_work->historyJson + used, NetworkWorkBuf::kHistoryJson - used,
+                 "{\"subsystem\":\"%s\",\"operation\":\"%s\",\"errorName\":\"%s\"}}",
+                 nvsSubsystemName(nvs.lastFailure.subsystem),
+                 nvsOperationName(nvs.lastFailure.operation),
+                 nvsErrorName(nvs.lastFailure.errorCode));
       } else {
-        const int m = snprintf(g_work->historyJson + used,
-                               NetworkWorkBuf::kHistoryJson - used, "null}");
-        if (m > 0 && static_cast<size_t>(m) < NetworkWorkBuf::kHistoryJson - used)
-          used += static_cast<size_t>(m);
+        snprintf(g_work->historyJson + used, NetworkWorkBuf::kHistoryJson - used, "null}");
       }
       telemetry.field("nvs", "%s", g_work->historyJson);
     }
@@ -978,11 +973,10 @@ bool OpenBrewByWeightNetwork::sendLogStream(UiStreamSession &session,
           static_cast<unsigned long>(work.logMetadata.serialDropped),
           work.logMetadata.cursorInvalid ? "true" : "false"))
     return false;
-  int16_t eventOffset = 0;
   bool budgetFull = false;
   for (size_t index = 0; index < count && !budgetFull; ++index) {
     const DebugEvent &event = work.logBatch[index];
-    eventOffset = 0;
+    int16_t eventOffset = 0;
     if (event.wallSec != 0)
       (void)timeZoneOffsetAtOrUtc(control.config.timezoneId, event.wallSec,
                                   eventOffset);

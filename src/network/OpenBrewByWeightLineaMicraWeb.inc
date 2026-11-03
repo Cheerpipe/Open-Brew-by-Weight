@@ -37,7 +37,6 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   char action[16] = {};
   char username[LINEA_MICRA_USERNAME_CAPACITY] = {};
   char password[LINEA_MICRA_PASSWORD_CAPACITY] = {};
-  char serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
   const bool known = root != nullptr &&
       jsonHasOnlyUniqueFields(root, fields, sizeof(fields) / sizeof(fields[0]));
   const bool actionOk = known &&
@@ -107,6 +106,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
       parseError = validationFailure("MICRA_CONNECT_FIELDS_ONLY");
     }
   } else if (parseError.reason == nullptr && strcmp(action, "select") == 0) {
+    char serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
     if (!jsonString(root, "serial", serial, sizeof(serial), false) ||
         !jsonBoolean(root, "applyTemperature", applyTemperature) ||
         !jsonBoolean(root, "observeState", observeState) ||

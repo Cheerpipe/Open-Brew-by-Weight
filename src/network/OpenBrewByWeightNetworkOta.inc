@@ -17,8 +17,6 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       "action", "ssid",    "password", "open", "wifiSleep", "ipMode", "ip",
       "netmask", "gateway", "dns1",    "dns2", "name",      "apply", "baseRevision"};
   ValidationFailure networkError;
-  SetupBrew brew = SetupBrew::NONE;
-  uint8_t brewPresetId = 0;
   bool brewSaveFailed = false, networkStale = false;
   bool parsed = root != nullptr &&
                 jsonString(root, "action", action, sizeof(action), false);
@@ -138,6 +136,8 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
   } else if (parsed && strcmp(action, "brew") == 0) {
     // Setup-context action: part one of onboarding saves the brewing choice
     // on its own, before and independent of Wi-Fi, without restarting.
+    SetupBrew brew = SetupBrew::NONE;
+    uint8_t brewPresetId = 0;
     networkError = !jsonHasOnlyUniqueFields(root, brewFields, 3)
                        ? validationFailure("SETUP_BREW_FIELDS_ONLY")
                    : !setupPeer ? validationFailure("SETUP_NO_NETWORK_BREW")
@@ -175,8 +175,7 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
                        nullptr, "NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE");
     }
     command.setNetworkType(WebCommandType::SAVE_NETWORK);
-    char ipMode[16] = {}, ipText[16] = {}, netmaskText[16] = {}, gatewayText[16] = {},
-         dns1Text[16] = {}, dns2Text[16] = {};
+    char ipMode[16] = {};
     const bool hasIp = jsonFieldPresent(root, "ip"), hasNetmask = jsonFieldPresent(root, "netmask"),
                hasGateway = jsonFieldPresent(root, "gateway"),
                hasDns1 = jsonFieldPresent(root, "dns1"), hasDns2 = jsonFieldPresent(root, "dns2");
@@ -197,6 +196,8 @@ esp_err_t OpenBrewByWeightNetwork::networkHandler(httpd_req_t *request) {
       }
     } else if (strcmp(ipMode, "static") == 0) {
       command.network.staIpMode = static_cast<uint8_t>(StaIpMode::STATIC);
+      char ipText[16] = {}, netmaskText[16] = {}, gatewayText[16] = {}, dns1Text[16] = {},
+           dns2Text[16] = {};
       if (!hasIp || !hasNetmask || !hasGateway || !hasDns1 ||
           !jsonString(root, "ip", ipText, sizeof(ipText), false) ||
           !jsonString(root, "netmask", netmaskText, sizeof(netmaskText),
@@ -584,15 +585,13 @@ uint8_t scaleProfileDownloadBatch[FLASH_IO_CHUNK_BYTES];
 
 void copyScaleProfileContextText(char *destination, size_t capacity,
                                  const char *source) {
+  if (destination == nullptr || capacity == 0) return;
   size_t used = 0;
-  if (destination != nullptr && capacity > 0) {
-    while (source != nullptr && source[used] != '\0' &&
-           used + 1 < capacity) {
-      destination[used] = source[used];
-      ++used;
-    }
-    destination[used] = '\0';
+  while (source != nullptr && source[used] != '\0' && used + 1 < capacity) {
+    destination[used] = source[used];
+    ++used;
   }
+  destination[used] = '\0';
 }
 
 }  // namespace
@@ -1270,7 +1269,7 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
       !readOtaHeader(request, "Content-Range", contentRange, sizeof(contentRange)) ||
       !parseOtaUint32(offsetText, headerOffset) || !parseOtaUint32(totalText, declaredTotal) ||
       !parseContentRange(contentRange, offset, rangeEnd, rangeTotal) ||
-      headerOffset != offset || rangeTotal != declaredTotal || request->content_len <= 0 ||
+      headerOffset != offset || rangeTotal != declaredTotal || request->content_len == 0 ||
       static_cast<uint32_t>(request->content_len) != rangeEnd - offset + 1U) {
     return rejectRange(STATUS_BAD_REQUEST, "OTA_INVALID_RANGE",
                        nullptr, "OTA_PATCH_RANGE_MISMATCH");

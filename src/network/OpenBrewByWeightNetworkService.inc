@@ -380,13 +380,13 @@ void OpenBrewByWeightNetwork::syncPreferredScale(const char *mac, const char *na
 
 void OpenBrewByWeightNetwork::syncLiveRuntime(const RuntimeConfig &runtime,
                                          const ShotPresetBank *presets,
-                                         bool ntpSettingsChanged) {
+                                         bool ntpChanged) {
   dataMux_.lock();
   settings_.runtime = runtime;
   if (presets != nullptr) {
     settings_.presets = *presets;
   }
-  if (ntpSettingsChanged && ++ntpSettingsGeneration_ == 0)
+  if (ntpChanged && ++ntpSettingsGeneration_ == 0)
     ++ntpSettingsGeneration_;
   dataMux_.unlock();
 }

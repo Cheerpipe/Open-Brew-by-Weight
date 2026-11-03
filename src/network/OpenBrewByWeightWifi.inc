@@ -1,4 +1,4 @@
-bool OpenBrewByWeightNetwork::controlAllowsNetworkMutation() {
+bool OpenBrewByWeightNetwork::controlAllowsNetworkMutation() const {
   return controlAllowsConfiguration(controlGate());
 }
 
@@ -60,7 +60,7 @@ SetupPhase OpenBrewByWeightNetwork::advanceSetupPhase(SetupEvent event) {
   return status_.setupPhase;
 }
 
-SetupPhase OpenBrewByWeightNetwork::setupPhase() {
+SetupPhase OpenBrewByWeightNetwork::setupPhase() const {
   TaskLockGuard lock(dataMux_);
   return status_.setupPhase;
 }
@@ -290,8 +290,7 @@ bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
   return true;
 }
 
-bool OpenBrewByWeightNetwork::revertPendingNetwork(uint32_t,
-                                              const char *reason) {
+bool OpenBrewByWeightNetwork::revertPendingNetwork(const char *reason) {
   PersistedSettings &next = workingSettings();
   if (next.staConfigState != static_cast<uint8_t>(StaConfigState::PENDING)) {
     return false;
@@ -1129,7 +1128,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
             static_cast<uint8_t>(StaConfigState::PENDING) &&
         static_cast<int32_t>(now - staConfirmDeadlineMs_) >= 0) {
       WiFi.disconnect(false, false);
-      if (!revertPendingNetwork(now, "confirm timeout")) {
+      if (!revertPendingNetwork("confirm timeout")) {
         noteNetworkRetryBackoff(false);
       } else {
         clearNetworkFailureStatus(false);
@@ -1144,7 +1143,6 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
       WiFi.status() == WL_CONNECTED) {
     char address[16] = {};
     formatIp(WiFi.localIP(), address);
-    char previousAddress[16] = {};
     finishOwnedHeapLifecycle(wifiHeap_, HeapLifecycleResult::SUCCESS);
     serviceSoftApTeardown(status, now);
     const bool mayStartHttp = !httpStartHeld_ &&
@@ -1159,6 +1157,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
       if (bssid != nullptr) {
         formatWifiMac(bssid, bssidText, sizeof(bssidText));
       }
+      char previousAddress[16] = {};
       dataMux_.lock();
       status_.staState = StaState::CONNECTED;
       status_.networkActive = httpReady;
@@ -1216,7 +1215,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
       !wifiScanInProgress() &&
       static_cast<int32_t>(now - staConfirmDeadlineMs_) >= 0) {
     WiFi.disconnect(false, false);
-    if (!revertPendingNetwork(now, "confirm timeout")) {
+    if (!revertPendingNetwork("confirm timeout")) {
       // Durable-write gate closed: retry in a second without the startup
       // backoff (noteNetworkRetryBackoff would clear startupComplete_ and
       // restart networking, dropping the onboarding SoftAP).
@@ -1247,7 +1246,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
                          static_cast<uint8_t>(StaConfigState::PENDING);
     if (pending) {
       lifecycleLog("WiFi STA failed; reverting pending config");
-      if (!revertPendingNetwork(now, "connect timeout")) {
+      if (!revertPendingNetwork("connect timeout")) {
         noteNetworkRetryBackoff(true);
       } else {
         clearNetworkFailureStatus(false);

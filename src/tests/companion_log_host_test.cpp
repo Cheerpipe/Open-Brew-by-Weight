@@ -27,15 +27,15 @@
 
 namespace openbrewbyweight {
 
-bool jsonBoolean(cJSON *object, const char *name, bool &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonBoolean(const cJSON *object, const char *name, bool &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsBool(item)) return false;
   output = cJSON_IsTrue(item);
   return true;
 }
 
-bool jsonUint32(cJSON *object, const char *name, uint32_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonUint32(const cJSON *object, const char *name, uint32_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsNumber(item) || item->valuedouble < 0.0 || item->valuedouble > UINT32_MAX ||
       std::floor(item->valuedouble) != item->valuedouble)
     return false;
@@ -87,7 +87,7 @@ class OpenBrewByWeightNetwork {
   bool companionSyncHold() const;
   bool networkFlashWriteAllowed() const { return !flashGateClosed; }
   bool flashGateClosed = false;
-  bool companionLinkLogSub(CompanionLinkSlot &slot, cJSON *frame);
+  bool companionLinkLogSub(CompanionLinkSlot &slot, const cJSON *frame) const;
   void companionLogService();
   void companionLogApplyLocked(CompanionLinkSlot &link);
   bool companionLogBody(uint8_t &count, const CompanionLinkSlot &sent, bool logSwitch, uint32_t &logLast,

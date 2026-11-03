@@ -214,9 +214,12 @@ bool OpenBrewByWeightNetwork::socketServedBySoftAp(int socketFd) {
       host = ntohl(reinterpret_cast<const sockaddr_in &>(address).sin_addr.s_addr);
       return true;
     }
-    const auto &v6 = reinterpret_cast<const sockaddr_in6 &>(address).sin6_addr;
-    if (address.ss_family != AF_INET6 || !IN6_IS_ADDR_V4MAPPED(&v6)) return false;
-    host = ntohl(v6.un.u32_addr[3]);
+    // IPv4-mapped (::ffff:a.b.c.d), tested on the words: lwIP's
+    // IN6_IS_ADDR_V4MAPPED casts the const address away.
+    const auto &v6 = reinterpret_cast<const sockaddr_in6 &>(address).sin6_addr.un.u32_addr;
+    if (address.ss_family != AF_INET6 || v6[0] != 0 || v6[1] != 0 || v6[2] != htonl(0xFFFFU))
+      return false;
+    host = ntohl(v6[3]);
     return true;
   };
   sockaddr_storage local = {}, peer = {};
@@ -268,19 +271,15 @@ bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {
   memset(caller.id, 0, sizeof(caller.id));
   // SoftAP onboarding bypass: whoever joined the device network already
   // proved the WPA2 passphrase, which is the device password.
-  if (!allowed && apActive &&
-      socketServedBySoftAp(httpd_req_to_sockfd(request))) {
-    allowed = true;
-  }
-  return allowed;
+  return allowed || (apActive && socketServedBySoftAp(httpd_req_to_sockfd(request)));
 #endif
 }
 
 bool OpenBrewByWeightNetwork::requireAdminUnlock(httpd_req_t *request) {
   if (!adminUnlockAllowed(request)) {
     // Field diagnosis reads the Web UI log: one line per quiet window.
-    static RefusalLog log;
-    if (const uint32_t count = log.due())
+    static RefusalLog refusals;
+    if (const uint32_t count = refusals.due())
       lifecycleLogf("Admin is locked: refused %lu request(s), the last to %.*s",
                     static_cast<unsigned long>(count),
                     static_cast<int>(strcspn(request->uri, "?")), request->uri);
@@ -493,15 +492,11 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
        false, false, true},
       {"/api/v1/diagnostic/tare", HTTP_POST, scaleTareHandler, false, false, true},
   };
-  const Route *matched = nullptr;
-  for (const Route &route : routes) {
-    if (request->method == route.method &&
-        apiUriMatches(request->uri, route.uri)) {
-      matched = &route;
-      break;
-    }
-  }
-  if (matched == nullptr) {
+  const Route *const matched =
+      std::find_if(std::begin(routes), std::end(routes), [request](const Route &route) {
+        return request->method == route.method && apiUriMatches(request->uri, route.uri);
+      });
+  if (matched == std::end(routes)) {
     return sendError(request, STATUS_NOT_FOUND, "NOT_FOUND",
                      nullptr, "UNKNOWN_ROUTE");
   }
@@ -547,7 +542,7 @@ bool OpenBrewByWeightNetwork::requireJsonContentType(httpd_req_t *request) {
 bool OpenBrewByWeightNetwork::readJsonBody(
     httpd_req_t *request, char body[REQUEST_BODY_CAPACITY], bool *envelopeFailed) {
   if (envelopeFailed != nullptr) *envelopeFailed = false;
-  if (!requireJsonContentType(request) || request->content_len <= 0 ||
+  if (!requireJsonContentType(request) || request->content_len == 0 ||
       request->content_len >= REQUEST_BODY_CAPACITY) {
     return false;
   }

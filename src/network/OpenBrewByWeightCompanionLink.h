@@ -12,11 +12,13 @@
 #include "OpenBrewByWeightShotCurveTypes.h"  // appendBase64
 #include "OpenBrewByWeightWebAccess.h"       // webAccessFnv, copyWebAccessLabel
 #include "machine/OpenBrewByWeightMicraCompanion.h"  // MicraCompanionRoute
+#include <algorithm>
 #include <cJSON.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 
 namespace openbrewbyweight {
 
@@ -376,12 +378,12 @@ inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
 
 // HMAC(Kr, "obbw-relay-v2\nMETHOD\nURI\nq\naddr\nscreen\nsession\n"); the
 // header carries its first 16 bytes. `uri` is the path with its query and
-// `session` the sealed X-WebUI-Session value as sent, or "".
+// `sealedSession` the sealed X-WebUI-Session value as sent, or "".
 inline bool companionRelayMac(const uint8_t key[32], const char *method, const char *uri,
-                              const CompanionRelayHeader &header, const char *session,
+                              const CompanionRelayHeader &header, const char *sealedSession,
                               uint8_t mac[32]) {
   const char *const fields[] = {"obbw-relay-v2", method, uri, header.q, header.addr,
-                                header.screen, session};
+                                header.screen, sealedSession};
   CompanionBytes parts[14];
   for (size_t index = 0; index < 7; ++index) {
     parts[2 * index] = {fields[index], strlen(fields[index])};
@@ -573,15 +575,15 @@ inline void companionPairTick(CompanionPairing &pairing, uint32_t now) {
 }
 
 inline bool companionIgnored(const CompanionPairing &pairing, const char *id) {
-  for (const auto &ignored : pairing.ignored)
-    if (ignored[0] != '\0' && strcmp(ignored, id) == 0) return true;
-  return false;
+  return std::any_of(std::begin(pairing.ignored), std::end(pairing.ignored),
+                     [id](const char *ignored) {
+                       return ignored[0] != '\0' && strcmp(ignored, id) == 0;
+                     });
 }
 
 inline uint8_t companionIgnoredCount(const CompanionPairing &pairing) {
-  uint8_t count = 0;
-  for (const auto &ignored : pairing.ignored) count += ignored[0] != '\0';
-  return count;
+  return static_cast<uint8_t>(std::count_if(std::begin(pairing.ignored), std::end(pairing.ignored),
+                                            [](const char *ignored) { return ignored[0] != '\0'; }));
 }
 
 // Fields are validated by the caller; `address` comes from the socket.

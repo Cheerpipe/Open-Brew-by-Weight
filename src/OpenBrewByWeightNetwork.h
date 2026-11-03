@@ -321,7 +321,7 @@ class OpenBrewByWeightNetwork {
   // Scale worker, per weight sample: wakes the stream dispatch when it is due.
   void noteScaleSample();
   void syncLiveRuntime(const RuntimeConfig &runtime,
-                       const ShotPresetBank *presets, bool ntpSettingsChanged);
+                       const ShotPresetBank *presets, bool ntpChanged);
   static bool ntpSettingsChanged(const RuntimeConfig &before,
                                  const RuntimeConfig &after);
   void syncLiveBullseye(const BullseyeMelodyConfig &config);
@@ -346,9 +346,9 @@ class OpenBrewByWeightNetwork {
                          uint8_t token[WEB_ACCESS_TOKEN_BYTES], bool &relayed);
   bool relayPassword(httpd_req_t *request, char *out, size_t capacity);
   bool relayBodyContext(httpd_req_t *request, uint8_t key[32], uint32_t &sequence);
-  bool relayResponseKey(httpd_req_t *request, uint8_t key[32], uint32_t &counter);
-  esp_err_t relaySendSealed(httpd_req_t *request, const char *json, size_t length);
-  esp_err_t relayEnvelopeReject(httpd_req_t *request);
+  bool relayResponseKey(httpd_req_t *request, uint8_t key[32], uint32_t &counter) const;
+  esp_err_t relaySendSealed(httpd_req_t *request, const char *json, size_t length) const;
+  esp_err_t relayEnvelopeReject(httpd_req_t *request) const;
 
   private:
   void mergePreferredScaleMac(PersistedSettings &settings);
@@ -558,7 +558,10 @@ class OpenBrewByWeightNetwork {
   RecordIndexWork *recordIndexWork_ = nullptr;
   RecordIndexWork *recordIndexWork();
   uint32_t recordsKeyNext_ = 0;  // under dataMux_
-  uint32_t nextRecordsKey() { return ++recordsKeyNext_ ? recordsKeyNext_ : ++recordsKeyNext_; }
+  uint32_t nextRecordsKey() {
+    if (++recordsKeyNext_ == 0) ++recordsKeyNext_;
+    return recordsKeyNext_;
+  }
   std::atomic<bool> companionRecordsDue_{false}, companionRecordsPending_{false};
   uint32_t companionRecordsAtMs_ = 0;  // network task: the last records work queued
   std::atomic<bool> uiStreamWorkPending_{false};
@@ -702,7 +705,7 @@ class OpenBrewByWeightNetwork {
   bool startNetwork();
   NetworkSettingsSnapshot networkSettingsSnapshot();
   void startStation(const NetworkSettingsSnapshot &settings, uint32_t now);
-  void applyStationAddressConfig(const NetworkSettingsSnapshot &settings);
+  static void applyStationAddressConfig(const NetworkSettingsSnapshot &settings);
   bool beginStationConnect(const NetworkSettingsSnapshot &settings, uint32_t now);
   void applyWifiPowerSave(bool apStarting = false);
   // mDNS responder (network-task-only ownership). ensureMdns() starts the
@@ -720,7 +723,7 @@ class OpenBrewByWeightNetwork {
   // Onboarding phase (OpenBrewByWeightNetworkSetup.h): network-task writer, read
   // under dataMux_; the teardown applies softApTeardownStep once STA is up.
   SetupPhase advanceSetupPhase(SetupEvent event);
-  SetupPhase setupPhase();
+  SetupPhase setupPhase() const;
   void serviceSoftApTeardown(const NetworkStatusSnapshot &status, uint32_t now);
   // Captive-portal DNS (wildcard A -> SoftAP IP) on UDP/53 while the SoftAP
   // is up. Network task owns the lifecycle; replies come from the AsyncUDP
@@ -761,8 +764,8 @@ class OpenBrewByWeightNetwork {
   void requestPendingNetworkConfirm(bool fromOwner = false);
   void requestPendingNetworkDiscard();
   bool confirmPendingNetwork(const char *reason);
-  bool revertPendingNetwork(uint32_t now, const char *reason);
-  bool controlAllowsNetworkMutation();
+  bool revertPendingNetwork(const char *reason);
+  bool controlAllowsNetworkMutation() const;
   bool networkFlashWriteAllowed() const;
   ControlGateSnapshot controlGate() const;
   bool lockWorkBufForStatus();
@@ -778,10 +781,10 @@ class OpenBrewByWeightNetwork {
     status_.staState = state;
     dataMux_.unlock();
   }
-  void actionLog(const char *message);
-  void actionLogf(const char *fmt, ...);
-  void lifecycleLog(const char *message);
-  void lifecycleLogf(const char *fmt, ...);
+  static void actionLog(const char *message);
+  static void actionLogf(const char *fmt, ...);
+  static void lifecycleLog(const char *message);
+  static void lifecycleLogf(const char *fmt, ...);
   void refreshExtendedStatus(uint32_t now);
   bool handleCliNetworkAction(const WebCommand &command, uint32_t now);
   bool handleCliWifiAction(const WebCommand &command, uint32_t now);
@@ -807,14 +810,14 @@ class OpenBrewByWeightNetwork {
   static esp_err_t heapMapDownloadHandler(httpd_req_t *request);
   static esp_err_t auditVerboseHandler(httpd_req_t *request);
   static esp_err_t assetHandler(httpd_req_t *request);
-  static esp_err_t notFoundHandler(httpd_req_t *request, httpd_err_code_t error);
+  static esp_err_t notFoundHandler(httpd_req_t *request, httpd_err_code_t);
   static esp_err_t claimHandler(httpd_req_t *request);
   static esp_err_t uiStreamHandshake(httpd_req_t *request);
   static esp_err_t uiStreamHandler(httpd_req_t *request);
   static void uiStreamFree(void *context);
   static void uiStreamDispatch(void *context);
   void serviceUiStream(uint32_t now);
-  void sendUiStream(UiStreamSession &session, ControlStatusSnapshot &control,
+  void sendUiStream(UiStreamSession &session, const ControlStatusSnapshot &control,
                     const NetworkStatusSnapshot &network,
                     const ShotLogRecord &latest, bool eligible);
   bool sendShotCard(UiStreamSession &session, const ControlStatusSnapshot &control,
@@ -827,7 +830,7 @@ class OpenBrewByWeightNetwork {
   // Audit fingerprinted frame inside the diagnostic stream: newest latch and
   // durable-window records plus the hunt-session state (own .inc fragment).
   bool sendAuditDiagFrame(UiStreamSession &session, bool initial);
-  bool sendUiStreamFrame(UiStreamSession &session, size_t used, bool &deferArm);
+  bool sendUiStreamFrame(const UiStreamSession &session, size_t used, bool &deferArm);
   // Settings-only paths (own .inc fragment); rides the Home + shot-card batch.
   bool sendSettingsStream(UiStreamSession &session,
                           const ControlStatusSnapshot &control);
@@ -842,8 +845,8 @@ class OpenBrewByWeightNetwork {
   // Shared stats row projection (scalars plus embedded curve fields) used by
   // the WS sender; writes into work.jsonItem and returns its length, 0 on
   // overflow.
-  size_t formatShotStatsRow(NetworkWorkBuf &work, const ShotLogRecord &record,
-                            const ShotCurveRecord *curve);
+  static size_t formatShotStatsRow(NetworkWorkBuf &work, const ShotLogRecord &record,
+                                   const ShotCurveRecord *curve);
 #if OPEN_BREW_BY_WEIGHT_DEVELOPMENT == 1
   // Unlock handlers are release-only: development builds serve public
   // administration and never compile the unlock endpoints.
@@ -1000,7 +1003,7 @@ class OpenBrewByWeightNetwork {
   // DISCONNECTED. Log payloads and timing values are unchanged.
   void noteNetworkRetryBackoff(bool logRetry);
   void clearNetworkFailureStatus(bool staDisconnected);
-  esp_err_t workBufBusy(httpd_req_t *request);
+  static esp_err_t workBufBusy(httpd_req_t *request);
   bool requireActiveWebUiClient(httpd_req_t *request);
   // `holder`: only when it holds the unlock (a companion screen's own).
   void clearAdminUnlock(const CompanionPrincipal *holder = nullptr);
@@ -1025,13 +1028,13 @@ class OpenBrewByWeightNetwork {
                                          PasswordCheck check);
   // Optional Web UI login (OpenBrewByWeightWebAccess.h). Effective only while
   // the device password is not the factory default.
-  bool webAccessActive();
+  bool webAccessActive() const;
   // Joining the SoftAP already proved the device password (WPA2 passphrase).
-  bool softApPeer(httpd_req_t *request);
-  bool webAccessSessionAllowed(httpd_req_t *request);
+  bool softApPeer(httpd_req_t *request) const;
+  bool webAccessSessionAllowed(httpd_req_t *request) const;
   // Reads the caller's session header without validating it; false when the
   // caller presents none (login off, SoftAP onboarding).
-  bool readClaimSessionToken(httpd_req_t *request, uint8_t out[WEB_ACCESS_TOKEN_BYTES]);
+  static bool readClaimSessionToken(httpd_req_t *request, uint8_t out[WEB_ACCESS_TOKEN_BYTES]);
   // everything: login off (sessions, Home Assistant, pairing). Otherwise
   // revoke Web UI sessions except `keep`; with no `keep` the claim drops too.
   void webAccessSignOut(const uint8_t *keep, bool everything);
@@ -1055,7 +1058,7 @@ class OpenBrewByWeightNetwork {
   static esp_err_t authNoticeHandler(httpd_req_t *request);
   static esp_err_t authPairingHandler(httpd_req_t *request);
   bool integrationAccessRoute(httpd_req_t *request, esp_err_t &result);
-  bool appendWebAccessStatus(httpd_req_t *request, size_t *used);
+  bool appendWebAccessStatus(httpd_req_t *request, size_t *used) const;
   // Companion link (network/OpenBrewByWeightCompanion*.inc, docs/COMPANION_LINK.md).
   static esp_err_t companionPairHandler(httpd_req_t *request);
   static esp_err_t companionAdminHandler(httpd_req_t *request);
@@ -1065,15 +1068,16 @@ class OpenBrewByWeightNetwork {
   static void companionLinkFree(void *context);
   static void companionSendWork(void *context);
   static void companionLruWork(void *context);
-  static void companionSocketClose(httpd_handle_t handle, int fd);
+  static void companionSocketClose(httpd_handle_t, int fd);
   static void companionOutboxChanged();
-  esp_err_t companionLinkRefuse(CompanionLinkSlot &slot, const char *reason, bool authentication);
+  esp_err_t companionLinkRefuse(CompanionLinkSlot &slot, const char *reason,
+                                bool authentication) const;
   esp_err_t companionLinkFrame(httpd_req_t *request, CompanionLinkSlot &slot, size_t length);
-  esp_err_t companionLinkHello(httpd_req_t *request, CompanionLinkSlot &slot, cJSON *frame,
+  esp_err_t companionLinkHello(httpd_req_t *request, CompanionLinkSlot &slot, const cJSON *frame,
                                const char *type);
-  esp_err_t companionLinkProof(httpd_req_t *request, CompanionLinkSlot &slot, cJSON *frame,
+  esp_err_t companionLinkProof(httpd_req_t *request, CompanionLinkSlot &slot, const cJSON *frame,
                                const char *type);
-  esp_err_t companionLinkInbound(CompanionLinkSlot &slot, cJSON *frame, const char *type,
+  esp_err_t companionLinkInbound(CompanionLinkSlot &slot, const cJSON *frame, const char *type,
                                  MicraCompanionIngress ingress);
   void beginCompanion();
   void resetCompanion();
@@ -1086,27 +1090,28 @@ class OpenBrewByWeightNetwork {
   // connection or discovery, the BLE quiet interval).
   bool companionLogHoldActive() const;
   bool companionSyncHold() const;
-  bool companionLinkLogSub(CompanionLinkSlot &slot, cJSON *frame);
+  bool companionLinkLogSub(CompanionLinkSlot &slot, const cJSON *frame) const;
   void companionLogService();
   void companionLogApplyLocked(CompanionLinkSlot &link);
   bool companionLogBody(uint8_t &count, const CompanionLinkSlot &sent, bool logSwitch,
                         uint32_t &logLast, bool &logMore, uint32_t &logMiss);
-  bool companionCredentialsBody(uint8_t &count, uint32_t generation,
-                                const uint8_t secret[COMPANION_SECRET_BYTES]);
+  static bool companionCredentialsBody(uint8_t &count, uint32_t generation,
+                                       const uint8_t secret[COMPANION_SECRET_BYTES]);
   // The archive record sync (network/OpenBrewByWeightCompanionRecords.inc).
-  bool companionRecordsSession(const UiStreamSession &session) const {
-    return companionRecords_ != nullptr && &session == &companionRecords_->session;
+  bool companionRecordsSession(const UiStreamSession &candidate) const {
+    return companionRecords_ != nullptr && &candidate == &companionRecords_->session;
   }
-  bool companionLinkRecordRequest(CompanionLinkSlot &slot, cJSON *frame, const char *type);
+  bool companionLinkRecordRequest(const CompanionLinkSlot &slot, const cJSON *frame,
+                                  const char *type);
   void companionRecordsService(uint32_t now, bool syncHold);
-  bool companionRecordsNoticeBody(uint8_t &count, bool syncHold, uint32_t (&told)[2]);
+  bool companionRecordsNoticeBody(uint8_t &count, bool syncHold, uint32_t (&told)[2]) const;
   static void companionRecordsWork(void *context);
   bool companionRecordsSend(size_t used, bool wrap, bool &deferArm);
   bool companionTraceFrame();
-  bool appendCompanionStatus(size_t *used);
-  void companionSnapshot(CompanionSnapshot &out);
+  bool appendCompanionStatus(size_t *used) const;
+  void companionSnapshot(CompanionSnapshot &out) const;
   void companionRequestLabels(char (&name)[COMPANION_NAME_TEXT],
-                              char (&address)[COMPANION_ADDRESS_TEXT]);
+                              char (&address)[COMPANION_ADDRESS_TEXT]) const;
   std::atomic<bool> companionNotified_{false}, companionSendPending_{false},
       companionLinkUp_{false}, companionSendRetry_{false}, companionLruPending_{false};
   // Sockets whose current request came through the relay (httpd writes).

@@ -988,7 +988,7 @@ if (!codeIncludes(viewJs.stats, 'SHOTS_PAGE_SIZE=10') ||
     !network.includes('sendStatsStream') ||
     !network.includes('formatShotStatsRow') ||
     !network.includes('shotLogPageSlice') ||
-    !network.includes('shotLogSortOrder(snapshot.records') ||
+    !network.includes('shotLogSortOrder(stored.records') ||
     !networkHeader.includes('SHOT_LOG_PAGE_DEFAULT') ||
     !networkHeader.includes('shotLogEpoch') ||
     !networkHeader.includes('sendStatsStream') ||

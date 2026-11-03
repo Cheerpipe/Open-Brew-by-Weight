@@ -234,7 +234,7 @@ ${header.slice(header.indexOf('  struct RecordIndexBaseline {'), header.indexOf(
   }
   size_t formatShotStatsRow(NetworkWorkBuf &work, const ShotLogRecord &record,
                             const ShotCurveRecord *curve);
-  bool sendUiStreamFrame(UiStreamSession &, size_t, bool &);
+  bool sendUiStreamFrame(const UiStreamSession &, size_t, bool &);
   bool sendHistoryStream(UiStreamSession &, const ControlStatusSnapshot &);
   bool sendStatsStream(UiStreamSession &, const ControlStatusSnapshot &);
   bool sendRecordsIndex(UiStreamSession &, const ControlStatusSnapshot &);

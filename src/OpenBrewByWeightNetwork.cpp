@@ -46,6 +46,7 @@
 #include <iterator>
 #include <float.h>
 #include <new>
+#include <numeric>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -331,13 +332,13 @@ constexpr uint32_t NETWORK_MANAGER_TASK_STACK_SIZE = 10240;
 // Stack stays internal: OTA flash writes run on this task.
 constexpr uint32_t HTTP_SERVER_TASK_STACK_SIZE = 11264;
 
-bool jsonFieldPresent(cJSON *object, const char *name) {
+bool jsonFieldPresent(const cJSON *object, const char *name) {
   return object != nullptr && name != nullptr &&
          cJSON_GetObjectItemCaseSensitive(object, name) != nullptr;
 }
 
-bool jsonBoolean(cJSON *object, const char *name, bool &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonBoolean(const cJSON *object, const char *name, bool &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsBool(item)) {
     return false;
   }
@@ -345,8 +346,8 @@ bool jsonBoolean(cJSON *object, const char *name, bool &output) {
   return true;
 }
 
-bool jsonUint32(cJSON *object, const char *name, uint32_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonUint32(const cJSON *object, const char *name, uint32_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsNumber(item) || !std::isfinite(item->valuedouble) ||
       item->valuedouble < 0.0 || item->valuedouble > UINT32_MAX ||
       floor(item->valuedouble) != item->valuedouble) {
@@ -356,7 +357,7 @@ bool jsonUint32(cJSON *object, const char *name, uint32_t &output) {
   return true;
 }
 
-bool jsonUint8(cJSON *object, const char *name, uint8_t &output) {
+bool jsonUint8(const cJSON *object, const char *name, uint8_t &output) {
   uint32_t value = 0;
   if (!jsonUint32(object, name, value) || value > UINT8_MAX) {
     return false;
@@ -365,8 +366,8 @@ bool jsonUint8(cJSON *object, const char *name, uint8_t &output) {
   return true;
 }
 
-bool jsonFloat(cJSON *object, const char *name, float &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonFloat(const cJSON *object, const char *name, float &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsNumber(item) || !std::isfinite(item->valuedouble) ||
       item->valuedouble > static_cast<double>(FLT_MAX) ||
       item->valuedouble < -static_cast<double>(FLT_MAX)) {
@@ -377,7 +378,7 @@ bool jsonFloat(cJSON *object, const char *name, float &output) {
 }
 
 // Target weight arrives in grams with tenths (36.5); stored as decigrams.
-bool jsonGoalWeightDg(cJSON *object, const char *name, uint16_t &output) {
+bool jsonGoalWeightDg(const cJSON *object, const char *name, uint16_t &output) {
   float grams = 0.0f;
   if (!jsonFloat(object, name, grams)) {
     return false;
@@ -389,7 +390,7 @@ bool jsonGoalWeightDg(cJSON *object, const char *name, uint16_t &output) {
 }
 
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-bool jsonInt16(cJSON *object, const char *name, int16_t &output) {
+bool jsonInt16(const cJSON *object, const char *name, int16_t &output) {
   if (object == nullptr || name == nullptr) {
     return false;
   }
@@ -423,9 +424,9 @@ bool secretsMatch(const char *candidate, const char *expected) {
   return difference == 0 && expectedLength > 0;
 }
 
-bool jsonString(cJSON *object, const char *name, char *output,
+bool jsonString(const cJSON *object, const char *name, char *output,
                 size_t outputCapacity, bool allowEmpty) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
@@ -438,7 +439,7 @@ bool jsonString(cJSON *object, const char *name, char *output,
   return true;
 }
 
-bool jsonHasOnlyUniqueFields(cJSON *object, const char *const *allowed,
+bool jsonHasOnlyUniqueFields(const cJSON *object, const char *const *allowed,
                              size_t allowedCount) {
   // Two fixed words cover the broad config patch without heap allocation.
   // Keep the ceiling explicit so callers fail loudly if they outgrow it.
@@ -448,7 +449,7 @@ bool jsonHasOnlyUniqueFields(cJSON *object, const char *const *allowed,
     return false;
   }
   uint64_t seen[kSeenWords] = {};
-  for (cJSON *item = object->child; item != nullptr; item = item->next) {
+  for (const cJSON *item = object->child; item != nullptr; item = item->next) {
     if (item->string == nullptr) {
       return false;
     }
@@ -480,9 +481,8 @@ void configValidationErrorBody(ConfigValidationError error, char *body,
       failure.params[0] != nullptr ? failure.params : nullptr;
   const char *prose =
       errorReasonProse(failure.reason, params, message, sizeof(message));
-  size_t at = 0;
   if (params != nullptr) {
-    at = static_cast<size_t>(snprintf(
+    size_t at = static_cast<size_t>(snprintf(
         body, capacity,
         "{\"error\":\"INVALID_CONFIG\",\"reason\":\"%s\",\"params\":[\"%s\"",
         failure.reason, failure.params[0]));
@@ -506,7 +506,7 @@ void configValidationErrorBody(ConfigValidationError error, char *body,
 
 // Recipe fields arrive in grams and seconds with tenths and are stored as
 // decigrams and milliseconds; range checks stay in the recipe validator.
-bool jsonTenths(cJSON *object, const char *name, uint32_t limitTenths,
+bool jsonTenths(const cJSON *object, const char *name, uint32_t limitTenths,
                 uint32_t &tenths) {
   float value = 0.0f;
   if (!jsonFloat(object, name, value) || value < 0.0f ||
@@ -517,21 +517,21 @@ bool jsonTenths(cJSON *object, const char *name, uint32_t limitTenths,
   return true;
 }
 
-bool jsonGramsDg(cJSON *object, const char *name, uint16_t &output) {
+bool jsonGramsDg(const cJSON *object, const char *name, uint16_t &output) {
   uint32_t tenths = 0;
   if (!jsonTenths(object, name, UINT16_MAX, tenths)) return false;
   output = static_cast<uint16_t>(tenths);
   return true;
 }
 
-bool jsonSecondsMs(cJSON *object, const char *name, uint32_t &output) {
+bool jsonSecondsMs(const cJSON *object, const char *name, uint32_t &output) {
   uint32_t tenths = 0;
   if (!jsonTenths(object, name, UINT32_MAX / 100, tenths)) return false;
   output = tenths * 100;
   return true;
 }
 
-bool jsonRampMs(cJSON *object, const char *name, uint16_t &output) {
+bool jsonRampMs(const cJSON *object, const char *name, uint16_t &output) {
   uint32_t tenths = 0;
   if (!jsonTenths(object, name, UINT16_MAX / 100, tenths)) return false;
   output = static_cast<uint16_t>(tenths * 100);
@@ -540,9 +540,9 @@ bool jsonRampMs(cJSON *object, const char *name, uint16_t &output) {
 
 // A transition curve type or hardness by its wire name (rampCurveName,
 // rampHardnessName); the index is the stored value.
-bool jsonRampChoice(cJSON *object, const char *name, const char *(*nameOf)(uint8_t),
+bool jsonRampChoice(const cJSON *object, const char *name, const char *(*nameOf)(uint8_t),
                     uint8_t count, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
   for (uint8_t i = 0; i < count; ++i) {
     if (strcmp(item->valuestring, nameOf(i)) == 0) {
@@ -556,8 +556,8 @@ bool jsonRampChoice(cJSON *object, const char *name, const char *(*nameOf)(uint8
 // Continuous hardness: a JSON number 0-100 (percent, one decimal) into the
 // level mirror and hundredths-of-hardness pct. The legacy soft/medium/hard
 // strings stay readable for one firmware cycle for older local scripts.
-bool jsonRampHardness(cJSON *object, const char *name, uint8_t &level, uint8_t &pct) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonRampHardness(const cJSON *object, const char *name, uint8_t &level, uint8_t &pct) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (cJSON_IsString(item) && item->valuestring != nullptr) {
     for (uint8_t i = 0; i < RAMP_HARDNESS_LEVELS; ++i) {
       if (strcmp(item->valuestring, rampHardnessName(i)) == 0) {
@@ -580,8 +580,8 @@ bool jsonRampHardness(cJSON *object, const char *name, uint8_t &level, uint8_t &
 
 // The Web UI hero card style by its wire name (heroCardModeId); the index is
 // the stored value.
-bool jsonHeroCardMode(cJSON *object, const char *name, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonHeroCardMode(const cJSON *object, const char *name, uint8_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
   for (uint8_t mode = HERO_CARD_TECHNICAL; mode <= HERO_CARD_COLORFUL; ++mode) {
     if (strcmp(item->valuestring, heroCardModeId(mode)) == 0) {
@@ -592,8 +592,8 @@ bool jsonHeroCardMode(cJSON *object, const char *name, uint8_t &output) {
   return false;
 }
 
-bool jsonNoScaleBbwMode(cJSON *object, const char *name, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonNoScaleBbwMode(const cJSON *object, const char *name, uint8_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
@@ -612,15 +612,15 @@ bool jsonNoScaleBbwMode(cJSON *object, const char *name, uint8_t &output) {
   return false;
 }
 
-bool jsonPaddleMode(cJSON *object, const char *name, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonPaddleMode(const cJSON *object, const char *name, uint8_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
   return parsePaddleMode(item->valuestring, output);
 }
 
-bool jsonStopPulseMs(cJSON *object, RuntimeConfig &config) {
+bool jsonStopPulseMs(const cJSON *object, RuntimeConfig &config) {
   uint32_t ms = 0;
   if (!jsonUint32(object, "stopPulseMs", ms) || ms < 50 || ms > 1000) {
     return false;
@@ -629,7 +629,7 @@ bool jsonStopPulseMs(cJSON *object, RuntimeConfig &config) {
   return true;
 }
 
-bool jsonMaxSinglePressMs(cJSON *object, RuntimeConfig &config) {
+bool jsonMaxSinglePressMs(const cJSON *object, RuntimeConfig &config) {
   uint32_t ms = 0;
   if (!jsonUint32(object, "maxSinglePressMs", ms) || ms < 100 || ms > 5000) {
     return false;
@@ -639,7 +639,7 @@ bool jsonMaxSinglePressMs(cJSON *object, RuntimeConfig &config) {
 }
 
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 2
-bool jsonReedConfirmTimeoutMs(cJSON *object, RuntimeConfig &config) {
+bool jsonReedConfirmTimeoutMs(const cJSON *object, RuntimeConfig &config) {
   uint32_t ms = 0;
   if (!jsonUint32(object, "reedConfirmTimeoutMs", ms) || ms < 200 ||
       ms > 5000) {
@@ -650,12 +650,12 @@ bool jsonReedConfirmTimeoutMs(cJSON *object, RuntimeConfig &config) {
 }
 #endif
 
-bool jsonAssumeIdleWhenScaleConnects(cJSON *object, RuntimeConfig &config) {
+bool jsonAssumeIdleWhenScaleConnects(const cJSON *object, RuntimeConfig &config) {
   return jsonBoolean(object, "assumeIdleWhenScaleConnects",
                      config.assumeIdleWhenScaleConnects);
 }
 
-bool jsonShotReactTimeoutS(cJSON *object, RuntimeConfig &config) {
+bool jsonShotReactTimeoutS(const cJSON *object, RuntimeConfig &config) {
   uint8_t seconds = 0;
   if (!jsonUint8(object, "shotReactTimeoutS", seconds)) {
     return false;
@@ -669,8 +669,8 @@ bool jsonShotReactTimeoutS(cJSON *object, RuntimeConfig &config) {
 }
 
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE != 0
-bool jsonMomentaryStartEdge(cJSON *object, RuntimeConfig &config) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, "momentaryStartEdge");
+bool jsonMomentaryStartEdge(const cJSON *object, RuntimeConfig &config) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, "momentaryStartEdge");
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
@@ -678,8 +678,8 @@ bool jsonMomentaryStartEdge(cJSON *object, RuntimeConfig &config) {
 }
 #endif
 
-bool jsonNtpPreset(cJSON *object, const char *name, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonNtpPreset(const cJSON *object, const char *name, uint8_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
@@ -702,17 +702,17 @@ bool jsonNtpPreset(cJSON *object, const char *name, uint8_t &output) {
   return false;
 }
 
-bool jsonScaleMacCacheMode(cJSON *object, const char *name, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonScaleMacCacheMode(const cJSON *object, const char *name, uint8_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
   return parseScaleMacCacheMode(item->valuestring, output);
 }
 
-bool jsonAlertOutputChannel(cJSON *object, const char *name, uint8_t &output,
+bool jsonAlertOutputChannel(const cJSON *object, const char *name, uint8_t &output,
                             bool optional) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (item == nullptr) {
     return optional;
   }
@@ -722,16 +722,16 @@ bool jsonAlertOutputChannel(cJSON *object, const char *name, uint8_t &output,
   return parseAlertOutputChannel(item->valuestring, output);
 }
 
-bool jsonLogLevel(cJSON *object, const char *name, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonLogLevel(const cJSON *object, const char *name, uint8_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
   return parseLogLevel(item->valuestring, output);
 }
 
-bool jsonExtendedPulseRate(cJSON *object, const char *name, uint8_t &output) {
-  cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+bool jsonExtendedPulseRate(const cJSON *object, const char *name, uint8_t &output) {
+  const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) {
     return false;
   }
@@ -757,15 +757,17 @@ uint32_t networkRevision(const PersistedSettings &settings, TaskMutex &mux) {
   const uint8_t shape[] = {settings.staOpen, settings.staWifiSleep, settings.staIpMode};
   const uint8_t *addresses[] = {settings.staIp, settings.staNetmask, settings.staGateway,
                                 settings.staDns1, settings.staDns2};
-  uint32_t revision = webAccessFnv(shape, sizeof(shape)) ^
-                      webAccessFnv(settings.staSsid, strlen(settings.staSsid)) * 3U ^
-                      webAccessFnv(settings.deviceName, strlen(settings.deviceName)) * 5U;
-  for (const uint8_t *address : addresses) revision = revision * 16777619U ^ webAccessFnv(address, 4);
-  return revision;
+  const uint32_t revision = webAccessFnv(shape, sizeof(shape)) ^
+                            webAccessFnv(settings.staSsid, strlen(settings.staSsid)) * 3U ^
+                            webAccessFnv(settings.deviceName, strlen(settings.deviceName)) * 5U;
+  return std::accumulate(std::begin(addresses), std::end(addresses), revision,
+                         [](uint32_t hash, const uint8_t *address) {
+                           return hash * 16777619U ^ webAccessFnv(address, 4);
+                         });
 }
 
 // A save without baseRevision is current; one with it must name `revision`.
-bool baseRevisionCurrent(cJSON *root, uint32_t revision) {
+bool baseRevisionCurrent(const cJSON *root, uint32_t revision) {
   uint32_t base = revision;
   return !jsonFieldPresent(root, "baseRevision") ||
          (jsonUint32(root, "baseRevision", base) && base == revision);

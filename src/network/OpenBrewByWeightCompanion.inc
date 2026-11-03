@@ -190,11 +190,12 @@ const char *companionRouteName(MicraCompanionRoute route) {
 }
 
 const CompanionLinkSlot *companionActiveLink() {
-  for (const auto &slot : g_companion.links)
-    if (slot.fd >= 0 && slot.phase == CompanionLinkPhase::READY &&
-        slot.generation == g_companion.active)
-      return &slot;
-  return nullptr;
+  const auto *const end = std::cend(g_companion.links);
+  const auto *const slot = std::find_if(std::cbegin(g_companion.links), end, [](const auto &link) {
+    return link.fd >= 0 && link.phase == CompanionLinkPhase::READY &&
+           link.generation == g_companion.active;
+  });
+  return slot != end ? slot : nullptr;
 }
 
 }  // namespace
@@ -423,11 +424,11 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHandshake(httpd_req_t *request) 
 void OpenBrewByWeightNetwork::companionLinkFree(void *context) {
   if (instance_ == nullptr || context == nullptr) return;
   OpenBrewByWeightNetwork &self = *instance_;
-  auto &slot = *static_cast<CompanionLinkSlot *>(context);
   bool down, lm;
   const char *reason;
   {
     TaskLockGuard lock(self.dataMux_);
+    auto &slot = *static_cast<CompanionLinkSlot *>(context);
     down = slot.phase == CompanionLinkPhase::READY && slot.generation == g_companion.active;
     if (down) {
       g_companion.active = 0;
@@ -447,7 +448,7 @@ void OpenBrewByWeightNetwork::companionLinkFree(void *context) {
 // its reason when it goes down; refusals before that share one rate-limited line.
 esp_err_t OpenBrewByWeightNetwork::companionLinkRefuse(CompanionLinkSlot &slot,
                                                        const char *reason,
-                                                       bool authentication) {
+                                                       bool authentication) const {
   bool ready;
   {
     TaskLockGuard lock(dataMux_);
@@ -456,9 +457,9 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkRefuse(CompanionLinkSlot &slot,
     ready = slot.phase == CompanionLinkPhase::READY;
     if (authentication) ++g_companion.authFailures;
   }
-  static RefusalLog log;
+  static RefusalLog refusals;
   if (!ready || authentication)
-    if (const uint32_t count = log.due())
+    if (const uint32_t count = refusals.due())
       lifecycleLogf("Companion link refused %lu time(s): %s", static_cast<unsigned long>(count), reason);
   return ESP_FAIL;
 }
@@ -515,7 +516,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkFrame(httpd_req_t *request,
 }
 
 esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
-                                                      CompanionLinkSlot &slot, cJSON *frame,
+                                                      CompanionLinkSlot &slot, const cJSON *frame,
                                                       const char *type) {
   char id[COMPANION_ID_TEXT] = {}, name[COMPANION_NAME_TEXT] = {},
        version[COMPANION_VERSION_TEXT] = {}, nonce[32] = {};
@@ -556,7 +557,6 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
     return ESP_FAIL;
   }
   char reply[80] = {};
-  size_t used = 0;
   if (verdict == CompanionHello::CHALLENGE) {
     uint8_t ns[COMPANION_NONCE_BYTES];
     esp_fill_random(ns, sizeof(ns));
@@ -569,7 +569,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
       slot.protocol = static_cast<uint8_t>(COMPANION_LINK_PROTOCOL);
       slot.phase = CompanionLinkPhase::PROOF;
     }
-    used = static_cast<size_t>(snprintf(reply, sizeof(reply), "{\"t\":\"challenge\",\"nonce\":\""));
+    size_t used = static_cast<size_t>(snprintf(reply, sizeof(reply), "{\"t\":\"challenge\",\"nonce\":\""));
     (void)appendBase64(reply, sizeof(reply), used, ns, sizeof(ns));
     snprintf(reply + used, sizeof(reply) - used, "\"}");
     return companionSendText(request, reply) == ESP_OK
@@ -581,7 +581,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
     const bool signedErase = companionHandshakeMac(secret, 'E', nc, nullptr, mac);
     memset(secret, 0, sizeof(secret));
     if (!signedErase) return companionLinkRefuse(slot, "the erase could not be signed", false);
-    used = static_cast<size_t>(snprintf(reply, sizeof(reply), "{\"t\":\"erase\",\"mac\":\""));
+    size_t used = static_cast<size_t>(snprintf(reply, sizeof(reply), "{\"t\":\"erase\",\"mac\":\""));
     (void)appendBase64(reply, sizeof(reply), used, mac, sizeof(mac));
     snprintf(reply + used, sizeof(reply) - used, "\"}");
     (void)companionSendText(request, reply);
@@ -595,7 +595,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkHello(httpd_req_t *request,
 }
 
 esp_err_t OpenBrewByWeightNetwork::companionLinkProof(httpd_req_t *request,
-                                                      CompanionLinkSlot &slot, cJSON *frame,
+                                                      CompanionLinkSlot &slot, const cJSON *frame,
                                                       const char *type) {
   char macText[48] = {};
   uint8_t mac[32], expected[32], secret[COMPANION_SECRET_BYTES], nc[COMPANION_NONCE_BYTES],
@@ -672,7 +672,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkProof(httpd_req_t *request,
 }
 
 esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
-    CompanionLinkSlot &slot, cJSON *frame, const char *type,
+    CompanionLinkSlot &slot, const cJSON *frame, const char *type,
     [[maybe_unused]] MicraCompanionIngress ingress) {
   uint32_t expected;
   {
@@ -700,10 +700,12 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
                     static_cast<unsigned long>(count));
     return ESP_OK;
   }
+  [[maybe_unused]] bool flag = false;
   // The La Marzocco frames use the rest only on Linea Micra builds.
-  [[maybe_unused]] bool flag = false, flag2 = false;
-  [[maybe_unused]] uint32_t first = 0, second = 0, third = 0;
-  [[maybe_unused]] char text[12] = {};
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+  uint32_t first = 0, second = 0, third = 0;
+  char text[12] = {};
+#endif
   if (!strcmp(type, "ping") && jsonBoolean(frame, "up", flag)) {
     {
       TaskLockGuard lock(dataMux_);
@@ -728,9 +730,10 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   } else if (!strcmp(type, "res") && jsonUint32(frame, "id", first) &&
              jsonString(frame, "r", text, sizeof(text), false) &&
              ((flag = !strcmp(text, "accepted")) || !strcmp(text, "failed")) &&
+             // An absent `http` leaves the status at 0.
              (!jsonFieldPresent(frame, "http") ||
-              ((flag2 = jsonUint32(frame, "http", second)) && second <= UINT16_MAX))) {
-    machineIntegrationCompanionCommandResult(first, flag, static_cast<uint16_t>(flag2 ? second : 0));
+              (jsonUint32(frame, "http", second) && second <= UINT16_MAX))) {
+    machineIntegrationCompanionCommandResult(first, flag, static_cast<uint16_t>(second));
   } else if (!strcmp(type, "st") && jsonString(frame, "k", text, sizeof(text), false) &&
              (!strcmp(text, "full") || !strcmp(text, "push") || !strcmp(text, "read")) &&
              jsonUint32(frame, "ep", first) &&
@@ -760,7 +763,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
   uint8_t companionKey[COMPANION_KEY_BYTES], controllerKey[COMPANION_KEY_BYTES];
   {
     TaskLockGuard lock(dataMux_);
-    CompanionRequest &request = g_companion.pairing.request;
+    const CompanionRequest &request = g_companion.pairing.request;
     companionPairTick(g_companion.pairing, now);
     pending = request.state == CompanionPairState::PENDING;
     serial = request.serial;
@@ -934,11 +937,10 @@ bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t 
   memset(key, 0, sizeof(key));
   memset(companionWs().crypt, 0, kCompanionPlainBytes);
   // The ciphertext is base64'd straight into the body after its prefix.
-  char *bodyStart = nullptr;
   if (ok) {
     size_t start = 0;
     for (uint8_t index = 0; index < count; ++index) start += strlen(companionWs().job.bodies + start) + 1;
-    bodyStart = companionWs().job.bodies + start;
+    char *const bodyStart = companionWs().job.bodies + start;
     size_t bodyUsed = static_cast<size_t>(snprintf(
         bodyStart, sizeof(companionWs().job.bodies) - start, "\"t\":\"creds\",\"gen\":%lu,\"iv\":\"%s\",\"ct\":\"",
         static_cast<unsigned long>(generation), ivText));
@@ -965,7 +967,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const MicraCompanionOutbox outbox = machineIntegrationCompanionOutbox();
   uint32_t generation = 0;
   [[maybe_unused]] uint32_t lastCommand = 0;
-  bool snapshot = false, ui = true, logSwitch = true, archive = true, pingReply = false;
+  bool snapshotDue = false, ui = true, logSwitch = true, archive = true, pingReply = false;
   const bool syncHold = companionSyncHold();
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
@@ -980,7 +982,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
         link = &slot;
     if (link == nullptr || link->closing) return;
     generation = link->generation;
-    snapshot = !link->snapshotSent;
+    snapshotDue = !link->snapshotSent;
     companionLogApplyLocked(*link);  // the log cursor, against this boot's id
     sent = *link;
     lastCommand = g_companion.lastCommandSent;
@@ -1010,7 +1012,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                                     deviceName, deviceIdText);
   const char *uiText = ui ? "true" : "false", *logText = logSwitch ? "true" : "false",
              *archiveText = archive ? "true" : "false";
-  const bool configDue = snapshot || outbox.configSequence != sent.sentConfig ||
+  const bool configDue = snapshotDue || outbox.configSequence != sent.sentConfig ||
                          ui != sent.sentUi || logSwitch != sent.sentLog || archive != sent.sentArchive;
   const bool config = configDue &&
       (kCompanionLm ? companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s,"
@@ -1024,13 +1026,13 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
        holdDue = false, hold = false, commandDue = false, command = false;
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   credentialsDue = outbox.credentialsGeneration != 0 &&
-      (snapshot || outbox.credentialsGeneration != sent.sentCredentials);
+      (snapshotDue || outbox.credentialsGeneration != sent.sentCredentials);
   credentials = credentialsDue &&
       (outbox.credentialsErase
            ? companionAddBody(count, "\"t\":\"creds\",\"gen\":%lu,\"erase\":true}",
                               static_cast<unsigned long>(outbox.credentialsGeneration))
            : companionCredentialsBody(count, outbox.credentialsGeneration, secret));
-  routeDue = snapshot || outbox.routeSequence != sent.sentRoute;
+  routeDue = snapshotDue || outbox.routeSequence != sent.sentRoute;
   route = routeDue && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
                                        outbox.routeCompanion ? "companion" : "direct");
   const char *op = companionCommandName(outbox.commandOp);
@@ -1047,7 +1049,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   // `hold` on every build: the La Marzocco hold (Linea Micra, while the
   // route is not direct) and every start and end of a sync hold, which
   // starts and ends the companion's silence.
-  holdDue = snapshot || outbox.holdSequence != sent.sentHold || syncHold != sent.sentSync;
+  holdDue = snapshotDue || outbox.holdSequence != sent.sentHold || syncHold != sent.sentSync;
   hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":%s}",
                                      outbox.hold ? "true" : "false", syncHold ? "true" : "false");
   // S17: a ping is answered while no sync hold is active, with the `hold`

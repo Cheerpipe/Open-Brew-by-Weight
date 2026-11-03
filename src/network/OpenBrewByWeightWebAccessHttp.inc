@@ -69,12 +69,12 @@ OpenBrewByWeightNetwork::PasswordCheck OpenBrewByWeightNetwork::checkDevicePassw
   return matches ? PasswordCheck::OK : PasswordCheck::WRONG;
 }
 
-bool OpenBrewByWeightNetwork::webAccessActive() {
+bool OpenBrewByWeightNetwork::webAccessActive() const {
   TaskLockGuard lock(dataMux_);
   return g_webAccess.stored.enabled != 0 && !passwordIsFactoryDefault(settings_);
 }
 
-bool OpenBrewByWeightNetwork::softApPeer(httpd_req_t *request) {
+bool OpenBrewByWeightNetwork::softApPeer(httpd_req_t *request) const {
   bool apActive = false;
   {
     TaskLockGuard lock(dataMux_);
@@ -83,7 +83,7 @@ bool OpenBrewByWeightNetwork::softApPeer(httpd_req_t *request) {
   return apActive && socketServedBySoftAp(httpd_req_to_sockfd(request));
 }
 
-bool OpenBrewByWeightNetwork::webAccessSessionAllowed(httpd_req_t *request) {
+bool OpenBrewByWeightNetwork::webAccessSessionAllowed(httpd_req_t *request) const {
   if (!webAccessActive() || softApPeer(request)) return true;
   uint8_t token[WEB_ACCESS_TOKEN_BYTES] = {};
   if (!readWebAccessToken(request, WEB_UI_SESSION_HEADER, "", token)) return false;
@@ -450,7 +450,7 @@ esp_err_t OpenBrewByWeightNetwork::authPairingHandler(httpd_req_t *request) {
 
 // Admin → Access: login state, Home Assistant, and every signed-in device by
 // id (never by token). Labels are sanitized on store, so they embed as is.
-bool OpenBrewByWeightNetwork::appendWebAccessStatus(httpd_req_t *request, size_t *used) {
+bool OpenBrewByWeightNetwork::appendWebAccessStatus(httpd_req_t *request, size_t *used) const {
   uint8_t own[WEB_ACCESS_TOKEN_BYTES] = {};
   const bool hasOwn = readWebAccessToken(request, WEB_UI_SESSION_HEADER, "", own);
   const Instant clock = webAccessNow(millis());
@@ -556,15 +556,15 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
   if (pair && request->method == HTTP_POST) {
     WebAccessBody body;
     if (!readWebAccessBody(request, body, result)) return true;
-    uint32_t random[2] = {};
-    esp_fill_random(random, sizeof(random));
-    const uint32_t id = random[0] != 0 ? random[0] : 1;
+    uint32_t entropy[2] = {};
+    esp_fill_random(entropy, sizeof(entropy));
+    const uint32_t id = entropy[0] != 0 ? entropy[0] : 1;
     bool started = false;
     char code[5] = {};
     {
       TaskLockGuard lock(dataMux_);
       started = webAccessStartPairing(
-          g_webAccess, {id, static_cast<uint16_t>(random[1] % 10000U)}, webAccessNow(now));
+          g_webAccess, {id, static_cast<uint16_t>(entropy[1] % 10000U)}, webAccessNow(now));
       memcpy(code, g_webAccess.pairing.code, sizeof(code));
     }
     if (!started) {
