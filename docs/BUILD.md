@@ -264,9 +264,9 @@ Micra builds, and the Home remote control bar only in builds compiled with
 remote machine control.
 
 The wrapper preserves project diagnostics but hides ESP-IDF 6.1's known
-`esp_wifi`/`wpa_supplicant` component-validation warnings. Extra-warning
-reports retain their unfiltered SDK log and report project-owned warnings
-separately.
+`esp_wifi`/`wpa_supplicant` component-validation warnings. Project-owned
+components compile with `-Wall -Wextra -Wunused-parameter`, and any warning
+they emit fails the build.
 
 `--flags` applies to one build only and is never saved in `.openbrewbyweight`;
 a value left there by older scripts is ignored. `--flags` cannot turn on a

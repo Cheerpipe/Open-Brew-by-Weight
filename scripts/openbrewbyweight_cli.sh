@@ -39,8 +39,8 @@ if [[ -z "${OBBW_CLI_ROOT:-}" ]]; then
   OBBW_CLI_ROOT="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 fi
 OBBW_CLI_STORE="$OBBW_CLI_ROOT/.openbrewbyweight"
-# Analysis builds (warnings-idf) point this at their own tree so toggling
-# analysis-only flags never reconfigures the gate's variant builds.
+# Release and dead-code builds point this at their own tree so their flags
+# never reconfigure the gate's variant builds.
 OBBW_IDF_BUILD_ROOT="${OPENBREWBYWEIGHT_IDF_BUILD_ROOT:-$OBBW_CLI_ROOT/build-idf}"
 
 obbw_upper() {

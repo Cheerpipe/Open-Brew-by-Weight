@@ -176,17 +176,17 @@ each checked against its own size baseline and, right after it, against the
 stack-depth gate of the destructive recovery paths, the settings_persist
 shot pool worker and the deepest httpd requests (see
 [Validation](../VALIDATION.md)). `--risk R3` also checks each pair
-with Cppcheck and a GCC warning build.
+with Cppcheck and runs the dead-code check over every pair. Every build
+already fails on any compiler warning in project-owned code.
 R2 and R3 run two lanes at once: the host tests, and the firmware steps in a
 fixed order (route capacity, Web UI budgets, Web contracts, then each pair's
-development build and stack depth, release build and stack depth, Cppcheck,
-and warning build). Each step's
+development build and stack depth, release build and stack depth, and
+Cppcheck, then the dead-code check). Each step's
 output appears in the log as one block when
 the step finishes. After any failure neither lane starts another step;
 steps already running finish first. When both lanes pass, a final
-`budget-verdict` step judges every size budget the run measured. The release and warning builds use their
-own trees, `build-idf/release/<hardware>--<machine>/` and
-`build-idf/warnings/<hardware>--<machine>/`, so the gate's
+`budget-verdict` step judges every size budget the run measured. The release builds use their
+own trees, `build-idf/release/<hardware>--<machine>/`, so the gate's
 `build-idf/<hardware>--<machine>/` images stay incremental. Host tests and
 Cppcheck use one job per CPU.
 

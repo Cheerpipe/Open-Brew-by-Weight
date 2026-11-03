@@ -64,10 +64,6 @@ if(NOT _obbw_extra_raw STREQUAL "")
       # to project-owned components. Applying them globally makes ESP-IDF's
       # dependency warnings fatal before the firmware can be examined.
       list(APPEND _obbw_project_only_options "${_opt}")
-    elseif(_opt STREQUAL "-Wunused-parameter")
-      # Project-owned components always build with it (below). ESP-IDF's own
-      # -Werror components have unused parameters (e.g.
-      # cxx_exception_stubs.cpp), so it is never applied globally.
     elseif(_opt MATCHES "^-D(.+)$")
       idf_build_set_property(COMPILE_DEFINITIONS "${CMAKE_MATCH_1}" APPEND)
     elseif(_opt MATCHES "^-W")

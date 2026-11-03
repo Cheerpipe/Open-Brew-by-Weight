@@ -9,8 +9,10 @@ flash: [Build environment](BUILD.md). Script reference: [Build scripts](SCRIPTS.
 Cppcheck, clang-tidy and IWYU read the ESP-IDF compilation database
 (`build-idf/<hardware>--<machine>/compile_commands.json`) from a normal build.
 GCC `-fanalyzer` and the dead-code check are different: their scripts build
-with analysis enabled. Each tool deletes and recreates its own reports
-directory on every run.
+with analysis enabled. Compiler warnings need no separate tool: every build
+compiles the project-owned components with `-Wall -Wextra -Wunused-parameter`
+and fails on any warning they emit. Each tool deletes and recreates its own
+reports directory on every run.
 
 Before Cppcheck or clang-tidy starts, `audit_compile_commands.py` compares the
 database, the production source tree and the versioned translation-unit manifest.
@@ -211,20 +213,16 @@ diagnostics follow the `HeaderFilterRegex` in `.clang-tidy`, mirrored by the scr
 
 ### Configuration and suppressions policy
 
-`.clang-tidy` starts deliberately small: `bugprone-*`, `performance-*`,
-`clang-analyzer-core.*`/`cplusplus.*` and a few `modernize-*` checks, each
-clean on the current codebase. Every disabled check has a comment in the file
-saying why (third-party noise vs. pending project debt). To grow it:
+`.clang-tidy` enables `bugprone-*`, `performance-*`,
+`clang-analyzer-core.*`/`cplusplus.*` and a few `modernize-*` checks with no
+check disabled, and the codebase is clean against all of them. Findings are
+fixed in the code, never silenced: the project uses no `// NOLINT` and no
+`#pragma GCC diagnostic` to hide warnings. To grow the set:
 
-1. Remove a check from the disable list (or add a new one).
-2. Run `./scripts/static-tidy-idf -a n16r8` and fix or triage every finding.
-3. Prefer fixing code over `// NOLINT(...)`. When a NOLINT is unavoidable,
-   add a comment explaining why — same rule as `scripts/cppcheck-suppressions.txt`.
-   Note that compiler diagnostics surfaced as `clang-diagnostic-*` are not
-   reliably suppressed by NOLINT; use a local
-   `#pragma GCC diagnostic ignored "-Wformat-security"` instead — the
-   GCC-style pragma is accepted by both compilers (see
-   `OpenBrewByWeightWebhook.cpp` for an example).
+1. Add the check to `Checks` in `.clang-tidy`.
+2. Run `./scripts/static-tidy-idf -a n16r8` and fix every finding in the code.
+3. If a finding looks impossible to fix without making the code worse, raise
+   it for review before changing any configuration.
 
 **Caution with `clang-tidy -fix`:** fixes are applied for every file that
 contributed diagnostics, including headers outside this repository (the

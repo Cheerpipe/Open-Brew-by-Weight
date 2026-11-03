@@ -1,9 +1,8 @@
 # Static analysis configuration for Open Brew by Weight.
 # Run through scripts/static-tidy (Espressif esp-clang clang-tidy) against the
-# ESP-IDF compilation database. The check set starts deliberately small: every
-# enabled check must pass on the current codebase, so a failing run means a
-# real regression. Grow it one check at a time and document any NOLINT with a
-# comment explaining why, mirroring scripts/cppcheck-suppressions.txt.
+# ESP-IDF compilation database. No check is disabled and the codebase is clean
+# against all of them, so a failing run means a real regression. Fix findings
+# in the code; the project uses no NOLINT.
 #
 # Diagnostics are NOT promoted to errors here (WarningsAsErrors is empty on
 # purpose): promoted errors bypass the header filter and would fail the run on

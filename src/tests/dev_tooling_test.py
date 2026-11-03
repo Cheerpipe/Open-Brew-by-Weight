@@ -1072,9 +1072,8 @@ for validate_args, environment, expected in (
         (["src/web/app.js"], "EN_us", "en-us"),
         (["--webui-language=FR_ca", "src/web/app.js"], "en", "fr-ca")):
     validate_steps = validate_language_steps(validate_args, environment)
-    build_steps = [argv for name, argv in validate_steps
-                   if name.startswith(("idf-", "warnings-"))]
-    assert len(build_steps) == 6
+    build_steps = [argv for name, argv in validate_steps if name.startswith("idf-")]
+    assert len(build_steps) == 3
     assert all(argv.count("--webui-language") == 1 and
                argv[argv.index("--webui-language") + 1] == expected
                for argv in build_steps), build_steps
@@ -1098,8 +1097,8 @@ assert len(r2_release) == 3 and all(
 # Host tests and firmware work run as two parallel lanes. Every step that
 # touches IDF trees, the shared Web UI header, or the CLI store stays serial in
 # the firmware lane: route capacity before Web contracts, then per variant the
-# budget build, cppcheck over its database, and the separate warnings build,
-# then one dead-code check over every variant.
+# budget build and cppcheck over its database, then one dead-code check over
+# every variant.
 host_lane, firmware_lane = validate_language_steps(["src/web/app.js"], lanes=True)
 assert [name for name, _ in host_lane] == [
     f"{stage}-{preset}" for preset in ("normal", "asan-ubsan", "tsan")
@@ -1110,7 +1109,7 @@ assert firmware_names[:4] == ["http-route-capacity", "web-budgets", "web-contrac
 assert firmware_names[4:] == [f"{kind}-{hardware}--{machine}"
                               for hardware, machine in dev_module["BUILD_PROFILES"]
                               for kind in ("idf", "stack", "release", "stack-release",
-                                           "cppcheck", "warnings")] + ["dead-code"], firmware_names
+                                           "cppcheck")] + ["dead-code"], firmware_names
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for name, argv in host_lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
@@ -1790,11 +1789,10 @@ for removed_alias in ("b", "bf", "bfm", "bo", "bsfm", "build", "f", "flash",
         f"legacy Arduino-era alias remains: {removed_alias}"
 assert not re.search(r"--(?:token|password)\s+['\"]", scripts_text), \
     "credentials must not be forwarded in argv"
-for analyzer in ("warnings-idf", "gcc_analyzer"):
-    analyzer_text = (ROOT / "scripts" / analyzer).read_text()
-    assert "./scripts/internal/build-idf" in analyzer_text
-    # Profile defines reach the build only through the forwarded switches.
-    assert "obbw_cli_flags_for development release no_auth_admin jtag" in analyzer_text
+analyzer_text = (ROOT / "scripts/gcc_analyzer").read_text()
+assert "./scripts/internal/build-idf" in analyzer_text
+# Profile defines reach the build only through the forwarded switches.
+assert "obbw_cli_flags_for development release no_auth_admin jtag" in analyzer_text
 dead_code_text = (ROOT / "scripts/dead-code-idf").read_text()
 analysis_flags = re.search(r'ANALYSIS_FLAGS="([^"]+)"', dead_code_text)[1].split()
 project_only = re.search(r'_opt MATCHES "\^-f\(([^)]+)\)\$"',
