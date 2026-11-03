@@ -199,8 +199,8 @@ void machineIntegrationCompanionPing(bool upstreamAlive) { service.companionPing
 void machineIntegrationCompanionSyncHold(bool on) { service.companionSyncHold(on); }
 
 void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
-                                         uint32_t tokenRenewInS, bool refused) {
-  service.companionUpstream(subscribed, epoch, tokenRenewInS, refused);
+                                         uint32_t tokenRenewInS, bool refused, bool policy) {
+  service.companionUpstream(subscribed, epoch, tokenRenewInS, refused, policy);
 }
 
 void machineIntegrationCompanionCredentials(uint32_t generation, bool ok) {

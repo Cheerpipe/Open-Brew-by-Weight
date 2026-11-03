@@ -267,7 +267,7 @@ secrets directory and never in logs.
 | Frame | Meaning |
 | --- | --- |
 | `{"t":"ping","up":true}` | Liveness; `up` is true while its La Marzocco subscription is open and alive. Every 15 s while the route is `companion`, every 120 s otherwise; none during a sync hold, and one at once when it ends |
-| `{"t":"lm","sub":true,"ep":12,"tok":2400,"err":"auth"}` | Its La Marzocco state: subscribed, its subscription epoch, seconds until its next token renewal, and `"err":"auth"` while the cloud refuses its dashboard reads or commands (401/403) with the subscription still open. Sent on every change and after `cfg` |
+| `{"t":"lm","sub":true,"ep":12,"tok":2400,"err":"auth"}` | Its La Marzocco state: subscribed, its subscription epoch, seconds until its next token renewal, and `"err":"auth"` while the cloud refuses its dashboard reads or commands (401/403) with the subscription still open. `"policy":true` joins `err` only while that refusal is La Marzocco's pending-policy 403 (`USER_MUST_ACCEPT_POLICY`); the controller then reports `policy_required` and clears it when a frame without `policy` follows. Sent on every change and after `cfg` |
 | `{"t":"creds","gen":3,"ok":true}` | Credentials stored and signed in; `"ok":false` when La Marzocco rejected them |
 | `{"t":"st","k":"read","ep":12,"ac":7,"d":{…}}` | Machine state (below); a `push` has no `ac` |
 | `{"t":"res","id":7,"r":"accepted"}` | Command result: `accepted` or `failed` with `"http":<status>` (0 for a transport failure) |

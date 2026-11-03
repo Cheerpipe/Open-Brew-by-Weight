@@ -65,7 +65,8 @@ void machineIntegrationCompanionPing(bool upstreamAlive);
 // A sync hold started or ended: the companion pings neither during it.
 void machineIntegrationCompanionSyncHold(bool on);
 void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
-                                         uint32_t tokenRenewInS, bool refused = false);
+                                         uint32_t tokenRenewInS, bool refused = false,
+                                         bool policy = false);
 void machineIntegrationCompanionCredentials(uint32_t generation, bool ok);
 MicraCompanionIngress machineIntegrationCompanionIngress();
 // `dashboard` is the `d` object of an `st` frame. False rejects a push (the

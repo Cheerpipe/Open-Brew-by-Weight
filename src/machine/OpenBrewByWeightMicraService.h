@@ -71,7 +71,7 @@ class OpenBrewByWeightMicraService {
   void companionPing(bool upstreamAlive);
   void companionSyncHold(bool on);
   void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS,
-                         bool refused = false);
+                         bool refused = false, bool policy = false);
   void companionCredentials(uint32_t generation, bool ok);
   MicraCompanionIngress companionIngress();
   bool companionState(MicraCompanionStateKind kind, uint32_t epoch, uint32_t afterCommand,
@@ -328,6 +328,8 @@ class OpenBrewByWeightMicraService {
   // and command paths read the route without taking mux_.
   std::atomic<bool> companionLink_{false};
   std::atomic<bool> companionRoute_{false};
+  // The companion's reads meet the account's pending La Marzocco policy.
+  std::atomic<bool> companionPolicy_{false};
   std::atomic<void (*)()> companionNotify_{nullptr};
 };
 

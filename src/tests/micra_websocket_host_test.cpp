@@ -1953,6 +1953,16 @@ struct MicraWebSocketTest {
     assert(!service.companionRouteStatus().upstreamRefused);
     assert(service.serviceCompanion());
     assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+    // A pending La Marzocco policy met by the companion is the account's
+    // state; only the companion reporting its end clears it.
+    service.companionUpstream(true, 7, 3000, true, true);
+    assert(service.status().error == LineaMicraError::POLICY_REQUIRED);
+    service.companionUpstream(true, 7, 3000, true);
+    assert(service.status().error == LineaMicraError::NONE);
+    service.companionUpstream(true, 7, 3000, true, true);
+    service.companionLink(false, true);
+    service.companionUpstream(true, 7, 3000);
+    assert(service.status().error == LineaMicraError::POLICY_REQUIRED);
     finish(service);
   }
   // During a sync hold (a shot) the companion does not ping and the route

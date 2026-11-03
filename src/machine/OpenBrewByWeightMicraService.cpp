@@ -2096,6 +2096,7 @@ void OpenBrewByWeightMicraService::deferObservation(
 }
 
 LineaMicraError OpenBrewByWeightMicraService::classifyFailure() const {
+  if (companionRoute_.load() && companionPolicy_.load()) return LineaMicraError::POLICY_REQUIRED;
   if (work_ != nullptr) {
     if (work_->policyRequired) return LineaMicraError::POLICY_REQUIRED;
     if (work_->httpStatus == 401) return LineaMicraError::INVALID_AUTH;

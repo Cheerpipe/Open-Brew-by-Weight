@@ -293,8 +293,11 @@ void OpenBrewByWeightMicraService::companionLink(bool ready, bool lmSwitch) {
     from = feed.status.route;
     feed.lmSwitch = lmSwitch;
     if (!ready || !lmSwitch) leaveCompanionLocked(ready ? "switch_off" : "link_lost", !ready);
-    if (!ready) feed.up = feed.status.upstreamSubscribed = feed.status.upstreamRefused =
-                     feed.status.credentialsConfirmed = false;
+    if (!ready) {
+      feed.up = feed.status.upstreamSubscribed = feed.status.upstreamRefused =
+          feed.status.credentialsConfirmed = false;
+      companionPolicy_.store(false);
+    }
     refreshCompanionConfigLocked();
     companionLink_.store(ready, std::memory_order_release);
     to = feed.status.route;
@@ -324,11 +327,18 @@ void OpenBrewByWeightMicraService::companionSyncHold(bool on) {
 }
 
 void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t epoch,
-                                                     uint32_t tokenRenewInS, bool refused) {
+                                                     uint32_t tokenRenewInS, bool refused,
+                                                     bool policy) {
   bool reset = false;
   {
     TaskLockGuard lock(mux_);
     auto &feed = companion_;
+    // The policy belongs to the account: the companion meeting it is a direct
+    // 403's state, and only its own report that it ended clears it.
+    if (policy) published_.error = LineaMicraError::POLICY_REQUIRED;
+    else if (companionPolicy_.load() && published_.error == LineaMicraError::POLICY_REQUIRED)
+      published_.error = LineaMicraError::NONE;
+    companionPolicy_.store(policy);
     feed.status.upstreamSubscribed = subscribed;
     feed.status.upstreamRefused = refused;
     feed.status.upstreamEpoch = epoch;
