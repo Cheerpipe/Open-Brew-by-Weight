@@ -399,7 +399,8 @@
 // for Export, which shows only when the page came through the companion.
 {
   const assert = require('assert').strict;
-  assert(codeIncludes(viewJs.diagnostic, 'headers:R.webUiHeaders(body&&{"Content-Type":"application/json"})'),
+  assert(codeIncludes(runtimeJs, 'async function companionLog(') &&
+         codeIncludes(runtimeJs, 'headers:webUiHeaders(body&&{"Content-Type":"application/json"})'),
       'history requests carry the Web UI session');
   assert(codeIncludes(viewJs.diagnostic, 'await(await companionLog(logHistoryQuery())).json()') &&
          codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export"+(range?"?"+range:""))'),
@@ -422,12 +423,16 @@
   assert(codeIncludes(viewJs.diagnostic, 'LOG_HISTORY_PAGE=500,LOG_HISTORY_CAP=20000') &&
          codeIncludes(viewJs.diagnostic, 'logHistory.length>=LOG_HISTORY_CAP'),
       'the view stops loading past the cap');
-  // D14: Delete the log history shows only through the companion with Admin
-  // unlocked here, follows the unlock, and posts through the same helper.
-  assert(codeIncludes(viewJs.diagnostic, '$("logDeleteButton").hidden=!here||!R.adminUnlockedHere()') &&
-         codeIncludes(viewJs.diagnostic, 'admin:()=>R.activeView==="diagnostic"&&logHistoryControls()') &&
-         codeIncludes(viewJs.diagnostic, 'await companionLog("/__companion/log/delete",{})'),
-      'Delete the log history follows the Admin unlock');
+  // D14: Clear log history sits with the other record clears in Admin, shows
+  // only through the companion, asks first, posts through the shared Web UI
+  // session helper, and has Diagnostic start its view over on its next show.
+  assert(partialHtml.admin.includes('id="clearLogHistoryButton" class="btnGlyph mutable btnInvert" type="button" hidden') &&
+         !partialHtml.diagnostic.includes('logDeleteButton') &&
+         codeIncludes(viewJs.admin, '$("clearLogHistoryButton").hidden=!here?.paired') &&
+         codeIncludes(viewJs.admin, 'await R.companionLog("/__companion/log/delete",{});R.uiState.logHistoryCleared=true') &&
+         codeIncludes(runtimeJs, 'headers:webUiHeaders(body&&{"Content-Type":"application/json"})') &&
+         codeIncludes(viewJs.diagnostic, 'if(R.uiState.logHistoryCleared){R.uiState.logHistoryCleared=false;jumpLog(null)}'),
+      'Clear log history lives in Admin and follows the companion');
 }
 // logZoneOffsetMinutes answers the zone's offset at each instant: January and
 // July of a DST zone differ, and a missing zone or one Intl rejects falls

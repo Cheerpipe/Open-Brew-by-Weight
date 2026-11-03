@@ -12,10 +12,16 @@ credentials. Firmware on the flash is not erased.
 ## Clear a history
 
 To start a shot or activation history over without resetting anything else,
-unlock Admin and open **Shot and activation history**: **Clear shot history**
-empties Stats and **Clear activation history** empties History. Each asks you
-to confirm, cannot be undone, and leaves the other history, your settings and
-presets as they are. Export what you want to keep from Stats or History first.
+unlock Admin and open **Shot, activation and log history**: **Clear shot
+history** empties Stats and **Clear activation history** empties History. Each
+asks you to confirm, cannot be undone, and leaves the other history, your
+settings and presets as they are. Export what you want to keep from Stats or
+History first.
+
+When you open the Web UI through a [companion](../features/companion.md#the-diagnostic-logs-history),
+**Clear log history** appears there too. It deletes the diagnostic log history
+the companion keeps; the controller keeps its own recent log, so the
+Diagnostic log still shows the latest events.
 
 Clearing empties the whole list, including the copy a
 [companion](../features/companion.md#deleting-records) keeps, older records it

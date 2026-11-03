@@ -1461,6 +1461,11 @@ function startLogStream() {
   if (R.webUiPollingActive()) {
     if (!logStreamWanted) {
       logStreamWanted = true;
+      // Admin cleared the companion's log history since this view last showed.
+      if (R.uiState.logHistoryCleared) {
+        R.uiState.logHistoryCleared = false;
+        jumpLog(null);
+      }
       R.sendUiOperation({ op: "log", on: true, after: lastLog });
     }
     return true;
@@ -1634,8 +1639,6 @@ function updateLogHealth(d) {
 const logStream = {
   // Log frames carry their own cursor: a pending resync must not drop them.
   cursor: true,
-  // Delete the log history follows this screen's Admin unlock.
-  admin: () => R.activeView === "diagnostic" && logHistoryControls(),
   subscribe: () => (logStreamWanted ? { op: "log", on: true, after: lastLog } : null),
   frame(data) {
     if (logStreamWanted) applyLogFrame(logStreamFrame(data));
@@ -1670,18 +1673,6 @@ function logHistoryAvailable() {
   return !!R.uiState.companionHere?.paired;
 }
 const logHistoryFull = () => logHistory.length >= LOG_HISTORY_CAP;
-// The companion answers only a browser the controller lets open the Web UI,
-// so the history goes out with this screen's session.
-async function companionLog(path, body) {
-  const reply = await fetch(path, {
-    cache: "no-store",
-    ...(body && { method: "POST", body: JSON.stringify(body) }),
-    headers: R.webUiHeaders(body && { "Content-Type": "application/json" }),
-  });
-  if (!reply.ok)
-    throw Object.assign(Error(String(reply.status)), await reply.json().catch(() => null));
-  return reply;
-}
 // A datetime-local value read on the controller's clock, as the log shows it.
 function logWallSec(value) {
   const at = Date.parse(value + "Z") / 1000;
@@ -1711,7 +1702,7 @@ async function loadLogOlder() {
     jumped = logJumpAt != null && !logHistory.length;
   try {
     for (let pages = 0, added = false; !added && !logHistoryDone && pages < 8; pages++) {
-      const page = await (await companionLog(logHistoryQuery())).json();
+      const page = await (await R.companionLog(logHistoryQuery())).json();
       if (!page || !Array.isArray(page.entries)) throw Error();
       // The page is newest first: flip it onto the front of the history.
       logHistory = page.entries.slice().reverse().concat(logHistory);
@@ -1756,7 +1747,6 @@ function logHistoryControls() {
   $("logHistoryTools").hidden = !here;
   $("logLatestButton").hidden = !here || logJumpAt == null;
   $("logExportButton").hidden = !here;
-  $("logDeleteButton").hidden = !here || !R.adminUnlockedHere();
   if (!here) return;
   const note = $("logHistoryNote");
   note.hidden = !(empty || logHistoryFull());
@@ -1776,31 +1766,12 @@ function exportLogHistory() {
   }
   const range = q.toString();
   downloadText(
-    companionLog("/__companion/log/export" + (range ? "?" + range : "")).then((reply) =>
+    R.companionLog("/__companion/log/export" + (range ? "?" + range : "")).then((reply) =>
       reply.text(),
     ),
     "log-history.json",
     __WEBUI_TEXT__("diagnostic.log_export_failed"),
   );
-}
-// The companion's copy of the log goes; the controller keeps its own recent
-// log, which the view shows as before.
-async function deleteLogHistory() {
-  if (
-    !(await R.askConfirm(
-      __WEBUI_TEXT__("diagnostic.log_delete_confirm"),
-      __WEBUI_TEXT__("records.delete"),
-      true,
-    ))
-  )
-    return;
-  try {
-    await companionLog("/__companion/log/delete", {});
-    jumpLog(null);
-    R.message(__WEBUI_TEXT__("diagnostic.log_deleted"), "ok");
-  } catch (e) {
-    R.message(R.formatCommandError(__WEBUI_TEXT__("diagnostic.log_delete_failed"), e), "error");
-  }
 }
 function renderLogHistoryNote() {
   // Opened directly, with a paired companion keeping the log: name where the
@@ -1892,7 +1863,6 @@ export function init() {
   $("logLatestButton").onclick = () => jumpLog(null);
   $("copyLogButton").onclick = () => copyText($("log").value);
   $("logExportButton").onclick = () => exportLogHistory();
-  $("logDeleteButton").onclick = () => void deleteLogHistory();
   $("clearLogButton").onclick = () => clearLogView();
   $("auditVerboseButton").onclick = () => toggleAuditHunt();
   $("auditClearButton").onclick = () => emptyAudit();

@@ -744,6 +744,7 @@ function applyCompanionStatus(c) {
 function companionCopy(here) {
   const a = here?.archive,
     row = $("companionCopyRow");
+  $("clearLogHistoryButton").hidden = !here?.paired;
   if (!row) return;
   row.hidden = !a?.on || !a.replica;
   if (row.hidden) return;
@@ -2402,6 +2403,27 @@ export function init() {
         };
       },
     );
+  // The companion's copy of the log goes; the controller keeps its own recent log.
+  $("clearLogHistoryButton").onclick = async () => {
+    if (
+      !(await R.askConfirm(
+        __WEBUI_TEXT__("admin.clear_log_history_confirm"),
+        __WEBUI_TEXT__("admin.clear"),
+        true,
+      ))
+    )
+      return;
+    try {
+      await R.companionLog("/__companion/log/delete", {});
+      R.uiState.logHistoryCleared = true;
+      R.message(__WEBUI_TEXT__("admin.log_history_cleared"), "ok");
+    } catch (e) {
+      R.message(
+        R.formatCommandError(__WEBUI_TEXT__("admin.could_not_clear_log_history"), e),
+        "error",
+      );
+    }
+  };
   $("factoryResetButton").onclick = () => {
     if (
       confirm(

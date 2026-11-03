@@ -199,10 +199,11 @@ continuous history:
   which downloads the whole history, or only the events between **Export
   from** and **Export to**. **Clear** only clears what this screen shows; the
   history stays.
-- Also through the companion, while Admin is unlocked, **Delete the log
-  history** deletes the companion's copy after you confirm. The controller
-  keeps its own recent log, which the view keeps showing. It needs the
-  controller on, to confirm that Admin is unlocked on your screen.
+- Also through the companion, Admin's **Shot, activation and log history**
+  offers **Clear log history**, which deletes the companion's copy after you
+  confirm. The controller keeps its own recent log, which the Diagnostic log
+  keeps showing. It needs the controller on, to confirm that Admin is
+  unlocked on your screen.
 - Opened **directly**, the log shows what the controller holds, with a note
   that the older history is in the companion.
 - The companion's own page (its address, then **Companion**) shows the whole

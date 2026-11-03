@@ -310,6 +310,8 @@ const uiState = {
   shotStats: {},
   // The companion this page came through: its own status, or null.
   companionHere: null,
+  // Admin cleared the companion's log history; Diagnostic starts its view over.
+  logHistoryCleared: false,
 };
 let bootId = 0,
   configRevision = 0,
@@ -2780,6 +2782,18 @@ async function fetchJson(path, options, ms = 8e3) {
 }
 // The firmware serves plain HTTP, so only an https: page may have come through
 // the companion; its status answers at a same-origin path.
+// The companion's diagnostic log answers only a browser the controller lets open the Web UI,
+// so its requests go out with this screen's session.
+async function companionLog(path, body) {
+  const reply = await fetch(path, {
+    cache: "no-store",
+    ...(body && { method: "POST", body: JSON.stringify(body) }),
+    headers: R.webUiHeaders(body && { "Content-Type": "application/json" }),
+  });
+  if (!reply.ok)
+    throw Object.assign(Error(String(reply.status)), await reply.json().catch(() => null));
+  return reply;
+}
 let companionHereLoad = null;
 function companionHere(fresh) {
   if (location.protocol !== "https:") return Promise.resolve(null);
@@ -7622,6 +7636,7 @@ export {
   adminUnlockedHere,
   webUiOverrideFor,
   companionHere,
+  companionLog,
   companionPairable,
   webUiStandalone,
   pairCompanionHere,

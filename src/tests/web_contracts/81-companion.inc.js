@@ -110,18 +110,22 @@
   }
   {
     // S3: through the companion, Admin → Companion shows how far its copy of
-    // the history is and how many pages it answered itself.
-    const els = {companionCopyRow: {hidden: true}, companionCopyState: {}, companionCopyCounts: {}};
+    // the history is and how many pages it answered itself; Records offers
+    // Clear log history only then.
+    const els = {companionCopyRow: {hidden: true}, companionCopyState: {}, companionCopyCounts: {},
+      clearLogHistoryButton: {hidden: true}};
     const run = vm.createContext({$: (id) => els[id],
       R: {sub: (text, args) => text.replace(/\{(\d)\}/g, (_, i) => args[i])}});
     vm.runInContext(blockAt(adminJs, 'function companionCopy('), run);
     run.companionCopy(null);
     assert.equal(els.companionCopyRow.hidden, true, 'opened directly: no row');
+    assert.equal(els.clearLogHistoryButton.hidden, true, 'opened directly: no log history to clear');
     run.companionCopy({archive: {on: false, replica: {shots: 'off', history: 'off'}}});
     assert.equal(els.companionCopyRow.hidden, true, 'archive off: no row');
-    run.companionCopy({archive: {on: true, replica: {shots: 'current', history: 'catchingUp'}, served: 12,
+    run.companionCopy({paired: true, archive: {on: true, replica: {shots: 'current', history: 'catchingUp'}, served: 12,
       fallbacks: 1, catchUpFetches: 3}});
     assert.equal(els.companionCopyRow.hidden, false);
+    assert.equal(els.clearLogHistoryButton.hidden, false, 'through the companion: Clear log history');
     assert.equal(els.companionCopyState.textContent, 'Shots up to date · History catching up');
     assert.equal(els.companionCopyCounts.textContent,
         'Pages answered from the copy: 12 · Pages passed to the controller: 1 · Requests for missing records: 3');
