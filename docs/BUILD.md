@@ -407,7 +407,7 @@ override matching choices. Review Diagnostic build identity and options before
 installation.
 
 The build renders the selected catalog into
-`build-idf/<hardware-id>--<machine-id>/generated/OpenBrewByWeightWebAssetsGzip.h`,
+`build-idf/<hardware-id>--<machine-id>/generated/OpenBrewByWeightWebAssetsGzip.cpp`,
 generates version identity and
 `build-idf/<hardware-id>--<machine-id>/openbrewbyweight.bin`, then checks image and
 memory budgets. Use only the image for the intended profile pair. The supported partition layout has

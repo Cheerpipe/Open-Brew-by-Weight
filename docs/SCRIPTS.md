@@ -240,12 +240,15 @@ matches; see [Validation](../VALIDATION.md#size-budgets-and-parallel-work) for
 the parallel-work rules.
 
 The Web UI generator keeps every Zopfli-compressed asset in
-`build-host/zopfli-cache/`, keyed by the asset's bytes, the compression
-options, and the Zopfli version, and uses a cached copy only after checking
-that it decompresses to the same bytes; `./scripts/dev clean` removes it.
-Each firmware build generates its Web UI header in its own tree,
-`<build>/generated/OpenBrewByWeightWebAssetsGzip.h`. The Web contracts write
-theirs under `src/` and take turns behind `build-idf/.locks/web-ui-header.lock`.
+`build-host/zopfli-cache/` of the main checkout, which worktrees share, keyed
+by the asset's bytes, the compression options, and the Zopfli version. It uses
+a cached copy only after checking that it decompresses to the same bytes;
+`./scripts/dev clean` in the main checkout removes it.
+Each firmware build generates the Web UI in its own tree: a small stable
+`<build>/generated/OpenBrewByWeightWebAssetsGzip.h` and the content in the
+`.cpp` beside it, so a Web UI change does not recompile the network code. The
+Web contracts write theirs under `build-host/webui/` and take turns behind
+`build-idf/.locks/web-ui-header.lock`.
 Two builds of the same tree take turns behind that tree's lock under
 `<build root>/.locks/`; different trees build in parallel, and only their CMake
 configures take turns behind `build-idf/.locks/idf-configure.lock`, because

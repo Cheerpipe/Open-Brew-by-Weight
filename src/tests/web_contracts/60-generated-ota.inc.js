@@ -45,11 +45,11 @@ if (!zlib.gunzipSync(Buffer.from(browserGzip)).equals(tarFixture)) {
 if (!generated.assetTag || !generated.cacheVersion ||
     !generated.html.includes(`src="/app.js?v=${generated.assetTag}"`) ||
     generated.html.includes(`v=${generated.cacheVersion}`) ||
-    !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebAssetsGzip.h'), 'utf8')
+    !fs.readFileSync(generated.sourceOutputPath, 'utf8')
          .includes(`WEB_UI_ASSET_TAG[] = "${generated.assetTag}"`) ||
-    !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebAssetsGzip.h'), 'utf8')
+    !fs.readFileSync(generated.sourceOutputPath, 'utf8')
          .includes(`WEB_UI_ETAG[] = ${JSON.stringify('"' + generated.cacheVersion + '"')}`) ||
-    !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebAssetsGzip.h'), 'utf8')
+    !fs.readFileSync(generated.sourceOutputPath, 'utf8')
          .includes(`WEB_UI_ASSET_ETAG[] = ${JSON.stringify('"' + generated.assetTag + '"')}`)) {
   throw new Error('Asset URLs and their ETag must carry the content tag alone; the shell ETag embeds FW version + tag');
 }
@@ -257,7 +257,7 @@ try {
   changedFixture.clean();
 }
 
-const generatedHeaderPath = path.join(sketchDir, 'OpenBrewByWeightWebAssetsGzip.h');
+const generatedHeaderPath = generated.sourceOutputPath;
 const generatedHeader = fs.readFileSync(generatedHeaderPath, 'utf8');
 for (const forbidden of ['__WEBUI_', '{{webui:', 'schemaVersion', 'shell.open_brew']) {
   localeAssert.ok(!generatedHeader.includes(forbidden),
@@ -573,7 +573,7 @@ if (!network.includes('#include <OpenBrewByWeightWebAssetsGzip.h>') ||
 if (!network.includes('OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP') ||
     !network.includes('OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP_LEN') ||
     !network.includes('for (const WebAsset &asset : WEB_ASSETS)') ||
-    !generatedHeader.includes('const WebAsset WEB_ASSETS[] = {') ||
+    !generatedHeader.includes(`const WebAsset WEB_ASSETS[${generated.assets.length}] = {`) ||
     generatedHeader.includes('_PARTIAL_') ||
     !network.includes('WEB_UI_ETAG') ||
     network.includes('OPEN_BREW_BY_WEIGHT_WEB_PARTIAL_HOME_GZIP') ||

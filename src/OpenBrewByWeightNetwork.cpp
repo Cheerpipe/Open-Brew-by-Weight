@@ -29,8 +29,7 @@
 #include "OpenBrewByWeightWebAccessStore.h"
 #include "OpenBrewByWeightWebhook.h"
 
-// Each build tree generates its own Web UI header; the angle include skips the
-// Web contracts' copy under src/.
+// Each build tree generates its own Web UI header and content unit.
 #include <OpenBrewByWeightWebAssetsGzip.h>
 #include "OpenBrewByWeightErrorReasonTexts.h"
 

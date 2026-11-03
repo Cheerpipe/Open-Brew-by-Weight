@@ -13,7 +13,8 @@ set(OPEN_BREW_BY_WEIGHT_SRCS
   "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightScaleWorker.cpp"
   "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightNetwork.cpp"
   "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightOta.cpp"
-  "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightWebhook.cpp")
+  "${OPEN_BREW_BY_WEIGHT_DIR}/OpenBrewByWeightWebhook.cpp"
+  "${CMAKE_BINARY_DIR}/generated/OpenBrewByWeightWebAssetsGzip.cpp")
 
 set(OPEN_BREW_BY_WEIGHT_REQUIRES
   arduino-esp32
@@ -90,3 +91,7 @@ add_custom_command(
 add_custom_target(openbrewbyweight_error_reason_texts
   DEPENDS "${OBBW_ERROR_TEXTS_HEADER}")
 add_dependencies(${COMPONENT_LIB} openbrewbyweight_error_reason_texts)
+# scripts/internal/build-idf writes the Web UI content before every build;
+# the first configure of a fresh tree runs before it exists.
+set_source_files_properties(
+  "${CMAKE_BINARY_DIR}/generated/OpenBrewByWeightWebAssetsGzip.cpp" PROPERTIES GENERATED TRUE)

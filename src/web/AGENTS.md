@@ -1,7 +1,7 @@
 # Web UI instructions
 
 - Edit `src/web/css/`, `src/web/app.js`, `src/web/html/`, and `src/web/js/`.
-  Never edit generated `src/OpenBrewByWeightWebAssetsGzip.h` by hand.
+  Never edit the generated `OpenBrewByWeightWebAssetsGzip.{h,cpp}` by hand.
 - The stylesheet ships as one `/app.css`: `CSS_SOURCES` in
   `scripts/localize_web_ui.js` owns the layer order — tokens, shell, shared
   components, views, global — and the generator fails on any `src/web/css`

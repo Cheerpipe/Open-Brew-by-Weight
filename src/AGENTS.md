@@ -1,8 +1,8 @@
 # Firmware instructions
 
 - Editable sources are `src/*.{h,cpp,ino}`; generated
-  `OpenBrewByWeightVersion.h` and `OpenBrewByWeightWebAssetsGzip.h` must be regenerated,
-  not hand-edited.
+  `OpenBrewByWeightVersion.h` must be regenerated, not hand-edited. The Web UI
+  header and source are generated into each build tree.
 - Read `docs/ARCHITECTURE.md`, `docs/STATE_MACHINES.md`, and
   `docs/RESOURCE_OWNERSHIP.md` only when the affected boundary requires them.
 - Control, safety, machine, relay, ISR, watchdog, boot, GPIO, and remote-control
