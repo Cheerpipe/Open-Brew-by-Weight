@@ -704,6 +704,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   // The La Marzocco frames use the rest only on Linea Micra builds.
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   uint32_t first = 0, second = 0, third = 0;
+  bool flag2 = false;
   char text[12] = {};
 #endif
   if (!strcmp(type, "ping") && jsonBoolean(frame, "up", flag)) {
