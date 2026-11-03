@@ -234,6 +234,15 @@ fi
 
 obbw_idf_verify_firmware
 
+# A local path in an image exposes the developer's machine and makes its size
+# depend on the checkout; idf/CMakeLists.txt maps them all away.
+for local_path in "$root" "$HOME" ../src/ ../idf/ ../libraries/; do
+  if LC_ALL=C grep -aqF "$local_path" "$IDF_IMAGE"; then
+    echo "Image contains the local path $local_path; check -fmacro-prefix-map." >&2
+    exit 1
+  fi
+done
+
 python -m esp_idf_size --format json2 -o "$IDF_BUILD_DIR/size.json" \
   "$IDF_MAP"
 # Only a flag-free release build is the shipped image its baseline describes.

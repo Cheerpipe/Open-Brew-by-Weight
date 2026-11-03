@@ -122,6 +122,15 @@ def tree_state() -> dict[str, object]:
                             for path in BUDGET_FILES}}
 
 
+def ccache_fill_warning(stats: str) -> list[str]:
+    """A full cache evicts objects, which silently turns warm builds cold."""
+    fill = re.search(r"Cache size .*\(([\d.]+)%\)", stats)
+    if fill and float(fill[1]) >= 95:
+        return [f"warning: ccache is {fill[1]}% full, so warm builds recompile evicted objects; "
+                "raise its limit with `ccache -M 25G`"]
+    return []
+
+
 def budget_gate(evidence: bool, firmware: bool) -> dict[str, object]:
     """Gate options that measure budgets: every check records instead of
     failing, and one final verdict judges all of them together. Only the
@@ -634,6 +643,9 @@ def main() -> int:
             missing = require(tools[:5])
             lines.append(f"ccache: {shutil.which('ccache')}" if shutil.which("ccache") else
                          "ccache: not installed (optional; speeds up firmware rebuilds)")
+            if shutil.which("ccache"):
+                lines += ccache_fill_warning(subprocess.run(
+                    ["ccache", "-s"], text=True, capture_output=True).stdout)
             if shutil.which("brew") is not None:
                 stale = subprocess.run(
                     ["brew", "outdated", "--formula", "node", "cppcheck",

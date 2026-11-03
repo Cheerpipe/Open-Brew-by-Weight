@@ -1172,6 +1172,18 @@ assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for name, argv in host_lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
 
+# doctor warns when ccache is nearly full: evictions silently turn builds cold.
+fill_warning = dev_module["ccache_fill_warning"]
+assert fill_warning("  Cache size (GB):     7.6 /    25.0 (30.23%)") == []
+assert "99.98% full" in fill_warning("  Cache size (GiB):     5.0 /     5.0 (99.98%)")[0]
+assert fill_warning("no statistics") == []
+build_idf_source = (INTERNAL / "build-idf").read_text()
+assert 'grep -aqF "$local_path" "$IDF_IMAGE"' in build_idf_source
+assert '"$root" "$HOME" ../src/ ../idf/ ../libraries/' in build_idf_source
+idf_cmake = (ROOT / "idf/CMakeLists.txt").read_text()
+assert idf_cmake.index('-fmacro-prefix-map=${_obbw_relative_root}/=') < \
+    idf_cmake.index('-fmacro-prefix-map=${_obbw_relative_root}/idf=.')
+
 # Risk gates only report budget overruns; the quality gate is the one
 # budget evidence, and it alone runs the non-functional checks.
 validate_language_steps(["src/web/app.js"], risk="R2")

@@ -42,7 +42,11 @@ brew install git python cmake ninja cjson node cppcheck ccache
 
 `ccache` is optional on both systems. Firmware builds use it automatically
 when it is installed, and rebuilds after a flag or configuration change are
-much faster.
+much faster. Every validated build tree adds about 85 MB to the cache, so give
+it room with `ccache -M 25G`; `./scripts/dev doctor` warns when it is nearly
+full. Git worktrees inside the main checkout share the cache, so a new worktree
+reuses what the others compiled. Generated code is the same either way; only
+debug information may name the worktree that compiled an object first.
 
 <a id="linux"></a>
 

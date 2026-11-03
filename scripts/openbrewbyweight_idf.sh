@@ -285,6 +285,16 @@ obbw_idf_py_args() {
   if [[ -z "${IDF_CCACHE_ENABLE:-}" ]] && command -v ccache >/dev/null 2>&1; then
     export IDF_CCACHE_ENABLE=1
   fi
+  # Worktrees live inside the main checkout: hashing paths relative to it lets
+  # a new worktree reuse every object the others compiled. Generated code stays
+  # the same; only debug info may name the worktree that compiled first. ccache
+  # does not hash -fmacro-prefix-map, so changing the maps in idf/CMakeLists.txt
+  # must also change this namespace, or stale __FILE__ strings get reused.
+  local common_dir
+  common_dir="$(git -C "$OBBW_CLI_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" &&
+    export CCACHE_BASEDIR="${CCACHE_BASEDIR:-$(dirname "$common_dir")}" \
+      CCACHE_NOHASHDIR="${CCACHE_NOHASHDIR:-1}" \
+      CCACHE_NAMESPACE="${CCACHE_NAMESPACE:-openbrewbyweight-paths-1}"
   # The locked components never change during a build; the component
   # manager's new-version check would query the registry on every configure.
   export IDF_COMPONENT_CHECK_NEW_VERSION="${IDF_COMPONENT_CHECK_NEW_VERSION:-0}"

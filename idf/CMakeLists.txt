@@ -43,6 +43,17 @@ if(EXISTS "${_obbw_profile_manifest}")
 endif()
 
 idf_build_set_property(COMPILE_DEFINITIONS "BOARD_HAS_PSRAM" APPEND)
+# Paths in __FILE__ must not depend on the checkout, the tree depth, or ccache,
+# which rewrites them relative to the build tree when worktrees share its cache
+# (obbw_idf_py_args). Images then name src/... and ./managed_components/...;
+# the idf/ maps come last because the last matching map wins.
+get_filename_component(_obbw_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+file(RELATIVE_PATH _obbw_relative_root "${CMAKE_BINARY_DIR}" "${_obbw_root}")
+string(REGEX REPLACE "/+$" "" _obbw_relative_root "${_obbw_relative_root}")
+idf_build_set_property(COMPILE_OPTIONS "-fmacro-prefix-map=${_obbw_root}/=" APPEND)
+idf_build_set_property(COMPILE_OPTIONS "-fmacro-prefix-map=${_obbw_relative_root}/=" APPEND)
+idf_build_set_property(COMPILE_OPTIONS "-fmacro-prefix-map=${_obbw_root}/idf=." APPEND)
+idf_build_set_property(COMPILE_OPTIONS "-fmacro-prefix-map=${_obbw_relative_root}/idf=." APPEND)
 # Every C/C++ unit writes GCC call-graph info beside its object for the
 # stack-depth gate (scripts/check_stack_depth.py); generated code is unchanged
 # and ccache restores the file on a hit.

@@ -264,9 +264,16 @@ required validation gate. Missing dependencies are reported as failures;
 scripts never install them automatically. `doctor` also reports each tool's
 resolved path and version and warns when a Homebrew-managed tool is outdated,
 so checks always run against the machine's current releases. It also shows
-whether the optional `ccache` is installed: when it is, firmware builds use it
-automatically, which makes rebuilds after a flag or configuration change much
-faster. Set `IDF_CCACHE_ENABLE=0` to build without it.
+whether the optional `ccache` is installed, and warns when it is nearly full:
+when it is installed, firmware builds use it automatically, and worktrees share
+it (`CCACHE_BASEDIR` is the main checkout), which makes rebuilds after a flag
+or configuration change and first builds in a new worktree much faster. Set
+`IDF_CCACHE_ENABLE=0` to build without it.
+
+Images name source files relative to the repository (`src/...`,
+`./managed_components/...`), whatever the checkout, the build tree, or ccache;
+a build fails if its image contains the checkout path, `$HOME`, or a path
+relative to the build tree.
 
 Node.js and Cppcheck carry no project version pin: every script resolves them
 from `PATH`, so install current releases with your package manager (see
