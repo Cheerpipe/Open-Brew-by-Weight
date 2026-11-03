@@ -326,8 +326,15 @@
   overflow-wrap: anywhere;
 }
 
+/* Each line clips to its own box, so all take the widest line's width: that
+   width is what scrolls sideways, and a line never falls out of view with it. */
+#log:not(.wrap) > #logLines {
+  width: max-content;
+  min-width: 100%;
+}
+
 /* Up to 20,000 lines: lines out of view skip rendering. */
-#log > div {
+#logLines > div {
   content-visibility: auto;
   contain-intrinsic-size: auto 1.125rem;
 }

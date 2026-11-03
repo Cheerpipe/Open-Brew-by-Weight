@@ -1626,6 +1626,7 @@ function renderLog() {
   // prepends, so a selection or a scrolled-back view survives; only a reader
   // already at the end follows new lines.
   const el = $("log"),
+    lines = $("logLines"),
     old = logShown,
     top = el.scrollTop,
     sh = el.scrollHeight,
@@ -1637,17 +1638,17 @@ function renderLog() {
   logAnchor = null;
   logShown = t;
   if (cut >= 0 && old.length - cut <= t.length && same(cut, 0, old.length - cut)) {
-    for (let i = 0; i < cut; i++) el.firstChild.remove();
+    for (let i = 0; i < cut; i++) lines.firstChild.remove();
     if (cut && !stick) el.scrollTop = top - sh + el.scrollHeight;
-    el.insertAdjacentHTML("beforeend", h.slice(old.length - cut).join(""));
+    lines.insertAdjacentHTML("beforeend", h.slice(old.length - cut).join(""));
   } else if (
     (pre = t.indexOf(old[0])) >= 0 &&
     pre + old.length <= t.length &&
     same(0, pre, old.length)
   ) {
-    el.insertAdjacentHTML("afterbegin", h.slice(0, pre).join(""));
-    el.insertAdjacentHTML("beforeend", h.slice(pre + old.length).join(""));
-  } else el.innerHTML = h.join("");
+    lines.insertAdjacentHTML("afterbegin", h.slice(0, pre).join(""));
+    lines.insertAdjacentHTML("beforeend", h.slice(pre + old.length).join(""));
+  } else lines.innerHTML = h.join("");
   if (anchor?.h) el.scrollTop = anchor.top + el.scrollHeight - anchor.h;
   else if (stick || anchor) el.scrollTop = el.scrollHeight;
   $("logCount").textContent = R.sub(__WEBUI_TEXT__("diagnostic.log_lines"), [t.length - markers]);

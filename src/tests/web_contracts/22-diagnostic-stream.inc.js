@@ -322,7 +322,7 @@
     set innerHTML(v) { this.rows = rows(v); this.sets++; },
     insertAdjacentHTML(at, v) { this.rows[at === 'afterbegin' ? 'unshift' : 'push'](...rows(v)); }};
   const ui = {logEvents: []}, count = {}, state = {shown: []},
-    nodes = {log: box, logCount: count, logFilter: {value: ''}, logLevelFilter: {value: '4'}};
+    nodes = {log: box, logLines: box, logCount: count, logFilter: {value: ''}, logLevelFilter: {value: '4'}};
   const lineOf = viewJs.diagnostic.slice(viewJs.diagnostic.indexOf('const logLineOf'),
       viewJs.diagnostic.indexOf('];\n', viewJs.diagnostic.indexOf('const logLineOf')) + 2);
   const makeRender = (logHistory, logBootId, zoneOffset = () => 0, diagConfig = null,
