@@ -7,7 +7,7 @@ const RECORDS_PRELUDE = [
   "downloadCsv", "actionMenu", "ICON_TRASH", "createFilterMenu", "armListSentinel",
   "archiveSources", "archiveStatsReady", "archiveChanged", "companionArchive", "archiveSource",
   "loadArchive", "recordOrder", "mergeRecords", "archiveMark", "archiveHeadings", "deleteItem",
-  "removeRecord", "archiveListNote",
+  "removeRecord", "archiveListNote", "streamArchive", "streamArchives",
 ];
 
 export default [
