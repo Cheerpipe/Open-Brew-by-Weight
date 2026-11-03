@@ -8,8 +8,9 @@ flash: [Build environment](BUILD.md). Script reference: [Build scripts](SCRIPTS.
 
 Cppcheck, clang-tidy and IWYU read the ESP-IDF compilation database
 (`build-idf/<hardware>--<machine>/compile_commands.json`) from a normal build.
-GCC `-fanalyzer` is different: its script builds with analysis enabled. Each tool
-deletes and recreates its own reports directory on every run.
+GCC `-fanalyzer` and the dead-code check are different: their scripts build
+with analysis enabled. Each tool deletes and recreates its own reports
+directory on every run.
 
 Before Cppcheck or clang-tidy starts, `audit_compile_commands.py` compares the
 database, the production source tree and the versioned translation-unit manifest.
@@ -20,6 +21,7 @@ reduce coverage.
 |------|--------|-------------------|----------|
 | Cppcheck | `./scripts/static-idf` | `reports/static-analysis/` | Fails (exit 1) on any warning/performance/portability/style finding |
 | GCC `-fanalyzer` | `./scripts/gcc_analyzer` | `reports/gcc-analyzer/` | Fails on diagnostics in versioned code (builds with the analyzer enabled) |
+| Dead functions | `./scripts/dead-code-idf` | `reports/dead-code/` | Fails on any project function that no validated build uses (builds every validated variant without inlining) |
 | clang-tidy | `./scripts/static-tidy-idf` | `reports/static-tidy/` | Fails on in-scope diagnostics, parse errors, or a tool error |
 | Include-What-You-Use | `./scripts/iwyu-idf` | `reports/iwyu/` | Advisory on suggestions: fails only when tooling is missing, the translation-unit audit fails, or nothing parses |
 
@@ -291,9 +293,53 @@ same without suppressing diagnostics in versioned project code.
 `gcc_analyzer` **builds** the firmware with `-fanalyzer` enabled and keeps
 only diagnostics whose primary location is versioned code.
 
-`unusedFunction` is not used: Cppcheck reports member functions the firmware
-does call as unused, so its findings are not actionable and would need broad
-suppressions that could hide real defects.
+Cppcheck's `unusedFunction` is not used: it cannot follow member calls across
+translation units, so it reports functions the firmware does call. The
+dead-code check below replaces it.
+
+### Dead functions
+
+```sh
+./scripts/dead-code-idf
+```
+
+The check answers which project functions no firmware image uses. A normal
+build cannot tell: it inlines small functions and discards their out-of-line
+copies even though their code runs. So the script compiles every profile pair
+that R2/R3 validation builds twice, each in its own tree under
+`build-idf/dead-code/<profile>/`: as a development image that also enables the
+remote machine control opt-in, so code only that supported build runs counts,
+and as a release image. The gate's `build-idf/<hardware>--<machine>/` trees
+are untouched. Only the project components get the analysis options
+(`-fno-inline -fkeep-inline-functions -fno-ipa-sra -fno-partial-inlining
+-fno-ipa-cp-clone -fno-ipa-icf -fno-ipa-pure-const -fno-ipa-modref`): no call
+is inlined, cloned, redirected to an identical twin, or dropped because the
+callee does nothing in that build. Only the inputs of the application link are
+built; the ELF is never linked, so code without inlining never has to fit the
+image.
+
+`scripts/dead_code.py` then reads the project objects with the toolchain's
+`readelf` and `nm`. A function is used when a relocation in another section of
+a project object reaches it (a call, a function pointer, a vtable, a static
+initializer), when a library outside the project leaves its name undefined or
+defines it weak (an override such as `app_main`, `setup`, or an ESP-IDF hook),
+when the link command or a linker script names it (`-u`, `--wrap`, `ENTRY`,
+`EXTERN`), or when a linker script keeps its section. A function that only
+calls itself is not used. Two cases have no trace in the objects and are read
+from elsewhere: bodies the compiler writes (implicit and `= default` members,
+lambda conversion operators) are recognized from their debug information and
+never reported, and a `constexpr` function counts as used when firmware
+sources outside the host tests name it, because the compiler evaluates such
+calls in constant expressions without emitting one. Every entry point comes
+from the build: the check has no list of known functions and no suppressions.
+
+A function defined in project code and used in none of the builds is listed in
+`reports/dead-code/dead-code.txt` as `file:line: name`, and the script exits 1.
+Delete it, or, when only host tests call it, make it test-only. A build failure
+keeps its own exit status and an analysis error exits 2; the build logs stay
+next to the report. `--hardware` and `--machine` restrict a quick run to one
+pair; that run also reports functions only the other pairs use. A full run
+takes about ten minutes.
 
 ## 9. Recommended order for a release check
 

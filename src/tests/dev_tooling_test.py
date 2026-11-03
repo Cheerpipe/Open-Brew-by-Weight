@@ -1794,6 +1794,18 @@ for analyzer in ("warnings-idf", "gcc_analyzer"):
     assert "./scripts/internal/build-idf" in analyzer_text
     # Profile defines reach the build only through the forwarded switches.
     assert "obbw_cli_flags_for development release no_auth_admin jtag" in analyzer_text
+dead_code_text = (ROOT / "scripts/dead-code-idf").read_text()
+analysis_flags = re.search(r'ANALYSIS_FLAGS="([^"]+)"', dead_code_text)[1].split()
+project_only = re.search(r'_opt MATCHES "\^-f\(([^)]+)\)\$"',
+                         (ROOT / "idf/CMakeLists.txt").read_text())[1].split("|")
+assert {flag.removeprefix("-f") for flag in analysis_flags} <= set(project_only), \
+    "dead-code analysis flags must reach only the project components"
+assert 'OPENBREWBYWEIGHT_IDF_BUILD_ROOT="$BUILD_ROOT/$profile"' in dead_code_text and \
+    "OPENBREWBYWEIGHT_IDF_LINK_INPUTS_ONLY=1" in dead_code_text, \
+    "the dead-code builds must use their own trees and never link the image"
+dead_code_help = subprocess.run([str(ROOT / "scripts/dead-code-idf"), "--help"],
+                                cwd=ROOT, text=True, capture_output=True)
+assert dead_code_help.returncode == 0 and "reports/dead-code" in dead_code_help.stdout
 cppcheck_suppressions = (ROOT / "scripts/cppcheck-suppressions.txt").read_text()
 assert "**" not in cppcheck_suppressions, \
     "Cppcheck suppression globs must use a single '*' wildcard"
@@ -1808,7 +1820,8 @@ assert "npm" + " install" not in tests_text and "npm" + " ci" not in tests_text,
 
 cppcheck_help = subprocess.run([str(ROOT / "scripts/static-idf"), "--help"],
                               cwd=ROOT, text=True, capture_output=True)
-assert cppcheck_help.returncode == 0 and "`unusedFunction`" in cppcheck_help.stdout
+assert cppcheck_help.returncode == 0 and "`unusedFunction`" in cppcheck_help.stdout and \
+    "./scripts/dead-code-idf" in cppcheck_help.stdout
 assert "--arch" in cppcheck_help.stdout and "command not found" not in cppcheck_help.stderr
 resolver = runpy.run_path(str(ROOT / "scripts/resolve_build_profiles.py"))
 hardware = [resolver["validate_hardware"](json.loads(path.read_text()))

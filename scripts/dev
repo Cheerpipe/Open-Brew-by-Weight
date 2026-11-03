@@ -739,7 +739,8 @@ def main() -> int:
                          ("webui-markup", ["node", "scripts/lint_web_ui.js"])]
             elif profile == "tooling":
                 steps = [("tooling-contracts", ["python3", "src/tests/dev_tooling_test.py"]),
-                         ("build-profiles", ["python3", "src/tests/build_profiles_test.py"])]
+                         ("build-profiles", ["python3", "src/tests/build_profiles_test.py"]),
+                         ("dead-code-analysis", ["python3", "src/tests/dead_code_test.py"])]
             else:
                 raise ValueError("unknown test profile: " + profile)
             return execute(command, "R2" if profile in {"ble", "ota"} else "R1",

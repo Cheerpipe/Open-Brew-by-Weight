@@ -212,11 +212,24 @@ node ./scripts/gen_web_ui.js \
 
 obbw_idf_commit_extra_flags_stamp
 
-obbw_idf_py build 2>&1 | obbw_idf_filter_output
+if [[ "${OPENBREWBYWEIGHT_IDF_LINK_INPUTS_ONLY:-0}" == "1" ]]; then
+  # Analysis builds (dead-code-idf) compile every input of the application
+  # link and stop there: code built for analysis need not fit the image.
+  [[ -f "$IDF_BUILD_DIR/CMakeCache.txt" ]] || obbw_idf_py reconfigure 2>&1 | obbw_idf_filter_output
+  link_inputs=()
+  while read -r link_input; do link_inputs+=("$link_input"); done < <(
+    ninja -C "$IDF_BUILD_DIR" -t query "${IDF_ELF##*/}" |
+      awk '/^  outputs:/ { exit } /^    / { sub(/^ *(\|\|? )?/, ""); print }')
+  [[ ${#link_inputs[@]} -gt 0 ]] || { echo "No link inputs found for ${IDF_ELF##*/}" >&2; exit 1; }
+  ninja -C "$IDF_BUILD_DIR" "${link_inputs[@]}" 2>&1 | obbw_idf_filter_output
+else
+  obbw_idf_py build 2>&1 | obbw_idf_filter_output
+fi
 if [[ "$(git hash-object "$lock_file")" != "$lock_sha" ]]; then
   echo "IDF component lock changed during build; update it explicitly and review the diff." >&2
   exit 1
 fi
+[[ "${OPENBREWBYWEIGHT_IDF_LINK_INPUTS_ONLY:-0}" == "1" ]] && exit 0
 
 obbw_idf_verify_firmware
 

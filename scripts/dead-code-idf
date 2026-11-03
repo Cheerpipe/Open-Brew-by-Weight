@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Report project firmware functions that no supported build uses. Each
+# variant is compiled without inlining in its own tree and analyzed by
+# scripts/dead_code.py; the application ELF is never linked.
+set -uo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=scripts/openbrewbyweight_board.sh
+source "$SCRIPT_DIR/openbrewbyweight_board.sh"
+# shellcheck source=scripts/openbrewbyweight_cli.sh
+source "$SCRIPT_DIR/openbrewbyweight_cli.sh"
+
+ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+readonly ROOT
+readonly OUTPUT_DIR="reports/dead-code"
+readonly BUILD_ROOT="$ROOT/build-idf/dead-code"
+# Project components only (idf/CMakeLists.txt): no inlining, every inline
+# function kept, no clones or folded twins that would hide a caller, and no
+# call dropped because its callee was proven free of side effects.
+readonly ANALYSIS_FLAGS="-fno-inline -fkeep-inline-functions -fno-ipa-sra -fno-partial-inlining -fno-ipa-cp-clone -fno-ipa-icf -fno-ipa-pure-const -fno-ipa-modref"
+# The development analysis build also compiles the remote machine control
+# opt-in, so code only that supported build uses counts as used.
+readonly DEVELOPMENT_FLAGS="-DOPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL=1"
+
+usage() {
+  cat <<EOF
+Usage: ./scripts/dead-code-idf [flags]
+
+Find project functions (src/, libraries/EspressoScaleBLE/, idf/main/ and
+idf/components/) that no firmware build uses, and save the list to
+$OUTPUT_DIR/dead-code.txt. Replaces the previous report.
+
+Every profile pair that R2/R3 validation builds is compiled twice, as a
+development image with the remote machine control opt-in ($DEVELOPMENT_FLAGS)
+and as a release image, each in its own tree under
+build-idf/dead-code/<profile>/<hardware>--<machine>. Project components build
+with: $ANALYSIS_FLAGS
+Every input of the application link is built; the ELF itself is not linked.
+A function counts as used when another section of a project object refers to
+it (call, function pointer, vtable, static initializer), when an SDK or
+managed-component library leaves its name undefined or defines it weak, when
+the link command or a linker script names it, or when a linker script keeps
+its section. Recursion alone is not use. Compiler-written bodies (implicit or
+= default members, lambda conversions) are never reported, and a constexpr
+function the firmware sources name counts as used in constant expressions.
+A function is dead when it is used in none of the analyzed builds; the build
+logs are kept next to the report.
+
+Exit status: 0 when nothing is dead, 1 when dead functions are reported, 2 for
+an analysis error, and the failing status of a build.
+
+--hardware and --machine restrict the run to one pair for a quick check;
+functions used only by the other pairs are then reported too.
+
+$(obbw_flag_help)
+
+Examples:
+  ./scripts/dead-code-idf
+  ./scripts/dead-code-idf --hardware esp32-s3-relay-x1-speaker \\
+    --machine la-marzocco-linea-micra
+EOF
+}
+
+obbw_cli_parse "$@" || exit $?
+if obbw_cli_help_requested; then
+  usage
+  exit 0
+fi
+
+cd "$ROOT" || exit
+hardware="$(obbw_get hardware_config)"
+webui_language="$(obbw_get webui_language)"
+machine="$(obbw_get machine_config)"
+if [[ -n "$hardware$machine" && (-z "$hardware" || -z "$machine") ]]; then
+  echo "Pass both --hardware and --machine, or neither for every validated pair." >&2
+  exit 2
+fi
+if [[ -n "$(obbw_get flags)$(obbw_get build_dir)" || "$OBBW_CLI_DEVELOPMENT$OBBW_CLI_RELEASE" != "00" ]]; then
+  echo "dead-code-idf builds its own development and release trees; it takes no --flags, --build-dir or profile switch." >&2
+  exit 2
+fi
+if [[ -n "$hardware" ]]; then
+  pairs="$hardware $machine"
+else
+  pairs="$(python3 scripts/dead_code.py pairs)" || exit $?
+fi
+
+output_path="$ROOT/$OUTPUT_DIR"
+rm -rf "$output_path"
+mkdir -p "$output_path"
+
+builds=()
+while read -r pair_hardware pair_machine; do
+  for profile in development release; do
+    variant="$pair_hardware--$pair_machine"
+    log="$output_path/build-$profile-$variant.log"
+    profile_switch=()
+    profile_flags="$ANALYSIS_FLAGS"
+    if [[ "$profile" == "development" ]]; then
+      profile_switch=(--development)
+      profile_flags="$ANALYSIS_FLAGS $DEVELOPMENT_FLAGS"
+    fi
+    echo "Building $variant ($profile) for dead-code analysis..."
+    OPENBREWBYWEIGHT_IDF_BUILD_ROOT="$BUILD_ROOT/$profile" OPENBREWBYWEIGHT_IDF_LINK_INPUTS_ONLY=1 \
+      OPENBREWBYWEIGHT_NONINTERACTIVE=1 ./scripts/internal/build-idf \
+      --hardware "$pair_hardware" --machine "$pair_machine" \
+      --webui-language "${webui_language:-en}" ${profile_switch[@]+"${profile_switch[@]}"} \
+      --flags "$profile_flags" </dev/null >"$log" 2>&1
+    build_status=$?
+    if [[ $build_status -ne 0 ]]; then
+      tail -n 60 "$log" >&2
+      echo "Build failed; log saved under $OUTPUT_DIR/${log##*/}" >&2
+      exit "$build_status"
+    fi
+    builds+=("$BUILD_ROOT/$profile/$variant")
+  done
+done <<<"$pairs"
+
+echo "Analyzing ${#builds[@]} build(s)..."
+python3 scripts/dead_code.py analyze --report "$output_path/dead-code.txt" "${builds[@]}"
+analysis_status=$?
+echo "Report saved under $OUTPUT_DIR/"
+exit "$analysis_status"

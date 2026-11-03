@@ -43,7 +43,7 @@ idf_build_set_property(COMPILE_DEFINITIONS "ARDUINO_USB_MODE=1" APPEND)
 set(_obbw_extra_flags_file "${CMAKE_BINARY_DIR}/open_brew_by_weight_extra_flags")
 set(_obbw_extra_raw "")
 set(_obbw_cdc_on_boot 0)
-set(_obbw_enable_gcc_analyzer OFF)
+set(_obbw_project_only_options "")
 if(DEFINED ENV{OPENBREWBYWEIGHT_EXTRA_FLAGS})
   set(_obbw_extra_raw "$ENV{OPENBREWBYWEIGHT_EXTRA_FLAGS}")
 endif()
@@ -59,11 +59,11 @@ if(NOT _obbw_extra_raw STREQUAL "")
     if(_opt STREQUAL "-DOPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1")
       set(_obbw_cdc_on_boot 1)
     endif()
-    if(_opt STREQUAL "-fanalyzer")
-      # The analyzer is attached below only to project-owned components.
-      # Applying it globally makes ESP-IDF's dependency warnings fatal before
-      # the firmware can be examined.
-      set(_obbw_enable_gcc_analyzer ON)
+    if(_opt MATCHES "^-f(analyzer|no-inline|keep-inline-functions|no-ipa-sra|no-partial-inlining|no-ipa-cp-clone|no-ipa-icf|no-ipa-pure-const|no-ipa-modref)$")
+      # Analysis options (gcc_analyzer, dead-code-idf) are attached below only
+      # to project-owned components. Applying them globally makes ESP-IDF's
+      # dependency warnings fatal before the firmware can be examined.
+      list(APPEND _obbw_project_only_options "${_opt}")
     elseif(_opt STREQUAL "-Wunused-parameter")
       # Project-owned components always build with it (below). ESP-IDF's own
       # -Werror components have unused parameters (e.g.
@@ -126,9 +126,7 @@ endforeach()
 # them as errors; component options follow the global ones, so they win.
 foreach(_obbw_component IN LISTS _obbw_project_components)
   idf_component_get_property(_obbw_component_lib ${_obbw_component} COMPONENT_LIB)
-  if(_obbw_enable_gcc_analyzer)
-    target_compile_options(${_obbw_component_lib} PRIVATE -fanalyzer)
-  endif()
+  target_compile_options(${_obbw_component_lib} PRIVATE ${_obbw_project_only_options})
   target_include_directories(${_obbw_component_lib} SYSTEM PRIVATE ${_obbw_sdk_include_dirs})
   target_compile_options(${_obbw_component_lib} PRIVATE
     -Wunused-parameter -Werror=unused-parameter -Werror=unused-function

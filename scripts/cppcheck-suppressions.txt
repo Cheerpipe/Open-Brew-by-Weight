@@ -7,5 +7,6 @@
 *:*/idf/managed_components/*
 *:*/idf/third_party/*
 # `unusedFunction` is not enabled by static-idf: it reports member functions the
-# firmware does call as unused. Findings in project code that are correct by
+# firmware does call as unused; scripts/dead-code-idf finds unused functions
+# instead. Findings in project code that are correct by
 # design use a single-line inline `cppcheck-suppress` comment with its reason.

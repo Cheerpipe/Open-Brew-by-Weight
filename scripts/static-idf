@@ -21,11 +21,12 @@ Usage: ./scripts/static-idf [flags]
 
 Run Cppcheck against a compilation database already produced by ESP-IDF.
 Checks warning, performance, portability and style. \`unusedFunction\` is not
-used: it reports member functions the firmware does call as unused. A finding
-that is correct by design carries an inline \`cppcheck-suppress\` comment with
-its reason on the line above it. The output directory is deleted and recreated
-on every run. This script never builds the firmware; run ./scripts/dev build
-separately first.
+used: it cannot follow member calls across translation units and reports
+functions the firmware does call; ./scripts/dead-code-idf finds unused
+functions instead. A finding that is correct by design carries an inline
+\`cppcheck-suppress\` comment with its reason on the line above it. The output
+directory is deleted and recreated on every run. This script never builds the
+firmware; run ./scripts/dev build separately first.
 
 Required parameters: --arch. For a profile build, pass its directory with
 --build-dir. Path overrides are one-shot and are not persisted.
