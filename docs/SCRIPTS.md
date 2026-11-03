@@ -188,13 +188,16 @@ before each release tag. It builds every pair both ways, runs the full
 Cppcheck analysis on each and the dead-code check over all of them, checks
 that the design preview renders, and ends with the only budget verdict that
 fails on an overrun.
-R2 and R3 run two lanes at once: the host tests, and the firmware steps in a
-fixed order (route capacity, Web UI budgets, Web contracts, then each pair's
-development build and stack depth, release build and stack depth, and
-Cppcheck). Each step's
-output appears in the log as one block when
-the step finishes. After any failure neither lane starts another step;
-steps already running finish first. When both lanes pass, a final
+
+R2 and R3 run parallel lanes: the host tests; the Web checks (route
+capacity, Web UI budgets, Web contracts); and one lane per profile pair
+(development build and stack depth, release build and stack depth, then
+Cppcheck on R3). The quality gate runs the Web UI budgets with the design
+preview, the dead-code check, and one lane per pair. Firmware builds take
+turns under the checkout build lock, so one pair's stack and Cppcheck steps
+run while the next pair builds. Each step's output appears in the log as one
+block when the step finishes. After any failure no lane starts another step;
+steps already running finish first. When every lane passes, a final
 `budget-verdict` step reports every size budget the run measured. The release builds use their
 own trees, `build-idf/release/<hardware>--<machine>/`, so the gate's
 `build-idf/<hardware>--<machine>/` images stay incremental. Host tests and
@@ -236,9 +239,13 @@ tree (`HEAD`, working-tree fingerprint, and budget-file hashes) no longer
 matches; see [Validation](../VALIDATION.md#size-budgets-and-parallel-work) for
 the parallel-work rules.
 
-Firmware builds and the Web contracts both rewrite the generated Web UI header
-under `src/`, so one checkout runs them one at a time behind
-`build-idf/.locks/source-tree.lock`; separate worktrees build in parallel.
+Each firmware build generates its Web UI header in its own tree,
+`<build>/generated/OpenBrewByWeightWebAssetsGzip.h`. The Web contracts write
+theirs under `src/` and take turns behind `build-idf/.locks/web-ui-header.lock`.
+Firmware builds in one checkout take turns behind
+`build-idf/.locks/source-tree.lock`, because every CMake configure runs the
+component manager over the shared `idf/` project; separate worktrees build in
+parallel.
 
 ## Diagnostics and recovery
 

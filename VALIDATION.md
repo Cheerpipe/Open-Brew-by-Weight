@@ -74,9 +74,10 @@ Image and memory regions are compared by
 `src/tests/check_firmware_size.js` against those versioned budgets.
 
 After each development and release build, R2/R3 also run the stack-depth gate
-(`stack-<pair>` and `stack-release-<pair>`, `scripts/check_stack_depth.py`). It
-recompiles every unit of that build with GCC `-fcallgraph-info=su` into
-`<build>/stack-usage/` and bounds the worst-case stack of the destructive
+(`stack-<pair>` and `stack-release-<pair>`, `scripts/check_stack_depth.py`).
+Every firmware build compiles each C/C++ unit with GCC `-fcallgraph-info=su`,
+which writes a call-graph file beside its object and leaves the generated code
+unchanged; the gate reads those files and bounds the worst-case stack of the destructive
 recovery paths and the deepest httpd requests against their task stacks: boot
 recovery on the Arduino loopTask (`CONFIG_ARDUINO_LOOP_STACK_SIZE`), the Web
 UI factory reset on `network_manager` (`NETWORK_MANAGER_TASK_STACK_SIZE`), the
@@ -114,11 +115,9 @@ and commit the budget change, explaining in the body why each budget moved.
 That run together with the update's re-check of its measurements is the gate
 evidence; the gate does not run again.
 
-Give each parallel agent its own worktree. Web contracts and firmware builds
-rewrite the shared generated Web UI header under `src/`, so in one checkout
-they hold a checkout-wide lock and wait for each other, and a measurement
-there includes every other session's edits. Gates in separate worktrees run
-independently.
+Give each parallel agent its own worktree. In one checkout, firmware builds
+take turns behind a checkout-wide lock and a measurement there includes every
+other session's edits. Gates in separate worktrees run independently.
 
 `budget update` refuses a run that recorded no budget measurements, is not a
 quality run, failed any check other than `budget-verdict` or stopped before

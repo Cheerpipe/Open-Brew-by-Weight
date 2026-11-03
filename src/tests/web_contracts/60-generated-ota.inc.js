@@ -566,7 +566,7 @@ if (!generated.html.includes('rel="manifest" href="/manifest.webmanifest?v=' + g
     !generated.html.includes('name="apple-mobile-web-app-capable"')) {
   throw new Error('Generated shell must link the PWA manifest, icon, and home-screen metadata');
 }
-if (!network.includes('#include "OpenBrewByWeightWebAssetsGzip.h"') ||
+if (!network.includes('#include <OpenBrewByWeightWebAssetsGzip.h>') ||
     network.includes('#include "OpenBrewByWeightWebAssets.h"')) {
   throw new Error('Firmware must embed the gzip Web UI, not the HTML source string');
 }

@@ -87,8 +87,10 @@ risk gate in [VALIDATION.md](../VALIDATION.md).
 
 - Canonical firmware: `src/`; Web source: `src/web/`; BLE library:
   `libraries/EspressoScaleBLE/`; ESP-IDF integration: `idf/`.
-- Generated: `src/OpenBrewByWeightVersion.h`,
-  `src/OpenBrewByWeightWebAssetsGzip.h`, build trees, reports, and `artifacts/`.
+- Generated: `src/OpenBrewByWeightVersion.h` and
+  `src/OpenBrewByWeightWebAssetsGzip.h` (host tests and Web contracts; each
+  firmware build generates its own under `generated/`), build trees, reports,
+  and `artifacts/`.
 - Local plans: `docs/plans/`; local audits: `docs/audits/`. Both are retained
   locally, excluded from Git, and serve as their own session handoffs.
 - Local temporary working files: `temp/`, inside the project and excluded from

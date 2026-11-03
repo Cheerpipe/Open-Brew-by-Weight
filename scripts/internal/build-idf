@@ -76,8 +76,9 @@ if [[ "${OBBW_BUILD_LOCKED:-}" != "1" ]]; then
 
   # Serialize builds in this checkout across parallel agents and sessions:
   # the remainder of this script mutates the variant tree (generated headers,
-  # sdkconfig, artifacts) and the Web UI header under src/ that every variant
-  # and the Web contracts share, so it holds one lock per checkout. Prompted
+  # sdkconfig, artifacts), and every CMake configure runs the component
+  # manager over the shared idf/ project, so it holds one lock per checkout.
+  # Gate lanes still overlap one pair's analysis with the next build. Prompted
   # input happened above, so no interactive pause holds the lock. The shell state crosses the exec via a
   # declare -p dump (arrays survive; export would flatten them); with-flock
   # holds the lock and execs the second pass, so the kernel releases it on
@@ -206,6 +207,7 @@ webui_machine_icon="$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "\
   "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"
 [[ -n "$webui_machine_icon" ]] && webui_args+=(--machine-icon "$webui_machine_icon")
 node ./scripts/gen_web_ui.js \
+  --output "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightWebAssetsGzip.h" \
   --version "$(sed -n 's/^#define FW_VERSION_STRING "\(.*\)"$/\1/p' \
     "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightVersion.h")" \
   --webui-language "$(obbw_get webui_language)" ${webui_args[@]+"${webui_args[@]}"}

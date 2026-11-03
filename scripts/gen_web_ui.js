@@ -458,6 +458,7 @@ async function generate(options = {}) {
     inputLanguage: localized.inputLanguage,
     resolvedLanguage: localized.resolvedLanguage,
     write: options.write !== false,
+    output: options.output || outputPath,
   });
 }
 
@@ -466,7 +467,7 @@ async function generate(options = {}) {
 async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, launchJs, modules, swJs,
                        css, manifest, icon192Raw, icon48Raw, assetTag,
                        version, inputLanguage, requestedLanguage,
-                       resolvedLanguage, write}) {
+                       resolvedLanguage, write, output}) {
   const text = (path, contentType, value) =>
     ({path, contentType, text: value, raw: Buffer.from(value, 'utf8'), gzip: true});
   const assets = [
@@ -538,11 +539,11 @@ ${rows}
 `;
 
   // Rewrite only on change so unchanged builds do not recompile includers.
-  if (write && !(fs.existsSync(outputPath) &&
-                 fs.readFileSync(outputPath, 'utf8') === body)) {
-    const temporaryOutput = `${outputPath}.tmp`;
+  if (write && !(fs.existsSync(output) &&
+                 fs.readFileSync(output, 'utf8') === body)) {
+    const temporaryOutput = `${output}.tmp`;
     fs.writeFileSync(temporaryOutput, body);
-    fs.renameSync(temporaryOutput, outputPath);
+    fs.renameSync(temporaryOutput, output);
   }
 
   const byPath = (path) => assets.find((asset) => asset.path === path).body;
@@ -577,7 +578,7 @@ ${rows}
     etag: `"${cacheVersion}"`,
     assetEtag: `"${assetTag}"`,
     combined,
-    outputPath,
+    outputPath: output,
     sourcePath,
     appJsPath,
     cssSourcePaths,
@@ -615,6 +616,7 @@ if (require.main === module) {
     let lineaMicra;
     let machineIcon;
     let versionOverride;
+    let output;
     for (let i = 2; i < process.argv.length; i++) {
       const arg = process.argv[i];
       if (arg === '--webui-language') {
@@ -643,12 +645,15 @@ if (require.main === module) {
         versionOverride = process.argv[i];
       } else if (arg.startsWith('--version=')) {
         versionOverride = process.argv[i].slice('--version='.length);
+      } else if (arg === '--output') {
+        if (++i >= process.argv.length) throw new Error('--output requires a value');
+        output = process.argv[i];
       } else {
         throw new Error(`Unknown argument: ${arg}`);
       }
     }
     return generate({webUiLanguage, developmentMode, machineType, remoteControl,
-      lineaMicra, machineIcon, versionOverride});
+      lineaMicra, machineIcon, versionOverride, output});
   })
       .then((result) => {
         const parts = [`shell ${result.gzip.length} B`,

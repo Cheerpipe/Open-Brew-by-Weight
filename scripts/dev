@@ -64,11 +64,11 @@ SECRET = re.compile(r"(?i)(password|token)(\s*[=:]\s*|\s+)\S+")
 HTTP_ROUTE_CAPACITY_STEP = (
     "http-route-capacity", ["node", "src/tests/check_http_route_capacity.js"])
 WEB_BUDGETS_STEP = ("web-budgets", ["node", "src/tests/check_web_budgets.js"])
-# The contracts and every IDF build rewrite the shared Web UI header under src/,
-# so one checkout runs them one at a time.
-SOURCE_TREE_LOCK = "build-idf/.locks/source-tree.lock"
+# The contracts rewrite the Web UI header under src/, so one checkout runs
+# them one at a time; IDF builds generate their own copy in each tree.
+WEB_HEADER_LOCK = "build-idf/.locks/web-ui-header.lock"
 WEB_CONTRACTS_STEP = ("web-contracts", ["python3", "scripts/internal/with-flock",
-                                        SOURCE_TREE_LOCK, "node", "src/tests/check_web_assets.js"])
+                                        WEB_HEADER_LOCK, "node", "src/tests/check_web_assets.js"])
 # The design preview slices live Web UI sources, so Web UI changes must keep it rendering.
 WEB_PREVIEW_STEP = ("web-preview", ["node", "src/tests/webui_preview_test.js"])
 BUDGET_FILES = ("config/web-asset-budgets.json", "config/resource-baselines.json")
@@ -782,15 +782,14 @@ def main() -> int:
                 # tag, over the whole tree: it is the only budget evidence.
                 if override is not None or paths:
                     raise ValueError("quality takes only --webui-language; it checks the whole tree")
-                web = [WEB_BUDGETS_STEP, WEB_PREVIEW_STEP]
-                firmware = []
+                lanes = [[WEB_BUDGETS_STEP, WEB_PREVIEW_STEP],
+                         [("dead-code", ["./scripts/dead-code-idf",
+                                         "--webui-language", webui_language])]]
                 for hardware, machine in BUILD_PROFILES:
                     variant, builds = pair_steps(hardware, machine)
-                    firmware += [*builds, cppcheck(variant)]
-                firmware.append(("dead-code", ["./scripts/dead-code-idf",
-                                               "--webui-language", webui_language]))
-                return execute(command, "quality", web + firmware, verbosity,
-                               lanes=[web, firmware],
+                    lanes.append([*builds, cppcheck(variant)])
+                return execute(command, "quality", [s for lane in lanes for s in lane],
+                               verbosity, lanes=lanes,
                                **budget_gate(evidence=True, firmware=True))
             inferred, details = classify(paths)
             if override not in RANK:
@@ -810,30 +809,32 @@ def main() -> int:
                 return record(command, risk, verbosity, doc_errors, 1, "docs-and-paths")
             if risk == "R0":
                 return record(command, risk, verbosity, prelude + ["documentation links and context paths: OK"])
-            # Host tests and firmware work share no outputs, so they run as two
-            # parallel lanes; firmware steps stay serial because every IDF
-            # build regenerates the shared Web UI header under src/.
+            # Host tests, Web checks, and each profile pair share no outputs, so
+            # they run as parallel lanes. IDF builds still take turns under the
+            # checkout build lock, so one pair's stack and Cppcheck steps
+            # overlap the next pair's build.
             host = cmake_steps("normal")
-            firmware = []
+            lanes = [host]
             if risk in {"R2", "R3"}:
                 host += cmake_steps("asan-ubsan") + cmake_steps("tsan") + [
                     ("architecture", ["python3", "scripts/check_architecture.py"])]
-                firmware = [HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP]
+                lanes.append([HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP])
                 # R3 checks only Cppcheck's warning category, over the units the
                 # change reaches; the quality gate runs the full analysis.
                 changed = ":".join(paths or changed_paths())
                 stack = ["python3", "scripts/check_stack_depth.py", "--build-dir"]
                 for hardware, machine in BUILD_PROFILES:
                     variant, (development, release) = pair_steps(hardware, machine)
-                    firmware += [development, (f"stack-{variant}", [*stack, f"build-idf/{variant}"]),
-                                 release, (f"stack-release-{variant}",
-                                           [*stack, f"build-idf/release/{variant}"])]
+                    lanes.append([development, (f"stack-{variant}", [*stack, f"build-idf/{variant}"]),
+                                  release, (f"stack-release-{variant}",
+                                            [*stack, f"build-idf/release/{variant}"])])
                     if risk == "R3":
-                        firmware.append(cppcheck(variant, "OPENBREWBYWEIGHT_CPPCHECK_RISK=1",
-                                                 f"OPENBREWBYWEIGHT_CPPCHECK_CHANGED={changed}"))
+                        lanes[-1].append(cppcheck(variant, "OPENBREWBYWEIGHT_CPPCHECK_RISK=1",
+                                                  f"OPENBREWBYWEIGHT_CPPCHECK_CHANGED={changed}"))
             manual = ["Complete and attach applicable HIL/manual evidence"] if risk == "R3" else []
-            return execute(command, risk, host + firmware, verbosity, manual, prelude,
-                           lanes=[host, firmware] if firmware else None,
+            firmware = len(lanes) > 1
+            return execute(command, risk, [s for lane in lanes for s in lane], verbosity, manual,
+                           prelude, lanes=lanes if firmware else None,
                            **(budget_gate(evidence=False, firmware=True) if firmware else {}))
 
         if verb in FIRMWARE_STAGES:

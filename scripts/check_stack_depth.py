@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Bound the worst-case stack depth of task paths that must never overflow.
 
-Every C/C++ unit of an ESP-IDF build is recompiled with GCC call-graph info
-(-fcallgraph-info=su) into <build>/stack-usage; the merged graph bounds the
-depth from each gate's task entry through its roots. GCC cannot follow
+Every C/C++ unit of an ESP-IDF build emits GCC call-graph info
+(-fcallgraph-info=su, set in idf/CMakeLists.txt) beside its object; the merged
+graph bounds the depth from each gate's task entry through its roots. GCC cannot follow
 function pointers or see ROM/libc frames, so those calls are charged declared
 reserves; recursion or an unbounded dynamic frame on a gated path fails.
 """
@@ -12,14 +12,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shlex
-import shutil
-import subprocess
 import sys
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable
@@ -359,41 +355,35 @@ def evaluate(graph: Graph, gate: Gate, budget: int) -> Result:
                   path, sorted(set(errors)))
 
 
-def compile_call_graphs(build: Path, out: Path, jobs: int) -> list[str]:
-    shutil.rmtree(out, ignore_errors=True)
-    out.mkdir(parents=True)
-    commands = json.loads((build / "compile_commands.json").read_text())
-
-    def run(item: tuple[int, dict]) -> str | None:
-        index, entry = item
-        if not entry["file"].endswith((".c", ".cc", ".cpp")):
-            return None
+def call_graph_files(build: Path) -> tuple[list[Path], list[str]]:
+    """The .ci file GCC wrote beside each compiled object (x.cpp.obj ->
+    x.cpp.ci), and the units that lack one. ESP-IDF's empty executable
+    placeholder (project_elf_src_*.c) defines no functions and gets no
+    component options."""
+    files, missing = [], []
+    for entry in json.loads((build / "compile_commands.json").read_text()):
+        if not entry["file"].endswith((".c", ".cc", ".cpp")) or \
+                Path(entry["file"]).name.startswith("project_elf_src_"):
+            continue
         args = entry.get("arguments") or shlex.split(entry["command"])
-        args = list(args)
-        obj = out / f"{index}.o"
-        args[args.index("-o") + 1] = str(obj)
-        done = subprocess.run([*args, "-fcallgraph-info=su"], cwd=entry["directory"],
-                              capture_output=True, text=True)
-        obj.unlink(missing_ok=True)
-        return None if done.returncode == 0 else f"{entry['file']}: {done.stderr[-400:]}"
-
-    with ThreadPoolExecutor(jobs) as pool:
-        return [failure for failure in pool.map(run, enumerate(commands)) if failure]
+        obj = Path(entry["directory"], args[args.index("-o") + 1])
+        ci = obj.with_suffix(".ci")
+        (files if ci.is_file() else missing).append(ci if ci.is_file() else entry["file"])
+    return files, missing
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--build-dir", required=True, type=Path)
-    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     args = parser.parse_args()
     build = args.build_dir.resolve()
-    out = build / "stack-usage"
-    failures = compile_call_graphs(build, out, args.jobs)
-    if failures:
-        print("\n".join(["stack-depth: call-graph compile failed", *failures[:5]]))
+    files, missing = call_graph_files(build)
+    if missing:
+        print("\n".join(["stack-depth: units without call-graph info; rebuild the tree",
+                         *missing[:5]]))
         return 1
     graph = Graph()
-    for ci in out.glob("*.ci"):
+    for ci in files:
         with ci.open(errors="replace") as lines:
             graph.add(lines)
     status = 0

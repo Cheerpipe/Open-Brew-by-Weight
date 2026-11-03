@@ -38,6 +38,11 @@ if(EXISTS "${_obbw_profile_manifest}")
 endif()
 
 idf_build_set_property(COMPILE_DEFINITIONS "BOARD_HAS_PSRAM" APPEND)
+# Every C/C++ unit writes GCC call-graph info beside its object for the
+# stack-depth gate (scripts/check_stack_depth.py); generated code is unchanged
+# and ccache restores the file on a hit.
+idf_build_set_property(C_COMPILE_OPTIONS "-fcallgraph-info=su" APPEND)
+idf_build_set_property(CXX_COMPILE_OPTIONS "-fcallgraph-info=su" APPEND)
 idf_build_set_property(COMPILE_DEFINITIONS "ARDUINO_USB_MODE=1" APPEND)
 
 set(_obbw_extra_flags_file "${CMAKE_BINARY_DIR}/open_brew_by_weight_extra_flags")

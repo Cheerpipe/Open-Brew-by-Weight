@@ -356,8 +356,8 @@ assert "cmake: MISSING" in failed_line(
     "missing_dependency")
 
 # Checkout-wide build serialization: build-idf must re-exec through with-flock
-# holding the source-tree lock the Web contracts share, and the helper must be
-# the portable fcntl holder.
+# holding the source-tree lock, the Web contracts hold their own header lock,
+# and the helper must be the portable fcntl holder.
 with_flock = INTERNAL / "with-flock"
 assert with_flock.is_file() and with_flock.stat().st_mode & 0o111
 assert "fcntl.flock" in with_flock.read_text()
@@ -365,9 +365,10 @@ assert "set_inheritable" in with_flock.read_text(), (
     "PEP 446 close-on-exec would release the lock before the build starts")
 assert "OBBW_BUILD_LOCKED" in internal_build and "with-flock" in internal_build
 assert '"$root/build-idf/.locks/source-tree.lock"' in internal_build
-assert dev_module["SOURCE_TREE_LOCK"] == "build-idf/.locks/source-tree.lock"
+assert '--output "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightWebAssetsGzip.h"' \
+    in internal_build, "each IDF tree must generate its own Web UI header"
 assert dev_module["WEB_CONTRACTS_STEP"][1][:3] == [
-    "python3", "scripts/internal/with-flock", dev_module["SOURCE_TREE_LOCK"]]
+    "python3", "scripts/internal/with-flock", "build-idf/.locks/web-ui-header.lock"]
 
 # Serialization actually blocks: a held lock must delay a second holder.
 import time as _time
@@ -1137,26 +1138,23 @@ assert len(r2_release) == 3 and all(
 # the firmware lane: route capacity before Web contracts, then per variant the
 # budget build and cppcheck over its database, then one dead-code check over
 # every variant.
-host_lane, firmware_lane = validate_language_steps(["src/web/app.js"], lanes=True)
+host_lane, web_lane, *pair_lanes = validate_language_steps(["src/web/app.js"], lanes=True)
 assert [name for name, _ in host_lane] == [
     f"{stage}-{preset}" for preset in ("normal", "asan-ubsan", "tsan")
     for stage in ("configure", "build", "test")] + ["architecture"], host_lane
-firmware_names = [name for name, _ in firmware_lane]
-assert firmware_names[:3] == ["http-route-capacity", "web-budgets", "web-contracts"], \
-    firmware_names
-assert firmware_names[3:] == [f"{kind}-{hardware}--{machine}"
-                              for hardware, machine in dev_module["BUILD_PROFILES"]
-                              for kind in ("idf", "stack", "release", "stack-release",
-                                           "cppcheck")], firmware_names
+assert [name for name, _ in web_lane] == ["http-route-capacity", "web-budgets",
+                                          "web-contracts"], web_lane
+assert [[name for name, _ in lane] for lane in pair_lanes] == [
+    [f"{kind}-{hardware}--{machine}"
+     for kind in ("idf", "stack", "release", "stack-release", "cppcheck")]
+    for hardware, machine in dev_module["BUILD_PROFILES"]], pair_lanes
 assert all("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv and
            "OPENBREWBYWEIGHT_CPPCHECK_CHANGED=src/web/app.js" in argv
-           for name, argv in firmware_lane if name.startswith("cppcheck-")), firmware_lane
+           for lane in pair_lanes for name, argv in lane if name.startswith("cppcheck-"))
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for name, argv in host_lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
 
-# Budget gates defer every size check to one verdict after all lanes, and
-# record the measured tree; report mode is never budget evidence.
 # Risk gates only report budget overruns; the quality gate is the one
 # budget evidence, and it alone runs the non-functional checks.
 validate_language_steps(["src/web/app.js"], risk="R2")
@@ -1165,13 +1163,16 @@ assert report_gate["env_extra"] == {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1"}, repor
 assert report_gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets",
                                                     "verdict", "--report"])]
 assert report_gate["summary_extra"]["budget"]["evidence"] is False
-web_lane, quality_lane = validate_language_steps([], verb="quality", lanes=True)
+quality_web, quality_dead_code, *quality_pairs = validate_language_steps(
+    [], verb="quality", lanes=True)
 gate = validate_language_steps.captured
-assert [name for name, _ in web_lane] == ["web-budgets", "web-preview"], web_lane
-assert [name for name, _ in quality_lane] == [
-    f"{kind}-{hardware}--{machine}" for hardware, machine in dev_module["BUILD_PROFILES"]
-    for kind in ("idf", "release", "cppcheck")] + ["dead-code"], quality_lane
-assert not any("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv for _, argv in quality_lane)
+assert [name for name, _ in quality_web] == ["web-budgets", "web-preview"], quality_web
+assert [name for name, _ in quality_dead_code] == ["dead-code"], quality_dead_code
+assert [[name for name, _ in lane] for lane in quality_pairs] == [
+    [f"{kind}-{hardware}--{machine}" for kind in ("idf", "release", "cppcheck")]
+    for hardware, machine in dev_module["BUILD_PROFILES"]], quality_pairs
+assert not any("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv
+               for lane in quality_pairs for _, argv in lane)
 assert gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict"])]
 assert gate["summary_extra"]["budget"]["evidence"] is True
 assert gate["summary_extra"]["budget"]["firmware"] is True
