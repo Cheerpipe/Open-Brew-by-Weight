@@ -1605,7 +1605,9 @@ While the La Marzocco account has a pending policy, the cloud answers machine
 requests with HTTP 403 and code `USER_MUST_ACCEPT_POLICY`. The firmware reports
 it as error `policy_required`, keeps the session token, does not retry the
 request, and keeps checking at the failure cadence. The Home frame carries
-`lineaMicra.policyRequired` (true while the state read reports it).
+`lineaMicra.accountProblem`: `policy` for `policy_required`, `auth` for
+`invalid_auth` (a 401 that a fresh sign-in in the same cycle did not clear),
+`access` for a 403 without that code, and an empty string otherwise.
 `acceptPolicy` requires a selected machine with `observeState` and sends `PUT /users/policy` with `profilePolicy` and `commercialPolicy` both
 `false`, so only the mandatory policy is accepted; on success it reads the
 machine state, which clears the error. It never sends a machine command.

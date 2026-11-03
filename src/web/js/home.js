@@ -98,12 +98,23 @@ function renderHints(s) {
   if (recipeTag && s.presetsTag !== recipeTag) R.dismissCard(cardKey("recipeHint"));
   recipeTag = s.presetsTag;
   let free = $("grindHintCard")?.hidden !== false;
-  // Pending La Marzocco terms block the machine link: shown first, no dismissal.
-  const policy = $("micraPolicyHint");
+  // A refused La Marzocco account blocks the machine link: shown first, no
+  // dismissal, gone once the account works again.
+  const problem = s.lineaMicra?.accountProblem,
+    policy = $("micraPolicyHint"),
+    account = $("micraAccountHint");
   if (policy) {
-    policy.hidden = s.lineaMicra?.policyRequired !== true;
+    policy.hidden = problem !== "policy";
     $("micraPolicyHintAccept").disabled = !R.controlsMutable;
-    free &&= policy.hidden;
+    account.hidden = problem !== "auth" && problem !== "access";
+    const auth = problem === "auth";
+    $("micraAccountHintTitle").textContent = auth
+      ? __WEBUI_TEXT__("home.micra_auth_title")
+      : __WEBUI_TEXT__("home.micra_access_title");
+    $("micraAccountHintText").textContent = auth
+      ? __WEBUI_TEXT__("home.micra_auth_text")
+      : __WEBUI_TEXT__("home.micra_access_text");
+    free &&= policy.hidden && account.hidden;
   }
   const request = s.companion?.requestName,
     here = R.uiState.companionHere,
@@ -184,8 +195,8 @@ function renderMachineRow(s) {
         : micraActive
           ? [
               "—",
-              lm.policyRequired
-                ? __WEBUI_TEXT__("runtime.micra_policy_required")
+              lm.accountProblem
+                ? R.accountProblemLabel(lm.accountProblem)
                 : off
                   ? __WEBUI_TEXT__("home.turn_on_to_brew")
                   : needsWater

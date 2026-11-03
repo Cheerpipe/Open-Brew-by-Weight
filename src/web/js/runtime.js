@@ -462,8 +462,8 @@ function updateHeaderSignals(s = {}) {
       ? __WEBUI_TEXT__("admin.companion_link_open")
       : stale
         ? unavailable
-        : lm.policyRequired
-          ? __WEBUI_TEXT__("runtime.micra_policy_required")
+        : lm.accountProblem
+          ? accountProblemLabel(lm.accountProblem)
           : quality === "unconfigured"
             ? __WEBUI_TEXT__("runtime.not_connected")
             : quality === "disabled"
@@ -826,6 +826,12 @@ function initHeaderSignals() {
     }
   });
   window.addEventListener("popstate", close);
+}
+// The short label for a La Marzocco account refusal (Home's accountProblem).
+function accountProblemLabel(problem) {
+  return problem === "policy"
+    ? __WEBUI_TEXT__("runtime.micra_policy_required")
+    : __WEBUI_TEXT__("runtime.micra_pill_account");
 }
 let homeBootDone = false,
   fwReloading = false,
@@ -7475,6 +7481,7 @@ export {
   shotRecorded,
   cupNeedsRetare,
   formatMicraCleaning,
+  accountProblemLabel,
   $,
   webUiOwner,
   webUiPollingActive,

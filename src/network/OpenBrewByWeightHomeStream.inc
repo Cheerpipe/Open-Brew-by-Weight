@@ -315,7 +315,12 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("lineaMicra.optimisticOn", bool(micra.optimisticOn));
   delta.field("lineaMicra.optimisticOff", bool(micra.optimisticOff));
   delta.field("lineaMicra.accountConfigured", bool(micra.accountConfigured));
-  delta.field("lineaMicra.policyRequired", micra.error == LineaMicraError::POLICY_REQUIRED);
+  // Why La Marzocco refuses the account, once the cycle's fresh sign-in failed too.
+  delta.field("lineaMicra.accountProblem", "\"%s\"",
+      micra.error == LineaMicraError::POLICY_REQUIRED ? "policy" :
+      micra.error == LineaMicraError::INVALID_AUTH ? "auth" :
+      micra.httpStatus == 403 && (micra.error == LineaMicraError::HTTP_ERROR ||
+          micra.error == LineaMicraError::REJECTED) ? "access" : "");
   delta.field("lineaMicra.observeState", bool(options & LINEA_MICRA_OBSERVE_STATE));
   delta.field("lineaMicra.connectionType", "\"%s\"", micraConnectionTypeName(connection));
   // The shared header's cloud indicator names the account and machine, so

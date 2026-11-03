@@ -154,6 +154,26 @@ You have two ways out:
 Accepting applies to the whole La Marzocco account, so it also brings back
 Home Assistant and any other app that uses the same account.
 
+### When La Marzocco refuses your account
+
+If La Marzocco stops accepting your account for any other reason, Home shows a
+card that says so and stays until the account works again. The machine row
+and the cloud icon in the header read **Account not accepted**. A one-off
+refusal, such as an expired session, never shows the card: the controller
+signs in again first, and the card appears only if that fails too.
+
+- **La Marzocco won't sign in this account** means it turns down the saved
+  email and password, usually because the password was changed. Check that
+  they work in the La Marzocco app, then choose **Check account** and sign in
+  again.
+- **La Marzocco is refusing this account** means the account no longer has
+  access to the machine. Open the La Marzocco app with the same account, make
+  sure your machine is listed and nothing is waiting for you there, then
+  choose **Check account**.
+
+The controller never retries a refused password on its own, so your La
+Marzocco account is not locked by repeated attempts.
+
 ## Monitor machine power state
 
 Enable **Show power state** to follow the machine through live updates from

@@ -215,7 +215,7 @@
   // offer, access, La Marzocco Cloud, recipe, scale; each waits while the
   // grind hint shows. Dismissals other than access stay in the browser under
   // the legacy card keys.
-  const order = ['micraPolicyHint', 'companionHint', 'companionPairHint', 'accessHint', 'micraCloudHint',
+  const order = ['micraPolicyHint', 'micraAccountHint', 'companionHint', 'companionPairHint', 'accessHint', 'micraCloudHint',
     'recipeHint', 'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
   for (const id of order) nodes[id] = {hidden: true};
@@ -241,9 +241,17 @@
   assert.deepEqual(shown(noCloud), ['scaleOnlyHint']);
   assert.deepEqual(shown({...noCloud, config: {scaleMacCacheMode: 'only'}}), []);
   assert.deepEqual(shown({...noCloud, scale: {preferredMac: ''}}), []);
-  // Pending La Marzocco terms take the slot before every hint, with no
-  // dismissal, and Accept follows the controls lock.
-  const blocked = {...noCloud, lineaMicra: {accountConfigured: true, policyRequired: true}};
+  // A refused La Marzocco account takes the slot before every hint, with no
+  // dismissal: pending terms offer Accept, which follows the controls lock;
+  // a refused sign-in or access names its cause and sends to Settings.
+  const refused = (accountProblem) => ({...noCloud, lineaMicra: {accountConfigured: true, accountProblem}});
+  const causes = ['auth', 'access'].map((problem) => {
+    assert.deepEqual(shown(refused(problem)), ['micraAccountHint']);
+    return nodes.micraAccountHintTitle.textContent + nodes.micraAccountHintText.textContent;
+  });
+  assert.ok(causes[0] && causes[1] && causes[0] !== causes[1], 'Each refusal names its own cause');
+  assert.deepEqual(shown(refused('')), ['scaleOnlyHint']);
+  const blocked = refused('policy');
   assert.deepEqual(shown(blocked), ['micraPolicyHint']);
   assert.strictEqual(nodes.micraPolicyHintAccept.disabled, false);
   home.R.controlsMutable = false;
@@ -252,6 +260,8 @@
   home.R.controlsMutable = true;
   assert.ok(partialHtml.home.includes('id="micraPolicyHintAccept"') &&
       !partialHtml.home.includes('micraPolicyHintDismiss'), 'The terms card offers Accept, no dismissal');
+  assert.ok(partialHtml.home.includes('id="micraAccountHint"') &&
+      !partialHtml.home.includes('micraAccountHintDismiss'), 'The account card sends to Settings, no dismissal');
   // A preset change retires the recipe hint for good.
   recorded = false;
   assert.deepEqual(shown({...noCloud, presetsTag: 8}), ['scaleOnlyHint']);
