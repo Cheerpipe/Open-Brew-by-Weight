@@ -238,7 +238,7 @@ export async function otaFileIdentity(file) {
         if (block.end() !== blocks[index]) return false;
       }
       return true;
-    } catch (_) {
+    } catch {
       return false;
     }
   };

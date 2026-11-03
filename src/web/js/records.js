@@ -1,13 +1,13 @@
 "use strict";
-// Shared by the Stats and History views of the records bundle: the generator
-// evaluates this file at the bundle's module scope ahead of both views, so
-// they read these names directly.
+// Shared by the Stats and History views of the records bundle: they import
+// these names, and the generator evaluates this file at the bundle's module
+// scope ahead of both views, dropping those imports and exports.
 import * as R from "./runtime.js?v=__FW_ASSET_TAG__";
 const $ = R.$;
 const ICON_TRASH = "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3";
 // Arms a list-end sentinel once so its view loads the next page whenever
 // the sentinel scrolls close enough to the viewport.
-function armListSentinel(id, onLoad) {
+export function armListSentinel(id, onLoad) {
   const el = $(id);
   if (!el || el.dataset.armed) return;
   el.dataset.armed = 1;
@@ -23,7 +23,7 @@ function armListSentinel(id, onLoad) {
 // open, so the options follow the data.
 // Returns the menu's Reset, which the view also runs when the firmware rejects
 // a list subscription.
-function createFilterMenu(buttonId, title, groups, onChange) {
+export function createFilterMenu(buttonId, title, groups, onChange) {
   const sel = {};
   let panel = null;
   const count = () => Object.values(sel).reduce((n, s) => n + s.size, 0);
@@ -165,7 +165,7 @@ function createPopup(label, fill) {
 // An action menu on the shared popup: a string starts a group, null draws a
 // separator, and [icon path, title, hint, run, danger, disabled] is an item
 // (a disabled one says why in its hint).
-function actionMenu(label, items) {
+export function actionMenu(label, items) {
   const menu = createPopup(label, (p, ...args) => {
     for (const item of items(...args)) {
       if (item === null) {
@@ -202,7 +202,7 @@ function actionMenu(label, items) {
 // CSV for spreadsheets: a BOM marks it UTF-8, fields with quotes, commas or
 // line breaks are quoted, and text a spreadsheet would run as a formula
 // (=, +, -, @) gets a leading apostrophe; numbers stay as they are.
-function downloadCsv(name, rows) {
+export function downloadCsv(name, rows) {
   const cell = (v) => {
     let s = String(v);
     if (/^[=+\-@\t\r]/.test(s) && !Number.isFinite(+s)) s = "'" + s;
@@ -221,7 +221,7 @@ function downloadCsv(name, rows) {
 // off (R.archiveView) the list is the archive alone, read here page by page:
 // every record it copied, read-only. The companion answers only a screen
 // the controller lets in.
-const archiveSources = {};
+export const archiveSources = {};
 // The archive answers for a store (its archive-only rows feed the list or,
 // with the controller off and Shot archive in the companion on, every copied
 // row) and for the whole-history Stats header (any copied shot).
@@ -233,21 +233,21 @@ function archiveReady(store) {
     a[R.archiveView ? store + "Total" : store] > 0
   );
 }
-function archiveStatsReady() {
+export function archiveStatsReady() {
   const a = R.uiState.companionHere?.archive;
   return !!(a?.available && a.on && (a.shotsTotal || a.shots) > 0);
 }
 // After an archive change (a deletion, a rating): the companion's facts load
 // again; its pages follow on their own, since the companion sends the open
 // lists again once its copy caught up.
-function archiveChanged(store, render) {
+export function archiveChanged(store, render) {
   R.companionHere(true).then(() => reloadArchive(store, render));
 }
 // Rows the companion alone keeps, on its pages: each is marked as kept by it
 // (archiveMark) and the page names its histories and gaps (`archive`) for the
 // lines between them (archiveHeadings).
-const streamArchives = {};
-function streamArchive(store, message, rows) {
+export const streamArchives = {};
+export function streamArchive(store, message, rows) {
   if (message.archive)
     streamArchives[store] = {
       gens: message.archive.generations || [],
@@ -257,7 +257,7 @@ function streamArchive(store, message, rows) {
     if (r?.archiveOnly && !r._archive)
       Object.defineProperty(r, "_archive", { value: streamArchives[store] || {} });
 }
-async function companionArchive(path, body) {
+export async function companionArchive(path, body) {
   const reply = await fetch("/__companion/archive/" + path, {
     cache: "no-store",
     ...(body && { method: "POST", body: JSON.stringify(body) }),
@@ -277,7 +277,7 @@ const archiveFresh = (key, query) => ({
   done: false,
   failures: 0,
 });
-function archiveSource(store, query) {
+export function archiveSource(store, query) {
   if (!R.archiveView || !archiveReady(store)) return null;
   query = { ...query, all: 1 };
   const key = JSON.stringify(query);
@@ -293,7 +293,7 @@ async function archivePage(store, s) {
   Object.assign(s, { next: j.next, done: !j.next, holes: j.holes || [] });
   Object.assign(s, { gens: j.generations || [], presets: j.presets || [] });
 }
-async function loadArchive(store, render) {
+export async function loadArchive(store, render) {
   const s = archiveSources[store];
   if (!s || s.busy || s.done) return;
   s.busy = true;
@@ -324,7 +324,7 @@ async function reloadArchive(store, render) {
     try {
       do await archivePage(store, s);
       while (!s.done && s.rows.length < old.rows.length);
-    } catch (_) {
+    } catch {
       return;
     }
     if (archiveSources[store] !== old) return;
@@ -336,7 +336,7 @@ async function reloadArchive(store, render) {
 // history generation and then the id (ids restart with a generation); by
 // rating unrated last, the rating in `dir`, then generation and id newest
 // first. Controller rows belong to the companion's open generation.
-function recordOrder(s, sort, dir) {
+export function recordOrder(s, sort, dir) {
   const open = s?.gens?.find((g) => g.current)?.generation ?? Infinity,
     gen = (r) => (r._archive ? r.archiveGeneration : open),
     newest = (a, b) => gen(b) - gen(a) || b.id - a.id;
@@ -348,7 +348,7 @@ function recordOrder(s, sort, dir) {
 }
 // The merged list: every row up to the first one a source still has to send,
 // and which source pages next (`need`).
-function mergeRecords(own, ownMore, s, order) {
+export function mergeRecords(own, ownMore, s, order) {
   if (!s || (!s.rows.length && !s.done))
     return { list: own, need: s && !s.done ? "archive" : null };
   // A record both hold shows the controller's row.
@@ -367,7 +367,7 @@ function mergeRecords(own, ownMore, s, order) {
 // Rows kept only by the companion are marked so, never by colour alone; in the
 // archive view the companion names them (archiveOnly) among the rows the
 // controller holds.
-function archiveMark(el, r) {
+export function archiveMark(el, r) {
   if (!r._archive || r.archiveOnly === false) return;
   // A closed history ended when the next existing one opened (its restartedAt).
   const before = (r._archive.gens || [])
@@ -389,7 +389,7 @@ function archiveMark(el, r) {
 const archiveDate = (at) => new Date(at * 1e3).toLocaleDateString([], { dateStyle: "medium" });
 // Date-ordered lists: a line where an earlier history begins and where the
 // companion could not copy records. Returns whether it added one.
-function archiveHeadings(body, list, i, columns, s, byDate) {
+export function archiveHeadings(body, list, i, columns, s, byDate) {
   const r = list[i],
     prev = list[i - 1],
     gen = (x) => (x._archive ? x.archiveGeneration : s?.gens?.find((g) => g.current)?.generation),
@@ -430,14 +430,14 @@ const archiveDirect = () =>
   location.protocol !== "https:" && !!R.homeStatusCache()?.companion?.archive;
 // A record's Delete, offered only while Admin is unlocked for this screen and
 // never in the read-only archive view: one action wherever the record is kept.
-const deleteItem = (label, run) =>
+export const deleteItem = (label, run) =>
   R.archiveView || !R.adminUnlockedHere() ? [] : [[ICON_TRASH, label, "", run, true]];
 // Deletes a record, after one confirmation. The controller deletes its own
 // records and the companion's copy follows on its next sync; a record only
 // the companion keeps (`_archive`) is deleted there. `drop()` removes the row
 // from the controller's list, `render()` repaints; a refusal (Admin locked, a
 // shot running) throws and leaves the list as it was.
-async function removeRecord(store, r, path, drop, render) {
+export async function removeRecord(store, r, path, drop, render) {
   if (r._archive)
     await companionArchive("delete", { store, id: r.id, generation: r.archiveGeneration });
   else {
@@ -448,4 +448,4 @@ async function removeRecord(store, r, path, drop, render) {
   render();
 }
 // Opened directly, the end of the list says the companion keeps a copy (S11).
-const archiveListNote = (id, more) => ($(id).hidden = more || !archiveDirect());
+export const archiveListNote = (id, more) => ($(id).hidden = more || !archiveDirect());

@@ -15,7 +15,7 @@
       localStorage.getItem("obbwAppNoSplash") === "1"
     )
       return;
-  } catch (_) {
+  } catch {
     return;
   }
   root.classList.add("launchIntro");

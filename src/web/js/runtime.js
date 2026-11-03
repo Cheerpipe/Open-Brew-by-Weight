@@ -158,7 +158,7 @@ function sessionToken() {
     return (
       localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY) || sessionMemory
     );
-  } catch (_) {
+  } catch {
     return sessionMemory;
   }
 }
@@ -168,7 +168,9 @@ function storeSession(token, remember) {
     localStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(SESSION_KEY);
     if (token) (remember ? localStorage : sessionStorage).setItem(SESSION_KEY, token);
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the session lives in memory for this page only.
+  }
 }
 // A short name for Admin → Access, e.g. "iPhone · Safari"; display only.
 function deviceLabel() {
@@ -833,7 +835,7 @@ function themeMode() {
   try {
     const v = localStorage.getItem(THEME_KEY);
     return THEME_MODES.includes(v) ? v : "auto";
-  } catch (_) {
+  } catch {
     return "auto";
   }
 }
@@ -862,7 +864,9 @@ function setTheme(m) {
   if (!THEME_MODES.includes(m)) m = "auto";
   try {
     localStorage.setItem(THEME_KEY, m);
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the theme applies to this page only.
+  }
   paintTheme(m);
 }
 function cycleTheme() {
@@ -1372,7 +1376,7 @@ let timezonePreviewSeq = 0,
 function browserTimezone() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-  } catch (_) {
+  } catch {
     return "";
   }
 }
@@ -1478,7 +1482,7 @@ async function syncTimezone(c) {
       "",
       "",
     );
-  } catch (_) {
+  } catch {
     // A rejected zone waits a minute instead of retrying on every frame.
     autoInitRetryAt = Date.now() + 6e4;
   } finally {
@@ -1793,7 +1797,9 @@ let fieldErrSeq = 0;
 function focusField(el) {
   try {
     el.focus({ preventScroll: true });
-  } catch (_) {}
+  } catch {
+    // Browsers without focus options still scroll the field into view below.
+  }
   el.scrollIntoView({ block: "center" });
 }
 function showFieldError(id, msg) {
@@ -2513,7 +2519,7 @@ function showInactiveOverlay() {
   if (btn) {
     try {
       btn.focus({ preventScroll: true });
-    } catch (_) {
+    } catch {
       btn.focus();
     }
   }
@@ -2588,7 +2594,9 @@ async function apiBinary(path, onProgress, cache = "no-store") {
       let data = {};
       try {
         data = await response.json();
-      } catch (_) {}
+      } catch {
+        // A non-JSON error body still reports the HTTP status below.
+      }
       throw Object.assign(
         new Error(errorText(data, __WEBUI_TEXT__("runtime.http") + response.status)),
         {
@@ -2652,7 +2660,7 @@ async function api(path, options = {}) {
   let data;
   try {
     data = JSON.parse(txt);
-  } catch (_) {
+  } catch {
     throw Object.assign(new Error(__WEBUI_TEXT__("runtime.invalid_response")), {
       status: response.status,
     });
@@ -2756,7 +2764,7 @@ async function fetchJson(path, options, ms = 8e3) {
       txt = await response.text();
     try {
       return [response, txt ? JSON.parse(txt) : {}];
-    } catch (_) {
+    } catch {
       return [response, null];
     }
   } finally {
@@ -2906,7 +2914,9 @@ async function showSignIn(signedOut) {
       overlay.classList.remove("isLogin");
       claimWebUiOwnership();
     }
-  } catch (_) {}
+  } catch {
+    // The sign-in form stays usable without the device name.
+  }
 }
 {
   const form = $("webUiLogin");
@@ -2946,7 +2956,7 @@ async function showSignIn(signedOut) {
         $("loginPassword").value = "";
         $("webUiInactive").classList.remove("isLogin");
         await claimWebUiOwnership(data.active ? data : undefined);
-      } catch (_) {
+      } catch {
         setSignInError(__WEBUI_TEXT__("runtime.device_unreachable"));
       } finally {
         submit.disabled = false;
@@ -4750,7 +4760,7 @@ function decodeCurveDeltas(text, ref) {
   let b;
   try {
     b = atob(text);
-  } catch (_) {
+  } catch {
     return null;
   }
   const wAtMs = [],
@@ -4907,7 +4917,7 @@ function startUiStream() {
         scheduleShotPaint();
       }
       if (shotGotHome && shotGotShot) clearTimeout(shotSetup);
-    } catch (_) {
+    } catch {
       invalidateHomeStream();
       shotStale = true;
       scheduleShotPaint();
@@ -5201,7 +5211,7 @@ const APP_SETTING_KEYS = {
 function appSetting(k) {
   try {
     return localStorage.getItem(APP_SETTING_KEYS[k]) === "1";
-  } catch (_) {
+  } catch {
     return false;
   }
 }
@@ -5209,7 +5219,9 @@ function setAppSetting(k, v) {
   try {
     if (v) localStorage.setItem(APP_SETTING_KEYS[k], "1");
     else localStorage.removeItem(APP_SETTING_KEYS[k]);
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the setting applies to this page only.
+  }
   if (k !== "awake") return;
   if (v && sessionShotLive()) keepShotAwake(true);
   else if (!v && shotAwakeUntil) {
@@ -5287,7 +5299,9 @@ function enterShotFullScreen() {
   try {
     history.pushState({ obbwShotFs: 1 }, "", location.href);
     shotFsPushed = true;
-  } catch (_) {}
+  } catch {
+    // History blocked: shotFsPushed stays false, so Back is not intercepted.
+  }
 }
 function exitShotFullScreen() {
   const view = $("liveShot");
@@ -5599,7 +5613,7 @@ function heroDeckFrame(m) {
       const r = { ...Object.fromEntries(heroDeck.cols.map((k, i) => [k, a[i]])), ...a.at(-1) };
       heroDeck.rows.push(r.wD === undefined ? r : Object.assign(r, decodeCurveDeltas(r.wD)));
     }
-  } catch (_) {
+  } catch {
     return void (heroDeck.request = 0);
   }
   if (m.more) return;
@@ -5797,7 +5811,9 @@ let archiveView = false;
 try {
   localStorage.removeItem("obbwOfflineCopy");
   indexedDB.deleteDatabase("obbw-records");
-} catch (_) {}
+} catch {
+  // Storage blocked or full: there is no legacy copy to clear.
+}
 // The out-of-reach overlay offers it once the companion answers now that its
 // archive is on and holds records (the last good answer that stands in for
 // a failed request does not count); `on` false withdraws the offer.
@@ -6176,14 +6192,16 @@ function heroTintMode() {
   try {
     const v = localStorage.getItem(HERO_TINT_KEY);
     return HERO_TINT_MODES.includes(v) ? v : "forecast";
-  } catch (_) {
+  } catch {
     return "forecast";
   }
 }
 function setHeroTintMode(v) {
   try {
     localStorage.setItem(HERO_TINT_KEY, HERO_TINT_MODES.includes(v) ? v : "forecast");
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the tint applies to this page only.
+  }
   scheduleShotPaint();
 }
 // Hero card style: the machine default comes from the config snapshot; a PWA
@@ -6198,12 +6216,14 @@ let heroCardDefault = null;
 try {
   const v = localStorage.getItem(HERO_CARD_DEFAULT_KEY);
   if (v === "technical" || v === "colorful") heroCardDefault = v;
-} catch (_) {}
+} catch {
+  // Storage blocked or full: keep the built-in default.
+}
 function heroCardOverride() {
   try {
     const v = localStorage.getItem(HERO_CARD_KEY);
     return v === "technical" || v === "colorful" ? v : null;
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -6216,7 +6236,9 @@ function setHeroCardOverride(v) {
   try {
     if (v === "technical" || v === "colorful") localStorage.setItem(HERO_CARD_KEY, v);
     else localStorage.removeItem(HERO_CARD_KEY);
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the choice applies to this page only.
+  }
   scheduleShotPaint();
 }
 function heroTint(d, m, kind, el, noScale, mode) {
@@ -6781,14 +6803,16 @@ function liveShotDash(d, model, m) {
 function cardDismissed(key) {
   try {
     return localStorage.getItem(key) || "";
-  } catch (_) {
+  } catch {
     return "";
   }
 }
 function dismissCard(key, value = "1") {
   try {
     localStorage.setItem(key, value);
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the dismissal is not remembered.
+  }
   renderHomeCards();
 }
 // Grind hint card: the firmware decides (state, direction, tier, size,
@@ -6953,7 +6977,9 @@ function checkFirmwareReload(version) {
   if (version === SHELL_FW_VERSION) {
     try {
       sessionStorage.removeItem("obbwFwReload");
-    } catch (_) {}
+    } catch {
+      // Storage blocked or full: there is no reload flag to clear.
+    }
     // The ?fw= landing cached the new shell under its own key; refresh the
     // plain paths' cached copies too, so the next open loads it directly.
     if (!fwShellRefreshed && /[?&]fw=/.test(location.search)) {
@@ -6969,7 +6995,9 @@ function checkFirmwareReload(version) {
   try {
     reloaded = !!sessionStorage.getItem("obbwFwReload");
     if (!reloaded) sessionStorage.setItem("obbwFwReload", "1");
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: reloaded stays true, so no reload loop can start.
+  }
   if (!reloaded) {
     fwReloading = true; // A fresh-cached navigation may be reopened without revalidating (WebKit
     // home-screen apps), so reload() can land on the stale copy again; a
@@ -7005,7 +7033,9 @@ function applyCommonStatus(s) {
     heroCardDefault = c.heroCardMode;
     try {
       localStorage.setItem(HERO_CARD_DEFAULT_KEY, heroCardDefault);
-    } catch (_) {}
+    } catch {
+      // Storage blocked or full: the default applies to this page only.
+    }
   }
   syncTimezone(c);
   lastCommandStatus = s.lastCommand || null;

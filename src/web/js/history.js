@@ -1,5 +1,22 @@
 "use strict";
 import * as R from "./runtime.js?v=__FW_ASSET_TAG__";
+import {
+  actionMenu,
+  archiveHeadings,
+  archiveListNote,
+  archiveMark,
+  archiveSource,
+  armListSentinel,
+  createFilterMenu,
+  deleteItem,
+  downloadCsv,
+  loadArchive,
+  mergeRecords,
+  recordOrder,
+  removeRecord,
+  streamArchive,
+  streamArchives,
+} from "./records.js?v=__FW_ASSET_TAG__";
 // createFilterMenu, actionMenu, downloadCsv, armListSentinel and ICON_TRASH come
 // from the records bundle prelude (records.js).
 const $ = R.$;

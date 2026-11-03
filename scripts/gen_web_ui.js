@@ -271,8 +271,9 @@ function injectHomePartial(shellHtml, homePartial) {
 function stripModuleHeader(name, src) {
   const body = src
       .replace(/^\(?['"]use strict['"]\)?;\s*/m, '')
-      .replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];\s*/m, '');
-  if (/\bimport\s*\*/.test(body)) {
+      .replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];\s*/m, '')
+      .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\/records\.js[^'"]*['"];\s*/m, '');
+  if (/\bimport\s*[*{]/.test(body)) {
     throw new Error(`View ${name} retained its runtime import`);
   }
   return body;
@@ -309,7 +310,7 @@ function buildViewModule(file, views, viewJsRaw, partials) {
   }
   return [
     `import * as R from '/js/runtime.js?v=${ASSET_TAG_PLACEHOLDER}';`,
-    stripModuleHeader(file, viewJsRaw[file]),
+    stripModuleHeader(file, viewJsRaw[file]).replace(/^export\s+/gm, ''),
     ...views.map((name) => scopedView(`__${name}`,
         `${viewJsRaw[name]}\nconst markup=${JSON.stringify(partials[name])};`,
         ['markup'])),

@@ -1545,7 +1545,7 @@ function logZoneOffsetMinutes(zone, unixSec) {
       (Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) - unixSec * 1000) /
         60000,
     );
-  } catch (_) {
+  } catch {
     return R.statusTimezoneOffsetMinutes;
   }
 }
@@ -1722,7 +1722,7 @@ async function loadLogOlder() {
     const el = $("log");
     logAnchor = jumped ? "end" : { h: el.scrollHeight, top: el.scrollTop };
     R.paint(renderLog);
-  } catch (_) {
+  } catch {
     // A page that did not come is asked again a little later.
     logHistoryRetryAt = performance.now() + 10e3;
   } finally {

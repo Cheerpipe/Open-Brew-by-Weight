@@ -542,7 +542,7 @@
       '!(a?.on && a.available && (a.shotsTotal > 0 || a.historyTotal > 0))'));
   assert.ok(codeIncludes(viewJs.stats, 'shotFilterReset(); applyShotPage({ bootId: R.bootId, total: 0, hasMore: false, shots: [] }, "replace"); refreshMergedHeader();'));
   assert.ok(codeIncludes(viewJs.history, 'historyFilterReset(); applyHistoryPage({ bootId: R.bootId, total: 0, hasMore: false, history: [] }, "replace");'));
-  assert.ok(codeIncludes(runtimeJs, 'try { localStorage.removeItem("obbwOfflineCopy"); indexedDB.deleteDatabase("obbw-records"); } catch (_) {}'));
+  assert.ok(codeIncludes(runtimeJs, 'try { localStorage.removeItem("obbwOfflineCopy"); indexedDB.deleteDatabase("obbw-records"); } catch {'));
   for (const source of [runtimeJs, appJsSource, ...Object.values(viewJs)])
     assert.ok(!source.includes('indexedDB.open') && !codeIncludes(source, 'op: "records"') &&
         !source.includes('registerStream("records"') && !codeIncludes(source, 'offlineCopy,'));

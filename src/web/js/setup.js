@@ -371,7 +371,7 @@ async function pollStatus() {
   let s;
   try {
     s = await R.api("/api/v1/status/admin");
-  } catch (e) {
+  } catch {
     return null; /* transient poll failure: keep waiting within the bounded window */
   }
   statusAt = Date.now();
@@ -734,12 +734,12 @@ async function copyAddress(text, button) {
   try {
     await navigator.clipboard.writeText(text.textContent);
     copied = true;
-  } catch (_) {
+  } catch {
     // Plain http (the setup network) has no async clipboard.
     getSelection().selectAllChildren(text);
     try {
       copied = document.execCommand("copy");
-    } catch (_) {
+    } catch {
       /* the address stays selected for a manual copy */
     }
   }
@@ -851,7 +851,7 @@ async function finishSetup() {
         body: R.body({ action: "finish" }),
       });
       finished = d.finished === true;
-    } catch (e) {
+    } catch {
       /* the setup network still closes on its own */
     }
   if (finished) window.location.href = PROBE_URL;
@@ -867,7 +867,7 @@ async function discardTest() {
   if (!testing()) return;
   try {
     await R.api("/api/v1/network", { method: "POST", body: R.body({ action: "discard" }) });
-  } catch (_) {
+  } catch {
     return;
   }
   for (let i = 0; i < 12 && testing(); i++) {

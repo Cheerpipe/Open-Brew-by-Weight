@@ -185,7 +185,7 @@ async function renderRoute(pathname, focus) {
     }
     const [, ok] = await Promise.all([ready, startView(view)]);
     if (seq === routeSeq) settleView(ok, boot);
-  } catch (e) {
+  } catch {
     // The browser's own import error is not for the reader.
     if (seq === routeSeq) R.message(__WEBUI_TEXT__("shell.unable_to_load_view"), "error");
   }

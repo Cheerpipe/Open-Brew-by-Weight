@@ -3,13 +3,6 @@
 import js from "@eslint/js";
 import globals from "globals";
 
-const RECORDS_PRELUDE = [
-  "downloadCsv", "actionMenu", "ICON_TRASH", "createFilterMenu", "armListSentinel",
-  "archiveSources", "archiveStatsReady", "archiveChanged", "companionArchive", "archiveSource",
-  "loadArchive", "recordOrder", "mergeRecords", "archiveMark", "archiveHeadings", "deleteItem",
-  "removeRecord", "archiveListNote", "streamArchive", "streamArchives",
-];
-
 export default [
   {
     files: ["src/web/**/*.js"],
@@ -31,23 +24,6 @@ export default [
     linterOptions: { reportUnusedDisableDirectives: "error" },
     rules: {
       ...js.configs.recommended.rules,
-      "no-unused-vars": ["error", { caughtErrors: "none" }],
-      "no-empty": ["error", { allowEmptyCatch: true }],
-    },
-  },
-  // The generator prepends js/records.js to stats.js and history.js, so its
-  // helpers are globals there and look unused in the prelude itself.
-  {
-    files: ["src/web/js/stats.js", "src/web/js/history.js"],
-    languageOptions: { globals: Object.fromEntries(RECORDS_PRELUDE.map((n) => [n, "readonly"])) },
-  },
-  {
-    files: ["src/web/js/records.js"],
-    rules: {
-      "no-unused-vars": [
-        "error",
-        { caughtErrors: "none", varsIgnorePattern: `^(${RECORDS_PRELUDE.join("|")})$` },
-      ],
     },
   },
 ];

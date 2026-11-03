@@ -47,7 +47,9 @@ async function changeTimezoneMode() {
   const select = $("timezoneId");
   try {
     await R.populateTimezoneOptions();
-  } catch (_) {}
+  } catch {
+    // The zone list is optional here; the browser zone below still applies.
+  }
   if (!$("timezoneAutomatic").checked) return;
   const id = R.browserTimezone();
   select.value = R.timezoneCatalog?.includes(id) ? id : "";
@@ -613,7 +615,7 @@ function companionPairUrl(text) {
   try {
     const u = new URL(/^https?:\/\//i.test(text) ? text : "http://" + text);
     return u.hostname && !u.username && !u.password ? u.origin + "/__companion/pair" : "";
-  } catch (_) {
+  } catch {
     return "";
   }
 }
@@ -1278,7 +1280,7 @@ function otaEndBusy(data, fallbackText, kind) {
 function otaStored() {
   try {
     return JSON.parse(localStorage.getItem("obbwOtaSession") || "null");
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -1286,7 +1288,9 @@ function otaStore(v) {
   try {
     if (v) localStorage.setItem("obbwOtaSession", JSON.stringify(v));
     else localStorage.removeItem("obbwOtaSession");
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the upload cannot resume after a reload.
+  }
 }
 const OTA_PROTOCOL_VERSION = 3;
 async function otaFileIdentity(file) {
@@ -1494,7 +1498,9 @@ async function otaUpload() {
     if (session) {
       try {
         current = await otaSend("/api/v1/ota/session", null, OTA_COMMAND_TIMEOUT_MS, "GET");
-      } catch (_) {}
+      } catch {
+        // Unreachable controller: report the upload error without its session state.
+      }
     }
     otaEndBusy(current, R.formatCommandError(otaUploadErrorText(session, current, e), e), "error");
   }
@@ -1502,7 +1508,7 @@ async function otaUpload() {
 function otaCommitStored() {
   try {
     return JSON.parse(localStorage.getItem("obbwOtaCommit") || "null");
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -1510,7 +1516,9 @@ function otaCommitStore(value) {
   try {
     if (value) localStorage.setItem("obbwOtaCommit", JSON.stringify(value));
     else localStorage.removeItem("obbwOtaCommit");
-  } catch (_) {}
+  } catch {
+    // Storage blocked or full: the commit check cannot survive a reload.
+  }
 }
 function otaCheckBoot(expected, status) {
   if (
@@ -1805,7 +1813,7 @@ function validWebhookUrl(url) {
   try {
     const parsed = new URL(url);
     return parsed.protocol === "http:" && !parsed.username && !parsed.password && !!parsed.hostname;
-  } catch (_) {
+  } catch {
     return false;
   }
 }
