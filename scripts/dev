@@ -367,6 +367,8 @@ def execute(command: list[str], risk: str, steps: list[tuple[str, list[str]]],
                 lines.append(clean)
                 if verbosity != "compact":
                     print(painted(clean), flush=True)
+            # Stall checks read run.log, so each finished block must reach it.
+            log.flush()
 
         def run_lane(lane: list[tuple[str, list[str]]], label: str) -> None:
             for name, argv in lane:

@@ -22,7 +22,7 @@ subset of the applicable gates does not validate the change.
 | R1 | Web UI, tests, tooling, pure logic | R0 + focused tests and generated assets | as identified |
 | R2 | BLE, network, persistence, OTA, build | full host + ASan/UBSan + TSAN + architecture + development and release images of every official validation profile pair | subsystem-dependent |
 | R3 | Relay, machine, ISR, watchdog, boot, GPIO, partitions, remote control, unknown | R2 + Cppcheck `warning` check of the changed code + build variants | HIL/manual required |
-| Release | Candidate firmware image | the quality gate, applicable soak, HIL and manual plan | required |
+| Release | Candidate firmware image | R3 + the quality gate, applicable soak, HIL and manual plan | required |
 
 Use `./scripts/dev validate [--risk R0..R3] [paths...]`. R2/R3 run the host
 tests and the firmware steps as two parallel lanes; see
@@ -33,7 +33,8 @@ runs in the quality gate, `./scripts/dev quality`, on demand and on the clean
 tree of every commit about to be tagged as a release: the full Cppcheck
 analysis (`warning`, `performance`, `portability`, `style`, inconclusive
 findings included), the dead-code check, the design preview, and the size
-budget verdict. It always covers the whole tree and every profile pair. Focused commands are
+budget verdict. It always covers the whole tree and every profile pair, and
+it adds to R3 rather than replacing it: a release candidate passes both. Focused commands are
 `./scripts/dev test [normal|asan|tsan|web|ble|ota|tooling|lint]`, `./scripts/dev build`, and
 `./scripts/dev analyze`; `lint` is the opt-in Web UI static analysis and is not part
 of any risk gate. The supported IDF setup and commands remain documented
