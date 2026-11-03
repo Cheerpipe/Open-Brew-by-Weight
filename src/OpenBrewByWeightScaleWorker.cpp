@@ -67,6 +67,7 @@ void reportNimbleRuntimeHealth(bool force) {
   static int32_t previousResetReason = 0;
   static uint32_t previousSyncGeneration = 0;
   static uint32_t previousStaleCallbacks = 0;
+  static uint32_t previousContextFaults = 0;
   static uint32_t previousCleanupCount = 0;
   static uint32_t previousTotalDrops = 0;
   static uint8_t previousClientState = 0xff;
@@ -74,11 +75,14 @@ void reportNimbleRuntimeHealth(bool force) {
   const ScaleBleBackendHealth client = scale.backendHealth();
   const uint32_t totalDrops = client.criticalEventDrops +
                               client.controlEventDrops + client.rxDrops;
+  const uint32_t contextFaults =
+      client.callbackContextExhausted + client.callbackContextViolations;
   if (!force && reported && health.state == previousState &&
       health.lastError == previousError &&
       health.lastResetReason == previousResetReason &&
       health.syncGeneration == previousSyncGeneration &&
       client.staleCallbacks == previousStaleCallbacks &&
+      contextFaults == previousContextFaults &&
       client.cleanupCount == previousCleanupCount &&
       totalDrops == previousTotalDrops && client.state == previousClientState) {
     return;
@@ -90,6 +94,7 @@ void reportNimbleRuntimeHealth(bool force) {
   previousResetReason = health.lastResetReason;
   previousSyncGeneration = health.syncGeneration;
   previousStaleCallbacks = client.staleCallbacks;
+  previousContextFaults = contextFaults;
   previousCleanupCount = client.cleanupCount;
   previousTotalDrops = totalDrops;
   previousClientState = client.state;
@@ -152,6 +157,15 @@ void reportNimbleRuntimeHealth(bool force) {
       static_cast<unsigned long>(client.lastAdvertisementToReadyMs),
       static_cast<unsigned long>(client.lastAdvertisementToFirstWeightMs),
       static_cast<unsigned long>(client.lastReadyToFirstWeightMs));
+  // Own line: the resilience line already fills the 128-byte log entry.
+  serialTraceCategoryf(
+      LogLevel::DEBUG, DebugCategory::BLE,
+      "NimBLE callback contexts armed=%u/%u/%u exhausted=%lu violations=%lu",
+      static_cast<unsigned>(client.scanContextsArmed),
+      static_cast<unsigned>(client.linkContextsArmed),
+      static_cast<unsigned>(client.gattContextsArmed),
+      static_cast<unsigned long>(client.callbackContextExhausted),
+      static_cast<unsigned long>(client.callbackContextViolations));
 }
 #endif
 

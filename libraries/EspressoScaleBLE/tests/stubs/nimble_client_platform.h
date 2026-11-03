@@ -12,6 +12,7 @@
 #include <mutex>
 #include <memory>
 #include <atomic>
+#include <vector>
 
 using TickType_t = uint32_t;
 using TaskHandle_t = void *;
@@ -70,7 +71,7 @@ inline int xSemaphoreTake(SemaphoreHandle_t s, uint32_t ms) {
 inline void vSemaphoreDelete(SemaphoreHandle_t) {}
 
 constexpr int BLE_HS_EAGAIN=1, BLE_HS_EALREADY=2, BLE_HS_EINVAL=3,
-  BLE_HS_ENOENT=5, BLE_HS_ENOMEM=6, BLE_HS_ENOTCONN=7,
+  BLE_HS_ENOENT=5, BLE_HS_ENOMEM=6, BLE_HS_ENOTCONN=7, BLE_HS_EAPP=9,
   BLE_HS_EBADDATA=10, BLE_HS_ETIMEOUT=13, BLE_HS_EDONE=14,
   BLE_HS_EBUSY=15, BLE_HS_EUNKNOWN=17, BLE_HS_ENOTSYNCED=22;
 constexpr int BLE_HS_ERR_ATT_BASE=0x100, BLE_HS_ERR_HCI_BASE=0x200;
@@ -81,7 +82,7 @@ constexpr uint8_t BLE_ERR_REM_USER_CONN_TERM=0x13;
 constexpr int BLE_GAP_EVENT_DISC=1, BLE_GAP_EVENT_DISC_COMPLETE=2,
   BLE_GAP_EVENT_CONNECT=3, BLE_GAP_EVENT_DISCONNECT=4, BLE_GAP_EVENT_NOTIFY_RX=5,
   BLE_GAP_EVENT_CONN_UPDATE=6, BLE_GAP_EVENT_CONN_UPDATE_REQ=7,
-  BLE_GAP_EVENT_L2CAP_UPDATE_REQ=8;
+  BLE_GAP_EVENT_L2CAP_UPDATE_REQ=8, BLE_GAP_EVENT_LINK_ESTAB=38;
 constexpr int BLE_HCI_ADV_RPT_EVTYPE_ADV_IND=0, BLE_HCI_ADV_RPT_EVTYPE_DIR_IND=1,
   BLE_HCI_ADV_RPT_EVTYPE_ADV_NONCONN_IND=3, BLE_HCI_ADV_RPT_EVTYPE_SCAN_RSP=4;
 constexpr uint8_t BLE_GATT_CHR_PROP_NOTIFY=0x10, BLE_GATT_CHR_PROP_INDICATE=0x20,
@@ -109,6 +110,7 @@ struct ble_gap_event {
   ble_gap_disc_desc disc;
   struct { int reason; } disc_complete;
   struct { int status; uint16_t conn_handle; } connect;
+  struct { int status; uint16_t conn_handle; } link_estab;
   struct { int reason; struct { uint16_t conn_handle; } conn; } disconnect;
   struct { uint16_t conn_handle,attr_handle; os_mbuf *om; } notify_rx;
   struct { int status; uint16_t conn_handle; } conn_update;
@@ -135,39 +137,194 @@ struct ble_gatt_attr {};
 struct ble_gatt_svc { uint16_t start_handle,end_handle; };
 struct ble_gatt_chr { uint16_t def_handle,val_handle; uint8_t properties; ble_uuid_any_t uuid; };
 struct ble_gatt_dsc { uint16_t handle; ble_uuid_any_t uuid; };
+using ble_gap_event_fn = int(ble_gap_event *, void *);
 using TestWriteCallback = int(*)(uint16_t,const ble_gatt_error *,ble_gatt_attr *,void *);
-inline TestWriteCallback testWriteCallback=nullptr;
-inline void *testWriteArg=nullptr;
+using TestServiceCallback = int(*)(uint16_t,const ble_gatt_error *,const ble_gatt_svc *,void *);
+using TestCharacteristicCallback = int(*)(uint16_t,const ble_gatt_error *,const ble_gatt_chr *,void *);
+using TestDescriptorCallback = int(*)(uint16_t,const ble_gatt_error *,uint16_t,const ble_gatt_dsc *,void *);
+
+// Every procedure a start call accepted, with the cb and cb_arg NimBLE would
+// hold, until the test (or testHostReset) delivers its terminal callback.
+enum class TestProcedureKind { Discovery, Connect, Services, Characteristics, Descriptors, Write };
+struct TestProcedure {
+  TestProcedureKind kind;
+  void *arg;
+  ble_gap_event_fn *gap;
+  TestServiceCallback service;
+  TestCharacteristicCallback characteristic;
+  TestDescriptorCallback descriptor;
+  TestWriteCallback write;
+  uint16_t connHandle;  // GATT target, or the link once a connect succeeded.
+  bool connected;
+};
+inline std::vector<TestProcedure> testProcedures;
+inline TestProcedure testStarted(TestProcedureKind kind, void *arg, uint16_t connHandle) {
+  TestProcedure procedure = {};
+  procedure.kind = kind; procedure.arg = arg; procedure.connHandle = connHandle;
+  return procedure;
+}
+inline bool testPending(TestProcedureKind kind) {
+  for (const auto &procedure : testProcedures) if (procedure.kind == kind) return true;
+  return false;
+}
+// Removes the newest pending procedure of this kind (or with this arg) the
+// way NimBLE unlinks a procedure before its terminal callback.
+inline TestProcedure testTake(TestProcedureKind kind, void *arg = nullptr) {
+  for (size_t index = testProcedures.size(); index-- > 0;) {
+    if (testProcedures[index].kind == kind && (arg == nullptr || testProcedures[index].arg == arg)) {
+      const TestProcedure procedure = testProcedures[index];
+      testProcedures.erase(testProcedures.begin() + static_cast<std::ptrdiff_t>(index));
+      return procedure;
+    }
+  }
+  assert(false && "no pending procedure");
+  return {};
+}
+inline TestProcedure &testFind(TestProcedureKind kind) {
+  for (size_t index = testProcedures.size(); index-- > 0;) {
+    if (testProcedures[index].kind == kind) return testProcedures[index];
+  }
+  assert(false && "no pending procedure");
+  return testProcedures.front();
+}
+inline void testGap(const TestProcedure &procedure, ble_gap_event event) {
+  procedure.gap(&event, procedure.arg);
+}
+// ESP-IDF NimBLE reports every connect outcome as CONNECT then LINK_ESTAB.
+inline void testConnectOutcome(const TestProcedure &procedure, int status, uint16_t connHandle) {
+  ble_gap_event event = {};
+  event.type = BLE_GAP_EVENT_CONNECT; event.connect.status = status; event.connect.conn_handle = connHandle;
+  testGap(procedure, event);
+  event.type = BLE_GAP_EVENT_LINK_ESTAB; event.link_estab.status = status; event.link_estab.conn_handle = connHandle;
+  testGap(procedure, event);
+}
+inline void testGattTerminal(const TestProcedure &procedure, int status) {
+  const ble_gatt_error error = {status, 0};
+  switch (procedure.kind) {
+    case TestProcedureKind::Services: procedure.service(procedure.connHandle, &error, nullptr, procedure.arg); break;
+    case TestProcedureKind::Characteristics: procedure.characteristic(procedure.connHandle, &error, nullptr, procedure.arg); break;
+    case TestProcedureKind::Descriptors: procedure.descriptor(procedure.connHandle, &error, 0, nullptr, procedure.arg); break;
+    case TestProcedureKind::Write: procedure.write(procedure.connHandle, &error, nullptr, procedure.arg); break;
+    default: assert(false && "not a GATT procedure");
+  }
+}
+// ble_gap_conn_broken: GATT procedures of the link fail with ENOTCONN before
+// the link's DISCONNECT.
+inline void testDisconnect(uint16_t connHandle, int reason) {
+  std::vector<TestProcedure> ended, kept;
+  TestProcedure link = {};
+  bool linkFound = false;
+  for (const auto &procedure : testProcedures) {
+    if (procedure.kind == TestProcedureKind::Connect && procedure.connected && procedure.connHandle == connHandle) {
+      link = procedure; linkFound = true;
+    } else if (procedure.kind >= TestProcedureKind::Services && procedure.connHandle == connHandle) {
+      ended.push_back(procedure);
+    } else {
+      kept.push_back(procedure);
+    }
+  }
+  testProcedures = kept;
+  for (const auto &procedure : ended) testGattTerminal(procedure, BLE_HS_ENOTCONN);
+  if (!linkFound) return;
+  ble_gap_event event = {};
+  event.type = BLE_GAP_EVENT_DISCONNECT; event.disconnect.reason = reason;
+  event.disconnect.conn.conn_handle = connHandle;
+  testGap(link, event);
+}
+// ble_hs reset: ble_gap_reset_state breaks every link, then
+// ble_gap_master_failed ends the pending connect or discovery.
+inline void testHostReset(int reason = BLE_HS_ENOTSYNCED) {
+  std::vector<uint16_t> links;
+  for (const auto &procedure : testProcedures) {
+    if (procedure.kind == TestProcedureKind::Connect && procedure.connected) links.push_back(procedure.connHandle);
+  }
+  for (uint16_t link : links) testDisconnect(link, reason);
+  while (!testProcedures.empty()) {
+    const TestProcedure procedure = testProcedures.back();
+    testProcedures.pop_back();
+    if (procedure.kind == TestProcedureKind::Connect) {
+      testConnectOutcome(procedure, reason, 0xffff);
+    } else if (procedure.kind == TestProcedureKind::Discovery) {
+      ble_gap_event event = {};
+      event.type = BLE_GAP_EVENT_DISC_COMPLETE; event.disc_complete.reason = reason;
+      testGap(procedure, event);
+    } else {
+      testGattTerminal(procedure, BLE_HS_ENOTCONN);
+    }
+  }
+}
+
 inline int testSubmitStatus=0, testTerminateStatus=0, testRssiStatus=0;
+inline int testDiscStatus=0, testConnectStatus=BLE_HS_EINVAL, testGattDiscoveryStatus=BLE_HS_EINVAL;
 inline unsigned testRadioProcedures=0, testTerminations=0, testWrites=0;
 inline std::function<void()> testOnSubmit;
 inline std::function<void()> testOnConnectCancel;
 inline std::function<void()> testOnTerminate;
 inline int testConnectCancelStatus=0;
-inline int ble_gattc_write_flat(uint16_t,uint16_t,const void *,uint16_t,TestWriteCallback cb,void *arg) {
+inline int ble_gattc_write_flat(uint16_t connHandle,uint16_t,const void *,uint16_t,TestWriteCallback cb,void *arg) {
   ++testRadioProcedures; ++testWrites;
-  testWriteCallback=cb; testWriteArg=arg;
+  if (testSubmitStatus == 0) {
+    TestProcedure procedure = testStarted(TestProcedureKind::Write, arg, connHandle);
+    procedure.write = cb;
+    testProcedures.push_back(procedure);
+  }
   if (testOnSubmit) testOnSubmit();
   return testSubmitStatus;
 }
 inline int ble_gattc_write_no_rsp_flat(uint16_t,uint16_t,const void *,uint16_t) { ++testRadioProcedures; ++testWrites; return testSubmitStatus; }
-template<class... T> int ble_gattc_disc_all_svcs(T...) { ++testRadioProcedures; return BLE_HS_EINVAL; }
-template<class... T> int ble_gattc_disc_all_chrs(T...) { ++testRadioProcedures; return BLE_HS_EINVAL; }
-template<class... T> int ble_gattc_disc_all_dscs(T...) { ++testRadioProcedures; return BLE_HS_EINVAL; }
-using ble_gap_event_fn = int(ble_gap_event *, void *);
-inline ble_gap_conn_params testConnectParams = {};
-inline ble_gap_disc_params testDiscParams = {};
-inline int ble_gap_connect(uint8_t, const ble_addr_t *, int32_t, const ble_gap_conn_params *params, ble_gap_event_fn *, void *) {
+inline int ble_gattc_disc_all_svcs(uint16_t connHandle, TestServiceCallback cb, void *arg) {
   ++testRadioProcedures;
-  testConnectParams = params == nullptr ? ble_gap_conn_params{} : *params;
-  return BLE_HS_EINVAL;
-}
-inline int ble_gap_disc(uint8_t, int32_t, const ble_gap_disc_params *params, ble_gap_event_fn *, void *) {
-  ++testRadioProcedures;
-  testDiscParams = params == nullptr ? ble_gap_disc_params{} : *params;
+  if (testGattDiscoveryStatus != 0) return testGattDiscoveryStatus;
+  TestProcedure procedure = testStarted(TestProcedureKind::Services, arg, connHandle);
+  procedure.service = cb;
+  testProcedures.push_back(procedure);
   return 0;
 }
-inline int ble_gap_disc_cancel() { ++testRadioProcedures; return 0; }
+inline int ble_gattc_disc_all_chrs(uint16_t connHandle, uint16_t, uint16_t, TestCharacteristicCallback cb, void *arg) {
+  ++testRadioProcedures;
+  if (testGattDiscoveryStatus != 0) return testGattDiscoveryStatus;
+  TestProcedure procedure = testStarted(TestProcedureKind::Characteristics, arg, connHandle);
+  procedure.characteristic = cb;
+  testProcedures.push_back(procedure);
+  return 0;
+}
+inline int ble_gattc_disc_all_dscs(uint16_t connHandle, uint16_t, uint16_t, TestDescriptorCallback cb, void *arg) {
+  ++testRadioProcedures;
+  if (testGattDiscoveryStatus != 0) return testGattDiscoveryStatus;
+  TestProcedure procedure = testStarted(TestProcedureKind::Descriptors, arg, connHandle);
+  procedure.descriptor = cb;
+  testProcedures.push_back(procedure);
+  return 0;
+}
+inline ble_gap_conn_params testConnectParams = {};
+inline ble_gap_disc_params testDiscParams = {};
+inline int ble_gap_connect(uint8_t, const ble_addr_t *, int32_t, const ble_gap_conn_params *params, ble_gap_event_fn *cb, void *arg) {
+  ++testRadioProcedures;
+  testConnectParams = params == nullptr ? ble_gap_conn_params{} : *params;
+  if (testConnectStatus != 0) return testConnectStatus;
+  if (testPending(TestProcedureKind::Discovery)) return BLE_HS_EBUSY;
+  TestProcedure procedure = testStarted(TestProcedureKind::Connect, arg, 0xffff);
+  procedure.gap = cb;
+  testProcedures.push_back(procedure);
+  return 0;
+}
+inline int ble_gap_disc(uint8_t, int32_t, const ble_gap_disc_params *params, ble_gap_event_fn *cb, void *arg) {
+  ++testRadioProcedures;
+  testDiscParams = params == nullptr ? ble_gap_disc_params{} : *params;
+  if (testDiscStatus != 0) return testDiscStatus;
+  if (testPending(TestProcedureKind::Discovery)) return BLE_HS_EALREADY;
+  TestProcedure procedure = testStarted(TestProcedureKind::Discovery, arg, 0xffff);
+  procedure.gap = cb;
+  testProcedures.push_back(procedure);
+  return 0;
+}
+// A successful cancel ends the discovery without DISC_COMPLETE.
+inline int ble_gap_disc_cancel() {
+  ++testRadioProcedures;
+  if (!testPending(TestProcedureKind::Discovery)) return BLE_HS_EALREADY;
+  (void)testTake(TestProcedureKind::Discovery);
+  return 0;
+}
 inline bool testDiscoveryActive = true;
 inline int ble_gap_disc_active() { return testDiscoveryActive; }
 inline int ble_gap_conn_cancel() {

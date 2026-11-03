@@ -9,17 +9,11 @@
 # purpose): promoted errors bypass the header filter and would fail the run on
 # third-party ESP-IDF headers. Scope gating is done by scripts/static-tidy,
 # which only counts diagnostics whose file is inside this repository.
-#
-# Disabled-check baseline owner: firmware-quality. Review/expiry: 2027-03-01.
-# Checks currently disabled, with the reason:
-#   performance-no-int-to-ptr             one site left: the NimBLE callback
-#                                         operation id carried in void *arg
 ---
 Checks: >
   -*,
   bugprone-*,
   performance-*,
-  -performance-no-int-to-ptr,
   clang-analyzer-core.*,
   clang-analyzer-cplusplus.*,
   modernize-use-override,

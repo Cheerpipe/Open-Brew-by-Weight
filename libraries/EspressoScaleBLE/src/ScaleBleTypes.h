@@ -162,6 +162,10 @@ struct ScaleBleBackendHealth {
     uint32_t cleanupCount;
     uint32_t duplicateCleanups;
     uint32_t teardownFailures;
+    // NimBLE callback contexts: starts refused because every context of the
+    // domain was armed, and callbacks whose arg was no armed context.
+    uint32_t callbackContextExhausted;
+    uint32_t callbackContextViolations;
     uint32_t backoffCount;
     uint32_t lastAdvertisementToConnectMs;
     uint32_t lastAdvertisementToReadyMs;
@@ -173,6 +177,9 @@ struct ScaleBleBackendHealth {
     uint8_t negativeCacheEntries;
     uint8_t state;
     uint8_t backoffFailures;
+    uint8_t scanContextsArmed;
+    uint8_t linkContextsArmed;
+    uint8_t gattContextsArmed;
 };
 
 #endif

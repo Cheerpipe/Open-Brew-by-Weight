@@ -35,23 +35,29 @@ static unsigned checks=0;
 
 namespace {
 struct NimbleScaleClientTest {
-static void ready(NimbleScaleClient &c) {
+// Each scenario starts after a host reset ended every earlier procedure, so
+// no scenario inherits the callback contexts another one left armed.
+static void resetHost() {
+  testHostReset();
+  testDiscStatus=0; testConnectStatus=BLE_HS_EINVAL; testGattDiscoveryStatus=BLE_HS_EINVAL;
   testOnWait={}; testOnDelay={}; testOnSubmit={}; testSubmitStatus=0;
   testOnConnectCancel={}; testOnTerminate={}; testConnectCancelStatus=0;
   testTerminateStatus=0; testRssiStatus=0; testRadioProcedures=0; testTerminations=0;
   testWrites=0; testWakeCount=0;
   capturedScaleLogs.clear(); capturedScaleLogTransport.clear();
   testRuntimeReady=true; testSyncGeneration=1;
+}
+static void ready(NimbleScaleClient &c) {
+  resetHost();
   c.beginGeneration(); c.lifecycleActive_=true; c.syncGeneration_=1;
-  c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+  c.beginOperation(CallbackDomain::Link);
   c.connectionHandle_=1; c.readHandle_=10; c.writeHandle_=12;
   c.writeProperties_=BLE_GATT_CHR_PROP_WRITE;
   c.protocol_=&kScaleProtocolGenericFf11;
   c.finishReady();
 }
 static void complete(int status=0) {
-  ble_gatt_error e={status,12};
-  testWriteCallback(1,&e,nullptr,testWriteArg);
+  testGattTerminal(testTake(TestProcedureKind::Write),status);
 }
 static void notify(NimbleScaleClient &c,uint16_t length) {
   os_mbuf b={}; b.length=length; b.data[0]=3;
@@ -149,7 +155,7 @@ static void run() {
     NimbleScaleClient c(false); ready(c);
     c.connectionHandle_=kInvalidHandle;
     c.enterState(NimbleScaleClient::State::Connecting);
-    const uint32_t operation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    const uint32_t operation=c.beginOperation(CallbackDomain::Link);
     ble_gap_event success={}; success.type=BLE_GAP_EVENT_CONNECT;
     success.connect.conn_handle=42;
     testConnectCancelStatus=BLE_HS_EALREADY;
@@ -180,7 +186,7 @@ static void run() {
       NimbleScaleClient c(false); ready(c);
       c.connectionHandle_=kInvalidHandle;
       c.enterState(NimbleScaleClient::State::Connecting);
-      const uint32_t operation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+      const uint32_t operation=c.beginOperation(CallbackDomain::Link);
       testConnectCancelStatus=cancelStatus;
       c.disconnect();
       const unsigned procedures=testRadioProcedures;
@@ -199,7 +205,7 @@ static void run() {
         c.service();
         c.beginGeneration(); c.lifecycleActive_=true; c.syncGeneration_=testSyncGeneration;
         c.enterState(NimbleScaleClient::State::Connecting);
-        const uint32_t replacement=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+        const uint32_t replacement=c.beginOperation(CallbackDomain::Link);
         c.onGapEvent(&event,replacement);
         c.onGapEvent(&event,operation); // Same handle, previous runtime epoch.
         CHECK(c.connectionHandle_==42);
@@ -230,7 +236,7 @@ static void run() {
       c.connectionHandle_=kInvalidHandle;
       c.lifecycleActive_=true;
       c.enterState(NimbleScaleClient::State::Connecting);
-      const uint32_t operation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+      const uint32_t operation=c.beginOperation(CallbackDomain::Link);
       c.disconnect();
       ble_gap_event failed={}; failed.type=BLE_GAP_EVENT_CONNECT;
       failed.connect.status=BLE_HS_ETIMEOUT;
@@ -290,7 +296,7 @@ static void run() {
     c.service(); CHECK(!c.linkCleanupPending());
     c.beginGeneration(); c.lifecycleActive_=true; c.syncGeneration_=testSyncGeneration;
     c.enterState(NimbleScaleClient::State::Connecting);
-    const uint32_t replacement=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    const uint32_t replacement=c.beginOperation(CallbackDomain::Link);
     ble_gap_event event={}; event.type=BLE_GAP_EVENT_CONNECT; event.connect.conn_handle=1;
     c.onGapEvent(&event,replacement);
     event.type=BLE_GAP_EVENT_DISCONNECT; event.disconnect.conn.conn_handle=1;
@@ -591,7 +597,7 @@ static void run() {
     NimbleScaleClient c(false);
     c.beginGeneration();
     c.state_ = NimbleScaleClient::State::Scanning;
-    const uint32_t operation = c.beginOperation(NimbleScaleClient::CallbackDomain::Scan);
+    const uint32_t operation = c.beginOperation(CallbackDomain::Scan);
     uint8_t firstName[] = "BOOKOO first";
     uint8_t secondName[] = "BOOKOO second";
     testAdvertisementParseStatus = 0;
@@ -745,7 +751,7 @@ static void run() {
     testRuntimeReady=true; testSyncGeneration=1;
     c.beginGeneration(); c.lifecycleActive_=true; c.syncGeneration_=1;
     c.enterState(NimbleScaleClient::State::Connecting);
-    const uint32_t operation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    const uint32_t operation=c.beginOperation(CallbackDomain::Link);
     ble_gap_event e={}; e.type=BLE_GAP_EVENT_CONNECT;
     e.connect.conn_handle=42;
     c.onGapEvent(&e,operation);
@@ -765,7 +771,7 @@ static void run() {
     testRuntimeReady=true; testSyncGeneration=1;
     c.beginGeneration(); c.lifecycleActive_=true; c.syncGeneration_=1;
     c.enterState(NimbleScaleClient::State::Connecting);
-    const uint32_t oldOperation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    const uint32_t oldOperation=c.beginOperation(CallbackDomain::Link);
     ble_gap_event e={}; e.type=BLE_GAP_EVENT_CONNECT;
     e.connect.conn_handle=42;
     c.onGapEvent(&e,oldOperation);
@@ -780,7 +786,7 @@ static void run() {
     CHECK(c.connectionHandle_==kInvalidHandle);
     c.beginGeneration(); c.lifecycleActive_=true; c.syncGeneration_=2;
     c.enterState(NimbleScaleClient::State::Connecting);
-    const uint32_t newOperation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    const uint32_t newOperation=c.beginOperation(CallbackDomain::Link);
     e.disconnect.conn.conn_handle=42;
     c.onGapEvent(&e,oldOperation);
     CHECK(!c.pendingDisconnect_);
@@ -796,7 +802,7 @@ static void run() {
     NimbleScaleClient c(false);
     c.beginGeneration(); c.lifecycleActive_=true;
     c.enterState(NimbleScaleClient::State::Connecting);
-    const uint32_t operation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    const uint32_t operation=c.beginOperation(CallbackDomain::Link);
     ble_gap_event e={}; e.type=BLE_GAP_EVENT_CONNECT;
     e.connect.status=BLE_HS_HCI_ERR(8); e.connect.conn_handle=42;
     c.onGapEvent(&e,operation);
@@ -1127,12 +1133,16 @@ static void run() {
     CHECK(c.diagnostics().disconnectStatus==BLE_HS_ETIMEOUT);
     CHECK(c.diagnostics().teardownStatus==BLE_HS_ENOTCONN);
     CHECK(c.diagnostics().disconnectCommand==static_cast<uint8_t>(ScaleOp::CombinedTareStart));
-    const auto oldCallback=testWriteCallback; void *oldArg=testWriteArg;
+    // The host ends the old write when its link drops; a late callback with
+    // its released context is a counted violation and cannot complete the
+    // next write.
+    const TestProcedure oldWrite=testFind(TestProcedureKind::Write);
     testNowMs+=SCALE_DISCONNECT_SILENCE_MS;
     ready(c);
     testOnWait=[&] {
-      ble_gatt_error e={0,12}; oldCallback(1,&e,nullptr,oldArg);
-      CHECK(!c.writeCompleted_);
+      const uint32_t violations=callbackContexts.violations;
+      testGattTerminal(oldWrite,0);
+      CHECK(!c.writeCompleted_ && callbackContexts.violations==violations+1);
       complete();
     };
     CHECK(c.writeOp(ScaleOp::Tare)==ScaleCommandResult::Ok);
@@ -1376,7 +1386,7 @@ static void run() {
     NimbleScaleClient c(false); ready(c);
     c.connectionHandle_=kInvalidHandle;
     c.enterState(NimbleScaleClient::State::Connecting);
-    const uint32_t operation=c.beginOperation(NimbleScaleClient::CallbackDomain::Link);
+    const uint32_t operation=c.beginOperation(CallbackDomain::Link);
     testConnDesc={7,12,0,kConnSupervisionTimeoutUnits}; testConnFindStatus=0;
     ble_gap_event e={}; e.type=BLE_GAP_EVENT_CONNECT; e.connect.conn_handle=7;
     c.onGapEvent(&e,operation);
@@ -1402,7 +1412,376 @@ static void run() {
     facade.setFrameQueuedObserver(nullptr);
     c.finishLink(false,ScaleDisconnectReason::HOST_RESET,0);
   }
+  callbackContextTests();
   printf("NimBLE production client: %u checks passed\n",checks);
+}
+static uint8_t armed(CallbackDomain domain) {
+  portENTER_CRITICAL(&callbackRegistry.mux);
+  const uint8_t count=armedCallbackContextsLocked(domain);
+  portEXIT_CRITICAL(&callbackRegistry.mux);
+  return count;
+}
+static bool allContextsFree() {
+  return armed(CallbackDomain::Scan)==0 && armed(CallbackDomain::Link)==0 &&
+         armed(CallbackDomain::Gatt)==0 && testProcedures.empty();
+}
+static ble_gap_event gapEvent(int type) {
+  ble_gap_event event={}; event.type=type; return event;
+}
+static CallbackContext &contextOf(const TestProcedure &procedure) {
+  return *static_cast<CallbackContext *>(procedure.arg);
+}
+// Drives a fresh client from a real discovery to a real connect attempt.
+static TestProcedure connecting(NimbleScaleClient &c) {
+  testConnectStatus=0;
+  CHECK(c.beginConfiguredScan(false));
+  advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND);
+  c.service();
+  c.service();
+  CHECK(c.state_==NimbleScaleClient::State::Connecting);
+  CHECK(armed(CallbackDomain::Scan)==0 && armed(CallbackDomain::Link)==1);
+  return testFind(TestProcedureKind::Connect);
+}
+// Marks the pending connect established, as NimBLE reports it.
+static TestProcedure connected(NimbleScaleClient &c, uint16_t handle) {
+  TestProcedure &pending=testFind(TestProcedureKind::Connect);
+  pending.connected=true; pending.connHandle=handle;
+  const TestProcedure link=pending;
+  testConnectOutcome(link,0,handle);
+  c.service();
+  return link;
+}
+static int startServices(NimbleScaleClient &c) {
+  return c.startProcedure(CallbackDomain::Gatt, c.beginOperation(CallbackDomain::Gatt),
+      [](void *arg) { return ble_gattc_disc_all_svcs(1, NimbleScaleClient::serviceCallback, arg); });
+}
+static void callbackContextTests() {
+  const ble_gatt_error progress={0,0};
+  {
+    // Scan: DISC_COMPLETE ends the discovery and frees its context.
+    resetHost(); NimbleScaleClient c(false);
+    CHECK(c.beginConfiguredScan(false) && armed(CallbackDomain::Scan)==1);
+    const TestProcedure scan=testTake(TestProcedureKind::Discovery);
+    ble_gap_event done=gapEvent(BLE_GAP_EVENT_DISC_COMPLETE); done.disc_complete.reason=BLE_HS_ETIMEOUT;
+    // The context stays armed until the client has queued the completion.
+    bool queuedWhileArmed=false;
+    std::function<void()> observe=[&] {
+      if (c.criticalEvents_.size()==1 && !queuedWhileArmed) {
+        queuedWhileArmed=contextOf(scan).state==CallbackContextState::Armed;
+      }
+      testAfterCriticalExit=observe;
+    };
+    testAfterCriticalExit=observe;
+    testGap(scan,done);
+    testAfterCriticalExit={};
+    CHECK(queuedWhileArmed);
+    CHECK(armed(CallbackDomain::Scan)==0 && contextOf(scan).state==CallbackContextState::Free);
+    c.service(); // The completion still reaches the client, which backs off.
+    CHECK(c.state_==NimbleScaleClient::State::Backoff && c.lastRawStatus()==BLE_HS_ETIMEOUT);
+  }
+  CHECK(allContextsFree());
+  {
+    // Scan: a successful cancel frees the context; a report NimBLE had
+    // already dispatched then meets a released context and is ignored.
+    resetHost(); NimbleScaleClient c(false);
+    CHECK(c.beginConfiguredScan(false));
+    const TestProcedure first=testFind(TestProcedureKind::Discovery);
+    c.disconnect();
+    CHECK(!testPending(TestProcedureKind::Discovery) && armed(CallbackDomain::Scan)==0);
+    CHECK(c.beginConfiguredScan(false));
+    const TestProcedure second=testFind(TestProcedureKind::Discovery);
+    CHECK(second.arg!=first.arg); // LRU keeps the released context out of use.
+    const uint32_t violations=callbackContexts.violations;
+    const uint32_t seen=c.advertisementsSeen_, stale=c.staleCallbacks_;
+    testAdvertisementParseStatus=0;
+    testGap(first,gapEvent(BLE_GAP_EVENT_DISC));
+    CHECK(callbackContexts.violations==violations+1);
+    CHECK(c.advertisementsSeen_==seen && c.staleCallbacks_==stale && !c.candidatePending_);
+    CHECK(contextOf(first).state==CallbackContextState::Free);
+    testGap(second,gapEvent(BLE_GAP_EVENT_DISC)); // The live scan still sees reports.
+    CHECK(c.advertisementsSeen_==seen+1 && callbackContexts.violations==violations+1);
+    testAdvertisementParseStatus=BLE_HS_EINVAL;
+  }
+  CHECK(allContextsFree());
+  {
+    // Scan: a refused start registers no callback and keeps no context.
+    resetHost(); NimbleScaleClient c(false);
+    testDiscStatus=BLE_HS_EINVAL;
+    (void)c.beginConfiguredScan(false);
+    CHECK(c.lastRawStatus()==BLE_HS_EINVAL && armed(CallbackDomain::Scan)==0);
+    CHECK(testProcedures.empty() && c.scanContext_==nullptr);
+  }
+  {
+    // Link: a connect cancelled by client teardown ends after the client is
+    // gone, and its outcome still frees the context.
+    resetHost();
+    {
+      NimbleScaleClient c(false);
+      (void)connecting(c);
+    }
+    CHECK(callbackRegistry.owner==nullptr && armed(CallbackDomain::Link)==1);
+    testConnectOutcome(testTake(TestProcedureKind::Connect),BLE_HS_EAPP,0xffff);
+  }
+  CHECK(allContextsFree());
+  {
+    // Link: a refused connect frees its context at once.
+    resetHost(); NimbleScaleClient c(false);
+    testConnectStatus=0;
+    CHECK(c.beginConfiguredScan(false));
+    advertise(c, BLE_HCI_ADV_RPT_EVTYPE_ADV_IND);
+    testConnectStatus=BLE_HS_EINVAL;
+    c.service();
+    CHECK(c.lastRawStatus()==BLE_HS_EINVAL && c.connectAttemptsTotal_==1);
+    CHECK(armed(CallbackDomain::Link)==0 && !testPending(TestProcedureKind::Connect));
+  }
+  for (const bool cancelled : {true,false}) {
+    // Link: the failed attempt (cancel: EAPP, expiry: ETIMEOUT) ends with the
+    // LINK_ESTAB that follows its CONNECT, not with the CONNECT itself.
+    resetHost(); NimbleScaleClient c(false);
+    const TestProcedure link=connecting(c);
+    if (cancelled) c.disconnect();
+    const int status=cancelled ? BLE_HS_EAPP : BLE_HS_ETIMEOUT;
+    (void)testTake(TestProcedureKind::Connect);
+    ble_gap_event failed=gapEvent(BLE_GAP_EVENT_CONNECT);
+    failed.connect.status=status; failed.connect.conn_handle=0xffff;
+    testGap(link,failed);
+    CHECK(armed(CallbackDomain::Link)==1);
+    failed=gapEvent(BLE_GAP_EVENT_LINK_ESTAB);
+    failed.link_estab.status=status; failed.link_estab.conn_handle=0xffff;
+    testGap(link,failed);
+    CHECK(armed(CallbackDomain::Link)==0);
+    c.service();
+    CHECK(!c.linkCleanupPending());
+    CHECK(cancelled ? c.lastReason()==ScaleDisconnectReason::USER_REQUEST
+                    : c.lastRawStatus()==BLE_HS_ETIMEOUT);
+  }
+  CHECK(allContextsFree());
+  {
+    // Link: an established link keeps its context through connection
+    // events; DISCONNECT ends the link and its pending GATT procedures.
+    resetHost(); NimbleScaleClient c(false);
+    (void)connecting(c);
+    testGattDiscoveryStatus=0;
+    const TestProcedure link=connected(c,7);
+    CHECK(c.state_==NimbleScaleClient::State::DiscoveringServices);
+    CHECK(armed(CallbackDomain::Link)==1 && armed(CallbackDomain::Gatt)==1);
+    ble_gap_event update=gapEvent(BLE_GAP_EVENT_CONN_UPDATE); update.conn_update.conn_handle=7;
+    testGap(link,update);
+    ble_gap_upd_params peer={6,3200,4,600,0,0}, self=peer;
+    ble_gap_event request=gapEvent(BLE_GAP_EVENT_CONN_UPDATE_REQ);
+    request.conn_update_req.peer_params=&peer; request.conn_update_req.self_params=&self;
+    testGap(link,request);
+    CHECK(self.itvl_max==kConnIntervalMaxUnits); // Still handled by the client.
+    os_mbuf frame={}; frame.length=20;
+    ble_gap_event notification=gapEvent(BLE_GAP_EVENT_NOTIFY_RX);
+    notification.notify_rx.conn_handle=7; notification.notify_rx.om=&frame;
+    testGap(link,notification);
+    CHECK(armed(CallbackDomain::Link)==1);
+    const uint32_t violations=callbackContexts.violations;
+    testDisconnect(7,BLE_HS_HCI_ERR(0x08));
+    CHECK(allContextsFree() && callbackContexts.violations==violations);
+    c.service();
+    CHECK(c.lastReason()==ScaleDisconnectReason::SUPERVISION_TIMEOUT);
+  }
+  {
+    // GATT: progress keeps a discovery armed; every non-zero status ends it.
+    // A write ends with its single callback, success or not.
+    for (const int status : {BLE_HS_EDONE,BLE_HS_ATT_ERR(0x0a),BLE_HS_ETIMEOUT,BLE_HS_ENOTCONN}) {
+      for (const TestProcedureKind kind : {TestProcedureKind::Services,TestProcedureKind::Characteristics,
+                                           TestProcedureKind::Descriptors,TestProcedureKind::Write}) {
+        NimbleScaleClient c(false); ready(c);
+        testGattDiscoveryStatus=0;
+        c.serviceCount_=1; c.services_[0]={1,20}; c.serviceIndex_=0;
+        const uint8_t cccd[]={1,0};
+        if (kind==TestProcedureKind::Services) c.beginServiceDiscovery();
+        if (kind==TestProcedureKind::Characteristics) c.beginCharacteristicDiscovery();
+        if (kind==TestProcedureKind::Descriptors) {
+          CHECK(c.startProcedure(CallbackDomain::Gatt,c.beginOperation(CallbackDomain::Gatt),[](void *arg) {
+            return ble_gattc_disc_all_dscs(1,10,12,NimbleScaleClient::descriptorCallback,arg); })==0);
+        }
+        if (kind==TestProcedureKind::Write) {
+          CHECK(c.submitWrite(13,cccd,sizeof(cccd),NimbleScaleClient::WritePurpose::Subscribe,"enable_notify",true));
+        }
+        const TestProcedure procedure=testTake(kind);
+        const ble_gatt_svc service={1,20};
+        const ble_gatt_chr characteristic={2,3,BLE_GATT_CHR_PROP_NOTIFY,{{0}}};
+        const ble_gatt_dsc descriptor={11,{{BLE_GATT_DSC_CLT_CFG_UUID16}}};
+        for (unsigned item=0; item<2 && kind!=TestProcedureKind::Write; ++item) {
+          if (kind==TestProcedureKind::Services) procedure.service(1,&progress,&service,procedure.arg);
+          if (kind==TestProcedureKind::Characteristics) procedure.characteristic(1,&progress,&characteristic,procedure.arg);
+          if (kind==TestProcedureKind::Descriptors) procedure.descriptor(1,&progress,10,&descriptor,procedure.arg);
+          CHECK(armed(CallbackDomain::Gatt)==1);
+        }
+        if (kind==TestProcedureKind::Services) CHECK(c.serviceCount_==2);
+        if (kind==TestProcedureKind::Descriptors) CHECK(c.cccdHandle_==11);
+        testGattTerminal(procedure,status);
+        CHECK(armed(CallbackDomain::Gatt)==0);
+        if (kind==TestProcedureKind::Write) CHECK(c.writeResult_==status);
+        if (kind==TestProcedureKind::Write) {
+          // Success is a write's terminal too.
+          CHECK(c.submitWrite(13,cccd,sizeof(cccd),NimbleScaleClient::WritePurpose::Subscribe,"enable_notify",true));
+          testGattTerminal(testTake(kind),0);
+          CHECK(armed(CallbackDomain::Gatt)==0);
+        }
+      }
+    }
+  }
+  CHECK(allContextsFree());
+  {
+    // GATT: a disconnect fails every pending procedure of the link.
+    NimbleScaleClient c(false); ready(c);
+    testGattDiscoveryStatus=0;
+    c.beginServiceDiscovery();
+    const uint8_t cccd[]={1,0};
+    CHECK(c.submitWrite(13,cccd,sizeof(cccd),NimbleScaleClient::WritePurpose::Subscribe,"enable_notify",true));
+    CHECK(armed(CallbackDomain::Gatt)==2);
+    testDisconnect(1,BLE_HS_HCI_ERR(0x08));
+    CHECK(allContextsFree());
+  }
+  {
+    // Stale: operation A stays armed after B started in the same domain. A's
+    // callbacks count as stale and leave B alone; A's terminal frees A only.
+    NimbleScaleClient c(false); ready(c);
+    testGattDiscoveryStatus=0;
+    c.beginServiceDiscovery();
+    const TestProcedure a=testFind(TestProcedureKind::Services);
+    c.beginServiceDiscovery();
+    const TestProcedure b=testFind(TestProcedureKind::Services);
+    CHECK(a.arg!=b.arg && armed(CallbackDomain::Gatt)==2);
+    const uint32_t stale=c.staleCallbacks_, violations=callbackContexts.violations;
+    const ble_gatt_svc service={1,20};
+    a.service(1,&progress,&service,a.arg);
+    CHECK(c.serviceCount_==0 && c.staleCallbacks_==stale+1);
+    testGattTerminal(testTake(TestProcedureKind::Services,a.arg),BLE_HS_EDONE);
+    CHECK(c.staleCallbacks_==stale+2 && callbackContexts.violations==violations);
+    CHECK(contextOf(a).state==CallbackContextState::Free);
+    CHECK(contextOf(b).state==CallbackContextState::Armed && contextOf(b).operationId==c.gattOperationId_);
+    c.service();
+    CHECK(c.state_==NimbleScaleClient::State::DiscoveringServices);
+    b.service(1,&progress,&service,b.arg);
+    testGattTerminal(testTake(TestProcedureKind::Services,b.arg),BLE_HS_EDONE);
+    CHECK(c.serviceCount_==1 && armed(CallbackDomain::Gatt)==0);
+    c.service(); // B's completion is current and advances discovery.
+    CHECK(c.state_==NimbleScaleClient::State::DiscoveringCharacteristics);
+  }
+  {
+    // Exhaustion: with every GATT context armed the next start is refused
+    // without reuse, counted and logged; one terminal makes room again.
+    NimbleScaleClient c(false); ready(c);
+    testGattDiscoveryStatus=0;
+    std::vector<TestProcedure> held;
+    for (size_t index=0; index<kGattCallbackContexts; ++index) {
+      CHECK(startServices(c)==0);
+      held.push_back(testFind(TestProcedureKind::Services));
+    }
+    std::vector<uint32_t> operations;
+    for (const auto &procedure : held) operations.push_back(contextOf(procedure).operationId);
+    const uint32_t exhausted=callbackContexts.exhausted;
+    const unsigned procedures=testRadioProcedures;
+    capturedScaleLogs.clear();
+    CHECK(startServices(c)==BLE_HS_EBUSY);
+    CHECK(testRadioProcedures==procedures && testProcedures.size()==kGattCallbackContexts);
+    CHECK(callbackContexts.exhausted==exhausted+1 && c.health().callbackContextExhausted==exhausted+1);
+    for (size_t index=0; index<held.size(); ++index) {
+      CHECK(contextOf(held[index]).state==CallbackContextState::Armed);
+      CHECK(contextOf(held[index]).operationId==operations[index]);
+    }
+    CHECK(capturedScaleLogs.size()==1 && capturedScaleLogs[0].first==kScaleLogWarningSeverity);
+    CHECK(capturedScaleLogs[0].second=="ble callback contexts exhausted domain=gatt");
+    CHECK(capturedScaleLogTransport.back());
+    testGattTerminal(testTake(TestProcedureKind::Services,held[1].arg),BLE_HS_EDONE);
+    CHECK(startServices(c)==0 && testFind(TestProcedureKind::Services).arg==held[1].arg);
+    CHECK(callbackContexts.exhausted==exhausted+1);
+  }
+  {
+    // LRU: a released context returns only after every older free one.
+    NimbleScaleClient c(false); ready(c);
+    testGattDiscoveryStatus=0;
+    std::vector<void *> handedOut;
+    for (size_t index=0; index<=kGattCallbackContexts; ++index) {
+      CHECK(startServices(c)==0);
+      const TestProcedure procedure=testTake(TestProcedureKind::Services);
+      handedOut.push_back(procedure.arg);
+      testGattTerminal(procedure,BLE_HS_EDONE);
+    }
+    for (size_t first=0; first<kGattCallbackContexts; ++first) {
+      for (size_t second=first+1; second<kGattCallbackContexts; ++second) {
+        CHECK(handedOut[first]!=handedOut[second]);
+      }
+    }
+    CHECK(handedOut[kGattCallbackContexts]==handedOut[0]);
+  }
+  {
+    // Host reset: every armed context gets its terminal and the pools end up
+    // free, for a pending discovery, a pending connect and a live link.
+    resetHost(); NimbleScaleClient c(false);
+    CHECK(c.beginConfiguredScan(false) && armed(CallbackDomain::Scan)==1);
+    testHostReset();
+    CHECK(allContextsFree());
+    ++testSyncGeneration; c.service();
+    CHECK(c.lastReason()==ScaleDisconnectReason::HOST_RESET);
+  }
+  {
+    resetHost(); NimbleScaleClient c(false);
+    (void)connecting(c);
+    testHostReset();
+    CHECK(allContextsFree());
+  }
+  {
+    resetHost(); NimbleScaleClient c(false);
+    (void)connecting(c);
+    testGattDiscoveryStatus=0;
+    (void)connected(c,7);
+    CHECK(startServices(c)==0 && armed(CallbackDomain::Gatt)==2);
+    const ScaleBleBackendHealth health=c.health();
+    CHECK(health.scanContextsArmed==0 && health.linkContextsArmed==1 && health.gattContextsArmed==2);
+    const uint32_t violations=callbackContexts.violations;
+    testHostReset();
+    CHECK(allContextsFree() && callbackContexts.violations==violations);
+    CHECK(c.health().linkContextsArmed==0 && c.health().gattContextsArmed==0);
+  }
+  {
+    // A callback after client teardown still frees its context.
+    resetHost();
+    TestProcedure discovery={}, write={};
+    {
+      NimbleScaleClient c(false); ready(c);
+      testGattDiscoveryStatus=0;
+      c.beginServiceDiscovery();
+      const uint8_t cccd[]={1,0};
+      CHECK(c.submitWrite(13,cccd,sizeof(cccd),NimbleScaleClient::WritePurpose::Subscribe,"enable_notify",true));
+      discovery=testFind(TestProcedureKind::Services);
+      write=testFind(TestProcedureKind::Write);
+    }
+    CHECK(callbackRegistry.owner==nullptr && armed(CallbackDomain::Gatt)==2);
+    const uint32_t violations=callbackContexts.violations;
+    discovery.service(1,&progress,nullptr,discovery.arg); // Progress keeps it armed.
+    testGattTerminal(testTake(TestProcedureKind::Services),BLE_HS_ENOTCONN);
+    testGattTerminal(testTake(TestProcedureKind::Write),BLE_HS_ENOTCONN);
+    CHECK(allContextsFree() && callbackContexts.violations==violations);
+  }
+  {
+    // Contract violations are counted and ignored, and touch no context: a
+    // foreign arg, another domain's context, a second terminal.
+    resetHost(); NimbleScaleClient c(false);
+    CHECK(c.beginConfiguredScan(false));
+    const TestProcedure scan=testFind(TestProcedureKind::Discovery);
+    const uint32_t violations=callbackContexts.violations, stale=c.staleCallbacks_;
+    int foreign=0;
+    ble_gap_event done=gapEvent(BLE_GAP_EVENT_DISC_COMPLETE);
+    CHECK(NimbleScaleClient::gapCallback(&done,&foreign)==0);
+    const ble_gatt_error error={BLE_HS_EDONE,0};
+    CHECK(NimbleScaleClient::writeCallback(1,&error,nullptr,scan.arg)==0);
+    CHECK(callbackContexts.violations==violations+2 && c.staleCallbacks_==stale);
+    CHECK(contextOf(scan).state==CallbackContextState::Armed && c.state_==NimbleScaleClient::State::Scanning);
+    testGap(testTake(TestProcedureKind::Discovery),done);
+    CHECK(armed(CallbackDomain::Scan)==0);
+    testGap(scan,done);
+    CHECK(callbackContexts.violations==violations+3 && armed(CallbackDomain::Scan)==0);
+    CHECK(c.health().callbackContextViolations==violations+3);
+  }
+  resetHost();
+  CHECK(allContextsFree());
 }
 };
 }

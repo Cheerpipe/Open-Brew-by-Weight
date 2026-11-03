@@ -29,7 +29,7 @@ static_assert(std::is_trivially_copyable<ScaleBleLifecycle>::value,
               "BLE lifecycle must remain trivially copyable");
 static_assert(std::is_trivially_copyable<ScaleBleBackendHealth>::value,
               "BLE health snapshot must remain trivially copyable");
-static_assert(sizeof(ScaleBleBackendHealth) <= 136,
+static_assert(sizeof(ScaleBleBackendHealth) <= 144,
               "BLE health snapshot must remain fixed and compact");
 static_assert(sizeof(ScaleBleEvent) <= 20,
               "BLE event DTO must stay suitable for a fixed queue");

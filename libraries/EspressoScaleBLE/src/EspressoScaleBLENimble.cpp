@@ -356,6 +356,137 @@ uint32_t nextCallbackOperationId() {
   return operationId;
 }
 
+enum class CallbackDomain : uint8_t { Scan, Link, Gatt };
+enum class CallbackContextState : uint8_t { Free, Armed };
+
+// NimBLE hands a procedure's cb_arg back to every callback of that procedure.
+// The arg is one of these contexts, which carries the operation id the
+// callbacks are checked against. A context stays Armed from its start call
+// until NimBLE ends the procedure (terminal callback or successful
+// ble_gap_disc_cancel), so a context NimBLE may still call back with never
+// serves another operation. Like callbackRegistry, the pool outlives the
+// client; every field is guarded by callbackRegistry.mux.
+struct CallbackContext {
+  uint32_t operationId;
+  uint32_t releaseOrder;
+  CallbackDomain domain;
+  CallbackContextState state;
+};
+
+// Pool sizes: the most procedures NimBLE (ESP-IDF 6.1 host) can hold at once
+// in each domain, plus headroom so LRU keeps a just-released context out of
+// use for a while and a context stranded by the host does not stop the client.
+// - Scan 1+2: one discovery at a time (ble_gap_disc refuses a second). A DISC
+//   report dispatched before a successful cancel can still arrive afterwards;
+//   with LRU it meets a released context, not the next scan's.
+// - Link 2+2: one master connect attempt plus the one established link
+//   (CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1). With CONN_REATTEMPT the host
+//   reconnects a 0x3E drop on the same context and strands it if that
+//   internal ble_gap_connect fails.
+// - Gatt 2+2: the worker runs one procedure at a time, but starts the next
+//   while the previous terminal callback is still returning. A request
+//   racing a disconnect ends only at NimBLE's 30 s GATT timeout.
+constexpr size_t kScanCallbackContexts = 3;
+constexpr size_t kLinkCallbackContexts = 4;
+constexpr size_t kGattCallbackContexts = 4;
+constexpr size_t kCallbackContextCount =
+    kScanCallbackContexts + kLinkCallbackContexts + kGattCallbackContexts;
+
+struct CallbackContextPool {
+  CallbackContext contexts[kCallbackContextCount];
+  uint32_t releaseSequence;
+  uint32_t exhausted;
+  uint32_t violations;
+};
+
+CallbackContextPool callbackContexts = {};
+
+// Each domain owns a fixed slice of the pool: scan, then link, then GATT.
+size_t callbackContextFirst(CallbackDomain domain) {
+  return domain == CallbackDomain::Scan ? 0
+         : domain == CallbackDomain::Link ? kScanCallbackContexts
+                                          : kScanCallbackContexts + kLinkCallbackContexts;
+}
+
+size_t callbackContextSlice(CallbackDomain domain) {
+  return domain == CallbackDomain::Scan ? kScanCallbackContexts
+         : domain == CallbackDomain::Link ? kLinkCallbackContexts
+                                          : kGattCallbackContexts;
+}
+
+const char *callbackDomainName(CallbackDomain domain) {
+  return domain == CallbackDomain::Scan ? "scan"
+         : domain == CallbackDomain::Link ? "link" : "gatt";
+}
+
+uint8_t armedCallbackContextsLocked(CallbackDomain domain) {
+  uint8_t armed = 0;
+  const size_t first = callbackContextFirst(domain);
+  for (size_t index = first; index < first + callbackContextSlice(domain); ++index) {
+    if (callbackContexts.contexts[index].state == CallbackContextState::Armed) ++armed;
+  }
+  return armed;
+}
+
+// Hands out the Free context of the domain released longest ago, or nullptr
+// (counted) when every context of the domain is still Armed.
+CallbackContext *armCallbackContext(CallbackDomain domain, uint32_t operationId) {
+  CallbackContext *chosen = nullptr;
+  portENTER_CRITICAL(&callbackRegistry.mux);
+  const size_t first = callbackContextFirst(domain);
+  for (size_t index = first; index < first + callbackContextSlice(domain); ++index) {
+    CallbackContext &context = callbackContexts.contexts[index];
+    if (context.state == CallbackContextState::Free &&
+        (chosen == nullptr ||
+         callbackContexts.releaseSequence - context.releaseOrder >
+             callbackContexts.releaseSequence - chosen->releaseOrder)) {
+      chosen = &context;
+    }
+  }
+  if (chosen != nullptr) {
+    chosen->operationId = operationId;
+    chosen->domain = domain;
+    chosen->state = CallbackContextState::Armed;
+  } else {
+    ++callbackContexts.exhausted;
+  }
+  portEXIT_CRITICAL(&callbackRegistry.mux);
+  return chosen;
+}
+
+// Frees a context once NimBLE has ended its procedure. Only the operation the
+// context was armed for may free it; anything else is a contract violation.
+void releaseCallbackContext(CallbackContext *context, uint32_t operationId) {
+  portENTER_CRITICAL(&callbackRegistry.mux);
+  if (context->state == CallbackContextState::Armed &&
+      context->operationId == operationId) {
+    context->state = CallbackContextState::Free;
+    context->releaseOrder = ++callbackContexts.releaseSequence;
+  } else {
+    ++callbackContexts.violations;
+  }
+  portEXIT_CRITICAL(&callbackRegistry.mux);
+}
+
+// Resolves a callback's arg to its Armed context and operation id. An arg
+// that is not one of the contexts, a Free context (including a DISC report
+// dispatched before a successful cancel) or another domain's context is
+// counted and must be ignored without touching the context.
+CallbackContext *armedCallbackContext(void *arg, bool gap, uint32_t &operationId) {
+  CallbackContext *armed = nullptr;
+  portENTER_CRITICAL(&callbackRegistry.mux);
+  for (CallbackContext &context : callbackContexts.contexts) {
+    if (&context == arg && context.state == CallbackContextState::Armed &&
+        (context.domain == CallbackDomain::Gatt) != gap) {
+      armed = &context;
+      operationId = context.operationId;
+    }
+  }
+  if (armed == nullptr) ++callbackContexts.violations;
+  portEXIT_CRITICAL(&callbackRegistry.mux);
+  return armed;
+}
+
 class NimbleScaleClient {
   friend struct NimbleScaleClientTest;
  public:
@@ -834,6 +965,13 @@ class NimbleScaleClient {
     result.state = static_cast<uint8_t>(state_);
     result.backoffFailures = backoff_.failureCount();
     portEXIT_CRITICAL(&mux_);
+    portENTER_CRITICAL(&callbackRegistry.mux);
+    result.callbackContextExhausted = callbackContexts.exhausted;
+    result.callbackContextViolations = callbackContexts.violations;
+    result.scanContextsArmed = armedCallbackContextsLocked(CallbackDomain::Scan);
+    result.linkContextsArmed = armedCallbackContextsLocked(CallbackDomain::Link);
+    result.gattContextsArmed = armedCallbackContextsLocked(CallbackDomain::Gatt);
+    portEXIT_CRITICAL(&callbackRegistry.mux);
     portENTER_CRITICAL(&advertMux_);
     result.negativeCacheEntries = static_cast<uint8_t>(
         negativeCache_.activeCount(nowMs()));
@@ -869,8 +1007,6 @@ class NimbleScaleClient {
   };
 
   enum class WritePurpose : uint8_t { None, Subscribe, Initialize, Command };
-
-  enum class CallbackDomain : uint8_t { Scan, Link, Gatt };
 
   enum class SilenceTrigger : uint8_t { PowerOff = 1, Gap, LocalDisconnect };
 
@@ -969,8 +1105,41 @@ class NimbleScaleClient {
     g_droppedFrameObserver(dropped);
   }
 
-  static void *callbackArg(uint32_t operationId) {
-    return reinterpret_cast<void *>(static_cast<uintptr_t>(operationId));
+  // Starts one NimBLE procedure with an armed context as its cb_arg. A start
+  // NimBLE refuses registers no callback, so its context is free at once.
+  // Without a free context nothing starts and the start reports EBUSY.
+  template <typename Start>
+  int startProcedure(CallbackDomain domain, uint32_t operationId, Start start,
+                     bool allowPowerOff = false,
+                     const uint32_t *captureBoundary = nullptr) {
+    CallbackContext *context = nullptr;
+    bool exhausted = false;
+    const int rc = submitRadioProcedure(allowPowerOff, [&] {
+      context = armCallbackContext(domain, operationId);
+      exhausted = context == nullptr;
+      return exhausted ? BLE_HS_EBUSY : start(static_cast<void *>(context));
+    }, captureBoundary);
+    if (rc != 0 && context != nullptr) releaseCallbackContext(context, operationId);
+    if (exhausted) {
+      scaleLogWarning(kBleLog, "ble callback contexts exhausted domain=%s",
+                      callbackDomainName(domain));
+    }
+    if (rc == 0 && domain == CallbackDomain::Scan) {
+      scanContext_ = context;
+      scanContextOperation_ = operationId;
+    }
+    return rc;
+  }
+
+  // A successful cancel ends the discovery without DISC_COMPLETE, so the
+  // cancel itself frees the context of the discovery started last.
+  int cancelDiscovery() {
+    const int rc = submitRadioProcedure(false, [] { return ble_gap_disc_cancel(); });
+    if (rc == 0 && scanContext_ != nullptr) {
+      releaseCallbackContext(scanContext_, scanContextOperation_);
+      scanContext_ = nullptr;
+    }
+    return rc;
   }
 
   void noteStaleCallback() {
@@ -1078,65 +1247,87 @@ class NimbleScaleClient {
     return current;
   }
 
-  static int gapCallback(ble_gap_event *event, void *arg) {
+  // Hands one NimBLE callback to the client with the operation id its context
+  // was armed for. The procedure's terminal callback frees the context after
+  // the client handled it, also when no client is left to handle it. GATT
+  // handlers must return 0: any other value makes NimBLE drop the procedure
+  // without a terminal callback, stranding its context.
+  template <typename Handle>
+  static int dispatchCallback(void *arg, bool gap, bool terminal, Handle handle) {
     CallbackLease lease;
+    uint32_t operationId = 0;
+    CallbackContext *context = armedCallbackContext(arg, gap, operationId);
+    if (context == nullptr) return 0;
     auto *client = static_cast<NimbleScaleClient *>(lease.owner());
-    return client == nullptr
-               ? 0
-               : client->onGapEvent(
-                     event, static_cast<uint32_t>(
-                                reinterpret_cast<uintptr_t>(arg)));
+    const int result = client == nullptr ? 0 : handle(*client, operationId);
+    if (terminal) releaseCallbackContext(context, operationId);
+    return result;
+  }
+
+  // Last callbacks of a GAP procedure: discovery ends with DISC_COMPLETE, a
+  // link with DISCONNECT. ESP-IDF NimBLE follows every CONNECT with a
+  // LINK_ESTAB on the same arg, so a failed attempt ends with that one.
+  static bool gapProcedureEnded(const ble_gap_event *event) {
+    return event != nullptr &&
+           (event->type == BLE_GAP_EVENT_DISC_COMPLETE ||
+            event->type == BLE_GAP_EVENT_DISCONNECT ||
+            (event->type == BLE_GAP_EVENT_LINK_ESTAB &&
+             event->link_estab.status != 0));
+  }
+
+  // Discovery reports progress with status 0 and ends with any other status.
+  static bool gattDiscoveryEnded(const ble_gatt_error *error) {
+    return error != nullptr && error->status != 0;
+  }
+
+  static int gapCallback(ble_gap_event *event, void *arg) {
+    return dispatchCallback(arg, true, gapProcedureEnded(event),
+                            [event](NimbleScaleClient &client, uint32_t operationId) {
+                              return client.onGapEvent(event, operationId);
+                            });
   }
 
   static int serviceCallback(uint16_t connectionHandle,
                              const ble_gatt_error *error,
                              const ble_gatt_svc *service, void *arg) {
-    CallbackLease lease;
-    auto *client = static_cast<NimbleScaleClient *>(lease.owner());
-    return client == nullptr
-               ? 0
-               : client->onService(
-                     connectionHandle, error, service,
-                     static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg)));
+    return dispatchCallback(arg, false, gattDiscoveryEnded(error),
+                            [&](NimbleScaleClient &client, uint32_t operationId) {
+                              return client.onService(connectionHandle, error,
+                                                      service, operationId);
+                            });
   }
 
   static int characteristicCallback(uint16_t connectionHandle,
                                     const ble_gatt_error *error,
                                     const ble_gatt_chr *characteristic,
                                     void *arg) {
-    CallbackLease lease;
-    auto *client = static_cast<NimbleScaleClient *>(lease.owner());
-    return client == nullptr
-               ? 0
-               : client->onCharacteristic(
-                     connectionHandle, error, characteristic,
-                     static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg)));
+    return dispatchCallback(arg, false, gattDiscoveryEnded(error),
+                            [&](NimbleScaleClient &client, uint32_t operationId) {
+                              return client.onCharacteristic(
+                                  connectionHandle, error, characteristic, operationId);
+                            });
   }
 
   static int descriptorCallback(uint16_t connectionHandle,
                                 const ble_gatt_error *error,
                                 uint16_t characteristicValueHandle,
                                 const ble_gatt_dsc *descriptor, void *arg) {
-    CallbackLease lease;
-    auto *client = static_cast<NimbleScaleClient *>(lease.owner());
-    return client == nullptr
-               ? 0
-               : client->onDescriptor(
-                     connectionHandle, error, characteristicValueHandle,
-                     descriptor,
-                     static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg)));
+    return dispatchCallback(arg, false, gattDiscoveryEnded(error),
+                            [&](NimbleScaleClient &client, uint32_t operationId) {
+                              return client.onDescriptor(connectionHandle, error,
+                                                         characteristicValueHandle,
+                                                         descriptor, operationId);
+                            });
   }
 
+  // A write calls back exactly once, whatever its status.
   static int writeCallback(uint16_t connectionHandle,
                            const ble_gatt_error *error, ble_gatt_attr *,
                            void *arg) {
-    CallbackLease lease;
-    auto *client = static_cast<NimbleScaleClient *>(lease.owner());
-    return client == nullptr
-               ? 0
-               : client->onWrite(
-                     connectionHandle, error,
-                     static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg)));
+    return dispatchCallback(arg, false, true,
+                            [&](NimbleScaleClient &client, uint32_t operationId) {
+                              return client.onWrite(connectionHandle, error, operationId);
+                            });
   }
 
   int onGapEvent(ble_gap_event *event, uint32_t operationId) {
@@ -1808,9 +1999,9 @@ class NimbleScaleClient {
     params.window = scanWindow_;
     params.filter_policy = 0;
     params.limited = 0;
-    const int rc = submitRadioProcedure(false, [&] {
+    const int rc = startProcedure(CallbackDomain::Scan, scanOperationId, [&](void *arg) {
       return ble_gap_disc(openBrewByWeightBleRuntimeOwnAddressType(), BLE_HS_FOREVER,
-                          &params, gapCallback, callbackArg(scanOperationId));
+                          &params, gapCallback, arg);
     });
     if (rc != 0) {
       if (rc == BLE_HS_EBUSY && communicationSilenced()) {
@@ -2012,8 +2203,7 @@ class NimbleScaleClient {
         enterState(State::CancelPending, kScanCancelTimeoutMs);
         connectStartedAt_ = nowMs();
         ++scanCancels_;
-        const int cancelResult =
-            submitRadioProcedure(false, [] { return ble_gap_disc_cancel(); });
+        const int cancelResult = cancelDiscovery();
         // ble_gap_disc_cancel() is synchronous: a zero return means scanning
         // has been fully aborted and a connect procedure can start
         // immediately.  A manual cancellation does not produce a later
@@ -2175,10 +2365,10 @@ class NimbleScaleClient {
     params.itvl_max = kConnIntervalMaxUnits;
     params.latency = kConnLatency;
     params.supervision_timeout = kConnSupervisionTimeoutUnits;
-    const int rc = submitRadioProcedure(false, [&] {
+    const int rc = startProcedure(CallbackDomain::Link, linkOperationId, [&](void *arg) {
       return ble_gap_connect(openBrewByWeightBleRuntimeOwnAddressType(),
                              &selectedAddress_, BLE_CONNECT_TIMEOUT_MS, &params,
-                             gapCallback, callbackArg(linkOperationId));
+                             gapCallback, arg);
     });
     if (rc != 0) {
       portENTER_CRITICAL(&mux_);
@@ -2199,9 +2389,8 @@ class NimbleScaleClient {
     memset(protocolHandles_, 0, sizeof(protocolHandles_));
     enterState(State::DiscoveringServices, BLE_DISCOVER_TIMEOUT_MS);
     const uint32_t gattOperationId = beginOperation(CallbackDomain::Gatt);
-    const int rc = submitRadioProcedure(false, [&] {
-      return ble_gattc_disc_all_svcs(connectionHandle_, serviceCallback,
-                                     callbackArg(gattOperationId));
+    const int rc = startProcedure(CallbackDomain::Gatt, gattOperationId, [&](void *arg) {
+      return ble_gattc_disc_all_svcs(connectionHandle_, serviceCallback, arg);
     });
     if (rc != 0) {
       ++discoveryFailures_;
@@ -2213,10 +2402,9 @@ class NimbleScaleClient {
     enterState(State::DiscoveringCharacteristics, BLE_DISCOVER_TIMEOUT_MS);
     const ServiceRange &service = services_[serviceIndex_];
     const uint32_t gattOperationId = beginOperation(CallbackDomain::Gatt);
-    const int rc = submitRadioProcedure(false, [&] {
-      return ble_gattc_disc_all_chrs(
-          connectionHandle_, service.start, service.end,
-          characteristicCallback, callbackArg(gattOperationId));
+    const int rc = startProcedure(CallbackDomain::Gatt, gattOperationId, [&](void *arg) {
+      return ble_gattc_disc_all_chrs(connectionHandle_, service.start, service.end,
+                                     characteristicCallback, arg);
     });
     if (rc != 0) {
       ++discoveryFailures_;
@@ -2267,10 +2455,9 @@ class NimbleScaleClient {
     }
     enterState(State::DiscoveringDescriptors, BLE_DISCOVER_TIMEOUT_MS);
     const uint32_t gattOperationId = beginOperation(CallbackDomain::Gatt);
-    const int rc = submitRadioProcedure(false, [&] {
-      return ble_gattc_disc_all_dscs(
-          connectionHandle_, readHandle_, readEndHandle_, descriptorCallback,
-          callbackArg(gattOperationId));
+    const int rc = startProcedure(CallbackDomain::Gatt, gattOperationId, [&](void *arg) {
+      return ble_gattc_disc_all_dscs(connectionHandle_, readHandle_, readEndHandle_,
+                                     descriptorCallback, arg);
     });
     if (rc != 0) {
       ++subscriptionFailures_;
@@ -2366,10 +2553,10 @@ class NimbleScaleClient {
                        ? xTaskGetCurrentTaskHandle()
                        : nullptr;
     portEXIT_CRITICAL(&mux_);
-    const int rc = submitRadioProcedure(terminalPowerOff, [&] {
+    const int rc = startProcedure(CallbackDomain::Gatt, gattOperationId, [&](void *arg) {
       return ble_gattc_write_flat(connectionHandle_, handle, data, length,
-                                  writeCallback, callbackArg(gattOperationId));
-    }, captureBoundary);
+                                  writeCallback, arg);
+    }, terminalPowerOff, captureBoundary);
     if (rc != 0) {
       portENTER_CRITICAL(&mux_);
       writePurpose_ = WritePurpose::None;
@@ -2655,8 +2842,7 @@ class NimbleScaleClient {
     if (!silenceWasActive &&
         (previous == State::Scanning || previous == State::CancelPending ||
          previous == State::Settling || previous == State::Backoff)) {
-      teardownStatus = submitRadioProcedure(
-          false, [] { return ble_gap_disc_cancel(); });
+      teardownStatus = cancelDiscovery();
     } else if (!silenceWasActive && previous == State::Connecting &&
                !connectComplete_) {
       teardownStatus = submitRadioProcedure(
@@ -2856,6 +3042,8 @@ class NimbleScaleClient {
   uint32_t linkCleanupGapAtMs_ = 0;
   bool connectComplete_ = false;
   uint32_t gattOperationId_ = 0;
+  CallbackContext *scanContext_ = nullptr;
+  uint32_t scanContextOperation_ = 0;
   uint32_t syncGeneration_ = 0;
   uint32_t stateEnteredAtMs_ = 0;
   uint32_t stateTimeoutMs_ = 0;
