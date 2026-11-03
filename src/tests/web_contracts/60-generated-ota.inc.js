@@ -1227,10 +1227,11 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
     }
   }
   // SAFETY_LOST reaches the operator through its stable reason code
-  // (OpenBrewByWeightOta::resultName): the sentence lives in the locale
+  // (otaResultName): the sentence lives in the locale
   // catalog (err.safety_lost) and the wire prose resolves from the
   // generated table at send time.
-  if (!otaSource.includes('"SAFETY_LOST"') ||
+  if (!fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightOtaResult.h'), 'utf8')
+           .includes('"SAFETY_LOST"') ||
       !JSON.parse(fs.readFileSync(
              path.join(sketchDir, 'web', 'locales', 'en.json'), 'utf8'))
            .strings['err.safety_lost']) {
