@@ -289,7 +289,7 @@ class OpenBrewByWeightOta {
   void publishSnapshotLocked() const;
   bool readBootState();
   bool confirmRunningImageLocked();
-  enum class RejectResult { REJECTED, NO_ALTERNATIVE, FAILED };
+  enum class RejectResult : uint8_t { REJECTED, NO_ALTERNATIVE, FAILED };
   RejectResult rejectRunningImageLocked();
 
   bool started_ = false;

@@ -70,7 +70,7 @@ constexpr uint8_t SCALE_PROFILE_SAVE_MAX_RETRIES = 3;
 constexpr uint16_t SCALE_PROFILE_FLAG_DISCONTINUITY = 0x0001;
 constexpr uint16_t SCALE_PROFILE_FLAG_DECODED = 0x0002;
 
-enum class ScaleProfileEvent : uint16_t {
+enum class ScaleProfileEvent : uint8_t {
   WEIGHT = 0,
   PROFILE_START,
   PROFILE_STOP,
@@ -134,7 +134,7 @@ constexpr size_t SCALE_PROFILE_EVENT_COUNT =
   X(IDLE_STATUS) X(IDLE_DEFERRED_REASON) X(CUP_PROTECTION_ENABLED) X(STOP_IF_REMOVED) \
   X(REQUIRE_CUP) X(TOUCH_ENABLED) X(GOAL_CG) X(OFFSET_CG) X(NO_SCALE_BBW_MODE)
 
-enum class ScaleProfileSignal : uint16_t {
+enum class ScaleProfileSignal : uint8_t {
 #define SCALE_PROFILE_SIGNAL_ENUM(name) name,
   SCALE_PROFILE_SIGNALS(SCALE_PROFILE_SIGNAL_ENUM)
 #undef SCALE_PROFILE_SIGNAL_ENUM

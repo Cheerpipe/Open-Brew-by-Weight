@@ -14,17 +14,14 @@
 # Checks currently disabled, with the reason:
 #   bugprone-easily-swappable-parameters  intentionally untyped hardware-style
 #                                         APIs; would need hundreds of NOLINTs
-#   performance-enum-size                 fires throughout ESP-IDF headers;
-#                                         revisit per enum with a fixed width
-#   performance-no-int-to-ptr             fires in ESP-IDF headers and a few
-#                                         project sites pending review
+#   performance-no-int-to-ptr             one site left: the NimBLE callback
+#                                         operation id carried in void *arg
 ---
 Checks: >
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   performance-*,
-  -performance-enum-size,
   -performance-no-int-to-ptr,
   clang-analyzer-core.*,
   clang-analyzer-cplusplus.*,

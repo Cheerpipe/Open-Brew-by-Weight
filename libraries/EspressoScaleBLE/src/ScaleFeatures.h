@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-enum ScaleFeature {
+enum ScaleFeature : uint16_t {
     ScaleFeatureWeight = 1u << 0,
     ScaleFeatureTare = 1u << 1,
     ScaleFeatureStartTimer = 1u << 2,

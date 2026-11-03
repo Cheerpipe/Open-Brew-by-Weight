@@ -1,7 +1,9 @@
 #ifndef ScaleBleBackend_h
 #define ScaleBleBackend_h
 
-enum class ScaleBleBackend {
+#include <stdint.h>
+
+enum class ScaleBleBackend : uint8_t {
     NimBle
 };
 

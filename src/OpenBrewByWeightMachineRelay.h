@@ -6,6 +6,10 @@
 #include "OpenBrewByWeightSafety.h"
 #include "OpenBrewByWeightCrashArchive.h"
 
+#ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
+#include "soc/gpio_struct.h"
+#endif
+
 // K1 electrical driver and independent deadline/feedback safety.
 // Included from OpenBrewByWeightMachine.h in the openBrewByWeight.cpp translation unit.
 // State is file-scope BSS — no heap.
@@ -113,20 +117,20 @@ void IRAM_ATTR writeGpioFromIsr(uint8_t pin, uint8_t level) {
                                    : (uint32_t{1} << (pin - 32));
   if (level == LOW) {
     if (pin < 32) {
-      REG_WRITE(GPIO_OUT_W1TC_REG, mask);
+      GPIO.out_w1tc = mask;
     }
 #ifdef GPIO_OUT1_W1TC_REG
     else {
-      REG_WRITE(GPIO_OUT1_W1TC_REG, mask);
+      GPIO.out1_w1tc.val = mask;
     }
 #endif
   } else {
     if (pin < 32) {
-      REG_WRITE(GPIO_OUT_W1TS_REG, mask);
+      GPIO.out_w1ts = mask;
     }
 #ifdef GPIO_OUT1_W1TS_REG
     else {
-      REG_WRITE(GPIO_OUT1_W1TS_REG, mask);
+      GPIO.out1_w1ts.val = mask;
     }
 #endif
   }

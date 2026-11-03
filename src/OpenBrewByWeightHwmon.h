@@ -12,6 +12,7 @@
 #include <freertos/task.h>
 #include "OpenBrewByWeightPsram.h"
 #include "soc/spi_mem_reg.h"
+#include "soc/spi_mem_struct.h"
 #endif
 
 namespace openbrewbyweight {
@@ -23,7 +24,7 @@ namespace openbrewbyweight {
 // the app does not link the whole bootloader_flash unit for one value.
 inline const char *flashReadModeName() {
 #ifdef ARDUINO
-  const uint32_t ctrl = READ_PERI_REG(SPI_MEM_CTRL_REG(0));
+  const uint32_t ctrl = SPIMEM0.ctrl.val;
   if (ctrl & SPI_MEM_FREAD_QIO) return "QIO";
   if (ctrl & SPI_MEM_FREAD_QUAD) return "QOUT";
   if (ctrl & SPI_MEM_FREAD_DIO) return "DIO";
@@ -59,7 +60,7 @@ inline bool flashReadModeDegraded() {
 // the heap metrics already show.
 inline uint32_t mspiCoreClockMhz() {
 #ifdef ARDUINO
-  switch (READ_PERI_REG(SPI_MEM_CORE_CLK_SEL_REG(0)) & SPI_MEM_CORE_CLK_SEL) {
+  switch (SPIMEM0.core_clk_sel.val & SPI_MEM_CORE_CLK_SEL) {
     case 0: return 80;
     case 1: return 120;
     case 2: return 160;
@@ -72,7 +73,7 @@ inline uint32_t mspiCoreClockMhz() {
 
 inline uint32_t flashClockMhz() {
 #ifdef ARDUINO
-  const uint32_t clock = READ_PERI_REG(SPI_MEM_CLOCK_REG(0));
+  const uint32_t clock = SPIMEM0.clock.val;
   const uint32_t div = (clock & SPI_MEM_CLK_EQU_SYSCLK) ? 1U :
       ((clock >> SPI_MEM_CLKCNT_N_S) & SPI_MEM_CLKCNT_N_V) + 1U;
   return mspiCoreClockMhz() / div;
@@ -83,7 +84,7 @@ inline uint32_t flashClockMhz() {
 
 inline uint32_t psramClockMhz() {
 #ifdef ARDUINO
-  const uint32_t clock = READ_PERI_REG(SPI_MEM_SRAM_CLK_REG(0));
+  const uint32_t clock = SPIMEM0.sram_clk.val;
   const uint32_t div = (clock & SPI_MEM_SCLK_EQU_SYSCLK) ? 1U :
       ((clock >> SPI_MEM_SCLKCNT_N_S) & SPI_MEM_SCLKCNT_N_V) + 1U;
   return mspiCoreClockMhz() / div;

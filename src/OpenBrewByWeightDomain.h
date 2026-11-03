@@ -1955,7 +1955,7 @@ enum class DebugCategory : uint8_t {
   BLE  // appended: persisted audit records keep their category values
 };
 
-enum class CircuitArmFailReason : int32_t {
+enum class CircuitArmFailReason : uint8_t {
   INVALID_LIMIT = 1,
   SAFETY_LOCKOUT = 2,
   SUPERVISOR_UNAVAILABLE = 3,
@@ -2903,8 +2903,9 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
       return true;
     case DebugCode::CIRCUIT_ARM_FAILED:
       snprintf(message, capacity, "cannot close the machine circuit: %s",
-               circuitArmFailReasonName(
-                   static_cast<CircuitArmFailReason>(event.argument1)));
+               circuitArmFailReasonName(event.argument1 >= 0 && event.argument1 <= UINT8_MAX
+                                            ? static_cast<CircuitArmFailReason>(event.argument1)
+                                            : CircuitArmFailReason{}));
       return true;
     case DebugCode::CYCLE_STARTED:
       formatWeightCentigrams(event.argument1, weightText, sizeof(weightText));
