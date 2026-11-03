@@ -256,6 +256,7 @@ inline void noteDurableStorageRevision(uint32_t revision) {
   unlockSettingsNvs();
 }
 
+#if defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
 inline void resetDurableStorageRevision() {
   if (!lockSettingsNvs()) {
     return;
@@ -264,6 +265,7 @@ inline void resetDurableStorageRevision() {
   durableTimezoneSaved().store(false);
   unlockSettingsNvs();
 }
+#endif
 
 inline bool savePersistedSettings(PersistedSettings &settings) {
   if (!settingsSchemaWritesAdmitted.load(std::memory_order_acquire)) return false;

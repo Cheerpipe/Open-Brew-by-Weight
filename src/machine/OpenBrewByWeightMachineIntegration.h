@@ -51,7 +51,6 @@ inline uint16_t hostMachineShotTargetDeciC = 0;
 inline uint16_t machineIntegrationShotTargetDeciC() {
   return hostMachineShotTargetDeciC;
 }
-inline constexpr uint8_t machineIntegrationTaskCount() { return 0; }
 inline MachinePhysicalStartDisposition
     hostMachinePhysicalStartDisposition =
         MachinePhysicalStartDisposition::NORMAL;
@@ -101,7 +100,6 @@ void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
 // record's snapshot, taken on the control task at the shot's end; 0 when no
 // integration reports a valid target.
 uint16_t machineIntegrationShotTargetDeciC();
-uint8_t machineIntegrationTaskCount();
 MachinePhysicalStartDisposition machineIntegrationPhysicalStart(
     MachineBackflushPermit *permit = nullptr);
 MachineBackflushSnapshot machineIntegrationBackflush(bool consume = false);

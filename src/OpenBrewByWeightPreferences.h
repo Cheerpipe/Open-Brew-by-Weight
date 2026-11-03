@@ -371,31 +371,6 @@ class OpenBrewByWeightPreferences {
 #endif
   }
 
-  bool clear() {
-#if defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
-    const bool cleared = preferences_.clear();
-    if (!cleared) recordNvsFailure(subsystem_, {NvsOperation::CLEAR, HOST_NVS_ERROR});
-    return cleared;
-#else
-    if (!started_ || readOnly_) {
-      recordNvsFailure(subsystem_,
-                       {NvsOperation::CLEAR, ESP_ERR_NVS_INVALID_HANDLE});
-      return false;
-    }
-    esp_err_t error = nvs_erase_all(handle_);
-    if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, {NvsOperation::CLEAR, error});
-      return false;
-    }
-    error = nvs_commit(handle_);
-    if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, {NvsOperation::COMMIT, error});
-      return false;
-    }
-    return true;
-#endif
-  }
-
  private:
   NvsSubsystem subsystem_;
 #if defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)

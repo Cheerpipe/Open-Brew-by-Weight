@@ -2205,6 +2205,7 @@ bool applyScalePreferenceReset() {
   return true;
 }
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 void resetScaleWorkerRadioStateForHost() {
   scaleConnecting = false;
   scaleScanAppliedInterval = 0;
@@ -2242,6 +2243,7 @@ void resetScaleWorkerRadioStateForHost() {
   scalePreferredResetReasonBits = 0;
   scalePreferredMacMux.unlock();
 }
+#endif
 
 void serviceScaleLinkRssi(uint32_t nowMs) {
   if (!scale.isConnected()) {

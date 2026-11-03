@@ -212,7 +212,6 @@ class AuditLogLatch {
   uint32_t latestSequence() const {
     return nextSequence_ > 1 ? nextSequence_ - 1 : 0;
   }
-  size_t count() const { return count_; }
   uint32_t overwritten() const { return overwritten_; }
   uint32_t rateLimited() const { return rateLimited_; }
 
@@ -252,7 +251,6 @@ class AuditLogLatch {
     if (sequence > pendingAfter_) pendingAfter_ = sequence;
   }
 
-  uint32_t pendingAfter() const { return pendingAfter_; }
   bool hasPending() const { return latestSequence() > pendingAfter_; }
 
  private:

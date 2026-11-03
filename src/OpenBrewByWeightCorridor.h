@@ -683,11 +683,6 @@ inline ArrivalStats arrivalStatsOf(size_t count, RowAt rowAt, const StatsScope &
   return out;
 }
 
-inline ArrivalStats arrivalStats(std::span<const ArrivalRecord> records,
-                                 const StatsScope &scope) {
-  return arrivalStatsOf(records.size(), [records](size_t i) { return records[i]; }, scope);
-}
-
 // Median of the newest <= 10 measured first drops of one preset since its
 // epoch, or with otherPresets of every other preset's shots (the fallback for
 // a preset without any). Unlike arrivals it ignores the window, target and

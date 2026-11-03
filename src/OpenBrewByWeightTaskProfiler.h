@@ -595,19 +595,9 @@ class TaskProfiler {
 #endif
   }
 
-  bool running() const {
-    TaskLockGuard lock(reportMutex_);
-    return report_.state == TaskProfilerState::RUNNING;
-  }
   bool loopPhaseProfilingEnabled() const {
     return loopPhaseEnabled_.load(std::memory_order_acquire);
   }
-  TaskProfilerSnapshot snapshot() const {
-    TaskProfilerSnapshot out;
-    copySnapshot(out);
-    return out;
-  }
-
   void copySnapshot(TaskProfilerSnapshot &out) const {
     TaskLockGuard lock(reportMutex_);
     out = report_;

@@ -28,9 +28,14 @@ static void testClassification() {
   assert(!auditWorthy(LogLevel::NONE, DebugCode::MACHINE_MUX_WAIT, true));
 }
 
+static size_t retainedCount(const AuditLogLatch &latch) {
+  AuditRecord all[AUDIT_RECORD_CAPACITY];
+  return latch.copyAfter(0, all, AUDIT_RECORD_CAPACITY);
+}
+
 static void testLatchCaptureAndPaging() {
   AuditLogLatch latch;
-  assert(latch.count() == 0);
+  assert(retainedCount(latch) == 0);
   assert(latch.latestSequence() == 0);
   assert(latch.add({100, 1000}, LogLevel::WARNING, DebugCategory::NETWORK,
                    DebugCode::MACHINE_MUX_WAIT, 850000, 12000,
@@ -74,11 +79,11 @@ static void testPerCodeRateLimit() {
     assert(latch.add({atMs, 100}, LogLevel::WARNING, DebugCategory::NETWORK,
                      DebugCode::MACHINE_MUX_WAIT, i, 0, nullptr));
   }
-  assert(latch.count() == AUDIT_RATE_LIMIT);
+  assert(retainedCount(latch) == AUDIT_RATE_LIMIT);
   // The 11th event of the same code inside the window is suppressed.
   assert(!latch.add({atMs + 100, 100}, LogLevel::WARNING, DebugCategory::NETWORK,
                     DebugCode::MACHINE_MUX_WAIT, 10, 0, nullptr));
-  assert(latch.count() == AUDIT_RATE_LIMIT);
+  assert(retainedCount(latch) == AUDIT_RATE_LIMIT);
   assert(latch.rateLimited() == 1);
   // A different code is unaffected by the saturated slot.
   assert(latch.add({atMs + 100, 100}, LogLevel::WARNING, DebugCategory::RELAY,
@@ -98,7 +103,7 @@ static void testRingWrapAndClear() {
                      DebugCode::INITIALIZATION_FAILED, static_cast<int32_t>(i),
                      0, nullptr));
   }
-  assert(latch.count() == AUDIT_RECORD_CAPACITY);
+  assert(retainedCount(latch) == AUDIT_RECORD_CAPACITY);
   assert(latch.overwritten() == 10);
   AuditRecord page[AUDIT_RECORD_CAPACITY];
   assert(latch.copyAfter(0, page, AUDIT_RECORD_CAPACITY) ==
@@ -107,7 +112,7 @@ static void testRingWrapAndClear() {
   assert(page[AUDIT_RECORD_CAPACITY - 1].argument1 ==
           static_cast<int32_t>(AUDIT_RECORD_CAPACITY + 9));
   latch.clear();
-  assert(latch.count() == 0);
+  assert(retainedCount(latch) == 0);
   assert(latch.overwritten() == 0);
   assert(latch.rateLimited() == 0);
   assert(latch.latestSequence() == 0);

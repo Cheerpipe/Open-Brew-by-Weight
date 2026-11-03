@@ -268,17 +268,8 @@ OpenBrewByWeightOta &OpenBrewByWeightOta::instance() {
   return shared;
 }
 
-bool OpenBrewByWeightOta::available() {
-  return publishedState().available;
-}
-
 bool OpenBrewByWeightOta::busy() {
   return publishedState().busy;
-}
-
-uint32_t OpenBrewByWeightOta::slotBytes() const {
-  TaskLockGuard lock(mutex_);
-  return slotBytes_;
 }
 
 bool OpenBrewByWeightOta::runningImageConfirmed() {

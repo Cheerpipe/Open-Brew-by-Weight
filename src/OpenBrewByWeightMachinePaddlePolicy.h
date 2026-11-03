@@ -72,11 +72,13 @@ uint32_t machineCloseLimitMs(uint32_t operationalWallMs) {
                                   : operationalWallMs;
 }
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 bool machineCycleHardMaxArmedForTest() { return machineCycleHardMaxArmed; }
 
 bool machineCyclePromotedToNaturalForTest() {
   return machineCyclePromotedToNatural;
 }
+#endif
 
 // Early paddle OFF still reports stop (or rinse) so Original/Auto walk-away
 // does not hide the gesture. After that window, Original/Auto may hide stop.

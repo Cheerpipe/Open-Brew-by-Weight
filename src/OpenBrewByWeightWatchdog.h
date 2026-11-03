@@ -63,16 +63,14 @@ class SafetyEventFlags {
 #endif
   }
 
-  bool consume(uint32_t bits) {
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
+  // Firmware never retracts a safety event; harnesses reset them between cases.
+  bool consume(uint32_t bits) {
     return (bits_.fetch_and(~bits, std::memory_order_acq_rel) & bits) != 0U;
-#else
-    return (xEventGroupClearBits(handle_, static_cast<EventBits_t>(bits)) &
-            static_cast<EventBits_t>(bits)) != 0U;
-#endif
   }
 
   void clear(uint32_t bits) { (void)consume(bits); }
+#endif
 
  private:
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST

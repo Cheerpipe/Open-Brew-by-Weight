@@ -965,15 +965,6 @@ inline uint32_t minimumBbwProtectionMs(const RuntimeConfig &config) {
   return effectiveRetareWindowMs(config) + MIN_BBW_PROTECTION_AFTER_RETARE_MS;
 }
 
-inline uint32_t effectiveRetareWindowMs(const CycleConfigSnapshot &config) {
-  return config.autoRetare ? config.retareWindowMs : 0U;
-}
-
-inline uint32_t minimumBbwProtectionMs(
-    const CycleConfigSnapshot &config) {
-  return effectiveRetareWindowMs(config) + MIN_BBW_PROTECTION_AFTER_RETARE_MS;
-}
-
 inline ConfigValidationError validateRuntimeConfig(
     const RuntimeConfig &config) {
   if (config.goalWeightDg < MIN_GOAL_WEIGHT_DG ||
@@ -1930,10 +1921,6 @@ inline bool controlAllowsHistoryMutation(const ControlGateSnapshot &status) {
   return !status.activeCycle && !status.machineRunning;
 }
 
-inline bool controlAllowsHistoryMutation(const ControlStatusSnapshot &status) {
-  return controlAllowsHistoryMutation(controlGateOf(status));
-}
-
 enum class DebugCategory : uint8_t {
   ACTIVATOR,
   RELAY,
@@ -2204,6 +2191,7 @@ struct DebugLogReadMetadata {
 };
 class DebugRingBuffer {
  public:
+#if !defined(ESP_PLATFORM)  // Host harnesses reuse one ring across cases.
   void clear() {
     nextSequence_ = 1;
     count_ = 0;
@@ -2212,6 +2200,7 @@ class DebugRingBuffer {
     alarmSequence_ = 0;
     std::fill(std::begin(events_), std::end(events_), DebugEvent{});
   }
+#endif
 
   void add(Instant at, LogLevel level, DebugCategory category, DebugCode code,
            int32_t argument1 = 0, int32_t argument2 = 0,

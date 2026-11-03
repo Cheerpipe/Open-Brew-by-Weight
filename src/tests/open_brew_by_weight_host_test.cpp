@@ -7027,12 +7027,12 @@ void w99e_recovery_cue_bypasses_mute_via_pipeline() {
 
 void w39_history_mutation_blocked_while_brew_rf_active() {
   ControlStatusSnapshot status;
-  CHECK(controlAllowsHistoryMutation(status));
+  CHECK(controlAllowsHistoryMutation(controlGateOf(status)));
   status.activeCycle = true;
-  CHECK(!controlAllowsHistoryMutation(status));
+  CHECK(!controlAllowsHistoryMutation(controlGateOf(status)));
   status.activeCycle = false;
   status.machineRunning = true;
-  CHECK(!controlAllowsHistoryMutation(status));
+  CHECK(!controlAllowsHistoryMutation(controlGateOf(status)));
 }
 
 void w37_factory_reset_is_rejected_while_control_is_active() {

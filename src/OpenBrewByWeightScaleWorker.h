@@ -123,7 +123,6 @@ void approveIdleScaleTareSample(uint32_t requestId, const WeightSample &sample);
 bool cancelIdleScaleTare(uint32_t requestId, IdleTareStatus *released = nullptr);
 bool publishScaleEvent(const ScaleEvent &event, bool critical);
 bool initializeScaleWorker();
-void resetScaleWorkerRadioStateForHost();
 bool scaleWorkerReady();
 uint32_t scaleWorkerDroppedEventCount();
 uint32_t scaleWorkerStackMinBytesValue();
@@ -134,6 +133,7 @@ void copyScaleWorkerPhaseProfilerSnapshot(
     PhaseProfilerSnapshot<SCALE_WORKER_PHASE_COUNT> &out);
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
+void resetScaleWorkerRadioStateForHost();
 void setScaleWorkerBleReadyForHost(bool ready);
 void setScaleWorkerTaskPresentForHost(bool present);
 void setScaleWorkerStackMinBytesForHost(uint32_t bytes);

@@ -53,7 +53,9 @@ class MicraScaleShutdownTracker {
     return !scale.relayClosed;
   }
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
   bool pending() const { return pending_; }
+#endif
 
  private:
   static uint32_t graceMs(uint8_t micraOptions) {

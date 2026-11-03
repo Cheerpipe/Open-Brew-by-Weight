@@ -1,3 +1,4 @@
+#define OPEN_BREW_BY_WEIGHT_HOST_TEST
 #include "machine/OpenBrewByWeightLineaMicraSettings.h"
 #include "machine/OpenBrewByWeightLineaMicraTypes.h"
 #include "machine/OpenBrewByWeightMicraMachinePower.h"

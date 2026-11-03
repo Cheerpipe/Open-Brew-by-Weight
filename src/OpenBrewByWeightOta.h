@@ -238,9 +238,7 @@ class OpenBrewByWeightOta {
   // confirmation. Safe to call more than once.
   void begin();
 
-  static bool available();
   static bool busy();
-  uint32_t slotBytes() const;
   // With `wait` false a reader never blocks behind an erase, range write or
   // commit holding the OTA mutex; it gets the copy published at that
   // operation's last state change or written sector instead.

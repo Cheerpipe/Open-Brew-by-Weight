@@ -147,8 +147,6 @@ void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
   requestScalePowerOff();
 }
 
-uint8_t machineIntegrationTaskCount() { return 1; }
-
 MachinePhysicalStartDisposition machineIntegrationPhysicalStart(MachineBackflushPermit *permit) {
   return service.physicalStart(permit);
 }

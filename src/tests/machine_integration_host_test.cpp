@@ -4,7 +4,6 @@
 
 int main() {
   using namespace openbrewbyweight;
-  assert(machineIntegrationTaskCount() == 0);
   assert(initializeMachineIntegration());
   publishMachineIntegrationNetworkState(true, false, false);
   requestMachineIntegrationPresetTemperature({2, 935}, 7);

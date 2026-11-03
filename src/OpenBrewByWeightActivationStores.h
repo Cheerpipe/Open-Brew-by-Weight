@@ -138,6 +138,7 @@ class ActivationStores {
   ShotLog shotLog;
   HistoryLog historyLog;
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
   // Harness support: reset and inspect the latched failure dedup state.
   void clearPersistFailLatches() {
     shotLogPersistFailLatched_ = false;
@@ -147,6 +148,7 @@ class ActivationStores {
   bool anyPersistFailLatched() const {
     return shotLogPersistFailLatched_ || historyPersistFailLatched_;
   }
+#endif
 
   void capturePersistenceImage(ActivationStores &image) const {
     shotLog.capturePersistenceImage(image.shotLog);

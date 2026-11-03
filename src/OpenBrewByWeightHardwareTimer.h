@@ -175,22 +175,12 @@ class IndependentSafetyTimer {
 #endif
   }
 
+#ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
   bool running() const {
-#ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
     std::lock_guard<std::mutex> lock(stateMutex_);
-#else
-    portENTER_CRITICAL(&stateMux_);
-#endif
-    const bool value = running_;
-#ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
-    return value;
-#else
-    portEXIT_CRITICAL(&stateMux_);
-    return value;
-#endif
+    return running_;
   }
 
-#ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
   void serviceForHost() {
     serviceForHostAt(static_cast<uint64_t>(millis()) * 1000ULL);
   }

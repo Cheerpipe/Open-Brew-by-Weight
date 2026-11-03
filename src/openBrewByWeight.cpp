@@ -1100,9 +1100,11 @@ bool safeRestartPending() {
   return safetyEventFlags.isSet(SAFETY_EVENT_SAFE_RESTART);
 }
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 bool consumeSafeRestartRequest() {
   return safetyEventFlags.consume(SAFETY_EVENT_SAFE_RESTART);
 }
+#endif
 
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
 // The Arduino core would otherwise cancel the bootloader rollback inside

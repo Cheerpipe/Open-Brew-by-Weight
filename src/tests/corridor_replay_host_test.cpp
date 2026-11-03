@@ -18,6 +18,11 @@ using namespace openbrewbyweight::corridor;
 
 namespace {
 
+// The firmware reads arrivals through ShotLog; the tests hold them as a span.
+ArrivalStats arrivalStats(std::span<const ArrivalRecord> records, const StatsScope &scope) {
+  return arrivalStatsOf(records.size(), [records](size_t i) { return records[i]; }, scope);
+}
+
 int failures = 0;
 #define CHECK(condition)                                                      \
   do {                                                                        \

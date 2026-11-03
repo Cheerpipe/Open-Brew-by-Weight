@@ -148,10 +148,12 @@ class LastShotStore {
     adopt(last);
   }
 
+#if defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   bool persist(const PersistedLastShot &last) {
     advance(last);
     return save();
   }
+#endif
 
   bool erasePersisted() {
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)

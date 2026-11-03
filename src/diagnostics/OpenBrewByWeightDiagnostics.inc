@@ -602,9 +602,11 @@ void serviceControlStatusPublish() {
 
 SerialCliParser serialCliParser;
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 void resetSerialCliState() {
   serialCliResetParser(serialCliParser);
 }
+#endif
 
 void serialCliReply(const char *message) {
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)

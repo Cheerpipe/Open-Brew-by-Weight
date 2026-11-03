@@ -67,7 +67,9 @@ bool momentarySettledWeightCutArmed = false;
 bool momentaryStopSettling = false;
 bool momentaryNoFlowIdlePending = false;
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 bool reedIsOn() { return false; }
+#endif
 
 inline float momentaryLiveWeightG() { return machineSense.weightG; }
 

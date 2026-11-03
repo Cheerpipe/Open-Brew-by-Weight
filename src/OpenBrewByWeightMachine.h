@@ -171,8 +171,10 @@ constexpr bool machineAllowsAutomationStop() { return true; }
 inline uint32_t machineCloseLimitMs(uint32_t operationalWallMs) {
   return operationalWallMs;
 }
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 constexpr bool machineCycleHardMaxArmedForTest() { return false; }
 constexpr bool machineCyclePromotedToNaturalForTest() { return false; }
+#endif
 inline void machineNoteFirmwareStop() {
   momentarySkipFirmwareStopPulse = false;
 }

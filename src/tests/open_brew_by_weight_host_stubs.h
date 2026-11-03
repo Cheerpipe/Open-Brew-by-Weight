@@ -982,8 +982,10 @@ inline AuditStoreStatus hostAuditStoreStatus{AuditStoreState::READY};
 
 inline void auditStoreBootOpen(AuditLogLatch &latch, uint32_t &pendingAfter) {
   pendingAfter = 0;
-  for (const AuditRecord &record : hostAuditStoreWindow()) latch.adopt(record);
-  pendingAfter = latch.pendingAfter();
+  for (const AuditRecord &record : hostAuditStoreWindow()) {
+    latch.adopt(record);
+    if (record.sequence > pendingAfter) pendingAfter = record.sequence;
+  }
 }
 inline bool auditStoreAppend(const AuditRecord &record) {
   auto &window = hostAuditStoreWindow();

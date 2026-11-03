@@ -67,7 +67,9 @@ void sampleReed() {
   }
 }
 
+#if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 bool reedIsOn() { return reedOn; }
+#endif
 
 void resetReedRuntime() {
   reedRawOn = false;

@@ -72,7 +72,9 @@ static void testBootBackfill() {
   AuditLogLatch latch;
   uint32_t pendingAfter = 12345;
   auditStoreBootOpen(latch, pendingAfter);
-  check(latch.count() == 20, "boot must backfill the whole retained window");
+  AuditRecord retained[AUDIT_RECORD_CAPACITY];
+  check(latch.copyAfter(0, retained, AUDIT_RECORD_CAPACITY) == 20,
+        "boot must backfill the whole retained window");
   check(pendingAfter == 20,
         "backfilled records must be marked already durable");
   check(latch.latestSequence() == 20,

@@ -316,8 +316,8 @@ class ShotTracePool {
   ShotTracePool(const ShotTracePool &) = delete;
   ShotTracePool &operator=(const ShotTracePool &) = delete;
 
-  size_t logicalEnd() const { return end(); }
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+  size_t logicalEnd() const { return end(); }
   // Tests only: grows the ring (a recover() must follow; a record that
   // wrapped from the old last sector to sector 0 is dropped by that walk).
   bool setLogicalEnd(size_t sectors) {
@@ -469,6 +469,13 @@ class ShotTracePool {
     return result == FlashStoreStepResult::COMPLETE;
   }
   void cancelAppend() { op_ = Op::IDLE; }
+  // n-th oldest entry; tests inspect the index through it.
+  bool entryAt(size_t n, ShotTracePoolEntry &out) const {
+    TaskLockGuard lock(mux_);
+    if (n >= count_) return false;
+    out = slot(firstSerial_ + static_cast<uint32_t>(n));
+    return true;
+  }
 #endif
 
   // Clear all and factory reset: one new sector whose floor is its own
@@ -497,13 +504,6 @@ class ShotTracePool {
   size_t count() const {
     TaskLockGuard lock(mux_);
     return count_;
-  }
-  // n-th oldest entry; tests inspect the index through it.
-  bool entryAt(size_t n, ShotTracePoolEntry &out) const {
-    TaskLockGuard lock(mux_);
-    if (n >= count_) return false;
-    out = slot(firstSerial_ + static_cast<uint32_t>(n));
-    return true;
   }
   // The newest record of the summary, by its full identity on flash (one
   // header read per candidate entry). Reads flash: hold no store lock.
