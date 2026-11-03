@@ -310,6 +310,7 @@ class OpenBrewByWeightOta {
   OpenBrewByWeightOta() = default;
 
   OtaResult finishFailure(OtaResult result);
+  bool sessionExpiredLocked(uint32_t now) const;
   bool reconfirmStagedTag();
   bool verifySessionSha256();
   bool startSessionSha256();

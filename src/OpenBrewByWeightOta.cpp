@@ -588,13 +588,18 @@ bool OpenBrewByWeightOta::isDuplicateRange(uint32_t offset,
          offset + contentLength == receivedBytes_;
 }
 
+// Callers sample `now` before taking the mutex, so a range finishing in
+// between leaves `now` behind the last activity. A signed age keeps that from
+// wrapping into an expiry of the session that was just written.
+bool OpenBrewByWeightOta::sessionExpiredLocked(uint32_t now) const {
+  return sessionActive_ && static_cast<int32_t>(now - sessionLastActivityMs_) >=
+                               static_cast<int32_t>(OTA_SESSION_TTL_MS);
+}
+
 void OpenBrewByWeightOta::expireSession(uint32_t now, bool flashAllowed, bool wait) {
   if (wait) mutex_.lock();
   else if (!mutex_.tryLock()) return;
-  if (sessionActive_ &&
-      static_cast<uint32_t>(now - sessionLastActivityMs_) >= OTA_SESSION_TTL_MS) {
-    finishFailure(OtaResult::SESSION_EXPIRED);
-  }
+  if (sessionExpiredLocked(now)) finishFailure(OtaResult::SESSION_EXPIRED);
   if (flashAllowed && journalStale_ && !sessionActive_) (void)removeSessionJournal();
   mutex_.unlock();
 }
@@ -605,11 +610,7 @@ OtaResult OpenBrewByWeightOta::createSession(const OtaSessionIdentity &identity,
   if (!started_ || !available_) {
     return OtaResult::UNAVAILABLE;
   }
-  if (sessionActive_ &&
-      static_cast<uint32_t>(now - sessionLastActivityMs_) >=
-          OTA_SESSION_TTL_MS) {
-    finishFailure(OtaResult::SESSION_EXPIRED);
-  }
+  if (sessionExpiredLocked(now)) finishFailure(OtaResult::SESSION_EXPIRED);
   if (state_ == OtaState::COMMITTED) return OtaResult::COMMITTED;
   if (busy_) {
     return OtaResult::BUSY;
@@ -731,11 +732,7 @@ OtaResult OpenBrewByWeightOta::writeRange(const char *transferId, uint32_t offse
       strncmp(session_.transferId, transferId, OTA_TRANSFER_ID_CAPACITY) != 0) {
     return OtaResult::SESSION_IDENTITY_MISMATCH;
   }
-  if (static_cast<uint32_t>(now - sessionLastActivityMs_) >=
-      OTA_SESSION_TTL_MS) {
-    finishFailure(OtaResult::SESSION_EXPIRED);
-    return OtaResult::SESSION_EXPIRED;
-  }
+  if (sessionExpiredLocked(now)) return finishFailure(OtaResult::SESSION_EXPIRED);
   if (busy_) {
     return OtaResult::BUSY;
   }

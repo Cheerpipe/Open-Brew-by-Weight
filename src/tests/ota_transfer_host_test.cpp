@@ -227,6 +227,24 @@ void testAbandonedSessionExpiresAndErasesLazily() {
   CHECK(persistence_host::records.empty());
 }
 
+void testStaleTickDoesNotExpireFreshSession() {
+  // The network task samples `now` before a range ends and refreshes activity.
+  reset();
+  auto ota = OtaHostTestAccess::fresh();
+  Image image(2 * OTA_TRANSFER_CHUNK_BYTES);
+  CHECK(ota->createSession(image.identity, hostMillis) == OtaResult::OK);
+  const uint32_t staleTick = hostMillis;
+  hostMillis += 50;
+  Stream stream{image.bytes};
+  CHECK(ota->writeRange(kTransfer, 0, OTA_TRANSFER_CHUNK_BYTES, stream.io(), hostMillis) == OtaResult::OK);
+  ota->expireSession(staleTick, true, false);
+  CHECK(ota->snapshot().sessionActive && ota->snapshot().nextOffset == OTA_TRANSFER_CHUNK_BYTES);
+  CHECK(ota->createSession(image.identity, staleTick) == OtaResult::OK);
+  CHECK(ota->writeRange(kTransfer, OTA_TRANSFER_CHUNK_BYTES, OTA_TRANSFER_CHUNK_BYTES,
+                        stream.io(), staleTick) == OtaResult::OK);
+  CHECK(ota->snapshot().stagedValid);
+}
+
 void testNewSessionClearsStaleJournal() {
   reset();
   auto ota = OtaHostTestAccess::fresh();
@@ -358,6 +376,7 @@ int main() {
   testSafetyAndFatalFailures();
   testCheckpointRecovery();
   testAbandonedSessionExpiresAndErasesLazily();
+  testStaleTickDoesNotExpireFreshSession();
   testNewSessionClearsStaleJournal();
   testJournalFailureHasDistinctResult();
   testConfirmationGatesAndDiagnostics();

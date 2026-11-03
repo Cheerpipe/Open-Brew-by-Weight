@@ -1232,8 +1232,19 @@ esp_err_t OpenBrewByWeightNetwork::otaSessionWork(httpd_req_t *request) {
 
 esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
-  auto rejectRange = [request](const char *status, const char *error,
-                               const char *message, const char *reason) {
+  auto rejectRange = [&self, request](const char *status, const char *error,
+                                      const char *message, const char *reason) {
+    // An async request's leftover body is never purged by httpd, and closing
+    // over unread bytes answers RST, which loses this error at the client.
+    // Drain at most one range, unless a shot or a server stop takes priority.
+    OtaTransfer transfer{&self, request};
+    char sink[256];
+    for (uint32_t left = OTA_TRANSFER_CHUNK_BYTES;
+         left > 0 && otaTransferStillSafe(&transfer);) {
+      const int got = httpd_req_recv(request, sink, left < sizeof(sink) ? left : sizeof(sink));
+      if (got <= 0) break;
+      left -= static_cast<uint32_t>(got);
+    }
     const esp_err_t sent = sendError(request, status, error, message, reason);
     if (request->content_len > 0) {
       httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
@@ -1269,6 +1280,10 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
   OtaStatusSnapshot snapshot = ota.snapshot();  // one ~0.5 KB copy, reused below
   if (strncmp(snapshot.session.transferId, transferId, sizeof(transferId)) != 0 ||
       snapshot.expectedBytes != declaredTotal) {
+    // Field evidence of why the client's session vanished (expiry, failure).
+    self.log(DebugCategory::NETWORK, DebugCode::OTA_UPLOAD_REJECTED,
+             static_cast<int32_t>(snapshot.lastResult),
+             static_cast<int32_t>(snapshot.lastReceivedBytes / 1024U));
     return rejectRange(STATUS_CONFLICT, "OTA_SESSION_IDENTITY_MISMATCH",
                        nullptr, "OTA_RANGE_NOT_IN_SESSION");
   }
