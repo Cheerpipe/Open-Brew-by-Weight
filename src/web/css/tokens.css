@@ -28,7 +28,7 @@
   --gFast: #d7301f;
   --gSlow: #2c7fb8;
   --gFlow: #7a7a7a;
-  --ah: 0 -4px 14px rgba(36, 36, 36, 0.1);
+  --ah: 0 -4px 14px rgb(36, 36, 36, 0.1);
   --popSh: 0 8px 28px #0002;
   --r: 0.75rem;
   --tap: 2.75rem;
@@ -63,7 +63,7 @@
     --mo: #193024;
     --mw: #33291b;
     --pa: #352820;
-    --ah: 0 -4px 14px rgba(0, 0, 0, 0.35);
-    --popSh: 0 8px 28px rgba(0, 0, 0, 0.45);
+    --ah: 0 -4px 14px rgb(0, 0, 0, 0.35);
+    --popSh: 0 8px 28px rgb(0, 0, 0, 0.45);
   }
 }

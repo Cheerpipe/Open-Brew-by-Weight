@@ -31,14 +31,14 @@ html.theme-dark :is(.pageNav, .quickPanel, #presetRenameDialog, #confirmDialog) 
   box-shadow: var(--popSh);
 }
 html.theme-dark :is(.qwSheet, #actionsPanel) {
-  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 -8px 28px rgb(0, 0, 0, 0.45);
 }
 @media (prefers-color-scheme: dark) {
   html:not(.theme-light) :is(.pageNav, .quickPanel, #presetRenameDialog, #confirmDialog) {
     box-shadow: var(--popSh);
   }
   html:not(.theme-light) :is(.qwSheet, #actionsPanel) {
-    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 -8px 28px rgb(0, 0, 0, 0.45);
   }
 }
 .glassBar > .btnGlyph {
@@ -94,7 +94,7 @@ html.theme-dark :is(.qwSheet, #actionsPanel) {
     width: 1px;
     height: 1px;
     overflow: hidden;
-    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
   }
 }
 .btnGlyph.btnRevert {

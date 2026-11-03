@@ -3,14 +3,6 @@
     "stylelint-config-standard"
   ],
   "rules": {
-    "function-no-unknown": [
-      true,
-      {
-        "ignoreFunctions": [
-          "__WEBUI_CSS_TEXT__"
-        ]
-      }
-    ],
     "selector-class-pattern": null,
     "selector-id-pattern": null,
     "custom-property-pattern": null,
@@ -33,14 +25,6 @@
     "selector-attribute-quotes": null,
     "font-family-name-quotes": null,
     "import-notation": null,
-    "function-name-case": [
-      "lower",
-      {
-        "ignoreFunctions": [
-          "__WEBUI_CSS_TEXT__"
-        ]
-      }
-    ],
     "declaration-block-no-duplicate-properties": [
       true,
       {

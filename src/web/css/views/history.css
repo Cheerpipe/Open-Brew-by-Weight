@@ -101,7 +101,7 @@
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
 }
 #actionsPanel #controlPolicy {
   display: none;
@@ -193,7 +193,7 @@
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
 }
 #shotTable,
 #historyTable,
@@ -350,7 +350,7 @@
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
 }
 .histBadge.archiveKept {
   outline: 1px dashed var(--mu);
@@ -1047,11 +1047,11 @@
   max-width: min(22rem, calc(100vw - 2rem));
   background: var(--sf);
   color: var(--fg);
-  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1rem 3rem rgb(0, 0, 0, 0.25);
 }
 #presetRenameDialog::backdrop,
 #confirmDialog::backdrop,
 #pairDialog::backdrop,
 #shotTraceDialog::backdrop {
-  background: rgba(21, 21, 21, 0.65);
+  background: rgb(21, 21, 21, 0.65);
 }

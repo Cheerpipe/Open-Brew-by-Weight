@@ -51,7 +51,7 @@ localeAssert.throws(() => webUiLocale.loadCatalog('es-CL'), /no catalog for es-c
       {file: 'text.html', type: 'html', content: `<p>{{webui:${key}}}</p>`},
       {file: 'attr.html', type: 'html', content: `<i title="{{webui:${key}}}"></i>`},
       {file: 'value.js', type: 'js', content: `const translated=__WEBUI_TEXT__("${key}")`},
-      {file: 'value.css', type: 'css', content: `x{content:__WEBUI_CSS_TEXT__("${key}")}`},
+      {file: 'value.css', type: 'css', content: `x{content:"{{webui:${key}}}"}`},
       {file: 'meta.html', type: 'html',
         content: '<html lang="{{webui-meta:locale}}"{{webui-meta:direction-attribute}}>'},
       {file: 'reuse.html', type: 'html',
@@ -141,7 +141,7 @@ expectLocaleFailure((c) => {
     {file: 'bad.html', type: 'html', content: `<a href="{{webui:${key}}}">x</a>`},
   ], options), /complete allowed quoted HTML attribute value/);
   localeAssert.throws(() => webUiLocale.renderSources([
-    {file: 'bad.css', type: 'css', content: `x{color:__WEBUI_CSS_TEXT__("${key}")}`},
+    {file: 'bad.css', type: 'css', content: `x{color:"{{webui:${key}}}"}`},
   ], options), /only valid as a CSS content value/);
   localeAssert.throws(() => webUiLocale.renderSources([
     {file: 'bad.js', type: 'js', content: 'const x=__WEBUI_TEXT__(key)'},

@@ -15,7 +15,7 @@ const MACHINE_ICON_MARKER = '{{webui-meta:machine-icon}}';
 const MACHINE_ICON_SPRITE_RE = /<svg\b[^>]*\bdata-machine-icons\b[^>]*>([\s\S]*?)<\/svg\s*>/;
 const MACHINE_ICON_SYMBOL_RE = /<symbol\b[^>]*\bid="machine-icon-([a-z0-9-]+)"[^>]*>([\s\S]*?)<\/symbol\s*>/g;
 const JS_MARKER_RE = /__WEBUI_TEXT__\(\s*"([a-z0-9_.]+)"\s*,?\s*\)/g;
-const CSS_MARKER_RE = /__WEBUI_CSS_TEXT__\(\s*"([a-z0-9_.]+)"\s*\)/g;
+const CSS_MARKER_RE = /"\{\{webui:([a-z0-9_.]+)\}\}"/g;
 
 function fail(message) {
   throw new Error(`Web UI localization: ${message}`);
@@ -242,7 +242,7 @@ function renderCss(source, file, state) {
 }
 
 function assertNoMarkers(source, file) {
-  if (/\{\{webui(?:-meta)?:|__WEBUI_(?:TEXT|CSS_TEXT)__/.test(source)) {
+  if (/\{\{webui(?:-meta)?:|__WEBUI_TEXT__/.test(source)) {
     fail(`${file}: unresolved or invalid localization marker`);
   }
 }

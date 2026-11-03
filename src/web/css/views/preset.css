@@ -667,7 +667,7 @@ body.qwOpen {
   position: fixed;
   inset: 0;
   z-index: 32;
-  background: rgba(21, 21, 21, 0.42);
+  background: rgb(21, 21, 21, 0.42);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.28s;
@@ -690,7 +690,7 @@ body.qwOpen {
   border-top: 1px solid var(--ln);
   border-radius: 1.35rem 1.35rem 0 0;
   background: var(--sf);
-  box-shadow: 0 -1.1rem 2.6rem rgba(0, 0, 0, 0.3);
+  box-shadow: 0 -1.1rem 2.6rem rgb(0, 0, 0, 0.3);
 }
 .qwSheet.open {
   transform: none;

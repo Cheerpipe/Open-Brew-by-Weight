@@ -54,7 +54,7 @@ anything and exits with 127 when they are missing. It runs three steps:
   (`__WEBUI_TEXT__`, `__LINEA_MICRA__`, `__REMOTE_CONTROL__`, `__homeModule`) are
   declared there; formatting stays with `npm run format:web`.
 - **Stylelint** on `src/web/css` (`scripts/lint/stylelint.json`), allowing the
-  `__WEBUI_CSS_TEXT__()` localization marker and the vendor prefixes Safari needs.
+  vendor prefixes Safari needs.
 - **Markup** (`scripts/lint_web_ui.js`): renders the English shell with every view
   partial injected, as the browser receives it, and runs html-validate with
   `scripts/lint/htmlvalidate.json`, which also fails on any id used twice
