@@ -906,6 +906,7 @@
               id="clearResetHistoryButton"
               class="btnGlyph btnWarn diagCtl diagGate"
               type="button"
+              data-p="1"
             >
               <span class="g" aria-hidden="true">×</span
               ><span class="t">{{webui:diagnostic.reset}}</span>
@@ -915,7 +916,7 @@
       </div>
     </details>
     <div class="btnBar glassBar">
-      <button id="exportDebugDataButton" class="btnGlyph diagCtl" type="button">
+      <button id="exportDebugDataButton" class="btnGlyph diagCtl" type="button" data-p="1">
         <span class="g" aria-hidden="true">↓</span
         ><span class="t">{{webui:diagnostic.export_debug}}</span>
       </button>
@@ -1061,10 +1062,11 @@
         class="btnGlyph diagCtl"
         title="{{webui:diagnostic.copy_log}}"
         type="button"
+        data-p="2"
       >
         <span class="g" aria-hidden="true">⧉</span
         ><span class="t">{{webui:diagnostic.copy}}</span></button
-      ><button id="logLatestButton" class="btnGlyph diagCtl" type="button" hidden>
+      ><button id="logLatestButton" class="btnGlyph diagCtl" type="button" hidden data-p="1">
         <span class="g" aria-hidden="true">↓</span
         ><span class="t">{{webui:diagnostic.log_latest}}</span></button
       ><button
@@ -1073,10 +1075,17 @@
         title="{{webui:diagnostic.log_export_title}}"
         type="button"
         hidden
+        data-p="3"
       >
         <span class="g" aria-hidden="true">⤓</span
         ><span class="t">{{webui:diagnostic.log_export}}</span></button
-      ><button id="logDeleteButton" class="btnGlyph diagCtl btnInvert" type="button" hidden>
+      ><button
+        id="logDeleteButton"
+        class="btnGlyph diagCtl btnInvert"
+        type="button"
+        hidden
+        data-p="4"
+      >
         <span class="g" aria-hidden="true">×</span
         ><span class="t">{{webui:diagnostic.log_delete}}</span></button
       ><button
@@ -1084,6 +1093,7 @@
         class="btnGlyph diagCtl"
         title="{{webui:diagnostic.clear_view}}"
         type="button"
+        data-p="5"
       >
         <span class="g" aria-hidden="true">×</span
         ><span class="t">{{webui:diagnostic.clear_view}}</span>

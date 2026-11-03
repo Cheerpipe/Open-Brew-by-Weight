@@ -92,7 +92,13 @@
   <div class="panelWrap">
     <div id="shotStickySentinel" class="stickyBarSentinel" aria-hidden="true"></div>
     <div class="btnBar glassBar">
-      <div id="shotSort" class="shotSort" role="group" aria-label="{{webui:stats.sort_history}}">
+      <div
+        id="shotSort"
+        class="shotSort"
+        role="group"
+        aria-label="{{webui:stats.sort_history}}"
+        data-p="1"
+      >
         <span class="sortLbl">{{webui:runtime.sort}}</span
         ><button id="sortDateButton" type="button" aria-pressed="true">{{webui:stats.date}}</button
         ><button id="sortRatingButton" type="button">{{webui:stats.rating}}</button>
@@ -104,6 +110,7 @@
         aria-haspopup="true"
         aria-expanded="false"
         title="{{webui:history.filter}}"
+        data-p="2"
       >
         <span class="g" aria-hidden="true"
           ><svg aria-hidden="true"><use href="#hFl" /></svg></span
@@ -116,6 +123,7 @@
         aria-haspopup="true"
         aria-expanded="false"
         title="{{webui:stats.export}}"
+        data-p="3"
       >
         <span class="g" aria-hidden="true">↓</span><span class="t">{{webui:stats.export}}</span>
       </button>

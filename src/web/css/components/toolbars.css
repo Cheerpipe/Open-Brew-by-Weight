@@ -71,7 +71,6 @@ html.themeDark :is(.qwSheet, #actionsPanel) {
     width: min(100%, 30rem);
     margin-inline: auto;
     padding: 0.25rem 0.3rem;
-    flex-wrap: wrap;
     justify-content: space-between;
   }
 
@@ -85,21 +84,27 @@ html.themeDark :is(.qwSheet, #actionsPanel) {
   }
 }
 
-@media (width <= 479px) {
-  .presetActions.glassBar > .btnGlyph[title],
-  #shotLogPanel .glassBar > .btnGlyph {
-    width: var(--tap);
-    padding: 0;
-  }
+/* One-row bars (app.js fitBar): an item past the fit keeps only its glyph,
+and a sort group its buttons; the label stays as the accessible name. */
+.glassBar.fit {
+  flex-wrap: nowrap;
+}
 
-  .presetActions.glassBar > .btnGlyph[title] .t,
-  #shotLogPanel .glassBar > .btnGlyph .t {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
+.glassBar.fit > * {
+  flex-shrink: 0;
+}
+
+.glassBar > .btnGlyph.iconOnly {
+  width: var(--tap);
+  padding: 0;
+}
+
+.glassBar > .iconOnly :is(.t, .sortLbl) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .btnGlyph.btnRevert {

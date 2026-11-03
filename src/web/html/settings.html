@@ -82,7 +82,13 @@
           role="group"
           aria-label="{{webui:settings.preset_actions}}"
         >
-          <button type="button" class="btnGlyph mutable" id="presetNewCoffeeBtn" disabled>
+          <button
+            type="button"
+            class="btnGlyph mutable"
+            id="presetNewCoffeeBtn"
+            data-p="1"
+            disabled
+          >
             <span class="g" aria-hidden="true"
               ><svg
                 viewBox="0 0 24 24"
@@ -105,6 +111,7 @@
             class="btnGlyph mutable"
             id="presetNewBtn"
             title="{{webui:settings.new}}"
+            data-p="3"
             disabled
           >
             <span class="g" aria-hidden="true">+</span
@@ -114,6 +121,7 @@
             class="btnGlyph mutable"
             id="presetDupBtn"
             title="{{webui:settings.duplicate}}"
+            data-p="4"
             disabled
           >
             <span class="g" aria-hidden="true">⧉</span
@@ -123,6 +131,7 @@
             class="btnGlyph mutable"
             id="presetResetBtn"
             title="{{webui:settings.restore}}"
+            data-p="5"
             disabled
           >
             <span class="g" aria-hidden="true">↻</span
@@ -132,6 +141,7 @@
             class="btnGlyph mutable btnDanger"
             id="presetDeleteBtn"
             title="{{webui:settings.delete}}"
+            data-p="2"
             disabled
           >
             <span class="g" aria-hidden="true">×</span

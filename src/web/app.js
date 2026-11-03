@@ -53,6 +53,36 @@ function fetchView(name) {
   );
 }
 const viewFails = {};
+// Toolbars keep one row: labels hide from the highest data-p down until the
+// row fits, measured so every language fits. A bar refits when its column
+// changes width or one of its items shows or hides; a bar with no data-p
+// items keeps wrapping.
+function fitBar(bar) {
+  const items = [...bar.querySelectorAll(":scope > [data-p]")].sort(
+    (a, b) => b.dataset.p - a.dataset.p,
+  );
+  for (const b of items) b.classList.remove("iconOnly");
+  for (const b of items) {
+    if (bar.scrollWidth <= bar.clientWidth) break;
+    if (!b.hidden) b.classList.add("iconOnly");
+  }
+}
+let barColumns, barItems;
+function fitBars(root) {
+  for (const bar of root.querySelectorAll(".glassBar:has(> [data-p])")) {
+    barColumns ??= new ResizeObserver((entries) => {
+      for (const { target, contentRect } of entries)
+        if (target.barW !== (target.barW = contentRect.width))
+          target.querySelectorAll(":scope > .glassBar.fit").forEach(fitBar);
+    });
+    barItems ??= new MutationObserver((records) =>
+      new Set(records.map((r) => r.target.closest(".glassBar"))).forEach(fitBar),
+    );
+    bar.classList.add("fit");
+    barColumns.observe(bar.parentElement);
+    barItems.observe(bar, { subtree: true, attributeFilter: ["hidden"] });
+  }
+}
 // Number fields get − and + keys for touch and mouse; a tap (not a scroll)
 // steps on click; holding one repeats. data-wrap fields (clock hours and
 // minutes) roll over from max to min and back instead of stopping.
@@ -105,6 +135,7 @@ async function ensureView(name) {
       if (!mod) throw new Error(__WEBUI_TEXT__("shell.missing_secondary_view") + name);
       section.innerHTML = mod.markup;
       addNumberKeys(section);
+      fitBars(section);
     }
     if (mod.init) mod.init();
     R.setMutable(R.controlsMutable, true);

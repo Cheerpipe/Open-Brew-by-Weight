@@ -1055,6 +1055,44 @@ if (!partialHtml.stats.includes('id="shotSort"') ||
     css.includes('html.themeDark #message,html.themeDark .configSaveBar{background:var(--bg)}')) {
   throw new Error('Shot history must sort by date or rating with unrated last and keep stats on newest shots');
 }
+// Toolbars keep one row: labels hide from the highest data-p down until the
+// bar fits, a hidden item is skipped, and an icon-only item keeps its label as
+// the accessible name. Every glyph button with a label carries a priority.
+{
+  const assert = require('assert').strict;
+  const fitBar = new Function(`${blockAt(appJsSource, 'function fitBar(')};return fitBar;`)();
+  const item = (p, w, hidden = false) => {
+    const c = new Set();
+    return {dataset: {p: String(p)}, hidden, c, w: () => (hidden ? 0 : c.has('iconOnly') ? 44 : w),
+      classList: {add: (x) => c.add(x), remove: (x) => c.delete(x)}};
+  };
+  const items = [item(1, 100), item(3, 70), item(4, 90, true), item(2, 80)];
+  const bar = {querySelectorAll: () => items, clientWidth: 230,
+    get scrollWidth() { return items.reduce((s, i) => s + i.w(), 0); }};
+  fitBar(bar);
+  assert.deepEqual(items.map((i) => i.c.has('iconOnly')), [false, true, false, false],
+      'only the lowest-priority visible label hides');
+  bar.clientWidth = 200;
+  fitBar(bar);
+  assert.deepEqual(items.map((i) => i.c.has('iconOnly')), [false, true, false, true]);
+  bar.clientWidth = 400;
+  fitBar(bar);
+  assert(items.every((i) => !i.c.has('iconOnly')), 'a wider column brings every label back');
+  assert(codeIncludes(appJsSource, 'addNumberKeys(section);fitBars(section);') &&
+         codeIncludes(appJsSource, 'root.querySelectorAll(".glassBar:has(> [data-p])")') &&
+         codeIncludes(appJsSource, 'barItems.observe(bar,{subtree:true,attributeFilter:["hidden"]})'),
+      'every view toolbar refits on width and on items showing or hiding');
+  assert(css.includes('.glassBar.fit{flex-wrap:nowrap}') &&
+         css.includes('.glassBar>.btnGlyph.iconOnly{width:var(--tap);padding:0}') &&
+         css.includes('.glassBar>.iconOnly :is(.t,.sortLbl){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}') &&
+         !css.includes('@media (width<=479px){.presetActions'),
+      'icon-only items keep a tap target and an accessible label');
+  for (const [view, html] of Object.entries(partialHtml))
+    for (const bar of html.split('glassBar').slice(1))
+      for (const b of bar.slice(0, bar.indexOf('</div>')).split('<button').slice(1))
+        assert(!b.slice(0, b.indexOf('</button>')).includes('class="t"') || /^[^>]*data-p="\d"/.test(b),
+            view + ': a labelled toolbar button needs a data-p priority');
+}
 {
   // Unified sort controls: pressing the already-selected criterion toggles the
   // direction, pressing the other one switches without resetting it, and the
