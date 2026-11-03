@@ -643,8 +643,8 @@ void commitLiveRuntimeConfig(const RuntimeConfig &composed, int32_t reasonBits,
                                  runtimeSettingsSubscribers);
   addDebugEvent(DebugCategory::CONFIG, DebugCode::CONFIG_ACCEPTED,
                 static_cast<int32_t>(runtimeConfig.revision));
-  scaleProfileNoteEvent(ScaleProfileEvent::SETTINGS_CHANGED, millis(), 0, 0,
-                        NAN, runtimeConfig.revision, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::SETTINGS_CHANGED, millis(),
+                        {.arg1 = runtimeConfig.revision});
   if (reasonBits != 0) queueRuntimePersist(reasonBits);
   publishRecipeState();
 }

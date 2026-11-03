@@ -62,9 +62,9 @@ bool expirePostTareBaselineIfNeeded(float softwareZeroG = NAN) {
   session.awaitingPostTareBaseline = false;
   session.retareEffectPending = false;
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_TIMEOUT, millis(),
-                        session.ownedConnectionGeneration, 0, softwareZeroG,
-                        session.appliedTareRequestId,
-                        static_cast<uint32_t>(IdleTareReason::EFFECT_UNCONFIRMED));
+                        {.connectionGeneration = session.ownedConnectionGeneration,
+                         .weightG = softwareZeroG, .arg1 = session.appliedTareRequestId,
+                         .arg2 = static_cast<uint32_t>(IdleTareReason::EFFECT_UNCONFIRMED)});
   addDebugEvent(DebugCategory::SCALE,
                 DebugCode::SCALE_POST_TARE_BASELINE_TIMEOUT,
                 overdueMs + static_cast<int32_t>(session.config.postTareBaselineGraceMs),
@@ -72,16 +72,15 @@ bool expirePostTareBaselineIfNeeded(float softwareZeroG = NAN) {
   return true;
 }
 
-bool acceptWeightIntoTrajectory(float weight, uint32_t receivedAtMs,
-                                uint32_t packetSequence) {
-  if (shot.datapoints > 0 && receivedAtMs == session.lastAcceptedWeightAtMs) {
+bool acceptWeightIntoTrajectory(WeightSample sample) {
+  if (shot.datapoints > 0 && sample.atMs == session.lastAcceptedWeightAtMs) {
     // Re-transmitted timestamp: counts as freshness for staleness watchers,
     // but a zero-duration sample must not widen the trajectory fit.
     session.receivedFreshWeightInCycle = true;
-    session.lastAcceptedWeightG = weight;
-    session.lastAcceptedPacketSequence = packetSequence;
+    session.lastAcceptedWeightG = sample.weightG;
+    session.lastAcceptedPacketSequence = sample.packetSequence;
     serialTraceCategoryf(LogLevel::DEBUG, DebugCategory::SCALE,
-                         "%.2fg, t=dup, kept freshness only", weight);
+                         "%.2fg, t=dup, kept freshness only", sample.weightG);
     return true;
   }
   size_t index;
@@ -95,19 +94,19 @@ bool acceptWeightIntoTrajectory(float weight, uint32_t receivedAtMs,
     index = MAX_SHOT_DATAPOINTS - 1U;
   }
   shot.timeS[index] =
-      static_cast<float>(receivedAtMs - shot.startMs) / 1000.0f;
-  shot.weight[index] = weight;
-  shotCurveSampler.accept(weight, receivedAtMs);
+      static_cast<float>(sample.atMs - shot.startMs) / 1000.0f;
+  shot.weight[index] = sample.weightG;
+  shotCurveSampler.accept(sample.weightG, sample.atMs);
   session.receivedFreshWeightInCycle = true;
   session.hasWeightAnchor = true;
-  session.lastAcceptedWeightAtMs = receivedAtMs;
-  session.lastAcceptedWeightG = weight;
-  session.lastAcceptedPacketSequence = packetSequence;
-  updateCutPrediction(weight, receivedAtMs);
+  session.lastAcceptedWeightAtMs = sample.atMs;
+  session.lastAcceptedWeightG = sample.weightG;
+  session.lastAcceptedPacketSequence = sample.packetSequence;
+  updateCutPrediction(sample);
 
   serialTraceCategoryf(LogLevel::DEBUG, DebugCategory::SCALE,
                        "%.2fg, t=%.2fs, expected end=%.2fs",
-                       weight, shot.timeS[index], shot.expectedEndS);
+                       sample.weightG, shot.timeS[index], shot.expectedEndS);
   return true;
 }
 
@@ -135,7 +134,7 @@ FirstFlowObservation considerScaleFlowMarkers(float weight,
   const bool seekingStreak = session.firstFlow.phase == FirstFlowPhase::SEEKING &&
       session.firstFlow.confirmations > 0;
   const FirstFlowClass classified =
-      stepFirstFlow(session.firstFlow, weight, receivedAtMs, packetSequence,
+      stepFirstFlow(session.firstFlow, {weight, receivedAtMs, packetSequence},
                     session.scaleBaselineG, runtimeConfig.minimumCupWeightG);
   if (seekingStreak && classified == FirstFlowClass::NONE &&
       static_cast<uint32_t>(receivedAtMs - session.firstFlow.lastFaAtMs) >=
@@ -146,12 +145,13 @@ FirstFlowObservation considerScaleFlowMarkers(float weight,
     // which a mistuned threshold is indistinguishable from a dead sensor.
     // Rate-limited so a noisy counter cannot evict the real first drop.
     session.firstFlow.lastFaAtMs = receivedAtMs;
-    scaleProfileNoteEvent(
-        ScaleProfileEvent::FIRST_DROP_SEEKING_FA, millis(),
-        session.ownedConnectionGeneration, packetSequence, weight,
-        static_cast<uint32_t>(firstFlowEffectiveThresholdG(session.firstFlow) *
-                              100.0f),
-        static_cast<uint32_t>(sqrtf(session.firstFlow.noiseVarHatG) * 100.0f));
+    scaleProfileNoteEvent(ScaleProfileEvent::FIRST_DROP_SEEKING_FA, millis(),
+                          {.connectionGeneration = session.ownedConnectionGeneration,
+                           .sequence = packetSequence, .weightG = weight,
+                           .arg1 = static_cast<uint32_t>(
+                               firstFlowEffectiveThresholdG(session.firstFlow) * 100.0f),
+                           .arg2 = static_cast<uint32_t>(
+                               sqrtf(session.firstFlow.noiseVarHatG) * 100.0f)});
   }
   if (classified == FirstFlowClass::FIRE) {
     return {session.firstFlow.candidateMs != 0 ? session.firstFlow.candidateMs

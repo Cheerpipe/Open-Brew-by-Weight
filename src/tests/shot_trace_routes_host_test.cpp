@@ -78,7 +78,7 @@ int httpd_resp_send_chunk(httpd_req_t *request, const char *data, size_t length)
 namespace openbrewbyweight {
 void shotTraceWriteBack(const void *, size_t) {}
 void shotTraceLogRecoveryDropped(uint32_t) {}
-void shotTraceNoteProfileEvent(ScaleProfileEvent, uint32_t, float, uint32_t, uint32_t) {}
+void shotTraceNoteProfileEvent(const ScaleProfileRecord &, uint32_t) {}
 void shotTraceNoteDroppedFrame(bool) {}
 
 // The fake pool record: a 9000-byte trace in chunks of the caller's size.

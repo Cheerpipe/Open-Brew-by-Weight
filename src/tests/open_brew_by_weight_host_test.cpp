@@ -2370,13 +2370,8 @@ void r12b_discovery_clears_stale_connected_link_snapshot() {
   // while an indefinite idle scan is in progress.
   scale.connected = false;
   scale.scanning = true;
-  uint32_t lastScanCycleMs = hostMillis;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = hostMillis;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery{hostMillis, 0, false, hostMillis, 0};
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(getScaleLinkSnapshot().state == ScaleLinkState::DISCONNECTED);
   CHECK(!scaleAvailable());
 }
@@ -5472,13 +5467,8 @@ void w75_bookoo_discovery_connect_applies_beep_policy() {
   scale.scanning = true;
   scale.connected = true;
   scale.commandLog.clear();
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.commandLog.empty());
   ScaleHistoryEntry copiedHistory[SCALE_HISTORY_CAPACITY] = {};
   copyScaleHistory(copiedHistory);
@@ -5847,21 +5837,15 @@ void d01_idle_scan_stays_enabled_between_ticks() {
       static_cast<uint8_t>(ScaleMacCacheMode::ONLY);
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(scale.directedScan);
   CHECK(scale.lastAddressScan);
   CHECK(scale.startScanCalls == 1);
   const size_t calls = scale.startScanCalls;
   hostMillis += SCALE_DISCOVERY_TICK_MS - 1;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(scale.directedScan);
   CHECK(scale.startScanCalls == calls);
@@ -5915,11 +5899,8 @@ void d13b_scale_power_off_is_terminal_for_connection_generation() {
   executeScalePowerOffCommand();
   CHECK(scale.commandLog.size() == 1);
   CHECK(scale.commandLog[0] == "powerOff");
-  uint32_t lastScanCycleMs=0, lastConnectLogMs=0, scanSessionAtMs=0;
-  uint32_t scanLastAdvertAtMs=0;
-  bool connectAttemptSeriesActive=false;
-  serviceScaleWorkerDiscovery(lastScanCycleMs,lastConnectLogMs,
-      connectAttemptSeriesActive,scanSessionAtMs,scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(getScaleLinkSnapshot().state == ScaleLinkState::CONNECTED);
   CHECK(scalePowerOffBlocksGeneration(generation));
   CHECK(scale.startScanCalls == 0);
@@ -5935,12 +5916,10 @@ void d13b_scale_power_off_is_terminal_for_connection_generation() {
   CHECK(!scaleDiscoveryPaused());
   CHECK(scale.communicationSilenceRemainingMs() ==
         SCALE_DISCONNECT_SILENCE_MS);
-  serviceScaleWorkerDiscovery(lastScanCycleMs,lastConnectLogMs,
-      connectAttemptSeriesActive,scanSessionAtMs,scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.startScanCalls==0);
   hostMillis+=SCALE_DISCONNECT_SILENCE_MS;
-  serviceScaleWorkerDiscovery(lastScanCycleMs,lastConnectLogMs,
-      connectAttemptSeriesActive,scanSessionAtMs,scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(!scaleDiscoveryPaused()); CHECK(scale.startScanCalls==1);
 }
 
@@ -6015,17 +5994,13 @@ void d13c_disconnect_silence_clears_connecting_snapshot() {
   scale.connecting = false;
   scale.silenceArmed = true;
   scale.silenceStartedAtMs = hostMillis;
-  uint32_t lastScanCycleMs = 0, lastConnectLogMs = 0, scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  bool connectAttemptSeriesActive = false;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-      connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(!getScaleLinkSnapshot().connecting);
   CHECK(desiredScaleConnectedLedPattern(getScaleLinkSnapshot()) ==
         ScaleConnectedLedPattern::OFF);
   hostMillis += 2999;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-      connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.communicationSilenceRemainingMs() == 1);
   CHECK(scale.startScanCalls == 0);
   ++hostMillis;
@@ -6123,13 +6098,8 @@ void d02_first_mode_uses_name_scan() {
   runtimeConfig.scaleMacCacheMode =
       static_cast<uint8_t>(ScaleMacCacheMode::FIRST);
   scalePreferredMac[0] = '\0';
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(!scale.directedScan);
   CHECK(!scale.lastAddressScan);
@@ -6144,14 +6114,8 @@ void d02b_only_without_preferred_bootstraps_and_adopts_on_connect() {
   scalePreferredMac[0] = '\0';
   scalePreferredName[0] = '\0';
   scalePreferredMacDirty = false;
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(!scale.directedScan);
   CHECK(!scale.lastAddressScan);
@@ -6161,18 +6125,14 @@ void d02b_only_without_preferred_bootstraps_and_adopts_on_connect() {
   strncpy(scale.seenName, scale.connectedLocalName, sizeof(scale.seenName) - 1);
   scale.seenPending = true;
   hostMillis += SCALE_DISCOVERY_TICK_MS;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scalePreferredMac[0] == '\0');
   CHECK(!scalePreferredMacDirty);
 
   scale.pollScanConnects = true;
   scale.pollScanStepsToConnect = 1;
   hostMillis += SCALE_DISCOVERY_TICK_MS;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.connected);
   CHECK(preferredScaleMacEqual(scalePreferredMac, scale.connectedAddress));
   CHECK(strcmp(scalePreferredName, scale.connectedLocalName) == 0);
@@ -6217,14 +6177,8 @@ void d02e_mode_change_restarts_an_active_scan_with_the_new_filter() {
       static_cast<uint8_t>(ScaleMacCacheMode::FIRST);
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(!scale.directedScan);
   const size_t calls = scale.startScanCalls;
@@ -6233,9 +6187,7 @@ void d02e_mode_change_restarts_an_active_scan_with_the_new_filter() {
   candidate.scaleMacCacheMode =
       static_cast<uint8_t>(ScaleMacCacheMode::ONLY);
   commitLiveRuntimeConfig(candidate, RUNTIME_PERSIST_REASON_USER);
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.startScanCalls == calls + 1);
   CHECK(scale.scanning);
   CHECK(scale.directedScan);
@@ -6311,17 +6263,11 @@ void d03_scan_start_failed_retries_immediately() {
   resetHarness(false, false);
   reachReadyFromBoot();
   scale.startScanSucceeds = false;
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(!scale.scanning);
   CHECK(scale.startScanCalls == 1);
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.startScanCalls == 2);
   CHECK(!scale.scanning);
 }
@@ -6333,18 +6279,11 @@ void d04_full_cache_keeps_directed_scan() {
       static_cast<uint8_t>(ScaleMacCacheMode::ONLY);
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   for (uint8_t tick = 0; tick < 3; ++tick) {
     hostMillis += SCALE_DISCOVERY_TICK_MS;
-    serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                                connectAttemptSeriesActive,
-                                scanSessionAtMs, scanLastAdvertAtMs);
+    serviceScaleWorkerDiscovery(discovery);
   }
   CHECK(scale.scanning);
   CHECK(scale.directedScan);
@@ -6359,14 +6298,8 @@ void d05_hci_watchdog_force_restarts_same_filter() {
       static_cast<uint8_t>(ScaleMacCacheMode::ONLY);
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.startScanCalls == 1);
   CHECK(!scale.lastForceRestart);
   CHECK(scale.lastScanInterval == BLE_SCAN_BALANCED_INTERVAL);
@@ -6375,9 +6308,7 @@ void d05_hci_watchdog_force_restarts_same_filter() {
   size_t ticks = 0;
   while (scale.startScanCalls == callsBeforeRestart) {
     hostMillis += SCALE_DISCOVERY_TICK_MS;
-    serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                                connectAttemptSeriesActive,
-                                scanSessionAtMs, scanLastAdvertAtMs);
+    serviceScaleWorkerDiscovery(discovery);
     ++ticks;
     CHECK(ticks < 40);
   }
@@ -6396,28 +6327,18 @@ void d05b_scan_intensity_change_restarts_gap() {
       static_cast<uint8_t>(ScaleMacCacheMode::ONLY);
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.startScanCalls == 1);
   CHECK(scale.lastScanInterval == BLE_SCAN_BALANCED_INTERVAL);
   applyLiveBleScanIntensity(BleScanIntensity::RELAXED);
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.startScanCalls == 2);
   CHECK(scale.lastForceRestart);
   CHECK(scale.lastScanInterval == BLE_SCAN_RELAXED_INTERVAL);
   CHECK(scale.lastScanWindow == BLE_SCAN_RELAXED_WINDOW);
   const size_t calls = scale.startScanCalls;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.startScanCalls == calls);
 }
 
@@ -6428,17 +6349,15 @@ void d05c_scan_intensity_hci_presets() {
   CHECK(BLE_SCAN_BALANCED_WINDOW == 0x0032);
   CHECK(BLE_SCAN_AGGRESSIVE_INTERVAL == 0x0020);
   CHECK(BLE_SCAN_AGGRESSIVE_WINDOW == 0x0020);
-  uint16_t interval = 0;
-  uint16_t window = 0;
-  bleScanHciParams(BleScanIntensity::RELAXED, interval, window);
-  CHECK(interval == BLE_SCAN_RELAXED_INTERVAL);
-  CHECK(window == BLE_SCAN_RELAXED_WINDOW);
-  bleScanHciParams(BleScanIntensity::BALANCED, interval, window);
-  CHECK(interval == BLE_SCAN_BALANCED_INTERVAL);
-  CHECK(window == BLE_SCAN_BALANCED_WINDOW);
-  bleScanHciParams(BleScanIntensity::AGGRESSIVE, interval, window);
-  CHECK(interval == BLE_SCAN_AGGRESSIVE_INTERVAL);
-  CHECK(window == BLE_SCAN_AGGRESSIVE_WINDOW);
+  BleScanTiming scan = bleScanHciParams(BleScanIntensity::RELAXED);
+  CHECK(scan.interval == BLE_SCAN_RELAXED_INTERVAL);
+  CHECK(scan.window == BLE_SCAN_RELAXED_WINDOW);
+  scan = bleScanHciParams(BleScanIntensity::BALANCED);
+  CHECK(scan.interval == BLE_SCAN_BALANCED_INTERVAL);
+  CHECK(scan.window == BLE_SCAN_BALANCED_WINDOW);
+  scan = bleScanHciParams(BleScanIntensity::AGGRESSIVE);
+  CHECK(scan.interval == BLE_SCAN_AGGRESSIVE_INTERVAL);
+  CHECK(scan.window == BLE_SCAN_AGGRESSIVE_WINDOW);
   BleScanIntensity parsed = BleScanIntensity::RELAXED;
   CHECK(parseBleScanIntensityId("aggressive", parsed));
   CHECK(parsed == BleScanIntensity::AGGRESSIVE);
@@ -6456,14 +6375,8 @@ void d16_scale_connect_debug_reports_phases() {
   reachReadyFromBoot();
   debugLog.clear();
   ringRetainLogLevel = LogLevel::DEBUG;
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(debugEventExists(DebugCode::SCALE_SCAN_STARTED, SCALE_SCAN_TARGET_ANY,
                          static_cast<int32_t>(BleScanIntensity::BALANCED)));
   CHECK(!debugEventExists(DebugCode::SCALE_CONNECTING));
@@ -6472,9 +6385,7 @@ void d16_scale_connect_debug_reports_phases() {
   scale.scanning = false;
   scale.connectStep = 2;
   scale.connectAttempts = 1;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(debugEventExists(DebugCode::SCALE_GATT_CONNECTING, SCALE_SCAN_TARGET_ANY,
                          INT32_MIN));
   CHECK(debugEventExists(DebugCode::SCALE_CONNECT_ATTEMPT_FAILED, 1, 2));
@@ -6482,9 +6393,7 @@ void d16_scale_connect_debug_reports_phases() {
   scale.connectAttempts = 3;
   scale.pollScanFailsConnect = true;
   scale.disconnectReason = ScaleDisconnectReason::CONNECT_FAILED;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(debugEventExists(DebugCode::SCALE_CONNECT_ATTEMPT_FAILED, 3, 2));
   CHECK(debugEventExists(DebugCode::SCALE_CONNECT_FAILED, 4, 2));
 
@@ -6520,13 +6429,8 @@ void d06_forget_pauses_discovery_for_30s() {
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
   noteScaleHistory("AA:BB:CC:DD:EE:FF", "BOOKOO_SC 369041", false);
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(scale.directedScan);
   const size_t callsBeforeForget = scale.startScanCalls;
@@ -6538,19 +6442,16 @@ void d06_forget_pauses_discovery_for_30s() {
                                       forgottenName, sizeof(forgottenName)));
   CHECK(scalePreferredMac[0] == '\0');
   CHECK(scalePreferredMacDirty);
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(!scale.connected);
   CHECK(!scale.scanning);
   CHECK(scale.startScanCalls == callsBeforeForget);
   hostMillis += SCALE_PAIRING_DISCOVERY_PAUSE_MS - 1;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(!scale.scanning);
   CHECK(scale.startScanCalls == callsBeforeForget);
   hostMillis += 2;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs, scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(!scale.directedScan);
   CHECK(scale.lastStartScanMac[0] == '\0');
@@ -6563,22 +6464,14 @@ void d07_prefer_falls_back_after_grace() {
       static_cast<uint8_t>(ScaleMacCacheMode::PREFER);
   publishTestScaleWorkerPolicy();
   setHostPreferredScaleMac("AA:BB:CC:DD:EE:FF");
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(scale.directedScan);
   CHECK(!scale.lastAddressScan);
   const size_t callsBefore = scale.startScanCalls;
   hostMillis += SCALE_PREFER_FALLBACK_MS;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(!scale.directedScan);
   CHECK(!scale.lastAddressScan);
@@ -6598,14 +6491,8 @@ void d08_select_none_clears_without_pause() {
   CHECK(runtimeConfig.scaleMacCacheMode ==
         static_cast<uint8_t>(ScaleMacCacheMode::ONLY));
   CHECK(!scaleDiscoveryPaused());
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(!scale.directedScan);
 }
@@ -6621,14 +6508,8 @@ void d09_first_mode_connects_seen_advertisement() {
     entry = ScaleHistoryEntry{};
   }
   scaleHistorySeq = 0;
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   CHECK(!scale.directedScan);
   CHECK(scale.lastStartScanMac[0] == '\0');
@@ -6639,9 +6520,7 @@ void d09_first_mode_connects_seen_advertisement() {
   scale.pollScanConnects = true;
   scale.pollScanStepsToConnect = 1;
   hostMillis += SCALE_DISCOVERY_TICK_MS;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.connected);
   CHECK(getScaleLinkSnapshot().state == ScaleLinkState::CONNECTED);
   CHECK(preferredScaleMacEqual(scaleHistory[0].mac, "AA:BB:CC:DD:EE:FF"));
@@ -6659,22 +6538,14 @@ void d12_advertisement_history_does_not_dirty_persist() {
   }
   scaleHistorySeq = 0;
   scalePreferredMacDirty = false;
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   copyCString(scale.seenMac, sizeof(scale.seenMac), "AA:BB:CC:DD:EE:01");
   strncpy(scale.seenName, "LUNAR", sizeof(scale.seenName) - 1);
   scale.seenPending = true;
   scale.pollScanConnects = false;
   hostMillis += SCALE_DISCOVERY_TICK_MS;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(preferredScaleMacEqual(scaleHistory[0].mac, "AA:BB:CC:DD:EE:01"));
   CHECK(!scalePreferredMacDirty);
 
@@ -6684,9 +6555,7 @@ void d12_advertisement_history_does_not_dirty_persist() {
   strncpy(scale.seenName, "LUNAR", sizeof(scale.seenName) - 1);
   scale.seenPending = true;
   hostMillis += SCALE_DISCOVERY_TICK_MS;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.connected);
   CHECK(scalePreferredMacDirty);
 }
@@ -6694,20 +6563,12 @@ void d12_advertisement_history_does_not_dirty_persist() {
 void d10c_softap_yields_discovery() {
   resetHarness(false, false);
   reachReadyFromBoot();
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   hostMillis += SCALE_HUNT_RF_CLEAR_MS + 1;
   syncScaleSoftApRadio(true);
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(!scale.scanning);
   CHECK(!startScaleDiscoveryScan(nullptr, false));
 }
@@ -6718,14 +6579,8 @@ void d11_select_preferred_is_noop_when_unchanged() {
   reachReadyFromBoot();
   runtimeConfig.scaleMacCacheMode =
       static_cast<uint8_t>(ScaleMacCacheMode::FIRST);
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
-  serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                              connectAttemptSeriesActive, scanSessionAtMs,
-                              scanLastAdvertAtMs);
+  ScaleDiscoveryState discovery;
+  serviceScaleWorkerDiscovery(discovery);
   CHECK(scale.scanning);
   const size_t calls = scale.startScanCalls;
   selectPreferredScale("", "");
@@ -7006,21 +6861,21 @@ void w99i_bullseye_test_never_queues_mutable_custom_notes() {
 
 void w99g_bullseye_requires_one_second_of_exact_fresh_samples() {
   BullseyeTracker tracker;
-  tracker.arm(360, 1000, 3000, 10);
-  CHECK(!tracker.accept(36.0f, 3999, 11, 1000));
-  CHECK(!tracker.accept(36.0f, 4000, 12, 1000));
-  CHECK(!tracker.accept(35.99f, 4500, 13, 1000));
-  CHECK(!tracker.accept(36.0f, 5000, 14, 1000));
-  CHECK(tracker.accept(36.0f, 6000, 15, 1000));
+  tracker.arm({360, 1000, 3000, 10});
+  CHECK(!tracker.accept({36.0f, 3999, 11}, 1000));
+  CHECK(!tracker.accept({36.0f, 4000, 12}, 1000));
+  CHECK(!tracker.accept({35.99f, 4500, 13}, 1000));
+  CHECK(!tracker.accept({36.0f, 5000, 14}, 1000));
+  CHECK(tracker.accept({36.0f, 6000, 15}, 1000));
   CHECK(!tracker.pending);
 
-  tracker.arm(360, 1000, 3000, 20);
-  CHECK(!tracker.accept(36.0f, 60000, 21, 1000));
-  CHECK(tracker.accept(36.0f, 61000, 22, 1000));
+  tracker.arm({360, 1000, 3000, 20});
+  CHECK(!tracker.accept({36.0f, 60000, 21}, 1000));
+  CHECK(tracker.accept({36.0f, 61000, 22}, 1000));
 
-  tracker.arm(360, 1000, 3000, 30);
-  CHECK(!tracker.accept(36.0f, 4000, 31, 1000));
-  CHECK(!tracker.accept(36.0f, 5001, 32, 1000));
+  tracker.arm({360, 1000, 3000, 30});
+  CHECK(!tracker.accept({36.0f, 4000, 31}, 1000));
+  CHECK(!tracker.accept({36.0f, 5001, 32}, 1000));
   CHECK(tracker.targetSampleCount == 1);
   CHECK(tracker.pending);
 }
@@ -7038,7 +6893,7 @@ void w99h_bullseye_service_runs_only_in_buzzer_only_mode() {
   markScaleWorkerProgress();
   cupPresence.state = CupPresenceState::PRESENT;
   cupPresence.placementId = 7;
-  bullseyeTracker.arm(360, hostMillis, 3000, 10, cupPresencePlacementId());
+  bullseyeTracker.arm({360, hostMillis, 3000, 10, cupPresencePlacementId()});
   currentWeight = 36.0f;
   currentWeightSequence = 11;
   currentWeightReceivedAtMs = 4000;
@@ -7055,8 +6910,7 @@ void w99h_bullseye_service_runs_only_in_buzzer_only_mode() {
   CHECK(localBuzzer.activeCue == BuzzerCue::BULLSEYE);
 
   localBuzzer.stopAll();
-  bullseyeTracker.arm(360, hostMillis, 0, currentWeightSequence,
-                      cupPresencePlacementId());
+  bullseyeTracker.arm({360, hostMillis, 0, currentWeightSequence, cupPresencePlacementId()});
   ++cupPresence.placementId;
   serviceBullseyeMelody();
   CHECK(!bullseyeTracker.pending);
@@ -7064,8 +6918,7 @@ void w99h_bullseye_service_runs_only_in_buzzer_only_mode() {
 
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::SCALE_PRIORITY);
-  bullseyeTracker.arm(360, hostMillis, 3000, currentWeightSequence,
-                      cupPresencePlacementId());
+  bullseyeTracker.arm({360, hostMillis, 3000, currentWeightSequence, cupPresencePlacementId()});
   ++currentWeightSequence;
   currentWeightReceivedAtMs = hostMillis + 100;
   hostMillis += 100;
@@ -10590,7 +10443,7 @@ void it22_worker_preserves_capture_time_and_zero_boundary() {
   idleCup(80.0f);
   ScaleCommand command;
   CHECK(xQueueReceive(scaleCommandQueue, &command, 0) == pdTRUE);
-  CHECK(claimIdleScaleTare(command.idleTareRequestId, 0, 41));
+  CHECK(claimIdleScaleTare(command.idleTareRequestId, {.captureBoundary = 41}));
   scale.weight = 0.0f;
   scale.weightCapturedAtMs = hostMillis;
   scale.weightCaptureSequence = 41; // Captured before claim in the same ms.
@@ -10653,7 +10506,7 @@ void it25_capture_and_packet_wrap_preserve_order() {
   idleCup(80.0f);
   ScaleCommand command;
   CHECK(xQueueReceive(scaleCommandQueue, &command, 0) == pdTRUE);
-  CHECK(claimIdleScaleTare(command.idleTareRequestId, 0, UINT32_MAX));
+  CHECK(claimIdleScaleTare(command.idleTareRequestId, {.captureBoundary = UINT32_MAX}));
   scale.weight = 0.0f;
   scale.weightCapturedAtMs = hostMillis;
   scale.weightCaptureSequence = 1;
@@ -14083,7 +13936,7 @@ void s02g_full_cycle_sub_one_gram_updates_last_shot_and_stores_bad() {
   currentWeightReceivedAtMs = hostMillis;
   session.hasWeightAnchor = true;
   session.lastAcceptedWeightG = 0.5f;
-  acceptWeightIntoTrajectory(0.5f, hostMillis, currentWeightSequence);
+  acceptWeightIntoTrajectory({0.5f, hostMillis, currentWeightSequence});
   releaseAtPhysicalDuration(rawOnAt, 12000);
   // Last shot updates immediately at cycle end (before drip delay).
   CHECK(persistedLastShot.valid);
@@ -14116,11 +13969,11 @@ void s02c_shot_curve_samples_on_half_second_grid_and_latches_slow() {
   session.circuitClosedAtMs = hostMillis;
   resetShotTrajectory(hostMillis);
   CHECK(shotCurveSampler.count == 0);
-  acceptWeightIntoTrajectory(0.2f, hostMillis, 1);
+  acceptWeightIntoTrajectory({0.2f, hostMillis, 1});
   CHECK(shotCurveSampler.count == 1);
   CHECK(curvePoint(shotCurveSampler, 0).cg == 20);
   hostMillis += 2100;
-  acceptWeightIntoTrajectory(8.5f, hostMillis, 2);
+  acceptWeightIntoTrajectory({8.5f, hostMillis, 2});
   CHECK(shotCurveSampler.count == 2);
   CHECK(curvePoint(shotCurveSampler, 1).cg == 850);
   CHECK(curvePoint(shotCurveSampler, 1).atMs == 2100);
@@ -14128,7 +13981,7 @@ void s02c_shot_curve_samples_on_half_second_grid_and_latches_slow() {
   CHECK(shotCurveSampler.extended.atMs == 2100);
   CHECK(shotCurveSampler.extended.weightCg == 1200);
   hostMillis += 4000;
-  acceptWeightIntoTrajectory(18.0f, hostMillis, 3);
+  acceptWeightIntoTrajectory({18.0f, hostMillis, 3});
   session.lastAcceptedWeightG = 18.0f;
   shot.automaticBrew = true;
   session.config.timerOnly = false;
@@ -14223,9 +14076,9 @@ void s02l_post_drip_curve_keeps_observations_and_rejection_gaps() {
   session.startedAtMs = session.circuitClosedAtMs = hostMillis;
   resetShotTrajectory(hostMillis);
   const uint32_t start = hostMillis;
-  acceptWeightIntoTrajectory(0, start, 1);
+  acceptWeightIntoTrajectory({0, start, 1});
   hostMillis = start + 28000;
-  acceptWeightIntoTrajectory(36, hostMillis, 2);
+  acceptWeightIntoTrajectory({36, hostMillis, 2});
   currentWeight = 36;
   currentWeightSequence = 2;
   currentWeightReceivedAtMs = hostMillis;
@@ -14280,7 +14133,7 @@ void s02d_shot_curve_latches_first_drop_fast_and_atm() {
   session.weightControlState = WeightControlState::ACTIVE;
   resetShotTrajectory(hostMillis);
   const uint32_t t0 = hostMillis;
-  acceptWeightIntoTrajectory(0.5f, hostMillis, 1);
+  acceptWeightIntoTrajectory({0.5f, hostMillis, 1});
   hostMillis = t0 + 4557;
   session.lastAcceptedWeightG = 4.0f;
   onFirstDropsDetected({hostMillis, 4.0f});
@@ -14288,7 +14141,7 @@ void s02d_shot_curve_latches_first_drop_fast_and_atm() {
   CHECK(shotCurveSampler.firstDrop.weightCg == 400);
   hostMillis = t0 + 13313;
   session.lastAcceptedWeightG = 36.0f;
-  acceptWeightIntoTrajectory(36.0f, hostMillis, 2);
+  acceptWeightIntoTrajectory({36.0f, hostMillis, 2});
   latchCutLineForTest(true, 36.0f, hostMillis);
   CHECK(shotCurveSampler.extended.atMs == 13313);
   CHECK(shotCurveSampler.extended.weightCg == 3600);
@@ -14338,7 +14191,7 @@ void s02d_shot_curve_latches_first_drop_fast_and_atm() {
   session.lastAcceptedWeightG = 28.0f;
   resetShotTrajectory(hostMillis);
   const uint32_t t1 = hostMillis;
-  acceptWeightIntoTrajectory(28.0f, hostMillis, 10);
+  acceptWeightIntoTrajectory({28.0f, hostMillis, 10});
   hostMillis = t1 + 12000;
   setWeightControlState(WeightControlState::SUSPENDED);
   CHECK(shotCurveSampler.atm.atMs == 12000);
@@ -14429,14 +14282,14 @@ void verifySettledCurveEndpointForCut(EndReason reason, bool slowExtended,
   resetShotTrajectory(hostMillis);
   const uint32_t t0 = hostMillis;
 
-  acceptWeightIntoTrajectory(20.0f, t0, 1);
+  acceptWeightIntoTrajectory({20.0f, t0, 1});
   if (slowExtended) {
     hostMillis = t0 + durationMs - 2200U;
-    acceptWeightIntoTrajectory(34.0f, hostMillis, 2);
+    acceptWeightIntoTrajectory({34.0f, hostMillis, 2});
     latchCutLineForTest(false, 34.0f, hostMillis);
   }
   hostMillis = t0 + durationMs;
-  acceptWeightIntoTrajectory(36.0f, hostMillis, 3);
+  acceptWeightIntoTrajectory({36.0f, hostMillis, 3});
   currentWeight = 36.0f;
   currentWeightSequence = 3;
   currentWeightReceivedAtMs = hostMillis;
@@ -15370,7 +15223,7 @@ void s18_last_shot_keeps_no_scale_guard_from_cycle() {
   fresh.packetSequence = ++currentWeightSequence;
   publishScaleEvent(fresh, false);
   processScaleWorkerEvents();
-  acceptWeightIntoTrajectory(18.0f, hostMillis, currentWeightSequence);
+  acceptWeightIntoTrajectory({18.0f, hostMillis, currentWeightSequence});
   session.lastAcceptedWeightG = 18.0f;
   session.hasWeightAnchor = true;
   releaseAtPhysicalDuration(rawOnAt, 12000);
@@ -15789,9 +15642,8 @@ void bc06_micra_scan_override_selects_discovery_duty() {
   CHECK(discoveryScanIntensity() == BleScanIntensity::AGGRESSIVE);
   CHECK(liveBleScanIntensity() == BleScanIntensity::RELAXED);
   CHECK(startScaleDiscoveryScan(nullptr, false));
-  uint16_t interval = 0, window = 0;
-  bleScanHciParams(BleScanIntensity::AGGRESSIVE, interval, window);
-  CHECK(scale.lastScanInterval == interval && scale.lastScanWindow == window);
+  BleScanTiming scan = bleScanHciParams(BleScanIntensity::AGGRESSIVE);
+  CHECK(scale.lastScanInterval == scan.interval && scale.lastScanWindow == scan.window);
 
   // The opposite override demotes even a saved Aggressive preference.
   applyLiveBleScanIntensity(BleScanIntensity::AGGRESSIVE);
@@ -15800,8 +15652,8 @@ void bc06_micra_scan_override_selects_discovery_duty() {
   CHECK(liveBleScanIntensity() == BleScanIntensity::AGGRESSIVE);
   // The running scan reconfigures only when the effective duty changes.
   serviceScaleScanIntensity();
-  bleScanHciParams(BleScanIntensity::RELAXED, interval, window);
-  CHECK(scale.lastScanInterval == interval && scale.lastScanWindow == window);
+  scan = bleScanHciParams(BleScanIntensity::RELAXED);
+  CHECK(scale.lastScanInterval == scan.interval && scale.lastScanWindow == scan.window);
   const size_t restarts = scale.startScanCalls;
   serviceScaleScanIntensity();
   CHECK(scale.startScanCalls == restarts);
@@ -15813,8 +15665,8 @@ void bc06_micra_scan_override_selects_discovery_duty() {
   CHECK(discoveryScanIntensity() == BleScanIntensity::AGGRESSIVE);
   powerAppliedProfile.store(PowerProfile::OFF);
   serviceScaleScanIntensity();
-  bleScanHciParams(BleScanIntensity::AGGRESSIVE, interval, window);
-  CHECK(scale.lastScanInterval == interval && scale.lastScanWindow == window);
+  scan = bleScanHciParams(BleScanIntensity::AGGRESSIVE);
+  CHECK(scale.lastScanInterval == scan.interval && scale.lastScanWindow == scan.window);
 
   // Time without scale evidence never demotes discovery on its own.
   hostMillis += 3600UL * 1000UL;
@@ -19189,128 +19041,128 @@ void at15_touch_fallback_preset_presence() {
 
 void ff01_classifier_seeking_touch_and_release() {
   FirstFlowState state;
-  CHECK(stepFirstFlow(state, 0.35f, 100, 1, 0.0f) == FirstFlowClass::CANDIDATE);
-  CHECK(stepFirstFlow(state, 0.40f, 200, 2, 0.0f) == FirstFlowClass::FIRE);
+  CHECK(stepFirstFlow(state, {0.35f, 100, 1}, 0.0f) == FirstFlowClass::CANDIDATE);
+  CHECK(stepFirstFlow(state, {0.40f, 200, 2}, 0.0f) == FirstFlowClass::FIRE);
   CHECK(state.candidateMs == 100);
   CHECK(fabsf(state.candidateWeightG - 0.35f) < 0.001f);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 0.4f, 100, 1, 0.0f) == FirstFlowClass::CANDIDATE);
-  CHECK(stepFirstFlow(state, 0.9f, 200, 2, 0.0f) == FirstFlowClass::FIRE);
-  CHECK(stepFirstFlow(state, 1.5f, 300, 3, 0.0f) == FirstFlowClass::FIRE);
-  CHECK(stepFirstFlow(state, 2.4f, 400, 4, 0.0f) == FirstFlowClass::FIRE);
+  CHECK(stepFirstFlow(state, {0.4f, 100, 1}, 0.0f) == FirstFlowClass::CANDIDATE);
+  CHECK(stepFirstFlow(state, {0.9f, 200, 2}, 0.0f) == FirstFlowClass::FIRE);
+  CHECK(stepFirstFlow(state, {1.5f, 300, 3}, 0.0f) == FirstFlowClass::FIRE);
+  CHECK(stepFirstFlow(state, {2.4f, 400, 4}, 0.0f) == FirstFlowClass::FIRE);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 3.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 3.1f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 3.05f, 300, 3, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {3.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {3.1f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {3.05f, 300, 3}, 0.0f) == FirstFlowClass::TOUCH);
   CHECK(state.phase == FirstFlowPhase::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 0.0f, 200, 2, 0.0f) == FirstFlowClass::NONE);
-  CHECK(stepFirstFlow(state, 0.05f, 300, 3, 0.0f) == FirstFlowClass::NONE);
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {0.0f, 200, 2}, 0.0f) == FirstFlowClass::NONE);
+  CHECK(stepFirstFlow(state, {0.05f, 300, 3}, 0.0f) == FirstFlowClass::NONE);
   CHECK(state.phase == FirstFlowPhase::SEEKING);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.2f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 0.0f, 300, 3, 0.0f) == FirstFlowClass::NONE);
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {1.2f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {0.0f, 300, 3}, 0.0f) == FirstFlowClass::NONE);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.2f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.3f, 300, 3, 0.0f) == FirstFlowClass::FIRE);
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {1.2f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {1.3f, 300, 3}, 0.0f) == FirstFlowClass::FIRE);
   CHECK(state.candidateMs == 200);
   CHECK(fabsf(state.candidateWeightG - 1.2f) < 0.001f);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 4.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 5.9f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 6.1f, 300, 3, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 6.2f, 400, 4, 0.0f) == FirstFlowClass::FIRE);
+  CHECK(stepFirstFlow(state, {4.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {5.9f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {6.1f, 300, 3}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {6.2f, 400, 4}, 0.0f) == FirstFlowClass::FIRE);
   CHECK(state.candidateMs == 100);
   CHECK(fabsf(state.candidateWeightG - 4.0f) < 0.001f);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 200.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 200.2f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 199.8f, 300, 3, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {200.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {200.2f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {199.8f, 300, 3}, 0.0f) == FirstFlowClass::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 160.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 150.0f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 150.1f, 300, 3, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {160.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {150.0f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {150.1f, 300, 3}, 0.0f) == FirstFlowClass::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 150.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 150.4f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 150.8f, 300, 3, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {150.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {150.4f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {150.8f, 300, 3}, 0.0f) == FirstFlowClass::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 3.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 3.4f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 3.8f, 300, 3, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {3.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {3.4f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {3.8f, 300, 3}, 0.0f) == FirstFlowClass::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 6.0f, 200, 2, 0.0f) == FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 6.1f, 300, 3, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {6.0f, 200, 2}, 0.0f) == FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {6.1f, 300, 3}, 0.0f) == FirstFlowClass::TOUCH);
 }
 
 void ff12_cupmin_parameter_gates_touch_and_residual() {
   FirstFlowState state;
-  CHECK(stepFirstFlow(state, 15.0f, 100, 1, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {15.0f, 100, 1}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 15.4f, 200, 2, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {15.4f, 200, 2}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 15.8f, 300, 3, 0.0f, 10.0f) ==
-        FirstFlowClass::TOUCH);
-
-  resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 18.0f, 100, 1, 0.0f, 15.0f) ==
-        FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 18.4f, 200, 2, 0.0f, 15.0f) ==
+  CHECK(stepFirstFlow(state, {15.8f, 300, 3}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {18.0f, 100, 1}, 0.0f, 15.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 12.0f, 200, 2, 0.0f, 10.0f) ==
-        FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 15.0f, 300, 3, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {18.4f, 200, 2}, 0.0f, 15.0f) ==
         FirstFlowClass::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.2f, 200, 2, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {12.0f, 200, 2}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.3f, 300, 3, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {15.0f, 300, 3}, 0.0f, 10.0f) ==
+        FirstFlowClass::TOUCH);
+
+  resetFirstFlowState(state);
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f, 10.0f) ==
+        FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {1.2f, 200, 2}, 0.0f, 10.0f) ==
+        FirstFlowClass::TOUCH);
+  CHECK(stepFirstFlow(state, {1.3f, 300, 3}, 0.0f, 10.0f) ==
         FirstFlowClass::FIRE);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f, 15.0f) ==
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f, 15.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.2f, 200, 2, 0.0f, 15.0f) ==
+  CHECK(stepFirstFlow(state, {1.2f, 200, 2}, 0.0f, 15.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.3f, 300, 3, 0.0f, 15.0f) ==
+  CHECK(stepFirstFlow(state, {1.3f, 300, 3}, 0.0f, 15.0f) ==
         FirstFlowClass::FIRE);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 8.0f, 100, 1, 0.0f, 5.0f) ==
+  CHECK(stepFirstFlow(state, {8.0f, 100, 1}, 0.0f, 5.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.2f, 200, 2, 0.0f, 5.0f) ==
+  CHECK(stepFirstFlow(state, {1.2f, 200, 2}, 0.0f, 5.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.3f, 300, 3, 0.0f, 5.0f) ==
+  CHECK(stepFirstFlow(state, {1.3f, 300, 3}, 0.0f, 5.0f) ==
         FirstFlowClass::TOUCH);
 
   resetFirstFlowState(state);
-  CHECK(stepFirstFlow(state, 15.0f, 100, 1, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {15.0f, 100, 1}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.2f, 200, 2, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {1.2f, 200, 2}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
-  CHECK(stepFirstFlow(state, 1.3f, 300, 3, 0.0f, 10.0f) ==
+  CHECK(stepFirstFlow(state, {1.3f, 300, 3}, 0.0f, 10.0f) ==
         FirstFlowClass::TOUCH);
 }
 
@@ -19361,8 +19213,9 @@ void at01_classifier_startup_and_trend_math() {
     weights[i] = 10.0f + 1.5f * times[i];
   }
   auto residual = [&](size_t n, float epochS, float weight, float nowS) {
-    return accidentalTouchResidual(times, weights, n, epochS, weights[n - 1],
-                                   times[n - 1], weight, nowS);
+    return accidentalTouchResidual({.timeS = times, .weightG = weights, .datapoints = n,
+                                    .epochS = epochS, .anchorG = weights[n - 1],
+                                    .anchorS = times[n - 1], .weight = weight, .nowS = nowS});
   };
   AccidentalTouchResidual r = residual(20, 0.0f, 13.0f, 2.0f);
   CHECK(r.frozen && fabsf(r.residualG) < 0.01f);
@@ -19371,7 +19224,8 @@ void at01_classifier_startup_and_trend_math() {
   r = residual(3, 0.0f, 10.45f, 0.3f);  // Young: flow from the whole history.
   CHECK(!r.frozen && fabsf(r.residualG) < 0.01f);
   CHECK(!residual(20, 1.55f, 13.0f, 2.0f).frozen);  // Level shift at 1.55 s.
-  r = accidentalTouchResidual(times, weights, 0, 0.0f, 0.0f, -0.3f, 2.0f, 0.0f);
+  r = accidentalTouchResidual({.timeS = times, .weightG = weights, .anchorS = -0.3f,
+                               .weight = 2.0f});
   CHECK(!r.frozen && r.residualG == 0.0f);  // Pre-cycle anchor: no trend.
 
   CHECK(classifyAccidentalTouch(1.4f, false, 0, nullptr, 0) ==
@@ -19665,7 +19519,7 @@ void ff17_noise_adaptive_threshold_and_rate_gate() {
     uint32_t atMs = 1000;
     for (int i = 0; i < 200; ++i, atMs += 100) {
       const float sample = (noise() + noise() + noise()) * 0.30f;
-      if (stepFirstFlow(state, sample, atMs, i + 1, 0.0f) ==
+      if (stepFirstFlow(state, {sample, atMs, static_cast<uint32_t>(i + 1)}, 0.0f) ==
           FirstFlowClass::FIRE) {
         fired = true;
       }
@@ -19682,7 +19536,7 @@ void ff17_noise_adaptive_threshold_and_rate_gate() {
     uint32_t atMs = 1000;
     for (int i = 1; i <= 6 && classified != FirstFlowClass::FIRE;
          ++i, atMs += 100) {
-      classified = stepFirstFlow(state, 0.1f * i, atMs, i, 0.0f);
+      classified = stepFirstFlow(state, {0.1f * i, atMs, static_cast<uint32_t>(i)}, 0.0f);
     }
     CHECK(classified == FirstFlowClass::FIRE);
   }
@@ -19693,7 +19547,7 @@ void ff17_noise_adaptive_threshold_and_rate_gate() {
     uint32_t atMs = 1000;
     for (int i = 1; i <= 40 && classified != FirstFlowClass::FIRE;
          ++i, atMs += 100) {
-      classified = stepFirstFlow(state, 0.015f * i, atMs, i, 0.0f);
+      classified = stepFirstFlow(state, {0.015f * i, atMs, static_cast<uint32_t>(i)}, 0.0f);
     }
     CHECK(classified == FirstFlowClass::FIRE);
   }
@@ -19703,7 +19557,7 @@ void ff17_noise_adaptive_threshold_and_rate_gate() {
     bool fired = false;
     uint32_t atMs = 1000;
     for (int i = 1; i <= 600; ++i, atMs += 100) {
-      if (stepFirstFlow(state, 0.003f * i, atMs, i, 0.0f) ==
+      if (stepFirstFlow(state, {0.003f * i, atMs, static_cast<uint32_t>(i)}, 0.0f) ==
           FirstFlowClass::FIRE) {
         fired = true;
       }
@@ -19724,12 +19578,11 @@ void ff17_noise_adaptive_threshold_and_rate_gate() {
     int q = 0;
     for (int i = 0; i < 30 && classified != FirstFlowClass::FIRE;
          ++i, ++q, atMs += 100) {
-      classified = stepFirstFlow(state, jitter() * 0.6f, atMs, q + 1, 0.0f);
+      classified = stepFirstFlow(state, {jitter() * 0.6f, atMs, static_cast<uint32_t>(q + 1)}, 0.0f);
     }
     for (int i = 1; i <= 150 && classified != FirstFlowClass::FIRE;
          ++i, ++q, atMs += 100) {
-      classified = stepFirstFlow(state, 0.015f * i + jitter(), atMs, q + 1,
-                                 0.0f);
+      classified = stepFirstFlow(state, {0.015f * i + jitter(), atMs, static_cast<uint32_t>(q + 1)}, 0.0f);
     }
     CHECK(classified == FirstFlowClass::FIRE);
     CHECK(firstFlowEffectiveThresholdG(state) <= 0.91f);  // Cap holds.
@@ -19743,7 +19596,7 @@ void ff17_noise_adaptive_threshold_and_rate_gate() {
     for (int i = 0; i < 260; ++i, atMs += 100) {
       // Jump to 5 g, then creep +0.005 g/sample (0.05 g/s) to ~+1.3 g.
       const float weight = i == 0 ? 5.0f : 5.0f + 0.005f * i;
-      if (stepFirstFlow(state, weight, atMs, i + 1, 0.0f) ==
+      if (stepFirstFlow(state, {weight, atMs, static_cast<uint32_t>(i + 1)}, 0.0f) ==
           FirstFlowClass::FIRE) {
         fired = true;
       }
@@ -19761,7 +19614,7 @@ void ff21_first_flow_hardening() {
     bool fired = false;
     uint32_t atMs = 1000;
     for (int i = 0; i < 600; ++i, atMs += 100) {
-      fired |= stepFirstFlow(state, 0.4f + 0.0003f * i, atMs, i + 1, 0.0f) ==
+      fired |= stepFirstFlow(state, {0.4f + 0.0003f * i, atMs, static_cast<uint32_t>(i + 1)}, 0.0f) ==
                FirstFlowClass::FIRE;
     }
     CHECK(!fired);
@@ -19772,12 +19625,12 @@ void ff21_first_flow_hardening() {
   // the same step within 100 ms is a touch.
   for (uint32_t gapMs : {2000U, 100U}) {
     FirstFlowState state;
-    CHECK(stepFirstFlow(state, 0.0f, 1000, 1, 0.0f) == FirstFlowClass::NONE);
-    const FirstFlowClass jump = stepFirstFlow(state, 6.0f, 1000 + gapMs, 2, 0.0f);
+    CHECK(stepFirstFlow(state, {0.0f, 1000, 1}, 0.0f) == FirstFlowClass::NONE);
+    const FirstFlowClass jump = stepFirstFlow(state, {6.0f, 1000 + gapMs, 2}, 0.0f);
     CHECK((jump == FirstFlowClass::TOUCH) == (gapMs == 100U));
     if (gapMs == 2000U) {
       CHECK(state.phase == FirstFlowPhase::SEEKING);
-      CHECK(stepFirstFlow(state, 6.3f, 1100 + gapMs, 3, 0.0f) == FirstFlowClass::FIRE);
+      CHECK(stepFirstFlow(state, {6.3f, 1100 + gapMs, 3}, 0.0f) == FirstFlowClass::FIRE);
     }
   }
   // F23: a vibration burst alternating around an offset never confirms;
@@ -19788,13 +19641,13 @@ void ff21_first_flow_hardening() {
     uint32_t atMs = 1000;
     int seq = 1;
     for (float w : {0.5f, 0.4f, 0.9f, 0.4f, 0.9f, 0.4f, 0.9f, 0.4f}) {
-      fired |= stepFirstFlow(state, w, atMs, seq++, 0.0f) == FirstFlowClass::FIRE;
+      fired |= stepFirstFlow(state, {w, atMs, static_cast<uint32_t>(seq++)}, 0.0f) == FirstFlowClass::FIRE;
       atMs += 100;
     }
     CHECK(!fired);
     FirstFlowState onset;
-    CHECK(stepFirstFlow(onset, 0.4f, 1000, 1, 0.0f) == FirstFlowClass::CANDIDATE);
-    CHECK(stepFirstFlow(onset, 0.6f, 1100, 2, 0.0f) == FirstFlowClass::FIRE);
+    CHECK(stepFirstFlow(onset, {0.4f, 1000, 1}, 0.0f) == FirstFlowClass::CANDIDATE);
+    CHECK(stepFirstFlow(onset, {0.6f, 1100, 2}, 0.0f) == FirstFlowClass::FIRE);
   }
 }
 
@@ -19804,11 +19657,13 @@ void ff22_small_cup_min_gush_fires_through_touch() {
   for (float rise : {0.3f, 0.0f}) {
     for (float jumpG : {8.0f, 12.0f}) {
       FirstFlowState state;
-      CHECK(stepFirstFlow(state, 0.0f, 1000, 1, 0.0f, 2.0f) == FirstFlowClass::NONE);
-      CHECK(stepFirstFlow(state, jumpG, 1100, 2, 0.0f, 2.0f) == FirstFlowClass::TOUCH);
+      CHECK(stepFirstFlow(state, {0.0f, 1000, 1}, 0.0f, 2.0f) == FirstFlowClass::NONE);
+      CHECK(stepFirstFlow(state, {jumpG, 1100, 2}, 0.0f, 2.0f) == FirstFlowClass::TOUCH);
       bool fired = false;
       for (int i = 1; i <= 12; ++i) {
-        fired |= stepFirstFlow(state, jumpG + rise * i, 1100 + 100 * i, 2 + i,
+        fired |= stepFirstFlow(state,
+                               {jumpG + rise * i, static_cast<uint32_t>(1100 + 100 * i),
+                                static_cast<uint32_t>(2 + i)},
                                0.0f, 2.0f) == FirstFlowClass::FIRE;
       }
       CHECK(fired == (rise > 0.0f));
@@ -22616,19 +22471,18 @@ void pow02_idle_scan_preserves_saved_preference() {
   // management no longer demotes an idle discovery scan to Relaxed.
   powerAppliedProfile.store(PowerProfile::IDLE);
   CHECK(startScaleDiscoveryScan(nullptr, false));
-  uint16_t interval = 0, window = 0;
-  bleScanHciParams(BleScanIntensity::AGGRESSIVE, interval, window);
-  CHECK(scale.lastScanInterval == interval && scale.lastScanWindow == window);
+  BleScanTiming scan = bleScanHciParams(BleScanIntensity::AGGRESSIVE);
+  CHECK(scale.lastScanInterval == scan.interval && scale.lastScanWindow == scan.window);
   CHECK(discoveryScanIntensity() == BleScanIntensity::AGGRESSIVE);
   CHECK(liveBleScanIntensity() == BleScanIntensity::AGGRESSIVE);
   // Hours without any scale evidence keep the saved duty too; only the
   // Micra override or a saved-mode change may alter discovery.
   hostMillis += 2UL * 3600UL * 1000UL;
   serviceScaleScanIntensity();
-  CHECK(scale.lastScanInterval == interval && scale.lastScanWindow == window);
+  CHECK(scale.lastScanInterval == scan.interval && scale.lastScanWindow == scan.window);
   powerAppliedProfile.store(PowerProfile::OFF);
   serviceScaleScanIntensity();
-  CHECK(scale.lastScanInterval == interval && scale.lastScanWindow == window);
+  CHECK(scale.lastScanInterval == scan.interval && scale.lastScanWindow == scan.window);
   // Radio sleep still follows the power policy and scale activity: the
   // hardware path keeps working while scan duty stays independent.
   CHECK(syncScalePower());
@@ -22992,9 +22846,9 @@ void home01_stream_lifecycle_uses_canonical_final_record() {
   session.startedAtMs = session.circuitClosedAtMs = hostMillis;
   const uint32_t start = hostMillis;
   resetShotTrajectory(start);
-  acceptWeightIntoTrajectory(0, start, 1);
+  acceptWeightIntoTrajectory({0, start, 1});
   hostMillis = start + 14010;
-  acceptWeightIntoTrajectory(36, hostMillis, 2);
+  acceptWeightIntoTrajectory({36, hostMillis, 2});
   currentWeight = 36;
   currentWeightSequence = 2;
   currentWeightReceivedAtMs = hostMillis;
@@ -23070,9 +22924,9 @@ void home02_nonqualifying_resolution_preserves_cutoff_and_endpoint() {
     session.startedAtMs = session.circuitClosedAtMs = hostMillis;
     const uint32_t start = hostMillis;
     resetShotTrajectory(start);
-    acceptWeightIntoTrajectory(0, start, 1);
+    acceptWeightIntoTrajectory({0, start, 1});
     hostMillis = start + 10057;
-    acceptWeightIntoTrajectory(20, hostMillis, 2);
+    acceptWeightIntoTrajectory({20, hostMillis, 2});
     currentWeight = 20;
     currentWeightSequence = 2;
     currentWeightReceivedAtMs = hostMillis;
@@ -23119,7 +22973,7 @@ void home02_nonqualifying_resolution_preserves_cutoff_and_endpoint() {
     resetShotTrajectory(start);
     hostMillis += 2057;
     if (weighted) {
-      acceptWeightIntoTrajectory(2, hostMillis, 2);
+      acceptWeightIntoTrajectory({2, hostMillis, 2});
       currentWeight = 2;
       currentWeightSequence = 2;
       currentWeightReceivedAtMs = hostMillis;
@@ -23149,7 +23003,7 @@ void home03_active_flow_requires_fresh_baseline_and_confirmed_drop() {
   session.scaleBaselineReady = true;
   session.scaleBaselineG = 80;
   session.firstDropMs = start + 2000;
-  acceptWeightIntoTrajectory(100, hostMillis, 2);
+  acceptWeightIntoTrajectory({100, hostMillis, 2});
   currentWeight = 100;
   currentWeightSequence = 2;
   currentWeightReceivedAtMs = hostMillis;
@@ -23521,7 +23375,8 @@ void trc03_end_counters_are_exact() {
   shotTrace().begin(1000);
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   for (uint32_t i = 0; i < 5000; ++i)
-    scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, 1000 + i, 0, i, 1.0f, i, 0);
+    scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, 1000 + i,
+                          {.sequence = i, .weightG = 1.0f, .arg1 = i});
   for (uint32_t atMs : {1100U, 1150U, 1400U, 1500U}) shotTrace().noteReading(atMs);
   shotTrace().noteHeld();
   shotTrace().noteHeld();
@@ -23529,21 +23384,23 @@ void trc03_end_counters_are_exact() {
   shotTrace().noteMicraRx(100);
   shotTrace().noteMicraRx(50);
   for (int i = 0; i < 3; ++i) shotTrace().noteUiDeferral();
-  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 1600, 0, 0, NAN, 900, 0);
-  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 1700, 0, 0, 12.34f,
-                        static_cast<uint32_t>(DebugCode::SCALE_SAMPLE_REJECTED_RECOVERY), 999);
-  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 1800, 0, 0, NAN,
-                        static_cast<uint32_t>(DebugCode::BOOT_READY), 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 1600, {.arg1 = 900});
+  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 1700,
+                        {.weightG = 12.34f,
+                         .arg1 = static_cast<uint32_t>(DebugCode::SCALE_SAMPLE_REJECTED_RECOVERY),
+                         .arg2 = 999});
+  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 1800,
+                        {.arg1 = static_cast<uint32_t>(DebugCode::BOOT_READY)});
   shotTrace().noteDebug(DebugCode::SCALE_PACKET_GAP, 1, 900, 1600);  // Twin: skipped.
-  scaleProfileNoteDroppedFrame(true, true, 1.0f, 1600, 1, 1, 8, 1600);
-  scaleProfileNoteDroppedFrame(false, false, NAN, 1600, 1, 2, 8, 1600);
-  scaleProfileNoteDroppedFrame(false, false, NAN, 1600, 1, 3, 8, 1600);
+  scaleProfileNoteDroppedFrame({{1, 1}, 1600, 1.0f}, 8, true, true, 1600);
+  scaleProfileNoteDroppedFrame({{1, 2}, 1600, NAN}, 8, false, false, 1600);
+  scaleProfileNoteDroppedFrame({{1, 3}, 1600, NAN}, 8, false, false, 1600);
   shotTrace().noteConfirmationReset();
   shotTrace().complete(9, 4, 2000, static_cast<uint8_t>(EndReason::SCALE_THRESHOLD));
   // Out of the window nothing counts.
   shotTrace().noteMicraRx(1000);
   shotTrace().noteUiDeferral();
-  scaleProfileNoteDroppedFrame(true, true, 1.0f, 2100, 1, 4, 8, 2100);
+  scaleProfileNoteDroppedFrame({{1, 4}, 2100, 1.0f}, 8, true, true, 2100);
   Trace trace;
   CHECK(shot_trace_test::decodeCompleted(trace));
   const ShotTraceCounters &counters = trace.counters;
@@ -23577,8 +23434,9 @@ void trc04_verbose_events_truncate_first_and_time_passes_65_s() {
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   // Rejected readings stop at 75 % of the buffer.
   for (size_t i = 0; i < SHOT_TRACE_EVENT_CAPACITY; ++i)
-    scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 600, 0, 0, 1.0f,
-                          static_cast<uint32_t>(DebugCode::SCALE_SAMPLE_REJECTED_SLEW), 0);
+    scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 600,
+                          {.weightG = 1.0f,
+                           .arg1 = static_cast<uint32_t>(DebugCode::SCALE_SAMPLE_REJECTED_SLEW)});
   // Decisions keep the rest; a wide debug event takes a continuation.
   addDebugEvent(DebugCategory::SCALE, DebugCode::AUTO_TO_MANUAL_GUARD_FIRED, 70123, -2);
   shotTrace().note(ShotTraceKind::STOP_REQUESTED, 500 + 9000000, 3, 0);
@@ -23660,14 +23518,19 @@ void trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot() {
 
 void trc06_pre_shot_events_keep_the_latest_per_kind() {
   shotTrace().hostReset();
-  scaleProfileNoteEvent(ScaleProfileEvent::SCALE_CONNECTED, 1000, 3, 0, NAN, 0, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::SCALE_CONNECTED, 1000, {.connectionGeneration = 3});
   for (uint32_t i = 0; i < 3; ++i)
-    scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, 2000 + i * 100, 3, i, 80.0f + i, i + 1, 0);
-  scaleProfileNoteEvent(ScaleProfileEvent::TARE_REJECTED, 2500, 3, 0, 82.0f, 3,
-                        static_cast<uint32_t>(IdleTareReason::NO_ABSENCE));
+    scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, 2000 + i * 100,
+                          {.connectionGeneration = 3, .sequence = i, .weightG = 80.0f + i,
+                           .arg1 = i + 1});
+  scaleProfileNoteEvent(ScaleProfileEvent::TARE_REJECTED, 2500,
+                        {.connectionGeneration = 3, .weightG = 82.0f, .arg1 = 3,
+                         .arg2 = static_cast<uint32_t>(IdleTareReason::NO_ABSENCE)});
   // Not pre-shot evidence: ignored outside a shot.
-  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 2600, 3, 0, 1.0f, 1, 0);
-  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 2600, 3, 0, NAN, 900, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 2600,
+                        {.connectionGeneration = 3, .weightG = 1.0f, .arg1 = 1});
+  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 2600,
+                        {.connectionGeneration = 3, .arg1 = 900});
   addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_CONNECTED, 0, 0);
   // CUP_PRESENT, EMPTY_READY, IDLE_ELIGIBILITY, then shot-only signals.
   const uint32_t present[SHOT_TRACE_STATE_COUNT] = {1, 0, 0, 0, 0, 0, 0};
@@ -23786,8 +23649,11 @@ void trc10_concurrent_producers_keep_counters_exact() {
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   std::thread scaleWorker([] {
     for (uint32_t i = 0; i < kRounds; ++i) {
-      scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, i, 1, i, NAN, 300, 0);
-      scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, i, 1, i, 1.0f, i, 0);
+      scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, i,
+                            {.connectionGeneration = 1, .sequence = i, .arg1 = 300});
+      scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, i,
+                            {.connectionGeneration = 1, .sequence = i, .weightG = 1.0f,
+                             .arg1 = i});
     }
   });
   std::thread health([] {
@@ -23816,7 +23682,9 @@ void trc10_concurrent_producers_keep_counters_exact() {
   });
   std::thread idleEvidence([&done] {  // Pre-shot ring writes racing begin().
     for (uint32_t i = 0; !done.load(); ++i)
-      scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, i, 1, i, 80.0f, i, 0);
+      scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, i,
+                            {.connectionGeneration = 1, .sequence = i, .weightG = 80.0f,
+                             .arg1 = i});
   });
   std::thread reader([&done, &corrupt] {
     Trace exported;
@@ -23872,8 +23740,10 @@ void trc12_cancelled_drip_analysis_completes_the_trace() {
 void trc13_pre_shot_ages_never_wrap() {
   shotTrace().hostReset();
   // Stamped after the anchor (between startedAtMs and begin()): age 0, not 2.3 h.
-  scaleProfileNoteEvent(ScaleProfileEvent::CUP_REMOVED, 1500, 1, 0, NAN, 1, 0);
-  scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, 400, 1, 0, 80.0f, 2, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::CUP_REMOVED, 1500,
+                        {.connectionGeneration = 1, .arg1 = 1});
+  scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, 400,
+                        {.connectionGeneration = 1, .weightG = 80.0f, .arg1 = 2});
   shotTrace().begin(1000);
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().complete(1, 1, 1, 1);
@@ -23886,7 +23756,8 @@ void trc13_pre_shot_ages_never_wrap() {
   CHECK(removed != nullptr && (removed->event.head & SHOT_TRACE_MS_MAX) == 0);
   CHECK(placed != nullptr && (placed->event.head & SHOT_TRACE_MS_MAX) == 600);
   // A late attach after a discard never consumes the ring.
-  scaleProfileNoteEvent(ScaleProfileEvent::CUP_RESET, 2000, 1, 0, NAN, 3, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::CUP_RESET, 2000,
+                        {.connectionGeneration = 1, .arg1 = 3});
   shotTrace().begin(2100);
   shotTrace().discard(static_cast<uint8_t>(EndReason::RELAY_SAFETY_FAILURE), 2100);
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
@@ -23953,12 +23824,16 @@ void trc15_over_line_reading_that_never_confirms_is_recorded() {
 
 void trc16_profile_arguments_keep_their_high_half() {
   shotTrace().hostReset();
-  scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, 50, 1, 0, NAN, 0x12345, 4);
+  scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, 50,
+                        {.connectionGeneration = 1, .arg1 = 0x12345, .arg2 = 4});
   shotTrace().begin(100);
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
-  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 200, 1, 0, NAN, 70000, 0);
-  scaleProfileNoteEvent(ScaleProfileEvent::SHOT_START, 200, 1, 0, NAN, 0x10002, 3600);
-  scaleProfileNoteEvent(ScaleProfileEvent::FIRST_DROP, 300, 1, 0, 0.4f, 1200, 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 200,
+                        {.connectionGeneration = 1, .arg1 = 70000});
+  scaleProfileNoteEvent(ScaleProfileEvent::SHOT_START, 200,
+                        {.connectionGeneration = 1, .arg1 = 0x10002, .arg2 = 3600});
+  scaleProfileNoteEvent(ScaleProfileEvent::FIRST_DROP, 300,
+                        {.connectionGeneration = 1, .weightG = 0.4f, .arg1 = 1200});
   shotTrace().complete(1, 1, 1, 1);
   Trace trace;
   CHECK(shot_trace_test::decodeCompleted(trace));
@@ -24225,8 +24100,13 @@ void trc25_the_web_ui_trace_fixture_is_a_real_trace() {
   if (getenv("SHOT_TRACE_FIXTURE_WRITE") != nullptr) {
     shotTrace().hostReset();
     for (int i = 0; i < 2; ++i)
-      shotTrace().noteProfile(ScaleProfileEvent::CUP_PLACED, 9000 + i * 100, 80.0f, 3, 0);
-    shotTrace().noteProfile(ScaleProfileEvent::CUP_REMOVED, 9500, 0.5f, 70001, 9);
+      shotTrace().noteProfile(
+          {.weightG = 80.0f, .arg1 = 3,
+           .kind = static_cast<uint16_t>(ScaleProfileEvent::CUP_PLACED)},
+          9000 + i * 100);
+    shotTrace().noteProfile({.weightG = 0.5f, .arg1 = 70001, .arg2 = 9,
+                             .kind = static_cast<uint16_t>(ScaleProfileEvent::CUP_REMOVED)},
+                            9500);
     shotTrace().begin(10000);
     ShotTraceSnapshot snapshot = {};
     snapshot.stabilitySamples = 5;
@@ -24235,7 +24115,9 @@ void trc25_the_web_ui_trace_fixture_is_a_real_trace() {
     snapshot.flags = SHOT_TRACE_SNAP_AUTO_TARE | SHOT_TRACE_SNAP_CUP_PRESENT;
     copyCString(snapshot.scaleName, sizeof(snapshot.scaleName), "Lunar");
     shotTrace().attachStart(snapshot, 7);
-    shotTrace().noteProfile(ScaleProfileEvent::FIRST_DROP, 16000, 1.2f, 70000, 5);
+    shotTrace().noteProfile({.weightG = 1.2f, .arg1 = 70000, .arg2 = 5,
+                             .kind = static_cast<uint16_t>(ScaleProfileEvent::FIRST_DROP)},
+                            16000);
     uint32_t states[SHOT_TRACE_STATE_COUNT] = {};
     states[SHOT_TRACE_STATE_WEIGHT_CONTROL] = 1;
     shotTrace().noteState(states, 17000);

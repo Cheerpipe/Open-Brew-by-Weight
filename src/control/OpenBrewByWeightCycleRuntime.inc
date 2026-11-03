@@ -93,10 +93,9 @@ bool requestRemoteTimerStart() {
   session.timerStartCommandQueued = enqueueScaleCommand(command);
   if (session.timerStartCommandQueued && command.autoTare) {
     scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, millis(),
-                          scaleConnectionGenerationNow(), 0, NAN,
-                          command.cupWeightRequestId,
-                          static_cast<uint32_t>(
-                              ScaleProfileTareOrigin::SHOT_START));
+                          {.connectionGeneration = scaleConnectionGenerationNow(),
+                           .arg1 = command.cupWeightRequestId,
+                           .arg2 = static_cast<uint32_t>(ScaleProfileTareOrigin::SHOT_START)});
     trackCupWeightTare(command.cupWeightRequestId);
   }
   return session.timerStartCommandQueued;
@@ -115,9 +114,9 @@ bool requestRemoteRetare() {
       getScaleLinkSnapshot().features.has(ScaleFeatureCommandAudibleFeedback);
   if (!enqueueScaleCommand(command)) return false;
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, millis(),
-                        scaleConnectionGenerationNow(), 0, NAN,
-                        command.cupWeightRequestId,
-                        static_cast<uint32_t>(ScaleProfileTareOrigin::RETARE));
+                        {.connectionGeneration = scaleConnectionGenerationNow(),
+                         .arg1 = command.cupWeightRequestId,
+                         .arg2 = static_cast<uint32_t>(ScaleProfileTareOrigin::RETARE)});
   session.retareRequestId = command.cupWeightRequestId;
   trackCupWeightTare(command.cupWeightRequestId);
   return true;
@@ -244,7 +243,7 @@ bool observeCupWeight(float weight, uint32_t atMs, uint32_t sequence,
        (static_cast<int32_t>(sequence - mass.sampleSequence) <= 0 ||
         static_cast<int32_t>(atMs - mass.sampleAtMs) < 0))) {
     resetCupSampleEvidence();
-    approveScaleTareSample(ScaleTareSample{});
+    approveScaleTareSample(WeightSample{});
     return false;
   }
   if (mass.sampleSequence != 0 && atMs - mass.sampleAtMs >
@@ -252,7 +251,7 @@ bool observeCupWeight(float weight, uint32_t atMs, uint32_t sequence,
   mass.sampleAtMs = atMs;
   mass.sampleSequence = sequence;
   mass.connectionGeneration = generation;
-  approveScaleTareSample(ScaleTareSample{weight, atMs, sequence, generation});
+  approveScaleTareSample(WeightSample{weight, atMs, sequence, generation});
   return true;
 }
 void trackCupWeightTare(uint32_t requestId) {
@@ -289,10 +288,10 @@ void finishCupWeight(uint32_t requestId, bool succeeded, bool uncertain,
         cupPresenceState() == CupPresenceState::PRESENT &&
         mass.pendingPlacementId == cupPresencePlacementId();
     if (std::isfinite(cupPresence.emptyAnchorG)) {
-      scaleProfileNoteEvent(
-          ScaleProfileEvent::CUP_ANCHOR_CHANGED, millis(), 0, 0, NAN,
-          mass.pendingPlacementId,
-          static_cast<uint32_t>(weightToCentigrams(cupPresence.emptyAnchorG)));
+      scaleProfileNoteEvent(ScaleProfileEvent::CUP_ANCHOR_CHANGED, millis(),
+                            {.arg1 = mass.pendingPlacementId,
+                             .arg2 = static_cast<uint32_t>(
+                                 weightToCentigrams(cupPresence.emptyAnchorG))});
     }
   } else if (uncertain) {
     invalidateCupWeight();
@@ -639,7 +638,7 @@ void applyShotTareResult(const ScaleEvent &event) {
 }
 
 void confirmLateRetareBaseline() {
-  const ScaleTareSample &zero = session.retareZeroSample;
+  const WeightSample &zero = session.retareZeroSample;
   const uint32_t atMs = zero.atMs;
   const ScaleLinkSnapshot link = getScaleLinkSnapshot();
   if (!session.retareEffectPending ||
@@ -659,8 +658,9 @@ void confirmLateRetareBaseline() {
        static_cast<int32_t>(atMs - pendingFinalize.endedAtMs) > 0))) return;
   session.retareEffectPending = false;
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_CONFIRMED, millis(),
-                        zero.connectionGeneration, session.retareZeroCaptureSequence,
-                        zero.weightG, session.retareRequestId, 0);
+                        {.connectionGeneration = zero.connectionGeneration,
+                         .sequence = session.retareZeroCaptureSequence, .weightG = zero.weightG,
+                         .arg1 = session.retareRequestId});
   session.tareCaptureBoundary = session.retareZeroCaptureSequence;
   session.firstDropMs = 0;
   shotCurveSampler.firstDrop = missingShotCurveEvent();
@@ -698,9 +698,11 @@ void profileScaleWeightDecision(bool accepted, DebugCode reason, float weight,
   scaleProfileNoteEvent(
       accepted ? ScaleProfileEvent::WEIGHT_ACCEPTED
                : ScaleProfileEvent::WEIGHT_REJECTED,
-      millis(), connectionGeneration, captureSequence, weight,
-      accepted ? packetSequence : static_cast<uint32_t>(reason),
-      accepted ? 0 : static_cast<uint32_t>(weightToCentigrams(referenceG)));
+      millis(),
+      {.connectionGeneration = connectionGeneration, .sequence = captureSequence,
+       .weightG = weight,
+       .arg1 = accepted ? packetSequence : static_cast<uint32_t>(reason),
+       .arg2 = accepted ? 0 : static_cast<uint32_t>(weightToCentigrams(referenceG))});
 }
 
 void notePostStopTailSample(PendingShotFinalize &pending, float weightG,
@@ -843,7 +845,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   session.touchStop = {};  // Only a qualifying touch sample may retain evidence.
   if (!std::isfinite(weight) || fabsf(weight) > MAX_PARSED_WEIGHT_G) {
     resetCupSampleEvidence();
-    approveScaleTareSample(ScaleTareSample{});
+    approveScaleTareSample(WeightSample{});
     serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
                         "Invalid or out-of-range weight ignored");
     rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_INVALID, weight);
@@ -884,7 +886,8 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                                                connectionGeneration);
   // Publish the approved pre-write load before allowing the worker to claim it.
   if (cupSampleValid && !session.active && idleTare.requestId != 0)
-    approveIdleScaleTareSample(idleTare.requestId, packetSequence);
+    approveIdleScaleTareSample(idleTare.requestId,
+                               {weight, receivedAtMs, packetSequence, connectionGeneration});
   const bool observedUnload = cupSampleValid && cupWeightNearKnownEmpty(weight);
   const uint32_t placementStartedAtMs = cupPresence.placeStabilityStartedAtMs;
   const CupPresenceEvent cupEvent = cupSampleValid ?
@@ -914,12 +917,14 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                   static_cast<int32_t>(cupEvent), weightToCentigrams(weight));
   if (cupEvent == CupPresenceEvent::PLACED) {
     scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, millis(),
-                          connectionGeneration, packetSequence, weight,
-                          cupPresencePlacementId(), 0);
+                          {.connectionGeneration = connectionGeneration,
+                           .sequence = packetSequence, .weightG = weight,
+                           .arg1 = cupPresencePlacementId()});
   } else if (cupEvent == CupPresenceEvent::REMOVED) {
     scaleProfileNoteEvent(ScaleProfileEvent::CUP_REMOVED, millis(),
-                          connectionGeneration, packetSequence, weight,
-                          cupPresencePlacementId(), 0);
+                          {.connectionGeneration = connectionGeneration,
+                           .sequence = packetSequence, .weightG = weight,
+                           .arg1 = cupPresencePlacementId()});
   }
   if (!session.active && pendingFinalize.pending &&
       (observedUnload || cupEvent != CupPresenceEvent::NONE)) {
@@ -1039,14 +1044,15 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
       session.awaitingPostTareBaseline = false;
       holdCupPresenceTransitions(false);
       weightStreamState = WeightStreamState::FRESH;
-      scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_CONFIRMED,
-                            millis(), connectionGeneration, captureSequence,
-                            weight, session.appliedTareRequestId, 0);
+      scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_CONFIRMED, millis(),
+                            {.connectionGeneration = connectionGeneration,
+                             .sequence = captureSequence, .weightG = weight,
+                             .arg1 = session.appliedTareRequestId});
       addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_TARE_BASELINE_CONFIRMED,
                     weightToCentigrams(weight),
                     static_cast<int32_t>(millis() - (session.postTareBaselineDeadlineMs -
                                                      session.config.postTareBaselineGraceMs)));
-      return acceptWeightIntoTrajectory(weight, receivedAtMs, packetSequence);
+      return acceptWeightIntoTrajectory({weight, receivedAtMs, packetSequence});
     }
     rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_SLEW, weight,
                       POST_TARE_BASELINE_MAX_ABS_G);
@@ -1198,7 +1204,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   profileScaleWeightDecision(true, static_cast<DebugCode>(0), weight,
                              receivedAtMs, packetSequence, connectionGeneration,
                              captureSequence, 0);
-  return acceptWeightIntoTrajectory(weight, receivedAtMs, packetSequence);
+  return acceptWeightIntoTrajectory({weight, receivedAtMs, packetSequence});
 }
 
 // Host-test-only entry point: the firmware path feeds weight through

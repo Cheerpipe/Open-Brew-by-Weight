@@ -423,10 +423,9 @@ void addDebugEventDetail(DebugCategory category, DebugCode code,
 }
 
 // Scale profile note path sinks (declared in OpenBrewByWeightScaleProfiler.h).
-void openbrewbyweight::shotTraceNoteProfileEvent(ScaleProfileEvent kind, uint32_t nowMs,
-                                                 float weightG, uint32_t arg1,
-                                                 uint32_t arg2) {
-  shotTrace().noteProfile(kind, nowMs, weightG, arg1, arg2);
+void openbrewbyweight::shotTraceNoteProfileEvent(const ScaleProfileRecord &event,
+                                                 uint32_t nowMs) {
+  shotTrace().noteProfile(event, nowMs);
 }
 void openbrewbyweight::shotTraceNoteDroppedFrame(bool stale) {
   shotTrace().noteDroppedFrame(stale);

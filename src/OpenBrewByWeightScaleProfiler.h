@@ -30,6 +30,7 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <span>
 
 #include "OpenBrewByWeightFlashIoScratch.h"
 #include "OpenBrewByWeightPsram.h"
@@ -156,6 +157,20 @@ constexpr uint32_t SCALE_PROFILE_UNKNOWN_VALUE = UINT32_MAX;
 struct ScaleProfileValue {
   ScaleProfileSignal signal;
   uint32_t value;
+};
+
+// The scale connection and frame capture sequence a record correlates with.
+struct ScaleProfileSource {
+  uint32_t connectionGeneration = 0;
+  uint32_t captureSequence = 0;
+};
+
+// One scale frame as the worker dequeued it: its source, the reception time
+// the library stamped and the weight it decoded to.
+struct ScaleProfileFrame {
+  ScaleProfileSource source;
+  uint32_t receivedAtMs = 0;
+  float weightG = NAN;
 };
 
 enum class ScaleProfileTareOrigin : uint8_t {
@@ -462,98 +477,85 @@ class ScaleProfiler {
   // debug or relay lock. All functions are bounded and non-blocking.
   // ---------------------------------------------------------------------
 
-  void noteWeight(float weightG, uint32_t receivedAtMs,
-                  uint32_t connectionGeneration, uint32_t captureSequence,
-                  bool discontinuity, uint32_t nowMs) {
+  void noteWeight(const ScaleProfileFrame &frame, bool discontinuity, uint32_t nowMs) {
     if (!recording()) return;
     captureMux_.lock();
     if (state_ != ScaleProfilerState::RECORDING ||
-        static_cast<int64_t>(static_cast<uint32_t>(nowMs - receivedAtMs)) >
+        static_cast<int64_t>(static_cast<uint32_t>(nowMs - frame.receivedAtMs)) >
             elapsedAt_(nowMs)) {
       // Buffered pre-epoch evidence is not part of this session.
       captureMux_.unlock();
       return;
     }
     ScaleProfileRecord record;
-    record.connectionGeneration = connectionGeneration;
-    record.sequence = captureSequence;
-    record.weightG = weightG;
+    record.connectionGeneration = frame.source.connectionGeneration;
+    record.sequence = frame.source.captureSequence;
+    record.weightG = frame.weightG;
     record.flags = discontinuity ? SCALE_PROFILE_FLAG_DISCONTINUITY : 0;
     record.kind = static_cast<uint16_t>(ScaleProfileEvent::WEIGHT);
-    appendLocked_(record, nowMs, nowMs - receivedAtMs);
+    appendLocked_(record, nowMs, nowMs - frame.receivedAtMs);
     captureMux_.unlock();
   }
 
   // Dropped-frame observation that keeps the frame's own reception time
   // (the library stamps it when the notification arrived), not the later
   // dequeue time.
-  void noteDroppedFrame(bool stale, bool decoded, float weightG,
-                        uint32_t receivedAtMs, uint32_t connectionGeneration,
-                        uint32_t captureSequence, uint16_t length,
-                        uint32_t nowMs) {
+  void noteDroppedFrame(const ScaleProfileFrame &frame, uint16_t length, bool stale,
+                        bool decoded, uint32_t nowMs) {
     if (!recording()) return;
     captureMux_.lock();
     if (state_ != ScaleProfilerState::RECORDING ||
-        static_cast<int64_t>(static_cast<uint32_t>(nowMs - receivedAtMs)) >
+        static_cast<int64_t>(static_cast<uint32_t>(nowMs - frame.receivedAtMs)) >
             elapsedAt_(nowMs)) {
       captureMux_.unlock();
       return;
     }
     ScaleProfileRecord record;
-    record.connectionGeneration = connectionGeneration;
-    record.sequence = captureSequence;
-    record.weightG = decoded ? weightG : NAN;
+    record.connectionGeneration = frame.source.connectionGeneration;
+    record.sequence = frame.source.captureSequence;
+    record.weightG = decoded ? frame.weightG : NAN;
     record.arg1 = length;
     record.flags = decoded ? SCALE_PROFILE_FLAG_DECODED : 0;
     record.kind =
         static_cast<uint16_t>(stale ? ScaleProfileEvent::STALE_FRAME
                                     : ScaleProfileEvent::FRAME_UNDECODABLE);
-    appendLocked_(record, nowMs, nowMs - receivedAtMs);
+    appendLocked_(record, nowMs, nowMs - frame.receivedAtMs);
     captureMux_.unlock();
   }
 
-  void noteEvent(ScaleProfileEvent kind, uint32_t nowMs,
-                 uint32_t connectionGeneration, uint32_t sequence, float weightG,
-                 uint32_t arg1, uint32_t arg2, uint16_t flags = 0) {
+  // Appends the producer's event; its time and ordinal are stamped here.
+  void noteEvent(const ScaleProfileRecord &event, uint32_t nowMs) {
     if (!recording()) return;
-    ScaleProfileRecord record;
-    record.connectionGeneration = connectionGeneration;
-    record.sequence = sequence;
-    record.weightG = weightG;
-    record.arg1 = arg1;
-    record.arg2 = arg2;
-    record.flags = flags;
-    record.kind = static_cast<uint16_t>(kind);
     captureMux_.lock();
     if (state_ != ScaleProfilerState::RECORDING) {
       captureMux_.unlock();
       return;
     }
-    appendLocked_(record, nowMs);
+    appendLocked_(event, nowMs);
     captureMux_.unlock();
   }
 
   // One control-owner observation, atomically ordered within the capture.
   // Cache lives in PSRAM and resets with each capture, including mid-cycle starts.
-  void noteValues(const ScaleProfileValue *values, size_t count, uint32_t nowMs,
-                  uint32_t connection, uint32_t captureSequence) {
+  void noteValues(std::span<const ScaleProfileValue> values, ScaleProfileSource source,
+                  uint32_t nowMs) {
     if (!recording()) return;
     const TaskLockGuard lock(captureMux_);
     if (state_ != ScaleProfilerState::RECORDING) return;
-    for (size_t i = 0; i < count; ++i) {
-      const auto key = static_cast<uint16_t>(values[i].signal);
+    for (const ScaleProfileValue &value : values) {
+      const auto key = static_cast<uint16_t>(value.signal);
       if (key >= static_cast<uint16_t>(ScaleProfileSignal::COUNT)) continue;
       auto &previous = workspace_->observations[key];
       const bool initial = previous.ordinal == 0;
-      if (!initial && previous.arg2 == values[i].value &&
-          previous.connectionGeneration == connection) continue;
+      if (!initial && previous.arg2 == value.value &&
+          previous.connectionGeneration == source.connectionGeneration) continue;
       ScaleProfileRecord record;
       record.kind = static_cast<uint16_t>(ScaleProfileEvent::STATE_CHANGED);
       record.flags = key | (initial ? SCALE_PROFILE_INITIAL : 0);
       record.arg1 = initial ? SCALE_PROFILE_UNKNOWN_VALUE : previous.arg2;
-      record.arg2 = values[i].value;
-      record.connectionGeneration = connection;
-      record.sequence = captureSequence;
+      record.arg2 = value.value;
+      record.connectionGeneration = source.connectionGeneration;
+      record.sequence = source.captureSequence;
       appendLocked_(record, nowMs);
       previous = record;
       previous.ordinal = 1;
@@ -1565,39 +1567,30 @@ inline ScaleProfiler &scaleProfiler() {
 
 // Producer entry points. Task context only; never inside a spinlock or an
 // ISR/NimBLE callback; never while holding a scale, debug or relay lock.
-inline void scaleProfileNoteWeight(float weightG, uint32_t receivedAtMs,
-                                   uint32_t connectionGeneration,
-                                   uint32_t captureSequence,
-                                   bool discontinuity, uint32_t nowMs) {
-  scaleProfiler().noteWeight(weightG, receivedAtMs, connectionGeneration,
-                             captureSequence, discontinuity, nowMs);
+inline void scaleProfileNoteWeight(const ScaleProfileFrame &frame, bool discontinuity,
+                                   uint32_t nowMs) {
+  scaleProfiler().noteWeight(frame, discontinuity, nowMs);
 }
 
 // Shot trace sinks (OpenBrewByWeightShotTrace.h), defined once in the control
 // unit. They run whether or not a manual capture is active and never nest the
 // capture lock.
-void shotTraceNoteProfileEvent(ScaleProfileEvent kind, uint32_t nowMs, float weightG,
-                               uint32_t arg1, uint32_t arg2);
+void shotTraceNoteProfileEvent(const ScaleProfileRecord &event, uint32_t nowMs);
 void shotTraceNoteDroppedFrame(bool stale);
 
+// The event carries its correlation fields and arguments; kind is set here
+// and the time and ordinal when it is appended.
 inline void scaleProfileNoteEvent(ScaleProfileEvent kind, uint32_t nowMs,
-                                  uint32_t connectionGeneration,
-                                  uint32_t sequence, float weightG, uint32_t arg1,
-                                  uint32_t arg2, uint16_t flags = 0) {
-  shotTraceNoteProfileEvent(kind, nowMs, weightG, arg1, arg2);
-  scaleProfiler().noteEvent(kind, nowMs, connectionGeneration, sequence, weightG,
-                            arg1, arg2, flags);
+                                  ScaleProfileRecord event) {
+  event.kind = static_cast<uint16_t>(kind);
+  shotTraceNoteProfileEvent(event, nowMs);
+  scaleProfiler().noteEvent(event, nowMs);
 }
 
-inline void scaleProfileNoteDroppedFrame(bool stale, bool decoded,
-                                         float weightG, uint32_t receivedAtMs,
-                                         uint32_t connectionGeneration,
-                                         uint32_t captureSequence,
-                                         uint16_t length, uint32_t nowMs) {
+inline void scaleProfileNoteDroppedFrame(const ScaleProfileFrame &frame, uint16_t length,
+                                         bool stale, bool decoded, uint32_t nowMs) {
   shotTraceNoteDroppedFrame(stale);
-  scaleProfiler().noteDroppedFrame(stale, decoded, weightG, receivedAtMs,
-                                   connectionGeneration, captureSequence,
-                                   length, nowMs);
+  scaleProfiler().noteDroppedFrame(frame, length, stale, decoded, nowMs);
 }
 
 // Formats one TXT data row in the requested shape:

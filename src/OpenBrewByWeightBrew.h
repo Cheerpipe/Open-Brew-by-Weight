@@ -110,13 +110,13 @@ void armSmoothCut(uint16_t sensorLagMs) {
 // After each accepted sample: the predicted stop-command time t* where the
 // projected weight plus in-flight lead and drip offset meets f. No valid rate
 // (or no crossing before the wall) leaves only the direct backstop.
-void updateCutPrediction(float weight, uint32_t receivedAtMs) {
+void updateCutPrediction(WeightSample sample) {
   shot.expectedEndS = NO_CUT_PREDICTION_S;
   int32_t shotMs = 0;
   corridor::CorridorState &cut = session.cut;
   cut.crossingValid = false;
-  const int32_t weightDg = gramsToDg(weight);
-  if (!shotTimeAtMs(receivedAtMs, shotMs) ||
+  const int32_t weightDg = gramsToDg(sample.weightG);
+  if (!shotTimeAtMs(sample.atMs, shotMs) ||
       cut.rate.push(shotMs, weightDg) !=
           corridor::RateEstimator::Result::ACCEPTED ||
       !cut.rate.valid) {
@@ -253,8 +253,8 @@ void considerTouchStopSample(float weight, uint32_t atMs, uint32_t sequence,
       static_cast<uint8_t>(continuous ? (previous.samples < 3 ? previous.samples + 1 : 3) : 1)};
 }
 
-void noteAccidentalTouchClass(AccidentalTouchClass classified, float weight,
-                              float residualG, uint32_t atMs) {
+void noteAccidentalTouchClass(AccidentalTouchClass classified, WeightSample sample,
+                              float residualG) {
   const bool wasHolding = session.accidentalTouchHolding;
   session.accidentalTouchClass = classified;
   if (classified == AccidentalTouchClass::TOUCH) {
@@ -271,11 +271,12 @@ void noteAccidentalTouchClass(AccidentalTouchClass classified, float weight,
           residualG;
     }
     if (!wasHolding) {
-      session.accidentalTouchHeldSinceMs = atMs;
+      session.accidentalTouchHeldSinceMs = sample.atMs;
       addDebugEvent(DebugCategory::SCALE, DebugCode::ACCIDENTAL_TOUCH_HOLD,
-                    weightToCentigrams(weight));
-      scaleProfileNoteEvent(ScaleProfileEvent::TOUCH_HOLD, millis(), 0, 0,
-                            weight, static_cast<uint32_t>(classified), 0);
+                    weightToCentigrams(sample.weightG));
+      scaleProfileNoteEvent(ScaleProfileEvent::TOUCH_HOLD, millis(),
+                            {.weightG = sample.weightG,
+                             .arg1 = static_cast<uint32_t>(classified)});
     }
     return;
   }
@@ -285,18 +286,20 @@ void noteAccidentalTouchClass(AccidentalTouchClass classified, float weight,
   if (classified == AccidentalTouchClass::SUSTAINED) {
     // An accepted level shift starts a new trend epoch and a curve segment.
     session.accidentalTouchEpochS =
-        static_cast<float>(static_cast<int32_t>(atMs - shot.startMs)) / 1000.0f;
+        static_cast<float>(static_cast<int32_t>(sample.atMs - shot.startMs)) / 1000.0f;
     shotCurveSampler.markBreak();
     session.calibrationEligible = false;
     addDebugEvent(DebugCategory::SCALE, DebugCode::ACCIDENTAL_TOUCH_SUSTAINED,
-                  weightToCentigrams(weight));
-    scaleProfileNoteEvent(ScaleProfileEvent::TOUCH_SUSTAINED, millis(), 0, 0,
-                          weight, static_cast<uint32_t>(classified), 0);
+                  weightToCentigrams(sample.weightG));
+    scaleProfileNoteEvent(ScaleProfileEvent::TOUCH_SUSTAINED, millis(),
+                          {.weightG = sample.weightG,
+                           .arg1 = static_cast<uint32_t>(classified)});
   } else if (wasHolding) {
     addDebugEvent(DebugCategory::SCALE, DebugCode::ACCIDENTAL_TOUCH_RELEASE,
-                  weightToCentigrams(weight));
-    scaleProfileNoteEvent(ScaleProfileEvent::TOUCH_RELEASE, millis(), 0, 0,
-                          weight, static_cast<uint32_t>(classified), 0);
+                  weightToCentigrams(sample.weightG));
+    scaleProfileNoteEvent(ScaleProfileEvent::TOUCH_RELEASE, millis(),
+                          {.weightG = sample.weightG,
+                           .arg1 = static_cast<uint32_t>(classified)});
   }
 }
 
@@ -308,9 +311,10 @@ AccidentalTouchClass evaluateAccidentalTouchSample(float weight,
       static_cast<float>(static_cast<int32_t>(session.lastAcceptedWeightAtMs - shot.startMs)) /
       1000.0f;
   const AccidentalTouchResidual trend = accidentalTouchResidual(
-      shot.timeS, shot.weight, session.hasWeightAnchor ? shot.datapoints : 0,
-      session.accidentalTouchEpochS, session.lastAcceptedWeightG, lastS, weight,
-      nowS);
+      {.timeS = shot.timeS, .weightG = shot.weight,
+       .datapoints = session.hasWeightAnchor ? shot.datapoints : 0,
+       .epochS = session.accidentalTouchEpochS, .anchorG = session.lastAcceptedWeightG,
+       .anchorS = lastS, .weight = weight, .nowS = nowS});
   const AccidentalTouchPhase phase = trend.frozen
                                          ? AccidentalTouchPhase::TREND
                                          : AccidentalTouchPhase::STARTUP;
@@ -339,15 +343,15 @@ AccidentalTouchClass evaluateAccidentalTouchSample(float weight,
       !session.accidentalTouchHolding && shot.datapoints > 0 &&
       shot.timeS[shot.datapoints - 1U] == lastS) {
     const float edgeG = accidentalTouchResidual(
-        shot.timeS, shot.weight, shot.datapoints, session.accidentalTouchEpochS,
-        session.lastAcceptedWeightG, lastS, session.lastAcceptedWeightG,
-        lastS).residualG;
+        {.timeS = shot.timeS, .weightG = shot.weight, .datapoints = shot.datapoints,
+         .epochS = session.accidentalTouchEpochS, .anchorG = session.lastAcceptedWeightG,
+         .anchorS = lastS, .weight = session.lastAcceptedWeightG, .nowS = lastS}).residualG;
     if (edgeG * trend.residualG > 0.0f &&
         fabsf(edgeG) >= ACCIDENTAL_TOUCH_HOLD_RESIDUAL_G) {
       --shot.datapoints;
     }
   }
-  noteAccidentalTouchClass(classified, weight, trend.residualG, receivedAtMs);
+  noteAccidentalTouchClass(classified, {weight, receivedAtMs}, trend.residualG);
   return classified;
 }
 
@@ -404,9 +408,9 @@ void onFirstDropsDetected(const FirstFlowObservation &observation) {
   const uint32_t firstDropAnchorMs = session.circuitClosedAtMs != 0U
                                          ? session.circuitClosedAtMs
                                          : session.startedAtMs;
-  scaleProfileNoteEvent(
-      ScaleProfileEvent::FIRST_DROP, millis(), 0, 0, observation.weightG,
-      static_cast<uint32_t>(observation.atMs - firstDropAnchorMs), 0);
+  scaleProfileNoteEvent(ScaleProfileEvent::FIRST_DROP, millis(),
+                        {.weightG = observation.weightG,
+                         .arg1 = static_cast<uint32_t>(observation.atMs - firstDropAnchorMs)});
   if (std::isfinite(observation.weightG)) {
     shotCurveSampler.latchFirstDrop(observation.atMs, observation.weightG);
   }

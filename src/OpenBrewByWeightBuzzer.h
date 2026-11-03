@@ -153,9 +153,6 @@ struct LocalBuzzer {
   void clearPlayback();
   bool acceptLocked(BuzzerPattern pattern, BuzzerCue cue, uint32_t durationMs,
                     bool rtttl, const BuzzerToneCommand *cmd);
-  bool startPendingLocked(BuzzerPattern pattern, BuzzerCue cue,
-                          uint8_t pulseRate, uint32_t durationMs,
-                          uint32_t nowMs);
   void startPendingDrainedLocked(uint32_t nowMs);
   static void phaseTimerCallback(void *arg);
 };
@@ -325,28 +322,6 @@ inline bool LocalBuzzer::deadlineReached(uint32_t nowMs) const {
          static_cast<int32_t>(nowMs - deadlineAtMs) >= 0;
 }
 
-inline bool LocalBuzzer::startPendingLocked(BuzzerPattern pattern, BuzzerCue cue,
-                                            uint8_t pulseRate,
-                                            uint32_t durationMs,
-                                            uint32_t nowMs) {
-  bool started = false;
-  if (cue != BuzzerCue::NONE) {
-    BuzzerToneCommand cmd;
-    cmd.cue = cue;
-    cmd.pulseRate = pulseRate;
-    cmd.looping = buzzerCueIsLooping(cue);
-    cmd.durationMs = durationMs;
-    cmd.valid = true;
-    started = startRtttl(cmd, nowMs);
-  } else {
-    started = startPattern(pattern, nowMs);
-  }
-  if (started) {
-    applyDeadline(durationMs, nowMs);
-  }
-  return started;
-}
-
 // Starts the queued pending tone (if any) after the active one stops.
 // Callers hold the mutex; a no-op cancels the phase timer.
 inline void LocalBuzzer::startPendingDrainedLocked(uint32_t nowMs) {
@@ -355,15 +330,21 @@ inline void LocalBuzzer::startPendingDrainedLocked(uint32_t nowMs) {
     return;
   }
   const BuzzerPattern next = pending;
-  const BuzzerCue nextCue = pendingCue;
-  const uint8_t nextPulseRate = pendingPulseRate;
-  const uint32_t nextDurationMs = pendingDurationMs;
+  BuzzerToneCommand cmd;
+  cmd.cue = pendingCue;
+  cmd.pulseRate = pendingPulseRate;
+  cmd.looping = buzzerCueIsLooping(cmd.cue);
+  cmd.durationMs = pendingDurationMs;
+  cmd.valid = true;
   pending = BuzzerPattern::NONE;
   pendingCue = BuzzerCue::NONE;
   pendingPulseRate = 0;
   pendingDurationMs = 0;
-  if (!startPendingLocked(next, nextCue, nextPulseRate, nextDurationMs,
-                          nowMs)) {
+  const bool started = cmd.cue != BuzzerCue::NONE ? startRtttl(cmd, nowMs)
+                                                  : startPattern(next, nowMs);
+  if (started) {
+    applyDeadline(cmd.durationMs, nowMs);
+  } else {
     cancelPhaseTimer();
   }
 }

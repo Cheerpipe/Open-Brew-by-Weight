@@ -351,9 +351,10 @@ class ShotTrace {
       changed = &capture_->header;
       changed->magic = 0;  // Never recovered.
       capturing_.store(false, std::memory_order_release);
-      notePreShotLocked_(static_cast<uint32_t>(ShotTraceKind::TRACE_DISCARDED) << 24,
-                         endReason,
-                         static_cast<uint16_t>(ranMs > UINT16_MAX ? UINT16_MAX : ranMs), 0,
+      notePreShotLocked_({{static_cast<uint32_t>(ShotTraceKind::TRACE_DISCARDED) << 24,
+                           endReason,
+                           static_cast<uint16_t>(ranMs > UINT16_MAX ? UINT16_MAX : ranMs)},
+                          0, 0, 0},
                          nowMs);
     }
     shotTraceWriteBack(changed, sizeof(*changed));
@@ -472,8 +473,10 @@ class ShotTrace {
   // atomic load, except the pre-shot events listed in preShotKind().
   // ---------------------------------------------------------------------
 
-  void noteProfile(ScaleProfileEvent kind, uint32_t nowMs, float weightG,
-                   uint32_t arg1, uint32_t arg2) {
+  void noteProfile(const ScaleProfileRecord &event, uint32_t nowMs) {
+    const auto kind = static_cast<ScaleProfileEvent>(event.kind);
+    const uint32_t arg1 = event.arg1;
+    uint32_t arg2 = event.arg2;
     if (kind == ScaleProfileEvent::WEIGHT_ACCEPTED) {
       // Fires on every reading: counted exactly, never recorded.
       if (capturing()) accepted_.fetch_add(1, std::memory_order_relaxed);
@@ -481,12 +484,12 @@ class ShotTrace {
     }
     if (!capturing() && !preShotKind(kind)) return;
     const uint32_t code = static_cast<uint32_t>(kind) << 24;
-    const int16_t a = shotTraceDg(weightG);
+    const int16_t a = shotTraceDg(event.weightG);
     const uint16_t b = static_cast<uint16_t>(arg1 & 0xFFFFU);
     const uint16_t high1 = static_cast<uint16_t>(arg1 >> 16);
     const TaskLockGuard lock(mux_);
     if (!capturing_.load(std::memory_order_relaxed)) {
-      if (preShotKind(kind)) notePreShotLocked_(code, a, b, arg2, nowMs, high1);
+      if (preShotKind(kind)) notePreShotLocked_({{code, a, b}, arg2, high1, 0}, nowMs);
       return;
     }
     ShotTraceCounters &counters = capture_->counters;
@@ -587,7 +590,7 @@ class ShotTrace {
       if (capturing_.load(std::memory_order_relaxed)) {
         appendLocked_(code | timeOfLocked_(nowMs), a, b, false, 0, 0, false);
       } else {
-        notePreShotLocked_(code, a, b, 0, nowMs);
+        notePreShotLocked_({{code, a, b}, 0, 0, 0}, nowMs);
       }
     }
   }
@@ -898,30 +901,30 @@ class ShotTrace {
     return true;
   }
 
-  // Latest occurrence per kind (per signal for states) with a repeat count.
-  // The keys (preShotKind() plus the pre-shot states) fit the capacity.
-  void notePreShotLocked_(uint32_t code, int16_t a, uint16_t b, uint32_t arg2,
-                          uint32_t nowMs, uint16_t arg1High = 0) {
+  // Latest occurrence per kind (per signal for states) with a repeat count,
+  // which is counted here. The keys (preShotKind() plus the pre-shot states)
+  // fit the capacity.
+  void notePreShotLocked_(ShotTracePreShot entry, uint32_t nowMs) {
+    const uint32_t code = entry.event.head;
     const bool state =
         code == static_cast<uint32_t>(ScaleProfileEvent::STATE_CHANGED) << 24;
-    const uint16_t signal = b & static_cast<uint16_t>(~SHOT_TRACE_STATE_INITIAL);
+    const uint16_t signal = entry.event.b & static_cast<uint16_t>(~SHOT_TRACE_STATE_INITIAL);
     size_t slot = 0;
     while (slot < ringCount_ &&
            (shotTraceStore.ring[slot].event.head != code ||
             (state && (shotTraceStore.ring[slot].event.b &
                        static_cast<uint16_t>(~SHOT_TRACE_STATE_INITIAL)) != signal)))
       ++slot;
-    uint16_t repeats = 0;
+    entry.repeats = 0;
     if (slot < ringCount_) {
-      repeats = shotTraceStore.ring[slot].repeats;
-      if (repeats < UINT16_MAX) ++repeats;
+      entry.repeats = shotTraceStore.ring[slot].repeats;
+      if (entry.repeats < UINT16_MAX) ++entry.repeats;
     } else if (ringCount_ < SHOT_TRACE_PRESHOT_CAPACITY) {
       ++ringCount_;
     } else {
       return;
     }
-    shotTraceStore.ring[slot] =
-        ShotTracePreShot{ShotTraceRecord{code, a, b}, arg2, arg1High, repeats};
+    shotTraceStore.ring[slot] = entry;
     shotTraceStore.ringAtMs[slot] = nowMs;
   }
 

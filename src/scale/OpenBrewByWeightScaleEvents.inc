@@ -414,10 +414,9 @@ void processScaleWorkerEvents() {
     }
     switch (event.type) {
       case ScaleEventType::REFERENCE_CHANGED:
-        scaleProfileNoteEvent(
-            ScaleProfileEvent::REFERENCE_CHANGED, millis(),
-            eventLink.connectionGeneration, 0, NAN,
-            event.writeSucceeded ? 1 : 0, 0);
+        scaleProfileNoteEvent(ScaleProfileEvent::REFERENCE_CHANGED, millis(),
+                              {.connectionGeneration = eventLink.connectionGeneration,
+                               .arg1 = event.writeSucceeded ? 1U : 0U});
         markShotCurveBreak();
         session.touchStop = {};
         if (idleTare.requestId != 0) {

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "OpenBrewByWeightRtttl.h"
+#include "OpenBrewByWeightScaleTypes.h"
 
 namespace openbrewbyweight {
 
@@ -69,13 +70,18 @@ inline bool bullseyeWeightExactlyTarget(float weightG, uint16_t targetWeightDg) 
          fabsf(weightG - goalWeightDgToGrams(targetWeightDg)) < 0.005f;
 }
 
-struct BullseyeTracker {
-  bool pending = false;
+// The just-ended shot whose settled weight the tracker watches.
+struct BullseyeShot {
   uint16_t targetWeightDg = 0;
   uint32_t endedAtMs = 0;
   uint32_t dripDelayMs = 0;
-  uint32_t cupPlacementId = 0;
   uint32_t endedWeightSequence = 0;
+  uint32_t cupPlacementId = 0;
+};
+
+struct BullseyeTracker {
+  bool pending = false;
+  BullseyeShot shot;
   uint32_t processedWeightSequence = 0;
   uint32_t targetSinceAtMs = 0;
   uint32_t lastTargetSampleAtMs = 0;
@@ -83,32 +89,28 @@ struct BullseyeTracker {
 
   void clear() { *this = BullseyeTracker{}; }
 
-  void arm(uint16_t targetWeightDg_, uint32_t endedAt, uint32_t dripDelay,
-           uint32_t weightSequence, uint32_t placementId = 0) {
+  void arm(const BullseyeShot &ended) {
     clear();
     pending = true;
-    targetWeightDg = targetWeightDg_;
-    endedAtMs = endedAt;
-    dripDelayMs = dripDelay;
-    cupPlacementId = placementId;
-    endedWeightSequence = weightSequence;
-    processedWeightSequence = weightSequence;
+    shot = ended;
+    processedWeightSequence = ended.endedWeightSequence;
   }
 
-  uint32_t opensAtMs() const { return endedAtMs + dripDelayMs; }
+  uint32_t opensAtMs() const { return shot.endedAtMs + shot.dripDelayMs; }
 
   // Returns true once, after at least two post-shot samples have continuously
   // reported the exact target over a full second. A stale/gapped stream or a
   // different weight resets the candidate.
-  bool accept(float weightG, uint32_t receivedAtMs, uint32_t sequence,
-              uint32_t maxSampleGapMs) {
+  bool accept(WeightSample sample, uint32_t maxSampleGapMs) {
+    const uint32_t sequence = sample.packetSequence;
+    const uint32_t receivedAtMs = sample.atMs;
     if (!pending || sequence == 0 || sequence == processedWeightSequence ||
-        sequence == endedWeightSequence ||
+        sequence == shot.endedWeightSequence ||
         static_cast<int32_t>(receivedAtMs - opensAtMs()) < 0) {
       return false;
     }
     processedWeightSequence = sequence;
-    if (!bullseyeWeightExactlyTarget(weightG, targetWeightDg)) {
+    if (!bullseyeWeightExactlyTarget(sample.weightG, shot.targetWeightDg)) {
       targetSinceAtMs = 0;
       lastTargetSampleAtMs = 0;
       targetSampleCount = 0;

@@ -78,11 +78,11 @@ inline const char *idleTareReasonName(uint8_t reason) {
       "connection_changed", "sample_gap", "slot_busy"};
   return reason < sizeof(names) / sizeof(names[0]) ? names[reason] : "unknown";
 }
-struct ScaleTareSample {
-  float weightG = NAN;
-  uint32_t atMs = 0;
-  uint32_t packetSequence = 0;
-  uint32_t connectionGeneration = 0;
+// What a tare write claims a queued idle request against: the approved
+// packet it expects (0 accepts any) and the capture sequence it starts after.
+struct IdleTareClaim {
+  uint32_t expectedPacketSequence = 0;
+  uint32_t captureBoundary = 0;
 };
 struct IdleTareStatus {
   uint32_t requestId = 0;

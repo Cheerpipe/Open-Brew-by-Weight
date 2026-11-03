@@ -22,22 +22,21 @@ constexpr uint32_t SCALE_DISCOVERY_TICK_MS = 3000;
 constexpr uint32_t SCALE_SCAN_HCI_RESTART_MS = 60000;
 constexpr uint32_t SCALE_HUNT_RF_CLEAR_MS = 3000;
 
-inline void bleScanHciParams(BleScanIntensity intensity, uint16_t &interval,
-                             uint16_t &window) {
+// HCI scan timing in 0.625 ms units.
+struct BleScanTiming {
+  uint16_t interval;
+  uint16_t window;
+};
+
+inline BleScanTiming bleScanHciParams(BleScanIntensity intensity) {
   switch (intensity) {
     case BleScanIntensity::AGGRESSIVE:
-      interval = BLE_SCAN_AGGRESSIVE_INTERVAL;
-      window = BLE_SCAN_AGGRESSIVE_WINDOW;
-      return;
+      return {BLE_SCAN_AGGRESSIVE_INTERVAL, BLE_SCAN_AGGRESSIVE_WINDOW};
     case BleScanIntensity::RELAXED:
-      interval = BLE_SCAN_RELAXED_INTERVAL;
-      window = BLE_SCAN_RELAXED_WINDOW;
-      return;
+      return {BLE_SCAN_RELAXED_INTERVAL, BLE_SCAN_RELAXED_WINDOW};
     case BleScanIntensity::BALANCED:
     default:
-      interval = BLE_SCAN_BALANCED_INTERVAL;
-      window = BLE_SCAN_BALANCED_WINDOW;
-      return;
+      return {BLE_SCAN_BALANCED_INTERVAL, BLE_SCAN_BALANCED_WINDOW};
   }
 }
 
@@ -117,10 +116,9 @@ uint32_t scaleWorkerTickDelayMs();
 void serviceScaleLinkRssi(uint32_t nowMs = millis());
 bool enqueueScaleCommand(const ScaleCommand &command, bool toFront = false);
 IdleTareStatus idleScaleTareStatus();
-void approveScaleTareSample(const ScaleTareSample &sample);
-bool claimIdleScaleTare(uint32_t requestId, uint32_t expectedPacketSequence = 0,
-                        uint32_t captureBoundary = 0);
-void approveIdleScaleTareSample(uint32_t requestId, uint32_t packetSequence);
+void approveScaleTareSample(const WeightSample &sample);
+bool claimIdleScaleTare(uint32_t requestId, IdleTareClaim claim = {});
+void approveIdleScaleTareSample(uint32_t requestId, const WeightSample &sample);
 // False only while an ATT write owns the request; never waits for BLE.
 bool cancelIdleScaleTare(uint32_t requestId, IdleTareStatus *released = nullptr);
 bool publishScaleEvent(const ScaleEvent &event, bool critical);

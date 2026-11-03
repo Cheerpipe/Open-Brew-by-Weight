@@ -29,7 +29,7 @@ const uint32_t T0 = 100000;
 
 void noteWeightAt(ScaleProfiler &profiler, uint32_t atMs, float weightG,
                   uint32_t captureSequence, uint32_t generation = 2) {
-  profiler.noteWeight(weightG, atMs, generation, captureSequence, false, atMs);
+  profiler.noteWeight({{generation, captureSequence}, atMs, weightG}, false, atMs);
 }
 
 void testLifecycleCapturesWeightsAndEvents() {
@@ -41,8 +41,10 @@ void testLifecycleCapturesWeightsAndEvents() {
   noteWeightAt(profiler, T0 + 203, 0.025f, 42);
   noteWeightAt(profiler, T0 + 203, 0.025f, 43);  // duplicate stays
   noteWeightAt(profiler, T0 + 204, -3.5f, 44);   // negative stays
-  profiler.noteEvent(ScaleProfileEvent::TARE_REQUEST, T0 + 105, 2, 40, NAN, 7,
-                     static_cast<uint32_t>(ScaleProfileTareOrigin::IDLE_CUP));
+  profiler.noteEvent({.connectionGeneration = 2, .sequence = 40, .weightG = NAN, .arg1 = 7,
+                      .arg2 = static_cast<uint32_t>(ScaleProfileTareOrigin::IDLE_CUP),
+                      .kind = static_cast<uint16_t>(ScaleProfileEvent::TARE_REQUEST)},
+                     T0 + 105);
   CHECK(profiler.hostRecordCount() == 6);
   profiler.hostStop(ScaleProfilerStopReason::USER, T0 + 1500);
   CHECK(profiler.hostState() == ScaleProfilerState::STOPPED);
@@ -74,7 +76,7 @@ void testPreEpochAndWrapAroundTimestamps() {
   ScaleProfiler wrapped;
   const uint32_t wrapEpoch = 0xFFFFFF00U;
   CHECK(wrapped.hostStartNoFlash(wrapEpoch));
-  wrapped.noteWeight(2.5f, 400U, 1, 7, false, 400U);  // millis() wrapped.
+  wrapped.noteWeight({{1, 7}, 400U, 2.5f}, false, 400U);  // millis() wrapped.
   CHECK(wrapped.hostRecordCount() == 2);
   CHECK(wrapped.hostRecord(1).relativeMs == 0x290);
 }
@@ -142,7 +144,7 @@ void testLongCaptureTimestampsAndExport() {
   }
   const uint64_t duration = 60ULL * 86400000;
   const uint32_t end = start + static_cast<uint32_t>(duration);
-  profiler.noteWeight(2.0f, end - 10, 2, 61, false, end);
+  profiler.noteWeight({{2, 61}, end - 10, 2.0f}, false, end);
   profiler.hostStop(ScaleProfilerStopReason::USER, end + 1);
   profiler.hostServiceIdle(end + 2);
   CHECK(scaleProfileDurationMs(profiler.hostHeader()) == duration + 1);
@@ -162,8 +164,11 @@ void recordSeconds(ScaleProfiler &profiler, uint32_t &now, uint32_t rate,
     for (uint32_t i = 1; i <= rate; ++i) {
       const uint32_t at = now + 1000 * i / rate;
       noteWeightAt(profiler, at, 1.0f, i);
-      if (events) profiler.noteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED,
-                                    at, 2, i, 1.0f, 0, 0);
+      if (events)
+        profiler.noteEvent(
+            {.connectionGeneration = 2, .sequence = i, .weightG = 1.0f,
+             .kind = static_cast<uint16_t>(ScaleProfileEvent::WEIGHT_ACCEPTED)},
+            at);
     }
     now += 1000;
     profiler.hostServiceIdle(now);
@@ -260,8 +265,10 @@ void testIndexOrdersByTimeThenOrdinal() {
   CHECK(profiler.hostStartNoFlash(T0));
   noteWeightAt(profiler, T0 + 300, 3.0f, 30);
   noteWeightAt(profiler, T0 + 100, 1.0f, 10);
-  profiler.noteEvent(ScaleProfileEvent::WEIGHT_ACCEPTED, T0 + 100, 2, 10, 1.0f,
-                     5, 0);  // Same time as the first weight, later ordinal.
+  // Same time as the first weight, later ordinal.
+  profiler.noteEvent({.connectionGeneration = 2, .sequence = 10, .weightG = 1.0f, .arg1 = 5,
+                      .kind = static_cast<uint16_t>(ScaleProfileEvent::WEIGHT_ACCEPTED)},
+                     T0 + 100);
   noteWeightAt(profiler, T0 + 200, 2.0f, 20);
   profiler.hostStop(ScaleProfilerStopReason::USER, T0 + 400);
   profiler.hostServiceIdle(T0 + 500);
@@ -476,26 +483,26 @@ void testStateObservations() {
   using S = ScaleProfileSignal;
   ScaleProfileValue values[] = {{S::CUP_PRESENT, 1}, {S::IDLE_REQUEST_ID, 42}};
   CHECK(profiler.hostStartNoFlash(T0));
-  profiler.noteValues(values, 2, T0 + 1, 7, 23);
+  profiler.noteValues(values, {7, 23}, T0 + 1);
   CHECK(profiler.hostRecordCount() == 3);
   CHECK(profiler.hostRecord(1).flags & SCALE_PROFILE_INITIAL);
-  profiler.noteValues(values, 2, T0 + 2, 7, 24);
+  profiler.noteValues(values, {7, 24}, T0 + 2);
   CHECK(profiler.hostRecordCount() == 3); // New sample alone is not a state change.
   values[0].value = 0;
-  profiler.noteValues(values, 2, T0 + 3, 7, 25);
+  profiler.noteValues(values, {7, 25}, T0 + 3);
   const auto removed = profiler.hostRecord(3);
   CHECK(removed.arg1 == 1 && removed.arg2 == 0 && removed.sequence == 25);
   CHECK(!(removed.flags & SCALE_PROFILE_INITIAL));
   char line[192];
   CHECK(formatScaleProfileRow(line, sizeof(line), removed) != 0);
   CHECK(std::string(line).find("CUP_PRESENT from=1 to=0 capture=25 connection=7") != std::string::npos);
-  profiler.noteValues(values, 2, T0 + 4, 8, 1);
+  profiler.noteValues(values, {8, 1}, T0 + 4);
   CHECK(profiler.hostRecordCount() == 6); // Reconnection renews unchanged evidence.
   profiler.hostStop(ScaleProfilerStopReason::USER, T0 + 5);
-  profiler.noteValues(values, 2, T0 + 6, 8, 2);
+  profiler.noteValues(values, {8, 2}, T0 + 6);
   CHECK(profiler.hostRecordCount() == 7);
   CHECK(profiler.hostStartNoFlash(T0 + 10));
-  profiler.noteValues(values, 2, T0 + 11, 8, 3);
+  profiler.noteValues(values, {8, 3}, T0 + 11);
   CHECK(profiler.hostRecordCount() == 3);
   CHECK(profiler.hostRecord(1).flags & SCALE_PROFILE_INITIAL);
   ScaleProfileRecord unknown;
@@ -523,7 +530,7 @@ void testConcurrentStateAndWeightCapture() {
   std::thread states([&]() {
     for (uint32_t i = 1; i <= 100; ++i) {
       const ScaleProfileValue value{ScaleProfileSignal::IDLE_REQUEST_ID, i};
-      profiler.noteValues(&value, 1, T0 + i, 2, i);
+      profiler.noteValues({&value, 1}, {2, i}, T0 + i);
     }
   });
   weights.join();

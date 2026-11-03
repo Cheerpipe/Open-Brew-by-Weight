@@ -85,9 +85,10 @@ void profileControlState(uint32_t captureSequence, uint32_t evidenceConnection) 
       {S::SHOT_TARE_REQUEST_ID, session.appliedTareRequestId},
       {S::RETARE_REQUEST_ID, session.retareRequestId},
   };
-  scaleProfiler().noteValues(values, sizeof(values) / sizeof(values[0]), millis(),
-                             link.connectionGeneration,
-                             evidenceConnection == link.connectionGeneration ? captureSequence : 0);
+  scaleProfiler().noteValues(
+      values, {link.connectionGeneration,
+               evidenceConnection == link.connectionGeneration ? captureSequence : 0},
+      millis());
 }
 
 bool liveConfigPersistPending() {

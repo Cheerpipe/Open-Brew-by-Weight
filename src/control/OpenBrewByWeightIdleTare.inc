@@ -149,9 +149,9 @@ void releaseIdleTareRequest(IdleTareReason reason = IdleTareReason::NONE) {
     reason = idleTare.deferredReason;
   idleTare.lastReason = reason;
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_RELEASED, millis(),
-                        idleTare.connectionGeneration,
-                        idleTare.lastCaptureSequence, NAN,
-                        idleTare.requestId, static_cast<uint32_t>(reason));
+                        {.connectionGeneration = idleTare.connectionGeneration,
+                         .sequence = idleTare.lastCaptureSequence, .arg1 = idleTare.requestId,
+                         .arg2 = static_cast<uint32_t>(reason)});
   // A lift or a shot start supersedes the request; any other end is a miss.
   if (reason != IdleTareReason::EFFECT_CONFIRMED &&
       reason != IdleTareReason::REMOVED &&
@@ -234,9 +234,9 @@ void serviceIdleTare() {
       elapsedMs(idleTare.requestedAtMs) >=
           SCALE_ATT_TIMEOUT_MS + runtimeConfig.postTareBaselineGraceMs) {
     scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_TIMEOUT, millis(),
-                          idleTare.connectionGeneration, idleTare.lastCaptureSequence,
-                          NAN, idleTare.requestId,
-                          static_cast<uint32_t>(IdleTareReason::EFFECT_UNCONFIRMED));
+                          {.connectionGeneration = idleTare.connectionGeneration,
+                           .sequence = idleTare.lastCaptureSequence, .arg1 = idleTare.requestId,
+                           .arg2 = static_cast<uint32_t>(IdleTareReason::EFFECT_UNCONFIRMED)});
     releaseIdleTareRequest(IdleTareReason::EFFECT_UNCONFIRMED);
   }
 }
@@ -329,9 +329,10 @@ bool observeIdleTareSample(float weight, uint32_t atMs, uint32_t sequence,
           notifyCupPresenceTare();
           idleTare.tareNotified = true;
           idleTare.effectAtMs = atMs;
-          scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_CONFIRMED,
-                                millis(), generation, captureSequence, weight,
-                                idleTare.requestId, 0);
+          scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_CONFIRMED, millis(),
+                                {.connectionGeneration = generation,
+                                 .sequence = captureSequence, .weightG = weight,
+                                 .arg1 = idleTare.requestId});
         }
         if (status.phase == IdleTarePhase::SUCCEEDED && idleTare.tareNotified) {
           releaseIdleTareRequest(IdleTareReason::EFFECT_CONFIRMED);
@@ -370,9 +371,10 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
   if (!idleTare.eligible) {
     if (event == CupPresenceEvent::PLACED) {
       scaleProfileNoteEvent(ScaleProfileEvent::TARE_REJECTED, millis(),
-                            idleTare.connectionGeneration, idleTare.lastPacketSequence,
-                            idleTare.lastWeightG, cupPresencePlacementId(),
-                            static_cast<uint32_t>(idleTare.eligibilityReason));
+                            {.connectionGeneration = idleTare.connectionGeneration,
+                             .sequence = idleTare.lastPacketSequence,
+                             .weightG = idleTare.lastWeightG, .arg1 = cupPresencePlacementId(),
+                             .arg2 = static_cast<uint32_t>(idleTare.eligibilityReason)});
       logIdlePlacementNotTared(idleTare.eligibilityReason, false);
     }
     return;
@@ -389,9 +391,10 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
     idleTare.lastReason = !placedInIdle ? IdleTareReason::NO_ABSENCE
         : idleTare.requestId != 0 ? IdleTareReason::SLOT_BUSY : IdleTareReason::UNSUPPORTED;
     scaleProfileNoteEvent(ScaleProfileEvent::TARE_REJECTED, millis(),
-                          idleTare.connectionGeneration, idleTare.lastPacketSequence,
-                          idleTare.lastWeightG, cupPresencePlacementId(),
-                          static_cast<uint32_t>(idleTare.lastReason));
+                          {.connectionGeneration = idleTare.connectionGeneration,
+                           .sequence = idleTare.lastPacketSequence,
+                           .weightG = idleTare.lastWeightG, .arg1 = cupPresencePlacementId(),
+                           .arg2 = static_cast<uint32_t>(idleTare.lastReason)});
     logIdlePlacementNotTared(idleTare.lastReason, accessory, previousReason);
     return;
   }
@@ -409,9 +412,10 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
   if (!enqueueScaleCommand(command)) {
     idleTare.lastReason = IdleTareReason::QUEUE_FULL;
     scaleProfileNoteEvent(ScaleProfileEvent::TARE_REJECTED, millis(),
-                          idleTare.connectionGeneration, idleTare.lastPacketSequence,
-                          idleTare.lastWeightG, cupPresencePlacementId(),
-                          static_cast<uint32_t>(idleTare.lastReason));
+                          {.connectionGeneration = idleTare.connectionGeneration,
+                           .sequence = idleTare.lastPacketSequence,
+                           .weightG = idleTare.lastWeightG, .arg1 = cupPresencePlacementId(),
+                           .arg2 = static_cast<uint32_t>(idleTare.lastReason)});
     logIdlePlacementNotTared(idleTare.lastReason, accessory, previousReason);
     return;
   }
@@ -423,12 +427,11 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
   idleTare.previouslyTared = cupPresenceIsTared();
   idleTare.previousReferenceG = cupPresenceReferenceG();
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, millis(),
-                        command.connectionGeneration,
-                        command.qualifiedPacketSequence, NAN,
-                        command.idleTareRequestId,
-                        static_cast<uint32_t>(accessory
-                                                  ? ScaleProfileTareOrigin::ACCESSORY
-                                                  : ScaleProfileTareOrigin::IDLE_CUP));
+                        {.connectionGeneration = command.connectionGeneration,
+                         .sequence = command.qualifiedPacketSequence,
+                         .arg1 = command.idleTareRequestId,
+                         .arg2 = static_cast<uint32_t>(accessory ? ScaleProfileTareOrigin::ACCESSORY
+                                                                 : ScaleProfileTareOrigin::IDLE_CUP)});
   idleTare.requestMinimumG = accessory ? idleTare.accessoryMinimumG : cupPresenceMinimumG();
   idleTare.requestMaximumG = accessory ? idleTare.accessoryMaximumG : cupPresenceMaximumG();
   idleTare.requestPlacementThresholdG = accessory ? runtimeConfig.minimumCupWeightG
@@ -535,9 +538,12 @@ void observeIdleAccessory(float weight, uint32_t atMs) {
           runtimeConfig.retareStabilityToleranceG) {
     if (idleTare.accessorySamples != 0)
       scaleProfileNoteEvent(ScaleProfileEvent::CUP_QUALIFICATION_RESET, millis(),
-                            idleTare.connectionGeneration, idleTare.lastPacketSequence, weight, 2,
-                            static_cast<uint32_t>(atMs - idleTare.accessoryLastAtMs > gapMs
-                                ? IdleTareReason::SAMPLE_GAP : IdleTareReason::UNSTABLE));
+                            {.connectionGeneration = idleTare.connectionGeneration,
+                             .sequence = idleTare.lastPacketSequence, .weightG = weight,
+                             .arg1 = 2,
+                             .arg2 = static_cast<uint32_t>(
+                                 atMs - idleTare.accessoryLastAtMs > gapMs
+                                     ? IdleTareReason::SAMPLE_GAP : IdleTareReason::UNSTABLE)});
     idleTare.accessorySamples = 0;
     idleTare.accessoryStartedAtMs = atMs;
     idleTare.accessoryMinimumG = idleTare.accessoryMaximumG = weight;

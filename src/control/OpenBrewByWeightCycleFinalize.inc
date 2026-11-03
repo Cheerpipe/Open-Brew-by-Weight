@@ -666,8 +666,8 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
   }
   captureLateTareCompletion();
   scaleProfileNoteEvent(ScaleProfileEvent::FINALIZE_CANCELLED, millis(),
-                        scaleConnectionGenerationNow(), 0, NAN,
-                        pendingFinalize.cycleId, profileReason);
+                        {.connectionGeneration = scaleConnectionGenerationNow(),
+                         .arg1 = pendingFinalize.cycleId, .arg2 = profileReason});
   static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PendingShotFinalize snapshot;
   snapshot = pendingFinalize;
   pendingFinalize.pending = false;
@@ -781,7 +781,7 @@ void serviceBullseyeMelody() {
       currentAlertOutputChannel() != AlertOutputChannel::BUZZER_ONLY ||
       !localBuzzer.ready || session.active ||
       cupPresenceState() != CupPresenceState::PRESENT ||
-      cupPresencePlacementId() != bullseyeTracker.cupPlacementId) {
+      cupPresencePlacementId() != bullseyeTracker.shot.cupPlacementId) {
     bullseyeTracker.clear();
     return;
   }
@@ -789,9 +789,8 @@ void serviceBullseyeMelody() {
       !scaleAvailable() || !currentWeightIsFresh(nowMs)) {
     return;
   }
-  if (bullseyeTracker.accept(currentWeight, currentWeightReceivedAtMs,
-                              currentWeightSequence,
-                              MAX_AUTOMATION_WEIGHT_AGE_MS)) {
+  if (bullseyeTracker.accept({currentWeight, currentWeightReceivedAtMs, currentWeightSequence},
+                             MAX_AUTOMATION_WEIGHT_AGE_MS)) {
     (void)localBuzzer.requestBullseye();
     serialTracef(LogLevel::INFO,
                  "Bullseye: %.2fg stable at target for %lums",

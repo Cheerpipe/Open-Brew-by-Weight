@@ -501,6 +501,16 @@ inline const char *accidentalTouchClassName(AccidentalTouchClass classified) {
   return "OK";
 }
 
+// One scale weight and where it came from: the millis() time its frame
+// arrived, the worker's packet sequence and the scale connection. Consumers
+// that track only weight and time leave the provenance at 0.
+struct WeightSample {
+  float weightG = NAN;
+  uint32_t atMs = 0;
+  uint32_t packetSequence = 0;
+  uint32_t connectionGeneration = 0;
+};
+
 enum class FirstFlowPhase : uint8_t {
   SEEKING = 0,
   TOUCH = 1
@@ -548,33 +558,30 @@ inline void resetFirstFlowState(FirstFlowState &state) {
 }
 
 inline bool firstFlowPacketsConsecutive(const FirstFlowState &state,
-                                        uint32_t receivedAtMs,
-                                        uint32_t packetSequence) {
+                                        WeightSample sample) {
   return state.hasLastSample &&
-         packetSequence == state.lastPacketSequence + 1U &&
-         static_cast<int32_t>(receivedAtMs - state.lastAtMs) >= 0 &&
-         static_cast<uint32_t>(receivedAtMs - state.lastAtMs) <=
+         sample.packetSequence == state.lastPacketSequence + 1U &&
+         static_cast<int32_t>(sample.atMs - state.lastAtMs) >= 0 &&
+         static_cast<uint32_t>(sample.atMs - state.lastAtMs) <=
              DIRECT_STOP_CONFIRMATION_WINDOW_MS;
 }
 
-inline void noteFirstFlowSample(FirstFlowState &state, float weight,
-                                uint32_t receivedAtMs, uint32_t packetSequence) {
+inline void noteFirstFlowSample(FirstFlowState &state, WeightSample sample) {
   state.hasLastSample = true;
-  state.lastWeightG = weight;
-  state.lastAtMs = receivedAtMs;
-  state.lastPacketSequence = packetSequence;
+  state.lastWeightG = sample.weightG;
+  state.lastAtMs = sample.atMs;
+  state.lastPacketSequence = sample.packetSequence;
 }
 
-inline FirstFlowClass enterFirstFlowTouch(FirstFlowState &state, float weight,
-                                          uint32_t receivedAtMs) {
+inline FirstFlowClass enterFirstFlowTouch(FirstFlowState &state, WeightSample sample) {
   state.phase = FirstFlowPhase::TOUCH;
-  state.postJumpG = weight;
-  state.peakG = weight;
-  state.jumpAtMs = receivedAtMs;
+  state.postJumpG = sample.weightG;
+  state.peakG = sample.weightG;
+  state.jumpAtMs = sample.atMs;
   state.confirmations = 0;
   state.residualConfirmations = 0;
-  state.candidateMs = receivedAtMs;
-  state.candidateWeightG = weight;
+  state.candidateMs = sample.atMs;
+  state.candidateWeightG = sample.weightG;
   return FirstFlowClass::TOUCH;
 }
 
@@ -622,9 +629,10 @@ inline void noteFirstFlowNoiseSample(FirstFlowState &state, float deviationG) {
 // Through FIRE only below cup min, or within 2 g above the rise needed after
 // the jump, so a small cup min or a large jump keeps a non-empty window.
 inline FirstFlowClass stepFirstFlow(
-    FirstFlowState &state, float weight, uint32_t receivedAtMs,
-    uint32_t packetSequence, float baselineG,
+    FirstFlowState &state, WeightSample sample, float baselineG,
     float cupMinG = FIRST_DROP_DEFAULT_CUP_MIN_G) {
+  const float weight = sample.weightG;
+  const uint32_t receivedAtMs = sample.atMs;
   if (!std::isfinite(weight) || !std::isfinite(baselineG)) {
     return FirstFlowClass::NONE;
   }
@@ -641,8 +649,7 @@ inline FirstFlowClass stepFirstFlow(
   const float delta = weight - baselineG;
   const float step =
       state.hasLastSample ? (weight - state.lastWeightG) : delta;
-  const bool consecutive =
-      firstFlowPacketsConsecutive(state, receivedAtMs, packetSequence);
+  const bool consecutive = firstFlowPacketsConsecutive(state, sample);
 
   if (state.phase == FirstFlowPhase::SEEKING) {
     // Vibration alternates sign; flow never steps down inside a streak.
@@ -659,7 +666,7 @@ inline FirstFlowClass stepFirstFlow(
       state.residualConfirmations = 0;
       state.candidateMs = 0;
       state.candidateWeightG = 0.0f;
-      noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+      noteFirstFlowSample(state, sample);
       return FirstFlowClass::NONE;
     }
     // A finger is a fast step (8 g/s); the same step spread over a packet
@@ -668,9 +675,8 @@ inline FirstFlowClass stepFirstFlow(
     if ((step >= FIRST_DROP_FINGER_STEP_G &&
          (!state.hasLastSample || step * 125.0f > static_cast<float>(stepMs > 100U ? stepMs : 100U))) ||
         delta >= objectMinG) {
-      const FirstFlowClass classified =
-          enterFirstFlowTouch(state, weight, receivedAtMs);
-      noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+      const FirstFlowClass classified = enterFirstFlowTouch(state, sample);
+      noteFirstFlowSample(state, sample);
       return classified;
     }
     state.confirmations =
@@ -683,7 +689,7 @@ inline FirstFlowClass stepFirstFlow(
       state.candidateMs = receivedAtMs;
       state.candidateWeightG = weight;
     }
-    noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+    noteFirstFlowSample(state, sample);
     if (state.confirmations >= FIRST_DROP_CONFIRMATION_SAMPLES) {
       // Mean rate across the streak separates flow from creep; a zero span
       // carries no independent evidence and keeps the streak waiting.
@@ -710,7 +716,7 @@ inline FirstFlowClass stepFirstFlow(
     state.residualConfirmations = 0;
     state.candidateMs = receivedAtMs;
     state.candidateWeightG = weight;
-    noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+    noteFirstFlowSample(state, sample);
     return FirstFlowClass::TOUCH;
   }
 
@@ -727,7 +733,7 @@ inline FirstFlowClass stepFirstFlow(
         state.candidateMs = receivedAtMs;
         state.candidateWeightG = weight;
       }
-      noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+      noteFirstFlowSample(state, sample);
       if (state.residualConfirmations >= FIRST_DROP_CONFIRMATION_SAMPLES) {
         return FirstFlowClass::FIRE;
       }
@@ -736,7 +742,7 @@ inline FirstFlowClass stepFirstFlow(
     if (delta >= thresholdG) {
       state.confirmations = 0;
       state.residualConfirmations = 0;
-      noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+      noteFirstFlowSample(state, sample);
       return FirstFlowClass::TOUCH;
     }
     state.phase = FirstFlowPhase::SEEKING;
@@ -744,7 +750,7 @@ inline FirstFlowClass stepFirstFlow(
     state.residualConfirmations = 0;
     state.candidateMs = 0;
     state.candidateWeightG = 0.0f;
-    noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+    noteFirstFlowSample(state, sample);
     return FirstFlowClass::NONE;
   }
 
@@ -757,7 +763,7 @@ inline FirstFlowClass stepFirstFlow(
         consecutive && state.confirmations > 0
             ? static_cast<uint8_t>(state.confirmations + 1U)
             : 1U;
-    noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+    noteFirstFlowSample(state, sample);
     if (state.confirmations >= FIRST_DROP_CONFIRMATION_SAMPLES) {
       // Same mean-rate law as SEEKING, measured from the touch jump, so a
       // slowly creeping extra load cannot latch a bogus first drop. The
@@ -780,7 +786,7 @@ inline FirstFlowClass stepFirstFlow(
 
   state.confirmations = 0;
   state.residualConfirmations = 0;
-  noteFirstFlowSample(state, weight, receivedAtMs, packetSequence);
+  noteFirstFlowSample(state, sample);
   return FirstFlowClass::TOUCH;
 }
 
@@ -811,14 +817,27 @@ struct AccidentalTouchResidual {
   float residualG = 0.0f;
 };
 
+// The accepted trajectory (datapoints long, shot seconds and grams), its
+// anchor (the newest accepted point) and the candidate weight at nowS.
+struct AccidentalTouchResidualInput {
+  const float *timeS = nullptr;
+  const float *weightG = nullptr;
+  size_t datapoints = 0;
+  float epochS = 0.0f;
+  float anchorG = 0.0f;
+  float anchorS = 0.0f;
+  float weight = 0.0f;
+  float nowS = 0.0f;
+};
+
 // Residual of a candidate against the accepted trend since the last level
 // shift (epochS). The reference is the newest accepted point at least
 // REFERENCE_LAG_S older than the anchor, so it moves only with the anchor and
 // held samples never shift it; until one exists the anchor is the reference.
 // An empty trajectory (pre-cycle anchor) carries no trend: residual 0.
 inline AccidentalTouchResidual accidentalTouchResidual(
-    const float *timeS, const float *weightG, size_t datapoints, float epochS,
-    float anchorG, float anchorS, float weight, float nowS) {
+    const AccidentalTouchResidualInput &input) {
+  const auto &[timeS, weightG, datapoints, epochS, anchorG, anchorS, weight, nowS] = input;
   AccidentalTouchResidual out;
   if (timeS == nullptr || weightG == nullptr || datapoints == 0) return out;
   const size_t newest = datapoints - 1U;

@@ -268,12 +268,11 @@ void beginCycle(ControlSource source = ControlSource::PHYSICAL) {
                 weightToCentigrams(
                     goalWeightDgToGrams(session.config.goalWeightDg)),
                 weightToCentigrams(session.config.weightOffsetG));
-  scaleProfileNoteEvent(
-      ScaleProfileEvent::SHOT_START, millis(),
-      scaleConnectionGenerationNow(), 0, NAN, session.id,
-      static_cast<uint32_t>(
-          static_cast<int32_t>(weightToCentigrams(
-              goalWeightDgToGrams(session.config.goalWeightDg)))));
+  scaleProfileNoteEvent(ScaleProfileEvent::SHOT_START, millis(),
+                        {.connectionGeneration = scaleConnectionGenerationNow(),
+                         .arg1 = session.id,
+                         .arg2 = static_cast<uint32_t>(static_cast<int32_t>(
+                             weightToCentigrams(goalWeightDgToGrams(session.config.goalWeightDg))))});
   maybeRequestNtpSyncOnActivity();
 }
 
@@ -391,9 +390,11 @@ bool finalizeCycle(EndReason reason, StopperState nextState,
       bullseyeMelodyConfig.enabled && soundAlertsEnabled() &&
       currentAlertOutputChannel() == AlertOutputChannel::BUZZER_ONLY &&
       localBuzzer.ready) {
-    bullseyeTracker.arm(session.config.goalWeightDg, millis(),
-                         session.config.dripDelayMs, currentWeightSequence,
-                         cupPresencePlacementId());
+    bullseyeTracker.arm({.targetWeightDg = session.config.goalWeightDg,
+                         .endedAtMs = millis(),
+                         .dripDelayMs = session.config.dripDelayMs,
+                         .endedWeightSequence = currentWeightSequence,
+                         .cupPlacementId = cupPresencePlacementId()});
   } else {
     bullseyeTracker.clear();
   }
@@ -453,8 +454,8 @@ bool finalizeCycle(EndReason reason, StopperState nextState,
   addDebugEvent(DebugCategory::STATE, DebugCode::CYCLE_ENDED,
                 static_cast<int32_t>(reason));
   scaleProfileNoteEvent(ScaleProfileEvent::SHOT_END, millis(),
-                        scaleConnectionGenerationNow(), 0, NAN,
-                        session.id, static_cast<uint32_t>(reason));
+                        {.connectionGeneration = scaleConnectionGenerationNow(),
+                         .arg1 = session.id, .arg2 = static_cast<uint32_t>(reason)});
   transitionTo(nextState);
   serviceIdleTare();
   return machineStopAccepted;

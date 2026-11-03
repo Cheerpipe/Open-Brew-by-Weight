@@ -295,7 +295,7 @@ struct CycleSession {
   bool firstDropsBeepSent = false;
   bool firstDropObserved = false;
   bool retareEffectPending = false;
-  ScaleTareSample retareZeroSample = {};
+  WeightSample retareZeroSample = {};
   uint32_t retareZeroCaptureSequence = 0;
   FirstFlowState firstFlow = {};
   ControlSource source = ControlSource::NONE;
@@ -1235,8 +1235,8 @@ void setWeightControlState(WeightControlState state) {
                   DebugCode::SCALE_CONTROL_SUSPENDED,
                   static_cast<int32_t>(previous));
     scaleProfileNoteEvent(ScaleProfileEvent::CONTROL_SUSPENDED, millis(),
-                          scaleConnectionGenerationNow(), 0, NAN,
-                          static_cast<uint32_t>(state), 0);
+                          {.connectionGeneration = scaleConnectionGenerationNow(),
+                           .arg1 = static_cast<uint32_t>(state)});
     enforceScaleLossBackup();
   } else if (state == WeightControlState::ACTIVE &&
              (previous == WeightControlState::SUSPENDED ||
@@ -1244,8 +1244,8 @@ void setWeightControlState(WeightControlState state) {
     addDebugEvent(DebugCategory::SCALE,
                   DebugCode::SCALE_CONTROL_RECOVERED);
     scaleProfileNoteEvent(ScaleProfileEvent::CONTROL_RECOVERED, millis(),
-                          scaleConnectionGenerationNow(), 0, NAN,
-                          static_cast<uint32_t>(state), 0);
+                          {.connectionGeneration = scaleConnectionGenerationNow(),
+                           .arg1 = static_cast<uint32_t>(state)});
     if (session.autoToManualGuardEnforced) {
       session.autoToManualGuardEnforced = false;
       shotCurveSampler.latchAtmCleared(millis());

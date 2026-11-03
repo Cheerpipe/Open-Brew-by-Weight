@@ -166,7 +166,7 @@ portMUX_TYPE scaleLinkMux = portMUX_INITIALIZER_UNLOCKED;
 TaskMutex idleScaleTareMux;
 IdleTareStatus workerIdleTare;
 uint32_t activeScaleCommandCycle = 0; // Protected by idleScaleTareMux.
-ScaleTareSample approvedTareSample; // Protected by idleScaleTareMux.
+WeightSample approvedTareSample; // Protected by idleScaleTareMux.
 TaskMutex scalePreferredMacMux;
 portMUX_TYPE scaleBeepMux = portMUX_INITIALIZER_UNLOCKED;
 portMUX_TYPE scaleDebugMux = portMUX_INITIALIZER_UNLOCKED;
@@ -623,10 +623,9 @@ void setScaleLinkState(ScaleLinkState state) {
             ? ScaleProfileEvent::SCALE_CONNECTED
             : ScaleProfileEvent::SCALE_DISCONNECTED,
         progressAtMs,
-        state == ScaleLinkState::CONNECTED ? connectedGeneration
-                                           : disconnectedGeneration,
-        0, NAN,
-        state == ScaleLinkState::CONNECTED ? 0 : scaleLastDisconnectReason, 0);
+        {.connectionGeneration = state == ScaleLinkState::CONNECTED ? connectedGeneration
+                                                                    : disconnectedGeneration,
+         .arg1 = state == ScaleLinkState::CONNECTED ? 0U : scaleLastDisconnectReason});
     addDebugEvent(DebugCategory::SCALE,
                   state == ScaleLinkState::CONNECTED
                       ? DebugCode::SCALE_CONNECTED
@@ -690,7 +689,7 @@ IdleTareStatus idleScaleTareStatus() {
   return workerIdleTare;
 }
 
-void approveScaleTareSample(const ScaleTareSample &sample) {
+void approveScaleTareSample(const WeightSample &sample) {
   const TaskLockGuard lock(idleScaleTareMux);
   approvedTareSample = sample;
 }
@@ -707,34 +706,34 @@ bool cancelIdleScaleTare(uint32_t requestId, IdleTareStatus *released) {
   return !writing;
 }
 
-void approveIdleScaleTareSample(uint32_t requestId, uint32_t packetSequence) {
+void approveIdleScaleTareSample(uint32_t requestId, const WeightSample &sample) {
   idleScaleTareMux.lock();
   if (workerIdleTare.requestId == requestId &&
       workerIdleTare.phase == IdleTarePhase::QUEUED) {
-    workerIdleTare.approvedPacketSequence = packetSequence;
+    workerIdleTare.approvedPacketSequence = sample.packetSequence;
   }
   idleScaleTareMux.unlock();
 }
 
-bool claimIdleScaleTare(uint32_t requestId, uint32_t expectedPacketSequence,
-                        uint32_t captureBoundary) {
+bool claimIdleScaleTare(uint32_t requestId, IdleTareClaim claim) {
   idleScaleTareMux.lock();
   const bool claimed = workerIdleTare.requestId == requestId &&
                        workerIdleTare.phase == IdleTarePhase::QUEUED &&
-                       (expectedPacketSequence == 0 ||
-                        workerIdleTare.approvedPacketSequence == expectedPacketSequence);
+                       (claim.expectedPacketSequence == 0 ||
+                        workerIdleTare.approvedPacketSequence == claim.expectedPacketSequence);
   if (claimed) {
     workerIdleTare.phase = IdleTarePhase::WRITING;
     workerIdleTare.startedAtMs = millis();
-    workerIdleTare.captureBoundary = captureBoundary;
+    workerIdleTare.captureBoundary = claim.captureBoundary;
   }
   const uint32_t startedAtMs = workerIdleTare.startedAtMs;
   const uint32_t generation = workerIdleTare.connectionGeneration;
   idleScaleTareMux.unlock();
   if (claimed) {
     scaleProfileNoteEvent(ScaleProfileEvent::TARE_PHASE, startedAtMs,
-                          generation, captureBoundary,
-                          NAN, requestId, static_cast<uint32_t>(IdleTarePhase::WRITING));
+                          {.connectionGeneration = generation,
+                           .sequence = claim.captureBoundary, .arg1 = requestId,
+                           .arg2 = static_cast<uint32_t>(IdleTarePhase::WRITING)});
   }
   return claimed;
 }
@@ -757,10 +756,10 @@ void finishIdleScaleTare(uint32_t requestId, bool succeeded,
   idleScaleTareMux.unlock();
   if (matched) {
     scaleProfileNoteEvent(ScaleProfileEvent::TARE_PHASE, writtenAtMs,
-                          generation, boundary,
-                          preTareWeightG, requestId,
-                          static_cast<uint32_t>(succeeded ? IdleTarePhase::SUCCEEDED : IdleTarePhase::FAILED) |
-                              (static_cast<uint32_t>(succeeded ? IdleTareReason::NONE : failureReason) << 8));
+                          {.connectionGeneration = generation, .sequence = boundary,
+                           .weightG = preTareWeightG, .arg1 = requestId,
+                           .arg2 = static_cast<uint32_t>(succeeded ? IdleTarePhase::SUCCEEDED : IdleTarePhase::FAILED) |
+                               (static_cast<uint32_t>(succeeded ? IdleTareReason::NONE : failureReason) << 8)});
   }
 }
 
@@ -789,8 +788,9 @@ bool enqueueScaleCommand(const ScaleCommand &command, bool toFront) {
     idleScaleTareMux.unlock();
     if (!available) return false;
     scaleProfileNoteEvent(ScaleProfileEvent::TARE_PHASE, millis(),
-                          stamped.connectionGeneration, 0, NAN, stamped.idleTareRequestId,
-                          static_cast<uint32_t>(IdleTarePhase::QUEUED));
+                          {.connectionGeneration = stamped.connectionGeneration,
+                           .arg1 = stamped.idleTareRequestId,
+                           .arg2 = static_cast<uint32_t>(IdleTarePhase::QUEUED)});
   }
   BaseType_t queued = pdFALSE;
   if (toFront) {
@@ -869,14 +869,14 @@ bool publishScaleEvent(const ScaleEvent &event, bool critical) {
           scaleWeightEventDrops - profileLastWeightFifoDrops;
       profileLastWeightFifoDrops = scaleWeightEventDrops;
       scaleProfileNoteEvent(ScaleProfileEvent::CONTROL_FIFO_LOSS, millis(),
-                            stamped.connectionGeneration,
-                            stamped.packetSequence, NAN, droppedWindow, 0);
+                            {.connectionGeneration = stamped.connectionGeneration,
+                             .sequence = stamped.packetSequence, .arg1 = droppedWindow});
     }
     if (streamGapMs != 0) {
       const uint32_t nowMs = millis();
       scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, nowMs,
-                            stamped.connectionGeneration,
-                            stamped.packetSequence, NAN, streamGapMs, 0);
+                            {.connectionGeneration = stamped.connectionGeneration,
+                             .sequence = stamped.packetSequence, .arg1 = streamGapMs});
       if (lastScalePacketGapLogMs == 0 ||
           static_cast<uint32_t>(nowMs - lastScalePacketGapLogMs) >=
               SCALE_PACKET_GAP_LOG_MIN_MS) {
@@ -930,8 +930,8 @@ bool publishScaleEvent(const ScaleEvent &event, bool critical) {
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_EVENT_DROPPED,
                   static_cast<int32_t>(stamped.type));
     scaleProfileNoteEvent(ScaleProfileEvent::EVENT_DROPPED, millis(),
-                          stamped.connectionGeneration, 0, NAN,
-                          scaleEventsDropped.load(std::memory_order_relaxed), 0);
+                          {.connectionGeneration = stamped.connectionGeneration,
+                           .arg1 = scaleEventsDropped.load(std::memory_order_relaxed)});
     return false;
   }
   if (xQueueSend(scaleEventQueue, &stamped, 0) != pdTRUE) {
@@ -940,8 +940,8 @@ bool publishScaleEvent(const ScaleEvent &event, bool critical) {
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_EVENT_DROPPED,
                   static_cast<int32_t>(stamped.type));
     scaleProfileNoteEvent(ScaleProfileEvent::EVENT_DROPPED, millis(),
-                          stamped.connectionGeneration, 0, NAN,
-                          scaleEventsDropped.load(std::memory_order_relaxed), 0);
+                          {.connectionGeneration = stamped.connectionGeneration,
+                           .arg1 = scaleEventsDropped.load(std::memory_order_relaxed)});
     return false;
   }
   return true;
@@ -1026,9 +1026,10 @@ bool publishPendingScaleWeightEvent() {
   const ScaleWeightSample sample = scale.getWeightSample();
   // Raw observation at the decode boundary: before acceptance, tare grace,
   // range/slew/recovery rejection, or control FIFO publication.
-  scaleProfileNoteWeight(sample.weightG, sample.receivedAtMs,
-                         scaleConnectionGenerationNow(),
-                         sample.captureSequence, false, millis());
+  scaleProfileNoteWeight(
+      {{scaleConnectionGenerationNow(), sample.captureSequence}, sample.receivedAtMs,
+       sample.weightG},
+      false, millis());
   event.receivedAtMs = sample.receivedAtMs;
   event.captureSequence = sample.captureSequence;
   event.weightG = sample.weightG;
@@ -1100,7 +1101,7 @@ bool approveScaleWrite(void *context, uint32_t &captureBoundary) {
       if (!std::isfinite(write.event.preTareWeightG) ||
           scale.getWeightSample().captureSequence != captureBoundary ||
           !claimIdleScaleTare(write.command.idleTareRequestId,
-                             getScaleLinkSnapshot().packetSequence, captureBoundary)) return false;
+                              {getScaleLinkSnapshot().packetSequence, captureBoundary})) return false;
     }
   }
   TaskLockGuard lock(idleScaleTareMux);
@@ -1173,8 +1174,9 @@ void executeScaleStartCommand(const ScaleCommand &command) {
     scaleProfileNoteEvent(
         event.tareSucceeded ? ScaleProfileEvent::TARE_WRITE_OK
                             : ScaleProfileEvent::TARE_WRITE_FAILED,
-        millis(), event.connectionGeneration, event.captureSequence, NAN,
-        event.cupWeightRequestId, 0);
+        millis(),
+        {.connectionGeneration = event.connectionGeneration,
+         .sequence = event.captureSequence, .arg1 = event.cupWeightRequestId});
   }
   publishScaleEvent(event, true);
 }
@@ -1227,8 +1229,9 @@ void executeScaleTareCommand(const ScaleCommand &command) {
         if (status.requestId == command.idleTareRequestId &&
             status.phase == IdleTarePhase::QUEUED) {
           scaleProfileNoteEvent(ScaleProfileEvent::TARE_PHASE, millis(),
-                                status.connectionGeneration, status.captureBoundary, NAN,
-                                status.requestId, static_cast<uint32_t>(IdleTarePhase::QUEUED));
+                                {.connectionGeneration = status.connectionGeneration,
+                                 .sequence = status.captureBoundary, .arg1 = status.requestId,
+                                 .arg2 = static_cast<uint32_t>(IdleTarePhase::QUEUED)});
           if (xQueueSend(scaleCommandQueue, &command, 0) != pdTRUE)
             finishIdleScaleTare(command.idleTareRequestId, false, IdleTareReason::QUEUE_FULL);
         }
@@ -1241,11 +1244,11 @@ void executeScaleTareCommand(const ScaleCommand &command) {
       scaleProfileNoteEvent(
           event.writeSucceeded ? ScaleProfileEvent::TARE_WRITE_OK
                                : ScaleProfileEvent::TARE_WRITE_FAILED,
-          event.receivedAtMs, event.connectionGeneration,
-          event.captureSequence, NAN,
-          command.idleTareRequestId != 0 ? command.idleTareRequestId
-                                         : command.cupWeightRequestId,
-          0);
+          event.receivedAtMs,
+          {.connectionGeneration = event.connectionGeneration,
+           .sequence = event.captureSequence,
+           .arg1 = command.idleTareRequestId != 0 ? command.idleTareRequestId
+                                                  : command.cupWeightRequestId});
     }
     if (event.writeSucceeded && command.cycleId != 0 && command.idleTareRequestId == 0) {
       const TaskLockGuard lock(scaleCriticalEventMux);
@@ -1381,16 +1384,16 @@ void executeScaleDebugCommand(BookooDebugAction action, uint8_t beepLevel) {
         addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_DEBUG_UNSUPPORTED);
         return;
       }
-      scaleProfileNoteEvent(
-          ScaleProfileEvent::TARE_REQUEST, millis(), generation, 0, NAN, 0,
-          static_cast<uint32_t>(ScaleProfileTareOrigin::MANUAL));
+      scaleProfileNoteEvent(ScaleProfileEvent::TARE_REQUEST, millis(),
+                            {.connectionGeneration = generation,
+                             .arg2 = static_cast<uint32_t>(ScaleProfileTareOrigin::MANUAL)});
       result = action == BookooDebugAction::TARE
                    ? scale.tare(&admission)
                    : scale.tareStartTimer(&admission);
       scaleProfileNoteEvent(
           scaleCommandOk(result) ? ScaleProfileEvent::TARE_WRITE_OK
                                  : ScaleProfileEvent::TARE_WRITE_FAILED,
-          millis(), generation, 0, NAN, 0, 0);
+          millis(), {.connectionGeneration = generation});
       break;
     case BookooDebugAction::BEEP:
       if (!scale.features().has(ScaleFeatureIndependentBeep)) {
@@ -2298,9 +2301,7 @@ bool startScaleDiscoveryScan(const char *mac, bool forceRestart) {
       !scale.isConnecting() && !scale.isLinkUp()) {
     return false;
   }
-  uint16_t interval = BLE_SCAN_BALANCED_INTERVAL;
-  uint16_t window = BLE_SCAN_BALANCED_WINDOW;
-  bleScanHciParams(discoveryScanIntensity(), interval, window);
+  const auto [interval, window] = bleScanHciParams(discoveryScanIntensity());
   const bool scanningBefore = scale.isScanning();
   const uint16_t prevInterval = scaleScanAppliedInterval;
   const uint16_t prevWindow = scaleScanAppliedWindow;
@@ -2336,9 +2337,7 @@ void serviceScaleScanIntensity() {
   if (!scale.isScanning() || scale.isConnecting()) {
     return;
   }
-  uint16_t interval = BLE_SCAN_BALANCED_INTERVAL;
-  uint16_t window = BLE_SCAN_BALANCED_WINDOW;
-  bleScanHciParams(discoveryScanIntensity(), interval, window);
+  const auto [interval, window] = bleScanHciParams(discoveryScanIntensity());
   if (scaleScanAppliedInterval == interval &&
       scaleScanAppliedWindow == window) {
     return;
@@ -2410,11 +2409,18 @@ bool configureScaleWorkerBridge(const ScaleWorkerBridgeCallbacks &callbacks) {
   return true;
 }
 
-void serviceScaleWorkerDiscovery(uint32_t &lastScanCycleMs,
-                                 uint32_t &lastConnectLogMs,
-                                 bool &connectAttemptSeriesActive,
-                                 uint32_t &scanSessionAtMs,
-                                 uint32_t &scanLastAdvertAtMs) {
+// Discovery bookkeeping the worker loop carries across ticks.
+struct ScaleDiscoveryState {
+  uint32_t lastScanCycleMs = 0;
+  uint32_t lastConnectLogMs = 0;
+  bool connectAttemptSeriesActive = false;
+  uint32_t scanSessionAtMs = 0;
+  uint32_t scanLastAdvertAtMs = 0;
+};
+
+void serviceScaleWorkerDiscovery(ScaleDiscoveryState &discovery) {
+  auto &[lastScanCycleMs, lastConnectLogMs, connectAttemptSeriesActive, scanSessionAtMs,
+         scanLastAdvertAtMs] = discovery;
   const bool preferenceRestarted = applyScalePreferenceReset();
   if (preferenceRestarted) {
     connectAttemptSeriesActive = false;
@@ -2728,11 +2734,7 @@ void scaleWorkerTask(void *) {
   scaleWorkerTaskHandle.store(xTaskGetCurrentTaskHandle(),
                               std::memory_order_release);
 #endif
-  uint32_t lastScanCycleMs = 0;
-  uint32_t lastConnectLogMs = 0;
-  bool connectAttemptSeriesActive = false;
-  uint32_t scanSessionAtMs = 0;
-  uint32_t scanLastAdvertAtMs = 0;
+  ScaleDiscoveryState discovery;
   uint32_t telemetryAtMs = 0;
 
   const bool watchdogSubscribed = subscribeCurrentTaskToWatchdog();
@@ -2856,7 +2858,7 @@ void scaleWorkerTask(void *) {
     // Packet timeout / remote-drop detection must not wait behind beeps or
     // queued commands. Bookoo has no heartbeat; silence is the only watchdog.
     if (linked) {
-      connectAttemptSeriesActive = false;
+      discovery.connectAttemptSeriesActive = false;
       serviceScaleWorkerLink();
       serviceScaleLinkRssi(nowMs);
       if (linkSnapshotDue) {
@@ -2876,9 +2878,7 @@ void scaleWorkerTask(void *) {
     const bool connecting =
         scale.isConnecting() || scaleLoggedGattConnecting;
     if (connecting) {
-      serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                                  connectAttemptSeriesActive, scanSessionAtMs,
-                                  scanLastAdvertAtMs);
+      serviceScaleWorkerDiscovery(discovery);
       finishScaleSection(ScaleWorkerPhase::DISCOVERY);
     } else {
       if (takeScalePowerOff()) {
@@ -2914,9 +2914,7 @@ void scaleWorkerTask(void *) {
               executeScaleDebugCommand(debugAction, debugLevel);
               finishScaleSection(ScaleWorkerPhase::COMMANDS);
             } else if (!linked && !applyScaleDiscoveryPause()) {
-              serviceScaleWorkerDiscovery(lastScanCycleMs, lastConnectLogMs,
-                                          connectAttemptSeriesActive,
-                                          scanSessionAtMs, scanLastAdvertAtMs);
+              serviceScaleWorkerDiscovery(discovery);
               finishScaleSection(ScaleWorkerPhase::DISCOVERY);
             }
           }
@@ -2954,10 +2952,10 @@ void scaleWorkerTask(void *) {
 // weights. Pure observation: the frame stays ineligible for control. The
 // note keeps the frame's own reception time.
 void handleScaleDroppedFrameForProfile(const ScaleDroppedFrame &frame) {
-  const bool stale = frame.reason == ScaleFrameDropReason::Stale;
   scaleProfileNoteDroppedFrame(
-      stale, frame.weightDecoded, frame.weightG, frame.receivedAtMs,
-      frame.generation, frame.captureSequence, frame.length, millis());
+      {{frame.generation, frame.captureSequence}, frame.receivedAtMs, frame.weightG},
+      frame.length, frame.reason == ScaleFrameDropReason::Stale, frame.weightDecoded,
+      millis());
 }
 
 bool initializeScaleWorker() {
