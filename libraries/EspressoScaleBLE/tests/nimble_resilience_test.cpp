@@ -25,22 +25,27 @@ NimblePeerKey peer(uint8_t suffix, uint8_t type = 0) {
 
 void testBackoffAndWrap() {
   NimbleBackoffPolicy policy;
-  const uint32_t first = policy.schedule(1000, 1);
+  policy.addEntropy(1);
+  const uint32_t first = policy.schedule(1000);
   CHECK(first >= 50 && first <= 80);
   CHECK(policy.active(1000));
   CHECK(!policy.active(1000 + first));
 
-  const uint32_t second = policy.schedule(2000, 2);
+  policy.addEntropy(2);
+  const uint32_t second = policy.schedule(2000);
   CHECK(second >= 80 && second <= 110);
   CHECK(second + 120 <= 250);
-  const uint32_t third = policy.schedule(3000, 3);
+  policy.addEntropy(3);
+  const uint32_t third = policy.schedule(3000);
   CHECK(third >= 100 && third <= 130);
   CHECK(third + 120 <= 250);
-  const uint32_t fourth = policy.schedule(4000, 4);
+  policy.addEntropy(4);
+  const uint32_t fourth = policy.schedule(4000);
   CHECK(fourth >= 250 && fourth <= 280);
   uint32_t capped = 0;
   for (uint8_t attempt = 5; attempt <= 12; ++attempt) {
-    capped = policy.schedule(4000 + attempt, attempt);
+    policy.addEntropy(attempt);
+    capped = policy.schedule(4000 + attempt);
   }
   CHECK(capped == 5000);
   CHECK(policy.failureCount() == 12);
@@ -50,12 +55,14 @@ void testBackoffAndWrap() {
   policy.reset();
   CHECK(policy.failureCount() == 0);
   CHECK(!policy.active(0));
-  const uint32_t recovered = policy.schedule(5000, 13);
+  policy.addEntropy(13);
+  const uint32_t recovered = policy.schedule(5000);
   CHECK(recovered >= 50 && recovered <= 80);
   policy.reset();
 
   const uint32_t nearWrap = 0xfffffff0U;
-  const uint32_t wrappedDelay = policy.schedule(nearWrap, 9);
+  policy.addEntropy(9);
+  const uint32_t wrappedDelay = policy.schedule(nearWrap);
   CHECK(policy.active(nearWrap));
   CHECK(!policy.active(nearWrap + wrappedDelay));
 }
@@ -129,7 +136,8 @@ void testThousandRecoveryCycles() {
       CHECK((event >> 8) == generation);
     }
     ++cleanupEdges;
-    const uint32_t wait = backoff.schedule(now, generation);
+    backoff.addEntropy(generation);
+    const uint32_t wait = backoff.schedule(now);
     CHECK(wait >= 50 && wait <= 80);
     CHECK(wait + 120 <= 250);
     now += wait;

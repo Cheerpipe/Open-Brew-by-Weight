@@ -24,7 +24,8 @@ inline bool nimbleTimeReached(uint32_t nowMs, uint32_t deadlineMs) {
 class NimbleBackoffPolicy {
  public:
   void reset();
-  uint32_t schedule(uint32_t nowMs, uint32_t entropy);
+  void addEntropy(uint32_t entropy);
+  uint32_t schedule(uint32_t nowMs);
   void clearDeadline();
   bool active(uint32_t nowMs) const;
   uint32_t remainingMs(uint32_t nowMs) const;
@@ -32,7 +33,7 @@ class NimbleBackoffPolicy {
   uint32_t deadlineMs() const { return deadlineMs_; }
 
  private:
-  uint32_t nextRandom(uint32_t entropy);
+  uint32_t nextRandom();
 
   uint32_t deadlineMs_ = 0;
   uint32_t randomState_ = 0x6d2b79f5U;

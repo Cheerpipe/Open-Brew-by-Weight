@@ -869,7 +869,7 @@ static void run() {
   {
     NimbleScaleClient c(false); ready(c);
     const int raw=BLE_HS_HCI_ERR(8);
-    CHECK(c.armGapSilenceIfCurrent(c.linkOperationId_,1,raw));
+    CHECK(c.armGapSilenceIfCurrent({c.linkOperationId_,1,raw}));
     c.finishLink(true,ScaleDisconnectReason::DISCOVERY_FAILED,BLE_HS_EBUSY);
     CHECK(c.lastReason()==ScaleDisconnectReason::SUPERVISION_TIMEOUT);
     CHECK(c.diagnostics().disconnectStatus==raw);

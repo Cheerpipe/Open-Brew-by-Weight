@@ -897,6 +897,13 @@ class NimbleScaleClient {
                  bytes);
   }
 
+  // Completion of one NimBLE procedure, as reported by its GAP/GATT callback.
+  struct ProcedureOutcome {
+    uint32_t operationId;
+    uint16_t connectionHandle;
+    int32_t status;
+  };
+
   struct Event {
     EventType type;
     uint32_t generation;
@@ -994,11 +1001,10 @@ class NimbleScaleClient {
   }
 
   void armCommunicationSilenceLocked(SilenceTrigger trigger,
-                                      uint32_t startedAtMs,
-                                      uint32_t powerOffGeneration) {
+                                      uint32_t startedAtMs) {
     radioSilenceArmed_ = true;
     radioSilenceStartedAtMs_ = startedAtMs;
-    powerOffSilenceGeneration_ = powerOffGeneration;
+    powerOffSilenceGeneration_ = 0;
     ++diagnostics_.silenceSequence;
     if (diagnostics_.silenceSequence == 0) ++diagnostics_.silenceSequence;
     diagnostics_.silenceStartedAtMs = startedAtMs;
@@ -1009,7 +1015,8 @@ class NimbleScaleClient {
                                 uint32_t powerOffGeneration = 0) {
     const uint32_t startedAtMs = nowMs();
     portENTER_CRITICAL(&mux_);
-    armCommunicationSilenceLocked(trigger, startedAtMs, powerOffGeneration);
+    armCommunicationSilenceLocked(trigger, startedAtMs);
+    powerOffSilenceGeneration_ = powerOffGeneration;
     portEXIT_CRITICAL(&mux_);
   }
 
@@ -1039,29 +1046,29 @@ class NimbleScaleClient {
     portENTER_CRITICAL(&mux_);
     radioSubmitActive_ = false;
     if (pendingDisconnect_ || cleanupDisconnectDuringSubmit_) {
-      armCommunicationSilenceLocked(SilenceTrigger::Gap, nowMs(), 0);
+      armCommunicationSilenceLocked(SilenceTrigger::Gap, nowMs());
       cleanupDisconnectDuringSubmit_ = false;
     }
     portEXIT_CRITICAL(&mux_);
     return status;
   }
 
-  bool armGapSilenceIfCurrent(uint32_t operationId, uint16_t connectionHandle,
-                              int32_t status) {
+  bool armGapSilenceIfCurrent(const ProcedureOutcome &disconnect) {
     TaskHandle_t waiter = nullptr;
     const uint32_t startedAtMs = nowMs();
     portENTER_CRITICAL(&mux_);
-    const bool current = operationId != 0 && operationId == linkOperationId_ &&
-                         connectionHandle == connectionHandle_;
+    const bool current = disconnect.operationId != 0 &&
+                         disconnect.operationId == linkOperationId_ &&
+                         disconnect.connectionHandle == connectionHandle_;
     if (current) {
       if (!radioSubmitActive_) {
-        armCommunicationSilenceLocked(SilenceTrigger::Gap, startedAtMs, 0);
+        armCommunicationSilenceLocked(SilenceTrigger::Gap, startedAtMs);
       }
       pendingDisconnect_ = true;
-      pendingDisconnectStatus_ = status;
+      pendingDisconnectStatus_ = disconnect.status;
       rxHead_ = rxTail_ = rxCount_ = 0;
       waiter = writeWaiter_;
-      writeResult_ = status;
+      writeResult_ = disconnect.status;
       writeInterrupted_ = true;
     } else {
       ++staleCallbacks_;
@@ -1146,8 +1153,8 @@ class NimbleScaleClient {
       case BLE_GAP_EVENT_DISC_COMPLETE:
         if (callbackMatches(operationId, CallbackDomain::Scan)) {
           pushCriticalEvent(EventType::ScanComplete,
-                            event->disc_complete.reason, kInvalidHandle,
-                            operationId);
+                            {operationId, kInvalidHandle,
+                             event->disc_complete.reason});
         }
         return 0;
       case BLE_GAP_EVENT_CONNECT:
@@ -1177,8 +1184,9 @@ class NimbleScaleClient {
           }
           portEXIT_CRITICAL(&mux_);
           if (current) {
-            pushCriticalEvent(EventType::ConnectComplete, event->connect.status,
-                              event->connect.conn_handle, operationId);
+            pushCriticalEvent(EventType::ConnectComplete,
+                              {operationId, event->connect.conn_handle,
+                               event->connect.status});
           }
         }
         return 0;
@@ -1195,16 +1203,16 @@ class NimbleScaleClient {
             linkCleanupGapAtMs_ = nowMs();
             if (radioSubmitActive_) cleanupDisconnectDuringSubmit_ = true;
             else armCommunicationSilenceLocked(SilenceTrigger::Gap,
-                                               linkCleanupGapAtMs_, 0);
+                                               linkCleanupGapAtMs_);
           }
           portEXIT_CRITICAL(&mux_);
           if (cleanup) return 0;
-        }
-        if (armGapSilenceIfCurrent(operationId,
-                                   event->disconnect.conn.conn_handle,
-                                   event->disconnect.reason)) {
-          pushCriticalEvent(EventType::Disconnected, event->disconnect.reason,
-                            event->disconnect.conn.conn_handle, operationId);
+          const ProcedureOutcome disconnect = {
+              operationId, event->disconnect.conn.conn_handle,
+              event->disconnect.reason};
+          if (armGapSilenceIfCurrent(disconnect)) {
+            pushCriticalEvent(EventType::Disconnected, disconnect);
+          }
         }
         return 0;
       case BLE_GAP_EVENT_NOTIFY_RX:
@@ -1475,8 +1483,8 @@ class NimbleScaleClient {
       portEXIT_CRITICAL(&mux_);
       return 0;
     }
-    pushControlEvent(EventType::ServicesComplete, error->status,
-                     connectionHandle, operationId);
+    pushControlEvent(EventType::ServicesComplete,
+                     {operationId, connectionHandle, error->status});
     return 0;
   }
 
@@ -1533,8 +1541,8 @@ class NimbleScaleClient {
       }
       return 0;
     }
-    pushControlEvent(EventType::CharacteristicsComplete, error->status,
-                     connectionHandle, operationId);
+    pushControlEvent(EventType::CharacteristicsComplete,
+                     {operationId, connectionHandle, error->status});
     return 0;
   }
 
@@ -1560,8 +1568,8 @@ class NimbleScaleClient {
       portEXIT_CRITICAL(&mux_);
       return 0;
     }
-    pushControlEvent(EventType::DescriptorsComplete, error->status,
-                     connectionHandle, operationId);
+    pushControlEvent(EventType::DescriptorsComplete,
+                     {operationId, connectionHandle, error->status});
     return 0;
   }
 
@@ -1600,19 +1608,18 @@ class NimbleScaleClient {
     if (purpose == WritePurpose::Command && waiter != nullptr) {
       xSemaphoreGive(writeSignal_);
     } else if (purpose != WritePurpose::None) {
-      pushControlEvent(EventType::WriteComplete, error->status,
-                       connectionHandle, operationId);
+      pushControlEvent(EventType::WriteComplete,
+                       {operationId, connectionHandle, error->status});
     }
     return 0;
   }
 
-  bool pushControlEvent(EventType type, int32_t status,
-                        uint16_t connectionHandle, uint32_t operationId) {
+  bool pushControlEvent(EventType type, const ProcedureOutcome &outcome) {
     Event event = {};
     event.type = type;
-    event.operationId = operationId;
-    event.status = status;
-    event.connectionHandle = connectionHandle;
+    event.operationId = outcome.operationId;
+    event.status = outcome.status;
+    event.connectionHandle = outcome.connectionHandle;
     bool pushed = false;
     portENTER_CRITICAL(&mux_);
     event.generation = generation_;
@@ -1624,13 +1631,12 @@ class NimbleScaleClient {
     return pushed;
   }
 
-  bool pushCriticalEvent(EventType type, int32_t status,
-                         uint16_t connectionHandle, uint32_t operationId) {
+  bool pushCriticalEvent(EventType type, const ProcedureOutcome &outcome) {
     Event event = {};
     event.type = type;
-    event.operationId = operationId;
-    event.status = status;
-    event.connectionHandle = connectionHandle;
+    event.operationId = outcome.operationId;
+    event.status = outcome.status;
+    event.connectionHandle = outcome.connectionHandle;
     portENTER_CRITICAL(&mux_);
     event.generation = generation_;
     const bool pushed = criticalEvents_.push(event);
@@ -2704,9 +2710,9 @@ class NimbleScaleClient {
                            reason != ScaleDisconnectReason::UNSUPPORTED_SCALE &&
                            reason != ScaleDisconnectReason::HOST_RESET;
     if (retryable) {
-      const uint32_t entropy = static_cast<uint32_t>(selectedAddress_.val[0]) |
-                               generation_ << 8;
-      const uint32_t delayMs = backoff_.schedule(nowMs(), entropy);
+      backoff_.addEntropy(static_cast<uint32_t>(selectedAddress_.val[0]) |
+                          generation_ << 8);
+      const uint32_t delayMs = backoff_.schedule(nowMs());
       ++backoffCount_;
       if (reason == ScaleDisconnectReason::SCAN_START_FAILED || communicationSilenced() ||
           linkCleanupPending()) {
@@ -2766,7 +2772,7 @@ class NimbleScaleClient {
       if (linkCleanupOperation_ == operation && !linkCleanupGapReceived_) {
         if (rc == 0 || rc == BLE_HS_EALREADY) linkCleanupTerminate_ = false;
         if (rc == BLE_HS_ENOTCONN) linkCleanupOperation_ = 0;
-        armCommunicationSilenceLocked(SilenceTrigger::LocalDisconnect, nowMs(), 0);
+        armCommunicationSilenceLocked(SilenceTrigger::LocalDisconnect, nowMs());
       }
       portEXIT_CRITICAL(&mux_);
       noteTeardownResult(rc);

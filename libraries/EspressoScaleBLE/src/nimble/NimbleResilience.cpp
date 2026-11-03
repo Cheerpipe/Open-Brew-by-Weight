@@ -14,15 +14,18 @@ void NimbleBackoffPolicy::reset() {
   armed_ = false;
 }
 
-uint32_t NimbleBackoffPolicy::nextRandom(uint32_t entropy) {
+void NimbleBackoffPolicy::addEntropy(uint32_t entropy) {
   randomState_ ^= entropy + 0x9e3779b9U;
+}
+
+uint32_t NimbleBackoffPolicy::nextRandom() {
   randomState_ ^= randomState_ << 13;
   randomState_ ^= randomState_ >> 17;
   randomState_ ^= randomState_ << 5;
   return randomState_;
 }
 
-uint32_t NimbleBackoffPolicy::schedule(uint32_t nowMs, uint32_t entropy) {
+uint32_t NimbleBackoffPolicy::schedule(uint32_t nowMs) {
   constexpr size_t delayCount =
       sizeof(kBackoffDelaysMs) / sizeof(kBackoffDelaysMs[0]);
   const size_t index = failureCount_ < delayCount ? failureCount_
@@ -30,7 +33,7 @@ uint32_t NimbleBackoffPolicy::schedule(uint32_t nowMs, uint32_t entropy) {
   if (failureCount_ != 0xff) {
     ++failureCount_;
   }
-  const uint32_t jitter = nextRandom(entropy) % (kBackoffJitterMs + 1U);
+  const uint32_t jitter = nextRandom() % (kBackoffJitterMs + 1U);
   const uint32_t delayMs = kBackoffDelaysMs[index] +
                            (index + 1 == delayCount ? 0 : jitter);
   deadlineMs_ = nowMs + delayMs;
