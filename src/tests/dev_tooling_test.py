@@ -798,6 +798,22 @@ with tempfile.TemporaryDirectory(prefix="openbrewbyweight-version-") as temporar
     subprocess.run([*git, "commit", "-qm", "v"], check=True)
     subprocess.run(version_command, check=True, capture_output=True)
     assert "1.2.3+" in output.read_text() and "-dirty" not in output.read_text()
+    # A firmware build splits the identity into a source beside a stable header,
+    # with the OTA marker text and the host header's field order unchanged.
+    host_tag = output.read_text()
+    assert "FW_IMAGE_TAG_STRING" in host_tag and 'constexpr char FW_VERSION[]' in host_tag
+    assert '"OPENBREWBYWEIGHT_FW_TAG_V2|arch=" FW_BOARD_ARCH_STRING "|hw="' in host_tag, host_tag
+    assert "\\" not in host_tag, host_tag
+    subprocess.run([*version_command, "split"], check=True, capture_output=True)
+    split_source = output.with_suffix(".cpp").read_text()
+    assert "1.2.3+" not in output.read_text() and "FW_IMAGE_TAG_STRING" not in output.read_text()
+    assert "extern const char FW_VERSION[];" in output.read_text()
+    assert 'extern "C" const char OPEN_BREW_BY_WEIGHT_FW_IMAGE_TAG[];' in output.read_text()
+    assert "1.2.3+" in split_source
+    assert 'OPEN_BREW_BY_WEIGHT_FW_IMAGE_TAG[] = FW_IMAGE_TAG_STRING;' in split_source
+    assert host_tag[host_tag.index('#define FW_IMAGE_TAG_STRING'):host_tag.index('namespace')].strip() \
+        == split_source[split_source.index('#define FW_IMAGE_TAG_STRING'):
+                        split_source.index('namespace')].strip()
     (version_root / "new.txt").write_text("x")
     subprocess.run(version_command, check=True, capture_output=True)
     assert '-dirty"' in output.read_text()

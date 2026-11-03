@@ -21,8 +21,12 @@ namespace openbrewbyweight {
 
 // The identity marker every flashable Open Brew by Weight image carries. It has
 // external linkage and is read back by begin(), which is what keeps the linker
-// from garbage-collecting the one thing an OTA verify looks for.
+// from garbage-collecting the one thing an OTA verify looks for. Firmware builds
+// define it in their generated version unit, so a commit does not recompile this
+// file; host tests get the whole identity from the header.
+#ifdef FW_IMAGE_TAG_STRING
 extern "C" const char OPEN_BREW_BY_WEIGHT_FW_IMAGE_TAG[] = FW_IMAGE_TAG_STRING;
+#endif
 
 namespace {
 

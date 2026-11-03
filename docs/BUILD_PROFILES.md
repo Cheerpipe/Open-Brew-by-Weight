@@ -446,8 +446,9 @@ Its `generated/` directory contains:
   supported overrides;
 - `OpenBrewByWeightBuildProfileGenerated.h`: compile-time macros consumed by the
   firmware, including `OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER` from `speaker.present`;
-- `OpenBrewByWeightVersion.h`: firmware version plus architecture and profile
-  compatibility identities.
+- `OpenBrewByWeightVersion.h` and `.cpp`: architecture and profile compatibility
+  identities in the header; the commit-dependent firmware version and the OTA
+  image tag in the source, so a new commit recompiles only that unit.
 
 The build also copies a named binary to
 `openbrewbyweight-<hardware-id>--<machine-id>.bin` inside the same build directory.

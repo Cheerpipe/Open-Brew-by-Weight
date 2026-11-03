@@ -165,8 +165,8 @@ esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request
 // whose identity is not unique (uncommitted changes, no Git) is revalidated.
 esp_err_t OpenBrewByWeightNetwork::shotTraceVocabularyHandler(httpd_req_t *request) {
   httpd_resp_set_type(request, JSON_CONTENT_TYPE);
-  constexpr bool unique = !constexprTextContains(FW_VERSION, "-dirty") &&
-                          !constexprTextContains(FW_VERSION, "+unknown");
+  const bool unique = strstr(FW_VERSION, "-dirty") == nullptr &&
+                      strstr(FW_VERSION, "+unknown") == nullptr;
   httpd_resp_set_hdr(request, "Cache-Control",
                      unique ? "private, max-age=31536000, immutable" : "no-cache");
   httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");

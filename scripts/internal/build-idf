@@ -174,7 +174,7 @@ obbw_idf_emit_opt_overlay
 
 ./scripts/gen_version.sh "$OPENBREWBYWEIGHT_ARCH" \
   "$OPENBREWBYWEIGHT_HARDWARE_COMPAT" "$OPENBREWBYWEIGHT_MACHINE_COMPAT" \
-  "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightVersion.h"
+  "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightVersion.h" split
 
 # Generate the Web UI after the firmware identity header so the baked cache
 # version equals the reported firmware version; the UI compares them to reload
@@ -208,7 +208,7 @@ webui_machine_icon="$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "\
 node ./scripts/gen_web_ui.js \
   --output "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightWebAssetsGzip.h" \
   --version "$(sed -n 's/^#define FW_VERSION_STRING "\(.*\)"$/\1/p' \
-    "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightVersion.h")" \
+    "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightVersion.cpp")" \
   --webui-language "$(obbw_get webui_language)" ${webui_args[@]+"${webui_args[@]}"}
 
 obbw_idf_commit_extra_flags_stamp
