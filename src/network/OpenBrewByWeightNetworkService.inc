@@ -141,7 +141,7 @@ bool OpenBrewByWeightNetwork::lockWorkBuf() {
 }
 
 void OpenBrewByWeightNetwork::unlockWorkBuf() {
-  xSemaphoreGive(statusResponseMux_.get());
+  semaphoreGive(statusResponseMux_.get());
 }
 
 void OpenBrewByWeightNetwork::unlockJsonBody() {
@@ -580,7 +580,7 @@ void OpenBrewByWeightNetwork::taskLoop() {
   stopNtp();
   stopNetwork();
   taskHandle_ = nullptr;
-  if (taskStopped_) xSemaphoreGive(taskStopped_.get());
+  if (taskStopped_) semaphoreGive(taskStopped_.get());
   vTaskDelete(nullptr);
 }
 

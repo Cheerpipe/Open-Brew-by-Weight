@@ -12,6 +12,7 @@
 #include "OpenBrewByWeightShotCurveTypes.h"
 #include "OpenBrewByWeightShotLogTypes.h"
 #include "OpenBrewByWeightTime.h"
+#include "OpenBrewByWeightSemaphore.h"
 #include "OpenBrewByWeightTaskMutex.h"
 #include "OpenBrewByWeightBootHeap.h"
 #include "OpenBrewByWeightResourceOwner.h"
@@ -39,7 +40,7 @@ struct FreeRtosQueueDeleter {
 };
 
 struct FreeRtosSemaphoreDeleter {
-  void operator()(SemaphoreHandle_t handle) const { vSemaphoreDelete(handle); }
+  void operator()(SemaphoreHandle_t handle) const { semaphoreDelete(handle); }
 };
 
 enum class StaState : uint8_t {

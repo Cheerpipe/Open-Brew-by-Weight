@@ -260,10 +260,10 @@ struct ShotTraceExportRef {
 // The newest completed trace, taken for the flash pool, and the identity of
 // the summary it explains.
 struct ShotTracePending {
-  ShotTraceExportRef trace;
-  ShotKey shot;
-  uint32_t firmwarePacked;
-  uint8_t endReason;
+  ShotTraceExportRef trace{};
+  ShotKey shot{};
+  uint32_t firmwarePacked = 0;
+  uint8_t endReason = 0;
 };
 
 inline int16_t shotTraceDg(float weightG) {

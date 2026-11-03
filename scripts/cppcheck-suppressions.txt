@@ -6,38 +6,6 @@
 *:*/esp-idf*/components/*
 *:*/idf/managed_components/*
 *:*/idf/third_party/*
-# Owner: firmware-platform. Review/expiry: 2027-03-01.
-# FreeRTOS semaphore macros (xSemaphoreGive, vSemaphoreDelete, ...) expand to
-# C handle casts inside the macro; the cast is not written at these call
-# sites, so it cannot be clarified there. Verified still firing on 2.22.0;
-# OpenBrewByWeightNetwork.cpp no longer triggers it and is no longer listed.
-dangerousTypeCast:*/src/OpenBrewByWeightNetwork.h
-dangerousTypeCast:*/src/network/OpenBrewByWeightNetworkService.inc
-dangerousTypeCast:*/src/OpenBrewByWeightWebhook.cpp
-dangerousTypeCast:*/src/OpenBrewByWeightTaskMutex.h
-dangerousTypeCast:*/src/OpenBrewByWeightTaskMutex.cpp
-# The scanner is aggregate-initialized with both required fields at its only
-# construction site; Cppcheck does not follow that aggregate initialization.
-uninitMemberVarNoCtor:*/src/OpenBrewByWeightJsonArena.h
-# Owner: safety-kernel. Review/expiry: 2027-03-01.
-# This deliberately uninitialized RTC record preserves reset evidence across a
-# reboot. It is always validated by magic, inverse fields, and checksum before
-# its contents are consumed; initializing it would defeat that safety guard.
-uninitMemberVarNoCtor:*/src/OpenBrewByWeightResetGuard.h
-# Owner: web-stream. Review/expiry: 2027-03-01.
-# uiStreamCurveHash (network/OpenBrewByWeightUiStream.inc) feeds one scalar
-# byte to crc32Update(hash, &split, 1); the callee loop in this header is
-# bounded by that length argument, but Cppcheck 2.22.0 cannot bound the
-# inlined index to zero and reports objectIndex at the crc ^= data[index]
-# line. Only the split byte itself is ever read.
-objectIndex:*/src/OpenBrewByWeightDomain.h
-# Owner: firmware-persistence. Review/expiry: 2027-03-01.
-# savePersistedSettings zeroes the shared flash scratch with memset before
-# memberwise assignment so stored settings blobs stay byte-reproducible:
-# indeterminate padding must not leak into the read-back verification.
-# All-zero bytes are a valid representation of every member on the ESP32-S3
-# targets (IEEE-754 floats), so the portability concern does not apply.
-memsetClassFloat:*/src/OpenBrewByWeightPersistence.h
 # `unusedFunction` is intentionally not enabled by static-idf: analysis through
 # the filtered, variant-specific ESP-IDF database misclassifies cross-TU public
 # APIs, and setup/loop are called by idf/main, so they no longer need inline

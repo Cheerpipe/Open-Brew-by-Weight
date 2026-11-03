@@ -189,8 +189,8 @@ inline NvsDiagnosticSnapshot captureNvsDiagnostics() {
 // One failed NVS operation: its error and, for a blob write, the entries it
 // needed.
 struct NvsFailure {
-  NvsOperation operation;
-  int32_t errorCode;
+  NvsOperation operation = NvsOperation::NONE;
+  int32_t errorCode = 0;
   size_t requiredEntries = 0;
 };
 

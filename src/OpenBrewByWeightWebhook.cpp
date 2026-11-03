@@ -16,6 +16,7 @@
 #include <esp_http_client.h>
 #include <esp_mac.h>
 #endif
+#include "OpenBrewByWeightSemaphore.h"
 void serialTraceCategoryf(openbrewbyweight::LogLevel level,
                           openbrewbyweight::DebugCategory category,
                           const char *fmt, ...);
@@ -114,7 +115,7 @@ bool WebhookDispatcher::begin(const WebhookConfig &config) {
   }
   workerStopped_ = xSemaphoreCreateBinary();
   if (workerStopped_ == nullptr) {
-    vSemaphoreDelete(lifecycleMutex_);
+    semaphoreDelete(lifecycleMutex_);
     lifecycleMutex_ = nullptr;
     mux_.lock();
     ++status_.workerStartFailures;
@@ -131,7 +132,7 @@ bool WebhookDispatcher::begin(const WebhookConfig &config) {
 bool WebhookDispatcher::stop() {
   if (lifecycleMutex_ == nullptr) {
     if (workerStopped_ != nullptr) {
-      vSemaphoreDelete(workerStopped_);
+      semaphoreDelete(workerStopped_);
       workerStopped_ = nullptr;
     }
     return true;
@@ -149,7 +150,7 @@ bool WebhookDispatcher::stop() {
     stopAfterDrain_ = false;
     mux_.unlock();
   }
-  xSemaphoreGive(lifecycleMutex_);
+  semaphoreGive(lifecycleMutex_);
 
   if (worker != nullptr) {
     xTaskNotifyGive(worker);
@@ -160,9 +161,9 @@ bool WebhookDispatcher::stop() {
     }
   }
 
-  vSemaphoreDelete(lifecycleMutex_);
+  semaphoreDelete(lifecycleMutex_);
   lifecycleMutex_ = nullptr;
-  vSemaphoreDelete(workerStopped_);
+  semaphoreDelete(workerStopped_);
   workerStopped_ = nullptr;
   return true;
 }
@@ -177,7 +178,7 @@ bool WebhookDispatcher::startWorker() {
   if (state == WorkerState::STOPPED) workerState_ = WorkerState::STARTING;
   mux_.unlock();
   if (state != WorkerState::STOPPED) {
-    xSemaphoreGive(lifecycleMutex_);
+    semaphoreGive(lifecycleMutex_);
     return state == WorkerState::READY;
   }
   // A worker disabled by setConfig() may have left an unconsumed completion.
@@ -207,7 +208,7 @@ bool WebhookDispatcher::startWorker() {
     status_.workerReady = false;
     ++status_.workerStartFailures;
     mux_.unlock();
-    xSemaphoreGive(lifecycleMutex_);
+    semaphoreGive(lifecycleMutex_);
     return false;
   }
   mux_.lock();
@@ -230,7 +231,7 @@ bool WebhookDispatcher::startWorker() {
     status_.workerReady = false;
     ++status_.workerStartFailures;
     mux_.unlock();
-    xSemaphoreGive(lifecycleMutex_);
+    semaphoreGive(lifecycleMutex_);
     return false;
   }
   mux_.lock();
@@ -238,7 +239,7 @@ bool WebhookDispatcher::startWorker() {
   status_.workerReady = true;
   ++status_.workerStarts;
   mux_.unlock();
-  xSemaphoreGive(lifecycleMutex_);
+  semaphoreGive(lifecycleMutex_);
   return true;
 }
 
@@ -264,12 +265,12 @@ void WebhookDispatcher::releaseWorkerFromTask() {
     status_.sending = false;
     ++status_.workerStops;
     mux_.unlock();
-    xSemaphoreGive(lifecycleMutex_);
+    semaphoreGive(lifecycleMutex_);
   }
   if (queue != nullptr) vQueueDelete(queue);
   heapCapsFree(queueStorage);
   heapCapsFree(payload);
-  if (workerStopped_ != nullptr) xSemaphoreGive(workerStopped_);
+  if (workerStopped_ != nullptr) semaphoreGive(workerStopped_);
 }
 
 esp_http_client_handle_t WebhookDispatcher::ensureHttpClient(const char *url) {
@@ -488,7 +489,7 @@ bool WebhookDispatcher::enqueue(const WebhookEvent &event) {
   else if (event.type == WebhookEventType::TEST && !live.enabled)
     stopAfterDrain_ = true;
   mux_.unlock();
-  if (locked) xSemaphoreGive(lifecycleMutex_);
+  if (locked) semaphoreGive(lifecycleMutex_);
   return accepted;
 }
 
@@ -562,7 +563,7 @@ void WebhookDispatcher::task() {
       }
       state = workerState_;
       mux_.unlock();
-      xSemaphoreGive(lifecycleMutex_);
+      semaphoreGive(lifecycleMutex_);
     }
     if (state == WorkerState::STOPPING) break;
   }

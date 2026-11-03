@@ -3,6 +3,7 @@
 // Host builds embed TaskMutex in host-test fragments; only the firmware
 // target compiles this file (registered in idf/components/openBrewByWeight).
 #if !defined(OPEN_BREW_BY_WEIGHT_TASK_MUTEX_HOST)
+#include "OpenBrewByWeightSemaphore.h"
 
 namespace openbrewbyweight {
 
@@ -36,9 +37,7 @@ void TaskMutex::unlock_() {
     }
     longestOwner_[index] = '\0';
   }
-  // FreeRTOS implements xSemaphoreGive as a C macro with an internal handle
-  // cast; the public handle type is the one created above.
-  const BaseType_t given = xSemaphoreGive(handle_);
+  const BaseType_t given = semaphoreGive(handle_);
   configASSERT(given == pdTRUE);
   (void)given;
 }

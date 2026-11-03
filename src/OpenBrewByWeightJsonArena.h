@@ -24,9 +24,9 @@ namespace detail {
 inline thread_local bool g_jsonLimitRejectedRecently = false;
 
 struct JsonStructureScanner {
-  const char *body;
-  size_t length;
-  size_t maxValues;
+  const char *body = nullptr;
+  size_t length = 0;
+  size_t maxValues = 0;
   size_t cursor = 0;
   size_t values = 0;
 
