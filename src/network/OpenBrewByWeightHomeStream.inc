@@ -315,6 +315,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("lineaMicra.optimisticOn", bool(micra.optimisticOn));
   delta.field("lineaMicra.optimisticOff", bool(micra.optimisticOff));
   delta.field("lineaMicra.accountConfigured", bool(micra.accountConfigured));
+  delta.field("lineaMicra.policyRequired", micra.error == LineaMicraError::POLICY_REQUIRED);
   delta.field("lineaMicra.observeState", bool(options & LINEA_MICRA_OBSERVE_STATE));
   delta.field("lineaMicra.connectionType", "\"%s\"", micraConnectionTypeName(connection));
   // The shared header's cloud indicator names the account and machine, so

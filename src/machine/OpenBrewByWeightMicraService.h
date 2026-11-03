@@ -180,6 +180,7 @@ class OpenBrewByWeightMicraService {
                         uint16_t targetDeciC);
   bool writeStandby(const LineaMicraPersistedSettings &settings);
   bool writePowerOn(const LineaMicraPersistedSettings &settings);
+  bool acceptPolicy(const LineaMicraPersistedSettings &settings);
   // A cloud call as the diagnostics name it: its purpose and endpoint path.
   struct CloudCall {
     const char *purpose;

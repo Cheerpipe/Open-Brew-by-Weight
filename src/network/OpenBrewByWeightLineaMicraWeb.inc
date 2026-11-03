@@ -181,6 +181,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   } else if (parseError.reason == nullptr &&
              (strcmp(action, "disconnect") == 0 ||
               strcmp(action, "refresh") == 0 ||
+              strcmp(action, "acceptPolicy") == 0 ||
               strcmp(action, "relist") == 0)) {
     if (jsonFieldPresent(root, "username") ||
         jsonFieldPresent(root, "password") ||
@@ -216,7 +217,8 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   }
 
   const bool relist = strcmp(action, "relist") == 0;
-  const bool refresh = strcmp(action, "refresh") == 0;
+  const bool acceptPolicy = strcmp(action, "acceptPolicy") == 0;
+  const bool refresh = acceptPolicy || strcmp(action, "refresh") == 0;
   if ((relist || refresh) && !candidate.accountConfigured) {
     return sendError(request, STATUS_CONFLICT, "MICRA_NOT_READY",
                      nullptr, "MICRA_NOT_READY");
@@ -243,7 +245,8 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
     LineaMicraRequest integrationRequest = {};
     integrationRequest.requestId = self.allocateRequestId();
     integrationRequest.configGeneration = currentRevision;
-    integrationRequest.type = LineaMicraRequestType::OBSERVE_STATE;
+    integrationRequest.type = acceptPolicy ? LineaMicraRequestType::ACCEPT_POLICY
+                                           : LineaMicraRequestType::OBSERVE_STATE;
     if (!queueMachineIntegrationRequest(integrationRequest)) {
       return sendError(request, STATUS_UNAVAILABLE, "MICRA_BUSY",
                        nullptr, "MICRA_BUSY");

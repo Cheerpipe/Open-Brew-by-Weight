@@ -215,8 +215,8 @@
   // offer, access, La Marzocco Cloud, recipe, scale; each waits while the
   // grind hint shows. Dismissals other than access stay in the browser under
   // the legacy card keys.
-  const order = ['companionHint', 'companionPairHint', 'accessHint', 'micraCloudHint', 'recipeHint',
-    'scaleOnlyHint'];
+  const order = ['micraPolicyHint', 'companionHint', 'companionPairHint', 'accessHint', 'micraCloudHint',
+    'recipeHint', 'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
   for (const id of order) nodes[id] = {hidden: true};
   const $ = (id) => nodes[id] ||= {textContent: '', hidden: false,
@@ -241,6 +241,17 @@
   assert.deepEqual(shown(noCloud), ['scaleOnlyHint']);
   assert.deepEqual(shown({...noCloud, config: {scaleMacCacheMode: 'only'}}), []);
   assert.deepEqual(shown({...noCloud, scale: {preferredMac: ''}}), []);
+  // Pending La Marzocco terms take the slot before every hint, with no
+  // dismissal, and Accept follows the controls lock.
+  const blocked = {...noCloud, lineaMicra: {accountConfigured: true, policyRequired: true}};
+  assert.deepEqual(shown(blocked), ['micraPolicyHint']);
+  assert.strictEqual(nodes.micraPolicyHintAccept.disabled, false);
+  home.R.controlsMutable = false;
+  shown(blocked);
+  assert.strictEqual(nodes.micraPolicyHintAccept.disabled, true);
+  home.R.controlsMutable = true;
+  assert.ok(partialHtml.home.includes('id="micraPolicyHintAccept"') &&
+      !partialHtml.home.includes('micraPolicyHintDismiss'), 'The terms card offers Accept, no dismissal');
   // A preset change retires the recipe hint for good.
   recorded = false;
   assert.deepEqual(shown({...noCloud, presetsTag: 8}), ['scaleOnlyHint']);

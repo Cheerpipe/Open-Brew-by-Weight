@@ -462,11 +462,13 @@ function updateHeaderSignals(s = {}) {
       ? __WEBUI_TEXT__("admin.companion_link_open")
       : stale
         ? unavailable
-        : quality === "unconfigured"
-          ? __WEBUI_TEXT__("runtime.not_connected")
-          : quality === "disabled"
-            ? __WEBUI_TEXT__("runtime.disabled")
-            : __WEBUI_TEXT__("shell.micra_link_trouble");
+        : lm.policyRequired
+          ? __WEBUI_TEXT__("runtime.micra_policy_required")
+          : quality === "unconfigured"
+            ? __WEBUI_TEXT__("runtime.not_connected")
+            : quality === "disabled"
+              ? __WEBUI_TEXT__("runtime.disabled")
+              : __WEBUI_TEXT__("shell.micra_link_trouble");
     micra.title = __WEBUI_TEXT__("diagnostic.marzocco_cloud") + ": " + label;
     micra.setAttribute("aria-label", micra.title);
     const account = $("micraName"),

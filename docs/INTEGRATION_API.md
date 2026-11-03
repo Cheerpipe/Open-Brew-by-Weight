@@ -246,7 +246,7 @@ params substituted in order (see the example above).
 | ``MICRA_CHANGE_PENDING`` | Another Linea Micra change is still being saved. |
 | ``MICRA_CONNECT_FIELDS_ONLY`` | connect requires only username and password. |
 | ``MICRA_NOT_READY`` | Connect an account and select a machine first. |
-| ``MICRA_READONLY_ACTIONS`` | disconnect, refresh, and relist do not accept setting fields. |
+| ``MICRA_READONLY_ACTIONS`` | disconnect, refresh, relist, and acceptPolicy do not accept setting fields. |
 | ``MICRA_REQUIRES_READY`` | Linea Micra settings can be changed only while Ready. |
 | ``MICRA_SAVE_BUSY`` | Control is busy; Linea Micra settings were not saved. |
 | ``MICRA_SAVE_FIELDS_REQUIRED`` | save requires a selected machine and at least one valid machine option. |
@@ -1562,7 +1562,7 @@ CSV order after browsing by rating without repeated store captures per frame.
 
 Micra-compiled firmware exposes `POST /api/v1/machine/linea-micra` to the
 claimed Web UI. It accepts one strict `action`: `connect`, `select`, `save`,
-`refresh`, `relist`, or `disconnect`. `connect` requires only `username` and `password`
+`refresh`, `relist`, `acceptPolicy`, or `disconnect`. `connect` requires only `username` and `password`
 and is rejected unless STA is connected and the setup AP is closed. It queues
 cloud authentication and account-machine discovery but does not persist or
 enable an account. `select` requires a `serial` from the latest discovery plus
@@ -1574,7 +1574,7 @@ and `shutdownWithScale` machine-link booleans with `shutdownGraceSeconds`,
 and the `scaleOffWithMachine` scale-link boolean. `select` and `save` optionally accept `connectionType` as exactly `websocket`
 or `api`; missing retains the saved preference. Null, wrong types, unknown
 values and use with any other action are rejected. WebSocket is the default.
-`save` is a patch for an already selected machine: it needs at least one option or `connectionType`, and every option it omits keeps its saved value. `refresh`, `relist`, and `disconnect` accept no additional fields;
+`save` is a patch for an already selected machine: it needs at least one option or `connectionType`, and every option it omits keeps its saved value. `refresh`, `relist`, `acceptPolicy`, and `disconnect` accept no additional fields;
 `relist` requires a selected machine, STA, and a closed setup AP, and lists the
 saved account's machines again over the existing session and installation key
 without changing the active machine, the published request phase/error, or
@@ -1600,6 +1600,15 @@ same error names). The saved account email is visible in Settings and
 Diagnostics; password, installation private key, access token and refresh
 token are never returned. `refresh` is read-only and requires a selected
 machine; none of these fields authorizes machine actuation.
+
+While the La Marzocco account has a pending policy, the cloud answers machine
+requests with HTTP 403 and code `USER_MUST_ACCEPT_POLICY`. The firmware reports
+it as error `policy_required`, keeps the session token, does not retry the
+request, and keeps checking at the failure cadence. The Home frame carries
+`lineaMicra.policyRequired` (true while the state read reports it).
+`acceptPolicy` requires a selected machine with `observeState` and sends `PUT /users/policy` with `profilePolicy` and `commercialPolicy` both
+`false`, so only the mandatory policy is accepted; on success it reads the
+machine state, which clears the error. It never sends a machine command.
 
 The Diagnostic stream adds the raw observed mode, power source, sample age and
 freshness, and temperature state. Beyond the cleaning fields Home shows, only

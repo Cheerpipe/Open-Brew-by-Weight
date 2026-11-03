@@ -98,6 +98,13 @@ function renderHints(s) {
   if (recipeTag && s.presetsTag !== recipeTag) R.dismissCard(cardKey("recipeHint"));
   recipeTag = s.presetsTag;
   let free = $("grindHintCard")?.hidden !== false;
+  // Pending La Marzocco terms block the machine link: shown first, no dismissal.
+  const policy = $("micraPolicyHint");
+  if (policy) {
+    policy.hidden = s.lineaMicra?.policyRequired !== true;
+    $("micraPolicyHintAccept").disabled = !R.controlsMutable;
+    free &&= policy.hidden;
+  }
   const request = s.companion?.requestName,
     here = R.uiState.companionHere,
     code = here?.pairing?.state === "pending" && here.pairing.code;
@@ -177,13 +184,15 @@ function renderMachineRow(s) {
         : micraActive
           ? [
               "—",
-              off
-                ? __WEBUI_TEXT__("home.turn_on_to_brew")
-                : needsWater
-                  ? __WEBUI_TEXT__("home.refill_tank")
-                  : power.startsWith("ON ")
-                    ? __WEBUI_TEXT__("home.starting_up")
-                    : "",
+              lm.policyRequired
+                ? __WEBUI_TEXT__("runtime.micra_policy_required")
+                : off
+                  ? __WEBUI_TEXT__("home.turn_on_to_brew")
+                  : needsWater
+                    ? __WEBUI_TEXT__("home.refill_tank")
+                    : power.startsWith("ON ")
+                      ? __WEBUI_TEXT__("home.starting_up")
+                      : "",
             ]
           : ["", ""]),
   );
@@ -257,6 +266,8 @@ export function init() {
       renderHints(R.homeStatusCache());
     };
   }
+  if ($("micraPolicyHintAccept"))
+    $("micraPolicyHintAccept").onclick = () => R.lineaMicraAction("acceptPolicy");
   if ($("scaleOnlyHintUse"))
     $("scaleOnlyHintUse").onclick = () =>
       R.command(

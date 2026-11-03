@@ -15,7 +15,8 @@ enum class LineaMicraRequestType : uint8_t {
   APPLY_TEMPERATURE,
   SET_STANDBY,
   SET_POWER_ON,
-  LIST_MACHINES
+  LIST_MACHINES,
+  ACCEPT_POLICY
 };
 enum class LineaMicraPowerState : uint8_t { UNKNOWN, ON, OFF };
 enum class MicraObservationSource : uint8_t { NONE, HTTP, HTTP_INITIAL, WEBSOCKET };
@@ -93,7 +94,8 @@ enum class LineaMicraError : uint8_t {
   TRANSPORT,
   CANCELED,
   REJECTED,
-  UNCONFIRMED
+  UNCONFIRMED,
+  POLICY_REQUIRED
 };
 enum class LineaMicraTemperatureState : uint8_t {
   Disabled,
@@ -215,6 +217,7 @@ inline const char *lineaMicraErrorName(LineaMicraError error) {
     case LineaMicraError::CANCELED: return "canceled";
     case LineaMicraError::REJECTED: return "rejected";
     case LineaMicraError::UNCONFIRMED: return "unconfirmed";
+    case LineaMicraError::POLICY_REQUIRED: return "policy_required";
   }
   return "unknown";
 }

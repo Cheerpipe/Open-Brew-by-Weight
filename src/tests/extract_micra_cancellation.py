@@ -9,7 +9,7 @@ text = source.read_text()
 
 def definition(name, text=text, source=source):
     # Top-level definitions end at column zero; keep their bodies verbatim.
-    match = re.search(r"^(?:const char \*|(?:bool|void|uint8_t|struct|LineaMicraStatus|MachineBackflushSnapshot|MachinePhysicalStartDisposition) )" + re.escape(name)
+    match = re.search(r"^(?:const char \*|(?:bool|void|uint8_t|struct|LineaMicraError|LineaMicraStatus|MachineBackflushSnapshot|MachinePhysicalStartDisposition) )" + re.escape(name)
                       + r"(?:\(| \{)", text, re.M)
     if match is None:
         raise ValueError(f"Missing production definition: {name}")
@@ -45,7 +45,7 @@ output.mkdir(parents=True, exist_ok=True)
                "reportMuxWaitAnomaly", "finishBackflush", "physicalStart",
                "physicalStartLocked", "post", "applyPostedLocked")) + "\n")
 (output / "micra_websocket_commands.inc").write_text(
-    "\n".join([definition("sameCommandRequest")] +
+    "\n".join([definition("sameCommandRequest"), definition("commandFailure")] +
               [definition("OpenBrewByWeightMicraService::" + name) for name in
               ("temperatureRequestCurrent", "powerRequestCurrent", "pushConfirms",
                "temperatureEligible", "deferTemperature", "deferPower",

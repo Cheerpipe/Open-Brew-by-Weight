@@ -158,6 +158,9 @@ int main() {
                      "rejected") == 0);
   assert(std::strcmp(lineaMicraErrorName(LineaMicraError::UNCONFIRMED),
                      "unconfirmed") == 0);
+  assert(std::strcmp(lineaMicraErrorName(LineaMicraError::POLICY_REQUIRED),
+                     "policy_required") == 0);
+  assert(!lineaMicraTemperatureCycleRetryable(LineaMicraError::POLICY_REQUIRED));
   assert(lineaMicraHttpRetryable(0));
   assert(lineaMicraHttpRetryable(401));
   assert(lineaMicraHttpRetryable(408));

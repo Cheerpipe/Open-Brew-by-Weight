@@ -52,6 +52,8 @@ constexpr char kRefreshUrl[] =
     "https://lion.lamarzocco.io/api/customer-app/auth/refreshtoken";
 constexpr char kThingsUrl[] =
     "https://lion.lamarzocco.io/api/customer-app/things";
+constexpr char kPolicyUrl[] =
+    "https://lion.lamarzocco.io/api/customer-app/users/policy";
 constexpr size_t kResponseCapacity = 16 * 1024;
 constexpr size_t kResponseMaxValues = 1024;
 constexpr size_t kTokenCapacity = 2048;
@@ -282,6 +284,26 @@ cJSON *parseResponse(const char *response) {
                                        kResponseMaxValues);
 }
 
+// Until the account accepts La Marzocco's latest policy, the cloud answers
+// every machine request with HTTP 403 and this code.
+bool policyAcceptanceRequired(const char *response) {
+  cJSON *root = parseResponse(response);
+  const char *code = root == nullptr ? nullptr : jsonText(root, "code");
+  const bool required = code != nullptr && strcmp(code, "USER_MUST_ACCEPT_POLICY") == 0;
+  cJSON_Delete(root);
+  return required;
+}
+
+// A command's outcome once its attempts are spent.
+LineaMicraError commandFailure(bool accepted, uint16_t http, bool transport, bool policy) {
+  return accepted ? LineaMicraError::UNCONFIRMED
+      : policy ? LineaMicraError::POLICY_REQUIRED
+      : http == 401 ? LineaMicraError::INVALID_AUTH
+      : transport ? LineaMicraError::TRANSPORT
+      : http != 0 && !lineaMicraHttpRetryable(http) ? LineaMicraError::REJECTED
+      : LineaMicraError::HTTP_ERROR;
+}
+
 // Field-wise identity for a queued command lane; the requestId makes an
 // in-flight execution stale when the desired request is replaced.
 bool sameCommandRequest(const LineaMicraRequest &left,
@@ -353,6 +375,7 @@ struct OpenBrewByWeightMicraService::WorkBuffer {
   int32_t transportStatus = 0;
   bool responseOverflow = false;
   bool transportFailure = false;
+  bool policyRequired = false;
 };
 
 struct OpenBrewByWeightMicraService::RequestStateGuard {
@@ -759,7 +782,8 @@ bool OpenBrewByWeightMicraService::queueLocked(const LineaMicraRequest &request)
   if (pending_.present || active_ || task_ == nullptr ||
       !config_.accountConfigured ||
       (config_.options & LINEA_MICRA_OBSERVE_STATE) == 0 ||
-      request.type != LineaMicraRequestType::OBSERVE_STATE) {
+      (request.type != LineaMicraRequestType::OBSERVE_STATE &&
+       request.type != LineaMicraRequestType::ACCEPT_POLICY)) {
     return false;
   }
   pending_ = {};
@@ -1381,6 +1405,23 @@ void OpenBrewByWeightMicraService::execute(PendingRequest &pending) {
   }
   work_->transportStatus = 0;
   work_->httpStatus = 0;
+  if (pending.request.type == LineaMicraRequestType::ACCEPT_POLICY) {
+    LineaMicraPersistedSettings settings;
+    {
+      TaskLockGuard lock(mux_);
+      settings = config_;
+    }
+    const bool accepted = ensureSession(settings, false) && acceptPolicy(settings);
+    wipeLineaMicraSettings(settings);
+    if (!accepted) {
+      fail(status, classifyFailure());
+      scheduleAutomatic(millis(), true);
+      return;
+    }
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                         "Micra La Marzocco policy accepted (profiling and marketing declined)");
+    pending.request.type = LineaMicraRequestType::OBSERVE_STATE;
+  }
   const bool connecting = pending.request.type == LineaMicraRequestType::CONNECT;
   const bool success = connecting ? executeConnect(pending)
                                   : executeObservation(pending);
@@ -1643,18 +1684,8 @@ bool OpenBrewByWeightMicraService::executeTemperatureApplication(
   wipeLineaMicraSettings(settings);
   const uint16_t failureHttpStatus =
       commandAttempted ? commandHttpStatus : work_->httpStatus;
-  const LineaMicraError error =
-      commandAccepted
-          ? LineaMicraError::UNCONFIRMED
-          : failureHttpStatus == 401
-                ? LineaMicraError::INVALID_AUTH
-                : work_->transportFailure
-                      ? LineaMicraError::TRANSPORT
-                      : failureHttpStatus != 0 &&
-                                !lineaMicraHttpRetryable(
-                                    failureHttpStatus)
-                            ? LineaMicraError::REJECTED
-                            : LineaMicraError::HTTP_ERROR;
+  const LineaMicraError error = commandFailure(
+      commandAccepted, failureHttpStatus, work_->transportFailure, work_->policyRequired);
   deferTemperature(request, error, micra_timing::kExhaustedCooldownMs,
                    lineaMicraTemperatureCycleRetryable(error), true);
   return false;
@@ -1815,18 +1846,8 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
   wipeLineaMicraSettings(settings);
   const uint16_t failureHttpStatus =
       commandAttempted ? commandHttpStatus : work_->httpStatus;
-  const LineaMicraError error =
-      commandAccepted
-          ? LineaMicraError::UNCONFIRMED
-          : failureHttpStatus == 401
-                ? LineaMicraError::INVALID_AUTH
-                : work_->transportFailure
-                      ? LineaMicraError::TRANSPORT
-                      : failureHttpStatus != 0 &&
-                                !lineaMicraHttpRetryable(
-                                    failureHttpStatus)
-                            ? LineaMicraError::REJECTED
-                            : LineaMicraError::HTTP_ERROR;
+  const LineaMicraError error = commandFailure(
+      commandAccepted, failureHttpStatus, work_->transportFailure, work_->policyRequired);
   deferPower(request, error, micra_timing::kExhaustedCooldownMs,
                 lineaMicraTemperatureCycleRetryable(error), true);
   return false;
@@ -2001,6 +2022,8 @@ bool OpenBrewByWeightMicraService::executeObservation(PendingRequest &pending) {
       deferObservation(pending, status, gateError);
       return true;
     }
+    // Only accepting the policy unblocks the account: retrying cannot.
+    if (classifyFailure() == LineaMicraError::POLICY_REQUIRED) break;
     discardAccessToken();
     if (attempt + 1U >= micra_timing::kMaxAttempts) break;
     status.phase = LineaMicraPhase::BACKOFF;
@@ -2074,6 +2097,7 @@ void OpenBrewByWeightMicraService::deferObservation(
 
 LineaMicraError OpenBrewByWeightMicraService::classifyFailure() const {
   if (work_ != nullptr) {
+    if (work_->policyRequired) return LineaMicraError::POLICY_REQUIRED;
     if (work_->httpStatus == 401) return LineaMicraError::INVALID_AUTH;
     if (work_->transportFailure) return LineaMicraError::TRANSPORT;
   }
@@ -2115,7 +2139,9 @@ void OpenBrewByWeightMicraService::scheduleAutomatic(uint32_t now, bool failed) 
   TaskLockGuard lock(mux_);
   // Rejected credentials latch like the WebSocket lane: retrying would only
   // repeat sign-ins until the vendor locks the account. An account edit or a
-  // manual refresh re-arms observation.
+  // manual refresh re-arms observation. A pending policy keeps the slow
+  // failure cadence instead, one read per check, so an acceptance made in the
+  // La Marzocco app is noticed without any action here.
   if (config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET) ||
       published_.error == LineaMicraError::INVALID_AUTH) {
     observationSchedule_.suspendPeriodic();
@@ -2160,8 +2186,10 @@ bool OpenBrewByWeightMicraService::generateInstallationKey(
 // A 401/403 answer rejects the token itself, not the request: discard it so
 // the next attempt re-acquires a session instead of reusing it by age. The
 // WebSocket lane reaches the same outcome through its handshake auth failure.
+// A pending policy's 403 keeps the token: the session is valid.
 void OpenBrewByWeightMicraService::discardAccessToken() {
-  if (work_ == nullptr || (work_->httpStatus != 401 && work_->httpStatus != 403))
+  if (work_ == nullptr || work_->policyRequired ||
+      (work_->httpStatus != 401 && work_->httpStatus != 403))
     return;
   const uint32_t ageMs = work_->accessTokenIssuedAtMs != 0
                              ? millis() - work_->accessTokenIssuedAtMs : 0;
@@ -2470,6 +2498,18 @@ bool OpenBrewByWeightMicraService::writePowerOn(
   return ok;
 }
 
+// Accepts only the mandatory policy: the optional profiling and marketing
+// consents La Marzocco asks alongside it are always sent as refused.
+bool OpenBrewByWeightMicraService::acceptPolicy(
+    const LineaMicraPersistedSettings &settings) {
+  if (!ensureIoBuffer()) return false;
+  const bool ok = request(settings, kPolicyUrl, HTTP_METHOD_PUT,
+                          "{\"profilePolicy\":false,\"commercialPolicy\":false}",
+                          true, {"accept_policy", "/users/policy"});
+  releaseIoBuffer();
+  return ok;
+}
+
 bool OpenBrewByWeightMicraService::applySignedHeaders(
     const LineaMicraPersistedSettings &settings, char *headers, size_t capacity) {
   MicraPublicIdentityCache &identity = work_->publicIdentity;
@@ -2546,7 +2586,8 @@ bool OpenBrewByWeightMicraService::request(
     CloudCall call, bool installationInit) {
   pendingCloudCall_ = {};
   pendingCloudCall_.api = call.purpose;
-  pendingCloudCall_.method = method == HTTP_METHOD_POST ? "POST" : "GET";
+  pendingCloudCall_.method = method == HTTP_METHOD_POST ? "POST"
+      : method == HTTP_METHOD_PUT ? "PUT" : "GET";
   pendingCloudCall_.startedAtMs = millis();
   const time_t now = time(nullptr);
   pendingCloudCall_.startedAtUtcSec =
@@ -2593,6 +2634,7 @@ bool OpenBrewByWeightMicraService::request(
   work_->httpStatus = 0;
   work_->transportStatus = 0;
   work_->transportFailure = false;
+  work_->policyRequired = false;
   clearRequestState();
   RequestStateGuard requestState{*this};
   if (esp_http_client_set_url(work_->client, url) != ESP_OK ||
@@ -2685,7 +2727,7 @@ bool OpenBrewByWeightMicraService::request(
   serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                        "Micra HTTP start id=%lu %s %s",
                        static_cast<unsigned long>(pendingCloudCall_.startedAtMs),
-                       method == HTTP_METHOD_POST ? "POST" : "GET", call.endpoint);
+                       pendingCloudCall_.method, call.endpoint);
   esp_err_t performed = ESP_ERR_HTTP_EAGAIN;
   bool canceled = false;
   while (performed == ESP_ERR_HTTP_EAGAIN) {
@@ -2750,6 +2792,8 @@ bool OpenBrewByWeightMicraService::request(
   }
   const bool ok = performed == ESP_OK && !work_->responseOverflow &&
                   work_->httpStatus >= 200 && work_->httpStatus < 300;
+  work_->policyRequired = performed == ESP_OK && work_->httpStatus == 403 &&
+                          policyAcceptanceRequired(io_->response);
   pendingCloudCall_.httpStatus = work_->httpStatus;
   pendingCloudCall_.transportStatus = performed;
   pendingCloudCall_.result = micraCloudCallResult(

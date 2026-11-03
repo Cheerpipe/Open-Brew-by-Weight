@@ -411,6 +411,7 @@ function micraErrorText(error) {
   return (
     {
       invalid_auth: __WEBUI_TEXT__("runtime.micra_error_auth"),
+      policy_required: __WEBUI_TEXT__("runtime.micra_error_policy"),
       no_machines: __WEBUI_TEXT__("runtime.micra_error_no_machines"),
       clock_unsynchronized: __WEBUI_TEXT__("runtime.micra_error_clock"),
     }[error] || __WEBUI_TEXT__("runtime.micra_error_cloud")
@@ -508,31 +509,33 @@ function applyLineaMicraStatus(s) {
     power = m.optimisticOn ? "ON" : m.optimisticOff ? "OFF" : m.powerState,
     [label, tone, warm] = ["invalid_auth", "no_machines"].includes(m.error)
       ? [__WEBUI_TEXT__("runtime.micra_pill_account"), "error"]
-      : m.apActive
-        ? [__WEBUI_TEXT__("runtime.ap_mode_paused"), "warn"]
-        : m.error === "clock_unsynchronized"
-          ? [__WEBUI_TEXT__("runtime.micra_pill_clock"), "warn"]
-          : error || m.quality === "communication_error"
-            ? [__WEBUI_TEXT__("runtime.micra_pill_cloud"), "warn"]
-            : !m.observeState
-              ? [__WEBUI_TEXT__("runtime.micra_pill_monitoring_off"), ""]
-              : m.machineOffline
-                ? [__WEBUI_TEXT__("runtime.micra_pill_offline"), "warn"]
-                : m.readiness === "needs_water"
-                  ? [__WEBUI_TEXT__("runtime.micra_pill_no_water"), "error"]
-                  : power === "OFF"
-                    ? [__WEBUI_TEXT__("runtime.micra_power_standby"), ""]
-                    : power !== "ON"
-                      ? [__WEBUI_TEXT__("runtime.micra_power_unknown"), ""]
-                      : {
-                          warming_up: [__WEBUI_TEXT__("runtime.micra_pill_heating"), "warn", 1],
-                          waiting_for_steam: [
-                            __WEBUI_TEXT__("runtime.micra_pill_steam"),
-                            "warn",
-                            1,
-                          ],
-                          ready: [__WEBUI_TEXT__("runtime.micra_pill_ready"), "on", 1],
-                        }[m.readiness] || [__WEBUI_TEXT__("runtime.micra_power_on"), "on", 1];
+      : m.error === "policy_required"
+        ? [__WEBUI_TEXT__("runtime.micra_policy_required"), "error"]
+        : m.apActive
+          ? [__WEBUI_TEXT__("runtime.ap_mode_paused"), "warn"]
+          : m.error === "clock_unsynchronized"
+            ? [__WEBUI_TEXT__("runtime.micra_pill_clock"), "warn"]
+            : error || m.quality === "communication_error"
+              ? [__WEBUI_TEXT__("runtime.micra_pill_cloud"), "warn"]
+              : !m.observeState
+                ? [__WEBUI_TEXT__("runtime.micra_pill_monitoring_off"), ""]
+                : m.machineOffline
+                  ? [__WEBUI_TEXT__("runtime.micra_pill_offline"), "warn"]
+                  : m.readiness === "needs_water"
+                    ? [__WEBUI_TEXT__("runtime.micra_pill_no_water"), "error"]
+                    : power === "OFF"
+                      ? [__WEBUI_TEXT__("runtime.micra_power_standby"), ""]
+                      : power !== "ON"
+                        ? [__WEBUI_TEXT__("runtime.micra_power_unknown"), ""]
+                        : {
+                            warming_up: [__WEBUI_TEXT__("runtime.micra_pill_heating"), "warn", 1],
+                            waiting_for_steam: [
+                              __WEBUI_TEXT__("runtime.micra_pill_steam"),
+                              "warn",
+                              1,
+                            ],
+                            ready: [__WEBUI_TEXT__("runtime.micra_pill_ready"), "on", 1],
+                          }[m.readiness] || [__WEBUI_TEXT__("runtime.micra_power_on"), "on", 1];
   pill.textContent = [
     label,
     warm && target ? __WEBUI_TEXT__("runtime.target") + " " + (target / 10).toFixed(1) + " °C" : "",

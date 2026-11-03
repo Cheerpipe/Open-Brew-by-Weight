@@ -125,6 +125,35 @@ and can change independently of this firmware. A cloud outage or API change
 affects Micra monitoring, but never scale operation, paddle handling, relay
 safety, or local shot control.
 
+### When La Marzocco updates its terms
+
+From time to time La Marzocco publishes new terms, and its cloud stops
+answering for your account until someone accepts them. The La Marzocco app
+asks you to accept them the next time you open it (usually right after an app
+update). Until then, the controller, Home Assistant, and anything else that
+uses your account can't see or turn on your machine.
+
+When this happens, Home shows a card that stays until the terms are accepted,
+and the machine row and the cloud icon in the header read **Terms not
+accepted**. Meanwhile the controller keeps checking only at its slow pace
+after a failure, with a single short request each time.
+
+You have two ways out:
+
+- **Open the La Marzocco app** and accept the terms there. This is the
+  recommended way, because the app shows you the text you are accepting. The
+  controller notices at its next check and the card goes away on its own.
+- **Choose Accept here** on the Home card to accept from the controller and
+  use the machine right away. The controller accepts only the required terms;
+  the optional marketing and profiling consents La Marzocco asks for alongside
+  them are always declined. La Marzocco's cloud doesn't say which version of
+  the terms is pending, so the controller can't show you their text: read
+  them in the app or on La Marzocco's website if you want to know what they
+  say.
+
+Accepting applies to the whole La Marzocco account, so it also brings back
+Home Assistant and any other app that uses the same account.
+
 ## Monitor machine power state
 
 Enable **Show power state** to follow the machine through live updates from
