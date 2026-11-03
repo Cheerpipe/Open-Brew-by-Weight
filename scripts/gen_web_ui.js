@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const {minify: terserMinify} = require('terser');
 const {minify: htmlMinify} = require('html-minifier-terser');
 const CleanCSS = require('clean-css');
@@ -226,11 +227,37 @@ async function minifyJs(js, flags = {}) {
   return result.code;
 }
 
+// Zopfli takes most of a generation, and builds and Web contract variants
+// recompress mostly unchanged assets, so its output is cached by input bytes,
+// options and zopfli version. A hit is used only if it inflates to the input.
+const ZOPFLI_OPTIONS = {numiterations: 15};
+const zopfliCacheDir = path.join(repoRoot, 'build-host', 'zopfli-cache');
+const zopfliCacheSalt = `${require('@gfx/zopfli/package.json').version}\0` +
+    `${JSON.stringify(ZOPFLI_OPTIONS)}\0`;
+
+function inflatesTo(gzip, buffer) {
+  try {
+    return zlib.gunzipSync(gzip).equals(buffer);
+  } catch {
+    return false;
+  }
+}
+
 function gzipBuffer(buffer) {
+  const key = crypto.createHash('sha256').update(zopfliCacheSalt).update(buffer).digest('hex');
+  const file = path.join(zopfliCacheDir, `${key}.gz`);
+  const cached = fs.existsSync(file) && fs.readFileSync(file);
+  if (cached && inflatesTo(cached, buffer)) return Promise.resolve(cached);
   return new Promise((resolve, reject) => {
-    zopfli.gzip(buffer, {numiterations: 15}, (err, out) => {
-      if (err) reject(err);
-      else resolve(Buffer.from(out));
+    zopfli.gzip(buffer, ZOPFLI_OPTIONS, (err, out) => {
+      if (err) return reject(err);
+      const result = Buffer.from(out);
+      // Builds and contracts run in parallel: publish each entry atomically.
+      fs.mkdirSync(zopfliCacheDir, {recursive: true});
+      const temporary = `${file}.${process.pid}.tmp`;
+      fs.writeFileSync(temporary, result);
+      fs.renameSync(temporary, file);
+      resolve(result);
     });
   });
 }

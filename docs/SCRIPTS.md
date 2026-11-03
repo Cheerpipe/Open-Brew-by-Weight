@@ -239,6 +239,10 @@ tree (`HEAD`, working-tree fingerprint, and budget-file hashes) no longer
 matches; see [Validation](../VALIDATION.md#size-budgets-and-parallel-work) for
 the parallel-work rules.
 
+The Web UI generator keeps every Zopfli-compressed asset in
+`build-host/zopfli-cache/`, keyed by the asset's bytes, the compression
+options, and the Zopfli version, and uses a cached copy only after checking
+that it decompresses to the same bytes; `./scripts/dev clean` removes it.
 Each firmware build generates its Web UI header in its own tree,
 `<build>/generated/OpenBrewByWeightWebAssetsGzip.h`. The Web contracts write
 theirs under `src/` and take turns behind `build-idf/.locks/web-ui-header.lock`.
