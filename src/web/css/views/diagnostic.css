@@ -175,19 +175,20 @@
   align-items: center;
   gap: 0.3rem;
   max-width: 100%;
-  min-height: 2rem;
-  padding: 0 0.65rem;
+  min-height: 1.75rem;
+  padding: 0 0.55rem;
   border: 1px solid var(--ln);
   border-radius: 2rem;
   background: var(--sf);
   color: var(--fg);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .logChip .k {
   color: var(--mu);
+  font-weight: 500;
 }
 
 .logChip .v {
@@ -223,9 +224,9 @@
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  margin: 0 -0.45rem 0 0.05rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0 -0.4rem 0 0;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -256,22 +257,22 @@
   opacity: 0.75;
 }
 
-.logChip:is(.lvi, .lvd) {
-  border-color: color-mix(in srgb, var(--sv) 50%, var(--ln));
+/* The Level chip takes its severity's colour as a tint; the solid pills
+   stay with the log's own tags. */
+.logChip:is(.lvc, .lve, .lvw, .lvi, .lvd) {
+  border-color: color-mix(in srgb, var(--sv) 45%, var(--ln));
   background: color-mix(in srgb, var(--sv) 10%, var(--sf));
   color: var(--sv);
 }
 
-.logChip:is(.lvc, .lve, .lvw) {
-  border-color: var(--sv);
-  background: var(--sv);
-  color: var(--so);
+.logChip.lvw {
+  color: var(--wn);
 }
 
 .logSw {
   flex: none;
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.45rem;
+  height: 0.45rem;
   border-radius: 50%;
   background: currentcolor;
 }
