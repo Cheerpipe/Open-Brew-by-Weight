@@ -978,60 +978,93 @@
         <b id="logStripTitle">{{webui:diagnostic.log_live}}</b
         ><small id="logStripNote" hidden></small>
       </p>
-      <button id="logJumpButton" class="logGo" type="button" hidden>
-        <svg class="cfgIcon" aria-hidden="true"><use href="#dg-date-and-time" /></svg
-        ><span>{{webui:diagnostic.log_jump}}</span></button
-      ><button id="logLiveButton" class="logGo" type="button" hidden>
+      <button id="logLiveButton" class="logGo" type="button" hidden>
         {{webui:diagnostic.log_back_live}}
       </button>
     </div>
-    <div class="logChips">
-      <div class="logChip lvi">
-        <span class="logSw" aria-hidden="true"></span
-        ><span class="k">{{webui:diagnostic.level}}</span><span class="v"></span
-        ><span class="cv" aria-hidden="true">▾</span
-        ><select id="logLevelFilter" class="diagCtl" aria-label="{{webui:diagnostic.level}}">
-          <option value="0">{{webui:diagnostic.log_show_critical}}</option>
-          <option value="1">{{webui:diagnostic.log_show_error}}</option>
-          <option value="2">{{webui:diagnostic.log_show_warning}}</option>
-          <option value="3" selected>{{webui:diagnostic.log_show_info}}</option>
-          <option value="4">{{webui:diagnostic.log_show_debug}}</option></select
-        ><button
-          class="x"
-          type="button"
-          value="3"
-          aria-label="{{webui:diagnostic.log_level_reset}}"
-        >
-          ×
-        </button>
+    <div class="logBox">
+      <div class="logBar" role="toolbar" aria-label="{{webui:diagnostic.log_view}}">
+        <div class="logChip lvi">
+          <span class="logSw" aria-hidden="true"></span
+          ><span class="k">{{webui:diagnostic.level}}</span><span class="v"></span
+          ><span class="cv" aria-hidden="true">▾</span
+          ><select id="logLevelFilter" class="diagCtl" aria-label="{{webui:diagnostic.level}}">
+            <option value="0" data-label="{{webui:diagnostic.log_short_critical}}">
+              {{webui:diagnostic.log_show_critical}}
+            </option>
+            <option value="1" data-label="{{webui:diagnostic.log_short_error}}">
+              {{webui:diagnostic.log_show_error}}
+            </option>
+            <option value="2" data-label="{{webui:diagnostic.log_short_warning}}">
+              {{webui:diagnostic.log_show_warning}}
+            </option>
+            <option value="3" selected data-label="{{webui:diagnostic.log_short_info}}">
+              {{webui:diagnostic.log_show_info}}
+            </option>
+            <option value="4" data-label="{{webui:diagnostic.log_short_debug}}">
+              {{webui:diagnostic.log_show_debug}}
+            </option></select
+          ><button
+            class="x"
+            type="button"
+            value="3"
+            aria-label="{{webui:diagnostic.log_level_reset}}"
+          >
+            ×
+          </button>
+        </div>
+        <div class="logChip">
+          <span class="k">{{webui:diagnostic.subsystem}}</span><span class="v"></span
+          ><span class="cv" aria-hidden="true">▾</span
+          ><select id="logFilter" class="diagCtl" aria-label="{{webui:diagnostic.subsystem}}">
+            <option value="">{{webui:diagnostic.all}}</option>
+            <option value="boot">{{webui:diagnostic.boot_2}}</option>
+            <option value="system">{{webui:diagnostic.system}}</option>
+            <option value="scale">{{webui:diagnostic.scale_2}}</option>
+            <option value="ble">{{webui:diagnostic.ble}}</option>
+            <option value="state">{{webui:diagnostic.state_2}}</option>
+            <option value="relay">{{webui:diagnostic.relay_2}}</option>
+            <option value="activator">{{webui:diagnostic.activator}}</option>
+            <option value="network">{{webui:diagnostic.network}}</option>
+            <option value="config">{{webui:diagnostic.config}}</option>
+            <option value="web">{{webui:diagnostic.web}}</option>
+            <option value="security">{{webui:diagnostic.security}}</option></select
+          ><button
+            class="x"
+            type="button"
+            value=""
+            aria-label="{{webui:diagnostic.log_all_subsystems}}"
+          >
+            ×
+          </button>
+        </div>
+        <span id="logNav" class="logNav" hidden>
+          <span class="logStep" role="group" aria-label="{{webui:diagnostic.log_day}}"
+            ><button type="button" value="day:-1" aria-label="{{webui:diagnostic.log_prev_day}}">
+              ‹</button
+            ><span aria-hidden="true">{{webui:diagnostic.log_day}}</span
+            ><button type="button" value="day:1" aria-label="{{webui:diagnostic.log_next_day}}">
+              ›
+            </button></span
+          ><span class="logStep" role="group" aria-label="{{webui:diagnostic.log_boot}}"
+            ><button type="button" value="boot:-1" aria-label="{{webui:diagnostic.log_prev_boot}}">
+              ‹</button
+            ><span aria-hidden="true">{{webui:diagnostic.log_boot}}</span
+            ><button type="button" value="boot:1" aria-label="{{webui:diagnostic.log_next_boot}}">
+              ›
+            </button></span
+          ><button
+            id="logJumpButton"
+            type="button"
+            aria-label="{{webui:diagnostic.log_jump}}"
+            title="{{webui:diagnostic.log_jump}}"
+          >
+            <svg class="cfgIcon" aria-hidden="true"><use href="#dg-date-and-time" /></svg>
+          </button>
+        </span>
       </div>
-      <div class="logChip">
-        <span class="k">{{webui:diagnostic.subsystem}}</span><span class="v"></span
-        ><span class="cv" aria-hidden="true">▾</span
-        ><select id="logFilter" class="diagCtl" aria-label="{{webui:diagnostic.subsystem}}">
-          <option value="">{{webui:diagnostic.all}}</option>
-          <option value="boot">{{webui:diagnostic.boot_2}}</option>
-          <option value="system">{{webui:diagnostic.system}}</option>
-          <option value="scale">{{webui:diagnostic.scale_2}}</option>
-          <option value="ble">{{webui:diagnostic.ble}}</option>
-          <option value="state">{{webui:diagnostic.state_2}}</option>
-          <option value="relay">{{webui:diagnostic.relay_2}}</option>
-          <option value="activator">{{webui:diagnostic.activator}}</option>
-          <option value="network">{{webui:diagnostic.network}}</option>
-          <option value="config">{{webui:diagnostic.config}}</option>
-          <option value="web">{{webui:diagnostic.web}}</option>
-          <option value="security">{{webui:diagnostic.security}}</option></select
-        ><button
-          class="x"
-          type="button"
-          value=""
-          aria-label="{{webui:diagnostic.log_all_subsystems}}"
-        >
-          ×
-        </button>
-      </div>
+      <div id="log" tabindex="0" role="region" aria-label="{{webui:diagnostic.log}}"></div>
     </div>
-    <div id="log" tabindex="0" role="region" aria-label="{{webui:diagnostic.log}}"></div>
     <div class="logMeta">
       <span id="logCount"></span
       ><button id="logWrapButton" type="button" aria-pressed="false">

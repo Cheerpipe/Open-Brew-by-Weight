@@ -330,6 +330,7 @@
       new Function('$', 'R', 'logHistory', 'logBootId', 'logZoneOffsetMinutes', 'diagConfig',
       '__WEBUI_TEXT__', 'logJumpAt', 'logAnchor', 'nearLogTop', 'logMarks', 'state',
       `${blockAt(viewJs.diagnostic, 'function logWallText(')};${lineOf};let logShown=state.shown;
+      const logPast=()=>logJumpAt!=null;
       ${blockAt(viewJs.diagnostic, 'function renderLog(')};
       return () => { renderLog(); state.shown = logShown; };`)(
       (id) => nodes[id], {uiState: ui, sub: (t, v) => t.replace('{0}', String(v[0])),
@@ -343,7 +344,7 @@
     ({sequence: n, atMs: n * 1000, wallSec: 0, level, category: 'web', message: 'm' + n});
   ui.logEvents = [ev(1), ev(2)];
   renderLog();
-  assert.equal(text(), '· restart, boot 0 ·\n+1.000s INFO [web] m1\n+2.000s INFO [web] m2',
+  assert.equal(text(), '· Boot 0 ·\n+1.000s INFO [web] m1\n+2.000s INFO [web] m2',
       "the boot's first event follows a restart marker");
   assert.equal(count.textContent, '2 lines');
   box.scrollTop = 0;
@@ -390,15 +391,15 @@
     {b: 7, s: 5, ms: 500, w: 0, l: 'i', c: 'web', m: 'overlap5'},
   ], 7)();
   assert.equal(text(),
-      '+0.900s INFO [web] old9\n· restart, boot 7 ·\n+0.100s INFO [web] kept1\n'
+      '+0.900s INFO [web] old9\n· Boot 7 ·\n+0.100s INFO [web] kept1\n'
       + '· 2 events could not be copied while the companion was away ·\n'
       + '+0.400s INFO [web] kept4\n+5.000s INFO [web] m5\n+6.000s INFO [web] m6',
       'history pages render with markers, and the live copy of an event wins');
-  assert.equal(box.rows[1], '<div class="logMk logBoot">restart, boot 7</div>',
+  assert.equal(box.rows[1], '<div class="logMk logBoot">Boot 7</div>',
       'a restart is a boot row the view pins while its lines scroll');
   ui.logEvents = [ev(1), ev(2)];
   makeRender([{g: 'boot', boot: 7}], 7)();
-  assert.equal(text(), '· restart, boot 7 ·\n+1.000s INFO [web] m1\n+2.000s INFO [web] m2',
+  assert.equal(text(), '· Boot 7 ·\n+1.000s INFO [web] m1\n+2.000s INFO [web] m2',
       'a restart the history already marks is not marked twice');
   // A new day on the controller's clock starts with a divider, never at the
   // top of the view.
@@ -449,35 +450,72 @@
          codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export"+(range?"?"+range:""))'),
       'paging and Export both read the companion through that request');
   assert(codeIncludes(viewJs.diagnostic, '$("logExportButton").hidden=!here') &&
-         codeIncludes(viewJs.diagnostic, '$("logJumpButton").hidden=!here'),
-      'Export and Jump to a time show only through a paired companion');
+         codeIncludes(viewJs.diagnostic, '$("logNav").hidden=!here'),
+      'Export and the time steps show only through a paired companion');
   // The strip names what the view shows: live, up to a moment (Back to live,
   // Mark hidden), or nothing at that moment, with the cap or the companion
   // note; a live chip shows its filter and a × away from the default.
   {
     const el = (extra = {}) => ({hidden: false, textContent: '', className: '', ...extra});
+    const steps = [el({value: 'day:-1'}), el({value: 'day:1'}), el({value: 'boot:-1'}), el({value: 'boot:1'})];
     const n = {logStrip: el(), logStripTitle: el(), logStripNote: el(), logLiveButton: el(),
-      logExportButton: el(), logMarkButton: el(), logJumpButton: el({lastElementChild: el()})};
-    const controls = (logJumpAt, logHistory, logHistoryDone, here, c = null) =>
+      logExportButton: el(), logMarkButton: el(), logNav: el({querySelectorAll: () => steps})};
+    const controls = (logJumpAt, logHistory, logHistoryDone, here, c = null, logJumpBoot = null) =>
       new Function('$', 'R', '__WEBUI_TEXT__', 'logHistoryAvailable', 'logHistoryFull', 'logJumpAt',
-          'logHistory', 'logHistoryDone', 'companionDiagnosticStatus', 'logWallText',
-          `${blockAt(viewJs.diagnostic, 'function logHistoryControls(')};logHistoryControls();`)(
+          'logHistory', 'logHistoryDone', 'companionDiagnosticStatus', 'logWallText', 'logJumpBoot',
+          'logBoots', 'loadLogBoots', 'logStepTarget',
+          `const logPast=()=>logJumpAt!=null||logJumpBoot!=null;
+          ${blockAt(viewJs.diagnostic, 'function logHistoryControls(')};logHistoryControls();`)(
           (id) => n[id], {sub: (t, v) => t.replace('{0}', v[0])}, (k) => k, () => here, () => false,
-          logJumpAt, logHistory, logHistoryDone, c, String);
+          logJumpAt, logHistory, logHistoryDone, c, String, logJumpBoot, [], () => {},
+          (kind, dir) => (kind === 'boot' && dir < 0 ? undefined : null));
     controls(null, [], false, true);
     assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent, n.logStripNote.textContent,
-      n.logJumpButton.hidden, n.logLiveButton.hidden, n.logMarkButton.hidden],
+      n.logNav.hidden, n.logLiveButton.hidden, n.logMarkButton.hidden],
       ['logStrip', 'Live · newest at the bottom', 'Scroll up for older events.', false, true, false]);
+    assert.deepEqual(steps.map((b) => b.disabled), [false, true, true, true],
+        'live: only a step back, and only where there is one');
     controls(1793380832, [{s: 1}], false, true);
-    assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent, n.logJumpButton.lastElementChild.textContent,
+    assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent,
       n.logLiveButton.hidden, n.logMarkButton.hidden],
-      ['logStrip past', 'Showing up to 1793380832', 'Change', false, true]);
+      ['logStrip past', 'Showing up to 1793380832', false, true]);
+    assert.deepEqual(steps.map((b) => b.disabled), [false, false, true, false]);
+    controls(null, [{s: 1}], false, true, null, {boot: 40});
+    assert.equal(n.logStripTitle.textContent, 'Showing the end of boot 40');
     controls(1793380832, [{g: 'boot'}], true, true);
     assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent],
       ['logStrip warn', 'Nothing logged at or before 1793380832']);
     controls(null, [], false, false, {paired: true, log: true});
-    assert.equal(n.logJumpButton.hidden && n.logExportButton.hidden, true);
+    assert.equal(n.logNav.hidden && n.logExportButton.hidden, true);
     assert.match(n.logStripNote.textContent, /companion keeps the older history/);
+  }
+  // Day steps land on the end of the day before or after the view's day (from
+  // inside a day, its own end first); boot steps on the end of the boot before
+  // or after, from inside a boot its own end first, and stepping into the
+  // live boot goes back to live.
+  {
+    const T = (iso) => Date.parse(iso) / 1000;
+    const boots = [
+      {boot: 38, from: T('2026-10-10T08:00Z'), to: T('2026-10-12T09:00Z'), end: {boot: 1}},
+      {boot: 39, from: T('2026-10-12T09:05Z'), to: T('2026-10-25T18:00Z'), end: {boot: 2}},
+      {boot: 41, from: T('2026-10-25T18:05Z'), to: T('2026-10-30T07:00Z'), end: {boot: 3}},
+    ];
+    const step = (logJumpAt, logJumpBoot, kind, dir) => new Function('diagConfig',
+        'logZoneOffsetMinutes', 'logBoots', 'logBootId', 'logJumpAt', 'logJumpBoot',
+        `const logPast=()=>logJumpAt!=null||logJumpBoot!=null;` +
+        ['function logLocalIso(', 'function logWallSec(', 'function logBootIndex(', 'function logStepTarget(']
+          .map((m) => blockAt(viewJs.diagnostic, m)).join(';') + ';return logStepTarget;')(
+        null, () => 0, boots, 41, logJumpAt, logJumpBoot)(kind, dir);
+    assert.deepEqual(step(null, null, 'boot', -1), {at: boots[1].to, boot: boots[1]}, 'live: back to the boot before');
+    assert.equal(step(null, boots[1], 'boot', 1), null, 'into the live boot: back to live');
+    assert.deepEqual(step(null, boots[1], 'boot', -1), {at: boots[0].to, boot: boots[0]});
+    assert.equal(step(null, boots[0], 'boot', -1), undefined, 'no boot before the oldest');
+    assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'boot', 1), {at: boots[1].to, boot: boots[1]},
+        'inside a boot, forward reaches its own end first');
+    assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'day', -1), {at: T('2026-10-19T23:59:59Z')});
+    assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'day', 1), {at: T('2026-10-20T23:59:59Z')});
+    assert.deepEqual(step(T('2026-10-20T23:59:59Z'), null, 'day', 1), {at: T('2026-10-21T23:59:59Z')});
+    assert.equal(step(T('2026-10-10T12:00Z'), null, 'day', -1), undefined, 'no day before the history');
   }
   // A jump in the future is refused inline; a custom export range that ends
   // before it starts disables Download, and an empty end means until now.
@@ -515,13 +553,17 @@
       'older history loads near the top: Show older is gone');
   // D16: pages of 500 carry the level and subsystem filters and the jump, and
   // the cap points to Export.
-  const query = new Function('$', 'LOG_HISTORY_PAGE', 'logHistoryNext', 'logJumpAt',
-      `${blockAt(viewJs.diagnostic, 'function logHistoryQuery(')};return logHistoryQuery;`);
+  const query = (c, page, next, at, boot = null) => new Function('$', 'LOG_HISTORY_PAGE',
+      'logHistoryNext', 'logJumpAt', 'logJumpBoot',
+      `${blockAt(viewJs.diagnostic, 'function logHistoryQuery(')};return logHistoryQuery;`)(c, page, next, at, boot);
   const controls = {logLevelFilter: {value: '2'}, logFilter: {value: 'ble'}};
   assert.equal(query((id) => controls[id], 500, null, 1793380832)(),
       '/__companion/log?limit=500&level=cew&category=ble&at=1793380832');
   assert.equal(query((id) => controls[id], 500, {boot: 3, before: 9}, 1793380832)(),
       '/__companion/log?limit=500&level=cew&category=ble&boot=3&before=9', 'a cursor continues the jump');
+  assert.equal(query((id) => controls[id], 500, null, 1793380832, {end: {boot: 4, before: 4294967295}})(),
+      '/__companion/log?limit=500&level=cew&category=ble&boot=4&before=4294967295',
+      "a boot step starts at the end cursor the companion's boot index gives");
   assert(codeIncludes(viewJs.diagnostic, 'LOG_HISTORY_PAGE=500,LOG_HISTORY_CAP=20000') &&
          codeIncludes(viewJs.diagnostic, 'logHistory.length>=LOG_HISTORY_CAP'),
       'the view stops loading past the cap');

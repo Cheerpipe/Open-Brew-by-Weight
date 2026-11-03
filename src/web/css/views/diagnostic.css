@@ -1,5 +1,6 @@
-/* The log: a status strip, removable filter chips, the log with severity
-   pills, its meta row and toolbar, then the logging settings. */
+/* The log: a status strip, the log box (its bar of filters and time steps
+   above the lines, with severity pills), its meta row and toolbar, then the
+   logging settings. */
 .logStrip {
   display: flex;
   flex-wrap: wrap;
@@ -71,11 +72,6 @@
   cursor: pointer;
 }
 
-.logGo .cfgIcon {
-  width: 1rem;
-  height: 1rem;
-}
-
 #logLiveButton {
   border-color: var(--ac);
   background: var(--ac);
@@ -106,11 +102,71 @@
   --sv: var(--mu);
 }
 
-.logChips {
+.logBox {
+  overflow: hidden;
+  border: 1px solid var(--bd);
+  border-radius: 0.5rem;
+  background: var(--in);
+}
+
+.logBar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0 0 0.6rem;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  border-bottom: 1px solid var(--ln);
+  background: var(--sf);
+}
+
+.logNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
+.logNav[hidden] {
+  display: none;
+}
+
+.logStep {
+  display: inline-flex;
+  align-items: center;
+  color: var(--mu);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.logNav button {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--ac);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.logNav button:not(:disabled):hover {
+  background: var(--pa);
+}
+
+.logNav button:disabled {
+  color: var(--mu);
+  opacity: 0.4;
+  cursor: default;
+}
+
+#logJumpButton .cfgIcon {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .logChip {
@@ -119,13 +175,13 @@
   align-items: center;
   gap: 0.3rem;
   max-width: 100%;
-  min-height: 2.25rem;
-  padding: 0 0.75rem;
+  min-height: 2rem;
+  padding: 0 0.65rem;
   border: 1px solid var(--ln);
   border-radius: 2rem;
   background: var(--sf);
   color: var(--fg);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -224,9 +280,7 @@
   height: 19rem;
   padding: 0.55rem 0.65rem;
   overflow: auto;
-  border: 1px solid var(--bd);
-  border-radius: 0.5rem;
-  background: var(--in);
+  outline-offset: -2px;
   color: var(--fg);
   font-size: 0.75rem;
   line-height: 1.5;

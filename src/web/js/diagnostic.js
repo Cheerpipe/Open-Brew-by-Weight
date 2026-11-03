@@ -1603,12 +1603,12 @@ function renderLog() {
   // first event follows a restart marker unless the history already has one.
   const marks = logMarks.filter((k) => k.boot === logBootId);
   if (
-    logJumpAt == null &&
+    !logPast() &&
     R.uiState.logEvents[0]?.sequence === 1 &&
     !logHistory.some((e) => e.g === "boot" && e.boot === logBootId)
   )
     marker(R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [logBootId]), "logMk logBoot");
-  for (const e of logJumpAt == null ? R.uiState.logEvents : []) {
+  for (const e of logPast() ? [] : R.uiState.logEvents) {
     while (marks.length && ((e.sequence - marks[0].after) | 0) > 0)
       marker(marks.shift().text, "logMark");
     if (f && e.category !== f) continue;
@@ -1621,7 +1621,7 @@ function renderLog() {
       )),
     );
   }
-  if (logJumpAt == null) for (const k of marks) marker(k.text, "logMark");
+  if (!logPast()) for (const k of marks) marker(k.text, "logMark");
   // New lines append (and the oldest drop) in place, and an older page
   // prepends, so a selection or a scrolled-back view survives; only a reader
   // already at the end follows new lines.
@@ -1687,8 +1687,9 @@ const logStream = {
 // log and prepend with the view held in place, deduplicated against the live
 // ring, with boot, gap and cleared-log markers between them. The companion
 // applies the level and subsystem filters, so every page adds matching lines.
-// A jump starts the history at a moment (`logJumpAt`, wall seconds) and hides
-// the live ring until Back to live.
+// A jump starts the history at a moment (`logJumpAt`, wall seconds) or at the
+// end of a stored boot (`logJumpBoot`, from the companion's boot index), and
+// hides the live ring until Back to live.
 const LOG_HISTORY_PAGE = 500,
   LOG_HISTORY_CAP = 20000;
 let logHistory = [],
@@ -1697,7 +1698,10 @@ let logHistory = [],
   logHistoryBusy = false,
   logHistoryRetryAt = 0,
   logJumpAt = null,
+  logJumpBoot = null,
+  logBoots = null,
   logAnchor = null;
+const logPast = () => logJumpAt != null || logJumpBoot != null;
 function logHistoryAvailable() {
   return !!R.uiState.companionHere?.paired;
 }
@@ -1718,6 +1722,9 @@ function logHistoryQuery() {
   if (logHistoryNext) {
     q.set("boot", logHistoryNext.boot);
     q.set("before", logHistoryNext.before);
+  } else if (logJumpBoot) {
+    q.set("boot", logJumpBoot.end.boot);
+    q.set("before", logJumpBoot.end.before);
   } else if (logJumpAt != null) q.set("at", logJumpAt);
   return "/__companion/log?" + q;
 }
@@ -1727,8 +1734,8 @@ async function loadLogOlder() {
   // The newest stored events are usually still in the live ring, which shows
   // them already: paging goes on until a page brings a line the view lacks.
   const live = new Set(R.uiState.logEvents.map((e) => e.sequence)),
-    shown = (e) => e.g || logJumpAt != null || !(e.b === logBootId && live.has(e.s)),
-    jumped = logJumpAt != null && !logHistory.length;
+    shown = (e) => e.g || logPast() || !(e.b === logBootId && live.has(e.s)),
+    jumped = logPast() && !logHistory.length;
   try {
     for (let pages = 0, added = false; !added && !logHistoryDone && pages < 8; pages++) {
       const page = await (await R.companionLog(logHistoryQuery())).json();
@@ -1764,17 +1771,66 @@ function restartLogHistory() {
   logAnchor = "end";
   R.paint(renderLog);
   void loadLogOlder();
+  void loadLogBoots();
 }
-function jumpLog(at) {
+function jumpLog(at, boot = null) {
   logJumpAt = at;
+  logJumpBoot = boot;
   logHistoryControls();
   restartLogHistory();
+}
+// The companion's boot index, oldest first, lets the view step boot by boot;
+// it is read when the view first shows the history and again on each jump.
+async function loadLogBoots() {
+  if (!logHistoryAvailable()) return;
+  logBoots ??= [];
+  try {
+    const { boots } = await (await R.companionLog("/__companion/log/boots")).json();
+    if (Array.isArray(boots)) logBoots = boots;
+  } catch {
+    // The steps keep the index they had; the next jump asks again.
+  }
+  logHistoryControls();
+}
+// The boot the view stands in (live: this boot), as an index into logBoots.
+function logBootIndex() {
+  const b = logBoots || [];
+  if (logJumpBoot) return b.findIndex((x) => x.end.boot === logJumpBoot.end.boot);
+  if (logJumpAt == null) return b.findLastIndex((x) => x.boot === logBootId);
+  return b.findLastIndex((x) => x.from != null && x.from <= logJumpAt);
+}
+// A day step shows up to the end of the day before or after the view's day
+// on the controller's clock; a boot step, up to the end of that boot. Past
+// the newest, the view goes back to live.
+function logStepTarget(kind, dir) {
+  const now = Date.now() / 1e3;
+  if (kind === "day") {
+    const m = logJumpBoot ? (logJumpBoot.to ?? now) : (logJumpAt ?? now),
+      day = (w) => logLocalIso(w).slice(0, 10),
+      end = (w) => logWallSec(day(w) + "T23:59:59"),
+      t = dir < 0 ? logWallSec(day(m) + "T00:00") - 1 : m < end(m) ? end(m) : end(m + 1);
+    return t >= now ? null : t > (logBoots?.[0]?.from ?? 0) ? { at: t } : undefined;
+  }
+  // A moment inside a boot steps forward to that boot's end first; a live
+  // boot the index does not hold yet comes after its newest.
+  const b = logBoots || [];
+  let i = logBootIndex();
+  if (i < 0 && !logPast()) i = b.length;
+  if (!(dir > 0 && logJumpAt != null && !logJumpBoot && b[i]?.to > logJumpAt)) i += dir;
+  if (!logBoots || i < 0) return undefined;
+  const x = b[i];
+  if (!x) return dir > 0 ? null : undefined;
+  return i === b.length - 1 && x.boot === logBootId ? null : { at: x.to, boot: x };
+}
+function stepLog(kind, dir) {
+  const t = logStepTarget(kind, dir);
+  if (t !== undefined) jumpLog(t?.at ?? null, t?.boot ?? null);
 }
 // The strip says what the log shows, live or up to a jumped-to moment, and
 // what that means: paging, the cap, or where the older history lives.
 function logHistoryControls() {
   const here = logHistoryAvailable(),
-    past = logJumpAt != null,
+    past = logPast(),
     empty = past && logHistoryDone && !logHistory.some((e) => !e.g),
     c = companionDiagnosticStatus,
     note = empty
@@ -1789,20 +1845,24 @@ function logHistoryControls() {
               ? __WEBUI_TEXT__("diagnostic.log_in_companion")
               : "";
   $("logStrip").className = "logStrip" + (empty ? " warn" : past ? " past" : "");
-  $("logStripTitle").textContent = past
-    ? R.sub(
-        empty
-          ? __WEBUI_TEXT__("diagnostic.log_nothing_at")
-          : __WEBUI_TEXT__("diagnostic.log_up_to"),
-        [logWallText(logJumpAt)],
-      )
-    : __WEBUI_TEXT__("diagnostic.log_live");
+  $("logStripTitle").textContent = logJumpBoot
+    ? R.sub(__WEBUI_TEXT__("diagnostic.log_boot_end"), [logJumpBoot.boot])
+    : past
+      ? R.sub(
+          empty
+            ? __WEBUI_TEXT__("diagnostic.log_nothing_at")
+            : __WEBUI_TEXT__("diagnostic.log_up_to"),
+          [logWallText(logJumpAt)],
+        )
+      : __WEBUI_TEXT__("diagnostic.log_live");
   $("logStripNote").textContent = note;
   $("logStripNote").hidden = !note;
-  $("logJumpButton").hidden = !here;
-  $("logJumpButton").lastElementChild.textContent = past
-    ? __WEBUI_TEXT__("diagnostic.log_change")
-    : __WEBUI_TEXT__("diagnostic.log_jump");
+  $("logNav").hidden = !here;
+  if (here && !logBoots) void loadLogBoots();
+  for (const b of $("logNav").querySelectorAll("button[value]")) {
+    const [kind, dir] = b.value.split(":");
+    b.disabled = logStepTarget(kind, +dir) === undefined || (+dir > 0 && !past);
+  }
   $("logLiveButton").hidden = !past;
   $("logExportButton").hidden = !here;
   $("logMarkButton").hidden = past;
@@ -1812,7 +1872,8 @@ function logHistoryControls() {
 function renderLogChips() {
   for (const s of [$("logLevelFilter"), $("logFilter")]) {
     const chip = s.parentElement;
-    chip.querySelector(".v").textContent = s.selectedOptions[0]?.text || "";
+    const o = s.selectedOptions[0];
+    chip.querySelector(".v").textContent = o?.dataset.label || o?.text || "";
     chip.className =
       "logChip" +
       (s.id === "logFilter" ? "" : " lv" + "cewid"[s.value]) +
@@ -1883,8 +1944,8 @@ function logRangeText([a, b]) {
 function openLogExport() {
   const oldest =
     logHistory.find((e) => e.w)?.w ??
-    (logJumpAt == null ? R.uiState.logEvents.find((e) => e.wallSec)?.wallSec : null);
-  logViewRange = [oldest ?? null, logJumpAt];
+    (logPast() ? null : R.uiState.logEvents.find((e) => e.wallSec)?.wallSec);
+  logViewRange = [oldest ?? null, logJumpBoot ? logJumpBoot.to : logJumpAt];
   $("logRangeView").textContent = logRangeText(logViewRange);
   $("logRangeDay").textContent = logRangeText([Date.now() / 1e3 - 86400, null]);
   $("logExportDialog").querySelector('[value="view"]').checked = true;
@@ -2002,6 +2063,10 @@ export function init() {
   $("logWrapButton").onclick = (e) =>
     e.currentTarget.setAttribute("aria-pressed", $("log").classList.toggle("wrap"));
   $("logJumpButton").onclick = openLogJump;
+  $("logNav").onclick = (e) => {
+    const [kind, dir] = e.target.closest("button[value]")?.value.split(":") || [];
+    if (kind) stepLog(kind, +dir);
+  };
   $("logLiveButton").onclick = () => jumpLog(null);
   $("copyLogButton").onclick = () => copyText(logShown.join("\n"));
   $("logExportButton").onclick = openLogExport;

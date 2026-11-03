@@ -189,16 +189,19 @@ continuous history:
 
 - Opened **through the companion**, the log on the Diagnostic page reaches
   back as far as the companion keeps it. Scroll up and older events load by
-  themselves, across restarts (each marked, with its reset reason in the log
+  themselves, across boots (each starts with a **Boot** row that stays pinned
+  at the top while you read its lines; the reset reason is in the log
   itself) and through gaps named as such when events could not be copied
   while the companion was away. A divider marks each new day, and the
   **Level** and **Subsystem** filters apply to the whole history, so every
   page that loads shows matching lines.
-- **Jump to a time** picks a date and time, read on the controller's clock as
-  the log shows it, or one of the shortcuts (15 minutes or an hour ago, the
-  start of today or yesterday). The log then shows everything up to that
-  moment, live updates pause, and **Back to live** returns to the newest
-  events. After about 20,000 lines the view stops loading and points you to
+- The bar on top of the log moves through time: **‹ Day ›** shows the log up
+  to the end of the previous or next day, **‹ Boot ›** up to the end of the
+  previous or next boot, and the clock (**Jump to a time**) picks a date and
+  time, read on the controller's clock as the log shows it, or a shortcut
+  (15 minutes or an hour ago, the start of today or yesterday). Live updates
+  then pause; stepping past the newest day or boot, or **Back to live**,
+  returns to the newest events. After about 20,000 lines the view stops loading and points you to
   **Export**.
 - **Export…** downloads a file with every level and subsystem, whatever the
   filters show. It offers what you're viewing (the default), the last 24
