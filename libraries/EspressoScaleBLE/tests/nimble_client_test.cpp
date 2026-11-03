@@ -43,7 +43,7 @@ static void resetHost() {
   testOnWait={}; testOnDelay={}; testOnSubmit={}; testSubmitStatus=0;
   testOnConnectCancel={}; testOnTerminate={}; testConnectCancelStatus=0;
   testTerminateStatus=0; testRssiStatus=0; testRadioProcedures=0; testTerminations=0;
-  testWrites=0; testWakeCount=0;
+  testWrites=0; testWakeCount=0; testReattemptCount=0;
   capturedScaleLogs.clear(); capturedScaleLogTransport.clear();
   testRuntimeReady=true; testSyncGeneration=1;
 }
@@ -329,6 +329,20 @@ static void run() {
     CHECK(c.diagnostics().teardownStatus==BLE_HS_ENOTCONN);
     testNowMs+=SCALE_DISCONNECT_SILENCE_MS;
     CHECK(c.startScan(nullptr,false,BLE_SCAN_BALANCED_INTERVAL,BLE_SCAN_BALANCED_WINDOW,false));
+  }
+  {
+    // A reconnected link owns the sole cleanup slot until GAP acknowledges
+    // it, also when the client then ends its own dead link.
+    NimbleScaleClient c(false); ready(c);
+    ble_gap_event event={}; event.type=BLE_GAP_EVENT_CONNECT; event.connect.conn_handle=8;
+    c.onGapEvent(&event,c.linkOperationId_);
+    const uint32_t operation=c.linkCleanupOperation_;
+    c.disconnect();
+    CHECK(c.linkCleanupHandle_==8 && testTerminations==1);
+    event.type=BLE_GAP_EVENT_DISCONNECT; event.disconnect.conn.conn_handle=8;
+    c.onGapEvent(&event,operation);
+    c.service();
+    CHECK(!c.linkCleanupPending());
   }
   for (bool earlyGap : {false,true}) {
     testNowMs=100;
@@ -1583,6 +1597,65 @@ static void callbackContextTests() {
     c.service();
     CHECK(c.lastReason()==ScaleDisconnectReason::SUPERVISION_TIMEOUT);
   }
+  for (const bool noticed : {true,false}) {
+    // CONN_REATTEMPT: a 0x3E loss reconnects on the link's context with no
+    // DISCONNECT. A re-attempt that succeeds after the client gave the link
+    // up (noticed) or on a new handle while it still uses the old one is a
+    // link nobody wants: it is terminated and its context freed.
+    resetHost(); NimbleScaleClient c(false);
+    (void)connecting(c);
+    testGattDiscoveryStatus=0;
+    const TestProcedure link=connected(c,7);
+    testDisconnect(7,BLE_HS_HCI_ERR(BLE_ERR_CONN_ESTABLISHMENT));
+    TestProcedure &retry=testFind(TestProcedureKind::Connect);
+    CHECK(retry.arg==link.arg && !retry.connected);
+    CHECK(armed(CallbackDomain::Link)==1 && armed(CallbackDomain::Gatt)==0);
+    testTerminateStatus=BLE_HS_ENOTCONN; // NimBLE already deleted handle 7.
+    if (noticed) {
+      c.service(); // The failed service discovery ends the link.
+      CHECK(testTerminations==1 && !c.linkCleanupPending());
+    }
+    retry.connected=true; retry.connHandle=8;
+    testConnectOutcome(retry,0,8);
+    testTerminateStatus=0;
+    testNowMs+=SCALE_DISCONNECT_SILENCE_MS;
+    c.service();
+    CHECK(testTerminations==(noticed ? 2u : 1u) && c.linkCleanupPending());
+    testDisconnect(8,BLE_HS_HCI_ERR(0x16));
+    CHECK(allContextsFree());
+    c.service();
+    CHECK(!c.linkCleanupPending());
+    if (!noticed) {
+      testTerminateStatus=BLE_HS_ENOTCONN;
+      testNowMs+=SCALE_DISCONNECT_SILENCE_MS;
+      c.service(); // Then the failed service discovery ends the old link.
+      CHECK(testTerminations==2 && !c.linkCleanupPending());
+    }
+    CHECK(c.lastReason()==ScaleDisconnectReason::DISCOVERY_FAILED);
+  }
+  for (const bool gaveUp : {false,true}) {
+    // ESP-IDF posts a master CONNECT only after reading the peer's features
+    // and version; a loss in between ends with DISCONNECT alone. It ends the
+    // attempt, and any link cleanup owed for it, at once.
+    resetHost(); NimbleScaleClient c(false);
+    (void)connecting(c);
+    TestProcedure &pending=testFind(TestProcedureKind::Connect);
+    pending.connected=true; pending.connHandle=7;
+    if (gaveUp) {
+      testConnectCancelStatus=BLE_HS_EALREADY; // No master procedure is left.
+      c.disconnect();
+      CHECK(c.linkCleanupPending());
+    }
+    testDisconnect(7,BLE_HS_HCI_ERR(0x08));
+    CHECK(allContextsFree());
+    c.service();
+    CHECK(!c.linkCleanupPending() && !c.isConnecting());
+    CHECK(c.lastReason()==(gaveUp ? ScaleDisconnectReason::USER_REQUEST
+                                  : ScaleDisconnectReason::SUPERVISION_TIMEOUT));
+    testNowMs+=SCALE_DISCONNECT_SILENCE_MS;
+    CHECK(c.startScan(nullptr,false,BLE_SCAN_BALANCED_INTERVAL,BLE_SCAN_BALANCED_WINDOW,false));
+  }
+  CHECK(allContextsFree());
   {
     // GATT: progress keeps a discovery armed; every non-zero status ends it.
     // A write ends with its single callback, success or not.

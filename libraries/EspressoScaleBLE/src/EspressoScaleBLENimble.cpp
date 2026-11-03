@@ -1214,9 +1214,12 @@ class NimbleScaleClient {
     TaskHandle_t waiter = nullptr;
     const uint32_t startedAtMs = nowMs();
     portENTER_CRITICAL(&mux_);
+    // ESP-IDF defers a master CONNECT until the peer's features and version
+    // are read, so a link lost before it has no handle yet.
     const bool current = disconnect.operationId != 0 &&
                          disconnect.operationId == linkOperationId_ &&
-                         disconnect.connectionHandle == connectionHandle_;
+                         (connectionHandle_ == kInvalidHandle ||
+                          disconnect.connectionHandle == connectionHandle_);
     if (current) {
       if (!radioSubmitActive_) {
         armCommunicationSilenceLocked(SilenceTrigger::Gap, startedAtMs);
@@ -1358,6 +1361,19 @@ class NimbleScaleClient {
                 linkCleanupOperation_ = 0;
               }
             }
+          } else if (operationId != 0 && event->connect.status == 0 &&
+                     linkCleanupOperation_ == 0 &&
+                     event->connect.conn_handle != connectionHandle_ &&
+                     (operationId == linkOperationId_ ||
+                      operationId == abandonedLinkOperation_)) {
+            // CONN_REATTEMPT reconnected a link lost with 0x3E on its context,
+            // posting no DISCONNECT: the client gave that link up, or still
+            // uses the old handle. Nobody owns the new link; terminate it.
+            linkCleanupOperation_ = operationId;
+            linkCleanupSyncGeneration_ = runtimeGeneration;
+            linkCleanupHandle_ = event->connect.conn_handle;
+            linkCleanupTerminate_ = true;
+            linkCleanupGapReceived_ = false;
           } else {
             ++staleCallbacks_;
           }
@@ -1374,7 +1390,8 @@ class NimbleScaleClient {
           portENTER_CRITICAL(&mux_);
           const bool cleanup = operationId != 0 &&
               operationId == linkCleanupOperation_ && !linkCleanupGapReceived_ &&
-              event->disconnect.conn.conn_handle == linkCleanupHandle_ &&
+              (linkCleanupHandle_ == kInvalidHandle ||
+               event->disconnect.conn.conn_handle == linkCleanupHandle_) &&
               linkCleanupSyncGeneration_ == runtimeGeneration;
           if (cleanup) {
             linkCleanupGapReceived_ = true;
@@ -1918,6 +1935,7 @@ class NimbleScaleClient {
       terminatePeer = false;
     }
     if (terminatePeer && reason != ScaleDisconnectReason::HOST_RESET &&
+        linkCleanupOperation_ == 0 &&
         (connectionHandle_ != kInvalidHandle ||
          (state_ == State::Connecting && !connectComplete_))) {
       linkCleanupOperation_ = linkOperationId_;
@@ -2945,7 +2963,10 @@ class NimbleScaleClient {
       portENTER_CRITICAL(&mux_);
       if (linkCleanupOperation_ == operation && !linkCleanupGapReceived_) {
         if (rc == 0 || rc == BLE_HS_EALREADY) linkCleanupTerminate_ = false;
-        if (rc == BLE_HS_ENOTCONN) linkCleanupOperation_ = 0;
+        if (rc == BLE_HS_ENOTCONN) {
+          abandonedLinkOperation_ = operation;
+          linkCleanupOperation_ = 0;
+        }
         armCommunicationSilenceLocked(SilenceTrigger::LocalDisconnect, nowMs());
       }
       portEXIT_CRITICAL(&mux_);
@@ -3021,6 +3042,9 @@ class NimbleScaleClient {
   uint32_t scanOperationId_ = 0;
   uint32_t linkOperationId_ = 0;
   uint32_t linkCleanupOperation_ = 0;
+  // The link operation NimBLE no longer knew a link for at termination; with
+  // CONN_REATTEMPT it can still report a reconnected one.
+  uint32_t abandonedLinkOperation_ = 0;
   uint32_t linkCleanupSyncGeneration_ = 0;
   uint16_t linkCleanupHandle_ = kInvalidHandle;
   bool linkCleanupTerminate_ = false;

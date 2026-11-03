@@ -78,11 +78,12 @@ constexpr int BLE_HS_ERR_ATT_BASE=0x100, BLE_HS_ERR_HCI_BASE=0x200;
 #define BLE_HS_HCI_ERR(x) (0x200+(x))
 #define BLE_HS_ATT_ERR(x) (0x100+(x))
 constexpr int BLE_HS_FOREVER=0x7fffffff;
-constexpr uint8_t BLE_ERR_REM_USER_CONN_TERM=0x13;
+constexpr uint8_t BLE_ERR_REM_USER_CONN_TERM=0x13, BLE_ERR_CONN_ESTABLISHMENT=0x3e;
 constexpr int BLE_GAP_EVENT_DISC=1, BLE_GAP_EVENT_DISC_COMPLETE=2,
   BLE_GAP_EVENT_CONNECT=3, BLE_GAP_EVENT_DISCONNECT=4, BLE_GAP_EVENT_NOTIFY_RX=5,
   BLE_GAP_EVENT_CONN_UPDATE=6, BLE_GAP_EVENT_CONN_UPDATE_REQ=7,
-  BLE_GAP_EVENT_L2CAP_UPDATE_REQ=8, BLE_GAP_EVENT_LINK_ESTAB=38;
+  BLE_GAP_EVENT_L2CAP_UPDATE_REQ=8, BLE_GAP_EVENT_REATTEMPT_COUNT=31,
+  BLE_GAP_EVENT_LINK_ESTAB=38;
 constexpr int BLE_HCI_ADV_RPT_EVTYPE_ADV_IND=0, BLE_HCI_ADV_RPT_EVTYPE_DIR_IND=1,
   BLE_HCI_ADV_RPT_EVTYPE_ADV_NONCONN_IND=3, BLE_HCI_ADV_RPT_EVTYPE_SCAN_RSP=4;
 constexpr uint8_t BLE_GATT_CHR_PROP_NOTIFY=0x10, BLE_GATT_CHR_PROP_INDICATE=0x20,
@@ -115,6 +116,7 @@ struct ble_gap_event {
   struct { uint16_t conn_handle,attr_handle; os_mbuf *om; } notify_rx;
   struct { int status; uint16_t conn_handle; } conn_update;
   struct { const ble_gap_upd_params *peer_params; ble_gap_upd_params *self_params; uint16_t conn_handle; } conn_update_req;
+  struct { uint16_t conn_handle; uint8_t count; } reattempt_cnt;
 };
 // The stub keeps no connection table: tests publish the one descriptor a
 // ble_gap_conn_find() may return.
@@ -208,8 +210,14 @@ inline void testGattTerminal(const TestProcedure &procedure, int status) {
     default: assert(false && "not a GATT procedure");
   }
 }
-// ble_gap_conn_broken: GATT procedures of the link fail with ENOTCONN before
-// the link's DISCONNECT.
+// ble_hs_hci_evt_disconn_complete then ble_gap_conn_broken: GATT procedures
+// of the link fail with ENOTCONN before the link's DISCONNECT. A master link
+// is established (connected) before its deferred CONNECT, and a loss in
+// between still ends with DISCONNECT alone. With CONN_REATTEMPT a master link
+// lost with 0x3E (up to CONFIG_BT_NIMBLE_MAX_CONN_REATTEMPT=3 times in a row)
+// instead posts REATTEMPT_COUNT, then after the GATT failures connects again
+// with the same cb and cb_arg and posts no DISCONNECT.
+inline unsigned testReattemptCount = 0;
 inline void testDisconnect(uint16_t connHandle, int reason) {
   std::vector<TestProcedure> ended, kept;
   TestProcedure link = {};
@@ -223,10 +231,23 @@ inline void testDisconnect(uint16_t connHandle, int reason) {
       kept.push_back(procedure);
     }
   }
+  const bool reattempt = linkFound && reason == BLE_HS_HCI_ERR(BLE_ERR_CONN_ESTABLISHMENT) &&
+                         testReattemptCount < 3;
+  if (linkFound) testReattemptCount = reattempt ? testReattemptCount + 1 : 0;
+  ble_gap_event event = {};
+  if (reattempt) {
+    event.type = BLE_GAP_EVENT_REATTEMPT_COUNT; event.reattempt_cnt.conn_handle = connHandle;
+    event.reattempt_cnt.count = static_cast<uint8_t>(testReattemptCount);
+    testGap(link, event);
+  }
   testProcedures = kept;
   for (const auto &procedure : ended) testGattTerminal(procedure, BLE_HS_ENOTCONN);
   if (!linkFound) return;
-  ble_gap_event event = {};
+  if (reattempt) {
+    link.connected = false; link.connHandle = 0xffff;
+    testProcedures.push_back(link);
+    return;
+  }
   event.type = BLE_GAP_EVENT_DISCONNECT; event.disconnect.reason = reason;
   event.disconnect.conn.conn_handle = connHandle;
   testGap(link, event);
