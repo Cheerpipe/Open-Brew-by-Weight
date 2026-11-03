@@ -19,12 +19,10 @@ constexpr size_t SHOT_CURVE_SECTION_FIXED_BYTES = 22;
 constexpr size_t SHOT_CURVE_SECTION_MAX_BYTES =
     SHOT_CURVE_SECTION_FIXED_BYTES + SHOT_CURVE_STREAM_BYTES + 2U * SHOT_CURVE_BREAK_BYTES;
 
-// Bits past the count are stale record bytes, never observations.
-inline void clearShotCurveTailBits(uint8_t *breakBefore, uint8_t *held, uint16_t count) {
+// Bits of a bitmap past the count are stale record bytes, never observations.
+inline void clearShotCurveTailBits(uint8_t *bitmap, uint16_t count) {
   if (count % 8U == 0U) return;
-  const uint8_t tail = static_cast<uint8_t>((1U << (count % 8U)) - 1U);
-  breakBefore[count / 8U] &= tail;
-  held[count / 8U] &= tail;
+  bitmap[count / 8U] &= static_cast<uint8_t>((1U << (count % 8U)) - 1U);
 }
 
 inline size_t encodeShotCurveSection(const ShotCurveRecord &curve, uint8_t *out) {
@@ -39,14 +37,16 @@ inline size_t encodeShotCurveSection(const ShotCurveRecord &curve, uint8_t *out)
   p += curve.bytes;
   memcpy(p, curve.breakBefore, bits);
   memcpy(p + bits, curve.held, bits);
-  clearShotCurveTailBits(p, p + bits, curve.count);
+  clearShotCurveTailBits(p, curve.count);
+  clearShotCurveTailBits(p + bits, curve.count);
   return static_cast<size_t>(p + 2U * bits - out);
 }
 
-// A section of `bytes` read through read(offset, out, count), straight into
-// the record; false unless it is a valid curve.
+// Shot `shotId`'s curve from a section of `bytes` read through
+// read(offset, out, count), straight into the record; false unless it is a
+// valid curve.
 template <typename Read>
-inline bool decodeShotCurveSection(size_t bytes, uint32_t shotId, ShotCurveRecord &curve,
+inline bool decodeShotCurveSection(uint32_t shotId, ShotCurveRecord &curve, size_t bytes,
                                    Read &&read) {
   uint8_t fixed[SHOT_CURVE_SECTION_FIXED_BYTES];
   resetShotCurveRecord(curve);
@@ -68,7 +68,8 @@ inline bool decodeShotCurveSection(size_t bytes, uint32_t shotId, ShotCurveRecor
     return false;
   curve.lastAtMs = walk.atMs;
   curve.lastWeightCg = walk.weightCg;
-  clearShotCurveTailBits(curve.breakBefore, curve.held, curve.count);
+  clearShotCurveTailBits(curve.breakBefore, curve.count);
+  clearShotCurveTailBits(curve.held, curve.count);
   return validShotCurveRecord(curve);
 }
 

@@ -151,6 +151,10 @@ inline bool tryLockFlashIo() { return true; }
 inline void unlockFlashIo() {}
 inline void feedFlashIoWatchdog() {}
 constexpr size_t FLASH_IO_CHUNK_BYTES = 1024;
+struct ByteRange {
+  size_t offset = 0;
+  size_t length = 0;
+};
 inline uint8_t *flashIoScratchBytes() {
   static uint8_t scratch[FLASH_IO_CHUNK_BYTES];
   return scratch;

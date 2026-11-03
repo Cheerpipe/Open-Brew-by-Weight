@@ -220,8 +220,10 @@ class DualSlotFlashLog {
       FinalizeFn(store_);
       beginFlashStoreTransaction(
           persistProgress_,
-          static_cast<size_t>(1U - (activeSlot_ & 1U)) * Traits::kSlotBytes,
-          kEraseBytes, Traits::kHeaderBytes, sizeof(store_));
+          {.targetOffset = static_cast<size_t>(1U - (activeSlot_ & 1U)) * Traits::kSlotBytes,
+           .eraseBytes = kEraseBytes,
+           .headerBytes = Traits::kHeaderBytes,
+           .totalBytes = sizeof(store_)});
     }
     const FlashStoreStepResult result = flashIoStoreStep(
         part, &store_, persistProgress_, lockTimeoutMs);

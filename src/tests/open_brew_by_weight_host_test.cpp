@@ -13534,7 +13534,8 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
     r.hasWallTime = 1;
     r.endedAtLocalSec = 1767225600U + static_cast<uint32_t>(i) * 43200U;
     shotLogSetPresetId(r, presetId);
-    shotLogSetBbw(r, 1, BBW_PROFILE_VERSION, 30, i % 4 != 1);
+    shotLogSetBbw(r, {.algorithm = 1, .version = BBW_PROFILE_VERSION, .alpha = 30,
+                      .learningApplied = i % 4 != 1});
     return r;
   };
   struct Reads {
@@ -16991,22 +16992,22 @@ void f17_health_counters_are_atomic_and_monotonic() {
 void s04b_shot_log_page_slice() {
   size_t start = 99;
   size_t pageCount = 99;
-  CHECK(shotLogPageSlice(120, 0, 10, start, pageCount) == true);
+  CHECK(shotLogPageSlice(120, {0, 10}, start, pageCount) == true);
   CHECK(start == 0);
   CHECK(pageCount == 10);
-  CHECK(shotLogPageSlice(120, 110, 10, start, pageCount) == false);
+  CHECK(shotLogPageSlice(120, {110, 10}, start, pageCount) == false);
   CHECK(start == 110);
   CHECK(pageCount == 10);
-  CHECK(shotLogPageSlice(120, 115, 10, start, pageCount) == false);
+  CHECK(shotLogPageSlice(120, {115, 10}, start, pageCount) == false);
   CHECK(start == 115);
   CHECK(pageCount == 5);
-  CHECK(shotLogPageSlice(5, 0, 10, start, pageCount) == false);
+  CHECK(shotLogPageSlice(5, {0, 10}, start, pageCount) == false);
   CHECK(start == 0);
   CHECK(pageCount == 5);
-  CHECK(shotLogPageSlice(0, 0, 10, start, pageCount) == false);
+  CHECK(shotLogPageSlice(0, {0, 10}, start, pageCount) == false);
   CHECK(start == 0);
   CHECK(pageCount == 0);
-  CHECK(shotLogPageSlice(20, 50, 10, start, pageCount) == false);
+  CHECK(shotLogPageSlice(20, {50, 10}, start, pageCount) == false);
   CHECK(start == 20);
   CHECK(pageCount == 0);
   CHECK(shotLogClampPageLimit(0) == 1);
@@ -17280,13 +17281,13 @@ void s12b_shot_log_update_rating() {
   CHECK(shotLog.append(record));
   ShotLogRecord stored[1] = {};
   CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
-  CHECK(shotLog.updateRating(stored[0].id, 3));
+  CHECK(shotLog.updateRating({stored[0].id, 3}));
   CHECK(shotLog.copyNewestFirst(stored, 1) == 1);
   CHECK(shotLogRating(stored[0].sideFlags) == 3);
   CHECK(shotLogFastGuardEnabled(stored[0].sideFlags));
   CHECK(!shotLogSlowGuardEnabled(stored[0].sideFlags));
-  CHECK(!shotLog.updateRating(stored[0].id, 6));
-  CHECK(!shotLog.updateRating(99999U, 1));
+  CHECK(!shotLog.updateRating({stored[0].id, 6}));
+  CHECK(!shotLog.updateRating({99999U, 1}));
 }
 
 void s12c_finalize_links_exact_history_row() {
@@ -17498,7 +17499,7 @@ void s12g_worker_acknowledgement_rechecks_generation_under_lock() {
       } else if (selected == 1) {
         CHECK(shotCurves.removeById(1) && shotLog.removeById(1, false));
       } else {
-        CHECK(shotLog.updateRating(1, 5, false));
+        CHECK(shotLog.updateRating({1, 5}, false));
       }
       shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
     };
@@ -21267,7 +21268,8 @@ void fw06_status_carries_recent_drips_and_markers() {
     record.offsetUsedCg = 100;
     record.actualWeightCg = static_cast<int16_t>(3550 + i);  // needed 0.50 + i cg
     shotLogSetPresetId(record, preset.id);
-    shotLogSetBbw(record, 1, BBW_PROFILE_VERSION, 30, i != 4);
+    shotLogSetBbw(record, {.algorithm = 1, .version = BBW_PROFILE_VERSION, .alpha = 30,
+                           .learningApplied = i != 4});
     TaskLockGuard lock(shotStoreMutex);
     if (i == 3) setAtId = shotLog.nextRecordId();
     CHECK(shotLog.append(record, false));
@@ -24224,13 +24226,14 @@ std::vector<uint8_t> poolTraceBytes(uint32_t shotId, uint32_t bootId, uint32_t e
                                     ShotTracePoolStatus *result = nullptr) {
   ShotTracePoolRef ref;
   uint8_t buffer[512];
-  size_t offset = 0, bytes = 0;
+  ByteRange found;
   ShotTracePoolStatus status =
       openShotTraceRecord(shotId, bootId, endedAtMs, ref, buffer, sizeof(buffer));
   if (status == ShotTracePoolStatus::OK)
-    status = shotTracePool().findSection(ref, ShotTracePoolSection::TRACE, offset, bytes);
-  std::vector<uint8_t> out(status == ShotTracePoolStatus::OK ? bytes : 0);
-  if (status == ShotTracePoolStatus::OK) status = shotTracePool().read(ref, offset, out.data(), bytes);
+    status = shotTracePool().findSection(ref, ShotTracePoolSection::TRACE, found);
+  std::vector<uint8_t> out(status == ShotTracePoolStatus::OK ? found.length : 0);
+  if (status == ShotTracePoolStatus::OK)
+    status = shotTracePool().read(ref, found.offset, out.data(), found.length);
   if (status != ShotTracePoolStatus::OK) out.clear();
   if (result != nullptr) *result = status;
   return out;
@@ -24355,11 +24358,11 @@ void tpw03_back_to_back_traces_are_both_saved_and_drops_are_counted() {
   ShotTracePending pending = {};
   uint8_t chunk[256];
   CHECK(shotTrace().pendingPersist(pending, chunk, sizeof(chunk), false) &&
-        pending.shotLogId == 5);
+        pending.shot.shotId == 5);
   completePoolTestTrace(6, 7, 600000);
   CHECK(shotTrace().begin(700000) && shotTrace().tracesDropped() == 1);
   shotTrace().complete(7, 7, 730000, static_cast<uint8_t>(EndReason::ACTIVATOR));
-  shotTrace().consume(pending.generation);
+  shotTrace().consume(pending.trace.generation);
   CHECK(shotTrace().unsavedCount() == 2 && shotTrace().tracesDropped() == 1);
   serviceShotTracePool();
   serviceShotTracePool();
@@ -24371,9 +24374,9 @@ void tpw03_back_to_back_traces_are_both_saved_and_drops_are_counted() {
   // Clear all while an append is in flight: its late consume changes nothing.
   completePoolTestTrace(10, 7, 1000000);
   CHECK(shotTrace().pendingPersist(pending, chunk, sizeof(chunk), false) &&
-        pending.shotLogId == 10);
+        pending.shot.shotId == 10);
   shotTrace().consumeCompleted();
-  shotTrace().consume(pending.generation);
+  shotTrace().consume(pending.trace.generation);
   CHECK(shotTrace().unsavedCount() == 0 && shotTrace().tracesDropped() == 1);
   // A discarded capture leaves nothing behind to drop.
   completePoolTestTrace(11, 7, 1100000);
@@ -24636,10 +24639,10 @@ ShotCurveRead poolTestRead(uint32_t id, bool *intact = nullptr, uint16_t points 
 bool poolRecordHas(uint32_t id, uint32_t endedAtMs, ShotTracePoolSection section) {
   ShotTracePoolRef ref;
   uint8_t buffer[512];
-  size_t offset = 0, bytes = 0;
+  ByteRange found;
   return shotTracePool().open(id, currentBootId(), endedAtMs, ref, buffer, sizeof(buffer)) ==
              ShotTracePoolStatus::OK &&
-         shotTracePool().findSection(ref, section, offset, bytes) == ShotTracePoolStatus::OK;
+         shotTracePool().findSection(ref, section, found) == ShotTracePoolStatus::OK;
 }
 
 void freshPoolShotLog() {

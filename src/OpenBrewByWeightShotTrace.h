@@ -25,10 +25,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
 
 #include "OpenBrewByWeightDomain.h"
 #include "OpenBrewByWeightPsram.h"
 #include "OpenBrewByWeightScaleProfiler.h"
+#include "OpenBrewByWeightShotLogTypes.h"
 #include "OpenBrewByWeightTaskMutex.h"
 #include <OpenBrewByWeightVersion.h>
 
@@ -247,11 +249,20 @@ constexpr uint32_t SHOT_TRACE_CHECK_SEED = 2166136261U;
 
 enum class ShotTraceExport : uint8_t { OK, BUSY, EMPTY, CHANGED, SINK_FAILED };
 
-// The newest completed trace, taken for the flash pool: its generation, the
-// export CRC and the identity of the summary it explains.
+// A completed trace as an export reads it: its generation (0: none), its
+// length and, once computed, the CRC patched into its header.
+struct ShotTraceExportRef {
+  uint32_t generation = 0;
+  size_t totalBytes = 0;
+  uint32_t crc = 0;
+};
+
+// The newest completed trace, taken for the flash pool, and the identity of
+// the summary it explains.
 struct ShotTracePending {
-  uint32_t generation, crc, shotLogId, bootId, endedAtMs, firmwarePacked;
-  uint16_t totalBytes;
+  ShotTraceExportRef trace;
+  ShotKey shot;
+  uint32_t firmwarePacked;
   uint8_t endReason;
 };
 
@@ -367,7 +378,7 @@ class ShotTrace {
     {
       const TaskLockGuard lock(mux_);
       if (!capturing_.load(std::memory_order_relaxed)) return;
-      changed = &completeLocked_(shotLogId, bootId, endedAtMs, endReason);
+      changed = &completeLocked_({shotLogId, bootId, endedAtMs}, endReason);
     }
     shotTraceWriteBack(changed, sizeof(*changed));
   }
@@ -404,14 +415,13 @@ class ShotTrace {
     return header;
   }
 
-  ShotTraceHeader &completeLocked_(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs,
-                                   uint8_t endReason) {
+  ShotTraceHeader &completeLocked_(const ShotKey &shot, uint8_t endReason) {
     ShotTraceBuffer &buffer = *capture_;
     ShotTraceHeader &header = buffer.header;
     header.magic = SHOT_TRACE_MAGIC;  // Completed: never recovered.
-    header.shotLogId = shotLogId;
-    header.bootId = bootId;
-    header.endedAtMs = endedAtMs;
+    header.shotLogId = shot.shotId;
+    header.bootId = shot.bootId;
+    header.endedAtMs = shot.endedAtMs;
     header.endReason = endReason;
     header.totalBytes = static_cast<uint32_t>(
         SHOT_TRACE_FIXED_BYTES + header.eventCount * sizeof(ShotTraceRecord));
@@ -655,27 +665,26 @@ class ShotTrace {
   // The mutex is held per chunk copy only, never across the sink.
   template <typename Sink>
   ShotTraceExport exportCompleted(uint8_t *chunk, size_t capacity, Sink &&sink) {
-    uint32_t generation = 0, crc = 0;
-    size_t total = 0;
-    const ShotTraceExport state = completedTrace_(Pick::NEWEST, generation, total);
+    ShotTraceExportRef trace;
+    const ShotTraceExport state = completedTrace_(Pick::NEWEST, trace);
     if (state != ShotTraceExport::OK) return state;
-    if (!crcOf_(generation, total, chunk, capacity, crc)) return ShotTraceExport::CHANGED;
-    for (size_t offset = 0; offset < total; offset += capacity) {
-      const size_t bytes = total - offset < capacity ? total - offset : capacity;
-      if (!copyExport(generation, offset, chunk, bytes, crc)) return ShotTraceExport::CHANGED;
+    if (!crcOf_(trace, {chunk, capacity})) return ShotTraceExport::CHANGED;
+    for (size_t offset = 0; offset < trace.totalBytes; offset += capacity) {
+      const size_t bytes = trace.totalBytes - offset < capacity ? trace.totalBytes - offset : capacity;
+      if (!copyExport(trace, offset, {chunk, bytes})) return ShotTraceExport::CHANGED;
       if (!sink(chunk, bytes)) return ShotTraceExport::SINK_FAILED;
     }
     return ShotTraceExport::OK;
   }
 
-  // Export bytes [offset, offset + bytes) of `generation`, its CRC set;
+  // Export bytes [offset, offset + out.size()) of the trace, its CRC set;
   // false while a capture is open or once one opened over it.
-  bool copyExport(uint32_t generation, size_t offset, uint8_t *out, size_t bytes,
-                  uint32_t crc) const {
-    if (!copyCompleted_(generation, offset, out, bytes)) return false;
-    for (size_t i = 0; i < sizeof(crc); ++i) {
+  bool copyExport(const ShotTraceExportRef &trace, size_t offset, std::span<uint8_t> out) const {
+    if (!copyCompleted_(trace, offset, out)) return false;
+    for (size_t i = 0; i < sizeof(trace.crc); ++i) {
       const size_t at = offsetof(ShotTraceHeader, crc32) + i;
-      if (at >= offset && at < offset + bytes) out[at - offset] = static_cast<uint8_t>(crc >> (8U * i));
+      if (at >= offset && at < offset + out.size())
+        out[at - offset] = static_cast<uint8_t>(trace.crc >> (8U * i));
     }
     return true;
   }
@@ -688,23 +697,19 @@ class ShotTrace {
 
   // The unsaved trace of `out`'s identity when `match`, else the oldest.
   bool pendingPersist(ShotTracePending &out, uint8_t *chunk, size_t capacity, bool match) {
-    size_t total = 0;
-    if (completedTrace_(match ? Pick::IDENTITY : Pick::OLDEST_UNSAVED, out.generation, total,
-                        out.shotLogId, out.bootId, out.endedAtMs) != ShotTraceExport::OK)
+    if (completedTrace_(match ? Pick::IDENTITY : Pick::OLDEST_UNSAVED, out.trace, out.shot) !=
+        ShotTraceExport::OK)
       return false;
     {
       const TaskLockGuard lock(mux_);
-      const ShotTraceBuffer *buffer = bufferOf_(out.generation);
+      const ShotTraceBuffer *buffer = bufferOf_(out.trace.generation);
       if (buffer == nullptr || !unsaved_[slotOf_(*buffer)]) return false;
       const ShotTraceHeader &header = buffer->header;
-      out.shotLogId = header.shotLogId;
-      out.bootId = header.bootId;
-      out.endedAtMs = header.endedAtMs;
+      out.shot = {header.shotLogId, header.bootId, header.endedAtMs};
       out.firmwarePacked = header.firmwarePacked;
       out.endReason = header.endReason;
     }
-    out.totalBytes = static_cast<uint16_t>(total);
-    return crcOf_(out.generation, total, chunk, capacity, out.crc);
+    return crcOf_(out.trace, {chunk, capacity});
   }
 
   // Saved, already on flash or given up. A generation a capture or a clear
@@ -947,9 +952,8 @@ class ShotTrace {
   // A completed trace (a recovered one verified first): the newest, the
   // oldest unsaved, or the unsaved one of an identity. BUSY while a capture
   // is open, EMPTY when there is none.
-  ShotTraceExport completedTrace_(Pick pick, uint32_t &generation, size_t &total,
-                                  uint32_t shotLogId = 0, uint32_t bootId = 0,
-                                  uint32_t endedAtMs = 0) {
+  ShotTraceExport completedTrace_(Pick pick, ShotTraceExportRef &trace,
+                                  const ShotKey &shot = {}) {
     bool dropped = false;
     uint32_t droppedBootId = 0;
     {
@@ -966,40 +970,40 @@ class ShotTrace {
         if (generationOf_[i] == 0 ||
             (pick != Pick::NEWEST && !unsaved_[i]) ||
             (pick == Pick::IDENTITY &&
-             (header.shotLogId != shotLogId || header.bootId != bootId ||
-              header.endedAtMs != endedAtMs)))
+             (header.shotLogId != shot.shotId || header.bootId != shot.bootId ||
+              header.endedAtMs != shot.endedAtMs)))
           continue;
         const bool newer = found != nullptr &&
             static_cast<int32_t>(generationOf_[i] - generationOf_[slotOf_(*found)]) > 0;
         if (found == nullptr || newer == (pick == Pick::NEWEST)) found = &buffer;
       }
-      generation = found != nullptr ? generationOf_[slotOf_(*found)] : 0;
-      total = found != nullptr ? found->header.totalBytes : 0;
+      trace.generation = found != nullptr ? generationOf_[slotOf_(*found)] : 0;
+      trace.totalBytes = found != nullptr ? found->header.totalBytes : 0;
     }
     if (dropped) shotTraceLogRecoveryDropped(droppedBootId);
-    return generation == 0 ? ShotTraceExport::EMPTY : ShotTraceExport::OK;
+    return trace.generation == 0 ? ShotTraceExport::EMPTY : ShotTraceExport::OK;
   }
 
-  // CRC-32 of the record with its CRC field zero, chunk by chunk.
-  bool crcOf_(uint32_t generation, size_t total, uint8_t *chunk, size_t capacity,
-              uint32_t &crc) const {
-    crc = 0;
-    for (size_t offset = 0; offset < total; offset += capacity) {
-      const size_t bytes = total - offset < capacity ? total - offset : capacity;
-      if (!copyCompleted_(generation, offset, chunk, bytes)) return false;
-      crc = scaleProfileChecksum(crc, chunk, bytes);
+  // trace.crc: CRC-32 of the record with its CRC field zero, chunk by chunk.
+  bool crcOf_(ShotTraceExportRef &trace, std::span<uint8_t> chunk) const {
+    trace.crc = 0;
+    for (size_t offset = 0; offset < trace.totalBytes; offset += chunk.size()) {
+      const size_t bytes =
+          trace.totalBytes - offset < chunk.size() ? trace.totalBytes - offset : chunk.size();
+      if (!copyCompleted_(trace, offset, chunk.first(bytes))) return false;
+      trace.crc = scaleProfileChecksum(trace.crc, chunk.data(), bytes);
     }
     return true;
   }
 
-  bool copyCompleted_(uint32_t generation, size_t offset, uint8_t *out,
-                      size_t bytes) const {
+  bool copyCompleted_(const ShotTraceExportRef &trace, size_t offset,
+                      std::span<uint8_t> out) const {
     const TaskLockGuard lock(mux_);
-    const ShotTraceBuffer *buffer = bufferOf_(generation);
+    const ShotTraceBuffer *buffer = bufferOf_(trace.generation);
     if (capturing_.load(std::memory_order_relaxed) || buffer == nullptr ||
-        offset + bytes > buffer->header.totalBytes)
+        offset + out.size() > buffer->header.totalBytes)
       return false;
-    memcpy(out, reinterpret_cast<const uint8_t *>(buffer) + offset, bytes);
+    memcpy(out.data(), reinterpret_cast<const uint8_t *>(buffer) + offset, out.size());
     return true;
   }
 

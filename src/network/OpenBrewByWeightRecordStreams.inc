@@ -228,7 +228,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
         cache.good += shotLogRecordEligible(snapshot.records[cache.order[index]]);
         cache.order[cache.matched++] = cache.order[index];
       }
-    cache.hasMore = shotLogPageSlice(cache.matched, offset, limit, cache.start, cache.pageCount);
+    cache.hasMore = shotLogPageSlice(cache.matched, {offset, limit}, cache.start, cache.pageCount);
     uint32_t fingerprint = crc32Update(0xFFFFFFFFU,
         reinterpret_cast<const uint8_t *>(&epoch), sizeof(epoch));
     const uint32_t window[5] = {static_cast<uint32_t>(offset), static_cast<uint32_t>(limit),
@@ -260,7 +260,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
         rowHash = read == ShotCurveRead::STORED ? record.id ^ 0x53544F52U  // "STOR"
             : uiStreamCurveHash(cache.fetchCurve,
                                 read == ShotCurveRead::FOUND ? cache.fetchCurve.count : 0);
-        cache.curveHashes.insert(record.id, rowHash);
+        if (uint32_t *slot = cache.curveHashes.claim(record.id)) *slot = rowHash;
       }
       const uint32_t row[2] = {record.id, record.sideFlags};
       fingerprint = crc32Update(fingerprint,

@@ -2199,7 +2199,7 @@ void p69b_record_index_copies_stay_strictly_id_descending() {
   HistoryRecord activation = {};
   for (int i = 0; i < 5; ++i) CHECK(shots.append(shot, false) && history.append(activation, false));
   CHECK(shotsDescending(5) && historyDescending(5));
-  CHECK(shots.updateRating(3, 4, false) && shotsDescending(5));
+  CHECK(shots.updateRating({3, 4}, false) && shotsDescending(5));
   CHECK(shots.removeById(3, false) && history.removeById(3, false));
   CHECK(shotsDescending(4) && historyDescending(4));
   // Past capacity the ring overwrites its oldest and wraps its write index.
@@ -2695,7 +2695,7 @@ ShotCurveRecord curveBoundaryRecord(uint32_t id) {
 uint8_t curveSection[SHOT_CURVE_SECTION_MAX_BYTES + 8];
 bool decodeCurveSection(const uint8_t *section, size_t bytes, uint32_t shotId,
                         ShotCurveRecord &out) {
-  return decodeShotCurveSection(bytes, shotId, out, [&](size_t at, void *to, size_t n) {
+  return decodeShotCurveSection(shotId, out, bytes, [&](size_t at, void *to, size_t n) {
     if (at + n > bytes) return false;
     memcpy(to, section + at, n);
     return true;
@@ -2899,7 +2899,7 @@ void p61h_shot_curve_section_malformed_payloads_are_rejected() {
   curveSection[1] = static_cast<uint8_t>((SHOT_CURVE_MAX_POINTS + 1U) >> 8);
   bytes = SHOT_CURVE_SECTION_FIXED_BYTES + 2U * ((SHOT_CURVE_MAX_POINTS + 8U) / 8U) + 40U;
   size_t reads = 0;
-  CHECK(!decodeShotCurveSection(bytes, 2, out, [&](size_t at, void *to, size_t n) {
+  CHECK(!decodeShotCurveSection(2, out, bytes, [&](size_t at, void *to, size_t n) {
     memcpy(to, curveSection + at, n);
     return ++reads, true;
   }));

@@ -59,16 +59,21 @@ inline size_t shotLogClampPageLimit(size_t limit) {
   return limit;
 }
 
-// Newest-first page into records[offset..). Returns hasMore.
-inline bool shotLogPageSlice(size_t total, size_t offset, size_t limit,
+// A requested page: at most `limit` records from records[offset..).
+struct ShotLogPageRequest {
+  size_t offset, limit;
+};
+
+// Newest-first page into records[page.offset..). Returns hasMore.
+inline bool shotLogPageSlice(size_t total, ShotLogPageRequest page,
                              size_t &start, size_t &pageCount) {
-  limit = shotLogClampPageLimit(limit);
-  if (offset > total) {
-    offset = total;
+  page.limit = shotLogClampPageLimit(page.limit);
+  if (page.offset > total) {
+    page.offset = total;
   }
-  start = offset;
-  const size_t remaining = total - offset;
-  pageCount = remaining < limit ? remaining : limit;
+  start = page.offset;
+  const size_t remaining = total - page.offset;
+  pageCount = remaining < page.limit ? remaining : page.limit;
   return (start + pageCount) < total;
 }
 
@@ -351,6 +356,18 @@ inline ShotLogType shotLogTypeFromCycle(StopperState finalState,
   return ShotLogType::MANUAL;
 }
 
+// A summary's identity, which an id reused after a clear never repeats: the
+// id with its boot and end time. Shot records and traces carry it.
+struct ShotKey {
+  uint32_t shotId, bootId, endedAtMs;
+};
+
+// A rating (0: none, up to SHOT_LOG_RATING_MAX) for the summary with the id.
+struct ShotLogRating {
+  uint32_t id;
+  uint8_t rating;
+};
+
 struct ShotLogRecord {
   uint32_t id;
   uint32_t bootId;
@@ -632,14 +649,18 @@ inline const char *shotLogBbwLearningApplied(const ShotLogRecord &record) {
   const uint8_t code = (record.extractionExtended >> 5) & 3;
   return code == 1 ? "false" : code == 2 ? "true" : "null";
 }
-inline void shotLogSetBbw(ShotLogRecord &record, uint8_t algorithm,
-                          uint8_t version, uint8_t alpha, bool applied) {
-  if (!validBbwAlpha(alpha)) alpha = 0;
-  const uint8_t profile = version == BBW_PROFILE_VERSION && algorithm == 1 ? 5 : 0;
+// The BBW model a shot ran with, as its summary records it.
+struct ShotLogBbw {
+  uint8_t algorithm, version, alpha;
+  bool learningApplied;
+};
+inline void shotLogSetBbw(ShotLogRecord &record, const ShotLogBbw &bbw) {
+  const uint8_t alpha = validBbwAlpha(bbw.alpha) ? bbw.alpha : uint8_t{0};
+  const uint8_t profile = bbw.version == BBW_PROFILE_VERSION && bbw.algorithm == 1 ? 5 : 0;
   record.cutType = (record.cutType & 15) | ((alpha >> 3) << 4);
   record.sideFlags = (record.sideFlags & 0x1f) | (profile << 5);
   record.extractionExtended = (record.extractionExtended & 3) |
-      ((alpha & 7) << 2) | ((applied ? 2 : 1) << 5);
+      ((alpha & 7) << 2) | ((bbw.learningApplied ? 2 : 1) << 5);
 }
 
 inline int shotLogCompareRatingOrder(const ShotLogRecord &left,

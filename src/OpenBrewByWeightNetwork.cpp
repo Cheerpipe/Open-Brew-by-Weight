@@ -97,18 +97,19 @@ struct StatsCurveHashCache {
     return nullptr;
   }
 
-  void insert(uint32_t id, uint32_t value) {
-    if (id == 0) return;
+  // The hash slot of `id`, claimed when new. Null for id 0 or a full table:
+  // the entry is dropped and that row re-fetches its curve next time.
+  uint32_t *claim(uint32_t id) {
+    if (id == 0) return nullptr;
     const size_t seed = id & (kCapacity - 1);
     for (size_t probe = 0; probe < kCapacity; ++probe) {
       const size_t index = (seed + probe) & (kCapacity - 1);
       if (shotId[index] == id || shotId[index] == 0) {
         shotId[index] = id;
-        hash[index] = value;
-        return;
+        return &hash[index];
       }
     }
-    // Full table: drop the entry; that row re-fetches its curve next time.
+    return nullptr;
   }
 };
 

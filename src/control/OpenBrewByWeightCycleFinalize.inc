@@ -476,8 +476,10 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
   record.arrivalDs = SHOT_LOG_METRIC_MISSING;
   record.verdict = static_cast<uint8_t>(corridor::Verdict::UNCLASSIFIED);
   record.actualWeightSource = static_cast<uint8_t>(weightSource);
-  shotLogSetBbw(record, snapshot.bbwAlgorithm, snapshot.bbwProfileVersion,
-                 snapshot.bbwAlpha, snapshot.bbwLearningApplied);
+  shotLogSetBbw(record, {.algorithm = snapshot.bbwAlgorithm,
+                         .version = snapshot.bbwProfileVersion,
+                         .alpha = snapshot.bbwAlpha,
+                         .learningApplied = snapshot.bbwLearningApplied});
 
   if (finalWeightValid) {
     record.actualWeightCg = shotLogWeightToCentigrams(finalWeightG);

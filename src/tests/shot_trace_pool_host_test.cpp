@@ -80,13 +80,13 @@ ShotTracePoolStatus readShot(ShotTracePool &pool, uint32_t id, bool &matches) {
     size_t bytes;
   } sections[] = {{ShotTracePoolSection::CURVE, sizes.curve}, {ShotTracePoolSection::TRACE, sizes.trace}};
   for (const auto &section : sections) {
-    size_t offset = 0, bytes = 0;
-    status = pool.findSection(ref, section.tag, offset, bytes);
+    ByteRange found;
+    status = pool.findSection(ref, section.tag, found);
     if (status != ShotTracePoolStatus::OK) return status;
-    matches = matches && bytes == section.bytes;
-    for (size_t at = 0; at < bytes;) {
-      const size_t piece = bytes - at < 777 ? bytes - at : 777;
-      status = pool.read(ref, offset + at, buffer, piece < sizeof(buffer) ? piece : sizeof(buffer));
+    matches = matches && found.length == section.bytes;
+    for (size_t at = 0; at < found.length;) {
+      const size_t piece = found.length - at < 777 ? found.length - at : 777;
+      status = pool.read(ref, found.offset + at, buffer, piece < sizeof(buffer) ? piece : sizeof(buffer));
       if (status != ShotTracePoolStatus::OK) return status;
       for (size_t i = 0; i < (piece < sizeof(buffer) ? piece : sizeof(buffer)); ++i)
         matches = matches && buffer[i] == contentByte(id, static_cast<uint8_t>(section.tag), at + i);
@@ -156,8 +156,8 @@ void tsp01_geometry_and_index_budget() {
   CHECK(SHOT_TRACE_POOL_SECTORS == 1337);
   CHECK(SHOT_TRACE_POOL_INDEX_CAPACITY == 2048);
   CHECK(sizeof(ShotTracePoolIndex) == 2048U * 8U + 168U);
-  CHECK(shotTracePoolIdTag(5, 1, 2) != shotTracePoolIdTag(5, 1, 3));
-  CHECK((shotTracePoolIdTag(5, 1, 2) & 0xFFFFFFU) == 5U);
+  CHECK(shotTracePoolIdTag({5, 1, 2}) != shotTracePoolIdTag({5, 1, 3}));
+  CHECK((shotTracePoolIdTag({5, 1, 2}) & 0xFFFFFFU) == 5U);
 }
 
 void tsp02_round_trip_spanning_sectors() {
@@ -183,21 +183,21 @@ void tsp02_round_trip_spanning_sectors() {
   CHECK(pool.open(8, identity.bootId, identity.endedAtMs, ref, buffer, sizeof(buffer)) ==
         ShotTracePoolStatus::OK);
   CHECK(ref.bytes == 832);
-  size_t offset = 0, bytes = 0;
-  CHECK(pool.findSection(ref, ShotTracePoolSection::CURVE, offset, bytes) == ShotTracePoolStatus::OK &&
-        bytes == 0);
+  ByteRange found;
+  CHECK(pool.findSection(ref, ShotTracePoolSection::CURVE, found) == ShotTracePoolStatus::OK &&
+        found.length == 0);
   CHECK(pool.read(ref, ref.bytes - 4U, buffer, 8) == ShotTracePoolStatus::IO_ERROR);
   CHECK(pool.append({77, 1, 2, 3, 0}, nullptr, 0));
   CHECK(pool.open(77, 1, 2, ref, buffer, sizeof(buffer)) == ShotTracePoolStatus::OK);
   CHECK(ref.bytes == sizeof(ShotTracePoolRecordHeader));
-  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, found) ==
         ShotTracePoolStatus::NOT_FOUND);
   // An odd section length is padded to 16 bytes: 32 + 4 + 8 (5 bytes) -> 48.
   const ShotTracePoolSource odd = {ShotTracePoolSection::TRACE, 0, 5, traceBuffer, nullptr, nullptr};
   CHECK(pool.append({78, 1, 2, 3, 0}, &odd, 1));
   CHECK(pool.open(78, 1, 2, ref, buffer, sizeof(buffer)) == ShotTracePoolStatus::OK && ref.bytes == 48);
-  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) == ShotTracePoolStatus::OK &&
-        bytes == 5);
+  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, found) == ShotTracePoolStatus::OK &&
+        found.length == 5);
   // Nothing outside `reserved` was touched.
   for (size_t p = RESERVED; p < Flash::kSectors; ++p) CHECK(Flash::touched(p) == 0);
 }
@@ -306,7 +306,7 @@ void startSectors(const ShotTracePool &pool, const std::vector<uint32_t> &ids, E
   for (const ShotTracePoolEntry &e : entries(pool))
     for (uint32_t id : ids) {
       const ShotTracePoolIdentity identity = identityOf(id);
-      if (e.idTag != shotTracePoolIdTag(id, identity.bootId, identity.endedAtMs)) continue;
+      if (e.idTag != shotTracePoolIdTag({id, identity.bootId, identity.endedAtMs})) continue;
       expected.entry[id] = e;
       std::vector<size_t> &list = expected.sectors[id];
       list.clear();
@@ -554,8 +554,8 @@ void tsp11_linkage_refuses_other_boots_and_times() {
         ShotTracePoolStatus::NOT_FOUND);
   // A tag collision (same 24-bit id and tag) is still refused on flash.
   uint32_t otherBoot = identity.bootId + 1U;
-  while (shotTracePoolIdTag(5, otherBoot, identity.endedAtMs) !=
-         shotTracePoolIdTag(5, identity.bootId, identity.endedAtMs)) ++otherBoot;
+  while (shotTracePoolIdTag({5, otherBoot, identity.endedAtMs}) !=
+         shotTracePoolIdTag({5, identity.bootId, identity.endedAtMs})) ++otherBoot;
   CHECK(!pool.contains(5, otherBoot, identity.endedAtMs));
   CHECK(pool.open(5, otherBoot, identity.endedAtMs, ref, buffer, sizeof(buffer)) ==
         ShotTracePoolStatus::NOT_FOUND);
@@ -563,8 +563,8 @@ void tsp11_linkage_refuses_other_boots_and_times() {
   // does not hide the older one, and neither answers for a third identity.
   CHECK(pool.append({5, otherBoot, identity.endedAtMs, 1, 0}, nullptr, 0));
   uint32_t thirdBoot = otherBoot + 1U;
-  while (shotTracePoolIdTag(5, thirdBoot, identity.endedAtMs) !=
-         shotTracePoolIdTag(5, identity.bootId, identity.endedAtMs)) ++thirdBoot;
+  while (shotTracePoolIdTag({5, thirdBoot, identity.endedAtMs}) !=
+         shotTracePoolIdTag({5, identity.bootId, identity.endedAtMs})) ++thirdBoot;
   CHECK(readable(pool, 5));
   CHECK(pool.contains(5, otherBoot, identity.endedAtMs));
   CHECK(!pool.contains(5, thirdBoot, identity.endedAtMs));
@@ -609,7 +609,7 @@ struct LiveSet {
 bool isLive(void *context, const ShotTracePoolEntry &entry) {
   for (uint32_t id : static_cast<LiveSet *>(context)->ids) {
     const ShotTracePoolIdentity identity = identityOf(id);
-    if (entry.idTag == shotTracePoolIdTag(id, identity.bootId, identity.endedAtMs)) return true;
+    if (entry.idTag == shotTracePoolIdTag({id, identity.bootId, identity.endedAtMs})) return true;
   }
   return false;
 }
@@ -811,14 +811,14 @@ void tsp17_reads_revalidate_against_recycling() {
   const ShotTracePoolIdentity identity = identityOf(1);
   ShotTracePoolRef ref;
   uint8_t buffer[256];
-  size_t offset = 0, bytes = 0;
+  ByteRange found;
   CHECK(pool.open(1, identity.bootId, identity.endedAtMs, ref, buffer, sizeof(buffer)) ==
         ShotTracePoolStatus::OK);
-  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) == ShotTracePoolStatus::OK);
+  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, found) == ShotTracePoolStatus::OK);
   recyclingPool = &pool;
   Flash::setReadHook(recycleShotOne);
-  CHECK(pool.read(ref, offset, buffer, sizeof(buffer)) == ShotTracePoolStatus::GONE);
-  CHECK(pool.read(ref, offset, buffer, sizeof(buffer)) == ShotTracePoolStatus::GONE);
+  CHECK(pool.read(ref, found.offset, buffer, sizeof(buffer)) == ShotTracePoolStatus::GONE);
+  CHECK(pool.read(ref, found.offset, buffer, sizeof(buffer)) == ShotTracePoolStatus::GONE);
   CHECK(!readable(pool, 1) && readable(pool, nextRecyclingId - 1U));
 }
 
@@ -888,14 +888,14 @@ bool appendSized(ShotTracePool &pool, uint32_t id, uint16_t total) {
 bool readableSized(ShotTracePool &pool, uint32_t id, uint16_t total) {
   ShotTracePoolRef ref;
   uint8_t buffer[512];
-  size_t offset = 0, bytes = 0;
+  ByteRange found;
   if (pool.open(id, tinyIdentity(id).bootId, tinyIdentity(id).endedAtMs, ref, buffer, sizeof(buffer)) !=
           ShotTracePoolStatus::OK || ref.bytes != total ||
-      pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) != ShotTracePoolStatus::OK)
+      pool.findSection(ref, ShotTracePoolSection::TRACE, found) != ShotTracePoolStatus::OK)
     return false;
-  for (size_t at = 0; at < bytes; at += sizeof(buffer)) {
-    const size_t piece = bytes - at < sizeof(buffer) ? bytes - at : sizeof(buffer);
-    if (pool.read(ref, offset + at, buffer, piece) != ShotTracePoolStatus::OK) return false;
+  for (size_t at = 0; at < found.length; at += sizeof(buffer)) {
+    const size_t piece = found.length - at < sizeof(buffer) ? found.length - at : sizeof(buffer);
+    if (pool.read(ref, found.offset + at, buffer, piece) != ShotTracePoolStatus::OK) return false;
     for (size_t i = 0; i < piece; ++i)
       if (buffer[i] != contentByte(id, 2, at + i)) return false;
   }
@@ -1091,11 +1091,11 @@ void tsp15_concurrent_reader_and_writer() {
       const ShotTracePoolStatus status =
           pool.open(id, identity.bootId, identity.endedAtMs, ref, buffer, sizeof(buffer));
       if (status == ShotTracePoolStatus::OK) {
-        size_t offset, bytes;
-        ShotTracePoolStatus read = pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes);
-        for (size_t at = 0; read == ShotTracePoolStatus::OK && at < bytes; at += sizeof(buffer)) {
-          const size_t piece = bytes - at < sizeof(buffer) ? bytes - at : sizeof(buffer);
-          read = pool.read(ref, offset + at, buffer, piece);
+        ByteRange found;
+        ShotTracePoolStatus read = pool.findSection(ref, ShotTracePoolSection::TRACE, found);
+        for (size_t at = 0; read == ShotTracePoolStatus::OK && at < found.length; at += sizeof(buffer)) {
+          const size_t piece = found.length - at < sizeof(buffer) ? found.length - at : sizeof(buffer);
+          read = pool.read(ref, found.offset + at, buffer, piece);
           for (size_t i = 0; read == ShotTracePoolStatus::OK && i < piece; ++i)
             if (buffer[i] != contentByte(id, 2, at + i)) bad.fetch_add(1);
         }
@@ -1146,11 +1146,11 @@ void tsp26_readers_race_recovery_clear_and_end_changes() {
           pool.open(id, identity.bootId, identity.endedAtMs, ref, buffer, sizeof(buffer));
       if (status == ShotTracePoolStatus::CORRUPT || status == ShotTracePoolStatus::IO_ERROR) bad.fetch_add(1);
       if (status != ShotTracePoolStatus::OK) continue;
-      size_t offset, bytes;
-      ShotTracePoolStatus read = pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes);
-      for (size_t at = 0; read == ShotTracePoolStatus::OK && at < bytes; at += sizeof(buffer)) {
-        const size_t piece = bytes - at < sizeof(buffer) ? bytes - at : sizeof(buffer);
-        read = pool.read(ref, offset + at, buffer, piece);
+      ByteRange found;
+      ShotTracePoolStatus read = pool.findSection(ref, ShotTracePoolSection::TRACE, found);
+      for (size_t at = 0; read == ShotTracePoolStatus::OK && at < found.length; at += sizeof(buffer)) {
+        const size_t piece = found.length - at < sizeof(buffer) ? found.length - at : sizeof(buffer);
+        read = pool.read(ref, found.offset + at, buffer, piece);
         for (size_t i = 0; read == ShotTracePoolStatus::OK && i < piece; ++i)
           if (buffer[i] != contentByte(id, 2, at + i)) bad.fetch_add(1);
       }
@@ -1275,13 +1275,13 @@ void tsp31_a_section_past_its_record_is_corrupt() {
   const ShotTracePoolIdentity id = identityOf(3);
   ShotTracePoolRef ref;
   uint8_t buffer[256];
-  size_t offset = 0, bytes = 0;
+  ByteRange found;
   CHECK(pool.open(3, id.bootId, id.endedAtMs, ref, buffer, sizeof(buffer)) ==
             ShotTracePoolStatus::OK &&
-        pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+        pool.findSection(ref, ShotTracePoolSection::TRACE, found) ==
             ShotTracePoolStatus::OK);
-  ref.bytes = static_cast<uint32_t>(offset + bytes - 1U);
-  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+  ref.bytes = static_cast<uint32_t>(found.offset + found.length - 1U);
+  CHECK(pool.findSection(ref, ShotTracePoolSection::TRACE, found) ==
         ShotTracePoolStatus::CORRUPT);
 }
 
@@ -1293,10 +1293,10 @@ void tsp32_a_record_without_sections() {
   const ShotTracePoolIdentity id = identityOf(5);
   ShotTracePoolRef ref;
   uint8_t buffer[64];
-  size_t offset = 0, bytes = 0;
+  ByteRange found;
   CHECK(pool.open(5, id.bootId, id.endedAtMs, ref, buffer, sizeof(buffer)) ==
             ShotTracePoolStatus::OK &&
-        pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+        pool.findSection(ref, ShotTracePoolSection::TRACE, found) ==
             ShotTracePoolStatus::NOT_FOUND);
 }
 

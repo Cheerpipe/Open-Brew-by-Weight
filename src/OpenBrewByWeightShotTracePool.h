@@ -133,11 +133,11 @@ static_assert(SHOT_TRACE_POOL_SECTORS * SHOT_TRACE_POOL_SECTOR_BYTES / 4U <= 0x2
 
 // Summary linkage: id reuse after a clear or factory reset never matches a
 // record of another boot or end time (exactly checked again on open).
-inline uint32_t shotTracePoolIdTag(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs) {
-  uint32_t mix = bootId * 0x9E3779B1U ^ endedAtMs;
+inline uint32_t shotTracePoolIdTag(const ShotKey &shot) {
+  uint32_t mix = shot.bootId * 0x9E3779B1U ^ shot.endedAtMs;
   mix ^= mix >> 16;
   mix ^= mix >> 8;
-  return (shotId & 0xFFFFFFU) | (mix & 0xFFU) << 24;
+  return (shot.shotId & 0xFFFFFFU) | (mix & 0xFFU) << 24;
 }
 
 // Static PSRAM storage of one pool: the FIFO index of the newest records
@@ -342,7 +342,7 @@ class ShotTracePool {
     size_t head = 0;
     floor_ = 1;
     for (size_t s = 0; s < end(); ++s) {
-      if (!read(s, 0, &h, sizeof(h))) return fail(ShotTracePoolError::READ);
+      if (!read({s, 0}, &h, sizeof(h))) return fail(ShotTracePoolError::READ);
       setUnused(s, !validSector(h));
       if (validSector(h) && h.sequence > headSeq) {
         headSeq = h.sequence;
@@ -354,7 +354,7 @@ class ShotTracePool {
     nextSequence_ = headSeq + 1U;
     sector_ = headSeq == 0 ? end() - 1U : head;
     fresh_ = true;
-    if (headSeq != 0 && !walk(head, headSeq)) return fail(ShotTracePoolError::READ);
+    if (headSeq != 0 && !walk(headSeq)) return fail(ShotTracePoolError::READ);
     TaskLockGuard lock(mux_);
     ready_ = true;
     return true;
@@ -420,7 +420,7 @@ class ShotTracePool {
       ok = programHeader();
     } else if (firstPending_) {
       const uint32_t first = encodeFirst(start_ % kSectorBytes);
-      ok = program(start_ / kSectorBytes, offsetof(ShotTracePoolSectorHeader, firstRecord),
+      ok = program({start_ / kSectorBytes, offsetof(ShotTracePoolSectorHeader, firstRecord)},
                    &first, sizeof(first));
       firstPending_ = false;
     } else if (written_ < header_.totalBytes) {
@@ -429,18 +429,18 @@ class ShotTracePool {
       if (piece > FLASH_IO_CHUNK_BYTES) piece = FLASH_IO_CHUNK_BYTES;
       if (!gather(written_, flashIoScratchBytes(), piece)) error = ShotTracePoolError::SOURCE;
       ok = error != ShotTracePoolError::SOURCE &&
-           program(sector_, offset_, flashIoScratchBytes(), piece);
+           program({sector_, offset_}, flashIoScratchBytes(), piece);
       written_ += piece;
       offset_ += piece;
       needErase_ = written_ < header_.totalBytes && offset_ == kSectorBytes;
     } else {
       const uint32_t commit = kCommitted;
       const size_t at = start_ % kSectorBytes + offsetof(ShotTracePoolRecordHeader, commit);
-      ok = program(start_ / kSectorBytes, at, &commit, sizeof(commit));
+      ok = program({start_ / kSectorBytes, at}, &commit, sizeof(commit));
       // A commit reported as failed may have landed: then it is committed,
       // and indexing it keeps a retry from writing the shot twice.
       uint32_t landed = 0;
-      if (!ok) ok = readLocked(start_ / kSectorBytes, at, &landed, sizeof(landed)) && landed == kCommitted;
+      if (!ok) ok = readLocked({start_ / kSectorBytes, at}, &landed, sizeof(landed)) && landed == kCommitted;
       if (ok) {
         push(header_, start_);
         op_ = Op::IDLE;
@@ -510,7 +510,7 @@ class ShotTracePool {
   ShotTracePoolStatus identify(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs,
                                ShotTracePoolRef &ref) {
     if (!ready()) return ShotTracePoolStatus::NOT_READY;
-    const uint32_t idTag = shotTracePoolIdTag(shotId, bootId, endedAtMs);
+    const uint32_t idTag = shotTracePoolIdTag({shotId, bootId, endedAtMs});
     ShotTracePoolEntry entry;
     // Older entries are tried too: a tag collision after an id reuse without
     // a pool clear (a downgrade) must not hide the matching record.
@@ -557,15 +557,15 @@ class ShotTracePool {
   ShotTracePoolStatus read(const ShotTracePoolRef &ref, size_t offset, void *out, size_t bytes) {
     if (offset > ref.bytes || bytes > ref.bytes - offset) return ShotTracePoolStatus::IO_ERROR;
     if (!alive(ref.serial)) return ShotTracePoolStatus::GONE;
-    size_t sector, at;
-    locate(ref.address, offset, sector, at);
-    if (!readSpan(sector, at, static_cast<uint8_t *>(out), bytes)) return ShotTracePoolStatus::IO_ERROR;
+    const Position start = {ref.address / kSectorBytes, ref.address % kSectorBytes};
+    if (!readSpan(locate(start, offset), static_cast<uint8_t *>(out), bytes))
+      return ShotTracePoolStatus::IO_ERROR;
     // Eviction precedes every erase: alive after the read means intact.
     return alive(ref.serial) ? ShotTracePoolStatus::OK : ShotTracePoolStatus::GONE;
   }
 
   ShotTracePoolStatus findSection(const ShotTracePoolRef &ref, ShotTracePoolSection tag,
-                                  size_t &offset, size_t &bytes) {
+                                  ByteRange &found) {
     for (size_t at = sizeof(ShotTracePoolRecordHeader);
          at + sizeof(ShotTracePoolSectionHeader) <= ref.bytes;) {
       ShotTracePoolSectionHeader section;
@@ -575,8 +575,7 @@ class ShotTracePool {
       at += sizeof(section);
       if (at + section.bytes > ref.bytes) return ShotTracePoolStatus::CORRUPT;
       if (section.tag == static_cast<uint8_t>(tag)) {
-        offset = at;
-        bytes = section.bytes;
+        found = {at, section.bytes};
         return ShotTracePoolStatus::OK;
       }
       at += align4(section.bytes);
@@ -631,6 +630,10 @@ class ShotTracePool {
   static constexpr size_t kSectorBytes = SHOT_TRACE_POOL_SECTOR_BYTES;
   static constexpr size_t kDataStart = sizeof(ShotTracePoolSectorHeader);
   static constexpr size_t kLastStart = kSectorBytes - sizeof(ShotTracePoolRecordHeader);
+  // A byte of the logical space: its sector and the offset in that sector.
+  struct Position {
+    size_t sector, offset;
+  };
 
   static size_t align4(size_t bytes) { return (bytes + 3U) & ~size_t(3U); }
   static uint32_t encodeFirst(size_t offset) {
@@ -670,17 +673,15 @@ class ShotTracePool {
     yieldFlashIo();
     feedFlashIoWatchdog();
   }
-  // Sector and offset of record byte `pos`; an end position stays in the
-  // sector it fills.
-  void locate(uint32_t address, size_t pos, size_t &sector, size_t &offset) const {
-    sector = address / kSectorBytes;
-    offset = address % kSectorBytes;
-    while (pos > kSectorBytes - offset) {
-      pos -= kSectorBytes - offset;
-      sector = next(sector);
-      offset = kDataStart;
+  // Position of byte `pos` of the record at `start`; an end position stays
+  // in the sector it fills.
+  Position locate(Position start, size_t pos) const {
+    while (pos > kSectorBytes - start.offset) {
+      pos -= kSectorBytes - start.offset;
+      start = {next(start.sector), kDataStart};
     }
-    offset += pos;
+    start.offset += pos;
+    return start;
   }
   void setUnused(size_t s, bool value) {
     const uint8_t bit = static_cast<uint8_t>(1U << (s % 8U));
@@ -744,7 +745,7 @@ class ShotTracePool {
       ++dropped_;
     }
     index_.entries[(firstSerial_ + count_) % SHOT_TRACE_POOL_INDEX_CAPACITY] = {
-        shotTracePoolIdTag(r.shotId, r.bootId, r.endedAtMs),
+        shotTracePoolIdTag({r.shotId, r.bootId, r.endedAtMs}),
         address / 4U | static_cast<uint32_t>(r.totalBytes) / 16U << 21};
     ++count_;
   }
@@ -791,7 +792,7 @@ class ShotTracePool {
                                    firstOffset_ != 0 ? encodeFirst(firstOffset_) : UINT32_MAX};
     h.crc = sectorCrc(h);
     needHeader_ = false;
-    const bool ok = program(sector_, 0, &h, sizeof(h));
+    const bool ok = program({sector_, 0}, &h, sizeof(h));
     if (ok) setUnused(sector_, false);
     return ok;
   }
@@ -800,13 +801,15 @@ class ShotTracePool {
     return false;
   }
 
-  // Pass 2 of recover(): walks the ring oldest first from head + 1. A sector
-  // joins the run only with a valid header, a sequence above every earlier
-  // one and at least the floor; anything else is a hole. Records chain by
-  // length through consecutive sequences and resynchronise at a sector's
-  // first-record pointer after a hole or an uncommitted record. A record
-  // that spans sectors is indexed only once its last sector joined.
-  bool walk(size_t head, uint32_t headSeq) {
+  // Pass 2 of recover(): walks the ring oldest first from the head (the
+  // cursor sector, sequence headSeq) + 1. A sector joins the run only with a
+  // valid header, a sequence above every earlier one and at least the floor;
+  // anything else is a hole. Records chain by length through consecutive
+  // sequences and resynchronise at a sector's first-record pointer after a
+  // hole or an uncommitted record. A record that spans sectors is indexed
+  // only once its last sector joined.
+  bool walk(uint32_t headSeq) {
+    const size_t head = sector_;
     ShotTracePoolSectorHeader h;
     ShotTracePoolRecordHeader r, spanning = {};
     uint32_t prevSeq = 0, spanningAddress = 0;
@@ -815,7 +818,7 @@ class ShotTracePool {
     for (size_t n = 1; n <= end(); ++n) {
       pace(n);
       const size_t s = (head + n) % end();
-      if (!read(s, 0, &h, sizeof(h))) return false;
+      if (!read({s, 0}, &h, sizeof(h))) return false;
       const bool valid = validSector(h) && h.sequence >= floor_ && h.sequence > prevSeq &&
                          h.sequence <= headSeq;
       if (!valid || prevSeq == 0 || h.sequence != prevSeq + 1U) unconfirmed = chain = false;
@@ -842,7 +845,7 @@ class ShotTracePool {
       }
       chain = true;
       while (chainOffset <= kLastStart) {
-        if (!read(s, chainOffset, &r, sizeof(r))) return false;
+        if (!read({s, chainOffset}, &r, sizeof(r))) return false;
         // Appending may follow a committed record only, and only where the
         // first-record pointer is blank or valid (programmable).
         if (blank(&r, sizeof(r)) && s == head && chainOffset > kDataStart &&
@@ -852,7 +855,9 @@ class ShotTracePool {
           break;
         }
         const uint32_t address = static_cast<uint32_t>(s * kSectorBytes + chainOffset);
-        locate(address, r.totalBytes, endSector, chainOffset);
+        const Position last = locate({s, chainOffset}, r.totalBytes);
+        endSector = last.sector;
+        chainOffset = last.offset;
         if (endSector != s) {
           spanning = r;
           spanningAddress = address;
@@ -871,7 +876,7 @@ class ShotTracePool {
     // Append after the newest record only when the rest of the head sector
     // is blank; otherwise (a torn append, an interrupted erase, a head with
     // no committed record) start a new sector. `h` is the head's header.
-    if (appendAt != 0 && headTailBlank(head, appendAt)) {
+    if (appendAt != 0 && headTailBlank(appendAt)) {
       offset_ = appendAt;
       fresh_ = false;
       cursorFirstSet_ = h.firstRecord != UINT32_MAX;
@@ -880,26 +885,23 @@ class ShotTracePool {
   }
   // A small chunk and its own frame: the walk runs deep on the 5,120 B
   // settings_persist stack (stack-depth gate).
-  [[gnu::noinline]] bool headTailBlank(size_t head, size_t from) {
+  [[gnu::noinline]] bool headTailBlank(size_t from) {
     uint8_t chunk[64];
     for (size_t at = from; at < kSectorBytes; at += sizeof(chunk)) {
       const size_t piece = kSectorBytes - at < sizeof(chunk) ? kSectorBytes - at : sizeof(chunk);
-      if (!read(head, at, chunk, piece) || !blank(chunk, piece)) return false;
+      if (!read({sector_, at}, chunk, piece) || !blank(chunk, piece)) return false;
     }
     return true;
   }
 
-  bool readSpan(size_t sector, size_t offset, uint8_t *out, size_t bytes) const {
+  bool readSpan(Position at, uint8_t *out, size_t bytes) const {
     while (bytes != 0) {
-      if (offset == kSectorBytes) {
-        sector = next(sector);
-        offset = kDataStart;
-      }
-      const size_t piece = bytes < kSectorBytes - offset ? bytes : kSectorBytes - offset;
-      if (!read(sector, offset, out, piece)) return false;
+      if (at.offset == kSectorBytes) at = {next(at.sector), kDataStart};
+      const size_t piece = bytes < kSectorBytes - at.offset ? bytes : kSectorBytes - at.offset;
+      if (!read(at, out, piece)) return false;
       out += piece;
       bytes -= piece;
-      offset += piece;
+      at.offset += piece;
     }
     return true;
   }
@@ -912,14 +914,12 @@ class ShotTracePool {
                                                      : sector + SHOT_TRACE_POOL_LEGACY_SECTORS;
   }
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
-  bool read(size_t sector, size_t offset, void *out, size_t bytes) const {
-    return ShotTracePoolHostFlash::read(physical(sector), offset, out, bytes);
+  bool read(Position at, void *out, size_t bytes) const {
+    return ShotTracePoolHostFlash::read(physical(at.sector), at.offset, out, bytes);
   }
-  bool readLocked(size_t sector, size_t offset, void *out, size_t bytes) const {
-    return read(sector, offset, out, bytes);
-  }
-  bool program(size_t sector, size_t offset, const void *in, size_t bytes) {
-    return ShotTracePoolHostFlash::program(physical(sector), offset,
+  bool readLocked(Position at, void *out, size_t bytes) const { return read(at, out, bytes); }
+  bool program(Position at, const void *in, size_t bytes) {
+    return ShotTracePoolHostFlash::program(physical(at.sector), at.offset,
                                            static_cast<const uint8_t *>(in), bytes);
   }
   bool erase(size_t sector) { return ShotTracePoolHostFlash::erase(physical(sector)); }
@@ -946,22 +946,22 @@ class ShotTracePool {
   }
   // Staged through the internal scratch like flashIoReadChunked, without its
   // per-chunk yield: recovery issues thousands of small reads and paces itself.
-  bool read(size_t sector, size_t offset, void *out, size_t bytes) const {
+  bool read(Position at, void *out, size_t bytes) const {
     if (!tryLockFlashIo()) return false;
-    const bool ok = readLocked(sector, offset, out, bytes);
+    const bool ok = readLocked(at, out, bytes);
     unlockFlashIo();
     return ok;
   }
   // Caller holds the flash I/O lock (the commit read-back): no nested lock,
   // so the lock-hold diagnostics see one hold.
-  bool readLocked(size_t sector, size_t offset, void *out, size_t bytes) const {
+  bool readLocked(Position at, void *out, size_t bytes) const {
     size_t base;
-    const esp_partition_t *part = partition(sector, base);
+    const esp_partition_t *part = partition(at.sector, base);
     uint8_t *scratch = flashIoScratchBytes();
     bool ok = part != nullptr;
     for (size_t done = 0; ok && done < bytes;) {
       const size_t piece = bytes - done < FLASH_IO_CHUNK_BYTES ? bytes - done : FLASH_IO_CHUNK_BYTES;
-      ok = esp_partition_read(part, base + offset + done, scratch, piece) == ESP_OK;
+      ok = esp_partition_read(part, base + at.offset + done, scratch, piece) == ESP_OK;
       if (ok) memcpy(static_cast<uint8_t *>(out) + done, scratch, piece);
       done += piece;
     }
@@ -969,12 +969,12 @@ class ShotTracePool {
   }
   // Caller holds the flash I/O lock; the source is staged in the internal
   // scratch unless it already is the scratch.
-  bool program(size_t sector, size_t offset, const void *in, size_t bytes) {
+  bool program(Position at, const void *in, size_t bytes) {
     size_t base;
-    const esp_partition_t *part = partition(sector, base);
+    const esp_partition_t *part = partition(at.sector, base);
     const void *staged = in == flashIoScratchBytes() ? in : copyToFlashIoScratch(in, bytes);
     return part != nullptr && staged != nullptr &&
-           esp_partition_write(part, base + offset, staged, bytes) == ESP_OK;
+           esp_partition_write(part, base + at.offset, staged, bytes) == ESP_OK;
   }
   bool erase(size_t sector) {
     size_t base;

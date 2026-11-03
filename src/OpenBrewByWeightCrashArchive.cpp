@@ -60,7 +60,7 @@ size_t metaOffset(uint8_t slot) {
   return (slot + 1) * CRASH_HISTORY_SLOT_BYTES - 4096;
 }
 
-bool digestPartition(const esp_partition_t *part, size_t offset, size_t length,
+bool digestPartition(const esp_partition_t *part, ByteRange range,
                      uint8_t digest[32]) {
   // The shared scratch stages each chunk (a 1 KiB stack chunk here pushed the
   // Web UI factory reset past the network task stack). The recursive flash
@@ -68,13 +68,13 @@ bool digestPartition(const esp_partition_t *part, size_t offset, size_t length,
   // across the whole dump; boot callers already holding it simply nest.
   psa_hash_operation_t context = PSA_HASH_OPERATION_INIT;
   bool ok = psa_hash_setup(&context, PSA_ALG_SHA_256) == PSA_SUCCESS;
-  for (size_t done = 0; ok && done < length; done += FLASH_IO_CHUNK_BYTES) {
-    const size_t bytes = length - done < FLASH_IO_CHUNK_BYTES
-                             ? length - done : FLASH_IO_CHUNK_BYTES;
+  for (size_t done = 0; ok && done < range.length; done += FLASH_IO_CHUNK_BYTES) {
+    const size_t bytes = range.length - done < FLASH_IO_CHUNK_BYTES
+                             ? range.length - done : FLASH_IO_CHUNK_BYTES;
     ok = tryLockFlashIo();
     if (!ok) break;
     uint8_t *chunk = flashIoScratchBytes();
-    ok = esp_partition_read(part, offset + done, chunk, bytes) == ESP_OK &&
+    ok = esp_partition_read(part, range.offset + done, chunk, bytes) == ESP_OK &&
          psa_hash_update(&context, chunk, bytes) == PSA_SUCCESS;
     unlockFlashIo();
     feedFlashIoWatchdog();
@@ -120,17 +120,17 @@ bool readEntry(const esp_partition_t *part, uint8_t slot,
       entry.checksum != entryChecksum(entry)) return false;
   if (!verifyDump) return true;
   uint8_t digest[32];
-  if (!digestPartition(part, slot * CRASH_HISTORY_SLOT_BYTES,
-                       entry.dumpBytes, digest)) {
+  if (!digestPartition(part, {slot * CRASH_HISTORY_SLOT_BYTES, entry.dumpBytes},
+                       digest)) {
     if (ioError) *ioError = true;
     return false;
   }
   return memcmp(digest, entry.dumpSha256, sizeof(digest)) == 0;
 }
 
-bool eraseSectors(const esp_partition_t *part, size_t offset, size_t length) {
-  for (size_t done = 0; done < length; done += 4096) {
-    if (esp_partition_erase_range(part, offset + done, 4096) != ESP_OK)
+bool eraseSectors(const esp_partition_t *part, ByteRange range) {
+  for (size_t done = 0; done < range.length; done += 4096) {
+    if (esp_partition_erase_range(part, range.offset + done, 4096) != ESP_OK)
       return false;
     feedFlashIoWatchdog();
     yieldFlashIo();
@@ -237,7 +237,7 @@ void crashArchivePromote(uint32_t resetReason) {
     return;
   }
   uint8_t digest[32];
-  if (!digestPartition(capture, 0, length, digest)) {
+  if (!digestPartition(capture, {0, length}, digest)) {
     g_status.state = CrashArchiveState::IO_ERROR;
     unlockFlashIo();
     return;
@@ -253,7 +253,7 @@ void crashArchivePromote(uint32_t resetReason) {
     }
     if (old.bootId == crashBootId && old.dumpBytes == length &&
         memcmp(old.dumpSha256, digest, sizeof(digest)) == 0) {
-      if (!eraseSectors(capture, 0, 4096)) {
+      if (!eraseSectors(capture, {0, 4096})) {
         g_status.state = CrashArchiveState::IO_ERROR;
       } else {
         g_panicRecord.magic = 0;
@@ -288,8 +288,8 @@ void crashArchivePromote(uint32_t resetReason) {
       memcpy(entry.elfSha256, entry.addresses.elfSha256,
              sizeof(entry.elfSha256));
   }
-  bool ok = eraseSectors(history, slot * CRASH_HISTORY_SLOT_BYTES,
-                         CRASH_HISTORY_SLOT_BYTES);
+  bool ok = eraseSectors(history, {slot * CRASH_HISTORY_SLOT_BYTES,
+                                  CRASH_HISTORY_SLOT_BYTES});
   uint8_t chunk[1024];
   for (size_t done = 0; ok && done < length; done += sizeof(chunk)) {
     const size_t bytes = length - done < sizeof(chunk)
@@ -300,8 +300,8 @@ void crashArchivePromote(uint32_t resetReason) {
     feedFlashIoWatchdog();
     yieldFlashIo();
   }
-  if (ok) ok = digestPartition(history, slot * CRASH_HISTORY_SLOT_BYTES,
-                               length, chunk) &&
+  if (ok) ok = digestPartition(history, {slot * CRASH_HISTORY_SLOT_BYTES, length},
+                               chunk) &&
                memcmp(chunk, digest, sizeof(digest)) == 0;
   entry.checksum = entryChecksum(entry);
   if (ok) ok = esp_partition_write(history, metaOffset(slot), &entry,
@@ -311,7 +311,7 @@ void crashArchivePromote(uint32_t resetReason) {
   if (ok) {
     ok = scanHistory(history);
     g_unverifiedSlots &= static_cast<uint8_t>(~(1U << slot));
-    if (ok) ok = eraseSectors(capture, 0, 4096);
+    if (ok) ok = eraseSectors(capture, {0, 4096});
     if (ok) g_panicRecord.magic = 0;
   }
   if (!ok) g_status.state = CrashArchiveState::IO_ERROR;
@@ -330,8 +330,9 @@ CrashArchiveStatus crashArchiveStatus(bool verifyDumps) {
       ++i;
       continue;
     }
-    if (!digestPartition(history, g_status.slots[i] * CRASH_HISTORY_SLOT_BYTES,
-                         g_status.entries[i].dumpBytes, digest)) {
+    if (!digestPartition(history, {g_status.slots[i] * CRASH_HISTORY_SLOT_BYTES,
+                                   g_status.entries[i].dumpBytes},
+                         digest)) {
       // A read or flash-lock failure fails this download only; the record
       // stays listed and unverified for the next attempt.
       g_status.state = CrashArchiveState::IO_ERROR;
@@ -369,8 +370,8 @@ bool crashArchiveClear() {
   const esp_partition_t *capture = capturePartition();
   if (!history) return true;
   if (!capture || !tryLockFlashIo()) return false;
-  const bool ok = eraseSectors(capture, 0, capture->size) &&
-                  eraseSectors(history, 0, history->size);
+  const bool ok = eraseSectors(capture, {0, capture->size}) &&
+                  eraseSectors(history, {0, history->size});
   const bool scanned = scanHistory(history);
   g_status.state = ok && scanned ? CrashArchiveState::READY
                                   : CrashArchiveState::IO_ERROR;

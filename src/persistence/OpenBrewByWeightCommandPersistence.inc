@@ -232,7 +232,7 @@ bool rateShotRecord(uint32_t id, uint8_t rating) {
   if (id == 0 || rating > SHOT_LOG_RATING_MAX) {
     return false;
   }
-  const bool changed = shotLog.updateRating(id, rating, false);
+  const bool changed = shotLog.updateRating({id, rating}, false);
   if (changed) shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return changed;
 }
@@ -242,7 +242,7 @@ bool rateLastShot(uint8_t rating) {
   ShotLogRecord latest = {};
   if (rating > SHOT_LOG_RATING_MAX || !shotLog.copyNewestEligible(latest))
     return false;
-  const bool changed = shotLog.updateRating(latest.id, rating, false);
+  const bool changed = shotLog.updateRating({latest.id, rating}, false);
   if (changed) shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
   return changed;
 }

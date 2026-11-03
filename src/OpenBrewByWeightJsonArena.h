@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <string_view>
 #include "OpenBrewByWeightPsram.h"
 
 namespace openbrewbyweight {
@@ -162,12 +163,11 @@ struct JsonStructureScanner {
   }
 };
 
-inline bool jsonNestingWithinLimit(const char *body, size_t length, size_t maxDepth) {
+inline bool jsonNestingWithinLimit(std::string_view body, size_t maxDepth) {
   size_t depth = 0;
   bool inString = false;
   bool escaped = false;
-  for (size_t i = 0; i < length; ++i) {
-    const char c = body[i];
+  for (const char c : body) {
     if (inString) {
       if (escaped) {
         escaped = false;
@@ -232,7 +232,7 @@ inline cJSON *parseJsonDocumentWithinLimits(const char *body, size_t maxBytes,
   const size_t length = strnlen(body, maxBytes + 1);
   bool overLimit = true;
   const bool accepted =
-      length <= maxBytes && detail::jsonNestingWithinLimit(body, length, maxDepth) &&
+      length <= maxBytes && detail::jsonNestingWithinLimit({body, length}, maxDepth) &&
       detail::jsonStructureAccepted(body, length, maxValues, overLimit);
   if (!accepted && overLimit) detail::noteJsonLimitRejection();
   return accepted ? cJSON_ParseWithLengthOpts(body, length + 1, nullptr, 1)

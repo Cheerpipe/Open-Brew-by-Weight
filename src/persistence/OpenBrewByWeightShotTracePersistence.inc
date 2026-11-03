@@ -85,7 +85,7 @@ bool shotTracePoolGateOpen() {
 
 bool readPendingShotTrace(void *context, size_t offset, uint8_t *out, size_t bytes) {
   const ShotTracePending &pending = static_cast<ShotTracePersistState *>(context)->pending;
-  return shotTrace().copyExport(pending.generation, offset, out, bytes, pending.crc);
+  return shotTrace().copyExport(pending.trace, offset, {out, bytes});
 }
 
 // Backs the next recovery or clear attempt off after a failure.
@@ -192,7 +192,7 @@ void retireShotRecord() {
     TaskLockGuard lock(shotStoreMutex);
     if (shotCurves.generation() == state.curveGeneration) shotCurves.markSaved(state.curveId);
   }
-  if (state.hasTrace) shotTrace().consume(state.pending.generation);
+  if (state.hasTrace) shotTrace().consume(state.pending.trace.generation);
 }
 
 // Stages the next record: the oldest curve not in the pool yet, joined by
@@ -221,22 +221,20 @@ bool stageShotRecord() {
     }
   }
   ShotTracePending &pending = state.pending;
-  pending.shotLogId = id.shotId;
-  pending.bootId = id.bootId;
-  pending.endedAtMs = id.endedAtMs;
+  pending.shot = {id.shotId, id.bootId, id.endedAtMs};
   state.hasTrace = shotTrace().pendingPersist(pending, shotTraceCrcChunk,
                                               sizeof(shotTraceCrcChunk), curveBytes != 0);
   if (curveBytes == 0 && !state.hasTrace) return false;
   // A shot that ended after the cache was read: its curve goes first, with
   // this trace, on the next pass (a trace-only record would make contains()
   // skip that curve).
-  if (curveBytes == 0 && pending.shotLogId != 0) {
+  if (curveBytes == 0 && pending.shot.shotId != 0) {
     TaskLockGuard lock(shotStoreMutex);
     if (shotCurves.oldestPending() != nullptr) return false;
   }
   if (state.hasTrace)
-    id = {pending.shotLogId, pending.bootId, pending.endedAtMs, pending.firmwarePacked,
-          pending.endReason};
+    id = {pending.shot.shotId, pending.shot.bootId, pending.shot.endedAtMs,
+          pending.firmwarePacked, pending.endReason};
   state.curveId = curveBytes != 0 ? id.shotId : 0;
   if (id.shotId != state.record.shotId || id.bootId != state.record.bootId ||
       id.endedAtMs != state.record.endedAtMs) {
@@ -262,7 +260,8 @@ bool stageShotRecord() {
     state.sources[state.sourceCount++] = {ShotTracePoolSection::CURVE, 0, curveBytes,
                                           shotCurveStaging.section, nullptr, nullptr};
   if (state.hasTrace)
-    state.sources[state.sourceCount++] = {ShotTracePoolSection::TRACE, 0, pending.totalBytes,
+    state.sources[state.sourceCount++] = {ShotTracePoolSection::TRACE, 0,
+                                          static_cast<uint16_t>(pending.trace.totalBytes),
                                           nullptr, readPendingShotTrace, &state};
   return true;
 }
@@ -297,15 +296,15 @@ ShotCurveRead readShotCurve(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs
   if (!shotTracePoolGateOpen()) return ShotCurveRead::BUSY;
   ShotTracePool &pool = shotTracePool();
   ShotTracePoolRef ref;
-  size_t offset = 0, bytes = 0;
+  ByteRange section;
   // The record's CRC is checked through the stream bytes the decode refills.
   ShotTracePoolStatus status =
       pool.open(shotId, bootId, endedAtMs, ref, curve.stream, sizeof(curve.stream));
   if (status == ShotTracePoolStatus::OK)
-    status = pool.findSection(ref, ShotTracePoolSection::CURVE, offset, bytes);
+    status = pool.findSection(ref, ShotTracePoolSection::CURVE, section);
   if (status == ShotTracePoolStatus::OK &&
-      decodeShotCurveSection(bytes, shotId, curve, [&](size_t at, void *out, size_t n) {
-        return (status = pool.read(ref, offset + at, out, n)) == ShotTracePoolStatus::OK;
+      decodeShotCurveSection(shotId, curve, section.length, [&](size_t at, void *out, size_t n) {
+        return (status = pool.read(ref, section.offset + at, out, n)) == ShotTracePoolStatus::OK;
       }))
     return ShotCurveRead::FOUND;
   resetShotCurveRecord(curve);
@@ -445,7 +444,7 @@ ShotTraceRead streamShotTrace(uint32_t shotId, uint32_t bootId, uint32_t endedAt
   }
   ShotTracePool &pool = shotTracePool();
   ShotTracePoolRef ref;
-  size_t offset = 0, bytes = 0;
+  ByteRange section;
   // Pending first: a commit landing before the lookup then reads as found,
   // never as a spurious 404. A current copy costs one header read.
   const bool pending = shotRecordPending(shotId, bootId, endedAtMs);
@@ -457,11 +456,12 @@ ShotTraceRead streamShotTrace(uint32_t shotId, uint32_t bootId, uint32_t endedAt
   if (status == ShotTracePoolStatus::OK)
     status = openShotTraceRecord(shotId, bootId, endedAtMs, ref, chunk, capacity);
   if (status == ShotTracePoolStatus::OK)
-    status = pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes);
+    status = pool.findSection(ref, ShotTracePoolSection::TRACE, section);
   if (status != ShotTracePoolStatus::OK) return shotTraceReadOf(status);
-  for (size_t at = 0; at < bytes; at += capacity) {
-    const size_t piece = bytes - at < capacity ? bytes - at : capacity;
-    if (!shotTracePoolGateOpen() || pool.read(ref, offset + at, chunk, piece) != ShotTracePoolStatus::OK ||
+  for (size_t at = 0; at < section.length; at += capacity) {
+    const size_t piece = section.length - at < capacity ? section.length - at : capacity;
+    if (!shotTracePoolGateOpen() ||
+        pool.read(ref, section.offset + at, chunk, piece) != ShotTracePoolStatus::OK ||
         !sink(context, chunk, piece, ref.header.crc))
       return ShotTraceRead::UNAVAILABLE;
   }
@@ -508,7 +508,7 @@ ShotTraceRead copyShotStorage(ShotStorageStats &out, uint32_t *tags, size_t capa
     TaskLockGuard lock(shotStoreMutex);
     (void)shotLog.findNewest([&](const ShotLogRecord &r) {
       tags[shotLogRecordEligible(r) ? good++ : capacity - ++bad] =
-          shotTracePoolIdTag(r.id, r.bootId, r.endedAtMs);
+          shotTracePoolIdTag({r.id, r.bootId, r.endedAtMs});
       return false;
     });
     out.pendingCurves = static_cast<uint32_t>(shotCurves.pending());
@@ -526,7 +526,7 @@ ShotTraceRead copyShotStorage(ShotStorageStats &out, uint32_t *tags, size_t capa
     const uint32_t oldestTag = live.oldestTag;
     TaskLockGuard lock(shotStoreMutex);
     const ShotLogRecord *oldest = shotLog.findNewest([oldestTag](const ShotLogRecord &r) {
-      return shotTracePoolIdTag(r.id, r.bootId, r.endedAtMs) == oldestTag;
+      return shotTracePoolIdTag({r.id, r.bootId, r.endedAtMs}) == oldestTag;
     });
     if (oldest != nullptr) {
       out.sinceShotId = oldest->id;
@@ -549,17 +549,17 @@ ShotTraceRead copyShotStorage(ShotStorageStats &out, uint32_t *tags, size_t capa
     if (!shotTracePoolGateOpen()) return ShotTraceRead::BUSY;
     if (n % 64U == 0) yieldFlashIo();
     ShotTracePoolRef ref;
-    size_t offset = 0, bytes = 0;
+    ByteRange section;
     uint8_t flags = 0;
     if (pool.headerAt(n, ref) != ShotTracePoolStatus::OK) continue;
     const ShotTracePoolRecordHeader &h = ref.header;
-    const uint32_t tag = shotTracePoolIdTag(h.shotId, h.bootId, h.endedAtMs);
+    const uint32_t tag = shotTracePoolIdTag({h.shotId, h.bootId, h.endedAtMs});
     if (h.shotId != 0 && !shotStorageTagIn(tags, good, tag) &&
         !shotStorageTagIn(badTags, bad, tag))
       continue;  // A deleted or evicted shot's record.
-    if (pool.findSection(ref, ShotTracePoolSection::TRACE, offset, bytes) ==
+    if (pool.findSection(ref, ShotTracePoolSection::TRACE, section) ==
             ShotTracePoolStatus::OK &&
-        pool.read(ref, offset + offsetof(ShotTraceHeader, flags), &flags, 1) ==
+        pool.read(ref, section.offset + offsetof(ShotTraceHeader, flags), &flags, 1) ==
             ShotTracePoolStatus::OK) {
       ++out.traces;
       if (flags & (SHOT_TRACE_VERBOSE_TRUNCATED | SHOT_TRACE_DECISIONS_TRUNCATED)) ++out.truncated;

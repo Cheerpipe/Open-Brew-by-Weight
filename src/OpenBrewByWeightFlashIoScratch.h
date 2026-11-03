@@ -240,30 +240,36 @@ inline void *copyToFlashIoScratch(const void *source, size_t bytes) {
   return scratch;
 }
 
+// Bytes [offset, offset + length) of a partition or record.
+struct ByteRange {
+  size_t offset = 0;
+  size_t length = 0;
+};
+
 enum class FlashStoreStepResult : uint8_t { MORE, COMPLETE, FAILED };
 
-struct FlashStoreTransaction {
-  enum class Phase : uint8_t { IDLE, ERASE, BODY, COMMIT };
-  Phase phase = Phase::IDLE;
+// A store's slot in its partition. eraseBytes is the sector-aligned span
+// erased before the body is written; it may be shorter than the slot when the
+// store does not fill it.
+struct FlashStoreLayout {
   size_t targetOffset = 0;
-  size_t offset = 0;
   size_t eraseBytes = 0;
   size_t headerBytes = 0;
   size_t totalBytes = 0;
 };
 
-// eraseBytes is the sector-aligned span erased before the body is written; it
-// may be shorter than the slot when the store does not fill it.
+struct FlashStoreTransaction {
+  enum class Phase : uint8_t { IDLE, ERASE, BODY, COMMIT };
+  Phase phase = Phase::IDLE;
+  FlashStoreLayout layout;
+  size_t offset = 0;
+};
+
 inline void beginFlashStoreTransaction(FlashStoreTransaction &tx,
-                                       size_t targetOffset, size_t eraseBytes,
-                                       size_t headerBytes,
-                                       size_t totalBytes) {
+                                       const FlashStoreLayout &layout) {
   tx.phase = FlashStoreTransaction::Phase::ERASE;
-  tx.targetOffset = targetOffset;
+  tx.layout = layout;
   tx.offset = 0;
-  tx.eraseBytes = eraseBytes;
-  tx.headerBytes = headerBytes;
-  tx.totalBytes = totalBytes;
 }
 
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) &&                                        \
@@ -331,20 +337,20 @@ inline FlashStoreStepResult flashIoStoreStep(
   }
   bool ok = false;
   if (tx.phase == FlashStoreTransaction::Phase::ERASE) {
-    ok = esp_partition_erase_range(part, tx.targetOffset + tx.offset,
+    ok = esp_partition_erase_range(part, tx.layout.targetOffset + tx.offset,
                                    FLASH_IO_SECTOR_BYTES) == ESP_OK;
     if (ok) {
       tx.offset += FLASH_IO_SECTOR_BYTES;
-      if (tx.offset == tx.eraseBytes) {
+      if (tx.offset == tx.layout.eraseBytes) {
         tx.phase = FlashStoreTransaction::Phase::BODY;
-        tx.offset = tx.headerBytes;
+        tx.offset = tx.layout.headerBytes;
       }
     }
   } else {
     const uint8_t *bytes = static_cast<const uint8_t *>(source);
     const size_t remaining = tx.phase == FlashStoreTransaction::Phase::COMMIT
-                                 ? tx.headerBytes
-                                 : tx.totalBytes - tx.offset;
+                                 ? tx.layout.headerBytes
+                                 : tx.layout.totalBytes - tx.offset;
     const size_t chunk = remaining < FLASH_IO_CHUNK_BYTES
                              ? remaining
                              : FLASH_IO_CHUNK_BYTES;
@@ -355,7 +361,7 @@ inline FlashStoreStepResult flashIoStoreStep(
     ok = scratch != nullptr &&
          esp_partition_write(
              part,
-             tx.targetOffset +
+             tx.layout.targetOffset +
                  (tx.phase == FlashStoreTransaction::Phase::COMMIT ? 0
                                                                     : tx.offset),
              scratch, chunk) == ESP_OK;
@@ -363,7 +369,7 @@ inline FlashStoreStepResult flashIoStoreStep(
       tx.phase = FlashStoreTransaction::Phase::IDLE;
     } else if (ok) {
       tx.offset += chunk;
-      if (tx.offset == tx.totalBytes) {
+      if (tx.offset == tx.layout.totalBytes) {
         tx.phase = FlashStoreTransaction::Phase::COMMIT;
         tx.offset = 0;
       }

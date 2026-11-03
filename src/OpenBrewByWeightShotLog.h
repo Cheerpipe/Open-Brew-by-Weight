@@ -174,13 +174,13 @@ class ShotLog
     return found != nullptr;
   }
 
-  bool updateRating(uint32_t id, uint8_t rating, bool persistNow = true) {
-    ShotLogRecord *found = findNewestById(id);
-    if (found == nullptr || rating > SHOT_LOG_RATING_MAX) {
+  bool updateRating(ShotLogRating change, bool persistNow = true) {
+    ShotLogRecord *found = findNewestById(change.id);
+    if (found == nullptr || change.rating > SHOT_LOG_RATING_MAX) {
       return false;
     }
     found->sideFlags =
-        shotLogPackRating(found->sideFlags, rating);
+        shotLogPackRating(found->sideFlags, change.rating);
     // The record bytes changed without moving count or nextRecordId, so bump
     // generation: the modified slot content must win dual-slot selection and
     // stream epochs hash these header words.
