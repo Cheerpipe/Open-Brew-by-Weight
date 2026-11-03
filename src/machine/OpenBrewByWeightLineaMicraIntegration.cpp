@@ -62,12 +62,12 @@ void publishMachineIntegrationNetworkState(bool staConnected, bool apActive,
 
 void inhibitMachineIntegrationCloud() { service.inhibitCloud(); }
 
-void requestMachineIntegrationPresetTemperature(
-    uint8_t presetId, uint32_t configGeneration, uint16_t targetDeciC) {
+void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
+                                                uint32_t configGeneration) {
   LineaMicraRequest request;
   request.configGeneration = configGeneration;
-  request.targetDeciC = targetDeciC;
-  request.presetId = presetId;
+  request.targetDeciC = preset.targetDeciC;
+  request.presetId = preset.presetId;
   request.type = LineaMicraRequestType::APPLY_TEMPERATURE;
   service.post(request);
 }

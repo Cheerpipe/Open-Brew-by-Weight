@@ -21,6 +21,12 @@ enum class MachinePhysicalStartDisposition : uint8_t {
   BLOCKED_CLEANING
 };
 
+// A preset's machine brew temperature target.
+struct PresetTemperature {
+  uint8_t presetId;
+  uint16_t targetDeciC;
+};
+
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 inline bool initializeMachineIntegration() { return true; }
 inline void publishMachineIntegrationConfig(const PersistedSettings &,
@@ -34,12 +40,12 @@ inline uint32_t hostMachineTemperatureRequestCount = 0;
 inline uint8_t hostMachineTemperaturePresetId = 0;
 inline uint32_t hostMachineTemperatureGeneration = 0;
 inline uint16_t hostMachineTemperatureTargetDeciC = 0;
-inline void requestMachineIntegrationPresetTemperature(
-    uint8_t presetId, uint32_t configGeneration, uint16_t targetDeciC) {
+inline void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
+                                                       uint32_t configGeneration) {
   ++hostMachineTemperatureRequestCount;
-  hostMachineTemperaturePresetId = presetId;
+  hostMachineTemperaturePresetId = preset.presetId;
   hostMachineTemperatureGeneration = configGeneration;
-  hostMachineTemperatureTargetDeciC = targetDeciC;
+  hostMachineTemperatureTargetDeciC = preset.targetDeciC;
 }
 inline uint16_t hostMachineShotTargetDeciC = 0;
 inline uint16_t machineIntegrationShotTargetDeciC() {
@@ -89,8 +95,8 @@ void serviceMachineIntegrationScaleLink(uint32_t now, bool scaleLinkUp,
 void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
                                            bool scaleSupportsPowerOff,
                                            bool machineBusy);
-void requestMachineIntegrationPresetTemperature(
-    uint8_t presetId, uint32_t configGeneration, uint16_t targetDeciC);
+void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
+                                                uint32_t configGeneration);
 // The integration's current coffee target in deci-Celsius for the shot
 // record's snapshot, taken on the control task at the shot's end; 0 when no
 // integration reports a valid target.

@@ -509,7 +509,7 @@ void p82_ble_scan_strict_versions_and_roundtrip() {
 
   CHECK(persistBleScanSettings(
       loaded, static_cast<uint8_t>(BleScanIntensity::AGGRESSIVE),
-      loaded.enabled));
+      loaded.enabled != 0));
   BleScanPersistedSettings reloaded;
   CHECK(loadBleScanSettings(reloaded));
   CHECK(reloaded.scanIntensity ==
@@ -519,7 +519,7 @@ void p82_ble_scan_strict_versions_and_roundtrip() {
   const uint32_t revisionBefore = loaded.revision;
   CHECK(persistBleScanSettings(loaded,
                                static_cast<uint8_t>(BleScanIntensity::RELAXED),
-                               0));
+                               false));
   CHECK(loadBleScanSettings(reloaded));
   CHECK(reloaded.revision == revisionBefore + 1);
   CHECK(reloaded.scanIntensity ==
@@ -552,7 +552,7 @@ void p82b_ble_scan_legacy_minute_bytes_stay_readable() {
   // The next durable write also clears the obsolete bytes on disk.
   CHECK(persistBleScanSettings(
       loaded, static_cast<uint8_t>(BleScanIntensity::RELAXED),
-      loaded.enabled));
+      loaded.enabled != 0));
   BleScanPersistedSettings onDisk;
   CHECK(readLatestBleScanSettings(onDisk));
   CHECK(onDisk.scanIntensity ==
@@ -1615,7 +1615,7 @@ void p48_ble_scan_defaults_and_dual_slot_round_trip() {
   // The master switch shares the combined save; disabled is durable.
   CHECK(persistBleScanSettings(loaded,
                                static_cast<uint8_t>(BleScanIntensity::AGGRESSIVE),
-                               0));
+                               false));
   CHECK(readLatestBleScanSettings(onDisk));
   CHECK(onDisk.version == BLE_SCAN_SETTINGS_VERSION);
   CHECK(onDisk.enabled == 0);
@@ -3174,11 +3174,11 @@ void p91d_legacy_blob_derives_identical_curve() {
     int32_t legacy = p.goalDg;
     if (t < p.fastBeforeMs) {
       legacy = t < a ? p.goalDg + p.fastMarginDg
-                     : p.goalDg + corridor::rampDg(p.fastMarginDg, t - a,
-                                                   p.fastBeforeMs - a, p.fastCurve, false);
+                     : p.goalDg + corridor::rampDg(p.fastMarginDg, {t - a, p.fastBeforeMs - a},
+                                                   p.fastCurve, false);
     } else if (t > p.slowAfterMs && t < b) {
-      legacy = p.goalDg - corridor::rampDg(p.slowMarginDg, t - p.slowAfterMs,
-                                           b - p.slowAfterMs, p.slowCurve, true);
+      legacy = p.goalDg - corridor::rampDg(p.slowMarginDg, {t - p.slowAfterMs, b - p.slowAfterMs},
+                                           p.slowCurve, true);
     } else if (t >= b) {
       legacy = p.goalDg - p.slowMarginDg;
     }

@@ -154,10 +154,10 @@ inline bool saveBleScanSettings(BleScanPersistedSettings &settings) {
 // several of them together must not cost several flash writes and revisions.
 // An unchanged field is passed through by the caller and writes nothing.
 inline bool persistBleScanSettings(BleScanPersistedSettings &settings,
-                                   uint8_t intensity, uint8_t enabled) {
+                                   uint8_t intensity, bool enabled) {
   const uint8_t storedIntensity =
       static_cast<uint8_t>(clampBleScanIntensity(intensity));
-  const uint8_t storedEnabled = enabled != 0 ? 1 : 0;
+  const uint8_t storedEnabled = enabled ? 1 : 0;
   if (settings.scanIntensity == storedIntensity &&
       settings.enabled == storedEnabled) {
     return true;

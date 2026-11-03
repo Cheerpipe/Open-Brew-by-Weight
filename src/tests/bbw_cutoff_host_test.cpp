@@ -191,30 +191,30 @@ int main() {
     const uint8_t id = bank.presets[0].id;
     QuickStartRecord record;
     int16_t jump = -1;
-    assert(!observeQuickStart(record, bank, id, 50, 1, jump));  // never armed
-    armQuickStart(record, bank, id, 1.2f, 40);
-    assert(observeQuickStart(record, bank, id, 48, 40, jump) && jump == -1);
-    assert(observeQuickStart(record, bank, id, 52, 41, jump) && jump == -1);
-    assert(observeQuickStart(record, bank, id, 50, 42, jump) && jump == 50);
+    assert(!observeQuickStart(record, bank, id, {50, 1}, jump));  // never armed
+    armQuickStart(record, bank, id, {1.2f, 40});
+    assert(observeQuickStart(record, bank, id, {48, 40}, jump) && jump == -1);
+    assert(observeQuickStart(record, bank, id, {52, 41}, jump) && jump == -1);
+    assert(observeQuickStart(record, bank, id, {50, 42}, jump) && jump == 50);
     const QuickStartEntry *entry = quickStartEntry(record, bank, id, false);
     assert(entry != nullptr && entry->state == static_cast<uint8_t>(QuickStartState::APPLIED) &&
            entry->setCg == 120 && entry->setAtId == 40 && entry->quickCg == 50 &&
            entry->quickAtId == 42);
-    assert(!observeQuickStart(record, bank, id, 50, 43, jump));  // decided once
+    assert(!observeQuickStart(record, bank, id, {50, 43}, jump));  // decided once
     // Shots that disagree leave normal learning in charge.
-    armQuickStart(record, bank, id, 1.2f, 50);
+    armQuickStart(record, bank, id, {1.2f, 50});
     jump = -1;
-    for (const int16_t cg : {63, -5, 10}) assert(observeQuickStart(record, bank, id, cg, 50, jump));
+    for (const int16_t cg : {63, -5, 10}) assert(observeQuickStart(record, bank, id, {cg, 50}, jump));
     assert(jump == -1);
     assert(quickStartEntry(record, bank, id, false)->state ==
            static_cast<uint8_t>(QuickStartState::DISAGREED));
     // Raw observations decide; the drip itself never goes below zero.
-    armQuickStart(record, bank, id, 0.5f, 60);
-    for (const int16_t cg : {-10, -20}) assert(observeQuickStart(record, bank, id, cg, 60, jump));
-    assert(observeQuickStart(record, bank, id, -15, 62, jump) && jump == 0);
+    armQuickStart(record, bank, id, {0.5f, 60});
+    for (const int16_t cg : {-10, -20}) assert(observeQuickStart(record, bank, id, {cg, 60}, jump));
+    assert(observeQuickStart(record, bank, id, {-15, 62}, jump) && jump == 0);
     // A damaged count can never index past the three observations.
     quickStartEntry(record, bank, id, false)->state = static_cast<uint8_t>(QuickStartState::ARMED);
-    assert(!observeQuickStart(record, bank, id, 50, 63, jump));
+    assert(!observeQuickStart(record, bank, id, {50, 63}, jump));
     // A fresh install quick starts every brew-by-weight preset, not Manual.
     const QuickStartRecord fresh = armedQuickStart(bank);
     for (uint8_t i = 0; i < bank.count; ++i) {

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <span>
+
 #include "OpenBrewByWeightBrewTypes.h"
 
 // =============================================================================
@@ -156,10 +158,16 @@ struct RampWide {
   }
 };
 
-// Exact floor(margin * e(n / d)) when `reached`, else floor(margin * (1 - e)):
+// A point u = n / d along a ramp (0 <= n <= d).
+struct RampFraction {
+  int32_t n;
+  int32_t d;
+};
+
+// Exact floor(margin * e(u)) when `reached`, else floor(margin * (1 - e)):
 // the Bernstein sum of I over j >= a (or j < a) divided by d^N, N = a + b - 1.
 // For Beta(2,2) these are the original smoothstep expressions bit for bit.
-inline int32_t rampDg(int32_t marginDg, int32_t n, int32_t d, uint8_t curve, bool reached) {
+inline int32_t rampDg(int32_t marginDg, RampFraction u, uint8_t curve, bool reached) {
   const RampCurve c = RAMP_CURVES[curve < RAMP_CURVE_TYPES * RAMP_HARDNESS_LEVELS ? curve : 0];
   const uint32_t degree = c.a + c.b - 1u;
   RampWide sum;
@@ -168,35 +176,40 @@ inline int32_t rampDg(int32_t marginDg, int32_t n, int32_t d, uint8_t curve, boo
     if ((j >= c.a) == reached) {
       RampWide term;
       term.w[0] = choose;
-      for (uint32_t i = 0; i < j; ++i) term.mul(static_cast<uint32_t>(n));
-      for (uint32_t i = j; i < degree; ++i) term.mul(static_cast<uint32_t>(d - n));
+      for (uint32_t i = 0; i < j; ++i) term.mul(static_cast<uint32_t>(u.n));
+      for (uint32_t i = j; i < degree; ++i) term.mul(static_cast<uint32_t>(u.d - u.n));
       sum.add(term);
     }
     choose = choose * (degree - j) / (j + 1);
   }
   sum.mul(static_cast<uint32_t>(marginDg));
   // floor(floor(x / D^2) / D) = floor(x / D^3): D^2 per step halves the divisions.
-  const uint32_t ud = static_cast<uint32_t>(d);
+  const uint32_t ud = static_cast<uint32_t>(u.d);
   for (uint32_t i = 0; i < degree; i += 2) sum.div(i + 1 < degree ? ud * ud : ud);
   return static_cast<int32_t>(sum.w[0]);
 }
 
-// Continuous hardness pct (hundredths of hardness, 0..200) for curve `type`:
-// whole hardness (0/100/200) is bit-identical to the legacy rampDg of that
+// A curve type at a continuous hardness, in hundredths of hardness (0..200;
+// above 200 reads as 200).
+struct RampBlend {
+  uint8_t type;
+  uint16_t hardnessPct;
+};
+
+// Whole hardness (0/100/200) is bit-identical to the legacy rampDg of that
 // integer curve; between them the two adjacent integer terms blend in fixed
 // point with one rounding. A convex blend of monotone non-increasing terms is
 // monotone non-increasing, so crossingMs keeps its contract, and the result
 // never leaves [min(lo, hi), max(lo, hi)] + 1 dg of the ideal blend.
-inline int32_t rampDgBlend(int32_t marginDg, int32_t n, int32_t d, uint8_t type,
-                           uint16_t pct, bool reached) {
+inline int32_t rampDgBlend(int32_t marginDg, RampFraction u, RampBlend curve, bool reached) {
   static_assert(2 * 100 * MAX_SIDE_MARGIN_DG + 50 <= INT32_MAX,
                 "the fixed-point blend cannot overflow int32");
-  if (pct > 200) pct = 200;
+  const uint16_t pct = curve.hardnessPct > 200 ? 200 : curve.hardnessPct;
   const uint8_t f = static_cast<uint8_t>(pct % 100);
   const uint8_t lo = static_cast<uint8_t>(pct / 100);
-  if (f == 0) return rampDg(marginDg, n, d, rampCurveIndex(type, lo), reached);
-  const int32_t loTerm = rampDg(marginDg, n, d, rampCurveIndex(type, lo), reached);
-  const int32_t hiTerm = rampDg(marginDg, n, d, rampCurveIndex(type, lo + 1), reached);
+  if (f == 0) return rampDg(marginDg, u, rampCurveIndex(curve.type, lo), reached);
+  const int32_t loTerm = rampDg(marginDg, u, rampCurveIndex(curve.type, lo), reached);
+  const int32_t hiTerm = rampDg(marginDg, u, rampCurveIndex(curve.type, lo + 1), reached);
   return (loTerm * (100 - f) + hiTerm * f + 50) / 100;
 }
 
@@ -226,15 +239,15 @@ inline int32_t cutLineDg(const Params &p, int32_t t) {
   if (t < p.fastBeforeMs) {
     if (t < a) return ceilingDg(p);
     return p.goalDg +
-           rampDgBlend(ceilingDg(p) - p.goalDg, t - a, p.fastBeforeMs - a,
-                       rampCurveTypeOf(p.fastCurve), p.fastCurveHardnessPct, false);
+           rampDgBlend(ceilingDg(p) - p.goalDg, {t - a, p.fastBeforeMs - a},
+                       {rampCurveTypeOf(p.fastCurve), p.fastCurveHardnessPct}, false);
   }
   if (t < p.slowAfterMs || (t == p.slowAfterMs && p.slowRampMs > 0)) return p.goalDg;
   const int32_t b = slowRampEndMs(p);
   if (t >= b) return floorDg(p);
   return p.goalDg -
-         rampDgBlend(p.goalDg - floorDg(p), t - p.slowAfterMs, b - p.slowAfterMs,
-                     rampCurveTypeOf(p.slowCurve), p.slowCurveHardnessPct, true);
+         rampDgBlend(p.goalDg - floorDg(p), {t - p.slowAfterMs, b - p.slowAfterMs},
+                     {rampCurveTypeOf(p.slowCurve), p.slowCurveHardnessPct}, true);
 }
 
 // Segment of f at a line value: raised (13), target (3) or lowered (16).
@@ -275,14 +288,25 @@ inline int32_t medianOfSorted(const int32_t *sorted, uint8_t count) {
   return count % 2 ? sorted[count / 2]
                    : (sorted[count / 2 - 1] + sorted[count / 2]) / 2;
 }
-inline int32_t madOf(const int32_t *values, uint8_t count, int32_t median) {
+inline int32_t madOf(std::span<const int32_t> values, int32_t median) {
   int32_t deviations[32];
+  const uint8_t count = static_cast<uint8_t>(values.size());
   for (uint8_t i = 0; i < count; ++i) {
     deviations[i] = values[i] > median ? values[i] - median : median - values[i];
   }
   sortSmall(deviations, count);
   return medianOfSorted(deviations, count);
 }
+
+// A weight, and a flow rate estimate, at a shot-clock time.
+struct ShotSample {
+  int32_t atMs;
+  int32_t weightDg;
+};
+struct RateSample {
+  int32_t atMs;
+  int32_t rateX100;
+};
 
 // Time-window least-squares flow estimator with a MAD innovation gate.
 struct RateEstimator {
@@ -316,7 +340,9 @@ struct RateEstimator {
     return static_cast<uint8_t>((head + CAPACITY - age) % CAPACITY);
   }
 
-  Result push(int32_t t, int32_t weight) {
+  Result push(ShotSample sample) {
+    const int32_t t = sample.atMs;
+    int32_t weight = sample.weightDg;
     if (count > 0 && t <= atMs[head]) return Result::IGNORED;
     if (weight > INT16_MAX) weight = INT16_MAX;
     if (weight < INT16_MIN) weight = INT16_MIN;
@@ -336,7 +362,7 @@ struct RateEstimator {
         innovations[n++] = innovationDg[index(age)];
       sortSmall(innovations, n);
       const int32_t median = medianOfSorted(innovations, n);
-      const int32_t mad = madOf(innovations, n, median);
+      const int32_t mad = madOf({innovations, n}, median);
       const int64_t deviation = innovation > median ? innovation - median
                                                     : median - innovation;
       // 4.5 * max(1.4826 * MAD, 3 dg), in 1e-4 dg.
@@ -408,26 +434,32 @@ struct RateEstimator {
   }
 };
 
+// What the cut law adds to a weight: the rate q projects it and, over tau,
+// carries the in-flight lead q*tau; r is the drip offset.
+struct CutLead {
+  int32_t rateX100;
+  int32_t tauMs;
+  int32_t offsetDg;
+};
+
 // Earliest t >= t_k where W_k + q(t - t_k) + q*tau + r >= f(t). Returns false
 // ("none") when q < 3 dg/s; returns the wall when the line is never met.
-inline bool crossingMs(const Params &p, int32_t tk, int32_t weightDgAtK,
-                       int32_t rateX100, int32_t tau, int32_t offsetDg,
-                       int32_t &out) {
-  if (rateX100 < MIN_PREDICTION_RATE_X100) return false;
-  const int32_t lead = leadDg(rateX100, tau);
+inline bool crossingMs(const Params &p, ShotSample k, CutLead lead, int32_t &out) {
+  if (lead.rateX100 < MIN_PREDICTION_RATE_X100) return false;
+  const int32_t inFlight = leadDg(lead.rateX100, lead.tauMs);
   auto met = [&](int32_t t) {
-    const int64_t ahead = static_cast<int64_t>(rateX100) * (t - tk) / 100000;
-    return weightDgAtK + ahead + lead + offsetDg >= cutLineDg(p, t);
+    const int64_t ahead = static_cast<int64_t>(lead.rateX100) * (t - k.atMs) / 100000;
+    return k.weightDg + ahead + inFlight + lead.offsetDg >= cutLineDg(p, t);
   };
-  if (tk >= p.wallMs || met(tk)) {
-    out = tk;
+  if (k.atMs >= p.wallMs || met(k.atMs)) {
+    out = k.atMs;
     return true;
   }
   if (!met(p.wallMs)) {
     out = p.wallMs;
     return true;
   }
-  int32_t lo = tk, hi = p.wallMs;
+  int32_t lo = k.atMs, hi = p.wallMs;
   while (hi - lo > 1) {
     const int32_t mid = lo + (hi - lo) / 2;
     (met(mid) ? hi : lo) = mid;
@@ -443,11 +475,10 @@ inline int32_t backstopThresholdDg(const Params &p, int32_t t, int32_t offsetDg)
 
 // The cut law against the flat target at a sample: weight plus in-flight lead
 // (when the rate predicts) plus drip offset reaches the target.
-inline bool targetCutDue(const Params &p, int32_t weightDg, int32_t rateX100,
-                         int32_t tau, int32_t offsetDg) {
-  const int32_t lead =
-      rateX100 < MIN_PREDICTION_RATE_X100 ? 0 : leadDg(rateX100, tau);
-  return weightDg + lead + offsetDg >= p.goalDg;
+inline bool targetCutDue(const Params &p, int32_t weightDg, CutLead lead) {
+  const int32_t inFlight =
+      lead.rateX100 < MIN_PREDICTION_RATE_X100 ? 0 : leadDg(lead.rateX100, lead.tauMs);
+  return weightDg + inFlight + lead.offsetDg >= p.goalDg;
 }
 
 enum class Verdict : uint8_t { ON_RECIPE = 0, FAST = 1, SLOW = 2, UNCLASSIFIED = 3 };
@@ -458,17 +489,17 @@ struct ArrivalVerdict {
 };
 
 // t_arr = t_cut + (target - f(t_cut)) / q_cut, clamped to +-5 s.
-inline ArrivalVerdict arrivalVerdict(const Params &p, int32_t cutMs, int32_t rateX100) {
+inline ArrivalVerdict arrivalVerdict(const Params &p, RateSample cut) {
   ArrivalVerdict out;
-  const int32_t line = cutLineDg(p, cutMs);
+  const int32_t line = cutLineDg(p, cut.atMs);
   if (line == p.goalDg) {
-    out.arrivalMs = cutMs;
+    out.arrivalMs = cut.atMs;
   } else {
-    if (rateX100 < MIN_PREDICTION_RATE_X100) return out;
-    int64_t shift = static_cast<int64_t>(p.goalDg - line) * 100000 / rateX100;
+    if (cut.rateX100 < MIN_PREDICTION_RATE_X100) return out;
+    int64_t shift = static_cast<int64_t>(p.goalDg - line) * 100000 / cut.rateX100;
     if (shift > ARRIVAL_CLAMP_MS) shift = ARRIVAL_CLAMP_MS;
     if (shift < -ARRIVAL_CLAMP_MS) shift = -ARRIVAL_CLAMP_MS;
-    out.arrivalMs = cutMs + static_cast<int32_t>(shift);
+    out.arrivalMs = cut.atMs + static_cast<int32_t>(shift);
     if (out.arrivalMs <= 0) return ArrivalVerdict{};  // before the shot: no arrival
   }
   out.verdict = out.arrivalMs < p.fastBeforeMs - VERDICT_DEAD_BAND_MS ? Verdict::FAST
@@ -645,23 +676,21 @@ inline ArrivalStats arrivalStatsOf(size_t count, RowAt rowAt, const StatsScope &
   out.maxMs = sorted[n - 1];
   out.medianMs = medianOfSorted(sorted, n);
   const int32_t sigma = static_cast<int32_t>(
-      static_cast<int64_t>(madOf(sorted, n, out.medianMs)) * 14826 / 10000);
+      static_cast<int64_t>(madOf({sorted, n}, out.medianMs)) * 14826 / 10000);
   out.sigmaMs = sigma > STATS_SIGMA_FLOOR_MS ? sigma : STATS_SIGMA_FLOOR_MS;
   return out;
 }
 
-inline ArrivalStats arrivalStats(const ArrivalRecord *records, size_t count,
-                                 uint8_t presetId, uint32_t epoch) {
-  StatsScope scope;
-  scope.presetId = presetId;
-  scope.epoch = epoch;
-  return arrivalStatsOf(count, [records](size_t i) { return records[i]; }, scope);
+inline ArrivalStats arrivalStats(std::span<const ArrivalRecord> records,
+                                 const StatsScope &scope) {
+  return arrivalStatsOf(records.size(), [records](size_t i) { return records[i]; }, scope);
 }
 
 // Median of the newest <= 10 measured first drops of one preset since its
 // epoch, or with otherPresets of every other preset's shots (the fallback for
 // a preset without any). Unlike arrivals it ignores the window, target and
-// how the shot ended: none of them moves the first drop.
+// how the shot ended: none of them moves the first drop, so only the scope's
+// preset and epoch apply.
 struct FirstDropStats {
   uint8_t n = 0;
   int32_t medianMs = 0;  // 0 = none
@@ -670,15 +699,15 @@ struct FirstDropStats {
 };
 
 template <typename RowAt>
-inline FirstDropStats firstDropStatsOf(size_t count, RowAt rowAt, uint8_t presetId,
-                                       uint32_t epoch, bool otherPresets) {
+inline FirstDropStats firstDropStatsOf(size_t count, RowAt rowAt, const StatsScope &scope,
+                                       bool otherPresets) {
   uint32_t ids[STATS_MAX_SHOTS] = {};
   int32_t drops[STATS_MAX_SHOTS] = {};
   uint8_t n = 0;
   for (size_t i = 0; i < count; ++i) {
     const ArrivalRecord r = rowAt(i);
-    const bool own = r.presetId == presetId;
-    if (r.firstDropMs <= 0 || (otherPresets ? own : !own || r.recordId < epoch)) continue;
+    const bool own = r.presetId == scope.presetId;
+    if (r.firstDropMs <= 0 || (otherPresets ? own : !own || r.recordId < scope.epoch)) continue;
     const int slot = newestSlot(ids, n, r.recordId);
     if (slot >= 0) drops[slot] = r.firstDropMs;
   }
@@ -737,7 +766,7 @@ inline int32_t trimmedLevelMs(int32_t *keys, uint8_t n) {
 // difference, not the whole scale (sorted in place).
 inline int32_t differenceSigmaMs(int32_t *differences, uint8_t n) {
   sortSmall(differences, n);
-  const int64_t mad = madOf(differences, n, medianOfSorted(differences, n));
+  const int64_t mad = madOf({differences, n}, medianOfSorted(differences, n));
   return static_cast<int32_t>(mad * 1483 / 1000 * 7071 / 10000);
 }
 
@@ -822,6 +851,10 @@ struct GrindHintReplay {
     int32_t key;       // arrival, + HINT_CENSORED_KEY when censored
     bool clamped;
   };
+  struct ShotRange {  // shot sequence numbers, both ends included
+    uint32_t first;
+    uint32_t last;
+  };
   struct Level {
     uint8_t n = 0;
     uint8_t censored = 0;
@@ -859,11 +892,11 @@ struct GrindHintReplay {
 
   const Shot &at(uint32_t k) const { return shots[k % RING]; }
 
-  // Level of the newest <= 6 kept shots in [from, to], skipping one.
-  Level levelOf(uint32_t from, uint32_t to, uint32_t skip = NO_SHOT) const {
+  // Level of the newest <= 6 kept shots in the range, skipping one.
+  Level levelOf(ShotRange range, uint32_t skip = NO_SHOT) const {
     Level l;
     int32_t keys[HINT_LEVEL_SHOTS];
-    for (uint32_t next = to + 1; next > from; --next) {
+    for (uint32_t next = range.last + 1; next > range.first; --next) {
       const uint32_t k = next - 1;
       if (k + RING < pushed || l.n >= HINT_LEVEL_SHOTS) break;
       if (k == skip) continue;
@@ -891,7 +924,7 @@ struct GrindHintReplay {
   // segment, leaving out a pending first of a pair.
   void detectChange(int32_t arrivalMs) {
     const uint32_t k = pushed;
-    const Level ref = levelOf(segmentStart, k - 1, armedPending || unarmedSide ? k - 1 : NO_SHOT);
+    const Level ref = levelOf({segmentStart, k - 1}, armedPending || unarmedSide ? k - 1 : NO_SHOT);
     if (ref.n == 0) return;
     const int32_t r = static_cast<int32_t>(static_cast<int64_t>(arrivalMs - ref.ms) * 1000000 /
                                            (static_cast<int64_t>(sigmaMs) * HINT_G[ref.n - 1]));
@@ -990,7 +1023,7 @@ struct GrindHintReplay {
     // confidently on the other side, start a segment at the first of them.
     if (advised != HintDirection::NONE && candidate != NO_SHOT && pushed - candidate >= 3 &&
         candidate + RING >= pushed) {
-      const HintDecision post = decide(levelOf(candidate, pushed - 1), 0);
+      const HintDecision post = decide(levelOf({candidate, pushed - 1}), 0);
       if (post.direction != advised && post.z >= Z_CONFIDENT) startSegment(candidate);
     }
     evaluate(r.recordId);
@@ -1002,8 +1035,8 @@ struct GrindHintReplay {
   void evaluate(uint32_t id) {
     const uint32_t last = pushed - 1, segmentShots = pushed - segmentStart;
     if (segmentStart + RING >= pushed) segmentStartId = at(segmentStart).id;
-    const Level level = levelOf(segmentStart, last);
-    const HintDecision d = decide(level, segmentShots >= 3 ? levelOf(last - 2, last).ms : 0);
+    const Level level = levelOf({segmentStart, last});
+    const HintDecision d = decide(level, segmentShots >= 3 ? levelOf({last - 2, last}).ms : 0);
     const bool moved = movedPermille >= R_MOVED;
     const bool checking = hint != HintDirection::NONE && moved;
     if (hint != HintDirection::NONE && !checking && (d.direction != hint || d.z < 0))
@@ -1100,6 +1133,8 @@ struct CorridorState {
   int32_t stopMs = 0;          // the weight cut that fired: shot time and line
   int32_t stopLineDg = 0;
   ArrivalStats history;        // this preset's recent arrivals (shot start)
+
+  CutLead lead(int32_t rateX100) const { return {rateX100, tauMs, offsetDg}; }
 };
 static_assert(sizeof(CorridorState) <= 512, "corridor state RAM budget");
 

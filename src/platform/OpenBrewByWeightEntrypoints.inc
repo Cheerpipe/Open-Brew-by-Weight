@@ -376,8 +376,7 @@ void startAfterBootRecovery() {
   seedDefaultShotPresetBank(presetBank);
 #endif
   (void)localBuzzer.configureBullseyeRtttl(bullseyeMelodyConfig.rtttl);
-  publishLogLevels(serialLogLevelFromRuntime(runtimeConfig),
-                   static_cast<LogLevel>(runtimeConfig.ringRetainLogLevel));
+  publishLogLevels(runtimeConfig);
   configureEspLogRuntime();
   publishRecipeState();
   publishScaleWorkerPolicy(runtimeConfig, false);

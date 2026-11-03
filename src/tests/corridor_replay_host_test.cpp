@@ -150,10 +150,10 @@ Outcome simulate(const Shot &shot, Params p, Law law, double offsetG,
     while (next < samples.size() && samples[next].atMs <= tick) {
       const Sample &k = samples[next++];
       if (lossAtMs && k.atMs >= lossAtMs) continue;
-      if (rate.push(k.atMs, k.weightDg) != RateEstimator::Result::ACCEPTED) continue;
+      if (rate.push({k.atMs, k.weightDg}) != RateEstimator::Result::ACCEPTED) continue;
       if (lastBeforeLoss) *lastBeforeLoss = k;
       if (rate.channeling) p.fastOn = false;  // f := min(f, target)
-      haveStar = rate.valid && crossingMs(p, k.atMs, k.weightDg, rate.rateX100, tau, offsetDg, star);
+      haveStar = rate.valid && crossingMs(p, {k.atMs, k.weightDg}, {rate.rateX100, tau, offsetDg}, star);
       const bool over = k.weightDg >= backstopThresholdDg(p, k.atMs, offsetDg);
       confirmations = over ? static_cast<uint8_t>(confirmations + 1) : 0;
       if (tick >= p.delayMs && (confirmations >= 2 ||
@@ -175,7 +175,7 @@ Outcome simulate(const Shot &shot, Params p, Law law, double offsetG,
     const double flow = shot.flowAt(tick + shot.valveMs);
     out.finalG = shot.at(tick + shot.valveMs) + shot.dripBaseG + 0.25 * flow;
     out.errorG = out.finalG - out.lineDg / 10.0;
-    const ArrivalVerdict v = arrivalVerdict(p, tick, out.rateAtCut);
+    const ArrivalVerdict v = arrivalVerdict(p, {tick, out.rateAtCut});
     out.arrivalValid = v.verdict != Verdict::UNCLASSIFIED;
     out.arrivalMs = v.arrivalMs;
     return out;
@@ -292,7 +292,7 @@ void syntheticReplay() {
     const Outcome &truth = timedOutcomes[i];
     if (!truth.weightCut || truth.channeling) continue;
     const uint8_t presetId = c.dbl ? 1 : 2;
-    const ArrivalStats stats = arrivalStats(history.data(), history.size(), presetId, 0);
+    const ArrivalStats stats = arrivalStats(history, {.presetId = presetId, .epoch = 0});
     const int32_t lossAt = truth.cutMs - static_cast<int32_t>(rng.range(300, 4000));
     if (lossAt > p.delayMs) {
       RateEstimator state;
@@ -303,8 +303,8 @@ void syntheticReplay() {
       in.lastSampleMs = last.atMs;
       in.beforeFirstDrops = last.weightDg < 5;
       in.crossingValid = state.valid &&
-          crossingMs(p, last.atMs, last.weightDg, state.rateX100, tauMs(c.shot.scale.lagMs, 0), 10,
-                     in.crossingMs);
+          crossingMs(p, {last.atMs, last.weightDg},
+                     {state.rateX100, tauMs(c.shot.scale.lagMs, 0), 10}, in.crossingMs);
       in.history = stats;
       const LossDeadline chosen = lossDeadline(p, in);
       if (chosen.deadlineMs < p.delayMs || chosen.deadlineMs > p.wallMs) ++outside;
@@ -367,9 +367,9 @@ int replayCsv(const char *path) {
         if (cells[i].empty() || cells[i + 1].empty()) break;
         const int32_t t = static_cast<int32_t>(std::atof(cells[i].c_str()) * 1000);
         const int32_t w = static_cast<int32_t>(std::lround(std::atof(cells[i + 1].c_str()) * 10));
-        if (rate.push(t, w) != RateEstimator::Result::ACCEPTED || !rate.valid || t < p.delayMs) continue;
+        if (rate.push({t, w}) != RateEstimator::Result::ACCEPTED || !rate.valid || t < p.delayMs) continue;
         int32_t star = 0;
-        if (crossingMs(p, t, w, rate.rateX100, tauMs(500, 0), 15, star) &&
+        if (crossingMs(p, {t, w}, {rate.rateX100, tauMs(500, 0), 15}, star) &&
             (law == 0 || star == t)) {
           cut[law] = std::max(star, t);
           break;

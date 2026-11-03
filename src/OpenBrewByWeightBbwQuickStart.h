@@ -91,15 +91,22 @@ inline QuickStartEntry *quickStartEntry(QuickStartRecord &record,
   return nullptr;
 }
 
+// A drip to quick start from and the first shot-log id it applies to
+// (0 = no "set" marker).
+struct QuickStartDrip {
+  float dripG;
+  uint32_t setAtId;
+};
+
 inline void armQuickStart(QuickStartRecord &record, const ShotPresetBank &bank,
-                          uint8_t presetId, float dripG, uint32_t setAtId) {
+                          uint8_t presetId, QuickStartDrip drip) {
   QuickStartEntry *entry = quickStartEntry(record, bank, presetId, true);
   if (entry == nullptr) return;
   *entry = QuickStartEntry{};
   entry->presetId = presetId;
   entry->state = static_cast<uint8_t>(QuickStartState::ARMED);
-  entry->setCg = static_cast<int16_t>(std::lround(dripG * 100.0f));
-  entry->setAtId = setAtId;
+  entry->setCg = static_cast<int16_t>(std::lround(drip.dripG * 100.0f));
+  entry->setAtId = drip.setAtId;
 }
 
 // A fresh or factory-reset controller: every brew-by-weight preset quick
@@ -108,8 +115,7 @@ inline QuickStartRecord armedQuickStart(const ShotPresetBank &bank) {
   QuickStartRecord record;
   for (uint8_t i = 0; i < bank.count; ++i)
     if (bank.presets[i].brewByWeight)
-      armQuickStart(record, bank, bank.presets[i].id,
-                    bank.presets[i].bbwEwmaOffsetG, 0);
+      armQuickStart(record, bank, bank.presets[i].id, {bank.presets[i].bbwEwmaOffsetG, 0});
   return record;
 }
 
@@ -124,21 +130,28 @@ inline bool bootQuickStart(QuickStartRecord &out, bool freshSettings,
   return arm;
 }
 
-// Records one eligible observation (offset used + final − cut line, raw) of an
-// armed preset and returns true; jumpCg becomes the median when the third one
-// agrees with the other two (the deciding shot then skips its EWMA step).
+// One eligible observation (offset used + final − cut line, raw) and the
+// shot-log record it came from.
+struct QuickStartObservation {
+  int16_t cg;
+  uint32_t recordId;
+};
+
+// Records one observation of an armed preset and returns true; jumpCg becomes
+// the median when the third one agrees with the other two (the deciding shot
+// then skips its EWMA step).
 inline bool observeQuickStart(QuickStartRecord &record, const ShotPresetBank &bank,
-                              uint8_t presetId, int16_t observedCg,
-                              uint32_t recordId, int16_t &jumpCg) {
+                              uint8_t presetId, QuickStartObservation observation,
+                              int16_t &jumpCg) {
   QuickStartEntry *entry = quickStartEntry(record, bank, presetId, false);
   if (entry == nullptr || entry->count >= QUICK_START_SHOTS ||
       entry->state != static_cast<uint8_t>(QuickStartState::ARMED)) return false;
-  entry->observedCg[entry->count++] = observedCg;
+  entry->observedCg[entry->count++] = observation.cg;
   if (entry->count < QUICK_START_SHOTS) return true;
   const int16_t *o = entry->observedCg;
   const int16_t lo = o[0] < o[1] ? (o[0] < o[2] ? o[0] : o[2]) : (o[1] < o[2] ? o[1] : o[2]);
   const int16_t hi = o[0] > o[1] ? (o[0] > o[2] ? o[0] : o[2]) : (o[1] > o[2] ? o[1] : o[2]);
-  entry->quickAtId = recordId;
+  entry->quickAtId = observation.recordId;
   if (hi - lo > QUICK_START_SPREAD_CG) {
     entry->state = static_cast<uint8_t>(QuickStartState::DISAGREED);
     return true;

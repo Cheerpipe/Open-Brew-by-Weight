@@ -119,8 +119,9 @@ void testVectors() {
   cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(root, "solver")) {
     const Params p = paramsOf(presets, cJSON_GetObjectItemCaseSensitive(item, "preset")->valuestring);
     int32_t out = -1;
-    const bool found = crossingMs(p, num(item, "tkMs"), num(item, "weightDg"), num(item, "rateX100"),
-                                  num(item, "tauMs"), num(item, "offsetDg"), out);
+    const bool found = crossingMs(p, {num(item, "tkMs"), num(item, "weightDg")},
+                                  {num(item, "rateX100"), num(item, "tauMs"), num(item, "offsetDg")},
+                                  out);
     const cJSON *expected = cJSON_GetObjectItemCaseSensitive(item, "crossingMs");
     CHECK(found == !cJSON_IsNull(expected));
     if (found) {
@@ -132,7 +133,7 @@ void testVectors() {
 
   cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(root, "verdict")) {
     const Params p = paramsOf(presets, cJSON_GetObjectItemCaseSensitive(item, "preset")->valuestring);
-    const ArrivalVerdict v = arrivalVerdict(p, num(item, "cutMs"), num(item, "rateX100"));
+    const ArrivalVerdict v = arrivalVerdict(p, {num(item, "cutMs"), num(item, "rateX100")});
     CHECK(static_cast<int32_t>(v.verdict) == num(item, "verdict"));
     CHECK(v.arrivalMs == num(item, "arrivalMs"));
   }
@@ -153,8 +154,9 @@ void testVectors() {
   cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(root, "stats")) {
     const cJSON *e = cJSON_GetObjectItemCaseSensitive(item, "expected");
     for (const ArrivalRecord *source : {records, reversed}) {
-      const ArrivalStats s = arrivalStats(source, count, static_cast<uint8_t>(num(item, "presetId")),
-                                          static_cast<uint32_t>(num(item, "epoch")));
+      const ArrivalStats s =
+          arrivalStats({source, count}, {.presetId = static_cast<uint8_t>(num(item, "presetId")),
+                                         .epoch = static_cast<uint32_t>(num(item, "epoch"))});
       CHECK(s.n == num(e, "n"));
       CHECK(s.minMs == num(e, "minMs"));
       CHECK(s.maxMs == num(e, "maxMs"));
@@ -323,9 +325,9 @@ void testStepsAndZeroLengthSegments() {
 void testSolverAgainstBruteForce() {
   const Params p = doubleAdaptive();
   int32_t none = 0;
-  CHECK(!crossingMs(p, 20000, 200, 299, 790, 15, none));
+  CHECK(!crossingMs(p, {20000, 200}, {299, 790, 15}, none));
   // Below the prediction rate the target law is the direct one: no lead.
-  CHECK(!targetCutDue(p, 340, 299, 790, 15) && targetCutDue(p, 345, 299, 790, 15));
+  CHECK(!targetCutDue(p, 340, {299, 790, 15}) && targetCutDue(p, 345, {299, 790, 15}));
   uint32_t seed = 12345;
   auto next = [&](uint32_t mod) {
     seed = seed * 1103515245u + 12345u;
@@ -335,22 +337,22 @@ void testSolverAgainstBruteForce() {
     const int32_t tk = 12000 + next(36000), w = next(420), q = 300 + next(3800),
                   tau = 300 + next(700), r = next(50);
     int32_t out = 0;
-    CHECK(crossingMs(p, tk, w, q, tau, r, out));
+    CHECK(crossingMs(p, {tk, w}, {q, tau, r}, out));
     CHECK(out == bruteCrossing(p, tk, w, q, tau, r));
     CHECK(out >= tk && out <= p.wallMs);
     // A cut due now against a raised f is due against the target too.
-    if (out == tk && cutLineDg(p, tk) >= p.goalDg) CHECK(targetCutDue(p, w, q, tau, r));
+    if (out == tk && cutLineDg(p, tk) >= p.goalDg) CHECK(targetCutDue(p, w, {q, tau, r}));
   }
 }
 
 void testEstimator() {
   // Exact on a clean 2.0 g/s ramp at 10 Hz once 4 samples span >= 2 s.
   RateEstimator e;
-  for (int32_t t = 10000; t <= 11900; t += 100) e.push(t, (t - 10000) / 50);
+  for (int32_t t = 10000; t <= 11900; t += 100) e.push({t, (t - 10000) / 50});
   CHECK(!e.valid);
-  e.push(12000, 40);
+  e.push({12000, 40});
   CHECK(e.valid && e.rateX100 == 2000);
-  for (int32_t t = 12100; t <= 20000; t += 100) e.push(t, (t - 10000) / 50);
+  for (int32_t t = 12100; t <= 20000; t += 100) e.push({t, (t - 10000) / 50});
   CHECK(e.valid && e.rateX100 == 2000);
   CHECK(e.count <= RateEstimator::CAPACITY);
   CHECK(e.atMs[e.index(e.count - 1)] > 20000 - RATE_WINDOW_MS);
@@ -359,35 +361,35 @@ void testEstimator() {
   RateEstimator j;
   for (int i = 0; i <= 60; ++i) {
     const int32_t t = 10000 + i * 100 + ((i * 37) % 81) - 40;
-    j.push(t, (i * 100 * 15) / 1000);
+    j.push({t, (i * 100 * 15) / 1000});
   }
   CHECK(j.valid && std::abs(j.rateX100 - 1500) <= 100);
 
   // A single spike is excluded; the fit is unchanged.
   RateEstimator s;
-  for (int32_t t = 10000; t <= 14000; t += 100) s.push(t, (t - 10000) / 50);
-  CHECK(s.push(14100, 300) == RateEstimator::Result::REJECTED);
+  for (int32_t t = 10000; t <= 14000; t += 100) s.push({t, (t - 10000) / 50});
+  CHECK(s.push({14100, 300}) == RateEstimator::Result::REJECTED);
   CHECK(s.rateX100 == 2000);
-  CHECK(s.push(14200, 84) == RateEstimator::Result::ACCEPTED);
+  CHECK(s.push({14200, 84}) == RateEstimator::Result::ACCEPTED);
   // Three consecutive rejections relearn from the new level.
-  CHECK(s.push(14300, 400) == RateEstimator::Result::REJECTED);
-  CHECK(s.push(14400, 402) == RateEstimator::Result::REJECTED);
-  CHECK(s.push(14500, 404) == RateEstimator::Result::ACCEPTED);
+  CHECK(s.push({14300, 400}) == RateEstimator::Result::REJECTED);
+  CHECK(s.push({14400, 402}) == RateEstimator::Result::REJECTED);
+  CHECK(s.push({14500, 404}) == RateEstimator::Result::ACCEPTED);
   CHECK(!s.valid && s.count == 1);
   // Duplicate or reordered timestamps are ignored.
-  CHECK(s.push(14500, 404) == RateEstimator::Result::IGNORED);
+  CHECK(s.push({14500, 404}) == RateEstimator::Result::IGNORED);
 
   // Clamps: a falling stream reads 0, a gusher reads 40 dg/s (raw kept).
   RateEstimator down;
-  for (int32_t t = 0; t <= 3000; t += 250) down.push(t, 300 - t / 100);
+  for (int32_t t = 0; t <= 3000; t += 250) down.push({t, 300 - t / 100});
   CHECK(down.valid && down.rateX100 == 0 && down.rawX100 < 0);
   RateEstimator gusher;
-  for (int32_t t = 0; t <= 3000; t += 100) gusher.push(t, t * 6 / 100);
+  for (int32_t t = 0; t <= 3000; t += 100) gusher.push({t, t * 6 / 100});
   CHECK(gusher.valid && gusher.rateX100 == MAX_RATE_X100 && gusher.rawX100 == 6000);
 
   // int64 sums at 10 Hz over 3 s with the maximum weight stay exact.
   RateEstimator heavy;
-  for (int32_t t = 0; t <= 6000; t += 100) heavy.push(t, 20000 + t / 10);
+  for (int32_t t = 0; t <= 6000; t += 100) heavy.push({t, 20000 + t / 10});
   CHECK(heavy.valid && heavy.rawX100 == 10000);
 
   // Reset keeps the channeling latch for the rest of the shot.
@@ -401,11 +403,11 @@ void testChanneling() {
   // qualifying sample.
   RateEstimator e;
   int32_t w = 0;
-  for (int32_t t = 0; t <= 4000; t += 200) e.push(t, w += 3);
+  for (int32_t t = 0; t <= 4000; t += 200) e.push({t, w += 3});
   CHECK(!e.channeling);
   int32_t latchedAt = -1;
   for (int32_t t = 4200; t <= 8000; t += 200) {
-    e.push(t, w += 12);
+    e.push({t, w += 12});
     if (e.channeling && latchedAt < 0) latchedAt = t;
   }
   CHECK(e.channeling);
@@ -413,7 +415,7 @@ void testChanneling() {
   // A steady fast shot (6 g/s from the start) is not channeling.
   RateEstimator steady;
   w = 0;
-  for (int32_t t = 0; t <= 8000; t += 200) steady.push(t, w += 12);
+  for (int32_t t = 0; t <= 8000; t += 200) steady.push({t, w += 12});
   CHECK(!steady.channeling);
   // A 5 g/s onset after 3 s of empty pan looks like a surge to a window that
   // still holds the empty pan; baselines after the first drop do not.
@@ -421,7 +423,7 @@ void testChanneling() {
     RateEstimator fast;
     fast.onsetMs = onset;
     w = 0;
-    for (int32_t t = 0; t <= 9000; t += 200) fast.push(t, t > 3000 ? w += 10 : w);
+    for (int32_t t = 0; t <= 9000; t += 200) fast.push({t, t > 3000 ? w += 10 : w});
     CHECK(fast.channeling == (onset == 0));
   }
   // A real mid-shot surge after the onset is still latched.
@@ -429,7 +431,7 @@ void testChanneling() {
   late.onsetMs = 2000;
   w = 0;
   for (int32_t t = 0; t <= 14000; t += 200)
-    late.push(t, t > 2000 ? w += (t <= 8000 ? 3 : 12) : w);
+    late.push({t, t > 2000 ? w += (t <= 8000 ? 3 : 12) : w});
   CHECK(late.channeling);
 }
 
@@ -444,7 +446,7 @@ void testNegativeArrival() {
   p.fastBeforeMs = 27000;
   p.slowAfterMs = 36000;
   p.wallMs = 50000;
-  CHECK(arrivalVerdict(p, 2000, 2000).verdict == Verdict::UNCLASSIFIED);
+  CHECK(arrivalVerdict(p, {2000, 2000}).verdict == Verdict::UNCLASSIFIED);
   // An extension sets its side's verdict but never classifies a lost arrival.
   ArrivalVerdict onRecipe;
   onRecipe.verdict = Verdict::ON_RECIPE;
@@ -454,7 +456,7 @@ void testNegativeArrival() {
   CHECK(extendedVerdict(onRecipe, false, false).verdict == Verdict::ON_RECIPE);
   CHECK(extendedVerdict(onRecipe, true, false).arrivalMs == 26800);
   CHECK(extendedVerdict(ArrivalVerdict{}, true, false).verdict == Verdict::UNCLASSIFIED);
-  const ArrivalVerdict later = arrivalVerdict(p, 6000, 2000);
+  const ArrivalVerdict later = arrivalVerdict(p, {6000, 2000});
   CHECK(later.verdict == Verdict::FAST && later.arrivalMs == 3000);
 }
 
@@ -711,14 +713,14 @@ void testRampCurvesExhaustive() {
     for (const int32_t d : {500, 1000, 2500, 5000, 7500, 10000}) {
       for (const int32_t m : {5, 100}) {
         int32_t previous = 0;
-        CHECK(rampDg(m, 0, d, c, true) == 0);
-        CHECK(rampDg(m, 0, d, c, false) == m);
-        CHECK(rampDg(m, d, d, c, true) == m);
-        CHECK(rampDg(m, 1, d, c, true) <= 1);
-        CHECK(m - rampDg(m, d - 1, d, c, true) <= 1);
+        CHECK(rampDg(m, {0, d}, c, true) == 0);
+        CHECK(rampDg(m, {0, d}, c, false) == m);
+        CHECK(rampDg(m, {d, d}, c, true) == m);
+        CHECK(rampDg(m, {1, d}, c, true) <= 1);
+        CHECK(m - rampDg(m, {d - 1, d}, c, true) <= 1);
         for (int32_t n = 0; n <= d; ++n) {
-          const int32_t reached = rampDg(m, n, d, c, true);
-          const int32_t left = rampDg(m, n, d, c, false);
+          const int32_t reached = rampDg(m, {n, d}, c, true);
+          const int32_t left = rampDg(m, {n, d}, c, false);
           CHECK(reached >= previous);
           CHECK(reached + left == m || reached + left == m - 1);
           const long double ideal =
@@ -740,10 +742,11 @@ void testSmoothstepIdentity() {
   for (const int64_t d : {1, 7, 500, 3000, 5000, 10000}) {
     for (const int64_t m : {5, 37, 100}) {
       for (int64_t n = 0; n < d; ++n) {
-        CHECK(rampDg(static_cast<int32_t>(m), static_cast<int32_t>(n), static_cast<int32_t>(d), 0,
-                     false) == m * (d * d * d - 3 * n * n * d + 2 * n * n * n) / (d * d * d));
-        CHECK(rampDg(static_cast<int32_t>(m), static_cast<int32_t>(n), static_cast<int32_t>(d), 0,
-                     true) == m * (3 * n * n * d - 2 * n * n * n) / (d * d * d));
+        const RampFraction u{static_cast<int32_t>(n), static_cast<int32_t>(d)};
+        CHECK(rampDg(static_cast<int32_t>(m), u, 0, false) ==
+              m * (d * d * d - 3 * n * n * d + 2 * n * n * n) / (d * d * d));
+        CHECK(rampDg(static_cast<int32_t>(m), u, 0, true) ==
+              m * (3 * n * n * d - 2 * n * n * n) / (d * d * d));
       }
     }
   }
@@ -774,8 +777,8 @@ void testContinuousHardnessBlend() {
           for (const int32_t m : {5, 37, 100}) {
             for (int i = 0; i <= 40; ++i) {
               const int32_t n = static_cast<int32_t>(static_cast<int64_t>(i) * d / 40);
-              CHECK(rampDgBlend(m, n, d, type, pct, reached) ==
-                    rampDg(m, n, d, rampCurveIndex(type, static_cast<uint8_t>(pct / 100)),
+              CHECK(rampDgBlend(m, {n, d}, {type, pct}, reached) ==
+                    rampDg(m, {n, d}, rampCurveIndex(type, static_cast<uint8_t>(pct / 100)),
                            reached));
             }
           }
@@ -834,7 +837,7 @@ void testContinuousHardnessBlend() {
                   betaReference(u, lo.a, lo.b) * (100 - f) / 100 +
                   betaReference(u, hi.a, hi.b) * f / 100;
               const long double ideal = m * (reached ? share : 1 - share);
-              const int32_t blend = rampDgBlend(m, n, d, type, pct, reached);
+              const int32_t blend = rampDgBlend(m, {n, d}, {type, pct}, reached);
               const long double real = blend > ideal ? blend - ideal : ideal - blend;
               if (real > worstReal) worstReal = real;
               CHECK(blend - static_cast<int32_t>(ideal) <= 1);
@@ -895,7 +898,7 @@ void testTransitionVectors() {
     for (int32_t tk = p.delayMs; tk < p.wallMs; tk += 4000) {
       for (const int32_t q : {400, 1500, 3500}) {
         int32_t out = 0;
-        CHECK(crossingMs(p, tk, p.goalDg / 2, q, 790, 15, out));
+        CHECK(crossingMs(p, {tk, p.goalDg / 2}, {q, 790, 15}, out));
         CHECK(out == bruteCrossing(p, tk, p.goalDg / 2, q, 790, 15));
       }
     }
@@ -929,17 +932,17 @@ void testShotStatsSummary() {
   for (uint8_t i = 1; i < s.n; ++i) CHECK(arrivals[i - 1] <= arrivals[i]);
   scope.goalDg = 10;  // 1 g away still counts
   CHECK(arrivalStatsOf(count, rows, scope).total == 13);
-  CHECK(arrivalStats(records, count, 1, 13).total == 0);
+  CHECK(arrivalStats({records, count}, {.presetId = 1, .epoch = 13}).total == 0);
   // First drops: the newest ten measured, whatever the window, target or
   // ending (ids 2,4,5,7,8,10,11,13,15,16): median of 5700 and 5800.
-  const FirstDropStats own = firstDropStatsOf(count, rows, 1, 0, false);
+  const FirstDropStats own = firstDropStatsOf(count, rows, {.presetId = 1, .epoch = 0}, false);
   CHECK(own.n == STATS_MAX_SHOTS && own.medianMs == (5700 + 5800) / 2);
   // New coffee (epoch 15) keeps only the shots after it.
-  const FirstDropStats fresh = firstDropStatsOf(count, rows, 1, 15, false);
+  const FirstDropStats fresh = firstDropStatsOf(count, rows, {.presetId = 1, .epoch = 15}, false);
   CHECK(fresh.n == 2 && fresh.medianMs == 9000);
-  CHECK(firstDropStatsOf(count, rows, 1, 17, false).n == 0);
+  CHECK(firstDropStatsOf(count, rows, {.presetId = 1, .epoch = 17}, false).n == 0);
   // The fallback reads only the other presets, whatever their epoch.
-  const FirstDropStats others = firstDropStatsOf(count, rows, 1, 99, true);
+  const FirstDropStats others = firstDropStatsOf(count, rows, {.presetId = 1, .epoch = 99}, true);
   CHECK(others.n == 1 && others.medianMs == 6000);
 }
 

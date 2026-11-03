@@ -69,8 +69,7 @@ const RuntimeSettingsSubscription runtimeSettingsSubscribers[] = {
        return a.serialLogLevel != b.serialLogLevel ||
               a.ringRetainLogLevel != b.ringRetainLogLevel;
      }, [](const RuntimeConfig &, const RuntimeConfig &after) {
-       publishLogLevels(serialLogLevelFromRuntime(after),
-                        static_cast<LogLevel>(after.ringRetainLogLevel));
+       publishLogLevels(after);
        configureEspLogRuntime();
      }},
     {[](const RuntimeConfig &a, const RuntimeConfig &b) {

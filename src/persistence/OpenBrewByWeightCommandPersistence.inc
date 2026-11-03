@@ -1140,7 +1140,7 @@ bool serviceBleScanPersist() {
     return true;
   }
   const bool ok =
-      persistBleScanSettings(bleScanPersistedSettings, intensity, enabled);
+      persistBleScanSettings(bleScanPersistedSettings, intensity, enabled != 0);
   bleScanPersistMux.lock();
   if (ok && pending && bleScanPersistIntensity == intensity) {
     // A newer staged value stays pending for the next idle pass.

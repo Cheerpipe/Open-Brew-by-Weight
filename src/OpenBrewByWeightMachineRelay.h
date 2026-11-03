@@ -112,10 +112,10 @@ void operationalLimitTimerCallback(void *) {
 }
 
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
-void IRAM_ATTR writeGpioFromIsr(uint8_t pin, uint8_t level) {
+void IRAM_ATTR writeGpioFromIsr(uint8_t pin, bool high) {
   const uint32_t mask = (pin < 32) ? (uint32_t{1} << pin)
                                    : (uint32_t{1} << (pin - 32));
-  if (level == LOW) {
+  if (!high) {
     if (pin < 32) {
       GPIO.out_w1tc = mask;
     }
@@ -142,7 +142,7 @@ void IRAM_ATTR openRelayElectricalFromIsr() {
   // the GPTimer deadline can de-energize K1 while flash cache is disabled.
   // Supports both active-HIGH and active-LOW relay modules: the correct
   // register (W1TS or W1TC) is selected at compile time via RELAY_OPEN_LEVEL.
-  writeGpioFromIsr(RELAY_GPIO, RELAY_OPEN_LEVEL);
+  writeGpioFromIsr(RELAY_GPIO, RELAY_OPEN_LEVEL != LOW);
 }
 #else
 void openRelayElectricalFromIsr() {

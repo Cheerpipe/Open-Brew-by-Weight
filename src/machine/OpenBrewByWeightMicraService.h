@@ -180,10 +180,14 @@ class OpenBrewByWeightMicraService {
                         uint16_t targetDeciC);
   bool writeStandby(const LineaMicraPersistedSettings &settings);
   bool writePowerOn(const LineaMicraPersistedSettings &settings);
+  // A cloud call as the diagnostics name it: its purpose and endpoint path.
+  struct CloudCall {
+    const char *purpose;
+    const char *endpoint;
+  };
   bool request(const LineaMicraPersistedSettings &settings, const char *url,
                esp_http_client_method_t method, const char *body,
-               bool authenticated, const char *purpose, const char *endpoint,
-               bool installationInit = false);
+               bool authenticated, CloudCall call, bool installationInit = false);
   LineaMicraError classifyFailure() const;
   bool applySignedHeaders(const LineaMicraPersistedSettings &settings,
                           char *headers = nullptr, size_t capacity = 0);

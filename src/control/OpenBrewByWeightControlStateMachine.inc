@@ -383,8 +383,9 @@ bool finalizeCycle(EndReason reason, StopperState nextState,
   // Bullseye celebrates an On recipe weight cut only.
   if (!rinseEnd && corridor::weightCutReason(static_cast<uint8_t>(reason)) &&
       corridor::extendedVerdict(
-          corridor::arrivalVerdict(session.cut.params, static_cast<int32_t>(durationMs),
-                                   session.cut.rate.valid ? session.cut.rate.rateX100 : 0),
+          corridor::arrivalVerdict(session.cut.params,
+                                   {static_cast<int32_t>(durationMs),
+                                    session.cut.rate.valid ? session.cut.rate.rateX100 : 0}),
           session.extractionExtended, session.slowExtractionExtended)
               .verdict == corridor::Verdict::ON_RECIPE &&
       bullseyeMelodyConfig.enabled && soundAlertsEnabled() &&

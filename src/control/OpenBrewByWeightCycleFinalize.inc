@@ -240,8 +240,7 @@ corridor::ArrivalVerdict pendingShotVerdict(const PendingShotFinalize &snapshot,
       !brewWeightCutSettlesMachineOff(snapshot.endReason))
     return corridor::ArrivalVerdict{};
   return corridor::extendedVerdict(
-      corridor::arrivalVerdict(pendingCutParams(snapshot), pendingCutMs(snapshot),
-                               rateX100),
+      corridor::arrivalVerdict(pendingCutParams(snapshot), {pendingCutMs(snapshot), rateX100}),
       snapshot.extractionExtended, snapshot.slowExtractionExtended);
 }
 

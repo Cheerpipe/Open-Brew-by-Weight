@@ -7,7 +7,7 @@ int main() {
   assert(machineIntegrationTaskCount() == 0);
   assert(initializeMachineIntegration());
   publishMachineIntegrationNetworkState(true, false, false);
-  requestMachineIntegrationPresetTemperature(2, 7, 935);
+  requestMachineIntegrationPresetTemperature({2, 935}, 7);
   assert(machineIntegrationPhysicalStart() ==
          MachinePhysicalStartDisposition::NORMAL);
   assert(machineIntegrationBackflush().phase == MachineBackflushPhase::UNSUPPORTED);

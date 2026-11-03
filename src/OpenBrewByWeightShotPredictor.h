@@ -70,6 +70,7 @@ constexpr int32_t QP_GATE_MARGIN_MS = 500;
 constexpr int32_t RATE_STEP_RATIO_X100 = 150;  // 1.5x within 2 s
 constexpr int32_t RATE_STEP_WINDOW_MS = 2000;
 constexpr int32_t RATE_STEP_MIN_BASE_X100 = 100;  // ignore steps off tiny rates
+constexpr int32_t RAW_RATE_TOLERANCE_MS = 400;
 constexpr int32_t RECOVERY_NOTE_MS = 3000;
 
 // floor(sqrt(v)) for v >= 0, integer Newton (converges from above).
@@ -148,27 +149,21 @@ struct PredictorInputs {
 
 inline void armShotPredictor(ShotPredictor &p) { p = ShotPredictor{}; }
 
-// Raw rate ~ageMs behind now within tolerance; NO_RATE if none fits.
-// When atMs is given it receives the matched sample's time (for dt).
-inline int32_t rawRateAt(const corridor::RateEstimator &rate, int32_t nowMs,
-                         int32_t ageMs, int32_t toleranceMs,
-                         int32_t *atMs = nullptr) {
-  const int32_t target = nowMs - ageMs;
-  int32_t best = corridor::RateEstimator::NO_RATE;
+// The raw rate sample nearest targetMs within RAW_RATE_TOLERANCE_MS, with its
+// time (for dt); NO_RATE at 0 if none fits.
+inline corridor::RateSample rawRateAt(const corridor::RateEstimator &rate, int32_t targetMs) {
+  corridor::RateSample best{0, corridor::RateEstimator::NO_RATE};
   int32_t bestDist = INT32_MAX;
-  int32_t bestAt = 0;
   for (uint8_t age = 0; age < rate.count; ++age) {
     const uint8_t i = rate.index(age);
     if (rate.rawRateX100[i] == corridor::RateEstimator::NO_RATE) continue;
-    const int32_t d = rate.atMs[i] - target;
+    const int32_t d = rate.atMs[i] - targetMs;
     const int32_t dist = d < 0 ? -d : d;
-    if (dist <= toleranceMs && dist < bestDist) {
-      best = rate.rawRateX100[i];
-      bestAt = rate.atMs[i];
+    if (dist <= RAW_RATE_TOLERANCE_MS && dist < bestDist) {
+      best = {rate.atMs[i], rate.rawRateX100[i]};
       bestDist = dist;
     }
   }
-  if (atMs != nullptr) *atMs = bestAt;
   return best;
 }
 
@@ -182,7 +177,7 @@ inline int32_t sigmaWDg(const corridor::RateEstimator &rate) {
   if (n == 0) return 3;
   corridor::sortSmall(values, n);
   const int32_t med = corridor::medianOfSorted(values, n);
-  const int32_t mad = corridor::madOf(values, n, med);
+  const int32_t mad = corridor::madOf({values, n}, med);
   const int32_t s = static_cast<int32_t>(static_cast<int64_t>(mad) * 14826 / 10000);
   return s < 3 ? 3 : s;
 }
@@ -218,24 +213,28 @@ struct Forecast {
   bool censored = false;  // line never met before the wall (tMs = wall)
 };
 
-// One crossing forecast. basis 0 = mean (acceleration-aware), 1 = raw.
-// aX100 is the clamped acceleration in rateX100/s; aRawX100 unclamped.
-inline Forecast forecastBasis(const corridor::CorridorState &cut, int32_t nowMs,
-                              int32_t weightDg, int basis, int32_t aX100,
-                              int32_t aRawX100) {
+// Flow acceleration in rateX100/s: clamped, and unclamped (raw).
+struct Acceleration {
+  int32_t x100;
+  int32_t rawX100;
+};
+
+// One crossing forecast from the sample now. basis 0 = mean
+// (acceleration-aware), 1 = raw.
+inline Forecast forecastBasis(const corridor::CorridorState &cut, corridor::ShotSample now,
+                              int basis, Acceleration a) {
   const corridor::RateEstimator &rate = cut.rate;
   const corridor::Params &p = cut.params;
   Forecast out;
   if (!rate.valid || rate.rateX100 < corridor::MIN_PREDICTION_RATE_X100)
     return out;
   int32_t tPlain = 0;
-  if (!corridor::crossingMs(p, nowMs, weightDg, rate.rateX100, cut.tauMs,
-                            cut.offsetDg, tPlain))
+  if (!corridor::crossingMs(p, now, cut.lead(rate.rateX100), tPlain))
     return out;
   if (tPlain >= p.wallMs) {
     out.censored = true;
     out.tMs = p.wallMs;
-    out.sigmaMs = (p.wallMs - nowMs) / CENSORED_SIGMA_DIV;
+    out.sigmaMs = (p.wallMs - now.atMs) / CENSORED_SIGMA_DIV;
     return out;
   }
   int32_t qBasis = rate.rateX100;
@@ -245,65 +244,64 @@ inline Forecast forecastBasis(const corridor::CorridorState &cut, int32_t nowMs,
       p.fastBeforeMs <= tPlain &&
       (tPlain < p.slowAfterMs || (tPlain == p.slowAfterMs && p.slowRampMs > 0));
   const bool floorFlat = tPlain >= floorStart;
-  if (basis == 0 && aX100 != 0 && (goalFlat || floorFlat)) {
+  if (basis == 0 && a.x100 != 0 && (goalFlat || floorFlat)) {
     // Closed-form quadratic on the flat level: with qc = q + a*T_w/2 and
     // lead qc*tau, solve a*h^2 + 2000*qc*h - 2e8*D = 0 (h in ms; the mass
     // (qc/1e5)*h + (a/2e8)*h^2 is in dg, matching leadDg's scaling).
     const int32_t level = goalFlat ? p.goalDg : corridor::floorDg(p);
-    const int32_t qc = qBasis + aX100 * 3 / 2;  // a * T_w/2, T_w = 3 s
+    const int32_t qc = qBasis + a.x100 * 3 / 2;  // a * T_w/2, T_w = 3 s
     if (qc > 0) {
       const int64_t lead = static_cast<int64_t>(qc) * cut.tauMs / 100000;
-      const int64_t D = static_cast<int64_t>(level) - cut.offsetDg - weightDg - lead;
+      const int64_t D = static_cast<int64_t>(level) - cut.offsetDg - now.weightDg - lead;
       if (D <= 0) {
-        tStar = nowMs;
+        tStar = now.atMs;
         qBasis = qc;
       } else {
         const int64_t b = static_cast<int64_t>(qc) * 2000;
-        const int64_t disc = b * b + 800000000LL * aX100 * D;
+        const int64_t disc = b * b + 800000000LL * a.x100 * D;
         if (disc < 0) {
           // Decelerating past the level: the projection never arrives.
           out.censored = true;
           out.tMs = p.wallMs;
-          out.sigmaMs = (p.wallMs - nowMs) / CENSORED_SIGMA_DIV;
+          out.sigmaMs = (p.wallMs - now.atMs) / CENSORED_SIGMA_DIV;
           return out;
         }
         const int64_t root = isqrt64(disc);
-        const int64_t h = (root - b) / (2 * static_cast<int64_t>(aX100));
+        const int64_t h = (root - b) / (2 * static_cast<int64_t>(a.x100));
         const int32_t hMs = static_cast<int32_t>(
             h < 0 ? 0 : (h > 200000 ? 200000 : h));
-        tStar = nowMs + hMs;
+        tStar = now.atMs + hMs;
         qBasis = qc;
         if (tStar >= p.wallMs) {
           out.censored = true;
           out.tMs = p.wallMs;
-          out.sigmaMs = (p.wallMs - nowMs) / CENSORED_SIGMA_DIV;
+          out.sigmaMs = (p.wallMs - now.atMs) / CENSORED_SIGMA_DIV;
           return out;
         }
       }
     }
-  } else if (basis == 0 && aX100 != 0) {
+  } else if (basis == 0 && a.x100 != 0) {
     // Ramp landing: one capped-lever pass (q_eff = q + a*min(T_w/2+h0/2, cap)).
-    const int32_t h0 = tPlain - nowMs;
+    const int32_t h0 = tPlain - now.atMs;
     const int32_t lever = 1500 + h0 / 2 < LEVER_CAP_MS ? 1500 + h0 / 2
                                                        : LEVER_CAP_MS;
     const int32_t qEff = static_cast<int32_t>(std::min<int64_t>(
-        qBasis + static_cast<int64_t>(aX100) * lever / 1000, corridor::MAX_RATE_X100));
+        qBasis + static_cast<int64_t>(a.x100) * lever / 1000, corridor::MAX_RATE_X100));
     int32_t tEff = 0;
     if (qEff < corridor::MIN_PREDICTION_RATE_X100 ||
-        !corridor::crossingMs(p, nowMs, weightDg, qEff, cut.tauMs,
-                              cut.offsetDg, tEff) ||
+        !corridor::crossingMs(p, now, cut.lead(qEff), tEff) ||
         tEff >= p.wallMs) {
       // A deceleration that collapses the projected rate never arrives.
       out.censored = true;
       out.tMs = p.wallMs;
-      out.sigmaMs = (p.wallMs - nowMs) / CENSORED_SIGMA_DIV;
+      out.sigmaMs = (p.wallMs - now.atMs) / CENSORED_SIGMA_DIV;
       return out;
     }
     tStar = tEff;
     qBasis = qEff;
   }
   // sigma_t from the mass-variance identity, in dg^2 x100 then to ms.
-  const int32_t h = tStar > nowMs ? tStar - nowMs : 0;
+  const int32_t h = tStar > now.atMs ? tStar - now.atMs : 0;
   int32_t v = qBasis / 100 - cutLineSlopeDgS(p, tStar);  // dg/s
   if (v < V_FLOOR_DGPS) v = V_FLOOR_DGPS;  // only the magnitude matters
   const int32_t swDg = sigmaWDg(rate);
@@ -315,9 +313,9 @@ inline Forecast forecastBasis(const corridor::CorridorState &cut, int32_t nowMs,
   t100 += static_cast<int64_t>(SIGMA_DELTA_DGPS_X10) *
           SIGMA_DELTA_DGPS_X10 * h * h * h / 1000000000LL / 3;
   // Declining-flow bias (F3): a_raw [g/s^2] * h_s^2 / 2 in grams, i.e.
-  // aRawX100 * h_ms^2 / 2e8 in dg (x100 in the variance units).
-  if (aRawX100 < -20 && h > 0) {
-    const int64_t bias = -static_cast<int64_t>(aRawX100) * h * h / 200000000LL;
+  // a.rawX100 * h_ms^2 / 2e8 in dg (x100 in the variance units).
+  if (a.rawX100 < -20 && h > 0) {
+    const int64_t bias = -static_cast<int64_t>(a.rawX100) * h * h / 200000000LL;
     t100 += bias * bias * 100;
   }
   const int64_t sigma2Ms =
@@ -351,19 +349,18 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
     pr.guardOkSinceMs = static_cast<uint32_t>(now);
   }
   pr.prevWDg = in.weightDg;
-  int32_t rawOldAt = 0;
-  const int32_t rawOld = rawRateAt(rate, now, 1500, 400, &rawOldAt);
-  pr.aRawX100 = (rawOld == corridor::RateEstimator::NO_RATE || !rate.valid ||
-                 now - rawOldAt <= 0)
+  const corridor::RateSample rawOld = rawRateAt(rate, now - 1500);
+  pr.aRawX100 = (rawOld.rateX100 == corridor::RateEstimator::NO_RATE || !rate.valid ||
+                 now - rawOld.atMs <= 0)
                     ? 0
                     : static_cast<int32_t>(
-                          (static_cast<int64_t>(rate.rawX100 - rawOld) * 1000) /
-                          (now - rawOldAt));
+                          (static_cast<int64_t>(rate.rawX100 - rawOld.rateX100) * 1000) /
+                          (now - rawOld.atMs));
   pr.aX100 = pr.aRawX100 < A_CLAMP_LO_X100 ? A_CLAMP_LO_X100
             : pr.aRawX100 > A_CLAMP_HI_X100 ? A_CLAMP_HI_X100
                                             : pr.aRawX100;
   if (rate.valid) {
-    const int32_t q2 = rawRateAt(rate, now, RATE_STEP_WINDOW_MS, 400);
+    const int32_t q2 = rawRateAt(rate, now - RATE_STEP_WINDOW_MS).rateX100;
     if (q2 != corridor::RateEstimator::NO_RATE && q2 >= RATE_STEP_MIN_BASE_X100 &&
         rate.rawX100 >= static_cast<int64_t>(q2) * RATE_STEP_RATIO_X100 / 100)
       pr.lastStepAtMs = static_cast<uint32_t>(now);
@@ -395,7 +392,7 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
 
   // --- Forecast + prior fusion ---------------------------------------------
   const Forecast mean =
-      qOk ? forecastBasis(cut, now, in.weightDg, 0, pr.aX100, pr.aRawX100)
+      qOk ? forecastBasis(cut, {now, in.weightDg}, 0, {pr.aX100, pr.aRawX100})
           : Forecast{};
   const bool collapse = !qOk && plateau && pr.lowQSinceMs != 0 &&
                         now - pr.lowQSinceMs >= 3000;
@@ -408,7 +405,7 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
   pr.fcTms = !live.censored && live.tMs >= 0 && live.tMs < p.wallMs ? live.tMs : -1;
   (void)eta::smooth(pr.fcSmoother, eta::SmootherConfig{}, now, pr.fcTms, plateau,
                     in.sampleDtMs);
-  const Forecast red = qOk ? forecastBasis(cut, now, in.weightDg, 1, 0, 0)
+  const Forecast red = qOk ? forecastBasis(cut, {now, in.weightDg}, 1, {0, 0})
                            : Forecast{};
   const corridor::ArrivalStats &h = cut.history;
   int32_t tHat = live.tMs, sigmaF = live.sigmaMs;

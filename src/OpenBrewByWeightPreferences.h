@@ -186,17 +186,24 @@ inline NvsDiagnosticSnapshot captureNvsDiagnostics() {
   return snapshot;
 }
 
-inline void recordNvsFailure(NvsSubsystem subsystem, NvsOperation operation,
-                             int32_t errorCode, size_t requiredEntries = 0) {
+// One failed NVS operation: its error and, for a blob write, the entries it
+// needed.
+struct NvsFailure {
+  NvsOperation operation;
+  int32_t errorCode;
+  size_t requiredEntries = 0;
+};
+
+inline void recordNvsFailure(NvsSubsystem subsystem, const NvsFailure &failure) {
   const NvsDiagnosticSnapshot capacity = captureNvsDiagnostics();
   NvsFailureState &state = nvsFailureState();
   state.sequence.fetch_add(1, std::memory_order_acq_rel);
   state.subsystem.store(static_cast<uint8_t>(subsystem),
                         std::memory_order_relaxed);
-  state.operation.store(static_cast<uint8_t>(operation),
+  state.operation.store(static_cast<uint8_t>(failure.operation),
                         std::memory_order_relaxed);
-  state.errorCode.store(errorCode, std::memory_order_relaxed);
-  state.requiredEntries.store(requiredEntries, std::memory_order_relaxed);
+  state.errorCode.store(failure.errorCode, std::memory_order_relaxed);
+  state.requiredEntries.store(failure.requiredEntries, std::memory_order_relaxed);
   state.availableEntries.store(capacity.availableEntries,
                                std::memory_order_relaxed);
   state.count.fetch_add(1, std::memory_order_relaxed);
@@ -223,12 +230,12 @@ class OpenBrewByWeightPreferences {
 #if defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
     (void)partitionLabel;
     const bool opened = preferences_.begin(name, readOnly);
-    if (!opened) recordNvsFailure(subsystem_, NvsOperation::OPEN, HOST_NVS_ERROR);
+    if (!opened) recordNvsFailure(subsystem_, {NvsOperation::OPEN, HOST_NVS_ERROR});
     return opened;
 #else
     if (started_) {
-      recordNvsFailure(subsystem_, NvsOperation::OPEN,
-                       ESP_ERR_NVS_INVALID_HANDLE);
+      recordNvsFailure(subsystem_,
+                       {NvsOperation::OPEN, ESP_ERR_NVS_INVALID_HANDLE});
       return false;
     }
     readOnly_ = readOnly;
@@ -245,7 +252,7 @@ class OpenBrewByWeightPreferences {
     }
     if (error != ESP_OK) {
       if (!(readOnly && error == ESP_ERR_NVS_NOT_FOUND)) {
-        recordNvsFailure(subsystem_, NvsOperation::OPEN, error);
+        recordNvsFailure(subsystem_, {NvsOperation::OPEN, error});
       }
       return false;
     }
@@ -272,7 +279,7 @@ class OpenBrewByWeightPreferences {
     const esp_err_t error = nvs_get_blob(handle_, key, nullptr, &length);
     if (error == ESP_OK) return length;
     if (error != ESP_ERR_NVS_NOT_FOUND) {
-      recordNvsFailure(subsystem_, NvsOperation::READ_BLOB, error);
+      recordNvsFailure(subsystem_, {NvsOperation::READ_BLOB, error});
     }
     return 0;
 #endif
@@ -287,7 +294,7 @@ class OpenBrewByWeightPreferences {
     const esp_err_t error = nvs_get_blob(handle_, key, value, &length);
     if (error == ESP_OK) return length;
     if (error != ESP_ERR_NVS_NOT_FOUND) {
-      recordNvsFailure(subsystem_, NvsOperation::READ_BLOB, error);
+      recordNvsFailure(subsystem_, {NvsOperation::READ_BLOB, error});
     }
     return 0;
 #endif
@@ -302,7 +309,7 @@ class OpenBrewByWeightPreferences {
     const esp_err_t error = nvs_get_blob(handle_, key, nullptr, &length);
     if (error == ESP_OK) return true;
     if (error != ESP_ERR_NVS_NOT_FOUND) {
-      recordNvsFailure(subsystem_, NvsOperation::READ_BLOB, error);
+      recordNvsFailure(subsystem_, {NvsOperation::READ_BLOB, error});
     }
     return false;
 #endif
@@ -316,23 +323,23 @@ class OpenBrewByWeightPreferences {
       const int32_t error = persistence_host::lastOperationError == 0
                                 ? HOST_NVS_ERROR
                                 : persistence_host::lastOperationError;
-      recordNvsFailure(subsystem_, NvsOperation::WRITE_BLOB, error, required);
+      recordNvsFailure(subsystem_, {NvsOperation::WRITE_BLOB, error, required});
     }
     return written;
 #else
     if (!started_ || key == nullptr || value == nullptr || readOnly_) {
-      recordNvsFailure(subsystem_, NvsOperation::WRITE_BLOB,
-                       ESP_ERR_NVS_INVALID_HANDLE, required);
+      recordNvsFailure(subsystem_, {NvsOperation::WRITE_BLOB,
+                                    ESP_ERR_NVS_INVALID_HANDLE, required});
       return 0;
     }
     esp_err_t error = nvs_set_blob(handle_, key, value, length);
     if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, NvsOperation::WRITE_BLOB, error, required);
+      recordNvsFailure(subsystem_, {NvsOperation::WRITE_BLOB, error, required});
       return 0;
     }
     error = nvs_commit(handle_);
     if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, NvsOperation::COMMIT, error, required);
+      recordNvsFailure(subsystem_, {NvsOperation::COMMIT, error, required});
       return 0;
     }
     return length;
@@ -342,22 +349,22 @@ class OpenBrewByWeightPreferences {
   bool remove(const char *key) {
 #if defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
     const bool removed = preferences_.remove(key);
-    if (!removed) recordNvsFailure(subsystem_, NvsOperation::REMOVE, HOST_NVS_ERROR);
+    if (!removed) recordNvsFailure(subsystem_, {NvsOperation::REMOVE, HOST_NVS_ERROR});
     return removed;
 #else
     if (!started_ || key == nullptr || readOnly_) {
-      recordNvsFailure(subsystem_, NvsOperation::REMOVE,
-                       ESP_ERR_NVS_INVALID_HANDLE);
+      recordNvsFailure(subsystem_,
+                       {NvsOperation::REMOVE, ESP_ERR_NVS_INVALID_HANDLE});
       return false;
     }
     esp_err_t error = nvs_erase_key(handle_, key);
     if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, NvsOperation::REMOVE, error);
+      recordNvsFailure(subsystem_, {NvsOperation::REMOVE, error});
       return false;
     }
     error = nvs_commit(handle_);
     if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, NvsOperation::COMMIT, error);
+      recordNvsFailure(subsystem_, {NvsOperation::COMMIT, error});
       return false;
     }
     return true;
@@ -367,22 +374,22 @@ class OpenBrewByWeightPreferences {
   bool clear() {
 #if defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
     const bool cleared = preferences_.clear();
-    if (!cleared) recordNvsFailure(subsystem_, NvsOperation::CLEAR, HOST_NVS_ERROR);
+    if (!cleared) recordNvsFailure(subsystem_, {NvsOperation::CLEAR, HOST_NVS_ERROR});
     return cleared;
 #else
     if (!started_ || readOnly_) {
-      recordNvsFailure(subsystem_, NvsOperation::CLEAR,
-                       ESP_ERR_NVS_INVALID_HANDLE);
+      recordNvsFailure(subsystem_,
+                       {NvsOperation::CLEAR, ESP_ERR_NVS_INVALID_HANDLE});
       return false;
     }
     esp_err_t error = nvs_erase_all(handle_);
     if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, NvsOperation::CLEAR, error);
+      recordNvsFailure(subsystem_, {NvsOperation::CLEAR, error});
       return false;
     }
     error = nvs_commit(handle_);
     if (error != ESP_OK) {
-      recordNvsFailure(subsystem_, NvsOperation::COMMIT, error);
+      recordNvsFailure(subsystem_, {NvsOperation::COMMIT, error});
       return false;
     }
     return true;

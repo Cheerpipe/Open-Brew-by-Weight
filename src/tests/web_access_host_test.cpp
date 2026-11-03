@@ -286,11 +286,11 @@ void ifNoneMatchAcceptsWeakAndListedTags() {
   for (const char *header : {"\"1.2.3.0abc1234\"", "W/\"1.2.3.0abc1234\"",
                              "\"old\", \"1.2.3.0abc1234\"", "\"old\",W/\"1.2.3.0abc1234\"",
                              "W/\"1.2.3.0abc1234\", \"other\""}) {
-    assert(ifNoneMatchContains(header, etag));
+    assert(IfNoneMatch{header}.contains(etag));
   }
   for (const char *header : {"", "\"1.2.3.0abc1234-gzip\"", "\"1.2.3.0abc123\"",
                              "1.2.3.0abc1234", "W/", "\"old\", \"older\""}) {
-    assert(!ifNoneMatchContains(header, etag));
+    assert(!IfNoneMatch{header}.contains(etag));
   }
 }
 

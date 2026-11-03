@@ -1870,9 +1870,8 @@ void r05_regression_uses_last_ten_valid_samples() {
   int32_t shotMs = 0;
   CHECK(shotTimeAtMs(session.lastAcceptedWeightAtMs, shotMs));
   int32_t crossing = 0;
-  CHECK(corridor::crossingMs(cut.params, shotMs, gramsToDg(weight),
-                             cut.rate.rateX100, cut.tauMs, cut.offsetDg,
-                             crossing));
+  CHECK(corridor::crossingMs(cut.params, {shotMs, gramsToDg(weight)},
+                             cut.lead(cut.rate.rateX100), crossing));
   CHECK(fabsf(shot.expectedEndS - crossing / 1000.0f) < 0.001f);
   // A falling stream has no rate: no prediction.
   for (unsigned i = 0; i < 40; ++i) {
@@ -13663,7 +13662,7 @@ void s01p_bad_cycles_never_train_and_no_scale_keeps_its_rule() {
   shotLog.clear(false);
   ShotPreset &preset = mutableActiveShotPreset(presetBank);
   const uint32_t generation = getScaleLinkSnapshot().connectionGeneration;
-  armQuickStart(bbwQuickStart, presetBank, preset.id, preset.bbwEwmaOffsetG, 1);
+  armQuickStart(bbwQuickStart, presetBank, preset.id, {preset.bbwEwmaOffsetG, 1});
   const auto quick = [&] { return quickStartEntry(bbwQuickStart, presetBank, preset.id, false)->count; };
   const auto finalize = [&](uint16_t durationDs, float finalG) -> ShotLogRecord {
     preparePendingBbwForTest();
@@ -20723,18 +20722,18 @@ void sp04_forecast_constant_rate_matches_analytic() {
   corridor::CorridorState cut = spArmed();
   const int32_t qX100 = 1900;  // 1.9 g/s
   for (int t = 6000; t <= 10000; t += 100)
-    CHECK(cut.rate.push(t, 500 + (t - 6000) / 10 * 19 / 10) ==
+    CHECK(cut.rate.push({t, 500 + (t - 6000) / 10 * 19 / 10}) ==
           corridor::RateEstimator::Result::ACCEPTED);
   CHECK(cut.rate.valid);
   const int32_t w = 1256;  // dg at t = 10000
-  const predictor::Forecast f = predictor::forecastBasis(cut, 10000, w, 1, 0, 0);
+  const predictor::Forecast f = predictor::forecastBasis(cut, {10000, w}, 1, {0, 0});
   CHECK(!f.censored && f.tMs > 0);
   // Analytic: (goal - offset - W - lead)/q + now, lead = q*tau/1e5 dg.
   const int32_t lead = static_cast<int32_t>(static_cast<int64_t>(qX100) * 650 / 100000);
   const double qcDgps = qX100 / 100.0;
   const double expectS = 10000 + (360.0 - 15.0 - w - lead) / qcDgps;
   CHECK(f.tMs > expectS - 60 && f.tMs < expectS + 60);
-  const predictor::Forecast m = predictor::forecastBasis(cut, 10000, w, 0, 0, 0);
+  const predictor::Forecast m = predictor::forecastBasis(cut, {10000, w}, 0, {0, 0});
   CHECK(m.tMs == f.tMs);  // a = 0: mean basis equals raw
   CHECK(m.sigmaMs > 0 && m.sigmaMs < 20000);
 }
@@ -20747,7 +20746,7 @@ void sp05_quadratic_matches_reference() {
     w += q / 1000.0;  // rateX100 -> dg per 100 ms
     q += 10;          // +100 rateX100 per second
     if (t >= 9000)
-      CHECK(cut.rate.push(t, static_cast<int32_t>(w)) ==
+      CHECK(cut.rate.push({t, static_cast<int32_t>(w)}) ==
             corridor::RateEstimator::Result::ACCEPTED);
   }
   CHECK(cut.rate.valid);
@@ -20761,7 +20760,7 @@ void sp05_quadratic_matches_reference() {
   const double plain = now + (360.0 - 15.0 - wDg - qhat * 0.65) / qhat * 1000;
   CHECK(plain >= 27000 && plain <= 36000);
   const predictor::Forecast f =
-      predictor::forecastBasis(cut, now, wDg, 0, 100, 100);
+      predictor::forecastBasis(cut, {now, wDg}, 0, {100, 100});
   CHECK(!f.censored);
   CHECK(f.tMs > now + h * 1000 - 150 && f.tMs < now + h * 1000 + 150);
 }
@@ -20770,15 +20769,15 @@ void sp06_sigma_finite_at_extremes() {
   corridor::CorridorState cut = spArmed();
   cut.params.wallMs = 50000;
   for (int t = 6000; t <= 10000; t += 100)
-    CHECK(cut.rate.push(t, 20 + (t - 6000) * 6 / 1000) ==  // 0.6 g/s = 6 dg/s
+    CHECK(cut.rate.push({t, 20 + (t - 6000) * 6 / 1000}) ==  // 0.6 g/s = 6 dg/s
           corridor::RateEstimator::Result::ACCEPTED);
   // 6 g in the cup at 0.6 g/s: the goal is unreachable before the wall.
   const predictor::Forecast f =
-      predictor::forecastBasis(cut, 10000, 60, 1, 0, 0);
+      predictor::forecastBasis(cut, {10000, 60}, 1, {0, 0});
   CHECK(f.censored);
   CHECK(f.sigmaMs == (50000 - 10000) / 4);
   const predictor::Forecast m =
-      predictor::forecastBasis(cut, 10000, 60, 0, 150, 150);
+      predictor::forecastBasis(cut, {10000, 60}, 0, {150, 150});
   CHECK(m.censored || (m.sigmaMs > 0 && m.sigmaMs <= 20000));
 }
 
@@ -20805,7 +20804,7 @@ void spReplay(corridor::CorridorState &cut, predictor::ShotPredictor &pr,
               int (*wAt)(int), predictor::PredictorInputs &in, int tEnd) {
   for (int t = 5000; t <= tEnd; t += 100) {
     const int32_t w = wAt(t);
-    if (cut.rate.push(t, w) != corridor::RateEstimator::Result::ACCEPTED)
+    if (cut.rate.push({t, w}) != corridor::RateEstimator::Result::ACCEPTED)
       continue;
     in.nowMs = t;
     in.weightDg = w;
@@ -20849,7 +20848,7 @@ void sp08_stall_without_history_stays_neutral() {
   const int stallW0 = spGreenW(12000);
   for (int t = 12100; t <= 30000; t += 100) {  // ...then a hard stall
     const int32_t w = stallW0 + (t - 12000) * 42 / 100000;
-    CHECK(cut.rate.push(t, w) == corridor::RateEstimator::Result::ACCEPTED);
+    CHECK(cut.rate.push({t, w}) == corridor::RateEstimator::Result::ACCEPTED);
     in.nowMs = t;
     in.weightDg = w;
     in.firstDropMs = 5200;
@@ -20870,7 +20869,7 @@ void sp08_stall_without_history_stays_neutral() {
   spReplay(cut2, pr2, spGreenW, in2, 12000);
   for (int t = 12100; t <= 30000; t += 100) {
     const int32_t w = stallW0 + (t - 12000) * 42 / 100000;
-    CHECK(cut2.rate.push(t, w) == corridor::RateEstimator::Result::ACCEPTED);
+    CHECK(cut2.rate.push({t, w}) == corridor::RateEstimator::Result::ACCEPTED);
     in2.nowMs = t;
     in2.weightDg = w;
     in2.firstDropMs = 5200;
@@ -20899,7 +20898,7 @@ void sp09_transient_spike_does_not_flip_fast() {
   const ShotTint before = pr.tintClass;
   for (int t = 20100; t <= 22000; t += 100) {
     const int32_t w = spGreenW(t) + (t == 20200 ? 80 : 0);  // one 8 g spike
-    cut.rate.push(t, w);
+    cut.rate.push({t, w});
     in.nowMs = t;
     in.weightDg = w;
     in.firstDropMs = 5200;
@@ -20927,7 +20926,7 @@ void sp10_blend_monotone_within_class() {
   bool full = false;
   for (int t = 5000; t <= 30000; t += 100) {
     const int32_t w = spGreenW(t);
-    if (cut.rate.push(t, w) != corridor::RateEstimator::Result::ACCEPTED)
+    if (cut.rate.push({t, w}) != corridor::RateEstimator::Result::ACCEPTED)
       continue;
     in.nowMs = t;
     in.weightDg = w;
@@ -20958,7 +20957,7 @@ void sp11_disturbance_guard_fades_to_neutral() {
   const int w = spGreenW(24000);
   for (int t = 24100; t <= 26500; t += 100) {  // scale drops 2 g mid-shot
     const int32_t bad = w + (t - 24000) * 19 / 1000 - 200;
-    (void)cut.rate.push(t, bad);  // MAD may reject; either way the guard sees it
+    (void)cut.rate.push({t, bad});  // MAD may reject; either way the guard sees it
     in.nowMs = t;
     in.weightDg = bad;
     in.firstDropMs = 5200;
@@ -20986,13 +20985,13 @@ void sp12_forecast_latch_tracks_the_accelerated_crossing() {
   CHECK(pr.fcTms > 15000);
   CHECK(pr.fcTms < 36000);
   int32_t linear = 0;
-  CHECK(corridor::crossingMs(cut.params, 15000, spGreenW(15000), cut.rate.rateX100,
-                             cut.tauMs, cut.offsetDg, linear));
+  CHECK(corridor::crossingMs(cut.params, {15000, spGreenW(15000)}, cut.lead(cut.rate.rateX100),
+                             linear));
   CHECK(pr.fcTms < linear);  // the ramp's acceleration pulls the arrival in
   const int stallW0 = spGreenW(15000);
   for (int t = 15100; t <= 25000; t += 100) {  // then a hard stall
     const int32_t w = stallW0 + (t - 15000) * 42 / 100000;
-    CHECK(cut.rate.push(t, w) == corridor::RateEstimator::Result::ACCEPTED);
+    CHECK(cut.rate.push({t, w}) == corridor::RateEstimator::Result::ACCEPTED);
     in.nowMs = t;
     in.weightDg = w;
     in.firstDropMs = 5200;
@@ -21018,7 +21017,7 @@ void sp13_display_forecast_waits_for_plateau_and_meets_the_raw_one() {
   int32_t lastRaw = -1, lastShown = -1;
   for (int t = 5000; t <= 27000; t += 100) {  // this shape crosses at ~27.5 s
     const int32_t w = spGreenW(t);
-    if (cut.rate.push(t, w) != corridor::RateEstimator::Result::ACCEPTED) continue;
+    if (cut.rate.push({t, w}) != corridor::RateEstimator::Result::ACCEPTED) continue;
     in.nowMs = t;
     in.weightDg = w;
     in.firstDropMs = 5200;
@@ -21275,7 +21274,7 @@ void fw06_status_carries_recent_drips_and_markers() {
     CHECK(shotLog.append(record, false));
   }
   shotStoreDirtyGeneration.fetch_add(1, std::memory_order_release);
-  armQuickStart(bbwQuickStart, presetBank, preset.id, 1.2f, setAtId);
+  armQuickStart(bbwQuickStart, presetBank, preset.id, {1.2f, setAtId});
   publishControlStatus();
   ControlStatusSnapshot status;
   copyControlStatus(status);
@@ -21302,7 +21301,7 @@ void fw06_status_carries_recent_drips_and_markers() {
 void fw07_quick_start_save_retries_and_reports_once() {
   resetHarness(false, true);
   reachReadyFromBoot();
-  armQuickStart(bbwQuickStart, presetBank, presetBank.activeId, 0.5f, 7);
+  armQuickStart(bbwQuickStart, presetBank, presetBank.activeId, {0.5f, 7});
   stageBbwQuickStart();
   hostQuickStartSaveSucceeds = false;
   debugLog.clear();
@@ -23065,14 +23064,13 @@ void eq01_live_cut_equals_kernel_replay() {
     for (const auto &k : samples) {
       const int32_t t = k.first, w = k.second;
       if (t < armed.params.delayMs) {
-        rate.push(t, w);
+        rate.push({t, w});
         continue;
       }
       int32_t star = INT32_MAX;
-      if (rate.push(t, w) == corridor::RateEstimator::Result::ACCEPTED && rate.valid) {
+      if (rate.push({t, w}) == corridor::RateEstimator::Result::ACCEPTED && rate.valid) {
         int32_t crossing = 0;
-        if (corridor::crossingMs(armed.params, t, w, rate.rateX100, armed.tauMs,
-                                 armed.offsetDg, crossing) &&
+        if (corridor::crossingMs(armed.params, {t, w}, armed.lead(rate.rateX100), crossing) &&
             crossing < armed.params.wallMs)
           star = crossing;
       }

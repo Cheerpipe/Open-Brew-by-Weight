@@ -103,8 +103,9 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   int16_t jumpCg = -1;
   if (!stepConfirmed &&
       observeQuickStart(bbwQuickStart, presetBank, preset->id,
-                        static_cast<int16_t>(lroundf(observation * 100.0f)),
-                        shotStatisticsEpochNow(), jumpCg)) {
+                        {static_cast<int16_t>(lroundf(observation * 100.0f)),
+                         shotStatisticsEpochNow()},
+                        jumpCg)) {
     if (jumpCg >= 0) updatedOffset = jumpCg / 100.0f;
     stageBbwQuickStart();
   }

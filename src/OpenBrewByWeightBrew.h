@@ -117,7 +117,7 @@ void updateCutPrediction(WeightSample sample) {
   cut.crossingValid = false;
   const int32_t weightDg = gramsToDg(sample.weightG);
   if (!shotTimeAtMs(sample.atMs, shotMs) ||
-      cut.rate.push(shotMs, weightDg) !=
+      cut.rate.push({shotMs, weightDg}) !=
           corridor::RateEstimator::Result::ACCEPTED ||
       !cut.rate.valid) {
     return;
@@ -128,9 +128,8 @@ void updateCutPrediction(WeightSample sample) {
     addDebugEvent(DebugCategory::SCALE, DebugCode::CHANNELING_DETECTED,
                   cut.rate.rawX100, shotMs);
   }
-  cut.crossingValid = corridor::crossingMs(cut.params, shotMs, weightDg,
-                                          cut.rate.rateX100, cut.tauMs,
-                                          cut.offsetDg, cut.crossingMs);
+  cut.crossingValid = corridor::crossingMs(cut.params, {shotMs, weightDg},
+                                          cut.lead(cut.rate.rateX100), cut.crossingMs);
   if (cut.crossingValid && cut.crossingMs < cut.params.wallMs) {
     shot.expectedEndS = static_cast<float>(cut.crossingMs) / 1000.0f;
   }
@@ -543,8 +542,7 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
   if (timed && !overload)
     noteExtension(shotMs,
                   corridor::targetCutDue(cut.params, weightDg,
-                                         cut.rate.valid ? cut.rate.rateX100 : 0,
-                                         cut.tauMs, cut.offsetDg),
+                                         cut.lead(cut.rate.valid ? cut.rate.rateX100 : 0)),
                   receivedAtMs, weightDg);
   const bool overThreshold = timed && weightDg >= corridor::backstopThresholdDg(
                                            session.cut.params, shotMs, session.cut.offsetDg);

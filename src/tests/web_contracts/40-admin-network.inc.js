@@ -20,9 +20,9 @@
         'Save machine must send only machine fields; Date & time has its own payload and dirty flag');
   }
 }
-if (firmware.indexOf('publishLogLevels(serialLogLevelFromRuntime(runtimeConfig)',
+if (firmware.indexOf('publishLogLevels(runtimeConfig)',
                      firmware.indexOf('persistenceReady = EEPROM.begin')) < 0 ||
-    firmware.indexOf('publishLogLevels(serialLogLevelFromRuntime(runtimeConfig)',
+    firmware.indexOf('publishLogLevels(runtimeConfig)',
                      firmware.indexOf('persistenceReady = EEPROM.begin')) >
         firmware.indexOf('BOOT_RESET_REASON') ||
     !codeIncludes(ui, "const LOG_LEVELS=['serialLogLevel','ringRetainLogLevel']") ||

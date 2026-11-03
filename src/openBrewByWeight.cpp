@@ -875,7 +875,9 @@ LogLevel currentRingRetainLogLevel() {
   return level;
 }
 
-void publishLogLevels(LogLevel serialLevel, LogLevel ringLevel) {
+void publishLogLevels(const RuntimeConfig &config) {
+  LogLevel serialLevel = serialLogLevelFromRuntime(config);
+  LogLevel ringLevel = static_cast<LogLevel>(config.ringRetainLogLevel);
   __atomic_store(&ringRetainLogLevel, &ringLevel, __ATOMIC_RELEASE);
   __atomic_store(&serialLogLevel, &serialLevel, __ATOMIC_RELEASE);
 }
@@ -1128,8 +1130,8 @@ RuntimeConfig effectiveRuntimeConfig() {
 
 void requestActivePresetMachineTemperature() {
   const ShotPreset &preset = activeShotPreset(presetBank);
-  requestMachineIntegrationPresetTemperature(
-      preset.id, runtimeConfig.revision, preset.lineaMicraBrewTargetDeciC);
+  requestMachineIntegrationPresetTemperature({preset.id, preset.lineaMicraBrewTargetDeciC},
+                                             runtimeConfig.revision);
 }
 
 bool scaleAvailable() {

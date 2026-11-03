@@ -42,8 +42,8 @@ uint32_t shotStatisticsEpochNow() {
 // Quick starts the preset from its current drip; a drip the owner set marks
 // the shot history from the next record on.
 void armBbwQuickStart(const ShotPreset &preset, bool userSet) {
-  armQuickStart(bbwQuickStart, presetBank, preset.id, preset.bbwEwmaOffsetG,
-                userSet ? shotStatisticsEpochNow() : 0);
+  armQuickStart(bbwQuickStart, presetBank, preset.id,
+                {preset.bbwEwmaOffsetG, userSet ? shotStatisticsEpochNow() : 0});
   stageBbwQuickStart();
 }
 

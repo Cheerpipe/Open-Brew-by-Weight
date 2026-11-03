@@ -106,8 +106,8 @@ class ShotLog
   // Caller holds the store mutex.
   corridor::FirstDropStats firstDropStats(const ShotPreset &preset,
                                           bool otherPresets = false) const {
-    return corridor::firstDropStatsOf(store_.header.count, arrivalRows(), preset.id,
-                                      preset.learningEpoch, otherPresets);
+    return corridor::firstDropStatsOf(store_.header.count, arrivalRows(), statsScope(preset),
+                                      otherPresets);
   }
 
   // The integration's ten-shot aggregate. Caller holds the store mutex.

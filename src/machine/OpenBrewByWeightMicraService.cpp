@@ -2199,7 +2199,7 @@ bool OpenBrewByWeightMicraService::registerInstallation(
   if (!ensureIoBuffer()) return false;
   const bool ok =
       request(settings, kRegisterUrl, HTTP_METHOD_POST, nullptr, false,
-              "register_installation", "/auth/init", true);
+              {"register_installation", "/auth/init"}, true);
   releaseIoBuffer();
   return ok;
 }
@@ -2226,7 +2226,7 @@ bool OpenBrewByWeightMicraService::signIn(
     return false;
   }
   if (!request(settings, kSignInUrl, HTTP_METHOD_POST, io_->body, false,
-               "sign_in", "/auth/signin")) {
+               {"sign_in", "/auth/signin"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2267,7 +2267,7 @@ bool OpenBrewByWeightMicraService::refreshToken(
     return false;
   }
   if (!request(settings, kRefreshUrl, HTTP_METHOD_POST, io_->body, false,
-               "refresh_token", "/auth/refreshtoken")) {
+               {"refresh_token", "/auth/refreshtoken"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2296,7 +2296,7 @@ bool OpenBrewByWeightMicraService::listMachines(
     LineaMicraDiscoverySnapshot &result) {
   if (!ensureIoBuffer()) return false;
   if (!request(settings, kThingsUrl, HTTP_METHOD_GET, nullptr, true,
-               "list_machines", "/things")) {
+               {"list_machines", "/things"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2353,7 +2353,7 @@ bool OpenBrewByWeightMicraService::readDashboard(
                               kApiRoot, settings.selectedSerial);
   if (length <= 0 || static_cast<size_t>(length) >= sizeof(url) ||
       !request(settings, url, HTTP_METHOD_GET, nullptr, true,
-               "read_dashboard", "/things/{serial}/dashboard")) {
+               {"read_dashboard", "/things/{serial}/dashboard"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2419,9 +2419,9 @@ bool OpenBrewByWeightMicraService::writeTemperature(
                   bodyLength > 0 &&
                   static_cast<size_t>(bodyLength) < sizeof(io_->body) &&
                   request(settings, url, HTTP_METHOD_POST, io_->body, true,
-                          "set_boiler_temperature",
-                          "/things/{serial}/command/"
-                          "CoffeeMachineSettingCoffeeBoilerTargetTemperature");
+                          {"set_boiler_temperature",
+                           "/things/{serial}/command/"
+                           "CoffeeMachineSettingCoffeeBoilerTargetTemperature"});
   const bool accepted =
       ok || (work_->transportStatus == ESP_OK && work_->httpStatus >= 200 &&
              work_->httpStatus < 300);
@@ -2443,8 +2443,9 @@ bool OpenBrewByWeightMicraService::writeStandby(
   const bool ok = urlLength > 0 &&
                   static_cast<size_t>(urlLength) < sizeof(url) &&
                   request(settings, url, HTTP_METHOD_POST,
-                          "{\"mode\":\"StandBy\"}", true, "set_standby",
-                          "/things/{serial}/command/CoffeeMachineChangeMode");
+                          "{\"mode\":\"StandBy\"}", true,
+                          {"set_standby",
+                           "/things/{serial}/command/CoffeeMachineChangeMode"});
   releaseIoBuffer();
   return ok;
 }
@@ -2463,8 +2464,9 @@ bool OpenBrewByWeightMicraService::writePowerOn(
   const bool ok = urlLength > 0 &&
                   static_cast<size_t>(urlLength) < sizeof(url) &&
                   request(settings, url, HTTP_METHOD_POST,
-                          "{\"mode\":\"BrewingMode\"}", true, "set_power_on",
-                          "/things/{serial}/command/CoffeeMachineChangeMode");
+                          "{\"mode\":\"BrewingMode\"}", true,
+                          {"set_power_on",
+                           "/things/{serial}/command/CoffeeMachineChangeMode"});
   releaseIoBuffer();
   return ok;
 }
@@ -2542,9 +2544,9 @@ bool OpenBrewByWeightMicraService::applySignedHeaders(
 bool OpenBrewByWeightMicraService::request(
     const LineaMicraPersistedSettings &settings, const char *url,
     esp_http_client_method_t method, const char *body, bool authenticated,
-    const char *purpose, const char *endpoint, bool installationInit) {
+    CloudCall call, bool installationInit) {
   pendingCloudCall_ = {};
-  pendingCloudCall_.api = purpose;
+  pendingCloudCall_.api = call.purpose;
   pendingCloudCall_.method = method == HTTP_METHOD_POST ? "POST" : "GET";
   pendingCloudCall_.startedAtMs = millis();
   const time_t now = time(nullptr);
@@ -2684,7 +2686,7 @@ bool OpenBrewByWeightMicraService::request(
   serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                        "Micra HTTP start id=%lu %s %s",
                        static_cast<unsigned long>(pendingCloudCall_.startedAtMs),
-                       method == HTTP_METHOD_POST ? "POST" : "GET", endpoint);
+                       method == HTTP_METHOD_POST ? "POST" : "GET", call.endpoint);
   esp_err_t performed = ESP_ERR_HTTP_EAGAIN;
   bool canceled = false;
   while (performed == ESP_ERR_HTTP_EAGAIN) {
