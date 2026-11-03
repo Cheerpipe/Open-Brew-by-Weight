@@ -146,7 +146,7 @@ uint32_t OpenBrewByWeightNetwork::webUiOverrideRemainingMs(httpd_req_t *request)
       strcmp(activeWebUiClientId_, clientId) == 0 &&
       (caller.relayed ? companionPrincipalHolds(webUiOverride_, caller)
                       : !webUiOverride_.relayed)) {
-    if (static_cast<int32_t>(now - webUiOverrideUntilMs_) >= 0) {
+    if (tickReached(now, webUiOverrideUntilMs_)) {
       webUiOverrideActive_ = false;
       webUiOverrideUntilMs_ = 0;
       webUiOverride_ = CompanionPrincipal{};
@@ -259,7 +259,7 @@ bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {
   dataMux_.lock();
   apActive = status_.apActive;
   if (hasClient && adminUnlocked_ && companionPrincipalHolds(adminUnlock_, caller)) {
-    if (static_cast<int32_t>(now - adminUnlockUntilMs_) >= 0) {
+    if (tickReached(now, adminUnlockUntilMs_)) {
       adminUnlocked_ = false;
       adminUnlock_ = CompanionPrincipal{};
       adminUnlockUntilMs_ = 0;
@@ -276,6 +276,7 @@ bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {
 }
 
 bool OpenBrewByWeightNetwork::requireAdminUnlock(httpd_req_t *request) {
+  // cppcheck-suppress knownConditionTrueFalse ; development builds make admin public by design: adminUnlockAllowed() returns true
   if (!adminUnlockAllowed(request)) {
     // Field diagnosis reads the Web UI log: one line per quiet window.
     static RefusalLog refusals;

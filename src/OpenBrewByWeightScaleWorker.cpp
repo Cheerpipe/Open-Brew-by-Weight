@@ -846,7 +846,7 @@ bool publishScaleEvent(const ScaleEvent &event, bool critical) {
     if (currentScaleWorkerPolicy().controlReady &&
         scaleLinkState == ScaleLinkState::CONNECTED &&
         lastScaleWeightAtMs != 0 &&
-        static_cast<int32_t>(stamped.receivedAtMs - lastScaleWeightAtMs) > 0) {
+        tickAfter(stamped.receivedAtMs, lastScaleWeightAtMs)) {
       const uint32_t dt = stamped.receivedAtMs - lastScaleWeightAtMs;
       if (dt > SCALE_STREAM_GAP_MS) {
         ++scalePacketGaps;
@@ -1109,7 +1109,7 @@ bool approveScaleWrite(void *context, uint32_t &captureBoundary) {
     captureBoundary = scale.notificationSequence();
     write.event.captureSequence = captureBoundary;
     if (write.command.idleTareRequestId != 0) {
-      if (static_cast<int32_t>(millis() - write.command.expiresAtMs) >= 0) {
+      if (tickReached(millis(), write.command.expiresAtMs)) {
         finishIdleScaleTare(write.command.idleTareRequestId, false, IdleTareReason::EXPIRED);
         return false;
       }
@@ -1874,7 +1874,7 @@ ScaleMacCacheMode currentScaleMacCacheMode() {
 
 bool scaleHuntRfClearActive(uint32_t nowMs = millis()) {
   return scaleHuntRfUntilMs != 0 &&
-         static_cast<int32_t>(nowMs - scaleHuntRfUntilMs) < 0;
+         tickBefore(nowMs, scaleHuntRfUntilMs);
 }
 
 void armScaleHuntRfClear() {
@@ -1917,7 +1917,7 @@ void notePreferredScale(const char *mac, const char *name) {
   scalePreferredMacDirty = true;
   const uint32_t pauseUntil = scaleDiscoveryPausedUntilMs;
   const bool paused = pauseUntil != 0 &&
-      static_cast<int32_t>(pauseUntil - millis()) > 0;
+      tickAfter(pauseUntil, millis());
   if (cacheMode == ScaleMacCacheMode::FIRST || paused) {
     scalePreferredMacMux.unlock();
     return;

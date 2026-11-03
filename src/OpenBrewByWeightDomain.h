@@ -2294,7 +2294,7 @@ class DebugRingBuffer {
   uint32_t latestAlarmSequence() const { return alarmSequence_; }
  private:
   static bool sequenceAfter(uint32_t sequence, uint32_t reference) {
-    return sequence != reference && static_cast<int32_t>(sequence - reference) > 0;
+    return tickAfter(sequence, reference);
   }
   static uint32_t missedBefore(uint32_t afterSequence, uint32_t oldestSequence) {
     uint32_t distance = oldestSequence - afterSequence;

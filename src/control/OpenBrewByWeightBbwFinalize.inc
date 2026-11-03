@@ -13,8 +13,7 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   if (!scaleAvailable() || !std::isfinite(finalWeightG) ||
       !std::isfinite(snapshot.weightOffsetG) ||
       currentWeightSequence == snapshot.endedWeightSequence ||
-      static_cast<int32_t>(currentWeightReceivedAtMs - snapshot.endedAtMs) <=
-          0) {
+      !tickAfter(currentWeightReceivedAtMs, snapshot.endedAtMs)) {
     serialTrace(LogLevel::INFO,
                 "Final weight unavailable; offset unchanged");
     return false;

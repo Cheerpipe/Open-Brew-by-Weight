@@ -5,6 +5,7 @@
 
 #include "OpenBrewByWeightShotCurveRecord.h"
 #include "OpenBrewByWeightShotLogTypes.h"
+#include "OpenBrewByWeightTimingTypes.h"
 
 #include <cmath>
 #include <stddef.h>
@@ -243,7 +244,7 @@ struct ShotCurveSampler : ShotCurveRecord {
     if (!active) {
       return false;
     }
-    if (static_cast<int32_t>(atMs - startMs) < 0) {
+    if (tickBefore(atMs, startMs)) {
       return false;
     }
     const uint32_t elapsedMs = atMs - startMs;

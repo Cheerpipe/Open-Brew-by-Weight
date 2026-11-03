@@ -142,8 +142,7 @@ void updateCutPrediction(WeightSample sample) {
     in.weightDg = weightDg;
     in.firstDropMs = session.firstDropMs > session.circuitClosedAtMs &&
                              session.circuitClosedAtMs != 0
-                         ? static_cast<int32_t>(session.firstDropMs -
-                                                session.circuitClosedAtMs)
+                         ? ticksSince(session.firstDropMs, session.circuitClosedAtMs)
                          : 0;
     in.qPX100 = session.predictorQpX100;
     in.autoMode = session.automaticEnabled && session.startedWithScale &&
@@ -152,8 +151,7 @@ void updateCutPrediction(WeightSample sample) {
     in.retarePending = session.retareEffectPending;
     in.sampleDtMs = session.predictor.lastSampleMs != 0 &&
                             uptime > session.predictor.lastSampleMs
-                        ? static_cast<int32_t>(uptime -
-                                               session.predictor.lastSampleMs)
+                        ? ticksSince(uptime, session.predictor.lastSampleMs)
                         : 100;
     if (in.sampleDtMs > 2000) in.sampleDtMs = 2000;
     session.predictor.lastSampleMs = uptime;
@@ -233,15 +231,15 @@ void considerTouchStopSample(float weight, uint32_t atMs, uint32_t sequence,
       bbwWeightStopInhibited() || session.awaitingPostTareBaseline ||
       !machineAllowsAutomationStop() || sequence == 0 || generation == 0 ||
       generation != session.ownedConnectionGeneration ||
-      static_cast<int32_t>(millis() - atMs) < 0 ||
+      tickBefore(millis(), atMs) ||
       elapsedMs(atMs) > MAX_AUTOMATION_WEIGHT_AGE_MS) return;
   float threshold;
   const EndReason policy = touchStopPolicy(threshold, atMs);
   if (weight < threshold) return;
-  const int32_t gap = static_cast<int32_t>(atMs - previous.lastAtMs);
+  const int32_t gap = ticksSince(atMs, previous.lastAtMs);
   // Duplicate/out-of-order observations cannot start a new interval either.
   if (previous.samples && generation == previous.connectionGeneration &&
-      (gap <= 0 || static_cast<int32_t>(sequence - previous.packetSequence) <= 0))
+      (gap <= 0 || !tickAfter(sequence, previous.packetSequence)))
     return;
   const bool continuous = previous.samples && previous.policy == policy &&
       generation == previous.connectionGeneration &&
@@ -285,7 +283,7 @@ void noteAccidentalTouchClass(AccidentalTouchClass classified, WeightSample samp
   if (classified == AccidentalTouchClass::SUSTAINED) {
     // An accepted level shift starts a new trend epoch and a curve segment.
     session.accidentalTouchEpochS =
-        static_cast<float>(static_cast<int32_t>(sample.atMs - shot.startMs)) / 1000.0f;
+        static_cast<float>(ticksSince(sample.atMs, shot.startMs)) / 1000.0f;
     shotCurveSampler.markBreak();
     session.calibrationEligible = false;
     addDebugEvent(DebugCategory::SCALE, DebugCode::ACCIDENTAL_TOUCH_SUSTAINED,
@@ -305,9 +303,9 @@ void noteAccidentalTouchClass(AccidentalTouchClass classified, WeightSample samp
 AccidentalTouchClass evaluateAccidentalTouchSample(float weight,
                                                    uint32_t receivedAtMs) {
   const float nowS =
-      static_cast<float>(static_cast<int32_t>(receivedAtMs - shot.startMs)) / 1000.0f;
+      static_cast<float>(ticksSince(receivedAtMs, shot.startMs)) / 1000.0f;
   const float lastS =
-      static_cast<float>(static_cast<int32_t>(session.lastAcceptedWeightAtMs - shot.startMs)) /
+      static_cast<float>(ticksSince(session.lastAcceptedWeightAtMs, shot.startMs)) /
       1000.0f;
   const AccidentalTouchResidual trend = accidentalTouchResidual(
       {.timeS = shot.timeS, .weightG = shot.weight,
@@ -403,7 +401,7 @@ void onFirstDropsDetected(const FirstFlowObservation &observation) {
   if (shotTimeAtMs(observation.atMs, onsetMs)) session.cut.rate.onsetMs = onsetMs;
   // Flow onset ends the flat pre-flow trend: a touch epoch starts with it.
   session.accidentalTouchEpochS = fmaxf(session.accidentalTouchEpochS,
-      static_cast<float>(static_cast<int32_t>(observation.atMs - shot.startMs)) / 1000.0f);
+      static_cast<float>(ticksSince(observation.atMs, shot.startMs)) / 1000.0f);
   const uint32_t firstDropAnchorMs = session.circuitClosedAtMs != 0U
                                          ? session.circuitClosedAtMs
                                          : session.startedAtMs;
@@ -567,7 +565,7 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
   const bool consecutive = session.thresholdConfirmations > 0 &&
       connectionGeneration == session.lastThresholdConnectionGeneration &&
       packetSequence == session.lastThresholdPacketSequence + 1U &&
-      static_cast<int32_t>(receivedAtMs - session.lastThresholdAtMs) > 0 &&
+      tickAfter(receivedAtMs, session.lastThresholdAtMs) &&
       static_cast<uint32_t>(receivedAtMs - session.lastThresholdAtMs) <=
           DIRECT_STOP_CONFIRMATION_WINDOW_MS;
   if (!consecutive && session.thresholdConfirmations != 0)
@@ -884,8 +882,7 @@ bool autoToManualGuardDeadlineDue() {
   if (!session.active || !session.autoToManualGuardEnforced) {
     return false;
   }
-  return static_cast<int32_t>(millis() -
-                              session.autoToManualGuardDeadlineAtMs) >= 0;
+  return tickReached(millis(), session.autoToManualGuardDeadlineAtMs);
 }
 bool automaticScaleStopDue() {
   if (session.config.timerOnly || stopperState != StopperState::BREW ||
@@ -902,7 +899,7 @@ bool automaticScaleStopDue() {
     const EndReason policy = touchStopPolicy(threshold, millis());
     if (policy == evidence.policy &&
         evidence.connectionGeneration == session.ownedConnectionGeneration &&
-        static_cast<int32_t>(millis() - evidence.lastAtMs) >= 0 &&
+        tickReached(millis(), evidence.lastAtMs) &&
         elapsedMs(evidence.lastAtMs) <= MAX_AUTOMATION_WEIGHT_AGE_MS &&
         static_cast<uint32_t>(evidence.lastAtMs - evidence.firstAtMs) >=
             TOUCH_STOP_FALLBACK_MS) {
@@ -914,7 +911,7 @@ bool automaticScaleStopDue() {
   }
   const bool directStopFresh = session.directStopPending &&
       session.thresholdConfirmations >= DIRECT_STOP_CONFIRMATION_SAMPLES &&
-      static_cast<int32_t>(millis() - session.lastThresholdAtMs) >= 0 &&
+      tickReached(millis(), session.lastThresholdAtMs) &&
       elapsedMs(session.lastThresholdAtMs) <= MAX_AUTOMATION_WEIGHT_AGE_MS;
   const bool directStopHonored =
       directStopFresh &&

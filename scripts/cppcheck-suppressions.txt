@@ -6,7 +6,6 @@
 *:*/esp-idf*/components/*
 *:*/idf/managed_components/*
 *:*/idf/third_party/*
-# `unusedFunction` is intentionally not enabled by static-idf: analysis through
-# the filtered, variant-specific ESP-IDF database misclassifies cross-TU public
-# APIs, and setup/loop are called by idf/main, so they no longer need inline
-# suppressions. Dead-code review is tracked separately.
+# `unusedFunction` is not enabled by static-idf: it reports member functions the
+# firmware does call as unused. Findings in project code that are correct by
+# design use a single-line inline `cppcheck-suppress` comment with its reason.

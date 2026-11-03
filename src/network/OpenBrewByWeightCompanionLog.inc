@@ -154,7 +154,7 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
   if (first) return false;
   memcpy(out + used, "]}", 3);
   ++count;
-  logMore = latest != 0 && static_cast<int32_t>(latest - logLast) > 0;
+  logMore = latest != 0 && tickAfter(latest, logLast);
   return true;
 }
 

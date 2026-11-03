@@ -1017,8 +1017,7 @@ void serviceSettingsPersistResult() {
     addDebugEvent(DebugCategory::CONFIG, DebugCode::CONFIG_PERSISTED,
                   static_cast<int32_t>(runtimeRevision));
     if (pendingPresetPersistence.requestId != 0 &&
-        static_cast<int32_t>(runtimeRevision -
-                             pendingPresetPersistence.revision) >= 0) {
+        tickReached(runtimeRevision, pendingPresetPersistence.revision)) {
       const bool notifyPresets = pendingPresetPersistence.notifyPresets;
       const bool applyMachineTemperature =
           pendingPresetPersistence.applyMachineTemperature;
@@ -1040,14 +1039,14 @@ void serviceSettingsPersistResult() {
         runtimePersistReasonBits |= RUNTIME_PERSIST_REASON_SCALE_MAC;
       }
     }
-    if (static_cast<int32_t>(runtimePersistRevision - runtimeRevision) > 0) {
+    if (tickAfter(runtimePersistRevision, runtimeRevision)) {
       runtimePersistPending = true;
       runtimePersistIoRetryMs = 0;
       runtimePersistRetryAtMs = millis();
     } else if (!runtimePersistPending) {
       runtimePersistReasonBits = 0;
     }
-    if (static_cast<int32_t>(runtimePersistRevision - runtimeRevision) <= 0 &&
+    if (!tickAfter(runtimePersistRevision, runtimeRevision) &&
         quickSettingsPersistPending) {
       quickSettingsPersistPending = false;
       queueWebhookQuickSettingsChanged();
@@ -1296,7 +1295,7 @@ void serviceShotStorePersistence() {
     shotStorePersistIoRetryMs = 0;
     shotStorePersistRetryAtMs = 0;
   }
-  if (static_cast<int32_t>(millis() - shotStorePersistRetryAtMs) < 0) {
+  if (tickBefore(millis(), shotStorePersistRetryAtMs)) {
     return;
   }
   {
@@ -1363,7 +1362,7 @@ void serviceRuntimePersistence(
   inFlight = settingsPersistInFlight;
   settingsPersistMux.unlock();
   if (inFlight || maintenanceLease.active ||
-      static_cast<int32_t>(millis() - runtimePersistRetryAtMs) < 0 ||
+      tickBefore(millis(), runtimePersistRetryAtMs) ||
       !controlAllowsConfigurationNow() ||
       !durableFlashWriteAllowed(false, link.connecting)) {
     return;
@@ -1381,7 +1380,7 @@ void serviceRuntimePersistence(
     return;
   }
   if (!runtimePersistPending || maintenanceLease.active ||
-      static_cast<int32_t>(millis() - runtimePersistRetryAtMs) < 0 ||
+      tickBefore(millis(), runtimePersistRetryAtMs) ||
       !controlAllowsConfigurationNow() ||
       !durableFlashWriteAllowed(false, link.connecting)) {
     return;
@@ -1408,8 +1407,7 @@ void serviceRuntimePersistence(
   runtimePersistFailed = false;
   runtimePersistIoRetryMs = 0;
   if (pendingPresetPersistence.requestId != 0 &&
-      static_cast<int32_t>(runtimeConfig.revision -
-                           pendingPresetPersistence.revision) >= 0) {
+      tickReached(runtimeConfig.revision, pendingPresetPersistence.revision)) {
     const bool notifyPresets = pendingPresetPersistence.notifyPresets;
     const bool applyMachineTemperature =
         pendingPresetPersistence.applyMachineTemperature;

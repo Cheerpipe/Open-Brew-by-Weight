@@ -875,7 +875,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     if (httpd_queue_work(server_, companionSendWork, this) != ESP_OK)
       companionSendRetry_.store(true, std::memory_order_release);
   }
-  if (dirty && (companionRetryAtMs_ == 0 || static_cast<int32_t>(now - companionRetryAtMs_) >= 0) &&
+  if (dirty && (companionRetryAtMs_ == 0 || tickReached(now, companionRetryAtMs_)) &&
       networkFlashWriteAllowed()) {
     CompanionStored stored;
     {

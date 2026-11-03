@@ -1373,7 +1373,7 @@ class ScaleProfiler {
   int64_t elapsedAt_(uint32_t nowMs) const {
     // Readers/producers may have sampled millis just before the owner tick.
     return static_cast<int64_t>(elapsedMs_) +
-           static_cast<int32_t>(nowMs - clockAtMs_);
+           ticksSince(nowMs, clockAtMs_);
   }
 
   ScaleProfilerWork servicePersistenceLocked_(uint32_t nowMs,
@@ -1417,7 +1417,7 @@ class ScaleProfiler {
                persistence_ == ScaleProfilerPersistence::FAILED &&
                state_ == ScaleProfilerState::STOPPED && !flashInFlight_ &&
                saveRetries_ < SCALE_PROFILE_SAVE_MAX_RETRIES &&
-               static_cast<int32_t>(nowMs - saveRetryAtMs_) >= 0) {
+               tickReached(nowMs, saveRetryAtMs_)) {
       persistence_ = ScaleProfilerPersistence::PENDING_SAVE;
     }
     if (work != ScaleProfilerWork::NONE) flashInFlight_ = true;

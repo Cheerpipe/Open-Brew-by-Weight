@@ -20,11 +20,12 @@ usage() {
 Usage: ./scripts/static-idf [flags]
 
 Run Cppcheck against a compilation database already produced by ESP-IDF.
-Checks warning, performance and portability. \`unusedFunction\` is deliberately
-excluded: Cppcheck reports project APIs used across filtered translation units
-and build variants as unused. Dead-code review is tracked separately from this
-F-21 gate. The output directory is deleted and recreated on every run. This
-script never builds the firmware; run ./scripts/dev build separately first.
+Checks warning, performance, portability and style. \`unusedFunction\` is not
+used: it reports member functions the firmware does call as unused. A finding
+that is correct by design carries an inline \`cppcheck-suppress\` comment with
+its reason on the line above it. The output directory is deleted and recreated
+on every run. This script never builds the firmware; run ./scripts/dev build
+separately first.
 
 Required parameters: --arch. For a profile build, pass its directory with
 --build-dir. Path overrides are one-shot and are not persisted.
@@ -84,7 +85,7 @@ for entry in entries:
 json.dump(entries, open(sys.argv[2], "w"))
 PY
 
-echo "Running Cppcheck (warning, performance, portability) on $build_dir..."
+echo "Running Cppcheck (warning, performance, portability, style) on $build_dir..."
 cppcheck \
   -j "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" \
   --project="$cppcheck_database" \
@@ -95,7 +96,7 @@ cppcheck \
   --file-filter='*/libraries/EspressoScaleBLE/src/protocols/*.cpp' \
   --file-filter='*/idf/main/*.cpp' \
   --file-filter='*/idf/components/OpenBrewByWeightBleRuntime/*.cpp' \
-  --enable=warning,performance,portability \
+  --enable=warning,performance,portability,style \
   --inline-suppr \
   --inconclusive \
   --error-exitcode=1 \

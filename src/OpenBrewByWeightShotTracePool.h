@@ -561,6 +561,7 @@ class ShotTracePool {
     if (!readSpan(locate(start, offset), static_cast<uint8_t *>(out), bytes))
       return ShotTracePoolStatus::IO_ERROR;
     // Eviction precedes every erase: alive after the read means intact.
+    // cppcheck-suppress knownConditionTrueFalse ; another task can evict the record during readSpan(); alive() re-reads the index under mux_
     return alive(ref.serial) ? ShotTracePoolStatus::OK : ShotTracePoolStatus::GONE;
   }
 
@@ -969,6 +970,7 @@ class ShotTracePool {
   }
   // Caller holds the flash I/O lock; the source is staged in the internal
   // scratch unless it already is the scratch.
+  // cppcheck-suppress functionConst ; programs the pool's flash sectors; a const member would misstate that it mutates pool storage
   bool program(Position at, const void *in, size_t bytes) {
     size_t base;
     const esp_partition_t *part = partition(at.sector, base);
@@ -976,6 +978,7 @@ class ShotTracePool {
     return part != nullptr && staged != nullptr &&
            esp_partition_write(part, base + at.offset, staged, bytes) == ESP_OK;
   }
+  // cppcheck-suppress functionConst ; erases the pool's flash sectors; a const member would misstate that it mutates pool storage
   bool erase(size_t sector) {
     size_t base;
     const esp_partition_t *part = partition(sector, base);

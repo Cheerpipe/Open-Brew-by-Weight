@@ -483,7 +483,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
       // The open subscription survives token renewal: only HTTPS needs the new
       // token, so renew in place instead of reconnecting and re-reading.
       if (!park && work_ && micra_timing::accessTokenRefreshDue(now - work_->accessTokenIssuedAtMs) &&
-          micra_timing::deadlineReached(now, websocket_->renewRetryAtMs) &&
+          tickReached(now, websocket_->renewRetryAtMs) &&
           !ensureSession(settings, false))
         websocket_->renewRetryAtMs = millis() + micra_timing::kExhaustedCooldownMs;
       if (streaming && now - connectedAtMs >= 30000) {
@@ -533,7 +533,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     wipeLineaMicraSettings(settings);
     return;
   }
-  if (retryAtMs && !micra_timing::deadlineReached(now, retryAtMs)) {
+  if (retryAtMs && !tickReached(now, retryAtMs)) {
     wipeLineaMicraSettings(settings);
     return;
   }

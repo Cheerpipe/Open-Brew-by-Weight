@@ -3,6 +3,7 @@
 #include "OpenBrewByWeightHeapMap.h"
 #include "OpenBrewByWeightPsram.h"
 #include "OpenBrewByWeightTaskMutex.h"
+#include "OpenBrewByWeightTimingTypes.h"
 
 namespace openbrewbyweight {
 
@@ -146,7 +147,7 @@ inline void serviceBootHeap(uint32_t now) {
     const uint32_t wsAtMs = capture.records[static_cast<size_t>(
         wsDone ? BootHeapStage::WS_DONE : BootHeapStage::WS_START)].atMs;
     const auto elapsed = [now](uint32_t atMs) {
-      return static_cast<int32_t>(now - atMs) >= static_cast<int32_t>(BOOT_HEAP_WINDOW_MS);
+      return ticksSince(now, atMs) >= static_cast<int32_t>(BOOT_HEAP_WINDOW_MS);
     };
     if (elapsed(capture.records[static_cast<size_t>(BootHeapStage::NETWORK_START)].atMs) &&
         (!wsStarted || elapsed(wsAtMs))) {

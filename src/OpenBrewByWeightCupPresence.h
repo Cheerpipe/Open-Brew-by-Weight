@@ -407,7 +407,7 @@ CupPresenceEvent feedCupPresence(float weight, uint32_t receivedAtMs,
       return CupPresenceEvent::NONE;
     }
     const bool consecutive = cupPresence.removedConfirmations > 0 &&
-        static_cast<int32_t>(receivedAtMs - cupPresence.lastRemovedAtMs) >= 0 &&
+        tickReached(receivedAtMs, cupPresence.lastRemovedAtMs) &&
         static_cast<uint32_t>(receivedAtMs - cupPresence.lastRemovedAtMs) <=
             DIRECT_STOP_CONFIRMATION_WINDOW_MS &&
         (packetSequence == 0 || cupPresence.lastRemovedPacketSequence == 0 ||

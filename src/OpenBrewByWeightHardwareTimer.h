@@ -149,6 +149,7 @@ class IndependentSafetyTimer {
       return false;
     }
     portENTER_CRITICAL(&stateMux_);
+    // cppcheck-suppress knownConditionTrueFalse ; the alarmCallback() ISR can set callbackInFlight_ while gptimer_stop() runs between the critical sections
     if (callbackInFlight_) {
       portEXIT_CRITICAL(&stateMux_);
       return false;

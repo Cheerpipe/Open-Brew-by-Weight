@@ -488,7 +488,7 @@ void OpenBrewByWeightNetwork::applyWifiPowerSave(bool apStarting) {
   // Called every 50 ms service pass: query the driver only on a state edge
   // or once per retry interval, not on every pass.
   if (lastAppliedWifiPsValid_ && inputs == lastWifiPsInputs_ &&
-      static_cast<int32_t>(now - wifiPsNextWriteAtMs_) < 0) {
+      tickBefore(now, wifiPsNextWriteAtMs_)) {
     return;
   }
   lastWifiPsInputs_ = inputs;
@@ -500,7 +500,7 @@ void OpenBrewByWeightNetwork::applyWifiPowerSave(bool apStarting) {
   }
   if (!apStarting && lastAppliedWifiPs_ == desiredPs &&
       wifiPsNextWriteAtMs_ != 0 &&
-      static_cast<int32_t>(now - wifiPsNextWriteAtMs_) < 0) {
+      tickBefore(now, wifiPsNextWriteAtMs_)) {
     return;
   }
   if (!WiFi.setSleep(desiredPs)) {
@@ -812,7 +812,7 @@ void OpenBrewByWeightNetwork::serviceSoftApIdle(uint32_t now, bool apActive,
   lastApClients_ = 0;
 
   if (!brewing && (apIdleDeadlineMs_ == 0 ||
-                   static_cast<int32_t>(now - apIdleDeadlineMs_) < 0)) {
+                   tickBefore(now, apIdleDeadlineMs_))) {
     return;
   }
 
@@ -1113,7 +1113,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
       dataMux_.unlock();
     }
     if (!httpStartHeld_ && server_ == nullptr &&
-        static_cast<int32_t>(now - httpRetryAtMs_) >= 0) {
+        tickReached(now, httpRetryAtMs_)) {
       const bool httpReady = startHttpServer();
       httpRetryAtMs_ = httpReady ? 0 : now + HTTP_RETRY_MS;
       dataMux_.lock();
@@ -1126,7 +1126,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
     if (staConfirmArmed_ &&
         staJoinHints().staConfigState ==
             static_cast<uint8_t>(StaConfigState::PENDING) &&
-        static_cast<int32_t>(now - staConfirmDeadlineMs_) >= 0) {
+        tickReached(now, staConfirmDeadlineMs_)) {
       WiFi.disconnect(false, false);
       if (!revertPendingNetwork("confirm timeout")) {
         noteNetworkRetryBackoff(false);
@@ -1146,7 +1146,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
     finishOwnedHeapLifecycle(wifiHeap_, HeapLifecycleResult::SUCCESS);
     serviceSoftApTeardown(status, now);
     const bool mayStartHttp = !httpStartHeld_ &&
-                              static_cast<int32_t>(now - httpRetryAtMs_) >= 0;
+                              tickReached(now, httpRetryAtMs_);
     const bool httpReady = mayStartHttp && startHttpServer();
     httpRetryAtMs_ = httpReady || httpStartHeld_ ? 0 : now + HTTP_RETRY_MS;
     staEverConnected_ = true;
@@ -1213,7 +1213,7 @@ void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
   if (status.apActive && setupKeepsSoftAp(status.setupPhase) &&
       staConfirmArmed_ &&
       !wifiScanInProgress() &&
-      static_cast<int32_t>(now - staConfirmDeadlineMs_) >= 0) {
+      tickReached(now, staConfirmDeadlineMs_)) {
     WiFi.disconnect(false, false);
     if (!revertPendingNetwork("confirm timeout")) {
       // Durable-write gate closed: retry in a second without the startup

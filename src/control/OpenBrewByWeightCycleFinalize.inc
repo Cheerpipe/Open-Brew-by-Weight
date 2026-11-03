@@ -20,11 +20,11 @@ void captureLateTareCompletion(uint32_t throughMs = millis()) {
       result.cupWeightRequestId != session.retareRequestId) return;
   const uint32_t anchor = session.circuitClosedAtMs != 0U
                               ? session.circuitClosedAtMs : session.startedAtMs;
-  if (static_cast<int32_t>(result.receivedAtMs - anchor) < 0 ||
-      static_cast<int32_t>(result.receivedAtMs - throughMs) > 0) return;
+  if (tickBefore(result.receivedAtMs, anchor) ||
+      tickAfter(result.receivedAtMs, throughMs)) return;
   if (!session.active &&
       (!pendingFinalize.pending || pendingFinalize.cycleId != session.id ||
-       static_cast<int32_t>(result.receivedAtMs - pendingFinalize.endedAtMs) > 0)) return;
+       tickAfter(result.receivedAtMs, pendingFinalize.endedAtMs))) return;
   applyShotTareResult(result);
   if (session.retareAtMs != 0) return;
   session.retareAtMs = result.receivedAtMs;
@@ -109,12 +109,12 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
       static_cast<uint16_t>(durationMs / 100U);
   const uint32_t shotAnchorMs = pendingFinalize.cycleStartedAtMs;
   if (session.firstDropMs != 0 &&
-      static_cast<int32_t>(session.firstDropMs - shotAnchorMs) >= 0) {
+      tickReached(session.firstDropMs, shotAnchorMs)) {
     pendingFinalize.firstDropDs = static_cast<uint16_t>(
         (session.firstDropMs - shotAnchorMs) / 100U);
   }
   if (session.retareAtMs != 0 &&
-      static_cast<int32_t>(session.retareAtMs - shotAnchorMs) >= 0) {
+      tickReached(session.retareAtMs, shotAnchorMs)) {
     pendingFinalize.tareAtDs = static_cast<uint16_t>(
         (session.retareAtMs - shotAnchorMs) / 100U);
   }
@@ -327,8 +327,7 @@ void persistLastShotFromFinalize(const PendingShotFinalize &snapshot,
 bool endedCycleWeightValid() {
   return currentWeightSequence != session.weightSequenceAtStart &&
          std::isfinite(currentWeight) &&
-         static_cast<int32_t>(currentWeightReceivedAtMs - session.startedAtMs) >=
-             0;
+         tickReached(currentWeightReceivedAtMs, session.startedAtMs);
 }
 
 PersistedLastShot lastShotFromEndedCycle(EndReason reason, uint32_t durationMs,
@@ -374,11 +373,11 @@ PersistedLastShot lastShotFromEndedCycle(EndReason reason, uint32_t durationMs,
   const uint32_t startMs =
       session.circuitClosedAtMs != 0U ? session.circuitClosedAtMs : session.startedAtMs;
   if (session.firstDropMs != 0 &&
-      static_cast<int32_t>(session.firstDropMs - startMs) >= 0) {
+      tickReached(session.firstDropMs, startMs)) {
     last.firstDropElapsedMs = session.firstDropMs - startMs;
   }
   if (session.retareAtMs != 0 &&
-      static_cast<int32_t>(session.retareAtMs - startMs) >= 0) {
+      tickReached(session.retareAtMs, startMs)) {
     last.tareElapsedMs = session.retareAtMs - startMs;
   }
   last.retarePerformed = session.retarePerformed;
@@ -716,8 +715,7 @@ void pendingShotFinalizeTask() {
   bool postDripWeightValid = false;
   if (scaleAvailable() && std::isfinite(currentWeight) &&
       currentWeightSequence != snapshot.endedWeightSequence &&
-      static_cast<int32_t>(currentWeightReceivedAtMs - snapshot.endedAtMs) >
-          0 &&
+      tickAfter(currentWeightReceivedAtMs, snapshot.endedAtMs) &&
       std::isfinite(finalWeightG) &&
       plausibleSettledBrewWeight(finalWeightG, snapshot.lastKnownWeightG,
                                  snapshot.lastKnownWeightValid)) {

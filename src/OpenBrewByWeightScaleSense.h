@@ -53,7 +53,7 @@ bool expirePostTareBaselineIfNeeded(float softwareZeroG = NAN) {
   // Without a reading since the tare write (a BLE gap), wait up to one more
   // grace for evidence; the late-tare window then counts from this expiry.
   const int32_t overdueMs =
-      static_cast<int32_t>(millis() - session.postTareBaselineDeadlineMs);
+      ticksSince(millis(), session.postTareBaselineDeadlineMs);
   if (overdueMs < 0 || (!session.postTareReadingSeen &&
                         overdueMs < static_cast<int32_t>(session.config.postTareBaselineGraceMs))) {
     return false;

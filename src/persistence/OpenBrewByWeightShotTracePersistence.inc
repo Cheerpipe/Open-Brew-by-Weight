@@ -91,7 +91,7 @@ bool readPendingShotTrace(void *context, size_t offset, uint8_t *out, size_t byt
 // Backs the next recovery or clear attempt off after a failure.
 bool shotTracePoolBackingOff() {
   const ShotTracePersistState &state = shotTracePersist;
-  return state.backoffMs != 0 && static_cast<int32_t>(millis() - state.retryAtMs) < 0;
+  return state.backoffMs != 0 && tickBefore(millis(), state.retryAtMs);
 }
 void shotTracePoolAttempted(bool ok) {
   ShotTracePersistState &state = shotTracePersist;

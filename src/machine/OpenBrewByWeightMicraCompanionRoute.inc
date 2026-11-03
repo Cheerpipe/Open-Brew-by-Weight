@@ -51,7 +51,7 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
         changed = true;
       }
     }
-    if (feed.flapping && micra_timing::deadlineReached(now, feed.flapUntilMs))
+    if (feed.flapping && tickReached(now, feed.flapUntilMs))
       feed.flapping = false;
     if (from != MicraCompanionRoute::DIRECT) {
       // A basis is the full frame's subscription; without one the route
@@ -152,7 +152,7 @@ bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
       http = done ? feed.resultHttp : 0;
       routed = feed.status.route == MicraCompanionRoute::COMPANION;
       if (done || !routed || abortRequested_.load(std::memory_order_acquire) ||
-          micra_timing::deadlineReached(now, deadline)) {
+          tickReached(now, deadline)) {
         feed.outbox.commandId = 0;  // A later link session never replays it.
         break;
       }
@@ -241,12 +241,12 @@ uint32_t OpenBrewByWeightMicraService::companionIntentLocked(uint32_t afterComma
       break;
     }
     if (intent.command != 0 &&
-        (!any || static_cast<int32_t>(intent.generation - generation) < 0)) {
+        (!any || tickBefore(intent.generation, generation))) {
       generation = intent.generation;
       any = true;
     }
   }
-  return any && static_cast<int32_t>(generation - start) > 0 ? generation : start;
+  return any && tickAfter(generation, start) ? generation : start;
 }
 
 void OpenBrewByWeightMicraService::recordCompanionIntentLocked(uint32_t command) {

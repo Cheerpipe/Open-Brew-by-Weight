@@ -18,7 +18,7 @@ reduce coverage.
 
 | Tool | Script | Reports directory | Contract |
 |------|--------|-------------------|----------|
-| Cppcheck | `./scripts/static-idf` | `reports/static-analysis/` | Fails (exit 1) on any warning/performance/portability finding |
+| Cppcheck | `./scripts/static-idf` | `reports/static-analysis/` | Fails (exit 1) on any warning/performance/portability/style finding |
 | GCC `-fanalyzer` | `./scripts/gcc_analyzer` | `reports/gcc-analyzer/` | Fails on diagnostics in versioned code (builds with the analyzer enabled) |
 | clang-tidy | `./scripts/static-tidy-idf` | `reports/static-tidy/` | Fails on in-scope diagnostics, parse errors, or a tool error |
 | Include-What-You-Use | `./scripts/iwyu-idf` | `reports/iwyu/` | Advisory on suggestions: fails only when tooling is missing, the translation-unit audit fails, or nothing parses |
@@ -275,8 +275,15 @@ cppcheck --version          # current release from PATH; see sections 2 or 3
   --machine la-marzocco-linea-micra
 ```
 
-`static-idf` never builds and fails on any finding; project suppressions live
-in `scripts/cppcheck-suppressions.txt` with a documented reason per entry.
+`static-idf` never builds, checks the `warning`, `performance`, `portability`
+and `style` categories, and fails on any finding. Fix the code first. A finding
+that is correct by design, such as a condition that a build profile makes
+constant or a callback signature fixed by the SDK, gets a single-line
+`// cppcheck-suppress <id> ; <reason>` comment directly above the reported
+line, one id per comment, with the concrete technical reason. File-wide,
+block or global suppressions are not used for project code. The suppression
+list `scripts/cppcheck-suppressions.txt` only excludes third-party dependency
+paths.
 Dependency suppressions identify the vendor header instead of a local ESP-IDF
 installation root, so an ESP-IDF checkout at `/opt/esp/idf` and a developer
 checkout behave the
@@ -284,12 +291,9 @@ same without suppressing diagnostics in versioned project code.
 `gcc_analyzer` **builds** the firmware with `-fanalyzer` enabled and keeps
 only diagnostics whose primary location is versioned code.
 
-`unusedFunction` is intentionally outside this gate. With a filtered,
-variant-specific ESP-IDF compilation database, Cppcheck reports public APIs
-used from other TUs or variants as unused. Enabling it produced dozens of
-non-actionable findings and would require broad suppressions that can hide real
-defects. Dead-code findings require compiler/linker and targeted source evidence;
-the analysis gate retains the reliable Cppcheck classes.
+`unusedFunction` is not used: Cppcheck reports member functions the firmware
+does call as unused, so its findings are not actionable and would need broad
+suppressions that could hide real defects.
 
 ## 9. Recommended order for a release check
 

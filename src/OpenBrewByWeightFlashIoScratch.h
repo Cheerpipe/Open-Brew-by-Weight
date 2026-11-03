@@ -128,8 +128,7 @@ inline void noteFlashIoHeld(bool held, uint32_t nowMs) {
 inline bool flashIoActiveSince(uint32_t sinceMs) {
   const FlashIoActivity &activity = flashIoActivity();
   return activity.heldSinceMs.load(std::memory_order_acquire) != 0 ||
-         static_cast<int32_t>(activity.releasedAtMs.load(
-             std::memory_order_relaxed) - sinceMs) >= 0;
+         tickReached(activity.releasedAtMs.load(std::memory_order_relaxed), sinceMs);
 }
 
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) &&                                        \

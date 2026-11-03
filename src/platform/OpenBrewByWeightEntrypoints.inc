@@ -257,6 +257,7 @@ void setup() {
       configureTaskWatchdog() && subscribeCurrentTaskToWatchdog();
   initializeRelaySafetyStateAfterBoot();
 
+  // cppcheck-suppress knownConditionTrueFalse ; no current hardware profile defines the circuit feedback GPIO; boards that do read a live input
   if (EXTERNAL_SAFETY_HARDWARE_PRESENT && readCircuitFeedbackClosed()) {
     tripRelaySafety(RelaySafetyFault::FEEDBACK_STUCK_CLOSED);
   }
@@ -284,7 +285,9 @@ void startAfterBootRecovery() {
   } else if (usbConsoleJumperPresent()) {
     usbSerialEnableSource = UsbSerialEnableSource::JUMPER;
   }
+  // cppcheck-suppress knownConditionTrueFalse ; --development builds set OPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1; release builds read the GPIO4 jumper
   const bool usbSerial = usbSerialEnableSource != UsbSerialEnableSource::OFF;
+  // cppcheck-suppress knownConditionTrueFalse ; --development builds set OPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1; release builds read the GPIO4 jumper
   if (usbSerial) Serial.begin(SERIAL_BAUD);
   installEspLogSink(usbSerial);
 

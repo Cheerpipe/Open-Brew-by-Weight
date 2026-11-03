@@ -62,19 +62,15 @@ inline constexpr bool accessTokenRefreshDue(uint32_t ageMs) {
   return ageMs >= kAccessTokenRefreshAgeMs;
 }
 
-inline constexpr bool deadlineReached(uint32_t now, uint32_t deadline) {
-  return static_cast<int32_t>(now - deadline) >= 0;
-}
-
 class ObservationSchedule {
  public:
   bool automaticDue(uint32_t now) const {
     return (periodic_ || postWakePending_) &&
-        deadlineReached(now, automaticAtMs_) && observationAllowed(now);
+        tickReached(now, automaticAtMs_) && observationAllowed(now);
   }
 
   bool observationAllowed(uint32_t now) const {
-    return !postWakePending_ || deadlineReached(now, postWakeAtMs_);
+    return !postWakePending_ || tickReached(now, postWakeAtMs_);
   }
 
   void dueNow(uint32_t now) { automaticAtMs_ = now; periodic_ = true; }
@@ -87,7 +83,7 @@ class ObservationSchedule {
   }
 
   bool observationStarted(uint32_t now) {
-    if (postWakePending_ && deadlineReached(now, postWakeAtMs_)) {
+    if (postWakePending_ && tickReached(now, postWakeAtMs_)) {
       postWakePending_ = false;
       return true;
     }

@@ -711,8 +711,7 @@ bool OpenBrewByWeightMicraService::queueLocked(const LineaMicraRequest &request)
       return false;
     }
     if (desiredTemperature_.present &&
-        static_cast<int32_t>(request.configGeneration -
-                             desiredTemperature_.request.configGeneration) < 0) {
+        tickBefore(request.configGeneration, desiredTemperature_.request.configGeneration)) {
       return true;
     }
     desiredTemperature_.request = request;
@@ -834,7 +833,7 @@ bool OpenBrewByWeightMicraService::pushConfirms(uint16_t targetDeciC,
     }
     if (abortRequested_.load(std::memory_order_acquire)) return false;
     (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(250));
-  } while (!micra_timing::deadlineReached(millis(), deadline));
+  } while (!tickReached(millis(), deadline));
   return false;
 }
 
@@ -1201,7 +1200,7 @@ void OpenBrewByWeightMicraService::taskLoop() {
                  !outboundShotActive.load(std::memory_order_acquire) &&
                  !scaleConnecting_.load(std::memory_order_acquire) &&
                  !cleaningBusy && desiredTemperature_.present &&
-                 static_cast<int32_t>(now - desiredTemperature_.retryAtMs) >= 0) {
+                 tickReached(now, desiredTemperature_.retryAtMs)) {
         pending.request = desiredTemperature_.request;
         temperatureMachineConfigGeneration =
             desiredTemperature_.machineConfigGeneration;
@@ -1213,7 +1212,7 @@ void OpenBrewByWeightMicraService::taskLoop() {
                  !outboundShotActive.load(std::memory_order_acquire) &&
                  !scaleConnecting_.load(std::memory_order_acquire) &&
                  desiredPower_.present &&
-                 static_cast<int32_t>(now - desiredPower_.retryAtMs) >= 0) {
+                 tickReached(now, desiredPower_.retryAtMs)) {
         pending.request = desiredPower_.request;
         powerMachineConfigGeneration =
             desiredPower_.machineConfigGeneration;
@@ -2129,14 +2128,14 @@ void OpenBrewByWeightMicraService::scheduleAutomatic(uint32_t now, bool failed) 
 
 void OpenBrewByWeightMicraService::waitRetry(uint32_t delayMs) {
   const uint32_t due = millis() + delayMs;
-  while (!micra_timing::deadlineReached(millis(), due)) {
+  while (!tickReached(millis(), due)) {
     LineaMicraError error;
     if (!networkEligible(error) || abortRequested_.load(std::memory_order_acquire)) {
       if (!websocketAdmitted()) stopWebSocket();
       return;
     }
     const uint32_t now = millis();
-    if (!micra_timing::deadlineReached(now, due))
+    if (!tickReached(now, due))
       (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(std::min(uint32_t(250), due - now)));
   }
 }

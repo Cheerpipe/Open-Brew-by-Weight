@@ -88,11 +88,11 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   char adminScreen[9] = "", overrideScreen[9] = "";
   {
     TaskLockGuard lock(dataMux_);
-    const bool unlock = adminUnlocked_ && static_cast<int32_t>(millis() - adminUnlockUntilMs_) < 0;
+    const bool unlock = adminUnlocked_ && tickBefore(millis(), adminUnlockUntilMs_);
     CompanionPrincipal window;
     copyCString(window.id, sizeof(window.id), session.clientId);
     unlocked |= unlock && companionPrincipalHolds(adminUnlock_, window);
-    override = webUiOverrideActive_ && static_cast<int32_t>(millis() - webUiOverrideUntilMs_) < 0;
+    override = webUiOverrideActive_ && tickBefore(millis(), webUiOverrideUntilMs_);
     if (session.relayed && unlock) companionScreenTag(adminUnlock_, adminScreen);
     if (session.relayed && override) companionScreenTag(webUiOverride_, overrideScreen);
     // A companion screen's override shows only through relay.overrideScreen.
@@ -853,7 +853,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
       telemetry.field("lineaMicra.websocket.pongAtMs", "%u",
                       static_cast<unsigned>(ws.pongAtMs));
       telemetry.field("lineaMicra.websocket.retryRemainingMs", "%u",
-                      static_cast<unsigned>(!ws.retryAtMs || micra_timing::deadlineReached(now, ws.retryAtMs) ? 0 : ws.retryAtMs - now));
+                      static_cast<unsigned>(!ws.retryAtMs || tickReached(now, ws.retryAtMs) ? 0 : ws.retryAtMs - now));
       telemetry.field("lineaMicra.websocket.rxBytes", "%llu",
                       static_cast<unsigned long long>(ws.receiveBytes));
       telemetry.field("lineaMicra.websocket.txBytes", "%llu",

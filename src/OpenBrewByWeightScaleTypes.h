@@ -9,6 +9,7 @@
 #include <string.h>
 #include "../libraries/EspressoScaleBLE/src/ScaleBleTypes.h"
 #include "../libraries/EspressoScaleBLE/src/ScaleProtocol.h"
+#include "OpenBrewByWeightTimingTypes.h"
 
 namespace openbrewbyweight {
 
@@ -567,7 +568,7 @@ inline bool firstFlowPacketsConsecutive(const FirstFlowState &state,
                                         WeightSample sample) {
   return state.hasLastSample &&
          sample.packetSequence == state.lastPacketSequence + 1U &&
-         static_cast<int32_t>(sample.atMs - state.lastAtMs) >= 0 &&
+         tickReached(sample.atMs, state.lastAtMs) &&
          static_cast<uint32_t>(sample.atMs - state.lastAtMs) <=
              DIRECT_STOP_CONFIRMATION_WINDOW_MS;
 }

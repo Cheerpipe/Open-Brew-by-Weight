@@ -29,7 +29,7 @@ void OpenBrewByWeightNetwork::processAcceptedCommands() {
     acceptedCommandReceivedAtMs_ = now;
     acceptedCommandRetryAtMs_ = now;
   }
-  if (static_cast<int32_t>(now - acceptedCommandRetryAtMs_) < 0) {
+  if (tickBefore(now, acceptedCommandRetryAtMs_)) {
     return;
   }
 
@@ -912,6 +912,7 @@ void OpenBrewByWeightNetwork::refreshExtendedStatus(uint32_t now) {
   dataMux_.unlock();
 }
 
+// cppcheck-suppress constParameterCallback ; the ESP-IDF sntp_sync_time_cb_t type fixes this non-const signature
 void OpenBrewByWeightNetwork::ntpSyncNotificationCallback(struct timeval *tv) {
   OpenBrewByWeightNetwork *self = instance_;
   if (tv == nullptr || self == nullptr ||
@@ -947,7 +948,7 @@ bool OpenBrewByWeightNetwork::ntpMayArm(uint32_t now, bool staConnected) const {
     return false;
   }
   if (staNtpEligibleAtMs_ != 0 &&
-      static_cast<int32_t>(now - staNtpEligibleAtMs_) < 0) {
+      tickBefore(now, staNtpEligibleAtMs_)) {
     return false;
   }
   return true;

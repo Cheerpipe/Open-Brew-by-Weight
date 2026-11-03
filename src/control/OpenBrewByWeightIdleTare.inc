@@ -261,12 +261,12 @@ bool observeIdleTareSample(float weight, uint32_t atMs, uint32_t sequence,
                            uint32_t generation, uint32_t captureSequence) {
   serviceIdleTare();
   if (generation != idleTare.connectionGeneration ||
-      static_cast<int32_t>(millis() - atMs) < 0 ||
-      static_cast<int32_t>(millis() - atMs) >
+      tickBefore(millis(), atMs) ||
+      ticksSince(millis(), atMs) >
           static_cast<int32_t>(MAX_AUTOMATION_WEIGHT_AGE_MS) ||
       (idleTare.lastPacketSequence != 0 &&
-       (static_cast<int32_t>(sequence - idleTare.lastPacketSequence) <= 0 ||
-        static_cast<int32_t>(atMs - idleTare.lastSampleAtMs) < 0))) {
+       (!tickAfter(sequence, idleTare.lastPacketSequence) ||
+        tickBefore(atMs, idleTare.lastSampleAtMs)))) {
     resetCupSampleEvidence();
     idleTare.unloadSamples = 0;
     ++idleTare.rejectedSamples;
@@ -318,8 +318,8 @@ bool observeIdleTareSample(float weight, uint32_t atMs, uint32_t sequence,
         (status.phase == IdleTarePhase::WRITING ||
          status.phase == IdleTarePhase::SUCCEEDED)) {
       const bool afterBoundary = captureSequence != 0
-          ? static_cast<int32_t>(captureSequence - status.captureBoundary) > 0
-          : static_cast<int32_t>(atMs - status.startedAtMs) > 0;
+          ? tickAfter(captureSequence, status.captureBoundary)
+          : tickAfter(atMs, status.startedAtMs);
       if (afterBoundary) {
         idleTare.unchangedAfterWrite =
             fmaxf(weight, idleTare.requestMaximumG) -

@@ -106,7 +106,7 @@ struct BullseyeTracker {
     const uint32_t receivedAtMs = sample.atMs;
     if (!pending || sequence == 0 || sequence == processedWeightSequence ||
         sequence == shot.endedWeightSequence ||
-        static_cast<int32_t>(receivedAtMs - opensAtMs()) < 0) {
+        tickBefore(receivedAtMs, opensAtMs())) {
       return false;
     }
     processedWeightSequence = sequence;
@@ -117,7 +117,7 @@ struct BullseyeTracker {
       return false;
     }
     const bool gap = targetSampleCount != 0 &&
-                     (static_cast<int32_t>(receivedAtMs - lastTargetSampleAtMs) <= 0 ||
+                     (!tickAfter(receivedAtMs, lastTargetSampleAtMs) ||
                       static_cast<uint32_t>(receivedAtMs - lastTargetSampleAtMs) >
                           maxSampleGapMs);
     if (targetSampleCount == 0 || gap) {

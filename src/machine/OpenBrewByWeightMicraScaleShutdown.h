@@ -1,6 +1,7 @@
 #pragma once
 
 #include "OpenBrewByWeightLineaMicraSettings.h"
+#include "OpenBrewByWeightTimingTypes.h"
 
 #include <cstdint>
 
@@ -45,7 +46,7 @@ class MicraScaleShutdownTracker {
       if (scale.linkUp || !enabled) pending_ = false;
     }
     if (!pending_) return false;
-    if (static_cast<int32_t>(now - fireAtMs_) < 0) return false;
+    if (tickBefore(now, fireAtMs_)) return false;
     pending_ = false;
     // A relay that closed during the grace window cancels the shutdown;
     // the machine is never powered off while brewing.

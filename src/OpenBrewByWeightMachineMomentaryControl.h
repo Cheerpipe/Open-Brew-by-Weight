@@ -33,7 +33,7 @@ void serviceFirmwarePulseDrive() {
       (void)setMachineCircuitClosed(false);
     }
     if (!firmwarePulsePending || momentaryPhysicalOn ||
-        static_cast<int32_t>(millis() - firmwarePulsePendingReadyAtMs) < 0) {
+        tickBefore(millis(), firmwarePulsePendingReadyAtMs)) {
       return;
     }
     const FirmwarePulseKind pendingKind = firmwarePulsePendingKind;
@@ -42,7 +42,7 @@ void serviceFirmwarePulseDrive() {
     (void)emitFirmwarePulse(pendingKind);
     return;
   }
-  if (static_cast<int32_t>(millis() - pulseOutputEndsAtMs) >= 0) {
+  if (tickReached(millis(), pulseOutputEndsAtMs)) {
     (void)setMachineCircuitClosed(false);
     pulseOutputActive = false;
     if (firmwarePulsePending) {

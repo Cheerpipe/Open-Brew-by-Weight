@@ -319,7 +319,7 @@ inline void LocalBuzzer::applyDeadline(uint32_t durationMs, uint32_t nowMs) {
 
 inline bool LocalBuzzer::deadlineReached(uint32_t nowMs) const {
   return deadlineAtMs != 0 &&
-         static_cast<int32_t>(nowMs - deadlineAtMs) >= 0;
+         tickReached(nowMs, deadlineAtMs);
 }
 
 // Starts the queued pending tone (if any) after the active one stops.

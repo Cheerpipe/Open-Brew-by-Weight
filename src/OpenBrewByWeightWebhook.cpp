@@ -828,6 +828,7 @@ WebhookDispatcher::SendOutcome WebhookDispatcher::send(
   const bool permanent = event.type == WebhookEventType::TEST || !prepared ||
       (statusCode >= 400 && statusCode < 500 && statusCode != 408 && statusCode != 429);
   const SendOutcome outcome = ok ? SendOutcome::DELIVERED
+      // cppcheck-suppress knownConditionTrueFalse ; the HTTP event handler sets requestSent_ during esp_http_client_perform(), so dispatched can be true
       : !dispatched && cancellation != WebhookCancellationReason::NONE ? SendOutcome::HELD
       : permanent || attempt + 1 >= kWebhookAttempts ? SendOutcome::DROPPED
                                                      : SendOutcome::RETRY;
@@ -858,6 +859,7 @@ WebhookDispatcher::SendOutcome WebhookDispatcher::send(
   status_.lastPhase = phase;
   status_.lastCancellation = cancellation;
   status_.lastDispatched = dispatched;
+  // cppcheck-suppress knownConditionTrueFalse ; the HTTP event handler sets requestSent_ during esp_http_client_perform(), so dispatched can be true
   status_.lastDeliveryUnknown = !ok && dispatched;
   if (ok) ++status_.sent;
   else if (outcome == SendOutcome::DROPPED) ++status_.dropped;

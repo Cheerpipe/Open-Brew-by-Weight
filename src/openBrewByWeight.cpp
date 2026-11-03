@@ -1184,7 +1184,7 @@ bool currentWeightIsFresh(uint32_t now = millis(),
          currentWeight <= MAX_AUTOMATION_WEIGHT_G &&
          (currentWeightConnectionGeneration == 0 ||
           currentWeightConnectionGeneration == linkGeneration) &&
-         static_cast<int32_t>(now - currentWeightReceivedAtMs) >= 0 &&
+         tickReached(now, currentWeightReceivedAtMs) &&
          static_cast<uint32_t>(now - currentWeightReceivedAtMs) <=
              MAX_AUTOMATION_WEIGHT_AGE_MS;
 }
@@ -1195,7 +1195,7 @@ bool observedWeightIsFresh(uint32_t now = millis(),
          fabsf(observedWeight) <= MAX_PARSED_WEIGHT_G &&
          observedWeightConnectionGeneration != 0 &&
          observedWeightConnectionGeneration == linkGeneration &&
-         static_cast<int32_t>(now - observedWeightReceivedAtMs) >= 0 &&
+         tickReached(now, observedWeightReceivedAtMs) &&
          static_cast<uint32_t>(now - observedWeightReceivedAtMs) <=
              MAX_AUTOMATION_WEIGHT_AGE_MS;
 }

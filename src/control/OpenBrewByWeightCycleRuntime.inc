@@ -36,7 +36,7 @@ void servicePendingScaleTimerStop() {
   if (!pendingScaleTimerStop.pending) return;
   const uint32_t nowMs = millis();
   if (pendingScaleTimerStop.extraDueAtMs != 0U) {
-    if (static_cast<int32_t>(nowMs - pendingScaleTimerStop.extraDueAtMs) >= 0 ||
+    if (tickReached(nowMs, pendingScaleTimerStop.extraDueAtMs) ||
         !scaleAvailable()) {
       completePendingScaleTimerStop();
     }
@@ -47,8 +47,7 @@ void servicePendingScaleTimerStop() {
     return;
   }
   const bool timedOut =
-      static_cast<int32_t>(nowMs -
-                           pendingScaleTimerStop.catchupDeadlineAtMs) >= 0;
+      tickReached(nowMs, pendingScaleTimerStop.catchupDeadlineAtMs);
   if (!session.remoteTimerStartSettled && !timedOut) return;
   const uint32_t extraDelayMs = pendingScaleTimerStop.extraDelayMs;
   if (session.remoteTimerStartSettled && !session.remoteTimerStarted) {
@@ -126,7 +125,7 @@ bool tryQueueRemoteTimerStop() {
   if (!session.stopTimerRequested || session.stopTimerCommandQueued ||
       session.timerStopResult == TimerStopResult::WRITE_SUCCEEDED ||
       session.stopTimerAttempts >= SCALE_STOP_MAX_ATTEMPTS ||
-      static_cast<int32_t>(millis() - session.stopTimerRetryDeadlineMs) >= 0 ||
+      tickReached(millis(), session.stopTimerRetryDeadlineMs) ||
       !scaleAvailable()) {
     return false;
   }
@@ -169,7 +168,7 @@ void serviceRemoteTimerStopRetry() {
   if (!session.stopTimerRequested || session.stopTimerCommandQueued ||
       session.timerStopResult == TimerStopResult::WRITE_SUCCEEDED ||
       session.stopTimerAttempts >= SCALE_STOP_MAX_ATTEMPTS ||
-      static_cast<int32_t>(millis() - session.stopTimerRetryDeadlineMs) >= 0) {
+      tickReached(millis(), session.stopTimerRetryDeadlineMs)) {
     return;
   }
   if (session.stopTimerAttempts > 0 &&
@@ -240,8 +239,8 @@ bool observeCupWeight(float weight, uint32_t atMs, uint32_t sequence,
   if (!std::isfinite(weight) || fabsf(weight) > MAX_PARSED_WEIGHT_G || generation != currentGeneration ||
       elapsedMs(atMs) > MAX_AUTOMATION_WEIGHT_AGE_MS ||
       (mass.sampleSequence != 0 && mass.connectionGeneration == generation &&
-       (static_cast<int32_t>(sequence - mass.sampleSequence) <= 0 ||
-        static_cast<int32_t>(atMs - mass.sampleAtMs) < 0))) {
+       (!tickAfter(sequence, mass.sampleSequence) ||
+        tickBefore(atMs, mass.sampleAtMs)))) {
     resetCupSampleEvidence();
     approveScaleTareSample(WeightSample{});
     return false;
@@ -357,7 +356,7 @@ void notifyWebhookFirstDrop(const FirstFlowObservation &observation) {
   const uint32_t anchor = session.circuitClosedAtMs != 0
                               ? session.circuitClosedAtMs
                               : session.startedAtMs;
-  event.firstDropValid = static_cast<int32_t>(observation.atMs - anchor) >= 0;
+  event.firstDropValid = tickReached(observation.atMs, anchor);
   event.firstDropMs = event.firstDropValid ? observation.atMs - anchor : 0;
   event.weightValid = std::isfinite(observation.weightG);
   event.weightG = event.weightValid ? observation.weightG : 0.0f;
@@ -612,7 +611,7 @@ void applyShotTareResult(const ScaleEvent &event) {
       event.cupWeightRequestId == session.retareRequestId;
   const bool ended = !session.active && lateRetare && pendingFinalize.pending &&
       pendingFinalize.cycleId == session.id &&
-      static_cast<int32_t>(event.receivedAtMs - pendingFinalize.endedAtMs) <= 0;
+      !tickAfter(event.receivedAtMs, pendingFinalize.endedAtMs);
   const ScaleLinkSnapshot link = getScaleLinkSnapshot();
   if (event.cycleId != session.id || !session.startedWithScale ||
       (!ended && (!session.active || stopperState != StopperState::BREW)) ||
@@ -620,7 +619,7 @@ void applyShotTareResult(const ScaleEvent &event) {
       link.state != ScaleLinkState::CONNECTED ||
       event.connectionGeneration != link.connectionGeneration ||
       (event.cupWeightRequestId != 0 && session.appliedTareRequestId != 0 &&
-       static_cast<int32_t>(event.cupWeightRequestId - session.appliedTareRequestId) <= 0)) return;
+       !tickAfter(event.cupWeightRequestId, session.appliedTareRequestId))) return;
   session.appliedTareRequestId = event.cupWeightRequestId;
   session.tareCaptureBoundary = event.captureSequence;
   session.tareConnectionGeneration = event.connectionGeneration;
@@ -647,15 +646,15 @@ void confirmLateRetareBaseline() {
       zero.connectionGeneration != link.connectionGeneration ||
       link.state != ScaleLinkState::CONNECTED ||
       zero.packetSequence == 0 || session.retareZeroCaptureSequence == 0 ||
-      static_cast<int32_t>(atMs - session.startedAtMs) < 0 ||
-      static_cast<int32_t>(session.retareZeroCaptureSequence - session.tareCaptureBoundary) <= 0 ||
-      static_cast<int32_t>(atMs - session.postTareBaselineDeadlineMs) >= 0 ||
-      static_cast<int32_t>(millis() - atMs) < 0 ||
+      tickBefore(atMs, session.startedAtMs) ||
+      !tickAfter(session.retareZeroCaptureSequence, session.tareCaptureBoundary) ||
+      tickReached(atMs, session.postTareBaselineDeadlineMs) ||
+      tickBefore(millis(), atMs) ||
       elapsedMs(atMs) > MAX_AUTOMATION_WEIGHT_AGE_MS ||
       !std::isfinite(zero.weightG) || !postTareBaselinePlausible(zero.weightG) ||
       (!session.active && (!pendingFinalize.pending ||
        pendingFinalize.cycleId != session.id ||
-       static_cast<int32_t>(atMs - pendingFinalize.endedAtMs) > 0))) return;
+       tickAfter(atMs, pendingFinalize.endedAtMs)))) return;
   session.retareEffectPending = false;
   scaleProfileNoteEvent(ScaleProfileEvent::TARE_BASELINE_CONFIRMED, millis(),
                         {.connectionGeneration = zero.connectionGeneration,
@@ -768,7 +767,7 @@ float postStopFinalWeightG(const PendingShotFinalize &pending,
 // a late cup must stand half a minimum cup above the lowest accepted reading
 // of the second before that window started, both in shot coordinates.
 bool cupPlacementIsStep(float weight, uint32_t placementStartedAtMs) {
-  const float startS = static_cast<int32_t>(placementStartedAtMs - shot.startMs) / 1000.0f;
+  const float startS = ticksSince(placementStartedAtMs, shot.startMs) / 1000.0f;
   float baseG = INFINITY;
   for (size_t i = shot.datapoints; i-- > 0;) {
     if (shot.timeS[i] >= startS) continue;
@@ -801,7 +800,7 @@ bool holdLateStartTare(float rawG, uint32_t receivedAtMs, uint32_t packetSequenc
                   fabsf(rawG - session.lastAcceptedWeightG - session.lateTareDroppedZeroG) > halfCupG
             : session.softwareZeroG <= 0.0f || session.cupRemovedPending ||
                   session.weightControlState == WeightControlState::SUSPENDED ||
-                  static_cast<int32_t>(receivedAtMs - session.postTareBaselineDeadlineMs) >=
+                  ticksSince(receivedAtMs, session.postTareBaselineDeadlineMs) >=
                       static_cast<int32_t>(session.config.postTareBaselineGraceMs) ||
                   fabsf(rawG) > halfCupG || !postTareBaselinePlausible(rawG))) {
     session.lateTareSequence = 0;
@@ -868,8 +867,8 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
       postTareBaselinePlausible(weight) &&
       connectionGeneration == scaleConnectionGenerationNow() &&
       (!session.hasWeightAnchor ||
-       (static_cast<int32_t>(receivedAtMs - session.lastAcceptedWeightAtMs) > 0 &&
-        static_cast<int32_t>(packetSequence - session.lastAcceptedPacketSequence) > 0))) {
+       (tickAfter(receivedAtMs, session.lastAcceptedWeightAtMs) &&
+        tickAfter(packetSequence, session.lastAcceptedPacketSequence)))) {
     session.retareZeroSample = {weight, receivedAtMs, packetSequence, connectionGeneration};
     session.retareZeroCaptureSequence = captureSequence;
     confirmLateRetareBaseline();
@@ -974,10 +973,10 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   if (!shouldTrackWeight()) {
     const bool valid = weight >= MIN_AUTOMATION_WEIGHT_G && weight <= MAX_AUTOMATION_WEIGHT_G;
     if (!session.active && pendingFinalize.pending && pendingFinalize.startedWithScale &&
-        static_cast<int32_t>(receivedAtMs - pendingFinalize.endedAtMs) > 0) {
+        tickAfter(receivedAtMs, pendingFinalize.endedAtMs)) {
       const bool continuous = valid &&
           connectionGeneration == pendingFinalize.scaleConnectionGeneration &&
-          static_cast<int32_t>(packetSequence - pendingFinalize.curveLastSequence) > 0 &&
+          tickAfter(packetSequence, pendingFinalize.curveLastSequence) &&
           plausibleSettledBrewWeight(weight, pendingFinalize.lastKnownWeightG,
                                      pendingFinalize.lastKnownWeightValid);
       pendingFinalize.curveBreakPending = !continuous ||
@@ -1022,7 +1021,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     return false;
   }
 
-  if (static_cast<int32_t>(receivedAtMs - shot.startMs) < 0) {
+  if (tickBefore(receivedAtMs, shot.startMs)) {
     rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_PRE_CYCLE, weight);
     profileScaleWeightDecision(false, DebugCode::SCALE_SAMPLE_REJECTED_PRE_CYCLE,
                                weight, receivedAtMs, packetSequence,
@@ -1031,7 +1030,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   }
 
   if (session.awaitingPostTareBaseline && session.retareEffectPending &&
-      static_cast<int32_t>(receivedAtMs - session.postTareBaselineDeadlineMs) >= 0)
+      tickReached(receivedAtMs, session.postTareBaselineDeadlineMs))
     expirePostTareBaseline();
   if (session.awaitingPostTareBaseline) {
     if (session.retareEffectPending) {
@@ -1049,8 +1048,8 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                              .arg1 = session.appliedTareRequestId});
       addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_TARE_BASELINE_CONFIRMED,
                     weightToCentigrams(weight),
-                    static_cast<int32_t>(millis() - (session.postTareBaselineDeadlineMs -
-                                                     session.config.postTareBaselineGraceMs)));
+                    ticksSince(millis(), session.postTareBaselineDeadlineMs -
+                                         session.config.postTareBaselineGraceMs));
       return acceptWeightIntoTrajectory({weight, receivedAtMs, packetSequence});
     }
     rejectScaleSample(DebugCode::SCALE_SAMPLE_REJECTED_SLEW, weight,
@@ -1064,8 +1063,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
 
   bool plausible = true;
   if (session.hasWeightAnchor) {
-    if (static_cast<int32_t>(receivedAtMs -
-                             session.lastAcceptedWeightAtMs) < 0) {
+    if (tickBefore(receivedAtMs, session.lastAcceptedWeightAtMs)) {
       plausible = false;
     } else {
       uint32_t deltaMs = receivedAtMs - session.lastAcceptedWeightAtMs;
@@ -1113,7 +1111,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
       const bool consecutive =
           packetSequence == session.recoveryLastPacketSequence + 1U;
       const int32_t signedDelta =
-          static_cast<int32_t>(receivedAtMs - session.recoveryLastAtMs);
+          ticksSince(receivedAtMs, session.recoveryLastAtMs);
       if (!consecutive || signedDelta <= 0 ||
           static_cast<uint32_t>(signedDelta) > MAX_AUTOMATION_WEIGHT_AGE_MS) {
         recoveryPlausible = false;

@@ -232,7 +232,7 @@ NetworkStatusSnapshot OpenBrewByWeightNetwork::snapshot() {
   if (pendingConfirm) {
     const uint32_t now = millis();
     copy.confirmRemainingMs =
-        static_cast<int32_t>(deadline - now) > 0 ? (deadline - now) : 0;
+        tickAfter(deadline, now) ? (deadline - now) : 0;
   } else {
     copy.confirmRemainingMs = 0;
   }
@@ -439,7 +439,7 @@ void OpenBrewByWeightNetwork::recordCommandResult(
       !sameRequest || static_cast<uint8_t>(state) >=
                           static_cast<uint8_t>(status_.lastCommandState);
   if (status_.lastCommandRequestId == 0 || (sameRequest && nonRegressing) ||
-      static_cast<int32_t>(requestId - status_.lastCommandRequestId) > 0) {
+      tickAfter(requestId, status_.lastCommandRequestId)) {
     status_.lastCommandRequestId = requestId;
     status_.lastCommandState = state;
   }
@@ -604,7 +604,7 @@ void OpenBrewByWeightNetwork::service() {
   // without a restart, keeping the SoftAP (and /setup) alive throughout.
   // Deferred RF gates retry here; the connect itself arms the 180 s window.
   if (setupPhase() == SetupPhase::QUEUED &&
-      static_cast<int32_t>(now - liveApplyRetryAtMs_) >= 0) {
+      tickReached(now, liveApplyRetryAtMs_)) {
     if (!snapshot().apActive) {
       // The onboarding AP went away before the connect could start (AP_STOP
       // or teardown): fall back to the ordinary save-and-restart path.
@@ -639,7 +639,7 @@ void OpenBrewByWeightNetwork::service() {
   }
 
   if (!startupComplete_ &&
-      static_cast<int32_t>(now - networkRetryAtMs_) >= 0) {
+      tickReached(now, networkRetryAtMs_)) {
     if (startNetwork()) {
       startupFailures_ = 0;
       networkRetryAtMs_ = 0;

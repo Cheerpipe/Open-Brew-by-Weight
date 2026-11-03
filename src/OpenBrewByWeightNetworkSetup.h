@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+#include "OpenBrewByWeightTimingTypes.h"
+
 namespace openbrewbyweight {
 
 enum class SetupPhase : uint8_t {
@@ -102,7 +104,7 @@ constexpr bool setupDiscardAllowed(SetupPhase phase) {
 constexpr bool setupFinishAllowed(SetupPhase phase, bool apActive,
                                   uint32_t teardownAtMs, uint32_t now) {
   return apActive && phase != SetupPhase::JOINED && teardownAtMs != 0 &&
-         static_cast<int32_t>(teardownAtMs - now) > 0;
+         tickAfter(teardownAtMs, now);
 }
 
 enum class SoftApTeardown : uint8_t { KEEP, ARM_GRACE, STOP };
@@ -115,8 +117,8 @@ constexpr SoftApTeardown softApTeardownStep(SetupPhase phase, uint8_t apClients,
   return setupKeepsSoftAp(phase) ? SoftApTeardown::KEEP
          : teardownAtMs == 0
              ? (apClients > 0 ? SoftApTeardown::ARM_GRACE : SoftApTeardown::STOP)
-         : static_cast<int32_t>(now - teardownAtMs) >= 0 ? SoftApTeardown::STOP
-                                                          : SoftApTeardown::KEEP;
+         : tickReached(now, teardownAtMs) ? SoftApTeardown::STOP
+                                          : SoftApTeardown::KEEP;
 }
 
 constexpr const char *setupPhaseName(SetupPhase phase) {

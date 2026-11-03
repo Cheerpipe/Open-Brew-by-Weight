@@ -66,6 +66,7 @@ void serviceBackflush(const MachineIntention &intent) {
   }
   if (confirmed && stopperState == StopperState::BACKFLUSH_CANDIDATE) {
     if (!backflushProvenanceCurrent(machineIntegrationBackflush()) ||
+        // cppcheck-suppress knownConditionTrueFalse ; momentary machine builds define machineConfirmBackflush() as constexpr false; paddle builds promote the relay
         !machineConfirmBackflush(backflushRelayGeneration) ||
         !backflushProvenanceCurrent(machineIntegrationBackflush())) {
       endBackflush(true, "promotion_failed");

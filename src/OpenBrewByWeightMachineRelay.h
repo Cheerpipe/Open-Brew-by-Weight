@@ -160,6 +160,7 @@ extern "C" void vApplicationStackOverflowHook(TaskHandle_t, char *) {
 }
 
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
+// cppcheck-suppress constParameterCallback ; the Arduino arduino_panic_handler_t type fixes this non-const signature
 void IRAM_ATTR openBrewByWeightPanicHandler(arduino_panic_info_t *info, void *) {
   // The Arduino core invokes this before its normal panic/reboot path. Keep
   // it allocation-free and flash-independent: only de-energize K1 through
@@ -351,6 +352,7 @@ bool setMachineCircuitClosed(bool closed,
           static_cast<int32_t>(CircuitArmFailReason::SUPERVISOR_UNAVAILABLE));
       return false;
     }
+    // cppcheck-suppress knownConditionTrueFalse ; no current hardware profile defines the circuit feedback GPIO; boards that do read a live input
     if (EXTERNAL_SAFETY_HARDWARE_PRESENT && readCircuitFeedbackClosed()) {
       tripRelaySafety(RelaySafetyFault::FEEDBACK_STUCK_CLOSED);
       addDebugEvent(
@@ -592,6 +594,7 @@ void serviceRelaySafety() {
     }
     portEXIT_CRITICAL(&relayMux);
     if (stillPending && feedbackClosed != expectedClosed) {
+      // cppcheck-suppress knownConditionTrueFalse ; feedbackClosed is constant false without the feedback GPIO; boards with it can read either state
       tripRelaySafety(expectedClosed
                           ? RelaySafetyFault::FEEDBACK_FAILED_TO_CLOSE
                           : RelaySafetyFault::FEEDBACK_STUCK_CLOSED);
@@ -600,6 +603,7 @@ void serviceRelaySafety() {
   }
 
   if (relay.closed != feedbackClosed) {
+    // cppcheck-suppress knownConditionTrueFalse ; feedbackClosed is constant false without the feedback GPIO; boards with it can read either state
     tripRelaySafety(relay.closed
                         ? RelaySafetyFault::FEEDBACK_CHANGED_UNEXPECTEDLY
                         : RelaySafetyFault::FEEDBACK_STUCK_CLOSED);

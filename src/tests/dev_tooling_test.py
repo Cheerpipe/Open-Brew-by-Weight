@@ -1799,6 +1799,8 @@ assert "**" not in cppcheck_suppressions, \
     "Cppcheck suppression globs must use a single '*' wildcard"
 assert "*:*/esp-idf*/components/*" in cppcheck_suppressions, \
     "Cppcheck must suppress dependencies from versioned ESP-IDF checkouts"
+assert "--enable=warning,performance,portability,style" in \
+    (ROOT / "scripts/static-idf").read_text(), "Cppcheck must keep the style category enabled"
 tests_text = "\n".join(path.read_text(errors="replace")
                        for path in (ROOT / "src/tests").iterdir() if path.is_file())
 assert "npm" + " install" not in tests_text and "npm" + " ci" not in tests_text, \

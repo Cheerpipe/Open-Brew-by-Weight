@@ -137,7 +137,7 @@ void OpenBrewByWeightNetwork::keepPasswordChangeSession(httpd_req_t *request,
 
 void OpenBrewByWeightNetwork::serviceWebAccess() {
   const uint32_t now = millis();
-  if ((webAccessRetryAtMs_ != 0 && static_cast<int32_t>(now - webAccessRetryAtMs_) < 0) ||
+  if ((webAccessRetryAtMs_ != 0 && tickBefore(now, webAccessRetryAtMs_)) ||
       !networkFlashWriteAllowed()) {
     return;
   }
@@ -219,6 +219,7 @@ esp_err_t OpenBrewByWeightNetwork::authStatusHandler(httpd_req_t *request) {
   snprintf(json, sizeof(json),
            "{\"loginRequired\":%s,\"signedIn\":%s,\"adminUnlocked\":%s,\"deviceName\":\"%s\"}",
            required ? "true" : "false", signedIn ? "true" : "false",
+           // cppcheck-suppress knownConditionTrueFalse ; development builds make admin public by design: adminUnlockAllowed() returns true
            adminUnlocked ? "true" : "false", name);
   return sendJson(request, STATUS_OK, json);
 }
@@ -488,7 +489,7 @@ bool OpenBrewByWeightNetwork::appendWebAccessStatus(httpd_req_t *request, size_t
   }
   for (uint8_t slot = 0; slot < WEB_ACCESS_BROWSER_SLOTS; ++slot) {
     const auto &browser = g_webAccess.browser[slot];
-    if (browser.live && static_cast<int32_t>(now - browser.untilMs) < 0) {
+    if (browser.live && tickBefore(now, browser.untilMs)) {
       session(WEB_ACCESS_REMEMBERED_SLOTS + slot, browser.label, false,
               static_cast<long>((now - browser.seenMs) / 1000U));
     }

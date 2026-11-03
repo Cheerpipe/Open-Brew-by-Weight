@@ -402,7 +402,7 @@ void OpenBrewByWeightOta::restoreSessionJournal() {
   if (!firstValid && !secondValid) return;
   const OtaJournalRecord &record =
       (!firstValid || (secondValid &&
-       static_cast<int32_t>(second.generation - first.generation) > 0)) ? second : first;
+       tickAfter(second.generation, first.generation))) ? second : first;
   if (!validJournalIdentity(record.identity) || record.identity.size > slotBytes_ ||
       record.received % OTA_WRITE_ALIGNMENT != 0 ||
       record.received >= record.identity.size) {
@@ -592,8 +592,8 @@ bool OpenBrewByWeightOta::isDuplicateRange(uint32_t offset,
 // between leaves `now` behind the last activity. A signed age keeps that from
 // wrapping into an expiry of the session that was just written.
 bool OpenBrewByWeightOta::sessionExpiredLocked(uint32_t now) const {
-  return sessionActive_ && static_cast<int32_t>(now - sessionLastActivityMs_) >=
-                               static_cast<int32_t>(OTA_SESSION_TTL_MS);
+  return sessionActive_ && ticksSince(now, sessionLastActivityMs_) >=
+                                static_cast<int32_t>(OTA_SESSION_TTL_MS);
 }
 
 void OpenBrewByWeightOta::expireSession(uint32_t now, bool flashAllowed, bool wait) {

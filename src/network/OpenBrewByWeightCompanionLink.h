@@ -570,7 +570,7 @@ struct CompanionPairing {
 inline void companionPairTick(CompanionPairing &pairing, uint32_t now) {
   CompanionRequest &request = pairing.request;
   if (request.state == CompanionPairState::PENDING && !request.approving &&
-      static_cast<int32_t>(now - request.untilMs) >= 0)
+      tickReached(now, request.untilMs))
     request.state = CompanionPairState::EXPIRED;
 }
 
@@ -812,8 +812,8 @@ inline bool companionLogPending(uint32_t latest, uint32_t sent) {
 }
 
 inline bool companionLogUrgent(uint32_t urgent, uint32_t latest, uint32_t sent) {
-  return (urgent != 0 && static_cast<int32_t>(urgent - sent) > 0) ||
-         (latest != 0 && static_cast<int32_t>(latest - sent) < 0);
+  return (urgent != 0 && tickAfter(urgent, sent)) ||
+         (latest != 0 && tickBefore(latest, sent));
 }
 
 // Whether the network task may flush pending log events now (plan G and
@@ -1021,7 +1021,7 @@ inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, MicraComp
 inline bool companionLinkSilent(CompanionLinkSlot &slot, MicraCompanionRoute route, uint32_t now,
                                 bool syncHold) {
   if (syncHold && slot.phase == CompanionLinkPhase::READY) slot.heardAtMs = now;
-  return static_cast<int32_t>(now - slot.heardAtMs) >=
+  return ticksSince(now, slot.heardAtMs) >=
          static_cast<int32_t>(companionSilenceLimitMs(slot, route));
 }
 

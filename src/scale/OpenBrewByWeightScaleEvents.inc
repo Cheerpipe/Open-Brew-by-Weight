@@ -433,7 +433,7 @@ void processScaleWorkerEvents() {
       case ScaleEventType::WEIGHT:
         if (session.active && event.captureSequence != 0 &&
             event.connectionGeneration == session.tareConnectionGeneration &&
-            static_cast<int32_t>(event.captureSequence - session.tareCaptureBoundary) <= 0)
+            !tickAfter(event.captureSequence, session.tareCaptureBoundary))
           break; // Exclude buffered evidence before publishing machine sense.
         if (!std::isfinite(event.weightG) ||
             fabsf(event.weightG) > MAX_PARSED_WEIGHT_G) {
@@ -447,8 +447,7 @@ void processScaleWorkerEvents() {
         }
         {
           if (session.active &&
-              static_cast<int32_t>(event.receivedAtMs -
-                                   session.startedAtMs) < 0) {
+              tickBefore(event.receivedAtMs, session.startedAtMs)) {
             session.touchStop = {};
             char detail[DEBUG_EVENT_TEXT_CAPACITY];
             snprintf(detail, sizeof(detail),

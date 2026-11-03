@@ -402,7 +402,7 @@ class ShotTrace {
     for (size_t i = 0; i < ringCount_; ++i) {
       buffer.preShot[i] = shotTraceStore.ring[i];
       const int32_t age =
-          static_cast<int32_t>(buffer.header.anchorMs - shotTraceStore.ringAtMs[i]);
+          ticksSince(buffer.header.anchorMs, shotTraceStore.ringAtMs[i]);
       buffer.preShot[i].event.head |= age <= 0 ? 0
           : static_cast<uint32_t>(age) > SHOT_TRACE_MS_MAX ? SHOT_TRACE_MS_MAX
                                                            : static_cast<uint32_t>(age);
@@ -800,7 +800,7 @@ class ShotTrace {
   }
 
   uint32_t timeOfLocked_(uint32_t nowMs) const {
-    const int32_t ms = static_cast<int32_t>(nowMs - capture_->header.anchorMs);
+    const int32_t ms = ticksSince(nowMs, capture_->header.anchorMs);
     return ms <= 0 ? 0 : static_cast<uint32_t>(ms) > SHOT_TRACE_MS_MAX
                              ? SHOT_TRACE_MS_MAX : static_cast<uint32_t>(ms);
   }
@@ -974,7 +974,7 @@ class ShotTrace {
               header.endedAtMs != key.endedAtMs)))
           continue;
         const bool newer = found != nullptr &&
-            static_cast<int32_t>(generationOf_[i] - generationOf_[slotOf_(*found)]) > 0;
+            tickAfter(generationOf_[i], generationOf_[slotOf_(*found)]);
         if (found == nullptr || newer == (pick == Pick::NEWEST)) found = &buffer;
       }
       trace.generation = found != nullptr ? generationOf_[slotOf_(*found)] : 0;

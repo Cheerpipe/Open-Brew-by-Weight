@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "OpenBrewByWeightTimingTypes.h"
+
 namespace openbrewbyweight {
 
 // Dual-slot pick by wrapping uint32 revision: settings, BLE scan intensity and
@@ -15,7 +17,7 @@ enum class DualSlotChoice : uint8_t {
 
 inline bool secondRevisionIsNewer(uint32_t firstRevision,
                                   uint32_t secondRevision) {
-  return static_cast<int32_t>(secondRevision - firstRevision) > 0;
+  return tickAfter(secondRevision, firstRevision);
 }
 
 inline DualSlotChoice chooseNewerRevision(bool firstValid,

@@ -687,6 +687,7 @@ void serviceCompatibilityMirror(const MachineIntention &intent) {
   machineSetActivatorDriveAllowed(true);
   machineAllowCurrentActivatorHold();
   if (!servicePowerManagement() ||
+      // cppcheck-suppress knownConditionTrueFalse ; momentary machine builds define a constexpr true compatibility drive; paddle builds can fail it
       !machineServiceCompatibilityDrive(intent)) {
     transitionTo(StopperState::REQUIRES_OFF);
   }

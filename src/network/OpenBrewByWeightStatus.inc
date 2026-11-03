@@ -34,6 +34,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
   const uint32_t webUiOverrideRemainingMs =
       webUiOverrideActive ? self.webUiOverrideRemainingMs(request) : 0;
   const bool adminUnlocked = self.adminUnlockAllowed(request);
+  // cppcheck-suppress knownConditionTrueFalse ; development builds make admin public by design: adminUnlockAllowed() returns true
   if (adminUnlocked) {
     self.touchAdminUnlock();
   }
@@ -159,6 +160,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         control.config.timezoneAutomatic ? "true" : "false",
         durableTimezoneSaved().load() ? "true" : "false");
   }
+  // cppcheck-suppress knownConditionTrueFalse ; development builds make admin public by design: adminUnlockAllowed() returns true
   if (ok && adminUnlocked) {
     ok = statusJsonAppend(
         &used,
@@ -204,9 +206,11 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
     }
     ok = statusJsonAppend(&used,
                           ",\"adminUnlocked\":%s,\"development\":%s,\"factoryPassword\":%s",
+                          // cppcheck-suppress knownConditionTrueFalse ; development builds make admin public by design: adminUnlockAllowed() returns true
                           adminUnlocked ? "true" : "false",
                           DEVELOPMENT_BUILD ? "true" : "false",
                           factoryPassword ? "true" : "false");
+    // cppcheck-suppress knownConditionTrueFalse ; development builds make admin public by design: adminUnlockAllowed() returns true
     if (ok && !adminUnlocked) {
       ok = statusJsonAppend(
           &used,

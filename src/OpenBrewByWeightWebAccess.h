@@ -182,7 +182,7 @@ inline bool webAccessSessionValid(WebAccessState &state,
                                   Instant now) {
   for (auto &browser : state.browser) {
     if (browser.live && webAccessTokenEqual(browser.token, token)) {
-      if (static_cast<int32_t>(now.monotonicMs - browser.untilMs) < 0) {
+      if (tickBefore(now.monotonicMs, browser.untilMs)) {
         browser.seenMs = now.monotonicMs;
         return true;
       }
@@ -232,7 +232,7 @@ inline void webAccessIssueSession(WebAccessState &state,
     WebAccessState::Browser *target = &state.browser[0];
     for (auto &browser : state.browser) {
       if (!browser.live) { target = &browser; break; }
-      if (static_cast<int32_t>(browser.untilMs - target->untilMs) < 0) target = &browser;
+      if (tickBefore(browser.untilMs, target->untilMs)) target = &browser;
     }
     memcpy(target->token, token, WEB_ACCESS_TOKEN_BYTES);
     target->untilMs = now.monotonicMs + WEB_ACCESS_BROWSER_MS;
@@ -350,7 +350,7 @@ inline void webAccessForgetHomeAssistant(WebAccessState &state) {
 inline void webAccessTickPairing(WebAccessState &state, uint32_t nowMs) {
   auto &pairing = state.pairing;
   if (pairing.state == WebAccessPairing::NONE ||
-      static_cast<int32_t>(nowMs - pairing.untilMs) < 0) {
+      tickBefore(nowMs, pairing.untilMs)) {
     return;
   }
   if (pairing.state == WebAccessPairing::PENDING) {
@@ -455,6 +455,7 @@ struct WebAccessPasswordPeer {
 
 // The peer's slot, or a free one claimed for it; nullptr while all are busy.
 inline WebAccessPasswordPeer *webAccessPasswordSlot(
+    // cppcheck-suppress constParameterReference ; the claimed slot is written through *free and through the returned pointer
     WebAccessPasswordPeer (&peers)[WEB_ACCESS_PASSWORD_PEERS], uint32_t peer, uint32_t nowMs) {
   WebAccessPasswordPeer *free = nullptr;
   for (auto &slot : peers) {

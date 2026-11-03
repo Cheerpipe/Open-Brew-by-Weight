@@ -984,6 +984,7 @@ bool OpenBrewByWeightNetwork::authorizeOtaRequest(httpd_req_t *request) {
     return true;
   }
   // A browser additionally needs its sign-in while the login is on.
+  // cppcheck-suppress knownConditionTrueFalse ; development builds make admin public by design: adminUnlockAllowed() returns true
   if (adminUnlockAllowed(request) && webAccessSessionAllowed(request)) {
     touchAdminUnlock();
     return true;
