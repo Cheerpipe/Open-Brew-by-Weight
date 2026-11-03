@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include <type_traits>
+
 #include "OpenBrewByWeightResetHistory.h"
 
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
@@ -30,6 +32,9 @@ struct SafetyResetRecord {
   uint32_t currentUptimeMs;
   uint32_t currentUptimeMsInverse;
 };
+// The record lives in RTC no-init memory and must survive resets: any
+// constructor would run at boot and overwrite the evidence it carries.
+static_assert(std::is_trivially_default_constructible_v<SafetyResetRecord>);
 
 struct SafetyResetSnapshot {
   uint32_t reasonCode = 0;

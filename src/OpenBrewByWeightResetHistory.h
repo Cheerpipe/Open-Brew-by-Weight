@@ -6,9 +6,12 @@ namespace openbrewbyweight {
 
 constexpr uint8_t RESET_HISTORY_CAPACITY = 10;
 
+// Trivial on purpose: SafetyResetRecord keeps these entries in RTC no-init
+// memory, where a default member initializer becomes a constructor that runs
+// at every boot and erases them. Value-initialize ({}) everywhere else.
 struct ResetHistoryEntry {
-  uint32_t reasonCode = 0;
-  uint32_t uptimeMs = 0;
+  uint32_t reasonCode;
+  uint32_t uptimeMs;
 };
 
 // FNV-style mix over the history entries, seeded per persisted record (seed

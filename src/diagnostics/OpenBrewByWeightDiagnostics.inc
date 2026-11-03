@@ -1226,6 +1226,8 @@ struct BootRecoveryStackNote {
   uint32_t operation;
   uint32_t check;
 };
+// Lives in RTC no-init memory: a constructor would run at boot and erase it.
+static_assert(std::is_trivially_default_constructible_v<BootRecoveryStackNote>);
 constexpr uint32_t BOOT_RECOVERY_STACK_MAGIC = 0x52535431UL;  // "RST1"
 RTC_NOINIT_ATTR BootRecoveryStackNote bootRecoveryStackNote;
 

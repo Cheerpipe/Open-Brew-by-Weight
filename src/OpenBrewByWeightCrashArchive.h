@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <type_traits>
+
 #ifdef OPEN_BREW_BY_WEIGHT_CRASH_HOST_TEST
 #include "tests/crash_archive_host_stubs.h"
 #elif !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
@@ -27,6 +29,8 @@ struct CrashAddressRecord {
   uint8_t elfSha256[32];
   uint32_t checksum;
 };
+// Lives in RTC no-init memory: a constructor would run at boot and erase it.
+static_assert(std::is_trivially_default_constructible_v<CrashAddressRecord>);
 
 struct CrashArchiveEntry {
   uint32_t magic;
