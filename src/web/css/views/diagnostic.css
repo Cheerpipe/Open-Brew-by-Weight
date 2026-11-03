@@ -103,6 +103,7 @@
 }
 
 .logBox {
+  container-type: inline-size;
   overflow: hidden;
   border: 1px solid var(--bd);
   border-radius: 0.5rem;
@@ -167,6 +168,27 @@
 #logJumpButton .cfgIcon {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+/* A narrow box lays the bar out in two rows by design: the filters share the
+   width, and the time steps spread evenly under a hairline. */
+@container (width < 34rem) {
+  .logBar > .logChip {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .logBar > .logChip > :is(.cv, .x) {
+    margin-left: auto;
+  }
+
+  .logNav {
+    flex-basis: 100%;
+    justify-content: space-evenly;
+    margin: 0 -0.3rem;
+    padding-top: 0.15rem;
+    border-top: 1px solid var(--ln);
+  }
 }
 
 .logChip {
