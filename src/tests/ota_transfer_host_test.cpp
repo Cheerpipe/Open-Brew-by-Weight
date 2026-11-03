@@ -127,7 +127,7 @@ void testFragmentedHeaderAndTail() {
   CHECK(ota->commit() == OtaResult::COMMITTED);
   CHECK(ota->createSession(image.identity, hostMillis) == OtaResult::COMMITTED);
   CHECK(ota->discard() == OtaResult::COMMITTED);
-  CHECK(std::string(OpenBrewByWeightOta::resultName(OtaResult::COMMITTED)) == "OTA_ALREADY_FLASHED");
+  CHECK(std::string(otaResultName(OtaResult::COMMITTED)) == "OTA_ALREADY_FLASHED");
 }
 
 void testInterruptedRangeAndAlignment() {
@@ -312,7 +312,7 @@ void testJournalFailureHasDistinctResult() {
   persistence_host::failNextWrite = true;
   CHECK(ota->createSession(image.identity, hostMillis) ==
         OtaResult::JOURNAL_FAILED);
-  CHECK(std::string(OpenBrewByWeightOta::resultName(OtaResult::JOURNAL_FAILED)) ==
+  CHECK(std::string(otaResultName(OtaResult::JOURNAL_FAILED)) ==
         "OTA_JOURNAL_FAILED");
   const NvsDiagnosticSnapshot nvs = captureNvsDiagnostics();
   CHECK(nvs.lastFailure.present);

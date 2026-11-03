@@ -938,7 +938,7 @@ const char *otaResultHttpStatus(OtaResult result) {
 }
 
 // Every OTA result sentence lives in the locale catalog (err.*): the
-// reason-bearing sites above pass resultName(result) as the reason and
+// reason-bearing sites above pass otaResultName(result) as the reason and
 // let sendError resolve the prose from the generated table.
 
 
@@ -1015,7 +1015,7 @@ void OpenBrewByWeightNetwork::buildOtaJson(char *buffer, size_t capacity,
       static_cast<unsigned int>(OTA_PROTOCOL_VERSION), ota_.available ? "true" : "false",
       OpenBrewByWeightOta::stateName(ota_.state),
       static_cast<unsigned long>(ota_.slotBytes), static_cast<unsigned long>(ota_.receivedBytes),
-      static_cast<unsigned long>(ota_.expectedBytes), OpenBrewByWeightOta::resultName(ota_.lastResult),
+      static_cast<unsigned long>(ota_.expectedBytes), otaResultName(ota_.lastResult),
       static_cast<unsigned long>(ota_.lastReceivedBytes), static_cast<unsigned long>(ota_.lastExpectedBytes),
       ota_.pendingVerify ? "true" : "false",
       ota_.confirmed ? "true" : "false", safe ? "true" : "false",
@@ -1224,8 +1224,8 @@ esp_err_t OpenBrewByWeightNetwork::otaSessionWork(httpd_req_t *request) {
                                              : HeapLifecycleResult::FAILURE);
   if (result != OtaResult::OK) {
     return sendError(request, otaResultHttpStatus(result),
-                     OpenBrewByWeightOta::resultName(result), nullptr,
-                     OpenBrewByWeightOta::resultName(result));
+                     otaResultName(result), nullptr,
+                     otaResultName(result));
   }
   return self.sendOtaSnapshot(request, STATUS_OK);
 }
@@ -1306,8 +1306,8 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
     self.log(DebugCategory::NETWORK, DebugCode::OTA_UPLOAD_REJECTED,
              static_cast<int32_t>(result),
              static_cast<int32_t>(snapshot.lastReceivedBytes / 1024U));
-    return rejectRange(otaResultHttpStatus(result), OpenBrewByWeightOta::resultName(result),
-                       nullptr, OpenBrewByWeightOta::resultName(result));
+    return rejectRange(otaResultHttpStatus(result), otaResultName(result),
+                       nullptr, otaResultName(result));
   }
   snapshot = ota.snapshot();
   if (snapshot.stagedValid) {
@@ -1345,8 +1345,8 @@ esp_err_t OpenBrewByWeightNetwork::otaFlashWork(httpd_req_t *request) {
   // A retried flash after a failed restart request asks for the restart again.
   if (result != OtaResult::OK && result != OtaResult::COMMITTED) {
     return sendError(request, otaResultHttpStatus(result),
-                     OpenBrewByWeightOta::resultName(result),
-                     nullptr, OpenBrewByWeightOta::resultName(result));
+                     otaResultName(result),
+                     nullptr, otaResultName(result));
   }
   if (result == OtaResult::OK) {
     self.log(DebugCategory::NETWORK, DebugCode::OTA_FLASH_COMMITTED,
@@ -1385,8 +1385,8 @@ esp_err_t OpenBrewByWeightNetwork::otaAbortWork(httpd_req_t *request) {
       ? HeapLifecycleResult::SUCCESS : HeapLifecycleResult::FAILURE);
   if (result != OtaResult::OK) {
     return sendError(request, otaResultHttpStatus(result),
-                     OpenBrewByWeightOta::resultName(result), nullptr,
-                     OpenBrewByWeightOta::resultName(result));
+                     otaResultName(result), nullptr,
+                     otaResultName(result));
   }
   return self.sendOtaSnapshot(request, STATUS_OK);
 }

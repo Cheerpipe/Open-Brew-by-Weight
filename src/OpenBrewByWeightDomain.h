@@ -56,6 +56,7 @@
 #include "OpenBrewByWeightScaleTypes.h"
 #include "OpenBrewByWeightBrewTypes.h"
 #include "OpenBrewByWeightNetworkTypes.h"
+#include "OpenBrewByWeightOtaResult.h"
 #include "OpenBrewByWeightTimeZone.h"
 
 namespace openbrewbyweight {
@@ -3034,8 +3035,8 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
                static_cast<unsigned long>(event.argument2));
       return true;
     case DebugCode::OTA_UPLOAD_REJECTED:
-      snprintf(message, capacity, "OTA upload rejected reason=%ld at %ld KiB",
-               static_cast<long>(event.argument1),
+      snprintf(message, capacity, "OTA upload rejected reason=%s at %ld KiB",
+               otaResultName(static_cast<OtaResult>(event.argument1)),
                static_cast<long>(event.argument2));
       return true;
     case DebugCode::OTA_FLASH_COMMITTED:

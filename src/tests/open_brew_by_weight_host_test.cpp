@@ -6496,6 +6496,15 @@ void d16_scale_connect_debug_reports_phases() {
   CHECK(formatLifecycleDebugMessage(failed, message, sizeof(message)));
   CHECK(std::string(message).find("connect failed") != std::string::npos);
   CHECK(std::string(message).find("step=connect") != std::string::npos);
+  DebugEvent otaRejected = {};
+  otaRejected.code = DebugCode::OTA_UPLOAD_REJECTED;
+  otaRejected.argument1 = static_cast<int32_t>(OtaResult::SESSION_EXPIRED);
+  otaRejected.argument2 = 960;
+  CHECK(formatLifecycleDebugMessage(otaRejected, message, sizeof(message)));
+  CHECK(std::string(message) == "OTA upload rejected reason=OTA_SESSION_EXPIRED at 960 KiB");
+  otaRejected.argument1 = 255;
+  CHECK(formatLifecycleDebugMessage(otaRejected, message, sizeof(message)));
+  CHECK(std::string(message).find("reason=UNKNOWN") != std::string::npos);
   CHECK(debugCodeDefaultLevel(DebugCode::SCALE_CONNECT_FAILED) ==
         LogLevel::WARNING);
   CHECK(debugCodeDefaultLevel(DebugCode::SCALE_SCAN_STARTED) == LogLevel::INFO);

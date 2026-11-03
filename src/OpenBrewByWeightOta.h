@@ -18,6 +18,7 @@
 //    the machine is not left without an application. USB recovery remains.
 
 #include "OpenBrewByWeightOtaImage.h"
+#include "OpenBrewByWeightOtaResult.h"
 #include "OpenBrewByWeightResourceOwner.h"
 #include "OpenBrewByWeightTaskMutex.h"
 
@@ -60,41 +61,6 @@ enum class OtaState : uint8_t {
   RECEIVING,
   STAGED,
   COMMITTED,  // boot partition switched; waiting for the restart
-};
-
-enum class OtaResult : uint8_t {
-  OK = 0,
-  UNAVAILABLE,
-  BUSY,
-  PENDING_VERIFY,  // this boot has not proven itself yet; esp_ota_begin refuses
-  BAD_LENGTH,
-  TOO_LARGE,
-  RECEIVE_FAILED,
-  BAD_IMAGE,
-  NO_TAG,
-  ARCH_MISMATCH,
-  DOWNGRADE,
-  WRITE_FAILED,
-  VERIFY_FAILED,
-  SAFETY_LOST,
-  NOTHING_STAGED,
-  COMMIT_FAILED,
-  NO_MEMORY,
-  // This build never declared which board it is for, so no image can be proven
-  // compatible with it. Reachable on firmware not produced by ./scripts/dev build.
-  NO_IDENTITY,
-  SESSION_REQUIRED,
-  SESSION_CONFLICT,
-  SESSION_IDENTITY_MISMATCH,
-  OFFSET_MISMATCH,
-  INVALID_RANGE,
-  HASH_MISMATCH,
-  SESSION_EXPIRED,
-  JOURNAL_FAILED,
-  INTERNAL,
-  // A verified image is already selected for the next boot; only a restart
-  // remains. Appended so existing numeric results keep their values.
-  COMMITTED,
 };
 
 constexpr size_t OTA_TRANSFER_ID_CAPACITY = 65;
@@ -300,7 +266,6 @@ class OpenBrewByWeightOta {
 
   OtaImageTag stagedTag() const;
 
-  static const char *resultName(OtaResult result);
   static const char *stateName(OtaState state);
 
   private:
