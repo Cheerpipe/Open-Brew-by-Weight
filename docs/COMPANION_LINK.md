@@ -699,3 +699,14 @@ claim and safety gates. The signature adds only this:
   digits of FNV-1a over its `X-WebUI-Client`, or `""`. `adminUnlocked` and
   `webUiOverrideActive` on that stream stay `false` for a screen's unlock or
   override, so each screen compares the tag with its own id.
+- **Per-session fields.** The companion hands later screens its copy of
+  Home, Settings and Diagnostic, so a field the controller computes for one
+  stream session would reach them stale. Each one is listed in
+  `src/tests/fixtures/companion_replay_v1.json` with how the companion
+  treats it: today only Home's `timeUtcSec`, a `clock` that the controller
+  sends only when the session opens or its clock resynchronizes, and that
+  the companion moves on by the seconds its copy has waited. The web
+  contract `27-companion-replay` fails when a sender reads session state
+  for a field the fixture does not list; the companion's tests hold its
+  code to a copy of the file. SHA-256 of the current file:
+  `10c1609c9b253db1750db426e76d923a42acb5d65aa0ba865ff5d1061b26d076`.
