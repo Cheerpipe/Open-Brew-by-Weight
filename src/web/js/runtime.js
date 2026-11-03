@@ -421,23 +421,27 @@ function updateHeaderSignals(s = {}) {
         ? __WEBUI_TEXT__("admin.companion_link_down") +
           (s.companion.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "")
         : unavailable;
+    const web =
+      !paired || stale
+        ? unavailable
+        : through
+          ? __WEBUI_TEXT__("shell.companion_web_through")
+          : __WEBUI_TEXT__("shell.companion_web_direct");
     companion.title =
       __WEBUI_TEXT__("shell.companion") +
       ": " +
       (paired && !stale
         ? sub(__WEBUI_TEXT__("shell.companion_link_state"), [label]) +
           " · " +
-          sub(__WEBUI_TEXT__("shell.companion_web_state"), [
-            through
-              ? __WEBUI_TEXT__("shell.companion_web_through")
-              : __WEBUI_TEXT__("shell.companion_web_direct"),
-          ])
+          sub(__WEBUI_TEXT__("shell.companion_web_state"), [web])
         : label);
     companion.setAttribute("aria-label", companion.title);
     const identity = $("companionName"),
-      detail = $("companionDetail");
+      detail = $("companionDetail"),
+      webUi = $("companionWeb");
     if (identity) identity.textContent = paired ? s.companion.name || "—" : "—";
     if (detail) detail.textContent = label;
+    if (webUi) webUi.textContent = web;
   }
   // The La Marzocco cloud link, Micra builds only: the feed's observation
   // quality decides — live (current, or a command the cloud has yet to

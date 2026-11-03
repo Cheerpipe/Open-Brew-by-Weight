@@ -15,7 +15,7 @@
   const elements = Object.fromEntries([...['wifi', 'bluetooth'].flatMap((kind, i) => [
     [kind + 'Signal', buttons[i]], [kind + 'Details', {hidden: true}],
     [kind + 'Name', {}], [kind + 'Detail', {}],
-  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}],
+  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}], ['companionWeb', {}],
     ['micraSignal', micraButton], ['micraName', {}], ['micraMachine', {}], ['micraDetail', {}],
     ['micraRoute', {textContent: '—'}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
@@ -73,6 +73,8 @@
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas'}});
   assert.equal(elements.companionSignal.dataset.level, 'partial', 'A page served by the companion keeps one rack lit while the link is down');
   assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Not connected \u00b7 Web UI: Through the companion');
+  assert.equal(elements.companionDetail.textContent, 'Not connected', 'The popup keeps the link row');
+  assert.equal(elements.companionWeb.textContent, 'Through the companion', 'The popup names how this page is served');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
   assert.equal(elements.companionSignal.dataset.level, 'on', 'An open link lights both racks even through the companion');
   context.updateHeaderSignals({snapshotStale: true, connections: {}, companion: {paired: true, link: 'down', name: 'nas'}});

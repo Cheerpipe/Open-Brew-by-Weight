@@ -2311,6 +2311,7 @@
     "shell.companion": "Companion",
     "shell.companion_link_state": "Link: {0}",
     "shell.companion_server": "Server",
+    "shell.companion_web": "Web UI",
     "shell.companion_web_direct": "Direct",
     "shell.companion_web_state": "Web UI: {0}",
     "shell.companion_web_through": "Through the companion",
