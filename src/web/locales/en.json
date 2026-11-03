@@ -2316,6 +2316,7 @@
     "shell.companion_relay_serving": "Serving this page",
     "shell.companion_relay_state": "Relay: {0}",
     "shell.companion_server": "Server",
+    "shell.confirm": "Confirm",
     "shell.device_password": "Device password",
     "shell.diagnostic": "Diagnostic",
     "shell.firmware_boot": "Firmware \u2014 \u00b7 Boot \u2014",

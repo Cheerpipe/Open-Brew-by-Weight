@@ -1551,7 +1551,8 @@ if (!codeIncludes(ui, 'id="learnedOffsetG"') ||
     html.indexOf('id="dripSetG"') > html.indexOf('id="alphaSet"') ||
     !codeIncludes(ui, 'Expected drip weight after the shot stops') ||
     codeIncludes(ui, 'Save new reset values first') ||
-    !codeIncludes(ui, 'type: "submit", className: "numSet", id: button') ||
+    !codeIncludes(html, '<button id="dripSetButton" class="numSet" type="submit"') ||
+    !codeIncludes(html, '<button id="alphaSetButton" class="numSet" type="submit"') ||
     !css.includes('.numBox:has(>input[data-edited])>button.numSet{width:4.6rem;border-left-color:var(--ln);opacity:1;pointer-events:auto') ||
     !css.includes('.numBox:has(>input[data-edited])>button.numUndo{width:2.75rem;border-left-color:var(--ln);opacity:1;pointer-events:auto') ||
     !css.includes('.numBox:has(>input[data-edited])>input{padding-right:13rem') ||

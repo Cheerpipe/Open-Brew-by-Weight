@@ -30,7 +30,7 @@
     <button type="button" id="setupStart" class="setupPrimary">{{webui:setup.start}}</button>
   </div>
   <div id="setupMode" hidden>
-    <fieldset class="setupChoices" aria-labelledby="setupTitle">
+    <div class="setupChoices" role="radiogroup" aria-labelledby="setupTitle">
       <label class="setupChoice"
         ><input type="radio" name="setupMode" value="usual" checked /><span
           ><b>{{webui:setup.mode_usual}}</b><small>{{webui:setup.mode_usual_hint}}</small></span
@@ -43,14 +43,14 @@
           ><small>{{webui:setup.mode_weight_hint}}</small></span
         ></label
       >
-    </fieldset>
+    </div>
     <button type="button" id="setupModeNext" class="setupPrimary">{{webui:setup.continue}}</button>
     <button type="button" id="setupModeBack" class="textLock setupBack">
       {{webui:setup.back}}
     </button>
   </div>
   <div id="setupRecipe" hidden>
-    <fieldset class="setupChoices" aria-labelledby="setupTitle">
+    <div class="setupChoices" role="radiogroup" aria-labelledby="setupTitle">
       <label class="setupChoice"
         ><input type="radio" name="setupRecipe" value="255" checked /><span
           ><b>{{webui:setup.recipe_manual}}</b
@@ -86,7 +86,7 @@
           ><small>{{webui:setup.recipe_single_fixed_hint}}</small></span
         ></label
       >
-    </fieldset>
+    </div>
     <button type="button" id="setupRecipeNext" class="setupPrimary">
       {{webui:setup.continue}}
     </button>

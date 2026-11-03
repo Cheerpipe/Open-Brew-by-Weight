@@ -2507,7 +2507,6 @@ function showInactiveOverlay() {
   inactiveOverlayTimer = 0;
   setInactiveError("");
   document.body.classList.add("webUiInactive");
-  el.setAttribute("aria-hidden", "false");
   // Modal: the page behind is inert.
   for (const n of el.parentElement.children) n.inert = n !== el;
   if (!el.classList.contains("isVisible")) {
@@ -2530,10 +2529,10 @@ function hideInactiveOverlay() {
   el.classList.remove("isVisible");
   document.body.classList.remove("webUiInactive");
   offerArchiveView(false);
-  for (const n of el.parentElement.children) n.inert = false;
+  // The page comes back; the fading overlay is out of focus and reach.
+  for (const n of el.parentElement.children) n.inert = n === el;
   clearTimeout(inactiveOverlayTimer);
   inactiveOverlayTimer = setTimeout(() => {
-    el.setAttribute("aria-hidden", "true");
     inactiveOverlayTimer = 0;
     setOverlayReconnectMode(false);
   }, 500);

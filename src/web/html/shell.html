@@ -454,7 +454,7 @@
       class="inactiveOverlay"
       role="dialog"
       aria-modal="true"
-      aria-hidden="true"
+      inert
       aria-labelledby="inactiveHint"
     >
       <div class="inactiveMain">
@@ -538,13 +538,8 @@
         <div class="btnBar">
           <button class="btnGlyph" type="submit" value="cancel">
             <span class="t">{{webui:shell.cancel}}</span></button
-          ><!-- [html-validate-disable-next text-content -- askConfirm writes the label when the dialog opens] --><button
-            id="confirmOk"
-            class="btnGlyph"
-            type="submit"
-            value="ok"
-          >
-            <span class="t"></span>
+          ><button id="confirmOk" class="btnGlyph" type="submit" value="ok">
+            <span class="t">{{webui:shell.confirm}}</span>
           </button>
         </div>
       </form>

@@ -4,19 +4,22 @@
     "html-validate:a11y"
   ],
   "rules": {
-    "void-style": "off",
-    "attribute-boolean-style": "off",
-    "no-trailing-whitespace": "off",
-    "long-title": "off",
-    "attr-case": "off",
-    "no-raw-characters": "off",
-    "doctype-style": "off",
     "no-inline-style": "error",
-    "wcag/h71": "off",
-    "hidden-focusable": "off",
     "text-content": [
       "error",
       {}
+    ],
+    "void-style": [
+      "error",
+      {
+        "style": "selfclose"
+      }
+    ],
+    "doctype-style": [
+      "error",
+      {
+        "style": "lowercase"
+      }
     ]
   }
 }

@@ -1858,33 +1858,17 @@ export function init() {
       el.addEventListener("change", fn);
     });
   // Set drip and Set learning speed apply at once; the field keeps the
-  // owner's value until the readback confirms it. Two keys live inside the
-  // field, left of the − key, and show only while an edit is pending
+  // owner's value until the readback confirms it. Their two keys move inside
+  // the field, left of the − key, and show only while an edit is pending
   // (input[data-edited]): Set applies (as the form's submit button it also
   // answers Enter); the undo key puts the value in use back without
   // applying anything.
-  for (const [input, button, undo, key, label] of [
-    ["dripSetG", "dripSetButton", "dripUndoButton", "dripG", __WEBUI_TEXT__("settings.set_drip")],
-    [
-      "alphaSet",
-      "alphaSetButton",
-      "alphaUndoButton",
-      "alpha",
-      __WEBUI_TEXT__("settings.set_learning_speed"),
-    ],
+  for (const [input, button, undo, key] of [
+    ["dripSetG", "dripSetButton", "dripUndoButton", "dripG"],
+    ["alphaSet", "alphaSetButton", "alphaUndoButton", "alpha"],
   ]) {
-    const apply = document.createElement("button");
-    Object.assign(apply, { type: "submit", className: "numSet", id: button });
-    apply.setAttribute("aria-label", label);
-    apply.innerHTML =
-      '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l4.7 4.7L19.5 6.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">' +
-      __WEBUI_TEXT__("settings.set") +
-      "</span>";
-    const restore = document.createElement("button");
-    Object.assign(restore, { type: "button", className: "numUndo", id: undo });
-    restore.setAttribute("aria-label", __WEBUI_TEXT__("settings.undo"));
-    restore.innerHTML =
-      '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 5v6h5.5M5.2 16a8.6 8.6 0 1 0 2-9.1L2.5 11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const apply = $(button),
+      restore = $(undo);
     $(input).closest(".numBox").append(apply, restore);
     $(input).addEventListener("input", () => {
       $(input).dataset.edited = "1";

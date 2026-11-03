@@ -461,7 +461,7 @@ if (!rawViewJs.stats.includes('R.escHtml(__WEBUI_TEXT__("runtime.stats_preset_fi
   need(!/<menu\b/.test(all), 'buttons inside menu');
   need(['id="headerSignals" class="headerSignals" role="group"', 'id="shotSort" class="shotSort" role="group"',
     'id="historySort" class="shotSort" role="group"'].every((s) => all.includes(s)), 'labelled groups');
-  need((partialHtml.setup.match(/<fieldset class="setupChoices" aria-labelledby="setupTitle">/g) || []).length === 2, 'setup choice groups');
+  need((partialHtml.setup.match(/<div class="setupChoices" role="radiogroup" aria-labelledby="setupTitle">/g) || []).length === 2, 'setup choice groups');
   need(!all.includes('<span class="g">') && !/<span class="g">/.test(rawViewJs.history + rawViewJs.stats + rawViewJs.admin), 'decorative glyphs hidden');
   need(shellHtml.includes('aria-labelledby="inactiveHint">') && !shellHtml.includes('aria-labelledby="webUiReload"'), 'inactive dialog name');
   // RV-03: the only History criterion keeps the selected look without a static pressed state.

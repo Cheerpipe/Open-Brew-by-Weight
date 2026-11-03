@@ -5,16 +5,19 @@
   assert(!html.includes('id="bbwAlgorithm"'));
   assert(!html.includes('Linear prediction + adaptive EWMA'));
   // Drip compensation: one value, a recent-shots chart, and the apply and
-  // undo keys settings.js builds inside the number fields; the starting
-  // values and the two resets are gone.
+  // undo keys each form declares (Set is its submit button), which
+  // settings.js moves inside the number fields; the starting values and the
+  // two resets are gone.
   for (const id of ['resetCalibrationButton', 'resetEwmaButton', 'weightOffsetBaselineG', 'bbwAlphaBaseline'])
     assert(!html.includes('id="' + id + '"'), id);
-  for (const id of ['dripSetButton', 'alphaSetButton', 'dripUndoButton', 'alphaUndoButton'])
-    assert(!html.includes('id="' + id + '"'), id);
+  for (const [set, undo] of [['dripSetButton', 'dripUndoButton'], ['alphaSetButton', 'alphaUndoButton']]) {
+    assert(codeIncludes(html, `<button id="${set}" class="numSet" type="submit"`), set);
+    assert(codeIncludes(html, `<button id="${undo}" class="numUndo" type="button"`), undo);
+  }
   assert(html.includes('id="dripSetG" type="number" min="0" max="5" step="0.01"'));
   assert(html.includes('id="alphaSet" type="number" min="0.01" max="1" step="0.01"'));
-  assert(codeIncludes(rawViewJs.settings, '["dripSetG", "dripSetButton", "dripUndoButton", "dripG", __WEBUI_TEXT__("settings.set_drip")]'));
-  assert(codeIncludes(rawViewJs.settings, 'className: "numUndo", id: undo'));
+  assert(codeIncludes(rawViewJs.settings, '["dripSetG", "dripSetButton", "dripUndoButton", "dripG"]'));
+  assert(codeIncludes(rawViewJs.settings, '$(input).closest(".numBox").append(apply, restore)'));
   assert(codeIncludes(viewJs.settings, '"/api/v1/calibration/reset", { [key]: R.number(input), baseRevision: R.formRev }'));
   const node = (classes = []) => {
     const names = new Set(classes);

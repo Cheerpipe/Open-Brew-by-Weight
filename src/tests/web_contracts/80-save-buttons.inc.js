@@ -412,7 +412,7 @@
   for (const [view, id] of [['settings', 'lineaMicraConnectButton'], ['admin', 'loginConfirmButton'],
     ['admin', 'changeDevicePasswordButton'], ['admin', 'saveNetworkButton'], ['admin', 'saveDateTimeButton'],
     ['admin', 'saveWebhookButton'], ['admin', 'saveScheduledRestartButton'],
-    ['settings', 'lineaMicraSelectButton']]) {
+    ['settings', 'lineaMicraSelectButton'], ['settings', 'dripSetButton'], ['settings', 'alphaSetButton']]) {
     const html = partialHtml[view], at = html.indexOf(`<button id="${id}"`),
       form = html.lastIndexOf('<form', at), tag = html.slice(at, html.indexOf('>', at));
     if (at < 0 || !/type="submit"/.test(tag) || html.lastIndexOf('</form>', at) > form ||
@@ -420,13 +420,12 @@
       throw new Error(`${id} must be the submit button of a novalidate .enterForm`);
     }
   }
-  // The two Drip compensation fields apply through keys settings.js builds
-  // inside their number fields; each one is its enterForm's submit button,
-  // so Enter keeps applying and the global blocker keeps the page put. The
-  // undo key beside it restores the value in use without applying.
-  if (!codeIncludes(rawViewJs.settings, 'type: "submit", className: "numSet", id: button') ||
-      !codeIncludes(rawViewJs.settings, '$(input).closest(".numBox").append(apply, restore)') ||
-      !codeIncludes(rawViewJs.settings, 'className: "numUndo", id: undo'))
+  // The two Drip compensation Set keys (checked above as enterForm submit
+  // buttons, so Enter keeps applying and the global blocker keeps the page
+  // put) move inside their number fields with the undo key beside them,
+  // which restores the value in use without applying.
+  if (!codeIncludes(rawViewJs.settings, '$(input).closest(".numBox").append(apply, restore)') ||
+      !codeIncludes(partialHtml.settings, '<button id="dripUndoButton" class="numUndo" type="button"'))
     throw new Error('The Drip compensation Set keys must be submit buttons inside their number fields');
   if (!codeIncludes(rawAppJsSource, 'document.addEventListener("submit", (e) => e.target.matches(".enterForm") && e.preventDefault())')) {
     throw new Error('An .enterForm must never submit or reload the page');
