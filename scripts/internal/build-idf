@@ -74,11 +74,10 @@ if [[ "${OBBW_BUILD_LOCKED:-}" != "1" ]]; then
   obbw_cli_resolve_profiles "$effective_flags" || exit $?
   printf '%s\n' "$OBBW_PROFILE_OUTPUT"
 
-  # Serialize builds in this checkout across parallel agents and sessions:
-  # the remainder of this script mutates the variant tree (generated headers,
-  # sdkconfig, artifacts), and every CMake configure runs the component
-  # manager over the shared idf/ project, so it holds one lock per checkout.
-  # Gate lanes still overlap one pair's analysis with the next build. Prompted
+  # Serialize builds of one tree across parallel agents and sessions: the
+  # remainder of this script mutates the variant tree (generated headers,
+  # sdkconfig, artifacts), so it holds that tree's lock. Other trees build in
+  # parallel; idf/CMakeLists.txt makes their CMake configures take turns. Prompted
   # input happened above, so no interactive pause holds the lock. The shell state crosses the exec via a
   # declare -p dump (arrays survive; export would flatten them); with-flock
   # holds the lock and execs the second pass, so the kernel releases it on
@@ -90,7 +89,7 @@ if [[ "${OBBW_BUILD_LOCKED:-}" != "1" ]]; then
     >"$OBBW_BUILD_STATE_FILE" || true
   OBBW_BUILD_LOCKED=1 OBBW_BUILD_STATE_FILE="$OBBW_BUILD_STATE_FILE" \
     exec python3 "$SCRIPT_DIR/internal/with-flock" \
-    "$root/build-idf/.locks/source-tree.lock" \
+    "$OBBW_IDF_BUILD_ROOT/.locks/$OPENBREWBYWEIGHT_VARIANT.lock" \
     bash "$SCRIPT_DIR/internal/${0##*/}"
 fi
 

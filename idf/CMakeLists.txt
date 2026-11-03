@@ -3,6 +3,11 @@
 # build-idf/<variant>.
 cmake_minimum_required(VERSION 3.16)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Builds of different trees run in parallel, but every configure runs the
+# component manager over this shared project, so configures take turns. The
+# lock is released when this CMake process exits.
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../build-idf/.locks")
+file(LOCK "${CMAKE_CURRENT_LIST_DIR}/../build-idf/.locks/idf-configure.lock" GUARD PROCESS)
 
 # Board defines (PSRAM + Hardware CDC). CDC stays off
 # until setup() sees the USB console jumper (GPIO4–GND) and calls Serial.begin

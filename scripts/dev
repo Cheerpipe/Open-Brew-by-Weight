@@ -126,7 +126,10 @@ def budget_gate(evidence: bool, firmware: bool) -> dict[str, object]:
     """Gate options that measure budgets: every check records instead of
     failing, and one final verdict judges all of them together. Only the
     quality gate is budget evidence; every other gate reports overruns."""
-    return {"env_extra": {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1"},
+    # Up to three pair lanes build at once, so each IDF build gets a third of
+    # the CPUs instead of all of them.
+    jobs = {"IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // 3))} if firmware else {}
+    return {"env_extra": {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1", **jobs},
             "final": [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict",
                                           *([] if evidence else ["--report"])])],
             "summary_extra": {"budget": {"evidence": evidence, "firmware": firmware,
@@ -812,9 +815,7 @@ def main() -> int:
             if risk == "R0":
                 return record(command, risk, verbosity, prelude + ["documentation links and context paths: OK"])
             # Host tests, Web checks, and each profile pair share no outputs, so
-            # they run as parallel lanes. IDF builds still take turns under the
-            # checkout build lock, so one pair's stack and Cppcheck steps
-            # overlap the next pair's build.
+            # they run as parallel lanes; each pair builds in its own trees.
             host = cmake_steps("normal")
             lanes = [host]
             if risk in {"R2", "R3"}:

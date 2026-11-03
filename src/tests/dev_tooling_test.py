@@ -355,16 +355,17 @@ assert "cmake: MISSING" in failed_line(
     [{"name": "doctor", "status": "failed"}], ["cmake: MISSING"],
     "missing_dependency")
 
-# Checkout-wide build serialization: build-idf must re-exec through with-flock
-# holding the source-tree lock, the Web contracts hold their own header lock,
-# and the helper must be the portable fcntl holder.
+# Build serialization: build-idf must re-exec through with-flock holding its
+# tree's lock, CMake configures take turns per checkout, the Web contracts hold
+# their own header lock, and the helper must be the portable fcntl holder.
 with_flock = INTERNAL / "with-flock"
 assert with_flock.is_file() and with_flock.stat().st_mode & 0o111
 assert "fcntl.flock" in with_flock.read_text()
 assert "set_inheritable" in with_flock.read_text(), (
     "PEP 446 close-on-exec would release the lock before the build starts")
 assert "OBBW_BUILD_LOCKED" in internal_build and "with-flock" in internal_build
-assert '"$root/build-idf/.locks/source-tree.lock"' in internal_build
+assert '"$OBBW_IDF_BUILD_ROOT/.locks/$OPENBREWBYWEIGHT_VARIANT.lock"' in internal_build
+assert "file(LOCK" in (ROOT / "idf/CMakeLists.txt").read_text()
 assert '--output "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightWebAssetsGzip.h"' \
     in internal_build, "each IDF tree must generate its own Web UI header"
 assert dev_module["WEB_CONTRACTS_STEP"][1][:3] == [
@@ -1159,7 +1160,9 @@ assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is Non
 # budget evidence, and it alone runs the non-functional checks.
 validate_language_steps(["src/web/app.js"], risk="R2")
 report_gate = validate_language_steps.captured
-assert report_gate["env_extra"] == {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1"}, report_gate
+assert report_gate["env_extra"] == {
+    "OPENBREWBYWEIGHT_BUDGET_DEFER": "1",
+    "IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // 3))}, report_gate
 assert report_gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets",
                                                     "verdict", "--report"])]
 assert report_gate["summary_extra"]["budget"]["evidence"] is False

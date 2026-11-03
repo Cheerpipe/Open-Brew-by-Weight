@@ -116,9 +116,9 @@ and commit the budget change, explaining in the body why each budget moved.
 That run together with the update's re-check of its measurements is the gate
 evidence; the gate does not run again.
 
-Give each parallel agent its own worktree. In one checkout, firmware builds
-take turns behind a checkout-wide lock and a measurement there includes every
-other session's edits. Gates in separate worktrees run independently.
+Give each parallel agent its own worktree. In one checkout, builds of the
+same tree take turns and a measurement there includes every other session's
+edits. Gates in separate worktrees run independently.
 
 `budget update` refuses a run that recorded no budget measurements, is not a
 quality run, failed any check other than `budget-verdict` or stopped before

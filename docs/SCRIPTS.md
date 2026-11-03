@@ -193,9 +193,9 @@ R2 and R3 run parallel lanes: the host tests; the Web checks (route
 capacity, Web UI budgets, Web contracts); and one lane per profile pair
 (development build and stack depth, release build and stack depth, then
 Cppcheck on R3). The quality gate runs the Web UI budgets with the design
-preview, the dead-code check, and one lane per pair. Firmware builds take
-turns under the checkout build lock, so one pair's stack and Cppcheck steps
-run while the next pair builds. Each step's output appears in the log as one
+preview, the dead-code check, and one lane per pair. The pairs build in
+parallel, each IDF build with a third of the CPUs (`IDF_PY_BUILD_JOBS`).
+Each step's output appears in the log as one
 block when the step finishes. After any failure no lane starts another step;
 steps already running finish first. When every lane passes, a final
 `budget-verdict` step reports every size budget the run measured. The release builds use their
@@ -242,10 +242,10 @@ the parallel-work rules.
 Each firmware build generates its Web UI header in its own tree,
 `<build>/generated/OpenBrewByWeightWebAssetsGzip.h`. The Web contracts write
 theirs under `src/` and take turns behind `build-idf/.locks/web-ui-header.lock`.
-Firmware builds in one checkout take turns behind
-`build-idf/.locks/source-tree.lock`, because every CMake configure runs the
-component manager over the shared `idf/` project; separate worktrees build in
-parallel.
+Two builds of the same tree take turns behind that tree's lock under
+`<build root>/.locks/`; different trees build in parallel, and only their CMake
+configures take turns behind `build-idf/.locks/idf-configure.lock`, because
+each one runs the component manager over the shared `idf/` project.
 
 ## Diagnostics and recovery
 
