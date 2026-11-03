@@ -21,12 +21,19 @@ subset of the applicable gates does not validate the change.
 | R0 | Non-critical docs/meta | contract, link, and path checks | none |
 | R1 | Web UI, tests, tooling, pure logic | R0 + focused tests and generated assets | as identified |
 | R2 | BLE, network, persistence, OTA, build | full host + ASan/UBSan + TSAN + architecture + development and release images of every official validation profile pair | subsystem-dependent |
-| R3 | Relay, machine, ISR, watchdog, boot, GPIO, partitions, remote control, unknown | R2 + cppcheck + dead-code check + build variants | HIL/manual required |
-| Release | Candidate firmware image | complete analysis, resource budgets, applicable soak, HIL and manual plan | required |
+| R3 | Relay, machine, ISR, watchdog, boot, GPIO, partitions, remote control, unknown | R2 + Cppcheck `warning` check of the changed code + build variants | HIL/manual required |
+| Release | Candidate firmware image | the quality gate, applicable soak, HIL and manual plan | required |
 
 Use `./scripts/dev validate [--risk R0..R3] [paths...]`. R2/R3 run the host
 tests and the firmware steps as two parallel lanes; see
-[scripts](docs/SCRIPTS.md) for the order and failure behavior. Focused commands are
+[scripts](docs/SCRIPTS.md) for the order and failure behavior.
+
+Risk gates check functional and safety defects only. Non-functional quality
+runs in the quality gate, `./scripts/dev quality`, on demand and on the clean
+tree of every commit about to be tagged as a release: the full Cppcheck
+analysis (`warning`, `performance`, `portability`, `style`, inconclusive
+findings included), the dead-code check, the design preview, and the size
+budget verdict. It always covers the whole tree and every profile pair. Focused commands are
 `./scripts/dev test [normal|asan|tsan|web|ble|ota|tooling|lint]`, `./scripts/dev build`, and
 `./scripts/dev analyze`; `lint` is the opt-in Web UI static analysis and is not part
 of any risk gate. The supported IDF setup and commands remain documented
@@ -39,10 +46,10 @@ Any change to `src/OpenBrewByWeightNetwork.cpp`,
 `src/network/OpenBrewByWeightHttpLifecycle.inc`, or another source that defines or
 registers HTTP routes or handlers must run `./scripts/dev test web`. That profile,
 and every R2/R3 validation gate, runs the named `http-route-capacity` check and
-the Web UI budgets (`web-budgets`) before the broader Web contracts, then
-checks that the design preview still renders from the current sources
-(`web-preview`); the profile first checks that the Web UI sources are
-Prettier-formatted (`web-format`). The route-capacity check counts all `registerHandler(server_, ...)`
+the Web UI budgets (`web-budgets`) before the broader Web contracts. The
+profile first checks that the Web UI sources are Prettier-formatted
+(`web-format`) and ends by checking that the design preview still renders
+from the current sources (`web-preview`), which the quality gate also runs. The route-capacity check counts all `registerHandler(server_, ...)`
 registrations in the network sources and requires `max_uri_handlers` to leave
 at least ten spare slots, the headroom the server configuration promises.
 
@@ -88,41 +95,38 @@ of raising a task stack.
 
 ## Size budgets and parallel work
 
-Every gate that measures sizes (`test web`, `test budgets`, and the R2/R3
-`validate` gates) records each measurement and ends with one `budget-verdict`
-step that lists every overrun at once: the Web UI budgets in
+Every gate that measures sizes (`test web`, `test budgets`, the R2/R3
+`validate` gates, and `quality`) records each measurement and ends with one
+`budget-verdict` step that lists every overrun at once: the Web UI budgets in
 `config/web-asset-budgets.json` and every development and release image
-against `config/resource-baselines.json`. `./scripts/dev test budgets` checks
-only the Web UI budgets, in a few seconds.
+against `config/resource-baselines.json`. Only the quality gate fails on an
+overrun and counts as budget evidence; every other gate prints overruns as
+warnings and passes. The OTA-slot and memory-placement limits are not budgets:
+every firmware build fails on them at once. `./scripts/dev test budgets`
+reports only the Web UI budgets, in a few seconds.
 
-When agents work in parallel:
+Budgets move at release time. Do not edit budget numbers in a feature change;
+report the measured deltas the gate printed instead. Before tagging a
+release, run `./scripts/dev quality` on the clean tree of the commit to be
+tagged. If its only failed check is `budget-verdict` and the growth is
+reviewed, run `./scripts/dev budget update --from <run-id>` for that same run
+and commit the budget change, explaining in the body why each budget moved.
+That run together with the update's re-check of its measurements is the gate
+evidence; the gate does not run again.
 
-- Give each agent its own worktree. Web contracts and firmware builds rewrite
-  the shared generated Web UI header under `src/`, so in one checkout they
-  hold a checkout-wide lock and wait for each other, and a measurement there
-  includes every other session's edits. Gates in separate worktrees run
-  independently.
-- While a change is still in development, validate with `--budget-report`
-  (on `validate` and `test web|budgets`). Overruns print as warnings and the
-  run passes, but it is not budget evidence. Do not edit budget numbers in
-  that change; report the measured deltas instead.
-- The change that lands last integrates, whether or not a coordinator
-  session runs it. Before landing in `main`, rebase on the current `main`
-  and run the full classified gate without `--budget-report`. If its only
-  failed check is `budget-verdict` and the growth is reviewed, run
-  `./scripts/dev budget update --from <run-id>` for that same run and commit
-  the budget change with the feature, explaining in the body why each budget
-  moved. That run together with the update's re-check of its measurements is
-  the gate evidence; the gate does not run again.
+Give each parallel agent its own worktree. Web contracts and firmware builds
+rewrite the shared generated Web UI header under `src/`, so in one checkout
+they hold a checkout-wide lock and wait for each other, and a measurement
+there includes every other session's edits. Gates in separate worktrees run
+independently.
 
-`budget update` refuses a run that recorded no budget measurements, used
-`--budget-report`, failed any check other than `budget-verdict` or stopped
-before it, or, for R2/R3, lacks the development or release measurement of
-some pair. It also refuses a stale run: every budget gate records `HEAD`, a
-fingerprint of tracked changes and untracked files, and the hash of both
-budget files, and any difference from the current tree (for example, a run
-taken before the rebase) means the gate must run again. The budget files
-classify as R1 validation data.
+`budget update` refuses a run that recorded no budget measurements, is not a
+quality run, failed any check other than `budget-verdict` or stopped before
+it, or lacks the development or release measurement of some pair. It also
+refuses a stale run: every budget gate records `HEAD`, a fingerprint of
+tracked changes and untracked files, and the hash of both budget files, and
+any difference from the current tree means the gate must run again. The
+budget files classify as R1 validation data.
 
 The documentation check covers root guides, canonical guides in `docs/`, the BLE
 library README, and the safety README. Local working files in `temp/`,

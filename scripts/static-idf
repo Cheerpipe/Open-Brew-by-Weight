@@ -75,18 +75,53 @@ printf 'Generated: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >> "$output_path/READM
 # (sdkconfig.h, ESP-IDF headers) only in -I directories, so it reads a copy of
 # the database with those directories as plain include paths.
 cppcheck_database="$output_path/compile_commands.json"
-python3 - "$compile_commands" "$cppcheck_database" <<'PY'
-import json, re, sys
+# A risk gate (OPENBREWBYWEIGHT_CPPCHECK_RISK=1) checks only the warning
+# category, and only the units that OPENBREWBYWEIGHT_CPPCHECK_CHANGED (paths
+# separated by ':') reaches through their ninja dependencies. Configuration,
+# profile, or analysis changes, or no listed paths, select every unit.
+python3 - "$compile_commands" "$cppcheck_database" "$ROOT" "$build_path" <<'PY'
+import json, os, re, subprocess, sys
 entries = json.load(open(sys.argv[1]))
 for entry in entries:
     if "command" in entry:
         entry["command"] = re.sub(r"(^|\s)-isystem\s+", r"\1-I", entry["command"])
     if "arguments" in entry:
         entry["arguments"] = ["-I" if arg == "-isystem" else arg for arg in entry["arguments"]]
+root, build = sys.argv[3], sys.argv[4]
+changed = [path for path in os.environ.get("OPENBREWBYWEIGHT_CPPCHECK_CHANGED", "").split(":") if path]
+full = ("idf/", "config/hardware/", "config/machines/", "scripts/cppcheck-suppressions.txt",
+        "scripts/static-idf")
+if os.environ.get("OPENBREWBYWEIGHT_CPPCHECK_RISK") == "1" and changed and \
+        not any(path.startswith(full) for path in changed):
+    sources = {os.path.join(root, path) for path in changed
+               if path.endswith((".c", ".cc", ".cpp", ".h", ".hpp", ".inc"))}
+    reached, unit = set(), None
+    deps = subprocess.run(["ninja", "-C", build, "-t", "deps"], capture_output=True,
+                          text=True, check=True).stdout
+    for line in deps.splitlines():
+        if line and not line.startswith(" "):
+            unit = None
+        elif unit is None and line.strip():
+            unit = os.path.normpath(os.path.join(build, line.strip()))
+            reached.add(unit) if unit in sources else None
+        elif os.path.normpath(os.path.join(build, line.strip())) in sources:
+            reached.add(unit)
+    entries = [entry for entry in entries
+               if os.path.normpath(os.path.join(entry["directory"], entry["file"])) in reached]
+    print(f"Cppcheck scope: {len(entries)} unit(s) reached by the changed paths")
 json.dump(entries, open(sys.argv[2], "w"))
+sys.exit(0 if entries else 3)
 PY
+scope_status=$?
+if [[ $scope_status -eq 3 ]]; then
+  echo "No changed path reaches a firmware translation unit; Cppcheck skipped." | tee "$output_path/cppcheck.txt"
+  exit 0
+fi
+[[ $scope_status -eq 0 ]] || exit 1
+categories=("--enable=warning,performance,portability,style" --inconclusive)
+[[ "${OPENBREWBYWEIGHT_CPPCHECK_RISK:-0}" == "1" ]] && categories=(--enable=warning)
 
-echo "Running Cppcheck (warning, performance, portability, style) on $build_dir..."
+echo "Running Cppcheck (${categories[*]}) on $build_dir..."
 cppcheck \
   -j "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" \
   --project="$cppcheck_database" \
@@ -97,9 +132,8 @@ cppcheck \
   --file-filter='*/libraries/EspressoScaleBLE/src/protocols/*.cpp' \
   --file-filter='*/idf/main/*.cpp' \
   --file-filter='*/idf/components/OpenBrewByWeightBleRuntime/*.cpp' \
-  --enable=warning,performance,portability,style \
+  "${categories[@]}" \
   --inline-suppr \
-  --inconclusive \
   --error-exitcode=1 \
   2>&1 | tee "$output_path/cppcheck.txt"
 cppcheck_status=${PIPESTATUS[0]}

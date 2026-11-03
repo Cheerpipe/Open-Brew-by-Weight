@@ -21,7 +21,7 @@ reduce coverage.
 
 | Tool | Script | Reports directory | Contract |
 |------|--------|-------------------|----------|
-| Cppcheck | `./scripts/static-idf` | `reports/static-analysis/` | Fails (exit 1) on any warning/performance/portability/style finding |
+| Cppcheck | `./scripts/static-idf` | `reports/static-analysis/` | Fails (exit 1) on any warning/performance/portability/style finding; R3 checks only `warning` over the changed code |
 | GCC `-fanalyzer` | `./scripts/gcc_analyzer` | `reports/gcc-analyzer/` | Fails on diagnostics in versioned code (builds with the analyzer enabled) |
 | Dead functions | `./scripts/dead-code-idf` | `reports/dead-code/` | Fails on any project function that no validated build uses (builds every validated variant without inlining) |
 | clang-tidy | `./scripts/static-tidy-idf` | `reports/static-tidy/` | Fails on in-scope diagnostics, parse errors, or a tool error |
@@ -276,7 +276,12 @@ cppcheck --version          # current release from PATH; see sections 2 or 3
 ```
 
 `static-idf` never builds, checks the `warning`, `performance`, `portability`
-and `style` categories, and fails on any finding. Fix the code first. A finding
+and `style` categories, inconclusive findings included, and fails on any
+finding. R3 validation sets `OPENBREWBYWEIGHT_CPPCHECK_RISK=1` and lists the
+changed paths in `OPENBREWBYWEIGHT_CPPCHECK_CHANGED` (separated by `:`): it
+then checks only the `warning` category, over the units those paths reach
+through the build tree's ninja dependencies; the full analysis runs in
+`./scripts/dev quality`. Fix the code first. A finding
 that is correct by design, such as a condition that a build profile makes
 constant or a callback signature fixed by the SDK, gets a single-line
 `// cppcheck-suppress <id> ; <reason>` comment directly above the reported
@@ -302,7 +307,7 @@ dead-code check below replaces it.
 ```
 
 The check answers which project functions no firmware image uses, and runs
-in every R3 validation (`./scripts/dev validate`). A normal
+in the quality gate (`./scripts/dev quality`). A normal
 build cannot tell: it inlines small functions and discards their out-of-line
 copies even though their code runs. So the script compiles every profile pair
 that R2/R3 validation builds twice, each in its own tree under
@@ -344,7 +349,7 @@ takes about ten minutes.
 
 ```sh
 ./scripts/dev validate --risk R3
-src/tests/run_host_tests.sh
+./scripts/dev quality
 ```
 
 ## 10. Troubleshooting

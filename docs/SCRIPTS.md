@@ -175,17 +175,27 @@ a `--development` budget build and the flag-free release image that ships,
 each checked against its own size baseline and, right after it, against the
 stack-depth gate of the destructive recovery paths, the settings_persist
 shot pool worker and the deepest httpd requests (see
-[Validation](../VALIDATION.md)). `--risk R3` also checks each pair
-with Cppcheck and runs the dead-code check over every pair. Every build
-already fails on any compiler warning in project-owned code.
+[Validation](../VALIDATION.md)). `--risk R3` also runs Cppcheck's
+`warning` category on each pair, over only the translation units the change
+reaches: the changed sources and every unit whose build dependencies include
+a changed header. A change to `idf/`, the hardware or machine profiles, the
+Cppcheck suppressions, or `scripts/static-idf` checks every unit, and a change
+that reaches none skips Cppcheck. Every build already fails on any compiler
+warning in project-owned code.
+
+`./scripts/dev quality` is the non-functional quality gate, run on demand and
+before each release tag. It builds every pair both ways, runs the full
+Cppcheck analysis on each and the dead-code check over all of them, checks
+that the design preview renders, and ends with the only budget verdict that
+fails on an overrun.
 R2 and R3 run two lanes at once: the host tests, and the firmware steps in a
 fixed order (route capacity, Web UI budgets, Web contracts, then each pair's
 development build and stack depth, release build and stack depth, and
-Cppcheck, then the dead-code check). Each step's
+Cppcheck). Each step's
 output appears in the log as one block when
 the step finishes. After any failure neither lane starts another step;
 steps already running finish first. When both lanes pass, a final
-`budget-verdict` step judges every size budget the run measured. The release builds use their
+`budget-verdict` step reports every size budget the run measured. The release builds use their
 own trees, `build-idf/release/<hardware>--<machine>/`, so the gate's
 `build-idf/<hardware>--<machine>/` images stay incremental. Host tests and
 Cppcheck use one job per CPU.
@@ -208,22 +218,20 @@ retain the physical image and memory placement checks; see [Build](BUILD.md#comp
 `./scripts/dev test budgets` measures every Web UI size budget in
 `config/web-asset-budgets.json` in a few seconds and lists each measurement
 against its limit. `test web` runs the same step before the Web contracts.
-Inside `test web`, `test budgets`, and the R2/R3 `validate` gates, the Web
-UI budget step and each firmware size check only record overruns under the
-run's `artifacts/runs/<run-id>/budgets/`; the final `budget-verdict` step
-fails once, listing all of them together with the command that accepts them.
+Inside `test web`, `test budgets`, the R2/R3 `validate` gates, and
+`quality`, the Web UI budget step and each firmware size check only record
+overruns under the run's `artifacts/runs/<run-id>/budgets/`; the final
+`budget-verdict` step lists all of them together. It fails only in the
+`quality` gate, which also prints the command that accepts them; the other
+gates print the overruns as warnings and are not budget evidence.
 Running `node src/tests/check_web_budgets.js` or a firmware build on its own
 still fails on the first measurement over its limit.
-
-`--budget-report` on `validate`, `test web`, or `test budgets` turns the
-verdict into warnings and marks the run as not budget evidence, for work that
-is still in development.
 
 `./scripts/dev budget update --from <run-id>` accepts the sizes a finished
 run measured: it raises only the exceeded limits in
 `config/web-asset-budgets.json` and `config/resource-baselines.json`, prints
 each change, and re-checks the run's measurements, without rebuilding. It
-refuses report-mode, incomplete, or failed runs and any run whose recorded
+refuses runs other than `quality`, incomplete or failed runs, and any run whose recorded
 tree (`HEAD`, working-tree fingerprint, and budget-file hashes) no longer
 matches; see [Validation](../VALIDATION.md#size-budgets-and-parallel-work) for
 the parallel-work rules.

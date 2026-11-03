@@ -114,11 +114,11 @@ and that process's CPU time) changes for several minutes; a quiet log alone is
 not one, since some steps, such as ESP-IDF builds, write only when they finish.
 Inspect a stall with `ps` and `sample` and report it before the user asks.
 
-Parallel agents work in separate worktrees, validate with `--budget-report`,
-and never edit budget numbers in a change still in development. The change
-that lands last rebases on `main`, runs the full gate once, and accepts
-reviewed overruns only with `./scripts/dev budget update --from <run-id>` from
-that post-rebase run; see
+Parallel agents work in separate worktrees and never edit budget numbers in
+a feature change; R2/R3 gates only report size overruns. Non-functional
+quality (full Cppcheck, dead code, budget verdict) runs in `./scripts/dev
+quality`, on demand and before each release tag, and only its run can accept
+reviewed overruns with `./scripts/dev budget update --from <run-id>`; see
 [Size budgets and parallel work](VALIDATION.md#size-budgets-and-parallel-work).
 
 Firmware compile checks and examples use the canonical development pair

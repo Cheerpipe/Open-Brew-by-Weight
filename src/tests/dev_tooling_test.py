@@ -696,18 +696,22 @@ def fake_database_sandbox() -> tuple[Path, Path, tempfile.TemporaryDirectory]:
     return root, tools, sandbox
 
 
-def static_idf_run(*extra: str) -> tuple[subprocess.CompletedProcess[str], Path,
-                                         tempfile.TemporaryDirectory]:
+def static_idf_run(*extra: str, env_extra: dict[str, str] | None = None,
+                   deps: str = "") -> tuple[subprocess.CompletedProcess[str], Path,
+                                            tempfile.TemporaryDirectory]:
     """Run static-idf end to end over a sandboxed fake compile database."""
     root, tools, sandbox = fake_database_sandbox()
     stub = tools / "cppcheck"
     stub.write_text("#!/bin/sh\nif [ \"$1\" = --version ]; then\n"
                     "  printf 'Cppcheck 9.9.9-stub\\n'\nelse\n"
-                    "  printf 'cppcheck-stub\\n'\nfi\n")
+                    "  printf 'cppcheck-stub %s\\n' \"$*\"\nfi\n")
     stub.chmod(0o755)
+    (tools / "deps.txt").write_text(deps)
+    (tools / "ninja").write_text(f"#!/bin/sh\ncat {tools / 'deps.txt'}\n")
+    (tools / "ninja").chmod(0o755)
     env = os.environ.copy()
     env.update(OBBW_CLI_ROOT=str(root), OPENBREWBYWEIGHT_NONINTERACTIVE="1",
-               PATH=f"{tools}:{os.environ['PATH']}")
+               PATH=f"{tools}:{os.environ['PATH']}", **(env_extra or {}))
     result = subprocess.run(
         ["bash", str(ROOT / "scripts/static-idf"), "--arch", "n16r8",
          "--build-dir", str(root / "build-idf" / "n16r8"), *extra],
@@ -725,12 +729,44 @@ try:
                      "files for integration=none", static_idf_result.stdout), \
         static_idf_result.stdout
     assert "Reports saved under reports/static-idf-golden/" in static_idf_result.stdout
-    assert "cppcheck-stub" in (static_idf_report / "cppcheck.txt").read_text()
+    static_idf_output = (static_idf_report / "cppcheck.txt").read_text()
+    assert "cppcheck-stub" in static_idf_output and "--inconclusive" in static_idf_output
+    assert "--enable=warning,performance,portability,style" in static_idf_output
     static_idf_readme = (static_idf_report / "README.txt").read_text()
     assert "Cppcheck exit status: 0" in static_idf_readme
     assert "Build database: " in static_idf_readme
 finally:
     static_idf_sandbox.cleanup()
+
+# Risk gates check only the warning category over the units a change reaches
+# through ninja dependencies; configuration changes reach every unit.
+def static_idf_risk(changed: str) -> tuple[subprocess.CompletedProcess[str], list[str], str]:
+    units = [path for path in (ROOT / "scripts/project-translation-units.txt").read_text()
+             .splitlines() if path.strip() and not path.startswith("#")][:2]
+    first, second = (str(ROOT / unit.partition("|")[0].strip()) for unit in units)
+    deps = (f"a.obj: #deps 2, deps mtime 1 (VALID)\n    {first}\n    {ROOT}/src/Shared.h\n\n"
+            f"b.obj: #deps 1, deps mtime 1 (VALID)\n    {second}\n\n")
+    result, report, sandbox = static_idf_run(
+        "--output-dir", "reports/static-idf-golden", deps=deps,
+        env_extra={"OPENBREWBYWEIGHT_CPPCHECK_RISK": "1",
+                   "OPENBREWBYWEIGHT_CPPCHECK_CHANGED": changed})
+    try:
+        database = report / "compile_commands.json"
+        files = [entry["file"] for entry in json.loads(database.read_text())] \
+            if database.exists() else []
+        return result, files, (report / "cppcheck.txt").read_text()
+    finally:
+        sandbox.cleanup()
+
+
+risk_result, risk_files, risk_output = static_idf_risk("docs/README.md:src/Shared.h")
+assert risk_result.returncode == 0, risk_result.stderr
+assert len(risk_files) == 1 and "--enable=warning " in risk_output, (risk_files, risk_output)
+assert "--inconclusive" not in risk_output, risk_output
+risk_result, risk_files, risk_output = static_idf_risk("docs/README.md")
+assert risk_result.returncode == 0 and "Cppcheck skipped" in risk_output, risk_output
+risk_result, risk_files, risk_output = static_idf_risk("idf/CMakeLists.txt")
+assert risk_result.returncode == 0 and len(risk_files) > 2, risk_files
 
 with tempfile.TemporaryDirectory(prefix="openbrewbyweight-version-") as temporary:
     fake_git = Path(temporary) / "git"
@@ -1045,7 +1081,7 @@ assert invalid_language.returncode == 2 and "Invalid WebUI language" in invalid_
 
 
 def validate_language_steps(args: list[str], environment: str | None = None,
-                            risk: str = "R3", lanes: bool = False):
+                            risk: str = "R3", lanes: bool = False, verb: str = "validate"):
     captured = {}
 
     def capture(command, risk, steps, verbosity, manual=None, prelude=None,
@@ -1056,7 +1092,9 @@ def validate_language_steps(args: list[str], environment: str | None = None,
 
     main = dev_module["main"]
     with patch.dict(main.__globals__, execute=capture, markdown_errors=lambda: []), \
-            patch.object(sys, "argv", [str(DEV), "validate", "--risk", risk, *args]), \
+            patch.object(sys, "argv", [str(DEV), verb,
+                                       *(["--risk", risk] if verb == "validate" else []),
+                                       *args]), \
             patch.dict(os.environ, {}, clear=False):
         if environment is None:
             os.environ.pop("OPENBREWBYWEIGHT_WEBUI_LANGUAGE", None)
@@ -1104,29 +1142,40 @@ assert [name for name, _ in host_lane] == [
     f"{stage}-{preset}" for preset in ("normal", "asan-ubsan", "tsan")
     for stage in ("configure", "build", "test")] + ["architecture"], host_lane
 firmware_names = [name for name, _ in firmware_lane]
-assert firmware_names[:4] == ["http-route-capacity", "web-budgets", "web-contracts",
-                             "web-preview"], firmware_names
-assert firmware_names[4:] == [f"{kind}-{hardware}--{machine}"
+assert firmware_names[:3] == ["http-route-capacity", "web-budgets", "web-contracts"], \
+    firmware_names
+assert firmware_names[3:] == [f"{kind}-{hardware}--{machine}"
                               for hardware, machine in dev_module["BUILD_PROFILES"]
                               for kind in ("idf", "stack", "release", "stack-release",
-                                           "cppcheck")] + ["dead-code"], firmware_names
+                                           "cppcheck")], firmware_names
+assert all("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv and
+           "OPENBREWBYWEIGHT_CPPCHECK_CHANGED=src/web/app.js" in argv
+           for name, argv in firmware_lane if name.startswith("cppcheck-")), firmware_lane
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for name, argv in host_lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
 
 # Budget gates defer every size check to one verdict after all lanes, and
 # record the measured tree; report mode is never budget evidence.
+# Risk gates only report budget overruns; the quality gate is the one
+# budget evidence, and it alone runs the non-functional checks.
 validate_language_steps(["src/web/app.js"], risk="R2")
+report_gate = validate_language_steps.captured
+assert report_gate["env_extra"] == {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1"}, report_gate
+assert report_gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets",
+                                                    "verdict", "--report"])]
+assert report_gate["summary_extra"]["budget"]["evidence"] is False
+web_lane, quality_lane = validate_language_steps([], verb="quality", lanes=True)
 gate = validate_language_steps.captured
-assert gate["env_extra"] == {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1"}, gate
+assert [name for name, _ in web_lane] == ["web-budgets", "web-preview"], web_lane
+assert [name for name, _ in quality_lane] == [
+    f"{kind}-{hardware}--{machine}" for hardware, machine in dev_module["BUILD_PROFILES"]
+    for kind in ("idf", "release", "cppcheck")] + ["dead-code"], quality_lane
+assert not any("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv for _, argv in quality_lane)
 assert gate["final"] == [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict"])]
 assert gate["summary_extra"]["budget"]["evidence"] is True
 assert gate["summary_extra"]["budget"]["firmware"] is True
 assert set(gate["summary_extra"]["budget"]["tree"]) == {"head", "worktree", "budgetFiles"}
-validate_language_steps(["--budget-report", "src/web/app.js"], risk="R2")
-report_gate = validate_language_steps.captured
-assert report_gate["final"][0][1][-1] == "--report"
-assert report_gate["summary_extra"]["budget"]["evidence"] is False
 for path in dev_module["BUDGET_FILES"]:
     assert dev_module["path_risk"](path) == "R1", path
 
@@ -1191,7 +1240,7 @@ with tempfile.TemporaryDirectory(prefix="openbrewbyweight-budget-runs-") as temp
     verdict_failed = [{"name": "web-budgets", "status": "passed"},
                       {"name": "budget-verdict", "status": "failed"}]
     assert problems_for(verdict_failed) == ""
-    assert "--budget-report" in problems_for(verdict_failed, evidence=False)
+    assert "only `./scripts/dev quality` runs are" in problems_for(verdict_failed, evidence=False)
     assert "check web-contracts failed" in problems_for(
         [{"name": "web-contracts", "status": "failed"}, *verdict_failed])
     assert "stopped before its budget verdict" in problems_for(verdict_failed[:1])
