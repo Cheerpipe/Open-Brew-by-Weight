@@ -419,7 +419,7 @@ inline void updateShotPredictor(ShotPredictor &pr, const PredictorInputs &in) {
     const int64_t sp = static_cast<int64_t>(sP) * g / 1000;
     const int64_t diff = tHat > h.medianMs ? tHat - h.medianMs
                                            : h.medianMs - tHat;
-    if (diff * 1000 > STALENESS_Z_PERMILLE *
+    if (diff * 1000 > static_cast<int64_t>(STALENESS_Z_PERMILLE) *
                           isqrt64(static_cast<int64_t>(sigmaF) * sigmaF +
                                   sp * sp)) {
       pr.priorSuspended = true;  // grind shift: live only for this shot

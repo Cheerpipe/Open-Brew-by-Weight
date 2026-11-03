@@ -401,12 +401,12 @@ inline bool decodeSettingsGroup(SettingsReader group, const SettingsField (&fiel
   const uint32_t magic = PERSISTED_SETTINGS_MAGIC;
   const uint16_t schema = static_cast<uint16_t>(CONFIG_SCHEMA_VERSION);
   const uint16_t bodyLength = static_cast<uint16_t>(body);
-  memcpy(out, &magic, 4);
-  memcpy(out + 4, &schema, 2);
-  memcpy(out + 6, &bodyLength, 2);
-  memcpy(out + 8, &revision, 4);
+  memcpy(out, &magic, sizeof(magic));
+  memcpy(out + 4, &schema, sizeof(schema));
+  memcpy(out + 6, &bodyLength, sizeof(bodyLength));
+  memcpy(out + 8, &revision, sizeof(revision));
   const uint32_t crc = crc32(out, writer.at);
-  memcpy(out + writer.at, &crc, 4);
+  memcpy(out + writer.at, &crc, sizeof(crc));
   return writer.at + 4U;
 }
 

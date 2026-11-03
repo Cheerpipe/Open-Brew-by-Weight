@@ -2989,7 +2989,7 @@ NimbleScaleClient &clientFromStorage(void *storage) {
 // allow external BSS, reclaiming the DRAM block; arduino-cli and host-test
 // builds compile the attribute away and keep the storage in DRAM.
 #if !defined(ESPRESSO_SCALE_BLE_HOST_TEST)
-EXT_RAM_BSS_ATTR alignas(8) uint8_t g_clientStorage[3328];
+alignas(8) EXT_RAM_BSS_ATTR uint8_t g_clientStorage[3328];
 #else
 alignas(8) uint8_t g_clientStorage[3328];
 #endif

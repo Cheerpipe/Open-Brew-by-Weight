@@ -114,9 +114,14 @@ inline FlashIoActivity &flashIoActivity() {
 
 inline void noteFlashIoHeld(bool held, uint32_t nowMs) {
   FlashIoActivity &activity = flashIoActivity();
-  if (held ? activity.depth++ != 0
-           : activity.depth == 0 || --activity.depth != 0) return;
-  if (!held) activity.releasedAtMs.store(nowMs, std::memory_order_relaxed);
+  if (held) {
+    if (activity.depth++ != 0) return;
+  } else {
+    if (activity.depth == 0) return;
+    --activity.depth;
+    if (activity.depth != 0) return;
+    activity.releasedAtMs.store(nowMs, std::memory_order_relaxed);
+  }
   activity.heldSinceMs.store(held ? nowMs | 1U : 0U, std::memory_order_release);
 }
 

@@ -544,7 +544,8 @@ class ShotTracePool {
                                offsetof(ShotTracePoolRecordHeader, crc));
     for (size_t at = sizeof(h); at < ref.bytes; at += bufferBytes) {
       const size_t piece = ref.bytes - at < bufferBytes ? ref.bytes - at : bufferBytes;
-      if ((status = read(ref, at, buffer, piece)) != ShotTracePoolStatus::OK) return status;
+      status = read(ref, at, buffer, piece);
+      if (status != ShotTracePoolStatus::OK) return status;
       crc = crc32Update(crc, buffer, piece);
     }
     if (~crc == h.crc) return ShotTracePoolStatus::OK;

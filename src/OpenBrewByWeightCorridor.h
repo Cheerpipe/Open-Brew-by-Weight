@@ -341,7 +341,8 @@ struct RateEstimator {
                                                     : median - innovation;
       // 4.5 * max(1.4826 * MAD, 3 dg), in 1e-4 dg.
       const int64_t scaled = static_cast<int64_t>(mad) * 66717;
-      const int64_t limit = scaled > 45000 * MAD_FLOOR_DG ? scaled : 45000 * MAD_FLOOR_DG;
+      const int64_t floor = int64_t{45000} * MAD_FLOOR_DG;
+      const int64_t limit = scaled > floor ? scaled : floor;
       if (deviation * 10000 > limit) {
         if (++rejectedRun <= MAX_CONSECUTIVE_REJECTIONS) return Result::REJECTED;
         // The stream moved for good: relearn from this sample.
@@ -373,7 +374,7 @@ struct RateEstimator {
     }
     int64_t sxx = 0, sxy = 0;
     for (uint8_t age = 0; age < count; ++age) {
-      const int64_t dt = (atMs[index(age)] - atMs[head]) * count - sumT;
+      const int64_t dt = static_cast<int64_t>(atMs[index(age)] - atMs[head]) * count - sumT;
       const int64_t dw = static_cast<int64_t>(weightDg[index(age)]) * count - sumW;
       sxx += dt * dt;
       sxy += dt * dw;
@@ -856,7 +857,9 @@ struct GrindHintReplay {
   Level levelOf(uint32_t from, uint32_t to, uint32_t skip = NO_SHOT) const {
     Level l;
     int32_t keys[HINT_LEVEL_SHOTS];
-    for (uint32_t k = to + 1; k-- > from && k + RING >= pushed && l.n < HINT_LEVEL_SHOTS;) {
+    for (uint32_t next = to + 1; next > from; --next) {
+      const uint32_t k = next - 1;
+      if (k + RING < pushed || l.n >= HINT_LEVEL_SHOTS) break;
       if (k == skip) continue;
       keys[l.n++] = at(k).key;
       if (at(k).key >= HINT_CENSORED_KEY) ++l.censored;
@@ -934,7 +937,9 @@ struct GrindHintReplay {
     int32_t differences[HINT_SIGMA_SHOTS];
     uint8_t n = 0;
     uint32_t end = pushed;
-    for (uint32_t k = pushed; k-- > 1 && k + HINT_SIGMA_SHOTS > pushed;) {
+    for (uint32_t next = pushed; next > 1; --next) {
+      const uint32_t k = next - 1;
+      if (k + HINT_SIGMA_SHOTS <= pushed) break;
       const Shot &a = at(k - 1), &b = at(k);
       if (k + 1 < pushed && at(k + 1).segment != b.segment) end = k + 1;
       if (a.segment == b.segment && end - b.segment >= 3 && a.key < HINT_CENSORED_KEY &&

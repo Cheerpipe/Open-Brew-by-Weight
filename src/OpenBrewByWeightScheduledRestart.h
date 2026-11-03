@@ -5,6 +5,7 @@
 
 namespace openbrewbyweight {
 
+constexpr int64_t SECONDS_PER_MINUTE = 60, SECONDS_PER_HOUR = 3600, SECONDS_PER_DAY = 86400;
 constexpr uint32_t SCHEDULED_RESTART_WINDOW_SEC = 30U * 60U;
 constexpr uint32_t SCHEDULED_RESTART_QUIET_MS = 5U * 60U * 1000U;
 constexpr uint32_t SCHEDULED_RESTART_MIN_UPTIME_MS = 30U * 60U * 1000U;
@@ -25,12 +26,12 @@ inline uint32_t scheduledRestartLocalToUtc(const char *zone, int64_t localSec) {
   uint32_t transition = 0;
   // Offsets span -12 h..+14 h and DST transitions are months apart, so the
   // two candidates bracket at most one transition.
-  if (!scheduledRestartOffsetAt(zone, localSec - 15 * 3600, before) ||
-      !scheduledRestartOffsetAt(zone, localSec + 13 * 3600, after)) {
+  if (!scheduledRestartOffsetAt(zone, localSec - 15 * SECONDS_PER_HOUR, before) ||
+      !scheduledRestartOffsetAt(zone, localSec + 13 * SECONDS_PER_HOUR, after)) {
     return 0;
   }
-  const int64_t first = localSec - before * 60;
-  const int64_t second = localSec - after * 60;
+  const int64_t first = localSec - before * SECONDS_PER_MINUTE;
+  const int64_t second = localSec - after * SECONDS_PER_MINUTE;
   if (scheduledRestartOffsetAt(zone, first, actual) && actual == before) {
     return static_cast<uint32_t>(first);
   }
@@ -43,10 +44,10 @@ inline uint32_t scheduledRestartNextUtc(const char *zone, uint32_t nowUtc,
                                         uint16_t minuteOfDay) {
   int16_t offset = 0;
   if (!scheduledRestartOffsetAt(zone, nowUtc, offset)) return 0;
-  const int64_t local = static_cast<int64_t>(nowUtc) + offset * 60;
-  const int64_t target = local - local % 86400 + minuteOfDay * 60;
+  const int64_t local = static_cast<int64_t>(nowUtc) + offset * SECONDS_PER_MINUTE;
+  const int64_t target = local - local % SECONDS_PER_DAY + minuteOfDay * SECONDS_PER_MINUTE;
   for (int64_t day = 0; day < 3; ++day) {
-    const uint32_t utc = scheduledRestartLocalToUtc(zone, target + day * 86400);
+    const uint32_t utc = scheduledRestartLocalToUtc(zone, target + day * SECONDS_PER_DAY);
     if (utc == 0 || utc > nowUtc) return utc;
   }
   return 0;
