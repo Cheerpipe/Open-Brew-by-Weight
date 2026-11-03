@@ -68,10 +68,26 @@ obbw_idf_audit_translation_units || {
 printf 'Build database: %s\n' "$compile_commands" > "$output_path/README.txt"
 printf 'Generated: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >> "$output_path/README.txt"
 
+# The firmware build includes SDK headers with -isystem so the project's
+# strict warnings skip third-party code. Cppcheck searches quoted includes
+# (sdkconfig.h, ESP-IDF headers) only in -I directories, so it reads a copy of
+# the database with those directories as plain include paths.
+cppcheck_database="$output_path/compile_commands.json"
+python3 - "$compile_commands" "$cppcheck_database" <<'PY'
+import json, re, sys
+entries = json.load(open(sys.argv[1]))
+for entry in entries:
+    if "command" in entry:
+        entry["command"] = re.sub(r"(^|\s)-isystem\s+", r"\1-I", entry["command"])
+    if "arguments" in entry:
+        entry["arguments"] = ["-I" if arg == "-isystem" else arg for arg in entry["arguments"]]
+json.dump(entries, open(sys.argv[2], "w"))
+PY
+
 echo "Running Cppcheck (warning, performance, portability) on $build_dir..."
 cppcheck \
   -j "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" \
-  --project="$compile_commands" \
+  --project="$cppcheck_database" \
   --suppressions-list="$SUPPRESSIONS_FILE" \
   --file-filter="$ROOT/src/*.cpp" \
   --file-filter='*/libraries/EspressoScaleBLE/src/*.cpp' \
