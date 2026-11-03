@@ -334,15 +334,10 @@ constexpr uint32_t COMPILED_SHOT_REACT_TIMEOUT_MS = 12000;
 constexpr uint8_t MIN_SHOT_REACT_TIMEOUT_S = 3;
 constexpr uint8_t MAX_SHOT_REACT_TIMEOUT_S = 30;
 
-inline const char *compiledMachineTypeId() {
-  switch (OPEN_BREW_BY_WEIGHT_MACHINE_TYPE) {
-    case 1:
-      return "momentary";
-    case 2:
-      return "momentary_reed";
-    default:
-      return "paddle";
-  }
+constexpr const char *compiledMachineTypeId() {
+  return OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 1   ? "momentary"
+         : OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 2 ? "momentary_reed"
+                                                 : "paddle";
 }
 
 enum class BuzzerPattern : uint8_t {

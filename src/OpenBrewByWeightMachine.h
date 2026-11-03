@@ -101,11 +101,11 @@ inline void machineNoteActivatorReleased() {
 inline void machineOnActivatorReady() {}
 inline void machineOnBrewOutcome(bool) {}
 // Time from a stop command to the machine acting on it (none for a paddle).
-inline uint32_t machineStopCommandLatencyMs() { return 0; }
+constexpr uint32_t machineStopCommandLatencyMs() { return 0; }
 inline bool machineSupportsRinse() { return runtimeConfig.rinseEnabled; }
 // A paddle ON may still classify as a short ON->OFF rinse. Keep a rejected
 // start pending until that gesture window has elapsed.
-inline bool machineBlockedStartNeedsHoldQualification() { return true; }
+constexpr bool machineBlockedStartNeedsHoldQualification() { return true; }
 inline void machineNoteFirmwareStop() {
   if (activatorOn || rawActivatorOn) {
     machineActivatorDriveSuppressedThisHold = true;
@@ -135,7 +135,7 @@ inline void serviceMachine() {
   machineServiceReminders();
 }
 inline void machineOverrideInferredOff() {}
-inline bool machineOverrideInferredOn() { return true; }
+constexpr bool machineOverrideInferredOn() { return true; }
 inline void machineArmSettledWeightCutOff() {}
 inline void machineNoteSettledWeightCutOff() {}
 inline void machineCancelSettledWeightCutOff() {}
@@ -150,7 +150,7 @@ inline void machineCancelSettledWeightCutOff() {}
 
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 2
 inline void machineOverrideInferredOff() {}
-inline bool machineOverrideInferredOn() { return true; }
+constexpr bool machineOverrideInferredOn() { return true; }
 inline void machineArmSettledWeightCutOff() {}
 inline void machineNoteSettledWeightCutOff() {}
 inline void machineCancelSettledWeightCutOff() {}
@@ -163,16 +163,16 @@ inline uint32_t machineStopCommandLatencyMs() {
 }
 // A momentary start edge is already a complete attempt. In particular,
 // release mode has no active hold left by the time REQUEST_START is emitted.
-inline bool machineBlockedStartNeedsHoldQualification() { return false; }
+constexpr bool machineBlockedStartNeedsHoldQualification() { return false; }
 inline void machineBeginCycle(bool) {}
 inline void machineEndCycle() { rinseActuationActive = false; }
-inline bool machineHidesPhysicalStop() { return false; }
-inline bool machineAllowsAutomationStop() { return true; }
+constexpr bool machineHidesPhysicalStop() { return false; }
+constexpr bool machineAllowsAutomationStop() { return true; }
 inline uint32_t machineCloseLimitMs(uint32_t operationalWallMs) {
   return operationalWallMs;
 }
-inline bool machineCycleHardMaxArmedForTest() { return false; }
-inline bool machineCyclePromotedToNaturalForTest() { return false; }
+constexpr bool machineCycleHardMaxArmedForTest() { return false; }
+constexpr bool machineCyclePromotedToNaturalForTest() { return false; }
 inline void machineNoteFirmwareStop() {
   momentarySkipFirmwareStopPulse = false;
 }
@@ -207,32 +207,28 @@ inline MachineIntention machinePollIntention() {
 // Compatibility mode is already transparent here: applyMomentaryRelayDrive
 // mirrors the switch 1:1, and every synthetic pulse source (orchestrator,
 // web commands) is gated upstream of the machine layer.
-inline bool machineServiceCompatibilityDrive(const MachineIntention &) {
+constexpr bool machineServiceCompatibilityDrive(const MachineIntention &) {
   return true;
 }
 #endif
 
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE != 1
-inline bool machineTakeNoFlowIdle() { return false; }
+constexpr bool machineTakeNoFlowIdle() { return false; }
 #endif
 
-inline bool machineStartBackflush() {
 #if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 0
+inline bool machineStartBackflush() {
   return !relayCircuitClosed() &&
       setMachineCircuitClosed(true, HARD_MAX_CIRCUIT_CLOSED_MS, RelayPurpose::BACKFLUSH_CANDIDATE);
-#else
-  return false;
-#endif
 }
 
 inline bool machineConfirmBackflush(uint32_t generation) {
-#if OPEN_BREW_BY_WEIGHT_MACHINE_TYPE == 0
   return promoteRelayBackflush(generation);
-#else
-  (void)generation;
-  return false;
-#endif
 }
+#else
+constexpr bool machineStartBackflush() { return false; }
+constexpr bool machineConfirmBackflush(uint32_t) { return false; }
+#endif
 
 inline void machineInitialize() {
   // Latch OPEN before enabling the driver: an active-LOW relay must not see

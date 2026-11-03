@@ -254,7 +254,9 @@ struct ShotCurveSampler : ShotCurveRecord {
     return true;
   }
 
-  void latchEvent(ShotCurveEvent &event, WeightSample sample) {
+  // Latches one of this curve's events, once.
+  void latchEvent(ShotCurveEvent ShotCurveRecord::*field, WeightSample sample) {
+    ShotCurveEvent &event = this->*field;
     if (shotCurveEventPresent(event) || !active) {
       return;
     }
@@ -271,11 +273,11 @@ struct ShotCurveSampler : ShotCurveRecord {
   }
 
   void latchFirstDrop(uint32_t atMs, float weight) {
-    latchEvent(firstDrop, {weight, atMs});
+    latchEvent(&ShotCurveRecord::firstDrop, {weight, atMs});
   }
 
   void latchExtended(uint32_t atMs, float weight) {
-    latchEvent(extended, {weight, atMs});
+    latchEvent(&ShotCurveRecord::extended, {weight, atMs});
   }
 
   void latchAtm(uint32_t atMs, float weight) {
@@ -285,7 +287,7 @@ struct ShotCurveSampler : ShotCurveRecord {
     }
     atm = missingShotCurveEvent();
     atmClearedMs = SHOT_LOG_METRIC_MISSING;
-    latchEvent(atm, {weight, atMs});
+    latchEvent(&ShotCurveRecord::atm, {weight, atMs});
   }
 
   void latchAtmCleared(uint32_t atMs) {
@@ -315,7 +317,7 @@ struct ShotCurveSampler : ShotCurveRecord {
     if (!active) return;
     if (!std::isfinite(weight) && count != 0)
       weight = static_cast<float>(lastWeightCg) / 100.0f;
-    latchEvent(ended, {weight, at});
+    latchEvent(&ShotCurveRecord::ended, {weight, at});
     active = false;
   }
 

@@ -244,22 +244,15 @@ inline void overlayLivePersistedSettings(PersistedSettings &settings,
   settings.presets = presets;
 }
 
-inline uint32_t &durableStorageRevision() {
-  static uint32_t revision = 0;
-  return revision;
-}
-
-inline bool &durableStorageRevisionValid() {
-  static bool valid = false;
-  return valid;
-}
+// Newest revision known to be on flash, 0 while unknown. Guarded by the
+// settings NVS lock.
+inline uint32_t durableStorageRevision = 0;
 
 inline void noteDurableStorageRevision(uint32_t revision) {
   if (!lockSettingsNvs()) {
     return;
   }
-  durableStorageRevision() = revision;
-  durableStorageRevisionValid() = revision != 0;
+  durableStorageRevision = revision;
   unlockSettingsNvs();
 }
 
@@ -267,8 +260,7 @@ inline void resetDurableStorageRevision() {
   if (!lockSettingsNvs()) {
     return;
   }
-  durableStorageRevision() = 0;
-  durableStorageRevisionValid() = false;
+  durableStorageRevision = 0;
   durableTimezoneSaved().store(false);
   unlockSettingsNvs();
 }
@@ -290,8 +282,8 @@ inline bool savePersistedSettings(PersistedSettings &settings) {
     return false;
   }
   uint32_t revision = settings.storageRevision;
-  if (durableStorageRevisionValid()) {
-    revision = durableStorageRevision();
+  if (durableStorageRevision != 0) {
+    revision = durableStorageRevision;
   } else if (revision == 0) {
     const char *keys[2] = {};
     (void)settingsSlotsNewestFirst(preferences, keys, &revision);
@@ -303,8 +295,7 @@ inline bool savePersistedSettings(PersistedSettings &settings) {
   preferences.end();
   if (saved) {
     settings.storageRevision = candidateRevision;
-    durableStorageRevision() = candidateRevision;
-    durableStorageRevisionValid() = true;
+    durableStorageRevision = candidateRevision;
     durableTimezoneSaved().store(settings.runtime.timezoneId[0] != '\0');
   }
   unlockSettingsNvs();
@@ -343,9 +334,8 @@ inline bool resetPersistedSettingsToFactory(PersistedSettings &settings) {
       existingMax = revision;
     }
   }
-  if (durableStorageRevisionValid() &&
-      durableStorageRevision() > existingMax) {
-    existingMax = durableStorageRevision();
+  if (durableStorageRevision > existingMax) {
+    existingMax = durableStorageRevision;
   }
   if (existingMax > UINT32_MAX - 2U) {
     existingMax = UINT32_MAX - 2U;

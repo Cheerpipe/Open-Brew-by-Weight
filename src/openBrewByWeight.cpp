@@ -1300,7 +1300,6 @@ bool machineRequestStart(uint32_t operationalLimitMs,
                          bool remoteActuation = false);
 bool machineRequestStop();
 bool machineRequestWebStop();
-bool machineRequestForcedPulse();
 void requestRemoteTimerStop();
 
 uint32_t cycleShotElapsedMs() { return session.active ? machineElapsedMs() : 0U; }

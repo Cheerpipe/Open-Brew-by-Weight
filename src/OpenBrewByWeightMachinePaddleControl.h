@@ -42,7 +42,7 @@ inline bool machineRequestStop() {
 
 inline bool machineRequestWebStop() { return machineRequestStop(); }
 
-inline bool machineRequestForcedPulse() { return false; }
+constexpr bool machineRequestForcedPulse() { return false; }
 
 // continueSessionRun has no paddle effect: an already-closed circuit keeps
 // its original close timestamp (a demoted rinse counts the pre-classification
