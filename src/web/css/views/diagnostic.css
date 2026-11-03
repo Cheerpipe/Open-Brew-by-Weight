@@ -171,7 +171,8 @@
 }
 
 /* A narrow box lays the bar out in two rows by design: the filters share the
-   width, and the time steps spread evenly under a hairline. */
+   width; under a hairline, Day and Boot sit centred as a pair and the clock
+   keeps to the right edge without pushing them. */
 @container (width < 34rem) {
   .logBar > .logChip {
     flex: 1 1 0;
@@ -183,11 +184,21 @@
   }
 
   .logNav {
+    display: grid;
     flex-basis: 100%;
-    justify-content: space-evenly;
+    grid-template-columns: 1fr auto auto 1fr;
+    column-gap: 1.5rem;
     margin: 0 -0.3rem;
-    padding-top: 0.15rem;
+    padding: 0.15rem 0.3rem 0;
     border-top: 1px solid var(--ln);
+  }
+
+  .logNav > .logStep:first-child {
+    grid-column: 2;
+  }
+
+  #logJumpButton {
+    justify-self: end;
   }
 }
 
