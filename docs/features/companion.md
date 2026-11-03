@@ -362,6 +362,8 @@ The server icon in the header shows the companion at a glance, as two racks.
 Both lit means the connection is open. One lit means you are viewing this
 page through the companion but its connection to the controller is down; the
 Web UI keeps working. Both dimmed means the companion is not connected.
+Tap the icon to see the server's name, the **Link** state, and whether the
+**Web UI relay** is serving the page you are on.
 
 For a quicker glance, tap the cloud icon in the header on any page: under
 **Connection type**, its popup says **Directly from the controller**,

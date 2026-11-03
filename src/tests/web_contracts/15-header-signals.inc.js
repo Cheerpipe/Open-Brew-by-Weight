@@ -15,7 +15,7 @@
   const elements = Object.fromEntries([...['wifi', 'bluetooth'].flatMap((kind, i) => [
     [kind + 'Signal', buttons[i]], [kind + 'Details', {hidden: true}],
     [kind + 'Name', {}], [kind + 'Detail', {}],
-  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}], ['companionWeb', {}],
+  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}], ['companionRelay', {}],
     ['micraSignal', micraButton], ['micraName', {}], ['micraMachine', {}], ['micraDetail', {}],
     ['micraRoute', {textContent: '—'}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
@@ -59,7 +59,7 @@
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas', peerProtocol: 0}});
   assert.equal(elements.companionSignal.hidden, false, 'A paired companion shows even while its link is down');
   assert.equal(elements.companionSignal.dataset.level, 'off');
-  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Not connected \u00b7 Web UI: Direct');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Not connected \u00b7 Relay: Not used by this page');
   assert.equal(elements.companionName.textContent, 'nas', 'The paired name stays while the link is down');
   assert.equal(elements.companionDetail.textContent, 'Not connected');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas', peerProtocol: 2}});
@@ -68,13 +68,13 @@
       'A refused link version names the connection problem');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
   assert.equal(elements.companionSignal.dataset.level, 'on');
-  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Connected \u00b7 Web UI: Direct');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Connected \u00b7 Relay: Not used by this page');
   vm.runInContext('uiState.companionHere = {paired: true}', context);
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'down', name: 'nas'}});
   assert.equal(elements.companionSignal.dataset.level, 'partial', 'A page served by the companion keeps one rack lit while the link is down');
-  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Not connected \u00b7 Web UI: Through the companion');
+  assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Not connected \u00b7 Relay: Serving this page');
   assert.equal(elements.companionDetail.textContent, 'Not connected', 'The popup keeps the link row');
-  assert.equal(elements.companionWeb.textContent, 'Through the companion', 'The popup names how this page is served');
+  assert.equal(elements.companionRelay.textContent, 'Serving this page', 'The popup has a relay row beside the link row');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
   assert.equal(elements.companionSignal.dataset.level, 'on', 'An open link lights both racks even through the companion');
   context.updateHeaderSignals({snapshotStale: true, connections: {}, companion: {paired: true, link: 'down', name: 'nas'}});
