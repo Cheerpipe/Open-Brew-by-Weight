@@ -101,7 +101,8 @@
     {"case": "no shot since Relearn", "epoch": 9, "shots": [31500, 31500, 31500], "segmentStartId": 0, "n": 0},
     {"case": "reversal exception", "window": [30000, 33000], "adviseAfter": 6, "advised": "finer", "shots": [31500, 31500, 31500, 31500, 31500, 31500, 33900, 33900, 33900], "segmentStartId": 7, "state": "maintenance", "direction": "coarser", "tier": "confident", "bin": "small", "n": 3, "offsetMs": 2400},
     {"case": "no reversal without advice (hard fallback: last three 0.9 s past t2)", "window": [30000, 33000], "shots": [31500, 31500, 31500, 31500, 31500, 31500, 33900, 33900, 33900], "segmentStartId": 1, "state": "maintenance", "direction": "coarser", "tier": "likely", "bin": "small", "n": 6, "offsetMs": 1200},
-    {"case": "no reversal in the advised direction", "window": [30000, 33000], "adviseAfter": 6, "advised": "coarser", "shots": [31500, 31500, 31500, 31500, 31500, 31500, 33900, 33900, 33900], "segmentStartId": 1, "state": "maintenance", "direction": "coarser", "tier": "likely", "bin": "small", "n": 6, "offsetMs": 1200}
+    {"case": "no reversal in the advised direction", "window": [30000, 33000], "adviseAfter": 6, "advised": "coarser", "shots": [31500, 31500, 31500, 31500, 31500, 31500, 33900, 33900, 33900], "segmentStartId": 1, "state": "maintenance", "direction": "coarser", "tier": "likely", "bin": "small", "n": 6, "offsetMs": 1200},
+    {"case": "an advice long gone does not block the other side (hard fallback: last three 2.8 s past t2)", "shots": [27100, 27900, 30700, 29000, 31100, 35100, 22800, 32400, 32100, 28100, 24700, 31600, 35100, 34300, 42800, 38800], "segmentStartId": 1, "state": "maintenance", "direction": "coarser", "tier": "likely", "bin": "small", "n": 6, "offsetMs": 3450}
   ],
   "lifecycle": [
     {"case": "dial-in: one gross shot, checking, confirmed change, new advice",

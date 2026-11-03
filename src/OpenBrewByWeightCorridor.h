@@ -1003,6 +1003,8 @@ struct GrindHintReplay {
   void push(const ArrivalRecord &r) {
     const int32_t arrival = hintArrivalMs(r);
     movedPermille = 0;
+    // An advice no longer shown stops binding once the whole level is newer than it.
+    if (hint == HintDirection::NONE && sinceAnnounce >= HINT_LEVEL_SHOTS) advised = HintDirection::NONE;
     if (pushed == 0 || (r.recordId >= scope.epoch && at(pushed - 1).id < scope.epoch)) {
       if (r.recordId >= scope.epoch) epochStart = pushed;
       startSegment(pushed);

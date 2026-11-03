@@ -9,6 +9,10 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **Grind hints no longer stuck on old advice:** a suggestion from your first
+  shots could silently keep a card in the opposite direction from appearing,
+  even many shots later. Once the shots being read are all newer than that
+  suggestion and its card is gone, it no longer holds new advice back.
 - **Every shot is kept:** each shot pulled with a scale is stored, even one
   that ran short or never reached a usable yield. Those are marked as bad
   shots: they never count in statistics, charts, grind hints or learning,
