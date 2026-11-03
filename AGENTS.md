@@ -107,7 +107,7 @@ touch hardware implicitly. Static analysis is run only when explicitly requested
 or required by the requested validation gate.
 
 A gate run in the background reports only when it exits, so a hung gate never
-reports. Check its progress once it passes its usual duration (R3 about 4
+reports. Check its progress once it passes its usual duration (R3 about 2.5
 minutes on a built tree and 10 after a compile-flag change, `quality` up to
 about 17 while its analysis trees are cold, `test web` about 1.5; each run's
 `summary.json` lists every step's duration). A stall means neither
