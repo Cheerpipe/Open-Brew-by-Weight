@@ -42,8 +42,7 @@ void serviceBackflush(const MachineIntention &intent) {
   // closes once as Backflush without touching either armed deadline.
   for (uint8_t i = 0; i < backflushObservation.count; ++i) {
     const auto &change = backflushObservation.changes[i];
-    uint32_t expected = backflushSequence + 1;
-    if (expected == 0) ++expected;
+    const uint32_t expected = backflushSequence == UINT32_MAX ? 1 : backflushSequence + 1;
     if (change.sequence != expected ||
         change.permit.continuity != backflushPermit.continuity ||
         change.permit.episode != backflushPermit.episode) {

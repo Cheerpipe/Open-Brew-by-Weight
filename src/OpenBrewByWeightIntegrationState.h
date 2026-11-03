@@ -106,17 +106,17 @@ struct SessionQuickSettings {
   bool shotEnded = false;
 };
 
-inline uint32_t quickRevertRemainingMs(const SessionQuickSettings &session, uint32_t nowMs) {
+inline uint32_t quickRevertRemainingMs(const SessionQuickSettings &quick, uint32_t nowMs) {
   static constexpr uint8_t minutes[QUICK_REVERT_POLICY_COUNT] = {0, 15, 30, 60, 0};
-  const uint32_t delayMs = minutes[static_cast<uint8_t>(session.revertPolicy)] * 60000UL;
-  const uint32_t elapsed = nowMs - session.changedAtMs;
-  return session.mask == 0 || delayMs == 0 || elapsed >= delayMs ? 0 : delayMs - elapsed;
+  const uint32_t delayMs = minutes[static_cast<uint8_t>(quick.revertPolicy)] * 60000UL;
+  const uint32_t elapsed = nowMs - quick.changedAtMs;
+  return quick.mask == 0 || delayMs == 0 || elapsed >= delayMs ? 0 : delayMs - elapsed;
 }
 
-inline bool quickRevertDue(const SessionQuickSettings &session, uint32_t nowMs) {
-  if (session.mask == 0 || session.revertPolicy == QuickRevertPolicy::KEEP) return false;
-  return session.revertPolicy == QuickRevertPolicy::NEXT_SHOT ? session.shotEnded
-                                                               : quickRevertRemainingMs(session, nowMs) == 0;
+inline bool quickRevertDue(const SessionQuickSettings &quick, uint32_t nowMs) {
+  if (quick.mask == 0 || quick.revertPolicy == QuickRevertPolicy::KEEP) return false;
+  return quick.revertPolicy == QuickRevertPolicy::NEXT_SHOT ? quick.shotEnded
+                                                             : quickRevertRemainingMs(quick, nowMs) == 0;
 }
 
 // Brew by weight and the fast/slow sides belong to the active preset; the
@@ -135,28 +135,28 @@ inline uint8_t presetQuickSettingValue(const ShotPreset &preset, QuickSettingFie
 
 // Applies each override's session value, or with `saved` the persisted value it
 // hides (the config as it must reach flash and the Settings page).
-[[gnu::noinline]] inline RuntimeConfig overlaySessionQuickSettings(const SessionQuickSettings &session,
+[[gnu::noinline]] inline RuntimeConfig overlaySessionQuickSettings(const SessionQuickSettings &quick,
                                                  RuntimeConfig config, bool saved = false) {
   for (uint8_t index = 0; index < QUICK_SETTING_FIELD_COUNT; ++index) {
-    if (session.mask & (1U << index))
+    if (quick.mask & (1U << index))
       setQuickSettingValue(config, static_cast<QuickSettingField>(index),
-                           saved ? session.saved[index] : session.value[index]);
+                           saved ? quick.saved[index] : quick.value[index]);
   }
   return config;
 }
 
 // Sets a session value on the effective config; matching the saved value
 // simply drops the override.
-[[gnu::noinline]] inline void setSessionQuickSetting(SessionQuickSettings &session, uint8_t activePresetId,
+[[gnu::noinline]] inline void setSessionQuickSetting(SessionQuickSettings &quick, uint8_t activePresetId,
                                    RuntimeConfig &effective, QuickSettingField field,
                                    uint8_t value) {
   const auto index = static_cast<uint8_t>(field);
   const auto bit = static_cast<uint8_t>(1U << index);
-  if (session.mask == 0) session.presetId = activePresetId;
-  if ((session.mask & bit) == 0) session.saved[index] = quickSettingValue(effective, field);
-  session.value[index] = value;
-  session.mask = static_cast<uint8_t>(session.saved[index] == value ? session.mask & ~bit
-                                                                    : session.mask | bit);
+  if (quick.mask == 0) quick.presetId = activePresetId;
+  if ((quick.mask & bit) == 0) quick.saved[index] = quickSettingValue(effective, field);
+  quick.value[index] = value;
+  quick.mask = static_cast<uint8_t>(quick.saved[index] == value ? quick.mask & ~bit
+                                                                : quick.mask | bit);
   setQuickSettingValue(effective, field, value);
 }
 
@@ -164,23 +164,23 @@ inline uint8_t presetQuickSettingValue(const ShotPreset &preset, QuickSettingFie
 // newly composed config. A preset change drops every override and restores the
 // saved device values (the new preset supplies its own fields). `incoming` is
 // the saved config a Settings edit sent, or nullptr otherwise.
-[[gnu::noinline]] inline void reconcileSessionQuickSettings(SessionQuickSettings &session,
+[[gnu::noinline]] inline void reconcileSessionQuickSettings(SessionQuickSettings &quick,
                                           const ShotPreset &active,
                                           const RuntimeConfig *incoming,
                                           RuntimeConfig &composed) {
-  const bool presetChanged = active.id != session.presetId;
+  const bool presetChanged = active.id != quick.presetId;
   for (uint8_t index = 0; index < QUICK_SETTING_FIELD_COUNT; ++index) {
     const auto field = static_cast<QuickSettingField>(index);
-    if ((session.mask & (1U << index)) == 0) continue;
+    if ((quick.mask & (1U << index)) == 0) continue;
     const bool fromPreset = quickSettingFromPreset(field);
-    if (presetChanged && !fromPreset) setQuickSettingValue(composed, field, session.saved[index]);
+    if (presetChanged && !fromPreset) setQuickSettingValue(composed, field, quick.saved[index]);
     const bool edited = presetChanged ||
-        (fromPreset ? presetQuickSettingValue(active, field) != session.saved[index]
+        (fromPreset ? presetQuickSettingValue(active, field) != quick.saved[index]
                     : incoming != nullptr &&
-                          quickSettingValue(*incoming, field) != session.saved[index]);
-    if (edited) session.mask &= static_cast<uint8_t>(~(1U << index));
+                          quickSettingValue(*incoming, field) != quick.saved[index]);
+    if (edited) quick.mask &= static_cast<uint8_t>(~(1U << index));
   }
-  composed = overlaySessionQuickSettings(session, composed);
+  composed = overlaySessionQuickSettings(quick, composed);
 }
 
 inline bool quickSettingsEqual(const QuickSettingsSnapshot &left,

@@ -507,7 +507,6 @@ inline bool LocalBuzzer::acceptLocked(BuzzerPattern pattern, BuzzerCue cue,
     stopTone();
     clearPlayback();
   }
-  bool started = false;
   bool accepted = false;
   if (buzzerPatternIsPulseTrain(active) || (looping && rtttlPlayback)) {
     if (pattern == active && cue == activeCue &&
@@ -521,11 +520,8 @@ inline bool LocalBuzzer::acceptLocked(BuzzerPattern pattern, BuzzerCue cue,
       pendingPulseRate = 0;
       pendingDurationMs = 0;
       stopTone();
-      if (rtttl && cmd != nullptr) {
-        started = startRtttl(*cmd, nowMs);
-      } else {
-        started = startPattern(pattern, nowMs);
-      }
+      const bool started = rtttl && cmd != nullptr ? startRtttl(*cmd, nowMs)
+                                                   : startPattern(pattern, nowMs);
       if (started) {
         applyDeadline(durationMs, nowMs);
         ++acceptedRequests;
@@ -533,11 +529,8 @@ inline bool LocalBuzzer::acceptLocked(BuzzerPattern pattern, BuzzerCue cue,
       }
     }
   } else if (active == BuzzerPattern::NONE && activeCue == BuzzerCue::NONE) {
-    if (rtttl && cmd != nullptr) {
-      started = startRtttl(*cmd, nowMs);
-    } else {
-      started = startPattern(pattern, nowMs);
-    }
+    const bool started = rtttl && cmd != nullptr ? startRtttl(*cmd, nowMs)
+                                                 : startPattern(pattern, nowMs);
     if (started) {
       applyDeadline(durationMs, nowMs);
       ++acceptedRequests;

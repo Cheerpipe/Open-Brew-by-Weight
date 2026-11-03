@@ -43,10 +43,10 @@ class HistoryLog
   bool clear(bool persistNow = true, bool user = false) {
     // Keep the monotonic generation: a regressed generation would make the
     // pre-clear slot look newer on the next load.
-    const uint32_t generation = store_.header.generation;
+    const uint32_t keptGeneration = store_.header.generation;
     const uint32_t clears = store_.marks.clears + (user ? 1U : 0U);
     resetHistoryStore(store_);
-    store_.header.generation = generation;
+    store_.header.generation = keptGeneration;
     store_.marks.clears = clears;
     return persistMutation(persistNow);
   }
@@ -68,14 +68,14 @@ class HistoryLog
   // from the oldest for Asc. Caller holds the store mutex.
   void copyPage(HistoryPage &page, size_t offset, size_t limit,
                 ShotLogSortDir dir, uint8_t types = 0) const {
-    const size_t count = store_.header.count;
+    const size_t stored = store_.header.count;
     const size_t oldest =
-        (store_.header.writeIndex + HISTORY_CAPACITY - count) % HISTORY_CAPACITY;
+        (store_.header.writeIndex + HISTORY_CAPACITY - stored) % HISTORY_CAPACITY;
     limit = historyClampPageLimit(limit);
     page.total = page.count = 0;
-    for (size_t step = 0; step < count; ++step) {
+    for (size_t step = 0; step < stored; ++step) {
       const HistoryRecord &record = store_.records[
-          (oldest + (dir == ShotLogSortDir::Desc ? count - 1U - step : step)) %
+          (oldest + (dir == ShotLogSortDir::Desc ? stored - 1U - step : step)) %
           HISTORY_CAPACITY];
       if (types && (record.type > 7 || !((types >> record.type) & 1U))) continue;
       if (page.total >= offset && page.count < limit)

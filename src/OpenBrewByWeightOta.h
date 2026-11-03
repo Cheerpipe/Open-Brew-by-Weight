@@ -238,14 +238,14 @@ class OpenBrewByWeightOta {
   // confirmation. Safe to call more than once.
   void begin();
 
-  bool available() const;
-  bool busy() const;
+  static bool available();
+  static bool busy();
   uint32_t slotBytes() const;
   // With `wait` false a reader never blocks behind an erase, range write or
   // commit holding the OTA mutex; it gets the copy published at that
   // operation's last state change or written sector instead.
   OtaStatusSnapshot snapshot(bool wait = true) const;
-  OtaPublishedState publishedState() const;
+  static OtaPublishedState publishedState();
 
   // Starts (or reconnects to) a resumable transfer.  This does not erase or
   // write flash; the first range validates the image header before begin().
@@ -267,8 +267,8 @@ class OpenBrewByWeightOta {
   OtaResult commit();
   OtaResult discard();
 
-  bool runningImageConfirmed() const;
-  bool runningImageRejected() const;
+  static bool runningImageConfirmed();
+  static bool runningImageRejected();
   // Confirms a pending image (the running image becomes permanent) or rejects
   // it: selects the previous slot without rebooting, so the caller can restart
   // through the normal machine circuit-safe path. Without another bootable
@@ -291,7 +291,7 @@ class OpenBrewByWeightOta {
   OtaResult finishFailure(OtaResult result);
   bool sessionExpiredLocked(uint32_t now) const;
   bool reconfirmStagedTag();
-  bool verifySessionSha256();
+  bool verifySessionSha256() const;
   bool startSessionSha256();
   bool updateSessionSha256(const uint8_t *bytes, size_t length);
   void clearSessionSha256();
@@ -299,7 +299,7 @@ class OpenBrewByWeightOta {
   bool persistSession();
   bool removeSessionJournal();
   void restoreSessionJournal();
-  void publishState();
+  void publishState() const;
   void publishSnapshotLocked() const;
   bool readBootState();
   bool confirmRunningImageLocked();

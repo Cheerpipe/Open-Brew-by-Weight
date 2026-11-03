@@ -67,12 +67,12 @@ inline bool writeFirmwareModeRecord(const char *key, const void *value,
     unlockFlashIo();
     return false;
   }
-  uint8_t verified[sizeof(SetupIntent)] = {};
   bool saved = false;
   if (value == nullptr) {
     saved = (preferences.getBytesLength(key) == 0 || preferences.remove(key)) &&
             preferences.getBytesLength(key) == 0;
   } else {
+    uint8_t verified[sizeof(SetupIntent)] = {};
     saved = size <= sizeof(verified) &&
             preferences.putBytes(key, value, size) == size &&
             preferences.getBytesLength(key) == size &&

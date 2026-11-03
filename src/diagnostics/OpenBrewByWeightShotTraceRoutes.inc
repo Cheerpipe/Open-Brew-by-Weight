@@ -98,7 +98,6 @@ struct ShotTraceJson {
 // covers a shot and its drip, and whatever else closes the durable write gate
 // (a rinse, a closed relay, a scale connecting, a maintenance lease).
 esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request) {
-  OpenBrewByWeightNetwork &self = *instance_;
   ShotTraceResponse response = {request, false, {}};
   unsigned long known = 0;
   char query[64] = {};
@@ -128,6 +127,7 @@ esp_err_t OpenBrewByWeightNetwork::shotTraceDownloadHandler(httpd_req_t *request
         tag[0] == '"')
       known = strtoul(tag + 1, &end, 16);
     if (end != tag + 9 || strcmp(end, "\"") != 0) known = 0;
+    const OpenBrewByWeightNetwork &self = *instance_;
     if (self.callbacks_.streamShotTrace != nullptr)
       result = self.callbacks_.streamShotTrace(identity[0], identity[1], identity[2],
                                                static_cast<uint32_t>(known),

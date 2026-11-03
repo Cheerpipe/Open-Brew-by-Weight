@@ -78,17 +78,20 @@ inline bool validQuickStart(const QuickStartRecord &record) {
 inline QuickStartEntry *quickStartEntry(QuickStartRecord &record,
                                         const ShotPresetBank &bank,
                                         uint8_t presetId, bool create) {
-  for (QuickStartEntry &entry : record.entries)
-    if (entry.presetId == presetId && presetId != 0) return &entry;
+  QuickStartEntry *const end = std::end(record.entries);
+  QuickStartEntry *found = std::find_if(
+      std::begin(record.entries), end, [presetId](const QuickStartEntry &entry) {
+        return entry.presetId == presetId && presetId != 0;
+      });
+  if (found != end) return found;
   if (!create) return nullptr;
-  for (QuickStartEntry &entry : record.entries) {
-    if (entry.presetId == 0 || findShotPresetIndex(bank, entry.presetId) < 0) {
-      entry = QuickStartEntry{};
-      entry.presetId = presetId;
-      return &entry;
-    }
-  }
-  return nullptr;
+  found = std::find_if(std::begin(record.entries), end, [&bank](const QuickStartEntry &entry) {
+    return entry.presetId == 0 || findShotPresetIndex(bank, entry.presetId) < 0;
+  });
+  if (found == end) return nullptr;
+  *found = QuickStartEntry{};
+  found->presetId = presetId;
+  return found;
 }
 
 // A drip to quick start from and the first shot-log id it applies to

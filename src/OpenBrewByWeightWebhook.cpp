@@ -99,12 +99,12 @@ void deviceId(char *output, size_t capacity) {
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
-bool WebhookDispatcher::begin(const WebhookConfig &config) {
+bool WebhookDispatcher::begin(const WebhookConfig &initial) {
   if (lifecycleMutex_ != nullptr || workerStopped_ != nullptr) return false;
   mux_.lock();
-  config_ = config;
+  config_ = initial;
   configGeneration_ = 1;
-  deferDuringShot_.store(config.deferDuringShot, std::memory_order_release);
+  deferDuringShot_.store(initial.deferDuringShot, std::memory_order_release);
   mux_.unlock();
   lifecycleMutex_ = xSemaphoreCreateMutex();
   if (lifecycleMutex_ == nullptr) {
@@ -122,7 +122,7 @@ bool WebhookDispatcher::begin(const WebhookConfig &config) {
     mux_.unlock();
     return false;
   }
-  if (!config.enabled || startWorker()) return true;
+  if (!initial.enabled || startWorker()) return true;
   // startWorker() already released its queue/payload attempt. Complete the
   // failed transaction by releasing the passive lifecycle objects as well.
   (void)stop();
@@ -284,16 +284,16 @@ esp_http_client_handle_t WebhookDispatcher::ensureHttpClient(const char *url) {
   }
 
   cleanupHttpClient();
-  esp_http_client_config_t config = {};
-  config.url = url;
-  config.timeout_ms = kWebhookPollMs;
+  esp_http_client_config_t clientConfig = {};
+  clientConfig.url = url;
+  clientConfig.timeout_ms = kWebhookPollMs;
   // IDF 6.1 TCP transport registers async connect with non-blocking sockets;
   // perform preserves header/body offsets across EAGAIN, including plain HTTP.
-  config.is_async = true;
-  config.disable_auto_redirect = true;
-  config.event_handler = httpEvent;
-  config.user_data = this;
-  esp_http_client_handle_t client = esp_http_client_init(&config);
+  clientConfig.is_async = true;
+  clientConfig.disable_auto_redirect = true;
+  clientConfig.event_handler = httpEvent;
+  clientConfig.user_data = this;
+  esp_http_client_handle_t client = esp_http_client_init(&clientConfig);
   if (client == nullptr) return nullptr;
   // Reconnect per delivery: receivers close idle keep-alive sockets (Home
   // Assistant after 75 s), and a write into one loses the event.
@@ -330,7 +330,7 @@ void WebhookDispatcher::lookupDone(const char *, const ip_addr_t *address,
 }
 
 void WebhookDispatcher::lookupStart(void *self) {
-  auto *dispatcher = static_cast<WebhookDispatcher *>(self);
+  const auto *dispatcher = static_cast<const WebhookDispatcher *>(self);
   ip_addr_t address;
   const err_t result = dns_gethostbyname(dispatcher->lookupHost_, &address,
                                          lookupDone, self);
@@ -382,21 +382,21 @@ void WebhookDispatcher::cleanupHttpClient() {
   mux_.unlock();
 }
 
-void WebhookDispatcher::setConfig(const WebhookConfig &config) {
+void WebhookDispatcher::setConfig(const WebhookConfig &next) {
   // A previous begin() can fail transactionally (for example, no PSRAM).
   // Permit a later configuration update to retry the full initialization.
   if (lifecycleMutex_ == nullptr) {
-    (void)begin(config);
+    (void)begin(next);
     return;
   }
   bool changed = false;
   mux_.lock();
-  changed = memcmp(&config_, &config, sizeof(config)) != 0;
+  changed = memcmp(&config_, &next, sizeof(next)) != 0;
   if (changed) {
-    if (!config.enabled || strcmp(config_.url, config.url) != 0)
+    if (!next.enabled || strcmp(config_.url, next.url) != 0)
       cleanupRequested_.store(true, std::memory_order_release);
-    config_ = config;
-    deferDuringShot_.store(config.deferDuringShot, std::memory_order_release);
+    config_ = next;
+    deferDuringShot_.store(next.deferDuringShot, std::memory_order_release);
     ++configGeneration_;
     if (configGeneration_ == 0) configGeneration_ = 1;
   }
@@ -405,7 +405,7 @@ void WebhookDispatcher::setConfig(const WebhookConfig &config) {
   // enable/disable changes. This avoids task/queue/stack churn under repeated
   // configuration updates. stop() remains the sole lifecycle teardown and
   // still performs stop/ack/join before releasing resources.
-  if (config.enabled) (void)startWorker();
+  if (next.enabled) (void)startWorker();
 }
 
 WebhookConfig WebhookDispatcher::config() const {

@@ -1,6 +1,9 @@
 #pragma once
+#include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <iterator>
+#include <memory>
 #include <new>
 #include <type_traits>
 #include <stddef.h>
@@ -1019,10 +1022,8 @@ inline ConfigValidationError validateRuntimeConfig(
       config.retareStabilityMaxGapMs > MAX_RETARE_STABILITY_MAX_GAP_MS) {
     return ConfigValidationError::RETARE_STABILITY_MAX_GAP;
   }
-  if (config.retareStabilityMinDurationMs <
-          MIN_RETARE_STABILITY_MIN_DURATION_MS ||
-      config.retareStabilityMinDurationMs >
-          MAX_RETARE_STABILITY_MIN_DURATION_MS) {
+  if (config.retareStabilityMinDurationMs >
+      MAX_RETARE_STABILITY_MIN_DURATION_MS) {
     return ConfigValidationError::RETARE_STABILITY_MIN_DURATION;
   }
   if (config.retareStabilityMinDurationMs > config.retareWindowMs) {
@@ -1075,8 +1076,7 @@ inline ConfigValidationError validateRuntimeConfig(
       config.postTareBaselineGraceMs > MAX_POST_TARE_BASELINE_GRACE_MS) {
     return ConfigValidationError::POST_TARE_BASELINE_GRACE;
   }
-  if (config.scaleTimerStopExtraDelayMs < MIN_SCALE_TIMER_STOP_EXTRA_DELAY_MS ||
-      config.scaleTimerStopExtraDelayMs > MAX_SCALE_TIMER_STOP_EXTRA_DELAY_MS) {
+  if (config.scaleTimerStopExtraDelayMs > MAX_SCALE_TIMER_STOP_EXTRA_DELAY_MS) {
     return ConfigValidationError::SCALE_TIMER_STOP_EXTRA_DELAY;
   }
   if (!validTimeZoneState(config)) {
@@ -1112,17 +1112,14 @@ inline ConfigValidationError validateRuntimeConfig(
       config.lastShotCooldownMs > MAX_LAST_SHOT_COOLDOWN_MS) {
     return ConfigValidationError::LAST_SHOT_COOLDOWN;
   }
-  if (config.dripDelayMs < MIN_DRIP_DELAY_MS ||
-      config.dripDelayMs > MAX_DRIP_DELAY_MS) {
+  if (config.dripDelayMs > MAX_DRIP_DELAY_MS) {
     return ConfigValidationError::DRIP_DELAY;
   }
   if (config.stopPulseTenMs != 0 &&
       (config.stopPulseTenMs < 5 || config.stopPulseTenMs > 100)) {
     return ConfigValidationError::STOP_PULSE;
   }
-  if (config.maxSinglePressHundredMs != 0 &&
-      (config.maxSinglePressHundredMs < 1 ||
-       config.maxSinglePressHundredMs > 50)) {
+  if (config.maxSinglePressHundredMs > 50) {
     return ConfigValidationError::MAX_SINGLE_PRESS;
   }
   if (config.reedConfirmTimeoutHundredMs != 0 &&
@@ -1357,8 +1354,8 @@ inline WifiPowerSaveMode desiredWifiPowerSave(bool sleepAllowed, bool apActive,
 // Settings / shot-store NVS flushes. Defer while a shot (or machine circuit)
 // is busy or the scale is mid-connect; dirty state stays in RAM.
 inline bool durableFlashWriteAllowed(bool shotOrMachineBusy,
-                                     bool scaleConnecting) {
-  return !shotOrMachineBusy && !scaleConnecting;
+                                     bool scaleMidConnect) {
+  return !shotOrMachineBusy && !scaleMidConnect;
 }
 
 // Live STA power-save reported by the driver (diagnostic). May be MAX_MODEM
@@ -1838,7 +1835,7 @@ struct PersistedLastShot {
   uint32_t arrivalMs = 0;  // Arrival at the target; 0 = unknown.
 };
 
-inline bool publishableLastShot(const PersistedLastShot &shot) { return shot.valid && shot.presetId != 0 && static_cast<LastShotType>(shot.shotType) <= LastShotType::MANUAL; }
+inline bool publishableLastShot(const PersistedLastShot &last) { return last.valid && last.presetId != 0 && static_cast<LastShotType>(last.shotType) <= LastShotType::MANUAL; }
 
 struct RecipeSnapshot {
   ShotPresetBank presets = {};
@@ -2218,9 +2215,7 @@ class DebugRingBuffer {
     writeIndex_ = 0;
     overwritten_ = 0;
     alarmSequence_ = 0;
-    for (DebugEvent &event : events_) {
-      event = DebugEvent{};
-    }
+    std::fill(std::begin(events_), std::end(events_), DebugEvent{});
   }
 
   void add(Instant at, LogLevel level, DebugCategory category, DebugCode code,

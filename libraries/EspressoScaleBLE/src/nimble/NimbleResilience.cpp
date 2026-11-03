@@ -1,5 +1,8 @@
 #include "nimble/NimbleResilience.h"
 
+#include <algorithm>
+#include <iterator>
+
 namespace {
 
 constexpr uint32_t kBackoffDelaysMs[] = {50, 80, 100, 250, 500, 1000, 2000,
@@ -66,13 +69,14 @@ void NimbleNegativeCache::expire(uint32_t nowMs) {
 bool NimbleNegativeCache::contains(const NimblePeerKey &key,
                                    uint32_t nowMs) {
   expire(nowMs);
-  for (auto & entrie : entries_) {
-    if (entrie.used && nimblePeerKeyEqual(entrie.key, key)) {
-      entrie.sequence = ++sequence_;
-      return true;
-    }
-  }
-  return false;
+  Entry *const end = std::end(entries_);
+  Entry *const found = std::find_if(
+      std::begin(entries_), end, [&key](const Entry &entry) {
+        return entry.used && nimblePeerKeyEqual(entry.key, key);
+      });
+  if (found == end) return false;
+  found->sequence = ++sequence_;
+  return true;
 }
 
 void NimbleNegativeCache::insert(const NimblePeerKey &key, uint32_t nowMs,
@@ -113,12 +117,10 @@ void NimbleNegativeCache::clear() {
 }
 
 size_t NimbleNegativeCache::activeCount(uint32_t nowMs) const {
-  size_t count = 0;
-  for (const auto & entrie : entries_) {
-    if (entrie.used &&
-        !nimbleTimeReached(nowMs, entrie.expiresAtMs)) {
-      ++count;
-    }
-  }
-  return count;
+  return static_cast<size_t>(
+      std::count_if(std::begin(entries_), std::end(entries_),
+                    [nowMs](const Entry &entry) {
+                      return entry.used &&
+                             !nimbleTimeReached(nowMs, entry.expiresAtMs);
+                    }));
 }

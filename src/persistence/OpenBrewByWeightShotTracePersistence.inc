@@ -179,7 +179,7 @@ void resetShotRecordsForFactoryReset() {
 // Curves the pool can still take (caller holds the store lock): a pool that
 // failed to recover holds nothing back, such as a planned restart.
 bool shotCurvesSavePending() {
-  ShotTracePool &pool = shotTracePool();
+  const ShotTracePool &pool = shotTracePool();
   return shotCurves.pending() != 0 &&
          (pool.ready() || pool.lastError() == ShotTracePoolError::NONE);
 }
@@ -187,7 +187,7 @@ bool shotCurvesSavePending() {
 // The record is on flash, or given up: its curve stops pending (unless a
 // clear came in between) and its trace is consumed.
 void retireShotRecord() {
-  ShotTracePersistState &state = shotTracePersist;
+  const ShotTracePersistState &state = shotTracePersist;
   if (state.curveId != 0) {
     TaskLockGuard lock(shotStoreMutex);
     if (shotCurves.generation() == state.curveGeneration) shotCurves.markSaved(state.curveId);
@@ -372,7 +372,7 @@ void serviceShotTracePool() {
   FlashStoreStepResult result = FlashStoreStepResult::FAILED;
   {
     TaskLockGuard writer(shotTracePoolWriterMutex);
-    ShotTracePersistState &state = shotTracePersist;
+    const ShotTracePersistState &state = shotTracePersist;
     // A factory reset in between dropped the paused append: stage again.
     if (!pool.appending() && (resume || !shotTracePoolGateOpen())) return;
     // A refused begin (other than a newer trace) costs an attempt, so one

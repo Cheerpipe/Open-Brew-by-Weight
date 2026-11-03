@@ -526,45 +526,45 @@ inline corridor::ArrivalRecord shotLogArrivalRecord(const ShotLogRecord &record)
 inline PersistedLastShot shotLogProjectLastShot(
     const ShotLogRecord &record, const PersistedLastShot &linked,
     const PersistedLastShot &linkedGood = PersistedLastShot{}) {
-  PersistedLastShot shot = linked.shotLogId == record.id       ? linked
-                           : linkedGood.shotLogId == record.id ? linkedGood
-                                                               : PersistedLastShot{};
-  shot.valid = true;
-  shot.shotLogId = record.id;
-  shot.endedAtUptimeMs = record.endedAtMs;
-  shot.endedAtUnixSec = record.endedAtUnixSec;
-  shot.endedAtLocalSec = record.endedAtLocalSec;
-  shot.hasWallTime = record.hasWallTime;
-  shot.durationMs = static_cast<uint32_t>(record.durationDs) * 100U;
-  shot.currentWeightG = static_cast<float>(record.actualWeightCg) / 100.0f;
-  shot.weightValid = true;
+  PersistedLastShot projected = linked.shotLogId == record.id       ? linked
+                                : linkedGood.shotLogId == record.id ? linkedGood
+                                                                    : PersistedLastShot{};
+  projected.valid = true;
+  projected.shotLogId = record.id;
+  projected.endedAtUptimeMs = record.endedAtMs;
+  projected.endedAtUnixSec = record.endedAtUnixSec;
+  projected.endedAtLocalSec = record.endedAtLocalSec;
+  projected.hasWallTime = record.hasWallTime;
+  projected.durationMs = static_cast<uint32_t>(record.durationDs) * 100U;
+  projected.currentWeightG = static_cast<float>(record.actualWeightCg) / 100.0f;
+  projected.weightValid = true;
   // Only good shots are projected: a measured yield, so every one had a scale.
-  shot.scaleAvailable = true;
-  shot.goalWeightDg = record.goalWeightDg;
-  shot.presetId = shotLogPresetId(record);
-  copyCString(shot.presetName, sizeof(shot.presetName), record.presetName);
-  shot.shotType = static_cast<uint8_t>(shotLogType(record));
-  shot.firstDropElapsedMs = record.firstDropDs == SHOT_LOG_METRIC_MISSING
+  projected.scaleAvailable = true;
+  projected.goalWeightDg = record.goalWeightDg;
+  projected.presetId = shotLogPresetId(record);
+  copyCString(projected.presetName, sizeof(projected.presetName), record.presetName);
+  projected.shotType = static_cast<uint8_t>(shotLogType(record));
+  projected.firstDropElapsedMs = record.firstDropDs == SHOT_LOG_METRIC_MISSING
       ? 0U : static_cast<uint32_t>(record.firstDropDs) * 100U;
-  shot.tareElapsedMs = record.tareAtDs == SHOT_LOG_METRIC_MISSING
+  projected.tareElapsedMs = record.tareAtDs == SHOT_LOG_METRIC_MISSING
       ? 0U : static_cast<uint32_t>(record.tareAtDs) * 100U;
-  copyCString(shot.scaleName, sizeof(shot.scaleName), record.scaleName);
-  shot.averageFlowValid = record.avgFlowCgS != SHOT_LOG_METRIC_MISSING;
-  shot.averageFlowGps = shot.averageFlowValid
+  copyCString(projected.scaleName, sizeof(projected.scaleName), record.scaleName);
+  projected.averageFlowValid = record.avgFlowCgS != SHOT_LOG_METRIC_MISSING;
+  projected.averageFlowGps = projected.averageFlowValid
       ? static_cast<float>(record.avgFlowCgS) / 100.0f : 0.0f;
-  shot.fastExtractionGuardEnabled =
+  projected.fastExtractionGuardEnabled =
       shotLogFastGuardEnabled(record.sideFlags);
-  shot.slowExtractionGuardEnabled =
+  projected.slowExtractionGuardEnabled =
       shotLogSlowGuardEnabled(record.sideFlags);
-  shot.extractionExtended = shotLogFastExtended(record.extractionExtended);
-  shot.slowExtractionExtended = shotLogSlowExtended(record.extractionExtended);
-  shot.rating = shotLogRating(record.sideFlags);
-  shot.verdict = record.verdict & 3;
-  shot.arrivalMs = record.arrivalDs == SHOT_LOG_METRIC_MISSING
+  projected.extractionExtended = shotLogFastExtended(record.extractionExtended);
+  projected.slowExtractionExtended = shotLogSlowExtended(record.extractionExtended);
+  projected.rating = shotLogRating(record.sideFlags);
+  projected.verdict = record.verdict & 3;
+  projected.arrivalMs = record.arrivalDs == SHOT_LOG_METRIC_MISSING
       ? 0U : static_cast<uint32_t>(record.arrivalDs) * 100U;
   if (!shotLogWeightIsMissing(record.cutLineCg))
-    shot.activeStopWeightG = static_cast<float>(record.cutLineCg) / 100.0f;
-  return shot;
+    projected.activeStopWeightG = static_cast<float>(record.cutLineCg) / 100.0f;
+  return projected;
 }
 
 inline ShotLogType shotLogType(const ShotLogRecord &record) {
@@ -611,13 +611,13 @@ inline bool shotListFilterMatches(const ShotListFilter &filter,
   if (filter.results && (result > 2 || !((filter.results >> result) & 1U)))
     return false;
   if (!filter.includeBad && !shotLogRecordEligible(record)) return false;
-  bool preset = filter.presetCount == 0, scale = filter.scaleCount == 0;
+  bool presetMatches = filter.presetCount == 0, scaleMatches = filter.scaleCount == 0;
   for (size_t i = 0; i < filter.presetCount; ++i)
-    preset = preset || filter.presets[i] == shotLogPresetId(record);
-  const uint32_t key = scale ? 0 : shotLogScaleKey(record);
+    presetMatches = presetMatches || filter.presets[i] == shotLogPresetId(record);
+  const uint32_t key = scaleMatches ? 0 : shotLogScaleKey(record);
   for (size_t i = 0; i < filter.scaleCount; ++i)
-    scale = scale || filter.scales[i] == key;
-  return preset && scale;
+    scaleMatches = scaleMatches || filter.scales[i] == key;
+  return presetMatches && scaleMatches;
 }
 
 // Identity of a filter for the page cache and the stream fingerprint.

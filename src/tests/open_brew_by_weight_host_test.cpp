@@ -2997,7 +2997,7 @@ void w03_runtime_timing_relations_are_transactional() {
   CHECK(validateRuntimeConfig(config) ==
         ConfigValidationError::LAST_SHOT_COOLDOWN);
   config = RuntimeConfig{};
-  config.dripDelayMs = MIN_DRIP_DELAY_MS;
+  config.dripDelayMs = 0;
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);
   config.dripDelayMs = MAX_DRIP_DELAY_MS;
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);

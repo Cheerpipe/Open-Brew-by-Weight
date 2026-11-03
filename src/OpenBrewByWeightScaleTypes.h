@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -62,18 +64,22 @@ inline constexpr ScaleDisconnectReasonLabel kScaleDisconnectReasonLabels[] = {
     {20, "MBUF_ALLOCATION_FAILED", "mbuf allocation failed"},
 };
 
+inline const ScaleDisconnectReasonLabel *findScaleDisconnectReasonLabel(int32_t reason) {
+  const ScaleDisconnectReasonLabel *const end = std::end(kScaleDisconnectReasonLabels);
+  const ScaleDisconnectReasonLabel *const found = std::find_if(
+      std::begin(kScaleDisconnectReasonLabels), end,
+      [reason](const ScaleDisconnectReasonLabel &label) { return label.code == reason; });
+  return found != end ? found : nullptr;
+}
+
 inline const char *scaleDisconnectReasonName(uint8_t reason) {
-  for (const auto &label : kScaleDisconnectReasonLabels) {
-    if (label.code == reason) return label.apiName;
-  }
-  return "UNKNOWN";
+  const ScaleDisconnectReasonLabel *const label = findScaleDisconnectReasonLabel(reason);
+  return label != nullptr ? label->apiName : "UNKNOWN";
 }
 
 inline const char *scaleDisconnectReasonDebugName(int32_t reason) {
-  for (const auto &label : kScaleDisconnectReasonLabels) {
-    if (label.code == reason) return label.debugName;
-  }
-  return "unknown";
+  const ScaleDisconnectReasonLabel *const label = findScaleDisconnectReasonLabel(reason);
+  return label != nullptr ? label->debugName : "unknown";
 }
 
 inline int32_t weightToCentigrams(float weightG) {

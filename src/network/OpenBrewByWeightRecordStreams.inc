@@ -412,7 +412,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
 OpenBrewByWeightNetwork::RecordIndexWork *OpenBrewByWeightNetwork::recordIndexWork() {
   if (recordIndexWork_ != nullptr) return recordIndexWork_;
   if (void *memory = allocExternal(sizeof(RecordIndexWork)))
-    return recordIndexWork_ = new (memory) RecordIndexWork{};
+    return recordIndexWork_ = std::construct_at(static_cast<RecordIndexWork *>(memory));
   static RefusalLog noMemory;
   if (noMemory.due() != 0)
     lifecycleLog("Record index: no memory for deltas; the companion gets whole indexes");

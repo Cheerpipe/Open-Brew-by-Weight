@@ -17,23 +17,26 @@ struct BbwLearningBank {
   } states[MAX_SHOT_PRESETS];
   uint32_t nextGeneration = 0;
 
+  // Zero is never a generation, so the counter skips it on wrap.
   uint32_t newGeneration() {
-    if (++nextGeneration == 0) ++nextGeneration;
+    nextGeneration = nextGeneration == UINT32_MAX ? 1 : nextGeneration + 1;
     return nextGeneration;
   }
 
   State &forPreset(uint8_t id, const ShotPresetBank &bank) {
-    for (State &state : states) if (state.id == id) return state;
-    for (State &state : states) {
-      if (state.id == 0 || findShotPresetIndex(bank, state.id) < 0) {
-        state = State{};
-        state.id = id;
-        state.generation = newGeneration();
-        return state;
-      }
-    }
-    // All eight extant presets are already present, so valid IDs return above.
-    return states[0];
+    State *const end = std::end(states);
+    State *found = std::find_if(std::begin(states), end,
+                                [id](const State &state) { return state.id == id; });
+    if (found != end) return *found;
+    found = std::find_if(std::begin(states), end, [&bank](const State &state) {
+      return state.id == 0 || findShotPresetIndex(bank, state.id) < 0;
+    });
+    // All eight extant presets are already present, so valid IDs never miss.
+    if (found == end) return states[0];
+    *found = State{};
+    found->id = id;
+    found->generation = newGeneration();
+    return *found;
   }
 
   // Stale pending shots stop learning and the candidate evidence restarts.

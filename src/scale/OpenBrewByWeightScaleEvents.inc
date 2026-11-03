@@ -72,11 +72,11 @@ bool dispatchAlert(AlertKind kind, AlertEvent event, uint32_t cycleId,
   if (sink == AlertSink::Scale) {
     return queueScaleIndependentAlert(event, cycleId);
   }
-  const BuzzerToneCommand tone =
+  const BuzzerToneCommand command =
       deriveBuzzerTone(event, session.slowExtractionExtended,
                        runtimeConfig.buzzerExtendedPulseRate,
                        runtimeConfig.buzzerSlowExtendedPulseRate);
-  return playLocalAlertTone(tone, kind != AlertKind::Recovery);
+  return playLocalAlertTone(command, kind != AlertKind::Recovery);
 }
 
 // Independent / multi-tone alerts: first drop, paddle, completion, triples.
@@ -102,11 +102,11 @@ bool emitCircuitCycleAlert(AlertEvent event, bool preempt) {
     if (preempt) {
       localBuzzer.stopAll();
     }
-    const BuzzerToneCommand tone =
+    const BuzzerToneCommand command =
         deriveBuzzerTone(event, session.slowExtractionExtended,
                          runtimeConfig.buzzerExtendedPulseRate,
                          runtimeConfig.buzzerSlowExtendedPulseRate);
-    return playLocalAlertTone(tone, true);
+    return playLocalAlertTone(command, true);
   }
   if (event == AlertEvent::COMPLETION_EXTRA) {
     return emitAlert(event);

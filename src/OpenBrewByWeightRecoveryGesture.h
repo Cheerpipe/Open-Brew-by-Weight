@@ -101,7 +101,7 @@ struct RecoveryGestureRecognizer {
     attemptStartedAtMs = 0;
   }
 
-  RecoveryGestureResult update(uint32_t nowMs, bool activatorOn,
+  RecoveryGestureResult update(uint32_t nowMs, bool activatorHeld,
                                bool turnedOn, bool turnedOff) {
     if (!active) {
       return RecoveryGestureResult::NONE;
@@ -152,7 +152,7 @@ struct RecoveryGestureRecognizer {
       return RecoveryGestureResult::NONE;
     }
 
-    const bool candidate = activatorOn &&
+    const bool candidate = activatorHeld &&
                            (completedCycles == RECOVERY_NETWORK_CYCLES ||
                             completedCycles == RECOVERY_FACTORY_CYCLES);
     if (candidate &&

@@ -329,10 +329,10 @@ AccidentalTouchClass evaluateAccidentalTouchSample(float weight,
       session.accidentalTouchPendingG, session.accidentalTouchPendingCount);
   // With the touch fallback on, a plateau or a hold above the cut line stays
   // touch evidence (labelled fallback) instead of releasing into a direct cut.
-  float threshold = 0.0f;
   if (classified != AccidentalTouchClass::TOUCH &&
       session.config.touchStopFallbackEnabled &&
       (classified == AccidentalTouchClass::SUSTAINED || session.accidentalTouchHolding)) {
+    float threshold = 0.0f;
     touchStopPolicy(threshold, receivedAtMs);
     if (weight >= threshold) classified = AccidentalTouchClass::TOUCH;
   }

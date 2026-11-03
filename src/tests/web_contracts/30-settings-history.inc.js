@@ -895,8 +895,8 @@ if (codeIncludes(ui, 'id="shotRating"') ||
     !network.includes('LAST_SHOT_NOT_FOUND') ||
     !network.includes('\\"rating\\":%u') ||
     !lastShotIo.includes('LAST_SHOT_SCHEMA_VERSION = 1') ||
-    !lastShotIo.includes('void advance(const PersistedLastShot &shot) {') ||
-    !lastShotIo.includes('shotLogEligible(shot.endReason, shot.durationMs)') ||
+    !lastShotIo.includes('void advance(const PersistedLastShot &last) {') ||
+    !lastShotIo.includes('shotLogEligible(last.endReason, last.durationMs)') ||
     !firmwareCore.includes('lastShotNvsDirty = false') ||
     !shotLogIo.includes('updateRating') ||
     !shotLogIo.includes('copyRatingById') ||

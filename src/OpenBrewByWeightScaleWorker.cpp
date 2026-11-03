@@ -15,8 +15,10 @@
 #include "OpenBrewByWeightSafety.h"
 #include "OpenBrewByWeightScheduling.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <iterator>
 #include <stdio.h>
 #include <string.h>
 
@@ -967,12 +969,11 @@ void updateWorkerLinkState() {
   if (linkUp) {
     const TaskLockGuard lock(scalePreferredMacMux);
     const char *name = scaleDefaultFriendlyName(scale.localName());
-    for (const auto &entry : scaleHistory) {
-      if (preferredScaleMacEqual(entry.mac, scale.address()) && entry.friendlyName[0]) {
-        name = entry.friendlyName;
-        break;
-      }
-    }
+    const ScaleHistoryEntry *const named = std::find_if(
+        std::begin(scaleHistory), std::end(scaleHistory), [](const ScaleHistoryEntry &entry) {
+          return preferredScaleMacEqual(entry.mac, scale.address()) && entry.friendlyName[0];
+        });
+    if (named != std::end(scaleHistory)) name = named->friendlyName;
     copyCString(shotName, sizeof(shotName), name);
     // Truncate at a UTF-8 boundary, never in the middle of a BLE name character.
     size_t length = strlen(shotName);
@@ -2036,12 +2037,11 @@ void clearPreferredScaleCache() {
   scalePreferredMacMux.lock();
   // Forgetting drops the learned record too: the scale leaves the saved
   // list and its rename, and returns unnamed if it is ever re-learned.
-  for (ScaleHistoryEntry &entry : scaleHistory) {
-    if (preferredScaleMacEqual(entry.mac, scalePreferredMac)) {
-      entry = ScaleHistoryEntry{};
-      break;
-    }
-  }
+  ScaleHistoryEntry *const forgotten =
+      std::find_if(std::begin(scaleHistory), std::end(scaleHistory), [](const ScaleHistoryEntry &entry) {
+        return preferredScaleMacEqual(entry.mac, scalePreferredMac);
+      });
+  if (forgotten != std::end(scaleHistory)) *forgotten = ScaleHistoryEntry{};
   scalePreferredMac[0] = '\0';
   scalePreferredName[0] = '\0';
   scalePreferredMacDirty = true;

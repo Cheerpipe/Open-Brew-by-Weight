@@ -1445,8 +1445,8 @@ void completeMaintenanceLease(const WebCommand &result) {
   if (result.succeeded &&
       maintenanceLease.command.type == WebCommandType::CLEAR_RESET_HISTORY) {
     safetyResetStatus.resetHistoryCount = 0;
-    for (ResetHistoryEntry &entry : safetyResetStatus.resetHistory)
-      entry = ResetHistoryEntry{};
+    std::fill(std::begin(safetyResetStatus.resetHistory),
+              std::end(safetyResetStatus.resetHistory), ResetHistoryEntry{});
   }
   if (!result.succeeded &&
       maintenanceLease.command.type == WebCommandType::PERSIST_RUNTIME &&

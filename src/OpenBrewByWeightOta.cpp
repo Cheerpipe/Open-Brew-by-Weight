@@ -268,11 +268,11 @@ OpenBrewByWeightOta &OpenBrewByWeightOta::instance() {
   return shared;
 }
 
-bool OpenBrewByWeightOta::available() const {
+bool OpenBrewByWeightOta::available() {
   return publishedState().available;
 }
 
-bool OpenBrewByWeightOta::busy() const {
+bool OpenBrewByWeightOta::busy() {
   return publishedState().busy;
 }
 
@@ -281,15 +281,15 @@ uint32_t OpenBrewByWeightOta::slotBytes() const {
   return slotBytes_;
 }
 
-bool OpenBrewByWeightOta::runningImageConfirmed() const {
+bool OpenBrewByWeightOta::runningImageConfirmed() {
   return publishedState().confirmed;
 }
 
-bool OpenBrewByWeightOta::runningImageRejected() const {
+bool OpenBrewByWeightOta::runningImageRejected() {
   return publishedState().rejected;
 }
 
-OtaPublishedState OpenBrewByWeightOta::publishedState() const {
+OtaPublishedState OpenBrewByWeightOta::publishedState() {
   const uint32_t flags = publishedFlags_.load(std::memory_order_acquire);
   OtaPublishedState state;
   state.available = (flags & OTA_PUBLISHED_AVAILABLE) != 0;
@@ -301,7 +301,7 @@ OtaPublishedState OpenBrewByWeightOta::publishedState() const {
   return state;
 }
 
-void OpenBrewByWeightOta::publishState() {
+void OpenBrewByWeightOta::publishState() const {
   uint32_t flags = 0;
   if (available_) flags |= OTA_PUBLISHED_AVAILABLE;
   if (busy_ || sessionActive_) flags |= OTA_PUBLISHED_BUSY;
@@ -373,17 +373,17 @@ bool OpenBrewByWeightOta::persistSession() {
   record.generation = ++sessionGeneration_;
   record.received = receivedBytes_;
   record.identity = session_;
-  psa_hash_operation_t snapshot = PSA_HASH_OPERATION_INIT;
+  psa_hash_operation_t hash = PSA_HASH_OPERATION_INIT;
   const psa_status_t cloned = psa_hash_clone(
       static_cast<const psa_hash_operation_t *>(sessionSha256_.get()),
-      &snapshot);
+      &hash);
   uint8_t digest[32] = {};
   size_t digestLength = 0;
   const bool ok = cloned == PSA_SUCCESS &&
-                  psa_hash_finish(&snapshot, digest, sizeof(digest),
+                  psa_hash_finish(&hash, digest, sizeof(digest),
                                   &digestLength) == PSA_SUCCESS &&
                   digestLength == sizeof(digest);
-  (void)psa_hash_abort(&snapshot);
+  (void)psa_hash_abort(&hash);
   if (!ok) return false;
   sha256Hex(digest, record.prefixSha256);
   record.checksum = journalChecksum(record);
@@ -674,7 +674,7 @@ OtaResult OpenBrewByWeightOta::createSession(const OtaSessionIdentity &identity,
   return OtaResult::OK;
 }
 
-bool OpenBrewByWeightOta::verifySessionSha256() {
+bool OpenBrewByWeightOta::verifySessionSha256() const {
   if (!sessionSha256_ || session_.size == 0) {
     return false;
   }

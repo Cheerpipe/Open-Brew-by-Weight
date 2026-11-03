@@ -386,8 +386,8 @@ void OpenBrewByWeightNetwork::syncLiveRuntime(const RuntimeConfig &runtime,
   if (presets != nullptr) {
     settings_.presets = *presets;
   }
-  if (ntpChanged && ++ntpSettingsGeneration_ == 0)
-    ++ntpSettingsGeneration_;
+  if (ntpChanged)
+    ntpSettingsGeneration_ = ntpSettingsGeneration_ == UINT32_MAX ? 1 : ntpSettingsGeneration_ + 1;
   dataMux_.unlock();
 }
 

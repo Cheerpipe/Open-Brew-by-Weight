@@ -24,13 +24,11 @@ inline bool verifyFactorySettings(const PersistedSettings &settings) {
           static_cast<uint8_t>(ScaleMacCacheMode::PREFER)) {
     return false;
   }
-  for (const ScaleHistoryEntry &entry : settings.scaleHistory) {
-    if (entry.mac[0] != '\0' || entry.name[0] != '\0' ||
-        entry.friendlyName[0] != '\0' || entry.lastSeenSeq != 0) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(std::begin(settings.scaleHistory), std::end(settings.scaleHistory),
+                     [](const ScaleHistoryEntry &entry) {
+                       return entry.mac[0] == '\0' && entry.name[0] == '\0' &&
+                              entry.friendlyName[0] == '\0' && entry.lastSeenSeq == 0;
+                     });
 }
 
 // Boot recovery only: setup() reloads settings from NVS afterwards, so the
@@ -88,8 +86,8 @@ inline bool releaseNvsSpaceForFactoryReset(LastShotStore &lastShot) {
 // an unusable pool never fails the reset.
 inline bool resetAllDurableStores(PersistedSettings &settings,
                                   BleScanPersistedSettings &ble,
-                                  ShotLog &shotLog,
-                                  HistoryLog &historyLog,
+                                  ShotLog &shots,
+                                  HistoryLog &history,
                                   LastShotStore &lastShot) {
   if (!settingsSchemaWritesAdmitted.load(std::memory_order_acquire)) return false;
   yieldFlashIo();
@@ -102,7 +100,7 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
   }
   yieldFlashIo();
   feedFlashIoWatchdog();
-  if (!shotLog.clear() || !historyLog.clear() || !lastShot.clear()) {
+  if (!shots.clear() || !history.clear() || !lastShot.clear()) {
     return false;
   }
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
@@ -137,8 +135,8 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
   // a second ~3.4 KB PersistedSettings overflowed the 8 KiB loopTask when a
   // pending factory reset resumes during setup().
   BleScanPersistedSettings verifiedBle;
-  const bool shotLogVerified = shotLog.load() && shotLog.count() == 0;
-  const bool historyVerified = historyLog.load() && historyLog.count() == 0;
+  const bool shotLogVerified = shots.load() && shots.count() == 0;
+  const bool historyVerified = history.load() && history.count() == 0;
   const bool lastShotVerified = lastShot.load() && !lastShot.get().valid &&
                                 !lastShot.getGood().valid;
   return loadPersistedSettings(settings) &&

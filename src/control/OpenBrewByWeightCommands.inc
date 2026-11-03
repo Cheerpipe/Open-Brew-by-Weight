@@ -49,8 +49,7 @@ void armBbwQuickStart(const ShotPreset &preset, bool userSet) {
 
 // Commits a session-only Quick Settings change: live and announced, never saved.
 void commitSessionQuickSettings(RuntimeConfig candidate) {
-  candidate.revision = runtimeConfig.revision + 1;
-  if (candidate.revision == 0) candidate.revision = 1;
+  candidate.revision = runtimeConfig.revision == UINT32_MAX ? 1 : runtimeConfig.revision + 1;
   commitLiveRuntimeConfig(candidate, 0);
   queueWebhookQuickSettingsChanged();
 }
@@ -306,10 +305,7 @@ void processWebCommand(const WebCommand &command) {
         rejectWebCommand(command);
         return;
       }
-      composed.revision = runtimeConfig.revision + 1;
-      if (composed.revision == 0) {
-        composed.revision = 1;
-      }
+      composed.revision = runtimeConfig.revision == UINT32_MAX ? 1 : runtimeConfig.revision + 1;
       ensureShotPresetBank(presetBank, composed.retareWindowMs,
                            composed.autoRetare);
       if (candidate.dripDelayMs != runtimeConfig.dripDelayMs ||
@@ -362,14 +358,14 @@ void processWebCommand(const WebCommand &command) {
         // values: the patch goes live as one change (one revision, webhook and
         // revert-timer restart) or, if invalid, not at all.
         RuntimeConfig candidate = runtimeConfig;
-        SessionQuickSettings session = sessionQuickSettings;
+        SessionQuickSettings quick = sessionQuickSettings;
         bool changed = false;
         for (uint8_t index = 0; index < QUICK_SETTING_FIELD_COUNT; ++index) {
           const auto field = static_cast<QuickSettingField>(index);
           const uint8_t value = quickSettingValue(command.config, field);
           if ((action & (1U << index)) == 0 || quickSettingValue(candidate, field) == value)
             continue;
-          setSessionQuickSetting(session, presetBank.activeId, candidate, field, value);
+          setSessionQuickSetting(quick, presetBank.activeId, candidate, field, value);
           changed = true;
         }
         if (changed && validateRuntimeConfig(candidate) != ConfigValidationError::NONE) {
@@ -377,9 +373,9 @@ void processWebCommand(const WebCommand &command) {
           return;
         }
         if (changed) {
-          session.changedAtMs = millis();
-          session.shotEnded = false;
-          sessionQuickSettings = session;
+          quick.changedAtMs = millis();
+          quick.shotEnded = false;
+          sessionQuickSettings = quick;
           commitSessionQuickSettings(candidate);
         }
       }
@@ -504,20 +500,26 @@ void processWebCommand(const WebCommand &command) {
         }
         case PresetAction::CREATE:
           ok = createUntitledShotPreset(presetBank, newId);
-          if (ok) mutableShotPreset(presetBank, newId)->learningEpoch = shotStatisticsEpochNow();
-          if (ok) armBbwQuickStart(*mutableShotPreset(presetBank, newId), false);
+          if (ok) {
+            mutableShotPreset(presetBank, newId)->learningEpoch = shotStatisticsEpochNow();
+            armBbwQuickStart(*mutableShotPreset(presetBank, newId), false);
+          }
           break;
         case PresetAction::DELETE:
           ok = deleteShotPreset(presetBank, command.presetId);
           if (ok) {
-            for (auto &state : bbwLearningBank.states)
-              if (state.id == command.presetId) state = BbwLearningBank::State{};
+            std::replace_if(
+                std::begin(bbwLearningBank.states), std::end(bbwLearningBank.states),
+                [&command](const BbwLearningBank::State &state) { return state.id == command.presetId; },
+                BbwLearningBank::State{});
           }
           break;
         case PresetAction::DUPLICATE:
           ok = duplicateShotPreset(presetBank, command.presetId, newId);
-          if (ok) mutableShotPreset(presetBank, newId)->learningEpoch = shotStatisticsEpochNow();
-          if (ok) armBbwQuickStart(*mutableShotPreset(presetBank, newId), false);
+          if (ok) {
+            mutableShotPreset(presetBank, newId)->learningEpoch = shotStatisticsEpochNow();
+            armBbwQuickStart(*mutableShotPreset(presetBank, newId), false);
+          }
           break;
         case PresetAction::RENAME:
           ok = renameShotPreset(presetBank, command.presetId, command.presetName);

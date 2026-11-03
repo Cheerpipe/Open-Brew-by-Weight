@@ -70,7 +70,7 @@ class MachineBackflushObservations {
     state_.phase = MachineBackflushPhase::UNSUPPORTED;
   }
 
-  void observe(MachineBackflushPhase phase, uint32_t ingressAttempt) {
+  void observe(MachineBackflushPhase phase, uint32_t observedAttempt) {
     markChanged();
     if (state_.phase == MachineBackflushPhase::UNSUPPORTED) {
       state_.phase = MachineBackflushPhase::UNKNOWN;
@@ -104,7 +104,7 @@ class MachineBackflushObservations {
     advance(state_.sequence);
     auto &change = state_.changes[state_.count++];
     change = {state_.permit, state_.sequence, phase};
-    change.permit.attempt = ingressAttempt;
+    change.permit.attempt = observedAttempt;
   }
 
   // Retires bytes already in flight; atomic, so control may fence an edge it
@@ -139,7 +139,7 @@ class MachineBackflushObservations {
   }
 
  private:
-  static void advance(uint32_t &value) { if (++value == 0) ++value; }
+  static void advance(uint32_t &value) { value = value == UINT32_MAX ? 1 : value + 1; }
   void markChanged() { __atomic_store_n(&changed_, true, __ATOMIC_RELEASE); }
   void advanceAttempt() {
     if (__atomic_add_fetch(&attemptCounter_, 1U, __ATOMIC_RELEASE) == 0)

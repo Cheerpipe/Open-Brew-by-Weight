@@ -999,22 +999,28 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   CompanionSendJob &job = companionWs().job;
   job.logBody = job.noticeBody = job.replyBody = 0xFF;
   uint8_t count = 0;
+  // The bodies this pass owes the session (`due`) and the ones it built.
+  struct Bodies {
+    bool device = false, config = false, credentials = false, route = false, hold = false,
+         command = false;
+    bool operator==(const Bodies &) const = default;
+  } due, built;
   // The companion's label for this controller and its id (the MAC text, the
   // log store's key), first: the companion subscribes to the log only once
   // it knows whose cursor to send. validDeviceName's charset (letters,
   // digits, spaces, hyphens) needs no JSON escaping; an unpublished name
   // goes empty.
-  const bool deviceDue = companionDeviceDue(sent, deviceName);
+  due.device = companionDeviceDue(sent, deviceName);
   char deviceIdText[24] = {};
   deviceId(deviceIdText, sizeof(deviceIdText));
-  const bool device =
-      deviceDue && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\",\"id\":\"%s\"}",
-                                    deviceName, deviceIdText);
+  built.device =
+      due.device && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\",\"id\":\"%s\"}",
+                                     deviceName, deviceIdText);
   const char *uiText = ui ? "true" : "false", *logText = logSwitch ? "true" : "false",
              *archiveText = archive ? "true" : "false";
-  const bool configDue = snapshotDue || outbox.configSequence != sent.sentConfig ||
-                         ui != sent.sentUi || logSwitch != sent.sentLog || archive != sent.sentArchive;
-  const bool config = configDue &&
+  due.config = snapshotDue || outbox.configSequence != sent.sentConfig ||
+               ui != sent.sentUi || logSwitch != sent.sentLog || archive != sent.sentArchive;
+  built.config = due.config &&
       (kCompanionLm ? companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s,"
                                               "\"ui\":%s,\"log\":%s,\"archive\":%s}",
                                        outbox.lmSwitch ? "true" : "false",
@@ -1022,22 +1028,20 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                                        outbox.observe ? "true" : "false", uiText, logText, archiveText)
                     : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s,\"archive\":%s}",
                                        uiText, logText, archiveText));
-  bool credentialsDue = false, credentials = false, routeDue = false, route = false,
-       holdDue = false, hold = false, commandDue = false, command = false;
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-  credentialsDue = outbox.credentialsGeneration != 0 &&
+  due.credentials = outbox.credentialsGeneration != 0 &&
       (snapshotDue || outbox.credentialsGeneration != sent.sentCredentials);
-  credentials = credentialsDue &&
+  built.credentials = due.credentials &&
       (outbox.credentialsErase
            ? companionAddBody(count, "\"t\":\"creds\",\"gen\":%lu,\"erase\":true}",
                               static_cast<unsigned long>(outbox.credentialsGeneration))
            : companionCredentialsBody(count, outbox.credentialsGeneration, secret));
-  routeDue = snapshotDue || outbox.routeSequence != sent.sentRoute;
-  route = routeDue && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
-                                       outbox.routeCompanion ? "companion" : "direct");
+  due.route = snapshotDue || outbox.routeSequence != sent.sentRoute;
+  built.route = due.route && companionAddBody(count, "\"t\":\"route\",\"to\":\"%s\"}",
+                                              outbox.routeCompanion ? "companion" : "direct");
   const char *op = companionCommandName(outbox.commandOp);
-  commandDue = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
-  command = commandDue &&
+  due.command = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
+  built.command = due.command &&
       (outbox.commandOp == MicraCompanionCommandOp::TEMPERATURE
            ? companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\",\"v\":%u}",
                               static_cast<unsigned long>(outbox.commandId), op,
@@ -1049,14 +1053,14 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   // `hold` on every build: the La Marzocco hold (Linea Micra, while the
   // route is not direct) and every start and end of a sync hold, which
   // starts and ends the companion's silence.
-  holdDue = snapshotDue || outbox.holdSequence != sent.sentHold || syncHold != sent.sentSync;
-  hold = holdDue && companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":%s}",
-                                     outbox.hold ? "true" : "false", syncHold ? "true" : "false");
+  due.hold = snapshotDue || outbox.holdSequence != sent.sentHold || syncHold != sent.sentSync;
+  built.hold = due.hold && companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":%s}",
+                                            outbox.hold ? "true" : "false", syncHold ? "true" : "false");
   // S17: a ping is answered while no sync hold is active, with the `hold`
   // frame (one segment with its ACK) and the store epochs (the replica's
   // heartbeat), so the companion sends sync requests only then; during a
   // hold it is not answered at all.
-  if (pingReply && (logSwitch || archive) && !syncHold && !hold &&
+  if (pingReply && (logSwitch || archive) && !syncHold && !built.hold &&
       companionAddBody(count, "\"t\":\"hold\",\"on\":%s,\"sync\":false,\"sh\":%lu,\"hi\":%lu}",
                        outbox.hold ? "true" : "false",
                        static_cast<unsigned long>(callbacks_.shotLogEpoch ? callbacks_.shotLogEpoch() : 0),
@@ -1077,9 +1081,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const bool notice = companionRecordsNoticeBody(count, syncHold, told);
   if (notice) job.noticeBody = static_cast<uint8_t>(count - 1);
   // A body that could not be built stays due and is tried on the next pass.
-  const bool complete = config == configDue && device == deviceDue &&
-                        credentials == credentialsDue &&
-                        route == routeDue && hold == holdDue && command == commandDue;
+  const bool complete = built == due;
   if (!complete || logMore) companionNotified_.store(true, std::memory_order_release);
   if (count == 0) return;
   companionWs().job.generation = generation;
@@ -1094,22 +1096,22 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   for (auto &slot : g_companion.links) {
     if (slot.fd < 0 || slot.generation != generation) continue;
     slot.snapshotSent = slot.snapshotSent || complete;
-    if (config) {
+    if (built.config) {
       slot.sentConfig = outbox.configSequence;
       slot.sentUi = ui;
       slot.sentLog = logSwitch;
       slot.sentArchive = archive;
     }
-    if (device) {
+    if (built.device) {
       memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));
       slot.deviceSent = true;
     }
-    if (route) slot.sentRoute = outbox.routeSequence;
-    if (hold) {
+    if (built.route) slot.sentRoute = outbox.routeSequence;
+    if (built.hold) {
       slot.sentHold = outbox.holdSequence;
       slot.sentSync = syncHold;
     }
-    if (credentials) slot.sentCredentials = outbox.credentialsGeneration;
+    if (built.credentials) slot.sentCredentials = outbox.credentialsGeneration;
     if (logBuilt) {
       slot.logSent = logLast;
       slot.logCatchUp = logMore;
@@ -1118,7 +1120,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       if (logMiss != 0) g_companion.logGaps += logMiss;
     }
   }
-  if (command) g_companion.lastCommandSent = outbox.commandId;
+  if (built.command) g_companion.lastCommandSent = outbox.commandId;
   if (notice && companionRecords_ != nullptr) {
     companionRecords_->toldShots = told[0];
     companionRecords_->toldHistory = told[1];

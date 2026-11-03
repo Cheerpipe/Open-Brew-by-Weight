@@ -1,8 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 
 namespace openbrewbyweight {
 
@@ -77,9 +79,9 @@ inline bool lineaMicraBoundedText(const char *value, size_t capacity,
 
 inline bool lineaMicraPrivateKeyConfigured(
     const LineaMicraPersistedSettings &settings) {
-  uint8_t combined = 0;
-  for (uint8_t byte : settings.installationPrivateKey) combined |= byte;
-  return combined != 0;
+  return std::any_of(std::begin(settings.installationPrivateKey),
+                     std::end(settings.installationPrivateKey),
+                     [](uint8_t byte) { return byte != 0; });
 }
 
 inline uint8_t lineaMicraShutdownGraceCode(uint8_t options) {

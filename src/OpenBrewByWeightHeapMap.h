@@ -50,16 +50,16 @@ inline HeapMapSnapshot *heapMaps = nullptr;
 
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
 inline bool heapMapWalk(walker_heap_into_t heap, walker_block_info_t info, void *user) {
-  auto &map = *static_cast<HeapMapSnapshot *>(user);
+  auto &capture = *static_cast<HeapMapSnapshot *>(user);
   const uint32_t start = static_cast<uint32_t>(heap.start);
-  if ((map.regions == 0 || map.region[map.regions - 1].start != start) &&
-      map.regions < HEAP_MAP_REGIONS)
-    map.region[map.regions++] = {start, static_cast<uint32_t>(heap.end)};
-  if (map.blocks == HEAP_MAP_BLOCKS) {
-    map.truncated = true;
+  if ((capture.regions == 0 || capture.region[capture.regions - 1].start != start) &&
+      capture.regions < HEAP_MAP_REGIONS)
+    capture.region[capture.regions++] = {start, static_cast<uint32_t>(heap.end)};
+  if (capture.blocks == HEAP_MAP_BLOCKS) {
+    capture.truncated = true;
     return true;
   }
-  HeapMapBlock &block = map.block[map.blocks++];
+  HeapMapBlock &block = capture.block[capture.blocks++];
   block.address = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(info.ptr));
   block.size = static_cast<uint32_t>(info.size);
   block.used = info.used;
@@ -78,13 +78,13 @@ inline void captureHeapMap(HeapMapSlot slot, uint32_t nowMs) {
         static_cast<size_t>(HeapMapSlot::COUNT), sizeof(HeapMapSnapshot),
         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   if (heapMaps == nullptr) return;
-  HeapMapSnapshot &map = heapMaps[static_cast<size_t>(slot)];
-  if (map.blocks != 0 && slot != HeapMapSlot::NOW) return;
-  map.atMs = nowMs;
-  map.blocks = 0;
-  map.regions = 0;
-  map.truncated = false;
-  heap_caps_walk(MALLOC_CAP_INTERNAL, heapMapWalk, &map);
+  HeapMapSnapshot &capture = heapMaps[static_cast<size_t>(slot)];
+  if (capture.blocks != 0 && slot != HeapMapSlot::NOW) return;
+  capture.atMs = nowMs;
+  capture.blocks = 0;
+  capture.regions = 0;
+  capture.truncated = false;
+  heap_caps_walk(MALLOC_CAP_INTERNAL, heapMapWalk, &capture);
 #else
   (void)slot;
   (void)nowMs;
@@ -100,24 +100,24 @@ inline bool heapMapRow(size_t &cursor, char *out, size_t capacity) {
   for (;;) {
     const size_t slot = cursor / HEAP_MAP_BLOCKS, index = cursor % HEAP_MAP_BLOCKS;
     if (slot >= static_cast<size_t>(HeapMapSlot::COUNT)) return false;
-    const HeapMapSnapshot &map = heapMaps[slot];
-    if (index >= map.blocks) {
+    const HeapMapSnapshot &capture = heapMaps[slot];
+    if (index >= capture.blocks) {
       cursor = (slot + 1) * HEAP_MAP_BLOCKS;
       continue;
     }
-    const HeapMapBlock &block = map.block[index];
+    const HeapMapBlock &block = capture.block[index];
     uint32_t regionStart = 0, regionEnd = 0;
-    for (uint8_t r = 0; r < map.regions; ++r)
-      if (block.address >= map.region[r].start && block.address < map.region[r].end) {
-        regionStart = map.region[r].start;
-        regionEnd = map.region[r].end;
+    for (uint8_t r = 0; r < capture.regions; ++r)
+      if (block.address >= capture.region[r].start && block.address < capture.region[r].end) {
+        regionStart = capture.region[r].start;
+        regionEnd = capture.region[r].end;
       }
     snprintf(out, capacity, "%s,%lu,%08lx,%08lx,%08lx,%lu,%s%s",
              heapMapSlotName(static_cast<HeapMapSlot>(slot)),
-             static_cast<unsigned long>(map.atMs), static_cast<unsigned long>(regionStart),
+             static_cast<unsigned long>(capture.atMs), static_cast<unsigned long>(regionStart),
              static_cast<unsigned long>(regionEnd), static_cast<unsigned long>(block.address),
              static_cast<unsigned long>(block.size), block.used ? "used" : "free",
-             map.truncated && index + 1 == map.blocks ? ",truncated" : "");
+             capture.truncated && index + 1 == capture.blocks ? ",truncated" : "");
     ++cursor;
     return true;
   }

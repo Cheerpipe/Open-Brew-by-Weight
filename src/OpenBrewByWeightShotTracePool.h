@@ -133,11 +133,11 @@ static_assert(SHOT_TRACE_POOL_SECTORS * SHOT_TRACE_POOL_SECTOR_BYTES / 4U <= 0x2
 
 // Summary linkage: id reuse after a clear or factory reset never matches a
 // record of another boot or end time (exactly checked again on open).
-inline uint32_t shotTracePoolIdTag(const ShotKey &shot) {
-  uint32_t mix = shot.bootId * 0x9E3779B1U ^ shot.endedAtMs;
+inline uint32_t shotTracePoolIdTag(const ShotKey &key) {
+  uint32_t mix = key.bootId * 0x9E3779B1U ^ key.endedAtMs;
   mix ^= mix >> 16;
   mix ^= mix >> 8;
-  return (shot.shotId & 0xFFFFFFU) | (mix & 0xFFU) << 24;
+  return (key.shotId & 0xFFFFFFU) | (mix & 0xFFU) << 24;
 }
 
 // Static PSRAM storage of one pool: the FIFO index of the newest records
@@ -364,10 +364,10 @@ class ShotTracePool {
   // call: erase, sector header, first-record pointer, a chunk of at most
   // FLASH_IO_CHUNK_BYTES, and the commit word last.
   bool beginAppend(const ShotTracePoolIdentity &id, const ShotTracePoolSource *sources,
-                   size_t count) {
-    if (!ready() || op_ != Op::IDLE || count > SHOT_TRACE_POOL_MAX_SECTIONS) return false;
+                   size_t sourceCount) {
+    if (!ready() || op_ != Op::IDLE || sourceCount > SHOT_TRACE_POOL_MAX_SECTIONS) return false;
     size_t total = sizeof(ShotTracePoolRecordHeader);
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < sourceCount; ++i) {
       if (sources[i].tag == ShotTracePoolSection::END ||
           (sources[i].data == nullptr && sources[i].read == nullptr && sources[i].bytes != 0))
         return false;
@@ -378,8 +378,8 @@ class ShotTracePool {
       return false;
     }
     total = (total + SHOT_TRACE_POOL_RECORD_ALIGN - 1U) & ~(SHOT_TRACE_POOL_RECORD_ALIGN - 1U);
-    if (count != 0) memcpy(sources_, sources, count * sizeof(*sources));
-    sourceCount_ = count;
+    if (sourceCount != 0) memcpy(sources_, sources, sourceCount * sizeof(*sources));
+    sourceCount_ = sourceCount;
     header_ = {kRecordMagic, static_cast<uint8_t>(SHOT_TRACE_POOL_FORMAT_VERSION),
                id.endReason, static_cast<uint16_t>(total), id.shotId, id.bootId,
                id.endedAtMs, id.firmwarePacked, 0, UINT32_MAX};
@@ -462,8 +462,8 @@ class ShotTracePool {
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) || defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   // Tests only: a whole append, and abandoning one (an unfinished append
   // leaves its bytes behind; the next starts a sector).
-  bool append(const ShotTracePoolIdentity &id, const ShotTracePoolSource *sources, size_t count) {
-    if (!beginAppend(id, sources, count)) return false;
+  bool append(const ShotTracePoolIdentity &id, const ShotTracePoolSource *sources, size_t sourceCount) {
+    if (!beginAppend(id, sources, sourceCount)) return false;
     FlashStoreStepResult result;
     do { result = appendStep(); } while (result == FlashStoreStepResult::MORE);
     return result == FlashStoreStepResult::COMPLETE;
@@ -508,7 +508,7 @@ class ShotTracePool {
   // The newest record of the summary, by its full identity on flash (one
   // header read per candidate entry). Reads flash: hold no store lock.
   ShotTracePoolStatus identify(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs,
-                               ShotTracePoolRef &ref) {
+                               ShotTracePoolRef &ref) const {
     if (!ready()) return ShotTracePoolStatus::NOT_READY;
     const uint32_t idTag = shotTracePoolIdTag({shotId, bootId, endedAtMs});
     ShotTracePoolEntry entry;
@@ -528,14 +528,14 @@ class ShotTracePool {
     }
     return ShotTracePoolStatus::NOT_FOUND;
   }
-  bool contains(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs) {
+  bool contains(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs) const {
     ShotTracePoolRef ref;
     return identify(shotId, bootId, endedAtMs, ref) == ShotTracePoolStatus::OK;
   }
 
   // identify(), then the CRC through the caller's buffer (any size >= 4).
   ShotTracePoolStatus open(uint32_t shotId, uint32_t bootId, uint32_t endedAtMs,
-                           ShotTracePoolRef &ref, uint8_t *buffer, size_t bufferBytes) {
+                           ShotTracePoolRef &ref, uint8_t *buffer, size_t bufferBytes) const {
     if (buffer == nullptr || bufferBytes < 4) return ShotTracePoolStatus::IO_ERROR;
     ShotTracePoolStatus status = identify(shotId, bootId, endedAtMs, ref);
     if (status != ShotTracePoolStatus::OK) return status;
@@ -554,7 +554,7 @@ class ShotTracePool {
 
   // Record bytes [offset, offset + bytes) of an opened record, in any chunk
   // size (an HTTP stream reads 1-4 KiB at a time).
-  ShotTracePoolStatus read(const ShotTracePoolRef &ref, size_t offset, void *out, size_t bytes) {
+  ShotTracePoolStatus read(const ShotTracePoolRef &ref, size_t offset, void *out, size_t bytes) const {
     if (offset > ref.bytes || bytes > ref.bytes - offset) return ShotTracePoolStatus::IO_ERROR;
     if (!alive(ref.serial)) return ShotTracePoolStatus::GONE;
     const Position start = {ref.address / kSectorBytes, ref.address % kSectorBytes};
@@ -565,7 +565,7 @@ class ShotTracePool {
   }
 
   ShotTracePoolStatus findSection(const ShotTracePoolRef &ref, ShotTracePoolSection tag,
-                                  ByteRange &found) {
+                                  ByteRange &found) const {
     for (size_t at = sizeof(ShotTracePoolRecordHeader);
          at + sizeof(ShotTracePoolSectionHeader) <= ref.bytes;) {
       ShotTracePoolSectionHeader section;
@@ -605,7 +605,7 @@ class ShotTracePool {
   // The n-th oldest indexed record by its address, header checked but not
   // its CRC (statistics: identity, length, sections). Reads flash: hold no
   // store lock.
-  ShotTracePoolStatus headerAt(size_t n, ShotTracePoolRef &ref) {
+  ShotTracePoolStatus headerAt(size_t n, ShotTracePoolRef &ref) const {
     {
       TaskLockGuard lock(mux_);
       if (!ready_) return ShotTracePoolStatus::NOT_READY;
@@ -885,7 +885,7 @@ class ShotTracePool {
   }
   // A small chunk and its own frame: the walk runs deep on the 5,120 B
   // settings_persist stack (stack-depth gate).
-  [[gnu::noinline]] bool headTailBlank(size_t from) {
+  [[gnu::noinline]] bool headTailBlank(size_t from) const {
     uint8_t chunk[64];
     for (size_t at = from; at < kSectorBytes; at += sizeof(chunk)) {
       const size_t piece = kSectorBytes - at < sizeof(chunk) ? kSectorBytes - at : sizeof(chunk);

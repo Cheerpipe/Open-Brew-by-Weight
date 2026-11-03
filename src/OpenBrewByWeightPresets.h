@@ -216,7 +216,7 @@ inline void ensureShotPresetBank(ShotPresetBank &bank,
     // value) derives from its legacy enum; a valid pct refreshes the enum
     // mirror to the nearest level, so both stay consistent and an OTA
     // downgrade still reads a sane enum.
-    for (auto &side : {std::pair(&preset.fastCurveHardness, &preset.fastCurveHardnessPct),
+    for (const auto &side : {std::pair(&preset.fastCurveHardness, &preset.fastCurveHardnessPct),
                        std::pair(&preset.slowCurveHardness, &preset.slowCurveHardnessPct)}) {
       if (*side.first >= RAMP_HARDNESS_LEVELS) *side.first = RAMP_HARDNESS_SOFT;
       if (*side.second > RAMP_HARDNESS_PCT_MAX)

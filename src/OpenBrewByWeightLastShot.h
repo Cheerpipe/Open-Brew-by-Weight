@@ -118,7 +118,7 @@ class LastShotStore {
       unlockFlashIo();
       return false;
     }
-    void *nvsSource = copyToFlashIoScratch(&blob_, sizeof(blob_));
+    const void *nvsSource = copyToFlashIoScratch(&blob_, sizeof(blob_));
     if (nvsSource == nullptr) {
       preferences.end();
       unlockFlashIo();
@@ -134,22 +134,22 @@ class LastShotStore {
 #endif
   }
 
-  void adopt(const PersistedLastShot &shot) {
-    blob_.lastShot = shot;
+  void adopt(const PersistedLastShot &last) {
+    blob_.lastShot = last;
     finalizeLastShotBlob(blob_);
   }
 
   // The last good shot follows the shot log's good rule
   // (shotLogRecordEligible), so a bad cycle never becomes it.
-  void advance(const PersistedLastShot &shot) {
-    if (shot.valid && shotLogEligible(shot.endReason, shot.durationMs) &&
-        shotLogWeightEligible(shot.currentWeightG, shot.weightValid))
-      blob_.lastGoodShot = shot;
-    adopt(shot);
+  void advance(const PersistedLastShot &last) {
+    if (last.valid && shotLogEligible(last.endReason, last.durationMs) &&
+        shotLogWeightEligible(last.currentWeightG, last.weightValid))
+      blob_.lastGoodShot = last;
+    adopt(last);
   }
 
-  bool persist(const PersistedLastShot &shot) {
-    advance(shot);
+  bool persist(const PersistedLastShot &last) {
+    advance(last);
     return save();
   }
 

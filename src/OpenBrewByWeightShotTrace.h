@@ -342,7 +342,7 @@ class ShotTrace {
   // ring; the capture becomes recoverable last. The ring is not written while
   // the window is open.
   void attachStart(const ShotTraceSnapshot &snapshot, uint32_t bootId) {
-    ShotTraceHeader *changed = nullptr;
+    const ShotTraceHeader *changed = nullptr;
     {
       const TaskLockGuard lock(mux_);
       if (!capturing_.load(std::memory_order_relaxed)) return;
@@ -374,7 +374,7 @@ class ShotTrace {
   // Drip finalize or cancellation: the trace waits for the flash pool.
   void complete(uint32_t shotLogId, uint32_t bootId, uint32_t endedAtMs,
                 uint8_t endReason) {
-    ShotTraceHeader *changed = nullptr;
+    const ShotTraceHeader *changed = nullptr;
     {
       const TaskLockGuard lock(mux_);
       if (!capturing_.load(std::memory_order_relaxed)) return;
@@ -415,18 +415,18 @@ class ShotTrace {
     return header;
   }
 
-  ShotTraceHeader &completeLocked_(const ShotKey &shot, uint8_t endReason) {
+  ShotTraceHeader &completeLocked_(const ShotKey &key, uint8_t endReason) {
     ShotTraceBuffer &buffer = *capture_;
     ShotTraceHeader &header = buffer.header;
     header.magic = SHOT_TRACE_MAGIC;  // Completed: never recovered.
-    header.shotLogId = shot.shotId;
-    header.bootId = shot.bootId;
-    header.endedAtMs = shot.endedAtMs;
+    header.shotLogId = key.shotId;
+    header.bootId = key.bootId;
+    header.endedAtMs = key.endedAtMs;
     header.endReason = endReason;
     header.totalBytes = static_cast<uint32_t>(
         SHOT_TRACE_FIXED_BYTES + header.eventCount * sizeof(ShotTraceRecord));
     mirrorCountersLocked_();
-    if (++generation_ == 0) generation_ = 1;
+    generation_ = generation_ == UINT32_MAX ? 1 : generation_ + 1;
     generationOf_[slotOf_(buffer)] = generation_;
     unsaved_[slotOf_(buffer)] = true;
     capture_ = completed_;
@@ -953,7 +953,7 @@ class ShotTrace {
   // oldest unsaved, or the unsaved one of an identity. BUSY while a capture
   // is open, EMPTY when there is none.
   ShotTraceExport completedTrace_(Pick pick, ShotTraceExportRef &trace,
-                                  const ShotKey &shot = {}) {
+                                  const ShotKey &key = {}) {
     bool dropped = false;
     uint32_t droppedBootId = 0;
     {
@@ -970,8 +970,8 @@ class ShotTrace {
         if (generationOf_[i] == 0 ||
             (pick != Pick::NEWEST && !unsaved_[i]) ||
             (pick == Pick::IDENTITY &&
-             (header.shotLogId != shot.shotId || header.bootId != shot.bootId ||
-              header.endedAtMs != shot.endedAtMs)))
+             (header.shotLogId != key.shotId || header.bootId != key.bootId ||
+              header.endedAtMs != key.endedAtMs)))
           continue;
         const bool newer = found != nullptr &&
             static_cast<int32_t>(generationOf_[i] - generationOf_[slotOf_(*found)]) > 0;

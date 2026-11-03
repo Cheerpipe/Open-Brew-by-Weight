@@ -569,7 +569,6 @@ void serviceRelaySafety() {
 
   const bool feedbackClosed = readCircuitFeedbackClosed();
   bool pending = false;
-  bool expectedClosed = false;
   uint32_t settleStartedAtMs = 0;
   portENTER_CRITICAL(&relayMux);
   if (feedbackTransitionStampPending) {
@@ -577,7 +576,6 @@ void serviceRelaySafety() {
     feedbackTransitionStampPending = false;
   }
   pending = feedbackTransitionPending;
-  expectedClosed = feedbackExpectedClosed;
   settleStartedAtMs = feedbackTransitionStartedAtMs;
   portEXIT_CRITICAL(&relayMux);
 
@@ -588,7 +586,7 @@ void serviceRelaySafety() {
     portENTER_CRITICAL(&relayMux);
     const bool stillPending = feedbackTransitionPending &&
         elapsedMs(feedbackTransitionStartedAtMs) >= CIRCUIT_FEEDBACK_SETTLE_MS;
-    expectedClosed = feedbackExpectedClosed;
+    const bool expectedClosed = feedbackExpectedClosed;
     if (stillPending) {
       feedbackTransitionPending = false;
     }

@@ -106,8 +106,8 @@ void healthWorkerTask(void *) {
     serviceScaleProfiler(now);
     if (sampledAtMs == 0 || elapsedMs(sampledAtMs) >= HEALTH_TELEMETRY_INTERVAL_MS) {
       HealthWorkerSample sample;
-      sample.version = ++version;
-      if (sample.version == 0) sample.version = ++version;
+      version = version == UINT32_MAX ? 1 : version + 1;
+      sample.version = version;
       sample.sampledAtMs = now;
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
       sample.heap = sampleHeapCaps();
@@ -290,8 +290,8 @@ void startAfterBootRecovery() {
 
   persistenceReady = EEPROM.begin(EEPROM_SIZE);
   bool flashIoReady = true;
-  bool settingsLoaded = persistenceReady;
-  bool settingsDurable = persistenceReady;
+  bool settingsLoaded = false;
+  bool settingsDurable = false;
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
   flashIoReady = ensureFlashIoMutex();
   if (!flashIoReady) {
@@ -309,8 +309,6 @@ void startAfterBootRecovery() {
   // RTC captures the prior uptime immediately across warm resets; NVS keeps
   // the history when RTC memory is lost (for example after power loss).
   persistResetHistoryAfterBoot(safetyResetStatus);
-  settingsLoaded = false;
-  settingsDurable = false;
   bool freshSettings = false;
   bool settingsRepaired = false;
   if (persistenceReady && loadPersistedSettings(persistedSettings, &settingsRepaired)) {
@@ -371,6 +369,7 @@ void startAfterBootRecovery() {
                                     persistedSettings.storageRevision);
   }
 #else
+  settingsLoaded = settingsDurable = persistenceReady;
   runtimeConfig = RuntimeConfig{};
   bullseyeMelodyConfig = BullseyeMelodyConfig{};
   seedDefaultShotPresetBank(presetBank);

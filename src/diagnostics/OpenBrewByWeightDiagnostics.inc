@@ -1,13 +1,13 @@
 void profileControlState(uint32_t captureSequence, uint32_t evidenceConnection) {
   const auto &cup = cupPresence;
   // ShotTraceState order; shot-only signals are read only during a shot.
-  const bool shot = shotTrace().capturing();
+  const bool capturing = shotTrace().capturing();
   const uint32_t traced[SHOT_TRACE_STATE_COUNT] = {
       cup.state == CupPresenceState::PRESENT, cup.weight.emptyValid,
       static_cast<uint32_t>(idleTare.eligibilityReason),
-      shot ? static_cast<uint32_t>(session.weightControlState) : 0,
-      shot && session.awaitingPostTareBaseline, shot && bbwProtectionActive(),
-      shot && session.autoToManualGuardEnforced};
+      capturing ? static_cast<uint32_t>(session.weightControlState) : 0,
+      capturing && session.awaitingPostTareBaseline, capturing && bbwProtectionActive(),
+      capturing && session.autoToManualGuardEnforced};
   shotTrace().noteState(traced, millis());
   if (!scaleProfiler().recording()) return;
   using S = ScaleProfileSignal;
@@ -245,13 +245,10 @@ void publishControlStatus() {
   ControlStatusFields &next = publishedControlStatus;
   // The signal level's hysteresis needs the published level the reset clears.
   const uint8_t scaleSignalLevel = next.scaleSignalLevel;
-  new (&next) ControlStatusFields{};
+  std::construct_at(&next);
   next.cupTare = cupTare;
-  next.snapshotVersion = ++controlStatusVersion;
-  if (controlStatusVersion == 0) {
-    controlStatusVersion = 1;
-    next.snapshotVersion = controlStatusVersion;
-  }
+  controlStatusVersion = controlStatusVersion == UINT32_MAX ? 1 : controlStatusVersion + 1;
+  next.snapshotVersion = controlStatusVersion;
   next.state = stopperState;
   next.activeCycle = session.active;
   next.traceCapturing = shotTrace().capturing();
@@ -795,7 +792,7 @@ void serialCliTaskProfile(const char *modeArg) {
   }
   static OPEN_BREW_BY_WEIGHT_PSRAM_BSS TaskProfilerSnapshot cliProfile;
   copyTaskProfiler(cliProfile);
-  const LoopPhaseProfilerSnapshot &loop = cliProfile.loopPhases;
+  const LoopPhaseProfilerSnapshot &phases = cliProfile.loopPhases;
   char line[128];
   snprintf(line, sizeof(line), "TASK_PROFILE state=%s stop=%s elapsedMs=%lu samples=%lu truncated=%d",
            taskProfilerStateName(cliProfile.state), taskProfilerStopReasonName(cliProfile.stopReason),
@@ -810,12 +807,12 @@ void serialCliTaskProfile(const char *modeArg) {
     Serial.println(line);
   }
   snprintf(line, sizeof(line), "loopPeakGapUs=%lu peakDelayUs=%lu peakDispatchUs=%lu peakGapCpuUs=%lu",
-           static_cast<unsigned long>(loop.peakGapUs), static_cast<unsigned long>(loop.peakDelayUs),
-           static_cast<unsigned long>(loop.peakDispatchUs), static_cast<unsigned long>(loop.peakGapCpuUs));
+           static_cast<unsigned long>(phases.peakGapUs), static_cast<unsigned long>(phases.peakDelayUs),
+           static_cast<unsigned long>(phases.peakDispatchUs), static_cast<unsigned long>(phases.peakGapCpuUs));
   Serial.println(line);
   Serial.println("phase,maxUs,maxCpuUs,avgUs,peakGapUs");
-  for (uint8_t i = 0; i < loop.rowCount && i < LOOP_PHASE_COUNT; ++i) {
-    const LoopPhaseProfilerRow &row = loop.rows[i];
+  for (uint8_t i = 0; i < phases.rowCount && i < LOOP_PHASE_COUNT; ++i) {
+    const LoopPhaseProfilerRow &row = phases.rows[i];
     snprintf(line, sizeof(line), "%s,%lu,%lu,%lu,%lu", row.name != nullptr ? row.name : "-",
              static_cast<unsigned long>(row.maxExecutionUs), static_cast<unsigned long>(row.maxCpuUs),
              static_cast<unsigned long>(row.averageExecutionUs),

@@ -76,7 +76,7 @@ void scheduleScaleTimerStopAfterCycle(uint32_t internalElapsedMs) {
 
 uint32_t nextCupWeightRequestId = 0;
 uint32_t allocateCupWeightRequestId() {
-  if (++nextCupWeightRequestId == 0) ++nextCupWeightRequestId;
+  nextCupWeightRequestId = nextCupWeightRequestId == UINT32_MAX ? 1 : nextCupWeightRequestId + 1;
   return nextCupWeightRequestId;
 }
 void trackCupWeightTare(uint32_t requestId);
@@ -859,10 +859,9 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     connectionGeneration = session.ownedConnectionGeneration;
   }
   if (packetSequence == 0) {
-    packetSequence = session.lastAcceptedPacketSequence + 1U;
-    if (packetSequence == 0) {
-      packetSequence = 1;
-    }
+    packetSequence = session.lastAcceptedPacketSequence == UINT32_MAX
+                         ? 1U
+                         : session.lastAcceptedPacketSequence + 1U;
   }
   if (session.retarePerformed &&
       (session.retareEffectPending || session.appliedTareRequestId != session.retareRequestId) &&

@@ -889,7 +889,7 @@ class ScaleProfiler {
   // Flash-source download: validated header read. Flash-only, so it never
   // holds the capture mutex across the flash lock (producers must not wait
   // behind flash I/O).
-  bool storeReadHeader(ScaleProfileHeader &header) const {
+  static bool storeReadHeader(ScaleProfileHeader &header) {
     const esp_partition_t *part = storePartition();
     if (part == nullptr || !tryLockFlashIo()) return false;
     const bool ok = esp_partition_read(part, 0, flashIoScratchBytes(),
@@ -900,7 +900,7 @@ class ScaleProfiler {
     return scaleProfileHeaderValid(header);
   }
 
-  bool storeReadRecords(uint32_t startIndex, uint8_t *out, size_t recordCount) const {
+  static bool storeReadRecords(uint32_t startIndex, uint8_t *out, size_t recordCount) {
     const esp_partition_t *part = storePartition();
     if (part == nullptr || !tryLockFlashIo()) return false;
     const bool ok =
@@ -912,7 +912,7 @@ class ScaleProfiler {
     return ok;
   }
 
-  bool storeVerifyChecksum(const ScaleProfileHeader &header) const {
+  static bool storeVerifyChecksum(const ScaleProfileHeader &header) {
     uint32_t crc = 0;
     uint8_t chunk[FLASH_IO_CHUNK_BYTES];
     for (size_t done = 0; done < header.payloadBytes;) {
@@ -1650,11 +1650,11 @@ inline size_t formatScaleProfileRow(char *out, size_t capacity,
   if (out == nullptr || capacity == 0) return 0;
   const uint64_t atMs = scaleProfileRecordTimeMs(record);
   const uint64_t seconds = atMs / 1000U;
-  const uint32_t millis = static_cast<uint32_t>(atMs % 1000U);
+  const uint32_t milliseconds = static_cast<uint32_t>(atMs % 1000U);
   size_t used = static_cast<size_t>(
       snprintf(out, capacity, "+%06llu.%03lu \xE2\x80\x93 ",
                static_cast<unsigned long long>(seconds),
-               static_cast<unsigned long>(millis)));
+               static_cast<unsigned long>(milliseconds)));
   if (used >= capacity) return 0;
   if (std::isfinite(record.weightG)) {
     used += static_cast<size_t>(snprintf(out + used, capacity - used, "%.9g",

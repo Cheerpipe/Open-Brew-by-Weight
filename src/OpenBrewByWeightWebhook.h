@@ -101,7 +101,6 @@ inline bool validWebhookUrl(const char *url) {
   if (authorityEnd <= host) return false;
 
   const char *port = nullptr;
-  const char *hostEnd = authorityEnd;
   if (*host == '[') {
     const char *close = static_cast<const char *>(
         memchr(host + 1, ']', static_cast<size_t>(authorityEnd - host - 1)));
@@ -115,6 +114,7 @@ inline bool validWebhookUrl(const char *url) {
       port = close + 2;
     }
   } else {
+    const char *hostEnd = authorityEnd;
     const char *colon = static_cast<const char *>(
         memchr(host, ':', static_cast<size_t>(authorityEnd - host)));
     if (colon != nullptr) {
@@ -299,11 +299,11 @@ struct WebhookStatus {
 
 class WebhookDispatcher {
  public:
-  bool begin(const WebhookConfig &config);
+  bool begin(const WebhookConfig &initial);
   // Stops and joins the worker before releasing lifecycle resources. Safe to
   // call after a partial begin() and more than once.
   bool stop();
-  void setConfig(const WebhookConfig &config);
+  void setConfig(const WebhookConfig &next);
   WebhookConfig config() const;
   WebhookStatus status() const;
   HeapLifecycleAggregate heapTelemetry() const;
@@ -347,7 +347,7 @@ class WebhookDispatcher {
   static void lookupDone(const char *, const ip_addr_t *address, void *self);
   static esp_err_t httpEvent(esp_http_client_event_t *event);
   void cleanupHttpClient();
-  bool buildPayload(const WebhookEvent &event, char *output, size_t capacity);
+  static bool buildPayload(const WebhookEvent &event, char *output, size_t capacity);
   bool dispatchAllowed() const;
   // Adds delta to the queued count of the event's full-state kind; returns it.
   int8_t queuedStates(WebhookEventType type, int8_t delta);

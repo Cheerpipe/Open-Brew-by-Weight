@@ -17,8 +17,10 @@ bool crashTarHeader(httpd_req_t *request, const char *name, size_t length) {
   header[156] = '0';
   memcpy(header + 257, "ustar", 5);
   memcpy(header + 263, "00", 2);
-  unsigned sum = 0;
-  for (unsigned char byte : header) sum += byte;
+  const unsigned sum = std::accumulate(std::begin(header), std::end(header), 0U,
+                                       [](unsigned total, char byte) {
+                                         return total + static_cast<unsigned char>(byte);
+                                       });
   snprintf(header + 148, 8, "%06o", sum);
   header[154] = '\0';
   header[155] = ' ';

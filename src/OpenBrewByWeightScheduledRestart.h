@@ -142,13 +142,13 @@ class ScheduledRestartPlanner {
     if (lateSec >= SCHEDULED_RESTART_WINDOW_SEC) {
       // PENDING keeps its blocking cause; a lease that never restarted is
       // BUSY; otherwise the window passed unseen, without a clock.
-      ScheduledRestartCause cause = ScheduledRestartCause::NO_CLOCK;
-      if (state_ == ScheduledRestartState::PENDING) cause = cause_;
+      ScheduledRestartCause missedCause = ScheduledRestartCause::NO_CLOCK;
+      if (state_ == ScheduledRestartState::PENDING) missedCause = cause_;
       if (state_ == ScheduledRestartState::FIRING ||
           state_ == ScheduledRestartState::SUBMITTED) {
-        cause = ScheduledRestartCause::BUSY;
+        missedCause = ScheduledRestartCause::BUSY;
       }
-      return skip(in, cause);
+      return skip(in, missedCause);
     }
     if (state_ == ScheduledRestartState::SUBMITTED) return {};
     if (!longUptime_ && in.nowMs / 1000U < SCHEDULED_RESTART_MIN_UPTIME_MS / 1000U +
@@ -206,21 +206,21 @@ class ScheduledRestartPlanner {
 
   // Gives up on this occurrence and arms the next one.
   ScheduledRestartLog skip(const ScheduledRestartInput &in,
-                           ScheduledRestartCause cause) {
+                           ScheduledRestartCause skipCause) {
     targetUtc_ = scheduledRestartNextUtc(in.utcSec, zone_, minute_);
     state_ = targetUtc_ != 0 ? ScheduledRestartState::ARMED
                              : ScheduledRestartState::NO_TIMEZONE;
     cause_ = ScheduledRestartCause::NONE;
-    return {true, DebugCode::SCHEDULED_RESTART_SKIPPED, cause};
+    return {true, DebugCode::SCHEDULED_RESTART_SKIPPED, skipCause};
   }
 
   // Logs DEFERRED once per new state or cause.
-  ScheduledRestartLog enter(ScheduledRestartState state,
-                            ScheduledRestartCause cause) {
-    const bool changed = state_ != state || cause_ != cause;
-    state_ = state;
-    cause_ = cause;
-    return {changed, DebugCode::SCHEDULED_RESTART_DEFERRED, cause};
+  ScheduledRestartLog enter(ScheduledRestartState nextState,
+                            ScheduledRestartCause nextCause) {
+    const bool changed = state_ != nextState || cause_ != nextCause;
+    state_ = nextState;
+    cause_ = nextCause;
+    return {changed, DebugCode::SCHEDULED_RESTART_DEFERRED, nextCause};
   }
 
   ScheduledRestartState state_ = ScheduledRestartState::OFF;

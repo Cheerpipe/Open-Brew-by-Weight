@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -46,7 +48,6 @@ constexpr float MIN_RETARE_STABILITY_TOLERANCE_G = 0.1f;
 constexpr float MAX_RETARE_STABILITY_TOLERANCE_G = 20.0f;
 constexpr uint32_t MIN_RETARE_STABILITY_MAX_GAP_MS = 100;
 constexpr uint32_t MAX_RETARE_STABILITY_MAX_GAP_MS = 5000;
-constexpr uint32_t MIN_RETARE_STABILITY_MIN_DURATION_MS = 0;
 constexpr uint32_t MAX_RETARE_STABILITY_MIN_DURATION_MS = 2000;
 // Target weight lives in decigrams (100–2000 dg = 10.0–200.0 g); the whole
 // pipeline — presets, runtime config, shot records, UI — speaks this unit.
@@ -137,10 +138,8 @@ inline double rampHardnessPercent(uint8_t pct, uint8_t level) {
 // Extra delay after the scale timer catches up to machine circuit time (whole seconds)
 // before sending STOP_TIMER. 0 stops in that same instant.
 constexpr uint32_t DEFAULT_SCALE_TIMER_STOP_EXTRA_DELAY_MS = 0;
-constexpr uint32_t MIN_SCALE_TIMER_STOP_EXTRA_DELAY_MS = 0;
 constexpr uint32_t MAX_SCALE_TIMER_STOP_EXTRA_DELAY_MS = 1000;
 constexpr uint32_t DEFAULT_DRIP_DELAY_MS = 3000;
-constexpr uint32_t MIN_DRIP_DELAY_MS = 0;
 constexpr uint32_t MAX_DRIP_DELAY_MS = 10000;
 constexpr uint32_t MAX_SCALE_TIMER_STOP_CATCHUP_MS = 2000;
 constexpr float MAX_OFFSET_G = 5.0f;
@@ -289,12 +288,11 @@ inline constexpr EndReasonLabel kEndReasonLabels[] = {
 };
 
 inline const EndReasonLabel *findEndReasonLabel(EndReason reason) {
-  for (const auto &label : kEndReasonLabels) {
-    if (label.reason == reason) {
-      return &label;
-    }
-  }
-  return nullptr;
+  const EndReasonLabel *const end = std::end(kEndReasonLabels);
+  const EndReasonLabel *const found = std::find_if(
+      std::begin(kEndReasonLabels), end,
+      [reason](const EndReasonLabel &label) { return label.reason == reason; });
+  return found != end ? found : nullptr;
 }
 
 constexpr size_t kEndReasonLabelCount =

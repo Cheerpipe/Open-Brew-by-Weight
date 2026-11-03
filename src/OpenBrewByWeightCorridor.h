@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <algorithm>
+#include <iterator>
 #include <span>
 
 #include "OpenBrewByWeightBrewTypes.h"
@@ -108,9 +110,9 @@ constexpr RampCurve RAMP_CURVES[RAMP_CURVE_TYPES * RAMP_HARDNESS_LEVELS] = {
     {3, 2}, {4, 2}, {6, 2}};  // Steep late
 constexpr uint8_t RAMP_CURVE_MAX_DEGREE = 7;
 constexpr bool rampCurvesValid() {
-  for (const RampCurve &c : RAMP_CURVES)
-    if (c.a < 2 || c.b < 2 || c.a + c.b - 1 > RAMP_CURVE_MAX_DEGREE) return false;
-  return true;
+  return std::all_of(std::begin(RAMP_CURVES), std::end(RAMP_CURVES), [](const RampCurve &c) {
+    return c.a >= 2 && c.b >= 2 && c.a + c.b - 1 <= RAMP_CURVE_MAX_DEGREE;
+  });
 }
 static_assert(rampCurvesValid(), "curves must be flat at both ends and fit the evaluator");
 constexpr double rampWideBound() {
@@ -502,9 +504,9 @@ inline ArrivalVerdict arrivalVerdict(const Params &p, RateSample cut) {
     out.arrivalMs = cut.atMs + static_cast<int32_t>(shift);
     if (out.arrivalMs <= 0) return ArrivalVerdict{};  // before the shot: no arrival
   }
-  out.verdict = out.arrivalMs < p.fastBeforeMs - VERDICT_DEAD_BAND_MS ? Verdict::FAST
-              : out.arrivalMs > p.slowAfterMs + VERDICT_DEAD_BAND_MS ? Verdict::SLOW
-                                                                     : Verdict::ON_RECIPE;
+  out.verdict = (out.arrivalMs < p.fastBeforeMs - VERDICT_DEAD_BAND_MS) ? Verdict::FAST
+              : (out.arrivalMs > p.slowAfterMs + VERDICT_DEAD_BAND_MS)  ? Verdict::SLOW
+                                                                        : Verdict::ON_RECIPE;
   return out;
 }
 
@@ -958,13 +960,13 @@ struct GrindHintReplay {
       // sigma_seg: differences of consecutive uncensored shots up to the
       // segment's fifth uncensored one.
       int32_t differences[HINT_SIGMA_SEGMENT_SHOTS];
-      uint8_t n = 0, shots = 0;
-      for (uint32_t k = segmentStart; k < pushed && shots < HINT_SIGMA_SEGMENT_SHOTS; ++k) {
+      uint8_t n = 0, uncensored = 0;
+      for (uint32_t k = segmentStart; k < pushed && uncensored < HINT_SIGMA_SEGMENT_SHOTS; ++k) {
         if (k + RING < pushed || at(k).key >= HINT_CENSORED_KEY) continue;
-        if (shots++ > 0 && at(k - 1).key < HINT_CENSORED_KEY)
+        if (uncensored++ > 0 && at(k - 1).key < HINT_CENSORED_KEY)
           differences[n++] = at(k).key - at(k - 1).key;
       }
-      if (shots == HINT_SIGMA_SEGMENT_SHOTS) {
+      if (uncensored == HINT_SIGMA_SEGMENT_SHOTS) {
         const int32_t segment = differenceSigmaMs(differences, n);
         sigmaLongMs = sigmaSeeded ? (3 * sigmaLongMs + segment) / 4 : segment;
         if (sigmaLongMs > HINT_SIGMA_CAP_MS) sigmaLongMs = HINT_SIGMA_CAP_MS;

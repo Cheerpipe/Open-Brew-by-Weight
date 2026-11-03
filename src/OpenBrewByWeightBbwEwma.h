@@ -75,7 +75,7 @@ struct Evidence {
     if (!std::isfinite(observation) || fabsf(observation) > MAX_OFFSET_G ||
         !std::isfinite(seed) || !validBbwAlpha(alpha)) return alpha;
     if (count == 0) {
-      for (float &anchor : anchors) anchor = seed;
+      std::fill(std::begin(anchors), std::end(anchors), seed);
       initialAlpha = alpha;
     }
     if (count == WINDOW) {

@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <iterator>
+#include <numeric>
 #include <type_traits>
 
 namespace openbrewbyweight {
@@ -196,9 +198,8 @@ constexpr size_t settingsGroupMaxBytes(uint8_t tag, const SettingsField (&fields
 // added without a row changes the struct size and fails these checks.
 template <size_t N>
 constexpr size_t settingsFieldBytes(const SettingsField (&fields)[N]) {
-  size_t bytes = 0;
-  for (const SettingsField &field : fields) bytes += field.size;
-  return bytes;
+  return std::accumulate(std::begin(fields), std::end(fields), size_t{0},
+                         [](size_t bytes, const SettingsField &field) { return bytes + field.size; });
 }
 
 static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 22 == sizeof(RuntimeConfig),

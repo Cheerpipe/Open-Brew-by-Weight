@@ -32,7 +32,7 @@ void TaskMutex::unlock_() {
     longestHoldUs_ = holdUs;
     const char *name = pcTaskGetName(nullptr);
     size_t index = 0;
-    for (; name[index] != '\0' && index < sizeof(longestOwner_) - 1; ++index) {
+    for (; index < sizeof(longestOwner_) - 1 && name[index] != '\0'; ++index) {
       longestOwner_[index] = name[index];
     }
     longestOwner_[index] = '\0';

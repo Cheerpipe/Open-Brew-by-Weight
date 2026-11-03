@@ -354,7 +354,7 @@ inline FlashStoreStepResult flashIoStoreStep(
     const size_t chunk = remaining < FLASH_IO_CHUNK_BYTES
                              ? remaining
                              : FLASH_IO_CHUNK_BYTES;
-    void *scratch = copyToFlashIoScratch(
+    const void *scratch = copyToFlashIoScratch(
         bytes + (tx.phase == FlashStoreTransaction::Phase::COMMIT ? 0
                                                                   : tx.offset),
         chunk);

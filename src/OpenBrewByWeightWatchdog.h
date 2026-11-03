@@ -32,8 +32,7 @@ constexpr uint32_t TASK_WATCHDOG_TIMEOUT_MS = 5000;
 constexpr uint32_t SAFETY_EVENT_CRITICAL_TASK_WATCHDOG = 1U << 0;
 constexpr uint32_t SAFETY_EVENT_SAFE_RESTART = 1U << 1;
 constexpr uint32_t SAFETY_EVENT_ALL =
-    SAFETY_EVENT_CRITICAL_TASK_WATCHDOG | SAFETY_EVENT_SAFE_RESTART |
-    0U;
+    SAFETY_EVENT_CRITICAL_TASK_WATCHDOG | SAFETY_EVENT_SAFE_RESTART;
 
 // ESP-IDF disables C++ hardware atomics for this Xtensa target. A statically
 // allocated event group gives task/callback producers and the control task a

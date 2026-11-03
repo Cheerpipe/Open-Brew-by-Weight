@@ -61,9 +61,9 @@ inline bool validPersistedSettings(const PersistedSettings &settings) {
 inline void finalizePersistedSettings(PersistedSettings &settings) {
   ensurePersistedPresetBank(settings);
   uint32_t seedSeq = 0;
-  for (auto & i : settings.scaleHistory) {
-    if (i.lastSeenSeq > seedSeq) {
-      seedSeq = i.lastSeenSeq;
+  for (const ScaleHistoryEntry &entry : settings.scaleHistory) {
+    if (entry.lastSeenSeq > seedSeq) {
+      seedSeq = entry.lastSeenSeq;
     }
   }
   seedScaleHistoryFromPreferred(settings.scaleHistory, seedSeq,
@@ -296,8 +296,7 @@ inline bool savePersistedSettings(PersistedSettings &settings) {
     const char *keys[2] = {};
     (void)settingsSlotsNewestFirst(preferences, keys, &revision);
   }
-  uint32_t candidateRevision = revision + 1U;
-  if (candidateRevision == 0) candidateRevision = 1;
+  const uint32_t candidateRevision = revision == UINT32_MAX ? 1U : revision + 1U;
   finalizePersistedSettings(settings);
   const char *target = (candidateRevision & 1U) ? SETTINGS_SLOT_A : SETTINGS_SLOT_B;
   const bool saved = writeSettingsSlot(preferences, target, settings, candidateRevision);

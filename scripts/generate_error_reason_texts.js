@@ -309,6 +309,9 @@ function render(codes, arities) {
 #include <stdio.h>
 #include <string.h>
 
+#include <algorithm>
+#include <iterator>
+
 namespace openbrewbyweight {
 
 struct ErrorReasonText {
@@ -323,10 +326,12 @@ ${rows.join('\n')}
 // Prose for a plain (non-parameterized) reason code, or null when the code
 // is unknown to the catalog or is a parameterized rule.
 inline const char *errorReasonText(const char *reason) {
-  for (const ErrorReasonText &entry : ERROR_REASON_TEXTS) {
-    if (strcmp(entry.reason, reason) == 0) return entry.text;
-  }
-  return nullptr;
+  const ErrorReasonText *const end = std::end(ERROR_REASON_TEXTS);
+  const ErrorReasonText *const found =
+      std::find_if(std::begin(ERROR_REASON_TEXTS), end, [reason](const ErrorReasonText &entry) {
+        return strcmp(entry.reason, reason) == 0;
+      });
+  return found != end ? found->text : nullptr;
 }
 
 // Formats the message of a parameterized rule with exactly one snprintf; the

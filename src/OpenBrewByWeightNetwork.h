@@ -559,7 +559,7 @@ class OpenBrewByWeightNetwork {
   RecordIndexWork *recordIndexWork();
   uint32_t recordsKeyNext_ = 0;  // under dataMux_
   uint32_t nextRecordsKey() {
-    if (++recordsKeyNext_ == 0) ++recordsKeyNext_;
+    recordsKeyNext_ = recordsKeyNext_ == UINT32_MAX ? 1 : recordsKeyNext_ + 1;
     return recordsKeyNext_;
   }
   std::atomic<bool> companionRecordsDue_{false}, companionRecordsPending_{false};
