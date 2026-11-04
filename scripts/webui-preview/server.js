@@ -56,6 +56,7 @@ function renderHome() {
       .replace(/<script\s+type="module"\s+src="\/app\.js\?v=__FW_ASSET_TAG__"\s*><\/script\s*>/,
           '<script src="/preview.js" defer></script>')
       .replace(/<link rel="(?:manifest|icon|apple-touch-icon|modulepreload)"[^>]*>/g, '')
+      .replace(/<script\s+src="\/js\/launch\.js\?v=__FW_ASSET_TAG__"\s*><\/script\s*>/, '')
       .replace(/__FW_(?:ASSET_TAG|RELEASE)__/g, 'design-preview');
 }
 
