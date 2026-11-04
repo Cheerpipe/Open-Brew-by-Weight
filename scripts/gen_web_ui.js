@@ -71,6 +71,9 @@ const JS_TYPE = 'application/javascript; charset=utf-8';
 const ASSET_PATHS = ['/app.js', '/app.css', '/js/runtime.js', '/js/ota-image.js', '/js/launch.js',
   ...Object.keys(VIEW_MODULES).map((file) => `/js/${file}.js`), '/sw.js',
   '/manifest.webmanifest', '/icons/icon-192.png', '/favicon.ico', '/apple-touch-icon*'];
+const WEB_UI_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; " +
+    "connect-src 'self'; media-src data:; frame-ancestors 'none'; " +
+    "form-action 'self'; base-uri 'none'";
 // Paths the firmware answers with the shell: the keys of app.js ROUTES, which
 // the service worker also matches navigations against.
 const SHELL_PATHS = [...fs.readFileSync(appJsPath, 'utf8')
@@ -547,6 +550,17 @@ async function finish({shellHtml, partials, appJs, runtimeJs, otaImageJs, launch
       .join('\n');
 
   const cacheVersion = `${version}.${assetTag}`;
+  const sha256 = (body) => crypto.createHash('sha256').update(body).digest('base64');
+  const assetList = JSON.stringify({
+    v: 1,
+    tag: assetTag,
+    etag: `"${cacheVersion}"`,
+    csp: WEB_UI_CSP,
+    shell: [sha256(shellGzip), shellGzip.length],
+    shellPaths: SHELL_PATHS,
+    assets: assets.map((asset) =>
+      [asset.path, sha256(asset.body), asset.body.length, asset.contentType, asset.gzip]),
+  });
   // The header holds only what never changes with the Web UI or the version,
   // so content and release changes recompile the generated source alone.
   const header = `#pragma once
@@ -570,6 +584,8 @@ struct WebAsset {
 extern const char WEB_UI_ASSET_TAG[];
 extern const char WEB_UI_ETAG[];
 extern const char WEB_UI_ASSET_ETAG[];
+extern const char WEB_UI_CSP[];
+extern const char WEB_ASSET_LIST_JSON[];
 extern const size_t OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP_LEN;
 extern const uint8_t OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP[];
 extern const WebAsset WEB_ASSETS[${assets.length}];
@@ -588,6 +604,9 @@ constexpr char WEB_UI_ASSET_TAG[] = "${assetTag}";
 // The shell and the worker name the release too; ?v= assets only their bytes.
 constexpr char WEB_UI_ETAG[] = ${JSON.stringify('"' + cacheVersion + '"')};
 constexpr char WEB_UI_ASSET_ETAG[] = ${JSON.stringify('"' + assetTag + '"')};
+constexpr char WEB_UI_CSP[] = ${JSON.stringify(WEB_UI_CSP)};
+// What a paired companion verifies each file against: the exact bytes served.
+constexpr char WEB_ASSET_LIST_JSON[] = ${JSON.stringify(assetList)};
 
 ${emitGzipConst('OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP', shellGzip)}
 ${arrays}
@@ -628,6 +647,7 @@ ${rows}
     icon48Raw,
     partials,
     assets,
+    assetList,
     gzip: shellGzip,
     jsGzip: byPath('/app.js'),
     runtimeGzip: byPath('/js/runtime.js'),

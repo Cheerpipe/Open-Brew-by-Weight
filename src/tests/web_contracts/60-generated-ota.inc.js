@@ -22,6 +22,24 @@ if (firmware.includes('maybeCaptureScaleStartLag') ||
 
 (async () => {
 const generated = await webUi.generate();
+// A companion trusts these hashes over the wire: each must name the exact bytes served.
+{
+  const digest = (body) => crypto.createHash('sha256').update(body).digest('base64');
+  const list = JSON.parse(generated.assetList);
+  if (list.tag !== generated.assetTag || list.etag !== `"${generated.cacheVersion}"` ||
+      list.shell[0] !== digest(generated.gzip) || list.shell[1] !== generated.gzip.length ||
+      list.assets.length !== generated.assets.length ||
+      !list.csp.includes("base-uri 'none'") || !list.shellPaths.includes('/')) {
+    throw new Error('the asset list must describe the shell and name every asset');
+  }
+  for (const [index, row] of list.assets.entries()) {
+    const asset = generated.assets[index];
+    if (row[0] !== asset.path || row[1] !== digest(asset.body) || row[2] !== asset.body.length ||
+        row[3] !== asset.contentType || row[4] !== asset.gzip) {
+      throw new Error(`the asset list does not match the bytes served for ${asset.path}`);
+    }
+  }
+}
 // Safari only honours the prefixed property, which the build adds for its
 // supported browsers: the shot card must not select text while it is held
 // for scrubbing or full screen.
@@ -625,6 +643,7 @@ const rootHandler = network.slice(rootHandlerStart, assetHandlerStart);
 const serveImmutable = network.slice(serveImmutableStart, rootHandlerStart);
 const assetHandler = network.slice(assetHandlerStart, notFoundHandlerStart);
 const notFoundHandler = network.slice(notFoundHandlerStart, statusHandlerStart);
+const webUiGenerator = fs.readFileSync(path.join(__dirname, '../../scripts/gen_web_ui.js'), 'utf8');
 if (rootHandler.includes('no-store') ||
     !rootHandler.includes('max-age=86400') ||
     !rootHandler.includes('stale-if-error=604800') ||
@@ -632,15 +651,18 @@ if (rootHandler.includes('no-store') ||
     !rootHandler.includes('ifNoneMatchEquals') ||
     !rootHandler.includes('ETag') ||
     !rootHandler.includes('httpd_resp_set_hdr(request, "Vary", "Accept-Encoding");') ||
-    !rootHandler.includes("style-src 'self'") ||
-    !rootHandler.includes("script-src 'self'") ||
+    !rootHandler.includes('WEB_UI_CSP') ||
+    !webUiGenerator.includes("style-src 'self'") ||
+    !webUiGenerator.includes("script-src 'self'") ||
+    !webUiGenerator.includes("form-action 'self'") ||
+    !webUiGenerator.includes("base-uri 'none'") ||
     rootHandler.includes('"Connection"') ||
     rootHandler.includes("script-src 'unsafe-inline'") ||
     rootHandler.includes('HTTPD_RESP_USE_STRLEN')) {
   throw new Error('GET / must serve a cacheable keep-alive shell with ETag/304, CSP script/style self, and gzip by length');
 }
 // Only the inline keep-awake video may load as media; no outside origin.
-if (!rootHandler.includes("media-src data:;") || /media-src[^;]*(\*|https?:|'self')/.test(rootHandler))
+if (!webUiGenerator.includes("media-src data:;") || /media-src[^;]*(\*|https?:|'self')/.test(webUiGenerator))
   throw new Error('GET / may allow only data: media, for the full-screen keep-awake video');
 if (!serveImmutable.includes('requestsCurrentAssetTag(request)') ||
     !network.includes('strcmp(query + 3, WEB_UI_ASSET_TAG) == 0') ||

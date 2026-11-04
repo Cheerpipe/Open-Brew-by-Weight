@@ -261,11 +261,12 @@ bool companionHkdfSha256(const uint8_t *ikm, size_t ikmSize, const uint8_t *salt
 // with the bytes (16 appended on seal, expected on open).
 bool companionAeadSealBytes(const uint8_t key[32], const uint8_t nonce[12],
                             const uint8_t *plain, size_t plainSize, uint8_t *out,
-                            size_t capacity, size_t &length) {
+                            size_t capacity, size_t &length,
+                            const uint8_t *aad, size_t aadSize) {
   const mbedtls_svc_key_id_t id =
       companionImportKey(key, 32, PSA_KEY_TYPE_AES, PSA_ALG_GCM, PSA_KEY_USAGE_ENCRYPT);
   if (mbedtls_svc_key_id_is_null(id)) return false;
-  const bool sealed = psa_aead_encrypt(id, PSA_ALG_GCM, nonce, 12, nullptr, 0, plain,
+  const bool sealed = psa_aead_encrypt(id, PSA_ALG_GCM, nonce, 12, aad, aadSize, plain,
                                        plainSize, out, capacity, &length) == PSA_SUCCESS;
   (void)psa_destroy_key(id);
   return sealed;

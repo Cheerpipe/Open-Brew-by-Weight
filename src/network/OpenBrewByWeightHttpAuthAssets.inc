@@ -467,6 +467,8 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       // The relay handshake proves the pairing secret instead (companion only).
       {"/api/v1/companion/relay", HTTP_GET, companionRelayHandler, false, true},
       {"/api/v1/companion/relay", HTTP_POST, companionRelayHandler, false, true},
+      // The Web UI's hashes: relayed only, where the seal proves them.
+      {"/api/v1/companion/assets", HTTP_GET, companionAssetsHandler, false, true},
 #if OPEN_BREW_BY_WEIGHT_DEVELOPMENT == 1
 // Unlock routes are not served in development builds; administration is
 // public there and the UI never calls these endpoints.
@@ -692,10 +694,7 @@ esp_err_t OpenBrewByWeightNetwork::rootHandler(httpd_req_t *request) {
   httpd_resp_set_hdr(request, "ETag", WEB_UI_ETAG);
   httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
   httpd_resp_set_hdr(request, "X-Frame-Options", "DENY");
-  httpd_resp_set_hdr(
-      request, "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self'; "
-      "connect-src 'self'; media-src data:; frame-ancestors 'none'");
+  httpd_resp_set_hdr(request, "Content-Security-Policy", WEB_UI_CSP);
   return sendBody(request, OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP,
                         OPEN_BREW_BY_WEIGHT_WEB_UI_GZIP_LEN);
 }

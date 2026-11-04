@@ -491,11 +491,12 @@ the controller asks for one and obtain it without the user copying anything.
 ### `GET /api/v1/integration/info`
 
 ```json
-{"apiVersion": 1, "name": "openbrewbyweight", "firmwareVersion": "0.1.0", "authRequired": true}
+{"apiVersion": 1, "name": "openbrewbyweight", "firmwareVersion": "0.1.0", "authRequired": true, "relayFeatures": 1}
 ```
 
 `name` is the controller's device name. `authRequired` is `true` only while the
-Web UI login is on.
+Web UI login is on. `relayFeatures` is for [Open Brew by Weight Companion](COMPANION_LINK.md#relay-features);
+other clients can ignore it.
 
 ### `POST /api/v1/integration/auth`
 
