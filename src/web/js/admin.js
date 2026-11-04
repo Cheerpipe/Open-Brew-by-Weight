@@ -30,6 +30,9 @@ function setSaveDirty(id, hintId, dirty) {
 // over a change made meanwhile (another screen through the companion) is
 // refused, and the form shows the saved values again.
 const formRevisions = {};
+// The controller's relay session outlives a companion that went away, so it says
+// connected only while no feature needs the link, which would otherwise tell.
+const companionRelayOnly = (c) => c.relay === "ready" && !c.log && !c.archive && !c.lm;
 function formStale(e, clean) {
   if (e?.status !== 409 || !/REVISION/.test(e.code || "")) return false;
   clean();
@@ -724,7 +727,9 @@ function applyCompanionStatus(c) {
   $("companionLinkState").textContent =
     (link
       ? __WEBUI_TEXT__("admin.companion_link_open")
-      : __WEBUI_TEXT__("admin.companion_link_down")) +
+      : companionRelayOnly(c)
+        ? __WEBUI_TEXT__("admin.companion_relay_only")
+        : __WEBUI_TEXT__("admin.companion_link_down")) +
     (c.linkAgeS >= 0
       ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
       : "") +
@@ -2061,7 +2066,7 @@ const ADMIN_SUMMARIES = {
         ? R.sub(__WEBUI_TEXT__("admin.sum_companion_request"), [c.request.name])
         : __WEBUI_TEXT__("admin.sum_not_paired");
     return R.sub(
-      c.link === "open"
+      c.link === "open" || companionRelayOnly(c)
         ? __WEBUI_TEXT__("admin.sum_companion_connected")
         : c.peerProtocol > 0
           ? __WEBUI_TEXT__("admin.sum_companion_update")

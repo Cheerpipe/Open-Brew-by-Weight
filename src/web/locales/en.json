@@ -75,6 +75,7 @@
     "admin.companion_open_page": "Open its page",
     "admin.companion_paired_waiting": "Paired. The companion connects on its own in a moment.",
     "admin.companion_protocol": "the companion and this controller use different link versions; update the older one",
+    "admin.companion_relay_only": "Web UI relay ready; no feature needs the link",
     "admin.companion_request": "\u201c{0}\u201d at {1} (version {2}) wants to connect. The request expires in {3} min.",
     "admin.companion_route": "La Marzocco",
     "admin.companion_routes": "Through the companion|Moving to the companion|Directly from the controller",
