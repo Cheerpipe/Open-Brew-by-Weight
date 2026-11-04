@@ -84,12 +84,33 @@ inline bool writeFirmwareModeRecord(const char *key, const void *value,
   return saved;
 }
 
-inline FirmwareMode loadFirmwareMode() {
+inline bool firmwareModeRecordPresent() {
+  if (!lockFlashIo()) {
+    return true;
+  }
+  OpenBrewByWeightPreferences preferences(NvsSubsystem::FIRMWARE_MODE);
+  // An absent namespace is a fresh device; NVS logs real open failures.
+  bool present = false;
+  if (preferences.begin(FIRMWARE_MODE_NAMESPACE, true)) {
+    present = preferences.isKey(FIRMWARE_MODE_KEY);
+    preferences.end();
+  }
+  unlockFlashIo();
+  return present;
+}
+
+// No record is a new controller, which starts transparent. A record that cannot
+// be read is not that choice: it loads as FULL, keeping the relay's time limits,
+// and sets `damaged` so the boot says why.
+inline FirmwareMode loadFirmwareMode(bool *damaged = nullptr) {
+  if (damaged != nullptr) *damaged = false;
   uint8_t raw = 0;
-  return readFirmwareModeRecord(FIRMWARE_MODE_KEY, &raw, sizeof(raw)) &&
-                 validFirmwareMode(raw)
-             ? static_cast<FirmwareMode>(raw)
-             : FirmwareMode::COMPATIBILITY;
+  if (readFirmwareModeRecord(FIRMWARE_MODE_KEY, &raw, sizeof(raw)) && validFirmwareMode(raw)) {
+    return static_cast<FirmwareMode>(raw);
+  }
+  const bool present = firmwareModeRecordPresent();
+  if (damaged != nullptr) *damaged = present;
+  return present ? FirmwareMode::FULL : FirmwareMode::COMPATIBILITY;
 }
 
 inline bool saveFirmwareMode(FirmwareMode mode) {

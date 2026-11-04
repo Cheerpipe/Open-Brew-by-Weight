@@ -9,6 +9,14 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **Strange names can't break the Web UI:** a scale, a companion or a stray web
+  address with a name that isn't valid text used to cut the live connection, on
+  Home, Shots or the log, over and over. Now it just shows a replacement
+  character.
+- **Firmware updates can't be blocked by a slow connection:** a device sending a
+  refused update very slowly can no longer freeze the Web UI.
+- **Time limits stay on if a setting is damaged:** if the controller can't read
+  whether the firmware is enabled, it stays enabled, with its relay limits.
 - **Notifications:** an app installed from the companion's address can tell you
   when a shot ends, with its time, yield, and result, even with the app closed.
   Tap one to open that shot's card. Turn it on in **Settings → This device**;

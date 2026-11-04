@@ -895,7 +895,12 @@ void sanitizeJsonEmbed(const char *input, char *output, size_t capacity) {
     if (byte == '\"' || byte == '\\' || byte < 0x20) {
       continue;
     }
-    output[written++] = static_cast<char>(byte);
+    const size_t sequence = utf8SequenceBytes(input + index);
+    if (sequence == 0) continue;  // SSIDs are raw bytes; these reach text frames.
+    if (written + sequence >= capacity) break;
+    memcpy(output + written, input + index, sequence);
+    written += sequence;
+    index += sequence - 1;
   }
   output[written] = '\0';
 }

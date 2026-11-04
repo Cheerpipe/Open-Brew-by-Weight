@@ -2560,11 +2560,19 @@ void p90_firmware_mode_store_round_trip_and_factory_reset() {
   CHECK(loadFirmwareMode() == FirmwareMode::COMPATIBILITY);
   CHECK(!saveFirmwareMode(static_cast<FirmwareMode>(0)));
   CHECK(loadFirmwareMode() == FirmwareMode::COMPATIBILITY);
-  // An invalid stored byte also reads as compatibility.
+  bool damaged = true;
+  CHECK(loadFirmwareMode(&damaged) == FirmwareMode::COMPATIBILITY);
+  CHECK(!damaged);
+  // An invalid stored byte keeps the relay's limits and says so at boot.
   const uint8_t invalid = 0x7F;
   persistence_host::putRaw(FIRMWARE_MODE_NAMESPACE, FIRMWARE_MODE_KEY, &invalid,
                            sizeof(invalid));
-  CHECK(loadFirmwareMode() == FirmwareMode::COMPATIBILITY);
+  CHECK(loadFirmwareMode(&damaged) == FirmwareMode::FULL);
+  CHECK(damaged);
+  // So does a record of the wrong length.
+  const uint8_t tooLong[2] = {1, 2};
+  persistence_host::putRaw(FIRMWARE_MODE_NAMESPACE, FIRMWARE_MODE_KEY, tooLong, sizeof(tooLong));
+  CHECK(loadFirmwareMode() == FirmwareMode::FULL);
   // Factory reset clears the record: the controller is fresh again.
   CHECK(saveFirmwareMode(FirmwareMode::FULL));
   PersistedSettings settings;

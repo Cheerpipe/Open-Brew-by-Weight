@@ -14,6 +14,7 @@
 #include <strings.h>
 
 #include "OpenBrewByWeightTimingTypes.h"
+#include "OpenBrewByWeightUtf8.h"
 
 namespace openbrewbyweight {
 
@@ -122,12 +123,9 @@ inline void copyWebAccessLabel(char (&label)[N], const char *text) {
   for (size_t index = 0; text != nullptr && text[index] != '\0'; ++index) {
     const unsigned char c = static_cast<unsigned char>(text[index]);
     if (c < 0x20 || c == 0x7F || c == '"' || c == '\\' || c == '<' || c == '>') continue;
-    const size_t width = c < 0x80 ? 1 : c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 0;
-    if (width == 0) continue;  // a stray continuation byte
+    const size_t width = utf8SequenceBytes(text + index);
+    if (width == 0) continue;  // not a valid sequence
     if (used + width >= N) break;
-    size_t next = 1;
-    while (next < width && (static_cast<unsigned char>(text[index + next]) & 0xC0) == 0x80) ++next;
-    if (next < width) continue;  // a truncated sequence
     memcpy(label + used, text + index, width);
     used += width;
     index += width - 1;

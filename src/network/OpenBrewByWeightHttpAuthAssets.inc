@@ -413,7 +413,7 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
   };
   static const Route routes[] = {
       {"/api/v1/status/admin", HTTP_GET, statusHandler, true},
-      {"/api/v1/debug/export", HTTP_GET, debugExportHandler},
+      {"/api/v1/debug/export", HTTP_GET, debugExportHandler, false, false, true},
       {"/api/v1/diagnostic/crashes", HTTP_GET, crashArchiveDownloadHandler},
       {"/api/v1/diagnostic/crashes/empty", HTTP_POST, crashArchiveClearHandler},
       {"/api/v1/diagnostic/audit/empty", HTTP_POST, auditLogClearHandler},

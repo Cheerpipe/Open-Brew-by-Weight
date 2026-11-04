@@ -101,8 +101,8 @@ static void testTornRecordTerminal() {
   fakeAuditLog.bytes[offset] = 0x02;
   AuditLogLatch recovered;
   auditStoreBootOpen(recovered, pendingAfter);
-  check(auditStoreStatus().retained == 4,
-        "a torn record must terminate the window");
+  check(auditStoreStatus().retained == 5,
+        "a torn slot stays in the window, as one in its middle does, and is never written over");
   AuditRecord page[8];
   check(auditStoreCopyAfter(0, page, 8) == 4 && page[3].sequence == 4,
         "the torn record must not be readable");
@@ -245,6 +245,19 @@ static void testTornSlotsKeepNewestWindow() {
   check(auditStoreAppend(makeRecord(41, 1)) &&
             auditStoreCopyAfter(39, page, 64) == 2 && page[1].sequence == 41,
         "the next append must follow the newest record");
+
+  resetStore();
+  auditStoreBootOpen(latch, pendingAfter);
+  for (uint32_t seq = 1; seq <= 5; ++seq) {
+    check(auditStoreAppend(makeRecord(seq, 1)), "append failed");
+  }
+  fakeAuditLog.bytes[slotOffset(5)] = 0x00;  // A power cut mid-program, right at the cursor.
+  auditStoreBootOpen(recovered, pendingAfter);
+  check(auditStoreAppend(makeRecord(6, 1)), "append after the tear failed");
+  auditStoreBootOpen(recovered, pendingAfter);
+  check(auditStoreStatus().seqHigh == 6 && auditStoreCopyAfter(5, page, 64) == 1 &&
+            page[0].sequence == 6,
+        "the first record after a tear must survive a restart");
 
   resetStore();
   auditStoreBootOpen(latch, pendingAfter);
