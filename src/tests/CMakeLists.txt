@@ -240,10 +240,15 @@ target_include_directories(companion_log_host_test PRIVATE "${CJSON_INCLUDE_DIR}
 target_link_libraries(companion_log_host_test PRIVATE "${CJSON_LIBRARY}")
 target_include_directories(integration_request_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
 target_link_libraries(integration_request_host_test PRIVATE "${CJSON_LIBRARY}")
-host_test(corridor_host_test LABEL "host;control"
-  DEFINITIONS "CORRIDOR_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
-target_include_directories(corridor_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
-target_link_libraries(corridor_host_test PRIVATE "${CJSON_LIBRARY}")
-host_test(corridor_replay_host_test LABEL "host;control")
-host_test(corridor_hint_loop_host_test LABEL "host;control")
+# The corridor kernel and its tests use no threads, atomics, or locks, so TSAN
+# cannot report anything in them, and it costs 50 s; return them to the TSAN
+# preset if that ever changes.
+if(NOT OPENBREWBYWEIGHT_SANITIZER STREQUAL "thread")
+  host_test(corridor_host_test LABEL "host;control"
+    DEFINITIONS "CORRIDOR_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
+  target_include_directories(corridor_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
+  target_link_libraries(corridor_host_test PRIVATE "${CJSON_LIBRARY}")
+  host_test(corridor_replay_host_test LABEL "host;control")
+  host_test(corridor_hint_loop_host_test LABEL "host;control")
+endif()
 host_test(eta_smoother_host_test LABEL "host;control")
