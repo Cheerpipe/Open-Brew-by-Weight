@@ -26,6 +26,9 @@ Clearing the app's browser data returns them to their defaults, and a
   machine and the timer appears on the counter.
 - **Vibrate when a shot ends** gives a short buzz when the extraction
   finishes. Android phones only.
+- **Show battery percentage** adds your scale's charge as a number next to
+  the battery icon at the top of the screen. It is off until you turn it on.
+  Without it, tap the Bluetooth icon to read the percentage.
 - **Hero card** picks which Home shot card this device shows — the recipe
   graph of **Technical** or the full-color **Colorful** card — overriding the
   machine's choice in Admin → Frontend for this device only. See

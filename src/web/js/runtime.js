@@ -381,7 +381,8 @@ function updateHeaderSignals(s = {}) {
   }
   // The scale battery joins the Bluetooth indicator: a cell after the bars
   // whose fill follows the percent, coloured only once it needs attention.
-  // The percent itself lives in the popover and the label. An envelope
+  // The number lives in the popover and the label, and beside the cell when
+  // this device opts in (.showBattPct). An envelope
   // without a scale model (the Admin poll) keeps the last Home frame's.
   if (c.bluetoothConnected !== true || s.scale)
     headerBatteryPct = c.bluetoothConnected === true ? s.scale.batteryPct : null;
@@ -393,19 +394,20 @@ function updateHeaderSignals(s = {}) {
   if (bt) {
     if (batt) bt.dataset.batt = batt;
     else delete bt.dataset.batt;
-    bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "5.2 0 38.4 24" : "5.2 0 26.1 24");
+    bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "5.2 0 39.5 24" : "5.2 0 26.1 24");
     if (batt) {
       bt.title += " · " + sub(__WEBUI_TEXT__("runtime.scale_battery"), [scaleBatteryText(pct)]);
       bt.setAttribute("aria-label", bt.title);
     }
   }
   if (fill && batt) {
-    const h = Math.max(1.2, (12.4 * pct) / 100);
+    const h = Math.max(3, (16 * pct) / 100);
     fill.setAttribute("height", h.toFixed(2));
-    fill.setAttribute("y", (18.4 - h).toFixed(2));
+    fill.setAttribute("y", (20 - h).toFixed(2));
   }
   if (line) line.hidden = !batt;
   if (batt && $("bluetoothBattery")) $("bluetoothBattery").textContent = scaleBatteryText(pct);
+  if (batt && $("bluetoothBatteryPct")) $("bluetoothBatteryPct").textContent = pct + "%";
   // The paired companion: an open link lights both racks, a closed link
   // grays them, and a page the companion itself serves keeps one rack lit
   // (its Web UI relay works without the link). A stale snapshot reads as
@@ -5238,6 +5240,7 @@ const APP_SETTING_KEYS = {
   vibrate: "obbwAppVibrate",
   // Stored as an opt-out so the splash is on by default; js/launch.js reads it.
   noSplash: "obbwAppNoSplash",
+  batteryPct: "obbwAppBatteryPct",
 };
 function appSetting(k) {
   try {
@@ -5253,6 +5256,7 @@ function setAppSetting(k, v) {
   } catch {
     // Storage blocked or full: the setting applies to this page only.
   }
+  if (k === "batteryPct") document.documentElement.classList.toggle("showBattPct", v);
   if (k !== "awake") return;
   if (v && sessionShotLive()) keepShotAwake(true);
   else if (!v && shotAwakeUntil) {
@@ -5967,6 +5971,7 @@ function onPageVisibility() {
 // The "This app" settings group exists only for the installed app; the class
 // gates it (and anything else pwaOnly) from first paint.
 document.documentElement?.classList?.toggle("pwaApp", webUiStandalone());
+document.documentElement?.classList?.toggle("showBattPct", appSetting("batteryPct"));
 document.addEventListener("visibilitychange", onPageVisibility);
 if (document.hidden) onPageVisibility();
 // Every https page knows its companion from load on, whatever view it opens

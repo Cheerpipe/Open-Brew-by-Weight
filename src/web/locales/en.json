@@ -1857,6 +1857,8 @@
     "settings.app": "This app",
     "settings.app_auto_live": "Open the live view when a shot starts",
     "settings.app_auto_live_hint": "While you are on Home, a shot opens the full-screen timer by itself.",
+    "settings.app_battery_pct": "Show battery percentage",
+    "settings.app_battery_pct_hint": "Adds the scale's charge as a number next to the battery icon at the top of the screen.",
     "settings.app_hero_card": "Hero card",
     "settings.app_hero_card_colorful": "Colorful",
     "settings.app_hero_card_default": "Machine default",

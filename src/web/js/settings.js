@@ -1895,6 +1895,7 @@ export function init() {
     ["appKeepAwake", "awake"],
     ["appAutoLive", "live"],
     ["appVibrate", "vibrate"],
+    ["appBatteryPct", "batteryPct"],
   ]) {
     if (!$(id)) continue;
     $(id).checked = R.appSetting(key);
