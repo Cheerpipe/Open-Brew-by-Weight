@@ -109,6 +109,7 @@ void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now, bool syncHol
   if (eventCheck && (callbacks_.recordStoresSavePending == nullptr ||
                      !callbacks_.recordStoresSavePending()))
     companionNotified_.store(true, std::memory_order_release);
+  if (gate && companionPolicyEventDue()) companionNotified_.store(true, std::memory_order_release);
   if (syncHold || now - companionRecordsAtMs_ < kStatsStreamPaceMs ||
       !companionRecordsDue_.load(std::memory_order_acquire) ||
       companionRecordsPending_.exchange(true, std::memory_order_acq_rel))
@@ -196,6 +197,24 @@ bool OpenBrewByWeightNetwork::companionShotEventBody(uint8_t &count, bool syncHo
     lifecycleLogf("Notifications: shot %lu not sent (%s)", static_cast<unsigned long>(shot.id),
                   reason);
   return false;
+}
+
+// Network task: La Marzocco refuses the account until its terms are accepted, a
+// device wants events, and this acceptance has not been told. A state, not an
+// instant, so a link or a device that arrives later still hears of it.
+bool OpenBrewByWeightNetwork::companionPolicyEventDue() {
+  {
+    TaskLockGuard lock(dataMux_);
+    const CompanionLinkSlot *link = companionActiveLink();
+    if (link == nullptr || link->closing || !link->eventsWanted) return false;
+  }
+  uint32_t sampleAtMs = 0;
+  const bool required = companionPolicyRequired(sampleAtMs);
+  TaskLockGuard lock(dataMux_);
+  CompanionShotEvents &events = g_companion.shotEvents;
+  if (events.policySent && companionPolicyEventRearmed(required, sampleAtMs, events.policyAtMs))
+    events.policySent = false;
+  return required && !events.policySent;
 }
 
 // httpd: a record frame built in statusJson after COMPANION_RECORD_ORIGIN,

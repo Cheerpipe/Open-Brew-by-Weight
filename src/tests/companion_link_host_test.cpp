@@ -1071,6 +1071,18 @@ static void testShotEventFrame() {
   CHECK(strstr(text, "\"r\":\"slow\",\"g\":36.00,\"w\":\"e\"}}") != nullptr);
 }
 
+static void testPolicyEvent() {
+  // (required, sampleAtMs, sentAtMs)
+  CHECK(companionPolicyEventRearmed(false, 2000, 1000));
+  CHECK(!companionPolicyEventRearmed(true, 2000, 1000));   // still refused
+  CHECK(!companionPolicyEventRearmed(false, 1000, 1000));  // no newer sample: a retry's cleared status
+  CHECK(!companionPolicyEventRearmed(false, 500, 1000));
+  CHECK(!companionPolicyEventRearmed(false, 0, 0xFFFFFF00U));  // never sampled, across the wrap
+  CHECK(companionPolicyEventRearmed(false, 100, 0xFFFFFF00U));
+  CHECK(strstr(COMPANION_POLICY_EVENT, "\"topic\":\"micra_policy\"") != nullptr);
+  CHECK(strstr(COMPANION_POLICY_EVENT, "\"ttl\":86400") != nullptr);
+}
+
 static void testNoticeDue() {
   // (subscribed, moved, committed, gateOpen, afterHold, stillMs)
   CHECK(companionNoticeDue(true, true, true, true, false, COMPANION_NOTICE_COALESCE_MS));
@@ -1249,6 +1261,7 @@ int main() {
   testSyncBodiesHeld();
   testShotEventRules();
   testShotEventFrame();
+  testPolicyEvent();
   testLogFlushDue();
   testLiveness();
   std::puts("companion_link_host_test: ok");

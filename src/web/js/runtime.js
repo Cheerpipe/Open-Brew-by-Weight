@@ -2808,7 +2808,6 @@ async function companionLog(path, body) {
 }
 // Notifications through the companion (docs/features/notifications.md), for this
 // browser: why it cannot have them, the subscription, and turning them on and off.
-const PUSH_TOPICS = ["shot_result"];
 function pushBlocked() {
   const here = uiState.companionHere;
   if (location.protocol !== "https:" || !here) return "address";
@@ -2840,14 +2839,21 @@ function pushDeviceLabel() {
     browser = ua.match(/Edg|Firefox|Chrome|Safari/)?.[0].replace("Edg", "Edge") ?? "";
   return [device, browser].filter(Boolean).join(" · ");
 }
-const pushRegister = (subscription) =>
+// What this device asked for, kept where the worker can read it too. A device
+// subscribed before there was a choice wanted the only topic there was.
+async function pushTopics() {
+  if (!(await pushSubscription())) return [];
+  const state = await caches.open("push-state");
+  return (await (await state.match("/topics"))?.json()) ?? ["shot_result"];
+}
+const pushRegister = (subscription, topics) =>
   companionLog("/__companion/push/subscribe", {
     subscription,
-    topics: PUSH_TOPICS,
+    topics,
     label: pushDeviceLabel(),
   });
 // In the tap: the permission prompt needs it, on iOS above all.
-async function pushEnable() {
+async function pushEnable(topics) {
   if ((await Notification.requestPermission()) !== "granted") throw Error("denied");
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
@@ -2855,16 +2861,18 @@ async function pushEnable() {
     await subscription.unsubscribe();
     subscription = null;
   }
+  const fresh = !subscription;
   subscription ??= await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: pushKeyBytes(uiState.companionHere.push.publicKey),
   });
   try {
-    await pushRegister(subscription);
+    await pushRegister(subscription, topics);
   } catch (error) {
-    await subscription.unsubscribe().catch(() => {});
+    if (fresh) await subscription.unsubscribe().catch(() => {});
     throw error;
   }
+  await (await caches.open("push-state")).put("/topics", new Response(JSON.stringify(topics)));
 }
 async function pushDisable() {
   const subscription = await pushSubscription();
@@ -2873,6 +2881,13 @@ async function pushDisable() {
   await subscription.unsubscribe();
   await companionLog("/__companion/push/unsubscribe", { endpoint });
 }
+// One setting's change; the last topic off ends the subscription.
+async function pushSetTopic(topic, wanted) {
+  if (wanted) await Notification.requestPermission();
+  const topics = (await pushTopics()).filter((name) => name !== topic);
+  if (wanted) topics.push(topic);
+  await (topics.length ? pushEnable(topics) : pushDisable());
+}
 // Once per open of an installed app: the companion, and only it, hears that
 // this device is still here, under the key it has now, and gets a receipt the
 // worker could not post away from home.
@@ -2880,8 +2895,9 @@ async function pushReconcile() {
   if (pushBlocked()) return;
   const subscription = await pushSubscription();
   if (!subscription) return;
-  if (pushKeyMatches(subscription)) await pushRegister(subscription);
-  else await pushEnable();
+  const topics = await pushTopics();
+  if (pushKeyMatches(subscription)) await pushRegister(subscription, topics);
+  else await pushEnable(topics);
   const state = await caches.open("push-state"),
     receipt = await (await state.match("/received"))?.json();
   if (receipt && !receipt.acked) {
@@ -7741,8 +7757,8 @@ export {
   pushBlocked,
   pushSubscription,
   pushKeyMatches,
-  pushEnable,
-  pushDisable,
+  pushTopics,
+  pushSetTopic,
   pushReconcile,
   webUiStandalone,
   pairCompanionHere,

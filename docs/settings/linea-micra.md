@@ -138,6 +138,10 @@ and the machine row and the cloud icon in the header read **Terms not
 accepted**. Meanwhile the controller keeps checking only at its slow pace
 after a failure, with a single short request each time.
 
+Nothing at the machine tells you this happened. To hear about it on your phone,
+even with the app closed, see
+[La Marzocco terms](../features/notifications.md#la-marzocco-terms).
+
 You have two ways out:
 
 - **Open the La Marzocco app** and accept the terms there. This is the

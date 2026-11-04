@@ -98,6 +98,22 @@
       assert.equal(note.data.url, "/stats", "only whole numbers reach the tap target");
     }
 
+    // La Marzocco's terms open Home, whose card says what to do; a tap never opens Shots.
+    const terms = await notify({ topic: "micra_policy", key: "micra-policy", mid: "m", d: { v: 1 } });
+    assert.equal(terms.title, "La Marzocco updated its terms");
+    assert.match(terms.body, /Tap to see what to do/);
+    assert.equal(terms.tag, "micra-policy", "a reminder replaces instead of stacking");
+    assert.equal(terms.data.url, "/");
+    assert.equal(
+      (await notify({ topic: "micra_policy", d: { v: 1, test: true } })).title,
+      "Test. La Marzocco updated its terms",
+    );
+    assert.equal(
+      (await notify({ topic: "micra_policy", d: { v: 2 } })).title,
+      "Open Brew by Weight",
+      "a newer event still shows the generic notification",
+    );
+
     let done;
     handlers.notificationclick({
       notification: { close() {}, data: { url: "/stats?shot=1&boot=2&end=3" } },
@@ -115,9 +131,21 @@
   // The setting is off until a tap asks, and only an installed app shows it.
   if (
     !/class="pwaOnly"\s*><input id="appPush"/.test(rawPartialHtml.settings) ||
-    !blockAt(runtimeJs, "async function pushEnable() {").includes("Notification.requestPermission()")
+    !blockAt(runtimeJs, "async function pushEnable(topics) {").includes("Notification.requestPermission()")
   )
     throw new Error("Notifications turn on only from a tap in the installed app");
+
+  // The terms setting is its own choice, on Linea Micra builds and in the installed app.
+  if (
+    !/class="micraOnly pwaOnly"\s*><input id="appPushTerms"/.test(rawPartialHtml.settings) ||
+    !fs
+      .readFileSync(path.join(sketchDir, "web", "js", "settings.js"), "utf8")
+      .includes('["appPushTerms", "micra_policy"]') ||
+    !blockAt(runtimeJs, "async function pushSetTopic(topic, wanted) {").startsWith(
+      "async function pushSetTopic(topic, wanted) {\n  if (wanted) await Notification.requestPermission();",
+    )
+  )
+    throw new Error("The terms notification is a separate, opt-in topic asked for in the tap");
 
   // A blocked setting's reason stays under its label: the row's grid places every
   // other child beside the toggle. The samples use the Web UI's own button bar.

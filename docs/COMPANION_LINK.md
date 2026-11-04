@@ -487,6 +487,14 @@ on unread, and holds no notification wording and no shot rule.
   the last one looked at and at most 10 minutes ago. A rating, a deletion or a Clear
   never fires. A short shot, or one with no yield and no estimate, does not fire: the
   Web UI log and `pushSkip` say so. An event not sent before a restart is lost.
+- **`micra_policy`.** `d` is `{"v":1}`, `key` is always `micra-policy` and `ttl` is
+  86400. It fires when the controller's La Marzocco error is `policy_required`, whether
+  it met the 403 itself or the companion reported it, and a session has asked for events.
+  It is a state, so a session or a `ps` that arrives later still hears of it. It fires
+  once until a machine sample newer than the event arrives with the error gone; other
+  errors in between are the same pending acceptance. The Web UI log records it. A restart
+  forgets that it was told, so a controller that restarts with the terms pending sends it
+  again. Devices choose it with their own `topics`, so the companion needs no change.
 
 ### Sync holds
 
