@@ -554,7 +554,8 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       diagHtml.indexOf('<summary>AP</summary>') > diagHtml.indexOf('<summary>Serial</summary>') ||
       diagHtml.indexOf('<summary>Serial</summary>') > diagHtml.indexOf('<summary>CPU</summary>') ||
       diagHtml.indexOf('<summary>CPU</summary>') > diagHtml.indexOf('<summary>CPU profiling</summary>') ||
-      diagHtml.indexOf('<summary>CPU profiling</summary>') > diagHtml.indexOf('<summary>RAM</summary>') ||
+      diagHtml.indexOf('<summary>CPU profiling</summary>') > diagHtml.indexOf('<summary>Flash and PSRAM</summary>') ||
+      diagHtml.indexOf('<summary>Flash and PSRAM</summary>') > diagHtml.indexOf('<summary>RAM</summary>') ||
       diagHtml.indexOf('<summary>RAM</summary>') > diagHtml.indexOf('<summary>HEAP</summary>') ||
       diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
       diagHtml.indexOf('<summary>Date and time</summary>') > diagHtml.indexOf('<summary>Companion</summary>') ||
