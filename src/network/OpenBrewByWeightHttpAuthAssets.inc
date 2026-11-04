@@ -80,7 +80,13 @@ esp_err_t OpenBrewByWeightNetwork::claimHandler(httpd_req_t *request) {
   const bool claimTokenPresent = self.readClaimSessionToken(request, claimToken);
   self.dataMux_.lock();
   const bool attach = relayed && strcmp(self.activeWebUiClientId_, clientId) == 0;
-  if (!attach || companionPrincipalHolds(self.webUiOverride_, screen)) {
+  // The window that held control through an unpaired companion, now paired: it
+  // takes nothing from anyone, so what it had unlocked stays with it.
+  const bool moved = relayed && !attach && strcmp(self.activeWebUiClientId_, screen.id) == 0;
+  if (moved) {
+    (void)companionPrincipalMove(self.adminUnlock_, screen);
+    (void)companionPrincipalMove(self.webUiOverride_, screen);
+  } else if (!attach || companionPrincipalHolds(self.webUiOverride_, screen)) {
     self.webUiOverrideActive_ = false;
     self.webUiOverrideUntilMs_ = 0;
     self.webUiOverride_ = CompanionPrincipal{};
@@ -91,7 +97,7 @@ esp_err_t OpenBrewByWeightNetwork::claimHandler(httpd_req_t *request) {
   memcpy(self.activeWebUiClaimToken_, claimToken, sizeof(claimToken));
   self.activeWebUiClaimTokenValid_ = claimTokenPresent;
   self.dataMux_.unlock();
-  self.clearAdminUnlock(attach ? &screen : nullptr);
+  if (!moved) self.clearAdminUnlock(attach ? &screen : nullptr);
   memset(clientId, 0, sizeof(clientId));
   memset(claimToken, 0, sizeof(claimToken));
   return sendJson(request, STATUS_OK,
@@ -254,7 +260,8 @@ bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {
   bool apActive = false;
   dataMux_.lock();
   apActive = status_.apActive;
-  if (hasClient && adminUnlocked_ && companionPrincipalHolds(adminUnlock_, caller)) {
+  if (hasClient && adminUnlocked_ &&
+      (companionPrincipalHolds(adminUnlock_, caller) || companionPrincipalMove(adminUnlock_, caller))) {
     if (tickReached(now, adminUnlockUntilMs_)) {
       adminUnlocked_ = false;
       adminUnlock_ = CompanionPrincipal{};

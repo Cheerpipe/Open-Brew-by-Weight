@@ -5077,6 +5077,11 @@ function startUiStream() {
     resetUiStream();
     scheduleShotPaint();
     if (event?.code === 4001) {
+      // The companion was just paired: this window keeps control, through it.
+      if (event.reason === "paired") {
+        claimWebUiOwnership();
+        return;
+      }
       const held = webUiTakeoverVisible();
       deactivateWebUi(event.reason);
       if (held) claimWebUiOwnership();

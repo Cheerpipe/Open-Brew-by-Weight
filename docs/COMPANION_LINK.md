@@ -763,6 +763,12 @@ claim and safety gates. The signature adds only this:
   that opened the controller directly, and a direct claim takes it back
   (relayed requests then get `409 UI_TAKEN_OVER` and the companion's stream
   closes with 4001).
+- **A window that was using an unpaired companion keeps its place.** Pairing
+  moves it onto the relay: the companion closes its stream with `4001` and the
+  reason `paired`, the window claims again without a notice, and the first
+  relayed request or claim naming the same id moves its Admin unlock and unsafe
+  override onto that screen. They move only this way: a direct request never
+  takes a screen's unlock.
 - **Admin unlock and the unsafe override belong to the screen.** Unlocking
   Admin, signing in, the unsafe override, Admin lock and the OTA password
   check act on the `screen` of the request, not on the relay id. One screen or
