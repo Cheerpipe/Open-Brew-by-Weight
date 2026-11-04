@@ -54,8 +54,10 @@ cannot send it without a preflight the controller never answers.
 `id` is the companion's UUID (36 characters), `name` 1 to 32 bytes of UTF-8
 without control characters, `version` up to 24 printable bytes,
 `commitment` the 32-byte `SHA-256("obbw-companion-commit-v1" ‖ companionKey)`
-of the companion's long-lived pairing key. The key itself is revealed only
-after the controller's key is known (below).
+of the key the companion made for this attempt. A key seen in an earlier attempt
+would let a device in the middle search for one that shows matching codes, so
+each attempt makes its own. The key itself is revealed only after the
+controller's key is known (below).
 
 **Commit, then reveal.** Neither side learns the other's key before its own
 is fixed, so a device in the middle cannot search for a key pair that makes
@@ -687,10 +689,13 @@ bytes. The controller opens the body where it reads it, before any parsing.
 The exception is the firmware update range upload, `PATCH /api/v1/ota`,
 whose body travels as it is (see below).
 
-**Sealed response bodies.** Every JSON response to a relayed request is
+**Sealed response bodies.** Every whole JSON response to a relayed request is
 sealed the same way and carries `X-OBBW-Enc: <counter>` (decimal, the
 response counter used as the nonce). A response without the header — web
-assets, WebSocket upgrades — is not sealed.
+assets, WebSocket upgrades, JSON streamed in chunks, a route's own refusals
+sent before admission — is not sealed. The companion refuses whole JSON that
+claims success without a seal, and a sealed answer it has already opened under
+this `Kb`.
 
 **What is deliberately not sealed.** OTA PATCH range bodies and web assets
 carry no secret: they are the user's own firmware image and the Web UI's

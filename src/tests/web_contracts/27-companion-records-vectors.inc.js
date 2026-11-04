@@ -23,6 +23,7 @@
   const networkSource = read('OpenBrewByWeightNetwork.cpp');
   const header = read('OpenBrewByWeightNetwork.h');
   const webhook = read('OpenBrewByWeightWebhook.h');
+  const utf8 = read('OpenBrewByWeightUtf8.h');
   const block = (text, marker) => {
     const out = blockAt(text, marker);
     assert(out, marker);
@@ -83,6 +84,7 @@ bool companionFrameMacHex(const uint8_t *, char, const char *, size_t, char hex[
 ${block(link, 'inline size_t companionSealFrame(')}
 ${block(link, 'inline size_t companionSealRecord(')}
 ${link.slice(link.indexOf('struct CompanionBase64Stream {'), link.indexOf('\n};', link.indexOf('struct CompanionBase64Stream {')) + 3)}
+${block(utf8, 'inline size_t utf8SequenceBytes(')}
 ${block(webhook, 'inline bool escapeJsonString(')}
 ${block(networkSource, 'struct StatsCurveHashCache {')};
 ${block(statsHeader, 'struct StatsHeaderWork {')};

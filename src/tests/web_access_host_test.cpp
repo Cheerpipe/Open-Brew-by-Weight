@@ -209,6 +209,11 @@ void labelsAreSanitizedAndWhole() {
   assert(std::strcmp(label, "0123456789012345678901") == 0);
   copyWebAccessLabel(label, "\xB7ok\xC2");  // stray continuation and truncated lead
   assert(std::strcmp(label, "ok") == 0);
+  // Bytes a WebSocket client would fail the whole frame on.
+  copyWebAccessLabel(label, "a\xC0\xAF""b\xFF\x80\x80\x80""c\xED\xA0\x80""d\xF4\x90\x80\x80""e");
+  assert(std::strcmp(label, "abcde") == 0);
+  copyWebAccessLabel(label, "\xE2\x82\xAC\xF0\x9F\x8D\xB5");
+  assert(std::strcmp(label, "\xE2\x82\xAC\xF0\x9F\x8D\xB5") == 0);
   copyWebAccessLabel(label, nullptr);
   assert(label[0] == '\0');
 }

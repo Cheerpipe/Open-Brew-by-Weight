@@ -12,6 +12,7 @@
 #include "OpenBrewByWeightIntegrationState.h"
 #include "OpenBrewByWeightPsram.h"
 #include "OpenBrewByWeightTaskMutex.h"
+#include "OpenBrewByWeightUtf8.h"
 #include "OpenBrewByWeightResourceOwner.h"
 
 #if defined(OPEN_BREW_BY_WEIGHT_WEBHOOK_TEST_PLATFORM)
@@ -57,7 +58,18 @@ inline bool escapeJsonString(const char *input, char *output, size_t capacity) {
     const unsigned char value = static_cast<unsigned char>(input[i]);
     const char *escape = nullptr;
     char unicode[7] = {};
-    if (value == '"') escape = "\\\"";
+    // Names and log text can hold anything, and this JSON leaves as WebSocket
+    // text frames: one invalid sequence would make the client drop the frame.
+    const size_t sequence = utf8SequenceBytes(input + i);
+    if (sequence > 1) {
+      if (used + sequence >= capacity) return false;
+      memcpy(output + used, input + i, sequence);
+      used += sequence;
+      i += sequence - 1;
+      continue;
+    }
+    if (sequence == 0) escape = "\\ufffd";
+    else if (value == '"') escape = "\\\"";
     else if (value == '\\') escape = "\\\\";
     else if (value == '\b') escape = "\\b";
     else if (value == '\f') escape = "\\f";

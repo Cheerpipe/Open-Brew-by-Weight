@@ -5,6 +5,7 @@
   const stream = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
       fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   const webhook = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebhook.h'), 'utf8');
+  const utf8 = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightUtf8.h'), 'utf8');
   const networkSource = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.cpp'), 'utf8');
   const body = (source, signature) => {
     const start = source.indexOf(signature);
@@ -67,6 +68,7 @@ struct OpenBrewByWeightNetwork {
   bool sendLogStream(UiStreamSession &,const ControlStatusSnapshot &);
 };
 ${body(networkSource, 'bool __attribute__((format(printf, 2, 3)))\nstatusJsonAppend(')}
+${body(utf8, 'inline size_t utf8SequenceBytes(')}
 ${body(webhook, 'inline bool escapeJsonString(')}
 ${body(stream, 'bool OpenBrewByWeightNetwork::sendUiStreamFrame(')}
 ${body(stream, 'bool OpenBrewByWeightNetwork::sendLogStream(')}

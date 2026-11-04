@@ -264,7 +264,20 @@ void verify(const char *path) {
 
 }  // namespace
 
+// The text frames' escaper keeps valid UTF-8 and never passes an invalid byte.
+void escaperReplacesInvalidUtf8() {
+  char out[64];
+  CHECK(escapeJsonString("caf\xC3\xA9 \xF0\x9F\x8D\xB5", out, sizeof(out)));
+  CHECK(std::strcmp(out, "caf\xC3\xA9 \xF0\x9F\x8D\xB5") == 0);
+  CHECK(escapeJsonString("BOOKO\xFF", out, sizeof(out)));
+  CHECK(std::strcmp(out, "BOOKO\\ufffd") == 0);
+  CHECK(escapeJsonString("cut\xE2\x82", out, sizeof(out)));
+  CHECK(std::strcmp(out, "cut\\ufffd\\ufffd") == 0);
+  CHECK(!escapeJsonString("\xF0\x9F\x8D\xB5", out, 4));
+}
+
 int main() {
+  escaperReplacesInvalidUtf8();
   const char *regenerateFlag = std::getenv("STATS_HEADER_REGENERATE");
   if (regenerateFlag != nullptr && std::strcmp(regenerateFlag, "1") == 0) regenerate(STATS_HEADER_VECTORS);
   verify(STATS_HEADER_VECTORS);
