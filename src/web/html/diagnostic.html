@@ -851,13 +851,17 @@
           <strong>{{webui:diagnostic.push_tapped}}</strong>
           <div id="dPuTapped">—</div>
         </div>
-        <div class="pushSamples">
-          <label><input id="dPuWait" type="checkbox" /> {{webui:diagnostic.push_wait}}</label>
-          <button type="button" data-result="on_recipe">{{webui:runtime.verdict_on_recipe}}</button>
-          <button type="button" data-result="fast">{{webui:runtime.verdict_fast}}</button>
-          <button type="button" data-result="slow">{{webui:runtime.verdict_slow}}</button>
-          <small id="dPuSample" class="fieldHint"></small>
+        <label><input id="dPuWait" type="checkbox" /> {{webui:diagnostic.push_wait}}</label>
+        <div class="btnBar glassBar">
+          <button class="btnGlyph" type="button" data-result="on_recipe">
+            {{webui:runtime.verdict_on_recipe}}</button
+          ><button class="btnGlyph" type="button" data-result="fast">
+            {{webui:runtime.verdict_fast}}</button
+          ><button class="btnGlyph" type="button" data-result="slow">
+            {{webui:runtime.verdict_slow}}
+          </button>
         </div>
+        <p id="dPuSample" class="fieldHint"></p>
       </div>
       <div class="statusColumn">
         <b class="blockHead">{{webui:diagnostic.push_controller}}</b>

@@ -514,6 +514,7 @@ async function renderPushCompanion() {
     ...status.devices.map((device) => {
       const remove = document.createElement("button");
       remove.type = "button";
+      remove.className = "btnGlyph";
       remove.textContent = __WEBUI_TEXT__("diagnostic.push_remove");
       remove.onclick = () =>
         R.companionLog("/__companion/push/remove", { id: device.id })

@@ -119,6 +119,18 @@
   )
     throw new Error("Notifications turn on only from a tap in the installed app");
 
+  // A blocked setting's reason stays under its label: the row's grid places every
+  // other child beside the toggle. The samples use the Web UI's own button bar.
+  if (
+    !/<small class="fieldHint">[^<]*<span id="appPushNote" hidden><\/span><\/small>/.test(
+      rawPartialHtml.settings,
+    ) ||
+    !/<div class="btnBar glassBar"><button class="btnGlyph" type="button" data-result="on_recipe">/.test(
+      rawPartialHtml.diagnostic,
+    )
+  )
+    throw new Error("The push setting and samples must keep the Web UI's own layout");
+
   // Opening without a notification's address changes nothing on Shots.
   const statsSource = fs.readFileSync(path.join(sketchDir, "web", "js", "stats.js"), "utf8");
   if (
