@@ -574,7 +574,7 @@ body.shotFs {
 
 /* Held upright: numbers across the top, the chart full width. */
 @media (orientation: portrait) {
-  .liveShot {
+  html:not(.liveLandscape) .liveShot {
     grid-template:
       "top" auto
       "side" minmax(clamp(16rem, 30vh, 22rem), auto)
@@ -583,19 +583,19 @@ body.shotFs {
       / minmax(0, 1fr);
   }
 
-  .lsSide {
+  html:not(.liveLandscape) .lsSide {
     display: grid;
     grid-template: auto minmax(0, 1fr) / minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  .lsHero {
+  html:not(.liveLandscape) .lsHero {
     grid-row: 1 / 3;
     display: flex;
     flex-direction: column;
     justify-content: center;
   }
 
-  .lsHero b {
+  html:not(.liveLandscape) .lsHero b {
     font-size: min(30cqi, 9rem);
   }
 }
@@ -713,7 +713,7 @@ body.shotFs {
 
 /* Phone held upright: the numbers stack full width, weight first. */
 @media (orientation: portrait) and (width <= 599px) {
-  .liveShot {
+  html:not(.liveLandscape) .liveShot {
     grid-template:
       "top" auto
       "side" auto
@@ -721,17 +721,47 @@ body.shotFs {
       / minmax(0, 1fr);
   }
 
-  .lsRecipe,
-  .lsTop #quickSignal {
+  html:not(.liveLandscape) :is(.lsRecipe, .lsTop #quickSignal) {
     display: none;
   }
 
-  .lsSide {
+  html:not(.liveLandscape) .lsSide {
     display: flex;
   }
 
-  .lsHero b {
+  html:not(.liveLandscape) .lsHero b {
     font-size: min(24cqi, 5.5rem);
+  }
+}
+
+/* Kept in landscape on an upright screen: the view turns a quarter clockwise,
+   for a phone held on its side, with its box, units and insets swapped to
+   match. A screen that really is sideways needs none of this. */
+@media (orientation: portrait) {
+  .liveLandscape .liveShot {
+    top: 50%;
+    left: 50%;
+    width: 100dvh;
+    height: 100dvw;
+    grid-template:
+      "top top" auto
+      "graph side" minmax(0, 1fr)
+      "lane side" clamp(7rem, 21vw, 11rem)
+      / minmax(0, 1fr) clamp(19rem, 32vh, 26rem);
+    padding: max(var(--lsGap), env(safe-area-inset-right))
+      max(var(--lsGap), env(safe-area-inset-bottom)) max(var(--lsGap), env(safe-area-inset-left))
+      max(var(--lsGap), env(safe-area-inset-top));
+    translate: -50% -50%;
+    rotate: 90deg;
+  }
+}
+
+@media (orientation: portrait) and (width <= 599px) {
+  .liveLandscape .liveShot {
+    grid-template:
+      "top top" auto
+      "side graph" minmax(0, 1fr)
+      / clamp(12rem, 34vh, 17rem) minmax(0, 1fr);
   }
 }
 

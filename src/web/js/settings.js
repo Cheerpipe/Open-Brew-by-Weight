@@ -1938,6 +1938,7 @@ export function init() {
   for (const [id, key] of [
     ["appKeepAwake", "awake"],
     ["appAutoLive", "live"],
+    ["appLiveLandscape", "liveLandscape"],
     ["appVibrate", "vibrate"],
     ["appBatteryPct", "batteryPct"],
   ]) {

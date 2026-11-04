@@ -1911,6 +1911,8 @@
     "settings.app_hero_colors_window": "By time window",
     "settings.app_keep_awake": "Keep the screen on while a shot runs",
     "settings.app_keep_awake_hint": "The screen stays on from the start of an extraction until a minute after it ends, even outside the live view.",
+    "settings.app_live_landscape": "Keep the live view in landscape",
+    "settings.app_live_landscape_hint": "The live view stays sideways even with the phone upright or its rotation locked, so the chart gets the full width. Turn the phone on its side to read it.",
     "settings.app_push": "Notify me when a shot ends",
     "settings.app_push_blocked": "Open and install the app from the companion's address to use this.|Pair the companion in Admin \u2192 Companion to use this.|Update the companion to use this.|This needs iOS or iPadOS 16.4 or newer, or a browser that supports notifications.|Notifications are blocked. Allow them for this app in your system settings.",
     "settings.app_push_failed": "That did not work. Check Diagnostic \u2192 Push.",
