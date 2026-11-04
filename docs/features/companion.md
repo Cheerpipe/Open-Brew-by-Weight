@@ -201,7 +201,7 @@ continuous history:
   controller's clock as the log shows it. Its shortcuts go back 15 minutes or
   an hour, or open **Today** or **Yesterday** on the first line. Live updates
   then pause; stepping past the newest day or boot, or **Back to live**,
-  returns to the newest events. After about 20,000 lines the view stops loading and points you to
+  returns to the newest events. After about 40,000 lines the view stops loading and points you to
   **Export**.
 - **Export…** downloads a file with every level and subsystem, whatever the
   filters show. It offers what you're viewing (the default), the last 24

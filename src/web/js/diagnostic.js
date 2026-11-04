@@ -1702,7 +1702,7 @@ const logStream = {
 // end (`logJumpDay` too) or a stored boot's end (`logJumpBoot`, from the
 // companion's boot index), and hides the live ring until Back to live.
 const LOG_HISTORY_PAGE = 500,
-  LOG_HISTORY_CAP = 20000;
+  LOG_HISTORY_CAP = 40000;
 let logHistory = [],
   logHistoryNext = null,
   logHistoryDone = false,

@@ -329,7 +329,7 @@ small {
   min-width: 100%;
 }
 
-/* Up to 20,000 lines: lines out of view skip rendering. */
+/* Up to 40,000 lines: lines out of view skip rendering. */
 #logLines > div {
   content-visibility: auto;
   contain-intrinsic-size: auto 1.125rem;

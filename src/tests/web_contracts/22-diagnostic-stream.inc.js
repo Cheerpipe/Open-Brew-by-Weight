@@ -576,7 +576,7 @@
   assert.equal(query((id) => controls[id], 500, null, 1793380832, {end: {boot: 4, before: 4294967295}})(),
       '/__companion/log?limit=500&level=cew&category=ble&boot=4&before=4294967295',
       "a boot step starts at the end cursor the companion's boot index gives");
-  assert(codeIncludes(viewJs.diagnostic, 'LOG_HISTORY_PAGE=500,LOG_HISTORY_CAP=20000') &&
+  assert(codeIncludes(viewJs.diagnostic, 'LOG_HISTORY_PAGE=500,LOG_HISTORY_CAP=40000') &&
          codeIncludes(viewJs.diagnostic, 'logHistory.length>=LOG_HISTORY_CAP'),
       'the view stops loading past the cap');
   // D14: Clear log history sits with the other record clears in Admin, shows
