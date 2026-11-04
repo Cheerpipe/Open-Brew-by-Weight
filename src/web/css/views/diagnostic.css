@@ -314,6 +314,7 @@
   height: 19rem;
   padding: 0.55rem 0.65rem;
   overflow: auto;
+  container-type: inline-size;
   outline-offset: -2px;
   color: var(--fg);
   font-size: 0.75rem;
@@ -354,6 +355,14 @@
   font-weight: 400;
 }
 
+/* Rows that name a place take the view's width, not the widest line's, so they
+   stay centred in what is on screen however far the lines scroll sideways. */
+#log :is(.logMk, .logMark) {
+  position: sticky;
+  left: 0;
+  width: 100cqw;
+}
+
 #log .logMk {
   color: var(--mu);
   font-style: italic;
@@ -367,6 +376,7 @@
   top: -0.55rem;
   left: -0.65rem;
   z-index: 1;
+  width: calc(100cqw + 1.3rem);
   margin: 0 -0.65rem;
   padding: 0.15rem 0.65rem;
   border-bottom: 1px solid var(--ln);

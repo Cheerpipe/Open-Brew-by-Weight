@@ -450,6 +450,12 @@
   assert(!/\bR\.\w/.test(runtimeJs), 'the runtime module never reads its own exports through R');
   assert(codeIncludes(viewJs.diagnostic, 'if(!logPast()&&e.b===logBootId&&live.has(e.s))continue'),
       'a jump hides the live ring, so the history keeps the events both hold');
+  assert(codeIncludes(viewJs.diagnostic, 'reached=boot?(e)=>e.g==="boot"&&e.boot===boot:shown') &&
+         codeIncludes(viewJs.diagnostic, 'logAnchor=boot?{boot}:jumped?"end"'),
+      'a boot step pages until its Boot row and opens on it');
+  assert(codeIncludes(viewJs.diagnostic, 'if(run!==logHistoryRun)return') &&
+         codeIncludes(viewJs.diagnostic, 'logHistoryRun++'),
+      'a restart abandons the pages still on their way');
   assert(codeIncludes(viewJs.diagnostic, 'await(await companionLog(logHistoryQuery())).json()') &&
          codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export"+(range?"?"+range:""))'),
       'paging and Export both read the companion through that request');
@@ -485,7 +491,7 @@
       ['logStrip past', 'Showing up to 1793380832', false, true]);
     assert.deepEqual(steps.map((b) => b.disabled), [false, false, true, false]);
     controls(null, [{s: 1}], false, true, null, {boot: 40});
-    assert.equal(n.logStripTitle.textContent, 'Showing the end of boot 40');
+    assert.equal(n.logStripTitle.textContent, 'Showing boot 40');
     controls(1793380832, [{g: 'boot'}], true, true);
     assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent],
       ['logStrip warn', 'Nothing logged at or before 1793380832']);

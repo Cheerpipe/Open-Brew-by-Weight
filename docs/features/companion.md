@@ -196,8 +196,8 @@ continuous history:
   **Level** and **Subsystem** filters apply to the whole history, so every
   page that loads shows matching lines.
 - The bar on top of the log moves through time: **‹ Day ›** shows the log up
-  to the end of the previous or next day, **‹ Boot ›** up to the end of the
-  previous or next boot, and the clock (**Jump to a time**) picks a date and
+  to the end of the previous or next day, **‹ Boot ›** opens the previous or
+  next boot on its first line, and the clock (**Jump to a time**) picks a date and
   time, read on the controller's clock as the log shows it, or a shortcut
   (15 minutes or an hour ago, the start of today or yesterday). Live updates
   then pause; stepping past the newest day or boot, or **Back to live**,

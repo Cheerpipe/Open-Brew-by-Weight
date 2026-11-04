@@ -1651,7 +1651,13 @@ function renderLog() {
     lines.insertAdjacentHTML("beforeend", h.slice(pre + old.length).join(""));
   } else lines.innerHTML = h.join("");
   if (anchor?.h) el.scrollTop = anchor.top + el.scrollHeight - anchor.h;
-  else if (stick || anchor) el.scrollTop = el.scrollHeight;
+  else if (anchor?.boot) {
+    const text = R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [anchor.boot]),
+      row = [...lines.querySelectorAll(".logBoot")].find((x) => x.textContent === text);
+    // Measured from the top, where no Boot row is pinned out of its place.
+    el.scrollTop = 0;
+    if (row) el.scrollTop = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
+  } else if (stick || anchor) el.scrollTop = el.scrollHeight;
   $("logCount").textContent = R.sub(__WEBUI_TEXT__("diagnostic.log_lines"), [t.length - markers]);
   nearLogTop();
 }
@@ -1699,6 +1705,7 @@ let logHistory = [],
   logHistoryDone = false,
   logHistoryBusy = false,
   logHistoryRetryAt = 0,
+  logHistoryRun = 0,
   logJumpAt = null,
   logJumpBoot = null,
   logBoots = null,
@@ -1735,28 +1742,40 @@ async function loadLogOlder() {
   logHistoryBusy = true;
   // The newest stored events are usually still in the live ring, which shows
   // them already: paging goes on until a page brings a line the view lacks.
-  const live = new Set(R.uiState.logEvents.map((e) => e.sequence)),
+  // A boot step opens on the boot's first line: pages go on until its Boot row
+  // comes. A restart abandons the run, whose answer belongs to the old view.
+  const run = logHistoryRun,
+    live = new Set(R.uiState.logEvents.map((e) => e.sequence)),
     shown = (e) => e.g || logPast() || !(e.b === logBootId && live.has(e.s)),
-    jumped = logPast() && !logHistory.length;
+    jumped = logPast() && !logHistory.length,
+    boot = jumped && logJumpBoot?.boot,
+    reached = boot ? (e) => e.g === "boot" && e.boot === boot : shown;
   try {
-    for (let pages = 0, added = false; !added && !logHistoryDone && pages < 8; pages++) {
+    for (
+      let pages = 0, added = false;
+      !added && !logHistoryDone && !logHistoryFull() && (boot || pages < 8);
+      pages++
+    ) {
       const page = await (await R.companionLog(logHistoryQuery())).json();
+      if (run !== logHistoryRun) return;
       if (!page || !Array.isArray(page.entries)) throw Error();
       // The page is newest first: flip it onto the front of the history.
       logHistory = page.entries.slice().reverse().concat(logHistory);
       logHistoryNext = page.next;
       logHistoryDone = !page.next;
-      added = page.entries.some(shown);
+      added = page.entries.some(reached);
     }
     const el = $("log");
-    logAnchor = jumped ? "end" : { h: el.scrollHeight, top: el.scrollTop };
+    logAnchor = boot ? { boot } : jumped ? "end" : { h: el.scrollHeight, top: el.scrollTop };
     R.paint(renderLog);
   } catch {
     // A page that did not come is asked again a little later.
-    logHistoryRetryAt = performance.now() + 10e3;
+    if (run === logHistoryRun) logHistoryRetryAt = performance.now() + 10e3;
   } finally {
-    logHistoryBusy = false;
-    logHistoryControls();
+    if (run === logHistoryRun) {
+      logHistoryBusy = false;
+      logHistoryControls();
+    }
   }
 }
 // Near the top of the log, the next older page loads by itself.
@@ -1766,6 +1785,8 @@ function nearLogTop() {
 }
 // A jump, Back to live or a filter change starts the history over.
 function restartLogHistory() {
+  logHistoryRun++;
+  logHistoryBusy = false;
   logHistory = [];
   logHistoryNext = null;
   logHistoryDone = false;
@@ -1802,7 +1823,7 @@ function logBootIndex() {
   return b.findLastIndex((x) => x.from != null && x.from <= logJumpAt);
 }
 // A day step shows up to the end of the day before or after the view's day
-// on the controller's clock; a boot step, up to the end of that boot. Past
+// on the controller's clock; a boot step, that boot from its first line. Past
 // the newest, the view goes back to live.
 function logStepTarget(kind, dir) {
   const now = Date.now() / 1e3;
@@ -1848,7 +1869,7 @@ function logHistoryControls() {
               : "";
   $("logStrip").className = "logStrip" + (empty ? " warn" : past ? " past" : "");
   $("logStripTitle").textContent = logJumpBoot
-    ? R.sub(__WEBUI_TEXT__("diagnostic.log_boot_end"), [logJumpBoot.boot])
+    ? R.sub(__WEBUI_TEXT__("diagnostic.log_boot_view"), [logJumpBoot.boot])
     : past
       ? R.sub(
           empty
