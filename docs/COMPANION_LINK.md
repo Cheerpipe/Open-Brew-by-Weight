@@ -622,8 +622,8 @@ X-OBBW-Relay: 2 <q> <addr> <screen> <mac>
 ```
 
 Relay protocol 2; the header's first field is the version, and a request
-that names any other version is `400 RELAY_INVALID`. The fields are as
-before:
+that names one other than 2 or [3](#relay-features) is `400 RELAY_INVALID`. The
+fields are as before:
 
 - `q`: the request counter of this relay session, from 1, decimal without
   leading zeros, at most 4294967295; the companion makes a new handshake

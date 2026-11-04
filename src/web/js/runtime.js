@@ -2654,10 +2654,13 @@ async function apiBinary(path, onProgress, cache = "no-store") {
   }
 }
 // A companion that is not paired relays nothing, so this page cannot work through
-// it; its own page says what to do. Only a companion that requires it sends this,
-// and an older one keeps proxying as it did.
+// it; its own page says what to do. The controller's Admin routes answer with the
+// same code, directly too, so only the companion's own word moves the window, and
+// an older companion, which keeps proxying, never gives it.
 function openCompanionPairing() {
-  location.replace("/__companion/?pair=1");
+  companionHere(true).then(
+    (c) => c?.pairingRequired === true && location.replace("/__companion/?pair=1"),
+  );
 }
 async function api(path, options = {}) {
   if (!webUiPollingActive())
@@ -5112,7 +5115,7 @@ function startUiStream() {
     else if (webUiPollingActive()) noteReachFail({ network: true });
     // A refused upgrade names no reason: a pairing that ended leaves only this.
     if (event?.code !== 4003 && webUiPollingActive() && location.protocol === "https:")
-      companionHere(true).then((c) => c?.pairingRequired === true && openCompanionPairing());
+      openCompanionPairing();
     if (webUiPollingActive())
       shotRetry = setTimeout(
         startUiStream,
