@@ -1063,7 +1063,22 @@ struct CompanionShotEvents {
   uint32_t afterMs = 0, epoch = 0;
   uint32_t sent = 0, skipped = 0, lastId = 0, lastAtMs = 0;
   const char *skip = "";
+  // The La Marzocco terms event: told once per pending acceptance.
+  bool policySent = false;
+  uint32_t policyAtMs = 0;
 };
+
+// Its one key replaces an unread notification instead of stacking another, and
+// its day-long TTL reaches a phone that is off: the terms wait for the person.
+constexpr const char *COMPANION_POLICY_EVENT =
+    "\"t\":\"ev\",\"topic\":\"micra_policy\",\"key\":\"micra-policy\",\"ttl\":86400,\"d\":{\"v\":1}}";
+
+// The account works again only with a machine sample newer than the event. An
+// error that merely stopped reading "policy" (a dropped connection, a retry's
+// cleared status) is the same pending acceptance and must not notify twice.
+inline bool companionPolicyEventRearmed(bool required, uint32_t sampleAtMs, uint32_t sentAtMs) {
+  return !required && sampleAtMs != 0 && static_cast<int32_t>(sampleAtMs - sentAtMs) > 0;
+}
 
 struct CompanionState {
   CompanionStored stored = {};

@@ -56,8 +56,19 @@ self.addEventListener("fetch", (event) => {
 // tap target are this firmware's. A push always shows something, since Safari
 // can revoke the permission of one that shows nothing.
 const PUSH_STATE = "push-state"; // Not "obbw-": it outlives a release's cache.
-const PUSH_TOPICS = ["shot_result"];
 function pushNotification(message) {
+  // Home's card says what to do about La Marzocco's terms, so a tap opens Home.
+  if (message?.topic === "micra_policy" && message.d?.v === 1) {
+    const title = __WEBUI_TEXT__("push.terms_title");
+    return {
+      title: message.d.test ? __WEBUI_TEXT__("push.title_test").replace("{0}", title) : title,
+      options: {
+        body: __WEBUI_TEXT__("push.terms_body"),
+        data: { url: "/" },
+        ...(typeof message.key === "string" && { tag: message.key }),
+      },
+    };
+  }
   const shot = message?.topic === "shot_result" && message.d?.v === 1 ? message.d : null;
   if (!Number.isFinite(shot?.s))
     return {
@@ -153,10 +164,16 @@ self.addEventListener("pushsubscriptionchange", (event) => {
           userVisibleOnly: true,
           applicationServerKey,
         }));
+      const saved = await (await caches.open(PUSH_STATE)).match("/topics");
       await fetch("/__companion/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription, topics: PUSH_TOPICS, label: "", old: old.endpoint }),
+        body: JSON.stringify({
+          subscription,
+          topics: (await saved?.json()) ?? ["shot_result"],
+          label: "",
+          old: old.endpoint,
+        }),
       });
     })().catch(() => {}),
   );

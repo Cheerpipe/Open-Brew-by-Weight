@@ -12,7 +12,9 @@ exported JSON formats are not carried over.
 - **Notifications:** an app installed from the companion's address can tell you
   when a shot ends, with its time, yield, and result, even with the app closed.
   Tap one to open that shot's card. Turn it on in **Settings → This device**;
-  see [Notifications](docs/features/notifications.md).
+  see [Notifications](docs/features/notifications.md). On a Linea Micra, it can
+  also tell you when La Marzocco needs you to accept new terms; tap it to open
+  Home and see what to do.
 - **Grind hints no longer stuck on old advice:** a suggestion from your first
   shots could silently keep a card in the opposite direction from appearing,
   even many shots later. Once the shots being read are all newer than that

@@ -563,9 +563,13 @@ function initPushGroup() {
       try {
         await R.companionLog("/__companion/push/test", {
           endpoint: subscription.endpoint,
-          topic: "shot_result",
+          ...(result === "terms"
+            ? { topic: "micra_policy", d: { v: 1, test: true } }
+            : {
+                topic: "shot_result",
+                d: { v: 1, test: true, s: 28.4, r: result, g: 36.2, w: "m" },
+              }),
           delayS,
-          d: { v: 1, test: true, s: 28.4, r: result, g: 36.2, w: "m" },
         });
         setTimeout(
           () => {

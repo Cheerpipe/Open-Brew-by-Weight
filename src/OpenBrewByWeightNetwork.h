@@ -1109,6 +1109,7 @@ class OpenBrewByWeightNetwork {
                                   const char *type);
   void companionRecordsService(uint32_t now, bool syncHold);
   bool companionShotEventBody(uint8_t &count, bool syncHold, ShotLogRecord &shot, uint32_t &epoch);
+  bool companionPolicyEventDue();
   bool companionRecordsNoticeBody(uint8_t &count, bool syncHold, uint32_t (&told)[2]) const;
   static void companionRecordsWork(void *context);
   bool companionRecordsSend(size_t used, bool wrap, bool &deferArm);

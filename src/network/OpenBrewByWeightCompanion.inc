@@ -11,6 +11,11 @@ namespace {
 
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
 constexpr bool kCompanionLm = true;
+bool companionPolicyRequired(uint32_t &sampleAtMs) {
+  const LineaMicraStatus micra = machineIntegrationStatus();
+  sampleAtMs = micra.sampleAtMs;
+  return micra.error == LineaMicraError::POLICY_REQUIRED;
+}
 #else
 // Without La Marzocco the route stays direct and the outbox empty, so the
 // link shares one path and carries only the switches.
@@ -20,6 +25,7 @@ MicraCompanionOutbox machineIntegrationCompanionOutbox() { return {}; }
 MicraCompanionIngress machineIntegrationCompanionIngress() { return {}; }
 void machineIntegrationCompanionLink(bool, bool) {}
 void machineIntegrationCompanionSyncHold(bool) {}
+bool companionPolicyRequired(uint32_t &) { return false; }
 #endif
 
 // Network task only: the open request's key pair and the request it serves.
@@ -35,6 +41,7 @@ struct CompanionSendJob {
   // and the log cursor before this job: a hold that begins before httpd
   // sends them drops them and rewinds, so they go again after it.
   uint8_t logBody, noticeBody, replyBody, eventBody;
+  bool eventPolicy;  // eventBody is the terms event, not a shot's
   uint32_t logFrom, eventFrom;
   char bodies[COMPANION_FRAME_BYTES];
 };
@@ -1100,6 +1107,14 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     TaskLockGuard lock(dataMux_);
     job.eventFrom = g_companion.shotEvents.afterMs;
   }
+  // One event per pass: the terms wait for the next one after a shot's.
+  const bool policyEvent = !shotEvent && !syncHold && companionPolicyEventDue() &&
+                           companionAddBody(count, "%s", COMPANION_POLICY_EVENT);
+  if (policyEvent) {
+    job.eventBody = static_cast<uint8_t>(count - 1);
+    job.eventPolicy = true;
+    lifecycleLogf("Notifications: La Marzocco terms sent to the companion");
+  }
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = built == due;
   if (!complete || logMore) companionNotified_.store(true, std::memory_order_release);
@@ -1153,6 +1168,10 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     ++events.sent;
     events.lastId = eventShot.id;
     events.lastAtMs = millis();
+  }
+  if (policyEvent) {
+    g_companion.shotEvents.policySent = true;
+    g_companion.shotEvents.policyAtMs = millis();
   }
 }
 
@@ -1227,11 +1246,15 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
       if (noticeDropped && self.companionRecords_ != nullptr)
         self.companionRecords_->toldShots = self.companionRecords_->toldHistory = 0;
       if (eventDropped) {
-        // Dropped for a hold: the shot is looked at again after it.
+        // Dropped for a hold: the shot or the terms are looked at again after it.
         CompanionShotEvents &events = g_companion.shotEvents;
-        events.afterMs = job.eventFrom;
-        events.epoch = 0;
-        --events.sent;
+        if (job.eventPolicy) {
+          events.policySent = false;
+        } else {
+          events.afterMs = job.eventFrom;
+          events.epoch = 0;
+          --events.sent;
+        }
       }
     }
     if (done != 0) httpd_sess_update_lru_counter(self.server_, fd);

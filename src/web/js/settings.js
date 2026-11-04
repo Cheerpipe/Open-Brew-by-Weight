@@ -1719,36 +1719,44 @@ const GROUP_SUMMARIES = {
 // Off until this device turns it on. Its state is the browser's subscription;
 // a device that cannot have notifications says why, and what to do.
 function initAppPush() {
-  const box = $("appPush"),
-    note = $("appPushNote"),
-    say = (text) => {
+  const rows = [
+      ["appPush", "shot_result"],
+      ["appPushTerms", "micra_policy"],
+    ].filter(([id]) => $(id)),
+    say = (id, text) => {
+      const note = $(id + "Note");
       note.textContent = text;
       note.hidden = !text;
     },
     sync = async () => {
-      const blocked = R.pushBlocked();
-      box.checked = !!(await R.pushSubscription().catch(() => null));
-      box.disabled = !!blocked && !box.checked;
-      say(
-        blocked &&
-          __WEBUI_TEXT__("settings.app_push_blocked").split("|")[PUSH_BLOCKS.indexOf(blocked)],
-      );
+      const blocked = R.pushBlocked(),
+        topics = await R.pushTopics().catch(() => []);
+      for (const [id, topic] of rows) {
+        $(id).checked = topics.includes(topic);
+        $(id).disabled = !!blocked && !$(id).checked;
+        say(
+          id,
+          blocked &&
+            __WEBUI_TEXT__("settings.app_push_blocked").split("|")[PUSH_BLOCKS.indexOf(blocked)],
+        );
+      }
     };
-  box.onchange = async () => {
-    const wanted = box.checked;
-    box.disabled = true;
-    let failure = "";
-    try {
-      await (wanted ? R.pushEnable() : R.pushDisable());
-    } catch (error) {
-      failure =
-        error.error === "AUTH_REQUIRED" || error.error === "CONTROLLER_UNREACHABLE"
-          ? __WEBUI_TEXT__("settings.app_push_needs_controller")
-          : __WEBUI_TEXT__("settings.app_push_failed");
-    }
-    await sync();
-    if (failure) say(failure);
-  };
+  for (const [id, topic] of rows)
+    $(id).onchange = async () => {
+      // One subscription holds every topic, so one change at a time.
+      for (const [other] of rows) $(other).disabled = true;
+      let failure = "";
+      try {
+        await R.pushSetTopic(topic, $(id).checked);
+      } catch (error) {
+        failure =
+          error.error === "AUTH_REQUIRED" || error.error === "CONTROLLER_UNREACHABLE"
+            ? __WEBUI_TEXT__("settings.app_push_needs_controller")
+            : __WEBUI_TEXT__("settings.app_push_failed");
+      }
+      await sync();
+      if (failure) say(id, failure);
+    };
   R.companionHere(true).then(sync);
 }
 const PUSH_BLOCKS = ["address", "pair", "update", "unsupported", "denied"];

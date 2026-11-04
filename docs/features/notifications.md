@@ -10,6 +10,9 @@ Yield: 36.0 g
 
 Tap the notification to open **Shots** on that shot's card.
 
+If you have a Linea Micra, it can also
+[tell you when La Marzocco needs you to accept new terms](#la-marzocco-terms).
+
 ## What you need
 
 - [Open Brew by Weight Companion](companion.md), paired with your controller and
@@ -28,6 +31,24 @@ Notifications are off until you turn them on, separately on each device.
 3. Allow notifications when your device asks.
 
 To stop them, turn the setting off. Signing out on the device turns them off too.
+
+## La Marzocco terms
+
+From time to time La Marzocco publishes new terms, and its cloud stops working for
+your account until someone accepts them. Your machine looks fine, but the controller
+can no longer see it or turn it on, and nothing at the machine tells you why.
+
+Turn on **Notify me when La Marzocco needs me to accept its terms** in
+**Settings → This device** to hear about it, even with the app closed. It is a separate
+choice from shot notifications, so you can have either one or both.
+
+Tap the notification to open Home, where a card explains your options: the best one is
+to accept in the La Marzocco app, and you can also accept right there on the card. See
+[When La Marzocco updates its terms](../settings/linea-micra.md#when-la-marzocco-updates-its-terms).
+
+You hear about it once each time terms are pending, and again if the controller restarts
+before they are accepted. If your phone is off, the notification can still reach it
+within a day; after that, the card on Home is still waiting for you.
 
 ## What to expect
 
@@ -58,7 +79,7 @@ a message was sent, when, and from which internet address.
 **Diagnostic → Push** shows where a notification stopped. It appears when you open
 the Web UI through the companion.
 
-To test, choose **On recipe**, **Fast**, or **Slow**. A sample goes to this device
+To test, choose **On recipe**, **Fast**, **Slow**, or **La Marzocco terms**. A sample goes to this device
 only. Select **Wait 30 seconds** first if you want to close the app and lock the
 screen before it arrives.
 

@@ -28,6 +28,11 @@ Clearing its data returns them to their defaults, and a
   companion and is off until you turn it on; unlike the rest of this group, the
   companion keeps this device's choice so it can send them. See
   [Notifications](../features/notifications.md).
+- **Notify me when La Marzocco needs me to accept its terms** (*installed app
+  only*, Linea Micra) tells this device when La Marzocco's cloud stops working
+  for your account until new terms are accepted. Tap it to open Home and see
+  what to do. It needs the companion too and is off until you turn it on. See
+  [Notifications](../features/notifications.md#la-marzocco-terms).
 - **Vibrate when a shot ends** gives a short buzz when the extraction
   finishes. Android phones only.
 - **Show battery percentage** adds your scale's charge as a number next to
