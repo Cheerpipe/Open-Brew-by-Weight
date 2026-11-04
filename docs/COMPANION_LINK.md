@@ -130,7 +130,7 @@ Admin reads the pairing, the open request and the link state from
 ```json
 "companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
  "version":"1.0.0","link":"open","linkAgeS":3600,"peerProtocol":0,
- "ui":true,"log":true,"archive":true,"relay":"ready","relayRejects":0,
+ "ui":true,"log":true,"archive":true,"relay":"ready","relayAgeS":12,"relayRejects":0,
  "route":"companion","lm":true,"upstream":true,"refused":false,"credentials":true,
  "request":null,"ignored":0}
 ```
@@ -142,8 +142,9 @@ controller refused with `PROTOCOL` (0 when none, or once a link opens), `ui`
 the Web UI switch, `log` the diagnostic log switch, `archive` the shot archive
 switch, `relay` `ready` once a
 [relay handshake](#relay) succeeded
-since the controller started (`down` before and after Forget), `relayRejects`
-the relayed requests refused since then; on Linea Micra builds `route` is
+since the controller started (`down` before and after Forget), `relayAgeS` the
+seconds since the last relay handshake or admitted request (`-1` none since it
+started), `relayRejects` the relayed requests refused since then; on Linea Micra builds `route` is
 `direct`, `pending` or `companion`, `refused` mirrors the `lm` frames'
 `err:"auth"` while the companion's cloud reads are being refused,
 `credentials` tells whether the

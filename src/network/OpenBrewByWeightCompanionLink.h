@@ -476,6 +476,7 @@ struct CompanionRelay {
   CompanionRelayWindow window = {};
   uint32_t generation = 0;  // names Kr for an admission that verified outside the lock
   uint32_t rejects = 0;     // signed-relay requests refused since boot
+  uint32_t usedAtMs = 0;    // last handshake or admitted request; 0: none this boot
 };
 
 // Forget and the factory reset end the relay session: relayed requests are
@@ -486,6 +487,40 @@ inline void companionRelayDrop(CompanionRelay &relay) {
   memset(relay.key, 0, sizeof(relay.key));
   memset(relay.bodyKey, 0, sizeof(relay.bodyKey));
   relay.window = CompanionRelayWindow{};
+}
+
+inline int32_t companionRelayAgeS(const CompanionRelay &relay, uint32_t now) {
+  return relay.usedAtMs == 0 ? -1 : static_cast<int32_t>((now - relay.usedAtMs) / 1000U);
+}
+
+// The local-address match is the discriminator: only a socket actually served
+// by the SoftAP interface address qualifies, so a LAN that happens to number
+// itself 192.168.4.0/24 never inherits the bypass. Addresses in host order.
+inline bool softApServesAddresses(uint32_t local, uint32_t peer) {
+  return local == 0xC0A80401u && (peer & 0xFFFFFF00u) == 0xC0A80400u;
+}
+
+// The SoftAP's trust is for who joined it: over a relay it would reach every
+// screen of the companion, so the relay never runs there.
+inline bool companionRelayPeerAllowed(bool localPeer, bool servedBySoftAp) {
+  return localPeer && !servedBySoftAp;
+}
+
+// A companion that may hold no more live state: unbinds its relayed ui-streams,
+// so later dispatches neither log nor send, and answers the sockets to close.
+// The claim ends only if one of them holds it; a direct browser's stays.
+template <typename Session, size_t N>
+size_t companionRelayedStreamsEnd(Session (&sessions)[N], const char *activeClient,
+                                  int (&fds)[N], bool &claimEnded) {
+  size_t count = 0;
+  claimEnded = false;
+  for (auto &stream : sessions) {
+    if (stream.fd < 0 || !stream.relayed) continue;
+    fds[count++] = stream.fd;
+    claimEnded |= stream.bound && strcmp(stream.clientId, activeClient) == 0;
+    stream.bound = false;
+  }
+  return count;
 }
 
 // The browser behind a socket's current relayed request; one per httpd socket.

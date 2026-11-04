@@ -234,11 +234,7 @@ bool OpenBrewByWeightNetwork::socketServedBySoftAp(int socketFd) {
       !ipv4Host(peer, peerHost)) {
     return false;
   }
-  // The local-address match is the discriminator: only a socket actually
-  // served by the SoftAP interface address qualifies, so a LAN that happens
-  // to number itself 192.168.4.0/24 never inherits the bypass.
-  return localHost == 0xC0A80401u &&
-         (peerHost & 0xFFFFFF00u) == 0xC0A80400u;
+  return softApServesAddresses(localHost, peerHost);
 }
 
 bool OpenBrewByWeightNetwork::adminUnlockAllowed(httpd_req_t *request) {

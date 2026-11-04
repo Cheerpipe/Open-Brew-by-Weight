@@ -371,6 +371,10 @@ WebSocket** says **Through the companion** and leaves out the figures of the
 controller's own connection. Every link and route change is also written to
 the Web UI log, with the reason a link went down.
 
+If you turned off everything that needs the companion's connection, Admin can't tell
+whether it is still running. It shows **Web UI relay with** the companion's name and
+when the relay last worked instead of saying it is connected.
+
 The server icon in the header shows the companion at a glance, as two racks.
 Both lit means the connection is open. One lit means you are viewing this
 page through the companion but its connection to the controller is down; the
