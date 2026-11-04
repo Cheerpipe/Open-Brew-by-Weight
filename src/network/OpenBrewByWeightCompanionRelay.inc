@@ -247,6 +247,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
         snprintf(slot->screen, sizeof(slot->screen), "%s", header.screen);
         snprintf(slot->addr, sizeof(slot->addr), "%s", header.addr);
         slot->sequence = header.sequence;
+        slot->version = header.version;
         memcpy(slot->bodyKey, admitted, sizeof(slot->bodyKey));
         if (sessionSealed) {
           slot->sessionValid = true;
@@ -291,6 +292,15 @@ void OpenBrewByWeightNetwork::closeRelayedUiStreams() {
   }
   for (size_t index = 0; index < count; ++index)
     (void)httpd_sess_trigger_close(server_, fds[index]);
+}
+
+// The Web UI's own hashes: public, but they mean something only sealed.
+esp_err_t OpenBrewByWeightNetwork::companionAssetsHandler(httpd_req_t *request) {
+  char screen[COMPANION_RELAY_SCREEN_TEXT], addr[COMPANION_RELAY_ADDR_TEXT];
+  if (!instance_->relayIdentity(request, screen, addr)) {
+    return sendError(request, STATUS_NOT_FOUND, "NOT_FOUND", nullptr, "UNKNOWN_ROUTE");
+  }
+  return sendJson(request, STATUS_OK, WEB_ASSET_LIST_JSON);
 }
 
 void OpenBrewByWeightNetwork::relayIdentityClear(int fd) {
@@ -374,11 +384,14 @@ bool OpenBrewByWeightNetwork::relayBodyContext(httpd_req_t *request, uint8_t key
 // One sealed response: the admitting session's Kb and the next response
 // counter, which never repeats within a boot (see CompanionRelay).
 bool OpenBrewByWeightNetwork::relayResponseKey(httpd_req_t *request, uint8_t key[32],
-                                               uint32_t &counter) const {
+                                               uint32_t &counter, uint32_t &q,
+                                               uint8_t &version) const {
   TaskLockGuard lock(dataMux_);
   for (const auto &entry : g_relayIdentities) {
     if (entry.screen[0] == '\0' || entry.fd != httpd_req_to_sockfd(request)) continue;
     memcpy(key, entry.bodyKey, 32);
+    q = entry.sequence;
+    version = entry.version;
     counter = ++g_companion.relay.responses;
     return true;
   }
@@ -386,19 +399,25 @@ bool OpenBrewByWeightNetwork::relayResponseKey(httpd_req_t *request, uint8_t key
 }
 
 // One sealed JSON response: X-OBBW-Enc names the counter it was sealed
-// under. A seal that cannot be made is never sent opened.
-esp_err_t OpenBrewByWeightNetwork::relaySendSealed(httpd_req_t *request,
+// under. A seal that cannot be made is never sent opened. For a version 3
+// request the seal also covers the q and status, so an answer held back from
+// one request cannot be delivered for another.
+esp_err_t OpenBrewByWeightNetwork::relaySendSealed(httpd_req_t *request, const char *status,
                                                    const char *json, size_t length) const {
   uint8_t key[32], nonce[12];
-  uint32_t counter = 0;
+  uint32_t counter = 0, q = 0;
+  uint8_t version = 2;
   uint8_t *const cipher = static_cast<uint8_t *>(malloc(length + 16));
-  const bool keyed = cipher != nullptr && relayResponseKey(request, key, counter);
+  const bool keyed = cipher != nullptr && relayResponseKey(request, key, counter, q, version);
   size_t sealedLength = 0;
   if (keyed) companionRelayNonce('f', COMPANION_RELAY_CTX_RESPONSE, counter, nonce);
+  char aad[COMPANION_RELAY_ANSWER_AAD_TEXT];
+  const size_t aadSize = version == 3 ? companionRelayAnswerAad(q, status, aad) : 0;
   const bool sealed =
       keyed && companionAeadSealBytes(key, nonce,
                                       reinterpret_cast<const uint8_t *>(json), length,
-                                      cipher, length + 16, sealedLength);
+                                      cipher, length + 16, sealedLength,
+                                      reinterpret_cast<const uint8_t *>(aad), aadSize);
   memset(key, 0, sizeof(key));
   if (!sealed) {
     free(cipher);

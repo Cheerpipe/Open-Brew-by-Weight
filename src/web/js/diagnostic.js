@@ -433,6 +433,13 @@ function renderScreen() {
     " · " +
     location.host;
   $("dUiWorker").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
+  const files = c?.assets,
+    states = __WEBUI_TEXT__("diagnostic.screen_files_states").split("|");
+  $("dUiFiles").textContent = !files
+    ? "—"
+    : files.refused > 0
+      ? R.sub(states[1], [files.refused, files.lastPath])
+      : states[files.legacy ? 2 : 0];
   logHistoryControls();
 }
 // Diagnostic → Push: each value says where a notification stopped. Over HTTPS

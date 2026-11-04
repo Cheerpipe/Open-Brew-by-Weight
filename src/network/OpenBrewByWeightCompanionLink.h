@@ -194,12 +194,14 @@ bool companionHmacSha256(const uint8_t *key, size_t keySize, const CompanionByte
                          size_t count, uint8_t out[32]);
 bool companionHkdfSha256(const uint8_t *ikm, size_t ikmSize, const uint8_t *salt,
                          size_t saltSize, const char *info, uint8_t out[32]);
-// AES-256-GCM with no additional data: `out` receives the plaintext plus the
-// 16-byte tag (seal) or the plaintext without it (open); the same reference
-// implementation contract as the hashes above.
+// AES-256-GCM: `out` receives the plaintext plus the 16-byte tag (seal) or the
+// plaintext without it (open); the same reference implementation contract as
+// the hashes above. Only a sealed answer to a version 3 request has additional
+// data.
 bool companionAeadSealBytes(const uint8_t key[32], const uint8_t nonce[12],
                             const uint8_t *plain, size_t plainSize, uint8_t *out,
-                            size_t capacity, size_t &length);
+                            size_t capacity, size_t &length,
+                            const uint8_t *aad = nullptr, size_t aadSize = 0);
 bool companionAeadOpenBytes(const uint8_t key[32], const uint8_t nonce[12],
                             const uint8_t *sealed, size_t sealedSize, uint8_t *out,
                             size_t capacity, size_t &length);
@@ -330,6 +332,7 @@ struct CompanionRelayHeader {
   uint32_t sequence = 0;
   const char *q = nullptr, *addr = nullptr, *screen = nullptr;  // inside the parsed text
   uint8_t mac[COMPANION_RELAY_MAC_BYTES] = {};
+  uint8_t version = 2;
 };
 
 inline bool companionLowerHex(const char *text, size_t minimum, size_t maximum) {
@@ -342,7 +345,7 @@ inline bool companionLowerHex(const char *text, size_t minimum, size_t maximum) 
 }
 
 // Splits the header in place at single spaces. v: the relay protocol version,
-// always 2; q: canonical decimal from 1; addr: the browser's IPv4 or IPv6
+// 2 or 3 (3 binds each sealed answer to its request); q: canonical decimal from 1; addr: the browser's IPv4 or IPv6
 // text; screen: its 16-24 lowercase hex X-WebUI-Client; mac: 32 lowercase
 // hex digits.
 inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
@@ -355,7 +358,8 @@ inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
   }
   const size_t qLength = strlen(field[1]), addrLength = strlen(field[2]);
   uint64_t sequence = 0;
-  bool ok = strcmp(field[0], "2") == 0 && qLength >= 1 && qLength <= 10 && field[1][0] != '0' &&
+  const bool bound = strcmp(field[0], "3") == 0;
+  bool ok = (bound || strcmp(field[0], "2") == 0) && qLength >= 1 && qLength <= 10 && field[1][0] != '0' &&
             addrLength >= 2 && addrLength < COMPANION_RELAY_ADDR_TEXT &&
             strspn(field[2], "0123456789abcdefABCDEF:.") == addrLength &&
             companionLowerHex(field[3], 16, COMPANION_RELAY_SCREEN_TEXT - 1) &&
@@ -370,6 +374,7 @@ inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
     const auto nibble = [](char c) { return static_cast<uint8_t>(c <= '9' ? c - '0' : c - 'a' + 10); };
     out.mac[index] = static_cast<uint8_t>(nibble(pair[0]) << 4 | nibble(pair[1]));
   }
+  out.version = bound ? 3 : 2;
   out.sequence = static_cast<uint32_t>(sequence);
   out.q = field[1];
   out.addr = field[2];
@@ -377,14 +382,15 @@ inline bool companionRelayParse(char *text, CompanionRelayHeader &out) {
   return true;
 }
 
-// HMAC(Kr, "obbw-relay-v2\nMETHOD\nURI\nq\naddr\nscreen\nsession\n"); the
-// header carries its first 16 bytes. `uri` is the path with its query and
+// HMAC(Kr, "obbw-relay-v2\nMETHOD\nURI\nq\naddr\nscreen\nsession\n"), with
+// obbw-relay-v3 for version 3, so a header rewritten to 2 fails; the header
+// carries its first 16 bytes. `uri` is the path with its query and
 // `sealedSession` the sealed X-WebUI-Session value as sent, or "".
 inline bool companionRelayMac(const uint8_t key[32], const char *method, const char *uri,
                               const CompanionRelayHeader &header, const char *sealedSession,
                               uint8_t mac[32]) {
-  const char *const fields[] = {"obbw-relay-v2", method, uri, header.q, header.addr,
-                                header.screen, sealedSession};
+  const char *const fields[] = {header.version == 3 ? "obbw-relay-v3" : "obbw-relay-v2", method,
+                                uri, header.q, header.addr, header.screen, sealedSession};
   CompanionBytes parts[14];
   for (size_t index = 0; index < 7; ++index) {
     parts[2 * index] = {fields[index], strlen(fields[index])};
@@ -406,6 +412,19 @@ constexpr uint8_t COMPANION_RELAY_CTX_SESSION = 0, COMPANION_RELAY_CTX_PASSWORD 
 
 inline bool companionBodyKey(const uint8_t relayKey[32], uint8_t bodyKey[32]) {
   return companionHkdfSha256(relayKey, 32, nullptr, 0, "obbw-relay-body-v2", bodyKey);
+}
+
+// What /api/v1/integration/info offers a paired companion: 1, bound answers and
+// the asset list. Sealed, so a device on the network cannot lower it.
+constexpr unsigned COMPANION_RELAY_FEATURES = 1;
+
+// The additional data of a sealed answer to a version 3 request, from the
+// status line's three digits. Returns its length.
+constexpr size_t COMPANION_RELAY_ANSWER_AAD_TEXT = 32;
+inline size_t companionRelayAnswerAad(uint32_t q, const char *status,
+                                      char (&out)[COMPANION_RELAY_ANSWER_AAD_TEXT]) {
+  return static_cast<size_t>(snprintf(out, sizeof(out), "obbw-resp-v3\n%lu\n%.3s",
+                                      static_cast<unsigned long>(q), status));
 }
 
 inline void companionRelayNonce(char direction, uint8_t context, uint32_t counter,
@@ -535,6 +554,7 @@ struct CompanionRelayIdentity {
   // session that admitted it (an OTA job may outlive a relay handshake, and
   // its body and answer still belong to the keys that asked).
   uint32_t sequence = 0;
+  uint8_t version = 2;
   uint8_t bodyKey[32] = {};
   bool sessionValid = false;
   uint8_t session[WEB_ACCESS_TOKEN_BYTES] = {};

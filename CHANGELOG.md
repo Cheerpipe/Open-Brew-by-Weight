@@ -9,6 +9,12 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **Companion sign-in hardened:** a device on your network could hold back your
+  sign-in answer and collect it for itself. Answers are now tied to the request
+  that asked, and the controller publishes a list of its Web UI files so a
+  companion can check them. **Diagnostic → This screen** shows whether they were
+  verified. This needs the companion's matching update; both keep working if
+  you update them one at a time.
 - **Strange names can't break the Web UI:** a scale, a companion or a stray web
   address with a name that isn't valid text used to cut the live connection, on
   Home, Shots or the log, over and over. Now it just shows a replacement

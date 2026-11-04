@@ -1,5 +1,5 @@
 {
-  "description": "Companion link test vectors (docs/COMPANION_LINK.md): pairing and link v1, relay protocol 2. Private scalars are test-only.",
+  "description": "Companion link test vectors (docs/COMPANION_LINK.md): pairing and link v1, relay protocols 2 and 3. Private scalars are test-only.",
   "companionPrivate": "2e81dffcbc3a2d1b5cc74347ec38bbd731eb73244cfdd70cc1ce063a7c1fb508",
   "controllerPrivate": "2b80d0771d0754ad6827e5424ca8bd0866bd04e3e870f2bcf31aa527970411f8",
   "companionKey": "BGj34BgnnHxylAr96pvcuEFJlqzfUCJaYwY0z+vwhmxNnW7szp6gW5NVvrzNOaIE7TsBVM0cC2zm5Ik+kipaE34=",
@@ -57,6 +57,18 @@
         "header": "2 9 fe80::1 0123456789abcdef01234567 5b4c238c77b4c7a1f755dffe650e439f"
       }
     ],
-    "bodyKey": "e3b8c164afe7eeeeea8f4deb2953bb00671bd0d5a73ae2d8e289d567bbe60add"
+    "bodyKey": "e3b8c164afe7eeeeea8f4deb2953bb00671bd0d5a73ae2d8e289d567bbe60add",
+    "boundRequest": {
+      "method": "POST",
+      "uri": "/api/v1/auth/login",
+      "screen": "0123456789abcdef",
+      "session": "token",
+      "canonical": "obbw-relay-v3\nPOST\n/api/v1/auth/login\n9\n192.168.1.50\n0123456789abcdef\ntoken\n",
+      "header": "3 9 192.168.1.50 0123456789abcdef 8874b94a13225b9d473b372a2206461d",
+      "answerAad": "obbw-resp-v3\n9\n401",
+      "answerCounter": 12,
+      "answerPlain": "{\"error\":\"AUTH_REQUIRED\"}",
+      "answerSealed": "e/4gEdbOWtG23pBEoeEwGga94s3JmiQwXQ0XMnAg6UmKRR8CAQSjvcE="
+    }
   }
 }

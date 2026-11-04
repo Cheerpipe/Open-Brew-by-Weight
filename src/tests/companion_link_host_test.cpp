@@ -184,16 +184,17 @@ void aeadKeystream(const uint8_t key[32], const uint8_t nonce[12], size_t block,
 
 bool companionAeadSealBytes(const uint8_t key[32], const uint8_t nonce[12],
                             const uint8_t *plain, size_t plainSize, uint8_t *out,
-                            size_t capacity, size_t &length) {
+                            size_t capacity, size_t &length,
+                            const uint8_t *aad, size_t aadSize) {
   if (plainSize + 16 > capacity) return false;
   for (size_t base = 0; base < plainSize; base += 32) {
     uint8_t stream[32];
     aeadKeystream(key, nonce, base / 32, stream);
     for (size_t i = 0; i + base < plainSize && i < 32; ++i) out[base + i] = plain[base + i] ^ stream[i];
   }
-  const CompanionBytes tag[] = {{nonce, 12}, {"\x02", 1}, {out, plainSize}};
+  const CompanionBytes tag[] = {{nonce, 12}, {"\x02", 1}, {out, plainSize}, {aad, aadSize}};
   uint8_t mac[32];
-  companionHmacSha256(key, 32, tag, 3, mac);
+  companionHmacSha256(key, 32, tag, 4, mac);
   memcpy(out + plainSize, mac, 16);
   length = plainSize + 16;
   return true;
@@ -336,6 +337,28 @@ static void testRelayVectors() {
     CHECK(companionRelayMac(key, field(item, "method"), field(item, "uri"), header, "x", mac));
     CHECK(!companionSame(mac, header.mac, COMPANION_RELAY_MAC_BYTES));
   }
+  // Version 3: its own canonical prefix, and the same q under version 2 is another signature.
+  const cJSON *bound = cJSON_GetObjectItemCaseSensitive(relay, "boundRequest");
+  CHECK(cJSON_IsObject(bound));
+  char text[COMPANION_RELAY_HEADER_TEXT];
+  std::snprintf(text, sizeof(text), "%s", field(bound, "header"));
+  CompanionRelayHeader header;
+  CHECK(companionRelayParse(text, header) && header.version == 3);
+  CHECK(companionRelayMac(key, field(bound, "method"), field(bound, "uri"), header,
+                          field(bound, "session"), mac));
+  CHECK(companionSame(mac, header.mac, COMPANION_RELAY_MAC_BYTES));
+  const std::string canonicalBound = field(bound, "canonical");
+  const CompanionBytes wholeBound = {canonicalBound.data(), canonicalBound.size()};
+  uint8_t referenceBound[32];
+  CHECK(companionHmacSha256(key, 32, &wholeBound, 1, referenceBound) &&
+        !memcmp(referenceBound, mac, 32));
+  header.version = 2;
+  CHECK(companionRelayMac(key, field(bound, "method"), field(bound, "uri"), header,
+                          field(bound, "session"), mac));
+  CHECK(!companionSame(mac, referenceBound, COMPANION_RELAY_MAC_BYTES));
+  char aad[COMPANION_RELAY_ANSWER_AAD_TEXT];
+  const size_t aadSize = companionRelayAnswerAad(header.sequence, "401 Unauthorized", aad);
+  CHECK(std::string(aad, aadSize) == field(bound, "answerAad"));
   cJSON_Delete(vectors);
 }
 

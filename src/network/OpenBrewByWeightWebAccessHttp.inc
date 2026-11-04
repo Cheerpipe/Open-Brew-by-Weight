@@ -515,8 +515,8 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::integrationAccessRoute(
     char json[DEVICE_NAME_CAPACITY + 160] = {};
     snprintf(json, sizeof(json),
              "{\"apiVersion\":1,\"name\":\"%s\",\"firmwareVersion\":\"%s\","
-             "\"authRequired\":%s}",
-             name, firmware, active ? "true" : "false");
+             "\"authRequired\":%s,\"relayFeatures\":%u}",
+             name, firmware, active ? "true" : "false", COMPANION_RELAY_FEATURES);
     result = sendJson(request, STATUS_OK, json);
     return true;
   }

@@ -347,8 +347,10 @@ class OpenBrewByWeightNetwork {
                          uint8_t token[WEB_ACCESS_TOKEN_BYTES], bool &relayed);
   bool relayPassword(httpd_req_t *request, char *out, size_t capacity);
   bool relayBodyContext(httpd_req_t *request, uint8_t key[32], uint32_t &sequence);
-  bool relayResponseKey(httpd_req_t *request, uint8_t key[32], uint32_t &counter) const;
-  esp_err_t relaySendSealed(httpd_req_t *request, const char *json, size_t length) const;
+  bool relayResponseKey(httpd_req_t *request, uint8_t key[32], uint32_t &counter, uint32_t &q,
+                        uint8_t &version) const;
+  esp_err_t relaySendSealed(httpd_req_t *request, const char *status, const char *json,
+                            size_t length) const;
   esp_err_t relayEnvelopeReject(httpd_req_t *request) const;
 
   private:
@@ -1067,6 +1069,7 @@ class OpenBrewByWeightNetwork {
   static esp_err_t companionPairHandler(httpd_req_t *request);
   static esp_err_t companionAdminHandler(httpd_req_t *request);
   static esp_err_t companionRelayHandler(httpd_req_t *request);
+  static esp_err_t companionAssetsHandler(httpd_req_t *request);
   static esp_err_t companionLinkHandshake(httpd_req_t *request);
   static esp_err_t companionLinkHandler(httpd_req_t *request);
   static void companionLinkFree(void *context);

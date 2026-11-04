@@ -702,7 +702,39 @@ carry no secret: they are the user's own firmware image and the Web UI's
 public files. Their integrity does not rest on the seal — the image is
 pinned by the session's `sha256`, which arrives in a sealed
 `/api/v1/ota/session` body and is verified over the assembled image before
-anything is committed, and assets are named by their build tag in the URL.
+anything is committed, and assets are pinned by the sealed list below. A build
+tag in a URL names a file; it proves nothing about the bytes.
+
+### Relay features
+
+`GET /api/v1/integration/info` carries `"relayFeatures":1` on a controller that
+has what this section describes. Read through the relay it arrives sealed, so a
+device on the network cannot lower it. A whole answer with exactly info's keys
+and no such field is an older controller, and the only case a companion treats
+as one: anything else it cannot read is a refusal.
+
+**Bound answers (relay version 3).** The header starts with `3` and its signature
+uses `obbw-relay-v3` as the canonical first line, so rewriting a header to `2`
+fails. The sealed answer then has additional data `obbw-resp-v3\n<q>\n<status>`,
+the status being the line's three digits. An answer held back from one request
+therefore opens for no other: without this, someone in the middle could deliver
+a victim's sign-in answer for their own request. Version 2 stays accepted; the
+companion moves to 3 for a relay session once it read the feature.
+
+**The asset list.** `GET /api/v1/companion/assets`, relayed only (`404` otherwise),
+answers with what each file must be, generated with them, so it costs flash and
+no hashing on the controller:
+
+```json
+{"v":1,"tag":"89abcdef","etag":"\"1.2.0.89abcdef\"","csp":"…",
+ "shell":["<sha256 base64>",96000],"shellPaths":["/","/stats"],
+ "assets":[["/app.js","<sha256 base64>",1234,"text/javascript; charset=utf-8",true]]}
+```
+
+Digests cover the exact bytes sent, gzip included. A path ending in `*` is a
+prefix. List and files share one image and a relay session ends with the boot,
+so an answer opened under the current session always describes the running image;
+after an OTA or a rollback the companion reads it again.
 The ui-stream and link frames after their handshakes carry no credentials.
 
 A request with the header is refused before any handler runs; after

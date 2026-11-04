@@ -653,6 +653,8 @@
     "diagnostic.scale_profiling": "Scale recording",
     "diagnostic.screen_access": "Access",
     "diagnostic.screen_count": "screens: {0}",
+    "diagnostic.screen_files": "Web UI files",
+    "diagnostic.screen_files_states": "Verified by the companion|{0} refused, last {1}: something on your network may be changing them|Not verified: update the controller's firmware",
     "diagnostic.screen_mode": "Mode",
     "diagnostic.screen_service_worker": "Service worker",
     "diagnostic.screen_states": "Web|PWA|Direct|Other HTTPS proxy|Unavailable|Inactive|Active|Companion \u201c{0}\u201d",

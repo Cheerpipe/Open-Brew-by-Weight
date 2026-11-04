@@ -1385,7 +1385,7 @@ esp_err_t OpenBrewByWeightNetwork::sendJson(httpd_req_t *request,
     (void)httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
     return sent;
   }
-  const esp_err_t sealed = instance_->relaySendSealed(request, json, length);
+  const esp_err_t sealed = instance_->relaySendSealed(request, status, json, length);
   (void)httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
   return sealed;
 }
