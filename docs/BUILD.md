@@ -176,9 +176,9 @@ For changed code, run `./scripts/dev classify` and the complete gate from
 [VALIDATION.md](../VALIDATION.md), including sanitizers/builds where required.
 Host tests cannot verify wiring, radio timing, or physical stop behavior.
 R2/R3 validation compiles every supported profile with the `--development`
-profile, including the Linea Micra pair, so a passing gate leaves the
-conservative local image ready in its normal `build-idf/<hardware>--<machine>/`
-directory.
+profile, including the Linea Micra pair, in its own `build-gate/` trees. It does
+not change `build-idf/<hardware>--<machine>/`, so run `./scripts/dev build` for
+the image you are going to install.
 
 <a id="8-host-tests-before-you-flash"></a>
 <a id="4-ble-backend"></a>

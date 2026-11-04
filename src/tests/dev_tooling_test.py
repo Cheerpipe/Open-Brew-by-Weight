@@ -1156,11 +1156,19 @@ r2_steps = validate_language_steps(["src/web/app.js"], risk="R2")
 r2_builds = [argv for name, argv in r2_steps if name.startswith("idf-")]
 assert len(r2_builds) == 3, r2_builds
 assert all("--development" in argv for argv in r2_builds), r2_builds
+assert all(argv[:2] == ["env", f"OPENBREWBYWEIGHT_IDF_BUILD_ROOT={ROOT}/build-gate"]
+           for argv in r2_builds), r2_builds
+# Gates never touch build-idf/, the trees manual builds, flash, and OTA use.
+for risk_steps in (r2_steps, validate_language_steps(["src/web/app.js"]),
+                   validate_language_steps([], verb="quality")):
+    for name, argv in risk_steps:
+        if name.startswith(("idf-", "release-", "stack-", "cppcheck-")):
+            assert not any("build-idf/" in arg for arg in argv if "scripts/" not in arg), argv
 # The shipped (flag-free release) image of every pair builds in its own tree
 # and compares its own versioned baseline.
 r2_release = [argv for name, argv in r2_steps if name.startswith("release-")]
 assert len(r2_release) == 3 and all(
-    argv[:2] == ["env", f"OPENBREWBYWEIGHT_IDF_BUILD_ROOT={ROOT}/build-idf/release"] and
+    argv[:2] == ["env", f"OPENBREWBYWEIGHT_IDF_BUILD_ROOT={ROOT}/build-gate/release"] and
     argv[-1] == "--flags=" and "--development" not in argv and "--jtag" not in argv
     for argv in r2_release), r2_release
 

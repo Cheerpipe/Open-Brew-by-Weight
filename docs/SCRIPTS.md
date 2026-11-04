@@ -200,10 +200,11 @@ of the CPUs (`IDF_PY_BUILD_JOBS`).
 Each step's output appears in the log as one
 block when the step finishes. After any failure no lane starts another step;
 steps already running finish first. When every lane passes, a final
-`budget-verdict` step reports every size budget the run measured. The release builds use their
-own trees, `build-idf/release/<hardware>--<machine>/`, so the gate's
-`build-idf/<hardware>--<machine>/` images stay incremental. Host tests and
-Cppcheck use one job per CPU.
+`budget-verdict` step reports every size budget the run measured. Gates build
+in their own trees, `build-gate/<hardware>--<machine>/` and
+`build-gate/release/<hardware>--<machine>/`, so they stay incremental whatever
+you build by hand, and never rewrite an image in `build-idf/` that a flash or
+OTA is using. Host tests and Cppcheck use one job per CPU.
 
 The supported transient options are `--webui-language`, `--flags`, `--o0`,
 `--og`, `--o2`, and `--os`. The build also accepts

@@ -15,7 +15,7 @@ image that ships: a flag-free release build (no `--development`, `--jtag`,
 `--no-auth-admin`, or `--flags`). This is enforced, not just prose: the R2/R3
 validation gate compiles every supported profile pair with `--development`
 (FIRMWARE_BUDGET_OPTIONS in scripts/dev) and again as a flag-free release
-image in its own `build-idf/release/` tree, and a tooling test pins that
+image in its own `build-gate/release/` tree, and a tooling test pins that
 composition for both risk levels and requires a release baseline for every
 pair. Any other build profile makes the resource verifier print "no versioned
 baseline for this build profile" instead of comparing baselines. Comparisons

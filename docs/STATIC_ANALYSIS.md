@@ -313,8 +313,8 @@ copies even though their code runs. So the script compiles every profile pair
 that R2/R3 validation builds twice, each in its own tree under
 `build-idf/dead-code/<profile>/`: as a development image that also enables the
 remote machine control opt-in, so code only that supported build runs counts,
-and as a release image. The gate's `build-idf/<hardware>--<machine>/` trees
-are untouched. Only the project components get the analysis options
+and as a release image. The trees of manual builds and of the other gates are
+untouched. Only the project components get the analysis options
 (`-fno-inline -fkeep-inline-functions -fno-ipa-sra -fno-partial-inlining
 -fno-ipa-cp-clone -fno-ipa-icf -fno-ipa-pure-const -fno-ipa-modref`): no call
 is inlined, cloned, redirected to an identical twin, or dropped because the

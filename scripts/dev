@@ -79,7 +79,11 @@ BUILD_PROFILES = (
     ("esp32-s3-relay-x1-speaker-reed", "rancilio-silvia-pro-x-reed"),
 )
 FIRMWARE_BUDGET_OPTIONS = ["--flags=", "--development"]
-RELEASE_BUILD_ROOT = f"OPENBREWBYWEIGHT_IDF_BUILD_ROOT={ROOT}/build-idf/release"
+# Gates build in their own trees: they must never rewrite an image a manual
+# flash or OTA is using from build-idf/, and a manual build's other flags must
+# not force them to rebuild. Same depth as build-idf/, so ccache still hits.
+GATE_BUILD_ROOT = "build-gate"
+GATE_RELEASE_BUILD_ROOT = f"{GATE_BUILD_ROOT}/release"
 FIRMWARE_STAGES = {"build", "flash", "ota", "monitor"}
 FIRMWARE_PIPELINES = {
     ("build",), ("flash",), ("ota",), ("monitor",),
@@ -121,6 +125,10 @@ def tree_state() -> dict[str, object]:
     return {"head": sha(), "worktree": worktree.hexdigest(),
             "budgetFiles": {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
                             for path in BUDGET_FILES}}
+
+
+def gate_root(root: str) -> str:
+    return f"OPENBREWBYWEIGHT_IDF_BUILD_ROOT={ROOT}/{root}"
 
 
 def ccache_fill_warning(stats: str) -> list[str]:
@@ -788,13 +796,14 @@ def main() -> int:
                 build = ["./scripts/internal/build-idf", "--hardware", hardware,
                          "--machine", machine, "--webui-language", webui_language]
                 # The shipped image builds in its own tree against its own baseline.
-                return variant, [(f"idf-{variant}", [*build, *FIRMWARE_BUDGET_OPTIONS]),
-                                 (f"release-{variant}", ["env", RELEASE_BUILD_ROOT, *build,
-                                                         "--flags="])]
+                return variant, [(f"idf-{variant}", ["env", gate_root(GATE_BUILD_ROOT), *build,
+                                                     *FIRMWARE_BUDGET_OPTIONS]),
+                                 (f"release-{variant}", ["env", gate_root(GATE_RELEASE_BUILD_ROOT),
+                                                         *build, "--flags="])]
 
             def cppcheck(variant: str, *env: str) -> tuple[str, list[str]]:
                 return (f"cppcheck-{variant}", ["env", *env, "./scripts/static-idf", "--arch",
-                                                "n16r8", "--build-dir", f"build-idf/{variant}",
+                                                "n16r8", "--build-dir", f"{GATE_BUILD_ROOT}/{variant}",
                                                 "--output-dir",
                                                 f"reports/static-analysis/{variant}"])
 
@@ -844,12 +853,13 @@ def main() -> int:
                 stack = ["python3", "scripts/check_stack_depth.py", "--build-dir"]
                 for hardware, machine in BUILD_PROFILES:
                     variant, (development, release) = pair_steps(hardware, machine)
-                    lanes.append([development, (f"stack-{variant}", [*stack, f"build-idf/{variant}"])])
+                    lanes.append([development, (f"stack-{variant}",
+                                                [*stack, f"{GATE_BUILD_ROOT}/{variant}"])])
                     if risk == "R3":
                         lanes[-1].append(cppcheck(variant, "OPENBREWBYWEIGHT_CPPCHECK_RISK=1",
                                                   f"OPENBREWBYWEIGHT_CPPCHECK_CHANGED={changed}"))
                     lanes.append([release, (f"stack-release-{variant}",
-                                            [*stack, f"build-idf/release/{variant}"])])
+                                            [*stack, f"{GATE_RELEASE_BUILD_ROOT}/{variant}"])])
             manual = ["Complete and attach applicable HIL/manual evidence"] if risk == "R3" else []
             firmware = len(lanes) > 1
             return execute(command, risk, [s for lane in lanes for s in lane], verbosity, manual,
