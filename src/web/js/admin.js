@@ -1024,7 +1024,7 @@ async function saveDateTimeConfig() {
   try {
     await R.command(
       "/api/v1/config",
-      { ...payload, baseRevision: formRevisions.dateTime },
+      payload,
       1,
       __WEBUI_TEXT__("runtime.date_and_time_settings_saved"),
       fail,
@@ -1036,8 +1036,7 @@ async function saveDateTimeConfig() {
     }
     await R.refreshStatus();
   } catch (e) {
-    if (!formStale(e, () => sectionDirty("dateTime", false)))
-      R.message(R.formatCommandError(fail, e), "error");
+    R.message(R.formatCommandError(fail, e), "error");
     await R.refreshStatus();
   }
 }
@@ -1055,7 +1054,6 @@ function loadAdminConfig(c) {
     $("timezoneAutomatic").checked = !!c.timezoneAutomatic;
     $("ntpSyncEnabled").checked = c.ntpSyncEnabled !== false;
     setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
-    formRevisions.dateTime = c.revision;
   }
   const state = $("timezoneSaveState");
   if (state)
@@ -1975,7 +1973,6 @@ function loadScheduledRestart(c) {
     R.uiState.scheduledRestartBaseline = R.snapshotControls(
       document.querySelectorAll("#scheduledRestartPanel input"),
     );
-    formRevisions.scheduledRestart = c.revision;
   }
   $("scheduledRestartStatus").textContent = R.uiState.scheduledRestartDirty
     ? ""
@@ -1998,7 +1995,6 @@ async function saveScheduledRestart() {
       const p = {
           scheduledRestartEnabled: $("scheduledRestartEnabled").checked,
           scheduledRestartMinuteOfDay: restartMinute(),
-          baseRevision: formRevisions.scheduledRestart,
         },
         a = await R.api("/api/v1/config", { method: "POST", body: R.body(p) });
       await waitSaved(
@@ -2012,7 +2008,7 @@ async function saveScheduledRestart() {
     sectionDirty("scheduledRestart", false);
     return true;
   } catch (e) {
-    if (!formStale(e, () => sectionDirty("scheduledRestart", false))) R.message(e.message, "error");
+    R.message(e.message, "error");
     return false;
   } finally {
     b.classList.remove("busy");

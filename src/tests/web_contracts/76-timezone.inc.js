@@ -205,21 +205,16 @@
       h.select.value = 'Asia/Tokyo'; gate.resolve(); await detection;
       assert.equal(h.select.value, 'Asia/Tokyo'); assert.equal(h.state.detections, 0);
     }],
-    // The form saves against the revision it was filled from; a change made
-    // meanwhile elsewhere is refused and the form takes the saved values again.
-    ['a stale date and time form is not saved over', async () => {
+    // The save changes only its own fields and names no revision: the global one
+    // moves with every finished shot, which must not refuse or discard the form.
+    ['a date and time save survives an unrelated config change', async () => {
       const h = harness(); await h.c.populateTimezoneOptions(); await flush();
       h.c.loadAdminConfig({timezoneId: 'Asia/Tokyo', revision: 5});
       h.c.dateTimeDirty = true; h.c.loadAdminConfig({timezoneId: 'Asia/Tokyo', revision: 6});
-      h.c.command = async (_, payload) => {
-        h.state.payloads.push(payload);
-        throw Object.assign(new Error('Config changed; refresh and retry.'),
-            {status: 409, code: 'CONFIG_REVISION_STALE'});
-      };
+      h.c.command = async (_, payload) => { h.state.payloads.push(payload); };
       await h.c.saveDateTimeConfig();
-      assert.equal(h.state.payloads.at(-1).baseRevision, 5);
+      assert.equal(h.state.payloads.at(-1).baseRevision, undefined);
       assert.equal(h.c.dateTimeDirty, false);
-      assert.equal(h.state.message, 'admin.changed_elsewhere');
     }],
     ['saving a prior draft retains edits made while it was pending', async () => {
       const h = harness(), gate = deferred(); h.c.command = () => gate.promise;

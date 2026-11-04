@@ -115,11 +115,12 @@
   // Admin sections saved whole carry the revision their form was filled from
   // (several screens through the companion): never the latest one, never one
   // the browser made up, and a refused save shows the saved values again.
+  // Date and time and the scheduled restart carry none: they change only their
+  // own fields, and the global revision moves with every finished shot.
+  assert(!codeIncludes(adminUi, 'formRevisions.dateTime') &&
+         !codeIncludes(adminUi, 'formRevisions.scheduledRestart'),
+      'A finished shot must not refuse a date and time or scheduled restart save');
   for (const [fill, send, clean] of [
-    ['formRevisions.dateTime=c.revision', '{...payload,baseRevision:formRevisions.dateTime}',
-      "formStale(e,()=>sectionDirty('dateTime',false))"],
-    ['formRevisions.scheduledRestart=c.revision', 'baseRevision:formRevisions.scheduledRestart,',
-      "formStale(e,()=>sectionDirty('scheduledRestart',false))"],
     ['formRevisions.webhooks=w.revision', 'baseRevision:formRevisions.webhooks,',
       'formStale(e,()=>(webhookDirty=false))'],
     ['formRevisions.network=n.revision', 'baseRevision:formRevisions.network,', ''],
