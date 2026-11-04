@@ -30,15 +30,16 @@ function withoutMockup(body, fixture) {
 const jsDir = path.join(root, 'src/web/js');
 const web = fs.readdirSync(jsDir).filter((name) => name.endsWith('.js'))
   .map((name) => fs.readFileSync(path.join(jsDir, name), 'utf8')).join('\n');
-const webFunctions = new Set([...web.matchAll(/^(?:export )?(?:async )?function ([\w$]+)\(/gm)]
-  .map((match) => match[1]));
+const webFunctions = new Set([...web.matchAll(
+  /^(?:export )?(?:(?:async )?function ([\w$]+)\(|const ([\w$]+) = (?:async )?(?:\([^)]*\)|[\w$]+) =>)/gm)]
+  .map((match) => match[1] || match[2]));
 // Module-level state (`uiState.x`, `presetState.y`) must be defined too.
 const webState = new Set([...web.matchAll(/^(?:export )?(?:let|const) ([\w$]+)\s*=/gm)]
   .map((match) => match[1]));
 function checkScript(url, fixture, required, fixtureProvided = []) {
   const script = withoutMockup(get(url), fixture);
   assert.doesNotThrow(() => new Function(script), url + ' must compile');
-  const defined = new Set([...script.matchAll(/function\s+([\w$]+)\s*\(|(?:const|let|var|,)\s*([\w$]+)\s*=/g)]
+  const defined = new Set([...script.matchAll(/function\s+([\w$]+)\s*\(|(?:const|let|var|,|window\.)\s*([\w$]+)\s*\??\??=/g)]
     .map((match) => match[1] || match[2]));
   for (const name of required) assert.ok(defined.has(name), url + ' must define ' + name);
   const missing = [...new Set([...script.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)]
@@ -57,10 +58,10 @@ for (const url of ['/', '/mobile-menu', '/micra'])
 // Header nav links point at bare view routes; they must not fall through to stale mockup files.
 assert.ok(get('/admin').includes('id="adminLockPanel"'), '/admin must render the live Admin view');
 checkScript('/preview.js', 'header.js',
-  ['updateHeaderSignals', 'initHeaderSignals', 'updateQuickSettings', 'buildQuickSettings', 'escHtml']);
+  ['updateHeaderSignals', 'initHeaderSignals', 'updateQuickSettings', 'buildQuickSettings', 'escHtml', 'sub']);
 // The Micra controller actions come from the local webui-mockups/micra.js fixture.
 checkScript('/micra-preview.js', 'micra.js',
   ['formatMicraCleaning', 'renderMicraCloudDiagnostic', 'renderMicraWebSocket', 'ensureMicraRows',
     'applyLineaMicraStatus'],
-  ['api', 'command', 'lineaMicraAction', 'refreshStatus', 'setSaveDirty', 'showFieldError']);
+  ['$', 'api', 'command', 'lineaMicraAction', 'refreshStatus', 'setSaveDirty', 'showFieldError']);
 console.log('Web UI design preview: reference pages and preview scripts OK');
