@@ -257,6 +257,8 @@
         'the view turns only on an upright screen');
     assert(css.includes('html:not(.liveLandscape) .liveShot{grid-template:'),
         'the upright layouts stand aside while the view is kept in landscape');
+    assert(/\.lsHero b\{font-size:min\([^;}]*var\(--lsFit\)/.test(css),
+        'on a short phone the weight gives way so the numbers column fits the screen');
   }
 
   // iOS WebKit ignores muted video for display sleep: the silent keep-awake
