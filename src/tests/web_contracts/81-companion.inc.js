@@ -7,14 +7,23 @@
   const assert = require('assert').strict, vm = require('vm');
   const admin = partialHtml.admin, adminJs = viewJs.admin;
   // A forgotten or switched-off companion keeps no live state.
-  // A companion working through the relay alone is connected, not down.
-  assert.ok(codeIncludes(adminJs, 'c.relay === "ready" && !c.log && !c.archive && !c.lm'),
-      'Admin shows a relay-only companion as connected, and only when no feature needs the link');
+  // With no feature needing the link, Admin says when the relay last worked: its
+  // session outlives a companion that went away, so it never claims connected.
+  {
+    const only = new Function('return ' + adminJs.match(/const companionRelayOnly = (.*);/)[1])();
+    assert.equal(only({relay: 'ready', log: false, archive: false, lm: false}), true);
+    assert.equal(only({relay: 'ready', log: false, archive: false}), true, 'a build without La Marzocco');
+    for (const on of ['log', 'archive', 'lm'])
+      assert.equal(only({relay: 'ready', [on]: true}), false, 'the link tells while ' + on + ' needs it');
+    assert.equal(only({relay: 'down'}), false);
+    assert.ok(!/companionRelayOnly\(c\)\s*\|\||\|\|\s*companionRelayOnly\(c\)/.test(adminJs),
+        'A relay-only companion is not reported as connected');
+  }
   const companionAdmin = readSources(['network/OpenBrewByWeightCompanionAdmin.inc']);
   assert.ok(codeIncludes(companionAdmin, 'self.closeRelayedUiStreams();self.lifecycleLogf("Companion\'%s\'forgotten",name);') &&
       codeIncludes(companionAdmin, 'if(!ui)self.closeRelayedUiStreams();') &&
       codeIncludes(blockAt(readSources(['network/OpenBrewByWeightCompanionRelay.inc']),
-          'void OpenBrewByWeightNetwork::closeRelayedUiStreams('), 'session.relayed'),
+          'void OpenBrewByWeightNetwork::closeRelayedUiStreams('), 'companionRelayedStreamsEnd(uiStreams_'),
       'Forget and Web UI off close the relayed ui-stream');
   assert.ok(admin.includes('<details id="companionPanel" data-g="companion" class="cfgGroup"><summary>Companion</summary>') &&
       admin.indexOf('id="accessPanel"') < admin.indexOf('id="companionPanel"') &&

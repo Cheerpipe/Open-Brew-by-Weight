@@ -11,10 +11,8 @@ namespace openbrewbyweight {
 esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   char address[COMPANION_ADDRESS_TEXT];
-  // The SoftAP's trust is for who joined it: over a relay it would reach every
-  // screen of the companion, so the relay never runs there.
-  if (!companionPeer(httpd_req_to_sockfd(request), address) ||
-      socketServedBySoftAp(httpd_req_to_sockfd(request)))
+  if (!companionRelayPeerAllowed(companionPeer(httpd_req_to_sockfd(request), address),
+                                 socketServedBySoftAp(httpd_req_to_sockfd(request))))
     return sendError(request, STATUS_FORBIDDEN, "COMPANION_PEER",
                      nullptr, "RELAY_LOCAL_NETWORK_ONLY");
   uint8_t rb[COMPANION_NONCE_BYTES];
@@ -127,6 +125,7 @@ esp_err_t OpenBrewByWeightNetwork::companionRelayHandler(httpd_req_t *request) {
     memcpy(relay.key, key, sizeof(key));
     memcpy(relay.bodyKey, bodyKey, sizeof(bodyKey));
     relay.ready = true;
+    relay.usedAtMs = millis();
     relay.window = CompanionRelayWindow{};
     ++relay.generation;
     esp_fill_random(relay.challenge, sizeof(relay.challenge));
@@ -168,7 +167,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
   CompanionRelayHeader header;
   const char *status = STATUS_BAD_REQUEST, *code = "RELAY_INVALID",
              *reason = "a malformed relay header";
-  if (!companionPeer(fd, address) || socketServedBySoftAp(fd)) {
+  if (!companionRelayPeerAllowed(companionPeer(fd, address), socketServedBySoftAp(fd))) {
     status = STATUS_FORBIDDEN;
     code = "COMPANION_PEER";
     reason = "a relay from outside the local network or over the SoftAP";
@@ -235,6 +234,7 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
         code = "RELAY_DISABLED";
         reason = "Web UI through the companion is off";
       } else {
+        relay.usedAtMs = millis();
         // This socket's entry, else a free one: closing sockets free theirs,
         // so httpd's seven sockets never need more.
         CompanionRelayIdentity *slot = nullptr;
@@ -278,18 +278,15 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
 
 void OpenBrewByWeightNetwork::closeRelayedUiStreams() {
   int fds[sizeof(uiStreams_) / sizeof(uiStreams_[0])];
-  size_t count = 0;
+  size_t count;
   {
     TaskLockGuard lock(dataMux_);
-    for (auto &session : uiStreams_) {
-      if (session.fd < 0 || !session.relayed) continue;
-      fds[count++] = session.fd;
-      if (session.bound && strcmp(session.clientId, activeWebUiClientId_) == 0) {
-        activeWebUiClientId_[0] = '\0';
-        activeWebUiClaimTokenValid_ = false;
-        memset(activeWebUiClaimToken_, 0, sizeof(activeWebUiClaimToken_));
-      }
-      session.bound = false;  // Later dispatches neither log nor send.
+    bool claimEnded;
+    count = companionRelayedStreamsEnd(uiStreams_, activeWebUiClientId_, fds, claimEnded);
+    if (claimEnded) {
+      activeWebUiClientId_[0] = '\0';
+      activeWebUiClaimTokenValid_ = false;
+      memset(activeWebUiClaimToken_, 0, sizeof(activeWebUiClaimToken_));
     }
   }
   for (size_t index = 0; index < count; ++index)

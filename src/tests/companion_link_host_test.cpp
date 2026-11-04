@@ -1089,7 +1089,68 @@ static void testLiveness() {
   CHECK(companionLinkAgeS(state, now) == 61);
 }
 
+static void testRelayEnds() {
+  struct Session {
+    int fd = -1;
+    bool relayed = false, bound = false;
+    char clientId[8] = {};
+  };
+  int fds[3];
+  bool claimEnded = true;
+
+  // A direct page and a free slot stay; the relayed owner closes with the claim.
+  Session sessions[3];
+  sessions[0].fd = 5;
+  sessions[0].bound = true;
+  memcpy(sessions[0].clientId, "direct", 7);
+  sessions[1].fd = 6;
+  sessions[1].relayed = sessions[1].bound = true;
+  memcpy(sessions[1].clientId, "relay", 6);
+  CHECK(companionRelayedStreamsEnd(sessions, "relay", fds, claimEnded) == 1);
+  CHECK(fds[0] == 6 && claimEnded);
+  CHECK(!sessions[1].bound && sessions[0].bound);
+
+  // A direct browser took the claim: the relayed stream closes, the claim stays.
+  sessions[1].bound = true;
+  CHECK(companionRelayedStreamsEnd(sessions, "direct", fds, claimEnded) == 1);
+  CHECK(fds[0] == 6 && !claimEnded && sessions[0].bound);
+
+  // A relayed stream that never bound holds no claim, whatever its empty id says.
+  sessions[1].clientId[0] = '\0';
+  sessions[1].bound = false;
+  CHECK(companionRelayedStreamsEnd(sessions, "", fds, claimEnded) == 1);
+  CHECK(!claimEnded);
+
+  // No relayed stream: nothing closes and the claim stays.
+  sessions[1].relayed = false;
+  CHECK(companionRelayedStreamsEnd(sessions, "direct", fds, claimEnded) == 0);
+  CHECK(!claimEnded);
+
+  // Only a socket the SoftAP's own address serves, with a peer on its subnet.
+  CHECK(softApServesAddresses(0xC0A80401u, 0xC0A80402u));
+  CHECK(!softApServesAddresses(0xC0A8040Au, 0xC0A80402u));  // A LAN numbered the same.
+  CHECK(!softApServesAddresses(0xC0A80401u, 0xC0A80502u));
+
+  // The relay runs only for a local peer, and never over the SoftAP.
+  CHECK(companionRelayPeerAllowed(true, false));
+  CHECK(!companionRelayPeerAllowed(true, true));
+  CHECK(!companionRelayPeerAllowed(false, false));
+  CHECK(!companionRelayPeerAllowed(false, true));
+
+  // Its age: none before the first use, seconds after, and across the millis wrap.
+  CompanionRelay relay;
+  CHECK(companionRelayAgeS(relay, 5000) == -1);
+  relay.usedAtMs = 2000;
+  CHECK(companionRelayAgeS(relay, 63000) == 61);
+  relay.usedAtMs = 0xFFFFF000U;
+  CHECK(companionRelayAgeS(relay, 5000) == 9);
+  // A dropped session keeps when it last worked.
+  companionRelayDrop(relay);
+  CHECK(!relay.ready && relay.usedAtMs == 0xFFFFF000U);
+}
+
 int main() {
+  testRelayEnds();
   testVectors();
   testRelayVectors();
   testRelayHeader();

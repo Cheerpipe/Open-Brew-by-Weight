@@ -15,12 +15,13 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) const {
       used,
       ",\"companion\":{\"paired\":%s,\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\","
       "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"log\":%s,\"archive\":%s,"
-      "\"relay\":\"%s\",\"relayRejects\":%lu,",
+      "\"relay\":\"%s\",\"relayAgeS\":%ld,\"relayRejects\":%lu,",
       stored.paired ? "true" : "false", stored.name, stored.address, stored.companionVersion,
       link != nullptr ? "open" : "down", static_cast<long>(companionLinkAgeS(g_companion, now)),
       static_cast<unsigned long>(link != nullptr ? 0 : g_companion.peerProtocol),
       stored.uiOff ? "false" : "true", stored.logSwitch ? "true" : "false",
       stored.archiveSwitch ? "true" : "false", g_companion.relay.ready ? "ready" : "down",
+      static_cast<long>(companionRelayAgeS(g_companion.relay, now)),
       static_cast<unsigned long>(g_companion.relay.rejects));
   if (kCompanionLm)
     ok = ok && statusJsonAppend(

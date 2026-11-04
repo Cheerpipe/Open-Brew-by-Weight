@@ -30,8 +30,8 @@ function setSaveDirty(id, hintId, dirty) {
 // over a change made meanwhile (another screen through the companion) is
 // refused, and the form shows the saved values again.
 const formRevisions = {};
-// The controller's relay session outlives a companion that went away, so it says
-// connected only while no feature needs the link, which would otherwise tell.
+// With no feature needing the link nothing shows a companion is alive: the relay
+// session outlives one that went away, so Admin says when it last worked.
 const companionRelayOnly = (c) => c.relay === "ready" && !c.log && !c.archive && !c.lm;
 function formStale(e, clean) {
   if (e?.status !== 409 || !/REVISION/.test(e.code || "")) return false;
@@ -725,15 +725,15 @@ function applyCompanionStatus(c) {
     );
   const link = c.link === "open";
   $("companionLinkState").textContent =
-    (link
-      ? __WEBUI_TEXT__("admin.companion_link_open")
-      : companionRelayOnly(c)
-        ? __WEBUI_TEXT__("admin.companion_relay_only")
-        : __WEBUI_TEXT__("admin.companion_link_down")) +
-    (c.linkAgeS >= 0
-      ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
-      : "") +
-    (!link && c.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "");
+    !link && companionRelayOnly(c)
+      ? R.sub(__WEBUI_TEXT__("admin.companion_relay_used"), [companionSince(c.relayAgeS)])
+      : (link
+          ? __WEBUI_TEXT__("admin.companion_link_open")
+          : __WEBUI_TEXT__("admin.companion_link_down")) +
+        (c.linkAgeS >= 0
+          ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
+          : "") +
+        (!link && c.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "");
   if (__LINEA_MICRA__) $("companionRouteState").textContent = companionRouteText(c);
   R.companionHere(true).then(companionCopy);
   if (!R.uiState.companionDirty) {
@@ -2066,11 +2066,13 @@ const ADMIN_SUMMARIES = {
         ? R.sub(__WEBUI_TEXT__("admin.sum_companion_request"), [c.request.name])
         : __WEBUI_TEXT__("admin.sum_not_paired");
     return R.sub(
-      c.link === "open" || companionRelayOnly(c)
+      c.link === "open"
         ? __WEBUI_TEXT__("admin.sum_companion_connected")
-        : c.peerProtocol > 0
-          ? __WEBUI_TEXT__("admin.sum_companion_update")
-          : __WEBUI_TEXT__("admin.sum_companion_disconnected"),
+        : companionRelayOnly(c)
+          ? __WEBUI_TEXT__("admin.sum_companion_relay")
+          : c.peerProtocol > 0
+            ? __WEBUI_TEXT__("admin.sum_companion_update")
+            : __WEBUI_TEXT__("admin.sum_companion_disconnected"),
       [c.name],
     );
   },
