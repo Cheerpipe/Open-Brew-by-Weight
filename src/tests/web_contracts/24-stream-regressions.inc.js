@@ -5,6 +5,14 @@
   const stream = (fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightHomeStream.inc'), 'utf8') +
       fs.readFileSync(path.join(sketchDir, 'network/OpenBrewByWeightRecordStreams.inc'), 'utf8'));
   const webhook = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightWebhook.h'), 'utf8');
+  // Pairing a companion is not a takeover: the window claims again quietly and keeps Admin.
+  const pairedRuntime = fs.readFileSync(path.join(sketchDir, 'web/js/runtime.js'), 'utf8');
+  const pairedClaim = fs.readFileSync(
+      path.join(sketchDir, 'network/OpenBrewByWeightHttpAuthAssets.inc'), 'utf8');
+  assert(pairedRuntime.indexOf('event.reason === "paired"') > 0 &&
+      pairedRuntime.indexOf('event.reason === "paired"') < pairedRuntime.indexOf(
+          'const held = webUiTakeoverVisible();'));
+  assert(pairedClaim.includes('if (!moved) self.clearAdminUnlock(attach ? &screen : nullptr);'));
   const utf8 = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightUtf8.h'), 'utf8');
   const networkSource = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.cpp'), 'utf8');
   const body = (source, signature) => {

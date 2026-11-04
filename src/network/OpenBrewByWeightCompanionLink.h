@@ -575,6 +575,17 @@ inline bool companionPrincipalHolds(const CompanionPrincipal &holder,
          strcmp(holder.id, caller.id) == 0;
 }
 
+// A browser that held this directly through an unpaired companion, reaching the
+// controller through the relay once paired: same id, signed now. It only moves
+// this way, so it narrows who holds it: a direct request can never take a
+// screen's unlock, since a screen's id crosses the network in the relay header.
+inline bool companionPrincipalMove(CompanionPrincipal &holder, const CompanionPrincipal &caller) {
+  if (holder.id[0] == '\0' || holder.relayed || !caller.relayed || strcmp(holder.id, caller.id) != 0)
+    return false;
+  holder.relayed = true;
+  return true;
+}
+
 // Home's relay.adminScreen/overrideScreen: the holder's screen as 8 hex
 // digits of FNV-1a, or "" unless a companion screen holds it.
 inline void companionScreenTag(const CompanionPrincipal &holder, char (&tag)[9]) {

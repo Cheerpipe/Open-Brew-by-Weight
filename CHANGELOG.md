@@ -9,6 +9,10 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **Pairing a companion no longer asks for the Admin password again:** if you
+  were already using the Web UI through the companion, finishing the pairing used
+  to lock Admin without warning. Now the page stays where it is and shows the
+  result.
 - **Companion sign-in hardened:** a device on your network could hold back your
   sign-in answer and collect it for itself. Answers are now tied to the request
   that asked, and the controller publishes a list of its Web UI files so a

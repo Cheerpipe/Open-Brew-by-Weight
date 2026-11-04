@@ -498,6 +498,18 @@ static void testPrincipals() {
   other = screen;
   other.id[0] = '1';
   CHECK(companionPrincipalHolds(direct, direct) && companionPrincipalHolds(screen, screen));
+  // Pairing moves a browser's own unlock onto the relay, only that way and only its own.
+  CompanionPrincipal moving = direct;
+  CHECK(!companionPrincipalMove(moving, direct) && !moving.relayed);
+  CompanionPrincipal stranger = other;
+  CHECK(!companionPrincipalMove(moving, stranger) && !moving.relayed);
+  CompanionPrincipal asRelayed = direct;
+  asRelayed.relayed = true;
+  CHECK(companionPrincipalMove(moving, asRelayed) && moving.relayed);
+  CHECK(companionPrincipalHolds(moving, asRelayed) && !companionPrincipalHolds(moving, direct));
+  CHECK(!companionPrincipalMove(moving, direct));
+  CompanionPrincipal nobody;
+  CHECK(!companionPrincipalMove(nobody, asRelayed));
   CHECK(!companionPrincipalHolds(direct, screen) && !companionPrincipalHolds(screen, direct));
   CHECK(!companionPrincipalHolds(screen, other) && !companionPrincipalHolds(empty, empty));
   char tag[9];
