@@ -246,6 +246,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
                        nullptr, "COMPANION_NOT_PAIRED");
     for (const int fd : fds)
       if (fd >= 0) (void)httpd_sess_trigger_close(request->handle, fd);
+    self.closeRelayedUiStreams();
     self.lifecycleLogf("Companion '%s' forgotten", name);
   } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog || hasArchive) &&
              (kCompanionLm || !hasLm)) {
@@ -282,6 +283,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     if (uiChanged) {
       // An open link learns it from the next cfg frame.
       companionOutboxChanged();
+      if (!ui) self.closeRelayedUiStreams();
       self.lifecycleLog(ui ? "Companion: Web UI through the companion turned on"
                            : "Companion: Web UI through the companion turned off");
     }

@@ -273,6 +273,26 @@ __attribute__((noinline)) bool OpenBrewByWeightNetwork::relayAdmit(httpd_req_t *
   return false;
 }
 
+void OpenBrewByWeightNetwork::closeRelayedUiStreams() {
+  int fds[sizeof(uiStreams_) / sizeof(uiStreams_[0])];
+  size_t count = 0;
+  {
+    TaskLockGuard lock(dataMux_);
+    for (auto &session : uiStreams_) {
+      if (session.fd < 0 || !session.relayed) continue;
+      fds[count++] = session.fd;
+      if (session.bound && strcmp(session.clientId, activeWebUiClientId_) == 0) {
+        activeWebUiClientId_[0] = '\0';
+        activeWebUiClaimTokenValid_ = false;
+        memset(activeWebUiClaimToken_, 0, sizeof(activeWebUiClaimToken_));
+      }
+      session.bound = false;  // Later dispatches neither log nor send.
+    }
+  }
+  for (size_t index = 0; index < count; ++index)
+    (void)httpd_sess_trigger_close(server_, fds[index]);
+}
+
 void OpenBrewByWeightNetwork::relayIdentityClear(int fd) {
   if (relayIdentities_.load(std::memory_order_acquire) == 0) return;
   TaskLockGuard lock(dataMux_);

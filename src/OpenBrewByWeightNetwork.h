@@ -1013,6 +1013,9 @@ class OpenBrewByWeightNetwork {
   bool relayIdentity(httpd_req_t *request, char (&screen)[COMPANION_RELAY_SCREEN_TEXT],
                      char (&addr)[COMPANION_RELAY_ADDR_TEXT]);
   void relayIdentityClear(int fd);
+  // The companion may no longer hold live state: its relayed ui-stream closes
+  // and its claim goes, whatever it does next. Outside dataMux_.
+  void closeRelayedUiStreams();
   void touchAdminUnlock();
   // True when the socket is served by the SoftAP interface address with a
   // peer on the SoftAP subnet (local-address match keeps a LAN that happens

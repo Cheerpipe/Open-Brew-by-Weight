@@ -6,6 +6,13 @@
   // builds.
   const assert = require('assert').strict, vm = require('vm');
   const admin = partialHtml.admin, adminJs = viewJs.admin;
+  // A forgotten or switched-off companion keeps no live state.
+  const companionAdmin = readSources(['network/OpenBrewByWeightCompanionAdmin.inc']);
+  assert.ok(codeIncludes(companionAdmin, 'self.closeRelayedUiStreams();self.lifecycleLogf("Companion\'%s\'forgotten",name);') &&
+      codeIncludes(companionAdmin, 'if(!ui)self.closeRelayedUiStreams();') &&
+      codeIncludes(blockAt(readSources(['network/OpenBrewByWeightCompanionRelay.inc']),
+          'void OpenBrewByWeightNetwork::closeRelayedUiStreams('), 'session.relayed'),
+      'Forget and Web UI off close the relayed ui-stream');
   assert.ok(admin.includes('<details id="companionPanel" data-g="companion" class="cfgGroup"><summary>Companion</summary>') &&
       admin.indexOf('id="accessPanel"') < admin.indexOf('id="companionPanel"') &&
       admin.indexOf('id="companionPanel"') < admin.indexOf('id="scheduledRestartPanel"'),
