@@ -484,6 +484,11 @@ html:not(.pwaApp) .pwaOnly {
   margin-left: 0;
 }
 
+#appPushNote:not([hidden]) {
+  display: block;
+  margin-top: 0.35rem;
+}
+
 .cfgGroup input[type="checkbox"] {
   grid-area: 1 / 2;
   position: relative;
