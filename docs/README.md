@@ -23,6 +23,7 @@ needed rather than reading the entire directory.
 - [Home Assistant integration](features/home-assistant.md) ([integration repository](https://github.com/Cheerpipe/ha-open-brew-by-weight))
 - [Generic webhooks](features/webhooks.md)
 - [Open Brew by Weight Companion](features/companion.md) ([companion repository](https://github.com/Cheerpipe/open-brew-by-weight-companion))
+- [Notifications](features/notifications.md)
 
 ## Settings
 

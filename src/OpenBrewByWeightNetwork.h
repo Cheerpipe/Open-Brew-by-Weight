@@ -247,6 +247,7 @@ struct NetworkBridgeCallbacks {
   bool (*shotLogSavePending)() = nullptr;
   // A record, curve or shot trace not saved yet (the companion's `rs` waits).
   bool (*recordStoresSavePending)() = nullptr;
+  uint32_t (*bootId)() = nullptr;  // this boot's id: a shot's own, for its event
   void (*copyHistoryPage)(HistoryPage &page, size_t offset, size_t limit,
                           ShotLogSortDir dir, uint8_t types) = nullptr;
   // Cheap change epoch (store header digest) so idle dispatches skip the
@@ -1107,6 +1108,7 @@ class OpenBrewByWeightNetwork {
   bool companionLinkRecordRequest(const CompanionLinkSlot &slot, const cJSON *frame,
                                   const char *type);
   void companionRecordsService(uint32_t now, bool syncHold);
+  bool companionShotEventBody(uint8_t &count, bool syncHold, ShotLogRecord &shot, uint32_t &epoch);
   bool companionRecordsNoticeBody(uint8_t &count, bool syncHold, uint32_t (&told)[2]) const;
   static void companionRecordsWork(void *context);
   bool companionRecordsSend(size_t used, bool wrap, bool &deferArm);

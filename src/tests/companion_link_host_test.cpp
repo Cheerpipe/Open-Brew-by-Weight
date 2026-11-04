@@ -992,6 +992,83 @@ static void testSyncBodiesHeld() {
   CHECK(!companionSyncBodyHeld(true, 1, 2, 3, 0));      // cfg, route, a command: always sent
   CHECK(!companionSyncBodyHeld(false, 2, 2, 3, 0));     // no hold: everything goes
   CHECK(!companionSyncBodyHeld(true, 0xFF, 0xFF, 0xFF, 0xFF));
+  CHECK(companionSyncBodyHeld(true, 4, 0xFF, 0xFF, 0xFF, 4));  // a shot's event waits too
+  CHECK(!companionSyncBodyHeld(false, 4, 0xFF, 0xFF, 0xFF, 4));
+}
+
+static ShotLogRecord eventShot() {
+  ShotLogRecord record = {};
+  record.id = 1003;
+  record.bootId = 42;
+  record.endedAtMs = 900000;
+  record.endedAtUnixSec = 1762268000;
+  record.hasWallTime = 1;
+  record.durationDs = 284;
+  record.actualWeightCg = 3620;
+  record.cutLineCg = 3600;
+  record.arrivalDs = 280;
+  record.verdict = 1;  // fast
+  return record;
+}
+
+// This firmware decides which shot notifies: only one that ended since `ps`
+// armed the events, this boot, recently, and with a yield to report.
+static void testShotEventRules() {
+  using V = CompanionShotEventVerdict;
+  const uint32_t after = 800000, now = 905000;
+  const ShotLogRecord good = eventShot();
+  CHECK(companionShotEventVerdict(good, 42, after, now) == V::SEND);
+  CHECK(companionShotEventVerdict(good, 43, after, now) == V::NONE);  // another boot's clock
+  CHECK(companionShotEventVerdict(good, 42, 900000, now) == V::NONE);  // already looked at, a rating
+  CHECK(companionShotEventVerdict(good, 42, 950000, now) == V::NONE);  // older: a deletion, a Clear
+  CHECK(companionShotEventVerdict(good, 42, after, 900000 + COMPANION_EVENT_FRESH_MS) == V::SEND);
+  CHECK(companionShotEventVerdict(good, 42, after, 900001 + COMPANION_EVENT_FRESH_MS) == V::STALE);
+  ShotLogRecord wrapped = good;  // the clock wraps between arming and the shot
+  wrapped.endedAtMs = 100;
+  CHECK(companionShotEventVerdict(wrapped, 42, 0xFFFFFF00U, 200) == V::SEND);
+
+  ShotLogRecord bad = good;
+  bad.durationDs = MIN_SHOT_LOG_DURATION_MS / 100U;
+  CHECK(companionShotEventVerdict(bad, 42, after, now) == V::BAD);
+  bad = good;
+  bad.actualWeightCg = 200;
+  CHECK(companionShotEventVerdict(bad, 42, after, now) == V::BAD);
+  bad = good;
+  bad.actualWeightCg = SHOT_LOG_WEIGHT_MISSING;
+  CHECK(companionShotEventVerdict(bad, 42, after, now) == V::BAD);  // no weight, no estimate
+  ShotLogRecord estimated = bad;  // the scale was lost and the stop was projected
+  estimated.stopDetail = static_cast<uint8_t>(ShotLogStopDetail::AUTO_TO_MANUAL);
+  estimated.verdict = corridor::packVerdict(corridor::Verdict::SLOW, false,
+                                            corridor::LossSource::PROJECTION, false);
+  CHECK(companionShotEventVerdict(estimated, 42, after, now) == V::SEND);
+  estimated.durationDs = 1;
+  CHECK(companionShotEventVerdict(estimated, 42, after, now) == V::BAD);
+}
+
+// The `ev` body, as the service worker reads it, with the Stats row's values.
+static void testShotEventFrame() {
+  char text[256];
+  ShotLogRecord record = eventShot();
+  CHECK(companionShotEventText(record, text, sizeof(text)));
+  CHECK(!strcmp(text,
+                "\"t\":\"ev\",\"topic\":\"shot_result\",\"key\":\"42-1003\",\"ttl\":3600,"
+                "\"d\":{\"v\":1,\"id\":1003,\"b\":42,\"e\":900000,\"at\":1762268000,\"s\":28.4,"
+                "\"r\":\"fast\",\"g\":36.20,\"w\":\"m\"}}"));
+  CHECK(!companionShotEventText(record, text, 40));  // too small: refused, never cut
+
+  record.hasWallTime = 0;
+  record.arrivalDs = 0;  // no time to target: no result, like the Shots page
+  CHECK(companionShotEventText(record, text, sizeof(text)));
+  CHECK(strstr(text, "\"at\":0,") != nullptr);
+  CHECK(strstr(text, "\"r\":null,\"g\":36.20") != nullptr);
+
+  record = eventShot();
+  record.actualWeightCg = SHOT_LOG_WEIGHT_MISSING;
+  record.stopDetail = static_cast<uint8_t>(ShotLogStopDetail::AUTO_TO_MANUAL);
+  record.verdict = corridor::packVerdict(corridor::Verdict::SLOW, false,
+                                         corridor::LossSource::PROJECTION, false);
+  CHECK(companionShotEventText(record, text, sizeof(text)));
+  CHECK(strstr(text, "\"r\":\"slow\",\"g\":36.00,\"w\":\"e\"}}") != nullptr);
 }
 
 static void testNoticeDue() {
@@ -1170,6 +1247,8 @@ int main() {
   testBase64Stream();
   testNoticeDue();
   testSyncBodiesHeld();
+  testShotEventRules();
+  testShotEventFrame();
   testLogFlushDue();
   testLiveness();
   std::puts("companion_link_host_test: ok");

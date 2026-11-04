@@ -77,6 +77,13 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) const {
                       : static_cast<int32_t>((now - g_companion.logFlushAtMs) / 1000U);
   const uint32_t archiveAt = companionRecords_ != nullptr ? companionRecords_->sentAtMs : 0;
   out.archiveSyncS = archiveAt == 0 ? -1 : static_cast<int32_t>((now - archiveAt) / 1000U);
+  const CompanionShotEvents &events = g_companion.shotEvents;
+  out.pushWanted = link != nullptr && link->eventsWanted;
+  out.pushSent = events.sent;
+  out.pushSkipped = events.skipped;
+  out.pushLastId = events.lastId;
+  out.pushLastS = events.lastAtMs == 0 ? -1 : static_cast<int32_t>((now - events.lastAtMs) / 1000U);
+  out.pushSkip = events.skip;
   memcpy(out.name, stored.name, sizeof(out.name));
   memcpy(out.address, stored.address, sizeof(out.address));
   memcpy(out.version, stored.companionVersion, sizeof(out.version));

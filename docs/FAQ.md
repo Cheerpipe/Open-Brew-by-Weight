@@ -64,6 +64,13 @@ brewing. A momentary machine needs a stop pulse and valid state conditions;
 without scale/reed evidence, a tap-started machine may not receive it. Read
 [Momentary limits](settings/momentary.md#stopping-and-time-limits).
 
+## Notifications
+
+### A notification did not arrive
+
+Open **Diagnostic → Push** through the companion: it shows where it stopped, and
+can send a sample to the device. See [Notifications](features/notifications.md#test-and-troubleshoot).
+
 ## Network and access
 
 ### I cannot find the controller's Wi-Fi

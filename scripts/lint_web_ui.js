@@ -20,6 +20,7 @@ function assembledDocument(machineIcon) {
     path.join(webUi.jsDir, `${name}.js`))];
   const read = (type) => (file) => ({file, type, content: fs.readFileSync(file, 'utf8')});
   const [shell, ...partials] = renderSources([...html.map(read('html')), ...js.map(read('js')),
+    read('js')(webUi.swPath),
     {file: 'app.css', type: 'css',
       content: webUi.cssSourcePaths.map((file) => fs.readFileSync(file, 'utf8')).join('')}],
     {language: 'en', machineIcon}).sources

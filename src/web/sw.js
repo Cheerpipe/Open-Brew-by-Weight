@@ -51,3 +51,113 @@ self.addEventListener("fetch", (event) => {
   if (!shell && !ASSETS.includes(url.pathname + url.search)) return;
   event.respondWith(caches.match(shell ? "/" : request).then((hit) => hit || fetch(request)));
 });
+
+// Notifications: the companion delivers an event unread, so its wording and its
+// tap target are this firmware's. A push always shows something, since Safari
+// can revoke the permission of one that shows nothing.
+const PUSH_STATE = "push-state"; // Not "obbw-": it outlives a release's cache.
+const PUSH_TOPICS = ["shot_result"];
+function pushNotification(message) {
+  const shot = message?.topic === "shot_result" && message.d?.v === 1 ? message.d : null;
+  if (!Number.isFinite(shot?.s))
+    return {
+      title: __WEBUI_TEXT__("push.generic_title"),
+      options: { body: __WEBUI_TEXT__("push.generic_body") },
+    };
+  const titles = {
+      on_recipe: __WEBUI_TEXT__("push.title_on_recipe"),
+      fast: __WEBUI_TEXT__("push.title_fast"),
+      slow: __WEBUI_TEXT__("push.title_slow"),
+    },
+    title = (
+      Object.hasOwn(titles, shot.r) ? titles[shot.r] : __WEBUI_TEXT__("push.title_shot")
+    ).replace("{0}", shot.s.toFixed(1)),
+    grams = Number.isFinite(shot.g) ? shot.g.toFixed(1) : null,
+    body =
+      grams === null
+        ? __WEBUI_TEXT__("push.no_yield")
+        : (shot.w === "e"
+            ? __WEBUI_TEXT__("push.estimated_yield")
+            : __WEBUI_TEXT__("push.yield")
+          ).replace("{0}", grams),
+    target =
+      shot.id > 0 &&
+      Number.isInteger(shot.id) &&
+      Number.isInteger(shot.b) &&
+      Number.isInteger(shot.e)
+        ? `/stats?shot=${shot.id}&boot=${shot.b}&end=${shot.e}`
+        : "/stats";
+  return {
+    title: shot.test ? __WEBUI_TEXT__("push.title_test").replace("{0}", title) : title,
+    options: {
+      body,
+      data: { url: target },
+      ...(typeof message.key === "string" && { tag: message.key }),
+      ...(shot.at > 0 && { timestamp: shot.at * 1000 }),
+    },
+  };
+}
+const pushRemember = async (name, value) =>
+  (await caches.open(PUSH_STATE)).put(name, new Response(JSON.stringify(value)));
+// The receipt: posted now, or by the page on its next open away from home.
+async function pushReceipt(message) {
+  const receipt = { at: Date.now(), key: message?.key, mid: message?.mid };
+  await pushRemember("/received", receipt);
+  const subscription = await self.registration.pushManager.getSubscription();
+  const reply = await fetch("/__companion/push/ack", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...receipt, endpoint: subscription?.endpoint }),
+  });
+  if (reply.ok) await pushRemember("/received", { ...receipt, acked: true });
+}
+self.addEventListener("push", (event) => {
+  let message = null;
+  try {
+    message = event.data?.json();
+  } catch {
+    // An unreadable message still shows the generic notification.
+  }
+  const { title, options } = pushNotification(message);
+  event.waitUntil(
+    self.registration
+      .showNotification(title, options)
+      .then(() => pushReceipt(message).catch(() => {})),
+  );
+});
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/stats";
+  event.waitUntil(
+    (async () => {
+      await pushRemember("/tapped", { at: Date.now() }).catch(() => {});
+      const [open] = await self.clients.matchAll({ type: "window" });
+      try {
+        await (await open.focus()).navigate(url);
+      } catch {
+        await self.clients.openWindow(url);
+      }
+    })(),
+  );
+});
+// A browser that replaced its subscription: the holder of the old endpoint moves it.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  const old = event.oldSubscription,
+    applicationServerKey = old?.options?.applicationServerKey;
+  if (!applicationServerKey) return;
+  event.waitUntil(
+    (async () => {
+      const subscription =
+        event.newSubscription ||
+        (await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        }));
+      await fetch("/__companion/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription, topics: PUSH_TOPICS, label: "", old: old.endpoint }),
+      });
+    })().catch(() => {}),
+  );
+});

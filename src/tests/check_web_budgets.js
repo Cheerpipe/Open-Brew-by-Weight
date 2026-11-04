@@ -38,6 +38,7 @@ async function authoringSources() {
   const raw = {shellHtml: await compactMarkup(read(webUi.sourcePath)), partialHtml: {},
     appJs: read(webUi.appJsPath), runtimeJs: read(path.join(webUi.jsDir, 'runtime.js')),
     otaImageJs: read(path.join(webUi.jsDir, 'ota-image.js')), viewJs: {},
+    swJs: read(webUi.swPath),
     css: compactCss(webUi.cssSourcePaths.map(read).join(''))};
   for (const name of VIEW_NAMES) {
     raw.partialHtml[name] = await compactMarkup(read(path.join(webUi.htmlDir, name + '.html')));
@@ -49,12 +50,13 @@ async function authoringSources() {
     {file: 'app.js', type: 'js', content: raw.appJs},
     {file: 'runtime.js', type: 'js', content: raw.runtimeJs},
     {file: 'ota-image.js', type: 'js', content: raw.otaImageJs},
+    {file: 'sw.js', type: 'js', content: raw.swJs},
     ...JS_FILES.map((name) => ({file: name + '.js', type: 'js', content: raw.viewJs[name]})),
     {file: 'app.css', type: 'css', content: raw.css},
   ], {language: 'en'}).sources.map((source) => source.content);
   const localized = {shellHtml: sources.shift(), partialHtml: {}, viewJs: {}};
   for (const name of VIEW_NAMES) localized.partialHtml[name] = sources.shift();
-  [localized.appJs, localized.runtimeJs, localized.otaImageJs] = sources.splice(0, 3);
+  [localized.appJs, localized.runtimeJs, localized.otaImageJs, localized.swJs] = sources.splice(0, 4);
   for (const name of JS_FILES) localized.viewJs[name] = sources.shift();
   localized.css = sources.shift();
   const allHtml = localized.shellHtml.replace(

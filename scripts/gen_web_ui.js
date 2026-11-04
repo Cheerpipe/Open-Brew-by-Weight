@@ -412,6 +412,7 @@ async function generate(options = {}) {
     {file: appJsPath, type: 'js', content: appJsRaw},
     {file: path.join(jsDir, 'runtime.js'), type: 'js', content: runtimeRaw},
     {file: otaImageJsPath, type: 'js', content: otaImageRaw},
+    {file: swPath, type: 'js', content: fs.readFileSync(swPath, 'utf8')},
     ...JS_FILES.map((name) => ({file: path.join(jsDir, `${name}.js`),
       type: 'js', content: viewJsRaw[name]})),
     {file: 'app.css', type: 'css', content: cssSource},
@@ -424,6 +425,7 @@ async function generate(options = {}) {
   const localizedAppJs = localized.sources[at++].content;
   const localizedRuntime = localized.sources[at++].content;
   const localizedOtaImage = localized.sources[at++].content;
+  const localizedSw = localized.sources[at++].content;
   for (const name of JS_FILES) viewJsRaw[name] = localized.sources[at++].content;
   const localizedCss = localized.sources[at].content;
   const excluded = excludedClasses(options);
@@ -456,7 +458,7 @@ async function generate(options = {}) {
         ? stripRemoteControlCss(localizedCss) : localizedCss, excluded)),
     manifest: JSON.stringify(manifestObject),
     // The worker precaches every ?v= row; probe paths and itself stay out.
-    swJs: await minifyJs(fs.readFileSync(swPath, 'utf8')
+    swJs: await minifyJs(localizedSw
         .split('__SHELL_PATHS__').join(JSON.stringify(SHELL_PATHS))
         .split('__SW_ASSETS__').join(
             JSON.stringify(ASSET_PATHS.filter((p) => !p.endsWith('*') && p !== '/sw.js'))), options),
@@ -658,6 +660,7 @@ module.exports = {
   generate,
   sourcePath,
   appJsPath,
+  swPath,
   cssSourcePaths,
   VIEW_NAMES,
   VIEW_MODULES,

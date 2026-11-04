@@ -435,11 +435,154 @@ function renderScreen() {
   $("dUiWorker").textContent = t[sw ? (sw.controller ? 6 : 5) : 4];
   logHistoryControls();
 }
+// Diagnostic → Push: each value says where a notification stopped. Over HTTPS
+// only; the companion answers for itself, and the controller's facts come
+// with this page's stream.
+const pushGroup = () => $("pushGroup");
+const pushClock = (seconds) => (seconds > 0 ? new Date(seconds * 1e3).toLocaleString() : "—");
+function renderPushController() {
+  const c = companionDiagnosticStatus;
+  if (!c?.paired) return;
+  const words = __WEBUI_TEXT__("diagnostic.push_yes_no").split("|");
+  $("dPuWanted").textContent = words[c.pushWanted ? 0 : 1];
+  $("dPuEvents").textContent = (c.pushSent ?? "—") + " / " + (c.pushSkipped ?? "—");
+  $("dPuLastSent").textContent =
+    c.pushLastS >= 0
+      ? R.sub(__WEBUI_TEXT__("diagnostic.push_last_sent_value"), [
+          c.pushLastId,
+          formatUptime(c.pushLastS * 1e3),
+        ])
+      : "—";
+  $("dPuLastSkip").textContent = c.pushSkip || "—";
+}
+async function renderPushDevice() {
+  const words = __WEBUI_TEXT__("diagnostic.push_yes_no").split("|"),
+    blocked = R.pushBlocked(),
+    subscription = await R.pushSubscription().catch(() => null);
+  $("dPuSupport").textContent = blocked
+    ? __WEBUI_TEXT__("settings.app_push_blocked").split("|")[
+        ["address", "pair", "update", "unsupported", "denied"].indexOf(blocked)
+      ]
+    : words[0];
+  $("dPuPermission").textContent = "Notification" in window ? Notification.permission : "—";
+  $("dPuSubscription").textContent = subscription
+    ? new URL(subscription.endpoint).hostname +
+      " · " +
+      __WEBUI_TEXT__("diagnostic.push_key_match").split("|")[R.pushKeyMatches(subscription) ? 0 : 1]
+    : words[1];
+  const state = await caches?.open("push-state").catch(() => null),
+    when = async (name) => {
+      const at = (await (await state?.match(name))?.json())?.at;
+      return at ? new Date(at).toLocaleString() : "—";
+    };
+  $("dPuReceived").textContent = await when("/received");
+  $("dPuTapped").textContent = await when("/tapped");
+  for (const button of pushGroup().querySelectorAll("[data-result]"))
+    button.disabled = !subscription;
+  return subscription;
+}
+function pushListRow(text, action) {
+  const row = document.createElement("div");
+  row.textContent = text;
+  if (action) row.append(" ", action);
+  return row;
+}
+async function renderPushCompanion() {
+  const status = await (await R.companionLog("/__companion/push/status")).json();
+  const n = status.counters,
+    last = status.lastEvent;
+  $("dPuKey").textContent = status.fingerprint;
+  $("dPuCounts").textContent = [
+    n.events,
+    n.sent,
+    n.accepted,
+    n.failed,
+    n.removed,
+    status.pending,
+  ].join(" / ");
+  $("dPuLastEvent").textContent = last
+    ? R.sub(__WEBUI_TEXT__("diagnostic.push_last_event_value"), [
+        last.key,
+        pushClock(last.receivedAt),
+        Object.values(last.answers).join(", ") || "—",
+        Object.keys(last.receivedOn).length,
+        last.devices,
+      ])
+    : "—";
+  $("dPuLastError").textContent = status.lastError || "—";
+  $("dPuDevices").replaceChildren(
+    ...status.devices.map((device) => {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = __WEBUI_TEXT__("diagnostic.push_remove");
+      remove.onclick = () =>
+        R.companionLog("/__companion/push/remove", { id: device.id })
+          .then(renderPushGroup)
+          .catch(pushSampleError);
+      return pushListRow(
+        [device.label || device.id, device.service, pushClock(device.lastOkAt), device.lastError]
+          .filter((part) => part && part !== "—")
+          .join(" · "),
+        remove,
+      );
+    }),
+  );
+  $("dPuActivity").replaceChildren(
+    ...status.activity.map((entry) =>
+      pushListRow(
+        [pushClock(entry.at), entry.kind, entry.key, entry.status, entry.detail]
+          .filter(Boolean)
+          .join(" · "),
+      ),
+    ),
+  );
+}
+const pushSampleError = (error) => {
+  $("dPuSample").textContent = R.sub(__WEBUI_TEXT__("diagnostic.push_failed"), [
+    error.error || error.message,
+  ]);
+};
+function renderPushGroup() {
+  renderPushController();
+  return Promise.all([renderPushDevice(), renderPushCompanion().catch(pushSampleError)]);
+}
+function initPushGroup() {
+  if (location.protocol !== "https:") return;
+  const group = pushGroup();
+  group.hidden = false;
+  group.addEventListener("toggle", () => {
+    if (group.open) renderPushGroup();
+  });
+  for (const button of group.querySelectorAll("[data-result]"))
+    button.onclick = async () => {
+      const delayS = $("dPuWait").checked ? 30 : 0,
+        subscription = await R.pushSubscription(),
+        result = button.dataset.result;
+      $("dPuSample").textContent = __WEBUI_TEXT__("diagnostic.push_asked");
+      try {
+        await R.companionLog("/__companion/push/test", {
+          endpoint: subscription.endpoint,
+          topic: "shot_result",
+          delayS,
+          d: { v: 1, test: true, s: 28.4, r: result, g: 36.2, w: "m" },
+        });
+        setTimeout(
+          () => {
+            if (group.open) renderPushGroup();
+          },
+          (delayS + 3) * 1e3,
+        );
+      } catch (error) {
+        pushSampleError(error);
+      }
+    };
+}
 // The paired companion as the controller sees it.
 function renderCompanionDiagnostic(c) {
   const t = (id, v) => ($(id).textContent = (c.paired && v) || "—"),
     pair = (a, b) => (a ?? "—") + " / " + (b ?? "—");
   companionDiagnosticStatus = c;
+  if (pushGroup()?.open) renderPushController();
   $("dCoName").textContent = c.paired ? c.name : __WEBUI_TEXT__("diagnostic.companion_not_paired");
   t("dCoAddress", c.address);
   // The protocol is known only while linked, or when this controller refused it.
@@ -2068,6 +2211,7 @@ export function init() {
   renderScreen();
   navigator.serviceWorker?.addEventListener("controllerchange", renderScreen);
   R.companionHere(true).then(renderScreen);
+  initPushGroup();
   for (const section of $("diagnosticsPanel").querySelectorAll(".cfgGroup")) {
     const title = section.firstElementChild;
     // Press-and-hold copy: cancel on release, pointer exit, or a browser

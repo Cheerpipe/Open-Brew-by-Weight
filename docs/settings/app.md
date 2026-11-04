@@ -23,6 +23,11 @@ Clearing its data returns them to their defaults, and a
 - **Open the live view when a shot starts** (*installed app only*) raises the
   full-screen timer by itself when a shot begins while you are on Home — start the shot at the
   machine and the timer appears on the counter.
+- **Notify me when a shot ends** (*installed app only*) shows the shot's time,
+  yield, and result on this device, even with the app closed. It needs the
+  companion and is off until you turn it on; unlike the rest of this group, the
+  companion keeps this device's choice so it can send them. See
+  [Notifications](../features/notifications.md).
 - **Vibrate when a shot ends** gives a short buzz when the extraction
   finishes. Android phones only.
 - **Show battery percentage** adds your scale's charge as a number next to

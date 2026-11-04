@@ -5,6 +5,10 @@ R.paintTheme(R.themeMode());
 // fixed URL is served no-cache with an ETag, so each update check revalidates
 // it and an unchanged worker answers 304.
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if (R.webUiStandalone())
+  R.companionHere()
+    .then(R.pushReconcile)
+    .catch(() => {});
 document.addEventListener("click", (e) => {
   if (e.target && e.target.closest("#themeSignal")) R.cycleTheme();
 });

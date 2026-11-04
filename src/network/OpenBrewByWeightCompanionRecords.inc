@@ -98,6 +98,17 @@ void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now, bool syncHol
                                                     records.heldSinceTold, now - records.movedAtMs);
   }
   if (notice) companionNotified_.store(true, std::memory_order_release);
+  // A device wants events and the shot store moved: look once it is saved.
+  bool eventCheck = false;
+  if (gate) {
+    TaskLockGuard lock(dataMux_);
+    const CompanionLinkSlot *link = companionActiveLink();
+    eventCheck = link != nullptr && !link->closing && link->eventsWanted &&
+                 shots != g_companion.shotEvents.epoch;
+  }
+  if (eventCheck && (callbacks_.recordStoresSavePending == nullptr ||
+                     !callbacks_.recordStoresSavePending()))
+    companionNotified_.store(true, std::memory_order_release);
   if (syncHold || now - companionRecordsAtMs_ < kStatsStreamPaceMs ||
       !companionRecordsDue_.load(std::memory_order_acquire) ||
       companionRecordsPending_.exchange(true, std::memory_order_acq_rel))
@@ -131,6 +142,60 @@ bool OpenBrewByWeightNetwork::companionRecordsNoticeBody(uint8_t &count, bool sy
   return due && companionAddBody(count, "\"t\":\"rs\",\"sh\":%lu,\"hi\":%lu}",
                                  static_cast<unsigned long>(shots),
                                  static_cast<unsigned long>(history));
+}
+
+// Network task, from companionPrepareSends: the `ev` body when the newest saved
+// shot qualifies (companionShotEventVerdict). The caller records it once the
+// job is queued; a shot that does not qualify is recorded here, with its reason
+// in the Web UI log, the only diagnostic a field unit has.
+bool OpenBrewByWeightNetwork::companionShotEventBody(uint8_t &count, bool syncHold,
+                                                     ShotLogRecord &shot, uint32_t &epoch) {
+  if (syncHold || callbacks_.shotLogEpoch == nullptr || callbacks_.copyShotRecords == nullptr ||
+      callbacks_.bootId == nullptr)
+    return false;
+  uint32_t seen = 0, after = 0;
+  {
+    TaskLockGuard lock(dataMux_);
+    const CompanionLinkSlot *link = companionActiveLink();
+    if (link == nullptr || !link->eventsWanted) return false;
+    seen = g_companion.shotEvents.epoch;
+    after = g_companion.shotEvents.afterMs;
+  }
+  epoch = callbacks_.shotLogEpoch();
+  if (epoch == seen || (callbacks_.recordStoresSavePending != nullptr &&
+                        callbacks_.recordStoresSavePending()))
+    return false;
+  const uint32_t now = millis();
+  const CompanionShotEventVerdict verdict =
+      callbacks_.copyShotRecords(&shot, 1) == 0
+          ? CompanionShotEventVerdict::NONE
+          : companionShotEventVerdict(shot, callbacks_.bootId(), after, now);
+  if (verdict == CompanionShotEventVerdict::SEND) {
+    char text[256];
+    if (companionShotEventText(shot, text, sizeof(text)) && companionAddBody(count, "%s", text)) {
+      lifecycleLogf("Notifications: shot %lu sent to the companion",
+                    static_cast<unsigned long>(shot.id));
+      return true;
+    }
+    companionNotified_.store(true, std::memory_order_release);
+    return false;
+  }
+  const bool skipped = verdict != CompanionShotEventVerdict::NONE;
+  const char *const reason = verdict == CompanionShotEventVerdict::BAD ? "bad" : "stale";
+  {
+    TaskLockGuard lock(dataMux_);
+    CompanionShotEvents &events = g_companion.shotEvents;
+    events.epoch = epoch;
+    if (skipped) {
+      events.afterMs = shot.endedAtMs;
+      ++events.skipped;
+      events.skip = reason;
+    }
+  }
+  if (skipped)
+    lifecycleLogf("Notifications: shot %lu not sent (%s)", static_cast<unsigned long>(shot.id),
+                  reason);
+  return false;
 }
 
 // httpd: a record frame built in statusJson after COMPANION_RECORD_ORIGIN,

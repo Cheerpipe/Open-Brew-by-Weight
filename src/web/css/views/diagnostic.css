@@ -553,3 +553,19 @@ small {
   pointer-events: none;
   cursor: default;
 }
+
+.pushSamples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pushSamples label,
+.pushSamples small {
+  flex-basis: 100%;
+}
+
+.pushList {
+  overflow-wrap: anywhere;
+}
