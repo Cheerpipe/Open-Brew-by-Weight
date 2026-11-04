@@ -1031,9 +1031,9 @@ inline CompanionShotEventVerdict companionShotEventVerdict(const ShotLogRecord &
                                                            uint32_t nowMs) {
   if (record.bootId != bootId || static_cast<int32_t>(record.endedAtMs - afterMs) <= 0)
     return CompanionShotEventVerdict::NONE;
-  char yield[32];
+  char field[32];
   if (record.durationDs <= MIN_SHOT_LOG_DURATION_MS / 100U ||
-      companionShotEventYield(record, yield) == nullptr)
+      companionShotEventYield(record, field) == nullptr)
     return CompanionShotEventVerdict::BAD;
   return nowMs - record.endedAtMs > COMPANION_EVENT_FRESH_MS ? CompanionShotEventVerdict::STALE
                                                              : CompanionShotEventVerdict::SEND;
@@ -1041,8 +1041,8 @@ inline CompanionShotEventVerdict companionShotEventVerdict(const ShotLogRecord &
 
 // The `ev` frame's body. Its values print as the Stats row prints them.
 inline bool companionShotEventText(const ShotLogRecord &record, char *text, size_t capacity) {
-  char yield[32];
-  const char *const value = companionShotEventYield(record, yield);
+  char field[32];
+  const char *const value = companionShotEventYield(record, field);
   const int length = snprintf(
       text, capacity,
       "\"t\":\"ev\",\"topic\":\"shot_result\",\"key\":\"%lu-%lu\",\"ttl\":%lu,"
