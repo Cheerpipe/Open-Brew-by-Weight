@@ -1236,11 +1236,14 @@ esp_err_t OpenBrewByWeightNetwork::otaPatchWork(httpd_req_t *request) {
                                       const char *message, const char *reason) {
     // An async request's leftover body is never purged by httpd, and closing
     // over unread bytes answers RST, which loses this error at the client.
-    // Drain at most one range, unless a shot or a server stop takes priority.
+    // Drain at most one range for at most 5 s, as readJsonBody allows a body,
+    // unless a shot or a server stop takes priority: a trickling peer must not
+    // hold the OTA worker while its refusal waits.
     OtaTransfer transfer{&self, request};
     char sink[256];
+    const uint32_t startedAtMs = millis();
     for (uint32_t left = OTA_TRANSFER_CHUNK_BYTES;
-         left > 0 && otaTransferStillSafe(&transfer);) {
+         left > 0 && millis() - startedAtMs < 5000 && otaTransferStillSafe(&transfer);) {
       const int got = httpd_req_recv(request, sink, left < sizeof(sink) ? left : sizeof(sink));
       if (got <= 0) break;
       left -= static_cast<uint32_t>(got);
