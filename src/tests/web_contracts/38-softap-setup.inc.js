@@ -42,6 +42,12 @@
     throw new Error(
         'SoftAP admin bypass must match the AP interface address and peer subnet, gated on apActive');
   }
+  // The bypasses above see only direct peers: the relay never runs over the SoftAP.
+  const relaySource = readSources(['network/OpenBrewByWeightCompanionRelay.inc']);
+  if (!codeIncludes(relaySource, '!companionPeer(httpd_req_to_sockfd(request),address)||socketServedBySoftAp(httpd_req_to_sockfd(request))') ||
+      !codeIncludes(relaySource, '!companionPeer(fd,address)||socketServedBySoftAp(fd)')) {
+    throw new Error('The relay handshake and admission must refuse a socket the SoftAP serves');
+  }
   if (!codeIncludes(handshake, 'session.fromSoftAp=socketServedBySoftAp(session.fd)') ||
       (network.match(/unlocked \|= session\.fromSoftAp/g) || []).length !== 1) {
     throw new Error(

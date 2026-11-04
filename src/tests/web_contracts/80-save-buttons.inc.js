@@ -67,7 +67,7 @@
          codeIncludes(adminUi, "const networkChanged=()=>R.setSaveDirty('saveNetworkButton','',true)") &&
          codeIncludes(adminUi, "R.setSaveDirty('saveWebhookButton','webhookDirtyHint',true)") &&
          codeIncludes(adminUi, "R.setSaveDirty('changeDevicePasswordButton','',false)") &&
-         codeIncludes(adminUi, "R.command('/api/v1/network',payload,undefined,undefined,undefined,'saveNetworkButton',).then((ok)=>{if(!ok)return") &&
+         codeIncludes(adminUi, "R.command('/api/v1/network',payload,true,undefined,undefined,'saveNetworkButton').then(saved)") &&
          codeIncludes(adminUi, "R.command('/api/v1/device/password',{newPassword:") &&
          // Every Admin section marks itself dirty through one named helper.
          codeIncludes(adminUi, "for(const name of['ble','power','frontend','scheduledRestart'])sectionChanged('#'+name+'Panel',()=>sectionDirty(name,true))") &&
@@ -115,11 +115,12 @@
   // Admin sections saved whole carry the revision their form was filled from
   // (several screens through the companion): never the latest one, never one
   // the browser made up, and a refused save shows the saved values again.
+  // Date and time and the scheduled restart carry none: they change only their
+  // own fields, and the global revision moves with every finished shot.
+  assert(!codeIncludes(adminUi, 'formRevisions.dateTime') &&
+         !codeIncludes(adminUi, 'formRevisions.scheduledRestart'),
+      'A finished shot must not refuse a date and time or scheduled restart save');
   for (const [fill, send, clean] of [
-    ['formRevisions.dateTime=c.revision', '{...payload,baseRevision:formRevisions.dateTime}',
-      "formStale(e,()=>sectionDirty('dateTime',false))"],
-    ['formRevisions.scheduledRestart=c.revision', 'baseRevision:formRevisions.scheduledRestart,',
-      "formStale(e,()=>sectionDirty('scheduledRestart',false))"],
     ['formRevisions.webhooks=w.revision', 'baseRevision:formRevisions.webhooks,',
       'formStale(e,()=>(webhookDirty=false))'],
     ['formRevisions.network=n.revision', 'baseRevision:formRevisions.network,', ''],
@@ -129,7 +130,9 @@
   assert(!codeIncludes(adminUi, 'withBaseRev({...payload})') &&
          !codeIncludes(adminUi, 'withBaseRev({scheduledRestartEnabled') &&
          codeIncludes(blockAt(adminUi, 'function loadNetworkAddress('), 'formRevisions.network=n.revision') &&
-         codeIncludes(adminUi, "elseif($('saveNetworkButton').dataset.dirty!=='1')R.resetNetworkAddressLoaded()"),
+         codeIncludes(adminUi, "elseif($('saveNetworkButton').dataset.dirty!=='1')R.resetNetworkAddressLoaded();else R.uiState.networkRevisionMoved=true;") &&
+         codeIncludes(blockAt(adminUi, 'function loadNetworkAddress('), 'if(R.uiState.networkRevisionMoved&&n.revision!==formRevisions.network){R.uiState.networkRevisionMoved=false;formRevisions.network=n.revision;}') &&
+         codeIncludes(adminUi, 'if(!formStale(e,saved))'),
     'Admin forms save against their own revision, and a Wi-Fi sleep save reloads a clean network form');
   {
     const run = vm.createContext({R: {message: (text, kind) => { run.shown = [text, kind]; }},

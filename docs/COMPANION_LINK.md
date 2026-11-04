@@ -566,7 +566,12 @@ handshake fails because `rb` changed. Forget and a factory reset end the
 relay session, and so does a change of either switch in Admin → Companion:
 the companion's next relayed request is `RELAY_STALE`, and its new handshake
 carries the new `ui` and `link`. A missing `ui` reads as `true` and a missing
-`link` as `false`.
+`link` as `false`. Forget and turning **Web UI through the companion** off also
+close the relayed ui-stream, without a close frame, and end its claim.
+
+The relay does not run over the SoftAP: a handshake or relayed request on a
+socket the SoftAP serves answers `403 COMPANION_PEER`, because the trust given to
+whoever joined the SoftAP must not reach every screen of a companion.
 
 ### Signed requests
 

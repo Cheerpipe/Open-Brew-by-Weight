@@ -81,10 +81,14 @@ A few things stay one at a time, on purpose:
 - **Admin unlocks for one screen at a time.** Unlocking Admin on the tablet
   locks it again on the phone, so only one screen can start the machine or
   change Admin settings.
-- **Saving a form that changed meanwhile.** If someone saves the same Admin
-  settings on another screen while you are editing them, your save is refused
-  and the form shows what is saved now. Make your change again if you still
-  need it.
+- **Saving a form that changed meanwhile.** If someone saves the same network or
+  webhook settings on another screen while you are editing them, your save is
+  refused and the form shows what is saved now. Make your change again if you
+  still need it. For date and time and the scheduled restart, the last save wins.
+- **No secure session, no Web UI through the companion.** A paired companion
+  sends everything to the controller sealed. If it can't open that secure session,
+  for instance when the two run versions that don't match, its pages say so and name
+  the controller's own address, which keeps working. Update whichever is behind.
 - **Opening the Web UI directly takes over.** If someone opens the
   controller's own address instead of the companion's, every companion screen
   pauses and says the Web UI was opened directly on another device. **Reload**
@@ -345,9 +349,9 @@ does.
 
 A factory reset forgets the companion on the controller only. The companion
 can no longer connect, but it keeps everything it received, the archive
-included. Pair the controller with it again and the companion picks up its
-archive where it left off, with the history before the reset kept as an
-earlier history.
+included. Until you pair them again, its address can't open the Web UI: use the
+controller's own address. Once paired, the companion picks up its archive where
+it left off, with the history before the reset kept as an earlier history.
 
 ## Checking that it works
 

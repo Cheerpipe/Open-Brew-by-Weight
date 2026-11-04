@@ -30,6 +30,9 @@ function setSaveDirty(id, hintId, dirty) {
 // over a change made meanwhile (another screen through the companion) is
 // refused, and the form shows the saved values again.
 const formRevisions = {};
+// The controller's relay session outlives a companion that went away, so it says
+// connected only while no feature needs the link, which would otherwise tell.
+const companionRelayOnly = (c) => c.relay === "ready" && !c.log && !c.archive && !c.lm;
 function formStale(e, clean) {
   if (e?.status !== 409 || !/REVISION/.test(e.code || "")) return false;
   clean();
@@ -724,7 +727,9 @@ function applyCompanionStatus(c) {
   $("companionLinkState").textContent =
     (link
       ? __WEBUI_TEXT__("admin.companion_link_open")
-      : __WEBUI_TEXT__("admin.companion_link_down")) +
+      : companionRelayOnly(c)
+        ? __WEBUI_TEXT__("admin.companion_relay_only")
+        : __WEBUI_TEXT__("admin.companion_link_down")) +
     (c.linkAgeS >= 0
       ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
       : "") +
@@ -931,7 +936,14 @@ async function startWifiScan() {
   });
 }
 function loadNetworkAddress(n) {
-  if (!n || R.uiState.networkAddressLoaded) return;
+  if (!n) return;
+  // Its own Wi-Fi sleep save: a dirty form keeps its fields and takes up the revision that moved.
+  if (R.uiState.networkRevisionMoved && n.revision !== formRevisions.network) {
+    R.uiState.networkRevisionMoved = false;
+    formRevisions.network = n.revision;
+  }
+  if (R.uiState.networkAddressLoaded) return;
+  R.uiState.networkRevisionMoved = false;
   R.uiState.networkAddressLoaded = true;
   formRevisions.network = n.revision;
   R.uiState.savedStaSsid = n.wifiConfigured && n.ssid ? n.ssid : "";
@@ -988,6 +1000,7 @@ async function setWifiSleep() {
   if (!ok) el.checked = R.uiState.savedStaWifiSleep;
   // The save moved the network revision: a clean form takes it up again.
   else if ($("saveNetworkButton").dataset.dirty !== "1") R.resetNetworkAddressLoaded();
+  else R.uiState.networkRevisionMoved = true;
   return ok;
 }
 function formatNetworkStatus(n) {
@@ -1024,7 +1037,7 @@ async function saveDateTimeConfig() {
   try {
     await R.command(
       "/api/v1/config",
-      { ...payload, baseRevision: formRevisions.dateTime },
+      payload,
       1,
       __WEBUI_TEXT__("runtime.date_and_time_settings_saved"),
       fail,
@@ -1036,8 +1049,7 @@ async function saveDateTimeConfig() {
     }
     await R.refreshStatus();
   } catch (e) {
-    if (!formStale(e, () => sectionDirty("dateTime", false)))
-      R.message(R.formatCommandError(fail, e), "error");
+    R.message(R.formatCommandError(fail, e), "error");
     await R.refreshStatus();
   }
 }
@@ -1055,7 +1067,6 @@ function loadAdminConfig(c) {
     $("timezoneAutomatic").checked = !!c.timezoneAutomatic;
     $("ntpSyncEnabled").checked = c.ntpSyncEnabled !== false;
     setSaveDirty("saveDateTimeButton", "dateTimeDirtyHint", false);
-    formRevisions.dateTime = c.revision;
   }
   const state = $("timezoneSaveState");
   if (state)
@@ -1975,7 +1986,6 @@ function loadScheduledRestart(c) {
     R.uiState.scheduledRestartBaseline = R.snapshotControls(
       document.querySelectorAll("#scheduledRestartPanel input"),
     );
-    formRevisions.scheduledRestart = c.revision;
   }
   $("scheduledRestartStatus").textContent = R.uiState.scheduledRestartDirty
     ? ""
@@ -1998,7 +2008,6 @@ async function saveScheduledRestart() {
       const p = {
           scheduledRestartEnabled: $("scheduledRestartEnabled").checked,
           scheduledRestartMinuteOfDay: restartMinute(),
-          baseRevision: formRevisions.scheduledRestart,
         },
         a = await R.api("/api/v1/config", { method: "POST", body: R.body(p) });
       await waitSaved(
@@ -2012,7 +2021,7 @@ async function saveScheduledRestart() {
     sectionDirty("scheduledRestart", false);
     return true;
   } catch (e) {
-    if (!formStale(e, () => sectionDirty("scheduledRestart", false))) R.message(e.message, "error");
+    R.message(e.message, "error");
     return false;
   } finally {
     b.classList.remove("busy");
@@ -2057,7 +2066,7 @@ const ADMIN_SUMMARIES = {
         ? R.sub(__WEBUI_TEXT__("admin.sum_companion_request"), [c.request.name])
         : __WEBUI_TEXT__("admin.sum_not_paired");
     return R.sub(
-      c.link === "open"
+      c.link === "open" || companionRelayOnly(c)
         ? __WEBUI_TEXT__("admin.sum_companion_connected")
         : c.peerProtocol > 0
           ? __WEBUI_TEXT__("admin.sum_companion_update")
@@ -2297,19 +2306,21 @@ export function init() {
       )
         return;
     } else payload._noReconnectWait = true;
-    R.command(
-      "/api/v1/network",
-      payload,
-      undefined,
-      undefined,
-      undefined,
-      "saveNetworkButton",
-    ).then((ok) => {
-      if (!ok) return;
+    const saved = () => {
       $("staPassword").value = "";
       setSaveDirty("saveNetworkButton", "", false);
       R.resetNetworkAddressLoaded();
-    });
+    };
+    R.command("/api/v1/network", payload, true, undefined, undefined, "saveNetworkButton")
+      .then(saved)
+      .catch((e) => {
+        if (!formStale(e, saved))
+          R.message(
+            R.formatCommandError(R.commandFailMessage("/api/v1/network", payload), e),
+            "error",
+          );
+        R.refreshStatus();
+      });
   };
   $("forgetNetworkButton").onclick = () => {
     if (confirm(__WEBUI_TEXT__("admin.forget_the_sta_network_and_restart")))
