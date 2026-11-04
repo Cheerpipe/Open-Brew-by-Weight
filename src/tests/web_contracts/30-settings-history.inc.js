@@ -525,8 +525,8 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !diagHtml.includes('<strong>Clock</strong>') ||
       !diagHtml.includes('<strong>Temp current</strong>') ||
       !diagHtml.includes('<strong>Temp peak</strong>') ||
-      // 22 Diagnostics sections and folds, plus the log's Logging settings.
-      (diagHtml.match(/<details/g) || []).length !== 23 ||
+      // 23 Diagnostics sections and folds, plus the log's Logging settings.
+      (diagHtml.match(/<details/g) || []).length !== 24 ||
       // Shot storage is its own section after HEAP and NVS, read when opened.
       diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Shot storage</summary>') ||
       diagHtml.indexOf('<summary>Shot storage</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
@@ -558,7 +558,8 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       diagHtml.indexOf('<summary>RAM</summary>') > diagHtml.indexOf('<summary>HEAP</summary>') ||
       diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
       diagHtml.indexOf('<summary>Date and time</summary>') > diagHtml.indexOf('<summary>Companion</summary>') ||
-      diagHtml.indexOf('<summary>Companion</summary>') > diagHtml.indexOf('<summary>Misc</summary>') ||
+      diagHtml.indexOf('<summary>Companion</summary>') > diagHtml.indexOf('<summary>Push</summary>') ||
+      diagHtml.indexOf('<summary>Push</summary>') > diagHtml.indexOf('<summary>Misc</summary>') ||
       diagHtml.includes('<summary>Frontend</summary>') ||
       diagHtml.indexOf('id="hWifiState"') > diagHtml.indexOf('id="hWifiPs"') ||
       diagHtml.indexOf('id="hWifiPs"') > diagHtml.indexOf('id="hWifiCoex"') ||

@@ -47,6 +47,10 @@ does today.
   show your whole history, even with the controller off. See
   [Your whole history](#your-whole-history) below.
 
+- **Sends your notifications.** An app installed from the companion's address can
+  [notify you when a shot ends](notifications.md). The controller decides what to
+  say and when; the companion only delivers it, over its own internet connection.
+
 If the companion stops, the controller reconnects to La Marzocco on its own.
 During a shot with a scale it waits until the shot is over, so nothing
 competes with your scale; without a scale it reconnects right away. A

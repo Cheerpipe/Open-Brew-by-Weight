@@ -31,11 +31,11 @@ struct CompanionSendJob {
   uint32_t generation;
   uint8_t count;
   uint8_t retries;  // clean aborts httpd deferred to the network task
-  // The sync bodies (S17: log, rs, the ping's hold answer), 0xFF for none,
+  // The sync bodies (S17: log, rs, the ping's hold answer, ev), 0xFF for none,
   // and the log cursor before this job: a hold that begins before httpd
   // sends them drops them and rewinds, so they go again after it.
-  uint8_t logBody, noticeBody, replyBody;
-  uint32_t logFrom;
+  uint8_t logBody, noticeBody, replyBody, eventBody;
+  uint32_t logFrom, eventFrom;
   char bodies[COMPANION_FRAME_BYTES];
 };
 constexpr size_t kCompanionPlainBytes = 1408;  // every field escaped at worst
@@ -691,7 +691,8 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   // newer companion keeps its link. Known types must be well formed; the La
   // Marzocco ones exist only on Linea Micra builds.
   const bool record = !strcmp(type, "rx") || !strcmp(type, "rf") || !strcmp(type, "rt");
-  if (strcmp(type, "ping") != 0 && strcmp(type, "logsub") != 0 && !record &&
+  if (strcmp(type, "ping") != 0 && strcmp(type, "logsub") != 0 && strcmp(type, "ps") != 0 &&
+      !record &&
       (!kCompanionLm || (strcmp(type, "lm") != 0 && strcmp(type, "creds") != 0 &&
                          strcmp(type, "res") != 0 && strcmp(type, "st") != 0))) {
     static RefusalLog unknown;
@@ -716,6 +717,14 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
     machineIntegrationCompanionPing(flag);
 #endif
+  } else if (!strcmp(type, "ps") && jsonBoolean(frame, "on", flag)) {
+    TaskLockGuard lock(dataMux_);
+    slot.eventsWanted = flag;
+    CompanionShotEvents &events = g_companion.shotEvents;
+    if (flag && !events.armed) {
+      events.armed = true;
+      events.afterMs = millis();
+    }
   } else if (!strcmp(type, "logsub") || record) {
     if (!(record ? companionLinkRecordRequest(slot, frame, type) : companionLinkLogSub(slot, frame)))
       return companionLinkRefuse(slot, "a malformed frame arrived", false);
@@ -999,7 +1008,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   memset(sent.key, 0, sizeof(sent.key));
   memset(&companionWs().job, 0, sizeof(companionWs().job));
   CompanionSendJob &job = companionWs().job;
-  job.logBody = job.noticeBody = job.replyBody = 0xFF;
+  job.logBody = job.noticeBody = job.replyBody = job.eventBody = 0xFF;
   uint8_t count = 0;
   // The bodies this pass owes the session (`due`) and the ones it built.
   struct Bodies {
@@ -1082,6 +1091,15 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   uint32_t told[2] = {};
   const bool notice = companionRecordsNoticeBody(count, syncHold, told);
   if (notice) job.noticeBody = static_cast<uint8_t>(count - 1);
+  // A shot's event, in the same pass, so it costs no wakeup of its own.
+  ShotLogRecord eventShot = {};
+  uint32_t eventEpoch = 0;
+  const bool shotEvent = companionShotEventBody(count, syncHold, eventShot, eventEpoch);
+  if (shotEvent) {
+    job.eventBody = static_cast<uint8_t>(count - 1);
+    TaskLockGuard lock(dataMux_);
+    job.eventFrom = g_companion.shotEvents.afterMs;
+  }
   // A body that could not be built stays due and is tried on the next pass.
   const bool complete = built == due;
   if (!complete || logMore) companionNotified_.store(true, std::memory_order_release);
@@ -1128,6 +1146,14 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     companionRecords_->toldHistory = told[1];
     companionRecords_->heldSinceTold = companionRecords_->noticeDue = false;
   }
+  if (shotEvent) {
+    CompanionShotEvents &events = g_companion.shotEvents;
+    events.afterMs = eventShot.endedAtMs;
+    events.epoch = eventEpoch;
+    ++events.sent;
+    events.lastId = eventShot.id;
+    events.lastAtMs = millis();
+  }
 }
 
 // httpd: sign the queued bodies with the session key and send them in order.
@@ -1150,13 +1176,15 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
   CompanionSendJob &job = companionWs().job;
   const char *body = job.bodies;
   uint8_t done = 0;
-  bool deferred = false, logDropped = false, noticeDropped = false;
+  bool deferred = false, logDropped = false, noticeDropped = false, eventDropped = false;
   const bool held = fd >= 0 && self.companionSyncHold();
   uiStreamSendKind = "companion";
   for (; fd >= 0 && done < job.count; ++done) {
-    if (companionSyncBodyHeld(held, done, job.logBody, job.noticeBody, job.replyBody)) {
+    if (companionSyncBodyHeld(held, done, job.logBody, job.noticeBody, job.replyBody,
+                              job.eventBody)) {
       logDropped = logDropped || done == job.logBody;
       noticeDropped = noticeDropped || done == job.noticeBody;
+      eventDropped = eventDropped || done == job.eventBody;
       body += strlen(body) + 1;
       continue;
     }
@@ -1198,6 +1226,13 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
       }
       if (noticeDropped && self.companionRecords_ != nullptr)
         self.companionRecords_->toldShots = self.companionRecords_->toldHistory = 0;
+      if (eventDropped) {
+        // Dropped for a hold: the shot is looked at again after it.
+        CompanionShotEvents &events = g_companion.shotEvents;
+        events.afterMs = job.eventFrom;
+        events.epoch = 0;
+        --events.sent;
+      }
     }
     if (done != 0) httpd_sess_update_lru_counter(self.server_, fd);
     if (!sent && !deferred) (void)httpd_sess_trigger_close(self.server_, fd);
@@ -1209,7 +1244,7 @@ void OpenBrewByWeightNetwork::companionSendWork(void *context) {
     memmove(job.bodies, body, rest);
     memset(job.bodies + rest, 0, sizeof(job.bodies) - rest);
     job.count = static_cast<uint8_t>(job.count - done);
-    for (uint8_t *index : {&job.logBody, &job.noticeBody, &job.replyBody})
+    for (uint8_t *index : {&job.logBody, &job.noticeBody, &job.replyBody, &job.eventBody})
       *index = *index == 0xFF || *index < done ? 0xFF : static_cast<uint8_t>(*index - done);
     self.companionSendRetry_.store(true, std::memory_order_release);
     return;

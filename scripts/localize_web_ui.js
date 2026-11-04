@@ -290,7 +290,7 @@ function projectSources() {
     ['html/settings.html', 'html'], ['html/admin.html', 'html'],
     ['html/setup.html', 'html'],
     ...CSS_SOURCES.map((name) => [`css/${name}`, 'css']),
-    ['app.js', 'js'], ['js/runtime.js', 'js'],
+    ['app.js', 'js'], ['sw.js', 'js'], ['js/runtime.js', 'js'],
     ['js/ota-image.js', 'js'], ['js/home.js', 'js'], ['js/stats.js', 'js'],
     ['js/history.js', 'js'], ['js/records.js', 'js'],
     ['js/diagnostic.js', 'js'], ['js/settings.js', 'js'], ['js/admin.js', 'js'],

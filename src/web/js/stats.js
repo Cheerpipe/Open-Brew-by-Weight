@@ -1271,6 +1271,7 @@ function renderShots() {
     }
   }
   R.lockControls(body);
+  pushedShotShow(list);
   archiveListNote("shotArchiveNote", R.uiState.shotHistory.hasMore);
   R.setEmptyState(
     "shotTableState",
@@ -1417,6 +1418,41 @@ function setShotSort(field) {
   else R.uiState.shotSort = field;
   syncShotSortButtons();
   statsSendSubscribe();
+}
+// The shot a tapped notification names (sw.js), read once from the address, so
+// a reload does not jump again. The tap loads the page anew, so no filter or sort
+// is on; it asks for more pages, up to a limit, only while the card is missing.
+const PUSHED_SHOT_PAGES = 5,
+  PUSHED_SHOT_WAIT_MS = 2e4;
+let pushedShot = null;
+function pushedShotRead() {
+  const query = new URLSearchParams(location.search),
+    id = +query.get("shot");
+  if (!(id > 0)) return;
+  pushedShot = { id, boot: +query.get("boot"), end: +query.get("end"), left: PUSHED_SHOT_PAGES };
+  history.replaceState({}, "", location.pathname);
+  setTimeout(pushedShotMissing, PUSHED_SHOT_WAIT_MS);
+}
+function pushedShotMissing() {
+  if (!pushedShot) return;
+  pushedShot = null;
+  $("shotPushedNote").hidden = false;
+}
+function pushedShotShow(list) {
+  if (!pushedShot) return;
+  const { id, boot, end } = pushedShot;
+  if (!list.some((r) => r.id === id && r.bootId === boot && r.endedAtMs === end)) {
+    if (!R.uiState.shotHistory.hasMore || pushedShot.left-- <= 0) return pushedShotMissing();
+    return void loadMoreShots();
+  }
+  pushedShot = null;
+  const row = [...$("shotRows").rows].find((r) => +r.dataset.id === id);
+  if (!row) return;
+  row.classList.add("shotPushed");
+  row.scrollIntoView({
+    block: "center",
+    behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+  });
 }
 const loadMoreShots = () => {
   if (statsArchiveNeed === "archive") return loadArchive("shots", renderShots);
@@ -2843,6 +2879,7 @@ export function init() {
     },
   );
   armListSentinel("shotLogSentinel", loadMoreShots);
+  pushedShotRead();
   R.armStickyBar("shotStickySentinel");
   renderStatsDurChart();
 }

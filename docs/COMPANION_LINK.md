@@ -162,6 +162,9 @@ Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
 `log`, `logCursor`, `logFlushS` (age of the last log flush, `-1` never),
 `logGaps` (events reported missing this boot), `archiveSwitch`,
 `archiveSyncS` (age of the last `rec` or `trc` frame, `-1` never this boot),
+`pushWanted` (this session's `ps`), `pushSent` and `pushSkipped` (this boot),
+`pushLastId`, `pushLastS` (age of the last `ev`, `-1` never this boot),
+`pushSkip` (why the last shot was not sent: `bad`, `stale`, or empty),
 `relay`, `relayRejects` and,
 on Linea Micra builds, `route`, `reason` (why the
 route is direct; `protocol` while `peerProtocol` is set), `lm`, `upstream`,
@@ -237,6 +240,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 | `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
 | `{"t":"log","b":42,"e":[[seq,atMs,wallSec,lvl,cat,"message"],…]}` | Diagnostic log events (below), the formatted text the Web UI log view renders, `lvl` one of `c/e/w/i/d` |
 | `{"t":"rs","sh":E1,"hi":E2}` | The shot and activation store epochs, once a change to either is saved ([archive sync](#archive-sync)) |
+| `{"t":"ev","topic":"shot_result","key":"42-1003","ttl":3600,"d":{…}}` | An event for the devices that asked for its topic ([events](#events)) |
 | `{"t":"rec","f":{…}}` | A record answer: `f` is a record index (`records`) or a ui-stream `history` or `stats` frame ([archive sync](#archive-sync)) |
 | `{"t":"trc","id":12,"b":43,"e":918204,"r":"ok","d":"…"}` | One shot's trace, or why there is none ([archive sync](#archive-sync)) |
 
@@ -275,10 +279,11 @@ secrets directory and never in logs.
 | `{"t":"rx","s":"shots","ep":12,"d":1}` | A store's record index (`s` `shots` or `history`); `ep` is the epoch the companion holds (0: none). Optional `d` (only `1`) accepts a delta against that epoch (below). The session's first `rx` subscribes it to `rs` |
 | `{"t":"rf","s":"shots","o":0,"n":50,"r":7}` | A fetch window: offset `o` 0–1000, `n` 1–50 shots or 1–120 activations, `r` echoed as the page's `request` |
 | `{"t":"rt","id":12,"b":43,"e":918204}` | One shot's trace by its Stats identity (`id` ≥ 1, `bootId`, `endedAtMs`) |
+| `{"t":"ps","on":true}` | Whether any device wants events ([events](#events)) |
 | `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the boot the companion stored last and its last stored sequence; the controller maps another boot to `after` 0. Sent once per session, after `cfg.log` is true and `dev` named the controller (so the cursor is that controller's), and again from the same cursor when the companion could not store a frame; `on:false` asks the controller to stop the stream (the switch itself is `cfg`'s to say) |
 
 Builds without La Marzocco know only `ping` (its `up` is ignored there),
-`logsub`, `rx`, `rf` and `rt`; the other four are types they do not know and
+`ps`, `logsub`, `rx`, `rf` and `rt`; the other four are types they do not know and
 ignore. A malformed `rx`, `rf` or `rt` closes the link like any known frame.
 
 The controller closes a link that sends nothing for two ping intervals: 35
@@ -456,6 +461,32 @@ infers ratings, deletions and restarted histories from the index.
   waits one second for the ones that follow it. It does not wait for a ping.
   There is no `rs` at the session start, since each `rx` answer already names
   its store's epoch, and each ping answer names both epochs again.
+
+### Events
+
+The controller decides which events exist and when they fire, and the Web UI's
+service worker turns them into text. The companion only delivers: it passes `d`
+on unread, and holds no notification wording and no shot rule.
+
+- **`ps`.** The companion sends `on:true` when a device is subscribed: on each
+  session's `cfg`, and when the first device arrives. `on:false` follows the last
+  device. No `ps` in a session means none wanted, so the controller then sends no
+  `ev` and does not read the shot store for it. The first `on:true` of a boot arms the
+  events: shots that ended before it never notify. `ps` is a sync request: it waits
+  for the end of a sync hold.
+- **`ev`.** `topic` and `key` are opaque strings (at most 32 and 64 bytes), `ttl` is
+  how long a push service may hold the message, in seconds, and `d` is an object of at
+  most 1 KiB. A malformed `ev` closes the link. `ev` is a sync body: it never crosses
+  during a hold, and leaves in the pass that finds the store saved after one.
+- **`shot_result`.** `d` is
+  `{"v":1,"id":1003,"b":42,"e":918204,"at":1762268000,"s":28.4,"r":"fast","g":36.20,"w":"m"}`:
+  the shot's Stats identity (`id`, `bootId`, `endedAtMs`), `at` its end in Unix seconds
+  (0 without a clock), `s` its duration, `r` its result (`on_recipe`, `fast`, `slow` or
+  null) and `g` its yield, measured (`w` `m`) or estimated after a scale loss (`w` `e`).
+  Only the newest shot is looked at. It fires for a shot of this boot that ended since
+  the last one looked at and at most 10 minutes ago. A rating, a deletion or a Clear
+  never fires. A short shot, or one with no yield and no estimate, does not fire: the
+  Web UI log and `pushSkip` say so. An event not sent before a restart is lost.
 
 ### Sync holds
 

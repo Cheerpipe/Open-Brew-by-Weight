@@ -2806,6 +2806,89 @@ async function companionLog(path, body) {
     throw Object.assign(Error(String(reply.status)), await reply.json().catch(() => null));
   return reply;
 }
+// Notifications through the companion (docs/features/notifications.md), for this
+// browser: why it cannot have them, the subscription, and turning them on and off.
+const PUSH_TOPICS = ["shot_result"];
+function pushBlocked() {
+  const here = uiState.companionHere;
+  if (location.protocol !== "https:" || !here) return "address";
+  if (!here.paired) return "pair";
+  if (!here.push?.publicKey) return "update";
+  if (!("serviceWorker" in navigator && "PushManager" in window && "Notification" in window))
+    return "unsupported";
+  return Notification.permission === "denied" ? "denied" : "";
+}
+async function pushSubscription() {
+  const registration = await navigator.serviceWorker?.getRegistration();
+  return (await registration?.pushManager?.getSubscription()) ?? null;
+}
+const pushKeyBytes = (text) =>
+  Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+function pushKeyMatches(subscription) {
+  const here = subscription?.options?.applicationServerKey,
+    key = uiState.companionHere?.push?.publicKey;
+  if (!here || !key) return false;
+  const a = new Uint8Array(here),
+    b = pushKeyBytes(key);
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+function pushDeviceLabel() {
+  const ua = navigator.userAgent,
+    device =
+      ua.match(/iPhone|iPad|Android|Macintosh|Windows|Linux/)?.[0].replace("Macintosh", "Mac") ??
+      "",
+    browser = ua.match(/Edg|Firefox|Chrome|Safari/)?.[0].replace("Edg", "Edge") ?? "";
+  return [device, browser].filter(Boolean).join(" · ");
+}
+const pushRegister = (subscription) =>
+  companionLog("/__companion/push/subscribe", {
+    subscription,
+    topics: PUSH_TOPICS,
+    label: pushDeviceLabel(),
+  });
+// In the tap: the permission prompt needs it, on iOS above all.
+async function pushEnable() {
+  if ((await Notification.requestPermission()) !== "granted") throw Error("denied");
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (subscription && !pushKeyMatches(subscription)) {
+    await subscription.unsubscribe();
+    subscription = null;
+  }
+  subscription ??= await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: pushKeyBytes(uiState.companionHere.push.publicKey),
+  });
+  try {
+    await pushRegister(subscription);
+  } catch (error) {
+    await subscription.unsubscribe().catch(() => {});
+    throw error;
+  }
+}
+async function pushDisable() {
+  const subscription = await pushSubscription();
+  if (!subscription) return;
+  const { endpoint } = subscription;
+  await subscription.unsubscribe();
+  await companionLog("/__companion/push/unsubscribe", { endpoint });
+}
+// Once per open of an installed app: the companion, and only it, hears that
+// this device is still here, under the key it has now, and gets a receipt the
+// worker could not post away from home.
+async function pushReconcile() {
+  if (pushBlocked()) return;
+  const subscription = await pushSubscription();
+  if (!subscription) return;
+  if (pushKeyMatches(subscription)) await pushRegister(subscription);
+  else await pushEnable();
+  const state = await caches.open("push-state"),
+    receipt = await (await state.match("/received"))?.json();
+  if (receipt && !receipt.acked) {
+    await companionLog("/__companion/push/ack", { ...receipt, endpoint: subscription.endpoint });
+    await state.put("/received", new Response(JSON.stringify({ ...receipt, acked: true })));
+  }
+}
 let companionHereLoad = null;
 function companionHere(fresh) {
   if (location.protocol !== "https:") return Promise.resolve(null);
@@ -3079,6 +3162,7 @@ async function decidePairing(allow) {
         ))
       )
         return;
+      await pushDisable().catch(() => {});
       await api("/api/v1/auth/logout", { method: "POST", body: "{}" }).catch(() => {});
       storeSession("", false);
       location.reload();
@@ -7654,6 +7738,12 @@ export {
   companionHere,
   companionLog,
   companionPairable,
+  pushBlocked,
+  pushSubscription,
+  pushKeyMatches,
+  pushEnable,
+  pushDisable,
+  pushReconcile,
   webUiStandalone,
   pairCompanionHere,
   refreshTimezonePreview,

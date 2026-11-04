@@ -527,6 +527,12 @@ Your shots live on the controller, so **Shots** needs it to be on. With
 installed through it can still show the shots the companion keeps, read-only,
 while the controller is out of reach.
 
+### From a notification
+
+Tapping a [notification](notifications.md) opens **Shots** on that shot's card, with
+any filter cleared. If the shot is no longer there, or the app cannot reach your
+controller, a short message says so.
+
 ## Export and share shots
 
 **Export**, next to Filter, opens a small menu with two choices. They

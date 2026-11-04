@@ -71,6 +71,9 @@
     <rect x="4" y="13" width="16" height="7" rx="1.5" />
     <path d="M8 7.5h.01M8 16.5h.01" />
   </symbol>
+  <symbol id="dg-push" viewBox="0 0 24 24">
+    <path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2ZM10 21h4" />
+  </symbol>
   <symbol id="dg-misc" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" /></symbol>
   <symbol id="dg-compile-flags" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5" /></symbol>
 </svg>
@@ -822,6 +825,83 @@
           <strong>{{webui:diagnostic.companion_counts}}</strong>
           <div id="dCoCounts">—</div>
         </div>
+      </div>
+    </details>
+    <details id="pushGroup" class="cfgGroup" data-g="push" hidden>
+      <summary>{{webui:diagnostic.push}}</summary>
+      <div class="statusColumn">
+        <b class="blockHead">{{webui:diagnostic.this_screen}}</b>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_support}}</strong>
+          <div id="dPuSupport">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_permission}}</strong>
+          <div id="dPuPermission">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_subscription}}</strong>
+          <div id="dPuSubscription">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_received}}</strong>
+          <div id="dPuReceived">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_tapped}}</strong>
+          <div id="dPuTapped">—</div>
+        </div>
+        <div class="pushSamples">
+          <label><input id="dPuWait" type="checkbox" /> {{webui:diagnostic.push_wait}}</label>
+          <button type="button" data-result="on_recipe">{{webui:runtime.verdict_on_recipe}}</button>
+          <button type="button" data-result="fast">{{webui:runtime.verdict_fast}}</button>
+          <button type="button" data-result="slow">{{webui:runtime.verdict_slow}}</button>
+          <small id="dPuSample" class="fieldHint"></small>
+        </div>
+      </div>
+      <div class="statusColumn">
+        <b class="blockHead">{{webui:diagnostic.push_controller}}</b>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_wanted}}</strong>
+          <div id="dPuWanted">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_events}}</strong>
+          <div id="dPuEvents">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_last_sent}}</strong>
+          <div id="dPuLastSent">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_last_skip}}</strong>
+          <div id="dPuLastSkip">—</div>
+        </div>
+      </div>
+      <div class="statusColumn">
+        <b class="blockHead">{{webui:diagnostic.companion}}</b>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_key}}</strong>
+          <div id="dPuKey">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_counts}}</strong>
+          <div id="dPuCounts">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_last_event}}</strong>
+          <div id="dPuLastEvent">—</div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:diagnostic.push_last_error}}</strong>
+          <div id="dPuLastError">—</div>
+        </div>
+      </div>
+      <div class="statusColumn">
+        <b class="blockHead">{{webui:diagnostic.push_devices}}</b>
+        <div id="dPuDevices" class="pushList"></div>
+        <b class="blockHead">{{webui:diagnostic.push_activity}}</b>
+        <div id="dPuActivity" class="pushList"></div>
       </div>
     </details>
     <details class="cfgGroup" data-g="misc">

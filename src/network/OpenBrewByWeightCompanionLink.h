@@ -10,6 +10,7 @@
 #include "OpenBrewByWeightNetworkTypes.h"             // DEVICE_NAME_CAPACITY
 #include "OpenBrewByWeightDomain.h"           // WIFI_PASSWORD_CAPACITY
 #include "OpenBrewByWeightShotCurveTypes.h"  // appendBase64
+#include "OpenBrewByWeightShotLogTypes.h"    // ShotLogRecord
 #include "OpenBrewByWeightWebAccess.h"       // webAccessFnv, copyWebAccessLabel
 #include "machine/OpenBrewByWeightMicraCompanion.h"  // MicraCompanionRoute
 #include <algorithm>
@@ -804,6 +805,7 @@ struct CompanionLinkSlot {
   // cursor and whether a catch-up is paging a backlog across passes.
   bool logWant = false, logApplied = true, logSubscribed = false, logCatchUp = false;
   uint32_t logWantBoot = 0, logWantAfter = 0, logSent = 0;
+  bool eventsWanted = false;  // this session's `ps`: a device wants events
 };
 
 // The `dev` frame is due once on every new session, whatever the name (its id
@@ -998,13 +1000,74 @@ inline bool companionNoticeDue(bool subscribed, bool moved, bool committed, bool
 // `rs` notice, the ping's hold answer; 0xFF names none), never the La
 // Marzocco or configuration frames.
 inline bool companionSyncBodyHeld(bool hold, uint8_t index, uint8_t logBody, uint8_t noticeBody,
-                                  uint8_t replyBody) {
+                                  uint8_t replyBody, uint8_t eventBody = 0xFF) {
   return hold && index != 0xFF &&
-         (index == logBody || index == noticeBody || index == replyBody);
+         (index == logBody || index == noticeBody || index == replyBody || index == eventBody);
 }
+
+// Shot events (docs/COMPANION_LINK.md, `ev`). This firmware decides which shot
+// notifies and what the event says; the companion only delivers it, and the
+// service worker renders it. Only a shot that ended since `ps` armed the
+// events, this boot, recently, and with a yield to report.
+constexpr uint32_t COMPANION_EVENT_FRESH_MS = 600000;
+constexpr uint32_t COMPANION_EVENT_TTL_S = 3600;
+
+enum class CompanionShotEventVerdict : uint8_t { NONE, SEND, BAD, STALE };
+
+inline const char *companionShotEventYield(const ShotLogRecord &record, char (&text)[32]) {
+  const bool estimated =
+      shotLogWeightIsMissing(record.actualWeightCg) && !shotLogWeightIsMissing(record.cutLineCg) &&
+      static_cast<ShotLogStopDetail>(record.stopDetail) == ShotLogStopDetail::AUTO_TO_MANUAL &&
+      corridor::lossSourceOf(record.verdict) == corridor::LossSource::PROJECTION;
+  if (!estimated && shotLogBadReason(record) != nullptr) return nullptr;
+  snprintf(text, sizeof(text), "\"g\":%.2f,\"w\":\"%c\"",
+           static_cast<double>(estimated ? record.cutLineCg : record.actualWeightCg) / 100.0,
+           estimated ? 'e' : 'm');
+  return text;
+}
+
+inline CompanionShotEventVerdict companionShotEventVerdict(const ShotLogRecord &record,
+                                                           uint32_t bootId, uint32_t afterMs,
+                                                           uint32_t nowMs) {
+  if (record.bootId != bootId || static_cast<int32_t>(record.endedAtMs - afterMs) <= 0)
+    return CompanionShotEventVerdict::NONE;
+  char yield[32];
+  if (record.durationDs <= MIN_SHOT_LOG_DURATION_MS / 100U ||
+      companionShotEventYield(record, yield) == nullptr)
+    return CompanionShotEventVerdict::BAD;
+  return nowMs - record.endedAtMs > COMPANION_EVENT_FRESH_MS ? CompanionShotEventVerdict::STALE
+                                                             : CompanionShotEventVerdict::SEND;
+}
+
+// The `ev` frame's body. Its values print as the Stats row prints them.
+inline bool companionShotEventText(const ShotLogRecord &record, char *text, size_t capacity) {
+  char yield[32];
+  const char *const value = companionShotEventYield(record, yield);
+  const int length = snprintf(
+      text, capacity,
+      "\"t\":\"ev\",\"topic\":\"shot_result\",\"key\":\"%lu-%lu\",\"ttl\":%lu,"
+      "\"d\":{\"v\":1,\"id\":%lu,\"b\":%lu,\"e\":%lu,\"at\":%lu,\"s\":%.1f,\"r\":%s%s%s}}",
+      static_cast<unsigned long>(record.bootId), static_cast<unsigned long>(record.id),
+      static_cast<unsigned long>(COMPANION_EVENT_TTL_S), static_cast<unsigned long>(record.id),
+      static_cast<unsigned long>(record.bootId), static_cast<unsigned long>(record.endedAtMs),
+      static_cast<unsigned long>(record.hasWallTime ? record.endedAtUnixSec : 0U),
+      static_cast<double>(record.durationDs) / 10.0, shotLogVerdictJson(shotLogResult(record)),
+      value != nullptr ? "," : "", value != nullptr ? value : "");
+  return length > 0 && static_cast<size_t>(length) < capacity;
+}
+
+// Owned by the network task once a session asked; httpd only arms it, under
+// dataMux_ like the rest of this state.
+struct CompanionShotEvents {
+  bool armed = false;
+  uint32_t afterMs = 0, epoch = 0;
+  uint32_t sent = 0, skipped = 0, lastId = 0, lastAtMs = 0;
+  const char *skip = "";
+};
 
 struct CompanionState {
   CompanionStored stored = {};
+  CompanionShotEvents shotEvents = {};
   CompanionPairing pairing = {};
   CompanionLinkSlot links[2] = {};  // the link, and a newcomer authenticating
   uint32_t generation = 0, active = 0;  // active: the ready session, 0 when down
@@ -1035,6 +1098,12 @@ struct CompanionSnapshot {
   uint32_t logCursor = 0, logGaps = 0;
   int32_t logFlushS = -1;
   int32_t archiveSyncS = -1;  // since the last archive record frame; -1: never this boot
+  // Shot events: a device wants them, sent and skipped this boot, the last one
+  // sent and its age (-1: none) and why the last was skipped.
+  bool pushWanted = false;
+  uint32_t pushSent = 0, pushSkipped = 0, pushLastId = 0;
+  int32_t pushLastS = -1;
+  const char *pushSkip = "";
   const char *route = "direct", *reason = "none";
   char name[COMPANION_NAME_TEXT] = {}, address[COMPANION_ADDRESS_TEXT] = {},
        version[COMPANION_VERSION_TEXT] = {};

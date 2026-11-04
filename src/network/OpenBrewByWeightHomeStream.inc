@@ -579,6 +579,12 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.logGaps", static_cast<unsigned long>(companion.logGaps));
     delta.field("companion.archiveSwitch", bool(companion.archiveSwitch));
     delta.field("companion.archiveSyncS", "%ld", static_cast<long>(companion.archiveSyncS));
+    delta.field("companion.pushWanted", bool(companion.pushWanted));
+    delta.field("companion.pushSent", static_cast<unsigned long>(companion.pushSent));
+    delta.field("companion.pushSkipped", static_cast<unsigned long>(companion.pushSkipped));
+    delta.field("companion.pushLastId", static_cast<unsigned long>(companion.pushLastId));
+    delta.field("companion.pushLastS", "%ld", static_cast<long>(companion.pushLastS));
+    delta.field("companion.pushSkip", "\"%s\"", companion.pushSkip);
     delta.field("companion.relay", "\"%s\"", companion.relayReady ? "ready" : "down");
     delta.field("companion.relayRejects", static_cast<unsigned long>(companion.relayRejects));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD

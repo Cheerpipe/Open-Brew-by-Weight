@@ -549,6 +549,7 @@ void startAfterBootRecovery() {
     callbacks.copyShotStorage = copyShotStorage;
     callbacks.shotLogSavePending = shotLogSavePending;
     callbacks.recordStoresSavePending = recordStoresSavePending;
+    callbacks.bootId = currentBootId;
     callbacks.copyHistoryPage = copyHistoryPage;
     callbacks.historyEpoch = copyHistoryEpoch;
     callbacks.shotLogEpoch = copyShotLogEpoch;

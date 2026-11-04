@@ -1716,6 +1716,42 @@ const GROUP_SUMMARIES = {
       : picked("alertOutputChannel");
   },
 };
+// Off until this device turns it on. Its state is the browser's subscription;
+// a device that cannot have notifications says why, and what to do.
+function initAppPush() {
+  const box = $("appPush"),
+    note = $("appPushNote"),
+    say = (text) => {
+      note.textContent = text;
+      note.hidden = !text;
+    },
+    sync = async () => {
+      const blocked = R.pushBlocked();
+      box.checked = !!(await R.pushSubscription().catch(() => null));
+      box.disabled = !!blocked && !box.checked;
+      say(
+        blocked &&
+          __WEBUI_TEXT__("settings.app_push_blocked").split("|")[PUSH_BLOCKS.indexOf(blocked)],
+      );
+    };
+  box.onchange = async () => {
+    const wanted = box.checked;
+    box.disabled = true;
+    let failure = "";
+    try {
+      await (wanted ? R.pushEnable() : R.pushDisable());
+    } catch (error) {
+      failure =
+        error.error === "AUTH_REQUIRED" || error.error === "CONTROLLER_UNREACHABLE"
+          ? __WEBUI_TEXT__("settings.app_push_needs_controller")
+          : __WEBUI_TEXT__("settings.app_push_failed");
+    }
+    await sync();
+    if (failure) say(failure);
+  };
+  R.companionHere(true).then(sync);
+}
+const PUSH_BLOCKS = ["address", "pair", "update", "unsupported", "denied"];
 export function init() {
   if (ready) return;
   ready = true;
@@ -1901,6 +1937,7 @@ export function init() {
     $(id).checked = R.appSetting(key);
     $(id).onchange = () => R.setAppSetting(key, $(id).checked);
   }
+  if ($("appPush")) initAppPush();
   if ($("appSplash")) {
     $("appSplash").checked = !R.appSetting("noSplash");
     $("appSplash").onchange = () => R.setAppSetting("noSplash", !$("appSplash").checked);

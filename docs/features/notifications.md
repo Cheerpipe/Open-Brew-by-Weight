@@ -1,0 +1,72 @@
+# Notifications
+
+Your phone can tell you how a shot went, even with the app closed and the screen
+off: its time, its yield, and whether it ran fast, on recipe, or slow.
+
+```text
+Fast shot: 21.0 s
+Yield: 36.0 g
+```
+
+Tap the notification to open **Shots** on that shot's card.
+
+## What you need
+
+- [Open Brew by Weight Companion](companion.md), paired with your controller and
+  connected to the internet. The companion sends the notifications, so without
+  it there are none. Everything else keeps working as usual.
+- The Web UI installed as an app from the companion's address,
+  `https://openbrewbyweight-secure.local`.
+- On iPhone and iPad, iOS or iPadOS 16.4 or newer.
+
+## Turn them on
+
+Notifications are off until you turn them on, separately on each device.
+
+1. Open the installed app.
+2. Go to **Settings → This device** and turn on **Notify me when a shot ends**.
+3. Allow notifications when your device asks.
+
+To stop them, turn the setting off. Signing out on the device turns them off too.
+
+## What to expect
+
+- **After the shot, not during it.** While a shot runs, the controller keeps its
+  radio for your scale, so the notification leaves once the shot and its drip
+  delay are over and the shot is saved. If something keeps the machine busy, such
+  as a paddle left on, it waits for that too.
+- **Which shots notify.** Shots too short to count, or with no yield at all, do not
+  notify, and neither does one that ended more than ten minutes before the controller
+  could send it. If the scale was lost during the shot, you see the estimated yield.
+- **Away from home.** Notifications still arrive over mobile data, with no extra
+  setup. Tapping one needs your home network to show the shot, so away from home the
+  app opens with a short message instead.
+- **Colors.** Notifications are text only. iPhones and iPads always show the app's
+  icon, so the result is written out.
+- **Best effort.** A notification can arrive late or not at all. Never rely on one
+  for anything that matters to your machine. It cannot start, stop, or change anything.
+
+## Privacy
+
+Your phone only accepts notifications through its maker's or browser's service:
+Apple, Google, Mozilla, or Microsoft. You do not need an account for this. The message
+is encrypted, so that service cannot read the time, yield, or result. It can see that
+a message was sent, when, and from which internet address.
+
+## Test and troubleshoot
+
+**Diagnostic → Push** shows where a notification stopped. It appears when you open
+the Web UI through the companion.
+
+To test, choose **On recipe**, **Fast**, or **Slow**. A sample goes to this device
+only. Select **Wait 30 seconds** first if you want to close the app and lock the
+screen before it arrives.
+
+| What you see | What to do |
+| --- | --- |
+| The setting is greyed out | Its message says why: usually the app was installed from another address, or the companion needs pairing or an update |
+| **Permission** says `denied` | Allow notifications for this app in your system settings |
+| **Last error** names a problem, and **Accepted** does not grow | Check that the companion can reach the internet |
+| The push service answered `201`, and nothing arrived | The service accepted it, so check Focus or Do Not Disturb, and your notification settings |
+| **A device wants notifications** says **No** | Turn the setting on again on your device; the companion may have been reset |
+| **Why the last shot was not sent** says `bad` or `stale` | The shot was too short or had no yield (`bad`), or ended too long ago (`stale`) |
