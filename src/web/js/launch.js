@@ -1,6 +1,6 @@
 // Launch intro gate. Loaded blocking in <head> (precached by sw.js) so the
 // decision lands before the first paint: the installed app plays the intro
-// once per fresh launch unless Settings → This app turns it off. Browser tabs,
+// once per fresh launch unless Settings → This device turns it off. Browser tabs,
 // reloads, back/forward and reduced motion keep the plain loading screen.
 (() => {
   const root = document.documentElement;

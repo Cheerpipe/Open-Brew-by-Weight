@@ -54,15 +54,14 @@ dot moves the dot instead. The older shots load together with Home, and while a
 shot is running the card stays on it until it ends.
 
 The machine's default is chosen in **Admin → Frontend**, and every browser
-and installed app follows it. An [installed app](app.md) can pick its own in
-**Settings → This app**, for that device only — handy when the phone on the
+and installed app follows it. Each browser or installed app can pick its own in
+[**Settings → This device**](app.md) — handy when the phone on the
 counter wants the graph while a laptop elsewhere keeps the colorful card.
 Double-tapping the card still opens the full-screen live view in both looks.
 
 ## Shot card colors
 
-**Settings → This app → Shot card colors** — in the
-[installed app](app.md) — chooses how the Home shot card uses
+[**Settings → This device**](app.md) **→ Shot card colors** chooses how the Home shot card uses
 color while a shot runs. It shapes the **Colorful**
 [hero card](#hero-card); the Technical card always follows the forecast on
 its graph zones. So the setting is only available while the Colorful card is

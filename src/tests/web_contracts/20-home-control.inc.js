@@ -1768,6 +1768,11 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
     tintAt = settingsHtml.indexOf('id="appHeroTint"');
   if (cardAt < 0 || tintAt < 0 || cardAt > tintAt)
     throw new Error('Settings must list the Hero card above Shot card colours');
+  if (!settingsHtml.includes('<details data-g="app" class="cfgGroup">') ||
+      settingsHtml.split('pwaOnly').length !== 4 ||
+      !['appSplash', 'appKeepAwake', 'appAutoLive'].every((id) =>
+        new RegExp('class="pwaOnly"\\s*><input id="' + id + '"').test(settingsHtml)))
+    throw new Error('This device shows everywhere; only three settings need the installed app');
   if (!codeIncludes(rawViewJs.settings,
         '$("appHeroTint").disabled = R.heroCardMode() === "technical"') ||
       !codeIncludes(rawViewJs.settings,

@@ -1854,7 +1854,7 @@
     "settings.allow_rinse_while_armed": "Rinse without a scale",
     "settings.allow_rinse_while_armed_hint": "Off: with the warning pending, a rinse runs no water and uses up the warning.",
     "settings.always_finishes_by_weight_or_time_for": "With a scale and By weight on, the shot stops at your yield or Max shot time wherever the paddle is; after the first second the paddle can't stop it early. OFF in the first second stops it, or starts a rinse if Quick rinse is on. Without weight control, OFF stops normally.",
-    "settings.app": "This app",
+    "settings.app": "This device",
     "settings.app_auto_live": "Open the live view when a shot starts",
     "settings.app_auto_live_hint": "While you are on Home, a shot opens the full-screen timer by itself.",
     "settings.app_battery_pct": "Show battery percentage",

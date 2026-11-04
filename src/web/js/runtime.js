@@ -3197,7 +3197,7 @@ function settingsSectionOf(id) {
   if (BREW_CONTROL_IDS.includes(id)) return "brew";
   return id.startsWith("lineaMicra") ? "micra" : "config";
 }
-// The browser-local "This app" group (data-g=app) sits inside #workflowPanel
+// The browser-local "This device" group (data-g=app) sits inside #workflowPanel
 // but never joins a controller section sweep.
 function settingsSectionEls(section) {
   return [
@@ -5231,9 +5231,9 @@ function keepShotFsAwake(on) {
   }
   shotFsVideo.play().catch(() => {});
 }
-// The installed app's own settings — the "This app" group in Settings, shown
-// only in standalone mode. Plain browser-local switches the controller never
-// sees; blocked storage reads as off and writes are best-effort.
+// Each browser's or installed app's own settings — the "This device" group in
+// Settings. Plain browser-local switches the controller never sees; blocked
+// storage reads as off and writes are best-effort.
 const APP_SETTING_KEYS = {
   awake: "obbwAppAwake",
   live: "obbwAppLive",
@@ -5968,8 +5968,8 @@ function onPageVisibility() {
   if (away >= HIDDEN_CLOSE_MS && !sessionShotLive()) stopUiStream();
   shotWs && shotWs.readyState === 1 ? shotActivity() : startUiStream();
 }
-// The "This app" settings group exists only for the installed app; the class
-// gates it (and anything else pwaOnly) from first paint.
+// The splash, keep-awake and auto live view settings belong to the installed
+// app; the class gates them (and anything else pwaOnly) from first paint.
 document.documentElement?.classList?.toggle("pwaApp", webUiStandalone());
 document.documentElement?.classList?.toggle("showBattPct", appSetting("batteryPct"));
 document.addEventListener("visibilitychange", onPageVisibility);
@@ -6240,8 +6240,8 @@ function setHeroTintMode(v) {
   }
   scheduleShotPaint();
 }
-// Hero card style: the machine default comes from the config snapshot; a PWA
-// install may override it per device (Settings > On this device). Colorful is
+// Hero card style: the machine default comes from the config snapshot; a browser
+// or PWA install may override it for itself (Settings > This device). Colorful is
 // the fallback for a missing value, Technical for a future one.
 const HERO_CARD_KEY = "obbwHeroCard";
 // The machine default last seen in a config snapshot, kept for paints that

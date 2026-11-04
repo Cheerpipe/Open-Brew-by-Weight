@@ -1889,8 +1889,8 @@ export function init() {
       R.updateBbwControls();
     };
   }
-  // The "This app" group is browser-local: every control applies at once and
-  // nothing in it reaches the controller. The installed app is its only home.
+  // The "This device" group is browser-local: every control applies at once
+  // and nothing in it reaches the controller.
   for (const [id, key] of [
     ["appKeepAwake", "awake"],
     ["appAutoLive", "live"],

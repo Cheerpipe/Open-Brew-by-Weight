@@ -1,28 +1,27 @@
-# App settings
+# Settings for this device
 
-When the Web UI runs as an installed app on a phone or tablet, Settings ends
-with a collapsible **This app** group, just below **Alerts**. Every choice
-there belongs to this one app on this one device: the controller never sees it,
-and other phones, tablets, and browsers keep their own. In a plain browser tab
-the group does not appear.
+Settings ends with a collapsible **This device** group, just below **Alerts**.
+Every choice there belongs to this one browser or installed app on this one
+device: the controller never sees it, and other phones, tablets, and browsers
+keep their own. Tabs and windows of the same browser share the same choices.
+In a browser tab, the group leaves out the settings marked *installed app only*.
 
-Like the [theme](theme.md), these choices live in the app's own storage.
-Clearing the app's browser data returns them to their defaults, and a
+Like the [theme](theme.md), these choices live in the browser's own storage.
+Clearing its data returns them to their defaults, and a
 [factory reset](factory-reset.md) does not touch them.
 
-- **Show splash screen** plays a short animation each time you open the app:
-  the logo drops in, its switch clicks shut and a few drops fill a cup at the
+- **Show splash screen** (*installed app only*) plays a short animation each
+  time you open the app: the logo drops in, its switch clicks shut and a few drops fill a cup at the
   bottom of the screen while the app gets ready. As soon as it is ready, the
   coffee rises and the app appears. Tap anywhere to skip it. It is on until
-  you turn it off, and it never plays in a browser tab or when the app
-  reloads.
-- **Keep the screen on while a shot runs** holds the screen awake from the
-  start of an extraction until a minute after it ends, wherever in the app
+  you turn it off, and it never plays when the app reloads.
+- **Keep the screen on while a shot runs** (*installed app only*) holds the
+  screen awake from the start of an extraction until a minute after it ends, wherever in the app
   you are. The minute of grace gives you time to read the result without the
   screen locking. The live view keeps the screen on by itself, with or
   without this setting.
-- **Open the live view when a shot starts** raises the full-screen timer by
-  itself when a shot begins while you are on Home — start the shot at the
+- **Open the live view when a shot starts** (*installed app only*) raises the
+  full-screen timer by itself when a shot begins while you are on Home — start the shot at the
   machine and the timer appears on the counter.
 - **Vibrate when a shot ends** gives a short buzz when the extraction
   finishes. Android phones only.
