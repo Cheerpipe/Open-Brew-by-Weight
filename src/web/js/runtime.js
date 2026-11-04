@@ -2653,6 +2653,15 @@ async function apiBinary(path, onProgress, cache = "no-store") {
     releaseDeviceSlot();
   }
 }
+// A companion that is not paired relays nothing, so this page cannot work through
+// it; its own page says what to do. The controller's Admin routes answer with the
+// same code, directly too, so only the companion's own word moves the window, and
+// an older companion, which keeps proxying, never gives it.
+function openCompanionPairing() {
+  companionHere(true).then(
+    (c) => c?.pairingRequired === true && location.replace("/__companion/?pair=1"),
+  );
+}
 async function api(path, options = {}) {
   if (!webUiPollingActive())
     throw new Error(__WEBUI_TEXT__("runtime.this_window_is_inactive_reload_to_continue"));
@@ -2695,6 +2704,7 @@ async function api(path, options = {}) {
   if (!response.ok) {
     if (data.error === "UI_TAKEN_OVER") deactivateWebUi("takeover");
     if (data.error === "AUTH_REQUIRED") showSignIn(true);
+    if (data.error === "COMPANION_NOT_PAIRED") openCompanionPairing();
     const err = new Error(errorText(data, __WEBUI_TEXT__("runtime.http") + response.status));
     err.code = data.error || "";
     err.reason = data.reason || "";
@@ -2974,6 +2984,10 @@ async function claimWebUiOwnership(claimed) {
       if (data.error === "AUTH_REQUIRED") {
         endNetworkReconnectWait();
         showSignIn(!!sessionToken());
+        return;
+      }
+      if (data.error === "COMPANION_NOT_PAIRED") {
+        openCompanionPairing();
         return;
       }
       if (!response.ok)
@@ -5099,6 +5113,9 @@ function startUiStream() {
     // Any other close is evidence, not a verdict: transient first failures
     // recover through the retry loop; only the five-failure budget paints.
     else if (webUiPollingActive()) noteReachFail({ network: true });
+    // A refused upgrade names no reason: a pairing that ended leaves only this.
+    if (event?.code !== 4003 && webUiPollingActive() && location.protocol === "https:")
+      openCompanionPairing();
     if (webUiPollingActive())
       shotRetry = setTimeout(
         startUiStream,

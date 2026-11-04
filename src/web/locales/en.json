@@ -57,7 +57,7 @@
     "admin.companion_copy_off": "off",
     "admin.companion_copy_state": "Shots {0} \u00b7 History {1}",
     "admin.companion_forget": "Forget",
-    "admin.companion_forget_ask": "The companion can no longer reach the controller, and it deletes everything it received from it the next time it tries, including its shot archive. To keep your records, export the archive from the companion's page first.",
+    "admin.companion_forget_ask": "The companion can no longer reach the controller, and it deletes everything it received from it the next time it tries, including its shot archive. To keep your records, export the archive from the companion's page first. A window using the Web UI through the companion goes to that page.",
     "admin.companion_forgotten": "Companion forgotten.",
     "admin.companion_ignore": "Ignore",
     "admin.companion_ignored": "Ignored companions: {0}",

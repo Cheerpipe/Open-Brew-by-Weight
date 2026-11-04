@@ -9,6 +9,9 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **A companion opens the Web UI only once paired:** a companion that requires it
+  takes you to its own page, with the code and a link to Admin, and a window left
+  open goes there too. See [the companion's guide](docs/features/companion.md).
 - **Pairing a companion no longer asks for the Admin password again:** if you
   were already using the Web UI through the companion, finishing the pairing used
   to lock Admin without warning. Now the page stays where it is and shows the
