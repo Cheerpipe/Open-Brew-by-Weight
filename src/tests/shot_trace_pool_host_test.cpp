@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -1165,9 +1166,14 @@ void tsp26_readers_race_recovery_clear_and_end_changes() {
     if (id == 50) CHECK(pool.clear());
     if (id == 60) CHECK(pool.setLogicalEnd(SHOT_TRACE_POOL_SECTORS) && pool.recover());
   }
+  // On a loaded machine the writer can finish before the reader completes one
+  // read, so the reader also gets the final pool, for at most 5 s.
+  for (int waited = 0; ok.load() == 0 && waited < 5000; ++waited)
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   done.store(true);
   reader.join();
-  CHECK(bad.load() == 0 && ok.load() > 0);
+  CHECK(bad.load() == 0);
+  CHECK(ok.load() > 0);
 }
 
 // A section read through a callback: bytes that change mid-append abandon
