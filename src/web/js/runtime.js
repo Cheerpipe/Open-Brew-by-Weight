@@ -2788,7 +2788,7 @@ async function companionLog(path, body) {
   const reply = await fetch(path, {
     cache: "no-store",
     ...(body && { method: "POST", body: JSON.stringify(body) }),
-    headers: R.webUiHeaders(body && { "Content-Type": "application/json" }),
+    headers: webUiHeaders(body && { "Content-Type": "application/json" }),
   });
   if (!reply.ok)
     throw Object.assign(Error(String(reply.status)), await reply.json().catch(() => null));

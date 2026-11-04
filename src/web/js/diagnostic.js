@@ -1574,7 +1574,8 @@ function renderLog() {
     add(pair);
   };
   // The companion's stored pages, if any, sit above the live ring; an event
-  // both hold renders once (same boot, same sequence).
+  // both hold renders once (same boot, same sequence). A jump hides the ring,
+  // so there the history shows them all.
   const live = new Set(R.uiState.logEvents.map((e) => e.sequence));
   for (const e of logHistory) {
     if (e.g) {
@@ -1590,7 +1591,7 @@ function renderLog() {
     }
     if (f && e.c !== f) continue;
     if ((hr[e.l] ?? 3) > m) continue;
-    if (e.b === logBootId && live.has(e.s)) continue;
+    if (!logPast() && e.b === logBootId && live.has(e.s)) continue;
     line(
       (e.v ??= logLineOf(
         e.w ? logWallText(e.w) : "+" + (e.ms / 1000).toFixed(3) + "s",

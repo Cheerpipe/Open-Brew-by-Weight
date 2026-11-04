@@ -446,6 +446,10 @@
   assert(codeIncludes(runtimeJs, 'async function companionLog(') &&
          codeIncludes(runtimeJs, 'headers:webUiHeaders(body&&{"Content-Type":"application/json"})'),
       'history requests carry the Web UI session');
+  // codeIncludes strips the R. qualifier, and runtime.js has no R to qualify with.
+  assert(!/\bR\.\w/.test(runtimeJs), 'the runtime module never reads its own exports through R');
+  assert(codeIncludes(viewJs.diagnostic, 'if(!logPast()&&e.b===logBootId&&live.has(e.s))continue'),
+      'a jump hides the live ring, so the history keeps the events both hold');
   assert(codeIncludes(viewJs.diagnostic, 'await(await companionLog(logHistoryQuery())).json()') &&
          codeIncludes(viewJs.diagnostic, 'companionLog("/__companion/log/export"+(range?"?"+range:""))'),
       'paging and Export both read the companion through that request');
