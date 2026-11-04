@@ -568,6 +568,7 @@ body.shotFs {
 .lsTiles.done > p {
   padding: 0;
   border: 0;
+  border-radius: 0;
 }
 
 .lsTiles.done b {
