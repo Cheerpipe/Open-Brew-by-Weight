@@ -17,6 +17,8 @@ exported JSON formats are not carried over.
   refused update very slowly can no longer freeze the Web UI.
 - **Time limits stay on if a setting is damaged:** if the controller can't read
   whether the firmware is enabled, it stays enabled, with its relay limits.
+- **Finished shot numbers read whole:** in the live view, the card of a finished
+  shot no longer cuts off the corners of its first letters and digits.
 - **Notifications:** an app installed from the companion's address can tell you
   when a shot ends, with its time, yield, and result, even with the app closed.
   Tap one to open that shot's card. Turn it on in **Settings → This device**;
