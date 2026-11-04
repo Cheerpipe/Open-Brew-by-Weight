@@ -258,13 +258,15 @@
 }
 
 /* The preset graph in its tight 132 px frame, bleeding into the side padding
-   so its axis labels land where the card's padding was. The live now-dot
-   speaks the card's own accent (--tint), not the live view's tone. */
+   so its axis labels land where the card's padding was. The right bleed is
+   shorter so the limit line's dots clear the edge by as much as the y labels.
+   The live now-dot speaks the card's own accent (--tint), not the live view's
+   tone. */
 .shotHero[data-hero="technical"] .heroChart {
   --lsTone: var(--tint);
 
   height: 8.25rem;
-  margin: 0.7rem -0.55rem 0;
+  margin: 0.7rem -0.39rem 0 -0.55rem;
 }
 
 .shotHero[data-hero="technical"] .heroChart svg {
