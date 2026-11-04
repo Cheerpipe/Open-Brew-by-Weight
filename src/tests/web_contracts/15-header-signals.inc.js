@@ -176,9 +176,9 @@
     {scale: {available: true, batteryPct}, connections: {bluetoothLevel: 3}, ...extra});
   battery(62);
   assert.equal(buttons[1].dataset.batt, 'ok');
-  assert.equal(glyph.attrs.viewBox, '5.2 0 39.5 24', 'The cell widens the glyph');
-  assert.equal(fill.attrs.height, '9.92');
-  assert.equal(fill.attrs.y, '10.08', 'The fill rises from the cell floor');
+  assert.equal(glyph.attrs.viewBox, '5.2 0 42.5 24', 'The cell widens the glyph');
+  assert.equal(fill.attrs.height, '6.08');
+  assert.equal(fill.attrs.y, '10.82', 'The fill rises from the cell floor');
   assert.equal(elements.bluetoothBatteryPct.textContent, '62%');
   assert.equal(buttons[1].attributes['aria-label'], 'Bluetooth: Strong · battery 62%');
   assert.equal(elements.bluetoothBatteryLine.hidden, false);
@@ -191,7 +191,7 @@
   assert.equal(buttons[1].dataset.batt, 'critical');
   battery(0);
   assert.equal(buttons[1].dataset.batt, 'empty');
-  assert.equal(fill.attrs.height, '3.00', 'An empty cell keeps a visible sliver');
+  assert.equal(fill.attrs.height, '1.40', 'An empty cell keeps a visible sliver');
   assert.equal(elements.bluetoothBattery.textContent, '0% · almost empty');
   context.updateHeaderSignals({connections: {bluetoothConnected: true, bluetoothLevel: 3}});
   assert.equal(buttons[1].dataset.batt, 'empty', 'An envelope without a scale model (Admin) keeps the cell');

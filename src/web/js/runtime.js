@@ -394,16 +394,16 @@ function updateHeaderSignals(s = {}) {
   if (bt) {
     if (batt) bt.dataset.batt = batt;
     else delete bt.dataset.batt;
-    bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "5.2 0 39.5 24" : "5.2 0 26.1 24");
+    bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "5.2 0 42.5 24" : "5.2 0 26.1 24");
     if (batt) {
       bt.title += " · " + sub(__WEBUI_TEXT__("runtime.scale_battery"), [scaleBatteryText(pct)]);
       bt.setAttribute("aria-label", bt.title);
     }
   }
   if (fill && batt) {
-    const h = Math.max(3, (16 * pct) / 100);
+    const h = Math.max(1.4, (9.8 * pct) / 100);
     fill.setAttribute("height", h.toFixed(2));
-    fill.setAttribute("y", (20 - h).toFixed(2));
+    fill.setAttribute("y", (16.9 - h).toFixed(2));
   }
   if (line) line.hidden = !batt;
   if (batt && $("bluetoothBattery")) $("bluetoothBattery").textContent = scaleBatteryText(pct);

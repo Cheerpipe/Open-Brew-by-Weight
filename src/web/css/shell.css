@@ -140,10 +140,10 @@ body {
   overflow: visible;
 }
 
-/* The scale battery rides the Bluetooth button: a solid vertical cell after
-   the bars, drawn only while the scale reports it. A dim block fills with the
-   charge and takes the level colour. The optional percent (Settings → This
-   app) keeps room for "100%", so the header never changes width with it. */
+/* The scale battery rides the Bluetooth button: a wide vertical cell after
+   the bars, drawn only while the scale reports it. Muted while healthy; the
+   cell takes the level colour. The optional percent (Settings → This device)
+   keeps room for "100%", so the header never changes width with it. */
 .battGlyph,
 .battPct {
   display: none;
@@ -172,8 +172,8 @@ body {
   display: inline;
 }
 
-#bluetoothSignal[data-batt] .battGlyph rect:not(.battFill) {
-  opacity: 0.3;
+#bluetoothSignal[data-batt="ok"] .battGlyph rect:not(.battFill) {
+  opacity: 0.8;
 }
 
 #bluetoothSignal[data-batt="low"] :is(.battGlyph, .battPct) {
@@ -1082,12 +1082,12 @@ html.themeDark #launchIntro {
 }
 
 #bluetoothSignal[data-batt] svg {
-  width: 2.42rem;
+  width: 2.6rem;
 }
 
 @media (width <= 480px) {
   #bluetoothSignal[data-batt] svg {
-    width: 2.16rem;
+    width: 2.32rem;
   }
 }
 
