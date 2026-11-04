@@ -9,6 +9,10 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **A clearer end to pairing:** opening Admin from a companion's page goes straight
+  to its Companion section. When pairing finishes and the companion takes over, the
+  window you approved from says so and offers to open the Web UI through the
+  companion, instead of just asking you to reload.
 - **A companion opens the Web UI only once paired:** a companion that requires it
   takes you to its own page, with the code and a link to Admin, and a window left
   open goes there too. See [the companion's guide](docs/features/companion.md).

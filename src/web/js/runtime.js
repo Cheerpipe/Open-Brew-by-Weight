@@ -2443,9 +2443,11 @@ function commandMessages(path, v) {
 }
 {
   const r = $("webUiReload"),
-    o = $("webUiArchive");
+    o = $("webUiArchive"),
+    c = $("webUiCompanion");
   if (r) r.onclick = () => claimWebUiOwnership();
   if (o) o.onclick = openArchiveView;
+  if (c) c.onclick = () => location.assign(pairedCompanion.url);
 }
 function setInactiveError(text) {
   const el = $("inactiveError");
@@ -2557,6 +2559,7 @@ function hideInactiveOverlay() {
   el.classList.remove("isVisible");
   document.body.classList.remove("webUiInactive");
   offerArchiveView(false);
+  closePairedCompanionOffer();
   // The page comes back; the fading overlay is out of focus and reach.
   for (const n of el.parentElement.children) n.inert = n === el;
   clearTimeout(inactiveOverlayTimer);
@@ -2652,6 +2655,44 @@ async function apiBinary(path, onProgress, cache = "no-store") {
     clearTimeout(timer);
     releaseDeviceSlot();
   }
+}
+// Opened from a companion's page: its secure address, for when pairing finishes.
+const companionOrigin = (() => {
+  try {
+    const asked = new URLSearchParams(location.search).get("companion");
+    if (asked === null) return "";
+    history.replaceState(null, "", location.pathname + location.hash);
+    const url = new URL(asked);
+    return url.protocol === "https:" ? url.origin : "";
+  } catch {
+    return "";
+  }
+})();
+let pairedCompanion = null;
+function notePairedCompanion(name, address) {
+  pairedCompanion = {
+    name,
+    url: companionOrigin ? companionOrigin + "/" : "http://" + address + "/__companion/",
+  };
+}
+// A window that just approved a companion loses control to it as soon as that page
+// opens the Web UI. That is the plan working, so it says so and where to go next.
+function offerPairedCompanion() {
+  const open = $("webUiCompanion"),
+    stay = $("webUiReload");
+  if (!open || !stay || !pairedCompanion) return;
+  setInactiveHint(sub(__WEBUI_TEXT__("runtime.companion_paired_here"), [pairedCompanion.name]));
+  open.hidden = false;
+  stay.dataset.d ||= stay.textContent;
+  stay.textContent = __WEBUI_TEXT__("shell.stay_on_this_address");
+  open.focus({ preventScroll: true });
+}
+function closePairedCompanionOffer() {
+  const open = $("webUiCompanion"),
+    stay = $("webUiReload");
+  if (open) open.hidden = true;
+  if (stay?.dataset.d) stay.textContent = stay.dataset.d;
+  pairedCompanion = null;
 }
 // A companion that is not paired relays nothing, so this page cannot work through
 // it; its own page says what to do. The controller's Admin routes answer with the
@@ -2790,6 +2831,7 @@ function deactivateWebUi(reason) {
   )) {
     if (reason === "direct") setInactiveHint(__WEBUI_TEXT__("runtime.opened_directly"));
     showInactiveOverlay();
+    if (reason === "takeover") offerPairedCompanion();
   }
 }
 // Bounded like api(); null data means a non-JSON body.
@@ -7789,6 +7831,7 @@ export {
   companionHere,
   companionLog,
   companionPairable,
+  notePairedCompanion,
   pushBlocked,
   pushSubscription,
   pushKeyMatches,

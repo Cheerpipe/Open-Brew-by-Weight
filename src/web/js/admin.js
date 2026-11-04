@@ -818,6 +818,7 @@ function initCompanion() {
     event.preventDefault();
     if (companionPairing) return;
     companionPairing = { stage: 0, startedAt: Date.now() };
+    const asked = companionState?.request;
     applyCompanionStatus(companionState);
     try {
       await R.api("/api/v1/companion/admin", {
@@ -831,6 +832,7 @@ function initCompanion() {
         }),
       });
       companionPairing.stage = 1;
+      if (asked) R.notePairedCompanion(asked.name, asked.address);
     } catch (e) {
       companionPairing = null;
       if (e.code === "COMPANION_CODE")

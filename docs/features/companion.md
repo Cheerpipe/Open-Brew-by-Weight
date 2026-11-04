@@ -123,6 +123,11 @@ you to this same page, with the code and a link to the controller's Admin; once
 you approve, it opens the Web UI by itself. The code is never filled in for you:
 typing it is how you confirm that the companion asking is the one you are using.
 
+The window you approved from then hands over to the companion, because only one
+window controls the machine at a time. It tells you pairing is done and offers to
+open the Web UI through the companion. You can also stay on the controller's own
+address, which takes control back.
+
 If the companion has not found the controller, type its address in **Admin →
 Companion → Connect to a companion at…** and tap **Open its page**. The
 companion's page opens in a new tab: choose **Pair** there, then come back to
