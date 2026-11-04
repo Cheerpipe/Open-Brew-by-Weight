@@ -189,8 +189,9 @@ Cppcheck analysis on each and the dead-code check over all of them, checks
 that the design preview renders, and ends with the only budget verdict that
 fails on an overrun.
 
-R2 and R3 run parallel lanes: the host tests; the Web checks (route
-capacity, Web UI budgets, Web contracts); and, for each profile pair, a
+R2 and R3 run parallel lanes: one per host test preset (normal with the
+architecture check, ASan/UBSan, TSAN); the Web checks (route capacity, Web UI
+budgets, Web contracts); and, for each profile pair, a
 development lane (build, stack depth, Cppcheck on R3) and a release lane
 (build, stack depth). The quality gate runs the Web UI budgets with the design
 preview, the dead-code check, and the same two lanes per pair (build and

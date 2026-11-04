@@ -1164,15 +1164,16 @@ assert len(r2_release) == 3 and all(
     argv[-1] == "--flags=" and "--development" not in argv and "--jtag" not in argv
     for argv in r2_release), r2_release
 
-# Host tests and firmware work run as two parallel lanes. Every step that
-# touches IDF trees, the shared Web UI header, or the CLI store stays serial in
-# the firmware lane: route capacity before Web contracts, then per variant the
-# budget build and cppcheck over its database, then one dead-code check over
-# every variant.
-host_lane, web_lane, *pair_lanes = validate_language_steps(["src/web/app.js"], lanes=True)
+# Each host preset, the Web checks, and each build tree run as parallel lanes:
+# route capacity before Web contracts, and per tree its build before the stack
+# and Cppcheck steps that read it.
+host_lane, asan_lane, tsan_lane, web_lane, *pair_lanes = validate_language_steps(
+    ["src/web/app.js"], lanes=True)
 assert [name for name, _ in host_lane] == [
-    f"{stage}-{preset}" for preset in ("normal", "asan-ubsan", "tsan")
-    for stage in ("configure", "build", "test")] + ["architecture"], host_lane
+    f"{stage}-normal" for stage in ("configure", "build", "test")] + ["architecture"], host_lane
+for preset, lane in (("asan-ubsan", asan_lane), ("tsan", tsan_lane)):
+    assert [name for name, _ in lane] == [
+        f"{stage}-{preset}" for stage in ("configure", "build", "test")], lane
 assert [name for name, _ in web_lane] == ["http-route-capacity", "web-budgets",
                                           "web-contracts"], web_lane
 assert [[name for name, _ in lane] for lane in pair_lanes] == [
@@ -1183,7 +1184,8 @@ assert all("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv and
            "OPENBREWBYWEIGHT_CPPCHECK_CHANGED=src/web/app.js" in argv
            for lane in pair_lanes for name, argv in lane if name.startswith("cppcheck-"))
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
-           for name, argv in host_lane if name.startswith("test-")), host_lane
+           for lane in (host_lane, asan_lane, tsan_lane)
+           for name, argv in lane if name.startswith("test-")), host_lane
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
 
 # doctor warns when ccache is nearly full: evictions silently turn builds cold.

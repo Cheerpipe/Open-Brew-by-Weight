@@ -25,7 +25,7 @@ subset of the applicable gates does not validate the change.
 | Release | Candidate firmware image | R3 + the quality gate, applicable soak, HIL and manual plan | required |
 
 Use `./scripts/dev validate [--risk R0..R3] [paths...]`. R2/R3 run the host
-tests and the firmware steps as two parallel lanes; see
+tests, the Web checks, and the firmware steps as parallel lanes; see
 [scripts](docs/SCRIPTS.md) for the order and failure behavior.
 
 Risk gates check functional and safety defects only. Non-functional quality

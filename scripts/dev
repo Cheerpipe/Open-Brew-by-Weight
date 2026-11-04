@@ -830,15 +830,14 @@ def main() -> int:
                 return record(command, risk, verbosity, doc_errors, 1, "docs-and-paths")
             if risk == "R0":
                 return record(command, risk, verbosity, prelude + ["documentation links and context paths: OK"])
-            # Host tests, Web checks, and each build tree share no outputs, so
+            # Host presets, Web checks, and each build tree share no outputs, so
             # they run as parallel lanes: a tree's stack and Cppcheck steps wait
             # only for that tree's build.
-            host = cmake_steps("normal")
-            lanes = [host]
+            lanes = [cmake_steps("normal")]
             if risk in {"R2", "R3"}:
-                host += cmake_steps("asan-ubsan") + cmake_steps("tsan") + [
-                    ("architecture", ["python3", "scripts/check_architecture.py"])]
-                lanes.append([HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP])
+                lanes[0].append(("architecture", ["python3", "scripts/check_architecture.py"]))
+                lanes += [cmake_steps("asan-ubsan"), cmake_steps("tsan"),
+                          [HTTP_ROUTE_CAPACITY_STEP, WEB_BUDGETS_STEP, WEB_CONTRACTS_STEP]]
                 # R3 checks only Cppcheck's warning category, over the units the
                 # change reaches; the quality gate runs the full analysis.
                 changed = ":".join(paths or changed_paths())
