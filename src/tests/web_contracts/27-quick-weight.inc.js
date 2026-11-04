@@ -110,6 +110,9 @@
   qwAssert.ok(/position:fixed[^}]*bottom:0[^}]*background:var\(--sf\)/.test(qwCssRule('qwSheet')) &&
       !/\.qwSheet\{[^}]*backdrop-filter/.test(css),
     'The sheet anchors to the viewport bottom on a solid surface, not frosted glass');
+  qwAssert.ok(qwCssRule('qwSheet').includes('translateY(calc(100% + 4rem))') &&
+      qwCssRule('qwSheet').includes('box-shadow:0 -1.1rem 2.6rem'),
+    'Closed, the sheet sits past its own 3.7rem shadow so none falls on the page');
   qwAssert.ok(/touch-action:none/.test(qwCssRule('qwZone')),
     'The tick zone must own touch gestures');
   qwAssert.ok(/body\.qwOpen\{overflow:hidden\}/.test(css),

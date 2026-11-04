@@ -780,7 +780,9 @@ body.qwOpen {
   display: flex;
   flex-direction: column;
   max-height: 46dvh;
-  transform: translateY(105%);
+
+  /* Closed, it sits past its own 3.7rem shadow, which would fall on the page. */
+  transform: translateY(calc(100% + 4rem));
   transition: transform 0.34s cubic-bezier(0.32, 0.72, 0.32, 1);
   border-top: 1px solid var(--ln);
   border-radius: 1.35rem 1.35rem 0 0;
