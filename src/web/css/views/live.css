@@ -202,6 +202,13 @@ body.shotFs {
 .liveShot {
   --lsTone: color-mix(in srgb, var(--cf) 60%, var(--fg));
   --lsGap: clamp(0.45rem, 1.4vmin, 0.9rem);
+  --lsH: 100dvh;
+  --lsPadT: max(var(--lsGap), env(safe-area-inset-top));
+  --lsPadB: max(var(--lsGap), env(safe-area-inset-bottom));
+
+  /* Compact weight that fits: the height left by the insets and the column's
+     fixed parts, over the 1.25 lines the number takes. */
+  --lsFit: max(2rem, 0.8 * var(--lsH) - 0.8 * var(--lsPadT) - 0.8 * var(--lsPadB) - 13.8rem);
 
   position: fixed;
   top: 0;
@@ -216,8 +223,8 @@ body.shotFs {
     "lane side" clamp(7rem, 21vh, 11rem)
     / minmax(0, 1fr) clamp(19rem, 32vw, 26rem);
   gap: var(--lsGap);
-  padding: max(var(--lsGap), env(safe-area-inset-top)) max(var(--lsGap), env(safe-area-inset-right))
-    max(var(--lsGap), env(safe-area-inset-bottom)) max(var(--lsGap), env(safe-area-inset-left));
+  padding: var(--lsPadT) max(var(--lsGap), env(safe-area-inset-right)) var(--lsPadB)
+    max(var(--lsGap), env(safe-area-inset-left));
   background: var(--bg);
   color: var(--fg);
   font-variant-numeric: tabular-nums;
@@ -608,6 +615,10 @@ body.shotFs {
       "side graph" minmax(0, 1fr)
       / clamp(12rem, 34vw, 17rem) minmax(0, 1fr);
   }
+
+  .lsTiles span {
+    display: none;
+  }
 }
 
 @media (height <= 520px), (orientation: portrait) and (width <= 599px) {
@@ -637,8 +648,9 @@ body.shotFs {
     padding: 0.45rem 0.7rem 0.5rem;
   }
 
+  /* The weight gives way when the column would outgrow a short screen. */
   .lsHero b {
-    font-size: min(29cqi, 4.6rem);
+    font-size: min(29cqi, 4.6rem, var(--lsFit));
   }
 
   .lsRow {
@@ -739,6 +751,10 @@ body.shotFs {
    match. A screen that really is sideways needs none of this. */
 @media (orientation: portrait) {
   .liveLandscape .liveShot {
+    --lsH: 100dvw;
+    --lsPadT: max(var(--lsGap), env(safe-area-inset-right));
+    --lsPadB: max(var(--lsGap), env(safe-area-inset-left));
+
     top: 50%;
     left: 50%;
     width: 100dvh;
@@ -748,8 +764,7 @@ body.shotFs {
       "graph side" minmax(0, 1fr)
       "lane side" clamp(7rem, 21vw, 11rem)
       / minmax(0, 1fr) clamp(19rem, 32vh, 26rem);
-    padding: max(var(--lsGap), env(safe-area-inset-right))
-      max(var(--lsGap), env(safe-area-inset-bottom)) max(var(--lsGap), env(safe-area-inset-left))
+    padding: var(--lsPadT) max(var(--lsGap), env(safe-area-inset-bottom)) var(--lsPadB)
       max(var(--lsGap), env(safe-area-inset-top));
     translate: -50% -50%;
     rotate: 90deg;
@@ -762,6 +777,10 @@ body.shotFs {
       "top top" auto
       "side graph" minmax(0, 1fr)
       / clamp(12rem, 34vh, 17rem) minmax(0, 1fr);
+  }
+
+  .liveLandscape .lsTiles span {
+    display: none;
   }
 }
 

@@ -18,6 +18,10 @@ exported JSON formats are not carried over.
 - **Live view when you rotate the phone:** turning the phone with the live view
   open no longer leaves the chart squeezed into the middle of its card, on an
   iPhone in particular. The chart now fills the card again at once.
+- **Live view on short phones:** with a phone on its side, the cards at the
+  bottom of the numbers column no longer run off the screen during a shot. To
+  make room, the weight shrinks a little on the shortest screens and **Max flow**
+  leaves out when it happened; held upright, it still shows it.
 - **Keep the live view in landscape:** a new choice in **Settings → This
   device**, for the installed app, lays the live view out sideways even with the
   phone upright or its rotation locked. See
