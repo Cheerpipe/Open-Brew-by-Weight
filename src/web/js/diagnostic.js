@@ -1701,7 +1701,7 @@ const logStream = {
 // A jump starts the history at a moment (`logJumpAt`, wall seconds), a day's
 // end (`logJumpDay` too) or a stored boot's end (`logJumpBoot`, from the
 // companion's boot index), and hides the live ring until Back to live.
-const LOG_HISTORY_PAGE = 500,
+const LOG_HISTORY_PAGE = 2000,
   LOG_HISTORY_CAP = 40000;
 let logHistory = [],
   logHistoryNext = null,
