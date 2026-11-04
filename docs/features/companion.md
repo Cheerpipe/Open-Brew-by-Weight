@@ -374,10 +374,15 @@ Web UI keeps working. Both dimmed means the companion is not connected.
 Tap the icon to see the server's name, the **Link** state, and whether the
 **Web UI relay** is serving the page you are on.
 
-For a quicker glance, tap the cloud icon in the header on any page: under
-**Connection type**, its popup says **Directly from the controller**,
-**Through the companion**, or **Moving to the companion** while the handover
-is underway.
+On a Linea Micra, pairing a companion also changes the cloud icon in the header
+from one cloud to two. Both lit means the machine's data runs through the
+companion. A dimmed back cloud means the cloud link works, but the data still
+runs directly from the controller. Both dimmed means the cloud link is off.
+Without a companion you see a single cloud, on or off.
+
+For the details, tap the cloud icon on any page: under **Connection type**, its
+popup says **Directly from the controller**, **Through the companion**, or
+**Moving to the companion** while the handover is underway.
 
 For developers, the protocol is described in
 [Companion link protocol](../COMPANION_LINK.md).

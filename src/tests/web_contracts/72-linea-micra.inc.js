@@ -348,11 +348,12 @@ if (micraStatusFailures.length) {
       diagRegion.includes('delta.field("lineaMicra.selectedName"'))
     fail('Diagnostic drops the identity fields: Home owns them');
   if (!(rawShellHtml.includes('<symbol id="dg-marzocco-cloud" class="micraOnly" viewBox') &&
+        rawShellHtml.includes('<symbol id="dg-marzocco-clouds" class="micraOnly" viewBox') &&
         rawShellHtml.indexOf('id="companionSignal"') < rawShellHtml.indexOf('id="micraSignal"') &&
         rawShellHtml.indexOf('id="micraSignal"') < rawShellHtml.indexOf('id="wifiSignal"') &&
         rawShellHtml.includes('id="micraDetails"') &&
-        !micraDiagnosticHtml.includes('<symbol id="dg-marzocco-cloud"')))
-    fail('the header cloud indicator sits right of companion with the one cloud glyph');
+        !micraDiagnosticHtml.includes('<symbol id="dg-marzocco-cloud')))
+    fail('the header cloud indicator sits right of companion with its one and two cloud glyphs');
 }
 if (micraService.includes('save_client_session')) {
   throw new Error('Async Micra client must not resume TLS sessions: ESP-IDF re-applies them per handshake step');

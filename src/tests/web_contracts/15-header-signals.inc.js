@@ -137,6 +137,30 @@
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud'});
   assert.equal(elements.micraSignal.dataset.level, 'on', 'A model-less envelope keeps the cloud icon');
   assert.equal(elements.micraDetail.textContent, 'Connected');
+  // Without a companion the one cloud only turns on and off, whatever the
+  // route; a paired companion adds the state that names a direct route.
+  micraFrame({quality: 'current'}, {paired: false, route: 'direct'});
+  assert.equal(elements.micraSignal.dataset.paired, 'false');
+  assert.equal(elements.micraSignal.dataset.level, 'on', 'No companion: a live link is fully on');
+  assert.equal(elements.micraSignal.attributes['aria-label'], 'La Marzocco cloud: Connected');
+  for (const [route, level, name] of [['direct', 'partial', 'Directly from the controller'],
+      ['pending', 'partial', 'Moving to the companion'], ['companion', 'on', 'Through the companion']]) {
+    micraFrame({quality: 'current'}, {paired: true, route});
+    assert.equal(elements.micraSignal.dataset.paired, 'true');
+    assert.equal(elements.micraSignal.dataset.level, level, route);
+    assert.equal(elements.micraSignal.attributes['aria-label'], 'La Marzocco cloud: Connected · ' + name);
+  }
+  micraFrame({quality: 'current'}, {paired: true, route: 'direct'});
+  micraFrame({quality: 'current'});
+  assert.equal(elements.micraSignal.dataset.level, 'partial', 'A companion-less frame keeps the pairing and route');
+  micraFrame({quality: 'stale'}, {paired: true, route: 'direct'});
+  assert.equal(elements.micraSignal.dataset.level, 'off', 'A paired companion does not light a dead feed');
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'linea_micra_cloud',
+    lineaMicra: {quality: 'current'}, companion: {paired: false}});
+  assert.equal(elements.micraSignal.dataset.paired, 'true', 'A stale snapshot keeps the last known pairing');
+  assert.equal(elements.micraSignal.dataset.level, 'off');
+  micraFrame({quality: 'current'}, {paired: false, route: 'direct'});
+  assert.equal(elements.micraSignal.dataset.level, 'on', 'Unpairing returns to the one cloud');
   // The scale battery rides the Bluetooth button under one level rule; the
   // header shows only the cell, the percent goes to the popover and label.
   for (const [pct, level] of [[100, 'ok'], [16, 'ok'], [15, 'low'], [11, 'low'], [10, 'critical'],

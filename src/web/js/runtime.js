@@ -449,9 +449,11 @@ function updateHeaderSignals(s = {}) {
   }
   // The La Marzocco cloud link, Micra builds only: the feed's observation
   // quality decides — live (current, or a command the cloud has yet to
-  // confirm) keeps the icon inked, anything else grays it. Envelopes without
-  // a lineaMicra model (the Admin poll) leave the icon on its last Home
-  // frame, and other builds fold this branch away entirely.
+  // confirm) keeps the icon inked, anything else grays it. A paired companion
+  // draws two clouds instead of one: both lit while the data runs through it,
+  // the back one dimmed while it runs direct (pending still does). Envelopes
+  // without a lineaMicra model (the Admin poll) leave the icon on its last
+  // Home frame, and other builds fold this branch away entirely.
   const micra = $("micraSignal");
   if (micra && __LINEA_MICRA__ && s.machineIntegration === "linea_micra_cloud" && s.lineaMicra) {
     const lm = s.lineaMicra,
@@ -459,7 +461,15 @@ function updateHeaderSignals(s = {}) {
       quality = lm.quality,
       live = !stale && (quality === "current" || quality === "optimistic");
     micra.hidden = false;
-    micra.dataset.level = live ? "on" : "off";
+    if (!stale && s.companion) micra.dataset.paired = String(s.companion.paired === true);
+    if (s.companion?.route) micra.dataset.route = s.companion.route;
+    const paired = micra.dataset.paired === "true",
+      via = micra.dataset.route,
+      routeName =
+        __WEBUI_TEXT__("admin.companion_routes").split("|")[
+          via === "companion" ? 0 : via === "pending" ? 1 : 2
+        ];
+    micra.dataset.level = !live ? "off" : paired && via !== "companion" ? "partial" : "on";
     const label = live
       ? __WEBUI_TEXT__("admin.companion_link_open")
       : stale
@@ -471,7 +481,11 @@ function updateHeaderSignals(s = {}) {
             : quality === "disabled"
               ? __WEBUI_TEXT__("runtime.disabled")
               : __WEBUI_TEXT__("shell.micra_link_trouble");
-    micra.title = __WEBUI_TEXT__("diagnostic.marzocco_cloud") + ": " + label;
+    micra.title =
+      __WEBUI_TEXT__("diagnostic.marzocco_cloud") +
+      ": " +
+      label +
+      (live && paired ? " · " + routeName : "");
     micra.setAttribute("aria-label", micra.title);
     const account = $("micraName"),
       machine = $("micraMachine"),
@@ -483,11 +497,7 @@ function updateHeaderSignals(s = {}) {
     if (detail) detail.textContent = label;
     // The route row uses Admin's wording; a frame without a companion model
     // keeps the last route (pending still carries the data direct).
-    if (route && s.companion?.route) {
-      const routes = __WEBUI_TEXT__("admin.companion_routes").split("|");
-      route.textContent =
-        routes[s.companion.route === "companion" ? 0 : s.companion.route === "pending" ? 1 : 2];
-    }
+    if (route && s.companion?.route) route.textContent = routeName;
   }
   updateBrandFit();
 }

@@ -64,6 +64,25 @@
       <symbol id="dg-marzocco-cloud" class="micraOnly" viewBox="0 0 24 24">
         <path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9Z" />
       </symbol>
+      <symbol id="dg-marzocco-clouds" class="micraOnly" viewBox="0 0 24 24">
+        <mask id="cloudFrontGap" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <rect width="24" height="24" fill="#fff" />
+          <path
+            fill="#000"
+            stroke="#000"
+            stroke-width="4"
+            d="M4.82 20.05a3.52 3.52 0 0 1-.44-7.04A5.28 5.28 0 0 1 14.5 12.13a3.96 3.96 0 0 1-.88 7.92Z"
+          />
+        </mask>
+        <path
+          class="cloudBack"
+          mask="url(#cloudFrontGap)"
+          d="M8.82 15.85a3.52 3.52 0 0 1-.44-7.04A5.28 5.28 0 0 1 18.5 7.93a3.96 3.96 0 0 1-.88 7.92Z"
+        />
+        <path
+          d="M4.82 20.05a3.52 3.52 0 0 1-.44-7.04A5.28 5.28 0 0 1 14.5 12.13a3.96 3.96 0 0 1-.88 7.92Z"
+        />
+      </symbol>
     </svg>
     <div id="launchIntro" aria-hidden="true">
       <span class="launchWord"
@@ -165,13 +184,10 @@
           hidden
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <use
-              href="#dg-marzocco-cloud"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linejoin="round"
-            />
+            <g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+              <use class="cloudAlone" href="#dg-marzocco-cloud" />
+              <use class="cloudPaired" href="#dg-marzocco-clouds" />
+            </g>
           </svg>
         </button>
         <button

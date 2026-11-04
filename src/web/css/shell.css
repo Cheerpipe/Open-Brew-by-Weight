@@ -217,6 +217,10 @@ body {
   opacity: var(--rackBottom, 1);
 }
 
+.cloudBack {
+  opacity: var(--cloudBack, 1);
+}
+
 .signalSlash {
   display: none;
 }
@@ -1078,6 +1082,15 @@ html.themeDark #launchIntro {
 
 #companionSignal[data-level="partial"] svg {
   --rackTop: 0.18;
+}
+
+#micraSignal[data-level="partial"] svg {
+  --cloudBack: 0.22;
+}
+
+#micraSignal[data-paired="true"] .cloudAlone,
+#micraSignal:not([data-paired="true"]) .cloudPaired {
+  display: none;
 }
 
 .launchPool .back {
