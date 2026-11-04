@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 import os
@@ -798,6 +799,12 @@ with tempfile.TemporaryDirectory(prefix="openbrewbyweight-version-") as temporar
     subprocess.run([*git, "commit", "-qm", "v"], check=True)
     subprocess.run(version_command, check=True, capture_output=True)
     assert "1.2.3+" in output.read_text() and "-dirty" not in output.read_text()
+    # Parallel preset configures run it against one header at once.
+    def write_version(_: int) -> int:
+        return subprocess.run(version_command, capture_output=True).returncode
+    with ThreadPoolExecutor(6) as pool:
+        assert not any(pool.map(write_version, range(60))), "concurrent gen_version.sh failed"
+    assert not list(output.parent.glob(output.name + ".tmp*"))
     # A firmware build splits the identity into a source beside a stable header,
     # with the OTA marker text and the host header's field order unchanged.
     host_tag = output.read_text()
