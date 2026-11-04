@@ -7491,6 +7491,7 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
 }
 export {
   SHELL_FW_VERSION,
+  commandFailMessage,
   archiveView,
   archiveViewNote,
   closeArchivePage,

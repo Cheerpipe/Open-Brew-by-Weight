@@ -931,7 +931,14 @@ async function startWifiScan() {
   });
 }
 function loadNetworkAddress(n) {
-  if (!n || R.uiState.networkAddressLoaded) return;
+  if (!n) return;
+  // Its own Wi-Fi sleep save: a dirty form keeps its fields and takes up the revision that moved.
+  if (R.uiState.networkRevisionMoved && n.revision !== formRevisions.network) {
+    R.uiState.networkRevisionMoved = false;
+    formRevisions.network = n.revision;
+  }
+  if (R.uiState.networkAddressLoaded) return;
+  R.uiState.networkRevisionMoved = false;
   R.uiState.networkAddressLoaded = true;
   formRevisions.network = n.revision;
   R.uiState.savedStaSsid = n.wifiConfigured && n.ssid ? n.ssid : "";
@@ -988,6 +995,7 @@ async function setWifiSleep() {
   if (!ok) el.checked = R.uiState.savedStaWifiSleep;
   // The save moved the network revision: a clean form takes it up again.
   else if ($("saveNetworkButton").dataset.dirty !== "1") R.resetNetworkAddressLoaded();
+  else R.uiState.networkRevisionMoved = true;
   return ok;
 }
 function formatNetworkStatus(n) {
@@ -2293,19 +2301,21 @@ export function init() {
       )
         return;
     } else payload._noReconnectWait = true;
-    R.command(
-      "/api/v1/network",
-      payload,
-      undefined,
-      undefined,
-      undefined,
-      "saveNetworkButton",
-    ).then((ok) => {
-      if (!ok) return;
+    const saved = () => {
       $("staPassword").value = "";
       setSaveDirty("saveNetworkButton", "", false);
       R.resetNetworkAddressLoaded();
-    });
+    };
+    R.command("/api/v1/network", payload, true, undefined, undefined, "saveNetworkButton")
+      .then(saved)
+      .catch((e) => {
+        if (!formStale(e, saved))
+          R.message(
+            R.formatCommandError(R.commandFailMessage("/api/v1/network", payload), e),
+            "error",
+          );
+        R.refreshStatus();
+      });
   };
   $("forgetNetworkButton").onclick = () => {
     if (confirm(__WEBUI_TEXT__("admin.forget_the_sta_network_and_restart")))
