@@ -13,6 +13,11 @@
       pairedRuntime.indexOf('event.reason === "paired"') < pairedRuntime.indexOf(
           'const held = webUiTakeoverVisible();'));
   assert(pairedClaim.includes('if (!moved) self.clearAdminUnlock(attach ? &screen : nullptr);'));
+  // A companion that requires pairing takes an open window to its page, wherever it finds out;
+  // an older one, which keeps proxying, never says so and keeps the window.
+  assert.equal(pairedRuntime.split('data.error === "COMPANION_NOT_PAIRED"').length - 1, 2);
+  assert(pairedRuntime.includes('c?.pairingRequired === true && openCompanionPairing()'));
+  assert(pairedRuntime.includes('location.replace("/__companion/?pair=1")'));
   const utf8 = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightUtf8.h'), 'utf8');
   const networkSource = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.cpp'), 'utf8');
   const body = (source, signature) => {

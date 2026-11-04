@@ -117,13 +117,11 @@ the controller's own address keeps working as before.
    controller and the companion connect. A request waits ten minutes; if it
    runs out, choose **Pair** on the companion's page to ask again.
 
-You can also pair from the Web UI itself. When you open it through a
-companion that is not paired yet, Home shows **Use the Web UI on several
-screens** (and **Admin → Companion** shows the same offer). Tap **Pair**: the
-companion asks the controller, Home shows its six-digit code, and **Review**
-takes you to Admin, where you type that code and tap **Approve**. The code is
-never filled in for you: typing it is how you confirm that the companion
-asking is the one you are using.
+The companion opens the Web UI only once it's paired, because that's what protects
+your password and sign-in on your network. Until then, its secure address takes
+you to this same page, with the code and a link to the controller's Admin; once
+you approve, it opens the Web UI by itself. The code is never filled in for you:
+typing it is how you confirm that the companion asking is the one you are using.
 
 If the companion has not found the controller, type its address in **Admin →
 Companion → Connect to a companion at…** and tap **Open its page**. The
