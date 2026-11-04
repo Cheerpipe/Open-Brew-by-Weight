@@ -47,6 +47,8 @@ transparent:
 There is no time limit in compatibility mode: the relay keeps following the
 paddle or switch even when it is held for more than 60 seconds. Releasing it
 opens the relay. Turning the firmware back on restores its normal time limits.
+If the controller can't read which mode you chose, it keeps the firmware on with
+those limits and says so in the log, rather than silently dropping them.
 If the paddle or switch is held during startup or after a safety stop, release
 it before activating the machine again.
 Automatic [Micra backflush](linea-micra.md#automatic-backflush) is available

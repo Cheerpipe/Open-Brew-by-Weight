@@ -73,6 +73,14 @@ bool scanWindow(const esp_partition_t *part) {
   g_status.writeCursor =
       oldest + (newest + AUDIT_STORE_RECORD_CAPACITY - oldest) %
                    AUDIT_STORE_RECORD_CAPACITY + 1;
+  // A power cut mid-program leaves a torn record right after the newest, and
+  // programming over its bits would lose the next record too. Within a sector
+  // only: entering a new one erases it first.
+  while (slotOffset(g_status.writeCursor) % AUDIT_STORE_SECTOR_BYTES != 0) {
+    if (!readSlot(part, g_status.writeCursor, slot)) return false;
+    if (auditStoreSlotEmpty(slot)) break;
+    ++g_status.writeCursor;
+  }
   return true;
 }
 

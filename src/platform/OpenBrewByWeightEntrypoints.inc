@@ -339,7 +339,12 @@ void startAfterBootRecovery() {
   }
   // Master switch: read before any subsystem init so BLE, Micra, NTP, and the
   // control machine all see the final boot-scoped mode.
-  firmwareModeRaw = static_cast<uint8_t>(loadFirmwareMode());
+  bool firmwareModeDamaged = false;
+  firmwareModeRaw = static_cast<uint8_t>(loadFirmwareMode(&firmwareModeDamaged));
+  if (firmwareModeDamaged) {
+    serialTraceCategory(LogLevel::WARNING, DebugCategory::CONFIG,
+                        "Firmware mode record unreadable; running as enabled, with relay limits");
+  }
   if (!loadBleScanSettings(bleScanPersistedSettings)) {
     bleScanPersistedSettings = BleScanPersistedSettings{};
     if (!saveBleScanSettings(bleScanPersistedSettings)) {
