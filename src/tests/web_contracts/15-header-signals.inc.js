@@ -414,3 +414,44 @@ if (!css.includes('#bluetoothSignal[data-level="0"] path{opacity:.12}') ||
 if (!css.includes('#companionSignal[data-level=off] svg,#micraSignal[data-level=off] svg{opacity:.12}')) {
   throw new Error('The disconnected companion and cloud icons must dim like the radios');
 }
+// The menu opens a page fresh; Back and Forward return it as it was left.
+{
+  const assert = require('assert').strict, vm = require('vm');
+  const views = {
+    diagnostic: [{tagName: 'DETAILS', open: false}, {tagName: 'DETAILS', open: true}],
+    settings: [{tagName: 'DETAILS', open: true}],
+    home: [{tagName: 'BUTTON', ariaExpanded: 'true', click() { this.ariaExpanded = 'false'; }}],
+  };
+  const history = {state: {y: 9}, pushed: [],
+    replaceState(state) { this.state = state; },
+    pushState(state, _, url) { this.pushed.push(url); this.state = state; location.pathname = url; }};
+  const location = {pathname: '/diagnostic'}, scrolled = [];
+  const context = vm.createContext({history, location, scrollY: 300, activeView: 'diagnostic',
+    knownPath: p => p, scrollTo: (_, y) => scrolled.push(y),
+    renderRoute: p => { context.activeView = p.slice(1) || 'home'; },
+    document: {querySelectorAll: s => views[s.match(/#view-(\w+)/)[1]]}});
+  const start = appJsSource.indexOf('const pageFolds');
+  vm.runInContext(appJsSource.slice(start, appJsSource.indexOf('history.scrollRestoration', start))
+    .replace(/^const /m, 'var '), context);
+  context.navigate('/settings');
+  assert.equal(JSON.stringify(history.state), '{}', 'a menu entry starts with nothing to restore');
+  assert.equal(views.settings[0].open, false, 'the menu closes the groups of the page it opens');
+  assert.deepEqual(scrolled, [], 'renderRoute scrolls a page that was hidden');
+  history.state = {y: 300, open: [1]};
+  context.showFolds('diagnostic', history.state.open);
+  assert.equal(views.diagnostic[1].open, true, 'Back reopens what the page had open');
+  context.activeView = 'diagnostic'; location.pathname = '/diagnostic';
+  context.scrollY = 120; history.state = {};
+  context.rememberPage();
+  assert.equal(JSON.stringify(history.state), '{"y":120,"open":[1]}', 'each entry records its scroll and folds');
+  context.navigate('/diagnostic');
+  assert.equal(history.pushed.length, 1, 'the page already showing adds no history entry');
+  assert.equal(views.diagnostic[1].open, false, 'the menu also resets the page already showing');
+  assert.deepEqual(scrolled, [0], 'and returns it to the top');
+  context.navigate('/home');
+  assert.equal(views.home[0].ariaExpanded, 'false', 'the preset graph chevron folds too');
+  assert(codeIncludes(appJsSource, 'if(history.state?.open)showFolds(view,history.state.open);'),
+      'a page shown from history restores its folds');
+  assert(codeIncludes(appJsSource, 'document.addEventListener("toggle",rememberPage,true);'),
+      'a group toggled after returning updates its entry');
+}

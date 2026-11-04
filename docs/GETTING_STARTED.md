@@ -169,6 +169,11 @@ unlocked and stay dimmed until you unlock it.
 The phone header keeps its compact size at all times, with the logo and
 connection icons always visible.
 
+**Where a page opens**: choosing a page from the menu always shows it from the
+top with every collapsible section closed. The browser's Back and Forward
+buttons instead return you to a page just as you left it, with the same
+sections open and the same scroll position.
+
 **While a page loads**: Home, Settings, Stats, History, Diagnostics, and Admin
 show a loading view with the Open Brew by Weight mark, a moving wave, and
 **Loading…**. Opening or refreshing the URL covers the whole screen. When you

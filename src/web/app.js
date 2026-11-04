@@ -194,9 +194,12 @@ async function renderRoute(pathname, focus) {
       if (el.dataset.view === view) changed = el.classList.contains("hidden");
       el.classList.toggle("hidden", el.dataset.view !== view);
     });
-    // Each page keeps its own scroll: a new page opens at the top, Back returns
-    // to where it was left, and a deep link scrolls to its own section.
-    if (changed && !location.hash) scrollTo(0, history.state?.y || 0);
+    // Back and Forward return a page as it was left; a deep link scrolls to its
+    // own section.
+    if (changed && !location.hash) {
+      if (history.state?.open) showFolds(view, history.state.open);
+      scrollTo(0, history.state?.y || 0);
+    }
     markNavActive(viewToPath(view));
     const section = focus && document.getElementById("view-" + view);
     if (section) {
@@ -267,15 +270,37 @@ function preloadRecords() {
         () => {},
       );
 }
+// A page's folds: its collapsible groups and the Home preset graph's chevrons.
+const pageFolds = (view) =>
+    document.querySelectorAll(`#view-${view} :is(details, .presetAccToggle)`),
+  foldOpen = (el) => el.open ?? el.ariaExpanded === "true";
+function showFolds(view, open) {
+  pageFolds(view).forEach((el, i) => {
+    if (foldOpen(el) === open.includes(i)) return;
+    if (el.tagName === "DETAILS") el.open = !el.open;
+    else el.click();
+  });
+}
+// Each history entry records its page's scroll and open folds for Back and Forward.
+function rememberPage() {
+  const open = [...pageFolds(activeView)].flatMap((el, i) => (foldOpen(el) ? [i] : []));
+  history.replaceState({ ...history.state, y: scrollY, open }, "");
+}
+// Only the menu navigates here, and it always opens a page fresh: at the top
+// with every fold closed, even the page already showing.
 function navigate(path, replace) {
-  const target = knownPath(path) || "/";
-  if (location.pathname !== target) {
-    if (!replace) history.replaceState({ ...history.state, y: scrollY }, "");
+  const target = knownPath(path) || "/",
+    same = location.pathname === target;
+  if (!same) {
+    if (!replace) rememberPage();
     history[replace ? "replaceState" : "pushState"]({}, "", target);
   }
   renderRoute(target, true);
+  showFolds(activeView, []);
+  if (same) scrollTo(0, 0);
 }
 history.scrollRestoration = "manual";
+document.addEventListener("toggle", rememberPage, true);
 R.setViewPollHooks({
   stop: stopExtraPolls,
   start: () => renderRoute(location.pathname),
