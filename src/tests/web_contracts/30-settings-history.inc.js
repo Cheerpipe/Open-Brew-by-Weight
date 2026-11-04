@@ -331,8 +331,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
   throw new Error('Brew presets CRUD UI must block factory delete, support reset, click-to-load, and save pending edits before switching');
 }
 {
-  const diagHtml = html.slice(html.indexOf('id="view-diagnostic"'),
-                              html.indexOf('</section>', html.indexOf('id="view-diagnostic"')) + 10);
+  const diagHtml = html.slice(html.indexOf('id="view-diagnostic"'), html.indexOf('id="view-settings"'));
   const adminHtml = html.slice(html.indexOf('id="view-admin"'),
                                html.indexOf('id="firmwareFooter"'));
   const statusHtml = html.slice(html.indexOf('id="equipmentPanel"'),
@@ -1710,11 +1709,9 @@ if (!/<fieldset[^>]*><legend>Log<\/legend>/.test(html) ||
     !codeIncludes(ui, 'e.level') ||
     !codeIncludes(ui, 'value="boot"') ||
     html.indexOf('id="ringRetainLogLevel"') < html.indexOf('id="view-diagnostic"') ||
-    html.indexOf('id="ringRetainLogLevel"') >
-        html.indexOf('</section>', html.indexOf('id="view-diagnostic"')) ||
+    html.indexOf('id="ringRetainLogLevel"') > html.indexOf('id="view-settings"') ||
     html.indexOf('id="serialLogLevel"') < html.indexOf('id="view-diagnostic"') ||
-    html.indexOf('id="serialLogLevel"') >
-        html.indexOf('</section>', html.indexOf('id="view-diagnostic"')) ||
+    html.indexOf('id="serialLogLevel"') > html.indexOf('id="view-settings"') ||
     html.indexOf('id="ringRetainLogLevel"') > html.indexOf('id="serialLogLevel"') ||
     !html.includes('id="serialLogLevel" class="diagCtl"') ||
     !html.includes('id="ringRetainLogLevel" class="diagCtl"') ||

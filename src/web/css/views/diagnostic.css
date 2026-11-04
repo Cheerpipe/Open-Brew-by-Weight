@@ -1,3 +1,8 @@
+small {
+  display: block;
+  color: var(--mu);
+}
+
 /* The log: a status strip, the log box (its bar of filters and time steps
    above the lines, with severity pills), its meta row and toolbar, then the
    logging settings. */
@@ -155,16 +160,6 @@
   cursor: pointer;
 }
 
-.logNav button:not(:disabled):hover {
-  background: var(--pa);
-}
-
-.logNav button:disabled {
-  color: var(--mu);
-  opacity: 0.4;
-  cursor: default;
-}
-
 #logJumpButton .cfgIcon {
   width: 1.1rem;
   height: 1.1rem;
@@ -247,11 +242,6 @@
   cursor: pointer;
 }
 
-.logChip:has(> select:focus-visible) {
-  outline: 2px solid var(--ac);
-  outline-offset: 2px;
-}
-
 .logChip > .x {
   position: relative;
   z-index: 1;
@@ -300,6 +290,11 @@
 
 .logChip.lvw {
   color: var(--wn);
+}
+
+.logChip:has(> select:focus-visible) {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 
 .logSw {
@@ -372,7 +367,6 @@
 /* A restart stays pinned at the top while its boot's lines scroll under
    it, so the reader always sees which boot they are in. */
 #log .logBoot {
-  position: sticky;
   top: -0.55rem;
   left: -0.65rem;
   z-index: 1;
@@ -490,6 +484,16 @@
   color: var(--ac);
 }
 
+.logNav button:disabled {
+  color: var(--mu);
+  opacity: 0.4;
+  cursor: default;
+}
+
+.logNav button:not(:disabled):hover {
+  background: var(--pa);
+}
+
 .logWhen {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -523,11 +527,6 @@
 #log,
 #bullseyeRtttl {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-small {
-  display: block;
-  color: var(--mu);
 }
 
 .fieldHint {

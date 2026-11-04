@@ -448,7 +448,7 @@ if (!rawViewJs.stats.includes('R.escHtml(__WEBUI_TEXT__("runtime.stats_preset_fi
   need(codeIncludes(rawViewJs.home, 'if (sheet.classList.contains("open") && !sheet.contains(e.relatedTarget)) zone.focus()'), 'sheet focus');
   need(codeIncludes(rawAppJsSource, 'document.title = path === "/" ? baseTitle : a.textContent + " · " + baseTitle'), 'page titles');
   need(codeIncludes(rawAppJsSource, 'renderRoute(target, true)') && codeIncludes(rawAppJsSource, 'section.focus({ preventScroll: true })'), 'route focus');
-  need(partialHtml.diagnostic.includes('<div id="log" tabindex="0" role="region" aria-label="Log">'), 'log name');
+  need(partialHtml.diagnostic.includes('<section id="log" tabindex="0" aria-label="Log">'), 'log name');
   need(partialHtml.admin.includes('<span id="scanStatus" role="status">') && partialHtml.admin.includes('<div id="otaStatus" role="status">'), 'live statuses');
   need(codeIncludes(rawViewJs.setup, 'if (document.activeElement?.closest("[hidden]")) $("setupTitle").focus({ preventScroll: true })') &&
       partialHtml.setup.includes('<h1 id="setupTitle" tabindex="-1">'), 'setup step focus');
