@@ -12,8 +12,10 @@ does today.
 
 ## What it does today
 
-- **Opens the Web UI over HTTPS** with a trusted certificate, so your phone
-  can install it as an app. With the machine off, Shots and History stay
+- **Opens the Web UI over HTTPS** with a trusted certificate. Once paired, your
+  phone can install it as an app, and the companion checks every Web UI file
+  against a list the controller sends sealed, so a device on your network can't
+  change what your browser runs. With the machine off, Shots and History stay
   available from the companion. This is
   what the companion did when it was called the HTTPS gateway.
 - **Lets several screens use the Web UI at once.** Once paired, your phone,

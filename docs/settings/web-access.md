@@ -67,10 +67,12 @@ of them brings control back to the companion.
 The password keeps casual visitors out of the Web UI and stops them from
 changing presets, settings, or the machine. Opening the controller's own
 address is not encrypted, so that path won't stop someone who can watch the
-traffic on your Wi-Fi. Signing in through a
-[companion](../features/companion.md) is protected: nobody listening on the
-network can read your password or your signed-in session. Keep the
-controller on your own network, not a guest or public one.
+traffic on your Wi-Fi. Signing in through a paired, up-to-date
+[companion](../features/companion.md) is protected: nobody on your network can
+read your password or your signed-in session, or change the Web UI your browser
+runs. A compromised device on your network could still make the companion stop
+working, or make live readings on screen wrong, so keep the controller on your
+own network, not a guest or public one.
 
 Joining the controller's own setup network already proves the device password,
 so the setup page never asks for it again.
