@@ -219,6 +219,35 @@
         'the live bar hides Live and Theme and keeps the signals before Close');
   }
 
+  // A rotation can settle in two steps, the width and then the height alone.
+  // The live view draws to its height, so it redraws on either; a graph that
+  // only follows its width ignores its height, which its own drawing sets.
+  {
+    let fire = null, draws = 0;
+    const observe = new Function('ResizeObserver',
+        runtimeJs.slice(runtimeJs.indexOf('let shotPresetObserver'),
+            runtimeJs.indexOf('// Every filled chart fades')) +
+        ';return observePresetHost')(class {
+      constructor(cb) { fire = cb; }
+      observe() {}
+      unobserve() {}
+    });
+    const host = {isConnected: true, clientWidth: 486, clientHeight: 716, _w: 486, _h: 716,
+      _draw() { draws++; }};
+    observe(host);
+    fire([{target: host}]);
+    assert.equal(draws, 0, 'an unchanged box does not redraw');
+    host.clientHeight = 322;
+    fire([{target: host}]);
+    assert.equal(draws, 1, 'the live view redraws when only its height changes');
+    delete host._h;
+    host.clientHeight = 180;
+    fire([{target: host}]);
+    assert.equal(draws, 1, 'a width-only graph ignores its height');
+    assert(/host\._h\s*=\s*host\.clientHeight/.test(runtimeJs),
+        'the live view records the height it drew to');
+  }
+
   // iOS WebKit ignores muted video for display sleep: the silent keep-awake
   // track plays unmuted on iPhone/iPad (and the desktop-class iPadOS UA),
   // muted everywhere else.

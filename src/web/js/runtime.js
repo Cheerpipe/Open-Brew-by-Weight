@@ -1537,11 +1537,17 @@ function shotRuleModel(r) {
 }
 let shotPresetObserver = null;
 // One shared observer re-lays out preset graphs once they get a width; detached hosts drop out.
+// A host that also draws to its height (the live view) records it in _h: iOS
+// can settle a rotation in two steps, the width first and the height after it.
 function observePresetHost(host) {
   shotPresetObserver ??= new ResizeObserver((entries) => {
     for (const e of entries) {
       if (!e.target.isConnected) shotPresetObserver.unobserve(e.target);
-      else if (e.target.clientWidth !== e.target._w) e.target._draw();
+      else if (
+        e.target.clientWidth !== e.target._w ||
+        (e.target._h ?? e.target.clientHeight) !== e.target.clientHeight
+      )
+        e.target._draw();
     }
   });
   shotPresetObserver.observe(host);
@@ -5505,7 +5511,8 @@ function initShotFullScreen() {
     close = $("liveShotClose");
   if (!view || view.dataset.fsBound) return;
   view.dataset.fsBound = "1";
-  $("liveShotGraph")._draw = paintUiStream;
+  // No frame yet paints nothing, but the view still shows the active preset.
+  $("liveShotGraph")._draw = () => (shotFrame ? paintUiStream() : shotFsActive && renderLiveShot());
   observePresetHost($("liveShotGraph"));
   let tap = 0;
   // A double tap or double click on the shot card opens the live view and on
@@ -6780,6 +6787,7 @@ function renderLiveShot(d, model, m = liveRuleModel, tint = "neutral") {
   $("liveShotPreset").textContent = name;
   const lane = $("liveShotLane");
   host._w = host.clientWidth;
+  host._h = host.clientHeight;
   lane.replaceChildren();
   if (!m || m.mode === "empty") return void host.replaceChildren();
   // Labels and strokes grow with the screen: the graph is laid out up to

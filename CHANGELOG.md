@@ -15,6 +15,9 @@ exported JSON formats are not carried over.
   see [Notifications](docs/features/notifications.md). On a Linea Micra, it can
   also tell you when La Marzocco needs you to accept new terms; tap it to open
   Home and see what to do.
+- **Live view when you rotate the phone:** turning the phone with the live view
+  open no longer leaves the chart squeezed into the middle of its card, on an
+  iPhone in particular. The chart now fills the card again at once.
 - **Grind hints no longer stuck on old advice:** a suggestion from your first
   shots could silently keep a card in the opposite direction from appearing,
   even many shots later. Once the shots being read are all newer than that
