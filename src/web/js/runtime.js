@@ -5346,6 +5346,7 @@ const APP_SETTING_KEYS = {
   // Stored as an opt-out so the splash is on by default; js/launch.js reads it.
   noSplash: "obbwAppNoSplash",
   batteryPct: "obbwAppBatteryPct",
+  liveLandscape: "obbwAppLiveLandscape",
 };
 function appSetting(k) {
   try {
@@ -5362,6 +5363,7 @@ function setAppSetting(k, v) {
     // Storage blocked or full: the setting applies to this page only.
   }
   if (k === "batteryPct") document.documentElement.classList.toggle("showBattPct", v);
+  if (k === "liveLandscape") document.documentElement.classList.toggle("liveLandscape", v);
   if (k !== "awake") return;
   if (v && sessionShotLive()) keepShotAwake(true);
   else if (!v && shotAwakeUntil) {
@@ -6078,6 +6080,10 @@ function onPageVisibility() {
 // app; the class gates them (and anything else pwaOnly) from first paint.
 document.documentElement?.classList?.toggle("pwaApp", webUiStandalone());
 document.documentElement?.classList?.toggle("showBattPct", appSetting("batteryPct"));
+document.documentElement?.classList?.toggle(
+  "liveLandscape",
+  webUiStandalone() && appSetting("liveLandscape"),
+);
 document.addEventListener("visibilitychange", onPageVisibility);
 if (document.hidden) onPageVisibility();
 // Every https page knows its companion from load on, whatever view it opens

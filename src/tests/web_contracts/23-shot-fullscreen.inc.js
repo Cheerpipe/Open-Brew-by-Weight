@@ -248,6 +248,17 @@
         'the live view records the height it drew to');
   }
 
+  // Keeping the live view in landscape belongs to the installed app and only
+  // turns an upright screen: the upright layouts step aside for it.
+  {
+    assert(/webUiStandalone\(\)\s*&&\s*appSetting\("liveLandscape"\)/.test(runtimeJs),
+        'the landscape setting applies only to the installed app');
+    assert(/@media[^{]*portrait[^{]*\{[^@]*\.liveLandscape \.liveShot\{[^}]*rotate:90deg/.test(css),
+        'the view turns only on an upright screen');
+    assert(css.includes('html:not(.liveLandscape) .liveShot{grid-template:'),
+        'the upright layouts stand aside while the view is kept in landscape');
+  }
+
   // iOS WebKit ignores muted video for display sleep: the silent keep-awake
   // track plays unmuted on iPhone/iPad (and the desktop-class iPadOS UA),
   // muted everywhere else.

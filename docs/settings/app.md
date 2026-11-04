@@ -23,6 +23,11 @@ Clearing its data returns them to their defaults, and a
 - **Open the live view when a shot starts** (*installed app only*) raises the
   full-screen timer by itself when a shot begins while you are on Home — start the shot at the
   machine and the timer appears on the counter.
+- **Keep the live view in landscape** (*installed app only*) always lays the
+  live view out sideways, with the chart across the long side of the screen,
+  even with the phone upright or its rotation locked. Turn the phone on its
+  side to read it. It is off until you turn it on; without it, the live view
+  follows the way you hold the phone.
 - **Notify me when a shot ends** (*installed app only*) shows the shot's time,
   yield, and result on this device, even with the app closed. It needs the
   companion and is off until you turn it on; unlike the rest of this group, the

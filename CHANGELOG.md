@@ -18,6 +18,10 @@ exported JSON formats are not carried over.
 - **Live view when you rotate the phone:** turning the phone with the live view
   open no longer leaves the chart squeezed into the middle of its card, on an
   iPhone in particular. The chart now fills the card again at once.
+- **Keep the live view in landscape:** a new choice in **Settings → This
+  device**, for the installed app, lays the live view out sideways even with the
+  phone upright or its rotation locked. See
+  [Settings for this device](docs/settings/app.md).
 - **Grind hints no longer stuck on old advice:** a suggestion from your first
   shots could silently keep a card in the opposite direction from appearing,
   even many shots later. Once the shots being read are all newer than that
