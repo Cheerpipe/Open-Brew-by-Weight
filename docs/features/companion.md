@@ -195,11 +195,11 @@ continuous history:
   while the companion was away. A divider marks each new day, and the
   **Level** and **Subsystem** filters apply to the whole history, so every
   page that loads shows matching lines.
-- The bar on top of the log moves through time: **‹ Day ›** shows the log up
-  to the end of the previous or next day, **‹ Boot ›** opens the previous or
-  next boot on its first line, and the clock (**Jump to a time**) picks a date and
-  time, read on the controller's clock as the log shows it, or a shortcut
-  (15 minutes or an hour ago, the start of today or yesterday). Live updates
+- The bar on top of the log moves through time: **‹ Day ›** and **‹ Boot ›**
+  open the previous or next day or boot on its first line, and the clock
+  (**Jump to a time**) shows the log up to a date and time, read on the
+  controller's clock as the log shows it. Its shortcuts go back 15 minutes or
+  an hour, or open **Today** or **Yesterday** on the first line. Live updates
   then pause; stepping past the newest day or boot, or **Back to live**,
   returns to the newest events. After about 20,000 lines the view stops loading and points you to
   **Export**.

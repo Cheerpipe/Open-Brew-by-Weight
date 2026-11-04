@@ -1651,12 +1651,15 @@ function renderLog() {
     lines.insertAdjacentHTML("beforeend", h.slice(pre + old.length).join(""));
   } else lines.innerHTML = h.join("");
   if (anchor?.h) el.scrollTop = anchor.top + el.scrollHeight - anchor.h;
-  else if (anchor?.boot) {
-    const text = R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [anchor.boot]),
-      row = [...lines.querySelectorAll(".logBoot")].find((x) => x.textContent === text);
-    // Measured from the top, where no Boot row is pinned out of its place.
+  else if (anchor?.mark) {
+    // Measured from the top, where no Boot row is pinned out of its place. A
+    // day's row stops below the Boot row pinned over it. Without the row, the
+    // top holds the oldest line loaded; a day with no events, the newest before.
+    const row = [...lines.querySelectorAll(".logMk")].find((x) => x.textContent === anchor.mark),
+      pin = row?.matches(".logBoot") ? 0 : (lines.querySelector(".logBoot")?.offsetHeight ?? 0);
     el.scrollTop = 0;
-    if (row) el.scrollTop = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    if (row) el.scrollTop = row.getBoundingClientRect().top - el.getBoundingClientRect().top - pin;
+    else if (!logHistoryDone && !logHistoryFull()) el.scrollTop = el.scrollHeight;
   } else if (stick || anchor) el.scrollTop = el.scrollHeight;
   $("logCount").textContent = R.sub(__WEBUI_TEXT__("diagnostic.log_lines"), [t.length - markers]);
   nearLogTop();
@@ -1695,9 +1698,9 @@ const logStream = {
 // log and prepend with the view held in place, deduplicated against the live
 // ring, with boot, gap and cleared-log markers between them. The companion
 // applies the level and subsystem filters, so every page adds matching lines.
-// A jump starts the history at a moment (`logJumpAt`, wall seconds) or at the
-// end of a stored boot (`logJumpBoot`, from the companion's boot index), and
-// hides the live ring until Back to live.
+// A jump starts the history at a moment (`logJumpAt`, wall seconds), a day's
+// end (`logJumpDay` too) or a stored boot's end (`logJumpBoot`, from the
+// companion's boot index), and hides the live ring until Back to live.
 const LOG_HISTORY_PAGE = 500,
   LOG_HISTORY_CAP = 20000;
 let logHistory = [],
@@ -1708,6 +1711,7 @@ let logHistory = [],
   logHistoryRun = 0,
   logJumpAt = null,
   logJumpBoot = null,
+  logJumpDay = null,
   logBoots = null,
   logAnchor = null;
 const logPast = () => logJumpAt != null || logJumpBoot != null;
@@ -1742,18 +1746,28 @@ async function loadLogOlder() {
   logHistoryBusy = true;
   // The newest stored events are usually still in the live ring, which shows
   // them already: paging goes on until a page brings a line the view lacks.
-  // A boot step opens on the boot's first line: pages go on until its Boot row
-  // comes. A restart abandons the run, whose answer belongs to the old view.
+  // A boot or day step opens on its first line: pages go on until its row comes
+  // (a day's needs a line from before it). A restart abandons the run, whose
+  // answer belongs to the old view.
   const run = logHistoryRun,
     live = new Set(R.uiState.logEvents.map((e) => e.sequence)),
     shown = (e) => e.g || logPast() || !(e.b === logBootId && live.has(e.s)),
     jumped = logPast() && !logHistory.length,
     boot = jumped && logJumpBoot?.boot,
-    reached = boot ? (e) => e.g === "boot" && e.boot === boot : shown;
+    day = jumped && logJumpDay,
+    dayStart = day && logWallSec(day + "T00:00"),
+    reached = boot
+      ? (e) => e.g === "boot" && e.boot === boot
+      : day
+        ? (e) => e.w && e.w < dayStart
+        : shown,
+    mark = boot
+      ? R.sub(__WEBUI_TEXT__("diagnostic.log_boot_marker"), [boot])
+      : day && R.sub(__WEBUI_TEXT__("diagnostic.log_day_marker"), [day]);
   try {
     for (
       let pages = 0, added = false;
-      !added && !logHistoryDone && !logHistoryFull() && (boot || pages < 8);
+      !added && !logHistoryDone && !logHistoryFull() && (mark || pages < 8);
       pages++
     ) {
       const page = await (await R.companionLog(logHistoryQuery())).json();
@@ -1766,7 +1780,7 @@ async function loadLogOlder() {
       added = page.entries.some(reached);
     }
     const el = $("log");
-    logAnchor = boot ? { boot } : jumped ? "end" : { h: el.scrollHeight, top: el.scrollTop };
+    logAnchor = mark ? { mark } : jumped ? "end" : { h: el.scrollHeight, top: el.scrollTop };
     R.paint(renderLog);
   } catch {
     // A page that did not come is asked again a little later.
@@ -1796,9 +1810,10 @@ function restartLogHistory() {
   void loadLogOlder();
   void loadLogBoots();
 }
-function jumpLog(at, boot = null) {
+function jumpLog(at, boot = null, day = null) {
   logJumpAt = at;
   logJumpBoot = boot;
+  logJumpDay = day;
   logHistoryControls();
   restartLogHistory();
 }
@@ -1822,9 +1837,9 @@ function logBootIndex() {
   if (logJumpAt == null) return b.findLastIndex((x) => x.boot === logBootId);
   return b.findLastIndex((x) => x.from != null && x.from <= logJumpAt);
 }
-// A day step shows up to the end of the day before or after the view's day
-// on the controller's clock; a boot step, that boot from its first line. Past
-// the newest, the view goes back to live.
+// A step opens on its first line the day before or after the view's day, on
+// the controller's clock, or that boot. Past the newest, the view goes back to
+// live.
 function logStepTarget(kind, dir) {
   const now = Date.now() / 1e3;
   if (kind === "day") {
@@ -1832,7 +1847,7 @@ function logStepTarget(kind, dir) {
       day = (w) => logLocalIso(w).slice(0, 10),
       end = (w) => logWallSec(day(w) + "T23:59:59"),
       t = dir < 0 ? logWallSec(day(m) + "T00:00") - 1 : m < end(m) ? end(m) : end(m + 1);
-    return t >= now ? null : t > (logBoots?.[0]?.from ?? 0) ? { at: t } : undefined;
+    return t >= now ? null : t > (logBoots?.[0]?.from ?? 0) ? { at: t, day: day(t) } : undefined;
   }
   // A moment inside a boot steps forward to that boot's end first; a live
   // boot the index does not hold yet comes after its newest.
@@ -1847,7 +1862,7 @@ function logStepTarget(kind, dir) {
 }
 function stepLog(kind, dir) {
   const t = logStepTarget(kind, dir);
-  if (t !== undefined) jumpLog(t?.at ?? null, t?.boot ?? null);
+  if (t !== undefined) jumpLog(t?.at ?? null, t?.boot ?? null, t?.day ?? null);
 }
 // The strip says what the log shows, live or up to a jumped-to moment, and
 // what that means: paging, the cap, or where the older history lives.
@@ -1870,14 +1885,16 @@ function logHistoryControls() {
   $("logStrip").className = "logStrip" + (empty ? " warn" : past ? " past" : "");
   $("logStripTitle").textContent = logJumpBoot
     ? R.sub(__WEBUI_TEXT__("diagnostic.log_boot_view"), [logJumpBoot.boot])
-    : past
-      ? R.sub(
-          empty
-            ? __WEBUI_TEXT__("diagnostic.log_nothing_at")
-            : __WEBUI_TEXT__("diagnostic.log_up_to"),
-          [logWallText(logJumpAt)],
-        )
-      : __WEBUI_TEXT__("diagnostic.log_live");
+    : logJumpDay && !empty
+      ? R.sub(__WEBUI_TEXT__("diagnostic.log_day_view"), [logJumpDay])
+      : past
+        ? R.sub(
+            empty
+              ? __WEBUI_TEXT__("diagnostic.log_nothing_at")
+              : __WEBUI_TEXT__("diagnostic.log_up_to"),
+            [logWallText(logJumpAt)],
+          )
+        : __WEBUI_TEXT__("diagnostic.log_live");
   $("logStripNote").textContent = note;
   $("logStripNote").hidden = !note;
   $("logNav").hidden = !here;
@@ -2107,10 +2124,13 @@ export function init() {
   $("logJumpDialog").querySelector(".logQuick").onclick = (e) => {
     const v = e.target.closest("button")?.value,
       now = Math.floor(Date.now() / 1e3),
-      day = (n) => logWallSec(logLocalIso(now - n * 86400).slice(0, 10) + "T00:00");
+      day = (n) => logLocalIso(now - n * 86400).slice(0, 10),
+      open = (d) => jumpLog(Math.min(logWallSec(d + "T23:59:59"), now), null, d);
     if (!v) return;
     $("logJumpDialog").close();
-    jumpLog(v === "today" ? day(0) : v === "yesterday" ? day(1) : now - v);
+    if (v === "today") open(day(0));
+    else if (v === "yesterday") open(day(1));
+    else jumpLog(now - v);
   };
   $("logJumpDialog").onclose = () =>
     $("logJumpDialog").returnValue === "go" && jumpLog(checkLogDialog($("logJumpDialog")));

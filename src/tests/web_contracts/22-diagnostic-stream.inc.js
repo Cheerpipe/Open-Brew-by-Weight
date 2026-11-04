@@ -450,9 +450,9 @@
   assert(!/\bR\.\w/.test(runtimeJs), 'the runtime module never reads its own exports through R');
   assert(codeIncludes(viewJs.diagnostic, 'if(!logPast()&&e.b===logBootId&&live.has(e.s))continue'),
       'a jump hides the live ring, so the history keeps the events both hold');
-  assert(codeIncludes(viewJs.diagnostic, 'reached=boot?(e)=>e.g==="boot"&&e.boot===boot:shown') &&
-         codeIncludes(viewJs.diagnostic, 'logAnchor=boot?{boot}:jumped?"end"'),
-      'a boot step pages until its Boot row and opens on it');
+  assert(codeIncludes(viewJs.diagnostic, '?(e)=>e.g==="boot"&&e.boot===boot:day?(e)=>e.w&&e.w<dayStart:shown') &&
+         codeIncludes(viewJs.diagnostic, 'logAnchor=mark?{mark}:jumped?"end"'),
+      'a boot or day step pages until its row and opens on it');
   assert(codeIncludes(viewJs.diagnostic, 'if(run!==logHistoryRun)return') &&
          codeIncludes(viewJs.diagnostic, 'logHistoryRun++'),
       'a restart abandons the pages still on their way');
@@ -470,15 +470,15 @@
     const steps = [el({value: 'day:-1'}), el({value: 'day:1'}), el({value: 'boot:-1'}), el({value: 'boot:1'})];
     const n = {logStrip: el(), logStripTitle: el(), logStripNote: el(), logLiveButton: el(),
       logExportButton: el(), logMarkButton: el(), logNav: el({querySelectorAll: () => steps})};
-    const controls = (logJumpAt, logHistory, logHistoryDone, here, c = null, logJumpBoot = null) =>
+    const controls = (logJumpAt, logHistory, logHistoryDone, here, c = null, logJumpBoot = null, logJumpDay = null) =>
       new Function('$', 'R', '__WEBUI_TEXT__', 'logHistoryAvailable', 'logHistoryFull', 'logJumpAt',
           'logHistory', 'logHistoryDone', 'companionDiagnosticStatus', 'logWallText', 'logJumpBoot',
-          'logBoots', 'loadLogBoots', 'logStepTarget',
+          'logBoots', 'loadLogBoots', 'logStepTarget', 'logJumpDay',
           `const logPast=()=>logJumpAt!=null||logJumpBoot!=null;
           ${blockAt(viewJs.diagnostic, 'function logHistoryControls(')};logHistoryControls();`)(
           (id) => n[id], {sub: (t, v) => t.replace('{0}', v[0])}, (k) => k, () => here, () => false,
           logJumpAt, logHistory, logHistoryDone, c, String, logJumpBoot, [], () => {},
-          (kind, dir) => (kind === 'boot' && dir < 0 ? undefined : null));
+          (kind, dir) => (kind === 'boot' && dir < 0 ? undefined : null), logJumpDay);
     controls(null, [], false, true);
     assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent, n.logStripNote.textContent,
       n.logNav.hidden, n.logLiveButton.hidden, n.logMarkButton.hidden],
@@ -492,6 +492,8 @@
     assert.deepEqual(steps.map((b) => b.disabled), [false, false, true, false]);
     controls(null, [{s: 1}], false, true, null, {boot: 40});
     assert.equal(n.logStripTitle.textContent, 'Showing boot 40');
+    controls(1793380832, [{s: 1}], false, true, null, null, '2026-11-01');
+    assert.equal(n.logStripTitle.textContent, 'Showing 2026-11-01');
     controls(1793380832, [{g: 'boot'}], true, true);
     assert.deepEqual([n.logStrip.className, n.logStripTitle.textContent],
       ['logStrip warn', 'Nothing logged at or before 1793380832']);
@@ -499,8 +501,8 @@
     assert.equal(n.logNav.hidden && n.logExportButton.hidden, true);
     assert.match(n.logStripNote.textContent, /companion keeps the older history/);
   }
-  // Day steps land on the end of the day before or after the view's day (from
-  // inside a day, its own end first); boot steps on the end of the boot before
+  // Day steps name the day before or after the view's day (from inside a day,
+  // its own first), paging from its end; boot steps the boot before
   // or after, from inside a boot its own end first, and stepping into the
   // live boot goes back to live.
   {
@@ -522,9 +524,9 @@
     assert.equal(step(null, boots[0], 'boot', -1), undefined, 'no boot before the oldest');
     assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'boot', 1), {at: boots[1].to, boot: boots[1]},
         'inside a boot, forward reaches its own end first');
-    assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'day', -1), {at: T('2026-10-19T23:59:59Z')});
-    assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'day', 1), {at: T('2026-10-20T23:59:59Z')});
-    assert.deepEqual(step(T('2026-10-20T23:59:59Z'), null, 'day', 1), {at: T('2026-10-21T23:59:59Z')});
+    assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'day', -1), {at: T('2026-10-19T23:59:59Z'), day: '2026-10-19'});
+    assert.deepEqual(step(T('2026-10-20T10:00Z'), null, 'day', 1), {at: T('2026-10-20T23:59:59Z'), day: '2026-10-20'});
+    assert.deepEqual(step(T('2026-10-20T23:59:59Z'), null, 'day', 1), {at: T('2026-10-21T23:59:59Z'), day: '2026-10-21'});
     assert.equal(step(T('2026-10-10T12:00Z'), null, 'day', -1), undefined, 'no day before the history');
   }
   // A jump in the future is refused inline; a custom export range that ends
