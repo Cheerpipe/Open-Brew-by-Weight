@@ -131,7 +131,7 @@
   // The setting is off until a tap asks, and only an installed app shows it.
   if (
     !/class="pwaOnly"\s*><input id="appPush"/.test(rawPartialHtml.settings) ||
-    !blockAt(runtimeJs, "async function pushEnable(topics) {").includes("Notification.requestPermission()")
+    !blockAt(runtimeJs, "async function pushSetTopic(topic, wanted) {").includes("Notification.requestPermission()")
   )
     throw new Error("Notifications turn on only from a tap in the installed app");
 
@@ -142,10 +142,15 @@
       .readFileSync(path.join(sketchDir, "web", "js", "settings.js"), "utf8")
       .includes('["appPushTerms", "micra_policy"]') ||
     !blockAt(runtimeJs, "async function pushSetTopic(topic, wanted) {").startsWith(
-      "async function pushSetTopic(topic, wanted) {\n  if (wanted) await Notification.requestPermission();",
+      'async function pushSetTopic(topic, wanted) {\n  if (wanted && (await Notification.requestPermission()) !== "granted")',
     )
   )
     throw new Error("The terms notification is a separate, opt-in topic asked for in the tap");
+
+  // Safari spends the tap on a permission request and answers any other "denied",
+  // whatever the permission is, so one tap may never ask twice.
+  if (runtimeJs.split("Notification.requestPermission(").length !== 2)
+    throw new Error("A tap asks for the notification permission exactly once");
 
   // A blocked setting's reason stays under its label: the row's grid places every
   // other child beside the toggle. The samples use the Web UI's own button bar.

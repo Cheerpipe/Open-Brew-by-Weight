@@ -2852,9 +2852,7 @@ const pushRegister = (subscription, topics) =>
     topics,
     label: pushDeviceLabel(),
   });
-// In the tap: the permission prompt needs it, on iOS above all.
 async function pushEnable(topics) {
-  if ((await Notification.requestPermission()) !== "granted") throw Error("denied");
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
   if (subscription && !pushKeyMatches(subscription)) {
@@ -2881,9 +2879,10 @@ async function pushDisable() {
   await subscription.unsubscribe();
   await companionLog("/__companion/push/unsubscribe", { endpoint });
 }
-// One setting's change; the last topic off ends the subscription.
+// One setting's change, in the tap; the last topic off ends the subscription.
+// Only once: Safari spends the tap on a request and answers any other "denied".
 async function pushSetTopic(topic, wanted) {
-  if (wanted) await Notification.requestPermission();
+  if (wanted && (await Notification.requestPermission()) !== "granted") throw Error("denied");
   const topics = (await pushTopics()).filter((name) => name !== topic);
   if (wanted) topics.push(topic);
   await (topics.length ? pushEnable(topics) : pushDisable());
