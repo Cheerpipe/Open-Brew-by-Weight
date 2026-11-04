@@ -347,6 +347,13 @@ assert (dev_module["uncovered_changes"](["./scripts/dev"])
 # Compact-mode failure hint: a failed gate must summarize the failing check
 # and the likeliest cause instead of making the reader dig through the tail.
 failed_line = dev_module["failed_check_line"]
+# In lane mode the hint stays in the failed step's own block.
+lane_hint = failed_line(
+    [{"name": "test-normal", "status": "failed"}],
+    ["==> test-normal: ctest", "\t46 - corridor_host_test (Failed)                       host",
+     "==> idf-pair: build", "[767/1595] Building C object mbedtls/library/error.c.obj"],
+    "failed")
+assert "corridor_host_test" in lane_hint and "error.c.obj" not in lane_hint, lane_hint
 hint = failed_line([{"name": "build-normal", "status": "failed"}],
                    ["==> build-normal: cmake --build build-host",
                     "src/X.h:37:15: error: something broke"], "failed")

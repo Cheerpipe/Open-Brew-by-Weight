@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import itertools
 import json
 import os
 from pathlib import Path
@@ -470,6 +471,8 @@ def failed_check_line(checks: list[dict[str, object]], lines: list[str],
     start = next((i for i, line in enumerate(lines)
                   if line.startswith(f"==> {failed}:")), None)
     output = lines[start + 1:] if start is not None else []
+    # In lane mode other steps' blocks follow this one.
+    output = list(itertools.takewhile(lambda line: not line.startswith("==> "), output))
     why = next((line for line in output if re.search(r"\berror\b", line, re.I)),
                None)
     if why is None:
