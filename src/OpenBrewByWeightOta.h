@@ -281,6 +281,8 @@ class OpenBrewByWeightOta {
   // Digest of the image a rollback left behind, empty when none did. Written
   // once in begin(), before the network task starts, so it needs no lock.
   const char *rolledBackImage() const { return rolledBackImageSha256_; }
+  // Likewise written once in begin().
+  const char *runningImage() const { return runningImageSha256_; }
 
   static const char *stateName(OtaState state);
 

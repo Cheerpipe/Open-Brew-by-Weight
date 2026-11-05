@@ -111,8 +111,11 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
       static_cast<unsigned long>(webUiOverrideRemainingMs),
       configLockReason(control));
   if (ok) {
-    ok = statusJsonAppend(&used, ",\"rolledBackImage\":\"%.16s\",\"wifiChangeResult\":\"%s\"",
+    ok = statusJsonAppend(&used,
+                          ",\"rolledBackImage\":\"%.16s\",\"runningImage\":\"%.16s\","
+                          "\"wifiChangeResult\":\"%s\"",
                           OpenBrewByWeightOta::instance().rolledBackImage(),
+                          OpenBrewByWeightOta::instance().runningImage(),
                           network.staChangeResult);
   }
   if (ok) {

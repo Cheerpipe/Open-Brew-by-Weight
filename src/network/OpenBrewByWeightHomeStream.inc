@@ -103,6 +103,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("bootId", static_cast<unsigned long>(control.bootId));
   delta.field("rolledBackImage", "\"%.16s\"", OpenBrewByWeightOta::instance().rolledBackImage());
   delta.field("wifiChangeResult", "\"%s\"", network.staChangeResult);
+  delta.field("runningImage", "\"%.16s\"", OpenBrewByWeightOta::instance().runningImage());
   delta.field("configMutable", bool(controlAllowsConfiguration(control)));
   delta.field("snapshotStale", bool(control.snapshotStale));
   delta.field("webUiOverrideActive", bool(override));
