@@ -190,6 +190,7 @@ void OpenBrewByWeightNetwork::armPendingConfirmWindow(uint32_t now, uint32_t tim
   dataMux_.lock();
   staConfirmArmed_ = true;
   staConfirmDeadlineMs_ = now + timeoutMs;
+  status_.staChangeResult = "";
   dataMux_.unlock();
   ::serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                          "WiFi STA config pending confirmation for %lu s",
@@ -229,6 +230,12 @@ void OpenBrewByWeightNetwork::requestPendingNetworkDiscard() {
   }
 }
 
+static void traceStaChange(LogLevel level, const char *what, const char *reason) {
+  const bool named = reason != nullptr && reason[0] != '\0';
+  ::serialTraceCategoryf(level, DebugCategory::NETWORK, "WiFi STA %s%s%s%s", what,
+                         named ? " (" : "", named ? reason : "", named ? ")" : "");
+}
+
 bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
   PersistedSettings &next = workingSettings();
   NetworkStatusSnapshot status = snapshot();
@@ -253,6 +260,7 @@ bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
   dataMux_.lock();
   settings_ = next;
   status_.staConfigState = next.staConfigState;
+  status_.staChangeResult = "CONFIRMED";
   pendingConfirmRequest_ = false;
   dataMux_.unlock();
   if (setupKeepsSoftAp(status.setupPhase)) {
@@ -282,11 +290,7 @@ bool OpenBrewByWeightNetwork::confirmPendingNetwork(const char *reason) {
   }
   log(DebugCategory::CONFIG, DebugCode::CONFIG_PERSISTED,
       static_cast<int32_t>(next.runtime.revision));
-  ::serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
-                         "WiFi STA config confirmed%s%s%s",
-                         reason != nullptr && reason[0] != '\0' ? " (" : "",
-                         reason != nullptr && reason[0] != '\0' ? reason : "",
-                         reason != nullptr && reason[0] != '\0' ? ")" : "");
+  traceStaChange(LogLevel::INFO, "config confirmed", reason);
   return true;
 }
 
@@ -300,11 +304,7 @@ bool OpenBrewByWeightNetwork::revertPendingNetwork(const char *reason) {
     // revert once the durable-write gate opens.
     return false;
   }
-  ::serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "WiFi STA pending config reverted%s%s%s",
-                         reason != nullptr && reason[0] != '\0' ? " (" : "",
-                         reason != nullptr && reason[0] != '\0' ? reason : "",
-                         reason != nullptr && reason[0] != '\0' ? ")" : "");
+  traceStaChange(LogLevel::WARNING, "pending config reverted", reason);
   if (!restoreLkgToActive(next)) {
     clearStaNetwork(next);
   }
@@ -320,6 +320,7 @@ bool OpenBrewByWeightNetwork::revertPendingNetwork(const char *reason) {
   settings_ = next;
   status_.wifiConfigured = next.staConfigured;
   status_.staConfigState = next.staConfigState;
+  status_.staChangeResult = "REVERTED";
   dataMux_.unlock();
   clearPendingConfirmWindow();
   publishConfiguredAddressStatus();

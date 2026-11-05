@@ -88,8 +88,8 @@ matters most: the weight on the scale with its name, the weight of the cup, and,
 on a Linea Micra, the brew temperature or the minutes left to warm up. Tap a row
 for all its details.
 
-On your first visits, Home shows a few short notes, one at a time: whether to
-ask for a password, how to connect a Linea Micra to your La Marzocco account,
+On your first visits, Home shows a few short notes, all at once if several
+apply: whether to ask for a password, how to connect a Linea Micra to your La Marzocco account,
 a reminder to check your recipe before the first shot, and, once your scale is
 saved, the option to use only that scale. Each note has a button that takes
 you straight there and a **Dismiss** button. A dismissed note doesn't come back

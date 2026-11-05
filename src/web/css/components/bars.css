@@ -66,3 +66,30 @@ dialog .btnBar {
   text-transform: none;
   line-height: 1.2;
 }
+
+.homeCard {
+  margin: 1rem 0;
+  padding: 0.8rem 1rem 0.4rem;
+  border: 1px solid var(--ln);
+  border-left: 4px solid var(--ok);
+  border-radius: var(--r);
+  background: var(--sf);
+}
+
+.homeCard p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.homeCard a.btnGlyph {
+  text-decoration: none;
+}
+
+/* Onboarding hints inform, not warn: a neutral edge. */
+.infoHint {
+  border-left-color: var(--bd);
+}
+
+.resultFailed {
+  border-left-color: var(--dn);
+}

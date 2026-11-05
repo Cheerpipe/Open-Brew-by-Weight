@@ -120,6 +120,8 @@ struct NetworkStatusSnapshot {
   StaState staState = StaState::NOT_CONFIGURED;
   uint8_t staIpMode = static_cast<uint8_t>(StaIpMode::DHCP);
   uint8_t staConfigState = static_cast<uint8_t>(StaConfigState::CONFIRMED);
+  // How the last network change ended: "", "CONFIRMED" or "REVERTED".
+  const char *staChangeResult = "";
   int8_t staRssi = 0;
   uint8_t staSignalLevel = 0;
   uint8_t staSignalQualityPct = 0;
@@ -652,6 +654,7 @@ class OpenBrewByWeightNetwork {
   const char *otaBootReason_ = "";
   int32_t otaBootLastError_ = 0;
   std::atomic<uint32_t> otaRestartRequestedAtMs_{0};
+  bool otaRollbackLogged_ = false;
   WebCommand acceptedCommand_ = {};
   WebCommand completionCommand_ = {};
   uint8_t acceptedCommandAttempts_ = 0;

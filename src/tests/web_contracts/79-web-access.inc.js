@@ -211,10 +211,9 @@
           "if(reason==='direct')setInactiveHint(__WEBUI_TEXT__('runtime.opened_directly'));showInactiveOverlay();") &&
       codeIncludes(blockAt(rawRuntimeJs, 'function setInactiveHint(text) {'), 'h.dataset.d||=h.textContent'),
       'The direct takeover explains itself and the overlay keeps its own text');
-  // Home onboarding hints show one at a time: a companion request, a pairing
-  // offer, access, La Marzocco Cloud, recipe, scale; each waits while the
-  // grind hint shows. Dismissals other than access stay in the browser under
-  // the legacy card keys.
+  // Home cards show independently, each whenever its own condition holds, and
+  // none waits for another or for the grind hint. Dismissals other than access
+  // stay in the browser under the legacy card keys.
   const order = ['micraPolicyHint', 'micraAccountHint', 'companionHint', 'companionPairHint', 'accessHint', 'micraCloudHint',
     'recipeHint', 'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
@@ -233,26 +232,26 @@
   const fresh = {access: {notice: true}, machineIntegration: 'linea_micra_cloud', presetsTag: 7,
     lineaMicra: {accountConfigured: false}, config: {scaleMacCacheMode: 'prefer'}, scale: {preferredMac: 'AA'}};
   const shown = (s) => (home.applyStatus(s), order.filter((id) => !nodes[id].hidden));
-  assert.deepEqual(shown(fresh), ['accessHint']);
-  assert.deepEqual(shown({...fresh, access: {notice: false}}), ['micraCloudHint']);
+  assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint', 'recipeHint', 'scaleOnlyHint']);
+  assert.deepEqual(shown({...fresh, access: {notice: false}}), ['micraCloudHint', 'recipeHint', 'scaleOnlyHint']);
   const noCloud = {...fresh, access: {notice: false}, lineaMicra: {accountConfigured: true}};
-  assert.deepEqual(shown(noCloud), ['recipeHint']);
+  assert.deepEqual(shown(noCloud), ['recipeHint', 'scaleOnlyHint']);
   recorded = true;
   assert.deepEqual(shown(noCloud), ['scaleOnlyHint']);
   assert.deepEqual(shown({...noCloud, config: {scaleMacCacheMode: 'only'}}), []);
   assert.deepEqual(shown({...noCloud, scale: {preferredMac: ''}}), []);
-  // A refused La Marzocco account takes the slot before every hint, with no
+  // A refused La Marzocco account shows with no
   // dismissal: pending terms offer Accept, which follows the controls lock;
   // a refused sign-in or access names its cause and sends to Settings.
   const refused = (accountProblem) => ({...noCloud, lineaMicra: {accountConfigured: true, accountProblem}});
   const causes = ['auth', 'access'].map((problem) => {
-    assert.deepEqual(shown(refused(problem)), ['micraAccountHint']);
+    assert.deepEqual(shown(refused(problem)), ['micraAccountHint', 'scaleOnlyHint']);
     return nodes.micraAccountHintTitle.textContent + nodes.micraAccountHintText.textContent;
   });
   assert.ok(causes[0] && causes[1] && causes[0] !== causes[1], 'Each refusal names its own cause');
   assert.deepEqual(shown(refused('')), ['scaleOnlyHint']);
   const blocked = refused('policy');
-  assert.deepEqual(shown(blocked), ['micraPolicyHint']);
+  assert.deepEqual(shown(blocked), ['micraPolicyHint', 'scaleOnlyHint']);
   assert.strictEqual(nodes.micraPolicyHintAccept.disabled, false);
   home.R.controlsMutable = false;
   shown(blocked);
@@ -268,23 +267,23 @@
   assert.equal(cards.get('obbwCard:recipe'), '1');
   cards.set('obbwCard:scaleOnly', '1');
   assert.deepEqual(shown({...noCloud, presetsTag: 8}), []);
-  // A page that came through an unpaired companion offers to pair it, ahead of
-  // access; the request it sends then shows instead, with the code typed in Admin.
+  // A page that came through an unpaired companion offers to pair it; the
+  // request it sends then replaces that offer, with the code typed in Admin.
   pairable = true;
   here.companionHere = {name: 'nas', paired: false, pairing: {state: 'unpaired'}};
-  assert.deepEqual(shown(fresh), ['companionPairHint']);
+  assert.deepEqual(shown(fresh), ['companionPairHint', 'accessHint', 'micraCloudHint']);
   assert.match(nodes.companionPairHintText.textContent, /^This page comes through the companion .*:nas$/);
   const asking = {...fresh, companion: {requestName: 'nas', requestAddress: '192.168.1.20'}};
-  assert.deepEqual(shown(asking), ['companionHint']);
+  assert.deepEqual(shown(asking), ['companionHint', 'accessHint', 'micraCloudHint']);
   assert.match(nodes.companionHintText.textContent, /^It is asking from .*:192\.168\.1\.20$/);
   here.companionHere = {name: 'nas', paired: false, pairing: {state: 'pending', code: '123456'}};
-  assert.deepEqual(shown(asking), ['companionHint']);
+  assert.deepEqual(shown(asking), ['companionHint', 'accessHint', 'micraCloudHint']);
   assert.match(nodes.companionHintText.textContent, /^Its code is .*:123456$/);
   cards.set('obbwCard:companionPair', '1');
-  assert.deepEqual(shown(fresh), ['accessHint'], 'the pairing offer can be dismissed in this browser');
+  assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint'], 'the pairing offer can be dismissed in this browser');
   pairable = false;
   nodes.grindHintCard.hidden = false;
-  assert.deepEqual(shown(fresh), []);
+  assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint'], 'the grind hint holds no card back');
   assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&
       codeIncludes(rawPartialHtml.settings, 'id="recipeSettings"') &&
       !codeIncludes(rawPartialHtml.home, 'type="checkbox"'));

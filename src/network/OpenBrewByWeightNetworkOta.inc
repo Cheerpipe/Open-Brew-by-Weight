@@ -1408,6 +1408,10 @@ void OpenBrewByWeightNetwork::serviceOtaRollback(uint32_t now) {
   }
 
   OpenBrewByWeightOta &ota = OpenBrewByWeightOta::instance();
+  if (!otaRollbackLogged_ && ota.rolledBackImage()[0] != '\0') {
+    otaRollbackLogged_ = true;
+    actionLogf("ota: the last update failed and rolled back: image=%.16s", ota.rolledBackImage());
+  }
   const ControlGateSnapshot control = controlGate();
   // Never wait behind an HTTP upload's OTA mutex in this watchdog task.
   ota.expireSession(now, controlAllowsConfiguration(control), false);

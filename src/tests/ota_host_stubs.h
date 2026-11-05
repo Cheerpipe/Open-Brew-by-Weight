@@ -47,6 +47,7 @@ inline esp_partition_t otaHostTargetPartition;
 namespace ota_host {
 inline std::array<uint8_t, 4U * 1024U * 1024U> flash;
 inline esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
+inline esp_ota_img_states_t spareState = ESP_OTA_IMG_VALID;
 inline esp_err_t stateError = ESP_OK, writeError = ESP_OK, endError = ESP_OK;
 inline esp_err_t confirmError = ESP_OK, rollbackError = ESP_OK, commitError = ESP_OK;
 inline bool rollbackPossible = true, active = false;
@@ -58,6 +59,7 @@ inline esp_ota_handle_t serial = 0;
 inline void reset() {
   flash.fill(0xFF);
   state = ESP_OTA_IMG_UNDEFINED;
+  spareState = ESP_OTA_IMG_VALID;
   stateError = writeError = endError = confirmError = rollbackError = commitError = ESP_OK;
   rollbackPossible = true;
   active = false;
@@ -80,10 +82,10 @@ inline const esp_partition_t *esp_ota_get_next_update_partition(const void *) {
   return &otaHostTargetPartition;
 }
 
-inline esp_err_t esp_ota_get_state_partition(const esp_partition_t *,
+inline esp_err_t esp_ota_get_state_partition(const esp_partition_t *partition,
                                              esp_ota_img_states_t *state) {
   if (state == nullptr) return ESP_FAIL;
-  *state = ota_host::state;
+  *state = partition == &otaHostTargetPartition ? ota_host::spareState : ota_host::state;
   return ota_host::stateError;
 }
 
