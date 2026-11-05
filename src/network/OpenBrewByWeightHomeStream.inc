@@ -100,6 +100,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   }
   unlocked |= session.fromSoftAp;
   delta.field("firmwareVersion", "\"%s\"", FW_VERSION);
+  delta.field("firmwareBuiltAt", static_cast<unsigned long>(FW_BUILD_EPOCH));
   delta.field("bootId", static_cast<unsigned long>(control.bootId));
   delta.field("rolledBackImage", "\"%.16s\"", OpenBrewByWeightOta::instance().rolledBackImage());
   delta.field("wifiChangeResult", "\"%s\"", network.staChangeResult);

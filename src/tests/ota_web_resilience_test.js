@@ -258,9 +258,13 @@ function firmwareResultChecks() {
     card.dismiss();
     assert.equal(run(12, version, next), null);
   }
-  // Two builds with the same version, as two of a dirty tree, are still an update.
+  // Two builds with the same version, as two of a dirty tree, are still an update,
+  // and the card says when this one was built once the firmware reports it.
   card = run(13, '4.0', '5'.repeat(16));
-  assert.match(card.text, /firmware_updated_text:4\.0/);
+  assert.match(card.text, /firmware_updated_text:4\.0$/);
+  card = result({bootId: 13, firmwareVersion: '4.0', runningImage: '5'.repeat(16), rolledBackImage: '',
+    firmwareBuiltAt: 1793900000});
+  assert.match(card.text, /firmware_updated_text:4\.0 shell\.firmware_built_text:.*2026/);
   card.dismiss();
   // A Wi-Fi change waits for the firmware's word, which a name could not give
   // for a wrong password on the same network, and Dismiss ends it.

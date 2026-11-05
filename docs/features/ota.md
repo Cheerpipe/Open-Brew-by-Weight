@@ -49,7 +49,7 @@ until it ends.
 
 The result card stays until you dismiss it, and the next update starts over:
 
-- **Firmware updated** names the version now running. It appears the same way
+- **Firmware updated** names the version now running and when it was built. It appears the same way
   after an update from the Web UI or the command line, in every browser and address
   you've used before, the first time you open it afterwards. Installing again the
   exact image already running only shows it in the browser that did it from Admin.
@@ -263,7 +263,9 @@ next range from `nextOffset`, including backward movement after reboot.
 digest; session `sha256` remains the hash of the entire file, including that
 digest. `bootState` uses IDF image states (unknown read failure is -2).
 
-`runningImage`, in the Home stream and `/api/v1/status/admin` with no unlock, is
+`firmwareBuiltAt`, in the Home stream and `/api/v1/status/admin` with no unlock, is
+the Unix time of the build, also shown in **Diagnostic → Misc**. `runningImage`, in
+the same places, is
 the first 16 hex digits of the running image's digest, which each browser compares
 with the last one it knew. `rolledBackImage`, in the same places, is that prefix
 for the image a rollback left in the spare slot, and empty otherwise. It comes from the slot's ABORTED or INVALID

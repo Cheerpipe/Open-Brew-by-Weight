@@ -2607,6 +2607,14 @@ function beginFirmwareRestartWait(bootId, version) {
   firmwareRestart = { bootId, version, shot: false };
   beginNetworkReconnectWait();
 }
+// When this firmware was built, in this browser's own time and language.
+const firmwareBuilt = (s) =>
+  s.firmwareBuiltAt > 0
+    ? new Date(s.firmwareBuiltAt * 1e3).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "";
 const FW_RESULT_KEY = "obbwFwResult",
   FW_UPDATED_CARD = "obbwCard:fwUpdated",
   FW_ROLLBACK_CARD = "obbwCard:fwRollback";
@@ -2668,7 +2676,11 @@ function firmwareResult(s) {
         failed: false,
         dismiss: () => dismissCard(FW_UPDATED_CARD, running),
         title: __WEBUI_TEXT__("shell.firmware_updated_title"),
-        text: sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [version]),
+        text:
+          sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [version]) +
+          (firmwareBuilt(s)
+            ? " " + sub(__WEBUI_TEXT__("shell.firmware_built_text"), [firmwareBuilt(s)])
+            : ""),
       };
 }
 const WIFI_CHANGE_KEY = "obbwWifiChange";
@@ -8073,6 +8085,7 @@ export {
   adminUnlockedFor,
   adminUnlockedHere,
   beginFirmwareRestartWait,
+  firmwareBuilt,
   noteFirmwareFlash,
   webUiOverrideFor,
   companionHere,
