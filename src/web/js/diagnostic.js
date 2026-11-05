@@ -2240,7 +2240,14 @@ export function init() {
       if (e.button === 0)
         hold = setTimeout(() => {
           copied = true;
-          copyText(section.innerText.trim());
+          // Read an open clone: a closed section only exposes its name, and
+          // opening the real row would animate it and fire its toggle.
+          const clone = section.cloneNode(true);
+          for (const d of [clone, ...clone.querySelectorAll("details")]) d.open = true;
+          clone.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+          section.after(clone);
+          copyText(clone.innerText.trim());
+          clone.remove();
         }, 600);
     };
     title.onpointerup = title.onpointerleave = title.onpointercancel = cancel;
