@@ -349,7 +349,7 @@ function updateHeaderSignals(s = {}) {
     unavailable = __WEBUI_TEXT__("runtime.signal_unavailable");
   for (const [kind, name] of [
     ["wifi", __WEBUI_TEXT__("shell.wifi")],
-    ["bluetooth", __WEBUI_TEXT__("shell.bluetooth")],
+    ["bluetooth", __WEBUI_TEXT__("shell.scale_signal")],
   ]) {
     const button = $(kind + "Signal");
     if (!button) continue;
@@ -366,7 +366,12 @@ function updateHeaderSignals(s = {}) {
             : levels[0]
           : levels[level];
     button.dataset.level = String(level);
-    button.title = name + ": " + label;
+    button.title =
+      kind === "wifi" || level > 0
+        ? name + ": " + label
+        : level === 0
+          ? label
+          : __WEBUI_TEXT__("shell.scale_signal_unavailable");
     button.setAttribute("aria-label", button.title);
     const identity = $(kind + "Name"),
       detail = $(kind + "Detail");
@@ -379,7 +384,7 @@ function updateHeaderSignals(s = {}) {
             : "—";
     if (detail) detail.textContent = label;
   }
-  // The scale battery joins the Bluetooth indicator: a cell after the bars
+  // The scale battery joins the scale indicator: a cell after the bars
   // whose fill follows the percent, coloured only once it needs attention.
   // The number lives in the popover and the label, and beside the cell when
   // this device opts in (.showBattPct). An envelope
@@ -394,7 +399,7 @@ function updateHeaderSignals(s = {}) {
   if (bt) {
     if (batt) bt.dataset.batt = batt;
     else delete bt.dataset.batt;
-    bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "5.2 0 42.5 24" : "5.2 0 26.1 24");
+    bt.querySelector?.("svg")?.setAttribute("viewBox", batt ? "0 0 51.2 24" : "0 0 34.5 24");
     if (batt) {
       bt.title += " · " + sub(__WEBUI_TEXT__("runtime.scale_battery"), [scaleBatteryText(pct)]);
       bt.setAttribute("aria-label", bt.title);
@@ -592,7 +597,8 @@ const QUICK_ICONS = {
   shield: "M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z",
   fastExtractionGuardEnabled: "M13 3 5 14h6l-1 7 8-11h-6z",
   slowExtractionGuardEnabled: "M7 3h10M7 21h10M8 3v3l4 6-4 6v3M16 3v3l-4 6 4 6v3",
-  noScaleBbwMode: "M4 19h16l-2.2-9H6.2zM12 10V5M9 5h6",
+  noScaleBbwMode:
+    "M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM15.2 10.2a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0zM9 16.5h6",
   autoToManualGuardEnabled: "M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5M12 8v4l3 2",
   avoidAccidentalTouchEnabled:
     "M9 12V5.5a1.5 1.5 0 0 1 3 0V12M12 11V9.5a1.5 1.5 0 0 1 3 0V12M15 11.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L4 15a1.5 1.5 0 0 1 2.5-1.6L9 16",

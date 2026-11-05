@@ -133,16 +133,16 @@ keyboard, or use your device's back gesture to close it; you return to the page
 you were on. While the view is open, your phone's screen stays on, so you can
 watch the whole shot.
 
-The header shows the controller's home-network Wi-Fi signal and its Bluetooth
-link to the scale. More lit arcs or bars mean a stronger signal; amber means
-weak reception. Tap Wi-Fi to see the connected network name and signal level;
-tap Bluetooth to see the connected scale and its signal level. These indicators
+The header shows the controller's home-network Wi-Fi signal and a scale icon
+for the Bluetooth link to your scale. More lit arcs or bars mean a stronger
+signal; amber means weak reception. Tap Wi-Fi to see the connected network name
+and signal level; tap the scale to see its name and signal level. These indicators
 update when reception moves between weak, medium, and strong; the popups show
 the level rather than a fluctuating dBm reading. The scale uses
 your friendly name when set; otherwise it shows the scale's model name when
 recognized, or the name reported over Bluetooth. Tap the same
 icon again, tap outside the popup, or press Escape to close it. When the
-whole Bluetooth icon fades out, the scale is disconnected. A crossed-out Wi-Fi
+whole scale icon fades out, the scale is disconnected. A crossed-out Wi-Fi
 icon means the home network is down. Dim bars or arcs under a visible symbol
 mean a reading is not available yet, or the page cannot refresh it. The Wi-Fi
 icon describes the home-network connection, even when you open the page through
