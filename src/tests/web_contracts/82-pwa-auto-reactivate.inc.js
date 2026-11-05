@@ -114,7 +114,6 @@
   // every visible loss and every "direct" pause keeps its explanation.
   {
     const shown = [],
-      offers = [],
       hints = [];
     const run = vm.createContext({
       webUiEpochClaimPending: false,
@@ -130,7 +129,6 @@
       setMutable() {},
       showInactiveOverlay: () => shown.push(1),
       setInactiveHint: (text) => hints.push(text),
-      offerPairedCompanion: () => offers.push(1),
       __WEBUI_TEXT__: (key) => key,
     });
     run.webUiHoldClaim = () => true;
@@ -149,7 +147,6 @@
     run.webUiOwner = true;
     run.deactivate("takeover");
     assert.equal(shown.length, 1, "a visible loss paints the overlay");
-    assert.equal(offers.length, 1, "a visible takeover checks for a companion just paired");
     // The held epoch re-claim keeps the overlay while the claim runs.
     run.webUiEpochClaimPending = true;
     run.webUiOwner = true;
@@ -162,7 +159,6 @@
     run.deactivate("direct");
     assert.equal(shown.length, 2, "direct paints its overlay");
     assert.equal(hints.length, 1, "direct keeps its explanation");
-    assert.equal(offers.length, 1, "only a takeover can be the companion taking over");
     run.webUiHoldClaim = () => false;
     run.webUiOwner = true;
     run.deactivate("inactivity");

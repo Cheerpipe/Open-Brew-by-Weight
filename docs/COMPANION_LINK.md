@@ -570,7 +570,8 @@ through the route active when they are sent.
 
 With **Web UI through the companion** on, the companion serves the Web UI to
 any number of screens while the controller keeps one claim and one ui-stream
-session, held by the companion. The companion forwards each screen's REST
+session for the companion, apart from those of a browser at its own address. The
+companion forwards each screen's REST
 calls and its own ui-stream upgrade with a signed header. The relay works
 without the link, uses no clock and writes nothing to flash. A request without
 the header takes exactly the path it takes without a companion.
@@ -758,11 +759,14 @@ claim and safety gates. The signature adds only this:
 - **Claim attach.** `POST /api/v1/ui/claim` from a companion screen while the
   relay id already holds control joins that claim: it validates the
   forwarded session, keeps the other screens' Admin unlock and override, and
-  drops only the ones this screen held. Otherwise the claim takes control as
-  usual, so a newly opened companion screen takes control from a browser
-  that opened the controller directly, and a direct claim takes it back
-  (relayed requests then get `409 UI_TAKEN_OVER` and the companion's stream
-  closes with 4001).
+  drops only the ones this screen held.
+- **One claim per channel.** A relayed claim and a direct claim never displace
+  each other, nor clear what the other channel holds. A new direct window displaces
+  only the previous direct window. The first of three ui-stream slots can only be
+  the companion's, so a direct browser can never occupy it, and each dispatch serves
+  the companion first, sharing one 800 ms budget. `409 UI_TAKEN_OVER` and close
+  code 4001 reach the companion only from firmware older than this, or after every
+  session is revoked.
 - **Before pairing nothing is relayed.** A companion that requires pairing, shown
   by `pairingRequired` in `/__companion/status`, answers `/api/` with
   `409 COMPANION_NOT_PAIRED` and redirects pages to `/__companion/?pair=1`, where
@@ -775,7 +779,9 @@ claim and safety gates. The signature adds only this:
 - **Admin unlock and the unsafe override belong to the screen.** Unlocking
   Admin, signing in, the unsafe override, Admin lock and the OTA password
   check act on the `screen` of the request, not on the relay id. One screen or
-  window holds Admin at a time: unlocking on another replaces it.
+  window holds Admin at a time, across both channels: unlocking on another
+  replaces it, so the controller's own address can always reach Admin when the
+  companion cannot.
   `GET /api/v1/auth` reports `adminUnlocked` for that `screen` too: the
   companion asks it signing the requesting browser's own `X-WebUI-Client` as
   `screen` before deleting a record or the log history it alone keeps, and

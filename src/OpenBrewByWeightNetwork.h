@@ -192,6 +192,9 @@ inline int8_t clampWifiRssi(int32_t rssi) {
 
 struct NetworkWorkBuf;
 
+// A bound stream and a takeover handshake for the direct channel, one for the
+// companion's (uiStreamFreeSlot).
+constexpr size_t UI_STREAM_SESSIONS = 3;
 struct UiStreamFingerprints {
   static constexpr size_t kHomeFields = 128, kDiagFields = 224, kCardFields = 32,
                           kSettingsFields = 80;
@@ -409,7 +412,7 @@ class OpenBrewByWeightNetwork {
   static constexpr uint32_t HEALTH_TELEMETRY_INTERVAL_MS = 5000;
   static constexpr uint32_t NETWORK_STOP_TIMEOUT_MS = 5000;
   static constexpr uint8_t COMMAND_MAX_ATTEMPTS = 5;
-  // Admin unlock is RAM-only and tied to the exclusive WebUI claim. Idle
+  // Admin unlock is RAM-only, with one holder across both WebUI claims. Idle
   // slides on Admin page polls and privileged APIs, not on Home polls.
   static constexpr uint32_t ADMIN_UNLOCK_IDLE_MS = 15 * 60 * 1000;
   static constexpr uint32_t WEB_UI_OVERRIDE_MS = 60 * 1000;
@@ -521,7 +524,7 @@ class OpenBrewByWeightNetwork {
     // screens holds Admin and the override (relay.*).
     bool relayed = false;
   };
-  UiStreamSession uiStreams_[2];
+  UiStreamSession uiStreams_[UI_STREAM_SESSIONS];
   // The companion archive's record sync (network/OpenBrewByWeightCompanionRecords.inc):
   // PSRAM, allocated with the link workspace by the first handshake, so a
   // never-paired controller reserves nothing. httpd records the companion's
@@ -575,11 +578,17 @@ class OpenBrewByWeightNetwork {
   std::atomic<uint32_t> scaleSamples_{0}, uiStreamDispatchSamples_{0};
   std::atomic<bool> uiStreamOpen_{false};
   mutable TaskMutex dataMux_;
-  char activeWebUiClientId_[WEB_UI_CLIENT_ID_CAPACITY] = {};
-  // Session token behind the current claim, wiped when the claim clears; a
-  // bound ui-stream ends with it (webAccessClaimSessionLive per dispatch).
-  uint8_t activeWebUiClaimToken_[WEB_ACCESS_TOKEN_BYTES] = {};
-  bool activeWebUiClaimTokenValid_ = false;
+  // One claim per channel: a browser at the controller's own address, and the
+  // companion for all its screens. Neither ever displaces the other.
+  struct WebUiClaim {
+    char clientId[WEB_UI_CLIENT_ID_CAPACITY] = {};
+    // Session token behind the claim, wiped when it clears; a bound ui-stream
+    // ends with it (webAccessClaimSessionLive per dispatch).
+    uint8_t token[WEB_ACCESS_TOKEN_BYTES] = {};
+    bool tokenValid = false;
+  };
+  WebUiClaim directClaim_, companionClaim_;
+  WebUiClaim &webUiClaim(bool relayed) { return relayed ? companionClaim_ : directClaim_; }
   bool webUiOverrideActive_ = false;
   uint32_t webUiOverrideUntilMs_ = 0;
   // One holder each (a companion screen or a direct window): a newer unlock
@@ -1009,7 +1018,7 @@ class OpenBrewByWeightNetwork {
   static esp_err_t workBufBusy(httpd_req_t *request);
   bool requireActiveWebUiClient(httpd_req_t *request);
   // `holder`: only when it holds the unlock (a companion screen's own).
-  void clearAdminUnlock(const CompanionPrincipal *holder = nullptr);
+  void clearAdminUnlock(bool relayed, const char *screen = nullptr);
   void grantAdminUnlock(const CompanionPrincipal &holder, uint32_t now);
   // The caller: a relayed request's screen, else its X-WebUI-Client.
   bool webUiPrincipal(httpd_req_t *request, CompanionPrincipal &principal);

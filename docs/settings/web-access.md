@@ -50,10 +50,11 @@ one you used least recently. Signing in with the password also unlocks Admin
 for 15 minutes. A remembered device opens the Web UI but asks for the password
 again before Admin.
 
-Only one window controls the controller at a time, as before. Opening the Web
-UI on another device moves control there, and the first window offers
+At the controller's own address, one window has control at a time. Opening the
+Web UI there on another device moves control to it, and the first window offers
 **Reload** to take it back without signing in again.
 
+A companion has its own place beside that window, so neither interrupts the other.
 Through an [Open Brew by Weight Companion](../features/companion.md), your
 phone, tablet and computer can all use the Web UI at the same time, each on
 its own page. Each screen signs in on its own, and Admin unlocks for one

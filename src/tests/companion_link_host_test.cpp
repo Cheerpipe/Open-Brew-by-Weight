@@ -1220,9 +1220,8 @@ static void testRelayEnds() {
     char clientId[8] = {};
   };
   int fds[3];
-  bool claimEnded = true;
 
-  // A direct page and a free slot stay; the relayed owner closes with the claim.
+  // A direct page and a free slot stay; relayed streams close, bound or not.
   Session sessions[3];
   sessions[0].fd = 5;
   sessions[0].bound = true;
@@ -1230,25 +1229,30 @@ static void testRelayEnds() {
   sessions[1].fd = 6;
   sessions[1].relayed = sessions[1].bound = true;
   memcpy(sessions[1].clientId, "relay", 6);
-  CHECK(companionRelayedStreamsEnd(sessions, "relay", fds, claimEnded) == 1);
-  CHECK(fds[0] == 6 && claimEnded);
+  CHECK(companionRelayedStreamsEnd(sessions, fds) == 1);
+  CHECK(fds[0] == 6);
   CHECK(!sessions[1].bound && sessions[0].bound);
-
-  // A direct browser took the claim: the relayed stream closes, the claim stays.
-  sessions[1].bound = true;
-  CHECK(companionRelayedStreamsEnd(sessions, "direct", fds, claimEnded) == 1);
-  CHECK(fds[0] == 6 && !claimEnded && sessions[0].bound);
-
-  // A relayed stream that never bound holds no claim, whatever its empty id says.
-  sessions[1].clientId[0] = '\0';
   sessions[1].bound = false;
-  CHECK(companionRelayedStreamsEnd(sessions, "", fds, claimEnded) == 1);
-  CHECK(!claimEnded);
-
-  // No relayed stream: nothing closes and the claim stays.
+  CHECK(companionRelayedStreamsEnd(sessions, fds) == 1);
   sessions[1].relayed = false;
-  CHECK(companionRelayedStreamsEnd(sessions, "direct", fds, claimEnded) == 0);
-  CHECK(!claimEnded);
+  CHECK(companionRelayedStreamsEnd(sessions, fds) == 0);
+
+  // The first slot is the companion's alone, and direct browsers never reach it.
+  Session slots[3];
+  CHECK(uiStreamFreeSlot(slots, true) == &slots[0]);
+  CHECK(uiStreamFreeSlot(slots, false) == &slots[2]);
+  slots[2].fd = 7;
+  CHECK(uiStreamFreeSlot(slots, false) == &slots[1]);
+  slots[1].fd = 8;
+  CHECK(uiStreamFreeSlot(slots, false) == nullptr);
+  CHECK(uiStreamFreeSlot(slots, true) == &slots[0]);
+  // A companion reconnecting over its dead socket overlaps in a direct slot when
+  // one is free, and it is still served before any direct browser.
+  slots[0].fd = 9;
+  slots[1].fd = -1;
+  CHECK(uiStreamFreeSlot(slots, true) == &slots[1]);
+  slots[1].fd = 10;
+  CHECK(uiStreamFreeSlot(slots, true) == nullptr);
 
   // Only a socket the SoftAP's own address serves, with a peer on its subnet.
   CHECK(softApServesAddresses(0xC0A80401u, 0xC0A80402u));

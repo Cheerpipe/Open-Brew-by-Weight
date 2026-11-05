@@ -73,31 +73,35 @@ esp_err_t OpenBrewByWeightNetwork::claimHandler(httpd_req_t *request) {
   }
   // A companion screen claiming while the companion holds control attaches
   // to that claim: it takes nothing from the other screens and drops only
-  // the unlock and override it held itself. Anything else takes control.
+  // the unlock and override it held itself. Anything else takes its channel's
+  // claim, and what that channel held, leaving the other channel alone.
   CompanionPrincipal screen;
   const bool relayed = self.webUiPrincipal(request, screen) && screen.relayed;
   uint8_t claimToken[WEB_ACCESS_TOKEN_BYTES] = {};
   const bool claimTokenPresent = self.readClaimSessionToken(request, claimToken);
   self.dataMux_.lock();
-  const bool attach = relayed && strcmp(self.activeWebUiClientId_, clientId) == 0;
+  WebUiClaim &claim = self.webUiClaim(relayed);
+  const bool attach = relayed && strcmp(claim.clientId, clientId) == 0;
   // The window that held control through an unpaired companion, now paired: it
   // takes nothing from anyone, so what it had unlocked stays with it.
-  const bool moved = relayed && !attach && strcmp(self.activeWebUiClientId_, screen.id) == 0;
+  const bool moved = relayed && !attach && strcmp(self.directClaim_.clientId, screen.id) == 0;
   if (moved) {
     (void)companionPrincipalMove(self.adminUnlock_, screen);
     (void)companionPrincipalMove(self.webUiOverride_, screen);
-  } else if (!attach || companionPrincipalHolds(self.webUiOverride_, screen)) {
+    self.directClaim_ = WebUiClaim{};
+  } else if (attach ? companionPrincipalHolds(self.webUiOverride_, screen)
+                    : self.webUiOverride_.relayed == relayed) {
     self.webUiOverrideActive_ = false;
     self.webUiOverrideUntilMs_ = 0;
     self.webUiOverride_ = CompanionPrincipal{};
   }
-  if (!attach) memcpy(self.activeWebUiClientId_, clientId, sizeof(clientId));
+  if (!attach) memcpy(claim.clientId, clientId, sizeof(clientId));
   // Attached or rotated, the claim carries this window's session so that
   // revoking it also ends the stream the claim holds.
-  memcpy(self.activeWebUiClaimToken_, claimToken, sizeof(claimToken));
-  self.activeWebUiClaimTokenValid_ = claimTokenPresent;
+  memcpy(claim.token, claimToken, sizeof(claimToken));
+  claim.tokenValid = claimTokenPresent;
   self.dataMux_.unlock();
-  if (!moved) self.clearAdminUnlock(attach ? &screen : nullptr);
+  if (!moved) self.clearAdminUnlock(relayed, attach ? screen.id : nullptr);
   memset(clientId, 0, sizeof(clientId));
   memset(claimToken, 0, sizeof(claimToken));
   return sendJson(request, STATUS_OK,
@@ -148,8 +152,8 @@ uint32_t OpenBrewByWeightNetwork::webUiOverrideRemainingMs(httpd_req_t *request)
   const uint32_t now = millis();
   uint32_t remaining = 0;
   dataMux_.lock();
-  if (webUiOverrideActive_ && activeWebUiClientId_[0] != '\0' &&
-      strcmp(activeWebUiClientId_, clientId) == 0 &&
+  const char *claimed = webUiClaim(caller.relayed).clientId;
+  if (webUiOverrideActive_ && claimed[0] != '\0' && strcmp(claimed, clientId) == 0 &&
       (caller.relayed ? companionPrincipalHolds(webUiOverride_, caller)
                       : !webUiOverride_.relayed)) {
     if (tickReached(now, webUiOverrideUntilMs_)) {
@@ -181,9 +185,11 @@ bool OpenBrewByWeightNetwork::historyMutationAllowed(
   return webUiConfigurationAllowed(request, status);
 }
 
-void OpenBrewByWeightNetwork::clearAdminUnlock(const CompanionPrincipal *holder) {
+// Only what this channel holds, or just `screen`'s: a claim or lock on one
+// channel never closes Admin on the other.
+void OpenBrewByWeightNetwork::clearAdminUnlock(bool relayed, const char *screen) {
   dataMux_.lock();
-  if (holder == nullptr || companionPrincipalHolds(adminUnlock_, *holder)) {
+  if (adminUnlock_.relayed == relayed && (!screen || strcmp(adminUnlock_.id, screen) == 0)) {
     adminUnlocked_ = false;
     adminUnlock_ = CompanionPrincipal{};
     adminUnlockUntilMs_ = 0;
@@ -364,8 +370,8 @@ esp_err_t OpenBrewByWeightNetwork::adminLockHandler(httpd_req_t *request) {
   self.unlockJsonBody();
   // A companion screen locks only its own unlock.
   CompanionPrincipal caller;
-  if (self.webUiPrincipal(request, caller) && caller.relayed) self.clearAdminUnlock(&caller);
-  else self.clearAdminUnlock();
+  (void)self.webUiPrincipal(request, caller);
+  self.clearAdminUnlock(caller.relayed, caller.relayed ? caller.id : nullptr);
   return sendJson(request, STATUS_OK, "{\"unlocked\":false}");
 }
 #endif
@@ -383,9 +389,11 @@ bool OpenBrewByWeightNetwork::requireActiveWebUiClient(httpd_req_t *request) {
     return false;
   }
   bool active = false;
+  CompanionPrincipal caller;
+  (void)webUiPrincipal(request, caller);
   dataMux_.lock();
-  active = activeWebUiClientId_[0] != '\0' &&
-           strcmp(activeWebUiClientId_, clientId) == 0;
+  const char *claimed = webUiClaim(caller.relayed).clientId;
+  active = claimed[0] != '\0' && strcmp(claimed, clientId) == 0;
   // An accepted request also proves the page alive to its stream session.
   for (auto &session : uiStreams_)
     if (active && session.bound && strcmp(session.clientId, clientId) == 0)

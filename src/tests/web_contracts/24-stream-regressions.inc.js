@@ -12,15 +12,34 @@
   assert(pairedRuntime.indexOf('event.reason === "paired"') > 0 &&
       pairedRuntime.indexOf('event.reason === "paired"') < pairedRuntime.indexOf(
           'const held = webUiTakeoverVisible();'));
-  assert(pairedClaim.includes('if (!moved) self.clearAdminUnlock(attach ? &screen : nullptr);'));
+  assert(pairedClaim.includes('if (!moved) self.clearAdminUnlock(relayed, attach ? screen.id : nullptr);'));
+  // One claim per channel: neither takes the other's claim, Admin, override or stream.
+  const channelStream = fs.readFileSync(
+      path.join(sketchDir, 'network/OpenBrewByWeightUiStream.inc'), 'utf8');
+  assert(pairedClaim.includes('WebUiClaim &claim = self.webUiClaim(relayed);') &&
+      pairedClaim.includes('self.webUiOverride_.relayed == relayed') &&
+      pairedClaim.includes('adminUnlock_.relayed == relayed'));
+  assert(channelStream.includes('other.bound && other.relayed == session->relayed'),
+      'binding supersedes only its own channel');
+  assert(channelStream.includes('uiStreamFreeSlot(self.uiStreams_, relayed)'),
+      'the first slot stays the companion\'s');
+  // Two stalled peers hold httpd no longer than one: the budget is per dispatch.
+  const channelBudget = channelStream.indexOf('uiStreamDeadlineStartMs = millis();');
+  assert(channelBudget > 0 && channelStream.indexOf('uiStreamDeadlineStartMs = millis();', channelBudget + 1) < 0 &&
+      channelBudget < channelStream.indexOf('if (session.fd < 0) continue;', channelBudget));
+  // The window that approved stays in control, and Admin links to the companion.
+  assert(fs.readFileSync(path.join(sketchDir, 'web/js/admin.js'), 'utf8').includes(
+      'icon.dataset.level = link ? "on" : c.relay === "ready" ? "partial" : "off"'),
+      'the paired companion\'s icon shows its state');
+  assert(fs.readFileSync(path.join(sketchDir, 'web/js/admin.js'), 'utf8').includes(
+      'location.protocol === "https:" || c.ui === false'), 'no link from a companion page or with its Web UI off');
+  assert(pairedRuntime.includes('url.protocol === "https:" ? url.origin : ""'),
+      'only a secure address is taken from the link');
   // A companion that requires pairing takes an open window to its page, wherever it finds out;
   // the controller's own use of the code, directly or relayed, and an older companion, which
   // keeps proxying, keep the window.
   assert.equal(pairedRuntime.split('data.error === "COMPANION_NOT_PAIRED"').length - 1, 2);
   assert.equal(pairedRuntime.split('location.replace("/__companion/?pair=1")').length - 1, 1);
-  // Losing control to the companion it just approved is success, not an unexplained Reload.
-  assert(pairedRuntime.includes('url.protocol === "https:" ? url.origin : ""'),
-      'only a secure address is taken from the link');
   assert(pairedRuntime.includes(
       'c?.pairingRequired === true && location.replace("/__companion/?pair=1")'));
   const utf8 = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightUtf8.h'), 'utf8');
@@ -57,6 +76,7 @@ struct NetworkWorkBuf {
 } work;
 auto *g_work=&work;
 struct UiStreamSession {
+  bool relayed=false;
   int fd=1; char clientId[8]="owner"; bool logPush=true; uint32_t logAfter=0;
   bool statsResync=true,statsFetch=false,statsPaging=false,statsPageFetch=false;
   uint32_t statsBoot=0,statsRequest=1,statsFetchRequest=2,statsPageRequest=0;
@@ -74,7 +94,7 @@ int httpd_ws_send_frame_async(int,int,httpd_ws_frame_t *frame){
 }
 DebugRingBuffer ring;
 struct OpenBrewByWeightNetwork {
-  int dataMux_=0,server_=1; char activeWebUiClientId_[8]="owner";
+  int dataMux_=0,server_=1; struct WebUiClaim{char clientId[8]="owner";};WebUiClaim directClaim_;WebUiClaim &webUiClaim(bool){return directClaim_;}
   struct {
     uint32_t (*debugLogLatestSequence)()=+[](){return ring.latestSequence();};
     size_t (*copyDebugEvents)(uint32_t,DebugEvent*,size_t,DebugLogReadMetadata*)=

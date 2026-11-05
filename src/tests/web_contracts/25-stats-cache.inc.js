@@ -154,7 +154,7 @@ ${deltaTypes}
     return recordIndexWork_;
   }
   int dataMux_=0,server_=1;bool webUiOverrideActive_=false;uint32_t webUiOverrideUntilMs_=0;
-  char activeWebUiClientId_[WEB_UI_CLIENT_ID_CAPACITY]="owner";
+  struct WebUiClaim{char clientId[WEB_UI_CLIENT_ID_CAPACITY]="owner";};WebUiClaim directClaim_;WebUiClaim &webUiClaim(bool){return directClaim_;}
   std::atomic<bool> uiStreamUrgent_{false};
   struct {
     uint32_t (*shotLogEpoch)()=+[](){return storeEpoch;};

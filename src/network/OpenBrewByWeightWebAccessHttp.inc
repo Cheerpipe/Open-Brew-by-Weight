@@ -111,9 +111,8 @@ void OpenBrewByWeightNetwork::webAccessSignOut(const uint8_t *keep, bool everyth
   webAccessRevokeSessions(g_webAccess, keep);
   // With the login off nobody holds a session, so the window keeps control.
   if (keep == nullptr && g_webAccess.stored.enabled != 0) {
-    activeWebUiClientId_[0] = '\0';
-    activeWebUiClaimTokenValid_ = false;
-    memset(activeWebUiClaimToken_, 0, sizeof(activeWebUiClaimToken_));
+    directClaim_ = WebUiClaim{};
+    companionClaim_ = WebUiClaim{};
     adminUnlocked_ = false;
     adminUnlock_ = CompanionPrincipal{};
     adminUnlockUntilMs_ = 0;
@@ -252,16 +251,19 @@ esp_err_t OpenBrewByWeightNetwork::authLoginHandler(httpd_req_t *request) {
   if (claimed) {
     {
       TaskLockGuard lock(self.dataMux_);
-      if (!holder.relayed || strcmp(self.activeWebUiClientId_, clientId) != 0) {
-        memcpy(self.activeWebUiClientId_, clientId, sizeof(clientId));
-        self.webUiOverrideActive_ = false;
-        self.webUiOverrideUntilMs_ = 0;
-        self.webUiOverride_ = CompanionPrincipal{};
+      WebUiClaim &claim = self.webUiClaim(holder.relayed);
+      if (!holder.relayed || strcmp(claim.clientId, clientId) != 0) {
+        memcpy(claim.clientId, clientId, sizeof(clientId));
+        if (self.webUiOverride_.relayed == holder.relayed) {
+          self.webUiOverrideActive_ = false;
+          self.webUiOverrideUntilMs_ = 0;
+          self.webUiOverride_ = CompanionPrincipal{};
+        }
       }
       // Attached or rotated, the claim carries the session just issued so
       // revoking it later also ends the stream the claim holds.
-      memcpy(self.activeWebUiClaimToken_, token, sizeof(token));
-      self.activeWebUiClaimTokenValid_ = true;
+      memcpy(claim.token, token, sizeof(token));
+      claim.tokenValid = true;
     }
     self.grantAdminUnlock(holder, now);
   }
@@ -296,11 +298,8 @@ esp_err_t OpenBrewByWeightNetwork::authLogoutHandler(httpd_req_t *request) {
   {
     TaskLockGuard lock(self.dataMux_);
     if (hasToken) webAccessRevokeSessions(g_webAccess, token, true);
-    if (hasClient && !caller.relayed && strcmp(self.activeWebUiClientId_, clientId) == 0) {
-      self.activeWebUiClientId_[0] = '\0';
-      self.activeWebUiClaimTokenValid_ = false;
-      memset(self.activeWebUiClaimToken_, 0, sizeof(self.activeWebUiClaimToken_));
-    }
+    if (hasClient && !caller.relayed && strcmp(self.directClaim_.clientId, clientId) == 0)
+      self.directClaim_ = WebUiClaim{};
     if (hasClient && companionPrincipalHolds(self.adminUnlock_, caller)) {
       self.adminUnlocked_ = false;
       self.adminUnlock_ = CompanionPrincipal{};

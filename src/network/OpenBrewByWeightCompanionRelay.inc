@@ -282,13 +282,8 @@ void OpenBrewByWeightNetwork::closeRelayedUiStreams() {
   size_t count;
   {
     TaskLockGuard lock(dataMux_);
-    bool claimEnded;
-    count = companionRelayedStreamsEnd(uiStreams_, activeWebUiClientId_, fds, claimEnded);
-    if (claimEnded) {
-      activeWebUiClientId_[0] = '\0';
-      activeWebUiClaimTokenValid_ = false;
-      memset(activeWebUiClaimToken_, 0, sizeof(activeWebUiClaimToken_));
-    }
+    count = companionRelayedStreamsEnd(uiStreams_, fds);
+    companionClaim_ = WebUiClaim{};
   }
   for (size_t index = 0; index < count; ++index)
     (void)httpd_sess_trigger_close(server_, fds[index]);

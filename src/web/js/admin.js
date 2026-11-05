@@ -707,6 +707,12 @@ function applyCompanionStatus(c) {
     $("companionApproveArchive").checked = true;
   }
   if (!c.paired) return;
+  // From the controller's own address, the way to the companion's Web UI.
+  $("companionOpenRow").hidden =
+    location.protocol === "https:" || c.ui === false || !(R.companionOrigin || c.address);
+  $("companionOpen").href = R.companionOrigin
+    ? R.companionOrigin + "/"
+    : "http://" + c.address + "/__companion/";
   // Status polls keep the row fresh, except while it is asking.
   if (!$("companionDev").querySelector(".confirm"))
     $("companionDev").replaceChildren(
@@ -734,6 +740,11 @@ function applyCompanionStatus(c) {
           ? " · " + R.sub(__WEBUI_TEXT__("admin.companion_since"), [companionSince(c.linkAgeS)])
           : "") +
         (!link && c.peerProtocol > 0 ? " · " + __WEBUI_TEXT__("admin.companion_protocol") : "");
+  const icon = $("companionDev").querySelector(".devIc");
+  if (icon) {
+    icon.dataset.level = link ? "on" : c.relay === "ready" ? "partial" : "off";
+    icon.title = $("companionLinkState").textContent;
+  }
   if (__LINEA_MICRA__) $("companionRouteState").textContent = companionRouteText(c);
   R.companionHere(true).then(companionCopy);
   if (!R.uiState.companionDirty) {
@@ -818,7 +829,6 @@ function initCompanion() {
     event.preventDefault();
     if (companionPairing) return;
     companionPairing = { stage: 0, startedAt: Date.now() };
-    const asked = companionState?.request;
     applyCompanionStatus(companionState);
     try {
       await R.api("/api/v1/companion/admin", {
@@ -832,7 +842,6 @@ function initCompanion() {
         }),
       });
       companionPairing.stage = 1;
-      if (asked) R.notePairedCompanion(asked.name, asked.address);
     } catch (e) {
       companionPairing = null;
       if (e.code === "COMPANION_CODE")

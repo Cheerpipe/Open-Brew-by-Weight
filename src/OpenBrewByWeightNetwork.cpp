@@ -182,7 +182,7 @@ struct NetworkWorkBuf {
   static constexpr size_t kAuditBatchSize = AUDIT_RECORD_CAPACITY;
   AuditRecord auditBatch[kAuditBatchSize]{};
   DebugLogReadMetadata logMetadata{};
-  UiStreamFingerprints uiFingerprints[2]{};
+  UiStreamFingerprints uiFingerprints[UI_STREAM_SESSIONS]{};
   // Rollback copy of one session's Home, shot-card and Settings fingerprints
   // for the stream's batch (httpd only, under the work buffer).
   uint32_t batchHomeHashes[UiStreamFingerprints::kHomeFields]{};

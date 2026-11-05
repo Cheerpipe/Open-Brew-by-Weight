@@ -1205,9 +1205,10 @@ while a companion asks to pair (empty strings otherwise), and
 `companion.archive` while a paired companion keeps the
 [shot archive](COMPANION_LINK.md#archive-sync). When the Web UI runs
 through [Open Brew by Weight Companion](features/companion.md), the companion
-holds the one claim and ui-stream session for all its screens through the
+holds a claim and ui-stream session of its own for all its screens through the
 signed [relay](COMPANION_LINK.md#relay): a companion screen's claim attaches to
-that claim instead of taking control, and Admin unlock and the unsafe override
+that claim. A browser at the controller's own address has the other claim and
+session, and neither displaces the other. Admin unlock and the unsafe override
 belong to the screen that opened them. Only that relayed stream carries
 `relay.adminScreen` and `relay.overrideScreen`, each the holding screen's
 `X-WebUI-Client` as 8 hex digits of FNV-1a or `""`; a screen is unlocked when
@@ -1226,7 +1227,7 @@ The firmware also closes a bound session that has sent nothing for 5.5
 minutes outside a live cycle (a phone that froze the page) with WebSocket
 close code 4002 and notes it in the Web UI log; the page reconnects quietly
 once visible, without the out-of-reach notice. Neither close affects the
-15-minute inactivity deactivation, and a setup session never closes on hide. Ownership takeover
+15-minute inactivity deactivation, and a setup session never closes on hide. A takeover on the same channel
 closes the previous socket with code 4001. An op from the owning page that
 fails validation closes the stream with code 4003 and a Web UI log warning; the
 page clears its list filters and Stats window before it reconnects, so the
