@@ -18,6 +18,9 @@
   // keeps proxying, keep the window.
   assert.equal(pairedRuntime.split('data.error === "COMPANION_NOT_PAIRED"').length - 1, 2);
   assert.equal(pairedRuntime.split('location.replace("/__companion/?pair=1")').length - 1, 1);
+  // Losing control to the companion it just approved is success, not an unexplained Reload.
+  assert(pairedRuntime.includes('url.protocol === "https:" ? url.origin : ""'),
+      'only a secure address is taken from the link');
   assert(pairedRuntime.includes(
       'c?.pairingRequired === true && location.replace("/__companion/?pair=1")'));
   const utf8 = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightUtf8.h'), 'utf8');

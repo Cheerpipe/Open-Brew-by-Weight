@@ -1340,7 +1340,8 @@ html.themeDark #launchIntro {
   text-align: center;
 }
 
-#webUiReload {
+#webUiReload,
+#webUiCompanion {
   min-height: 3rem;
   min-width: 10rem;
   padding: 0.65rem 1.5rem;
@@ -1372,6 +1373,11 @@ html.themeDark #launchIntro {
 .archiveView #historyRows .shotDel,
 .inactiveOverlay.isLogin #webUiArchive {
   display: none;
+}
+
+#webUiCompanion:not([hidden]) ~ #webUiReload {
+  background: none;
+  color: var(--pri);
 }
 
 #webUiReload:disabled,
@@ -1437,7 +1443,7 @@ body.homeAdminActions .view[data-view="home"]:not(.hidden) ~ .pageFooter {
 
 /* Optional sign-in: the inactive overlay swaps Reload for this form. */
 #webUiLogin,
-.inactiveOverlay.isLogin :is(#webUiReload, #inactiveHint, #inactiveError) {
+.inactiveOverlay.isLogin :is(#webUiCompanion, #webUiReload, #inactiveHint, #inactiveError) {
   display: none;
 }
 
