@@ -34,7 +34,6 @@
   box-shadow: var(--ah);
   transition-property: --tint, --tp;
   transition-duration: 0.4s;
-  touch-action: manipulation;
 }
 
 .shotHero[data-tint="neutral"],
