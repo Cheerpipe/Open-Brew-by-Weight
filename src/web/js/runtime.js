@@ -2534,16 +2534,30 @@ function pollNetworkReconnect() {
 // Only the firmware's own status with another boot ends this wait: the old boot
 // keeps answering until it restarts, and a companion answers for a controller
 // that is down (an API error, or the last copy of a page).
+async function firmwareRestartStatus() {
+  // A companion serves one read at a time and takes seconds to give up on a
+  // controller that is down.
+  const read = () =>
+      fetchJson("/api/v1/status/admin", { headers: webUiHeaders(), cache: "no-store" }, 12e3),
+    answer = await read();
+  if (answer[1]?.error !== "UI_TAKEN_OVER") return answer;
+  // A claim lives in RAM, so a restarted controller asks for one. Only then: a
+  // claim also ends the Admin unlock that says whether a restart is coming.
+  await fetchJson(
+    "/api/v1/ui/claim",
+    {
+      method: "POST",
+      headers: webUiHeaders({ "Content-Type": "application/json" }),
+      body: "{}",
+    },
+    12e3,
+  );
+  return read();
+}
 function pollFirmwareRestart() {
   if (!firmwareRestart) return;
   let next = 2e3;
-  fetchJson(
-    "/api/v1/status/admin",
-    { headers: webUiHeaders(), cache: "no-store" },
-    // A companion serves one read at a time and takes seconds to give up on a
-    // controller that is down.
-    12e3,
-  )
+  firmwareRestartStatus()
     .then(async ([response, s]) => {
       if (s?.error === "AUTH_REQUIRED") await landAfterFirmwareRestart(firmwareRestart.version);
       else if (!response.ok || !Number.isInteger(s?.bootId)) return;
@@ -2629,19 +2643,29 @@ function firmwareResult(s) {
         : sub(__WEBUI_TEXT__("shell.firmware_rollback_text"), [s.firmwareVersion]),
     };
   }
-  if (!flash) return null;
-  // Another version with no rollback: someone updated it some other way.
-  if (s.firmwareVersion !== flash.version) {
-    noteFirmwareFlash(null);
+  // Another version with no rollback than this browser flashed: it was updated
+  // some other way, and this browser has no word on it.
+  if (flash && s.firmwareVersion !== flash.version) noteFirmwareFlash(null);
+  const version = s.firmwareVersion,
+    known = cardDismissed(FW_UPDATED_CARD),
+    flashed = flash?.version === version;
+  // The version this browser last knew about, so another page, browser or
+  // address hears of an update too. The first visit has nothing to compare.
+  if (!known && !flashed) {
+    try {
+      localStorage.setItem(FW_UPDATED_CARD, version);
+    } catch {
+      // Storage blocked or full: the next visit starts over.
+    }
     return null;
   }
-  return cardDismissed(FW_UPDATED_CARD)
+  return known === version
     ? null
     : {
         failed: false,
-        dismiss: () => dismissCard(FW_UPDATED_CARD),
+        dismiss: () => dismissCard(FW_UPDATED_CARD, version),
         title: __WEBUI_TEXT__("shell.firmware_updated_title"),
-        text: sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [flash.version]),
+        text: sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [version]),
       };
 }
 const WIFI_CHANGE_KEY = "obbwWifiChange";
@@ -2718,7 +2742,7 @@ function beginNetworkReconnectWait() {
   setOverlayReconnectMode(true);
   if (webUiOwner) deactivateWebUi("reconnect");
   else showInactiveOverlay();
-  offerArchiveView(true);
+  offerArchiveView(!firmwareRestart);
   updateReconnectCountdown();
   networkReconnectTimer = setInterval(updateReconnectCountdown, 1e3);
   networkReconnectPollTimer = setTimeout(

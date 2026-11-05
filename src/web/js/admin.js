@@ -1618,7 +1618,7 @@ async function otaFlash() {
     expected.bootId = data.bootId;
     otaCommitStore(expected);
     R.noteFirmwareFlash({
-      version: session.version,
+      version: staged.version,
       imageSha256: expected.imageSha256,
       bootId: expected.bootId,
     });
@@ -1642,13 +1642,13 @@ async function otaFlash() {
         if (data.state !== "staged" || attempt === 3) throw error;
       }
     }
-    R.beginFirmwareRestartWait(expected.bootId, session.version);
+    R.beginFirmwareRestartWait(expected.bootId, staged.version);
     otaEndBusy(data, "", "");
   } catch (e) {
     // A controller that stopped answering after the flash request may be
     // restarting: the wait finds out, and tells if it was not.
     if (sent && !data) {
-      R.beginFirmwareRestartWait(expected.bootId, session.version);
+      R.beginFirmwareRestartWait(expected.bootId, staged.version);
       otaEndBusy(null, "", "");
       return;
     }
