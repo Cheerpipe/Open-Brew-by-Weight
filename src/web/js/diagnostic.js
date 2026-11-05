@@ -846,6 +846,7 @@ function applyDiagnosticStatus(s) {
     e.inert = !u && !s.development && !R.diagnosticVisible;
   const t = (i, v) => ($(i).textContent = v || "—");
   t("hFirmware", s.firmwareVersion);
+  t("hFirmwareBuilt", R.firmwareBuilt(s));
   t("hBoot", typeof s.bootId === "number" && s.bootId ? "#" + s.bootId : "");
   const m = s.maintenance;
   t(

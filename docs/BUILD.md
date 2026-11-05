@@ -556,3 +556,6 @@ example `1.0.0`; `1.0`, `v1.0.0`, and leading zeros are rejected). The build
 adds the git revision and a `-dirty` marker when tracked files changed or
 untracked files exist. The Web UI footer and boot output identify the resulting
 version; the ESP-IDF app descriptor reports the `VERSION` number.
+The generator also records the time of each firmware build, shown in Diagnostic
+and on the Firmware updated card, so every build relinks that one file and is an
+image of its own, even with no source change.

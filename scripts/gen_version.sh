@@ -94,10 +94,12 @@ identity_macros="#define FW_VERSION_STRING \"${build_id}\"
 if [ "$split" = "split" ]; then
   header_identity=""
   namespace_identity='extern "C" const char OPEN_BREW_BY_WEIGHT_FW_IMAGE_TAG[];
-extern const char FW_VERSION[];'
+extern const char FW_VERSION[];
+extern const uint32_t FW_BUILD_EPOCH;'
 else
   header_identity="$identity_macros"
-  namespace_identity='constexpr char FW_VERSION[] = FW_VERSION_STRING;'
+  namespace_identity='constexpr char FW_VERSION[] = FW_VERSION_STRING;
+constexpr uint32_t FW_BUILD_EPOCH = 0;'
 fi
 
 # Parallel preset configures run this script against one header at once, so each
@@ -142,6 +144,8 @@ namespace openbrewbyweight {
 
 extern "C" const char OPEN_BREW_BY_WEIGHT_FW_IMAGE_TAG[] = FW_IMAGE_TAG_STRING;
 const char FW_VERSION[] = FW_VERSION_STRING;
+// The time of this build, so each one relinks this unit and is its own image.
+const uint32_t FW_BUILD_EPOCH = $(date +%s)U;
 
 }  // namespace openbrewbyweight
 EOF

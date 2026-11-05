@@ -816,12 +816,15 @@ with tempfile.TemporaryDirectory(prefix="openbrewbyweight-version-") as temporar
     # with the OTA marker text and the host header's field order unchanged.
     host_tag = output.read_text()
     assert "FW_IMAGE_TAG_STRING" in host_tag and 'constexpr char FW_VERSION[]' in host_tag
+    assert "constexpr uint32_t FW_BUILD_EPOCH = 0;" in host_tag
     assert '"OPENBREWBYWEIGHT_FW_TAG_V2|arch=" FW_BOARD_ARCH_STRING "|hw="' in host_tag, host_tag
     assert "\\" not in host_tag, host_tag
     subprocess.run([*version_command, "split"], check=True, capture_output=True)
     split_source = output.with_suffix(".cpp").read_text()
     assert "1.2.3+" not in output.read_text() and "FW_IMAGE_TAG_STRING" not in output.read_text()
     assert "extern const char FW_VERSION[];" in output.read_text()
+    assert "extern const uint32_t FW_BUILD_EPOCH;" in output.read_text()
+    assert re.search(r"FW_BUILD_EPOCH = [1-9][0-9]*U;", split_source), split_source
     assert 'extern "C" const char OPEN_BREW_BY_WEIGHT_FW_IMAGE_TAG[];' in output.read_text()
     assert "1.2.3+" in split_source
     assert 'OPEN_BREW_BY_WEIGHT_FW_IMAGE_TAG[] = FW_IMAGE_TAG_STRING;' in split_source
