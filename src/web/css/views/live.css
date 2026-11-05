@@ -228,7 +228,6 @@ body.shotFs {
   background: var(--bg);
   color: var(--fg);
   font-variant-numeric: tabular-nums;
-  user-select: none;
   animation: liveShotIn 0.26s ease-out;
 }
 

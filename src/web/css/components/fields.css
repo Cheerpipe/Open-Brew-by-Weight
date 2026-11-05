@@ -514,7 +514,6 @@ label:has(> input[type="checkbox"]) .fieldHint {
   list-style: none;
   font-weight: 400;
   cursor: pointer;
-  user-select: none;
 }
 
 .lampRow summary::-webkit-details-marker {

@@ -584,7 +584,6 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       adminHtml.includes('<summary>Diagnostics</summary>') ||
       statusHtml.includes('id="currentTime"') ||
       statusHtml.includes('id="ntpStatus"') ||
-      !css.includes('#diagnosticsPanel .cfgGroup>summary{') ||
       !css.includes('.metric,.shotCard>*{') ||
       css.includes('#diagnosticsPanel .metric,#statusPanel .metric,#scalePanel .metric,.shotCard>*{') ||
       css.includes('diagGroup')) {

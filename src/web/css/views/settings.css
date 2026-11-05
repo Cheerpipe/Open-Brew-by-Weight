@@ -668,10 +668,6 @@ summary {
   margin-inline: -2.15rem -0.85rem;
 }
 
-#diagnosticsPanel .cfgGroup > summary {
-  user-select: none;
-}
-
 .configSaveBar {
   position: sticky;
   bottom: var(--navOffset);
