@@ -192,8 +192,7 @@ html:not(.pwaApp) .pwaOnly {
   line-height: 1.4;
 }
 
-#message::before,
-.scopeNote::before {
+#message::before {
   content: "{{webui:css.i}}";
   display: grid;
   place-items: center;
@@ -322,30 +321,6 @@ html:not(.pwaApp) .pwaOnly {
 
 #diagnosticsPanel .statusColumn > .btnBar {
   grid-column: 1/-1;
-}
-
-.scopeNote {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin: 0.85rem 0 0.75rem;
-  padding-inline: 0.25rem;
-  color: var(--mu);
-  font-size: 0.8125rem;
-  line-height: 1.35;
-}
-
-.scopeNote::before {
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 0;
-  border-radius: 0;
-  clip-path: polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%);
-  background: var(--mu);
-  color: var(--sf);
-  font:
-    italic 700 0.8rem Georgia,
-    serif;
 }
 
 #diagnosticsPanel > .cfgGroup + .btnBar {
