@@ -483,6 +483,7 @@
     "diagnostic.log_day_marker": "New day · {0}",
     "diagnostic.log_day_view": "Showing {0}",
     "diagnostic.log_download": "Download",
+    "diagnostic.log_end": "Go to end",
     "diagnostic.log_export": "Export…",
     "diagnostic.log_export_failed": "Could not download the log history.",
     "diagnostic.log_export_hint": "Downloads a file for troubleshooting. It includes every level and subsystem, even the ones your filters hide.",

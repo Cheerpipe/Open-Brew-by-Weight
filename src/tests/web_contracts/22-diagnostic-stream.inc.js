@@ -326,10 +326,11 @@
   const lineOf = viewJs.diagnostic.slice(viewJs.diagnostic.indexOf('const logLineOf'),
       viewJs.diagnostic.indexOf('];\n', viewJs.diagnostic.indexOf('const logLineOf')) + 2);
   const makeRender = (logHistory, logBootId, zoneOffset = () => 0, diagConfig = null,
-                      logJumpAt = null, logAnchor = null, nearLogTop = () => {}, logMarks = []) =>
+                      logJumpAt = null, logAnchor = null, logScrolled = () => {}, logMarks = []) =>
       new Function('$', 'R', 'logHistory', 'logBootId', 'logZoneOffsetMinutes', 'diagConfig',
-      '__WEBUI_TEXT__', 'logJumpAt', 'logAnchor', 'nearLogTop', 'logMarks', 'state',
+      '__WEBUI_TEXT__', 'logJumpAt', 'logAnchor', 'logScrolled', 'logMarks', 'state',
       `${blockAt(viewJs.diagnostic, 'function logWallText(')};${lineOf};let logShown=state.shown;
+      ${blockAt(viewJs.diagnostic, 'function logAtEnd(')};
       const logPast=()=>logJumpAt!=null;
       ${blockAt(viewJs.diagnostic, 'function renderLog(')};
       return () => { renderLog(); state.shown = logShown; };`)(
@@ -337,7 +338,7 @@
                           formatWallTimeLocal: String,
                           escHtml: (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')},
       logHistory, logBootId, zoneOffset, diagConfig, (key) => key, logJumpAt, logAnchor,
-      nearLogTop, logMarks, state);
+      logScrolled, logMarks, state);
   const text = () => state.shown.join('\n');
   const renderLog = makeRender([], 0);
   const ev = (n, level = 'info') =>
@@ -364,6 +365,17 @@
   ui.logEvents.push(ev(5));
   renderLog();
   assert.equal(box.scrollTop, 80, 'a reader at the end follows new lines');
+  // The way back to the end shows only to a reader away from it.
+  const endButton = {hidden: true}, logScrolledOf = new Function('$', 'logHistoryAvailable',
+      `${blockAt(viewJs.diagnostic, 'function logAtEnd(')};
+      ${blockAt(viewJs.diagnostic, 'function logScrolled(')};
+      return logScrolled;`)((id) => (id === 'log' ? box : endButton), () => false);
+  box.scrollTop = 0;
+  logScrolledOf();
+  assert.equal(endButton.hidden, false, 'a scrolled-back reader sees the way to the end');
+  box.scrollTop = 80;
+  logScrolledOf();
+  assert.equal(endButton.hidden, true, 'a reader at the end does not');
   // D5: the severity is a tag the view colours, and a message cannot inject
   // markup.
   ui.logEvents = [{...ev(6, 'error'), message: '<b>x</b>'}];

@@ -77,10 +77,25 @@ small {
   cursor: pointer;
 }
 
-#logLiveButton {
+#logLiveButton,
+#logEndButton {
   border-color: var(--ac);
   background: var(--ac);
   color: var(--on);
+}
+
+/* Over the log's corner, clear of its scrollbars; the log is the box's last row. */
+#logEndButton {
+  position: absolute;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 2;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: var(--popSh);
 }
 
 /* Severity colours, shared by the Level chip and the log's tags. */
@@ -108,6 +123,7 @@ small {
 }
 
 .logBox {
+  position: relative;
   container-type: inline-size;
   overflow: hidden;
   border: 1px solid var(--bd);
