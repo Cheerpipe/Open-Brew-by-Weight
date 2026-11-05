@@ -215,40 +215,53 @@ function firmwareResultChecks() {
     context.flash = flash;
     vm.runInContext('noteFirmwareFlash(flash)', context);
   };
-  const image = flash.imageSha256.slice(0, 16);
-  assert.equal(result({bootId: 8, firmwareVersion: '1.0', rolledBackImage: ''}), null, 'a first visit has nothing to compare');
-  // Another page or browser that knew an older version hears of the update, once.
-  let card = result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''});
-  assert.match(card.text, /firmware_updated_text:2\.0/);
-  card.dismiss();
-  assert.equal(result({bootId: 9, firmwareVersion: '2.0', rolledBackImage: ''}), null);
-  note();
-  assert.equal(result({bootId: 7, firmwareVersion: '1.0', rolledBackImage: ''}), null, 'same boot');
-  card = result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''});
+  const image = flash.imageSha256.slice(0, 16), oldImage = '1'.repeat(16);
+  const run = (bootId, firmwareVersion, runningImage, rolledBackImage = '') =>
+    result({bootId, firmwareVersion, runningImage, rolledBackImage});
+  assert.equal(run(8, '1.0', oldImage), null, 'a first visit has nothing to compare');
+  // An update from anywhere reaches a browser that knew the previous image, once.
+  let card = run(9, '2.0', image);
   assert.equal(card.failed, false);
   assert.match(card.text, /firmware_updated_text:2\.0/);
+  card.dismiss();
+  assert.equal(run(10, '2.0', image), null);
+  // A reinstall from this browser reports too, from the next boot on.
+  note();
+  assert.equal(run(7, '2.0', image), null, 'same boot');
+  card = run(8, '2.0', image);
+  assert.match(card.text, /firmware_updated_text:2\.0/);
+  card.dismiss();
   // A rollback overrides success even after that card was dismissed, including
   // a reinstall of the same version, which only the firmware's record can tell.
-  card.dismiss();
-  assert.equal(result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''}), null);
-  card = result({bootId: 9, firmwareVersion: '2.0', rolledBackImage: image});
+  card = run(9, '2.0', image, image);
   assert.equal(card.failed, true);
   assert.match(card.text, /firmware_rollback_named:2\.0,2\.0/);
-  card = result({bootId: 9, firmwareVersion: '1.0', rolledBackImage: image});
+  card = run(9, '1.0', oldImage, image);
   assert.match(card.text, /firmware_rollback_named:2\.0,1\.0/);
   // Dismissed stays dismissed across restarts, until the next flash.
   card.dismiss();
-  assert.equal(result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: image}), null);
+  assert.equal(run(10, '1.0', oldImage, image), null);
   note();
-  assert.equal(result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: image}).failed, true);
+  assert.equal(run(10, '1.0', oldImage, image).failed, true);
   // Another image's rollback, as after a CLI update, names no version of ours.
-  card = result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: '0123456789abcdef'});
-  assert.match(card.text, /firmware_rollback_text:1\.0/);
-  // A USB downgrade clears the record: another version with no rollback shows
-  // nothing and forgets the flash.
-  note();
-  assert.equal(result({bootId: 11, firmwareVersion: '0.9', rolledBackImage: ''}), null);
-  assert.equal(store.has('obbwFwResult'), false);
+  assert.match(run(10, '1.0', oldImage, '0123456789abcdef').text, /firmware_rollback_text:1\.0/);
+  // A command line update after a Web UI one, with that card dismissed or not.
+  for (const dismissed of [true, false]) {
+    note();
+    card = run(8, '2.0', image);
+    if (dismissed) card.dismiss();
+    const next = (dismissed ? '3' : '4').repeat(16), version = dismissed ? '3.0' : '4.0';
+    card = run(11, version, next);
+    assert.equal(card.failed, false, 'CLI after a Web UI update');
+    assert.match(card.text, new RegExp('firmware_updated_text:' + version));
+    assert.equal(store.has('obbwFwResult'), false, 'that flash is over');
+    card.dismiss();
+    assert.equal(run(12, version, next), null);
+  }
+  // Two builds with the same version, as two of a dirty tree, are still an update.
+  card = run(13, '4.0', '5'.repeat(16));
+  assert.match(card.text, /firmware_updated_text:4\.0/);
+  card.dismiss();
   // A Wi-Fi change waits for the firmware's word, which a name could not give
   // for a wrong password on the same network, and Dismiss ends it.
   const wifi = status => {

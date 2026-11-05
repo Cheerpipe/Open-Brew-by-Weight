@@ -198,7 +198,7 @@ struct NetworkWorkBuf;
 // companion's (uiStreamFreeSlot).
 constexpr size_t UI_STREAM_SESSIONS = 3;
 struct UiStreamFingerprints {
-  static constexpr size_t kHomeFields = 128, kDiagFields = 224, kCardFields = 32,
+  static constexpr size_t kHomeFields = 136, kDiagFields = 224, kCardFields = 32,
                           kSettingsFields = 80;
   // The shot card's ten curve scalars (forEachShotCurveScalar) follow its
   // card fields in cardHashes.

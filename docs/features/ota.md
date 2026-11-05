@@ -49,9 +49,10 @@ until it ends.
 
 The result card stays until you dismiss it, and the next update starts over:
 
-- **Firmware updated** names the version now running. It also appears in any other
-  browser or address you've used before, the first time you open it after an update,
-  however that update was installed.
+- **Firmware updated** names the version now running. It appears the same way
+  after an update from the Web UI or the command line, in every browser and address
+  you've used before, the first time you open it afterwards. Installing again the
+  exact image already running only shows it in the browser that did it from Admin.
 - **Firmware update failed** means the new version failed while starting and the
   controller went back to the previous one. This can appear some time after the
   success card, because a new firmware is on trial for its first moments. The
@@ -262,9 +263,10 @@ next range from `nextOffset`, including backward movement after reboot.
 digest; session `sha256` remains the hash of the entire file, including that
 digest. `bootState` uses IDF image states (unknown read failure is -2).
 
-`rolledBackImage`, in the Home stream and `/api/v1/status/admin` with no unlock,
-is the first 16 hex digits of that digest for the image a rollback left in the
-spare slot, and empty otherwise. It comes from the slot's ABORTED or INVALID
+`runningImage`, in the Home stream and `/api/v1/status/admin` with no unlock, is
+the first 16 hex digits of the running image's digest, which each browser compares
+with the last one it knew. `rolledBackImage`, in the same places, is that prefix
+for the image a rollback left in the spare slot, and empty otherwise. It comes from the slot's ABORTED or INVALID
 otadata state, read once at boot, so it survives restarts until the next commit
 or a USB installation rewrites otadata (writing only the application with
 `--image` leaves it). The Web UI's wait after a flash ends only on a `200` status

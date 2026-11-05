@@ -2611,13 +2611,15 @@ const FW_RESULT_KEY = "obbwFwResult",
   FW_UPDATED_CARD = "obbwCard:fwUpdated",
   FW_ROLLBACK_CARD = "obbwCard:fwRollback";
 // What this browser flashed, for the result card; null when nothing was. A new
-// flash also brings back a result dismissed earlier.
+// flash also brings back a rollback dismissed earlier, and an update card for a
+// reinstall of the image this browser already knows.
 function noteFirmwareFlash(flash) {
   try {
-    if (flash) localStorage.setItem(FW_RESULT_KEY, JSON.stringify(flash));
-    else localStorage.removeItem(FW_RESULT_KEY);
-    localStorage.removeItem(FW_UPDATED_CARD);
+    if (!flash) return localStorage.removeItem(FW_RESULT_KEY);
+    localStorage.setItem(FW_RESULT_KEY, JSON.stringify(flash));
     localStorage.removeItem(FW_ROLLBACK_CARD);
+    if (flash.imageSha256?.startsWith(localStorage.getItem(FW_UPDATED_CARD)))
+      localStorage.removeItem(FW_UPDATED_CARD);
   } catch {
     // Storage blocked or full: no card reports this update.
   }
@@ -2643,27 +2645,28 @@ function firmwareResult(s) {
         : sub(__WEBUI_TEXT__("shell.firmware_rollback_text"), [s.firmwareVersion]),
     };
   }
-  // Another version with no rollback than this browser flashed: it was updated
-  // some other way, and this browser has no word on it.
-  if (flash && s.firmwareVersion !== flash.version) noteFirmwareFlash(null);
+  // Another version than this browser flashed: this flash is over.
   const version = s.firmwareVersion,
+    running = s.runningImage || version,
     known = cardDismissed(FW_UPDATED_CARD),
     flashed = flash?.version === version;
-  // The version this browser last knew about, so another page, browser or
-  // address hears of an update too. The first visit has nothing to compare.
+  if (flash && !flashed) noteFirmwareFlash(null);
+  // The image this browser last knew about, so any update reaches every page,
+  // browser and address, from the Web UI or the command line, even between
+  // builds with the same version. The first visit has nothing to compare.
   if (!known && !flashed) {
     try {
-      localStorage.setItem(FW_UPDATED_CARD, version);
+      localStorage.setItem(FW_UPDATED_CARD, running);
     } catch {
       // Storage blocked or full: the next visit starts over.
     }
     return null;
   }
-  return known === version
+  return known === running
     ? null
     : {
         failed: false,
-        dismiss: () => dismissCard(FW_UPDATED_CARD, version),
+        dismiss: () => dismissCard(FW_UPDATED_CARD, running),
         title: __WEBUI_TEXT__("shell.firmware_updated_title"),
         text: sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [version]),
       };
