@@ -17,7 +17,9 @@ const otaSource = admin.slice(admin.search(/const\s+OTA_UPLOAD_TIMEOUT_MS\s*=/),
     admin.indexOf('async function setBleScanIntensity('));
 const runtime = fs.readFileSync(path.join(jsDir, 'runtime.js'), 'utf8');
 const restartSource = runtime.slice(runtime.indexOf('// Only the firmware\'s own status with another boot'),
-    runtime.indexOf('// One card, moved to the view showing it'));
+    runtime.indexOf('const WIFI_CHANGE_KEY'));
+const wifiSource = runtime.slice(runtime.indexOf('const WIFI_CHANGE_KEY'),
+    runtime.indexOf('// Each card is moved to the view showing it'));
 const parser = new Function(fs.readFileSync(path.join(jsDir, 'ota-image.js'), 'utf8')
     .replace(/export\s+/g, '') + ';return otaFileIdentity;')();
 
@@ -191,8 +193,9 @@ function firmwareResultChecks() {
   const context = vm.createContext({JSON, Number, __WEBUI_TEXT__: key => key,
     localStorage: {getItem: key => store.get(key) ?? null,
       setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key)},
-    cardDismissed: key => store.get(key) || '', sub: (text, values) => text + ':' + values.join(',')});
-  vm.runInContext('let firmwareRestart = null, fwReloading = false;' + restartSource, context);
+    cardDismissed: key => store.get(key) || '', dismissCard: (key, value = '1') => store.set(key, value),
+    sub: (text, values) => text + ':' + values.join(',')});
+  vm.runInContext('let firmwareRestart = null, fwReloading = false;' + restartSource + wifiSource, context);
   const result = status => {
     context.status = status;
     return vm.runInContext('firmwareResult(status)', context);
@@ -211,7 +214,7 @@ function firmwareResultChecks() {
   assert.match(card.text, /firmware_updated_text:2\.0/);
   // A rollback overrides success even after that card was dismissed, including
   // a reinstall of the same version, which only the firmware's record can tell.
-  store.set(card.key, card.value);
+  card.dismiss();
   assert.equal(result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''}), null);
   card = result({bootId: 9, firmwareVersion: '2.0', rolledBackImage: image});
   assert.equal(card.failed, true);
@@ -219,7 +222,7 @@ function firmwareResultChecks() {
   card = result({bootId: 9, firmwareVersion: '1.0', rolledBackImage: image});
   assert.match(card.text, /firmware_rollback_named:2\.0,1\.0/);
   // Dismissed stays dismissed across restarts, until the next flash.
-  store.set(card.key, card.value);
+  card.dismiss();
   assert.equal(result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: image}), null);
   note();
   assert.equal(result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: image}).failed, true);
@@ -231,6 +234,28 @@ function firmwareResultChecks() {
   note();
   assert.equal(result({bootId: 11, firmwareVersion: '0.9', rolledBackImage: ''}), null);
   assert.equal(store.has('obbwFwResult'), false);
+  // A Wi-Fi change waits for the firmware's word, which a name could not give
+  // for a wrong password on the same network, and Dismiss ends it.
+  const wifi = status => {
+    context.status = status;
+    return vm.runInContext('wifiResult(status)', context);
+  };
+  assert.equal(wifi({wifiChangeResult: 'CONFIRMED'}), null, 'nothing saved here');
+  vm.runInContext('noteWifiChange("Home")', context);
+  assert.equal(wifi({wifiChangeResult: ''}), null, 'still pending');
+  assert.equal(wifi({wifiChangeResult: 'CONFIRMED'}).failed, false);
+  card = wifi({wifiChangeResult: 'REVERTED'});
+  assert.equal(card.failed, true);
+  assert.match(card.text, /wifi_failed_text:Home/);
+  card.dismiss();
+  assert.equal(wifi({wifiChangeResult: 'REVERTED'}), null);
+  // Saving starts the result over, and only the two endings set it.
+  const firmware = fs.readFileSync(path.join(__dirname, '../network/OpenBrewByWeightWifi.inc'), 'utf8');
+  for (const [fn, value] of [['::armPendingConfirmWindow', ''], ['::confirmPendingNetwork', 'CONFIRMED'],
+    ['::revertPendingNetwork', 'REVERTED']]) {
+    const start = firmware.indexOf(fn), body = firmware.slice(start, firmware.indexOf('\n}\n', start));
+    assert.ok(body.includes(`status_.staChangeResult = "${value}";`), fn);
+  }
 }
 
 (async () => {

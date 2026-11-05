@@ -2622,8 +2622,7 @@ function firmwareResult(s) {
     const named = flash?.imageSha256?.startsWith(image);
     return {
       failed: true,
-      key: FW_ROLLBACK_CARD,
-      value: image,
+      dismiss: () => dismissCard(FW_ROLLBACK_CARD, image),
       title: __WEBUI_TEXT__("shell.firmware_rollback_title"),
       text: named
         ? sub(__WEBUI_TEXT__("shell.firmware_rollback_named"), [flash.version, s.firmwareVersion])
@@ -2640,35 +2639,75 @@ function firmwareResult(s) {
     ? null
     : {
         failed: false,
-        key: FW_UPDATED_CARD,
-        value: "1",
+        dismiss: () => dismissCard(FW_UPDATED_CARD),
         title: __WEBUI_TEXT__("shell.firmware_updated_title"),
         text: sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [flash.version]),
       };
 }
-// One card, moved to the view showing it: on Home with the other cards, and on
-// Admin, the only page compatibility mode has, above the unlock form.
-function renderFirmwareResult(s) {
-  const card = $("fwResultCard"),
-    host = $(activeView === "admin" ? "adminLockPanel" : "grindHintCard");
-  if (!card) return;
-  const view = (activeView === "admin" || activeView === "home") && host && firmwareResult(s);
-  card.hidden = !view;
-  if (!view) return;
-  if (card.nextElementSibling !== host) host.before(card);
-  card.classList.toggle("fwFailed", view.failed);
-  $("fwResultTitle").textContent = view.title;
-  $("fwResultText").textContent = view.text;
-  $("fwResultOpen").hidden = !view.failed;
-  $("fwResultOpen").onclick = (e) => {
-    e.preventDefault();
-    history.pushState(null, "", "/diagnostic");
-    renderRoute("/diagnostic");
+const WIFI_CHANGE_KEY = "obbwWifiChange";
+function noteWifiChange(ssid) {
+  try {
+    if (ssid) localStorage.setItem(WIFI_CHANGE_KEY, ssid);
+    else localStorage.removeItem(WIFI_CHANGE_KEY);
+  } catch {
+    // Storage blocked or full: no card reports this change.
+  }
+}
+// The firmware says how the change saved from this browser ended, and it's
+// empty until it has; a name alone can't tell a wrong password on the same network.
+function wifiResult(s) {
+  let ssid = "";
+  try {
+    ssid = localStorage.getItem(WIFI_CHANGE_KEY);
+  } catch {
+    // Storage blocked: nothing to report.
+  }
+  if (!ssid || !s.wifiChangeResult) return null;
+  const failed = s.wifiChangeResult !== "CONFIRMED";
+  return {
+    failed,
+    dismiss: () => noteWifiChange(""),
+    title: failed
+      ? __WEBUI_TEXT__("shell.wifi_failed_title")
+      : __WEBUI_TEXT__("shell.wifi_connected_title"),
+    text: sub(
+      failed
+        ? __WEBUI_TEXT__("shell.wifi_failed_text")
+        : __WEBUI_TEXT__("shell.wifi_connected_text"),
+      [ssid],
+    ),
   };
-  $("fwResultDismiss").onclick = () => {
-    dismissCard(view.key, view.value);
-    renderFirmwareResult(s);
-  };
+}
+// Each card is moved to the view showing it: on Home with the other cards, and
+// on Admin, the only page compatibility mode has, above the unlock form.
+function renderResultCards(s) {
+  const host = $(activeView === "admin" ? "adminLockPanel" : "grindHintCard"),
+    shown = activeView === "admin" || activeView === "home";
+  for (const [id, result] of [
+    ["fwResult", firmwareResult],
+    ["wifiResult", wifiResult],
+  ]) {
+    const card = $(id + "Card"),
+      view = card && host && shown && result(s);
+    if (!card) continue;
+    card.hidden = !view;
+    if (!view) continue;
+    if (card.parentElement !== host.parentElement) host.before(card);
+    card.classList.toggle("resultFailed", view.failed);
+    $(id + "Title").textContent = view.title;
+    $(id + "Text").textContent = view.text;
+    const open = $(id + "Open");
+    open.hidden = !view.failed || open.pathname === location.pathname;
+    open.onclick = (e) => {
+      e.preventDefault();
+      history.pushState(null, "", open.pathname);
+      renderRoute(open.pathname);
+    };
+    $(id + "Dismiss").onclick = () => {
+      view.dismiss();
+      renderResultCards(s);
+    };
+  }
 }
 function beginNetworkReconnectWait() {
   clearInterval(networkReconnectTimer);
@@ -7370,7 +7409,7 @@ function applyCommonStatus(s) {
   }
   if (typeof s.bootId === "number") bootId = s.bootId;
   updateFirmwareFooter();
-  renderFirmwareResult(s);
+  renderResultCards(s);
   const c = s.config || {};
   if (
     (c.heroCardMode === "colorful" || c.heroCardMode === "technical") &&
@@ -7745,6 +7784,7 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
       noteReachOk();
       if (noReconnect) uiState.savedStaWifiSleep = !!$("staWifiSleep").checked;
       if (path.endsWith("/network") && value.action === "save" && !noReconnect) {
+        noteWifiChange(value.ssid);
         beginNetworkReconnectWait();
         return true;
       }

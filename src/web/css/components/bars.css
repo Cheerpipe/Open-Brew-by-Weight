@@ -90,6 +90,6 @@ dialog .btnBar {
   border-left-color: var(--bd);
 }
 
-.fwFailed {
+.resultFailed {
   border-left-color: var(--dn);
 }
