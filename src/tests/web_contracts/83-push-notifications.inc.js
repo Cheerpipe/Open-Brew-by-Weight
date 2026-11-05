@@ -128,41 +128,199 @@
     if (!fs.readFileSync(path.join(sketchDir, "web", "sw.js"), "utf8").includes(key))
       throw new Error(`The worker must take ${key} from the catalog`);
 
-  // The setting is off until a tap asks, and only an installed app shows it.
-  if (
-    !/class="pwaOnly"\s*><input id="appPush"/.test(rawPartialHtml.settings) ||
-    !blockAt(runtimeJs, "async function pushSetTopic(topic, wanted) {").includes("Notification.requestPermission()")
-  )
-    throw new Error("Notifications turn on only from a tap in the installed app");
-
-  // The terms setting is its own choice, on Linea Micra builds and in the installed app.
-  if (
-    !/class="micraOnly pwaOnly"\s*><input id="appPushTerms"/.test(rawPartialHtml.settings) ||
-    !fs
-      .readFileSync(path.join(sketchDir, "web", "js", "settings.js"), "utf8")
-      .includes('["appPushTerms", "micra_policy"]') ||
-    !blockAt(runtimeJs, "async function pushSetTopic(topic, wanted) {").startsWith(
-      'async function pushSetTopic(topic, wanted) {\n  if (wanted && (await Notification.requestPermission()) !== "granted")',
+  // Each setting shows only in an installed app, and the terms one on Linea Micra
+  // builds. Its warning sits beside the label, not in it: a tap on the warning
+  // must not flip the toggle. The samples use the Web UI's own button bar.
+  const settingsSource = fs.readFileSync(path.join(sketchDir, "web", "js", "settings.js"), "utf8");
+  for (const [id, gate] of [
+    ["appPush", "pwaOnly"],
+    ["appPushTerms", "micraOnly pwaOnly"],
+  ])
+    if (
+      !new RegExp(
+        `<div class="${gate}">\\s*<label\\s*><input id="${id}"[^]*?</label\\s*>\\s*` +
+          `<div id="${id}Note" class="homeCard resultFailed pushNote" role="status" hidden>`,
+      ).test(rawPartialHtml.settings)
     )
-  )
-    throw new Error("The terms notification is a separate, opt-in topic asked for in the tap");
-
-  // Safari spends the tap on a permission request and answers any other "denied",
-  // whatever the permission is, so one tap may never ask twice.
-  if (runtimeJs.split("Notification.requestPermission(").length !== 2)
-    throw new Error("A tap asks for the notification permission exactly once");
-
-  // A blocked setting's reason stays under its label: the row's grid places every
-  // other child beside the toggle. The samples use the Web UI's own button bar.
+      throw new Error(`${id} must keep its gate and its warning below the label`);
   if (
-    !/<small class="fieldHint">[^<]*<span id="appPushNote" hidden><\/span><\/small>/.test(
-      rawPartialHtml.settings,
-    ) ||
+    !settingsSource.includes('["appPushTerms", "micra_policy"]') ||
     !/<div class="btnBar glassBar"><button class="btnGlyph" type="button" data-result="on_recipe">/.test(
       rawPartialHtml.diagnostic,
     )
   )
-    throw new Error("The push setting and samples must keep the Web UI's own layout");
+    throw new Error("The terms topic and the samples must keep their own controls");
+
+  // A toggle holds the choice whatever push can do, and every way push can fail
+  // has a reason to show.
+  if (
+    /\.disabled = !!blocked/.test(settingsSource) ||
+    !settingsSource.includes("note.hidden = !($(id).checked && problem)")
+  )
+    throw new Error("A toggle follows the choice, with the warning only while it is on");
+  if (runtimeJs.split("Notification.requestPermission(").length !== 2)
+    throw new Error("A tap asks for the notification permission exactly once");
+  if (!blockAt(runtimeJs, "async function pushSetTopic(topic, wanted) {").match(
+    /^async function pushSetTopic\(topic, wanted\) \{\s*if \(wanted &&[^;{]*Notification\.requestPermission\(\);/,
+  ))
+    throw new Error("Safari spends the tap: the request comes before anything is awaited");
+  const localeEntries = JSON.parse(
+    fs.readFileSync(path.join(sketchDir, "web", "locales", "en.json"), "utf8"),
+  ).strings;
+  const reasons = localeEntries["settings.app_push_blocked"].split("|");
+  if (reasons.length !== 8 || reasons.some((reason) => !reason.trim()))
+    throw new Error("Every push problem needs its own reason");
+
+  const pushSource = rawRuntimeJs.slice(
+    rawRuntimeJs.indexOf("function pushBlocked() {"),
+    rawRuntimeJs.indexOf("let companionHereLoad"),
+  );
+  const pushDevice = ({ protocol = "https:", here, permission = "default", answer, stale }) => {
+    const device = {
+      saved: {},
+      posts: [],
+      asked: 0,
+      subscribed: 0,
+      subscription: null,
+      fail: null,
+      permission,
+    };
+    const toSubscription = (key) => ({
+      endpoint: "https://push/1",
+      options: { applicationServerKey: key },
+      unsubscribe: async () => (device.subscription = null),
+    });
+    const registration = {
+      pushManager: {
+        getSubscription: async () => device.subscription,
+        subscribe: async ({ applicationServerKey }) => {
+          device.subscribed++;
+          return (device.subscription = toSubscription(applicationServerKey));
+        },
+      },
+    };
+    const Notification = {
+      get permission() {
+        return device.permission;
+      },
+      requestPermission: async () => {
+        device.asked++;
+        return (device.permission = answer ?? device.permission);
+      },
+    };
+    device.context = vm.createContext({
+      __WEBUI_TEXT__: (key) => localeEntries[key],
+      uiState: { companionHere: here },
+      location: { protocol },
+      window: { PushManager: 1, Notification },
+      Notification,
+      navigator: {
+        userAgent: "",
+        serviceWorker: { ready: Promise.resolve(registration), getRegistration: async () => registration },
+      },
+      localStorage: {
+        getItem: (name) => device.saved[name] ?? null,
+        setItem: (name, value) => (device.saved[name] = value),
+      },
+      caches: {
+        open: async () => ({
+          match: async (name) => (name === "/topics" && stale ? { json: async () => stale } : undefined),
+          put: async () => {},
+        }),
+      },
+      Response: class {},
+      companionLog: async (url, body) => {
+        if (device.fail) throw device.fail;
+        device.posts.push([url, body]);
+      },
+      atob: (text) => Buffer.from(text, "base64").toString("latin1"),
+      Uint8Array,
+      JSON,
+      Error,
+    });
+    vm.runInContext(`${pushSource};Object.assign(globalThis, { pushTopics, pushSetTopic, pushApply, pushProblem, pushDisable, pushReconcile, pushProblemText });`, device.context);
+    device.topics = async () => [...(await device.context.pushTopics())];
+    return device;
+  };
+  const ready = { paired: true, push: { publicKey: "AAEC" } };
+
+  await (async () => {
+    // Off the companion's address nothing can ask, and the choice still holds.
+    let device = pushDevice({ protocol: "http:", here: null });
+    await device.context.pushSetTopic("shot_result", true);
+    assert.deepEqual(await device.topics(), ["shot_result"]);
+    assert.equal(device.asked, 0, "only the companion's address can ask");
+    assert.equal(device.context.pushProblem(), "address");
+    await device.context.pushSetTopic("shot_result", false);
+    assert.deepEqual(await device.topics(), [], "turning off works while push cannot");
+
+    // Unpaired: the tap still asks, and pairing later needs no second tap.
+    device = pushDevice({ here: { paired: false }, answer: "granted" });
+    await device.context.pushSetTopic("shot_result", true);
+    assert.equal(device.asked, 1);
+    assert.equal(device.subscribed, 0);
+    assert.equal(device.context.pushProblem(), "pair");
+    device.context.uiState.companionHere = ready;
+    await device.context.pushApply();
+    assert.equal(device.subscribed, 1, "the choice takes effect once nothing is missing");
+    assert.equal(device.context.pushProblem(), "");
+    device.posts.length = 0;
+    await device.context.pushApply();
+    assert.equal(device.posts.length, 0, "a device that looks right sends nothing");
+
+    // Each choice stands on its own, and the last one off ends the subscription.
+    await device.context.pushSetTopic("micra_policy", true);
+    assert.deepEqual(device.posts.at(-1)[1].topics, ["shot_result", "micra_policy"]);
+    await device.context.pushSetTopic("shot_result", false);
+    await device.context.pushSetTopic("micra_policy", false);
+    assert.equal(device.subscription, null);
+    assert.equal(device.posts.at(-1)[0], "/__companion/push/unsubscribe");
+
+    // A dismissed or refused prompt keeps the choice and says what to do.
+    device = pushDevice({ here: ready });
+    await device.context.pushSetTopic("shot_result", true);
+    assert.deepEqual(await device.topics(), ["shot_result"]);
+    assert.equal(device.subscribed, 0, "nothing subscribes without the permission");
+    assert.equal(device.context.pushProblem(), "ask");
+    device = pushDevice({ here: ready, answer: "denied" });
+    await device.context.pushSetTopic("shot_result", true);
+    assert.deepEqual(await device.topics(), ["shot_result"]);
+    assert.equal(device.context.pushProblem(), "denied");
+
+    // A failed sign-up keeps the choice, names the cause, and is retried.
+    device = pushDevice({ here: ready, answer: "granted" });
+    device.fail = { error: "CONTROLLER_UNREACHABLE" };
+    await device.context.pushSetTopic("shot_result", true);
+    assert.deepEqual(await device.topics(), ["shot_result"]);
+    assert.equal(device.context.pushProblem(), "controller");
+    device.fail = Error("500");
+    await device.context.pushApply();
+    assert.equal(device.context.pushProblem(), "failed");
+    device.fail = null;
+    await device.context.pushApply();
+    assert.equal(device.context.pushProblem(), "");
+    assert.equal(device.posts.length, 1, "the retry signs this device up");
+
+    // A subscription the browser lost comes back from the choice on the next open.
+    device.subscription = null;
+    device.subscribed = 0;
+    await device.context.pushReconcile();
+    assert.equal(device.subscribed, 1);
+
+    // Signing out ends the choice too.
+    await device.context.pushDisable();
+    assert.deepEqual(await device.topics(), []);
+
+    // A device from before the choice was kept: subscribed means what it held,
+    // and what an old "off" left behind in the worker's copy means nothing.
+    device = pushDevice({ here: ready, permission: "granted", stale: ["micra_policy"] });
+    assert.deepEqual(await device.topics(), [], "no subscription, no choice");
+    device.subscription = { endpoint: "https://push/1" };
+    assert.deepEqual(await device.topics(), ["micra_policy"]);
+    device = pushDevice({ here: ready, permission: "granted" });
+    device.subscription = { endpoint: "https://push/1" };
+    assert.deepEqual(await device.topics(), ["shot_result"]);
+  })();
 
   // Opening without a notification's address changes nothing on Shots.
   const statsSource = fs.readFileSync(path.join(sketchDir, "web", "js", "stats.js"), "utf8");

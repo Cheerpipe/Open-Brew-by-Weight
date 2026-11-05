@@ -466,11 +466,7 @@ async function renderPushDevice() {
   const words = __WEBUI_TEXT__("diagnostic.push_yes_no").split("|"),
     blocked = R.pushBlocked(),
     subscription = await R.pushSubscription().catch(() => null);
-  $("dPuSupport").textContent = blocked
-    ? __WEBUI_TEXT__("settings.app_push_blocked").split("|")[
-        ["address", "pair", "update", "unsupported", "denied"].indexOf(blocked)
-      ]
-    : words[0];
+  $("dPuSupport").textContent = blocked ? R.pushProblemText(blocked) : words[0];
   $("dPuPermission").textContent = "Notification" in window ? Notification.permission : "—";
   $("dPuSubscription").textContent = subscription
     ? new URL(subscription.endpoint).hostname +

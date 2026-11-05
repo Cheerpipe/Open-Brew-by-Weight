@@ -30,6 +30,11 @@ Notifications are off until you turn them on, separately on each device.
 2. Go to **Settings → This device** and turn on **Notify me when a shot ends**.
 3. Allow notifications when your device asks.
 
+The setting records what you want, so it stays on even when notifications can't
+work yet. If something is in the way, a red note below the setting says what it is
+and what to do. Once that's sorted, notifications start on their own the next time
+you open the app or return to **Settings**.
+
 To stop them, turn the setting off. Signing out on the device turns them off too.
 
 ## La Marzocco terms
@@ -85,9 +90,9 @@ screen before it arrives.
 
 | What you see | What to do |
 | --- | --- |
-| The setting is greyed out | Its message says why: usually the app was installed from another address, or the companion needs pairing or an update |
+| A red note appears below the setting | It says why notifications may not arrive: usually the app was installed from another address, or the companion needs pairing or an update |
 | **Permission** says `denied` | Allow notifications for this app in your system settings |
 | **Last error** names a problem, and **Accepted** does not grow | Check that the companion can reach the internet |
 | The push service answered `201`, and nothing arrived | The service accepted it, so check Focus or Do Not Disturb, and your notification settings |
-| **A device wants notifications** says **No** | Turn the setting on again on your device; the companion may have been reset |
+| **A device wants notifications** says **No** | Open the app again on your device so it signs up again; the companion may have been reset |
 | **Why the last shot was not sent** says `bad` or `stale` | The shot was too short or had no yield (`bad`), or ended too long ago (`stale`) |
