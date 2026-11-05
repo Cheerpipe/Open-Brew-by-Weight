@@ -3058,7 +3058,7 @@ async function companionLog(path, body) {
   return reply;
 }
 // Notifications through the companion (docs/features/notifications.md), for this
-// browser: why it cannot have them, the subscription, and turning them on and off.
+// browser: what it chose, why that may not work, and the subscription behind it.
 function pushBlocked() {
   const here = uiState.companionHere;
   if (location.protocol !== "https:" || !here) return "address";
@@ -3068,6 +3068,17 @@ function pushBlocked() {
     return "unsupported";
   return Notification.permission === "denied" ? "denied" : "";
 }
+const pushAllowed = () => !pushBlocked() && Notification.permission === "granted";
+let pushFailure = "";
+// Why what this device chose may not be happening, in the order worth fixing.
+const pushProblem = () =>
+  pushBlocked() || (Notification.permission === "granted" ? pushFailure : "ask");
+const pushProblemText = (problem) =>
+  __WEBUI_TEXT__("settings.app_push_blocked").split("|")[
+    ["address", "pair", "update", "unsupported", "denied", "ask", "controller", "failed"].indexOf(
+      problem,
+    )
+  ];
 async function pushSubscription() {
   const registration = await navigator.serviceWorker?.getRegistration();
   return (await registration?.pushManager?.getSubscription()) ?? null;
@@ -3090,9 +3101,26 @@ function pushDeviceLabel() {
     browser = ua.match(/Edg|Firefox|Chrome|Safari/)?.[0].replace("Edg", "Edge") ?? "";
   return [device, browser].filter(Boolean).join(" · ");
 }
-// What this device asked for, kept where the worker can read it too. A device
-// subscribed before there was a choice wanted the only topic there was.
+// What this device chose, kept apart from the subscription so it holds while
+// notifications cannot work, on any address. The worker cannot read this store,
+// so pushEnable also leaves what it registered in "push-state". A device
+// subscribed before the choice was kept here wanted what that holds, or else
+// the only topic there was.
+const PUSH_TOPICS_KEY = "obbwPushTopics";
+function pushChoose(topics) {
+  try {
+    localStorage.setItem(PUSH_TOPICS_KEY, JSON.stringify(topics));
+  } catch {
+    // Storage blocked or full: the choice applies to this page only.
+  }
+}
 async function pushTopics() {
+  try {
+    const chosen = localStorage.getItem(PUSH_TOPICS_KEY);
+    if (chosen) return JSON.parse(chosen);
+  } catch {
+    // Unreadable: what the subscription says below.
+  }
   if (!(await pushSubscription())) return [];
   const state = await caches.open("push-state");
   return (await (await state.match("/topics"))?.json()) ?? ["shot_result"];
@@ -3124,30 +3152,47 @@ async function pushEnable(topics) {
   await (await caches.open("push-state")).put("/topics", new Response(JSON.stringify(topics)));
 }
 async function pushDisable() {
+  pushChoose([]);
   const subscription = await pushSubscription();
   if (!subscription) return;
   const { endpoint } = subscription;
   await subscription.unsubscribe();
   await companionLog("/__companion/push/unsubscribe", { endpoint });
 }
-// One setting's change, in the tap; the last topic off ends the subscription.
-// Only once: Safari spends the tap on a request and answers any other "denied".
+// Brings this device in line with its choice; the last topic off ends the
+// subscription. Without `all`, a device that looks right sends nothing.
+async function pushApply(all) {
+  try {
+    const topics = await pushTopics();
+    if (!topics.length) await pushDisable();
+    else if (pushAllowed() && (all || pushFailure || !pushKeyMatches(await pushSubscription())))
+      await pushEnable(topics);
+    pushFailure = "";
+  } catch (error) {
+    pushFailure = ["AUTH_REQUIRED", "CONTROLLER_UNREACHABLE"].includes(error.error)
+      ? "controller"
+      : "failed";
+  }
+}
+// One setting's change, in the tap. The choice stands whatever comes of it, and
+// the tap asks for the permission even if something else is missing, since
+// nothing but a tap can. Only once: Safari spends the tap on a request and
+// answers any other "denied".
 async function pushSetTopic(topic, wanted) {
-  if (wanted && (await Notification.requestPermission()) !== "granted") throw Error("denied");
+  if (wanted && !["address", "unsupported"].includes(pushBlocked()))
+    await Notification.requestPermission();
   const topics = (await pushTopics()).filter((name) => name !== topic);
   if (wanted) topics.push(topic);
-  await (topics.length ? pushEnable(topics) : pushDisable());
+  pushChoose(topics);
+  await pushApply(true);
 }
 // Once per open of an installed app: the companion, and only it, hears that
 // this device is still here, under the key it has now, and gets a receipt the
 // worker could not post away from home.
 async function pushReconcile() {
-  if (pushBlocked()) return;
+  await pushApply(true);
   const subscription = await pushSubscription();
-  if (!subscription) return;
-  const topics = await pushTopics();
-  if (pushKeyMatches(subscription)) await pushRegister(subscription, topics);
-  else await pushEnable(topics);
+  if (pushBlocked() || !subscription) return;
   const state = await caches.open("push-state"),
     receipt = await (await state.match("/received"))?.json();
   if (receipt && !receipt.acked) {
@@ -8032,6 +8077,9 @@ export {
   companionPairable,
   companionOrigin,
   pushBlocked,
+  pushProblem,
+  pushProblemText,
+  pushApply,
   pushSubscription,
   pushKeyMatches,
   pushTopics,

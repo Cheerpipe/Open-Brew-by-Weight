@@ -1716,50 +1716,55 @@ const GROUP_SUMMARIES = {
       : picked("alertOutputChannel");
   },
 };
-// Off until this device turns it on. Its state is the browser's subscription;
-// a device that cannot have notifications says why, and what to do.
+// Off until this device turns it on. A toggle is this device's choice and says
+// so whether or not notifications can work; a choice they cannot meet has the
+// reason below it, and starts working once the reason is gone.
+let refreshAppPush = () => {};
 function initAppPush() {
   const rows = [
-      ["appPush", "shot_result"],
-      ["appPushTerms", "micra_policy"],
-    ].filter(([id]) => $(id)),
-    say = (id, text) => {
+    ["appPush", "shot_result"],
+    ["appPushTerms", "micra_policy"],
+  ].filter(([id]) => $(id));
+  let changing = false;
+  const paint = async () => {
+    const topics = await R.pushTopics().catch(() => []),
+      problem = R.pushProblem();
+    if (changing) return;
+    for (const [id, topic] of rows) {
       const note = $(id + "Note");
-      note.textContent = text;
-      note.hidden = !text;
-    },
-    sync = async () => {
-      const blocked = R.pushBlocked(),
-        topics = await R.pushTopics().catch(() => []);
-      for (const [id, topic] of rows) {
-        $(id).checked = topics.includes(topic);
-        $(id).disabled = !!blocked && !$(id).checked;
-        say(
-          id,
-          blocked &&
-            __WEBUI_TEXT__("settings.app_push_blocked").split("|")[PUSH_BLOCKS.indexOf(blocked)],
-        );
-      }
-    };
+      $(id).checked = topics.includes(topic);
+      note.hidden = !($(id).checked && problem);
+      note.querySelector("span").textContent = problem && R.pushProblemText(problem);
+    }
+  };
   for (const [id, topic] of rows)
     $(id).onchange = async () => {
       // One subscription holds every topic, so one change at a time.
+      changing = true;
       for (const [other] of rows) $(other).disabled = true;
-      let failure = "";
       try {
         await R.pushSetTopic(topic, $(id).checked);
-      } catch (error) {
-        failure =
-          error.error === "AUTH_REQUIRED" || error.error === "CONTROLLER_UNREACHABLE"
-            ? __WEBUI_TEXT__("settings.app_push_needs_controller")
-            : __WEBUI_TEXT__("settings.app_push_failed");
+      } finally {
+        changing = false;
+        for (const [other] of rows) $(other).disabled = false;
       }
-      await sync();
-      if (failure) say(id, failure);
+      await paint();
     };
-  R.companionHere(true).then(sync);
+  // Each entry and return to the page: the companion may be paired by now, or
+  // the permission allowed in the system settings.
+  refreshAppPush = async () => {
+    if (changing || !R.webUiStandalone()) return;
+    if ((await R.pushTopics().catch(() => [])).length) {
+      await R.companionHere(true);
+      await R.pushApply();
+    }
+    await paint();
+  };
+  R.companionHere().then(paint);
 }
-const PUSH_BLOCKS = ["address", "pair", "update", "unsupported", "denied"];
+export function start() {
+  refreshAppPush();
+}
 export function init() {
   if (ready) return;
   ready = true;

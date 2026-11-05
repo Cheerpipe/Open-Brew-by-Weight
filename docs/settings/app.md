@@ -31,8 +31,9 @@ Clearing its data returns them to their defaults, and a
 - **Notify me when a shot ends** (*installed app only*) shows the shot's time,
   yield, and result on this device, even with the app closed. It needs the
   companion and is off until you turn it on; unlike the rest of this group, the
-  companion keeps this device's choice so it can send them. See
-  [Notifications](../features/notifications.md).
+  companion keeps this device's choice so it can send them. If notifications
+  can't work on this device, the setting stays on and a red note below it says
+  why. See [Notifications](../features/notifications.md).
 - **Notify me when La Marzocco needs me to accept its terms** (*installed app
   only*, Linea Micra) tells this device when La Marzocco's cloud stops working
   for your account until new terms are accepted. Tap it to open Home and see

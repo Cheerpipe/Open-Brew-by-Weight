@@ -1313,15 +1313,28 @@
           >{{webui:settings.app_live_landscape_hint}}</small
         ></label
       >
-      <label class="pwaOnly"
-        ><input id="appPush" type="checkbox" /> {{webui:settings.app_push}}<small class="fieldHint"
-          >{{webui:settings.app_push_hint}}<span id="appPushNote" hidden></span></small
-      ></label>
-      <label class="micraOnly pwaOnly"
-        ><input id="appPushTerms" type="checkbox" /> {{webui:settings.app_push_terms}}<small
-          class="fieldHint"
-          >{{webui:settings.app_push_terms_hint}}<span id="appPushTermsNote" hidden></span></small
-      ></label>
+      <div class="pwaOnly">
+        <label
+          ><input id="appPush" type="checkbox" /> {{webui:settings.app_push}}<small
+            class="fieldHint"
+            >{{webui:settings.app_push_hint}}</small
+          ></label
+        >
+        <div id="appPushNote" class="homeCard resultFailed pushNote" role="status" hidden>
+          <p><strong>{{webui:settings.app_push_problem}}</strong> <span></span></p>
+        </div>
+      </div>
+      <div class="micraOnly pwaOnly">
+        <label
+          ><input id="appPushTerms" type="checkbox" /> {{webui:settings.app_push_terms}}<small
+            class="fieldHint"
+            >{{webui:settings.app_push_terms_hint}}</small
+          ></label
+        >
+        <div id="appPushTermsNote" class="homeCard resultFailed pushNote" role="status" hidden>
+          <p><strong>{{webui:settings.app_push_problem}}</strong> <span></span></p>
+        </div>
+      </div>
       <label
         ><input id="appVibrate" type="checkbox" /> {{webui:settings.app_vibrate}}<small
           class="fieldHint"
