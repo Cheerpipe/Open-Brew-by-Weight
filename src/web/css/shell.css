@@ -140,7 +140,7 @@ body {
   overflow: visible;
 }
 
-/* The scale battery rides the Bluetooth button: a wide vertical cell after
+/* The scale battery rides the scale button: a wide vertical cell after
    the bars, drawn only while the scale reports it. Muted while healthy; the
    cell takes the level colour. The optional percent (Settings → This device)
    keeps room for "100%", so the header never changes width with it. */
@@ -163,7 +163,7 @@ body {
   display: inline;
 }
 
-#bluetoothSignal[data-batt] {
+#bluetoothSignal {
   width: auto;
   padding: 0 0.3rem;
 }
@@ -247,7 +247,7 @@ body {
 
 .signalIndicator[data-level="0"] [data-step],
 .signalIndicator[data-level="unknown"] [data-step],
-#bluetoothSignal[data-level="0"] path {
+#bluetoothSignal[data-level="0"] .scaleGlyph {
   opacity: 0.12;
 }
 
@@ -359,8 +359,7 @@ body {
     width: 1.85rem;
   }
 
-  .headerSignals #bluetoothSignal[data-batt] {
-    width: auto;
+  .headerSignals #bluetoothSignal {
     padding: 0 0.1rem;
   }
 }
@@ -1078,16 +1077,16 @@ html.themeDark #launchIntro {
 }
 
 #bluetoothSignal svg {
-  width: 1.6rem;
+  width: 2.09rem;
 }
 
 #bluetoothSignal[data-batt] svg {
-  width: 2.6rem;
+  width: 3.1rem;
 }
 
 @media (width <= 480px) {
   #bluetoothSignal[data-batt] svg {
-    width: 2.32rem;
+    width: 2.76rem;
   }
 }
 

@@ -34,7 +34,7 @@
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3, bluetoothConnected: false, bluetoothLevel: 3}});
   assert.equal(elements.wifiSignal.dataset.level, '3');
   assert.equal(elements.bluetoothSignal.dataset.level, '0', 'Disconnect overrides an old reading');
-  assert.equal(elements.bluetoothSignal.attributes['aria-label'], 'Bluetooth: Scale disconnected');
+  assert.equal(elements.bluetoothSignal.attributes['aria-label'], 'Scale disconnected');
   context.updateHeaderSignals({connections: {wifiConnected: false, wifiLevel: 3}});
   assert.equal(elements.wifiSignal.dataset.level, '0', 'STA disconnected does not imply a strong AP signal');
   context.updateHeaderSignals({snapshotStale: true, connections: {wifiConnected: true, wifiLevel: 3, bluetoothConnected: true, bluetoothLevel: 3}});
@@ -42,10 +42,10 @@
   assert.equal(elements.bluetoothSignal.dataset.level, 'unknown');
   context.updateHeaderSignals();
   assert.equal(elements.wifiSignal.title, 'Wi-Fi: Signal unavailable', 'Transport failures clear the displayed measurement');
-  assert.equal(elements.bluetoothSignal.title, 'Bluetooth: Signal unavailable');
+  assert.equal(elements.bluetoothSignal.title, 'Scale signal unavailable');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3, bluetoothConnected: true, bluetoothLevel: 2}});
   assert.equal(elements.wifiSignal.title, 'Wi-Fi: Strong');
-  assert.equal(elements.bluetoothSignal.title, 'Bluetooth: Medium');
+  assert.equal(elements.bluetoothSignal.title, 'Scale signal: Medium');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: null, wifiName: 'Cafe "A"\\B', bluetoothConnected: true, bluetoothLevel: 3, bluetoothName: '<img src=x onerror=alert(1)>'}});
   assert.equal(elements.wifiName.textContent, 'Cafe "A"\\B', 'Connected names survive missing signal level');
   assert.equal(elements.bluetoothName.textContent, '<img src=x onerror=alert(1)>', 'Identity is rendered as text');
@@ -161,7 +161,7 @@
   assert.equal(elements.micraSignal.dataset.level, 'off');
   micraFrame({quality: 'current'}, {paired: false, route: 'direct'});
   assert.equal(elements.micraSignal.dataset.level, 'on', 'Unpairing returns to the one cloud');
-  // The scale battery rides the Bluetooth button under one level rule; the
+  // The scale battery rides the scale button under one level rule; the
   // header draws the cell, the percent goes to the popover, the label and,
   // only with this device's setting, the text beside the cell.
   for (const [pct, level] of [[100, 'ok'], [16, 'ok'], [15, 'low'], [11, 'low'], [10, 'critical'],
@@ -176,17 +176,17 @@
     {scale: {available: true, batteryPct}, connections: {bluetoothLevel: 3}, ...extra});
   battery(62);
   assert.equal(buttons[1].dataset.batt, 'ok');
-  assert.equal(glyph.attrs.viewBox, '5.2 0 42.5 24', 'The cell widens the glyph');
+  assert.equal(glyph.attrs.viewBox, '0 0 51.2 24', 'The cell widens the glyph');
   assert.equal(fill.attrs.height, '6.08');
   assert.equal(fill.attrs.y, '10.82', 'The fill rises from the cell floor');
   assert.equal(elements.bluetoothBatteryPct.textContent, '62%');
-  assert.equal(buttons[1].attributes['aria-label'], 'Bluetooth: Strong · battery 62%');
+  assert.equal(buttons[1].attributes['aria-label'], 'Scale signal: Strong · battery 62%');
   assert.equal(elements.bluetoothBatteryLine.hidden, false);
   assert.equal(elements.bluetoothBattery.textContent, '62%');
   battery(12);
   assert.equal(buttons[1].dataset.batt, 'low');
   assert.equal(elements.bluetoothBattery.textContent, '12% · low');
-  assert.equal(buttons[1].attributes['aria-label'], 'Bluetooth: Strong · battery 12% · low');
+  assert.equal(buttons[1].attributes['aria-label'], 'Scale signal: Strong · battery 12% · low');
   battery(9);
   assert.equal(buttons[1].dataset.batt, 'critical');
   battery(0);
@@ -195,13 +195,13 @@
   assert.equal(elements.bluetoothBattery.textContent, '0% · almost empty');
   context.updateHeaderSignals({connections: {bluetoothConnected: true, bluetoothLevel: 3}});
   assert.equal(buttons[1].dataset.batt, 'empty', 'An envelope without a scale model (Admin) keeps the cell');
-  assert.equal(buttons[1].attributes['aria-label'], 'Bluetooth: Strong · battery 0% · almost empty');
+  assert.equal(buttons[1].attributes['aria-label'], 'Scale signal: Strong · battery 0% · almost empty');
   for (const hidden of [() => battery(null), () => battery(40, {snapshotStale: true}),
       () => context.updateHeaderSignals({scale: {available: false, batteryPct: 40}, connections: {bluetoothLevel: 3}})]) {
     battery(40);
     hidden();
     assert.equal(buttons[1].dataset.batt, undefined, 'No reading, a stale frame or no scale hides the cell');
-    assert.equal(glyph.attrs.viewBox, '5.2 0 26.1 24');
+    assert.equal(glyph.attrs.viewBox, '0 0 34.5 24');
     assert.equal(elements.bluetoothBatteryLine.hidden, true);
     assert(!buttons[1].attributes['aria-label'].includes('battery'));
   }
@@ -408,11 +408,11 @@
   assert(css.includes('#message{position:sticky;top:var(--barH,var(--hdr))'),
       'The message banner sticks under the measured header height, clear of the menu');
 }
-// A disconnected Bluetooth icon dims its rune like the Wi-Fi arcs and carries
+// A disconnected scale icon dims its drawing like the Wi-Fi arcs and carries
 // no slash, which only added visual noise next to the dimmed bars.
-if (!css.includes('#bluetoothSignal[data-level="0"] path{opacity:.12}') ||
+if (!css.includes('#bluetoothSignal[data-level="0"] .scaleGlyph{opacity:.12}') ||
     /#bluetoothSignal[^{]*svg>g/.test(css) || /id="bluetoothSignal"[^]*?signalSlash[^]*?<\/button>/.test(html)) {
-  throw new Error('The disconnected Bluetooth icon must dim as a whole without a slash');
+  throw new Error('The disconnected scale icon must dim as a whole without a slash');
 }
 // The companion and cloud icons need the radios' OFF dimming too: the muted
 // color alone still reads as active in dark mode.

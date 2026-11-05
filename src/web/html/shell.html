@@ -213,30 +213,33 @@
           type="button"
           class="signalIndicator"
           id="bluetoothSignal"
-          aria-label="{{webui:shell.bluetooth_unavailable}}"
+          aria-label="{{webui:shell.scale_signal_unavailable}}"
           aria-expanded="false"
           aria-controls="bluetoothDetails"
           data-level="unknown"
         >
-          <svg viewBox="5.2 0 26.1 24" aria-hidden="true">
+          <svg viewBox="0 0 34.5 24" aria-hidden="true">
             <g
+              class="scaleGlyph"
               fill="none"
               stroke="currentColor"
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <path d="M6.5 7.6 14.5 15 10.5 19V3.8l4 4L6.5 15.2" />
+              <rect x="2" y="4" width="16" height="16" rx="3" />
+              <circle cx="10" cy="10.2" r="3.2" />
+              <path d="M7 16.5h6" />
             </g>
             <g fill="currentColor">
-              <rect data-step="1" x="17" y="15" width="3.5" height="5" rx="1" />
-              <rect data-step="2" x="22" y="10" width="3.5" height="10" rx="1" />
-              <rect data-step="3" x="27" y="4" width="3.5" height="16" rx="1" />
+              <rect data-step="1" x="21" y="15" width="3.5" height="5" rx="1" />
+              <rect data-step="2" x="26" y="10" width="3.5" height="10" rx="1" />
+              <rect data-step="3" x="31" y="4" width="3.5" height="16" rx="1" />
             </g>
             <g class="battGlyph" fill="currentColor">
-              <rect x="37.6" y="1.4" width="5" height="2.1" rx=".7" />
+              <rect x="41.6" y="1.4" width="5" height="2.1" rx=".7" />
               <rect
-                x="34.1"
+                x="38.1"
                 y="5.1"
                 width="12"
                 height="13.8"
@@ -245,7 +248,7 @@
                 stroke="currentColor"
                 stroke-width="2.2"
               />
-              <rect id="bluetoothBatteryFill" class="battFill" x="36.1" width="8" rx="1" />
+              <rect id="bluetoothBatteryFill" class="battFill" x="40.1" width="8" rx="1" />
             </g>
           </svg>
           <span id="bluetoothBatteryPct" class="battPct"></span>
@@ -297,10 +300,10 @@
           aria-labelledby="bluetoothDetailsTitle"
           hidden
         >
-          <strong id="bluetoothDetailsTitle">{{webui:shell.bluetooth}}</strong>
-          <p><span>{{webui:shell.scale}}</span><b id="bluetoothName">—</b></p>
+          <strong id="bluetoothDetailsTitle">{{webui:shell.scale}}</strong>
+          <p><span>{{webui:shell.name}}</span><b id="bluetoothName">—</b></p>
           <p>
-            <span>{{webui:shell.signal}}</span
+            <span>{{webui:shell.bluetooth_signal}}</span
             ><b id="bluetoothDetail">{{webui:runtime.signal_unavailable}}</b>
           </p>
           <p id="bluetoothBatteryLine" hidden>
