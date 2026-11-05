@@ -15,6 +15,9 @@ const locale = JSON.parse(fs.readFileSync(
     path.join(jsDir, '../locales/en.json'), 'utf8')).strings;
 const otaSource = admin.slice(admin.search(/const\s+OTA_UPLOAD_TIMEOUT_MS\s*=/),
     admin.indexOf('async function setBleScanIntensity('));
+const runtime = fs.readFileSync(path.join(jsDir, 'runtime.js'), 'utf8');
+const restartSource = runtime.slice(runtime.indexOf('// Only the firmware\'s own status with another boot'),
+    runtime.indexOf('// One card, moved to the view showing it'));
 const parser = new Function(fs.readFileSync(path.join(jsDir, 'ota-image.js'), 'utf8')
     .replace(/export\s+/g, '') + ';return otaFileIdentity;')();
 
@@ -35,7 +38,7 @@ async function harness(mode) {
   const source = mode === 'changed' ? Buffer.from(await file.arrayBuffer()) : null;
   const uploadFile = source ?
       {size: source.length, slice: (a, b) => new Blob([source.subarray(a, b)])} : file;
-  const messages = [], patches = [], payloads = [], delays = [];
+  const messages = [], patches = [], payloads = [], delays = [], waits = [], flashes = [];
   let offset = 0, posts = 0, commits = 0;
   const session = {...identity, transferId: 'test-transfer'};
   const status = () => ({otaProtocolVersion: 3, available: true, safe: true,
@@ -52,6 +55,7 @@ async function harness(mode) {
       imageSha256: identity.imageSha256}});
   const R = {uiState: {}, controlsMutable: true,
     message: text => messages.push(text), clearFieldErrors() {}, showFieldError() {},
+    beginFirmwareRestartWait: (...args) => waits.push(args), noteFirmwareFlash: note => flashes.push(note),
     formatCommandError: (text, error) => text + ' ' + error.message, refreshStatus() {},
     sleep: async (ms) => { delays.push(ms); },
     sub: (text, values) => text.replace(/\{(\d)\}/g, (_, i) => values[i])};
@@ -104,8 +108,129 @@ async function harness(mode) {
     throw new Error('Unexpected request');
   };
   context.otaSend = send;
-  return {context, session, identity, items, messages, patches, payloads, file, delays,
+  return {context, session, identity, items, messages, patches, payloads, file, delays, waits, flashes,
     status, setOffset: value => {offset = value;}, commits: () => commits};
+}
+
+// The wait after a flash, against the answers each route really gives.
+function restartContext(answers, pages = () => ({ok: true})) {
+  const log = {landed: [], claims: 0, messages: [], polled: 0, flashes: []};
+  const context = vm.createContext({console, Date, Number, JSON,
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+    __WEBUI_TEXT__: key => key, webUiHeaders: () => ({}),
+    fetchJson: async (url) => {
+      assert.equal(url, '/api/v1/status/admin');
+      const answer = answers[log.polled++];
+      if (answer === 'offline') throw new TypeError('Failed to fetch');
+      return [{ok: answer.status === 200}, answer.body];
+    },
+    fetch: async url => pages(url), setTimeout: fn => { log.next = fn; return 1; },
+    beginNetworkReconnectWait() {}, endNetworkReconnectWait: () => { log.ended = true; },
+    claimWebUiOwnership: () => { log.claims++; }, message: text => log.messages.push(text),
+    cardDismissed: () => '', sub: (text, values) => text + ':' + values.join(','),
+    location: {replace: url => log.landed.push(url)}, networkReconnectPollTimer: 0,
+    networkReconnectDeadline: 0});
+  vm.runInContext('let firmwareRestart = null, fwReloading = false;' +
+      restartSource.replace(/^const FW_RESULT_KEY/m, 'var FW_RESULT_KEY'), context);
+  vm.runInContext('beginFirmwareRestartWait(7, "2.0"); globalThis.peek = () => firmwareRestart;', context);
+  log.poll = async () => {
+    vm.runInContext('pollFirmwareRestart()', context);
+    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
+  };
+  log.context = context;
+  return log;
+}
+
+async function restartWaitChecks() {
+  const ok = body => ({status: 200, body});
+  // Down, directly and through a companion, and the old boot still answering.
+  let w = restartContext(['offline', {status: 502, body: {error: 'CONTROLLER_UNREACHABLE'}},
+    {status: 503, body: {error: 'NO_CONTROLLER'}}, ok({bootId: 7, configMutable: true}),
+    {status: 200, body: null}, ok({bootId: 8, firmwareVersion: '2.0'})]);
+  for (let i = 0; i < 5; i++) {
+    await w.poll();
+    assert.equal(w.landed.length, 0, 'answer ' + i + ' does not end the wait');
+    assert.notEqual(vm.runInContext('peek()', w.context), null);
+  }
+  await w.poll();
+  assert.deepEqual(w.landed, ['/?fw=2.0']);
+  assert.equal(vm.runInContext('peek()', w.context), null);
+  // The page itself still failing keeps the wait until a later poll finds it.
+  let pages = 0;
+  w = restartContext([ok({bootId: 8, firmwareVersion: '2.0'}), ok({bootId: 8, firmwareVersion: '2.0'})],
+      () => ({ok: pages++ > 0}));
+  await w.poll();
+  assert.equal(w.landed.length, 0);
+  await w.poll();
+  assert.deepEqual(w.landed, ['/?fw=2.0']);
+  // A rollback lands on the version that really runs; a sign-in on the expected one.
+  w = restartContext([ok({bootId: 8, firmwareVersion: '1.0'})]);
+  await w.poll();
+  assert.deepEqual(w.landed, ['/?fw=1.0']);
+  w = restartContext([{status: 401, body: {error: 'AUTH_REQUIRED'}}]);
+  await w.poll();
+  assert.deepEqual(w.landed, ['/?fw=2.0']);
+  // A shot holds the count and slows the polls.
+  w = restartContext([ok({bootId: 7, configMutable: false})]);
+  await w.poll();
+  assert.equal(vm.runInContext('peek().shot', w.context), true);
+  // No restart coming: back to the panel, saying which case it is.
+  for (const [state, text] of [['committed', 'never_came'], ['staged', 'was_not_installed']]) {
+    w = restartContext([ok({bootId: 7, configMutable: true, ota: {restartPending: false, state}})]);
+    await w.poll();
+    assert.equal(vm.runInContext('peek()', w.context), null);
+    assert.equal(w.claims, 1);
+    assert.ok(w.ended);
+    assert.match(w.messages[0], new RegExp(text));
+  }
+}
+
+function firmwareResultChecks() {
+  const store = new Map();
+  const context = vm.createContext({JSON, Number, __WEBUI_TEXT__: key => key,
+    localStorage: {getItem: key => store.get(key) ?? null,
+      setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key)},
+    cardDismissed: key => store.get(key) || '', sub: (text, values) => text + ':' + values.join(',')});
+  vm.runInContext('let firmwareRestart = null, fwReloading = false;' + restartSource, context);
+  const result = status => {
+    context.status = status;
+    return vm.runInContext('firmwareResult(status)', context);
+  };
+  const flash = {version: '2.0', imageSha256: 'abcdef0123456789' + 'f'.repeat(48), bootId: 7};
+  const note = () => {
+    context.flash = flash;
+    vm.runInContext('noteFirmwareFlash(flash)', context);
+  };
+  const image = flash.imageSha256.slice(0, 16);
+  assert.equal(result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''}), null, 'nothing flashed here');
+  note();
+  assert.equal(result({bootId: 7, firmwareVersion: '1.0', rolledBackImage: ''}), null, 'same boot');
+  let card = result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''});
+  assert.equal(card.failed, false);
+  assert.match(card.text, /firmware_updated_text:2\.0/);
+  // A rollback overrides success even after that card was dismissed, including
+  // a reinstall of the same version, which only the firmware's record can tell.
+  store.set(card.key, card.value);
+  assert.equal(result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''}), null);
+  card = result({bootId: 9, firmwareVersion: '2.0', rolledBackImage: image});
+  assert.equal(card.failed, true);
+  assert.match(card.text, /firmware_rollback_named:2\.0,2\.0/);
+  card = result({bootId: 9, firmwareVersion: '1.0', rolledBackImage: image});
+  assert.match(card.text, /firmware_rollback_named:2\.0,1\.0/);
+  // Dismissed stays dismissed across restarts, until the next flash.
+  store.set(card.key, card.value);
+  assert.equal(result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: image}), null);
+  note();
+  assert.equal(result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: image}).failed, true);
+  // Another image's rollback, as after a CLI update, names no version of ours.
+  card = result({bootId: 10, firmwareVersion: '1.0', rolledBackImage: '0123456789abcdef'});
+  assert.match(card.text, /firmware_rollback_text:1\.0/);
+  // A USB downgrade clears the record: another version with no rollback shows
+  // nothing and forgets the flash.
+  note();
+  assert.equal(result({bootId: 11, firmwareVersion: '0.9', rolledBackImage: ''}), null);
+  assert.equal(store.has('obbwFwResult'), false);
 }
 
 (async () => {
@@ -148,6 +273,8 @@ async function harness(mode) {
     await vm.runInContext('otaFlash()', h.context);
     assert.equal(h.commits(), 3);
     assert.equal(h.items.has('obbwOtaCommit'), false);
+    assert.equal(h.waits.length, 0);
+    assert.equal(h.flashes.at(-1), null, 'no result card reports a flash that did not happen');
   }
   // A device that stops answering after the flash request may be restarting
   // into the new image: stale pre-flash status must not drop the expectation.
@@ -158,7 +285,7 @@ async function harness(mode) {
     h.context.R.uiState.otaLastStatus = h.status();
     await vm.runInContext('otaFlash()', h.context);
     assert.equal(h.commits(), flashes);
-    assert.match(h.messages.at(-1), /unverified/);
+    assert.deepEqual(h.waits, [[7, h.identity.version]], mode + ' waits for the restart');
     assert.equal(h.items.has('obbwOtaCommit'), true, mode + ' keeps the commit expectation');
   }
   // The real transport is the shared API client, and each step keeps the UI active.
@@ -183,10 +310,16 @@ async function harness(mode) {
     h.context.R.uiState.otaLastStatus = h.status();
     await vm.runInContext('otaFlash()', h.context);
     assert.equal(h.commits(), 1);
-    assert.match(h.messages.at(-1), mode === 'wrong-commit' ? /unverified/ :
-      mode === 'booted-commit' ? /OTA confirmed/ : /Waiting for the controller to restart/);
-    if (mode === 'booted-commit') assert.equal(h.items.has('obbwOtaCommit'), false);
-    else assert.equal(h.items.has('obbwOtaCommit'), true);
+    assert.equal(h.items.has('obbwOtaCommit'), mode !== 'booted-commit');
+    if (mode === 'wrong-commit') {
+      assert.match(h.messages.at(-1), /unverified/);
+      assert.equal(h.waits.length, 0);
+      assert.equal(h.flashes.at(-1), null);
+    } else {
+      assert.deepEqual(h.waits, [[7, h.identity.version]]);
+      assert.deepEqual({...h.flashes[0]}, {version: h.identity.version,
+        imageSha256: h.identity.imageSha256, bootId: 7});
+    }
   }
   const h = await harness('normal');
   h.context.expected = {...h.session, bootId: 7};
@@ -210,5 +343,7 @@ async function harness(mode) {
   h.context.remote = {...h.status(), bootId: 8};
   assert.match(vm.runInContext('otaStatusText(remote)', h.context), /OTA confirmed/);
   assert.equal(h.items.has('obbwOtaCommit'), false);
+  await restartWaitChecks();
+  firmwareResultChecks();
   console.log('OTA Web resilience: strict sessions, recovery, commit and boot identity OK');
 })().catch(error => {console.error(error); process.exitCode = 1;});

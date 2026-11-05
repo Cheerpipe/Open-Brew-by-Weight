@@ -652,6 +652,7 @@ class OpenBrewByWeightNetwork {
   const char *otaBootReason_ = "";
   int32_t otaBootLastError_ = 0;
   std::atomic<uint32_t> otaRestartRequestedAtMs_{0};
+  bool otaRollbackLogged_ = false;
   WebCommand acceptedCommand_ = {};
   WebCommand completionCommand_ = {};
   uint8_t acceptedCommandAttempts_ = 0;

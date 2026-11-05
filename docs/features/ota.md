@@ -38,11 +38,30 @@ back. The La Marzocco cloud connection also stays up, so power state and
 machine commands keep working until the controller restarts into the new
 firmware.
 
-After the restart, an open Web UI page notices the new version and reloads
-itself once. The first time you open the Web UI afterwards it may also reload
-once; after that, the start page and the page you opened load the new version
-directly. Other pages opened straight from a bookmark may still reload once
-on their first visit.
+When you choose **Flash and restart**, a screen with a countdown takes over
+while the controller restarts. You don't need to do anything: as soon as the
+new firmware answers, the page opens Home by itself, and a card there tells you
+how the update went. In compatibility mode, which has no Home, the card appears
+on Admin. If the countdown runs out, the page keeps checking; a new firmware
+that can't start is replaced by the previous version on its own, which takes a
+little longer. If a shot is pouring, the screen says so and the restart waits
+until it ends.
+
+The result card stays until you dismiss it, and the next update starts over:
+
+- **Firmware updated** names the version now running.
+- **Firmware update failed** means the new version failed while starting and the
+  controller went back to the previous one. This can appear some time after the
+  success card, because a new firmware is on trial for its first moments. The
+  controller remembers it until the next update, so you'll see it in any browser
+  and also after an update from the command line. **Diagnostic** may have saved
+  details: a crash record on 16 MB controllers, and the log of the failed firmware
+  if you use the companion, since the controller itself keeps its log in memory.
+
+Other open Web UI pages notice the new version and reload themselves once. The
+first time you open the Web UI afterwards it may also reload once; after that,
+the start page and the page you opened load the new version directly. Other pages
+opened straight from a bookmark may still reload once on their first visit.
 
 ## Safety behavior
 
@@ -90,7 +109,8 @@ controller's SoftAP network).
 
 Open **Admin → Firmware update**, unlock Admin with the device password, then
 select the firmware `.bin`. Choose **Upload and verify** and, once verification
-succeeds, select **Flash and restart**. The controller IP is shown on the
+succeeds, select **Flash and restart**. The page then waits for the restart and
+returns to Home with the result. The controller IP is shown on the
 Admin page; when using its SoftAP it is always `192.168.4.1`.
 
 ### Command line (CLI)
@@ -239,6 +259,15 @@ next range from `nextOffset`, including backward movement after reboot.
 `running.imageSha256` and `staged.imageSha256` are the verified appended image
 digest; session `sha256` remains the hash of the entire file, including that
 digest. `bootState` uses IDF image states (unknown read failure is -2).
+
+`rolledBackImage`, in the Home stream and `/api/v1/status/admin` with no unlock,
+is the first 16 hex digits of that digest for the image a rollback left in the
+spare slot, and empty otherwise. It comes from the slot's ABORTED or INVALID
+otadata state, read once at boot, so it survives restarts until the next commit
+or a USB installation rewrites otadata (writing only the application with
+`--image` leaves it). The Web UI's wait after a flash ends only on a `200` status
+whose `bootId` changed, or on `AUTH_REQUIRED`: the old boot keeps answering until
+it restarts, and a companion answers for a controller that is down.
 
 Run the focused functional regression suite with `bash src/tests/run_ota_tests.sh`.
 Hardware qualification must cover Web and CLI without a browser open during

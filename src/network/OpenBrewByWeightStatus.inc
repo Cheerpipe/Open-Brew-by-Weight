@@ -111,6 +111,10 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
       static_cast<unsigned long>(webUiOverrideRemainingMs),
       configLockReason(control));
   if (ok) {
+    ok = statusJsonAppend(&used, ",\"rolledBackImage\":\"%.16s\"",
+                          OpenBrewByWeightOta::instance().rolledBackImage());
+  }
+  if (ok) {
     ok = statusJsonAppend(
         &used, ",\"machineType\":\"%s\",\"machineIntegration\":\"%s\","
         "\"connections\":{\"wifiConnected\":%s,\"wifiLevel\":%s,"

@@ -240,6 +240,15 @@ bool readImageDigest(const esp_partition_t *partition, char *hex) {
   return true;
 }
 
+// The spare slot keeps this mark from the rollback until the next flash, and a
+// USB installation rewrites otadata: it is the only record of a failed update.
+bool slotRolledBack(const esp_partition_t *slot) {
+  FlashIoGuard flash;
+  esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
+  return flash.ok() && esp_ota_get_state_partition(slot, &state) == ESP_OK &&
+         (state == ESP_OTA_IMG_ABORTED || state == ESP_OTA_IMG_INVALID);
+}
+
 bool abortOtaHandle(esp_ota_handle_t handle) {
   FlashIoGuard flash;
   const bool aborted = flash.ok() && esp_ota_abort(handle) == ESP_OK;
@@ -345,6 +354,7 @@ void OpenBrewByWeightOta::begin() {
 
   readBootState();
   if (running != nullptr) (void)readImageDigest(running, runningImageSha256_);
+  if (available_ && slotRolledBack(target)) (void)readImageDigest(target, rolledBackImageSha256_);
   if (available_ && confirmed_) {
     restoreSessionJournal();
   }

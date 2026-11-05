@@ -278,6 +278,10 @@ class OpenBrewByWeightOta {
 
   OtaImageTag stagedTag() const;
 
+  // Digest of the image a rollback left behind, empty when none did. Written
+  // once in begin(), before the network task starts, so it needs no lock.
+  const char *rolledBackImage() const { return rolledBackImageSha256_; }
+
   static const char *stateName(OtaState state);
 
   private:
@@ -318,6 +322,7 @@ class OpenBrewByWeightOta {
   uint32_t bootLastAttemptMs_ = 0;
   bool bootAttempted_ = false;
   char runningImageSha256_[OTA_SHA256_HEX_CAPACITY] = {};
+  char rolledBackImageSha256_[OTA_SHA256_HEX_CAPACITY] = {};
   char stagedImageSha256_[OTA_SHA256_HEX_CAPACITY] = {};
   OtaState state_ = OtaState::UNAVAILABLE;
   uint32_t slotBytes_ = 0;

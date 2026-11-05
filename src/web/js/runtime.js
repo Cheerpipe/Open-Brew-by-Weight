@@ -223,6 +223,9 @@ function webUiPowerSeconds() {
 }
 const WEB_UI_INACTIVITY_MS = 15 * 60 * 1000;
 const NETWORK_RECONNECT_WAIT_MS = 180000;
+// A new image that never serves HTTP is rolled back 180 s into its boot, and the
+// previous one still has to start and rejoin Wi-Fi.
+const FIRMWARE_RESTART_WAIT_MS = 240000;
 const SHELL_FW_VERSION = document.documentElement.dataset.fw || "dev";
 function randomHex(bytes) {
   const b = new Uint8Array(bytes);
@@ -252,6 +255,7 @@ let webUiOwner = false,
   webUiActiveUntil = 0,
   inactiveOverlayTimer = 0,
   networkReconnectWait = false,
+  firmwareRestart = null,
   networkReconnectDeadline = 0,
   networkReconnectTimer = 0,
   networkReconnectPollTimer = 0,
@@ -2494,16 +2498,23 @@ function setOverlayReconnectMode(on) {
   }
 }
 function updateReconnectCountdown() {
-  const n = Math.max(0, Math.ceil((networkReconnectDeadline - Date.now()) / 1e3));
+  const wait = firmwareRestart ? FIRMWARE_RESTART_WAIT_MS : NETWORK_RECONNECT_WAIT_MS,
+    n = Math.max(0, Math.ceil((networkReconnectDeadline - Date.now()) / 1e3));
   const s = $("reconnectSeconds");
   if (s) s.textContent = n;
   const w = $("reconnectWait");
-  if (w) w.style.setProperty("--p", String(Math.round((n * 100) / 180)));
+  if (w) w.style.setProperty("--p", String(Math.round((n * 1e5) / wait)));
   const h = $("inactiveHint");
   if (h)
-    h.textContent = n
-      ? __WEBUI_TEXT__("runtime.waiting_for_the_controller_on_this_address")
-      : __WEBUI_TEXT__("runtime.still_waiting_if_the_new_wi_fi");
+    h.textContent = firmwareRestart?.shot
+      ? __WEBUI_TEXT__("runtime.firmware_restart_after_shot")
+      : firmwareRestart
+        ? n
+          ? __WEBUI_TEXT__("runtime.firmware_restarting")
+          : __WEBUI_TEXT__("runtime.firmware_restart_slow")
+        : n
+          ? __WEBUI_TEXT__("runtime.waiting_for_the_controller_on_this_address")
+          : __WEBUI_TEXT__("runtime.still_waiting_if_the_new_wi_fi");
 }
 function endNetworkReconnectWait() {
   networkReconnectWait = false;
@@ -2520,18 +2531,161 @@ function pollNetworkReconnect() {
     if (networkReconnectWait) networkReconnectPollTimer = setTimeout(pollNetworkReconnect, 2e3);
   });
 }
+// Only the firmware's own status with another boot ends this wait: the old boot
+// keeps answering until it restarts, and a companion answers for a controller
+// that is down (an API error, or the last copy of a page).
+function pollFirmwareRestart() {
+  if (!firmwareRestart) return;
+  let next = 2e3;
+  fetchJson(
+    "/api/v1/status/admin",
+    { headers: webUiHeaders(), cache: "no-store" },
+    // A companion serves one read at a time and takes seconds to give up on a
+    // controller that is down.
+    12e3,
+  )
+    .then(async ([response, s]) => {
+      if (s?.error === "AUTH_REQUIRED") await landAfterFirmwareRestart(firmwareRestart.version);
+      else if (!response.ok || !Number.isInteger(s?.bootId)) return;
+      else if (s.bootId !== firmwareRestart.bootId)
+        await landAfterFirmwareRestart(s.firmwareVersion);
+      else next = firmwareStillOnOldBoot(s);
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (firmwareRestart) networkReconnectPollTimer = setTimeout(pollFirmwareRestart, next);
+    });
+}
+// The old boot's answer: the next poll's delay. With Admin still unlocked it
+// says when no restart is coming; without, the wait simply runs on.
+function firmwareStillOnOldBoot(s) {
+  if (s.ota && !s.ota.restartPending) {
+    const flashed = s.ota.state === "committed";
+    if (!flashed) noteFirmwareFlash(null);
+    firmwareRestart = null;
+    endNetworkReconnectWait();
+    claimWebUiOwnership();
+    message(
+      flashed
+        ? __WEBUI_TEXT__("runtime.firmware_restart_never_came")
+        : __WEBUI_TEXT__("runtime.firmware_was_not_installed"),
+      "warn",
+    );
+    return 0;
+  }
+  firmwareRestart.shot = s.configMutable === false;
+  if (!firmwareRestart.shot) return 2e3;
+  // The restart waits for the pour; so does the count, and the radio stays quiet.
+  networkReconnectDeadline = Date.now() + FIRMWARE_RESTART_WAIT_MS;
+  return 1e4;
+}
+// The new page's own address, which the service worker and any cache leave to
+// the firmware. Asked first, so a list a companion is still fetching never ends
+// on its error page: another poll simply tries again.
+async function landAfterFirmwareRestart(version) {
+  const url = "/?fw=" + version;
+  if (!(await fetch(url)).ok) return;
+  firmwareRestart = null;
+  fwReloading = true;
+  location.replace(url);
+}
+function beginFirmwareRestartWait(bootId, version) {
+  firmwareRestart = { bootId, version, shot: false };
+  beginNetworkReconnectWait();
+}
+const FW_RESULT_KEY = "obbwFwResult",
+  FW_UPDATED_CARD = "obbwCard:fwUpdated",
+  FW_ROLLBACK_CARD = "obbwCard:fwRollback";
+// What this browser flashed, for the result card; null when nothing was. A new
+// flash also brings back a result dismissed earlier.
+function noteFirmwareFlash(flash) {
+  try {
+    if (flash) localStorage.setItem(FW_RESULT_KEY, JSON.stringify(flash));
+    else localStorage.removeItem(FW_RESULT_KEY);
+    localStorage.removeItem(FW_UPDATED_CARD);
+    localStorage.removeItem(FW_ROLLBACK_CARD);
+  } catch {
+    // Storage blocked or full: no card reports this update.
+  }
+}
+function firmwareResult(s) {
+  let flash = null;
+  try {
+    flash = JSON.parse(localStorage.getItem(FW_RESULT_KEY));
+  } catch {
+    // Storage blocked: only the firmware's own rollback record is left.
+  }
+  if (!Number.isInteger(s.bootId) || flash?.bootId === s.bootId) return null;
+  const image = s.rolledBackImage;
+  if (image) {
+    if (cardDismissed(FW_ROLLBACK_CARD) === image) return null;
+    const named = flash?.imageSha256?.startsWith(image);
+    return {
+      failed: true,
+      key: FW_ROLLBACK_CARD,
+      value: image,
+      title: __WEBUI_TEXT__("shell.firmware_rollback_title"),
+      text: named
+        ? sub(__WEBUI_TEXT__("shell.firmware_rollback_named"), [flash.version, s.firmwareVersion])
+        : sub(__WEBUI_TEXT__("shell.firmware_rollback_text"), [s.firmwareVersion]),
+    };
+  }
+  if (!flash) return null;
+  // Another version with no rollback: someone updated it some other way.
+  if (s.firmwareVersion !== flash.version) {
+    noteFirmwareFlash(null);
+    return null;
+  }
+  return cardDismissed(FW_UPDATED_CARD)
+    ? null
+    : {
+        failed: false,
+        key: FW_UPDATED_CARD,
+        value: "1",
+        title: __WEBUI_TEXT__("shell.firmware_updated_title"),
+        text: sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [flash.version]),
+      };
+}
+// One card, moved to the view showing it: on Home with the other cards, and on
+// Admin, the only page compatibility mode has, above the unlock form.
+function renderFirmwareResult(s) {
+  const card = $("fwResultCard"),
+    host = $(activeView === "admin" ? "adminLockPanel" : "grindHintCard");
+  if (!card) return;
+  const view = (activeView === "admin" || activeView === "home") && host && firmwareResult(s);
+  card.hidden = !view;
+  if (!view) return;
+  if (card.nextElementSibling !== host) host.before(card);
+  card.classList.toggle("fwFailed", view.failed);
+  $("fwResultTitle").textContent = view.title;
+  $("fwResultText").textContent = view.text;
+  $("fwResultOpen").hidden = !view.failed;
+  $("fwResultOpen").onclick = (e) => {
+    e.preventDefault();
+    history.pushState(null, "", "/diagnostic");
+    renderRoute("/diagnostic");
+  };
+  $("fwResultDismiss").onclick = () => {
+    dismissCard(view.key, view.value);
+    renderFirmwareResult(s);
+  };
+}
 function beginNetworkReconnectWait() {
   clearInterval(networkReconnectTimer);
   clearTimeout(networkReconnectPollTimer);
   networkReconnectWait = true;
-  networkReconnectDeadline = Date.now() + NETWORK_RECONNECT_WAIT_MS;
+  networkReconnectDeadline =
+    Date.now() + (firmwareRestart ? FIRMWARE_RESTART_WAIT_MS : NETWORK_RECONNECT_WAIT_MS);
   setOverlayReconnectMode(true);
   if (webUiOwner) deactivateWebUi("reconnect");
   else showInactiveOverlay();
   offerArchiveView(true);
   updateReconnectCountdown();
   networkReconnectTimer = setInterval(updateReconnectCountdown, 1e3);
-  networkReconnectPollTimer = setTimeout(pollNetworkReconnect, 2e3);
+  networkReconnectPollTimer = setTimeout(
+    firmwareRestart ? pollFirmwareRestart : pollNetworkReconnect,
+    2e3,
+  );
 }
 function showInactiveOverlay() {
   const el = $("webUiInactive");
@@ -2980,6 +3134,8 @@ async function pairCompanionHere() {
 // `claimed` is a sign-in response, which already claimed this window.
 async function claimWebUiOwnership(claimed) {
   initShotFullScreen();
+  // The controller keeps answering until it restarts: no claim ends that wait.
+  if (firmwareRestart) return;
   if (webUiClaiming) return;
   webUiClaiming = true;
   const rec = networkReconnectWait;
@@ -7214,6 +7370,7 @@ function applyCommonStatus(s) {
   }
   if (typeof s.bootId === "number") bootId = s.bootId;
   updateFirmwareFooter();
+  renderFirmwareResult(s);
   const c = s.config || {};
   if (
     (c.heroCardMode === "colorful" || c.heroCardMode === "technical") &&
@@ -7803,6 +7960,8 @@ export {
   syncAdminSessionUi,
   adminUnlockedFor,
   adminUnlockedHere,
+  beginFirmwareRestartWait,
+  noteFirmwareFlash,
   webUiOverrideFor,
   companionHere,
   companionLog,

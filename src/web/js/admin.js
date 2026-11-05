@@ -1609,13 +1609,20 @@ async function otaFlash() {
         saved && otaRemoteMatches(saved, current) ? saved.imageSha256 : staged.imageSha256 || "",
     };
   otaBeginBusy();
-  let data = null;
+  let data = null,
+    sent = false;
   try {
     data = await otaSend("/api/v1/ota/session", null, OTA_COMMAND_TIMEOUT_MS, "GET");
     if (!otaRemoteMatches(session, data) || data.state !== "staged")
       throw new Error(__WEBUI_TEXT__("runtime.the_staged_transfer_changed_before_flash"));
     expected.bootId = data.bootId;
     otaCommitStore(expected);
+    R.noteFirmwareFlash({
+      version: session.version,
+      imageSha256: expected.imageSha256,
+      bootId: expected.bootId,
+    });
+    sent = true;
     for (let attempt = 1; attempt <= 3; attempt++) {
       data = null;
       try {
@@ -1635,13 +1642,22 @@ async function otaFlash() {
         if (data.state !== "staged" || attempt === 3) throw error;
       }
     }
-    otaEndBusy(data, otaCheckBoot(expected, data), "");
+    R.beginFirmwareRestartWait(expected.bootId, session.version);
+    otaEndBusy(data, "", "");
   } catch (e) {
+    // A controller that stopped answering after the flash request may be
+    // restarting: the wait finds out, and tells if it was not.
+    if (sent && !data) {
+      R.beginFirmwareRestartWait(expected.bootId, session.version);
+      otaEndBusy(null, "", "");
+      return;
+    }
     // This attempt's status from the same boot with nothing committed means
     // the flash did not happen: keep no expectation that would later read as
-    // an unverified commit. A device that stopped answering keeps it.
+    // an unverified commit.
     if (data?.bootId === expected.bootId && !data.restartPending && data.state !== "committed")
       otaCommitStore(null);
+    R.noteFirmwareFlash(null);
     otaEndBusy(
       data,
       R.formatCommandError(

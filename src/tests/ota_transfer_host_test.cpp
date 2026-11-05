@@ -345,6 +345,24 @@ void testConfirmationRetryAndStateRecovery() {
   CHECK(service(*ota, 16000).state == ESP_OTA_IMG_VALID);
 }
 
+void testRolledBackImageIsReportedFromTheSpareSlot() {
+  reset();
+  auto ota = OtaHostTestAccess::fresh();
+  CHECK(std::string(ota->rolledBackImage()).empty());
+  for (const auto state : {ESP_OTA_IMG_ABORTED, ESP_OTA_IMG_INVALID}) {
+    reset();
+    ota_host::spareState = state;
+    ota = OtaHostTestAccess::fresh();
+    // The stub gives every partition the same appended digest.
+    CHECK(std::string(ota->rolledBackImage()) == ota->snapshot().runningImageSha256);
+  }
+  reset();
+  ota_host::spareState = ESP_OTA_IMG_ABORTED;
+  ota_host::stateError = ESP_FAIL;
+  ota = OtaHostTestAccess::fresh();
+  CHECK(std::string(ota->rolledBackImage()).empty());
+}
+
 void testRollbackDoesNotConfirmOnFailure() {
   for (bool flashBusy : {false, true}) {
     reset(ESP_OTA_IMG_PENDING_VERIFY);
@@ -381,6 +399,7 @@ int main() {
   testJournalFailureHasDistinctResult();
   testConfirmationGatesAndDiagnostics();
   testConfirmationRetryAndStateRecovery();
+  testRolledBackImageIsReportedFromTheSpareSlot();
   testRollbackDoesNotConfirmOnFailure();
   std::cout << "OTA functional transfer, checkpoint and boot service tests passed\n";
 }

@@ -101,6 +101,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   unlocked |= session.fromSoftAp;
   delta.field("firmwareVersion", "\"%s\"", FW_VERSION);
   delta.field("bootId", static_cast<unsigned long>(control.bootId));
+  delta.field("rolledBackImage", "\"%.16s\"", OpenBrewByWeightOta::instance().rolledBackImage());
   delta.field("configMutable", bool(controlAllowsConfiguration(control)));
   delta.field("snapshotStale", bool(control.snapshotStale));
   delta.field("webUiOverrideActive", bool(override));

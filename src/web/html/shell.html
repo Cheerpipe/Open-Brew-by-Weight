@@ -385,6 +385,16 @@
           ×
         </button>
       </p>
+      <section id="fwResultCard" class="homeCard" role="status" hidden>
+        <p><strong id="fwResultTitle"></strong> <span id="fwResultText"></span></p>
+        <div class="btnBar">
+          <a id="fwResultOpen" class="btnGlyph btnInvert" href="/diagnostic"
+            ><span class="t">{{webui:shell.firmware_open_diagnostic}}</span></a
+          ><button id="fwResultDismiss" class="btnGlyph ghost" type="button">
+            <span class="t">{{webui:home.dismiss}}</span>
+          </button>
+        </div>
+      </section>
       <section id="view-home" class="view" data-view="home"></section>
       <section id="view-stats" class="view" data-view="stats"></section>
       <section id="view-history" class="view" data-view="history"></section>
