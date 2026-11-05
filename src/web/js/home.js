@@ -83,8 +83,8 @@ export function applyStatus(s) {
   }
   renderMicraBoilers();
 }
-// Onboarding hints show one at a time, in this order, and wait while the
-// grind hint shows. Dismissals stay in this browser, except the access one,
+// A card shows whenever its condition holds, independently of the others.
+// Dismissals stay in this browser, except the access one,
 // which the controller keeps for every phone. A companion's pairing request
 // has no dismissal: it lasts ten minutes at most, Admin's Ignore is the
 // lasting answer, and a key could not tell a new request from an old one.
@@ -97,7 +97,6 @@ function renderHints(s) {
   // A preset change means the recipe has been looked at.
   if (recipeTag && s.presetsTag !== recipeTag) R.dismissCard(cardKey("recipeHint"));
   recipeTag = s.presetsTag;
-  let free = $("grindHintCard")?.hidden !== false;
   // A refused La Marzocco account blocks the machine link: shown first, no
   // dismissal, gone once the account works again.
   const problem = s.lineaMicra?.accountProblem,
@@ -114,7 +113,6 @@ function renderHints(s) {
     $("micraAccountHintText").textContent = auth
       ? __WEBUI_TEXT__("home.micra_auth_text")
       : __WEBUI_TEXT__("home.micra_access_text");
-    free &&= policy.hidden && account.hidden;
   }
   const request = s.companion?.requestName,
     here = R.uiState.companionHere,
@@ -150,8 +148,7 @@ function renderHints(s) {
   ]) {
     const el = $(id);
     if (!el) continue;
-    el.hidden = !(free && want && !R.cardDismissed(cardKey(id)));
-    free &&= el.hidden;
+    el.hidden = !(want && !R.cardDismissed(cardKey(id)));
   }
   if ($("scaleOnlyHintUse")) $("scaleOnlyHintUse").disabled = !R.controlsMutable;
 }
