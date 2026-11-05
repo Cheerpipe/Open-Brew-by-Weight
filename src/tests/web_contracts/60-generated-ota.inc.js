@@ -48,7 +48,7 @@ if (!/(^|\})html\{[^}]*-webkit-user-select:none/.test(generated.css)) {
   throw new Error('The Web UI must disable text selection in Safari too');
 }
 const selectable = /(?:^|\})([^{}]*)\{[^}]*-webkit-user-select:text/.exec(generated.css)?.[1] || '';
-for (const need of ['input:not(', 'textarea', '[data-view=diagnostic]', '.setupAddress>span']) {
+for (const need of ['input:not(', 'textarea', '#log', '.setupAddress>span']) {
   if (!selectable.includes(need)) throw new Error(`Text selection must stay available for ${need}`);
 }
 if (!generated.modules.diagnostic.includes('new CompressionStream("gzip")') ||
