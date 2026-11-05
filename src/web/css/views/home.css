@@ -35,7 +35,6 @@
   transition-property: --tint, --tp;
   transition-duration: 0.4s;
   touch-action: manipulation;
-  user-select: none;
 }
 
 .shotHero[data-tint="neutral"],

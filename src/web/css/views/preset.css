@@ -163,10 +163,6 @@
   background: transparent;
   cursor: pointer;
   touch-action: none;
-
-  /* A tap must grab the thumb, never start a text selection of the rail. */
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .rampHardness input[type="range"]:focus-visible {
@@ -225,7 +221,6 @@
 .reviewGraph svg {
   display: block;
   overflow: visible;
-  user-select: none;
 }
 
 .reviewGraph path {
@@ -995,7 +990,6 @@ body.qwOpen {
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
-  user-select: none;
 }
 
 .qwDial button:active {
@@ -1010,7 +1004,6 @@ body.qwOpen {
   padding: 1.5rem 0 0.95rem;
   touch-action: none;
   cursor: ew-resize;
-  user-select: none;
 }
 
 .qwScale {

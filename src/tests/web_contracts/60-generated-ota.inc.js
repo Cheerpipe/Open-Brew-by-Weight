@@ -41,10 +41,15 @@ const generated = await webUi.generate();
   }
 }
 // Safari only honours the prefixed property, which the build adds for its
-// supported browsers: the shot card must not select text while it is held
-// for scrubbing or full screen.
-if (!/\.shotHero\{[^}]*-webkit-user-select:none/.test(generated.css)) {
-  throw new Error('The shot card must disable text selection in Safari too');
+// supported browsers: no text selects unless a rule exempts it, and iOS cannot
+// type in a field that is not exempt. The log is the only field diagnostic, and
+// the Setup address fallback copies by selecting.
+if (!/(^|\})html\{[^}]*-webkit-user-select:none/.test(generated.css)) {
+  throw new Error('The Web UI must disable text selection in Safari too');
+}
+const selectable = /(?:^|\})([^{}]*)\{[^}]*-webkit-user-select:text/.exec(generated.css)?.[1] || '';
+for (const need of ['input:not(', 'textarea', '[data-view=diagnostic]', '.setupAddress>span']) {
+  if (!selectable.includes(need)) throw new Error(`Text selection must stay available for ${need}`);
 }
 if (!generated.modules.diagnostic.includes('new CompressionStream("gzip")') ||
     !generated.modules.diagnostic.includes('"crashes.tar"') ||

@@ -683,11 +683,6 @@ body {
   background: var(--pa);
 }
 
-.pillNav {
-  user-select: none;
-  -webkit-touch-callout: none;
-}
-
 .pillNav a.active {
   background: 0 0;
   touch-action: none;

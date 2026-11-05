@@ -86,11 +86,55 @@ html.themeDark {
   overflow-wrap: anywhere;
 }
 
+/* One selection contract for the whole UI: it behaves as an app, so text is not
+   selectable unless someone has a reason to copy it. Exempt are the fields
+   people type in, the whole Diagnostic view (the log and its tables go into
+   support requests), results and errors, and the names, addresses, versions
+   and codes shown as plain text. Controls inside an exempt area stay out. */
+html {
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+textarea,
+[data-view="diagnostic"],
+#message,
+[role="alert"],
+[role="status"]:not(#homeBoot),
+.fieldError,
+.signalDetails b,
+.setupAddress > span,
+.setupSummary dd,
+#setupNextStep,
+#firmwareFooter,
+#inactiveFirmware,
+#pairCode,
+#networkStatus,
+#apStatus,
+#webhookStatus,
+#otaRunning,
+#otaStaged,
+#companionDev small,
+#companionRequestText,
+#lineaMicraAccount,
+#lineaMicraIdentity {
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+:where(button, summary, label, select, svg) {
+  user-select: none;
+}
+
 /* One focus contract for the whole UI: the browser's default light-blue ring
    never shows on any focusable element, in any focus state. The accent ring
    is reserved for keyboard focus on native controls; [tabindex] hosts are
    custom widgets (sliders, scrub charts, cards) that scripts also focus on
-   pointer interaction, so they never paint a ring of their own. */
+   pointer interaction, so they never paint a ring of their own. A text field
+   takes focus on every tap and must show where typing goes, so it only tints
+   its border; drawn as an outline, a field's error and warning still win. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus,
 :where([tabindex]):focus-visible {
   outline: none;
@@ -99,6 +143,14 @@ html.themeDark {
 :where(a, button, input, select, textarea, summary):focus-visible {
   outline: 3px solid var(--ac);
   outline-offset: 2px;
+}
+
+:where(
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], .fieldWarn),
+  textarea
+):focus {
+  outline: 1px solid var(--ac);
+  outline-offset: -1px;
 }
 
 .btnGlyph:not(:disabled):hover {
