@@ -49,7 +49,9 @@ until it ends.
 
 The result card stays until you dismiss it, and the next update starts over:
 
-- **Firmware updated** names the version now running.
+- **Firmware updated** names the version now running. It also appears in any other
+  browser or address you've used before, the first time you open it after an update,
+  however that update was installed.
 - **Firmware update failed** means the new version failed while starting and the
   controller went back to the previous one. This can appear some time after the
   success card, because a new firmware is on trial for its first moments. The
@@ -267,7 +269,9 @@ otadata state, read once at boot, so it survives restarts until the next commit
 or a USB installation rewrites otadata (writing only the application with
 `--image` leaves it). The Web UI's wait after a flash ends only on a `200` status
 whose `bootId` changed, or on `AUTH_REQUIRED`: the old boot keeps answering until
-it restarts, and a companion answers for a controller that is down.
+it restarts, and a companion answers for a controller that is down. That status
+needs the Web UI claim, which a restart clears, so a `UI_TAKEN_OVER` answer makes
+the wait claim and read again.
 
 Run the focused functional regression suite with `bash src/tests/run_ota_tests.sh`.
 Hardware qualification must cover Web and CLI without a browser open during

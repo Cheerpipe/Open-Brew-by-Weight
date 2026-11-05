@@ -116,11 +116,16 @@ async function harness(mode) {
 
 // The wait after a flash, against the answers each route really gives.
 function restartContext(answers, pages = () => ({ok: true})) {
-  const log = {landed: [], claims: 0, messages: [], polled: 0, flashes: []};
+  const log = {landed: [], claims: 0, posted: 0, messages: [], polled: 0, flashes: []};
   const context = vm.createContext({console, Date, Number, JSON,
     localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
     __WEBUI_TEXT__: key => key, webUiHeaders: () => ({}),
-    fetchJson: async (url) => {
+    fetchJson: async (url, options) => {
+      if (url === '/api/v1/ui/claim') {
+        assert.equal(options.method, 'POST');
+        log.posted++;
+        return [{ok: true}, {active: true}];
+      }
       assert.equal(url, '/api/v1/status/admin');
       const answer = answers[log.polled++];
       if (answer === 'offline') throw new TypeError('Failed to fetch');
@@ -137,8 +142,7 @@ function restartContext(answers, pages = () => ({ok: true})) {
   vm.runInContext('beginFirmwareRestartWait(7, "2.0"); globalThis.peek = () => firmwareRestart;', context);
   log.poll = async () => {
     vm.runInContext('pollFirmwareRestart()', context);
-    await new Promise(resolve => setImmediate(resolve));
-    await new Promise(resolve => setImmediate(resolve));
+    for (let i = 0; i < 6; i++) await new Promise(resolve => setImmediate(resolve));
   };
   log.context = context;
   return log;
@@ -158,6 +162,12 @@ async function restartWaitChecks() {
   await w.poll();
   assert.deepEqual(w.landed, ['/?fw=2.0']);
   assert.equal(vm.runInContext('peek()', w.context), null);
+  assert.equal(w.posted, 0, 'no claim while the status answers: it would end the Admin unlock');
+  // A restarted controller holds no claim, and refuses the status until there is one.
+  w = restartContext([{status: 409, body: {error: 'UI_TAKEN_OVER'}}, ok({bootId: 8, firmwareVersion: '2.0'})]);
+  await w.poll();
+  assert.equal(w.posted, 1);
+  assert.deepEqual(w.landed, ['/?fw=2.0']);
   // The page itself still failing keeps the wait until a later poll finds it.
   let pages = 0;
   w = restartContext([ok({bootId: 8, firmwareVersion: '2.0'}), ok({bootId: 8, firmwareVersion: '2.0'})],
@@ -206,10 +216,15 @@ function firmwareResultChecks() {
     vm.runInContext('noteFirmwareFlash(flash)', context);
   };
   const image = flash.imageSha256.slice(0, 16);
-  assert.equal(result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''}), null, 'nothing flashed here');
+  assert.equal(result({bootId: 8, firmwareVersion: '1.0', rolledBackImage: ''}), null, 'a first visit has nothing to compare');
+  // Another page or browser that knew an older version hears of the update, once.
+  let card = result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''});
+  assert.match(card.text, /firmware_updated_text:2\.0/);
+  card.dismiss();
+  assert.equal(result({bootId: 9, firmwareVersion: '2.0', rolledBackImage: ''}), null);
   note();
   assert.equal(result({bootId: 7, firmwareVersion: '1.0', rolledBackImage: ''}), null, 'same boot');
-  let card = result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''});
+  card = result({bootId: 8, firmwareVersion: '2.0', rolledBackImage: ''});
   assert.equal(card.failed, false);
   assert.match(card.text, /firmware_updated_text:2\.0/);
   // A rollback overrides success even after that card was dismissed, including
