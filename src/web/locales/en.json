@@ -386,7 +386,7 @@
     "diagnostic.copied": "Copied",
     "diagnostic.copy": "Copy",
     "diagnostic.copy_log": "Copy log",
-    "diagnostic.copy_section_note": "Press and hold the name of an open section to copy its contents.",
+    "diagnostic.copy_section_note": "Press and hold a section's name to copy its contents.",
     "diagnostic.core": "Core",
     "diagnostic.coredump": "Coredump",
     "diagnostic.cpu": "CPU",

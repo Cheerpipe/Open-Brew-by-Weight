@@ -290,7 +290,7 @@ example, the exact reason a secure connection to the La Marzocco cloud
 failed — so you can troubleshoot from the browser without opening the machine
 or connecting a USB cable. If the
 connection drops, the interface reconnects and reloads current readings. To
-share a section, open it, then press and hold its name to copy its contents.
+share a section, press and hold its name to copy its contents.
 
 In **NVS**, unavailable entry and namespace measurements appear as a dash,
 so a failed measurement is not mistaken for an empty store.
