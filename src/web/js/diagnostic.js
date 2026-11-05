@@ -1702,6 +1702,9 @@ const logLineOf = (at, level, rest) => [
   at + " " + level + " " + rest,
   `<div>${at} <b class="lv${level[0].toLowerCase()}">${R.escHtml(level)}</b> ${R.escHtml(rest)}</div>`,
 ];
+function logAtEnd(el) {
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+}
 function renderLog() {
   const f = $("logFilter").value,
     m = +$("logLevelFilter").value,
@@ -1783,7 +1786,7 @@ function renderLog() {
     old = logShown,
     top = el.scrollTop,
     sh = el.scrollHeight,
-    stick = top + el.clientHeight >= sh - 8,
+    stick = logAtEnd(el),
     anchor = logAnchor,
     same = (i, j, n) => old.slice(i, i + n).every((x, k) => x === t[j + k]),
     cut = old.indexOf(t[0]);
@@ -1814,7 +1817,7 @@ function renderLog() {
     else if (!logHistoryDone && !logHistoryFull()) el.scrollTop = el.scrollHeight;
   } else if (stick || anchor) el.scrollTop = el.scrollHeight;
   $("logCount").textContent = R.sub(__WEBUI_TEXT__("diagnostic.log_lines"), [t.length - markers]);
-  nearLogTop();
+  logScrolled();
 }
 function updateLogHealth(d) {
   const a = [],
@@ -1944,8 +1947,10 @@ async function loadLogOlder() {
     }
   }
 }
-// Near the top of the log, the next older page loads by itself.
-function nearLogTop() {
+// Away from the end, the reader gets a way back; near the top of the log, the
+// next older page loads by itself.
+function logScrolled() {
+  $("logEndButton").hidden = logAtEnd($("log"));
   if (logHistoryAvailable() && $("log").scrollTop < 160 && performance.now() >= logHistoryRetryAt)
     void loadLogOlder();
 }
@@ -2252,9 +2257,16 @@ export function init() {
       x.previousElementSibling.onchange();
     };
   renderLogChips();
-  $("log").onscroll = nearLogTop;
-  $("logWrapButton").onclick = (e) =>
+  $("log").onscroll = logScrolled;
+  $("logEndButton").onclick = () => {
+    const el = $("log");
+    el.scrollTop = el.scrollHeight;
+    el.focus({ preventScroll: true });
+  };
+  $("logWrapButton").onclick = (e) => {
     e.currentTarget.setAttribute("aria-pressed", $("log").classList.toggle("wrap"));
+    logScrolled();
+  };
   $("logJumpButton").onclick = openLogJump;
   $("logNav").onclick = (e) => {
     const [kind, dir] = e.target.closest("button[value]")?.value.split(":") || [];
