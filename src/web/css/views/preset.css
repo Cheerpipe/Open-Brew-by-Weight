@@ -989,7 +989,6 @@ body.qwOpen {
   line-height: 1;
   font-weight: 700;
   cursor: pointer;
-  touch-action: manipulation;
 }
 
 .qwDial button:active {
