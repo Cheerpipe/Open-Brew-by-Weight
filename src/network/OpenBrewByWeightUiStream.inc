@@ -204,8 +204,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
   char screen[COMPANION_RELAY_SCREEN_TEXT], address[COMPANION_RELAY_ADDR_TEXT];
   const bool relayed = self.relayIdentity(request, screen, address);
   TaskLockGuard lock(self.dataMux_);
-  for (auto &session : self.uiStreams_) {
-    if (session.fd != -1) continue;
+  if (UiStreamSession *free = uiStreamFreeSlot(self.uiStreams_, relayed)) {
+    UiStreamSession &session = *free;
     session = UiStreamSession{};
     new (&self.workBuf_->uiFingerprints[&session - self.uiStreams_]) UiStreamFingerprints{};
     session.fd = httpd_req_to_sockfd(request);
@@ -227,7 +227,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandshake(httpd_req_t *request) {
   static RefusalLog log;
   if (const uint32_t count = log.due())
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "ui-stream: refused %lu upgrade(s): both sessions are busy",
+                         "ui-stream: refused %lu upgrade(s): this channel's sessions are busy",
                          static_cast<unsigned long>(count));
   return ESP_FAIL;
 }
@@ -280,7 +280,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
       accepted = false;
       if (cJSON_IsString(op) && session->bound && message == document &&
           strcmp(op->valuestring, "activity") == 0 &&
-          strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+          strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0) {
         const cJSON *seconds = cJSON_GetObjectItemCaseSensitive(message, "seconds");
         const cJSON *hidden = cJSON_GetObjectItemCaseSensitive(message, "hidden");
         if (cJSON_IsNumber(seconds) && seconds->valuedouble >= 0 &&
@@ -294,7 +294,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         }
       } else if (cJSON_IsString(op) && session->bound &&
                  strcmp(op->valuestring, "resync") == 0 &&
-                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+                 strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0) {
         session->resync = true;
         session->homeResync = true;
         session->diagResync = session->diagnostic;
@@ -306,7 +306,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         accepted = true;
       } else if (cJSON_IsString(op) && session->bound &&
                  strcmp(op->valuestring, "settings") == 0 &&
-                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+                 strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0) {
         // Standing Settings subscription: the page subscribes once per socket
         // and never unsubscribes; `tag` names the model it still holds.
         // Compatibility mode has no Settings view: the op is accepted inert,
@@ -323,7 +323,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         }
       } else if (cJSON_IsString(op) && session->bound &&
                  strcmp(op->valuestring, "diagnostic") == 0 &&
-                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+                 strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0) {
         // View-scoped telemetry toggle: the client subscribes only while the
         // Diagnostic page is shown and unsubscribes on every navigation.
         const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
@@ -334,7 +334,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         }
       } else if (cJSON_IsString(op) && session->bound &&
                  strcmp(op->valuestring, "log") == 0 &&
-                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+                 strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0) {
         // View-scoped serial-log toggle: the cursor comes from the client's
         // rendered tail; unsubscribe carries no window fields.
         const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
@@ -362,7 +362,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         }
       } else if (cJSON_IsString(op) && session->bound &&
                  strcmp(op->valuestring, "history") == 0 &&
-                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+                 strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0) {
         // View-scoped History page subscription: the standing window tracks the
         // page; a one-shot fetch serves sentinel appends without disturbing it.
         // `types`, `limit` and `dir` shape both; a fetch keeps the standing
@@ -433,7 +433,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         }
       } else if (cJSON_IsString(op) && session->bound &&
                  strcmp(op->valuestring, "stats") == 0 &&
-                 strcmp(session->clientId, self.activeWebUiClientId_) == 0) {
+                 strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0) {
         // View-scoped Stats page subscription on the same contract; one-shot
         // fetches also serve the CSV export window (date/desc, good shots).
         // `filter` works like History's `types`; `window` picks the newest
@@ -535,8 +535,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         accepted = true;
       } else if (cJSON_IsString(op) && !session->bound &&
                  strcmp(op->valuestring, "bind") == 0 && cJSON_IsString(client) &&
-                 self.activeWebUiClientId_[0] &&
-                 strcmp(client->valuestring, self.activeWebUiClientId_) == 0 &&
+                 self.webUiClaim(session->relayed).clientId[0] &&
+                 strcmp(client->valuestring, self.webUiClaim(session->relayed).clientId) == 0 &&
                  millis() - session->openedAtMs < kUiStreamBindMs) {
         copyCString(session->clientId, sizeof(session->clientId), client->valuestring);
         const cJSON *cycle = cJSON_GetObjectItemCaseSensitive(message, "cycle");
@@ -552,7 +552,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         if (presetsTag && uiStreamIntInRange(presetsTag, 1, UINT32_MAX))
           session->knownPresetsTag = static_cast<uint32_t>(presetsTag->valuedouble);
         for (auto &other : self.uiStreams_) {
-          if (&other != session && other.bound) {
+          if (&other != session && other.bound && other.relayed == session->relayed) {
             superseded = other.fd;
             other.bound = false;
             other.openedAtMs = millis() - kUiStreamBindMs;
@@ -566,7 +566,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
       }
     }
     if (accepted) session->heardAtMs = millis();
-    owner = session->bound && strcmp(session->clientId, self.activeWebUiClientId_) == 0;
+    owner = session->bound && strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0;
   }
   const bool bindRejected = bindOp && !bound;
   if (!accepted && !bindRejected && owner)
@@ -664,24 +664,27 @@ void OpenBrewByWeightNetwork::uiStreamDispatch(void *context) {
   // is still valid: revoking or aging out that session closes the stream on
   // this dispatch instead of waiting for silence or a takeover.
   const uint32_t claimNowMs = millis();
-  bool claimSessionLive = true;
+  bool directLive, companionLive;
   {
     TaskLockGuard lock(self.dataMux_);
-    claimSessionLive = webAccessClaimSessionLive(
-        g_webAccess, self.activeWebUiClaimToken_,
-        self.activeWebUiClaimTokenValid_, webAccessNow(claimNowMs));
+    const Instant now = webAccessNow(claimNowMs);
+    directLive = webAccessClaimSessionLive(g_webAccess, self.directClaim_.token,
+                                           self.directClaim_.tokenValid, now);
+    companionLive = webAccessClaimSessionLive(g_webAccess, self.companionClaim_.token,
+                                              self.companionClaim_.tokenValid, now);
   }
+  // One budget per dispatch, whatever is bound: closes, takeovers and stream
+  // writes share it, so two stalled peers hold httpd no longer than one.
   uiStreamDeadlineBudgetMs = kUiStreamDispatchBudgetMs;
+  uiStreamDeadlineStartMs = millis();
   for (auto &session : self.uiStreams_) {
     if (session.fd < 0) continue;
-    // Each session gets the budget; its close, takeover and stream writes share it.
-    uiStreamDeadlineStartMs = millis();
     bool allowed, silent;
     {
       TaskLockGuard lock(self.dataMux_);
       allowed = session.bound
-          ? claimSessionLive &&
-                strcmp(session.clientId, self.activeWebUiClientId_) == 0
+          ? (session.relayed ? companionLive : directLive) &&
+                strcmp(session.clientId, self.webUiClaim(session.relayed).clientId) == 0
           : millis() - session.openedAtMs < kUiStreamBindMs;
       silent = allowed && session.bound && !live &&
           millis() - session.heardAtMs >= kUiStreamSilentMs;
@@ -932,7 +935,7 @@ bool OpenBrewByWeightNetwork::sendShotCard(UiStreamSession &session,
     return false;
   // Recheck ownership immediately before delivery; telemetry never renews it.
   bool owner;
-  { TaskLockGuard lock(dataMux_); owner = strcmp(session.clientId, activeWebUiClientId_) == 0; }
+  { TaskLockGuard lock(dataMux_); owner = strcmp(session.clientId, webUiClaim(session.relayed).clientId) == 0; }
   if (!owner) return false;
   httpd_ws_frame_t frame = {};
   frame.type = HTTPD_WS_TYPE_TEXT;

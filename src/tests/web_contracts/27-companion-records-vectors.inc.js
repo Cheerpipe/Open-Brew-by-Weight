@@ -204,7 +204,7 @@ ${header.slice(header.indexOf('  struct RecordIndexBaseline {'), header.indexOf(
   CompanionRecords records;
   CompanionRecords *companionRecords_ = &records;
   int dataMux_ = 0, server_ = 1;
-  char activeWebUiClientId_[WEB_UI_CLIENT_ID_CAPACITY] = "owner";
+  struct WebUiClaim{char clientId[WEB_UI_CLIENT_ID_CAPACITY]="owner";};WebUiClaim directClaim_;WebUiClaim &webUiClaim(bool){return directClaim_;}
   std::atomic<bool> uiStreamUrgent_{false};
   struct {
     uint32_t (*shotLogEpoch)() = +[] { return moved ? kMovedEpoch : kShotsEpoch; };

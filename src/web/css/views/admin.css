@@ -53,6 +53,30 @@
   color: var(--mu);
 }
 
+/* The paired companion's icon reads like the header's indicator: lit with the
+   link, one rack lit with the relay alone, faded with neither. */
+.devIc[data-level="on"],
+.devIc[data-level="partial"] {
+  color: var(--ac);
+}
+
+.devIc[data-level="partial"] svg {
+  --rackTop: 0.18;
+}
+
+.devIc[data-level="off"] svg {
+  opacity: 0.3;
+}
+
+#companionOpen {
+  text-decoration: underline;
+}
+
+#companionOpen span {
+  display: inline-block;
+  margin-inline-start: 0.3em;
+}
+
 .devIc svg {
   width: 1.15rem;
   height: 1.15rem;

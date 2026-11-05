@@ -382,7 +382,7 @@ bool OpenBrewByWeightNetwork::sendUiStreamFrame(const UiStreamSession &session,
                                            size_t used, bool &deferArm) {
   if (companionRecordsSession(session)) return companionRecordsSend(used, true, deferArm);
   bool owner;
-  { TaskLockGuard lock(dataMux_); owner = strcmp(session.clientId, activeWebUiClientId_) == 0; }
+  { TaskLockGuard lock(dataMux_); owner = strcmp(session.clientId, webUiClaim(session.relayed).clientId) == 0; }
   if (!owner) return false;
   httpd_ws_frame_t frame = {};
   frame.type = HTTPD_WS_TYPE_TEXT;

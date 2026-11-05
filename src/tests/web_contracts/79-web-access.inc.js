@@ -22,7 +22,7 @@
       'Login off and SoftAP setup peers need no session');
   assert.ok(body(network, 'bool OpenBrewByWeightNetwork::requireActiveWebUiClient(')
       .indexOf('webAccessSessionAllowed(request)') <
-      body(network, 'bool OpenBrewByWeightNetwork::requireActiveWebUiClient(').indexOf('activeWebUiClientId_'),
+      body(network, 'bool OpenBrewByWeightNetwork::requireActiveWebUiClient(').indexOf('webUiClaim(caller.relayed)'),
       'Every claimed API route checks the session before the claim');
   assert.ok(body(network, 'esp_err_t OpenBrewByWeightNetwork::claimHandler(')
       .includes('webAccessSessionAllowed(request)'), 'Claiming control needs a session');

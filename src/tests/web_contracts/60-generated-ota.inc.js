@@ -1460,7 +1460,7 @@ if (!codeIncludes(js, 'withPollGate(async()=>{if(scanBusy||!webUiPollingActive()
     const start = network.indexOf('OpenBrewByWeightNetwork::adminLockHandler');
     const end = network.indexOf('bool OpenBrewByWeightNetwork::requireActiveWebUiClient');
     const body = start >= 0 && end > start ? network.slice(start, end) : '';
-    if (!body.includes('clearAdminUnlock()') ||
+    if (!body.includes('clearAdminUnlock(caller.relayed') ||
         body.includes('requireAdminUnlock')) {
       throw new Error('Admin lock must clear unlock without requiring a still-valid unlock');
     }

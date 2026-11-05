@@ -95,10 +95,12 @@ A few things stay one at a time, on purpose:
   sends everything to the controller sealed. If it can't open that secure session,
   for instance when the two run versions that don't match, its pages say so and name
   the controller's own address, which keeps working. Update whichever is behind.
-- **Opening the Web UI directly takes over.** If someone opens the
-  controller's own address instead of the companion's, every companion screen
-  pauses and says the Web UI was opened directly on another device. **Reload**
-  on any of them brings control back to the companion.
+- **The controller's own address works alongside it.** If someone opens the
+  controller's own address while companion screens are in use, both keep working
+  and neither interrupts the other. Admin is the one exception: it stays open on
+  one screen at a time, so unlocking it in one place locks it in the other.
+  Keeping both open during a shot uses more of the radio the scale shares, so it's
+  best kept for when you need it.
 
 If the companion stops, its screens show that the controller is out of reach;
 the controller's own address keeps working as before.
@@ -122,11 +124,8 @@ your password and sign-in on your network. Until then, its secure address takes
 you to this same page, with the code and a link to the controller's Admin; once
 you approve, it opens the Web UI by itself. The code is never filled in for you:
 typing it is how you confirm that the companion asking is the one you are using.
-
-The window you approved from then hands over to the companion, because only one
-window controls the machine at a time. It tells you pairing is done and offers to
-open the Web UI through the companion. You can also stay on the controller's own
-address, which takes control back.
+The window you approved from keeps working, and **Admin → Companion** now has a
+link to the Web UI through the companion.
 
 If the companion has not found the controller, type its address in **Admin →
 Companion → Connect to a companion at…** and tap **Open its page**. The

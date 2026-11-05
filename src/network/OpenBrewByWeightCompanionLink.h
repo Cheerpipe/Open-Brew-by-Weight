@@ -528,19 +528,30 @@ inline bool companionRelayPeerAllowed(bool localPeer, bool servedBySoftAp) {
 
 // A companion that may hold no more live state: unbinds its relayed ui-streams,
 // so later dispatches neither log nor send, and answers the sockets to close.
-// The claim ends only if one of them holds it; a direct browser's stays.
 template <typename Session, size_t N>
-size_t companionRelayedStreamsEnd(Session (&sessions)[N], const char *activeClient,
-                                  int (&fds)[N], bool &claimEnded) {
+size_t companionRelayedStreamsEnd(Session (&sessions)[N], int (&fds)[N]) {
   size_t count = 0;
-  claimEnded = false;
   for (auto &stream : sessions) {
     if (stream.fd < 0 || !stream.relayed) continue;
     fds[count++] = stream.fd;
-    claimEnded |= stream.bound && strcmp(stream.clientId, activeClient) == 0;
     stream.bound = false;
   }
   return count;
+}
+
+// A free ui-stream slot for this channel, or nullptr. The first slot is the
+// companion's alone: a direct browser searches down from the last and stops short
+// of it, so the dispatch, walking in order, always serves the companion first.
+template <typename Session, size_t N>
+Session *uiStreamFreeSlot(Session (&sessions)[N], bool relayed) {
+  if (relayed) {
+    for (auto &slot : sessions)
+      if (slot.fd == -1) return &slot;
+    return nullptr;
+  }
+  for (size_t index = N - 1; index > 0; --index)
+    if (sessions[index].fd == -1) return &sessions[index];
+  return nullptr;
 }
 
 // The browser behind a socket's current relayed request; one per httpd socket.

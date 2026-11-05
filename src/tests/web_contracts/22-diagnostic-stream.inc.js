@@ -115,7 +115,7 @@
       !uiStreamSrc.includes('sendRecordsIndex') && !uiStreamSrc.includes('recordsKey'),
       'a stray records op must be ignored without a 4003 close or an index answer');
   // The rejection reaches the Web UI log as a warning (" failed" sets the level).
-  assert(uiStreamSrc.includes('owner = session->bound && strcmp(session->clientId, self.activeWebUiClientId_) == 0;') &&
+  assert(uiStreamSrc.includes('owner = session->bound && strcmp(session->clientId, self.webUiClaim(session->relayed).clientId) == 0;') &&
       uiStreamSrc.includes('"UI stream op %.12s failed validation; the page resets its list views"'));
   assert(/uiStreamSendKind = "close";\s*sendUiStreamClose\(self\.server_, session\.fd, kUiStreamCloseTakeover\)/
       .test(uiStreamSrc.replace(/\n\s+/g, ' ')),
