@@ -86,11 +86,10 @@ html.themeDark {
   overflow-wrap: anywhere;
 }
 
-/* One selection contract for the whole UI: it behaves as an app, so text is not
-   selectable unless someone has a reason to copy it. Exempt are the fields
-   people type in, the whole Diagnostic view (the log and its tables go into
-   support requests), results and errors, and the names, addresses, versions
-   and codes shown as plain text. Controls inside an exempt area stay out.
+/* One selection contract for the whole UI: it behaves as an app, so text does
+   not select. Exempt are the fields people type in, the log's lines (the only
+   diagnostic in the field, and people quote single lines), and the Setup
+   address, whose copy fallback works by selecting it.
    A double tap does not zoom and the page does not bounce or pull to refresh;
    pinch zoom stays, because people need it to read small text. */
 html {
@@ -103,33 +102,10 @@ html {
 
 input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
 textarea,
-[data-view="diagnostic"],
-#message,
-[role="alert"],
-[role="status"]:not(#homeBoot),
-.fieldError,
-.signalDetails b,
-.setupAddress > span,
-.setupSummary dd,
-#setupNextStep,
-#firmwareFooter,
-#inactiveFirmware,
-#pairCode,
-#networkStatus,
-#apStatus,
-#webhookStatus,
-#otaRunning,
-#otaStaged,
-#companionDev small,
-#companionRequestText,
-#lineaMicraAccount,
-#lineaMicraIdentity {
+#log,
+.setupAddress > span {
   user-select: text;
   -webkit-touch-callout: default;
-}
-
-:where(button, summary, label, select, svg) {
-  user-select: none;
 }
 
 /* One focus contract for the whole UI: the browser's default light-blue ring
