@@ -1387,7 +1387,7 @@ void maybeRunBootRecoveryGesture() {
       return;
     }
     if (result == RecoveryGestureResult::TIMED_OUT) {
-      (void)playRecoveryCue(BuzzerCue::RECOVERY_START);
+      (void)playRecoveryCue(BuzzerCue::RECOVERY_END);
       waitForRecoveryBuzzer();
       return;
     }

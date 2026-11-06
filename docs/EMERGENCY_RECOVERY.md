@@ -67,7 +67,9 @@ would confirm access recovery before the longer gesture is complete.
 **Before confirmation**, move the activator OFF and keep it OFF until the
 60-second recovery window expires. OFF prevents a three/five-cycle candidate
 from confirming. Do not simply stop moving while ON after three or five cycles:
-that is the confirmation gesture.
+that is the confirmation gesture. When the window expires you hear a short
+descending tone, the reverse of the one that opened it, and startup continues
+normally.
 
 You can also remove controller power before confirmation. Once the operation
 has begun, power loss is not cancellation: a durable recovery intent makes

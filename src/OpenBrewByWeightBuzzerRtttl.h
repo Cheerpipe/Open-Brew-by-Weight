@@ -23,6 +23,7 @@ enum class BuzzerCue : uint8_t {
   GUARD_STOP,
   NO_SCALE,
   RECOVERY_START,
+  RECOVERY_END,
   NETWORK_RESET_OK,
   FACTORY_RESET_OK,
   BULLSEYE,
@@ -68,6 +69,9 @@ constexpr const char *RTTTL_NO_SCALE = "no_scale:d=8,o=4,b=180:g,32p,g,32p,g";
 // Recovery: start gesture
 constexpr const char *RTTTL_RECOVERY_START =
     "recovery_start:d=16,o=5,b=200:c,g,c6";
+// Recovery: gesture window expired (descending: reverse of recovery_start)
+constexpr const char *RTTTL_RECOVERY_END =
+    "recovery_end:d=16,o=5,b=200:c6,g,c";
 // Recovery: network reset OK
 constexpr const char *RTTTL_NETWORK_RESET_OK =
     "network_reset_ok:d=16,o=5,b=220:c,e,g,c6";
@@ -109,6 +113,8 @@ inline const char *rtttlForCue(BuzzerCue cue) {
       return RTTTL_NO_SCALE;
     case BuzzerCue::RECOVERY_START:
       return RTTTL_RECOVERY_START;
+    case BuzzerCue::RECOVERY_END:
+      return RTTTL_RECOVERY_END;
     case BuzzerCue::NETWORK_RESET_OK:
       return RTTTL_NETWORK_RESET_OK;
     case BuzzerCue::FACTORY_RESET_OK:
