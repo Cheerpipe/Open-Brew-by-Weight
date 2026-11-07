@@ -1593,15 +1593,24 @@ function saveLogLevel(id) {
 const LOG_EVENTS_CAPACITY = 500;
 let logStreamWanted = false,
   logBootId = 0,
-  lastLog = 0;
+  lastLog = 0,
+  logScrollTop = null;
 function startLogStream() {
   if (R.webUiPollingActive()) {
     if (!logStreamWanted) {
       logStreamWanted = true;
+      const top = logScrollTop;
+      logScrollTop = null;
       // Admin cleared the companion's log history since this view last showed.
       if (R.uiState.logHistoryCleared) {
         R.uiState.logHistoryCleared = false;
         jumpLog(null);
+      } else if (top != null) {
+        // Hiding the view drops the log's scroll position, and a re-shown one
+        // would read as a reader parked at the top, paging in older history
+        // unprompted on every visit. The reader's place comes back as soon as
+        // the view shows, before any paint can mistake the reset for a scroll.
+        R.viewReady.then(() => ($("log").scrollTop = top));
       }
       R.sendUiOperation({ op: "log", on: true, after: lastLog });
     }
@@ -1610,7 +1619,11 @@ function startLogStream() {
   return false;
 }
 function stopLogStream() {
-  if (logStreamWanted) R.sendUiOperation({ op: "log", on: false });
+  // The view is still on screen here: route teardown runs before it hides.
+  if (logStreamWanted) {
+    logScrollTop = $("log").scrollTop;
+    R.sendUiOperation({ op: "log", on: false });
+  }
   logStreamWanted = false;
 }
 function logStreamFrame(m) {

@@ -272,12 +272,18 @@ int main(){
   }
 }
 // Route changes stop the Diagnostic and log streams: only a live subscription
-// sends "off". A tab loaded in the background settles its view once it shows
-// instead of reporting a failure, a failed view import is retried with a fresh
-// URL, and modified nav clicks keep the browser's own handling.
+// sends "off", and the log's reader comes back where the view left them,
+// because hiding a view drops its scroll position and a re-shown log must not
+// read as a reader parked at the top. A tab loaded in the background settles
+// its view once it shows instead of reporting a failure, a failed view import
+// is retried with a fresh URL, and modified nav clicks keep the browser's own
+// handling.
 {
   const assert = require('assert').strict;
-  assert(codeIncludes(viewJs.diagnostic, 'if(logStreamWanted)sendUiOperation({op:log,on:false})'));
+  assert(codeIncludes(viewJs.diagnostic,
+      'if(logStreamWanted){logScrollTop=$("log").scrollTop;sendUiOperation({op:log,on:false})}'));
+  assert(codeIncludes(viewJs.diagnostic,
+      'viewReady.then(() => ($("log").scrollTop = top))'));
   assert(codeIncludes(runtimeJs, "if(diagStreamWanted&&shotWs&&shotWs.readyState===1)shotWs.send('{\"op\":\"diagnostic\",\"on\":false}')"));
   assert(codeIncludes(appJsSource, 'if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'));
   const calls = [], loading = new Set(['pageLoading']),
