@@ -1594,24 +1594,21 @@ const LOG_EVENTS_CAPACITY = 500;
 let logStreamWanted = false,
   logBootId = 0,
   lastLog = 0,
-  logScrollTop = null;
+  logEntryHold = false;
 function startLogStream() {
   if (R.webUiPollingActive()) {
     if (!logStreamWanted) {
       logStreamWanted = true;
-      const top = logScrollTop;
-      logScrollTop = null;
-      // Admin cleared the companion's log history since this view last showed.
-      if (R.uiState.logHistoryCleared) {
-        R.uiState.logHistoryCleared = false;
-        jumpLog(null);
-      } else if (top != null) {
-        // Hiding the view drops the log's scroll position, and a re-shown one
-        // would read as a reader parked at the top, paging in older history
-        // unprompted on every visit. The reader's place comes back as soon as
-        // the view shows, before any paint can mistake the reset for a scroll.
-        R.viewReady.then(() => ($("log").scrollTop = top));
-      }
+      // Every visit reads the log from its live tail again: the stored pages
+      // an earlier visit loaded belong to that reading. The view restarts at
+      // the end and pages 500 lines at a time only when the view is short or
+      // the reader scrolls up. A history the admin cleared lands here too:
+      // the view starts over either way.
+      logEntryHold = false;
+      logJumpAt = logJumpBoot = logJumpDay = null;
+      logHistoryControls();
+      restartLogHistory(false);
+      R.uiState.logHistoryCleared = false;
       R.sendUiOperation({ op: "log", on: true, after: lastLog });
     }
     return true;
@@ -1620,8 +1617,10 @@ function startLogStream() {
 }
 function stopLogStream() {
   // The view is still on screen here: route teardown runs before it hides.
+  // Hold the history paging until the next entry restarts the log, so the
+  // hidden view's dropped scroll never reads as a reader at the top.
   if (logStreamWanted) {
-    logScrollTop = $("log").scrollTop;
+    logEntryHold = true;
     R.sendUiOperation({ op: "log", on: false });
   }
   logStreamWanted = false;
@@ -1869,7 +1868,7 @@ const logStream = {
 // A jump starts the history at a moment (`logJumpAt`, wall seconds), a day's
 // end (`logJumpDay` too) or a stored boot's end (`logJumpBoot`, from the
 // companion's boot index), and hides the live ring until Back to live.
-const LOG_HISTORY_PAGE = 2000,
+const LOG_HISTORY_PAGE = 500,
   LOG_HISTORY_CAP = 40000;
 let logHistory = [],
   logHistoryNext = null,
@@ -1910,7 +1909,16 @@ function logHistoryQuery() {
   return "/__companion/log?" + q;
 }
 async function loadLogOlder() {
-  if (logHistoryBusy || logHistoryDone || logHistoryFull() || !logHistoryAvailable()) return;
+  // The hold covers the walk from a hidden view to the next entry: the hidden
+  // view's dropped scroll must not page history in on the way.
+  if (
+    logEntryHold ||
+    logHistoryBusy ||
+    logHistoryDone ||
+    logHistoryFull() ||
+    !logHistoryAvailable()
+  )
+    return;
   logHistoryBusy = true;
   // The newest stored events are usually still in the live ring, which shows
   // them already: paging goes on until a page brings a line the view lacks.
@@ -1967,8 +1975,10 @@ function logScrolled() {
   if (logHistoryAvailable() && $("log").scrollTop < 160 && performance.now() >= logHistoryRetryAt)
     void loadLogOlder();
 }
-// A jump, Back to live or a filter change starts the history over.
-function restartLogHistory() {
+// A jump, Back to live or a filter change starts the history over, its first
+// page included. A view entry restarts without one: it opens at the live tail
+// and only fetches when the view is short or the reader scrolls up.
+function restartLogHistory(page = true) {
   logHistoryRun++;
   logHistoryBusy = false;
   logHistory = [];
@@ -1977,7 +1987,7 @@ function restartLogHistory() {
   logHistoryRetryAt = 0;
   logAnchor = "end";
   R.paint(renderLog);
-  void loadLogOlder();
+  if (page) void loadLogOlder();
   void loadLogBoots();
 }
 function jumpLog(at, boot = null, day = null) {

@@ -197,7 +197,7 @@ int main(){
 // Replay the real diagnostic assembly/lifecycle against an asynchronous socket.
 {
   const assert = require('assert').strict, vm = require('vm');
-  const sockets=[],timers=new Map(),paints=[];let nextTimer=0;
+  const sockets=[],timers=new Map(),paints=[],els={};let nextTimer=0;
   class Socket {
     static OPEN=1;
     constructor(){this.readyState=0;this.sent=[];sockets.push(this);}
@@ -208,7 +208,12 @@ int main(){
     document:{hidden:false,addEventListener(){}},window:{addEventListener(){}},
     setTimeout:(fn,delay)=>{timers.set(++nextTimer,{fn,delay});return nextTimer;},clearTimeout:id=>timers.delete(id),
     requestAnimationFrame:()=>1,webUiPollingActive:()=>true,webUiClientId:'owner',webUiPowerSeconds:()=>0,
-    activeView:'diagnostic',diagnosticUnlocked:true,developmentMode:false,lastLog:0,viewReady:Promise.resolve(),homeResolve(){},invalidateHomeStream(){},noteReachFail(){},$:()=>null,
+    activeView:'diagnostic',diagnosticUnlocked:true,developmentMode:false,lastLog:0,viewReady:Promise.resolve(),homeResolve(){},invalidateHomeStream(){},noteReachFail(){},
+    // The view entry refreshes the log's strip: the harness stubs just the
+    // elements that refresh touches and answers the text lookup silently.
+    __WEBUI_TEXT__:(k)=>k,console:{error(){},log(){}},
+    $:(id)=>['logStrip','logStripTitle','logStripNote','logNav','logLiveButton','logExportButton','logMarkButton']
+        .includes(id)?(els[id]??(els[id]={hidden:false,className:'',textContent:'',querySelectorAll:()=>[]})):null,
     // The Diagnostic view restarts the log subscription from its status paint.
     viewStatusHandlers:{diagnostic:s=>{assert(s.health);assert(s.tasks);paints.push(s);context.startLogStream();}}});
   vm.runInContext(runtimeStateDecl+'let homeFrame=null;'+runtimeJs.slice(runtimeJs.indexOf('function statusStreamFrame('),runtimeJs.indexOf('function renderHomeStream('))+
@@ -272,18 +277,21 @@ int main(){
   }
 }
 // Route changes stop the Diagnostic and log streams: only a live subscription
-// sends "off", and the log's reader comes back where the view left them,
-// because hiding a view drops its scroll position and a re-shown log must not
-// read as a reader parked at the top. A tab loaded in the background settles
-// its view once it shows instead of reporting a failure, a failed view import
-// is retried with a fresh URL, and modified nav clicks keep the browser's own
-// handling.
+// sends "off", and the leaving view holds the history paging until the next
+// entry restarts the log at its live tail, because a hidden view drops its
+// scroll and a re-shown one must not read as a reader parked at the top. A tab
+// loaded in the background settles its view once it shows instead of reporting
+// a failure, a failed view import is retried with a fresh URL, and modified
+// nav clicks keep the browser's own handling.
 {
   const assert = require('assert').strict;
   assert(codeIncludes(viewJs.diagnostic,
-      'if(logStreamWanted){logScrollTop=$("log").scrollTop;sendUiOperation({op:log,on:false})}'));
+      'if(logStreamWanted){logEntryHold=true;sendUiOperation({op:log,on:false})}'));
   assert(codeIncludes(viewJs.diagnostic,
-      'viewReady.then(() => ($("log").scrollTop = top))'));
+      'logEntryHold||logHistoryBusy||logHistoryDone||logHistoryFull()'));
+  assert(codeIncludes(viewJs.diagnostic,
+      'logEntryHold=false;logJumpAt=logJumpBoot=logJumpDay=null'));
+  assert(codeIncludes(viewJs.diagnostic, 'restartLogHistory(false)'));
   assert(codeIncludes(runtimeJs, "if(diagStreamWanted&&shotWs&&shotWs.readyState===1)shotWs.send('{\"op\":\"diagnostic\",\"on\":false}')"));
   assert(codeIncludes(appJsSource, 'if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'));
   const calls = [], loading = new Set(['pageLoading']),

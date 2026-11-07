@@ -588,18 +588,19 @@
   assert.equal(query((id) => controls[id], 500, null, 1793380832, {end: {boot: 4, before: 4294967295}})(),
       '/__companion/log?limit=500&level=cew&category=ble&boot=4&before=4294967295',
       "a boot step starts at the end cursor the companion's boot index gives");
-  assert(codeIncludes(viewJs.diagnostic, 'LOG_HISTORY_PAGE=2000,LOG_HISTORY_CAP=40000') &&
+  assert(codeIncludes(viewJs.diagnostic, 'LOG_HISTORY_PAGE=500,LOG_HISTORY_CAP=40000') &&
          codeIncludes(viewJs.diagnostic, 'logHistory.length>=LOG_HISTORY_CAP'),
       'the view stops loading past the cap');
   // D14: Clear log history sits with the other record clears in Admin, shows
   // only through the companion, asks first, posts through the shared Web UI
-  // session helper, and has Diagnostic start its view over on its next show.
+  // session helper, and Diagnostic consumes the flag on its next show, whose
+  // entry restarts the view either way.
   assert(partialHtml.admin.includes('id="clearLogHistoryButton" class="btnGlyph mutable btnInvert" type="button" hidden') &&
          !partialHtml.diagnostic.includes('logDeleteButton') &&
          codeIncludes(viewJs.admin, '$("clearLogHistoryButton").hidden=!here?.paired') &&
          codeIncludes(viewJs.admin, 'await R.companionLog("/__companion/log/delete",{});R.uiState.logHistoryCleared=true') &&
          codeIncludes(runtimeJs, 'headers:webUiHeaders(body&&{"Content-Type":"application/json"})') &&
-         codeIncludes(viewJs.diagnostic, 'if(R.uiState.logHistoryCleared){R.uiState.logHistoryCleared=false;jumpLog(null)}'),
+         codeIncludes(viewJs.diagnostic, 'restartLogHistory(false);uiState.logHistoryCleared=false'),
       'Clear log history lives in Admin and follows the companion');
 }
 // logZoneOffsetMinutes answers the zone's offset at each instant: January and
