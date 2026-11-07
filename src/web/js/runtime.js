@@ -1557,7 +1557,9 @@ function observePresetHost(host) {
         e.target.clientWidth !== e.target._w ||
         (e.target._h ?? e.target.clientHeight) !== e.target.clientHeight
       )
-        e.target._draw();
+        // One host without a draw (a colourful hero spark, say) must not throw
+        // here and skip every other host queued in the same batch.
+        e.target._draw?.();
     }
   });
   shotPresetObserver.observe(host);
@@ -6806,7 +6808,11 @@ const HERO_ZONE_BANDS = {
 function renderHeroTechnicalChart(host, d, model, m) {
   const segs = model ? model.segs.filter((s) => s.pts.length > 1) : [];
   if (!host) return;
-  host._draw = null;
+  // The shared observer redraws a resized host with this same frame, so the
+  // redraw stays callable even when this pass paints nothing (no data yet, or
+  // a hidden view's zero width): a null here would throw in the observer and
+  // leave every other host queued with it undrawn.
+  host._draw = () => renderHeroTechnicalChart(host, d, model, m);
   if (!m || !segs.length) return void host.replaceChildren();
   const last = segs.map((s) => s.pts.map((q) => [q.t, q.cg / 100])),
     // The forecast lands on the cut line at the SAP's arrival: the landing
@@ -6897,7 +6903,6 @@ function renderHeroTechnicalChart(host, d, model, m) {
       host._fc = null;
     }
   }
-  host._draw = () => renderHeroTechnicalChart(host, d, model, m);
   observePresetHost(host);
 }
 // The scrub cursor on an ended Technical hero: guide, handle and pill at the

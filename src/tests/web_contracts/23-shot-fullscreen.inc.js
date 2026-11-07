@@ -246,6 +246,22 @@
     assert.equal(draws, 1, 'a width-only graph ignores its height');
     assert(/host\._h\s*=\s*host\.clientHeight/.test(runtimeJs),
         'the live view records the height it drew to');
+    // A host that cannot draw (a colourful hero spark keeps its chart out of
+    // the observer's hands) must not throw: one throw would leave every other
+    // host queued in the same batch undrawn, the shot cards included.
+    const broken = {isConnected: true, clientWidth: 486, clientHeight: 716, _w: 300};
+    const drawn = {isConnected: true, clientWidth: 486, clientHeight: 716, _w: 0,
+      _draw() { draws++; }};
+    observe(broken);
+    observe(drawn);
+    fire([{target: broken}, {target: drawn}]);
+    assert.equal(draws, 2, 'a host without a draw never skips the hosts queued with it');
+    const heroDraw = blockAt(runtimeJs, 'function renderHeroTechnicalChart(');
+    const drawAt =
+        heroDraw.indexOf('host._draw = () => renderHeroTechnicalChart(host, d, model, m)');
+    assert(drawAt >= 0 && drawAt < heroDraw.indexOf('if (!m || !segs.length)') &&
+        !heroDraw.includes('host._draw = null'),
+        'a hero redraw stays callable through the passes that paint nothing');
   }
 
   // Keeping the live view in landscape belongs to the installed app and only
