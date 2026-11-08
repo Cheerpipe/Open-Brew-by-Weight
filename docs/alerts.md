@@ -56,20 +56,20 @@ changed. On momentary machines, check the actual group and its state feedback.
 | --- | --- | --- | --- |
 | **Sound alerts** | ON | ON / OFF | Master switch in **Settings → Shared settings → Alerts**. |
 | **Play alerts on** | **Buzzer only** with a local buzzer; **Scale only** without | Buzzer only / Scale only / Scale first | Where most alerts play. **Buzzer only**: all sound on the local buzzer. **Scale only**: scale path; scale-incapable local cues are muted. **Scale first**: scale when connected/able, else buzzer; never both for one event. Shot **start** and **stop** always use the local buzzer at machine circuit when a buzzer is compiled in. Shown only with buzzer support. |
-| **First drops** | ON | ON / OFF | One beep on first coffee drops during an automatic shot. Ignored when brew by weight is off. |
-| **Paddle-off reminder** | 30 s | OFF / 15 / 30 / 60 / 120 s | Repeat beeps at the chosen interval while the **physical paddle stays ON** and **machine circuit is already open**; OFF silences them. |
-| **Paddle reminder limit (min)** | 15 min | 1–60 min | Stop beeping after this time even if the paddle remains ON. |
-| **Scale disconnected** | (buzzer builds) | ON / OFF | Descending RTTTL on the local buzzer when the scale disconnects (idle or during a shot). Hidden / disabled when Play alerts on is Scale only. |
-| **Use the scale's own power-off tone** | ON | ON / OFF | Plays the scale's own power-off sound instead of the controller's descending tone. Only scales whose sounds are known (today Bookoo Themis Mini and Ultra); other scales keep the controller's tone. Available only while **Scale disconnected** is on and Play alerts on is not Scale only. |
-| **Shot finished by backup time** | (buzzer builds) | ON / OFF | Distinct RTTTL on the local buzzer when the [scale-loss backup](features/auto-to-manual.md) finishes a shot by time after the scale dropped. Disabled when Play alerts on is Scale only. |
-| **Manual without scale (BBW on)** | (buzzer builds) | ON / OFF | Warns on the local buzzer that Brew by weight cannot start normally because the scale is missing, including the first blocked attempt. See [No-scale BBW](settings/no-scale-bbw.md). |
 | **Scale connected** | ON (Buzzer only or Scale first) | ON / OFF | Rising RTTTL when a scale connects or reconnects. Always the local buzzer. |
 | **Use the scale's own power-on tone** | ON | ON / OFF | Plays the scale's own power-on sound instead of the controller's rising tone. Only scales whose sounds are known (today Bookoo Themis Mini and Ultra); other scales keep the controller's tone. Available only while **Scale connected** is on and Play alerts on is not Scale only. |
-| **Blue light while connected** | ON | ON / OFF | Onboard light on GPIO 1: steady while a scale is connected, fast blink while it connects, slow blink when a connected scale stops sending weight. Independent of Sound alerts. |
+| **Scale disconnected** | (buzzer builds) | ON / OFF | Descending RTTTL on the local buzzer when the scale disconnects (idle or during a shot). Hidden / disabled when Play alerts on is Scale only. |
+| **Use the scale's own power-off tone** | ON | ON / OFF | Plays the scale's own power-off sound instead of the controller's descending tone. Only scales whose sounds are known (today Bookoo Themis Mini and Ultra); other scales keep the controller's tone. Available only while **Scale disconnected** is on and Play alerts on is not Scale only. |
+| **Manual without scale (BBW on)** | (buzzer builds) | ON / OFF | Warns on the local buzzer that Brew by weight cannot start normally because the scale is missing, including the first blocked attempt. See [No-scale BBW](settings/no-scale-bbw.md). |
+| **First drops** | ON | ON / OFF | One beep on first coffee drops during an automatic shot. Ignored when brew by weight is off. |
 | **Fast-shot beeps** | Fast | Disabled / Slow / Medium / Fast / Rapid | Local-buzzer pulses from the moment a fast shot would have stopped at the target but keeps going for its extra yield. Disabled when Play alerts on is Scale only. |
 | **Slow-shot beeps** | Fast | Same rates | Pulses from the moment a shot runs past your shot time window without having stopped. |
+| **Shot finished by backup time** | (buzzer builds) | ON / OFF | Distinct RTTTL on the local buzzer when the [scale-loss backup](features/auto-to-manual.md) finishes a shot by time after the scale dropped. Disabled when Play alerts on is Scale only. |
 | **Bullseye melody** | OFF | ON / OFF; Buzzer only | Plays the saved custom RTTTL tune once when a shot stopped by weight **On recipe** remains exactly at its target weight for at least 1 full second. Important alerts, such as a lost scale, interrupt the melody so you never miss them. The text is retained when disabled. |
 | **Custom RTTTL** | empty | Up to 500 ASCII characters / 250 notes | Editable once Bullseye melody is on; otherwise it stays visible and read-only. Bullseye melody and its tune are saved together: switching it on saves nothing until you paste a tune, and a valid tune then saves both by itself. A tune that isn't valid RTTTL is marked and neither is saved. |
+| **Paddle-off reminder** | 30 s | OFF / 15 / 30 / 60 / 120 s | Repeat beeps at the chosen interval while the **physical paddle stays ON** and **machine circuit is already open**; OFF silences them. |
+| **Paddle reminder limit (min)** | 15 min | 1–60 min | Stop beeping after this time even if the paddle remains ON. |
+| **Blue light while connected** | ON | ON / OFF | Onboard light on GPIO 1: steady while a scale is connected, fast blink while it connects, slow blink when a connected scale stops sending weight. Independent of Sound alerts. |
 
 ## The scale's own sounds
 

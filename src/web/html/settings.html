@@ -1203,12 +1203,85 @@
             >
             {{webui:settings.scale_only_hint}}</small
           ></label
+        ><label class="buzzerOpt scaleIncapableOpt"
+          ><input id="buzzerScaleConnectedBeep" type="checkbox" checked />
+          {{webui:settings.scale_connected}}<small class="fieldHint"
+            >{{webui:settings.beeps_when_a_scale_connects_or_reconnects}}</small
+          ></label
+        ><label class="buzzerOpt scaleIncapableOpt" data-parent="buzzerScaleConnectedBeep"
+          ><input id="buzzerScaleConnectedStockTone" type="checkbox" checked />
+          {{webui:settings.scale_power_on_tone}}<small class="fieldHint"
+            >{{webui:settings.scale_power_on_tone_hint}}</small
+          ></label
+        ><label class="buzzerOpt scaleIncapableOpt"
+          ><input id="buzzerScaleLostBeep" type="checkbox" checked />
+          {{webui:settings.scale_lost}}<small class="fieldHint"
+            >{{webui:settings.beeps_when_the_scale_disconnects_when_alerts}}</small
+          ></label
+        ><label class="buzzerOpt scaleIncapableOpt" data-parent="buzzerScaleLostBeep"
+          ><input id="buzzerScaleLostStockTone" type="checkbox" checked />
+          {{webui:settings.scale_power_off_tone}}<small class="fieldHint"
+            >{{webui:settings.scale_power_off_tone_hint}}</small
+          ></label
+        ><label class="buzzerOpt scaleIncapableOpt"
+          ><input id="buzzerManualNoScaleBeep" type="checkbox" />
+          {{webui:settings.manual_without_scale_bbw_on}}<small class="fieldHint"
+            >{{webui:settings.beeps_when_brew_by_weight_is_on}}</small
+          ></label
         ><label
           ><input id="firstDropBeep" type="checkbox" />
           {{webui:settings.beep_when_coffee_starts}}<small class="fieldHint"
             >{{webui:settings.one_beep_when_the_first_coffee_drops}}</small
           ></label
-        ><label class="paddleOnly"
+        ><label class="buzzerOpt scaleIncapableOpt"
+          >{{webui:settings.fast_shot_pulse}}<span class="selBox"
+            ><select id="buzzerExtendedPulseRate">
+              <option value="disabled">{{webui:settings.disabled}}</option>
+              <option value="slow">{{webui:settings.slow}}</option>
+              <option value="medium">{{webui:settings.medium}}</option>
+              <option value="fast" selected>{{webui:settings.fast}}</option>
+              <option value="rapid">{{webui:settings.rapid}}</option>
+            </select></span
+          ><small class="fieldHint">{{webui:settings.fast_shot_pulse_hint}}</small></label
+        ><label class="buzzerOpt scaleIncapableOpt"
+          >{{webui:settings.slow_shot_pulse}}<span class="selBox"
+            ><select id="buzzerSlowExtendedPulseRate">
+              <option value="disabled">{{webui:settings.disabled}}</option>
+              <option value="slow">{{webui:settings.slow}}</option>
+              <option value="medium">{{webui:settings.medium}}</option>
+              <option value="fast" selected>{{webui:settings.fast}}</option>
+              <option value="rapid">{{webui:settings.rapid}}</option>
+            </select></span
+          ><small class="fieldHint">{{webui:settings.slow_shot_pulse_hint}}</small></label
+        ><label class="buzzerOpt scaleIncapableOpt"
+          ><input id="buzzerAutoToManualGuardEndBeep" type="checkbox" />
+          {{webui:settings.scale_loss_ended_beep}}<small class="fieldHint"
+            >{{webui:settings.scale_loss_ended_beep_hint}}</small
+          ></label
+        >
+        <div class="buzzerOpt bullseyeOpt">
+          <label
+            ><input id="bullseyeMelodyEnabled" type="checkbox" />
+            {{webui:settings.bullseye_melody}}<small class="fieldHint"
+              >{{webui:settings.play_a_custom_rtttl_melody_when_the}}
+              <strong>{{webui:settings.buzzer_only}}</strong>.</small
+            ></label
+          ><label id="bullseyeTuneWrap"
+            >{{webui:settings.custom_rtttl}}<textarea
+              id="bullseyeRtttl"
+              maxlength="500"
+              rows="4"
+              spellcheck="false"
+              placeholder="{{webui:settings.bullseye_d_8_o_5_b_180}}"
+            ></textarea
+            ><small class="fieldHint"
+              >{{webui:settings.maximum_500_characters_the_tune_is_kept}}</small
+            ><a id="bullseyeTestLink" class="rtttlTest" href="#"
+              >{{webui:settings.test_it}}</a
+            ></label
+          >
+        </div>
+        <label class="paddleOnly"
           >{{webui:settings.paddle_off_reminder}}<span class="selBox"
             ><select id="paddleReturnReminder">
               <option value="0">{{webui:settings.paddle_off_reminder_off}}</option>
@@ -1231,56 +1304,6 @@
           /><small class="fieldHint"
             >{{webui:settings.stops_reminding_after_this_time_if_the}}</small
           ></label
-        ><label class="buzzerOpt scaleIncapableOpt"
-          ><input id="buzzerScaleLostBeep" type="checkbox" checked />
-          {{webui:settings.scale_lost}}<small class="fieldHint"
-            >{{webui:settings.beeps_when_the_scale_disconnects_when_alerts}}</small
-          ></label
-        ><label class="buzzerOpt scaleIncapableOpt" data-parent="buzzerScaleLostBeep"
-          ><input id="buzzerScaleLostStockTone" type="checkbox" checked />
-          {{webui:settings.scale_power_off_tone}}<small class="fieldHint"
-            >{{webui:settings.scale_power_off_tone_hint}}</small
-          ></label
-        ><label class="buzzerOpt scaleIncapableOpt"
-          ><input id="buzzerAutoToManualGuardEndBeep" type="checkbox" />
-          {{webui:settings.scale_loss_ended_beep}}<small class="fieldHint"
-            >{{webui:settings.scale_loss_ended_beep_hint}}</small
-          ></label
-        ><label class="buzzerOpt scaleIncapableOpt"
-          ><input id="buzzerManualNoScaleBeep" type="checkbox" />
-          {{webui:settings.manual_without_scale_bbw_on}}<small class="fieldHint"
-            >{{webui:settings.beeps_when_brew_by_weight_is_on}}</small
-          ></label
-        ><label class="buzzerOpt scaleIncapableOpt"
-          ><input id="buzzerScaleConnectedBeep" type="checkbox" checked />
-          {{webui:settings.scale_connected}}<small class="fieldHint"
-            >{{webui:settings.beeps_when_a_scale_connects_or_reconnects}}</small
-          ></label
-        ><label class="buzzerOpt scaleIncapableOpt" data-parent="buzzerScaleConnectedBeep"
-          ><input id="buzzerScaleConnectedStockTone" type="checkbox" checked />
-          {{webui:settings.scale_power_on_tone}}<small class="fieldHint"
-            >{{webui:settings.scale_power_on_tone_hint}}</small
-          ></label
-        ><label class="buzzerOpt scaleIncapableOpt"
-          >{{webui:settings.fast_shot_pulse}}<span class="selBox"
-            ><select id="buzzerExtendedPulseRate">
-              <option value="disabled">{{webui:settings.disabled}}</option>
-              <option value="slow">{{webui:settings.slow}}</option>
-              <option value="medium">{{webui:settings.medium}}</option>
-              <option value="fast" selected>{{webui:settings.fast}}</option>
-              <option value="rapid">{{webui:settings.rapid}}</option>
-            </select></span
-          ><small class="fieldHint">{{webui:settings.fast_shot_pulse_hint}}</small></label
-        ><label class="buzzerOpt scaleIncapableOpt"
-          >{{webui:settings.slow_shot_pulse}}<span class="selBox"
-            ><select id="buzzerSlowExtendedPulseRate">
-              <option value="disabled">{{webui:settings.disabled}}</option>
-              <option value="slow">{{webui:settings.slow}}</option>
-              <option value="medium">{{webui:settings.medium}}</option>
-              <option value="fast" selected>{{webui:settings.fast}}</option>
-              <option value="rapid">{{webui:settings.rapid}}</option>
-            </select></span
-          ><small class="fieldHint">{{webui:settings.slow_shot_pulse_hint}}</small></label
         >
       </div>
       <label
@@ -1289,26 +1312,6 @@
           >{{webui:settings.lights_the_blue_led_while_a_scale}}</small
         ></label
       >
-      <div class="buzzerOpt bullseyeOpt">
-        <label
-          ><input id="bullseyeMelodyEnabled" type="checkbox" />
-          {{webui:settings.bullseye_melody}}<small class="fieldHint"
-            >{{webui:settings.play_a_custom_rtttl_melody_when_the}}
-            <strong>{{webui:settings.buzzer_only}}</strong>.</small
-          ></label
-        ><label id="bullseyeTuneWrap"
-          >{{webui:settings.custom_rtttl}}<textarea
-            id="bullseyeRtttl"
-            maxlength="500"
-            rows="4"
-            spellcheck="false"
-            placeholder="{{webui:settings.bullseye_d_8_o_5_b_180}}"
-          ></textarea
-          ><small class="fieldHint"
-            >{{webui:settings.maximum_500_characters_the_tune_is_kept}}</small
-          ><a id="bullseyeTestLink" class="rtttlTest" href="#">{{webui:settings.test_it}}</a></label
-        >
-      </div>
     </details>
     <details data-g="app" class="cfgGroup">
       <summary>{{webui:settings.app}}</summary>
