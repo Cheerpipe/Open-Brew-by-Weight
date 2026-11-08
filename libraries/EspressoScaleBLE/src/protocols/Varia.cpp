@@ -100,5 +100,6 @@ const ScaleProtocol kScaleProtocolVaria = {
     &encodeVariaCommand,
     nullptr,
     0,
-    true
+    true,
+    {nullptr, nullptr}
 };

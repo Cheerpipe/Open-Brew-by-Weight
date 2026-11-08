@@ -246,6 +246,10 @@ Bookoo volume is not rewritten on reconnections during the same controller
 session. Restarting the controller or explicitly clearing that preferred
 scale opens a new first-connection session for it.
 
+The controller also knows the Bookoo Themis power-on and power-off sounds:
+with a local buzzer, it can play them when the scale connects and disconnects.
+Choose this under [Alerts](../alerts.md#the-scales-own-sounds).
+
 If no compatible scale is available, the controller stays in the bootstrap
 name scan indefinitely and does not silently change the saved preference.
 Choosing **My scale first** before a scale has been adopted uses the same

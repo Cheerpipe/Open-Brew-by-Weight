@@ -70,5 +70,6 @@ const ScaleProtocol kScaleProtocolMyscale = {
     &encodeMyscaleCommand,
     nullptr,
     0,
-    false
+    false,
+    {nullptr, nullptr}
 };

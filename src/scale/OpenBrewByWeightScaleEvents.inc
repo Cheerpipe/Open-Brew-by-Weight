@@ -60,7 +60,7 @@ bool queueScaleIndependentAlert(AlertEvent event, uint32_t cycleId) {
 
 bool dispatchAlert(AlertKind kind, AlertEvent event, uint32_t cycleId,
                    bool commandAttempted, bool writeSucceeded,
-                   bool commandFeedbackExpected) {
+                   bool commandFeedbackExpected, bool scaleTone = false) {
   AlertChannelContext ctx = currentAlertChannelContext();
   ctx.commandAttempted = commandAttempted;
   ctx.writeSucceeded = writeSucceeded;
@@ -75,14 +75,14 @@ bool dispatchAlert(AlertKind kind, AlertEvent event, uint32_t cycleId,
   const BuzzerToneCommand command =
       deriveBuzzerTone(event, session.slowExtractionExtended,
                        runtimeConfig.buzzerExtendedPulseRate,
-                       runtimeConfig.buzzerSlowExtendedPulseRate);
+                       runtimeConfig.buzzerSlowExtendedPulseRate, scaleTone);
   return playLocalAlertTone(command, kind != AlertKind::Recovery);
 }
 
 // Independent / multi-tone alerts: first drop, paddle, completion, triples.
-bool emitAlert(AlertEvent event, uint32_t cycleId) {
+bool emitAlert(AlertEvent event, uint32_t cycleId, bool scaleTone) {
   return dispatchAlert(AlertKind::Independent, event, cycleId, false, false,
-                       false);
+                       false, scaleTone);
 }
 
 // Tare/start/stop replacement sounds: fire at the local circuit/paddle/retare
@@ -313,14 +313,20 @@ void processScaleLinkTransitions() {
 
   auto handleConnected = [&]() {
     requestActivePresetMachineTemperature();
+    if (!localBuzzer.configureScaleTones(link.stockTones)) {
+      serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
+                          "Scale tone invalid; default melody kept");
+    }
     if (runtimeConfig.buzzerScaleConnectedBeep) {
-      emitAlert(AlertEvent::SCALE_CONNECTED);
+      emitAlert(AlertEvent::SCALE_CONNECTED, 0,
+                runtimeConfig.buzzerScaleConnectedStockTone);
     }
   };
   auto handleDisconnected = [&]() {
     markShotCurveBreak();
     if (runtimeConfig.buzzerScaleLostBeep) {
-      emitAlert(AlertEvent::SCALE_LOST);
+      emitAlert(AlertEvent::SCALE_LOST, 0,
+                runtimeConfig.buzzerScaleLostStockTone);
     }
     // Cup presence is control-owned. A link loss invalidates the observation,
     // but only this task is allowed to mutate the detector.

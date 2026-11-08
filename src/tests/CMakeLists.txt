@@ -186,6 +186,18 @@ host_test(nimble_client_test
 target_include_directories(nimble_client_test PRIVATE "${ble_dir}/tests/stubs" "${ble_dir}/src")
 set_tests_properties(nimble_client_test PROPERTIES LABELS "host;ble;concurrency")
 
+# The buzzer host cases parse every protocol's real stock tones. Only the
+# protocol files see the library include path, so the stubs stay in charge.
+set_source_files_properties(${scale_protocol_sources} PROPERTIES
+  INCLUDE_DIRECTORIES "${ble_dir}/src")
+foreach(target open_brew_by_weight_host_test open_brew_by_weight_buzzer_high
+        open_brew_by_weight_tsan)
+  if(TARGET ${target})
+    target_sources(${target} PRIVATE
+      "${ble_dir}/src/ScaleProtocolCommon.cpp" ${scale_protocol_sources})
+  endif()
+endforeach()
+
 # The BBW λ sanity pin reads the real per-protocol sensor-lag table.
 if(TARGET bbw_cutoff_host_test)
   target_sources(bbw_cutoff_host_test PRIVATE

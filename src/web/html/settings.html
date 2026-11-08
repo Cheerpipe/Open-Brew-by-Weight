@@ -970,7 +970,7 @@
           ><small class="fieldHint"
             >{{webui:settings.how_loud_the_scale_is_when_it}}<strong>{{webui:settings.scale_only_or_scale_priority}}</strong>).</small
           ></label
-        >
+        ><small class="fieldHint buzzerOpt">{{webui:settings.bookoo_stock_tones_hint}}</small>
       </details>
       <details class="cfgGroup">
         <summary>{{webui:settings.acaia}}</summary>
@@ -1236,6 +1236,11 @@
           {{webui:settings.scale_lost}}<small class="fieldHint"
             >{{webui:settings.beeps_when_the_scale_disconnects_when_alerts}}</small
           ></label
+        ><label class="buzzerOpt scaleIncapableOpt" data-parent="buzzerScaleLostBeep"
+          ><input id="buzzerScaleLostStockTone" type="checkbox" checked />
+          {{webui:settings.scale_power_off_tone}}<small class="fieldHint"
+            >{{webui:settings.scale_power_off_tone_hint}}</small
+          ></label
         ><label class="buzzerOpt scaleIncapableOpt"
           ><input id="buzzerAutoToManualGuardEndBeep" type="checkbox" />
           {{webui:settings.scale_loss_ended_beep}}<small class="fieldHint"
@@ -1250,6 +1255,11 @@
           ><input id="buzzerScaleConnectedBeep" type="checkbox" checked />
           {{webui:settings.scale_connected}}<small class="fieldHint"
             >{{webui:settings.beeps_when_a_scale_connects_or_reconnects}}</small
+          ></label
+        ><label class="buzzerOpt scaleIncapableOpt" data-parent="buzzerScaleConnectedBeep"
+          ><input id="buzzerScaleConnectedStockTone" type="checkbox" checked />
+          {{webui:settings.scale_power_on_tone}}<small class="fieldHint"
+            >{{webui:settings.scale_power_on_tone_hint}}</small
           ></label
         ><label class="buzzerOpt scaleIncapableOpt"
           >{{webui:settings.fast_shot_pulse}}<span class="selBox"

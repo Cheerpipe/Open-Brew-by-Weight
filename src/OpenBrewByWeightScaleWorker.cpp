@@ -221,6 +221,7 @@ char scaleConnectedMac[PREFERRED_SCALE_MAC_CAPACITY] = {};
 static char scaleShotName[SCALE_FRIENDLY_NAME_MAX_LEN + 1] = {};
 ScaleModel scaleLinkModel = ScaleModel::Unknown;
 ScaleFeatureSet scaleLinkFeatures = {};
+ScaleStockTones scaleLinkStockTones = {};
 bool scaleLinkRssiValid = false;
 int8_t scaleLinkRssi = 0;
 bool scaleBatteryValid = false;
@@ -567,6 +568,7 @@ ScaleLinkSnapshot getScaleLinkSnapshot() {
   memcpy(snapshot.shotScaleName, scaleShotName, sizeof(snapshot.shotScaleName));
   snapshot.model = scaleLinkModel;
   snapshot.features = scaleLinkFeatures;
+  snapshot.stockTones = scaleLinkStockTones;
   snapshot.rssiValid = scaleLinkRssiValid;
   snapshot.rssi = scaleLinkRssi;
   snapshot.batteryValid = scaleBatteryValid;
@@ -619,6 +621,7 @@ void setScaleLinkState(ScaleLinkState state) {
     scaleFlowRateAtMs = 0;
     scaleLinkFeatures = scaleFeatureSetNone();
     scaleLinkModel = ScaleModel::Unknown;
+    scaleLinkStockTones = {};
     scaleLinkRssiValid = false;
     scaleLinkRssi = 0;
     lastScaleLinkRssiSampleMs = 0;
@@ -1011,6 +1014,7 @@ void updateWorkerLinkState() {
   scaleLinkFeatures = linkUp ? scale.features()
                                        : scaleFeatureSetNone();
   scaleLinkModel = linkUp ? scale.model() : ScaleModel::Unknown;
+  scaleLinkStockTones = linkUp ? scale.stockTones() : ScaleStockTones{};
   scaleTimerValid = timerValid;
   scaleTimerMs = timerMs;
   scaleTimerAgeMs = timerAgeMs;

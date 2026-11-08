@@ -815,6 +815,11 @@ class NimbleScaleClient {
                                                           : "none";
   }
 
+  ScaleStockTones stockTones() const {
+    return state_ == State::Ready && protocol_ != nullptr ? protocol_->stockTones
+                                                          : ScaleStockTones{};
+  }
+
   const char *address() const { return identityPresent_ ? address_ : ""; }
   const char *name() const { return identityPresent_ ? name_ : ""; }
   bool directedScan() const {
@@ -3370,6 +3375,10 @@ ScaleModel EspressoScaleBLE::model() const {
 
 const char *EspressoScaleBLE::connectedProtocolName() const {
   return clientFromStorage(g_clientStorage).protocolName();
+}
+
+ScaleStockTones EspressoScaleBLE::stockTones() const {
+  return clientFromStorage(g_clientStorage).stockTones();
 }
 
 const char *EspressoScaleBLE::address() const {

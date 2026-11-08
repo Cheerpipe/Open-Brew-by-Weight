@@ -70,8 +70,13 @@ void testProtocolInitializationContracts() {
     // An in-frame timer declaration needs the hook it exempts from checking.
     CHECK(!protocol->features.has(ScaleFeatureTimerInWeightFrame) ||
           protocol->parseTimer != nullptr);
+    // Stock tones come as a pair: both unknown or both non-empty.
+    const ScaleStockTones &tones = protocol->stockTones;
+    CHECK((tones.powerOn == nullptr) == (tones.powerOff == nullptr));
+    CHECK(tones.powerOn == nullptr || (*tones.powerOn && *tones.powerOff));
     if (std::strcmp(protocol->id, "bookoo_generic") == 0) {
       sawBookoo = true;
+      CHECK(tones.powerOn != nullptr);
       CHECK(protocol->features.has(ScaleFeatureFlowRate));
       CHECK(protocol->initWrites == nullptr);
       CHECK(protocol->initWriteCount == 0);

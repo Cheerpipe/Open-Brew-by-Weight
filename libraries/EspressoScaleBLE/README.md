@@ -108,6 +108,17 @@ the other protocols report no battery. The offsets are not yet confirmed on
 hardware, which is why the compatibility table lists them as Testing; an Acaia
 scale reports its battery only when it connects through the new protocol.
 
+## Stock tones
+
+`ScaleProtocol::stockTones` holds a brand's own power-on and power-off sounds
+as RTTTL strings (`ScaleStockTones`), or `nullptr` where they are unknown;
+`stockTones()` returns them for the connected scale and nulls otherwise. The
+library never parses or plays them: the firmware validates each string against
+its buzzer limits and falls back to its own melody when one is missing or
+invalid. To add a brand's tones, set them in its protocol file; host tests
+require both pointers to be null or both to be non-empty. Only Bookoo declares
+tones today, shared by the Themis Mini and Ultra.
+
 ## Requirements
 
 Release 5.0.0 uses the native NimBLE C APIs from ESP-IDF 6.1.x. The supported

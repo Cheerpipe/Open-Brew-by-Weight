@@ -77,6 +77,13 @@ enum class ScaleOp : uint8_t {
     PowerOff
 };
 
+// The scale's own power-on and power-off sounds as RTTTL, for a host that
+// imitates them; nullptr means unknown. Opaque here: the host validates them.
+struct ScaleStockTones {
+    const char *powerOn;
+    const char *powerOff;
+};
+
 enum class ScaleModel : uint8_t { Unknown, BookooMini, BookooUltra };
 
 #endif

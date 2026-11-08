@@ -232,6 +232,9 @@ void processWebCommand(const WebCommand &command) {
       candidate.buzzerManualNoScaleBeep = command.config.buzzerManualNoScaleBeep;
       candidate.buzzerScaleConnectedBeep =
           command.config.buzzerScaleConnectedBeep;
+      candidate.buzzerScaleConnectedStockTone =
+          command.config.buzzerScaleConnectedStockTone;
+      candidate.buzzerScaleLostStockTone = command.config.buzzerScaleLostStockTone;
       candidate.scaleConnectedLed = command.config.scaleConnectedLed;
       candidate.buzzerExtendedPulseRate = command.config.buzzerExtendedPulseRate;
       candidate.buzzerSlowExtendedPulseRate =

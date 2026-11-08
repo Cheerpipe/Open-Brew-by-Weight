@@ -3763,9 +3763,11 @@ function updateScaleIncapableAlertControls(buzzerOn) {
   const el = $("alertOutputChannel");
   const scaleOnly = !!buzzerOn && el && el.value === "scale_only";
   document.querySelectorAll(".scaleIncapableOpt").forEach((e) => {
-    e.classList.toggle("fieldOff", scaleOnly);
+    // A sub-option (data-parent) also follows its parent alert switch.
+    const off = scaleOnly || (!!e.dataset.parent && !$(e.dataset.parent).checked);
+    e.classList.toggle("fieldOff", off);
     e.querySelectorAll("input,select").forEach((i) => {
-      i.disabled = !buzzerOn || scaleOnly || !controlsMutable || !soundAlertsAreOn();
+      i.disabled = !buzzerOn || off || !controlsMutable || !soundAlertsAreOn();
     });
   });
 }
@@ -7597,6 +7599,8 @@ function loadSettingsConfig({ config: c, quickRevert }) {
     "buzzerAutoToManualGuardEndBeep",
     "buzzerManualNoScaleBeep",
     "buzzerScaleConnectedBeep",
+    "buzzerScaleLostStockTone",
+    "buzzerScaleConnectedStockTone",
     "autoRetare",
     "fastExtractionGuardEnabled",
     "avoidAccidentalTouchEnabled",

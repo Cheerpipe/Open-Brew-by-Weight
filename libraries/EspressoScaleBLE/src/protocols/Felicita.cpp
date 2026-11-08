@@ -121,5 +121,6 @@ const ScaleProtocol kScaleProtocolFelicita = {
     &encodeFelicitaCommand,
     kFelicitaInitWrites,
     sizeof(kFelicitaInitWrites) / sizeof(kFelicitaInitWrites[0]),
-    false
+    false,
+    {nullptr, nullptr}
 };

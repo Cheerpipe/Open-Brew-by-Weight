@@ -107,5 +107,7 @@ const ScaleProtocol kScaleProtocolGenericFf11 = {
     &encodeGenericCommand,
     nullptr,
     0,
-    false
+    false,
+    {"bookoo:d=16,o=6,b=100:16c6,16g6,16f6,16c7",
+     "bookoo-off:d=16,o=6,b=100:16c7,16c6"}
 };

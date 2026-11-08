@@ -79,5 +79,6 @@ const ScaleProtocol kScaleProtocolEclair = {
     &encodeEclairCommand,
     nullptr,
     0,
-    false
+    false,
+    {nullptr, nullptr}
 };

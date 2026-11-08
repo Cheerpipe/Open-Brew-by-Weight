@@ -4600,6 +4600,8 @@ void ns17_require_scale_triple_cycle_temporarily_allows() {
       static_cast<uint8_t>(NoScaleBbwMode::REQUIRE_SCALE);
   runtimeConfig.lastShotCooldownMs = 1000;
   reachReadyFromBoot();
+  // The confirmation reuses the connected cue but never a scale's own tone.
+  CHECK(localBuzzer.configureScaleTones(kScaleProtocolGenericFf11.stockTones));
 
   completeRequireScaleBypassGesture();
 
@@ -4610,6 +4612,14 @@ void ns17_require_scale_triple_cycle_temporarily_allows() {
   CHECK(!noScaleShotGuardHold);
   CHECK(noScaleShotGuardNeedsFreshActivator);
   CHECK(localBuzzer.activeCue == BuzzerCue::SCALE_CONNECTED);
+#if OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER == 1
+  CHECK(localBuzzer.rtttlCount ==
+            localBuzzer.cueNoteCount[static_cast<uint8_t>(BuzzerCue::SCALE_CONNECTED)] &&
+        memcmp(localBuzzer.rtttlBuf,
+               localBuzzer.rtttlCatalog->cueNotes[static_cast<uint8_t>(
+                   BuzzerCue::SCALE_CONNECTED)],
+               sizeof(RtttlNote) * localBuzzer.rtttlCount) == 0);
+#endif
   CHECK(debugEventExists(DebugCode::NO_SCALE_SHOT_GUARD_CONSUMED));
   CHECK(historyLog.count() == 3);
 
@@ -5002,6 +5012,109 @@ void w94_scale_connected_silent_when_flag_off_or_scale_only() {
   const uint32_t beforeScaleOnly = localBuzzer.acceptedRequests;
   setScaleConnected(true);
   CHECK(localBuzzer.acceptedRequests == beforeScaleOnly);
+}
+
+#if OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER == 1
+bool buzzerPlays(const RtttlNote *notes, uint8_t count) {
+  return localBuzzer.rtttlCount == count &&
+         memcmp(localBuzzer.rtttlBuf, notes, sizeof(RtttlNote) * count) == 0;
+}
+
+void drainBuzzerUntil(BuzzerCue cue) {
+  for (uint32_t step = 0; step < 200 && localBuzzer.activeCue != cue; ++step) {
+    hostMillis += 20;
+    hostServiceEspTimer(localBuzzer.phaseTimer);
+  }
+}
+#endif
+
+void w94b_scale_stock_tones_replace_link_melodies() {
+  // Every tone a library protocol declares fits the fixed-cue catalog.
+  constexpr uint8_t kNotes = RtttlCatalog::kFixedNoteCapacity;
+  RtttlNote notes[kNotes];
+  uint8_t count = 0;
+  for (size_t index = 0; index < scaleProtocolCount(); ++index) {
+    const ScaleStockTones tones = scaleProtocolAt(index)->stockTones;
+    for (const char *rtttl : {tones.powerOn, tones.powerOff}) {
+      CHECK(rtttl == nullptr ||
+            (parseRtttlBounded(rtttl, notes, kNotes, count) && count > 0));
+    }
+  }
+  const ScaleStockTones bookoo = kScaleProtocolGenericFf11.stockTones;
+  CHECK(strcmp(bookoo.powerOn, "bookoo:d=16,o=6,b=100:16c6,16g6,16f6,16c7") == 0);
+  CHECK(strcmp(bookoo.powerOff, "bookoo-off:d=16,o=6,b=100:16c7,16c6") == 0);
+  CHECK(deriveBuzzerTone(AlertEvent::SCALE_CONNECTED, false, 0, 0, true).scaleTone);
+  CHECK(deriveBuzzerTone(AlertEvent::SCALE_LOST, false, 0, 0, true).scaleTone);
+  CHECK(!deriveBuzzerTone(AlertEvent::SCALE_LOST, false, 0, 0).scaleTone);
+  CHECK(!deriveBuzzerTone(AlertEvent::TARE, false, 0, 0, true).scaleTone);
+#if OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER == 1
+  resetHarness(false, false);
+  runtimeConfig.alertOutputChannel =
+      static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
+  CHECK(runtimeConfig.buzzerScaleConnectedStockTone);
+  CHECK(runtimeConfig.buzzerScaleLostStockTone);
+  const RtttlCatalog &catalog = *localBuzzer.rtttlCatalog;
+  const RtttlNote *connectedDefault =
+      catalog.cueNotes[static_cast<uint8_t>(BuzzerCue::SCALE_CONNECTED)];
+  const RtttlNote *lostDefault =
+      catalog.cueNotes[static_cast<uint8_t>(BuzzerCue::SCALE_LOST)];
+  RtttlNote powerOn[kNotes], powerOff[kNotes];
+  uint8_t onCount = 0, offCount = 0;
+  CHECK(parseRtttlBounded(bookoo.powerOn, powerOn, kNotes, onCount));
+  CHECK(parseRtttlBounded(bookoo.powerOff, powerOff, kNotes, offCount));
+
+  // A Bookoo plays its own tones; the lost one queues behind the connect
+  // tone and still plays after the link snapshot dropped the tones.
+  scale.connectedStockTones = bookoo;
+  setScaleConnected(true);
+  CHECK(localBuzzer.activeCue == BuzzerCue::SCALE_CONNECTED);
+  CHECK(buzzerPlays(powerOn, onCount));
+  setScaleConnected(false);
+  CHECK(getScaleLinkSnapshot().stockTones.powerOff == nullptr);
+  CHECK(localBuzzer.pendingCue == BuzzerCue::SCALE_LOST);
+  drainBuzzerUntil(BuzzerCue::SCALE_LOST);
+  CHECK(buzzerPlays(powerOff, offCount));
+
+  // Either switch off keeps the controller's melody for that event.
+  runtimeConfig.buzzerScaleConnectedStockTone = false;
+  runtimeConfig.buzzerScaleLostStockTone = false;
+  localBuzzer.stopAll();
+  setScaleConnected(true);
+  CHECK(buzzerPlays(connectedDefault, localBuzzer.cueNoteCount[static_cast<uint8_t>(
+                                          BuzzerCue::SCALE_CONNECTED)]));
+  localBuzzer.stopAll();
+  setScaleConnected(false);
+  CHECK(buzzerPlays(lostDefault, localBuzzer.cueNoteCount[static_cast<uint8_t>(
+                                     BuzzerCue::SCALE_LOST)]));
+
+  // A scale without known tones replaces the previous scale's tones.
+  runtimeConfig.buzzerScaleConnectedStockTone = true;
+  runtimeConfig.buzzerScaleLostStockTone = true;
+  scale.connectedStockTones = {};
+  localBuzzer.stopAll();
+  setScaleConnected(true);
+  CHECK(buzzerPlays(connectedDefault, localBuzzer.cueNoteCount[static_cast<uint8_t>(
+                                          BuzzerCue::SCALE_CONNECTED)]));
+  localBuzzer.stopAll();
+  setScaleConnected(false);
+  CHECK(buzzerPlays(lostDefault, localBuzzer.cueNoteCount[static_cast<uint8_t>(
+                                     BuzzerCue::SCALE_LOST)]));
+
+  // A tone that does not fit falls back to the default with a log warning.
+  scale.connectedStockTones = {"x:d=8,o=5,b=150:c,d,e,f,g,a,b,c6,d6", nullptr};
+  localBuzzer.stopAll();
+  setScaleConnected(true);
+  static DebugEvent events[DEBUG_EVENT_CAPACITY];
+  const size_t logged = copyDebugEvents(0, events, DEBUG_EVENT_CAPACITY);
+  CHECK(std::any_of(events, events + logged, [](const DebugEvent &event) {
+    return event.code == DebugCode::LOG_TEXT && event.level == LogLevel::WARNING &&
+           strcmp(event.text, "Scale tone invalid; default melody kept") == 0;
+  }));
+  CHECK(localBuzzer.scaleNoteCount[0] == 0);
+  CHECK(buzzerPlays(connectedDefault, localBuzzer.cueNoteCount[static_cast<uint8_t>(
+                                          BuzzerCue::SCALE_CONNECTED)]));
+  localBuzzer.stopAll();
+#endif
 }
 
 void f01_link_side_effects_run_only_on_control() {
@@ -25899,6 +26012,7 @@ const TestCase testCases[] = {
     {"W93", w93_scale_connected_echo_on_rising_edge},
     {"W93B", w93b_buzzer_phase_uses_current_time_and_wraps},
     {"W94", w94_scale_connected_silent_when_flag_off_or_scale_only},
+    {"W94B", w94b_scale_stock_tones_replace_link_melodies},
     {"F01A", f01_link_side_effects_run_only_on_control},
     {"F01B", f01_worker_uses_only_published_policy},
     {"W95", w95_web_buzzer_test_plays_chime_sequence},

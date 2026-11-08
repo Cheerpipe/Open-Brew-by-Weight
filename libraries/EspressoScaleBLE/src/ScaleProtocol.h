@@ -55,6 +55,7 @@ struct ScaleProtocol {
     const ScalePayload *initWrites;
     size_t initWriteCount;
     bool requireAdvertisedName;
+    ScaleStockTones stockTones;
 };
 
 // Advertisement identity is a hint for display; command filtering also

@@ -9,6 +9,11 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **Your Bookoo's own sounds on the buzzer:** when a Bookoo Themis connects,
+  the buzzer plays the scale's own power-on melody, and when it disconnects, its
+  power-off melody. Two new switches under **Alerts** turn this off; other
+  scales keep the controller's tones. **Scale lost** is now called **Scale
+  disconnected**. See [Alerts](docs/alerts.md#the-scales-own-sounds).
 - **The companion and the controller's own address work side by side:** opening the
   controller's own address no longer interrupts the screens using the companion, or
   the reverse. The window you pair from keeps working, and Admin links to the Web UI

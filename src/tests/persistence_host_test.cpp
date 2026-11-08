@@ -145,6 +145,8 @@ void p01_defaults_are_valid() {
   CHECK(settings.runtime.ringRetainLogLevel ==
         static_cast<uint8_t>(LogLevel::NONE));
   CHECK(settings.runtime.buzzerScaleConnectedBeep);
+  CHECK(settings.runtime.buzzerScaleConnectedStockTone);
+  CHECK(settings.runtime.buzzerScaleLostStockTone);
   CHECK(settings.runtime.scaleConnectedLed);
   CHECK(validPreferredScaleMac(settings.preferredScaleMac));
   CHECK(validPreferredScaleName(settings.preferredScaleName));
@@ -3232,6 +3234,26 @@ void p91e_power_split_migrates_single_setting() {
         !corrupt.runtime.idlePowerSavingEnabled);
 }
 
+// Tags 89/90 are additive: an older blob keeps both stock tones on.
+void p91f_scale_stock_tone_tags_round_trip() {
+  const std::vector<uint8_t> runtime = {89, 1, 0, 90, 1, 1};
+  std::vector<uint8_t> body = {SETTINGS_GROUP_RUNTIME,
+                               static_cast<uint8_t>(runtime.size())};
+  body.insert(body.end(), runtime.begin(), runtime.end());
+  PersistedSettings settings;
+  uint32_t malformed = 0;
+  std::vector<uint8_t> blob = settingsBlobWithBody(body);
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), settings, malformed) &&
+        malformed == 0);
+  CHECK(!settings.runtime.buzzerScaleConnectedStockTone);
+  CHECK(settings.runtime.buzzerScaleLostStockTone);
+  blob = settingsBlobWithBody({});
+  PersistedSettings older;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), older, malformed));
+  CHECK(older.runtime.buzzerScaleConnectedStockTone &&
+        older.runtime.buzzerScaleLostStockTone);
+}
+
 void p91b_settings_codec_round_trips_and_evolves() {
   // Every persisted member survives an encode/decode round trip.
   PersistedSettings original;
@@ -3604,6 +3626,7 @@ const TestCase tests[] = {
     {"P91C", p91c_preset_transitions_repair_out_of_range},
     {"P91D", p91d_legacy_blob_derives_identical_curve},
     {"P91E", p91e_power_split_migrates_single_setting},
+    {"P91F", p91f_scale_stock_tone_tags_round_trip},
     {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},

@@ -14,6 +14,8 @@ struct BuzzerToneCommand {
   bool looping = false;
   uint32_t durationMs = 0;
   bool valid = false;
+  // Play the connected scale's own tone for this cue when one is loaded.
+  bool scaleTone = false;
 };
 
 inline const char *rtttlForExtendedPulseRate(uint8_t rate) {
@@ -68,9 +70,13 @@ inline BuzzerCue buzzerCueForAlertEvent(AlertEvent event, bool slowExtended) {
 // command (silent).
 inline BuzzerToneCommand deriveBuzzerTone(AlertEvent event, bool slowExtended,
                                          uint8_t extendedPulseRate,
-                                         uint8_t slowExtendedPulseRate) {
+                                         uint8_t slowExtendedPulseRate,
+                                         bool scaleTone = false) {
   BuzzerToneCommand cmd;
   cmd.cue = buzzerCueForAlertEvent(event, slowExtended);
+  // Connected maps to the scale's power-on tone, lost to its power-off tone.
+  cmd.scaleTone = scaleTone && (event == AlertEvent::SCALE_CONNECTED ||
+                                event == AlertEvent::SCALE_LOST);
   if (cmd.cue == BuzzerCue::NONE) {
     return cmd;
   }

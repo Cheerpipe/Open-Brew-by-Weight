@@ -44,6 +44,8 @@ struct RtttlCatalog {
   RtttlNote bullseyeNotes[BULLSEYE_RTTTL_MAX_NOTES] = {};
   RtttlNote cueNotes[kCueCount][kFixedNoteCapacity] = {};
   RtttlNote pulseNotes[kPulseRateCount][kFixedNoteCapacity] = {};
+  // Connected scale's own power-on [0] and power-off [1] tones.
+  RtttlNote scaleNotes[2][kFixedNoteCapacity] = {};
 };
 #endif
 
@@ -59,6 +61,7 @@ struct LocalBuzzer {
   BuzzerPattern pending = BuzzerPattern::NONE;
   BuzzerCue activeCue = BuzzerCue::NONE;
   BuzzerCue pendingCue = BuzzerCue::NONE;
+  bool pendingScaleTone = false;  // Written whenever pendingCue is set.
   uint8_t activePulseRate = 0;
   uint8_t pendingPulseRate = 0;
   uint8_t beepIndex = 0;
@@ -93,6 +96,8 @@ struct LocalBuzzer {
   RtttlCatalog *rtttlCatalog = nullptr;
   uint8_t cueNoteCount[kRtttlCueCount] = {};
   uint8_t pulseNoteCount[kPulseRateCount] = {};
+  // Replaced on each scale connect, kept after link down for the lost tone.
+  uint8_t scaleNoteCount[2] = {};
 #endif
   esp_timer_handle_t phaseTimer = nullptr;
   mutable TaskMutex mutex;
@@ -109,6 +114,8 @@ struct LocalBuzzer {
   bool request(BuzzerPattern pattern, uint32_t durationMs = 0);
   bool requestTone(const BuzzerToneCommand &cmd);
   bool configureBullseyeRtttl(const char *rtttl);
+  // False when a declared tone does not fit; that cue keeps its default.
+  bool configureScaleTones(const ScaleStockTones &tones);
   // Tests must start immediately so restoring the saved custom tune cannot
   // change a queued request. Normal shot completion may use the pending slot.
   bool requestBullseye(bool allowQueue = true);
@@ -269,6 +276,7 @@ inline void LocalBuzzer::begin(uint8_t gpioPin) {
   ::new (static_cast<void *>(rtttlCatalog)) RtttlCatalog{};
   memset(cueNoteCount, 0, sizeof(cueNoteCount));
   memset(pulseNoteCount, 0, sizeof(pulseNoteCount));
+  memset(scaleNoteCount, 0, sizeof(scaleNoteCount));
   bullseyeNoteCount = 0;
   for (uint8_t i = 1; i < kRtttlCueCount; ++i) {
     const BuzzerCue cue = static_cast<BuzzerCue>(i);
@@ -333,6 +341,7 @@ inline void LocalBuzzer::startPendingDrainedLocked(uint32_t nowMs) {
   BuzzerToneCommand cmd;
   cmd.cue = pendingCue;
   cmd.pulseRate = pendingPulseRate;
+  cmd.scaleTone = pendingScaleTone;
   cmd.looping = buzzerCueIsLooping(cmd.cue);
   cmd.durationMs = pendingDurationMs;
   cmd.valid = true;
@@ -409,11 +418,14 @@ inline bool LocalBuzzer::startRtttl(const BuzzerToneCommand &cmd,
            sizeof(RtttlNote) * rtttlCount);
     activePulseRate = rate;
   } else {
-    if (id == 0 || id >= kRtttlCueCount || cueNoteCount[id] == 0) {
+    const uint8_t kind = cmd.cue == BuzzerCue::SCALE_LOST ? 1 : 0;
+    const bool scale = cmd.scaleTone && scaleNoteCount[kind] != 0;
+    if (!scale && (id == 0 || id >= kRtttlCueCount || cueNoteCount[id] == 0)) {
       return false;
     }
-    rtttlCount = cueNoteCount[id];
-    memcpy(rtttlBuf, rtttlCatalog->cueNotes[id],
+    rtttlCount = scale ? scaleNoteCount[kind] : cueNoteCount[id];
+    memcpy(rtttlBuf,
+           scale ? rtttlCatalog->scaleNotes[kind] : rtttlCatalog->cueNotes[id],
            sizeof(RtttlNote) * rtttlCount);
     activePulseRate = 0;
   }
@@ -539,6 +551,7 @@ inline bool LocalBuzzer::acceptLocked(BuzzerPattern pattern, BuzzerCue cue,
   } else if (pending == BuzzerPattern::NONE && pendingCue == BuzzerCue::NONE) {
     pending = pattern;
     pendingCue = cue;
+    pendingScaleTone = cmd != nullptr && cmd->scaleTone;
     pendingPulseRate = pulseRate;
     pendingDurationMs = durationMs;
     ++acceptedRequests;
@@ -547,6 +560,7 @@ inline bool LocalBuzzer::acceptLocked(BuzzerPattern pattern, BuzzerCue cue,
              !buzzerRequestIsHighPriority(pending, pendingCue)) {
     pending = pattern;
     pendingCue = cue;
+    pendingScaleTone = cmd != nullptr && cmd->scaleTone;
     pendingPulseRate = pulseRate;
     pendingDurationMs =
         buzzerPatternIsPulseTrain(pattern) || buzzerCueIsLooping(cue)
@@ -607,6 +621,34 @@ inline bool LocalBuzzer::configureBullseyeRtttl(const char *rtttl) {
   TaskLockGuard lock(mutex);
   bullseyeNoteCount = count;
   return true;
+#endif
+}
+
+inline bool LocalBuzzer::configureScaleTones(const ScaleStockTones &tones) {
+#if OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER != 1
+  (void)tones;
+  return true;
+#else
+  // Like the bullseye: unpublish, parse into the idle slots, then publish.
+  {
+    TaskLockGuard lock(mutex);
+    memset(scaleNoteCount, 0, sizeof(scaleNoteCount));
+  }
+  const char *const rtttl[2] = {tones.powerOn, tones.powerOff};
+  uint8_t counts[2] = {};
+  bool valid = true;
+  for (uint8_t kind = 0; kind < 2; ++kind) {
+    if (rtttl[kind] != nullptr && rtttlCatalog != nullptr &&
+        (!parseRtttlBounded(rtttl[kind], rtttlCatalog->scaleNotes[kind],
+                            RtttlCatalog::kFixedNoteCapacity, counts[kind]) ||
+         counts[kind] == 0)) {
+      counts[kind] = 0;
+      valid = false;
+    }
+  }
+  TaskLockGuard lock(mutex);
+  memcpy(scaleNoteCount, counts, sizeof(counts));
+  return valid;
 #endif
 }
 

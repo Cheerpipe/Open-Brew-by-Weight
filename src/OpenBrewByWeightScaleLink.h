@@ -177,6 +177,8 @@ struct ScaleLinkSnapshot {
   char shotScaleName[SCALE_FRIENDLY_NAME_MAX_LEN + 1] = {};
   ScaleModel model = ScaleModel::Unknown;
   ScaleFeatureSet features = {};
+  // Static library strings of the connected protocol; nulls while down.
+  ScaleStockTones stockTones = {};
   bool rssiValid = false;
   int8_t rssi = 0;
   // Display-only scale battery (ScaleFeatureBatteryLevel), never a control input.

@@ -668,6 +668,9 @@ class EspressoScaleBLE {
   const char* connectedProtocolName() const {
     return connected ? connectedProtocol : "none";
   }
+  ScaleStockTones stockTones() const {
+    return connected ? connectedStockTones : ScaleStockTones{};
+  }
   ScaleModel model() const {
     return connected && strcmp(connectedProtocol, "bookoo_generic") == 0
                ? scaleModelForAdvertisement(connectedLocalName)
@@ -749,6 +752,7 @@ class EspressoScaleBLE {
   char connectedLocalName[ACAIA_NAME_CAPACITY] = "BOOKOO";
   char connectedProtocol[20] = "bookoo_generic";
   ScaleFeatureSet connectedFeatures = hostGenericScaleFeatures();
+  ScaleStockTones connectedStockTones = {};
   bool tareSucceeds = true;
   bool startTimerSucceeds = true;
   bool stopTimerSucceeds = true;

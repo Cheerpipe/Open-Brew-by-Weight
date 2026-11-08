@@ -204,7 +204,7 @@ static_assert(MAX_SHOT_DATAPOINTS * 0.1f >
                   ACCIDENTAL_TOUCH_REFERENCE_LAG_S + ACCIDENTAL_TOUCH_FLOW_WINDOW_S,
               "Shot trajectory must span the touch reference window at 10 Hz");
 
-bool emitAlert(AlertEvent event, uint32_t cycleId = 0);
+bool emitAlert(AlertEvent event, uint32_t cycleId = 0, bool scaleTone = false);
 void emitImmediateCommandAlertIfBuzzer(AlertEvent event);
 
 enum class TimerStopResult : uint8_t {

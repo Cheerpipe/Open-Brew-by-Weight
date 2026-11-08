@@ -1,7 +1,7 @@
 # Alerts
 
 Sounds and the optional onboard LED that tell you what the controller is
-doing: tare, first drops, paddle left ON, scale lost or connected, and
+doing: tare, first drops, paddle left ON, scale disconnected or connected, and
 extended-shot pulses.
 
 First-drop sound plays at most once per shot. A confirmed late-cup retare can
@@ -59,15 +59,30 @@ changed. On momentary machines, check the actual group and its state feedback.
 | **First drops** | ON | ON / OFF | One beep on first coffee drops during an automatic shot. Ignored when brew by weight is off. |
 | **Paddle-off reminder** | 30 s | OFF / 15 / 30 / 60 / 120 s | Repeat beeps at the chosen interval while the **physical paddle stays ON** and **machine circuit is already open**; OFF silences them. |
 | **Paddle reminder limit (min)** | 15 min | 1–60 min | Stop beeping after this time even if the paddle remains ON. |
-| **Scale lost** | (buzzer builds) | ON / OFF | Descending RTTTL on the local buzzer when the scale disconnects (idle or during a shot). Hidden / disabled when Play alerts on is Scale only. |
+| **Scale disconnected** | (buzzer builds) | ON / OFF | Descending RTTTL on the local buzzer when the scale disconnects (idle or during a shot). Hidden / disabled when Play alerts on is Scale only. |
+| **Use the scale's own power-off tone** | ON | ON / OFF | Plays the scale's own power-off sound instead of the controller's descending tone. Only scales whose sounds are known (today Bookoo Themis Mini and Ultra); other scales keep the controller's tone. Available only while **Scale disconnected** is on and Play alerts on is not Scale only. |
 | **Shot finished by backup time** | (buzzer builds) | ON / OFF | Distinct RTTTL on the local buzzer when the [scale-loss backup](features/auto-to-manual.md) finishes a shot by time after the scale dropped. Disabled when Play alerts on is Scale only. |
 | **Manual without scale (BBW on)** | (buzzer builds) | ON / OFF | Warns on the local buzzer that Brew by weight cannot start normally because the scale is missing, including the first blocked attempt. See [No-scale BBW](settings/no-scale-bbw.md). |
 | **Scale connected** | ON (Buzzer only or Scale first) | ON / OFF | Rising RTTTL when a scale connects or reconnects. Always the local buzzer. |
+| **Use the scale's own power-on tone** | ON | ON / OFF | Plays the scale's own power-on sound instead of the controller's rising tone. Only scales whose sounds are known (today Bookoo Themis Mini and Ultra); other scales keep the controller's tone. Available only while **Scale connected** is on and Play alerts on is not Scale only. |
 | **Blue light while connected** | ON | ON / OFF | Onboard light on GPIO 1: steady while a scale is connected, fast blink while it connects, slow blink when a connected scale stops sending weight. Independent of Sound alerts. |
 | **Fast-shot beeps** | Fast | Disabled / Slow / Medium / Fast / Rapid | Local-buzzer pulses from the moment a fast shot would have stopped at the target but keeps going for its extra yield. Disabled when Play alerts on is Scale only. |
 | **Slow-shot beeps** | Fast | Same rates | Pulses from the moment a shot runs past your shot time window without having stopped. |
 | **Bullseye melody** | OFF | ON / OFF; Buzzer only | Plays the saved custom RTTTL tune once when a shot stopped by weight **On recipe** remains exactly at its target weight for at least 1 full second. Important alerts, such as a lost scale, interrupt the melody so you never miss them. The text is retained when disabled. |
 | **Custom RTTTL** | empty | Up to 500 ASCII characters / 250 notes | Editable once Bullseye melody is on; otherwise it stays visible and read-only. Bullseye melody and its tune are saved together: switching it on saves nothing until you paste a tune, and a valid tune then saves both by itself. A tune that isn't valid RTTTL is marked and neither is saved. |
+
+## The scale's own sounds
+
+With a Bookoo Themis, the buzzer can greet the scale the way the scale greets
+you: when it connects you hear the Bookoo's own power-on melody, and when it
+disconnects (for example because you switched it off) you hear its power-off
+melody. Both switches are on by default and only choose which melody plays;
+**Scale connected**, **Scale disconnected**, **Sound alerts** and **Play alerts
+on** still decide whether anything plays. For a scale whose sounds the
+controller does not know, nothing changes: it keeps the controller's own
+connected and disconnected tones. The melody that confirms a
+[Require a scale](settings/no-scale-bbw.md) gesture always uses the controller's
+tone, since no scale is connected then.
 
 ## Bullseye timing
 

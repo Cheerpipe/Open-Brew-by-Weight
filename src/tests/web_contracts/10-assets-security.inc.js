@@ -572,7 +572,7 @@ if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     html.includes('id="ntpServerCustom" type="number"') ||
     !html.includes('id="staSsid" type="text" maxlength="32" autocomplete="off"') ||
     !html.includes('id="ntpServerCustom" type="text" maxlength="63" placeholder="e.g. ntp.example.com" autocomplete="off"') ||
-    !html.includes('> Scale lost<small class="fieldHint">Warns when the scale disconnects') ||
+    !html.includes('> Scale disconnected<small class="fieldHint">Warns when the scale disconnects') ||
     html.includes('Scale lost (BBW)') ||
     !html.includes('option value="fast" selected') ||
     !html.includes('option value="rapid">Rapid') ||
@@ -715,6 +715,62 @@ if (!network.includes('"firstDropBeep"') ||
     !firmware.includes('BUZZER_GPIO') ||
     !firmware.includes('machineServiceReminders')) {
   throw new Error('Scale beep settings must be configurable end-to-end');
+}
+{
+  // Stock-tone switches: default ON, right after their parent alert, and owned
+  // by the shared scale-incapable refresh, so a status tick cannot re-enable
+  // them while the parent is off or Scale only plays.
+  const pairs = [['buzzerScaleLostBeep', 'buzzerScaleLostStockTone', 'off'],
+    ['buzzerScaleConnectedBeep', 'buzzerScaleConnectedStockTone', 'on']];
+  const scope = 'Works with scales whose tones are known (Bookoo Themis); ' +
+    'other scales keep the controller&#39;s tone.';
+  for (const [parent, child, kind] of pairs) {
+    const end = html.indexOf('</label>', html.indexOf(`id="${parent}"`)) + '</label>'.length;
+    if (!html.startsWith(`<label class="buzzerOpt scaleIncapableOpt" data-parent="${parent}">` +
+          `<input id="${child}" type="checkbox" checked`, end) ||
+        !html.includes(`Use the scale&#39;s own power-${kind} tone<small class="fieldHint">` +
+          `The buzzer imitates the scale&#39;s own power-${kind} sound. ${scope}`) ||
+        !codeIncludes(viewJs.settings, `${child}: $("${child}").checked,`) ||
+        !codeIncludes(runtimeJs, `"${child}",`) ||
+        !network.includes(`"${child}"`) ||
+        !network.includes(`validationFailure("FIELD_BOOLEAN", "${child}")`) ||
+        !network.includes(`fields.field("config.${child}", bool(config.${child}))`) ||
+        !firmware.includes(`candidate.${child}`)) {
+      throw new Error('Scale stock-tone switch must be wired end-to-end under its parent: ' + child);
+    }
+  }
+  if (!html.includes('The buzzer knows this scale&#39;s own power-on and power-off sounds. ' +
+        'Choose whether it plays them under Alerts.') ||
+      !codeIncludes(runtimeJs,
+        'const off = scaleOnly || (!!e.dataset.parent && !$(e.dataset.parent).checked);') ||
+      !firmware.includes('localBuzzer.configureScaleTones(link.stockTones)') ||
+      !firmware.includes('runtimeConfig.buzzerScaleConnectedStockTone') ||
+      !firmware.includes('runtimeConfig.buzzerScaleLostStockTone')) {
+    throw new Error('Scale stock tones must state their Bookoo scope and play from the link edges');
+  }
+  const refresh = runtimeJs.slice(
+    runtimeJs.search(/function\s+updateScaleIncapableAlertControls\(/),
+    runtimeJs.search(/function\s+updateBullseyeControls\(/));
+  for (const parentOn of [false, true]) for (const channel of ['buzzer_only', 'scale_only']) {
+    for (const buzzer of [false, true]) for (const alertsOn of [false, true]) {
+      const nodes = {};
+      const get = id => nodes[id] ||= {checked: true, value: 'off', disabled: false};
+      get('alertOutputChannel').value = channel;
+      get('buzzerScaleLostBeep').checked = parentOn;
+      const label = {off: null, dataset: {parent: 'buzzerScaleLostBeep'},
+        classList: {toggle(_, off) { label.off = off; }},
+        querySelectorAll: () => [get('buzzerScaleLostStockTone')]};
+      new Function('$', 'document', 'controlsMutable', 'soundAlertsAreOn',
+        refresh + ';return updateScaleIncapableAlertControls;')(
+        get, {querySelectorAll: () => [label]}, true, () => alertsOn)(buzzer);
+      const off = !parentOn || (buzzer && channel === 'scale_only');
+      if (label.off !== off ||
+          get('buzzerScaleLostStockTone').disabled !== (off || !buzzer || !alertsOn) ||
+          !get('buzzerScaleLostStockTone').checked) {
+        throw new Error('The power-off tone switch must follow its parent and the buzzer rules');
+      }
+    }
+  }
 }
 if (firmware.includes('OPEN_BREW_BY_WEIGHT_ENABLE_ALED') ||
     firmware.includes('WS2812') ||

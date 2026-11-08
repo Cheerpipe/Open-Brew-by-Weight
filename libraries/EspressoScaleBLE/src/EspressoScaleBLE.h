@@ -164,6 +164,8 @@ class EspressoScaleBLE {
                                                     uint16_t peerIntervalUnits));
         ScaleFeatureSet features() const;
         ScaleModel model() const;
+        // Static strings of the connected protocol; nulls while not Ready.
+        ScaleStockTones stockTones() const;
         // Borrowed until the connection changes; copy if retained.
         const char* connectedProtocolName() const;
         const char* address() const;

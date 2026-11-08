@@ -167,6 +167,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "reedConfirmTimeoutMs", "assumeIdleWhenScaleConnects", "shotReactTimeoutS",
       "buzzerScaleLostBeep", "buzzerAutoToManualGuardEndBeep",
       "buzzerManualNoScaleBeep", "buzzerScaleConnectedBeep",
+      "buzzerScaleConnectedStockTone", "buzzerScaleLostStockTone",
       "buzzerExtendedPulseRate", "buzzerSlowExtendedPulseRate",
       "bullseyeMelodyEnabled", "bullseyeRtttl",
       "alertOutputChannel", "autoRetare", "retareWindowMs", "minimumCupWeightG",
@@ -238,8 +239,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
                          candidate.postTareBaselineGraceMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "postTareBaselineGraceMs");
   } else if (jsonFieldPresent(root, "canTareStartTimer") &&
-             !jsonBoolean(root, "canTareStartTimer",
-                          candidate.canTareStartTimer)) {
+             !jsonBoolean(root, "canTareStartTimer", candidate.canTareStartTimer)) {
     parseError = validationFailure("FIELD_BOOLEAN", "canTareStartTimer");
   } else if (jsonFieldPresent(root, "scaleTimerStopExtraDelayMs") &&
              !jsonUint32(root, "scaleTimerStopExtraDelayMs",
@@ -268,12 +268,10 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
                          ? validationFailure("BULLSEYE_MELODY_TUNE_REQUIRED")
                          : validationFailure("BULLSEYE_RTTTL_INVALID");
   } else if (jsonFieldPresent(root, "scaleConnectedLed") &&
-             !jsonBoolean(root, "scaleConnectedLed",
-                          candidate.scaleConnectedLed)) {
+             !jsonBoolean(root, "scaleConnectedLed", candidate.scaleConnectedLed)) {
     parseError = validationFailure("FIELD_BOOLEAN", "scaleConnectedLed");
   } else if (jsonFieldPresent(root, "paddleReturnReminderBeep") &&
-             !jsonBoolean(root, "paddleReturnReminderBeep",
-                          candidate.paddleReturnReminderBeep)) {
+             !jsonBoolean(root, "paddleReturnReminderBeep", candidate.paddleReturnReminderBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "paddleReturnReminderBeep");
   } else if (jsonFieldPresent(root, "paddleReturnReminderIntervalMs") &&
              !jsonUint32(root, "paddleReturnReminderIntervalMs",
@@ -309,21 +307,25 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
              !jsonShotReactTimeoutS(root, candidate)) {
     parseError = validationFailure("SHOT_REACT_TIMEOUT_FIELD_INVALID");
   } else if (jsonFieldPresent(root, "buzzerScaleLostBeep") &&
-             !jsonBoolean(root, "buzzerScaleLostBeep",
-                          candidate.buzzerScaleLostBeep)) {
+             !jsonBoolean(root, "buzzerScaleLostBeep", candidate.buzzerScaleLostBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleLostBeep");
   } else if (jsonFieldPresent(root, "buzzerAutoToManualGuardEndBeep") &&
              !jsonBoolean(root, "buzzerAutoToManualGuardEndBeep",
                           candidate.buzzerAutoToManualGuardEndBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerAutoToManualGuardEndBeep");
   } else if (jsonFieldPresent(root, "buzzerManualNoScaleBeep") &&
-             !jsonBoolean(root, "buzzerManualNoScaleBeep",
-                          candidate.buzzerManualNoScaleBeep)) {
+             !jsonBoolean(root, "buzzerManualNoScaleBeep", candidate.buzzerManualNoScaleBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerManualNoScaleBeep");
   } else if (jsonFieldPresent(root, "buzzerScaleConnectedBeep") &&
-             !jsonBoolean(root, "buzzerScaleConnectedBeep",
-                          candidate.buzzerScaleConnectedBeep)) {
+             !jsonBoolean(root, "buzzerScaleConnectedBeep", candidate.buzzerScaleConnectedBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleConnectedBeep");
+  } else if (jsonFieldPresent(root, "buzzerScaleConnectedStockTone") &&
+             !jsonBoolean(root, "buzzerScaleConnectedStockTone",
+                          candidate.buzzerScaleConnectedStockTone)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleConnectedStockTone");
+  } else if (jsonFieldPresent(root, "buzzerScaleLostStockTone") &&
+             !jsonBoolean(root, "buzzerScaleLostStockTone", candidate.buzzerScaleLostStockTone)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleLostStockTone");
   } else if (jsonFieldPresent(root, "buzzerExtendedPulseRate") &&
              !jsonExtendedPulseRate(root, "buzzerExtendedPulseRate",
                                     candidate.buzzerExtendedPulseRate)) {
@@ -374,20 +376,17 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
              !jsonUint32(root, "bbwProtectionMs", candidate.bbwProtectionMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "bbwProtectionMs");
   } else if (jsonFieldPresent(root, "fastExtractionGuardEnabled") &&
-             !jsonBoolean(root, "fastExtractionGuardEnabled",
-                          candidate.fastSideEnabled)) {
+             !jsonBoolean(root, "fastExtractionGuardEnabled", candidate.fastSideEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "fastExtractionGuardEnabled");
   } else if (jsonFieldPresent(root, "avoidAccidentalTouchEnabled") &&
              !jsonBoolean(root, "avoidAccidentalTouchEnabled",
                           candidate.avoidAccidentalTouchEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "avoidAccidentalTouchEnabled");
   } else if (jsonFieldPresent(root, "touchStopFallbackEnabled") &&
-             !jsonBoolean(root, "touchStopFallbackEnabled",
-                          candidate.touchStopFallbackEnabled)) {
+             !jsonBoolean(root, "touchStopFallbackEnabled", candidate.touchStopFallbackEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "touchStopFallbackEnabled");
   } else if (jsonFieldPresent(root, "cupProtectionEnabled") &&
-             !jsonBoolean(root, "cupProtectionEnabled",
-                          candidate.cupProtectionEnabled)) {
+             !jsonBoolean(root, "cupProtectionEnabled", candidate.cupProtectionEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "cupProtectionEnabled");
   } else if (jsonFieldPresent(root, "stopIfCupRemoved") &&
              !jsonBoolean(root, "stopIfCupRemoved", candidate.stopIfCupRemoved)) {
@@ -402,8 +401,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
              !jsonGramsDg(root, "fastMarginG", candidate.fastMarginDg)) {
     parseError = validationFailure("FIELD_GRAMS", "fastMarginG");
   } else if (jsonFieldPresent(root, "slowExtractionGuardEnabled") &&
-             !jsonBoolean(root, "slowExtractionGuardEnabled",
-                          candidate.slowSideEnabled)) {
+             !jsonBoolean(root, "slowExtractionGuardEnabled", candidate.slowSideEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "slowExtractionGuardEnabled");
   } else if (jsonFieldPresent(root, "slowAfterS") &&
              !jsonSecondsMs(root, "slowAfterS", candidate.slowAfterMs)) {
@@ -434,8 +432,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
                                candidate.slowCurveHardnessPct)) {
     parseError = validationFailure("FIELD_RANGE_NUMBER", "slowCurveHardness", "0", "100");
   } else if (jsonFieldPresent(root, "autoToManualGuardEnabled") &&
-             !jsonBoolean(root, "autoToManualGuardEnabled",
-                          candidate.scaleLossEnabled)) {
+             !jsonBoolean(root, "autoToManualGuardEnabled", candidate.scaleLossEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "autoToManualGuardEnabled");
   } else if (jsonFieldPresent(root, "scaleLossFixedS") &&
              !jsonSecondsMs(root, "scaleLossFixedS", candidate.scaleLossFixedMs)) {
@@ -490,8 +487,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
                !validPreferredScaleMac(preferredScaleMac)))) {
     parseError = validationFailure("PREFERRED_SCALE_MAC_INVALID");
   } else if (jsonFieldPresent(root, "bookooMuteOnBuzzerOnly") &&
-             !jsonBoolean(root, "bookooMuteOnBuzzerOnly",
-                          candidate.bookooMuteOnBuzzerOnly)) {
+             !jsonBoolean(root, "bookooMuteOnBuzzerOnly", candidate.bookooMuteOnBuzzerOnly)) {
     parseError = validationFailure("FIELD_BOOLEAN", "bookooMuteOnBuzzerOnly");
   } else if (jsonFieldPresent(root, "bookooConnectBeepLevel") &&
              (!jsonUint8(root, "bookooConnectBeepLevel",

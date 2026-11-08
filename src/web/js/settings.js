@@ -323,6 +323,8 @@ function machinePayload() {
     buzzerAutoToManualGuardEndBeep: $("buzzerAutoToManualGuardEndBeep").checked,
     buzzerManualNoScaleBeep: $("buzzerManualNoScaleBeep").checked,
     buzzerScaleConnectedBeep: $("buzzerScaleConnectedBeep").checked,
+    buzzerScaleConnectedStockTone: $("buzzerScaleConnectedStockTone").checked,
+    buzzerScaleLostStockTone: $("buzzerScaleLostStockTone").checked,
     buzzerExtendedPulseRate: R.extRate($("buzzerExtendedPulseRate").value),
     buzzerSlowExtendedPulseRate: R.extRate($("buzzerSlowExtendedPulseRate").value),
     alertOutputChannel: ["scale_only", "buzzer_only", "scale_priority"].includes(
