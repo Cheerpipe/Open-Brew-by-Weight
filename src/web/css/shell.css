@@ -38,7 +38,10 @@ body {
   /* The painted surface is the ::before pseudo, which desktop layouts cut
      at the menu's middle: content scrolls under the menu's rounded lower
      half, and the bare strip neither paints nor intercepts pointer events.
-     The resting gap below the bar is a margin for the same reason. */
+     The resting gap below the bar is a margin for the same reason.
+     The surface also reaches far above the bar: iOS 26 home-screen apps
+     paint scrolled content behind a transparent status bar, outside the
+     viewport the bar sticks to. */
   padding: 0.5rem 1rem 0;
   padding-top: calc(0.5rem + env(safe-area-inset-top));
   background: none;
@@ -49,7 +52,7 @@ body {
 .topBar::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -100vh 0 0;
   background: var(--bg);
 }
 
