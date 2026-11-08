@@ -278,8 +278,9 @@ int main(){
 }
 // Route changes stop the Diagnostic and log streams: only a live subscription
 // sends "off", and the leaving view holds the history paging until the next
-// entry restarts the log at its live tail, because a hidden view drops its
-// scroll and a re-shown one must not read as a reader parked at the top. A tab
+// entry restarts the log on its newest page (one stored page tops up a short
+// live ring), because a hidden view drops its scroll and a re-shown one must
+// not read as a reader parked at the top. A tab
 // loaded in the background settles its view once it shows instead of reporting
 // a failure, a failed view import is retried with a fresh URL, and modified
 // nav clicks keep the browser's own handling.
@@ -291,7 +292,8 @@ int main(){
       'logEntryHold||logHistoryBusy||logHistoryDone||logHistoryFull()'));
   assert(codeIncludes(viewJs.diagnostic,
       'logEntryHold=false;logJumpAt=logJumpBoot=logJumpDay=null'));
-  assert(codeIncludes(viewJs.diagnostic, 'restartLogHistory(false)'));
+  assert(codeIncludes(viewJs.diagnostic,
+      'restartLogHistory(R.uiState.logEvents.length < LOG_HISTORY_PAGE)'));
   assert(codeIncludes(runtimeJs, "if(diagStreamWanted&&shotWs&&shotWs.readyState===1)shotWs.send('{\"op\":\"diagnostic\",\"on\":false}')"));
   assert(codeIncludes(appJsSource, 'if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;'));
   const calls = [], loading = new Set(['pageLoading']),

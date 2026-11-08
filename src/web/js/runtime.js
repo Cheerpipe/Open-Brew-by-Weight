@@ -314,8 +314,6 @@ const uiState = {
   shotStats: {},
   // The companion this page came through: its own status, or null.
   companionHere: null,
-  // Admin cleared the companion's log history; Diagnostic starts its view over.
-  logHistoryCleared: false,
 };
 let bootId = 0,
   configRevision = 0,

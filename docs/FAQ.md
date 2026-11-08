@@ -284,9 +284,9 @@ timer — update on their own several times per second, so readings such as the
 relay, the switch, the cup, and the weight stay current without reloading;
 every other section refreshes every few seconds. The page finishes loading
 when those sections have arrived. New log entries appear automatically while
-Diagnostic is open, and leaving the page stops its live updates. Reopening the
-page starts the log again at the newest lines; scrolling up brings in stored
-history 500 lines at a time. The log also
+Diagnostic is open, and leaving the page stops its live updates. Each time you
+open the page, the log starts over with its newest 500 lines; scrolling up
+brings in older stored history 500 lines at a time. The log also
 shows warnings and errors from the device's built-in system components — for
 example, the exact reason a secure connection to the La Marzocco cloud
 failed — so you can troubleshoot from the browser without opening the machine

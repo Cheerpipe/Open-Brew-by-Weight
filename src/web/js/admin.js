@@ -2455,7 +2455,6 @@ export function init() {
       return;
     try {
       await R.companionLog("/__companion/log/delete", {});
-      R.uiState.logHistoryCleared = true;
       R.message(__WEBUI_TEXT__("admin.log_history_cleared"), "ok");
     } catch (e) {
       R.message(

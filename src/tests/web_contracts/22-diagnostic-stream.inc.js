@@ -593,14 +593,14 @@
       'the view stops loading past the cap');
   // D14: Clear log history sits with the other record clears in Admin, shows
   // only through the companion, asks first, posts through the shared Web UI
-  // session helper, and Diagnostic consumes the flag on its next show, whose
-  // entry restarts the view either way.
+  // session helper; Diagnostic needs no word of it, since every entry starts
+  // its view over from the newest page.
   assert(partialHtml.admin.includes('id="clearLogHistoryButton" class="btnGlyph mutable btnInvert" type="button" hidden') &&
          !partialHtml.diagnostic.includes('logDeleteButton') &&
          codeIncludes(viewJs.admin, '$("clearLogHistoryButton").hidden=!here?.paired') &&
-         codeIncludes(viewJs.admin, 'await R.companionLog("/__companion/log/delete",{});R.uiState.logHistoryCleared=true') &&
+         codeIncludes(viewJs.admin, 'await R.companionLog("/__companion/log/delete",{});R.message(') &&
          codeIncludes(runtimeJs, 'headers:webUiHeaders(body&&{"Content-Type":"application/json"})') &&
-         codeIncludes(viewJs.diagnostic, 'restartLogHistory(false);uiState.logHistoryCleared=false'),
+         !codeIncludes(runtimeJs + viewJs.admin + viewJs.diagnostic, 'logHistoryCleared'),
       'Clear log history lives in Admin and follows the companion');
 }
 // logZoneOffsetMinutes answers the zone's offset at each instant: January and

@@ -1599,16 +1599,14 @@ function startLogStream() {
   if (R.webUiPollingActive()) {
     if (!logStreamWanted) {
       logStreamWanted = true;
-      // Every visit reads the log from its live tail again: the stored pages
-      // an earlier visit loaded belong to that reading. The view restarts at
-      // the end and pages 500 lines at a time only when the view is short or
-      // the reader scrolls up. A history the admin cleared lands here too:
-      // the view starts over either way.
+      // Every visit opens on the newest page of the log again, dropping what an
+      // earlier visit loaded (or the admin cleared): a live ring short of a
+      // page is topped up with one stored page, and older pages follow only as
+      // the reader scrolls up.
       logEntryHold = false;
       logJumpAt = logJumpBoot = logJumpDay = null;
       logHistoryControls();
-      restartLogHistory(false);
-      R.uiState.logHistoryCleared = false;
+      restartLogHistory(R.uiState.logEvents.length < LOG_HISTORY_PAGE);
       R.sendUiOperation({ op: "log", on: true, after: lastLog });
     }
     return true;
@@ -1976,8 +1974,7 @@ function logScrolled() {
     void loadLogOlder();
 }
 // A jump, Back to live or a filter change starts the history over, its first
-// page included. A view entry restarts without one: it opens at the live tail
-// and only fetches when the view is short or the reader scrolls up.
+// page included. A view entry skips that page when the live ring fills one.
 function restartLogHistory(page = true) {
   logHistoryRun++;
   logHistoryBusy = false;
