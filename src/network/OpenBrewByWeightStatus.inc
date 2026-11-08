@@ -111,13 +111,19 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
       static_cast<unsigned long>(webUiOverrideRemainingMs),
       configLockReason(control));
   if (ok) {
+    escapeJsonString(network.staChangeSsid, g_work->historyJson, NetworkWorkBuf::kHistoryJson);
+    {
+      TaskLockGuard lock(self.dataMux_);
+      formatCardDismissals(g_work->jsonItem, NetworkWorkBuf::kJsonItem);
+    }
     ok = statusJsonAppend(&used,
                           ",\"firmwareBuiltAt\":%lu,\"rolledBackImage\":\"%.16s\","
-                          "\"runningImage\":\"%.16s\",\"wifiChangeResult\":\"%s\"",
+                          "\"runningImage\":\"%.16s\",\"wifiChangeResult\":\"%s\","
+                          "\"wifiChangeSsid\":\"%s\",\"dismissed\":%s",
                           static_cast<unsigned long>(FW_BUILD_EPOCH),
                           OpenBrewByWeightOta::instance().rolledBackImage(),
                           OpenBrewByWeightOta::instance().runningImage(),
-                          network.staChangeResult);
+                          network.staChangeResult, g_work->historyJson, g_work->jsonItem);
   }
   if (ok) {
     ok = statusJsonAppend(

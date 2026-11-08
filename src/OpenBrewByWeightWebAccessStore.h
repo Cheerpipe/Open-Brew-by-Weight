@@ -1,8 +1,7 @@
 #pragma once
 
-// NVS I/O for the Web UI access blob (OpenBrewByWeightWebAccess.h). One key in
-// the settings namespace; NVS keeps the previous value until a write commits.
-// Callers pass a stack copy because flash I/O must not read PSRAM.
+// NVS I/O for the Web UI access blob (OpenBrewByWeightWebAccess.h), one key in
+// the settings namespace (see loadSettingsBlob).
 
 #include "OpenBrewByWeightPersistence.h"
 #include "OpenBrewByWeightWebAccess.h"
@@ -14,46 +13,17 @@ constexpr const char *WEB_ACCESS_KEY = "webAccess";
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                      \
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
 
-enum class WebAccessLoad : uint8_t { LOADED, MISSING, INVALID };
+using WebAccessLoad = SettingsBlobLoad;
 
-// A missing or invalid blob loads as the default: login off. INVALID (a
-// record that cannot be read, has another length, or fails its checksum) is
-// worth a log line.
+// A missing or invalid blob loads as the default: login off.
 inline WebAccessLoad loadWebAccessStored(WebAccessStored &stored) {
-  WebAccessLoad result = WebAccessLoad::INVALID;
-  if (lockSettingsNvs()) {
-    OpenBrewByWeightPreferences preferences(NvsSubsystem::WEB_ACCESS);
-    // An absent namespace is a fresh device; NVS logs real open failures.
-    result = WebAccessLoad::MISSING;
-    if (preferences.begin(SETTINGS_NAMESPACE, true)) {
-      if (preferences.isKey(WEB_ACCESS_KEY)) {
-        const bool loaded =
-            preferences.getBytesLength(WEB_ACCESS_KEY) == sizeof(stored) &&
-            preferences.getBytes(WEB_ACCESS_KEY, &stored, sizeof(stored)) ==
-                sizeof(stored) &&
-            validWebAccessStored(stored);
-        result = loaded ? WebAccessLoad::LOADED : WebAccessLoad::INVALID;
-      }
-      preferences.end();
-    }
-    unlockSettingsNvs();
-  }
-  if (result != WebAccessLoad::LOADED) stored = WebAccessStored{};
-  return result;
+  return loadSettingsBlob(NvsSubsystem::WEB_ACCESS, WEB_ACCESS_KEY, stored,
+                          validWebAccessStored);
 }
 
 inline bool saveWebAccessStored(WebAccessStored &stored) {
   finalizeWebAccessStored(stored);
-  if (!lockSettingsNvs()) return false;
-  OpenBrewByWeightPreferences preferences(NvsSubsystem::WEB_ACCESS);
-  bool saved = false;
-  if (preferences.begin(SETTINGS_NAMESPACE, false)) {
-    saved = preferences.putBytes(WEB_ACCESS_KEY, &stored, sizeof(stored)) ==
-            sizeof(stored);
-    preferences.end();
-  }
-  unlockSettingsNvs();
-  return saved;
+  return saveSettingsBlob(NvsSubsystem::WEB_ACCESS, WEB_ACCESS_KEY, stored);
 }
 
 // Factory reset forgets everything, including the Home notice choice.

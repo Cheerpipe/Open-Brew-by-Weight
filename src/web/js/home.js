@@ -247,7 +247,8 @@ export function init() {
     };
   if ($("grindHintNewBeans")) $("grindHintNewBeans").onclick = () => R.startNewCoffee();
   if ($("grindHintLater"))
-    $("grindHintLater").onclick = () => R.dismissCard($("grindHintCard").dataset.key);
+    $("grindHintLater").onclick = () =>
+      R.dismissOnController("grind", $("grindHintCard").dataset.key);
   for (const id of [
     "companionHint",
     "companionPairHint",

@@ -35,6 +35,7 @@ enum class NvsSubsystem : uint8_t {
   FIRMWARE_MODE,
   WEB_ACCESS,
   COMPANION,
+  CARD_DISMISSALS,
 };
 
 enum class NvsOperation : uint8_t {
@@ -80,6 +81,7 @@ inline const char *nvsSubsystemName(NvsSubsystem subsystem) {
     case NvsSubsystem::FIRMWARE_MODE: return "firmwareMode";
     case NvsSubsystem::WEB_ACCESS: return "webAccess";
     case NvsSubsystem::COMPANION: return "companion";
+    case NvsSubsystem::CARD_DISMISSALS: return "cardDismissals";
     default: return "unknown";
   }
 }

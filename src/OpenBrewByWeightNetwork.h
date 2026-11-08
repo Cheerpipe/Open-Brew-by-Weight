@@ -120,8 +120,10 @@ struct NetworkStatusSnapshot {
   StaState staState = StaState::NOT_CONFIGURED;
   uint8_t staIpMode = static_cast<uint8_t>(StaIpMode::DHCP);
   uint8_t staConfigState = static_cast<uint8_t>(StaConfigState::CONFIRMED);
-  // How the last network change ended: "", "CONFIRMED" or "REVERTED".
+  // How the last network change ended: "", "CONFIRMED" or "REVERTED", and
+  // the network it tried; a Home card dismissal clears the result.
   const char *staChangeResult = "";
+  char staChangeSsid[WIFI_SSID_CAPACITY] = {};
   int8_t staRssi = 0;
   uint8_t staSignalLevel = 0;
   uint8_t staSignalQualityPct = 0;
@@ -1074,6 +1076,7 @@ class OpenBrewByWeightNetwork {
   static esp_err_t authLogoutHandler(httpd_req_t *request);
   static esp_err_t authAccessHandler(httpd_req_t *request);
   static esp_err_t authNoticeHandler(httpd_req_t *request);
+  static esp_err_t cardDismissHandler(httpd_req_t *request);
   static esp_err_t authPairingHandler(httpd_req_t *request);
   bool integrationAccessRoute(httpd_req_t *request, esp_err_t &result);
   bool appendWebAccessStatus(httpd_req_t *request, size_t *used) const;

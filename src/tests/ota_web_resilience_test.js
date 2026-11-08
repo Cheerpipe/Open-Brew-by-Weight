@@ -17,8 +17,8 @@ const otaSource = admin.slice(admin.search(/const\s+OTA_UPLOAD_TIMEOUT_MS\s*=/),
     admin.indexOf('async function setBleScanIntensity('));
 const runtime = fs.readFileSync(path.join(jsDir, 'runtime.js'), 'utf8');
 const restartSource = runtime.slice(runtime.indexOf('// Only the firmware\'s own status with another boot'),
-    runtime.indexOf('const WIFI_CHANGE_KEY'));
-const wifiSource = runtime.slice(runtime.indexOf('const WIFI_CHANGE_KEY'),
+    runtime.indexOf('// The firmware says how the last network change ended'));
+const wifiSource = runtime.slice(runtime.indexOf('// The firmware says how the last network change ended'),
     runtime.indexOf('// Each card is moved to the view showing it'));
 const parser = new Function(fs.readFileSync(path.join(jsDir, 'ota-image.js'), 'utf8')
     .replace(/export\s+/g, '') + ';return otaFileIdentity;')();
@@ -134,7 +134,7 @@ function restartContext(answers, pages = () => ({ok: true})) {
     fetch: async url => pages(url), setTimeout: fn => { log.next = fn; return 1; },
     beginNetworkReconnectWait() {}, endNetworkReconnectWait: () => { log.ended = true; },
     claimWebUiOwnership: () => { log.claims++; }, message: text => log.messages.push(text),
-    cardDismissed: () => '', sub: (text, values) => text + ':' + values.join(','),
+    sub: (text, values) => text + ':' + values.join(','),
     location: {replace: url => log.landed.push(url)}, networkReconnectPollTimer: 0,
     networkReconnectDeadline: 0});
   vm.runInContext('let firmwareRestart = null, fwReloading = false;' +
@@ -199,16 +199,23 @@ async function restartWaitChecks() {
 }
 
 function firmwareResultChecks() {
-  const store = new Map();
+  const store = new Map(), posted = [];
+  // The controller's record of dismissed cards, as each status carries it.
+  let seen = {image: '', rollback: '', grind: []};
   const context = vm.createContext({JSON, Number, __WEBUI_TEXT__: key => key,
     localStorage: {getItem: key => store.get(key) ?? null,
       setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key)},
-    cardDismissed: key => store.get(key) || '', dismissCard: (key, value = '1') => store.set(key, value),
-    sub: (text, values) => text + ':' + values.join(',')});
+    api: async (url, options) => {
+      assert.equal(url, '/api/v1/home/dismiss');
+      const body = JSON.parse(options.body);
+      posted.push(body);
+      if (body.key) seen = {...seen, [body.card]: body.key};
+    },
+    renderHomeCards() {}, sub: (text, values) => text + ':' + values.join(',')});
   vm.runInContext('let firmwareRestart = null, fwReloading = false;' + restartSource + wifiSource, context);
   const result = status => {
     context.status = status;
-    return vm.runInContext('firmwareResult(status)', context);
+    return vm.runInContext('dismissed = status.dismissed; firmwareResult(status)', context);
   };
   const flash = {version: '2.0', imageSha256: 'abcdef0123456789' + 'f'.repeat(48), bootId: 7};
   const note = () => {
@@ -217,29 +224,39 @@ function firmwareResultChecks() {
   };
   const image = flash.imageSha256.slice(0, 16), oldImage = '1'.repeat(16);
   const run = (bootId, firmwareVersion, runningImage, rolledBackImage = '') =>
-    result({bootId, firmwareVersion, runningImage, rolledBackImage});
-  assert.equal(run(8, '1.0', oldImage), null, 'a first visit has nothing to compare');
-  // An update from anywhere reaches a browser that knew the previous image, once.
-  let card = run(9, '2.0', image);
+    result({bootId, firmwareVersion, runningImage, rolledBackImage, dismissed: seen});
+  // With nothing acknowledged yet, the running image is news once.
+  let card = run(8, '1.0', oldImage);
   assert.equal(card.failed, false);
-  assert.match(card.text, /firmware_updated_text:2\.0/);
   card.dismiss();
-  assert.equal(run(10, '2.0', image), null);
-  // A reinstall from this browser reports too, from the next boot on.
+  assert.deepEqual(posted.at(-1), {card: 'image', key: oldImage});
+  assert.equal(run(9, '1.0', oldImage), null);
+  // An update from anywhere reaches every browser until one dismisses it.
+  card = run(9, '2.0', image);
+  assert.match(card.text, /firmware_updated_text:2\.0/);
+  store.clear();
+  assert.ok(run(9, '2.0', image), 'another browser');
+  card.dismiss();
+  assert.equal(run(10, '2.0', image), null, 'dismissed for every browser');
+  // A reinstall from this browser reports here, from the next boot on.
   note();
   assert.equal(run(7, '2.0', image), null, 'same boot');
   card = run(8, '2.0', image);
   assert.match(card.text, /firmware_updated_text:2\.0/);
   card.dismiss();
-  // A rollback overrides success even after that card was dismissed, including
-  // a reinstall of the same version, which only the firmware's record can tell.
+  assert.equal(store.has('obbwFwResult'), false, 'dismissing ends this flash');
+  assert.equal(run(9, '2.0', image), null);
+  // A rollback overrides success, including a reinstall of the same version,
+  // which only the firmware's record can tell.
+  note();
   card = run(9, '2.0', image, image);
   assert.equal(card.failed, true);
   assert.match(card.text, /firmware_rollback_named:2\.0,2\.0/);
   card = run(9, '1.0', oldImage, image);
   assert.match(card.text, /firmware_rollback_named:2\.0,1\.0/);
-  // Dismissed stays dismissed across restarts, until the next flash.
+  // Dismissed stays dismissed everywhere, until this browser flashes it again.
   card.dismiss();
+  assert.deepEqual(posted.at(-1), {card: 'rollback', key: image});
   assert.equal(run(10, '1.0', oldImage, image), null);
   note();
   assert.equal(run(10, '1.0', oldImage, image).failed, true);
@@ -263,30 +280,33 @@ function firmwareResultChecks() {
   card = run(13, '4.0', '5'.repeat(16));
   assert.match(card.text, /firmware_updated_text:4\.0$/);
   card = result({bootId: 13, firmwareVersion: '4.0', runningImage: '5'.repeat(16), rolledBackImage: '',
-    firmwareBuiltAt: 1793900000});
+    firmwareBuiltAt: 1793900000, dismissed: seen});
   assert.match(card.text, /firmware_updated_text:4\.0 shell\.firmware_built_text:.*2026/);
   card.dismiss();
   // A Wi-Fi change waits for the firmware's word, which a name could not give
-  // for a wrong password on the same network, and Dismiss ends it.
+  // for a wrong password on the same network; every browser shows it, and
+  // Dismiss ends it for all of them.
   const wifi = status => {
     context.status = status;
     return vm.runInContext('wifiResult(status)', context);
   };
-  assert.equal(wifi({wifiChangeResult: 'CONFIRMED'}), null, 'nothing saved here');
-  vm.runInContext('noteWifiChange("Home")', context);
-  assert.equal(wifi({wifiChangeResult: ''}), null, 'still pending');
-  assert.equal(wifi({wifiChangeResult: 'CONFIRMED'}).failed, false);
-  card = wifi({wifiChangeResult: 'REVERTED'});
+  assert.equal(wifi({wifiChangeResult: '', wifiChangeSsid: 'Home'}), null, 'pending');
+  assert.equal(wifi({wifiChangeResult: 'CONFIRMED', wifiChangeSsid: 'Home'}).failed, false);
+  const reverted = {wifiChangeResult: 'REVERTED', wifiChangeSsid: 'Home'};
+  card = wifi(reverted);
   assert.equal(card.failed, true);
   assert.match(card.text, /wifi_failed_text:Home/);
   card.dismiss();
-  assert.equal(wifi({wifiChangeResult: 'REVERTED'}), null);
+  assert.deepEqual(posted.at(-1), {card: 'wifi'});
+  assert.equal(wifi(reverted), null, 'hidden at once');
   // Saving starts the result over, and only the two endings set it.
   const firmware = fs.readFileSync(path.join(__dirname, '../network/OpenBrewByWeightWifi.inc'), 'utf8');
   for (const [fn, value] of [['::armPendingConfirmWindow', ''], ['::confirmPendingNetwork', 'CONFIRMED'],
     ['::revertPendingNetwork', 'REVERTED']]) {
     const start = firmware.indexOf(fn), body = firmware.slice(start, firmware.indexOf('\n}\n', start));
     assert.ok(body.includes(`status_.staChangeResult = "${value}";`), fn);
+    assert.equal(body.includes('copyCString(status_.staChangeSsid, sizeof(status_.staChangeSsid), settings_.staSsid);'),
+        !value, fn + ': the network on trial is named when the window opens');
   }
 }
 

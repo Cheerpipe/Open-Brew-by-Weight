@@ -3,6 +3,7 @@
 #include "../OpenBrewByWeightValidationFailure.h"
 #include "../OpenBrewByWeightBleScanPersistence.h"
 #include "../OpenBrewByWeightWebAccessStore.h"
+#include "../OpenBrewByWeightCardDismissals.h"
 #include "../OpenBrewByWeightDurableStores.h"
 #include "../OpenBrewByWeightFirmwareMode.h"
 #include "../OpenBrewByWeightRecovery.h"
@@ -1537,6 +1538,52 @@ void p91_web_access_store_round_trip_and_corruption() {
   CHECK(eraseWebAccessStored());
   CHECK(loadWebAccessStored(loaded) == WebAccessLoad::MISSING);
   CHECK(eraseWebAccessStored());
+}
+
+// Home cards dismissed for every browser: what a page may post, the newest
+// advice first with one entry per preset, and a corrupt record forgotten.
+void p91c_card_dismissals_validate_order_and_persist() {
+  resetHostPersistence();
+  CHECK(cardImageValid("") && cardImageValid("0123456789abcdef"));
+  CHECK(!cardImageValid("0123456789ABCDEF") && !cardImageValid("0123456789abcde") &&
+        !cardImageValid("0123456789abcdef0"));
+  CHECK(cardGrindPreset("3:41:finer:likely") == 3 && cardGrindPreset("12:0:vary:") == 12);
+  for (const char *bad : {"", "0:41:vary:", "256:1:vary:", "3:41:vary", "3:41:\"x:",
+                          "a:41:vary:", "3:41:vary:likely:x", " 3:41:vary:",
+                          "3:1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:"}) {
+    CHECK(cardGrindPreset(bad) == 0);
+  }
+  CardDismissals d;
+  CHECK(cardDismissImage(d.image, "0123456789abcdef") && !cardDismissImage(d.image, "0123456789abcdef"));
+  CHECK(cardIgnoreGrind(d, "3:41:vary:") && cardIgnoreGrind(d, "4:7:finer:likely"));
+  CHECK(!cardIgnoreGrind(d, "4:7:finer:likely"));
+  // A preset's newer advice replaces its older one and moves to the front.
+  CHECK(cardIgnoreGrind(d, "3:42:coarser:tentative"));
+  CHECK(strcmp(d.grind[0], "3:42:coarser:tentative") == 0 &&
+        strcmp(d.grind[1], "4:7:finer:likely") == 0 && d.grind[2][0] == '\0');
+  // With every slot taken, the oldest entry ages out.
+  char key[CARD_GRIND_KEY_BYTES];
+  for (unsigned preset = 10; preset < 10 + MAX_SHOT_PRESETS - 1; ++preset) {
+    snprintf(key, sizeof(key), "%u:1:vary:", preset);
+    CHECK(cardIgnoreGrind(d, key));
+  }
+  CHECK(strcmp(d.grind[MAX_SHOT_PRESETS - 1], "3:42:coarser:tentative") == 0);
+  CHECK(cardIgnoreGrind(d, "20:1:vary:"));
+  for (const char *entry : d.grind) CHECK(cardGrindPreset(entry) != 3);
+
+  CardDismissals loaded;
+  CHECK(loadCardDismissals(loaded) == SettingsBlobLoad::MISSING);
+  CHECK(saveCardDismissals(d));
+  CHECK(loadCardDismissals(loaded) == SettingsBlobLoad::LOADED);
+  CHECK(memcmp(&loaded, &d, sizeof(d)) == 0);
+  // A key no page could post makes the whole record invalid.
+  strcpy(d.grind[0], "3:41:\"x:");
+  d.checksum = cardDismissalsChecksum(d);
+  persistence_host::putRaw(SETTINGS_NAMESPACE, CARD_DISMISSALS_KEY, &d, sizeof(d));
+  CHECK(loadCardDismissals(loaded) == SettingsBlobLoad::INVALID);
+  CHECK(loaded.image[0] == '\0' && loaded.grind[0][0] == '\0');
+  CHECK(eraseCardDismissals());
+  CHECK(loadCardDismissals(loaded) == SettingsBlobLoad::MISSING);
 }
 
 void p48_ble_scan_defaults_and_dual_slot_round_trip() {
@@ -3549,6 +3596,7 @@ const TestCase tests[] = {
     {"P90", p90_firmware_mode_store_round_trip_and_factory_reset},
     {"P11", p11_config_validation_catalog_agreement},
     {"P91", p91_web_access_store_round_trip_and_corruption},
+    {"P91c", p91c_card_dismissals_validate_order_and_persist},
     {"P90b", p90b_setup_intent_commits_with_its_wifi},
     {"P86", p86_timezone_preference_and_durable_initialization},
     {"P85", p85_schema1_is_strict_and_micra_defaults_round_trip},

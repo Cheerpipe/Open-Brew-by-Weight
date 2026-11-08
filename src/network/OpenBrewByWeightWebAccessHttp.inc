@@ -140,25 +140,43 @@ void OpenBrewByWeightNetwork::serviceWebAccess() {
       !networkFlashWriteAllowed()) {
     return;
   }
-  WebAccessStored stored;
+  // Disjoint scopes let the two stack copies share one slot.
+  const char *failed = nullptr;
   {
-    TaskLockGuard lock(dataMux_);
-    if (!g_webAccess.dirty) return;
-    stored = g_webAccess.stored;
-    g_webAccess.dirty = false;
+    WebAccessStored stored;
+    bool dirty = false;
+    {
+      TaskLockGuard lock(dataMux_);
+      if ((dirty = g_webAccess.dirty)) stored = g_webAccess.stored;
+      g_webAccess.dirty = false;
+    }
+    if (dirty && !saveWebAccessStored(stored)) {
+      TaskLockGuard lock(dataMux_);
+      g_webAccess.dirty = true;
+      failed = "Web UI access settings could not be saved; retrying";
+    }
+    memset(&stored, 0, sizeof(stored));
   }
-  const bool saved = saveWebAccessStored(stored);
-  memset(&stored, 0, sizeof(stored));
-  if (saved) {
+  {
+    CardDismissals dismissals;
+    bool dirty = false;
+    {
+      TaskLockGuard lock(dataMux_);
+      if ((dirty = g_cardDismissalsDirty)) dismissals = g_cardDismissals;
+      g_cardDismissalsDirty = false;
+    }
+    if (dirty && !saveCardDismissals(dismissals)) {
+      TaskLockGuard lock(dataMux_);
+      g_cardDismissalsDirty = true;
+      failed = "Dismissed Home cards could not be saved; retrying";
+    }
+  }
+  if (failed == nullptr) {
     webAccessRetryAtMs_ = 0;
     return;
   }
-  {
-    TaskLockGuard lock(dataMux_);
-    g_webAccess.dirty = true;
-  }
   webAccessRetryAtMs_ = (now + 30000U) | 1U;
-  lifecycleLog("Web UI access settings could not be saved; retrying");
+  lifecycleLog(failed);
 }
 
 bool OpenBrewByWeightNetwork::readWebAccessBody(httpd_req_t *request,
@@ -422,6 +440,43 @@ esp_err_t OpenBrewByWeightNetwork::authNoticeHandler(httpd_req_t *request) {
     }
   }
   return sendJson(request, STATUS_OK, "{\"ok\":true}");
+}
+
+// One Home card dismissed for every browser: {"card":"image"|"rollback"|
+// "grind","key":...} names the image prefix or advice key the page showed,
+// so a stale page can only dismiss what it showed; {"card":"wifi"} ends the
+// Wi-Fi change report.
+esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
+  OpenBrewByWeightNetwork &self = *instance_;
+  esp_err_t sent = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
+  if (sent != ESP_OK) return sent;
+  char card[12] = {}, key[CARD_GRIND_KEY_BYTES] = {};
+  cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
+  static const char *const fields[] = {"card", "key"};
+  const bool parsed = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 2) &&
+                      jsonString(root, "card", card, sizeof(card), false) &&
+                      (!jsonFieldPresent(root, "key") ||
+                       jsonString(root, "key", key, sizeof(key), false));
+  if (root != nullptr) cJSON_Delete(root);
+  self.unlockJsonBody();
+  const bool image = strcmp(card, "image") == 0, rollback = strcmp(card, "rollback") == 0;
+  bool known = parsed;
+  if (known) {
+    TaskLockGuard lock(self.dataMux_);
+    if ((image || rollback) && key[0] != '\0' && cardImageValid(key)) {
+      g_cardDismissalsDirty |= cardDismissImage(
+          image ? g_cardDismissals.image : g_cardDismissals.rollback, key);
+    } else if (strcmp(card, "grind") == 0 && cardGrindPreset(key) != 0) {
+      g_cardDismissalsDirty |= cardIgnoreGrind(g_cardDismissals, key);
+    } else if (strcmp(card, "wifi") == 0) {
+      self.status_.staChangeResult = "";
+    } else {
+      known = false;
+    }
+  }
+  return known ? sendJson(request, STATUS_OK, "{\"ok\":true}")
+               : sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", nullptr,
+                           "CARD_DISMISS_INVALID");
 }
 
 esp_err_t OpenBrewByWeightNetwork::authPairingHandler(httpd_req_t *request) {

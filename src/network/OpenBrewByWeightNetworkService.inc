@@ -29,6 +29,11 @@ bool OpenBrewByWeightNetwork::begin(const PersistedSettings &settings,
   g_webAccess.stored = access;
   if (passwordIsFactoryDefault(settings_)) webAccessDisable(g_webAccess);
   memset(&access, 0, sizeof(access));
+  CardDismissals dismissals;
+  if (loadCardDismissals(dismissals) == SettingsBlobLoad::INVALID) {
+    lifecycleLog("Dismissed Home cards unreadable; they show again");
+  }
+  g_cardDismissals = dismissals;
   beginCompanion();
   stopRequested_.store(false, std::memory_order_release);
   acceptedCommandQueue_.reset(

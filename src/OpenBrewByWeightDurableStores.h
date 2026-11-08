@@ -11,6 +11,7 @@
 #include "OpenBrewByWeightCrashArchive.h"
 #include "OpenBrewByWeightAuditStore.h"
 #include "OpenBrewByWeightWebAccessStore.h"
+#include "OpenBrewByWeightCardDismissals.h"
 #include "network/OpenBrewByWeightCompanionStore.h"
 
 namespace openbrewbyweight {
@@ -122,7 +123,7 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
   // quick start record the next boot quick starts every factory preset.
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                      \
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
-  if (!clearFirmwareMode() || !eraseWebAccessStored() ||
+  if (!clearFirmwareMode() || !eraseWebAccessStored() || !eraseCardDismissals() ||
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, QUICK_START_KEY)) {
     return false;
   }

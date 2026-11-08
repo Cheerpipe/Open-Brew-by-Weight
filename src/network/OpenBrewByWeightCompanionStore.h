@@ -49,15 +49,7 @@ inline CompanionLoad loadCompanionStored(CompanionStored &stored) {
 
 inline bool saveCompanionStored(CompanionStored &stored) {
   finalizeCompanionStored(stored);
-  if (!lockSettingsNvs()) return false;
-  OpenBrewByWeightPreferences preferences(NvsSubsystem::COMPANION);
-  bool saved = false;
-  if (preferences.begin(SETTINGS_NAMESPACE, false)) {
-    saved = preferences.putBytes(COMPANION_KEY, &stored, sizeof(stored)) == sizeof(stored);
-    preferences.end();
-  }
-  unlockSettingsNvs();
-  return saved;
+  return saveSettingsBlob(NvsSubsystem::COMPANION, COMPANION_KEY, stored);
 }
 
 inline bool eraseCompanionStored() {

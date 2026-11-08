@@ -195,6 +195,50 @@ inline bool eraseSettingsNvsKey(NvsSubsystem subsystem, const char *key) {
   return erased;
 }
 
+// One fixed-size blob under `key` in the settings namespace; NVS keeps the
+// previous value until a write commits. Callers pass stack copies because
+// flash I/O must not read PSRAM. A missing key loads as MISSING; a record
+// that cannot be read, has another length or fails `valid` as INVALID (worth
+// a log line). Either way the blob holds its defaults.
+enum class SettingsBlobLoad : uint8_t { LOADED, MISSING, INVALID };
+
+template <typename T, typename Valid>
+inline SettingsBlobLoad loadSettingsBlob(NvsSubsystem subsystem, const char *key, T &blob,
+                                         Valid valid) {
+  SettingsBlobLoad result = SettingsBlobLoad::INVALID;
+  if (lockSettingsNvs()) {
+    OpenBrewByWeightPreferences preferences(subsystem);
+    // An absent namespace is a fresh device; NVS logs real open failures.
+    result = SettingsBlobLoad::MISSING;
+    if (preferences.begin(SETTINGS_NAMESPACE, true)) {
+      if (preferences.isKey(key)) {
+        result = preferences.getBytesLength(key) == sizeof(blob) &&
+                         preferences.getBytes(key, &blob, sizeof(blob)) == sizeof(blob) &&
+                         valid(blob)
+                     ? SettingsBlobLoad::LOADED
+                     : SettingsBlobLoad::INVALID;
+      }
+      preferences.end();
+    }
+    unlockSettingsNvs();
+  }
+  if (result != SettingsBlobLoad::LOADED) blob = T{};
+  return result;
+}
+
+template <typename T>
+inline bool saveSettingsBlob(NvsSubsystem subsystem, const char *key, const T &blob) {
+  if (!lockSettingsNvs()) return false;
+  OpenBrewByWeightPreferences preferences(subsystem);
+  bool saved = false;
+  if (preferences.begin(SETTINGS_NAMESPACE, false)) {
+    saved = preferences.putBytes(key, &blob, sizeof(blob)) == sizeof(blob);
+    preferences.end();
+  }
+  unlockSettingsNvs();
+  return saved;
+}
+
 inline bool savePersistedSettings(PersistedSettings &settings);
 
 // Revisions of the intact slots, newest first; returns how many there are.

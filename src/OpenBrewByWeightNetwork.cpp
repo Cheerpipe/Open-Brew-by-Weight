@@ -60,6 +60,7 @@
 #include <sys/socket.h>
 
 #include "OpenBrewByWeightIntegrationRequest.h"
+#include "OpenBrewByWeightCardDismissals.h"
 #include "network/OpenBrewByWeightCompanionStore.h"
 #include <arpa/inet.h>
 #include <psa/crypto.h>
@@ -231,6 +232,24 @@ static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkSettings;
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS PersistedSettings g_networkWorkingSettings;
 // Web UI login state; dataMux_ guards it and the network task persists it.
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebAccessState g_webAccess;
+// Home cards dismissed for every browser; dataMux_ guards them and
+// serviceWebAccess persists them.
+static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CardDismissals g_cardDismissals;
+static bool g_cardDismissalsDirty = false;
+
+// The dismissals as the status "dismissed" object, under dataMux_. Image
+// prefixes and advice keys are JSON safe once validated.
+static void formatCardDismissals(char *out, size_t cap) {
+  int used = snprintf(out, cap, "{\"image\":\"%s\",\"rollback\":\"%s\",\"grind\":[",
+                      g_cardDismissals.image, g_cardDismissals.rollback);
+  const char *separator = "";
+  for (const char *key : g_cardDismissals.grind) {
+    if (key[0] == '\0' || used < 0 || static_cast<size_t>(used) >= cap) continue;
+    used += snprintf(out + used, cap - used, "%s\"%s\"", separator, key);
+    separator = ",";
+  }
+  if (used >= 0 && static_cast<size_t>(used) < cap) snprintf(out + used, cap - used, "]}");
+}
 // Companion pairing, link and relay; dataMux_ guards it (network/OpenBrewByWeightCompanion.inc).
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionState g_companion;
 // Relayed requests' browser identities by socket: httpd writes them at

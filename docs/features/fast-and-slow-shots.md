@@ -179,7 +179,7 @@ up. When your shots run clearly fast or slow, Home shows a card:
   beans age. This card waits until several shots agree.
 - **Checking your change**: your last shot moved the way the card suggested. No
   new advice until the next shot confirms the new setting. **Ignore** hides
-  this waiting card in this browser until the advice changes.
+  this waiting card on every phone and browser until the advice changes.
 - **Shots vary**: your shots spread more than this window allows. A grind
   change can't fix that; weigh each dose, check your puck prep, or widen the
   window.
@@ -195,8 +195,8 @@ a setting and never counts clicks or steps: only you know your grinder.
 You don't need to tell the controller when you adjust the grind; it notices the
 change from your next shots and starts reading the new setting. Use
 **Relearn**, on the card or in **Settings → Presets**, after a new bag or a
-change to your dose, basket or grinder. **Ignore** hides the card in this
-browser until the advice changes: another direction, a firmer suggestion or a
+change to your dose, basket or grinder. **Ignore** hides the card on every
+phone and browser until the advice changes: another direction, a firmer suggestion or a
 new grind setting brings it back.
 
 ## Examples

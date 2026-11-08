@@ -51,7 +51,8 @@ on, Wi-Fi sleep on, and Balanced scan mode. The machine-aware scale search optio
 password returns to **`ineedacoffee`** and the device name to
 **`openbrewbyweight`**. The [Web UI password](web-access.md) turns off, every
 remembered device and Home Assistant's access are forgotten, and Home shows
-the access note again. The [firmware mode](firmware-mode.md) switch is
+the access note again. Dismissed firmware update and grind hint cards are
+forgotten too. The [firmware mode](firmware-mode.md) switch is
 left off, so the machine works as usual until you choose how to brew on the
 setup page or in Admin. The device then restarts.
 

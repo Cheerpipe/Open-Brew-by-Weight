@@ -532,6 +532,7 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
   } else if (factoryReset) {
     dataMux_.lock();
     g_webAccess = WebAccessState{};  // the durable reset erased its record
+    g_cardDismissals = CardDismissals{};
     settings_ = next;
     status_.wifiConfigured = false;
     status_.staConfigState =

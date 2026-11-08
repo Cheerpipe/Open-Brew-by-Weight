@@ -177,10 +177,8 @@ void OpenBrewByWeightNetwork::publishConfiguredAddressStatus() {
               configuredNetmask);
   copyCString(status_.iface.configuredGateway, sizeof(status_.iface.configuredGateway),
               configuredGateway);
-  copyCString(status_.iface.configuredDns1, sizeof(status_.iface.configuredDns1),
-              configuredDns1);
-  copyCString(status_.iface.configuredDns2, sizeof(status_.iface.configuredDns2),
-              configuredDns2);
+  copyCString(status_.iface.configuredDns1, sizeof(status_.iface.configuredDns1), configuredDns1);
+  copyCString(status_.iface.configuredDns2, sizeof(status_.iface.configuredDns2), configuredDns2);
   copyCString(status_.deviceName, sizeof(status_.deviceName), deviceName);
   copyCString(status_.mdnsHost, sizeof(status_.mdnsHost), mdnsHost);
   dataMux_.unlock();
@@ -191,6 +189,8 @@ void OpenBrewByWeightNetwork::armPendingConfirmWindow(uint32_t now, uint32_t tim
   staConfirmArmed_ = true;
   staConfirmDeadlineMs_ = now + timeoutMs;
   status_.staChangeResult = "";
+  // The network on trial, which the result card names once it is decided.
+  copyCString(status_.staChangeSsid, sizeof(status_.staChangeSsid), settings_.staSsid);
   dataMux_.unlock();
   ::serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                          "WiFi STA config pending confirmation for %lu s",

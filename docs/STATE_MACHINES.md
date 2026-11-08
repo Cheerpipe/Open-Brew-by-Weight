@@ -945,7 +945,7 @@ during a shot or scan.
 | State | Meaning |
 | --- | --- |
 | `CONFIRMED` | Current STA addressing is committed. |
-| `PENDING` | A new static IP (or similar) is on probation (~3 min). Unreachable config **reverts**. `wifiChangeResult`, in the status and the Home stream, is empty here and then says `CONFIRMED` or `REVERTED` until the next change or restart. |
+| `PENDING` | A new static IP (or similar) is on probation (~3 min). Unreachable config **reverts**. `wifiChangeResult`, in the status and the Home stream, is empty here and then says `CONFIRMED` or `REVERTED`, with the network tried in `wifiChangeSsid`, until the next change, a restart or a dismissal of its card (`POST /api/v1/home/dismiss` `{"card":"wifi"}`). |
 
 ---
 

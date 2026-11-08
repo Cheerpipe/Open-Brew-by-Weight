@@ -784,6 +784,7 @@
     "err.busy": "Another firmware update is already running.",
     "err.calibration_locked_active_cycle": "Calibration is locked while a cycle is active.",
     "err.calibration_reset_busy": "Control is busy; calibration was not reset.",
+    "err.card_dismiss_invalid": "This card could not be dismissed.",
     "err.clock_sync_requires_idle": "Stop the cycle, switch the physical activator OFF, and wait for Ready before syncing the clock.",
     "err.commit_failed": "The bootloader refused the staged image. Nothing was changed.",
     "err.companion_auth": "The relay handshake did not authenticate.",

@@ -1976,6 +1976,7 @@ const errorReasonTexts = {
   AUTH_REQUIRED: __WEBUI_TEXT__("err.auth_required"),
   BAD_IMAGE: __WEBUI_TEXT__("err.bad_image"),
   BAD_LENGTH: __WEBUI_TEXT__("err.bad_length"),
+  CARD_DISMISS_INVALID: __WEBUI_TEXT__("err.card_dismiss_invalid"),
   BBW_ALGORITHM_INVALID: __WEBUI_TEXT__("err.bbw_algorithm_invalid"),
   BBW_ALPHA_BASELINE_INVALID: __WEBUI_TEXT__("err.bbw_alpha_baseline_invalid"),
   BBW_LEARNING_READ_ONLY: __WEBUI_TEXT__("err.bbw_learning_read_only"),
@@ -2615,22 +2616,31 @@ const firmwareBuilt = (s) =>
         timeStyle: "short",
       })
     : "";
-const FW_RESULT_KEY = "obbwFwResult",
-  FW_UPDATED_CARD = "obbwCard:fwUpdated",
-  FW_ROLLBACK_CARD = "obbwCard:fwRollback";
-// What this browser flashed, for the result card; null when nothing was. A new
-// flash also brings back a rollback dismissed earlier, and an update card for a
-// reinstall of the image this browser already knows.
+const FW_RESULT_KEY = "obbwFwResult";
+// What this browser flashed, for the result card; null when nothing was. It
+// also brings back a dismissed card here: a reinstall of the same image, or
+// the same image failing again.
 function noteFirmwareFlash(flash) {
   try {
     if (!flash) return localStorage.removeItem(FW_RESULT_KEY);
     localStorage.setItem(FW_RESULT_KEY, JSON.stringify(flash));
-    localStorage.removeItem(FW_ROLLBACK_CARD);
-    if (flash.imageSha256?.startsWith(localStorage.getItem(FW_UPDATED_CARD)))
-      localStorage.removeItem(FW_UPDATED_CARD);
   } catch {
     // Storage blocked or full: no card reports this update.
   }
+}
+// Cards the controller dismisses for every browser and address: the
+// firmware image and rolled back image acknowledged, the ignored grind
+// advice, and the Wi-Fi change result. The page hides a card at once; the
+// status confirms it.
+let dismissed = { image: "", rollback: "", grind: [] };
+function dismissOnController(card, key) {
+  if (card === "grind") dismissed.grind = [key, ...dismissed.grind];
+  else if (key) dismissed[card] = key;
+  api("/api/v1/home/dismiss", {
+    method: "POST",
+    body: JSON.stringify(key ? { card, key } : { card }),
+  }).catch(() => {});
+  renderHomeCards();
 }
 function firmwareResult(s) {
   let flash = null;
@@ -2640,41 +2650,35 @@ function firmwareResult(s) {
     // Storage blocked: only the firmware's own rollback record is left.
   }
   if (!Number.isInteger(s.bootId) || flash?.bootId === s.bootId) return null;
-  const image = s.rolledBackImage;
+  const image = s.rolledBackImage,
+    dismiss = (card, key) => () => {
+      noteFirmwareFlash(null);
+      dismissOnController(card, key);
+    };
   if (image) {
-    if (cardDismissed(FW_ROLLBACK_CARD) === image) return null;
     const named = flash?.imageSha256?.startsWith(image);
+    if (dismissed.rollback === image && !named) return null;
     return {
       failed: true,
-      dismiss: () => dismissCard(FW_ROLLBACK_CARD, image),
+      dismiss: dismiss("rollback", image),
       title: __WEBUI_TEXT__("shell.firmware_rollback_title"),
       text: named
         ? sub(__WEBUI_TEXT__("shell.firmware_rollback_named"), [flash.version, s.firmwareVersion])
         : sub(__WEBUI_TEXT__("shell.firmware_rollback_text"), [s.firmwareVersion]),
     };
   }
-  // Another version than this browser flashed: this flash is over.
+  // Another version than this browser flashed: this flash is over. Any other
+  // image than the one acknowledged, from the Web UI or the command line, even
+  // a build with the same version, is news on every page until dismissed.
   const version = s.firmwareVersion,
-    running = s.runningImage || version,
-    known = cardDismissed(FW_UPDATED_CARD),
+    running = s.runningImage,
     flashed = flash?.version === version;
   if (flash && !flashed) noteFirmwareFlash(null);
-  // The image this browser last knew about, so any update reaches every page,
-  // browser and address, from the Web UI or the command line, even between
-  // builds with the same version. The first visit has nothing to compare.
-  if (!known && !flashed) {
-    try {
-      localStorage.setItem(FW_UPDATED_CARD, running);
-    } catch {
-      // Storage blocked or full: the next visit starts over.
-    }
-    return null;
-  }
-  return known === running
+  return !running || (dismissed.image === running && !flashed)
     ? null
     : {
         failed: false,
-        dismiss: () => dismissCard(FW_UPDATED_CARD, running),
+        dismiss: dismiss("image", running),
         title: __WEBUI_TEXT__("shell.firmware_updated_title"),
         text:
           sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [version]) +
@@ -2683,29 +2687,18 @@ function firmwareResult(s) {
             : ""),
       };
 }
-const WIFI_CHANGE_KEY = "obbwWifiChange";
-function noteWifiChange(ssid) {
-  try {
-    if (ssid) localStorage.setItem(WIFI_CHANGE_KEY, ssid);
-    else localStorage.removeItem(WIFI_CHANGE_KEY);
-  } catch {
-    // Storage blocked or full: no card reports this change.
-  }
-}
-// The firmware says how the change saved from this browser ended, and it's
-// empty until it has; a name alone can't tell a wrong password on the same network.
+// The firmware says how the last network change ended and which network it
+// tried, empty until it has; a name alone can't tell a wrong password on the
+// same network.
 function wifiResult(s) {
-  let ssid = "";
-  try {
-    ssid = localStorage.getItem(WIFI_CHANGE_KEY);
-  } catch {
-    // Storage blocked: nothing to report.
-  }
-  if (!ssid || !s.wifiChangeResult) return null;
+  if (!s.wifiChangeResult) return null;
   const failed = s.wifiChangeResult !== "CONFIRMED";
   return {
     failed,
-    dismiss: () => noteWifiChange(""),
+    dismiss: () => {
+      s.wifiChangeResult = "";
+      dismissOnController("wifi");
+    },
     title: failed
       ? __WEBUI_TEXT__("shell.wifi_failed_title")
       : __WEBUI_TEXT__("shell.wifi_connected_title"),
@@ -2713,13 +2706,14 @@ function wifiResult(s) {
       failed
         ? __WEBUI_TEXT__("shell.wifi_failed_text")
         : __WEBUI_TEXT__("shell.wifi_connected_text"),
-      [ssid],
+      [s.wifiChangeSsid],
     ),
   };
 }
 // Each card is moved to the view showing it: on Home with the other cards, and
 // on Admin, the only page compatibility mode has, above the unlock form.
 function renderResultCards(s) {
+  if (s.dismissed) dismissed = s.dismissed;
   const host = $(activeView === "admin" ? "adminLockPanel" : "grindHintCard"),
     shown = activeView === "admin" || activeView === "home";
   for (const [id, result] of [
@@ -7384,8 +7378,7 @@ function liveShotDash(d, model, m) {
         prev?.firstDropS ? sub(__WEBUI_TEXT__("shell.live_last"), [strong(prev.firstDropS)]) : "",
       );
 }
-// Home cards: a grind hint when the active preset's shots drift. Dismissals
-// stay in this browser.
+// Home hint cards dismissed in this browser only (see dismissOnController).
 function cardDismissed(key) {
   try {
     return localStorage.getItem(key) || "";
@@ -7415,9 +7408,7 @@ function grindHintView(p) {
     fine = h.direction === "finer",
     v = {
       // Ignore holds for this advice: preset, grind setting, direction, tier.
-      key: ["obbwCard:grind", p.id, h.segmentStartId, h.direction || h.state, h.tier || ""].join(
-        ":",
-      ),
+      key: [p.id, h.segmentStartId, h.direction || h.state, h.tier || ""].join(":"),
       cls: { checking: "isCheck", vary: "isSpread" }[h.state] || (fine ? "isFast" : "isSlow"),
       level: at(level),
       band: [at(c - h.bandS), 100 - at(c + h.bandS)],
@@ -7490,7 +7481,7 @@ function renderHomeCards() {
   const v = grindHintView(presetState.items.find((x) => x.id === presetState.activeId)),
     card = $("grindHintCard");
   if (card) {
-    reveal(card, !!v && !cardDismissed(v.key));
+    reveal(card, !!v && !dismissed.grind.includes(v.key));
     if (v) {
       card.dataset.key = v.key;
       card.className = "homeCard ghCard " + v.cls;
@@ -7988,7 +7979,6 @@ async function command(path, value = {}, soft, okMsg, failMsg, busyId) {
       noteReachOk();
       if (noReconnect) uiState.savedStaWifiSleep = !!$("staWifiSleep").checked;
       if (path.endsWith("/network") && value.action === "save" && !noReconnect) {
-        noteWifiChange(value.ssid);
         beginNetworkReconnectWait();
         return true;
       }
@@ -8157,6 +8147,7 @@ export {
   populateTimezoneOptions,
   cardDismissed,
   dismissCard,
+  dismissOnController,
   startNewCoffee,
   invalidateSettingsHydration,
   clearBrewDirty,

@@ -47,12 +47,14 @@ that can't start is replaced by the previous version on its own, which takes a
 little longer. If a shot is pouring, the screen says so and the restart waits
 until it ends.
 
-The result card stays until you dismiss it, and the next update starts over:
+The result card stays until you dismiss it, and the next update starts over.
+The controller remembers the dismissal, so dismissing it on one phone or
+browser clears it everywhere:
 
 - **Firmware updated** names the version now running and when it was built. It appears the same way
-  after an update from the Web UI or the command line, in every browser and address
-  you've used before, the first time you open it afterwards. Installing again the
-  exact image already running only shows it in the browser that did it from Admin.
+  after an update from the Web UI or the command line, in every browser and at
+  every address. Installing again the exact image already running only shows it
+  in the browser that did it from Admin.
 - **Firmware update failed** means the new version failed while starting and the
   controller went back to the previous one. This can appear some time after the
   success card, because a new firmware is on trial for its first moments. The
@@ -266,12 +268,15 @@ digest. `bootState` uses IDF image states (unknown read failure is -2).
 `firmwareBuiltAt`, in the Home stream and `/api/v1/status/admin` with no unlock, is
 the Unix time of the build, also shown in **Diagnostic → Misc**. `runningImage`, in
 the same places, is
-the first 16 hex digits of the running image's digest, which each browser compares
-with the last one it knew. `rolledBackImage`, in the same places, is that prefix
+the first 16 hex digits of the running image's digest, which the Web UI compares
+with `dismissed.image`, the prefix last acknowledged. `rolledBackImage`, in the same places, is that prefix
 for the image a rollback left in the spare slot, and empty otherwise. It comes from the slot's ABORTED or INVALID
 otadata state, read once at boot, so it survives restarts until the next commit
 or a USB installation rewrites otadata (writing only the application with
-`--image` leaves it). The Web UI's wait after a flash ends only on a `200` status
+`--image` leaves it); `dismissed.rollback` is the one acknowledged. Dismissing
+a card sends `POST /api/v1/home/dismiss` with `{"card":"image"}` or
+`{"card":"rollback"}` and that prefix as `key`; the controller keeps it in NVS
+key `cardDismissals`. The Web UI's wait after a flash ends only on a `200` status
 whose `bootId` changed, or on `AUTH_REQUIRED`: the old boot keeps answering until
 it restarts, and a companion answers for a controller that is down. That status
 needs the Web UI claim, which a restart clears, so a `UI_TAKEN_OVER` answer makes

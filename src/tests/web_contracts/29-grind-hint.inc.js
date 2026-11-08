@@ -51,15 +51,15 @@
   assert.notEqual(key({segmentStartId: 42}), key({}));
   assert.notEqual(key({direction: 'finer'}), key({}));
   assert.notEqual(view(preset(hint(), {id: 4})).key, key({}));
-  assert.equal(key({state: 'vary', direction: null, tier: null}), 'obbwCard:grind:3:41:vary:');
+  assert.equal(key({state: 'vary', direction: null, tier: null}), '3:41:vary:');
 
-  if (!codeIncludes(viewJs.home, '$("grindHintLater").onclick = () => R.dismissCard($("grindHintCard").dataset.key)') ||
+  if (!codeIncludes(viewJs.home, '$("grindHintLater").onclick = () =>\n      R.dismissOnController("grind", $("grindHintCard").dataset.key)') ||
       !codeIncludes(viewJs.home, '$("grindHintNewBeans").onclick = () => R.startNewCoffee()') ||
       !partialHtml.home.includes('<button id="grindHintLater" class="btnGlyph ghost" type="button"><span class="t">Ignore</span>') ||
       !partialHtml.home.includes('<span class="t">Relearn</span>') ||
-      !codeIncludes(runtimeJs, 'reveal(card, !!v && !cardDismissed(v.key))') ||
+      !codeIncludes(runtimeJs, 'reveal(card, !!v && !dismissed.grind.includes(v.key))') ||
       !codeIncludes(runtimeJs, '$("grindHintNewBeans").hidden = !v.relearn'))
-    throw new Error('Grind hint card must offer Relearn and Ignore, and Ignore must hold per advice (D6)');
+    throw new Error('Grind hint card must offer Relearn and Ignore, and Ignore must hold per advice on the controller (D6)');
 }
 // Inline preset rename: the 4 s Settings poll leaves a card being renamed alone,
 // and Enter or Escape settle it once even though removing the input blurs it.
