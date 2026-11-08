@@ -271,6 +271,7 @@ function updH(h, s) {
     "hFlashMhz",
     "hPsramMode",
     "hPsramClock",
+    "hPsramEcc",
   ];
   if (!h) {
     cpu
@@ -324,6 +325,17 @@ function updH(h, s) {
   t("hFlashMhz", w.flashMhz > 0 ? w.flashMhz + __WEBUI_TEXT__("runtime.mhz") : "—");
   t("hPsramMode", w.psramMode || "—");
   t("hPsramClock", w.psramMhz > 0 ? w.psramMhz + __WEBUI_TEXT__("runtime.mhz") : "—");
+  t(
+    "hPsramEcc",
+    typeof w.psramEcc !== "boolean"
+      ? "—"
+      : !w.psramEcc
+        ? __WEBUI_TEXT__("runtime.disabled")
+        : __WEBUI_TEXT__("diagnostic.psram_ecc_enabled") +
+          (w.psramEccErrors > 0
+            ? __WEBUI_TEXT__("diagnostic.psram_ecc_errors_suffix").replace("{0}", w.psramEccErrors)
+            : ""),
+  );
   t("hTemp", w.tempValid ? w.tempC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");
   t("hTPeak", w.tempValid ? w.tempPeakC.toFixed(1) + __WEBUI_TEXT__("runtime.c") : "");
   t("hRamT", b(w.ramTotalBytes));

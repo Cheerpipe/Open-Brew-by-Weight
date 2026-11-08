@@ -1351,6 +1351,7 @@ FAKE_RESOLVER = (
     "print('hardware_compat=esp32-s3-relay-x1-speaker')\n"
     "print('machine_compat=rancilio-silvia-pro-x')\n"
     "print('machine_integration=none')\n"
+    "print('psram_ecc=disabled')\n"
     "print('generated_dir=build-idf/generated')\n")
 
 
@@ -1736,7 +1737,7 @@ assert '. "${idf_root}/export.sh" >/dev/null' in idf_helpers, \
 
 
 def verify_production_profile(arch: str, selectors: list[str], integration: str = "none",
-                              extra_flags: str = ""):
+                              extra_flags: str = "", psram_ecc: str = "disabled"):
     with tempfile.NamedTemporaryFile(mode="w", prefix="openbrewbyweight-sdkconfig-",
                                      delete=False) as fixture:
         fixture.write("\n".join(selectors) + "\n")
@@ -1748,7 +1749,8 @@ def verify_production_profile(arch: str, selectors: list[str], integration: str 
              'obbw_idf_verify_production_profile "$1" "$2"',
              "profile-test", arch, fixture_path],
             cwd=ROOT, env={**os.environ, "OPENBREWBYWEIGHT_MACHINE_INTEGRATION": integration,
-                           "OPENBREWBYWEIGHT_EXTRA_FLAGS": extra_flags},
+                           "OPENBREWBYWEIGHT_EXTRA_FLAGS": extra_flags,
+                           "OPENBREWBYWEIGHT_PSRAM_ECC": psram_ecc},
             text=True, capture_output=True)
     finally:
         Path(fixture_path).unlink()
@@ -1806,6 +1808,7 @@ profile_common = [
     '# CONFIG_OPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL is not set',
     'CONFIG_OPEN_BREW_BY_WEIGHT_ENABLE_JTAG=0',
     'CONFIG_ESP_CONSOLE_NONE=y',
+    '# CONFIG_SPIRAM_ECC_ENABLE is not set',
 ]
 profile_arch = {
     "n16r8": ['CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y',
@@ -1842,6 +1845,14 @@ for arch, arch_selectors in profile_arch.items():
         arch, jtag_selectors, extra_flags=jtag_define).returncode == 0
     assert verify_production_profile(arch, jtag_selectors).returncode == 1
     assert verify_production_profile(arch, selectors, extra_flags=jtag_define).returncode == 1
+    # The hardware profile's target.psram_ecc must match the built sdkconfig both ways.
+    ecc_selectors = [item for item in selectors if item != "# CONFIG_SPIRAM_ECC_ENABLE is not set"] + [
+        "CONFIG_SPIRAM_ECC_ENABLE=y"]
+    assert verify_production_profile(arch, ecc_selectors, psram_ecc="enabled").returncode == 0
+    assert "expected CONFIG_SPIRAM_ECC_ENABLE=y" in verify_production_profile(
+        arch, selectors, psram_ecc="enabled").stderr
+    assert "CONFIG_SPIRAM_ECC_ENABLE is not set" in verify_production_profile(
+        arch, ecc_selectors).stderr
 
 durable_stores = (ROOT / "src/OpenBrewByWeightDurableStores.h").read_text()
 network_reset = durable_stores.split("bool resetPersistedNetworkAccess", 1)[1].split(

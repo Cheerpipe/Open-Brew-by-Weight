@@ -17,6 +17,8 @@ ID_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 LEVELS = {"low": 0, "high": 1}
 PULLS = {"none", "up", "down"}
 TARGETS = {("esp32s3", "n16r8"): "n16r8"}
+# Memory profiles whose octal PSRAM supports the MSPI hardware ECC.
+PSRAM_ECC_CAPABLE = {"n16r8"}
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -133,7 +135,8 @@ def list_profiles() -> None:
                           profile["target"]["memory_profile"])]
         print(f"  {profile['id']}  target={target} "
               f"speaker={'yes' if profile['speaker']['present'] else 'no'} "
-              f"reed={'yes' if profile['reed']['present'] else 'no'}")
+              f"reed={'yes' if profile['reed']['present'] else 'no'} "
+              f"psram_ecc={'yes' if profile['target']['psram_ecc'] else 'no'}")
     print("Machine profiles:")
     for profile in machine_profiles:
         compatible = [hardware["id"] for hardware in hardware_profiles
@@ -162,12 +165,15 @@ def validate_hardware(obj: dict[str, Any]) -> dict[str, Any]:
     common_profile(obj, where)
     if not isinstance(obj["metadata"], dict):
         fail("hardware.metadata must be an object")
-    target = exact(obj["target"], {"chip", "memory_profile"}, "hardware.target")
+    target = exact(obj["target"], {"chip", "memory_profile", "psram_ecc"}, "hardware.target")
     target_key = (choice(target["chip"], {"esp32s3"}, "hardware.target.chip"),
                   choice(target["memory_profile"], {"n16r8"},
                          "hardware.target.memory_profile"))
     if target_key not in TARGETS:
         fail("unsupported hardware target")
+    if (boolean(target["psram_ecc"], "hardware.target.psram_ecc") and
+            target["memory_profile"] not in PSRAM_ECC_CAPABLE):
+        fail("hardware.target.psram_ecc requires a memory profile with octal PSRAM")
 
     activator = exact(obj["activator"], {"gpio", "active_level", "pull", "debounce_ms"},
                       "hardware.activator")
@@ -672,6 +678,7 @@ def main() -> int:
     print(f"hardware_compat={resolved['hardware']['id']}-r{resolved['hardware']['compatibility_revision']}")
     print(f"machine_compat={resolved['machine']['id']}-r{resolved['machine']['compatibility_revision']}")
     print(f"machine_integration={resolved['machine_integration']}")
+    print(f"psram_ecc={'enabled' if resolved['hardware']['target']['psram_ecc'] else 'disabled'}")
     print(f"generated_dir={output_dir}")
     return 0
 

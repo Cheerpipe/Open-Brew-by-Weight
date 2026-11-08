@@ -630,6 +630,8 @@ struct SerialCliHealthDump {
   uint32_t flashMhz = 0;
   uint32_t psramMhz = 0;
   char psramMode[7] = "";
+  bool psramEcc = false;
+  uint32_t psramEccErrors = 0;
   float cpuLoad5s = 0.0f;
   float cpuLoad1m = 0.0f;
   float cpuLoad5m = 0.0f;
@@ -885,6 +887,10 @@ inline void serialCliPrintHealth(const SerialCliHealthDump &dump) {
   Serial.println(static_cast<unsigned long>(dump.psramMhz));
   Serial.print("psramMode=");
   Serial.println(dump.psramMode);
+  Serial.print("psramEcc=");
+  Serial.println(dump.psramEcc ? "enabled" : "disabled");
+  Serial.print("psramEccErrors=");
+  Serial.println(static_cast<unsigned long>(dump.psramEccErrors));
   Serial.print("cpuLoad5s=");
   Serial.println(dump.cpuLoad5s, 2);
   Serial.print("cpuLoad1m=");

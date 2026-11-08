@@ -408,6 +408,14 @@ link (`n`).
 This is routine briefly after a scale disconnects or reconnects, so it is
 logged as information rather than a warning.
 
+A `PSRAM ECC detected … memory error(s)` warning means the controller's
+external memory returned a faulty value and its error correction caught it.
+**Diagnostic → Flash and PSRAM → PSRAM ECC** counts these errors since the last
+restart. An isolated warning needs no action. Repeated warnings often point to
+heat: check the temperature around the controller, its enclosure, and its
+mounting inside the machine, and include the warning lines when you report
+the issue.
+
 ## Where to change it
 
 Use the [settings index](README.md#settings) for parameter references,

@@ -501,10 +501,11 @@ obbw_cli_resolve_profiles() {
   OPENBREWBYWEIGHT_MACHINE_COMPAT="$(printf '%s\n' "$OBBW_PROFILE_OUTPUT" | sed -n 's/^machine_compat=//p')"
   OPENBREWBYWEIGHT_MACHINE_INTEGRATION="$(printf '%s\n' "$OBBW_PROFILE_OUTPUT" | sed -n 's/^machine_integration=//p')"
   OPENBREWBYWEIGHT_GENERATED_DIR="$(printf '%s\n' "$OBBW_PROFILE_OUTPUT" | sed -n 's/^generated_dir=//p')"
+  OPENBREWBYWEIGHT_PSRAM_ECC="$(printf '%s\n' "$OBBW_PROFILE_OUTPUT" | sed -n 's/^psram_ecc=//p')"
   if [[ -z "$resolved_arch" || -z "$OPENBREWBYWEIGHT_VARIANT" ||
     -z "$OPENBREWBYWEIGHT_HARDWARE_COMPAT" || -z "$OPENBREWBYWEIGHT_MACHINE_COMPAT" ||
     -z "$OPENBREWBYWEIGHT_MACHINE_INTEGRATION" ||
-    -z "$OPENBREWBYWEIGHT_GENERATED_DIR" ]]; then
+    -z "$OPENBREWBYWEIGHT_GENERATED_DIR" || -z "$OPENBREWBYWEIGHT_PSRAM_ECC" ]]; then
     obbw_cli_die "Profile resolver returned incomplete build metadata."
     return 2
   fi
@@ -515,7 +516,8 @@ obbw_cli_resolve_profiles() {
     return 2
   fi
   obbw_put arch "$resolved_arch" profile
-  export OPENBREWBYWEIGHT_VARIANT OPENBREWBYWEIGHT_MACHINE_INTEGRATION OPENBREWBYWEIGHT_GENERATED_DIR
+  export OPENBREWBYWEIGHT_VARIANT OPENBREWBYWEIGHT_MACHINE_INTEGRATION OPENBREWBYWEIGHT_GENERATED_DIR \
+    OPENBREWBYWEIGHT_PSRAM_ECC
 }
 
 obbw_cli_load_store() {

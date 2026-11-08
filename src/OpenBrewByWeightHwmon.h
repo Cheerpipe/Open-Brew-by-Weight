@@ -93,6 +93,26 @@ inline uint32_t psramClockMhz() {
 #endif
 }
 
+// Whether the image was built with the PSRAM hardware ECC (hardware profile
+// target.psram_ecc); with it the driver keeps 15/16 of the PSRAM usable.
+constexpr bool psramEccEnabled() {
+#if defined(CONFIG_SPIRAM_ECC_ENABLE)
+  return true;
+#else
+  return false;
+#endif
+}
+
+// Errors the MSPI ECC counted between two reads, and where it saw the first.
+struct PsramEccErrors {
+  uint32_t count = 0;
+  uint32_t firstAddress = 0;
+  bool saturated = false;  // The 8-bit hardware counter reached 255.
+};
+
+// Shortest gap between two Web UI log reports of detected PSRAM ECC errors.
+constexpr uint32_t PSRAM_ECC_REPORT_INTERVAL_MS = 60000U;
+
 inline const char *psramModeName() {
 #if defined(CONFIG_SPIRAM_MODE_OCT)
   return "Octal";
@@ -116,13 +136,14 @@ struct HwmonSnapshot {
   float cpu0Busy = 0.0f;
   float cpu1Busy = 0.0f;
   bool cpuLoadValid = false;
+  bool tempValid = false;  // Beside cpuLoadValid: both share one padded word.
   uint32_t cpuMhz = 0;
   float tempC = 0.0f;
   float tempPeakC = 0.0f;
-  bool tempValid = false;
   uint32_t ramTotalBytes = 0;
   uint32_t ramUsedBytes = 0;
   uint32_t ramFreeBytes = 0;
+  uint32_t psramEccErrors = 0;  // Detected since boot; 0 without ECC.
 };
 
 class Hwmon {
@@ -137,6 +158,12 @@ class Hwmon {
     prevIdleCounter_[1] = 0;
 #endif
     countersPrimed_ = true;
+#if defined(CONFIG_SPIRAM_ECC_ENABLE)
+    // Count-only: the ECC error interrupt stays disabled. The driver wrote this
+    // register once during PSRAM init and nothing else writes it afterwards.
+    if (psramFound())
+      SET_PERI_REG_MASK(SPI_MEM_SPI_SMEM_AC_REG(0), SPI_MEM_SPI_SMEM_ECC_ERR_INT_EN_M);
+#endif
 #else
     sampleStartedUs_ = 0;
 #endif
@@ -151,7 +178,20 @@ class Hwmon {
     hostCountersFresh_ = countersFresh;
     hostIdleInjected_ = true;
   }
+  // Host tests: errors the next sample() reads as if from the MSPI counter.
+  void hostAddPsramEccErrors(const PsramEccErrors &errors) { hostPsramEcc_ = errors; }
 #endif
+
+  // Pending ECC errors once per PSRAM_ECC_REPORT_INTERVAL_MS, for the caller
+  // of sample() to log; every error detected meanwhile is folded in.
+  bool takePsramEccReport(PsramEccErrors &out) {
+    if (psramEccPending_.count == 0 || psramEccQuietMs_ < PSRAM_ECC_REPORT_INTERVAL_MS)
+      return false;
+    out = psramEccPending_;
+    psramEccPending_ = {};
+    psramEccQuietMs_ = 0;
+    return true;
+  }
 
 #ifdef ARDUINO
   HwmonSnapshot sample(uint32_t intervalMs,
@@ -161,6 +201,7 @@ class Hwmon {
 #endif
     HwmonSnapshot out;
     sampleCpuLoad_(out, intervalMs);
+    samplePsramEcc_(out, intervalMs);
 
 #ifndef ARDUINO
     out.cpuMhz = 80U;
@@ -253,6 +294,30 @@ class Hwmon {
     return static_cast<uint32_t>(now - prev);
   }
 #endif
+
+  void samplePsramEcc_(HwmonSnapshot &out, uint32_t intervalMs) {
+    PsramEccErrors read;
+#if defined(ARDUINO) && defined(CONFIG_SPIRAM_ECC_ENABLE)
+    read.count = REG_GET_FIELD(SPI_MEM_ECC_ERR_BIT_REG(0), SPI_MEM_ECC_ERR_CNT);
+    if (read.count != 0) {
+      read.firstAddress = READ_PERI_REG(SPI_MEM_ECC_ERR_ADDR_REG(0));
+      read.saturated = read.count == SPI_MEM_ECC_ERR_CNT_V;
+      WRITE_PERI_REG(SPI_MEM_INT_CLR_REG(0), SPI_MEM_ECC_ERR_INT_CLR_M);  // Clears count and address.
+    }
+#elif !defined(ARDUINO)
+    read = hostPsramEcc_;
+    hostPsramEcc_ = {};
+#endif
+    psramEccTotal_ += read.count;
+    out.psramEccErrors = psramEccTotal_;
+    if (psramEccPending_.count == 0) {
+      psramEccPending_ = read;
+    } else {
+      psramEccPending_.count += read.count;
+      psramEccPending_.saturated |= read.saturated;
+    }
+    if (psramEccQuietMs_ < PSRAM_ECC_REPORT_INTERVAL_MS) psramEccQuietMs_ += intervalMs;
+  }
 
   void publishPreviousCpu_(HwmonSnapshot &out) const {
     out.cpuLoadValid = false;
@@ -366,7 +431,11 @@ class Hwmon {
   bool hostIdleInjected_ = false;
   bool hostCountersFresh_ = true;
   uint64_t idleAccumUs_[2] = {};
+  PsramEccErrors hostPsramEcc_;
 #endif
+  uint32_t psramEccTotal_ = 0;
+  PsramEccErrors psramEccPending_;
+  uint32_t psramEccQuietMs_ = PSRAM_ECC_REPORT_INTERVAL_MS;  // The first report is immediate.
   uint64_t sampleStartedUs_ = 0;
   float cpu0Busy_ = 0.0f;
   float cpu1Busy_ = 0.0f;

@@ -177,6 +177,14 @@ void healthWorkerTask(void *) {
       sample.heap.internalLargest = largestFreeHeapBlockBytes;
       sample.hwmon = hwmon.sample(HEALTH_TELEMETRY_INTERVAL_MS);
 #endif
+      PsramEccErrors ecc;
+      if (hwmon.takePsramEccReport(ecc))
+        serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SYSTEM,
+                             "PSRAM ECC detected %s%lu memory error(s), first at 0x%08lx; "
+                             "%lu since boot", ecc.saturated ? "at least " : "",
+                             static_cast<unsigned long>(ecc.count),
+                             static_cast<unsigned long>(ecc.firstAddress),
+                             static_cast<unsigned long>(sample.hwmon.psramEccErrors));
       const bool heapLow =
           sample.heapValid &&
           (sample.heap.internalFree < HEALTH_HEAP_FREE_ALERT_BYTES ||

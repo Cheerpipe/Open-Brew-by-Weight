@@ -629,7 +629,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            "\"cpuLoad5s\":%.2f,\"cpuLoad1m\":%.2f,\"cpuLoad5m\":%.2f,"
            "\"cpuMhz\":%lu,\"tempC\":%.1f,\"tempPeakC\":%.1f,"
            "\"flashReadMode\":\"%s\",\"flashReadModeBuilt\":\"%s\","
-           "\"flashMhz\":%lu,\"psramMhz\":%lu,\"psramMode\":\"%s\"},",
+           "\"flashMhz\":%lu,\"psramMhz\":%lu,\"psramMode\":\"%s\","
+           "\"psramEcc\":%s,\"psramEccErrors\":%lu},",
            static_cast<unsigned long>(c.uptimeMs),
            static_cast<unsigned long>(c.snapshotVersion),
            c.snapshotStale ? "true" : "false",
@@ -680,7 +681,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            static_cast<unsigned long>(flashClockMhz()),
            static_cast<unsigned long>(
                c.psramSizeBytes ? psramClockMhz() : 0U),
-           psramModeName());
+           psramModeName(), psramEccEnabled() ? "true" : "false",
+           static_cast<unsigned long>(c.hwmon.psramEccErrors));
 
   if (self.callbacks_.copyTaskProfiler != nullptr) {
     self.callbacks_.copyTaskProfiler(work.taskProfiler);

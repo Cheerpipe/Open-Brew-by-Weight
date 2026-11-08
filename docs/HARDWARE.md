@@ -68,6 +68,15 @@ relay, memory, and peripheral description for the speaker-equipped assembly;
 it is not a generic DevKit pinout. Classic ESP32 and Arduino Nano ESP32
 are not supported.
 
+The firmware for these boards can use the error correction (ECC) built into
+the module's PSRAM, its external working memory. The controller lives inside a
+hot machine, and Espressif rates this memory for a higher ambient temperature
+with ECC on. ECC sets aside a sixteenth of the PSRAM, which still leaves the
+controller plenty of room. **Diagnostic → Flash and PSRAM → PSRAM ECC** shows
+whether the installed firmware uses it. If the memory ever returns a faulty
+value, the log shows a `PSRAM ECC detected` warning; see
+[Troubleshooting](FAQ.md#safety-and-diagnostics).
+
 ## 3D-printable enclosure
 
 A simple two-part enclosure is provided for the ESP32-S3 relay development

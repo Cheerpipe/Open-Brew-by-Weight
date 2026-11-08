@@ -139,7 +139,7 @@ The complete current hardware profile is:
     "product_url": "https://aliexpress.com/item/1005011880181624.html",
     "identifiers": ["303E32S3DC2", "5437314A_Y1248-250908"]
   },
-  "target": { "chip": "esp32s3", "memory_profile": "n16r8" },
+  "target": { "chip": "esp32s3", "memory_profile": "n16r8", "psram_ecc": true },
   "activator": {
     "gpio": 21,
     "active_level": "low",
@@ -205,6 +205,7 @@ account-specific URLs, or other secrets in profile metadata.
 | --- | --- |
 | `target.chip` | Currently `esp32s3`. |
 | `target.memory_profile` | Currently `n16r8`: 16 MB flash and 8 MB OPI PSRAM. This describes capacity, not the physical board or pinout. |
+| `target.psram_ecc` | `true` or `false`. `true` builds the image with the PSRAM hardware error correction (ECC), which needs a memory profile with octal PSRAM such as `n16r8`. ECC reserves 1/16 of the PSRAM for check bytes and makes each PSRAM read the cache cannot serve slightly slower; Espressif rates octal-PSRAM modules for a higher ambient temperature with it on. Images built with either value install over each other by OTA, so changing it needs no `compatibility_revision` increment. Diagnostic's **Flash and PSRAM** section shows the value the running image was built with. |
 | `activator.gpio` | Physical brew-switch input, GPIO 0–48. |
 | `activator.active_level` / `pull` | Current driver requires `low` with internal pull `up`. |
 | `activator.debounce_ms` | Input debounce, 1–99 ms. |

@@ -269,6 +269,10 @@ obbw_idf_resolve_paths() {
   if obbw_idf_jtag_enabled; then
     IDF_SDKCONFIG_DEFAULTS="$IDF_SDKCONFIG_DEFAULTS;$IDF_PROJECT/sdkconfig.defaults.jtag"
   fi
+  # The hardware profile's target.psram_ecc, exported by the profile resolver.
+  if [[ "${OPENBREWBYWEIGHT_PSRAM_ECC:-disabled}" == "enabled" ]]; then
+    IDF_SDKCONFIG_DEFAULTS="$IDF_SDKCONFIG_DEFAULTS;$IDF_PROJECT/sdkconfig.defaults.psram-ecc"
+  fi
   # The optimization level overlay is generated per build from --o0/--og/--o2/--os
   # (empty means the repository default, -O2). Appended last so the chosen level
   # wins over every earlier default file. It must live outside the build dir:
@@ -560,6 +564,11 @@ obbw_idf_verify_production_profile() {
   else
     required+=("CONFIG_OPEN_BREW_BY_WEIGHT_ENABLE_JTAG=0" "CONFIG_ESP_CONSOLE_NONE=y")
   fi
+  if [[ "${OPENBREWBYWEIGHT_PSRAM_ECC:-disabled}" == "enabled" ]]; then
+    required+=("CONFIG_SPIRAM_ECC_ENABLE=y")
+  else
+    required+=("# CONFIG_SPIRAM_ECC_ENABLE is not set")
+  fi
   if [[ "${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}" == "linea_micra_cloud" ]]; then
     required+=("CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y"
       "CONFIG_MBEDTLS_DYNAMIC_BUFFER=y"
@@ -578,7 +587,7 @@ obbw_idf_verify_production_profile() {
     echo "Production profile mismatch for $arch: unexpected QUAD PSRAM mode" >&2
     return 1
   fi
-  echo "sdkconfig: verified exact $arch flash/PSRAM, partition, MMU, rollback, watchdog, panic, GPTimer, IRAM placement, console, and build-option profile"
+  echo "sdkconfig: verified exact $arch flash/PSRAM, partition, MMU, rollback, watchdog, panic, GPTimer, IRAM placement, console, PSRAM ECC, and build-option profile"
 }
 
 obbw_idf_verify_firmware() {

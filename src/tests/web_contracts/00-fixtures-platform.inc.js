@@ -322,6 +322,18 @@ if (sdkconfigDefaults.includes('CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y') ||
       'IDF console must default to NONE; JTAG stays off unless ENABLE_JTAG=1');
 }
 {
+  // PSRAM ECC follows the hardware profile only: the base defaults never set it.
+  const sdkconfigEcc = fs.readFileSync(
+      path.resolve(sketchDir, '..', 'idf', 'sdkconfig.defaults.psram-ecc'), 'utf8');
+  if (!sdkconfigEcc.includes('CONFIG_SPIRAM_ECC_ENABLE=y') ||
+      sdkconfigDefaults.includes('CONFIG_SPIRAM_ECC_ENABLE') ||
+      !idfHelpers.includes('sdkconfig.defaults.psram-ecc') ||
+      !idfHelpers.includes('OPENBREWBYWEIGHT_PSRAM_ECC')) {
+    throw new Error(
+        'PSRAM ECC must come from sdkconfig.defaults.psram-ecc, selected by target.psram_ecc');
+  }
+}
+{
   const sdkconfigJtag = fs.readFileSync(
       path.resolve(sketchDir, '..', 'idf', 'sdkconfig.defaults.jtag'), 'utf8');
   if (!sdkconfigJtag.includes('CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y') ||

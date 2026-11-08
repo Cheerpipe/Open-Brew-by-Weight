@@ -16172,6 +16172,8 @@ void sc15_status_printers_use_dump_views() {
   health.flashMhz = 80;
   health.psramMhz = 80;
   copyCString(health.psramMode, sizeof(health.psramMode), "Octal");
+  health.psramEcc = true;
+  health.psramEccErrors = 3;
   health.cpuLoad5s = 0.42f;
   health.cpuLoad1m = 0.55f;
   health.cpuLoad5m = 0.61f;
@@ -16202,6 +16204,8 @@ void sc15_status_printers_use_dump_views() {
   CHECK(serialTxContains("flashMhz=80"));
   CHECK(serialTxContains("psramMhz=80"));
   CHECK(serialTxContains("psramMode=Octal"));
+  CHECK(serialTxContains("psramEcc=enabled"));
+  CHECK(serialTxContains("psramEccErrors=3"));
   CHECK(serialTxContains("cpuLoad5s=0.42"));
   CHECK(serialTxContains("cpuLoad1m=0.55"));
   CHECK(serialTxContains("cpuLoad5m=0.61"));
@@ -18102,6 +18106,37 @@ void h02_hwmon_cpu_load_uses_refreshed_idle_and_ema() {
   snap = monitor.sample(5000);
   CHECK(!snap.cpuLoadValid);
   CHECK(snap.cpuLoad5s == snap.cpuLoad1m);
+}
+
+void h02b_hwmon_psram_ecc_reports_are_rate_limited() {
+  CHECK(!psramEccEnabled());  // Host builds have no CONFIG_SPIRAM_ECC_ENABLE.
+  Hwmon monitor;
+  monitor.begin();
+  PsramEccErrors report;
+  CHECK(monitor.sample(5000).psramEccErrors == 0U);
+  CHECK(!monitor.takePsramEccReport(report));
+
+  // The first error is reported at once, with its address.
+  monitor.hostAddPsramEccErrors({2U, 0x3C123450U, false});
+  CHECK(monitor.sample(5000).psramEccErrors == 2U);
+  CHECK(monitor.takePsramEccReport(report));
+  CHECK(report.count == 2U && report.firstAddress == 0x3C123450U && !report.saturated);
+  CHECK(!monitor.takePsramEccReport(report));
+
+  // Errors within the next minute fold into one report that keeps the first
+  // address and the saturation of the 8-bit hardware counter.
+  monitor.hostAddPsramEccErrors({1U, 0x3C200000U, false});
+  monitor.sample(5000);
+  monitor.hostAddPsramEccErrors({255U, 0x3C300000U, true});
+  HwmonSnapshot snap = monitor.sample(5000);
+  CHECK(snap.psramEccErrors == 258U);
+  CHECK(!monitor.takePsramEccReport(report));
+  for (int i = 0; i < 9; ++i) snap = monitor.sample(5000);
+  CHECK(!monitor.takePsramEccReport(report));
+  snap = monitor.sample(5000);
+  CHECK(monitor.takePsramEccReport(report));
+  CHECK(report.count == 256U && report.firstAddress == 0x3C200000U && report.saturated);
+  CHECK(snap.psramEccErrors == 258U);
 }
 
 void h03_task_profiler_start_stop_updates_snapshot() {
@@ -26223,6 +26258,7 @@ const TestCase testCases[] = {
     {"H01b", h01b_health_heap_low_restarts_only_when_ready_and_sustained},
     {"H01c", h01c_health_zero_is_exhaustion_not_missing_telemetry},
     {"H02", h02_hwmon_cpu_load_uses_refreshed_idle_and_ema},
+    {"H02b", h02b_hwmon_psram_ecc_reports_are_rate_limited},
     {"H03", h03_task_profiler_start_stop_updates_snapshot},
     {"H04", h04_loop_phase_profiler_publishes_window_and_session_totals},
     {"H05", h05_loop_phase_profiler_pairs_cpu_with_wall_maxima},

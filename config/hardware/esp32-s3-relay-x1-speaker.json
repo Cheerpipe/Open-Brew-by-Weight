@@ -12,7 +12,8 @@
   },
   "target": {
     "chip": "esp32s3",
-    "memory_profile": "n16r8"
+    "memory_profile": "n16r8",
+    "psram_ecc": true
   },
   "activator": {
     "gpio": 21,

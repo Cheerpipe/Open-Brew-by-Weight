@@ -128,6 +128,26 @@ try:
 finally:
     bad_icon.unlink()
 
+# target.psram_ecc reaches the build as psram_ecc=enabled|disabled. Both values
+# come from fixtures, so a shipped profile can switch without a test change.
+for ecc, expected in ((True, "enabled"), (False, "disabled")):
+    fixture = changed(HARDWARE, lambda value, ecc=ecc: value["target"].update(psram_ecc=ecc))
+    temporary, result = run(hardware=fixture)
+    try:
+        assert result.returncode == 0, result.stderr
+        assert f"psram_ecc={expected}" in result.stdout.splitlines(), result.stdout
+    finally:
+        temporary.cleanup()
+        fixture.unlink()
+for mutate, text in (
+        (lambda value: value["target"].update(psram_ecc="yes"), "hardware.target.psram_ecc"),
+        (lambda value: value["target"].pop("psram_ecc"), "hardware.target is missing: psram_ecc")):
+    fixture = changed(HARDWARE, mutate)
+    try:
+        expect_failure(hardware=fixture, text=text)
+    finally:
+        fixture.unlink()
+
 temporary, result = run(hardware=HARDWARE_REED, machine=PRO_X_REED)
 try:
     assert result.returncode == 0, result.stderr

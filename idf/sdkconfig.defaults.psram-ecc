@@ -1,0 +1,2 @@
+# Added when the hardware profile sets target.psram_ecc (see docs/BUILD_PROFILES.md).
+CONFIG_SPIRAM_ECC_ENABLE=y
