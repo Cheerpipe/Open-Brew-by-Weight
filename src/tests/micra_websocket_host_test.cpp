@@ -10,6 +10,7 @@
 #include "machine/OpenBrewByWeightMicraPublicIdentityCache.h"
 #include "machine/OpenBrewByWeightMicraService.h"
 #include "machine/OpenBrewByWeightMicraStomp.h"
+#include "micra_power_test_helpers.h"
 #include "OpenBrewByWeightOutboundAdmission.h"
 #include "OpenBrewByWeightJsonArena.h"
 #include "OpenBrewByWeightDomain.h"
@@ -502,7 +503,7 @@ struct MicraWebSocketTest {
     deliver(service, observation(service, off));
     assert(service.powerState_.notePhysicalStart(service.published_, true, true, now));
     service.stopWebSocket();  // Also used by the HTTP progress cancellation path.
-    assert(service.powerState_.retained());
+    assert(retained(service.powerState_));
     now += 100000;
     assert(service.powerState_.effectiveStatus(service.published_, true, millis()).effectiveOn);
     service.serviceWebSocket();
@@ -642,7 +643,7 @@ struct MicraWebSocketTest {
     service.active_ = false;
     const auto fresh = service.published_.sampleAtMs;
     deliver(service, observation(service, R"({"connected":false,"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})"));
-    assert(service.published_.sampleAtMs == fresh && service.powerState_.retained());
+    assert(service.published_.sampleAtMs == fresh && retained(service.powerState_));
     // Discovery retains WebSocket observation and accepts fresh frames.
     publishOutboundAcquisition(true, ++now);
     deliver(service, observation(service, off));
@@ -654,7 +655,7 @@ struct MicraWebSocketTest {
     publishOutboundAcquisition(false, now);
     service.serviceWebSocket();
     deliver(service, observation(service, off));
-    assert(!service.powerState_.retained());
+    assert(!retained(service.powerState_));
     // Unscaled paddle shots retain both the subscription and fresh push evidence.
     const auto stopsBeforeShot = stops;
     const auto epoch = service.observationFence_.epoch;
@@ -706,7 +707,7 @@ struct MicraWebSocketTest {
     assert(stops == stopsBeforeShot && transmitted == sentBeforeShot);
     outboundScaleConnected.store(false);
     deliver(service, observation(service, off));
-    assert(!service.powerState_.retained());
+    assert(!retained(service.powerState_));
     // A fragmented message started before an intent cannot confirm that intent.
     const auto bytes = observation(service, off);
     deliver(service, bytes.substr(0, 15), false);
@@ -774,7 +775,7 @@ struct MicraWebSocketTest {
     assert(service.snapshotStamp_.powerRevision == firstStamp.powerRevision);
     service.snapshotPending_ = false;  // Owner has dispatched initialization.
     deliver(service, observation(service, R"({"connected":false})"));
-    assert(service.observationFence_.offline && service.powerState_.retained());
+    assert(service.observationFence_.offline && retained(service.powerState_));
     deliver(service, observation(service, R"({"connected":true})"));
     // Back online without power queues no HTTPS read; the next push resyncs.
     assert(!service.snapshotPending_ && !service.observationFence_.synchronized);
@@ -785,7 +786,7 @@ struct MicraWebSocketTest {
     esp_websocket_event_data_t event;
     service.websocketEvent(&service, nullptr, WEBSOCKET_EVENT_CLOSED, &event);
     assert(!service.observationFence_.synchronized && !service.snapshotPending_);
-    assert(service.powerState_.retained());  // Invalidated before owner teardown.
+    assert(retained(service.powerState_));  // Invalidated before owner teardown.
     assert(service.status().quality == LineaMicraObservationQuality::STALE);
     service.stopWebSocket();
     assert(!service.snapshotPending_);
@@ -1107,11 +1108,11 @@ struct MicraWebSocketTest {
     service.published_.sampleAtMs = now;
     LineaMicraStatus failed = service.published_;
     service.fail(failed, LineaMicraError::TRANSPORT);  // WebSocket mode: the socket owner holds.
-    assert(!service.powerState_.retained() &&
+    assert(!retained(service.powerState_) &&
            service.status().assumedPower == LineaMicraAssumedPower::ON);
     service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
     service.fail(failed, LineaMicraError::TRANSPORT);
-    assert(service.powerState_.retained());
+    assert(retained(service.powerState_));
     auto status = service.status();
     assert(status.assumedPower == LineaMicraAssumedPower::ON_STALE &&
            status.powerState == LineaMicraPowerState::ON &&
@@ -1936,7 +1937,7 @@ struct MicraWebSocketTest {
       assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
       assert(std::strcmp(service.companionRouteStatus().reason, "no_link") == 0);
       assert(!service.backflush().valid && !service.observationFence_.synchronized);
-      assert(service.powerState_.retained() && service.observationFence_.epoch == epoch + 1);
+      assert(retained(service.powerState_) && service.observationFence_.epoch == epoch + 1);
       assert(!service.websocketStatus().subscribed && !service.companionRoute_.load());
       assert(service.status().quality == LineaMicraObservationQuality::STALE);
       // Late frames from the lost feed are ignored.
@@ -2069,7 +2070,7 @@ struct MicraWebSocketTest {
     // full frame arrives; the controller makes no request meanwhile.
     service.companionUpstream(true, 8, 3000);
     assert(!service.websocketStatus().subscribed && !service.observationFence_.synchronized);
-    assert(service.powerState_.retained() && !service.backflush().valid);
+    assert(retained(service.powerState_) && !service.backflush().valid);
     assert(frame(service, MicraCompanionStateKind::PUSH, kStandby, 0, 8));
     assert(service.published_.powerState == LineaMicraPowerState::ON);
     assert(service.serviceCompanion());

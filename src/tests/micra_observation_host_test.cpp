@@ -1,4 +1,5 @@
 #include "machine/OpenBrewByWeightMicraObservation.h"
+#include "micra_power_test_helpers.h"
 #include <cJSON.h>
 #include <cassert>
 #include <cstring>
@@ -49,7 +50,7 @@ static void initialStateContinuity() {
     staleOffline.connectedPresent = true;
     staleOffline.connected = false;
     assert(fence.merge(state, power, staleOffline, true, true));
-    assert(fence.synchronized && !fence.offline && !power.retained());
+    assert(fence.synchronized && !fence.offline && !retained(power));
     initial.stamp = fence.stamp(1, power.generation());
     initial.source = MicraObservationSource::HTTP;
     initial.receivedAtMs = 200;
@@ -64,20 +65,20 @@ static void initialStateContinuity() {
     auto late = initial;
     late.stamp = offline.stamp;
     assert(fence.merge(state, power, offline, true));
-    assert(fence.offline && !fence.synchronized && power.retained());
+    assert(fence.offline && !fence.synchronized && retained(power));
     late.connectedPresent = late.connected = true;
     assert(fence.merge(state, power, late, true, true));
-    assert(fence.offline && power.retained() && state.sampleAtMs == 200);
+    assert(fence.offline && retained(power) && state.sampleAtMs == 200);
     offline.connected = true;
     assert(fence.merge(state, power, offline, true));
-    assert(!fence.offline && !fence.synchronized && power.retained());
+    assert(!fence.offline && !fence.synchronized && retained(power));
     push.powerPresent = false;
     assert(fence.merge(state, power, push, true));
     assert(power.effectiveStatus(state, true, 400).quality == LineaMicraObservationQuality::STALE);
     push.powerPresent = true;
     push.receivedAtMs = 500;
     assert(fence.merge(state, power, push, true));
-    assert(fence.synchronized && !power.retained());
+    assert(fence.synchronized && !retained(power));
     late.connected = false;  // An older HTTP offline result cannot undo recovery.
     assert(fence.merge(state, power, late, true, true));
     assert(fence.synchronized && !fence.offline && state.sampleAtMs == 500);
@@ -103,7 +104,7 @@ static void connectionOnlyOrdering() {
   online.connected = true;
   assert(fence.merge(state, power, online, true));
   assert(fence.merge(state, power, initial, true));
-  assert(!fence.offline && !power.retained());  // Older API offline cannot win.
+  assert(!fence.offline && !retained(power));  // Older API offline cannot win.
   // Online-only push must not prevent independent power initialization.
   initial.connected = initial.powerPresent = true;
   initial.mode = LineaMicraObservedMode::STANDBY;
@@ -113,7 +114,7 @@ static void connectionOnlyOrdering() {
   initial.stamp = fence.stamp(0, power.generation());
   initial.connected = false;
   assert(fence.merge(state, power, initial, true));
-  assert(fence.offline && !fence.synchronized && power.retained());
+  assert(fence.offline && !fence.synchronized && retained(power));
 }
 
 int main() {
@@ -379,11 +380,11 @@ int main() {
   push.stamp = fence.stamp(1, intent);
   push.powerPresent = false;
   push.temperaturePresent = push.temperatureValid = true;
-  assert(fence.merge(state, power, push, true) && power.retained());
+  assert(fence.merge(state, power, push, true) && retained(power));
   push.powerPresent = true;
   push.mode = LineaMicraObservedMode::BREWING;
   push.receivedAtMs = 100001;
-  assert(fence.merge(state, power, push, true) && !power.retained());
+  assert(fence.merge(state, power, push, true) && !retained(power));
   assert(power.effectiveStatus(state, true, 100002).effectiveOn);
 
   // Retention is one clock: a hold stands in for kStaleRetentionMs, then the
@@ -401,7 +402,7 @@ int main() {
     assert(e.powerState == LineaMicraPowerState::ON && e.quality == LineaMicraObservationQuality::STALE);
     e = held.effectiveStatus(on, true, 2000 + kStaleRetentionMs);
     assert(e.powerState == LineaMicraPowerState::UNKNOWN && e.effectiveOn &&
-           e.quality == LineaMicraObservationQuality::STALE && held.retained());
+           e.quality == LineaMicraObservationQuality::STALE && retained(held));
     assert(!held.notePhysicalStart(on, true, true, 2000 + kStaleRetentionMs));  // Unknown: normal shot...
     held.notePhysicalEvidence(on, true, 2000 + kStaleRetentionMs);  // ...and evidence of ON.
     e = held.effectiveStatus(on, true, 2000 + 2 * kStaleRetentionMs - 1);
@@ -409,10 +410,10 @@ int main() {
     assert(held.effectiveStatus(on, true, 2000 + 2 * kStaleRetentionMs).powerState ==
            LineaMicraPowerState::UNKNOWN);
     held.noteEvidence(held.generation(), LineaMicraPowerState::OFF, 3000 + 2 * kStaleRetentionMs, false);
-    assert(!held.retained());  // Cloud evidence always wins.
+    assert(!retained(held));  // Cloud evidence always wins.
     held.hold(on, true, 5000);
     held.reset();
-    assert(!held.retained());
+    assert(!retained(held));
 
     LineaMicraStatus off = on;  // Held OFF: the wake gesture flips it to ON and restarts.
     off.powerState = LineaMicraPowerState::OFF;
@@ -450,15 +451,15 @@ int main() {
 
     LineaMicraPowerStateTracker fresh;  // A fresh reading needs no evidence...
     fresh.notePhysicalEvidence(on, true, 5);
-    assert(!fresh.retained());
+    assert(!retained(fresh));
     fresh.notePhysicalEvidence(on, false, 5);  // ...nor does a machine that is not observed.
-    assert(!fresh.retained());
+    assert(!retained(fresh));
     LineaMicraStatus none;  // Boot before the first read: the paddle says ON until the read lands.
     LineaMicraPowerStateTracker boot;
     boot.notePhysicalEvidence(none, true, 5);
     assert(boot.effectiveStatus(none, true, 6).powerState == LineaMicraPowerState::ON);
     boot.noteEvidence(boot.generation(), LineaMicraPowerState::OFF, 7, false);
-    assert(!boot.retained());
+    assert(!retained(boot));
     LineaMicraStatus eco = on;  // Eco: the machine reports no power; the paddle cannot invent one.
     eco.powerState = LineaMicraPowerState::UNKNOWN;
     eco.quality = LineaMicraObservationQuality::UNSUPPORTED;

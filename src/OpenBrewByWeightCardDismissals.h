@@ -6,8 +6,10 @@
 // persists it as one blob; missing or invalid, nothing is dismissed. The
 // Wi-Fi change result it dismisses lives in RAM (NetworkStatusSnapshot).
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 
 #include "OpenBrewByWeightPersistence.h"
 #include "OpenBrewByWeightWebAccess.h"
@@ -68,10 +70,8 @@ inline bool validCardDismissals(const CardDismissals &dismissals) {
       !cardImageValid(dismissals.image) || !cardImageValid(dismissals.rollback)) {
     return false;
   }
-  for (const char *key : dismissals.grind) {
-    if (key[0] != '\0' && cardGrindPreset(key) == 0) return false;
-  }
-  return true;
+  return std::all_of(std::begin(dismissals.grind), std::end(dismissals.grind),
+                     [](const char *key) { return key[0] == '\0' || cardGrindPreset(key) != 0; });
 }
 
 // Acknowledges a valid image prefix; returns whether it changed.

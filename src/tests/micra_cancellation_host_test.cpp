@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include "machine/OpenBrewByWeightMicraPublicIdentityCache.h"
 #include "machine/OpenBrewByWeightMicraService.h"
+#include "micra_power_test_helpers.h"
 #include "OpenBrewByWeightAuditLog.h"
 #include "OpenBrewByWeightOutboundAdmission.h"
 
@@ -302,7 +303,7 @@ void MicraCancellationTest::run() {
   OpenBrewByWeightMicraService::PendingRequest paused;
   paused.identityGeneration = service.identityGeneration_;
   service.deferObservation(paused, service.published_, LineaMicraError::CANCELED);
-  assert(service.pending_.present && service.powerState_.retained());
+  assert(service.pending_.present && retained(service.powerState_));
   const auto held = service.powerState_.effectiveStatus(service.published_, true, 100000);
   assert(!held.effectiveOn && held.quality == LineaMicraObservationQuality::STALE);
   assert(service.published_.sampleAtMs == 900);

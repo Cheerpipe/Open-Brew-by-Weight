@@ -1111,6 +1111,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   // One event per pass: the terms wait for the next one after a shot's.
   const bool policyEvent = !shotEvent && !syncHold && companionPolicyEventDue() &&
                            companionAddBody(count, "%s", COMPANION_POLICY_EVENT);
+  // cppcheck-suppress knownConditionTrueFalse ; builds without La Marzocco stub companionPolicyRequired() to false; Linea Micra builds send the terms event
   if (policyEvent) {
     job.eventBody = static_cast<uint8_t>(count - 1);
     job.eventPolicy = true;
@@ -1170,6 +1171,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     events.lastId = eventShot.id;
     events.lastAtMs = millis();
   }
+  // cppcheck-suppress knownConditionTrueFalse ; builds without La Marzocco stub companionPolicyRequired() to false; Linea Micra builds send the terms event
   if (policyEvent) {
     g_companion.shotEvents.policySent = true;
     g_companion.shotEvents.policyAtMs = millis();

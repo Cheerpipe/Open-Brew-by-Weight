@@ -109,6 +109,7 @@ void OpenBrewByWeightNetwork::companionRecordsService(uint32_t now, bool syncHol
   if (eventCheck && (callbacks_.recordStoresSavePending == nullptr ||
                      !callbacks_.recordStoresSavePending()))
     companionNotified_.store(true, std::memory_order_release);
+  // cppcheck-suppress knownConditionTrueFalse ; builds without La Marzocco stub companionPolicyRequired() to false; Linea Micra builds send the terms event
   if (gate && companionPolicyEventDue()) companionNotified_.store(true, std::memory_order_release);
   if (syncHold || now - companionRecordsAtMs_ < kStatsStreamPaceMs ||
       !companionRecordsDue_.load(std::memory_order_acquire) ||
@@ -202,7 +203,7 @@ bool OpenBrewByWeightNetwork::companionShotEventBody(uint8_t &count, bool syncHo
 // Network task: La Marzocco refuses the account until its terms are accepted, a
 // device wants events, and this acceptance has not been told. A state, not an
 // instant, so a link or a device that arrives later still hears of it.
-bool OpenBrewByWeightNetwork::companionPolicyEventDue() {
+bool OpenBrewByWeightNetwork::companionPolicyEventDue() const {
   {
     TaskLockGuard lock(dataMux_);
     const CompanionLinkSlot *link = companionActiveLink();
@@ -214,6 +215,7 @@ bool OpenBrewByWeightNetwork::companionPolicyEventDue() {
   CompanionShotEvents &events = g_companion.shotEvents;
   if (events.policySent && companionPolicyEventRearmed(required, sampleAtMs, events.policyAtMs))
     events.policySent = false;
+  // cppcheck-suppress knownConditionTrueFalse ; builds without La Marzocco stub companionPolicyRequired() to false; Linea Micra builds send the terms event
   return required && !events.policySent;
 }
 

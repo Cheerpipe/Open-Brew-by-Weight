@@ -96,8 +96,6 @@ class LineaMicraPowerStateTracker {
 
   uint32_t generation() const { return generation_; }
 
-  bool retained() const { return held_; }
-
   void hold(const LineaMicraStatus &authoritative, bool observing, uint32_t now) {
     if (!observing || held_) return;
     const auto effective = effectiveStatus(authoritative, observing, now);

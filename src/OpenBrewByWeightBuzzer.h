@@ -419,13 +419,13 @@ inline bool LocalBuzzer::startRtttl(const BuzzerToneCommand &cmd,
     activePulseRate = rate;
   } else {
     const uint8_t kind = cmd.cue == BuzzerCue::SCALE_LOST ? 1 : 0;
-    const bool scale = cmd.scaleTone && scaleNoteCount[kind] != 0;
-    if (!scale && (id == 0 || id >= kRtttlCueCount || cueNoteCount[id] == 0)) {
+    const bool scaleCue = cmd.scaleTone && scaleNoteCount[kind] != 0;
+    if (!scaleCue && (id == 0 || id >= kRtttlCueCount || cueNoteCount[id] == 0)) {
       return false;
     }
-    rtttlCount = scale ? scaleNoteCount[kind] : cueNoteCount[id];
+    rtttlCount = scaleCue ? scaleNoteCount[kind] : cueNoteCount[id];
     memcpy(rtttlBuf,
-           scale ? rtttlCatalog->scaleNotes[kind] : rtttlCatalog->cueNotes[id],
+           scaleCue ? rtttlCatalog->scaleNotes[kind] : rtttlCatalog->cueNotes[id],
            sizeof(RtttlNote) * rtttlCount);
     activePulseRate = 0;
   }

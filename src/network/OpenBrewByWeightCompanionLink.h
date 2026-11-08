@@ -545,9 +545,9 @@ size_t companionRelayedStreamsEnd(Session (&sessions)[N], int (&fds)[N]) {
 template <typename Session, size_t N>
 Session *uiStreamFreeSlot(Session (&sessions)[N], bool relayed) {
   if (relayed) {
-    for (auto &slot : sessions)
-      if (slot.fd == -1) return &slot;
-    return nullptr;
+    Session *slot = std::find_if(std::begin(sessions), std::end(sessions),
+                                 [](const Session &session) { return session.fd == -1; });
+    return slot == std::end(sessions) ? nullptr : slot;
   }
   for (size_t index = N - 1; index > 0; --index)
     if (sessions[index].fd == -1) return &sessions[index];
