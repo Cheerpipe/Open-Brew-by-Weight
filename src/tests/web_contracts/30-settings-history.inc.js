@@ -525,14 +525,15 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !diagHtml.includes('<strong>Clock</strong>') ||
       !diagHtml.includes('<strong>Temp current</strong>') ||
       !diagHtml.includes('<strong>Temp peak</strong>') ||
-      // 23 Diagnostics sections and folds, plus the log's Logging settings.
-      (diagHtml.match(/<details/g) || []).length !== 24 ||
+      // 24 Diagnostics sections and folds, plus the log's Logging settings.
+      (diagHtml.match(/<details/g) || []).length !== 25 ||
       // Shot storage is its own section after HEAP and NVS, read when opened.
       diagHtml.indexOf('<summary>HEAP</summary>') > diagHtml.indexOf('<summary>Shot storage</summary>') ||
       diagHtml.indexOf('<summary>Shot storage</summary>') > diagHtml.indexOf('<summary>Date and time</summary>') ||
       !codeIncludes(ui, '$("shotStorage").addEventListener("toggle", loadShotStorage)') ||
       !codeIncludes(ui, 'R.api("/api/v1/diagnostic/shot-storage", { timeoutMs: 15e3 })') ||
       !diagHtml.includes('<details class="fold"><summary>Last 10 resets</summary>') ||
+      !diagHtml.includes('<details id="loopTimingWrap" class="fold"><summary>Loop timing</summary>') ||
       diagHtml.includes('<summary>Diagnostics</summary>') ||
       !diagHtml.includes('id="hFirmware"') ||
       !diagHtml.includes('id="hBoot"') ||

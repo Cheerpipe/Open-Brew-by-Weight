@@ -959,7 +959,8 @@
           >
           <div id="hLoopMax">—</div>
         </div>
-        <div id="loopTimingWrap">
+        <details id="loopTimingWrap" class="fold">
+          <summary>{{webui:diagnostic.loop_timing}}</summary>
           <table id="loopTimingTable">
             <thead>
               <tr>
@@ -970,7 +971,7 @@
             </thead>
             <tbody id="loopTimingBody"></tbody>
           </table>
-        </div>
+        </details>
         <div class="metric">
           <strong>{{webui:diagnostic.last_command}}</strong>
           <div id="lastCommand">—</div>

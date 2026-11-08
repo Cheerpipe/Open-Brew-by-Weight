@@ -550,6 +550,7 @@
     "diagnostic.loop_gap": "Loop gap",
     "diagnostic.loop_max": "Loop max",
     "diagnostic.loop_phase": "Loop phase",
+    "diagnostic.loop_timing": "Loop timing",
     "diagnostic.machine_activity": "Machine activity",
     "diagnostic.machine_cleaning": "Backflush",
     "diagnostic.machine_i_o": "Machine I/O",
