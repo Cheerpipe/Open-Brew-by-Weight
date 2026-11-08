@@ -288,7 +288,8 @@ void processWebCommand(const WebCommand &command) {
       candidate.serialLogLevel = command.config.serialLogLevel;
       candidate.ringRetainLogLevel = command.config.ringRetainLogLevel;
       candidate.showDiagnosticPage = command.config.showDiagnosticPage;
-      candidate.powerManagementEnabled = command.config.powerManagementEnabled;
+      candidate.idlePowerSavingEnabled = command.config.idlePowerSavingEnabled;
+      candidate.performanceBoostEnabled = command.config.performanceBoostEnabled;
       candidate.heroCardMode = command.config.heroCardMode;
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
       // Host APPLY_CONFIG still carries brew fields; update the active recipe.

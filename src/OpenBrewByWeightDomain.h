@@ -529,14 +529,16 @@ inline const char *heroCardModeId(uint8_t mode) {
 struct RuntimeConfig {
   uint32_t revision = 1;
   uint16_t goalWeightDg = DEFAULT_GOAL_WEIGHT_DG;
-  // Global setting, never copied into a preset.
-  bool powerManagementEnabled = true;
+  // Global power settings, never copied into a preset.
+  bool idlePowerSavingEnabled = true;
   uint8_t timezoneAutomatic = 1;
   float weightOffsetG = DEFAULT_WEIGHT_OFFSET_G;
   // Seed for Reset learned stop offset (DEFAULT_WEIGHT_OFFSET_G).
   float weightOffsetBaselineG = DEFAULT_WEIGHT_OFFSET_G;
   bool autoTare = true;
   bool touchStopFallbackEnabled = true;
+  // 0/1; fills padding. A blob without it inherits idle saving on load.
+  uint8_t performanceBoostEnabled = 1;
   uint32_t postTareBaselineGraceMs = DEFAULT_POST_TARE_BASELINE_GRACE_MS;
   // Internal polarity: true disables weight stop. UI/API brewByWeight is the inverse.
   bool timerOnly = false;

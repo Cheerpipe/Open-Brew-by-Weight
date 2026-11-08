@@ -86,7 +86,8 @@ void p01_defaults_are_valid() {
   CHECK(settings.runtime.timezoneAutomatic == 1);
   CHECK(settings.runtime.autoTareOutsideBrew);
   CHECK(idleAccessoryRetareEnabled(settings.runtime.noScaleBbwMode));
-  CHECK(settings.runtime.powerManagementEnabled);
+  CHECK(settings.runtime.idlePowerSavingEnabled);
+  CHECK(settings.runtime.performanceBoostEnabled == 1);
   CHECK(!settings.webhook.deferDuringShot);
   CHECK(settings.runtime.fastSideEnabled);
   CHECK(settings.runtime.fastMarginDg == DEFAULT_FAST_MARGIN_DG);
@@ -3194,6 +3195,38 @@ void p91d_legacy_blob_derives_identical_curve() {
   }
 }
 
+// Tag 3 was the single power setting before the split: a blob without tag 88
+// keeps that choice for both settings; a later blob keeps them independent.
+void p91e_power_split_migrates_single_setting() {
+  const struct {
+    std::vector<uint8_t> runtime;
+    bool idle;
+    uint8_t boost;
+  } cases[] = {
+      {{3, 1, 0}, false, 0},
+      {{3, 1, 1}, true, 1},
+      {{3, 1, 0, 88, 1, 1}, false, 1},
+      {{3, 1, 1, 88, 1, 0}, true, 0},
+  };
+  for (const auto &c : cases) {
+    std::vector<uint8_t> body = {SETTINGS_GROUP_RUNTIME,
+                                 static_cast<uint8_t>(c.runtime.size())};
+    body.insert(body.end(), c.runtime.begin(), c.runtime.end());
+    const std::vector<uint8_t> blob = settingsBlobWithBody(body);
+    PersistedSettings settings;
+    uint32_t malformed = 0;
+    CHECK(decodePersistedSettings(blob.data(), blob.size(), settings, malformed) &&
+          malformed == 0);
+    CHECK(settings.runtime.idlePowerSavingEnabled == c.idle);
+    CHECK(settings.runtime.performanceBoostEnabled == c.boost);
+  }
+  PersistedSettings empty;
+  uint32_t malformed = 0;
+  const std::vector<uint8_t> blob = settingsBlobWithBody({});
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), empty, malformed));
+  CHECK(empty.runtime.idlePowerSavingEnabled && empty.runtime.performanceBoostEnabled == 1);
+}
+
 void p91b_settings_codec_round_trips_and_evolves() {
   // Every persisted member survives an encode/decode round trip.
   PersistedSettings original;
@@ -3565,6 +3598,7 @@ const TestCase tests[] = {
     {"P74", p74_factory_intent_second_failure_keeps_settings},
     {"P91C", p91c_preset_transitions_repair_out_of_range},
     {"P91D", p91d_legacy_blob_derives_identical_curve},
+    {"P91E", p91e_power_split_migrates_single_setting},
     {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},

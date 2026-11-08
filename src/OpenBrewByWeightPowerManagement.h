@@ -35,14 +35,15 @@ inline bool powerIdleSavings() {
 
 // Called only by control, outside critical sections. No actuation here.
 #ifdef OPEN_BREW_BY_WEIGHT_HOST_TEST
-inline bool applyPowerProfile(PowerProfile profile) {
+inline bool applyPowerProfile(PowerProfile profile, bool = false) {
   powerRequestedProfile.store(profile, std::memory_order_release);
   powerAppliedProfile.store(powerBleError.load() == 0 ? profile : PowerProfile::OFF,
                             std::memory_order_release);
   return true;
 }
 #else
-bool applyPowerProfile(PowerProfile profile);
+// boost: Performance boost lets the scale-window profiles reach 160 MHz.
+bool applyPowerProfile(PowerProfile profile, bool boost = false);
 #endif
 
 }  // namespace openbrewbyweight

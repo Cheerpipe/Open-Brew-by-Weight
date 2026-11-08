@@ -206,6 +206,7 @@ int main() {
   LineaMicraStatus scanStatus;
   scanStatus.powerState = LineaMicraPowerState::UNKNOWN;
   scanStatus.effectiveOn = true;  // UNKNOWN keeps effectiveOn true; never enough.
+  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::UNKNOWN);
   assert(micraScanOverride(scanStatus, LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
          MicraScanOverride::NONE);
   scanStatus.powerState = LineaMicraPowerState::ON;
@@ -234,6 +235,7 @@ int main() {
   // alone never selects a duty.
   scanStatus.powerState = LineaMicraPowerState::ON;
   scanStatus.quality = LineaMicraObservationQuality::STALE;
+  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::ON);
   assert(micraScanOverride(
              scanStatus, LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
          MicraScanOverride::AGGRESSIVE);
@@ -245,6 +247,7 @@ int main() {
   scanStatus.quality = LineaMicraObservationQuality::OPTIMISTIC;
   scanStatus.effectiveOn = true;
   scanStatus.optimisticOn = true;  // ...but the machine is waking now.
+  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::ON);
   assert(micraScanOverride(
              scanStatus, LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
          MicraScanOverride::AGGRESSIVE);
@@ -259,6 +262,7 @@ int main() {
   scanStatus.quality = LineaMicraObservationQuality::OPTIMISTIC;
   scanStatus.effectiveOn = false;
   scanStatus.optimisticOff = true;  // ...but standby was accepted.
+  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::OFF);
   assert(micraScanOverride(
              scanStatus, LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
          MicraScanOverride::RELAXED);

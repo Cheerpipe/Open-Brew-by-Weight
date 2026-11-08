@@ -289,9 +289,14 @@
   <details id="powerPanel" data-g="energy" class="cfgGroup">
     <summary>{{webui:admin.power_management}}</summary>
     <label
-      ><input id="powerManagementEnabled" type="checkbox" role="switch" />
-      {{webui:admin.esp32_power_management}}<small class="fieldHint"
-        >{{webui:admin.adjusts_the_esp32_cpu_speed_and_radio_sleep}}</small
+      ><input id="performanceBoostEnabled" type="checkbox" role="switch" />
+      {{webui:admin.performance_boost}}<small class="fieldHint"
+        >{{webui:admin.runs_the_processor_at_full_speed}}</small
+      ></label
+    ><label
+      ><input id="idlePowerSavingEnabled" type="checkbox" role="switch" />
+      {{webui:admin.idle_power_saving}}<small class="fieldHint"
+        >{{webui:admin.lets_the_processor_slow_down}}</small
       ><small id="powerStatus" class="fieldHint"></small></label
     ><label
       ><input id="staWifiSleep" type="checkbox" checked /> {{webui:admin.wi_fi_sleep}}<small

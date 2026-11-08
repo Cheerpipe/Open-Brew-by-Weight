@@ -116,7 +116,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   // Log/debug fields stay public with the Diagnostic page; the visibility
   // toggle and the Frontend preferences always require the Admin session.
   const bool diagnosticPagePatch = jsonFieldPresent(root, "showDiagnosticPage") ||
-      jsonFieldPresent(root, "powerManagementEnabled") || jsonFieldPresent(root, "heroCardMode");
+      jsonFieldPresent(root, "idlePowerSavingEnabled") ||
+      jsonFieldPresent(root, "performanceBoostEnabled") || jsonFieldPresent(root, "heroCardMode");
   // Patch: seed live effective config; only present keys overwrite.
   RuntimeConfig candidate = {};
   if (self.callbacks_.copyRuntimeConfig != nullptr) {
@@ -133,6 +134,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   bool browserTimezonePatch = false;
   bool soundAlertsEnabled = !candidate.soundAlertsMuted;
   bool scheduledRestartEnabled = candidate.scheduledRestartEnabled != 0;
+  bool performanceBoost = candidate.performanceBoostEnabled != 0;
   uint32_t scheduledRestartMinute = candidate.scheduledRestartMinuteOfDay;
   BullseyeMelodyConfig candidateBullseye = {};
   if (self.callbacks_.copyBullseyeConfig != nullptr) {
@@ -186,7 +188,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "bookooConnectBeepLevel", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
-      "powerManagementEnabled", "heroCardMode"};
+      "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode"};
   ValidationFailure parseError;
   size_t settingFieldCount = 0;
   if (root != nullptr) {
@@ -524,9 +526,13 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
     parseError = validationFailure("FIELD_ENUM", "ringRetainLogLevel",
                                    "none, critical, error, warning, info, or debug");
   }
-  if (parseError.reason == nullptr && jsonFieldPresent(root, "powerManagementEnabled") &&
-      !jsonBoolean(root, "powerManagementEnabled", candidate.powerManagementEnabled)) {
-    parseError = validationFailure("FIELD_BOOLEAN", "powerManagementEnabled");
+  if (parseError.reason == nullptr && jsonFieldPresent(root, "idlePowerSavingEnabled") &&
+      !jsonBoolean(root, "idlePowerSavingEnabled", candidate.idlePowerSavingEnabled)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "idlePowerSavingEnabled");
+  } else if (parseError.reason == nullptr &&
+             jsonFieldPresent(root, "performanceBoostEnabled") &&
+             !jsonBoolean(root, "performanceBoostEnabled", performanceBoost)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "performanceBoostEnabled");
   }
   if (parseError.reason == nullptr &&
       ((timezoneAutoInit || timezoneDetected) && !timezoneIdPresent)) {
@@ -574,6 +580,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   }
   candidate.timezoneAutomatic = timezoneAutomatic;
   candidate.scheduledRestartEnabled = scheduledRestartEnabled ? 1 : 0;
+  candidate.performanceBoostEnabled = performanceBoost ? 1 : 0;
   candidate.scheduledRestartMinuteOfDay =
       static_cast<uint16_t>(scheduledRestartMinute);
   if (timezoneIdPresent) {

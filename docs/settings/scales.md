@@ -295,8 +295,8 @@ rejects readings older than 1 s, before that link timeout. Check
 4. If discovery is slow, check **Admin → Power management → BLE scan mode**:
    factory **Balanced**, with **Aggressive** searching harder and **Relaxed**
    trading some speed for less radio time. The saved mode always decides how
-   hard the search runs; [ESP32 power management](power-management.md) only
-   manages CPU and radio hardware and never changes the search intensity.
+   hard the search runs; [Performance boost and Idle power saving](power-management.md)
+   only manage CPU and radio hardware and never change the search intensity.
    On a La Marzocco Linea Micra, the
    [machine-aware scan options](linea-micra.md#machine-aware-scale-search)
    can search harder while the machine is on and ease off while it is off.

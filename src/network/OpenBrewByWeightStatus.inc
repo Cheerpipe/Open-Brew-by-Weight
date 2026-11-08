@@ -139,14 +139,17 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
   }
   if (ok) {
     const PowerProfile applied = powerAppliedProfile.load(std::memory_order_acquire);
+    const bool boost = control.config.performanceBoostEnabled != 0;
     ok = statusJsonAppend(&used,
-        ",\"power\":{\"enabled\":%s,\"requestedProfile\":\"%s\",\"profile\":\"%s\",\"cpuMhz\":%u,"
+        ",\"power\":{\"idleSaving\":%s,\"boost\":%s,\"requestedProfile\":\"%s\","
+        "\"profile\":\"%s\",\"cpuMhz\":%u,"
         "\"minMhz\":%d,\"maxMhz\":%d,\"clockError\":%d,\"bleError\":%d,"
         "\"bleSleep\":%s,\"webActive\":%s,\"cooldownMs\":%lu}",
-        control.config.powerManagementEnabled ? "true" : "false",
+        control.config.idlePowerSavingEnabled ? "true" : "false",
+        boost ? "true" : "false",
         powerProfileName(powerRequestedProfile.load(std::memory_order_acquire)),
         powerProfileName(applied), static_cast<unsigned>(getCpuFrequencyMhz()),
-        powerMinMhz(applied), powerMaxMhz(applied), powerClockError.load(),
+        powerMinMhz(applied, boost), powerMaxMhz(applied, boost), powerClockError.load(),
         powerBleError.load(), powerBleSleeping.load() ? "true" : "false",
         powerWebActive(millis()) ? "true" : "false",
         static_cast<unsigned long>(powerCooldownRemainingMs.load()));
@@ -178,7 +181,8 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         "\"firstTimezoneAutoBootId\":%lu,\"firstTimezoneAutoClockQuality\":%u,"
         "\"ntpServerPreset\":\"%s\",\"ntpSyncEnabled\":%s,"
         "\"ntpServerCustom\":\"%s\",\"showDiagnosticPage\":%s,"
-        "\"powerManagementEnabled\":%s,\"heroCardMode\":\"%s\","
+        "\"idlePowerSavingEnabled\":%s,\"performanceBoostEnabled\":%s,"
+        "\"heroCardMode\":\"%s\","
         "\"persistPending\":%s,\"persistFailed\":%s,"
         "\"scheduledRestartEnabled\":%s,\"scheduledRestartMinuteOfDay\":%u,"
         "\"scheduledRestartState\":\"%s\",\"scheduledRestartCause\":\"%s\"",
@@ -190,7 +194,8 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         ntpPresetId(control.config.ntpServerPreset),
         control.config.ntpSyncEnabled ? "true" : "false", safeNtpCustom,
         control.config.showDiagnosticPage ? "true" : "false",
-        control.config.powerManagementEnabled ? "true" : "false",
+        control.config.idlePowerSavingEnabled ? "true" : "false",
+        control.config.performanceBoostEnabled != 0 ? "true" : "false",
         heroCardModeId(control.config.heroCardMode),
         control.configPersistPending ? "true" : "false",
         control.configPersistFailed ? "true" : "false",

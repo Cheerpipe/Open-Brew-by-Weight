@@ -227,6 +227,7 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   hostMachinePhysicalStartDisposition =
       MachinePhysicalStartDisposition::NORMAL;
   hostMachinePhysicalStartCount = 0;
+  hostMachinePowerState = MachinePower::UNKNOWN;
   hostBackflushObservations = {};
   backflushObservation = {};
   backflushPermit = {};
@@ -22422,7 +22423,6 @@ void bbw03_shared_guard_parity() {
 
 void pow01_scale_disconnect_grace_and_rinse_clock() {
   resetHarness(false, true);
-  runtimeConfig.powerManagementEnabled = true;
   reachReadyFromBoot();
   CHECK(servicePowerManagement());
   CHECK(powerAppliedProfile.load() == PowerProfile::WAITING);
@@ -22447,7 +22447,6 @@ void pow01_scale_disconnect_grace_and_rinse_clock() {
   CHECK(powerCooldownRemainingMs.load() == 270000);
 
   resetHarness(false, true);
-  runtimeConfig.powerManagementEnabled = true;
   reachReadyFromBoot();
   startCycle();
   CHECK(enterRinse());
@@ -22455,14 +22454,39 @@ void pow01_scale_disconnect_grace_and_rinse_clock() {
   CHECK(powerAppliedProfile.load() == PowerProfile::WORKING);
 
   resetHarness(false, false);
-  runtimeConfig.powerManagementEnabled = true;
   runtimeConfig.noScaleBbwMode = static_cast<uint8_t>(NoScaleBbwMode::OFF);
   reachReadyFromBoot();
   CHECK(beginRinseCycle(ControlSource::PHYSICAL));
   CHECK(powerAppliedProfile.load() == PowerProfile::MANUAL);
-  runtimeConfig.powerManagementEnabled = false;
+  runtimeConfig.idlePowerSavingEnabled = false;
+  CHECK(servicePowerManagement());
+  CHECK(powerAppliedProfile.load() == PowerProfile::MANUAL);
+  runtimeConfig.performanceBoostEnabled = 0;
   CHECK(servicePowerManagement());
   CHECK(powerAppliedProfile.load() == PowerProfile::OFF);
+}
+
+// The machine integration's assumed power state reaches the policy: ON holds
+// 80 MHz, OFF admits idle saving without the 5-minute cooldown.
+void pow07_machine_power_state_drives_idle() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  hostMachinePowerState = MachinePower::ON;
+  CHECK(servicePowerManagement());
+  CHECK(powerAppliedProfile.load() == PowerProfile::MACHINE_ON);
+  CHECK(servicePowerManagement(true));
+  CHECK(powerAppliedProfile.load() == PowerProfile::MACHINE_ON);
+  CHECK(powerCooldownRemainingMs.load() == 300000);
+  hostMachinePowerState = MachinePower::OFF;
+  CHECK(servicePowerManagement());
+  CHECK(powerAppliedProfile.load() == PowerProfile::SETTLING);
+  CHECK(powerCooldownRemainingMs.load() == 0);
+  hostMillis += 1000;
+  CHECK(servicePowerManagement());
+  CHECK(powerAppliedProfile.load() == PowerProfile::IDLE);
+  hostMachinePowerState = MachinePower::UNKNOWN;
+  CHECK(servicePowerManagement(true));
+  CHECK(powerAppliedProfile.load() == PowerProfile::COOLDOWN);
 }
 
 void pow02_idle_scan_preserves_saved_preference() {
@@ -22587,13 +22611,17 @@ void pow05_power_config_command_and_persistence() {
   resetHarness(false, false);
   reachReadyFromBoot();
   for (bool enabled : {true, false}) {
+    // The two settings save independently of each other.
+    const uint8_t boost = enabled ? 0 : 1;
     WebCommand update;
     update.type = WebCommandType::APPLY_CONFIG;
     update.requestId = enabled ? 41 : 42;
     update.config = runtimeConfig;
-    update.config.powerManagementEnabled = enabled;
+    update.config.idlePowerSavingEnabled = enabled;
+    update.config.performanceBoostEnabled = boost;
     processWebCommand(update);
-    CHECK(runtimeConfig.powerManagementEnabled == enabled);
+    CHECK(runtimeConfig.idlePowerSavingEnabled == enabled);
+    CHECK(runtimeConfig.performanceBoostEnabled == boost);
     CHECK(runtimeConfig.revision == update.config.revision + 1);
     CHECK(runtimePersistPending);
     CHECK(hostLastForwardedNetworkCommand.requestId == update.requestId);
@@ -22601,22 +22629,26 @@ void pow05_power_config_command_and_persistence() {
     hostRuntimePersistSucceeds = false;
     runLoopAfter(RUNTIME_PERSIST_DEBOUNCE_MS + 1);
     CHECK(publishedControlStatus.configPersistFailed);
-    CHECK(runtimeConfig.powerManagementEnabled == enabled);
+    CHECK(runtimeConfig.idlePowerSavingEnabled == enabled);
     hostRuntimePersistSucceeds = true;
     runLoopAfter(RUNTIME_PERSIST_RETRY_MS + 1);
     CHECK(!runtimePersistPending && !runtimePersistFailed);
-    CHECK(hostLastFlushedRuntime.powerManagementEnabled == enabled);
+    CHECK(hostLastFlushedRuntime.idlePowerSavingEnabled == enabled);
+    CHECK(hostLastFlushedRuntime.performanceBoostEnabled == boost);
     CHECK(hostLastFlushedRuntime.revision == runtimeConfig.revision);
-    CHECK(publishedControlStatus.config.powerManagementEnabled == enabled);
+    CHECK(publishedControlStatus.config.idlePowerSavingEnabled == enabled);
+    CHECK(publishedControlStatus.config.performanceBoostEnabled == boost);
     CHECK(!publishedControlStatus.configPersistPending);
   }
   WebCommand blocked;
   blocked.type = WebCommandType::APPLY_CONFIG;
   blocked.config = runtimeConfig;
-  blocked.config.powerManagementEnabled = true;
+  blocked.config.idlePowerSavingEnabled = true;
+  blocked.config.performanceBoostEnabled = 0;
   session.active = true;
   processWebCommand(blocked);
-  CHECK(!runtimeConfig.powerManagementEnabled);
+  CHECK(!runtimeConfig.idlePowerSavingEnabled);
+  CHECK(runtimeConfig.performanceBoostEnabled == 1);
   CHECK(runtimeConfig.revision == blocked.config.revision);
 }
 
@@ -25253,6 +25285,7 @@ const TestCase testCases[] = {
     {"POW06", pow06_machine_use_never_changes_scan_duty},
     {"POW04", pow04_ble_policy_failure_recovery},
     {"POW05", pow05_power_config_command_and_persistence},
+    {"POW07", pow07_machine_power_state_drives_idle},
     {"T01", t01_boot_with_paddle_off},
     {"T02", t02_boot_with_activator_on},
     {"T02B", t02b_off_wake_bypasses_brew_guards_and_records_power_on},

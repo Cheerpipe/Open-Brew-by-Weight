@@ -45,9 +45,9 @@ the cloud account credentials, installation key, selected machine, and session.
 Presets return to the five factory presets (Double · Adaptive, Single · Adaptive,
 Double · Fixed, Single · Fixed and Manual) with Manual active. Its three
 integration options return to ON, and factory preset boiler targets return to
-93.0 °C. ESP32 power management, Wi-Fi sleep, and the BLE scan mode return to
-their factory values: ESP32 power management on, Wi-Fi sleep on, and Balanced
-scan mode. The machine-aware scale search options return to off. The device
+93.0 °C. Performance boost, Idle power saving, Wi-Fi sleep, and the BLE scan
+mode return to their factory values: Performance boost on, Idle power saving
+on, Wi-Fi sleep on, and Balanced scan mode. The machine-aware scale search options return to off. The device
 password returns to **`ineedacoffee`** and the device name to
 **`openbrewbyweight`**. The [Web UI password](web-access.md) turns off, every
 remembered device and Home Assistant's access are forgotten, and Home shows

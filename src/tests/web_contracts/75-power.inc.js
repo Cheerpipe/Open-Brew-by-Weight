@@ -27,10 +27,13 @@
   now += 180000;
   lease.activity();
   assert.equal(lease.seconds(), 0);
-  assert(network.includes('"powerManagementEnabled"'));
+  assert(!network.includes('"powerManagementEnabled"'));
   const handler = network.slice(network.indexOf('const bool diagnosticPagePatch'),
-      network.indexOf('const bool diagnosticPagePatch') + 200);
-  assert(handler.includes('powerManagementEnabled'));
+      network.indexOf('const bool diagnosticPagePatch') + 260);
+  for (const key of ['idlePowerSavingEnabled', 'performanceBoostEnabled']) {
+    assert(network.includes(`"${key}"`));
+    assert(handler.includes(key));
+  }
   assert(network.includes('diagnosticPagePatch && !self.requireAdminUnlock(request)'));
   assert(network.includes('notePowerWebActivity(millis()'));
   assert(codeIncludes(runtimeJs, "options.headers['X-WebUI-Activity']"));
@@ -51,7 +54,7 @@
       },
       sleep: async () => { now += 150; }
     }, {now: () => now});
-    for (const key of ['powerManagementEnabled', 'showDiagnosticPage']) {
+    for (const key of ['idlePowerSavingEnabled', 'performanceBoostEnabled', 'showDiagnosticPage']) {
       for (const value of [true, false]) {
         const snapshot = (state, revision, pending, failed = false, actual = value) => ({
           lastCommand: {requestId: 7, state},
@@ -90,7 +93,7 @@
       admin.indexOf('async function saveBleSettings('));
   const run = async () => {
     const el = {checked: true};
-    let reject = false, posted, waited = 0;
+    let reject = false, posted, waited = 0, refreshed = 0;
     const handler = new Function('R', 'waitSaved', '$', source + ';return saveDurableConfigKey')(
         {
           withCommandGate: fn => fn(),
@@ -100,21 +103,22 @@
             posted = JSON.parse(options.body);
             if (reject) throw new Error('Revision conflict');
             return {requestId: 5};
-          }, message: () => {}
+          }, refreshStatus: async () => { ++refreshed; }, message: () => {}
         },
         async (id, label, config, key) => {
           assert.equal(id, 5);
-          assert.equal(label, 'power management');
-          assert.equal(key, 'powerManagementEnabled');
+          assert.equal(label, 'performance boost');
+          assert.equal(key, 'performanceBoostEnabled');
           assert.deepEqual(config, posted);
           ++waited;
         }, () => el);
-    await handler('powerManagementEnabled', 'power management');
-    assert.deepEqual(posted, {powerManagementEnabled: true, baseRevision: 12});
+    await handler('performanceBoostEnabled', 'performance boost');
+    assert.deepEqual(posted, {performanceBoostEnabled: true, baseRevision: 12});
     assert.equal(waited, 1);
+    assert.equal(refreshed, 1);
     assert.equal(el.checked, true);
     reject = true;
-    await assert.rejects(handler('powerManagementEnabled', 'power management'), /Revision conflict/);
+    await assert.rejects(handler('performanceBoostEnabled', 'performance boost'), /Revision conflict/);
   };
   run().catch(error => { console.error(error); process.exitCode = 1; });
 }

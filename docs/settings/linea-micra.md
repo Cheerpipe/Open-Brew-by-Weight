@@ -214,6 +214,12 @@ If observation pauses during that estimate, its effective value stays on screen
 with stale quality until a fresh power update arrives after reconnection.
 Connection or temperature updates alone cannot confirm power.
 
+The same state, optimistic estimates included, guides
+[Idle power saving](power-management.md#linea-micra-power-state): while the
+machine is on the controller keeps its processor at its working speed, and
+once the machine is off it starts saving energy straight away instead of
+waiting for the five-minute cooldown.
+
 Diagnostics → Machine distinguishes the last observed mode from its quality:
 
 | Micra response | Displayed state |

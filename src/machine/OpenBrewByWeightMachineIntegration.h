@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "OpenBrewByWeightMachineBackflush.h"
+#include "OpenBrewByWeightPowerPolicy.h"
 
 namespace openbrewbyweight {
 // Callback-safe wakeup; admission itself is published by discovery.
@@ -36,6 +37,8 @@ inline void publishMachineIntegrationNetworkState(bool, bool, bool,
 inline void serviceMachineIntegrationScaleLink(uint32_t, bool, uint32_t,
                                                uint8_t, bool) {}
 inline void serviceMachineIntegrationMachinePower(bool, bool, bool) {}
+inline MachinePower hostMachinePowerState = MachinePower::UNKNOWN;
+inline MachinePower machineIntegrationPowerState() { return hostMachinePowerState; }
 inline uint32_t hostMachineTemperatureRequestCount = 0;
 inline uint8_t hostMachineTemperaturePresetId = 0;
 inline uint32_t hostMachineTemperatureGeneration = 0;
@@ -94,6 +97,10 @@ void serviceMachineIntegrationScaleLink(uint32_t now, bool scaleLinkUp,
 void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
                                            bool scaleSupportsPowerOff,
                                            bool machineBusy);
+// The machine's assumed power state (confirmed state under any live
+// optimistic overlay) for the control task's power policy; UNKNOWN when the
+// integration cannot tell. Reads the cached status poll, never blocks.
+MachinePower machineIntegrationPowerState();
 void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
                                                 uint32_t configGeneration);
 // The integration's current coffee target in deci-Celsius for the shot

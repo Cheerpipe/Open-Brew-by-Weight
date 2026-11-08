@@ -68,7 +68,7 @@ constexpr SettingsFieldKind settingsFieldKind() {
 
 #define SF(tag, member) OBBW_SETTINGS_FIELD(tag, RuntimeConfig, member)
 inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
-    SF(1, revision), SF(2, goalWeightDg), SF(3, powerManagementEnabled),
+    SF(1, revision), SF(2, goalWeightDg), SF(3, idlePowerSavingEnabled),
     SF(4, timezoneAutomatic), SF(5, weightOffsetG), SF(6, weightOffsetBaselineG),
     SF(7, autoTare), SF(8, touchStopFallbackEnabled), SF(9, postTareBaselineGraceMs),
     SF(10, timerOnly), SF(11, canTareStartTimer), SF(12, scaleTimerStopExtraDelayMs),
@@ -101,7 +101,8 @@ inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
     SF(77, scheduledRestartEnabled), SF(78, scheduledRestartMinuteOfDay),
     SF(79, fastRampMs), SF(80, slowRampMs), SF(81, fastCurve), SF(82, fastCurveHardness),
     SF(83, slowCurve), SF(84, slowCurveHardness), SF(85, heroCardMode),
-    SF(86, fastCurveHardnessPct), SF(87, slowCurveHardnessPct)};
+    SF(86, fastCurveHardnessPct), SF(87, slowCurveHardnessPct),
+    SF(88, performanceBoostEnabled)};
 #undef SF
 
 #define SF(tag, member) OBBW_SETTINGS_FIELD(tag, ShotPreset, member)
@@ -202,7 +203,7 @@ constexpr size_t settingsFieldBytes(const SettingsField (&fields)[N]) {
                          [](size_t bytes, const SettingsField &field) { return bytes + field.size; });
 }
 
-static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 22 == sizeof(RuntimeConfig),
+static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 21 == sizeof(RuntimeConfig),
               "every RuntimeConfig member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 3 == sizeof(ShotPreset),
               "every ShotPreset member needs a settings field row");
@@ -434,6 +435,8 @@ inline bool settingsBlobIntact(const uint8_t *blob, size_t length, uint32_t &rev
                                                       uint32_t &malformed) {
   SettingsReader body{blob + SETTINGS_BLOB_HEADER_BYTES, blob + length - 4U};
   uint8_t presets = 0, scales = 0;
+  constexpr uint8_t kBoostAbsent = 0xFF;  // Tag 88 not decoded (yet).
+  settings.runtime.performanceBoostEnabled = kBoostAbsent;
   while (body.at < body.end) {
     size_t tag = 0;
     SettingsReader group{};
@@ -482,6 +485,10 @@ inline bool settingsBlobIntact(const uint8_t *blob, size_t length, uint32_t &rev
     }
     if (!framed) return false;
   }
+  // Tag 3 was the single power setting before the split: a blob without
+  // tag 88 keeps that choice for both.
+  if (settings.runtime.performanceBoostEnabled == kBoostAbsent)
+    settings.runtime.performanceBoostEnabled = settings.runtime.idlePowerSavingEnabled;
   settings.presets.count = presets;
   return true;
 }

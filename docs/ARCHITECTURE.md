@@ -262,8 +262,10 @@ they can be restored but not deleted. A golden schema-2 blob in the host tests
 proves later firmware keeps settings across OTA. Candidate
 anchors/observations/generations are RAM only; deferred persistence retains
 offsets, gain/provenance, and profile through the existing dual-slot owner.
-`powerManagementEnabled`, webhook preset delivery, and Rinse without a scale
-are current explicit fields. Presets never copy the global power setting.
+`idlePowerSavingEnabled` (tag 3, the former single power setting),
+`performanceBoostEnabled` (tag 88, inherits tag 3 when a blob predates it),
+webhook preset delivery, and Rinse without a scale are current explicit fields.
+Presets never copy the global power settings.
 `touchStopFallbackEnabled` is a device-level runtime field, defaulting to true. Revisions and
 dual-slot ownership remain unchanged.
 The shot log is the authority for a completed shot: confirmed, non-rinse,

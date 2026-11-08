@@ -109,6 +109,14 @@ void serviceMachineIntegrationScaleLink(uint32_t now, bool scaleLinkUp,
   }
 }
 
+// Control task only, like the other cached status poll readers.
+MachinePower machineIntegrationPowerState() {
+  const LineaMicraPowerState state = micraAssumedPowerState(service.statusPoll());
+  return state == LineaMicraPowerState::ON    ? MachinePower::ON
+         : state == LineaMicraPowerState::OFF ? MachinePower::OFF
+                                              : MachinePower::UNKNOWN;
+}
+
 void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
                                            bool scaleSupportsPowerOff,
                                            bool machineBusy) {

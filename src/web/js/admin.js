@@ -30,6 +30,7 @@ function setSaveDirty(id, hintId, dirty) {
 // over a change made meanwhile (another screen through the companion) is
 // refused, and the form shows the saved values again.
 const formRevisions = {};
+const POWER_KEYS = ["performanceBoostEnabled", "idlePowerSavingEnabled"];
 // With no feature needing the link nothing shows a companion is alive: the relay
 // session outlives one that went away, so Admin says when it last worked.
 const companionRelayOnly = (c) => c.relay === "ready" && !c.log && !c.archive && !c.lm;
@@ -1162,13 +1163,13 @@ function applyAdminStatus(s) {
     );
   // The switches take their saved values before the baselines are taken, so
   // flipping one and back before the next poll reads as clean.
-  for (const id of ["powerManagementEnabled", "showDiagnosticPage"]) {
+  for (const id of POWER_KEYS.concat("showDiagnosticPage")) {
     const el = $(id),
       v = s.config && s.config[id];
     if (
       el &&
       typeof v === "boolean" &&
-      !(id === "powerManagementEnabled" ? R.uiState.powerDirty : R.uiState.frontendDirty)
+      !(id === "showDiagnosticPage" ? R.uiState.frontendDirty : R.uiState.powerDirty)
     )
       el.checked = v;
   }
@@ -1900,6 +1901,8 @@ async function saveDurableConfigKey(key, label) {
     const p = R.withBaseRev({ [key]: wanted }),
       a = await R.api("/api/v1/config", { method: "POST", body: R.body(p) });
     await waitSaved(a.requestId, label, p, key);
+    // The next key saved by the same Save carries the revision this one made.
+    await R.refreshStatus();
     R.message(__WEBUI_TEXT__("admin.setting_saved"), "ok");
   });
 }
@@ -1922,12 +1925,13 @@ async function savePowerSettings() {
   b.classList.add("busy");
   let ok = true;
   try {
-    if (controlChanged("powerManagementEnabled", R.uiState.powerBaseline)) {
+    for (const [key, label] of [
+      ["performanceBoostEnabled", __WEBUI_TEXT__("admin.performance_boost_setting")],
+      ["idlePowerSavingEnabled", __WEBUI_TEXT__("admin.idle_power_saving_setting")],
+    ]) {
+      if (!controlChanged(key, R.uiState.powerBaseline)) continue;
       try {
-        await saveDurableConfigKey(
-          "powerManagementEnabled",
-          __WEBUI_TEXT__("admin.power_management_setting"),
-        );
+        await saveDurableConfigKey(key, label);
       } catch (e) {
         R.message(e.message, "error");
         ok = false;
@@ -2064,8 +2068,13 @@ const ADMIN_SUMMARIES = {
   ble: () => onOff("bleEnabled"),
   network: () => $("staSsid").value.trim() || __WEBUI_TEXT__("admin.sum_not_set"),
   energy: () =>
-    onOff("powerManagementEnabled") +
-    ($("staWifiSleep").checked ? " · " + __WEBUI_TEXT__("admin.wi_fi_sleep") : ""),
+    [
+      $("performanceBoostEnabled").checked && __WEBUI_TEXT__("admin.performance_boost"),
+      $("idlePowerSavingEnabled").checked && __WEBUI_TEXT__("admin.idle_power_saving"),
+      $("staWifiSleep").checked && __WEBUI_TEXT__("admin.wi_fi_sleep"),
+    ]
+      .filter(Boolean)
+      .join(" · ") || __WEBUI_TEXT__("runtime.off_2"),
   clock: () => ($("timezoneId").value || R.uiState.savedTimezoneId || "").replaceAll("_", " "),
   frontend: () => onOff("showDiagnosticPage") + " · " + ($("heroCardMode")?.value ?? ""),
   schedule: () =>

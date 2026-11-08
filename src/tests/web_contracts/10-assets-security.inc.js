@@ -813,7 +813,8 @@ if (codeIncludes(ui, 'bleCompanionEnabled') ||
     networkHeader.includes('bleCompatHandler') ||
     firmwareCore.includes('persistBleCompanionEnabled') ||
     !codeIncludes(ui, '<legend>') || !codeIncludes(ui, 'Power management') ||
-    !codeIncludes(ui, 'ESP32 power management') ||
+    codeIncludes(ui, 'ESP32 power management') ||
+    !codeIncludes(ui, 'Performance boost') || !codeIncludes(ui, 'Idle power saving') ||
     !codeIncludes(ui, 'bleScanIntensity') ||
     !codeIncludes(ui, 'BLE scan mode') ||
     codeIncludes(ui, 'Aggressive 100%') ||

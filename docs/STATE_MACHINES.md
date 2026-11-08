@@ -36,7 +36,7 @@ Related product docs: [Brew by weight](features/brew-by-weight.md),
 | Cross-cutting | [End reasons](#end-reasons-brew-outcomes), [loop ordering](#control-loop-ordering) |
 
 [Power management](settings/power-management.md) derives energy demand from
-these existing states. It has no actuation authority: active or uncertain
+these existing states and, on a Linea Micra, the machine's assumed power state. It has no actuation authority: active or uncertain
 machine operation holds the CPU requirement until confirmed stop, independent
 of relay level. Control owns clock changes, ScaleService owns BLE policy and
 NetworkService owns Wi-Fi policy. Temporary WebUI/physical leases never change

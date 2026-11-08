@@ -126,7 +126,7 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            "\"appliedTimezoneOffsetMinutes\":%d,\"timezoneOffsetKnown\":%s,"
            "\"tzdbVersion\":\"%s\",\"timezoneResolution\":\"%s\","
            "\"serialLogLevel\":\"%s\","
-           "\"powerManagementEnabled\":%s},",
+           "\"idlePowerSavingEnabled\":%s,\"performanceBoostEnabled\":%s},",
            static_cast<unsigned long>(c.config.revision),
            static_cast<double>(goalWeightDgToGrams(c.config.goalWeightDg)),
            static_cast<double>(c.config.weightOffsetG),
@@ -179,7 +179,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            timezoneOffsetKnown ? "true" : "false", tzdb::kVersion,
            timeZoneResolution(c.config.timezoneId, timeStatus.utcSec),
            logLevelName(serialLogLevelFromRuntime(c.config)),
-           c.config.powerManagementEnabled ? "true" : "false");
+           c.config.idlePowerSavingEnabled ? "true" : "false",
+           c.config.performanceBoostEnabled != 0 ? "true" : "false");
 
   if (self.callbacks_.copyPresetBank != nullptr) {
     self.callbacks_.copyPresetBank(&work.presetBank);
