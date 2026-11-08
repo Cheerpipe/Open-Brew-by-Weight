@@ -60,6 +60,16 @@
   color: var(--ac);
 }
 
+.devIc svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .devIc[data-level="partial"] svg {
   --rackTop: 0.18;
 }
@@ -75,16 +85,6 @@
 #companionOpen span {
   display: inline-block;
   margin-inline-start: 0.3em;
-}
-
-.devIc svg {
-  width: 1.15rem;
-  height: 1.15rem;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .devTx {

@@ -654,7 +654,7 @@
 }
 
 .presetLock svg,
-.presetAccBadge.lockSay svg {
+.lockSay svg {
   width: 1rem;
   height: 1rem;
   overflow: visible;
@@ -694,7 +694,7 @@
   font-weight: 700;
 }
 
-.presetAccBadge.lockSay svg {
+.lockSay svg {
   width: 0.8rem;
   height: 0.8rem;
   margin-right: 0.25rem;
