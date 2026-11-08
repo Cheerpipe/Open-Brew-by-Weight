@@ -6,6 +6,9 @@ device: the controller never sees it, and other phones, tablets, and browsers
 keep their own. Tabs and windows of the same browser share the same choices.
 In a browser tab, the group leaves out the settings marked *installed app only*.
 
+The [preset lock](../features/presets.md#lock-the-preset-list-on-home) on
+Home is kept the same way, per device, though you set it on Home itself.
+
 Like the [theme](theme.md), these choices live in the browser's own storage.
 Clearing its data returns them to their defaults, and a
 [factory reset](factory-reset.md) does not touch them.

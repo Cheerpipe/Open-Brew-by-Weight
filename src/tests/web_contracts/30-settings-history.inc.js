@@ -205,8 +205,8 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     !/<button[^>]*value="cancel"[^>]*formnovalidate/.test(partialHtml.settings) ||
     !codeIncludes(ui, 'id="homePresetAcc"') ||
     !html.includes('<legend>Presets</legend>') ||
-    html.indexOf('id="presetPanel"') > html.indexOf('<legend>Presets</legend>') ||
-    html.indexOf('<legend>Presets</legend>') > html.indexOf('id="homePresetAcc"') ||
+    html.indexOf('id="presetPanel"') > html.indexOf('<legend>Presets <button type="button" id="presetLockButton"') ||
+    html.indexOf('<legend>Presets <button type="button" id="presetLockButton"') > html.indexOf('id="homePresetAcc"') ||
     html.indexOf('id="homePresetBlock"') > html.indexOf('id="homePresetAcc"') ||
     codeIncludes(ui, 'id="quickSettingsPanel"') ||
     codeIncludes(ui, 'id="stopPanel"') || codeIncludes(ui, 'homeBrewByWeight') ||

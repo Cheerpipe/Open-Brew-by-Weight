@@ -51,8 +51,10 @@ seconds when weight never stops the shot.
 Low in the chart, a soft shaded area traces your flow, the same flow the shot
 history shows, smoothed so scale jitter and splashes don't show as spikes;
 after the machine stops, the drip tail fades further.
-Tapping another row applies that recipe. These rows show the recipe's own values; learned
-drip compensation and time limits still apply.
+Holding another row applies that recipe, or a tap once the list is unlocked
+(see [Lock the preset list on Home](#lock-the-preset-list-on-home)).
+These rows show the recipe's own values; learned drip compensation and time
+limits still apply.
 
 The preset list and its action bar stay hidden behind a loading animation
 until presets are ready. The other Settings groups remain available as
@@ -68,6 +70,25 @@ preset and whether editing is allowed.
 | **Duplicate** | Copies the selected preset into a new one. |
 | **Restore** | Factory presets only: returns the preset to its factory values and starts its shot statistics over. Shared settings do not change. |
 | **Delete** | Your own presets only: removes the preset. This cannot be undone. |
+
+## Lock the preset list on Home
+
+A stray tap on Home could switch your recipe, so the list of presets starts
+locked. The lock next to the **Presets** title shows **Locked**, and tapping
+another preset leaves your current one in place: its label briefly reads
+**Locked · hold to switch** instead.
+
+- **Switch while locked:** press and hold the preset you want. A ring fills
+  around its circle, and when it closes that preset becomes the active one.
+  The list stays locked.
+- **Unlock:** press and hold the lock next to the title until its ring closes.
+  It reads **Unlocked**, and a normal tap switches presets again.
+- **Lock again:** press and hold the lock the same way.
+
+The lock stays as you leave it until you change it. It belongs to this phone
+or browser, like the [settings for this device](../settings/app.md): other
+devices keep their own lock, and Home Assistant and webhooks are not
+affected. With a keyboard, hold Space or Enter instead of pressing.
 
 ## Change the target weight from Home
 

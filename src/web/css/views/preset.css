@@ -579,6 +579,7 @@
 }
 
 .presetAccDot {
+  position: relative;
   flex: none;
   width: 1.05rem;
   height: 1.05rem;
@@ -613,6 +614,115 @@
   font-size: 0.68rem;
   color: var(--mu);
   text-transform: uppercase;
+}
+
+/* Preset lock: the legend's toggle, and a ring that fills while a hold runs
+   around its icon or around a row's dot. A locked tap shakes the row and
+   turns its badge into the hint. */
+.presetLock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: var(--tap);
+  margin: calc((var(--tap) - 1.6rem) / -2) 0;
+  padding: 0 0.3rem 0 0.1rem;
+  border: 0;
+  background: none;
+  color: var(--mu);
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.presetLock,
+.presetAccHead {
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.presetLock.open {
+  color: var(--ac);
+}
+
+.presetLockIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.presetLock svg,
+.presetAccBadge.lockSay svg {
+  width: 1rem;
+  height: 1rem;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.presetLock path {
+  transform-origin: 16px 11px;
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0.32, 1);
+}
+
+.presetLock.open path {
+  transform: translateX(5px) rotate(18deg);
+}
+
+.presetLockIcon::after,
+.presetAccDot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--ac) calc(var(--hold, 0) * 360deg), transparent 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.6px), #000 calc(100% - 2.4px));
+  pointer-events: none;
+}
+
+.presetAccDot::after {
+  inset: -5px;
+}
+
+.presetAccBadge.lockSay {
+  color: var(--ac);
+  font-weight: 700;
+}
+
+.presetAccBadge.lockSay svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-right: 0.25rem;
+  vertical-align: -0.1rem;
+}
+
+.presetAccItem.lockNudge {
+  animation: presetLockNudge 0.3s;
+}
+
+@keyframes presetLockNudge {
+  25% {
+    translate: -3px;
+  }
+
+  75% {
+    translate: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .presetAccItem.lockNudge {
+    animation: none;
+  }
+
+  .presetLock path {
+    transition: none;
+  }
 }
 
 .presetAccPanel,

@@ -4001,10 +4001,12 @@ function renderHomePresetAccordion() {
   const el = $("homePresetAcc");
   if (!el) return;
   const canSelect = controlsMutable,
+    locked = !appSetting("presetUnlocked"),
     openId = homeAccPendingId || presetState.activeId,
-    sig = JSON.stringify([openId, canSelect, liveRuleModel, presetState.rev]);
+    sig = JSON.stringify([openId, canSelect, locked, liveRuleModel, presetState.rev]);
   if (sig === homeAccSig) return;
   homeAccSig = sig;
+  renderPresetLock(locked);
   const focusIdx = [...el.querySelectorAll(".presetAccHead")].indexOf(document.activeElement),
     have = new Map([...el.children].map((n) => [n.dataset.id, n])),
     nodes = [];
@@ -4026,7 +4028,15 @@ function renderHomePresetAccordion() {
       name.className = "presetAccName";
       const badge = document.createElement("span");
       badge.className = "presetAccBadge";
+      badge.setAttribute("aria-live", "polite");
       head.append(dot, name, badge);
+      // Locked, holding an inactive preset is how you switch to it.
+      pressAndHold(
+        head,
+        () => !appSetting("presetUnlocked") && !item.classList.contains("open") && !head.disabled,
+        (v) => head.style.setProperty("--hold", v),
+        () => applyPreset(p.id),
+      );
       const panel = document.createElement("div");
       panel.className = "presetAccPanel";
       const panelIn = document.createElement("div");
@@ -4062,7 +4072,9 @@ function renderHomePresetAccordion() {
     head.children[1].textContent = p.name;
     head.children[2].textContent = presetBadge(p);
     head.onclick = () => {
-      if (p.id !== openId) applyPreset(p.id);
+      if (p.id === openId || performance.now() < holdClickGuard) return;
+      if (locked) presetLockHint(item);
+      else applyPreset(p.id);
     };
     const saved = buildRuleChartModel(p),
       m =
@@ -4912,6 +4924,104 @@ function positionPresetScrub(host) {
   g.setAttribute("aria-valuetext", text);
   if (host._readout) host._readout.textContent = text;
 }
+// Home's preset lock, kept per device: locked, a tap on another preset only
+// says how to switch, and holding it (or holding the legend's lock to unlock
+// the list) does. The click that ends a hold is swallowed by holdClickGuard.
+const HOLD_MS = 700;
+let holdClickGuard = 0,
+  presetHintTimer = 0;
+function pressAndHold(el, ready, progress, done) {
+  let t0 = 0,
+    raf = 0,
+    timer = 0,
+    x = 0,
+    y = 0;
+  const key = (e) => e.key === " " || e.key === "Enter",
+    stop = () => {
+      if (!t0) return false;
+      t0 = 0;
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      progress(0);
+      return true;
+    },
+    start = () => {
+      t0 = performance.now();
+      const paint = (now) => {
+        if (!t0) return;
+        progress(Math.min(1, (now - t0) / HOLD_MS));
+        raf = requestAnimationFrame(paint);
+      };
+      raf = requestAnimationFrame(paint);
+      timer = setTimeout(() => {
+        stop();
+        holdClickGuard = performance.now() + 600;
+        done();
+      }, HOLD_MS);
+    };
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button || !ready()) return;
+    [x, y] = [e.clientX, e.clientY];
+    start();
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (t0 && Math.hypot(e.clientX - x, e.clientY - y) > 10) stop();
+  });
+  for (const t of ["pointerup", "pointerleave", "pointercancel"]) el.addEventListener(t, stop);
+  el.addEventListener("contextmenu", (e) => ready() && e.preventDefault());
+  // Space or Enter held is the keyboard's hold; released early, a normal click.
+  el.addEventListener("keydown", (e) => {
+    if (!key(e) || e.repeat || !ready()) return;
+    e.preventDefault();
+    start();
+  });
+  el.addEventListener("keyup", (e) => key(e) && stop() && el.click());
+}
+function renderPresetLock(locked) {
+  const btn = $("presetLockButton");
+  if (!btn) return;
+  if (!btn.dataset.hold) {
+    btn.dataset.hold = "1";
+    pressAndHold(
+      btn,
+      () => true,
+      (v) => btn.style.setProperty("--hold", v),
+      () => {
+        setAppSetting("presetUnlocked", !appSetting("presetUnlocked"));
+        presetLockHint();
+        renderHomePresetAccordion();
+      },
+    );
+  }
+  btn.classList.toggle("open", !locked);
+  btn.lastElementChild.textContent = locked
+    ? __WEBUI_TEXT__("runtime.preset_locked")
+    : __WEBUI_TEXT__("runtime.preset_unlocked");
+  btn.title = locked
+    ? __WEBUI_TEXT__("runtime.preset_hold_to_unlock")
+    : __WEBUI_TEXT__("runtime.preset_hold_to_lock");
+}
+// One hint at a time: it shows on the tapped row and leaves every other one.
+function presetLockHint(target) {
+  clearTimeout(presetHintTimer);
+  for (const item of $("homePresetAcc")?.children || []) {
+    const badge = item.querySelector(".presetAccBadge"),
+      p = presetState.items.find((x) => String(x.id) === item.dataset.id);
+    badge.classList.toggle("lockSay", item === target);
+    if (item !== target) badge.textContent = p ? presetBadge(p) : "";
+  }
+  if (!target) return;
+  target
+    .querySelector(".presetAccBadge")
+    .replaceChildren(
+      $("presetLockButton").querySelector("svg").cloneNode(true),
+      __WEBUI_TEXT__("runtime.preset_locked_hold_to_switch"),
+    );
+  target.classList.remove("lockNudge");
+  void target.offsetWidth;
+  target.classList.add("lockNudge");
+  presetHintTimer = setTimeout(presetLockHint, 2200);
+}
 let liveRuleModel = null,
   homeAccSig = "",
   homeAccPendingId = 0,
@@ -5669,6 +5779,8 @@ const APP_SETTING_KEYS = {
   noSplash: "obbwAppNoSplash",
   batteryPct: "obbwAppBatteryPct",
   liveLandscape: "obbwAppLiveLandscape",
+  // Stored as an opt-in so Home's preset list starts locked.
+  presetUnlocked: "obbwAppPresetUnlocked",
 };
 function appSetting(k) {
   try {
