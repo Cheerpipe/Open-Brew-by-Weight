@@ -6,6 +6,7 @@
 // persists it as one blob; missing or invalid, nothing is dismissed. The
 // Wi-Fi change result it dismisses lives in RAM (NetworkStatusSnapshot).
 
+#include <cstdio>
 #include <cstdlib>
 
 #include "OpenBrewByWeightPersistence.h"
@@ -97,7 +98,7 @@ inline bool cardIgnoreGrind(CardDismissals &dismissals, const char *key) {
   }
   if (at == 0 && strcmp(dismissals.grind[0], key) == 0) return false;
   memmove(dismissals.grind[1], dismissals.grind[0], at * CARD_GRIND_KEY_BYTES);
-  strncpy(dismissals.grind[0], key, CARD_GRIND_KEY_BYTES);
+  snprintf(dismissals.grind[0], CARD_GRIND_KEY_BYTES, "%s", key);
   return true;
 }
 
