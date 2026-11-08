@@ -30,6 +30,9 @@ namespace openbrewbyweight {
 #ifndef OPEN_BREW_BY_WEIGHT_BUZZER_GPIO
 #define OPEN_BREW_BY_WEIGHT_BUZZER_GPIO 14
 #endif
+#ifndef OPEN_BREW_BY_WEIGHT_BUZZER_ACTIVE_LEVEL
+#define OPEN_BREW_BY_WEIGHT_BUZZER_ACTIVE_LEVEL LOW
+#endif
 #ifndef OPEN_BREW_BY_WEIGHT_USB_CONSOLE_GPIO
 #define OPEN_BREW_BY_WEIGHT_USB_CONSOLE_GPIO 4
 #endif
@@ -89,6 +92,9 @@ constexpr uint8_t SCALE_CONNECTED_LED_INACTIVE_LEVEL =
 constexpr uint32_t SCALE_LED_FAST_BLINK_MS = 100;
 constexpr uint32_t SCALE_LED_SLOW_BLINK_MS = 500;
 constexpr uint8_t BUZZER_GPIO = OPEN_BREW_BY_WEIGHT_BUZZER_GPIO;
+// Input level that drives the transducer: LOW for PNP (S8550) modules,
+// HIGH for NPN (S8050) modules and bare piezos. Silence holds the other level.
+constexpr uint8_t BUZZER_ACTIVE_LEVEL = OPEN_BREW_BY_WEIGHT_BUZZER_ACTIVE_LEVEL;
 constexpr uint8_t USB_CONSOLE_GPIO = OPEN_BREW_BY_WEIGHT_USB_CONSOLE_GPIO;
 // Dupont IO4 to a GND pad (never the EN column). Sampled once at boot.
 constexpr uint8_t USB_CONSOLE_ACTIVE_LEVEL =

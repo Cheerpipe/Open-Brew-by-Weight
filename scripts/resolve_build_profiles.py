@@ -189,7 +189,7 @@ def validate_hardware(obj: dict[str, Any]) -> dict[str, Any]:
 
     led = optional_role(obj["scale_status_led"], {"gpio", "active_level"},
                         "hardware.scale_status_led")
-    speaker = optional_role(obj["speaker"], {"type", "gpio"}, "hardware.speaker")
+    speaker = optional_role(obj["speaker"], {"type", "gpio", "active_level"}, "hardware.speaker")
     usb = optional_role(obj["usb_console_jumper"],
                         {"gpio", "active_level", "pull", "sample_at"},
                         "hardware.usb_console_jumper")
@@ -208,6 +208,7 @@ def validate_hardware(obj: dict[str, Any]) -> dict[str, Any]:
     if speaker["present"]:
         choice(speaker["type"], {"passive_pwm"}, "hardware.speaker.type")
         gpio(speaker["gpio"], "hardware.speaker.gpio")
+        choice(speaker["active_level"], set(LEVELS), "hardware.speaker.active_level")
         pins.append(("speaker", speaker["gpio"]))
     if usb["present"]:
         gpio(usb["gpio"], "hardware.usb_console_jumper.gpio")
@@ -416,6 +417,7 @@ def apply_overrides(hardware: dict[str, Any], machine: dict[str, Any],
         "OPEN_BREW_BY_WEIGHT_RELAY_CLOSED_LEVEL": ("relay", "closed_level"),
         "OPEN_BREW_BY_WEIGHT_RELAY_OPEN_LEVEL": ("relay", "open_level"),
         "OPEN_BREW_BY_WEIGHT_SCALE_CONNECTED_LED_ACTIVE_LEVEL": ("scale_status_led", "active_level"),
+        "OPEN_BREW_BY_WEIGHT_BUZZER_ACTIVE_LEVEL": ("speaker", "active_level"),
         "OPEN_BREW_BY_WEIGHT_USB_CONSOLE_ACTIVE_LEVEL": ("usb_console_jumper", "active_level"),
         "OPEN_BREW_BY_WEIGHT_REED_ACTIVE_LEVEL": ("reed", "active_level"),
         "OPEN_BREW_BY_WEIGHT_CIRCUIT_FEEDBACK_CLOSED_LEVEL":
@@ -580,6 +582,8 @@ def header_for(resolved: dict[str, Any]) -> str:
     define(lines, "OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER", hardware["speaker"]["present"])
     if hardware["speaker"]["present"]:
         define(lines, "OPEN_BREW_BY_WEIGHT_BUZZER_GPIO", hardware["speaker"]["gpio"])
+        define(lines, "OPEN_BREW_BY_WEIGHT_BUZZER_ACTIVE_LEVEL",
+               LEVELS[hardware["speaker"]["active_level"]])
     if hardware["usb_console_jumper"]["present"]:
         define(lines, "OPEN_BREW_BY_WEIGHT_USB_CONSOLE_GPIO", hardware["usb_console_jumper"]["gpio"])
         define(lines, "OPEN_BREW_BY_WEIGHT_USB_CONSOLE_ACTIVE_LEVEL",

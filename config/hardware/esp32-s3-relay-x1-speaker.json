@@ -34,7 +34,7 @@
   "speaker": {
     "present": true,
     "type": "passive_pwm",
-    "gpio": 14
+    "gpio": 14, "active_level": "low"
   },
   "usb_console_jumper": {
     "present": true,

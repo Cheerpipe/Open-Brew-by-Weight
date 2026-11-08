@@ -153,7 +153,7 @@ The complete current hardware profile is:
     "open_level": "low"
   },
   "scale_status_led": { "present": true, "gpio": 1, "active_level": "high" },
-  "speaker": { "present": true, "type": "passive_pwm", "gpio": 14 },
+  "speaker": { "present": true, "type": "passive_pwm", "gpio": 14, "active_level": "low" },
   "usb_console_jumper": {
     "present": true,
     "gpio": 4,
@@ -225,7 +225,7 @@ only field; do not retain a GPIO for hardware that is not installed.
 | Role | Fields when present | Current constraints |
 | --- | --- | --- |
 | `scale_status_led` | `gpio`, `active_level` | Level is `low` or `high`. |
-| `speaker` | `type`, `gpio` | Type is currently `passive_pwm`. Presence enables the local buzzer; `-DOPEN_BREW_BY_WEIGHT_ENABLE_BUZZER=0` omits it. |
+| `speaker` | `type`, `gpio`, `active_level` | Type is currently `passive_pwm`. `active_level` is the input level that makes the buzzer sound: `low` for PNP (S8550) modules, `high` for NPN (S8050) modules and bare piezos; silence holds the opposite level. Presence enables the local buzzer; `-DOPEN_BREW_BY_WEIGHT_ENABLE_BUZZER=0` omits it. |
 | `usb_console_jumper` | `gpio`, `active_level`, `pull`, `sample_at` | Current driver requires active-low, pull-up, sampled at `boot`; GPIO 0, 45, and 46 are rejected as strapping pins. |
 | `reed` | `gpio`, `active_level`, `pull`, `debounce_ms` | Current driver requires active-low and pull-up; debounce is 1–99 ms and must equal the activator debounce. |
 | `external_safety` | `heartbeat_gpio`, `heartbeat_idle_level`, `feedback_gpio`, `feedback_closed_level`, `feedback_pull`, `heartbeat_period_ms`, `feedback_settle_ms` | Current driver requires low heartbeat idle and feedback pull-up; periods are 10–1000 ms and 1–1000 ms respectively. |

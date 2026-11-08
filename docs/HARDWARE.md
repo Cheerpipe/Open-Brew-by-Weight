@@ -175,10 +175,23 @@ Wire a **passive** 3.3 V piezo/speaker to `OPEN_BREW_BY_WEIGHT_BUZZER_GPIO` (def
 14). The firmware drives it with PWM (RTTTL melodies), so it must be
 **passive, not active**. A module with three pins — **GND**, **VCC** and
 **IN** — is preferred over a loose two-wire speaker: connect GND to GND, VCC
-to 3.3 V, and IN to the buzzer GPIO. These modules sound on a low input, so
-the firmware keeps the buzzer GPIO high while silent; this keeps the speaker
-quiet instead of letting it pick up electrical noise. For a two-wire passive
-piezo, connect the marked **+** to the GPIO and the other lead to GND.
+to 3.3 V, and IN to the buzzer GPIO. For a two-wire passive piezo, connect
+the marked **+** to the GPIO and the other lead to GND.
+
+While silent, the firmware holds the buzzer GPIO at the level that switches
+the buzzer off, so it does not pick up electrical noise. That level depends on
+the transistor on the module, set by `speaker.active_level` in the hardware
+profile:
+
+| Buzzer | Transistor | `active_level` |
+|---|---|---|
+| 3-pin module that sounds on a low input (the example below) | S8550 / 9012 (PNP) | `low` (default) |
+| 3-pin module that sounds on a high input | S8050 / 9013 (NPN) | `high` |
+| Two-wire passive piezo on the GPIO | none | `high` |
+
+A wrong setting still plays sounds, but leaves the buzzer switched on while
+silent, which brings back the noise and wastes power. Do not wire a magnetic
+two-wire buzzer straight to the GPIO; use a module with a transistor.
 
 Example used: [3.3 V passive buzzer module (AliExpress)](https://es.aliexpress.com/item/1005007287329656.html).
 
