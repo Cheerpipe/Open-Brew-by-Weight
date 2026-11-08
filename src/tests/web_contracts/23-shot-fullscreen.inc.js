@@ -193,10 +193,10 @@
       for (const p of new Set([from, this])) p?.kids.forEach((k, i) => { k.nextSibling = p.kids[i + 1] || null; });
     }});
     const bar = parent(), top = parent(), brand = {}, signals = {}, menu = {}, chip = {},
-      close = {focus() {}};
+      close = {};
     for (const node of [brand, signals, menu]) bar.insertBefore(node, null);
     for (const node of [chip, close]) top.insertBefore(node, null);
-    const els = {headerSignals: signals, liveShotClose: close, liveShot: {classList: {add() {}, remove() {}},
+    const els = {headerSignals: signals, liveShotClose: close, liveShot: {classList: {add() {}, remove() {}}, focus() {},
       querySelector: selector => (assert.equal(selector, '.lsTop'), top)}};
     const api = new Function('$', 'history', 'location', 'document', 'setTimeout', 'clearTimeout',
         'navigator', 'paintUiStream', 'renderLiveShot',

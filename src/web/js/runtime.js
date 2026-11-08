@@ -5876,7 +5876,8 @@ function enterShotFullScreen() {
   moveHeaderSignals(true);
   document.body.classList.add("shotFs");
   keepShotFsAwake(true);
-  $("liveShotClose")?.focus();
+  // Script focus on the close button would paint the keyboard ring.
+  view.focus({ preventScroll: true });
   // Open on the active preset, then the stream's latest frame if there is one.
   renderLiveShot();
   paintUiStream();
