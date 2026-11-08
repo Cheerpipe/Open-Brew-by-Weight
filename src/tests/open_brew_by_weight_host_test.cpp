@@ -6939,7 +6939,8 @@ void w99b_passive_cue_drives_ledc_note_frequency() {
   CHECK(hostLedcLastFreq >= 780 && hostLedcLastFreq <= 790);
   CHECK(hostPinLevel[BUZZER_GPIO] == HIGH);
   localBuzzer.stopAll();
-  CHECK(hostLedcInverted && hostLedcLastFreq == 0);
+  CHECK(hostLedcInverted == (BUZZER_ACTIVE_LEVEL == LOW));
+  CHECK(hostLedcLastFreq == 0);
 }
 
 void w99c_select_alert_sink_preserves_channel_rules() {

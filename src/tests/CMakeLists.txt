@@ -96,6 +96,8 @@ if(OPENBREWBYWEIGHT_SANITIZER STREQUAL "thread")
     LABEL "host;persistence;concurrency")
 else()
   host_test(open_brew_by_weight_host_test LABEL "host;control")
+  host_test(open_brew_by_weight_buzzer_high SOURCE open_brew_by_weight_host_test.cpp
+    DEFINITIONS OPEN_BREW_BY_WEIGHT_BUZZER_ACTIVE_LEVEL=1 CASES W99b LABEL "host;control")
   host_test(persistence_host_test LABEL "host;persistence")
   host_test(crash_archive_host_test
     DEFINITIONS OPEN_BREW_BY_WEIGHT_CRASH_HOST_TEST LABEL "host;persistence;safety")
