@@ -175,8 +175,10 @@ Wire a **passive** 3.3 V piezo/speaker to `OPEN_BREW_BY_WEIGHT_BUZZER_GPIO` (def
 14). The firmware drives it with PWM (RTTTL melodies), so it must be
 **passive, not active**. A module with three pins — **GND**, **VCC** and
 **IN** — is preferred over a loose two-wire speaker: connect GND to GND, VCC
-to 3.3 V, and IN to the buzzer GPIO. For a two-wire passive piezo, connect
-the marked **+** to the GPIO and the other lead to GND.
+to 3.3 V, and IN to the buzzer GPIO. These modules sound on a low input, so
+the firmware keeps the buzzer GPIO high while silent; this keeps the speaker
+quiet instead of letting it pick up electrical noise. For a two-wire passive
+piezo, connect the marked **+** to the GPIO and the other lead to GND.
 
 Example used: [3.3 V passive buzzer module (AliExpress)](https://es.aliexpress.com/item/1005007287329656.html).
 

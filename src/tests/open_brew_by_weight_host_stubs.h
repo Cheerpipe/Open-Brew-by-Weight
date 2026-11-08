@@ -135,6 +135,15 @@ inline bool ledcAttach(uint8_t pin, double freq, uint8_t resolution) {
   return true;
 }
 
+inline bool hostLedcInverted = false;
+
+// Pin levels model the sounding state; inversion is tracked separately.
+inline bool ledcOutputInvert(uint8_t pin, bool invert) {
+  (void)pin;
+  hostLedcInverted = invert;
+  return true;
+}
+
 inline uint32_t ledcWriteTone(uint8_t pin, uint32_t freq) {
   hostLedcLastFreq = freq;
   digitalWrite(pin, freq > 0 ? HIGH : LOW);
