@@ -1105,9 +1105,40 @@ to UNKNOWN. API-mode evidence older than 30 seconds remains the last cloud
 classification but its quality becomes stale. WebSocket-mode evidence stays
 current without an age deadline while its subscription remains synchronized.
 Power source distinguishes the initial API read, ordinary API reads and push;
-it changes only when power is accepted. An unsupported response or an exhausted
-API-mode communication cycle can replace power with UNKNOWN; the separate
+it changes only when power is accepted. An unsupported response maps to
+UNKNOWN. Every loss of fresh evidence (machine reported offline, socket or
+companion feed stopped, STA lost or AP entered, exhausted API cycle, cancelled
+observation) holds the last effective state in the tracker; the hold stands in
+for `kStaleRetentionMs` (15 minutes) and then reports UNKNOWN. The separate
 `effectiveOn` policy treats UNKNOWN as ON without claiming that ON was measured.
+
+### Assumed machine power
+
+`statusLocked()` publishes one resolved value, `LineaMicraStatus::assumedPower`
+(`ON`, `OFF`, `ON_STALE`, `OFF_STALE`, `UNKNOWN`), from the confirmed reading
+and the optimistic or held overlays; `quality` says why a value is an
+assumption. Consumers switch on it and never recombine the raw fields.
+
+| From | Paddle | 15 min held without fresh evidence | Fresh cloud reading |
+| --- | --- | --- | --- |
+| `ON` / `OFF` (current) | unchanged; `OFF` → wake gesture → optimistic `ON_STALE` | n/a | real state |
+| `ON_STALE` | `ON_STALE`, clock restarted | `UNKNOWN` | real state |
+| `OFF_STALE` | wake gesture → `ON_STALE`, clock restarted (not over an optimistic OFF) | `UNKNOWN` | real state |
+| `UNKNOWN` (observing) | normal shot, `ON_STALE`, clock restarted (not in Eco) | `UNKNOWN` | real state |
+
+Time only degrades an assumption, local evidence only moves it toward ON, and
+offline there is no path into `OFF_STALE`.
+
+| Consumer | `ON` / `ON_STALE` | `OFF` / `OFF_STALE` | `UNKNOWN` |
+| --- | --- | --- | --- |
+| Wake qualification | normal shot | wake gesture (not over an optimistic OFF) | normal shot |
+| Idle power saving | `machine-on` | idle at once; the OFF edge ends the cooldown | five-minute rule |
+| BLE scan override | aggressive, if the option is on | relaxed, if the option is on | saved mode |
+| Redundant standby skip | send | skip only for an optimistic OFF | send |
+| Home readiness lamp | boiler evidence; neutral for an optimistic ON | off | neutral |
+
+The scale-off-with-machine trigger reads the confirmed layer only (`CURRENT`
+ON → OFF transitions).
 
 WebSocket transitions through waiting for network/time, authentication, socket
 connect, STOMP connect, waiting for data and streaming. Failure uses backoff;

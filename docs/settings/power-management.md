@@ -117,6 +117,15 @@ and OFF estimates after a paddle wake or a standby command:
   stable idle. Using the paddle afterwards starts a new cooldown.
 - **Unknown** (monitoring off, no account, Eco mode, or no reading yet) — the
   usual five-minute cooldown applies, as on every other machine.
+- **Connection lost** — when the machine drops off the La Marzocco cloud, or
+  the controller cannot reach the cloud (home internet or Wi-Fi down), the
+  last known state stands in for 15 minutes: a machine that was on keeps
+  80 MHz, one that was off keeps saving. Moving the paddle tells the
+  controller the machine is on and starts another 15 minutes. After that the
+  state counts as unknown and the five-minute cooldown applies again. The
+  machine stays usable throughout: every paddle movement is a normal shot,
+  except that a machine last seen off is woken by its first movement, as
+  usual.
 
 Scale activity, WebUI activity and maintenance still take priority over the
 machine's state.

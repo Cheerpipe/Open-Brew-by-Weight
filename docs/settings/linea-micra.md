@@ -218,7 +218,8 @@ The same state, optimistic estimates included, guides
 [Idle power saving](power-management.md#linea-micra-power-state): while the
 machine is on the controller keeps its processor at its working speed, and
 once the machine is off it starts saving energy straight away instead of
-waiting for the five-minute cooldown.
+waiting for the five-minute cooldown. While the connection to the machine is
+lost, the last known state stands in for 15 minutes, then counts as unknown.
 
 Diagnostics → Machine distinguishes the last observed mode from its quality:
 
@@ -235,14 +236,17 @@ or hours. The next power update replaces it. Diagnostics shows the source beside
 **StandBy (API via WebSocket)**. The last label means the initial API reading
 requested when the WebSocket subscription starts; a later manual API read shows
 **API**. The sample age keeps increasing; unrelated messages do not reset it.
-An explicit machine-offline report makes the retained value stale. When the
-machine comes back online, La Marzocco sends its full state over the
-WebSocket, so no extra API reading is needed.
+An explicit machine-offline report, a lost subscription or a lost Wi-Fi link
+keeps the last value as a stale estimate for 15 minutes; moving the paddle
+tells the controller the machine is on and restarts that period. After it the
+state is unknown. When the machine comes back online, La Marzocco sends its
+full state over the WebSocket, so no extra API reading is needed.
 
 In API mode, power evidence becomes stale after 30 seconds. API failures use
 four attempts with 3, 6 and 9 second delays. Regular API polling resumes its
-30-second cadence after exhaustion and reports communication-error quality and
-UNKNOWN unless a paused value is being retained. A failed WebSocket initialization does not
+30-second cadence after exhaustion; the last reading stays on screen as a
+stale estimate for the same 15 minutes, with the error in the status pill and
+the Web UI log. A failed WebSocket initialization does not
 start recurring API polls or discard valid power updates already received.
 WebSocket losses retain the last effective value as stale and reconnect right
 away, then retry after 1, 3, 6 and 9 seconds, with a 60-second cooldown after

@@ -185,7 +185,11 @@ changes its source (`api_initial`, `api`, `websocket`) and synchronization.
 WebSocket power stays current during healthy silence; API mode retains its
 30-second age limit. Accepted commands do not fabricate power/temperature samples.
 A 60-second optimistic overlay and a separate stale suspension hold preserve
-the effective power without changing the last cloud evidence timestamp.
+the effective power without changing the last cloud evidence timestamp; the
+hold stands in for 15 minutes (`kStaleRetentionMs`), then reports unknown, and
+a paddle gesture restarts it. The service publishes one resolved
+`assumedPower` (ON, OFF, ON_STALE, OFF_STALE, UNKNOWN) that every consumer
+switches on; see [State machines](STATE_MACHINES.md#assumed-machine-power).
 The SDK callback publishes decoded updates under the facade mutex, independently
 of the HTTP worker. Only the worker stops/destroys the WebSocket.
 Observation pauses require both an admitted shot and a currently connected

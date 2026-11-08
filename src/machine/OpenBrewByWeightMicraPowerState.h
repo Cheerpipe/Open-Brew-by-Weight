@@ -14,6 +14,10 @@ namespace openbrewbyweight {
 // Qualification depends only on the power state: a stale sample still reports
 // its last confirmed ON or OFF and qualifies; UNKNOWN and a live overlay do
 // not.
+// A hold (connection lost, machine reported offline, failed API observation)
+// keeps the last effective state as an assumption for kStaleRetentionMs, then
+// reports UNKNOWN; a paddle gesture restarts that clock. Time only degrades
+// an assumption and local evidence only moves it toward ON.
 enum class OptimisticDirection : uint8_t { NONE, ON, OFF };
 
 class LineaMicraPowerStateTracker {
@@ -38,14 +42,33 @@ class LineaMicraPowerStateTracker {
       result.quality = LineaMicraObservationQuality::STALE;
     }
     if (observing && held_) {
-      result.powerState = heldKnown_
+      const bool expired = static_cast<uint32_t>(now - heldAtMs_) >=
+                           micra_timing::kStaleRetentionMs;
+      result.powerState = heldKnown_ && !expired
           ? (heldOn_ ? LineaMicraPowerState::ON : LineaMicraPowerState::OFF)
           : LineaMicraPowerState::UNKNOWN;
-      result.effectiveOn = heldOn_;
+      result.effectiveOn = expired || heldOn_;
       result.quality = LineaMicraObservationQuality::STALE;
       result.optimisticOn = result.optimisticOff = false;
     }
     return result;
+  }
+
+  // The paddle proves the machine is on after the gesture: it brews, or it
+  // wakes from standby. It only fills in where the layer has nothing fresher
+  // (a held assumption or no reading yet); a live overlay from a
+  // cloud-accepted command and an unsupported mode (the machine does not
+  // report power) are left alone. Independent of Recognize wake gesture.
+  void notePhysicalEvidence(const LineaMicraStatus &authoritative, bool observing,
+                            uint32_t now) {
+    if (!observing ||
+        authoritative.quality == LineaMicraObservationQuality::UNSUPPORTED ||
+        (!held_ && authoritative.sampleAtMs != 0) ||
+        (direction_ != OptimisticDirection::NONE &&
+         static_cast<uint32_t>(now - optimisticAtMs_) < micra_timing::kOptimisticOverlayMs))
+      return;
+    held_ = heldOn_ = heldKnown_ = true;
+    heldAtMs_ = now;
   }
 
   bool notePhysicalStart(const LineaMicraStatus &authoritative, bool observing,
@@ -81,6 +104,7 @@ class LineaMicraPowerStateTracker {
     heldOn_ = effective.effectiveOn;
     heldKnown_ = effective.powerState != LineaMicraPowerState::UNKNOWN;
     held_ = true;
+    heldAtMs_ = now;
   }
 
   bool noteEvidence(uint32_t intent, LineaMicraPowerState state,
@@ -101,6 +125,7 @@ class LineaMicraPowerStateTracker {
   void reset() {
     direction_ = OptimisticDirection::NONE;
     held_ = false;
+    heldAtMs_ = 0;
     ++generation_;
   }
 
@@ -122,6 +147,7 @@ class LineaMicraPowerStateTracker {
     if (held_) {
       heldOn_ = direction == OptimisticDirection::ON;
       heldKnown_ = true;
+      heldAtMs_ = now;
     }
     ++generation_;
     return true;
@@ -129,6 +155,7 @@ class LineaMicraPowerStateTracker {
 
   uint32_t generation_ = 0;
   uint32_t optimisticAtMs_ = 0;
+  uint32_t heldAtMs_ = 0;
   OptimisticDirection direction_ = OptimisticDirection::NONE;
   bool held_ = false;
   bool heldOn_ = true;

@@ -203,6 +203,7 @@ int main() {
   assert(micra_timing::kPostWakeObservationDelayMs == 15000);
   assert(micra_timing::kPostWakeObservationDelayMs <
          micra_timing::kOptimisticOverlayMs);
+  assert(micra_timing::kStaleRetentionMs == 15U * 60U * 1000U);
   // The resolved assumed state is the only input of every consumer.
   const auto resolve = [](LineaMicraStatus s) {
     s.assumedPower = lineaMicraAssumedPower(s);

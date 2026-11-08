@@ -1095,6 +1095,34 @@ struct MicraWebSocketTest {
     assert(muxWaitEvents == 2);
     assert(lastMuxWaitArgs[0] == 2000);
   }
+  // API mode has no socket owner to hold on a loss: an exhausted cycle holds
+  // the last reading itself, for kStaleRetentionMs, and a paddle press from
+  // the expired unknown is a normal shot that counts as evidence of ON.
+  static void apiFailureHoldsLastReading() {
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    service.config_.accountConfigured = true;
+    service.published_.powerState = LineaMicraPowerState::ON;
+    service.published_.quality = LineaMicraObservationQuality::CURRENT;
+    service.published_.sampleAtMs = now;
+    LineaMicraStatus failed = service.published_;
+    service.fail(failed, LineaMicraError::TRANSPORT);  // WebSocket mode: the socket owner holds.
+    assert(!service.powerState_.retained() &&
+           service.status().assumedPower == LineaMicraAssumedPower::ON);
+    service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
+    service.fail(failed, LineaMicraError::TRANSPORT);
+    assert(service.powerState_.retained());
+    auto status = service.status();
+    assert(status.assumedPower == LineaMicraAssumedPower::ON_STALE &&
+           status.powerState == LineaMicraPowerState::ON &&
+           status.quality == LineaMicraObservationQuality::STALE &&
+           status.error == LineaMicraError::TRANSPORT && status.phase == LineaMicraPhase::FAILED);
+    now += micra_timing::kStaleRetentionMs;
+    status = service.status();
+    assert(status.assumedPower == LineaMicraAssumedPower::UNKNOWN && status.effectiveOn);
+    assert(service.physicalStart(nullptr) == MachinePhysicalStartDisposition::NORMAL);
+    assert(service.status().assumedPower == LineaMicraAssumedPower::ON_STALE);
+  }
   static void statusPollCache() {
     now = 1000;
     OpenBrewByWeightMicraService service;
@@ -2223,6 +2251,7 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::setupAdmissionAndBackoff();
   openbrewbyweight::MicraWebSocketTest::backflushWaitAttribution();
   openbrewbyweight::MicraWebSocketTest::statusPollCache();
+  openbrewbyweight::MicraWebSocketTest::apiFailureHoldsLastReading();
   openbrewbyweight::MicraWebSocketTest::backflushForcedMissDuringEpisode();
   openbrewbyweight::MicraWebSocketTest::backflushForcedMissAfterConsume();
   openbrewbyweight::MicraWebSocketTest::backflushMissNeverServesIdleSnapshot();

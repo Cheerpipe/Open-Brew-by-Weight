@@ -385,6 +385,7 @@ if (!micraTiming.includes('kStatePollMs = 30000') ||
     !micraTiming.includes('kOptimisticOverlayMs = 2U * kStatePollMs') ||
     !micraTiming.includes('kExhaustedCooldownMs = kOptimisticOverlayMs') ||
     !micraTiming.includes('kPostWakeObservationDelayMs = 15000') ||
+    !micraTiming.includes('kStaleRetentionMs = 15U * 60U * 1000U') ||
     !micraService.includes('const bool networkReady = networkEligible(observationGate)') ||
     !micraService.includes('pending_.present && networkReady && !localActivity &&') ||
     !micraService.includes('(!pendingObservation || observationReady)') ||
@@ -405,10 +406,10 @@ if (!micraStatus.includes('delta.field("lineaMicra.optimisticOn"') ||
     !deferObservation.includes('powerState_.hold(published_, true, millis());') ||
     deferObservation.includes('published_.powerState =') ||
     !micraService.includes('status.phase = LineaMicraPhase::BACKOFF;\n    publish(status);') ||
-    !terminalFailure.includes('status.powerState = LineaMicraPowerState::UNKNOWN;') ||
-    !terminalFailure.includes('status.effectiveOn = true;') ||
-    !terminalFailure.includes('status.quality = LineaMicraObservationQuality::COMMUNICATION_ERROR;')) {
-  throw new Error('Pending, retry, and canceled observations must preserve power until terminal failure publishes UNKNOWN');
+    !terminalFailure.includes('powerState_.hold(published_,') ||
+    terminalFailure.includes('published_.powerState =') ||
+    terminalFailure.includes('LineaMicraPowerState::UNKNOWN')) {
+  throw new Error('Pending, retry, and canceled observations must preserve power; a terminal API failure holds the last reading as a stale assumption');
 }
 if (!micraTypes.includes('APPLY_TEMPERATURE') ||
     !machineIntegration.includes('requestMachineIntegrationPresetTemperature') ||

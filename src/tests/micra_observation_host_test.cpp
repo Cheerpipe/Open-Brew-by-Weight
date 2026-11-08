@@ -386,6 +386,88 @@ int main() {
   assert(fence.merge(state, power, push, true) && !power.retained());
   assert(power.effectiveStatus(state, true, 100002).effectiveOn);
 
+  // Retention is one clock: a hold stands in for kStaleRetentionMs, then the
+  // state is unknown; the paddle restarts it; nothing offline ever turns an
+  // assumption into OFF; fresh evidence clears it at any time.
+  {
+    using micra_timing::kStaleRetentionMs;
+    LineaMicraStatus on;
+    on.powerState = LineaMicraPowerState::ON;
+    on.quality = LineaMicraObservationQuality::CURRENT;
+    on.sampleAtMs = 1000;
+    LineaMicraPowerStateTracker held;
+    held.hold(on, true, 2000);
+    auto e = held.effectiveStatus(on, true, 2000 + kStaleRetentionMs - 1);
+    assert(e.powerState == LineaMicraPowerState::ON && e.quality == LineaMicraObservationQuality::STALE);
+    e = held.effectiveStatus(on, true, 2000 + kStaleRetentionMs);
+    assert(e.powerState == LineaMicraPowerState::UNKNOWN && e.effectiveOn &&
+           e.quality == LineaMicraObservationQuality::STALE && held.retained());
+    assert(!held.notePhysicalStart(on, true, true, 2000 + kStaleRetentionMs));  // Unknown: normal shot...
+    held.notePhysicalEvidence(on, true, 2000 + kStaleRetentionMs);  // ...and evidence of ON.
+    e = held.effectiveStatus(on, true, 2000 + 2 * kStaleRetentionMs - 1);
+    assert(e.powerState == LineaMicraPowerState::ON && !e.optimisticOn);
+    assert(held.effectiveStatus(on, true, 2000 + 2 * kStaleRetentionMs).powerState ==
+           LineaMicraPowerState::UNKNOWN);
+    held.noteEvidence(held.generation(), LineaMicraPowerState::OFF, 3000 + 2 * kStaleRetentionMs, false);
+    assert(!held.retained());  // Cloud evidence always wins.
+    held.hold(on, true, 5000);
+    held.reset();
+    assert(!held.retained());
+
+    LineaMicraStatus off = on;  // Held OFF: the wake gesture flips it to ON and restarts.
+    off.powerState = LineaMicraPowerState::OFF;
+    off.effectiveOn = false;
+    LineaMicraPowerStateTracker fromOff;
+    fromOff.hold(off, true, 10);
+    assert(fromOff.effectiveStatus(off, true, 10 + kStaleRetentionMs - 1).powerState ==
+           LineaMicraPowerState::OFF);
+    assert(fromOff.notePhysicalStart(off, true, true, 30));
+    fromOff.notePhysicalEvidence(off, true, 30);  // No-op over the live overlay.
+    e = fromOff.effectiveStatus(off, true, 31);
+    assert(e.powerState == LineaMicraPowerState::ON && !e.optimisticOn &&
+           e.quality == LineaMicraObservationQuality::STALE);
+    assert(fromOff.effectiveStatus(off, true, 30 + kStaleRetentionMs - 1).powerState ==
+           LineaMicraPowerState::ON);
+    assert(fromOff.effectiveStatus(off, true, 30 + kStaleRetentionMs).powerState ==
+           LineaMicraPowerState::UNKNOWN);
+
+    constexpr uint32_t kMinute = 60U * 1000U, kWrap = 0xFFFFFF00U;
+    LineaMicraPowerStateTracker restart;  // A press before expiry restarts the clock...
+    restart.hold(on, true, kWrap);        // ...across the millis() wrap.
+    restart.notePhysicalEvidence(on, true, kWrap + 10 * kMinute);
+    assert(restart.effectiveStatus(on, true, kWrap + 25 * kMinute - 1).powerState ==
+           LineaMicraPowerState::ON);
+    assert(restart.effectiveStatus(on, true, kWrap + 25 * kMinute).powerState ==
+           LineaMicraPowerState::UNKNOWN);
+    LineaMicraPowerStateTracker inflight;  // Our own standby outranks the paddle while live...
+    assert(inflight.noteStandbyCommandAccepted(on, true, 1100));
+    inflight.hold(on, true, 1101);
+    inflight.notePhysicalEvidence(on, true, 1102);
+    assert(inflight.effectiveStatus(on, true, 1103).powerState == LineaMicraPowerState::OFF);
+    inflight.notePhysicalEvidence(on, true, 1100 + micra_timing::kOptimisticOverlayMs);  // ...then counts.
+    assert(inflight.effectiveStatus(on, true, 1101 + micra_timing::kOptimisticOverlayMs).powerState ==
+           LineaMicraPowerState::ON);
+
+    LineaMicraPowerStateTracker fresh;  // A fresh reading needs no evidence...
+    fresh.notePhysicalEvidence(on, true, 5);
+    assert(!fresh.retained());
+    fresh.notePhysicalEvidence(on, false, 5);  // ...nor does a machine that is not observed.
+    assert(!fresh.retained());
+    LineaMicraStatus none;  // Boot before the first read: the paddle says ON until the read lands.
+    LineaMicraPowerStateTracker boot;
+    boot.notePhysicalEvidence(none, true, 5);
+    assert(boot.effectiveStatus(none, true, 6).powerState == LineaMicraPowerState::ON);
+    boot.noteEvidence(boot.generation(), LineaMicraPowerState::OFF, 7, false);
+    assert(!boot.retained());
+    LineaMicraStatus eco = on;  // Eco: the machine reports no power; the paddle cannot invent one.
+    eco.powerState = LineaMicraPowerState::UNKNOWN;
+    eco.quality = LineaMicraObservationQuality::UNSUPPORTED;
+    LineaMicraPowerStateTracker unsupported;
+    unsupported.hold(eco, true, 5);
+    unsupported.notePhysicalEvidence(eco, true, 6);
+    assert(unsupported.effectiveStatus(eco, true, 7).powerState == LineaMicraPowerState::UNKNOWN);
+  }
+
   // Same production reducer, concurrent facade-style publication/snapshots.
   std::mutex mutex;
   std::thread receiver([&] {

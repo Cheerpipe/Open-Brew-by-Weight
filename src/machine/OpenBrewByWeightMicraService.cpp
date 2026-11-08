@@ -1104,11 +1104,12 @@ MachinePhysicalStartDisposition OpenBrewByWeightMicraService::physicalStartLocke
   }
   const bool observing = config_.accountConfigured &&
                          (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0;
-  if (!powerState_.notePhysicalStart(
-          published_, observing,
-          (config_.options & LINEA_MICRA_RECOGNIZE_WAKE) != 0, now)) {
-    return MachinePhysicalStartDisposition::NORMAL;
-  }
+  // Qualification first (the gesture is read against the state before the
+  // press), then the press itself as evidence that the machine is on.
+  const bool wake = powerState_.notePhysicalStart(
+      published_, observing, (config_.options & LINEA_MICRA_RECOGNIZE_WAKE) != 0, now);
+  powerState_.notePhysicalEvidence(published_, observing, now);
+  if (!wake) return MachinePhysicalStartDisposition::NORMAL;
   observationSchedule_.armPostEvent(now);
   return MachinePhysicalStartDisposition::WAKE_PASSTHROUGH;
 }
@@ -2111,22 +2112,22 @@ void OpenBrewByWeightMicraService::fail(LineaMicraStatus &status,
   const LineaMicraPhase failedStage = status.phase;
   status.phase = LineaMicraPhase::FAILED;
   status.error = error;
-  status.quality = LineaMicraObservationQuality::COMMUNICATION_ERROR;
-  status.powerState = LineaMicraPowerState::UNKNOWN;
-  status.effectiveOn = true;
   if (work_ != nullptr) {
     status.httpStatus = work_->httpStatus;
     status.transportStatus = work_->transportStatus;
   }
   publish(status);
   {
+    // API mode has no socket to stop: the exhausted cycle holds the last
+    // reading as an assumption (kStaleRetentionMs, then unknown) instead of
+    // publishing unknown at once. The error itself stays in the status.
     TaskLockGuard lock(mux_);
-    if (status.identityGeneration == identityGeneration_ && !powerState_.retained() &&
+    if (status.identityGeneration == identityGeneration_ &&
         config_.connectionType == static_cast<uint8_t>(MicraConnectionType::API)) {
-      published_.quality = status.quality;
-      published_.powerState = status.powerState;
-      mirrorPowerLocked();
-      published_.effectiveOn = status.effectiveOn;
+      powerState_.hold(published_,
+                       config_.accountConfigured &&
+                           (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0,
+                       millis());
     }
   }
   serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,

@@ -44,6 +44,12 @@ inline constexpr uint32_t kStateFreshnessMs = kStatePollMs;
 inline constexpr uint32_t kOptimisticOverlayMs = 2U * kStatePollMs;
 inline constexpr uint32_t kPostWakeObservationDelayMs = 15000;
 inline constexpr uint32_t kExhaustedCooldownMs = kOptimisticOverlayMs;
+// How long an assumption stands in for a confirmation, by what produced it:
+// a cloud-accepted command is confirmed by a push within seconds (the
+// 60-second overlay above); a lost connection has no confirmation to wait
+// for, so the held state is acted on for 15 minutes and then becomes
+// unknown. The paddle restarts the held clock.
+inline constexpr uint32_t kStaleRetentionMs = 15U * 60U * 1000U;
 // A machine command that exhausts this many cycles while the machine is online
 // is dropped instead of re-reading the dashboard every cooldown forever.
 inline constexpr uint8_t kMaxCommandCycles = 3;
@@ -111,6 +117,7 @@ static_assert(kWsReconnectDelaysMs.front() == 0 &&
 static_assert(kStatePollMs > 0);
 static_assert(kOptimisticOverlayMs == 2U * kStatePollMs);
 static_assert(kPostWakeObservationDelayMs < kOptimisticOverlayMs);
+static_assert(kStaleRetentionMs > kOptimisticOverlayMs);
 static_assert(kAccessTokenRefreshAgeMs < kAccessTokenLifetimeMs);
 
 }  // namespace openbrewbyweight::micra_timing

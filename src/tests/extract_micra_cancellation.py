@@ -43,7 +43,8 @@ output.mkdir(parents=True, exist_ok=True)
                "queue", "queueLocked", "muxWaitAnomalyDue",
                "qualifyBackflushLocked", "backflushReadyLocked", "backflush",
                "reportMuxWaitAnomaly", "finishBackflush", "physicalStart",
-               "physicalStartLocked", "post", "applyPostedLocked")) + "\n")
+               "physicalStartLocked", "post", "applyPostedLocked", "publish",
+               "fail")) + "\n")
 (output / "micra_websocket_commands.inc").write_text(
     "\n".join([definition("sameCommandRequest"), definition("commandFailure")] +
               [definition("OpenBrewByWeightMicraService::" + name) for name in
