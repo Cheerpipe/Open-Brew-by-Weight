@@ -1178,7 +1178,7 @@ assert len(r2_release) == 3 and all(
 # Each host preset, the Web checks, and each build tree run as parallel lanes:
 # route capacity before Web contracts, and per tree its build before the stack
 # and Cppcheck steps that read it.
-host_lane, asan_lane, tsan_lane, web_lane, *pair_lanes = validate_language_steps(
+host_lane, asan_lane, tsan_lane, web_lane, *pair_lanes, dead_code_lane = validate_language_steps(
     ["src/web/app.js"], lanes=True)
 assert [name for name, _ in host_lane] == [
     f"{stage}-normal" for stage in ("configure", "build", "test")] + ["architecture"], host_lane
@@ -1197,6 +1197,13 @@ assert all("OPENBREWBYWEIGHT_CPPCHECK_RISK=1" in argv and
 assert all(argv[-2:] == ["-j", str(os.cpu_count() or 1)]
            for lane in (host_lane, asan_lane, tsan_lane)
            for name, argv in lane if name.startswith("test-")), host_lane
+# R3 also compiles the reference pair without inlining, as the quality gate's
+# dead-code build does; R2 does not.
+assert dead_code_lane == [("dead-code-compile", [
+    "env", "OPENBREWBYWEIGHT_DEAD_CODE_COMPILE_ONLY=1", "./scripts/dead-code-idf",
+    "--hardware", dev_module["BUILD_PROFILES"][0][0], "--machine",
+    dev_module["BUILD_PROFILES"][0][1], "--webui-language", "en"])], dead_code_lane
+assert not any(name == "dead-code-compile" for name, _ in r2_steps), r2_steps
 assert validate_language_steps(["src/web/app.js"], risk="R1", lanes=True) is None
 
 # doctor warns when ccache is nearly full: evictions silently turn builds cold.
@@ -1915,7 +1922,8 @@ project_only = re.search(r'_opt MATCHES "\^-f\(([^)]+)\)\$"',
                          (ROOT / "idf/CMakeLists.txt").read_text())[1].split("|")
 assert {flag.removeprefix("-f") for flag in analysis_flags} <= set(project_only), \
     "dead-code analysis flags must reach only the project components"
-assert 'OPENBREWBYWEIGHT_IDF_BUILD_ROOT="$BUILD_ROOT/$profile"' in dead_code_text and \
+assert 'BUILD_ROOT="$ROOT/build-gate/dead-code"' in dead_code_text and \
+    'OPENBREWBYWEIGHT_IDF_BUILD_ROOT="$BUILD_ROOT/$profile"' in dead_code_text and \
     "OPENBREWBYWEIGHT_IDF_LINK_INPUTS_ONLY=1" in dead_code_text, \
     "the dead-code builds must use their own trees and never link the image"
 dead_code_help = subprocess.run([str(ROOT / "scripts/dead-code-idf"), "--help"],

@@ -307,11 +307,14 @@ dead-code check below replaces it.
 ```
 
 The check answers which project functions no firmware image uses, and runs
-in the quality gate (`./scripts/dev quality`). A normal
+in the quality gate (`./scripts/dev quality`). R3 validation compiles the
+reference pair's development image the same way with
+`OPENBREWBYWEIGHT_DEAD_CODE_COMPILE_ONLY=1`, which builds and reports nothing
+else, so code that builds only with inlining fails before the quality gate. A normal
 build cannot tell: it inlines small functions and discards their out-of-line
 copies even though their code runs. So the script compiles every profile pair
 that R2/R3 validation builds twice, each in its own tree under
-`build-idf/dead-code/<profile>/`: as a development image that also enables the
+`build-gate/dead-code/<profile>/`: as a development image that also enables the
 remote machine control opt-in, so code only that supported build runs counts,
 and as a release image. The trees of manual builds and of the other gates are
 untouched. Only the project components get the analysis options

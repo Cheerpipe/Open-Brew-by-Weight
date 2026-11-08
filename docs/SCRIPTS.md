@@ -181,7 +181,11 @@ reaches: the changed sources and every unit whose build dependencies include
 a changed header. A change to `idf/`, the hardware or machine profiles, the
 Cppcheck suppressions, or `scripts/static-idf` checks every unit, and a change
 that reaches none skips Cppcheck. Every build already fails on any compiler
-warning in project-owned code.
+warning in project-owned code. R3 also compiles the reference pair's
+development image without inlining, as the quality gate's dead-code check
+does (`dead-code-compile`, no report): some GCC warnings only appear when a
+function is not inlined, so code that builds only with inlining fails there
+instead of in the quality gate.
 
 `./scripts/dev quality` is the non-functional quality gate, run on demand and
 before each release tag. It builds every pair both ways, runs the full
@@ -193,7 +197,7 @@ R2 and R3 run parallel lanes: one per host test preset (normal with the
 architecture check, ASan/UBSan, TSAN); the Web checks (route capacity, Web UI
 budgets, Web contracts); and, for each profile pair, a
 development lane (build, stack depth, Cppcheck on R3) and a release lane
-(build, stack depth). The quality gate runs the Web UI budgets with the design
+(build, stack depth); R3 adds the `dead-code-compile` lane. The quality gate runs the Web UI budgets with the design
 preview, the dead-code check, and the same two lanes per pair (build and
 Cppcheck, release build). All six builds run in parallel, each with its share
 of the CPUs (`IDF_PY_BUILD_JOBS`).

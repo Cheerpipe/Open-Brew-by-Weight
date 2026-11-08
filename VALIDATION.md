@@ -21,7 +21,7 @@ subset of the applicable gates does not validate the change.
 | R0 | Non-critical docs/meta | contract, link, and path checks | none |
 | R1 | Web UI, tests, tooling, pure logic | R0 + focused tests and generated assets | as identified |
 | R2 | BLE, network, persistence, OTA, build | full host + ASan/UBSan + TSAN + architecture + development and release images of every official validation profile pair | subsystem-dependent |
-| R3 | Relay, machine, ISR, watchdog, boot, GPIO, partitions, remote control, unknown | R2 + Cppcheck `warning` check of the changed code + build variants | HIL/manual required |
+| R3 | Relay, machine, ISR, watchdog, boot, GPIO, partitions, remote control, unknown | R2 + Cppcheck `warning` check of the changed code + a no-inlining compile of the reference pair + build variants | HIL/manual required |
 | Release | Candidate firmware image | R3 + the quality gate, applicable soak, HIL and manual plan | required |
 
 Use `./scripts/dev validate [--risk R0..R3] [paths...]`. R2/R3 run the host

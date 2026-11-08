@@ -13,7 +13,10 @@ source "$SCRIPT_DIR/openbrewbyweight_cli.sh"
 ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 readonly ROOT
 readonly OUTPUT_DIR="reports/dead-code"
-readonly BUILD_ROOT="$ROOT/build-idf/dead-code"
+readonly BUILD_ROOT="$ROOT/build-gate/dead-code"
+# R3 sets this to compile only the development image, the widest one: a change
+# that builds only with inlining then fails there instead of in the quality gate.
+readonly COMPILE_ONLY="${OPENBREWBYWEIGHT_DEAD_CODE_COMPILE_ONLY:-0}"
 # Project components only (idf/CMakeLists.txt): no inlining, every inline
 # function kept, no clones or folded twins that would hide a caller, and no
 # call dropped because its callee was proven free of side effects.
@@ -33,7 +36,7 @@ $OUTPUT_DIR/dead-code.txt. Replaces the previous report.
 Every profile pair that R2/R3 validation builds is compiled twice, as a
 development image with the remote machine control opt-in ($DEVELOPMENT_FLAGS)
 and as a release image, each in its own tree under
-build-idf/dead-code/<profile>/<hardware>--<machine>. Project components build
+build-gate/dead-code/<profile>/<hardware>--<machine>. Project components build
 with: $ANALYSIS_FLAGS
 Every input of the application link is built; the ELF itself is not linked.
 A function counts as used when another section of a project object refers to
@@ -51,6 +54,9 @@ an analysis error, and the failing status of a build.
 
 --hardware and --machine restrict the run to one pair for a quick check;
 functions used only by the other pairs are then reported too.
+OPENBREWBYWEIGHT_DEAD_CODE_COMPILE_ONLY=1 builds only the development images
+and reports nothing; the R3 gate uses it to catch code that builds only with
+inlining.
 
 $(obbw_flag_help)
 
@@ -91,7 +97,9 @@ mkdir -p "$output_path"
 
 builds=()
 while read -r pair_hardware pair_machine; do
-  for profile in development release; do
+  profiles="development release"
+  [[ "$COMPILE_ONLY" == 1 ]] && profiles="development"
+  for profile in $profiles; do
     variant="$pair_hardware--$pair_machine"
     log="$output_path/build-$profile-$variant.log"
     profile_switch=()
@@ -116,6 +124,10 @@ while read -r pair_hardware pair_machine; do
   done
 done <<<"$pairs"
 
+if [[ "$COMPILE_ONLY" == 1 ]]; then
+  echo "Compiled ${#builds[@]} build(s) without inlining; no analysis requested."
+  exit 0
+fi
 echo "Analyzing ${#builds[@]} build(s)..."
 python3 scripts/dead_code.py analyze --report "$output_path/dead-code.txt" "${builds[@]}"
 analysis_status=$?

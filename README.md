@@ -219,7 +219,7 @@ and exact commands are in [Validation gates](VALIDATION.md).
 | R0 | Non-critical documentation and repository metadata | Documentation contracts, local links, headings, images, and known paths | For documentation-only changes and as the base of every higher gate |
 | R1 | Web UI, tests, developer tooling, and isolated logic | R0 plus the normal host tests and any focused checks or generated assets relevant to the change | While developing these areas and before submitting the finished change |
 | R2 | BLE, networking, saved data, OTA, and build changes | Full host coverage, ASan/UBSan, TSAN, architecture rules, Web contracts, and every built-in compatible profile pair | When a change can affect integration, concurrency, memory safety, or a firmware image |
-| R3 | Relay and machine control, ISR, watchdog, boot, GPIO, partitions, remote control, or an unknown path | R2 plus cppcheck, the dead-code check, build variants, and the applicable HIL/manual evidence | Before accepting any safety-critical or not-yet-classified change |
+| R3 | Relay and machine control, ISR, watchdog, boot, GPIO, partitions, remote control, or an unknown path | R2 plus Cppcheck on the changed code, a no-inlining compile of the reference pair, build variants, and the applicable HIL/manual evidence | Before accepting any safety-critical or not-yet-classified change |
 | Release | A firmware image intended for distribution or installation | The complete automated analysis plus resource budgets, applicable soak tests, HIL, and the manual test plan | For a release candidate; a passing automated R3 run alone is not release approval |
 
 **Host tests** run on the developer computer, without an ESP32 or

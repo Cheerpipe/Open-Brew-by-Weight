@@ -860,6 +860,14 @@ def main() -> int:
                                                   f"OPENBREWBYWEIGHT_CPPCHECK_CHANGED={changed}"))
                     lanes.append([release, (f"stack-release-{variant}",
                                             [*stack, f"{GATE_RELEASE_BUILD_ROOT}/{variant}"])])
+                if risk == "R3":
+                    # Inlining can hide a warning that the quality gate's
+                    # dead-code build turns into an error: compile that way too.
+                    hardware, machine = BUILD_PROFILES[0]
+                    lanes.append([("dead-code-compile", [
+                        "env", "OPENBREWBYWEIGHT_DEAD_CODE_COMPILE_ONLY=1", "./scripts/dead-code-idf",
+                        "--hardware", hardware, "--machine", machine,
+                        "--webui-language", webui_language])])
             manual = ["Complete and attach applicable HIL/manual evidence"] if risk == "R3" else []
             firmware = len(lanes) > 1
             return execute(command, risk, [s for lane in lanes for s in lane], verbosity, manual,
