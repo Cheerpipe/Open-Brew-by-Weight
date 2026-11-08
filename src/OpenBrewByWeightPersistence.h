@@ -87,6 +87,10 @@ inline bool repairPersistedSettings(PersistedSettings &s) {
     r.scheduledRestartMinuteOfDay = RuntimeConfig{}.scheduledRestartMinuteOfDay;
     repaired = true;
   }
+  if (r.performanceBoostEnabled > 1) {
+    r.performanceBoostEnabled = RuntimeConfig{}.performanceBoostEnabled;
+    repaired = true;
+  }
   if (validateRuntimeConfig(r) != ConfigValidationError::NONE ||
       r.timezoneSource >= 3 || r.timezoneAutomatic > 1) {
     reset(r);

@@ -3225,6 +3225,11 @@ void p91e_power_split_migrates_single_setting() {
   const std::vector<uint8_t> blob = settingsBlobWithBody({});
   CHECK(decodePersistedSettings(blob.data(), blob.size(), empty, malformed));
   CHECK(empty.runtime.idlePowerSavingEnabled && empty.runtime.performanceBoostEnabled == 1);
+  PersistedSettings corrupt;  // An out-of-range byte returns to factory; the rest survives.
+  corrupt.runtime.idlePowerSavingEnabled = false;
+  corrupt.runtime.performanceBoostEnabled = 7;
+  CHECK(repairPersistedSettings(corrupt) && corrupt.runtime.performanceBoostEnabled == 1 &&
+        !corrupt.runtime.idlePowerSavingEnabled);
 }
 
 void p91b_settings_codec_round_trips_and_evolves() {
