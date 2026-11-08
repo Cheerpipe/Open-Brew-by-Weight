@@ -70,6 +70,14 @@ class MachineBackflushObservations {
     state_.phase = MachineBackflushPhase::UNSUPPORTED;
   }
 
+  // Supervision lost for longer than any cleaning program retires the
+  // unresolved episode, so starts stop being refused; a live attempt stays.
+  void release() {
+    if (!state_.unresolved || state_.permit.attempt) return;
+    markChanged();
+    state_.unresolved = state_.consumed = false;
+  }
+
   void observe(MachineBackflushPhase phase, uint32_t observedAttempt) {
     markChanged();
     if (state_.phase == MachineBackflushPhase::UNSUPPORTED) {

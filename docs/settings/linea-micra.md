@@ -376,6 +376,14 @@ unconfirmed or ambiguous activation never receives 180 seconds. When the
 physical paddle remains ON after any stop, return it OFF before trying again;
 restoring the connection cannot restart the machine.
 
+If the connection to La Marzocco drops while a backflush is requested or
+running — your router, the internet or the cloud goes down — the controller
+stops supervising it and, for three minutes, the longest a cleaning program can
+run, it does not start the machine. After that the paddle works normally again,
+with the usual protections, even while the connection is still down. If the app
+still shows the backflush request once the connection returns, cancel it and
+request it again.
+
 Disabling observation, switching to API monitoring, or changing the connected
 account or machine ends supervised backflush. Return the paddle OFF before
 starting again. The previous cleaning request does not keep ordinary operation

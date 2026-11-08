@@ -908,7 +908,7 @@ void OpenBrewByWeightMicraService::qualifyBackflushLocked() {
   const uint32_t now = millis();
   const uint32_t aliveAt = websocketStatus_.pongAtMs ? websocketStatus_.pongAtMs
                                                    : websocketStatus_.connectedAtMs;
-  if (!config_.accountConfigured || !(config_.options & LINEA_MICRA_OBSERVE_STATE) ||
+  const bool linkLost = !config_.accountConfigured || !(config_.options & LINEA_MICRA_OBSERVE_STATE) ||
       config_.connectionType != static_cast<uint8_t>(MicraConnectionType::WEBSOCKET) ||
       // The companion feed qualifies like the socket: subscribed on the current
       // identity and epoch, an `up` ping within 30 s and a known token.
@@ -921,10 +921,15 @@ void OpenBrewByWeightMicraService::qualifyBackflushLocked() {
                  websocket_->stamp.epoch != observationFence_.epoch ||
                  now - aliveAt >= 30000) ||
       !websocketStatus_.machineConnectedKnown || !websocketStatus_.machineConnected ||
-      observationFence_.offline ||
-      !staConnected_.load() || apActive_.load() || shotActive_.load() ||
-      outboundShotActive.load() || outboundMaintenance.load())
+      observationFence_.offline || !staConnected_.load() || apActive_.load();
+  if (linkLost || shotActive_.load() || outboundShotActive.load() || outboundMaintenance.load())
     backflush_.invalidate();
+  // Only the cloud can resolve a cleaning episode. Without it, once any
+  // program has certainly ended, starts follow the ordinary caps; local
+  // activity pauses supervision without hiding the machine's state.
+  if (!linkLost) backflushLinkLostAtMs_ = 0;
+  else if (!backflushLinkLostAtMs_) backflushLinkLostAtMs_ = now ? now : 1;
+  else if (now - backflushLinkLostAtMs_ >= BACKFLUSH_MAX_CIRCUIT_CLOSED_MS) backflush_.release();
 }
 
 bool OpenBrewByWeightMicraService::backflushReadyLocked() const {

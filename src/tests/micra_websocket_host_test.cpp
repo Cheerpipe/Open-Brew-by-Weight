@@ -949,6 +949,52 @@ struct MicraWebSocketTest {
     }
     outboundScaleConnected.store(false);
   }
+  // Without the cloud nothing resolves cleaning: starts are refused for as
+  // long as any program could run, then follow the ordinary caps. Local
+  // activity, a live attempt and a reconnect still reporting the request
+  // keep the refusal.
+  static void backflushReleasedAfterLostLink() {
+    const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    service.config_.accountConfigured = true;
+    std::strcpy(service.config_.selectedSerial, "synthetic");
+    service.staConnected_.store(true);
+    service.tokenAvailable_.store(true);
+    service.tokenIssuedAtMs_.store(millis());
+    service.serviceWebSocket();
+    subscribe(service);
+    deliver(service, observation(service, awaiting));
+    service.shotActive_.store(true);
+    (void)service.backflush(true);
+    now += BACKFLUSH_MAX_CIRCUIT_CLOSED_MS;
+    service.websocketStatus_.pongAtMs = millis();
+    assert(service.backflush(true).busy());
+    service.shotActive_.store(false);
+    MachineBackflushPermit permit;
+    service.staConnected_.store(false);
+    (void)service.backflush(true);
+    now += BACKFLUSH_MAX_CIRCUIT_CLOSED_MS - 1;
+    assert(service.backflush(true).busy());
+    assert(service.physicalStart(&permit) == MachinePhysicalStartDisposition::BLOCKED_CLEANING);
+    ++now;
+    assert(!service.backflush(true).busy());
+    assert(service.physicalStart(&permit) == MachinePhysicalStartDisposition::NORMAL &&
+           !permit.attempt);
+    service.staConnected_.store(true);
+    deliver(service, observation(service, awaiting));
+    service.websocketStatus_.pongAtMs = millis();
+    assert(service.backflush(true).busy());
+    assert(service.physicalStart(&permit) == MachinePhysicalStartDisposition::BACKFLUSH_CANDIDATE);
+    service.staConnected_.store(false);
+    (void)service.backflush(true);
+    now += BACKFLUSH_MAX_CIRCUIT_CLOSED_MS;
+    assert(service.backflush(true).busy());
+    service.finishBackflush(permit.attempt);
+    assert(!service.backflush(true).busy());
+    service.stopWebSocket(true);
+    delete service.work_;
+  }
   static void backflushIdlePoll() {
     const char *standby = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})";
     const char *requested = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
@@ -2246,6 +2292,7 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::initialSynchronization();
   openbrewbyweight::MicraWebSocketTest::commandsSkipUnchangedMachineState();
   openbrewbyweight::MicraWebSocketTest::backflushContract();
+  openbrewbyweight::MicraWebSocketTest::backflushReleasedAfterLostLink();
   openbrewbyweight::MicraWebSocketTest::backflushIdlePoll();
   openbrewbyweight::MicraWebSocketTest::pongPublicationRace();
   openbrewbyweight::MicraWebSocketTest::concurrentStatusLifecycle();

@@ -252,6 +252,7 @@ class OpenBrewByWeightMicraService {
   MicraObservationFence observationFence_;
   MachineBackflushObservations backflush_;
   MachineBackflushSnapshot idleBackflush_;  // Control task only; see backflush().
+  uint32_t backflushLinkLostAtMs_ = 0;  // Control task only; see qualifyBackflushLocked().
   // Control task only, like idleBackflush_: backflush()'s slow path stores
   // its last locked snapshot here and the same task reads it on tryLock
   // misses, with count zeroed so no stale edges are re-served.
