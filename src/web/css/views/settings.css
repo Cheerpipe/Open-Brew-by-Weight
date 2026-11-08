@@ -456,6 +456,7 @@ html:not(.pwaApp) .pwaOnly {
 }
 
 .cfgGroup label:has(> input[type="checkbox"]) .fieldHint {
+  grid-column: 1;
   margin-left: 0;
 }
 
