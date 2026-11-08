@@ -466,6 +466,20 @@
           <div class="dcBarX" id="dripBarX" aria-hidden="true"></div>
           <small class="fieldHint" id="dripHint"></small>
         </figure>
+        <div class="dcQuick" id="dripQuickStart" hidden>
+          <span>{{webui:settings.drip_quick_start_hint}}</span>
+          <button id="dripQuickStartButton" type="button">
+            <svg class="g" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M13 2.5 4.5 13.5h6.5l-1 8 8.5-11h-6.5z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linejoin="round"
+              /></svg
+            >{{webui:settings.quick_start}}</button
+          >
+        </div>
 
         <form class="enterForm" novalidate>
           <label

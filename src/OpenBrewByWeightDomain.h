@@ -1690,6 +1690,7 @@ struct WebCommand {
   uint32_t presetRecipeFields = PRESET_RECIPE_ALL;
   bool bbwFullReset = false;
   bool bbwSetDrip = false;  // Set drip: config.weightOffsetBaselineG is the value.
+  bool bbwQuickStart = false;  // Quick start alone: the drip and speed stay.
   bool bbwResetRevisionSpecified = false;
   BuzzerPattern buzzerPattern = BuzzerPattern::NONE;
   BookooDebugAction bookooDebugAction = BookooDebugAction::START;

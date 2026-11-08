@@ -1114,8 +1114,9 @@ esp_err_t OpenBrewByWeightNetwork::resetCalibrationHandler(httpd_req_t *request)
     return bodyStatus;
   }
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  static const char *const resetFields[] = {"fullEwma", "baseRevision", "dripG", "alpha"};
-  bool fullEwma = false;
+  static const char *const resetFields[] = {"fullEwma", "baseRevision", "dripG", "alpha",
+                                           "quickStart"};
+  bool fullEwma = false, quickStart = false;
   uint32_t baseRevision = 0;
   uint8_t alpha = 0;
   const bool revisionSpecified = root && jsonFieldPresent(root, "baseRevision");
@@ -1123,9 +1124,11 @@ esp_err_t OpenBrewByWeightNetwork::resetCalibrationHandler(httpd_req_t *request)
   const cJSON *speed = root ? cJSON_GetObjectItemCaseSensitive(root, "alpha") : nullptr;
   const double dripG = drip != nullptr && cJSON_IsNumber(drip) ? drip->valuedouble : -1.0;
   const bool parsed = root != nullptr &&
-      jsonHasOnlyUniqueFields(root, resetFields, 4) &&
+      jsonHasOnlyUniqueFields(root, resetFields, 5) &&
       (!revisionSpecified || jsonUint32(root, "baseRevision", baseRevision)) &&
       (!jsonFieldPresent(root, "fullEwma") || jsonBoolean(root, "fullEwma", fullEwma)) &&
+      (!jsonFieldPresent(root, "quickStart") || (jsonBoolean(root, "quickStart", quickStart) &&
+                                                  quickStart && !fullEwma && !drip && !speed)) &&
       (drip == nullptr || (dripG >= 0.0 && dripG <= MAX_OFFSET_G)) &&
       (speed == nullptr ||
        (cJSON_IsNumber(speed) && parseBbwAlphaBaseline(speed->valuedouble, alpha)));
@@ -1141,6 +1144,7 @@ esp_err_t OpenBrewByWeightNetwork::resetCalibrationHandler(httpd_req_t *request)
   command.type = WebCommandType::RESET_WEIGHT_OFFSET;
   command.bbwFullReset = fullEwma;
   command.bbwSetDrip = dripG >= 0.0;
+  command.bbwQuickStart = quickStart;
   command.config.weightOffsetBaselineG = static_cast<float>(dripG);
   command.bbwAlphaBaseline = alpha;
   command.bbwResetRevisionSpecified = revisionSpecified;

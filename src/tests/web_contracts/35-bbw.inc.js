@@ -19,6 +19,7 @@
   assert(codeIncludes(rawViewJs.settings, '["dripSetG", "dripSetButton", "dripUndoButton", "dripG"]'));
   assert(codeIncludes(rawViewJs.settings, '$(input).closest(".numBox").append(apply, restore)'));
   assert(codeIncludes(viewJs.settings, '"/api/v1/calibration/reset", { [key]: R.number(input), baseRevision: R.formRev }'));
+  assert(codeIncludes(viewJs.settings, '"/api/v1/calibration/reset", { quickStart: true, baseRevision: R.formRev }'));
   const node = (classes = []) => {
     const names = new Set(classes);
     const n = {value: '', checked: false, disabled: false, hidden: false, textContent: '', innerHTML: '',
@@ -34,7 +35,8 @@
   };
   const elements = new Map();
   for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripBars', 'dripBarX',
-    'dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton'])
+    'dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton',
+    'dripQuickStart', 'dripQuickStartButton'])
     elements.set(id, node());
   const status = node(); status.lastElementChild = node(); elements.set('dripStatus', status);
   const learning = node(['bbwLearning']);
@@ -68,6 +70,7 @@
   assert.equal(elements.get('dripSetG').value, '1.56');
   assert.equal(elements.get('alphaSet').value, '0.30');
   assert(!elements.get('dripSetButton').disabled && !elements.get('alphaSetButton').disabled);
+  assert(!elements.get('dripQuickStart').hidden && !elements.get('dripQuickStartButton').disabled);
   // A shot ignored for learning keeps its bar, hatched with its measured
   // value, and stays out of the verdict (the user's 3.20 g glitch).
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.70, bbwAlpha: 0.3,
@@ -108,7 +111,8 @@
   assert.equal(bars().filter(b => b.className.includes('old')).length, 2);
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);
-  assert.equal(marks()[0].children[0].children[0], 'Manually set to 1.20 g');
+  assert.equal(marks()[0].children[0].children[0], 'Quick start from 1.20 g');
+  assert(elements.get('dripQuickStart').hidden);
   // Applied: the quick start marker joins the manual one.
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.5, bbwAlpha: 0.3, bbwRecentG: [0.5, 0.52, 0.48, 0.55, 0.63],
     bbwRecentAfterSet: 3, bbwRecentAfterQuick: 0, bbwQuickStart: {state: 'applied', count: 3, setG: 1.2, quickG: 0.5}});
@@ -118,7 +122,8 @@
   // Unsaved recipe edits, read-only access or another preset block the sets.
   context.uiState.brewDirty = true;
   refresh();
-  assert(elements.get('dripSetButton').disabled && elements.get('alphaSetButton').disabled);
+  assert(elements.get('dripSetButton').disabled && elements.get('alphaSetButton').disabled &&
+    elements.get('dripQuickStartButton').disabled);
   context.uiState.brewDirty = false;
   // An empty edit keeps the undo key as the way out.
   elements.get('dripSetG').value = '';

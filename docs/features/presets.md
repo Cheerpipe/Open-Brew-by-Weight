@@ -198,12 +198,14 @@ drip in grams, gain α and candidate observations belong to that preset; shots
 from another preset do not train it. The candidate window is transient, while
 offset/gain and the shot log are persistent. When you change the physical setup
 under the same preset (another basket, a spouted or bottomless portafilter, a
-different dose), the drip is not re-detected: use the drip field's **Set** key
-to start it again.
+different dose), the drip is not re-detected: use **Quick start** under the
+drip chart, or the drip field's **Set** key, to start it again.
 
 **Set** on the drip field uses the value you enter from the next shot and keeps
 it as the preset's starting point; if your next three shots agree on a different
-amount, the drip moves there at once. **Set** on the learning-speed field
+amount, the drip moves there at once. **Quick start**, under the chart, does
+the same from the drip already in use without changing it, for a setup change
+when you don't know the new drip yet. **Set** on the learning-speed field
 (0.01–1.00, step 0.01) applies a new speed at once and keeps the drip. The
 **Set** and **undo** keys appear inside the field while your value differs from
 the one in use: undo puts the value in use back without applying, and typing

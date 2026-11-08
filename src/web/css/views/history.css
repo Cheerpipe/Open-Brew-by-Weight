@@ -82,6 +82,39 @@
   color: var(--ac);
 }
 
+/* Quick start without a new drip: the reason and the action in one row. */
+.dcQuick {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.6rem 0 0;
+  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
+  border: 1px dashed var(--bd);
+  border-radius: var(--r);
+  font-size: 0.8rem;
+  color: var(--mu);
+}
+
+.dcQuick button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  margin: 0;
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--ac);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dcQuick .g {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
 #actionsPanel {
   position: fixed;
   left: 0;

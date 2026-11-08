@@ -249,9 +249,15 @@ configuration with no recipe change still being saved.
   preset's starting point. It also starts a **quick start**: if your next three
   learning shots agree within 0.4 g, the drip moves straight to the middle one
   instead of taking the usual small step; if they don't, learning simply
-  carries on. The chart marks where you set the drip and where the quick start
-  decided. New presets, restored factory presets and a fresh install start the
+  carries on. The chart colors the shots the quick start counts and marks
+  where it began and where it decided. New presets, restored factory presets and a fresh install start the
   same way; presets kept from an earlier firmware keep their drip untouched.
+- **Quick start**, in the row under the chart, starts a quick start without
+  changing anything else: the drip in use and the learning speed stay as they
+  are, the shots before it stop counting, and your next three learning shots
+  can move the drip at once. Use it after a change that affects the drip,
+  such as a new basket, portafilter or shower screen, or a different pressure.
+  The row leaves while the quick start runs and comes back once it ends.
 - **Set** on the learning-speed field applies a new α at once, restarts its
   evidence and marks it as your choice; the drip stays as it is.
 - **Undo** discards a pending edit and puts the value in use back; nothing

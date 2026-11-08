@@ -393,8 +393,14 @@ void processWebCommand(const WebCommand &command) {
         return;
       }
       // Set drip and the plain reset (re)start the drip and quick start from
-      // it; Set learning speed alone keeps the drip.
+      // it; Set learning speed alone keeps the drip; quick start alone keeps
+      // the drip, its learning and the speed.
       ShotPreset &preset = mutableActiveShotPreset(presetBank);
+      if (command.bbwQuickStart) {
+        armBbwQuickStart(preset, true);
+        reportControlCommandResult(command, CommandResultState::APPLIED);
+        return;
+      }
       bbwLearningBank.invalidate(preset.id, presetBank);
       if (command.bbwSetDrip)
         preset.weightOffsetBaselineG = command.config.weightOffsetBaselineG;

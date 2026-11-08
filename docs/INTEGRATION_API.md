@@ -186,7 +186,7 @@ params substituted in order (see the example above).
 | ``STATE_OVERRIDE_SWITCH_ONLY`` | Inferred-state override is only available on switch-only builds. |
 | ``STATUS_PAGE_UNKNOWN`` | Unknown status page; use /api/v1/status/admin. |
 | ``STATUS_TOO_LARGE`` | Status snapshot exceeds its size limit. |
-| ``STOP_PREDICTION_FIELDS_INVALID`` | Use fullEwma, dripG (0–5 g) or alpha (0.01–1.00). |
+| ``STOP_PREDICTION_FIELDS_INVALID`` | Use fullEwma, dripG (0–5 g), alpha (0.01–1.00) or quickStart alone. |
 | ``TARE_REQUIRES_EMPTY_OBJECT`` | The tare request must be an empty object. |
 | ``TARE_REQUIRES_READY`` | Stop the cycle and wait for Ready before taring. |
 

@@ -1520,7 +1520,7 @@ function renderDripChart(c) {
     at = (after) => pad + shots.length - Math.min(after, shots.length),
     marks = [];
   if (marked && afterSet >= 0)
-    marks.push([at(afterSet), __WEBUI_TEXT__("runtime.drip_manual_set") + dripText(q.setG), ""]);
+    marks.push([at(afterSet), __WEBUI_TEXT__("runtime.drip_quick_from") + dripText(q.setG), ""]);
   if (mode === "applied")
     marks.push([
       at(afterQuick),
@@ -1616,6 +1616,7 @@ function renderDripChart(c) {
         applied: __WEBUI_TEXT__("runtime.drip_hint_applied"),
         varied: __WEBUI_TEXT__("runtime.drip_hint_varied"),
       }[mode];
+  $("dripQuickStart").hidden = !c || armed;
   $("dripStatus").className = "dcStatus" + (armed || mode === "applied" ? " quick" : "");
   $("dripStatus").lastElementChild.textContent = armed
     ? __WEBUI_TEXT__("runtime.drip_status_quick") +
@@ -1938,6 +1939,10 @@ export function init() {
       R.updateBbwControls();
     };
   }
+  // Quick start alone: the next 3 shots may move the drip at once; the drip
+  // in use and the learning speed stay.
+  $("dripQuickStartButton").onclick = () =>
+    R.command("/api/v1/calibration/reset", { quickStart: true, baseRevision: R.formRev });
   // The "This device" group is browser-local: every control applies at once
   // and nothing in it reaches the controller.
   for (const [id, key] of [

@@ -3745,6 +3745,7 @@ function updateBbwControls() {
     // empty or invalid field.
     $(undo).disabled = blocked;
   }
+  $("dripQuickStartButton").disabled = blocked;
 }
 function soundAlertsAreOn() {
   return !!$("soundAlertsEnabled")?.checked;

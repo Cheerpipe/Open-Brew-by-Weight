@@ -21240,6 +21240,19 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
   }
   CHECK(fabsf(preset.bbwEwmaOffsetG - 0.50f) < 0.005f);
   CHECK(state() == static_cast<uint8_t>(QuickStartState::APPLIED));
+  // Quick start alone arms again from the drip in use and keeps the drip,
+  // its starting value and the learning speed.
+  WebCommand quick;
+  quick.type = WebCommandType::RESET_WEIGHT_OFFSET;
+  quick.bbwQuickStart = true;
+  const float drip = preset.bbwEwmaOffsetG;
+  const uint8_t alpha = preset.bbwEwmaAlpha;
+  processWebCommand(quick);
+  const QuickStartEntry *armed = quickStartEntry(bbwQuickStart, presetBank, preset.id, false);
+  CHECK(armed->state == static_cast<uint8_t>(QuickStartState::ARMED) && armed->count == 0);
+  CHECK(armed->setAtId == shotStatisticsEpochNow() && armed->setCg == 50);
+  CHECK(preset.bbwEwmaOffsetG == drip && preset.weightOffsetBaselineG == 1.2f &&
+        preset.bbwEwmaAlpha == alpha);
   // Restore quick starts again and marks where the factory drip came back,
   // so the chart fades the shots pulled before it.
   WebCommand restore;
