@@ -870,6 +870,7 @@ LineaMicraStatus OpenBrewByWeightMicraService::statusLocked() const {
   if (result.connectionFreshness && result.quality == LineaMicraObservationQuality::CURRENT &&
       (!observationFence_.synchronized || !liveSubscriptionLocked()))
     result.quality = LineaMicraObservationQuality::STALE;
+  result.assumedPower = lineaMicraAssumedPower(result);
   result.staConnected = staConnected_.load(std::memory_order_acquire);
   result.apActive = apActive_.load(std::memory_order_acquire);
   result.shotPaused = shotTransportPaused();

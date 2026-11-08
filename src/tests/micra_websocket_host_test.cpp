@@ -1683,7 +1683,7 @@ struct MicraWebSocketTest {
     // Every member, not the two padding gaps: those bytes are indeterminate.
     const auto *bytesA = reinterpret_cast<const unsigned char *>(&a);
     const auto *bytesB = reinterpret_cast<const unsigned char *>(&b);
-    const size_t head = offsetof(LineaMicraStatus, appliedTargetDeciC) + sizeof(a.appliedTargetDeciC),
+    const size_t head = offsetof(LineaMicraStatus, assumedPower) + sizeof(a.assumedPower),
                  body = offsetof(LineaMicraStatus, transportStatus),
                  end = offsetof(LineaMicraStatus, temperatureRetryable) + sizeof(bool);
     assert(std::memcmp(bytesA, bytesB, head) == 0 &&

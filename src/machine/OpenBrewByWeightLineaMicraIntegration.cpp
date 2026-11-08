@@ -29,13 +29,21 @@ std::atomic<bool> micraAccountConfigured{false};
 
 // A standby command is pointless once the machine is already effectively off.
 // Skipping it also keeps the remote disconnect that follows our own scale
-// power-off command from re-arming the shutdown cycle. A stale poll cache
-// counts as unknown, not off: the redundant command is re-validated anyway.
+// power-off command from re-arming the shutdown cycle. A stale poll cache or
+// a retained OFF counts as unknown, not off: the redundant command is
+// re-validated anyway. Only our own standby in flight (optimistic OFF) skips.
 bool machineEffectivelyOff() {
   const LineaMicraStatus status = service.statusPoll();
-  return !service.statusPollStale() && !status.effectiveOn &&
-         (status.quality == LineaMicraObservationQuality::CURRENT ||
-          status.quality == LineaMicraObservationQuality::OPTIMISTIC);
+  const bool trusted = !service.statusPollStale();
+  switch (status.assumedPower) {
+    case LineaMicraAssumedPower::OFF: return trusted;
+    case LineaMicraAssumedPower::OFF_STALE:
+      return trusted && status.quality == LineaMicraObservationQuality::OPTIMISTIC;
+    case LineaMicraAssumedPower::ON:
+    case LineaMicraAssumedPower::ON_STALE:
+    case LineaMicraAssumedPower::UNKNOWN: break;
+  }
+  return false;
 }
 
 }  // namespace
@@ -111,10 +119,14 @@ void serviceMachineIntegrationScaleLink(uint32_t now, bool scaleLinkUp,
 
 // Control task only, like the other cached status poll readers.
 MachinePower machineIntegrationPowerState() {
-  const LineaMicraPowerState state = micraAssumedPowerState(service.statusPoll());
-  return state == LineaMicraPowerState::ON    ? MachinePower::ON
-         : state == LineaMicraPowerState::OFF ? MachinePower::OFF
-                                              : MachinePower::UNKNOWN;
+  switch (service.statusPoll().assumedPower) {
+    case LineaMicraAssumedPower::ON:
+    case LineaMicraAssumedPower::ON_STALE: return MachinePower::ON;
+    case LineaMicraAssumedPower::OFF:
+    case LineaMicraAssumedPower::OFF_STALE: return MachinePower::OFF;
+    case LineaMicraAssumedPower::UNKNOWN: break;
+  }
+  return MachinePower::UNKNOWN;
 }
 
 void serviceMachineIntegrationMachinePower(bool scaleLinkUp,

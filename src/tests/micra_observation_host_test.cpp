@@ -287,43 +287,54 @@ int main() {
   drySteam.receivedAtMs = 250;
   assert(bfence.merge(bstate, bpower, drySteam, true));
   bstate.powerState = LineaMicraPowerState::ON;
+  bstate.assumedPower = lineaMicraAssumedPower(bstate);  // As statusLocked() publishes it.
   assert(lineaMicraReadiness(bstate) == LineaMicraReadiness::NEEDS_WATER);
 
-  // Readiness rollup truth table over the effective status.
+  // Readiness rollup truth table over the effective status, resolved as
+  // statusLocked() publishes it.
+  const auto resolved = [](LineaMicraStatus s) {
+    s.assumedPower = lineaMicraAssumedPower(s);
+    return s;
+  };
   LineaMicraStatus rs;
   rs.powerState = LineaMicraPowerState::ON;
   rs.coffeeBoiler = rs.steamBoiler = LineaMicraBoilerState::HEATING_UP;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::WARMING_UP);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WARMING_UP);
   rs.coffeeBoiler = LineaMicraBoilerState::READY;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::WAITING_FOR_STEAM);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WAITING_FOR_STEAM);
   rs.steamBoiler = LineaMicraBoilerState::READY;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::READY);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::READY);
   rs.steamBoiler = LineaMicraBoilerState::OFF;  // Steam off never blocks.
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::READY);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::READY);
   rs.coffeeBoiler = LineaMicraBoilerState::NO_WATER;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::NEEDS_WATER);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::NEEDS_WATER);
   rs.powerState = LineaMicraPowerState::OFF;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::OFF);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::OFF);
   rs.optimisticOff = true;  // Standby accepted, cloud not yet confirming.
+  rs.quality = LineaMicraObservationQuality::OPTIMISTIC;
   rs.powerState = LineaMicraPowerState::ON;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::OFF);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::OFF);
   rs.optimisticOff = false;
+  rs.quality = LineaMicraObservationQuality::CURRENT;
   rs.powerState = LineaMicraPowerState::UNKNOWN;
   rs.coffeeBoiler = rs.steamBoiler = LineaMicraBoilerState::READY;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::UNKNOWN);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);
   rs.powerState = LineaMicraPowerState::OFF;
   rs.optimisticOn = true;  // Paddle wake: confirmed OFF, optimistic ON.
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::UNKNOWN);  // Retained boilers predate standby.
+  rs.quality = LineaMicraObservationQuality::OPTIMISTIC;
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);  // Retained boilers predate standby.
   rs.coffeeBoiler = rs.steamBoiler = LineaMicraBoilerState::UNKNOWN;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::UNKNOWN);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);
+  rs.optimisticOn = false;  // Confirmed ON, no overlay.
+  rs.quality = LineaMicraObservationQuality::CURRENT;
   rs.powerState = LineaMicraPowerState::ON;
   rs.coffeeBoiler = LineaMicraBoilerState::STANDBY;  // Contradictory: no claim.
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::UNKNOWN);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);
   rs.coffeeBoiler = LineaMicraBoilerState::ECO;  // Below temperature.
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::WARMING_UP);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WARMING_UP);
   rs.coffeeBoiler = LineaMicraBoilerState::READY;
   rs.steamBoiler = LineaMicraBoilerState::ECO;
-  assert(lineaMicraReadiness(rs) == LineaMicraReadiness::WAITING_FOR_STEAM);
+  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WAITING_FOR_STEAM);
   assert(std::strcmp(lineaMicraReadinessName(LineaMicraReadiness::WAITING_FOR_STEAM), "waiting_for_steam") == 0);
   assert(std::strcmp(lineaMicraBoilerStateName(LineaMicraBoilerState::HEATING_UP), "heating_up") == 0);
   assert(std::strcmp(lineaMicraSteamLevelName(LineaMicraSteamLevel::LEVEL_3), "level_3") == 0);

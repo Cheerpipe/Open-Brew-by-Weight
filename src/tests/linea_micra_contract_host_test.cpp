@@ -203,42 +203,45 @@ int main() {
   assert(micra_timing::kPostWakeObservationDelayMs == 15000);
   assert(micra_timing::kPostWakeObservationDelayMs <
          micra_timing::kOptimisticOverlayMs);
+  // The resolved assumed state is the only input of every consumer.
+  const auto resolve = [](LineaMicraStatus s) {
+    s.assumedPower = lineaMicraAssumedPower(s);
+    return s;
+  };
   LineaMicraStatus scanStatus;
   scanStatus.powerState = LineaMicraPowerState::UNKNOWN;
   scanStatus.effectiveOn = true;  // UNKNOWN keeps effectiveOn true; never enough.
-  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::UNKNOWN);
-  assert(micraScanOverride(scanStatus, LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
+  assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::UNKNOWN);
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
          MicraScanOverride::NONE);
   scanStatus.powerState = LineaMicraPowerState::ON;
-  assert(micraScanOverride(scanStatus, 0) == MicraScanOverride::NONE);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
+  scanStatus.quality = LineaMicraObservationQuality::CURRENT;
+  assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::ON);
+  assert(micraScanOverride(resolve(scanStatus), 0) == MicraScanOverride::NONE);
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
          MicraScanOverride::AGGRESSIVE);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
          MicraScanOverride::NONE);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
          MicraScanOverride::AGGRESSIVE);
   scanStatus.powerState = LineaMicraPowerState::OFF;
   scanStatus.effectiveOn = false;
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
+  assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::OFF);
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
          MicraScanOverride::NONE);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
          MicraScanOverride::RELAXED);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
          MicraScanOverride::RELAXED);
   // Retained (stale) states qualify through their power state; quality
   // alone never selects a duty.
   scanStatus.powerState = LineaMicraPowerState::ON;
   scanStatus.quality = LineaMicraObservationQuality::STALE;
-  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::ON);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
+  assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::ON_STALE);
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
          MicraScanOverride::AGGRESSIVE);
+  scanStatus.quality = LineaMicraObservationQuality::COMMUNICATION_ERROR;
+  assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::ON_STALE);
   // A live optimistic overlay leaves the confirmed value in powerState and
   // reports itself only through its flags: the overlay replaces the
   // confirmed state, in both directions, exclusively.
@@ -247,27 +250,22 @@ int main() {
   scanStatus.quality = LineaMicraObservationQuality::OPTIMISTIC;
   scanStatus.effectiveOn = true;
   scanStatus.optimisticOn = true;  // ...but the machine is waking now.
-  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::ON);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
+  assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::ON_STALE);
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
          MicraScanOverride::AGGRESSIVE);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
          MicraScanOverride::NONE);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
          MicraScanOverride::AGGRESSIVE);
   scanStatus = LineaMicraStatus{};
   scanStatus.powerState = LineaMicraPowerState::ON;  // Confirmed ON...
   scanStatus.quality = LineaMicraObservationQuality::OPTIMISTIC;
   scanStatus.effectiveOn = false;
   scanStatus.optimisticOff = true;  // ...but standby was accepted.
-  assert(micraAssumedPowerState(scanStatus) == LineaMicraPowerState::OFF);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
+  assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::OFF_STALE);
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) ==
          MicraScanOverride::RELAXED);
-  assert(micraScanOverride(
-             scanStatus, LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
+  assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) ==
          MicraScanOverride::NONE);
   scanStatus.powerState = LineaMicraPowerState::UNKNOWN;
   scanStatus.optimisticOn = scanStatus.optimisticOff = false;
@@ -279,9 +277,30 @@ int main() {
         LineaMicraObservationQuality::COMMUNICATION_ERROR,
         LineaMicraObservationQuality::UNSUPPORTED}) {
     scanStatus.quality = quality;
-    assert(micraScanOverride(scanStatus, LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
+    assert(lineaMicraAssumedPower(scanStatus) == LineaMicraAssumedPower::UNKNOWN);
+    assert(micraScanOverride(resolve(scanStatus), LINEA_MICRA_KNOWN_SCALE_OPTIONS) ==
            MicraScanOverride::NONE);
   }
+  // Readiness decides from the same value: OFF either way is off, an
+  // optimistic ON is neutral, a retained ON keeps its boiler evidence.
+  LineaMicraStatus lamp;
+  lamp.coffeeBoiler = lamp.steamBoiler = LineaMicraBoilerState::READY;
+  lamp.powerState = LineaMicraPowerState::ON;
+  lamp.quality = LineaMicraObservationQuality::OPTIMISTIC;
+  lamp.optimisticOff = true;
+  assert(lineaMicraReadiness(resolve(lamp)) == LineaMicraReadiness::OFF);
+  lamp.optimisticOff = false;
+  lamp.powerState = LineaMicraPowerState::OFF;
+  lamp.optimisticOn = true;
+  assert(lineaMicraReadiness(resolve(lamp)) == LineaMicraReadiness::UNKNOWN);
+  lamp.optimisticOn = false;
+  lamp.quality = LineaMicraObservationQuality::STALE;
+  assert(lineaMicraReadiness(resolve(lamp)) == LineaMicraReadiness::OFF);
+  lamp.powerState = LineaMicraPowerState::ON;
+  assert(lineaMicraReadiness(resolve(lamp)) == LineaMicraReadiness::READY);
+  lamp.powerState = LineaMicraPowerState::UNKNOWN;
+  assert(lineaMicraReadiness(resolve(lamp)) == LineaMicraReadiness::UNKNOWN);
+  static_assert(sizeof(LineaMicraStatus) == 72, "assumedPower must fill the alignment gap");
 
   assert(!micra_timing::accessTokenRefreshDue(50U * 60U * 1000U - 1U));
   assert(micra_timing::accessTokenRefreshDue(50U * 60U * 1000U));

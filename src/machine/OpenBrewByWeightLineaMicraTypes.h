@@ -288,6 +288,16 @@ struct LineaMicraCloudCall {
   bool clientReused = false;
 };
 
+// The one assumed power state the firmware acts on, resolved by the service
+// from the confirmed reading and the optimistic or retained overlays. ON and
+// OFF are current confirmations; ON_STALE and OFF_STALE are assumptions
+// (quality says which kind: OPTIMISTIC after an accepted command, STALE for a
+// retained reading); UNKNOWN means "behave like a machine that does not
+// report power".
+// Consumers switch on this value and never recombine powerState, quality or
+// the overlay flags themselves.
+enum class LineaMicraAssumedPower : uint8_t { UNKNOWN, ON, OFF, ON_STALE, OFF_STALE };
+
 struct LineaMicraStatus {
   uint32_t requestId = 0;
   uint32_t sampleAtMs = 0;
@@ -299,6 +309,7 @@ struct LineaMicraStatus {
   uint16_t targetDeciC = 0;
   uint16_t requestedTargetDeciC = 0;
   uint16_t appliedTargetDeciC = 0;
+  LineaMicraAssumedPower assumedPower = LineaMicraAssumedPower::UNKNOWN;  // Fills an alignment gap.
   int32_t transportStatus = 0;
   int32_t temperatureTransportStatus = 0;
   uint16_t httpStatus = 0;
@@ -330,6 +341,23 @@ struct LineaMicraStatus {
   bool temperatureRetryable = false;
 };
 
+// Resolution the service applies when it publishes a status: a live overlay
+// replaces the confirmed value; a confirmed value is current only with
+// CURRENT quality and an assumption otherwise; no confirmed value is UNKNOWN.
+inline LineaMicraAssumedPower lineaMicraAssumedPower(const LineaMicraStatus &status) {
+  if (status.optimisticOn) return LineaMicraAssumedPower::ON_STALE;
+  if (status.optimisticOff) return LineaMicraAssumedPower::OFF_STALE;
+  const bool current = status.quality == LineaMicraObservationQuality::CURRENT;
+  switch (status.powerState) {
+    case LineaMicraPowerState::ON:
+      return current ? LineaMicraAssumedPower::ON : LineaMicraAssumedPower::ON_STALE;
+    case LineaMicraPowerState::OFF:
+      return current ? LineaMicraAssumedPower::OFF : LineaMicraAssumedPower::OFF_STALE;
+    case LineaMicraPowerState::UNKNOWN: break;
+  }
+  return LineaMicraAssumedPower::UNKNOWN;
+}
+
 // Informational rollup of the dashboard boiler widgets. Evidence-driven: a
 // HeatingUp or EcoMode boiler is below temperature (warming), a Ready boiler
 // is at temperature, and an Off steam boiler never blocks readiness because
@@ -338,14 +366,23 @@ struct LineaMicraStatus {
 // UNKNOWN instead of guessing, so the Home lamp can fall back to a neutral
 // label. This layer never feeds control: power remains ON/OFF only.
 inline LineaMicraReadiness lineaMicraReadiness(const LineaMicraStatus &status) {
-  if (status.optimisticOff) return LineaMicraReadiness::OFF;
-  // An optimistic ON overlay means the machine is waking while the confirmed
-  // state still reads OFF: any retained boiler evidence predates the standby,
-  // so the rollup must stay UNKNOWN and the lamp neutral rather than claim a
-  // readiness the reheating machine cannot have yet.
-  if (status.powerState == LineaMicraPowerState::OFF && !status.optimisticOn)
-    return LineaMicraReadiness::OFF;
-  if (status.powerState != LineaMicraPowerState::ON) return LineaMicraReadiness::UNKNOWN;
+  switch (status.assumedPower) {
+    case LineaMicraAssumedPower::OFF:
+    case LineaMicraAssumedPower::OFF_STALE:
+      return LineaMicraReadiness::OFF;
+    case LineaMicraAssumedPower::UNKNOWN:
+      return LineaMicraReadiness::UNKNOWN;
+    case LineaMicraAssumedPower::ON_STALE:
+      // An optimistic ON means the machine is waking while the confirmed
+      // state still reads OFF: any retained boiler evidence predates the
+      // standby, so the lamp stays neutral rather than claim a readiness the
+      // reheating machine cannot have yet. A retained ON keeps its evidence.
+      if (status.quality == LineaMicraObservationQuality::OPTIMISTIC)
+        return LineaMicraReadiness::UNKNOWN;
+      break;
+    case LineaMicraAssumedPower::ON:
+      break;
+  }
   const LineaMicraBoilerState coffee = status.coffeeBoiler;
   const LineaMicraBoilerState steam = status.steamBoiler;
   if (coffee == LineaMicraBoilerState::NO_WATER ||

@@ -9,30 +9,21 @@ namespace openbrewbyweight {
 // the saved BLE scan mode in charge.
 enum class MicraScanOverride : uint8_t { NONE, AGGRESSIVE, RELAXED };
 
-// The assumed power state the firmware acts on: a live optimistic overlay
-// still leaves the last confirmed value in powerState, so the overlay flags
-// replace it; together they are the same resolved state Home shows. UNKNOWN —
-// whatever effectiveOn says — covers no account, observation disabled,
-// unsupported, and failed observations.
-inline LineaMicraPowerState micraAssumedPowerState(const LineaMicraStatus &machine) {
-  return machine.optimisticOn    ? LineaMicraPowerState::ON
-         : machine.optimisticOff ? LineaMicraPowerState::OFF
-                                 : machine.powerState;
-}
-
 // One compact discovery override computed from the persisted scale options
-// and the assumed power state. Only a known ON or OFF state can override;
-// UNKNOWN keeps NONE.
+// and the assumed power state. Assumptions count like confirmations; UNKNOWN
+// keeps NONE.
 inline MicraScanOverride micraScanOverride(const LineaMicraStatus &machine,
                                            uint8_t micraScaleOptions) {
-  const LineaMicraPowerState resolved = micraAssumedPowerState(machine);
-  if (resolved == LineaMicraPowerState::ON &&
-      (micraScaleOptions & LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) != 0) {
-    return MicraScanOverride::AGGRESSIVE;
-  }
-  if (resolved == LineaMicraPowerState::OFF &&
-      (micraScaleOptions & LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) != 0) {
-    return MicraScanOverride::RELAXED;
+  switch (machine.assumedPower) {
+    case LineaMicraAssumedPower::ON:
+    case LineaMicraAssumedPower::ON_STALE:
+      return (micraScaleOptions & LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON) != 0
+                 ? MicraScanOverride::AGGRESSIVE : MicraScanOverride::NONE;
+    case LineaMicraAssumedPower::OFF:
+    case LineaMicraAssumedPower::OFF_STALE:
+      return (micraScaleOptions & LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF) != 0
+                 ? MicraScanOverride::RELAXED : MicraScanOverride::NONE;
+    case LineaMicraAssumedPower::UNKNOWN: break;
   }
   return MicraScanOverride::NONE;
 }
