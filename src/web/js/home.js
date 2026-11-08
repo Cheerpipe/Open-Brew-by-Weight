@@ -151,6 +151,14 @@ function renderHints(s) {
     el.hidden = !(want && !R.cardDismissed(cardKey(id)));
   }
   if ($("scaleOnlyHintUse")) $("scaleOnlyHintUse").disabled = !R.controlsMutable;
+  // No dismissal: the card lasts as long as the recording. Stop follows the
+  // Diagnostic page's gate; Download needs only this window's ownership.
+  const rec = $("scaleRecCard");
+  if (!rec) return;
+  rec.hidden = !s.scaleRecording;
+  $("scaleRecStop").disabled =
+    !R.webUiOwner || !(R.adminUnlockedFor(s) || s.development || R.diagnosticVisible);
+  $("scaleRecDownload").disabled = !R.webUiOwner;
 }
 // The machine row ticks with the boiler rows so a warm-up countdown stays live.
 function renderMachineRow(s) {
@@ -277,6 +285,11 @@ export function init() {
   }
   if ($("micraPolicyHintAccept"))
     $("micraPolicyHintAccept").onclick = () => R.lineaMicraAction("acceptPolicy");
+  if ($("scaleRecStop")) {
+    $("scaleRecStop").onclick = () =>
+      R.command("/api/v1/diagnostic/scale-profile", { action: "stop" });
+    $("scaleRecDownload").onclick = () => R.downloadScaleProfile();
+  }
   if ($("scaleOnlyHintUse"))
     $("scaleOnlyHintUse").onclick = () =>
       R.command(

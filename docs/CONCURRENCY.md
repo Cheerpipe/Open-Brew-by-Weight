@@ -186,14 +186,17 @@ DRAM scalar state. The local buzzer, debug ring, and other task-only compound
 state use `TaskMutex`. Heap/CPU sampling and task-profiler capture belong to the
 core-0 health worker; control consumes its one-slot mailbox without waiting and
 ages stale samples explicitly. The same health worker owns the manual scale
-profiler: the health worker maintains the capture clock and smoothed capacity
-ETA on its service tick, independently of browser reads. Producers request
-completion on filling the last ordinary slot; the health worker closes the
-capture with the reserved terminal record. Producers (scale worker and control loop) append 32-byte records
-through one leaf capture mutex they only take after releasing their own locks,
-flash invalidate/save run as single cache-off steps on the settings_persist
-worker between safe-write gates, and a download lease pins the frozen
-generation so Start/Delete cannot replace a trace while it streams. The
+profiler: the health worker maintains the capture clock on its service tick,
+independently of browser reads, and takes the automatic-session decision from
+copies of the scale link and control gate snapshots. Producers (scale worker
+and control loop) append 32-byte records to the ring through one leaf capture
+mutex they only take after releasing their own locks; the ring never refuses a
+record. Flash invalidate/save run as single cache-off steps on the
+settings_persist worker between safe-write gates, and a download lease pins the
+generation so Start/Delete/Restart cannot replace a trace while it streams. A
+live download copies sort keys and records in 32-record holds of the capture
+mutex and sorts the copies outside it; while the lease is held the health
+worker builds no index, so the network task alone writes it. The
 per-shot trace (see [shot trace](SHOT_TRACE.md)) is opened, discarded and
 completed by the control loop, which alone owns its state-change cache and
 reading statistics. Before the relay acts it only resets the header and

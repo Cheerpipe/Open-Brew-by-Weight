@@ -204,9 +204,12 @@ constexpr BleScanIntensity BLE_SCAN_FACTORY_INTENSITY =
 struct BleScanCommandPayload {
   static constexpr uint8_t INTENSITY = 0x01;
   static constexpr uint8_t ENABLED = 0x08;
+  // Automatic scale recording shares the scan blob (Diagnostic route).
+  static constexpr uint8_t AUTO_SCALE_RECORD = 0x10;
   uint8_t specified = 0;
   uint8_t intensity = static_cast<uint8_t>(BLE_SCAN_FACTORY_INTENSITY);
   uint8_t enabled = 1;
+  uint8_t autoScaleRecord = 0;
 };
 
 inline bool parseBleScanIntensityId(const char *id, BleScanIntensity &out) {

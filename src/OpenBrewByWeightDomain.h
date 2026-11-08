@@ -1532,6 +1532,7 @@ enum class WebCommandType : uint8_t {
   SCALE_PROFILE_START,
   SCALE_PROFILE_STOP,
   SCALE_PROFILE_DELETE,
+  SCALE_PROFILE_AUTO,
   STATE_OVERRIDE_OFF,
   STATE_OVERRIDE_ON,
   FORCE_SWITCH_PULSE,
@@ -1589,6 +1590,7 @@ inline const char *webCommandTypeName(WebCommandType type) {
     case WebCommandType::SCALE_PROFILE_START: return "start scale profile";
     case WebCommandType::SCALE_PROFILE_STOP: return "stop scale profile";
     case WebCommandType::SCALE_PROFILE_DELETE: return "delete scale profile";
+    case WebCommandType::SCALE_PROFILE_AUTO: return "set automatic scale recording";
     case WebCommandType::STATE_OVERRIDE_OFF:
       return "override inferred idle";
     case WebCommandType::STATE_OVERRIDE_ON:

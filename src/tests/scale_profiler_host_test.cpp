@@ -81,23 +81,30 @@ void testPreEpochAndWrapAroundTimestamps() {
   CHECK(wrapped.hostRecord(1).relativeMs == 0x290);
 }
 
-void testCapacityReservesTerminalAndCountsLoss() {
+void testRingKeepsNewestAndCountsOverwritten() {
   ScaleProfiler profiler;
   CHECK(profiler.hostStartNoFlash(T0));
-  for (uint32_t i = 0; i < SCALE_PROFILE_ORDINARY_CAPACITY + 25; ++i) {
-    noteWeightAt(profiler, T0 + i, 1.0f, i + 1);
-  }
-  CHECK(profiler.hostRecordCount() == SCALE_PROFILE_ORDINARY_CAPACITY);
-  CHECK(profiler.hostLostCount() ==
-        25 + 1);  // 8191 appends fit after the PROFILE_START marker.
-  profiler.hostServiceIdle(T0 + 2000);
-  CHECK(profiler.hostState() == ScaleProfilerState::STOPPED);
-  CHECK(profiler.hostStopReason() == ScaleProfilerStopReason::BUFFER_FULL);
+  const uint32_t extra = 100;
+  for (uint32_t i = 1; i <= SCALE_PROFILE_RECORD_CAPACITY + extra; ++i)
+    noteWeightAt(profiler, T0 + i, 1.0f, i);
+  profiler.hostServiceIdle(T0 + SCALE_PROFILE_RECORD_CAPACITY + extra + 1);
+  // No capacity stop: the oldest records (start marker first) are overwritten.
+  CHECK(profiler.hostState() == ScaleProfilerState::RECORDING);
   CHECK(profiler.hostRecordCount() == SCALE_PROFILE_RECORD_CAPACITY);
-  const ScaleProfileRecord terminal =
-      profiler.hostRecord(SCALE_PROFILE_RECORD_CAPACITY - 1);
-  CHECK(terminal.kind ==
+  CHECK(profiler.hostLostCount() == 0);
+  const ScaleProfilerStatus status = profiler.status(T0 + 20000);
+  CHECK(status.overwritten == extra + 1);
+  CHECK(status.windowMs == SCALE_PROFILE_RECORD_CAPACITY - 1);
+  CHECK(status.weightCount == SCALE_PROFILE_RECORD_CAPACITY + extra);
+  CHECK(profiler.hostRecord(0).sequence == extra + 1);
+  CHECK(profiler.hostRecord(SCALE_PROFILE_RECORD_CAPACITY - 1).sequence ==
+        SCALE_PROFILE_RECORD_CAPACITY + extra);
+  // Ordinals keep counting every append past the ring size.
+  CHECK((profiler.hostRecord(0).ordinal & 0xFFFFFFU) == extra + 2);
+  profiler.hostStop(ScaleProfilerStopReason::USER, T0 + 20000);
+  CHECK(profiler.hostRecord(SCALE_PROFILE_RECORD_CAPACITY - 1).kind ==
         static_cast<uint16_t>(ScaleProfileEvent::PROFILE_STOP));
+  CHECK(profiler.hostHeader().omittedCount == extra + 2);
 }
 
 void testCaptureHasNoTimeLimit() {
@@ -114,22 +121,6 @@ void testCaptureHasNoTimeLimit() {
   CHECK(profiler.hostHeader().durationMs == 3600001);
 }
 
-void testFullCaptureStopsWithoutRejectedAppend() {
-  ScaleProfiler profiler;
-  CHECK(profiler.hostStartNoFlash(T0));
-  for (uint32_t i = 1; i < SCALE_PROFILE_ORDINARY_CAPACITY; ++i)
-    noteWeightAt(profiler, T0 + i, 1.0f, i);
-  CHECK(profiler.status(T0 + 9000).estimatedRemainingMs == 0);
-  profiler.hostServiceIdle(T0 + 9000);
-  CHECK(profiler.hostRecordCount() == SCALE_PROFILE_RECORD_CAPACITY);
-  CHECK(profiler.hostStopReason() == ScaleProfilerStopReason::BUFFER_FULL);
-  CHECK(profiler.hostLostCount() == 0);
-  noteWeightAt(profiler, T0 + 9001, 1.0f, 9999);
-  profiler.hostServiceIdle(T0 + 9002);
-  CHECK(profiler.hostRecordCount() == SCALE_PROFILE_RECORD_CAPACITY);
-  CHECK(profiler.hostLostCount() == 0);
-}
-
 void testLongCaptureTimestampsAndExport() {
   ScaleProfiler profiler;
   const uint32_t start = 0xffffff00U;
@@ -142,6 +133,9 @@ void testLongCaptureTimestampsAndExport() {
     CHECK(profiler.status(now).elapsedMs == elapsed);
     CHECK(scaleProfileRecordTimeMs(profiler.hostRecord(day)) == elapsed);
   }
+  // 24-bit append counter below the 8-bit time extension.
+  CHECK((profiler.hostRecord(60).ordinal & 0xFFFFFFU) == 61);
+  CHECK(profiler.hostRecord(60).ordinal >> SCALE_PROFILE_ORDINAL_BITS == 1);
   const uint64_t duration = 60ULL * 86400000;
   const uint32_t end = start + static_cast<uint32_t>(duration);
   profiler.noteWeight({{2, 61}, end - 10, 2.0f}, false, end);
@@ -155,109 +149,7 @@ void testLongCaptureTimestampsAndExport() {
   CHECK(std::string(line).find("+5184000.000") == 0);
   CHECK(static_cast<uint32_t>(ScaleProfilerStopReason::BUFFER_FULL) == 3);
   CHECK(formatScaleProfileRow(line, sizeof(line), profiler.hostExportRecord(0)));
-  CHECK(std::string(line).find("limit=capacity") != std::string::npos);
-}
-
-void recordSeconds(ScaleProfiler &profiler, uint32_t &now, uint32_t rate,
-                   uint32_t seconds, bool events = false) {
-  for (uint32_t second = 0; second < seconds; ++second) {
-    for (uint32_t i = 1; i <= rate; ++i) {
-      const uint32_t at = now + 1000 * i / rate;
-      noteWeightAt(profiler, at, 1.0f, i);
-      if (events)
-        profiler.noteEvent(
-            {.connectionGeneration = 2, .sequence = i, .weightG = 1.0f,
-             .kind = static_cast<uint16_t>(ScaleProfileEvent::WEIGHT_ACCEPTED)},
-            at);
-    }
-    now += 1000;
-    profiler.hostServiceIdle(now);
-  }
-}
-
-double estimatedRate(const ScaleProfilerStatus &status) {
-  return 1000.0 * (SCALE_PROFILE_ORDINARY_CAPACITY - status.recordCount) /
-         status.estimatedRemainingMs;
-}
-
-void testEstimateRatesAndLifecycle() {
-  for (const uint32_t interval : {50U, 100U, 200U, 500U}) {
-    ScaleProfiler profiler;
-    uint32_t now = T0;
-    CHECK(profiler.hostStartNoFlash(now));
-    profiler.hostServiceIdle(now);
-    recordSeconds(profiler, now, 1000 / interval, 4);
-    CHECK(profiler.status(now).estimatedRemainingMs == UINT32_MAX);
-    recordSeconds(profiler, now, 1000 / interval, 26);
-    const auto status = profiler.status(now);
-    CHECK(std::abs(estimatedRate(status) / (1000.0 / interval) - 1) < 0.05);
-    // Reads do not sample the estimator, even with different poll times.
-    CHECK(profiler.status(now + 200).estimatedRemainingMs == status.estimatedRemainingMs);
-    recordSeconds(profiler, now, 1000 / interval, 15, true);
-    CHECK(std::abs(estimatedRate(profiler.status(now)) / (2000.0 / interval) - 1) < 0.1);
-    recordSeconds(profiler, now, 0, 5);
-    CHECK(profiler.status(now).estimatedRemainingMs == UINT32_MAX);
-    CHECK(profiler.recording());
-    recordSeconds(profiler, now, 1000 / interval, 6);
-    CHECK(profiler.status(now).estimatedRemainingMs != UINT32_MAX);
-    profiler.hostStop(ScaleProfilerStopReason::USER, now);
-    CHECK(profiler.status(now).estimatedRemainingMs == UINT32_MAX);
-    const uint32_t captured = profiler.hostRecordCount();
-    profiler.hostServiceIdle(++now);
-    profiler.hostPublishFlashResult(true);
-    profiler.hostServiceIdle(++now);
-    CHECK(profiler.status(now).savedRecordCount == captured);
-    CHECK(profiler.status(now).estimatedRemainingMs == UINT32_MAX);
-    profiler.hostService(ScaleProfilerRequest::DELETE, ++now);
-    CHECK(profiler.status(now).recordCount == 0);
-    CHECK(profiler.status(now).elapsedMs == 0);
-    CHECK(profiler.hostStartNoFlash(++now));
-    CHECK(profiler.status(now).estimatedRemainingMs == UINT32_MAX);
-  }
-}
-
-void testEstimateJitterAndRateChanges() {
-  ScaleProfiler profiler;
-  uint32_t now = T0;
-  CHECK(profiler.hostStartNoFlash(now));
-  // A large startup burst consumes space, but must not bias steady-rate ETA.
-  for (uint32_t i = 0; i < 200; ++i) noteWeightAt(profiler, now, 1.0f, i);
-  profiler.hostServiceIdle(now);
-  recordSeconds(profiler, now, 20, 30);
-  double squaredError = 0;
-  for (uint32_t second = 0; second < 60; ++second) {
-    recordSeconds(profiler, now, second % 2 ? 16 : 24, 1);
-    const double error = estimatedRate(profiler.status(now)) - 20;
-    squaredError += error * error;
-  }
-  CHECK(std::sqrt(squaredError / 60) < 4 * 0.3); // At least 70% less RMS jitter.
-  for (const uint32_t rate : {40U, 20U, 2U, 20U}) {
-    recordSeconds(profiler, now, rate, rate == 40 ? 15 : 25);
-    const double eta = profiler.status(now).estimatedRemainingMs;
-    const double expected = 1000.0 *
-        (SCALE_PROFILE_ORDINARY_CAPACITY - profiler.hostRecordCount()) / rate;
-    CHECK(std::abs(eta / expected - 1) < 0.1);
-  }
-}
-
-void testEstimateIrregularServiceAndClockWrap() {
-  ScaleProfiler regular, delayed;
-  uint32_t now = 0xfffff000U;
-  CHECK(regular.hostStartNoFlash(now));
-  CHECK(delayed.hostStartNoFlash(now));
-  regular.hostServiceIdle(now);
-  delayed.hostServiceIdle(now);
-  for (uint32_t tick = 1; tick <= 600; ++tick) {
-    now += 100;
-    noteWeightAt(regular, now, 1.0f, tick);
-    noteWeightAt(delayed, now, 1.0f, tick);
-    regular.hostServiceIdle(now);
-    if (tick % 17 == 0) delayed.hostServiceIdle(now);
-  }
-  delayed.hostServiceIdle(now);
-  CHECK(std::abs(estimatedRate(regular.status(now)) - 10) < 0.01);
-  CHECK(std::abs(estimatedRate(delayed.status(now)) - 10) < 0.01);
-  CHECK(regular.status(now).elapsedMs == 60000);
+  CHECK(std::string(line).find("limit=rolling") != std::string::npos);
 }
 
 void testIndexOrdersByTimeThenOrdinal() {
@@ -332,6 +224,7 @@ void testDownloadLeasePinsGeneration() {
   CHECK(profiler.acquireDownloadLease());
   CHECK(profiler.downloadLeaseGeneration() != 0);
   CHECK(profiler.downloadFromRam());
+  CHECK(!profiler.downloadLive());
   CHECK(profiler.downloadRecordCount() == 3);
   // Start and Delete refuse while the lease pins the frozen trace.
   (void)profiler.hostService(ScaleProfilerRequest::START, T0 + 200);
@@ -368,12 +261,12 @@ void testSaveCompletingMidDownloadKeepsRamStream() {
   CHECK(profiler.hostState() == ScaleProfilerState::SAVED);
   CHECK(profiler.downloadFromRam());
   CHECK(profiler.downloadRecordCount() == 4);
-  CHECK(profiler.downloadRecordAt(0).kind ==
-        static_cast<uint16_t>(ScaleProfileEvent::PROFILE_START));
-  CHECK(profiler.downloadRecordAt(1).sequence == 1);
-  CHECK(profiler.downloadRecordAt(2).sequence == 2);
-  CHECK(profiler.downloadRecordAt(3).kind ==
-        static_cast<uint16_t>(ScaleProfileEvent::PROFILE_STOP));
+  ScaleProfileRecord rows[4];
+  CHECK(profiler.downloadRecords(0, rows, 4) == 4);
+  CHECK(rows[0].kind == static_cast<uint16_t>(ScaleProfileEvent::PROFILE_START));
+  CHECK(rows[1].sequence == 1);
+  CHECK(rows[2].sequence == 2);
+  CHECK(rows[3].kind == static_cast<uint16_t>(ScaleProfileEvent::PROFILE_STOP));
   const ScaleProfileHeader header = profiler.downloadHeader();
   CHECK(header.weightCount == 2);
   CHECK(header.eventCount == 2);  // start + terminal
@@ -395,7 +288,7 @@ void testSaveResultTransitionsAndFailureRetry() {
   CHECK(profiler.hostState() == ScaleProfilerState::SAVED);
   CHECK(profiler.hostPersistence() == ScaleProfilerPersistence::SAVED);
   CHECK(!profiler.downloadFromRam());
-  CHECK(profiler.downloadRecordCount() == 3);
+  CHECK(profiler.status(T0 + 300).savedRecordCount == 3);
 
   ScaleProfiler failing;
   CHECK(failing.hostStartNoFlash(T0));
@@ -447,12 +340,152 @@ void testHeaderContextProviderRunsAtStart() {
 }
 
 void testBudgetMatchesPlan() {
-  CHECK(SCALE_PROFILE_RECORD_CAPACITY * SCALE_PROFILE_RECORD_BYTES ==
-        256U * 1024U);
+  CHECK(SCALE_PROFILE_RECORD_CAPACITY * SCALE_PROFILE_RECORD_BYTES == 512U * 1024U);
+  CHECK(SCALE_PROFILE_INDEX_BYTES == 128U * 1024U);
+  // The flash partition is unchanged; it holds the newest half of the ring.
   CHECK(SCALE_PROFILE_PARTITION_BYTES == 0x41000);
   CHECK(SCALE_PROFILE_PARTITION_BYTES - SCALE_PROFILE_PAYLOAD_OFFSET ==
-        SCALE_PROFILE_RECORD_CAPACITY * SCALE_PROFILE_RECORD_BYTES);
+        SCALE_PROFILE_SAVED_CAPACITY * SCALE_PROFILE_RECORD_BYTES);
   CHECK(sizeof(ScaleProfileHeader) <= 4096);
+  CHECK(static_cast<uint32_t>(ScaleProfilerStopReason::BUFFER_FULL) == 3 &&
+        static_cast<uint32_t>(ScaleProfilerStopReason::SUPERSEDED) == 5);
+}
+
+void fillRing(ScaleProfiler &profiler, uint32_t count) {
+  for (uint32_t i = 1; i <= count; ++i) noteWeightAt(profiler, T0 + i, 1.0f, i);
+}
+
+void testRestartSupersedesWithoutSaving() {
+  ScaleProfiler profiler;
+  CHECK(profiler.hostStartNoFlash(T0));
+  noteWeightAt(profiler, T0 + 10, 1.0f, 1);
+  const uint32_t session = profiler.hostHeader().sessionId;
+  CHECK(profiler.hostService(ScaleProfilerRequest::RESTART, T0 + 20) ==
+        ScaleProfilerWork::NONE);
+  CHECK(profiler.hostState() == ScaleProfilerState::RECORDING);
+  CHECK(profiler.hostHeader().sessionId == session + 1);
+  CHECK(profiler.hostPersistence() == ScaleProfilerPersistence::NONE);
+  CHECK(profiler.hostRecordCount() == 1);  // Only the new start marker.
+  CHECK(profiler.hostService(ScaleProfilerRequest::NONE, T0 + 30) ==
+        ScaleProfilerWork::NONE);  // The superseded session never saves.
+  // A live download pins the session: the restart waits for its release.
+  CHECK(profiler.acquireDownloadLease());
+  (void)profiler.hostService(ScaleProfilerRequest::RESTART, T0 + 40);
+  CHECK(profiler.hostHeader().sessionId == session + 1);
+  CHECK(profiler.hostLastError() == ScaleProfilerError::BUSY);
+  profiler.releaseDownloadLease();
+  (void)profiler.hostService(ScaleProfilerRequest::RESTART, T0 + 50);
+  CHECK(profiler.hostHeader().sessionId == session + 2);
+  CHECK(profiler.hostLastError() == ScaleProfilerError::NONE);
+  // A stopped trace is replaced as well, its pending save dropped.
+  profiler.hostStop(ScaleProfilerStopReason::USER, T0 + 60);
+  CHECK(profiler.hostService(ScaleProfilerRequest::RESTART, T0 + 70) ==
+        ScaleProfilerWork::NONE);
+  CHECK(profiler.hostState() == ScaleProfilerState::RECORDING);
+  CHECK(profiler.hostHeader().sessionId == session + 3);
+}
+
+void testLiveDownloadWindowAndOvertake() {
+  ScaleProfiler profiler;
+  CHECK(profiler.hostStartNoFlash(T0));
+  fillRing(profiler, SCALE_PROFILE_RECORD_CAPACITY + 500);
+  CHECK(profiler.acquireDownloadLease());
+  CHECK(profiler.downloadLive() && profiler.downloadFromRam());
+  const uint32_t window = SCALE_PROFILE_RECORD_CAPACITY - SCALE_PROFILE_LIVE_HEADROOM;
+  CHECK(profiler.downloadRecordCount() == window);
+  const ScaleProfileHeader header = profiler.downloadHeader();
+  CHECK(header.recordCount == window);
+  CHECK(header.omittedCount == SCALE_PROFILE_RECORD_CAPACITY + 501 - window);
+  // The frozen window is the newest records, oldest first.
+  ScaleProfileRecord rows[32];
+  CHECK(profiler.downloadRecords(0, rows, 32) == 32);
+  const uint32_t first = SCALE_PROFILE_RECORD_CAPACITY + 500 - window + 1;
+  for (uint32_t i = 0; i < 32; ++i) CHECK(rows[i].sequence == first + i);
+  // Recording continues; newer records stay out of this download.
+  noteWeightAt(profiler, T0 + 30000, 2.0f, 99999);
+  CHECK(profiler.hostState() == ScaleProfilerState::RECORDING);
+  CHECK(profiler.downloadRecordCount() == window);
+  // The writer overtakes unsent records: the read stops at the first one.
+  for (uint32_t i = 0; i < SCALE_PROFILE_LIVE_HEADROOM + 99; ++i)
+    noteWeightAt(profiler, T0 + 30001 + i, 3.0f, 100000 + i);
+  CHECK(profiler.downloadRecords(32, rows, 32) == 0);
+  CHECK(profiler.downloadRecords(100, rows, 32) == 32);
+  CHECK(rows[0].sequence == first + 100);
+  // A Stop mid-download keeps the stream; the save waits for the release.
+  CHECK(profiler.hostService(ScaleProfilerRequest::STOP, T0 + 40000) ==
+        ScaleProfilerWork::NONE);
+  CHECK(profiler.hostState() == ScaleProfilerState::STOPPED);
+  CHECK(profiler.downloadRecords(window - 1, rows, 32) == 1);
+  CHECK(profiler.hostService(ScaleProfilerRequest::NONE, T0 + 40100) ==
+        ScaleProfilerWork::NONE);
+  profiler.releaseDownloadLease();
+  CHECK(!profiler.downloadLive());
+  CHECK(profiler.hostService(ScaleProfilerRequest::NONE, T0 + 40200) ==
+        ScaleProfilerWork::SAVE);
+}
+
+void testFlashSaveKeepsNewestRecords() {
+  ScaleProfiler profiler;
+  CHECK(profiler.hostStartNoFlash(T0));
+  fillRing(profiler, SCALE_PROFILE_RECORD_CAPACITY + 10);
+  profiler.hostStop(ScaleProfilerStopReason::USER, T0 + 30000);
+  CHECK(profiler.hostService(ScaleProfilerRequest::NONE, T0 + 30100) ==
+        ScaleProfilerWork::SAVE);
+  CHECK(profiler.hostSavedRecordCount() == SCALE_PROFILE_SAVED_CAPACITY);
+  // Chronological, newest that fit: the stop marker closes the payload.
+  const uint32_t written = SCALE_PROFILE_RECORD_CAPACITY + 12;
+  CHECK(profiler.hostSavedRecord(0).sequence ==
+        SCALE_PROFILE_RECORD_CAPACITY + 10 - SCALE_PROFILE_SAVED_CAPACITY + 2);
+  CHECK(profiler.hostSavedRecord(SCALE_PROFILE_SAVED_CAPACITY - 1).kind ==
+        static_cast<uint16_t>(ScaleProfileEvent::PROFILE_STOP));
+  profiler.hostPublishFlashResult(true);
+  profiler.hostServiceIdle(T0 + 30200);
+  const ScaleProfilerStatus status = profiler.status(T0 + 30200);
+  CHECK(status.state == ScaleProfilerState::SAVED);
+  CHECK(status.savedRecordCount == SCALE_PROFILE_SAVED_CAPACITY);
+  CHECK(status.overwritten == written - SCALE_PROFILE_SAVED_CAPACITY);
+}
+
+ScaleProfileAutoReason tick(ScaleProfileAutoSession &session, bool connected,
+                            uint32_t generation, uint8_t reason, uint32_t nowMs,
+                            bool recording = true, bool brewing = false) {
+  return session.observe(connected, generation, reason, recording, brewing, nowMs);
+}
+
+void testAutoSessionDecisions() {
+  constexpr uint8_t NONE = 0, SCAN_TIMEOUT = 3, POWER_OFF = 9, SUPERVISION = 14;
+  using R = ScaleProfileAutoReason;
+  ScaleProfileAutoSession session;
+  // Boot: nothing records yet, so the first connection starts a session.
+  CHECK(tick(session, false, 0, NONE, 0) == R::NONE);
+  CHECK(tick(session, true, 1, NONE, 100, false) == R::FIRST);
+  CHECK(tick(session, true, 1, NONE, 200, false) == R::FIRST);  // Until served.
+  session.served(1);
+  CHECK(tick(session, true, 1, NONE, 300) == R::NONE);
+  // Power-off: latched at the drop edge, kept over later scan failures.
+  CHECK(tick(session, false, 1, POWER_OFF, 400) == R::NONE);
+  CHECK(tick(session, false, 1, SCAN_TIMEOUT, 500) == R::NONE);
+  CHECK(tick(session, true, 2, SCAN_TIMEOUT, 5000) == R::POWER_OFF);
+  CHECK(session.downReason() == POWER_OFF);
+  session.served(2);
+  // A lost link continues the running session.
+  CHECK(tick(session, false, 2, SUPERVISION, 6000) == R::NONE);
+  CHECK(tick(session, true, 3, SUPERVISION, 9000) == R::LOST_LINK);
+  session.served(3);
+  // The same lost link after 30 minutes or more starts a new session.
+  CHECK(tick(session, false, 3, SUPERVISION, 10000) == R::NONE);
+  CHECK(tick(session, true, 4, SCAN_TIMEOUT, 10000 + SCALE_PROFILE_SESSION_GAP_MS) == R::GAP);
+  session.served(4);
+  // Never during a brew cycle, even after a power-off.
+  CHECK(tick(session, false, 4, POWER_OFF, 20000000) == R::NONE);
+  CHECK(tick(session, true, 5, POWER_OFF, 20001000, true, true) == R::BREWING);
+  // ...unless nothing records: there is no session to protect.
+  CHECK(tick(session, true, 5, POWER_OFF, 20001000, false, true) == R::FIRST);
+  session.served(5);
+  // A drop and reconnection inside one tick latch on reconnection.
+  CHECK(tick(session, true, 6, POWER_OFF, 20002000) == R::POWER_OFF);
+  session.served(6);
+  CHECK(tick(session, true, 7, SUPERVISION, 20003000) == R::LOST_LINK);
 }
 
 void testIdleTarePresentation() {
@@ -550,13 +583,9 @@ void runAll() {
   testLifecycleCapturesWeightsAndEvents();
   testStopReasonUserIsLastRecord();
   testPreEpochAndWrapAroundTimestamps();
-  testCapacityReservesTerminalAndCountsLoss();
+  testRingKeepsNewestAndCountsOverwritten();
   testCaptureHasNoTimeLimit();
-  testFullCaptureStopsWithoutRejectedAppend();
   testLongCaptureTimestampsAndExport();
-  testEstimateRatesAndLifecycle();
-  testEstimateJitterAndRateChanges();
-  testEstimateIrregularServiceAndClockWrap();
   testIndexOrdersByTimeThenOrdinal();
   testTxtRowShapeAndPrecision();
   testDownloadLeasePinsGeneration();
@@ -565,6 +594,10 @@ void runAll() {
   testStartRetryNeverRestartsActiveSession();
   testHeaderContextProviderRunsAtStart();
   testBudgetMatchesPlan();
+  testRestartSupersedesWithoutSaving();
+  testLiveDownloadWindowAndOvertake();
+  testFlashSaveKeepsNewestRecords();
+  testAutoSessionDecisions();
 }
 
 }  // namespace

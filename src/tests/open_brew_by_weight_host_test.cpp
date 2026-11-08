@@ -15908,6 +15908,28 @@ void bc11_ble_master_switch_command_persists_live_without_restart() {
   applyLiveBleEnabled(true);
 }
 
+void bc12_auto_scale_record_applies_live_and_persists() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  CHECK(!scaleProfiler().autoStart());
+  WebCommand command = webControlCommand(WebCommandType::SCALE_PROFILE_AUTO);
+  command.bleScan.specified = BleScanCommandPayload::AUTO_SCALE_RECORD;
+  command.bleScan.autoScaleRecord = 1;
+  processWebCommand(command);
+  // Live at once; the scan blob write shares the deferred BLE scan flush.
+  CHECK(scaleProfiler().autoStart());
+  CHECK(liveBleEnabled());
+  runLoopAfter(CONTROL_HOUSEKEEPING_INTERVAL_MS);
+  CHECK(hostLastForwardedNetworkCommand.requestId == 1);
+  CHECK(hostLastForwardedNetworkCommand.resultState ==
+        CommandResultState::PERSISTED);
+  CHECK(!bleScanAutoScaleRecordPersistPending);
+  command.requestId = 2;
+  command.bleScan.autoScaleRecord = 0;
+  processWebCommand(command);
+  CHECK(!scaleProfiler().autoStart());
+}
+
 void sc07_reset_device_password_and_clear_wifi_queue() {
   resetHarness(false, false);
   reachReadyFromBoot();
@@ -26245,6 +26267,7 @@ const TestCase testCases[] = {
     {"BC08", bc08_ble_scan_superseded_requests_all_report_persisted},
     {"BC10", bc10_ble_master_switch_quiesces_scale_link},
     {"BC11", bc11_ble_master_switch_command_persists_live_without_restart},
+    {"BC12", bc12_auto_scale_record_applies_live_and_persists},
     {"CM01", cm01_compatibility_mirror_follows_activator},
     {"CM02", cm02_compatibility_has_no_duration_cutoff},
     {"CM03", cm03_compatibility_rejects_actuation_commands},

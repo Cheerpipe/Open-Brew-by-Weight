@@ -5,6 +5,7 @@ void rejectWebCommand(const WebCommand &command) {
 }
 void persistBleScanIntensity(BleScanIntensity intensity);
 void persistBleScanEnabled(bool enabled);
+void persistAutoScaleRecord(bool enabled);
 
 // Compatibility mode blocks commands that actuate the machine or execute
 // disabled functionality (brew intelligence, scale, alerts). Persistence,
@@ -750,7 +751,8 @@ void processWebCommand(const WebCommand &command) {
       }
       return;
 
-    case WebCommandType::BLE_SCAN_INTENSITY: {
+    case WebCommandType::BLE_SCAN_INTENSITY:
+    case WebCommandType::SCALE_PROFILE_AUTO: {
       if (!persistentConfigurationMutationAllowed(command)) {
         rejectWebCommand(command);
         return;
@@ -764,6 +766,10 @@ void processWebCommand(const WebCommand &command) {
       if (command.bleScan.specified & BleScanCommandPayload::ENABLED) {
         applied = true;
         persistBleScanEnabled(command.bleScan.enabled != 0);
+      }
+      if (command.bleScan.specified & BleScanCommandPayload::AUTO_SCALE_RECORD) {
+        applied = true;
+        persistAutoScaleRecord(command.bleScan.autoScaleRecord != 0);
       }
       if (!applied) {
         rejectWebCommand(command);
@@ -857,5 +863,13 @@ void persistBleScanEnabled(bool enabled) {
   bleScanPersistMux.lock();
   bleScanPersistEnabled = enabled ? 1 : 0;
   bleScanEnabledPersistPending = true;
+  bleScanPersistMux.unlock();
+}
+
+void persistAutoScaleRecord(bool enabled) {
+  scaleProfiler().setAutoStart(enabled);
+  bleScanPersistMux.lock();
+  bleScanPersistAutoScaleRecord = enabled;
+  bleScanAutoScaleRecordPersistPending = true;
   bleScanPersistMux.unlock();
 }

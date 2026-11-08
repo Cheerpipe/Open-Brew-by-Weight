@@ -2375,7 +2375,14 @@ export function init() {
     hideUntilChanged("scaleProfile", () =>
       R.command("/api/v1/diagnostic/scale-profile", { action: "delete" }),
     );
-  $("scaleProfileDownloadButton").onclick = () => downloadScaleProfile();
+  $("scaleProfileDownloadButton").onclick = () => R.downloadScaleProfile();
+  // The switch keeps the user's pick until its command settles.
+  $("scaleProfileAuto").onchange = ({ currentTarget: c }) => {
+    c.dataset.pending = 1;
+    R.command("/api/v1/diagnostic/scale-profile", { action: "auto", enabled: c.checked }).finally(
+      () => delete c.dataset.pending,
+    );
+  };
   $("heapMapDownload").onclick = () => (downloadHeapMap(), false);
   $("shotStorage").addEventListener("toggle", loadShotStorage);
   for (const [id, path] of [
@@ -2418,7 +2425,6 @@ function applyLoopTiming(s) {
   ].forEach((label, i) => add([label, recentReady ? ms(a[i]) : "—", peakReady ? ms(b[i]) : "—"]));
   fillRows($("loopTimingBody"), out);
 }
-let profileBusy = false;
 function applyScaleProfile(p) {
   const set = (key, value) => {
       $("hProfile" + key).textContent = value;
@@ -2438,9 +2444,12 @@ function applyScaleProfile(p) {
   ["Start", "Stop", "Delete", "Download"].forEach((key) => {
     $("scaleProfile" + key + "Button").disabled = !valid || !p["can" + key] || !R.webUiOwner;
   });
+  const auto = $("scaleProfileAuto");
+  auto.disabled = !valid || !R.webUiOwner;
+  if (!auto.dataset.pending) auto.checked = !!p?.autoStart;
   if (!valid) {
     set("State", error || __WEBUI_TEXT__("diagnostic.profile_unavailable"));
-    ["Elapsed", "Records", "Capacity", "Remaining"].forEach((key) => set(key, "—"));
+    ["Elapsed", "Records", "Capacity", "Window"].forEach((key) => set(key, "—"));
     return;
   }
   const SN = __WEBUI_TEXT__("diagnostic.profile_state_names").split("|"),
@@ -2458,18 +2467,14 @@ function applyScaleProfile(p) {
   set(
     "Capacity",
     p.recordCapacity
-      ? Math.floor((100 * (p.recordCount + (p.reservedRecords || 0))) / p.recordCapacity) + "%"
+      ? Math.floor((100 * p.recordCount) / p.recordCapacity) +
+          "%" +
+          (p.overwritten > 0
+            ? " · " + R.sub(__WEBUI_TEXT__("diagnostic.profile_overwritten"), [p.overwritten])
+            : "")
       : "—",
   );
-  const eta = p.estimatedRemainingMs;
-  set(
-    "Remaining",
-    p.state === "recording"
-      ? eta == null
-        ? __WEBUI_TEXT__("diagnostic.profile_estimating")
-        : "≈ " + formatUptime(Math.ceil(eta / 5e3) * 5e3)
-      : "—",
-  );
+  set("Window", p.windowMs > 0 ? formatUptime(p.windowMs) : "—");
   set(
     "Records",
     p.recordCount +
@@ -2482,16 +2487,6 @@ function applyScaleProfile(p) {
         ? " · " + __WEBUI_TEXT__("diagnostic.profile_incomplete").replace("{n}", p.lostCount)
         : ""),
   );
-}
-async function downloadScaleProfile() {
-  if (profileBusy) return;
-  profileBusy = true;
-  await downloadText(
-    R.apiBinary("/api/v1/diagnostic/scale-profile/download"),
-    "scale-profile.txt",
-    __WEBUI_TEXT__("diagnostic.profile_download_failed"),
-  );
-  profileBusy = false;
 }
 function updateCrashRow(s) {
   const misc = $("hResetHistory")?.closest(".statusColumn");

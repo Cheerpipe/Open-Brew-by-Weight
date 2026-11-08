@@ -284,6 +284,34 @@
   pairable = false;
   nodes.grindHintCard.hidden = false;
   assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint'], 'the grind hint holds no card back');
+  // A running scale recording shows its card until it stops, with no
+  // dismissal: Stop follows the Diagnostic page's gate, Download only this
+  // window's ownership.
+  Object.assign(home.R, {webUiOwner: true, diagnosticVisible: false,
+    adminUnlockedFor: (s) => !!s.adminUnlocked});
+  const recording = {...noCloud, scaleRecording: true};
+  shown(recording);
+  assert.equal(nodes.scaleRecCard.hidden, false);
+  assert.equal(nodes.scaleRecStop.disabled, true);
+  assert.equal(nodes.scaleRecDownload.disabled, false);
+  for (const gate of [{adminUnlocked: true}, {development: true}]) {
+    shown({...recording, ...gate});
+    assert.equal(nodes.scaleRecStop.disabled, false, JSON.stringify(gate));
+  }
+  home.R.diagnosticVisible = true;
+  shown(recording);
+  assert.equal(nodes.scaleRecStop.disabled, false);
+  home.R.webUiOwner = false;
+  shown(recording);
+  assert.ok(nodes.scaleRecStop.disabled && nodes.scaleRecDownload.disabled);
+  shown({...recording, scaleRecording: false});
+  assert.equal(nodes.scaleRecCard.hidden, true);
+  assert.ok(codeIncludes(rawPartialHtml.home, '<section id="scaleRecCard" class="homeCard warnHint" hidden>') &&
+      !partialHtml.home.includes('scaleRecDismiss') &&
+      codeIncludes(viewJs.home, 'R.command("/api/v1/diagnostic/scale-profile",{action:"stop"})') &&
+      codeIncludes(viewJs.home, '$("scaleRecDownload").onclick=()=>R.downloadScaleProfile();') &&
+      codeIncludes(rawRuntimeJs, 'apiBinary("/api/v1/diagnostic/scale-profile/download")'),
+      'The recording card stops through the Diagnostic action and downloads without stopping');
   assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&
       codeIncludes(rawPartialHtml.settings, 'id="recipeSettings"') &&
       !codeIncludes(rawPartialHtml.home, 'type="checkbox"'));

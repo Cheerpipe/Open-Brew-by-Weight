@@ -263,8 +263,8 @@
           <div id="hProfileCapacity">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.profile_remaining}}</strong>
-          <div id="hProfileRemaining">—</div>
+          <strong>{{webui:diagnostic.profile_window}}</strong>
+          <div id="hProfileWindow">—</div>
         </div>
         <p class="fieldHint">{{webui:diagnostic.profile_capacity_hint}}</p>
         <div class="metric">
@@ -299,6 +299,17 @@
           </button>
         </div>
         <p class="fieldHint">{{webui:diagnostic.start_replaces_recording}}</p>
+        <label
+          ><input
+            id="scaleProfileAuto"
+            class="scaleProfileCtl diagGate"
+            type="checkbox"
+            role="switch"
+          />
+          {{webui:diagnostic.profile_auto}}<small class="fieldHint"
+            >{{webui:diagnostic.profile_auto_hint}}</small
+          ></label
+        >
       </div>
     </details>
     <details class="cfgGroup" data-g="guards">

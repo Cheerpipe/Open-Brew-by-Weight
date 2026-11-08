@@ -1095,11 +1095,6 @@ bool statusJsonAppendTaskProfiler(size_t *used,
 
 bool statusJsonAppendScaleProfiler(size_t *used,
                                    const ScaleProfilerStatus &profile) {
-  char remaining[16] = "null";
-  if (profile.estimatedRemainingMs != UINT32_MAX) {
-    snprintf(remaining, sizeof(remaining), "%lu",
-             static_cast<unsigned long>(profile.estimatedRemainingMs));
-  }
   // The can* flags mirror the profiler's own guards so the browser and the
   // server can never disagree about availability.
   const bool busy = profile.downloading ||
@@ -1118,33 +1113,34 @@ bool statusJsonAppendScaleProfiler(size_t *used,
                 (profile.state == ScaleProfilerState::STOPPED &&
                  (profile.persistence == ScaleProfilerPersistence::FAILED ||
                   profile.persistence == ScaleProfilerPersistence::NONE)));
+  // A recording downloads its newest records without stopping.
   const bool canDownload =
-      !profile.downloading && profile.state != ScaleProfilerState::RECORDING &&
-      profile.state != ScaleProfilerState::PREPARING &&
-      (profile.state == ScaleProfilerState::SAVED ||
-       profile.state == ScaleProfilerState::STOPPED);
+      !profile.downloading && (profile.state == ScaleProfilerState::SAVED ||
+                               profile.state == ScaleProfilerState::STOPPED ||
+                               profile.state == ScaleProfilerState::RECORDING);
   return statusJsonAppend(
       used,
       "\"scaleProfile\":{\"state\":\"%s\",\"persistence\":\"%s\","
-      "\"elapsedMs\":%llu,\"recordCount\":%lu,\"recordCapacity\":%lu,"
-      "\"reservedRecords\":%u,\"estimatedRemainingMs\":%s,"
+      "\"elapsedMs\":%llu,\"windowMs\":%llu,\"recordCount\":%lu,"
+      "\"recordCapacity\":%lu,\"overwritten\":%lu,"
       "\"weightCount\":%lu,\"eventCount\":%lu,\"lostCount\":%lu,"
-      "\"stopReason\":\"%s\","
+      "\"stopReason\":\"%s\",\"autoStart\":%s,"
       "\"partitionAvailable\":%s,\"lastError\":\"%s\","
       "\"canStart\":%s,\"canStop\":%s,\"canDelete\":%s,\"canDownload\":%s}",
       scaleProfilerStateName(profile.state),
       scaleProfilerPersistenceName(profile.persistence),
       static_cast<unsigned long long>(profile.elapsedMs),
+      static_cast<unsigned long long>(profile.windowMs),
       static_cast<unsigned long>(profile.state == ScaleProfilerState::SAVED
                                      ? profile.savedRecordCount
                                      : profile.recordCount),
       static_cast<unsigned long>(SCALE_PROFILE_RECORD_CAPACITY),
-      profile.state == ScaleProfilerState::RECORDING ? 1U : 0U,
-      remaining,
+      static_cast<unsigned long>(profile.overwritten),
       static_cast<unsigned long>(profile.weightCount),
       static_cast<unsigned long>(profile.eventCount),
       static_cast<unsigned long>(profile.lostCount),
       scaleProfilerStopReasonName(profile.stopReason),
+      profile.autoStart ? "true" : "false",
       profile.partitionAvailable ? "true" : "false",
       scaleProfilerErrorName(profile.lastError),
       canStart ? "true" : "false", canStop ? "true" : "false",

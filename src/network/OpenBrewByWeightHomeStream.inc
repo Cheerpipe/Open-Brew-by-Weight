@@ -116,6 +116,8 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("snapshotStale", bool(control.snapshotStale));
   delta.field("webUiOverrideActive", bool(override));
   delta.field("liveShot", bool(control.activeCycle || control.relayClosed));
+  // Home's recording card: one fingerprint, sent only on start and stop.
+  delta.field("scaleRecording", bool(scaleProfiler().recording()));
   delta.field("machineType", "\"%s\"", compiledMachineTypeId());
   delta.field("diagnosticPageVisible", bool(diagnosticPageEnabled()));
   delta.field("compatibilityMode", bool(firmwareCompatibilityMode()));

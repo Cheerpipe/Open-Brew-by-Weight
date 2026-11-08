@@ -507,10 +507,14 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileHandler(httpd_req_t *request) {
   }
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   char action[16] = {};
-  static const char *const fields[] = {"action"};
+  bool enabled = false;
+  // "enabled" belongs to the automatic-session action alone.
+  static const char *const fields[] = {"action", "enabled"};
   const bool parsed =
-      root != nullptr && jsonHasOnlyUniqueFields(root, fields, 1) &&
-      jsonString(root, "action", action, sizeof(action), false);
+      root != nullptr && jsonHasOnlyUniqueFields(root, fields, 2) &&
+      jsonString(root, "action", action, sizeof(action), false) &&
+      (strcmp(action, "auto") == 0 ? jsonBoolean(root, "enabled", enabled)
+                                   : !jsonFieldPresent(root, "enabled"));
   cJSON_Delete(root);
   self.unlockJsonBody();
   WebCommandType type;
@@ -520,12 +524,18 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileHandler(httpd_req_t *request) {
     type = WebCommandType::SCALE_PROFILE_STOP;
   } else if (parsed && strcmp(action, "delete") == 0) {
     type = WebCommandType::SCALE_PROFILE_DELETE;
+  } else if (parsed && strcmp(action, "auto") == 0) {
+    type = WebCommandType::SCALE_PROFILE_AUTO;
   } else {
     return sendError(request, STATUS_UNPROCESSABLE, "INVALID_PROFILE_ACTION",
                      nullptr, "OTA_ACTION_INVALID");
   }
   WebCommand command;
   command.type = type;
+  if (type == WebCommandType::SCALE_PROFILE_AUTO) {
+    command.bleScan.specified = BleScanCommandPayload::AUTO_SCALE_RECORD;
+    command.bleScan.autoScaleRecord = enabled ? 1 : 0;
+  }
   command.requestId = self.allocateRequestId();
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
@@ -579,9 +589,9 @@ class ScaleProfileTextSink {
 
 constexpr size_t SCALE_PROFILE_DOWNLOAD_BATCH =
     FLASH_IO_CHUNK_BYTES / SCALE_PROFILE_RECORD_BYTES;
-// Internal staging for one batch of flash-sourced records; lives for the
-// whole handler call so httpd only ever sees stable bytes.
-uint8_t scaleProfileDownloadBatch[FLASH_IO_CHUNK_BYTES];
+// Internal staging for one batch of records (RAM copies are taken in one
+// short capture-lock hold); httpd only ever sees the formatted lines.
+ScaleProfileRecord scaleProfileDownloadBatch[SCALE_PROFILE_DOWNLOAD_BATCH];
 
 void copyScaleProfileContextText(char *destination, size_t capacity,
                                  const char *source) {
@@ -603,6 +613,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
                      nullptr, "SCALE_PROFILE_BUSY");
   }
   const bool fromRam = scaleProfiler().downloadFromRam();
+  const bool live = fromRam && scaleProfiler().downloadLive();
   const ScaleProfilerStatus status = scaleProfiler().status(millis());
   uint32_t recordCount = 0;
   uint32_t sessionId = status.sessionId;
@@ -612,6 +623,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
   uint32_t weightCount = 0;
   uint32_t eventCount = 0;
   uint32_t utcStartSec = 0;
+  uint32_t omittedCount = 0;
   char context[SCALE_PROFILE_CONTEXT_BYTES + 1];
   bool valid = false;
   if (fromRam) {
@@ -620,6 +632,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
     weightCount = header.weightCount;
     eventCount = header.eventCount;
     utcStartSec = header.startWallUtcSec;
+    omittedCount = header.omittedCount;
     scaleProfiler().copyDownloadContext(context, sizeof(context));
     valid = recordCount != 0;
   } else {
@@ -634,6 +647,7 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
       weightCount = header.weightCount;
       eventCount = header.eventCount;
       utcStartSec = header.startWallUtcSec;
+      omittedCount = header.omittedCount;
       copyScaleProfileContextText(context, sizeof(context), header.context);
       valid = recordCount != 0;
       if (valid && !scaleProfiler().storeVerifyChecksum(header)) {
@@ -669,17 +683,21 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
                         static_cast<unsigned long long>(durationMs),
                         scaleProfilerStopReasonName(
                             static_cast<ScaleProfilerStopReason>(stopReason)));
-  ok = ok && sink.linef("records=%lu weights=%lu events=%lu losses=%lu",
+  // Weights and events count the whole session; overwritten counts its older
+  // records this file does not hold.
+  ok = ok && sink.linef("records=%lu weights=%lu events=%lu losses=%lu overwritten=%lu",
                         static_cast<unsigned long>(recordCount),
                         static_cast<unsigned long>(weightCount),
                         static_cast<unsigned long>(eventCount),
-                        static_cast<unsigned long>(lostCount));
+                        static_cast<unsigned long>(lostCount),
+                        static_cast<unsigned long>(omittedCount));
   if (ok) {
     const char *savedLabel =
-        fromRam ? (status.persistence == ScaleProfilerPersistence::FAILED
-                       ? "no (save failed)"
-                       : "no (not yet saved)")
-                : "yes";
+        live ? "no (recording)"
+        : fromRam ? (status.persistence == ScaleProfilerPersistence::FAILED
+                         ? "no (save failed)"
+                         : "no (not yet saved)")
+                  : "yes";
     ok = sink.linef("saved=%s", savedLabel) &&
          sink.linef("units=grams precision=float32 time=sessionMs");
   }
@@ -691,36 +709,32 @@ esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(
     if (end == nullptr) break;
     c = end + 1;
   }
-  ScaleProfileRecord record;
-  for (uint32_t index = 0; ok && index < recordCount; ++index) {
+  // A live window ends early when the recording overwrites a record before
+  // it is sent; the trailer says how many were left out.
+  uint32_t sent = 0;
+  while (ok && sent < recordCount) {
+    const size_t wanted =
+        std::min<size_t>(SCALE_PROFILE_DOWNLOAD_BATCH, recordCount - sent);
+    size_t count = wanted;
     if (fromRam) {
-      record = scaleProfiler().downloadRecordAt(index);
+      count = scaleProfiler().downloadRecords(sent, scaleProfileDownloadBatch, wanted);
     } else {
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
-      if (index % SCALE_PROFILE_DOWNLOAD_BATCH == 0) {
-        const size_t count =
-            index + SCALE_PROFILE_DOWNLOAD_BATCH < recordCount
-                ? SCALE_PROFILE_DOWNLOAD_BATCH
-                : static_cast<size_t>(recordCount - index);
-        if (!scaleProfiler().storeReadRecords(index, scaleProfileDownloadBatch,
-                                              count)) {
-          ok = false;
-          break;
-        }
-      }
-      memcpy(&record,
-             scaleProfileDownloadBatch +
-                 (index % SCALE_PROFILE_DOWNLOAD_BATCH) *
-                     SCALE_PROFILE_RECORD_BYTES,
-             sizeof(record));
+      ok = scaleProfiler().storeReadRecords(
+          sent, reinterpret_cast<uint8_t *>(scaleProfileDownloadBatch), wanted);
 #endif
     }
-    const size_t length = formatScaleProfileRow(line, sizeof(line), record);
-    if (length == 0) {
-      ok = false;
-    } else {
-      ok = sink.line(line, length);
+    for (size_t i = 0; ok && i < count; ++i) {
+      const size_t length =
+          formatScaleProfileRow(line, sizeof(line), scaleProfileDownloadBatch[i]);
+      ok = length != 0 && sink.line(line, length);
     }
+    sent += static_cast<uint32_t>(count);
+    if (count < wanted) break;
+  }
+  if (ok && sent < recordCount) {
+    ok = sink.linef("# truncated: %lu records overwritten during download",
+                    static_cast<unsigned long>(recordCount - sent));
   }
   const bool flushed = sink.flush();
   const esp_err_t finished =

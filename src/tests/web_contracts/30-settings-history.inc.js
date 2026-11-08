@@ -369,7 +369,8 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
       !codeIncludes(ui, 'id="hProfileElapsed"') ||
       !codeIncludes(ui, 'id="hProfileRecords"') ||
       !codeIncludes(ui, 'id="hProfileCapacity"') ||
-      !codeIncludes(ui, 'id="hProfileRemaining"') ||
+      !codeIncludes(ui, 'id="hProfileWindow"') ||
+      !codeIncludes(ui, 'id="scaleProfileAuto"') ||
       !codeIncludes(ui, 'id="scaleProfileStartButton"') ||
       !codeIncludes(ui, 'id="scaleProfileStopButton"') ||
       !codeIncludes(ui, 'id="scaleProfileDeleteButton"') ||
@@ -617,38 +618,41 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
   const assert = require('assert').strict;
   const source = viewJs.diagnostic;
   const nodes = Object.fromEntries(['hProfileState', 'hProfileElapsed', 'hProfileRecords',
-    'hProfileCapacity', 'hProfileRemaining', 'scaleProfileStartButton', 'scaleProfileStopButton',
-    'scaleProfileDeleteButton', 'scaleProfileDownloadButton'].map(id => [id, {}]));
-  const runtime = {webUiOwner: true, formatUptime: ms => `${ms / 1000}s`};
+    'hProfileCapacity', 'hProfileWindow', 'scaleProfileStartButton', 'scaleProfileStopButton',
+    'scaleProfileDeleteButton', 'scaleProfileDownloadButton', 'scaleProfileAuto'].map(id => [id, {dataset: {}}]));
+  const runtime = {webUiOwner: true, formatUptime: ms => `${ms / 1000}s`,
+    sub: (t, v) => t.replace(/\{(\d)\}/g, (_, i) => v[+i])};
   const render = new Function('$', 'R', '__WEBUI_TEXT__', 'const {formatUptime} = R;' +
     source.slice(source.indexOf('function applyScaleProfile('),
-      source.indexOf('async function downloadScaleProfile(')) + ';return applyScaleProfile;')(
+      source.indexOf('function updateCrashRow(')) + ';return applyScaleProfile;')(
       id => nodes[id], runtime, key => key);
   const profile = {state: 'recording', partitionAvailable: true, persistence: 'none',
-    recordCount: 4095, recordCapacity: 8192, recordBytes: 32, reservedRecords: 1,
-    elapsedMs: 181000, estimatedRemainingMs: 61100, canStop: true,
-    weightCount: 4000, eventCount: 95, lostCount: 0};
+    recordCount: 8192, recordCapacity: 16384, overwritten: 0, windowMs: 181000,
+    elapsedMs: 181000, canStop: true, canDownload: true, autoStart: false,
+    weightCount: 8000, eventCount: 192, lostCount: 0};
   render(profile);
   assert.equal(nodes.hProfileElapsed.textContent, '181s');
   assert.equal(nodes.hProfileCapacity.textContent, '50%');
-  assert.equal(nodes.hProfileRemaining.textContent, '≈ 65s');
+  assert.equal(nodes.hProfileWindow.textContent, '181s');
   assert.equal(nodes.scaleProfileStopButton.disabled, false);
-  render({...profile, elapsedMs: 3600000, estimatedRemainingMs: 59300});
-  assert.equal(nodes.hProfileCapacity.textContent, '50%');
-  assert.equal(nodes.hProfileRemaining.textContent, '≈ 60s');
-  for (const estimatedRemainingMs of [null, undefined]) {
-    render({...profile, estimatedRemainingMs});
-    assert.equal(nodes.hProfileRemaining.textContent, 'Estimating…');
-  }
-  render({...profile, recordCount: 8189});
-  assert.match(nodes.hProfileCapacity.textContent, /^99%/);
-  render({...profile, recordCount: 8191, estimatedRemainingMs: 0});
-  assert.match(nodes.hProfileCapacity.textContent, /^100%/);
-  assert.equal(nodes.hProfileRemaining.textContent, '≈ 0s');
-  render({...profile, state: 'stopped', reservedRecords: 0});
-  assert.match(nodes.hProfileCapacity.textContent, /^49%/);
-  assert.equal(nodes.hProfileRemaining.textContent, '—');
-  render({...profile, state: 'saved', recordCount: 4096, reservedRecords: 0});
+  // A recording downloads without stopping.
+  assert.equal(nodes.scaleProfileDownloadButton.disabled, false);
+  assert.equal(nodes.scaleProfileAuto.checked, false);
+  // A full ring keeps recording and says how many older records it dropped.
+  render({...profile, recordCount: 16384, overwritten: 4200, windowMs: 1500000, elapsedMs: 3600000});
+  assert.equal(nodes.hProfileCapacity.textContent, '100% · 4200 older records overwritten');
+  assert.equal(nodes.hProfileWindow.textContent, '1500s');
+  assert.equal(nodes.hProfileElapsed.textContent, '3600s');
+  render({...profile, windowMs: 0});
+  assert.equal(nodes.hProfileWindow.textContent, '—');
+  // The automatic switch follows the controller unless a change is pending.
+  render({...profile, autoStart: true});
+  assert.equal(nodes.scaleProfileAuto.checked, true);
+  nodes.scaleProfileAuto.dataset.pending = 1;
+  render({...profile, autoStart: false});
+  assert.equal(nodes.scaleProfileAuto.checked, true);
+  delete nodes.scaleProfileAuto.dataset.pending;
+  render({...profile, state: 'saved', recordCount: 8192});
   assert.match(nodes.hProfileCapacity.textContent, /^50%/);
   render({...profile, state: 'stopped', persistence: 'failed', lastError: 'save_failed', canDownload: true});
   assert.match(nodes.hProfileState.textContent, /Could not save the recording/);
@@ -656,18 +660,22 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
   render({...profile, partitionAvailable: false, lastError: 'no_partition'});
   assert.equal(nodes.hProfileState.textContent, 'Recording storage unavailable');
   assert.equal(nodes.scaleProfileStopButton.disabled, true);
+  assert.equal(nodes.scaleProfileAuto.disabled, true);
   render({...profile, lastError: 'none'});
   assert(!nodes.hProfileState.textContent.includes('Could not'));
   runtime.webUiOwner = false;
   render(profile);
   assert.equal(nodes.scaleProfileStopButton.disabled, true);
+  assert.equal(nodes.scaleProfileAuto.disabled, true);
   render({...profile, state: 'saved', canDownload: true});
   assert.equal(nodes.scaleProfileDownloadButton.disabled, true);
   render(null);
   assert.equal(nodes.hProfileCapacity.textContent, '—');
-  assert.equal(nodes.hProfileRemaining.textContent, '—');
-  for (const name of ['lastError', 'reservedRecords', 'estimatedRemainingMs'])
+  assert.equal(nodes.hProfileWindow.textContent, '—');
+  for (const name of ['lastError', 'overwritten', 'windowMs', 'autoStart'])
     assert.ok(network.includes(`\\"${name}\\"`), `Missing profiler status field ${name}`);
+  for (const name of ['reservedRecords', 'estimatedRemainingMs'])
+    assert.ok(!network.includes(`\\"${name}\\"`), `Retired profiler status field ${name}`);
   assert.ok(!source.includes('p.durationLimitMs'), 'Profiler UI must not display a fixed deadline');
 }
 {

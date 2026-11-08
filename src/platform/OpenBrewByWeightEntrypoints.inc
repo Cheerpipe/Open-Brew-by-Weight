@@ -85,13 +85,61 @@ void recoverShotTraceAtBoot(uint32_t resetReason) {
                          static_cast<unsigned long>(interruptedBootId));
 }
 
+// Automatic sessions decide once per scale connection and log the outcome to
+// the Web UI log. A restart the busy profiler refuses (a download streams, a
+// flash step runs) is retried on the next tick; a user request goes first.
 void serviceScaleProfiler(uint32_t now) {
-  const ScaleProfilerRequest request = scaleProfileRequest.exchange(
+  static ScaleProfileAutoSession autoSession;
+  ScaleProfilerRequest request = scaleProfileRequest.exchange(
       ScaleProfilerRequest::NONE, std::memory_order_acq_rel);
+  ScaleProfileAutoReason decision = ScaleProfileAutoReason::NONE;
+  uint32_t connection = 0;
+  {
+    const ScaleLinkSnapshot link = getScaleLinkSnapshot();
+    ControlGateSnapshot gate;
+    copyControlGate(gate);
+    connection = link.connectionGeneration;
+    decision = autoSession.observe(link.state == ScaleLinkState::CONNECTED, connection,
+                                   link.lastDisconnectReason, scaleProfiler().recording(),
+                                   gate.activeCycle, now);
+  }
+  const bool autoOn = scaleProfiler().autoStart();
+  const bool restart = autoOn && scaleProfileAutoRestarts(decision) &&
+                       request == ScaleProfilerRequest::NONE;
+  const uint32_t sessionBefore = restart ? scaleProfiler().status(now).sessionId : 0;
+  if (restart) request = ScaleProfilerRequest::RESTART;
   const ScaleProfilerWork work = scaleProfiler().service(request, now);
   if (work != ScaleProfilerWork::NONE && !dispatchScaleProfileWork()) {
     scaleProfiler().noteWorkDispatchFailed();
   }
+  if (decision == ScaleProfileAutoReason::NONE) return;
+  const unsigned long id = connection;
+  if (restart) {
+    const ScaleProfilerStatus after = scaleProfiler().status(now);
+    const bool started = after.state == ScaleProfilerState::PREPARING ||
+                         after.sessionId != sessionBefore;
+    if (!started && after.lastError == ScaleProfilerError::BUSY) return;
+    if (started)
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                           "Scale recording started automatically (scale connection "
+                           "%lu, reason: %s)", id, scaleProfileAutoReasonName(decision));
+    else
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                           "Scale recording could not start automatically (scale "
+                           "connection %lu): %s", id, scaleProfilerErrorName(after.lastError));
+  } else if (autoOn && scaleProfileAutoRestarts(decision)) {
+    return;  // A user request went first; decide again on the next tick.
+  } else if (decision == ScaleProfileAutoReason::BREWING && autoOn) {
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                         "Scale recording not restarted: scale connection %lu "
+                         "arrived during a brew cycle", id);
+  } else if (autoOn) {
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                         "Scale recording continued across a lost link (scale "
+                         "connection %lu, %s)", id,
+                         scaleDisconnectReasonDebugName(autoSession.downReason()));
+  }
+  autoSession.served(connection);
 }
 
 void healthWorkerTask(void *) {
@@ -358,6 +406,8 @@ void startAfterBootRecovery() {
   // Bluetooth setting; re-enabling the firmware restores it untouched.
   applyLiveBleEnabled(!firmwareCompatibilityMode() &&
                       bleScanPersistedSettings.enabled != 0);
+  scaleProfiler().setAutoStart(bleScanPersistedSettings.autoScaleRecord ==
+                               BLE_SCAN_AUTO_SCALE_RECORD_ON);
   if (settingsLoaded) {
     runtimeConfig = persistedSettings.runtime;
     bullseyeMelodyConfig = persistedSettings.bullseyeMelody;

@@ -318,14 +318,19 @@ flash progress back to each live store even when newer RAM edits remain dirty,
 so the next snapshot advances from the committed physical state. ShotLog and
 History keep their two-slot generations. The manual scale
 profiler follows the same deferred pattern: the health worker owns one
-bounded PSRAM capture of raw decoded weights plus correlated firmware
-decisions, and the persistence worker commits the completed trace to a
-dedicated flash partition with the validity-bearing header written last.
-Capture ends at record capacity or on request, with a reserved terminal slot;
-there is no elapsed-time cutoff. Its 256 KiB PSRAM payload and 256 KiB flash
-payload hold the same trace, so they are not additive capacity. The health
-worker maintains a constant-memory, time-based EWMA of record growth for the
-advisory remaining-time estimate. Persistence state remains separate from
+PSRAM capture of raw decoded weights plus correlated firmware decisions, and
+the persistence worker commits a user-stopped trace to a dedicated flash
+partition with the validity-bearing header written last. The capture is a
+512 KiB ring of 16,384 records that overwrites its oldest record, so it ends
+only on request or when an opt-in automatic session replaces it; the health
+worker decides that once per scale connection from the link snapshot
+(restart after the scale's own power-off or a 30-minute gap, continue across
+a lost link, never during a brew cycle) and a superseded session is never
+saved. The unchanged 256 KiB flash payload keeps the newest 8,192 records in
+time order. The network task may download a running capture: it freezes a
+window that leaves the writer 1,024 slots of headroom, orders it outside the
+capture lock from keys copied in short lock holds, and ends the stream if the
+writer overtakes an unsent record. Persistence state remains separate from
 capture occupancy. Existing record/header fields extend timestamps without
 changing the 32-byte record size or partition layout; see the
 [diagnostic API](INTEGRATION_API.md#post-apiv1diagnosticscale-profile). Independently

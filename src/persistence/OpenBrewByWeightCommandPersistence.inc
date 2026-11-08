@@ -205,12 +205,14 @@ bool resetAllDurableStoresForNetwork(PersistedSettings &settings) {
   }
   scaleProfileRequest.store(ScaleProfilerRequest::NONE,
                             std::memory_order_release);
+  scaleProfiler().setAutoStart(false);
   // Drop transient dirty state only after the durable factory reset succeeds.
   // A staged scan setting must not survive the reset's default write.
   clearLastShotRuntimeState();
   bleScanPersistMux.lock();
   bleScanPersistPending = false;
   bleScanEnabledPersistPending = false;
+  bleScanAutoScaleRecordPersistPending = false;
   pendingBleScanRequestIdCount = 0;
   bleScanPersistFailLatched = false;
   bleScanPersistMux.unlock();
@@ -1118,9 +1120,11 @@ bool serviceBleScanPersist() {
   // Host harness: no NVS layer; a staged change completes immediately.
   bleScanPersistMux.lock();
   const bool pending = bleScanPersistPending ||
-                       bleScanEnabledPersistPending;
+                       bleScanEnabledPersistPending ||
+                       bleScanAutoScaleRecordPersistPending;
   bleScanPersistPending = false;
   bleScanEnabledPersistPending = false;
+  bleScanAutoScaleRecordPersistPending = false;
   bleScanPersistResultOk = true;
   bleScanPersistResultReady = pending;
   bleScanPersistMux.unlock();
@@ -1129,17 +1133,21 @@ bool serviceBleScanPersist() {
   bleScanPersistMux.lock();
   const bool pending = bleScanPersistPending;
   const bool enabledPending = bleScanEnabledPersistPending;
-  // An unstaged field keeps its durable value, so both share one save.
+  const bool autoPending = bleScanAutoScaleRecordPersistPending;
+  // An unstaged field keeps its durable value, so all share one save.
   const uint8_t intensity = pending ? bleScanPersistIntensity
                                     : bleScanPersistedSettings.scanIntensity;
   const uint8_t enabled = enabledPending ? bleScanPersistEnabled
                                          : bleScanPersistedSettings.enabled;
+  const bool autoRecord =
+      autoPending ? bleScanPersistAutoScaleRecord
+                  : bleScanPersistedSettings.autoScaleRecord == BLE_SCAN_AUTO_SCALE_RECORD_ON;
   bleScanPersistMux.unlock();
-  if (!pending && !enabledPending) {
+  if (!pending && !enabledPending && !autoPending) {
     return true;
   }
-  const bool ok =
-      persistBleScanSettings(bleScanPersistedSettings, intensity, enabled != 0);
+  const bool ok = persistBleScanSettings(bleScanPersistedSettings, intensity,
+                                         enabled != 0, autoRecord);
   bleScanPersistMux.lock();
   if (ok && pending && bleScanPersistIntensity == intensity) {
     // A newer staged value stays pending for the next idle pass.
@@ -1147,6 +1155,9 @@ bool serviceBleScanPersist() {
   }
   if (ok && enabledPending && bleScanPersistEnabled == enabled) {
     bleScanEnabledPersistPending = false;
+  }
+  if (ok && autoPending && bleScanPersistAutoScaleRecord == autoRecord) {
+    bleScanAutoScaleRecordPersistPending = false;
   }
   bleScanPersistResultOk = ok;
   bleScanPersistResultReady = true;

@@ -513,22 +513,24 @@ void p82_ble_scan_strict_versions_and_roundtrip() {
 
   CHECK(persistBleScanSettings(
       loaded, static_cast<uint8_t>(BleScanIntensity::AGGRESSIVE),
-      loaded.enabled != 0));
+      loaded.enabled != 0, false));
   BleScanPersistedSettings reloaded;
   CHECK(loadBleScanSettings(reloaded));
   CHECK(reloaded.scanIntensity ==
         static_cast<uint8_t>(BleScanIntensity::AGGRESSIVE));
 
-  // Both remaining fields in one call cost a single revision bump.
+  // All remaining fields in one call cost a single revision bump.
   const uint32_t revisionBefore = loaded.revision;
   CHECK(persistBleScanSettings(loaded,
                                static_cast<uint8_t>(BleScanIntensity::RELAXED),
-                               false));
+                               false, true));
   CHECK(loadBleScanSettings(reloaded));
   CHECK(reloaded.revision == revisionBefore + 1);
   CHECK(reloaded.scanIntensity ==
         static_cast<uint8_t>(BleScanIntensity::RELAXED));
   CHECK(reloaded.enabled == 0);
+  CHECK(reloaded.autoScaleRecord == BLE_SCAN_AUTO_SCALE_RECORD_ON);
+  CHECK(!verifyFactoryBleScanSettings(reloaded));
 
   BleScanPersistedSettings factory;
   finalizeBleScanSettings(factory);
@@ -537,31 +539,31 @@ void p82_ble_scan_strict_versions_and_roundtrip() {
 
 void p82b_ble_scan_legacy_minute_bytes_stay_readable() {
   // Firmware that stored the removed backoff/boost minutes wrote non-zero
-  // bytes where reserved0/reserved1 now sit. Those blobs must stay loadable,
-  // their reserved values must be ignored, and the next durable write must
-  // clear them on disk.
+  // bytes where autoScaleRecord/reserved1 now sit. Those blobs must stay
+  // loadable, the minutes must never read as automatic recording, and the
+  // next durable write must clear them on disk.
   resetHostPersistence();
   BleScanPersistedSettings legacy;
   CHECK(saveBleScanSettings(legacy));
-  legacy.reserved0 = 30;
+  legacy.autoScaleRecord = 240;
   legacy.reserved1 = 15;
   legacy.checksum = bleScanSettingsChecksum(legacy);
   persistence_host::putRaw(SETTINGS_NAMESPACE, BLE_SCAN_SLOT_A,
                            &legacy, sizeof(legacy));
   BleScanPersistedSettings loaded;
   CHECK(loadBleScanSettings(loaded));
-  CHECK(loaded.reserved0 == 0 && loaded.reserved1 == 0);
+  CHECK(loaded.autoScaleRecord == 0 && loaded.reserved1 == 0);
   CHECK(loaded.scanIntensity == legacy.scanIntensity);
   CHECK(loaded.enabled == 1);
   // The next durable write also clears the obsolete bytes on disk.
   CHECK(persistBleScanSettings(
       loaded, static_cast<uint8_t>(BleScanIntensity::RELAXED),
-      loaded.enabled != 0));
+      loaded.enabled != 0, false));
   BleScanPersistedSettings onDisk;
   CHECK(readLatestBleScanSettings(onDisk));
   CHECK(onDisk.scanIntensity ==
         static_cast<uint8_t>(BleScanIntensity::RELAXED));
-  CHECK(onDisk.reserved0 == 0 && onDisk.reserved1 == 0);
+  CHECK(onDisk.autoScaleRecord == 0 && onDisk.reserved1 == 0);
 }
 
 void p65_factory_settings_survives_second_slot_write_fail() {
@@ -1665,7 +1667,7 @@ void p48_ble_scan_defaults_and_dual_slot_round_trip() {
   // The master switch shares the combined save; disabled is durable.
   CHECK(persistBleScanSettings(loaded,
                                static_cast<uint8_t>(BleScanIntensity::AGGRESSIVE),
-                               false));
+                               false, false));
   CHECK(readLatestBleScanSettings(onDisk));
   CHECK(onDisk.version == BLE_SCAN_SETTINGS_VERSION);
   CHECK(onDisk.enabled == 0);

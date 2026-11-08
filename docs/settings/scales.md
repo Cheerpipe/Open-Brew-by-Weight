@@ -314,9 +314,10 @@ When a scale misbehaves in a way settings cannot explain, the diagnostic page
 can record a trace of everything the scale sends and every tare, cup,
 touch, and first-drop decision that follows. See
 [the diagnostic guide](../FAQ.md)
-for how to start, stop, and download the recording. Capture lasts until its
-recording space fills or you stop it; the page shows capacity used, elapsed
-time, and a smoothed estimate of time remaining based on the arriving data.
+for how to start, stop, and download the recording, and for the option that
+starts a new recording each time the scale connects. A recording runs until
+you stop it: once its space is full, the oldest records make room for new
+ones, and the page shows how much time the held records cover.
 
 Use **Diagnostic → Scale recording** to investigate unexpected cup detection,
 tare, or weight-controlled brewing. Start a capture, reproduce the behavior,
@@ -335,8 +336,9 @@ unchanged states. The recording cannot recover events that happened before
 you started it. Cup events describe what the controller detected from the
 weight, rather than an independent measurement of the physical cup.
 
-A capture can also stop when its buffer fills. A busy session fills it sooner
-because weights and state changes share that space. Check the stop reason and
-lost-record count before treating a trace as complete. Completed captures are
-saved when safe and survive a restart; the download indicates whether saving
-has completed. Starting another capture replaces the previous one.
+A busy session covers less time because weights and state changes share the
+same space, so download soon after reproducing the problem. You can download
+while the recording keeps running; the file's header says whether it was
+still recording and how many older records it no longer holds. A recording
+you stop is saved when safe and survives a restart; the saved copy keeps its
+newest part. Starting another recording replaces the previous one.

@@ -90,6 +90,12 @@ dialog .btnBar {
   border-left-color: var(--bd);
 }
 
+/* A diagnostic recording runs in the background: a yellow, notice-level edge. */
+.warnHint {
+  border-left-color: var(--lw);
+  background: var(--mw);
+}
+
 .resultFailed {
   border-left-color: var(--dn);
 }

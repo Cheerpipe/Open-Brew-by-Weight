@@ -77,6 +77,14 @@ int main(){
   assert(scale()==empty);
   profile.downloading=true;assert(scale()!=empty);puts(scale().c_str());
   profile.downloading=false;profile.lastError=ScaleProfilerError::ALLOCATION;puts(scale().c_str());
+  // A recording downloads without stopping and reports its rolling window.
+  profile.lastError=ScaleProfilerError::NONE;profile.state=ScaleProfilerState::RECORDING;
+  profile.autoStart=true;profile.overwritten=7;profile.windowMs=1500;
+  const auto recording=scale();
+  for(const char *field:{"\\"canDownload\\":true","\\"canStop\\":true","\\"canStart\\":false",
+      "\\"autoStart\\":true","\\"overwritten\\":7","\\"windowMs\\":1500"})
+    assert(recording.find(field)!=std::string::npos);
+  profile.downloading=true;assert(scale().find("\\"canDownload\\":false")!=std::string::npos);
   ShotLogRecord record{};record.id=1;record.bootId=9;record.goalWeightDg=400;record.actualWeightCg=4200;
   record.errorCg=200;record.avgFlowCgS=SHOT_LOG_METRIC_MISSING;
   record.firstDropDs=record.tareAtDs=SHOT_LOG_METRIC_MISSING;
@@ -166,8 +174,11 @@ int main(){
   assert(!(('averageExecutionUs') in scaleRow));
   assert(('averageExecutionUs') in full.rows.find((r) => r.name === 'scaleWorker/sec'));
   assert(Buffer.byteLength(JSON.stringify(full))-Buffer.byteLength(JSON.stringify(live)) >= 1000);
-  for (const key of ['generation','sessionId','durationLimitMs','recordBytes','complete','downloading'])
+  for (const key of ['generation','sessionId','durationLimitMs','recordBytes','complete','downloading',
+      'reservedRecords','estimatedRemainingMs'])
     assert(!(key in empty.scaleProfile), key);
+  assert.equal(empty.scaleProfile.autoStart, false);
+  assert.equal(empty.scaleProfile.overwritten, 0);
   assert.equal(empty.scaleProfile.canStart, true);
   assert.equal(busy.scaleProfile.canStart, false);
   assert.equal(failed.scaleProfile.lastError, 'allocation');

@@ -858,41 +858,72 @@ retained window.
 
 ### `POST /api/v1/diagnostic/scale-profile`
 
-Starts, stops, or deletes the manual scale profile capture. Requires the
-exclusive Web UI claim like every owned API route. The body is
-`{"action":"start"}` or `{"action":"stop"}` or `{"action":"delete"}`; replies
-`202 Accepted` with a request id that follows the common acknowledgement
-rules. Bounded state (including `state`, `persistence`, counts, `stopReason`,
-`lostCount`, and `canStart`/`canStop`/`canDelete`/`canDownload`) is reported
-as `scaleProfile` in the diagnostic status document.
+Starts, stops, or deletes the scale profile capture, or turns automatic
+sessions on or off. Requires the exclusive Web UI claim like every owned API
+route. The body is `{"action":"start"}`, `{"action":"stop"}`,
+`{"action":"delete"}`, or `{"action":"auto","enabled":true|false}`
+(`enabled` is accepted with `auto` only); replies `202 Accepted` with a
+request id that follows the common acknowledgement rules. `auto` is a
+persisted setting (off by default, cleared by factory reset): its result
+reaches `persisted` once the settings_persist worker has written it, and it
+is refused like other configuration changes while configuration is locked.
+Bounded state (including `state`, `persistence`, counts, `stopReason`,
+`lostCount`, `autoStart`, and `canStart`/`canStop`/`canDelete`/`canDownload`)
+is reported as `scaleProfile` in the diagnostic status document.
 
-Capture has no duration cutoff: it stops on explicit request or when all
-ordinary record slots are occupied, preserving one slot for the closing event.
-The existing numeric `durationLimitMs` field is deprecated and is always `0`
-(no limit). `elapsedMs` reports elapsed capture time independently of capacity.
+Capture has no duration or capacity cutoff: the records form a 16,384-slot
+ring that overwrites its oldest record once full, so a capture ends only on
+request (`user`) or when an automatic session replaces it (`superseded`,
+never saved). `elapsedMs` reports elapsed capture time. A user Stop saves the
+newest 8,192 records in time order (the flash payload is unchanged); a
+superseded session never touches flash.
+
+With `autoStart` on, the health worker decides once per scale connection: a
+new session starts when none is recording, when the scale ended the previous
+link itself (`REMOTE_DISCONNECTED`, the scale's power-off), or when the link
+was down for 30 minutes or more; any other reconnection continues the running
+session, and a running session is never restarted while a brew cycle is
+active (a connection that finds no session recording starts one even then). The
+disconnect reason is latched when the link drops, before reconnection scans
+replace it. A restart refused while a download streams or a flash step runs is
+retried on the next tick. Every decision is written to the log (and so to the
+Web UI log) with its reason.
 
 | Status field | Meaning |
 | --- | --- |
-| `recordCount` / `recordCapacity` | Accepted records in the current or saved capture / total payload slots (8,192). Empty/preparing states expose zero current records. |
-| `recordBytes` | Fixed stored record size, 32 bytes; downloaded text size is unrelated. |
-| `reservedRecords` | One terminal slot while recording, zero otherwise. Capacity used is `(recordCount + reservedRecords) / recordCapacity`. |
-| `estimatedRemainingMs` | Smoothed estimate until capture capacity fills, or JSON `null` until enough data arrives, after a sustained stall, or outside recording. Full captures report zero. It never acts as a deadline. |
+| `recordCount` / `recordCapacity` | Records held by the current capture, or saved in flash (at most 8,192) / ring slots (16,384). Empty/preparing states expose zero current records. |
+| `overwritten` | Older records of the session that are no longer held: overwritten by the ring, or, once saved, also those left out of the flash payload. |
+| `windowMs` | Time between the oldest and the newest record held in memory; zero when none are held (empty, or saved and released). |
+| `autoStart` | Whether automatic sessions are on. |
+| `weightCount` / `eventCount` | Weights and events appended over the whole session, including overwritten ones. |
+| `lostCount` | Records the capture refused; the ring refuses none, so new captures report zero. |
 
-The estimate is maintained by the firmware independently of status polling. It
-uses all accepted records, samples growth about once per second, and smooths
-the rate with a five-second exponential time constant. Initialization requires
-at least five seconds and ten records after the initial state snapshot; five
-seconds without progress invalidates it. A new session resets the estimate.
-`persistence` remains the authority for pending/saving/saved/failed state:
-recorded bytes are not claimed as durable before the save completes.
+`canDownload` is true while recording as well. `persistence` remains the
+authority for pending/saving/saved/failed state: recorded bytes are not
+claimed as durable before the save completes.
 
 ### `GET /api/v1/diagnostic/scale-profile/download`
 
-Streams the most recent completed capture as a chunked `text/plain`
+Streams the current or most recent capture as a chunked `text/plain`
 attachment (`Content-Disposition: attachment`,
-`Cache-Control: no-store`). Disabled while a capture is recording; a trace
-that stopped but has not finished saving downloads from memory and is labeled
-accordingly. Concurrent Start/Delete are refused while the download streams.
+`Cache-Control: no-store`). A trace that stopped but has not finished saving
+downloads from memory and is labeled accordingly; Start, Delete and automatic
+restarts are refused while the download streams, while Stop is not.
+
+A recording downloads without stopping. The handler freezes a window of the
+newest held records (all but the 1,024 oldest ring slots, which give the
+writer room while the window is ordered), orders it outside the capture lock
+from keys copied in short lock holds, and reads it in batches of 32. The
+header says `saved=no (recording)` and `stopReason=none`, and `durationMs` is
+the elapsed time at the request. If the recording overwrites a record before
+it is sent, the stream ends with
+`# truncated: N records overwritten during download`, where `N` counts the
+records of the window that were not sent. A Stop during such a download
+delays the save until the download ends.
+
+The `records=` header line also carries `overwritten=N`: the session's older
+records the file does not hold. `weights=` and `events=` count the whole
+session.
 
 The trace retains the 32-byte record layout and schema version 1; new event IDs
 are appended, preserving the meaning of saved records. `STATE_CHANGED` rows
@@ -904,14 +935,17 @@ times, independently of the initial header snapshot. No initial observations
 means control was not observed before capture stopped. Unchanged signals are
 omitted; a new connection generation renews the observations.
 
-New `PROFILE_START` rows state `limit=capacity`; historical `maxMs` and timeout
-overrun rows remain readable. Durations and exported relative times can exceed
-the 32-bit millisecond rollover: ordinal bits 0–13 retain append order and bits
-14–31 contain the high word of the record time. Header `reserved[0]` contains
-the high word of `durationMs`. Legacy records and headers have zero extension
-bits; their interpretation is unchanged. Readers that decode binary records
-must combine these words before sorting or displaying long captures. Old
-firmware retains its original 32-bit time display for such long captures.
+New `PROFILE_START` rows state `limit=rolling`; earlier `limit=capacity`,
+`maxMs` and timeout overrun rows remain readable, as does the `buffer_full`
+stop reason of traces saved by earlier firmware. Durations and exported
+relative times can exceed the 32-bit millisecond rollover: ordinal bits 0–23
+hold the append count (wrapping) and bits 24–31 the high word of the record
+time. The header word after `checksum` (`durationMsHigh`) holds the high word
+of `durationMs`, and the next one (`omittedCount`) the session's older
+records the trace does not hold. Traces saved by earlier firmware used bits
+14–31 for the time extension; their times read the same unless the capture
+ran longer than 49.7 days. Readers that decode binary records must combine
+these words before sorting or displaying long captures.
 
 Signals cover cup presence, settling and removal qualification, reference/mass
 validity, tare eligibility/presentation/reasons, request and placement IDs,
@@ -1247,7 +1281,9 @@ live shot (an owed snapshot still goes out) and keeps their fingerprints, so
 the visible `activity` (`hidden: false`) is followed by one catch-up delta
 instead of every intermediate change. Clock synchronization
 supplies a new time anchor; the browser advances relative time locally.
-`GET /api/v1/status/home` no longer exists: navigation visibility
+Home also carries `scaleRecording`, true while a scale recording runs, for
+the Home recording card; its fingerprint changes only when a recording
+starts or stops. `GET /api/v1/status/home` no longer exists: navigation visibility
 (`diagnosticPageVisible`, `compatibilityMode`) is carried by the Home stream
 itself and applied on every view, and the browser no longer probes a status
 route when entering Stats, History, or Diagnostic. Settings and Diagnostic are
@@ -1369,7 +1405,7 @@ and scale-gap resets, reset-history clearing, machine-integration refresh)
 keep their HTTP endpoints; their results reach the page through the stream's
 `lastCommand` and configuration revision fields, so no status polling backs
 them. The diagnostic actions under `/api/v1/diagnostic/` (verbose audit,
-task profiler, scale profile start/stop/delete, heap map, loop and scale-gap
+task profiler, scale profile start/stop/delete/auto, heap map, loop and scale-gap
 resets, tare, reset-history clearing) additionally need **Show diagnostic
 page** on or the Admin unlock; otherwise they answer `401 ADMIN_LOCKED`.
 

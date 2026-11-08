@@ -148,16 +148,17 @@ and [target traces](P2_TARGET_TRACE.md), not by a historical pass.
 | ST-06 | Restart the controller with Home Assistant connected and its stored last-shot detail removed; trigger the integration's refreshes (the `end` webhook of a new shot, a reload of the integration) while the controller loads its curves back, and again afterwards. | `/api/v1/integration/shots/last` answers `503 SHOT_CURVE_BUSY` until the curves are loaded back, then the row with its curve; Home Assistant keeps its previous detail on the 503 and never stores the shot without its curve. |
 | ST-07 | Pull a shot and start the next one during its drip delay (cancelling its drip analysis), let that one finish normally; then pull two more shots back to back, each started the moment the previous drip delay ends. Open **⋯ → View trace** on each and **Diagnostic → Shot storage**. | Every shot of the first pair has its own trace (no mixed events); **Traces not saved since restart** stays at 0 unless a shot started with two earlier traces still unsaved, and then the Web UI log says "Shot trace of an earlier shot not saved: this shot started first" once per lost trace. |
 
-## Scale profiling capacity and time estimate
+## Scale recording ring, live download and automatic sessions
 
 Run these cases only on an explicitly authorized isolated bench; this table
 does not authorize flashing, OTA, relay operation, or HIL execution.
 
 | ID | Procedure | Expected result |
 | --- | --- | --- |
-| M-SP-01 | Start profiling with a connected scale. Observe elapsed time, capacity and ETA beyond three minutes while capacity remains; leave/reopen the page. | Recording continues beyond 180 s. Capacity reflects recorded data and the closing reservation. ETA appears after calibration, varies smoothly, and survives reopening the page. |
-| M-SP-02 | Repeat with scales of different update rates; vary the rate of tare/cup events, then interrupt and resume scale data. | All event traffic affects capacity and ETA. The estimate may increase when traffic slows; a sustained lack of records makes it unavailable without stopping capture. Resumption recalibrates it. |
-| M-SP-03 | Allow a capture to fill, then download and save/restart. Repeat with a manual stop before full. | Full capture stops automatically with one terminal record and no overwrite. A partial stop retains its actual percentage. Saving state is distinct from occupancy; once Saved, the trace and final occupancy survive restart. Machine safety behavior remains unchanged. |
+| M-SP-01 | Start a recording with a connected scale and leave it running past full capacity (about 25 minutes idle); leave and reopen the page. | Recording never stops on its own. Capacity reaches 100% and then reports a growing count of overwritten records; **Time covered** stays near the ring's span while **Elapsed** keeps growing. Home shows the yellow recording card throughout. |
+| M-SP-02 | While recording, press **Download** on Diagnostic and on Home's card, including during a shot. Then stop a full recording, wait for **Saved**, restart and download again. | Live downloads say `saved=no (recording)`, are in time order, end with the newest records at the request and do not stop the recording. The saved copy holds the newest 8,192 records ending with the stop marker, and its `overwritten=` line counts the rest. Machine safety behavior remains unchanged. |
+| M-SP-03 | Turn on **Start a new recording each time the scale connects**. Switch the scale off and on; walk it out of range for a minute and back; keep it away for 30 minutes and back; switch it off and on during a brew cycle. Read the Web UI log each time. | Power-off and the 30-minute gap start a new recording; the short loss continues the current one; the brew-cycle reconnection keeps the current one. Each case logs one line with its reason. The setting survives a restart and is off after factory reset. |
+| M-SP-04 | With the PSRAM figures on **Diagnostic** visible, keep a recording running through a shot while a live download is in flight. | Free PSRAM stays above 1 MB and the largest free block allows the ring plus index (640 KiB) to be allocated again after a Delete. Record the figures in the plan. |
 
 ## Post-drip chart acceptance
 

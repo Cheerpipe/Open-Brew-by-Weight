@@ -318,33 +318,43 @@ space: deleted shots' records stay until the oldest space is reused.
 each other so closely that the controller had no moment to save them. **Last error** names the last storage failure, if
 any.
 
-**Diagnostic → Scale → Profiling** records what the scale actually sent and
+**Diagnostic → Scale recording** records what the scale actually sent and
 what the firmware decided about it. Press **Start** before reproducing a
 problem — for example a wrong tare or an unexpected cup event — and **Stop**
-when done; **Download** then saves a plain-text trace and **Delete** removes
-it. Recording continues until its capacity fills or you press **Stop**, keeps
-running while you leave the page, and works with or without a shot in
-progress. Every decoded weight is kept exactly as received — including
-identical, negative, and rejected readings — together with the tare, cup,
-touch, and first-drop decisions taken around it, so a support conversation
-can point at one line instead of guessing. Starting a new recording replaces
-the previous one, which is stated next to the buttons; a finished recording
-survives a restart once it reports as saved. Losing power during recording or
-saving can lose that session.
+when done; **Download** saves a plain-text trace and **Delete** removes it.
+A recording keeps running while you leave the page and works with or without
+a shot in progress. Every decoded weight is kept exactly as received —
+including identical, negative, and rejected readings — together with the tare,
+cup, touch, and first-drop decisions taken around it, so a support
+conversation can point at one line instead of guessing. Starting a new
+recording replaces the previous one, which is stated next to the buttons.
 
-**Capture capacity used** shows how much recording space has been consumed,
-including the space kept for the closing event. **Elapsed** is the time already
-recorded. **Estimated time remaining** adapts to how quickly readings and events
-arrive, so different scales can record for different lengths of time. It takes
-a few seconds to appear, smooths brief changes in activity, and may increase
-when fewer events arrive. If no records arrive for several seconds, the estimate
-returns to **Estimating…**; recording stays active.
-The percentage describes the capture, while **Saving…** and **Saved** tell you
-whether it has been stored for a restart. Stopping early keeps the actual
-percentage used rather than changing it to 100%.
-The state also explains recording errors, such as insufficient memory or a
-failed save. If saving fails and **Download** remains available, download the
-trace before restarting to preserve the recording held in memory.
+A recording never stops on its own. Once its space is full, the oldest records
+make room for new ones, so it always holds the most recent stretch: about
+25 minutes with an idle scale, and less during busy shots. **Time covered**
+shows how far back the held records go, and **Capture capacity used** says how
+many older records have already been overwritten. **Elapsed** is the time
+since the recording started.
+
+You can press **Download** while a recording is still running: you get
+everything it holds at that moment and it keeps recording. If you press
+**Stop**, the newest part of the recording that fits the controller's storage
+is saved and survives a restart once it reports as **Saved**. Losing power
+before then loses that recording. The state also explains recording errors,
+such as insufficient memory or a failed save. If saving fails and
+**Download** remains available, download the trace before restarting to keep
+the recording held in memory.
+
+Turn on **Start a new recording each time the scale connects** to keep a
+recording running without remembering to press Start. Switching the scale on
+then starts a fresh recording that replaces the previous one, as does a scale
+coming back after 30 minutes or more away. When the connection only drops for
+a moment, the current recording continues, so the drop itself stays in the
+trace; nothing restarts during a shot. Download what you need before you
+switch the scale off. While any recording runs, **Home** shows a yellow
+**Scale recording in progress** card with **Stop** and **Download**: Download
+works for whoever is using the controller, and Stop needs the same access as
+the Diagnostic page's buttons.
 
 On a 16 MB controller, **Diagnostic → Misc → Coredump** shows how many complete
 crash records are saved, up to two. Unlock Admin to download them. The browser

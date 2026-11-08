@@ -174,3 +174,25 @@
   live({lineaMicra: null, safety: {}, scale: {available: false, batteryPct: 62, cupPresence: {}}, cupPresence: {}});
   if (!elements.dScaleBatteryRow.hidden) throw new Error('A disconnected scale hides its battery');
 }
+// Scale recording: the automatic-session switch rides the Diagnostic action,
+// a recording downloads its frozen window while it keeps running, and Home
+// learns of a recording through one transition-only stream field.
+{
+  const handler = blockAt(network, 'esp_err_t OpenBrewByWeightNetwork::scaleProfileHandler(');
+  const download = blockAt(network, 'esp_err_t OpenBrewByWeightNetwork::scaleProfileDownloadHandler(');
+  for (const needle of ['static const char *const fields[] = {"action", "enabled"};',
+    '(strcmp(action, "auto") == 0 ? jsonBoolean(root, "enabled", enabled)',
+    'type = WebCommandType::SCALE_PROFILE_AUTO;'])
+    if (!handler.includes(needle)) throw new Error('Scale recording handler misses: ' + needle);
+  for (const needle of ['live ? "no (recording)"', 'overwritten=%lu',
+    'scaleProfiler().downloadRecords(sent, scaleProfileDownloadBatch, wanted)',
+    '"# truncated: %lu records overwritten during download"'])
+    if (!download.includes(needle)) throw new Error('Scale recording download misses: ' + needle);
+  if (!network.includes('delta.field("scaleRecording", bool(scaleProfiler().recording()));'))
+    throw new Error('Home must carry the recording state as one fingerprinted field');
+  if (!firmwareCore.includes('case WebCommandType::SCALE_PROFILE_AUTO: {') ||
+      !firmwareCore.includes('persistAutoScaleRecord(command.bleScan.autoScaleRecord != 0);') ||
+      !firmwareCore.includes('scaleProfiler().setAutoStart(bleScanPersistedSettings.autoScaleRecord ==') ||
+      !firmwareCore.includes('autoSession.observe(link.state == ScaleLinkState::CONNECTED, connection,'))
+    throw new Error('Automatic scale recording must persist, load at boot, and decide per connection');
+}

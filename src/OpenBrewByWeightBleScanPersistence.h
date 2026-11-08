@@ -11,6 +11,10 @@ constexpr uint32_t BLE_SCAN_SETTINGS_MAGIC = 0x424C4543U;  // "BLEC"
 constexpr uint16_t BLE_SCAN_SETTINGS_VERSION = 0;
 constexpr const char *BLE_SCAN_SLOT_A = "bleCfgA";
 constexpr const char *BLE_SCAN_SLOT_B = "bleCfgB";
+// Automatic scale recording lives in the byte where firmware before v1 kept
+// its quiet-backoff minutes (0-240): only this marker means on, so such a
+// leftover byte loads as off.
+constexpr uint8_t BLE_SCAN_AUTO_SCALE_RECORD_ON = 0xFA;
 
 struct BleScanPersistedSettings {
   uint32_t magic = BLE_SCAN_SETTINGS_MAGIC;
@@ -20,7 +24,7 @@ struct BleScanPersistedSettings {
   // BLE master switch: 1 (factory default) keeps scale Bluetooth active.
   uint8_t enabled = 1;
   uint8_t scanIntensity = static_cast<uint8_t>(BLE_SCAN_FACTORY_INTENSITY);
-  uint8_t reserved0 = 0;  // Always written as zero; ignored on load.
+  uint8_t autoScaleRecord = 0;  // BLE_SCAN_AUTO_SCALE_RECORD_ON or 0.
   uint8_t reserved1 = 0;
   uint32_t checksum = 0;
 };
@@ -45,7 +49,9 @@ inline void finalizeBleScanSettings(BleScanPersistedSettings &settings) {
   settings.enabled = settings.enabled != 0 ? 1 : 0;
   settings.scanIntensity =
       static_cast<uint8_t>(clampBleScanIntensity(settings.scanIntensity));
-  settings.reserved0 = 0;
+  settings.autoScaleRecord = settings.autoScaleRecord == BLE_SCAN_AUTO_SCALE_RECORD_ON
+                                 ? BLE_SCAN_AUTO_SCALE_RECORD_ON
+                                 : 0;
   settings.reserved1 = 0;
   settings.checksum = 0;
   settings.checksum = bleScanSettingsChecksum(settings);
@@ -114,7 +120,7 @@ inline bool verifyFactoryBleScanSettings(
     const BleScanPersistedSettings &settings) {
   return validBleScanSettingsBlob(settings) &&
          settings.version == BLE_SCAN_SETTINGS_VERSION &&
-         settings.enabled == 1 &&
+         settings.enabled == 1 && settings.autoScaleRecord == 0 &&
          settings.scanIntensity ==
              static_cast<uint8_t>(BLE_SCAN_FACTORY_INTENSITY);
 }
@@ -154,17 +160,20 @@ inline bool saveBleScanSettings(BleScanPersistedSettings &settings) {
 // several of them together must not cost several flash writes and revisions.
 // An unchanged field is passed through by the caller and writes nothing.
 inline bool persistBleScanSettings(BleScanPersistedSettings &settings,
-                                   uint8_t intensity, bool enabled) {
+                                   uint8_t intensity, bool enabled,
+                                   bool autoScaleRecord) {
   const uint8_t storedIntensity =
       static_cast<uint8_t>(clampBleScanIntensity(intensity));
   const uint8_t storedEnabled = enabled ? 1 : 0;
+  const uint8_t storedAuto = autoScaleRecord ? BLE_SCAN_AUTO_SCALE_RECORD_ON : 0;
   if (settings.scanIntensity == storedIntensity &&
-      settings.enabled == storedEnabled) {
+      settings.enabled == storedEnabled && settings.autoScaleRecord == storedAuto) {
     return true;
   }
   BleScanPersistedSettings candidate = settings;
   candidate.scanIntensity = storedIntensity;
   candidate.enabled = storedEnabled;
+  candidate.autoScaleRecord = storedAuto;
   if (!saveBleScanSettings(candidate)) {
     return false;
   }
