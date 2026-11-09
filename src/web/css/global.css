@@ -89,20 +89,25 @@ html.themeDark {
 /* One selection contract for the whole UI: it behaves as an app, so text does
    not select. Exempt are the fields people type in, the log's lines (the only
    diagnostic in the field, and people quote single lines), and the Setup
-   address, whose copy fallback works by selecting it.
+   address, whose copy fallback works by selecting it. The rule sits on every
+   element: iOS long-press selection ignores a value inherited from html.
    A double tap does not zoom and the page does not bounce or pull to refresh;
    pinch zoom stays, because people need it to read small text. */
 html {
-  user-select: none;
   touch-action: manipulation;
   overscroll-behavior: none;
-  -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
 textarea,
 #log,
+#log *,
 .setupAddress > span {
   user-select: text;
   -webkit-touch-callout: default;
