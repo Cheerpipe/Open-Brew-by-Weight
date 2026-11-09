@@ -635,6 +635,12 @@
   cursor: pointer;
 }
 
+.presetLock,
+.presetAccHead {
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .presetLock.open {
   color: var(--ac);
 }

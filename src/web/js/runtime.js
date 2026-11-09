@@ -6530,16 +6530,6 @@ document.documentElement?.classList?.toggle(
 );
 document.addEventListener("visibilitychange", onPageVisibility);
 if (document.hidden) onPageVisibility();
-// iOS Safari long-press still selects user-select: none text, so a selection
-// outside the places global.css exempts is dropped as soon as it appears.
-document.addEventListener("selectionchange", () => {
-  const sel = getSelection(),
-    node = sel?.anchorNode,
-    el = node?.nodeType === 1 ? node : node?.parentElement;
-  if (sel?.isCollapsed !== false || el?.closest("#log, .setupAddress > span")) return;
-  const field = "input:not([type=checkbox], [type=radio], [type=range], [type=file]), textarea";
-  if (!document.activeElement?.matches(field)) sel.removeAllRanges();
-});
 // Every https page knows its companion from load on, whatever view it opens
 // on (the manifest shortcuts included); resolving it re-evaluates the hold.
 if (location.protocol === "https:") companionHere().then(refreshWebUiHold);
