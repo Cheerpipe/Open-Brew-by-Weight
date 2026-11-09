@@ -115,7 +115,6 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
 // transport failure, so retries and confirmation behave as for HTTPS.
 bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
                                                     uint16_t value) {
-  static constexpr const char *names[] = {"none", "temp", "standby", "on", "refresh"};
   static uint32_t lastLogAtMs = 0;  // Cloud task only.
   if (work_ == nullptr) return false;
   work_->transportStatus = ESP_FAIL;
@@ -166,6 +165,7 @@ bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
     work_->httpStatus = accepted ? 200 : http;
   }
   if (!accepted && millis() - lastLogAtMs >= kCompanionLogPeriodMs) {
+    static constexpr const char *names[] = {"none", "temp", "standby", "on", "refresh"};
     lastLogAtMs = millis();
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
                          "Micra companion command %s %s http=%u",
@@ -251,11 +251,11 @@ uint32_t OpenBrewByWeightMicraService::companionIntentLocked(uint32_t afterComma
 
 void OpenBrewByWeightMicraService::recordCompanionIntentLocked(uint32_t command) {
   auto &feed = companion_;
-  for (auto &intent : feed.intents) {
-    if (intent.command == command) {
-      intent.generation = powerState_.generation();
-      return;
-    }
+  const auto match = std::find_if(std::begin(feed.intents), std::end(feed.intents),
+                                  [command](const auto &i) { return i.command == command; });
+  if (match != std::end(feed.intents)) {
+    match->generation = powerState_.generation();
+    return;
   }
   feed.intents[feed.nextIntent] = {command, powerState_.generation()};
   feed.nextIntent = static_cast<uint8_t>((feed.nextIntent + 1) % 8);
@@ -373,11 +373,12 @@ void OpenBrewByWeightMicraService::companionCredentials(uint32_t generation, boo
   if (!ok)
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
                          "Micra companion: La Marzocco rejected the account");
-  if (from != to) logCompanionRoute(from, to, "credentials");
-  if (from != to) notifyCompanion();
+  if (from == to) return;
+  logCompanionRoute(from, to, "credentials");
+  notifyCompanion();
 }
 
-MicraCompanionIngress OpenBrewByWeightMicraService::companionIngress() {
+MicraCompanionIngress OpenBrewByWeightMicraService::companionIngress() const {
   MicraCompanionIngress ingress;
   // Sampled before any mutex, like the socket callback, so contention cannot
   // retag a push taken before a cleaning edge.
@@ -513,7 +514,7 @@ MicraCompanionRouteStatus OpenBrewByWeightMicraService::companionRouteStatus() c
 
 bool OpenBrewByWeightMicraService::companionCopyCredentials(
     uint32_t generation, char *email, size_t emailCapacity, char *password,
-    size_t passwordCapacity, char *serial, size_t serialCapacity) {
+    size_t passwordCapacity, char *serial, size_t serialCapacity) const {
   TaskLockGuard lock(mux_);
   const bool ok = generation != 0 && generation == companion_.outbox.credentialsGeneration &&
       !companion_.outbox.credentialsErase && config_.accountConfigured &&

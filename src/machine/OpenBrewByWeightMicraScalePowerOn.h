@@ -25,15 +25,15 @@ class MicraScalePowerOnTracker {
   // its own explicit power-off while the option and account stayed active and
   // the relay stayed open. A trigger observed with the option off or a closed
   // relay is consumed, never deferred.
-  bool service(const Snapshot &scale, uint8_t micraOptions,
+  bool service(const Snapshot &observed, uint8_t micraOptions,
                bool accountConfigured) {
     const bool enabled =
         accountConfigured &&
         (micraOptions & LINEA_MICRA_POWER_ON_WITH_SCALE) != 0;
-    const bool edge = !lastLinkUp_ && scale.linkUp;
-    lastLinkUp_ = scale.linkUp;
-    if (!edge || !enabled || scale.relayClosed) return false;
-    return scale.lastDisconnectReason == LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT;
+    const bool edge = !lastLinkUp_ && observed.linkUp;
+    lastLinkUp_ = observed.linkUp;
+    if (!edge || !enabled || observed.relayClosed) return false;
+    return observed.lastDisconnectReason == LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT;
   }
 
  private:

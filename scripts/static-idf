@@ -127,6 +127,7 @@ cppcheck \
   --project="$cppcheck_database" \
   --suppressions-list="$SUPPRESSIONS_FILE" \
   --file-filter="$ROOT/src/*.cpp" \
+  --file-filter="$ROOT/src/machine/*.cpp" \
   --file-filter='*/libraries/EspressoScaleBLE/src/*.cpp' \
   --file-filter='*/libraries/EspressoScaleBLE/src/nimble/*.cpp' \
   --file-filter='*/libraries/EspressoScaleBLE/src/protocols/*.cpp' \

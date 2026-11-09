@@ -789,7 +789,7 @@ const protocolGeneric = fs.readFileSync(
               'protocols', 'GenericFf11.cpp'),
     'utf8');
 if (!micraScaleShutdown.includes('LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT = 9') ||
-    !micraScaleShutdown.includes('!scale.relayClosed') ||
+    !micraScaleShutdown.includes('!observed.relayClosed') ||
     !micraScaleShutdown.includes('LINEA_MICRA_SHUTDOWN_WITH_SCALE') ||
     !micraScaleShutdown.includes('lineaMicraShutdownGraceSeconds') ||
     !micraService.includes('CoffeeMachineChangeMode') ||
@@ -810,7 +810,7 @@ if (!micraScaleShutdown.includes('LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT = 9') ||
 }
 if (!micraScalePowerOn.includes('LINEA_MICRA_POWER_ON_WITH_SCALE') ||
     !micraScalePowerOn.includes('LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT') ||
-    !micraScalePowerOn.includes('scale.relayClosed') ||
+    !micraScalePowerOn.includes('observed.relayClosed') ||
     !micraService.includes('SET_POWER_ON') ||
     !micraService.includes('{\\"mode\\":\\"BrewingMode\\"}') ||
     !machineIntegration.includes('MicraScalePowerOnTracker') ||

@@ -197,7 +197,7 @@ bool selectMachineIntegrationDevice(
 
 void clearMachineIntegrationDiscovery() { service.clearDiscovery(); }
 
-LineaMicraStatus machineIntegrationStatus() { return service.status(); }
+LineaMicraStatus machineIntegrationStatus() { return service.currentStatus(); }
 
 LineaMicraCloudCall machineIntegrationCloudCall() { return service.cloudCall(); }
 MicraWebSocketStatus machineIntegrationWebSocketStatus(bool includeTraffic) { return service.websocketStatus(includeTraffic); }

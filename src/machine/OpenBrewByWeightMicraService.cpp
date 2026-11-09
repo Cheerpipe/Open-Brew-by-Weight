@@ -364,8 +364,8 @@ struct OpenBrewByWeightMicraService::WorkBuffer {
   char accessToken[kTokenCapacity] = {};
   char refreshToken[kTokenCapacity] = {};
   // Scratch for the formatted Authorization header. Lives beside the tokens in
-  // external RAM so request() never renders the header over the IoBuffer union
-  // (which aliases response and body) and never adds a large stack frame.
+  // external RAM so cloudRequest() never renders the header over the IoBuffer
+  // union (which aliases response and body) and never adds a large stack frame.
   char authorization[kTokenCapacity + 8] = {};
   esp_http_client_handle_t client = nullptr;
   size_t responseUsed = 0;
@@ -414,7 +414,7 @@ void OpenBrewByWeightMicraService::publishConfig(
   bool cancelObservation = false;
   bool identityChanged = false;
   bool transportChanged = false;
-  MicraCompanionRoute companionFrom = MicraCompanionRoute::DIRECT, companionTo = companionFrom;
+  MicraCompanionRoute companionFrom = MicraCompanionRoute::DIRECT, companionTo;
   {
     TaskLockGuard lock(mux_);
     const bool wasObserving =
@@ -799,7 +799,7 @@ bool OpenBrewByWeightMicraService::queueLocked(const LineaMicraRequest &request)
 }
 
 bool OpenBrewByWeightMicraService::selectDiscoveredMachine(
-    const char *serial, LineaMicraPersistedSettings &settings) {
+    const char *serial, LineaMicraPersistedSettings &settings) const {
   TaskLockGuard lock(mux_);
   if (serial == nullptr || discovery_.count == 0 ||
       !lineaMicraPrivateKeyConfigured(candidate_)) {
@@ -827,7 +827,7 @@ void OpenBrewByWeightMicraService::clearDiscovery() {
   discovery_ = {};
 }
 
-LineaMicraStatus OpenBrewByWeightMicraService::status() const {
+LineaMicraStatus OpenBrewByWeightMicraService::currentStatus() const {
   TaskLockGuard lock(mux_);
   return statusLocked();
 }
@@ -1973,7 +1973,7 @@ void OpenBrewByWeightMicraService::executeRelist(PendingRequest &pending) {
   discovery_.error = error;
 }
 
-bool OpenBrewByWeightMicraService::executeObservation(PendingRequest &pending) {
+bool OpenBrewByWeightMicraService::executeObservation(const PendingRequest &pending) {
   if (!observationCurrent(pending.identityGeneration)) return true;
   LineaMicraPersistedSettings settings;
   LineaMicraStatus status;
@@ -2224,7 +2224,7 @@ void OpenBrewByWeightMicraService::discardAccessToken() {
 }
 
 bool OpenBrewByWeightMicraService::ensureSession(
-    LineaMicraPersistedSettings &settings, bool registerKey, bool *renewed) {
+    const LineaMicraPersistedSettings &settings, bool registerKey, bool *renewed) {
   if (renewed != nullptr) *renewed = false;
   if (work_ == nullptr) return false;
   if (registerKey) {
@@ -2246,8 +2246,8 @@ bool OpenBrewByWeightMicraService::registerInstallation(
     const LineaMicraPersistedSettings &settings) {
   if (!ensureIoBuffer()) return false;
   const bool ok =
-      request(settings, kRegisterUrl, HTTP_METHOD_POST, nullptr, false,
-              {"register_installation", "/auth/init"}, true);
+      cloudRequest(settings, kRegisterUrl, HTTP_METHOD_POST, nullptr, false,
+                   {"register_installation", "/auth/init"}, true);
   releaseIoBuffer();
   return ok;
 }
@@ -2273,8 +2273,8 @@ bool OpenBrewByWeightMicraService::signIn(
     releaseIoBuffer();
     return false;
   }
-  if (!request(settings, kSignInUrl, HTTP_METHOD_POST, io_->body, false,
-               {"sign_in", "/auth/signin"})) {
+  if (!cloudRequest(settings, kSignInUrl, HTTP_METHOD_POST, io_->body, false,
+                    {"sign_in", "/auth/signin"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2314,8 +2314,8 @@ bool OpenBrewByWeightMicraService::refreshToken(
     releaseIoBuffer();
     return false;
   }
-  if (!request(settings, kRefreshUrl, HTTP_METHOD_POST, io_->body, false,
-               {"refresh_token", "/auth/refreshtoken"})) {
+  if (!cloudRequest(settings, kRefreshUrl, HTTP_METHOD_POST, io_->body, false,
+                    {"refresh_token", "/auth/refreshtoken"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2343,8 +2343,8 @@ bool OpenBrewByWeightMicraService::listMachines(
     const LineaMicraPersistedSettings &settings,
     LineaMicraDiscoverySnapshot &result) {
   if (!ensureIoBuffer()) return false;
-  if (!request(settings, kThingsUrl, HTTP_METHOD_GET, nullptr, true,
-               {"list_machines", "/things"})) {
+  if (!cloudRequest(settings, kThingsUrl, HTTP_METHOD_GET, nullptr, true,
+                    {"list_machines", "/things"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2400,8 +2400,8 @@ bool OpenBrewByWeightMicraService::readDashboard(
   const int length = snprintf(url, sizeof(url), "%s/things/%s/dashboard",
                               kApiRoot, settings.selectedSerial);
   if (length <= 0 || static_cast<size_t>(length) >= sizeof(url) ||
-      !request(settings, url, HTTP_METHOD_GET, nullptr, true,
-               {"read_dashboard", "/things/{serial}/dashboard"})) {
+      !cloudRequest(settings, url, HTTP_METHOD_GET, nullptr, true,
+                    {"read_dashboard", "/things/{serial}/dashboard"})) {
     releaseIoBuffer();
     return false;
   }
@@ -2466,10 +2466,10 @@ bool OpenBrewByWeightMicraService::writeTemperature(
                   static_cast<size_t>(urlLength) < sizeof(url) &&
                   bodyLength > 0 &&
                   static_cast<size_t>(bodyLength) < sizeof(io_->body) &&
-                  request(settings, url, HTTP_METHOD_POST, io_->body, true,
-                          {"set_boiler_temperature",
-                           "/things/{serial}/command/"
-                           "CoffeeMachineSettingCoffeeBoilerTargetTemperature"});
+                  cloudRequest(settings, url, HTTP_METHOD_POST, io_->body, true,
+                               {"set_boiler_temperature",
+                                "/things/{serial}/command/"
+                                "CoffeeMachineSettingCoffeeBoilerTargetTemperature"});
   const bool accepted =
       ok || (work_->transportStatus == ESP_OK && work_->httpStatus >= 200 &&
              work_->httpStatus < 300);
@@ -2490,10 +2490,10 @@ bool OpenBrewByWeightMicraService::writeStandby(
   work_->httpStatus = 0;
   const bool ok = urlLength > 0 &&
                   static_cast<size_t>(urlLength) < sizeof(url) &&
-                  request(settings, url, HTTP_METHOD_POST,
-                          "{\"mode\":\"StandBy\"}", true,
-                          {"set_standby",
-                           "/things/{serial}/command/CoffeeMachineChangeMode"});
+                  cloudRequest(settings, url, HTTP_METHOD_POST,
+                               "{\"mode\":\"StandBy\"}", true,
+                               {"set_standby",
+                                "/things/{serial}/command/CoffeeMachineChangeMode"});
   releaseIoBuffer();
   return ok;
 }
@@ -2511,10 +2511,10 @@ bool OpenBrewByWeightMicraService::writePowerOn(
   work_->httpStatus = 0;
   const bool ok = urlLength > 0 &&
                   static_cast<size_t>(urlLength) < sizeof(url) &&
-                  request(settings, url, HTTP_METHOD_POST,
-                          "{\"mode\":\"BrewingMode\"}", true,
-                          {"set_power_on",
-                           "/things/{serial}/command/CoffeeMachineChangeMode"});
+                  cloudRequest(settings, url, HTTP_METHOD_POST,
+                               "{\"mode\":\"BrewingMode\"}", true,
+                               {"set_power_on",
+                                "/things/{serial}/command/CoffeeMachineChangeMode"});
   releaseIoBuffer();
   return ok;
 }
@@ -2524,9 +2524,9 @@ bool OpenBrewByWeightMicraService::writePowerOn(
 bool OpenBrewByWeightMicraService::acceptPolicy(
     const LineaMicraPersistedSettings &settings) {
   if (!ensureIoBuffer()) return false;
-  const bool ok = request(settings, kPolicyUrl, HTTP_METHOD_PUT,
-                          "{\"profilePolicy\":false,\"commercialPolicy\":false}",
-                          true, {"accept_policy", "/users/policy"});
+  const bool ok = cloudRequest(settings, kPolicyUrl, HTTP_METHOD_PUT,
+                               "{\"profilePolicy\":false,\"commercialPolicy\":false}",
+                               true, {"accept_policy", "/users/policy"});
   releaseIoBuffer();
   return ok;
 }
@@ -2601,7 +2601,7 @@ bool OpenBrewByWeightMicraService::applySignedHeaders(
   return ok;
 }
 
-bool OpenBrewByWeightMicraService::request(
+bool OpenBrewByWeightMicraService::cloudRequest(
     const LineaMicraPersistedSettings &settings, const char *url,
     esp_http_client_method_t method, const char *body, bool authenticated,
     CloudCall call, bool installationInit) {

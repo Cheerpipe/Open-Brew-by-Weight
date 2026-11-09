@@ -150,7 +150,7 @@ bool OpenBrewByWeightMicraService::ensureWorkBuffer() {
   return true;
 }
 static unsigned sessionCalls = 0;
-bool OpenBrewByWeightMicraService::ensureSession(LineaMicraPersistedSettings &, bool, bool *) {
+bool OpenBrewByWeightMicraService::ensureSession(const LineaMicraPersistedSettings &, bool, bool *) {
   ++sessionCalls;
   now += sessionDelayMs;
   if (inhibitAfterSession) outboundBleQuiet.store(true);
@@ -666,8 +666,8 @@ struct MicraWebSocketTest {
     deliver(service, observation(service, on));
     assert(stops == stopsBeforeShot && service.websocketStatus().subscribed);
     assert(service.observationFence_.epoch == epoch);
-    assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
-    assert(!service.status().shotPaused && !service.abortRequested_.load());
+    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
+    assert(!service.currentStatus().shotPaused && !service.abortRequested_.load());
     // A live scale parks the subscription from the shot's start until its
     // relay opens: an UNSUBSCRIBE, pings stopped, socket and fence kept, no
     // frame timeout; a push still in flight is dropped without failing.
@@ -677,7 +677,7 @@ struct MicraWebSocketTest {
     assert(transmitted.rfind("UNSUBSCRIBE\nid:", 0) == 0 && pingInterval == 3600);
     assert(stops == stopsBeforeShot && service.websocketStatus().subscribed);
     deliver(service, observation(service, off));
-    assert(!service.websocket_->failed.load() && service.status().shotPaused);
+    assert(!service.websocket_->failed.load() && service.currentStatus().shotPaused);
     assert(service.published_.powerState == LineaMicraPowerState::ON);
     now += 40000;
     service.serviceWebSocket();
@@ -765,10 +765,10 @@ struct MicraWebSocketTest {
     initial.receivedAtMs = now;
     assert(service.observationFence_.merge(service.published_, service.powerState_, initial, true));
     now += 600000;
-    assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
-    assert(service.status().powerSource == MicraObservationSource::HTTP_INITIAL);
+    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.currentStatus().powerSource == MicraObservationSource::HTTP_INITIAL);
     outboundAcquisitionHeld.store(true);
-    assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
     outboundAcquisitionHeld.store(false);
     deliver(service, observation(service, R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})"));
     assert(service.published_.powerSource == MicraObservationSource::WEBSOCKET);
@@ -782,18 +782,18 @@ struct MicraWebSocketTest {
     deliver(service, observation(service, R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}}]})"));
     assert(service.observationFence_.synchronized);
     ++outboundAcquisitionGeneration;
-    assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
     esp_websocket_event_data_t event;
     service.websocketEvent(&service, nullptr, WEBSOCKET_EVENT_CLOSED, &event);
     assert(!service.observationFence_.synchronized && !service.snapshotPending_);
     assert(retained(service.powerState_));  // Invalidated before owner teardown.
-    assert(service.status().quality == LineaMicraObservationQuality::STALE);
+    assert(service.currentStatus().quality == LineaMicraObservationQuality::STALE);
     service.stopWebSocket();
     assert(!service.snapshotPending_);
     service.serviceWebSocket();
     subscribe(service);
     assert(service.snapshotStamp_.connectionRevision != firstStamp.connectionRevision);
-    assert(service.status().quality == LineaMicraObservationQuality::STALE);
+    assert(service.currentStatus().quality == LineaMicraObservationQuality::STALE);
     service.stopWebSocket(true);
     delete service.work_;
   }
@@ -1124,7 +1124,7 @@ struct MicraWebSocketTest {
     std::thread reader([&] {
       while (!done.load()) {
         (void)service.backflush_.ingressAttempt();
-        const auto state = service.status();
+        const auto state = service.currentStatus();
         assert(state.powerState != LineaMicraPowerState::OFF);
         // The control task's non-blocking poll races the same lifecycle
         // churn; its single-reader cache must never tear into a phantom OFF.
@@ -1200,20 +1200,20 @@ struct MicraWebSocketTest {
     LineaMicraStatus failed = service.published_;
     service.fail(failed, LineaMicraError::TRANSPORT);  // WebSocket mode: the socket owner holds.
     assert(!retained(service.powerState_) &&
-           service.status().assumedPower == LineaMicraAssumedPower::ON);
+           service.currentStatus().assumedPower == LineaMicraAssumedPower::ON);
     service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
     service.fail(failed, LineaMicraError::TRANSPORT);
     assert(retained(service.powerState_));
-    auto status = service.status();
+    auto status = service.currentStatus();
     assert(status.assumedPower == LineaMicraAssumedPower::ON_STALE &&
            status.powerState == LineaMicraPowerState::ON &&
            status.quality == LineaMicraObservationQuality::STALE &&
            status.error == LineaMicraError::TRANSPORT && status.phase == LineaMicraPhase::FAILED);
     now += micra_timing::kStaleRetentionMs;
-    status = service.status();
+    status = service.currentStatus();
     assert(status.assumedPower == LineaMicraAssumedPower::UNKNOWN && status.effectiveOn);
     assert(service.physicalStart(nullptr) == MachinePhysicalStartDisposition::NORMAL);
-    assert(service.status().assumedPower == LineaMicraAssumedPower::ON_STALE);
+    assert(service.currentStatus().assumedPower == LineaMicraAssumedPower::ON_STALE);
   }
   static void statusPollCache() {
     now = 1000;
@@ -1234,7 +1234,7 @@ struct MicraWebSocketTest {
     // the trivially copyable snapshot must match field for field, so a
     // never-refreshed cache cannot pass as a fresh poll.
     const auto fresh = service.statusPoll();
-    const auto reference = service.status();
+    const auto reference = service.currentStatus();
     assert(fresh.powerState == LineaMicraPowerState::OFF && !fresh.effectiveOn);
     assert(std::memcmp(&fresh, &reference, sizeof(fresh)) == 0);
     assert(!service.statusPollStale());
@@ -1751,7 +1751,7 @@ struct MicraWebSocketTest {
     route(service);
     assert(stops == stopsBefore + 1 && service.companionRouteStatus().switches == 1);
     // The full frame is a new subscription plus its initial read.
-    const auto status = service.status();
+    const auto status = service.currentStatus();
     assert(status.powerState == LineaMicraPowerState::ON && status.targetDeciC == 930);
     assert(status.quality == LineaMicraObservationQuality::CURRENT);
     assert(status.powerSource == MicraObservationSource::HTTP_INITIAL);
@@ -1799,7 +1799,7 @@ struct MicraWebSocketTest {
     route(feed, R"({"connected":false})");
     deliver(socket, observation(socket, dashboard));
     assert(frame(feed, MicraCompanionStateKind::PUSH, dashboard));
-    const auto a = socket.status(), b = feed.status();
+    const auto a = socket.currentStatus(), b = feed.currentStatus();
     // Every member, not the two padding gaps: those bytes are indeterminate.
     const auto *bytesA = reinterpret_cast<const unsigned char *>(&a);
     const auto *bytesB = reinterpret_cast<const unsigned char *>(&b);
@@ -2030,7 +2030,7 @@ struct MicraWebSocketTest {
       assert(!service.backflush().valid && !service.observationFence_.synchronized);
       assert(retained(service.powerState_) && service.observationFence_.epoch == epoch + 1);
       assert(!service.websocketStatus().subscribed && !service.companionRoute_.load());
-      assert(service.status().quality == LineaMicraObservationQuality::STALE);
+      assert(service.currentStatus().quality == LineaMicraObservationQuality::STALE);
       // Late frames from the lost feed are ignored.
       assert(frame(service, MicraCompanionStateKind::PUSH, kStandby));
       assert(service.published_.powerState == LineaMicraPowerState::ON);
@@ -2076,13 +2076,13 @@ struct MicraWebSocketTest {
     // A pending La Marzocco policy met by the companion is the account's
     // state; only the companion reporting its end clears it.
     service.companionUpstream(true, 7, 3000, true, true);
-    assert(service.status().error == LineaMicraError::POLICY_REQUIRED);
+    assert(service.currentStatus().error == LineaMicraError::POLICY_REQUIRED);
     service.companionUpstream(true, 7, 3000, true);
-    assert(service.status().error == LineaMicraError::NONE);
+    assert(service.currentStatus().error == LineaMicraError::NONE);
     service.companionUpstream(true, 7, 3000, true, true);
     service.companionLink(false, true);
     service.companionUpstream(true, 7, 3000);
-    assert(service.status().error == LineaMicraError::POLICY_REQUIRED);
+    assert(service.currentStatus().error == LineaMicraError::POLICY_REQUIRED);
     finish(service);
   }
   // During a sync hold (a shot) the companion does not ping and the route
@@ -2166,7 +2166,7 @@ struct MicraWebSocketTest {
     assert(service.published_.powerState == LineaMicraPowerState::ON);
     assert(service.serviceCompanion());
     assert(frame(service, MicraCompanionStateKind::FULL, kBrewing93, 0, 8));
-    assert(service.status().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
     // A full frame that never comes returns the route to direct.
     service.companionUpstream(true, 9, 3000);
     now += 30000;
@@ -2243,7 +2243,7 @@ struct MicraWebSocketTest {
       } else if (stage == 1) {
         assert(frame(service, MicraCompanionStateKind::READ, kBrewing, 0));
         assert(service.published_.powerState == LineaMicraPowerState::ON);
-        assert(service.status().optimisticOff);
+        assert(service.currentStatus().optimisticOff);
         assert(frame(service, MicraCompanionStateKind::READ, kStandby, sent));
         stage = 2;
       }
@@ -2294,7 +2294,7 @@ struct MicraWebSocketTest {
       done.store(true);
     });
     while (!done.load()) {
-      (void)service.status();
+      (void)service.currentStatus();
       (void)service.backflush(true);
       (void)service.serviceCompanion();
       (void)service.companionRouteStatus();

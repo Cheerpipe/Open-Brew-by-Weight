@@ -73,8 +73,8 @@ void OpenBrewByWeightMicraService::releaseIoBuffer(bool) {}
 void OpenBrewByWeightMicraService::releaseWorkBuffer() { clearSession(); }
 void OpenBrewByWeightMicraService::serviceWebSocket() {}
 void OpenBrewByWeightMicraService::stopWebSocket(bool) { ++websocketStops; }
-bool OpenBrewByWeightMicraService::ensureSession(LineaMicraPersistedSettings &, bool registerKey,
-                                            bool *renewed) {
+bool OpenBrewByWeightMicraService::ensureSession(const LineaMicraPersistedSettings &, bool registerKey,
+                                                  bool *renewed) {
   ++authentications;
   lastRegisterKey = registerKey;
   if (renewed != nullptr) *renewed = true;

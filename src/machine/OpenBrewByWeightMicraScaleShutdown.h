@@ -30,27 +30,27 @@ class MicraScaleShutdownTracker {
   // Returns true exactly once per accepted trigger: an explicit scale
   // power-off observed while the relay was open stayed offline for the
   // configured grace window with the option and account still active.
-  bool service(uint32_t now, const Snapshot &scale, uint8_t micraOptions,
+  bool service(uint32_t now, const Snapshot &observed, uint8_t micraOptions,
                bool accountConfigured) {
     const bool enabled =
         accountConfigured &&
         (micraOptions & LINEA_MICRA_SHUTDOWN_WITH_SCALE) != 0;
-    if (scale.disconnectSequence != lastDisconnectSequence_) {
-      lastDisconnectSequence_ = scale.disconnectSequence;
+    if (observed.disconnectSequence != lastDisconnectSequence_) {
+      lastDisconnectSequence_ = observed.disconnectSequence;
       // A closed relay (shot or rinse in progress, wake passthrough) means
       // the event is ignored completely, never deferred.
-      pending_ = enabled && !scale.linkUp && !scale.relayClosed &&
-                 scale.disconnectReason == LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT;
+      pending_ = enabled && !observed.linkUp && !observed.relayClosed &&
+                 observed.disconnectReason == LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT;
       fireAtMs_ = now + graceMs(micraOptions);
     } else if (pending_) {
-      if (scale.linkUp || !enabled) pending_ = false;
+      if (observed.linkUp || !enabled) pending_ = false;
     }
     if (!pending_) return false;
     if (tickBefore(now, fireAtMs_)) return false;
     pending_ = false;
     // A relay that closed during the grace window cancels the shutdown;
     // the machine is never powered off while brewing.
-    return !scale.relayClosed;
+    return !observed.relayClosed;
   }
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)

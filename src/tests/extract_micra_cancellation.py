@@ -38,7 +38,7 @@ output.mkdir(parents=True, exist_ok=True)
 (output / "micra_websocket_status.inc").write_text(
     definition("powerOptionBit") + "\n" + definition("secureCopy") + "\n" +
     "\n".join(definition("OpenBrewByWeightMicraService::" + name) for name in
-              ("status", "statusLocked", "liveSubscriptionLocked", "statusPoll", "statusPollStale",
+              ("currentStatus", "statusLocked", "liveSubscriptionLocked", "statusPoll", "statusPollStale",
                "mergeReadLocked",
                "queue", "queueLocked", "muxWaitAnomalyDue",
                "qualifyBackflushLocked", "backflushReadyLocked", "backflush",
@@ -62,7 +62,7 @@ output.mkdir(parents=True, exist_ok=True)
 retry = definition("OpenBrewByWeightMicraService::waitRetry")
 (output / "micra_cancellation_retry.inc").write_text(
     retry.split("\n", 1)[0] + "\n" + retry[retry.index("{") + 1:retry.rindex("}")])
-request = text.index("bool OpenBrewByWeightMicraService::request(")
+request = text.index("bool OpenBrewByWeightMicraService::cloudRequest(")
 gate = text.index("  const auto requestAllowed =", request)
 gate_end = text.index("\n  };", gate) + len("\n  };")
 loop = text.index("  esp_err_t performed =", request)

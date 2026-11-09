@@ -48,9 +48,9 @@ class OpenBrewByWeightMicraService {
   // latest wins per kind, as queue() itself would keep only the newest.
   void post(const LineaMicraRequest &request);
   bool selectDiscoveredMachine(const char *serial,
-                               LineaMicraPersistedSettings &settings);
+                               LineaMicraPersistedSettings &settings) const;
   void clearDiscovery();
-  LineaMicraStatus status() const;
+  LineaMicraStatus currentStatus() const;
   // Control task only: never waits on mux_ — tryLocks, refreshes the
   // task-owned cache, and serves the last snapshot on contention.
   LineaMicraStatus statusPoll() const;
@@ -73,7 +73,7 @@ class OpenBrewByWeightMicraService {
   void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS,
                          bool refused = false, bool policy = false);
   void companionCredentials(uint32_t generation, bool ok);
-  MicraCompanionIngress companionIngress();
+  MicraCompanionIngress companionIngress() const;
   bool companionState(MicraCompanionStateKind kind, uint32_t epoch, uint32_t afterCommand,
                       const cJSON *dashboard, MicraCompanionIngress ingress);
   void companionCommandResult(uint32_t id, bool accepted, uint16_t httpStatus);
@@ -81,7 +81,7 @@ class OpenBrewByWeightMicraService {
   MicraCompanionRouteStatus companionRouteStatus() const;
   bool companionCopyCredentials(uint32_t generation, char *email, size_t emailCapacity,
                                 char *password, size_t passwordCapacity, char *serial,
-                                size_t serialCapacity);
+                                size_t serialCapacity) const;
   void setCompanionNotify(void (*notify)()) { companionNotify_.store(notify); }
 
  private:
@@ -159,15 +159,15 @@ class OpenBrewByWeightMicraService {
   void execute(PendingRequest &pending);
   bool executeConnect(PendingRequest &pending);
   void executeRelist(PendingRequest &pending);
-  bool executeObservation(PendingRequest &pending);
+  bool executeObservation(const PendingRequest &pending);
   bool executeTemperatureApplication(const LineaMicraRequest &request,
                                      uint32_t machineConfigGeneration);
   bool executePowerApplication(const LineaMicraRequest &request,
                                uint32_t machineConfigGeneration);
-  bool ensureSession(LineaMicraPersistedSettings &settings, bool registerKey,
+  bool ensureSession(const LineaMicraPersistedSettings &settings, bool registerKey,
                      bool *renewed = nullptr);
   void discardAccessToken();
-  bool generateInstallationKey(LineaMicraPersistedSettings &settings);
+  static bool generateInstallationKey(LineaMicraPersistedSettings &settings);
   bool registerInstallation(const LineaMicraPersistedSettings &settings);
   bool signIn(const LineaMicraPersistedSettings &settings);
   bool refreshToken(const LineaMicraPersistedSettings &settings);
@@ -186,9 +186,9 @@ class OpenBrewByWeightMicraService {
     const char *purpose;
     const char *endpoint;
   };
-  bool request(const LineaMicraPersistedSettings &settings, const char *url,
-               esp_http_client_method_t method, const char *body,
-               bool authenticated, CloudCall call, bool installationInit = false);
+  bool cloudRequest(const LineaMicraPersistedSettings &settings, const char *url,
+                    esp_http_client_method_t method, const char *body,
+                    bool authenticated, CloudCall call, bool installationInit = false);
   LineaMicraError classifyFailure() const;
   bool applySignedHeaders(const LineaMicraPersistedSettings &settings,
                           char *headers = nullptr, size_t capacity = 0);
