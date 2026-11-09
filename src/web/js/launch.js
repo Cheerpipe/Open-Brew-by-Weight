@@ -1,6 +1,6 @@
 // Launch intro gate. Loaded blocking in <head> (precached by sw.js) so the
 // decision lands before the first paint: the installed app plays the intro
-// once per fresh launch unless Settings → This device turns it off. Browser tabs,
+// once per fresh launch when Settings → This device turns it on. Browser tabs,
 // reloads, back/forward and reduced motion keep the plain loading screen.
 (() => {
   const root = document.documentElement;
@@ -12,7 +12,7 @@
       !(matchMedia("(display-mode: standalone)").matches || navigator.standalone) ||
       matchMedia("(prefers-reduced-motion: reduce)").matches ||
       performance.getEntriesByType("navigation")[0]?.type !== "navigate" ||
-      localStorage.getItem("obbwAppNoSplash") === "1"
+      localStorage.getItem("obbwAppSplash") !== "1"
     )
       return;
   } catch {

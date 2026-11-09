@@ -1960,8 +1960,8 @@ export function init() {
   }
   if ($("appPush")) initAppPush();
   if ($("appSplash")) {
-    $("appSplash").checked = !R.appSetting("noSplash");
-    $("appSplash").onchange = () => R.setAppSetting("noSplash", !$("appSplash").checked);
+    $("appSplash").checked = R.appSetting("splash");
+    $("appSplash").onchange = () => R.setAppSetting("splash", $("appSplash").checked);
   }
   if ($("appHeroTint")) {
     $("appHeroTint").value = R.heroTintMode();

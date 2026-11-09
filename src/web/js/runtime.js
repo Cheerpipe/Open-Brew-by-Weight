@@ -5784,8 +5784,8 @@ const APP_SETTING_KEYS = {
   awake: "obbwAppAwake",
   live: "obbwAppLive",
   vibrate: "obbwAppVibrate",
-  // Stored as an opt-out so the splash is on by default; js/launch.js reads it.
-  noSplash: "obbwAppNoSplash",
+  // js/launch.js reads it directly, before runtime.js loads.
+  splash: "obbwAppSplash",
   batteryPct: "obbwAppBatteryPct",
   liveLandscape: "obbwAppLiveLandscape",
   // Stored as an opt-in so Home's preset list starts locked.

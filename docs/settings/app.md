@@ -16,8 +16,8 @@ Clearing its data returns them to their defaults, and a
 - **Show splash screen** (*installed app only*) plays a short animation each
   time you open the app: the logo drops in, its switch clicks shut and a few drops fill a cup at the
   bottom of the screen while the app gets ready. As soon as it is ready, the
-  coffee rises and the app appears. Tap anywhere to skip it. It is on until
-  you turn it off, and it never plays when the app reloads.
+  coffee rises and the app appears. Tap anywhere to skip it. It is off until
+  you turn it on, and it never plays when the app reloads.
 - **Keep the screen on while a shot runs** (*installed app only*) holds the
   screen awake from the start of an extraction until a minute after it ends, wherever in the app
   you are. The minute of grace gives you time to read the result without the
