@@ -650,13 +650,16 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
   assert.equal(nodes.hProfileElapsed.textContent, '3600s');
   render({...profile, windowMs: 0});
   assert.equal(nodes.hProfileWindow.textContent, '—');
-  // The automatic switch follows the controller unless a change is pending.
+  // The automatic switch keeps a pending pick until the controller reports it.
   render({...profile, autoStart: true});
   assert.equal(nodes.scaleProfileAuto.checked, true);
-  nodes.scaleProfileAuto.dataset.pending = 1;
+  Object.assign(nodes.scaleProfileAuto, {checked: false, dataset: {pending: 'false'}});
+  render({...profile, autoStart: true});
+  assert.equal(nodes.scaleProfileAuto.checked, false);
   render({...profile, autoStart: false});
+  assert.equal(nodes.scaleProfileAuto.dataset.pending, undefined);
+  render({...profile, autoStart: true});
   assert.equal(nodes.scaleProfileAuto.checked, true);
-  delete nodes.scaleProfileAuto.dataset.pending;
   render({...profile, state: 'saved', recordCount: 8192});
   assert.match(nodes.hProfileCapacity.textContent, /^50%/);
   render({...profile, state: 'stopped', persistence: 'failed', lastError: 'save_failed', canDownload: true});

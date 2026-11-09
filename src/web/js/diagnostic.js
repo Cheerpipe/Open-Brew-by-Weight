@@ -2388,12 +2388,13 @@ export function init() {
       R.command("/api/v1/diagnostic/scale-profile", { action: "delete" }),
     );
   $("scaleProfileDownloadButton").onclick = () => R.downloadScaleProfile();
-  // The switch keeps the user's pick until its command settles.
-  $("scaleProfileAuto").onchange = ({ currentTarget: c }) => {
-    c.dataset.pending = 1;
-    R.command("/api/v1/diagnostic/scale-profile", { action: "auto", enabled: c.checked }).finally(
-      () => delete c.dataset.pending,
-    );
+  // The reply only means queued: the switch keeps the pick until reported.
+  $("scaleProfileAuto").onchange = async ({ currentTarget: c }) => {
+    const want = (c.dataset.pending = String(c.checked)),
+      release = () => c.dataset.pending === want && delete c.dataset.pending;
+    (await R.command("/api/v1/diagnostic/scale-profile", { action: "auto", enabled: c.checked }))
+      ? setTimeout(release, 1e4)
+      : release();
   };
   $("heapMapDownload").onclick = () => (downloadHeapMap(), false);
   $("shotStorage").addEventListener("toggle", loadShotStorage);
@@ -2458,6 +2459,7 @@ function applyScaleProfile(p) {
   });
   const auto = $("scaleProfileAuto");
   auto.disabled = !valid || !R.webUiOwner;
+  if (auto.dataset.pending === String(!!p?.autoStart)) delete auto.dataset.pending;
   if (!auto.dataset.pending) auto.checked = !!p?.autoStart;
   if (!valid) {
     set("State", error || __WEBUI_TEXT__("diagnostic.profile_unavailable"));
