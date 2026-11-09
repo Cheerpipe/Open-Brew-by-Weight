@@ -995,6 +995,51 @@ struct MicraWebSocketTest {
     service.stopWebSocket(true);
     delete service.work_;
   }
+  // An unrecognized cleaning label or a removed cleaning widget is no
+  // supervision either, even while connected: the same bound applies, a
+  // recognized status resets it and a live attempt is never released.
+  static void backflushReleasedOnUnrecognizedStatus() {
+    const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
+    const char *unknown = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Rinsing"}}]})";
+    const char *removed = R"({"removedWidgets":["CMBackFlush"]})";
+    now = 1000;
+    OpenBrewByWeightMicraService service;
+    service.config_.accountConfigured = true;
+    std::strcpy(service.config_.selectedSerial, "synthetic");
+    service.staConnected_.store(true);
+    service.tokenAvailable_.store(true);
+    service.tokenIssuedAtMs_.store(millis());
+    service.serviceWebSocket();
+    subscribe(service);
+    const auto poll = [&](uint32_t elapsedMs) {
+      now += elapsedMs;
+      service.websocketStatus_.pongAtMs = millis();  // The link stays live.
+      return service.backflush(true);
+    };
+    MachineBackflushPermit permit;
+    for (const char *unsupervised : {unknown, removed}) {
+      deliver(service, observation(service, awaiting));
+      deliver(service, observation(service, unsupervised));
+      assert(poll(0).busy() && poll(BACKFLUSH_MAX_CIRCUIT_CLOSED_MS - 1).busy());
+      assert(service.physicalStart(&permit) == MachinePhysicalStartDisposition::BLOCKED_CLEANING);
+      assert(!poll(1).busy());
+      assert(service.physicalStart(&permit) == MachinePhysicalStartDisposition::NORMAL &&
+             !permit.attempt);
+    }
+    deliver(service, observation(service, awaiting));
+    deliver(service, observation(service, unknown));
+    (void)poll(0);
+    (void)poll(BACKFLUSH_MAX_CIRCUIT_CLOSED_MS - 1);
+    deliver(service, observation(service, awaiting));
+    assert(poll(1).busy() && poll(BACKFLUSH_MAX_CIRCUIT_CLOSED_MS).busy());
+    assert(service.physicalStart(&permit) == MachinePhysicalStartDisposition::BACKFLUSH_CANDIDATE);
+    deliver(service, observation(service, unknown));
+    assert(poll(0).busy() && poll(BACKFLUSH_MAX_CIRCUIT_CLOSED_MS).busy());
+    service.finishBackflush(permit.attempt);
+    assert(!poll(0).busy());
+    service.stopWebSocket(true);
+    delete service.work_;
+  }
   static void backflushIdlePoll() {
     const char *standby = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})";
     const char *requested = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
@@ -2293,6 +2338,7 @@ int main() {
   openbrewbyweight::MicraWebSocketTest::commandsSkipUnchangedMachineState();
   openbrewbyweight::MicraWebSocketTest::backflushContract();
   openbrewbyweight::MicraWebSocketTest::backflushReleasedAfterLostLink();
+  openbrewbyweight::MicraWebSocketTest::backflushReleasedOnUnrecognizedStatus();
   openbrewbyweight::MicraWebSocketTest::backflushIdlePoll();
   openbrewbyweight::MicraWebSocketTest::pongPublicationRace();
   openbrewbyweight::MicraWebSocketTest::concurrentStatusLifecycle();

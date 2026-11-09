@@ -1,10 +1,12 @@
 #include <atomic>
 #include <cassert>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <functional>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <sys/time.h>
 #include "machine/OpenBrewByWeightMicraPublicIdentityCache.h"
@@ -18,8 +20,20 @@ static uint32_t testNowMs = 1000, performAdvanceMs = 0, lastWaitTicks = 0;
 uint32_t millis() { return testNowMs; }
 void xTaskNotifyGive(TaskHandle_t) {}
 // The queue() mux-wait detector's emit path; uncontended waits never reach it.
+// It also records the unrecognized cleaning notice.
+static std::string cleaningTrace;
+static unsigned cleaningTraces = 0;
 void serialTraceCategoryf(openbrewbyweight::LogLevel, openbrewbyweight::DebugCategory,
-                          const char *, ...) {}
+                          const char *format, ...) {
+  char line[160];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(line, sizeof(line), format, args);
+  va_end(args);
+  if (!std::strstr(line, "cleaning status")) return;
+  cleaningTrace = line;
+  ++cleaningTraces;
+}
 void addDebugEventDetail(openbrewbyweight::DebugCategory, openbrewbyweight::DebugCode,
                          int32_t, int32_t, const char *) {}
 void shotTraceNoteMicraRx(uint32_t) {}
@@ -122,6 +136,7 @@ struct MicraCancellationTest {
   static void tokenDiscardedOnCloudRefusal();
   static void relistKeepsSavedMachine();
   static void idleClosesWebSocketModeClient();
+  static void unrecognizedCleaningLogged();
   static void postWakeSettledFromPush();
   static void companionRouteNeverReads();
   static void run();
@@ -774,6 +789,32 @@ void MicraCancellationTest::idleClosesWebSocketModeClient() {
   }
 }
 
+// The Web UI log names an unrecognized cleaning status once per change.
+void MicraCancellationTest::unrecognizedCleaningLogged() {
+  OpenBrewByWeightMicraService service;
+  service.publishConfig(LineaMicraPersistedSettings{}, 1);
+  service.clearSessionRequested_.store(false);
+  auto &ws = service.websocketStatus_;
+  const auto loop = [&] { try { service.taskLoop(); } catch (const WorkerStopped &) {} };
+  loop();
+  assert(cleaningTraces == 0);  // Nothing received yet.
+  ws.cleaningAtMs = millis();
+  ws.cleaningAvailable = true;
+  std::strcpy(ws.cleaningLabel, "Rinsing");
+  loop();
+  loop();
+  assert(cleaningTraces == 1 && cleaningTrace ==
+         "Micra cleaning status \"Rinsing\" not recognized: paddle starts refused for up to 3 min");
+  ws.cleaningAvailable = false;
+  loop();
+  assert(cleaningTraces == 2 && cleaningTrace.find("\"(removed)\"") != std::string::npos);
+  ws.cleaning = MicraCleaningState::OFF;
+  loop();
+  ws.cleaning = MicraCleaningState::UNKNOWN;
+  loop();
+  assert(cleaningTraces == 3);
+}
+
 void MicraCancellationTest::postWakeSettledFromPush() {
   for (const bool live : {true, false}) {
     OpenBrewByWeightMicraService service;
@@ -857,6 +898,7 @@ int main() {
   MicraCancellationTest::postWakeSettledFromPush();
   MicraCancellationTest::relistKeepsSavedMachine();
   MicraCancellationTest::idleClosesWebSocketModeClient();
+  MicraCancellationTest::unrecognizedCleaningLogged();
   MicraCancellationTest::retireBackflushConfiguration();
   MicraCancellationTest::invalidAuthLatchesApiObservation();
   MicraCancellationTest::tokenDiscardedOnCloudRefusal();

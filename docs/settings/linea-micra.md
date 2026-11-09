@@ -384,6 +384,11 @@ with the usual protections, even while the connection is still down. If the app
 still shows the backflush request once the connection returns, cancel it and
 request it again.
 
+The same three-minute limit applies if La Marzocco reports a cleaning status
+the controller does not recognize, for example after an update to the
+machine or the app. The log names that status, so it can be supported in a
+later firmware version.
+
 Disabling observation, switching to API monitoring, or changing the connected
 account or machine ends supervised backflush. Return the paddle OFF before
 starting again. The previous cleaning request does not keep ordinary operation

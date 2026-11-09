@@ -924,12 +924,14 @@ void OpenBrewByWeightMicraService::qualifyBackflushLocked() {
       observationFence_.offline || !staConnected_.load() || apActive_.load();
   if (linkLost || shotActive_.load() || outboundShotActive.load() || outboundMaintenance.load())
     backflush_.invalidate();
-  // Only the cloud can resolve a cleaning episode. Without it, once any
-  // program has certainly ended, starts follow the ordinary caps; local
-  // activity pauses supervision without hiding the machine's state.
-  if (!linkLost) backflushLinkLostAtMs_ = 0;
-  else if (!backflushLinkLostAtMs_) backflushLinkLostAtMs_ = now ? now : 1;
-  else if (now - backflushLinkLostAtMs_ >= BACKFLUSH_MAX_CIRCUIT_CLOSED_MS) backflush_.release();
+  // Only a recognized cloud status can resolve a cleaning episode. Without
+  // one (link lost, unknown label, widget removed), once any program has
+  // certainly ended, starts follow the ordinary caps; local activity pauses
+  // supervision without hiding the machine's state.
+  if (!linkLost && websocketStatus_.cleaning != MicraCleaningState::UNKNOWN)
+    backflushUnsupervisedAtMs_ = 0;
+  else if (!backflushUnsupervisedAtMs_) backflushUnsupervisedAtMs_ = now ? now : 1;
+  else if (now - backflushUnsupervisedAtMs_ >= BACKFLUSH_MAX_CIRCUIT_CLOSED_MS) backflush_.release();
 }
 
 bool OpenBrewByWeightMicraService::backflushReadyLocked() const {
@@ -1187,7 +1189,8 @@ void OpenBrewByWeightMicraService::taskLoop() {
     bool settledFromPush = false;
     LineaMicraBoilerState coffee, steam;
     uint32_t coffeeReadyAt, steamReadyAt;
-    bool boilersChanged;
+    bool boilersChanged, cleaningChanged;
+    char cleaning[sizeof(loggedCleaning_)] = {};
     {
       TaskLockGuard lock(mux_);
       // Boiler readiness is gathered here and logged after the lock, once per
@@ -1202,6 +1205,12 @@ void OpenBrewByWeightMicraService::taskLoop() {
       loggedSteam_ = steam;
       loggedCoffeeReadyAt_ = coffeeReadyAt;
       loggedSteamReadyAt_ = steamReadyAt;
+      // An unrecognized cleaning status, logged once per change after the lock.
+      if (websocketStatus_.cleaningAtMs && websocketStatus_.cleaning == MicraCleaningState::UNKNOWN)
+        copyMicraText(cleaning, sizeof(cleaning),
+                      websocketStatus_.cleaningAvailable ? websocketStatus_.cleaningLabel : "(removed)");
+      cleaningChanged = strcmp(cleaning, loggedCleaning_) != 0;
+      memcpy(loggedCleaning_, cleaning, sizeof(cleaning));
       // The companion feed keeps the state current: no polling and no reads.
       const bool companion = companion_.status.route == MicraCompanionRoute::COMPANION;
       if (config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET) ||
@@ -1299,6 +1308,10 @@ void OpenBrewByWeightMicraService::taskLoop() {
                            lineaMicraBoilerStateName(coffee), coffeeEta,
                            lineaMicraBoilerStateName(steam), steamEta);
     }
+    if (cleaningChanged && cleaning[0])
+      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                           "Micra cleaning status \"%s\" not recognized: paddle starts "
+                           "refused for up to 3 min", cleaning);
     if (haveRequest) {
       if (haveTemperature) {
         executeTemperatureApplication(pending.request,

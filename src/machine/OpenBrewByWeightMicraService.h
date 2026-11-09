@@ -252,7 +252,7 @@ class OpenBrewByWeightMicraService {
   MicraObservationFence observationFence_;
   MachineBackflushObservations backflush_;
   MachineBackflushSnapshot idleBackflush_;  // Control task only; see backflush().
-  uint32_t backflushLinkLostAtMs_ = 0;  // Control task only; see qualifyBackflushLocked().
+  uint32_t backflushUnsupervisedAtMs_ = 0;  // Under mux_; see qualifyBackflushLocked().
   // Control task only, like idleBackflush_: backflush()'s slow path stores
   // its last locked snapshot here and the same task reads it on tryLock
   // misses, with count zeroed so no stale edges are re-served.
@@ -266,6 +266,7 @@ class OpenBrewByWeightMicraService {
   LineaMicraBoilerState loggedCoffee_ = LineaMicraBoilerState::UNKNOWN,
                         loggedSteam_ = LineaMicraBoilerState::UNKNOWN;
   uint32_t loggedCoffeeReadyAt_ = 0, loggedSteamReadyAt_ = 0;
+  char loggedCleaning_[sizeof(MicraWebSocketStatus::cleaningLabel)] = {};
   bool postedPending() const {
     return postedTemperaturePresent_ || postedPowerPresent_ ||
            postedFinishAttempt_ != 0;

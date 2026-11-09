@@ -275,10 +275,12 @@ void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &updat
         ? MachineBackflushPhase::INACTIVE : update.cleaning == MicraCleaningState::REQUESTED
         ? MachineBackflushPhase::AWAITING : update.cleaning == MicraCleaningState::CLEANING
         ? MachineBackflushPhase::ACTIVE : MachineBackflushPhase::UNKNOWN;
+    // A recognized status restarts the unsupervised clock even between polls.
     if (!observationFence_.offline && status.machineConnectedKnown &&
-        status.machineConnected)
+        status.machineConnected) {
       backflush_.observe(phase, ingressAttempt);
-    else if (phase != MachineBackflushPhase::INACTIVE)
+      if (phase != MachineBackflushPhase::UNKNOWN) backflushUnsupervisedAtMs_ = 0;
+    } else if (phase != MachineBackflushPhase::INACTIVE)
       backflush_.observe(MachineBackflushPhase::UNKNOWN, ingressAttempt);
     if (backflush_.status().busy()) {
       desiredPower_ = {};
