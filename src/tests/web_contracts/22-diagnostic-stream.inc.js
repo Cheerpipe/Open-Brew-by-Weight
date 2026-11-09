@@ -189,14 +189,15 @@
   const assert = require('assert').strict;
   const source = fs.readFileSync(path.join(sketchDir, 'web/js/diagnostic.js'), 'utf8');
   const controls = {serialLogLevel: {dataset: {}}, ringRetainLogLevel: {dataset: {}}};
-  let settle, sent;
+  let settle, sent, timer;
   const R = {withBaseRev: (v) => v,
-    command: (url, v) => { sent = v; return {finally: (f) => { settle = f; }}; }};
+    command: (url, v) => { sent = v; return {then: (f) => { settle = f; }}; }};
   // Only the log-level hydration at the top of applyStatus runs here.
-  const [apply, save] = new Function('applyDiagnosticStatus', '$', 'R', source.slice(source.indexOf('const LOG_LEVELS'),
+  const [apply, save] = new Function('applyDiagnosticStatus', '$', 'R', 'setTimeout',
+      source.slice(source.indexOf('const LOG_LEVELS'),
       source.indexOf('export function init(')).replace(/export /g, '').replace('if (!s) return;', 'return;') +
       ';return [applyStatus, saveLogLevel];')(
-      () => {}, id => controls[id], R);
+      () => {}, id => controls[id], R, (f) => { timer = f; });
   apply({config: {serialLogLevel: 'warning', ringRetainLogLevel: 'debug'}});
   assert.equal(controls.serialLogLevel.value, 'warning');
   assert.equal(controls.ringRetainLogLevel.value, 'debug');
@@ -208,11 +209,26 @@
   assert.equal(controls.serialLogLevel.value, 'debug');
   assert.equal(controls.ringRetainLogLevel.value, 'info');
   // RV-08: once a failed save settles, the still-focused select shows the device's value.
-  settle();
+  settle(false);
   assert.equal(controls.serialLogLevel.value, 'warning');
   assert.equal(controls.serialLogLevel.dataset.pending, undefined);
   apply({config: {serialLogLevel: 'error', ringRetainLogLevel: 'info'}});
   assert.equal(controls.serialLogLevel.value, 'error');
+  // An applied save keeps the pick until the stream reports it.
+  controls.serialLogLevel.value = 'info';
+  save('serialLogLevel');
+  settle(true);
+  apply({config: {serialLogLevel: 'error', ringRetainLogLevel: 'info'}});
+  assert.equal(controls.serialLogLevel.value, 'info');
+  apply({config: {serialLogLevel: 'info', ringRetainLogLevel: 'info'}});
+  assert.equal(controls.serialLogLevel.dataset.pending, undefined);
+  // An unconfirmed save hands the select back to the device.
+  controls.serialLogLevel.value = 'debug';
+  save('serialLogLevel');
+  settle(true);
+  timer();
+  assert.equal(controls.serialLogLevel.value, 'info');
+  assert.equal(controls.serialLogLevel.dataset.pending, undefined);
 }
 
 // Firmware projection: bounded field budget, view-scoped dispatch, and wiring.

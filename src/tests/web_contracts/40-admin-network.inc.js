@@ -26,7 +26,7 @@ if (firmware.indexOf('publishLogLevels(runtimeConfig)',
                      firmware.indexOf('persistenceReady = EEPROM.begin')) >
         firmware.indexOf('BOOT_RESET_REASON') ||
     !codeIncludes(ui, "const LOG_LEVELS=['serialLogLevel','ringRetainLogLevel']") ||
-    !codeIncludes(ui, "withBaseRev({[id]:el.value||'none'})") ||
+    !codeIncludes(ui, "withBaseRev({[id]:want})") ||
     !codeIncludes(ui, 'for(const id of LOG_LEVELS)$(id).onchange=()=>saveLogLevel(id)') ||
     !codeIncludes(ui, 'baseRevision') ||
     !network.includes('ringRetainLogLevel') ||

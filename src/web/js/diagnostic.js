@@ -1589,15 +1589,19 @@ async function emptyAudit() {
 }
 const LOG_LEVELS = ["serialLogLevel", "ringRetainLogLevel"];
 let diagConfig = null;
-// A level being saved keeps the user's pick until its command settles, then
-// shows the device's value, which a failed save leaves unchanged.
+// A level being saved keeps the user's pick until the diagnostic stream
+// reports it; a failed or unconfirmed save shows the device's value again.
 function saveLogLevel(id) {
-  const el = $(id);
-  el.dataset.pending = 1;
-  R.command("/api/v1/config", R.withBaseRev({ [id]: el.value || "none" })).finally(() => {
-    delete el.dataset.pending;
-    el.value = diagConfig?.[id] || "none";
-  });
+  const el = $(id),
+    want = (el.dataset.pending = el.value || "none"),
+    release = () => {
+      if (el.dataset.pending !== want) return;
+      delete el.dataset.pending;
+      el.value = diagConfig?.[id] || "none";
+    };
+  R.command("/api/v1/config", R.withBaseRev({ [id]: want })).then((ok) =>
+    ok ? setTimeout(release, 1e4) : release(),
+  );
 }
 // The serial log rides the owned socket (runtime.js registerStream): subscribe
 // with the rendered tail's cursor; watermark-gated frames push new events
@@ -2209,8 +2213,12 @@ function exportLogHistory([from, to]) {
 export function applyStatus(s) {
   applyDiagnosticStatus(s);
   diagConfig = s?.config;
-  for (const id of LOG_LEVELS)
-    if ($(id) && !$(id).dataset.pending) $(id).value = diagConfig?.[id] || "none";
+  for (const id of LOG_LEVELS) {
+    const el = $(id),
+      level = diagConfig?.[id] || "none";
+    if (el?.dataset.pending === level) delete el.dataset.pending;
+    if (el && !el.dataset.pending) el.value = level;
+  }
   if (!s) return;
   // The account email and machine name ride the Home stream beside the
   // header's cloud indicator; diagnosticStatus() merges every model, so each
