@@ -857,13 +857,9 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     bool holdChanged = false;
     // A format chosen in Settings reaches the companion in the next cfg.
     const uint8_t format = beanconquerorEndpoint();
-    uint8_t beanconqueror;
     {
       TaskLockGuard lock(dataMux_);
-      beanconqueror = companionBeanconquerorFormat(g_companion.stored, format);
-    }
-    {
-      TaskLockGuard lock(dataMux_);
+      const uint8_t beanconqueror = companionBeanconquerorFormat(g_companion.stored, format);
       for (size_t index = 0; index < 2; ++index) {
         CompanionLinkSlot &slot = g_companion.links[index];
         holdChanged |= slot.fd >= 0 && slot.snapshotSent &&

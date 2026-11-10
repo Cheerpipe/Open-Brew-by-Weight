@@ -4,6 +4,7 @@
 #include "../OpenBrewByWeightBeanconqueror.h"
 
 #include <cJSON.h>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -123,7 +124,7 @@ int main() {
     for (const cJSON *f = cJSON_GetObjectItemCaseSensitive(c, "flowGS")->child; f; f = f->next, ++index) {
       const double v = cJSON_IsNull(f) ? 0 : f->valuedouble;
       CHECK(flowWork.tenths[index] == static_cast<int16_t>(std::floor(v * 10 + 0.5)));
-      CHECK(flowWork.hundredths[index] == static_cast<int16_t>(std::floor(v * 100 + 0.5)));
+      CHECK(flowWork.hundredths[index] == std::min(32767.0, std::floor(v * 100 + 0.5)));
     }
     const cJSON *gaggiuino = cJSON_GetObjectItemCaseSensitive(c, "gaggiuino");
     const cJSON *gaggimate = cJSON_GetObjectItemCaseSensitive(c, "gaggimate");
