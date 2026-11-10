@@ -39,6 +39,7 @@
 #include <esp_log.h>
 #include <esp_mac.h>
 #include <esp_random.h>
+#include <esp_system.h>
 #include <esp_sntp.h>
 #include <esp_wifi.h>
 #include <mdns.h>

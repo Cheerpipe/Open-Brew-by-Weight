@@ -75,6 +75,13 @@ bool OpenBrewByWeightNetwork::begin(const PersistedSettings &settings,
   initJsonParser();
   ntpAppliedSettingsGeneration_ = ntpSettingsGeneration_;
   g_wallClock.reset();
+  // Power-on and brownout lose the RTC; the other resets keep its NTP time.
+  const esp_reset_reason_t reset = esp_reset_reason();
+  if (reset != ESP_RST_POWERON && reset != ESP_RST_BROWNOUT && reset != ESP_RST_UNKNOWN) {
+    g_wallClock.resume(static_cast<uint32_t>(time(nullptr)), millis());
+    if (g_wallClock.synced())
+      lifecycleLog("Clock resumed from before the restart; NTP will confirm it");
+  }
   if (!ensureRfCoexBt()) {
     log(DebugCategory::NETWORK, DebugCode::INITIALIZATION_FAILED,
         BOOT_SUBSYSTEM_NETWORK, rfCoexLastError());

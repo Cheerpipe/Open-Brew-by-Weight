@@ -15429,6 +15429,25 @@ void n01d_wall_clock_keeps_time_through_failures_and_rebase() {
   CHECK(g_wallClock.snapshot(later).lastSyncAgeMs > NTP_STALE_AFTER_MS);
 }
 
+void n01c_wall_clock_resumes_from_the_rtc() {
+  g_wallClock.reset();
+  g_wallClock.resume(86'400U, 2000);  // an RTC that lost power
+  CHECK(!g_wallClock.synced());
+  g_wallClock.resume(1'800'000'000U, 2000);
+  CHECK(g_wallClock.synced());
+  CHECK(g_wallClock.nowUtcSec(5000) == 1'800'000'003U);
+  TimeStatusSnapshot snap = g_wallClock.snapshot(5000);
+  CHECK(snap.state == TimeSyncState::STALE);
+  CHECK(snap.lastSyncUtcSec == 0U);
+  CHECK(snap.lastSyncAgeMs >= NTP_RESYNC_INTERVAL_MS);  // NTP is due at once
+  g_wallClock.setSyncing("pool.ntp.org", 6000);
+  g_wallClock.queueSyncFromCallback(1'800'000'100U);
+  CHECK(g_wallClock.applyPendingSync(6000));
+  snap = g_wallClock.snapshot(6000);
+  CHECK(snap.state == TimeSyncState::SYNCED && snap.utcSec == 1'800'000'100U);
+  g_wallClock.reset();
+}
+
 void n01b_wall_clock_survives_millis_wrap() {
   g_wallClock.reset();
   g_wallClock.setSyncing("pool.ntp.org", 1000);
@@ -26813,6 +26832,7 @@ const TestCase testCases[] = {
     {"H12", h12_persistence_fast_path_skips_clean_store_mutex},
     {"N01", n01_wall_clock_tracks_utc_from_anchor},
     {"N01b", n01b_wall_clock_survives_millis_wrap},
+    {"N01c", n01c_wall_clock_resumes_from_the_rtc},
     {"N01d", n01d_wall_clock_keeps_time_through_failures_and_rebase},
     {"N01c", n01c_wall_clock_cancel_syncing_restores_anchor},
     {"N02", n02_ntp_hostname_validation},

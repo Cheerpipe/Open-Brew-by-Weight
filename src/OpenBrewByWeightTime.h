@@ -74,6 +74,10 @@ inline uint32_t monotonicRemainingMs(uint32_t deadlineMs, uint32_t nowMs) {
   return remaining > 0 ? static_cast<uint32_t>(remaining) : 0U;
 }
 
+// The Micra cloud client's own "clock synced" bound (November 2023): an RTC
+// that lost power reads near 1970 and never passes it.
+constexpr uint32_t WALL_CLOCK_RESUME_MIN_UTC = 1700000000U;
+
 class WallClock {
  public:
   void reset(TimeSyncState state = TimeSyncState::OFF) {
@@ -89,6 +93,24 @@ class WallClock {
     consecutiveFailures_ = 0;
     activeServer_[0] = '\0';
     pendingSync_ = false;
+#if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
+    !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+    portEXIT_CRITICAL(&mux_);
+#endif
+  }
+
+  // A software, panic or watchdog reset keeps the RTC clock NTP last set:
+  // start from it, reading as stale, so NTP replaces it at its first chance.
+  void resume(uint32_t utcSec, uint32_t monotonicMs) {
+    if (utcSec < WALL_CLOCK_RESUME_MIN_UTC) return;
+#if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
+    !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
+    portENTER_CRITICAL(&mux_);
+#endif
+    anchorUtcSec_ = utcSec;
+    anchorMonotonicMs_ = monotonicMs;
+    lastSyncMonotonicMs_ = monotonicMs - NTP_STALE_AFTER_MS - 1U;
+    state_ = TimeSyncState::SYNCED;
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) && \
     !defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
     portEXIT_CRITICAL(&mux_);

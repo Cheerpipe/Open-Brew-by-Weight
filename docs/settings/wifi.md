@@ -67,7 +67,10 @@ when the zone is saved or whether the controller is retrying a failed write.
 Edits made during a previous save remain available for your next save.
 
 NTP supplies the current UTC time; the saved zone determines how that instant
-appears locally. Changing the zone does not change NTP, past history entries,
+appears locally. After a restart the controller keeps the time it had, so the
+log and History carry real times before Wi-Fi is back; **Diagnostic → Date and
+time** shows it as stale until NTP confirms it, usually within seconds of
+joining Wi-Fi. A power cut loses the clock until NTP sets it again. Changing the zone does not change NTP, past history entries,
 or the controller's brew timers. **Diagnostic → Date and time** shows the saved
 zone and the offset currently applied to it as separate values. Daylight
 saving changes update that offset automatically. The controller includes
