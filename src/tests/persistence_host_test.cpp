@@ -2009,8 +2009,12 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   CHECK(saveQuickStart(QuickStartRecord{}));
   BbwLearningRecord learning;
   CHECK(saveBbwLearning(learning));
+  uint32_t rejectedAccount = 5;
+  CHECK(saveSettingsBlob(NvsSubsystem::SETTINGS, LINEA_MICRA_REJECTED_KEY, rejectedAccount));
 
   CHECK(resetAllDurableStores(settings, ble, log, history, lastShot));
+  CHECK(loadSettingsBlob(NvsSubsystem::SETTINGS, LINEA_MICRA_REJECTED_KEY, rejectedAccount,
+                         [](uint32_t) { return true; }) == SettingsBlobLoad::MISSING);
   CHECK(verifyFactorySettings(settings));
   // Without its record the next boot quick starts every factory preset, and
   // drip learning starts with an empty memory.

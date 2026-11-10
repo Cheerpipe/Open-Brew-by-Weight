@@ -170,6 +170,7 @@ class OpenBrewByWeightMicraService {
   static bool generateInstallationKey(LineaMicraPersistedSettings &settings);
   bool registerInstallation(const LineaMicraPersistedSettings &settings);
   bool signIn(const LineaMicraPersistedSettings &settings);
+  void rememberSignIn(uint32_t account, bool rejected);
   bool refreshToken(const LineaMicraPersistedSettings &settings);
   bool listMachines(const LineaMicraPersistedSettings &settings,
                     LineaMicraDiscoverySnapshot &result);
@@ -295,6 +296,11 @@ class OpenBrewByWeightMicraService {
   MicraWebSocketStatus websocketStatus_;
   bool websocketUnexpectedReconnect_ = false;  // Protected by mux_; survives pauses.
   uint8_t websocketAuthRecoveries_ = 0;  // Cloud owner; survives workspace parking.
+  // lineaMicraAccountKey of the account the cloud refused (NVS; 0 = none).
+  // Read by begin(), then cloud owner. While it names the saved account a
+  // sign-in waits for an edit, a refresh, a relist or a new connection.
+  uint32_t rejectedAccount_ = 0;
+  std::atomic<bool> signInRetryAllowed_{false};
   std::atomic<bool> websocketRetryRequested_{false};
   std::atomic<bool> staConnected_{false};
   std::atomic<bool> apActive_{false};

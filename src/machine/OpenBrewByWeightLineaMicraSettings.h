@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 
 namespace openbrewbyweight {
@@ -139,6 +140,25 @@ inline bool validLineaMicraSettings(
          validLineaMicraSerial(settings.selectedSerial) &&
          lineaMicraBoundedText(settings.selectedName,
                                sizeof(settings.selectedName), true);
+}
+
+// The account La Marzocco last refused, kept so a restart does not sign in
+// with it again: an FNV-1a of the username and password (never 0), stored in
+// NVS key LINEA_MICRA_REJECTED_KEY of the settings namespace (0 = none).
+constexpr const char *LINEA_MICRA_REJECTED_KEY = "micraRejected";
+
+static_assert(LINEA_MICRA_USERNAME_CAPACITY == LINEA_MICRA_PASSWORD_CAPACITY,
+              "lineaMicraAccountKey bounds both fields alike");
+inline uint32_t lineaMicraAccountKey(const LineaMicraPersistedSettings &settings) {
+  uint32_t hash = 2166136261U;
+  for (const char *text : {settings.username, settings.password}) {
+    const size_t length = strnlen(text, LINEA_MICRA_PASSWORD_CAPACITY - 1);
+    for (size_t index = 0; index <= length; ++index) {
+      hash ^= static_cast<uint8_t>(text[index]);
+      hash *= 16777619U;
+    }
+  }
+  return hash | 1U;
 }
 
 inline void wipeLineaMicraSettings(LineaMicraPersistedSettings &settings) {

@@ -9,6 +9,7 @@
 #include "OpenBrewByWeightTaskProfiler.h"
 #include "OpenBrewByWeightMicraPublicIdentityCache.h"
 #include "OpenBrewByWeightPsram.h"
+#include "OpenBrewByWeightPersistedSettings.h"
 
 #include <Arduino.h>
 #include <cJSON.h>
@@ -393,6 +394,17 @@ bool OpenBrewByWeightMicraService::begin() {
   if (task_ != nullptr || psa_crypto_init() != PSA_SUCCESS) {
     return false;
   }
+  if (lockFlashIo()) {
+    OpenBrewByWeightPreferences preferences(NvsSubsystem::SETTINGS);
+    if (preferences.begin(SETTINGS_NAMESPACE, true)) {
+      if (preferences.getBytesLength(LINEA_MICRA_REJECTED_KEY) != sizeof(rejectedAccount_) ||
+          preferences.getBytes(LINEA_MICRA_REJECTED_KEY, &rejectedAccount_,
+                               sizeof(rejectedAccount_)) != sizeof(rejectedAccount_))
+        rejectedAccount_ = 0;
+      preferences.end();
+    }
+    unlockFlashIo();
+  }
   if (xTaskCreatePinnedToCore(taskEntry, "micra_cloud", kWorkerStackBytes, this,
                              tskIDLE_PRIORITY, &task_, 0) != pdPASS) {
     return false;
@@ -557,8 +569,10 @@ void OpenBrewByWeightMicraService::publishConfig(
                            LINEA_MICRA_POWER_ON_WITH_SCALE)) == 0;
   wipeLineaMicraSettings(effective);
   if (identityChanged || transportChanged || cloudDisabled) {
-    if (identityChanged || transportChanged)
+    if (identityChanged || transportChanged) {
       websocketRetryRequested_.store(true, std::memory_order_release);
+      signInRetryAllowed_.store(true, std::memory_order_release);
+    }
     clearSessionRequested_.store(true, std::memory_order_release);
     abortRequested_.store(true, std::memory_order_release);
   } else if ((cancelObservation &&
@@ -663,6 +677,7 @@ bool OpenBrewByWeightMicraService::queueConnect(uint32_t requestId,
   pending_.request.requestId = requestId;
   pending_.request.configGeneration = configGeneration_;
   pending_.request.type = LineaMicraRequestType::CONNECT;
+  signInRetryAllowed_.store(true, std::memory_order_release);
   pending_.credentials = credentials;
   pending_.identityGeneration = identityGeneration_;
   pending_.present = true;
@@ -688,6 +703,7 @@ bool OpenBrewByWeightMicraService::queueRelist(uint32_t requestId) {
   pending_.request.requestId = requestId;
   pending_.request.configGeneration = configGeneration_;
   pending_.request.type = LineaMicraRequestType::LIST_MACHINES;
+  signInRetryAllowed_.store(true, std::memory_order_release);
   pending_.credentials = config_;
   pending_.identityGeneration = identityGeneration_;
   pending_.present = true;
@@ -792,6 +808,7 @@ bool OpenBrewByWeightMicraService::queueLocked(const LineaMicraRequest &request)
   pending_.present = true;
   published_.requestId = request.requestId;
   websocketRetryRequested_.store(true, std::memory_order_release);
+  signInRetryAllowed_.store(true, std::memory_order_release);
   published_.phase = LineaMicraPhase::QUEUED;
   published_.error = LineaMicraError::NONE;
   xTaskNotifyGive(task_);
@@ -2254,6 +2271,17 @@ bool OpenBrewByWeightMicraService::registerInstallation(
 
 bool OpenBrewByWeightMicraService::signIn(
     const LineaMicraPersistedSettings &settings) {
+  const uint32_t account = lineaMicraAccountKey(settings);
+  if (account == rejectedAccount_ &&
+      !signInRetryAllowed_.exchange(false, std::memory_order_acq_rel)) {
+    // Reads as the refusal it repeats, so both lanes keep their auth latch.
+    work_->httpStatus = 401;
+    work_->transportFailure = work_->policyRequired = false;
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                         "Micra sign-in skipped: La Marzocco refused this account; "
+                         "edit it or refresh to try again");
+    return false;
+  }
   if (!ensureIoBuffer()) return false;
   char username[2 * LINEA_MICRA_USERNAME_CAPACITY];
   char password[2 * LINEA_MICRA_PASSWORD_CAPACITY];
@@ -2276,6 +2304,7 @@ bool OpenBrewByWeightMicraService::signIn(
   if (!cloudRequest(settings, kSignInUrl, HTTP_METHOD_POST, io_->body, false,
                     {"sign_in", "/auth/signin"})) {
     releaseIoBuffer();
+    if (work_->httpStatus == 401 && !work_->policyRequired) rememberSignIn(account, true);
     return false;
   }
   cJSON *root = parseResponse(io_->response);
@@ -2297,7 +2326,28 @@ bool OpenBrewByWeightMicraService::signIn(
   work_->accessTokenIssuedAtMs = millis();
   tokenIssuedAtMs_.store(work_->accessTokenIssuedAtMs, std::memory_order_release);
   tokenAvailable_.store(true, std::memory_order_release);
+  rememberSignIn(account, false);
   return true;
+}
+
+// Cloud owner. A sign-in never runs during a shot (networkEligible and the
+// WebSocket admission), so this small write stays out of the shot window.
+void OpenBrewByWeightMicraService::rememberSignIn(uint32_t account, bool rejected) {
+  const uint32_t next = rejected ? account : 0;
+  if (next == rejectedAccount_) return;
+  bool saved = false;
+  if (lockFlashIo()) {
+    OpenBrewByWeightPreferences preferences(NvsSubsystem::SETTINGS);
+    if (preferences.begin(SETTINGS_NAMESPACE, false)) {
+      saved = preferences.putBytes(LINEA_MICRA_REJECTED_KEY, &next, sizeof(next)) == sizeof(next);
+      preferences.end();
+    }
+    unlockFlashIo();
+  }
+  rejectedAccount_ = next;
+  if (!saved)
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                         "Micra sign-in result not saved; a restart may sign in again");
 }
 
 bool OpenBrewByWeightMicraService::refreshToken(

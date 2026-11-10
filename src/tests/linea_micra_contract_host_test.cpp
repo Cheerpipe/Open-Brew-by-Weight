@@ -20,7 +20,19 @@ int main() {
   unterminated->connectionType = static_cast<uint8_t>(MicraConnectionType::API);
   unterminated->accountConfigured = true;
   assert(!validLineaMicraSettings(*unterminated));
+  assert(lineaMicraAccountKey(*unterminated) != 0);  // bounded, never "none"
   delete unterminated;
+  // The rejected-account key follows the username and the password.
+  LineaMicraPersistedSettings account;
+  std::strcpy(account.username, "barista@example.com");
+  std::strcpy(account.password, "old-password");
+  const uint32_t rejected = lineaMicraAccountKey(account);
+  assert(rejected != 0 && rejected == lineaMicraAccountKey(account));
+  std::strcpy(account.password, "new-password");
+  assert(lineaMicraAccountKey(account) != rejected);
+  std::strcpy(account.password, "old-password");
+  std::strcpy(account.username, "other@example.com");
+  assert(lineaMicraAccountKey(account) != rejected);
   MicraPublicIdentityCache identity;
   int derivations = 0;
   const char *activeId = "installation-a";

@@ -127,7 +127,8 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   if (!clearFirmwareMode() || !eraseWebAccessStored() || !eraseCardDismissals() ||
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, QUICK_START_KEY) ||
-      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, BBW_LEARNING_KEY)) {
+      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, BBW_LEARNING_KEY) ||
+      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, LINEA_MICRA_REJECTED_KEY)) {
     return false;
   }
 #endif

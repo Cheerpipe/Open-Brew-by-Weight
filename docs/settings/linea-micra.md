@@ -169,7 +169,9 @@ signs in again first, and the card appears only if that fails too.
 - **La Marzocco won't sign in this account** means it turns down the saved
   email and password, usually because the password was changed. Check that
   they work in the La Marzocco app, then choose **Check account** and sign in
-  again.
+  again. Until you do, the controller does not try that email and password
+  again, even after a restart, so La Marzocco has no reason to lock the
+  account.
 - **La Marzocco is refusing this account** means the account no longer has
   access to the machine. Open the La Marzocco app with the same account, make
   sure your machine is listed and nothing is waiting for you there, then
