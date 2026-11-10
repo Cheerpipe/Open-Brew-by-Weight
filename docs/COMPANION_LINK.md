@@ -117,7 +117,7 @@ public key; it discards its request key.
 | Body | Effect |
 | --- | --- |
 | `{"action":"approve","code":"123456","lm":true,"log":true,"archive":true,"bc":true}` | Approves the open request; `lm`, `log`, `archive` and `bc` (optional, `true` when absent) are the La Marzocco, diagnostic log, shot archive and Beanconqueror switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
-| `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids) |
+| `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids, kept across restarts) |
 | `{"action":"unignore"}` | Forgets the ignored ids |
 | `{"action":"forget"}` | Removes the pairing and closes the link; the next link attempt receives `erase` |
 | `{"action":"switches","ui":false,"lm":true,"log":true,"archive":true,"bc":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere), `log` **Diagnostic log through the companion**, `archive` **Shot archive in the companion** and `bc` **Beanconqueror through the companion** (every build). An open link receives a new `cfg` |

@@ -132,8 +132,9 @@ Companion → Connect to a companion at…** and tap **Open its page**. The
 companion's page opens in a new tab: choose **Pair** there, then come back to
 Admin for the code.
 
-**Ignore** turns down a companion you do not want, and it stops asking.
-**Stop ignoring** lets ignored companions ask again.
+**Ignore** turns down a companion you do not want, and it stops asking, even
+after the controller restarts. **Stop ignoring** lets ignored companions ask
+again.
 
 Pairing never sends your La Marzocco password in the clear: the controller
 hands the account over encrypted, only to the companion you approved. The

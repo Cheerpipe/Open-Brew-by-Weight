@@ -11,6 +11,7 @@
 namespace openbrewbyweight {
 
 constexpr const char *COMPANION_KEY = "companion";
+constexpr const char *COMPANION_IGNORED_KEY = "cmpIgnored";
 
 enum class CompanionLoad : uint8_t { LOADED, PROMOTED, MISSING, INVALID };
 
@@ -53,7 +54,8 @@ inline bool saveCompanionStored(CompanionStored &stored) {
 }
 
 inline bool eraseCompanionStored() {
-  return eraseSettingsNvsKey(NvsSubsystem::COMPANION, COMPANION_KEY);
+  return eraseSettingsNvsKey(NvsSubsystem::COMPANION, COMPANION_KEY) &&
+         eraseSettingsNvsKey(NvsSubsystem::COMPANION, COMPANION_IGNORED_KEY);
 }
 
 }  // namespace openbrewbyweight

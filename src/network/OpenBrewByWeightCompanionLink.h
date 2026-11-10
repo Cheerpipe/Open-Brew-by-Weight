@@ -648,12 +648,24 @@ inline bool companionCodeReady(const CompanionRequest &request) {
   return request.state == CompanionPairState::PENDING && request.keyReady && request.revealed;
 }
 
+// The ignored ids keep an NVS key of their own (CompanionStore.h), so they
+// outlive a restart without changing the pairing blob an older image reads.
+struct CompanionIgnoredIds {
+  char ids[COMPANION_IGNORED_IDS][COMPANION_ID_TEXT] = {};
+  uint8_t next = 0;
+};
+
+inline bool validCompanionIgnored(const CompanionIgnoredIds &ignored) {
+  return ignored.next < COMPANION_IGNORED_IDS &&
+         std::all_of(std::begin(ignored.ids), std::end(ignored.ids),
+                     [](const char *id) { return id[0] == '\0' || companionIdValid(id); });
+}
+
 struct CompanionPairing {
   CompanionRequest request = {};
   uint32_t newAtMs = 0;
   bool newSeen = false;
-  char ignored[COMPANION_IGNORED_IDS][COMPANION_ID_TEXT] = {};
-  uint8_t ignoredNext = 0;
+  CompanionIgnoredIds ignored = {};
 };
 
 inline void companionPairTick(CompanionPairing &pairing, uint32_t now) {
@@ -664,14 +676,14 @@ inline void companionPairTick(CompanionPairing &pairing, uint32_t now) {
 }
 
 inline bool companionIgnored(const CompanionPairing &pairing, const char *id) {
-  return std::any_of(std::begin(pairing.ignored), std::end(pairing.ignored),
+  return std::any_of(std::begin(pairing.ignored.ids), std::end(pairing.ignored.ids),
                      [id](const char *ignored) {
                        return ignored[0] != '\0' && strcmp(ignored, id) == 0;
                      });
 }
 
 inline uint8_t companionIgnoredCount(const CompanionPairing &pairing) {
-  return static_cast<uint8_t>(std::count_if(std::begin(pairing.ignored), std::end(pairing.ignored),
+  return static_cast<uint8_t>(std::count_if(std::begin(pairing.ignored.ids), std::end(pairing.ignored.ids),
                                             [](const char *ignored) { return ignored[0] != '\0'; }));
 }
 
@@ -773,17 +785,14 @@ inline bool companionPairIgnore(CompanionPairing &pairing, uint32_t now) {
   CompanionRequest &request = pairing.request;
   if (request.state != CompanionPairState::PENDING || request.approving) return false;
   if (!companionIgnored(pairing, request.id)) {
-    memcpy(pairing.ignored[pairing.ignoredNext], request.id, COMPANION_ID_TEXT);
-    pairing.ignoredNext = (pairing.ignoredNext + 1) % COMPANION_IGNORED_IDS;
+    memcpy(pairing.ignored.ids[pairing.ignored.next], request.id, COMPANION_ID_TEXT);
+    pairing.ignored.next = (pairing.ignored.next + 1) % COMPANION_IGNORED_IDS;
   }
   request.state = CompanionPairState::DENIED;
   return true;
 }
 
-inline void companionUnignore(CompanionPairing &pairing) {
-  memset(pairing.ignored, 0, sizeof(pairing.ignored));
-  pairing.ignoredNext = 0;
-}
+inline void companionUnignore(CompanionPairing &pairing) { pairing.ignored = {}; }
 
 // The derived secret makes the request the stored pairing.
 inline void companionPairComplete(CompanionPairing &pairing, CompanionStored &stored,
@@ -1153,7 +1162,7 @@ struct CompanionState {
   bool pingReply = false;  // a ping waits for its `hold` answer (S17)
   uint32_t logFlushAtMs = 0, logGaps = 0;
   CompanionRelay relay = {};
-  bool dirty = false;
+  bool dirty = false, ignoredDirty = false;
 };
 
 // Diagnostic → Companion; strings are sanitized on store.

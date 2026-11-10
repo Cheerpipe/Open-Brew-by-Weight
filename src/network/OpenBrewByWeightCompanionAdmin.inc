@@ -211,6 +211,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     {
       TaskLockGuard lock(self.dataMux_);
       ignored = companionPairIgnore(g_companion.pairing, now);
+      g_companion.ignoredDirty |= ignored;
       memcpy(name, g_companion.pairing.request.name, sizeof(name));
     }
     if (!ignored)
@@ -221,7 +222,10 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     {
       TaskLockGuard lock(self.dataMux_);
       companionUnignore(g_companion.pairing);
+      g_companion.ignoredDirty = true;
     }
+    // An unpaired controller sleeps the companion task that saves the list.
+    self.companionAwake_.store(true, std::memory_order_release);
     self.lifecycleLog("Ignored companions may ask to pair again");
   } else if (!strcmp(action, "forget")) {
     int fds[2] = {-1, -1};

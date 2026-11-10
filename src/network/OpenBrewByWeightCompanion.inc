@@ -291,8 +291,13 @@ void OpenBrewByWeightNetwork::beginCompanion() {
   const CompanionLoad loaded = loadCompanionStored(stored);
   if (loaded == CompanionLoad::INVALID)
     lifecycleLog("Companion pairing unreadable; pair the companion again");
+  CompanionIgnoredIds ignored;
+  if (loadSettingsBlob(NvsSubsystem::COMPANION, COMPANION_IGNORED_KEY, ignored,
+                       validCompanionIgnored) == SettingsBlobLoad::INVALID)
+    lifecycleLog("Ignored companions unreadable; they may ask to pair again");
   g_companion = CompanionState{};
   g_companion.stored = stored;
+  g_companion.pairing.ignored = ignored;
   // A version 1 pairing keeps working; its next switch change writes v2.
   g_companion.dirty = loaded == CompanionLoad::PROMOTED;
   companionAwake_.store(stored.paired != 0 || stored.forgotten != 0, std::memory_order_release);
@@ -317,7 +322,7 @@ void OpenBrewByWeightNetwork::resetCompanion() {
     g_companion.stored = CompanionStored{};
     g_companion.pairing = CompanionPairing{};
     companionRelayDrop(g_companion.relay);
-    g_companion.dirty = false;
+    g_companion.dirty = g_companion.ignoredDirty = false;
   }
   for (const int fd : fds)
     if (fd >= 0 && server_ != nullptr) (void)httpd_sess_trigger_close(server_, fd);
@@ -778,7 +783,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
   // A controller that never paired has nothing to service: not even the lock.
   if (!companionAwake_.load(std::memory_order_acquire)) return;
   uint32_t serial = 0, makeKey = 0, derive = 0;
-  bool pending = false, linkOpen = false, dirty = false;
+  bool pending = false, linkOpen = false, dirty = false, ignoredDirty = false;
   uint8_t companionKey[COMPANION_KEY_BYTES], controllerKey[COMPANION_KEY_BYTES];
   {
     TaskLockGuard lock(dataMux_);
@@ -794,6 +799,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     }
     for (const auto &slot : g_companion.links) linkOpen |= slot.fd >= 0;
     dirty = g_companion.dirty;
+    ignoredDirty = g_companion.ignoredDirty;
   }
   // The request key lives exactly as long as its request.
   if ((!pending || serial != g_companionRequestSerial) && makeKey == 0)
@@ -898,22 +904,28 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     if (httpd_queue_work(server_, companionSendWork, this) != ESP_OK)
       companionSendRetry_.store(true, std::memory_order_release);
   }
-  if (dirty && (companionRetryAtMs_ == 0 || tickReached(now, companionRetryAtMs_)) &&
+  if ((dirty || ignoredDirty) &&
+      (companionRetryAtMs_ == 0 || tickReached(now, companionRetryAtMs_)) &&
       networkFlashWriteAllowed()) {
     CompanionStored stored;
+    CompanionIgnoredIds ignored;
     {
       TaskLockGuard lock(dataMux_);
       stored = g_companion.stored;
-      g_companion.dirty = false;
+      ignored = g_companion.pairing.ignored;
+      g_companion.dirty = g_companion.ignoredDirty = false;
     }
-    const bool saved = saveCompanionStored(stored);
+    const bool saved = (!dirty || saveCompanionStored(stored)) &&
+                       (!ignoredDirty || saveSettingsBlob(NvsSubsystem::COMPANION,
+                                                          COMPANION_IGNORED_KEY, ignored));
     memset(&stored, 0, sizeof(stored));
     if (saved) {
       companionRetryAtMs_ = 0;
     } else {
       {
         TaskLockGuard lock(dataMux_);
-        g_companion.dirty = true;
+        g_companion.dirty |= dirty;
+        g_companion.ignoredDirty |= ignoredDirty;
       }
       companionRetryAtMs_ = (now + 30000U) | 1U;
       lifecycleLog("Companion pairing could not be saved; retrying");

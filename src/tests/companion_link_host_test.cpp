@@ -832,6 +832,18 @@ static void testPairing() {
   CHECK(companionIgnoredCount(many) == COMPANION_IGNORED_IDS);
   CHECK(!companionIgnored(many, "00000000-2f4e-4d7a-9c1b-5e8f0a1d2c3b"));
   CHECK(companionIgnored(many, id));
+  // The list as saved reloads; a torn id or cursor does not.
+  CHECK(validCompanionIgnored(many.ignored) && validCompanionIgnored(CompanionIgnoredIds{}));
+  CompanionPairing restored;
+  restored.ignored = many.ignored;
+  CHECK(companionPairRequest(restored, false, id, "n", "", "10.0.0.2", commitment, 1u) ==
+        CompanionPairResult::IGNORED);
+  CompanionIgnoredIds torn = many.ignored;
+  torn.ids[1][5] = 'x';
+  CHECK(!validCompanionIgnored(torn));
+  torn = many.ignored;
+  torn.next = COMPANION_IGNORED_IDS;
+  CHECK(!validCompanionIgnored(torn));
 }
 
 static void testStoredBlob() {
