@@ -1635,32 +1635,39 @@ const BC_FORMATS = {
   gaggiuino: { name: "Gaggiuino", since: "8.2" },
   gaggimate: { name: "GaggiMate", since: "8.8" },
 };
+// The format the preview shows or is reading, "busy" while a shot runs, or "".
 let bcShown = "";
 // The address in use, always over HTTP: the controller's as typed, or the
 // companion's while it serves Beanconqueror too (else the controller's).
-async function beanconquerorAddress() {
-  const here = location.protocol === "https:" ? await R.companionHere() : null,
-    home = R.settingsStatus() || {},
+// `here` says the side that served this page answers it, so it can preview.
+async function beanconquerorAddress(home) {
+  const here = await R.companionHere(),
     path = "/beanconqueror";
   if (!here?.paired) {
     const ip = /\.local$/i.test(location.hostname) && home.network?.staIp;
-    return { url: "http://" + location.host + path, ip: ip && "http://" + ip + path };
+    return { here: true, url: "http://" + location.host + path, ip: ip && "http://" + ip + path };
   }
-  if (!home.companion?.beanconqueror)
+  // A companion from before this feature reports no format and serves none.
+  if (!home.companion?.beanconqueror || here.beanconqueror === undefined)
     return {
       url: "http://" + (home.network?.staIp || "") + path,
       note: __WEBUI_TEXT__("settings.beanconqueror_companion_off"),
     };
   const port = here.httpPort > 0 && here.httpPort !== 80 ? ":" + here.httpPort : "";
   return {
+    here: true,
     url: "http://" + location.hostname + port + path,
     ip: here.ip && "http://" + here.ip + port + path,
     note: __WEBUI_TEXT__("settings.beanconqueror_companion_serves"),
   };
 }
+// Drawn only while the row is open, and written only when it changes: the
+// note is a live region, and this runs with every Settings paint.
 async function renderBeanconqueror() {
+  if (!$("beanconquerorChoices").closest("details").open) return;
   const format = $("beanconquerorEndpoint").value,
-    f = BC_FORMATS[format];
+    f = BC_FORMATS[format],
+    put = (id, text) => $(id).textContent !== text && ($(id).textContent = text);
   for (const radio of document.querySelectorAll("[name=beanconquerorChoice]")) {
     radio.checked = radio.value === format;
     radio.disabled = !R.controlsMutable;
@@ -1671,63 +1678,93 @@ async function renderBeanconqueror() {
     bcShown = "";
     return;
   }
-  $("beanconquerorPublic").textContent = R.sub(__WEBUI_TEXT__("settings.beanconqueror_public"), [
-    f.name,
-  ]);
-  const importLabel = R.sub(__WEBUI_TEXT__("settings.beanconqueror_import"), [f.name]);
-  $("beanconquerorSteps").replaceChildren(
-    ...[
-      R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_preparation"), [f.since]),
-      R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_machine"), [f.name]),
-      __WEBUI_TEXT__("settings.beanconqueror_step_url"),
-      R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_import"), [importLabel]),
-    ].map((text) => Object.assign(document.createElement("li"), { textContent: text })),
+  put("beanconquerorPublic", R.sub(__WEBUI_TEXT__("settings.beanconqueror_public"), [f.name]));
+  const importLabel = R.sub(__WEBUI_TEXT__("settings.beanconqueror_import"), [f.name]),
+    steps = $("beanconquerorSteps");
+  if (steps.dataset.format !== format) {
+    steps.dataset.format = format;
+    steps.replaceChildren(
+      ...[
+        R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_preparation"), [f.since]),
+        R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_machine"), [f.name]),
+        __WEBUI_TEXT__("settings.beanconqueror_step_url"),
+        R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_import"), [importLabel]),
+      ].map((text) => Object.assign(document.createElement("li"), { textContent: text })),
+    );
+  }
+  const home = R.settingsStatus() || {},
+    a = await beanconquerorAddress(home);
+  // The companion's answer may arrive after another choice.
+  if ($("beanconquerorEndpoint").value !== format) return;
+  put("beanconquerorUrl", a.url);
+  put(
+    "beanconquerorAlt",
+    [a.ip && R.sub(__WEBUI_TEXT__("settings.beanconqueror_alt"), [a.ip]), a.note]
+      .filter(Boolean)
+      .join(" "),
   );
-  const a = await beanconquerorAddress();
-  $("beanconquerorUrl").textContent = a.url;
-  $("beanconquerorAlt").textContent = [
-    a.ip && R.sub(__WEBUI_TEXT__("settings.beanconqueror_alt"), [a.ip]),
-    a.note,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  if ($("beanconquerorChoices").closest("details").open && bcShown !== format)
+  // Only what this side answers, once the controller holds the choice (it is
+  // saved a moment after the tap), and again after each shot.
+  if (
+    a.here &&
+    home.config?.beanconquerorEndpoint === format &&
+    (bcShown !== format || R.shotRunning())
+  )
     loadBeanconquerorPreview(format, importLabel);
 }
 // The served bytes, decoded as Beanconqueror reads them, from the side that
-// served this page; read only while the row is open (Wi-Fi traffic economy).
+// served this page: one request at a time through the device slot, read only
+// while the row is open and never during a shot (Wi-Fi traffic economy).
 async function loadBeanconquerorPreview(format, importLabel) {
-  bcShown = format;
   const box = $("beanconquerorPreview"),
     say = (text) =>
       box.replaceChildren(
         Object.assign(document.createElement("p"), { className: "bcEmpty", textContent: text }),
       );
   box.hidden = false;
+  if (R.shotRunning()) {
+    if (bcShown !== "busy") say(__WEBUI_TEXT__("settings.beanconqueror_busy"));
+    bcShown = "busy";
+    return;
+  }
+  bcShown = format;
   say(__WEBUI_TEXT__("settings.beanconqueror_loading"));
   const get = async (path, binary) => {
-    const r = await fetch("/beanconqueror" + path, { cache: "no-store" });
-    if (r.status === 503) throw new Error("busy");
-    if (!r.ok) return null;
-    return binary ? new DataView(await r.arrayBuffer()) : r.json();
+    let body;
+    try {
+      body = await R.apiBinary("/beanconqueror" + path);
+    } catch (e) {
+      if (e.status === 404) return null;
+      throw e;
+    }
+    return binary ? new DataView(await body.arrayBuffer()) : JSON.parse(await body.text());
   };
   try {
-    const shot = format === "gaggiuino" ? await gaggiuinoPreview(get) : await gaggimatePreview(get);
+    const shot = await (format === "gaggiuino" ? gaggiuinoPreview : gaggimatePreview)(get);
     if (bcShown !== format) return;
-    if (!shot) return say(__WEBUI_TEXT__("settings.beanconqueror_empty"));
-    renderBeanconquerorPreview(box, format, shot, importLabel);
-  } catch (e) {
-    if (bcShown === format)
-      say(
-        e.message === "busy"
-          ? __WEBUI_TEXT__("settings.beanconqueror_busy")
-          : __WEBUI_TEXT__("settings.beanconqueror_failed"),
-      );
+    if (shot) return renderBeanconquerorPreview(box, format, shot, importLabel);
+    if (shot === null) return say(__WEBUI_TEXT__("settings.beanconqueror_empty"));
+    // Not answered here yet (the format is on its way): the next paint asks again.
+    box.hidden = true;
     bcShown = "";
+  } catch (e) {
+    if (bcShown !== format) return;
+    // Busy outside a shot (a rinse, a scale connecting) reads again on the
+    // next paint; any other failure waits for the row to be reopened.
+    const busy = e.status === 503;
+    say(
+      busy
+        ? __WEBUI_TEXT__("settings.beanconqueror_busy")
+        : __WEBUI_TEXT__("settings.beanconqueror_failed"),
+    );
+    if (busy) bcShown = "";
   }
 }
+// Each preview: the shot, null without one, undefined when the format is not served.
 async function gaggiuinoPreview(get) {
-  const id = (await get("/api/shots/latest"))?.[0]?.lastShotId,
+  const latest = await get("/api/shots/latest");
+  if (!latest) return;
+  const id = latest[0]?.lastShotId,
     j = id && (await get("/api/shots/" + id));
   if (!j) return null;
   const d = j.datapoints,
@@ -1744,7 +1781,8 @@ async function gaggiuinoPreview(get) {
 }
 async function gaggimatePreview(get) {
   const index = await get("/api/history/recent.bin?limit=1", true);
-  if (!index || index.byteLength < 160 || index.getUint32(8, true) < 1) return null;
+  if (!index) return;
+  if (index.byteLength < 160 || index.getUint32(8, true) < 1) return null;
   const text = (view, at, size) =>
     new TextDecoder().decode(new Uint8Array(view.buffer, at, size)).replace(/\0.*$/s, "");
   const id = index.getUint32(32, true),
@@ -1764,7 +1802,8 @@ async function gaggimatePreview(get) {
     profile: text(index, 80, 48),
     timestamp: index.getUint32(36, true),
     timeS: index.getUint32(40, true) / 1000,
-    yieldG: index.getUint16(44, true) / 10,
+    // Beanconqueror takes the yield from the last reading, as with a Gaggiuino.
+    yieldG: points.length ? points.at(-1)[1] : index.getUint16(44, true) / 10,
     rating: index.getUint8(46),
     doseG: parseFloat(notes?.doseIn) || 0,
     tempC: count ? slog.getUint16(516, true) / 10 : 0,
@@ -1898,11 +1937,9 @@ function renderBeanconquerorPreview(box, format, s, importLabel) {
     group.append(el("h4", "", title));
     for (const [rowState, label, value, note] of rows.filter((r) => r[0] === state)) {
       const row = el("div", "bcRow " + rowState);
-      row.append(
-        el("span", "bcState " + rowState, { sent: "✓", bc: "≈", none: "–" }[rowState]),
-        el("span", "k", label),
-        el("span", "v", value),
-      );
+      const mark = el("span", "bcState " + rowState, { sent: "✓", bc: "≈", none: "–" }[rowState]);
+      mark.setAttribute("aria-hidden", "true"); // the group heading says it
+      row.append(mark, el("span", "k", label), el("span", "v", value));
       if (note) row.append(el("small", "", note));
       group.append(row);
     }
@@ -2317,8 +2354,11 @@ export function init() {
       bcShown = e.target.open ? "" : bcShown;
       renderBeanconqueror();
     });
-  $("beanconquerorCopy").onclick = async ({ currentTarget: b }) => {
-    await navigator.clipboard?.writeText($("beanconquerorUrl").textContent).catch(() => {});
+  $("beanconquerorCopy").onclick = ({ currentTarget: b }) => {
+    // execCommand copies on the plain-HTTP device UI, which has no async
+    // clipboard; refused, the address stays selected for a manual copy.
+    getSelection().selectAllChildren($("beanconquerorUrl"));
+    if (!document.execCommand("copy")) return;
     b.textContent = __WEBUI_TEXT__("settings.beanconqueror_copied");
     setTimeout(() => (b.textContent = __WEBUI_TEXT__("settings.beanconqueror_copy")), 1500);
   };

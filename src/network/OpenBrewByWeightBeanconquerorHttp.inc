@@ -50,7 +50,7 @@ esp_err_t OpenBrewByWeightNetwork::beanconquerorHandler(httpd_req_t *request) {
   const char *uri = request->uri + strlen("/beanconqueror");
   snprintf(path, sizeof(path), "%.*s", static_cast<int>(strcspn(uri, "?")), uri);
   const auto notFound = [&] {
-    return sendError(request, STATUS_NOT_FOUND, "NOT_FOUND", nullptr, nullptr);
+    return sendError(request, STATUS_NOT_FOUND, "NOT_FOUND", nullptr, "NOT_FOUND");
   };
   if (format == BEANCONQUEROR_OFF) return notFound();
   if (format == BEANCONQUEROR_GAGGIUINO && strcmp(path, "/api/system/status") == 0)
@@ -84,8 +84,16 @@ esp_err_t OpenBrewByWeightNetwork::beanconquerorHandler(httpd_req_t *request) {
   out.flush = beanconquerorChunk;
   out.context = request;
   BeanconquerorShot shot;
+  // A streamed answer closes its socket like every JSON answer (sendJson), so
+  // an app's keep-alive pool never holds one of the few sessions.
+  const auto begin = [&](const char *type) {
+    httpd_resp_set_type(request, type);
+    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(request, "Connection", "close");
+  };
   const auto finish = [&](uint32_t id) {
     const esp_err_t result = out.finish() ? httpd_resp_send_chunk(request, nullptr, 0) : ESP_FAIL;
+    (void)httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
     if (result != ESP_OK)
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
                            "Beanconqueror: %s %lu could not be sent", id ? "shot" : "index",
@@ -112,8 +120,7 @@ esp_err_t OpenBrewByWeightNetwork::beanconquerorHandler(httpd_req_t *request) {
       self.unlockWorkBuf();
       return sendJson(request, STATUS_OK, body);
     }
-    httpd_resp_set_type(request, "application/octet-stream");
-    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+    begin("application/octet-stream");
     const uint32_t count = static_cast<uint32_t>(good < limit ? good : limit);
     beanconquerorIndexHeader(out, count, index && count ? records.records[newest].id + 1U : 0U);
     for (size_t i = 0, sent = 0; i < records.count && sent < count; ++i)
@@ -145,8 +152,7 @@ esp_err_t OpenBrewByWeightNetwork::beanconquerorHandler(httpd_req_t *request) {
   }
   if (read != ShotCurveRead::FOUND) resetShotCurveRecord(curve);  // a shot without a curve
   beanconquerorFlow(curve, shot, work.beanconquerorFlow);
-  httpd_resp_set_type(request, gaggiuino ? "application/json" : "application/octet-stream");
-  httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+  begin(gaggiuino ? "application/json" : "application/octet-stream");
   if (gaggiuino) beanconquerorGaggiuinoShot(shot, curve, work.beanconquerorFlow, out);
   else beanconquerorSlog(out, shot, curve, work.beanconquerorFlow);
   return finish(id);

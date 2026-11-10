@@ -210,7 +210,9 @@ trailing window of at least 1 s, with none at a segment's first reading,
 before the first drop, across a break or a scale-loss window, or overlapping
 a held reading. A missing value is sent as 0. The start time is
 `round(endedAtUnixSec - durationS)` with wall time, otherwise absent (`0` in
-GaggiMate's fields). The yield is `actualG`, which every good shot has.
+GaggiMate's fields). The yield is `actualG`, which every good shot has;
+Beanconqueror itself takes the yield from the last reading's weight in both
+formats.
 
 **Gaggiuino shot.** `id`; `timestamp` (Unix s, only with wall time);
 `duration` (ds); `datapoints` with ten arrays of one entry per sample:
@@ -223,7 +225,8 @@ and `profile` `{id, name, waterTemperature}` (the preset and its target in
 from the last reading.
 
 **GaggiMate index entry** (128 bytes): `id`; `timestamp`; `duration`
-(`durationS` in ms); `volume` (yield, dg); `rating` (0–5); `flags` `0x01`
+(`durationS` in ms, which Beanconqueror uses as the brew time, so it leaves
+out the drip wait); `volume` (yield, dg); `rating` (0–5); `flags` `0x01`
 completed, plus `0x04` when there is a dose; `profileId` (the preset id as
 text, 32 bytes) and `profileName` (UTF-8, at most 47 bytes, never splitting a
 character, 48 bytes); `avgTemp` and `maxPressure` 0 (not measured);
@@ -231,15 +234,18 @@ character, 48 bytes); `avgTemp` and `maxPressure` 0 (not measured);
 
 **GaggiMate `.slog`**: a 512-byte header with `magic` `SHOT`, `version` 7,
 the sample size 30, `headerSize` 512, `sampleInterval` 50, `fieldsMask`
-`0x3FFF`, `sampleCount`, `durationMs` (`durationS` in ms, so Beanconqueror's
-brew time leaves out the drip wait), `startEpoch`, `profileId`,
+`0x3FFF`, `sampleCount`, `durationMs` (`durationS` in ms), `startEpoch`,
+`profileId`,
 `profileName`, `finalWeight` (yield, dg) and no phase transitions; then
 30-byte samples with `t` (ms), `tt` (target, tenths of °C), `vf` (weight
 flow, hundredths of g/s, at most 32767) and `v` (dg). Every other field is 0.
 
 - [`beanconqueror-v1.vectors.json`](beanconqueror-v1.vectors.json): Stats-row
   inputs (`cases[].shot`), the derived flow (`flowGS`), and every answer above
-  for each served case; `bad-short` is not served. Generated from the Web
+  for each served case; `bad-short` is not served, and the `edge-` cases
+  hold the readings the ports could disagree on (repeated times, long gaps,
+  falling and negative weight, the flow field's limit, held readings beside a
+  break, no cutoff, an open scale-loss window). Generated from the Web
   UI's flow; consumed by the firmware host tests, the Web contracts (the
   Settings preview decoder) and the companion's tests, whose fixture copy is
   byte-identical.

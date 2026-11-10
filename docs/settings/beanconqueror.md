@@ -21,7 +21,8 @@ complete of the two. **As a Gaggiuino** works with older versions.
 While an option is on, the section shows a preview of your last shot as
 Beanconqueror will receive it: what it fills in for you, what it works out
 itself (the first drip, from its own threshold), and what it does not get.
-The preview loads when you open the row.
+The preview loads when you open the row, waits while a shot is brewing, and
+then shows the new shot.
 
 Some things are never sent: the controller has no pressure sensor, and the
 bean, the grind and your notes are yours to pick in Beanconqueror. With

@@ -358,16 +358,6 @@ input:is([type="date"], [type="time"])::-webkit-date-and-time-value {
   accent-color: var(--ac);
 }
 
-/* The focus ring follows the rounded card, not the square radio. */
-.setupChoice input:focus-visible {
-  outline: none;
-}
-
-.setupChoice:has(input:focus-visible) {
-  outline: 2px solid var(--ac);
-  outline-offset: 2px;
-}
-
 .setupChoice small {
   display: block;
   font-weight: 400;
@@ -409,6 +399,16 @@ input[readonly],
 textarea[readonly] {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+/* The focus ring follows the rounded card, not the square radio. */
+.setupChoice input:focus-visible {
+  outline: none;
+}
+
+.setupChoice:has(input:focus-visible) {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 
 .selBox[data-paired] > select {
