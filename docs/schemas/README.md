@@ -170,4 +170,5 @@ projects' own formats and are not versioned here:
 - **Beanconqueror brew handoff**: `beanconqueror://ADD_BREW?len=<n>&shareBrew0=…`,
   a gzip-compressed `IHandoffEnvelope` v1 in unpadded base64url split into
   400-character `shareBrew<n>` parameters. Water in is sent as 0 ml because it
-  is not measured. Beanconqueror releases up to 8.7.0 do not accept it.
+  is not measured. Beanconqueror accepts it from 8.8; earlier releases have no
+  `ADD_BREW` route and show their generic wrong-QR-code alert.

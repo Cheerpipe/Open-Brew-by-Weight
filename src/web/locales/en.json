@@ -2552,7 +2552,7 @@
     "stats.bad_low_yield": "Bad \u00b7 low yield",
     "stats.bad_no_yield": "Bad \u00b7 no yield",
     "stats.bad_short": "Bad \u00b7 short",
-    "stats.beanconqueror_hint": "Opens the Beanconqueror app on this device with the shot ready to save",
+    "stats.beanconqueror_hint": "Opens Beanconqueror 8.8 or later on this device with the shot ready to save",
     "stats.beanconqueror_unsupported": "This browser can\u2019t build the Beanconqueror link.",
     "stats.could_not_open_beanconqueror": "Could not open Beanconqueror.",
     "stats.csv_hint": "A table of every good shot for Excel, Numbers or Sheets",

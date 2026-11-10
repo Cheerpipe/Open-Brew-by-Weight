@@ -569,9 +569,10 @@ that shot only:
 - **Open in Beanconqueror** hands the shot to the Beanconqueror app on the same
   phone or tablet, ready to save as a brew with its dose, yield, time, first
   drip, target temperature, rating, and weight curve. Open the Web UI on the
-  device where Beanconqueror is installed. It needs a Beanconqueror version
-  that accepts brews from other apps; versions up to 8.7.0 do not, and on a
-  device without a suitable app nothing happens.
+  device where Beanconqueror is installed. It needs Beanconqueror 8.8 or
+  later: older versions answer with a wrong QR code or content message, so
+  update the app if you see it. On a device without Beanconqueror nothing
+  happens.
 - **JSON** downloads the shot in the same format as the full export, so one
   shot and the whole log read the same way: everything the controller
   recorded about it, with its trace when it has one, as a plain uncompressed
