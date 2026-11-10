@@ -7737,6 +7737,8 @@ function loadSettingsConfig({ config: c, quickRevert }) {
     if (el) el.checked = !!c[k];
   });
   $("noScaleBbwMode").value = c.noScaleBbwMode;
+  if ($("beanconquerorEndpoint"))
+    $("beanconquerorEndpoint").value = c.beanconquerorEndpoint || "off";
   $("buzzerExtendedPulseRate").value = extRate(c.buzzerExtendedPulseRate);
   $("buzzerSlowExtendedPulseRate").value = extRate(c.buzzerSlowExtendedPulseRate);
   $("alertOutputChannel").value = ["scale_only", "buzzer_only", "scale_priority"].includes(
@@ -8136,6 +8138,7 @@ export {
   paceStartNote,
   bbwFormPresetId,
   setSettingsRenderer,
+  settingsStatus,
   initGroupRows,
   renderGroupRows,
   formatHumanTime,

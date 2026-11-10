@@ -310,6 +310,7 @@ function machinePayload() {
     reedConfirmTimeoutMs: $("reedConfirmTimeoutS") ? R.sToMs("reedConfirmTimeoutS") : undefined,
     assumeIdleWhenScaleConnects: $("assumeIdleWhenScaleConnects")?.checked ?? true,
     shotReactTimeoutS: $("shotReactTimeoutS") ? R.number("shotReactTimeoutS") || 0 : undefined,
+    beanconquerorEndpoint: $("beanconquerorEndpoint").value,
     canTareStartTimer: $("canTareStartTimer").checked,
     bookooMuteOnBuzzerOnly: $("bookooMuteOnBuzzerOnly").checked,
     bookooConnectBeepLevel: Number($("bookooConnectBeepLevel").value),
@@ -1628,6 +1629,329 @@ function renderDripChart(c) {
       ? __WEBUI_TEXT__("runtime.drip_status_applied")
       : __WEBUI_TEXT__("runtime.drip_status_learning");
 }
+// Settings → Coffee apps → Beanconqueror (docs/schemas/README.md): the format,
+// the address to paste, and the last shot as the serving side answers it.
+const BC_FORMATS = {
+  gaggiuino: { name: "Gaggiuino", since: "8.2" },
+  gaggimate: { name: "GaggiMate", since: "8.8" },
+};
+let bcShown = "";
+// The address in use, always over HTTP: the controller's as typed, or the
+// companion's while it serves Beanconqueror too (else the controller's).
+async function beanconquerorAddress() {
+  const here = location.protocol === "https:" ? await R.companionHere() : null,
+    home = R.settingsStatus() || {},
+    path = "/beanconqueror";
+  if (!here?.paired) {
+    const ip = /\.local$/i.test(location.hostname) && home.network?.staIp;
+    return { url: "http://" + location.host + path, ip: ip && "http://" + ip + path };
+  }
+  if (!home.companion?.beanconqueror)
+    return {
+      url: "http://" + (home.network?.staIp || "") + path,
+      note: __WEBUI_TEXT__("settings.beanconqueror_companion_off"),
+    };
+  const port = here.httpPort > 0 && here.httpPort !== 80 ? ":" + here.httpPort : "";
+  return {
+    url: "http://" + location.hostname + port + path,
+    ip: here.ip && "http://" + here.ip + port + path,
+    note: __WEBUI_TEXT__("settings.beanconqueror_companion_serves"),
+  };
+}
+async function renderBeanconqueror() {
+  const format = $("beanconquerorEndpoint").value,
+    f = BC_FORMATS[format];
+  for (const radio of document.querySelectorAll("[name=beanconquerorChoice]")) {
+    radio.checked = radio.value === format;
+    radio.disabled = !R.controlsMutable;
+  }
+  $("beanconquerorPublic").hidden = $("beanconquerorHelp").hidden = !f;
+  if (!f) {
+    $("beanconquerorPreview").hidden = true;
+    bcShown = "";
+    return;
+  }
+  $("beanconquerorPublic").textContent = R.sub(__WEBUI_TEXT__("settings.beanconqueror_public"), [
+    f.name,
+  ]);
+  const importLabel = R.sub(__WEBUI_TEXT__("settings.beanconqueror_import"), [f.name]);
+  $("beanconquerorSteps").replaceChildren(
+    ...[
+      R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_preparation"), [f.since]),
+      R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_machine"), [f.name]),
+      __WEBUI_TEXT__("settings.beanconqueror_step_url"),
+      R.sub(__WEBUI_TEXT__("settings.beanconqueror_step_import"), [importLabel]),
+    ].map((text) => Object.assign(document.createElement("li"), { textContent: text })),
+  );
+  const a = await beanconquerorAddress();
+  $("beanconquerorUrl").textContent = a.url;
+  $("beanconquerorAlt").textContent = [
+    a.ip && R.sub(__WEBUI_TEXT__("settings.beanconqueror_alt"), [a.ip]),
+    a.note,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if ($("beanconquerorChoices").closest("details").open && bcShown !== format)
+    loadBeanconquerorPreview(format, importLabel);
+}
+// The served bytes, decoded as Beanconqueror reads them, from the side that
+// served this page; read only while the row is open (Wi-Fi traffic economy).
+async function loadBeanconquerorPreview(format, importLabel) {
+  bcShown = format;
+  const box = $("beanconquerorPreview"),
+    say = (text) =>
+      box.replaceChildren(
+        Object.assign(document.createElement("p"), { className: "bcEmpty", textContent: text }),
+      );
+  box.hidden = false;
+  say(__WEBUI_TEXT__("settings.beanconqueror_loading"));
+  const get = async (path, binary) => {
+    const r = await fetch("/beanconqueror" + path, { cache: "no-store" });
+    if (r.status === 503) throw new Error("busy");
+    if (!r.ok) return null;
+    return binary ? new DataView(await r.arrayBuffer()) : r.json();
+  };
+  try {
+    const shot = format === "gaggiuino" ? await gaggiuinoPreview(get) : await gaggimatePreview(get);
+    if (bcShown !== format) return;
+    if (!shot) return say(__WEBUI_TEXT__("settings.beanconqueror_empty"));
+    renderBeanconquerorPreview(box, format, shot, importLabel);
+  } catch (e) {
+    if (bcShown === format)
+      say(
+        e.message === "busy"
+          ? __WEBUI_TEXT__("settings.beanconqueror_busy")
+          : __WEBUI_TEXT__("settings.beanconqueror_failed"),
+      );
+    bcShown = "";
+  }
+}
+async function gaggiuinoPreview(get) {
+  const id = (await get("/api/shots/latest"))?.[0]?.lastShotId,
+    j = id && (await get("/api/shots/" + id));
+  if (!j) return null;
+  const d = j.datapoints,
+    n = d.timeInShot.length;
+  return {
+    id,
+    profile: j.profile?.name,
+    timestamp: j.timestamp,
+    timeS: n ? d.timeInShot[n - 1] / 10 : j.duration / 10,
+    yieldG: n ? d.shotWeight[n - 1] / 10 : null,
+    tempC: j.profile?.waterTemperature || 0,
+    points: d.timeInShot.map((t, i) => [t / 10, d.shotWeight[i] / 10, d.pumpFlow[i] / 10]),
+  };
+}
+async function gaggimatePreview(get) {
+  const index = await get("/api/history/recent.bin?limit=1", true);
+  if (!index || index.byteLength < 160 || index.getUint32(8, true) < 1) return null;
+  const text = (view, at, size) =>
+    new TextDecoder().decode(new Uint8Array(view.buffer, at, size)).replace(/\0.*$/s, "");
+  const id = index.getUint32(32, true),
+    slog = await get("/api/history/" + String(id).padStart(6, "0") + ".slog", true),
+    notes = await get("/api/history/" + id + ".json");
+  if (!slog) return null;
+  const count = slog.getUint32(16, true),
+    points = [];
+  for (let i = 0, at = 512; i < count && at + 30 <= slog.byteLength; i++, at += 30)
+    points.push([
+      slog.getUint32(at, true) / 1000,
+      slog.getUint16(at + 20, true) / 10,
+      slog.getInt16(at + 18, true) / 100,
+    ]);
+  return {
+    id,
+    profile: text(index, 80, 48),
+    timestamp: index.getUint32(36, true),
+    timeS: index.getUint32(40, true) / 1000,
+    yieldG: index.getUint16(44, true) / 10,
+    rating: index.getUint8(46),
+    doseG: parseFloat(notes?.doseIn) || 0,
+    tempC: count ? slog.getUint16(516, true) / 10 : 0,
+    points,
+  };
+}
+function renderBeanconquerorPreview(box, format, s, importLabel) {
+  const g = (v) => v.toFixed(1) + " g",
+    gaggimate = format === "gaggimate",
+    rows = [
+      [
+        "sent",
+        __WEBUI_TEXT__("settings.beanconqueror_brew_time"),
+        s.timeS.toFixed(1) + " s",
+        gaggimate
+          ? __WEBUI_TEXT__("settings.beanconqueror_brew_time_exact")
+          : __WEBUI_TEXT__("settings.beanconqueror_brew_time_drip"),
+      ],
+      [
+        "sent",
+        __WEBUI_TEXT__("settings.beanconqueror_yield"),
+        s.yieldG == null ? "—" : g(s.yieldG),
+        __WEBUI_TEXT__("settings.beanconqueror_yield_note"),
+      ],
+      ...(gaggimate
+        ? [
+            [
+              s.doseG ? "sent" : "none",
+              __WEBUI_TEXT__("settings.beanconqueror_dose"),
+              s.doseG ? g(s.doseG) : "—",
+              s.doseG
+                ? __WEBUI_TEXT__("settings.beanconqueror_dose_note")
+                : __WEBUI_TEXT__("settings.beanconqueror_dose_missing"),
+            ],
+            [
+              s.rating ? "sent" : "none",
+              __WEBUI_TEXT__("settings.beanconqueror_rating"),
+              s.rating
+                ? R.sub(__WEBUI_TEXT__("settings.beanconqueror_rating_value"), [s.rating])
+                : "—",
+              __WEBUI_TEXT__("settings.beanconqueror_rating_note"),
+            ],
+          ]
+        : []),
+      [
+        s.tempC ? "sent" : "none",
+        __WEBUI_TEXT__("settings.beanconqueror_temperature"),
+        s.tempC ? s.tempC.toFixed(1) + " °C" : "—",
+        gaggimate
+          ? __WEBUI_TEXT__("settings.beanconqueror_temperature_target")
+          : __WEBUI_TEXT__("settings.beanconqueror_temperature_note"),
+      ],
+      [
+        "sent",
+        __WEBUI_TEXT__("settings.beanconqueror_profile"),
+        s.profile || "—",
+        __WEBUI_TEXT__("settings.beanconqueror_profile_note"),
+      ],
+      [
+        s.timestamp ? "sent" : "none",
+        __WEBUI_TEXT__("settings.beanconqueror_date"),
+        s.timestamp
+          ? new Date(s.timestamp * 1000).toLocaleString([], {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })
+          : "—",
+        __WEBUI_TEXT__("settings.beanconqueror_date_note"),
+      ],
+      [
+        "sent",
+        __WEBUI_TEXT__("settings.beanconqueror_graph"),
+        __WEBUI_TEXT__("settings.beanconqueror_graph_value"),
+        gaggimate
+          ? __WEBUI_TEXT__("settings.beanconqueror_graph_weight")
+          : __WEBUI_TEXT__("settings.beanconqueror_graph_pump"),
+      ],
+      [
+        "bc",
+        __WEBUI_TEXT__("settings.beanconqueror_first_drip"),
+        __WEBUI_TEXT__("settings.beanconqueror_first_drip_value"),
+        __WEBUI_TEXT__("settings.beanconqueror_first_drip_note"),
+      ],
+      [
+        "none",
+        __WEBUI_TEXT__("settings.beanconqueror_pressure"),
+        "—",
+        __WEBUI_TEXT__("settings.beanconqueror_pressure_note"),
+      ],
+      ...(gaggimate
+        ? [
+            [
+              "none",
+              __WEBUI_TEXT__("settings.beanconqueror_notes"),
+              "—",
+              __WEBUI_TEXT__("settings.beanconqueror_notes_note"),
+            ],
+          ]
+        : [
+            [
+              "none",
+              __WEBUI_TEXT__("settings.beanconqueror_dose"),
+              "—",
+              __WEBUI_TEXT__("settings.beanconqueror_dose_missing"),
+            ],
+            ["none", __WEBUI_TEXT__("settings.beanconqueror_rating"), "—", ""],
+          ]),
+    ];
+  const el = (tag, cls, text) =>
+    Object.assign(document.createElement(tag), { className: cls, textContent: text ?? "" });
+  const head = el("div", "bcHead");
+  head.append(
+    el("h3", "", __WEBUI_TEXT__("settings.beanconqueror_preview")),
+    el(
+      "small",
+      "",
+      R.sub(__WEBUI_TEXT__("settings.beanconqueror_preview_shot"), [
+        s.timestamp
+          ? new Date(s.timestamp * 1000).toLocaleDateString([], { day: "numeric", month: "short" })
+          : "#" + s.id,
+        s.profile || "—",
+      ]),
+    ),
+  );
+  const groups = [
+    [__WEBUI_TEXT__("settings.beanconqueror_filled"), "sent"],
+    [__WEBUI_TEXT__("settings.beanconqueror_worked_out"), "bc"],
+    [__WEBUI_TEXT__("settings.beanconqueror_not_sent"), "none"],
+  ].map(([title, state]) => {
+    const group = el("div", "bcGroup");
+    group.append(el("h4", "", title));
+    for (const [rowState, label, value, note] of rows.filter((r) => r[0] === state)) {
+      const row = el("div", "bcRow " + rowState);
+      row.append(
+        el("span", "bcState " + rowState, { sent: "✓", bc: "≈", none: "–" }[rowState]),
+        el("span", "k", label),
+        el("span", "v", value),
+      );
+      if (note) row.append(el("small", "", note));
+      group.append(row);
+    }
+    return group;
+  });
+  box.replaceChildren(
+    head,
+    beanconquerorChart(s.points),
+    ...groups,
+    el(
+      "p",
+      "bcFoot",
+      R.sub(__WEBUI_TEXT__("settings.beanconqueror_footer"), [
+        gaggimate
+          ? __WEBUI_TEXT__("settings.beanconqueror_shots_gaggimate")
+          : __WEBUI_TEXT__("settings.beanconqueror_shots_gaggiuino"),
+        importLabel,
+      ]),
+    ),
+  );
+}
+// Weight in the coffee neutral, flow as a quiet line, on the shot's own scale.
+function beanconquerorChart(points) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"),
+    tMax = Math.max(1, ...points.map((p) => p[0])),
+    wMax = Math.max(1, ...points.map((p) => p[1])),
+    fMax = Math.max(1, ...points.map((p) => p[2])),
+    line = (k, max) =>
+      points
+        .map(
+          (p, i) =>
+            (i ? "L" : "M") +
+            ((p[0] / tMax) * 296 + 2).toFixed(1) +
+            " " +
+            (82 - (p[k] / max) * 78).toFixed(1),
+        )
+        .join(""),
+    path = (cls, d) => {
+      const e = document.createElementNS(svg.namespaceURI, "path");
+      e.setAttribute("class", cls);
+      e.setAttribute("d", d);
+      return e;
+    };
+  svg.setAttribute("viewBox", "0 0 300 84");
+  svg.setAttribute("class", "bcChart");
+  svg.setAttribute("aria-hidden", "true");
+  if (points.length) svg.append(path("bcFlow", line(2, fMax)), path("bcWeight", line(1, wMax)));
+  return svg;
+}
 // Each group row summarizes its current values and follows the form while it
 // is edited; keys are the groups' data-g names.
 const on = (id) => !!$(id)?.checked,
@@ -1636,6 +1960,11 @@ const on = (id) => !!$(id)?.checked,
   OFF = __WEBUI_TEXT__("settings.disabled"),
   ON = __WEBUI_TEXT__("runtime.on_2");
 const GROUP_SUMMARIES = {
+  beanconqueror: () =>
+    ({
+      gaggiuino: __WEBUI_TEXT__("settings.beanconqueror_gaggiuino"),
+      gaggimate: __WEBUI_TEXT__("settings.beanconqueror_gaggimate"),
+    })[$("beanconquerorEndpoint")?.value] || OFF,
   recipe: () =>
     on("brewByWeight")
       ? R.sub(__WEBUI_TEXT__("settings.sum_recipe"), [
@@ -1975,8 +2304,27 @@ export function init() {
     };
   }
   syncHeroTintAvailability();
+  // A choice writes the hidden field, which saves with the config section.
+  $("beanconquerorChoices").onchange = ({ target }) => {
+    if (target.name !== "beanconquerorChoice" || !R.controlsMutable) return;
+    $("beanconquerorEndpoint").value = target.value;
+    $("beanconquerorEndpoint").dispatchEvent(new Event("change"));
+    renderBeanconqueror();
+  };
+  $("beanconquerorChoices")
+    .closest("details")
+    .addEventListener("toggle", (e) => {
+      bcShown = e.target.open ? "" : bcShown;
+      renderBeanconqueror();
+    });
+  $("beanconquerorCopy").onclick = async ({ currentTarget: b }) => {
+    await navigator.clipboard?.writeText($("beanconquerorUrl").textContent).catch(() => {});
+    b.textContent = __WEBUI_TEXT__("settings.beanconqueror_copied");
+    setTimeout(() => (b.textContent = __WEBUI_TEXT__("settings.beanconqueror_copy")), 1500);
+  };
   R.setSettingsRenderer((c) => {
     renderDripChart(c);
     R.renderGroupRows($("workflowPanel"), GROUP_SUMMARIES);
+    renderBeanconqueror();
   });
 }

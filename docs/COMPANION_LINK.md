@@ -116,11 +116,11 @@ public key; it discards its request key.
 
 | Body | Effect |
 | --- | --- |
-| `{"action":"approve","code":"123456","lm":true,"log":true,"archive":true}` | Approves the open request; `lm`, `log` and `archive` (optional, `true` when absent) are the La Marzocco, diagnostic log and shot archive switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
+| `{"action":"approve","code":"123456","lm":true,"log":true,"archive":true,"bc":true}` | Approves the open request; `lm`, `log`, `archive` and `bc` (optional, `true` when absent) are the La Marzocco, diagnostic log, shot archive and Beanconqueror switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
 | `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids) |
 | `{"action":"unignore"}` | Forgets the ignored ids |
 | `{"action":"forget"}` | Removes the pairing and closes the link; the next link attempt receives `erase` |
-| `{"action":"switches","ui":false,"lm":true,"log":true,"archive":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere), `log` **Diagnostic log through the companion** and `archive` **Shot archive in the companion** (every build). An open link receives a new `cfg` |
+| `{"action":"switches","ui":false,"lm":true,"log":true,"archive":true,"bc":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere), `log` **Diagnostic log through the companion**, `archive` **Shot archive in the companion** and `bc` **Beanconqueror through the companion** (every build). An open link receives a new `cfg` |
 
 Every action answers `{"ok":true}`. Approve and Ignore without an open request
 answer `409 PAIRING_NOT_PENDING`; Forget and Switches without a pairing answer
@@ -132,7 +132,7 @@ Admin reads the pairing, the open request and the link state from
 ```json
 "companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
  "version":"1.0.0","link":"open","linkAgeS":3600,"peerProtocol":0,
- "ui":true,"log":true,"archive":true,"relay":"ready","relayAgeS":12,"relayRejects":0,
+ "ui":true,"log":true,"archive":true,"bc":true,"relay":"ready","relayAgeS":12,"relayRejects":0,
  "route":"companion","lm":true,"upstream":true,"refused":false,"credentials":true,
  "request":null,"ignored":0}
 ```
@@ -142,7 +142,7 @@ up or went down (`-1` when neither happened since the controller started),
 `peerProtocol` the protocol of the paired companion's last hello that this
 controller refused with `PROTOCOL` (0 when none, or once a link opens), `ui`
 the Web UI switch, `log` the diagnostic log switch, `archive` the shot archive
-switch, `relay` `ready` once a
+switch, `bc` the Beanconqueror switch, `relay` `ready` once a
 [relay handshake](#relay) succeeded
 since the controller started (`down` before and after Forget), `relayAgeS` the
 seconds since the last relay handshake or admitted request (`-1` none since it
@@ -157,12 +157,14 @@ open (`codeReady` once the companion revealed its key and the controller's key
 exists). Home's stream carries `companion.requestName` and
 `companion.requestAddress` (empty strings when no request is open) and
 `companion.archive` (paired with the shot archive switch on, so History and
-Stats opened directly can say the companion keeps a copy). The
-Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
+Stats opened directly can say the companion keeps a copy). The Settings
+stream carries `companion.beanconqueror` (paired with the shot archive and
+Beanconqueror switches on, so Coffee apps can show the companion's address).
+The Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
 `protocol` (the open link's, 0 while down), `peerProtocol`, `link`,
 `linkAgeS`, `reconnects`, `authFailures` (link and relay handshakes), `ui`,
 `log`, `logCursor`, `logFlushS` (age of the last log flush, `-1` never),
-`logGaps` (events reported missing this boot), `archiveSwitch`,
+`logGaps` (events reported missing this boot), `archiveSwitch`, `bcSwitch`,
 `archiveSyncS` (age of the last `rec` or `trc` frame, `-1` never this boot),
 `pushWanted` (this session's `ps`), `pushSent` and `pushSkipped` (this boot),
 `pushLastId`, `pushLastS` (age of the last `ev`, `-1` never this boot),
@@ -234,7 +236,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 
 | Frame | Meaning |
 | --- | --- |
-| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true,"archive":true}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true,"archive":true}`. Sent after `ready` and on every change |
+| `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true,"archive":true,"bc":"gaggimate"}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true,"archive":true,"bc":"off"}`. `bc` is the [Beanconqueror](schemas/README.md#beanconqueror-machine-endpoints-v1) format the companion serves from its archive: **Settings → Coffee apps**' choice (`gaggiuino` or `gaggimate`) while the archive and Beanconqueror switches are on, otherwise `off`; the companion keeps it, so it answers with the controller off, and never asks the controller for those answers. A companion that does not know `bc` serves nothing. Sent after `ready` and on every change, a new format included |
 | `{"t":"dev","name":"Kitchen","id":"AA:BB:CC:DD:EE:FF"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address, and its stable device id (the webhook's `deviceId`), the log store's key. Up to 32 bytes of letters, digits, spaces and hyphens, empty while no name is published yet. Sent first after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |

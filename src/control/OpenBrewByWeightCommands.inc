@@ -295,6 +295,12 @@ void processWebCommand(const WebCommand &command) {
       candidate.idlePowerSavingEnabled = command.config.idlePowerSavingEnabled;
       candidate.performanceBoostEnabled = command.config.performanceBoostEnabled;
       candidate.heroCardMode = command.config.heroCardMode;
+      if (candidate.beanconquerorEndpoint != command.config.beanconquerorEndpoint) {
+        serialTraceCategoryf(LogLevel::INFO, DebugCategory::CONFIG,
+                             "Beanconqueror address: %s",
+                             beanconquerorEndpointId(command.config.beanconquerorEndpoint));
+      }
+      candidate.beanconquerorEndpoint = command.config.beanconquerorEndpoint;
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
       // Host APPLY_CONFIG still carries brew fields; update the active recipe.
       {

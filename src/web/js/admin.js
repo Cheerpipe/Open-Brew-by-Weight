@@ -705,8 +705,10 @@ function applyCompanionStatus(c) {
     $("companionCode").value = "";
     if (__LINEA_MICRA__) $("companionApproveLm").checked = true;
     $("companionApproveLog").checked = true;
-    $("companionApproveArchive").checked = true;
+    $("companionApproveArchive").checked = $("companionApproveBc").checked = true;
   }
+  // Beanconqueror is served from the archive: it needs the archive on.
+  $("companionApproveBc").disabled = !$("companionApproveArchive").checked;
   if (!c.paired) return;
   // From the controller's own address, the way to the companion's Web UI.
   $("companionOpenRow").hidden =
@@ -753,6 +755,8 @@ function applyCompanionStatus(c) {
     if (__LINEA_MICRA__) $("companionLm").checked = !!c.lm;
     $("companionLog").checked = !!c.log;
     $("companionArchive").checked = !!c.archive;
+    $("companionBc").checked = c.bc !== false;
+    companionBcNeedsArchive();
     R.uiState.companionBaseline = R.snapshotControls(companionSwitches());
   }
 }
@@ -782,6 +786,8 @@ function companionCopy(here) {
   ]);
 }
 const companionSwitches = () => document.querySelectorAll("#companionPaired input");
+// Beanconqueror through the companion is served from its archive.
+const companionBcNeedsArchive = () => ($("companionBc").disabled = !$("companionArchive").checked);
 async function saveCompanionSettings() {
   if (!R.uiState.companionDirty) return;
   const ui = $("companionUi").checked;
@@ -801,6 +807,7 @@ async function saveCompanionSettings() {
         ui,
         log: $("companionLog").checked,
         archive: $("companionArchive").checked,
+        bc: $("companionBc").checked,
         ...(__LINEA_MICRA__ && { lm: $("companionLm").checked }),
       },
       __WEBUI_TEXT__("admin.setting_saved"),
@@ -839,6 +846,7 @@ function initCompanion() {
           code: $("companionCode").value,
           log: $("companionApproveLog").checked,
           archive: $("companionApproveArchive").checked,
+          bc: $("companionApproveBc").checked && $("companionApproveArchive").checked,
           ...(__LINEA_MICRA__ && { lm: $("companionApproveLm").checked }),
         }),
       });
@@ -863,7 +871,9 @@ function initCompanion() {
     companionAction({ action: "unignore" }, __WEBUI_TEXT__("admin.companion_unignored")).then(
       R.refreshStatus,
     );
-  for (const el of companionSwitches()) el.onchange = () => sectionDirty("companion", true);
+  for (const el of companionSwitches())
+    el.onchange = () => (companionBcNeedsArchive(), sectionDirty("companion", true));
+  $("companionApproveArchive").onchange = () => applyCompanionStatus(companionState);
   $("saveCompanionButton").onclick = saveCompanionSettings;
   $("revertCompanionButton").onclick = () => revertSection("companion");
 }

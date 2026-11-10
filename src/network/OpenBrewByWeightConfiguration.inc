@@ -189,7 +189,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "bookooConnectBeepLevel", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
-      "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode"};
+      "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode", "beanconquerorEndpoint"};
   ValidationFailure parseError;
   size_t settingFieldCount = 0;
   if (root != nullptr) {
@@ -514,8 +514,11 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
              !jsonBoolean(root, "showDiagnosticPage", candidate.showDiagnosticPage)) {
     parseError = validationFailure("FIELD_BOOLEAN", "showDiagnosticPage");
   } else if (jsonFieldPresent(root, "heroCardMode") &&
-             !jsonHeroCardMode(root, "heroCardMode", candidate.heroCardMode)) {
+             !jsonEnumId(root, "heroCardMode", HERO_CARD_COLORFUL + 1, heroCardModeId, candidate.heroCardMode)) {
     parseError = validationFailure("FIELD_ENUM", "heroCardMode", "technical or colorful");
+  } else if (jsonFieldPresent(root, "beanconquerorEndpoint") && !jsonEnumId(root, "beanconquerorEndpoint",
+             BEANCONQUEROR_ENDPOINT_COUNT, beanconquerorEndpointId, candidate.beanconquerorEndpoint)) {
+    parseError = validationFailure("FIELD_ENUM", "beanconquerorEndpoint", "off, gaggiuino, or gaggimate");
   } else if (jsonFieldPresent(root, "ringRetainLogLevel") &&
              !jsonLogLevel(root, "ringRetainLogLevel",
                            candidate.ringRetainLogLevel)) {

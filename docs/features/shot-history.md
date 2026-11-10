@@ -572,7 +572,8 @@ that shot only:
   device where Beanconqueror is installed. It needs Beanconqueror 8.8 or
   later: older versions answer with a wrong QR code or content message, so
   update the app if you see it. On a device without Beanconqueror nothing
-  happens.
+  happens. To import shots from inside Beanconqueror instead, on any phone,
+  see [Beanconqueror](../settings/beanconqueror.md).
 - **JSON** downloads the shot in the same format as the full export, so one
   shot and the whole log read the same way: everything the controller
   recorded about it, with its trace when it has one, as a plain uncompressed

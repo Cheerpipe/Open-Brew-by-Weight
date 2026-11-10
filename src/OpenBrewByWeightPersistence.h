@@ -91,6 +91,10 @@ inline bool repairPersistedSettings(PersistedSettings &s) {
     r.performanceBoostEnabled = RuntimeConfig{}.performanceBoostEnabled;
     repaired = true;
   }
+  if (r.beanconquerorEndpoint >= BEANCONQUEROR_ENDPOINT_COUNT) {
+    r.beanconquerorEndpoint = RuntimeConfig{}.beanconquerorEndpoint;
+    repaired = true;
+  }
   if (validateRuntimeConfig(r) != ConfigValidationError::NONE ||
       r.timezoneSource >= 3 || r.timezoneAutomatic > 1) {
     reset(r);

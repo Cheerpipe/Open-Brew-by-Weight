@@ -41,11 +41,12 @@ constexpr size_t COMPANION_MAC_HEX = 32;  // first 16 bytes of the frame HMAC
 constexpr size_t COMPANION_ID_TEXT = 37, COMPANION_NAME_TEXT = 33,
                  COMPANION_VERSION_TEXT = 25, COMPANION_ADDRESS_TEXT = 48;
 constexpr uint32_t COMPANION_MAGIC = 0x434D504EU;  // "CMPN"
-constexpr uint16_t COMPANION_STORED_VERSION = 3;
+constexpr uint16_t COMPANION_STORED_VERSION = 4;
 constexpr size_t COMPANION_STORED_V1_BYTES = 328;  // version 1: no logSwitch tail
 
 // One NVS blob. Missing or invalid means "never paired". The tail switches
-// (`logSwitch` from v2, `archiveSwitch` from v3, in what was padding) ride
+// (`logSwitch` from v2, `archiveSwitch` from v3, `bcSwitch` from v4, in what
+// was padding) ride
 // after the checksum: an older blob is the same bytes without them, so
 // promotion is a version bump plus the defaults, and only those switches are
 // outside the checksum's coverage (corruption there changes a switch, not
@@ -69,6 +70,7 @@ struct CompanionStored {
   uint32_t checksum = 0;
   uint8_t logSwitch = 1;  // "Diagnostic log through the companion" (v2)
   uint8_t archiveSwitch = 1;  // "Shot archive in the companion" (v3)
+  uint8_t bcSwitch = 1;  // "Beanconqueror through the companion" (v4)
 };
 static_assert(sizeof(CompanionStored) == 332, "companion blob layout changed");
 
@@ -87,30 +89,39 @@ inline bool validCompanionStored(const CompanionStored &stored) {
   return stored.magic == COMPANION_MAGIC && stored.version == COMPANION_STORED_VERSION &&
          stored.structureSize == sizeof(CompanionStored) && stored.paired <= 1 &&
          stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
-         stored.logSwitch <= 1 && stored.archiveSwitch <= 1 &&
+         stored.logSwitch <= 1 && stored.archiveSwitch <= 1 && stored.bcSwitch <= 1 &&
          stored.checksum == companionChecksum(stored);
 }
 
 // An older blob: v1 read raw into its first COMPANION_STORED_V1_BYTES (no
-// tail), or v2 (logSwitch, then padding). Promotion keeps the pairing and
-// turns the newer switches on (the switches default on, plan T); the caller
-// persists the v3 layout.
+// tail), v2 (logSwitch, then padding) or v3 (archiveSwitch too). Promotion
+// keeps the pairing and the switches it had, and turns the newer ones on (the
+// switches default on, plan T); the caller persists the v4 layout.
 inline bool validCompanionStoredOlder(const CompanionStored &stored) {
   const bool v1 = stored.version == 1 && stored.structureSize == COMPANION_STORED_V1_BYTES,
              v2 = stored.version == 2 && stored.structureSize == sizeof(CompanionStored) &&
-                  stored.logSwitch <= 1;
-  return stored.magic == COMPANION_MAGIC && (v1 || v2) && stored.paired <= 1 &&
+                  stored.logSwitch <= 1,
+             v3 = stored.version == 3 && stored.structureSize == sizeof(CompanionStored) &&
+                  stored.logSwitch <= 1 && stored.archiveSwitch <= 1;
+  return stored.magic == COMPANION_MAGIC && (v1 || v2 || v3) && stored.paired <= 1 &&
          stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
          stored.checksum == companionChecksum(stored);
 }
 
 inline void promoteCompanionStored(CompanionStored &stored) {
   if (stored.version == 1) stored.logSwitch = 1;
+  if (stored.version <= 2) stored.archiveSwitch = 1;
+  stored.bcSwitch = 1;
   stored.version = COMPANION_STORED_VERSION;
   stored.structureSize = sizeof(CompanionStored);
-  stored.archiveSwitch = 1;
   // version and structureSize sit inside the checksummed prefix.
   stored.checksum = companionChecksum(stored);
+}
+
+// The Beanconqueror format the companion serves from its archive: the
+// controller's, while paired with the archive and Beanconqueror switches on.
+inline uint8_t companionBeanconquerorFormat(const CompanionStored &stored, uint8_t format) {
+  return stored.paired && stored.archiveSwitch && stored.bcSwitch ? format : BEANCONQUEROR_OFF;
 }
 
 // --- Request validation and peers -----------------------------------------
@@ -619,7 +630,7 @@ struct CompanionRequest {
   bool revealed = false;   // companionKey holds the key matching the commitment
   bool approving = false;  // the code matched; the network task derives S
   bool lmSwitch = true,    // the switches chosen in the approval panel
-       logSwitch = true, archiveSwitch = true;
+       logSwitch = true, archiveSwitch = true, bcSwitch = true;
   uint8_t wrongCodes = 0;
   uint32_t serial = 0;  // names the request key the network task made
   uint32_t untilMs = 0;
@@ -737,7 +748,7 @@ inline const char *companionPairPoll(CompanionPairing &pairing, const char *id, 
 inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, uint32_t code,
                                                    uint32_t expected, bool lmSwitch,
                                                    bool logSwitch, bool archiveSwitch,
-                                                   uint32_t now) {
+                                                   bool bcSwitch, uint32_t now) {
   companionPairTick(pairing, now);
   CompanionRequest &request = pairing.request;
   if (request.state != CompanionPairState::PENDING || request.approving)
@@ -752,6 +763,7 @@ inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, ui
   request.lmSwitch = lmSwitch;
   request.logSwitch = logSwitch;
   request.archiveSwitch = archiveSwitch;
+  request.bcSwitch = bcSwitch;
   return CompanionApproveResult::OK;
 }
 
@@ -786,6 +798,7 @@ inline void companionPairComplete(CompanionPairing &pairing, CompanionStored &st
   stored.lmSwitch = request.lmSwitch ? 1 : 0;
   stored.logSwitch = request.logSwitch ? 1 : 0;
   stored.archiveSwitch = request.archiveSwitch ? 1 : 0;
+  stored.bcSwitch = request.bcSwitch ? 1 : 0;
   memcpy(stored.secret, secret, COMPANION_SECRET_BYTES);
   memcpy(stored.publicKey, request.companionKey, COMPANION_KEY_BYTES);
   memcpy(stored.id, request.id, sizeof(stored.id));
@@ -837,6 +850,7 @@ struct CompanionLinkSlot {
   // Outbox sequences already sent in this session; the first send is the
   // whole snapshot.
   bool snapshotSent = false, sentUi = true, sentLog = true, sentArchive = true;
+  uint8_t sentBc = BEANCONQUEROR_OFF;  // the format cfg last told it to serve
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
   bool sentSync = false;  // the sync hold the last `hold` frame carried
   bool deviceSent = false;  // this session's `dev` frame
@@ -1145,7 +1159,7 @@ struct CompanionState {
 // Diagnostic → Companion; strings are sanitized on store.
 struct CompanionSnapshot {
   bool paired = false, lmSwitch = false, linkOpen = false, upstream = false, ui = true,
-       relayReady = false, logSwitch = false, archiveSwitch = false;
+       relayReady = false, logSwitch = false, archiveSwitch = false, bcSwitch = false;
   uint32_t relayRejects = 0;
   uint8_t protocol = 0;   // the open link's; 0 while down
   int32_t linkAgeS = -1;  // since the link came up or went down; -1: not since boot

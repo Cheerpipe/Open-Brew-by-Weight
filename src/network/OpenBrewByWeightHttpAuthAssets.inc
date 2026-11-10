@@ -838,7 +838,7 @@ bool OpenBrewByWeightNetwork::rejectForeignHost(httpd_req_t *request) {
        (network.apActive && captiveProbeHost(request) != nullptr)))
     return false;
   logRefusedHost(host, network.mdnsHost);
-  if (strncmp(request->uri, "/api/", 5) == 0) {
+  if (strncmp(request->uri, "/api/", 5) == 0 || strncmp(request->uri, "/beanconqueror/", 15) == 0) {
     sendError(request, STATUS_FORBIDDEN, "HOST_NOT_ALLOWED",
               nullptr, "HOST_NOT_ALLOWED");
     return true;

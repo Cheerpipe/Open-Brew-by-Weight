@@ -31,6 +31,7 @@ needed rather than reading the entire directory.
 | --- | --- |
 | Physical switch | [Paddle](settings/paddle.md) / [momentary](settings/momentary.md) |
 | Machine integration | [La Marzocco Linea Micra](settings/linea-micra.md) |
+| Coffee apps | [Beanconqueror](settings/beanconqueror.md) |
 | Without a scale / rinse | [No-scale BBW](settings/no-scale-bbw.md) / [quick rinse](settings/quick-rinse.md) |
 | Scale and cup | [Scales](settings/scales.md) / [Bluetooth on/off](settings/scales.md#bluetooth-onoff) / [cup detection](settings/cup.md) / [tare](settings/tare.md) |
 | Network | [Wi-Fi](settings/wifi.md) / [access point](settings/ap.md) / [device name](settings/wifi.md#discovery-by-name) / [Web UI access](settings/web-access.md) |
@@ -75,6 +76,7 @@ risk gate in [VALIDATION.md](../VALIDATION.md).
 | Companion link and relay protocol | [`COMPANION_LINK.md`](COMPANION_LINK.md) | `src/network/OpenBrewByWeightCompanion*`, `src/machine/OpenBrewByWeightMicraCompanion.h` (La Marzocco route) | `docs/schemas/companion-link-v1.vectors.json`, companion link host tests | `./scripts/dev validate --risk R3` |
 | Shot trace format and flash pool | [`SHOT_TRACE.md`](SHOT_TRACE.md) | `src/OpenBrewByWeightShotTrace.h`, `src/OpenBrewByWeightShotTracePool.h`, `src/diagnostics/OpenBrewByWeightShotTraceRoutes.inc` | `TRC*`/`TPW*` host cases, `src/tests/shot_trace_test_decoder.h`, `shot_trace_pool_host_test.cpp`, `shot_trace_routes_host_test.cpp` | `./scripts/dev test normal` |
 | Shot export formats and the trace view | [`schemas/README.md`](schemas/README.md) | `src/web/js/stats.js` (`shotsJson`, `decodeShotTrace`, `shotGaggiuino`, `shotVisualizer`, `shotBeanconquerorLink`) | `33-shot-export.inc.js` | `./scripts/dev test web` |
+| Beanconqueror machine endpoints | [`schemas/README.md`](schemas/README.md#beanconqueror-machine-endpoints-v1) | `src/OpenBrewByWeightBeanconqueror.h`, `src/network/OpenBrewByWeightBeanconquerorHttp.inc`, `src/web/js/settings.js` (Coffee apps) | `beanconqueror_host_test.cpp`, `34-beanconqueror.inc.js`, `docs/schemas/beanconqueror-v1.vectors.json` | `./scripts/dev validate --risk R3` |
 | Firmware OTA | `features/ota.md`, `features/ota-image-identity.md`, `EMERGENCY_RECOVERY.md` | `scripts/internal/ota-idf`, `src/OpenBrewByWeightOta*` | OTA host, CLI, and Web resilience tests | `./scripts/dev test ota` |
 | Persistence | `ARCHITECTURE.md`, settings docs | `src/OpenBrewByWeightPersist*`, durable stores/logs | `persistence_host_test.cpp` | `./scripts/dev test normal` |
 | Web UI | `SCREENSHOTS.md`, feature/settings docs | `src/web/` | Web asset/contract tests | `./scripts/dev test web` |

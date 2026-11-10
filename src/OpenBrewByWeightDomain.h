@@ -525,6 +525,18 @@ inline const char *heroCardModeId(uint8_t mode) {
   return mode == HERO_CARD_COLORFUL ? "colorful" : "technical";
 }
 
+// The machine Beanconqueror imports shots from (wire names
+// beanconquerorEndpointId; docs/schemas/README.md); Off by default.
+constexpr uint8_t BEANCONQUEROR_OFF = 0;
+constexpr uint8_t BEANCONQUEROR_GAGGIUINO = 1;
+constexpr uint8_t BEANCONQUEROR_GAGGIMATE = 2;
+constexpr uint8_t BEANCONQUEROR_ENDPOINT_COUNT = 3;
+inline const char *beanconquerorEndpointId(uint8_t endpoint) {
+  return endpoint == BEANCONQUEROR_GAGGIUINO   ? "gaggiuino"
+         : endpoint == BEANCONQUEROR_GAGGIMATE ? "gaggimate"
+                                               : "off";
+}
+
 // Every member needs a row in OpenBrewByWeightSettingsCodec.h.
 struct RuntimeConfig {
   uint32_t revision = 1;
@@ -539,6 +551,8 @@ struct RuntimeConfig {
   bool touchStopFallbackEnabled = true;
   // 0/1; fills padding. A blob without it inherits idle saving on load.
   uint8_t performanceBoostEnabled = 1;
+  // BEANCONQUEROR_*: the public, read-only shot address; fills padding.
+  uint8_t beanconquerorEndpoint = BEANCONQUEROR_OFF;
   uint32_t postTareBaselineGraceMs = DEFAULT_POST_TARE_BASELINE_GRACE_MS;
   // Internal polarity: true disables weight stop. UI/API brewByWeight is the inverse.
   bool timerOnly = false;

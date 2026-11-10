@@ -189,6 +189,13 @@ times it asked the controller for missing records. It has one switch per job:
     shots and activations while the controller is off.
   - **Off:** the companion stops copying and keeps what it already has.
     With the controller off, the app offers no shots.
+- **Beanconqueror through the companion** (on by default; needs the shot
+  archive).
+  - **On:** when [Beanconqueror](../settings/beanconqueror.md) is turned on in
+    **Settings → Coffee apps**, the companion answers it from its copy of your
+    shots, without asking the controller, even while the machine is off. Like
+    the controller's, its address needs no password.
+  - **Off:** only the controller's own address answers Beanconqueror.
 
 Save and Revert work like the rest of Admin.
 

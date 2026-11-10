@@ -441,11 +441,9 @@ bool OpenBrewByWeightNetwork::sendRecordsIndex(UiStreamSession &session,
   const uint32_t held = shots ? session.recordsShotsEpoch : session.recordsHistoryEpoch;
   const bool rows = epoch != held;
   auto &cache = g_work->statsCache;
-  if (shots && rows && (!cache.valid || cache.snapshot.epoch != epoch)) {
-    if (!callbacks_.copyShotStatsRecords) return false;
-    callbacks_.copyShotStatsRecords(cache.snapshot);
+  if (shots && rows) {
+    if (!freshShotSnapshot(epoch)) return false;
     epoch = cache.snapshot.epoch;
-    cache.curveHashes = {};
   }
   size_t used = COMPANION_RECORD_ORIGIN;
   // The header counters (S19), read before the rows: only a Clear or a
