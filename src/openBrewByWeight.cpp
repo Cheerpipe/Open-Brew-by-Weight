@@ -476,6 +476,13 @@ bool bbwQuickStartPersistPending = false;
 bool bbwQuickStartPersistFailLatched = false;  // persist worker only
 TaskMutex bbwQuickStartMux;
 void stageBbwQuickStart();
+// Staged copy of bbwLearningBank for the settings_persist worker, guarded by
+// bbwLearningMux; saveBbwLearning sets its header.
+OPEN_BREW_BY_WEIGHT_PSRAM_BSS BbwLearningRecord bbwLearningStaged;
+bool bbwLearningPersistPending = false;
+bool bbwLearningPersistFailLatched = false;  // persist worker only
+TaskMutex bbwLearningMux;
+void stageBbwLearning();
 uint32_t shotStatisticsEpochNow();
 LastCycleSummary lastCycle;
 // Debug events are not a flash DMA source and are not added from an ISR.
@@ -637,9 +644,28 @@ uint32_t hostForwardAcceptedNetworkCommandCalls = 0;
 WebCommand hostLastForwardedNetworkCommand;
 uint32_t hostNtpSyncRequestCount = 0;
 bool hostRuntimePersistSucceeds = true;
-// Host: no NVS layer; the quick start flush reports this and keeps the copy.
+// Host: no NVS layer; the record flushes report these and keep the copy.
 bool hostQuickStartSaveSucceeds = true;
 QuickStartRecord hostLastSavedQuickStart;
+bool hostBbwLearningSaveSucceeds = true;
+BbwLearningRecord hostLastSavedBbwLearning;
+bool saveQuickStart(QuickStartRecord record) {
+  if (hostQuickStartSaveSucceeds) hostLastSavedQuickStart = record;
+  return hostQuickStartSaveSucceeds;
+}
+bool saveBbwLearning(BbwLearningRecord &record) {
+  if (hostBbwLearningSaveSucceeds) hostLastSavedBbwLearning = record;
+  return hostBbwLearningSaveSucceeds;
+}
+// The boot load reads back the last saved copy when it reports LOADED; the
+// enum mirrors OpenBrewByWeightPersistence.h, which host builds leave out.
+enum class SettingsBlobLoad : uint8_t { LOADED, MISSING, INVALID };
+SettingsBlobLoad hostBbwLearningLoad = SettingsBlobLoad::MISSING;
+SettingsBlobLoad loadBbwLearning(BbwLearningRecord &record) {
+  record = hostBbwLearningLoad == SettingsBlobLoad::LOADED ? hostLastSavedBbwLearning
+                                                           : BbwLearningRecord{};
+  return hostBbwLearningLoad;
+}
 uint32_t hostRuntimePersistAttempts = 0;
 RuntimeConfig hostLastFlushedRuntime;
 ShotPresetBank hostLastFlushedPresets;

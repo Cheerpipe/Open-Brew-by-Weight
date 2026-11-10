@@ -225,11 +225,14 @@ from each trajectory's state before the oldest retained sample, without using
 future measurements. Once a candidate wins, subsequent choices use the four
 fixed gains. Saving dose or grind-hint changes does not reset learning.
 
-Each preset retains its own offset. Reboot keeps offset, gain,
-initial/learned provenance and a quick start in progress, but collects a fresh
-evidence window. Recipe or
-relevant tare/drip timing changes also restart evidence without erasing the
-offset or gain.
+Each preset retains its own offset and learning. A restart or a power cut
+loses nothing: the offset, the gain and its initial/learned provenance, a
+quick start in progress, the recent shots the plausibility check and the gain
+scoring compare against, and a shot held for confirmation all come back as
+they were, so the next shot is judged exactly as it would have been without
+the restart. Only a power cut in the second after a shot is saved can make
+that preset's evidence start over, as a recipe change does. Recipe or relevant
+tare/drip timing changes restart evidence without erasing the offset or gain.
 
 In **Settings → Presets → Drip compensation** you see the drip in use, its
 status, and a small chart of what each of your last five shots with this preset

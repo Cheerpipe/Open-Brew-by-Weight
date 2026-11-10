@@ -211,13 +211,13 @@ is free and the name is available.
 Learning follows the preset. New and factory recipes seed the offset from
 the table above and use current/base α=0.30. Duplicating a preset copies the
 baseline, offset and gain/provenance into an independent recipe with empty
-candidate evidence. Reboot retains those saved values and rebuilds only the
-transient evidence window.
+candidate evidence. A restart keeps those values and the candidate evidence
+alike.
 
 Use a separate preset for each physical portafilter/basket setup. The learned
 drip in grams, gain α and candidate observations belong to that preset; shots
-from another preset do not train it. The candidate window is transient, while
-offset/gain and the shot log are persistent. When you change the physical setup
+from another preset do not train it. All of it, and the shot log, survive a
+restart; deleting the preset deletes its learning. When you change the physical setup
 under the same preset (another basket, a spouted or bottomless portafilter, a
 different dose), the drip is not re-detected: use **Quick start** under the
 drip chart, or the drip field's **Set** key, to start it again.

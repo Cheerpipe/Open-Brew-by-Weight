@@ -320,6 +320,7 @@ void processWebCommand(const WebCommand &command) {
           candidate.postTareBaselineGraceMs != runtimeConfig.postTareBaselineGraceMs) {
         for (uint8_t i = 0; i < presetBank.count; ++i)
           bbwLearningBank.invalidate(presetBank.presets[i].id, presetBank);
+        stageBbwLearning();
       }
       commitLiveRuntimeConfig(composed, RUNTIME_PERSIST_REASON_USER, &command.config);
       if (command.preferredScaleSpecified) {
@@ -405,6 +406,7 @@ void processWebCommand(const WebCommand &command) {
       bbwLearningBank.invalidate(preset.id, presetBank);
       if (command.bbwQuickStart) {
         armBbwQuickStart(preset, true);
+        stageBbwLearning();
         reportControlCommandResult(command, CommandResultState::APPLIED);
         return;
       }
@@ -420,6 +422,7 @@ void processWebCommand(const WebCommand &command) {
         preset.bbwEwmaAlpha = preset.bbwAlphaBaseline;
         preset.bbwAlphaLearned = 0;
       }
+      stageBbwLearning();  // after the drip it saves alongside
       RuntimeConfig candidate = runtimeConfig;
       applyShotPresetToConfig(preset, candidate);
       ++candidate.revision;
@@ -561,6 +564,9 @@ void processWebCommand(const WebCommand &command) {
       }
       ensureShotPresetBank(presetBank, runtimeConfig.retareWindowMs,
                            runtimeConfig.autoRetare);
+      // A recipe edit, a restore or a deletion may have changed the learning
+      // memory; an unchanged copy costs no flash write.
+      stageBbwLearning();
       const bool presetChanged =
           memcmp(&quickBefore.presets, &presetBank, sizeof(presetBank)) != 0;
       RuntimeConfig candidate = runtimeConfig;

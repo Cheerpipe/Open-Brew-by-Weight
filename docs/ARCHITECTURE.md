@@ -264,8 +264,11 @@ preset. A fresh or factory-reset bank holds four permanent factory presets (ids
 1–4: Double · Adaptive, Single · Adaptive, Double · Fixed, Single · Fixed);
 they can be restored but not deleted. A golden schema-2 blob in the host tests
 proves later firmware keeps settings across OTA. Candidate
-anchors/observations/generations are RAM only; deferred persistence retains
-offsets, gain/provenance, and profile through the existing dual-slot owner.
+anchors/observations and the held outlier live in control-owned RAM
+(`BbwLearningBank`) and survive restarts as NVS key `bbwLearn`, saved by the
+settings_persist worker from a staged copy; their generations are
+session-only. Deferred persistence retains offsets, gain/provenance, and
+profile through the existing dual-slot owner.
 `idlePowerSavingEnabled` (tag 3, the former single power setting),
 `performanceBoostEnabled` (tag 88, inherits tag 3 when a blob predates it),
 webhook preset delivery, and Rinse without a scale are current explicit fields.

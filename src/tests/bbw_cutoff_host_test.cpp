@@ -246,5 +246,60 @@ int main() {
     assert(formatDripChartJson(json, 40, fields) == 0);
   }
 
+  // Drip learning memory: exact NVS round trip, damaged or foreign records
+  // rejected, and stale entries (deleted preset, moved drip) dropped.
+  {
+    ShotPresetBank bank;
+    seedDefaultShotPresetBank(bank);
+    BbwLearningBank memory;
+    BbwLearningBank::State &a = memory.forPreset(bank.presets[0].id, bank);
+    BbwLearningBank::State &b = memory.forPreset(bank.presets[1].id, bank);
+    for (const float observation : {0.71f, 0.6943f, 0.73f}) a.evidence.observe(observation, 0.7f, 30);
+    a.pendingOutlier = true;
+    a.pendingCg = 131;
+    b.evidence.observe(0.42f, 0.4f, 50);
+    BbwLearningRecord record;
+    BbwLearningRecord loaded;
+    assert(loadBbwLearning(loaded) == SettingsBlobLoad::MISSING);
+    snapshotBbwLearning(record, memory, bank);
+    assert(saveBbwLearning(record) && loadBbwLearning(loaded) == SettingsBlobLoad::LOADED);
+    BbwLearningBank restarted;
+    assert(restoreBbwLearning(restarted, loaded, bank) == 2);
+    const BbwLearningBank::State &a2 = restarted.forPreset(bank.presets[0].id, bank);
+    assert(a2.pendingOutlier && a2.pendingCg == 131 && a2.generation != 0);
+    assert(memcmp(a2.evidence.observations, a.evidence.observations,
+                  sizeof(a.evidence.observations)) == 0 &&
+           memcmp(a2.evidence.anchors, a.evidence.anchors, sizeof(a.evidence.anchors)) == 0 &&
+           a2.evidence.count == 3 && a2.evidence.position == 3 &&
+           a2.evidence.initialAlpha == 30);
+    assert(restarted.forPreset(bank.presets[1].id, bank).evidence.count == 1);
+    // A drip that moved without the record, or a deleted preset, drops it.
+    ShotPresetBank moved = bank;
+    moved.presets[1].bbwEwmaOffsetG += 0.01f;
+    BbwLearningBank partial;
+    assert(restoreBbwLearning(partial, loaded, moved) == 1);
+    assert(partial.forPreset(bank.presets[1].id, moved).evidence.count == 0);
+    BbwLearningRecord gone = loaded;
+    gone.entries[0].presetId = 200;  // no such preset
+    BbwLearningBank none;
+    assert(restoreBbwLearning(none, gone, bank) == 1);
+    // A damaged, foreign-version or out-of-window record is never loaded.
+    for (int damage = 0; damage < 3; ++damage) {
+      BbwLearningRecord bad = record;
+      if (damage == 0) bad.entries[0].pendingCg ^= 1;
+      if (damage == 1) bad.version = BBW_LEARNING_VERSION + 1;
+      if (damage == 2) bad.entries[0].evidence.position = bbwEwma::Evidence::WINDOW;
+      if (damage != 0) bad.checksum = bbwLearningChecksum(bad);
+      assert(!validBbwLearning(bad));
+    }
+    BbwLearningRecord foreign = record;
+    foreign.version = BBW_LEARNING_VERSION + 1;
+    foreign.checksum = bbwLearningChecksum(foreign);
+    assert(saveSettingsBlob(NvsSubsystem::SETTINGS, BBW_LEARNING_KEY, foreign));
+    assert(loadBbwLearning(loaded) == SettingsBlobLoad::INVALID);
+    assert(std::all_of(std::begin(loaded.entries), std::end(loaded.entries),
+                       [](const BbwLearningEntry &entry) { return entry.presetId == 0; }));
+  }
+
   std::cout << "BBW numeric, adaptation, state, and history checks passed\n";
 }

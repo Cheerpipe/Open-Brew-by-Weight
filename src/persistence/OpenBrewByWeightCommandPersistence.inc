@@ -216,10 +216,14 @@ bool resetAllDurableStoresForNetwork(PersistedSettings &settings) {
   pendingBleScanRequestIdCount = 0;
   bleScanPersistFailLatched = false;
   bleScanPersistMux.unlock();
-  // The next boot re-arms the factory presets; no staged copy may land first.
+  // The next boot re-arms the factory presets and starts learning empty; no
+  // staged copy may land first.
   bbwQuickStartMux.lock();
   bbwQuickStartPersistPending = false;
   bbwQuickStartMux.unlock();
+  bbwLearningMux.lock();
+  bbwLearningPersistPending = false;
+  bbwLearningMux.unlock();
   return true;
 }
 
@@ -653,6 +657,7 @@ void commitLiveRuntimeConfig(const RuntimeConfig &composed, int32_t reasonBits,
 
 bool serviceBleScanPersist();
 void serviceBbwQuickStartPersist();
+void serviceBbwLearningPersist();
 
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
 bool shotStoreWorkerWriteAllowed(bool &maintenance) {
@@ -838,6 +843,7 @@ void settingsPersistTask(void *parameter) {
         (void)persistResetUptimeCheckpoint(millis());
         serviceBleScanPersist();
         serviceBbwQuickStartPersist();
+        serviceBbwLearningPersist();
         serviceShotTracePool();
         if (auditFlushDue()) (void)dispatchAuditFlushWork();
       }
@@ -1166,39 +1172,41 @@ bool serviceBleScanPersist() {
 #endif
 }
 
-// Control side: hand the quick start record to the settings_persist worker.
-void stageBbwQuickStart() {
-  bbwQuickStartMux.lock();
-  bbwQuickStartStaged = bbwQuickStart;
-  bbwQuickStartPersistPending = true;
-  bbwQuickStartMux.unlock();
-}
-
-// Worker side, on the idle cadence that is also the retry backoff.
-void serviceBbwQuickStartPersist() {
-  bbwQuickStartMux.lock();
-  const bool pending = bbwQuickStartPersistPending;
-  const QuickStartRecord record = bbwQuickStartStaged;
-  bbwQuickStartPersistPending = false;
-  bbwQuickStartMux.unlock();
-  if (!pending) return;
-#ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
-  const bool saved = saveQuickStart(record);
-#else
-  const bool saved = hostQuickStartSaveSucceeds;
-  if (saved) hostLastSavedQuickStart = record;
-#endif
-  if (saved) {
-    bbwQuickStartPersistFailLatched = false;
+// Worker side of a staged control record, on the idle cadence that is also
+// the retry backoff: saves a stack copy and reports a failing run once.
+// Not inlined, so the copy never adds to the worker loop's own frame.
+template <typename Record, typename Save>
+__attribute__((noinline)) void serviceStagedRecord(TaskMutex &mux, bool &pending,
+                                                   const Record &staged, bool &failLatched,
+                                                   int32_t reason, Save save) {
+  mux.lock();
+  const bool due = pending;
+  Record record = staged;
+  pending = false;
+  mux.unlock();
+  if (!due) return;
+  if (save(record)) {
+    failLatched = false;
     return;
   }
-  if (!bbwQuickStartPersistFailLatched)
-    addDebugEvent(DebugCategory::CONFIG, DebugCode::RUNTIME_PERSIST_FAILED, 0,
-                  RUNTIME_PERSIST_REASON_BBW_QUICK_START);
-  bbwQuickStartPersistFailLatched = true;
-  bbwQuickStartMux.lock();
-  bbwQuickStartPersistPending = true;
-  bbwQuickStartMux.unlock();
+  if (!failLatched)
+    addDebugEvent(DebugCategory::CONFIG, DebugCode::RUNTIME_PERSIST_FAILED, 0, reason);
+  failLatched = true;
+  mux.lock();
+  pending = true;
+  mux.unlock();
+}
+
+void serviceBbwQuickStartPersist() {
+  serviceStagedRecord(bbwQuickStartMux, bbwQuickStartPersistPending, bbwQuickStartStaged,
+                      bbwQuickStartPersistFailLatched, RUNTIME_PERSIST_REASON_BBW_QUICK_START,
+                      saveQuickStart);
+}
+
+void serviceBbwLearningPersist() {
+  serviceStagedRecord(bbwLearningMux, bbwLearningPersistPending, bbwLearningStaged,
+                      bbwLearningPersistFailLatched, RUNTIME_PERSIST_REASON_BBW_LEARNING,
+                      saveBbwLearning);
 }
 
 // Control-loop side: consume the worker's flush result, report the held

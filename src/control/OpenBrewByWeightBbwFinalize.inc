@@ -84,7 +84,7 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   // scale event is never drip. It also clears a pending outlier: a step is
   // confirmed by statistics on physically possible observations only.
   if (!bbwEwma::physicsPlausibleDrip(observation, snapshot.rateAtStopX100)) {
-    learning.pendingOutlier = false;
+    if (std::exchange(learning.pendingOutlier, false)) stageBbwLearning();
     serialTrace(LogLevel::INFO,
                 "Drip observation impossible for the flow at the stop; offset unchanged");
     return false;
@@ -106,6 +106,7 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
     } else {
       learning.pendingOutlier = true;
       learning.pendingCg = static_cast<int16_t>(lroundf(observation * 100.0f));
+      stageBbwLearning();
       serialTracef(LogLevel::INFO,
                     "Drip observation %.2fg is an outlier; offset unchanged",
                     observation);
@@ -135,6 +136,7 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   if (nextAlpha != preset->bbwEwmaAlpha) preset->bbwAlphaLearned = 1;
   preset->bbwEwmaAlpha = nextAlpha;
   learning.generation = bbwLearningBank.newGeneration();
+  stageBbwLearning();
   RuntimeConfig candidate = runtimeConfig;
   applyShotPresetToConfig(activeShotPreset(presetBank), candidate);
   ++candidate.revision;
@@ -145,4 +147,20 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   serialTracef(LogLevel::INFO, "New offset pending durable commit: %.2f",
                updatedOffset);
   return true;
+}
+
+// Control side: hand the quick start record to the settings_persist worker.
+void stageBbwQuickStart() {
+  bbwQuickStartMux.lock();
+  bbwQuickStartStaged = bbwQuickStart;
+  bbwQuickStartPersistPending = true;
+  bbwQuickStartMux.unlock();
+}
+
+// Control side: hand a copy of the learning memory to the settings_persist worker.
+void stageBbwLearning() {
+  bbwLearningMux.lock();
+  snapshotBbwLearning(bbwLearningStaged, bbwLearningBank, presetBank);
+  bbwLearningPersistPending = true;
+  bbwLearningMux.unlock();
 }

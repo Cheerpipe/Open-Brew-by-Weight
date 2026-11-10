@@ -162,6 +162,10 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   bbwQuickStartPersistPending = false;
   bbwQuickStartPersistFailLatched = false;
   hostQuickStartSaveSucceeds = true;
+  bbwLearningPersistPending = false;
+  bbwLearningPersistFailLatched = false;
+  hostBbwLearningSaveSucceeds = true;
+  hostBbwLearningLoad = SettingsBlobLoad::MISSING;
   // Legacy scenarios opt out; dedicated idle-tare cases exercise the ON default.
   runtimeConfig.autoTareOutsideBrew = false;
   runtimeConfig.rinseEnabled = true;
@@ -21697,6 +21701,184 @@ void fw09_learning_skips_name_their_reason() {
   CHECK(debugLogTextCount("Offset learn skipped") == 0);
 }
 
+// One weight-cut shot of the active preset that needed `needed` grams of drip.
+bool pullBbwShotForTest(float needed) {
+  pendingFinalize = PendingShotFinalize{};
+  preparePendingBbwForTest();
+  pendingFinalize.offsetAnalysis = pendingFinalize.logEligible = true;
+  pendingFinalize.startedWithScale = pendingFinalize.automaticBrew = true;
+  pendingFinalize.scaleBaselineReady = true;
+  pendingFinalize.scaleConnectionGeneration = getScaleLinkSnapshot().connectionGeneration;
+  pendingFinalize.weightOffsetG = activeShotPreset(presetBank).bbwEwmaOffsetG;
+  pendingFinalize.cutLineDg = 360;
+  pendingFinalize.endReason = EndReason::SCALE_THRESHOLD;
+  pendingFinalize.endedAtMs = hostMillis;
+  currentWeight = 36.0f - pendingFinalize.weightOffsetG + needed;
+  currentWeightConnectionGeneration = pendingFinalize.scaleConnectionGeneration;
+  ++currentWeightSequence;
+  currentWeightReceivedAtMs = ++hostMillis;
+  return learnPendingBbw(pendingFinalize, currentWeight, true);
+}
+
+// A restart: the worker saves the staged memory, RAM is lost and the boot
+// load restores what was saved.
+void restartBbwLearningForTest(SettingsBlobLoad load = SettingsBlobLoad::LOADED) {
+  serviceBbwLearningPersist();
+  bbwLearningBank = BbwLearningBank{};
+  hostBbwLearningLoad = load;
+  debugLog.clear();
+  bootBbwLearning(false);
+}
+
+bool sameEvidence(const bbwEwma::Evidence &a, const bbwEwma::Evidence &b) {
+  return memcmp(a.anchors, b.anchors, sizeof(a.anchors)) == 0 &&
+         memcmp(a.observations, b.observations, sizeof(a.observations)) == 0 &&
+         a.initialAlpha == b.initialAlpha && a.count == b.count && a.position == b.position &&
+         a.cadence == b.cadence && a.sinceSwitch == b.sinceSwitch &&
+         a.challenger == b.challenger && a.wins == b.wins;
+}
+
+void fw10_drip_learning_memory_survives_a_restart() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  ShotPreset &preset = mutableActiveShotPreset(presetBank);
+  WebCommand set;
+  set.type = WebCommandType::RESET_WEIGHT_OFFSET;
+  set.bbwSetDrip = true;
+  set.config.weightOffsetBaselineG = 1.0f;
+  const auto stable = [&] {  // five accepted shots at 1.00 g
+    processWebCommand(set);
+    for (int i = 0; i < 5; ++i) CHECK(pullBbwShotForTest(1.0f));
+    CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f);
+  };
+  // A6: the held shot survives the restart; the next one confirms the step.
+  stable();
+  CHECK(!pullBbwShotForTest(0.30f));
+  restartBbwLearningForTest();
+  CHECK(debugLogTextCount("Drip learning memory restored for") == 1);
+  CHECK(debugLogTextCount("0 stale entries dropped") == 1);
+  CHECK(pullBbwShotForTest(0.32f));
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.31f) < 0.005f);
+  // A7: the filter is active right after the restart.
+  stable();
+  restartBbwLearningForTest();
+  CHECK(!pullBbwShotForTest(0.30f));
+  CHECK(debugLogTextCount("is an outlier") == 1);
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f);
+  // A12: 19 shots, a restart, the 20th: the same state as without it.
+  struct Outcome {
+    bbwEwma::Evidence evidence;
+    float drip = 0.0f;
+    uint8_t alpha = 0;
+  } reference, restarted;
+  const auto twenty = [&](bool restart, Outcome &out) {
+    uint32_t noise = 0x5eed;
+    processWebCommand(set);
+    for (int i = 0; i < 20; ++i) {
+      if (restart && i == 19) restartBbwLearningForTest();
+      noise = noise * 1664525U + 1013904223U;
+      CHECK(pullBbwShotForTest(1.0f + (static_cast<int32_t>((noise >> 24) % 25U) - 12) / 100.0f));
+    }
+    out = {bbwLearningBank.forPreset(preset.id, presetBank).evidence, preset.bbwEwmaOffsetG,
+           preset.bbwEwmaAlpha};
+  };
+  twenty(false, reference);
+  twenty(true, restarted);
+  CHECK(reference.evidence.count == bbwEwma::Evidence::WINDOW && reference.evidence.cadence == 0);
+  CHECK(sameEvidence(reference.evidence, restarted.evidence) &&
+        reference.drip == restarted.drip && reference.alpha == restarted.alpha);
+  // A13: Set, Quick start, a recipe edit and factory values each leave an
+  // empty memory behind them, so the 0.30 g after the restart is not held.
+  WebCommand quick;
+  quick.type = WebCommandType::RESET_WEIGHT_OFFSET;
+  quick.bbwQuickStart = true;
+  WebCommand edit;
+  edit.type = WebCommandType::PRESET_OP;
+  edit.presetAction = static_cast<uint8_t>(PresetAction::SAVE);
+  edit.presetId = preset.id;
+  WebCommand restore;
+  restore.type = WebCommandType::PRESET_OP;
+  restore.presetAction = static_cast<uint8_t>(PresetAction::RESTORE_FACTORY_VALUES);
+  restore.presetId = preset.id;
+  for (WebCommand *reset : {&set, &quick, &edit, &restore}) {
+    stable();
+    edit.config = runtimeConfig;
+    edit.config.goalWeightDg = runtimeConfig.goalWeightDg == 400 ? 380 : 400;
+    pendingPresetPersistence = {};
+    processWebCommand(*reset);
+    restartBbwLearningForTest();
+    CHECK(pullBbwShotForTest(0.30f));
+    CHECK(debugLogTextCount("is an outlier") == 0);
+  }
+  // A14: an absent or unreadable record restores nothing, says so once, and
+  // learning carries on as on a fresh install.
+  for (const SettingsBlobLoad load : {SettingsBlobLoad::MISSING, SettingsBlobLoad::INVALID}) {
+    stable();
+    restartBbwLearningForTest(load);
+    CHECK(debugLogTextCount("Drip learning memory") == 1);
+    CHECK(debugLogTextCount(load == SettingsBlobLoad::MISSING ? "not saved" : "unreadable") == 1);
+    CHECK(bbwLearningBank.forPreset(preset.id, presetBank).evidence.count == 0);
+    CHECK(pullBbwShotForTest(0.30f));
+  }
+  // A15: a deleted preset's memory never reaches a new preset, even one that
+  // gets the same id.
+  pendingPresetPersistence = {};
+  WebCommand create;
+  create.type = WebCommandType::PRESET_OP;
+  create.presetAction = static_cast<uint8_t>(PresetAction::CREATE);
+  const uint8_t custom = presetBank.nextId;
+  processWebCommand(create);
+  CHECK(setActiveShotPreset(presetBank, custom));
+  ShotPreset &mine = mutableActiveShotPreset(presetBank);
+  mine.bbwEwmaOffsetG = 1.0f;
+  for (int i = 0; i < 5; ++i) CHECK(pullBbwShotForTest(1.0f));
+  CHECK(setActiveShotPreset(presetBank, preset.id));
+  pendingPresetPersistence = {};
+  WebCommand remove;
+  remove.type = WebCommandType::PRESET_OP;
+  remove.presetAction = static_cast<uint8_t>(PresetAction::DELETE);
+  remove.presetId = custom;
+  processWebCommand(remove);
+  CHECK(findShotPreset(presetBank, custom) == nullptr);
+  restartBbwLearningForTest();
+  presetBank.nextId = custom;
+  pendingPresetPersistence = {};
+  processWebCommand(create);
+  CHECK(setActiveShotPreset(presetBank, custom));
+  mutableActiveShotPreset(presetBank).bbwEwmaOffsetG = 1.0f;
+  CHECK(bbwLearningBank.forPreset(custom, presetBank).evidence.count == 0);
+  CHECK(pullBbwShotForTest(0.30f));
+}
+
+void fw11_drip_learning_save_retries_and_reports_once() {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  CHECK(pullBbwShotForTest(0.50f));  // a learned shot stages the memory
+  CHECK(bbwLearningPersistPending);
+  hostBbwLearningSaveSucceeds = false;
+  debugLog.clear();
+  serviceBbwLearningPersist();
+  CHECK(bbwLearningPersistPending);  // kept for the next idle pass
+  CHECK(debugEventExists(DebugCode::RUNTIME_PERSIST_FAILED, 0,
+                         RUNTIME_PERSIST_REASON_BBW_LEARNING));
+  debugLog.clear();
+  serviceBbwLearningPersist();
+  CHECK(bbwLearningPersistPending);
+  CHECK(!debugEventExists(DebugCode::RUNTIME_PERSIST_FAILED));  // once per run
+  hostBbwLearningSaveSucceeds = true;
+  serviceBbwLearningPersist();
+  CHECK(!bbwLearningPersistPending);
+  const uint8_t id = activeShotPreset(presetBank).id;
+  const auto saved = std::find_if(std::begin(hostLastSavedBbwLearning.entries),
+                                  std::end(hostLastSavedBbwLearning.entries),
+                                  [id](const BbwLearningEntry &entry) { return entry.presetId == id; });
+  CHECK(saved != std::end(hostLastSavedBbwLearning.entries));
+  CHECK(sameEvidence(saved->evidence, bbwLearningBank.forPreset(id, presetBank).evidence));
+  CHECK(saved->dripG == activeShotPreset(presetBank).bbwEwmaOffsetG);
+  serviceBbwLearningPersist();  // nothing staged: nothing to save
+  CHECK(!bbwLearningPersistPending);
+}
+
 void rt24_late_cup_step_uses_shot_coordinates() {
   // After a failed start tare the trajectory is software-zeroed: the same
   // 300 g cup set back down over 5 g of coffee is not a late-cup step.
@@ -26219,6 +26401,8 @@ const TestCase testCases[] = {
     {"FW07", fw07_quick_start_save_retries_and_reports_once},
     {"FW08", fw08_drip_filter_physics_outliers_and_step},
     {"FW09", fw09_learning_skips_name_their_reason},
+    {"FW10", fw10_drip_learning_memory_survives_a_restart},
+    {"FW11", fw11_drip_learning_save_retries_and_reports_once},
     {"RT21", rt21_empty_pan_at_cycle_start_resyncs_stuck_present},
     {"RS01", rs01_fast_samples_wait_for_min_duration},
     {"RS02", rs02_slow_samples_meet_min_duration_at_third_sample},

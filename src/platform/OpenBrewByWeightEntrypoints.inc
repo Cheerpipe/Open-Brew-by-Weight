@@ -331,6 +331,30 @@ void setup() {
   startAfterBootRecovery();
 }
 
+// Boot, after the presets: restores the drip learning memory. Never a
+// readiness dependency: without a usable record learning starts empty, as on
+// a fresh install. Out of line, so the record's stack copy is freed before
+// the rest of startup.
+[[gnu::noinline]] void bootBbwLearning(bool freshSettings) {
+  BbwLearningRecord stored;
+  const SettingsBlobLoad load = loadBbwLearning(stored);
+  if (load == SettingsBlobLoad::LOADED && !freshSettings) {
+    const unsigned saved = static_cast<unsigned>(std::count_if(
+        std::begin(stored.entries), std::end(stored.entries),
+        [](const BbwLearningEntry &entry) { return entry.presetId != 0; }));
+    const unsigned restored = restoreBbwLearning(bbwLearningBank, stored, presetBank);
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::CONFIG,
+                         "Drip learning memory restored for %u presets; %u stale entries dropped",
+                         restored, saved - restored);
+    return;
+  }
+  serialTraceCategoryf(load == SettingsBlobLoad::INVALID ? LogLevel::WARNING : LogLevel::INFO,
+                       DebugCategory::CONFIG, "Drip learning memory %s; learning starts empty",
+                       load == SettingsBlobLoad::LOADED    ? "ignored with factory settings"
+                       : load == SettingsBlobLoad::MISSING ? "not saved"
+                                                           : "unreadable or of another version");
+}
+
 void startAfterBootRecovery() {
   // Default builds keep USB Serial/JTAG off until GPIO4 is jumpered to GND.
   // Serial is HWCDC (native USB), not UART0 — see OpenBrewByWeightUsbConsole.h.
@@ -426,6 +450,7 @@ void startAfterBootRecovery() {
     if (bootQuickStart(bbwQuickStart, freshSettings, presetBank,
                        loadQuickStart(storedQuickStart) ? &storedQuickStart : nullptr))
       stageBbwQuickStart();
+    bootBbwLearning(freshSettings);
     // Stop mode follows the active preset only.
     runtimeConfig.timerOnly = !activeShotPreset(presetBank).brewByWeight;
     scaleWorkerLoadPreferred(persistedSettings.preferredScaleMac,

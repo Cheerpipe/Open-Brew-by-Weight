@@ -186,7 +186,15 @@ the third sets the offset to their median instead of the EWMA step.
 EWMA reuses the accepted final observation and additionally requires fresh weight,
 valid baseline and matching connection provenance. Control updates only the
 originating preset/algorithm generation. Reset or deletion invalidates pending
-learning while history can still finalize. A new shot cancels old pending
+learning while history can still finalize. The learning memory (per preset the
+held outlier and the evidence window; not the generation, which restarts with
+the session) is staged whenever it changes and saved in NVS key `bbwLearn`;
+boot restores it after the presets, so the filter decides after a restart as it
+would have without one. An absent, unreadable or other-version record, a
+deleted preset, or a drip that differs from the one saved with the entry
+(an older image learned without the record, or a power cut between the two
+writes) restores an empty memory, with one Web UI log line either way; the
+record is never a readiness dependency, and factory reset erases it. A new shot cancels old pending
 analysis through the cut-short path above. Candidate scoring never
 runs in the active cutoff or ISR path.
 

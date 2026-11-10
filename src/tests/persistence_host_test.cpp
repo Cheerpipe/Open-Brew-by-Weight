@@ -2007,12 +2007,16 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   ble.scanIntensity = static_cast<uint8_t>(BleScanIntensity::RELAXED);
   CHECK(saveBleScanSettings(ble));
   CHECK(saveQuickStart(QuickStartRecord{}));
+  BbwLearningRecord learning;
+  CHECK(saveBbwLearning(learning));
 
   CHECK(resetAllDurableStores(settings, ble, log, history, lastShot));
   CHECK(verifyFactorySettings(settings));
-  // Without its record the next boot quick starts every factory preset.
+  // Without its record the next boot quick starts every factory preset, and
+  // drip learning starts with an empty memory.
   QuickStartRecord quickStart;
   CHECK(!loadQuickStart(quickStart));
+  CHECK(loadBbwLearning(learning) == SettingsBlobLoad::MISSING);
   CHECK(bootQuickStart(quickStart, false, settings.presets, nullptr));
   CHECK(log.count() == 0);
   CHECK(history.count() == 0);

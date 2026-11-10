@@ -1,5 +1,6 @@
 #pragma once
 
+#include "OpenBrewByWeightBbwLearning.h"
 #include "OpenBrewByWeightBbwQuickStart.h"
 #include "OpenBrewByWeightBleScanPersistence.h"
 #include "OpenBrewByWeightBuildProfile.h"
@@ -120,11 +121,13 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
   }
   // Factory reset clears the master switch too, so the controller comes back
   // transparent (compatibility mode) and offers onboarding again; without a
-  // quick start record the next boot quick starts every factory preset.
+  // quick start record the next boot quick starts every factory preset, and
+  // without a learning record the drip learning starts empty.
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                      \
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   if (!clearFirmwareMode() || !eraseWebAccessStored() || !eraseCardDismissals() ||
-      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, QUICK_START_KEY)) {
+      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, QUICK_START_KEY) ||
+      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, BBW_LEARNING_KEY)) {
     return false;
   }
 #endif
