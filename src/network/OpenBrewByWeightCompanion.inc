@@ -1005,7 +1005,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   bool snapshotDue = false, ui = true, logSwitch = true, archive = true, pingReply = false;
   const bool syncHold = companionSyncHold();
   const uint8_t format = beanconquerorEndpoint();
-  uint8_t beanconqueror = BEANCONQUEROR_OFF;
+  uint8_t beanconqueror;  // set under the lock before any use
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
   uint8_t secret[COMPANION_SECRET_BYTES];
