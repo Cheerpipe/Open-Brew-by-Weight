@@ -162,6 +162,9 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   pendingFinalize.lastKnownWeightValid =
       session.hasWeightAnchor && std::isfinite(session.lastAcceptedWeightG);
   pendingFinalize.lastKnownWeightG = session.lastAcceptedWeightG;
+  // The cut lead (tau) of flow was already under way at that reading.
+  pendingFinalize.tailRefAtMs = session.lastAcceptedWeightAtMs -
+                                static_cast<uint32_t>(session.cut.tauMs);
   pendingFinalize.activePresetId = session.activePresetId != 0
                                        ? session.activePresetId
                                        : presetBank.activeId;
@@ -717,6 +720,7 @@ void pendingShotFinalizeTask() {
       currentWeightSequence != snapshot.endedWeightSequence &&
       tickAfter(currentWeightReceivedAtMs, snapshot.endedAtMs) &&
       std::isfinite(finalWeightG) &&
+      finalWeightG <= postStopCeilingG(snapshot, currentWeightReceivedAtMs) &&
       plausibleSettledBrewWeight(finalWeightG, snapshot.lastKnownWeightG,
                                  snapshot.lastKnownWeightValid)) {
     postDripWeightValid = snapshot.startedWithScale;

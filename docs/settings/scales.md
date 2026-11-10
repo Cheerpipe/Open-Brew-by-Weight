@@ -210,6 +210,15 @@ leaves the link, and your tare, untouched.
 **Drip delay** runs after machine circuit opens. It is used for Last Shot, history,
 drip learning, and the scale-loss backup's recent shots.
 
+The final weight is the weight the cup settles at during that wait, not simply
+the last reading. If you bump the cup, press on it, or rest something on the
+scale before the delay ends, readings that the last drips could not explain
+are left out, and the shot keeps the weight it had settled at. Two touches can
+still be counted as coffee: one that starts within the first second after the
+stop and is held, and a light press held until the delay ends. Leave the cup
+alone until the final weight appears; lifting it off early records the weight
+at the moment the machine stopped.
+
 ## Parameters
 
 | Setting | Default | Range / notes | Effect |

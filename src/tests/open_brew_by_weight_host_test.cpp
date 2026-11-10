@@ -21253,8 +21253,8 @@ void fw01_median_final_weight_filters_dip() {
               (seedOffset + (preset.bbwEwmaAlpha / 100.0f) * (36.15f - 36.0f))) <
         0.01f);
 
-  // A wide-span tail where dipped samples form the majority: the median
-  // guard falls back to the running max instead of letting the dip win.
+  // Dipped samples own the last ring (a cup being lifted): coffee never
+  // leaves the cup, so the settled weight keeps the highest median reached.
   resetHarness(false, true);
   reachReadyFromBoot();
   startCycle();
@@ -21271,7 +21271,8 @@ void fw01_median_final_weight_filters_dip() {
   pendingFinalize.endedAtMs = hostMillis;
   sequence = pendingFinalize.curveLastSequence + 1U;
   {
-    const float wideTail[] = {34.05f, 34.0f, 37.0f, 34.05f, 34.0f, 34.02f};
+    const float wideTail[] = {36.0f, 36.1f, 36.2f, 36.2f,
+                              36.2f, 34.5f, 34.4f, 34.5f};
     uint32_t wideAtMs = pendingFinalize.endedAtMs + 100;
     for (float sample : wideTail) {
       hostMillis = wideAtMs;
@@ -21285,7 +21286,7 @@ void fw01_median_final_weight_filters_dip() {
   hostMillis = pendingFinalize.endedAtMs + pendingFinalize.dripDelayMs + 1;
   pendingShotFinalizeTask();
   CHECK(shotLog.copyNewestFirst(record, 1) == 1);
-  CHECK(fabsf(record[0].actualWeightCg / 100.0f - 37.0f) < 0.02f);
+  CHECK(fabsf(record[0].actualWeightCg / 100.0f - 36.2f) < 0.02f);
 
   // Sparse tail (two samples spanning 0.2 s): running-max fallback.
   resetHarness(false, true);
@@ -21755,6 +21756,166 @@ void fw03_dense_tail_decimates_to_reachable_median() {
   ShotLogRecord record[1] = {};
   CHECK(shotLog.copyNewestFirst(record, 1) == 1);
   CHECK(fabsf(record[0].actualWeightCg / 100.0f - 35.1f) < 0.02f);
+}
+
+struct PostStopSample {
+  uint32_t afterMs;
+  float weightG;
+};
+
+// A shot stopped at lastKnownG while flowing at rateX100, its last reading
+// taken at the stop with a 500 ms cut lead.
+PendingShotFinalize postStopPending(float lastKnownG, int32_t rateX100) {
+  PendingShotFinalize pending;
+  pending.lastKnownWeightValid = true;
+  pending.lastKnownWeightG = lastKnownG;
+  pending.rateAtStopX100 = rateX100;
+  pending.endedAtMs = 10000;
+  pending.tailRefAtMs = pending.endedAtMs - 500;
+  return pending;
+}
+
+// Feeds a tail as the drip hold does; returns the readings the ceiling refused.
+uint32_t feedPostStopTail(PendingShotFinalize &pending,
+                          std::span<const PostStopSample> tail) {
+  uint32_t refused = 0;
+  for (const PostStopSample &sample : tail) {
+    const uint32_t atMs = pending.endedAtMs + sample.afterMs;
+    if (sample.weightG > postStopCeilingG(pending, atMs)) {
+      ++refused;
+    } else {
+      notePostStopTailSample(pending, sample.weightG, atMs);
+    }
+  }
+  return refused;
+}
+
+// Field recording (2026-11-10): a settled 35.9 g tail, then +53 g on the pan
+// 150 ms before a 3 s drip delay ended.
+constexpr PostStopSample POST_STOP_SPIKE_TAIL[] = {
+    {89, 34.9f},   {208, 35.0f},  {298, 35.2f},  {418, 35.5f},  {508, 35.5f},
+    {598, 35.7f},  {718, 35.59f}, {808, 35.7f},  {898, 35.7f},  {1018, 35.7f},
+    {1108, 35.7f}, {1198, 35.7f}, {1318, 35.7f}, {1408, 35.7f}, {1498, 35.7f},
+    {1618, 35.7f}, {1708, 35.7f}, {1828, 35.7f}, {1918, 35.8f}, {2038, 35.8f},
+    {2128, 35.8f}, {2218, 35.8f}, {2338, 35.9f}, {2428, 35.9f}, {2548, 35.9f},
+    {2638, 35.9f}, {2728, 35.9f}, {2848, 60.2f}, {2938, 89.2f}};
+
+void fw04_post_stop_ceiling_ignores_touches() {
+  // Flow only decays after the stop, so a reading above the last trusted
+  // weight plus the rate at the stop times that weight's age is a touch or an
+  // object, never drip.
+  {
+    // Field recording (2026-10-31): a fast shot still rising 1.3 s after the
+    // stop. Genuine drip is never refused.
+    PendingShotFinalize rising = postStopPending(36.0f, 2100);
+    const PostStopSample tail[] = {
+        {30, 36.3f},    {120, 36.5f},   {240, 36.7f},  {330, 37.2f},
+        {420, 37.5f},   {540, 37.59f},  {630, 37.9f},  {750, 38.09f},
+        {840, 38.4f},   {930, 38.59f},  {1050, 38.8f}, {1140, 39.09f},
+        {1260, 39.2f},  {1350, 39.3f},  {1440, 39.3f}, {1590, 39.4f},
+        {1770, 39.4f},  {1950, 39.4f},  {2160, 39.4f}, {2370, 39.4f},
+        {2580, 39.4f},  {2670, 39.5f},  {2790, 39.5f}, {2940, 39.5f}};
+    CHECK(feedPostStopTail(rising, tail) == 0);
+    CHECK(fabsf(postStopFinalWeightG(rising, 0.0f) - 39.4f) < 0.01f);
+
+    // The spike recording: both late readings refused, the settled median kept.
+    PendingShotFinalize spike = postStopPending(34.7f, 1900);
+    CHECK(feedPostStopTail(spike, POST_STOP_SPIKE_TAIL) == 2);
+    CHECK(fabsf(postStopFinalWeightG(spike, 0.0f) - 35.8f) < 0.01f);
+
+    // Field recording (2026-10-29): a hand pressing harder for the last
+    // 0.8 s. Readings inside the band cannot own the median; the rest are
+    // refused (38.5 g was recorded for a 35.9 g shot).
+    PendingShotFinalize press = postStopPending(34.2f, 1850);
+    const PostStopSample pressTail[] = {
+        {60, 34.3f},    {150, 34.5f},   {300, 34.7f},   {370, 34.9f},
+        {480, 35.0f},   {570, 35.3f},   {700, 35.4f},   {790, 35.59f},
+        {880, 35.7f},   {1000, 35.7f},  {1080, 35.7f},  {1210, 35.8f},
+        {1300, 35.8f},  {1390, 35.8f},  {1500, 35.8f},  {1600, 35.8f},
+        {1650, 35.7f},  {1800, 35.9f},  {1890, 35.8f},  {2010, 35.9f},
+        {2110, 35.9f},  {2160, 36.0f},  {2320, 36.09f}, {2400, 36.2f},
+        {2460, 36.5f},  {2610, 37.0f},  {2680, 37.4f},  {2760, 37.9f},
+        {2890, 38.2f},  {2970, 38.5f}};
+    CHECK(feedPostStopTail(press, pressTail) == 1);
+    CHECK(fabsf(postStopFinalWeightG(press, 0.0f) - 36.0f) < 0.01f);
+
+    // A tail too short to settle (1 s drip delay) has only the ceiling.
+    PendingShotFinalize sparse = postStopPending(34.7f, 1900);
+    const PostStopSample sparseTail[] = {{100, 34.9f}, {400, 35.5f}, {900, 85.0f}};
+    CHECK(feedPostStopTail(sparse, sparseTail) == 1);
+    CHECK(!std::isfinite(sparse.tailSettledG));
+    CHECK(fabsf(postStopFinalWeightG(sparse, 0.0f) - 35.5f) < 0.01f);
+
+    // No ceiling without a trustworthy rate or reference: the estimate alone.
+    PendingShotFinalize open = postStopPending(34.7f, 0);
+    CHECK(postStopCeilingG(open, open.endedAtMs + 100) == INFINITY);
+    open.rateAtStopX100 = corridor::MAX_RATE_X100;  // Clamped: true flow unknown.
+    CHECK(postStopCeilingG(open, open.endedAtMs + 100) == INFINITY);
+    open.rateAtStopX100 = 1900;
+    CHECK(fabsf(postStopCeilingG(open, open.endedAtMs + 100) - 36.34f) < 0.01f);
+    open.channeling = true;
+    CHECK(postStopCeilingG(open, open.endedAtMs + 100) == INFINITY);
+    open.channeling = false;
+    open.lastKnownWeightValid = false;
+    CHECK(postStopCeilingG(open, open.endedAtMs + 100) == INFINITY);
+  }
+
+  // The spike recording through the real drip hold: the record keeps the
+  // settled yield and the trace names the refused run once.
+  const auto holdAfterStop = [](uint32_t dripDelayMs) {
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    startCycle();
+    advanceToBrew();
+    session.startedWithScale = true;
+    session.scaleBaselineReady = true;
+    endBbwProtectionForTests();
+    publishControlRamp(1.0f, 30.0f, 0.5f, 100, 10);
+    schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
+    session.active = false;
+    pendingFinalize.dripDelayMs = dripDelayMs;
+    pendingFinalize.lastKnownWeightG = 34.7f;
+    pendingFinalize.lastKnownWeightValid = true;
+    pendingFinalize.rateAtStopX100 = 1900;
+    pendingFinalize.channeling = false;
+    pendingFinalize.endedAtMs = hostMillis;
+    pendingFinalize.tailRefAtMs = hostMillis - 500;
+    CHECK(scaleProfiler().hostStartNoFlash(hostMillis));
+  };
+  const auto publishAfterStop = [](PostStopSample sample, uint32_t sequence) {
+    hostMillis = pendingFinalize.endedAtMs + sample.afterMs;
+    markScaleWorkerProgress();
+    publishWeight(sample.weightG, hostMillis,
+                  pendingFinalize.scaleConnectionGeneration, sequence);
+  };
+  holdAfterStop(3000);
+  uint32_t sequence = pendingFinalize.curveLastSequence + 1U;
+  for (const PostStopSample &sample : POST_STOP_SPIKE_TAIL) {
+    publishAfterStop(sample, sequence++);
+  }
+  CHECK(pendingFinalize.pending && pendingFinalize.curveBreakPending);
+  uint32_t ceilingCg = 0;
+  CHECK(profileEventCount(ScaleProfileEvent::WEIGHT_REJECTED, &ceilingCg) == 1);
+  CHECK(ceilingCg == 3820);  // 35.8 g settled + 1.9 g/s x 1 s + 0.5 g.
+  hostMillis = pendingFinalize.endedAtMs + pendingFinalize.dripDelayMs + 1;
+  pendingShotFinalizeTask();
+  ShotLogRecord record[1] = {};
+  CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+  CHECK(fabsf(record[0].actualWeightCg / 100.0f - 35.8f) < 0.02f);
+  CHECK(record[0].actualWeightSource ==
+        static_cast<uint8_t>(ActualWeightSource::POST_DRIP));
+
+  // The only reading of the hold is a refused one: no post-drip weight, so
+  // the record falls back to the weight at the stop instead of that reading.
+  holdAfterStop(1000);
+  publishAfterStop({900, 85.0f}, pendingFinalize.curveLastSequence + 1U);
+  CHECK(pendingFinalize.pending && pendingFinalize.tailCount == 0);
+  hostMillis = pendingFinalize.endedAtMs + pendingFinalize.dripDelayMs + 1;
+  pendingShotFinalizeTask();
+  CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+  CHECK(fabsf(record[0].actualWeightCg / 100.0f - 34.7f) < 0.02f);
+  CHECK(record[0].actualWeightSource ==
+        static_cast<uint8_t>(ActualWeightSource::LAST_KNOWN));
 }
 
 void ff02_chorrito_fires_on_second_sample() {
@@ -25696,6 +25857,7 @@ const TestCase testCases[] = {
     {"FW01", fw01_median_final_weight_filters_dip},
     {"FW02", fw02_offset_learns_below_sensor_lag},
     {"FW03", fw03_dense_tail_decimates_to_reachable_median},
+    {"FW04", fw04_post_stop_ceiling_ignores_touches},
     {"FF13", ff13_rinse_first_drop_goes_through_stopper},
     {"FF14", ff14_no_scale_first_drop_does_not_skip_stopper},
     {"FF15", ff15_orchestrate_post_tare_holds_cup_transitions},

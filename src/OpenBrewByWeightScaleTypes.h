@@ -364,8 +364,8 @@ constexpr uint8_t ACCIDENTAL_TOUCH_SUSTAINED_SAMPLES = 10;
 // internal RAM — do not allocate on heap or PSRAM on the weight path.
 constexpr size_t MAX_SHOT_DATAPOINTS = 32;
 
-// Post-stop drip tail: the settled final weight is the median of the last
-// POST_STOP_TAIL_SAMPLE_COUNT plausible samples once they span at least
+// Post-stop drip tail: the settled final weight is the highest median reached
+// by a ring of POST_STOP_TAIL_SAMPLE_COUNT plausible samples spanning at least
 // POST_STOP_TAIL_MIN_COVERAGE_MS; sparser tails fall back to the running max.
 // Dense streams are decimated to one sample per spacing window so the ring
 // actually reaches the required coverage (~10 Hz scales would otherwise span

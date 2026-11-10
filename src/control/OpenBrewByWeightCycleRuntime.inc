@@ -727,21 +727,9 @@ void notePostStopTailSample(PendingShotFinalize &pending, float weightG,
     pending.tailG[POST_STOP_TAIL_SAMPLE_COUNT - 1U] = weightG;
     pending.tailAtMs[POST_STOP_TAIL_SAMPLE_COUNT - 1U] = atMs;
   }
-}
-
-// Median of the plausible post-stop tail; early post-stop samples are still
-// rising, so a sparse or short-span tail falls back to the running max
-// rather than letting one dip or one pre-settle sample define the shot.
-float postStopFinalWeightG(const PendingShotFinalize &pending,
-                           float fallbackG) {
-  if (pending.tailCount == 0) {
-    return fallbackG;
-  }
-  if (pending.tailCount < POST_STOP_TAIL_SAMPLE_COUNT ||
-      static_cast<uint32_t>(
-          pending.tailAtMs[pending.tailCount - 1U] - pending.tailAtMs[0]) <
-          POST_STOP_TAIL_MIN_COVERAGE_MS) {
-    return pending.tailMaxG;
+  // A full ring spans POST_STOP_TAIL_MIN_COVERAGE_MS by its spacing.
+  if (pending.tailCount < POST_STOP_TAIL_SAMPLE_COUNT) {
+    return;
   }
   float sorted[POST_STOP_TAIL_SAMPLE_COUNT];
   memcpy(sorted, pending.tailG, sizeof(sorted));
@@ -754,13 +742,41 @@ float postStopFinalWeightG(const PendingShotFinalize &pending,
     }
     sorted[j] = value;
   }
-  const float median = sorted[POST_STOP_TAIL_SAMPLE_COUNT / 2U];
-  // A majority of dipped samples would own the median; the plausibility
-  // pre-filter only rejects individual outliers, so cap the damage by
-  // falling back to the running max.
-  return median < pending.tailMaxG - MAX_RECOVERY_WEIGHT_DROP_G
-             ? pending.tailMaxG
-             : median;
+  // Coffee in the cup never decreases: a later dip cannot lower the settled
+  // weight, and fmaxf ignores the NAN it starts from.
+  pending.tailSettledG =
+      fmaxf(pending.tailSettledG, sorted[POST_STOP_TAIL_SAMPLE_COUNT / 2U]);
+}
+
+// Settled weight of the plausible post-stop tail. Early samples are still
+// rising, so a tail too sparse to settle falls back to its running max.
+float postStopFinalWeightG(const PendingShotFinalize &pending,
+                           float fallbackG) {
+  if (pending.tailCount == 0) {
+    return fallbackG;
+  }
+  return std::isfinite(pending.tailSettledG) ? pending.tailSettledG
+                                             : pending.tailMaxG;
+}
+
+// Flow only decays after the stop, so a post-stop reading cannot exceed the
+// last trusted weight by more than the rate at the stop times that weight's
+// age: the last accepted reading until the tail settles, then the settled
+// median, which trails the cup by at most the ring's coverage. Unbounded
+// when that rate is unknown, clamped, or behind a channeling surge.
+float postStopCeilingG(const PendingShotFinalize &pending, uint32_t atMs) {
+  if (!pending.lastKnownWeightValid || pending.channeling ||
+      pending.rateAtStopX100 <= 0 ||
+      pending.rateAtStopX100 >= corridor::MAX_RATE_X100) {
+    return INFINITY;
+  }
+  const bool settled = std::isfinite(pending.tailSettledG);
+  const uint32_t ageMs =
+      settled ? POST_STOP_TAIL_MIN_COVERAGE_MS : atMs - pending.tailRefAtMs;
+  const float rateGS = static_cast<float>(pending.rateAtStopX100) / 1000.0f;
+  return (settled ? pending.tailSettledG : pending.lastKnownWeightG) +
+         rateGS * static_cast<float>(ageMs) / 1000.0f +
+         bbwEwma::DRIP_PHYSICS_ALLOWANCE_G;
 }
 
 // Coffee filling a cup-less pan can look stable over the placement window;
@@ -974,11 +990,21 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     const bool valid = weight >= MIN_AUTOMATION_WEIGHT_G && weight <= MAX_AUTOMATION_WEIGHT_G;
     if (!session.active && pendingFinalize.pending && pendingFinalize.startedWithScale &&
         tickAfter(receivedAtMs, pendingFinalize.endedAtMs)) {
-      const bool continuous = valid &&
+      const float ceilingG = postStopCeilingG(pendingFinalize, receivedAtMs);
+      const bool continuous = valid && weight <= ceilingG &&
           connectionGeneration == pendingFinalize.scaleConnectionGeneration &&
           tickAfter(packetSequence, pendingFinalize.curveLastSequence) &&
           plausibleSettledBrewWeight(weight, pendingFinalize.lastKnownWeightG,
                                      pendingFinalize.lastKnownWeightValid);
+      // Once per run of readings no drip can explain (a touch, an object).
+      if (valid && weight > ceilingG && !pendingFinalize.curveBreakPending) {
+        profileScaleWeightDecision(false, DebugCode::SCALE_SAMPLE_REJECTED_SLEW,
+                                   weight, receivedAtMs, packetSequence,
+                                   connectionGeneration, captureSequence, ceilingG);
+        serialTracef(LogLevel::INFO,
+                     "Post-stop reading %.1fg ignored: above the %.1fg drip ceiling",
+                     static_cast<double>(weight), static_cast<double>(ceilingG));
+      }
       pendingFinalize.curveBreakPending = !continuous ||
           !appendShotCurveObservation(pendingFinalize.curve, weight,
               receivedAtMs - pendingFinalize.cycleStartedAtMs, pendingFinalize.curveBreakPending);

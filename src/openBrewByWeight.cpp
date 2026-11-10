@@ -384,11 +384,13 @@ struct PendingShotFinalize {
   bool lastKnownWeightValid = false;
   float lastKnownWeightG = 0.0f;
   // Plausible post-stop tail collected during the drip hold; the final
-  // weight is the median of the last POST_STOP_TAIL_SAMPLE_COUNT samples.
+  // weight is the highest median its ring of samples reached.
   float tailG[POST_STOP_TAIL_SAMPLE_COUNT] = {};
   uint32_t tailAtMs[POST_STOP_TAIL_SAMPLE_COUNT] = {};
   uint8_t tailCount = 0;
   float tailMaxG = 0.0f;
+  float tailSettledG = NAN;  // NAN until the ring first fills
+  uint32_t tailRefAtMs = 0;  // when the cup held lastKnownWeightG
   uint8_t activePresetId = 0;
   char activePresetName[SHOT_PRESET_NAME_CAPACITY] = {};
   uint16_t targetTempDeciC = 0;  // Machine target at the shot's end; 0 = none.

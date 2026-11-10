@@ -154,6 +154,19 @@ removal and A→M keep their existing authority; nothing in the smooth cut can
 suspend the wall or the circuit limit.
 
 After drip delay, history records captured values and whether learning applied.
+The settled yield is the highest median reached by a ring of five post-stop
+readings taken at least 250 ms apart (a full ring spans 1 s); a tail too sparse
+to fill the ring uses its highest accepted reading. A post-stop reading is
+accepted only when it is no more than 2 g below the weight at the stop and no
+higher than a drip ceiling: the last trusted weight, plus the flow estimate at
+the stop times that weight's age, plus 0.5 g. Until the ring first fills, the
+trusted weight is the last accepted in-shot reading, aged from one cut lead (τ)
+before it; afterwards it is the settled yield at a fixed 1 s age. No ceiling
+applies without a valid flow estimate, at the estimator's 4 g/s clamp, after
+channeling, or without a last accepted reading. A refused reading leaves a
+segment break in the curve, and the first of each refused run is a
+`WEIGHT_REJECTED` trace event and a Web UI log line. With no accepted
+post-stop reading the record keeps the last-known weight.
 The drip offset learns from weight cuts on any segment, against the cut line at
 the stop (observation = offset used + final − f(t_cut)); channeling, manual,
 time/safety-limit, A→M and cup-removal outcomes, and cuts without a valid flow
