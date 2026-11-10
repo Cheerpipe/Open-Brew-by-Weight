@@ -21916,6 +21916,28 @@ void fw04_post_stop_ceiling_ignores_touches() {
   CHECK(fabsf(record[0].actualWeightCg / 100.0f - 34.7f) < 0.02f);
   CHECK(record[0].actualWeightSource ==
         static_cast<uint8_t>(ActualWeightSource::LAST_KNOWN));
+
+  // A hold cut short (cup lifted, next shot started) keeps a tail that had
+  // already settled, without training the drip; before the ring fills only
+  // the weight at the stop is known.
+  for (size_t published : {size_t{22}, size_t{12}}) {
+    holdAfterStop(3000);
+    sequence = pendingFinalize.curveLastSequence + 1U;
+    for (size_t i = 0; i < published; ++i) {
+      publishAfterStop(POST_STOP_SPIKE_TAIL[i], sequence++);
+    }
+    const bool settled = published == 22;
+    CHECK(std::isfinite(pendingFinalize.tailSettledG) == settled);
+    cancelPendingFinalize("Cup continuity lost during drip analysis", 1);
+    CHECK(!pendingFinalize.pending);
+    CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+    CHECK(fabsf(record[0].actualWeightCg / 100.0f - (settled ? 35.7f : 34.7f)) < 0.02f);
+    CHECK(record[0].actualWeightSource ==
+          static_cast<uint8_t>(settled ? ActualWeightSource::POST_DRIP
+                                       : ActualWeightSource::LAST_KNOWN));
+    CHECK(strcmp(shotLogBbwLearningApplied(record[0]), "false") == 0);
+    CHECK(!settled || pendingFinalize.curve.ended.weightCg == 3570);
+  }
 }
 
 void ff02_chorrito_fires_on_second_sample() {

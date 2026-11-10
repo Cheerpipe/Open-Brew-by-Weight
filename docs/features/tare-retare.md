@@ -94,8 +94,9 @@ reach the cup detector; this does not expand the placement or brew weight limits
 If a much lighter replacement remains below the supported −500 g net-reading
 limit, tare the empty pan on the scale, reconnect it, wait for stable zero, then place it.
 
-Observed removal during drip analysis preserves the previous shot's captured
-last-known weight and skips post-drip learning, even with idle tare disabled.
+Observed removal during drip analysis preserves the weight the previous shot
+had settled at (or, in about the first second, its weight at the stop) and
+skips post-drip learning, even with idle tare disabled.
 A single credible near-empty reading can discard that optional analysis;
 it cannot authorize a replacement tare. A completely unsampled swap remains
 indistinguishable from some additions to the same cup.

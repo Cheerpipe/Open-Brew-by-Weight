@@ -680,7 +680,15 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
   ActualWeightSource source = ActualWeightSource::NONE;
   float weightG = 0.0f;
   bool valid = false;
-  if (snapshot.lastKnownWeightValid && std::isfinite(snapshot.lastKnownWeightG)) {
+  // A tail that settled before the hold was cut short is the yield: its
+  // readings predate whatever ended the hold.
+  if (std::isfinite(snapshot.tailSettledG)) {
+    source = ActualWeightSource::POST_DRIP;
+    weightG = snapshot.tailSettledG;
+    valid = true;
+    (void)settleShotCurveEndWeight(snapshot.curve, weightG);
+    pendingFinalize.curve.ended = snapshot.curve.ended;
+  } else if (snapshot.lastKnownWeightValid && std::isfinite(snapshot.lastKnownWeightG)) {
     source = ActualWeightSource::LAST_KNOWN;
     weightG = snapshot.lastKnownWeightG;
     valid = true;

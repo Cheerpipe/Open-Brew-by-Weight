@@ -166,7 +166,10 @@ applies without a valid flow estimate, at the estimator's 4 g/s clamp, after
 channeling, or without a last accepted reading. A refused reading leaves a
 segment break in the curve, and the first of each refused run is a
 `WEIGHT_REJECTED` trace event and a Web UI log line. With no accepted
-post-stop reading the record keeps the last-known weight.
+post-stop reading the record keeps the last-known weight. A drip hold cut
+short (cup continuity lost, a new cycle, rinse or backflush) records the
+settled yield if the ring had filled, else the last-known weight, and never
+learns.
 The drip offset learns from weight cuts on any segment, against the cut line at
 the stop (observation = offset used + final − f(t_cut)); channeling, manual,
 time/safety-limit, A→M and cup-removal outcomes, and cuts without a valid flow
@@ -180,7 +183,7 @@ EWMA reuses the accepted final observation and additionally requires fresh weigh
 valid baseline and matching connection provenance. Control updates only the
 originating preset/algorithm generation. Reset or deletion invalidates pending
 learning while history can still finalize. A new shot cancels old pending
-analysis through the existing last-known-weight path. Candidate scoring never
+analysis through the cut-short path above. Candidate scoring never
 runs in the active cutoff or ISR path.
 
 **Stop.** Brew policy (`SCALE_THRESHOLD`, paddle OFF, guards, Web Stop)
@@ -622,8 +625,9 @@ Idle tare requires current-connection absence evidence followed by PLACED while
 READY, or after a normal shot stop in REQUIRES_OFF awaiting paddle release,
 with machine run state `IDLE` and no active cycle, safety trip, or maintenance.
 A placement outside eligibility is consumed, not deferred. Observed removal or
-placement during drip finalization commits captured last-known weight instead of
-the replacement cup, independently of the idle-tare setting. One fresh credible
+placement during drip finalization commits the yield settled before it, or the
+captured last-known weight when none had settled, instead of the replacement
+cup, independently of the idle-tare setting. One fresh credible
 near-empty sample can discard optional post-drip substitution/learning without
 emitting a cup event or authorizing tare. Entirely unsampled motion remains
 unobservable from final weight alone.

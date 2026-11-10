@@ -216,8 +216,10 @@ scale before the delay ends, readings that the last drips could not explain
 are left out, and the shot keeps the weight it had settled at. Two touches can
 still be counted as coffee: one that starts within the first second after the
 stop and is held, and a light press held until the delay ends. Leave the cup
-alone until the final weight appears; lifting it off early records the weight
-at the moment the machine stopped.
+alone until the final weight appears. If you lift it off early, or start the
+next shot, the shot keeps the weight it had already settled at; within about
+the first second, before it settles, it records the weight at the moment the
+machine stopped.
 
 ## Parameters
 
