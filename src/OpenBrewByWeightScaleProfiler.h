@@ -208,6 +208,7 @@ enum class ScaleProfilerStopReason : uint8_t {
   BUFFER_FULL,  // Only in traces saved before the ring; values stay stable.
   TRACE_LOSS,
   SUPERSEDED,   // Replaced by an automatic session; never saved.
+  SCALE_GONE,   // The scale switched off or stayed away for the session gap.
 };
 enum class ScaleProfilerError : uint8_t {
   NONE,
@@ -218,7 +219,7 @@ enum class ScaleProfilerError : uint8_t {
   SAVE_FAILED,
   INDEX_FAILED,
 };
-enum class ScaleProfilerRequest : uint8_t { NONE, START, STOP, DELETE, RESTART };
+enum class ScaleProfilerRequest : uint8_t { NONE, START, STOP, DELETE, RESTART, END };
 enum class ScaleProfilerWork : uint8_t { NONE, INVALIDATE, SAVE };
 
 inline const char *scaleProfilerStateName(ScaleProfilerState state) {
@@ -252,6 +253,7 @@ inline const char *scaleProfilerStopReasonName(ScaleProfilerStopReason reason) {
     case ScaleProfilerStopReason::BUFFER_FULL: return "buffer_full";
     case ScaleProfilerStopReason::TRACE_LOSS: return "trace_loss";
     case ScaleProfilerStopReason::SUPERSEDED: return "superseded";
+    case ScaleProfilerStopReason::SCALE_GONE: return "scale_gone";
   }
   return "none";
 }
@@ -385,6 +387,29 @@ struct ScaleProfilerStatus {
   bool autoStart = false;
 };
 
+// What the browser may do now. Mirrors the profiler's own guards so the
+// browser and the server can never disagree about availability.
+struct ScaleProfilerActions {
+  bool start, stop, remove, download;
+};
+inline ScaleProfilerActions scaleProfilerActions(const ScaleProfilerStatus &p) {
+  const bool busy = p.downloading || p.persistence == ScaleProfilerPersistence::SAVING ||
+                    p.persistence == ScaleProfilerPersistence::INVALIDATING;
+  const bool stopped = p.state == ScaleProfilerState::STOPPED;
+  const bool held = stopped || p.state == ScaleProfilerState::SAVED;
+  return {
+      p.partitionAvailable && !busy && (held || p.state == ScaleProfilerState::EMPTY),
+      p.state == ScaleProfilerState::RECORDING,
+      // Stopped traces stay deletable once saving is neither pending nor
+      // active; a failed save keeps the RAM evidence downloadable and deletable.
+      !busy && (p.state == ScaleProfilerState::SAVED ||
+                (stopped && (p.persistence == ScaleProfilerPersistence::FAILED ||
+                             p.persistence == ScaleProfilerPersistence::NONE))),
+      // A recording downloads its newest records without stopping.
+      !p.downloading && (held || p.state == ScaleProfilerState::RECORDING),
+  };
+}
+
 inline uint64_t scaleProfileRecordTimeMs(const ScaleProfileRecord &record) {
   return (static_cast<uint64_t>(record.ordinal >> SCALE_PROFILE_ORDINAL_BITS)
           << 32) | record.relativeMs;
@@ -409,6 +434,7 @@ enum class ScaleProfileAutoReason : uint8_t {
   GAP,        // The link was down for the session gap or longer: start anew.
   LOST_LINK,  // A dropped link: the running session continues.
   BREWING,    // A connection during a brew cycle never restarts a running session.
+  ENDED,      // Down: the session that saw the scale leave stops (power-off or gap).
 };
 
 inline const char *scaleProfileAutoReasonName(ScaleProfileAutoReason reason) {
@@ -418,6 +444,7 @@ inline const char *scaleProfileAutoReasonName(ScaleProfileAutoReason reason) {
     case ScaleProfileAutoReason::GAP: return "gap";
     case ScaleProfileAutoReason::LOST_LINK: return "lost link";
     case ScaleProfileAutoReason::BREWING: return "brew cycle";
+    case ScaleProfileAutoReason::ENDED: return "scale gone";
     case ScaleProfileAutoReason::NONE: break;
   }
   return "none";
@@ -442,10 +469,19 @@ class ScaleProfileAutoSession {
       downReason_ = disconnectReason;
       downAtMs_ = nowMs;
       downKnown_ = true;
+      downRecording_ = recording;
     }
     up_ = connected;
     upGeneration_ = generation;
-    if (!connected || generation == servedGeneration_) return ScaleProfileAutoReason::NONE;
+    // A recording started after the drop is the user's own and keeps running.
+    downRecording_ = downRecording_ && recording;
+    if (!connected)
+      return downRecording_ && !activeCycle &&
+                     (downReason_ == SCALE_PROFILE_POWER_OFF_REASON ||
+                      nowMs - downAtMs_ >= SCALE_PROFILE_SESSION_GAP_MS)
+                 ? ScaleProfileAutoReason::ENDED
+                 : ScaleProfileAutoReason::NONE;
+    if (generation == servedGeneration_) return ScaleProfileAutoReason::NONE;
     // Nothing to protect while no session records: start one even mid-shot.
     if (!recording) return ScaleProfileAutoReason::FIRST;
     if (activeCycle) return ScaleProfileAutoReason::BREWING;
@@ -461,6 +497,7 @@ class ScaleProfileAutoSession {
  private:
   bool up_ = false;
   bool downKnown_ = false;
+  bool downRecording_ = false;
   uint8_t downReason_ = 0;
   uint32_t upGeneration_ = 0;
   uint32_t downAtMs_ = 0;
@@ -496,7 +533,7 @@ inline bool scaleProfileHeaderValid(const ScaleProfileHeader &header) {
          header.payloadBytes <=
              SCALE_PROFILE_PARTITION_BYTES - SCALE_PROFILE_PAYLOAD_OFFSET &&
          header.stopReason <=
-             static_cast<uint32_t>(ScaleProfilerStopReason::SUPERSEDED);
+             static_cast<uint32_t>(ScaleProfilerStopReason::SCALE_GONE);
 }
 
 class ScaleProfiler {
@@ -696,9 +733,10 @@ class ScaleProfiler {
         work = beginStartLocked_(nowMs);
         break;
       case ScaleProfilerRequest::STOP:
-        if (state_ == ScaleProfilerState::RECORDING) {
-          stopLocked_(ScaleProfilerStopReason::USER, nowMs);
-        }
+      case ScaleProfilerRequest::END:
+        stopLocked_(request == ScaleProfilerRequest::END ? ScaleProfilerStopReason::SCALE_GONE
+                                                         : ScaleProfilerStopReason::USER,
+                    nowMs);
         break;
       case ScaleProfilerRequest::DELETE:
         work = beginDeleteLocked_();

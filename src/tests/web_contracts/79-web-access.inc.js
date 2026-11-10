@@ -223,7 +223,7 @@
   const cards = new Map(), here = {companionHere: null};
   let recorded = false, pairable = false;
   const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, presetState: {items: []},
-    cardDismissed: (k) => cards.get(k) || '', dismissCard: (k) => cards.set(k, '1'), shotRecorded: () => recorded,
+    cardDismissed: (k) => cards.get(k) || '', dismissCard: (k, v = '1') => cards.set(k, v), shotRecorded: () => recorded,
     controlsMutable: true, uiState: here, companionHere: () => Promise.resolve(here.companionHere),
     companionPairable: () => pairable, sub: (t, a) => t + ':' + a.join(',')},
     document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
@@ -284,14 +284,16 @@
   pairable = false;
   nodes.grindHintCard.hidden = false;
   assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint'], 'the grind hint holds no card back');
-  // A running scale recording shows its card until it stops, with no
-  // dismissal: Stop follows the Diagnostic page's gate, Download only this
-  // window's ownership.
+  // A scale recording shows its card: Stop while it runs, Delete once it is
+  // held. Stop and Delete follow the Diagnostic page's gate, Download only
+  // this window's ownership.
   Object.assign(home.R, {webUiOwner: true, diagnosticVisible: false,
     adminUnlockedFor: (s) => !!s.adminUnlocked});
-  const recording = {...noCloud, scaleRecording: true};
+  const recording = {...noCloud, scaleRecording: 'recording', scaleRecordingId: 4};
   shown(recording);
   assert.equal(nodes.scaleRecCard.hidden, false);
+  assert.ok(!nodes.scaleRecStop.hidden && nodes.scaleRecDelete.hidden);
+  assert.equal(nodes.scaleRecTitle.textContent, 'Scale recording in progress.');
   assert.equal(nodes.scaleRecStop.disabled, true);
   assert.equal(nodes.scaleRecDownload.disabled, false);
   for (const gate of [{adminUnlocked: true}, {development: true}]) {
@@ -304,14 +306,29 @@
   home.R.webUiOwner = false;
   shown(recording);
   assert.ok(nodes.scaleRecStop.disabled && nodes.scaleRecDownload.disabled);
-  shown({...recording, scaleRecording: false});
+  home.R.webUiOwner = true;
+  const held = {...recording, scaleRecording: 'held'};
+  shown(held);
+  assert.ok(nodes.scaleRecStop.hidden && !nodes.scaleRecDelete.hidden && !nodes.scaleRecDelete.disabled);
+  assert.equal(nodes.scaleRecTitle.textContent, 'Scale recording ready.');
+  shown({...held, scaleRecording: 'busy'});
+  assert.ok(nodes.scaleRecDelete.disabled && !nodes.scaleRecDownload.disabled,
+      'Delete waits for the save; Download stays available');
+  // A handled recording stays hidden until the next one; no recording clears it.
+  cards.set('obbwCard:scaleRec', '4');
+  shown(held);
   assert.equal(nodes.scaleRecCard.hidden, true);
+  shown({...held, scaleRecordingId: 5});
+  assert.equal(nodes.scaleRecCard.hidden, false);
+  shown({...held, scaleRecording: '', scaleRecordingId: 0});
+  assert.ok(nodes.scaleRecCard.hidden && cards.get('obbwCard:scaleRec') === '');
   assert.ok(codeIncludes(rawPartialHtml.home, '<section id="scaleRecCard" class="homeCard warnHint" hidden>') &&
       !partialHtml.home.includes('scaleRecDismiss') &&
       codeIncludes(viewJs.home, 'R.command("/api/v1/diagnostic/scale-profile",{action:"stop"})') &&
-      codeIncludes(viewJs.home, '$("scaleRecDownload").onclick=()=>R.downloadScaleProfile();') &&
+      codeIncludes(viewJs.home, '"Delete this scale recording? It cannot be recovered.")&&handled(await R.command("/api/v1/diagnostic/scale-profile",{action:"delete"}))') &&
+      codeIncludes(viewJs.home, '$("scaleRecDownload").onclick=async()=>handled(await R.downloadScaleProfile());') &&
       codeIncludes(rawRuntimeJs, 'apiBinary("/api/v1/diagnostic/scale-profile/download")'),
-      'The recording card stops through the Diagnostic action and downloads without stopping');
+      'The recording card stops and deletes through the Diagnostic actions and downloads without stopping');
   assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&
       codeIncludes(rawPartialHtml.settings, 'id="recipeSettings"') &&
       !codeIncludes(rawPartialHtml.home, 'type="checkbox"'));

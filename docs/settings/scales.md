@@ -327,7 +327,7 @@ touch, and first-drop decision that follows. See
 [the diagnostic guide](../FAQ.md)
 for how to start, stop, and download the recording, and for the option that
 starts a new recording each time the scale connects. A recording runs until
-you stop it: once its space is full, the oldest records make room for new
+you stop it or the scale switches off or stays away for 30 minutes: once its space is full, the oldest records make room for new
 ones, and the page shows how much time the held records cover.
 
 Use **Diagnostic → Scale recording** to investigate unexpected cup detection,

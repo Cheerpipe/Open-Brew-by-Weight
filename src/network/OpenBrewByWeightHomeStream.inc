@@ -116,8 +116,19 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("snapshotStale", bool(control.snapshotStale));
   delta.field("webUiOverrideActive", bool(override));
   delta.field("liveShot", bool(control.activeCycle || control.relayClosed));
-  // Home's recording card: one fingerprint, sent only on start and stop.
-  delta.field("scaleRecording", bool(scaleProfiler().recording()));
+  // Home's recording card: changes on start and stop, and while a save or a
+  // download keeps a held recording from being deleted.
+  {
+    const ScaleProfilerStatus rec = scaleProfiler().status(millis());
+    const bool held = rec.state == ScaleProfilerState::STOPPED ||
+                      rec.state == ScaleProfilerState::SAVED;
+    delta.field("scaleRecording", "\"%s\"",
+                rec.state == ScaleProfilerState::RECORDING ? "recording"
+                : !held ? "" : scaleProfilerActions(rec).remove ? "held" : "busy");
+    delta.field("scaleRecordingId",
+                static_cast<unsigned long>(held || rec.state == ScaleProfilerState::RECORDING
+                                               ? rec.sessionId : 0));
+  }
   delta.field("machineType", "\"%s\"", compiledMachineTypeId());
   delta.field("diagnosticPageVisible", bool(diagnosticPageEnabled()));
   delta.field("compatibilityMode", bool(firmwareCompatibilityMode()));

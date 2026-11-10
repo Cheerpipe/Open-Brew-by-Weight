@@ -188,11 +188,13 @@
     'scaleProfiler().downloadRecords(sent, scaleProfileDownloadBatch, wanted)',
     '"# truncated: %lu records overwritten during download"'])
     if (!download.includes(needle)) throw new Error('Scale recording download misses: ' + needle);
-  if (!network.includes('delta.field("scaleRecording", bool(scaleProfiler().recording()));'))
-    throw new Error('Home must carry the recording state as one fingerprinted field');
+  if (!network.includes('delta.field("scaleRecording", "\\"%s\\"",') ||
+      !network.includes('delta.field("scaleRecordingId",'))
+    throw new Error('Home must carry the recording state and its session id as fingerprinted fields');
   if (!firmwareCore.includes('case WebCommandType::SCALE_PROFILE_AUTO: {') ||
       !firmwareCore.includes('persistAutoScaleRecord(command.bleScan.autoScaleRecord != 0);') ||
       !firmwareCore.includes('scaleProfiler().setAutoStart(bleScanPersistedSettings.autoScaleRecord ==') ||
-      !firmwareCore.includes('autoSession.observe(link.state == ScaleLinkState::CONNECTED, connection,'))
+      !firmwareCore.includes('autoSession.observe(link.state == ScaleLinkState::CONNECTED, connection,') ||
+      !firmwareCore.includes('if (ended) request = ScaleProfilerRequest::END;'))
     throw new Error('Automatic scale recording must persist, load at boot, and decide per connection');
 }

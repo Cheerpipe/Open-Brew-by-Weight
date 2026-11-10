@@ -331,8 +331,10 @@ cup, touch, and first-drop decisions taken around it, so a support
 conversation can point at one line instead of guessing. Starting a new
 recording replaces the previous one, which is stated next to the buttons.
 
-A recording never stops on its own. Once its space is full, the oldest records
-make room for new ones, so it always holds the most recent stretch: about
+A recording keeps going until you stop it, or until the scale switches off or
+stays away for 30 minutes; a connection that only drops for a moment keeps it
+going, and a shot in progress is always recorded to its end. Once its space is
+full, the oldest records make room for new ones, so it always holds the most recent stretch: about
 25 minutes with an idle scale, and less during busy shots. **Time covered**
 shows how far back the held records go, and **Capture capacity used** says how
 many older records have already been overwritten. **Elapsed** is the time
@@ -353,10 +355,15 @@ then starts a fresh recording that replaces the previous one, as does a scale
 coming back after 30 minutes or more away. When the connection only drops for
 a moment, the current recording continues, so the drop itself stays in the
 trace; nothing restarts during a shot. Download what you need before you
-switch the scale off. While any recording runs, **Home** shows a yellow
-**Scale recording in progress** card with **Stop** and **Download**: Download
-works for whoever is using the controller, and Stop needs the same access as
-the Diagnostic page's buttons.
+switch the scale back on.
+
+While a recording runs, **Home** shows a yellow **Scale recording in
+progress** card with **Stop** and **Download**. Once it has stopped, the card
+reads **Scale recording ready** and offers **Delete** and **Download**
+instead; Delete asks you to confirm first and becomes available once the
+recording is saved. Downloading or deleting hides the card in that browser
+until the next recording. Download works for whoever is using the controller,
+while Stop and Delete need the same access as the Diagnostic page's buttons.
 
 On a 16 MB controller, **Diagnostic → Misc → Coredump** shows how many complete
 crash records are saved, up to two. Unlock Admin to download them. The browser

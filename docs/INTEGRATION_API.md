@@ -873,8 +873,12 @@ is reported as `scaleProfile` in the diagnostic status document.
 
 Capture has no duration or capacity cutoff: the records form a 16,384-slot
 ring that overwrites its oldest record once full, so a capture ends only on
-request (`user`) or when an automatic session replaces it (`superseded`,
-never saved). `elapsedMs` reports elapsed capture time. A user Stop saves the
+request (`user`), when an automatic session replaces it (`superseded`,
+never saved), or when its scale leaves (`scale_gone`, saved like a user Stop).
+The health worker stops a running capture that was recording when the link
+dropped, automatic or not, once the scale ended that link itself or the link
+has been down for 30 minutes, never while a brew cycle is active; a capture
+started after the drop keeps running. `elapsedMs` reports elapsed capture time. A user Stop saves the
 newest 8,192 records in time order (the flash payload is unchanged); a
 superseded session never touches flash.
 
@@ -1281,9 +1285,12 @@ live shot (an owed snapshot still goes out) and keeps their fingerprints, so
 the visible `activity` (`hidden: false`) is followed by one catch-up delta
 instead of every intermediate change. Clock synchronization
 supplies a new time anchor; the browser advances relative time locally.
-Home also carries `scaleRecording`, true while a scale recording runs, for
-the Home recording card; its fingerprint changes only when a recording
-starts or stops. `GET /api/v1/status/home` no longer exists: navigation visibility
+Home also carries `scaleRecording` for the Home recording card:
+`"recording"` while a capture runs, `"held"` for a stopped or saved capture
+that can be deleted, `"busy"` while a save or download keeps it from being
+deleted, and `""` otherwise; `scaleRecordingId` is that capture's session id
+(0 without one), which the browser uses to hide a handled card until the next
+capture. Both change only on those transitions. `GET /api/v1/status/home` no longer exists: navigation visibility
 (`diagnosticPageVisible`, `compatibilityMode`) is carried by the Home stream
 itself and applied on every view, and the browser no longer probes a status
 route when entering Stats, History, or Diagnostic. Settings and Diagnostic are

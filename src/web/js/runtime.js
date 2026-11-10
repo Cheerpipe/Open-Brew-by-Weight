@@ -1628,17 +1628,20 @@ function saveFile(blob, name) {
 // Diagnostic and Home's recording card: a running recording downloads too.
 let scaleProfileBusy = false;
 async function downloadScaleProfile() {
-  if (scaleProfileBusy) return;
+  if (scaleProfileBusy) return false;
   scaleProfileBusy = true;
   message(__WEBUI_TEXT__("runtime.scale_profile_downloading"));
+  let ok = false;
   try {
     const text = await apiBinary("/api/v1/diagnostic/scale-profile/download");
     saveFile(new Blob([text], { type: "text/plain" }), "openbrewbyweight-scale-profile.txt");
     message(__WEBUI_TEXT__("diagnostic.ok"), "ok");
+    ok = true;
   } catch (e) {
     message(formatCommandError(__WEBUI_TEXT__("diagnostic.profile_download_failed"), e), "error");
   }
   scaleProfileBusy = false;
+  return ok;
 }
 function scaleDisplayName(sc) {
   const fr = (sc && sc.preferredFriendlyName && String(sc.preferredFriendlyName).trim()) || "";

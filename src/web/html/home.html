@@ -85,10 +85,12 @@
   </div>
 </section>
 <section id="scaleRecCard" class="homeCard warnHint" hidden>
-  <p><strong>{{webui:home.scale_rec_title}}</strong> {{webui:home.scale_rec_text}}</p>
+  <p><strong id="scaleRecTitle"></strong> <span id="scaleRecText"></span></p>
   <div class="btnBar">
     <button id="scaleRecStop" class="btnGlyph scaleProfileCtl" type="button">
       <span class="t">{{webui:home.scale_rec_stop}}</span></button
+    ><button id="scaleRecDelete" class="btnGlyph scaleProfileCtl" type="button">
+      <span class="t">{{webui:home.scale_rec_delete}}</span></button
     ><button id="scaleRecDownload" class="btnGlyph btnInvert scaleProfileCtl" type="button">
       <span class="t">{{webui:home.scale_rec_download}}</span>
     </button>

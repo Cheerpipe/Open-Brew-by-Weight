@@ -107,12 +107,24 @@ void serviceScaleProfiler(uint32_t now) {
   const bool restart = autoOn && scaleProfileAutoRestarts(decision) &&
                        request == ScaleProfilerRequest::NONE;
   const uint32_t sessionBefore = restart ? scaleProfiler().status(now).sessionId : 0;
+  // A session that saw its scale leave ends there, automatic or not; it
+  // repeats each tick until a free tick serves it.
+  const bool ended = decision == ScaleProfileAutoReason::ENDED &&
+                     request == ScaleProfilerRequest::NONE;
   if (restart) request = ScaleProfilerRequest::RESTART;
+  if (ended) request = ScaleProfilerRequest::END;
   const ScaleProfilerWork work = scaleProfiler().service(request, now);
   if (work != ScaleProfilerWork::NONE && !dispatchScaleProfileWork()) {
     scaleProfiler().noteWorkDispatchFailed();
   }
-  if (decision == ScaleProfileAutoReason::NONE) return;
+  if (ended)
+    serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                         "Scale recording stopped: the scale %s",
+                         autoSession.downReason() == SCALE_PROFILE_POWER_OFF_REASON
+                             ? "switched off" : "has been away for 30 minutes");
+  if (decision == ScaleProfileAutoReason::NONE ||
+      decision == ScaleProfileAutoReason::ENDED)
+    return;
   const unsigned long id = connection;
   if (restart) {
     const ScaleProfilerStatus after = scaleProfiler().status(now);

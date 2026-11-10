@@ -348,7 +348,20 @@ void testBudgetMatchesPlan() {
         SCALE_PROFILE_SAVED_CAPACITY * SCALE_PROFILE_RECORD_BYTES);
   CHECK(sizeof(ScaleProfileHeader) <= 4096);
   CHECK(static_cast<uint32_t>(ScaleProfilerStopReason::BUFFER_FULL) == 3 &&
-        static_cast<uint32_t>(ScaleProfilerStopReason::SUPERSEDED) == 5);
+        static_cast<uint32_t>(ScaleProfilerStopReason::SUPERSEDED) == 5 &&
+        static_cast<uint32_t>(ScaleProfilerStopReason::SCALE_GONE) == 6);
+}
+
+void testEndStopsAndSaves() {
+  ScaleProfiler profiler;
+  CHECK(profiler.hostStartNoFlash(T0));
+  noteWeightAt(profiler, T0 + 10, 1.0f, 1);
+  // Saved like a user Stop: the save is dispatched at once and blocks Delete.
+  CHECK(profiler.hostService(ScaleProfilerRequest::END, T0 + 20) == ScaleProfilerWork::SAVE);
+  const ScaleProfilerStatus status = profiler.status(T0 + 20);
+  CHECK(status.state == ScaleProfilerState::STOPPED &&
+        status.stopReason == ScaleProfilerStopReason::SCALE_GONE);
+  CHECK(!scaleProfilerActions(status).remove && scaleProfilerActions(status).download);
 }
 
 void fillRing(ScaleProfiler &profiler, uint32_t count) {
@@ -462,9 +475,13 @@ void testAutoSessionDecisions() {
   CHECK(tick(session, true, 1, NONE, 200, false) == R::FIRST);  // Until served.
   session.served(1);
   CHECK(tick(session, true, 1, NONE, 300) == R::NONE);
-  // Power-off: latched at the drop edge, kept over later scan failures.
-  CHECK(tick(session, false, 1, POWER_OFF, 400) == R::NONE);
-  CHECK(tick(session, false, 1, SCAN_TIMEOUT, 500) == R::NONE);
+  // Power-off: latched at the drop edge, kept over later scan failures; the
+  // running session ends until it stops.
+  CHECK(tick(session, false, 1, POWER_OFF, 400) == R::ENDED);
+  CHECK(tick(session, false, 1, SCAN_TIMEOUT, 500) == R::ENDED);
+  CHECK(tick(session, false, 1, SCAN_TIMEOUT, 600, false) == R::NONE);
+  // A recording started after the drop keeps running.
+  CHECK(tick(session, false, 1, SCAN_TIMEOUT, 700) == R::NONE);
   CHECK(tick(session, true, 2, SCAN_TIMEOUT, 5000) == R::POWER_OFF);
   CHECK(session.downReason() == POWER_OFF);
   session.served(2);
@@ -474,10 +491,12 @@ void testAutoSessionDecisions() {
   session.served(3);
   // The same lost link after 30 minutes or more starts a new session.
   CHECK(tick(session, false, 3, SUPERVISION, 10000) == R::NONE);
+  CHECK(tick(session, false, 3, SCAN_TIMEOUT, 9999 + SCALE_PROFILE_SESSION_GAP_MS) == R::NONE);
+  CHECK(tick(session, false, 3, SCAN_TIMEOUT, 10000 + SCALE_PROFILE_SESSION_GAP_MS) == R::ENDED);
   CHECK(tick(session, true, 4, SCAN_TIMEOUT, 10000 + SCALE_PROFILE_SESSION_GAP_MS) == R::GAP);
   session.served(4);
   // Never during a brew cycle, even after a power-off.
-  CHECK(tick(session, false, 4, POWER_OFF, 20000000) == R::NONE);
+  CHECK(tick(session, false, 4, POWER_OFF, 20000000, true, true) == R::NONE);
   CHECK(tick(session, true, 5, POWER_OFF, 20001000, true, true) == R::BREWING);
   // ...unless nothing records: there is no session to protect.
   CHECK(tick(session, true, 5, POWER_OFF, 20001000, false, true) == R::FIRST);
@@ -598,6 +617,7 @@ void runAll() {
   testLiveDownloadWindowAndOvertake();
   testFlashSaveKeepsNewestRecords();
   testAutoSessionDecisions();
+  testEndStopsAndSaves();
 }
 
 }  // namespace

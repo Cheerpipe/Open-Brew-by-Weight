@@ -151,13 +151,26 @@ function renderHints(s) {
     el.hidden = !(want && !R.cardDismissed(cardKey(id)));
   }
   if ($("scaleOnlyHintUse")) $("scaleOnlyHintUse").disabled = !R.controlsMutable;
-  // No dismissal: the card lasts as long as the recording. Stop follows the
-  // Diagnostic page's gate; Download needs only this window's ownership.
+  // One card per recording: Stop while it runs, Delete once it is held.
+  // Download or Delete hides it until the next recording; Stop and Delete
+  // follow the Diagnostic page's gate, Download only this window's ownership.
   const rec = $("scaleRecCard");
   if (!rec) return;
-  rec.hidden = !s.scaleRecording;
-  $("scaleRecStop").disabled =
-    !R.webUiOwner || !(R.adminUnlockedFor(s) || s.development || R.diagnosticVisible);
+  const id = String(s.scaleRecordingId || ""),
+    running = s.scaleRecording === "recording",
+    locked = !R.webUiOwner || !(R.adminUnlockedFor(s) || s.development || R.diagnosticVisible);
+  if (!id && R.cardDismissed(cardKey("scaleRec"))) R.dismissCard(cardKey("scaleRec"), "");
+  rec.hidden = !id || R.cardDismissed(cardKey("scaleRec")) === id;
+  $("scaleRecTitle").textContent = running
+    ? __WEBUI_TEXT__("home.scale_rec_title")
+    : __WEBUI_TEXT__("home.scale_rec_held_title");
+  $("scaleRecText").textContent = running
+    ? __WEBUI_TEXT__("home.scale_rec_text")
+    : __WEBUI_TEXT__("home.scale_rec_held_text");
+  $("scaleRecStop").hidden = !running;
+  $("scaleRecDelete").hidden = running;
+  $("scaleRecStop").disabled = locked;
+  $("scaleRecDelete").disabled = locked || s.scaleRecording !== "held";
   $("scaleRecDownload").disabled = !R.webUiOwner;
 }
 // The machine row ticks with the boiler rows so a warm-up countdown stays live.
@@ -286,9 +299,14 @@ export function init() {
   if ($("micraPolicyHintAccept"))
     $("micraPolicyHintAccept").onclick = () => R.lineaMicraAction("acceptPolicy");
   if ($("scaleRecStop")) {
+    const handled = (ok) =>
+      ok && R.dismissCard(cardKey("scaleRec"), String(R.homeStatusCache()?.scaleRecordingId));
     $("scaleRecStop").onclick = () =>
       R.command("/api/v1/diagnostic/scale-profile", { action: "stop" });
-    $("scaleRecDownload").onclick = () => R.downloadScaleProfile();
+    $("scaleRecDelete").onclick = async () =>
+      confirm(__WEBUI_TEXT__("diagnostic.delete_profile_confirm")) &&
+      handled(await R.command("/api/v1/diagnostic/scale-profile", { action: "delete" }));
+    $("scaleRecDownload").onclick = async () => handled(await R.downloadScaleProfile());
   }
   if ($("scaleOnlyHintUse"))
     $("scaleOnlyHintUse").onclick = () =>

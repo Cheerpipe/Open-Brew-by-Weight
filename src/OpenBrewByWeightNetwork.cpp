@@ -1099,29 +1099,7 @@ bool statusJsonAppendTaskProfiler(size_t *used,
 
 bool statusJsonAppendScaleProfiler(size_t *used,
                                    const ScaleProfilerStatus &profile) {
-  // The can* flags mirror the profiler's own guards so the browser and the
-  // server can never disagree about availability.
-  const bool busy = profile.downloading ||
-                    profile.persistence == ScaleProfilerPersistence::SAVING ||
-                    profile.persistence == ScaleProfilerPersistence::INVALIDATING;
-  const bool canStart =
-      profile.partitionAvailable && !busy &&
-      (profile.state == ScaleProfilerState::EMPTY ||
-       profile.state == ScaleProfilerState::STOPPED ||
-       profile.state == ScaleProfilerState::SAVED);
-  const bool canStop = profile.state == ScaleProfilerState::RECORDING;
-  // Stopped traces stay deletable once saving is neither pending nor active;
-  // a failed save keeps the RAM evidence downloadable and deletable.
-  const bool canDelete =
-      !busy && (profile.state == ScaleProfilerState::SAVED ||
-                (profile.state == ScaleProfilerState::STOPPED &&
-                 (profile.persistence == ScaleProfilerPersistence::FAILED ||
-                  profile.persistence == ScaleProfilerPersistence::NONE)));
-  // A recording downloads its newest records without stopping.
-  const bool canDownload =
-      !profile.downloading && (profile.state == ScaleProfilerState::SAVED ||
-                               profile.state == ScaleProfilerState::STOPPED ||
-                               profile.state == ScaleProfilerState::RECORDING);
+  const ScaleProfilerActions can = scaleProfilerActions(profile);
   return statusJsonAppend(
       used,
       "\"scaleProfile\":{\"state\":\"%s\",\"persistence\":\"%s\","
@@ -1147,8 +1125,8 @@ bool statusJsonAppendScaleProfiler(size_t *used,
       profile.autoStart ? "true" : "false",
       profile.partitionAvailable ? "true" : "false",
       scaleProfilerErrorName(profile.lastError),
-      canStart ? "true" : "false", canStop ? "true" : "false",
-      canDelete ? "true" : "false", canDownload ? "true" : "false");
+      can.start ? "true" : "false", can.stop ? "true" : "false",
+      can.remove ? "true" : "false", can.download ? "true" : "false");
 }
 
 // Preset statistics replay every stored shot: recompute them only when the

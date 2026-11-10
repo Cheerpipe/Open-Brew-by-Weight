@@ -326,7 +326,8 @@ PSRAM capture of raw decoded weights plus correlated firmware decisions, and
 the persistence worker commits a user-stopped trace to a dedicated flash
 partition with the validity-bearing header written last. The capture is a
 512 KiB ring of 16,384 records that overwrites its oldest record, so it ends
-only on request or when an opt-in automatic session replaces it; the health
+only on request, when an opt-in automatic session replaces it, or when its
+scale switches off or stays away for 30 minutes outside a brew cycle; the health
 worker decides that once per scale connection from the link snapshot
 (restart after the scale's own power-off or a 30-minute gap, continue across
 a lost link, never during a brew cycle) and a superseded session is never
