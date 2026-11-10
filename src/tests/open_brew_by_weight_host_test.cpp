@@ -19405,6 +19405,20 @@ void at01_classifier_startup_and_trend_math() {
   r = accidentalTouchResidual({.timeS = times, .weightG = weights, .anchorS = -0.3f,
                                .weight = 2.0f});
   CHECK(!r.frozen && r.residualG == 0.0f);  // Pre-cycle anchor: no trend.
+  // First drops at 3.56 g/s that slow to 1 g/s (recorded shot, epoch 4.03 s):
+  // the reference at 4.48 s knows the spurt alone and extrapolates 4.24 g.
+  const float spurtS[] = {4.03f, 4.09f, 4.18f, 4.30f, 4.39f, 4.48f,
+                          4.60f, 4.69f, 4.81f, 4.90f, 4.99f};
+  const float spurtG[] = {0.4f, 0.6f, 1.0f, 1.2f, 1.7f, 2.0f, 2.0f, 2.2f, 2.4f, 2.5f, 2.6f};
+  auto young = [&](float weight) {
+    return accidentalTouchResidual({.timeS = spurtS, .weightG = spurtG, .datapoints = 11,
+                                    .epochS = 4.03f, .anchorG = 2.6f, .anchorS = 4.99f,
+                                    .weight = weight, .nowS = 5.11f});
+  };
+  r = young(2.7f);  // Between the reference and its trend: slower flow.
+  CHECK(r.frozen && r.residualG == 0.0f);
+  CHECK(fabsf(young(6.7f).residualG - 2.46f) < 0.02f);  // A press keeps its residual.
+  CHECK(fabsf(young(0.2f).residualG + 1.8f) < 0.01f);   // A lift: below the reference.
 
   CHECK(classifyAccidentalTouch(1.4f, false, 0, nullptr, 0) ==
         AccidentalTouchClass::OK);
@@ -20208,6 +20222,38 @@ void at26_first_drop_onset_is_flow_not_touch() {
   CHECK(session.calibrationEligible);
   CHECK(shotCurveBitCount(shotCurveSampler.held, 0) == 0);
   publishWeight(11.0f, baseMs + 8538);  // A real step is still held.
+  CHECK(session.accidentalTouchHolding);
+}
+
+void at27_first_drop_spurt_that_slows_is_flow_not_touch() {
+  // Recorded Themis Mini shot: the first drops land at 3.5 g/s for half a
+  // second, then the flow settles near 1 g/s. Extrapolating the spurt put
+  // the shot on touch hold at 5.11 s and made it SUSTAINED at 7.75 s.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  enableAccidentalTouchForTest();
+  startCycle();
+  advanceToBrew();
+  const uint32_t baseMs = hostMillis;
+  const int onset[][2] = {
+      {4031, 4},  {4091, 6},  {4181, 10}, {4301, 12}, {4391, 17}, {4481, 20},
+      {4601, 20}, {4691, 22}, {4811, 24}, {4901, 25}, {4991, 26}, {5111, 27},
+      {5201, 28}, {5291, 29}, {5411, 30}, {5501, 31}, {5591, 32}, {5711, 33},
+      {5801, 34}, {5891, 34}, {6011, 35}, {6101, 36}, {6221, 36}, {6311, 37},
+      {6401, 38}, {6521, 38}, {6611, 39}, {6701, 40}, {6821, 41}, {6911, 42},
+      {7001, 42}, {7121, 43}, {7211, 43}, {7301, 44}, {7421, 45}, {7511, 45},
+      {7601, 46}, {7751, 46}, {7811, 47}, {7931, 48}, {8021, 48}, {8141, 49}};
+  for (int i = 1; i < 40; ++i) publishWeight(0.0f, baseMs + 100U * i);
+  for (const auto &sample : onset) {
+    markScaleWorkerProgress();
+    publishWeight(sample[1] / 10.0f, baseMs + sample[0]);
+    loop();
+    CHECK(!session.accidentalTouchHolding);
+  }
+  CHECK(session.firstDropMs != 0);
+  CHECK(session.calibrationEligible);
+  CHECK(shotCurveBitCount(shotCurveSampler.held, 0) == 0);
+  publishWeight(12.9f, baseMs + 8261);  // A real step is still held.
   CHECK(session.accidentalTouchHolding);
 }
 
@@ -26151,6 +26197,7 @@ const TestCase testCases[] = {
     {"AT24", at24_ramped_contact_and_lift_are_held},
     {"AT25", at25_real_spurt_is_accepted_as_flow},
     {"AT26", at26_first_drop_onset_is_flow_not_touch},
+    {"AT27", at27_first_drop_spurt_that_slows_is_flow_not_touch},
     {"TR01", tr01_failed_start_tare_uses_software_zero},
     {"TR02", tr02_late_zero_after_grace_is_the_late_tare},
     {"TR03", tr03_failed_start_tare_cup_lift_stops},

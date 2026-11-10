@@ -832,6 +832,9 @@ struct AccidentalTouchResidualInput {
 // REFERENCE_LAG_S older than the anchor, so it moves only with the anchor and
 // held samples never shift it; until one exists the anchor is the reference.
 // An empty trajectory (pre-cycle anchor) carries no trend: residual 0.
+// Until the reference is a full flow window past the epoch, the flow may be
+// the first drops' spurt alone: a candidate between the reference and its
+// extrapolation is flow that slowed down, never a touch.
 inline AccidentalTouchResidual accidentalTouchResidual(
     const AccidentalTouchResidualInput &input) {
   const auto &[timeS, weightG, datapoints, epochS, anchorG, anchorS, weight, nowS] = input;
@@ -863,7 +866,9 @@ inline AccidentalTouchResidual accidentalTouchResidual(
   const float flow = span >= ACCIDENTAL_TOUCH_MIN_FLOW_SPAN_S
                          ? fmaxf((weightG[end] - weightG[lo]) / span, 0.0f)
                          : 0.0f;
-  out.residualG = weight - (refG + flow * (nowS - refS));
+  const float trendG = refG + flow * (nowS - refS);
+  const bool young = refS - epochS < ACCIDENTAL_TOUCH_FLOW_WINDOW_S;
+  out.residualG = weight - (young ? fminf(trendG, fmaxf(weight, refG)) : trendG);
   return out;
 }
 

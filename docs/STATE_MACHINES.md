@@ -717,7 +717,11 @@ so it moves only when the anchor does: held samples never drag it. The flow
 `m` is the secant of the accepted points over the second ending at the
 reference (with younger history, the secant up to the newest point; never
 negative). Neither reaches behind the last accepted level shift or the
-first drop, where the flat pre-flow trend ends. A sample is anomalous at
+first drop, where the flat pre-flow trend ends. Until the reference is one
+second past that epoch, `m` may describe the first drops' spurt alone, so a
+sample between `w_ref` and the trend has residual 0 (flow that slowed down is
+not a touch): only a sample above the trend, or below the reference itself,
+keeps its residual. A sample is anomalous at
 `|residual| ≥ 1.5 g`; once holding it stays anomalous down to 1.0 g
 (hysteresis). An empty trajectory (pre-cycle anchor) is never judged.
 When a hold begins, the anchor's own sample leaves the trend if it was already
