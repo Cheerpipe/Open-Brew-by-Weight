@@ -181,12 +181,19 @@ struct BeanconquerorOut {
   }
 };
 
-// Each non-held reading, in order: emit(index, atMs, weightCg).
+// Each non-held reading, in order: emit(index, atMs, weightCg). A shot without
+// one gets a single closing reading (its time, its yield, index 0 with no flow),
+// since Beanconqueror cannot import a shot with no samples.
 template <typename Emit>
-inline void beanconquerorSamples(const ShotCurveRecord &curve, Emit &&emit) {
+inline void beanconquerorSamples(const BeanconquerorShot &s, const ShotCurveRecord &curve,
+                                 Emit &&emit) {
   ShotCurveReader reader{curve.stream, curve.bytes};
+  bool any = false;
   for (uint16_t i = 0; i < curve.count && reader.next(); ++i)
-    if (!shotCurveHeld(curve, i)) emit(i, reader.atMs, reader.weightCg);
+    if (!shotCurveHeld(curve, i)) emit(i, reader.atMs, reader.weightCg), any = true;
+  if (!any)
+    emit(uint16_t{0}, static_cast<uint16_t>(s.durationDs * 100U > 65535U ? 65535U : s.durationDs * 100U),
+         static_cast<int16_t>(s.yieldCg > 32767 ? 32767 : s.yieldCg));
 }
 
 inline void beanconquerorGaggiuinoShot(const BeanconquerorShot &s, const ShotCurveRecord &curve,
@@ -199,7 +206,7 @@ inline void beanconquerorGaggiuinoShot(const BeanconquerorShot &s, const ShotCur
     out.text("%s\"%s\":[", comma, key);
     comma = ",";
     bool first = true;
-    beanconquerorSamples(curve, [&](uint16_t i, uint16_t ms, int16_t cg) {
+    beanconquerorSamples(s, curve, [&](uint16_t i, uint16_t ms, int16_t cg) {
       out.text(first ? "%d" : ",%d", value(i, ms, cg));
       first = false;
     });
@@ -262,7 +269,7 @@ inline void beanconquerorIndexEntry(BeanconquerorOut &out, const BeanconquerorSh
 inline void beanconquerorSlog(BeanconquerorOut &out, const BeanconquerorShot &s,
                               const ShotCurveRecord &curve, const BeanconquerorFlowWork &w) {
   uint32_t count = 0;
-  beanconquerorSamples(curve, [&](uint16_t, uint16_t, int16_t) { count++; });
+  beanconquerorSamples(s, curve, [&](uint16_t, uint16_t, int16_t) { count++; });
   char id[8];
   snprintf(id, sizeof(id), "%u", static_cast<unsigned>(s.presetId));
   out.u32(0x544F4853);  // 'SHOT'
@@ -279,7 +286,7 @@ inline void beanconquerorSlog(BeanconquerorOut &out, const BeanconquerorShot &s,
   beanconquerorCString(out, s.presetName, 47, 48);
   out.u16(beanconquerorDg(s.yieldCg));
   out.zeros(BEANCONQUEROR_SLOG_HEADER - 110);  // no phase transitions
-  beanconquerorSamples(curve, [&](uint16_t i, uint16_t ms, int16_t cg) {
+  beanconquerorSamples(s, curve, [&](uint16_t i, uint16_t ms, int16_t cg) {
     out.u32(ms);
     out.u16(s.targetTempDeciC);
     out.zeros(12);  // ct, tp, cp, fl, tf, pf
