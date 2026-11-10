@@ -65,6 +65,7 @@
 #include "OpenBrewByWeightDomain.h"
 #include "OpenBrewByWeightShotPredictor.h"
 #include "OpenBrewByWeightAuditLog.h"
+#include "OpenBrewByWeightLastWords.h"
 #include "OpenBrewByWeightOutboundAdmission.h"
 #include "OpenBrewByWeightSettingsWriteAdmission.h"
 #include "OpenBrewByWeightFirmwareMode.h"
@@ -490,6 +491,11 @@ OPEN_BREW_BY_WEIGHT_PSRAM_BSS DebugRingBuffer debugLog;
 // Curated audit latch: classified rare events only, guarded by the same mutex
 // as the common ring so logEmitDetail captures both in one critical section.
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS AuditLogLatch auditLog;
+// Every warning and error, whatever the ring keeps, for the next boot
+// (OpenBrewByWeightLastWords.h); noted under debugLogMutex once armed.
+OPEN_BREW_BY_WEIGHT_PSRAM_NOINIT LastWords lastWords;
+uint32_t lastWordsSequence = 0;
+bool lastWordsArmed = false;
 // Audit flush bookkeeping: the worker drains records the latch marked
 // pending; the timestamp opens the 2 s batching window on the first pending
 // record so short bursts coalesce into one header commit.

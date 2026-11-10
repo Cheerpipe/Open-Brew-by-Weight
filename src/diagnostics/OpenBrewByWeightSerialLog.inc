@@ -3,12 +3,64 @@
 // logEmit/addDebugEvent entry points. Part of the openBrewByWeight control TU;
 // included at the position of the original definitions.
 
+bool lastWordsWorthy(LogLevel level) {
+  return lastWordsArmed && logLevelAtMost(level, LogLevel::WARNING);
+}
+
+// Under debugLogMutex. The line is written back at once: a reset drops the
+// PSRAM cache, and the panic handler writes back only the shot trace.
+void noteLastWordsLocked(Instant at, LogLevel level, DebugCategory category, DebugCode code,
+                         int32_t argument1, int32_t argument2, const char *text) {
+  const LastWordsLine &line = noteLastWords(lastWords, ++lastWordsSequence, at, level,
+                                            category, code, argument1, argument2, text);
+#ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
+  (void)esp_cache_msync(const_cast<LastWordsLine *>(&line), sizeof(line),
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+#else
+  (void)line;
+#endif
+}
+
+// Boot, before anything can log a warning: the previous boot's last warnings
+// and errors go back into the WebUI ring whatever it retains, and the store
+// starts over. Out of line: its frame must not sit under setup()'s.
+[[gnu::noinline]] void restoreLastWords(uint32_t resetReason) {
+  LastWordsLine lines[LAST_WORDS_CAPACITY];
+  const size_t count =
+      collectLastWords(lastWords, shotTraceResetKeepsPsram(resetReason), lines);
+#ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
+  (void)esp_cache_msync(&lastWords, sizeof(lastWords),
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+#endif
+  for (size_t index = 0; index < count; ++index) {
+    const LastWordsLine &line = lines[index];
+    DebugEvent event;
+    event.code = static_cast<DebugCode>(line.code);
+    event.argument1 = line.argument1;
+    event.argument2 = line.argument2;
+    copyCString(event.text, sizeof(event.text), line.text);
+    char message[DEBUG_EVENT_TEXT_CAPACITY], restored[DEBUG_EVENT_TEXT_CAPACITY];
+    formatDebugEventMessage(event, message, sizeof(message), FW_VERSION);
+    // The ring keeps 127 characters: the prefix takes at most 42 of them.
+    snprintf(restored, sizeof(restored), "Before the restart, %lu s after boot: %.85s",
+             static_cast<unsigned long>(line.atMs / 1000U), message);
+    TaskLockGuard lock(debugLogMutex);
+    debugLog.add({millis(), line.wallSec}, static_cast<LogLevel>(line.level),
+                 static_cast<DebugCategory>(line.category), DebugCode::LOG_TEXT, 0, 0, restored);
+  }
+  lastWordsArmed = true;
+}
+
 // Retains one text line in the WebUI ring when its level passes retention.
 void retainLogText(LogLevel level, DebugCategory category, const char *message) {
-  if (!logLevelAtMost(level, currentRingRetainLogLevel())) return;
+  const bool toRing = logLevelAtMost(level, currentRingRetainLogLevel());
+  const bool toLast = lastWordsWorthy(level);
+  if (!toRing && !toLast) return;
   const uint32_t atMs = millis();
   const Instant at{atMs, g_wallClock.nowUtcSec(atMs)};
   TaskLockGuard lock(debugLogMutex);
+  if (toLast) noteLastWordsLocked(at, level, category, DebugCode::LOG_TEXT, 0, 0, message);
+  if (!toRing) return;
   debugLog.add(at, level, category, DebugCode::LOG_TEXT, 0, 0, message);
   __atomic_store_n(&debugLogDroppedSnapshot, debugLog.overwritten(),
                    __ATOMIC_RELAXED);
@@ -365,7 +417,8 @@ void logEmitDetail(LogLevel level, DebugCategory category, DebugCode code,
   // Audit capture is level-independent: curated events enter the latch even
   // when neither serial nor ring retains them.
   const bool toAudit = auditWorthy(level, code, auditVerboseActive());
-  if (!toSerial && !toRing && !toAudit) {
+  const bool toLast = lastWordsWorthy(level);
+  if (!toSerial && !toRing && !toAudit && !toLast) {
     return;
   }
   const uint32_t atMs = millis();
@@ -381,6 +434,7 @@ void logEmitDetail(LogLevel level, DebugCategory category, DebugCode code,
     if (toAudit) {
       auditLog.add(at, level, category, code, argument1, argument2, detail);
     }
+    if (toLast) noteLastWordsLocked(at, level, category, code, argument1, argument2, detail);
   }
 
   // Target builds enqueue in the bounded serial sink; host builds emit

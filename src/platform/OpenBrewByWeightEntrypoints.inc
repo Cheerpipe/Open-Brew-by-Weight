@@ -301,6 +301,7 @@ void setup() {
   set_arduino_panic_handler(openBrewByWeightPanicHandler, nullptr);
 #endif
   safetyResetStatus = beginSafetyResetGuard();
+  restoreLastWords(safetyResetStatus.reasonCode);
 
   if (SPEAKER_PRESENT) {
     localBuzzer.begin(BUZZER_GPIO);

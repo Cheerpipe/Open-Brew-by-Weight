@@ -15448,6 +15448,35 @@ void n01c_wall_clock_resumes_from_the_rtc() {
   g_wallClock.reset();
 }
 
+void n01d_last_words_outlive_a_restart() {
+  static LastWords store;
+  LastWordsLine out[LAST_WORDS_CAPACITY];
+  for (uint32_t sequence = 1; sequence <= LAST_WORDS_CAPACITY + 2; ++sequence)
+    noteLastWords(store, sequence, {sequence * 1000U, 0}, LogLevel::WARNING,
+                  DebugCategory::NETWORK, DebugCode::LOG_TEXT, 0, 0, "line");
+  store.lines[0].text[0] ^= 1;  // a torn line (sequence 9) is dropped
+  size_t count = collectLastWords(store, true, out);
+  CHECK(count == LAST_WORDS_CAPACITY - 1 && out[0].sequence == 3 &&
+        out[count - 1].sequence == LAST_WORDS_CAPACITY + 2);
+  CHECK(collectLastWords(store, true, out) == 0);  // the boot emptied it
+  noteLastWords(store, 1, {}, LogLevel::ERROR, DebugCategory::SYSTEM, DebugCode::LOG_TEXT, 0, 0, "x");
+  CHECK(collectLastWords(store, false, out) == 0);  // power-on loses PSRAM
+
+  // Through the log pipeline, whatever the ring retains.
+  restoreLastWords(1);  // power-on boot: arms the capture
+  serialTraceCategory(LogLevel::WARNING, DebugCategory::NETWORK, "esp-tls: handshake failed");
+  serialTraceCategory(LogLevel::INFO, DebugCategory::NETWORK, "an info line");
+  const uint32_t before = debugLog.latestSequence();
+  restoreLastWords(3);  // software restart
+  DebugEvent events[4];
+  const size_t restored = debugLog.copyAfter(before, events, 4);
+  CHECK(restored == 1);
+  CHECK(events[0].level == LogLevel::WARNING && events[0].category == DebugCategory::NETWORK);
+  CHECK(strstr(events[0].text, "Before the restart, ") == events[0].text &&
+        strstr(events[0].text, "esp-tls: handshake failed") != nullptr);
+  CHECK(collectLastWords(lastWords, true, out) == 0);
+}
+
 void n01b_wall_clock_survives_millis_wrap() {
   g_wallClock.reset();
   g_wallClock.setSyncing("pool.ntp.org", 1000);
@@ -26833,6 +26862,7 @@ const TestCase testCases[] = {
     {"N01", n01_wall_clock_tracks_utc_from_anchor},
     {"N01b", n01b_wall_clock_survives_millis_wrap},
     {"N01c", n01c_wall_clock_resumes_from_the_rtc},
+    {"N01d", n01d_last_words_outlive_a_restart},
     {"N01d", n01d_wall_clock_keeps_time_through_failures_and_rebase},
     {"N01c", n01c_wall_clock_cancel_syncing_restores_anchor},
     {"N02", n02_ntp_hostname_validation},

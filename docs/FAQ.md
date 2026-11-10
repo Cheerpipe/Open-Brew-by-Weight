@@ -290,7 +290,9 @@ brings in older stored history 500 lines at a time. The log also
 shows warnings and errors from the device's built-in system components — for
 example, the exact reason a secure connection to the La Marzocco cloud
 failed — so you can troubleshoot from the browser without opening the machine
-or connecting a USB cable. If the
+or connecting a USB cable. After a crash, a watchdog reset or a restart, the
+log starts with the last warnings and errors from before it, marked **Before
+the restart**, so you can see what went wrong; a power cut loses them. If the
 connection drops, the interface reconnects and reloads current readings. To
 share a section, press and hold its name to copy its contents.
 
