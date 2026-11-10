@@ -139,7 +139,7 @@ inline uint8_t restoreBbwLearning(BbwLearningBank &bank, const BbwLearningRecord
 
 namespace openbrewbyweight {
 
-// Callers pass stack copies: flash I/O must not read or write PSRAM.
+// Callers pass internal-RAM copies: flash I/O must not read or write PSRAM.
 inline SettingsBlobLoad loadBbwLearning(BbwLearningRecord &record) {
   return loadSettingsBlob(NvsSubsystem::SETTINGS, BBW_LEARNING_KEY, record, validBbwLearning);
 }

@@ -1173,15 +1173,18 @@ bool serviceBleScanPersist() {
 }
 
 // Worker side of a staged control record, on the idle cadence that is also
-// the retry backoff: saves a stack copy and reports a failing run once.
-// Not inlined, so the copy never adds to the worker loop's own frame.
+// the retry backoff: saves a copy and reports a failing run once. The copy is
+// the worker's own, in internal RAM: flash I/O must not read PSRAM, and the
+// learning record does not fit this task's stack. Not inlined: it is a
+// root of the stack-depth gate.
 template <typename Record, typename Save>
 __attribute__((noinline)) void serviceStagedRecord(TaskMutex &mux, bool &pending,
                                                    const Record &staged, bool &failLatched,
                                                    int32_t reason, Save save) {
+  static Record record;
   mux.lock();
   const bool due = pending;
-  Record record = staged;
+  record = staged;
   pending = false;
   mux.unlock();
   if (!due) return;
