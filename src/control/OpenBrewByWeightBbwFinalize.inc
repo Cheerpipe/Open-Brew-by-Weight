@@ -4,9 +4,20 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   // r learns from weight cuts only (target, raised or lowered segment),
   // never from channeling, scale loss, the wall or a manual stop, nor from a
   // cut without a valid rate (no q x tau lead, so the error is not drip).
-  if (pendingFinalizeIsRinse(snapshot) || !snapshot.offsetAnalysis ||
-      snapshot.channeling || snapshot.rateAtStopX100 == 0 ||
-      !corridor::weightCutReason(static_cast<uint8_t>(snapshot.endReason))) {
+  // A rinse never reaches the shot log; every other skip names its reason.
+  if (pendingFinalizeIsRinse(snapshot)) return false;
+  const char *const skipped =
+      !snapshot.offsetAnalysis
+          ? (!snapshot.automaticBrew ? "manual brew"
+             : snapshot.timerOnly    ? "timer-only shot"
+                                     : "weight disturbed during the shot")
+      : snapshot.channeling           ? "channeling"
+      : snapshot.rateAtStopX100 == 0  ? "no valid flow rate at the stop"
+      : !corridor::weightCutReason(static_cast<uint8_t>(snapshot.endReason))
+          ? "not a weight cut"
+          : nullptr;
+  if (skipped != nullptr) {
+    serialTracef(LogLevel::INFO, "Offset learn skipped: %s; offset unchanged", skipped);
     return false;
   }
 
@@ -57,10 +68,17 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
   }
   if (snapshot.bbwAlgorithm !=
           static_cast<uint8_t>(BbwAlgorithm::LINEAR_EWMA) ||
-      snapshot.bbwProfileVersion != bbwAlgorithmVersion(snapshot.bbwAlgorithm)) return false;
-  auto &learning = bbwLearningBank.forPreset(preset->id, presetBank);
-  if (snapshot.bbwLearningGeneration != learning.generation)
+      snapshot.bbwProfileVersion != bbwAlgorithmVersion(snapshot.bbwAlgorithm)) {
+    serialTrace(LogLevel::INFO,
+                "Offset learn skipped: shot used another drip algorithm version");
     return false;
+  }
+  auto &learning = bbwLearningBank.forPreset(preset->id, presetBank);
+  if (snapshot.bbwLearningGeneration != learning.generation) {
+    serialTrace(LogLevel::INFO,
+                "Offset learn skipped: drip learning restarted during the shot");
+    return false;
+  }
   const float observation = snapshot.weightOffsetG + (finalWeightG - cutLineG);
   // Physics gate (design review 2026-10-29): flow that kept running or a
   // scale event is never drip. It also clears a pending outlier: a step is

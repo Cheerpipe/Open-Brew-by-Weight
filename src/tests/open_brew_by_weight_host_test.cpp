@@ -21617,6 +21617,56 @@ void fw08_drip_filter_physics_outliers_and_step() {
   CHECK(preset.bbwEwmaOffsetG > 0.55f && preset.bbwEwmaOffsetG < 0.85f);
 }
 
+void fw09_learning_skips_name_their_reason() {
+  // A11: a logged shot that does not train says why in the Web UI log, and
+  // the drip stays where it was.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  ShotPreset &preset = mutableActiveShotPreset(presetBank);
+  preset.bbwEwmaOffsetG = 0.70f;
+  const auto skips = [&](const char *reason, const auto &spoil) {
+    pendingFinalize = PendingShotFinalize{};
+    preparePendingBbwForTest();
+    pendingFinalize.offsetAnalysis = pendingFinalize.logEligible = true;
+    pendingFinalize.startedWithScale = pendingFinalize.automaticBrew = true;
+    pendingFinalize.scaleBaselineReady = true;
+    pendingFinalize.scaleConnectionGeneration =
+        getScaleLinkSnapshot().connectionGeneration;
+    pendingFinalize.weightOffsetG = 0.70f;
+    pendingFinalize.cutLineDg = 360;
+    pendingFinalize.endReason = EndReason::SCALE_THRESHOLD;
+    pendingFinalize.endedAtMs = hostMillis;
+    spoil();
+    currentWeight = 36.0f;
+    currentWeightConnectionGeneration = pendingFinalize.scaleConnectionGeneration;
+    ++currentWeightSequence;
+    currentWeightReceivedAtMs = ++hostMillis;
+    debugLog.clear();
+    const bool learned = learnPendingBbw(pendingFinalize, currentWeight, true);
+    return !learned && debugLogTextCount("Offset learn skipped") == 1 &&
+           debugLogTextCount(reason) == 1 && preset.bbwEwmaOffsetG == 0.70f;
+  };
+  CHECK(skips("weight disturbed during the shot",
+              [] { pendingFinalize.offsetAnalysis = false; }));
+  CHECK(skips("manual brew", [] {
+    pendingFinalize.offsetAnalysis = pendingFinalize.automaticBrew = false;
+  }));
+  CHECK(skips("channeling", [] { pendingFinalize.channeling = true; }));
+  CHECK(skips("no valid flow rate", [] { pendingFinalize.rateAtStopX100 = 0; }));
+  CHECK(skips("not a weight cut",
+              [] { pendingFinalize.endReason = EndReason::GLOBAL_LIMIT; }));
+  CHECK(skips("another drip algorithm version",
+              [] { ++pendingFinalize.bbwProfileVersion; }));
+  CHECK(skips("drip learning restarted during the shot", [&] {
+    bbwLearningBank.invalidate(preset.id, presetBank);
+  }));
+  // A rinse never reaches the shot log, so it adds no line.
+  debugLog.clear();
+  pendingFinalize.endReason = EndReason::RINSE_COMPLETE;
+  CHECK(!learnPendingBbw(pendingFinalize, currentWeight, true));
+  CHECK(debugLogTextCount("Offset learn skipped") == 0);
+}
+
 void rt24_late_cup_step_uses_shot_coordinates() {
   // After a failed start tare the trajectory is software-zeroed: the same
   // 300 g cup set back down over 5 g of coffee is not a late-cup step.
@@ -26138,6 +26188,7 @@ const TestCase testCases[] = {
     {"FW06", fw06_status_carries_recent_drips_and_markers},
     {"FW07", fw07_quick_start_save_retries_and_reports_once},
     {"FW08", fw08_drip_filter_physics_outliers_and_step},
+    {"FW09", fw09_learning_skips_name_their_reason},
     {"RT21", rt21_empty_pan_at_cycle_start_resyncs_stuck_present},
     {"RS01", rs01_fast_samples_wait_for_min_duration},
     {"RS02", rs02_slow_samples_meet_min_duration_at_third_sample},
