@@ -396,16 +396,18 @@ void processWebCommand(const WebCommand &command) {
         rejectWebCommand(command);
         return;
       }
-      // Set drip and the plain reset (re)start the drip and quick start from
-      // it; Set learning speed alone keeps the drip; quick start alone keeps
-      // the drip, its learning and the speed.
+      // Every variant restarts the learning evidence, so earlier shots no
+      // longer anchor the outlier filter. Set drip and the plain reset
+      // (re)start the drip and quick start from it; Set learning speed alone
+      // keeps the drip; quick start alone keeps the drip, its starting value
+      // and the speed.
       ShotPreset &preset = mutableActiveShotPreset(presetBank);
+      bbwLearningBank.invalidate(preset.id, presetBank);
       if (command.bbwQuickStart) {
         armBbwQuickStart(preset, true);
         reportControlCommandResult(command, CommandResultState::APPLIED);
         return;
       }
-      bbwLearningBank.invalidate(preset.id, presetBank);
       if (command.bbwSetDrip)
         preset.weightOffsetBaselineG = command.config.weightOffsetBaselineG;
       if (command.bbwSetDrip || command.bbwAlphaBaseline == 0) {

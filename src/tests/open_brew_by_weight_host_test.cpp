@@ -21427,6 +21427,36 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
   CHECK(armed->setAtId == shotStatisticsEpochNow() && armed->setCg == 50);
   CHECK(preset.bbwEwmaOffsetG == drip && preset.weightOffsetBaselineG == 1.2f &&
         preset.bbwEwmaAlpha == alpha);
+  // A1: after five shots at 1.00 g, Quick start drops their evidence too, so
+  // 0.30, 0.32 and 0.30 all count: no outlier hold, no step, the third
+  // applies 0.30 g.
+  const auto pull = [&](float needed) {
+    preparePendingBbwForTest();
+    pendingFinalize.offsetAnalysis = pendingFinalize.logEligible = true;
+    pendingFinalize.startedWithScale = pendingFinalize.automaticBrew = true;
+    pendingFinalize.scaleBaselineReady = true;
+    pendingFinalize.scaleConnectionGeneration =
+        getScaleLinkSnapshot().connectionGeneration;
+    pendingFinalize.weightOffsetG = preset.bbwEwmaOffsetG;
+    pendingFinalize.goalWeightDg = 360;
+    pendingFinalize.endReason = EndReason::SCALE_THRESHOLD;
+    pendingFinalize.endedAtMs = hostMillis;
+    currentWeight = 36.0f - preset.bbwEwmaOffsetG + needed;
+    currentWeightConnectionGeneration = pendingFinalize.scaleConnectionGeneration;
+    ++currentWeightSequence;
+    currentWeightReceivedAtMs = ++hostMillis;
+    return learnPendingBbw(pendingFinalize, currentWeight, true);
+  };
+  set.config.weightOffsetBaselineG = 1.0f;
+  processWebCommand(set);
+  for (int i = 0; i < 5; ++i) CHECK(pull(1.0f));
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f);
+  processWebCommand(quick);
+  debugLog.clear();
+  for (const float needed : {0.30f, 0.32f, 0.30f}) CHECK(pull(needed));
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.30f) < 0.005f);
+  CHECK(state() == static_cast<uint8_t>(QuickStartState::APPLIED));
+  CHECK(debugLogTextCount("is an outlier") == 0 && debugLogTextCount("Drip step") == 0);
   // Restore quick starts again and marks where the factory drip came back,
   // so the chart fades the shots pulled before it.
   WebCommand restore;

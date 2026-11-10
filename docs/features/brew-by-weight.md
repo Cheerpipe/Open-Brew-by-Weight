@@ -254,8 +254,10 @@ configuration with no recipe change still being saved.
   same way; presets kept from an earlier firmware keep their drip untouched.
 - **Quick start**, in the row under the chart, starts a quick start without
   changing anything else: the drip in use and the learning speed stay as they
-  are, the shots before it stop counting, and your next three learning shots
-  can move the drip at once. Use it after a change that affects the drip,
+  are, and the shots before it stop counting — for the quick start, for the
+  check that holds odd shots and for the automatic choice of learning speed —
+  so your next three learning shots can move the drip at once, however far
+  they land from the old drip. Use it after a change that affects the drip,
   such as a new basket, portafilter or shower screen, or a different pressure.
   The row leaves while the quick start runs and comes back once it ends.
 - **Set** on the learning-speed field applies a new α at once, restarts its
