@@ -17,7 +17,9 @@ constexpr float DRIP_PHYSICS_ALLOWANCE_G = 0.5f;
 constexpr uint8_t DRIP_STAT_WINDOW = 5;
 constexpr uint8_t DRIP_STAT_MIN_OBSERVATIONS = 3;
 constexpr float DRIP_STAT_MIN_SIGMA_G = 0.10f;
-constexpr float DRIP_STAT_MIN_GATE_G = 0.30f;
+// Genuine drip spreads about 0.26 g (sd) from shot to shot on a real machine;
+// at 0.30 the gate held one clean shot in ten.
+constexpr float DRIP_STAT_MIN_GATE_G = 0.50f;
 constexpr float DRIP_STEP_AGREE_G = 0.50f;
 
 inline float clampOffset(float value) {

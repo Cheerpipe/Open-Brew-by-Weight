@@ -21617,12 +21617,14 @@ void fw08_drip_filter_physics_outliers_and_step() {
   CHECK(ok);
   ok = shot(preset.bbwEwmaOffsetG, 1.40f, 2000);
   CHECK(ok);
+  // 0.45 g from the window is inside the 0.50 g minimum gate: it trains.
+  CHECK(shot(preset.bbwEwmaOffsetG, 1.85f, 3000));
   // Disagreeing outliers replace the pending one instead of confirming;
   // the next shot that agrees with the replacement confirms the step.
-  CHECK(!shot(preset.bbwEwmaOffsetG, 1.90f, 2000));
-  CHECK(!shot(preset.bbwEwmaOffsetG, 0.90f, 2000));
-  ok = shot(preset.bbwEwmaOffsetG, 0.94f, 2000);
-  CHECK(ok && fabsf(preset.bbwEwmaOffsetG - 0.92f) < 0.005f);
+  CHECK(!shot(preset.bbwEwmaOffsetG, 2.00f, 3000));
+  CHECK(!shot(preset.bbwEwmaOffsetG, 0.84f, 2000));
+  ok = shot(preset.bbwEwmaOffsetG, 0.88f, 2000);
+  CHECK(ok && fabsf(preset.bbwEwmaOffsetG - 0.86f) < 0.005f);
   // A run of faulty shots that agree with each other is vetoed by physics
   // before the quick start could ever install it; clean shots then decide.
   processWebCommand(set);
