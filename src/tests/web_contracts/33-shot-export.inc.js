@@ -15,7 +15,8 @@
       path.join(schemaDir, 'openbrewbyweight-shot-export-v1.example.json'), 'utf8'));
   // One schema, version 1, and the vectors shared with the companion; the
   // retired files are gone.
-  assert.deepEqual(fs.readdirSync(schemaDir).sort(), ['README.md', 'companion-link-v1.vectors.json',
+  assert.deepEqual(fs.readdirSync(schemaDir).sort(), ['README.md', 'beanconqueror-v1.vectors.json',
+    'companion-link-v1.vectors.json',
     'companion-records-v1.vectors.json',
     'openbrewbyweight-shot-export-v1.example.json', 'openbrewbyweight-shot-export-v1.schema.json',
     'stats-header-v1.vectors.json']);

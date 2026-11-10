@@ -271,7 +271,8 @@ session-only. Deferred persistence retains offsets, gain/provenance, and
 profile through the existing dual-slot owner.
 `idlePowerSavingEnabled` (tag 3, the former single power setting),
 `performanceBoostEnabled` (tag 88, inherits tag 3 when a blob predates it),
-webhook preset delivery, and Rinse without a scale are current explicit fields.
+`beanconquerorEndpoint` (tag 91, Off when a blob predates it), webhook preset
+delivery, and Rinse without a scale are current explicit fields.
 Presets never copy the global power settings.
 `touchStopFallbackEnabled` is a device-level runtime field, defaulting to true. Revisions and
 dual-slot ownership remain unchanged.

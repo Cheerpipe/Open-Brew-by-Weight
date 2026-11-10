@@ -43,6 +43,12 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   gate = gateOver(gate, drip, strlen(drip));
   gate = gateOver(gate, readback, sizeof(readback));
   gate = gateOver(gate, g_work->quickSaved, strlen(g_work->quickSaved));
+  // Coffee apps: whether the companion serves Beanconqueror too.
+  CompanionSnapshot companion;
+  companionSnapshot(companion);
+  const bool companionBeanconqueror =
+      companion.paired && companion.archiveSwitch && companion.bcSwitch;
+  gate = gateOver(gate, &companionBeanconqueror, sizeof(companionBeanconqueror));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   char serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
   uint8_t options, scaleOptions;
@@ -79,6 +85,9 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   // Drip chart and quick start change as one block after each shot.
   fields.field("config.bbwDrip", "{%s}", drip + 1);
   fields.field("config.autoTare", bool(config.autoTare));
+  fields.field("config.beanconquerorEndpoint", "\"%s\"",
+               beanconquerorEndpointId(config.beanconquerorEndpoint));
+  fields.field("companion.beanconqueror", companionBeanconqueror);
   fields.field("config.autoTareOutsideBrew", bool(config.autoTareOutsideBrew));
   fields.field("config.retareAccessoryOutsideBrew",
                bool(idleAccessoryRetareEnabled(config.noScaleBbwMode)));

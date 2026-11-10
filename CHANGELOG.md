@@ -9,6 +9,14 @@ Web UI footer.
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **Import shots in Beanconqueror:** **Settings → Coffee apps → Beanconqueror**
+  lets the app import your shots as if the controller were a Gaggiuino
+  (Beanconqueror 8.2 or later) or a GaggiMate (8.8 or later, with your dose
+  and rating). The section shows the address to paste, the steps, and a
+  preview of your last shot as the app will receive it. The address has no
+  password, like those machines'. A companion can serve it too, from its own
+  copy and even with the machine off: **Admin → Companion → Beanconqueror
+  through the companion**. See [Beanconqueror](docs/settings/beanconqueror.md).
 - **Your Bookoo's own sounds on the buzzer:** when a Bookoo Themis connects,
   the buzzer plays the scale's own power-on melody, and when it disconnects, its
   power-off melody. Two new switches under **Alerts** turn this off; other

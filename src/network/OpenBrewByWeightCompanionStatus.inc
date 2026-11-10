@@ -15,12 +15,13 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) const {
       used,
       ",\"companion\":{\"paired\":%s,\"name\":\"%s\",\"address\":\"%s\",\"version\":\"%s\","
       "\"link\":\"%s\",\"linkAgeS\":%ld,\"peerProtocol\":%lu,\"ui\":%s,\"log\":%s,\"archive\":%s,"
-      "\"relay\":\"%s\",\"relayAgeS\":%ld,\"relayRejects\":%lu,",
+      "\"bc\":%s,\"relay\":\"%s\",\"relayAgeS\":%ld,\"relayRejects\":%lu,",
       stored.paired ? "true" : "false", stored.name, stored.address, stored.companionVersion,
       link != nullptr ? "open" : "down", static_cast<long>(companionLinkAgeS(g_companion, now)),
       static_cast<unsigned long>(link != nullptr ? 0 : g_companion.peerProtocol),
       stored.uiOff ? "false" : "true", stored.logSwitch ? "true" : "false",
-      stored.archiveSwitch ? "true" : "false", g_companion.relay.ready ? "ready" : "down",
+      stored.archiveSwitch ? "true" : "false", stored.bcSwitch ? "true" : "false",
+      g_companion.relay.ready ? "ready" : "down",
       static_cast<long>(companionRelayAgeS(g_companion.relay, now)),
       static_cast<unsigned long>(g_companion.relay.rejects));
   if (kCompanionLm)
@@ -61,6 +62,7 @@ void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) const {
   out.ui = stored.uiOff == 0;
   out.logSwitch = stored.logSwitch != 0;
   out.archiveSwitch = stored.archiveSwitch != 0;
+  out.bcSwitch = stored.bcSwitch != 0;
   out.relayReady = g_companion.relay.ready;
   out.relayRejects = g_companion.relay.rejects;
   out.linkOpen = link != nullptr;

@@ -172,3 +172,74 @@ projects' own formats and are not versioned here:
   400-character `shareBrew<n>` parameters. Water in is sent as 0 ml because it
   is not measured. Beanconqueror accepts it from 8.8; earlier releases have no
   `ADD_BREW` route and show their generic wrong-QR-code alert.
+
+## Beanconqueror machine endpoints v1
+
+Beanconqueror imports shots from a connected espresso machine. With
+**Settings → Coffee apps → Beanconqueror** on, the controller answers as a
+Gaggiuino or a GaggiMate under one base address, `http://<host>/beanconqueror`.
+A companion with **Beanconqueror through the companion** on answers the same
+paths from its archive, without contacting the controller. The routes are
+read-only, need no token by design (like the machines they stand in for), keep
+the controller's `Host` check, and send no CORS headers. With the setting Off,
+every path answers `404`. The controller answers `503` while it keeps the
+radio quiet: a shot until its drip delay ends, a rinse, a scale connecting
+(the companion link's sync hold). Only good shots are served; a bad or
+missing shot answers `404`.
+
+| Format | Path under `/beanconqueror` | Answer |
+| --- | --- | --- |
+| Gaggiuino | `/api/system/status` | `{}` |
+| Gaggiuino | `/api/shots/latest` | `[{"lastShotId":N}]`, the newest good shot; `[]` with none |
+| Gaggiuino | `/api/shots/<id>` | the shot as JSON (below) |
+| GaggiMate | `/api/status` | `{"mode":0}` |
+| GaggiMate | `/api/history/index.bin` | `SIDX` v1 index of every good shot, newest first, `nextId` = newest id + 1 |
+| GaggiMate | `/api/history/recent.bin?limit=n` | the same index cut to the newest `n` (default 8, 1–50), `nextId` 0 |
+| GaggiMate | `/api/history/<id, 6 digits>.slog` | `SHOT` v7 file (below) |
+| GaggiMate | `/api/history/<id>.json` | notes `{"id":"<id>","doseIn":"18.0"}`; `404` without a dose |
+
+JSON answers are `application/json`; binary answers are
+`application/octet-stream`, little-endian.
+
+**Samples.** Both formats send the curve's readings in order, drip included,
+leaving out held readings, as the shot JSON export does. Rounding is half up
+(`floor(x + 0.5)`). A weight is clamped at 0 and sent in decigrams
+(`floor((cg + 5) / 10)`). The flow is the Stats page's weight flow
+(`buildShotSparkModel().flowCurve` in `runtime.js`), in g/s: the gain over a
+trailing window of at least 1 s, with none at a segment's first reading,
+before the first drop, across a break or a scale-loss window, or overlapping
+a held reading. A missing value is sent as 0. The start time is
+`round(endedAtUnixSec - durationS)` with wall time, otherwise absent (`0` in
+GaggiMate's fields). The yield is `actualG`, which every good shot has.
+
+**Gaggiuino shot.** `id`; `timestamp` (Unix s, only with wall time);
+`duration` (ds); `datapoints` with ten arrays of one entry per sample:
+`timeInShot` (ds), `shotWeight` (dg), `pumpFlow` and `weightFlow` (both the
+weight flow, tenths of g/s), `temperature` and `targetTemperature` (the
+target, tenths of °C; 0 without one), and `pressure`, `waterPumped`,
+`targetPumpFlow` and `targetPressure`, all 0 because they are not measured;
+and `profile` `{id, name, waterTemperature}` (the preset and its target in
+°C). There is no `globalStopConditions`, so Beanconqueror takes the yield
+from the last reading.
+
+**GaggiMate index entry** (128 bytes): `id`; `timestamp`; `duration`
+(`durationS` in ms); `volume` (yield, dg); `rating` (0–5); `flags` `0x01`
+completed, plus `0x04` when there is a dose; `profileId` (the preset id as
+text, 32 bytes) and `profileName` (UTF-8, at most 47 bytes, never splitting a
+character, 48 bytes); `avgTemp` and `maxPressure` 0 (not measured);
+`avgFlow` (`avgFlowGS` × 100, 0 when missing); the rest 0.
+
+**GaggiMate `.slog`**: a 512-byte header with `magic` `SHOT`, `version` 7,
+the sample size 30, `headerSize` 512, `sampleInterval` 50, `fieldsMask`
+`0x3FFF`, `sampleCount`, `durationMs` (`durationS` in ms, so Beanconqueror's
+brew time leaves out the drip wait), `startEpoch`, `profileId`,
+`profileName`, `finalWeight` (yield, dg) and no phase transitions; then
+30-byte samples with `t` (ms), `tt` (target, tenths of °C), `vf` (weight
+flow, hundredths of g/s, at most 32767) and `v` (dg). Every other field is 0.
+
+- [`beanconqueror-v1.vectors.json`](beanconqueror-v1.vectors.json): Stats-row
+  inputs (`cases[].shot`), the derived flow (`flowGS`), and every answer above
+  for each served case; `bad-short` is not served. Generated from the Web
+  UI's flow; consumed by the firmware host tests, the Web contracts (the
+  Settings preview decoder) and the companion's tests, whose fixture copy is
+  byte-identical.

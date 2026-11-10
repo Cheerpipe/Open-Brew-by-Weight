@@ -5,7 +5,8 @@
 {
   const assert = require('assert').strict, {spawnSync} = require('child_process');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
-  const source = read('network/OpenBrewByWeightHomeStream.inc') + read('network/OpenBrewByWeightRecordStreams.inc');
+  const source = read('network/OpenBrewByWeightHomeStream.inc') + read('network/OpenBrewByWeightRecordStreams.inc') +
+      read('network/OpenBrewByWeightBeanconquerorHttp.inc');
   const headerSource = read('network/OpenBrewByWeightStatsHeader.inc');
   const networkSource = read('OpenBrewByWeightNetwork.cpp');
   const header = read('OpenBrewByWeightNetwork.h');
@@ -181,12 +182,14 @@ ${deltaTypes}
   bool sendUiStreamFrame(const UiStreamSession &,size_t,bool &);
   bool sendStatsStream(UiStreamSession &,const ControlStatusSnapshot &);
   bool sendRecordsIndex(UiStreamSession &,const ControlStatusSnapshot &);
+  bool freshShotSnapshot(uint32_t);
 };
 ${body(headerSource, 'bool appendStatsDensity(')}
 ${body(headerSource, 'bool formatStatsHeader(')}
 ${body(source, 'bool OpenBrewByWeightNetwork::sendUiStreamFrame(')}
 ${body(source, 'bool OpenBrewByWeightNetwork::sendStatsStream(')}
 ${body(source, 'bool OpenBrewByWeightNetwork::sendRecordsIndex(')}
+${body(source, 'bool OpenBrewByWeightNetwork::freshShotSnapshot(')}
 int main(){
   // The header covers the newest window of eligible shots: timed arrivals
   // oldest first, a density curve per scope scaled to its peak, and the

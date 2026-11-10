@@ -11,7 +11,8 @@
 {
   const assert = require('assert').strict, {spawnSync} = require('child_process'), zlib = require('zlib');
   const read = (file) => fs.readFileSync(path.join(sketchDir, file), 'utf8');
-  const records = read('network/OpenBrewByWeightRecordStreams.inc');
+  const records = read('network/OpenBrewByWeightRecordStreams.inc') +
+      read('network/OpenBrewByWeightBeanconquerorHttp.inc');
   const home = read('network/OpenBrewByWeightHomeStream.inc');
   const statsPage = read('network/OpenBrewByWeightStatsPage.inc');
   const statsHeader = read('network/OpenBrewByWeightStatsHeader.inc');
@@ -240,6 +241,7 @@ ${header.slice(header.indexOf('  struct RecordIndexBaseline {'), header.indexOf(
   bool sendHistoryStream(UiStreamSession &, const ControlStatusSnapshot &);
   bool sendStatsStream(UiStreamSession &, const ControlStatusSnapshot &);
   bool sendRecordsIndex(UiStreamSession &, const ControlStatusSnapshot &);
+  bool freshShotSnapshot(uint32_t);
   bool companionTraceFrame();
 };
 // sendUiStreamFrame's browser path, which no link case reaches.
@@ -254,6 +256,7 @@ ${block(home, 'bool OpenBrewByWeightNetwork::sendUiStreamFrame(')}
 ${block(records, 'bool OpenBrewByWeightNetwork::sendHistoryStream(')}
 ${block(records, 'bool OpenBrewByWeightNetwork::sendStatsStream(')}
 ${block(records, 'bool OpenBrewByWeightNetwork::sendRecordsIndex(')}
+${block(records, 'bool OpenBrewByWeightNetwork::freshShotSnapshot(')}
 ${block(recordsWork, 'bool companionTraceSink(')}
 ${block(recordsWork, 'bool OpenBrewByWeightNetwork::companionTraceFrame(')}
 // A plain link body (rs, the ping's answer) through the real 4 KiB sealer.

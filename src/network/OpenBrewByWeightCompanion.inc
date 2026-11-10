@@ -855,11 +855,19 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     companionSyncHeld_ = syncHold;
     int silent[2] = {-1, -1};
     bool holdChanged = false;
+    // A format chosen in Settings reaches the companion in the next cfg.
+    const uint8_t format = beanconquerorEndpoint();
+    uint8_t beanconqueror;
+    {
+      TaskLockGuard lock(dataMux_);
+      beanconqueror = companionBeanconquerorFormat(g_companion.stored, format);
+    }
     {
       TaskLockGuard lock(dataMux_);
       for (size_t index = 0; index < 2; ++index) {
         CompanionLinkSlot &slot = g_companion.links[index];
-        holdChanged |= slot.fd >= 0 && slot.snapshotSent && slot.sentSync != syncHold;
+        holdChanged |= slot.fd >= 0 && slot.snapshotSent &&
+                       (slot.sentSync != syncHold || slot.sentBc != beanconqueror);
         if (slot.fd < 0 || slot.closing || !companionLinkSilent(slot, route, now, syncHold))
           continue;
         slot.closing = true;
@@ -988,6 +996,8 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   [[maybe_unused]] uint32_t lastCommand = 0;
   bool snapshotDue = false, ui = true, logSwitch = true, archive = true, pingReply = false;
   const bool syncHold = companionSyncHold();
+  const uint8_t format = beanconquerorEndpoint();
+  uint8_t beanconqueror = BEANCONQUEROR_OFF;
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
   uint8_t secret[COMPANION_SECRET_BYTES];
@@ -1008,6 +1018,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     ui = g_companion.stored.uiOff == 0;
     logSwitch = g_companion.stored.logSwitch != 0;
     archive = g_companion.stored.archiveSwitch != 0;
+    beanconqueror = companionBeanconquerorFormat(g_companion.stored, format);
     pingReply = g_companion.pingReply;
     g_companion.pingReply = false;
     memcpy(deviceName, status_.deviceName, sizeof(deviceName));
@@ -1036,17 +1047,20 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       due.device && companionAddBody(count, "\"t\":\"dev\",\"name\":\"%s\",\"id\":\"%s\"}",
                                      deviceName, deviceIdText);
   const char *uiText = ui ? "true" : "false", *logText = logSwitch ? "true" : "false",
-             *archiveText = archive ? "true" : "false";
+             *archiveText = archive ? "true" : "false", *bcText = beanconquerorEndpointId(beanconqueror);
   due.config = snapshotDue || outbox.configSequence != sent.sentConfig ||
-               ui != sent.sentUi || logSwitch != sent.sentLog || archive != sent.sentArchive;
+               ui != sent.sentUi || logSwitch != sent.sentLog || archive != sent.sentArchive ||
+               beanconqueror != sent.sentBc;
   built.config = due.config &&
       (kCompanionLm ? companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s,"
-                                              "\"ui\":%s,\"log\":%s,\"archive\":%s}",
+                                              "\"ui\":%s,\"log\":%s,\"archive\":%s,\"bc\":\"%s\"}",
                                        outbox.lmSwitch ? "true" : "false",
                                        outbox.websocketConnection ? "ws" : "api",
-                                       outbox.observe ? "true" : "false", uiText, logText, archiveText)
-                    : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s,\"archive\":%s}",
-                                       uiText, logText, archiveText));
+                                       outbox.observe ? "true" : "false", uiText, logText, archiveText,
+                                       bcText)
+                    : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s,\"archive\":%s,"
+                                              "\"bc\":\"%s\"}",
+                                       uiText, logText, archiveText, bcText));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
   due.credentials = outbox.credentialsGeneration != 0 &&
       (snapshotDue || outbox.credentialsGeneration != sent.sentCredentials);
@@ -1138,6 +1152,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       slot.sentUi = ui;
       slot.sentLog = logSwitch;
       slot.sentArchive = archive;
+      slot.sentBc = beanconqueror;
     }
     if (built.device) {
       memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));

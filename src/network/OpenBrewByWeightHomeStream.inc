@@ -591,6 +591,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.logFlushS", "%ld", static_cast<long>(companion.logFlushS));
     delta.field("companion.logGaps", static_cast<unsigned long>(companion.logGaps));
     delta.field("companion.archiveSwitch", bool(companion.archiveSwitch));
+    delta.field("companion.bcSwitch", bool(companion.bcSwitch));
     delta.field("companion.archiveSyncS", "%ld", static_cast<long>(companion.archiveSyncS));
     delta.field("companion.pushWanted", bool(companion.pushWanted));
     delta.field("companion.pushSent", static_cast<unsigned long>(companion.pushSent));

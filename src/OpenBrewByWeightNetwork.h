@@ -887,6 +887,7 @@ class OpenBrewByWeightNetwork {
   static esp_err_t webhookHandler(httpd_req_t *request);
   static esp_err_t lineaMicraHandler(httpd_req_t *request);
   static esp_err_t integrationHandler(httpd_req_t *request);
+  static esp_err_t beanconquerorHandler(httpd_req_t *request);
   static esp_err_t bullseyeTestHandler(httpd_req_t *request);
   static esp_err_t preferredScaleClearHandler(httpd_req_t *request);
   static esp_err_t preferredScaleSelectHandler(httpd_req_t *request);
@@ -1112,6 +1113,8 @@ class OpenBrewByWeightNetwork {
   // connection or discovery, the BLE quiet interval).
   bool companionLogHoldActive() const;
   bool companionSyncHold() const;
+  bool freshShotSnapshot(uint32_t epoch);
+  uint8_t beanconquerorEndpoint() const;
   bool companionLinkLogSub(CompanionLinkSlot &slot, const cJSON *frame) const;
   void companionLogService();
   void companionLogApplyLocked(CompanionLinkSlot &link);

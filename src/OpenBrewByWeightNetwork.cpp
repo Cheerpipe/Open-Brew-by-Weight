@@ -1,5 +1,6 @@
 #include "OpenBrewByWeightNetwork.h"
 #include "OpenBrewByWeightShotTrace.h"
+#include "OpenBrewByWeightBeanconqueror.h"
 #include "OpenBrewByWeightOutboundAdmission.h"
 #include "OpenBrewByWeightBbwQuickStart.h"
 #include "OpenBrewByWeightDebugExport.h"
@@ -176,6 +177,7 @@ struct NetworkWorkBuf {
     char jsonItem[kJsonItem]{};
     char otaJson[kOtaJson];
     HistoryPage historyPage;
+    BeanconquerorFlowWork beanconquerorFlow;
   };
   DebugEvent logBatch[kNetworkLogBatchSize]{};
   // Audit latch export batches: full-capacity copies stay bounded by the
@@ -598,14 +600,15 @@ bool jsonRampHardness(const cJSON *object, const char *name, uint8_t &level, uin
   return true;
 }
 
-// The Web UI hero card style by its wire name (heroCardModeId); the index is
+// A stored enum by its wire name (id(value) for value < count); the index is
 // the stored value.
-bool jsonHeroCardMode(const cJSON *object, const char *name, uint8_t &output) {
+bool jsonEnumId(const cJSON *object, const char *name, uint8_t count,
+                const char *(*id)(uint8_t), uint8_t &output) {
   const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsString(item) || item->valuestring == nullptr) return false;
-  for (uint8_t mode = HERO_CARD_TECHNICAL; mode <= HERO_CARD_COLORFUL; ++mode) {
-    if (strcmp(item->valuestring, heroCardModeId(mode)) == 0) {
-      output = mode;
+  for (uint8_t value = 0; value < count; ++value) {
+    if (strcmp(item->valuestring, id(value)) == 0) {
+      output = value;
       return true;
     }
   }
@@ -1352,6 +1355,7 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "network/OpenBrewByWeightConfiguration.inc"
 #include "network/OpenBrewByWeightLineaMicraWeb.inc"
 #include "network/OpenBrewByWeightIntegrationApi.inc"
+#include "network/OpenBrewByWeightBeanconquerorHttp.inc"
 #include "network/OpenBrewByWeightNetworkOta.inc"
 #include "network/OpenBrewByWeightCompanion.inc"
 #include "network/OpenBrewByWeightCompanionAdmin.inc"

@@ -3,6 +3,10 @@
     <ellipse cx="12" cy="12" rx="5.5" ry="8.5" transform="rotate(35 12 12)" />
     <path d="M8.6 17.6c2.6-2 3.8-8.4 6.8-11.2" />
   </symbol>
+  <symbol id="g-beanconqueror" viewBox="0 0 24 24">
+    <rect x="7" y="2.5" width="10" height="19" rx="2" />
+    <path d="M12 6.5v7m-3-3 3 3 3-3m-4.5 5.5h3" />
+  </symbol>
   <symbol id="g-fast" viewBox="0 0 24 24"><path d="m4 6 7 6-7 6M12 6l7 6-7 6" /></symbol>
   <symbol id="g-slow" viewBox="0 0 24 24">
     <path d="M7 3h10M7 21h10M8 3c0 4 8 5 8 9s-8 5-8 9m8-18c0 4-8 5-8 9s8 5 8 9" />
@@ -745,6 +749,57 @@
         >
       </details>
     </div>
+  </fieldset>
+  <fieldset id="coffeeAppsSettings">
+    <legend>{{webui:settings.coffee_apps}}</legend>
+    <p class="scopeNote">{{webui:settings.coffee_apps_scope_note}}</p>
+    <details data-g="beanconqueror" class="cfgGroup">
+      <summary>{{webui:settings.beanconqueror}}</summary>
+      <small class="fieldHint">{{webui:settings.beanconqueror_intro}}</small>
+      <div
+        id="beanconquerorChoices"
+        class="setupChoices"
+        role="radiogroup"
+        aria-label="{{webui:settings.beanconqueror}}"
+      >
+        <label class="setupChoice"
+          ><input type="radio" name="beanconquerorChoice" value="off" /><span
+            ><b>{{webui:settings.beanconqueror_off}}</b
+            ><small>{{webui:settings.beanconqueror_off_hint}}</small></span
+          ></label
+        ><label class="setupChoice"
+          ><input type="radio" name="beanconquerorChoice" value="gaggiuino" /><span
+            ><b>{{webui:settings.beanconqueror_gaggiuino}}</b>
+            <span class="presetCardBadge">8.2+</span
+            ><small>{{webui:settings.beanconqueror_gaggiuino_hint}}</small></span
+          ></label
+        ><label class="setupChoice"
+          ><input type="radio" name="beanconquerorChoice" value="gaggimate" /><span
+            ><b>{{webui:settings.beanconqueror_gaggimate}}</b>
+            <span class="presetCardBadge">{{webui:settings.beanconqueror_gaggimate_badge}}</span
+            ><small>{{webui:settings.beanconqueror_gaggimate_hint}}</small></span
+          ></label
+        >
+      </div>
+      <select id="beanconquerorEndpoint" class="hidden" aria-hidden="true" tabindex="-1">
+        <option value="off"></option>
+        <option value="gaggiuino"></option>
+        <option value="gaggimate"></option>
+      </select>
+      <p id="beanconquerorPublic" class="readyMsg" role="status" hidden></p>
+      <div id="beanconquerorHelp" class="bcHelp" hidden>
+        <b>{{webui:settings.beanconqueror_connect}}</b>
+        <ol id="beanconquerorSteps"></ol>
+        <div class="bcUrl">
+          <code id="beanconquerorUrl"></code
+          ><button id="beanconquerorCopy" class="bcCopy" type="button">
+            {{webui:settings.beanconqueror_copy}}
+          </button>
+        </div>
+        <small id="beanconquerorAlt" class="bcAlt"></small>
+      </div>
+      <section id="beanconquerorPreview" class="bcPreview" aria-live="polite" hidden></section>
+    </details>
   </fieldset>
   <fieldset>
     <legend>{{webui:settings.shared_settings}}</legend>

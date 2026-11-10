@@ -3307,6 +3307,26 @@ void p91f_scale_stock_tone_tags_round_trip() {
         older.runtime.buzzerScaleLostStockTone);
 }
 
+// Tag 91 is additive: an older blob, and so every OTA from an earlier image,
+// starts with the Beanconqueror address Off; an out-of-range byte repairs to Off.
+void p91g_beanconqueror_endpoint_tag() {
+  const std::vector<uint8_t> runtime = {91, 1, BEANCONQUEROR_GAGGIMATE};
+  std::vector<uint8_t> body = {SETTINGS_GROUP_RUNTIME, static_cast<uint8_t>(runtime.size())};
+  body.insert(body.end(), runtime.begin(), runtime.end());
+  PersistedSettings settings;
+  uint32_t malformed = 0;
+  std::vector<uint8_t> blob = settingsBlobWithBody(body);
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), settings, malformed) &&
+        malformed == 0 && settings.runtime.beanconquerorEndpoint == BEANCONQUEROR_GAGGIMATE);
+  blob = settingsBlobWithBody({});
+  PersistedSettings older;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), older, malformed) &&
+        older.runtime.beanconquerorEndpoint == BEANCONQUEROR_OFF);
+  older.runtime.beanconquerorEndpoint = BEANCONQUEROR_ENDPOINT_COUNT;
+  CHECK(repairPersistedSettings(older) && older.runtime.beanconquerorEndpoint == BEANCONQUEROR_OFF);
+  CHECK(strcmp(beanconquerorEndpointId(BEANCONQUEROR_GAGGIUINO), "gaggiuino") == 0);
+}
+
 void p91b_settings_codec_round_trips_and_evolves() {
   // Every persisted member survives an encode/decode round trip.
   PersistedSettings original;
@@ -3681,6 +3701,7 @@ const TestCase tests[] = {
     {"P91D", p91d_legacy_blob_derives_identical_curve},
     {"P91E", p91e_power_split_migrates_single_setting},
     {"P91F", p91f_scale_stock_tone_tags_round_trip},
+    {"P91G", p91g_beanconqueror_endpoint_tag},
     {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},

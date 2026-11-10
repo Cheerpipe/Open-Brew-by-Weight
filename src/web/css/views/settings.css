@@ -429,16 +429,26 @@ html:not(.pwaApp) .pwaOnly {
 
 /* Settings rows: a block with its own highlight and a line between
    consecutive rows. On/off options are switches on the right, placed by the
-   grid so the markup keeps the checkbox first. The ramp curve cards are
-   buttons, not rows: their own rules size and border them. */
-.cfgGroup label:not(.windowPair label, .rampCurves label) {
+   grid so the markup keeps the checkbox first. The ramp curve and choice
+   cards are buttons, not rows: their own rules size and border them. */
+.cfgGroup label:not(.windowPair label, .rampCurves label, .setupChoices label) {
   margin: 0 -0.75rem;
   padding: 0.75rem;
 }
 
 .cfgGroup
-  :is(label, .windowField, div:has(> label)):not(.rampCurves, .rampCurves label)
-  + :is(label, .windowField, div:has(> label)):not(.rampCurves, .rampCurves label) {
+  :is(label, .windowField, div:has(> label)):not(
+    .rampCurves,
+    .rampCurves label,
+    .setupChoices,
+    .setupChoices label
+  )
+  + :is(label, .windowField, div:has(> label)):not(
+    .rampCurves,
+    .rampCurves label,
+    .setupChoices,
+    .setupChoices label
+  ) {
   border-top: 1px solid var(--ln);
 }
 
@@ -694,4 +704,195 @@ summary {
 
 .shotCard > :nth-child(5) {
   grid-area: avgflow;
+}
+
+/* Coffee apps → Beanconqueror: the dashed help box (as drip compensation's
+   Quick start), the address, and the preview of what the app receives. */
+.bcHelp {
+  margin: 0.75rem 0 0;
+  padding: 0.7rem 0.8rem 0.75rem;
+  border: 1px dashed var(--bd);
+  border-radius: var(--r);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--mu);
+}
+
+.bcHelp b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.bcHelp ol {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.bcUrl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.55rem 0 0;
+  padding: 0.45rem 0.4rem 0.45rem 0.65rem;
+  border: 1px solid var(--ln);
+  border-radius: calc(var(--r) * 0.75);
+  background: var(--in);
+}
+
+.bcUrl code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+  font:
+    600 0.82rem/1.35 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.bcCopy {
+  flex: none;
+  margin: 0;
+  padding: 0.25rem 0.45rem;
+  border: 0;
+  background: none;
+  color: var(--ac);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bcAlt {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.bcPreview {
+  margin: 0.9rem 0 0;
+  padding: 0.8rem 0.85rem 0.7rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+  background: var(--sf);
+}
+
+.bcHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.bcHead h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.bcHead small,
+.bcEmpty,
+.bcFoot,
+.bcRow small {
+  color: var(--mu);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.bcEmpty {
+  margin: 0;
+  text-align: center;
+}
+
+.bcChart {
+  display: block;
+  width: 100%;
+  height: 5.2rem;
+  margin: 0.55rem 0 0.15rem;
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.bcWeight {
+  stroke: color-mix(in srgb, var(--cf) 55%, var(--fg));
+  stroke-width: 2.2;
+}
+
+.bcFlow {
+  stroke: var(--gFlow);
+  stroke-width: 1.4;
+}
+
+.bcGroup {
+  margin: 0.75rem 0 0;
+}
+
+.bcGroup h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+
+.bcRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.15rem 0.55rem;
+  align-items: start;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--ln);
+  font-size: 0.84rem;
+}
+
+.bcGroup h4 + .bcRow {
+  border-top: 0;
+}
+
+.bcRow .k {
+  font-weight: 600;
+}
+
+.bcRow .v {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bcRow.none .v {
+  color: var(--mu);
+  font-weight: 500;
+}
+
+.bcRow small {
+  grid-column: 2 / 4;
+}
+
+.bcState {
+  display: inline-grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.bcState.sent {
+  background: var(--mo);
+  color: var(--ok);
+}
+
+.bcState.bc {
+  background: var(--pa);
+  color: var(--ac);
+}
+
+.bcState.none {
+  border: 1px solid var(--ln);
+  background: var(--in);
+  color: var(--mu);
+}
+
+.bcFoot {
+  margin: 0.7rem 0 0;
 }

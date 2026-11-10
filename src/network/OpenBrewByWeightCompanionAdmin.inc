@@ -130,11 +130,11 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   const esp_err_t body = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (body != ESP_OK) return body;
-  static const char *const fields[] = {"action", "code", "lm", "ui", "log", "archive"};
+  static const char *const fields[] = {"action", "code", "lm", "ui", "log", "archive", "bc"};
   char action[12] = {}, code[8] = {};
-  bool lm = true, ui = true, log = true, archive = true;
+  bool lm = true, ui = true, log = true, archive = true, bc = true;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 6) &&
+  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 7) &&
                jsonString(root, "action", action, sizeof(action), false);
   if (valid && jsonFieldPresent(root, "code")) valid = jsonString(root, "code", code, sizeof(code), false);
   const bool hasLm = valid && jsonFieldPresent(root, "lm");
@@ -145,6 +145,8 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (hasLog) valid = jsonBoolean(root, "log", log);
   const bool hasArchive = valid && jsonFieldPresent(root, "archive");
   if (hasArchive) valid = jsonBoolean(root, "archive", archive);
+  const bool hasBc = valid && jsonFieldPresent(root, "bc");
+  if (hasBc) valid = jsonBoolean(root, "bc", bc);
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   if (!valid)
@@ -178,7 +180,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       if (pending.serial == serial)
         result = expected != UINT32_MAX
             ? companionPairApprove(g_companion.pairing, static_cast<uint32_t>(atol(code)),
-                                   expected, lm, log, archive, now)
+                                   expected, lm, log, archive, bc, now)
             : pending.state == CompanionPairState::PENDING && !pending.approving
                 ? CompanionApproveResult::NOT_READY
                 : CompanionApproveResult::NOT_PENDING;
@@ -248,10 +250,10 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       if (fd >= 0) (void)httpd_sess_trigger_close(request->handle, fd);
     self.closeRelayedUiStreams();
     self.lifecycleLogf("Companion '%s' forgotten", name);
-  } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog || hasArchive) &&
+  } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog || hasArchive || hasBc) &&
              (kCompanionLm || !hasLm)) {
     bool paired, lmChanged = false, uiChanged = false, logChanged = false, archiveChanged = false,
-         linkUp = false;
+         bcChanged = false, linkUp = false;
     {
       TaskLockGuard lock(self.dataMux_);
       CompanionStored &stored = g_companion.stored;
@@ -265,7 +267,9 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
         if (hasLog) stored.logSwitch = log ? 1 : 0;
         archiveChanged = hasArchive && (stored.archiveSwitch != 0) != archive;
         if (hasArchive) stored.archiveSwitch = archive ? 1 : 0;
-        g_companion.dirty |= lmChanged || uiChanged || logChanged || archiveChanged;
+        bcChanged = hasBc && (stored.bcSwitch != 0) != bc;
+        if (hasBc) stored.bcSwitch = bc ? 1 : 0;
+        g_companion.dirty |= lmChanged || uiChanged || logChanged || archiveChanged || bcChanged;
         linkUp = g_companion.active != 0;
         // Its next relayed request is stale, and the new handshake carries ui and link.
         if (lmChanged || uiChanged || logChanged || archiveChanged)
@@ -289,13 +293,16 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     }
     // An open link learns these from the next cfg frame; the relay handshake
     // re-answers whether the link is needed at all.
-    if (logChanged || archiveChanged) companionOutboxChanged();
+    if (logChanged || archiveChanged || bcChanged) companionOutboxChanged();
     if (logChanged)
       self.lifecycleLog(log ? "Companion: Diagnostic log through the companion turned on"
                             : "Companion: Diagnostic log through the companion turned off");
     if (archiveChanged)
       self.lifecycleLog(archive ? "Companion: Shot archive in the companion turned on"
                                 : "Companion: Shot archive in the companion turned off");
+    if (bcChanged)
+      self.lifecycleLog(bc ? "Companion: Beanconqueror through the companion turned on"
+                           : "Companion: Beanconqueror through the companion turned off");
   } else {
     return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", nullptr, "UNKNOWN_COMPANION_ACTION");
   }

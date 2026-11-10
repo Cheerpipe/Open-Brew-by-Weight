@@ -684,7 +684,7 @@ static void testCommitThenReveal() {
   CHECK(!companionPairReveal(pairing, kOtherId, key, true, now));
   pairing.request.keyReady = true;
   CHECK(!companionCodeReady(pairing.request));
-  CHECK(companionPairApprove(pairing, 1, 1, true, true, true, now) == CompanionApproveResult::NOT_READY);
+  CHECK(companionPairApprove(pairing, 1, 1, true, true, true, true, now) == CompanionApproveResult::NOT_READY);
   // Revealing before controllerKey was issued shows a device in the middle.
   CHECK(!companionPairReveal(pairing, kCompanionId, key, true, now));
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
@@ -709,7 +709,7 @@ static void testCommitThenReveal() {
   CHECK(companionPairRequest(pairing, false, kCompanionId, "Kitchen", "1.0.0", "192.168.1.9",
                              commitment, now + 1) == CompanionPairResult::PENDING);
   CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 2) && companionCodeReady(pairing.request));
-  CHECK(companionPairApprove(pairing, 5, 5, true, true, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(pairing, 5, 5, true, true, true, true, now) == CompanionApproveResult::OK);
   // A retry while the secret is derived is harmless; another key is refused, not denied.
   CHECK(companionPairReveal(pairing, kCompanionId, key, true, now + 3));
   uint8_t other[COMPANION_KEY_BYTES];
@@ -738,13 +738,13 @@ static void testPairing() {
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
   // The code waits for both keys, then three wrong codes deny it.
-  CHECK(companionPairApprove(pairing, 1, 1, true, true, true, now) == CompanionApproveResult::NOT_READY);
+  CHECK(companionPairApprove(pairing, 1, 1, true, true, true, true, now) == CompanionApproveResult::NOT_READY);
   reveal(pairing, key, now);
-  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, now) == CompanionApproveResult::WRONG_CODE);
-  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, now) == CompanionApproveResult::WRONG_CODE);
-  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, now) == CompanionApproveResult::DENIED);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, true, now) == CompanionApproveResult::WRONG_CODE);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, true, now) == CompanionApproveResult::WRONG_CODE);
+  CHECK(companionPairApprove(pairing, 1, 2, true, true, true, true, now) == CompanionApproveResult::DENIED);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now), "denied"));
-  CHECK(companionPairApprove(pairing, 2, 2, true, true, true, now) == CompanionApproveResult::NOT_PENDING);
+  CHECK(companionPairApprove(pairing, 2, 2, true, true, true, true, now) == CompanionApproveResult::NOT_PENDING);
   // One new request per 5 s.
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 4999) == CompanionPairResult::RATE_LIMITED);
@@ -779,9 +779,9 @@ static void testPairing() {
   now += 5000;
   // Approval: the network task derives S, which makes the pairing.
   reveal(pairing, key, now);
-  CHECK(companionPairApprove(pairing, 7, 7, false, true, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(pairing, 7, 7, false, true, true, true, now) == CompanionApproveResult::OK);
   CHECK(!strcmp(companionPairPoll(pairing, kCompanionId, now + COMPANION_REQUEST_MS + 5), "pending"));
-  CHECK(companionPairApprove(pairing, 7, 7, false, true, true, now) == CompanionApproveResult::NOT_PENDING);
+  CHECK(companionPairApprove(pairing, 7, 7, false, true, true, true, now) == CompanionApproveResult::NOT_PENDING);
   CHECK(!companionPairIgnore(pairing, now));
   CHECK(companionPairRequest(pairing, false, kOtherId, "Other", "", "192.168.1.10", commitment,
                              now + 6000) == CompanionPairResult::BUSY);
@@ -814,7 +814,7 @@ static void testPairing() {
   CHECK(companionPairRequest(next, false, kOtherId, "Other", "", "192.168.1.10", commitment, now) ==
         CompanionPairResult::NEW);
   reveal(next, key, now);
-  CHECK(companionPairApprove(next, 3, 3, true, true, true, now) == CompanionApproveResult::OK);
+  CHECK(companionPairApprove(next, 3, 3, true, true, true, true, now) == CompanionApproveResult::OK);
   companionPairComplete(next, stored, secret);
   CHECK(stored.paired == 1 && stored.forgotten == 1 &&
         companionHelloVerdict(stored, kCompanionId, 1) == CompanionHello::ERASE &&
@@ -868,10 +868,11 @@ static void testStoredBlob() {
   copy.checksum = companionChecksum(copy);
   CHECK(!validCompanionStored(copy));
   CHECK(offsetof(CompanionStored, uiOff) == 11);
-  // The log switch rides as the v2 tail, right after the checksum, and the
-  // archive switch in the next byte, formerly padding (v3).
+  // The log switch rides as the v2 tail, right after the checksum, then the
+  // archive (v3) and Beanconqueror (v4) switches in what was padding.
   CHECK(offsetof(CompanionStored, logSwitch) == 328);
   CHECK(offsetof(CompanionStored, archiveSwitch) == 329);
+  CHECK(offsetof(CompanionStored, bcSwitch) == 330);
   CHECK(sizeof(CompanionStored) == 332);
   copy = stored;
   copy.logSwitch = 2;
@@ -881,6 +882,19 @@ static void testStoredBlob() {
   copy.archiveSwitch = 2;
   copy.checksum = companionChecksum(copy);
   CHECK(!validCompanionStored(copy));
+  copy = stored;
+  copy.bcSwitch = 2;
+  copy.checksum = companionChecksum(copy);
+  CHECK(!validCompanionStored(copy));
+  // The companion serves Beanconqueror only with both switches on.
+  copy = stored;
+  copy.paired = 1;
+  CHECK(companionBeanconquerorFormat(copy, BEANCONQUEROR_GAGGIMATE) == BEANCONQUEROR_GAGGIMATE);
+  copy.archiveSwitch = 0;
+  CHECK(companionBeanconquerorFormat(copy, BEANCONQUEROR_GAGGIMATE) == BEANCONQUEROR_OFF);
+  copy.archiveSwitch = 1;
+  copy.bcSwitch = 0;
+  CHECK(companionBeanconquerorFormat(copy, BEANCONQUEROR_GAGGIUINO) == BEANCONQUEROR_OFF);
 }
 
 static void testStoredV1Promotion() {
@@ -893,11 +907,12 @@ static void testStoredV1Promotion() {
   v1.structureSize = 328;
   v1.checksum = companionChecksum(v1);
   CHECK(validCompanionStoredOlder(v1));
-  CHECK(!validCompanionStored(v1));  // not v3 until promoted
+  CHECK(!validCompanionStored(v1));  // not current until promoted
   CompanionStored promoted = v1;
   promoteCompanionStored(promoted);
-  CHECK(validCompanionStored(promoted));  // re-finalized as v3
-  CHECK(promoted.logSwitch == 1 && promoted.archiveSwitch == 1);  // the switches default on
+  CHECK(validCompanionStored(promoted));  // re-finalized as v4
+  CHECK(promoted.logSwitch == 1 && promoted.archiveSwitch == 1 &&
+        promoted.bcSwitch == 1);  // the switches default on
   CHECK(promoted.paired == 1 && promoted.version == COMPANION_STORED_VERSION);
   CHECK(memcmp(promoted.secret, v1.secret, 32) == 0);  // the pairing survives
   // A corrupted v1 blob does not promote.
@@ -916,6 +931,17 @@ static void testStoredV1Promotion() {
   CHECK(validCompanionStoredOlder(v2) && !validCompanionStored(v2));
   promoteCompanionStored(v2);
   CHECK(validCompanionStored(v2) && v2.logSwitch == 0 && v2.archiveSwitch == 1);
+  // A v3 blob keeps both switches it had; Beanconqueror arrives on.
+  CompanionStored v3 = v1;
+  v3.version = 3;
+  v3.structureSize = sizeof(CompanionStored);
+  v3.logSwitch = 1;
+  v3.archiveSwitch = 0;
+  v3.bcSwitch = 0x5A;
+  v3.checksum = companionChecksum(v3);
+  CHECK(validCompanionStoredOlder(v3) && !validCompanionStored(v3));
+  promoteCompanionStored(v3);
+  CHECK(validCompanionStored(v3) && v3.archiveSwitch == 0 && v3.bcSwitch == 1);
 }
 
 // The archive's record requests (2A): every field present and in range.
