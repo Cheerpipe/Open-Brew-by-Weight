@@ -22,7 +22,7 @@
     const g = await context.gaggiuinoPreview(async (p) =>
       (p.endsWith('/latest') ? [{lastShotId: s.id}] : c.gaggiuino.shot));
     assert.deepEqual([g.id, g.profile, g.tempC, g.points.length],
-        [s.id, s.presetName, s.targetTempDeciC / 10, s.wCg.length - s.wHeld.length], c.name);
+        [s.id, s.presetName, s.targetTempDeciC / 10, Math.max(1, s.wCg.length - s.wHeld.length)], c.name);
     const header = Buffer.alloc(32);
     header.writeUInt32LE(0x58444953, 0);
     header.writeUInt16LE(1, 4);
@@ -32,13 +32,14 @@
     const m = await context.gaggimatePreview(async (p) =>
       (p.startsWith('/api/history/recent.bin') ? view(index)
         : p.endsWith('.slog') ? view(Buffer.from(c.gaggimate.slog, 'base64')) : c.gaggimate.notes));
-    // The yield is the last reading's, as Beanconqueror takes it; the settled one without a curve.
+    // The yield is the last reading's, as Beanconqueror takes it; without a curve, the
+    // closing sample's, which is the settled yield.
     const last = s.wCg.filter((_, i) => !s.wHeld.includes(i)).at(-1);
     const yieldG = last === undefined ? s.actualG : Math.floor((Math.max(0, last) + 5) / 10) / 10;
-    assert.deepEqual([g.yieldG, m.yieldG], [last === undefined ? null : yieldG, yieldG], c.name);
+    assert.deepEqual([g.yieldG, m.yieldG], [yieldG, yieldG], c.name);
     assert.deepEqual([m.id, m.profile, m.timeS, m.rating, m.doseG, m.tempC, m.points.length],
         [s.id, s.presetName, s.durationS, s.rating, s.doseG, s.targetTempDeciC / 10,
-          s.wCg.length - s.wHeld.length], c.name);
+          Math.max(1, s.wCg.length - s.wHeld.length)], c.name);
     // A format that is not served (404) is not an empty history.
     assert.equal(await context.gaggiuinoPreview(async () => null), undefined);
     assert.equal(await context.gaggimatePreview(async () => null), undefined);

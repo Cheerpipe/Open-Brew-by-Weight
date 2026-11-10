@@ -202,7 +202,9 @@ JSON answers are `application/json`; binary answers are
 `application/octet-stream`, little-endian.
 
 **Samples.** Both formats send the curve's readings in order, drip included,
-leaving out held readings, as the shot JSON export does. Rounding is half up
+leaving out held readings, as the shot JSON export does. A shot without such a
+reading (no stored curve) is sent with one closing sample, at its time with its
+yield and no flow, because Beanconqueror cannot import a shot with none. Rounding is half up
 (`floor(x + 0.5)`). A weight is clamped at 0 and sent in decigrams
 (`floor((cg + 5) / 10)`). The flow is the Stats page's weight flow
 (`buildShotSparkModel().flowCurve` in `runtime.js`), in g/s: the gain over a
