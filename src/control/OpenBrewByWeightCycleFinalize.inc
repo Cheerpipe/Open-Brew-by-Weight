@@ -165,6 +165,18 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   // The cut lead (tau) of flow was already under way at that reading.
   pendingFinalize.tailRefAtMs = session.lastAcceptedWeightAtMs -
                                 static_cast<uint32_t>(session.cut.tauMs);
+  // The drip ceiling trusts the rate at the stop only where it describes the
+  // flow there: inside the range the cut predicts with, no surge, a full
+  // estimator window of flow behind it, and a reading fresh at the stop.
+  const corridor::RateEstimator &rate = session.cut.rate;
+  if (rate.valid && !rate.channeling &&
+      rate.rateX100 >= corridor::MIN_PREDICTION_RATE_X100 &&
+      rate.rateX100 < corridor::MAX_RATE_X100 &&
+      rate.atMs[rate.head] - corridor::RATE_WINDOW_MS >= rate.onsetMs &&
+      ticksSince(end.endedAtMs, session.lastAcceptedWeightAtMs) <=
+          static_cast<int32_t>(MAX_AUTOMATION_WEIGHT_AGE_MS)) {
+    pendingFinalize.tailRateX100 = rate.rateX100;
+  }
   pendingFinalize.activePresetId = session.activePresetId != 0
                                        ? session.activePresetId
                                        : presetBank.activeId;
@@ -684,7 +696,7 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
   // readings predate whatever ended the hold.
   if (std::isfinite(snapshot.tailSettledG)) {
     source = ActualWeightSource::POST_DRIP;
-    weightG = snapshot.tailSettledG;
+    weightG = postStopFinalWeightG(snapshot, 0.0f);
     valid = true;
     (void)settleShotCurveEndWeight(snapshot.curve, weightG);
     pendingFinalize.curve.ended = snapshot.curve.ended;

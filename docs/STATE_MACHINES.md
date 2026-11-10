@@ -154,22 +154,26 @@ removal and A→M keep their existing authority; nothing in the smooth cut can
 suspend the wall or the circuit limit.
 
 After drip delay, history records captured values and whether learning applied.
-The settled yield is the highest median reached by a ring of five post-stop
-readings taken at least 250 ms apart (a full ring spans 1 s); a tail too sparse
-to fill the ring uses its highest accepted reading. A post-stop reading is
-accepted only when it is no more than 2 g below the weight at the stop and no
-higher than a drip ceiling: the last trusted weight, plus the flow estimate at
-the stop times that weight's age, plus 0.5 g. Until the ring first fills, the
-trusted weight is the last accepted in-shot reading, aged from one cut lead (τ)
-before it; afterwards it is the settled yield at a fixed 1 s age. No ceiling
-applies without a valid flow estimate, at the estimator's 4 g/s clamp, after
-channeling, or without a last accepted reading. A refused reading leaves a
-segment break in the curve, and the first of each refused run is a
-`WEIGHT_REJECTED` trace event and a Web UI log line. With no accepted
-post-stop reading the record keeps the last-known weight. A drip hold cut
-short (cup continuity lost, a new cycle, rinse or backflush) records the
-settled yield if the ring had filled, else the last-known weight, and never
-learns.
+The settled yield is the median of a ring of the last five post-stop readings
+taken at least 250 ms apart (a full ring spans 1 s). If that median is more
+than 2 g below the highest median the ring reached, the highest is used:
+coffee does not leave the cup. A tail too sparse to fill the ring uses its
+highest accepted reading. A post-stop reading is accepted only when it is no
+more than 2 g below the weight at the stop and no higher than a drip ceiling:
+the last trusted weight, plus the flow estimate at the stop times that
+weight's age, plus 0.5 g. Until the ring first fills, the trusted weight is the
+last accepted in-shot reading, aged from one cut lead (τ) before it;
+afterwards it is the ring's highest median at a fixed 1 s age. The ceiling
+applies only when the flow estimate describes the flow at the stop: valid,
+between the 0.3 g/s prediction minimum and the 4 g/s clamp, no channeling, a
+full 3 s estimator window after the first drop, and a last accepted reading no
+older than 1 s. A refused reading leaves a segment break in the curve and a
+`WEIGHT_REJECTED` trace event; the first one of a hold also writes a Web UI
+log line. When the hold ends with no accepted tail reading, the newest
+reading is used if it passes the same floor and ceiling; otherwise the record
+keeps the last-known weight. A drip hold cut short (cup continuity lost, a new
+cycle, rinse or backflush) records the settled yield if the ring had filled,
+else the last-known weight, and never learns.
 The drip offset learns from weight cuts on any segment, against the cut line at
 the stop (observation = offset used + final − f(t_cut)); channeling, manual,
 time/safety-limit, A→M and cup-removal outcomes, and cuts without a valid flow
