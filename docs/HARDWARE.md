@@ -20,7 +20,8 @@ non-Micra installations.
 
 | Part | Selection requirement |
 | --- | --- |
-| ESP32-S3 relay controller | Supported PSRAM variant; verify actual module, GPIO map and relay polarity against the board below. |
+| ESP32-S3 relay controller | Supported PSRAM variant; verify actual module, GPIO map and relay polarity against the board below. The development board ships its pin headers loose: solder them before wiring. |
+| Printed enclosure | Required. Print it in PETG at least, never PLA; see [3D-printable enclosure](#3d-printable-enclosure). |
 | Power source | Voltage, isolation, capacity, and protection verified for the actual board and machine. The repository does not define a universal machine power tap. |
 | Wiring, connectors, mounting | Correct ratings, insulation, strain relief and clearance for the installation; machine-specific part numbers remain unverified. |
 | Dupont leads (Linea Micra) | One [pack of 20 cm Dupont leads](https://www.aliexpress.com/item/1005006754560696.html), option **20cm 3kinds 120pcs** (female–female, male–male and male–female), has everything needed to connect the controller to the Micra with single 1×1 leads. See [Linea Micra cables](#linea-micra-cables). |
@@ -84,6 +85,9 @@ Firmware was developed on an **ESP32-S3 1-channel relay** board (WROOM-1
 **N16R8** module: 16 MB flash, 8 MB OPI PSRAM, USB-C, onboard Songle relay
 with COM / NO / NC screw terminals). Product listing used for development:
 [ESP32-S3 1-channel relay (AliExpress)](https://es.aliexpress.com/item/1005011880181624.html).
+Its pin headers come loose in the bag, so solder them to the board before
+wiring. Unlike many ESP32 boards, it does not need its **BOOT** button held to
+accept new firmware over USB.
 
 ### Front
 
@@ -110,15 +114,19 @@ value, the log shows a `PSRAM ECC detected` warning; see
 
 ## 3D-printable enclosure
 
-A simple two-part enclosure is provided for the ESP32-S3 relay development
-board. Choose a matching box-and-cover pair:
+The controller goes inside the machine in a two-part printed enclosure made for
+the ESP32-S3 relay development board; every installation needs one. The STL
+files are in [`stl/`](../stl/). Choose a matching box-and-cover pair:
 
 - **Standard:** `OpenBrewByWeight-Box.stl` with its open/partial cover
   `OpenBrewByWeight-Cover.stl`.
 - **Thick:** `OpenBrewByWeight-Box-thick.stl` with its thicker cover
   `OpenBrewByWeight-Cover-thick.stl`. This pair
-  better resists deformation where the ESP32 is exposed to more heat; PETG is
-  recommended.
+  better resists deformation where the ESP32 is exposed to more heat.
+
+The inside of an espresso machine gets hot, so never print the enclosure in
+PLA. Use PETG at least; ABS, or a composite that resists warping under heat,
+such as glass-fiber PETG, is better.
 
 The supplied geometry is a fit reference, not a thermal or electrical safety
 rating. Choose material and mounting for measured temperatures and required

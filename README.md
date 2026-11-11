@@ -25,6 +25,7 @@ and stop behavior.
 
 | I want to… | Read |
 | --- | --- |
+| Go from parts to the first shot on a Linea Micra | [Quickstart](#quickstart) |
 | Check whether my equipment fits | [Requirements](#requirements) and [machine types](#machine-types) |
 | Prepare hardware and firmware | [Hardware](docs/HARDWARE.md) → [Build and USB installation](docs/BUILD.md) |
 | Choose a controller and machine build | [Hardware and machine build profiles](docs/BUILD_PROFILES.md) |
@@ -54,11 +55,131 @@ and stop behavior.
 - **Installation skills:** identify and verify your machine's electrical
   connections, build the firmware, and test the installation on a bench.
 
-A [printable enclosure](docs/HARDWARE.md#3d-printable-enclosure) is included in
-standard and thicker versions. PETG is recommended for the thick pair in
-warmer installations.
+The controller sits inside the machine in a
+[printable enclosure](docs/HARDWARE.md#3d-printable-enclosure), included in
+standard and thick versions. Print it in PETG or a more heat-resistant
+material, never PLA.
 Classic ESP32, boards without PSRAM, and Timemore scales are outside the current
 support scope.
+
+## Quickstart
+
+The shortest path for the reference build: an ESP32-S3 Relay X1 controller on
+a La Marzocco Linea Micra. You install and set up the controller on the bench
+first, with nothing connected to the machine; wiring it in comes last. Each
+step links to its full guide. Other machines follow the same path with their
+own [build profile](docs/BUILD_PROFILES.md) and wiring.
+
+### 1. Get the parts
+
+| Part | Qty | Reference price (USD) | Notes |
+| --- | ---: | ---: | --- |
+| [ESP32-S3 1-channel relay board](docs/HARDWARE.md#development-board), N16R8 | 1 | 15–23 | Must be the N16R8 module (16 MB flash, 8 MB PSRAM). The pin headers come loose in the bag: solder them to the board before wiring. |
+| [20 cm Dupont lead pack](docs/HARDWARE.md#linea-micra-cables), "20cm 3kinds 120pcs" | 1 | 3 | Every lead the Micra needs. |
+| Supported [Bluetooth scale](libraries/EspressoScaleBLE/README.md#scale-compatibility) | 1 | 130–150 | Bookoo Themis Mini shown; other models cost more or less. |
+| USB-C data cable | 1 | 3 | Charge-only cables cannot install firmware. |
+| [Passive 3.3 V buzzer module](docs/HARDWARE.md#local-buzzer) (optional) | 1 | 1–4 | Alert sounds. Must be passive. |
+| [Dupont housings](docs/HARDWARE.md#dupont-housings-optional) (optional) | 1 set | 8 | A tidier harness that is harder to plug in wrong. |
+| [Printed enclosure](docs/HARDWARE.md#3d-printable-enclosure) | 1 | 1–2 | Filament only: PETG or better. See step 4. |
+
+Without the scale, the required parts cost about US$22–31. Prices are a
+November 2026 reference from AliExpress, before shipping and taxes, and change
+often.
+
+You also need a soldering iron, a multimeter, a wire stripper and a small
+screwdriver.
+
+### 2. Build and install the firmware
+
+On macOS (Ubuntu packages are in the [build guide](docs/BUILD.md#linux)):
+
+```sh
+brew install git python cmake ninja cjson node cppcheck ccache
+
+# ESP-IDF 6.1; the project scripts find it here on their own
+git clone -b v6.1 --recursive https://github.com/espressif/esp-idf.git ~/esp/esp-idf-v6.1
+~/esp/esp-idf-v6.1/install.sh esp32s3
+
+git clone https://github.com/Cheerpipe/Open-Brew-by-Weight.git
+cd Open-Brew-by-Weight
+git checkout "$(git describe --tags --abbrev=0)"   # latest release
+npm ci
+./scripts/dev doctor
+```
+
+Connect only the board by USB, then build and install. The script finds the
+board and asks you to confirm its port: press Enter. If it finds none, try
+another USB cable: many only charge. Many ESP32 boards need their **BOOT**
+button held to accept new firmware; the Relay X1 does not.
+
+```sh
+./scripts/dev build flash --confirm --erase-all \
+  --hardware esp32-s3-relay-x1-speaker \
+  --machine la-marzocco-linea-micra
+```
+
+`--erase-all` is for the first installation on a new board: it wipes the whole
+flash. Later updates install over Wi-Fi ([OTA](docs/features/ota.md)) and keep
+your settings.
+
+### 3. Connect it to your Wi-Fi
+
+Do this on the bench, with the controller powered over USB.
+
+1. On your phone, join the **`OpenBrewByWeightAP-…`** network. The password is
+   `ineedacoffee`. Stay joined even if the phone says there is no internet.
+2. The setup page opens on its own within a few seconds. If it does not, open
+   **`http://192.168.4.1/setup`**.
+3. Choose how you want to brew and a starting recipe, then pick your own
+   password. It replaces `ineedacoffee` and is the one you use to sign in from
+   now on.
+4. Choose your home network, type its password and select **Connect**. When the
+   page confirms the controller got in, select **Save Wi-Fi**.
+5. Select **Finish**, switch your phone back to your home network and open
+   **`http://openbrewbyweight.local`**, or the address the setup page showed.
+
+Every screen is shown in [First setup](docs/GETTING_STARTED.md#the-setup-page-screen-by-screen).
+Before going near the machine, run the [bench checks](docs/MANUAL_TEST_PLAN.md)
+and confirm the relay stays open on startup, reset and power loss.
+
+### 4. Print the enclosure
+
+The controller goes inside the machine in its printed enclosure. Print one
+box-and-cover pair from [`stl/`](stl/):
+
+- **Standard:** [`OpenBrewByWeight-Box.stl`](stl/OpenBrewByWeight-Box.stl) and
+  [`OpenBrewByWeight-Cover.stl`](stl/OpenBrewByWeight-Cover.stl).
+- **Thick:** [`OpenBrewByWeight-Box-thick.stl`](stl/OpenBrewByWeight-Box-thick.stl)
+  and [`OpenBrewByWeight-Cover-thick.stl`](stl/OpenBrewByWeight-Cover-thick.stl).
+  It holds its shape better where the controller gets hotter.
+
+The inside of an espresso machine gets hot, so never print the enclosure in
+PLA. Use PETG at least; ABS, or a composite that resists warping under heat,
+such as glass-fiber PETG, is better. The enclosure is a fit reference, not a
+heat or electrical rating: see [3D-printable enclosure](docs/HARDWARE.md#3d-printable-enclosure).
+
+### 5. Wire it into the Micra
+
+Unplug the machine from the mains first. Measure which CN4 pins carry 5 V and
+GND before connecting anything, and connect CN9 only to the relay's **COM** and
+**NO** terminals.
+
+![Linea Micra wiring with power from the relay board's six-pin header](docs/images/micra_diagram_header_power.png)
+
+<details>
+<summary>Cable list: which Dupont lead goes where</summary>
+
+![Linea Micra cable list: the Dupont leads for power, the paddle, CN9 and the optional buzzer](docs/images/micra_cable_list.png)
+
+</details>
+
+Powering from the green terminal instead, or building a harness with housings?
+See [Linea Micra wiring](docs/HARDWARE.md#linea-micra-wiring).
+
+### 6. Pull the first shot
+
+Connect the scale, choose a recipe and brew: see
+[First shot](docs/GETTING_STARTED.md#first-shot).
 
 ## How it works
 
@@ -170,7 +291,7 @@ After installation and bench verification, follow
 [First setup and daily use](docs/GETTING_STARTED.md). It covers connecting to the
 controller's access point, opening the Web UI, joining home Wi-Fi, selecting a
 scale, and making the first shot. Once the controller has joined your home
-Wi-Fi, reach the Web UI at `open-brew-by-weight.local`. Factory network details
+Wi-Fi, reach the Web UI at `openbrewbyweight.local`. Factory network details
 are in [AP → First connection](docs/settings/ap.md#first-connection).
 
 ## Admin

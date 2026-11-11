@@ -58,6 +58,34 @@ start with [Hardware](HARDWARE.md).
    network; change it any time in **Admin → Access**. How the sign-in works —
    and how to open or close it — is in [Web UI access](settings/web-access.md).
 
+### The setup page, screen by screen
+
+These are the screens you go through on your phone. The example network is
+called Home; yours shows your own network and address.
+
+<table>
+<tr>
+<td width="33%" valign="top"><b>1. Welcome.</b> The page lists the three parts. Select <b>Start</b>.<br><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="images/onboarding-1-welcome-dark.png"><img src="images/onboarding-1-welcome-light.png" width="260" alt="Setup welcome screen listing the three parts: your controller, Wi-Fi and review"></picture></td>
+<td width="33%" valign="top"><b>2. How you brew.</b> Keep brewing as usual, or stop shots by weight.<br><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="images/onboarding-2-mode-dark.png"><img src="images/onboarding-2-mode-light.png" width="260" alt="Choice between brewing as usual and stopping shots by weight"></picture></td>
+<td width="33%" valign="top"><b>3. Starting recipe.</b> Shown when you stop shots by weight. You can switch recipes any time from the Home screen.<br><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="images/onboarding-3-recipe-dark.png"><img src="images/onboarding-3-recipe-light.png" width="260" alt="List of starting recipes with dose, yield and ratio"></picture></td>
+</tr>
+<tr>
+<td width="33%" valign="top"><b>4. Your password.</b> Type it twice. <b>Save and continue</b> stores everything in this part.<br><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="images/onboarding-4-password-dark.png"><img src="images/onboarding-4-password-light.png" width="260" alt="Password form with its checklist and a summary of what the step saves"></picture></td>
+<td width="33%" valign="top"><b>5. Wi-Fi.</b> Choose your network, type its password and select <b>Connect</b>. Only 2.4 GHz networks work.<br><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="images/onboarding-5-wifi-dark.png"><img src="images/onboarding-5-wifi-light.png" width="260" alt="Wi-Fi form with a network chosen and its password typed"></picture></td>
+<td width="33%" valign="top"><b>6. Connected.</b> The connection works but is not saved yet: select <b>Save Wi-Fi</b>.<br><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="images/onboarding-6-connected-dark.png"><img src="images/onboarding-6-connected-light.png" width="260" alt="Connected screen asking to save the Wi-Fi network"></picture></td>
+</tr>
+<tr>
+<td width="33%" valign="top"><b>7. Review and finish.</b> Everything is saved. Note the address, rejoin your home network and select <b>Finish</b>.<br><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="images/onboarding-7-summary-dark.png"><img src="images/onboarding-7-summary-light.png" width="260" alt="Summary of the saved choices with the addresses to open the controller"></picture></td>
+</tr>
+</table>
+
 A wrong Wi-Fi password can be corrected right there: the reason appears at
 the top of the card, your entries stay in place, and **Connect** tries again.
 Nothing is saved until **Save Wi-Fi**, so a failed or unsaved test never
