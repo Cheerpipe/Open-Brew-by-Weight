@@ -4,8 +4,28 @@
     <path d="M8.6 17.6c2.6-2 3.8-8.4 6.8-11.2" />
   </symbol>
   <symbol id="g-beanconqueror" viewBox="0 0 24 24">
-    <rect x="7" y="2.5" width="10" height="19" rx="2" />
-    <path d="M12 6.5v7m-3-3 3 3 3-3m-4.5 5.5h3" />
+    <mask id="beanCut" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+      <rect width="24" height="24" fill="#fff" />
+      <ellipse
+        cx="15.6"
+        cy="9.8"
+        rx="4.9"
+        ry="7.4"
+        transform="rotate(22 15.6 9.8)"
+        stroke="#000"
+        stroke-width="4.2"
+      />
+    </mask>
+    <g mask="url(#beanCut)">
+      <g transform="rotate(-28 7.8 14.4)">
+        <ellipse cx="7.8" cy="14.4" rx="4.6" ry="7" />
+        <path d="M7.8 21.4c1.5-2.5-1.4-4.5 0-7s-1.5-4.5 0-7" />
+      </g>
+    </g>
+    <g transform="rotate(22 15.6 9.8)">
+      <ellipse cx="15.6" cy="9.8" rx="4.9" ry="7.4" />
+      <path d="M15.6 17.2c1.8-2.7-1.6-4.7 0-7.4s-1.7-4.7 0-7.4" />
+    </g>
   </symbol>
   <symbol id="g-fast" viewBox="0 0 24 24"><path d="m4 6 7 6-7 6M12 6l7 6-7 6" /></symbol>
   <symbol id="g-slow" viewBox="0 0 24 24">
