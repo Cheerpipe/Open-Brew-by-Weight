@@ -10,7 +10,7 @@ The board pin map and enclosure are documented below. Machine-specific wiring di
 ### Wiring Diagrams
 
 - **Linea Micra**:
-  ![Linea Micra wiring: paddle cable, CN9 on the relay, CN4 power and the optional buzzer](images/micra_diagram.png)
+  ![Linea Micra wiring between the relay board and the machine control board: paddle cable, CN9 on the relay, CN4 power and the optional buzzer](images/micra_diagram.png)
 - **Rancilio Silvia Pro X**:
   ![Rancilio Silvia Pro X Wiring Diagram](images/silvia_pro_x_diagram.png)
 

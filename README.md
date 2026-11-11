@@ -92,7 +92,7 @@ cable, the machine's CN9 and CN4 connectors, and the optional buzzer. It is a
 reference, not a replacement for checking your own machine; verify the actual
 machine circuit and follow the [hardware safety guidance](docs/HARDWARE.md) before installation.
 
-![Linea Micra wiring: paddle cable, CN9 on the relay, CN4 power and the optional buzzer](docs/images/micra_diagram.png)
+![Linea Micra wiring between the relay board and the machine control board: paddle cable, CN9 on the relay, CN4 power and the optional buzzer](docs/images/micra_diagram.png)
 
 ## Main features
 
