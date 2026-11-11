@@ -71,7 +71,7 @@ are different on momentary machines; read the [stop limitations](settings/moment
 | Printed enclosure | Required. Print it in PETG at least, never PLA; see [3D-printable enclosure](#3d-printable-enclosure). |
 | Power source | Voltage, isolation, capacity, and protection verified for the actual board and machine. The repository does not define a universal machine power tap. |
 | Wiring, connectors, mounting | Correct ratings, insulation, strain relief and clearance for the installation; machine-specific part numbers remain unverified. |
-| Dupont leads (Linea Micra) | One [pack of 20 cm Dupont leads](https://www.aliexpress.com/item/1005006754560696.html), option **20cm 3kinds 120pcs** (female–female, male–male and male–female), has everything needed to connect the controller to the Micra with single 1×1 leads. See [Linea Micra cables](#linea-micra-cables). |
+| Dupont leads (Linea Micra) | One [pack of 20 cm Dupont leads](https://es.aliexpress.com/item/1005009071621102.html), option **20cm 3kinds 120pcs** (female–female, male–male and male–female), has everything needed to connect the controller to the Micra with single 1×1 leads. See [Linea Micra cables](#linea-micra-cables). |
 | Dupont housings (Linea Micra, optional) | One [2×10 housing](https://www.aliexpress.com/item/1005012190859135.html), plus one 1×6 and three 1×4 housings from an [assorted housing pack](https://www.aliexpress.com/item/1005012842619301.html). These listings are only examples. |
 | Bluetooth scale | Check [model capabilities](../libraries/EspressoScaleBLE/README.md#scale-compatibility). |
 | Reed/hall feedback | Recommended for momentary machines; input must be compatible with the ESP32 and isolated from the machine circuit. |

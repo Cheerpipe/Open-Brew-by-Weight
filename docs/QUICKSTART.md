@@ -11,7 +11,7 @@ own [build profile](BUILD_PROFILES.md) and wiring.
 | Part | Qty | Reference price (USD) | Notes |
 | --- | ---: | ---: | --- |
 | [ESP32-S3 1-channel relay board](https://es.aliexpress.com/item/1005013070576654.html), N16R8 | 1 | 15–23 | Must be the N16R8 module (16 MB flash, 8 MB PSRAM). The pin headers come loose in the bag: solder them to the board before wiring. |
-| [20 cm Dupont lead pack](https://www.aliexpress.com/item/1005006754560696.html), "20cm 3kinds 120pcs" | 1 | 3 | Every lead the Micra needs. |
+| [20 cm Dupont lead pack](https://es.aliexpress.com/item/1005009071621102.html), "20cm 3kinds 120pcs" | 1 | 3 | Every lead the Micra needs. |
 | Supported [Bluetooth scale](../libraries/EspressoScaleBLE/README.md#scale-compatibility) | 1 | 130–150 | Bookoo Themis Mini shown; other models cost more or less. |
 | USB-C data cable | 1 | 3 | Charge-only cables cannot install firmware. |
 | [Passive 3.3 V buzzer module](https://es.aliexpress.com/item/1005007287329656.html) (optional) | 1 | 1–4 | Alert sounds. Must be passive. |
