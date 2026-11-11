@@ -444,10 +444,18 @@ function renderLaMarzoccoMachines(machines, canEdit) {
 function applyLaMarzoccoStatus(s) {
   const m = __LA_MARZOCCO__ && s.laMarzocco;
   if (!m) return;
+  // The brew range is the machine's own, read by a cloud session: without
+  // one there is no range and no brew temperature to set.
+  const coffee = m.boiler?.coffee || {},
+    ranged = coffee.targetMinDeciC > 0 && coffee.targetMaxDeciC > coffee.targetMinDeciC;
   document.documentElement.classList.toggle(
     "laMarzoccoTemperatureEnabled",
-    m.applyTemperature && m.accountConfigured,
+    m.applyTemperature && m.accountConfigured && ranged,
   );
+  if (ranged && $("laMarzoccoBrewTargetC")) {
+    $("laMarzoccoBrewTargetC").min = coffee.targetMinDeciC / 10;
+    $("laMarzoccoBrewTargetC").max = coffee.targetMaxDeciC / 10;
+  }
   const machines = m.machines || [],
     canEdit = R.controlsMutable,
     connected = m.accountConfigured,
@@ -915,7 +923,13 @@ function validateBrewClient() {
   add(brewRange("operationalWallS", 5, 60, { int: 1 }));
   add(brewRange("bbwProtectionS", 0.5, 30));
   if (document.documentElement.classList.contains("laMarzoccoTemperatureEnabled"))
-    add(brewRange("laMarzoccoBrewTargetC", 80, 100));
+    add(
+      brewRange(
+        "laMarzoccoBrewTargetC",
+        +$("laMarzoccoBrewTargetC").min,
+        +$("laMarzoccoBrewTargetC").max,
+      ),
+    );
   add(brewRange("doseG", 5, 30, { step: 0.1 }));
   add(brewRange("fastBeforeS", 2.5, 58, { step: 0.5 }));
   add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));

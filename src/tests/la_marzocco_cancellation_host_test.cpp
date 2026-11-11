@@ -113,7 +113,7 @@ bool OpenBrewByWeightLaMarzoccoService::executePowerApplication(
 #undef gettimeofday
 // The companion route runs unchanged; observation publication is out of scope.
 namespace openbrewbyweight {
-bool decodeLaMarzoccoDashboard(const cJSON *, LaMarzoccoObservation &, const char **) { return false; }
+bool decodeLaMarzoccoDashboard(const cJSON *, LaMarzoccoObservation &) { return false; }
 void OpenBrewByWeightLaMarzoccoService::applyPushLocked(const LaMarzoccoObservation &, uint32_t) {}
 bool OpenBrewByWeightLaMarzoccoService::mergeReadLocked(const LaMarzoccoObservation &) { return false; }
 #include "machine/OpenBrewByWeightLaMarzoccoCompanionRoute.inc"

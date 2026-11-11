@@ -166,8 +166,11 @@ without changing its target or learned values, and the scale-loss backup, cup
 protection and accidental touch are shared settings.
 Save remains bound to the preset whose fields were loaded into the form; an
 asynchronous active-preset change cannot redirect those values to another recipe.
-The Linea Micra brew target accepts 80.0–100.0 °C in 0.1 °C steps and defaults
-to 93.0 °C for new and factory-reset recipes. Duplicating a preset copies this value;
+The Linea Micra brew target accepts the range the machine itself reports
+through La Marzocco's cloud (80.0–100.0 °C on a Linea Micra) in 0.1 °C steps,
+and defaults to 93.0 °C for new and factory-reset recipes. The field appears
+once the connected account has read that range; without a connection there is
+no range and no brew temperature to set. Duplicating a preset copies this value;
 disabling the option or disconnecting the Micra account does not erase it. See
 [Linea Micra settings](../settings/linea-micra.md).
 With a connected Micra account and **Set the brew temperature in each preset**

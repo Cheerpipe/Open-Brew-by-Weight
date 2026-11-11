@@ -312,7 +312,8 @@ decodes, so the controller runs the same decoder as for a direct connection:
 
 - `connected`;
 - in `widgets`, only `CMMachineStatus` (`output.mode`), `CMCoffeeBoiler`
-  (`output.status`, `targetTemperature`, `readyStartTime`),
+  (`output.status`, `targetTemperature`, `targetTemperatureMin`,
+  `targetTemperatureMax`, `readyStartTime`),
   `CMSteamBoilerLevel` (`output.status`, `targetLevel`, `readyStartTime`),
   `CMSteamBoilerTemperature` (`output.status`, `readyStartTime`: the steam
   boiler of a machine that sets steam by temperature) and, in pushes,

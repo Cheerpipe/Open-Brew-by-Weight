@@ -557,6 +557,7 @@ for (const id of ['dLaMarzoccoPower', 'dLaMarzoccoPowerValue', 'dLaMarzoccoMode'
   get('laMarzoccoPowerDeps').children = ['RecognizeWake', 'ScaleOffWithMachine', 'BoostScaleDetectionWhenOn',
     'ReduceScaleScanningWhenOff'].map(id => get('laMarzocco' + id));
   const commands = [];
+  const rootClasses = new Set();
   let actionOk = true, polls = 0;
   get('laMarzoccoSteps').children = [node(), node(), node()];
   const steps = () => get('laMarzoccoSteps').children.map(li => li.className).join();
@@ -564,7 +565,9 @@ for (const id of ['dLaMarzoccoPower', 'dLaMarzoccoPowerValue', 'dLaMarzoccoMode'
     laMarzoccoDirty: false, laMarzoccoSignInState: null, laMarzoccoChange: false,
     refreshStatus: () => {}, setTimeout: () => { polls++; return 1; },
     laMarzoccoAction: async action => { commands.push({action}); return actionOk; },
-    document: {documentElement: {classList: {toggle() {}}}, createElement() {
+    document: {documentElement: {classList: {toggle(name, on) {
+      on ? rootClasses.add(name) : rootClasses.delete(name);
+    }}}, createElement() {
       const label = node();
       Object.defineProperty(label, 'innerHTML', {set() {
         label.radio = node(); label.firstChild = label.radio; label.b = node(); label.small = node();
@@ -639,6 +642,20 @@ for (const id of ['dLaMarzoccoPower', 'dLaMarzoccoPowerValue', 'dLaMarzoccoMode'
     apply(connected);
     assert.strictEqual(panes(), 'Connected');
     assert.strictEqual(context.laMarzoccoSignInState, null);
+    // The preset temperature field follows the machine's own range, which
+    // only a cloud session reads: without it there is nothing to set.
+    assert(!rootClasses.has('laMarzoccoTemperatureEnabled'), 'No range yet: no brew temperature field');
+    const ranged = {...connected, boiler: {coffee: {targetDeciC: 935, targetMinDeciC: 850, targetMaxDeciC: 1040}}};
+    apply(ranged);
+    assert(rootClasses.has('laMarzoccoTemperatureEnabled'), 'A reported range opens the field');
+    assert.deepStrictEqual([get('laMarzoccoBrewTargetC').min, get('laMarzoccoBrewTargetC').max], [85, 104]);
+    for (const off of [{applyTemperature: false}, {accountConfigured: false},
+      {boiler: {coffee: {targetMinDeciC: 0, targetMaxDeciC: 0}}},
+      {boiler: {coffee: {targetMinDeciC: 900, targetMaxDeciC: 900}}}]) {
+      apply({...ranged, ...off});
+      assert(!rootClasses.has('laMarzoccoTemperatureEnabled'), JSON.stringify(off));
+    }
+    apply(connected);
     assert.strictEqual(get('laMarzoccoIdentity').innerText, 'Micra · ABC');
     assert.strictEqual(get('laMarzoccoAccount').innerText, 'user@example.test');
     assert.strictEqual(get('laMarzoccoStatus').textContent, 'runtime.la_marzocco_power_on · runtime.target 93.5 °C');

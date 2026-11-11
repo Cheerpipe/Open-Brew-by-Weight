@@ -313,7 +313,15 @@ int main() {
   assert(laMarzoccoReadiness(resolve(lamp)) == LaMarzoccoReadiness::READY);
   lamp.powerState = LaMarzoccoPowerState::UNKNOWN;
   assert(laMarzoccoReadiness(resolve(lamp)) == LaMarzoccoReadiness::UNKNOWN);
-  static_assert(sizeof(LaMarzoccoStatus) == 72, "assumedPower must fill the alignment gap");
+  static_assert(sizeof(LaMarzoccoStatus) == 76, "assumedPower must fill the alignment gap");
+  // A preset's brew target is settable only inside the range a cloud session
+  // read from the machine; with no range nothing is.
+  LaMarzoccoStatus ranged;
+  for (long target : {600L, 930L, 1100L}) assert(!laMarzoccoBrewTargetSettable(ranged, target));
+  ranged.targetMinDeciC = 850;
+  ranged.targetMaxDeciC = 1040;
+  for (long target : {850L, 930L, 1040L}) assert(laMarzoccoBrewTargetSettable(ranged, target));
+  for (long target : {-1L, 0L, 849L, 1041L, 70000L}) assert(!laMarzoccoBrewTargetSettable(ranged, target));
 
   assert(!la_marzocco_timing::accessTokenRefreshDue(50U * 60U * 1000U - 1U));
   assert(la_marzocco_timing::accessTokenRefreshDue(50U * 60U * 1000U));

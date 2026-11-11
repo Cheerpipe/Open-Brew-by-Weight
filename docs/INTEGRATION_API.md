@@ -237,7 +237,7 @@ params substituted in order (see the example above).
 | ``INVALID_LA_MARZOCCO_CONFIG`` | The La Marzocco settings are not valid. |
 | ``INVALID_WEBHOOK`` | Use an http:// URL without embedded credentials; HTTPS is not supported. |
 | ``JSON_TOO_LARGE`` | JSON too large for device buffer |
-| ``LA_MARZOCCO_PRESET_TARGET_RANGE`` | laMarzoccoBrewTargetC must be 80.0–100.0 in 0.1 degree steps. |
+| ``LA_MARZOCCO_PRESET_TARGET_RANGE`` | laMarzoccoBrewTargetC must be inside the range the connected machine reports, in 0.1 degree steps. |
 | ``LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED`` | La Marzocco preset temperature is not supported by this firmware. |
 | ``LA_MARZOCCO_ACTION_FIELDS_INVALID`` | action is required and all fields must be known. |
 | ``LA_MARZOCCO_ACTION_UNKNOWN`` | Unknown La Marzocco action. |
@@ -701,7 +701,8 @@ after it when the matching guard is enabled, nothing is cut before
 target, oldest first), `firstDropS` is their median first drop (`firstDropN`
 shots; `0` falls back to other presets), and `grindHint` is the Web UI grind
 hint object or `null`. `laMarzoccoBrewTargetC` only matters on Linea Micra
-builds. The statistics follow every stored good shot (bad shots never count),
+builds; a save may change it only while the connected machine has reported
+its brew range, and only to a value inside that range. The statistics follow every stored good shot (bad shots never count),
 so Home Assistant's read after the `end` webhook already returns the new
 arrival.
 
@@ -1634,7 +1635,9 @@ Home frame reports whether an account is configured, `observeState`,
 optimistic-ON and optimistic-OFF provenance, `readiness` (`off`, `warming_up`,
 `waiting_for_steam`, `ready`, `needs_water` or `unknown`) and the boiler states,
 estimates and brew target (`laMarzocco.boiler.coffee.targetDeciC`, 0 when the
-machine reported none). The Settings frame adds the saved account `email`, the
+machine reported none), with the range the machine accepts for it
+(`targetMinDeciC` and `targetMaxDeciC`, both 0 until a cloud session has read
+the machine). The Settings frame adds the saved account `email`, the
 selected name and serial, the option flags with `shutdownGraceSeconds`, the
 request `phase` and `error`, `machineOffline` (true when the cloud reports that
 the machine itself is disconnected), the STA/AP/shot gates (`staConnected`,

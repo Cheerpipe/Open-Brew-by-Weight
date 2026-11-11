@@ -888,7 +888,7 @@
     "err.la_marzocco_change_pending": "Another La Marzocco change is still being saved.",
     "err.la_marzocco_connect_fields_only": "connect requires only username and password.",
     "err.la_marzocco_not_ready": "Connect an account and select a machine first.",
-    "err.la_marzocco_preset_target_range": "laMarzoccoBrewTargetC must be 80.0\u2013100.0 in 0.1 degree steps.",
+    "err.la_marzocco_preset_target_range": "laMarzoccoBrewTargetC must be inside the range the connected machine reports, in 0.1 degree steps.",
     "err.la_marzocco_preset_target_unsupported": "La Marzocco preset temperature is not supported by this firmware.",
     "err.la_marzocco_readonly_actions": "disconnect, refresh, relist, and acceptPolicy do not accept setting fields.",
     "err.la_marzocco_requires_ready": "La Marzocco settings can be changed only while Ready.",

@@ -128,7 +128,6 @@ int main() {
   update = {};
   assert(!decode(R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"targetTemperature":"93"}}]})", update));
   assert(!update.powerPresent);  // No partial publication from invalid data.
-  assert(!decode(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":100.1}}]})", update));
   assert(decode(R"({"connected":false,"widgets":[{"code":"FutureWidget"}]})", update));
   // Malformed widgets the decoder does not use are skipped, not fatal.
   {
@@ -323,26 +322,74 @@ int main() {
     assert(machine.steamReadyAtUtcSec == 1760000820U);
   }
 
-  // A brew target outside what the firmware supports rejects the frame and
-  // names the value for the Web UI log; a shape error names nothing.
+  // The brew range is the machine's own, read from the coffee boiler widget
+  // and kept inside the firmware's absolute bounds.
+  const auto coffee = [&](const char *output) {
+    fresh();
+    return decode((std::string(R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},)") +
+                   R"({"code":"CMCoffeeBoiler","output":{"status":"Ready",)" + output + "}}]}").c_str(),
+                  update);
+  };
+  assert(coffee(R"("targetTemperature":102.5,"targetTemperatureMin":85,"targetTemperatureMax":104)"));
+  assert(update.targetMinDeciC == 850 && update.targetMaxDeciC == 1040);
+  assert(update.temperaturePresent && update.temperatureValid && update.targetDeciC == 1025);
+  // A target outside the machine's range is no target; the frame still
+  // carries the machine's power and boiler state.
+  for (const char *target : {"79.9", "100.1"}) {
+    assert(coffee((std::string(R"("targetTemperatureMin":80,"targetTemperatureMax":100,"targetTemperature":)") +
+                   target).c_str()));
+    assert(update.powerPresent && update.coffeeBoiler == LaMarzoccoBoilerState::READY);
+    assert(update.temperaturePresent && !update.temperatureValid && update.targetDeciC == 0);
+    assert(update.targetMinDeciC == 800 && update.targetMaxDeciC == 1000);
+  }
+  // Without a reported range only the absolute bounds apply.
+  assert(coffee(R"("targetTemperature":104.0)"));
+  assert(update.targetMinDeciC == 0 && update.temperatureValid && update.targetDeciC == 1040);
+  for (const char *target : {"59.9", "110.1", "1e9"}) {
+    assert(coffee((std::string(R"("targetTemperature":)") + target).c_str()));
+    assert(update.powerPresent && update.temperaturePresent && !update.temperatureValid);
+  }
+  // A range that is malformed, inverted, or outside the absolute bounds
+  // counts as not reported: it never widens what the firmware accepts.
+  for (const char *range : {
+      R"("targetTemperatureMin":"80","targetTemperatureMax":100)",
+      R"("targetTemperatureMin":100,"targetTemperatureMax":80)",
+      R"("targetTemperatureMin":93,"targetTemperatureMax":93)",
+      R"("targetTemperatureMin":50,"targetTemperatureMax":100)",
+      R"("targetTemperatureMin":80,"targetTemperatureMax":130)",
+      R"("targetTemperatureMin":80)"}) {
+    assert(coffee((std::string(range) + R"(,"targetTemperature":93.0)").c_str()));
+    assert(update.targetMinDeciC == 0 && update.targetMaxDeciC == 0);
+    assert(update.temperatureValid && update.targetDeciC == 930);
+  }
+  assert(coffee(R"("targetTemperatureMin":60,"targetTemperatureMax":110,"targetTemperature":110.0)"));
+  assert(update.targetMinDeciC == 600 && update.targetMaxDeciC == 1100 && update.targetDeciC == 1100);
+  // A target that is not a number is still a malformed frame.
+  assert(!coffee(R"("targetTemperature":"93")"));
+  // The status keeps the machine's range across frames that name none, and a
+  // machine that never names one gets the default; steam alone sets nothing.
   {
-    const auto rejected = [](const char *json) {
+    LaMarzoccoStatus machine;
+    machine.identityGeneration = 1;
+    LaMarzoccoPowerStateTracker tracker;
+    LaMarzoccoObservationFence fence;
+    const auto push = [&](const char *json) {
       LaMarzoccoObservation frame;
-      const char *unsupported = nullptr;
-      cJSON *root = cJSON_Parse(json);
-      assert(!decodeLaMarzoccoDashboard(root, frame, &unsupported));
-      cJSON_Delete(root);
-      return unsupported;
+      frame.source = LaMarzoccoObservationSource::WEBSOCKET;
+      frame.stamp = fence.stamp(1, tracker.generation());
+      assert(decode(json, frame));
+      assert(fence.merge(machine, tracker, frame, true));
     };
-    for (const char *json : {
-        R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":100.1}}]})",
-        R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":79.9}}]})"}) {
-      const char *unsupported = rejected(json);
-      assert(unsupported != nullptr &&
-             std::strcmp(unsupported, "brew target outside 80.0-100.0 C") == 0);
-    }
-    assert(rejected(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":"93"}}]})") == nullptr);
-    assert(rejected(R"({"widgets":"none"})") == nullptr);
+    push(R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready"}}]})");
+    assert(machine.targetMinDeciC == 0 && machine.targetMaxDeciC == 0);
+    push(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}}]})");
+    assert(machine.targetMinDeciC == 800 && machine.targetMaxDeciC == 1000);
+    push(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":95.0,"targetTemperatureMin":85,"targetTemperatureMax":104}}]})");
+    assert(machine.targetMinDeciC == 850 && machine.targetMaxDeciC == 1040);
+    assert(machine.targetValid && machine.targetDeciC == 950);
+    push(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":96.0}}]})");
+    assert(machine.targetMinDeciC == 850 && machine.targetMaxDeciC == 1040);
+    assert(machine.targetDeciC == 960);
   }
 
   // The account listing keeps only coffee machines of the model the machine

@@ -399,17 +399,14 @@ bool OpenBrewByWeightLaMarzoccoService::companionState(LaMarzoccoCompanionStateK
   update.source = push ? LaMarzoccoObservationSource::WEBSOCKET
       : kind == LaMarzoccoCompanionStateKind::FULL ? LaMarzoccoObservationSource::HTTP_INITIAL
       : LaMarzoccoObservationSource::HTTP;
-  const char *unsupported = nullptr;
-  if (!decodeLaMarzoccoDashboard(dashboard, update, &unsupported) ||
+  if (!decodeLaMarzoccoDashboard(dashboard, update) ||
       (!push && !update.powerPresent && !(update.connectedPresent && !update.connected))) {
     const uint32_t now = millis();
     if (now - lastRejectAtMs.load() >= kCompanionLogPeriodMs) {
       lastRejectAtMs.store(now);
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                           "La Marzocco companion state rejected kind=%s%s%s",
-                           push ? "push" : kind == LaMarzoccoCompanionStateKind::FULL ? "full" : "read",
-                           unsupported != nullptr ? ": " : "",
-                           unsupported != nullptr ? unsupported : "");
+                           "La Marzocco companion state rejected kind=%s",
+                           push ? "push" : kind == LaMarzoccoCompanionStateKind::FULL ? "full" : "read");
     }
     // Like a failed direct read, a rejected full or read frame is ignored (a
     // missing full frame then times out as full_missing); a rejected push

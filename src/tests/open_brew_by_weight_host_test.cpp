@@ -14647,8 +14647,10 @@ void w90c_preset_temperature_presence_and_learning_invalidation() {
   CHECK(hostMachineTemperatureGeneration == runtimeConfig.revision);
   CHECK(hostMachineTemperatureTargetDeciC == 945);
 
+  // The control stage holds the absolute bounds; the machine's own range is
+  // checked where the request arrives and again before the cloud command.
   save.requestId = 903;
-  save.laMarzoccoBrewTargetDeciC = 1001;
+  save.laMarzoccoBrewTargetDeciC = LA_MARZOCCO_BREW_TARGET_MAX_DECI_C + 1;
   processWebCommand(save);
   CHECK(preset.laMarzoccoBrewTargetDeciC == 945);
   CHECK(hostLastForwardedNetworkCommand.resultState ==

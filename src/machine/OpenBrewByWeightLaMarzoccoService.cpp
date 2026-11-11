@@ -1584,6 +1584,7 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
     uint32_t machineConfigGeneration) {
   LaMarzoccoPersistedSettings settings;
   bool commandAccepted = false;
+  bool outsideRange = false;
   {
     TaskLockGuard lock(mux_);
     if (!desiredTemperature_.present ||
@@ -1593,8 +1594,13 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
         configGeneration_ != machineConfigGeneration) {
       return true;
     }
+    // The machine refuses a target outside the range it reported: fail it
+    // here, visibly, instead of spending a cloud request on it.
+    outsideRange = published_.targetMinDeciC != 0 &&
+        (request.targetDeciC < published_.targetMinDeciC ||
+         request.targetDeciC > published_.targetMaxDeciC);
     const LaMarzoccoStatus current = statusLocked();
-    const bool unchanged = current.connectionFreshness &&
+    const bool unchanged = !outsideRange && current.connectionFreshness &&
         current.quality == LaMarzoccoObservationQuality::CURRENT &&
         observationFence_.temperatureTrusted && published_.targetValid &&
         published_.targetDeciC == request.targetDeciC;
@@ -1622,6 +1628,11 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
     settings = config_;
     commandAccepted = desiredTemperature_.commandAccepted;
     published_.temperatureCommandAccepted = commandAccepted;
+  }
+  if (outsideRange) {
+    wipeLaMarzoccoSettings(settings);
+    deferTemperature(request, LaMarzoccoError::REJECTED, 0, false);
+    return false;
   }
   if (!ensureWorkBuffer()) {
     wipeLaMarzoccoSettings(settings);
@@ -2443,17 +2454,15 @@ bool OpenBrewByWeightLaMarzoccoService::readDashboard(
     return false;
   }
   cJSON *root = parseResponse(io_->response);
-  const char *unsupported = nullptr;
-  const bool decoded = decodeLaMarzoccoDashboard(root, update, &unsupported) &&
+  const bool decoded = decodeLaMarzoccoDashboard(root, update) &&
       (update.powerPresent || (update.connectedPresent && !update.connected));
   cJSON_Delete(root);
   // A transport-level success with no observation sample means the payload
-  // was rejected; the log names an unsupported value, else the excerpt
-  // names the offending shape.
+  // was rejected; the excerpt names the offending shape on the serial log.
   if (!decoded)
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
                          "La Marzocco dashboard decode rejected: %.96s",
-                         unsupported != nullptr ? unsupported : io_->response);
+                         io_->response);
   work_->responseUsed = 0;
   releaseIoBuffer(decoded);
   if (!decoded) return false;

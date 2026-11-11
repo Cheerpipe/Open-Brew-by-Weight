@@ -221,14 +221,8 @@ bool OpenBrewByWeightLaMarzoccoService::stompFrame(void *context, const LaMarzoc
   }
   cJSON *root = parseJsonDocumentWithinLimits(frame.body, LaMarzoccoStompDecoder::kBodyLimit,
                                              1024);
-  const char *unsupported = nullptr;
-  const bool decoded = root && decodeLaMarzoccoDashboard(root, update, &unsupported);
+  const bool decoded = root && decodeLaMarzoccoDashboard(root, update);
   if (root) cJSON_Delete(root);
-  if (!decoded && unsupported != nullptr) {
-    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "La Marzocco dashboard push rejected: %s", unsupported);
-    return false;
-  }
   if (!decoded) {
     // Names the offending push shape on the serial log instead of failing
     // the subscription silently. The body is length-delimited, not

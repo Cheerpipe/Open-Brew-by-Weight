@@ -26,6 +26,8 @@ struct LaMarzoccoObservation {
   uint32_t coffeeReadyAtUtcSec = 0;
   uint32_t steamReadyAtUtcSec = 0;
   uint16_t targetDeciC = 0;
+  uint16_t targetMinDeciC = 0;  // The machine's brew range; 0 when the frame names none.
+  uint16_t targetMaxDeciC = 0;
   LaMarzoccoObservationSource source = LaMarzoccoObservationSource::HTTP;
   LaMarzoccoObservedMode mode = LaMarzoccoObservedMode::NONE;
   LaMarzoccoBoilerState coffeeBoiler = LaMarzoccoBoilerState::UNKNOWN;
@@ -46,10 +48,7 @@ struct LaMarzoccoObservation {
   bool connected = false;
 };
 
-// A frame rejected for a value this firmware does not support, rather than
-// for its shape, names that value in *unsupported when it is given.
-bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update,
-                          const char **unsupported = nullptr);
+bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update);
 
 // Hears each account coffee machine the listing leaves out: its La Marzocco
 // modelCode, or nullptr when the model matched and the serial cannot be kept.
@@ -147,6 +146,16 @@ struct LaMarzoccoObservationFence {
       if (update.temperaturePresent) {
         status.targetValid = temperatureTrusted = update.temperatureValid;
         status.targetDeciC = update.targetDeciC;
+      }
+      // The brew range is the machine's own. A frame that names none keeps
+      // the last one, and a machine that never names one gets the default.
+      if (update.targetMinDeciC != 0) {
+        status.targetMinDeciC = update.targetMinDeciC;
+        status.targetMaxDeciC = update.targetMaxDeciC;
+      } else if (status.targetMinDeciC == 0 &&
+                 (update.temperaturePresent || update.coffeeBoilerPresent)) {
+        status.targetMinDeciC = LA_MARZOCCO_BREW_RANGE_DEFAULT_MIN_DECI_C;
+        status.targetMaxDeciC = LA_MARZOCCO_BREW_RANGE_DEFAULT_MAX_DECI_C;
       }
       if (update.coffeeBoilerPresent) {
         status.coffeeBoiler = update.coffeeBoiler;

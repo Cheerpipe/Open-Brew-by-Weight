@@ -636,8 +636,12 @@ connected scale regardless of brand.
 
 ## Brew temperature in presets
 
-**Set the brew temperature in each preset** reveals a per-preset value from
-80.0 to 100.0 °C in 0.1 °C steps. New and factory-reset presets start at 93.0 °C;
+**Set the brew temperature in each preset** reveals a per-preset value in
+0.1 °C steps. Its limits are the ones your machine reports through La
+Marzocco's cloud, 80.0 to 100.0 °C on a Linea Micra, so the field appears once
+the connected account has read them. A saved value that the machine's range no
+longer allows is not sent: Diagnostics shows the temperature request as
+rejected, and the Web UI log records it. New and factory-reset presets start at 93.0 °C;
 duplicates copy the source value. Turning the option off or disconnecting the
 account keeps every saved preset value.
 

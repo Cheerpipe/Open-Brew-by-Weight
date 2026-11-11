@@ -307,6 +307,10 @@ struct LaMarzoccoStatus {
   uint32_t configGeneration = 0;
   uint32_t identityGeneration = 0;
   uint16_t targetDeciC = 0;
+  // The brew range the selected machine accepts, from its cloud report; 0
+  // until a session has read it, and then no target can be set.
+  uint16_t targetMinDeciC = 0;
+  uint16_t targetMaxDeciC = 0;
   uint16_t requestedTargetDeciC = 0;
   uint16_t appliedTargetDeciC = 0;
   LaMarzoccoAssumedPower assumedPower = LaMarzoccoAssumedPower::UNKNOWN;  // Fills an alignment gap.
@@ -401,6 +405,14 @@ inline LaMarzoccoReadiness laMarzoccoReadiness(const LaMarzoccoStatus &status) {
   }
   if (warming(coffee)) return LaMarzoccoReadiness::WARMING_UP;
   return LaMarzoccoReadiness::UNKNOWN;
+}
+
+// A preset's brew target can be set only inside the range the selected
+// machine reported. Before a cloud session has read that range there is
+// none, and no brew temperature can be set.
+inline bool laMarzoccoBrewTargetSettable(const LaMarzoccoStatus &status, long deciC) {
+  return status.targetMinDeciC != 0 && deciC >= status.targetMinDeciC &&
+         deciC <= status.targetMaxDeciC;
 }
 
 static_assert(sizeof(LaMarzoccoRequest) <= 16,

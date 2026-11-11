@@ -2229,6 +2229,19 @@ struct LaMarzoccoWebSocketTest {
     assert(!temperature(950));
     assert(service.published_.temperatureError == LaMarzoccoError::REJECTED &&
            service.published_.temperatureHttpStatus == 422);
+    // A target outside the range the machine reported is refused before any
+    // command leaves the controller.
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":94.0,"targetTemperatureMin":85,"targetTemperatureMax":104}}]})"));
+    assert(service.published_.targetMinDeciC == 850 && service.published_.targetMaxDeciC == 1040);
+    bool commanded = false;
+    notifyHook = [&] { commanded = commanded || service.companionOutbox().commandId != 0; };
+    for (uint16_t outside : {uint16_t{849}, uint16_t{1041}}) {
+      assert(!temperature(outside) && !commanded);
+      assert(service.published_.temperatureState == LaMarzoccoTemperatureState::FAILED);
+      assert(service.published_.temperatureError == LaMarzoccoError::REJECTED);
+      assert(!service.published_.temperatureRetryable && !service.desiredTemperature_.present);
+    }
+    service.published_.targetMinDeciC = service.published_.targetMaxDeciC = 0;
     // Standby: an older read cannot undo the accepted command's intent; a read
     // ordered after the command confirms it.
     stage = 0;

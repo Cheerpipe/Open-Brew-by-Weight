@@ -1062,8 +1062,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
                                     : NAN;
           const long rounded = lround(scaled);
           if (!std::isfinite(scaled) || fabs(scaled - rounded) > 0.0001 ||
-              rounded < LA_MARZOCCO_BREW_TARGET_MIN_DECI_C ||
-              rounded > LA_MARZOCCO_BREW_TARGET_MAX_DECI_C) {
+              !laMarzoccoBrewTargetSettable(machineIntegrationStatus(), rounded)) {
             parseError = validationFailure("LA_MARZOCCO_PRESET_TARGET_RANGE");
           } else {
             command.laMarzoccoBrewTargetSpecified = true;

@@ -366,6 +366,12 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   // 0 when the machine has not reported a brew target; the Home row hides it.
   delta.field("laMarzocco.boiler.coffee.targetDeciC", "%u",
               static_cast<unsigned>(micra.targetValid ? micra.targetDeciC : 0));
+  // The range the machine accepts for a preset's brew temperature; 0 until a
+  // session has read it, and the Web UI offers no temperature field then.
+  delta.field("laMarzocco.boiler.coffee.targetMinDeciC", "%u",
+              static_cast<unsigned>(micra.targetMinDeciC));
+  delta.field("laMarzocco.boiler.coffee.targetMaxDeciC", "%u",
+              static_cast<unsigned>(micra.targetMaxDeciC));
   delta.field("laMarzocco.boiler.steam.state", "\"%s\"",
               laMarzoccoBoilerStateName(micra.steamBoiler));
   delta.field("laMarzocco.boiler.steam.readyAtUtcSec",

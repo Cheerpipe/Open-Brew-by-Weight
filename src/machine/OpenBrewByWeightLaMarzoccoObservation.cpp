@@ -48,6 +48,16 @@ LaMarzoccoSteamLevel steamLevel(const char *value) {
   return LaMarzoccoSteamLevel::UNSUPPORTED;
 }
 
+// A temperature in tenths of a degree, 0 unless it is a number inside the
+// absolute brew-target bounds.
+uint16_t deciC(const cJSON *value) {
+  if (!cJSON_IsNumber(value) || !std::isfinite(value->valuedouble)) return 0;
+  const double tenths = std::round(value->valuedouble * 10.0);
+  return tenths < LA_MARZOCCO_BREW_TARGET_MIN_DECI_C ||
+          tenths > LA_MARZOCCO_BREW_TARGET_MAX_DECI_C
+      ? 0 : static_cast<uint16_t>(tenths);
+}
+
 // True when a widgets or removedWidgets array names this widget code.
 bool names(const cJSON *list, const char *code) {
   const cJSON *entry = nullptr;
@@ -74,8 +84,7 @@ void readyAtSeconds(const cJSON *value, uint32_t &seconds) {
 }
 }  // namespace
 
-bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update,
-                          const char **unsupported) {
+bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update) {
   if (!cJSON_IsObject(root)) return false;
   unsigned seen = 0;
   for (const cJSON *field = root->child; field; field = field->next) {
@@ -153,16 +162,26 @@ bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update,
       if (duplicated(target, boiler ? "targetTemperature" : "targetLevel")) return false;
       if (boiler) {
         if (ready != nullptr) next.coffeeReadyAtUtcSec = readyAt;
+        // The widget carries the range this machine accepts; it is kept inside
+        // the absolute bounds, and a malformed one counts as not reported.
+        const uint16_t low = deciC(find(output, "targetTemperatureMin"));
+        const uint16_t high = deciC(find(output, "targetTemperatureMax"));
+        if (low != 0 && low < high) {
+          next.targetMinDeciC = low;
+          next.targetMaxDeciC = high;
+        }
         if (target == nullptr) continue;
         if (!cJSON_IsNumber(target) || !std::isfinite(target->valuedouble) ||
             next.temperaturePresent) return false;
-        if (target->valuedouble < LA_MARZOCCO_BREW_TARGET_MIN_DECI_C / 10.0 ||
-            target->valuedouble > LA_MARZOCCO_BREW_TARGET_MAX_DECI_C / 10.0) {
-          if (unsupported != nullptr) *unsupported = "brew target outside 80.0-100.0 C";
-          return false;
-        }
-        next.temperaturePresent = next.temperatureValid = true;
-        next.targetDeciC = static_cast<uint16_t>(std::lround(target->valuedouble * 10.0));
+        // A target outside the machine's own range, or outside the absolute
+        // bounds, is reported as no target: the frame still carries the
+        // machine's power and boiler state.
+        const uint16_t reported = deciC(target);
+        next.temperaturePresent = true;
+        next.temperatureValid = reported != 0 &&
+            (next.targetMinDeciC == 0 ||
+             (reported >= next.targetMinDeciC && reported <= next.targetMaxDeciC));
+        next.targetDeciC = next.temperatureValid ? reported : 0;
       } else {
         next.steamByTemperature = !levelFrame;
         if (ready != nullptr) next.steamReadyAtUtcSec = readyAt;
