@@ -84,6 +84,37 @@ The resolver performs these operations in order:
 
 No flash, OTA upload, or hardware action is part of `build`.
 
+### Experimental builds: Linea Mini R and Linea Mini
+
+The Linea Mini R and Linea Mini profiles are **experimental**. They reuse the
+Linea Micra firmware with each machine's own identity, and the project's
+author has neither machine to test them on. They may not work, and no support
+is offered beyond the Linea Micra. If you try one, you do so at your own risk;
+reports of what you find are welcome.
+
+Both use the same ESP32-S3 Relay X1 controller as the Micra. Build and install
+over USB in one command, replacing the port with your controller's:
+
+```sh
+./scripts/dev build flash --confirm \
+  --hardware esp32-s3-relay-x1-speaker \
+  --machine la-marzocco-linea-mini-r \
+  --port /dev/cu.usbmodem2101
+```
+
+```sh
+./scripts/dev build flash --confirm \
+  --hardware esp32-s3-relay-x1-speaker \
+  --machine la-marzocco-linea-mini \
+  --port /dev/cu.usbmodem2101
+```
+
+The La Marzocco Cloud features of the Linea Mini need the machine's IoT board,
+the one that makes it appear in the La Marzocco app. The
+[wiring guide](HARDWARE.md) covers the Linea Micra only: there is no
+installation guide for either Mini yet. See [Flash (USB)](BUILD.md#6-flash-usb)
+for ports, a clean first installation, and the checks to make afterwards.
+
 ### Capability matching
 
 Profiles do not name or depend on one specific counterpart. The hardware

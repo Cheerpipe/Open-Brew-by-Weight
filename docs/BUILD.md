@@ -455,6 +455,11 @@ their options:
   --port /dev/cu.usbmodem2101
 ```
 
+The same command installs any other profile pair. The Linea Mini R and Linea
+Mini builds are experimental and untested on real machines; see
+[Experimental builds](BUILD_PROFILES.md#experimental-builds-linea-mini-r-and-linea-mini)
+before installing one.
+
 Add `monitor` to open the serial console only after both earlier stages pass:
 
 ```sh
