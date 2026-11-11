@@ -137,6 +137,31 @@ exported JSON formats are not carried over.
   connected scale pauses La Marzocco updates from its start until the pump
   stops, so the scale has the radio to itself. The connection stays open and
   updates resume the moment the pump stops.
+- **A new Home card:** the card at the top of Home shows your last three
+  shots, and a new **Technical** look draws the recipe's graph under the
+  numbers, with your shot over it. Pick it in
+  [Theme](docs/settings/theme.md#hero-card).
+- **Scale battery:** a Bookoo Themis, Felicita Arc or recent Acaia shows its
+  charge in the header, the live view, Home and Diagnostic, and warns you as
+  it runs low. See [Scales](docs/settings/scales.md#scale-battery).
+- **Lock the presets on Home:** the preset list starts locked, so a stray tap
+  no longer switches your recipe. Press and hold a preset to switch, or the
+  lock to unlock. See [Presets](docs/features/presets.md#lock-the-preset-list-on-home).
+- **Update and Wi-Fi results on Home:** after a firmware update, Home waits
+  for the restart and tells you how it went, in every open browser; a Wi-Fi
+  change reports its outcome the same way.
+- **A redesigned Diagnostic log:** step through the log by day and by boot,
+  jump back to the newest line, and read far more history at once.
+- **Learning kept across restarts:** what the controller learned about your
+  drips survives a restart, and a drip hold cut short keeps the weight
+  it had already settled at.
+- **The Linea Micra's own temperature range:** the brew temperature in your
+  presets accepts the range the machine reports, and nothing is sent until
+  the machine has reported it.
+- **Two power settings instead of one:** **Performance boost** and **Idle
+  power saving** replace the single power management switch in Admin; your
+  previous choice carries over to both. See
+  [Power management](docs/settings/power-management.md).
 
 ## 1.1.0 — 2026-10-26
 
