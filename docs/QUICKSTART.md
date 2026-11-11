@@ -10,12 +10,12 @@ own [build profile](BUILD_PROFILES.md) and wiring.
 
 | Part | Qty | Reference price (USD) | Notes |
 | --- | ---: | ---: | --- |
-| [ESP32-S3 1-channel relay board](HARDWARE.md#development-board), N16R8 | 1 | 15–23 | Must be the N16R8 module (16 MB flash, 8 MB PSRAM). The pin headers come loose in the bag: solder them to the board before wiring. |
-| [20 cm Dupont lead pack](HARDWARE.md#linea-micra-cables), "20cm 3kinds 120pcs" | 1 | 3 | Every lead the Micra needs. |
+| [ESP32-S3 1-channel relay board](https://es.aliexpress.com/item/1005013070576654.html), N16R8 | 1 | 15–23 | Must be the N16R8 module (16 MB flash, 8 MB PSRAM). The pin headers come loose in the bag: solder them to the board before wiring. |
+| [20 cm Dupont lead pack](https://www.aliexpress.com/item/1005006754560696.html), "20cm 3kinds 120pcs" | 1 | 3 | Every lead the Micra needs. |
 | Supported [Bluetooth scale](../libraries/EspressoScaleBLE/README.md#scale-compatibility) | 1 | 130–150 | Bookoo Themis Mini shown; other models cost more or less. |
 | USB-C data cable | 1 | 3 | Charge-only cables cannot install firmware. |
-| [Passive 3.3 V buzzer module](HARDWARE.md#local-buzzer) (optional) | 1 | 1–4 | Alert sounds. Must be passive. |
-| [Dupont housings](HARDWARE.md#dupont-housings-optional) (optional) | 1 set | 8 | A tidier harness that is harder to plug in wrong. |
+| [Passive 3.3 V buzzer module](https://es.aliexpress.com/item/1005007287329656.html) (optional) | 1 | 1–4 | Alert sounds. Must be passive. |
+| Dupont housings (optional): one [2×10 housing](https://www.aliexpress.com/item/1005012190859135.html) and an [assorted housing pack](https://www.aliexpress.com/item/1005012842619301.html) | 1 set | 8 | Not required: the 1×1 leads from the pack work on their own. Housings make a tidier harness that is harder to plug in wrong. |
 | [Printed enclosure](HARDWARE.md#3d-printable-enclosure) | 1 | 1–2 | Filament only: PETG or better. See step 3. |
 
 Without the scale, the required parts cost about US$22–31. Prices are a
