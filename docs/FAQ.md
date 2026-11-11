@@ -279,6 +279,32 @@ paddle behaves exactly like the Linea Micra's. Treat them as a starting point
 for your own investigation, at your own risk; reports of what you find are
 welcome.
 
+### Can I use Quick rinse on the Linea Mini or Linea Mini R?
+
+Yes. Both machines already rinse the group on their own when you flick the
+paddle on and back off within about a second, and you set how long that rinse
+lasts in the La Marzocco app. That is why the controller ships with its own
+[Quick rinse](settings/quick-rinse.md) turned off on these machines: the
+paddle flick stays the machine's.
+
+If you prefer the controller's rinse, or your Linea Mini is an older one
+without a rinse of its own, turn on **Settings → Shared settings → Quick
+rinse**. Your choice is kept across restarts and updates. With it on, the
+controller keeps the group running for its own rinse time, so the machine's
+rinse no longer starts.
+
+To build firmware that starts with Quick rinse already on, after a fresh
+installation or a factory reset, add the rinse flag to the build:
+
+```sh
+./scripts/dev build \
+  --hardware esp32-s3-relay-x1-speaker \
+  --machine la-marzocco-linea-mini-r \
+  --flags "-DOPEN_BREW_BY_WEIGHT_DEFAULT_RINSE_ENABLED=1"
+```
+
+Use `--machine la-marzocco-linea-mini` for the Linea Mini.
+
 ## Safety and diagnostics
 
 After a watchdog/panic reset, the relay is forced open and the interrupted shot

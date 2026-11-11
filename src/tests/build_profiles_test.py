@@ -178,10 +178,12 @@ assert identities == {
     "la-marzocco-linea-mini": "la-marzocco-linea-mini-r1",
     "la-marzocco-linea-mini-r": "la-marzocco-linea-mini-r-r1"}, identities
 # Owner requirement while the Minis are experimental: they behave as the Micra
-# does. Drop a key from this list in the change that deliberately gives a Mini
-# its own value.
+# does, except that Quick rinse ships off because their paddle flick already
+# runs the machine's own rinse. Drop a key from this list in the change that
+# deliberately gives a Mini its own value.
 la_marzocco_profile, mini_profile, mini_r_profile = (
     json.loads(path.read_text()) for path in (MICRA, MINI, MINI_R))
+la_marzocco_profile["factory_defaults"]["quick_rinse"]["enabled"] = False
 for profile in (mini_profile, mini_r_profile):
     for key in ("hardware", "interface", "factory_defaults", "integration",
                 "integration_revision"):

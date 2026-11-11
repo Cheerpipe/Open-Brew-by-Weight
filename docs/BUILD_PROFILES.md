@@ -386,7 +386,8 @@ reed machine requires hardware whose reed role is present. For example:
 
 The Linea Micra uses the historical paddle source defaults, with Quick rinse
 enabled. The experimental Linea Mini R and Linea Mini profiles repeat it and
-differ only in identity, `cloud_model`, and icon:
+differ only in identity, `cloud_model`, icon, and Quick rinse, which they ship
+disabled because the machines run their own rinse on the same paddle gesture:
 
 ```json
 {
@@ -426,7 +427,7 @@ Both topologies require `quick_rinse`: `enabled` is Boolean, `gesture_ms` is
 100–5000, and `duration_ms` is 500–10000 without exceeding
 `operational_wall_ms`. The
 historical timing defaults are a 1000 ms gesture and 4000 ms duration. It is
-disabled in the Rancilio profiles and enabled in the La Marzocco profiles.
+enabled only in the Linea Micra profile.
 
 ## Defaults, persistence, and factory reset
 
