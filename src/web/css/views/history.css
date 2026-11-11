@@ -743,7 +743,7 @@
 .histNoWeight path:first-child {
   fill: none;
   stroke: currentcolor;
-  stroke-width: 36;
+  stroke-width: 1.7;
   stroke-linejoin: round;
 }
 
