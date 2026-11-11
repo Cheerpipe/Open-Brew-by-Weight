@@ -9,7 +9,7 @@ this project.
 | A→M | **Automatic-to-manual** transition: brew-by-weight can no longer rely on the scale, so the scale-loss backup limits the remaining shot by time. |
 | Admin unlock | A password-protected authorization required for privileged Web UI actions; it is separate from claiming the browser session. |
 | AGPL-3.0 | GNU Affero General Public License version 3, the repository's current copyleft license. Network use of a modified version can require offering its corresponding source code. |
-| AI | Artificial intelligence. The [disclaimer](../DISCLAIMER.md) notes its use during project development. |
+| AI | Artificial intelligence. The [disclaimer](../README.md#disclaimer) notes its use during project development. |
 | API | Application Programming Interface: a defined way for software components or external integrations to exchange commands and data. |
 | ASan | **AddressSanitizer**, a host-test instrument that detects invalid memory access, such as reading past a buffer or using freed memory. |
 | BLE | Bluetooth Low Energy, the wireless link used to communicate with supported scales. |

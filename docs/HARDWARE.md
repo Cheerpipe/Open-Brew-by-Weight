@@ -310,4 +310,4 @@ Micra**.
 
 Example used: [reed switch sensor module (AliExpress)](https://es.aliexpress.com/item/1005002797173105.html).
 
-Related: [Disclaimer](../DISCLAIMER.md), [FAQ](FAQ.md).
+Related: [Disclaimer](../README.md#disclaimer), [FAQ](FAQ.md).

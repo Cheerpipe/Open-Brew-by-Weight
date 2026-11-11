@@ -12,7 +12,7 @@ needed rather than reading the entire directory.
 - [Build, test, and USB installation](BUILD.md)
 - [Troubleshooting](FAQ.md), [USB commands](SERIAL_CLI.md), [recovery](EMERGENCY_RECOVERY.md)
 - [Firmware updates (OTA)](features/ota.md), [screenshots](SCREENSHOTS.md)
-- [Technical glossary](GLOSSARY.md), [disclaimer](../DISCLAIMER.md)
+- [Technical glossary](GLOSSARY.md), [disclaimer](../README.md#disclaimer)
 
 ## Features
 
