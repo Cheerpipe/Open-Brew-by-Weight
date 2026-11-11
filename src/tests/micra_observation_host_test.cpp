@@ -237,9 +237,11 @@ int main() {
   assert(decode(R"({"widgets":[)"
       R"({"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},)"
       R"({"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}},)"
-      R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","targetTemperature":128.0,"readyStartTime":1760000820500}}]})", update));
-  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::HEATING_UP);
+      R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","targetTemperature":128.0,"targetLevel":"Level2","readyStartTime":1760000820500}}]})", update));
+  assert(update.steamBoilerPresent && update.steamByTemperature);
+  assert(update.steamBoiler == LineaMicraBoilerState::HEATING_UP);
   assert(update.steamReadyAtUtcSec == 1760000820U);
+  // A level is read from the level widget only, as the companion forwards it.
   assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN);
   // Its steam target is not the brew target: the coffee boiler alone sets it.
   assert(update.temperaturePresent && update.targetDeciC == 930);
@@ -252,15 +254,154 @@ int main() {
     mini.assumedPower = lineaMicraAssumedPower(mini);
     assert(lineaMicraReadiness(mini) == LineaMicraReadiness::WAITING_FOR_STEAM);
   }
+  // A steam boiler switched off never blocks readiness, whichever widget says so.
+  fresh();
+  assert(decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"Off"}}]})", update));
+  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::OFF);
+  // Without a status the widget carries no steam state, like the level widget.
+  fresh();
+  assert(decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"readyStartTime":1760000820500}}]})", update));
+  assert(!update.steamBoilerPresent && update.steamReadyAtUtcSec == 1760000820U);
   fresh();
   assert(decode(R"({"removedWidgets":["CMSteamBoilerTemperature"]})", update));
-  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
+  assert(update.steamBoilerPresent && update.steamByTemperature);
+  assert(update.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
   assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN && update.steamReadyAtUtcSec == 0);
-  // One machine has one steam boiler: both widgets in a frame are ambiguous.
+  assert(!decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}},{"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}}]})", update));
+
+  // A frame that carries the level widget decodes as it did before the
+  // temperature widget was read: that code is ignored in it, whatever its
+  // position, content, or removal.
+  const char *levelOnly =
+      R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}}]})";
   fresh();
-  assert(!decode(R"({"widgets":[)"
-      R"({"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2"}},)"
-      R"({"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}}]})", update));
+  assert(decode(levelOnly, update));
+  const MicraObservation level = update;
+  assert(level.steamBoilerPresent && !level.steamByTemperature);
+  assert(level.steamBoiler == LineaMicraBoilerState::READY);
+  assert(level.steamLevel == LineaMicraSteamLevel::LEVEL_2);
+  for (const char *frame : {
+      R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}}],"removedWidgets":["CMSteamBoilerTemperature"]})",
+      R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}},{"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","readyStartTime":1760000999000}}]})",
+      R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","readyStartTime":1760000999000}},{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}}]})",
+      R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}},{"code":"CMSteamBoilerTemperature","output":{"status":null,"readyStartTime":null}}]})"}) {
+    fresh();
+    assert(decode(frame, update));
+    assert(std::memcmp(&update, &level, sizeof(update)) == 0);
+  }
+  // A temperature frame keeps its state when the same frame removes the level
+  // widget the machine never had.
+  fresh();
+  assert(decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}}],"removedWidgets":["CMSteamBoilerLevel"]})", update));
+  assert(update.steamByTemperature && update.steamBoiler == LineaMicraBoilerState::READY);
+  // Across frames, a machine that reports a steam level keeps the level
+  // widget as its steam boiler; one that never did follows the temperature.
+  {
+    LineaMicraStatus machine;
+    machine.identityGeneration = 1;
+    LineaMicraPowerStateTracker tracker;
+    MicraObservationFence fence;
+    const auto push = [&](const char *json) {
+      MicraObservation frame;
+      frame.source = MicraObservationSource::WEBSOCKET;
+      frame.stamp = fence.stamp(1, tracker.generation());
+      assert(decode(json, frame));
+      assert(fence.merge(machine, tracker, frame, true));
+    };
+    push(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","readyStartTime":1760000999000}}]})");
+    assert(machine.steamBoiler == LineaMicraBoilerState::HEATING_UP);
+    assert(machine.steamReadyAtUtcSec == 1760000999U);
+    push(R"({"removedWidgets":["CMSteamBoilerTemperature"]})");
+    assert(machine.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
+    push(levelOnly);
+    assert(machine.steamBoiler == LineaMicraBoilerState::READY);
+    assert(machine.steamLevel == LineaMicraSteamLevel::LEVEL_2);
+    push(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","readyStartTime":1760000999000}}]})");
+    push(R"({"removedWidgets":["CMSteamBoilerTemperature"]})");
+    assert(machine.steamBoiler == LineaMicraBoilerState::READY);
+    assert(machine.steamLevel == LineaMicraSteamLevel::LEVEL_2);
+    assert(machine.steamReadyAtUtcSec == 1760000820U);
+  }
+
+  // A brew target outside what the firmware supports rejects the frame and
+  // names the value for the Web UI log; a shape error names nothing.
+  {
+    const auto rejected = [](const char *json) {
+      MicraObservation frame;
+      const char *unsupported = nullptr;
+      cJSON *root = cJSON_Parse(json);
+      assert(!decodeMicraDashboard(root, frame, &unsupported));
+      cJSON_Delete(root);
+      return unsupported;
+    };
+    for (const char *json : {
+        R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":100.1}}]})",
+        R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":79.9}}]})"}) {
+      const char *unsupported = rejected(json);
+      assert(unsupported != nullptr &&
+             std::strcmp(unsupported, "brew target outside 80.0-100.0 C") == 0);
+    }
+    assert(rejected(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":"93"}}]})") == nullptr);
+    assert(rejected(R"({"widgets":"none"})") == nullptr);
+  }
+
+  // The account listing keeps only coffee machines of the model the machine
+  // profile names, and reports what it leaves out without its serial.
+  {
+    static std::string skippedModels;
+    const auto list = [](const char *json, const char *profileModel,
+                         LineaMicraDiscoverySnapshot &found) {
+      skippedModels.clear();
+      cJSON *root = cJSON_Parse(json);
+      const bool listed = decodeMicraThings(root, profileModel, found, [](const char *model) {
+        skippedModels += model == nullptr ? "<serial>" : model;
+        skippedModels += ';';
+      });
+      cJSON_Delete(root);
+      return listed;
+    };
+    const char *account = R"([)"
+        R"({"type":"CoffeeMachine","modelCode":"LINEAMICRA","serialNumber":"MR000001","name":"Kitchen"},)"
+        R"({"type":"CoffeeMachine","modelCode":"LINEAMINIR","serialNumber":"MI000002","name":""},)"
+        R"({"type":"CoffeeMachine","modelCode":"LINEAMINI","serialNumber":"LM000003"},)"
+        R"({"type":"Grinder","modelCode":"PICOGRINDER","serialNumber":"PG000004"},)"
+        R"({"type":"CoffeeMachine","serialNumber":"XX000005"},)"
+        R"({"type":"CoffeeMachine","modelCode":7,"serialNumber":"XX000006"},)"
+        R"("note"])";
+    struct Case { const char *model, *serial, *name, *skipped; };
+    for (const Case &expected : {
+        Case{"LINEAMICRA", "MR000001", "Kitchen", "LINEAMINIR;LINEAMINI;unknown;unknown;"},
+        Case{"LINEAMINIR", "MI000002", "MI000002", "LINEAMICRA;LINEAMINI;unknown;unknown;"},
+        Case{"LINEAMINI", "LM000003", "LM000003", "LINEAMICRA;LINEAMINIR;unknown;unknown;"}}) {
+      LineaMicraDiscoverySnapshot found;
+      assert(list(account, expected.model, found));
+      assert(found.count == 1);
+      assert(std::strcmp(found.machines[0].serial, expected.serial) == 0);
+      assert(std::strcmp(found.machines[0].name, expected.name) == 0);
+      assert(skippedModels == expected.skipped);
+    }
+    // A matching machine whose serial cannot be stored is skipped, unnamed.
+    LineaMicraDiscoverySnapshot found;
+    assert(list(R"([{"type":"CoffeeMachine","modelCode":"LINEAMICRA","serialNumber":"bad serial!"},)"
+                R"({"type":"CoffeeMachine","modelCode":"LINEAMICRA"}])", "LINEAMICRA", found));
+    assert(found.count == 0 && skippedModels == "<serial>;<serial>;");
+    assert(skippedModels.find("bad serial") == std::string::npos);
+    // The listing stops at the machines it can hold and reports none beyond.
+    std::string many = "[";
+    for (int i = 0; i < 10; ++i)
+      many += std::string(i ? "," : "") +
+          R"({"type":"CoffeeMachine","modelCode":"LINEAMICRA","serialNumber":"MR00000)" +
+          std::to_string(i) + R"("})";
+    many += R"(,{"type":"CoffeeMachine","modelCode":"GS3AV","serialNumber":"GS000001"}])";
+    found = {};
+    assert(list(many.c_str(), "LINEAMICRA", found));
+    assert(found.count == LINEA_MICRA_MAX_ACCOUNT_MACHINES && skippedModels.empty());
+    assert(std::strcmp(found.machines[7].serial, "MR000007") == 0);
+    // Anything but the things array is a failed listing.
+    found = {};
+    assert(!list(R"({"message":"Unauthorized"})", "LINEAMICRA", found) && found.count == 0);
+    assert(!list("", "LINEAMICRA", found));
+  }
 
   // Boiler fields ride the temperature revision: partial pushes apply, and a
   // stale poll cannot clobber fresher pushed boiler states.

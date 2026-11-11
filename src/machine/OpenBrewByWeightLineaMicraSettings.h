@@ -117,14 +117,6 @@ inline bool validLineaMicraSerial(const char *serial) {
   return true;
 }
 
-// An account thing this controller may select: a coffee machine whose La
-// Marzocco modelCode is the one the machine profile was built for.
-inline bool lineaMicraSelectableThing(const char *type, const char *model,
-                                      const char *profileModel) {
-  return type != nullptr && strcmp(type, "CoffeeMachine") == 0 &&
-         model != nullptr && strcmp(model, profileModel) == 0;
-}
-
 inline bool validLineaMicraSettings(
     const LineaMicraPersistedSettings &settings) {
   if ((settings.options & ~LINEA_MICRA_KNOWN_OPTIONS) != 0 ||

@@ -221,8 +221,14 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   }
   cJSON *root = parseJsonDocumentWithinLimits(frame.body, MicraStompDecoder::kBodyLimit,
                                              1024);
-  const bool decoded = root && decodeMicraDashboard(root, update);
+  const char *unsupported = nullptr;
+  const bool decoded = root && decodeMicraDashboard(root, update, &unsupported);
   if (root) cJSON_Delete(root);
+  if (!decoded && unsupported != nullptr) {
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                         "Micra dashboard push rejected: %s", unsupported);
+    return false;
+  }
   if (!decoded) {
     // Names the offending push shape on the serial log instead of failing
     // the subscription silently. The body is length-delimited, not

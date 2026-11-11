@@ -136,16 +136,24 @@ finally:
 
 # The cloud model belongs to the La Marzocco integration alone and names one
 # of the models the client is written for.
-for source, mutate in (
-        (MICRA, lambda value: value.pop("cloud_model")),
-        (MICRA, lambda value: value.update(cloud_model="GS3AV")),
-        (MICRA, lambda value: value.update(cloud_model="lineamicra")),
-        (PRO_X, lambda value: value.update(cloud_model="LINEAMICRA"))):
+for source, mutate, text in (
+        (MICRA, lambda value: value.pop("cloud_model"),
+         "machine.cloud_model is required with la_marzocco_cloud"),
+        (PRO_X, lambda value: value.update(cloud_model="LINEAMICRA"),
+         "machine.cloud_model is required with la_marzocco_cloud"),
+        (MICRA, lambda value: value.update(cloud_model="GS3AV"),
+         "machine.cloud_model must be one of"),
+        (MICRA, lambda value: value.update(cloud_model="lineamicra"),
+         "machine.cloud_model must be one of")):
     fixture = changed(source, mutate)
     try:
-        expect_failure(machine=fixture, text="machine.cloud_model")
+        expect_failure(machine=fixture, text=text)
     finally:
         fixture.unlink()
+# The model belongs to the profile's identity: a build flag cannot change it.
+expect_failure(machine=MICRA,
+               flags='-DOPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL=\\"GS3AV\\"',
+               text="profile identity cannot be overridden with --flags")
 
 # The three La Marzocco machines are one integration with separate identities:
 # each keeps its own OTA compatibility identity, so an image built for one is
@@ -164,6 +172,9 @@ assert identities == {
     "la-marzocco-linea-micra": "la-marzocco-linea-micra-r1",
     "la-marzocco-linea-mini": "la-marzocco-linea-mini-r1",
     "la-marzocco-linea-mini-r": "la-marzocco-linea-mini-r-r1"}, identities
+# Owner requirement while the Minis are experimental: they behave as the Micra
+# does. Drop a key from this list in the change that deliberately gives a Mini
+# its own value.
 micra_profile, mini_profile, mini_r_profile = (
     json.loads(path.read_text()) for path in (MICRA, MINI, MINI_R))
 for profile in (mini_profile, mini_r_profile):

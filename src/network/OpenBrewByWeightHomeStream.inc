@@ -333,7 +333,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     connection = settings_.lineaMicra.connectionType;
     sanitizeJsonEmbed(settings_.lineaMicra.username, safeEmail, sizeof(safeEmail));
     sanitizeJsonEmbed(settings_.lineaMicra.selectedName, safeName, sizeof(safeName)); }
-  delta.field("machineIntegration", "\"la_marzocco_cloud\"");
+  delta.field("machineIntegration", "\"linea_micra_cloud\"");
   delta.field("lineaMicra.powerState", "\"%s\"", lineaMicraPowerStateName(micra.powerState));
   delta.field("lineaMicra.quality", "\"%s\"", lineaMicraObservationQualityName(micra.quality));
   delta.field("lineaMicra.optimisticOn", bool(micra.optimisticOn));

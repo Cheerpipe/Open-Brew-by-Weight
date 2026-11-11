@@ -72,7 +72,7 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert.strictEqual(brew.textContent, '');
   // Boiler-readiness lamp: with boiler evidence the machine row claims Ready
   // only when both boilers are ready; otherwise it narrates the warm-up.
-  const warming = {machineIntegration: 'la_marzocco_cloud', state: 'READY',
+  const warming = {machineIntegration: 'linea_micra_cloud', state: 'READY',
     lineaMicra: {accountConfigured: true, observeState: true, powerState: 'ON', quality: 'current'}};
   for (const [readiness, expected, bad] of [
     ['warming_up', 'Heating up', false],
@@ -106,12 +106,16 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert.strictEqual(rowSlots.machineRowValue.textContent, '');
   // Home boiler rows: estimate math (Date.now pinned to 60000 ms),
   // clamping, labels, and configuration gating.
-  const frame = (coffee, steam) => ({machineIntegration: 'la_marzocco_cloud', state: 'READY',
+  const frame = (coffee, steam) => ({machineIntegration: 'linea_micra_cloud', state: 'READY',
     lineaMicra: {accountConfigured: true, observeState: true, powerState: 'ON', quality: 'current',
       boiler: {coffee, steam}}});
   context.applyStatus(frame({state: 'heating_up', readyAtUtcSec: 1000},
       {state: 'heating_up', readyAtUtcSec: 1200, level: 'level_3'}));
   assert.strictEqual(brewBoiler.textContent, 'Heating up · ready in ~16 min');
+  assert.strictEqual(steamBoiler.textContent, 'Heating up · ready in ~19 min');
+  // A steam boiler set by temperature reports no level: the row needs none.
+  context.applyStatus(frame({state: 'ready'},
+      {state: 'heating_up', readyAtUtcSec: 1200, level: 'unknown'}));
   assert.strictEqual(steamBoiler.textContent, 'Heating up · ready in ~19 min');
   context.applyStatus(frame({state: 'heating_up', readyAtUtcSec: 10}, {state: 'heating_up'}));
   assert.strictEqual(brewBoiler.textContent, 'Heating up');  // Expired estimate: no countdown.
@@ -292,8 +296,10 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert(complete.includes('call.result = "invalid_response"'));
   assert.strictEqual((micraService.match(/releaseIoBuffer\(ok\)/g) || []).length, 2,
       'Both token responses must be validated before reporting success');
-  assert.strictEqual((micraService.match(/releaseIoBuffer\(false\)/g) || []).length, 1,
-      'Invalid machine lists and dashboards must be reported as errors');
+  for (const validated of ['releaseIoBuffer(listed);', 'releaseIoBuffer(decoded);']) {
+    assert(micraService.includes(validated),
+        'Invalid machine lists and dashboards must be reported as errors');
+  }
   assert(micraService.includes('releaseIoBuffer(decoded)'));
   assert(micraService.includes(': overflow ? "response_too_large"') &&
       micraService.includes('canceled, work_->responseOverflow, ok, work_->httpStatus'));
@@ -721,7 +727,7 @@ if (!rawCss.includes('html:not(.lineaMicraIntegration) .micraOnly') ||
     !micraDiagnosticHtml.includes('<span id="dMicraPowerValue">—</span> - <a id="lineaMicraRefreshLink" href="#" aria-disabled="true" tabindex="-1">({{webui:diagnostic.refresh_state}})</a>') ||
     micraDiagnosticHtml.includes('id="lineaMicraRefreshButton"') ||
     !codeIncludes(viewJs.diagnostic, "e.preventDefault();R.lineaMicraAction('refresh')") ||
-    !codeIncludes(rawRuntimeJs, "s.machineIntegration==='la_marzocco_cloud'") ||
+    !codeIncludes(rawRuntimeJs, "s.machineIntegration==='linea_micra_cloud'") ||
     !codeIncludes(rawAllJs, "{action:'connect',username,password}") ||
     !codeIncludes(rawAllJs, "lineaMicraAction('disconnect')") ||
     codeIncludes(rawRuntimeJs, "['queued','authenticating','listing','running','backoff'].includes(m.phase)") ||

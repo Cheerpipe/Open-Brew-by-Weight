@@ -26,6 +26,11 @@ exported JSON formats are not carried over.
   power-off melody. Two new switches under **Alerts** turn this off; other
   scales keep the controller's tones. **Scale lost** is now called **Scale
   disconnected**. See [Alerts](docs/alerts.md#the-scales-own-sounds).
+- **La Marzocco Cloud names the machine, not the model:** the options now read
+  **Turn the machine on with the scale**, **Turn the scale off with the
+  machine**, **Paddle wakes the machine** and **Find the scale faster while
+  the machine is on**; Home says **Machine heating up**, and Diagnostics groups
+  the machine's state under **La Marzocco**. Nothing else about them changed.
 - **The companion and the controller's own address work side by side:** opening the
   controller's own address no longer interrupts the screens using the companion, or
   the reverse. The window you pair from keeps working, and Admin links to the Web UI

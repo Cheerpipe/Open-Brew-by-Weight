@@ -456,7 +456,7 @@ function updateHeaderSignals(s = {}) {
     if (detail) detail.textContent = label;
     if (relayRow) relayRow.textContent = relay;
   }
-  // The La Marzocco cloud link, Micra builds only: the feed's observation
+  // The La Marzocco cloud link, in builds that ship it: the feed's observation
   // quality decides — live (current, or a command the cloud has yet to
   // confirm) keeps the icon inked, anything else grays it. A paired companion
   // draws two clouds instead of one: both lit while the data runs through it,
@@ -464,7 +464,7 @@ function updateHeaderSignals(s = {}) {
   // without a lineaMicra model (the Admin poll) leave the icon on its last
   // Home frame, and other builds fold this branch away entirely.
   const micra = $("micraSignal");
-  if (micra && __LINEA_MICRA__ && s.machineIntegration === "la_marzocco_cloud" && s.lineaMicra) {
+  if (micra && __LINEA_MICRA__ && s.machineIntegration === "linea_micra_cloud" && s.lineaMicra) {
     const lm = s.lineaMicra,
       stale = !!s.snapshotStale,
       quality = lm.quality,
@@ -7658,7 +7658,7 @@ function applyMachineTypeUi(s) {
   document.documentElement.classList.toggle("reedMachine", t === "momentary_reed");
   document.documentElement.classList.toggle(
     "lineaMicraIntegration",
-    s.machineIntegration === "la_marzocco_cloud",
+    s.machineIntegration === "linea_micra_cloud",
   );
   if ($("dMt")) $("dMt").textContent = t;
 }

@@ -1690,7 +1690,7 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
     ';return renderReadyMsg;')(() => msg, R, () => '', () => 0);
   const warming = {accountConfigured: true, observeState: true, readiness: 'warming_up', boiler: {coffee: {}}};
   const show = (batteryPct, {state = 'IDLE', stream = 'FRESH', lm} = {}) => {
-    render({state, config: {brewByWeight: true}, machineIntegration: lm ? 'la_marzocco_cloud' : 'none',
+    render({state, config: {brewByWeight: true}, machineIntegration: lm ? 'linea_micra_cloud' : 'none',
       scale: {available: true, streamState: stream, batteryPct}, noScaleShotGuard: {}}, lm);
     return msg.hidden ? '' : (classes.has('isErr') ? 'red: ' : '') + msg.textContent;
   };

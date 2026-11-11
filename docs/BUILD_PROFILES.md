@@ -102,8 +102,8 @@ This keeps electrical facts in hardware and behavioral facts in the machine.
 The machine profile never owns a reed GPIO, and the hardware profile never
 selects momentary or paddle behavior. Each machine profile declares its
 compatible hardware profiles in its `hardware` list, and the resolver rejects
-any other pairing. Automated validation builds the supported built-in
-pairs with `-O2`:
+any other pairing. Automated validation builds every built-in pair with
+`-O2`, the two experimental La Marzocco pairs included:
 
 ```text
 esp32-s3-relay-x1-speaker       + rancilio-silvia-pro-x
@@ -257,7 +257,7 @@ Two more fields may appear:
 
 | Field | Contract |
 | --- | --- |
-| `cloud_model` | Required with `la_marzocco_cloud` and rejected with `none`. La Marzocco's model code for the machine: `LINEAMICRA`, `LINEAMINIR`, or `LINEAMINI`. The controller lists only account machines of this model, so it can never be paired with a different machine on the same account. It selects no other behavior: the firmware adapts to what each machine reports, for example a steam level on the Linea Micra and Mini R and a steam temperature on the Linea Mini. |
+| `cloud_model` | Required with `la_marzocco_cloud` and rejected with `none`. La Marzocco's model code for the machine: `LINEAMICRA`, `LINEAMINIR`, or `LINEAMINI`. The controller lists only account machines of this model. It selects no other behavior: the firmware reads whichever steam boiler report the machine sends, a level or a temperature. `--flags` cannot override it. |
 | `machine_icon` | Kebab-case name of the machine's own icon in Home's Equipment row. The glyph catalog is the hidden `data-machine-icons` sprite in `src/web/html/home.html` (`machine-icon-default` is the reserved fallback every profile without the field keeps); the build bakes exactly the named glyph — flat shape elements in the marker site's 24×24 viewBox — into the row. |
 
 The brand, model, and integration are not parsed from the file name, ID, or

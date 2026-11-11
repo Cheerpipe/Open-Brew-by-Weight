@@ -397,6 +397,7 @@ def apply_overrides(hardware: dict[str, Any], machine: dict[str, Any],
                  "OPEN_BREW_BY_WEIGHT_MACHINE_PROFILE_ID",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_COMPATIBILITY_REVISION",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_BRAND", "OPEN_BREW_BY_WEIGHT_MACHINE_MODEL",
+                 "OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON"}
     selected = sorted(forbidden & definitions.keys())
     if selected:

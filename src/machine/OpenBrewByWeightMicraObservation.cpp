@@ -48,12 +48,14 @@ LineaMicraSteamLevel steamLevel(const char *value) {
   return LineaMicraSteamLevel::UNSUPPORTED;
 }
 
-// One steam boiler widget per machine family: a level on the Linea Micra and
-// Mini R, a temperature on the Linea Mini. Both carry status and
-// readyStartTime; only the level widget carries targetLevel.
-bool steamWidget(const char *code) {
-  return strcmp(code, "CMSteamBoilerLevel") == 0 ||
-      strcmp(code, "CMSteamBoilerTemperature") == 0;
+// True when a widgets or removedWidgets array names this widget code.
+bool names(const cJSON *list, const char *code) {
+  const cJSON *entry = nullptr;
+  cJSON_ArrayForEach(entry, list) {
+    const char *name = cJSON_IsString(entry) ? entry->valuestring : text(entry, "code");
+    if (name != nullptr && strcmp(name, code) == 0) return true;
+  }
+  return false;
 }
 
 // readyStartTime is cloud epoch time: milliseconds in the captured payloads,
@@ -72,7 +74,8 @@ void readyAtSeconds(const cJSON *value, uint32_t &seconds) {
 }
 }  // namespace
 
-bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
+bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
+                          const char **unsupported) {
   if (!cJSON_IsObject(root)) return false;
   unsigned seen = 0;
   for (const cJSON *field = root->child; field; field = field->next) {
@@ -92,6 +95,12 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
   }
   const cJSON *widgets = find(root, "widgets");
   if (widgets != nullptr && !cJSON_IsArray(widgets)) return false;
+  // A machine reports its steam boiler through one widget: a level (Linea
+  // Micra, Mini R) or a temperature (Linea Mini). A frame that carries the
+  // level widget is read exactly as before the temperature widget existed
+  // here: the temperature code is ignored in it, removal included.
+  const bool levelFrame = names(widgets, "CMSteamBoilerLevel");
+  const char *steamCode = levelFrame ? "CMSteamBoilerLevel" : "CMSteamBoilerTemperature";
   const cJSON *widget = nullptr;
   cJSON_ArrayForEach(widget, widgets) {
     // A widget without a string code cannot be one this decoder relies on;
@@ -103,7 +112,7 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
     if (code == nullptr) continue;
     const bool power = strcmp(code, "CMMachineStatus") == 0;
     const bool boiler = strcmp(code, "CMCoffeeBoiler") == 0;
-    const bool steam = steamWidget(code);
+    const bool steam = strcmp(code, steamCode) == 0;
     const bool cleaning = strcmp(code, "CMBackFlush") == 0;
     if (!power && !boiler && !steam && !cleaning) continue;
     const cJSON *output = find(widget, "output");
@@ -146,14 +155,18 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
         if (ready != nullptr) next.coffeeReadyAtUtcSec = readyAt;
         if (target == nullptr) continue;
         if (!cJSON_IsNumber(target) || !std::isfinite(target->valuedouble) ||
-            target->valuedouble < LINEA_MICRA_BREW_TARGET_MIN_DECI_C / 10.0 ||
-            target->valuedouble > LINEA_MICRA_BREW_TARGET_MAX_DECI_C / 10.0 ||
             next.temperaturePresent) return false;
+        if (target->valuedouble < LINEA_MICRA_BREW_TARGET_MIN_DECI_C / 10.0 ||
+            target->valuedouble > LINEA_MICRA_BREW_TARGET_MAX_DECI_C / 10.0) {
+          if (unsupported != nullptr) *unsupported = "brew target outside 80.0-100.0 C";
+          return false;
+        }
         next.temperaturePresent = next.temperatureValid = true;
         next.targetDeciC = static_cast<uint16_t>(std::lround(target->valuedouble * 10.0));
       } else {
+        next.steamByTemperature = !levelFrame;
         if (ready != nullptr) next.steamReadyAtUtcSec = readyAt;
-        if (target != nullptr && cJSON_IsString(target) &&
+        if (levelFrame && target != nullptr && cJSON_IsString(target) &&
             target->valuestring != nullptr)
           next.steamLevel = steamLevel(target->valuestring);
       }
@@ -187,7 +200,14 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
       next.coffeeBoilerPresent = true;
       next.coffeeBoiler = LineaMicraBoilerState::UNSUPPORTED;
       next.coffeeReadyAtUtcSec = 0;
-    } else if (steamWidget(code)) {
+    } else if (const bool byTemperature = strcmp(code, "CMSteamBoilerTemperature") == 0;
+               byTemperature
+                   ? !levelFrame
+                   // A level removal never undoes the temperature widget this
+                   // frame just read.
+                   : strcmp(code, "CMSteamBoilerLevel") == 0 &&
+                         !(next.steamBoilerPresent && next.steamByTemperature)) {
+      next.steamByTemperature = byTemperature;
       next.steamBoilerPresent = true;
       next.steamBoiler = LineaMicraBoilerState::UNSUPPORTED;
       next.steamReadyAtUtcSec = 0;
@@ -203,5 +223,31 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
   }
   update = next;
   return widgets != nullptr || removed != nullptr || connected != nullptr;
+}
+
+bool decodeMicraThings(const cJSON *root, const char *profileModel,
+                       LineaMicraDiscoverySnapshot &result,
+                       MicraThingSkipped skipped) {
+  if (!cJSON_IsArray(root)) return false;
+  const cJSON *thing = nullptr;
+  cJSON_ArrayForEach(thing, root) {
+    if (result.count >= LINEA_MICRA_MAX_ACCOUNT_MACHINES) break;
+    const char *type = text(thing, "type");
+    if (type == nullptr || strcmp(type, "CoffeeMachine") != 0) continue;
+    const char *model = text(thing, "modelCode");
+    const char *serial = text(thing, "serialNumber");
+    const bool wanted = model != nullptr && strcmp(model, profileModel) == 0;
+    if (!wanted || serial == nullptr || !validLineaMicraSerial(serial)) {
+      skipped(wanted ? nullptr : model == nullptr ? "unknown" : model);
+      continue;
+    }
+    LineaMicraMachineSummary &machine = result.machines[result.count++];
+    std::memset(machine.serial, 0, sizeof(machine.serial));
+    std::memcpy(machine.serial, serial, std::strlen(serial));  // Validated to fit.
+    const char *name = text(thing, "name");
+    copyMicraText(machine.name, sizeof(machine.name),
+                  name == nullptr || name[0] == '\0' ? serial : name);
+  }
+  return true;
 }
 }  // namespace openbrewbyweight

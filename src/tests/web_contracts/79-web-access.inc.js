@@ -229,7 +229,7 @@
     document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
   vm.runInNewContext(viewJs.home.replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];?/, '')
       .replace(/export /g, ''), home);
-  const fresh = {access: {notice: true}, machineIntegration: 'la_marzocco_cloud', presetsTag: 7,
+  const fresh = {access: {notice: true}, machineIntegration: 'linea_micra_cloud', presetsTag: 7,
     lineaMicra: {accountConfigured: false}, config: {scaleMacCacheMode: 'prefer'}, scale: {preferredMac: 'AA'}};
   const shown = (s) => (home.applyStatus(s), order.filter((id) => !nodes[id].hidden));
   assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint', 'recipeHint', 'scaleOnlyHint']);

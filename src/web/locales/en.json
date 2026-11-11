@@ -64,7 +64,7 @@
     "admin.companion_ignore": "Ignore",
     "admin.companion_ignored": "Ignored companions: {0}",
     "admin.companion_ignored_now": "Request ignored. This companion won't ask again until you stop ignoring it.",
-    "admin.companion_intro": "Open Brew by Weight Companion is an optional helper you run on a computer at home. It opens the Web UI over HTTPS on as many phones, tablets and computers as you like, and with a La Marzocco machine it can keep the La Marzocco connection so the controller's radio stays free for your scale. Once it runs on your network, it asks to connect here by itself.",
+    "admin.companion_intro": "Open Brew by Weight Companion is an optional helper you run on a computer at home. It opens the Web UI over HTTPS on as many phones, tablets and computers as you like, and with a Linea Micra it can keep the La Marzocco connection so the controller's radio stays free for your scale. Once it runs on your network, it asks to connect here by itself.",
     "admin.companion_link": "Connection",
     "admin.companion_link_down": "Not connected",
     "admin.companion_link_open": "Connected",

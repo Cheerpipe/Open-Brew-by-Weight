@@ -1,5 +1,5 @@
 // Companion link, controller side (docs/COMPANION_LINK.md), every build; the
-// La Marzocco route only on Linea Micra builds. httpd owns the link sockets,
+// La Marzocco route only on La Marzocco cloud builds. httpd owns the link sockets,
 // the frame codec, every send and the relay; the network task owns the
 // request key pair, the pairing derivation, the NVS write, liveness and the
 // outbox. g_companion is guarded by dataMux_. Until a companion asks, nothing
@@ -702,7 +702,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   }
   // A type this controller does not know is a later addition: ignored, so a
   // newer companion keeps its link. Known types must be well formed; the La
-  // Marzocco ones exist only on Linea Micra builds.
+  // Marzocco ones exist only on La Marzocco cloud builds.
   const bool record = !strcmp(type, "rx") || !strcmp(type, "rf") || !strcmp(type, "rt");
   if (strcmp(type, "ping") != 0 && strcmp(type, "logsub") != 0 && strcmp(type, "ps") != 0 &&
       !record &&
@@ -715,7 +715,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
     return ESP_OK;
   }
   [[maybe_unused]] bool flag = false;
-  // The La Marzocco frames use the rest only on Linea Micra builds.
+  // The La Marzocco frames use the rest only on La Marzocco cloud builds.
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   uint32_t first = 0, second = 0, third = 0;
   bool flag2 = false;

@@ -399,14 +399,17 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
   update.source = push ? MicraObservationSource::WEBSOCKET
       : kind == MicraCompanionStateKind::FULL ? MicraObservationSource::HTTP_INITIAL
       : MicraObservationSource::HTTP;
-  if (!decodeMicraDashboard(dashboard, update) ||
+  const char *unsupported = nullptr;
+  if (!decodeMicraDashboard(dashboard, update, &unsupported) ||
       (!push && !update.powerPresent && !(update.connectedPresent && !update.connected))) {
     const uint32_t now = millis();
     if (now - lastRejectAtMs.load() >= kCompanionLogPeriodMs) {
       lastRejectAtMs.store(now);
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                           "Micra companion state rejected kind=%s",
-                           push ? "push" : kind == MicraCompanionStateKind::FULL ? "full" : "read");
+                           "Micra companion state rejected kind=%s%s%s",
+                           push ? "push" : kind == MicraCompanionStateKind::FULL ? "full" : "read",
+                           unsupported != nullptr ? ": " : "",
+                           unsupported != nullptr ? unsupported : "");
     }
     // Like a failed direct read, a rejected full or read frame is ignored (a
     // missing full frame then times out as full_missing); a rejected push

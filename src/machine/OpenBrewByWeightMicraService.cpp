@@ -2400,45 +2400,23 @@ bool OpenBrewByWeightMicraService::listMachines(
     return false;
   }
   cJSON *root = parseResponse(io_->response);
-  if (!cJSON_IsArray(root)) {
-    if (root != nullptr) cJSON_Delete(root);
-    work_->responseUsed = 0;
-    releaseIoBuffer(false);
-    return false;
-  }
-  const cJSON *thing = nullptr;
-  cJSON_ArrayForEach(thing, root) {
-    if (result.count >= LINEA_MICRA_MAX_ACCOUNT_MACHINES ||
-        !cJSON_IsObject(thing)) {
-      continue;
-    }
-    const char *type = jsonText(thing, "type");
-    const char *model = jsonText(thing, "modelCode");
-    const char *serial = jsonText(thing, "serialNumber");
-    const char *name = jsonText(thing, "name");
-    if (!lineaMicraSelectableThing(type, model,
-                                   OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL)) {
-      // Names the model so an account whose machine is not listed can be
-      // diagnosed from the Web UI log; the serial stays out of the log.
-      if (type != nullptr && strcmp(type, "CoffeeMachine") == 0)
-        serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
-                             "La Marzocco account machine skipped: model %.23s, "
-                             "this firmware is built for "
-                             OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL,
-                             model == nullptr ? "unknown" : model);
-      continue;
-    }
-    if (serial == nullptr || !validLineaMicraSerial(serial)) continue;
-    LineaMicraMachineSummary &machine = result.machines[result.count];
-    if (!secureCopy(machine.serial, sizeof(machine.serial), serial)) continue;
-    copyMicraText(machine.name, sizeof(machine.name),
-                  name == nullptr || name[0] == '\0' ? serial : name);
-    ++result.count;
-  }
-  cJSON_Delete(root);
+  // The Web UI log names what the listing left out, so an account whose
+  // machine does not appear can be diagnosed there; never the serial.
+  const bool listed = decodeMicraThings(
+      root, OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL, result, [](const char *model) {
+        if (model == nullptr)
+          serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                               "Micra account machine skipped: serial not usable");
+        else
+          serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                               "Micra account machine skipped: model %.23s, "
+                               "firmware built for %s",
+                               model, OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL);
+      });
+  if (root != nullptr) cJSON_Delete(root);
   work_->responseUsed = 0;
-  releaseIoBuffer();
-  return true;
+  releaseIoBuffer(listed);
+  return listed;
 }
 
 bool OpenBrewByWeightMicraService::readDashboard(
@@ -2465,15 +2443,17 @@ bool OpenBrewByWeightMicraService::readDashboard(
     return false;
   }
   cJSON *root = parseResponse(io_->response);
-  const bool decoded = decodeMicraDashboard(root, update) &&
+  const char *unsupported = nullptr;
+  const bool decoded = decodeMicraDashboard(root, update, &unsupported) &&
       (update.powerPresent || (update.connectedPresent && !update.connected));
   cJSON_Delete(root);
   // A transport-level success with no observation sample means the payload
-  // was rejected; the excerpt names the offending shape on the serial log.
+  // was rejected; the log names an unsupported value, else the excerpt
+  // names the offending shape.
   if (!decoded)
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
                          "Micra dashboard decode rejected: %.96s",
-                         io_->response);
+                         unsupported != nullptr ? unsupported : io_->response);
   work_->responseUsed = 0;
   releaseIoBuffer(decoded);
   if (!decoded) return false;

@@ -197,7 +197,7 @@ esac
 # panel markup and CSS are omitted so a disabled feature costs no UI bytes.
 grep -q -- '-DOPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL=1' <<<"$effective_flags" \
   || webui_args+=(--no-remote-control)
-# Only Linea Micra cloud builds ship the Micra settings and diagnostics code.
+# Only La Marzocco cloud builds ship its settings and diagnostics code.
 [[ "$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION //p' \
   "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)" == 1 ]] \
   || webui_args+=(--no-linea-micra)

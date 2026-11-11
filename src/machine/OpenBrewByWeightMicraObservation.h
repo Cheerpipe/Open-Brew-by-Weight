@@ -38,13 +38,27 @@ struct MicraObservation {
   bool temperatureValid = false;
   bool coffeeBoilerPresent = false;
   bool steamBoilerPresent = false;
+  // The steam fields come from the temperature widget, not the level widget.
+  bool steamByTemperature = false;
   bool cleaningPresent = false;
   bool cleaningAvailable = false;
   bool connectedPresent = false;
   bool connected = false;
 };
 
-bool decodeMicraDashboard(const cJSON *root, MicraObservation &update);
+// A frame rejected for a value this firmware does not support, rather than
+// for its shape, names that value in *unsupported when it is given.
+bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
+                          const char **unsupported = nullptr);
+
+// Hears each account coffee machine the listing leaves out: its La Marzocco
+// modelCode, or nullptr when the model matched and the serial cannot be kept.
+using MicraThingSkipped = void (*)(const char *model);
+// The account's coffee machines whose modelCode is the machine profile's, from
+// the cloud's things array; false when the payload is not that array.
+bool decodeMicraThings(const cJSON *root, const char *profileModel,
+                       LineaMicraDiscoverySnapshot &result,
+                       MicraThingSkipped skipped);
 
 // Copies vendor text, truncating an over-long value at a UTF-8 character
 // boundary instead of rejecting it.
@@ -141,7 +155,11 @@ struct MicraObservationFence {
       // temperatureAtMs keeps its REST-facing name but now timestamps the
       // last boiler-widget frame, which is what the boiler age renders.
       status.temperatureAtMs = update.receivedAtMs;
-      if (update.steamBoilerPresent) {
+      // A machine that reports a steam level keeps the level widget as its
+      // steam boiler: the temperature widget never replaces it.
+      if (update.steamBoilerPresent &&
+          !(update.steamByTemperature &&
+            status.steamLevel != LineaMicraSteamLevel::UNKNOWN)) {
         status.steamBoiler = update.steamBoiler;
         status.steamReadyAtUtcSec = update.steamReadyAtUtcSec;
         status.steamLevel = update.steamLevel;

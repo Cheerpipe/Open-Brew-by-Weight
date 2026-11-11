@@ -113,7 +113,7 @@ bool OpenBrewByWeightMicraService::executePowerApplication(
 #undef gettimeofday
 // The companion route runs unchanged; observation publication is out of scope.
 namespace openbrewbyweight {
-bool decodeMicraDashboard(const cJSON *, MicraObservation &) { return false; }
+bool decodeMicraDashboard(const cJSON *, MicraObservation &, const char **) { return false; }
 void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &, uint32_t) {}
 bool OpenBrewByWeightMicraService::mergeReadLocked(const MicraObservation &) { return false; }
 #include "machine/OpenBrewByWeightMicraCompanionRoute.inc"
