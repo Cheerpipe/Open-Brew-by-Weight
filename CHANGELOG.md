@@ -4,11 +4,15 @@ Notable changes for people who install and use Open Brew by Weight. Version
 numbers follow `MAJOR.MINOR.PATCH`; the firmware reports the same number in the
 Web UI footer.
 
-## Unreleased
+## 2.0.0 — 2026-11-11
 
 Install this version over USB with a full erase: earlier shot curves and
 exported JSON formats are not carried over.
 
+- **Quickstart:** a new [Quickstart](docs/QUICKSTART.md) takes the Linea Micra
+  build from a shopping list with reference prices to the first shot, with
+  every setup screen shown. The README now introduces the project, its
+  features, and where to start.
 - **Import shots in Beanconqueror:** **Settings → Coffee apps → Beanconqueror**
   lets the app import your shots as if the controller were a Gaggiuino
   (Beanconqueror 8.2 or later) or a GaggiMate (8.8 or later, with your dose
