@@ -69,6 +69,9 @@ box-and-cover pair from [`stl/`](../stl/):
   and [`OpenBrewByWeight-Cover-thick.stl`](../stl/OpenBrewByWeight-Cover-thick.stl).
   It holds its shape better where the controller gets hotter.
 
+For more refined designs, see the [enclosure repository](https://github.com/Cheerpipe/open-brew-by-weight-enclosure),
+which has several versions that are still being tested.
+
 The inside of an espresso machine gets hot, so never print the enclosure in
 PLA. Use PETG at least; ABS, or a composite that resists warping under heat,
 such as glass-fiber PETG, is better. The enclosure is a fit reference, not a

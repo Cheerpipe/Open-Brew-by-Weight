@@ -171,6 +171,10 @@ files are in [`stl/`](../stl/). Choose a matching box-and-cover pair:
   `OpenBrewByWeight-Cover-thick.stl`. This pair
   better resists deformation where the ESP32 is exposed to more heat.
 
+For more refined designs, the [Open Brew by Weight enclosure](https://github.com/Cheerpipe/open-brew-by-weight-enclosure)
+repository has several enclosure versions, from a full case that holds the
+connector down to a minimal open tray. Those designs are still being tested.
+
 The inside of an espresso machine gets hot, so never print the enclosure in
 PLA. Use PETG at least; ABS, or a composite that resists warping under heat,
 such as glass-fiber PETG, is better.

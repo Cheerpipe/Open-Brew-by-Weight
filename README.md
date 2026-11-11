@@ -119,6 +119,14 @@ from a shopping list to your first shot by weight in six steps:
 | Look up a technical term | [Technical glossary](docs/GLOSSARY.md) |
 | Find anything else | [Documentation index](docs/README.md) |
 
+## Related repositories
+
+| Repository | What it holds |
+| --- | --- |
+| [Open Brew by Weight Companion](https://github.com/Cheerpipe/open-brew-by-weight-companion) | The optional [companion](docs/features/companion.md) server for your home network |
+| [Open Brew by Weight enclosure](https://github.com/Cheerpipe/open-brew-by-weight-enclosure) | More refined 3D-printable enclosures for the controller, in several versions |
+| [Open Brew by Weight for Home Assistant](https://github.com/Cheerpipe/ha-open-brew-by-weight) | The [Home Assistant](docs/features/home-assistant.md) integration |
+
 ## Disclaimer
 
 **Use at your own risk.** Anyone who builds, installs, configures, or operates
