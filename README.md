@@ -16,9 +16,8 @@ It is a work in progress, not a ready-to-install or certified kit. Development
 started on the La Marzocco Linea Micra; other switch types have different wiring
 and stop behavior.
 
-> Before installation, read [Hardware](docs/HARDWARE.md) and complete the
-> applicable [bench checks](docs/MANUAL_TEST_PLAN.md). The relay must remain open
-> on startup, reset, power loss, and safety failure. Machine-specific wiring
+> Before installation, read [Hardware](docs/HARDWARE.md). The relay must remain
+> open on startup, reset, power loss, and safety failure. Machine-specific wiring
 > instructions are incomplete. See the [Disclaimer](#disclaimer).
 
 ## Start here
@@ -139,8 +138,6 @@ Do this on the bench, with the controller powered over USB.
    **`http://openbrewbyweight.local`**, or the address the setup page showed.
 
 Every screen is shown in [First setup](docs/GETTING_STARTED.md#the-setup-page-screen-by-screen).
-Before going near the machine, run the [bench checks](docs/MANUAL_TEST_PLAN.md)
-and confirm the relay stays open on startup, reset and power loss.
 
 ### 4. Print the enclosure
 
@@ -287,7 +284,7 @@ for eligibility, comparison windows and persistence.
 
 ## First connection
 
-After installation and bench verification, follow
+After installation, follow
 [First setup and daily use](docs/GETTING_STARTED.md). It covers connecting to the
 controller's access point, opening the Web UI, joining home Wi-Fi, selecting a
 scale, and making the first shot. Once the controller has joined your home
@@ -443,9 +440,8 @@ You are solely responsible for:
 - **Designing and building a correct, safe circuit** — suitable relay or contact,
   electrical isolation, ratings, polarity, feedback, and any external safety
   barrier (e.g. K2) appropriate for your machine and jurisdiction.
-- **Installing and verifying that circuit** on your equipment, including bench
-  tests and the full [manual test plan](docs/MANUAL_TEST_PLAN.md) before
-  connecting to a live espresso machine.
+- **Installing and verifying that circuit** on your equipment before connecting
+  to a live espresso machine.
 - **Configuring the firmware correctly and safely** — including GPIO assignment,
   compile-time pin maps, polarity, machine circuit limits, and workflow parameters — so
   that paddle readback, machine control, and automatic stop behavior match your
