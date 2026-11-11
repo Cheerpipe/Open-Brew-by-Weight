@@ -757,7 +757,7 @@ const autosave = {
   // Conflicts already show as live warnings; the patch waits for them.
   brew: {
     payload: brewPayload,
-    valid: () => !validateBrewClient().length,
+    valid: () => !validateBrewClient().some((e) => !e.advice),
     save: (patch) => R.saveBrewPreset(patch, ""),
   },
   ...(__LA_MARZOCCO__ && {
@@ -922,14 +922,27 @@ function validateBrewClient() {
   add(brewRange("goalWeightG", 10, 200, { step: 0.1 }));
   add(brewRange("operationalWallS", 5, 60, { int: 1 }));
   add(brewRange("bbwProtectionS", 0.5, 30));
-  if (document.documentElement.classList.contains("laMarzoccoTemperatureEnabled"))
-    add(
-      brewRange(
-        "laMarzoccoBrewTargetC",
-        +$("laMarzoccoBrewTargetC").min,
-        +$("laMarzoccoBrewTargetC").max,
-      ),
-    );
+  // The brew temperature is held to the machine's range only while it is
+  // being changed. A saved value the range no longer allows stays as saved:
+  // the controller sends the nearest value the machine accepts, and the note
+  // says which.
+  if (document.documentElement.classList.contains("laMarzoccoTemperatureEnabled")) {
+    const field = $("laMarzoccoBrewTargetC"),
+      min = +field.min,
+      max = +field.max,
+      value = Number(field.value);
+    if (edited.has("laMarzoccoBrewTargetC")) add(brewRange("laMarzoccoBrewTargetC", min, max));
+    else if (field.value.trim() !== "" && (value < min || value > max))
+      add({
+        id: "laMarzoccoBrewTargetC",
+        advice: true,
+        msg: __WEBUI_TEXT__("settings.brew_temperature_adjusted")
+          .replace("{min}", min.toFixed(1))
+          .replace("{max}", max.toFixed(1))
+          .replace("{sent}", (value < min ? min : max).toFixed(1))
+          .replace("{value}", value.toFixed(1)),
+      });
+  }
   add(brewRange("doseG", 5, 30, { step: 0.1 }));
   add(brewRange("fastBeforeS", 2.5, 58, { step: 0.5 }));
   add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));
@@ -1042,7 +1055,10 @@ function brewPayload() {
         [s + "CurveHardness", R.number(s + "CurveHardness")],
       ]),
     ),
-    ...(document.documentElement.classList.contains("laMarzoccoTemperatureEnabled")
+    // Sent only when changed: an untouched value may lie outside the range
+    // the machine reports now, and a save must not be refused for it.
+    ...(document.documentElement.classList.contains("laMarzoccoTemperatureEnabled") &&
+    editedBrewFields().has("laMarzoccoBrewTargetC")
       ? { laMarzoccoBrewTargetC: R.number("laMarzoccoBrewTargetC") }
       : {}),
   };

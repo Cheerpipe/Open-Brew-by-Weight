@@ -178,6 +178,7 @@ unsigned ulTaskNotifyTake(int, int ticks) {
   return 0;
 }
 static uint16_t cloudTargetDeciC = 0;
+static uint16_t cloudRangeMinDeciC = 0, cloudRangeMaxDeciC = 0;  // What a direct read reports.
 static bool cloudIgnoresTemperature = false;
 static bool cloudRefusesCommands = false;
 static LaMarzoccoPowerState cloudPower = LaMarzoccoPowerState::UNKNOWN;
@@ -206,6 +207,8 @@ bool OpenBrewByWeightLaMarzoccoService::readDashboard(const LaMarzoccoPersistedS
   ++dashboardReads;
   result.targetValid = true;
   result.targetDeciC = cloudTargetDeciC;
+  result.targetMinDeciC = cloudRangeMinDeciC;
+  result.targetMaxDeciC = cloudRangeMaxDeciC;
   result.powerState = cloudPower;
   return true;
 }
@@ -808,7 +811,7 @@ struct LaMarzoccoWebSocketTest {
     service.staConnected_.store(true);
     service.serviceWebSocket();
     subscribe(service);
-    const char *brewing93 = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}}]})";
+    const char *brewing93 = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0,"targetTemperatureMin":80,"targetTemperatureMax":100}}]})";
     deliver(service, observation(service, brewing93));
     assert(service.observationFence_.temperatureTrusted && service.observationFence_.powerTrusted);
     uint32_t requestId = 0;
@@ -882,6 +885,24 @@ struct LaMarzoccoWebSocketTest {
     assert(sessionCalls == sessionsBefore + 1 && service.work_->accessToken[0] == '\0');
     cloudRefusesCommands = false;
     service.work_->httpStatus = 0;
+    // No frame has brought the machine's range: the controller reads it
+    // first and sends the preset inside it, never the preset's own value.
+    service.published_.targetMinDeciC = service.published_.targetMaxDeciC = 0;
+    service.observationFence_.invalidate();
+    cloudRangeMinDeciC = 850;
+    cloudRangeMaxDeciC = 1040;
+    auto writes = temperatureWrites, reads = dashboardReads;
+    assert(service.executeTemperatureApplication(temperature(800), service.configGeneration_));
+    assert(temperatureWrites == writes + 1 && cloudTargetDeciC == 850 && dashboardReads > reads);
+    assert(service.published_.requestedTargetDeciC == 800 &&
+           service.published_.appliedTargetDeciC == 850);
+    // A machine that reports no range is sent nothing at all.
+    cloudRangeMinDeciC = cloudRangeMaxDeciC = 0;
+    writes = temperatureWrites;
+    assert(!service.executeTemperatureApplication(temperature(930), service.configGeneration_));
+    assert(temperatureWrites == writes && cloudTargetDeciC == 850);
+    assert(service.published_.temperatureState == LaMarzoccoTemperatureState::FAILED &&
+           service.published_.temperatureError == LaMarzoccoError::REJECTED);
     service.stopWebSocket(true);
     delete service.work_;
   }
@@ -1690,7 +1711,7 @@ struct LaMarzoccoWebSocketTest {
     delete service.work_;
   }
   // --- Companion route (docs/COMPANION_LINK.md) ---
-  static constexpr const char *kBrewing93 = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
+  static constexpr const char *kBrewing93 = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0,"targetTemperatureMin":80,"targetTemperatureMax":100}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
   static constexpr const char *kStandby = R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})";
   static constexpr const char *kBrewing = R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}}]})";
   static constexpr const char *kAwaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
@@ -2229,19 +2250,45 @@ struct LaMarzoccoWebSocketTest {
     assert(!temperature(950));
     assert(service.published_.temperatureError == LaMarzoccoError::REJECTED &&
            service.published_.temperatureHttpStatus == 422);
-    // A target outside the range the machine reported is refused before any
-    // command leaves the controller.
+    // The range is the machine's own report. A preset outside it is sent as
+    // the nearest value the machine accepts, and confirmed against that.
     assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":94.0,"targetTemperatureMin":85,"targetTemperatureMax":104}}]})"));
     assert(service.published_.targetMinDeciC == 850 && service.published_.targetMaxDeciC == 1040);
-    bool commanded = false;
-    notifyHook = [&] { commanded = commanded || service.companionOutbox().commandId != 0; };
-    for (uint16_t outside : {uint16_t{849}, uint16_t{1041}}) {
-      assert(!temperature(outside) && !commanded);
-      assert(service.published_.temperatureState == LaMarzoccoTemperatureState::FAILED);
-      assert(service.published_.temperatureError == LaMarzoccoError::REJECTED);
-      assert(!service.published_.temperatureRetryable && !service.desiredTemperature_.present);
+    for (const auto &[preset, sentDeciC, reported] : {
+        std::tuple<uint16_t, uint16_t, const char *>{800, 850, "85.0"}, {1100, 1040, "104.0"}}) {
+      stage = 0;
+      notifyHook = [&] {
+        const auto box = service.companionOutbox();
+        if (stage == 0 && box.commandId) {
+          assert(box.commandOp == LaMarzoccoCompanionCommandOp::TEMPERATURE &&
+                 box.commandValue == sentDeciC);
+          service.companionCommandResult(box.commandId, true, 0);
+          stage = 1;
+        } else if (stage == 1) {
+          assert(frame(service, LaMarzoccoCompanionStateKind::PUSH,
+                       (std::string(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":)") +
+                        reported + "}}]}").c_str()));
+          stage = 2;
+        }
+      };
+      assert(temperature(preset) && stage == 2);
+      assert(service.published_.temperatureState == LaMarzoccoTemperatureState::CONFIRMED);
+      assert(service.published_.requestedTargetDeciC == preset);
+      assert(service.published_.appliedTargetDeciC == sentDeciC);
     }
+    // A machine that has reported no range is sent nothing: the request waits
+    // for the report instead of guessing what the machine accepts.
+    const uint32_t commandsSoFar = service.companionRouteStatus().commands;
     service.published_.targetMinDeciC = service.published_.targetMaxDeciC = 0;
+    notifyHook = nullptr;
+    assert(!temperature(930));
+    assert(service.companionRouteStatus().commands == commandsSoFar);
+    assert(service.companionOutbox().commandId == 0);
+    assert(service.published_.temperatureState == LaMarzoccoTemperatureState::FAILED);
+    assert(service.published_.temperatureError == LaMarzoccoError::REJECTED);
+    assert(service.desiredTemperature_.present && service.published_.temperatureRetryable);
+    service.desiredTemperature_ = {};
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":93.0,"targetTemperatureMin":80,"targetTemperatureMax":100}}]})"));
     // Standby: an older read cannot undo the accepted command's intent; a read
     // ordered after the command confirms it.
     stage = 0;
@@ -2271,7 +2318,7 @@ struct LaMarzoccoWebSocketTest {
     service.desiredPower_.present = true;
     assert(service.executePowerApplication(standby, service.configGeneration_) && stage == 2);
     assert(service.published_.powerState == LaMarzoccoPowerState::OFF);
-    assert(!service.desiredPower_.present && service.companionRouteStatus().commands == 3);
+    assert(!service.desiredPower_.present && service.companionRouteStatus().commands == 5);
     // Zero HTTPS on the companion route: no session, write or dashboard read.
     assert(temperatureWrites == temperatureBefore && powerWrites == powerBefore);
     assert(dashboardReads == reads && sessionCalls == sessions);

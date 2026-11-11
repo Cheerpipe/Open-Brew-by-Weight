@@ -425,7 +425,14 @@ if (!laMarzoccoTypes.includes('APPLY_TEMPERATURE') ||
     !networkService.includes('scaleConnecting_.load(std::memory_order_acquire)') ||
     !laMarzoccoService.includes('CoffeeMachineSettingCoffeeBoilerTargetTemperature') ||
     !laMarzoccoService.includes('{\\\"boilerIndex\\\":1,\\\"targetTemperature\\\":%u.%u}') ||
-    !laMarzoccoService.includes('verification.targetDeciC == request.targetDeciC') ||
+    !laMarzoccoService.includes('verification.targetDeciC == target') ||
+    // The preset's target never leaves as it is: what is sent is that target
+    // inside the range the machine reported, and nothing without that range.
+    !laMarzoccoService.includes('target = laMarzoccoSendableBrewTarget(published_, request.targetDeciC);') ||
+    !laMarzoccoService.includes('if (target == 0 && !unread) break;') ||
+    !laMarzoccoService.includes(': writeTemperature(settings, target);') ||
+    laMarzoccoService.includes('writeTemperature(settings, request.targetDeciC)') ||
+    laMarzoccoService.includes('LaMarzoccoCompanionCommandOp::TEMPERATURE, request.targetDeciC') ||
     !laMarzoccoService.includes('commandAccepted = desiredTemperature_.commandAccepted;') ||
     !laMarzoccoService.includes('desiredTemperature_.commandAccepted = true;') ||
     !laMarzoccoService.includes('laMarzoccoHttpRetryable') ||

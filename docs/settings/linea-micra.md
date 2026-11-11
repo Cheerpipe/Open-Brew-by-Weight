@@ -639,9 +639,16 @@ connected scale regardless of brand.
 **Set the brew temperature in each preset** reveals a per-preset value in
 0.1 °C steps. Its limits are the ones your machine reports through La
 Marzocco's cloud, 80.0 to 100.0 °C on a Linea Micra, so the field appears once
-the connected account has read them. A saved value that the machine's range no
-longer allows is not sent: Diagnostics shows the temperature request as
-rejected, and the Web UI log records it. New and factory-reset presets start at 93.0 °C;
+the connected account has read them. The controller never sends a temperature
+the machine has not said it accepts: until the machine has reported its
+limits, nothing is sent.
+
+If a preset was saved with a value the machine's limits no longer allow, the
+preset keeps that value and the machine gets the nearest one it accepts. A
+note under the field says which, for example **Your Micra accepts 85.0–100.0 °C,
+so it gets 85.0 °C instead of this preset's 80.0 °C**, and the Web UI log
+records it. You can still change the preset's other fields; a new temperature
+has to fit the limits. New and factory-reset presets start at 93.0 °C;
 duplicates copy the source value. Turning the option off or disconnecting the
 account keeps every saved preset value.
 

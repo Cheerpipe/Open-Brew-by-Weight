@@ -4225,7 +4225,8 @@ async function saveBrewPreset(patch, okMsg, failMsg) {
     message(formatCommandError(fail, e), "error");
     return false;
   }
-  const errs = settingsForm.validateBrewClient();
+  // A note that only informs (advice) never holds a save back.
+  const errs = settingsForm.validateBrewClient().filter((e) => !e.advice);
   if (errs.length) {
     // The red report replaces the yellow preview (same sentences): drop the
     // amber marks so each verdict reads exactly once until the next edit.

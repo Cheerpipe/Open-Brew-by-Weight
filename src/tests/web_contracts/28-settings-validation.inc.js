@@ -50,7 +50,7 @@
     ';const R={uiState,validateBrewClient,settingsSectionEls,refreshFieldAria,clearBrewWarningsDom};' +
     ['brewWarningList', 'refreshBrewWarnings', 'clearBrewFieldErrors']
         .map((n) => blockAt(viewJs.settings, `function ${n}(`)).join('\n');
-  const svValidate = (edit, setup) => {
+  const svValidate = (edit, setup, temperature = false) => {
     const fields = {};
     for (const [id, [type, step, init]] of Object.entries(svFieldSpec))
       fields[id] = {id, type, step, value: type === 'checkbox' ? '' : init,
@@ -65,7 +65,7 @@
       svValidatorSrc +
       ';return {validateBrewClient, brewWarningList, rules: BREW_CROSS_RULES};')(
       (id) => fields[id],
-      {documentElement: {classList: {contains: () => false}}},
+      {documentElement: {classList: {contains: () => temperature}}},
       (section) => (section === 'brew' ? Object.values(fields) : []),
       {formBaseline: baseline});
     return {errors: api.validateBrewClient(), warnings: api.brewWarningList(),
@@ -76,6 +76,30 @@
     svAssert.equal(result.errors[0].id, id);
     svAssert.equal(result.errors[0].msg, msg);
   };
+
+  // The brew temperature follows the range the machine reports. A saved value
+  // that range no longer allows is not an error: a note says what is sent
+  // instead, and it never holds a save back. A value being changed must fit.
+  {
+    const withTarget = (value, edit) => svValidate(edit, (f) => {
+      f.laMarzoccoBrewTargetC = {id: 'laMarzoccoBrewTargetC', type: 'number', step: '0.1',
+        value, min: '85', max: '104', checked: false, disabled: false, validity: {valid: true}};
+    }, true);
+    svAssert.deepEqual(withTarget('93.0').errors, []);
+    for (const [saved, sent] of [['80.0', '85.0'], ['110.0', '104.0']]) {
+      const note = withTarget(saved);
+      svAssert.equal(note.errors.length, 1);
+      svAssert.equal(note.errors[0].advice, true);
+      svAssert.equal(note.errors[0].msg,
+        `Your Micra accepts 85.0–104.0 °C, so it gets ${sent} °C instead of this preset's ${Number(saved).toFixed(1)} °C.`);
+      svAssert.deepEqual(note.warnings, note.errors, 'the note shows as a live warning');
+    }
+    const changed = withTarget('93.0', (f) => { f.laMarzoccoBrewTargetC.value = '84.9'; });
+    svOne(changed, 'laMarzoccoBrewTargetC', 'Brew temperature (°C) must be from 85 to 104 °C.');
+    svAssert.equal(changed.errors[0].advice, undefined);
+    // Outside the build that shows the field, it is never looked at.
+    svAssert.deepEqual(svValidate().errors, []);
+  }
 
   // (a) The factory state is valid; a self-range violation is phrased with
   // the field's UI label and unit.
@@ -195,7 +219,7 @@
   for (const section of ['Recipe', 'Fast shots', 'Slow shots', 'Time limits', 'Tare'])
     svAssert.ok(settingsHtml.includes('>' + section + '</summary>'),
       'Settings section summary missing: ' + section);
-  svAssert.ok(codeIncludes(runtimeJs, 'const errs = settingsForm.validateBrewClient(); if (errs.length) {') &&
+  svAssert.ok(codeIncludes(runtimeJs, 'const errs = settingsForm.validateBrewClient().filter((e) => !e.advice); if (errs.length) {') &&
       codeIncludes(runtimeJs, 'clearBrewWarnings(); showFieldErrors(errs); return false; }'),
     'saveBrewPreset must render the full violation list, replacing the yellow preview');
   svAssert.ok(codeIncludes(viewJs.settings,

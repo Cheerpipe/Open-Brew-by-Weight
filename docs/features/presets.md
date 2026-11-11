@@ -170,7 +170,9 @@ The Linea Micra brew target accepts the range the machine itself reports
 through La Marzocco's cloud (80.0–100.0 °C on a Linea Micra) in 0.1 °C steps,
 and defaults to 93.0 °C for new and factory-reset recipes. The field appears
 once the connected account has read that range; without a connection there is
-no range and no brew temperature to set. Duplicating a preset copies this value;
+no range and no brew temperature to set or send. A preset whose saved value
+the range no longer allows keeps it, and the machine gets the nearest value
+it accepts; see [Linea Micra settings](../settings/linea-micra.md#brew-temperature-in-presets). Duplicating a preset copies this value;
 disabling the option or disconnecting the Micra account does not erase it. See
 [Linea Micra settings](../settings/linea-micra.md).
 With a connected Micra account and **Set the brew temperature in each preset**

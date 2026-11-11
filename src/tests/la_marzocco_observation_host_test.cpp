@@ -366,8 +366,8 @@ int main() {
   assert(update.targetMinDeciC == 600 && update.targetMaxDeciC == 1100 && update.targetDeciC == 1100);
   // A target that is not a number is still a malformed frame.
   assert(!coffee(R"("targetTemperature":"93")"));
-  // The status keeps the machine's range across frames that name none, and a
-  // machine that never names one gets the default; steam alone sets nothing.
+  // The status keeps the machine's range across frames that name none; until
+  // the machine names one there is none, and nothing stands in for it.
   {
     LaMarzoccoStatus machine;
     machine.identityGeneration = 1;
@@ -383,7 +383,8 @@ int main() {
     push(R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready"}}]})");
     assert(machine.targetMinDeciC == 0 && machine.targetMaxDeciC == 0);
     push(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}}]})");
-    assert(machine.targetMinDeciC == 800 && machine.targetMaxDeciC == 1000);
+    assert(machine.targetMinDeciC == 0 && machine.targetMaxDeciC == 0);
+    assert(machine.targetValid && machine.targetDeciC == 930);
     push(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":95.0,"targetTemperatureMin":85,"targetTemperatureMax":104}}]})");
     assert(machine.targetMinDeciC == 850 && machine.targetMaxDeciC == 1040);
     assert(machine.targetValid && machine.targetDeciC == 950);

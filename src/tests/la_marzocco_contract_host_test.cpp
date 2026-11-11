@@ -322,6 +322,15 @@ int main() {
   ranged.targetMaxDeciC = 1040;
   for (long target : {850L, 930L, 1040L}) assert(laMarzoccoBrewTargetSettable(ranged, target));
   for (long target : {-1L, 0L, 849L, 1041L, 70000L}) assert(!laMarzoccoBrewTargetSettable(ranged, target));
+  // What is sent for a preset is its target brought inside the reported
+  // range, and nothing at all while the machine has reported none.
+  for (uint16_t preset : {uint16_t{600}, uint16_t{930}, uint16_t{1100}})
+    assert(laMarzoccoSendableBrewTarget(LaMarzoccoStatus{}, preset) == 0);
+  assert(laMarzoccoSendableBrewTarget(ranged, 800) == 850);
+  assert(laMarzoccoSendableBrewTarget(ranged, 850) == 850);
+  assert(laMarzoccoSendableBrewTarget(ranged, 930) == 930);
+  assert(laMarzoccoSendableBrewTarget(ranged, 1040) == 1040);
+  assert(laMarzoccoSendableBrewTarget(ranged, 1100) == 1040);
 
   assert(!la_marzocco_timing::accessTokenRefreshDue(50U * 60U * 1000U - 1U));
   assert(la_marzocco_timing::accessTokenRefreshDue(50U * 60U * 1000U));

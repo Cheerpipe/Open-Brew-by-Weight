@@ -702,7 +702,9 @@ target, oldest first), `firstDropS` is their median first drop (`firstDropN`
 shots; `0` falls back to other presets), and `grindHint` is the Web UI grind
 hint object or `null`. `laMarzoccoBrewTargetC` only matters on Linea Micra
 builds; a save may change it only while the connected machine has reported
-its brew range, and only to a value inside that range. The statistics follow every stored good shot (bad shots never count),
+its brew range, and only to a value inside that range. What the machine is
+sent is that value brought inside the range, and nothing before the machine
+has reported one. The statistics follow every stored good shot (bad shots never count),
 so Home Assistant's read after the `end` webhook already returns the new
 arrival.
 

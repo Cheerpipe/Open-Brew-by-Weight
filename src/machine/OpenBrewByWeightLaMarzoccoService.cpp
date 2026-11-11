@@ -1584,7 +1584,9 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
     uint32_t machineConfigGeneration) {
   LaMarzoccoPersistedSettings settings;
   bool commandAccepted = false;
-  bool outsideRange = false;
+  // What is sent and confirmed: the preset's target inside the range the
+  // machine reported; 0 until that range is known.
+  uint16_t target = 0;
   {
     TaskLockGuard lock(mux_);
     if (!desiredTemperature_.present ||
@@ -1594,16 +1596,12 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
         configGeneration_ != machineConfigGeneration) {
       return true;
     }
-    // The machine refuses a target outside the range it reported: fail it
-    // here, visibly, instead of spending a cloud request on it.
-    outsideRange = published_.targetMinDeciC != 0 &&
-        (request.targetDeciC < published_.targetMinDeciC ||
-         request.targetDeciC > published_.targetMaxDeciC);
+    target = laMarzoccoSendableBrewTarget(published_, request.targetDeciC);
     const LaMarzoccoStatus current = statusLocked();
-    const bool unchanged = !outsideRange && current.connectionFreshness &&
+    const bool unchanged = target != 0 && current.connectionFreshness &&
         current.quality == LaMarzoccoObservationQuality::CURRENT &&
         observationFence_.temperatureTrusted && published_.targetValid &&
-        published_.targetDeciC == request.targetDeciC;
+        published_.targetDeciC == target;
     published_.requestId = request.requestId;
     published_.requestedTargetDeciC = request.targetDeciC;
     published_.temperatureState = unchanged ? LaMarzoccoTemperatureState::CONFIRMED
@@ -1614,25 +1612,20 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
       // The subscription would have pushed any change: the machine already
       // holds this target, so no cloud command is needed.
       desiredTemperature_ = {};
-      published_.appliedTargetDeciC = request.targetDeciC;
+      published_.appliedTargetDeciC = target;
       published_.temperatureTransportStatus = 0;
       published_.temperatureHttpStatus = 0;
       published_.temperatureCommandAccepted = false;
       lock.unlock();  // logging takes its own locks; never nest them in mux_
       serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                            "La Marzocco temperature %u.%u already set, command skipped",
-                           static_cast<unsigned>(request.targetDeciC / 10U),
-                           static_cast<unsigned>(request.targetDeciC % 10U));
+                           static_cast<unsigned>(target / 10U),
+                           static_cast<unsigned>(target % 10U));
       return true;
     }
     settings = config_;
     commandAccepted = desiredTemperature_.commandAccepted;
     published_.temperatureCommandAccepted = commandAccepted;
-  }
-  if (outsideRange) {
-    wipeLaMarzoccoSettings(settings);
-    deferTemperature(request, LaMarzoccoError::REJECTED, 0, false);
-    return false;
   }
   if (!ensureWorkBuffer()) {
     wipeLaMarzoccoSettings(settings);
@@ -1670,11 +1663,28 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
     bool success = false;
     if ((companion || ensureSession(settings, false)) &&
         temperatureRequestCurrent(request, machineConfigGeneration)) {
-      if (!commandAccepted) {
+      // No frame has brought the machine's range yet: read it before sending.
+      // The companion route has no read of its own and waits for its state.
+      // A failed read retries like a failed command; a machine that reports
+      // no range ends the cycle with nothing sent.
+      const bool unread = target == 0 && !companion && !readDashboard(settings, verification);
+      if (target == 0 && !unread)
+        target = laMarzoccoSendableBrewTarget(verification, request.targetDeciC);
+      if (target == 0 && !unread) break;
+      if (target != 0 && !commandAccepted) {
+        if (target != request.targetDeciC)
+          serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                               "La Marzocco temperature preset=%u asks %u.%u outside the "
+                               "machine's range: sending %u.%u",
+                               static_cast<unsigned>(request.presetId),
+                               static_cast<unsigned>(request.targetDeciC / 10U),
+                               static_cast<unsigned>(request.targetDeciC % 10U),
+                               static_cast<unsigned>(target / 10U),
+                               static_cast<unsigned>(target % 10U));
         commandAttempted = true;
         commandAccepted = companion
-            ? companionCommand(LaMarzoccoCompanionCommandOp::TEMPERATURE, request.targetDeciC)
-            : writeTemperature(settings, request.targetDeciC);
+            ? companionCommand(LaMarzoccoCompanionCommandOp::TEMPERATURE, target)
+            : writeTemperature(settings, target);
         commandTransportStatus = work_->transportStatus;
         commandHttpStatus = work_->httpStatus;
         if (commandAccepted) {
@@ -1686,12 +1696,12 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
           }
         }
       }
-      success = commandAccepted &&
+      success = target != 0 && commandAccepted &&
                 temperatureRequestCurrent(request, machineConfigGeneration) &&
-                (pushConfirms(request.targetDeciC, LaMarzoccoPowerState::UNKNOWN) ||
+                (pushConfirms(target, LaMarzoccoPowerState::UNKNOWN) ||
                  (!companion && readDashboard(settings, verification) &&
                   verification.targetValid &&
-                  verification.targetDeciC == request.targetDeciC));
+                  verification.targetDeciC == target));
     }
     if (success) {
       wipeLaMarzoccoSettings(settings);
@@ -1699,7 +1709,7 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
       if (desiredTemperature_.present &&
           sameCommandRequest(desiredTemperature_.request, request)) {
         desiredTemperature_ = {};
-        published_.appliedTargetDeciC = request.targetDeciC;
+        published_.appliedTargetDeciC = target;
         published_.temperatureState = LaMarzoccoTemperatureState::CONFIRMED;
         published_.temperatureError = LaMarzoccoError::NONE;
         published_.temperatureTransportStatus = work_->transportStatus;
@@ -1731,6 +1741,16 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
   }
 
   wipeLaMarzoccoSettings(settings);
+  if (target == 0) {
+    // Nothing was sent: the machine has not reported the range it accepts.
+    // The request waits a bounded number of cycles for that report.
+    serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
+                         "La Marzocco temperature not sent: the machine has reported no "
+                         "brew range");
+    deferTemperature(request, LaMarzoccoError::REJECTED,
+                     la_marzocco_timing::kExhaustedCooldownMs, true, true);
+    return false;
+  }
   const uint16_t failureHttpStatus =
       commandAttempted ? commandHttpStatus : work_->httpStatus;
   const LaMarzoccoError error = commandFailure(

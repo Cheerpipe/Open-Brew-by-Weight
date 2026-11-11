@@ -147,15 +147,11 @@ struct LaMarzoccoObservationFence {
         status.targetValid = temperatureTrusted = update.temperatureValid;
         status.targetDeciC = update.targetDeciC;
       }
-      // The brew range is the machine's own. A frame that names none keeps
-      // the last one, and a machine that never names one gets the default.
+      // The brew range is only ever the machine's own report: a frame that
+      // names none keeps the last one, and nothing stands in for a missing one.
       if (update.targetMinDeciC != 0) {
         status.targetMinDeciC = update.targetMinDeciC;
         status.targetMaxDeciC = update.targetMaxDeciC;
-      } else if (status.targetMinDeciC == 0 &&
-                 (update.temperaturePresent || update.coffeeBoilerPresent)) {
-        status.targetMinDeciC = LA_MARZOCCO_BREW_RANGE_DEFAULT_MIN_DECI_C;
-        status.targetMaxDeciC = LA_MARZOCCO_BREW_RANGE_DEFAULT_MAX_DECI_C;
       }
       if (update.coffeeBoilerPresent) {
         status.coffeeBoiler = update.coffeeBoiler;

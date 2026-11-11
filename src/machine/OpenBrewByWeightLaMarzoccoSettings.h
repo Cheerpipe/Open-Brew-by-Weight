@@ -49,9 +49,6 @@ constexpr uint16_t LA_MARZOCCO_SHUTDOWN_GRACE_SECONDS[] = {0, 5, 15, 30, 60};
 // stored preset, an observed target and a sent command stay inside them.
 constexpr uint16_t LA_MARZOCCO_BREW_TARGET_MIN_DECI_C = 600;
 constexpr uint16_t LA_MARZOCCO_BREW_TARGET_MAX_DECI_C = 1100;
-// The range of a machine whose cloud report names none.
-constexpr uint16_t LA_MARZOCCO_BREW_RANGE_DEFAULT_MIN_DECI_C = 800;
-constexpr uint16_t LA_MARZOCCO_BREW_RANGE_DEFAULT_MAX_DECI_C = 1000;
 enum class LaMarzoccoConnectionType : uint8_t { WEBSOCKET = 0, API = 1 };
 inline const char *laMarzoccoConnectionTypeName(uint8_t value) {
   return value == static_cast<uint8_t>(LaMarzoccoConnectionType::API) ? "api" : "websocket";

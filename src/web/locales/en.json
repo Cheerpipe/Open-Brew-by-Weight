@@ -2045,6 +2045,7 @@
     "settings.boost_scale_detection_when_machine_on": "Find the scale faster while the {machine-short} is on",
     "settings.boost_scale_detection_when_machine_on_hint": "Your scale connects sooner after you switch the {machine-short} on.",
     "settings.brew_by_weight_2": "Brew by weight",
+    "settings.brew_temperature_adjusted": "Your {machine-short} accepts {min}\u2013{max} \u00b0C, so it gets {sent} \u00b0C instead of this preset's {value} \u00b0C.",
     "settings.brew_temperature_c": "Brew temperature (\u00b0C)",
     "settings.brew_temperature_hint": "Sent to the {machine-short} when you choose this preset, if Set brew temperature per preset is on.",
     "settings.brew_without_a_scale": "You start and stop the shot. Only the 60 s safety limit applies.",
