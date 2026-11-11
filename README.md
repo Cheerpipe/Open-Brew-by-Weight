@@ -24,27 +24,36 @@ paddle or a push button can follow the same path with their own wiring.
 
 ## Why Open Brew by Weight
 
-Weighing every shot is the simplest way to make espresso repeatable, but
-stopping the machine at the right gram, shot after shot, is tedious, and few
-machines do it for you. Open Brew by Weight brings that to the machine on your
-counter instead of asking you to replace it.
+I wanted a [Shot Stopper](https://github.com/tatemazer/AcaiaArduinoBLE) by Tate
+Mazer. It is a wonderful project, but its hardware layout limits how much of
+the machine it can control, and its firmware covers the basics. What I was
+after was brew by weight built into the machine as natively as possible, with
+full control of the paddle and no workarounds: start a shot, and the automatic
+stop simply works, with no conditions and no compromises.
 
-A few ideas shape every decision in the project:
+That is how this firmware started. Without planning it, it grew into a serious,
+advanced piece of software, packed with features the community asked for and
+others designed around my own workflow, such as cut curves that move the stop
+for fast and slow shots.
 
-- **Your machine stays yours.** The paddle or button still starts every shot
-  and can always stop it. The controller only adds the stop by weight, and
-  remote start stays off unless you build it in on purpose.
-- **Everything runs in your kitchen.** Brew by weight needs no cloud account,
-  no subscription, and no Wi-Fi. Home Assistant, the companion, and the other
-  integrations are optional extras.
-- **It learns your machine.** Coffee keeps dripping after the machine stops,
-  and every machine drips differently. The controller learns that drip shot by
-  shot and stops early enough to land on your target.
-- **Safety comes first.** The relay is the controller's only connection to the
-  machine, and it opens whenever anything is wrong.
-- **Open to everyone.** The firmware, the wiring guides, and the enclosure are
-  free under the AGPL. The project was inspired by Tate Mazer's
-  [Shot Stopper](https://github.com/tatemazer/AcaiaArduinoBLE).
+Six ideas shape every decision:
+
+- **The machine's own interface.** The paddle remains the way you use the
+  machine. Nothing to add, nothing new to learn.
+- **The stock workflow.** Move the paddle and that's it, just like the stock
+  machine or a Linea Mini with built-in brew by weight. It works without you
+  noticing that the firmware is doing its job.
+- **Complete, yet forgettable.** As complete as firmware can be, and robust
+  enough to use every day and forget it is there.
+- **Affordable.** The same result for about US$20–30 in parts, plus your scale,
+  instead of US$200–300.
+- **Easy to get, easy to build.** Starting this project isn't for everyone, but
+  I have worked hard to make it as accessible as possible: the hardware is easy
+  to find, and the project's tools make building, customizing, and installing
+  the firmware as simple as they can be.
+- **Open forever, integrated where it counts.** Free and open source for good
+  and built to work with virtually any machine, while integrating as deeply as
+  possible with the Linea Micra.
 
 ## Quickstart
 
@@ -59,38 +68,27 @@ from a shopping list to your first shot by weight in six steps:
 5. [Connect it to your Wi-Fi](docs/QUICKSTART.md#5-connect-it-to-your-wi-fi)
 6. [Pull the first shot](docs/QUICKSTART.md#6-pull-the-first-shot)
 
-## Features
+## Main features
 
-- **Stops at your weight, and learns.** A predictive cut with learned drip
-  compensation, and Adaptive recipes that adjust to fast and slow shots.
-  See [Brew by weight](docs/features/brew-by-weight.md).
-- **Recipes ready to go.** Single and Double presets in Adaptive and Fixed
-  versions, plus your own. See [Presets](docs/features/presets.md).
-- **Watch every shot.** A real-time shot timer and a live shot view while you
-  brew, then [shot history and statistics](docs/features/shot-history.md) with
-  export to Visualizer.coffee and the Gaggiuino format.
-- **Beanconqueror integration.** [Beanconqueror](docs/settings/beanconqueror.md)
-  imports your shots in the Gaggiuino or GaggiMate format, as if the controller
-  were one of those machines.
-- **Protects the shot.** [Tare and retare](docs/features/tare-retare.md),
-  [cup protection](docs/features/cup-protection.md),
-  [fast and slow shots](docs/features/fast-and-slow-shots.md), and a
-  [backup timer](docs/features/auto-to-manual.md) if the scale drops out.
-- **Works with your scale.** Bookoo, Acaia, Felicita, Decent, DiFluid, Varia,
-  Eureka, and more; see [scale compatibility](libraries/EspressoScaleBLE/README.md#scale-compatibility).
-- **Fits paddle and push-button machines.** Paddle, momentary, and
-  momentary-plus-reed builds; see [Machine types](docs/HARDWARE.md#machine-types).
-- **Talks to your Linea Micra.** [La Marzocco Cloud](docs/settings/linea-micra.md)
-  sets the brew-boiler temperature of each preset and knows when the paddle is
-  only waking the machine.
-- **Fits your smart home.** [Home Assistant](docs/features/home-assistant.md),
-  [webhooks](docs/features/webhooks.md), [notifications](docs/features/notifications.md),
-  and the optional [companion](docs/features/companion.md).
-- **Alerts you can hear.** [Buzzer tones](docs/alerts.md), or your Bookoo's own
-  sounds.
-- **Safe updates.** [Over-the-air updates](docs/features/ota.md) with automatic
-  rollback, and [emergency recovery](docs/EMERGENCY_RECOVERY.md) from the
-  machine's own switch.
+| Need | Feature |
+| --- | --- |
+| Stop at your recipe's weight | [Brew by weight](docs/features/brew-by-weight.md): a predictive cut with learned drip compensation that learns your machine shot by shot |
+| Handle fast and slow shots | [Fast and slow shots](docs/features/fast-and-slow-shots.md): cut curves move the stop when a shot runs fast or slow |
+| Use different recipes | [Presets](docs/features/presets.md): factory Single and Double in Adaptive and Fixed versions, plus your own |
+| Follow the shot as it happens | A real-time shot timer and a live shot view while you brew |
+| Review results | [Shot history and statistics](docs/features/shot-history.md), with export to Visualizer.coffee and the Gaggiuino format |
+| Log shots in Beanconqueror | [Beanconqueror](docs/settings/beanconqueror.md) imports your shots in the Gaggiuino or GaggiMate format, as if the controller were one of those machines |
+| Place the cup after starting | [Tare and retare](docs/features/tare-retare.md) |
+| Handle cup removal or bumps | [Cup protection](docs/features/cup-protection.md) |
+| Limit a shot after scale loss | [Scale-loss backup](docs/features/auto-to-manual.md): a timed limit takes over if the scale drops out |
+| Rinse with a switch gesture | [Quick rinse](docs/settings/quick-rinse.md), with a machine-profile default |
+| Use the scale you have | Bookoo, Acaia, Felicita, Decent, DiFluid, Varia, Eureka, and more; see [scale compatibility](libraries/EspressoScaleBLE/README.md#scale-compatibility) |
+| Fit your machine | Paddle, momentary, and momentary-plus-reed builds; see [Machine types](docs/HARDWARE.md#machine-types) |
+| Integrate with a Linea Micra | [La Marzocco Cloud](docs/settings/linea-micra.md) reads and sets each preset's brew-boiler temperature and knows when the paddle is only waking the machine |
+| Hear local feedback | [Alerts](docs/alerts.md): buzzer tones, or your Bookoo's own sounds |
+| Connect your smart home | [Home Assistant](docs/features/home-assistant.md) (integration in [its own repository](https://github.com/Cheerpipe/ha-open-brew-by-weight)), [webhooks](docs/features/webhooks.md), [notifications](docs/features/notifications.md), and the optional [companion](docs/features/companion.md) |
+| Update safely without a USB cable | [Over-the-air updates](docs/features/ota.md) over Wi-Fi into a spare firmware slot, with boot verification and automatic rollback |
+| Recover from a mistake | [Emergency recovery](docs/EMERGENCY_RECOVERY.md) restores access or resets settings from the machine's own switch |
 
 ## Documentation
 
