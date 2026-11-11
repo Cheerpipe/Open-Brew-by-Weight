@@ -2,8 +2,8 @@
 """Enforce the F-20 firmware service boundaries without compiling sources.
 
 Also rejects discarded critical OTA, NimBLE and buzzer results, task watchdog
-reconfiguration outside its owner, and the legacy project name anywhere in the
-repository.
+reconfiguration outside its owner, and the legacy project name anywhere outside
+the README.
 """
 
 from __future__ import annotations
@@ -178,8 +178,9 @@ def main() -> int:
             failures.append(
                 f"task watchdog reconfigured outside its owner: {path.relative_to(ROOT)}")
 
-    # Legacy project names must not return; only the README inspiration credit
-    # keeps them. Untracked files are checked before they are added.
+    # Legacy project names must not return; only the README names the inspiration
+    # (its story, credits, and non-affiliation notice). Untracked files are
+    # checked before they are added.
     legacy = re.compile(
         r"shot[ _-]?stopper|tate[ _-]?mazer|acaia[ _-]?(arduino[ _-]?)?ble",
         re.IGNORECASE)
@@ -191,12 +192,11 @@ def main() -> int:
             failures.append(f"legacy project name in path: {relative}")
         path = ROOT / relative
         content = path.read_bytes() if path.is_file() else b"\0"
-        if b"\0" in content or relative == "scripts/check_architecture.py":
+        if b"\0" in content or relative in ("scripts/check_architecture.py", "README.md"):
             continue
         lines = content.decode("utf-8", errors="replace").splitlines()
         for number, line in enumerate(lines, 1):
-            if legacy.search(line) and not (
-                    relative == "README.md" and "inspired this project" in line):
+            if legacy.search(line):
                 failures.append(f"legacy project name: {relative}:{number}")
 
     if failures:
