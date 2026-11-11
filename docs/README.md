@@ -6,6 +6,7 @@ needed rather than reading the entire directory.
 
 ## Setup and use
 
+- [Quickstart: from parts to the first shot](QUICKSTART.md)
 - [First setup and daily use](GETTING_STARTED.md)
 - [Hardware and installation prerequisites](HARDWARE.md)
 - [Build, test, and USB installation](BUILD.md)
