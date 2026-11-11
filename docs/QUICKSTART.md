@@ -1,9 +1,9 @@
 # Quickstart
 
 The shortest path for the reference build: an ESP32-S3 Relay X1 controller on
-a La Marzocco Linea Micra. You install and set up the controller on the bench
-first, with nothing connected to the machine; wiring it in comes last. Each
-step links to its full guide. Other machines follow the same path with their
+a La Marzocco Linea Micra. You install the firmware over USB, print the
+enclosure, wire the controller into the machine, and then set it up from your
+phone. Each step links to its full guide. Other machines follow the same path with their
 own [build profile](BUILD_PROFILES.md) and wiring.
 
 ## 1. Get the parts
@@ -16,7 +16,7 @@ own [build profile](BUILD_PROFILES.md) and wiring.
 | USB-C data cable | 1 | 3 | Charge-only cables cannot install firmware. |
 | [Passive 3.3 V buzzer module](HARDWARE.md#local-buzzer) (optional) | 1 | 1–4 | Alert sounds. Must be passive. |
 | [Dupont housings](HARDWARE.md#dupont-housings-optional) (optional) | 1 set | 8 | A tidier harness that is harder to plug in wrong. |
-| [Printed enclosure](HARDWARE.md#3d-printable-enclosure) | 1 | 1–2 | Filament only: PETG or better. See step 4. |
+| [Printed enclosure](HARDWARE.md#3d-printable-enclosure) | 1 | 1–2 | Filament only: PETG or better. See step 3. |
 
 Without the scale, the required parts cost about US$22–31. Prices are a
 November 2026 reference from AliExpress, before shipping and taxes, and change
@@ -58,9 +58,43 @@ button held to accept new firmware; the Relay X1 does not.
 flash. Later updates install over Wi-Fi ([OTA](features/ota.md)) and keep
 your settings.
 
-## 3. Connect it to your Wi-Fi
+## 3. Print the enclosure
 
-Do this on the bench, with the controller powered over USB.
+The controller goes inside the machine in its printed enclosure. Print one
+box-and-cover pair from [`stl/`](../stl/):
+
+- **Standard:** [`OpenBrewByWeight-Box.stl`](../stl/OpenBrewByWeight-Box.stl) and
+  [`OpenBrewByWeight-Cover.stl`](../stl/OpenBrewByWeight-Cover.stl).
+- **Thick:** [`OpenBrewByWeight-Box-thick.stl`](../stl/OpenBrewByWeight-Box-thick.stl)
+  and [`OpenBrewByWeight-Cover-thick.stl`](../stl/OpenBrewByWeight-Cover-thick.stl).
+  It holds its shape better where the controller gets hotter.
+
+The inside of an espresso machine gets hot, so never print the enclosure in
+PLA. Use PETG at least; ABS, or a composite that resists warping under heat,
+such as glass-fiber PETG, is better. The enclosure is a fit reference, not a
+heat or electrical rating: see [3D-printable enclosure](HARDWARE.md#3d-printable-enclosure).
+
+## 4. Wire it into the Micra
+
+Unplug the machine from the mains first. Measure which CN4 pins carry 5 V and
+GND before connecting anything, and connect CN9 only to the relay's **COM** and
+**NO** terminals.
+
+![Linea Micra wiring with power from the relay board's six-pin header](images/micra_diagram_header_power.png)
+
+<details>
+<summary>Cable list: which Dupont lead goes where</summary>
+
+![Linea Micra cable list: the Dupont leads for power, the paddle, CN9 and the optional buzzer](images/micra_cable_list.png)
+
+</details>
+
+Powering from the green terminal instead, or building a harness with housings?
+See [Linea Micra wiring](HARDWARE.md#linea-micra-wiring).
+
+## 5. Connect it to your Wi-Fi
+
+Plug the machine back in and turn it on: the controller starts with it.
 
 1. On your phone, join the **`OpenBrewByWeightAP-…`** network. The password is
    `ineedacoffee`. Stay joined even if the phone says there is no internet.
@@ -102,40 +136,6 @@ called Home; yours shows your own network and address.
 
 [First setup](GETTING_STARTED.md#connect-for-the-first-time) explains every
 choice on these screens in detail.
-
-## 4. Print the enclosure
-
-The controller goes inside the machine in its printed enclosure. Print one
-box-and-cover pair from [`stl/`](../stl/):
-
-- **Standard:** [`OpenBrewByWeight-Box.stl`](../stl/OpenBrewByWeight-Box.stl) and
-  [`OpenBrewByWeight-Cover.stl`](../stl/OpenBrewByWeight-Cover.stl).
-- **Thick:** [`OpenBrewByWeight-Box-thick.stl`](../stl/OpenBrewByWeight-Box-thick.stl)
-  and [`OpenBrewByWeight-Cover-thick.stl`](../stl/OpenBrewByWeight-Cover-thick.stl).
-  It holds its shape better where the controller gets hotter.
-
-The inside of an espresso machine gets hot, so never print the enclosure in
-PLA. Use PETG at least; ABS, or a composite that resists warping under heat,
-such as glass-fiber PETG, is better. The enclosure is a fit reference, not a
-heat or electrical rating: see [3D-printable enclosure](HARDWARE.md#3d-printable-enclosure).
-
-## 5. Wire it into the Micra
-
-Unplug the machine from the mains first. Measure which CN4 pins carry 5 V and
-GND before connecting anything, and connect CN9 only to the relay's **COM** and
-**NO** terminals.
-
-![Linea Micra wiring with power from the relay board's six-pin header](images/micra_diagram_header_power.png)
-
-<details>
-<summary>Cable list: which Dupont lead goes where</summary>
-
-![Linea Micra cable list: the Dupont leads for power, the paddle, CN9 and the optional buzzer](images/micra_cable_list.png)
-
-</details>
-
-Powering from the green terminal instead, or building a harness with housings?
-See [Linea Micra wiring](HARDWARE.md#linea-micra-wiring).
 
 ## 6. Pull the first shot
 

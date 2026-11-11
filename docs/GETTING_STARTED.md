@@ -59,7 +59,7 @@ start with [Hardware](HARDWARE.md).
    and how to open or close it — is in [Web UI access](settings/web-access.md).
 
 Screenshots of every setup screen are in the
-[Quickstart](QUICKSTART.md#3-connect-it-to-your-wi-fi).
+[Quickstart](QUICKSTART.md#5-connect-it-to-your-wi-fi).
 
 A wrong Wi-Fi password can be corrected right there: the reason appears at
 the top of the card, your entries stay in place, and **Connect** tries again.

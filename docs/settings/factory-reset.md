@@ -89,7 +89,7 @@ Follow [first setup](../GETTING_STARTED.md) using the
 [factory AP connection](ap.md#first-connection). Which scale returns to **My scale first**, with
 **First detected** shown until the first compatible scale connects
 successfully. See [Scales](scales.md), [AP](ap.md), and the
-[README first connection](../../README.md#first-connection).
+[first setup](../GETTING_STARTED.md#connect-for-the-first-time).
 
 ## If reset fails
 

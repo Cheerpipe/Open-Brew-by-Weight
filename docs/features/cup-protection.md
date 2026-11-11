@@ -77,7 +77,7 @@ manual no-scale cycles skip late retare and the initial earliest-weight-stop per
   than interpreting its mass as coffee.
 - **Cup lifted during brewing:** with cup protection and removal stop enabled,
   the controller requests stop. The physical stop mechanism depends on the
-  [machine type](../../README.md#machine-types).
+  [machine type](../HARDWARE.md#machine-types).
 
 Do not press the scale with a finger to cancel a shot: touch protection can
 ignore that load. Use the physical stop action for your

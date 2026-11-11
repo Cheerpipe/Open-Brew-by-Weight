@@ -12,6 +12,7 @@ needed rather than reading the entire directory.
 - [Build, test, and USB installation](BUILD.md)
 - [Troubleshooting](FAQ.md), [USB commands](SERIAL_CLI.md), [recovery](EMERGENCY_RECOVERY.md)
 - [Firmware updates (OTA)](features/ota.md), [screenshots](SCREENSHOTS.md)
+- [Technical glossary](GLOSSARY.md), [disclaimer](../DISCLAIMER.md)
 
 ## Features
 
@@ -110,6 +111,7 @@ risk gate in [VALIDATION.md](../VALIDATION.md).
 
 - [Project charter](../PROJECT_CHARTER.md)
 - [Validation gates](../VALIDATION.md)
+- [Testing and validation overview](TESTING.md)
 - [Contribution workflow](../CONTRIBUTING.md)
 - [AI workflow](AI_WORKFLOW.md)
 - [Build](BUILD.md) and [script reference](SCRIPTS.md)

@@ -16,6 +16,53 @@ path that makes the machine run — not as a Micra-specific name. Other machines
 intercept a different brew/run circuit with the same relay contract. Other guides call this the **machine circuit** so the term also applies to
 non-Micra installations.
 
+## Requirements
+
+- **Board:** the current built-in hardware profiles use an ESP32-S3 N16R8
+  (16 MB flash / 8 MB PSRAM). The [development relay board](#development-board)
+  has a specific GPIO map; another board needs a complete reviewed profile.
+- **Scale:** a supported Bluetooth model. Bookoo Themis Mini/Ultra were the
+  primary development scales. Check the [model and capability table](../libraries/EspressoScaleBLE/README.md#scale-compatibility);
+  implemented protocols are not all equally tested.
+- **Machine:** a compatible activation circuit connected only to isolated relay
+  contacts, plus a physical switch input appropriate to the selected build.
+- **Installation skills:** identify and verify your machine's electrical
+  connections, build the firmware, and test the installation on a bench.
+
+The controller sits inside the machine in a
+[printable enclosure](#3d-printable-enclosure), included in
+standard and thick versions. Print it in PETG or a more heat-resistant
+material, never PLA.
+Classic ESP32, boards without PSRAM, and Timemore scales are outside the current
+support scope.
+
+## How it works
+
+The controller reads your brew switch separately from the machine's activation
+circuit. It can therefore interpret your gesture and stop brewing according to
+the scale, recipe guards, or time limits.
+
+On paddle machines, the relay remains closed while brewing and opens to stop.
+On momentary machines, it copies button presses and sends a pulse to request a
+stop. **Opening that relay alone does not necessarily stop a momentary machine.**
+See [Machine types](#machine-types) before choosing a build.
+
+## Machine types
+
+Prefer a named [hardware and machine build profile](BUILD_PROFILES.md).
+The selected machine profile resolves the corresponding compile-time type; it
+is not a Web UI setting.
+
+| Build | Value | How the controller knows the group is running |
+| --- | ---: | --- |
+| [Paddle / latch](settings/paddle.md) | 0, default | Follows the maintained brew contact. Developed first for the Linea Micra. |
+| [Momentary](settings/momentary.md) | 1 | Infers flow from scale readings. Without confirmed flow, an automatic stop pulse may not be sent. |
+| [Momentary + reed](settings/momentary.md) | 2 | Uses an additional reed/hall input to observe the machine state. Preferred for momentary installations. |
+
+Support for a switch model is not certification of a particular espresso
+machine. The firmware's 60 s relay limit and the ability to stop water flow
+are different on momentary machines; read the [stop limitations](settings/momentary.md#stopping-and-time-limits).
+
 ## Parts checklist
 
 | Part | Selection requirement |
@@ -263,4 +310,4 @@ Micra**.
 
 Example used: [reed switch sensor module (AliExpress)](https://es.aliexpress.com/item/1005002797173105.html).
 
-Related: [Disclaimer](../README.md#disclaimer), [FAQ](FAQ.md).
+Related: [Disclaimer](../DISCLAIMER.md), [FAQ](FAQ.md).

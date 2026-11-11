@@ -343,7 +343,7 @@ BLE APIs from arbitrary application callbacks is not an equivalent integration.
 ## Espresso Machine Compatibility
 
 Machine wiring and stop behavior belong to the host application, not this scale
-library. Use the current [machine types](../../README.md#machine-types) and
+library. Use the current [machine types](../../docs/HARDWARE.md#machine-types) and
 [hardware guidance](../../docs/HARDWARE.md). Configure the application through
 [Build](../../docs/BUILD.md) and the [settings index](../../docs/README.md#settings).
 
