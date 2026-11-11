@@ -72,10 +72,12 @@ from a shopping list to your first shot by weight in six steps:
 
 | Need | Feature |
 | --- | --- |
+| Get started in minutes | Easy onboarding: a [guided setup page](docs/QUICKSTART.md#5-connect-it-to-your-wi-fi) on your phone walks you through how you brew, your password, and Wi-Fi |
 | Stop at your recipe's weight | [Brew by weight](docs/features/brew-by-weight.md): a predictive cut with learned drip compensation that learns your machine shot by shot |
 | Handle fast and slow shots | [Fast and slow shots](docs/features/fast-and-slow-shots.md): cut curves move the stop when a shot runs fast or slow |
 | Use different recipes | [Presets](docs/features/presets.md): factory Single and Double in Adaptive and Fixed versions, plus your own |
 | Follow the shot as it happens | A real-time shot timer and a live shot view while you brew |
+| See everything at a glance | A live dashboard on Home: the shot chart with its cut line, your presets, and the state of your scale and machine |
 | Review results | [Shot history and statistics](docs/features/shot-history.md), with export to Visualizer.coffee and the Gaggiuino format |
 | Log shots in Beanconqueror | [Beanconqueror](docs/settings/beanconqueror.md) imports your shots in the Gaggiuino or GaggiMate format, as if the controller were one of those machines |
 | Place the cup after starting | [Tare and retare](docs/features/tare-retare.md) |
@@ -84,9 +86,11 @@ from a shopping list to your first shot by weight in six steps:
 | Rinse with a switch gesture | [Quick rinse](docs/settings/quick-rinse.md), with a machine-profile default |
 | Use the scale you have | Bookoo, Acaia, Felicita, Decent, DiFluid, Varia, Eureka, and more; see [scale compatibility](libraries/EspressoScaleBLE/README.md#scale-compatibility) |
 | Fit your machine | Paddle, momentary, and momentary-plus-reed builds; see [Machine types](docs/HARDWARE.md#machine-types) |
-| Integrate with a Linea Micra | [La Marzocco Cloud](docs/settings/linea-micra.md) reads and sets each preset's brew-boiler temperature and knows when the paddle is only waking the machine |
+| Run on a small, inexpensive board | Extremely efficient use of the ESP32-S3: careful memory use and as few Wi-Fi transmissions as possible keep the radio free for your scale |
+| Integrate with a Linea Micra | [La Marzocco Cloud](docs/settings/linea-micra.md) keeps your scale and the machine's power in sync, so turning the scale on can wake the Micra and turning it off can put it on standby; it also sets each preset's brew-boiler temperature and knows when the paddle is only waking the machine |
 | Hear local feedback | [Alerts](docs/alerts.md): buzzer tones, or your Bookoo's own sounds |
-| Connect your smart home | [Home Assistant](docs/features/home-assistant.md) (integration in [its own repository](https://github.com/Cheerpipe/ha-open-brew-by-weight)), [webhooks](docs/features/webhooks.md), [notifications](docs/features/notifications.md), and the optional [companion](docs/features/companion.md) |
+| Connect your smart home | [Home Assistant](docs/features/home-assistant.md) (integration in [its own repository](https://github.com/Cheerpipe/ha-open-brew-by-weight)), [webhooks](docs/features/webhooks.md), and [notifications](docs/features/notifications.md) |
+| Go further (advanced users) | The optional [companion](docs/features/companion.md), a small server at home that opens the Web UI over HTTPS, lets several screens use it at once, and takes La Marzocco's cloud work off the controller |
 | Update safely without a USB cable | [Over-the-air updates](docs/features/ota.md) over Wi-Fi into a spare firmware slot, with boot verification and automatic rollback |
 | Recover from a mistake | [Emergency recovery](docs/EMERGENCY_RECOVERY.md) restores access or resets settings from the machine's own switch |
 
