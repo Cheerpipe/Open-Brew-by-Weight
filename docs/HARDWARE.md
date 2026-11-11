@@ -5,26 +5,8 @@ warnings.
 
 ## Installation readiness
 
-The board pin map and enclosure are documented below. Machine-specific wiring diagrams are provided as references.
-
-### Wiring Diagrams
-
-- **Linea Micra**:
-  ![Linea Micra wiring between the relay board and the machine control board: paddle cable, CN9 on the relay, CN4 power and the optional buzzer](images/micra_diagram.png)
-
-  **Alternative power wiring:** CN4 supplies 5 V, the voltage the controller
-  board itself runs on, so on the Micra you can instead wire CN4 to the **5V**
-  and **GND** pins of the board's six-pin header and leave the green terminal
-  empty. The header's 5V pin is the board's own 5 V supply, so only connect it
-  to a source you have measured at 5 V.
-
-  ![Linea Micra alternative wiring: CN4 power to the 5V and GND pins of the relay board's six-pin header](images/micra_diagram_header_power.png)
-
-  **Cable list:** these are the Dupont leads for the header-power wiring.
-  20 cm leads reach every connector without cutting the machine's factory zip
-  tie, so you can undo the installation completely.
-
-  ![Linea Micra cable list: the Dupont leads for power, the paddle, CN9 and the optional buzzer](images/micra_cable_list.png)
+The board pin map and enclosure are documented below, together with
+reference wiring for the Linea Micra.
 
 Treat the diagrams as references, and do not assume compatibility from a machine name. Before connecting a machine, obtain and verify its circuit documentation and complete the applicable [bench tests](MANUAL_TEST_PLAN.md). This page cannot replace complete electrical verification.
 
@@ -41,7 +23,8 @@ non-Micra installations.
 | ESP32-S3 relay controller | Supported PSRAM variant; verify actual module, GPIO map and relay polarity against the board below. |
 | Power source | Voltage, isolation, capacity, and protection verified for the actual board and machine. The repository does not define a universal machine power tap. |
 | Wiring, connectors, mounting | Correct ratings, insulation, strain relief and clearance for the installation; machine-specific part numbers remain unverified. |
-| Dupont leads (Linea Micra) | One [pack of 20 cm Dupont leads](https://www.aliexpress.com/item/1005006754560696.html), option **20cm 3kinds 120pcs** (female–female, male–male and male–female), has everything needed to connect the controller to the Micra with single 1×1 leads. For the bare ends at the relay, cut one end off a lead and strip it. See the [cable list](#wiring-diagrams). |
+| Dupont leads (Linea Micra) | One [pack of 20 cm Dupont leads](https://www.aliexpress.com/item/1005006754560696.html), option **20cm 3kinds 120pcs** (female–female, male–male and male–female), has everything needed to connect the controller to the Micra with single 1×1 leads. See [Linea Micra cables](#linea-micra-cables). |
+| Dupont housings (Linea Micra, optional) | One [2×10 housing](https://www.aliexpress.com/item/1005012190859135.html), plus one 1×6 and three 1×4 housings from an [assorted housing pack](https://www.aliexpress.com/item/1005012842619301.html). These listings are only examples. |
 | Bluetooth scale | Check [model capabilities](../libraries/EspressoScaleBLE/README.md#scale-compatibility). |
 | Reed/hall feedback | Recommended for momentary machines; input must be compatible with the ESP32 and isolated from the machine circuit. |
 | Local sound | Optional passive buzzer; see [connection notes](#local-buzzer). |
@@ -52,6 +35,48 @@ The functional path is physical switch → ESP32 input → control policy →
 isolated relay contacts → machine activation circuit. It is a signal-flow
 description, not a wiring schematic. Paddle uses a maintained contact;
 momentary uses press/stop pulses.
+
+## Linea Micra wiring
+
+The paddle cable, CN9 and the optional buzzer are wired the same way in both
+layouts; they differ only in where the controller takes its power from CN4.
+
+### Power from the green terminal
+
+![Linea Micra wiring between the relay board and the machine control board: paddle cable, CN9 on the relay, CN4 power and the optional buzzer](images/micra_diagram.png)
+
+### Power from the six-pin header
+
+CN4 supplies 5 V, the voltage the controller board itself runs on, so on the
+Micra you can instead wire CN4 to the **5V** and **GND** pins of the board's
+six-pin header and leave the green terminal empty. The header's 5V pin is the
+board's own 5 V supply, so only connect it to a source you have measured at
+5 V.
+
+![Linea Micra alternative wiring: CN4 power to the 5V and GND pins of the relay board's six-pin header](images/micra_diagram_header_power.png)
+
+## Linea Micra cables
+
+Use 20 cm Dupont leads: they reach every connector without cutting the
+machine's factory zip tie, so you can undo the installation completely. Both
+options below are for the six-pin header layout.
+
+### Single Dupont leads
+
+Every connection uses its own 1×1 lead. For the bare ends at the relay, cut
+one end off a lead and strip it.
+
+![Linea Micra cable list: the Dupont leads for power, the paddle, CN9 and the optional buzzer](images/micra_cable_list.png)
+
+### Dupont housings (optional)
+
+Grouping the same leads into multi-pin housings is recommended because it
+makes a tidier install that is harder to plug in wrong, but it is not
+essential: single 1×1 leads work just as well. Slide the single housings off
+the leads and push their crimped ends into the larger housings, lining up
+position 1 with the triangle.
+
+![Linea Micra harness: a 2×10 housing for the paddle and buzzer, 1×4 housings for the paddle plug, CN9 and CN4, and a 1×6 housing for the six-pin header](images/micra_harness.png)
 
 ## Development board
 
