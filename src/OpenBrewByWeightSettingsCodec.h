@@ -114,7 +114,7 @@ inline constexpr SettingsField SETTINGS_PRESET_FIELDS[] = {
     SF(13, scaleLossFixedMs), SF(14, learningEpoch), SF(15, bbwEwmaOffsetG),
     SF(16, weightOffsetBaselineG), SF(17, fastSideEnabled), SF(18, slowSideEnabled),
     SF(19, grindHintsEnabled), SF(20, bbwEwmaAlpha), SF(21, bbwAlphaLearned),
-    SF(22, bbwAlphaBaseline), SF(23, lineaMicraBrewTargetDeciC), SF(24, fastRampMs),
+    SF(22, bbwAlphaBaseline), SF(23, laMarzoccoBrewTargetDeciC), SF(24, fastRampMs),
     SF(25, slowRampMs), SF(26, fastCurve), SF(27, fastCurveHardness), SF(28, slowCurve),
     SF(29, slowCurveHardness), SF(30, fastCurveHardnessPct), SF(31, slowCurveHardnessPct)};
 #undef SF
@@ -151,8 +151,8 @@ inline constexpr SettingsField SETTINGS_WEBHOOK_FIELDS[] = {
     SF(6, deferDuringShot), SF(7, presetChanges)};
 #undef SF
 
-#define SF(tag, member) OBBW_SETTINGS_FIELD(tag, LineaMicraPersistedSettings, member)
-inline constexpr SettingsField SETTINGS_MICRA_FIELDS[] = {
+#define SF(tag, member) OBBW_SETTINGS_FIELD(tag, LaMarzoccoPersistedSettings, member)
+inline constexpr SettingsField SETTINGS_LA_MARZOCCO_FIELDS[] = {
     SF(1, username), SF(2, password), SF(3, installationPrivateKey),
     SF(4, selectedSerial), SF(5, selectedName), SF(6, options), SF(7, scaleOptions),
     SF(8, accountConfigured), SF(9, connectionType)};
@@ -167,7 +167,7 @@ enum SettingsGroupTag : uint8_t {
   SETTINGS_GROUP_PRESET_BANK = 5,
   SETTINGS_GROUP_SCALE_HISTORY = 6,
   SETTINGS_GROUP_WEBHOOK = 7,
-  SETTINGS_GROUP_MICRA = 8,
+  SETTINGS_GROUP_LA_MARZOCCO = 8,
 };
 
 constexpr size_t settingsVarintBytes(size_t value) {
@@ -219,14 +219,14 @@ static_assert(settingsFieldBytes(SETTINGS_SCALE_HISTORY_FIELDS) + 2 ==
               "every ScaleHistoryEntry member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_WEBHOOK_FIELDS) == sizeof(WebhookConfig),
               "every WebhookConfig member needs a settings field row");
-static_assert(settingsFieldBytes(SETTINGS_MICRA_FIELDS) ==
-                  sizeof(LineaMicraPersistedSettings),
-              "every LineaMicraPersistedSettings member needs a settings field row");
+static_assert(settingsFieldBytes(SETTINGS_LA_MARZOCCO_FIELDS) ==
+                  sizeof(LaMarzoccoPersistedSettings),
+              "every LaMarzoccoPersistedSettings member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_DEVICE_FIELDS) +
                       sizeof(PersistedSettings::storageRevision) + sizeof(RuntimeConfig) +
                       sizeof(BullseyeMelodyConfig) + sizeof(ShotPresetBank) +
                       sizeof(PersistedSettings::scaleHistory) + sizeof(WebhookConfig) +
-                      sizeof(LineaMicraPersistedSettings) + 7 ==
+                      sizeof(LaMarzoccoPersistedSettings) + 7 ==
                   sizeof(PersistedSettings),
               "every PersistedSettings member needs a settings field row or group");
 
@@ -240,7 +240,7 @@ constexpr size_t PERSISTED_SETTINGS_ENCODED_MAX_BYTES =
     SCALE_HISTORY_CAPACITY *
         settingsGroupMaxBytes(SETTINGS_GROUP_SCALE_HISTORY, SETTINGS_SCALE_HISTORY_FIELDS) +
     settingsGroupMaxBytes(SETTINGS_GROUP_WEBHOOK, SETTINGS_WEBHOOK_FIELDS) +
-    settingsGroupMaxBytes(SETTINGS_GROUP_MICRA, SETTINGS_MICRA_FIELDS);
+    settingsGroupMaxBytes(SETTINGS_GROUP_LA_MARZOCCO, SETTINGS_LA_MARZOCCO_FIELDS);
 static_assert(PERSISTED_SETTINGS_ENCODED_MAX_BYTES <= PERSISTED_SETTINGS_NVS_BUDGET,
               "Encoded settings exceed the NVS budget earlier firmware can read");
 
@@ -398,7 +398,7 @@ inline bool decodeSettingsGroup(SettingsReader group, const SettingsField (&fiel
     encodeSettingsGroup(writer, SETTINGS_GROUP_SCALE_HISTORY, SETTINGS_SCALE_HISTORY_FIELDS,
                         &entry);
   encodeSettingsGroup(writer, SETTINGS_GROUP_WEBHOOK, SETTINGS_WEBHOOK_FIELDS, &settings.webhook);
-  encodeSettingsGroup(writer, SETTINGS_GROUP_MICRA, SETTINGS_MICRA_FIELDS, &settings.lineaMicra);
+  encodeSettingsGroup(writer, SETTINGS_GROUP_LA_MARZOCCO, SETTINGS_LA_MARZOCCO_FIELDS, &settings.laMarzocco);
   const size_t body = writer.at - SETTINGS_BLOB_HEADER_BYTES;
   if (!writer.ok || body > UINT16_MAX) return 0;
   const uint32_t magic = PERSISTED_SETTINGS_MAGIC;
@@ -477,8 +477,8 @@ inline bool settingsBlobIntact(const uint8_t *blob, size_t length, uint32_t &rev
       case SETTINGS_GROUP_WEBHOOK:
         framed = decodeSettingsGroup(group, SETTINGS_WEBHOOK_FIELDS, &settings.webhook, malformed);
         break;
-      case SETTINGS_GROUP_MICRA:
-        framed = decodeSettingsGroup(group, SETTINGS_MICRA_FIELDS, &settings.lineaMicra,
+      case SETTINGS_GROUP_LA_MARZOCCO:
+        framed = decodeSettingsGroup(group, SETTINGS_LA_MARZOCCO_FIELDS, &settings.laMarzocco,
                                      malformed);
         break;
       default:

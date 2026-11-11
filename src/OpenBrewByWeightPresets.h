@@ -3,7 +3,7 @@
 #include <initializer_list>
 
 #include "OpenBrewByWeightDomain.h"
-#include "machine/OpenBrewByWeightLineaMicraSettings.h"
+#include "machine/OpenBrewByWeightLaMarzoccoSettings.h"
 
 namespace openbrewbyweight {
 
@@ -115,8 +115,8 @@ inline bool validateShotPresetRecipe(const ShotPreset &preset,
                                      bool machineAutoRetare) {
   if (!validBbwAlpha(preset.bbwEwmaAlpha) ||
       !validBbwAlpha(preset.bbwAlphaBaseline) || preset.bbwAlphaLearned > 1 ||
-      preset.lineaMicraBrewTargetDeciC < LINEA_MICRA_BREW_TARGET_MIN_DECI_C ||
-      preset.lineaMicraBrewTargetDeciC > LINEA_MICRA_BREW_TARGET_MAX_DECI_C ||
+      preset.laMarzoccoBrewTargetDeciC < LA_MARZOCCO_BREW_TARGET_MIN_DECI_C ||
+      preset.laMarzoccoBrewTargetDeciC > LA_MARZOCCO_BREW_TARGET_MAX_DECI_C ||
       preset.doseDg < MIN_DOSE_DG || preset.doseDg > MAX_DOSE_DG ||
       !std::isfinite(preset.bbwEwmaOffsetG) || preset.bbwEwmaOffsetG < 0.0f ||
       preset.bbwEwmaOffsetG > MAX_OFFSET_G) return false;

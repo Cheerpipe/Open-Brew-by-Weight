@@ -5,7 +5,7 @@
 namespace openbrewbyweight {
 
 bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) const {
-  const MicraCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
+  const LaMarzoccoCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
   const uint32_t now = millis();
   TaskLockGuard lock(dataMux_);
   companionPairTick(g_companion.pairing, now);
@@ -47,7 +47,7 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) const {
 
 // Diagnostic → Companion: the pairing, its link and the La Marzocco route.
 void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) const {
-  const MicraCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
+  const LaMarzoccoCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();
   out.route = companionRouteName(route.route);
   out.reason = route.reason != nullptr ? route.reason : "none";
   out.upstream = route.upstreamSubscribed;

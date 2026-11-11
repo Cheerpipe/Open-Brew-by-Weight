@@ -7,7 +7,7 @@
 namespace openbrewbyweight {
 
 // One PSRAM-owned accumulator. Network spans never escape the receive callback.
-struct MicraStompFrame {
+struct LaMarzoccoStompFrame {
   char command[16] = {};
   char destination[128] = {};
   char subscription[40] = {};
@@ -18,12 +18,12 @@ struct MicraStompFrame {
   uint32_t ingressAttempt = 0;
 };
 
-class MicraStompDecoder {
+class LaMarzoccoStompDecoder {
  public:
   static constexpr size_t kHeaderLimit = 1024;
   static constexpr size_t kBodyLimit = 16384;
   static constexpr size_t kCapacity = kHeaderLimit + kBodyLimit + 2;
-  using Consumer = bool (*)(void *, const MicraStompFrame &);
+  using Consumer = bool (*)(void *, const LaMarzoccoStompFrame &);
 
   void reset() { used_ = bodyOffset_ = 0; startedAtMs_ = 0; hasLength_ = false; frame_ = {}; }
   uint32_t pendingSince() const { return used_ ? startedAtMs_ : 0; }
@@ -149,7 +149,7 @@ class MicraStompDecoder {
   size_t used_ = 0, bodyOffset_ = 0;
   uint32_t startedAtMs_ = 0;
   bool hasLength_ = false;
-  MicraStompFrame frame_;
+  LaMarzoccoStompFrame frame_;
   char bytes_[kCapacity] = {};
 };
 }  // namespace openbrewbyweight

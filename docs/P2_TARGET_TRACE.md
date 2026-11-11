@@ -42,7 +42,7 @@ from BLE Candidate→connect→Ready. Include both an established WSS connection
 and residual DNS/connect setup; transport completion is not RF silence.
 Correlate generic `outboundPause` generation/reason and per-client completion
 with WS lifecycle, power/message/pong ages, receive/transmit payload rates,
-publication latency, cleaning availability and `heapLifecycle.micraWebsocket`.
+publication latency, cleaning availability and `heapLifecycle.laMarzoccoWebsocket`.
 Measure machine action→cloud arrival, fragment assembly, STOMP callback duration
 and validated-frame→facade publication separately, including a stalled HTTP
 operation and large multiline frames. Confirm that an established subscription

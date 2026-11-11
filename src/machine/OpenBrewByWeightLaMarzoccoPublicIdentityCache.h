@@ -4,7 +4,7 @@
 
 namespace openbrewbyweight {
 
-struct MicraPublicIdentityCache {
+struct LaMarzoccoPublicIdentityCache {
   char id[37] = {};
   char publicKeyBase64[128] = {};
 

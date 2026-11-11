@@ -97,7 +97,7 @@ enum : uint16_t {
   SHOT_TRACE_SNAP_EMPTY_VALID = 1U << 10,
   SHOT_TRACE_SNAP_IDLE_ELIGIBLE = 1U << 11,
   SHOT_TRACE_SNAP_SCALE_TARE = 1U << 12,
-  SHOT_TRACE_SNAP_MICRA_CONNECTED = 1U << 13,
+  SHOT_TRACE_SNAP_LA_MARZOCCO_CONNECTED = 1U << 13,
   SHOT_TRACE_SNAP_RSSI_VALID = 1U << 14,
 };
 
@@ -181,7 +181,7 @@ struct ShotTraceCounters {
   uint32_t undecodableFrames;
   uint32_t confirmationResets;  // over-line chains that broke before a stop
   uint32_t loopGapMaxMs;
-  uint32_t micraRxBytes;
+  uint32_t laMarzoccoRxBytes;
   uint32_t uiStreamDeferrals;
   uint32_t verboseDropped;
   uint32_t decisionsDropped;
@@ -330,7 +330,7 @@ class ShotTrace {
     confirmationResets_.store(0, std::memory_order_relaxed);
     staleFrames_.store(0, std::memory_order_relaxed);
     undecodableFrames_.store(0, std::memory_order_relaxed);
-    micraRx_.store(0, std::memory_order_relaxed);
+    laMarzoccoRx_.store(0, std::memory_order_relaxed);
     uiDeferrals_.store(0, std::memory_order_relaxed);
     for (size_t i = SHOT_TRACE_STATE_IDLE_ELIGIBILITY; i < SHOT_TRACE_STATE_COUNT; ++i)
       stateKnown_[i] = false;  // Recorded as initial.
@@ -396,8 +396,8 @@ class ShotTrace {
     header.preShotCapacity = SHOT_TRACE_PRESHOT_CAPACITY;
     header.bootId = bootId;
     buffer.snapshot = snapshot;
-    if (micraSubscribed_.load(std::memory_order_relaxed))
-      buffer.snapshot.flags |= SHOT_TRACE_SNAP_MICRA_CONNECTED;
+    if (laMarzoccoSubscribed_.load(std::memory_order_relaxed))
+      buffer.snapshot.flags |= SHOT_TRACE_SNAP_LA_MARZOCCO_CONNECTED;
     memset(buffer.preShot, 0, sizeof(buffer.preShot));
     for (size_t i = 0; i < ringCount_; ++i) {
       buffer.preShot[i] = shotTraceStore.ring[i];
@@ -644,12 +644,12 @@ class ShotTrace {
       loopGapMax_.store(gapMs, std::memory_order_relaxed);
   }
 
-  void noteMicraRx(uint32_t bytes) {
-    if (capturing()) micraRx_.fetch_add(bytes, std::memory_order_relaxed);
+  void noteLaMarzoccoRx(uint32_t bytes) {
+    if (capturing()) laMarzoccoRx_.fetch_add(bytes, std::memory_order_relaxed);
   }
 
-  void noteMicraSubscribed(bool subscribed) {
-    micraSubscribed_.store(subscribed, std::memory_order_relaxed);
+  void noteLaMarzoccoSubscribed(bool subscribed) {
+    laMarzoccoSubscribed_.store(subscribed, std::memory_order_relaxed);
   }
 
   void noteUiDeferral() {
@@ -760,7 +760,7 @@ class ShotTrace {
     tracesDropped_ = 0;
     ringCount_ = 0;
     for (bool &known : stateKnown_) known = false;
-    micraSubscribed_.store(false);
+    laMarzoccoSubscribed_.store(false);
   }
 #endif
 
@@ -849,7 +849,7 @@ class ShotTrace {
     counters.undecodableFrames = undecodableFrames_.load(std::memory_order_relaxed);
     counters.confirmationResets = confirmationResets_.load(std::memory_order_relaxed);
     counters.loopGapMaxMs = loopGapMax_.load(std::memory_order_relaxed);
-    counters.micraRxBytes = micraRx_.load(std::memory_order_relaxed);
+    counters.laMarzoccoRxBytes = laMarzoccoRx_.load(std::memory_order_relaxed);
     counters.uiStreamDeferrals = uiDeferrals_.load(std::memory_order_relaxed);
   }
 
@@ -1009,7 +1009,7 @@ class ShotTrace {
 
   mutable TaskMutex mux_;
   std::atomic<bool> capturing_{false};
-  std::atomic<bool> micraSubscribed_{false};
+  std::atomic<bool> laMarzoccoSubscribed_{false};
   ShotTraceBuffer *capture_ = &shotTraceStore.buffers[0];
   ShotTraceBuffer *completed_ = &shotTraceStore.buffers[1];
   uint32_t generation_ = 0;  // The last completion's; 0: none since boot.
@@ -1027,7 +1027,7 @@ class ShotTrace {
   std::atomic<uint32_t> received_{0}, accepted_{0}, held_{0};
   std::atomic<uint32_t> gapSum_{0}, gapMin_{UINT32_MAX}, gapMax_{0};
   std::atomic<uint32_t> confirmationResets_{0}, staleFrames_{0}, undecodableFrames_{0};
-  std::atomic<uint32_t> loopGapMax_{0}, micraRx_{0}, uiDeferrals_{0};
+  std::atomic<uint32_t> loopGapMax_{0}, laMarzoccoRx_{0}, uiDeferrals_{0};
 };
 
 // Shared instance across the control and network units; the scale worker

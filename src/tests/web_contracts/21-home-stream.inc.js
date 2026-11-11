@@ -131,14 +131,14 @@
   assert(!rest.includes('loadControlStatus') || rest.indexOf('loadControlStatus') > rest.indexOf('// JSON / snapshot'),
       'routing must not snapshot control state');
   for (const legacy of ['homeLastShot', 'homeHistoryLinked', 'safeHomeShot', '"\\"shotCurve']) assert(!rest.includes(legacy));
-  const formatCleaning = context.formatMicraCleaning;
+  const formatCleaning = context.formatLaMarzoccoCleaning;
   const lm = {accountConfigured: true, observeState: true, connectionType: 'websocket', websocket: {cleaningAvailable: true}};
   for (const [cleaning, expected] of [['inactive', 'Not running'], ['waiting_for_paddle', 'Ready · paddle to ON'], ['cleaning', 'Running']])
     assert.equal(formatCleaning({...lm, websocket: {...lm.websocket, cleaning}}), expected);
   assert.equal(formatCleaning({...lm, connectionType: 'api'}), 'Needs WebSocket');
   assert.equal(formatCleaning({...lm, observeState: false}), 'Disabled');
-  assert(codeIncludes(viewJs.diagnostic, "set('Cleaning',R.formatMicraCleaning(lm))"));
-  assert(codeIncludes(viewJs.home, 'R.formatMicraCleaning(s.lineaMicra)'));
+  assert(codeIncludes(viewJs.diagnostic, "set('Cleaning',R.formatLaMarzoccoCleaning(lm))"));
+  assert(codeIncludes(viewJs.home, 'R.formatLaMarzoccoCleaning(s.laMarzocco)'));
 }
 
 // Execute the firmware's bounded field writer itself, including unchanged,

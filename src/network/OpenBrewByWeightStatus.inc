@@ -132,11 +132,11 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         "\"bluetoothConnected\":%s,\"bluetoothLevel\":%s,"
         "\"wifiName\":\"%s\",\"bluetoothName\":\"%s\"}",
         compiledMachineTypeId(),
-        // The wire token keeps its first name, like the lineaMicra keys: a Web
+        // The wire token keeps its first name, like the laMarzocco keys: a Web
         // UI shell cached from older firmware shows the La Marzocco controls
         // only when it reads this value.
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
-        "linea_micra_cloud",
+        "la_marzocco_cloud",
 #else
         "none",
 #endif

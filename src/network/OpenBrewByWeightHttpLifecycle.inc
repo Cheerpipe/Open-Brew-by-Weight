@@ -1,7 +1,7 @@
 // Linea Micra settings persist without a maintenance lease (see the control
-// task's SAVE_LINEA_MICRA case); every other accepted write holds one.
+// task's SAVE_LA_MARZOCCO case); every other accepted write holds one.
 static bool leaseFreeCommand(const WebCommand &command) {
-  return command.type == WebCommandType::SAVE_LINEA_MICRA &&
+  return command.type == WebCommandType::SAVE_LA_MARZOCCO &&
          command.maintenanceLeaseId == 0;
 }
 
@@ -102,8 +102,8 @@ void OpenBrewByWeightNetwork::processAcceptedMaintenanceCommand(uint32_t now) {
       if (acceptedCommand_.type == WebCommandType::SAVE_WEBHOOK) {
         clearStagedWebhook(acceptedCommand_.stagedConfigRequestId);
       }
-      if (acceptedCommand_.type == WebCommandType::SAVE_LINEA_MICRA) {
-        clearStagedLineaMicra(acceptedCommand_.stagedConfigRequestId);
+      if (acceptedCommand_.type == WebCommandType::SAVE_LA_MARZOCCO) {
+        clearStagedLaMarzocco(acceptedCommand_.stagedConfigRequestId);
       }
       if (acceptedCommand_.type == WebCommandType::START_WIFI_SCAN) {
         // The handler published an optimistic QUEUED for this command; the
@@ -122,8 +122,8 @@ void OpenBrewByWeightNetwork::processAcceptedMaintenanceCommand(uint32_t now) {
     if (acceptedCommand_.type == WebCommandType::SAVE_WEBHOOK) {
       clearStagedWebhook(acceptedCommand_.stagedConfigRequestId);
     }
-    if (acceptedCommand_.type == WebCommandType::SAVE_LINEA_MICRA) {
-      clearStagedLineaMicra(acceptedCommand_.stagedConfigRequestId);
+    if (acceptedCommand_.type == WebCommandType::SAVE_LA_MARZOCCO) {
+      clearStagedLaMarzocco(acceptedCommand_.stagedConfigRequestId);
     }
     if (acceptedCommand_.type == WebCommandType::START_WIFI_SCAN) {
       abortWifiScan(now, false);
@@ -150,8 +150,8 @@ void OpenBrewByWeightNetwork::processAcceptedMaintenanceCommand(uint32_t now) {
     if (acceptedCommand_.type == WebCommandType::SAVE_WEBHOOK) {
       clearStagedWebhook(acceptedCommand_.stagedConfigRequestId);
     }
-    if (acceptedCommand_.type == WebCommandType::SAVE_LINEA_MICRA) {
-      clearStagedLineaMicra(acceptedCommand_.stagedConfigRequestId);
+    if (acceptedCommand_.type == WebCommandType::SAVE_LA_MARZOCCO) {
+      clearStagedLaMarzocco(acceptedCommand_.stagedConfigRequestId);
     }
     (void)enqueueMaintenanceCompletion(acceptedCommand_, false);
     log(DebugCategory::SECURITY, DebugCode::COMMAND_FAILED,
@@ -261,26 +261,26 @@ bool OpenBrewByWeightNetwork::processPersistedCommand(const WebCommand &command)
       break;
     }
 
-    case WebCommandType::SAVE_LINEA_MICRA: {
-      LineaMicraPersistedSettings staged = {};
+    case WebCommandType::SAVE_LA_MARZOCCO: {
+      LaMarzoccoPersistedSettings staged = {};
       dataMux_.lock();
-      const bool matches = stagedLineaMicraRequestId_ != 0 &&
-                           stagedLineaMicraRequestId_ ==
+      const bool matches = stagedLaMarzoccoRequestId_ != 0 &&
+                           stagedLaMarzoccoRequestId_ ==
                                command.stagedConfigRequestId;
-      if (matches) staged = stagedLineaMicra_;
+      if (matches) staged = stagedLaMarzocco_;
       dataMux_.unlock();
-      if (!matches || !validLineaMicraSettings(staged)) {
+      if (!matches || !validLaMarzoccoSettings(staged)) {
         log(DebugCategory::CONFIG, DebugCode::CONFIG_REJECTED);
         return false;
       }
       // A Settings-page change lives in the PSRAM record; the deferred
       // settings persist decides when it reaches flash.
       dataMux_.lock();
-      settings_.lineaMicra = staged;
+      settings_.laMarzocco = staged;
       dataMux_.unlock();
-      next.lineaMicra = staged;
-      wipeLineaMicraSettings(staged);
-      clearStagedLineaMicra(command.stagedConfigRequestId);
+      next.laMarzocco = staged;
+      wipeLaMarzoccoSettings(staged);
+      clearStagedLaMarzocco(command.stagedConfigRequestId);
       publishMachineIntegrationConfig(next, next.storageRevision);
       networkSettingsPersistRequested.store(true, std::memory_order_release);
       return true;

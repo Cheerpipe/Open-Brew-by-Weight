@@ -1,7 +1,7 @@
 #pragma once
 
-#include "OpenBrewByWeightLineaMicraTypes.h"
-#include "OpenBrewByWeightMicraTiming.h"
+#include "OpenBrewByWeightLaMarzoccoTypes.h"
+#include "OpenBrewByWeightLaMarzoccoTiming.h"
 
 namespace openbrewbyweight {
 
@@ -20,35 +20,35 @@ namespace openbrewbyweight {
 // an assumption and local evidence only moves it toward ON.
 enum class OptimisticDirection : uint8_t { NONE, ON, OFF };
 
-class LineaMicraPowerStateTracker {
+class LaMarzoccoPowerStateTracker {
  public:
-  LineaMicraStatus effectiveStatus(const LineaMicraStatus &authoritative,
+  LaMarzoccoStatus effectiveStatus(const LaMarzoccoStatus &authoritative,
                                    bool observing, uint32_t now) const {
-    LineaMicraStatus result = authoritative;
+    LaMarzoccoStatus result = authoritative;
     if (!observing || result.sampleAtMs == 0) {
-      result.powerState = LineaMicraPowerState::UNKNOWN;
+      result.powerState = LaMarzoccoPowerState::UNKNOWN;
       result.effectiveOn = true;
     } else if (direction_ != OptimisticDirection::NONE &&
         static_cast<uint32_t>(now - optimisticAtMs_) <
-            micra_timing::kOptimisticOverlayMs) {
-      result.quality = LineaMicraObservationQuality::OPTIMISTIC;
+            la_marzocco_timing::kOptimisticOverlayMs) {
+      result.quality = LaMarzoccoObservationQuality::OPTIMISTIC;
       result.effectiveOn = direction_ == OptimisticDirection::ON;
       result.optimisticOn = direction_ == OptimisticDirection::ON;
       result.optimisticOff = direction_ == OptimisticDirection::OFF;
     } else if (!result.connectionFreshness &&
-               result.powerState != LineaMicraPowerState::UNKNOWN &&
+               result.powerState != LaMarzoccoPowerState::UNKNOWN &&
                static_cast<uint32_t>(now - result.sampleAtMs) >=
-                   micra_timing::kStateFreshnessMs) {
-      result.quality = LineaMicraObservationQuality::STALE;
+                   la_marzocco_timing::kStateFreshnessMs) {
+      result.quality = LaMarzoccoObservationQuality::STALE;
     }
     if (observing && held_) {
       const bool expired = static_cast<uint32_t>(now - heldAtMs_) >=
-                           micra_timing::kStaleRetentionMs;
+                           la_marzocco_timing::kStaleRetentionMs;
       result.powerState = heldKnown_ && !expired
-          ? (heldOn_ ? LineaMicraPowerState::ON : LineaMicraPowerState::OFF)
-          : LineaMicraPowerState::UNKNOWN;
+          ? (heldOn_ ? LaMarzoccoPowerState::ON : LaMarzoccoPowerState::OFF)
+          : LaMarzoccoPowerState::UNKNOWN;
       result.effectiveOn = expired || heldOn_;
-      result.quality = LineaMicraObservationQuality::STALE;
+      result.quality = LaMarzoccoObservationQuality::STALE;
       result.optimisticOn = result.optimisticOff = false;
     }
     return result;
@@ -59,19 +59,19 @@ class LineaMicraPowerStateTracker {
   // (a held assumption or no reading yet); a live overlay from a
   // cloud-accepted command and an unsupported mode (the machine does not
   // report power) are left alone. Independent of Recognize wake gesture.
-  void notePhysicalEvidence(const LineaMicraStatus &authoritative, bool observing,
+  void notePhysicalEvidence(const LaMarzoccoStatus &authoritative, bool observing,
                             uint32_t now) {
     if (!observing ||
-        authoritative.quality == LineaMicraObservationQuality::UNSUPPORTED ||
+        authoritative.quality == LaMarzoccoObservationQuality::UNSUPPORTED ||
         (!held_ && authoritative.sampleAtMs != 0) ||
         (direction_ != OptimisticDirection::NONE &&
-         static_cast<uint32_t>(now - optimisticAtMs_) < micra_timing::kOptimisticOverlayMs))
+         static_cast<uint32_t>(now - optimisticAtMs_) < la_marzocco_timing::kOptimisticOverlayMs))
       return;
     held_ = heldOn_ = heldKnown_ = true;
     heldAtMs_ = now;
   }
 
-  bool notePhysicalStart(const LineaMicraStatus &authoritative, bool observing,
+  bool notePhysicalStart(const LaMarzoccoStatus &authoritative, bool observing,
                          bool recognizeWake, uint32_t now) {
     if (!recognizeWake) return false;
     return notePowerOnCommandAccepted(authoritative, observing, now);
@@ -81,7 +81,7 @@ class LineaMicraPowerStateTracker {
   // wake gesture or a scale-triggered turn-on — once the confirmed state is
   // OFF, current or stale: the machine is certainly waking, but the dashboard
   // has not said so yet.
-  bool notePowerOnCommandAccepted(const LineaMicraStatus &authoritative,
+  bool notePowerOnCommandAccepted(const LaMarzoccoStatus &authoritative,
                                   bool observing, uint32_t now) {
     return arm(authoritative, observing, OptimisticDirection::ON, now);
   }
@@ -89,33 +89,33 @@ class LineaMicraPowerStateTracker {
   // A scale shutdown only asserts optimistic OFF once the cloud command was
   // accepted and the confirmed state is ON, current or stale: the machine is
   // certainly heading to standby, but the dashboard has not said so yet.
-  bool noteStandbyCommandAccepted(const LineaMicraStatus &authoritative,
+  bool noteStandbyCommandAccepted(const LaMarzoccoStatus &authoritative,
                                   bool observing, uint32_t now) {
     return arm(authoritative, observing, OptimisticDirection::OFF, now);
   }
 
   uint32_t generation() const { return generation_; }
 
-  void hold(const LineaMicraStatus &authoritative, bool observing, uint32_t now) {
+  void hold(const LaMarzoccoStatus &authoritative, bool observing, uint32_t now) {
     if (!observing || held_) return;
     const auto effective = effectiveStatus(authoritative, observing, now);
     heldOn_ = effective.effectiveOn;
-    heldKnown_ = effective.powerState != LineaMicraPowerState::UNKNOWN;
+    heldKnown_ = effective.powerState != LaMarzoccoPowerState::UNKNOWN;
     held_ = true;
     heldAtMs_ = now;
   }
 
-  bool noteEvidence(uint32_t intent, LineaMicraPowerState state,
+  bool noteEvidence(uint32_t intent, LaMarzoccoPowerState state,
                     uint32_t now, bool reconcile) {
     if (intent != generation_) return false;
     const bool live = direction_ != OptimisticDirection::NONE &&
-        static_cast<uint32_t>(now - optimisticAtMs_) < micra_timing::kOptimisticOverlayMs;
-    const bool matches = state != LineaMicraPowerState::UNKNOWN &&
-        (state == LineaMicraPowerState::ON) == (direction_ == OptimisticDirection::ON);
+        static_cast<uint32_t>(now - optimisticAtMs_) < la_marzocco_timing::kOptimisticOverlayMs;
+    const bool matches = state != LaMarzoccoPowerState::UNKNOWN &&
+        (state == LaMarzoccoPowerState::ON) == (direction_ == OptimisticDirection::ON);
     if (!live || matches || (reconcile &&
-        static_cast<uint32_t>(now - optimisticAtMs_) >= micra_timing::kPostWakeObservationDelayMs)) {
+        static_cast<uint32_t>(now - optimisticAtMs_) >= la_marzocco_timing::kPostWakeObservationDelayMs)) {
       direction_ = OptimisticDirection::NONE;
-      if (state != LineaMicraPowerState::UNKNOWN) held_ = false;
+      if (state != LaMarzoccoPowerState::UNKNOWN) held_ = false;
     }
     return true;
   }
@@ -128,17 +128,17 @@ class LineaMicraPowerStateTracker {
   }
 
  private:
-  bool arm(const LineaMicraStatus &authoritative, bool observing,
+  bool arm(const LaMarzoccoStatus &authoritative, bool observing,
            OptimisticDirection direction, uint32_t now) {
-    const LineaMicraStatus before =
+    const LaMarzoccoStatus before =
         effectiveStatus(authoritative, observing, now);
-    const LineaMicraPowerState required =
+    const LaMarzoccoPowerState required =
         direction == OptimisticDirection::ON
-            ? LineaMicraPowerState::OFF
-            : LineaMicraPowerState::ON;
+            ? LaMarzoccoPowerState::OFF
+            : LaMarzoccoPowerState::ON;
     if (before.powerState != required ||
-        (before.quality != LineaMicraObservationQuality::CURRENT &&
-         before.quality != LineaMicraObservationQuality::STALE))
+        (before.quality != LaMarzoccoObservationQuality::CURRENT &&
+         before.quality != LaMarzoccoObservationQuality::STALE))
       return false;
     direction_ = direction;
     optimisticAtMs_ = now;

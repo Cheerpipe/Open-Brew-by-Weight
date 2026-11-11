@@ -9,9 +9,9 @@
 #include "OpenBrewByWeightMachineMomentaryConfig.h"
 #include "OpenBrewByWeightMachinePaddleConfig.h"
 #include "OpenBrewByWeightBuildProfile.h"
-#include "machine/OpenBrewByWeightLineaMicraIntegration.h"
+#include "machine/OpenBrewByWeightLaMarzoccoIntegration.h"
 #include "machine/OpenBrewByWeightMachineIntegration.h"
-#include "machine/OpenBrewByWeightMicraTiming.h"
+#include "machine/OpenBrewByWeightLaMarzoccoTiming.h"
 #include "OpenBrewByWeightJsonArena.h"
 #include "OpenBrewByWeightShotPredictor.h"
 #include "OpenBrewByWeightOta.h"
@@ -994,7 +994,7 @@ bool formatTaskProfilerObject(char *buf, size_t cap, size_t *used,
           ",\"peakGapCpuUs\":%lu,\"peakGapIdleUs\":%lu,\"peakGapAtMs\":%lu,"
           "\"stackUnit\":\"bytes\",\"remainingMs\":%lu,\"sampleCount\":%lu,"
           "\"averageTotalCpuPct\":%.1f,\"lastCaptureUs\":%lu,\"maxCaptureUs\":%lu,"
-          "\"lockWaits\":{\"micraBackflush\":{\"lastUs\":%lu,\"maxUs\":%lu,"
+          "\"lockWaits\":{\"laMarzoccoBackflush\":{\"lastUs\":%lu,\"maxUs\":%lu,"
           "\"holdLastUs\":%lu,\"holdMaxUs\":%lu},"
           "\"scaleEvents\":{\"lastUs\":%lu,\"maxUs\":%lu},"
           "\"shotStore\":{\"lastUs\":%lu,\"maxUs\":%lu},"
@@ -1007,10 +1007,10 @@ bool formatTaskProfilerObject(char *buf, size_t cap, size_t *used,
           static_cast<double>(tasks.averageTotalCpuPct),
           static_cast<unsigned long>(tasks.lastCaptureUs),
           static_cast<unsigned long>(tasks.maxCaptureUs),
-          static_cast<unsigned long>(tasks.micraBackflushWaitLastUs),
-          static_cast<unsigned long>(tasks.micraBackflushWaitMaxUs),
-          static_cast<unsigned long>(tasks.micraBackflushHoldLastUs),
-          static_cast<unsigned long>(tasks.micraBackflushHoldMaxUs),
+          static_cast<unsigned long>(tasks.laMarzoccoBackflushWaitLastUs),
+          static_cast<unsigned long>(tasks.laMarzoccoBackflushWaitMaxUs),
+          static_cast<unsigned long>(tasks.laMarzoccoBackflushHoldLastUs),
+          static_cast<unsigned long>(tasks.laMarzoccoBackflushHoldMaxUs),
           static_cast<unsigned long>(tasks.scaleEventsWaitLastUs),
           static_cast<unsigned long>(tasks.scaleEventsWaitMaxUs),
           static_cast<unsigned long>(tasks.shotStoreWaitLastUs),
@@ -1220,7 +1220,7 @@ bool buildSlimPresetsJson(const char *lead = "") {
         "\"slowAfterS\":%.1f,\"fastMarginG\":%.1f,\"slowMarginG\":%.1f,"
         "\"operationalWallMs\":%lu,\"bbwProtectionMs\":%lu,"
         "\"fastExtractionGuardEnabled\":%s,\"slowExtractionGuardEnabled\":%s,"
-        "\"grindHintsEnabled\":%s,\"lineaMicraBrewTargetC\":%.1f,"
+        "\"grindHintsEnabled\":%s,\"laMarzoccoBrewTargetC\":%.1f,"
         "\"fastRampS\":%.1f,\"slowRampS\":%.1f,\"fastCurve\":\"%s\",\"slowCurve\":\"%s\","
         "\"fastCurveHardness\":%.1f,\"slowCurveHardness\":%.1f",
         i == 0 ? "" : ",", static_cast<unsigned>(p.id), safeName,
@@ -1235,7 +1235,7 @@ bool buildSlimPresetsJson(const char *lead = "") {
         p.fastSideEnabled ? "true" : "false",
         p.slowSideEnabled ? "true" : "false",
         p.grindHintsEnabled ? "true" : "false",
-        static_cast<double>(p.lineaMicraBrewTargetDeciC) / 10.0, p.fastRampMs / 1000.0,
+        static_cast<double>(p.laMarzoccoBrewTargetDeciC) / 10.0, p.fastRampMs / 1000.0,
         p.slowRampMs / 1000.0, rampCurveName(p.fastCurve), rampCurveName(p.slowCurve),
         rampHardnessPercent(p.fastCurveHardnessPct, p.fastCurveHardness),
         rampHardnessPercent(p.slowCurveHardnessPct, p.slowCurveHardness));
@@ -1332,7 +1332,7 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "diagnostics/OpenBrewByWeightCrashRoutes.inc"
 #include "diagnostics/OpenBrewByWeightShotTraceRoutes.inc"
 #include "network/OpenBrewByWeightConfiguration.inc"
-#include "network/OpenBrewByWeightLineaMicraWeb.inc"
+#include "network/OpenBrewByWeightLaMarzoccoWeb.inc"
 #include "network/OpenBrewByWeightIntegrationApi.inc"
 #include "network/OpenBrewByWeightBeanconquerorHttp.inc"
 #include "network/OpenBrewByWeightNetworkOta.inc"

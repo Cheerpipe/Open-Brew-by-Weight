@@ -1,10 +1,10 @@
 "use strict";
 import * as R from "./runtime.js?v=__FW_ASSET_TAG__";
 const $ = R.$;
-function renderMicraCloudDiagnostic(lm, viaCompanion) {
-  ensureMicraRows();
+function renderLaMarzoccoCloudDiagnostic(lm, viaCompanion) {
+  ensureLaMarzoccoRows();
   const set = (id, value) => {
-    const el = $("dMicra" + id);
+    const el = $("dLaMarzocco" + id);
     if (el) el.textContent = value;
   };
   const none = __WEBUI_TEXT__("diagnostic.cloud_no_call"),
@@ -45,12 +45,12 @@ function renderMicraCloudDiagnostic(lm, viaCompanion) {
       : none,
   );
   set("CloudDuration", call ? call.durationMs + __WEBUI_TEXT__("runtime.ms_2") : none);
-  renderMicraWebSocket(lm, set, viaCompanion);
+  renderLaMarzoccoWebSocket(lm, set, viaCompanion);
 }
 
 // On the companion route the state comes from the companion's feed: the row
 // says so, and the controller's own socket figures (traffic, pong, heap) hide.
-function renderMicraWebSocket(lm, set, via) {
+function renderLaMarzoccoWebSocket(lm, set, via) {
   const ws = lm.websocket || {},
     unknown = "—",
     api = lm.connectionType === "api",
@@ -81,7 +81,7 @@ function renderMicraWebSocket(lm, set, via) {
           (ws.maxStoppedLatencyMs ?? "—") +
           " ms"),
   );
-  for (const el of [$("dMicraWsTraffic")?.parentElement, $("dMicraWsHeap")])
+  for (const el of [$("dLaMarzoccoWsTraffic")?.parentElement, $("dLaMarzoccoWsHeap")])
     if (el) el.hidden = !!via;
   set(
     "WsTraffic",
@@ -106,7 +106,7 @@ function renderMicraWebSocket(lm, set, via) {
   );
   set("WsPlanned", String(ws.plannedConnections || 0));
   set("WsUnexpected", String(ws.unexpectedConnections || 0));
-  set("Cleaning", R.formatMicraCleaning(lm));
+  set("Cleaning", R.formatLaMarzoccoCleaning(lm));
   set(
     "CleaningHint",
     lm.accountConfigured && lm.observeState && !api && ws.cleaningAvailable
@@ -139,14 +139,14 @@ function renderMicraWebSocket(lm, set, via) {
       (ws.allocationFailures || 0),
   );
 }
-function ensureMicraRows() {
-  const cloud = $("micraCloudDiagnostics");
+function ensureLaMarzoccoRows() {
+  const cloud = $("laMarzoccoCloudDiagnostics");
   const row = (id, title) => {
     if ($(id) || !cloud) return;
     const row = document.createElement("div"),
       label = document.createElement("strong"),
       v = document.createElement("div");
-    row.className = "metric micraOnly";
+    row.className = "metric laMarzoccoOnly";
     label.textContent = title;
     v.id = id;
     row.append(label, v);
@@ -164,15 +164,15 @@ function ensureMicraRows() {
     "WsTraffic",
     "WsPlanned",
     "WsUnexpected",
-  ].forEach((id, i) => row("dMicra" + (i < 6 ? "Cloud" : "") + id, titles[i]));
+  ].forEach((id, i) => row("dLaMarzocco" + (i < 6 ? "Cloud" : "") + id, titles[i]));
   for (const [id, anchor] of [
-    ["dMicraWsTiming", "dMicraWsState"],
-    ["dMicraWsHeap", "hHeapLargest"],
+    ["dLaMarzoccoWsTiming", "dLaMarzoccoWsState"],
+    ["dLaMarzoccoWsHeap", "hHeapLargest"],
   ]) {
     if ($(id) || !$(anchor)) continue;
     const hint = document.createElement("small");
     hint.id = id;
-    hint.className = "fieldHint micraOnly";
+    hint.className = "fieldHint laMarzoccoOnly";
     $(anchor).parentElement.append(hint);
   }
 }
@@ -424,9 +424,9 @@ function renderDiagClock() {
   t("ud")(utc && utc.slice(0, 10));
   t("lt")(local && local.slice(11));
   t("ld")(local && local.slice(0, 10));
-  renderLineaMicraDiagnostic();
+  renderLaMarzoccoDiagnostic();
 }
-let micraDiagnosticStatus = null,
+let laMarzoccoDiagnosticStatus = null,
   companionDiagnosticStatus = null;
 // Facts about this browser, not the controller. The firmware serves plain HTTP
 // only, so an https: page always came through a reverse proxy, and only there
@@ -579,7 +579,7 @@ function initPushGroup() {
         await R.companionLog("/__companion/push/test", {
           endpoint: subscription.endpoint,
           ...(result === "terms"
-            ? { topic: "micra_policy", d: { v: 1, test: true } }
+            ? { topic: "la_marzocco_policy", d: { v: 1, test: true } }
             : {
                 topic: "shot_result",
                 d: { v: 1, test: true, s: 28.4, r: result, g: 36.2, w: "m" },
@@ -651,7 +651,7 @@ function renderCompanionDiagnostic(c) {
         : ""),
   );
   logHistoryControls();
-  if (!__LINEA_MICRA__) return;
+  if (!__LA_MARZOCCO__) return;
   t("dCoRoute", c.route + (c.reason ? " · " + c.reason.replace(/_/g, " ") : ""));
   t(
     "dCoLm",
@@ -661,9 +661,9 @@ function renderCompanionDiagnostic(c) {
   );
   t("dCoCounts", pair(c.routeSwitches, c.commands));
 }
-function renderLineaMicraDiagnostic() {
-  const lm = __LINEA_MICRA__ && micraDiagnosticStatus;
-  if (!lm || !$("dMicraPowerValue")) return;
+function renderLaMarzoccoDiagnostic() {
+  const lm = __LA_MARZOCCO__ && laMarzoccoDiagnosticStatus;
+  if (!lm || !$("dLaMarzoccoPowerValue")) return;
   const age = lm.sampleValid ? lm.sampleAgeMs + Math.max(0, Date.now() - lm.receivedAtMs) : 0,
     stale =
       lm.freshnessPolicy !== "connection" && lm.quality === "current" && age >= lm.freshnessMs,
@@ -679,12 +679,12 @@ function renderLineaMicraDiagnostic() {
       : !lm.observeState
         ? __WEBUI_TEXT__("runtime.disabled")
         : "";
-  $("dMicraPowerValue").textContent = power || "—";
-  const brief = $("dMicraPowerBrief");
+  $("dLaMarzoccoPowerValue").textContent = power || "—";
+  const brief = $("dLaMarzoccoPowerBrief");
   if (brief) brief.textContent = power || "—";
-  $("dMicraMode").textContent = (lm.observedMode || "—") + (source ? " (" + source + ")" : "");
-  $("dMicraQuality").textContent = (stale ? "stale" : lm.quality) || "—";
-  $("dMicraAge").textContent =
+  $("dLaMarzoccoMode").textContent = (lm.observedMode || "—") + (source ? " (" + source + ")" : "");
+  $("dLaMarzoccoQuality").textContent = (stale ? "stale" : lm.quality) || "—";
+  $("dLaMarzoccoAge").textContent =
     lm.temperatureState +
     "/" +
     lm.temperatureError +
@@ -735,21 +735,21 @@ function renderLineaMicraDiagnostic() {
       if (boilerAge) parts.push(boilerAge + __WEBUI_TEXT__("runtime.s_ago"));
       return parts.length ? parts.join(" · ") : "—";
     };
-  $("dMicraReadiness").textContent = unavailable || readinessLabel || lm.readiness || "—";
-  $("dMicraBrewBoiler").textContent = boilerRow(
+  $("dLaMarzoccoReadiness").textContent = unavailable || readinessLabel || lm.readiness || "—";
+  $("dLaMarzoccoBrewBoiler").textContent = boilerRow(
     coffee,
     coffee.targetDeciC
       ? (coffee.targetDeciC / 10).toFixed(1) + __WEBUI_TEXT__("diagnostic.deg_c")
       : "",
   );
-  $("dMicraSteamBoiler").textContent = boilerRow(
+  $("dLaMarzoccoSteamBoiler").textContent = boilerRow(
     steam,
     steam.level && steam.level !== "unknown" && steam.level !== "unsupported"
       ? steam.level.replace("level_", __WEBUI_TEXT__("diagnostic.level_word"))
       : "",
   );
-  $("dMicraWater").textContent = unavailable || waterLabel;
-  const refresh = $("lineaMicraRefreshLink");
+  $("dLaMarzoccoWater").textContent = unavailable || waterLabel;
+  const refresh = $("laMarzoccoRefreshLink");
   if (refresh) {
     const disabled = !R.controlsMutable || !lm.observeState || !lm.accountConfigured || busy;
     refresh.setAttribute("aria-disabled", String(disabled));
@@ -766,10 +766,10 @@ function applyDiagnosticLive(s) {
     sc = s.scale || {},
     cp = s.cupPresence || {};
   t("dMachine", s.machineState);
-  const lm = s.lineaMicra;
+  const lm = s.laMarzocco;
   if (lm) {
-    micraDiagnosticStatus = { ...lm, receivedAtMs: Date.now() };
-    renderLineaMicraDiagnostic();
+    laMarzoccoDiagnosticStatus = { ...lm, receivedAtMs: Date.now() };
+    renderLaMarzoccoDiagnostic();
   }
   t("dBrew", R.formatBackflushState(s) || s.state);
   t("dCup", cp.state);
@@ -2223,8 +2223,8 @@ export function applyStatus(s) {
   // The account email and machine name ride the Home stream beside the
   // header's cloud indicator; diagnosticStatus() merges every model, so each
   // renderer reads one composed status.
-  if (__LINEA_MICRA__ && s.lineaMicra)
-    renderMicraCloudDiagnostic(s.lineaMicra, s.companion?.route === "companion");
+  if (__LA_MARZOCCO__ && s.laMarzocco)
+    renderLaMarzoccoCloudDiagnostic(s.laMarzocco, s.companion?.route === "companion");
   if (s.companion) renderCompanionDiagnostic(s.companion);
   const sc = s.scale || {};
   applyScaleCommands(sc);
@@ -2361,10 +2361,10 @@ export function init() {
       renderAuditPage();
     };
   $("exportDebugDataButton").onclick = () => exportDebugData();
-  if ($("lineaMicraRefreshLink"))
-    $("lineaMicraRefreshLink").onclick = (e) => {
+  if ($("laMarzoccoRefreshLink"))
+    $("laMarzoccoRefreshLink").onclick = (e) => {
       e.preventDefault();
-      R.lineaMicraAction("refresh");
+      R.laMarzoccoAction("refresh");
     };
   const dScaleNameRename = $("dScaleNameRename");
   if (dScaleNameRename)

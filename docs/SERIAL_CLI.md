@@ -228,7 +228,7 @@ blocks actually sit at each stage, download **Diagnostic → HEAP → Heap map**
 Use the same firmware revision, board, account, connection settings and task
 stack sizes for each build.
 This trial also reduces the WS SDK task stack from 8 to 6 KiB; capture the
-`websocket_task` and `micra_cloud` stack watermarks after cold connection,
+`websocket_task` and `lm_cloud` stack watermarks after cold connection,
 renewal and reconnection before accepting it. Save separate boot captures for
 successful startup and a failed connection. Reconnection activity after the
 capture window requires

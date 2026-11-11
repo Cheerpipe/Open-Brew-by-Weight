@@ -164,8 +164,8 @@ html:not(.momentaryMachine) .switchOnly {
   font-weight: 400;
 }
 
-html:not(.lineaMicraIntegration) .micraOnly,
-html:not(.micraTemperatureEnabled) .micraTempOpt {
+html:not(.laMarzoccoIntegration) .laMarzoccoOnly,
+html:not(.laMarzoccoTemperatureEnabled) .laMarzoccoTempOpt {
   display: none !important;
 }
 
@@ -339,7 +339,7 @@ html:not(.pwaApp) .pwaOnly {
   border-bottom: 1px solid var(--ln);
 }
 
-#lineaMicraLinkedNote:not([hidden]) + .cfgGroup {
+#laMarzoccoLinkedNote:not([hidden]) + .cfgGroup {
   margin-top: 0.85rem;
 }
 
@@ -529,11 +529,11 @@ html:not(.pwaApp) .pwaOnly {
   margin-top: 0.75rem;
 }
 
-.micraDeps {
+.laMarzoccoDeps {
   margin-left: 1.9rem;
 }
 
-.micraPill {
+.laMarzoccoPill {
   display: flex;
   width: fit-content;
   align-items: center;
@@ -547,7 +547,7 @@ html:not(.pwaApp) .pwaOnly {
   font-weight: 600;
 }
 
-.micraPill::before {
+.laMarzoccoPill::before {
   content: "";
   flex: none;
   width: 0.55rem;
@@ -556,31 +556,31 @@ html:not(.pwaApp) .pwaOnly {
   background: var(--bd);
 }
 
-.micraPill[data-tone="on"] {
+.laMarzoccoPill[data-tone="on"] {
   background: var(--mo);
 }
 
-.micraPill[data-tone="on"]::before {
+.laMarzoccoPill[data-tone="on"]::before {
   background: var(--ok);
 }
 
-.micraPill[data-tone="warn"] {
+.laMarzoccoPill[data-tone="warn"] {
   background: var(--mw);
 }
 
-.micraPill[data-tone="warn"]::before {
+.laMarzoccoPill[data-tone="warn"]::before {
   background: var(--lw);
 }
 
-.micraPill[data-tone="error"] {
+.laMarzoccoPill[data-tone="error"] {
   background: var(--me);
 }
 
-.micraPill[data-tone="error"]::before {
+.laMarzoccoPill[data-tone="error"]::before {
   background: var(--dn);
 }
 
-.micraSteps {
+.laMarzoccoStepList {
   display: grid;
   gap: 0.45rem;
   margin: 0.9rem 0 0.25rem;
@@ -588,14 +588,14 @@ html:not(.pwaApp) .pwaOnly {
   list-style: none;
 }
 
-.micraSteps li {
+.laMarzoccoStepList li {
   display: flex;
   align-items: center;
   gap: 0.55rem;
   color: var(--mu);
 }
 
-.micraSteps li::before {
+.laMarzoccoStepList li::before {
   content: "";
   flex: none;
   width: 0.9rem;
@@ -604,22 +604,22 @@ html:not(.pwaApp) .pwaOnly {
   border-radius: 50%;
 }
 
-.micraSteps .on {
+.laMarzoccoStepList .on {
   color: var(--fg);
   font-weight: 600;
 }
 
-.micraSteps .on::before {
+.laMarzoccoStepList .on::before {
   border-color: var(--pri);
   border-right-color: transparent;
   animation: busySpin 0.8s linear infinite;
 }
 
-.micraSteps .ok {
+.laMarzoccoStepList .ok {
   color: var(--fg);
 }
 
-.micraSteps .ok::before {
+.laMarzoccoStepList .ok::before {
   border-color: var(--ok);
   background: var(--ok);
 }

@@ -1525,7 +1525,7 @@ enum class WebCommandType : uint8_t {
   CLEAR_SHOT_LOG,
   CLEAR_RESET_HISTORY,
   SAVE_WEBHOOK,
-  SAVE_LINEA_MICRA,
+  SAVE_LA_MARZOCCO,
   CLEAR_PREFERRED_SCALE,
   SELECT_PREFERRED_SCALE,
   PERSIST_RUNTIME,
@@ -1581,7 +1581,7 @@ inline const char *webCommandTypeName(WebCommandType type) {
     case WebCommandType::CLEAR_SHOT_LOG: return "clear shot history";
     case WebCommandType::CLEAR_RESET_HISTORY: return "clear reset history";
     case WebCommandType::SAVE_WEBHOOK: return "save webhook";
-    case WebCommandType::SAVE_LINEA_MICRA: return "save Linea Micra settings";
+    case WebCommandType::SAVE_LA_MARZOCCO: return "save La Marzocco settings";
     case WebCommandType::CLEAR_PREFERRED_SCALE:
       return "forget paired scale";
     case WebCommandType::SELECT_PREFERRED_SCALE:
@@ -1698,8 +1698,8 @@ struct WebCommand {
   // PRESET_OP payload (keep small — no full bank on the queue element).
   uint8_t presetAction = 0;
   uint8_t presetId = 0;
-  bool lineaMicraBrewTargetSpecified = false;
-  uint16_t lineaMicraBrewTargetDeciC = 0;
+  bool laMarzoccoBrewTargetSpecified = false;
+  uint16_t laMarzoccoBrewTargetDeciC = 0;
   char presetName[24] = {};
   bool persistPresets = false;
   bool bbwBaselineSpecified = true;

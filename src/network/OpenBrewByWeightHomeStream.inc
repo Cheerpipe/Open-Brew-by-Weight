@@ -326,49 +326,49 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   const auto micra = machineIntegrationStatus();
   const auto ws = machineIntegrationWebSocketStatus(false);
   uint8_t options, connection;
-  char safeEmail[LINEA_MICRA_USERNAME_CAPACITY * 2] = {},
-       safeName[LINEA_MICRA_NAME_CAPACITY * 2] = {};
+  char safeEmail[LA_MARZOCCO_USERNAME_CAPACITY * 2] = {},
+       safeName[LA_MARZOCCO_NAME_CAPACITY * 2] = {};
   { TaskLockGuard lock(dataMux_);
-    options = settings_.lineaMicra.options;
-    connection = settings_.lineaMicra.connectionType;
-    sanitizeJsonEmbed(settings_.lineaMicra.username, safeEmail, sizeof(safeEmail));
-    sanitizeJsonEmbed(settings_.lineaMicra.selectedName, safeName, sizeof(safeName)); }
-  delta.field("machineIntegration", "\"linea_micra_cloud\"");
-  delta.field("lineaMicra.powerState", "\"%s\"", lineaMicraPowerStateName(micra.powerState));
-  delta.field("lineaMicra.quality", "\"%s\"", lineaMicraObservationQualityName(micra.quality));
-  delta.field("lineaMicra.optimisticOn", bool(micra.optimisticOn));
-  delta.field("lineaMicra.optimisticOff", bool(micra.optimisticOff));
-  delta.field("lineaMicra.accountConfigured", bool(micra.accountConfigured));
+    options = settings_.laMarzocco.options;
+    connection = settings_.laMarzocco.connectionType;
+    sanitizeJsonEmbed(settings_.laMarzocco.username, safeEmail, sizeof(safeEmail));
+    sanitizeJsonEmbed(settings_.laMarzocco.selectedName, safeName, sizeof(safeName)); }
+  delta.field("machineIntegration", "\"la_marzocco_cloud\"");
+  delta.field("laMarzocco.powerState", "\"%s\"", laMarzoccoPowerStateName(micra.powerState));
+  delta.field("laMarzocco.quality", "\"%s\"", laMarzoccoObservationQualityName(micra.quality));
+  delta.field("laMarzocco.optimisticOn", bool(micra.optimisticOn));
+  delta.field("laMarzocco.optimisticOff", bool(micra.optimisticOff));
+  delta.field("laMarzocco.accountConfigured", bool(micra.accountConfigured));
   // Why La Marzocco refuses the account, once the cycle's fresh sign-in failed too.
-  delta.field("lineaMicra.accountProblem", "\"%s\"",
-      micra.error == LineaMicraError::POLICY_REQUIRED ? "policy" :
-      micra.error == LineaMicraError::INVALID_AUTH ? "auth" :
-      micra.httpStatus == 403 && (micra.error == LineaMicraError::HTTP_ERROR ||
-          micra.error == LineaMicraError::REJECTED) ? "access" : "");
-  delta.field("lineaMicra.observeState", bool(options & LINEA_MICRA_OBSERVE_STATE));
-  delta.field("lineaMicra.connectionType", "\"%s\"", micraConnectionTypeName(connection));
+  delta.field("laMarzocco.accountProblem", "\"%s\"",
+      micra.error == LaMarzoccoError::POLICY_REQUIRED ? "policy" :
+      micra.error == LaMarzoccoError::INVALID_AUTH ? "auth" :
+      micra.httpStatus == 403 && (micra.error == LaMarzoccoError::HTTP_ERROR ||
+          micra.error == LaMarzoccoError::REJECTED) ? "access" : "");
+  delta.field("laMarzocco.observeState", bool(options & LA_MARZOCCO_OBSERVE_STATE));
+  delta.field("laMarzocco.connectionType", "\"%s\"", laMarzoccoConnectionTypeName(connection));
   // The shared header's cloud indicator names the account and machine, so
   // Home owns these two; Settings and Diagnostic compose them from Home.
-  delta.field("lineaMicra.email", "\"%s\"", safeEmail);
-  delta.field("lineaMicra.selectedName", "\"%s\"", safeName);
-  delta.field("lineaMicra.websocket.cleaningAvailable", bool(ws.cleaningAvailable));
-  delta.field("lineaMicra.websocket.cleaning", "\"%s\"", ws.cleaning == MicraCleaningState::OFF ? "inactive" :
-      ws.cleaning == MicraCleaningState::REQUESTED ? "waiting_for_paddle" :
-      ws.cleaning == MicraCleaningState::CLEANING ? "cleaning" : "unknown");
+  delta.field("laMarzocco.email", "\"%s\"", safeEmail);
+  delta.field("laMarzocco.selectedName", "\"%s\"", safeName);
+  delta.field("laMarzocco.websocket.cleaningAvailable", bool(ws.cleaningAvailable));
+  delta.field("laMarzocco.websocket.cleaning", "\"%s\"", ws.cleaning == LaMarzoccoCleaningState::OFF ? "inactive" :
+      ws.cleaning == LaMarzoccoCleaningState::REQUESTED ? "waiting_for_paddle" :
+      ws.cleaning == LaMarzoccoCleaningState::CLEANING ? "cleaning" : "unknown");
   escapeJsonString(ws.cleaningLabel, g_work->historyJson, NetworkWorkBuf::kHistoryJson);
-  delta.field("lineaMicra.websocket.cleaningLabel", "\"%s\"", g_work->historyJson);
-  delta.field("lineaMicra.readiness", "\"%s\"",
-              lineaMicraReadinessName(lineaMicraReadiness(micra)));
-  delta.field("lineaMicra.boiler.coffee.state", "\"%s\"",
-              lineaMicraBoilerStateName(micra.coffeeBoiler));
-  delta.field("lineaMicra.boiler.coffee.readyAtUtcSec",
+  delta.field("laMarzocco.websocket.cleaningLabel", "\"%s\"", g_work->historyJson);
+  delta.field("laMarzocco.readiness", "\"%s\"",
+              laMarzoccoReadinessName(laMarzoccoReadiness(micra)));
+  delta.field("laMarzocco.boiler.coffee.state", "\"%s\"",
+              laMarzoccoBoilerStateName(micra.coffeeBoiler));
+  delta.field("laMarzocco.boiler.coffee.readyAtUtcSec",
               static_cast<unsigned long>(micra.coffeeReadyAtUtcSec));
   // 0 when the machine has not reported a brew target; the Home row hides it.
-  delta.field("lineaMicra.boiler.coffee.targetDeciC", "%u",
+  delta.field("laMarzocco.boiler.coffee.targetDeciC", "%u",
               static_cast<unsigned>(micra.targetValid ? micra.targetDeciC : 0));
-  delta.field("lineaMicra.boiler.steam.state", "\"%s\"",
-              lineaMicraBoilerStateName(micra.steamBoiler));
-  delta.field("lineaMicra.boiler.steam.readyAtUtcSec",
+  delta.field("laMarzocco.boiler.steam.state", "\"%s\"",
+              laMarzoccoBoilerStateName(micra.steamBoiler));
+  delta.field("laMarzocco.boiler.steam.readyAtUtcSec",
               static_cast<unsigned long>(micra.steamReadyAtUtcSec));
 #else
   delta.field("machineIntegration", "\"none\"");
@@ -532,46 +532,46 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
   {
     const auto micra = machineIntegrationStatus();
     const bool sampleValid = micra.sampleAtMs != 0 &&
-        (micra.quality == LineaMicraObservationQuality::CURRENT ||
-         micra.quality == LineaMicraObservationQuality::STALE ||
-         micra.quality == LineaMicraObservationQuality::UNSUPPORTED);
-    delta.field("lineaMicra.observedMode", "\"%s\"", lineaMicraObservedModeName(micra.observedMode));
-    delta.field("lineaMicra.sampleValid", bool(sampleValid));
+        (micra.quality == LaMarzoccoObservationQuality::CURRENT ||
+         micra.quality == LaMarzoccoObservationQuality::STALE ||
+         micra.quality == LaMarzoccoObservationQuality::UNSUPPORTED);
+    delta.field("laMarzocco.observedMode", "\"%s\"", laMarzoccoObservedModeName(micra.observedMode));
+    delta.field("laMarzocco.sampleValid", bool(sampleValid));
     // Whole seconds: the UI renders integer age and interpolates locally, so
     // a raw millisecond age would force one frame every dispatch tick.
-    delta.field("lineaMicra.sampleAgeMs",
+    delta.field("laMarzocco.sampleAgeMs",
                 static_cast<unsigned long>(micra.sampleAtMs == 0 ? 0 : static_cast<uint32_t>(millis() - micra.sampleAtMs) / 1000 * 1000));
-    delta.field("lineaMicra.freshnessPolicy", "\"%s\"",
+    delta.field("laMarzocco.freshnessPolicy", "\"%s\"",
                 micra.connectionFreshness ? "connection" : "time");
-    delta.field("lineaMicra.freshnessMs",
-                static_cast<unsigned long>(micra_timing::kStateFreshnessMs));
-    delta.field("lineaMicra.boiler.steam.level", "\"%s\"",
-                lineaMicraSteamLevelName(micra.steamLevel));
+    delta.field("laMarzocco.freshnessMs",
+                static_cast<unsigned long>(la_marzocco_timing::kStateFreshnessMs));
+    delta.field("laMarzocco.boiler.steam.level", "\"%s\"",
+                laMarzoccoSteamLevelName(micra.steamLevel));
     // Whole seconds, like sampleAgeMs: the browser interpolates the boiler
     // age and estimate countdowns locally instead of costing delta frames.
-    delta.field("lineaMicra.boiler.sampleAgeMs",
+    delta.field("laMarzocco.boiler.sampleAgeMs",
                 static_cast<unsigned long>(micra.temperatureAtMs == 0
                     ? 0
                     : static_cast<uint32_t>(millis() - micra.temperatureAtMs) / 1000 * 1000));
-    delta.field("lineaMicra.powerSource", "\"%s\"", micraPowerSourceName(micra.powerSource));
+    delta.field("laMarzocco.powerSource", "\"%s\"", laMarzoccoPowerSourceName(micra.powerSource));
     // Settings owns these four while subscribed; compatibility mode has no
     // Settings stream, so the slots stay and only their emission is skipped.
     delta.skipNext = session.settingsOn;
-    delta.field("lineaMicra.phase", "\"%s\"", lineaMicraPhaseName(micra.phase));
-    delta.field("lineaMicra.temperatureState", "\"%s\"", lineaMicraTemperatureStateName(micra.temperatureState));
-    delta.field("lineaMicra.temperatureError", "\"%s\"", lineaMicraErrorName(micra.temperatureError));
-    char safeSerial[LINEA_MICRA_SERIAL_CAPACITY * 2] = {};
+    delta.field("laMarzocco.phase", "\"%s\"", laMarzoccoPhaseName(micra.phase));
+    delta.field("laMarzocco.temperatureState", "\"%s\"", laMarzoccoTemperatureStateName(micra.temperatureState));
+    delta.field("laMarzocco.temperatureError", "\"%s\"", laMarzoccoErrorName(micra.temperatureError));
+    char safeSerial[LA_MARZOCCO_SERIAL_CAPACITY * 2] = {};
     { TaskLockGuard lock(dataMux_);
-      sanitizeJsonEmbed(settings_.lineaMicra.selectedSerial, safeSerial, sizeof(safeSerial)); }
+      sanitizeJsonEmbed(settings_.laMarzocco.selectedSerial, safeSerial, sizeof(safeSerial)); }
     // The account and machine names ride the Home stream; this page composes
     // them with its own report.
     delta.skipNext = session.settingsOn;
-    delta.field("lineaMicra.selectedSerial", "\"%s\"", safeSerial);
-    const LineaMicraCloudCall call = machineIntegrationCloudCall();
+    delta.field("laMarzocco.selectedSerial", "\"%s\"", safeSerial);
+    const LaMarzoccoCloudCall call = machineIntegrationCloudCall();
     if (call.api == nullptr)
-      delta.field("lineaMicra.cloudCall", "null");
+      delta.field("laMarzocco.cloudCall", "null");
     else
-      delta.field("lineaMicra.cloudCall",
+      delta.field("laMarzocco.cloudCall",
                   "{\"api\":\"%s\",\"method\":\"%s\",\"result\":\"%s\","
                   "\"startedAtUtcSec\":%lu,\"durationMs\":%lu,"
                   "\"httpStatus\":%u,\"transportStatus\":%ld}",
@@ -770,14 +770,14 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
       const NetworkHeapTelemetrySnapshot networkHeap = heapTelemetrySnapshot();
       const HeapLifecycleAggregate webhookHeap = webhooks_.heapTelemetry();
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
-      const HeapLifecycleAggregate micraHeap = machineIntegrationHeapTelemetry();
+      const HeapLifecycleAggregate laMarzoccoHeap = machineIntegrationHeapTelemetry();
 #else
-      const HeapLifecycleAggregate micraHeap = {};
+      const HeapLifecycleAggregate laMarzoccoHeap = {};
 #endif
       char heapSummary[224] = {};
       snprintf(heapSummary, sizeof(heapSummary),
                "blocks allocated/free %lu/%lu frag %u/1000; "
-               "HTTP %ld/%ld WiFi %ld/%ld OTA %ld/%ld webhooks %ld/%ld Micra TLS %ld/%ld",
+               "HTTP %ld/%ld WiFi %ld/%ld OTA %ld/%ld webhooks %ld/%ld La Marzocco TLS %ld/%ld",
                static_cast<unsigned long>(control.internalHeapAllocatedBlocks),
                static_cast<unsigned long>(control.internalHeapFreeBlocks),
                static_cast<unsigned>(control.internalHeapFragmentationPermille),
@@ -789,8 +789,8 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                static_cast<long>(networkHeap.ota.worstLargestDelta),
                static_cast<long>(webhookHeap.lastDelta.largestBlock),
                static_cast<long>(webhookHeap.worstLargestDelta),
-               static_cast<long>(micraHeap.lastDelta.largestBlock),
-               static_cast<long>(micraHeap.worstLargestDelta));
+               static_cast<long>(laMarzoccoHeap.lastDelta.largestBlock),
+               static_cast<long>(laMarzoccoHeap.worstLargestDelta));
       telemetry.field("health.heap", "\"%s\"", heapSummary);
     }
     const auto &hwmon = control.hwmon;
@@ -875,62 +875,62 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     }
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
     {
-      const MicraWebSocketStatus ws = machineIntegrationWebSocketStatus();
+      const LaMarzoccoWebSocketStatus ws = machineIntegrationWebSocketStatus();
       char safeReason[48] = {};
       sanitizeJsonEmbed(ws.reason, safeReason, sizeof(safeReason));
       // Whole seconds: the UI derives ages from nowMs locally.
-      telemetry.field("lineaMicra.websocket.nowMs", static_cast<unsigned long>(now / 1000 * 1000));
-      telemetry.field("lineaMicra.websocket.state", "\"%s\"", micraSocketStateName(ws.state));
-      telemetry.field("lineaMicra.websocket.reason", "\"%s\"", safeReason);
-      telemetry.field("lineaMicra.websocket.subscribed", bool(ws.subscribed));
-      telemetry.field("lineaMicra.websocket.live", bool(ws.live));
-      telemetry.field("lineaMicra.websocket.machineConnectedKnown", bool(ws.machineConnectedKnown));
-      telemetry.field("lineaMicra.websocket.machineConnected", bool(ws.machineConnected));
-      telemetry.field("lineaMicra.websocket.messageAtMs", "%u",
+      telemetry.field("laMarzocco.websocket.nowMs", static_cast<unsigned long>(now / 1000 * 1000));
+      telemetry.field("laMarzocco.websocket.state", "\"%s\"", laMarzoccoSocketStateName(ws.state));
+      telemetry.field("laMarzocco.websocket.reason", "\"%s\"", safeReason);
+      telemetry.field("laMarzocco.websocket.subscribed", bool(ws.subscribed));
+      telemetry.field("laMarzocco.websocket.live", bool(ws.live));
+      telemetry.field("laMarzocco.websocket.machineConnectedKnown", bool(ws.machineConnectedKnown));
+      telemetry.field("laMarzocco.websocket.machineConnected", bool(ws.machineConnected));
+      telemetry.field("laMarzocco.websocket.messageAtMs", "%u",
                       static_cast<unsigned>(ws.messageAtMs));
-      telemetry.field("lineaMicra.websocket.powerAtMs", "%u",
+      telemetry.field("laMarzocco.websocket.powerAtMs", "%u",
                       static_cast<unsigned>(ws.powerAtMs));
-      telemetry.field("lineaMicra.websocket.pongAtMs", "%u",
+      telemetry.field("laMarzocco.websocket.pongAtMs", "%u",
                       static_cast<unsigned>(ws.pongAtMs));
-      telemetry.field("lineaMicra.websocket.retryRemainingMs", "%u",
+      telemetry.field("laMarzocco.websocket.retryRemainingMs", "%u",
                       static_cast<unsigned>(!ws.retryAtMs || tickReached(now, ws.retryAtMs) ? 0 : ws.retryAtMs - now));
-      telemetry.field("lineaMicra.websocket.rxBytes", "%llu",
+      telemetry.field("laMarzocco.websocket.rxBytes", "%llu",
                       static_cast<unsigned long long>(ws.receiveBytes));
-      telemetry.field("lineaMicra.websocket.txBytes", "%llu",
+      telemetry.field("laMarzocco.websocket.txBytes", "%llu",
                       static_cast<unsigned long long>(ws.transmitBytes));
-      telemetry.field("lineaMicra.websocket.rxBytesPerSecond", "%u",
+      telemetry.field("laMarzocco.websocket.rxBytesPerSecond", "%u",
                       static_cast<unsigned>(ws.receivePerSecond));
-      telemetry.field("lineaMicra.websocket.txBytesPerSecond", "%u",
+      telemetry.field("laMarzocco.websocket.txBytesPerSecond", "%u",
                       static_cast<unsigned>(ws.transmitPerSecond));
-      telemetry.field("lineaMicra.websocket.rxBytesPerMinute", "%u",
+      telemetry.field("laMarzocco.websocket.rxBytesPerMinute", "%u",
                       static_cast<unsigned>(ws.receivePerMinute));
-      telemetry.field("lineaMicra.websocket.txBytesPerMinute", "%u",
+      telemetry.field("laMarzocco.websocket.txBytesPerMinute", "%u",
                       static_cast<unsigned>(ws.transmitPerMinute));
-      telemetry.field("lineaMicra.websocket.messages", "%u",
+      telemetry.field("laMarzocco.websocket.messages", "%u",
                       static_cast<unsigned>(ws.messages));
-      telemetry.field("lineaMicra.websocket.errors", "%u",
+      telemetry.field("laMarzocco.websocket.errors", "%u",
                       static_cast<unsigned>(ws.errors));
-      telemetry.field("lineaMicra.websocket.plannedConnections", "%u",
+      telemetry.field("laMarzocco.websocket.plannedConnections", "%u",
                       static_cast<unsigned>(ws.plannedConnections));
-      telemetry.field("lineaMicra.websocket.unexpectedConnections", "%u",
+      telemetry.field("laMarzocco.websocket.unexpectedConnections", "%u",
                       static_cast<unsigned>(ws.unexpectedConnections));
-      telemetry.field("lineaMicra.websocket.retainedBytes", "%u",
+      telemetry.field("laMarzocco.websocket.retainedBytes", "%u",
                       static_cast<unsigned>(ws.retainedBytes));
-      telemetry.field("lineaMicra.websocket.stoppedLatencyMs", "%u",
+      telemetry.field("laMarzocco.websocket.stoppedLatencyMs", "%u",
                       static_cast<unsigned>(ws.stoppedLatencyMs));
-      telemetry.field("lineaMicra.websocket.maxStoppedLatencyMs", "%u",
+      telemetry.field("laMarzocco.websocket.maxStoppedLatencyMs", "%u",
                       static_cast<unsigned>(ws.maxStoppedLatencyMs));
-      telemetry.field("lineaMicra.websocket.allocationFailures", "%u",
+      telemetry.field("laMarzocco.websocket.allocationFailures", "%u",
                       static_cast<unsigned>(ws.allocationFailures));
-      telemetry.field("lineaMicra.websocket.connectFreeDelta", "%ld",
+      telemetry.field("laMarzocco.websocket.connectFreeDelta", "%ld",
                       static_cast<long>(ws.heap.lastDelta.freeBytes));
-      telemetry.field("lineaMicra.websocket.connectLargestDelta", "%ld",
+      telemetry.field("laMarzocco.websocket.connectLargestDelta", "%ld",
                       static_cast<long>(ws.heap.lastDelta.largestBlock));
-      telemetry.field("lineaMicra.websocket.stopFreeDelta", "%ld",
+      telemetry.field("laMarzocco.websocket.stopFreeDelta", "%ld",
                       static_cast<long>(ws.stopHeap.lastDelta.freeBytes));
-      telemetry.field("lineaMicra.websocket.stopLargestDelta", "%ld",
+      telemetry.field("laMarzocco.websocket.stopLargestDelta", "%ld",
                       static_cast<long>(ws.stopHeap.lastDelta.largestBlock));
-      telemetry.field("lineaMicra.websocket.cleaningAtMs", "%u",
+      telemetry.field("laMarzocco.websocket.cleaningAtMs", "%u",
                       static_cast<unsigned>(ws.cleaningAtMs));
     }
 #endif

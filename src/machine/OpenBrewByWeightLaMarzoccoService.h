@@ -1,13 +1,13 @@
 #pragma once
 
-#include "OpenBrewByWeightLineaMicraSettings.h"
-#include "OpenBrewByWeightLineaMicraTypes.h"
+#include "OpenBrewByWeightLaMarzoccoSettings.h"
+#include "OpenBrewByWeightLaMarzoccoTypes.h"
 #include "OpenBrewByWeightMachineIntegration.h"
-#include "OpenBrewByWeightMicraCompanion.h"
-#include "OpenBrewByWeightMicraPowerState.h"
-#include "OpenBrewByWeightMicraObservation.h"
-#include "OpenBrewByWeightMicraWebSocket.h"
-#include "OpenBrewByWeightMicraTiming.h"
+#include "OpenBrewByWeightLaMarzoccoCompanion.h"
+#include "OpenBrewByWeightLaMarzoccoPowerState.h"
+#include "OpenBrewByWeightLaMarzoccoObservation.h"
+#include "OpenBrewByWeightLaMarzoccoWebSocket.h"
+#include "OpenBrewByWeightLaMarzoccoTiming.h"
 #include "OpenBrewByWeightPsram.h"
 #include "OpenBrewByWeightBootHeap.h"
 #include "OpenBrewByWeightTaskMutex.h"
@@ -21,7 +21,7 @@
 
 namespace openbrewbyweight {
 
-class OpenBrewByWeightMicraService {
+class OpenBrewByWeightLaMarzoccoService {
  public:
   bool begin();
   void inhibitCloud() {
@@ -35,31 +35,31 @@ class OpenBrewByWeightMicraService {
       abortRequested_.store(true, std::memory_order_release);
     if (task_ != nullptr) xTaskNotifyGive(task_);
   }
-  void publishConfig(const LineaMicraPersistedSettings &settings,
+  void publishConfig(const LaMarzoccoPersistedSettings &settings,
                      uint32_t configGeneration);
   void publishNetworkState(bool staConnected, bool apActive, bool shotActive,
                            bool scaleConnecting);
   bool queueConnect(uint32_t requestId, const char *username,
                     const char *password);
   bool queueRelist(uint32_t requestId);
-  bool queue(const LineaMicraRequest &request);
+  bool queue(const LaMarzoccoRequest &request);
   // Control task only, for temperature and power commands: never waits on
   // mux_. Contention defers the command to the task's next successful lock,
   // latest wins per kind, as queue() itself would keep only the newest.
-  void post(const LineaMicraRequest &request);
+  void post(const LaMarzoccoRequest &request);
   bool selectDiscoveredMachine(const char *serial,
-                               LineaMicraPersistedSettings &settings) const;
+                               LaMarzoccoPersistedSettings &settings) const;
   void clearDiscovery();
-  LineaMicraStatus currentStatus() const;
+  LaMarzoccoStatus currentStatus() const;
   // Control task only: never waits on mux_ — tryLocks, refreshes the
   // task-owned cache, and serves the last snapshot on contention.
-  LineaMicraStatus statusPoll() const;
+  LaMarzoccoStatus statusPoll() const;
   // True when that served cache is older than the poll staleness bound.
   bool statusPollStale() const;
-  LineaMicraCloudCall cloudCall() const;
+  LaMarzoccoCloudCall cloudCall() const;
   HeapLifecycleAggregate heapTelemetry() const;
-  MicraWebSocketStatus websocketStatus(bool includeTraffic = true) const;
-  LineaMicraDiscoverySnapshot discovery() const;
+  LaMarzoccoWebSocketStatus websocketStatus(bool includeTraffic = true) const;
+  LaMarzoccoDiscoverySnapshot discovery() const;
   // Control task only: physicalStart() and finishBackflush() never wait on
   // mux_ either (see their definitions for the contended resolution).
   MachinePhysicalStartDisposition physicalStart(MachineBackflushPermit *permit = nullptr);
@@ -73,12 +73,12 @@ class OpenBrewByWeightMicraService {
   void companionUpstream(bool subscribed, uint32_t epoch, uint32_t tokenRenewInS,
                          bool refused = false, bool policy = false);
   void companionCredentials(uint32_t generation, bool ok);
-  MicraCompanionIngress companionIngress() const;
-  bool companionState(MicraCompanionStateKind kind, uint32_t epoch, uint32_t afterCommand,
-                      const cJSON *dashboard, MicraCompanionIngress ingress);
+  LaMarzoccoCompanionIngress companionIngress() const;
+  bool companionState(LaMarzoccoCompanionStateKind kind, uint32_t epoch, uint32_t afterCommand,
+                      const cJSON *dashboard, LaMarzoccoCompanionIngress ingress);
   void companionCommandResult(uint32_t id, bool accepted, uint16_t httpStatus);
-  MicraCompanionOutbox companionOutbox() const;
-  MicraCompanionRouteStatus companionRouteStatus() const;
+  LaMarzoccoCompanionOutbox companionOutbox() const;
+  LaMarzoccoCompanionRouteStatus companionRouteStatus() const;
   bool companionCopyCredentials(uint32_t generation, char *email, size_t emailCapacity,
                                 char *password, size_t passwordCapacity, char *serial,
                                 size_t serialCapacity) const;
@@ -86,23 +86,23 @@ class OpenBrewByWeightMicraService {
 
  private:
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
-  friend struct MicraCancellationTest;
-  friend struct MicraWebSocketTest;
+  friend struct LaMarzoccoCancellationTest;
+  friend struct LaMarzoccoWebSocketTest;
 #endif
   struct IoBuffer;
   struct WorkBuffer;
   struct WebSocketBuffer;
   struct RequestStateGuard;
   struct PendingRequest {
-    LineaMicraRequest request = {};
-    LineaMicraPersistedSettings credentials = {};
+    LaMarzoccoRequest request = {};
+    LaMarzoccoPersistedSettings credentials = {};
     uint32_t identityGeneration = 0;
-    MicraObservationStamp snapshotStamp;
+    LaMarzoccoObservationStamp snapshotStamp;
     bool initialSnapshot = false;
     bool present = false;
   };
   struct DesiredTemperature {
-    LineaMicraRequest request = {};
+    LaMarzoccoRequest request = {};
     uint32_t machineConfigGeneration = 0;
     uint32_t retryAtMs = 0;
     uint8_t cycles = 0;  // Exhausted cycles while the machine was online.
@@ -110,7 +110,7 @@ class OpenBrewByWeightMicraService {
     bool commandAccepted = false;
   };
   struct DesiredPower {
-    LineaMicraRequest request = {};
+    LaMarzoccoRequest request = {};
     uint32_t machineConfigGeneration = 0;
     uint32_t shotGeneration = 0;
     uint32_t retryAtMs = 0;
@@ -123,7 +123,7 @@ class OpenBrewByWeightMicraService {
   static esp_err_t httpEvent(esp_http_client_event_t *event);
   void taskLoop();
   static void websocketEvent(void *context, const char *, int32_t event, void *data);
-  static bool stompFrame(void *context, const struct MicraStompFrame &frame);
+  static bool stompFrame(void *context, const struct LaMarzoccoStompFrame &frame);
   bool websocketAdmitted(bool starting = false) const;
   bool shotTransportPaused() const {
     return outboundScaleConnected.load(std::memory_order_acquire) &&
@@ -138,12 +138,12 @@ class OpenBrewByWeightMicraService {
         outboundScaleInhibited();
   }
   bool sendSubscription(bool on = true);
-  void applyPushLocked(const MicraObservation &update, uint32_t ingressAttempt);
-  bool mergeReadLocked(const MicraObservation &update);
+  void applyPushLocked(const LaMarzoccoObservation &update, uint32_t ingressAttempt);
+  bool mergeReadLocked(const LaMarzoccoObservation &update);
   void serviceWebSocket();
   void stopWebSocket(bool release = false);
   bool serviceCompanion();
-  bool companionCommand(MicraCompanionCommandOp op, uint16_t value);
+  bool companionCommand(LaMarzoccoCompanionCommandOp op, uint16_t value);
   void leaveCompanionLocked(const char *reason, bool loss);
   void dropCompanionFeedLocked();
   bool companionFeedLiveLocked() const;
@@ -153,52 +153,52 @@ class OpenBrewByWeightMicraService {
   void notifyCompanion() const {
     if (auto notify = companionNotify_.load()) notify();
   }
-  static void logCompanionRoute(MicraCompanionRoute from, MicraCompanionRoute to,
+  static void logCompanionRoute(LaMarzoccoCompanionRoute from, LaMarzoccoCompanionRoute to,
                                 const char *reason);
   void waitRetry(uint32_t delayMs);
   void execute(PendingRequest &pending);
   bool executeConnect(PendingRequest &pending);
   void executeRelist(PendingRequest &pending);
   bool executeObservation(const PendingRequest &pending);
-  bool executeTemperatureApplication(const LineaMicraRequest &request,
+  bool executeTemperatureApplication(const LaMarzoccoRequest &request,
                                      uint32_t machineConfigGeneration);
-  bool executePowerApplication(const LineaMicraRequest &request,
+  bool executePowerApplication(const LaMarzoccoRequest &request,
                                uint32_t machineConfigGeneration);
-  bool ensureSession(const LineaMicraPersistedSettings &settings, bool registerKey,
+  bool ensureSession(const LaMarzoccoPersistedSettings &settings, bool registerKey,
                      bool *renewed = nullptr);
   void discardAccessToken();
-  static bool generateInstallationKey(LineaMicraPersistedSettings &settings);
-  bool registerInstallation(const LineaMicraPersistedSettings &settings);
-  bool signIn(const LineaMicraPersistedSettings &settings);
+  static bool generateInstallationKey(LaMarzoccoPersistedSettings &settings);
+  bool registerInstallation(const LaMarzoccoPersistedSettings &settings);
+  bool signIn(const LaMarzoccoPersistedSettings &settings);
   void rememberSignIn(uint32_t account, bool rejected);
-  bool refreshToken(const LineaMicraPersistedSettings &settings);
-  bool listMachines(const LineaMicraPersistedSettings &settings,
-                    LineaMicraDiscoverySnapshot &result);
-  bool readDashboard(const LineaMicraPersistedSettings &settings,
-                     LineaMicraStatus &result,
-                     const MicraObservationStamp *snapshot = nullptr);
-  bool writeTemperature(const LineaMicraPersistedSettings &settings,
+  bool refreshToken(const LaMarzoccoPersistedSettings &settings);
+  bool listMachines(const LaMarzoccoPersistedSettings &settings,
+                    LaMarzoccoDiscoverySnapshot &result);
+  bool readDashboard(const LaMarzoccoPersistedSettings &settings,
+                     LaMarzoccoStatus &result,
+                     const LaMarzoccoObservationStamp *snapshot = nullptr);
+  bool writeTemperature(const LaMarzoccoPersistedSettings &settings,
                         uint16_t targetDeciC);
-  bool writeStandby(const LineaMicraPersistedSettings &settings);
-  bool writePowerOn(const LineaMicraPersistedSettings &settings);
-  bool acceptPolicy(const LineaMicraPersistedSettings &settings);
+  bool writeStandby(const LaMarzoccoPersistedSettings &settings);
+  bool writePowerOn(const LaMarzoccoPersistedSettings &settings);
+  bool acceptPolicy(const LaMarzoccoPersistedSettings &settings);
   // A cloud call as the diagnostics name it: its purpose and endpoint path.
   struct CloudCall {
     const char *purpose;
     const char *endpoint;
   };
-  bool cloudRequest(const LineaMicraPersistedSettings &settings, const char *url,
+  bool cloudRequest(const LaMarzoccoPersistedSettings &settings, const char *url,
                     esp_http_client_method_t method, const char *body,
                     bool authenticated, CloudCall call, bool installationInit = false);
-  LineaMicraError classifyFailure() const;
-  bool applySignedHeaders(const LineaMicraPersistedSettings &settings,
+  LaMarzoccoError classifyFailure() const;
+  bool applySignedHeaders(const LaMarzoccoPersistedSettings &settings,
                           char *headers = nullptr, size_t capacity = 0);
   void clearRequestState();
-  bool networkEligible(LineaMicraError &error, bool observation = false) const;
-  LineaMicraStatus statusLocked() const;
+  bool networkEligible(LaMarzoccoError &error, bool observation = false) const;
+  LaMarzoccoStatus statusLocked() const;
   bool liveSubscriptionLocked() const;
-  bool pushConfirms(uint16_t targetDeciC, LineaMicraPowerState power);
-  bool queueLocked(const LineaMicraRequest &request);
+  bool pushConfirms(uint16_t targetDeciC, LaMarzoccoPowerState power);
+  bool queueLocked(const LaMarzoccoRequest &request);
   void qualifyBackflushLocked();
   bool backflushReadyLocked() const;
   MachinePhysicalStartDisposition physicalStartLocked(
@@ -215,42 +215,42 @@ class OpenBrewByWeightMicraService {
   void clearSession();
   void releaseIoBuffer(bool responseValid = true);
   void releaseWorkBuffer();
-  void publish(const LineaMicraStatus &status);
+  void publish(const LaMarzoccoStatus &status);
   void deferObservation(const PendingRequest &pending,
-                        LineaMicraStatus status, LineaMicraError reason);
-  void fail(LineaMicraStatus &status, LineaMicraError error);
+                        LaMarzoccoStatus status, LaMarzoccoError reason);
+  void fail(LaMarzoccoStatus &status, LaMarzoccoError error);
   void scheduleAutomatic(uint32_t now, bool failed);
-  bool temperatureRequestCurrent(const LineaMicraRequest &request,
+  bool temperatureRequestCurrent(const LaMarzoccoRequest &request,
                                  uint32_t machineConfigGeneration) const;
-  bool powerRequestCurrent(const LineaMicraRequest &request,
+  bool powerRequestCurrent(const LaMarzoccoRequest &request,
                            uint32_t machineConfigGeneration) const;
   bool identityCurrent(uint32_t identityGeneration) const;
   bool observationCurrent(uint32_t identityGeneration) const;
-  bool temperatureEligible(LineaMicraError &error) const;
-  void deferTemperature(const LineaMicraRequest &request,
-                        LineaMicraError error, uint32_t delayMs,
+  bool temperatureEligible(LaMarzoccoError &error) const;
+  void deferTemperature(const LaMarzoccoRequest &request,
+                        LaMarzoccoError error, uint32_t delayMs,
                         bool retryable = true, bool exhausted = false);
-  void deferPower(const LineaMicraRequest &request,
-                  LineaMicraError error, uint32_t delayMs,
+  void deferPower(const LaMarzoccoRequest &request,
+                  LaMarzoccoError error, uint32_t delayMs,
                   bool retryable = true, bool exhausted = false);
 
   mutable TaskMutex mux_;
-  LineaMicraPersistedSettings config_ = {};
-  LineaMicraPersistedSettings candidate_ = {};
+  LaMarzoccoPersistedSettings config_ = {};
+  LaMarzoccoPersistedSettings candidate_ = {};
   PendingRequest pending_ = {};
   DesiredTemperature desiredTemperature_ = {};
   DesiredPower desiredPower_ = {};
-  LineaMicraStatus published_ = {};
-  LineaMicraCloudCall pendingCloudCall_ = {};  // Cloud worker only.
-  LineaMicraCloudCall publishedCloudCall_ = {};  // Protected by mux_.
+  LaMarzoccoStatus published_ = {};
+  LaMarzoccoCloudCall pendingCloudCall_ = {};  // Cloud worker only.
+  LaMarzoccoCloudCall publishedCloudCall_ = {};  // Protected by mux_.
   HeapLifecycleTracker tlsHeap_ = {};
-  LineaMicraDiscoverySnapshot discovery_ = {};
+  LaMarzoccoDiscoverySnapshot discovery_ = {};
   uint32_t configGeneration_ = 0;
   uint32_t identityGeneration_ = 0;
   uint32_t nextAutomaticRequestId_ = 0x80000000UL;
-  micra_timing::ObservationSchedule observationSchedule_;
-  LineaMicraPowerStateTracker powerState_;
-  MicraObservationFence observationFence_;
+  la_marzocco_timing::ObservationSchedule observationSchedule_;
+  LaMarzoccoPowerStateTracker powerState_;
+  LaMarzoccoObservationFence observationFence_;
   MachineBackflushObservations backflush_;
   MachineBackflushSnapshot idleBackflush_;  // Control task only; see backflush().
   uint32_t backflushUnsupervisedAtMs_ = 0;  // Under mux_; see qualifyBackflushLocked().
@@ -260,14 +260,14 @@ class OpenBrewByWeightMicraService {
   MachineBackflushSnapshot lastPollSnapshot_;
   // Control task only, like lastPollSnapshot_: mutations a busy mux_ deferred
   // from post() and finishBackflush(), applied first at the task's next lock.
-  LineaMicraRequest postedTemperature_ = {}, postedPower_ = {};
+  LaMarzoccoRequest postedTemperature_ = {}, postedPower_ = {};
   uint32_t postedFinishAttempt_ = 0;  // 0: no release pending
   bool postedTemperaturePresent_ = false, postedPowerPresent_ = false;
   // Micra task only: the boiler readiness the log last reported.
-  LineaMicraBoilerState loggedCoffee_ = LineaMicraBoilerState::UNKNOWN,
-                        loggedSteam_ = LineaMicraBoilerState::UNKNOWN;
+  LaMarzoccoBoilerState loggedCoffee_ = LaMarzoccoBoilerState::UNKNOWN,
+                        loggedSteam_ = LaMarzoccoBoilerState::UNKNOWN;
   uint32_t loggedCoffeeReadyAt_ = 0, loggedSteamReadyAt_ = 0;
-  char loggedCleaning_[sizeof(MicraWebSocketStatus::cleaningLabel)] = {};
+  char loggedCleaning_[sizeof(LaMarzoccoWebSocketStatus::cleaningLabel)] = {};
   bool postedPending() const {
     return postedTemperaturePresent_ || postedPowerPresent_ ||
            postedFinishAttempt_ != 0;
@@ -275,28 +275,28 @@ class OpenBrewByWeightMicraService {
   void applyPostedLocked();
   // Control task only, like idleBackflush_: statusPoll() writes both under
   // mux_ and the same task reads them, so nothing else guards them.
-  mutable LineaMicraStatus statusCache_ = {};
+  mutable LaMarzoccoStatus statusCache_ = {};
   mutable uint32_t statusCacheWrittenAtMs_ = 0;
   // Mirrors published_.powerState == OFF for the lock-free poll; written
   // under mux_ wherever published_.powerState changes.
   std::atomic<bool> powerOff_{false};
   void mirrorPowerLocked() {
-    powerOff_.store(published_.powerState == LineaMicraPowerState::OFF,
+    powerOff_.store(published_.powerState == LaMarzoccoPowerState::OFF,
                     std::memory_order_release);
   }
   std::atomic<uint32_t> tokenIssuedAtMs_{0};
   std::atomic<bool> tokenAvailable_{false};
-  MicraObservationStamp snapshotStamp_;  // Protected by mux_, captured at subscription.
+  LaMarzoccoObservationStamp snapshotStamp_;  // Protected by mux_, captured at subscription.
   bool snapshotPending_ = false;
   bool active_ = false;
   TaskHandle_t task_ = nullptr;
   IoBuffer *io_ = nullptr;
   WorkBuffer *work_ = nullptr;
   WebSocketBuffer *websocket_ = nullptr;
-  MicraWebSocketStatus websocketStatus_;
+  LaMarzoccoWebSocketStatus websocketStatus_;
   bool websocketUnexpectedReconnect_ = false;  // Protected by mux_; survives pauses.
   uint8_t websocketAuthRecoveries_ = 0;  // Cloud owner; survives workspace parking.
-  // lineaMicraAccountKey of the account the cloud refused (NVS; 0 = none).
+  // laMarzoccoAccountKey of the account the cloud refused (NVS; 0 = none).
   // Read by begin(), then cloud owner. While it names the saved account a
   // sign-in waits for an edit, a refresh, a relist or a new connection.
   uint32_t rejectedAccount_ = 0;
@@ -318,9 +318,9 @@ class OpenBrewByWeightMicraService {
   // PENDING, the full frame moves PENDING to COMPANION, and any side returns
   // to DIRECT. Without a link the route stays DIRECT and nothing here runs.
   struct CompanionFeed {
-    MicraCompanionOutbox outbox;
-    MicraCompanionRouteStatus status;
-    MicraObservationStamp stamp;  // Basis set by the last full frame.
+    LaMarzoccoCompanionOutbox outbox;
+    LaMarzoccoCompanionRouteStatus status;
+    LaMarzoccoObservationStamp stamp;  // Basis set by the last full frame.
     struct Intent { uint32_t command = 0, generation = 0; } intents[8];
     uint32_t losses[4] = {};
     uint32_t routeIntent = 0, epoch = 0, requestedAtMs = 0, pingAtMs = 0;

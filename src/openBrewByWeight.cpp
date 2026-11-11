@@ -70,7 +70,7 @@
 #include "OpenBrewByWeightSettingsWriteAdmission.h"
 #include "OpenBrewByWeightFirmwareMode.h"
 #include "machine/OpenBrewByWeightMachineIntegration.h"
-#include "machine/OpenBrewByWeightMicraTiming.h"
+#include "machine/OpenBrewByWeightLaMarzoccoTiming.h"
 #include "OpenBrewByWeightIntegrationState.h"
 #include "OpenBrewByWeightDebugExport.h"
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
@@ -1077,14 +1077,14 @@ void copyTaskProfiler(TaskProfilerSnapshot &output) {
   taskProfiler.copySnapshot(output);
   loopPhaseProfiler.copySnapshot(output.loopPhases);
   copyScaleWorkerPhaseProfilerSnapshot(output.scaleWorkerPhases);
-  output.micraBackflushWaitLastUs =
-      micraBackflushWaitStat().lastUs.load(std::memory_order_relaxed);
-  output.micraBackflushWaitMaxUs =
-      micraBackflushWaitStat().maxUs.load(std::memory_order_relaxed);
-  output.micraBackflushHoldLastUs =
-      micraBackflushHoldStat().lastUs.load(std::memory_order_relaxed);
-  output.micraBackflushHoldMaxUs =
-      micraBackflushHoldStat().maxUs.load(std::memory_order_relaxed);
+  output.laMarzoccoBackflushWaitLastUs =
+      laMarzoccoBackflushWaitStat().lastUs.load(std::memory_order_relaxed);
+  output.laMarzoccoBackflushWaitMaxUs =
+      laMarzoccoBackflushWaitStat().maxUs.load(std::memory_order_relaxed);
+  output.laMarzoccoBackflushHoldLastUs =
+      laMarzoccoBackflushHoldStat().lastUs.load(std::memory_order_relaxed);
+  output.laMarzoccoBackflushHoldMaxUs =
+      laMarzoccoBackflushHoldStat().maxUs.load(std::memory_order_relaxed);
   output.scaleEventsWaitLastUs =
       scaleCriticalEventWaitStat().lastUs.load(std::memory_order_relaxed);
   output.scaleEventsWaitMaxUs =
@@ -1171,7 +1171,7 @@ RuntimeConfig effectiveRuntimeConfig() {
 
 void requestActivePresetMachineTemperature() {
   const ShotPreset &preset = activeShotPreset(presetBank);
-  requestMachineIntegrationPresetTemperature({preset.id, preset.lineaMicraBrewTargetDeciC},
+  requestMachineIntegrationPresetTemperature({preset.id, preset.laMarzoccoBrewTargetDeciC},
                                              runtimeConfig.revision);
 }
 

@@ -1152,7 +1152,7 @@ static void testPolicyEvent() {
   CHECK(!companionPolicyEventRearmed(false, 500, 1000));
   CHECK(!companionPolicyEventRearmed(false, 0, 0xFFFFFF00U));  // never sampled, across the wrap
   CHECK(companionPolicyEventRearmed(false, 100, 0xFFFFFF00U));
-  CHECK(strstr(COMPANION_POLICY_EVENT, "\"topic\":\"micra_policy\"") != nullptr);
+  CHECK(strstr(COMPANION_POLICY_EVENT, "\"topic\":\"la_marzocco_policy\"") != nullptr);
   CHECK(strstr(COMPANION_POLICY_EVENT, "\"ttl\":86400") != nullptr);
 }
 
@@ -1218,32 +1218,32 @@ static void testLogFlushDue() {
 
 static void testLiveness() {
   CompanionLinkSlot slot;
-  CHECK(companionSilenceLimitMs(slot, MicraCompanionRoute::DIRECT) == 10000);
+  CHECK(companionSilenceLimitMs(slot, LaMarzoccoCompanionRoute::DIRECT) == 10000);
   slot.phase = CompanionLinkPhase::READY;
-  CHECK(companionSilenceLimitMs(slot, MicraCompanionRoute::DIRECT) == 250000);
-  CHECK(companionSilenceLimitMs(slot, MicraCompanionRoute::COMPANION) == 35000);
+  CHECK(companionSilenceLimitMs(slot, LaMarzoccoCompanionRoute::DIRECT) == 250000);
+  CHECK(companionSilenceLimitMs(slot, LaMarzoccoCompanionRoute::COMPANION) == 35000);
   // A route request on a link idle for 100 s (pings every 120 s while direct)
   // keeps the link: only the companion route pings every 15 s.
   const uint32_t now = 500000;
   slot.heardAtMs = now - 100000;
-  CHECK(now - slot.heardAtMs < companionSilenceLimitMs(slot, MicraCompanionRoute::PENDING));
+  CHECK(now - slot.heardAtMs < companionSilenceLimitMs(slot, LaMarzoccoCompanionRoute::PENDING));
   // A long shot: the companion stops pinging at the hold and the link is
   // trusted throughout; its silence counts again only from the hold's end,
   // so the companion's first ping after it is the one that must arrive.
   slot.heardAtMs = now;
   uint32_t at = now;
   for (; at <= now + 600000; at += 1000)
-    CHECK(!companionLinkSilent(slot, MicraCompanionRoute::COMPANION, at, true));
+    CHECK(!companionLinkSilent(slot, LaMarzoccoCompanionRoute::COMPANION, at, true));
   at -= 1000;  // the hold's last pass
-  CHECK(!companionLinkSilent(slot, MicraCompanionRoute::COMPANION, at + 34999, false));
-  CHECK(companionLinkSilent(slot, MicraCompanionRoute::COMPANION, at + 35000, false));
+  CHECK(!companionLinkSilent(slot, LaMarzoccoCompanionRoute::COMPANION, at + 34999, false));
+  CHECK(companionLinkSilent(slot, LaMarzoccoCompanionRoute::COMPANION, at + 35000, false));
   // An opening link keeps its 10 s handshake limit through a hold.
   CompanionLinkSlot opening;
   opening.heardAtMs = now;
-  CHECK(companionLinkSilent(opening, MicraCompanionRoute::DIRECT, now + 10000, true));
+  CHECK(companionLinkSilent(opening, LaMarzoccoCompanionRoute::DIRECT, now + 10000, true));
   // A ping httpd heard after the pass took its `now` is not silence.
   slot.heardAtMs = now + 5;
-  CHECK(!companionLinkSilent(slot, MicraCompanionRoute::COMPANION, now, false));
+  CHECK(!companionLinkSilent(slot, LaMarzoccoCompanionRoute::COMPANION, now, false));
   // "Since" covers both states, and is unknown until the first change.
   CompanionState state;
   CHECK(companionLinkAgeS(state, now) == -1);

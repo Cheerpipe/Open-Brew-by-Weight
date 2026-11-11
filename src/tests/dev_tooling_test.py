@@ -1835,7 +1835,7 @@ for arch, arch_selectors in profile_arch.items():
     assert verify_production_profile(arch, micra, "la_marzocco_cloud").returncode == 0
     assert "CONFIG_WS_BUFFER_SIZE=4096" in verify_production_profile(
         arch, micra[:-1], "la_marzocco_cloud").stderr
-    assert "unexpected Micra TLS allocator" in verify_production_profile(
+    assert "unexpected La Marzocco TLS allocator" in verify_production_profile(
         arch, micra).stderr
     jtag_define = "-DOPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1"
     jtag_selectors = [item for item in selectors if item not in {

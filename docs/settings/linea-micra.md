@@ -303,7 +303,7 @@ during a cleaning cycle, the cycle stops just as it does when the controller
 loses its own connection.
 
 The Web UI log records each change of route and why the controller is using
-its own connection, for example **Micra route companion -> direct
+its own connection, for example **La Marzocco route companion -> direct
 reason=link_lost**. Only an unexpected loss of the companion is a warning;
 planned switches, such as before a firmware update, are informational.
 
@@ -343,7 +343,7 @@ Connection and account details stay in **La Marzocco cloud**.
 The ready time is La Marzocco's estimate, and a machine that is still warm can
 be ready well before it. To check what the cloud reported, the Web UI log
 records every change of either boiler's state or estimate, for example
-**Micra boilers brew=heating_up ready_in=1140s steam=off ready_in=none**.
+**La Marzocco boilers brew=heating_up ready_in=1140s steam=off ready_in=none**.
 
 These states are informational. Nothing about paddle handling, guards, brew
 control, or how the machine is turned on and off changes with them. In API

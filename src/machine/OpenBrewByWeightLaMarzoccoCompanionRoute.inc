@@ -12,30 +12,30 @@ constexpr uint32_t kCompanionFlapHoldMs = 300000;
 constexpr uint32_t kCompanionLogPeriodMs = 10000;
 }  // namespace
 
-void OpenBrewByWeightMicraService::logCompanionRoute(MicraCompanionRoute from,
-                                                     MicraCompanionRoute to,
+void OpenBrewByWeightLaMarzoccoService::logCompanionRoute(LaMarzoccoCompanionRoute from,
+                                                     LaMarzoccoCompanionRoute to,
                                                      const char *reason) {
   static constexpr const char *names[] = {"direct", "pending", "companion"};
   // Only a lost companion warns; maintenance, settings or Wi-Fi fallbacks are routine.
-  const bool lost = to == MicraCompanionRoute::DIRECT &&
+  const bool lost = to == LaMarzoccoCompanionRoute::DIRECT &&
       (!strcmp(reason, "link_lost") || !strcmp(reason, "ping_missing") ||
        !strcmp(reason, "upstream_down") || !strcmp(reason, "full_missing"));
   serialTraceCategoryf(lost ? LogLevel::WARNING : LogLevel::INFO,
-                       DebugCategory::NETWORK, "Micra route %s -> %s reason=%s",
+                       DebugCategory::NETWORK, "La Marzocco route %s -> %s reason=%s",
                        names[static_cast<uint8_t>(from)], names[static_cast<uint8_t>(to)],
                        reason);
 }
 
-bool OpenBrewByWeightMicraService::serviceCompanion() {
+bool OpenBrewByWeightLaMarzoccoService::serviceCompanion() {
   if (!companionLink_.load(std::memory_order_acquire)) return false;
   const uint32_t now = millis();
   const bool hold = companionHold();
   // A quiet point: no shot, scale connection, maintenance or command, and a
   // usable network; cleaning and queued work are checked under the lock.
-  LineaMicraError gate = LineaMicraError::NONE;
+  LaMarzoccoError gate = LaMarzoccoError::NONE;
   const bool quiet = !hold && networkEligible(gate, true) && !shotActive_.load() &&
       !outboundShotActive.load() && !temperatureActive_.load() && !powerActive_.load();
-  MicraCompanionRoute from, to;
+  LaMarzoccoCompanionRoute from, to;
   const char *reason;
   bool changed = false, release = false;
   {
@@ -46,17 +46,17 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
     // goes out only with a route request (below) and while it stands.
     if (feed.outbox.hold != hold) {
       feed.outbox.hold = hold;
-      if (from != MicraCompanionRoute::DIRECT) {
+      if (from != LaMarzoccoCompanionRoute::DIRECT) {
         ++feed.outbox.holdSequence;
         changed = true;
       }
     }
     if (feed.flapping && tickReached(now, feed.flapUntilMs))
       feed.flapping = false;
-    if (from != MicraCompanionRoute::DIRECT) {
+    if (from != LaMarzoccoCompanionRoute::DIRECT) {
       // A basis is the full frame's subscription; without one the route
       // waits for a full frame (after `route` or an upstream reset).
-      const bool basis = from == MicraCompanionRoute::COMPANION && websocketStatus_.subscribed;
+      const bool basis = from == LaMarzoccoCompanionRoute::COMPANION && websocketStatus_.subscribed;
       const char *lost = !feed.syncHold && now - feed.pingAtMs >= kCompanionAliveMs ? "ping_missing"
           : !feed.up && now - feed.downSinceMs >= kCompanionAliveMs ? "upstream_down"
           : !basis && now - feed.requestedAtMs >= kCompanionPendingMs ? "full_missing"
@@ -68,7 +68,7 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
         leaveCompanionLocked("network", false);
     } else {
       const bool observing = config_.accountConfigured &&
-          (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0;
+          (config_.options & LA_MARZOCCO_OBSERVE_STATE) != 0;
       feed.status.reason = !feed.lmSwitch ? "switch_off"
           : !observing ? "not_observing"
           : !feed.status.credentialsConfirmed ? "credentials"
@@ -79,7 +79,7 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
                   desiredPower_.present || pending_.present || active_ ? "busy"
           : "none";
       if (strcmp(feed.status.reason, "none") == 0) {
-        feed.status.route = MicraCompanionRoute::PENDING;
+        feed.status.route = LaMarzoccoCompanionRoute::PENDING;
         feed.outbox.routeCompanion = true;
         ++feed.outbox.routeSequence;
         ++feed.outbox.holdSequence;
@@ -90,12 +90,12 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
     to = feed.status.route;
     reason = feed.status.reason;
     changed = changed || from != to;
-    release = to == MicraCompanionRoute::COMPANION && feed.release;
+    release = to == LaMarzoccoCompanionRoute::COMPANION && feed.release;
     feed.release = false;
   }
   if (from != to) logCompanionRoute(from, to, reason);
   if (changed) notifyCompanion();
-  if (to == MicraCompanionRoute::DIRECT) return false;
+  if (to == LaMarzoccoCompanionRoute::DIRECT) return false;
   // While the request is pending the owner leaves the direct socket as it is
   // (it keeps streaming on its own task), so the full frame can retire it
   // from the link task without racing a reconnection. Make before break:
@@ -113,7 +113,7 @@ bool OpenBrewByWeightMicraService::serviceCompanion() {
 
 // Waits for the companion's `res`; a loss, timeout or cancellation reads as a
 // transport failure, so retries and confirmation behave as for HTTPS.
-bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
+bool OpenBrewByWeightLaMarzoccoService::companionCommand(LaMarzoccoCompanionCommandOp op,
                                                     uint16_t value) {
   static uint32_t lastLogAtMs = 0;  // Cloud task only.
   if (work_ == nullptr) return false;
@@ -124,7 +124,7 @@ bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
   {
     TaskLockGuard lock(mux_);
     auto &feed = companion_;
-    if (feed.status.route == MicraCompanionRoute::COMPANION) {
+    if (feed.status.route == LaMarzoccoCompanionRoute::COMPANION) {
       if (++feed.lastCommand == 0) ++feed.lastCommand;
       id = feed.lastCommand;
       feed.outbox.commandId = id;
@@ -149,7 +149,7 @@ bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
       done = feed.resultId == id;
       accepted = done && feed.resultAccepted;
       http = done ? feed.resultHttp : 0;
-      routed = feed.status.route == MicraCompanionRoute::COMPANION;
+      routed = feed.status.route == LaMarzoccoCompanionRoute::COMPANION;
       if (done || !routed || abortRequested_.load(std::memory_order_acquire) ||
           tickReached(now, deadline)) {
         feed.outbox.commandId = 0;  // A later link session never replays it.
@@ -168,7 +168,7 @@ bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
     static constexpr const char *names[] = {"none", "temp", "standby", "on", "refresh"};
     lastLogAtMs = millis();
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "Micra companion command %s %s http=%u",
+                         "La Marzocco companion command %s %s http=%u",
                          names[static_cast<uint8_t>(op)],
                          done ? "failed" : !routed ? "lost" : "unanswered",
                          static_cast<unsigned>(http));
@@ -176,13 +176,13 @@ bool OpenBrewByWeightMicraService::companionCommand(MicraCompanionCommandOp op,
   return accepted;
 }
 
-void OpenBrewByWeightMicraService::leaveCompanionLocked(const char *reason, bool loss) {
+void OpenBrewByWeightLaMarzoccoService::leaveCompanionLocked(const char *reason, bool loss) {
   auto &feed = companion_;
   const uint32_t now = millis();
   feed.status.reason = reason;
   feed.release = false;
-  if (feed.status.route == MicraCompanionRoute::DIRECT) return;
-  if (feed.status.route == MicraCompanionRoute::COMPANION) {
+  if (feed.status.route == LaMarzoccoCompanionRoute::DIRECT) return;
+  if (feed.status.route == LaMarzoccoCompanionRoute::COMPANION) {
     // The direct socket's stop steps, applied to the feed; the direct client
     // then reconnects as soon as its usual admission rule allows.
     dropCompanionFeedLocked();
@@ -190,7 +190,7 @@ void OpenBrewByWeightMicraService::leaveCompanionLocked(const char *reason, bool
     observationSchedule_.dueNow(now);
     ++feed.status.switches;
   }
-  feed.status.route = MicraCompanionRoute::DIRECT;
+  feed.status.route = LaMarzoccoCompanionRoute::DIRECT;
   feed.status.routeSinceMs = now;
   companionRoute_.store(false, std::memory_order_release);
   feed.outbox.routeCompanion = false;
@@ -206,12 +206,12 @@ void OpenBrewByWeightMicraService::leaveCompanionLocked(const char *reason, bool
   }
 }
 
-void OpenBrewByWeightMicraService::dropCompanionFeedLocked() {
+void OpenBrewByWeightLaMarzoccoService::dropCompanionFeedLocked() {
   powerState_.hold(published_, config_.accountConfigured &&
-      (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0, millis());
-  websocketStatus_.state = MicraSocketState::STOPPING;
+      (config_.options & LA_MARZOCCO_OBSERVE_STATE) != 0, millis());
+  websocketStatus_.state = LaMarzoccoSocketState::STOPPING;
   websocketStatus_.subscribed = false;
-  shotTraceNoteMicraSubscribed(false);
+  shotTraceNoteLaMarzoccoSubscribed(false);
   backflush_.invalidate();
   snapshotPending_ = false;
   observationFence_.invalidate();
@@ -219,7 +219,7 @@ void OpenBrewByWeightMicraService::dropCompanionFeedLocked() {
   companion_.requestedAtMs = millis();  // A full frame is due from now on.
 }
 
-bool OpenBrewByWeightMicraService::companionFeedLiveLocked() const {
+bool OpenBrewByWeightLaMarzoccoService::companionFeedLiveLocked() const {
   return websocketStatus_.subscribed && companion_.status.upstreamSubscribed && companion_.up &&
       companion_.stamp.identity == identityGeneration_ &&
       companion_.stamp.epoch == observationFence_.epoch && companionLink_.load() &&
@@ -229,7 +229,7 @@ bool OpenBrewByWeightMicraService::companionFeedLiveLocked() const {
 // Power intent of a companion read: the generation recorded for command `ac`
 // (the oldest kept when it is unknown), never older than the route request,
 // so an observation taken before a power command cannot undo it.
-uint32_t OpenBrewByWeightMicraService::companionIntentLocked(uint32_t afterCommand) const {
+uint32_t OpenBrewByWeightLaMarzoccoService::companionIntentLocked(uint32_t afterCommand) const {
   const uint32_t start = companion_.routeIntent;
   if (afterCommand == 0) return start;
   bool any = false;
@@ -249,7 +249,7 @@ uint32_t OpenBrewByWeightMicraService::companionIntentLocked(uint32_t afterComma
   return any && tickAfter(generation, start) ? generation : start;
 }
 
-void OpenBrewByWeightMicraService::recordCompanionIntentLocked(uint32_t command) {
+void OpenBrewByWeightLaMarzoccoService::recordCompanionIntentLocked(uint32_t command) {
   auto &feed = companion_;
   const auto match = std::find_if(std::begin(feed.intents), std::end(feed.intents),
                                   [command](const auto &i) { return i.command == command; });
@@ -261,13 +261,13 @@ void OpenBrewByWeightMicraService::recordCompanionIntentLocked(uint32_t command)
   feed.nextIntent = static_cast<uint8_t>((feed.nextIntent + 1) % 8);
 }
 
-void OpenBrewByWeightMicraService::refreshCompanionConfigLocked() {
+void OpenBrewByWeightLaMarzoccoService::refreshCompanionConfigLocked() {
   auto &feed = companion_;
   auto &box = feed.outbox;
   const bool observe = config_.accountConfigured &&
-      (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0;
+      (config_.options & LA_MARZOCCO_OBSERVE_STATE) != 0;
   const bool websocket =
-      config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
+      config_.connectionType == static_cast<uint8_t>(LaMarzoccoConnectionType::WEBSOCKET);
   if (box.lmSwitch != feed.lmSwitch || box.observe != observe ||
       box.websocketConnection != websocket) {
     box.lmSwitch = feed.lmSwitch;
@@ -284,8 +284,8 @@ void OpenBrewByWeightMicraService::refreshCompanionConfigLocked() {
   }
 }
 
-void OpenBrewByWeightMicraService::companionLink(bool ready, bool lmSwitch) {
-  MicraCompanionRoute from, to;
+void OpenBrewByWeightLaMarzoccoService::companionLink(bool ready, bool lmSwitch) {
+  LaMarzoccoCompanionRoute from, to;
   const char *reason;
   {
     TaskLockGuard lock(mux_);
@@ -308,7 +308,7 @@ void OpenBrewByWeightMicraService::companionLink(bool ready, bool lmSwitch) {
   if (task_ != nullptr) xTaskNotifyGive(task_);  // Ends a command wait at once.
 }
 
-void OpenBrewByWeightMicraService::companionPing(bool upstreamAlive) {
+void OpenBrewByWeightLaMarzoccoService::companionPing(bool upstreamAlive) {
   TaskLockGuard lock(mux_);
   auto &feed = companion_;
   const uint32_t now = millis();
@@ -320,13 +320,13 @@ void OpenBrewByWeightMicraService::companionPing(bool upstreamAlive) {
 
 // The ping clock restarts at both ends of a sync hold, so the first ping
 // after it (sent at once) is the one that has to arrive.
-void OpenBrewByWeightMicraService::companionSyncHold(bool on) {
+void OpenBrewByWeightLaMarzoccoService::companionSyncHold(bool on) {
   TaskLockGuard lock(mux_);
   companion_.syncHold = on;
   companion_.pingAtMs = millis();
 }
 
-void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t epoch,
+void OpenBrewByWeightLaMarzoccoService::companionUpstream(bool subscribed, uint32_t epoch,
                                                      uint32_t tokenRenewInS, bool refused,
                                                      bool policy) {
   bool reset = false;
@@ -335,9 +335,9 @@ void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t e
     auto &feed = companion_;
     // The policy belongs to the account: the companion meeting it is a direct
     // 403's state, and only its own report that it ended clears it.
-    if (policy) published_.error = LineaMicraError::POLICY_REQUIRED;
-    else if (companionPolicy_.load() && published_.error == LineaMicraError::POLICY_REQUIRED)
-      published_.error = LineaMicraError::NONE;
+    if (policy) published_.error = LaMarzoccoError::POLICY_REQUIRED;
+    else if (companionPolicy_.load() && published_.error == LaMarzoccoError::POLICY_REQUIRED)
+      published_.error = LaMarzoccoError::NONE;
     companionPolicy_.store(policy);
     feed.status.upstreamSubscribed = subscribed;
     feed.status.upstreamRefused = refused;
@@ -345,7 +345,7 @@ void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t e
     feed.tokenRenewAtMs = (millis() + std::min<uint32_t>(tokenRenewInS, 86400) * 1000U) | 1U;
     // A new upstream epoch or a lost subscription ends the basis of the last
     // full frame; the next full frame rebuilds it, so no gap stays hidden.
-    reset = feed.status.route == MicraCompanionRoute::COMPANION &&
+    reset = feed.status.route == LaMarzoccoCompanionRoute::COMPANION &&
         websocketStatus_.subscribed && (!subscribed || epoch != feed.epoch);
     if (reset) dropCompanionFeedLocked();
   }
@@ -353,12 +353,12 @@ void OpenBrewByWeightMicraService::companionUpstream(bool subscribed, uint32_t e
   // frame rebuilds the basis, so a reset is routine.
   if (reset)
     serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
-                         "Micra companion feed reset subscribed=%u epoch=%lu",
+                         "La Marzocco companion feed reset subscribed=%u epoch=%lu",
                          static_cast<unsigned>(subscribed), static_cast<unsigned long>(epoch));
 }
 
-void OpenBrewByWeightMicraService::companionCredentials(uint32_t generation, bool ok) {
-  MicraCompanionRoute from, to;
+void OpenBrewByWeightLaMarzoccoService::companionCredentials(uint32_t generation, bool ok) {
+  LaMarzoccoCompanionRoute from, to;
   {
     TaskLockGuard lock(mux_);
     auto &feed = companion_;
@@ -372,14 +372,14 @@ void OpenBrewByWeightMicraService::companionCredentials(uint32_t generation, boo
   }
   if (!ok)
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "Micra companion: La Marzocco rejected the account");
+                         "La Marzocco companion: La Marzocco rejected the account");
   if (from == to) return;
   logCompanionRoute(from, to, "credentials");
   notifyCompanion();
 }
 
-MicraCompanionIngress OpenBrewByWeightMicraService::companionIngress() const {
-  MicraCompanionIngress ingress;
+LaMarzoccoCompanionIngress OpenBrewByWeightLaMarzoccoService::companionIngress() const {
+  LaMarzoccoCompanionIngress ingress;
   // Sampled before any mutex, like the socket callback, so contention cannot
   // retag a push taken before a cleaning edge.
   ingress.attempt = backflush_.ingressAttempt();
@@ -388,26 +388,26 @@ MicraCompanionIngress OpenBrewByWeightMicraService::companionIngress() const {
   return ingress;
 }
 
-bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
+bool OpenBrewByWeightLaMarzoccoService::companionState(LaMarzoccoCompanionStateKind kind,
                                                   uint32_t epoch, uint32_t afterCommand,
                                                   const cJSON *dashboard,
-                                                  MicraCompanionIngress ingress) {
+                                                  LaMarzoccoCompanionIngress ingress) {
   static std::atomic<uint32_t> lastRejectAtMs{0};
-  const bool push = kind == MicraCompanionStateKind::PUSH;
-  MicraObservation update;
+  const bool push = kind == LaMarzoccoCompanionStateKind::PUSH;
+  LaMarzoccoObservation update;
   // Cleaning is decoded only from pushes, exactly as on the direct socket.
-  update.source = push ? MicraObservationSource::WEBSOCKET
-      : kind == MicraCompanionStateKind::FULL ? MicraObservationSource::HTTP_INITIAL
-      : MicraObservationSource::HTTP;
+  update.source = push ? LaMarzoccoObservationSource::WEBSOCKET
+      : kind == LaMarzoccoCompanionStateKind::FULL ? LaMarzoccoObservationSource::HTTP_INITIAL
+      : LaMarzoccoObservationSource::HTTP;
   const char *unsupported = nullptr;
-  if (!decodeMicraDashboard(dashboard, update, &unsupported) ||
+  if (!decodeLaMarzoccoDashboard(dashboard, update, &unsupported) ||
       (!push && !update.powerPresent && !(update.connectedPresent && !update.connected))) {
     const uint32_t now = millis();
     if (now - lastRejectAtMs.load() >= kCompanionLogPeriodMs) {
       lastRejectAtMs.store(now);
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                           "Micra companion state rejected kind=%s%s%s",
-                           push ? "push" : kind == MicraCompanionStateKind::FULL ? "full" : "read",
+                           "La Marzocco companion state rejected kind=%s%s%s",
+                           push ? "push" : kind == LaMarzoccoCompanionStateKind::FULL ? "full" : "read",
                            unsupported != nullptr ? ": " : "",
                            unsupported != nullptr ? unsupported : "");
     }
@@ -421,29 +421,29 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
       !outboundMaintenance.load() && !clearSessionRequested_.load();
   // Like a direct read, a read landing while the companion is told to hold
   // is dropped; pushes keep arriving as they do on the socket.
-  const bool readDropped = kind == MicraCompanionStateKind::READ && companionHold();
+  const bool readDropped = kind == LaMarzoccoCompanionStateKind::READ && companionHold();
   const bool quiet = !shotActive_.load() && !outboundShotActive.load() &&
       !scaleConnecting_.load() && !outboundScaleInhibited() &&
       !temperatureActive_.load() && !powerActive_.load();
-  MicraCompanionRoute from, to;
+  LaMarzoccoCompanionRoute from, to;
   const char *reason;
   {
     TaskLockGuard lock(mux_);
     auto &feed = companion_;
     from = feed.status.route;
     const bool usable = admitted && config_.accountConfigured &&
-        (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0;
-    if (usable && kind == MicraCompanionStateKind::FULL &&
-        from != MicraCompanionRoute::DIRECT) {
-      if (from == MicraCompanionRoute::PENDING &&
+        (config_.options & LA_MARZOCCO_OBSERVE_STATE) != 0;
+    if (usable && kind == LaMarzoccoCompanionStateKind::FULL &&
+        from != LaMarzoccoCompanionRoute::DIRECT) {
+      if (from == LaMarzoccoCompanionRoute::PENDING &&
           (!quiet || backflush_.status().busy() || desiredTemperature_.present ||
            desiredPower_.present)) {
         leaveCompanionLocked("busy", false);
       } else {
-        if (from == MicraCompanionRoute::PENDING) {
+        if (from == LaMarzoccoCompanionRoute::PENDING) {
           // Make before break: ending the socket's epoch here drops its later
           // frames, so exactly one source feeds the fence from now on.
-          feed.status.route = MicraCompanionRoute::COMPANION;
+          feed.status.route = LaMarzoccoCompanionRoute::COMPANION;
           feed.status.routeSinceMs = update.receivedAtMs;
           ++feed.status.switches;
           companionRoute_.store(true, std::memory_order_release);
@@ -456,9 +456,9 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
         observationFence_.offline = false;
         websocketStatus_.pongAtMs = 0;
         websocketStatus_.subscribed = true;
-        shotTraceNoteMicraSubscribed(true);
+        shotTraceNoteLaMarzoccoSubscribed(true);
         websocketStatus_.machineConnectedKnown = false;
-        websocketStatus_.state = MicraSocketState::WAITING_FOR_DATA;
+        websocketStatus_.state = LaMarzoccoSocketState::WAITING_FOR_DATA;
         snapshotPending_ = false;
         feed.epoch = epoch;
         feed.stamp = observationFence_.stamp(identityGeneration_, powerState_.generation());
@@ -466,8 +466,8 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
         update.stamp.intent = companionIntentLocked(afterCommand);
         (void)mergeReadLocked(update);
       }
-    } else if (usable && !readDropped && from == MicraCompanionRoute::COMPANION &&
-               kind != MicraCompanionStateKind::FULL && epoch == feed.epoch &&
+    } else if (usable && !readDropped && from == LaMarzoccoCompanionRoute::COMPANION &&
+               kind != LaMarzoccoCompanionStateKind::FULL && epoch == feed.epoch &&
                websocketStatus_.subscribed && feed.stamp.epoch == observationFence_.epoch &&
                feed.stamp.identity == identityGeneration_) {
       if (push) {
@@ -490,7 +490,7 @@ bool OpenBrewByWeightMicraService::companionState(MicraCompanionStateKind kind,
   return true;
 }
 
-void OpenBrewByWeightMicraService::companionCommandResult(uint32_t id, bool accepted,
+void OpenBrewByWeightLaMarzoccoService::companionCommandResult(uint32_t id, bool accepted,
                                                           uint16_t httpStatus) {
   {
     TaskLockGuard lock(mux_);
@@ -503,19 +503,19 @@ void OpenBrewByWeightMicraService::companionCommandResult(uint32_t id, bool acce
   if (task_ != nullptr) xTaskNotifyGive(task_);
 }
 
-MicraCompanionOutbox OpenBrewByWeightMicraService::companionOutbox() const {
+LaMarzoccoCompanionOutbox OpenBrewByWeightLaMarzoccoService::companionOutbox() const {
   TaskLockGuard lock(mux_);
   return companion_.outbox;
 }
 
-MicraCompanionRouteStatus OpenBrewByWeightMicraService::companionRouteStatus() const {
+LaMarzoccoCompanionRouteStatus OpenBrewByWeightLaMarzoccoService::companionRouteStatus() const {
   TaskLockGuard lock(mux_);
-  MicraCompanionRouteStatus result = companion_.status;
+  LaMarzoccoCompanionRouteStatus result = companion_.status;
   if (!companionLink_.load()) result.reason = "no_link";
   return result;
 }
 
-bool OpenBrewByWeightMicraService::companionCopyCredentials(
+bool OpenBrewByWeightLaMarzoccoService::companionCopyCredentials(
     uint32_t generation, char *email, size_t emailCapacity, char *password,
     size_t passwordCapacity, char *serial, size_t serialCapacity) const {
   TaskLockGuard lock(mux_);

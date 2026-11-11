@@ -2065,7 +2065,7 @@ const TRACE_SNAPSHOT_FLAGS = [
   "emptyPanQualified",
   "idleTareEligible",
   "scaleSupportsTare",
-  "lineaMicraConnected",
+  "laMarzoccoConnected",
 ];
 const TRACE_COUNTERS = [
   "readingsReceived",
@@ -2085,7 +2085,7 @@ const TRACE_COUNTERS = [
   "undecodableFrames",
   "confirmationResets",
   "loopGapMaxMs",
-  "micraRxBytes",
+  "laMarzoccoRxBytes",
   "uiStreamDeferrals",
   "verboseDropped",
   "decisionsDropped",

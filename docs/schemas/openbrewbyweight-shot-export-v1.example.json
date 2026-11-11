@@ -264,7 +264,7 @@
             "emptyPanQualified": false,
             "idleTareEligible": false,
             "scaleSupportsTare": false,
-            "lineaMicraConnected": false
+            "laMarzoccoConnected": false
           }
         },
         "counters": {
@@ -285,7 +285,7 @@
           "undecodableFrames": 0,
           "confirmationResets": 0,
           "loopGapMaxMs": 0,
-          "micraRxBytes": 0,
+          "laMarzoccoRxBytes": 0,
           "uiStreamDeferrals": 0,
           "verboseDropped": 0,
           "decisionsDropped": 0
@@ -493,7 +493,7 @@
             "emptyPanQualified": false,
             "idleTareEligible": false,
             "scaleSupportsTare": false,
-            "lineaMicraConnected": false
+            "laMarzoccoConnected": false
           }
         },
         "counters": {
@@ -514,7 +514,7 @@
           "undecodableFrames": 0,
           "confirmationResets": 0,
           "loopGapMaxMs": 0,
-          "micraRxBytes": 0,
+          "laMarzoccoRxBytes": 0,
           "uiStreamDeferrals": 0,
           "verboseDropped": 0,
           "decisionsDropped": 0

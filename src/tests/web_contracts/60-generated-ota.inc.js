@@ -89,7 +89,7 @@ const developmentShell = await webUi.generate({developmentMode: true, write: fal
     await prettier.format(fs.readFileSync(file, 'utf8'), {filepath: file, printWidth})])));
   const widths = await Promise.all([40, 160].map(printed));
   const shipped = (r) => [r.html, r.css, ...Object.values(r.partials), ...Object.values(r.modules)];
-  for (const options of [{}, {remoteControl: false, lineaMicra: false, machineType: 'paddle'}]) {
+  for (const options of [{}, {remoteControl: false, laMarzocco: false, machineType: 'paddle'}]) {
     const [narrow, wide] = await Promise.all(widths.map((sources) => webUi.generate(
         {...options, readSource: (file) => sources.get(file), versionOverride: 'format', write: false})));
     require('assert').deepStrictEqual(shipped(narrow), shipped(wide),
@@ -220,31 +220,31 @@ for (const remoteControl of [false, true]) {
   }
 }
 // Only Linea Micra cloud builds ship the Micra status and diagnostics code.
-const noMicra = await webUi.generate({webUiLanguage: 'EN', lineaMicra: false, write: false});
+const noLaMarzocco = await webUi.generate({webUiLanguage: 'EN', laMarzocco: false, write: false});
 // The Diagnostic module ships the Micra markup in every build; its renderer folds away.
 if (!codeIncludes(generated.modules.diagnostic, 'freshnessPolicy') ||
-    codeIncludes(noMicra.modules.diagnostic, 'freshnessPolicy') ||
-    /__LINEA_MICRA__|__REMOTE_CONTROL__/.test(noMicra.runtimeJs + generated.runtimeJs +
-        noMicra.modules.diagnostic + generated.modules.diagnostic)) {
+    codeIncludes(noLaMarzocco.modules.diagnostic, 'freshnessPolicy') ||
+    /__LA_MARZOCCO__|__REMOTE_CONTROL__/.test(noLaMarzocco.runtimeJs + generated.runtimeJs +
+        noLaMarzocco.modules.diagnostic + generated.modules.diagnostic)) {
   throw new Error('Linea Micra code must fold away in builds without the integration');
 }
 // Builds without the integration also drop its markup and CSS; nested
 // Micra rows go with their section, and the JS that binds them folds away.
 {
-  const noMicraUi = [noMicra.html, ...Object.values(noMicra.partials), noMicra.css].join('\n');
-  const micraIds = ['lineaMicraSettings', 'lineaMicraConnectButton', 'lineaMicraBrewTargetC',
-    'micraMachineDiagnostics', 'micraCloudDiagnostics', 'dMicraPowerBrief', 'homeMicraPower'];
-  const leaked = [...micraIds.filter((id) => noMicraUi.includes(`id="${id}"`)),
-    ...['.micraOnly', '.micraTempOpt'].filter((c) => noMicraUi.includes(c))];
-  const missing = micraIds.filter((id) => ![generated.html, ...Object.values(generated.partials)]
+  const noLaMarzoccoUi = [noLaMarzocco.html, ...Object.values(noLaMarzocco.partials), noLaMarzocco.css].join('\n');
+  const laMarzoccoIds = ['laMarzoccoSettings', 'laMarzoccoConnectButton', 'laMarzoccoBrewTargetC',
+    'laMarzoccoMachineDiagnostics', 'laMarzoccoCloudDiagnostics', 'dLaMarzoccoPowerBrief', 'homeLaMarzoccoPower'];
+  const leaked = [...laMarzoccoIds.filter((id) => noLaMarzoccoUi.includes(`id="${id}"`)),
+    ...['.laMarzoccoOnly', '.laMarzoccoTempOpt'].filter((c) => noLaMarzoccoUi.includes(c))];
+  const missing = laMarzoccoIds.filter((id) => ![generated.html, ...Object.values(generated.partials)]
       .join('\n').includes(`id="${id}"`));
-  const diag = noMicra.partials.diagnostic;
+  const diag = noLaMarzocco.partials.diagnostic;
   if (leaked.length || missing.length ||
       (diag.match(/<div\b/g) || []).length !== (diag.match(/<\/div>/g) || []).length ||
       (diag.match(/<fieldset\b/g) || []).length !== (diag.match(/<\/fieldset>/g) || []).length ||
       !diag.includes('id="hFirmware"') ||
-      noMicra.modules.settings.includes('lineaMicraConnectButton') ||
-      noMicra.js.includes('homeMicraPower')) {
+      noLaMarzocco.modules.settings.includes('laMarzoccoConnectButton') ||
+      noLaMarzocco.js.includes('homeLaMarzoccoPower')) {
     throw new Error(`Non-Micra builds must strip Micra UI (leaked ${leaked}, missing ${missing})`);
   }
 }

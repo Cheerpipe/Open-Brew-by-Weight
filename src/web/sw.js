@@ -58,7 +58,7 @@ self.addEventListener("fetch", (event) => {
 const PUSH_STATE = "push-state"; // Not "obbw-": it outlives a release's cache.
 function pushNotification(message) {
   // Home's card says what to do about La Marzocco's terms, so a tap opens Home.
-  if (message?.topic === "micra_policy" && message.d?.v === 1) {
+  if (message?.topic === "la_marzocco_policy" && message.d?.v === 1) {
     const title = __WEBUI_TEXT__("push.terms_title");
     return {
       title: message.d.test ? __WEBUI_TEXT__("push.title_test").replace("{0}", title) : title,

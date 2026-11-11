@@ -118,8 +118,8 @@ try:
 finally:
     temporary.cleanup()
 
-custom_micra = changed(MICRA, lambda value: value.update(id="custom-micra"))
-temporary, result = run(machine=custom_micra)
+custom_la_marzocco = changed(MICRA, lambda value: value.update(id="custom-micra"))
+temporary, result = run(machine=custom_la_marzocco)
 try:
     assert result.returncode == 0, result.stderr
     generated = Path(dict(line.split("=", 1) for line in
@@ -130,7 +130,7 @@ try:
     assert "#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION 1" in header
 finally:
     temporary.cleanup()
-    custom_micra.unlink()
+    custom_la_marzocco.unlink()
 
 unknown_integration = changed(
     PRO_X, lambda value: value.update(integration="future_machine_bus"))
@@ -180,12 +180,12 @@ assert identities == {
 # Owner requirement while the Minis are experimental: they behave as the Micra
 # does. Drop a key from this list in the change that deliberately gives a Mini
 # its own value.
-micra_profile, mini_profile, mini_r_profile = (
+la_marzocco_profile, mini_profile, mini_r_profile = (
     json.loads(path.read_text()) for path in (MICRA, MINI, MINI_R))
 for profile in (mini_profile, mini_r_profile):
     for key in ("hardware", "interface", "factory_defaults", "integration",
                 "integration_revision"):
-        assert profile[key] == micra_profile[key], \
+        assert profile[key] == la_marzocco_profile[key], \
             f"{profile['id']}: {key} must match the Linea Micra profile"
 
 bad_icon = changed(

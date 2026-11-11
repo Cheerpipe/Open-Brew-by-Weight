@@ -990,7 +990,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
           "slowExtractionGuardEnabled", "slowMarginG", "slowAfterS", "scaleLossFixedS",
           "fastRampS", "fastCurve", "fastCurveHardness", "slowRampS", "slowCurve",
           "slowCurveHardness", "weightOffsetBaselineG", "doseG", "grindHintsEnabled",
-          "bbwAlphaBaseline", "lineaMicraBrewTargetC"};
+          "bbwAlphaBaseline", "laMarzoccoBrewTargetC"};
       uint32_t present = 0;
       for (size_t i = 0; i < sizeof(recipeKeys) / sizeof(recipeKeys[0]); ++i)
         if (jsonFieldPresent(root, recipeKeys[i])) present |= 1UL << i;
@@ -1053,25 +1053,25 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
             jsonFieldPresent(root, "bbwAlphaLearned") ||
             jsonFieldPresent(root, "bbwEwmaOffsetG"))
           parseError = validationFailure("BBW_LEARNING_READ_ONLY");
-        const cJSON *micraTarget =
-            cJSON_GetObjectItemCaseSensitive(root, "lineaMicraBrewTargetC");
-        if (parseError.reason == nullptr && micraTarget != nullptr) {
+        const cJSON *laMarzoccoTarget =
+            cJSON_GetObjectItemCaseSensitive(root, "laMarzoccoBrewTargetC");
+        if (parseError.reason == nullptr && laMarzoccoTarget != nullptr) {
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
-          const double scaled = cJSON_IsNumber(micraTarget)
-                                    ? micraTarget->valuedouble * 10.0
+          const double scaled = cJSON_IsNumber(laMarzoccoTarget)
+                                    ? laMarzoccoTarget->valuedouble * 10.0
                                     : NAN;
           const long rounded = lround(scaled);
           if (!std::isfinite(scaled) || fabs(scaled - rounded) > 0.0001 ||
-              rounded < LINEA_MICRA_BREW_TARGET_MIN_DECI_C ||
-              rounded > LINEA_MICRA_BREW_TARGET_MAX_DECI_C) {
-            parseError = validationFailure("LINEA_MICRA_PRESET_TARGET_RANGE");
+              rounded < LA_MARZOCCO_BREW_TARGET_MIN_DECI_C ||
+              rounded > LA_MARZOCCO_BREW_TARGET_MAX_DECI_C) {
+            parseError = validationFailure("LA_MARZOCCO_PRESET_TARGET_RANGE");
           } else {
-            command.lineaMicraBrewTargetSpecified = true;
-            command.lineaMicraBrewTargetDeciC =
+            command.laMarzoccoBrewTargetSpecified = true;
+            command.laMarzoccoBrewTargetDeciC =
                 static_cast<uint16_t>(rounded);
           }
 #else
-          parseError = validationFailure("LINEA_MICRA_PRESET_TARGET_UNSUPPORTED");
+          parseError = validationFailure("LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED");
 #endif
         }
       }

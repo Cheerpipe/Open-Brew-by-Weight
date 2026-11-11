@@ -12,7 +12,7 @@
 #include "OpenBrewByWeightShotCurveTypes.h"  // appendBase64
 #include "OpenBrewByWeightShotLogTypes.h"    // ShotLogRecord
 #include "OpenBrewByWeightWebAccess.h"       // webAccessFnv, copyWebAccessLabel
-#include "machine/OpenBrewByWeightMicraCompanion.h"  // MicraCompanionRoute
+#include "machine/OpenBrewByWeightLaMarzoccoCompanion.h"  // LaMarzoccoCompanionRoute
 #include <algorithm>
 #include <cJSON.h>
 #include <cstddef>
@@ -1136,7 +1136,7 @@ struct CompanionShotEvents {
 // Its one key replaces an unread notification instead of stacking another, and
 // its day-long TTL reaches a phone that is off: the terms wait for the person.
 constexpr const char *COMPANION_POLICY_EVENT =
-    "\"t\":\"ev\",\"topic\":\"micra_policy\",\"key\":\"micra-policy\",\"ttl\":86400,\"d\":{\"v\":1}}";
+    "\"t\":\"ev\",\"topic\":\"la_marzocco_policy\",\"key\":\"micra-policy\",\"ttl\":86400,\"d\":{\"v\":1}}";
 
 // The account works again only with a machine sample newer than the event. An
 // error that merely stopped reading "policy" (a dropped connection, a retry's
@@ -1193,16 +1193,16 @@ struct CompanionSnapshot {
 // route is the companion's. A route request (pending) keeps the long limit:
 // the companion answers it on its own cadence, and the La Marzocco service
 // gives up on it after 30 s without a ping or the full frame.
-inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, MicraCompanionRoute route) {
+inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, LaMarzoccoCompanionRoute route) {
   return slot.phase != CompanionLinkPhase::READY ? 10000U
-         : route == MicraCompanionRoute::COMPANION ? 35000U : 250000U;
+         : route == LaMarzoccoCompanionRoute::COMPANION ? 35000U : 250000U;
 }
 
 // Whether an open slot went silent. During a sync hold both sides trust the
 // link: the companion stops pinging, so an authenticated link's silence
 // restarts from the hold's end, when the companion pings at once. `now` is
 // the pass's start: a frame httpd heard after it is not silence.
-inline bool companionLinkSilent(CompanionLinkSlot &slot, MicraCompanionRoute route, uint32_t now,
+inline bool companionLinkSilent(CompanionLinkSlot &slot, LaMarzoccoCompanionRoute route, uint32_t now,
                                 bool syncHold) {
   if (syncHold && slot.phase == CompanionLinkPhase::READY) slot.heardAtMs = now;
   return ticksSince(now, slot.heardAtMs) >=

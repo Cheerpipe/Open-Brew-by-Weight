@@ -14,14 +14,14 @@ struct cJSON;
 
 namespace openbrewbyweight {
 
-enum class MicraCompanionStateKind : uint8_t { FULL, PUSH, READ };
-enum class MicraCompanionCommandOp : uint8_t { NONE, TEMPERATURE, STANDBY, POWER_ON, REFRESH };
-enum class MicraCompanionRoute : uint8_t { DIRECT, PENDING, COMPANION };
+enum class LaMarzoccoCompanionStateKind : uint8_t { FULL, PUSH, READ };
+enum class LaMarzoccoCompanionCommandOp : uint8_t { NONE, TEMPERATURE, STANDBY, POWER_ON, REFRESH };
+enum class LaMarzoccoCompanionRoute : uint8_t { DIRECT, PENDING, COMPANION };
 
 // What the service wants the link to send. The link resends the whole
 // snapshot after every new authenticated session and sends a field again
 // whenever its sequence changes.
-struct MicraCompanionOutbox {
+struct LaMarzoccoCompanionOutbox {
   uint32_t configSequence = 0;  // cfg frame
   bool lmSwitch = false;
   bool observe = false;
@@ -33,21 +33,21 @@ struct MicraCompanionOutbox {
   uint32_t holdSequence = 0;  // hold frame
   bool hold = false;
   uint32_t commandId = 0;  // cmd frame; 0 or an id already sent: none
-  MicraCompanionCommandOp commandOp = MicraCompanionCommandOp::NONE;
+  LaMarzoccoCompanionCommandOp commandOp = LaMarzoccoCompanionCommandOp::NONE;
   uint16_t commandValue = 0;  // tenths of a degree for TEMPERATURE
 };
 
 // Sampled when a link frame arrives, before it is verified or parsed, the
 // way the direct socket stamps a push at its first byte: a power command
 // issued while the frame is decoded must not make it look newer.
-struct MicraCompanionIngress {
+struct LaMarzoccoCompanionIngress {
   uint32_t intent = 0;   // power generation
   uint32_t attempt = 0;  // backflush ingress attempt
 };
 
 // Published by the service for Admin and Diagnostic.
-struct MicraCompanionRouteStatus {
-  MicraCompanionRoute route = MicraCompanionRoute::DIRECT;
+struct LaMarzoccoCompanionRouteStatus {
+  LaMarzoccoCompanionRoute route = LaMarzoccoCompanionRoute::DIRECT;
   bool upstreamSubscribed = false;
   bool upstreamRefused = false;
   bool credentialsConfirmed = false;
@@ -68,18 +68,18 @@ void machineIntegrationCompanionUpstream(bool subscribed, uint32_t epoch,
                                          uint32_t tokenRenewInS, bool refused = false,
                                          bool policy = false);
 void machineIntegrationCompanionCredentials(uint32_t generation, bool ok);
-MicraCompanionIngress machineIntegrationCompanionIngress();
+LaMarzoccoCompanionIngress machineIntegrationCompanionIngress();
 // `dashboard` is the `d` object of an `st` frame. False rejects a push (the
 // link closes, as the direct socket does on a rejected push); a rejected
 // `full` or `read` is logged and ignored, as a failed direct read is.
-bool machineIntegrationCompanionState(MicraCompanionStateKind kind,
+bool machineIntegrationCompanionState(LaMarzoccoCompanionStateKind kind,
                                       uint32_t epoch, uint32_t afterCommand,
-                                      const cJSON *dashboard, MicraCompanionIngress ingress);
+                                      const cJSON *dashboard, LaMarzoccoCompanionIngress ingress);
 void machineIntegrationCompanionCommandResult(uint32_t id, bool accepted,
                                               uint16_t httpStatus);
 // Service → link.
-MicraCompanionOutbox machineIntegrationCompanionOutbox();
-MicraCompanionRouteStatus machineIntegrationCompanionRouteStatus();
+LaMarzoccoCompanionOutbox machineIntegrationCompanionOutbox();
+LaMarzoccoCompanionRouteStatus machineIntegrationCompanionRouteStatus();
 // Copies the account for the creds frame; the caller encrypts and wipes it.
 bool machineIntegrationCompanionCopyCredentials(uint32_t generation, char *email,
                                                 size_t emailCapacity, char *password,

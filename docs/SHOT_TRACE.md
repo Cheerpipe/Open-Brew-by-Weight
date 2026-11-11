@@ -148,7 +148,7 @@ Exact even when records were dropped.
 | `staleFrames`, `undecodableFrames` | Scale frames dropped by the scale worker (stale or from an old connection; not decodable). Counted only, never recorded |
 | `confirmationResets` | Over-the-line confirmation chains that broke before a weight stop (a reading back under the line, or too late to be consecutive) |
 | `loopGapMaxMs` | Longest control-loop gap |
-| `micraRxBytes` | Linea Micra WebSocket bytes received |
+| `laMarzoccoRxBytes` | Linea Micra WebSocket bytes received |
 | `uiStreamDeferrals` | Web UI stream batches deferred by a full socket |
 | `verboseDropped`, `decisionsDropped` | Records that did not fit |
 

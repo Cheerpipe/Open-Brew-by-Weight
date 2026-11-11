@@ -114,19 +114,23 @@
     </button>
   </div>
 </section>
-<section id="micraPolicyHint" class="homeCard infoHint" hidden>
-  <p><strong>{{webui:home.micra_policy_title}}</strong> {{webui:home.micra_policy_text}}</p>
+<section id="laMarzoccoPolicyHint" class="homeCard infoHint" hidden>
+  <p>
+    <strong>{{webui:home.la_marzocco_policy_title}}</strong> {{webui:home.la_marzocco_policy_text}}
+  </p>
   <div class="btnBar">
-    <button id="micraPolicyHintAccept" class="btnGlyph btnInvert" type="button">
-      <span class="t">{{webui:home.micra_policy_accept}}</span>
+    <button id="laMarzoccoPolicyHintAccept" class="btnGlyph btnInvert" type="button">
+      <span class="t">{{webui:home.la_marzocco_policy_accept}}</span>
     </button>
   </div>
 </section>
-<section id="micraAccountHint" class="homeCard infoHint" hidden>
-  <p><strong id="micraAccountHintTitle"></strong> <span id="micraAccountHintText"></span></p>
+<section id="laMarzoccoAccountHint" class="homeCard infoHint" hidden>
+  <p>
+    <strong id="laMarzoccoAccountHintTitle"></strong> <span id="laMarzoccoAccountHintText"></span>
+  </p>
   <div class="btnBar">
-    <a class="btnGlyph btnInvert" href="/settings#lineaMicraSettings"
-      ><span class="t">{{webui:home.micra_account_check}}</span></a
+    <a class="btnGlyph btnInvert" href="/settings#laMarzoccoSettings"
+      ><span class="t">{{webui:home.la_marzocco_account_check}}</span></a
     >
   </div>
 </section>
@@ -160,12 +164,12 @@
     </button>
   </div>
 </section>
-<section id="micraCloudHint" class="homeCard infoHint" hidden>
-  <p><strong>{{webui:home.micra_hint_title}}</strong> {{webui:home.micra_hint_text}}</p>
+<section id="laMarzoccoCloudHint" class="homeCard infoHint" hidden>
+  <p><strong>{{webui:home.la_marzocco_hint_title}}</strong> {{webui:home.la_marzocco_hint_text}}</p>
   <div class="btnBar">
-    <a id="micraCloudHintOpen" class="btnGlyph btnInvert" href="/settings#lineaMicraSettings"
-      ><span class="t">{{webui:home.micra_hint_open}}</span></a
-    ><button id="micraCloudHintDismiss" class="btnGlyph ghost" type="button">
+    <a id="laMarzoccoCloudHintOpen" class="btnGlyph btnInvert" href="/settings#laMarzoccoSettings"
+      ><span class="t">{{webui:home.la_marzocco_hint_open}}</span></a
+    ><button id="laMarzoccoCloudHintDismiss" class="btnGlyph ghost" type="button">
       <span class="t">{{webui:home.dismiss}}</span>
     </button>
   </div>
@@ -231,21 +235,21 @@
         <strong>{{webui:home.brew}}</strong>
         <div id="state">—</div>
       </div>
-      <div class="metric micraOnly">
+      <div class="metric laMarzoccoOnly">
         <strong>{{webui:home.machine_power_state}}</strong>
-        <div id="homeMicraPower">—</div>
+        <div id="homeLaMarzoccoPower">—</div>
       </div>
-      <div class="metric micraOnly">
+      <div class="metric laMarzoccoOnly">
         <strong>{{webui:home.machine_brew_boiler}}</strong>
-        <div id="homeMicraBrewBoiler">—</div>
+        <div id="homeLaMarzoccoBrewBoiler">—</div>
       </div>
-      <div class="metric micraOnly">
+      <div class="metric laMarzoccoOnly">
         <strong>{{webui:home.machine_steam_boiler}}</strong>
-        <div id="homeMicraSteamBoiler">—</div>
+        <div id="homeLaMarzoccoSteamBoiler">—</div>
       </div>
-      <div class="metric micraOnly">
+      <div class="metric laMarzoccoOnly">
         <strong>{{webui:home.machine_cleaning}}</strong>
-        <div id="homeMicraCleaning">—</div>
+        <div id="homeLaMarzoccoCleaning">—</div>
       </div>
     </div>
   </details>

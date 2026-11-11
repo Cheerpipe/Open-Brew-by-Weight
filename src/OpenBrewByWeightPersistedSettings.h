@@ -4,7 +4,7 @@
 #include "OpenBrewByWeightBullseye.h"
 #include "OpenBrewByWeightPresets.h"
 #include "OpenBrewByWeightWebhook.h"
-#include "machine/OpenBrewByWeightLineaMicraSettings.h"
+#include "machine/OpenBrewByWeightLaMarzoccoSettings.h"
 
 namespace openbrewbyweight {
 
@@ -54,7 +54,7 @@ struct PersistedSettings {
   // mDNS device name.
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   // Optional Micra cloud account, selected machine and independent options.
-  LineaMicraPersistedSettings lineaMicra = {};
+  LaMarzoccoPersistedSettings laMarzocco = {};
 };
 
 struct SettingsPersistRequest {

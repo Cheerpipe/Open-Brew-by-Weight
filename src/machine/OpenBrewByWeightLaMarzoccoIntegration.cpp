@@ -1,11 +1,11 @@
-#include "OpenBrewByWeightLineaMicraIntegration.h"
+#include "OpenBrewByWeightLaMarzoccoIntegration.h"
 
 #include "OpenBrewByWeightMachineIntegration.h"
-#include "OpenBrewByWeightMicraCompanion.h"
-#include "OpenBrewByWeightMicraMachinePower.h"
-#include "OpenBrewByWeightMicraScalePowerOn.h"
-#include "OpenBrewByWeightMicraScaleShutdown.h"
-#include "OpenBrewByWeightMicraService.h"
+#include "OpenBrewByWeightLaMarzoccoCompanion.h"
+#include "OpenBrewByWeightLaMarzoccoMachinePower.h"
+#include "OpenBrewByWeightLaMarzoccoScalePowerOn.h"
+#include "OpenBrewByWeightLaMarzoccoScaleShutdown.h"
+#include "OpenBrewByWeightLaMarzoccoService.h"
 #include "OpenBrewByWeightPersistedSettings.h"
 #include "OpenBrewByWeightScaleWorker.h"
 
@@ -19,13 +19,13 @@ void serialTraceCategoryf(openbrewbyweight::LogLevel level,
 namespace openbrewbyweight {
 namespace {
 
-OpenBrewByWeightMicraService service;
-MicraScaleShutdownTracker scaleShutdown;
-MicraScalePowerOnTracker scalePowerOn;
-MicraMachinePowerTracker machinePower;
-std::atomic<uint8_t> micraOptions{LINEA_MICRA_DEFAULT_OPTIONS};
-std::atomic<uint8_t> micraScaleOptions{0};
-std::atomic<bool> micraAccountConfigured{false};
+OpenBrewByWeightLaMarzoccoService service;
+LaMarzoccoScaleShutdownTracker scaleShutdown;
+LaMarzoccoScalePowerOnTracker scalePowerOn;
+LaMarzoccoMachinePowerTracker machinePower;
+std::atomic<uint8_t> laMarzoccoOptions{LA_MARZOCCO_DEFAULT_OPTIONS};
+std::atomic<uint8_t> laMarzoccoScaleOptions{0};
+std::atomic<bool> laMarzoccoAccountConfigured{false};
 
 // A standby command is pointless once the machine is already effectively off.
 // Skipping it also keeps the remote disconnect that follows our own scale
@@ -33,15 +33,15 @@ std::atomic<bool> micraAccountConfigured{false};
 // a retained OFF counts as unknown, not off: the redundant command is
 // re-validated anyway. Only our own standby in flight (optimistic OFF) skips.
 bool machineEffectivelyOff() {
-  const LineaMicraStatus status = service.statusPoll();
+  const LaMarzoccoStatus status = service.statusPoll();
   const bool trusted = !service.statusPollStale();
   switch (status.assumedPower) {
-    case LineaMicraAssumedPower::OFF: return trusted;
-    case LineaMicraAssumedPower::OFF_STALE:
-      return trusted && status.quality == LineaMicraObservationQuality::OPTIMISTIC;
-    case LineaMicraAssumedPower::ON:
-    case LineaMicraAssumedPower::ON_STALE:
-    case LineaMicraAssumedPower::UNKNOWN: break;
+    case LaMarzoccoAssumedPower::OFF: return trusted;
+    case LaMarzoccoAssumedPower::OFF_STALE:
+      return trusted && status.quality == LaMarzoccoObservationQuality::OPTIMISTIC;
+    case LaMarzoccoAssumedPower::ON:
+    case LaMarzoccoAssumedPower::ON_STALE:
+    case LaMarzoccoAssumedPower::UNKNOWN: break;
   }
   return false;
 }
@@ -52,13 +52,13 @@ bool initializeMachineIntegration() { return service.begin(); }
 
 void publishMachineIntegrationConfig(const PersistedSettings &settings,
                                      uint32_t configGeneration) {
-  micraOptions.store(settings.lineaMicra.options,
+  laMarzoccoOptions.store(settings.laMarzocco.options,
                      std::memory_order_relaxed);
-  micraScaleOptions.store(settings.lineaMicra.scaleOptions,
+  laMarzoccoScaleOptions.store(settings.laMarzocco.scaleOptions,
                           std::memory_order_relaxed);
-  micraAccountConfigured.store(settings.lineaMicra.accountConfigured,
+  laMarzoccoAccountConfigured.store(settings.laMarzocco.accountConfigured,
                                std::memory_order_relaxed);
-  service.publishConfig(settings.lineaMicra, configGeneration);
+  service.publishConfig(settings.laMarzocco, configGeneration);
 }
 
 void publishMachineIntegrationNetworkState(bool staConnected, bool apActive,
@@ -72,18 +72,18 @@ void inhibitMachineIntegrationCloud() { service.inhibitCloud(); }
 
 void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
                                                 uint32_t configGeneration) {
-  LineaMicraRequest request;
+  LaMarzoccoRequest request;
   request.configGeneration = configGeneration;
   request.targetDeciC = preset.targetDeciC;
   request.presetId = preset.presetId;
-  request.type = LineaMicraRequestType::APPLY_TEMPERATURE;
+  request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
   service.post(request);
 }
 
 // Control task only (the finalize path): the cached poll never blocks on the
 // service mutex, and the loop refreshes that cache each iteration.
 uint16_t machineIntegrationShotTargetDeciC() {
-  const LineaMicraStatus status = service.statusPoll();
+  const LaMarzoccoStatus status = service.statusPoll();
   return status.targetValid ? status.targetDeciC : 0;
 }
 
@@ -91,28 +91,28 @@ void serviceMachineIntegrationScaleLink(uint32_t now, bool scaleLinkUp,
                                         uint32_t scaleDisconnectSequence,
                                         uint8_t scaleDisconnectReason,
                                         bool machineBusy) {
-  const uint8_t options = micraOptions.load(std::memory_order_relaxed);
+  const uint8_t options = laMarzoccoOptions.load(std::memory_order_relaxed);
   const bool accountConfigured =
-      micraAccountConfigured.load(std::memory_order_relaxed);
-  const MicraScaleShutdownTracker::Snapshot shutdownSnapshot{
+      laMarzoccoAccountConfigured.load(std::memory_order_relaxed);
+  const LaMarzoccoScaleShutdownTracker::Snapshot shutdownSnapshot{
       scaleDisconnectSequence, scaleDisconnectReason, scaleLinkUp,
       machineBusy};
   if (scaleShutdown.service(now, shutdownSnapshot, options,
                             accountConfigured) &&
       !machineEffectivelyOff()) {
     serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
-                         "Micra scale shutdown: scale powered off, requesting StandBy");
-    LineaMicraRequest request;
-    request.type = LineaMicraRequestType::SET_STANDBY;
+                         "La Marzocco scale shutdown: scale powered off, requesting StandBy");
+    LaMarzoccoRequest request;
+    request.type = LaMarzoccoRequestType::SET_STANDBY;
     service.post(request);
   }
-  const MicraScalePowerOnTracker::Snapshot powerOnSnapshot{
+  const LaMarzoccoScalePowerOnTracker::Snapshot powerOnSnapshot{
       scaleLinkUp, scaleDisconnectReason, machineBusy};
   if (scalePowerOn.service(powerOnSnapshot, options, accountConfigured)) {
     serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
-                         "Micra scale power-on: scale powered on, requesting BrewingMode");
-    LineaMicraRequest request;
-    request.type = LineaMicraRequestType::SET_POWER_ON;
+                         "La Marzocco scale power-on: scale powered on, requesting BrewingMode");
+    LaMarzoccoRequest request;
+    request.type = LaMarzoccoRequestType::SET_POWER_ON;
     service.post(request);
   }
 }
@@ -120,11 +120,11 @@ void serviceMachineIntegrationScaleLink(uint32_t now, bool scaleLinkUp,
 // Control task only, like the other cached status poll readers.
 MachinePower machineIntegrationPowerState() {
   switch (service.statusPoll().assumedPower) {
-    case LineaMicraAssumedPower::ON:
-    case LineaMicraAssumedPower::ON_STALE: return MachinePower::ON;
-    case LineaMicraAssumedPower::OFF:
-    case LineaMicraAssumedPower::OFF_STALE: return MachinePower::OFF;
-    case LineaMicraAssumedPower::UNKNOWN: break;
+    case LaMarzoccoAssumedPower::ON:
+    case LaMarzoccoAssumedPower::ON_STALE: return MachinePower::ON;
+    case LaMarzoccoAssumedPower::OFF:
+    case LaMarzoccoAssumedPower::OFF_STALE: return MachinePower::OFF;
+    case LaMarzoccoAssumedPower::UNKNOWN: break;
   }
   return MachinePower::UNKNOWN;
 }
@@ -133,21 +133,21 @@ void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
                                            bool scaleSupportsPowerOff,
                                            bool machineBusy) {
   const uint8_t scaleOptions =
-      micraScaleOptions.load(std::memory_order_relaxed);
-  const LineaMicraStatus status = service.statusPoll();
+      laMarzoccoScaleOptions.load(std::memory_order_relaxed);
+  const LaMarzoccoStatus status = service.statusPoll();
   // Refresh the discovery override every loop before any scale power-off
   // early return: eligibility changes (option, identity, observation, or
   // state) clear it here without a separate timer or event.
-  const MicraScanOverride scanOverride = micraScanOverride(status,
+  const LaMarzoccoScanOverride scanOverride = laMarzoccoScanOverride(status,
                                                            scaleOptions);
   applyLiveBleScanOverride(
-      scanOverride == MicraScanOverride::AGGRESSIVE
+      scanOverride == LaMarzoccoScanOverride::AGGRESSIVE
           ? BleScanIntensity::AGGRESSIVE
-      : scanOverride == MicraScanOverride::RELAXED
+      : scanOverride == LaMarzoccoScanOverride::RELAXED
           ? BleScanIntensity::RELAXED
           : BleScanIntensity::BALANCED);
   if (!machinePower.service(status, scaleOptions,
-                            micraAccountConfigured.load(
+                            laMarzoccoAccountConfigured.load(
                                 std::memory_order_relaxed))) {
     return;
   }
@@ -186,27 +186,27 @@ bool queueMachineIntegrationRelist(uint32_t requestId) {
   return service.queueRelist(requestId);
 }
 
-bool queueMachineIntegrationRequest(const LineaMicraRequest &request) {
+bool queueMachineIntegrationRequest(const LaMarzoccoRequest &request) {
   return service.queue(request);
 }
 
 bool selectMachineIntegrationDevice(
-    const char *serial, LineaMicraPersistedSettings &settings) {
+    const char *serial, LaMarzoccoPersistedSettings &settings) {
   return service.selectDiscoveredMachine(serial, settings);
 }
 
 void clearMachineIntegrationDiscovery() { service.clearDiscovery(); }
 
-LineaMicraStatus machineIntegrationStatus() { return service.currentStatus(); }
+LaMarzoccoStatus machineIntegrationStatus() { return service.currentStatus(); }
 
-LineaMicraCloudCall machineIntegrationCloudCall() { return service.cloudCall(); }
-MicraWebSocketStatus machineIntegrationWebSocketStatus(bool includeTraffic) { return service.websocketStatus(includeTraffic); }
+LaMarzoccoCloudCall machineIntegrationCloudCall() { return service.cloudCall(); }
+LaMarzoccoWebSocketStatus machineIntegrationWebSocketStatus(bool includeTraffic) { return service.websocketStatus(includeTraffic); }
 
 HeapLifecycleAggregate machineIntegrationHeapTelemetry() {
   return service.heapTelemetry();
 }
 
-LineaMicraDiscoverySnapshot machineIntegrationDiscovery() {
+LaMarzoccoDiscoverySnapshot machineIntegrationDiscovery() {
   return service.discovery();
 }
 
@@ -227,11 +227,11 @@ void machineIntegrationCompanionCredentials(uint32_t generation, bool ok) {
   service.companionCredentials(generation, ok);
 }
 
-MicraCompanionIngress machineIntegrationCompanionIngress() { return service.companionIngress(); }
+LaMarzoccoCompanionIngress machineIntegrationCompanionIngress() { return service.companionIngress(); }
 
-bool machineIntegrationCompanionState(MicraCompanionStateKind kind, uint32_t epoch,
+bool machineIntegrationCompanionState(LaMarzoccoCompanionStateKind kind, uint32_t epoch,
                                       uint32_t afterCommand, const cJSON *dashboard,
-                                      MicraCompanionIngress ingress) {
+                                      LaMarzoccoCompanionIngress ingress) {
   return service.companionState(kind, epoch, afterCommand, dashboard, ingress);
 }
 
@@ -240,9 +240,9 @@ void machineIntegrationCompanionCommandResult(uint32_t id, bool accepted,
   service.companionCommandResult(id, accepted, httpStatus);
 }
 
-MicraCompanionOutbox machineIntegrationCompanionOutbox() { return service.companionOutbox(); }
+LaMarzoccoCompanionOutbox machineIntegrationCompanionOutbox() { return service.companionOutbox(); }
 
-MicraCompanionRouteStatus machineIntegrationCompanionRouteStatus() {
+LaMarzoccoCompanionRouteStatus machineIntegrationCompanionRouteStatus() {
   return service.companionRouteStatus();
 }
 

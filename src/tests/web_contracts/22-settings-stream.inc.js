@@ -84,7 +84,7 @@
   // The account email and machine name ride Home now (the header's cloud
   // indicator owns them), so the compatibility fallback covers only the
   // machine state and serial.
-  const shared = ['lineaMicra.phase', 'lineaMicra.selectedSerial'];
+  const shared = ['laMarzocco.phase', 'laMarzocco.selectedSerial'];
   assert.deepEqual(overlaps(diagPaths, settingsPaths).sort(), [...shared].sort(),
       'Diagnostic shares only the compatibility-mode Micra paths with Settings');
   for (const p of shared)
@@ -218,7 +218,7 @@
   // Settings never polls or reads REST; command results land on the streams.
   assert(!codeIncludes(rawRuntimeJs, "api('/api/v1/status/'+v)") &&
       codeIncludes(runtimeJs, "if(activeView==='settings')return scheduleSettingsPaint()") &&
-      !codeIncludes(viewJs.settings, 'micraPoll') && !codeIncludes(viewJs.settings, 'dataset.applied'),
+      !codeIncludes(viewJs.settings, 'laMarzoccoPoll') && !codeIncludes(viewJs.settings, 'dataset.applied'),
   'Settings repaints from the stream: no REST status, no poll, no 1 s Micra re-poll');
   // The form never rewrites the field being typed in, and "38" equals "38.0".
   assert(codeIncludes(runtimeJs, "if(configLoaded&&els.includes(focused)&&focused.type!=='checkbox')return focused.addEventListener('blur',scheduleSettingsPaint,{once:true})") &&

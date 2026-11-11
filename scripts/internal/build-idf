@@ -200,7 +200,7 @@ grep -q -- '-DOPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL=1' <<<"$effectiv
 # Only La Marzocco cloud builds ship its settings and diagnostics code.
 [[ "$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION //p' \
   "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)" == 1 ]] \
-  || webui_args+=(--no-linea-micra)
+  || webui_args+=(--no-la-marzocco)
 # A machine profile that names its own icon ships it in Home's Equipment row.
 webui_machine_icon="$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "\(.*\)"$/\1/p' \
   "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"

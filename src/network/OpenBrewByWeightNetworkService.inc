@@ -335,11 +335,11 @@ void OpenBrewByWeightNetwork::clearStagedWebhook(uint32_t requestId) {
   dataMux_.unlock();
 }
 
-void OpenBrewByWeightNetwork::clearStagedLineaMicra(uint32_t requestId) {
+void OpenBrewByWeightNetwork::clearStagedLaMarzocco(uint32_t requestId) {
   dataMux_.lock();
-  if (requestId == 0 || stagedLineaMicraRequestId_ == requestId) {
-    wipeLineaMicraSettings(stagedLineaMicra_);
-    stagedLineaMicraRequestId_ = 0;
+  if (requestId == 0 || stagedLaMarzoccoRequestId_ == requestId) {
+    wipeLaMarzoccoSettings(stagedLaMarzocco_);
+    stagedLaMarzoccoRequestId_ = 0;
   }
   dataMux_.unlock();
 }

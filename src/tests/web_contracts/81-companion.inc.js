@@ -65,21 +65,21 @@
         `${id} must start visibly disabled`);
   for (const needle of [
     "R.api('/api/v1/companion/admin',{method:'POST',body:R.body(body)})",
-    "{action:'approve',code:$('companionCode').value,log:$('companionApproveLog').checked,archive:$('companionApproveArchive').checked,bc:$('companionApproveBc').checked&&$('companionApproveArchive').checked,...(__LINEA_MICRA__&&{lm:$('companionApproveLm').checked}),}",
-    "$('companionCode').value='';if(__LINEA_MICRA__)$('companionApproveLm').checked=true;$('companionApproveLog').checked=true;$('companionApproveArchive').checked=$('companionApproveBc').checked=true",
+    "{action:'approve',code:$('companionCode').value,log:$('companionApproveLog').checked,archive:$('companionApproveArchive').checked,bc:$('companionApproveBc').checked&&$('companionApproveArchive').checked,...(__LA_MARZOCCO__&&{lm:$('companionApproveLm').checked}),}",
+    "$('companionCode').value='';if(__LA_MARZOCCO__)$('companionApproveLm').checked=true;$('companionApproveLog').checked=true;$('companionApproveArchive').checked=$('companionApproveBc').checked=true",
     "!link&&c.peerProtocol>0?' · '+",
     "{action:'ignore'}",
     "{action:'unignore'}",
     "{action:'forget'}",
-    "{action:'switches',ui,log:$('companionLog').checked,archive:$('companionArchive').checked,bc:$('companionBc').checked,...(__LINEA_MICRA__&&{lm:$('companionLm').checked}),}",
+    "{action:'switches',ui,log:$('companionLog').checked,archive:$('companionArchive').checked,bc:$('companionBc').checked,...(__LA_MARZOCCO__&&{lm:$('companionLm').checked}),}",
     "if(e.code==='COMPANION_CODE')R.showFieldError('companionCode',",
     "window.open(url,'_blank','noopener')",
     "saveCompanionButton:'revertCompanionButton'",
     "constcompanionSwitches=()=>document.querySelectorAll('#companionPaired input')",
     "for(const el of companionSwitches())el.onchange=()=>(companionBcNeedsArchive(),sectionDirty('companion',true))",
     "$('revertCompanionButton').onclick=()=>revertSection('companion')",
-    "if(!R.uiState.companionDirty){$('companionUi').checked=c.ui!==false;if(__LINEA_MICRA__)$('companionLm').checked=!!c.lm;$('companionLog').checked=!!c.log;$('companionArchive').checked=!!c.archive;$('companionBc').checked=c.bc!==false;companionBcNeedsArchive();R.uiState.companionBaseline=R.snapshotControls(companionSwitches())}",
-    "if(__LINEA_MICRA__)$('companionRouteState').textContent=companionRouteText(c)",
+    "if(!R.uiState.companionDirty){$('companionUi').checked=c.ui!==false;if(__LA_MARZOCCO__)$('companionLm').checked=!!c.lm;$('companionLog').checked=!!c.log;$('companionArchive').checked=!!c.archive;$('companionBc').checked=c.bc!==false;companionBcNeedsArchive();R.uiState.companionBaseline=R.snapshotControls(companionSwitches())}",
+    "if(__LA_MARZOCCO__)$('companionRouteState').textContent=companionRouteText(c)",
     "applyCompanionStatus(s.companion)",
     "initCompanion()",
     "['blePanel','dateTimePanel','webhookPanel','companionPanel']",
@@ -87,12 +87,12 @@
     "p.stage=!c.paired?1:c.link!=='open'&&c.relay!=='ready'?2:3",
   ])
     assert.ok(codeIncludes(adminJs, needle), 'Admin → Companion wiring: ' + needle);
-  assert.ok(!/__LINEA_MICRA__\)\s*(applyCompanionStatus|initCompanion)/.test(adminJs) &&
-      !adminJs.includes('...(__LINEA_MICRA__ && { companion'),
+  assert.ok(!/__LA_MARZOCCO__\)\s*(applyCompanionStatus|initCompanion)/.test(adminJs) &&
+      !adminJs.includes('...(__LA_MARZOCCO__ && { companion'),
       'Admin → Companion runs in every build');
-  assert.ok(/<form id="companionRequest"[^]*<label class="micraOnly"><input id="companionApproveLm" type="checkbox" role="switch" checked[^]*id="companionApproveButton"/.test(admin),
+  assert.ok(/<form id="companionRequest"[^]*<label class="laMarzoccoOnly"><input id="companionApproveLm" type="checkbox" role="switch" checked[^]*id="companionApproveButton"/.test(admin),
       'The approval panel chooses the La Marzocco switch before the account is handed over, on by default, in Micra builds');
-  assert.ok(/<div id="companionPaired"[^]*<div class="accessRow micraOnly"><span><b>La Marzocco[^]*<input id="companionUi" type="checkbox" role="switch" checked[^]*<label class="micraOnly"><input id="companionLm"/.test(admin),
+  assert.ok(/<div id="companionPaired"[^]*<div class="accessRow laMarzoccoOnly"><span><b>La Marzocco[^]*<input id="companionUi" type="checkbox" role="switch" checked[^]*<label class="laMarzoccoOnly"><input id="companionLm"/.test(admin),
       'Paired: the Web UI switch in every build, the La Marzocco route and switch in Micra builds');
   assert.ok(admin.includes('Connect to a companion at…') &&
       codeIncludes(adminJs, 'That code does not match.'),
@@ -227,7 +227,7 @@
       ['dUiMode', 'dUiAccess', 'dUiWorker', 'dCoName', 'dCoAddress', 'dCoVersion', 'dCoLink',
         'dCoLinkCounts', 'dCoUi', 'dCoRoute', 'dCoLm', 'dCoCounts'].every((id) => diag.includes(`id="${id}"`)) &&
       ['dCoRoute', 'dCoLm', 'dCoCounts'].every((id) =>
-        new RegExp(`<div class="metric micraOnly"><strong>[^<]*</strong><div id="${id}">`).test(diag)) &&
+        new RegExp(`<div class="metric laMarzoccoOnly"><strong>[^<]*</strong><div id="${id}">`).test(diag)) &&
       codeIncludes(diagJs, 'R.companionHere(true).then(renderScreen)') &&
       codeIncludes(diagJs, 'screens=Array.isArray(c?.screens)?c.screens.length:c?.screens') &&
       codeIncludes(rawViewJs.diagnostic, "screens>0?' · '+R.sub(__WEBUI_TEXT__('diagnostic.screen_count'),[screens]):''") &&
@@ -235,12 +235,12 @@
       codeIncludes(diagJs, "c.paired?c.name:'Not paired'") &&
       codeIncludes(diagJs, "c.linkAgeS>=0?' · '+formatUptime(c.linkAgeS*1e3):''") &&
       codeIncludes(diagJs, "on(c.ui!==false)+(c.relay?' · '+c.relay:'')") &&
-      codeIncludes(diagJs, 'if(!__LINEA_MICRA__)return;') &&
+      codeIncludes(diagJs, 'if(!__LA_MARZOCCO__)return;') &&
       codeIncludes(diagJs, "c.protocol>0?") && codeIncludes(diagJs, "c.peerProtocol>0?"),
       'Diagnostic → Companion shows this screen and the controller\'s companion link');
   // On the companion route the WebSocket row names its source and drops the
   // direct socket's figures; cleaning is "not live" only without supervision.
-  assert.ok(codeIncludes(diagJs, "renderMicraCloudDiagnostic(s.lineaMicra,s.companion?.route==='companion')") &&
+  assert.ok(codeIncludes(diagJs, "renderLaMarzoccoCloudDiagnostic(s.laMarzocco,s.companion?.route==='companion')") &&
       codeIncludes(diagJs, "link=api?0:ws.live?1:") &&
       codeIncludes(diagJs, "if(el)el.hidden=!!via") &&
       codeIncludes(diagJs, "(!ws.live||(ws.machineConnectedKnown&&!ws.machineConnected)"),
@@ -248,11 +248,11 @@
 
   // Other builds keep the companion and drop only the La Marzocco parts.
   (async () => {
-    const noMicra = await webUi.generate({webUiLanguage: 'EN', lineaMicra: false, write: false});
-    const out = [noMicra.html, noMicra.js, noMicra.runtimeJs, ...Object.values(noMicra.partials),
-      ...Object.values(noMicra.modules)].join('\n');
+    const noLaMarzocco = await webUi.generate({webUiLanguage: 'EN', laMarzocco: false, write: false});
+    const out = [noLaMarzocco.html, noLaMarzocco.js, noLaMarzocco.runtimeJs, ...Object.values(noLaMarzocco.partials),
+      ...Object.values(noLaMarzocco.modules)].join('\n');
     const leaked = ['id="companionLm"', 'id="companionApproveLm"', 'id="companionRouteState"', 'id="dCoRoute"',
-      'id="dCoLm"', 'id="dCoCounts"', 'id="micraSignal"', 'id="micraDetails"', 'dg-marzocco-cloud'].filter((s) => out.includes(s));
+      'id="dCoLm"', 'id="dCoCounts"', 'id="laMarzoccoSignal"', 'id="laMarzoccoDetails"', 'dg-marzocco-cloud'].filter((s) => out.includes(s));
     assert.deepEqual(leaked, [], 'The La Marzocco companion parts stay out of builds without Linea Micra');
     const missing = ['id="companionPanel"', 'id="companionHint"', 'id="companionPairHint"', 'id="companionUi"',
       'id="g-companion"', 'id="dCoName"', 'id="dCoUi"', 'id="dUiAccess"', '/api/v1/companion/admin',

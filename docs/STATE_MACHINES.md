@@ -1147,7 +1147,7 @@ for `kStaleRetentionMs` (15 minutes) and then reports UNKNOWN. The separate
 
 ### Assumed machine power
 
-`statusLocked()` publishes one resolved value, `LineaMicraStatus::assumedPower`
+`statusLocked()` publishes one resolved value, `LaMarzoccoStatus::assumedPower`
 (`ON`, `OFF`, `ON_STALE`, `OFF_STALE`, `UNKNOWN`), from the confirmed reading
 and the optimistic or held overlays; `quality` says why a value is an
 assumption. Consumers switch on it and never recombine the raw fields.

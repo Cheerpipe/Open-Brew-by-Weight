@@ -167,7 +167,7 @@ deadlines. Every non-active state after confirmation, observation loss, physical
 release or safety failure opens the relay. The end path appends one electrical
 duration record without scale commands, shot statistics or brew events.
 
-The settings blob carries the `LineaMicraPersistedSettings` record in every
+The settings blob carries the `LaMarzoccoPersistedSettings` record in every
 profile; its connection type is explicitly WebSocket=0 and API=1. Settings
 saves and resets wait for successful OTA trial confirmation, preserving the old
 durable records for rollback. This admission does not gate boot readiness or

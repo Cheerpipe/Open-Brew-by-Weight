@@ -61,7 +61,7 @@ checkScript('/preview.js', 'header.js',
   ['updateHeaderSignals', 'initHeaderSignals', 'updateQuickSettings', 'buildQuickSettings', 'escHtml', 'sub']);
 // The Micra controller actions come from the local webui-mockups/micra.js fixture.
 checkScript('/micra-preview.js', 'micra.js',
-  ['formatMicraCleaning', 'renderMicraCloudDiagnostic', 'renderMicraWebSocket', 'ensureMicraRows',
-    'applyLineaMicraStatus'],
-  ['$', 'api', 'command', 'lineaMicraAction', 'refreshStatus', 'setSaveDirty', 'showFieldError']);
+  ['formatLaMarzoccoCleaning', 'renderLaMarzoccoCloudDiagnostic', 'renderLaMarzoccoWebSocket', 'ensureLaMarzoccoRows',
+    'applyLaMarzoccoStatus'],
+  ['$', 'api', 'command', 'laMarzoccoAction', 'refreshStatus', 'setSaveDirty', 'showFieldError']);
 console.log('Web UI design preview: reference pages and preview scripts OK');

@@ -446,7 +446,7 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       {"/api/v1/time/preview", HTTP_POST, timeZonePreviewHandler},
       {"/api/v1/config", HTTP_POST, configHandler},
       {"/api/v1/webhooks", HTTP_POST, webhookHandler},
-      {"/api/v1/machine/linea-micra", HTTP_POST, lineaMicraHandler},
+      {"/api/v1/machine/la-marzocco", HTTP_POST, laMarzoccoHandler},
       {"/api/v1/bullseye/test", HTTP_POST, bullseyeTestHandler},
       {"/api/v1/scale/preferred/clear", HTTP_POST, preferredScaleClearHandler},
       {"/api/v1/scale/preferred/select", HTTP_POST, preferredScaleSelectHandler},

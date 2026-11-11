@@ -48,7 +48,7 @@
   <symbol id="g-auto" viewBox="0 0 24 24">
     <path d="M4 12a8 8 0 0 1 13.7-5.6L20 9m0-5v5h-5m5 3a8 8 0 0 1-13.7 5.6L4 15m0 5v-5h5" />
   </symbol>
-  <symbol id="g-micraPresets" viewBox="0 0 24 24">
+  <symbol id="g-laMarzoccoPresets" viewBox="0 0 24 24">
     <path d="M9 6h11M9 12h11M9 18h11" />
     <circle cx="4.5" cy="6" r="1" />
     <circle cx="4.5" cy="12" r="1" />
@@ -242,9 +242,9 @@
           step="0.1"
           required
         /><small class="fieldHint">{{webui:settings.target_weight_hint}}</small></label
-      ><label class="micraOnly micraTempOpt"
+      ><label class="laMarzoccoOnly laMarzoccoTempOpt"
         >{{webui:settings.brew_temperature_c}}<input
-          id="lineaMicraBrewTargetC"
+          id="laMarzoccoBrewTargetC"
           type="number"
           min="80"
           max="100"
@@ -601,85 +601,87 @@
       ><small id="brewConflictChip" class="warn hidden"></small>
     </div>
   </fieldset>
-  <fieldset id="lineaMicraSettings" class="micraOnly">
+  <fieldset id="laMarzoccoSettings" class="laMarzoccoOnly">
     <legend>
-      {{webui:settings.la_marzocco_cloud}} <span id="lineaMicraLegendHint" class="hint"></span>
+      {{webui:settings.la_marzocco_cloud}} <span id="laMarzoccoLegendHint" class="hint"></span>
     </legend>
-    <form id="lineaMicraSignIn" class="enterForm" novalidate>
+    <form id="laMarzoccoSignIn" class="enterForm" novalidate>
       <p>
-        {{webui:settings.micra_intro}}<small class="fieldHint"
-          >{{webui:settings.micra_cloud_hint}}</small
+        {{webui:settings.la_marzocco_intro}}<small class="fieldHint"
+          >{{webui:settings.lm_cloud_hint}}</small
         >
       </p>
       <label
-        >{{webui:settings.micra_email}}<input
-          id="lineaMicraUsername"
+        >{{webui:settings.la_marzocco_email}}<input
+          id="laMarzoccoUsername"
           type="email"
           maxlength="96"
           autocomplete="username"
           spellcheck="false"
-        /><small class="fieldHint">{{webui:settings.micra_email_hint}}</small></label
+        /><small class="fieldHint">{{webui:settings.la_marzocco_email_hint}}</small></label
       ><label
-        >{{webui:settings.micra_password}}<input
-          id="lineaMicraPassword"
+        >{{webui:settings.la_marzocco_password}}<input
+          id="laMarzoccoPassword"
           type="password"
           maxlength="96"
           autocomplete="current-password"
           spellcheck="false"
-        /><small class="fieldHint">{{webui:settings.micra_password_hint}}</small></label
+        /><small class="fieldHint">{{webui:settings.la_marzocco_password_hint}}</small></label
       >
-      <p id="lineaMicraWifiNote" class="readyMsg hidden">{{webui:settings.micra_needs_wifi}}</p>
+      <p id="laMarzoccoWifiNote" class="readyMsg hidden">
+        {{webui:settings.la_marzocco_needs_wifi}}
+      </p>
       <div class="btnBar">
-        <button id="lineaMicraConnectButton" class="btnGlyph mutable btnInvert" type="submit">
+        <button id="laMarzoccoConnectButton" class="btnGlyph mutable btnInvert" type="submit">
           <span class="g" aria-hidden="true">↻</span
           ><span class="t">{{webui:settings.connect_account}}</span>
         </button>
       </div>
     </form>
-    <div id="lineaMicraBusy" hidden>
-      <p>{{webui:settings.micra_connecting}}</p>
-      <ol id="lineaMicraSteps" class="micraSteps">
-        <li>{{webui:settings.micra_step_sign_in}}</li>
-        <li>{{webui:settings.micra_step_list}}</li>
-        <li>{{webui:settings.micra_step_link}}</li>
+    <div id="laMarzoccoBusy" hidden>
+      <p>{{webui:settings.la_marzocco_connecting}}</p>
+      <ol id="laMarzoccoSteps" class="laMarzoccoStepList">
+        <li>{{webui:settings.la_marzocco_step_sign_in}}</li>
+        <li>{{webui:settings.la_marzocco_step_list}}</li>
+        <li>{{webui:settings.la_marzocco_step_link}}</li>
       </ol>
     </div>
-    <form id="lineaMicraChoose" class="enterForm" novalidate hidden>
+    <form id="laMarzoccoChoose" class="enterForm" novalidate hidden>
       <p>
-        {{webui:settings.micra_choose_intro}}<small class="fieldHint"
-          >{{webui:settings.micra_machine_hint}}</small
+        {{webui:settings.la_marzocco_choose_intro}}<small class="fieldHint"
+          >{{webui:settings.la_marzocco_machine_hint}}</small
         >
       </p>
       <div
-        id="lineaMicraMachines"
+        id="laMarzoccoMachines"
         class="setupChoices"
         role="radiogroup"
-        aria-label="{{webui:settings.micra_machine}}"
+        aria-label="{{webui:settings.la_marzocco_machine}}"
       ></div>
       <div class="btnBar">
         <button
-          id="lineaMicraSelectButton"
+          id="laMarzoccoSelectButton"
           class="btnGlyph mutable btnInvert"
           type="submit"
           disabled
         >
           <span class="g" aria-hidden="true">✓</span
           ><span class="t">{{webui:settings.use_selected_machine}}</span></button
-        ><button id="lineaMicraCancelButton" class="btnGlyph mutable" type="button">
+        ><button id="laMarzoccoCancelButton" class="btnGlyph mutable" type="button">
           {{webui:settings.cancel}}
         </button>
       </div>
     </form>
-    <small id="lineaMicraProgress" role="status"></small>
-    <div id="lineaMicraConnected" hidden>
-      <p class="scopeNote">{{webui:settings.micra_scope_note}}</p>
+    <small id="laMarzoccoProgress" role="status"></small>
+    <div id="laMarzoccoConnected" hidden>
+      <p class="scopeNote">{{webui:settings.la_marzocco_scope_note}}</p>
       <details data-g="account" class="cfgGroup">
         <summary>{{webui:settings.account}}</summary>
         <div class="metric">
           <strong>{{webui:settings.account}}</strong>
           <div>
-            <span id="lineaMicraAccount"></span>
-            <button id="lineaMicraDisconnectButton" class="inlineAction mutable" type="button">
+            <span id="laMarzoccoAccount"></span>
+            <button id="laMarzoccoDisconnectButton" class="inlineAction mutable" type="button">
               ({{webui:settings.disconnect_account}})
             </button>
           </div>
@@ -687,47 +689,47 @@
         <div class="metric">
           <strong>{{webui:settings.selected_machine}}</strong>
           <div>
-            <span id="lineaMicraIdentity"></span>
-            <button id="lineaMicraChangeButton" class="inlineAction mutable" type="button">
+            <span id="laMarzoccoIdentity"></span>
+            <button id="laMarzoccoChangeButton" class="inlineAction mutable" type="button">
               ({{webui:settings.change}})
             </button>
           </div>
         </div>
         <div class="metric">
           <strong>{{webui:settings.machine_status}}</strong>
-          <span id="lineaMicraStatus" class="micraPill"></span>
+          <span id="laMarzoccoStatus" class="laMarzoccoPill"></span>
         </div>
       </details>
-      <p id="lineaMicraLinkedNote" class="readyMsg isOk" role="status" hidden>
-        {{webui:settings.micra_linked_note}}
+      <p id="laMarzoccoLinkedNote" class="readyMsg isOk" role="status" hidden>
+        {{webui:settings.la_marzocco_linked_note}}
       </p>
       <details data-g="power" class="cfgGroup">
         <summary>{{webui:settings.machine_power}}</summary>
         <small class="fieldHint">{{webui:settings.machine_power_hint}}</small
         ><label
-          ><input id="lineaMicraObserveState" type="checkbox" checked />
+          ><input id="laMarzoccoObserveState" type="checkbox" checked />
           {{webui:settings.monitor_machine_power_state}}<small class="fieldHint"
             >{{webui:settings.monitor_machine_power_state_hint}}</small
           ></label
         >
-        <div id="lineaMicraPowerDeps" class="micraDeps">
+        <div id="laMarzoccoPowerDeps" class="laMarzoccoDeps">
           <label
-            ><input id="lineaMicraRecognizeWake" type="checkbox" checked />
+            ><input id="laMarzoccoRecognizeWake" type="checkbox" checked />
             {{webui:settings.recognize_wake_gesture}}<small class="fieldHint"
               >{{webui:settings.recognize_wake_gesture_hint}}</small
             ></label
           ><label
-            ><input id="lineaMicraScaleOffWithMachine" type="checkbox" checked />
+            ><input id="laMarzoccoScaleOffWithMachine" type="checkbox" checked />
             {{webui:settings.turn_scale_off_with_machine}}<small class="fieldHint"
               >{{webui:settings.turn_scale_off_with_machine_hint}}</small
             ></label
           ><label
-            ><input id="lineaMicraBoostScaleDetectionWhenOn" type="checkbox" checked />
+            ><input id="laMarzoccoBoostScaleDetectionWhenOn" type="checkbox" checked />
             {{webui:settings.boost_scale_detection_when_machine_on}}<small class="fieldHint"
               >{{webui:settings.boost_scale_detection_when_machine_on_hint}}</small
             ></label
           ><label
-            ><input id="lineaMicraReduceScaleScanningWhenOff" type="checkbox" checked />
+            ><input id="laMarzoccoReduceScaleScanningWhenOff" type="checkbox" checked />
             {{webui:settings.reduce_scale_scanning_when_machine_off}}<small class="fieldHint"
               >{{webui:settings.reduce_scale_scanning_when_machine_off_hint}}</small
             ></label
@@ -738,18 +740,18 @@
         <summary>{{webui:settings.scale_automations}}</summary>
         <small class="fieldHint">{{webui:settings.scale_automations_hint}}</small
         ><label
-          ><input id="lineaMicraPowerOnWithScale" type="checkbox" />
+          ><input id="laMarzoccoPowerOnWithScale" type="checkbox" />
           {{webui:settings.power_on_machine_with_scale}}<small class="fieldHint warn"
             >{{webui:settings.power_on_machine_with_scale_hint}}</small
           ></label
         ><label
-          ><input id="lineaMicraShutdownWithScale" type="checkbox" checked />
+          ><input id="laMarzoccoShutdownWithScale" type="checkbox" checked />
           {{webui:settings.shutdown_machine_with_scale}}<small class="fieldHint"
             >{{webui:settings.shutdown_machine_with_scale_hint}}</small
           ></label
-        ><label id="lineaMicraShutdownGraceWrap"
+        ><label id="laMarzoccoShutdownGraceWrap"
           >{{webui:settings.shutdown_grace_period}}<span class="selBox"
-            ><select id="lineaMicraShutdownGrace">
+            ><select id="laMarzoccoShutdownGrace">
               <option value="0">{{webui:settings.shutdown_grace_off}}</option>
               <option value="5">{{webui:settings.shutdown_grace_5s}}</option>
               <option value="15" selected>{{webui:settings.shutdown_grace_15s}}</option>
@@ -759,10 +761,10 @@
           ><small class="fieldHint">{{webui:settings.shutdown_grace_period_hint}}</small></label
         >
       </details>
-      <details data-g="micraPresets" class="cfgGroup">
+      <details data-g="laMarzoccoPresets" class="cfgGroup">
         <summary>{{webui:settings.preset_extensions}}</summary>
         <label
-          ><input id="lineaMicraApplyTemperature" type="checkbox" checked />
+          ><input id="laMarzoccoApplyTemperature" type="checkbox" checked />
           {{webui:settings.allow_brew_temperature}}<small class="fieldHint"
             >{{webui:settings.allow_brew_temperature_hint}}</small
           ></label
@@ -1426,7 +1428,7 @@
           <p><strong>{{webui:settings.app_push_problem}}</strong> <span></span></p>
         </div>
       </div>
-      <div class="micraOnly pwaOnly">
+      <div class="laMarzoccoOnly pwaOnly">
         <label
           ><input id="appPushTerms" type="checkbox" /> {{webui:settings.app_push_terms}}<small
             class="fieldHint"

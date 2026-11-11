@@ -846,8 +846,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
 
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   {
-    const HeapLifecycleAggregate micraHeap = machineIntegrationHeapTelemetry();
-    const MicraWebSocketStatus ws = machineIntegrationWebSocketStatus(false);
+    const HeapLifecycleAggregate laMarzoccoHeap = machineIntegrationHeapTelemetry();
+    const LaMarzoccoWebSocketStatus ws = machineIntegrationWebSocketStatus(false);
     ok = ok &&
          debugExportChunkf(
              request, buf, cap,
@@ -862,14 +862,14 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
              "\"stop\":{\"lastFreeDelta\":%ld,\"lastLargestDelta\":%ld,"
              "\"worstFreeDelta\":%ld,\"worstLargestDelta\":%ld},"
              "\"allocationFailures\":%lu}},",
-             static_cast<unsigned long>(micraHeap.cycles),
-             static_cast<unsigned long>(micraHeap.staleReplacements),
-             static_cast<unsigned>(micraHeap.lastEvent),
-             static_cast<unsigned>(micraHeap.lastResult),
-             static_cast<long>(micraHeap.lastDelta.freeBytes),
-             static_cast<long>(micraHeap.lastDelta.largestBlock),
-             static_cast<long>(micraHeap.worstFreeDelta),
-             static_cast<long>(micraHeap.worstLargestDelta),
+             static_cast<unsigned long>(laMarzoccoHeap.cycles),
+             static_cast<unsigned long>(laMarzoccoHeap.staleReplacements),
+             static_cast<unsigned>(laMarzoccoHeap.lastEvent),
+             static_cast<unsigned>(laMarzoccoHeap.lastResult),
+             static_cast<long>(laMarzoccoHeap.lastDelta.freeBytes),
+             static_cast<long>(laMarzoccoHeap.lastDelta.largestBlock),
+             static_cast<long>(laMarzoccoHeap.worstFreeDelta),
+             static_cast<long>(laMarzoccoHeap.worstLargestDelta),
              static_cast<unsigned long>(ws.heap.cycles),
              static_cast<long>(ws.heap.lastDelta.freeBytes),
              static_cast<long>(ws.heap.lastDelta.largestBlock),

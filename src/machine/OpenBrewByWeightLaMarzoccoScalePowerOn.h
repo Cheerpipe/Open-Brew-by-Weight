@@ -1,19 +1,19 @@
 #pragma once
 
-#include "OpenBrewByWeightLineaMicraSettings.h"
-#include "OpenBrewByWeightMicraScaleShutdown.h"
+#include "OpenBrewByWeightLaMarzoccoSettings.h"
+#include "OpenBrewByWeightLaMarzoccoScaleShutdown.h"
 
 #include <cstdint>
 
 namespace openbrewbyweight {
 
 // Machine-side policy for turning the Micra on when the scale powers on: the
-// inverse of MicraScaleShutdownTracker. A link-up edge counts as the scale
+// inverse of LaMarzoccoScaleShutdownTracker. A link-up edge counts as the scale
 // powering on only when the preceding disconnect was the scale's own
 // power-off (REMOTE_DISCONNECTED), so radio-loss reconnects and the first
 // connection after boot never wake the machine. The Micra cloud service owns
 // the BrewingMode command.
-class MicraScalePowerOnTracker {
+class LaMarzoccoScalePowerOnTracker {
  public:
   struct Snapshot {
     bool linkUp = false;
@@ -25,15 +25,15 @@ class MicraScalePowerOnTracker {
   // its own explicit power-off while the option and account stayed active and
   // the relay stayed open. A trigger observed with the option off or a closed
   // relay is consumed, never deferred.
-  bool service(const Snapshot &observed, uint8_t micraOptions,
+  bool service(const Snapshot &observed, uint8_t laMarzoccoOptions,
                bool accountConfigured) {
     const bool enabled =
         accountConfigured &&
-        (micraOptions & LINEA_MICRA_POWER_ON_WITH_SCALE) != 0;
+        (laMarzoccoOptions & LA_MARZOCCO_POWER_ON_WITH_SCALE) != 0;
     const bool edge = !lastLinkUp_ && observed.linkUp;
     lastLinkUp_ = observed.linkUp;
     if (!edge || !enabled || observed.relayClosed) return false;
-    return observed.lastDisconnectReason == LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT;
+    return observed.lastDisconnectReason == LA_MARZOCCO_SCALE_EXPLICIT_DISCONNECT;
   }
 
  private:

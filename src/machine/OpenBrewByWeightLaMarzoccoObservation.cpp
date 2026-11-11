@@ -1,4 +1,4 @@
-#include "OpenBrewByWeightMicraObservation.h"
+#include "OpenBrewByWeightLaMarzoccoObservation.h"
 
 #include <cJSON.h>
 #include <cmath>
@@ -24,28 +24,28 @@ const char *text(const cJSON *object, const char *key) {
   return value->valuestring;
 }
 
-LineaMicraObservedMode mode(const char *value) {
-  if (strcmp(value, "StandBy") == 0) return LineaMicraObservedMode::STANDBY;
-  if (strcmp(value, "BrewingMode") == 0) return LineaMicraObservedMode::BREWING;
-  if (strcmp(value, "EcoMode") == 0) return LineaMicraObservedMode::ECO;
-  return LineaMicraObservedMode::UNSUPPORTED;
+LaMarzoccoObservedMode mode(const char *value) {
+  if (strcmp(value, "StandBy") == 0) return LaMarzoccoObservedMode::STANDBY;
+  if (strcmp(value, "BrewingMode") == 0) return LaMarzoccoObservedMode::BREWING;
+  if (strcmp(value, "EcoMode") == 0) return LaMarzoccoObservedMode::ECO;
+  return LaMarzoccoObservedMode::UNSUPPORTED;
 }
 
-LineaMicraBoilerState boilerState(const char *value) {
-  if (strcmp(value, "StandBy") == 0) return LineaMicraBoilerState::STANDBY;
-  if (strcmp(value, "HeatingUp") == 0) return LineaMicraBoilerState::HEATING_UP;
-  if (strcmp(value, "Ready") == 0) return LineaMicraBoilerState::READY;
-  if (strcmp(value, "NoWater") == 0) return LineaMicraBoilerState::NO_WATER;
-  if (strcmp(value, "EcoMode") == 0) return LineaMicraBoilerState::ECO;
-  if (strcmp(value, "Off") == 0) return LineaMicraBoilerState::OFF;
-  return LineaMicraBoilerState::UNSUPPORTED;
+LaMarzoccoBoilerState boilerState(const char *value) {
+  if (strcmp(value, "StandBy") == 0) return LaMarzoccoBoilerState::STANDBY;
+  if (strcmp(value, "HeatingUp") == 0) return LaMarzoccoBoilerState::HEATING_UP;
+  if (strcmp(value, "Ready") == 0) return LaMarzoccoBoilerState::READY;
+  if (strcmp(value, "NoWater") == 0) return LaMarzoccoBoilerState::NO_WATER;
+  if (strcmp(value, "EcoMode") == 0) return LaMarzoccoBoilerState::ECO;
+  if (strcmp(value, "Off") == 0) return LaMarzoccoBoilerState::OFF;
+  return LaMarzoccoBoilerState::UNSUPPORTED;
 }
 
-LineaMicraSteamLevel steamLevel(const char *value) {
-  if (strcmp(value, "Level1") == 0) return LineaMicraSteamLevel::LEVEL_1;
-  if (strcmp(value, "Level2") == 0) return LineaMicraSteamLevel::LEVEL_2;
-  if (strcmp(value, "Level3") == 0) return LineaMicraSteamLevel::LEVEL_3;
-  return LineaMicraSteamLevel::UNSUPPORTED;
+LaMarzoccoSteamLevel steamLevel(const char *value) {
+  if (strcmp(value, "Level1") == 0) return LaMarzoccoSteamLevel::LEVEL_1;
+  if (strcmp(value, "Level2") == 0) return LaMarzoccoSteamLevel::LEVEL_2;
+  if (strcmp(value, "Level3") == 0) return LaMarzoccoSteamLevel::LEVEL_3;
+  return LaMarzoccoSteamLevel::UNSUPPORTED;
 }
 
 // True when a widgets or removedWidgets array names this widget code.
@@ -74,7 +74,7 @@ void readyAtSeconds(const cJSON *value, uint32_t &seconds) {
 }
 }  // namespace
 
-bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
+bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update,
                           const char **unsupported) {
   if (!cJSON_IsObject(root)) return false;
   unsigned seen = 0;
@@ -86,7 +86,7 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
     if (seen & bit) return false;
     seen |= bit;
   }
-  MicraObservation next = update;
+  LaMarzoccoObservation next = update;
   const cJSON *connected = find(root, "connected");
   if (connected != nullptr) {
     if (!cJSON_IsBool(connected)) return false;
@@ -156,8 +156,8 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
         if (target == nullptr) continue;
         if (!cJSON_IsNumber(target) || !std::isfinite(target->valuedouble) ||
             next.temperaturePresent) return false;
-        if (target->valuedouble < LINEA_MICRA_BREW_TARGET_MIN_DECI_C / 10.0 ||
-            target->valuedouble > LINEA_MICRA_BREW_TARGET_MAX_DECI_C / 10.0) {
+        if (target->valuedouble < LA_MARZOCCO_BREW_TARGET_MIN_DECI_C / 10.0 ||
+            target->valuedouble > LA_MARZOCCO_BREW_TARGET_MAX_DECI_C / 10.0) {
           if (unsupported != nullptr) *unsupported = "brew target outside 80.0-100.0 C";
           return false;
         }
@@ -170,7 +170,7 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
             target->valuestring != nullptr)
           next.steamLevel = steamLevel(target->valuestring);
       }
-    } else if (next.source == MicraObservationSource::WEBSOCKET) {
+    } else if (next.source == LaMarzoccoObservationSource::WEBSOCKET) {
       const cJSON *value = find(output, "status");
       if (duplicated(value, "status")) return false;
       if (value == nullptr) continue;
@@ -178,11 +178,11 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
           next.cleaningPresent) return false;
       next.cleaningPresent = next.cleaningAvailable = true;
       const char *label = value->valuestring;
-      next.cleaning = strcmp(label, "Off") == 0 ? MicraCleaningState::OFF
-          : strcmp(label, "Requested") == 0 ? MicraCleaningState::REQUESTED
-          : strcmp(label, "Cleaning") == 0 ? MicraCleaningState::CLEANING
-          : MicraCleaningState::UNKNOWN;
-      copyMicraText(next.cleaningLabel, sizeof(next.cleaningLabel), label);
+      next.cleaning = strcmp(label, "Off") == 0 ? LaMarzoccoCleaningState::OFF
+          : strcmp(label, "Requested") == 0 ? LaMarzoccoCleaningState::REQUESTED
+          : strcmp(label, "Cleaning") == 0 ? LaMarzoccoCleaningState::CLEANING
+          : LaMarzoccoCleaningState::UNKNOWN;
+      copyLaMarzoccoText(next.cleaningLabel, sizeof(next.cleaningLabel), label);
     }
   }
   const cJSON *removed = find(root, "removedWidgets");
@@ -192,13 +192,13 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
     if (code == nullptr) continue;
     if (strcmp(code, "CMMachineStatus") == 0) {
       next.powerPresent = true;
-      next.mode = LineaMicraObservedMode::NONE;
+      next.mode = LaMarzoccoObservedMode::NONE;
     } else if (strcmp(code, "CMCoffeeBoiler") == 0) {
       next.temperaturePresent = true;
       next.temperatureValid = false;
       next.targetDeciC = 0;
       next.coffeeBoilerPresent = true;
-      next.coffeeBoiler = LineaMicraBoilerState::UNSUPPORTED;
+      next.coffeeBoiler = LaMarzoccoBoilerState::UNSUPPORTED;
       next.coffeeReadyAtUtcSec = 0;
     } else if (const bool byTemperature = strcmp(code, "CMSteamBoilerTemperature") == 0;
                byTemperature
@@ -209,15 +209,15 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
                          !(next.steamBoilerPresent && next.steamByTemperature)) {
       next.steamByTemperature = byTemperature;
       next.steamBoilerPresent = true;
-      next.steamBoiler = LineaMicraBoilerState::UNSUPPORTED;
+      next.steamBoiler = LaMarzoccoBoilerState::UNSUPPORTED;
       next.steamReadyAtUtcSec = 0;
-      next.steamLevel = LineaMicraSteamLevel::UNKNOWN;
+      next.steamLevel = LaMarzoccoSteamLevel::UNKNOWN;
     } else if (strcmp(code, "CMBackFlush") == 0 &&
-               next.source == MicraObservationSource::WEBSOCKET) {
+               next.source == LaMarzoccoObservationSource::WEBSOCKET) {
       if (next.cleaningPresent) return false;
       next.cleaningPresent = true;
       next.cleaningAvailable = false;
-      next.cleaning = MicraCleaningState::UNKNOWN;
+      next.cleaning = LaMarzoccoCleaningState::UNKNOWN;
       next.cleaningLabel[0] = '\0';
     }
   }
@@ -225,27 +225,27 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
   return widgets != nullptr || removed != nullptr || connected != nullptr;
 }
 
-bool decodeMicraThings(const cJSON *root, const char *profileModel,
-                       LineaMicraDiscoverySnapshot &result,
-                       MicraThingSkipped skipped) {
+bool decodeLaMarzoccoThings(const cJSON *root, const char *profileModel,
+                       LaMarzoccoDiscoverySnapshot &result,
+                       LaMarzoccoThingSkipped skipped) {
   if (!cJSON_IsArray(root)) return false;
   const cJSON *thing = nullptr;
   cJSON_ArrayForEach(thing, root) {
-    if (result.count >= LINEA_MICRA_MAX_ACCOUNT_MACHINES) break;
+    if (result.count >= LA_MARZOCCO_MAX_ACCOUNT_MACHINES) break;
     const char *type = text(thing, "type");
     if (type == nullptr || strcmp(type, "CoffeeMachine") != 0) continue;
     const char *model = text(thing, "modelCode");
     const char *serial = text(thing, "serialNumber");
     const bool wanted = model != nullptr && strcmp(model, profileModel) == 0;
-    if (!wanted || serial == nullptr || !validLineaMicraSerial(serial)) {
+    if (!wanted || serial == nullptr || !validLaMarzoccoSerial(serial)) {
       skipped(wanted ? nullptr : model == nullptr ? "unknown" : model);
       continue;
     }
-    LineaMicraMachineSummary &machine = result.machines[result.count++];
+    LaMarzoccoMachineSummary &machine = result.machines[result.count++];
     std::memset(machine.serial, 0, sizeof(machine.serial));
     std::memcpy(machine.serial, serial, std::strlen(serial));  // Validated to fit.
     const char *name = text(thing, "name");
-    copyMicraText(machine.name, sizeof(machine.name),
+    copyLaMarzoccoText(machine.name, sizeof(machine.name),
                   name == nullptr || name[0] == '\0' ? serial : name);
   }
   return true;

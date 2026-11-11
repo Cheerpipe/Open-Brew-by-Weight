@@ -2,7 +2,7 @@
 // reads that the Home frame does not carry. Home owns config.revision, the
 // shared config.* keys (effective, overrides included), presets, lastCommand,
 // quickRevert.{after,overrides,remainingS}, connections, scale.preferred* and
-// its lineaMicra.* keys — the account email and machine name included, for
+// its laMarzocco.* keys — the account email and machine name included, for
 // the shared header's cloud indicator; the page composes both models.
 // The standing subscription rides the Home + shot-card batch. One source
 // fingerprint gates the evaluation, so an idle dispatch formats nothing, and
@@ -50,22 +50,22 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
       companion.paired && companion.archiveSwitch && companion.bcSwitch;
   gate = gateOver(gate, &companionBeanconqueror, sizeof(companionBeanconqueror));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
-  char serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
+  char serial[LA_MARZOCCO_SERIAL_CAPACITY] = {};
   uint8_t options, scaleOptions;
   {
     TaskLockGuard lock(dataMux_);
-    options = settings_.lineaMicra.options;
-    scaleOptions = settings_.lineaMicra.scaleOptions;
-    sanitizeJsonEmbed(settings_.lineaMicra.selectedSerial, serial, sizeof(serial));
+    options = settings_.laMarzocco.options;
+    scaleOptions = settings_.laMarzocco.scaleOptions;
+    sanitizeJsonEmbed(settings_.laMarzocco.selectedSerial, serial, sizeof(serial));
   }
-  const LineaMicraStatus micra = machineIntegrationStatus();
-  const LineaMicraDiscoverySnapshot discovery = machineIntegrationDiscovery();
-  const MicraWebSocketStatus ws = machineIntegrationWebSocketStatus(false);
-  const uint8_t micraState[] = {options, scaleOptions, static_cast<uint8_t>(micra.phase),
+  const LaMarzoccoStatus micra = machineIntegrationStatus();
+  const LaMarzoccoDiscoverySnapshot discovery = machineIntegrationDiscovery();
+  const LaMarzoccoWebSocketStatus ws = machineIntegrationWebSocketStatus(false);
+  const uint8_t laMarzoccoState[] = {options, scaleOptions, static_cast<uint8_t>(micra.phase),
                                 static_cast<uint8_t>(micra.error), micra.staConnected,
                                 micra.apActive, micra.shotPaused,
                                 ws.machineConnectedKnown && !ws.machineConnected};
-  gate = gateOver(gate, micraState, sizeof(micraState));
+  gate = gateOver(gate, laMarzoccoState, sizeof(laMarzoccoState));
   gate = gateOver(gate, &discovery, sizeof(discovery));
   gate = gateOver(gate, serial, sizeof(serial));
 #endif
@@ -159,33 +159,33 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("scaleLoss.source", "%s",
                shotLogScaleLossSourceJson(static_cast<uint8_t>(control.scaleLossProjectedSource << 3)));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
-  fields.field("lineaMicra.selectedSerial", "\"%s\"", serial);
-  fields.field("lineaMicra.applyTemperature", bool(options & LINEA_MICRA_APPLY_TEMPERATURE));
-  fields.field("lineaMicra.recognizeWakeGesture", bool(options & LINEA_MICRA_RECOGNIZE_WAKE));
-  fields.field("lineaMicra.powerOnWithScale", bool(options & LINEA_MICRA_POWER_ON_WITH_SCALE));
-  fields.field("lineaMicra.shutdownWithScale", bool(options & LINEA_MICRA_SHUTDOWN_WITH_SCALE));
-  fields.field("lineaMicra.shutdownGraceSeconds",
-               static_cast<unsigned long>(lineaMicraShutdownGraceSeconds(options)));
-  fields.field("lineaMicra.scaleOffWithMachine",
-               bool(scaleOptions & LINEA_MICRA_SCALE_OFF_WITH_MACHINE));
-  fields.field("lineaMicra.boostScaleDetectionWhenOn",
-               bool(scaleOptions & LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON));
-  fields.field("lineaMicra.reduceScaleScanningWhenOff",
-               bool(scaleOptions & LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF));
-  fields.field("lineaMicra.phase", "\"%s\"", lineaMicraPhaseName(micra.phase));
-  fields.field("lineaMicra.error", "\"%s\"", lineaMicraErrorName(micra.error));
-  fields.field("lineaMicra.machineOffline", bool(micraState[7]));
-  fields.field("lineaMicra.staConnected", bool(micra.staConnected));
-  fields.field("lineaMicra.apActive", bool(micra.apActive));
-  fields.field("lineaMicra.shotPaused", bool(micra.shotPaused));
-  fields.field("lineaMicra.machineListing", bool(discovery.listing));
-  fields.field("lineaMicra.machineListError", "\"%s\"", lineaMicraErrorName(discovery.error));
+  fields.field("laMarzocco.selectedSerial", "\"%s\"", serial);
+  fields.field("laMarzocco.applyTemperature", bool(options & LA_MARZOCCO_APPLY_TEMPERATURE));
+  fields.field("laMarzocco.recognizeWakeGesture", bool(options & LA_MARZOCCO_RECOGNIZE_WAKE));
+  fields.field("laMarzocco.powerOnWithScale", bool(options & LA_MARZOCCO_POWER_ON_WITH_SCALE));
+  fields.field("laMarzocco.shutdownWithScale", bool(options & LA_MARZOCCO_SHUTDOWN_WITH_SCALE));
+  fields.field("laMarzocco.shutdownGraceSeconds",
+               static_cast<unsigned long>(laMarzoccoShutdownGraceSeconds(options)));
+  fields.field("laMarzocco.scaleOffWithMachine",
+               bool(scaleOptions & LA_MARZOCCO_SCALE_OFF_WITH_MACHINE));
+  fields.field("laMarzocco.boostScaleDetectionWhenOn",
+               bool(scaleOptions & LA_MARZOCCO_SCALE_SCAN_BOOST_WHEN_ON));
+  fields.field("laMarzocco.reduceScaleScanningWhenOff",
+               bool(scaleOptions & LA_MARZOCCO_SCALE_SCAN_RELAX_WHEN_OFF));
+  fields.field("laMarzocco.phase", "\"%s\"", laMarzoccoPhaseName(micra.phase));
+  fields.field("laMarzocco.error", "\"%s\"", laMarzoccoErrorName(micra.error));
+  fields.field("laMarzocco.machineOffline", bool(laMarzoccoState[7]));
+  fields.field("laMarzocco.staConnected", bool(micra.staConnected));
+  fields.field("laMarzocco.apActive", bool(micra.apActive));
+  fields.field("laMarzocco.shotPaused", bool(micra.shotPaused));
+  fields.field("laMarzocco.machineListing", bool(discovery.listing));
+  fields.field("laMarzocco.machineListError", "\"%s\"", laMarzoccoErrorName(discovery.error));
   {
     size_t used = 0;
     g_work->historyJson[used++] = '[';
-    for (uint8_t index = 0; index < discovery.count && index < LINEA_MICRA_MAX_ACCOUNT_MACHINES;
+    for (uint8_t index = 0; index < discovery.count && index < LA_MARZOCCO_MAX_ACCOUNT_MACHINES;
          ++index) {
-      char safeSerial[LINEA_MICRA_SERIAL_CAPACITY] = {}, safeName[LINEA_MICRA_NAME_CAPACITY] = {};
+      char safeSerial[LA_MARZOCCO_SERIAL_CAPACITY] = {}, safeName[LA_MARZOCCO_NAME_CAPACITY] = {};
       sanitizeJsonEmbed(discovery.machines[index].serial, safeSerial, sizeof(safeSerial));
       sanitizeJsonEmbed(discovery.machines[index].name, safeName, sizeof(safeName));
       const int n = snprintf(g_work->historyJson + used, NetworkWorkBuf::kHistoryJson - used,
@@ -196,7 +196,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
     }
     g_work->historyJson[used++] = ']';
     g_work->historyJson[used] = '\0';
-    fields.field("lineaMicra.machines", "%s", g_work->historyJson);
+    fields.field("laMarzocco.machines", "%s", g_work->historyJson);
   }
 #endif
   if (!fields.ok) return false;

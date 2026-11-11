@@ -675,7 +675,7 @@
           maxlength="6"
           autocomplete="one-time-code" /><small id="companionCodeHint" class="fieldHint"></small
       ></label>
-      <label class="micraOnly"
+      <label class="laMarzoccoOnly"
         ><input id="companionApproveLm" type="checkbox" role="switch" checked />
         {{webui:admin.companion_lm}}<small class="fieldHint"
           >{{webui:admin.companion_lm_approve_hint}}</small
@@ -710,7 +710,7 @@
     </form>
     <div id="companionBusy" hidden>
       <p>{{webui:admin.companion_connecting}}</p>
-      <ol id="companionSteps" class="micraSteps">
+      <ol id="companionSteps" class="laMarzoccoStepList">
         <li>{{webui:admin.companion_step_code}}</li>
         <li>{{webui:admin.companion_step_pair}}</li>
         <li>{{webui:admin.companion_step_link}}</li>
@@ -726,7 +726,7 @@
       <div class="accessRow">
         <span><b>{{webui:admin.companion_link}}</b> <span id="companionLinkState"></span></span>
       </div>
-      <div class="accessRow micraOnly">
+      <div class="accessRow laMarzoccoOnly">
         <span><b>{{webui:admin.companion_route}}</b> <span id="companionRouteState"></span></span>
       </div>
       <div id="companionCopyRow" class="accessRow" hidden>
@@ -741,7 +741,7 @@
           >{{webui:admin.companion_ui_hint}}</small
         ></label
       >
-      <label class="micraOnly"
+      <label class="laMarzoccoOnly"
         ><input id="companionLm" type="checkbox" role="switch" /> {{webui:admin.companion_lm}}<small
           class="fieldHint"
           >{{webui:admin.companion_lm_hint}}</small

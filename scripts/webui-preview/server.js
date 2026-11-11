@@ -65,7 +65,7 @@ function renderHome() {
 const PREVIEW_HEADER_PRELUDE = `window.$ ??= id => document.getElementById(id);
 // The design preview serves raw sources, so the build constants Terser folds
 // into the shipped bundle stand in for themselves here.
-const __LINEA_MICRA__ = true, __REMOTE_CONTROL__ = true;
+const __LA_MARZOCCO__ = true, __REMOTE_CONTROL__ = true;
 let controlsMutable = true, configRevision = 1;
 const previewStatus = {config: {revision: 1, brewByWeight: true, noScaleBbwMode: 'warn_once',
   fastExtractionGuardEnabled: true, slowExtractionGuardEnabled: true, autoToManualGuardEnabled: true,
@@ -118,7 +118,7 @@ function renderMobileMenu() {
       .replace('</body>', '<script src="/mobile-menu.js" defer></script></body>');
 }
 
-function renderMicra() {
+function renderLaMarzocco() {
   return renderMobileMenu()
       .replace('<link rel="stylesheet" href="/header.css">', '')
       .replace('<link rel="stylesheet" href="/mobile-menu.css">', '')
@@ -126,20 +126,20 @@ function renderMicra() {
       .replace('<script src="/mobile-menu.js" defer></script>', '<script src="/micra-preview.js" defer></script>');
 }
 
-function renderMicraScript() {
+function renderLaMarzoccoScript() {
   // The Micra settings code lives in the Settings module; the preview runs it
   // as plain globals, so module qualifiers are dropped.
   const settings = read('src/web/js/settings.js'), diagnostic = read('src/web/js/diagnostic.js');
-  const runtime = read('src/web/js/runtime.js'), switches = settings.search(/const\s+MICRA_SWITCHES\s*=/);
+  const runtime = read('src/web/js/runtime.js'), switches = settings.search(/const\s+LA_MARZOCCO_SWITCHES\s*=/);
   const switchesEnd = settings.indexOf('function loadBullseyeConfig(');
   if (switches < 0 || switchesEnd < switches) throw new Error('settings.js Micra block not found');
   const pick = (source, names) => names.map(name => functionSource(source, name)).join('');
-  const content = (pick(runtime, ['formatMicraCleaning', 'formatWallTimeLocal', 'pad2']) +
+  const content = (pick(runtime, ['formatLaMarzoccoCleaning', 'formatWallTimeLocal', 'pad2']) +
       settings.slice(switches, switchesEnd) +
-      pick(diagnostic, ['renderMicraCloudDiagnostic', 'renderMicraWebSocket', 'ensureMicraRows']))
+      pick(diagnostic, ['renderLaMarzoccoCloudDiagnostic', 'renderLaMarzoccoWebSocket', 'ensureLaMarzoccoRows']))
       .replace(/\bR\.(?:uiState\.)?/g, '');
   const extra = mockup('micra.js');
-  return 'const __LINEA_MICRA__ = true;\n' + renderSources([{file: 'src/web/js/settings.js', type: 'js', content}],
+  return 'const __LA_MARZOCCO__ = true;\n' + renderSources([{file: 'src/web/js/settings.js', type: 'js', content}],
       {language: 'en', allowUnused: true}).sources[0].content + (extra ? '\n' + extra : '');
 }
 
@@ -152,8 +152,8 @@ function createServer() {
     }
     try {
       const mobileMenu = /^(?:\/mobile-menu|(?:\/mobile-menu)?\/(?:stats|history|settings|diagnostic|admin))\/?$/.test(pathname);
-      const micraScript = pathname === '/micra-preview.js';
-      const micra = pathname === '/micra' || micraScript;
+      const laMarzoccoScript = pathname === '/micra-preview.js';
+      const micra = pathname === '/micra' || laMarzoccoScript;
       const signals = pathname === '/preview.js';
       const appCss = pathname === '/app.css';
       const home = pathname === '/';
@@ -162,10 +162,10 @@ function createServer() {
         res.writeHead(404).end('Preview resource not found');
         return;
       }
-      const body = micraScript ? renderMicraScript() : micra ? renderMicra() : mobileMenu ? renderMobileMenu()
+      const body = laMarzoccoScript ? renderLaMarzoccoScript() : micra ? renderLaMarzocco() : mobileMenu ? renderMobileMenu()
           : signals ? renderSignals() + (mockup('header.js') ? '\n' + mockup('header.js') : '')
           : appCss ? appCssBody() : file ? fs.readFileSync(file[0]) : renderHome();
-      res.writeHead(200, {'Content-Type': micraScript || signals ? 'text/javascript' : appCss ? 'text/css'
+      res.writeHead(200, {'Content-Type': laMarzoccoScript || signals ? 'text/javascript' : appCss ? 'text/css'
           : file ? file[1] : 'text/html; charset=utf-8',
         'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
         'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; frame-ancestors 'self'; form-action 'none'"});

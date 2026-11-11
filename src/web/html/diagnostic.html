@@ -89,9 +89,9 @@
           <strong>{{webui:diagnostic.machine_activity}}</strong>
           <div id="dMachine">—</div>
         </div>
-        <div class="metric micraOnly">
+        <div class="metric laMarzoccoOnly">
           <strong>{{webui:diagnostic.machine_power_state}}</strong>
-          <div id="dMicraPowerBrief">—</div>
+          <div id="dLaMarzoccoPowerBrief">—</div>
         </div>
         <div class="metric">
           <strong>{{webui:diagnostic.brew}}</strong>
@@ -709,54 +709,54 @@
         </div>
       </div>
     </details>
-    <details class="cfgGroup micraOnly" data-g="marzocco-micra">
-      <summary>{{webui:diagnostic.marzocco_micra}}</summary>
-      <div id="micraMachineDiagnostics" class="statusColumn">
+    <details class="cfgGroup laMarzoccoOnly" data-g="marzocco-micra">
+      <summary>{{webui:diagnostic.la_marzocco}}</summary>
+      <div id="laMarzoccoMachineDiagnostics" class="statusColumn">
         <div class="metric">
           <strong>{{webui:diagnostic.readiness}}</strong>
-          <div id="dMicraReadiness">—</div>
+          <div id="dLaMarzoccoReadiness">—</div>
         </div>
-        <div class="metric micraOnly">
+        <div class="metric laMarzoccoOnly">
           <strong>{{webui:diagnostic.machine_power_state}}</strong>
-          <div id="dMicraPower">
-            <span id="dMicraPowerValue">—</span> -
-            <a id="lineaMicraRefreshLink" href="#" aria-disabled="true" tabindex="-1"
+          <div id="dLaMarzoccoPower">
+            <span id="dLaMarzoccoPowerValue">—</span> -
+            <a id="laMarzoccoRefreshLink" href="#" aria-disabled="true" tabindex="-1"
               >({{webui:diagnostic.refresh_state}})</a
             >
           </div>
           <small class="fieldHint"></small>
         </div>
-        <div class="metric micraOnly">
+        <div class="metric laMarzoccoOnly">
           <strong>{{webui:diagnostic.observed_mode}}</strong>
-          <div id="dMicraMode">—</div>
+          <div id="dLaMarzoccoMode">—</div>
         </div>
-        <div class="metric micraOnly">
+        <div class="metric laMarzoccoOnly">
           <strong>{{webui:diagnostic.communication}}</strong>
-          <div id="dMicraQuality">—</div>
-          <small id="dMicraAge" class="fieldHint"></small>
+          <div id="dLaMarzoccoQuality">—</div>
+          <small id="dLaMarzoccoAge" class="fieldHint"></small>
         </div>
         <div class="metric">
           <strong>{{webui:diagnostic.brew_boiler}}</strong>
-          <div id="dMicraBrewBoiler">—</div>
+          <div id="dLaMarzoccoBrewBoiler">—</div>
         </div>
         <div class="metric">
           <strong>{{webui:diagnostic.steam_boiler}}</strong>
-          <div id="dMicraSteamBoiler">—</div>
+          <div id="dLaMarzoccoSteamBoiler">—</div>
         </div>
         <div class="metric">
           <strong>{{webui:diagnostic.water}}</strong>
-          <div id="dMicraWater">—</div>
+          <div id="dLaMarzoccoWater">—</div>
         </div>
         <div class="metric">
           <strong>{{webui:diagnostic.machine_cleaning}}</strong>
-          <div id="dMicraCleaning">—</div>
-          <small id="dMicraCleaningHint" class="fieldHint"></small>
+          <div id="dLaMarzoccoCleaning">—</div>
+          <small id="dLaMarzoccoCleaningHint" class="fieldHint"></small>
         </div>
       </div>
     </details>
-    <details class="cfgGroup micraOnly" data-g="marzocco-cloud">
+    <details class="cfgGroup laMarzoccoOnly" data-g="marzocco-cloud">
       <summary>{{webui:diagnostic.marzocco_cloud}}</summary>
-      <div id="micraCloudDiagnostics" class="statusColumn"></div>
+      <div id="laMarzoccoCloudDiagnostics" class="statusColumn"></div>
     </details>
     <details class="cfgGroup" data-g="compile-flags">
       <summary>{{webui:diagnostic.compile_flags}}</summary>
@@ -834,15 +834,15 @@
           <strong>{{webui:diagnostic.companion_archive}}</strong>
           <div id="dCoArchive">—</div>
         </div>
-        <div class="metric micraOnly">
+        <div class="metric laMarzoccoOnly">
           <strong>{{webui:diagnostic.companion_route}}</strong>
           <div id="dCoRoute">—</div>
         </div>
-        <div class="metric micraOnly">
+        <div class="metric laMarzoccoOnly">
           <strong>{{webui:diagnostic.companion_lm}}</strong>
           <div id="dCoLm">—</div>
         </div>
-        <div class="metric micraOnly">
+        <div class="metric laMarzoccoOnly">
           <strong>{{webui:diagnostic.companion_counts}}</strong>
           <div id="dCoCounts">—</div>
         </div>
@@ -880,7 +880,7 @@
             {{webui:runtime.verdict_fast}}</button
           ><button class="btnGlyph" type="button" data-result="slow">
             {{webui:runtime.verdict_slow}}</button
-          ><button class="btnGlyph micraOnly" type="button" data-result="terms">
+          ><button class="btnGlyph laMarzoccoOnly" type="button" data-result="terms">
             {{webui:diagnostic.push_sample_terms}}
           </button>
         </div>

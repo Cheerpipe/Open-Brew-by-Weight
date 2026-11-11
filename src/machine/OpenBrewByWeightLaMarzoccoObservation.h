@@ -2,15 +2,15 @@
 
 #include <cstring>
 
-#include "OpenBrewByWeightMicraPowerState.h"
+#include "OpenBrewByWeightLaMarzoccoPowerState.h"
 
 struct cJSON;
 
 namespace openbrewbyweight {
 
-enum class MicraCleaningState : uint8_t { UNKNOWN, OFF, REQUESTED, CLEANING };
+enum class LaMarzoccoCleaningState : uint8_t { UNKNOWN, OFF, REQUESTED, CLEANING };
 
-struct MicraObservationStamp {
+struct LaMarzoccoObservationStamp {
   uint32_t identity = 0;
   uint32_t epoch = 0;
   uint32_t intent = 0;
@@ -20,18 +20,18 @@ struct MicraObservationStamp {
   uint32_t onlineRevision = 0;
 };
 
-struct MicraObservation {
-  MicraObservationStamp stamp;
+struct LaMarzoccoObservation {
+  LaMarzoccoObservationStamp stamp;
   uint32_t receivedAtMs = 0;
   uint32_t coffeeReadyAtUtcSec = 0;
   uint32_t steamReadyAtUtcSec = 0;
   uint16_t targetDeciC = 0;
-  MicraObservationSource source = MicraObservationSource::HTTP;
-  LineaMicraObservedMode mode = LineaMicraObservedMode::NONE;
-  LineaMicraBoilerState coffeeBoiler = LineaMicraBoilerState::UNKNOWN;
-  LineaMicraBoilerState steamBoiler = LineaMicraBoilerState::UNKNOWN;
-  LineaMicraSteamLevel steamLevel = LineaMicraSteamLevel::UNKNOWN;
-  MicraCleaningState cleaning = MicraCleaningState::UNKNOWN;
+  LaMarzoccoObservationSource source = LaMarzoccoObservationSource::HTTP;
+  LaMarzoccoObservedMode mode = LaMarzoccoObservedMode::NONE;
+  LaMarzoccoBoilerState coffeeBoiler = LaMarzoccoBoilerState::UNKNOWN;
+  LaMarzoccoBoilerState steamBoiler = LaMarzoccoBoilerState::UNKNOWN;
+  LaMarzoccoSteamLevel steamLevel = LaMarzoccoSteamLevel::UNKNOWN;
+  LaMarzoccoCleaningState cleaning = LaMarzoccoCleaningState::UNKNOWN;
   char cleaningLabel[33] = {};
   bool powerPresent = false;
   bool temperaturePresent = false;
@@ -48,21 +48,21 @@ struct MicraObservation {
 
 // A frame rejected for a value this firmware does not support, rather than
 // for its shape, names that value in *unsupported when it is given.
-bool decodeMicraDashboard(const cJSON *root, MicraObservation &update,
+bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update,
                           const char **unsupported = nullptr);
 
 // Hears each account coffee machine the listing leaves out: its La Marzocco
 // modelCode, or nullptr when the model matched and the serial cannot be kept.
-using MicraThingSkipped = void (*)(const char *model);
+using LaMarzoccoThingSkipped = void (*)(const char *model);
 // The account's coffee machines whose modelCode is the machine profile's, from
 // the cloud's things array; false when the payload is not that array.
-bool decodeMicraThings(const cJSON *root, const char *profileModel,
-                       LineaMicraDiscoverySnapshot &result,
-                       MicraThingSkipped skipped);
+bool decodeLaMarzoccoThings(const cJSON *root, const char *profileModel,
+                       LaMarzoccoDiscoverySnapshot &result,
+                       LaMarzoccoThingSkipped skipped);
 
 // Copies vendor text, truncating an over-long value at a UTF-8 character
 // boundary instead of rejecting it.
-inline void copyMicraText(char *destination, size_t capacity, const char *source) {
+inline void copyLaMarzoccoText(char *destination, size_t capacity, const char *source) {
   size_t length = std::strlen(source);
   if (length >= capacity) {
     length = capacity - 1;
@@ -74,7 +74,7 @@ inline void copyMicraText(char *destination, size_t capacity, const char *source
 
 // The facade owns this revision fence and the authoritative status; no copy
 // of machine power lives in an adapter. Call only under the facade mutex.
-struct MicraObservationFence {
+struct LaMarzoccoObservationFence {
   uint32_t epoch = 0;
   uint32_t powerRevision = 0;
   uint32_t temperatureRevision = 0;
@@ -93,16 +93,16 @@ struct MicraObservationFence {
     synchronized = temperatureTrusted = powerTrusted = false;
   }
 
-  MicraObservationStamp stamp(uint32_t identity, uint32_t intent) const {
+  LaMarzoccoObservationStamp stamp(uint32_t identity, uint32_t intent) const {
     return {identity, epoch, intent, powerRevision, temperatureRevision, connectionRevision, onlineRevision};
   }
 
-  bool merge(LineaMicraStatus &status, LineaMicraPowerStateTracker &power,
-             const MicraObservation &update, bool observing,
+  bool merge(LaMarzoccoStatus &status, LaMarzoccoPowerStateTracker &power,
+             const LaMarzoccoObservation &update, bool observing,
              bool reconcile = false) {
     if (update.stamp.identity != status.identityGeneration ||
         update.stamp.epoch != epoch) return false;
-    const bool push = update.source == MicraObservationSource::WEBSOCKET;
+    const bool push = update.source == LaMarzoccoObservationSource::WEBSOCKET;
     if (!push && (update.stamp.connectionRevision != connectionRevision ||
         (update.connectedPresent && !update.connected &&
          (update.stamp.powerRevision != powerRevision ||
@@ -116,25 +116,25 @@ struct MicraObservationFence {
     }
     if (offline) {
       power.hold(status, observing, update.receivedAtMs);
-      status.quality = LineaMicraObservationQuality::STALE;
+      status.quality = LaMarzoccoObservationQuality::STALE;
       return true;
     }
     if (update.powerPresent && observing &&
         (push || update.stamp.powerRevision == powerRevision) &&
         power.noteEvidence(update.stamp.intent,
-                           lineaMicraPowerStateForMode(update.mode),
+                           laMarzoccoPowerStateForMode(update.mode),
                            update.receivedAtMs, reconcile)) {
       status.observedMode = update.mode;
-      status.powerState = lineaMicraPowerStateForMode(update.mode);
-      status.effectiveOn = status.powerState != LineaMicraPowerState::OFF;
+      status.powerState = laMarzoccoPowerStateForMode(update.mode);
+      status.effectiveOn = status.powerState != LaMarzoccoPowerState::OFF;
       status.sampleAtMs = update.receivedAtMs;
       status.powerSource = update.source;
-      synchronized = powerTrusted = status.powerState != LineaMicraPowerState::UNKNOWN;
-      status.quality = update.mode == LineaMicraObservedMode::UNSUPPORTED
-                           ? LineaMicraObservationQuality::UNSUPPORTED
-                           : update.mode == LineaMicraObservedMode::NONE
-                           ? LineaMicraObservationQuality::STALE
-                           : LineaMicraObservationQuality::CURRENT;
+      synchronized = powerTrusted = status.powerState != LaMarzoccoPowerState::UNKNOWN;
+      status.quality = update.mode == LaMarzoccoObservedMode::UNSUPPORTED
+                           ? LaMarzoccoObservationQuality::UNSUPPORTED
+                           : update.mode == LaMarzoccoObservedMode::NONE
+                           ? LaMarzoccoObservationQuality::STALE
+                           : LaMarzoccoObservationQuality::CURRENT;
       ++powerRevision;
     }
     // Boiler-widget data rides the temperature revision: the coffee target
@@ -159,7 +159,7 @@ struct MicraObservationFence {
       // steam boiler: the temperature widget never replaces it.
       if (update.steamBoilerPresent &&
           !(update.steamByTemperature &&
-            status.steamLevel != LineaMicraSteamLevel::UNKNOWN)) {
+            status.steamLevel != LaMarzoccoSteamLevel::UNKNOWN)) {
         status.steamBoiler = update.steamBoiler;
         status.steamReadyAtUtcSec = update.steamReadyAtUtcSec;
         status.steamLevel = update.steamLevel;
@@ -170,10 +170,10 @@ struct MicraObservationFence {
   }
 };
 
-static_assert(std::is_trivially_copyable<MicraObservation>::value);
+static_assert(std::is_trivially_copyable<LaMarzoccoObservation>::value);
 // Boiler readiness fields (states, steam level, readyAt timestamps) widened
 // the observation beyond the historic 80-byte budget; 96 keeps it compact
 // for the per-frame decode path.
-static_assert(sizeof(MicraObservation) <= 96);
+static_assert(sizeof(LaMarzoccoObservation) <= 96);
 
 }  // namespace openbrewbyweight

@@ -289,7 +289,7 @@ cases also remain pending; the successful full transfer does not qualify them.
 | Micra cloud workspace | external and lazy; a 6,344-byte work buffer on ESP32-S3 holds identity, tokens, authorization header, and client state while cloud observation is active, plus one request-scoped 16 KiB buffer whose mutually exclusive request-body and response phases share storage (22,728 bytes combined, excluding HTTP/TLS library allocations); Disconnect, disabled observation, STA loss, and AP entry destroy the client and free both blocks; WebSocket mode also destroys the client between operations, while API polling reuses it for up to 180 s idle |
 | Micra WS/STOMP scratch | PSRAM-only reusable block, capped at 24 KiB; includes 17410 B accumulator, two 1025 B header scratch arrays, signed-header/CONNECT storage, and 60 × 12 B rate bins; retained across shot/acquisition pauses, freed after callback quiescence for API/disable/identity/network/maintenance changes |
 | Micra SDK transport buffers | HTTP RX/TX 4096 B each; WebSocket RX/TX 4096 B each plus a separate 4096 B upgrade buffer. Ordinary malloc prefers PSRAM above ALWAYSINTERNAL=2048, with possible internal fallback. The 6144 B internal WebSocket task stack remains on core 0 priority 1; event/transport objects and WSS TLS are separate; dynamic SDK buffers and auto-reconnect disabled |
-| Micra TLS allocations | external through the Micra profile's mbedTLS allocator (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` from `sdkconfig.defaults.micra`); dynamic record, certificate, handshake, and session objects use PSRAM without internal fallback. Generic webhooks accept HTTP only and do not create TLS handshakes |
+| Micra TLS allocations | external through the Micra profile's mbedTLS allocator (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC` from `sdkconfig.defaults.la_marzocco`); dynamic record, certificate, handshake, and session objects use PSRAM without internal fallback. Generic webhooks accept HTTP only and do not create TLS handshakes |
 | Profiler processing workspace | external, at most 4 KiB, only while running |
 | Profiler published report | external BSS, 2,512 bytes; written and copied under the profiler's internal mutex by tasks only |
 | OTA state singleton | external BSS, about 1.6 KiB (identity, tags, journal bookkeeping, tag scanner); its mutex and published flags are internal statics, and chunk buffers, SHA context and tag re-reads use internal memory |
@@ -593,10 +593,10 @@ python3 scripts/p2_soak.py --self-test
 
 ## WebSocket memory qualification
 
-Diagnostic `lineaMicra.websocket` reports retained application bytes/placement,
+Diagnostic `laMarzocco.websocket` reports retained application bytes/placement,
 allocation failures, internal free/largest-block deltas for connect and stop,
 and internal/PSRAM minima plus PSRAM free/largest values sampled at lifecycle
-boundaries. `heapLifecycle.micraTls` remains HTTP-only; `micraWebsocket` records
+boundaries. `heapLifecycle.laMarzoccoTls` remains HTTP-only; `laMarzoccoWebsocket` records
 WS connection history. Counts exclude TLS, SDK stack and allocator overhead.
 These are bounded samples, not continuously observed peaks or proof of placement.
 The internal stack and SDK buffers remain independent reservations even when TLS

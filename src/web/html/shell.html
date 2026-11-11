@@ -61,10 +61,10 @@
           <path d="M8 16.5h.01" />
         </g>
       </symbol>
-      <symbol id="dg-marzocco-cloud" class="micraOnly" viewBox="0 0 24 24">
+      <symbol id="dg-marzocco-cloud" class="laMarzoccoOnly" viewBox="0 0 24 24">
         <path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9Z" />
       </symbol>
-      <symbol id="dg-marzocco-clouds" class="micraOnly" viewBox="0 0 24 24">
+      <symbol id="dg-marzocco-clouds" class="laMarzoccoOnly" viewBox="0 0 24 24">
         <mask id="cloudFrontGap" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
           <rect width="24" height="24" fill="#fff" />
           <path
@@ -176,11 +176,11 @@
         </button>
         <button
           type="button"
-          class="signalIndicator micraOnly"
-          id="micraSignal"
+          class="signalIndicator laMarzoccoOnly"
+          id="laMarzoccoSignal"
           aria-label="{{webui:diagnostic.marzocco_cloud}}"
           aria-expanded="false"
-          aria-controls="micraDetails"
+          aria-controls="laMarzoccoDetails"
           hidden
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -328,19 +328,19 @@
           </p>
         </section>
         <section
-          id="micraDetails"
-          class="signalDetails micraOnly"
-          aria-labelledby="micraDetailsTitle"
+          id="laMarzoccoDetails"
+          class="signalDetails laMarzoccoOnly"
+          aria-labelledby="laMarzoccoDetailsTitle"
           hidden
         >
-          <strong id="micraDetailsTitle">{{webui:diagnostic.marzocco_cloud}}</strong>
-          <p><span>{{webui:settings.account}}</span><b id="micraName">—</b></p>
-          <p><span>{{webui:settings.micra_machine}}</span><b id="micraMachine">—</b></p>
+          <strong id="laMarzoccoDetailsTitle">{{webui:diagnostic.marzocco_cloud}}</strong>
+          <p><span>{{webui:settings.account}}</span><b id="laMarzoccoName">—</b></p>
+          <p><span>{{webui:settings.la_marzocco_machine}}</span><b id="laMarzoccoSelected">—</b></p>
           <p>
             <span>{{webui:admin.companion_link}}</span
-            ><b id="micraDetail">{{webui:runtime.signal_unavailable}}</b>
+            ><b id="laMarzoccoDetail">{{webui:runtime.signal_unavailable}}</b>
           </p>
-          <p><span>{{webui:shell.micra_route}}</span><b id="micraRoute">—</b></p>
+          <p><span>{{webui:shell.la_marzocco_route}}</span><b id="laMarzoccoRoute">—</b></p>
         </section>
       </div>
       <nav class="pageNav">

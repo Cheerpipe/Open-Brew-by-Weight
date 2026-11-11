@@ -45,7 +45,7 @@ subscribed nor part of control. Stack values are configured bytes in ESP-IDF.
 | httpd | framework event | n/a | n/a | idle+1 | 2500 ms response workspace; 30000 ms OTA receive only when the worker cannot start | 11264 | 0 | no |
 | ota_worker | transient, while OTA requests are queued | n/a | n/a | idle+1 | 30000 ms OTA receive budget | 11264 | 0 | no |
 | webhook | event-driven | n/a | n/a | idle | 1800 ms HTTP | 4608 | 0 | no |
-| micra_cloud | event-driven | n/a | n/a | idle | 10000 ms per HTTPS request | 8192 | 0 | no |
+| lm_cloud | event-driven | n/a | n/a | idle | 10000 ms per HTTPS request | 8192 | 0 | no |
 | websocket_task | SDK transport events | n/a | n/a | 1 | 10000 ms network timeout | 6144 | 0 | no |
 | serial_log | event-driven | n/a | n/a | idle | unbounded USB sink | 3072 | 0 | no |
 

@@ -1,4 +1,4 @@
-#include "machine/OpenBrewByWeightMicraStomp.h"
+#include "machine/OpenBrewByWeightLaMarzoccoStomp.h"
 #include <cassert>
 #include <algorithm>
 #include <string>
@@ -8,7 +8,7 @@ using namespace openbrewbyweight;
 struct Received {
   std::vector<std::string> bodies;
   std::vector<uint32_t> attempts;
-  static bool accept(void *context, const MicraStompFrame &frame) {
+  static bool accept(void *context, const LaMarzoccoStompFrame &frame) {
     auto &received = *static_cast<Received *>(context);
     assert(std::string(frame.command) == "MESSAGE");
     assert(std::string(frame.destination) == "/ws/sn/test/dashboard");
@@ -30,14 +30,14 @@ int main() {
   for (bool length : {false, true}) for (bool crlf : {false, true}) {
     const auto bytes = frame("{\"widgets\":[]}", length, crlf);
     for (size_t split = 0; split <= bytes.size(); ++split) {
-      MicraStompDecoder decoder;
+      LaMarzoccoStompDecoder decoder;
       Received received;
       assert(decoder.feed(bytes.data(), split, 1, Received::accept, &received));
       assert(decoder.feed(bytes.data() + split, bytes.size() - split, 2, Received::accept, &received));
       assert(received.bodies.size() == 1 && received.bodies[0] == "{\"widgets\":[]}");
       assert(!decoder.pendingSince());
     }
-    MicraStompDecoder decoder;
+    LaMarzoccoStompDecoder decoder;
     Received received;
     for (char byte : bytes) assert(decoder.feed(&byte, 1, 1, Received::accept, &received));
     assert(received.bodies.size() == 1);
@@ -45,7 +45,7 @@ int main() {
     assert(decoder.feed(batch.data(), batch.size(), 2, Received::accept, &received));
     assert(received.bodies.size() == 3);
   }
-  MicraStompDecoder decoder;
+  LaMarzoccoStompDecoder decoder;
   Received received;
   const auto oldFrame = frame("{}", true, false);
   assert(decoder.feed(oldFrame.data(), 5, 0, Received::accept, &received, 10));

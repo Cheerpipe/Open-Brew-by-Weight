@@ -963,7 +963,7 @@
                 "emptyPanQualified",
                 "idleTareEligible",
                 "scaleSupportsTare",
-                "lineaMicraConnected"
+                "laMarzoccoConnected"
               ],
               "properties": {
                 "autoTare": {
@@ -1005,7 +1005,7 @@
                 "scaleSupportsTare": {
                   "type": "boolean"
                 },
-                "lineaMicraConnected": {
+                "laMarzoccoConnected": {
                   "type": "boolean"
                 }
               }
@@ -1033,7 +1033,7 @@
             "undecodableFrames",
             "confirmationResets",
             "loopGapMaxMs",
-            "micraRxBytes",
+            "laMarzoccoRxBytes",
             "uiStreamDeferrals",
             "verboseDropped",
             "decisionsDropped"
@@ -1158,7 +1158,7 @@
               ],
               "minimum": 0
             },
-            "micraRxBytes": {
+            "laMarzoccoRxBytes": {
               "type": [
                 "integer",
                 "null"

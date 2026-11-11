@@ -56,10 +56,10 @@
     assert(new RegExp(`id="${id}"[^>]*data-dirty="0"[^>]*disabled`).test(normalizedUi),
         `${id} must start visibly disabled next to its save button`);
   // Settings saves every edit by itself: no Save/Revert button or unsaved hint.
-  assert(!/id="(saveConfigButton|saveBrewPresetButton|lineaMicraSaveButton|revert(Config|BrewPreset|LineaMicra)Button|(config|brew|lineaMicra)DirtyHint)"/
+  assert(!/id="(saveConfigButton|saveBrewPresetButton|laMarzoccoSaveButton|revert(Config|BrewPreset|LaMarzocco)Button|(config|brew|laMarzocco)DirtyHint)"/
       .test(partialHtml.settings), 'Settings must not offer Save/Revert buttons or unsaved hints');
   assert(codeIncludes(viewJs.settings,
-      "if(['presetRenameInput','dripSetG','alphaSet'].includes(el.id)||el.closest('#lineaMicraSignIn,#lineaMicraChoose,[data-g=app]'))return"),
+      "if(['presetRenameInput','dripSetG','alphaSet'].includes(el.id)||el.closest('#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app]'))return"),
       'The preset rename dialog, the drip set fields, Micra sign-in inputs and the browser-local app group must not dirty a settings section');
   assert(codeIncludes(js, 'e.dataset.dirty!=null') &&
          codeIncludes(js, "setSaveDirty('saveDateTimeButton','dateTimeDirtyHint',false)") &&
@@ -175,7 +175,7 @@
         ? {options: [], appendChild(o) {this.options.push(o);}, get innerHTML() {return markup(this.options);}}
         : {dataset: {}},
         querySelectorAll: () => [sel]},
-      controlsMutable: true, __LINEA_MICRA__: false,
+      controlsMutable: true, __LA_MARZOCCO__: false,
       settingsSectionOf: () => 'config', updateScalePreferenceOptions() {},
       updateScaleRenameUi: (_, mac) => {context.renameMac = mac;},
       validateMachineClient: () => null, validateBullseyeClient: () => null,
@@ -412,10 +412,10 @@
 // Enter in a credential or Save card clicks its primary button: each one is
 // the submit button of an .enterForm that app.js keeps from submitting.
 {
-  for (const [view, id] of [['settings', 'lineaMicraConnectButton'], ['admin', 'loginConfirmButton'],
+  for (const [view, id] of [['settings', 'laMarzoccoConnectButton'], ['admin', 'loginConfirmButton'],
     ['admin', 'changeDevicePasswordButton'], ['admin', 'saveNetworkButton'], ['admin', 'saveDateTimeButton'],
     ['admin', 'saveWebhookButton'], ['admin', 'saveScheduledRestartButton'],
-    ['settings', 'lineaMicraSelectButton'], ['settings', 'dripSetButton'], ['settings', 'alphaSetButton']]) {
+    ['settings', 'laMarzoccoSelectButton'], ['settings', 'dripSetButton'], ['settings', 'alphaSetButton']]) {
     const html = partialHtml[view], at = html.indexOf(`<button id="${id}"`),
       form = html.lastIndexOf('<form', at), tag = html.slice(at, html.indexOf('>', at));
     if (at < 0 || !/type="submit"/.test(tag) || html.lastIndexOf('</form>', at) > form ||

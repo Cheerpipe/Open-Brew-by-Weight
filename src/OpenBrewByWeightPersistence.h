@@ -47,7 +47,7 @@ inline bool validPersistedSettings(const PersistedSettings &settings) {
                               settings.runtime.autoRetare) ||
       !validDevicePassword(settings.devicePassword) ||
       !validDeviceName(settings.deviceName) ||
-      !validLineaMicraSettings(settings.lineaMicra) ||
+      !validLaMarzoccoSettings(settings.laMarzocco) ||
       !validPreferredScaleMac(settings.preferredScaleMac) ||
       !validPreferredScaleName(settings.preferredScaleName) ||
       !validScaleHistoryEntries(settings.scaleHistory) ||
@@ -101,7 +101,7 @@ inline bool repairPersistedSettings(PersistedSettings &s) {
   }
   if (!validateShotPresetBank(s.presets, r.retareWindowMs, r.autoRetare)) reset(s.presets);
   if (!validBullseyeMelodyConfig(s.bullseyeMelody)) reset(s.bullseyeMelody);
-  if (!validLineaMicraSettings(s.lineaMicra)) reset(s.lineaMicra);
+  if (!validLaMarzoccoSettings(s.laMarzocco)) reset(s.laMarzocco);
   if (!validWebhookConfig(s.webhook)) reset(s.webhook);
   if (!validPreferredScaleMac(s.preferredScaleMac) ||
       !validPreferredScaleName(s.preferredScaleName) ||

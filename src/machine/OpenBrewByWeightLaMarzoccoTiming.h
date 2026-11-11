@@ -15,19 +15,19 @@ namespace openbrewbyweight {
 // every host-test harness that compiles only fragments links the same
 // instance; this header is Micra-specific, keeping the concrete feature out
 // of the common machine lifecycle.
-inline MutexWaitStat &micraBackflushWaitStat() {
+inline MutexWaitStat &laMarzoccoBackflushWaitStat() {
   static MutexWaitStat stat;
   return stat;
 }
 // Ownership time of the same mutex by the control task inside the poll.
-inline MutexWaitStat &micraBackflushHoldStat() {
+inline MutexWaitStat &laMarzoccoBackflushHoldStat() {
   static MutexWaitStat stat;
   return stat;
 }
 
 }  // namespace openbrewbyweight
 
-namespace openbrewbyweight::micra_timing {
+namespace openbrewbyweight::la_marzocco_timing {
 
 inline constexpr std::array<uint32_t, 3> kRetryDelaysMs{{3000, 6000, 9000}};
 inline constexpr size_t kMaxAttempts = 1U + kRetryDelaysMs.size();
@@ -120,4 +120,4 @@ static_assert(kPostWakeObservationDelayMs < kOptimisticOverlayMs);
 static_assert(kStaleRetentionMs > kOptimisticOverlayMs);
 static_assert(kAccessTokenRefreshAgeMs < kAccessTokenLifetimeMs);
 
-}  // namespace openbrewbyweight::micra_timing
+}  // namespace openbrewbyweight::la_marzocco_timing

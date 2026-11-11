@@ -72,19 +72,19 @@ set_tests_properties(ble_runtime_host_test PROPERTIES LABELS "host;ble;concurren
 
 # Exercise actual Micra method bodies with deterministic task/HTTP shims.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-set(micra_source "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightMicraService.cpp")
-set(micra_extract "${CMAKE_CURRENT_SOURCE_DIR}/extract_micra_cancellation.py")
+set(la_marzocco_source "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightLaMarzoccoService.cpp")
+set(la_marzocco_extract "${CMAKE_CURRENT_SOURCE_DIR}/extract_la_marzocco_cancellation.py")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-  "${micra_source}" "${micra_extract}"
-  "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightMicraWebSocket.inc")
-execute_process(COMMAND "${Python3_EXECUTABLE}" "${micra_extract}"
-  "${micra_source}" "${CMAKE_CURRENT_BINARY_DIR}"
+  "${la_marzocco_source}" "${la_marzocco_extract}"
+  "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightLaMarzoccoWebSocket.inc")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${la_marzocco_extract}"
+  "${la_marzocco_source}" "${CMAKE_CURRENT_BINARY_DIR}"
   COMMAND_ERROR_IS_FATAL ANY)
-host_test(micra_cancellation_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
+host_test(la_marzocco_cancellation_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
   LABEL "host;network;control;concurrency")
-target_include_directories(micra_cancellation_host_test PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/micra_stubs" "${CMAKE_CURRENT_BINARY_DIR}")
-host_test(micra_stomp_host_test LABEL "host;network;concurrency")
+target_include_directories(la_marzocco_cancellation_host_test PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/la_marzocco_stubs" "${CMAKE_CURRENT_BINARY_DIR}")
+host_test(la_marzocco_stomp_host_test LABEL "host;network;concurrency")
 host_test(boot_heap_host_test LABEL "host;resources;network;concurrency")
 host_test(ui_stream_transport_host_test LABEL "host;network")
 
@@ -132,7 +132,7 @@ host_test(audit_store_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_AUDIT_HOST_TEST
   host_test(machine_integration_host_test
     SOURCES "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightMachineIntegration.cpp"
     LABEL "host;control")
-  host_test(linea_micra_contract_host_test LABEL "host;network;control")
+  host_test(la_marzocco_contract_host_test LABEL "host;network;control")
   host_test(reset_guard_instance_host_test
     SOURCES reset_guard_instance_a.cpp reset_guard_instance_b.cpp
     LABEL "host;safety")
@@ -223,17 +223,17 @@ if(TARGET persistence_host_test)
     "ERROR_REASON_CATALOG_PATH=\"${CMAKE_SOURCE_DIR}/src/web/locales/en.json\"")
 endif()
 host_test(json_arena_host_test LABEL "host;concurrency")
-host_test(micra_observation_host_test
-  SOURCES "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightMicraObservation.cpp"
+host_test(la_marzocco_observation_host_test
+  SOURCES "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightLaMarzoccoObservation.cpp"
   LABEL "host;network;control;concurrency")
-target_include_directories(micra_observation_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
-target_link_libraries(micra_observation_host_test PRIVATE "${CJSON_LIBRARY}")
-host_test(micra_websocket_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
-  SOURCES "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightMicraObservation.cpp"
+target_include_directories(la_marzocco_observation_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
+target_link_libraries(la_marzocco_observation_host_test PRIVATE "${CJSON_LIBRARY}")
+host_test(la_marzocco_websocket_host_test DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
+  SOURCES "${CMAKE_SOURCE_DIR}/src/machine/OpenBrewByWeightLaMarzoccoObservation.cpp"
   LABEL "host;network;control;concurrency")
-target_include_directories(micra_websocket_host_test PRIVATE "${CJSON_INCLUDE_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/micra_stubs" "${CMAKE_CURRENT_BINARY_DIR}")
-target_link_libraries(micra_websocket_host_test PRIVATE "${CJSON_LIBRARY}")
+target_include_directories(la_marzocco_websocket_host_test PRIVATE "${CJSON_INCLUDE_DIR}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/la_marzocco_stubs" "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(la_marzocco_websocket_host_test PRIVATE "${CJSON_LIBRARY}")
 target_include_directories(json_arena_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
 target_link_libraries(json_arena_host_test PRIVATE "${CJSON_LIBRARY}")
 host_test(integration_request_host_test LABEL "host;network;safety")

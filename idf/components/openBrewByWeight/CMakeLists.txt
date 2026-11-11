@@ -23,9 +23,9 @@ set(OPEN_BREW_BY_WEIGHT_REQUIRES
   OpenBrewByWeightBleRuntime)
 if(OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION STREQUAL "la_marzocco_cloud")
   list(APPEND OPEN_BREW_BY_WEIGHT_SRCS
-    "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightLineaMicraIntegration.cpp"
-    "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightMicraService.cpp"
-    "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightMicraObservation.cpp")
+    "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightLaMarzoccoIntegration.cpp"
+    "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightLaMarzoccoService.cpp"
+    "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightLaMarzoccoObservation.cpp")
 else()
   list(APPEND OPEN_BREW_BY_WEIGHT_SRCS
     "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightMachineIntegration.cpp")

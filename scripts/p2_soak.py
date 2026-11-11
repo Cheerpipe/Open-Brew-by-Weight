@@ -21,7 +21,7 @@ COUNTERS = (
     "loopDeadlineMisses",
     "scaleWorkerDeadlineMisses",
 )
-LIFECYCLE_FAMILIES = ("http", "wifi", "ota", "webhookTls", "micraTls")
+LIFECYCLE_FAMILIES = ("http", "wifi", "ota", "webhookTls", "laMarzoccoTls")
 
 
 def number(source: dict[str, Any], key: str) -> float | None:

@@ -838,9 +838,9 @@ if (!statusSection || !statusSection[1].includes('class="lamp"') ||
     statusSection[1].includes('data-label="Machine"') ||
     !statusSection[1].includes('id="machineState"') ||
     !statusSection[1].includes('id="state"') ||
-    !statusSection[1].includes('id="homeMicraPower"') ||
-    !statusSection[1].includes('id="homeMicraBrewBoiler"') ||
-    !statusSection[1].includes('id="homeMicraSteamBoiler"') ||
+    !statusSection[1].includes('id="homeLaMarzoccoPower"') ||
+    !statusSection[1].includes('id="homeLaMarzoccoBrewBoiler"') ||
+    !statusSection[1].includes('id="homeLaMarzoccoSteamBoiler"') ||
     statusSection[1].includes('id="cupState"') ||
     statusSection[1].includes('id="paddle"') ||
     statusSection[1].includes('id="relay"') ||
@@ -1690,7 +1690,7 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
     ';return renderReadyMsg;')(() => msg, R, () => '', () => 0);
   const warming = {accountConfigured: true, observeState: true, readiness: 'warming_up', boiler: {coffee: {}}};
   const show = (batteryPct, {state = 'IDLE', stream = 'FRESH', lm} = {}) => {
-    render({state, config: {brewByWeight: true}, machineIntegration: lm ? 'linea_micra_cloud' : 'none',
+    render({state, config: {brewByWeight: true}, machineIntegration: lm ? 'la_marzocco_cloud' : 'none',
       scale: {available: true, streamState: stream, batteryPct}, noScaleShotGuard: {}}, lm);
     return msg.hidden ? '' : (classes.has('isErr') ? 'red: ' : '') + msg.textContent;
   };

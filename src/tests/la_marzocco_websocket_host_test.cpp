@@ -7,10 +7,10 @@
 #include <cstdio>
 #include <string>
 #include <thread>
-#include "machine/OpenBrewByWeightMicraPublicIdentityCache.h"
-#include "machine/OpenBrewByWeightMicraService.h"
-#include "machine/OpenBrewByWeightMicraStomp.h"
-#include "micra_power_test_helpers.h"
+#include "machine/OpenBrewByWeightLaMarzoccoPublicIdentityCache.h"
+#include "machine/OpenBrewByWeightLaMarzoccoService.h"
+#include "machine/OpenBrewByWeightLaMarzoccoStomp.h"
+#include "la_marzocco_power_test_helpers.h"
 #include "OpenBrewByWeightOutboundAdmission.h"
 #include "OpenBrewByWeightJsonArena.h"
 #include "OpenBrewByWeightDomain.h"
@@ -71,11 +71,11 @@ void addDebugEventDetail(openbrewbyweight::DebugCategory category,
 // Shot trace hooks: received bytes counted outside the facade mutex.
 static uint64_t traceRxBytes = 0;
 static bool traceSubscribed = false;
-void shotTraceNoteMicraRx(uint32_t bytes) {
+void shotTraceNoteLaMarzoccoRx(uint32_t bytes) {
   assert(!locked);
   traceRxBytes += bytes;
 }
-void shotTraceNoteMicraSubscribed(bool subscribed) { traceSubscribed = subscribed; }
+void shotTraceNoteLaMarzoccoSubscribed(bool subscribed) { traceSubscribed = subscribed; }
 static int sendLimit = -1;
 static bool initFails = false, startFails = false;
 static bool sessionFails = false, inhibitAfterSession = false, inhibitAfterInit = false;
@@ -137,20 +137,20 @@ int esp_websocket_client_send_text(void *, const char *bytes, int count, int) {
   transmitted.assign(bytes, count);
   return sendLimit < 0 ? count : std::min(sendLimit, count);
 }
-#include "micra_websocket_work.inc"
+#include "la_marzocco_websocket_work.inc"
 namespace openbrewbyweight {
 void secureWipe(void *bytes, size_t count) { std::memset(bytes, 0, count); }
-bool OpenBrewByWeightMicraService::networkEligible(LineaMicraError &error, bool) const {
-  error = LineaMicraError::NONE;
+bool OpenBrewByWeightLaMarzoccoService::networkEligible(LaMarzoccoError &error, bool) const {
+  error = LaMarzoccoError::NONE;
   return true;
 }
-LineaMicraError OpenBrewByWeightMicraService::classifyFailure() const { return LineaMicraError::TRANSPORT; }
-bool OpenBrewByWeightMicraService::ensureWorkBuffer() {
+LaMarzoccoError OpenBrewByWeightLaMarzoccoService::classifyFailure() const { return LaMarzoccoError::TRANSPORT; }
+bool OpenBrewByWeightLaMarzoccoService::ensureWorkBuffer() {
   if (!work_) work_ = new WorkBuffer;
   return true;
 }
 static unsigned sessionCalls = 0;
-bool OpenBrewByWeightMicraService::ensureSession(const LineaMicraPersistedSettings &, bool, bool *) {
+bool OpenBrewByWeightLaMarzoccoService::ensureSession(const LaMarzoccoPersistedSettings &, bool, bool *) {
   ++sessionCalls;
   now += sessionDelayMs;
   if (inhibitAfterSession) outboundBleQuiet.store(true);
@@ -158,17 +158,17 @@ bool OpenBrewByWeightMicraService::ensureSession(const LineaMicraPersistedSettin
   work_->accessTokenIssuedAtMs = now;
   return !sessionFails;
 }
-void OpenBrewByWeightMicraService::clearSession() { work_->accessToken[0] = '\0'; }
-void OpenBrewByWeightMicraService::releaseWorkBuffer() {
+void OpenBrewByWeightLaMarzoccoService::clearSession() { work_->accessToken[0] = '\0'; }
+void OpenBrewByWeightLaMarzoccoService::releaseWorkBuffer() {
   delete work_;
   work_ = nullptr;
 }
-bool OpenBrewByWeightMicraService::applySignedHeaders(const LineaMicraPersistedSettings &, char *headers, size_t) {
+bool OpenBrewByWeightLaMarzoccoService::applySignedHeaders(const LaMarzoccoPersistedSettings &, char *headers, size_t) {
   std::strcpy(headers, "synthetic-signed-upgrade\r\n");
   return true;
 }
-#include "machine/OpenBrewByWeightMicraWebSocket.inc"
-#include "micra_websocket_status.inc"
+#include "machine/OpenBrewByWeightLaMarzoccoWebSocket.inc"
+#include "la_marzocco_websocket_status.inc"
 static unsigned temperatureWrites = 0, powerWrites = 0, dashboardReads = 0;
 static std::function<void()> notifyHook;
 constexpr int pdTRUE = 1;
@@ -180,8 +180,8 @@ unsigned ulTaskNotifyTake(int, int ticks) {
 static uint16_t cloudTargetDeciC = 0;
 static bool cloudIgnoresTemperature = false;
 static bool cloudRefusesCommands = false;
-static LineaMicraPowerState cloudPower = LineaMicraPowerState::UNKNOWN;
-bool OpenBrewByWeightMicraService::writeTemperature(const LineaMicraPersistedSettings &,
+static LaMarzoccoPowerState cloudPower = LaMarzoccoPowerState::UNKNOWN;
+bool OpenBrewByWeightLaMarzoccoService::writeTemperature(const LaMarzoccoPersistedSettings &,
                                                     uint16_t targetDeciC) {
   ++temperatureWrites;
   if (cloudRefusesCommands) {
@@ -191,33 +191,33 @@ bool OpenBrewByWeightMicraService::writeTemperature(const LineaMicraPersistedSet
   if (!cloudIgnoresTemperature) cloudTargetDeciC = targetDeciC;
   return true;
 }
-bool OpenBrewByWeightMicraService::writeStandby(const LineaMicraPersistedSettings &) {
+bool OpenBrewByWeightLaMarzoccoService::writeStandby(const LaMarzoccoPersistedSettings &) {
   ++powerWrites;
-  cloudPower = LineaMicraPowerState::OFF;
+  cloudPower = LaMarzoccoPowerState::OFF;
   return true;
 }
-bool OpenBrewByWeightMicraService::writePowerOn(const LineaMicraPersistedSettings &) {
+bool OpenBrewByWeightLaMarzoccoService::writePowerOn(const LaMarzoccoPersistedSettings &) {
   ++powerWrites;
-  cloudPower = LineaMicraPowerState::ON;
+  cloudPower = LaMarzoccoPowerState::ON;
   return true;
 }
-bool OpenBrewByWeightMicraService::readDashboard(const LineaMicraPersistedSettings &,
-    LineaMicraStatus &result, const MicraObservationStamp *) {
+bool OpenBrewByWeightLaMarzoccoService::readDashboard(const LaMarzoccoPersistedSettings &,
+    LaMarzoccoStatus &result, const LaMarzoccoObservationStamp *) {
   ++dashboardReads;
   result.targetValid = true;
   result.targetDeciC = cloudTargetDeciC;
   result.powerState = cloudPower;
   return true;
 }
-void OpenBrewByWeightMicraService::waitRetry(uint32_t) {}
-#include "micra_websocket_commands.inc"
+void OpenBrewByWeightLaMarzoccoService::waitRetry(uint32_t) {}
+#include "la_marzocco_websocket_commands.inc"
 constexpr int ESP_FAIL = -1;
-#include "machine/OpenBrewByWeightMicraCompanionRoute.inc"
-struct MicraWebSocketTest {
+#include "machine/OpenBrewByWeightLaMarzoccoCompanionRoute.inc"
+struct LaMarzoccoWebSocketTest {
   static void setupAdmissionAndBackoff() {
     for (unsigned gate = 0; gate < 4; ++gate) {
       now = 1000;
-      OpenBrewByWeightMicraService service;
+      OpenBrewByWeightLaMarzoccoService service;
       service.config_.accountConfigured = true;
       std::strcpy(service.config_.selectedSerial, "synthetic");
       service.staConnected_.store(true);
@@ -226,8 +226,8 @@ struct MicraWebSocketTest {
       inhibited.store(true);
       service.serviceWebSocket();
       assert(!service.websocket_ && !service.work_);
-      assert(service.websocketStatus().state == MicraSocketState::PAUSED);
-      assert(service.websocketStatus(false).state == MicraSocketState::PAUSED);
+      assert(service.websocketStatus().state == LaMarzoccoSocketState::PAUSED);
+      assert(service.websocketStatus(false).state == LaMarzoccoSocketState::PAUSED);
       inhibited.store(false);
       service.serviceWebSocket();
       subscribe(service);
@@ -248,7 +248,7 @@ struct MicraWebSocketTest {
       delete service.work_;
     }
     for (unsigned phase = 0; phase < 2; ++phase) {
-      OpenBrewByWeightMicraService service;
+      OpenBrewByWeightLaMarzoccoService service;
       service.config_.accountConfigured = true;
       service.staConnected_.store(true);
       inhibitAfterSession = phase == 0;
@@ -264,7 +264,7 @@ struct MicraWebSocketTest {
     }
     for (unsigned phase = 0; phase < 3; ++phase) {
       now = UINT32_MAX - 2000ULL;  // Cleanup and the retry ladder cross millis rollover.
-      OpenBrewByWeightMicraService service;
+      OpenBrewByWeightLaMarzoccoService service;
       service.config_.accountConfigured = true;
       service.staConnected_.store(true);
       if (phase == 0) {
@@ -311,13 +311,13 @@ struct MicraWebSocketTest {
   }
   static void pongPublicationRace() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
     service.serviceWebSocket();
     subscribe(service);
-    static OpenBrewByWeightMicraService *subject;
+    static OpenBrewByWeightLaMarzoccoService *subject;
     static unsigned acquisitions;
     subject = &service;
     acquisitions = 0;
@@ -337,7 +337,7 @@ struct MicraWebSocketTest {
   }
   static void renewalKeepsSubscription() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -348,7 +348,7 @@ struct MicraWebSocketTest {
     const auto errorsBefore = service.websocketStatus().errors;
     const auto sent = transmitted;
     // A due token renews over HTTP while the same socket stays subscribed.
-    now += micra_timing::kAccessTokenRefreshAgeMs;
+    now += la_marzocco_timing::kAccessTokenRefreshAgeMs;
     deliver(service, "", true, 0xA);
     service.serviceWebSocket();
     assert(stops == stopsBefore && initCalls == initsBefore && transmitted == sent);
@@ -366,7 +366,7 @@ struct MicraWebSocketTest {
   }
   static void slowHandshakeIsNotAReconnect() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -382,7 +382,7 @@ struct MicraWebSocketTest {
   }
   static void connectionClassification() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -399,15 +399,15 @@ struct MicraWebSocketTest {
         case 1: publishOutboundAcquisition(true, ++now); break;
         case 2: outboundBleQuiet.store(true); break;
         case 3: outboundMaintenance.store(true); break;
-        case 4: now += micra_timing::kAccessTokenRefreshAgeMs; deliver(service, "", true, 0xA); break;
+        case 4: now += la_marzocco_timing::kAccessTokenRefreshAgeMs; deliver(service, "", true, 0xA); break;
         case 5:
           deliver(service, "MESS", false);
           now += 10000;
           ++service.observationFence_.epoch;
           break;
         case 6: service.apActive_.store(true); break;
-        case 7: service.config_.options &= ~LINEA_MICRA_OBSERVE_STATE; break;
-        case 8: service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API); break;
+        case 7: service.config_.options &= ~LA_MARZOCCO_OBSERVE_STATE; break;
+        case 8: service.config_.connectionType = static_cast<uint8_t>(LaMarzoccoConnectionType::API); break;
         case 9: service.clearSessionRequested_.store(true); break;
       }
       service.serviceWebSocket();
@@ -419,8 +419,8 @@ struct MicraWebSocketTest {
       outboundBleQuiet.store(false);
       outboundMaintenance.store(false);
       service.apActive_.store(false);
-      service.config_.options |= LINEA_MICRA_OBSERVE_STATE;
-      service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
+      service.config_.options |= LA_MARZOCCO_OBSERVE_STATE;
+      service.config_.connectionType = static_cast<uint8_t>(LaMarzoccoConnectionType::WEBSOCKET);
       service.clearSessionRequested_.store(false);
       service.serviceWebSocket();
       if (!kept) { subscribe(service); ++planned; }
@@ -482,7 +482,7 @@ struct MicraWebSocketTest {
   static void lifecycleRegressions() {
     TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locked = acquired; };
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -498,7 +498,7 @@ struct MicraWebSocketTest {
     service.serviceWebSocket();
     // The first retry is immediate: the loss is processed and the socket
     // reconnects within the same worker pass.
-    assert(service.websocket_->client && service.websocketStatus().state == MicraSocketState::CONNECTING);
+    assert(service.websocket_->client && service.websocketStatus().state == LaMarzoccoSocketState::CONNECTING);
     subscribe(service);
     deliver(service, observation(service, off));
     assert(service.powerState_.notePhysicalStart(service.published_, true, true, now));
@@ -520,7 +520,7 @@ struct MicraWebSocketTest {
         event.error_handle.esp_transport_sock_errno = 110;
         event.data_ptr = "synthetic-token-and-signed-header";
         service.websocketEvent(&service, nullptr, WEBSOCKET_EVENT_DISCONNECTED, &event);
-        assert(disconnectLog == "Micra WS disconnected http=401 tls=32774 stack=-29312 verify=8 errno=110");
+        assert(disconnectLog == "La Marzocco WS disconnected http=401 tls=32774 stack=-29312 verify=8 errno=110");
       }
       callback = false;
       service.serviceWebSocket();
@@ -533,19 +533,19 @@ struct MicraWebSocketTest {
         service.serviceWebSocket();
       }
     }
-    assert(service.websocketStatus().state == MicraSocketState::AUTH_ERROR);
+    assert(service.websocketStatus().state == LaMarzoccoSocketState::AUTH_ERROR);
     publishOutboundAcquisition(true, now);
     service.serviceWebSocket();
     publishOutboundAcquisition(false, now);
     now += 60000;
     service.serviceWebSocket();
-    assert(service.websocketStatus().state == MicraSocketState::AUTH_ERROR && !service.websocket_->client);
+    assert(service.websocketStatus().state == LaMarzoccoSocketState::AUTH_ERROR && !service.websocket_->client);
     outboundMaintenance.store(true);
     service.serviceWebSocket();
     assert(!service.websocket_);
     outboundMaintenance.store(false);
     service.serviceWebSocket();
-    assert(service.websocketStatus().state == MicraSocketState::AUTH_ERROR && !service.websocket_);
+    assert(service.websocketStatus().state == LaMarzoccoSocketState::AUTH_ERROR && !service.websocket_);
     service.websocketRetryRequested_.store(true);
     service.serviceWebSocket();
     assert(service.websocket_ && service.websocket_->client);
@@ -554,7 +554,7 @@ struct MicraWebSocketTest {
     service.work_ = nullptr;
     TaskMutex::hostObserver = nullptr;
   }
-  static void deliver(OpenBrewByWeightMicraService &service, const std::string &bytes,
+  static void deliver(OpenBrewByWeightLaMarzoccoService &service, const std::string &bytes,
                       bool fin = true, int opcode = 1) {
     esp_websocket_event_data_t message;
     message.client = service.websocket_->client;
@@ -568,11 +568,11 @@ struct MicraWebSocketTest {
     assert(traceRxBytes == traced + (opcode <= 2 ? bytes.size() : 0));
     callback = false;
   }
-  static std::string observation(OpenBrewByWeightMicraService &service, const char *body) {
+  static std::string observation(OpenBrewByWeightLaMarzoccoService &service, const char *body) {
     return std::string("MESSAGE\ndestination:") + service.websocket_->destination +
         "\nsubscription:" + service.websocket_->subscription + "\n\n" + body + std::string(1, '\0');
   }
-  static void subscribe(OpenBrewByWeightMicraService &service) {
+  static void subscribe(OpenBrewByWeightLaMarzoccoService &service) {
     esp_websocket_event_data_t message;
     message.client = service.websocket_->client;
     callback = true;
@@ -589,7 +589,7 @@ struct MicraWebSocketTest {
   }
   static void run() {
     TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locked = acquired; };
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -600,8 +600,8 @@ struct MicraWebSocketTest {
     assert(service.websocketStatus().transmitBytes > UINT32_MAX);
     const char *off = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     deliver(service, observation(service, off));
-    assert(service.published_.powerState == LineaMicraPowerState::OFF);
-    assert(service.websocketStatus().cleaning == MicraCleaningState::REQUESTED);
+    assert(service.published_.powerState == LaMarzoccoPowerState::OFF);
+    assert(service.websocketStatus().cleaning == LaMarzoccoCleaningState::REQUESTED);
     // A relay-only wake keeps the socket and accepts confirming push evidence.
     const auto connectionsBeforeWake = service.websocketStatus().reconnects;
     assert(service.powerState_.notePhysicalStart(service.published_, true, true, ++now));
@@ -639,7 +639,7 @@ struct MicraWebSocketTest {
     assert(rates.receivePerSecond == 0 && rates.receivePerMinute == 0);
     std::thread receiver([&] { deliver(service, observation(service, on)); });
     receiver.join();
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     service.active_ = false;
     const auto fresh = service.published_.sampleAtMs;
     deliver(service, observation(service, R"({"connected":false,"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})"));
@@ -651,7 +651,7 @@ struct MicraWebSocketTest {
     service.websocketStatus_.pongAtMs = millis();
     service.serviceWebSocket();
     assert(stops == 0 && destroys == 0 && service.websocket_->client);
-    assert(service.websocketStatus().state == MicraSocketState::STREAMING);
+    assert(service.websocketStatus().state == LaMarzoccoSocketState::STREAMING);
     publishOutboundAcquisition(false, now);
     service.serviceWebSocket();
     deliver(service, observation(service, off));
@@ -666,7 +666,7 @@ struct MicraWebSocketTest {
     deliver(service, observation(service, on));
     assert(stops == stopsBeforeShot && service.websocketStatus().subscribed);
     assert(service.observationFence_.epoch == epoch);
-    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.currentStatus().quality == LaMarzoccoObservationQuality::CURRENT);
     assert(!service.currentStatus().shotPaused && !service.abortRequested_.load());
     // A live scale parks the subscription from the shot's start until its
     // relay opens: an UNSUBSCRIBE, pings stopped, socket and fence kept, no
@@ -678,7 +678,7 @@ struct MicraWebSocketTest {
     assert(stops == stopsBeforeShot && service.websocketStatus().subscribed);
     deliver(service, observation(service, off));
     assert(!service.websocket_->failed.load() && service.currentStatus().shotPaused);
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     now += 40000;
     service.serviceWebSocket();
     assert(stops == stopsBeforeShot && service.websocket_->parked.load());
@@ -691,7 +691,7 @@ struct MicraWebSocketTest {
     assert(!service.websocket_->parked.load() && !service.snapshotPending_);
     assert(stops == stopsBeforeShot && service.observationFence_.epoch == epoch);
     deliver(service, observation(service, off));
-    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    assert(service.published_.powerState == LaMarzoccoPowerState::OFF);
     now += 20000;
     service.serviceWebSocket();
     assert(stops == stopsBeforeShot);
@@ -702,7 +702,7 @@ struct MicraWebSocketTest {
     service.inhibitCloud();
     outboundShotActive.store(false);
     deliver(service, observation(service, on));
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     service.serviceWebSocket();
     assert(stops == stopsBeforeShot && transmitted == sentBeforeShot);
     outboundScaleConnected.store(false);
@@ -736,7 +736,7 @@ struct MicraWebSocketTest {
     sendLimit = -1;
     outboundMaintenance.store(true);
     service.serviceWebSocket();
-    assert(!service.websocket_ && service.websocketStatus().state == MicraSocketState::PAUSED);
+    assert(!service.websocket_ && service.websocketStatus().state == LaMarzoccoSocketState::PAUSED);
     assert(std::strcmp(service.websocketStatus().reason, "maintenance") == 0);
     outboundMaintenance.store(false);
     detail::g_hostAllocationsUntilFailure.store(0);
@@ -749,7 +749,7 @@ struct MicraWebSocketTest {
   }
   static void initialSynchronization() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.published_.connectionFreshness = true;
@@ -757,21 +757,21 @@ struct MicraWebSocketTest {
     service.serviceWebSocket();
     subscribe(service);
     const auto firstStamp = service.snapshotStamp_;
-    MicraObservation initial;
+    LaMarzoccoObservation initial;
     initial.stamp = firstStamp;
-    initial.source = MicraObservationSource::HTTP_INITIAL;
+    initial.source = LaMarzoccoObservationSource::HTTP_INITIAL;
     initial.powerPresent = true;
-    initial.mode = LineaMicraObservedMode::BREWING;
+    initial.mode = LaMarzoccoObservedMode::BREWING;
     initial.receivedAtMs = now;
     assert(service.observationFence_.merge(service.published_, service.powerState_, initial, true));
     now += 600000;
-    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
-    assert(service.currentStatus().powerSource == MicraObservationSource::HTTP_INITIAL);
+    assert(service.currentStatus().quality == LaMarzoccoObservationQuality::CURRENT);
+    assert(service.currentStatus().powerSource == LaMarzoccoObservationSource::HTTP_INITIAL);
     outboundAcquisitionHeld.store(true);
-    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.currentStatus().quality == LaMarzoccoObservationQuality::CURRENT);
     outboundAcquisitionHeld.store(false);
     deliver(service, observation(service, R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})"));
-    assert(service.published_.powerSource == MicraObservationSource::WEBSOCKET);
+    assert(service.published_.powerSource == LaMarzoccoObservationSource::WEBSOCKET);
     assert(service.snapshotStamp_.powerRevision == firstStamp.powerRevision);
     service.snapshotPending_ = false;  // Owner has dispatched initialization.
     deliver(service, observation(service, R"({"connected":false})"));
@@ -782,27 +782,27 @@ struct MicraWebSocketTest {
     deliver(service, observation(service, R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}}]})"));
     assert(service.observationFence_.synchronized);
     ++outboundAcquisitionGeneration;
-    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
+    assert(service.currentStatus().quality == LaMarzoccoObservationQuality::CURRENT);
     esp_websocket_event_data_t event;
     service.websocketEvent(&service, nullptr, WEBSOCKET_EVENT_CLOSED, &event);
     assert(!service.observationFence_.synchronized && !service.snapshotPending_);
     assert(retained(service.powerState_));  // Invalidated before owner teardown.
-    assert(service.currentStatus().quality == LineaMicraObservationQuality::STALE);
+    assert(service.currentStatus().quality == LaMarzoccoObservationQuality::STALE);
     service.stopWebSocket();
     assert(!service.snapshotPending_);
     service.serviceWebSocket();
     subscribe(service);
     assert(service.snapshotStamp_.connectionRevision != firstStamp.connectionRevision);
-    assert(service.currentStatus().quality == LineaMicraObservationQuality::STALE);
+    assert(service.currentStatus().quality == LaMarzoccoObservationQuality::STALE);
     service.stopWebSocket(true);
     delete service.work_;
   }
   static void commandsSkipUnchangedMachineState() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
-    service.config_.options = LINEA_MICRA_APPLY_TEMPERATURE | LINEA_MICRA_OBSERVE_STATE |
-        LINEA_MICRA_POWER_ON_WITH_SCALE | LINEA_MICRA_SHUTDOWN_WITH_SCALE;
+    service.config_.options = LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_OBSERVE_STATE |
+        LA_MARZOCCO_POWER_ON_WITH_SCALE | LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.published_.connectionFreshness = true;
     service.staConnected_.store(true);
@@ -813,8 +813,8 @@ struct MicraWebSocketTest {
     assert(service.observationFence_.temperatureTrusted && service.observationFence_.powerTrusted);
     uint32_t requestId = 0;
     const auto temperature = [&](uint16_t targetDeciC) {
-      LineaMicraRequest request;
-      request.type = LineaMicraRequestType::APPLY_TEMPERATURE;
+      LaMarzoccoRequest request;
+      request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
       request.presetId = 1;
       request.targetDeciC = targetDeciC;
       request.requestId = ++requestId;
@@ -824,8 +824,8 @@ struct MicraWebSocketTest {
       service.desiredTemperature_.present = true;
       return request;
     };
-    const auto power = [&](LineaMicraRequestType type) {
-      LineaMicraRequest request;
+    const auto power = [&](LaMarzoccoRequestType type) {
+      LaMarzoccoRequest request;
       request.type = type;
       request.requestId = ++requestId;
       service.desiredPower_ = {};
@@ -838,7 +838,7 @@ struct MicraWebSocketTest {
     // A trusted equal target needs no cloud command; a different one does.
     assert(service.executeTemperatureApplication(temperature(930), service.configGeneration_));
     assert(temperatureWrites == 0 && !service.desiredTemperature_.present);
-    assert(service.published_.temperatureState == LineaMicraTemperatureState::CONFIRMED);
+    assert(service.published_.temperatureState == LaMarzoccoTemperatureState::CONFIRMED);
     // The push showing the new target confirms it without an HTTPS read.
     const auto readsBefore = dashboardReads;
     notifyHook = [&] {
@@ -855,22 +855,22 @@ struct MicraWebSocketTest {
     assert(temperatureWrites == 2);
     // Measured power on a live subscription skips a command that changes nothing.
     deliver(service, observation(service, brewing93));
-    assert(power(LineaMicraRequestType::SET_POWER_ON));
+    assert(power(LaMarzoccoRequestType::SET_POWER_ON));
     assert(powerWrites == 0 && !service.desiredPower_.present);
-    assert(power(LineaMicraRequestType::SET_STANDBY) && powerWrites == 1);
+    assert(power(LaMarzoccoRequestType::SET_STANDBY) && powerWrites == 1);
     // An offline machine defers a target locally and drops power commands.
     deliver(service, observation(service, R"({"connected":false})"));
     assert(!service.executeTemperatureApplication(temperature(950), service.configGeneration_));
     assert(temperatureWrites == 2 && service.desiredTemperature_.present);
-    assert(!power(LineaMicraRequestType::SET_POWER_ON));
+    assert(!power(LaMarzoccoRequestType::SET_POWER_ON));
     assert(powerWrites == 1 && !service.desiredPower_.present);
     // An accepted command the machine never confirms stops after a few cycles.
     deliver(service, observation(service, R"({"connected":true})"));
     cloudIgnoresTemperature = true;
     const auto unconfirmed = temperature(960);
-    for (uint8_t cycle = 1; cycle <= micra_timing::kMaxCommandCycles; ++cycle) {
+    for (uint8_t cycle = 1; cycle <= la_marzocco_timing::kMaxCommandCycles; ++cycle) {
       assert(!service.executeTemperatureApplication(unconfirmed, service.configGeneration_));
-      assert(service.desiredTemperature_.present == (cycle < micra_timing::kMaxCommandCycles));
+      assert(service.desiredTemperature_.present == (cycle < la_marzocco_timing::kMaxCommandCycles));
     }
     assert(temperatureWrites == 3);
     cloudIgnoresTemperature = false;
@@ -892,7 +892,7 @@ struct MicraWebSocketTest {
     for (bool scalePresent : {false, true}) for (int scenario = 0; scenario < 5; ++scenario) {
       outboundScaleConnected.store(scalePresent);
       now = 1000;
-      OpenBrewByWeightMicraService service;
+      OpenBrewByWeightLaMarzoccoService service;
       service.config_.accountConfigured = true;
       std::strcpy(service.config_.selectedSerial, "synthetic");
       service.staConnected_.store(true);
@@ -909,7 +909,7 @@ struct MicraWebSocketTest {
       service.powerActive_.store(true);
       assert(!service.backflush().ready);
       service.powerActive_.store(false);
-      service.tokenIssuedAtMs_.store(now - micra_timing::kAccessTokenRefreshAgeMs + 210000);
+      service.tokenIssuedAtMs_.store(now - la_marzocco_timing::kAccessTokenRefreshAgeMs + 210000);
       assert(!service.backflush().ready);
       service.tokenIssuedAtMs_.store(now);
       MachineBackflushPermit permit;
@@ -956,7 +956,7 @@ struct MicraWebSocketTest {
   static void backflushReleasedAfterLostLink() {
     const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1003,7 +1003,7 @@ struct MicraWebSocketTest {
     const char *unknown = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Rinsing"}}]})";
     const char *removed = R"({"removedWidgets":["CMBackFlush"]})";
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1046,7 +1046,7 @@ struct MicraWebSocketTest {
     const char *inactive = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Off"}}]})";
     static unsigned locks;
     TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locks += acquired; };
-    const auto poll = [](OpenBrewByWeightMicraService &service, bool locking) {
+    const auto poll = [](OpenBrewByWeightLaMarzoccoService &service, bool locking) {
       const unsigned before = locks;
       const auto result = service.backflush(true);
       assert((locks != before) == locking);
@@ -1059,7 +1059,7 @@ struct MicraWebSocketTest {
       return result;
     };
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1070,11 +1070,11 @@ struct MicraWebSocketTest {
     poll(service, true);  // First poll always reads under the lock.
     // The stub clock advances 1 ms per micros() call, so a locked poll owns
     // the mutex for a measurable hold; the shortcut records none.
-    assert(micraBackflushHoldStat().lastUs.load() > 0);
-    assert(micraBackflushHoldStat().maxUs.load() >= micraBackflushHoldStat().lastUs.load());
+    assert(laMarzoccoBackflushHoldStat().lastUs.load() > 0);
+    assert(laMarzoccoBackflushHoldStat().maxUs.load() >= laMarzoccoBackflushHoldStat().lastUs.load());
     poll(service, false);
     (void)service.backflush(true);  // The shortcut alone records no hold.
-    assert(micraBackflushHoldStat().lastUs.load() == 0);
+    assert(laMarzoccoBackflushHoldStat().lastUs.load() == 0);
     deliver(service, observation(service, requested));
     assert(poll(service, true).count == 1);  // Consumed exactly once.
     assert(poll(service, true).count == 0);  // Valid state keeps qualifying.
@@ -1114,7 +1114,7 @@ struct MicraWebSocketTest {
   }
   static void concurrentStatusLifecycle() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     service.published_.connectionFreshness = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
@@ -1125,11 +1125,11 @@ struct MicraWebSocketTest {
       while (!done.load()) {
         (void)service.backflush_.ingressAttempt();
         const auto state = service.currentStatus();
-        assert(state.powerState != LineaMicraPowerState::OFF);
+        assert(state.powerState != LaMarzoccoPowerState::OFF);
         // The control task's non-blocking poll races the same lifecycle
         // churn; its single-reader cache must never tear into a phantom OFF.
         const auto polled = service.statusPoll();
-        assert(polled.powerState != LineaMicraPowerState::OFF);
+        assert(polled.powerState != LaMarzoccoPowerState::OFF);
         (void)service.websocketStatus();
         ++samples;
       }
@@ -1155,7 +1155,7 @@ struct MicraWebSocketTest {
     muxWaitEvents = 0;
     disconnectLog.clear();
     lastMuxWaitDetail.clear();
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     // With the stub clock each micros() call is 1 ms, so an uncontended
     // acquisition waits ~1 ms and stays below the 2 ms report bar.
     service.backflush(false);
@@ -1163,27 +1163,27 @@ struct MicraWebSocketTest {
     assert(disconnectLog.empty());
     uint32_t latch = 0;
     // Just below the 2 ms threshold: not due.
-    assert(!OpenBrewByWeightMicraService::muxWaitAnomalyDue(1999, latch, now));
+    assert(!OpenBrewByWeightLaMarzoccoService::muxWaitAnomalyDue(1999, latch, now));
     assert(muxWaitEvents == 0);
     // At and past the threshold the report names the gathered holder and
     // carries the wait as the ring event's first argument; the audit excerpt
     // keeps the holder for the detail view.
-    assert(OpenBrewByWeightMicraService::muxWaitAnomalyDue(31000, latch, now));
-    OpenBrewByWeightMicraService::reportMuxWaitAnomaly(31000, "host", 0);
+    assert(OpenBrewByWeightLaMarzoccoService::muxWaitAnomalyDue(31000, latch, now));
+    OpenBrewByWeightLaMarzoccoService::reportMuxWaitAnomaly(31000, "host", 0);
     assert(muxWaitEvents == 1);
     assert(lastMuxWaitArgs[0] == 31000 && lastMuxWaitArgs[1] == 0);
     assert(lastMuxWaitDetail == "holder=host");
-    assert(disconnectLog.find("Micra mux wait=31000 us") != std::string::npos);
+    assert(disconnectLog.find("La Marzocco mux wait=31000 us") != std::string::npos);
     assert(disconnectLog.find("holder=host") != std::string::npos);
     // Rate limit: a second anomaly inside the 10 s window stays due-false...
     now += 100;
-    assert(!OpenBrewByWeightMicraService::muxWaitAnomalyDue(31000, latch, now));
+    assert(!OpenBrewByWeightLaMarzoccoService::muxWaitAnomalyDue(31000, latch, now));
     assert(muxWaitEvents == 1);
     // ...and clears once the window has passed. The re-fire waits exactly at
     // the threshold, probing the boundary after the 1999 probe below it.
     now += 10000;
-    assert(OpenBrewByWeightMicraService::muxWaitAnomalyDue(2000, latch, now));
-    OpenBrewByWeightMicraService::reportMuxWaitAnomaly(2000, "host", 0);
+    assert(OpenBrewByWeightLaMarzoccoService::muxWaitAnomalyDue(2000, latch, now));
+    OpenBrewByWeightLaMarzoccoService::reportMuxWaitAnomaly(2000, "host", 0);
     assert(muxWaitEvents == 2);
     assert(lastMuxWaitArgs[0] == 2000);
   }
@@ -1192,36 +1192,36 @@ struct MicraWebSocketTest {
   // the expired unknown is a normal shot that counts as evidence of ON.
   static void apiFailureHoldsLastReading() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
-    service.published_.powerState = LineaMicraPowerState::ON;
-    service.published_.quality = LineaMicraObservationQuality::CURRENT;
+    service.published_.powerState = LaMarzoccoPowerState::ON;
+    service.published_.quality = LaMarzoccoObservationQuality::CURRENT;
     service.published_.sampleAtMs = now;
-    LineaMicraStatus failed = service.published_;
-    service.fail(failed, LineaMicraError::TRANSPORT);  // WebSocket mode: the socket owner holds.
+    LaMarzoccoStatus failed = service.published_;
+    service.fail(failed, LaMarzoccoError::TRANSPORT);  // WebSocket mode: the socket owner holds.
     assert(!retained(service.powerState_) &&
-           service.currentStatus().assumedPower == LineaMicraAssumedPower::ON);
-    service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
-    service.fail(failed, LineaMicraError::TRANSPORT);
+           service.currentStatus().assumedPower == LaMarzoccoAssumedPower::ON);
+    service.config_.connectionType = static_cast<uint8_t>(LaMarzoccoConnectionType::API);
+    service.fail(failed, LaMarzoccoError::TRANSPORT);
     assert(retained(service.powerState_));
     auto status = service.currentStatus();
-    assert(status.assumedPower == LineaMicraAssumedPower::ON_STALE &&
-           status.powerState == LineaMicraPowerState::ON &&
-           status.quality == LineaMicraObservationQuality::STALE &&
-           status.error == LineaMicraError::TRANSPORT && status.phase == LineaMicraPhase::FAILED);
-    now += micra_timing::kStaleRetentionMs;
+    assert(status.assumedPower == LaMarzoccoAssumedPower::ON_STALE &&
+           status.powerState == LaMarzoccoPowerState::ON &&
+           status.quality == LaMarzoccoObservationQuality::STALE &&
+           status.error == LaMarzoccoError::TRANSPORT && status.phase == LaMarzoccoPhase::FAILED);
+    now += la_marzocco_timing::kStaleRetentionMs;
     status = service.currentStatus();
-    assert(status.assumedPower == LineaMicraAssumedPower::UNKNOWN && status.effectiveOn);
+    assert(status.assumedPower == LaMarzoccoAssumedPower::UNKNOWN && status.effectiveOn);
     assert(service.physicalStart(nullptr) == MachinePhysicalStartDisposition::NORMAL);
-    assert(service.currentStatus().assumedPower == LineaMicraAssumedPower::ON_STALE);
+    assert(service.currentStatus().assumedPower == LaMarzoccoAssumedPower::ON_STALE);
   }
   static void statusPollCache() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     service.published_.connectionFreshness = true;
     service.published_.sampleAtMs = now;
-    service.published_.powerState = LineaMicraPowerState::OFF;
+    service.published_.powerState = LaMarzoccoPowerState::OFF;
     service.published_.effectiveOn = false;
     service.staConnected_.store(true);
     // Before any successful poll the cache counts as unknown — effectiveOn,
@@ -1229,13 +1229,13 @@ struct MicraWebSocketTest {
     assert(service.statusPollStale());
     const auto &boot = service.statusCache_;
     assert(boot.effectiveOn &&
-           boot.quality == LineaMicraObservationQuality::Disabled);
+           boot.quality == LaMarzoccoObservationQuality::Disabled);
     // Uncontended, the poll serves exactly the locked status() resolution;
     // the trivially copyable snapshot must match field for field, so a
     // never-refreshed cache cannot pass as a fresh poll.
     const auto fresh = service.statusPoll();
     const auto reference = service.currentStatus();
-    assert(fresh.powerState == LineaMicraPowerState::OFF && !fresh.effectiveOn);
+    assert(fresh.powerState == LaMarzoccoPowerState::OFF && !fresh.effectiveOn);
     assert(std::memcmp(&fresh, &reference, sizeof(fresh)) == 0);
     assert(!service.statusPollStale());
     // A mutex held by another task serves the previous cache — never torn,
@@ -1243,14 +1243,14 @@ struct MicraWebSocketTest {
     std::atomic<bool> held{false}, release{false};
     std::thread holder([&] {
       TaskLockGuard lock(service.mux_);
-      service.published_.powerState = LineaMicraPowerState::ON;
+      service.published_.powerState = LaMarzoccoPowerState::ON;
       service.published_.effectiveOn = true;
       held.store(true);
       while (!release.load()) std::this_thread::yield();
     });
     while (!held.load()) std::this_thread::yield();
     const auto served = service.statusPoll();
-    assert(served.powerState == LineaMicraPowerState::OFF && !served.effectiveOn);
+    assert(served.powerState == LaMarzoccoPowerState::OFF && !served.effectiveOn);
     assert(std::memcmp(&served, &fresh, sizeof(served)) == 0);
     now += 249;
     assert(!service.statusPollStale());
@@ -1263,14 +1263,14 @@ struct MicraWebSocketTest {
     release.store(true);
     holder.join();
     const auto refreshed = service.statusPoll();
-    assert(refreshed.powerState == LineaMicraPowerState::ON &&
+    assert(refreshed.powerState == LaMarzoccoPowerState::ON &&
            refreshed.effectiveOn);
     assert(!service.statusPollStale());
     // The age subtraction is unsigned-wraparound-safe: a cache stamped just
     // before the ~49.7-day millis() rollover ages across the seam.
     now = UINT32_MAX - 100ULL;
     const auto wrapped = service.statusPoll();
-    assert(wrapped.powerState == LineaMicraPowerState::ON && wrapped.effectiveOn);
+    assert(wrapped.powerState == LaMarzoccoPowerState::ON && wrapped.effectiveOn);
     assert(!service.statusPollStale());
     now = 148;  // stamp + 249 across the wrap: one ms short of the bound.
     assert(!service.statusPollStale());
@@ -1295,7 +1295,7 @@ struct MicraWebSocketTest {
     const char *active = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Cleaning"}}]})";
     muxWaitEvents = 0;
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1345,7 +1345,7 @@ struct MicraWebSocketTest {
   static void backflushForcedMissAfterConsume() {
     const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1384,7 +1384,7 @@ struct MicraWebSocketTest {
     const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     const char *active = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Cleaning"}}]})";
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1429,7 +1429,7 @@ struct MicraWebSocketTest {
     const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     const char *active = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Cleaning"}}]})";
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1470,7 +1470,7 @@ struct MicraWebSocketTest {
     muxWaitEvents = 0;
     disconnectLog.clear();
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1501,13 +1501,13 @@ struct MicraWebSocketTest {
     muxWaitEvents = 0;
     disconnectLog.clear();
     lastMuxWaitDetail.clear();
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
-    service.config_.options |= LINEA_MICRA_SHUTDOWN_WITH_SCALE;
+    service.config_.options |= LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
     service.task_ = reinterpret_cast<TaskHandle_t>(1);
-    LineaMicraRequest request;
-    request.type = LineaMicraRequestType::SET_STANDBY;
+    LaMarzoccoRequest request;
+    request.type = LaMarzoccoRequestType::SET_STANDBY;
     // Uncontended (~1 ms on the stub clock): accepted, no report.
     armMuxWaitBurn(0);
     assert(service.queue(request));
@@ -1518,7 +1518,7 @@ struct MicraWebSocketTest {
     assert(muxWaitEvents == 1);
     assert(lastMuxWaitArgs[0] == 2000 && lastMuxWaitArgs[1] == 0);
     assert(lastMuxWaitDetail == "holder=host");
-    assert(disconnectLog.find("Micra mux wait=2000 us") != std::string::npos);
+    assert(disconnectLog.find("La Marzocco mux wait=2000 us") != std::string::npos);
     assert(disconnectLog.find("holder=host") != std::string::npos);
     // Rate limit: a second forced wait inside the 10 s window stays silent.
     armMuxWaitBurn(1);
@@ -1532,7 +1532,7 @@ struct MicraWebSocketTest {
     TaskMutex::hostObserver = nullptr;
   }
   template <typename Body>
-  static void withMuxHeld(OpenBrewByWeightMicraService &service, Body body) {
+  static void withMuxHeld(OpenBrewByWeightLaMarzoccoService &service, Body body) {
     std::atomic<bool> held{false}, release{false};
     std::thread holder([&] {
       service.mux_.lock();
@@ -1548,10 +1548,10 @@ struct MicraWebSocketTest {
   static void loopEntryPointsNeverWaitOnMux() {
     const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
-    service.config_.options |= LINEA_MICRA_APPLY_TEMPERATURE;
+    service.config_.options |= LA_MARZOCCO_APPLY_TEMPERATURE;
     service.staConnected_.store(true);
     service.tokenAvailable_.store(true);
     service.tokenIssuedAtMs_.store(millis());
@@ -1560,10 +1560,10 @@ struct MicraWebSocketTest {
     deliver(service, observation(service, awaiting));
     assert(service.backflush(true).busy());
     service.task_ = reinterpret_cast<TaskHandle_t>(1);
-    LineaMicraRequest request;
-    request.type = LineaMicraRequestType::APPLY_TEMPERATURE;
+    LaMarzoccoRequest request;
+    request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
     request.presetId = 1;
-    request.targetDeciC = LINEA_MICRA_BREW_TARGET_MIN_DECI_C;
+    request.targetDeciC = LA_MARZOCCO_BREW_TARGET_MIN_DECI_C;
     withMuxHeld(service, [&] {
       // A busy cleaning episode refuses the contended edge with no permit,
       // still fencing in-flight bytes like a locked evaluation.
@@ -1592,7 +1592,7 @@ struct MicraWebSocketTest {
     delete service.work_;
 
     // Without a busy episode a contended edge is a normal start.
-    OpenBrewByWeightMicraService idle;
+    OpenBrewByWeightLaMarzoccoService idle;
     withMuxHeld(idle, [&] {
       MachineBackflushPermit permit;
       assert(idle.physicalStart(&permit) == MachinePhysicalStartDisposition::NORMAL);
@@ -1602,12 +1602,12 @@ struct MicraWebSocketTest {
   static void muxWaitReportEmittedAfterUnlock() {
     now = 50000;  // Clears the queue latch's rate-limit window.
     muxWaitEvents = 0;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
-    service.config_.options |= LINEA_MICRA_SHUTDOWN_WITH_SCALE;
+    service.config_.options |= LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
     service.task_ = reinterpret_cast<TaskHandle_t>(1);
-    LineaMicraRequest request;
-    request.type = LineaMicraRequestType::SET_STANDBY;
+    LaMarzoccoRequest request;
+    request.type = LaMarzoccoRequestType::SET_STANDBY;
     armMuxWaitBurn(1);
     assert(service.queue(request));
     assert(muxWaitEvents == 1 && muxWaitDepthAtEvent == 0);
@@ -1618,7 +1618,7 @@ struct MicraWebSocketTest {
     static unsigned locks;
     TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locks += acquired; };
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1648,7 +1648,7 @@ struct MicraWebSocketTest {
     const char *inactive = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Off"}}]})";
     const char *awaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.staConnected_.store(true);
@@ -1695,7 +1695,7 @@ struct MicraWebSocketTest {
   static constexpr const char *kBrewing = R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}}]})";
   static constexpr const char *kAwaiting = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
   static constexpr const char *kCleaningOff = R"({"widgets":[{"code":"CMBackFlush","output":{"status":"Off"}}]})";
-  static bool frame(OpenBrewByWeightMicraService &service, MicraCompanionStateKind kind,
+  static bool frame(OpenBrewByWeightLaMarzoccoService &service, LaMarzoccoCompanionStateKind kind,
                     const char *body, uint32_t afterCommand = 0, uint32_t epoch = 7) {
     cJSON *root = cJSON_Parse(body);
     const bool ok =
@@ -1703,10 +1703,10 @@ struct MicraWebSocketTest {
     cJSON_Delete(root);
     return ok;
   }
-  static void direct(OpenBrewByWeightMicraService &service) {
+  static void direct(OpenBrewByWeightLaMarzoccoService &service) {
     service.config_.accountConfigured = true;
-    service.config_.options |= LINEA_MICRA_APPLY_TEMPERATURE | LINEA_MICRA_POWER_ON_WITH_SCALE |
-        LINEA_MICRA_SHUTDOWN_WITH_SCALE;
+    service.config_.options |= LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_POWER_ON_WITH_SCALE |
+        LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.published_.connectionFreshness = true;
     service.staConnected_.store(true);
@@ -1715,27 +1715,27 @@ struct MicraWebSocketTest {
     service.serviceWebSocket();
     subscribe(service);
   }
-  static void link(OpenBrewByWeightMicraService &service) {
+  static void link(OpenBrewByWeightLaMarzoccoService &service) {
     service.companion_.outbox.credentialsGeneration = 1;  // publishConfig's first account.
     service.companionLink(true, true);
     service.companionCredentials(1, true);
     service.companionUpstream(true, 7, 3000);
     service.companionPing(true);
   }
-  static void route(OpenBrewByWeightMicraService &service, const char *full = kBrewing93) {
+  static void route(OpenBrewByWeightLaMarzoccoService &service, const char *full = kBrewing93) {
     const auto sequence = service.companionOutbox().routeSequence;
     assert(service.serviceCompanion());  // Pending: the owner skips the socket.
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::PENDING);
     assert(service.companionOutbox().routeCompanion &&
            service.companionOutbox().routeSequence == sequence + 1);
-    assert(frame(service, MicraCompanionStateKind::FULL, full));
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    assert(frame(service, LaMarzoccoCompanionStateKind::FULL, full));
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::COMPANION);
     // Make before break: the socket is obsolete before its owner stops it.
     assert(!service.websocket_ || service.websocket_->stamp.epoch != service.observationFence_.epoch);
     assert(service.serviceCompanion());
     assert(!service.websocket_ && !service.work_);
   }
-  static void finish(OpenBrewByWeightMicraService &service) {
+  static void finish(OpenBrewByWeightLaMarzoccoService &service) {
     service.stopWebSocket(true);
     delete service.work_;
     service.work_ = nullptr;
@@ -1743,7 +1743,7 @@ struct MicraWebSocketTest {
   static void companionFullFrameAndCleaning() {
     TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locked = acquired; };
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     const auto reads = dashboardReads, sessions = sessionCalls, inits = initCalls;
@@ -1752,19 +1752,19 @@ struct MicraWebSocketTest {
     assert(stops == stopsBefore + 1 && service.companionRouteStatus().switches == 1);
     // The full frame is a new subscription plus its initial read.
     const auto status = service.currentStatus();
-    assert(status.powerState == LineaMicraPowerState::ON && status.targetDeciC == 930);
-    assert(status.quality == LineaMicraObservationQuality::CURRENT);
-    assert(status.powerSource == MicraObservationSource::HTTP_INITIAL);
+    assert(status.powerState == LaMarzoccoPowerState::ON && status.targetDeciC == 930);
+    assert(status.quality == LaMarzoccoObservationQuality::CURRENT);
+    assert(status.powerSource == LaMarzoccoObservationSource::HTTP_INITIAL);
     assert(service.websocketStatus().subscribed && service.websocketStatus().machineConnected);
     assert(!service.snapshotPending_ && traceSubscribed);
     // Cleaning comes only from pushes: never from full or read frames.
-    assert(service.websocketStatus().cleaning == MicraCleaningState::UNKNOWN);
+    assert(service.websocketStatus().cleaning == LaMarzoccoCleaningState::UNKNOWN);
     assert(!service.backflush().valid);
-    assert(frame(service, MicraCompanionStateKind::READ, kAwaiting));
-    assert(service.websocketStatus().cleaning == MicraCleaningState::UNKNOWN);
+    assert(frame(service, LaMarzoccoCompanionStateKind::READ, kAwaiting));
+    assert(service.websocketStatus().cleaning == LaMarzoccoCleaningState::UNKNOWN);
     assert(!service.backflush().valid);
-    assert(frame(service, MicraCompanionStateKind::PUSH, kAwaiting));
-    assert(service.websocketStatus().cleaning == MicraCleaningState::REQUESTED);
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kAwaiting));
+    assert(service.websocketStatus().cleaning == LaMarzoccoCleaningState::REQUESTED);
     const auto backflush = service.backflush();
     assert(backflush.valid && backflush.phase == MachineBackflushPhase::AWAITING && backflush.ready);
     // Readiness needs >210 s of the companion's token and an `up` ping < 30 s.
@@ -1778,12 +1778,12 @@ struct MicraWebSocketTest {
     // push fails the feed (the link closes); a rejected read or full frame is
     // ignored, as a failed direct read is.
     const auto sample = service.published_.sampleAtMs;
-    assert(frame(service, MicraCompanionStateKind::PUSH, kStandby, 0, 8));
-    assert(!frame(service, MicraCompanionStateKind::PUSH, R"({"widgets":7})"));
-    assert(frame(service, MicraCompanionStateKind::READ, R"({"connected":true})"));
-    assert(frame(service, MicraCompanionStateKind::FULL, R"({"widgets":7})"));
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kStandby, 0, 8));
+    assert(!frame(service, LaMarzoccoCompanionStateKind::PUSH, R"({"widgets":7})"));
+    assert(frame(service, LaMarzoccoCompanionStateKind::READ, R"({"connected":true})"));
+    assert(frame(service, LaMarzoccoCompanionStateKind::FULL, R"({"widgets":7})"));
     assert(service.published_.sampleAtMs == sample);
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::COMPANION);
     // No HTTPS session, dashboard read or socket was opened on the way.
     assert(dashboardReads == reads && sessionCalls == sessions && initCalls == inits);
     finish(service);
@@ -1792,23 +1792,23 @@ struct MicraWebSocketTest {
   static void companionPushParity() {
     const char *dashboard = R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"HeatingUp","targetTemperature":94.5,"readyStartTime":1800000000000}},{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1800000000}},{"code":"CMBackFlush","output":{"status":"Requested"}}]})";
     now = 5000;
-    OpenBrewByWeightMicraService socket, feed;
+    OpenBrewByWeightLaMarzoccoService socket, feed;
     direct(socket);
     direct(feed);
     link(feed);
     route(feed, R"({"connected":false})");
     deliver(socket, observation(socket, dashboard));
-    assert(frame(feed, MicraCompanionStateKind::PUSH, dashboard));
+    assert(frame(feed, LaMarzoccoCompanionStateKind::PUSH, dashboard));
     const auto a = socket.currentStatus(), b = feed.currentStatus();
     // Every member, not the two padding gaps: those bytes are indeterminate.
     const auto *bytesA = reinterpret_cast<const unsigned char *>(&a);
     const auto *bytesB = reinterpret_cast<const unsigned char *>(&b);
-    const size_t head = offsetof(LineaMicraStatus, assumedPower) + sizeof(a.assumedPower),
-                 body = offsetof(LineaMicraStatus, transportStatus),
-                 end = offsetof(LineaMicraStatus, temperatureRetryable) + sizeof(bool);
+    const size_t head = offsetof(LaMarzoccoStatus, assumedPower) + sizeof(a.assumedPower),
+                 body = offsetof(LaMarzoccoStatus, transportStatus),
+                 end = offsetof(LaMarzoccoStatus, temperatureRetryable) + sizeof(bool);
     assert(std::memcmp(bytesA, bytesB, head) == 0 &&
            std::memcmp(bytesA + body, bytesB + body, end - body) == 0);
-    assert(a.powerSource == MicraObservationSource::WEBSOCKET && a.targetDeciC == 945);
+    assert(a.powerSource == LaMarzoccoObservationSource::WEBSOCKET && a.targetDeciC == 945);
     const auto x = socket.websocketStatus(false), y = feed.websocketStatus(false);
     assert(x.cleaning == y.cleaning && x.cleaningAvailable == y.cleaningAvailable &&
            x.cleaningAtMs == y.cleaningAtMs && std::strcmp(x.cleaningLabel, y.cleaningLabel) == 0 &&
@@ -1822,31 +1822,31 @@ struct MicraWebSocketTest {
   }
   static void companionReadsWaitForShots() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
     // Reads landing in a scaled shot or a scale connection are dropped...
     outboundScaleConnected.store(true);
     service.shotActive_.store(true);
-    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(frame(service, LaMarzoccoCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     service.shotActive_.store(false);
     service.scaleConnecting_.store(true);
-    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(frame(service, LaMarzoccoCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     // ...while pushes keep arriving, as on the socket.
-    assert(frame(service, MicraCompanionStateKind::PUSH, kStandby));
-    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kStandby));
+    assert(service.published_.powerState == LaMarzoccoPowerState::OFF);
     service.scaleConnecting_.store(false);
     outboundScaleConnected.store(false);
-    assert(frame(service, MicraCompanionStateKind::READ, kBrewing));
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(frame(service, LaMarzoccoCompanionStateKind::READ, kBrewing));
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     finish(service);
   }
   static void companionHoldFollowsShotAndScale() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     // Without a link the route costs nothing: no lock, no state change.
     static unsigned locks;
@@ -1863,13 +1863,13 @@ struct MicraWebSocketTest {
     assert(!service.serviceCompanion());
     auto box = service.companionOutbox();
     assert(box.hold && box.holdSequence == sequence);
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::DIRECT);
     service.shotActive_.store(false);
     outboundScaleConnected.store(false);
     assert(service.serviceCompanion());
     box = service.companionOutbox();
     assert(!box.hold && box.holdSequence == sequence + 1 && box.routeCompanion);
-    assert(frame(service, MicraCompanionStateKind::FULL, kBrewing93));
+    assert(frame(service, LaMarzoccoCompanionStateKind::FULL, kBrewing93));
     assert(service.serviceCompanion());
     // On the companion route each change goes out.
     sequence = service.companionOutbox().holdSequence;
@@ -1896,7 +1896,7 @@ struct MicraWebSocketTest {
   // the BLE quiet interval that follows it, so it is applied, not dropped.
   static void companionHeldReadSurvivesQuietInterval() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
@@ -1911,14 +1911,14 @@ struct MicraWebSocketTest {
     outboundBleQuiet.store(true);
     (void)service.serviceCompanion();
     assert(service.companionOutbox().hold && service.companionOutbox().holdSequence == sequence + 1);
-    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(frame(service, LaMarzoccoCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     // The interval ends: hold off, and the released read is applied.
     outboundBleQuiet.store(false);
     (void)service.serviceCompanion();
     assert(!service.companionOutbox().hold && service.companionOutbox().holdSequence == sequence + 2);
-    assert(frame(service, MicraCompanionStateKind::READ, kStandby));
-    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    assert(frame(service, LaMarzoccoCompanionStateKind::READ, kStandby));
+    assert(service.published_.powerState == LaMarzoccoPowerState::OFF);
     outboundScaleConnected.store(false);
     finish(service);
   }
@@ -1926,37 +1926,37 @@ struct MicraWebSocketTest {
   // the HTTPS session, once, and a command's buffer is not freed again.
   static void companionReleasesApiSession() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     service.stopWebSocket(true);
-    service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
+    service.config_.connectionType = static_cast<uint8_t>(LaMarzoccoConnectionType::API);
     assert(service.ensureWorkBuffer() && !service.websocket_);
     route(service);  // Asserts the work buffer was released.
     assert(service.ensureWorkBuffer());  // As a command does.
     assert(service.serviceCompanion() && service.work_);
-    service.config_.connectionType = static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
+    service.config_.connectionType = static_cast<uint8_t>(LaMarzoccoConnectionType::WEBSOCKET);
     finish(service);
   }
   // A push takes its power intent when it arrives: a command issued while it
   // is being decoded makes it older, not newer, as on the socket.
   static void companionPushIntentAtIngress() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
-    const MicraCompanionIngress ingress = service.companionIngress();
+    const LaMarzoccoCompanionIngress ingress = service.companionIngress();
     assert(service.powerState_.noteStandbyCommandAccepted(service.published_, true, millis()));
     cJSON *root = cJSON_Parse(kStandby);
-    assert(service.companionState(MicraCompanionStateKind::PUSH, 7, 0, root, ingress));
+    assert(service.companionState(LaMarzoccoCompanionStateKind::PUSH, 7, 0, root, ingress));
     cJSON_Delete(root);
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     finish(service);
   }
   static void companionSwitchesOnlyAtQuietPoints() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     for (int blocker = 0; blocker < 6; ++blocker) {
@@ -1970,7 +1970,7 @@ struct MicraWebSocketTest {
       }
       assert(!service.serviceCompanion());
       const auto status = service.companionRouteStatus();
-      assert(status.route == MicraCompanionRoute::DIRECT && std::strcmp(status.reason, "busy") == 0);
+      assert(status.route == LaMarzoccoCompanionRoute::DIRECT && std::strcmp(status.reason, "busy") == 0);
       service.shotActive_.store(false);
       service.scaleConnecting_.store(false);
       outboundBleQuiet.store(false);
@@ -1982,22 +1982,22 @@ struct MicraWebSocketTest {
     // the direct socket: the full frame turns the route back to direct.
     for (int late = 0; late < 2; ++late) {
       assert(service.serviceCompanion());
-      assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+      assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::PENDING);
       if (late == 0) service.shotActive_.store(true);
       else deliver(service, observation(service, kAwaiting));
-      assert(frame(service, MicraCompanionStateKind::FULL, kBrewing93));
+      assert(frame(service, LaMarzoccoCompanionStateKind::FULL, kBrewing93));
       const auto status = service.companionRouteStatus();
-      assert(status.route == MicraCompanionRoute::DIRECT && std::strcmp(status.reason, "busy") == 0);
+      assert(status.route == LaMarzoccoCompanionRoute::DIRECT && std::strcmp(status.reason, "busy") == 0);
       assert(!service.companionOutbox().routeCompanion && service.websocket_->client);
       service.shotActive_.store(false);
       deliver(service, observation(service, kCleaningOff));
     }
     // The route never moves on its own while a cleaning episode is busy.
     route(service);
-    assert(frame(service, MicraCompanionStateKind::PUSH, kAwaiting));
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kAwaiting));
     assert(service.backflush().busy());
     assert(service.serviceCompanion());
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::COMPANION);
     // Each switch-blocking condition has its own reason.
     service.companionLink(true, false);
     assert(std::strcmp(service.companionRouteStatus().reason, "switch_off") == 0);
@@ -2013,11 +2013,11 @@ struct MicraWebSocketTest {
   static void companionFailover() {
     for (const bool scaled : {false, true}) {
       now = 1000;
-      OpenBrewByWeightMicraService service;
+      OpenBrewByWeightLaMarzoccoService service;
       direct(service);
       link(service);
       route(service);
-      assert(frame(service, MicraCompanionStateKind::PUSH, kAwaiting));
+      assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kAwaiting));
       assert(service.backflush().valid && service.observationFence_.synchronized);
       const auto epoch = service.observationFence_.epoch;
       // The companion dies in the middle of a shot.
@@ -2025,22 +2025,22 @@ struct MicraWebSocketTest {
       service.shotActive_.store(true);
       outboundShotActive.store(true);
       service.companionLink(false, true);
-      assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+      assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::DIRECT);
       assert(std::strcmp(service.companionRouteStatus().reason, "no_link") == 0);
       assert(!service.backflush().valid && !service.observationFence_.synchronized);
       assert(retained(service.powerState_) && service.observationFence_.epoch == epoch + 1);
       assert(!service.websocketStatus().subscribed && !service.companionRoute_.load());
-      assert(service.currentStatus().quality == LineaMicraObservationQuality::STALE);
+      assert(service.currentStatus().quality == LaMarzoccoObservationQuality::STALE);
       // Late frames from the lost feed are ignored.
-      assert(frame(service, MicraCompanionStateKind::PUSH, kStandby));
-      assert(service.published_.powerState == LineaMicraPowerState::ON);
+      assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kStandby));
+      assert(service.published_.powerState == LaMarzoccoPowerState::ON);
       const auto inits = initCalls, sessions = sessionCalls;
       if (!service.serviceCompanion()) service.serviceWebSocket();
       // With a scale the direct connection waits for the shot; without, it starts.
       assert(initCalls == inits + (scaled ? 0 : 1));
       assert(sessionCalls == sessions + (scaled ? 0 : 1));
       if (scaled) {
-        assert(service.websocketStatus().state == MicraSocketState::PAUSED);
+        assert(service.websocketStatus().state == LaMarzoccoSocketState::PAUSED);
         service.shotActive_.store(false);
         outboundShotActive.store(false);
         service.serviceWebSocket();
@@ -2057,14 +2057,14 @@ struct MicraWebSocketTest {
   // otherwise: the controller stays direct without counting a loss.
   static void companionUpstreamRefusal() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     service.companionUpstream(true, 7, 3000, true);
     assert(service.companionRouteStatus().upstreamRefused);
     const auto sequence = service.companionOutbox().routeSequence;
     assert(!service.serviceCompanion());
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::DIRECT);
     assert(std::strcmp(service.companionRouteStatus().reason, "upstream_auth") == 0);
     assert(!service.companionOutbox().routeCompanion &&
            service.companionOutbox().routeSequence == sequence);
@@ -2072,24 +2072,24 @@ struct MicraWebSocketTest {
     service.companionUpstream(true, 7, 3000);
     assert(!service.companionRouteStatus().upstreamRefused);
     assert(service.serviceCompanion());
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::PENDING);
     // A pending La Marzocco policy met by the companion is the account's
     // state; only the companion reporting its end clears it.
     service.companionUpstream(true, 7, 3000, true, true);
-    assert(service.currentStatus().error == LineaMicraError::POLICY_REQUIRED);
+    assert(service.currentStatus().error == LaMarzoccoError::POLICY_REQUIRED);
     service.companionUpstream(true, 7, 3000, true);
-    assert(service.currentStatus().error == LineaMicraError::NONE);
+    assert(service.currentStatus().error == LaMarzoccoError::NONE);
     service.companionUpstream(true, 7, 3000, true, true);
     service.companionLink(false, true);
     service.companionUpstream(true, 7, 3000);
-    assert(service.currentStatus().error == LineaMicraError::POLICY_REQUIRED);
+    assert(service.currentStatus().error == LaMarzoccoError::POLICY_REQUIRED);
     finish(service);
   }
   // During a sync hold (a shot) the companion does not ping and the route
   // trusts it; the 30 s limit counts again from the hold's end.
   static void companionSyncHoldSilence() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
@@ -2097,7 +2097,7 @@ struct MicraWebSocketTest {
     service.companionSyncHold(true);
     now += 240000;  // a long shot without a single ping
     assert(service.serviceCompanion());
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::COMPANION);
     service.companionSyncHold(false);
     now += 29999;
     assert(service.serviceCompanion());
@@ -2108,7 +2108,7 @@ struct MicraWebSocketTest {
   }
   static void companionLossesAndFlapping() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     for (int loss = 0; loss < 4; ++loss) {
       link(service);
@@ -2148,12 +2148,12 @@ struct MicraWebSocketTest {
     now += 300000;
     service.companionPing(true);
     assert(service.serviceCompanion());
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::PENDING);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::PENDING);
     finish(service);
   }
   static void companionBasisLoss() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
@@ -2162,11 +2162,11 @@ struct MicraWebSocketTest {
     service.companionUpstream(true, 8, 3000);
     assert(!service.websocketStatus().subscribed && !service.observationFence_.synchronized);
     assert(retained(service.powerState_) && !service.backflush().valid);
-    assert(frame(service, MicraCompanionStateKind::PUSH, kStandby, 0, 8));
-    assert(service.published_.powerState == LineaMicraPowerState::ON);
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kStandby, 0, 8));
+    assert(service.published_.powerState == LaMarzoccoPowerState::ON);
     assert(service.serviceCompanion());
-    assert(frame(service, MicraCompanionStateKind::FULL, kBrewing93, 0, 8));
-    assert(service.currentStatus().quality == LineaMicraObservationQuality::CURRENT);
+    assert(frame(service, LaMarzoccoCompanionStateKind::FULL, kBrewing93, 0, 8));
+    assert(service.currentStatus().quality == LaMarzoccoObservationQuality::CURRENT);
     // A full frame that never comes returns the route to direct.
     service.companionUpstream(true, 9, 3000);
     now += 30000;
@@ -2184,15 +2184,15 @@ struct MicraWebSocketTest {
   static void companionCommands() {
     TaskMutex::hostObserver = [](const TaskMutex *, bool acquired) { locked = acquired; };
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
-    service.work_ = new OpenBrewByWeightMicraService::WorkBuffer;  // As ensureWorkBuffer() before each command.
+    service.work_ = new OpenBrewByWeightLaMarzoccoService::WorkBuffer;  // As ensureWorkBuffer() before each command.
     uint32_t requestId = 100;
     const auto temperature = [&](uint16_t targetDeciC) {
-      LineaMicraRequest request;
-      request.type = LineaMicraRequestType::APPLY_TEMPERATURE;
+      LaMarzoccoRequest request;
+      request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
       request.presetId = 1;
       request.targetDeciC = targetDeciC;
       request.requestId = ++requestId;
@@ -2209,17 +2209,17 @@ struct MicraWebSocketTest {
     notifyHook = [&] {
       const auto box = service.companionOutbox();
       if (stage == 0 && box.commandId) {
-        assert(box.commandOp == MicraCompanionCommandOp::TEMPERATURE && box.commandValue == 940);
+        assert(box.commandOp == LaMarzoccoCompanionCommandOp::TEMPERATURE && box.commandValue == 940);
         service.companionCommandResult(box.commandId, true, 0);
         stage = 1;
       } else if (stage == 1) {
         assert(box.commandId == 0);
-        assert(frame(service, MicraCompanionStateKind::PUSH, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":94.0}}]})"));
+        assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":94.0}}]})"));
         stage = 2;
       }
     };
     assert(temperature(940) && stage == 2);
-    assert(service.published_.temperatureState == LineaMicraTemperatureState::CONFIRMED);
+    assert(service.published_.temperatureState == LaMarzoccoTemperatureState::CONFIRMED);
     assert(service.published_.appliedTargetDeciC == 940);
     // A rejected command reports the companion's status like an HTTPS answer.
     notifyHook = [&] {
@@ -2227,7 +2227,7 @@ struct MicraWebSocketTest {
       if (box.commandId) service.companionCommandResult(box.commandId, false, 422);
     };
     assert(!temperature(950));
-    assert(service.published_.temperatureError == LineaMicraError::REJECTED &&
+    assert(service.published_.temperatureError == LaMarzoccoError::REJECTED &&
            service.published_.temperatureHttpStatus == 422);
     // Standby: an older read cannot undo the accepted command's intent; a read
     // ordered after the command confirms it.
@@ -2236,20 +2236,20 @@ struct MicraWebSocketTest {
     notifyHook = [&] {
       const auto box = service.companionOutbox();
       if (stage == 0 && box.commandId) {
-        assert(box.commandOp == MicraCompanionCommandOp::STANDBY);
+        assert(box.commandOp == LaMarzoccoCompanionCommandOp::STANDBY);
         sent = box.commandId;
         service.companionCommandResult(sent, true, 0);
         stage = 1;
       } else if (stage == 1) {
-        assert(frame(service, MicraCompanionStateKind::READ, kBrewing, 0));
-        assert(service.published_.powerState == LineaMicraPowerState::ON);
+        assert(frame(service, LaMarzoccoCompanionStateKind::READ, kBrewing, 0));
+        assert(service.published_.powerState == LaMarzoccoPowerState::ON);
         assert(service.currentStatus().optimisticOff);
-        assert(frame(service, MicraCompanionStateKind::READ, kStandby, sent));
+        assert(frame(service, LaMarzoccoCompanionStateKind::READ, kStandby, sent));
         stage = 2;
       }
     };
-    LineaMicraRequest standby;
-    standby.type = LineaMicraRequestType::SET_STANDBY;
+    LaMarzoccoRequest standby;
+    standby.type = LaMarzoccoRequestType::SET_STANDBY;
     standby.requestId = ++requestId;
     service.desiredPower_ = {};
     service.desiredPower_.request = standby;
@@ -2257,7 +2257,7 @@ struct MicraWebSocketTest {
     service.desiredPower_.shotGeneration = service.shotGeneration_.load();
     service.desiredPower_.present = true;
     assert(service.executePowerApplication(standby, service.configGeneration_) && stage == 2);
-    assert(service.published_.powerState == LineaMicraPowerState::OFF);
+    assert(service.published_.powerState == LaMarzoccoPowerState::OFF);
     assert(!service.desiredPower_.present && service.companionRouteStatus().commands == 3);
     // Zero HTTPS on the companion route: no session, write or dashboard read.
     assert(temperatureWrites == temperatureBefore && powerWrites == powerBefore);
@@ -2269,24 +2269,24 @@ struct MicraWebSocketTest {
       dropped = true;
     };
     assert(temperature(960) && dropped);
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::DIRECT);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::DIRECT);
     assert(temperatureWrites == temperatureBefore + 1 && sessionCalls == sessions + 1);
     assert(dashboardReads == reads + 1 && service.companionOutbox().commandId == 0);
-    assert(service.published_.temperatureState == LineaMicraTemperatureState::CONFIRMED);
+    assert(service.published_.temperatureState == LaMarzoccoTemperatureState::CONFIRMED);
     notifyHook = nullptr;
     finish(service);
     TaskMutex::hostObserver = nullptr;
   }
   static void companionConcurrentFeed() {
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
     std::atomic<bool> done{false};
     std::thread linkTask([&] {
       for (unsigned i = 0; i < 2000; ++i) {
-        (void)frame(service, MicraCompanionStateKind::PUSH, i % 2 ? kAwaiting : kStandby);
+        (void)frame(service, LaMarzoccoCompanionStateKind::PUSH, i % 2 ? kAwaiting : kStandby);
         service.companionPing(true);
         service.companionUpstream(true, 7, 3000);
         (void)service.companionOutbox();
@@ -2300,7 +2300,7 @@ struct MicraWebSocketTest {
       (void)service.companionRouteStatus();
     }
     linkTask.join();
-    assert(service.companionRouteStatus().route == MicraCompanionRoute::COMPANION);
+    assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::COMPANION);
     finish(service);
   }
   static void backflushMissBeforeFirstPoll() {
@@ -2308,7 +2308,7 @@ struct MicraWebSocketTest {
     // not busy, in both consume modes — the same fail-closed snapshot an
     // uncontended poll of an empty ring produces. The miss never stamps it.
     now = 1000;
-    OpenBrewByWeightMicraService service;
+    OpenBrewByWeightLaMarzoccoService service;
     std::atomic<bool> held{false}, release{false};
     std::thread holder([&] {
       TaskLockGuard lock(service.mux_);
@@ -2329,47 +2329,47 @@ struct MicraWebSocketTest {
 }
 int main() {
   openbrewbyweight::initJsonParser();
-  openbrewbyweight::MicraWebSocketTest::run();
-  openbrewbyweight::MicraWebSocketTest::lifecycleRegressions();
-  openbrewbyweight::MicraWebSocketTest::connectionClassification();
-  openbrewbyweight::MicraWebSocketTest::slowHandshakeIsNotAReconnect();
-  openbrewbyweight::MicraWebSocketTest::renewalKeepsSubscription();
-  openbrewbyweight::MicraWebSocketTest::initialSynchronization();
-  openbrewbyweight::MicraWebSocketTest::commandsSkipUnchangedMachineState();
-  openbrewbyweight::MicraWebSocketTest::backflushContract();
-  openbrewbyweight::MicraWebSocketTest::backflushReleasedAfterLostLink();
-  openbrewbyweight::MicraWebSocketTest::backflushReleasedOnUnrecognizedStatus();
-  openbrewbyweight::MicraWebSocketTest::backflushIdlePoll();
-  openbrewbyweight::MicraWebSocketTest::pongPublicationRace();
-  openbrewbyweight::MicraWebSocketTest::concurrentStatusLifecycle();
-  openbrewbyweight::MicraWebSocketTest::setupAdmissionAndBackoff();
-  openbrewbyweight::MicraWebSocketTest::backflushWaitAttribution();
-  openbrewbyweight::MicraWebSocketTest::statusPollCache();
-  openbrewbyweight::MicraWebSocketTest::apiFailureHoldsLastReading();
-  openbrewbyweight::MicraWebSocketTest::backflushForcedMissDuringEpisode();
-  openbrewbyweight::MicraWebSocketTest::backflushForcedMissAfterConsume();
-  openbrewbyweight::MicraWebSocketTest::backflushMissNeverServesIdleSnapshot();
-  openbrewbyweight::MicraWebSocketTest::backflushMissSurvivesLongHold();
-  openbrewbyweight::MicraWebSocketTest::backflushDetectorSilentAfterConversion();
-  openbrewbyweight::MicraWebSocketTest::queueMuxWaitDetectorFires();
-  openbrewbyweight::MicraWebSocketTest::loopEntryPointsNeverWaitOnMux();
-  openbrewbyweight::MicraWebSocketTest::muxWaitReportEmittedAfterUnlock();
-  openbrewbyweight::MicraWebSocketTest::backflushConsumeFastPathUnchanged();
-  openbrewbyweight::MicraWebSocketTest::backflushMissAfterAdmission();
-  openbrewbyweight::MicraWebSocketTest::backflushMissBeforeFirstPoll();
-  openbrewbyweight::MicraWebSocketTest::companionFullFrameAndCleaning();
-  openbrewbyweight::MicraWebSocketTest::companionPushParity();
-  openbrewbyweight::MicraWebSocketTest::companionReadsWaitForShots();
-  openbrewbyweight::MicraWebSocketTest::companionHoldFollowsShotAndScale();
-  openbrewbyweight::MicraWebSocketTest::companionHeldReadSurvivesQuietInterval();
-  openbrewbyweight::MicraWebSocketTest::companionReleasesApiSession();
-  openbrewbyweight::MicraWebSocketTest::companionPushIntentAtIngress();
-  openbrewbyweight::MicraWebSocketTest::companionSwitchesOnlyAtQuietPoints();
-  openbrewbyweight::MicraWebSocketTest::companionFailover();
-  openbrewbyweight::MicraWebSocketTest::companionUpstreamRefusal();
-  openbrewbyweight::MicraWebSocketTest::companionLossesAndFlapping();
-  openbrewbyweight::MicraWebSocketTest::companionSyncHoldSilence();
-  openbrewbyweight::MicraWebSocketTest::companionBasisLoss();
-  openbrewbyweight::MicraWebSocketTest::companionCommands();
-  openbrewbyweight::MicraWebSocketTest::companionConcurrentFeed();
+  openbrewbyweight::LaMarzoccoWebSocketTest::run();
+  openbrewbyweight::LaMarzoccoWebSocketTest::lifecycleRegressions();
+  openbrewbyweight::LaMarzoccoWebSocketTest::connectionClassification();
+  openbrewbyweight::LaMarzoccoWebSocketTest::slowHandshakeIsNotAReconnect();
+  openbrewbyweight::LaMarzoccoWebSocketTest::renewalKeepsSubscription();
+  openbrewbyweight::LaMarzoccoWebSocketTest::initialSynchronization();
+  openbrewbyweight::LaMarzoccoWebSocketTest::commandsSkipUnchangedMachineState();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushContract();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushReleasedAfterLostLink();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushReleasedOnUnrecognizedStatus();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushIdlePoll();
+  openbrewbyweight::LaMarzoccoWebSocketTest::pongPublicationRace();
+  openbrewbyweight::LaMarzoccoWebSocketTest::concurrentStatusLifecycle();
+  openbrewbyweight::LaMarzoccoWebSocketTest::setupAdmissionAndBackoff();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushWaitAttribution();
+  openbrewbyweight::LaMarzoccoWebSocketTest::statusPollCache();
+  openbrewbyweight::LaMarzoccoWebSocketTest::apiFailureHoldsLastReading();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushForcedMissDuringEpisode();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushForcedMissAfterConsume();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushMissNeverServesIdleSnapshot();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushMissSurvivesLongHold();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushDetectorSilentAfterConversion();
+  openbrewbyweight::LaMarzoccoWebSocketTest::queueMuxWaitDetectorFires();
+  openbrewbyweight::LaMarzoccoWebSocketTest::loopEntryPointsNeverWaitOnMux();
+  openbrewbyweight::LaMarzoccoWebSocketTest::muxWaitReportEmittedAfterUnlock();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushConsumeFastPathUnchanged();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushMissAfterAdmission();
+  openbrewbyweight::LaMarzoccoWebSocketTest::backflushMissBeforeFirstPoll();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionFullFrameAndCleaning();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionPushParity();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionReadsWaitForShots();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionHoldFollowsShotAndScale();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionHeldReadSurvivesQuietInterval();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionReleasesApiSession();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionPushIntentAtIngress();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionSwitchesOnlyAtQuietPoints();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionFailover();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionUpstreamRefusal();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionLossesAndFlapping();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionSyncHoldSilence();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionBasisLoss();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionCommands();
+  openbrewbyweight::LaMarzoccoWebSocketTest::companionConcurrentFeed();
 }

@@ -2,9 +2,9 @@
 // The IDF client cannot switch pings off (0 means its default), so a parked
 // subscription pings once an hour: never within a shot.
 constexpr size_t kPingSec = 15, kParkedPingSec = 3600;
-struct OpenBrewByWeightMicraService::WebSocketBuffer {
-  MicraStompDecoder decoder;
-  MicraObservationStamp stamp;
+struct OpenBrewByWeightLaMarzoccoService::WebSocketBuffer {
+  LaMarzoccoStompDecoder decoder;
+  LaMarzoccoObservationStamp stamp;
   esp_websocket_client_handle_t client = nullptr;
   char headers[1024] = {};
   char connect[kTokenCapacity + 160] = {};
@@ -26,9 +26,9 @@ struct OpenBrewByWeightMicraService::WebSocketBuffer {
   uint8_t attempts = 0;
 };
 
-MicraWebSocketStatus OpenBrewByWeightMicraService::websocketStatus(bool includeTraffic) const {
+LaMarzoccoWebSocketStatus OpenBrewByWeightLaMarzoccoService::websocketStatus(bool includeTraffic) const {
   TaskLockGuard lock(mux_);
-  MicraWebSocketStatus result = websocketStatus_;
+  LaMarzoccoWebSocketStatus result = websocketStatus_;
   result.live = liveSubscriptionLocked();
   if (includeTraffic && websocket_ != nullptr) {
     const uint64_t second = static_cast<uint64_t>(esp_timer_get_time()) / 1000000;
@@ -47,7 +47,7 @@ MicraWebSocketStatus OpenBrewByWeightMicraService::websocketStatus(bool includeT
   return result;
 }
 
-bool OpenBrewByWeightMicraService::websocketAdmitted(bool starting) const {
+bool OpenBrewByWeightLaMarzoccoService::websocketAdmitted(bool starting) const {
   if (starting && (outboundScaleInhibited() || scaleConnecting_.load(std::memory_order_acquire) ||
                    shotTransportPaused())) return false;
   if (outboundMaintenance.load(std::memory_order_acquire)) return false;
@@ -56,11 +56,11 @@ bool OpenBrewByWeightMicraService::websocketAdmitted(bool starting) const {
       clearSessionRequested_.load(std::memory_order_acquire)) return false;
   TaskLockGuard lock(mux_);
   return config_.accountConfigured &&
-      (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0 &&
-      config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
+      (config_.options & LA_MARZOCCO_OBSERVE_STATE) != 0 &&
+      config_.connectionType == static_cast<uint8_t>(LaMarzoccoConnectionType::WEBSOCKET);
 }
 
-void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
+void OpenBrewByWeightLaMarzoccoService::stopWebSocket(bool release) {
   WebSocketBuffer *buffer = websocket_;
   if (!buffer) {
     return;
@@ -71,19 +71,19 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
     {
       TaskLockGuard lock(mux_);
       if (buffer->stamp.identity == identityGeneration_ && config_.accountConfigured &&
-          (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0 &&
-          config_.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET))
+          (config_.options & LA_MARZOCCO_OBSERVE_STATE) != 0 &&
+          config_.connectionType == static_cast<uint8_t>(LaMarzoccoConnectionType::WEBSOCKET))
         websocketUnexpectedReconnect_ = websocketUnexpectedReconnect_ || buffer->failed.load() ||
             (!staConnected_.load() && !apActive_.load());
       // On the companion route this socket is already obsolete; the feed
       // that replaced it keeps its own subscription and supervision.
-      if (companion_.status.route != MicraCompanionRoute::COMPANION) {
+      if (companion_.status.route != LaMarzoccoCompanionRoute::COMPANION) {
         if (buffer->stamp.identity == identityGeneration_)
           powerState_.hold(published_, config_.accountConfigured &&
-              (config_.options & LINEA_MICRA_OBSERVE_STATE) != 0, millis());
-        websocketStatus_.state = MicraSocketState::STOPPING;
+              (config_.options & LA_MARZOCCO_OBSERVE_STATE) != 0, millis());
+        websocketStatus_.state = LaMarzoccoSocketState::STOPPING;
         websocketStatus_.subscribed = false;
-        shotTraceNoteMicraSubscribed(false);
+        shotTraceNoteLaMarzoccoSubscribed(false);
         backflush_.invalidate();
       }
       if (buffer->heap.pending) finishHeapLifecycle(buffer->heap, HeapLifecycleResult::FAILURE, before);
@@ -97,7 +97,7 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
     buffer->client = nullptr;
     const auto after = sampleHeapCaps();
     TaskLockGuard lock(mux_);
-    if (companion_.status.route != MicraCompanionRoute::COMPANION) {
+    if (companion_.status.route != LaMarzoccoCompanionRoute::COMPANION) {
       snapshotPending_ = false;
       observationFence_.invalidate();
     }
@@ -137,7 +137,7 @@ void OpenBrewByWeightMicraService::stopWebSocket(bool release) {
 // queues one initial dashboard read. A scaled shot parks it (`on` false: an
 // UNSUBSCRIBE, socket kept) until the relay opens; that resumed SUBSCRIBE
 // reads nothing, since the cloud sends the machine's state seconds after a shot.
-bool OpenBrewByWeightMicraService::sendSubscription(bool on) {
+bool OpenBrewByWeightLaMarzoccoService::sendSubscription(bool on) {
   WebSocketBuffer &buffer = *websocket_;
   char frame[256];
   const int length = on ? snprintf(frame, sizeof(frame),
@@ -167,17 +167,17 @@ bool OpenBrewByWeightMicraService::sendSubscription(bool on) {
   observationFence_.invalidate();
   status.pongAtMs = 0;
   status.subscribed = true;
-  shotTraceNoteMicraSubscribed(true);
+  shotTraceNoteLaMarzoccoSubscribed(true);
   status.machineConnectedKnown = false;
   observationFence_.offline = false;
   snapshotStamp_ = observationFence_.stamp(identityGeneration_, powerState_.generation());
   snapshotPending_ = true;
-  status.state = MicraSocketState::WAITING_FOR_DATA;
+  status.state = LaMarzoccoSocketState::WAITING_FOR_DATA;
   return true;
 }
 
-bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFrame &frame) {
-  auto &self = *static_cast<OpenBrewByWeightMicraService *>(context);
+bool OpenBrewByWeightLaMarzoccoService::stompFrame(void *context, const LaMarzoccoStompFrame &frame) {
+  auto &self = *static_cast<OpenBrewByWeightLaMarzoccoService *>(context);
   WebSocketBuffer &buffer = *self.websocket_;
   if (!self.websocketAdmitted()) return true;
   bool subscribed;
@@ -210,8 +210,8 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
   // JSON cannot contain an embedded raw NUL, even with STOMP content-length.
   if (memchr(frame.body, '\0', frame.bodyLength)) return false;
   const uint32_t receivedAt = millis();
-  MicraObservation update;
-  update.source = MicraObservationSource::WEBSOCKET;
+  LaMarzoccoObservation update;
+  update.source = LaMarzoccoObservationSource::WEBSOCKET;
   update.receivedAtMs = receivedAt;
   {
     TaskLockGuard lock(self.mux_);
@@ -219,14 +219,14 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
     // Intent is captured at ingress, before parsing, not at handshake time.
     update.stamp.intent = buffer.frameIntent;
   }
-  cJSON *root = parseJsonDocumentWithinLimits(frame.body, MicraStompDecoder::kBodyLimit,
+  cJSON *root = parseJsonDocumentWithinLimits(frame.body, LaMarzoccoStompDecoder::kBodyLimit,
                                              1024);
   const char *unsupported = nullptr;
-  const bool decoded = root && decodeMicraDashboard(root, update, &unsupported);
+  const bool decoded = root && decodeLaMarzoccoDashboard(root, update, &unsupported);
   if (root) cJSON_Delete(root);
   if (!decoded && unsupported != nullptr) {
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "Micra dashboard push rejected: %s", unsupported);
+                         "La Marzocco dashboard push rejected: %s", unsupported);
     return false;
   }
   if (!decoded) {
@@ -238,7 +238,7 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
     memcpy(excerpt, frame.body, excerptLength);
     excerpt[excerptLength] = '\0';
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "Micra dashboard push rejected: %s", excerpt);
+                         "La Marzocco dashboard push rejected: %s", excerpt);
     return false;
   }
   if (!self.websocketAdmitted()) return true;
@@ -251,7 +251,7 @@ bool OpenBrewByWeightMicraService::stompFrame(void *context, const MicraStompFra
 
 // Publishes one decoded dashboard push under mux_. The direct socket and the
 // companion feed share this body, so both routes publish identically.
-void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &update,
+void OpenBrewByWeightLaMarzoccoService::applyPushLocked(const LaMarzoccoObservation &update,
                                                    uint32_t ingressAttempt) {
   const uint32_t receivedAt = update.receivedAtMs;
   if (!observationFence_.merge(published_, powerState_, update, true)) return;
@@ -260,7 +260,7 @@ void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &updat
   // needs no HTTPS read; an offline machine makes a pending one useless.
   if (observationFence_.offline) snapshotPending_ = false;
   auto &status = websocketStatus_;
-  status.state = MicraSocketState::STREAMING;
+  status.state = LaMarzoccoSocketState::STREAMING;
   status.reason = "none";
   status.messageAtMs = receivedAt;
   ++status.messages;
@@ -270,16 +270,16 @@ void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &updat
     status.machineConnected = update.connected;
   }
   if (observationFence_.offline ||
-      (update.powerPresent && update.mode != LineaMicraObservedMode::BREWING))
+      (update.powerPresent && update.mode != LaMarzoccoObservedMode::BREWING))
     backflush_.invalidate();
   if (update.cleaningPresent) {
     status.cleaning = update.cleaning;
     status.cleaningAvailable = update.cleaningAvailable;
     status.cleaningAtMs = receivedAt;
     memcpy(status.cleaningLabel, update.cleaningLabel, sizeof(status.cleaningLabel));
-    const auto phase = update.cleaning == MicraCleaningState::OFF
-        ? MachineBackflushPhase::INACTIVE : update.cleaning == MicraCleaningState::REQUESTED
-        ? MachineBackflushPhase::AWAITING : update.cleaning == MicraCleaningState::CLEANING
+    const auto phase = update.cleaning == LaMarzoccoCleaningState::OFF
+        ? MachineBackflushPhase::INACTIVE : update.cleaning == LaMarzoccoCleaningState::REQUESTED
+        ? MachineBackflushPhase::AWAITING : update.cleaning == LaMarzoccoCleaningState::CLEANING
         ? MachineBackflushPhase::ACTIVE : MachineBackflushPhase::UNKNOWN;
     // A recognized status restarts the unsupervised clock even between polls.
     if (!observationFence_.offline && status.machineConnectedKnown &&
@@ -298,9 +298,9 @@ void OpenBrewByWeightMicraService::applyPushLocked(const MicraObservation &updat
   status.maxPublishLatencyMs = std::max(status.maxPublishLatencyMs, status.publishLatencyMs);
 }
 
-void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
+void OpenBrewByWeightLaMarzoccoService::websocketEvent(void *context, const char *,
                                             int32_t event, void *data) {
-  auto &self = *static_cast<OpenBrewByWeightMicraService *>(context);
+  auto &self = *static_cast<OpenBrewByWeightLaMarzoccoService *>(context);
   const uint32_t ingressAttempt = self.backflush_.ingressAttempt();
   auto &buffer = *self.websocket_;
   if (!data || (event != WEBSOCKET_EVENT_CONNECTED && event != WEBSOCKET_EVENT_DATA &&
@@ -316,7 +316,7 @@ void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
       event == WEBSOCKET_EVENT_ERROR) {
     if (event == WEBSOCKET_EVENT_DISCONNECTED)
       serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-          "Micra WS disconnected http=%d tls=%d stack=%d verify=%u errno=%d",
+          "La Marzocco WS disconnected http=%d tls=%d stack=%d verify=%u errno=%d",
           message.error_handle.esp_ws_handshake_status_code,
           int(message.error_handle.esp_tls_last_esp_err), message.error_handle.esp_tls_stack_err,
           unsigned(message.error_handle.esp_tls_cert_verify_flags), message.error_handle.esp_transport_sock_errno);
@@ -352,7 +352,7 @@ void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
         self.websocketStatus_.psramMinimum = heap.psramMinimum;
         self.websocketStatus_.psramFree = heap.psramFree;
         self.websocketStatus_.psramLargest = heap.psramLargest;
-        self.websocketStatus_.state = MicraSocketState::STOMP_CONNECTING;
+        self.websocketStatus_.state = LaMarzoccoSocketState::STOMP_CONNECTING;
         self.websocketStatus_.connectedAtMs = millis();
       }
     }
@@ -370,7 +370,7 @@ void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
         if (bin.second != second) bin = {second, 0, 0};
         bin.rx += std::max(0, message.data_len);
       }
-      shotTraceNoteMicraRx(static_cast<uint32_t>(std::max(0, message.data_len)));
+      shotTraceNoteLaMarzoccoRx(static_cast<uint32_t>(std::max(0, message.data_len)));
       if (!self.websocketAdmitted()) return;
       bool valid = message.data_len >= 0 && message.payload_len >= 0 &&
           message.payload_offset >= 0 && message.payload_offset <= message.payload_len &&
@@ -413,17 +413,17 @@ void OpenBrewByWeightMicraService::websocketEvent(void *context, const char *,
   if (self.task_) xTaskNotifyGive(self.task_);
 }
 
-void OpenBrewByWeightMicraService::serviceWebSocket() {
+void OpenBrewByWeightLaMarzoccoService::serviceWebSocket() {
   static_assert(sizeof(WebSocketBuffer) <= 24 * 1024);
-  LineaMicraPersistedSettings settings;
+  LaMarzoccoPersistedSettings settings;
   {
     TaskLockGuard lock(mux_);
     settings = config_;
   }
   const bool selected = settings.accountConfigured &&
-      (settings.options & LINEA_MICRA_OBSERVE_STATE) != 0 &&
-      settings.connectionType == static_cast<uint8_t>(MicraConnectionType::WEBSOCKET);
-  LineaMicraError gate = LineaMicraError::NONE;
+      (settings.options & LA_MARZOCCO_OBSERVE_STATE) != 0 &&
+      settings.connectionType == static_cast<uint8_t>(LaMarzoccoConnectionType::WEBSOCKET);
+  LaMarzoccoError gate = LaMarzoccoError::NONE;
   const bool maintenance = outboundMaintenance.load();
   const bool admitted = selected && websocketAdmitted() && networkEligible(gate, true);
   if (!admitted) {
@@ -431,7 +431,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
       TaskLockGuard lock(mux_);
       if (maintenance) {
         powerState_.hold(published_, settings.accountConfigured &&
-            (settings.options & LINEA_MICRA_OBSERVE_STATE) != 0, millis());
+            (settings.options & LA_MARZOCCO_OBSERVE_STATE) != 0, millis());
         if (websocket_ && websocket_->client && websocket_->stamp.epoch == observationFence_.epoch)
           ++observationFence_.epoch;
         if (!websocketStatus_.pauseAtMs) websocketStatus_.pauseAtMs =
@@ -440,13 +440,13 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     }
     stopWebSocket(!selected || maintenance || clearSessionRequested_.load(std::memory_order_acquire));
     TaskLockGuard lock(mux_);
-    websocketStatus_.state = !selected ? MicraSocketState::Disabled
-        : maintenance ? MicraSocketState::PAUSED
-        : gate == LineaMicraError::CLOCK_UNSYNCED ? MicraSocketState::WAITING_FOR_TIME
-        : MicraSocketState::WAITING_FOR_NETWORK;
+    websocketStatus_.state = !selected ? LaMarzoccoSocketState::Disabled
+        : maintenance ? LaMarzoccoSocketState::PAUSED
+        : gate == LaMarzoccoError::CLOCK_UNSYNCED ? LaMarzoccoSocketState::WAITING_FOR_TIME
+        : LaMarzoccoSocketState::WAITING_FOR_NETWORK;
     websocketStatus_.reason = !selected ? "disabled" : maintenance ? "maintenance"
-        : lineaMicraErrorName(gate);
-    wipeLineaMicraSettings(settings);
+        : laMarzoccoErrorName(gate);
+    wipeLaMarzoccoSettings(settings);
     return;
   }
   uint32_t now = millis();
@@ -455,7 +455,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     if (websocket_) websocket_->attempts = 0;
     TaskLockGuard lock(mux_);
     websocketStatus_.retryAtMs = 0;
-    if (websocketStatus_.state == MicraSocketState::AUTH_ERROR) websocketStatus_.state = MicraSocketState::BACKOFF;
+    if (websocketStatus_.state == LaMarzoccoSocketState::AUTH_ERROR) websocketStatus_.state = LaMarzoccoSocketState::BACKOFF;
   }
   if (websocket_ && websocket_->client) {
     const bool partialPending = websocket_->partialPending.load(std::memory_order_acquire);
@@ -465,7 +465,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     {
       TaskLockGuard lock(mux_);
       subscribed = websocketStatus_.subscribed;
-      streaming = websocketStatus_.state == MicraSocketState::STREAMING;
+      streaming = websocketStatus_.state == LaMarzoccoSocketState::STREAMING;
       pongAtMs = websocketStatus_.pongAtMs;
       connectedAtMs = websocketStatus_.connectedAtMs;
       obsolete = websocket_->stamp.epoch != observationFence_.epoch;
@@ -490,15 +490,15 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
       }
       // The open subscription survives token renewal: only HTTPS needs the new
       // token, so renew in place instead of reconnecting and re-reading.
-      if (!park && work_ && micra_timing::accessTokenRefreshDue(now - work_->accessTokenIssuedAtMs) &&
+      if (!park && work_ && la_marzocco_timing::accessTokenRefreshDue(now - work_->accessTokenIssuedAtMs) &&
           tickReached(now, websocket_->renewRetryAtMs) &&
           !ensureSession(settings, false))
-        websocket_->renewRetryAtMs = millis() + micra_timing::kExhaustedCooldownMs;
+        websocket_->renewRetryAtMs = millis() + la_marzocco_timing::kExhaustedCooldownMs;
       if (streaming && now - connectedAtMs >= 30000) {
         websocket_->attempts = 0;
         websocketAuthRecoveries_ = 0;
       }
-      wipeLineaMicraSettings(settings);
+      wipeLaMarzoccoSettings(settings);
       return;
     }
     const bool auth = websocket_->authFailed.load(std::memory_order_acquire);
@@ -518,15 +518,15 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     if (!obsolete) {
       if (auth) ++websocketAuthRecoveries_;
       ++websocket_->attempts;
-      websocketStatus_.retryAtMs = now + (websocket_->attempts < micra_timing::kWsMaxAttempts
-          ? micra_timing::kWsReconnectDelaysMs[websocket_->attempts - 1]
-          : micra_timing::kExhaustedCooldownMs);
+      websocketStatus_.retryAtMs = now + (websocket_->attempts < la_marzocco_timing::kWsMaxAttempts
+          ? la_marzocco_timing::kWsReconnectDelaysMs[websocket_->attempts - 1]
+          : la_marzocco_timing::kExhaustedCooldownMs);
       websocketStatus_.state = websocketAuthRecoveries_ > 1
-          ? MicraSocketState::AUTH_ERROR : MicraSocketState::BACKOFF;
-      if (websocket_->attempts >= micra_timing::kWsMaxAttempts) websocket_->attempts = 0;
+          ? LaMarzoccoSocketState::AUTH_ERROR : LaMarzoccoSocketState::BACKOFF;
+      if (websocket_->attempts >= la_marzocco_timing::kWsMaxAttempts) websocket_->attempts = 0;
     } else {
       websocketStatus_.retryAtMs = 0;
-      websocketStatus_.state = MicraSocketState::BACKOFF;
+      websocketStatus_.state = LaMarzoccoSocketState::BACKOFF;
     }
   }
   uint32_t retryAtMs;
@@ -536,20 +536,20 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
   }
   if (websocketAuthRecoveries_ > 1) {
     TaskLockGuard lock(mux_);
-    websocketStatus_.state = MicraSocketState::AUTH_ERROR;
+    websocketStatus_.state = LaMarzoccoSocketState::AUTH_ERROR;
     websocketStatus_.reason = "authentication";
-    wipeLineaMicraSettings(settings);
+    wipeLaMarzoccoSettings(settings);
     return;
   }
   if (retryAtMs && !tickReached(now, retryAtMs)) {
-    wipeLineaMicraSettings(settings);
+    wipeLaMarzoccoSettings(settings);
     return;
   }
   if (!websocketAdmitted(true)) {
     TaskLockGuard lock(mux_);
-    websocketStatus_.state = MicraSocketState::PAUSED;
+    websocketStatus_.state = LaMarzoccoSocketState::PAUSED;
     websocketStatus_.reason = shotTransportPaused() ? "shot" : "scale";
-    wipeLineaMicraSettings(settings);
+    wipeLaMarzoccoSettings(settings);
     return;
   }
   if (!websocket_) {
@@ -557,10 +557,10 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     if (!buffer) {
       TaskLockGuard lock(mux_);
       ++websocketStatus_.allocationFailures;
-      websocketStatus_.state = MicraSocketState::BACKOFF;
+      websocketStatus_.state = LaMarzoccoSocketState::BACKOFF;
       websocketStatus_.reason = "allocation_failed";
-      websocketStatus_.retryAtMs = millis() + micra_timing::kExhaustedCooldownMs;
-      wipeLineaMicraSettings(settings);
+      websocketStatus_.retryAtMs = millis() + la_marzocco_timing::kExhaustedCooldownMs;
+      wipeLaMarzoccoSettings(settings);
       return;
     }
     new (buffer) WebSocketBuffer{};
@@ -571,20 +571,20 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
   }
   {
     TaskLockGuard lock(mux_);
-    websocketStatus_.state = MicraSocketState::AUTHENTICATING;
+    websocketStatus_.state = LaMarzoccoSocketState::AUTHENTICATING;
   }
   bool renewed = false;
   if (!ensureWorkBuffer() || !ensureSession(settings, false, &renewed) || !websocketAdmitted(true)) {
     TaskLockGuard lock(mux_);
-    if (classifyFailure() == LineaMicraError::INVALID_AUTH) websocketAuthRecoveries_ = 2;
+    if (classifyFailure() == LaMarzoccoError::INVALID_AUTH) websocketAuthRecoveries_ = 2;
     websocketStatus_.state = websocketAuthRecoveries_ > 1
-        ? MicraSocketState::AUTH_ERROR : MicraSocketState::BACKOFF;
+        ? LaMarzoccoSocketState::AUTH_ERROR : LaMarzoccoSocketState::BACKOFF;
     websocketStatus_.reason = "session_unavailable";
     const uint8_t attempt = ++websocket_->attempts;
-    websocketStatus_.retryAtMs = millis() + (attempt < micra_timing::kWsMaxAttempts
-        ? micra_timing::kWsReconnectDelaysMs[attempt - 1] : micra_timing::kExhaustedCooldownMs);
-    if (attempt >= micra_timing::kWsMaxAttempts) websocket_->attempts = 0;
-    wipeLineaMicraSettings(settings);
+    websocketStatus_.retryAtMs = millis() + (attempt < la_marzocco_timing::kWsMaxAttempts
+        ? la_marzocco_timing::kWsReconnectDelaysMs[attempt - 1] : la_marzocco_timing::kExhaustedCooldownMs);
+    if (attempt >= la_marzocco_timing::kWsMaxAttempts) websocket_->attempts = 0;
+    wipeLaMarzoccoSettings(settings);
     return;
   }
   auto &buffer = *websocket_;
@@ -632,7 +632,7 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
   {
     TaskLockGuard lock(mux_);
     beginHeapLifecycle(buffer.heap, HeapLifecycleEvent::TLS_REQUEST, before);
-    websocketStatus_.state = MicraSocketState::CONNECTING;
+    websocketStatus_.state = LaMarzoccoSocketState::CONNECTING;
     ++websocketStatus_.reconnects;
   }
   ok = ok && websocketAdmitted(true) && esp_websocket_client_start(buffer.client) == ESP_OK;
@@ -645,12 +645,12 @@ void OpenBrewByWeightMicraService::serviceWebSocket() {
     TaskLockGuard lock(mux_);
     websocketUnexpectedReconnect_ = websocketUnexpectedReconnect_ ||
         (unexpected && buffer.stamp.epoch == observationFence_.epoch);
-    websocketStatus_.state = MicraSocketState::BACKOFF;
+    websocketStatus_.state = LaMarzoccoSocketState::BACKOFF;
     websocketStatus_.reason = "start_failed";
     const uint8_t attempt = ++buffer.attempts;
-    websocketStatus_.retryAtMs = millis() + (attempt < micra_timing::kWsMaxAttempts
-        ? micra_timing::kWsReconnectDelaysMs[attempt - 1] : micra_timing::kExhaustedCooldownMs);
-    if (attempt >= micra_timing::kWsMaxAttempts) buffer.attempts = 0;
+    websocketStatus_.retryAtMs = millis() + (attempt < la_marzocco_timing::kWsMaxAttempts
+        ? la_marzocco_timing::kWsReconnectDelaysMs[attempt - 1] : la_marzocco_timing::kExhaustedCooldownMs);
+    if (attempt >= la_marzocco_timing::kWsMaxAttempts) buffer.attempts = 0;
   }
-  wipeLineaMicraSettings(settings);
+  wipeLaMarzoccoSettings(settings);
 }

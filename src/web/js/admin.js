@@ -703,7 +703,7 @@ function applyCompanionStatus(c) {
       !r.codeReady || !/^\d{6}$/.test($("companionCode").value);
   } else {
     $("companionCode").value = "";
-    if (__LINEA_MICRA__) $("companionApproveLm").checked = true;
+    if (__LA_MARZOCCO__) $("companionApproveLm").checked = true;
     $("companionApproveLog").checked = true;
     $("companionApproveArchive").checked = $("companionApproveBc").checked = true;
   }
@@ -748,11 +748,11 @@ function applyCompanionStatus(c) {
     icon.dataset.level = link ? "on" : c.relay === "ready" ? "partial" : "off";
     icon.title = $("companionLinkState").textContent;
   }
-  if (__LINEA_MICRA__) $("companionRouteState").textContent = companionRouteText(c);
+  if (__LA_MARZOCCO__) $("companionRouteState").textContent = companionRouteText(c);
   R.companionHere(true).then(companionCopy);
   if (!R.uiState.companionDirty) {
     $("companionUi").checked = c.ui !== false;
-    if (__LINEA_MICRA__) $("companionLm").checked = !!c.lm;
+    if (__LA_MARZOCCO__) $("companionLm").checked = !!c.lm;
     $("companionLog").checked = !!c.log;
     $("companionArchive").checked = !!c.archive;
     $("companionBc").checked = c.bc !== false;
@@ -808,7 +808,7 @@ async function saveCompanionSettings() {
         log: $("companionLog").checked,
         archive: $("companionArchive").checked,
         bc: $("companionBc").checked,
-        ...(__LINEA_MICRA__ && { lm: $("companionLm").checked }),
+        ...(__LA_MARZOCCO__ && { lm: $("companionLm").checked }),
       },
       __WEBUI_TEXT__("admin.setting_saved"),
       $("saveCompanionButton"),
@@ -847,7 +847,7 @@ function initCompanion() {
           log: $("companionApproveLog").checked,
           archive: $("companionApproveArchive").checked,
           bc: $("companionApproveBc").checked && $("companionApproveArchive").checked,
-          ...(__LINEA_MICRA__ && { lm: $("companionApproveLm").checked }),
+          ...(__LA_MARZOCCO__ && { lm: $("companionApproveLm").checked }),
         }),
       });
       companionPairing.stage = 1;

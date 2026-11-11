@@ -1,22 +1,22 @@
 #pragma once
-#include "OpenBrewByWeightMicraObservation.h"
+#include "OpenBrewByWeightLaMarzoccoObservation.h"
 #include "OpenBrewByWeightPsram.h"
 
 namespace openbrewbyweight {
-enum class MicraSocketState : uint8_t {
+enum class LaMarzoccoSocketState : uint8_t {
   Disabled, WAITING_FOR_NETWORK, WAITING_FOR_TIME, PAUSED, AUTHENTICATING,
   CONNECTING, STOMP_CONNECTING, WAITING_FOR_DATA, STREAMING, STOPPING,
   BACKOFF, AUTH_ERROR
 };
-inline const char *micraSocketStateName(MicraSocketState state) {
+inline const char *laMarzoccoSocketStateName(LaMarzoccoSocketState state) {
   static constexpr const char *names[] = {
       "disabled", "waiting_for_network", "waiting_for_time", "paused",
       "authenticating", "connecting", "stomp_connecting", "waiting_for_data",
       "streaming", "stopping", "backoff", "auth_error"};
   return names[static_cast<unsigned>(state)];
 }
-struct MicraWebSocketStatus {
-  MicraSocketState state = MicraSocketState::Disabled;
+struct LaMarzoccoWebSocketStatus {
+  LaMarzoccoSocketState state = LaMarzoccoSocketState::Disabled;
   const char *reason = "disabled";
   uint32_t epoch = 0, connectedAtMs = 0, messageAtMs = 0, powerAtMs = 0;
   uint32_t pongAtMs = 0, retryAtMs = 0, pauseAtMs = 0;
@@ -30,7 +30,7 @@ struct MicraWebSocketStatus {
   uint32_t publishLatencyMs = 0, maxPublishLatencyMs = 0;
   uint32_t cleaningAtMs = 0, retainedBytes = 0;
   uint32_t internalMinimum = 0, psramMinimum = 0, psramFree = 0, psramLargest = 0;
-  MicraCleaningState cleaning = MicraCleaningState::UNKNOWN;
+  LaMarzoccoCleaningState cleaning = LaMarzoccoCleaningState::UNKNOWN;
   char cleaningLabel[33] = {};
   bool subscribed = false, machineConnectedKnown = false, machineConnected = false;
   bool live = false;  // the active route's subscription supervises cleaning

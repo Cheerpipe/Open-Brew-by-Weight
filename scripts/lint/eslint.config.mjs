@@ -14,7 +14,7 @@ export default [
         // Build-time constants and markers that scripts/gen_web_ui.js and
         // scripts/localize_web_ui.js replace or fold before minification.
         __WEBUI_TEXT__: "readonly",
-        __LINEA_MICRA__: "readonly",
+        __LA_MARZOCCO__: "readonly",
         __REMOTE_CONTROL__: "readonly",
         __homeModule: "readonly",
         __SW_ASSETS__: "readonly",

@@ -513,10 +513,10 @@ void openbrewbyweight::shotTraceLogRecoveryDropped(uint32_t crashedBootId) {
                        static_cast<unsigned long>(crashedBootId));
 }
 
-// Linea Micra WebSocket task hooks (declared in OpenBrewByWeightMicraService.cpp).
-void shotTraceNoteMicraRx(uint32_t bytes) { shotTrace().noteMicraRx(bytes); }
-void shotTraceNoteMicraSubscribed(bool subscribed) {
-  shotTrace().noteMicraSubscribed(subscribed);
+// Linea Micra WebSocket task hooks (declared in OpenBrewByWeightLaMarzoccoService.cpp).
+void shotTraceNoteLaMarzoccoRx(uint32_t bytes) { shotTrace().noteLaMarzoccoRx(bytes); }
+void shotTraceNoteLaMarzoccoSubscribed(bool subscribed) {
+  shotTrace().noteLaMarzoccoSubscribed(subscribed);
 }
 
 uint32_t debugLogLatestSequence() {

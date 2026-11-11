@@ -19,7 +19,7 @@ inline bool outboundScaleInhibited() {
 }
 inline std::atomic<uint32_t> outboundAcquisitionGeneration{0};
 inline std::atomic<uint32_t> outboundAcquisitionAtMs{0};
-enum class OutboundClient : uint8_t { MICRA_HTTP, WEBHOOK, NTP, COUNT };
+enum class OutboundClient : uint8_t { LA_MARZOCCO_HTTP, WEBHOOK, NTP, COUNT };
 struct OutboundPauseCompletion {
   std::atomic<uint32_t> generation{0}, latencyMs{0};
 };

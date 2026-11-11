@@ -9,7 +9,7 @@ let accessHintClosed = false,
 
 // Boiler rows interpolate the warm-up estimate locally from the absolute
 // readyAtUtcSec the stream delivers once; a stable estimate costs no frames.
-function micraBoilerText(lm, boiler) {
+function laMarzoccoBoilerText(lm, boiler) {
   if (!lm || !lm.accountConfigured) return __WEBUI_TEXT__("runtime.not_connected");
   if (!lm.observeState) return __WEBUI_TEXT__("runtime.disabled");
   const data = lm.boiler ? lm.boiler[boiler] : null;
@@ -36,18 +36,18 @@ function setRowValue(row, value, hint) {
   $(row + "Hint").textContent = hint;
 }
 
-function renderMicraBoilers() {
+function renderLaMarzoccoBoilers() {
   // Reads the live cache: once the stream is invalidated the cache is null
   // and the ticker leaves the reset placeholders alone.
   const st = R.homeStatusCache(),
-    lm = st?.lineaMicra;
+    lm = st?.laMarzocco;
   renderReadyMsg(st, lm);
   if (st) renderMachineRow(st);
   if (!lm) return;
-  const brew = $("homeMicraBrewBoiler"),
-    steam = $("homeMicraSteamBoiler");
-  if (brew) brew.textContent = micraBoilerText(lm, "coffee");
-  if (steam) steam.textContent = micraBoilerText(lm, "steam");
+  const brew = $("homeLaMarzoccoBrewBoiler"),
+    steam = $("homeLaMarzoccoSteamBoiler");
+  if (brew) brew.textContent = laMarzoccoBoilerText(lm, "coffee");
+  if (steam) steam.textContent = laMarzoccoBoilerText(lm, "steam");
 }
 
 export function applyStatus(s) {
@@ -77,11 +77,11 @@ export function applyStatus(s) {
   }
   renderHints(s);
   // Builds without the Micra integration ship none of its rows.
-  if (__LINEA_MICRA__) {
-    $("homeMicraPower").textContent = micraPower(s.lineaMicra);
-    $("homeMicraCleaning").textContent = R.formatMicraCleaning(s.lineaMicra);
+  if (__LA_MARZOCCO__) {
+    $("homeLaMarzoccoPower").textContent = laMarzoccoPower(s.laMarzocco);
+    $("homeLaMarzoccoCleaning").textContent = R.formatLaMarzoccoCleaning(s.laMarzocco);
   }
-  renderMicraBoilers();
+  renderLaMarzoccoBoilers();
 }
 // A card shows whenever its condition holds, independently of the others.
 // Dismissals stay in this browser, except the access one,
@@ -99,20 +99,20 @@ function renderHints(s) {
   recipeTag = s.presetsTag;
   // A refused La Marzocco account blocks the machine link: shown first, no
   // dismissal, gone once the account works again.
-  const problem = s.lineaMicra?.accountProblem,
-    policy = $("micraPolicyHint"),
-    account = $("micraAccountHint");
+  const problem = s.laMarzocco?.accountProblem,
+    policy = $("laMarzoccoPolicyHint"),
+    account = $("laMarzoccoAccountHint");
   if (policy) {
     policy.hidden = problem !== "policy";
-    $("micraPolicyHintAccept").disabled = !R.controlsMutable;
+    $("laMarzoccoPolicyHintAccept").disabled = !R.controlsMutable;
     account.hidden = problem !== "auth" && problem !== "access";
     const auth = problem === "auth";
-    $("micraAccountHintTitle").textContent = auth
-      ? __WEBUI_TEXT__("home.micra_auth_title")
-      : __WEBUI_TEXT__("home.micra_access_title");
-    $("micraAccountHintText").textContent = auth
-      ? __WEBUI_TEXT__("home.micra_auth_text")
-      : __WEBUI_TEXT__("home.micra_access_text");
+    $("laMarzoccoAccountHintTitle").textContent = auth
+      ? __WEBUI_TEXT__("home.la_marzocco_auth_title")
+      : __WEBUI_TEXT__("home.la_marzocco_access_title");
+    $("laMarzoccoAccountHintText").textContent = auth
+      ? __WEBUI_TEXT__("home.la_marzocco_auth_text")
+      : __WEBUI_TEXT__("home.la_marzocco_access_text");
   }
   const request = s.companion?.requestName,
     here = R.uiState.companionHere,
@@ -138,8 +138,8 @@ function renderHints(s) {
     ["companionPairHint", !request && R.companionPairable()],
     ["accessHint", !accessHintClosed && s.access?.notice],
     [
-      "micraCloudHint",
-      s.machineIntegration === "linea_micra_cloud" && s.lineaMicra?.accountConfigured === false,
+      "laMarzoccoCloudHint",
+      s.machineIntegration === "la_marzocco_cloud" && s.laMarzocco?.accountConfigured === false,
     ],
     // Until the first shot is saved; unknown until the shot stream answers.
     ["recipeHint", R.shotRecorded() === false],
@@ -178,17 +178,18 @@ function renderMachineRow(s) {
   const rs = $("machineRowState"),
     row = $("machineRow");
   if (!row) return;
-  const lm = s.lineaMicra || {},
-    power = micraPower(lm),
-    micraActive =
-      s.machineIntegration === "linea_micra_cloud" && lm.accountConfigured && lm.observeState,
+  const lm = s.laMarzocco || {},
+    power = laMarzoccoPower(lm),
+    laMarzoccoActive =
+      s.machineIntegration === "la_marzocco_cloud" && lm.accountConfigured && lm.observeState,
     off = power.startsWith("OFF"),
     needsWater = lm.readiness === "needs_water",
-    warming = !off && micraActive && ["warming_up", "waiting_for_steam"].includes(lm.readiness),
+    warming =
+      !off && laMarzoccoActive && ["warming_up", "waiting_for_steam"].includes(lm.readiness),
     // With boiler evidence the lamp claims Ready only when both boilers
     // are ready; without it (or without the integration) the controller
     // state decides, as before.
-    rdy = !off && (micraActive ? lm.readiness === "ready" : s.state === "READY"),
+    rdy = !off && (laMarzoccoActive ? lm.readiness === "ready" : s.state === "READY"),
     labels = {
       warming_up: __WEBUI_TEXT__("home.warming_up"),
       waiting_for_steam: __WEBUI_TEXT__("home.waiting_for_steam"),
@@ -197,7 +198,7 @@ function renderMachineRow(s) {
     // No live boiler reading: minutes left while warming, target once ready;
     // "ON - Optimistic" is a wake-up the cloud has not confirmed yet.
     mins = warming ? Math.max(minsLeft(lm.boiler?.coffee), minsLeft(lm.boiler?.steam)) : 0,
-    target = rdy && micraActive ? Math.round((lm.boiler?.coffee?.targetDeciC || 0) / 10) : 0;
+    target = rdy && laMarzoccoActive ? Math.round((lm.boiler?.coffee?.targetDeciC || 0) / 10) : 0;
   rs.textContent = off
     ? __WEBUI_TEXT__("home.turned_off")
     : rdy
@@ -210,7 +211,7 @@ function renderMachineRow(s) {
       ? [mins + __WEBUI_TEXT__("runtime.min_2"), __WEBUI_TEXT__("home.until_ready")]
       : target > 0
         ? [target + "°C", __WEBUI_TEXT__("home.brew_temperature")]
-        : micraActive
+        : laMarzoccoActive
           ? [
               "—",
               lm.accountProblem
@@ -226,7 +227,7 @@ function renderMachineRow(s) {
           : ["", ""]),
   );
   row.classList.toggle("lampWarn", warming);
-  row.classList.toggle("lampBad", !rdy && (!micraActive || off || needsWater));
+  row.classList.toggle("lampBad", !rdy && (!laMarzoccoActive || off || needsWater));
 }
 export function init() {
   if (ready) return;
@@ -234,7 +235,7 @@ export function init() {
   R.registerViewStatus("home", applyStatus);
   // The countdown ticks only while Home shows; entering Home repaints it.
   setInterval(() => {
-    if (!document.hidden && R.activeView === "home") renderMicraBoilers();
+    if (!document.hidden && R.activeView === "home") renderLaMarzoccoBoilers();
   }, 1000);
   const rinseButton = $("rinseButton");
   if (rinseButton) rinseButton.onclick = () => R.command("/api/v1/control/rinse");
@@ -274,7 +275,7 @@ export function init() {
     "companionHint",
     "companionPairHint",
     "accessHint",
-    "micraCloudHint",
+    "laMarzoccoCloudHint",
     "recipeHint",
     "scaleOnlyHint",
   ]) {
@@ -296,8 +297,8 @@ export function init() {
       renderHints(R.homeStatusCache());
     };
   }
-  if ($("micraPolicyHintAccept"))
-    $("micraPolicyHintAccept").onclick = () => R.lineaMicraAction("acceptPolicy");
+  if ($("laMarzoccoPolicyHintAccept"))
+    $("laMarzoccoPolicyHintAccept").onclick = () => R.laMarzoccoAction("acceptPolicy");
   if ($("scaleRecStop")) {
     const handled = (ok) =>
       ok && R.dismissCard(cardKey("scaleRec"), String(R.homeStatusCache()?.scaleRecordingId));
@@ -356,7 +357,7 @@ function renderReadyMsg(s, lm) {
           ? __WEBUI_TEXT__("home.no_scale_required")
           : __WEBUI_TEXT__("home.no_scale_warn")
       : urgent ||
-        (s.machineIntegration === "linea_micra_cloud" &&
+        (s.machineIntegration === "la_marzocco_cloud" &&
         lm?.accountConfigured &&
         lm.observeState &&
         lm.readiness === "warming_up"
@@ -689,7 +690,7 @@ function initQuickWeight() {
   });
   return { open, close };
 }
-function micraPower(m) {
+function laMarzoccoPower(m) {
   const p = m?.quality === "optimistic" && (m.optimisticOn ? "ON" : m.optimisticOff ? "OFF" : "");
   return p
     ? p + " - " + __WEBUI_TEXT__("home.optimistic")

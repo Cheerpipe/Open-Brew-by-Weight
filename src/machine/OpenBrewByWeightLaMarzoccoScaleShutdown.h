@@ -1,6 +1,6 @@
 #pragma once
 
-#include "OpenBrewByWeightLineaMicraSettings.h"
+#include "OpenBrewByWeightLaMarzoccoSettings.h"
 #include "OpenBrewByWeightTimingTypes.h"
 
 #include <cstdint>
@@ -12,13 +12,13 @@ namespace openbrewbyweight {
 // BLE library enum (see scaleDisconnectReasonName); supervision timeouts,
 // packet timeouts, scan failures, and firmware-requested disconnects never
 // match, so radio silence cannot turn the machine off.
-constexpr uint8_t LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT = 9;
+constexpr uint8_t LA_MARZOCCO_SCALE_EXPLICIT_DISCONNECT = 9;
 
 // Machine-side policy for turning the Micra off when the scale powers off.
 // The stopper only forwards scale link edges and relay state each loop; this
 // tracker owns the eligibility rules and the grace window, and the Micra
 // cloud service owns the standby command.
-class MicraScaleShutdownTracker {
+class LaMarzoccoScaleShutdownTracker {
  public:
   struct Snapshot {
     uint32_t disconnectSequence = 0;
@@ -30,18 +30,18 @@ class MicraScaleShutdownTracker {
   // Returns true exactly once per accepted trigger: an explicit scale
   // power-off observed while the relay was open stayed offline for the
   // configured grace window with the option and account still active.
-  bool service(uint32_t now, const Snapshot &observed, uint8_t micraOptions,
+  bool service(uint32_t now, const Snapshot &observed, uint8_t laMarzoccoOptions,
                bool accountConfigured) {
     const bool enabled =
         accountConfigured &&
-        (micraOptions & LINEA_MICRA_SHUTDOWN_WITH_SCALE) != 0;
+        (laMarzoccoOptions & LA_MARZOCCO_SHUTDOWN_WITH_SCALE) != 0;
     if (observed.disconnectSequence != lastDisconnectSequence_) {
       lastDisconnectSequence_ = observed.disconnectSequence;
       // A closed relay (shot or rinse in progress, wake passthrough) means
       // the event is ignored completely, never deferred.
       pending_ = enabled && !observed.linkUp && !observed.relayClosed &&
-                 observed.disconnectReason == LINEA_MICRA_SCALE_EXPLICIT_DISCONNECT;
-      fireAtMs_ = now + graceMs(micraOptions);
+                 observed.disconnectReason == LA_MARZOCCO_SCALE_EXPLICIT_DISCONNECT;
+      fireAtMs_ = now + graceMs(laMarzoccoOptions);
     } else if (pending_) {
       if (observed.linkUp || !enabled) pending_ = false;
     }
@@ -58,8 +58,8 @@ class MicraScaleShutdownTracker {
 #endif
 
  private:
-  static uint32_t graceMs(uint8_t micraOptions) {
-    return 1000U * lineaMicraShutdownGraceSeconds(micraOptions);
+  static uint32_t graceMs(uint8_t laMarzoccoOptions) {
+    return 1000U * laMarzoccoShutdownGraceSeconds(laMarzoccoOptions);
   }
 
   uint32_t lastDisconnectSequence_ = 0;

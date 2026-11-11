@@ -141,9 +141,9 @@
   // The preset save no longer carries drip or speed values.
   const payload = blockAt(viewJs.settings, 'function brewPayload(');
   const makePayload = new Function('$', 'R', 'document', payload + ';return brewPayload();');
-  const nonMicraDocument = {documentElement: {classList: {contains: () => false}}};
+  const nonLaMarzoccoDocument = {documentElement: {classList: {contains: () => false}}};
   const fields = makePayload(id => elements.get(id) || {checked: true, value: 'auto'},
-    {number: () => 36, sToMs: () => 30000, presetState: {activeId: 1}, bbwFormPresetId: 2}, nonMicraDocument);
+    {number: () => 36, sToMs: () => 30000, presetState: {activeId: 1}, bbwFormPresetId: 2}, nonLaMarzoccoDocument);
   assert(!('id' in fields) && codeIncludes(blockAt(runtimeJs, 'async function saveBrewPreset('),
       "{action:'save',id:bbwFormPresetId,...patch}"),
       'A selection change must not retarget the rendered recipe');

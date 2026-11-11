@@ -491,9 +491,9 @@ void processWebCommand(const WebCommand &command) {
           ShotPreset candidateRecipe = *preset;
           copyUserRecipeFromConfig(command.config, candidateRecipe,
                                    command.presetRecipeFields);
-          if (command.lineaMicraBrewTargetSpecified)
-            candidateRecipe.lineaMicraBrewTargetDeciC =
-                command.lineaMicraBrewTargetDeciC;
+          if (command.laMarzoccoBrewTargetSpecified)
+            candidateRecipe.laMarzoccoBrewTargetDeciC =
+                command.laMarzoccoBrewTargetDeciC;
           if (!command.bbwBaselineSpecified)
             candidateRecipe.weightOffsetBaselineG = preset->weightOffsetBaselineG;
           if (command.bbwAlphaBaseline != 0)
@@ -589,8 +589,8 @@ void processWebCommand(const WebCommand &command) {
       const ShotPreset &afterActive = activeShotPreset(presetBank);
       const bool applyMachineTemperature =
           beforeActive.id != afterActive.id ||
-          beforeActive.lineaMicraBrewTargetDeciC !=
-              afterActive.lineaMicraBrewTargetDeciC;
+          beforeActive.laMarzoccoBrewTargetDeciC !=
+              afterActive.laMarzoccoBrewTargetDeciC;
       RecipeSnapshot quickAfter;
       quickAfter.presets = presetBank;
       quickAfter.runtime = runtimeConfig;
@@ -609,7 +609,7 @@ void processWebCommand(const WebCommand &command) {
 
     // Micra settings touch neither the network nor the machine: they persist
     // without a maintenance lease, so configuration and the cloud stay live.
-    case WebCommandType::SAVE_LINEA_MICRA:
+    case WebCommandType::SAVE_LA_MARZOCCO:
       if (!webCommandAllowsUnsafeConfiguration(command) ||
           !forwardAcceptedNetworkCommand(command)) {
         rejectWebCommand(command);

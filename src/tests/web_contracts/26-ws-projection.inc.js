@@ -46,8 +46,8 @@ int main(){
   puts(live.c_str());puts(full.c_str());
   tasks.remainingMs=900;tasks.sampleCount=20;tasks.averageTotalCpuPct=80;
   tasks.lastCaptureUs=100;tasks.maxCaptureUs=200;
-  tasks.micraBackflushWaitLastUs=11;tasks.micraBackflushWaitMaxUs=22;
-  tasks.micraBackflushHoldLastUs=13;tasks.micraBackflushHoldMaxUs=24;
+  tasks.laMarzoccoBackflushWaitLastUs=11;tasks.laMarzoccoBackflushWaitMaxUs=22;
+  tasks.laMarzoccoBackflushHoldLastUs=13;tasks.laMarzoccoBackflushHoldMaxUs=24;
   tasks.scaleEventsWaitLastUs=33;tasks.scaleEventsWaitMaxUs=44;
   tasks.shotStoreWaitLastUs=55;tasks.shotStoreWaitMaxUs=66;
   tasks.controlStatusWaitLastUs=77;tasks.controlStatusWaitMaxUs=88;
@@ -59,7 +59,7 @@ int main(){
   assert(detailed.find("\\\"maxCpuUs\\\":7,\\\"maxAtMs\\\":8")!=std::string::npos);
   assert(live.find("peakGapAtMs")==std::string::npos &&
          detailed.find("\\\"peakGapAtMs\\\":4242")!=std::string::npos);
-  assert(detailed.find("\\\"lockWaits\\\":{\\\"micraBackflush\\\":{\\\"lastUs\\\":11,"
+  assert(detailed.find("\\\"lockWaits\\\":{\\\"laMarzoccoBackflush\\\":{\\\"lastUs\\\":11,"
                       "\\\"maxUs\\\":22,\\\"holdLastUs\\\":13,\\\"holdMaxUs\\\":24},"
                       "\\\"scaleEvents\\\":{\\\"lastUs\\\":33,"
                       "\\\"maxUs\\\":44},\\\"shotStore\\\":{\\\"lastUs\\\":55,"

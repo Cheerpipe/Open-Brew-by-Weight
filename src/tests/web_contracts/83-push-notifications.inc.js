@@ -99,17 +99,17 @@
     }
 
     // La Marzocco's terms open Home, whose card says what to do; a tap never opens Shots.
-    const terms = await notify({ topic: "micra_policy", key: "micra-policy", mid: "m", d: { v: 1 } });
+    const terms = await notify({ topic: "la_marzocco_policy", key: "micra-policy", mid: "m", d: { v: 1 } });
     assert.equal(terms.title, "La Marzocco updated its terms");
     assert.match(terms.body, /Tap to see what to do/);
     assert.equal(terms.tag, "micra-policy", "a reminder replaces instead of stacking");
     assert.equal(terms.data.url, "/");
     assert.equal(
-      (await notify({ topic: "micra_policy", d: { v: 1, test: true } })).title,
+      (await notify({ topic: "la_marzocco_policy", d: { v: 1, test: true } })).title,
       "Test. La Marzocco updated its terms",
     );
     assert.equal(
-      (await notify({ topic: "micra_policy", d: { v: 2 } })).title,
+      (await notify({ topic: "la_marzocco_policy", d: { v: 2 } })).title,
       "Open Brew by Weight",
       "a newer event still shows the generic notification",
     );
@@ -134,7 +134,7 @@
   const settingsSource = fs.readFileSync(path.join(sketchDir, "web", "js", "settings.js"), "utf8");
   for (const [id, gate] of [
     ["appPush", "pwaOnly"],
-    ["appPushTerms", "micraOnly pwaOnly"],
+    ["appPushTerms", "laMarzoccoOnly pwaOnly"],
   ])
     if (
       !new RegExp(
@@ -144,7 +144,7 @@
     )
       throw new Error(`${id} must keep its gate and its warning below the label`);
   if (
-    !settingsSource.includes('["appPushTerms", "micra_policy"]') ||
+    !settingsSource.includes('["appPushTerms", "la_marzocco_policy"]') ||
     !/<div class="btnBar glassBar"><button class="btnGlyph" type="button" data-result="on_recipe">/.test(
       rawPartialHtml.diagnostic,
     )
@@ -269,10 +269,10 @@
     assert.equal(device.posts.length, 0, "a device that looks right sends nothing");
 
     // Each choice stands on its own, and the last one off ends the subscription.
-    await device.context.pushSetTopic("micra_policy", true);
-    assert.deepEqual(device.posts.at(-1)[1].topics, ["shot_result", "micra_policy"]);
+    await device.context.pushSetTopic("la_marzocco_policy", true);
+    assert.deepEqual(device.posts.at(-1)[1].topics, ["shot_result", "la_marzocco_policy"]);
     await device.context.pushSetTopic("shot_result", false);
-    await device.context.pushSetTopic("micra_policy", false);
+    await device.context.pushSetTopic("la_marzocco_policy", false);
     assert.equal(device.subscription, null);
     assert.equal(device.posts.at(-1)[0], "/__companion/push/unsubscribe");
 
@@ -313,10 +313,10 @@
 
     // A device from before the choice was kept: subscribed means what it held,
     // and what an old "off" left behind in the worker's copy means nothing.
-    device = pushDevice({ here: ready, permission: "granted", stale: ["micra_policy"] });
+    device = pushDevice({ here: ready, permission: "granted", stale: ["la_marzocco_policy"] });
     assert.deepEqual(await device.topics(), [], "no subscription, no choice");
     device.subscription = { endpoint: "https://push/1" };
-    assert.deepEqual(await device.topics(), ["micra_policy"]);
+    assert.deepEqual(await device.topics(), ["la_marzocco_policy"]);
     device = pushDevice({ here: ready, permission: "granted" });
     device.subscription = { endpoint: "https://push/1" };
     assert.deepEqual(await device.topics(), ["shot_result"]);

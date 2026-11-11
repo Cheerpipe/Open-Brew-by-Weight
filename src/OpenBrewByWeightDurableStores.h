@@ -128,7 +128,7 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
   if (!clearFirmwareMode() || !eraseWebAccessStored() || !eraseCardDismissals() ||
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, QUICK_START_KEY) ||
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, BBW_LEARNING_KEY) ||
-      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, LINEA_MICRA_REJECTED_KEY)) {
+      !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, LA_MARZOCCO_REJECTED_KEY)) {
     return false;
   }
 #endif

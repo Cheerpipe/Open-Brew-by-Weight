@@ -264,7 +264,7 @@ obbw_idf_resolve_paths() {
   IDF_SDKCONFIG="$IDF_BUILD_DIR/sdkconfig"
   IDF_SDKCONFIG_DEFAULTS="$IDF_PROJECT/sdkconfig.defaults;$IDF_PROJECT/sdkconfig.defaults.nimble;$IDF_PROJECT/sdkconfig.defaults.$OPENBREWBYWEIGHT_ARCH"
   if [[ "${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}" == "la_marzocco_cloud" ]]; then
-    IDF_SDKCONFIG_DEFAULTS="$IDF_SDKCONFIG_DEFAULTS;$IDF_PROJECT/sdkconfig.defaults.micra"
+    IDF_SDKCONFIG_DEFAULTS="$IDF_SDKCONFIG_DEFAULTS;$IDF_PROJECT/sdkconfig.defaults.la_marzocco"
   fi
   if obbw_idf_jtag_enabled; then
     IDF_SDKCONFIG_DEFAULTS="$IDF_SDKCONFIG_DEFAULTS;$IDF_PROJECT/sdkconfig.defaults.jtag"
@@ -574,7 +574,7 @@ obbw_idf_verify_production_profile() {
       "CONFIG_MBEDTLS_DYNAMIC_BUFFER=y"
       "CONFIG_WS_BUFFER_SIZE=4096")
   elif grep -Fqx 'CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y' "$sdkconfig"; then
-    echo "Production profile mismatch: unexpected Micra TLS allocator" >&2
+    echo "Production profile mismatch: unexpected La Marzocco TLS allocator" >&2
     return 1
   fi
   for selector in "${required[@]}"; do

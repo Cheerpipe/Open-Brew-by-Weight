@@ -67,7 +67,7 @@ constexpr TaskScheduleContract TASK_SCHEDULE_CONTRACTS[] = {
      false},
     {"webhook", 0, 0, 4608, TaskActivation::EVENT_DRIVEN, 0, 0, 0, 1800, 0,
      false},
-    {"micra_cloud", 0, 0, 8192, TaskActivation::EVENT_DRIVEN, 0, 0, 0,
+    {"lm_cloud", 0, 0, 8192, TaskActivation::EVENT_DRIVEN, 0, 0, 0,
      10000, 0, false},
     {"serial_log", 0, 0, 3072, TaskActivation::EVENT_DRIVEN, 0, 0, 0,
      TASK_BLOCKING_UNBOUNDED_MS, 0, false},

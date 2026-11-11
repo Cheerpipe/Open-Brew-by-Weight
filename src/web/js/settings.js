@@ -395,7 +395,7 @@ async function saveMachineConfig(patch) {
       return false;
     }
 }
-const MICRA_SWITCHES = [
+const LA_MARZOCCO_SWITCHES = [
   "ApplyTemperature",
   "ObserveState",
   "BoostScaleDetectionWhenOn",
@@ -405,23 +405,23 @@ const MICRA_SWITCHES = [
   "ShutdownWithScale",
   "ScaleOffWithMachine",
 ];
-function micraOptionField(id) {
+function laMarzoccoOptionField(id) {
   return id[0].toLowerCase() + id.slice(1) + (id === "RecognizeWake" ? "Gesture" : "");
 }
 // Shots and scale activity cancel cloud requests routinely: not an error.
-function micraErrorText(error) {
+function laMarzoccoErrorText(error) {
   if (error === "none" || error === "canceled") return "";
   return (
     {
-      invalid_auth: __WEBUI_TEXT__("runtime.micra_error_auth"),
-      policy_required: __WEBUI_TEXT__("runtime.micra_error_policy"),
-      no_machines: __WEBUI_TEXT__("runtime.micra_error_no_machines"),
-      clock_unsynchronized: __WEBUI_TEXT__("runtime.micra_error_clock"),
-    }[error] || __WEBUI_TEXT__("runtime.micra_error_cloud")
+      invalid_auth: __WEBUI_TEXT__("runtime.la_marzocco_error_auth"),
+      policy_required: __WEBUI_TEXT__("runtime.la_marzocco_error_policy"),
+      no_machines: __WEBUI_TEXT__("runtime.la_marzocco_error_no_machines"),
+      clock_unsynchronized: __WEBUI_TEXT__("runtime.la_marzocco_error_clock"),
+    }[error] || __WEBUI_TEXT__("runtime.la_marzocco_error_cloud")
   );
 }
-function renderMicraMachines(machines, canEdit) {
-  const list = $("lineaMicraMachines"),
+function renderLaMarzoccoMachines(machines, canEdit) {
+  const list = $("laMarzoccoMachines"),
     key = machines.map((x) => x.serial).join();
   if (list.dataset.key !== key) {
     list.dataset.key = key;
@@ -430,7 +430,7 @@ function renderMicraMachines(machines, canEdit) {
         const label = document.createElement("label");
         label.className = "setupChoice";
         label.innerHTML =
-          '<input type="radio" name="lineaMicraMachine"><span><b></b><small></small></span>';
+          '<input type="radio" name="laMarzoccoMachine"><span><b></b><small></small></span>';
         label.firstChild.value = x.serial;
         label.querySelector("b").textContent = x.name || x.serial;
         label.querySelector("small").textContent = x.serial;
@@ -439,106 +439,116 @@ function renderMicraMachines(machines, canEdit) {
     );
   }
   list.querySelectorAll("input").forEach((r) => (r.disabled = !canEdit));
-  $("lineaMicraSelectButton").disabled = !canEdit || !list.querySelector("input:checked");
+  $("laMarzoccoSelectButton").disabled = !canEdit || !list.querySelector("input:checked");
 }
-function applyLineaMicraStatus(s) {
-  const m = __LINEA_MICRA__ && s.lineaMicra;
+function applyLaMarzoccoStatus(s) {
+  const m = __LA_MARZOCCO__ && s.laMarzocco;
   if (!m) return;
   document.documentElement.classList.toggle(
-    "micraTemperatureEnabled",
+    "laMarzoccoTemperatureEnabled",
     m.applyTemperature && m.accountConfigured,
   );
   const machines = m.machines || [],
     canEdit = R.controlsMutable,
     connected = m.accountConfigured,
     signingIn = !connected && ["queued", "authenticating", "listing"].includes(m.phase),
-    changing = connected && R.uiState.micraChange,
+    changing = connected && R.uiState.laMarzoccoChange,
     offline = !m.staConnected || m.apActive,
-    error = micraErrorText(m.error),
+    error = laMarzoccoErrorText(m.error),
     listing = changing && m.machineListing,
-    shown = changing ? micraErrorText(m.machineListError) : connected ? "" : error;
-  if (!R.uiState.micraDirty) {
-    for (const id of MICRA_SWITCHES) $("lineaMicra" + id).checked = !!m[micraOptionField(id)];
-    $("lineaMicraShutdownGrace").value = String(m.shutdownGraceSeconds || 0);
+    shown = changing ? laMarzoccoErrorText(m.machineListError) : connected ? "" : error;
+  if (!R.uiState.laMarzoccoDirty) {
+    for (const id of LA_MARZOCCO_SWITCHES)
+      $("laMarzocco" + id).checked = !!m[laMarzoccoOptionField(id)];
+    $("laMarzoccoShutdownGrace").value = String(m.shutdownGraceSeconds || 0);
   }
-  R.uiState.micraChange = changing;
+  R.uiState.laMarzoccoChange = changing;
   // A lone listed machine is saved with the options above, once per page;
   // if that fails the choice pane takes over.
-  if (connected) R.uiState.micraSignIn = null;
+  if (connected) R.uiState.laMarzoccoSignInState = null;
   else if (
     !signingIn &&
     machines.length === 1 &&
-    !["linking", "failed"].includes(R.uiState.micraSignIn)
+    !["linking", "failed"].includes(R.uiState.laMarzoccoSignInState)
   ) {
-    R.uiState.micraSignIn = "linking";
-    selectLineaMicra(machines[0].serial);
-  } else if (R.uiState.micraSignIn === "pending" && !signingIn && error) {
-    R.uiState.micraSignIn = null;
-    $("lineaMicraPassword").focus();
+    R.uiState.laMarzoccoSignInState = "linking";
+    selectLaMarzocco(machines[0].serial);
+  } else if (R.uiState.laMarzoccoSignInState === "pending" && !signingIn && error) {
+    R.uiState.laMarzoccoSignInState = null;
+    $("laMarzoccoPassword").focus();
   }
-  const linking = R.uiState.micraSignIn === "linking" && !connected && machines.length === 1,
+  const linking =
+      R.uiState.laMarzoccoSignInState === "linking" && !connected && machines.length === 1,
     busy = signingIn || linking,
     choosing = changing || (!connected && !busy && machines.length > 0),
     stage = linking ? 2 : m.phase === "listing" ? 1 : 0,
     target = m.boiler?.coffee?.targetDeciC;
-  $("lineaMicraLegendHint").textContent =
+  $("laMarzoccoLegendHint").textContent =
     connected && !changing
-      ? __WEBUI_TEXT__("runtime.micra_state_connected")
+      ? __WEBUI_TEXT__("runtime.la_marzocco_state_connected")
       : busy
-        ? __WEBUI_TEXT__("runtime.micra_state_connecting")
+        ? __WEBUI_TEXT__("runtime.la_marzocco_state_connecting")
         : choosing
-          ? __WEBUI_TEXT__("runtime.micra_state_choose")
+          ? __WEBUI_TEXT__("runtime.la_marzocco_state_choose")
           : __WEBUI_TEXT__("runtime.not_connected");
-  [...$("lineaMicraSteps").children].forEach(
+  [...$("laMarzoccoSteps").children].forEach(
     (li, i) => (li.className = i < stage ? "ok" : i > stage ? "" : "on"),
   );
-  $("lineaMicraBusy").hidden = !busy;
-  $("lineaMicraSignIn").hidden = connected || choosing || busy;
-  $("lineaMicraChoose").hidden = !choosing;
-  $("lineaMicraConnected").hidden = !connected || changing;
-  $("lineaMicraWifiNote").classList.toggle("hidden", !offline);
-  $("lineaMicraConnectButton").disabled = !canEdit || offline;
-  $("lineaMicraConnectButton").classList.toggle("busy", busy);
-  $("lineaMicraProgress").textContent = listing
-    ? __WEBUI_TEXT__("runtime.micra_progress_listing")
+  $("laMarzoccoBusy").hidden = !busy;
+  $("laMarzoccoSignIn").hidden = connected || choosing || busy;
+  $("laMarzoccoChoose").hidden = !choosing;
+  $("laMarzoccoConnected").hidden = !connected || changing;
+  $("laMarzoccoWifiNote").classList.toggle("hidden", !offline);
+  $("laMarzoccoConnectButton").disabled = !canEdit || offline;
+  $("laMarzoccoConnectButton").classList.toggle("busy", busy);
+  $("laMarzoccoProgress").textContent = listing
+    ? __WEBUI_TEXT__("runtime.la_marzocco_progress_listing")
     : shown;
-  $("lineaMicraProgress").classList.toggle("error", !listing && !!shown);
-  renderMicraMachines(machines, canEdit);
-  $("lineaMicraCancelButton").disabled = !canEdit;
-  $("lineaMicraIdentity").innerText = connected ? m.selectedName + " · " + m.selectedSerial : "";
-  $("lineaMicraAccount").innerText = connected ? m.email : "";
+  $("laMarzoccoProgress").classList.toggle("error", !listing && !!shown);
+  renderLaMarzoccoMachines(machines, canEdit);
+  $("laMarzoccoCancelButton").disabled = !canEdit;
+  $("laMarzoccoIdentity").innerText = connected ? m.selectedName + " · " + m.selectedSerial : "";
+  $("laMarzoccoAccount").innerText = connected ? m.email : "";
   // Most actionable first: account, link, then the machine itself.
-  const pill = $("lineaMicraStatus"),
+  const pill = $("laMarzoccoStatus"),
     power = m.optimisticOn ? "ON" : m.optimisticOff ? "OFF" : m.powerState,
     [label, tone, warm] = ["invalid_auth", "no_machines"].includes(m.error)
-      ? [__WEBUI_TEXT__("runtime.micra_pill_account"), "error"]
+      ? [__WEBUI_TEXT__("runtime.la_marzocco_pill_account"), "error"]
       : m.error === "policy_required"
-        ? [__WEBUI_TEXT__("runtime.micra_policy_required"), "error"]
+        ? [__WEBUI_TEXT__("runtime.la_marzocco_policy_required"), "error"]
         : m.apActive
           ? [__WEBUI_TEXT__("runtime.ap_mode_paused"), "warn"]
           : m.error === "clock_unsynchronized"
-            ? [__WEBUI_TEXT__("runtime.micra_pill_clock"), "warn"]
+            ? [__WEBUI_TEXT__("runtime.la_marzocco_pill_clock"), "warn"]
             : error || m.quality === "communication_error"
-              ? [__WEBUI_TEXT__("runtime.micra_pill_cloud"), "warn"]
+              ? [__WEBUI_TEXT__("runtime.la_marzocco_pill_cloud"), "warn"]
               : !m.observeState
-                ? [__WEBUI_TEXT__("runtime.micra_pill_monitoring_off"), ""]
+                ? [__WEBUI_TEXT__("runtime.la_marzocco_pill_monitoring_off"), ""]
                 : m.machineOffline
-                  ? [__WEBUI_TEXT__("runtime.micra_pill_offline"), "warn"]
+                  ? [__WEBUI_TEXT__("runtime.la_marzocco_pill_offline"), "warn"]
                   : m.readiness === "needs_water"
-                    ? [__WEBUI_TEXT__("runtime.micra_pill_no_water"), "error"]
+                    ? [__WEBUI_TEXT__("runtime.la_marzocco_pill_no_water"), "error"]
                     : power === "OFF"
-                      ? [__WEBUI_TEXT__("runtime.micra_power_standby"), ""]
+                      ? [__WEBUI_TEXT__("runtime.la_marzocco_power_standby"), ""]
                       : power !== "ON"
-                        ? [__WEBUI_TEXT__("runtime.micra_power_unknown"), ""]
+                        ? [__WEBUI_TEXT__("runtime.la_marzocco_power_unknown"), ""]
                         : {
-                            warming_up: [__WEBUI_TEXT__("runtime.micra_pill_heating"), "warn", 1],
-                            waiting_for_steam: [
-                              __WEBUI_TEXT__("runtime.micra_pill_steam"),
+                            warming_up: [
+                              __WEBUI_TEXT__("runtime.la_marzocco_pill_heating"),
                               "warn",
                               1,
                             ],
-                            ready: [__WEBUI_TEXT__("runtime.micra_pill_ready"), "on", 1],
-                          }[m.readiness] || [__WEBUI_TEXT__("runtime.micra_power_on"), "on", 1];
+                            waiting_for_steam: [
+                              __WEBUI_TEXT__("runtime.la_marzocco_pill_steam"),
+                              "warn",
+                              1,
+                            ],
+                            ready: [__WEBUI_TEXT__("runtime.la_marzocco_pill_ready"), "on", 1],
+                          }[m.readiness] || [
+                            __WEBUI_TEXT__("runtime.la_marzocco_power_on"),
+                            "on",
+                            1,
+                          ];
   pill.textContent = [
     label,
     warm && target ? __WEBUI_TEXT__("runtime.target") + " " + (target / 10).toFixed(1) + " °C" : "",
@@ -548,82 +558,82 @@ function applyLineaMicraStatus(s) {
     .join(" · ");
   pill.dataset.tone = tone;
   pill.title = error;
-  $("lineaMicraDisconnectButton").disabled = !canEdit;
-  $("lineaMicraChangeButton").disabled = !canEdit || offline;
-  for (const id of MICRA_SWITCHES) $("lineaMicra" + id).disabled = !canEdit;
-  updateMicraDependentControls();
+  $("laMarzoccoDisconnectButton").disabled = !canEdit;
+  $("laMarzoccoChangeButton").disabled = !canEdit || offline;
+  for (const id of LA_MARZOCCO_SWITCHES) $("laMarzocco" + id).disabled = !canEdit;
+  updateLaMarzoccoDependentControls();
 }
-function updateMicraDependentControls() {
+function updateLaMarzoccoDependentControls() {
   const canEdit = R.controlsMutable,
-    deps = $("lineaMicraPowerDeps"),
-    observe = $("lineaMicraObserveState").checked,
-    on = $("lineaMicraShutdownWithScale").checked;
+    deps = $("laMarzoccoPowerDeps"),
+    observe = $("laMarzoccoObserveState").checked,
+    on = $("laMarzoccoShutdownWithScale").checked;
   deps.classList.toggle("fieldOff", !observe);
   deps.querySelectorAll("input").forEach((i) => (i.disabled = !canEdit || !observe));
-  $("lineaMicraShutdownGrace").disabled = !canEdit || !on;
-  $("lineaMicraShutdownGraceWrap").classList.toggle("hidden", !on);
+  $("laMarzoccoShutdownGrace").disabled = !canEdit || !on;
+  $("laMarzoccoShutdownGraceWrap").classList.toggle("hidden", !on);
 }
-async function connectLineaMicra() {
-  const username = $("lineaMicraUsername").value.trim(),
-    password = $("lineaMicraPassword").value;
-  if (!username || !$("lineaMicraUsername").validity.valid) {
-    R.showFieldError("lineaMicraUsername", __WEBUI_TEXT__("runtime.enter_valid_email"));
+async function connectLaMarzocco() {
+  const username = $("laMarzoccoUsername").value.trim(),
+    password = $("laMarzoccoPassword").value;
+  if (!username || !$("laMarzoccoUsername").validity.valid) {
+    R.showFieldError("laMarzoccoUsername", __WEBUI_TEXT__("runtime.enter_valid_email"));
     return false;
   }
   if (!password) {
-    R.showFieldError("lineaMicraPassword", __WEBUI_TEXT__("runtime.enter_password"));
+    R.showFieldError("laMarzoccoPassword", __WEBUI_TEXT__("runtime.enter_password"));
     return false;
   }
-  $("lineaMicraConnectButton").classList.add("busy");
+  $("laMarzoccoConnectButton").classList.add("busy");
   const ok = await R.command(
-    "/api/v1/machine/linea-micra",
+    "/api/v1/machine/la-marzocco",
     { action: "connect", username, password },
     false,
-    __WEBUI_TEXT__("runtime.micra_connection_queued"),
-    __WEBUI_TEXT__("runtime.micra_action_failed"),
+    __WEBUI_TEXT__("runtime.la_marzocco_connection_queued"),
+    __WEBUI_TEXT__("runtime.la_marzocco_action_failed"),
   );
-  $("lineaMicraPassword").value = "";
-  R.uiState.micraSignIn = ok ? "pending" : null;
+  $("laMarzoccoPassword").value = "";
+  R.uiState.laMarzoccoSignInState = ok ? "pending" : null;
   return ok;
 }
-async function selectLineaMicra(serial) {
-  const ok = await saveLineaMicraSettings("select", serial);
-  if (ok) $("lineaMicraLinkedNote").hidden = false;
-  else R.uiState.micraSignIn = "failed";
-  if (ok && R.uiState.micraChange) endMicraChange();
+async function selectLaMarzocco(serial) {
+  const ok = await saveLaMarzoccoSettings("select", serial);
+  if (ok) $("laMarzoccoLinkedNote").hidden = false;
+  else R.uiState.laMarzoccoSignInState = "failed";
+  if (ok && R.uiState.laMarzoccoChange) endLaMarzoccoChange();
   return ok;
 }
 // Back to the saved machine; nothing was changed on the device.
-function endMicraChange() {
-  R.uiState.micraChange = false;
-  $("lineaMicraChoose").hidden = !($("lineaMicraConnected").hidden = false);
-  $("lineaMicraProgress").textContent = "";
+function endLaMarzoccoChange() {
+  R.uiState.laMarzoccoChange = false;
+  $("laMarzoccoChoose").hidden = !($("laMarzoccoConnected").hidden = false);
+  $("laMarzoccoProgress").textContent = "";
 }
-function micraPayload() {
+function laMarzoccoPayload() {
   return {
     ...Object.fromEntries(
-      MICRA_SWITCHES.map((id) => [micraOptionField(id), $("lineaMicra" + id).checked]),
+      LA_MARZOCCO_SWITCHES.map((id) => [laMarzoccoOptionField(id), $("laMarzocco" + id).checked]),
     ),
-    shutdownGraceSeconds: Number($("lineaMicraShutdownGrace").value) || 0,
+    shutdownGraceSeconds: Number($("laMarzoccoShutdownGrace").value) || 0,
   };
 }
 // Select sends every option with the chosen machine; save is a patch that
 // keeps the saved transport.
-function saveLineaMicraSettings(action, serial, options = micraPayload()) {
+function saveLaMarzoccoSettings(action, serial, options = laMarzoccoPayload()) {
   return R.command(
-    "/api/v1/machine/linea-micra",
+    "/api/v1/machine/la-marzocco",
     { action, ...options, ...(action === "select" ? { serial, connectionType: "websocket" } : {}) },
     false,
-    action === "select" ? __WEBUI_TEXT__("runtime.micra_settings_queued") : "",
-    __WEBUI_TEXT__("runtime.could_not_save_micra"),
+    action === "select" ? __WEBUI_TEXT__("runtime.la_marzocco_settings_queued") : "",
+    __WEBUI_TEXT__("runtime.could_not_save_la_marzocco"),
   );
 }
-async function disconnectLineaMicra() {
-  const ok = await R.lineaMicraAction("disconnect");
+async function disconnectLaMarzocco() {
+  const ok = await R.laMarzoccoAction("disconnect");
   if (ok) {
-    $("lineaMicraUsername").value = "";
-    $("lineaMicraPassword").value = "";
-    R.uiState.micraDirty = false;
+    $("laMarzoccoUsername").value = "";
+    $("laMarzoccoPassword").value = "";
+    R.uiState.laMarzoccoDirty = false;
   }
   return ok;
 }
@@ -642,7 +652,7 @@ function applySettingsStatus(s) {
   syncScaleForgetKey(!(R.controlsMutable && (sc.preferredMac || sc.macCachePauseRemainingMs > 0)));
   R.loadSettingsConfig(s);
   loadBullseyeConfig(s.config);
-  applyLineaMicraStatus(s);
+  applyLaMarzoccoStatus(s);
   R.updateBbwControls();
   const sl = s.scaleLoss,
     active = R.presetState.items.find((x) => x.id === R.presetState.activeId);
@@ -742,10 +752,10 @@ const autosave = {
     valid: () => !validateBrewClient().length,
     save: (patch) => R.saveBrewPreset(patch, ""),
   },
-  ...(__LINEA_MICRA__ && {
+  ...(__LA_MARZOCCO__ && {
     micra: {
-      payload: micraPayload,
-      save: (patch) => saveLineaMicraSettings("save", "", patch),
+      payload: laMarzoccoPayload,
+      save: (patch) => saveLaMarzoccoSettings("save", "", patch),
     },
   }),
 };
@@ -820,7 +830,7 @@ const BREW_FIELD_TEXT = {
       __WEBUI_TEXT__("runtime.s"),
       "limits",
     ],
-    lineaMicraBrewTargetC: [__WEBUI_TEXT__("runtime.brew_temperature"), "°C"],
+    laMarzoccoBrewTargetC: [__WEBUI_TEXT__("runtime.brew_temperature"), "°C"],
     fastBeforeS: [__WEBUI_TEXT__("runtime.window_start"), __WEBUI_TEXT__("runtime.s"), "recipe"],
     fastMarginG: [__WEBUI_TEXT__("runtime.fast_margin"), __WEBUI_TEXT__("runtime.g"), "fast"],
     slowAfterS: [__WEBUI_TEXT__("runtime.window_end"), __WEBUI_TEXT__("runtime.s"), "recipe"],
@@ -904,8 +914,8 @@ function validateBrewClient() {
   add(brewRange("goalWeightG", 10, 200, { step: 0.1 }));
   add(brewRange("operationalWallS", 5, 60, { int: 1 }));
   add(brewRange("bbwProtectionS", 0.5, 30));
-  if (document.documentElement.classList.contains("micraTemperatureEnabled"))
-    add(brewRange("lineaMicraBrewTargetC", 80, 100));
+  if (document.documentElement.classList.contains("laMarzoccoTemperatureEnabled"))
+    add(brewRange("laMarzoccoBrewTargetC", 80, 100));
   add(brewRange("doseG", 5, 30, { step: 0.1 }));
   add(brewRange("fastBeforeS", 2.5, 58, { step: 0.5 }));
   add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));
@@ -1018,8 +1028,8 @@ function brewPayload() {
         [s + "CurveHardness", R.number(s + "CurveHardness")],
       ]),
     ),
-    ...(document.documentElement.classList.contains("micraTemperatureEnabled")
-      ? { lineaMicraBrewTargetC: R.number("lineaMicraBrewTargetC") }
+    ...(document.documentElement.classList.contains("laMarzoccoTemperatureEnabled")
+      ? { laMarzoccoBrewTargetC: R.number("laMarzoccoBrewTargetC") }
       : {}),
   };
 }
@@ -2026,8 +2036,8 @@ const GROUP_SUMMARIES = {
   },
   account: () => __WEBUI_TEXT__("settings.sum_signed_in"),
   power: () => {
-    if (!on("lineaMicraObserveState")) return OFF;
-    const deps = [...$("lineaMicraPowerDeps").querySelectorAll("input")],
+    if (!on("laMarzoccoObserveState")) return OFF;
+    const deps = [...$("laMarzoccoPowerDeps").querySelectorAll("input")],
       n = deps.filter((i) => i.checked).length;
     return n === deps.length
       ? __WEBUI_TEXT__("settings.sum_all_on")
@@ -2035,13 +2045,13 @@ const GROUP_SUMMARIES = {
   },
   auto: () =>
     [
-      on("lineaMicraPowerOnWithScale") && __WEBUI_TEXT__("settings.sum_wake"),
-      on("lineaMicraShutdownWithScale") && __WEBUI_TEXT__("settings.sum_standby"),
+      on("laMarzoccoPowerOnWithScale") && __WEBUI_TEXT__("settings.sum_wake"),
+      on("laMarzoccoShutdownWithScale") && __WEBUI_TEXT__("settings.sum_standby"),
     ]
       .filter(Boolean)
       .join(" + ") || OFF,
-  micraPresets: () =>
-    on("lineaMicraApplyTemperature") ? __WEBUI_TEXT__("settings.sum_sets_temperature") : OFF,
+  laMarzoccoPresets: () =>
+    on("laMarzoccoApplyTemperature") ? __WEBUI_TEXT__("settings.sum_sets_temperature") : OFF,
   paddle: () => picked("paddleMode"),
   switch: () =>
     $("momentaryStartEdge").value === "release"
@@ -2092,7 +2102,7 @@ let refreshAppPush = () => {};
 function initAppPush() {
   const rows = [
     ["appPush", "shot_result"],
-    ["appPushTerms", "micra_policy"],
+    ["appPushTerms", "la_marzocco_policy"],
   ].filter(([id]) => $(id));
   let changing = false;
   const paint = async () => {
@@ -2212,26 +2222,26 @@ export function init() {
       R.renameScale();
     };
   // Builds without the Micra integration ship none of its controls.
-  if (__LINEA_MICRA__) {
-    if ($("lineaMicraConnectButton")) $("lineaMicraConnectButton").onclick = connectLineaMicra;
-    if ($("lineaMicraSelectButton"))
-      $("lineaMicraSelectButton").onclick = () =>
-        selectLineaMicra($("lineaMicraMachines").querySelector("input:checked")?.value);
-    if ($("lineaMicraMachines"))
-      $("lineaMicraMachines").onchange = () => ($("lineaMicraSelectButton").disabled = false);
-    if ($("lineaMicraCancelButton"))
-      $("lineaMicraCancelButton").onclick = () =>
-        R.uiState.micraChange ? endMicraChange() : R.lineaMicraAction("disconnect");
-    if ($("lineaMicraChangeButton"))
-      $("lineaMicraChangeButton").onclick = async () => {
-        $("lineaMicraLinkedNote").hidden = R.uiState.micraChange = true;
-        if (!(await R.lineaMicraAction("relist"))) endMicraChange();
+  if (__LA_MARZOCCO__) {
+    if ($("laMarzoccoConnectButton")) $("laMarzoccoConnectButton").onclick = connectLaMarzocco;
+    if ($("laMarzoccoSelectButton"))
+      $("laMarzoccoSelectButton").onclick = () =>
+        selectLaMarzocco($("laMarzoccoMachines").querySelector("input:checked")?.value);
+    if ($("laMarzoccoMachines"))
+      $("laMarzoccoMachines").onchange = () => ($("laMarzoccoSelectButton").disabled = false);
+    if ($("laMarzoccoCancelButton"))
+      $("laMarzoccoCancelButton").onclick = () =>
+        R.uiState.laMarzoccoChange ? endLaMarzoccoChange() : R.laMarzoccoAction("disconnect");
+    if ($("laMarzoccoChangeButton"))
+      $("laMarzoccoChangeButton").onclick = async () => {
+        $("laMarzoccoLinkedNote").hidden = R.uiState.laMarzoccoChange = true;
+        if (!(await R.laMarzoccoAction("relist"))) endLaMarzoccoChange();
       };
-    if ($("lineaMicraDisconnectButton"))
-      $("lineaMicraDisconnectButton").onclick = () =>
-        confirm(__WEBUI_TEXT__("settings.disconnect_account_confirm")) && disconnectLineaMicra();
-    for (const id of ["lineaMicraObserveState", "lineaMicraShutdownWithScale"])
-      if ($(id)) $(id).onchange = updateMicraDependentControls;
+    if ($("laMarzoccoDisconnectButton"))
+      $("laMarzoccoDisconnectButton").onclick = () =>
+        confirm(__WEBUI_TEXT__("settings.disconnect_account_confirm")) && disconnectLaMarzocco();
+    for (const id of ["laMarzoccoObserveState", "laMarzoccoShutdownWithScale"])
+      if ($(id)) $(id).onchange = updateLaMarzoccoDependentControls;
   }
   // Every #workflowPanel field autosaves its section and refreshes the
   // dependent groups through the shared listener below.
@@ -2258,7 +2268,7 @@ export function init() {
     .forEach((el) => {
       if (
         ["presetRenameInput", "dripSetG", "alphaSet"].includes(el.id) ||
-        el.closest("#lineaMicraSignIn,#lineaMicraChoose,[data-g=app]")
+        el.closest("#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app]")
       )
         return;
       // Typing waits for a pause; leaving the field (a trusted change) saves
@@ -2266,7 +2276,7 @@ export function init() {
       const typed = el.tagName === "TEXTAREA" || ["text", "number"].includes(el.type);
       const fn = (e) => {
         const sec = R.settingsSectionOf(el.id);
-        if (sec === "micra") $("lineaMicraLinkedNote").hidden = true;
+        if (sec === "micra") $("laMarzoccoLinkedNote").hidden = true;
         R.noteEdit(autosave[sec], !typed ? 300 : e.type === "change" && e.isTrusted ? 0 : 1200);
         R.updateConfigGroups();
         // Failed-save red marks on brew fields hand over to the live yellow

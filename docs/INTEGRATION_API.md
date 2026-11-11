@@ -234,25 +234,25 @@ params substituted in order (see the example above).
 | ``FIRMWARE_MODE_REQUIRES_IDLE`` | Wait until the machine is idle, then save the firmware mode again. |
 | ``FIRMWARE_MODE_SAVE_FAILED`` | Could not persist the firmware mode. |
 | ``HOST_NOT_ALLOWED`` | Open the controller by its IP address or its .local name. |
-| ``INVALID_MICRA_CONFIG`` | The La Marzocco settings are not valid. |
+| ``INVALID_LA_MARZOCCO_CONFIG`` | The La Marzocco settings are not valid. |
 | ``INVALID_WEBHOOK`` | Use an http:// URL without embedded credentials; HTTPS is not supported. |
 | ``JSON_TOO_LARGE`` | JSON too large for device buffer |
-| ``LINEA_MICRA_PRESET_TARGET_RANGE`` | lineaMicraBrewTargetC must be 80.0–100.0 in 0.1 degree steps. |
-| ``LINEA_MICRA_PRESET_TARGET_UNSUPPORTED`` | La Marzocco preset temperature is not supported by this firmware. |
-| ``MICRA_ACTION_FIELDS_INVALID`` | action is required and all fields must be known. |
-| ``MICRA_ACTION_UNKNOWN`` | Unknown La Marzocco action. |
-| ``MICRA_BOUNDED_JSON_REQUIRED`` | A bounded La Marzocco JSON request is required. |
-| ``MICRA_BUSY`` | The La Marzocco integration is busy; try again shortly. |
-| ``MICRA_CHANGE_PENDING`` | Another La Marzocco change is still being saved. |
-| ``MICRA_CONNECT_FIELDS_ONLY`` | connect requires only username and password. |
-| ``MICRA_NOT_READY`` | Connect an account and select a machine first. |
-| ``MICRA_READONLY_ACTIONS`` | disconnect, refresh, relist, and acceptPolicy do not accept setting fields. |
-| ``MICRA_REQUIRES_READY`` | La Marzocco settings can be changed only while Ready. |
-| ``MICRA_SAVE_BUSY`` | Control is busy; La Marzocco settings were not saved. |
-| ``MICRA_SAVE_FIELDS_REQUIRED`` | save requires a selected machine and at least one valid machine option. |
-| ``MICRA_SELECT_FIELDS_REQUIRED`` | select requires serial and all machine options. |
-| ``MICRA_SELECT_MACHINE_UNKNOWN`` | Select a machine returned by the latest account connection. |
-| ``MICRA_STA_REQUIRED`` | Connect to Wi-Fi station mode and close setup AP first. |
+| ``LA_MARZOCCO_PRESET_TARGET_RANGE`` | laMarzoccoBrewTargetC must be 80.0–100.0 in 0.1 degree steps. |
+| ``LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED`` | La Marzocco preset temperature is not supported by this firmware. |
+| ``LA_MARZOCCO_ACTION_FIELDS_INVALID`` | action is required and all fields must be known. |
+| ``LA_MARZOCCO_ACTION_UNKNOWN`` | Unknown La Marzocco action. |
+| ``LA_MARZOCCO_BOUNDED_JSON_REQUIRED`` | A bounded La Marzocco JSON request is required. |
+| ``LA_MARZOCCO_BUSY`` | The La Marzocco integration is busy; try again shortly. |
+| ``LA_MARZOCCO_CHANGE_PENDING`` | Another La Marzocco change is still being saved. |
+| ``LA_MARZOCCO_CONNECT_FIELDS_ONLY`` | connect requires only username and password. |
+| ``LA_MARZOCCO_NOT_READY`` | Connect an account and select a machine first. |
+| ``LA_MARZOCCO_READONLY_ACTIONS`` | disconnect, refresh, relist, and acceptPolicy do not accept setting fields. |
+| ``LA_MARZOCCO_REQUIRES_READY`` | La Marzocco settings can be changed only while Ready. |
+| ``LA_MARZOCCO_SAVE_BUSY`` | Control is busy; La Marzocco settings were not saved. |
+| ``LA_MARZOCCO_SAVE_FIELDS_REQUIRED`` | save requires a selected machine and at least one valid machine option. |
+| ``LA_MARZOCCO_SELECT_FIELDS_REQUIRED`` | select requires serial and all machine options. |
+| ``LA_MARZOCCO_SELECT_MACHINE_UNKNOWN`` | Select a machine returned by the latest account connection. |
+| ``LA_MARZOCCO_STA_REQUIRED`` | Connect to Wi-Fi station mode and close setup AP first. |
 | ``NETWORK_SETTINGS_CHANGED_RETRY`` | Network settings changed; refresh and retry. |
 | ``NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE`` | Network settings are locked while a cycle is active. |
 | ``NETWORK_SSID_PASSWORD_INVALID`` | Invalid network SSID or password. |
@@ -671,7 +671,7 @@ here to one item):
    "fastMarginG":6.0,"slowMarginG":3.0,"operationalWallMs":50000,
    "bbwProtectionMs":12000,"fastExtractionGuardEnabled":true,
    "slowExtractionGuardEnabled":true,"grindHintsEnabled":true,
-   "lineaMicraBrewTargetC":93.0,"fastRampS":5.0,"slowRampS":5.0,
+   "laMarzoccoBrewTargetC":93.0,"fastRampS":5.0,"slowRampS":5.0,
    "fastCurve":"even","slowCurve":"even","fastCurveHardness":0.0,
    "slowCurveHardness":0.0,
    "shotStats":{"n":5,"total":5,"minS":21.4,"maxS":34.2,"medianS":30.6},
@@ -700,7 +700,7 @@ after it when the matching guard is enabled, nothing is cut before
 `arrivalsS` describe the preset's newest timed shots (arrival times at the
 target, oldest first), `firstDropS` is their median first drop (`firstDropN`
 shots; `0` falls back to other presets), and `grindHint` is the Web UI grind
-hint object or `null`. `lineaMicraBrewTargetC` only matters on Linea Micra
+hint object or `null`. `laMarzoccoBrewTargetC` only matters on Linea Micra
 builds. The statistics follow every stored good shot (bad shots never count),
 so Home Assistant's read after the `end` webhook already returns the new
 arrival.
@@ -1210,7 +1210,7 @@ RSSI changes within a level produce no signal delta; raw RSSI remains
 available in Diagnostics. The header popups display level names without dBm.
 The initial snapshot supplies the complete Home state; subsequent `changes`
 objects contain only changed paths, such as `scale.timerMs` or
-`lineaMicra.websocket.cleaning`. Objects such as `presets` are replaced as a
+`laMarzocco.websocket.cleaning`. Objects such as `presets` are replaced as a
 unit when they change. Reliable, ordered WebSocket delivery applies these
 scalar assignments in order. The shot card and curve retain their independent
 sequence and cursor contract on the same socket. A shot snapshot
@@ -1230,9 +1230,9 @@ unchanged shot card or curve. Commands continue to use the existing
 HTTP endpoints and ownership checks.
 
 Micra firmware streams an informational boiler-readiness layer on the same
-frames: `lineaMicra.readiness` (the derived rollup: `off`, `warming_up`,
+frames: `laMarzocco.readiness` (the derived rollup: `off`, `warming_up`,
 `waiting_for_steam`, `ready`, `needs_water`, or `unknown`),
-`lineaMicra.boiler.coffee.state` and `lineaMicra.boiler.steam.state`, and each
+`laMarzocco.boiler.coffee.state` and `laMarzocco.boiler.steam.state`, and each
 boiler's `readyAtUtcSec` estimate. `readyAtUtcSec` is an absolute UTC second
 timestamp (0 when the machine gave no estimate), and the browser derives the
 ticking countdown locally, so a stable estimate emits no frames. Readiness is
@@ -1318,7 +1318,7 @@ streams, `presets` (including the active preset's dose and grind-hint switch),
 `lastCommand`, `quickRevert.after`, `quickRevert.overrides`,
 `quickRevert.remainingS` (rounded up to whole minutes, the resolution the
 header panel shows), `connections`, `scale.preferred*` and its
-`lineaMicra.*` keys, and the page reads them from the Home model, so a change
+`laMarzocco.*` keys, and the page reads them from the Home model, so a change
 to one of those settings reaches the browser on the Home frame alone. Home's
 `config.*` values are the effective ones, Quick Settings overrides included.
 The settings frame adds `quickRevert.saved`, an object with the saved value of
@@ -1329,8 +1329,8 @@ sends it and drops exactly that override. It also adds the remaining
 chart and quick start as one `config.bbwDrip` object (sent whole when any part
 changes), `config.bbwPresetId`, `config.bbwEwmaOffsetG` and `config.bbwAlpha`,
 `scale.history`, `scaleLoss.projectedS` and `scaleLoss.source`,
-`buzzerSupported`, and in Micra firmware the Settings part of `lineaMicra`
-described under [Linea Micra Web API](#linea-micra-web-api). The cup-minimum
+`buzzerSupported`, and in Micra firmware the Settings part of `laMarzocco`
+described under [Linea Micra Web API](#la-marzocco-web-api). The cup-minimum
 hint follows Home's `scale.observedWeightG`, so this frame carries no live
 measurement.
 
@@ -1603,9 +1603,9 @@ and window changes reuse that snapshot, and the header is rebuilt when the
 store, the window, or the active preset changes. This preserves chronological
 CSV order after browsing by rating without repeated store captures per frame.
 
-## Linea Micra Web API
+## La Marzocco Web API
 
-Micra-compiled firmware exposes `POST /api/v1/machine/linea-micra` to the
+Micra-compiled firmware exposes `POST /api/v1/machine/la-marzocco` to the
 claimed Web UI. It accepts one strict `action`: `connect`, `select`, `save`,
 `refresh`, `relist`, `acceptPolicy`, or `disconnect`. `connect` requires only `username` and `password`
 and is rejected unless STA is connected and the setup AP is closed. It queues
@@ -1628,12 +1628,12 @@ disconnect erases durable credentials/selection and the RAM session. Unknown,
 duplicate, or action-inappropriate fields are rejected. Accepted commands
 return `202`.
 
-The Web UI streams carry a `lineaMicra` subtree only in Micra firmware. The
+The Web UI streams carry a `laMarzocco` subtree only in Micra firmware. The
 Home frame reports whether an account is configured, `observeState`,
 `connectionType`, the ON/OFF/UNKNOWN power state, evidence quality,
 optimistic-ON and optimistic-OFF provenance, `readiness` (`off`, `warming_up`,
 `waiting_for_steam`, `ready`, `needs_water` or `unknown`) and the boiler states,
-estimates and brew target (`lineaMicra.boiler.coffee.targetDeciC`, 0 when the
+estimates and brew target (`laMarzocco.boiler.coffee.targetDeciC`, 0 when the
 machine reported none). The Settings frame adds the saved account `email`, the
 selected name and serial, the option flags with `shutdownGraceSeconds`, the
 request `phase` and `error`, `machineOffline` (true when the cloud reports that
@@ -1650,7 +1650,7 @@ While the La Marzocco account has a pending policy, the cloud answers machine
 requests with HTTP 403 and code `USER_MUST_ACCEPT_POLICY`. The firmware reports
 it as error `policy_required`, keeps the session token, does not retry the
 request, and keeps checking at the failure cadence. The Home frame carries
-`lineaMicra.accountProblem`: `policy` for `policy_required`, `auth` for
+`laMarzocco.accountProblem`: `policy` for `policy_required`, `auth` for
 `invalid_auth` (a 401 that a fresh sign-in in the same cycle did not clear),
 `access` for a 403 without that code, and an empty string otherwise.
 `acceptPolicy` requires a selected machine with `observeState` and sends `PUT /users/policy` with `profilePolicy` and `commercialPolicy` both
@@ -1659,12 +1659,12 @@ machine state, which clears the error. It never sends a machine command.
 
 The Diagnostic stream adds the raw observed mode, power source, sample age and
 freshness, and temperature state. Beyond the cleaning fields Home shows, only
-it includes the `lineaMicra.websocket` detail: socket lifecycle/reason/epoch,
+it includes the `laMarzocco.websocket` detail: socket lifecycle/reason/epoch,
 subscription and machine connectivity, genuine evidence timestamps, payload
 byte counters, fixed 1s/60s rates, retry/stop/publication latency and memory
 metrics. It also carries the boiler detail beyond the Home projection:
-`lineaMicra.boiler.steam.level` (`level_1`–`level_3`) and a whole-second
-`lineaMicra.boiler.sampleAgeMs`.
+`laMarzocco.boiler.steam.level` (`level_1`–`level_3`) and a whole-second
+`laMarzocco.boiler.sampleAgeMs`.
 `cloudCall` remains the last HTTP call. Cleaning never changes control state.
 Payload byte totals use 64-bit counters and include positive partial sends.
 Rate windows use the 64-bit monotonic clock, independently of millisecond

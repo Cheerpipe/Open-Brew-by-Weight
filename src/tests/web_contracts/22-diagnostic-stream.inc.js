@@ -299,7 +299,7 @@
   }
   // Home owns the shared live state; Diagnostic reads it from the Home model.
   for (const field of ['"state"', '"machineState"', '"cupPresence.weightG"', '"physicalActivatorOn"',
-      '"scale.streamState"', '"scale.timerMs"', '"scale.observedWeightG"', '"lineaMicra.powerState"'])
+      '"scale.streamState"', '"scale.timerMs"', '"scale.observedWeightG"', '"laMarzocco.powerState"'])
     assert(!diagRegion.includes('delta.field(' + field), 'Home-owned path repeated by Diagnostic: ' + field);
   assert(homeStream.includes('control.scaleAvailable && control.currentTimerValid') &&
       homeStream.includes('control.currentTimerMs / 100 * 100'),

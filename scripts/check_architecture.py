@@ -81,23 +81,23 @@ def main() -> int:
                 )
     machine_cmake = text("idf/components/openBrewByWeight/CMakeLists.txt")
     for required in (
-        "OpenBrewByWeightLineaMicraIntegration.cpp",
+        "OpenBrewByWeightLaMarzoccoIntegration.cpp",
         "OpenBrewByWeightMachineIntegration.cpp",
     ):
         if required not in machine_cmake:
             failures.append(f"selected machine source contract missing {required!r}")
-    micra_service = text("src/machine/OpenBrewByWeightMicraService.cpp")
+    la_marzocco_service = text("src/machine/OpenBrewByWeightLaMarzoccoService.cpp")
     for required in (
         "esp_crt_bundle_attach",
         "networkEligible",
         "parseJsonDocumentWithinLimits",
         "clearSession",
     ):
-        if required not in micra_service:
-            failures.append(f"Micra cloud boundary missing {required!r}")
+        if required not in la_marzocco_service:
+            failures.append(f"La Marzocco cloud boundary missing {required!r}")
     for forbidden in ("NimBLE", "OpenBrewByWeightBle", "ble_gap", "ble_gatt"):
-        if forbidden in micra_service:
-            failures.append(f"Micra cloud service depends on BLE via {forbidden!r}")
+        if forbidden in la_marzocco_service:
+            failures.append(f"La Marzocco cloud service depends on BLE via {forbidden!r}")
     entrypoints = text("src/platform/OpenBrewByWeightEntrypoints.inc")
     if "scaleBridgeOk && machineIntegrationOk" in entrypoints:
         failures.append("optional machine integration gates scale-worker startup")
@@ -121,7 +121,7 @@ def main() -> int:
         "src/tests/webhook_error_host_test.cpp",
         "src/tests/resource_owner_host_test.cpp",
         "src/tests/machine_integration_host_test.cpp",
-        "src/tests/linea_micra_contract_host_test.cpp",
+        "src/tests/la_marzocco_contract_host_test.cpp",
         "libraries/EspressoScaleBLE/tests/scale_ble_portable_test.cpp",
     )
     for relative in independent_harnesses:

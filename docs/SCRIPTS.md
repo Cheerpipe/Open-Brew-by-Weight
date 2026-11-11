@@ -54,7 +54,7 @@ anything and exits with 127 when they are missing. It runs three steps:
 
 - **ESLint** on `src/web/app.js` and `src/web/js/` with its full recommended
   rule set (`scripts/lint/eslint.config.mjs`). The build-time constants and markers
-  (`__WEBUI_TEXT__`, `__LINEA_MICRA__`, `__REMOTE_CONTROL__`, `__homeModule`) are
+  (`__WEBUI_TEXT__`, `__LA_MARZOCCO__`, `__REMOTE_CONTROL__`, `__homeModule`) are
   declared there; formatting stays with `npm run format:web`.
 - **Stylelint** on `src/web/css` (`scripts/lint/stylelint.json`) with the
   standard config; class, id, custom property and keyframe names must be

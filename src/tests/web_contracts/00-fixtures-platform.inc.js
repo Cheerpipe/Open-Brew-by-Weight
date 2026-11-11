@@ -65,7 +65,7 @@ const network = readSources([
   'diagnostics/OpenBrewByWeightNetworkDiagnostics.inc',
   'diagnostics/OpenBrewByWeightShotTraceRoutes.inc',
   'network/OpenBrewByWeightConfiguration.inc',
-  'network/OpenBrewByWeightLineaMicraWeb.inc',
+  'network/OpenBrewByWeightLaMarzoccoWeb.inc',
   'network/OpenBrewByWeightNetworkOta.inc',
 ]);
 const networkHeader = fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightNetwork.h'), 'utf8');
@@ -180,8 +180,8 @@ const taskProfiler = fs.readFileSync(
   path.join(sketchDir, 'OpenBrewByWeightTaskProfiler.h'), 'utf8');
 const sdkconfigDefaults = fs.readFileSync(
   path.resolve(sketchDir, '..', 'idf', 'sdkconfig.defaults'), 'utf8');
-const sdkconfigMicra = fs.readFileSync(
-  path.resolve(sketchDir, '..', 'idf', 'sdkconfig.defaults.micra'), 'utf8');
+const sdkconfigLaMarzocco = fs.readFileSync(
+  path.resolve(sketchDir, '..', 'idf', 'sdkconfig.defaults.la_marzocco'), 'utf8');
 const sdkconfigNimble = fs.readFileSync(
   path.resolve(sketchDir, '..', 'idf', 'sdkconfig.defaults.nimble'), 'utf8');
 const bleComponentCmake = fs.readFileSync(
@@ -296,14 +296,14 @@ if (!sdkconfigDefaults.includes('CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768') |
   throw new Error(
       'sdkconfig.defaults must place only mDNS runtime memory in PSRAM and keep other task stacks internal');
 }
-if (!idfHelpers.includes('sdkconfig.defaults.micra') ||
+if (!idfHelpers.includes('sdkconfig.defaults.la_marzocco') ||
     !idfHelpers.includes('obbw_idf_config_fingerprint') ||
     !idfBuildScript.includes('obbw_idf_refresh_config') ||
-    !sdkconfigMicra.includes('# CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC is not set') ||
-    !sdkconfigMicra.includes('# CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not set') ||
-    !sdkconfigMicra.includes('CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y') ||
-    !sdkconfigMicra.includes('CONFIG_MBEDTLS_DYNAMIC_BUFFER=y') ||
-    !sdkconfigMicra.includes('CONFIG_WS_BUFFER_SIZE=4096')) {
+    !sdkconfigLaMarzocco.includes('# CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC is not set') ||
+    !sdkconfigLaMarzocco.includes('# CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not set') ||
+    !sdkconfigLaMarzocco.includes('CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y') ||
+    !sdkconfigLaMarzocco.includes('CONFIG_MBEDTLS_DYNAMIC_BUFFER=y') ||
+    !sdkconfigLaMarzocco.includes('CONFIG_WS_BUFFER_SIZE=4096')) {
   throw new Error(
       'Micra-only mbedTLS must use PSRAM and dynamic record buffers');
 }
@@ -437,19 +437,19 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
 // Equipment machine row: the catalog sprite and the marker are scaffolding
 // that must never ship, and an unnamed machine keeps the default glyph.
 {
-  const [defaultUi, micraUi] = await Promise.all([
+  const [defaultUi, laMarzoccoUi] = await Promise.all([
     webUi.generate({webUiLanguage: 'EN', write: false}),
     webUi.generate({webUiLanguage: 'EN', machineIcon: 'linea-micra', write: false}),
   ]);
   const generic = 'M4 3h16v8H4', micra = 'M4 2.5h16a1 1 0 0 1';
-  for (const generated of [defaultUi, micraUi]) {
+  for (const generated of [defaultUi, laMarzoccoUi]) {
     if (generated.html.includes('data-machine-icons') ||
         generated.html.includes('{{webui-meta:machine-icon}}')) {
       throw new Error('machine-icon scaffolding must not ship in generated markup');
     }
   }
   if (!defaultUi.html.includes(generic) || defaultUi.html.includes(micra) ||
-      !micraUi.html.includes(micra) || micraUi.html.includes(generic)) {
+      !laMarzoccoUi.html.includes(micra) || laMarzoccoUi.html.includes(generic)) {
     throw new Error('generate() must bake exactly the machine profile icon into the Home machine row');
   }
 }
@@ -470,12 +470,12 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
     return [built.html, built.runtimeJs, ...Object.values(built.partials),
       ...Object.values(built.modules)].join('');
   };
-  const micraCopy = await copy({});
+  const laMarzoccoCopy = await copy({});
   const miniCopy = await copy({machineModel: 'Linea Mini R', machineShortModel: 'Mini R'});
-  for (const text of [micraCopy, miniCopy]) {
+  for (const text of [laMarzoccoCopy, miniCopy]) {
     if (text.includes('{machine')) throw new Error('an unresolved machine name ships in the Web UI');
   }
-  for (const [text, model, short] of [[micraCopy, 'Linea Micra', 'Micra'],
+  for (const [text, model, short] of [[laMarzoccoCopy, 'Linea Micra', 'Micra'],
     [miniCopy, 'Linea Mini R', 'Mini R']]) {
     for (const phrase of [`Turn the ${short} on with the scale`, `Paddle wakes the ${short}`,
       `This account has no ${model}.`]) {

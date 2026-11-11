@@ -12,17 +12,17 @@ namespace {
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
 constexpr bool kCompanionLm = true;
 bool companionPolicyRequired(uint32_t &sampleAtMs) {
-  const LineaMicraStatus micra = machineIntegrationStatus();
+  const LaMarzoccoStatus micra = machineIntegrationStatus();
   sampleAtMs = micra.sampleAtMs;
-  return micra.error == LineaMicraError::POLICY_REQUIRED;
+  return micra.error == LaMarzoccoError::POLICY_REQUIRED;
 }
 #else
 // Without La Marzocco the route stays direct and the outbox empty, so the
 // link shares one path and carries only the switches.
 constexpr bool kCompanionLm = false;
-MicraCompanionRouteStatus machineIntegrationCompanionRouteStatus() { return {}; }
-MicraCompanionOutbox machineIntegrationCompanionOutbox() { return {}; }
-MicraCompanionIngress machineIntegrationCompanionIngress() { return {}; }
+LaMarzoccoCompanionRouteStatus machineIntegrationCompanionRouteStatus() { return {}; }
+LaMarzoccoCompanionOutbox machineIntegrationCompanionOutbox() { return {}; }
+LaMarzoccoCompanionIngress machineIntegrationCompanionIngress() { return {}; }
 void machineIntegrationCompanionLink(bool, bool) {}
 void machineIntegrationCompanionSyncHold(bool) {}
 bool companionPolicyRequired(uint32_t &) { return false; }
@@ -181,17 +181,17 @@ companionAddBody(uint8_t &count, const char *format, ...) {
   return true;
 }
 
-const char *companionRouteName(MicraCompanionRoute route) {
-  return route == MicraCompanionRoute::COMPANION ? "companion"
-         : route == MicraCompanionRoute::PENDING ? "pending" : "direct";
+const char *companionRouteName(LaMarzoccoCompanionRoute route) {
+  return route == LaMarzoccoCompanionRoute::COMPANION ? "companion"
+         : route == LaMarzoccoCompanionRoute::PENDING ? "pending" : "direct";
 }
 
-[[maybe_unused]] const char *companionCommandName(MicraCompanionCommandOp op) {
+[[maybe_unused]] const char *companionCommandName(LaMarzoccoCompanionCommandOp op) {
   switch (op) {
-    case MicraCompanionCommandOp::TEMPERATURE: return "temp";
-    case MicraCompanionCommandOp::STANDBY: return "standby";
-    case MicraCompanionCommandOp::POWER_ON: return "on";
-    case MicraCompanionCommandOp::REFRESH: return "refresh";
+    case LaMarzoccoCompanionCommandOp::TEMPERATURE: return "temp";
+    case LaMarzoccoCompanionCommandOp::STANDBY: return "standby";
+    case LaMarzoccoCompanionCommandOp::POWER_ON: return "on";
+    case LaMarzoccoCompanionCommandOp::REFRESH: return "refresh";
     default: return nullptr;
   }
 }
@@ -509,9 +509,9 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkFrame(httpd_req_t *request,
     memcpy(key, slot.key, sizeof(key));
   }
   // A state frame's power intent is its arrival, as on the direct socket.
-  const MicraCompanionIngress ingress = phase == CompanionLinkPhase::READY
+  const LaMarzoccoCompanionIngress ingress = phase == CompanionLinkPhase::READY
                                             ? machineIntegrationCompanionIngress()
-                                            : MicraCompanionIngress{};
+                                            : LaMarzoccoCompanionIngress{};
   const char *json = companionWs().frame;
   if (phase == CompanionLinkPhase::READY) json = companionOpenFrame(key, companionWs().frame, length);
   memset(key, 0, sizeof(key));
@@ -686,7 +686,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkProof(httpd_req_t *request,
 
 esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
     CompanionLinkSlot &slot, const cJSON *frame, const char *type,
-    [[maybe_unused]] MicraCompanionIngress ingress) {
+    [[maybe_unused]] LaMarzoccoCompanionIngress ingress) {
   uint32_t expected;
   {
     TaskLockGuard lock(dataMux_);
@@ -764,9 +764,9 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
              // A push takes its intent at ingress; reads order by `ac`.
              (!strcmp(text, "push") || jsonUint32(frame, "ac", third)) &&
              cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(frame, "d"))) {
-    const MicraCompanionStateKind kind = !strcmp(text, "full")   ? MicraCompanionStateKind::FULL
-                                         : !strcmp(text, "push") ? MicraCompanionStateKind::PUSH
-                                                                 : MicraCompanionStateKind::READ;
+    const LaMarzoccoCompanionStateKind kind = !strcmp(text, "full")   ? LaMarzoccoCompanionStateKind::FULL
+                                         : !strcmp(text, "push") ? LaMarzoccoCompanionStateKind::PUSH
+                                                                 : LaMarzoccoCompanionStateKind::READ;
     if (!machineIntegrationCompanionState(kind, first, third,
                                           cJSON_GetObjectItemCaseSensitive(frame, "d"), ingress))
       return companionLinkRefuse(slot, "a machine state push was rejected", false);
@@ -853,7 +853,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
       lifecycleLogf(derived ? "Companion '%s' paired" : "Companion '%s' could not be paired", name);
   }
   if (linkOpen && server_ != nullptr) {
-    const MicraCompanionRoute route = machineIntegrationCompanionRouteStatus().route;
+    const LaMarzoccoCompanionRoute route = machineIntegrationCompanionRouteStatus().route;
     // A sync hold silences the link both ways: the companion stops pinging,
     // so neither the link's nor the La Marzocco route's liveness counts it.
     const bool syncHold = companionSyncHold();
@@ -937,8 +937,8 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
 // The account for the creds frame, sealed for the companion and wiped here.
 bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t generation,
                                                        const uint8_t secret[COMPANION_SECRET_BYTES]) {
-  char email[LINEA_MICRA_USERNAME_CAPACITY] = {}, password[LINEA_MICRA_PASSWORD_CAPACITY] = {},
-       serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
+  char email[LA_MARZOCCO_USERNAME_CAPACITY] = {}, password[LA_MARZOCCO_PASSWORD_CAPACITY] = {},
+       serial[LA_MARZOCCO_SERIAL_CAPACITY] = {};
   bool ok = machineIntegrationCompanionCopyCredentials(generation, email, sizeof(email), password,
                                                        sizeof(password), serial, sizeof(serial));
   char *plain = reinterpret_cast<char *>(companionWs().crypt);
@@ -999,7 +999,7 @@ bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t 
 // session last sent them (everything after a new session). httpd signs and sends.
 void OpenBrewByWeightNetwork::companionPrepareSends() {
   companionNotified_.store(false, std::memory_order_release);
-  const MicraCompanionOutbox outbox = machineIntegrationCompanionOutbox();
+  const LaMarzoccoCompanionOutbox outbox = machineIntegrationCompanionOutbox();
   uint32_t generation = 0;
   [[maybe_unused]] uint32_t lastCommand = 0;
   bool snapshotDue = false, ui = true, logSwitch = true, archive = true, pingReply = false;
@@ -1083,7 +1083,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const char *op = companionCommandName(outbox.commandOp);
   due.command = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
   built.command = due.command &&
-      (outbox.commandOp == MicraCompanionCommandOp::TEMPERATURE
+      (outbox.commandOp == LaMarzoccoCompanionCommandOp::TEMPERATURE
            ? companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\",\"v\":%u}",
                               static_cast<unsigned long>(outbox.commandId), op,
                               static_cast<unsigned>(outbox.commandValue))

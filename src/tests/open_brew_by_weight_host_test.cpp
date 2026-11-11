@@ -1531,7 +1531,7 @@ void t15_repeated_rinse_and_brew_reset_session_state() {
   CHECK(scale.tareStartTimerCalls == 2);
 }
 
-void t16_only_micra_states_are_compiled() {
+void t16_only_la_marzocco_states_are_compiled() {
   CHECK(StopperState::REQUIRES_OFF != StopperState::READY);
   CHECK(ACTIVATOR_ACTIVE_LEVEL == LOW);
   CHECK(RELAY_OPEN_LEVEL != RELAY_CLOSED_LEVEL);
@@ -5142,7 +5142,7 @@ void f01_link_side_effects_run_only_on_control() {
   CHECK(hostMachineTemperatureRequestCount == 1);
   CHECK(hostMachineTemperaturePresetId == presetBank.activeId);
   CHECK(hostMachineTemperatureTargetDeciC ==
-        activeShotPreset(presetBank).lineaMicraBrewTargetDeciC);
+        activeShotPreset(presetBank).laMarzoccoBrewTargetDeciC);
 
   const uint32_t beforeDisconnect = localBuzzer.acceptedRequests;
   scale.connected = false;
@@ -7336,17 +7336,17 @@ void r23b_maintenance_waits_for_shot_store_persist() {
 // Micra settings take no maintenance lease and persist on the deferred path:
 // configuration stays editable and the cloud is not paused, but a working
 // machine still refuses.
-void r23c_micra_settings_save_without_a_lease() {
+void r23c_la_marzocco_settings_save_without_a_lease() {
   resetHarness(false, false);
   reachReadyFromBoot();
   WebCommand command;
-  command.type = WebCommandType::SAVE_LINEA_MICRA;
+  command.type = WebCommandType::SAVE_LA_MARZOCCO;
   command.requestId = 79;
   const uint32_t callsBefore = hostForwardAcceptedNetworkCommandCalls;
   processWebCommand(command);
   CHECK(!maintenanceLease.active);
   CHECK(hostForwardAcceptedNetworkCommandCalls == callsBefore + 1);
-  CHECK(hostLastForwardedNetworkCommand.type == WebCommandType::SAVE_LINEA_MICRA);
+  CHECK(hostLastForwardedNetworkCommand.type == WebCommandType::SAVE_LA_MARZOCCO);
   CHECK(hostLastForwardedNetworkCommand.maintenanceLeaseId == 0);
   // The network task commits it to the PSRAM record and asks for the
   // deferred settings persist, which the control task schedules.
@@ -7362,7 +7362,7 @@ void r23c_micra_settings_save_without_a_lease() {
   processWebCommand(command);
   CHECK(!maintenanceLease.active);
   CHECK(hostLastForwardedNetworkCommand.requestId == 80);
-  CHECK(hostLastForwardedNetworkCommand.type != WebCommandType::SAVE_LINEA_MICRA);
+  CHECK(hostLastForwardedNetworkCommand.type != WebCommandType::SAVE_LA_MARZOCCO);
   CHECK(hostLastForwardedNetworkCommand.resultState == CommandResultState::FAILED);
 }
 
@@ -14576,7 +14576,7 @@ void w91_preset_persistence_serializes_and_survives_retry() {
   CHECK(hostMachineTemperaturePresetId == FACTORY_PRESET_ID_SINGLE_ADAPTIVE);
   CHECK(hostMachineTemperatureGeneration == runtimeConfig.revision);
   CHECK(hostMachineTemperatureTargetDeciC ==
-        activeShotPreset(presetBank).lineaMicraBrewTargetDeciC);
+        activeShotPreset(presetBank).laMarzoccoBrewTargetDeciC);
   CHECK(hostPresetWebhookCount == 1);
   CHECK(hostQuickSettingsWebhookCount == 1);
 }
@@ -14620,7 +14620,7 @@ void w90c_preset_temperature_presence_and_learning_invalidation() {
   resetHarness(false, false);
   reachReadyFromBoot();
   ShotPreset &preset = mutableActiveShotPreset(presetBank);
-  preset.lineaMicraBrewTargetDeciC = 930;
+  preset.laMarzoccoBrewTargetDeciC = 930;
   WebCommand save;
   save.type = WebCommandType::PRESET_OP;
   save.requestId = 901;
@@ -14628,17 +14628,17 @@ void w90c_preset_temperature_presence_and_learning_invalidation() {
   save.presetId = preset.id;
   save.config = runtimeConfig;
   processWebCommand(save);
-  CHECK(preset.lineaMicraBrewTargetDeciC == 930);
+  CHECK(preset.laMarzoccoBrewTargetDeciC == 930);
   CHECK(hostMachineTemperatureRequestCount == 0);
   runLoopAfter(RUNTIME_PERSIST_DEBOUNCE_MS + 1);
 
   auto &learning = bbwLearningBank.forPreset(preset.id, presetBank);
   const uint32_t generation = learning.generation;
   save.requestId = 902;
-  save.lineaMicraBrewTargetSpecified = true;
-  save.lineaMicraBrewTargetDeciC = 945;
+  save.laMarzoccoBrewTargetSpecified = true;
+  save.laMarzoccoBrewTargetDeciC = 945;
   processWebCommand(save);
-  CHECK(preset.lineaMicraBrewTargetDeciC == 945);
+  CHECK(preset.laMarzoccoBrewTargetDeciC == 945);
   CHECK(hostMachineTemperatureRequestCount == 0);
   CHECK(learning.generation != generation);
   runLoopAfter(RUNTIME_PERSIST_DEBOUNCE_MS + 1);
@@ -14648,9 +14648,9 @@ void w90c_preset_temperature_presence_and_learning_invalidation() {
   CHECK(hostMachineTemperatureTargetDeciC == 945);
 
   save.requestId = 903;
-  save.lineaMicraBrewTargetDeciC = 1001;
+  save.laMarzoccoBrewTargetDeciC = 1001;
   processWebCommand(save);
-  CHECK(preset.lineaMicraBrewTargetDeciC == 945);
+  CHECK(preset.laMarzoccoBrewTargetDeciC == 945);
   CHECK(hostLastForwardedNetworkCommand.resultState ==
         CommandResultState::FAILED);
   CHECK(hostMachineTemperatureRequestCount == 1);
@@ -15800,7 +15800,7 @@ void bc05_ble_scan_intensity_applies_live_without_restart() {
   CHECK(!bleScanPersistPending);
 }
 
-void bc06_micra_scan_override_selects_discovery_duty() {
+void bc06_la_marzocco_scan_override_selects_discovery_duty() {
   resetHarness(false, false);
   reachReadyFromBoot();
   applyLiveBleScanIntensity(BleScanIntensity::RELAXED);
@@ -17082,7 +17082,7 @@ void f13_schedule_contract_and_snapshot_evidence_are_explicit() {
   CHECK(TASK_SCHEDULE_CONTRACTS[3].core == 0);
   CHECK(strcmp(TASK_SCHEDULE_CONTRACTS[5].name, "httpd") == 0);
   CHECK(TASK_SCHEDULE_CONTRACTS[5].configuredStackBytes == 11264);
-  CHECK(strcmp(TASK_SCHEDULE_CONTRACTS[7].name, "micra_cloud") == 0);
+  CHECK(strcmp(TASK_SCHEDULE_CONTRACTS[7].name, "lm_cloud") == 0);
   CHECK(TASK_SCHEDULE_CONTRACTS[7].maxBlockingMs == 10000);
   CHECK(TASK_SCHEDULE_CONTRACTS[8].maxBlockingMs ==
         TASK_BLOCKING_UNBOUNDED_MS);
@@ -18426,15 +18426,15 @@ void h06_loop_phase_input_subphases_report_individually() {
 void h08_lock_wait_stats_flow_into_the_profiler_snapshot() {
   resetHarness(false, false);
   scaleCriticalEventWaitStat().note(650U);
-  micraBackflushWaitStat().note(25U);
+  laMarzoccoBackflushWaitStat().note(25U);
   shotStoreWait.note(700U);
   controlStatusWait.note(150U);
   TaskProfilerSnapshot snap;
   copyTaskProfiler(snap);
   CHECK(snap.scaleEventsWaitLastUs == 650U);
   CHECK(snap.scaleEventsWaitMaxUs == 650U);
-  CHECK(snap.micraBackflushWaitLastUs == 25U);
-  CHECK(snap.micraBackflushWaitMaxUs == 25U);
+  CHECK(snap.laMarzoccoBackflushWaitLastUs == 25U);
+  CHECK(snap.laMarzoccoBackflushWaitMaxUs == 25U);
   CHECK(snap.shotStoreWaitLastUs == 700U);
   CHECK(snap.shotStoreWaitMaxUs == 700U);
   CHECK(snap.controlStatusWaitLastUs == 150U);
@@ -18574,7 +18574,7 @@ void h07_mutex_wait_accounting_tracks_last_and_max() {
   // The live stats are readable from the profiler snapshot's side (the
   // Micra backflush accessor is exercised by the micra host tests).
   CHECK(scaleCriticalEventWaitStat().lastUs.load() == 0U);
-  CHECK(micraBackflushWaitStat().lastUs.load() == 0U);
+  CHECK(laMarzoccoBackflushWaitStat().lastUs.load() == 0U);
 }
 
 void r51_auto_to_manual_guard_fires_while_scale_lost() {
@@ -24185,8 +24185,8 @@ void trc03_end_counters_are_exact() {
   shotTrace().noteHeld();
   shotTrace().noteHeld();
   for (uint32_t gapMs : {30U, 12U}) shotTrace().noteLoopGap(gapMs);
-  shotTrace().noteMicraRx(100);
-  shotTrace().noteMicraRx(50);
+  shotTrace().noteLaMarzoccoRx(100);
+  shotTrace().noteLaMarzoccoRx(50);
   for (int i = 0; i < 3; ++i) shotTrace().noteUiDeferral();
   scaleProfileNoteEvent(ScaleProfileEvent::PACKET_GAP, 1600, {.arg1 = 900});
   scaleProfileNoteEvent(ScaleProfileEvent::WEIGHT_REJECTED, 1700,
@@ -24202,7 +24202,7 @@ void trc03_end_counters_are_exact() {
   shotTrace().noteConfirmationReset();
   shotTrace().complete(9, 4, 2000, static_cast<uint8_t>(EndReason::SCALE_THRESHOLD));
   // Out of the window nothing counts.
-  shotTrace().noteMicraRx(1000);
+  shotTrace().noteLaMarzoccoRx(1000);
   shotTrace().noteUiDeferral();
   scaleProfileNoteDroppedFrame({{1, 4}, 2100, 1.0f}, 8, true, true, 2100);
   Trace trace;
@@ -24212,7 +24212,7 @@ void trc03_end_counters_are_exact() {
         counters.readingsHeld == 2);
   CHECK(counters.readingGapMinMs == 50 && counters.readingGapMaxMs == 250 &&
         counters.readingGapMeanMs == 400 / 3);
-  CHECK(counters.loopGapMaxMs == 30 && counters.micraRxBytes == 150 &&
+  CHECK(counters.loopGapMaxMs == 30 && counters.laMarzoccoRxBytes == 150 &&
         counters.uiStreamDeferrals == 3 && counters.packetGaps == 1);
   CHECK(counters.readingsRejected[3] == 1 && counters.readingsRejected[5] == 1);
   CHECK(counters.staleFrames == 1 && counters.undecodableFrames == 2 &&
@@ -24286,7 +24286,7 @@ void trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot() {
   ShotTraceExport result = ShotTraceExport::OK;
   shot_trace_test::exportBytes(&result);
   CHECK(result == ShotTraceExport::EMPTY);
-  shotTrace().noteMicraSubscribed(true);
+  shotTrace().noteLaMarzoccoSubscribed(true);
   shotTrace().begin(100);
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
   shotTrace().note(ShotTraceKind::STOP_REQUESTED, 200, 1, 0);
@@ -24296,7 +24296,7 @@ void trc05_double_buffer_keeps_newest_and_refuses_export_during_a_shot() {
   Trace trace;
   CHECK(shot_trace_test::decodeCompleted(trace));
   CHECK(trace.header.shotLogId == 7 && trace.header.flags == 0);
-  CHECK(trace.snapshot.flags == SHOT_TRACE_SNAP_MICRA_CONNECTED);
+  CHECK(trace.snapshot.flags == SHOT_TRACE_SNAP_LA_MARZOCCO_CONNECTED);
   // A new shot hides the completed trace until it ends.
   shotTrace().begin(400);
   shotTrace().attachStart(ShotTraceSnapshot{}, 1);
@@ -24467,7 +24467,7 @@ void trc10_concurrent_producers_keep_counters_exact() {
   std::thread network([] {
     for (uint32_t i = 0; i < kRounds; ++i) {
       shotTrace().noteUiDeferral();
-      shotTrace().noteMicraRx(3);
+      shotTrace().noteLaMarzoccoRx(3);
     }
   });
   scaleWorker.join();
@@ -24477,7 +24477,7 @@ void trc10_concurrent_producers_keep_counters_exact() {
   Trace trace;
   CHECK(shot_trace_test::decodeCompleted(trace));
   CHECK(trace.counters.packetGaps == kRounds && trace.counters.readingsAccepted == kRounds &&
-        trace.counters.uiStreamDeferrals == kRounds && trace.counters.micraRxBytes == 3 * kRounds);
+        trace.counters.uiStreamDeferrals == kRounds && trace.counters.laMarzoccoRxBytes == 3 * kRounds);
   CHECK(shot_trace_test::count(trace, DebugCode::HEALTH_LOOP_GAP) == kRounds);
   // Captures open and close while producers append and a reader exports.
   std::atomic<bool> done{false}, corrupt{false};
@@ -26081,7 +26081,7 @@ const TestCase testCases[] = {
     {"T13", t13_reset_path_starts_with_relay_open},
     {"T14", t14_automatic_stop_stays_open_while_activator_on},
     {"T15", t15_repeated_rinse_and_brew_reset_session_state},
-    {"T16", t16_only_micra_states_are_compiled},
+    {"T16", t16_only_la_marzocco_states_are_compiled},
     {"T17", t17_simultaneous_global_limit_and_paddle_off_is_idempotent},
     {"T18", t18_rinse_and_short_shot_each_request_one_stop},
     {"T19", t19_manual_cycle_without_scale_has_no_timer_commands},
@@ -26167,7 +26167,7 @@ const TestCase testCases[] = {
     {"R23", r23_maintenance_is_canceled_fail_open_by_physical_paddle},
     {"R23b", r23b_maintenance_waits_for_shot_store_persist},
     {"R23d", r23d_restart_waits_for_unpersisted_shot_records},
-    {"R23c", r23c_micra_settings_save_without_a_lease},
+    {"R23c", r23c_la_marzocco_settings_save_without_a_lease},
     {"R24", r24_web_control_is_available_without_session_owner},
     {"R25", r25_critical_scale_mailbox_never_blocks_and_keeps_latest},
     {"RACE01", race01_idle_tare_validates_after_command_spacing},
@@ -26891,7 +26891,7 @@ const TestCase testCases[] = {
     {"SC15", sc15_status_printers_use_dump_views},
     {"SC16", sc16_debug_status_and_log_dump},
     {"BC05", bc05_ble_scan_intensity_applies_live_without_restart},
-    {"BC06", bc06_micra_scan_override_selects_discovery_duty},
+    {"BC06", bc06_la_marzocco_scan_override_selects_discovery_duty},
     {"BC07", bc07_ble_scan_relaxed_with_disabled_switch_is_api_valid},
     {"BC08", bc08_ble_scan_superseded_requests_all_report_persisted},
     {"BC10", bc10_ble_master_switch_quiesces_scale_link},

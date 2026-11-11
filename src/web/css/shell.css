@@ -224,7 +224,7 @@ body {
 }
 
 #companionSignal[data-level="off"],
-#micraSignal[data-level="off"] {
+#laMarzoccoSignal[data-level="off"] {
   color: var(--mu);
 }
 
@@ -1089,7 +1089,7 @@ html.themeDark #launchIntro {
 }
 
 #companionSignal[data-level="off"] svg,
-#micraSignal[data-level="off"] svg {
+#laMarzoccoSignal[data-level="off"] svg {
   opacity: 0.12;
 }
 
@@ -1097,12 +1097,12 @@ html.themeDark #launchIntro {
   --rackTop: 0.18;
 }
 
-#micraSignal[data-level="partial"] svg {
+#laMarzoccoSignal[data-level="partial"] svg {
   --cloudBack: 0.22;
 }
 
-#micraSignal[data-paired="true"] .cloudAlone,
-#micraSignal:not([data-paired="true"]) .cloudPaired {
+#laMarzoccoSignal[data-paired="true"] .cloudAlone,
+#laMarzoccoSignal:not([data-paired="true"]) .cloudPaired {
   display: none;
 }
 

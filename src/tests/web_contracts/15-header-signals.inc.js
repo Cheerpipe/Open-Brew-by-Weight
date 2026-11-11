@@ -9,18 +9,18 @@
   const companionButton = {dataset: {}, hidden: true, attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
     getAttribute(name) { return this.attributes[name]; }};
-  const micraButton = {dataset: {}, hidden: true, attributes: {},
+  const laMarzoccoButton = {dataset: {}, hidden: true, attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
     getAttribute(name) { return this.attributes[name]; }};
   const elements = Object.fromEntries([...['wifi', 'bluetooth'].flatMap((kind, i) => [
     [kind + 'Signal', buttons[i]], [kind + 'Details', {hidden: true}],
     [kind + 'Name', {}], [kind + 'Detail', {}],
   ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}], ['companionRelay', {}],
-    ['micraSignal', micraButton], ['micraName', {}], ['micraMachine', {}], ['micraDetail', {}],
-    ['micraRoute', {textContent: '—'}]]);
+    ['laMarzoccoSignal', laMarzoccoButton], ['laMarzoccoName', {}], ['laMarzoccoSelected', {}], ['laMarzoccoDetail', {}],
+    ['laMarzoccoRoute', {textContent: '—'}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
   assert(start >= 0, 'Shared header must render cached signal status');
-  const context = vm.createContext({$: id => elements[id], __LINEA_MICRA__: true,
+  const context = vm.createContext({$: id => elements[id], __LA_MARZOCCO__: true,
     document: {querySelectorAll: () => buttons, querySelector: () => null,
       addEventListener: (name, fn) => {events[name] = fn;}},
     window: {addEventListener: (name, fn) => {events[name] = fn;}},
@@ -91,76 +91,76 @@
   assert.equal(elements.companionSignal.dataset.level, 'on', 'Frames without companion changes keep the indicator');
   // The La Marzocco cloud indicator exists only on the micra integration and
   // follows the feed's observation quality: live inks, everything else grays.
-  const micraFrame = (lineaMicra, companion) => context.updateHeaderSignals(
-    {connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud', lineaMicra, companion});
+  const laMarzoccoFrame = (laMarzocco, companion) => context.updateHeaderSignals(
+    {connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'la_marzocco_cloud', laMarzocco, companion});
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}});
-  assert.equal(elements.micraSignal.hidden, true, 'Other integrations show no cloud icon');
-  micraFrame({quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
-  assert.equal(elements.micraSignal.hidden, false, 'The micra integration shows the cloud icon');
-  assert.equal(elements.micraSignal.dataset.level, 'on');
-  assert.equal(elements.micraSignal.attributes['aria-label'], 'La Marzocco cloud: Connected');
-  assert.equal(elements.micraName.textContent, 'barista@example.test');
-  assert.equal(elements.micraMachine.textContent, 'Kitchen Micra');
-  assert.equal(elements.micraDetail.textContent, 'Connected');
+  assert.equal(elements.laMarzoccoSignal.hidden, true, 'Other integrations show no cloud icon');
+  laMarzoccoFrame({quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
+  assert.equal(elements.laMarzoccoSignal.hidden, false, 'The micra integration shows the cloud icon');
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'on');
+  assert.equal(elements.laMarzoccoSignal.attributes['aria-label'], 'La Marzocco cloud: Connected');
+  assert.equal(elements.laMarzoccoName.textContent, 'barista@example.test');
+  assert.equal(elements.laMarzoccoSelected.textContent, 'Kitchen Micra');
+  assert.equal(elements.laMarzoccoDetail.textContent, 'Connected');
   // The route row names where the machine's data runs, with Admin's wording;
   // a frame without a companion model keeps the last route it named.
-  assert.equal(elements.micraRoute.textContent, '—', 'Before any companion model the row holds its placeholder');
-  micraFrame({quality: 'current'}, {route: 'direct'});
-  assert.equal(elements.micraRoute.textContent, 'Directly from the controller');
-  micraFrame({quality: 'current'}, {route: 'companion'});
-  assert.equal(elements.micraRoute.textContent, 'Through the companion');
-  micraFrame({quality: 'current'}, {route: 'pending'});
-  assert.equal(elements.micraRoute.textContent, 'Moving to the companion');
-  micraFrame({quality: 'current'});
-  assert.equal(elements.micraRoute.textContent, 'Moving to the companion',
+  assert.equal(elements.laMarzoccoRoute.textContent, '—', 'Before any companion model the row holds its placeholder');
+  laMarzoccoFrame({quality: 'current'}, {route: 'direct'});
+  assert.equal(elements.laMarzoccoRoute.textContent, 'Directly from the controller');
+  laMarzoccoFrame({quality: 'current'}, {route: 'companion'});
+  assert.equal(elements.laMarzoccoRoute.textContent, 'Through the companion');
+  laMarzoccoFrame({quality: 'current'}, {route: 'pending'});
+  assert.equal(elements.laMarzoccoRoute.textContent, 'Moving to the companion');
+  laMarzoccoFrame({quality: 'current'});
+  assert.equal(elements.laMarzoccoRoute.textContent, 'Moving to the companion',
       'A companion-less frame keeps the last route');
-  micraFrame({quality: 'optimistic', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
-  assert.equal(elements.micraSignal.dataset.level, 'on', 'A commanded wake-up the cloud has yet to confirm stays inked');
+  laMarzoccoFrame({quality: 'optimistic', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'on', 'A commanded wake-up the cloud has yet to confirm stays inked');
   for (const [quality, label] of [['stale', 'Connection problems'],
       ['communication_error', 'Connection problems'], ['unconfigured', 'Not connected'],
       ['disabled', 'Disabled'], ['unsupported', 'Connection problems']]) {
-    micraFrame({quality, email: '', selectedName: ''});
-    assert.equal(elements.micraSignal.dataset.level, 'off', quality);
-    assert.equal(elements.micraDetail.textContent, label, quality);
+    laMarzoccoFrame({quality, email: '', selectedName: ''});
+    assert.equal(elements.laMarzoccoSignal.dataset.level, 'off', quality);
+    assert.equal(elements.laMarzoccoDetail.textContent, label, quality);
   }
-  assert.equal(elements.micraName.textContent, 'No account saved', 'No account says so');
-  assert.equal(elements.micraMachine.textContent, 'No machine selected', 'No machine says so');
-  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'linea_micra_cloud',
-    lineaMicra: {quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'}});
-  assert.equal(elements.micraSignal.dataset.level, 'off', 'A stale snapshot grays the cloud icon');
-  assert.equal(elements.micraDetail.textContent, 'Signal unavailable');
-  assert.equal(elements.micraName.textContent, 'barista@example.test', 'The stale account keeps its last known email');
-  micraFrame({quality: 'current'});
-  assert.equal(elements.micraSignal.dataset.level, 'on', 'A fresh frame re-inks the cloud icon');
+  assert.equal(elements.laMarzoccoName.textContent, 'No account saved', 'No account says so');
+  assert.equal(elements.laMarzoccoSelected.textContent, 'No machine selected', 'No machine says so');
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'la_marzocco_cloud',
+    laMarzocco: {quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'}});
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'off', 'A stale snapshot grays the cloud icon');
+  assert.equal(elements.laMarzoccoDetail.textContent, 'Signal unavailable');
+  assert.equal(elements.laMarzoccoName.textContent, 'barista@example.test', 'The stale account keeps its last known email');
+  laMarzoccoFrame({quality: 'current'});
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'on', 'A fresh frame re-inks the cloud icon');
   // The Admin poll names the integration but carries no micra model; it must
   // leave the indicator on its last Home frame instead of graying it.
-  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud'});
-  assert.equal(elements.micraSignal.dataset.level, 'on', 'A model-less envelope keeps the cloud icon');
-  assert.equal(elements.micraDetail.textContent, 'Connected');
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'la_marzocco_cloud'});
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'on', 'A model-less envelope keeps the cloud icon');
+  assert.equal(elements.laMarzoccoDetail.textContent, 'Connected');
   // Without a companion the one cloud only turns on and off, whatever the
   // route; a paired companion adds the state that names a direct route.
-  micraFrame({quality: 'current'}, {paired: false, route: 'direct'});
-  assert.equal(elements.micraSignal.dataset.paired, 'false');
-  assert.equal(elements.micraSignal.dataset.level, 'on', 'No companion: a live link is fully on');
-  assert.equal(elements.micraSignal.attributes['aria-label'], 'La Marzocco cloud: Connected');
+  laMarzoccoFrame({quality: 'current'}, {paired: false, route: 'direct'});
+  assert.equal(elements.laMarzoccoSignal.dataset.paired, 'false');
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'on', 'No companion: a live link is fully on');
+  assert.equal(elements.laMarzoccoSignal.attributes['aria-label'], 'La Marzocco cloud: Connected');
   for (const [route, level, name] of [['direct', 'partial', 'Directly from the controller'],
       ['pending', 'partial', 'Moving to the companion'], ['companion', 'on', 'Through the companion']]) {
-    micraFrame({quality: 'current'}, {paired: true, route});
-    assert.equal(elements.micraSignal.dataset.paired, 'true');
-    assert.equal(elements.micraSignal.dataset.level, level, route);
-    assert.equal(elements.micraSignal.attributes['aria-label'], 'La Marzocco cloud: Connected · ' + name);
+    laMarzoccoFrame({quality: 'current'}, {paired: true, route});
+    assert.equal(elements.laMarzoccoSignal.dataset.paired, 'true');
+    assert.equal(elements.laMarzoccoSignal.dataset.level, level, route);
+    assert.equal(elements.laMarzoccoSignal.attributes['aria-label'], 'La Marzocco cloud: Connected · ' + name);
   }
-  micraFrame({quality: 'current'}, {paired: true, route: 'direct'});
-  micraFrame({quality: 'current'});
-  assert.equal(elements.micraSignal.dataset.level, 'partial', 'A companion-less frame keeps the pairing and route');
-  micraFrame({quality: 'stale'}, {paired: true, route: 'direct'});
-  assert.equal(elements.micraSignal.dataset.level, 'off', 'A paired companion does not light a dead feed');
-  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'linea_micra_cloud',
-    lineaMicra: {quality: 'current'}, companion: {paired: false}});
-  assert.equal(elements.micraSignal.dataset.paired, 'true', 'A stale snapshot keeps the last known pairing');
-  assert.equal(elements.micraSignal.dataset.level, 'off');
-  micraFrame({quality: 'current'}, {paired: false, route: 'direct'});
-  assert.equal(elements.micraSignal.dataset.level, 'on', 'Unpairing returns to the one cloud');
+  laMarzoccoFrame({quality: 'current'}, {paired: true, route: 'direct'});
+  laMarzoccoFrame({quality: 'current'});
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'partial', 'A companion-less frame keeps the pairing and route');
+  laMarzoccoFrame({quality: 'stale'}, {paired: true, route: 'direct'});
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'off', 'A paired companion does not light a dead feed');
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'la_marzocco_cloud',
+    laMarzocco: {quality: 'current'}, companion: {paired: false}});
+  assert.equal(elements.laMarzoccoSignal.dataset.paired, 'true', 'A stale snapshot keeps the last known pairing');
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'off');
+  laMarzoccoFrame({quality: 'current'}, {paired: false, route: 'direct'});
+  assert.equal(elements.laMarzoccoSignal.dataset.level, 'on', 'Unpairing returns to the one cloud');
   // The scale battery rides the scale button under one level rule; the
   // header draws the cell, the percent goes to the popover, the label and,
   // only with this device's setting, the text beside the cell.
@@ -416,7 +416,7 @@ if (!css.includes('#bluetoothSignal[data-level="0"] .scaleGlyph{opacity:.12}') |
 }
 // The companion and cloud icons need the radios' OFF dimming too: the muted
 // color alone still reads as active in dark mode.
-if (!css.includes('#companionSignal[data-level=off] svg,#micraSignal[data-level=off] svg{opacity:.12}')) {
+if (!css.includes('#companionSignal[data-level=off] svg,#laMarzoccoSignal[data-level=off] svg{opacity:.12}')) {
   throw new Error('The disconnected companion and cloud icons must dim like the radios');
 }
 // The menu opens a page fresh; Back and Forward return it as it was left.

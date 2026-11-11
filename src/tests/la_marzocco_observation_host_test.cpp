@@ -1,5 +1,5 @@
-#include "machine/OpenBrewByWeightMicraObservation.h"
-#include "micra_power_test_helpers.h"
+#include "machine/OpenBrewByWeightLaMarzoccoObservation.h"
+#include "la_marzocco_power_test_helpers.h"
 #include <cJSON.h>
 #include <cassert>
 #include <cstring>
@@ -9,56 +9,56 @@
 
 using namespace openbrewbyweight;
 
-static bool decode(const char *json, MicraObservation &update) {
+static bool decode(const char *json, LaMarzoccoObservation &update) {
   cJSON *root = cJSON_Parse(json);
-  const bool valid = decodeMicraDashboard(root, update);
+  const bool valid = decodeLaMarzoccoDashboard(root, update);
   cJSON_Delete(root);
   return valid;
 }
 
 static void initialStateContinuity() {
   for (bool pushFirst : {false, true}) {
-    LineaMicraStatus state;
+    LaMarzoccoStatus state;
     state.identityGeneration = 1;
     state.connectionFreshness = true;
-    LineaMicraPowerStateTracker power;
-    MicraObservationFence fence;
-    MicraObservation initial;
+    LaMarzoccoPowerStateTracker power;
+    LaMarzoccoObservationFence fence;
+    LaMarzoccoObservation initial;
     initial.stamp = fence.stamp(1, power.generation());
-    initial.source = MicraObservationSource::HTTP_INITIAL;
+    initial.source = LaMarzoccoObservationSource::HTTP_INITIAL;
     initial.powerPresent = initial.temperaturePresent = initial.temperatureValid = true;
-    initial.mode = LineaMicraObservedMode::STANDBY;
+    initial.mode = LaMarzoccoObservedMode::STANDBY;
     initial.targetDeciC = 930;
     initial.receivedAtMs = 100;
-    MicraObservation push = initial;
-    push.source = MicraObservationSource::WEBSOCKET;
+    LaMarzoccoObservation push = initial;
+    push.source = LaMarzoccoObservationSource::WEBSOCKET;
     push.temperaturePresent = false;
-    push.mode = LineaMicraObservedMode::BREWING;
+    push.mode = LaMarzoccoObservedMode::BREWING;
     push.receivedAtMs = 101;
     if (pushFirst) assert(fence.merge(state, power, push, true));
     assert(fence.merge(state, power, initial, true, true));
     assert(state.targetDeciC == 930);
-    assert(state.powerSource == (pushFirst ? MicraObservationSource::WEBSOCKET :
-                                            MicraObservationSource::HTTP_INITIAL));
-    assert(state.powerState == (pushFirst ? LineaMicraPowerState::ON : LineaMicraPowerState::OFF));
+    assert(state.powerSource == (pushFirst ? LaMarzoccoObservationSource::WEBSOCKET :
+                                            LaMarzoccoObservationSource::HTTP_INITIAL));
+    assert(state.powerState == (pushFirst ? LaMarzoccoPowerState::ON : LaMarzoccoPowerState::OFF));
     assert(fence.synchronized);
     for (uint32_t now : {30100U, 60100U, 600100U, 3600100U})
-      assert(power.effectiveStatus(state, true, now).quality == LineaMicraObservationQuality::CURRENT);
+      assert(power.effectiveStatus(state, true, now).quality == LaMarzoccoObservationQuality::CURRENT);
     assert(fence.merge(state, power, push, true));
-    assert(state.powerSource == MicraObservationSource::WEBSOCKET);
+    assert(state.powerSource == LaMarzoccoObservationSource::WEBSOCKET);
     auto staleOffline = initial;
     staleOffline.connectedPresent = true;
     staleOffline.connected = false;
     assert(fence.merge(state, power, staleOffline, true, true));
     assert(fence.synchronized && !fence.offline && !retained(power));
     initial.stamp = fence.stamp(1, power.generation());
-    initial.source = MicraObservationSource::HTTP;
+    initial.source = LaMarzoccoObservationSource::HTTP;
     initial.receivedAtMs = 200;
     assert(fence.merge(state, power, initial, true, true));  // Later explicit refresh.
-    assert(state.powerSource == MicraObservationSource::HTTP && state.sampleAtMs == 200);
+    assert(state.powerSource == LaMarzoccoObservationSource::HTTP && state.sampleAtMs == 200);
 
-    MicraObservation offline;
-    offline.source = MicraObservationSource::WEBSOCKET;
+    LaMarzoccoObservation offline;
+    offline.source = LaMarzoccoObservationSource::WEBSOCKET;
     offline.stamp = fence.stamp(1, power.generation());
     offline.connectedPresent = true;
     offline.receivedAtMs = 300;
@@ -74,7 +74,7 @@ static void initialStateContinuity() {
     assert(!fence.offline && !fence.synchronized && retained(power));
     push.powerPresent = false;
     assert(fence.merge(state, power, push, true));
-    assert(power.effectiveStatus(state, true, 400).quality == LineaMicraObservationQuality::STALE);
+    assert(power.effectiveStatus(state, true, 400).quality == LaMarzoccoObservationQuality::STALE);
     push.powerPresent = true;
     push.receivedAtMs = 500;
     assert(fence.merge(state, power, push, true));
@@ -86,31 +86,31 @@ static void initialStateContinuity() {
     assert(!fence.merge(state, power, late, true, true));
 
     state.connectionFreshness = false;
-    assert(power.effectiveStatus(state, true, 30500).quality == LineaMicraObservationQuality::STALE);
+    assert(power.effectiveStatus(state, true, 30500).quality == LaMarzoccoObservationQuality::STALE);
   }
 }
 
 static void connectionOnlyOrdering() {
-  LineaMicraStatus state;
-  LineaMicraPowerStateTracker power;
-  MicraObservationFence fence;
-  MicraObservation initial;
-  initial.source = MicraObservationSource::HTTP_INITIAL;
+  LaMarzoccoStatus state;
+  LaMarzoccoPowerStateTracker power;
+  LaMarzoccoObservationFence fence;
+  LaMarzoccoObservation initial;
+  initial.source = LaMarzoccoObservationSource::HTTP_INITIAL;
   initial.stamp = fence.stamp(0, power.generation());
   initial.connectedPresent = true;
   initial.receivedAtMs = 100;
-  MicraObservation online = initial;
-  online.source = MicraObservationSource::WEBSOCKET;
+  LaMarzoccoObservation online = initial;
+  online.source = LaMarzoccoObservationSource::WEBSOCKET;
   online.connected = true;
   assert(fence.merge(state, power, online, true));
   assert(fence.merge(state, power, initial, true));
   assert(!fence.offline && !retained(power));  // Older API offline cannot win.
   // Online-only push must not prevent independent power initialization.
   initial.connected = initial.powerPresent = true;
-  initial.mode = LineaMicraObservedMode::STANDBY;
+  initial.mode = LaMarzoccoObservedMode::STANDBY;
   assert(fence.merge(state, power, initial, true));
-  assert(state.powerState == LineaMicraPowerState::OFF && fence.synchronized);
-  assert(state.powerSource == MicraObservationSource::HTTP_INITIAL);
+  assert(state.powerState == LaMarzoccoPowerState::OFF && fence.synchronized);
+  assert(state.powerSource == LaMarzoccoObservationSource::HTTP_INITIAL);
   initial.stamp = fence.stamp(0, power.generation());
   initial.connected = false;
   assert(fence.merge(state, power, initial, true));
@@ -121,9 +121,9 @@ int main() {
   initialStateContinuity();
   connectionOnlyOrdering();
   // Synthetic dashboard fixtures; no cloud or hardware is contacted.
-  MicraObservation update;
+  LaMarzoccoObservation update;
   assert(decode(R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"StandBy","status":"Brewing"}},{"code":"CMCoffeeBoiler","output":{"targetTemperature":93.5}}]})", update));
-  assert(update.mode == LineaMicraObservedMode::STANDBY);
+  assert(update.mode == LaMarzoccoObservedMode::STANDBY);
   assert(update.targetDeciC == 935 && update.temperatureValid);
   update = {};
   assert(!decode(R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"targetTemperature":"93"}}]})", update));
@@ -132,7 +132,7 @@ int main() {
   assert(decode(R"({"connected":false,"widgets":[{"code":"FutureWidget"}]})", update));
   // Malformed widgets the decoder does not use are skipped, not fatal.
   {
-    MicraObservation tolerant;
+    LaMarzoccoObservation tolerant;
     assert(decode(R"({"widgets":[{"code":7},"note",{"output":{}},{"code":"CMMachineStatus","output":{"mode":"StandBy"}}]})", tolerant));
     assert(tolerant.powerPresent);
     assert(decode(R"({"removedWidgets":[{"name":"Future"},"CMBackFlush"]})", tolerant));
@@ -145,64 +145,64 @@ int main() {
   assert(!update.powerPresent);
   assert(!decode(R"({"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode","mode":null}}]})", update));
   assert(!decode(R"({"widgets":[{"code":"CMMachineStatus","code":"Future","output":{"mode":"BrewingMode"}}]})", update));
-  update.source = MicraObservationSource::WEBSOCKET;
+  update.source = LaMarzoccoObservationSource::WEBSOCKET;
   assert(decode(R"({"widgets":[{"code":"CMBackFlush","output":{"status":"123456789012345678901234567890éé"}}]})", update));
   assert(std::strcmp(update.cleaningLabel, "123456789012345678901234567890é") == 0);
-  assert(update.cleaning == MicraCleaningState::UNKNOWN);
+  assert(update.cleaning == LaMarzoccoCleaningState::UNKNOWN);
 
   for (const char *label : {"Requested", "Cleaning", "Off", "Future"}) {
     char json[120];
     std::snprintf(json, sizeof(json), "{\"widgets\":[{\"code\":\"CMBackFlush\",\"output\":{\"status\":\"%s\"}}]}", label);
     update = {};
     assert(decode(json, update) && !update.cleaningPresent);
-    update.source = MicraObservationSource::WEBSOCKET;
+    update.source = LaMarzoccoObservationSource::WEBSOCKET;
     assert(decode(json, update) && update.cleaningPresent && update.cleaningAvailable);
     assert(std::strcmp(update.cleaningLabel, label) == 0);
   }
   update = {};
-  update.source = MicraObservationSource::WEBSOCKET;
+  update.source = LaMarzoccoObservationSource::WEBSOCKET;
   assert(decode(R"({"removedWidgets":["CMBackFlush","CMMachineStatus","CMCoffeeBoiler"]})", update));
   assert(update.cleaningPresent && !update.cleaningAvailable);
-  assert(update.powerPresent && update.mode == LineaMicraObservedMode::NONE);
+  assert(update.powerPresent && update.mode == LaMarzoccoObservedMode::NONE);
   assert(update.temperaturePresent && !update.temperatureValid);
   update = {};
   assert(decode(R"({"removedWidgets":[{"code":"CMMachineStatus"},{"code":"CMCoffeeBoiler"}]})", update));
-  assert(update.powerPresent && update.mode == LineaMicraObservedMode::NONE);
+  assert(update.powerPresent && update.mode == LaMarzoccoObservedMode::NONE);
   assert(update.temperaturePresent && !update.temperatureValid);
 
   // Boiler readiness widgets: status, estimate, and steam level.
   update = {};
-  update.source = MicraObservationSource::WEBSOCKET;
+  update.source = LaMarzoccoObservationSource::WEBSOCKET;
   assert(decode(R"({"widgets":[)"
       R"({"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},)"
       R"({"code":"CMCoffeeBoiler","output":{"status":"HeatingUp","targetTemperature":93.0,"readyStartTime":1760000460000}},)"
       R"({"code":"CMSteamBoilerLevel","output":{"status":"HeatingUp","targetLevel":"Level3","readyStartTime":1760000820500}}]})", update));
-  assert(update.powerPresent && update.mode == LineaMicraObservedMode::BREWING);
+  assert(update.powerPresent && update.mode == LaMarzoccoObservedMode::BREWING);
   assert(update.temperaturePresent && update.temperatureValid && update.targetDeciC == 930);
-  assert(update.coffeeBoilerPresent && update.coffeeBoiler == LineaMicraBoilerState::HEATING_UP);
+  assert(update.coffeeBoilerPresent && update.coffeeBoiler == LaMarzoccoBoilerState::HEATING_UP);
   assert(update.coffeeReadyAtUtcSec == 1760000460U);
-  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::HEATING_UP);
-  assert(update.steamLevel == LineaMicraSteamLevel::LEVEL_3);
+  assert(update.steamBoilerPresent && update.steamBoiler == LaMarzoccoBoilerState::HEATING_UP);
+  assert(update.steamLevel == LaMarzoccoSteamLevel::LEVEL_3);
   assert(update.steamReadyAtUtcSec == 1760000820U);
   // Unknown status strings degrade to UNSUPPORTED instead of failing.
   update = {};
-  update.source = MicraObservationSource::WEBSOCKET;
+  update.source = LaMarzoccoObservationSource::WEBSOCKET;
   assert(decode(R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"FutureMode","targetLevel":"Level4"}}]})", update));
-  assert(update.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
-  assert(update.steamLevel == LineaMicraSteamLevel::UNSUPPORTED);
+  assert(update.steamBoiler == LaMarzoccoBoilerState::UNSUPPORTED);
+  assert(update.steamLevel == LaMarzoccoSteamLevel::UNSUPPORTED);
   // Null estimate means no estimate; malformed values degrade to absent
   // instead of failing the frame (display-only field), and both epoch
   // milliseconds and seconds-scale values are interpreted.
   const auto fresh = [&update] {
     update = {};
-    update.source = MicraObservationSource::WEBSOCKET;
+    update.source = LaMarzoccoObservationSource::WEBSOCKET;
   };
   fresh();
   assert(decode(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":94,"readyStartTime":null}}]})", update));
-  assert(update.coffeeBoiler == LineaMicraBoilerState::READY && update.coffeeReadyAtUtcSec == 0);
+  assert(update.coffeeBoiler == LaMarzoccoBoilerState::READY && update.coffeeReadyAtUtcSec == 0);
   fresh();
   assert(decode(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"HeatingUp","readyStartTime":"soon"}}]})", update));
-  assert(update.coffeeBoiler == LineaMicraBoilerState::HEATING_UP && update.coffeeReadyAtUtcSec == 0);
+  assert(update.coffeeBoiler == LaMarzoccoBoilerState::HEATING_UP && update.coffeeReadyAtUtcSec == 0);
   fresh();
   assert(decode(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"HeatingUp","readyStartTime":1000}}]})", update));
   assert(update.coffeeReadyAtUtcSec == 0);  // Sub-epoch garbage: absent.
@@ -221,15 +221,15 @@ int main() {
   fresh();
   // A non-string boiler status degrades to absent, not rejection.
   assert(decode(R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":7,"targetLevel":"Level2"}}]})", update));
-  assert(!update.steamBoilerPresent && update.steamLevel == LineaMicraSteamLevel::LEVEL_2);
+  assert(!update.steamBoilerPresent && update.steamLevel == LaMarzoccoSteamLevel::LEVEL_2);
   fresh();
   assert(!decode(R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","status":"Ready"}}]})", update));
   assert(!decode(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready"}}]})", update));
   update = {};
-  update.source = MicraObservationSource::WEBSOCKET;
+  update.source = LaMarzoccoObservationSource::WEBSOCKET;
   assert(decode(R"({"removedWidgets":["CMSteamBoilerLevel"]})", update));
-  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
-  assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN && update.steamReadyAtUtcSec == 0);
+  assert(update.steamBoilerPresent && update.steamBoiler == LaMarzoccoBoilerState::UNSUPPORTED);
+  assert(update.steamLevel == LaMarzoccoSteamLevel::UNKNOWN && update.steamReadyAtUtcSec == 0);
 
   // The Linea Mini reports its steam boiler as a temperature widget: it feeds
   // the same state and estimate, and no level exists to read.
@@ -239,25 +239,25 @@ int main() {
       R"({"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}},)"
       R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","targetTemperature":128.0,"targetLevel":"Level2","readyStartTime":1760000820500}}]})", update));
   assert(update.steamBoilerPresent && update.steamByTemperature);
-  assert(update.steamBoiler == LineaMicraBoilerState::HEATING_UP);
+  assert(update.steamBoiler == LaMarzoccoBoilerState::HEATING_UP);
   assert(update.steamReadyAtUtcSec == 1760000820U);
   // A level is read from the level widget only, as the companion forwards it.
-  assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN);
+  assert(update.steamLevel == LaMarzoccoSteamLevel::UNKNOWN);
   // Its steam target is not the brew target: the coffee boiler alone sets it.
   assert(update.temperaturePresent && update.targetDeciC == 930);
-  assert(update.coffeeBoiler == LineaMicraBoilerState::READY);
+  assert(update.coffeeBoiler == LaMarzoccoBoilerState::READY);
   {
-    LineaMicraStatus mini;
-    mini.powerState = LineaMicraPowerState::ON;
+    LaMarzoccoStatus mini;
+    mini.powerState = LaMarzoccoPowerState::ON;
     mini.coffeeBoiler = update.coffeeBoiler;
     mini.steamBoiler = update.steamBoiler;
-    mini.assumedPower = lineaMicraAssumedPower(mini);
-    assert(lineaMicraReadiness(mini) == LineaMicraReadiness::WAITING_FOR_STEAM);
+    mini.assumedPower = laMarzoccoAssumedPower(mini);
+    assert(laMarzoccoReadiness(mini) == LaMarzoccoReadiness::WAITING_FOR_STEAM);
   }
   // A steam boiler switched off never blocks readiness, whichever widget says so.
   fresh();
   assert(decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"Off"}}]})", update));
-  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::OFF);
+  assert(update.steamBoilerPresent && update.steamBoiler == LaMarzoccoBoilerState::OFF);
   // Without a status the widget carries no steam state, like the level widget.
   fresh();
   assert(decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"readyStartTime":1760000820500}}]})", update));
@@ -265,8 +265,8 @@ int main() {
   fresh();
   assert(decode(R"({"removedWidgets":["CMSteamBoilerTemperature"]})", update));
   assert(update.steamBoilerPresent && update.steamByTemperature);
-  assert(update.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
-  assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN && update.steamReadyAtUtcSec == 0);
+  assert(update.steamBoiler == LaMarzoccoBoilerState::UNSUPPORTED);
+  assert(update.steamLevel == LaMarzoccoSteamLevel::UNKNOWN && update.steamReadyAtUtcSec == 0);
   assert(!decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}},{"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}}]})", update));
 
   // A frame that carries the level widget decodes as it did before the
@@ -276,10 +276,10 @@ int main() {
       R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}}]})";
   fresh();
   assert(decode(levelOnly, update));
-  const MicraObservation level = update;
+  const LaMarzoccoObservation level = update;
   assert(level.steamBoilerPresent && !level.steamByTemperature);
-  assert(level.steamBoiler == LineaMicraBoilerState::READY);
-  assert(level.steamLevel == LineaMicraSteamLevel::LEVEL_2);
+  assert(level.steamBoiler == LaMarzoccoBoilerState::READY);
+  assert(level.steamLevel == LaMarzoccoSteamLevel::LEVEL_2);
   for (const char *frame : {
       R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}}],"removedWidgets":["CMSteamBoilerTemperature"]})",
       R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2","readyStartTime":1760000820500}},{"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","readyStartTime":1760000999000}}]})",
@@ -293,33 +293,33 @@ int main() {
   // widget the machine never had.
   fresh();
   assert(decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}}],"removedWidgets":["CMSteamBoilerLevel"]})", update));
-  assert(update.steamByTemperature && update.steamBoiler == LineaMicraBoilerState::READY);
+  assert(update.steamByTemperature && update.steamBoiler == LaMarzoccoBoilerState::READY);
   // Across frames, a machine that reports a steam level keeps the level
   // widget as its steam boiler; one that never did follows the temperature.
   {
-    LineaMicraStatus machine;
+    LaMarzoccoStatus machine;
     machine.identityGeneration = 1;
-    LineaMicraPowerStateTracker tracker;
-    MicraObservationFence fence;
+    LaMarzoccoPowerStateTracker tracker;
+    LaMarzoccoObservationFence fence;
     const auto push = [&](const char *json) {
-      MicraObservation frame;
-      frame.source = MicraObservationSource::WEBSOCKET;
+      LaMarzoccoObservation frame;
+      frame.source = LaMarzoccoObservationSource::WEBSOCKET;
       frame.stamp = fence.stamp(1, tracker.generation());
       assert(decode(json, frame));
       assert(fence.merge(machine, tracker, frame, true));
     };
     push(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","readyStartTime":1760000999000}}]})");
-    assert(machine.steamBoiler == LineaMicraBoilerState::HEATING_UP);
+    assert(machine.steamBoiler == LaMarzoccoBoilerState::HEATING_UP);
     assert(machine.steamReadyAtUtcSec == 1760000999U);
     push(R"({"removedWidgets":["CMSteamBoilerTemperature"]})");
-    assert(machine.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
+    assert(machine.steamBoiler == LaMarzoccoBoilerState::UNSUPPORTED);
     push(levelOnly);
-    assert(machine.steamBoiler == LineaMicraBoilerState::READY);
-    assert(machine.steamLevel == LineaMicraSteamLevel::LEVEL_2);
+    assert(machine.steamBoiler == LaMarzoccoBoilerState::READY);
+    assert(machine.steamLevel == LaMarzoccoSteamLevel::LEVEL_2);
     push(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","readyStartTime":1760000999000}}]})");
     push(R"({"removedWidgets":["CMSteamBoilerTemperature"]})");
-    assert(machine.steamBoiler == LineaMicraBoilerState::READY);
-    assert(machine.steamLevel == LineaMicraSteamLevel::LEVEL_2);
+    assert(machine.steamBoiler == LaMarzoccoBoilerState::READY);
+    assert(machine.steamLevel == LaMarzoccoSteamLevel::LEVEL_2);
     assert(machine.steamReadyAtUtcSec == 1760000820U);
   }
 
@@ -327,10 +327,10 @@ int main() {
   // names the value for the Web UI log; a shape error names nothing.
   {
     const auto rejected = [](const char *json) {
-      MicraObservation frame;
+      LaMarzoccoObservation frame;
       const char *unsupported = nullptr;
       cJSON *root = cJSON_Parse(json);
-      assert(!decodeMicraDashboard(root, frame, &unsupported));
+      assert(!decodeLaMarzoccoDashboard(root, frame, &unsupported));
       cJSON_Delete(root);
       return unsupported;
     };
@@ -350,10 +350,10 @@ int main() {
   {
     static std::string skippedModels;
     const auto list = [](const char *json, const char *profileModel,
-                         LineaMicraDiscoverySnapshot &found) {
+                         LaMarzoccoDiscoverySnapshot &found) {
       skippedModels.clear();
       cJSON *root = cJSON_Parse(json);
-      const bool listed = decodeMicraThings(root, profileModel, found, [](const char *model) {
+      const bool listed = decodeLaMarzoccoThings(root, profileModel, found, [](const char *model) {
         skippedModels += model == nullptr ? "<serial>" : model;
         skippedModels += ';';
       });
@@ -373,7 +373,7 @@ int main() {
         Case{"LINEAMICRA", "MR000001", "Kitchen", "LINEAMINIR;LINEAMINI;unknown;unknown;"},
         Case{"LINEAMINIR", "MI000002", "MI000002", "LINEAMICRA;LINEAMINI;unknown;unknown;"},
         Case{"LINEAMINI", "LM000003", "LM000003", "LINEAMICRA;LINEAMINIR;unknown;unknown;"}}) {
-      LineaMicraDiscoverySnapshot found;
+      LaMarzoccoDiscoverySnapshot found;
       assert(list(account, expected.model, found));
       assert(found.count == 1);
       assert(std::strcmp(found.machines[0].serial, expected.serial) == 0);
@@ -381,7 +381,7 @@ int main() {
       assert(skippedModels == expected.skipped);
     }
     // A matching machine whose serial cannot be stored is skipped, unnamed.
-    LineaMicraDiscoverySnapshot found;
+    LaMarzoccoDiscoverySnapshot found;
     assert(list(R"([{"type":"CoffeeMachine","modelCode":"LINEAMICRA","serialNumber":"bad serial!"},)"
                 R"({"type":"CoffeeMachine","modelCode":"LINEAMICRA"}])", "LINEAMICRA", found));
     assert(found.count == 0 && skippedModels == "<serial>;<serial>;");
@@ -395,7 +395,7 @@ int main() {
     many += R"(,{"type":"CoffeeMachine","modelCode":"GS3AV","serialNumber":"GS000001"}])";
     found = {};
     assert(list(many.c_str(), "LINEAMICRA", found));
-    assert(found.count == LINEA_MICRA_MAX_ACCOUNT_MACHINES && skippedModels.empty());
+    assert(found.count == LA_MARZOCCO_MAX_ACCOUNT_MACHINES && skippedModels.empty());
     assert(std::strcmp(found.machines[7].serial, "MR000007") == 0);
     // Anything but the things array is a failed listing.
     found = {};
@@ -405,134 +405,134 @@ int main() {
 
   // Boiler fields ride the temperature revision: partial pushes apply, and a
   // stale poll cannot clobber fresher pushed boiler states.
-  LineaMicraStatus bstate;
+  LaMarzoccoStatus bstate;
   bstate.identityGeneration = 1;
-  LineaMicraPowerStateTracker bpower;
-  MicraObservationFence bfence;
-  MicraObservation poll;
-  poll.source = MicraObservationSource::HTTP_INITIAL;
+  LaMarzoccoPowerStateTracker bpower;
+  LaMarzoccoObservationFence bfence;
+  LaMarzoccoObservation poll;
+  poll.source = LaMarzoccoObservationSource::HTTP_INITIAL;
   poll.stamp = bfence.stamp(1, bpower.generation());
   poll.powerPresent = poll.temperaturePresent = poll.temperatureValid = true;
-  poll.mode = LineaMicraObservedMode::BREWING;
+  poll.mode = LaMarzoccoObservedMode::BREWING;
   poll.targetDeciC = 930;
   poll.coffeeBoilerPresent = poll.steamBoilerPresent = true;
-  poll.coffeeBoiler = poll.steamBoiler = LineaMicraBoilerState::HEATING_UP;
+  poll.coffeeBoiler = poll.steamBoiler = LaMarzoccoBoilerState::HEATING_UP;
   poll.coffeeReadyAtUtcSec = 1760000460U;
   poll.steamReadyAtUtcSec = 1760000820U;
-  poll.steamLevel = LineaMicraSteamLevel::LEVEL_3;
+  poll.steamLevel = LaMarzoccoSteamLevel::LEVEL_3;
   poll.receivedAtMs = 100;
   assert(bfence.merge(bstate, bpower, poll, true, true));
-  assert(bstate.coffeeBoiler == LineaMicraBoilerState::HEATING_UP);
-  assert(bstate.steamLevel == LineaMicraSteamLevel::LEVEL_3);
+  assert(bstate.coffeeBoiler == LaMarzoccoBoilerState::HEATING_UP);
+  assert(bstate.steamLevel == LaMarzoccoSteamLevel::LEVEL_3);
   assert(bstate.temperatureAtMs == 100);
-  MicraObservation steamOnly;
-  steamOnly.source = MicraObservationSource::WEBSOCKET;
+  LaMarzoccoObservation steamOnly;
+  steamOnly.source = LaMarzoccoObservationSource::WEBSOCKET;
   steamOnly.stamp = bfence.stamp(1, bpower.generation());
   steamOnly.steamBoilerPresent = true;
-  steamOnly.steamBoiler = LineaMicraBoilerState::READY;
+  steamOnly.steamBoiler = LaMarzoccoBoilerState::READY;
   steamOnly.receivedAtMs = 150;
   assert(bfence.merge(bstate, bpower, steamOnly, true));
-  assert(bstate.steamBoiler == LineaMicraBoilerState::READY);
-  assert(bstate.coffeeBoiler == LineaMicraBoilerState::HEATING_UP);  // Untouched.
+  assert(bstate.steamBoiler == LaMarzoccoBoilerState::READY);
+  assert(bstate.coffeeBoiler == LaMarzoccoBoilerState::HEATING_UP);  // Untouched.
   assert(bstate.temperatureAtMs == 150);
   assert(bfence.merge(bstate, bpower, poll, true, true));  // Stale poll loses.
-  assert(bstate.steamBoiler == LineaMicraBoilerState::READY);
-  assert(bstate.coffeeBoiler == LineaMicraBoilerState::HEATING_UP);
+  assert(bstate.steamBoiler == LaMarzoccoBoilerState::READY);
+  assert(bstate.coffeeBoiler == LaMarzoccoBoilerState::HEATING_UP);
   // A coffee widget carrying only a status (no targetTemperature) updates the
   // boiler state and keeps the last known target.
   update = {};
-  update.source = MicraObservationSource::WEBSOCKET;
+  update.source = LaMarzoccoObservationSource::WEBSOCKET;
   assert(decode(R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"status":"Ready"}}]})", update));
-  assert(update.coffeeBoilerPresent && update.coffeeBoiler == LineaMicraBoilerState::READY);
+  assert(update.coffeeBoilerPresent && update.coffeeBoiler == LaMarzoccoBoilerState::READY);
   assert(!update.temperaturePresent && !update.steamBoilerPresent);
   update.stamp = bfence.stamp(1, bpower.generation());
   update.receivedAtMs = 200;
   assert(bfence.merge(bstate, bpower, update, true));
-  assert(bstate.coffeeBoiler == LineaMicraBoilerState::READY);
+  assert(bstate.coffeeBoiler == LaMarzoccoBoilerState::READY);
   assert(bstate.targetDeciC == 930 && bstate.targetValid);  // Retained target.
-  assert(bstate.steamBoiler == LineaMicraBoilerState::READY);  // Untouched.
+  assert(bstate.steamBoiler == LaMarzoccoBoilerState::READY);  // Untouched.
   // A steam-only NoWater report drives the rollup once power is ON.
-  MicraObservation drySteam;
-  drySteam.source = MicraObservationSource::WEBSOCKET;
+  LaMarzoccoObservation drySteam;
+  drySteam.source = LaMarzoccoObservationSource::WEBSOCKET;
   drySteam.stamp = bfence.stamp(1, bpower.generation());
   drySteam.steamBoilerPresent = true;
-  drySteam.steamBoiler = LineaMicraBoilerState::NO_WATER;
+  drySteam.steamBoiler = LaMarzoccoBoilerState::NO_WATER;
   drySteam.receivedAtMs = 250;
   assert(bfence.merge(bstate, bpower, drySteam, true));
-  bstate.powerState = LineaMicraPowerState::ON;
-  bstate.assumedPower = lineaMicraAssumedPower(bstate);  // As statusLocked() publishes it.
-  assert(lineaMicraReadiness(bstate) == LineaMicraReadiness::NEEDS_WATER);
+  bstate.powerState = LaMarzoccoPowerState::ON;
+  bstate.assumedPower = laMarzoccoAssumedPower(bstate);  // As statusLocked() publishes it.
+  assert(laMarzoccoReadiness(bstate) == LaMarzoccoReadiness::NEEDS_WATER);
 
   // Readiness rollup truth table over the effective status, resolved as
   // statusLocked() publishes it.
-  const auto resolved = [](LineaMicraStatus s) {
-    s.assumedPower = lineaMicraAssumedPower(s);
+  const auto resolved = [](LaMarzoccoStatus s) {
+    s.assumedPower = laMarzoccoAssumedPower(s);
     return s;
   };
-  LineaMicraStatus rs;
-  rs.powerState = LineaMicraPowerState::ON;
-  rs.coffeeBoiler = rs.steamBoiler = LineaMicraBoilerState::HEATING_UP;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WARMING_UP);
-  rs.coffeeBoiler = LineaMicraBoilerState::READY;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WAITING_FOR_STEAM);
-  rs.steamBoiler = LineaMicraBoilerState::READY;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::READY);
-  rs.steamBoiler = LineaMicraBoilerState::OFF;  // Steam off never blocks.
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::READY);
-  rs.coffeeBoiler = LineaMicraBoilerState::NO_WATER;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::NEEDS_WATER);
-  rs.powerState = LineaMicraPowerState::OFF;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::OFF);
+  LaMarzoccoStatus rs;
+  rs.powerState = LaMarzoccoPowerState::ON;
+  rs.coffeeBoiler = rs.steamBoiler = LaMarzoccoBoilerState::HEATING_UP;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::WARMING_UP);
+  rs.coffeeBoiler = LaMarzoccoBoilerState::READY;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::WAITING_FOR_STEAM);
+  rs.steamBoiler = LaMarzoccoBoilerState::READY;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::READY);
+  rs.steamBoiler = LaMarzoccoBoilerState::OFF;  // Steam off never blocks.
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::READY);
+  rs.coffeeBoiler = LaMarzoccoBoilerState::NO_WATER;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::NEEDS_WATER);
+  rs.powerState = LaMarzoccoPowerState::OFF;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::OFF);
   rs.optimisticOff = true;  // Standby accepted, cloud not yet confirming.
-  rs.quality = LineaMicraObservationQuality::OPTIMISTIC;
-  rs.powerState = LineaMicraPowerState::ON;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::OFF);
+  rs.quality = LaMarzoccoObservationQuality::OPTIMISTIC;
+  rs.powerState = LaMarzoccoPowerState::ON;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::OFF);
   rs.optimisticOff = false;
-  rs.quality = LineaMicraObservationQuality::CURRENT;
-  rs.powerState = LineaMicraPowerState::UNKNOWN;
-  rs.coffeeBoiler = rs.steamBoiler = LineaMicraBoilerState::READY;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);
-  rs.powerState = LineaMicraPowerState::OFF;
+  rs.quality = LaMarzoccoObservationQuality::CURRENT;
+  rs.powerState = LaMarzoccoPowerState::UNKNOWN;
+  rs.coffeeBoiler = rs.steamBoiler = LaMarzoccoBoilerState::READY;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::UNKNOWN);
+  rs.powerState = LaMarzoccoPowerState::OFF;
   rs.optimisticOn = true;  // Paddle wake: confirmed OFF, optimistic ON.
-  rs.quality = LineaMicraObservationQuality::OPTIMISTIC;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);  // Retained boilers predate standby.
-  rs.coffeeBoiler = rs.steamBoiler = LineaMicraBoilerState::UNKNOWN;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);
+  rs.quality = LaMarzoccoObservationQuality::OPTIMISTIC;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::UNKNOWN);  // Retained boilers predate standby.
+  rs.coffeeBoiler = rs.steamBoiler = LaMarzoccoBoilerState::UNKNOWN;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::UNKNOWN);
   rs.optimisticOn = false;  // Confirmed ON, no overlay.
-  rs.quality = LineaMicraObservationQuality::CURRENT;
-  rs.powerState = LineaMicraPowerState::ON;
-  rs.coffeeBoiler = LineaMicraBoilerState::STANDBY;  // Contradictory: no claim.
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::UNKNOWN);
-  rs.coffeeBoiler = LineaMicraBoilerState::ECO;  // Below temperature.
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WARMING_UP);
-  rs.coffeeBoiler = LineaMicraBoilerState::READY;
-  rs.steamBoiler = LineaMicraBoilerState::ECO;
-  assert(lineaMicraReadiness(resolved(rs)) == LineaMicraReadiness::WAITING_FOR_STEAM);
-  assert(std::strcmp(lineaMicraReadinessName(LineaMicraReadiness::WAITING_FOR_STEAM), "waiting_for_steam") == 0);
-  assert(std::strcmp(lineaMicraBoilerStateName(LineaMicraBoilerState::HEATING_UP), "heating_up") == 0);
-  assert(std::strcmp(lineaMicraSteamLevelName(LineaMicraSteamLevel::LEVEL_3), "level_3") == 0);
+  rs.quality = LaMarzoccoObservationQuality::CURRENT;
+  rs.powerState = LaMarzoccoPowerState::ON;
+  rs.coffeeBoiler = LaMarzoccoBoilerState::STANDBY;  // Contradictory: no claim.
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::UNKNOWN);
+  rs.coffeeBoiler = LaMarzoccoBoilerState::ECO;  // Below temperature.
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::WARMING_UP);
+  rs.coffeeBoiler = LaMarzoccoBoilerState::READY;
+  rs.steamBoiler = LaMarzoccoBoilerState::ECO;
+  assert(laMarzoccoReadiness(resolved(rs)) == LaMarzoccoReadiness::WAITING_FOR_STEAM);
+  assert(std::strcmp(laMarzoccoReadinessName(LaMarzoccoReadiness::WAITING_FOR_STEAM), "waiting_for_steam") == 0);
+  assert(std::strcmp(laMarzoccoBoilerStateName(LaMarzoccoBoilerState::HEATING_UP), "heating_up") == 0);
+  assert(std::strcmp(laMarzoccoSteamLevelName(LaMarzoccoSteamLevel::LEVEL_3), "level_3") == 0);
 
-  LineaMicraStatus state;
+  LaMarzoccoStatus state;
   state.identityGeneration = 1;
   state.sampleAtMs = 100;
-  state.powerState = LineaMicraPowerState::ON;
-  state.quality = LineaMicraObservationQuality::CURRENT;
-  LineaMicraPowerStateTracker power;
-  MicraObservationFence fence;
-  MicraObservation old;
+  state.powerState = LaMarzoccoPowerState::ON;
+  state.quality = LaMarzoccoObservationQuality::CURRENT;
+  LaMarzoccoPowerStateTracker power;
+  LaMarzoccoObservationFence fence;
+  LaMarzoccoObservation old;
   old.stamp = fence.stamp(1, power.generation());
   old.powerPresent = old.temperaturePresent = old.temperatureValid = true;
-  old.mode = LineaMicraObservedMode::BREWING;
+  old.mode = LaMarzoccoObservedMode::BREWING;
   old.targetDeciC = 930;
   old.receivedAtMs = 200;
-  MicraObservation push = old;
-  push.source = MicraObservationSource::WEBSOCKET;
+  LaMarzoccoObservation push = old;
+  push.source = LaMarzoccoObservationSource::WEBSOCKET;
   push.temperaturePresent = false;
-  push.mode = LineaMicraObservedMode::STANDBY;
+  push.mode = LaMarzoccoObservedMode::STANDBY;
   push.receivedAtMs = 150;
   assert(fence.merge(state, power, push, true));
   assert(fence.merge(state, power, old, true));
-  assert(state.powerState == LineaMicraPowerState::OFF && state.sampleAtMs == 150);
+  assert(state.powerState == LaMarzoccoPowerState::OFF && state.sampleAtMs == 150);
   assert(state.targetDeciC == 930);  // Independent field revisions.
 
   assert(power.notePhysicalStart(state, true, true, 300));
@@ -548,13 +548,13 @@ int main() {
   ++fence.epoch;
   assert(!fence.merge(state, power, push, true));
   assert(power.effectiveStatus(state, true, 100000).effectiveOn);
-  assert(power.effectiveStatus(state, true, 100000).quality == LineaMicraObservationQuality::STALE);
+  assert(power.effectiveStatus(state, true, 100000).quality == LaMarzoccoObservationQuality::STALE);
   push.stamp = fence.stamp(1, intent);
   push.powerPresent = false;
   push.temperaturePresent = push.temperatureValid = true;
   assert(fence.merge(state, power, push, true) && retained(power));
   push.powerPresent = true;
-  push.mode = LineaMicraObservedMode::BREWING;
+  push.mode = LaMarzoccoObservedMode::BREWING;
   push.receivedAtMs = 100001;
   assert(fence.merge(state, power, push, true) && !retained(power));
   assert(power.effectiveStatus(state, true, 100002).effectiveOn);
@@ -563,82 +563,82 @@ int main() {
   // state is unknown; the paddle restarts it; nothing offline ever turns an
   // assumption into OFF; fresh evidence clears it at any time.
   {
-    using micra_timing::kStaleRetentionMs;
-    LineaMicraStatus on;
-    on.powerState = LineaMicraPowerState::ON;
-    on.quality = LineaMicraObservationQuality::CURRENT;
+    using la_marzocco_timing::kStaleRetentionMs;
+    LaMarzoccoStatus on;
+    on.powerState = LaMarzoccoPowerState::ON;
+    on.quality = LaMarzoccoObservationQuality::CURRENT;
     on.sampleAtMs = 1000;
-    LineaMicraPowerStateTracker held;
+    LaMarzoccoPowerStateTracker held;
     held.hold(on, true, 2000);
     auto e = held.effectiveStatus(on, true, 2000 + kStaleRetentionMs - 1);
-    assert(e.powerState == LineaMicraPowerState::ON && e.quality == LineaMicraObservationQuality::STALE);
+    assert(e.powerState == LaMarzoccoPowerState::ON && e.quality == LaMarzoccoObservationQuality::STALE);
     e = held.effectiveStatus(on, true, 2000 + kStaleRetentionMs);
-    assert(e.powerState == LineaMicraPowerState::UNKNOWN && e.effectiveOn &&
-           e.quality == LineaMicraObservationQuality::STALE && retained(held));
+    assert(e.powerState == LaMarzoccoPowerState::UNKNOWN && e.effectiveOn &&
+           e.quality == LaMarzoccoObservationQuality::STALE && retained(held));
     assert(!held.notePhysicalStart(on, true, true, 2000 + kStaleRetentionMs));  // Unknown: normal shot...
     held.notePhysicalEvidence(on, true, 2000 + kStaleRetentionMs);  // ...and evidence of ON.
     e = held.effectiveStatus(on, true, 2000 + 2 * kStaleRetentionMs - 1);
-    assert(e.powerState == LineaMicraPowerState::ON && !e.optimisticOn);
+    assert(e.powerState == LaMarzoccoPowerState::ON && !e.optimisticOn);
     assert(held.effectiveStatus(on, true, 2000 + 2 * kStaleRetentionMs).powerState ==
-           LineaMicraPowerState::UNKNOWN);
-    held.noteEvidence(held.generation(), LineaMicraPowerState::OFF, 3000 + 2 * kStaleRetentionMs, false);
+           LaMarzoccoPowerState::UNKNOWN);
+    held.noteEvidence(held.generation(), LaMarzoccoPowerState::OFF, 3000 + 2 * kStaleRetentionMs, false);
     assert(!retained(held));  // Cloud evidence always wins.
     held.hold(on, true, 5000);
     held.reset();
     assert(!retained(held));
 
-    LineaMicraStatus off = on;  // Held OFF: the wake gesture flips it to ON and restarts.
-    off.powerState = LineaMicraPowerState::OFF;
+    LaMarzoccoStatus off = on;  // Held OFF: the wake gesture flips it to ON and restarts.
+    off.powerState = LaMarzoccoPowerState::OFF;
     off.effectiveOn = false;
-    LineaMicraPowerStateTracker fromOff;
+    LaMarzoccoPowerStateTracker fromOff;
     fromOff.hold(off, true, 10);
     assert(fromOff.effectiveStatus(off, true, 10 + kStaleRetentionMs - 1).powerState ==
-           LineaMicraPowerState::OFF);
+           LaMarzoccoPowerState::OFF);
     assert(fromOff.notePhysicalStart(off, true, true, 30));
     fromOff.notePhysicalEvidence(off, true, 30);  // No-op over the live overlay.
     e = fromOff.effectiveStatus(off, true, 31);
-    assert(e.powerState == LineaMicraPowerState::ON && !e.optimisticOn &&
-           e.quality == LineaMicraObservationQuality::STALE);
+    assert(e.powerState == LaMarzoccoPowerState::ON && !e.optimisticOn &&
+           e.quality == LaMarzoccoObservationQuality::STALE);
     assert(fromOff.effectiveStatus(off, true, 30 + kStaleRetentionMs - 1).powerState ==
-           LineaMicraPowerState::ON);
+           LaMarzoccoPowerState::ON);
     assert(fromOff.effectiveStatus(off, true, 30 + kStaleRetentionMs).powerState ==
-           LineaMicraPowerState::UNKNOWN);
+           LaMarzoccoPowerState::UNKNOWN);
 
     constexpr uint32_t kMinute = 60U * 1000U, kWrap = 0xFFFFFF00U;
-    LineaMicraPowerStateTracker restart;  // A press before expiry restarts the clock...
+    LaMarzoccoPowerStateTracker restart;  // A press before expiry restarts the clock...
     restart.hold(on, true, kWrap);        // ...across the millis() wrap.
     restart.notePhysicalEvidence(on, true, kWrap + 10 * kMinute);
     assert(restart.effectiveStatus(on, true, kWrap + 25 * kMinute - 1).powerState ==
-           LineaMicraPowerState::ON);
+           LaMarzoccoPowerState::ON);
     assert(restart.effectiveStatus(on, true, kWrap + 25 * kMinute).powerState ==
-           LineaMicraPowerState::UNKNOWN);
-    LineaMicraPowerStateTracker inflight;  // Our own standby outranks the paddle while live...
+           LaMarzoccoPowerState::UNKNOWN);
+    LaMarzoccoPowerStateTracker inflight;  // Our own standby outranks the paddle while live...
     assert(inflight.noteStandbyCommandAccepted(on, true, 1100));
     inflight.hold(on, true, 1101);
     inflight.notePhysicalEvidence(on, true, 1102);
-    assert(inflight.effectiveStatus(on, true, 1103).powerState == LineaMicraPowerState::OFF);
-    inflight.notePhysicalEvidence(on, true, 1100 + micra_timing::kOptimisticOverlayMs);  // ...then counts.
-    assert(inflight.effectiveStatus(on, true, 1101 + micra_timing::kOptimisticOverlayMs).powerState ==
-           LineaMicraPowerState::ON);
+    assert(inflight.effectiveStatus(on, true, 1103).powerState == LaMarzoccoPowerState::OFF);
+    inflight.notePhysicalEvidence(on, true, 1100 + la_marzocco_timing::kOptimisticOverlayMs);  // ...then counts.
+    assert(inflight.effectiveStatus(on, true, 1101 + la_marzocco_timing::kOptimisticOverlayMs).powerState ==
+           LaMarzoccoPowerState::ON);
 
-    LineaMicraPowerStateTracker fresh;  // A fresh reading needs no evidence...
+    LaMarzoccoPowerStateTracker fresh;  // A fresh reading needs no evidence...
     fresh.notePhysicalEvidence(on, true, 5);
     assert(!retained(fresh));
     fresh.notePhysicalEvidence(on, false, 5);  // ...nor does a machine that is not observed.
     assert(!retained(fresh));
-    LineaMicraStatus none;  // Boot before the first read: the paddle says ON until the read lands.
-    LineaMicraPowerStateTracker boot;
+    LaMarzoccoStatus none;  // Boot before the first read: the paddle says ON until the read lands.
+    LaMarzoccoPowerStateTracker boot;
     boot.notePhysicalEvidence(none, true, 5);
-    assert(boot.effectiveStatus(none, true, 6).powerState == LineaMicraPowerState::ON);
-    boot.noteEvidence(boot.generation(), LineaMicraPowerState::OFF, 7, false);
+    assert(boot.effectiveStatus(none, true, 6).powerState == LaMarzoccoPowerState::ON);
+    boot.noteEvidence(boot.generation(), LaMarzoccoPowerState::OFF, 7, false);
     assert(!retained(boot));
-    LineaMicraStatus eco = on;  // Eco: the machine reports no power; the paddle cannot invent one.
-    eco.powerState = LineaMicraPowerState::UNKNOWN;
-    eco.quality = LineaMicraObservationQuality::UNSUPPORTED;
-    LineaMicraPowerStateTracker unsupported;
+    LaMarzoccoStatus eco = on;  // Eco: the machine reports no power; the paddle cannot invent one.
+    eco.powerState = LaMarzoccoPowerState::UNKNOWN;
+    eco.quality = LaMarzoccoObservationQuality::UNSUPPORTED;
+    LaMarzoccoPowerStateTracker unsupported;
     unsupported.hold(eco, true, 5);
     unsupported.notePhysicalEvidence(eco, true, 6);
-    assert(unsupported.effectiveStatus(eco, true, 7).powerState == LineaMicraPowerState::UNKNOWN);
+    assert(unsupported.effectiveStatus(eco, true, 7).powerState == LaMarzoccoPowerState::UNKNOWN);
   }
 
   // Same production reducer, concurrent facade-style publication/snapshots.
@@ -660,8 +660,8 @@ int main() {
   // Discovery keeps an over-long UTF-8 machine name, cut at a character edge.
   std::string name;
   for (unsigned i = 0; i < 30; ++i) name += "\xc3\xa9";  // 60 bytes of "é".
-  char machine[LINEA_MICRA_NAME_CAPACITY];
-  copyMicraText(machine, sizeof(machine), name.c_str());
-  assert(std::strlen(machine) == (LINEA_MICRA_NAME_CAPACITY - 1) / 2 * 2);
+  char machine[LA_MARZOCCO_NAME_CAPACITY];
+  copyLaMarzoccoText(machine, sizeof(machine), name.c_str());
+  assert(std::strlen(machine) == (LA_MARZOCCO_NAME_CAPACITY - 1) / 2 * 2);
   assert(std::strncmp(machine, name.c_str(), std::strlen(machine)) == 0);
 }

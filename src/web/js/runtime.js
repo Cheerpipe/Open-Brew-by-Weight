@@ -286,9 +286,9 @@ const uiState = {
   brewWarnSig: "",
   brewWarnSeq: 0,
   formBaseline: null,
-  micraDirty: false,
+  laMarzoccoDirty: false,
   quickDirty: false,
-  micraSignIn: null,
+  laMarzoccoSignInState: null,
   dateTimeBaseline: null,
   scanBusy: false,
   networkAddressLoaded: false,
@@ -461,11 +461,11 @@ function updateHeaderSignals(s = {}) {
   // confirm) keeps the icon inked, anything else grays it. A paired companion
   // draws two clouds instead of one: both lit while the data runs through it,
   // the back one dimmed while it runs direct (pending still does). Envelopes
-  // without a lineaMicra model (the Admin poll) leave the icon on its last
+  // without a laMarzocco model (the Admin poll) leave the icon on its last
   // Home frame, and other builds fold this branch away entirely.
-  const micra = $("micraSignal");
-  if (micra && __LINEA_MICRA__ && s.machineIntegration === "linea_micra_cloud" && s.lineaMicra) {
-    const lm = s.lineaMicra,
+  const micra = $("laMarzoccoSignal");
+  if (micra && __LA_MARZOCCO__ && s.machineIntegration === "la_marzocco_cloud" && s.laMarzocco) {
+    const lm = s.laMarzocco,
       stale = !!s.snapshotStale,
       quality = lm.quality,
       live = !stale && (quality === "current" || quality === "optimistic");
@@ -489,17 +489,17 @@ function updateHeaderSignals(s = {}) {
             ? __WEBUI_TEXT__("runtime.not_connected")
             : quality === "disabled"
               ? __WEBUI_TEXT__("runtime.disabled")
-              : __WEBUI_TEXT__("shell.micra_link_trouble");
+              : __WEBUI_TEXT__("shell.la_marzocco_link_trouble");
     micra.title =
       __WEBUI_TEXT__("diagnostic.marzocco_cloud") +
       ": " +
       label +
       (live && paired ? " · " + routeName : "");
     micra.setAttribute("aria-label", micra.title);
-    const account = $("micraName"),
-      machine = $("micraMachine"),
-      detail = $("micraDetail"),
-      route = $("micraRoute");
+    const account = $("laMarzoccoName"),
+      machine = $("laMarzoccoSelected"),
+      detail = $("laMarzoccoDetail"),
+      route = $("laMarzoccoRoute");
     if (account) account.textContent = lm.email || __WEBUI_TEXT__("diagnostic.cloud_no_account");
     if (machine)
       machine.textContent = lm.selectedName || __WEBUI_TEXT__("diagnostic.cloud_no_machine");
@@ -852,8 +852,8 @@ function initHeaderSignals() {
 // The short label for a La Marzocco account refusal (Home's accountProblem).
 function accountProblemLabel(problem) {
   return problem === "policy"
-    ? __WEBUI_TEXT__("runtime.micra_policy_required")
-    : __WEBUI_TEXT__("runtime.micra_pill_account");
+    ? __WEBUI_TEXT__("runtime.la_marzocco_policy_required")
+    : __WEBUI_TEXT__("runtime.la_marzocco_pill_account");
 }
 let homeBootDone = false,
   fwReloading = false,
@@ -2096,33 +2096,33 @@ const errorReasonTexts = {
   INTEGRATION_REQUEST_EXPIRED: __WEBUI_TEXT__("err.integration_request_expired"),
   INTEGRATION_SNAPSHOT_OVERFLOW: __WEBUI_TEXT__("err.integration_snapshot_overflow"),
   INTERNAL: __WEBUI_TEXT__("err.internal"),
-  INVALID_MICRA_CONFIG: __WEBUI_TEXT__("err.invalid_micra_config"),
+  INVALID_LA_MARZOCCO_CONFIG: __WEBUI_TEXT__("err.invalid_la_marzocco_config"),
   INVALID_WEBHOOK: __WEBUI_TEXT__("err.invalid_webhook"),
   JSON_BODY_REQUIRED: __WEBUI_TEXT__("err.json_body_required"),
   JSON_TOO_LARGE: __WEBUI_TEXT__("err.json_too_large"),
   LAST_SHOT_NOT_FOUND: __WEBUI_TEXT__("err.last_shot_not_found"),
   LAST_SHOT_OVERFLOW: __WEBUI_TEXT__("err.last_shot_overflow"),
-  LINEA_MICRA_PRESET_TARGET_RANGE: __WEBUI_TEXT__("err.linea_micra_preset_target_range"),
-  LINEA_MICRA_PRESET_TARGET_UNSUPPORTED: __WEBUI_TEXT__(
-    "err.linea_micra_preset_target_unsupported",
+  LA_MARZOCCO_PRESET_TARGET_RANGE: __WEBUI_TEXT__("err.la_marzocco_preset_target_range"),
+  LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED: __WEBUI_TEXT__(
+    "err.la_marzocco_preset_target_unsupported",
   ),
   LOGIN_PASSWORD_MISSING: __WEBUI_TEXT__("err.login_password_missing"),
   LOOP_TIMING_UNAVAILABLE: __WEBUI_TEXT__("err.loop_timing_unavailable"),
   MACHINE_TYPE_UNSUPPORTED: __WEBUI_TEXT__("err.machine_type_unsupported"),
-  MICRA_ACTION_FIELDS_INVALID: __WEBUI_TEXT__("err.micra_action_fields_invalid"),
-  MICRA_ACTION_UNKNOWN: __WEBUI_TEXT__("err.micra_action_unknown"),
-  MICRA_BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.micra_bounded_json_required"),
-  MICRA_BUSY: __WEBUI_TEXT__("err.micra_busy"),
-  MICRA_CHANGE_PENDING: __WEBUI_TEXT__("err.micra_change_pending"),
-  MICRA_CONNECT_FIELDS_ONLY: __WEBUI_TEXT__("err.micra_connect_fields_only"),
-  MICRA_NOT_READY: __WEBUI_TEXT__("err.micra_not_ready"),
-  MICRA_READONLY_ACTIONS: __WEBUI_TEXT__("err.micra_readonly_actions"),
-  MICRA_REQUIRES_READY: __WEBUI_TEXT__("err.micra_requires_ready"),
-  MICRA_SAVE_BUSY: __WEBUI_TEXT__("err.micra_save_busy"),
-  MICRA_SAVE_FIELDS_REQUIRED: __WEBUI_TEXT__("err.micra_save_fields_required"),
-  MICRA_SELECT_FIELDS_REQUIRED: __WEBUI_TEXT__("err.micra_select_fields_required"),
-  MICRA_SELECT_MACHINE_UNKNOWN: __WEBUI_TEXT__("err.micra_select_machine_unknown"),
-  MICRA_STA_REQUIRED: __WEBUI_TEXT__("err.micra_sta_required"),
+  LA_MARZOCCO_ACTION_FIELDS_INVALID: __WEBUI_TEXT__("err.la_marzocco_action_fields_invalid"),
+  LA_MARZOCCO_ACTION_UNKNOWN: __WEBUI_TEXT__("err.la_marzocco_action_unknown"),
+  LA_MARZOCCO_BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.la_marzocco_bounded_json_required"),
+  LA_MARZOCCO_BUSY: __WEBUI_TEXT__("err.la_marzocco_busy"),
+  LA_MARZOCCO_CHANGE_PENDING: __WEBUI_TEXT__("err.la_marzocco_change_pending"),
+  LA_MARZOCCO_CONNECT_FIELDS_ONLY: __WEBUI_TEXT__("err.la_marzocco_connect_fields_only"),
+  LA_MARZOCCO_NOT_READY: __WEBUI_TEXT__("err.la_marzocco_not_ready"),
+  LA_MARZOCCO_READONLY_ACTIONS: __WEBUI_TEXT__("err.la_marzocco_readonly_actions"),
+  LA_MARZOCCO_REQUIRES_READY: __WEBUI_TEXT__("err.la_marzocco_requires_ready"),
+  LA_MARZOCCO_SAVE_BUSY: __WEBUI_TEXT__("err.la_marzocco_save_busy"),
+  LA_MARZOCCO_SAVE_FIELDS_REQUIRED: __WEBUI_TEXT__("err.la_marzocco_save_fields_required"),
+  LA_MARZOCCO_SELECT_FIELDS_REQUIRED: __WEBUI_TEXT__("err.la_marzocco_select_fields_required"),
+  LA_MARZOCCO_SELECT_MACHINE_UNKNOWN: __WEBUI_TEXT__("err.la_marzocco_select_machine_unknown"),
+  LA_MARZOCCO_STA_REQUIRED: __WEBUI_TEXT__("err.la_marzocco_sta_required"),
   NETWORK_SETTINGS_CHANGED_RETRY: __WEBUI_TEXT__("err.network_settings_changed_retry"),
   NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE: __WEBUI_TEXT__("err.network_settings_locked_active_cycle"),
   NETWORK_SSID_PASSWORD_INVALID: __WEBUI_TEXT__("err.network_ssid_password_invalid"),
@@ -3619,11 +3619,11 @@ const BREW_CONTROL_IDS = [
   "slowCurveHardnessRange",
   "grindHintsEnabled",
   "scaleLossFixedS",
-  "lineaMicraBrewTargetC",
+  "laMarzoccoBrewTargetC",
 ];
 function settingsSectionOf(id) {
   if (BREW_CONTROL_IDS.includes(id)) return "brew";
-  return id.startsWith("lineaMicra") ? "micra" : "config";
+  return id.startsWith("laMarzocco") ? "micra" : "config";
 }
 // The browser-local "This device" group (data-g=app) sits inside #workflowPanel
 // but never joins a controller section sweep.
@@ -4354,12 +4354,12 @@ function ingestPresets(s) {
   if ($("brewByWeight") && !uiState.brewDirty) $("brewByWeight").checked = recipeBrewByWeight();
   const active = presetState.items.find((x) => x.id === presetState.activeId);
   if (
-    $("lineaMicraBrewTargetC") &&
+    $("laMarzoccoBrewTargetC") &&
     !uiState.brewDirty &&
     active &&
-    typeof active.lineaMicraBrewTargetC === "number"
+    typeof active.laMarzoccoBrewTargetC === "number"
   )
-    $("lineaMicraBrewTargetC").value = active.lineaMicraBrewTargetC.toFixed(1);
+    $("laMarzoccoBrewTargetC").value = active.laMarzoccoBrewTargetC.toFixed(1);
 }
 
 // Cut line f(t), non-increasing: the ceiling holds until the Fast transition
@@ -5116,10 +5116,10 @@ function invalidateHomeStream() {
     "scaleBattery",
     "machineState",
     "state",
-    "homeMicraPower",
-    "homeMicraBrewBoiler",
-    "homeMicraSteamBoiler",
-    "homeMicraCleaning",
+    "homeLaMarzoccoPower",
+    "homeLaMarzoccoBrewBoiler",
+    "homeLaMarzoccoSteamBoiler",
+    "homeLaMarzoccoCleaning",
     "machineRowState",
     "scale",
     "machineRowValue",
@@ -5143,7 +5143,7 @@ function shotRecorded() {
 function homeStatusCache() {
   return homeStale ? null : homeFrame?.status || null;
 }
-function formatMicraCleaning(lm) {
+function formatLaMarzoccoCleaning(lm) {
   const ws = lm?.websocket || {},
     label = __WEBUI_TEXT__("diagnostic.cleaning_states").split("|")[
       ["inactive", "waiting_for_paddle", "cleaning"].indexOf(ws.cleaning)
@@ -7657,8 +7657,8 @@ function applyMachineTypeUi(s) {
   document.documentElement.classList.toggle("momentaryMachine", t !== "paddle");
   document.documentElement.classList.toggle("reedMachine", t === "momentary_reed");
   document.documentElement.classList.toggle(
-    "lineaMicraIntegration",
-    s.machineIntegration === "linea_micra_cloud",
+    "laMarzoccoIntegration",
+    s.machineIntegration === "la_marzocco_cloud",
   );
   if ($("dMt")) $("dMt").textContent = t;
 }
@@ -7894,13 +7894,13 @@ function applyHomeStatus(s) {
   renderHomeCards();
   renderHomePresetAccordion();
 }
-function lineaMicraAction(action) {
+function laMarzoccoAction(action) {
   return command(
-    "/api/v1/machine/linea-micra",
+    "/api/v1/machine/la-marzocco",
     { action },
     false,
     "",
-    __WEBUI_TEXT__("runtime.micra_action_failed"),
+    __WEBUI_TEXT__("runtime.la_marzocco_action_failed"),
   );
 }
 function statusPageOk(v, s) {
@@ -8076,7 +8076,7 @@ export {
   homeStatusCache,
   shotRecorded,
   cupNeedsRetare,
-  formatMicraCleaning,
+  formatLaMarzoccoCleaning,
   accountProblemLabel,
   $,
   webUiOwner,
@@ -8156,7 +8156,7 @@ export {
   settingsSectionOf,
   snapshotControls,
   restoreSnapshot,
-  lineaMicraAction,
+  laMarzoccoAction,
   updateNetworkPasswordState,
   updateStaticIpFieldsState,
   renameScale,

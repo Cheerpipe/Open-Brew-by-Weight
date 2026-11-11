@@ -89,13 +89,13 @@ const MACHINE_TYPE_EXCLUSIONS = {
   momentary_reed: ['paddleOnly', 'switchOnly'],
 };
 // Builds without the Linea Micra cloud integration drop its markup and CSS;
-// the JS that drives it folds away with __LINEA_MICRA__.
-const LINEA_MICRA_EXCLUSIONS = ['micraOnly', 'micraTempOpt'];
+// the JS that drives it folds away with __LA_MARZOCCO__.
+const LA_MARZOCCO_EXCLUSIONS = ['laMarzoccoOnly', 'laMarzoccoTempOpt'];
 
 // Classes whose markup and CSS a build strips, for its options.
 function excludedClasses(options) {
   return [...(MACHINE_TYPE_EXCLUSIONS[options.machineType] || []),
-    ...(options.lineaMicra === false ? LINEA_MICRA_EXCLUSIONS : [])];
+    ...(options.laMarzocco === false ? LA_MARZOCCO_EXCLUSIONS : [])];
 }
 
 function stripClassMarkup(html, excluded) {
@@ -221,7 +221,7 @@ async function minifyJs(js, flags = {}) {
     module: true,
     compress: {passes: 2, global_defs: {
       __REMOTE_CONTROL__: flags.remoteControl !== false,
-      __LINEA_MICRA__: flags.lineaMicra !== false,
+      __LA_MARZOCCO__: flags.laMarzocco !== false,
     }},
     mangle: true,
     format: {comments: false},
@@ -698,7 +698,7 @@ if (require.main === module) {
     let developmentMode;
     let machineType;
     let remoteControl;
-    let lineaMicra;
+    let laMarzocco;
     let machineIcon;
     let machineModel;
     let machineShortModel;
@@ -713,8 +713,8 @@ if (require.main === module) {
         webUiLanguage = arg.slice('--webui-language='.length);
       } else if (arg === '--no-remote-control') {
         remoteControl = false;
-      } else if (arg === '--no-linea-micra') {
-        lineaMicra = false;
+      } else if (arg === '--no-la-marzocco') {
+        laMarzocco = false;
       } else if (arg === '--machine-icon') {
         if (++i >= process.argv.length) throw new Error('--machine-icon requires a value');
         machineIcon = process.argv[i];
@@ -744,7 +744,7 @@ if (require.main === module) {
       }
     }
     return generate({webUiLanguage, developmentMode, machineType, remoteControl,
-      lineaMicra, machineIcon, machineModel, machineShortModel, versionOverride, output});
+      laMarzocco, machineIcon, machineModel, machineShortModel, versionOverride, output});
   })
       .then((result) => {
         const parts = [`shell ${result.gzip.length} B`,

@@ -1,8 +1,8 @@
 // Maps the grace seconds accepted by the Web API to its packed option code.
-bool lineaMicraGraceCodeFromSeconds(int16_t seconds, uint8_t &code) {
-  for (uint8_t index = 0; index <= LINEA_MICRA_SHUTDOWN_GRACE_CODE_MAX;
+bool laMarzoccoGraceCodeFromSeconds(int16_t seconds, uint8_t &code) {
+  for (uint8_t index = 0; index <= LA_MARZOCCO_SHUTDOWN_GRACE_CODE_MAX;
        ++index) {
-    if (LINEA_MICRA_SHUTDOWN_GRACE_SECONDS[index] ==
+    if (LA_MARZOCCO_SHUTDOWN_GRACE_SECONDS[index] ==
         static_cast<uint16_t>(seconds)) {
       code = index;
       return true;
@@ -11,7 +11,7 @@ bool lineaMicraGraceCodeFromSeconds(int16_t seconds, uint8_t &code) {
   return false;
 }
 
-esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
+esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION != OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   return sendError(request, "404 Not Found", "UNSUPPORTED_MACHINE",
                    nullptr, "UNSUPPORTED_MACHINE");
@@ -21,10 +21,10 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   if (!self.webUiConfigurationAllowed(request, gate)) {
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
-                     nullptr, "MICRA_REQUIRES_READY");
+                     nullptr, "LA_MARZOCCO_REQUIRES_READY");
   }
   const esp_err_t bodyStatus = self.lockJsonBody(
-      request, nullptr, "MICRA_BOUNDED_JSON_REQUIRED");
+      request, nullptr, "LA_MARZOCCO_BOUNDED_JSON_REQUIRED");
   if (bodyStatus != ESP_OK) return bodyStatus;
 
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
@@ -35,15 +35,15 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
       "boostScaleDetectionWhenOn", "reduceScaleScanningWhenOff",
       "connectionType"};
   char action[16] = {};
-  char username[LINEA_MICRA_USERNAME_CAPACITY] = {};
-  char password[LINEA_MICRA_PASSWORD_CAPACITY] = {};
+  char username[LA_MARZOCCO_USERNAME_CAPACITY] = {};
+  char password[LA_MARZOCCO_PASSWORD_CAPACITY] = {};
   const bool known = root != nullptr &&
       jsonHasOnlyUniqueFields(root, fields, sizeof(fields) / sizeof(fields[0]));
   const bool actionOk = known &&
       jsonString(root, "action", action, sizeof(action), false);
   ValidationFailure parseError;
   if (!actionOk) {
-    parseError = validationFailure("MICRA_ACTION_FIELDS_INVALID");
+    parseError = validationFailure("LA_MARZOCCO_ACTION_FIELDS_INVALID");
   }
   bool applyTemperature = false;
   bool observeState = false;
@@ -55,24 +55,24 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   bool reduceScaleScanningWhenOff = false;
   int16_t shutdownGraceSeconds = -1;
   uint8_t shutdownGraceCode = 0;
-  LineaMicraPersistedSettings candidate = {};
+  LaMarzoccoPersistedSettings candidate = {};
   struct SensitiveWiper {
-    SensitiveWiper(char (&user)[LINEA_MICRA_USERNAME_CAPACITY],
-                   char (&pass)[LINEA_MICRA_PASSWORD_CAPACITY],
-                   LineaMicraPersistedSettings &settingsToWipe)
+    SensitiveWiper(char (&user)[LA_MARZOCCO_USERNAME_CAPACITY],
+                   char (&pass)[LA_MARZOCCO_PASSWORD_CAPACITY],
+                   LaMarzoccoPersistedSettings &settingsToWipe)
         : username(user), password(pass), settings(settingsToWipe) {}
-    char (&username)[LINEA_MICRA_USERNAME_CAPACITY];
-    char (&password)[LINEA_MICRA_PASSWORD_CAPACITY];
-    LineaMicraPersistedSettings &settings;
+    char (&username)[LA_MARZOCCO_USERNAME_CAPACITY];
+    char (&password)[LA_MARZOCCO_PASSWORD_CAPACITY];
+    LaMarzoccoPersistedSettings &settings;
     ~SensitiveWiper() {
-      memset(username, 0, LINEA_MICRA_USERNAME_CAPACITY);
-      memset(password, 0, LINEA_MICRA_PASSWORD_CAPACITY);
-      wipeLineaMicraSettings(settings);
+      memset(username, 0, LA_MARZOCCO_USERNAME_CAPACITY);
+      memset(password, 0, LA_MARZOCCO_PASSWORD_CAPACITY);
+      wipeLaMarzoccoSettings(settings);
     }
   } sensitiveWiper(username, password, candidate);
   uint32_t currentRevision = 0;
   self.dataMux_.lock();
-  candidate = self.settings_.lineaMicra;
+  candidate = self.settings_.laMarzocco;
   currentRevision = self.settings_.storageRevision;
   self.dataMux_.unlock();
 
@@ -86,7 +86,7 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
                                      "websocket or api on select or save");
     } else {
       connectionType = static_cast<uint8_t>(strcmp(value, "api") == 0
-          ? MicraConnectionType::API : MicraConnectionType::WEBSOCKET);
+          ? LaMarzoccoConnectionType::API : LaMarzoccoConnectionType::WEBSOCKET);
     }
   }
 
@@ -103,10 +103,10 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
         jsonFieldPresent(root, "scaleOffWithMachine") ||
         jsonFieldPresent(root, "boostScaleDetectionWhenOn") ||
         jsonFieldPresent(root, "reduceScaleScanningWhenOff")) {
-      parseError = validationFailure("MICRA_CONNECT_FIELDS_ONLY");
+      parseError = validationFailure("LA_MARZOCCO_CONNECT_FIELDS_ONLY");
     }
   } else if (parseError.reason == nullptr && strcmp(action, "select") == 0) {
-    char serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
+    char serial[LA_MARZOCCO_SERIAL_CAPACITY] = {};
     if (!jsonString(root, "serial", serial, sizeof(serial), false) ||
         !jsonBoolean(root, "applyTemperature", applyTemperature) ||
         !jsonBoolean(root, "observeState", observeState) ||
@@ -119,18 +119,18 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
         !jsonBoolean(root, "reduceScaleScanningWhenOff",
                      reduceScaleScanningWhenOff) ||
         !jsonInt16(root, "shutdownGraceSeconds", shutdownGraceSeconds) ||
-        !lineaMicraGraceCodeFromSeconds(shutdownGraceSeconds,
+        !laMarzoccoGraceCodeFromSeconds(shutdownGraceSeconds,
                                         shutdownGraceCode) ||
         jsonFieldPresent(root, "username") ||
         jsonFieldPresent(root, "password")) {
-      parseError = validationFailure("MICRA_SELECT_FIELDS_REQUIRED");
+      parseError = validationFailure("LA_MARZOCCO_SELECT_FIELDS_REQUIRED");
     } else {
-      wipeLineaMicraSettings(candidate);
+      wipeLaMarzoccoSettings(candidate);
       if (!selectMachineIntegrationDevice(serial, candidate)) {
-        parseError = validationFailure("MICRA_SELECT_MACHINE_UNKNOWN");
+        parseError = validationFailure("LA_MARZOCCO_SELECT_MACHINE_UNKNOWN");
       } else {
         candidate.connectionType = connectionType;
-        setLineaMicraOptions(candidate, applyTemperature, observeState,
+        setLaMarzoccoOptions(candidate, applyTemperature, observeState,
                              recognizeWakeGesture, shutdownWithScale,
                              powerOnWithScale, shutdownGraceCode,
                              scaleOffWithMachine, boostScaleDetectionWhenOn,
@@ -140,15 +140,15 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   } else if (parseError.reason == nullptr && strcmp(action, "save") == 0) {
     // A save is a patch: each absent option keeps its stored value.
     const uint8_t o = candidate.options, so = candidate.scaleOptions;
-    applyTemperature = o & LINEA_MICRA_APPLY_TEMPERATURE;
-    observeState = o & LINEA_MICRA_OBSERVE_STATE;
-    recognizeWakeGesture = o & LINEA_MICRA_RECOGNIZE_WAKE;
-    shutdownWithScale = o & LINEA_MICRA_SHUTDOWN_WITH_SCALE;
-    powerOnWithScale = o & LINEA_MICRA_POWER_ON_WITH_SCALE;
-    scaleOffWithMachine = so & LINEA_MICRA_SCALE_OFF_WITH_MACHINE;
-    boostScaleDetectionWhenOn = so & LINEA_MICRA_SCALE_SCAN_BOOST_WHEN_ON;
-    reduceScaleScanningWhenOff = so & LINEA_MICRA_SCALE_SCAN_RELAX_WHEN_OFF;
-    shutdownGraceSeconds = static_cast<int16_t>(lineaMicraShutdownGraceSeconds(o));
+    applyTemperature = o & LA_MARZOCCO_APPLY_TEMPERATURE;
+    observeState = o & LA_MARZOCCO_OBSERVE_STATE;
+    recognizeWakeGesture = o & LA_MARZOCCO_RECOGNIZE_WAKE;
+    shutdownWithScale = o & LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
+    powerOnWithScale = o & LA_MARZOCCO_POWER_ON_WITH_SCALE;
+    scaleOffWithMachine = so & LA_MARZOCCO_SCALE_OFF_WITH_MACHINE;
+    boostScaleDetectionWhenOn = so & LA_MARZOCCO_SCALE_SCAN_BOOST_WHEN_ON;
+    reduceScaleScanningWhenOff = so & LA_MARZOCCO_SCALE_SCAN_RELAX_WHEN_OFF;
+    shutdownGraceSeconds = static_cast<int16_t>(laMarzoccoShutdownGraceSeconds(o));
     const auto option = [&](const char *key, bool &value) {
       return !jsonFieldPresent(root, key) || jsonBoolean(root, key, value);
     };
@@ -164,15 +164,15 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
         !option("reduceScaleScanningWhenOff", reduceScaleScanningWhenOff) ||
         (jsonFieldPresent(root, "shutdownGraceSeconds") &&
          !jsonInt16(root, "shutdownGraceSeconds", shutdownGraceSeconds)) ||
-        !lineaMicraGraceCodeFromSeconds(shutdownGraceSeconds,
+        !laMarzoccoGraceCodeFromSeconds(shutdownGraceSeconds,
                                         shutdownGraceCode) ||
         jsonFieldPresent(root, "username") ||
         jsonFieldPresent(root, "password") ||
         jsonFieldPresent(root, "serial")) {
-      parseError = validationFailure("MICRA_SAVE_FIELDS_REQUIRED");
+      parseError = validationFailure("LA_MARZOCCO_SAVE_FIELDS_REQUIRED");
     } else {
       candidate.connectionType = connectionType;
-      setLineaMicraOptions(candidate, applyTemperature, observeState,
+      setLaMarzoccoOptions(candidate, applyTemperature, observeState,
                            recognizeWakeGesture, shutdownWithScale,
                            powerOnWithScale, shutdownGraceCode,
                            scaleOffWithMachine, boostScaleDetectionWhenOn,
@@ -195,10 +195,10 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
         jsonFieldPresent(root, "scaleOffWithMachine") ||
         jsonFieldPresent(root, "boostScaleDetectionWhenOn") ||
         jsonFieldPresent(root, "reduceScaleScanningWhenOff")) {
-      parseError = validationFailure("MICRA_READONLY_ACTIONS");
+      parseError = validationFailure("LA_MARZOCCO_READONLY_ACTIONS");
     }
   } else if (parseError.reason == nullptr) {
-    parseError = validationFailure("MICRA_ACTION_UNKNOWN");
+    parseError = validationFailure("LA_MARZOCCO_ACTION_UNKNOWN");
   }
 
   cJSON *passwordField = root == nullptr
@@ -220,8 +220,8 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
   const bool acceptPolicy = strcmp(action, "acceptPolicy") == 0;
   const bool refresh = acceptPolicy || strcmp(action, "refresh") == 0;
   if ((relist || refresh) && !candidate.accountConfigured) {
-    return sendError(request, STATUS_CONFLICT, "MICRA_NOT_READY",
-                     nullptr, "MICRA_NOT_READY");
+    return sendError(request, STATUS_CONFLICT, "LA_MARZOCCO_NOT_READY",
+                     nullptr, "LA_MARZOCCO_NOT_READY");
   }
   if (relist || strcmp(action, "connect") == 0) {
     const NetworkStatusSnapshot network = self.snapshot();
@@ -229,59 +229,59 @@ esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
                               network.wifiConfigured &&
                               network.iface.staIp[0] != '\0';
     if (!staConnected || network.apActive) {
-      return sendError(request, STATUS_CONFLICT, "MICRA_STA_REQUIRED",
-                       nullptr, "MICRA_STA_REQUIRED");
+      return sendError(request, STATUS_CONFLICT, "LA_MARZOCCO_STA_REQUIRED",
+                       nullptr, "LA_MARZOCCO_STA_REQUIRED");
     }
     const uint32_t requestId = self.allocateRequestId();
     if (relist ? !queueMachineIntegrationRelist(requestId)
                : !queueMachineIntegrationConnect(requestId, username, password)) {
-      return sendError(request, STATUS_UNAVAILABLE, "MICRA_BUSY",
-                       nullptr, "MICRA_BUSY");
+      return sendError(request, STATUS_UNAVAILABLE, "LA_MARZOCCO_BUSY",
+                       nullptr, "LA_MARZOCCO_BUSY");
     }
     return self.sendAccepted(request, requestId);
   }
 
   if (refresh) {
-    LineaMicraRequest integrationRequest = {};
+    LaMarzoccoRequest integrationRequest = {};
     integrationRequest.requestId = self.allocateRequestId();
     integrationRequest.configGeneration = currentRevision;
-    integrationRequest.type = acceptPolicy ? LineaMicraRequestType::ACCEPT_POLICY
-                                           : LineaMicraRequestType::OBSERVE_STATE;
+    integrationRequest.type = acceptPolicy ? LaMarzoccoRequestType::ACCEPT_POLICY
+                                           : LaMarzoccoRequestType::OBSERVE_STATE;
     if (!queueMachineIntegrationRequest(integrationRequest)) {
-      return sendError(request, STATUS_UNAVAILABLE, "MICRA_BUSY",
-                       nullptr, "MICRA_BUSY");
+      return sendError(request, STATUS_UNAVAILABLE, "LA_MARZOCCO_BUSY",
+                       nullptr, "LA_MARZOCCO_BUSY");
     }
     return self.sendAccepted(request, integrationRequest.requestId);
   }
 
   if (strcmp(action, "disconnect") == 0) {
-    disconnectLineaMicra(candidate);
+    disconnectLaMarzocco(candidate);
     clearMachineIntegrationDiscovery();
   }
-  if (!validLineaMicraSettings(candidate)) {
-    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_MICRA_CONFIG",
-                     nullptr, "INVALID_MICRA_CONFIG");
+  if (!validLaMarzoccoSettings(candidate)) {
+    return sendError(request, STATUS_UNPROCESSABLE, "INVALID_LA_MARZOCCO_CONFIG",
+                     nullptr, "INVALID_LA_MARZOCCO_CONFIG");
   }
   WebCommand command;
-  command.type = WebCommandType::SAVE_LINEA_MICRA;
+  command.type = WebCommandType::SAVE_LA_MARZOCCO;
   command.requestId = self.allocateRequestId();
   command.unsafeWebUiOverride = self.webUiOverrideAllowed(request);
   command.stagedConfigRequestId = command.requestId;
   self.dataMux_.lock();
-  const bool available = self.stagedLineaMicraRequestId_ == 0;
+  const bool available = self.stagedLaMarzoccoRequestId_ == 0;
   if (available) {
-    self.stagedLineaMicra_ = candidate;
-    self.stagedLineaMicraRequestId_ = command.requestId;
+    self.stagedLaMarzocco_ = candidate;
+    self.stagedLaMarzoccoRequestId_ = command.requestId;
   }
   self.dataMux_.unlock();
   if (!available) {
-    return sendError(request, STATUS_UNAVAILABLE, "MICRA_BUSY",
-                     nullptr, "MICRA_CHANGE_PENDING");
+    return sendError(request, STATUS_UNAVAILABLE, "LA_MARZOCCO_BUSY",
+                     nullptr, "LA_MARZOCCO_CHANGE_PENDING");
   }
   if (!self.callbacks_.enqueueWebCommand(command)) {
-    self.clearStagedLineaMicra(command.requestId);
+    self.clearStagedLaMarzocco(command.requestId);
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
-                     nullptr, "MICRA_SAVE_BUSY");
+                     nullptr, "LA_MARZOCCO_SAVE_BUSY");
   }
   return self.sendAccepted(request, command.requestId);
 #endif

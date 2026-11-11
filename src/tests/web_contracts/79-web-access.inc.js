@@ -214,7 +214,7 @@
   // Home cards show independently, each whenever its own condition holds, and
   // none waits for another or for the grind hint. Dismissals other than access
   // stay in the browser under the legacy card keys.
-  const order = ['micraPolicyHint', 'micraAccountHint', 'companionHint', 'companionPairHint', 'accessHint', 'micraCloudHint',
+  const order = ['laMarzoccoPolicyHint', 'laMarzoccoAccountHint', 'companionHint', 'companionPairHint', 'accessHint', 'laMarzoccoCloudHint',
     'recipeHint', 'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
   for (const id of order) nodes[id] = {hidden: true};
@@ -226,15 +226,15 @@
     cardDismissed: (k) => cards.get(k) || '', dismissCard: (k, v = '1') => cards.set(k, v), shotRecorded: () => recorded,
     controlsMutable: true, uiState: here, companionHere: () => Promise.resolve(here.companionHere),
     companionPairable: () => pairable, sub: (t, a) => t + ':' + a.join(',')},
-    document: {}, __LINEA_MICRA__: false, __WEBUI_TEXT__: (key) => key};
+    document: {}, __LA_MARZOCCO__: false, __WEBUI_TEXT__: (key) => key};
   vm.runInNewContext(viewJs.home.replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];?/, '')
       .replace(/export /g, ''), home);
-  const fresh = {access: {notice: true}, machineIntegration: 'linea_micra_cloud', presetsTag: 7,
-    lineaMicra: {accountConfigured: false}, config: {scaleMacCacheMode: 'prefer'}, scale: {preferredMac: 'AA'}};
+  const fresh = {access: {notice: true}, machineIntegration: 'la_marzocco_cloud', presetsTag: 7,
+    laMarzocco: {accountConfigured: false}, config: {scaleMacCacheMode: 'prefer'}, scale: {preferredMac: 'AA'}};
   const shown = (s) => (home.applyStatus(s), order.filter((id) => !nodes[id].hidden));
-  assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint', 'recipeHint', 'scaleOnlyHint']);
-  assert.deepEqual(shown({...fresh, access: {notice: false}}), ['micraCloudHint', 'recipeHint', 'scaleOnlyHint']);
-  const noCloud = {...fresh, access: {notice: false}, lineaMicra: {accountConfigured: true}};
+  assert.deepEqual(shown(fresh), ['accessHint', 'laMarzoccoCloudHint', 'recipeHint', 'scaleOnlyHint']);
+  assert.deepEqual(shown({...fresh, access: {notice: false}}), ['laMarzoccoCloudHint', 'recipeHint', 'scaleOnlyHint']);
+  const noCloud = {...fresh, access: {notice: false}, laMarzocco: {accountConfigured: true}};
   assert.deepEqual(shown(noCloud), ['recipeHint', 'scaleOnlyHint']);
   recorded = true;
   assert.deepEqual(shown(noCloud), ['scaleOnlyHint']);
@@ -243,24 +243,24 @@
   // A refused La Marzocco account shows with no
   // dismissal: pending terms offer Accept, which follows the controls lock;
   // a refused sign-in or access names its cause and sends to Settings.
-  const refused = (accountProblem) => ({...noCloud, lineaMicra: {accountConfigured: true, accountProblem}});
+  const refused = (accountProblem) => ({...noCloud, laMarzocco: {accountConfigured: true, accountProblem}});
   const causes = ['auth', 'access'].map((problem) => {
-    assert.deepEqual(shown(refused(problem)), ['micraAccountHint', 'scaleOnlyHint']);
-    return nodes.micraAccountHintTitle.textContent + nodes.micraAccountHintText.textContent;
+    assert.deepEqual(shown(refused(problem)), ['laMarzoccoAccountHint', 'scaleOnlyHint']);
+    return nodes.laMarzoccoAccountHintTitle.textContent + nodes.laMarzoccoAccountHintText.textContent;
   });
   assert.ok(causes[0] && causes[1] && causes[0] !== causes[1], 'Each refusal names its own cause');
   assert.deepEqual(shown(refused('')), ['scaleOnlyHint']);
   const blocked = refused('policy');
-  assert.deepEqual(shown(blocked), ['micraPolicyHint', 'scaleOnlyHint']);
-  assert.strictEqual(nodes.micraPolicyHintAccept.disabled, false);
+  assert.deepEqual(shown(blocked), ['laMarzoccoPolicyHint', 'scaleOnlyHint']);
+  assert.strictEqual(nodes.laMarzoccoPolicyHintAccept.disabled, false);
   home.R.controlsMutable = false;
   shown(blocked);
-  assert.strictEqual(nodes.micraPolicyHintAccept.disabled, true);
+  assert.strictEqual(nodes.laMarzoccoPolicyHintAccept.disabled, true);
   home.R.controlsMutable = true;
-  assert.ok(partialHtml.home.includes('id="micraPolicyHintAccept"') &&
-      !partialHtml.home.includes('micraPolicyHintDismiss'), 'The terms card offers Accept, no dismissal');
-  assert.ok(partialHtml.home.includes('id="micraAccountHint"') &&
-      !partialHtml.home.includes('micraAccountHintDismiss'), 'The account card sends to Settings, no dismissal');
+  assert.ok(partialHtml.home.includes('id="laMarzoccoPolicyHintAccept"') &&
+      !partialHtml.home.includes('laMarzoccoPolicyHintDismiss'), 'The terms card offers Accept, no dismissal');
+  assert.ok(partialHtml.home.includes('id="laMarzoccoAccountHint"') &&
+      !partialHtml.home.includes('laMarzoccoAccountHintDismiss'), 'The account card sends to Settings, no dismissal');
   // A preset change retires the recipe hint for good.
   recorded = false;
   assert.deepEqual(shown({...noCloud, presetsTag: 8}), ['scaleOnlyHint']);
@@ -271,19 +271,19 @@
   // request it sends then replaces that offer, with the code typed in Admin.
   pairable = true;
   here.companionHere = {name: 'nas', paired: false, pairing: {state: 'unpaired'}};
-  assert.deepEqual(shown(fresh), ['companionPairHint', 'accessHint', 'micraCloudHint']);
+  assert.deepEqual(shown(fresh), ['companionPairHint', 'accessHint', 'laMarzoccoCloudHint']);
   assert.match(nodes.companionPairHintText.textContent, /^This page comes through the companion .*:nas$/);
   const asking = {...fresh, companion: {requestName: 'nas', requestAddress: '192.168.1.20'}};
-  assert.deepEqual(shown(asking), ['companionHint', 'accessHint', 'micraCloudHint']);
+  assert.deepEqual(shown(asking), ['companionHint', 'accessHint', 'laMarzoccoCloudHint']);
   assert.match(nodes.companionHintText.textContent, /^It is asking from .*:192\.168\.1\.20$/);
   here.companionHere = {name: 'nas', paired: false, pairing: {state: 'pending', code: '123456'}};
-  assert.deepEqual(shown(asking), ['companionHint', 'accessHint', 'micraCloudHint']);
+  assert.deepEqual(shown(asking), ['companionHint', 'accessHint', 'laMarzoccoCloudHint']);
   assert.match(nodes.companionHintText.textContent, /^Its code is .*:123456$/);
   cards.set('obbwCard:companionPair', '1');
-  assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint'], 'the pairing offer can be dismissed in this browser');
+  assert.deepEqual(shown(fresh), ['accessHint', 'laMarzoccoCloudHint'], 'the pairing offer can be dismissed in this browser');
   pairable = false;
   nodes.grindHintCard.hidden = false;
-  assert.deepEqual(shown(fresh), ['accessHint', 'micraCloudHint'], 'the grind hint holds no card back');
+  assert.deepEqual(shown(fresh), ['accessHint', 'laMarzoccoCloudHint'], 'the grind hint holds no card back');
   // A scale recording shows its card: Stop while it runs, Delete once it is
   // held. Stop and Delete follow the Diagnostic page's gate, Download only
   // this window's ownership.

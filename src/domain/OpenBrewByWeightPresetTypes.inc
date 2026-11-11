@@ -27,7 +27,7 @@ struct ShotPreset {
   uint8_t bbwAlphaLearned = 0;
   uint8_t bbwAlphaBaseline = DEFAULT_BBW_EWMA_ALPHA;  // Hundredths.
   // Deci-Celsius (80.0–100.0 °C), applied only by the Linea Micra integration.
-  uint16_t lineaMicraBrewTargetDeciC = 930;
+  uint16_t laMarzoccoBrewTargetDeciC = 930;
   uint16_t fastRampMs = DEFAULT_RAMP_MS;
   uint16_t slowRampMs = DEFAULT_RAMP_MS;
   uint8_t fastCurve = RAMP_CURVE_EVEN;

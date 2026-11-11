@@ -15,7 +15,7 @@
 #include "../OpenBrewByWeightHistory.h"
 #include "../OpenBrewByWeightActivationStores.h"
 #include "../OpenBrewByWeightLastShot.h"
-#include "../machine/OpenBrewByWeightLineaMicraSettings.h"
+#include "../machine/OpenBrewByWeightLaMarzoccoSettings.h"
 #include <OpenBrewByWeightErrorReasonTexts.h>
 #include <cJSON.h>
 
@@ -2010,10 +2010,10 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   BbwLearningRecord learning;
   CHECK(saveBbwLearning(learning));
   uint32_t rejectedAccount = 5;
-  CHECK(saveSettingsBlob(NvsSubsystem::SETTINGS, LINEA_MICRA_REJECTED_KEY, rejectedAccount));
+  CHECK(saveSettingsBlob(NvsSubsystem::SETTINGS, LA_MARZOCCO_REJECTED_KEY, rejectedAccount));
 
   CHECK(resetAllDurableStores(settings, ble, log, history, lastShot));
-  CHECK(loadSettingsBlob(NvsSubsystem::SETTINGS, LINEA_MICRA_REJECTED_KEY, rejectedAccount,
+  CHECK(loadSettingsBlob(NvsSubsystem::SETTINGS, LA_MARZOCCO_REJECTED_KEY, rejectedAccount,
                          [](uint32_t) { return true; }) == SettingsBlobLoad::MISSING);
   CHECK(verifyFactorySettings(settings));
   // Without its record the next boot quick starts every factory preset, and
@@ -2400,7 +2400,7 @@ void p63_flash_io_lock_fails_closed_without_mutex() {
   CHECK(FLASH_IO_LOCK_TIMEOUT_MS == 3000);
 }
 
-void p85_schema1_is_strict_and_micra_defaults_round_trip() {
+void p85_schema1_is_strict_and_la_marzocco_defaults_round_trip() {
   CHECK(validDeviceName(DEFAULT_DEVICE_NAME));
   CHECK(strcmp(DEFAULT_DEVICE_NAME, "openbrewbyweight") == 0);
   CHECK(validDeviceName("Cafe Bar 2"));
@@ -2427,9 +2427,9 @@ void p85_schema1_is_strict_and_micra_defaults_round_trip() {
   resetHostPersistence();
   PersistedSettings settings;
   CHECK(initializeDefaultSettings(settings));
-  CHECK(settings.lineaMicra.options == LINEA_MICRA_DEFAULT_OPTIONS);
-  CHECK(settings.lineaMicra.scaleOptions == LINEA_MICRA_KNOWN_SCALE_OPTIONS);
-  CHECK(settings.lineaMicra.connectionType == 0);
+  CHECK(settings.laMarzocco.options == LA_MARZOCCO_DEFAULT_OPTIONS);
+  CHECK(settings.laMarzocco.scaleOptions == LA_MARZOCCO_KNOWN_SCALE_OPTIONS);
+  CHECK(settings.laMarzocco.connectionType == 0);
 
   // A CRC-corrupt record must be rejected, never repaired.
   std::vector<uint8_t> blob = settingsBlob(settings);
@@ -2437,7 +2437,7 @@ void p85_schema1_is_strict_and_micra_defaults_round_trip() {
   putSettingsBlob(SETTINGS_SLOT_A, blob);
   PersistedSettings migrated;
   CHECK(!loadPersistedSettings(migrated));
-  settings.lineaMicra.connectionType = 0;
+  settings.laMarzocco.connectionType = 0;
   settingsSchemaWritesAdmitted.store(false);
   const auto trialRecords = persistence_host::records;
   CHECK(!savePersistedSettings(settings));
@@ -2456,67 +2456,67 @@ void p85_schema1_is_strict_and_micra_defaults_round_trip() {
   putSettingsBlob(SETTINGS_SLOT_B, settingsBlob(settings));
   PersistedSettings loaded;
   CHECK(loadPersistedSettings(loaded));
-  CHECK(loaded.lineaMicra.scaleOptions == settings.lineaMicra.scaleOptions);
-  CHECK(loaded.lineaMicra.options == settings.lineaMicra.options);
-  CHECK(strcmp(loaded.lineaMicra.username, settings.lineaMicra.username) == 0);
+  CHECK(loaded.laMarzocco.scaleOptions == settings.laMarzocco.scaleOptions);
+  CHECK(loaded.laMarzocco.options == settings.laMarzocco.options);
+  CHECK(strcmp(loaded.laMarzocco.username, settings.laMarzocco.username) == 0);
   // A corrupted CRC stays invalid.
   blob = settingsBlob(settings);
   blob.back() ^= 0xffU;
   putSettingsBlob(SETTINGS_SLOT_B, blob);
   CHECK(!loadPersistedSettings(rejected));
 
-  strcpy(settings.lineaMicra.username, "barista@example.com");
-  strcpy(settings.lineaMicra.password, "correct horse battery staple");
-  memset(settings.lineaMicra.installationPrivateKey, 0x5a,
-         sizeof(settings.lineaMicra.installationPrivateKey));
-  strcpy(settings.lineaMicra.selectedSerial, "MR123456");
-  strcpy(settings.lineaMicra.selectedName, "Kitchen Micra");
-  settings.lineaMicra.accountConfigured = true;
-  settings.lineaMicra.connectionType = static_cast<uint8_t>(MicraConnectionType::API);
-  setLineaMicraOptions(settings.lineaMicra, true, true, true,
+  strcpy(settings.laMarzocco.username, "barista@example.com");
+  strcpy(settings.laMarzocco.password, "correct horse battery staple");
+  memset(settings.laMarzocco.installationPrivateKey, 0x5a,
+         sizeof(settings.laMarzocco.installationPrivateKey));
+  strcpy(settings.laMarzocco.selectedSerial, "MR123456");
+  strcpy(settings.laMarzocco.selectedName, "Kitchen Micra");
+  settings.laMarzocco.accountConfigured = true;
+  settings.laMarzocco.connectionType = static_cast<uint8_t>(LaMarzoccoConnectionType::API);
+  setLaMarzoccoOptions(settings.laMarzocco, true, true, true,
                               false, false, 0, false, false, false);
   strcpy(settings.deviceName, "Cafe Bar 2");
-  settings.presets.presets[0].lineaMicraBrewTargetDeciC = 935;
+  settings.presets.presets[0].laMarzoccoBrewTargetDeciC = 935;
   CHECK(savePersistedSettings(settings));
   CHECK(loadPersistedSettings(settings));
-  CHECK(settings.lineaMicra.options ==
-        (LINEA_MICRA_APPLY_TEMPERATURE | LINEA_MICRA_OBSERVE_STATE |
-         LINEA_MICRA_RECOGNIZE_WAKE));
-  CHECK(settings.lineaMicra.accountConfigured);
-  CHECK(settings.lineaMicra.connectionType == static_cast<uint8_t>(MicraConnectionType::API));
-  CHECK(strcmp(settings.lineaMicra.username, "barista@example.com") == 0);
-  CHECK(strcmp(settings.lineaMicra.selectedSerial, "MR123456") == 0);
-  CHECK(settings.presets.presets[0].lineaMicraBrewTargetDeciC == 935);
+  CHECK(settings.laMarzocco.options ==
+        (LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_OBSERVE_STATE |
+         LA_MARZOCCO_RECOGNIZE_WAKE));
+  CHECK(settings.laMarzocco.accountConfigured);
+  CHECK(settings.laMarzocco.connectionType == static_cast<uint8_t>(LaMarzoccoConnectionType::API));
+  CHECK(strcmp(settings.laMarzocco.username, "barista@example.com") == 0);
+  CHECK(strcmp(settings.laMarzocco.selectedSerial, "MR123456") == 0);
+  CHECK(settings.presets.presets[0].laMarzoccoBrewTargetDeciC == 935);
   CHECK(strcmp(settings.deviceName, "Cafe Bar 2") == 0);
 
-  setLineaMicraOptions(settings.lineaMicra, false, false, false,
+  setLaMarzoccoOptions(settings.laMarzocco, false, false, false,
                               true, false, 3, false, false, false);
   CHECK(savePersistedSettings(settings));
   CHECK(loadPersistedSettings(settings));
-  CHECK(settings.lineaMicra.options ==
-        (LINEA_MICRA_SHUTDOWN_WITH_SCALE |
-         (3U << LINEA_MICRA_SHUTDOWN_GRACE_SHIFT)));
-  disconnectLineaMicra(settings.lineaMicra);
-  CHECK(validLineaMicraSettings(settings.lineaMicra));
-  CHECK(settings.lineaMicra.options ==
-        (LINEA_MICRA_SHUTDOWN_WITH_SCALE |
-         (3U << LINEA_MICRA_SHUTDOWN_GRACE_SHIFT)));
+  CHECK(settings.laMarzocco.options ==
+        (LA_MARZOCCO_SHUTDOWN_WITH_SCALE |
+         (3U << LA_MARZOCCO_SHUTDOWN_GRACE_SHIFT)));
+  disconnectLaMarzocco(settings.laMarzocco);
+  CHECK(validLaMarzoccoSettings(settings.laMarzocco));
+  CHECK(settings.laMarzocco.options ==
+        (LA_MARZOCCO_SHUTDOWN_WITH_SCALE |
+         (3U << LA_MARZOCCO_SHUTDOWN_GRACE_SHIFT)));
   CHECK(resetPersistedNetworkAccess(settings));
   CHECK(strcmp(settings.deviceName, "Cafe Bar 2") == 0);
 
   ShotPresetBank bank = settings.presets;
-  mutableShotPreset(bank, bank.activeId)->lineaMicraBrewTargetDeciC = 947;
+  mutableShotPreset(bank, bank.activeId)->laMarzoccoBrewTargetDeciC = 947;
   uint8_t duplicateId = 0;
   CHECK(duplicateShotPreset(bank, bank.activeId, duplicateId));
-  CHECK(findShotPreset(bank, duplicateId)->lineaMicraBrewTargetDeciC == 947);
+  CHECK(findShotPreset(bank, duplicateId)->laMarzoccoBrewTargetDeciC == 947);
   uint8_t createdId = 0;
   CHECK(createUntitledShotPreset(bank, createdId));
-  CHECK(findShotPreset(bank, createdId)->lineaMicraBrewTargetDeciC == 930);
+  CHECK(findShotPreset(bank, createdId)->laMarzoccoBrewTargetDeciC == 930);
   CHECK(resetPersistedSettingsToFactory(settings));
-  CHECK(settings.lineaMicra.options == LINEA_MICRA_DEFAULT_OPTIONS);
-  CHECK(settings.lineaMicra.scaleOptions == LINEA_MICRA_KNOWN_SCALE_OPTIONS);
+  CHECK(settings.laMarzocco.options == LA_MARZOCCO_DEFAULT_OPTIONS);
+  CHECK(settings.laMarzocco.scaleOptions == LA_MARZOCCO_KNOWN_SCALE_OPTIONS);
   CHECK(strcmp(settings.deviceName, DEFAULT_DEVICE_NAME) == 0);
-  CHECK(settings.presets.presets[0].lineaMicraBrewTargetDeciC == 930);
+  CHECK(settings.presets.presets[0].laMarzoccoBrewTargetDeciC == 930);
 }
 
 struct TestCase {
@@ -3070,7 +3070,7 @@ void p91_schema2_golden_settings_blob_loads() {
     dbl.doseDg = 185;
     dbl.grindHintsEnabled = false;
     dbl.learningEpoch = 42;
-    dbl.lineaMicraBrewTargetDeciC = 940;
+    dbl.laMarzoccoBrewTargetDeciC = 940;
     uint8_t customId = 0;
     CHECK(duplicateShotPreset(settings.presets, FACTORY_PRESET_ID_SINGLE_FIXED, customId));
     CHECK(renameShotPreset(settings.presets, customId, "Golden"));
@@ -3108,7 +3108,7 @@ void p91_schema2_golden_settings_blob_loads() {
   const ShotPreset *dbl = findShotPreset(loaded.presets, FACTORY_PRESET_ID_DOUBLE_ADAPTIVE);
   CHECK(dbl != nullptr && dbl->fastBeforeMs == 26500 && dbl->fastMarginDg == 35);
   CHECK(dbl->scaleLossFixedMs == 31000 && dbl->doseDg == 185 && !dbl->grindHintsEnabled);
-  CHECK(dbl->learningEpoch == 42 && dbl->lineaMicraBrewTargetDeciC == 940);
+  CHECK(dbl->learningEpoch == 42 && dbl->laMarzoccoBrewTargetDeciC == 940);
   // The blob predates the per-side transitions: they load as the original cut.
   for (uint8_t i = 0; i < loaded.presets.count; ++i) {
     const ShotPreset &p = loaded.presets.presets[i];
@@ -3344,7 +3344,7 @@ void p91b_settings_codec_round_trips_and_evolves() {
   for (uint8_t i = 0; i < SCALE_HISTORY_CAPACITY; ++i)
     fillSettingsFields(SETTINGS_SCALE_HISTORY_FIELDS, &original.scaleHistory[i], 30 + i);
   fillSettingsFields(SETTINGS_WEBHOOK_FIELDS, &original.webhook, 5);
-  fillSettingsFields(SETTINGS_MICRA_FIELDS, &original.lineaMicra, 6);
+  fillSettingsFields(SETTINGS_LA_MARZOCCO_FIELDS, &original.laMarzocco, 6);
   std::vector<uint8_t> blob(PERSISTED_SETTINGS_NVS_BUDGET);
   blob.resize(encodePersistedSettings(original, 9, blob.data(), blob.size()));
   CHECK(blob.size() == PERSISTED_SETTINGS_ENCODED_MAX_BYTES);
@@ -3365,7 +3365,7 @@ void p91b_settings_codec_round_trips_and_evolves() {
     CHECK(settingsFieldsEqual(SETTINGS_SCALE_HISTORY_FIELDS, &original.scaleHistory[i],
                               &decoded.scaleHistory[i]));
   CHECK(settingsFieldsEqual(SETTINGS_WEBHOOK_FIELDS, &original.webhook, &decoded.webhook));
-  CHECK(settingsFieldsEqual(SETTINGS_MICRA_FIELDS, &original.lineaMicra, &decoded.lineaMicra));
+  CHECK(settingsFieldsEqual(SETTINGS_LA_MARZOCCO_FIELDS, &original.laMarzocco, &decoded.laMarzocco));
 
   // Unknown groups and fields are skipped, missing fields keep defaults, and
   // integers convert between widths while they fit.
@@ -3629,7 +3629,7 @@ const TestCase tests[] = {
     {"P91c", p91c_card_dismissals_validate_order_and_persist},
     {"P90b", p90b_setup_intent_commits_with_its_wifi},
     {"P86", p86_timezone_preference_and_durable_initialization},
-    {"P85", p85_schema1_is_strict_and_micra_defaults_round_trip},
+    {"P85", p85_schema1_is_strict_and_la_marzocco_defaults_round_trip},
     {"P91", p91_schema2_golden_settings_blob_loads},
     {"P91b", p91b_settings_codec_round_trips_and_evolves},
     {"P92", p92_schema2_golden_shot_log_loads},
