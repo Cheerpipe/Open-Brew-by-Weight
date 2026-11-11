@@ -18,9 +18,17 @@ firmware, and wire the controller into the machine. It was developed on a La
 Marzocco Linea Micra, which has the most complete guide; other machines with a
 paddle or a push button can follow the same path with their own wiring.
 
-> Open Brew by Weight is not a certified product. Read [Hardware](docs/HARDWARE.md)
-> before you open your machine, and the [Disclaimer](DISCLAIMER.md) before you
-> install it. The relay stays open on startup, reset, power loss, and any fault.
+> [!WARNING]
+> **Safety and responsibility.** Installing Open Brew by Weight means opening
+> your espresso machine and working on its electrical wiring, next to mains
+> voltage, a pressurized boiler, hot water, and steam. Opening or modifying the
+> machine may void its warranty. Open Brew by Weight is not a certified product:
+> you install and use it at your own risk and under your sole responsibility,
+> and the author and contributors accept no liability for any injury, damage,
+> or loss. Always unplug the machine before you open it, and if you are not
+> comfortable working on mains-powered equipment, have a qualified technician
+> do the installation. Read [Hardware](docs/HARDWARE.md) before you open your
+> machine and the full [Disclaimer](DISCLAIMER.md) before you install it.
 
 ## Why Open Brew by Weight
 

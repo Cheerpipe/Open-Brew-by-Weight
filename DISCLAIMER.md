@@ -33,6 +33,10 @@ hazard, or fire. **Do not connect this firmware to mains-powered espresso
 equipment unless you understand these risks and have validated your entire
 system on the bench first.**
 
+**Opening or modifying your espresso machine may void its warranty.** Check
+your manufacturer's warranty terms before you install anything; any loss of
+warranty coverage is your own responsibility.
+
 This project provides software and documentation only. It **does not**
 certify, warrant, or guarantee safe operation on any machine. No statement in
 this repository should be interpreted as professional electrical, plumbing, or
