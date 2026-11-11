@@ -49,7 +49,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   const bool companionBeanconqueror =
       companion.paired && companion.archiveSwitch && companion.bcSwitch;
   gate = gateOver(gate, &companionBeanconqueror, sizeof(companionBeanconqueror));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   char serial[LINEA_MICRA_SERIAL_CAPACITY] = {};
   uint8_t options, scaleOptions;
   {
@@ -158,7 +158,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("scaleLoss.projectedS", control.autoToManualGuardTrendMs / 1000.0f);
   fields.field("scaleLoss.source", "%s",
                shotLogScaleLossSourceJson(static_cast<uint8_t>(control.scaleLossProjectedSource << 3)));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   fields.field("lineaMicra.selectedSerial", "\"%s\"", serial);
   fields.field("lineaMicra.applyTemperature", bool(options & LINEA_MICRA_APPLY_TEMPERATURE));
   fields.field("lineaMicra.recognizeWakeGesture", bool(options & LINEA_MICRA_RECOGNIZE_WAKE));

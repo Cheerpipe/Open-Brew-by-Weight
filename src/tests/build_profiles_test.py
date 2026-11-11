@@ -17,6 +17,8 @@ HARDWARE_REED = ROOT / "config/hardware/esp32-s3-relay-x1-speaker-reed.json"
 PRO_X = ROOT / "config/machines/rancilio-silvia-pro-x.json"
 PRO_X_REED = ROOT / "config/machines/rancilio-silvia-pro-x-reed.json"
 MICRA = ROOT / "config/machines/la-marzocco-linea-micra.json"
+MINI = ROOT / "config/machines/la-marzocco-linea-mini.json"
+MINI_R = ROOT / "config/machines/la-marzocco-linea-mini-r.json"
 
 
 def run(hardware=HARDWARE, machine=PRO_X, flags=""):
@@ -49,11 +51,15 @@ def expect_failure(hardware=HARDWARE, machine=PRO_X, flags="", text=""):
         temporary.cleanup()
 
 
-for hardware, machine, expected_type, integration, brand, model, icon in (
-        (HARDWARE, PRO_X, "1", "none", "Rancilio", "Silvia Pro X", None),
-        (HARDWARE_REED, PRO_X_REED, "2", "none", "Rancilio", "Silvia Pro X", None),
-        (HARDWARE, MICRA, "0", "linea_micra_cloud", "La Marzocco", "Linea Micra",
-         "linea-micra")):
+for hardware, machine, expected_type, integration, brand, model, icon, cloud_model in (
+        (HARDWARE, PRO_X, "1", "none", "Rancilio", "Silvia Pro X", None, None),
+        (HARDWARE_REED, PRO_X_REED, "2", "none", "Rancilio", "Silvia Pro X", None, None),
+        (HARDWARE, MICRA, "0", "la_marzocco_cloud", "La Marzocco", "Linea Micra",
+         "linea-micra", "LINEAMICRA"),
+        (HARDWARE, MINI, "0", "la_marzocco_cloud", "La Marzocco", "Linea Mini",
+         "linea-mini", "LINEAMINI"),
+        (HARDWARE, MINI_R, "0", "la_marzocco_cloud", "La Marzocco", "Linea Mini R",
+         "linea-mini-r", "LINEAMINIR")):
     temporary, result = run(hardware=hardware, machine=machine)
     try:
         assert result.returncode == 0, result.stderr
@@ -65,7 +71,7 @@ for hardware, machine, expected_type, integration, brand, model, icon in (
         manifest = json.loads((generated / "build-profile.json").read_text())
         assert f"#define OPEN_BREW_BY_WEIGHT_MACHINE_TYPE {expected_type}" in header
         assert f'#define OPEN_BREW_BY_WEIGHT_MACHINE_MODEL "{model}"' in header
-        expected_integration = "1" if integration == "linea_micra_cloud" else "0"
+        expected_integration = "1" if integration == "la_marzocco_cloud" else "0"
         assert (f"#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION "
                 f"{expected_integration}") in header
         # The machine's Home icon is profile metadata the build forwards to the
@@ -74,6 +80,13 @@ for hardware, machine, expected_type, integration, brand, model, icon in (
             assert f'#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "{icon}"' in header
         else:
             assert "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON" not in header
+        # The cloud model is the one profile fact the La Marzocco client reads:
+        # it selects which account machines the controller lists.
+        if cloud_model:
+            assert (f'#define OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL '
+                    f'"{cloud_model}"') in header
+        else:
+            assert "OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL" not in header
         assert manifest["machine_integration"] == integration
         assert manifest["machine"]["brand"] == brand
         assert manifest["hardware"]["relay"] == {
@@ -108,7 +121,7 @@ try:
                           result.stdout.splitlines())["generated_dir"])
     manifest = json.loads((generated / "build-profile.json").read_text())
     header = (generated / "OpenBrewByWeightBuildProfileGenerated.h").read_text()
-    assert manifest["machine_integration"] == "linea_micra_cloud"
+    assert manifest["machine_integration"] == "la_marzocco_cloud"
     assert "#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION 1" in header
 finally:
     temporary.cleanup()
@@ -120,6 +133,44 @@ try:
     expect_failure(machine=unknown_integration, text="machine.integration")
 finally:
     unknown_integration.unlink()
+
+# The cloud model belongs to the La Marzocco integration alone and names one
+# of the models the client is written for.
+for source, mutate in (
+        (MICRA, lambda value: value.pop("cloud_model")),
+        (MICRA, lambda value: value.update(cloud_model="GS3AV")),
+        (MICRA, lambda value: value.update(cloud_model="lineamicra")),
+        (PRO_X, lambda value: value.update(cloud_model="LINEAMICRA"))):
+    fixture = changed(source, mutate)
+    try:
+        expect_failure(machine=fixture, text="machine.cloud_model")
+    finally:
+        fixture.unlink()
+
+# The three La Marzocco machines are one integration with separate identities:
+# each keeps its own OTA compatibility identity, so an image built for one is
+# never installed over another, and the Micra's identity predates the others.
+identities = {}
+for machine in (MICRA, MINI, MINI_R):
+    temporary, result = run(hardware=HARDWARE, machine=machine)
+    try:
+        assert result.returncode == 0, result.stderr
+        output = dict(line.split("=", 1) for line in result.stdout.splitlines())
+        identities[machine.stem] = output["machine_compat"]
+        assert output["machine_integration"] == "la_marzocco_cloud"
+    finally:
+        temporary.cleanup()
+assert identities == {
+    "la-marzocco-linea-micra": "la-marzocco-linea-micra-r1",
+    "la-marzocco-linea-mini": "la-marzocco-linea-mini-r1",
+    "la-marzocco-linea-mini-r": "la-marzocco-linea-mini-r-r1"}, identities
+micra_profile, mini_profile, mini_r_profile = (
+    json.loads(path.read_text()) for path in (MICRA, MINI, MINI_R))
+for profile in (mini_profile, mini_r_profile):
+    for key in ("hardware", "interface", "factory_defaults", "integration",
+                "integration_revision"):
+        assert profile[key] == micra_profile[key], \
+            f"{profile['id']}: {key} must match the Linea Micra profile"
 
 bad_icon = changed(
     MICRA, lambda value: value.update(machine_icon="Not An Icon"))

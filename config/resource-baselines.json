@@ -27,6 +27,20 @@
       "flash_code": 1670372,
       "flash_rodata": 647028
     },
+    "esp32-s3-relay-x1-speaker--la-marzocco-linea-mini": {
+      "image": 2477840,
+      "total_size": 2477727,
+      "used_diram": 193074,
+      "flash_code": 1670372,
+      "flash_rodata": 647028
+    },
+    "esp32-s3-relay-x1-speaker--la-marzocco-linea-mini-r": {
+      "image": 2477840,
+      "total_size": 2477727,
+      "used_diram": 193074,
+      "flash_code": 1670372,
+      "flash_rodata": 647028
+    },
     "esp32-s3-relay-x1-speaker--rancilio-silvia-pro-x": {
       "image": 2309696,
       "total_size": 2309575,

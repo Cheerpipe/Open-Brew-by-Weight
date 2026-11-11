@@ -48,6 +48,14 @@ LineaMicraSteamLevel steamLevel(const char *value) {
   return LineaMicraSteamLevel::UNSUPPORTED;
 }
 
+// One steam boiler widget per machine family: a level on the Linea Micra and
+// Mini R, a temperature on the Linea Mini. Both carry status and
+// readyStartTime; only the level widget carries targetLevel.
+bool steamWidget(const char *code) {
+  return strcmp(code, "CMSteamBoilerLevel") == 0 ||
+      strcmp(code, "CMSteamBoilerTemperature") == 0;
+}
+
 // readyStartTime is cloud epoch time: milliseconds in the captured payloads,
 // but live machines also report zero or seconds-scale values for the same
 // field. An estimate that cannot be interpreted is absent; this display-only
@@ -95,7 +103,7 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
     if (code == nullptr) continue;
     const bool power = strcmp(code, "CMMachineStatus") == 0;
     const bool boiler = strcmp(code, "CMCoffeeBoiler") == 0;
-    const bool steam = strcmp(code, "CMSteamBoilerLevel") == 0;
+    const bool steam = steamWidget(code);
     const bool cleaning = strcmp(code, "CMBackFlush") == 0;
     if (!power && !boiler && !steam && !cleaning) continue;
     const cJSON *output = find(widget, "output");
@@ -179,7 +187,7 @@ bool decodeMicraDashboard(const cJSON *root, MicraObservation &update) {
       next.coffeeBoilerPresent = true;
       next.coffeeBoiler = LineaMicraBoilerState::UNSUPPORTED;
       next.coffeeReadyAtUtcSec = 0;
-    } else if (strcmp(code, "CMSteamBoilerLevel") == 0) {
+    } else if (steamWidget(code)) {
       next.steamBoilerPresent = true;
       next.steamBoiler = LineaMicraBoilerState::UNSUPPORTED;
       next.steamReadyAtUtcSec = 0;

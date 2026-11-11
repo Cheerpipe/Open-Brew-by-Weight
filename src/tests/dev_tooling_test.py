@@ -1146,7 +1146,7 @@ for validate_args, environment, expected in (
         (["--webui-language=FR_ca", "src/web/app.js"], "en", "fr-ca")):
     validate_steps = validate_language_steps(validate_args, environment)
     build_steps = [argv for name, argv in validate_steps if name.startswith("idf-")]
-    assert len(build_steps) == 3
+    assert len(build_steps) == len(dev_module["BUILD_PROFILES"])
     assert all(argv.count("--webui-language") == 1 and
                argv[argv.index("--webui-language") + 1] == expected
                for argv in build_steps), build_steps
@@ -1157,7 +1157,7 @@ for validate_args, environment, expected in (
 # --development so the versioned size baselines are always compared.
 r2_steps = validate_language_steps(["src/web/app.js"], risk="R2")
 r2_builds = [argv for name, argv in r2_steps if name.startswith("idf-")]
-assert len(r2_builds) == 3, r2_builds
+assert len(r2_builds) == len(dev_module["BUILD_PROFILES"]), r2_builds
 assert all("--development" in argv for argv in r2_builds), r2_builds
 assert all(argv[:2] == ["env", f"OPENBREWBYWEIGHT_IDF_BUILD_ROOT={ROOT}/build-gate"]
            for argv in r2_builds), r2_builds
@@ -1170,7 +1170,7 @@ for risk_steps in (r2_steps, validate_language_steps(["src/web/app.js"]),
 # The shipped (flag-free release) image of every pair builds in its own tree
 # and compares its own versioned baseline.
 r2_release = [argv for name, argv in r2_steps if name.startswith("release-")]
-assert len(r2_release) == 3 and all(
+assert len(r2_release) == len(dev_module["BUILD_PROFILES"]) and all(
     argv[:2] == ["env", f"OPENBREWBYWEIGHT_IDF_BUILD_ROOT={ROOT}/build-gate/release"] and
     argv[-1] == "--flags=" and "--development" not in argv and "--jtag" not in argv
     for argv in r2_release), r2_release
@@ -1832,9 +1832,9 @@ for arch, arch_selectors in profile_arch.items():
     micra = selectors + ["CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y",
                          "CONFIG_MBEDTLS_DYNAMIC_BUFFER=y",
                          "CONFIG_WS_BUFFER_SIZE=4096"]
-    assert verify_production_profile(arch, micra, "linea_micra_cloud").returncode == 0
+    assert verify_production_profile(arch, micra, "la_marzocco_cloud").returncode == 0
     assert "CONFIG_WS_BUFFER_SIZE=4096" in verify_production_profile(
-        arch, micra[:-1], "linea_micra_cloud").stderr
+        arch, micra[:-1], "la_marzocco_cloud").stderr
     assert "unexpected Micra TLS allocator" in verify_production_profile(
         arch, micra).stderr
     jtag_define = "-DOPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1"

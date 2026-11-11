@@ -9,7 +9,7 @@
 namespace openbrewbyweight {
 namespace {
 
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
 constexpr bool kCompanionLm = true;
 bool companionPolicyRequired(uint32_t &sampleAtMs) {
   const LineaMicraStatus micra = machineIntegrationStatus();
@@ -302,7 +302,7 @@ void OpenBrewByWeightNetwork::beginCompanion() {
   g_companion.dirty = loaded == CompanionLoad::PROMOTED;
   companionAwake_.store(stored.paired != 0 || stored.forgotten != 0, std::memory_order_release);
   memset(&stored, 0, sizeof(stored));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   setMachineIntegrationCompanionNotify(companionOutboxChanged);
 #endif
 }
@@ -716,7 +716,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   }
   [[maybe_unused]] bool flag = false;
   // The La Marzocco frames use the rest only on Linea Micra builds.
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   uint32_t first = 0, second = 0, third = 0;
   bool flag2 = false;
   char text[12] = {};
@@ -727,7 +727,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
       g_companion.pingReply = true;
     }
     companionOutboxChanged();
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
     machineIntegrationCompanionPing(flag);
 #endif
   } else if (!strcmp(type, "ps") && jsonBoolean(frame, "on", flag)) {
@@ -741,7 +741,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   } else if (!strcmp(type, "logsub") || record) {
     if (!(record ? companionLinkRecordRequest(slot, frame, type) : companionLinkLogSub(slot, frame)))
       return companionLinkRefuse(slot, "a malformed frame arrived", false);
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   } else if (!strcmp(type, "lm") && jsonBoolean(frame, "sub", flag) &&
              jsonUint32(frame, "ep", first) && jsonUint32(frame, "tok", second)) {
     machineIntegrationCompanionUpstream(flag, first, second,
@@ -933,7 +933,7 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
   }
 }
 
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
 // The account for the creds frame, sealed for the companion and wiped here.
 bool OpenBrewByWeightNetwork::companionCredentialsBody(uint8_t &count, uint32_t generation,
                                                        const uint8_t secret[COMPANION_SECRET_BYTES]) {
@@ -1069,7 +1069,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
                     : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s,\"archive\":%s,"
                                               "\"bc\":\"%s\"}",
                                        uiText, logText, archiveText, bcText));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   due.credentials = outbox.credentialsGeneration != 0 &&
       (snapshotDue || outbox.credentialsGeneration != sent.sentCredentials);
   built.credentials = due.credentials &&

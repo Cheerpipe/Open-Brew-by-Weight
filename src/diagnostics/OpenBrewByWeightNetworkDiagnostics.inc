@@ -844,7 +844,7 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
   }
   ok = ok && debugExportChunk(request, "]},");
 
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   {
     const HeapLifecycleAggregate micraHeap = machineIntegrationHeapTelemetry();
     const MicraWebSocketStatus ws = machineIntegrationWebSocketStatus(false);

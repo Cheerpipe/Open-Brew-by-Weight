@@ -1056,7 +1056,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
         const cJSON *micraTarget =
             cJSON_GetObjectItemCaseSensitive(root, "lineaMicraBrewTargetC");
         if (parseError.reason == nullptr && micraTarget != nullptr) {
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
           const double scaled = cJSON_IsNumber(micraTarget)
                                     ? micraTarget->valuedouble * 10.0
                                     : NAN;

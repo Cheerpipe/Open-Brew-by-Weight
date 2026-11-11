@@ -464,7 +464,7 @@ function updateHeaderSignals(s = {}) {
   // without a lineaMicra model (the Admin poll) leave the icon on its last
   // Home frame, and other builds fold this branch away entirely.
   const micra = $("micraSignal");
-  if (micra && __LINEA_MICRA__ && s.machineIntegration === "linea_micra_cloud" && s.lineaMicra) {
+  if (micra && __LINEA_MICRA__ && s.machineIntegration === "la_marzocco_cloud" && s.lineaMicra) {
     const lm = s.lineaMicra,
       stale = !!s.snapshotStale,
       quality = lm.quality,
@@ -7658,7 +7658,7 @@ function applyMachineTypeUi(s) {
   document.documentElement.classList.toggle("reedMachine", t === "momentary_reed");
   document.documentElement.classList.toggle(
     "lineaMicraIntegration",
-    s.machineIntegration === "linea_micra_cloud",
+    s.machineIntegration === "la_marzocco_cloud",
   );
   if ($("dMt")) $("dMt").textContent = t;
 }

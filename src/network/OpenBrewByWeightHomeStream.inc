@@ -278,7 +278,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     delta.field("companion.peerProtocol", static_cast<unsigned long>(companion.peerProtocol));
     // History and Stats say where older records are kept (paired, switch on).
     delta.field("companion.archive", bool(companion.paired && companion.archiveSwitch));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
     // The header's cloud popup names the route the machine's data takes.
     delta.field("companion.route", "\"%s\"", companion.route);
 #endif
@@ -322,7 +322,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   session.knownPresetsTag = 0;
   delta.hashedField("presets", renderedPresetsHash, g_work->presetsJson);
   delta.field("presetsTag", static_cast<unsigned long>(renderedPresetsHash));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   const auto micra = machineIntegrationStatus();
   const auto ws = machineIntegrationWebSocketStatus(false);
   uint8_t options, connection;
@@ -333,7 +333,7 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
     connection = settings_.lineaMicra.connectionType;
     sanitizeJsonEmbed(settings_.lineaMicra.username, safeEmail, sizeof(safeEmail));
     sanitizeJsonEmbed(settings_.lineaMicra.selectedName, safeName, sizeof(safeName)); }
-  delta.field("machineIntegration", "\"linea_micra_cloud\"");
+  delta.field("machineIntegration", "\"la_marzocco_cloud\"");
   delta.field("lineaMicra.powerState", "\"%s\"", lineaMicraPowerStateName(micra.powerState));
   delta.field("lineaMicra.quality", "\"%s\"", lineaMicraObservationQualityName(micra.quality));
   delta.field("lineaMicra.optimisticOn", bool(micra.optimisticOn));
@@ -528,7 +528,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("scale.supportedCommands", "%s", commandsJson);
   }
   int32_t linkAgeS = -1;
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   {
     const auto micra = machineIntegrationStatus();
     const bool sampleValid = micra.sampleAtMs != 0 &&
@@ -612,7 +612,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     delta.field("companion.pushSkip", "\"%s\"", companion.pushSkip);
     delta.field("companion.relay", "\"%s\"", companion.relayReady ? "ready" : "down");
     delta.field("companion.relayRejects", static_cast<unsigned long>(companion.relayRejects));
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
     delta.field("companion.reason", "\"%s\"", companion.reason);
     delta.field("companion.lm", bool(companion.lmSwitch));
     delta.field("companion.upstream", bool(companion.upstream));
@@ -769,7 +769,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
     {
       const NetworkHeapTelemetrySnapshot networkHeap = heapTelemetrySnapshot();
       const HeapLifecycleAggregate webhookHeap = webhooks_.heapTelemetry();
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
       const HeapLifecycleAggregate micraHeap = machineIntegrationHeapTelemetry();
 #else
       const HeapLifecycleAggregate micraHeap = {};
@@ -873,7 +873,7 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
       }
       telemetry.field("nvs", "%s", g_work->historyJson);
     }
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
     {
       const MicraWebSocketStatus ws = machineIntegrationWebSocketStatus();
       char safeReason[48] = {};

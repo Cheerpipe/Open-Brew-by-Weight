@@ -313,9 +313,11 @@ decodes, so the controller runs the same decoder as for a direct connection:
 - `connected`;
 - in `widgets`, only `CMMachineStatus` (`output.mode`), `CMCoffeeBoiler`
   (`output.status`, `targetTemperature`, `readyStartTime`),
-  `CMSteamBoilerLevel` (`output.status`, `targetLevel`, `readyStartTime`) and,
-  in pushes, `CMBackFlush` (`output.status`), each with only those keys;
-- in `removedWidgets`, only those four codes.
+  `CMSteamBoilerLevel` (`output.status`, `targetLevel`, `readyStartTime`),
+  `CMSteamBoilerTemperature` (`output.status`, `readyStartTime`: the steam
+  boiler of a machine that sets steam by temperature) and, in pushes,
+  `CMBackFlush` (`output.status`), each with only those keys;
+- in `removedWidgets`, only those five codes.
 
 The companion forwards every La Marzocco event that carries any of these
 fields, whether or not they changed, and drops the others. `k` says where the

@@ -92,7 +92,7 @@
   // The La Marzocco cloud indicator exists only on the micra integration and
   // follows the feed's observation quality: live inks, everything else grays.
   const micraFrame = (lineaMicra, companion) => context.updateHeaderSignals(
-    {connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud', lineaMicra, companion});
+    {connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'la_marzocco_cloud', lineaMicra, companion});
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}});
   assert.equal(elements.micraSignal.hidden, true, 'Other integrations show no cloud icon');
   micraFrame({quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'});
@@ -125,7 +125,7 @@
   }
   assert.equal(elements.micraName.textContent, 'No account saved', 'No account says so');
   assert.equal(elements.micraMachine.textContent, 'No machine selected', 'No machine says so');
-  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'linea_micra_cloud',
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'la_marzocco_cloud',
     lineaMicra: {quality: 'current', email: 'barista@example.test', selectedName: 'Kitchen Micra'}});
   assert.equal(elements.micraSignal.dataset.level, 'off', 'A stale snapshot grays the cloud icon');
   assert.equal(elements.micraDetail.textContent, 'Signal unavailable');
@@ -134,7 +134,7 @@
   assert.equal(elements.micraSignal.dataset.level, 'on', 'A fresh frame re-inks the cloud icon');
   // The Admin poll names the integration but carries no micra model; it must
   // leave the indicator on its last Home frame instead of graying it.
-  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'linea_micra_cloud'});
+  context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, machineIntegration: 'la_marzocco_cloud'});
   assert.equal(elements.micraSignal.dataset.level, 'on', 'A model-less envelope keeps the cloud icon');
   assert.equal(elements.micraDetail.textContent, 'Connected');
   // Without a companion the one cloud only turns on and off, whatever the
@@ -155,7 +155,7 @@
   assert.equal(elements.micraSignal.dataset.level, 'partial', 'A companion-less frame keeps the pairing and route');
   micraFrame({quality: 'stale'}, {paired: true, route: 'direct'});
   assert.equal(elements.micraSignal.dataset.level, 'off', 'A paired companion does not light a dead feed');
-  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'linea_micra_cloud',
+  context.updateHeaderSignals({snapshotStale: true, connections: {}, machineIntegration: 'la_marzocco_cloud',
     lineaMicra: {quality: 'current'}, companion: {paired: false}});
   assert.equal(elements.micraSignal.dataset.paired, 'true', 'A stale snapshot keeps the last known pairing');
   assert.equal(elements.micraSignal.dataset.level, 'off');

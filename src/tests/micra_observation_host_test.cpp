@@ -231,6 +231,37 @@ int main() {
   assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
   assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN && update.steamReadyAtUtcSec == 0);
 
+  // The Linea Mini reports its steam boiler as a temperature widget: it feeds
+  // the same state and estimate, and no level exists to read.
+  fresh();
+  assert(decode(R"({"widgets":[)"
+      R"({"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},)"
+      R"({"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}},)"
+      R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","targetTemperature":128.0,"readyStartTime":1760000820500}}]})", update));
+  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::HEATING_UP);
+  assert(update.steamReadyAtUtcSec == 1760000820U);
+  assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN);
+  // Its steam target is not the brew target: the coffee boiler alone sets it.
+  assert(update.temperaturePresent && update.targetDeciC == 930);
+  assert(update.coffeeBoiler == LineaMicraBoilerState::READY);
+  {
+    LineaMicraStatus mini;
+    mini.powerState = LineaMicraPowerState::ON;
+    mini.coffeeBoiler = update.coffeeBoiler;
+    mini.steamBoiler = update.steamBoiler;
+    mini.assumedPower = lineaMicraAssumedPower(mini);
+    assert(lineaMicraReadiness(mini) == LineaMicraReadiness::WAITING_FOR_STEAM);
+  }
+  fresh();
+  assert(decode(R"({"removedWidgets":["CMSteamBoilerTemperature"]})", update));
+  assert(update.steamBoilerPresent && update.steamBoiler == LineaMicraBoilerState::UNSUPPORTED);
+  assert(update.steamLevel == LineaMicraSteamLevel::UNKNOWN && update.steamReadyAtUtcSec == 0);
+  // One machine has one steam boiler: both widgets in a frame are ambiguous.
+  fresh();
+  assert(!decode(R"({"widgets":[)"
+      R"({"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level2"}},)"
+      R"({"code":"CMSteamBoilerTemperature","output":{"status":"Ready"}}]})", update));
+
   // Boiler fields ride the temperature revision: partial pushes apply, and a
   // stale poll cannot clobber fresher pushed boiler states.
   LineaMicraStatus bstate;

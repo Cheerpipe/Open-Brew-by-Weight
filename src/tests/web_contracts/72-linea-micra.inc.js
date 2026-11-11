@@ -72,7 +72,7 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert.strictEqual(brew.textContent, '');
   // Boiler-readiness lamp: with boiler evidence the machine row claims Ready
   // only when both boilers are ready; otherwise it narrates the warm-up.
-  const warming = {machineIntegration: 'linea_micra_cloud', state: 'READY',
+  const warming = {machineIntegration: 'la_marzocco_cloud', state: 'READY',
     lineaMicra: {accountConfigured: true, observeState: true, powerState: 'ON', quality: 'current'}};
   for (const [readiness, expected, bad] of [
     ['warming_up', 'Heating up', false],
@@ -106,7 +106,7 @@ const micraDiagnosticHtml = rawPartialHtml.diagnostic;
   assert.strictEqual(rowSlots.machineRowValue.textContent, '');
   // Home boiler rows: estimate math (Date.now pinned to 60000 ms),
   // clamping, labels, and configuration gating.
-  const frame = (coffee, steam) => ({machineIntegration: 'linea_micra_cloud', state: 'READY',
+  const frame = (coffee, steam) => ({machineIntegration: 'la_marzocco_cloud', state: 'READY',
     lineaMicra: {accountConfigured: true, observeState: true, powerState: 'ON', quality: 'current',
       boiler: {coffee, steam}}});
   context.applyStatus(frame({state: 'heating_up', readyAtUtcSec: 1000},
@@ -324,7 +324,7 @@ const micraStatusFailures = [
   !micraStatus.includes('delta.field("lineaMicra.email"') && 'account email missing',
   !micraStatus.includes('fields.field("lineaMicra.machines"') && 'machine list missing',
   micraStatus.includes('accountMachineCount') && 'unread account machine count streamed',
-  !micraStatus.includes('OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD') && 'compile gate missing',
+  !micraStatus.includes('OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD') && 'compile gate missing',
   !micraStatus.includes('delta.field("machineIntegration"') && 'integration capability missing',
 ].filter(Boolean);
 if (micraStatusFailures.length) {
@@ -721,7 +721,7 @@ if (!rawCss.includes('html:not(.lineaMicraIntegration) .micraOnly') ||
     !micraDiagnosticHtml.includes('<span id="dMicraPowerValue">—</span> - <a id="lineaMicraRefreshLink" href="#" aria-disabled="true" tabindex="-1">({{webui:diagnostic.refresh_state}})</a>') ||
     micraDiagnosticHtml.includes('id="lineaMicraRefreshButton"') ||
     !codeIncludes(viewJs.diagnostic, "e.preventDefault();R.lineaMicraAction('refresh')") ||
-    !codeIncludes(rawRuntimeJs, "s.machineIntegration==='linea_micra_cloud'") ||
+    !codeIncludes(rawRuntimeJs, "s.machineIntegration==='la_marzocco_cloud'") ||
     !codeIncludes(rawAllJs, "{action:'connect',username,password}") ||
     !codeIncludes(rawAllJs, "lineaMicraAction('disconnect')") ||
     codeIncludes(rawRuntimeJs, "['queued','authenticating','listing','running','backoff'].includes(m.phase)") ||

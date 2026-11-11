@@ -263,7 +263,7 @@ obbw_idf_resolve_paths() {
   IDF_MAP="$IDF_BUILD_DIR/${IDF_PROJECT_NAME}.map"
   IDF_SDKCONFIG="$IDF_BUILD_DIR/sdkconfig"
   IDF_SDKCONFIG_DEFAULTS="$IDF_PROJECT/sdkconfig.defaults;$IDF_PROJECT/sdkconfig.defaults.nimble;$IDF_PROJECT/sdkconfig.defaults.$OPENBREWBYWEIGHT_ARCH"
-  if [[ "${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}" == "linea_micra_cloud" ]]; then
+  if [[ "${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}" == "la_marzocco_cloud" ]]; then
     IDF_SDKCONFIG_DEFAULTS="$IDF_SDKCONFIG_DEFAULTS;$IDF_PROJECT/sdkconfig.defaults.micra"
   fi
   if obbw_idf_jtag_enabled; then
@@ -569,7 +569,7 @@ obbw_idf_verify_production_profile() {
   else
     required+=("# CONFIG_SPIRAM_ECC_ENABLE is not set")
   fi
-  if [[ "${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}" == "linea_micra_cloud" ]]; then
+  if [[ "${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}" == "la_marzocco_cloud" ]]; then
     required+=("CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y"
       "CONFIG_MBEDTLS_DYNAMIC_BUFFER=y"
       "CONFIG_WS_BUFFER_SIZE=4096")

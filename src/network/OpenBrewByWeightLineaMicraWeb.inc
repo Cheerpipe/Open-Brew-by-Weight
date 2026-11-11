@@ -12,7 +12,7 @@ bool lineaMicraGraceCodeFromSeconds(int16_t seconds, uint8_t &code) {
 }
 
 esp_err_t OpenBrewByWeightNetwork::lineaMicraHandler(httpd_req_t *request) {
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION != OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION != OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   return sendError(request, "404 Not Found", "UNSUPPORTED_MACHINE",
                    nullptr, "UNSUPPORTED_MACHINE");
 #else

@@ -234,21 +234,21 @@ params substituted in order (see the example above).
 | ``FIRMWARE_MODE_REQUIRES_IDLE`` | Wait until the machine is idle, then save the firmware mode again. |
 | ``FIRMWARE_MODE_SAVE_FAILED`` | Could not persist the firmware mode. |
 | ``HOST_NOT_ALLOWED`` | Open the controller by its IP address or its .local name. |
-| ``INVALID_MICRA_CONFIG`` | The Linea Micra settings are not valid. |
+| ``INVALID_MICRA_CONFIG`` | The La Marzocco settings are not valid. |
 | ``INVALID_WEBHOOK`` | Use an http:// URL without embedded credentials; HTTPS is not supported. |
 | ``JSON_TOO_LARGE`` | JSON too large for device buffer |
 | ``LINEA_MICRA_PRESET_TARGET_RANGE`` | lineaMicraBrewTargetC must be 80.0–100.0 in 0.1 degree steps. |
-| ``LINEA_MICRA_PRESET_TARGET_UNSUPPORTED`` | Linea Micra preset temperature is not supported by this firmware. |
+| ``LINEA_MICRA_PRESET_TARGET_UNSUPPORTED`` | La Marzocco preset temperature is not supported by this firmware. |
 | ``MICRA_ACTION_FIELDS_INVALID`` | action is required and all fields must be known. |
-| ``MICRA_ACTION_UNKNOWN`` | Unknown Linea Micra action. |
-| ``MICRA_BOUNDED_JSON_REQUIRED`` | A bounded Linea Micra JSON request is required. |
-| ``MICRA_BUSY`` | The Linea Micra integration is busy; try again shortly. |
-| ``MICRA_CHANGE_PENDING`` | Another Linea Micra change is still being saved. |
+| ``MICRA_ACTION_UNKNOWN`` | Unknown La Marzocco action. |
+| ``MICRA_BOUNDED_JSON_REQUIRED`` | A bounded La Marzocco JSON request is required. |
+| ``MICRA_BUSY`` | The La Marzocco integration is busy; try again shortly. |
+| ``MICRA_CHANGE_PENDING`` | Another La Marzocco change is still being saved. |
 | ``MICRA_CONNECT_FIELDS_ONLY`` | connect requires only username and password. |
 | ``MICRA_NOT_READY`` | Connect an account and select a machine first. |
 | ``MICRA_READONLY_ACTIONS`` | disconnect, refresh, relist, and acceptPolicy do not accept setting fields. |
-| ``MICRA_REQUIRES_READY`` | Linea Micra settings can be changed only while Ready. |
-| ``MICRA_SAVE_BUSY`` | Control is busy; Linea Micra settings were not saved. |
+| ``MICRA_REQUIRES_READY`` | La Marzocco settings can be changed only while Ready. |
+| ``MICRA_SAVE_BUSY`` | Control is busy; La Marzocco settings were not saved. |
 | ``MICRA_SAVE_FIELDS_REQUIRED`` | save requires a selected machine and at least one valid machine option. |
 | ``MICRA_SELECT_FIELDS_REQUIRED`` | select requires serial and all machine options. |
 | ``MICRA_SELECT_MACHINE_UNKNOWN`` | Select a machine returned by the latest account connection. |
@@ -324,7 +324,7 @@ params substituted in order (see the example above).
 | ``TIME_SYNC_DISABLED`` | Time sync is unavailable while the firmware is disabled. |
 | ``UNKNOWN_ROUTE`` | Unknown API route. |
 | ``UNKNOWN_SCALE`` | mac is not a known scale. |
-| ``UNSUPPORTED_MACHINE`` | Linea Micra integration is not compiled in this firmware. |
+| ``UNSUPPORTED_MACHINE`` | La Marzocco integration is not compiled in this firmware. |
 | ``WEBHOOK_CONFIG_SAVE_PENDING`` | Another webhook configuration save is still pending. |
 | ``WEBHOOK_REQUIRES_READY`` | Webhooks can be changed or tested only while Ready. |
 | ``WEBHOOK_SETTINGS_CHANGED_RETRY`` | Webhook settings changed; refresh and retry. |

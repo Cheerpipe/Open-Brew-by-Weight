@@ -33,6 +33,8 @@ The initial profiles are:
 | `config/machines/rancilio-silvia-pro-x.json` | Rancilio Silvia Pro X, momentary button without machine-state feedback |
 | `config/machines/rancilio-silvia-pro-x-reed.json` | Rancilio Silvia Pro X, momentary button with required reed feedback |
 | `config/machines/la-marzocco-linea-micra.json` | La Marzocco Linea Micra, maintained paddle input plus cloud power observation and optional wake-gesture recognition |
+| `config/machines/la-marzocco-linea-mini-r.json` | La Marzocco Linea Mini R. Experimental: the Linea Micra profile with its own identity and cloud model, not yet validated on a machine and not an officially supported build |
+| `config/machines/la-marzocco-linea-mini.json` | La Marzocco Linea Mini. Experimental under the same terms; its cloud features need the machine's IoT board |
 
 The Linea Micra is this project's reference machine: the command examples
 throughout the documentation select the `esp32-s3-relay-x1-speaker` hardware
@@ -107,6 +109,8 @@ pairs with `-O2`:
 esp32-s3-relay-x1-speaker       + rancilio-silvia-pro-x
 esp32-s3-relay-x1-speaker-reed  + rancilio-silvia-pro-x-reed
 esp32-s3-relay-x1-speaker       + la-marzocco-linea-micra
+esp32-s3-relay-x1-speaker       + la-marzocco-linea-mini
+esp32-s3-relay-x1-speaker       + la-marzocco-linea-mini-r
 ```
 
 ## Common profile identity
@@ -242,17 +246,18 @@ A machine profile adds these required identity and integration fields:
 | Field | Contract |
 | --- | --- |
 | `brand` | Manufacturer stored separately, for example `Rancilio` or `La Marzocco`. |
-| `model` | Product model stored separately, for example `Silvia Pro X` or `Linea Micra`. |
+| `model` | Product model stored separately, for example `Silvia Pro X` or `Linea Micra`. It is shown to people and selects no behavior. |
 | `integration_revision` | Kebab-case description of the reviewed integration. Initial profiles end in `unqualified` until physically tested. |
-| `integration` | Compile-time digital integration: `none` or the allow-listed `linea_micra_cloud`. This is explicit and is never inferred from brand, model, ID, or display name. |
+| `integration` | Compile-time digital integration: `none` or the allow-listed `la_marzocco_cloud`, the La Marzocco cloud client. This is explicit and is never inferred from brand, model, ID, or display name. |
 | `interface.control` | `momentary` or `paddle`. |
 | `interface.feedback` | `none` or `reed`. Paddle currently permits only `none`. |
 | `factory_defaults` | Defaults appropriate to the selected control topology. |
 
-One optional field may also appear:
+Two more fields may appear:
 
 | Field | Contract |
 | --- | --- |
+| `cloud_model` | Required with `la_marzocco_cloud` and rejected with `none`. La Marzocco's model code for the machine: `LINEAMICRA`, `LINEAMINIR`, or `LINEAMINI`. The controller lists only account machines of this model, so it can never be paired with a different machine on the same account. It selects no other behavior: the firmware adapts to what each machine reports, for example a steam level on the Linea Micra and Mini R and a steam temperature on the Linea Mini. |
 | `machine_icon` | Kebab-case name of the machine's own icon in Home's Equipment row. The glyph catalog is the hidden `data-machine-icons` sprite in `src/web/html/home.html` (`machine-icon-default` is the reserved fallback every profile without the field keeps); the build bakes exactly the named glyph — flat shape elements in the marker site's 24×24 viewBox — into the row. |
 
 The brand, model, and integration are not parsed from the file name, ID, or
@@ -340,8 +345,9 @@ reed machine requires hardware whose reed role is present. For example:
 
 ### Paddle machines
 
-Linea Micra uses the historical paddle source defaults, with Quick rinse enabled
-for this machine profile:
+The Linea Micra uses the historical paddle source defaults, with Quick rinse
+enabled. The experimental Linea Mini R and Linea Mini profiles repeat it and
+differ only in identity, `cloud_model`, and icon:
 
 ```json
 {
@@ -352,7 +358,8 @@ for this machine profile:
   "brand": "La Marzocco",
   "model": "Linea Micra",
   "integration_revision": "paddle-v1-unqualified",
-  "integration": "linea_micra_cloud",
+  "integration": "la_marzocco_cloud",
+  "cloud_model": "LINEAMICRA",
   "interface": { "control": "paddle", "feedback": "none" },
   "factory_defaults": {
     "operational_wall_ms": 50000,
@@ -380,7 +387,7 @@ Both topologies require `quick_rinse`: `enabled` is Boolean, `gesture_ms` is
 100–5000, and `duration_ms` is 500–10000 without exceeding
 `operational_wall_ms`. The
 historical timing defaults are a 1000 ms gesture and 4000 ms duration. It is
-disabled in the Rancilio profiles and enabled in the Linea Micra profile.
+disabled in the Rancilio profiles and enabled in the La Marzocco profiles.
 
 ## Defaults, persistence, and factory reset
 

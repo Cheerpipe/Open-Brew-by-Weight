@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "la-marzocco-linea-mini-r",
+  "display_name": "La Marzocco Linea Mini R",
+  "compatibility_revision": 1,
+  "hardware": ["esp32-s3-relay-x1-speaker"],
+  "brand": "La Marzocco",
+  "model": "Linea Mini R",
+  "integration_revision": "paddle-v1-unqualified",
+  "integration": "la_marzocco_cloud",
+  "cloud_model": "LINEAMINIR",
+  "machine_icon": "linea-mini-r",
+  "interface": {
+    "control": "paddle",
+    "feedback": "none"
+  },
+  "factory_defaults": {
+    "operational_wall_ms": 50000,
+    "paddle": {
+      "mode": "natural",
+      "return_reminder": {
+        "enabled": true,
+        "interval_ms": 30000,
+        "max_duration_ms": 900000
+      }
+    },
+    "quick_rinse": {
+      "enabled": true,
+      "gesture_ms": 1000,
+      "duration_ms": 4000
+    }
+  }
+}

@@ -7,7 +7,8 @@
   "brand": "La Marzocco",
   "model": "Linea Micra",
   "integration_revision": "paddle-v1-unqualified",
-  "integration": "linea_micra_cloud",
+  "integration": "la_marzocco_cloud",
+  "cloud_model": "LINEAMICRA",
   "machine_icon": "linea-micra",
   "interface": {
     "control": "paddle",

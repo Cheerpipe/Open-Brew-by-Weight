@@ -132,8 +132,8 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         "\"bluetoothConnected\":%s,\"bluetoothLevel\":%s,"
         "\"wifiName\":\"%s\",\"bluetoothName\":\"%s\"}",
         compiledMachineTypeId(),
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
-        "linea_micra_cloud",
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
+        "la_marzocco_cloud",
 #else
         "none",
 #endif

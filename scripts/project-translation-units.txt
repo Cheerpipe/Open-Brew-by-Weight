@@ -27,7 +27,7 @@ src/OpenBrewByWeightScaleWorker.cpp
 src/OpenBrewByWeightTaskMutex.cpp
 src/OpenBrewByWeightWebhook.cpp
 src/machine/OpenBrewByWeightMachineIntegration.cpp | integration=none
-src/machine/OpenBrewByWeightLineaMicraIntegration.cpp | integration=linea_micra_cloud
-src/machine/OpenBrewByWeightMicraService.cpp | integration=linea_micra_cloud
-src/machine/OpenBrewByWeightMicraObservation.cpp | integration=linea_micra_cloud
+src/machine/OpenBrewByWeightLineaMicraIntegration.cpp | integration=la_marzocco_cloud
+src/machine/OpenBrewByWeightMicraService.cpp | integration=la_marzocco_cloud
+src/machine/OpenBrewByWeightMicraObservation.cpp | integration=la_marzocco_cloud
 src/openBrewByWeight.cpp

@@ -58,7 +58,7 @@ struct MicraCompanionRouteStatus {
   const char *reason = "none";  // why the route is direct
 };
 
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
 // Link side → service. All may run on the HTTP or network task.
 void machineIntegrationCompanionLink(bool ready, bool lmSwitch);
 void machineIntegrationCompanionPing(bool upstreamAlive);

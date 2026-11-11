@@ -75,6 +75,8 @@ WEB_PREVIEW_STEP = ("web-preview", ["node", "src/tests/webui_preview_test.js"])
 BUDGET_FILES = ("config/web-asset-budgets.json", "config/resource-baselines.json")
 BUILD_PROFILES = (
     ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-micra"),
+    ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-mini"),
+    ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-mini-r"),
     ("esp32-s3-relay-x1-speaker", "rancilio-silvia-pro-x"),
     ("esp32-s3-relay-x1-speaker-reed", "rancilio-silvia-pro-x-reed"),
 )

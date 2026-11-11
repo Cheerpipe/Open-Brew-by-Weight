@@ -36,9 +36,9 @@ async function main() {
   const config = JSON.parse(fs.readFileSync(
       path.join(repoRoot, 'scripts', 'lint', 'htmlvalidate.json'), 'utf8'));
   const validator = new HtmlValidate(config);
-  // The fallback glyph and the reference machine's glyph both ship in real
-  // builds, so both baked forms must validate.
-  for (const machineIcon of [undefined, 'linea-micra']) {
+  // The fallback glyph and each machine's own glyph ship in real builds, so
+  // every baked form must validate.
+  for (const machineIcon of [undefined, 'linea-micra', 'linea-mini', 'linea-mini-r']) {
     const doc = assembledDocument(machineIcon);
     const report = await validator.validateString(doc, 'webui.html');
     for (const result of report.results) {

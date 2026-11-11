@@ -264,7 +264,7 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
     exact(obj, {"schema_version", "id", "display_name", "compatibility_revision",
                 "hardware", "brand", "model", "integration_revision", "integration",
                 "interface", "factory_defaults"}, where,
-          optional={"machine_icon"})
+          optional={"machine_icon", "cloud_model"})
     common_profile(obj, where)
     if "machine_icon" in obj:
         # Names a glyph in src/web/html/home.html's data-machine-icons
@@ -275,7 +275,7 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
     profile_text(obj["model"], "machine.model")
     profile_text(obj["integration_revision"], "machine.integration_revision",
                  identifier=True)
-    integration = choice(obj["integration"], {"none", "linea_micra_cloud"},
+    integration = choice(obj["integration"], {"none", "la_marzocco_cloud"},
                          "machine.integration")
     interface = exact(obj["interface"], {"control", "feedback"}, "machine.interface")
     control = choice(interface["control"], {"paddle", "momentary"},
@@ -284,8 +284,16 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
                       "machine.interface.feedback")
     if control == "paddle" and feedback != "none":
         fail("paddle control does not support reed feedback")
-    if integration == "linea_micra_cloud" and (control, feedback) != ("paddle", "none"):
-        fail("linea_micra_cloud requires paddle control without feedback")
+    if integration == "la_marzocco_cloud" and (control, feedback) != ("paddle", "none"):
+        fail("la_marzocco_cloud requires paddle control without feedback")
+    # La Marzocco's modelCode for this machine: the account lists only machines
+    # of this model. Behavior follows the widgets the cloud sends, never this.
+    if (integration == "la_marzocco_cloud") != ("cloud_model" in obj):
+        fail("machine.cloud_model is required with la_marzocco_cloud and "
+             "not allowed with any other integration")
+    if "cloud_model" in obj:
+        choice(obj["cloud_model"], {"LINEAMICRA", "LINEAMINI", "LINEAMINIR"},
+               "machine.cloud_model")
     if not isinstance(obj["hardware"], list) or not obj["hardware"] or \
             any(not isinstance(entry, str) for entry in obj["hardware"]):
         fail("machine.hardware must be a non-empty list of hardware profile ids")
@@ -559,9 +567,11 @@ def header_for(resolved: dict[str, Any]) -> str:
     define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_MODEL", machine["model"])
     define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_COMPATIBILITY_REVISION", machine["compatibility_revision"])
     define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_NONE", 0)
-    define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD", 1)
+    define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD", 1)
     define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION",
-           {"none": 0, "linea_micra_cloud": 1}[resolved["machine_integration"]])
+           {"none": 0, "la_marzocco_cloud": 1}[resolved["machine_integration"]])
+    if "cloud_model" in machine:
+        define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL", machine["cloud_model"])
     # Web UI metadata, consumed by the build's gen_web_ui.js step; the firmware
     # itself never reads it.
     if "machine_icon" in machine:

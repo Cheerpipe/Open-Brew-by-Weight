@@ -57,7 +57,7 @@
             homeRegion.indexOf('delta.field("cupPresence.state"'),
         'The companion rows sit with the connection rows the header reads');
     assert(homeRegion.includes(
-        '#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LINEA_MICRA_CLOUD\n    // The header\'s cloud popup names the route the machine\'s data takes.\n    delta.field("companion.route"'),
+        '#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD\n    // The header\'s cloud popup names the route the machine\'s data takes.\n    delta.field("companion.route"'),
         'The route rides the Home stream only on Linea Micra builds');
   }
   for (const id of ['saveCompanionButton', 'revertCompanionButton'])

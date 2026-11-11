@@ -12,7 +12,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "scripts" / "project-translation-units.txt"
-KNOWN_INTEGRATIONS = {"none", "linea_micra_cloud"}
+KNOWN_INTEGRATIONS = {"none", "la_marzocco_cloud"}
 SOURCE_ROOTS = (
     ROOT / "src",
     ROOT / "libraries" / "EspressoScaleBLE" / "src",

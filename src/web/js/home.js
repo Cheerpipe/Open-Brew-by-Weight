@@ -139,7 +139,7 @@ function renderHints(s) {
     ["accessHint", !accessHintClosed && s.access?.notice],
     [
       "micraCloudHint",
-      s.machineIntegration === "linea_micra_cloud" && s.lineaMicra?.accountConfigured === false,
+      s.machineIntegration === "la_marzocco_cloud" && s.lineaMicra?.accountConfigured === false,
     ],
     // Until the first shot is saved; unknown until the shot stream answers.
     ["recipeHint", R.shotRecorded() === false],
@@ -181,7 +181,7 @@ function renderMachineRow(s) {
   const lm = s.lineaMicra || {},
     power = micraPower(lm),
     micraActive =
-      s.machineIntegration === "linea_micra_cloud" && lm.accountConfigured && lm.observeState,
+      s.machineIntegration === "la_marzocco_cloud" && lm.accountConfigured && lm.observeState,
     off = power.startsWith("OFF"),
     needsWater = lm.readiness === "needs_water",
     warming = !off && micraActive && ["warming_up", "waiting_for_steam"].includes(lm.readiness),
@@ -356,7 +356,7 @@ function renderReadyMsg(s, lm) {
           ? __WEBUI_TEXT__("home.no_scale_required")
           : __WEBUI_TEXT__("home.no_scale_warn")
       : urgent ||
-        (s.machineIntegration === "linea_micra_cloud" &&
+        (s.machineIntegration === "la_marzocco_cloud" &&
         lm?.accountConfigured &&
         lm.observeState &&
         lm.readiness === "warming_up"

@@ -21,7 +21,7 @@ set(OPEN_BREW_BY_WEIGHT_REQUIRES
   arduino-esp32
   EspressoScaleBLE
   OpenBrewByWeightBleRuntime)
-if(OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION STREQUAL "linea_micra_cloud")
+if(OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION STREQUAL "la_marzocco_cloud")
   list(APPEND OPEN_BREW_BY_WEIGHT_SRCS
     "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightLineaMicraIntegration.cpp"
     "${OPEN_BREW_BY_WEIGHT_DIR}/machine/OpenBrewByWeightMicraService.cpp"

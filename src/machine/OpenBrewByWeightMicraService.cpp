@@ -1,5 +1,6 @@
 #include "OpenBrewByWeightMicraService.h"
 #include "OpenBrewByWeightAuditLog.h"
+#include "OpenBrewByWeightBuildProfile.h"
 #include "OpenBrewByWeightFirmwareMode.h"
 #include "OpenBrewByWeightOutboundAdmission.h"
 
@@ -2415,11 +2416,19 @@ bool OpenBrewByWeightMicraService::listMachines(
     const char *model = jsonText(thing, "modelCode");
     const char *serial = jsonText(thing, "serialNumber");
     const char *name = jsonText(thing, "name");
-    if (type == nullptr || strcmp(type, "CoffeeMachine") != 0 ||
-        model == nullptr || strcmp(model, "LINEAMICRA") != 0 ||
-        serial == nullptr || !validLineaMicraSerial(serial)) {
+    if (!lineaMicraSelectableThing(type, model,
+                                   OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL)) {
+      // Names the model so an account whose machine is not listed can be
+      // diagnosed from the Web UI log; the serial stays out of the log.
+      if (type != nullptr && strcmp(type, "CoffeeMachine") == 0)
+        serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                             "La Marzocco account machine skipped: model %.23s, "
+                             "this firmware is built for "
+                             OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL,
+                             model == nullptr ? "unknown" : model);
       continue;
     }
+    if (serial == nullptr || !validLineaMicraSerial(serial)) continue;
     LineaMicraMachineSummary &machine = result.machines[result.count];
     if (!secureCopy(machine.serial, sizeof(machine.serial), serial)) continue;
     copyMicraText(machine.name, sizeof(machine.name),

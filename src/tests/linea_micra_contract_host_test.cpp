@@ -33,6 +33,15 @@ int main() {
   std::strcpy(account.password, "old-password");
   std::strcpy(account.username, "other@example.com");
   assert(lineaMicraAccountKey(account) != rejected);
+  // The account lists only coffee machines of the model the profile names.
+  for (const char *profileModel : {"LINEAMICRA", "LINEAMINI", "LINEAMINIR"}) {
+    for (const char *model : {"LINEAMICRA", "LINEAMINI", "LINEAMINIR", "GS3AV", ""})
+      assert(lineaMicraSelectableThing("CoffeeMachine", model, profileModel) ==
+             (std::strcmp(model, profileModel) == 0));
+    assert(!lineaMicraSelectableThing("Grinder", profileModel, profileModel));
+    assert(!lineaMicraSelectableThing(nullptr, profileModel, profileModel));
+    assert(!lineaMicraSelectableThing("CoffeeMachine", nullptr, profileModel));
+  }
   MicraPublicIdentityCache identity;
   int derivations = 0;
   const char *activeId = "installation-a";
