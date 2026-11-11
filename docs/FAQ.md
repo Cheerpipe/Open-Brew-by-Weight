@@ -269,6 +269,16 @@ proof of electrical or behavioral compatibility.
 - **Change GPIOs:** create or select a reviewed hardware profile and rebuild;
   the Web UI does not configure safety-critical pins.
 
+### Does it work with the La Marzocco Linea Mini or Linea Mini R?
+
+In theory, yes, and there are already
+[experimental builds](BUILD_PROFILES.md#experimental-builds-linea-mini-r-and-linea-mini)
+for both. They are untested: the author has neither machine, has no wiring
+diagrams to connect the controller to them, and does not know whether their
+paddle behaves exactly like the Linea Micra's. Treat them as a starting point
+for your own investigation, at your own risk; reports of what you find are
+welcome.
+
 ## Safety and diagnostics
 
 After a watchdog/panic reset, the relay is forced open and the interrupted shot
