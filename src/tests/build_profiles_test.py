@@ -82,6 +82,11 @@ for hardware, machine, expected_type, integration, brand, model, icon, cloud_mod
             assert "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON" not in header
         # The cloud model is the one profile fact the La Marzocco client reads:
         # it selects which account machines the controller lists.
+        # The everyday name the Web UI copy uses; the model when the profile
+        # gives none.
+        short = {"Linea Micra": "Micra", "Linea Mini": "Mini", "Linea Mini R": "Mini R"}
+        assert (f'#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_SHORT_MODEL '
+                f'"{short.get(model, model)}"') in header
         if cloud_model:
             assert (f'#define OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL '
                     f'"{cloud_model}"') in header

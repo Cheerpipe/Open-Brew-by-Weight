@@ -463,6 +463,28 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
         JSON.parse(fs.readFileSync(path.join(machinesDir, profile), 'utf8'));
     if (icon) await webUi.generate({webUiLanguage: 'EN', machineIcon: icon, write: false});
   }
+  // The copy names the machine each build is for. Without a profile it reads
+  // as the reference machine; no build ships an unresolved name.
+  const copy = async (names) => {
+    const built = await webUi.generate({webUiLanguage: 'EN', write: false, ...names});
+    return [built.html, built.runtimeJs, ...Object.values(built.partials),
+      ...Object.values(built.modules)].join('');
+  };
+  const micraCopy = await copy({});
+  const miniCopy = await copy({machineModel: 'Linea Mini R', machineShortModel: 'Mini R'});
+  for (const text of [micraCopy, miniCopy]) {
+    if (text.includes('{machine')) throw new Error('an unresolved machine name ships in the Web UI');
+  }
+  for (const [text, model, short] of [[micraCopy, 'Linea Micra', 'Micra'],
+    [miniCopy, 'Linea Mini R', 'Mini R']]) {
+    for (const phrase of [`Turn the ${short} on with the scale`, `Paddle wakes the ${short}`,
+      `This account has no ${model}.`]) {
+      if (!text.includes(phrase)) throw new Error(`the Web UI copy must say: ${phrase}`);
+    }
+  }
+  if (miniCopy.includes('Paddle wakes the Micra')) {
+    throw new Error('a build for another machine must not name the Micra in its controls');
+  }
 }
 if (!taskProfiler.includes('void copySnapshot(TaskProfilerSnapshot &out) const') ||
     !taskProfiler.includes('TaskLockGuard lock(reportMutex_)') ||

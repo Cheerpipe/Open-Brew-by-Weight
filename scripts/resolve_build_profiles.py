@@ -264,7 +264,7 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
     exact(obj, {"schema_version", "id", "display_name", "compatibility_revision",
                 "hardware", "brand", "model", "integration_revision", "integration",
                 "interface", "factory_defaults"}, where,
-          optional={"machine_icon", "cloud_model"})
+          optional={"machine_icon", "short_model", "cloud_model"})
     common_profile(obj, where)
     if "machine_icon" in obj:
         # Names a glyph in src/web/html/home.html's data-machine-icons
@@ -273,6 +273,9 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
         profile_text(obj["machine_icon"], "machine.machine_icon", identifier=True)
     profile_text(obj["brand"], "machine.brand")
     profile_text(obj["model"], "machine.model")
+    # The everyday name Web UI copy uses for the machine ("the Micra"); a
+    # profile without one is called by its model.
+    profile_text(obj.get("short_model", obj["model"]), "machine.short_model")
     profile_text(obj["integration_revision"], "machine.integration_revision",
                  identifier=True)
     integration = choice(obj["integration"], {"none", "la_marzocco_cloud"},
@@ -398,7 +401,8 @@ def apply_overrides(hardware: dict[str, Any], machine: dict[str, Any],
                  "OPEN_BREW_BY_WEIGHT_MACHINE_COMPATIBILITY_REVISION",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_BRAND", "OPEN_BREW_BY_WEIGHT_MACHINE_MODEL",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL",
-                 "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON"}
+                 "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON",
+                 "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_SHORT_MODEL"}
     selected = sorted(forbidden & definitions.keys())
     if selected:
         fail(f"profile identity cannot be overridden with --flags: {', '.join(selected)}")
@@ -577,6 +581,8 @@ def header_for(resolved: dict[str, Any]) -> str:
     # itself never reads it.
     if "machine_icon" in machine:
         define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON", machine["machine_icon"])
+    define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_SHORT_MODEL",
+           machine.get("short_model", machine["model"]))
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_GPIO", hardware["activator"]["gpio"])
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_ACTIVE_LEVEL", LEVELS[hardware["activator"]["active_level"]])
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_DEBOUNCE_MS", hardware["activator"]["debounce_ms"])

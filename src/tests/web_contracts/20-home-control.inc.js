@@ -1699,7 +1699,7 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
   assert.match(show(15), /^Scale battery low \(15%\)/);
   assert.match(show(10), /^red: Scale battery very low \(10%\)/);
   assert.match(show(5), /^red: Scale battery almost empty \(5%\)/);
-  assert.match(show(15, {lm: warming}), /^Machine heating up/, 'A low battery yields to the machine warming up');
+  assert.match(show(15, {lm: warming}), /^Micra heating up/, 'A low battery yields to the Micra warming up');
   assert.match(show(10, {lm: warming}), /^red: Scale battery very low/, 'A critical battery outranks the Micra');
   assert.match(show(5, {stream: 'STALE'}), /^No scale connected/, 'No scale outranks the battery');
   assert.equal(show(5, {state: 'BREW'}), '', 'Notices stay idle-only');

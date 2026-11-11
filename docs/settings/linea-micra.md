@@ -65,7 +65,7 @@ explanation of a problem.
 ### Recommended options
 
 A new controller, or one that was factory reset, starts with every option on
-except **Turn the machine on with the scale**, which you switch on deliberately
+except **Turn the Micra on with the scale**, which you switch on deliberately
 because it starts heating the machine even when you're not next to it.
 **Standby when the scale turns off** starts with a 15-second delay. Updating the
 firmware keeps the options you already saved.
@@ -335,7 +335,7 @@ don't need to open the panel. The steam row shows the steam level set in the app
 temperature; the current temperature of either boiler is not available through
 the cloud service.
 
-Diagnostics groups every machine-reported state under **La Marzocco**:
+Diagnostics groups every machine-reported state under **Linea Micra**:
 readiness, power state, observed mode, both boilers (with the brew target
 temperature and remaining estimate), water, cleaning, and observation quality.
 Connection and account details stay in **La Marzocco cloud**.
@@ -461,7 +461,7 @@ or OFF observation is available.
 Two switches directly under **Show power state** tie scale
 discovery to the machine's power state:
 
-- **Find the scale faster while the machine is on** — searches more actively for a
+- **Find the scale faster while the Micra is on** — searches more actively for a
   scale while the machine is on, whatever the saved scan mode is.
 - **Search for the scale less in standby** — uses less Bluetooth
   scanning time while the machine is off; finding a scale may take longer.
@@ -488,7 +488,7 @@ radio hardware policy (see [Power management](power-management.md)).
 
 ## Recognize paddle wake gestures
 
-Keep **Paddle wakes the machine** on to use a monitored OFF state. The
+Keep **Paddle wakes the Micra** on to use a monitored OFF state. The
 last confirmed OFF counts while it is current or stale, so the next physical
 paddle ON is then treated only as the Micra's standby wake
 gesture. The controller mirrors the paddle through its normal relay safety path,
@@ -523,7 +523,7 @@ recognition is inactive until monitoring produces a confirmed OFF observation.
 
 ## Turn machine on when the scale powers on
 
-Keep **Turn the machine on with the scale** on to wake the Micra when
+Keep **Turn the Micra on with the scale** on to wake the Micra when
 you switch the scale on. It is the mirror of the shutdown option above: the
 machine turns on — the same wake the La Marzocco app performs — when the
 scale comes back from its own power-off. A scale that merely reconnects after
@@ -604,7 +604,7 @@ next read lands.
 
 ## Turn scale off when the machine powers off
 
-Keep **Turn the scale off with the machine** on and the connected
+Keep **Turn the scale off with the Micra** on and the connected
 scale switches itself off once the Micra is confirmed off — after the cloud
 dashboard reports standby following a confirmed on state. A stale or
 optimistic reading never triggers it, and it happens exactly once per

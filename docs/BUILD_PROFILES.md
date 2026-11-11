@@ -260,10 +260,11 @@ A machine profile adds these required identity and integration fields:
 | `interface.feedback` | `none` or `reed`. Paddle currently permits only `none`. |
 | `factory_defaults` | Defaults appropriate to the selected control topology. |
 
-Two more fields may appear:
+Three more fields may appear:
 
 | Field | Contract |
 | --- | --- |
+| `short_model` | The everyday name the Web UI copy uses for the machine, for example `Micra` in **Paddle wakes the Micra**. A profile without it is called by its `model`. `--flags` cannot override it. |
 | `cloud_model` | Required with `la_marzocco_cloud` and rejected with `none`. La Marzocco's model code for the machine: `LINEAMICRA`, `LINEAMINIR`, or `LINEAMINI`. The controller lists only account machines of this model. It selects no other behavior: the firmware reads whichever steam boiler report the machine sends, a level or a temperature. `--flags` cannot override it. |
 | `machine_icon` | Kebab-case name of the machine's own icon in Home's Equipment row. The glyph catalog is the hidden `data-machine-icons` sprite in `src/web/html/home.html` (`machine-icon-default` is the reserved fallback every profile without the field keeps); the build bakes exactly the named glyph — flat shape elements in the marker site's 24×24 viewBox — into the row. |
 

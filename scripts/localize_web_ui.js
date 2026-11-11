@@ -107,6 +107,14 @@ function loadCatalog(language, options = {}) {
     catalog: catalogs.get(resolvedLanguage), referenceKeys};
 }
 
+// Copy names the machine a build is for: {machine} is the machine profile's
+// model and {machine-short} its everyday name. Without a profile (tests, lint,
+// the design preview) both read as the reference machine.
+function nameMachine(text, options) {
+  return text.replaceAll('{machine}', options.machineModel || 'Linea Micra')
+      .replaceAll('{machine-short}', options.machineShortModel || 'Micra');
+}
+
 function htmlEscape(value) {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -225,7 +233,7 @@ function useString(file, key, state) {
     fail(`${file}: missing key ${key} in ${state.catalog.locale}`);
   }
   state.used.add(key);
-  return state.catalog.strings[key];
+  return nameMachine(state.catalog.strings[key], state.options);
 }
 
 function renderJavaScript(source, file, state) {

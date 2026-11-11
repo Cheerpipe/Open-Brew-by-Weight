@@ -6,6 +6,7 @@
   "hardware": ["esp32-s3-relay-x1-speaker"],
   "brand": "La Marzocco",
   "model": "Linea Mini R",
+  "short_model": "Mini R",
   "integration_revision": "paddle-v1-unqualified",
   "integration": "la_marzocco_cloud",
   "cloud_model": "LINEAMINIR",

@@ -108,7 +108,7 @@ in a few places:
   charge the scale soon; at 10 % or less a red notice; at 5 % or less a red
   notice to charge it before your next shot. A missing scale is always
   reported first. On La Marzocco Linea Micra builds, a very low or almost
-  empty battery comes before the "Machine heating up" notice, while a simple
+  empty battery comes before the "Micra heating up" notice, while a simple
   low-battery reminder waits until the machine is ready.
 
 A charge reading can wobble by a point or two. The controller shows a drop
@@ -144,7 +144,7 @@ turning Bluetooth back on restores normal operation without a restart.
 
 ## Scale power-off support
 
-**Turn the scale off with the machine**
+**Turn the scale off with the Micra**
 ([La Marzocco Linea Micra](linea-micra.md#turn-scale-off-when-the-machine-powers-off))
 switches the connected scale off over Bluetooth, but only when the scale
 itself accepts a power-off command. The explicit support list:

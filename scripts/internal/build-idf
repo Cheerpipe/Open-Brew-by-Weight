@@ -205,6 +205,13 @@ grep -q -- '-DOPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL=1' <<<"$effectiv
 webui_machine_icon="$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "\(.*\)"$/\1/p' \
   "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"
 [[ -n "$webui_machine_icon" ]] && webui_args+=(--machine-icon "$webui_machine_icon")
+# The Web UI copy names the machine: its model, and the everyday name the
+# profile gives it (the model again when it gives none).
+for webui_name in MODEL:--machine-model WEB_SHORT_MODEL:--machine-short-model; do
+  webui_value="$(sed -n "s/^#define OPEN_BREW_BY_WEIGHT_MACHINE_${webui_name%%:*} \"\(.*\)\"\$/\1/p" \
+    "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"
+  [[ -n "$webui_value" ]] && webui_args+=("${webui_name##*:}" "$webui_value")
+done
 node ./scripts/gen_web_ui.js \
   --output "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightWebAssetsGzip.h" \
   --version "$(sed -n 's/^#define FW_VERSION_STRING "\(.*\)"$/\1/p' \
