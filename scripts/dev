@@ -75,11 +75,21 @@ WEB_PREVIEW_STEP = ("web-preview", ["node", "src/tests/webui_preview_test.js"])
 BUDGET_FILES = ("config/web-asset-budgets.json", "config/resource-baselines.json")
 BUILD_PROFILES = (
     ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-micra"),
-    ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-mini"),
-    ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-mini-r"),
     ("esp32-s3-relay-x1-speaker", "rancilio-silvia-pro-x"),
     ("esp32-s3-relay-x1-speaker-reed", "rancilio-silvia-pro-x-reed"),
 )
+# Buildable pairs not yet validated on a machine. No gate builds them unless
+# asked with --experimental-pairs, so everyday validation does not pay for
+# them; they carry no release baseline.
+EXPERIMENTAL_BUILD_PROFILES = (
+    ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-mini"),
+    ("esp32-s3-relay-x1-speaker", "la-marzocco-linea-mini-r"),
+)
+EXPERIMENTAL_PAIRS_ENV = "OPENBREWBYWEIGHT_EXPERIMENTAL_PAIRS"
+
+
+def validation_pairs(experimental: bool) -> tuple[tuple[str, str], ...]:
+    return BUILD_PROFILES + (EXPERIMENTAL_BUILD_PROFILES if experimental else ())
 FIRMWARE_BUDGET_OPTIONS = ["--flags=", "--development"]
 # Gates build in their own trees: they must never rewrite an image a manual
 # flash or OTA is using from build-idf/, and a manual build's other flags must
@@ -142,15 +152,17 @@ def ccache_fill_warning(stats: str) -> list[str]:
     return []
 
 
-def budget_gate(evidence: bool, firmware: bool) -> dict[str, object]:
+def budget_gate(evidence: bool, firmware: bool, experimental: bool = False) -> dict[str, object]:
     """Gate options that measure budgets: every check records instead of
     failing, and one final verdict judges all of them together. Only the
     quality gate is budget evidence; every other gate reports overruns."""
     # Every pair's development and release lanes build at once, so each IDF
     # build gets its share of the CPUs instead of all of them.
-    jobs = {"IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // (2 * len(BUILD_PROFILES))))
+    pairs = len(validation_pairs(experimental))
+    jobs = {"IDF_PY_BUILD_JOBS": str(max(2, (os.cpu_count() or 6) // (2 * pairs)))
             } if firmware else {}
-    return {"env_extra": {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1", **jobs},
+    return {"env_extra": {"OPENBREWBYWEIGHT_BUDGET_DEFER": "1", **jobs,
+                          **({EXPERIMENTAL_PAIRS_ENV: "1"} if experimental else {})},
             "final": [("budget-verdict", ["python3", "scripts/internal/budgets", "verdict",
                                           *([] if evidence else ["--report"])])],
             "summary_extra": {"budget": {"evidence": evidence, "firmware": firmware,
@@ -171,8 +183,9 @@ def budget_update_problems(run_id: str) -> list[str]:
                 if check["status"] != "passed" and check["name"] != "budget-verdict"]
     if not any(check["name"] == "budget-verdict" for check in checks):
         problems.append(f"run {run_id} stopped before its budget verdict")
-    if budget["firmware"] and len(list((run_dir / "budgets").glob("firmware-*.json"))) != \
-            2 * len(BUILD_PROFILES):
+    if budget["firmware"] and not all(
+            (run_dir / "budgets" / f"firmware-{profile}-{hardware}--{machine}.json").is_file()
+            for hardware, machine in BUILD_PROFILES for profile in ("development", "release")):
         problems.append(f"run {run_id} lacks a development or release measurement of some pair")
     now = tree_state()
     stale = [name for name in ("head", "worktree", "budgetFiles")
@@ -581,9 +594,11 @@ commands:
   context AREA               list focused paths and their purpose
   classify [PATH ...]        print path risks and aggregate risk
   test [normal|asan|tsan|web|budgets|ble|ota|tooling|lint]
-  validate [--risk R0..R3] [--webui-language CODE] [PATH ...]
-  quality [--webui-language CODE]
-                             full Cppcheck, dead code, preview, and budget evidence
+  validate [--risk R0..R3] [--webui-language CODE] [--experimental-pairs] [PATH ...]
+  quality [--webui-language CODE] [--experimental-pairs]
+                             full Cppcheck, dead code, preview, and budget evidence;
+                             --experimental-pairs also builds the pairs not yet
+                             validated on a machine
   budget update --from RUN_ID
                              raise only the budgets that run exceeded; no rebuild
   profiles                   list exact profile IDs and compatibility
@@ -787,6 +802,8 @@ def main() -> int:
         if verb in {"validate", "quality"}:
             override, paths = extract_option(args, "--risk")
             webui_language, paths = extract_option(paths, "--webui-language")
+            experimental, paths = extract_switch(paths, "--experimental-pairs")
+            pairs = validation_pairs(experimental)
             webui_language = (webui_language or
                               os.getenv("OPENBREWBYWEIGHT_WEBUI_LANGUAGE") or "en")
             webui_language = webui_language.strip().replace("_", "-").lower()
@@ -813,16 +830,18 @@ def main() -> int:
                 # Non-functional quality runs on demand and before each release
                 # tag, over the whole tree: it is the only budget evidence.
                 if override is not None or paths:
-                    raise ValueError("quality takes only --webui-language; it checks the whole tree")
+                    raise ValueError("quality takes only --webui-language and "
+                                     "--experimental-pairs; it checks the whole tree")
                 lanes = [[WEB_BUDGETS_STEP, WEB_PREVIEW_STEP],
                          [("dead-code", ["./scripts/dead-code-idf",
                                          "--webui-language", webui_language])]]
-                for hardware, machine in BUILD_PROFILES:
+                for hardware, machine in pairs:
                     variant, (development, release) = pair_steps(hardware, machine)
                     lanes += [[development, cppcheck(variant)], [release]]
                 return execute(command, "quality", [s for lane in lanes for s in lane],
                                verbosity, lanes=lanes,
-                               **budget_gate(evidence=True, firmware=True))
+                               **budget_gate(evidence=True, firmware=True,
+                                             experimental=experimental))
             inferred, details = classify(paths)
             if override not in RANK:
                 if override is not None:
@@ -853,7 +872,7 @@ def main() -> int:
                 # change reaches; the quality gate runs the full analysis.
                 changed = ":".join(paths or changed_paths())
                 stack = ["python3", "scripts/check_stack_depth.py", "--build-dir"]
-                for hardware, machine in BUILD_PROFILES:
+                for hardware, machine in pairs:
                     variant, (development, release) = pair_steps(hardware, machine)
                     lanes.append([development, (f"stack-{variant}",
                                                 [*stack, f"{GATE_BUILD_ROOT}/{variant}"])])
@@ -874,7 +893,8 @@ def main() -> int:
             firmware = len(lanes) > 1
             return execute(command, risk, [s for lane in lanes for s in lane], verbosity, manual,
                            prelude, lanes=lanes if firmware else None,
-                           **(budget_gate(evidence=False, firmware=True) if firmware else {}))
+                           **(budget_gate(evidence=False, firmware=True,
+                                          experimental=experimental) if firmware else {}))
 
         if verb in FIRMWARE_STAGES:
             ensure_no_secret_argv(args)

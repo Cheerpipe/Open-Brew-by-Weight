@@ -68,8 +68,10 @@ profile" and are **not** budget evidence. Any change that can move image size
 (embedded Web assets included) must be verified with the R2/R3 gate, or with
 both a `--development` build and a flag-free release build of each affected
 pair, before it is called done.
-R2/R3 validation builds all supported built-in profile pairs in
-`docs/BUILD_PROFILES.md` both ways, in trees of their own: the development
+R2/R3 validation builds the official profile pairs in
+`docs/BUILD_PROFILES.md` both ways, in trees of their own (add
+`--experimental-pairs` to `validate` or `quality` to build the experimental
+pairs too; they are built only on request and have no release baseline): the development
 images in `build-gate/` and the release images in `build-gate/release/`. A gate
 never touches `build-idf/`, so it cannot rewrite an image that a manual flash or
 OTA is using, and it does not leave one there either: build what you install.

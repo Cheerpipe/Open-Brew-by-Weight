@@ -1971,12 +1971,33 @@ for hardware_profile in hardware:
             continue
         supported_pairs.add((hardware_profile["id"], machine_profile["id"]))
 local_pairs = dev_module["BUILD_PROFILES"]
-assert len(local_pairs) == len(supported_pairs) and set(local_pairs) == supported_pairs, \
-    "local validation must cover every supported profile pair exactly once"
+experimental_pairs = dev_module["EXPERIMENTAL_BUILD_PROFILES"]
+every_pair = local_pairs + experimental_pairs
+assert len(every_pair) == len(supported_pairs) and set(every_pair) == supported_pairs, \
+    "every buildable profile pair is validated by default or on request, exactly once"
+assert dev_module["validation_pairs"](False) == local_pairs
+assert dev_module["validation_pairs"](True) == every_pair
+# Experimental pairs build only when asked, in both gates, and the quality
+# gate hands the same choice to its dead-code step.
+default_builds = {name for name, _ in validate_language_steps(["src/web/app.js"], risk="R2")
+                  if name.startswith(("idf-", "release-"))}
+assert default_builds == {f"{kind}-{hardware}--{machine}"
+                          for hardware, machine in local_pairs for kind in ("idf", "release")}
+for verb, arguments in (("validate", ["--experimental-pairs", "src/web/app.js"]),
+                        ("quality", ["--experimental-pairs"])):
+    requested = {name for name, _ in validate_language_steps(arguments, verb=verb)
+                 if name.startswith(("idf-", "release-"))}
+    assert requested == {f"{kind}-{hardware}--{machine}"
+                         for hardware, machine in every_pair for kind in ("idf", "release")}, verb
+    environment = validate_language_steps.captured["env_extra"]
+    assert environment["OPENBREWBYWEIGHT_EXPERIMENTAL_PAIRS"] == "1", verb
+    assert environment["IDF_PY_BUILD_JOBS"] == str(
+        max(2, (os.cpu_count() or 6) // (2 * len(every_pair)))), verb
+assert "OPENBREWBYWEIGHT_EXPERIMENTAL_PAIRS" not in report_gate["env_extra"]
 release_baselines = json.loads((ROOT / "config/resource-baselines.json").read_text())
 assert set(release_baselines["releaseTargets"]) == {
     f"{hardware}--{machine}" for hardware, machine in local_pairs}, \
-    "every supported pair needs its own release-image baseline"
+    "every default pair needs its own release-image baseline; experimental pairs carry none"
 # The opt-in Web UI lint profile never installs: absent linters fail with 127.
 assert "test [normal|asan|tsan|web|budgets|ble|ota|tooling|lint]" in dev_module["help_text"]()
 with tempfile.TemporaryDirectory(prefix="openbrewbyweight-lint-") as temporary:

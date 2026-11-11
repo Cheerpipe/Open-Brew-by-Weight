@@ -170,7 +170,10 @@ default. Passing `--release` explicitly marks a publishable image and requires
 a clean Git tree, untracked files included. These options are compile-time
 only and are never persisted.
 
-`./scripts/dev validate --risk R2` builds each official validation pair twice:
+`./scripts/dev validate --risk R2` builds each official validation pair twice
+(`--experimental-pairs` adds the experimental pairs of
+[Build profiles](BUILD_PROFILES.md#capability-matching), which no gate builds
+otherwise):
 a `--development` budget build and the flag-free release image that ships,
 each checked against its own size baseline and, right after it, against the
 stack-depth gate of the destructive recovery paths, the settings_persist

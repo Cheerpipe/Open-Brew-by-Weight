@@ -107,10 +107,11 @@ touch hardware implicitly. Static analysis is run only when explicitly requested
 or required by the requested validation gate.
 
 A gate run in the background reports only when it exits, so a hung gate never
-reports. Check its progress once it passes its usual duration (R3 about 3
-to 6 minutes on a built tree and 15 with a full rebuild, as in a new worktree
-or after a compile-flag change, `quality` up to about 21 while its analysis
-trees are cold, `test web` about 1; each run's `summary.json` lists every step's duration). A stall means neither
+reports. Check its progress once it passes its usual duration (R3 about 1
+minute on a built tree, 3 in a new worktree, and 10 after a compile-flag
+change, `quality` up to about 13 while its analysis trees are cold, `test web`
+about 1; with `--experimental-pairs` R3 takes about 3 to 6 minutes on a built
+tree and 15 in a new worktree, and `quality` up to about 21; each run's `summary.json` lists every step's duration). A stall means neither
 `artifacts/runs/<id>/run.log` nor the gate's process tree (its newest process
 and that process's CPU time) changes for several minutes; a quiet log alone is
 not one, since some steps, such as ESP-IDF builds, write only when they finish.

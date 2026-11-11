@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import runpy
 import shlex
@@ -459,7 +460,10 @@ def main() -> int:
     check.add_argument("builds", type=Path, nargs="+")
     args = parser.parse_args()
     if args.command == "pairs":
-        for hardware, machine in runpy.run_path(str(ROOT / "scripts/dev"))["BUILD_PROFILES"]:
+        dev = runpy.run_path(str(ROOT / "scripts/dev"))
+        # The quality gate asks for the experimental pairs through this variable.
+        for hardware, machine in dev["validation_pairs"](
+                os.environ.get(dev["EXPERIMENTAL_PAIRS_ENV"]) == "1"):
             print(hardware, machine)
         return 0
     components = project_components()
