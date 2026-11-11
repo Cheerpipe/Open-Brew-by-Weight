@@ -371,6 +371,24 @@ from official vendor documentation and public references, and obsolete
 references to earlier projects have been cleaned up. See [LICENSE](LICENSE) for
 the full terms.
 
+### Logo and icons
+
+The Open Brew by Weight logo and app icons are licensed separately under
+[Creative Commons Attribution 4.0](LICENSES/CC-BY-4.0.txt) (CC BY 4.0). You can
+use them in articles, videos, store listings, or your own projects, change
+them, and use them commercially, as long as you give credit, for example:
+"Open Brew by Weight logo by Felipe Urzúa, CC BY 4.0". Mention it if you
+changed the artwork.
+
+This applies only to the logo (`docs/images/OpenBrewByWeight.svg`), the brand
+mark (`resources/icons/brand-mark.svg`), the favicon, and the app icons in
+`resources/icons/android/`, `ios/`, and `windows/`, as listed in
+[REUSE.toml](REUSE.toml). Everything else stays under the AGPL-3.0.
+
+The license covers the artwork, not the name. Please don't use the name or
+logo in a way that suggests your product or fork is the official Open Brew by
+Weight project.
+
 ## Credits
 
 Open Brew by Weight is maintained by **Felipe Urzúa**
