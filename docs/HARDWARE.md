@@ -11,6 +11,14 @@ The board pin map and enclosure are documented below. Machine-specific wiring di
 
 - **Linea Micra**:
   ![Linea Micra wiring between the relay board and the machine control board: paddle cable, CN9 on the relay, CN4 power and the optional buzzer](images/micra_diagram.png)
+
+  **Alternative power wiring:** CN4 supplies 5 V, the voltage the controller
+  board itself runs on, so on the Micra you can instead wire CN4 to the **5V**
+  and **GND** pins of the board's six-pin header and leave the green terminal
+  empty. The header's 5V pin is the board's own 5 V supply, so only connect it
+  to a source you have measured at 5 V.
+
+  ![Linea Micra alternative wiring: CN4 power to the 5V and GND pins of the relay board's six-pin header](images/micra_diagram_header_power.png)
 - **Rancilio Silvia Pro X**:
   ![Rancilio Silvia Pro X Wiring Diagram](images/silvia_pro_x_diagram.png)
 
