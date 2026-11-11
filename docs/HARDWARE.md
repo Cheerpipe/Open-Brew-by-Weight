@@ -19,6 +19,12 @@ The board pin map and enclosure are documented below. Machine-specific wiring di
   to a source you have measured at 5 V.
 
   ![Linea Micra alternative wiring: CN4 power to the 5V and GND pins of the relay board's six-pin header](images/micra_diagram_header_power.png)
+
+  **Cable list:** these are the Dupont leads for the header-power wiring.
+  20 cm leads reach every connector without cutting the machine's factory zip
+  tie, so you can undo the installation completely.
+
+  ![Linea Micra cable list: the Dupont leads for power, the paddle, CN9 and the optional buzzer](images/micra_cable_list.png)
 - **Rancilio Silvia Pro X**:
   ![Rancilio Silvia Pro X Wiring Diagram](images/silvia_pro_x_diagram.png)
 
