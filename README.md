@@ -169,6 +169,13 @@ testing workflows; human review, hardware validation, and safety judgment remain
 the author’s responsibility. Use on real espresso equipment only after you have
 verified wiring, isolation, and behavior on your own setup.
 
+**Open Brew by Weight is an independent project.** It is not associated with,
+affiliated with, endorsed by, or sponsored by Gaggiuino, GaggiMate, Shot
+Stopper, Beanconqueror, or La Marzocco in any way. All product names and
+trademarks mentioned in this project, including those of scale makers and other
+services, belong to their respective owners and are used only to describe
+compatibility.
+
 ## License
 
 Open Brew by Weight is licensed under the
