@@ -131,7 +131,7 @@ void p01_defaults_are_valid() {
         static_cast<uint8_t>(DEFAULT_EXTENDED_PULSE_RATE));
   CHECK(noScaleBbwModeValue(settings.runtime.noScaleBbwMode) ==
         static_cast<uint8_t>(NoScaleBbwMode::WARN_ONCE));
-  CHECK(!noScaleAllowRinseWhileArmed(settings.runtime.noScaleBbwMode));
+  CHECK(noScaleAllowRinseWhileArmed(settings.runtime.noScaleBbwMode));
   CHECK(settings.runtime.cupProtectionEnabled);
   CHECK(settings.runtime.stopIfCupRemoved);
   CHECK(!settings.runtime.requireCupToStart);
