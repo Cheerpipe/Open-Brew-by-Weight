@@ -136,4 +136,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = {compactMarkup, compactCss, authoringSources, profile};
+module.exports = {compactMarkup, compactCss, authoringSources};
