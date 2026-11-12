@@ -31,13 +31,16 @@ const laMarzoccoDiagnosticHtml = rawPartialHtml.diagnostic;
   const brewBoiler = el(), steamBoiler = el();
   const machineRow = {textContent: '', bad: false};
   machineRow.classList = {toggle: (_, on) => { machineRow.bad = on; }};
+  const machineId = {dataset: {}}, idState = el(), idDetail = el();
+  const heading = () => [idState.textContent, idDetail.textContent, machineId.dataset.state];
   let lastStatus = null;
   const rowSlots = {};
   const context = {R: {applyHomeStatus() {}, formatLaMarzoccoCleaning:()=>'', deviceUtcSec: () => 60,
       homeStatusCache: () => lastStatus, shotRecorded: () => null, uiState: {companionHere: null},
       companionPairable: () => false, companionHere: () => Promise.resolve(null),
       $: id => ({homeLaMarzoccoCleaning: cleaning, homeLaMarzoccoPower: power, machineRowState: rowState, state: brew, machineRow,
-        homeLaMarzoccoBrewBoiler: brewBoiler, homeLaMarzoccoSteamBoiler: steamBoiler}[id] ||
+        homeLaMarzoccoBrewBoiler: brewBoiler, homeLaMarzoccoSteamBoiler: steamBoiler,
+        machineId, machineIdState: idState, machineIdDetail: idDetail}[id] ||
         (/Row(Value|Hint)$|^(scaleWeight|preferredScale|cupWeight)$/.test(id) ? (rowSlots[id] ||= el()) : null))},
     document: {querySelector: () => null}, __LA_MARZOCCO__: true,
     Date: {now: () => 60000},
@@ -70,6 +73,9 @@ const laMarzoccoDiagnosticHtml = rawPartialHtml.diagnostic;
   context.applyStatus({laMarzocco: {powerState: 'ON', quality: 'current'}, state: 'BREWING'});
   assert.strictEqual(machineRow.bad, true);
   assert.strictEqual(brew.textContent, '');
+  // A shot in progress is not a fault: Home's heading keeps its dot calm.
+  context.applyStatus({laMarzocco: {powerState: 'ON', quality: 'current'}, state: 'BREW'});
+  assert.deepStrictEqual([machineRow.bad, machineId.dataset.state], [true, 'ok']);
   // Boiler-readiness lamp: with boiler evidence the machine row claims Ready
   // only when both boilers are ready; otherwise it narrates the warm-up.
   const warming = {machineIntegration: 'la_marzocco_cloud', state: 'READY',
@@ -90,11 +96,15 @@ const laMarzoccoDiagnosticHtml = rawPartialHtml.diagnostic;
   context.applyStatus(boilers('warming_up', {state: 'heating_up', readyAtUtcSec: 1000, targetDeciC: 930}));
   assert.deepStrictEqual([rowState.textContent, rowSlots.machineRowValue.textContent, rowSlots.machineRowHint.textContent],
       ['Heating up', '16 min', 'Until ready']);
+  // Home's machine heading repeats the row: state, key reading, dot.
+  assert.deepStrictEqual(heading(), ['Heating up', 'ready in ~16 min', 'warn']);
   context.applyStatus(boilers('ready', {state: 'ready', targetDeciC: 930}));
   assert.deepStrictEqual([rowState.textContent, rowSlots.machineRowValue.textContent, rowSlots.machineRowHint.textContent],
       ['Ready', '93°C', 'Brew temperature']);
+  assert.deepStrictEqual(heading(), ['Ready', '93°C', 'ok']);
   context.applyStatus({...warming, laMarzocco: {...warming.laMarzocco, powerState: 'OFF'}});
   assert.deepStrictEqual([rowSlots.machineRowValue.textContent, rowSlots.machineRowHint.textContent], ['—', 'Turn on to brew']);
+  assert.deepStrictEqual(heading(), ['Turned off', 'Turn on to brew', 'bad']);
   context.applyStatus(boilers('needs_water', {state: 'no_water'}));
   assert.deepStrictEqual([rowSlots.machineRowValue.textContent, rowSlots.machineRowHint.textContent], ['—', 'Refill the tank']);
   context.applyStatus({...warming, laMarzocco: {...warming.laMarzocco, powerState: 'OFF', quality: 'optimistic', optimisticOn: true, readiness: 'unknown'}});

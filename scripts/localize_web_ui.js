@@ -108,11 +108,13 @@ function loadCatalog(language, options = {}) {
 }
 
 // Copy names the machine a build is for: {machine} is the machine profile's
-// model and {machine-short} its everyday name. Without a profile (tests, lint,
-// the design preview) both read as the reference machine.
+// model, {machine-short} its everyday name and {machine-brand} its maker.
+// Without a profile (tests, lint, the design preview) all read as the
+// reference machine.
 function nameMachine(text, options) {
   return text.replaceAll('{machine}', options.machineModel || 'Linea Micra')
-      .replaceAll('{machine-short}', options.machineShortModel || 'Micra');
+      .replaceAll('{machine-short}', options.machineShortModel || 'Micra')
+      .replaceAll('{machine-brand}', options.machineBrand || 'La Marzocco');
 }
 
 function htmlEscape(value) {
@@ -156,7 +158,7 @@ function assertHtmlContext(source, marker, offset, meta) {
 // <symbol id="machine-icon-<id>"> per machine) next to the marker that shows
 // it, the render's machineIcon option selects the glyph (default: the generic
 // machine), and every html source in the render may place the marker (Home's
-// Equipment row, Diagnostics' machine group). Glyphs are flat shape elements
+// machine heading and Equipment row, Diagnostics' machine group). Glyphs are flat shape elements
 // authored in a 24x24 viewBox. Returns undefined when the render has neither.
 function machineIconGlyph(sources, options) {
   const html = sources.filter((source) => source.type === 'html');

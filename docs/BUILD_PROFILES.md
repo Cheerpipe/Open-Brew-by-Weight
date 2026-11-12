@@ -297,11 +297,12 @@ Three more fields may appear:
 | --- | --- |
 | `short_model` | The everyday name the Web UI copy uses for the machine, for example `Micra` in **Paddle wakes the Micra**. A profile without it is called by its `model`. `--flags` cannot override it. |
 | `cloud_model` | Required with `la_marzocco_cloud` and rejected with `none`. La Marzocco's model code for the machine: `LINEAMICRA`, `LINEAMINIR`, or `LINEAMINI`. The controller lists only account machines of this model. It selects no other behavior: the firmware reads whichever steam boiler report the machine sends, a level or a temperature. `--flags` cannot override it. |
-| `machine_icon` | Kebab-case name of the machine's own icon in Home's Equipment row and Diagnostic's La Marzocco group. The glyph catalog is the hidden `data-machine-icons` sprite in `src/web/html/home.html` (`machine-icon-default` is the reserved fallback every profile without the field keeps); the build bakes exactly the named glyph — flat shape elements in a 24×24 viewBox — into both places. |
+| `machine_icon` | Kebab-case name of the machine's own icon in Home's machine heading and Equipment row, and in Diagnostic's La Marzocco group. The glyph catalog is the hidden `data-machine-icons` sprite in `src/web/html/home.html` (`machine-icon-default` is the reserved fallback every profile without the field keeps); the build bakes exactly the named glyph — flat shape elements in a 24×24 viewBox — into each place. |
 
 The brand, model, and integration are not parsed from the file name, ID, or
 display name. Brand and model are compiled separately and shown separately in
-Diagnostic. An unknown integration fails profile resolution; adding one
+Diagnostic and in Home's machine heading, where the build bakes them into the
+Web UI. An unknown integration fails profile resolution; adding one
 requires its own isolated implementation and build registration. A
 `machine_icon` that names no glyph in the Web UI catalog fails the build.
 

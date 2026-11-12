@@ -422,7 +422,8 @@ async function generate(options = {}) {
   ], {language: webUiLanguage, localesDir: options.localesDir,
     developmentMode: options.developmentMode === true,
     machineType: options.machineType, machineIcon: options.machineIcon,
-    machineModel: options.machineModel, machineShortModel: options.machineShortModel});
+    machineModel: options.machineModel, machineShortModel: options.machineShortModel,
+    machineBrand: options.machineBrand});
   let at = 0;
   shellHtmlRaw = localized.sources[at++].content;
   for (const name of VIEW_NAMES) partialsRaw[name] = localized.sources[at++].content;
@@ -702,6 +703,7 @@ if (require.main === module) {
     let machineIcon;
     let machineModel;
     let machineShortModel;
+    let machineBrand;
     let versionOverride;
     let output;
     for (let i = 2; i < process.argv.length; i++) {
@@ -720,9 +722,10 @@ if (require.main === module) {
         machineIcon = process.argv[i];
       } else if (arg.startsWith('--machine-icon=')) {
         machineIcon = arg.slice('--machine-icon='.length);
-      } else if (arg === '--machine-model' || arg === '--machine-short-model') {
+      } else if (['--machine-model', '--machine-short-model', '--machine-brand'].includes(arg)) {
         if (++i >= process.argv.length) throw new Error(`${arg} requires a value`);
         if (arg === '--machine-model') machineModel = process.argv[i];
+        else if (arg === '--machine-brand') machineBrand = process.argv[i];
         else machineShortModel = process.argv[i];
       } else if (arg === '--development') {
         developmentMode = true;
@@ -744,7 +747,8 @@ if (require.main === module) {
       }
     }
     return generate({webUiLanguage, developmentMode, machineType, remoteControl,
-      laMarzocco, machineIcon, machineModel, machineShortModel, versionOverride, output});
+      laMarzocco, machineIcon, machineModel, machineShortModel, machineBrand, versionOverride,
+      output});
   })
       .then((result) => {
         const parts = [`shell ${result.gzip.length} B`,

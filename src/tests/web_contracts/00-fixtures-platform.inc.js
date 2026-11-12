@@ -483,8 +483,16 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
   };
   const laMarzoccoCopy = await copy({});
   const miniCopy = await copy({machineModel: 'Linea Mini R', machineShortModel: 'Mini R'});
-  for (const text of [laMarzoccoCopy, miniCopy]) {
+  const silviaCopy = await copy({machineBrand: 'Rancilio', machineModel: 'Silvia Pro X'});
+  for (const text of [laMarzoccoCopy, miniCopy, silviaCopy]) {
     if (text.includes('{machine')) throw new Error('an unresolved machine name ships in the Web UI');
+  }
+  // Home's machine heading names the build's own brand and model.
+  for (const [text, brand, model] of [[laMarzoccoCopy, 'La Marzocco', 'Linea Micra'],
+    [silviaCopy, 'Rancilio', 'Silvia Pro X']]) {
+    if (!text.includes(`>${brand}</p>`) || !text.includes(`>${model}</h2>`)) {
+      throw new Error(`Home's machine heading must name the ${brand} ${model}`);
+    }
   }
   for (const [text, model, short] of [[laMarzoccoCopy, 'Linea Micra', 'Micra'],
     [miniCopy, 'Linea Mini R', 'Mini R']]) {

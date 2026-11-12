@@ -6,6 +6,8 @@ let quickWeight = null;
 let quickWeightWanted = false;
 let accessHintClosed = false,
   recipeTag = 0;
+// Controller states in which water is flowing.
+const BREWING_STATES = ["BREW", "RINSE", "MANUAL_NO_SCALE"];
 
 // Boiler rows interpolate the warm-up estimate locally from the absolute
 // readyAtUtcSec the stream delivers once; a stable estimate costs no frames.
@@ -62,7 +64,7 @@ export function applyStatus(s) {
         ? __WEBUI_TEXT__("home.cup_not_tared")
         : "",
   );
-  const brewing = ["BREW", "RINSE", "MANUAL_NO_SCALE"].includes(s.state);
+  const brewing = BREWING_STATES.includes(s.state);
   if (quickWeight && brewing) quickWeight.close();
   // URL launcher: ?edit_weight=1 opens the sheet without the Presets row.
   // Wait for the active preset and the admin lock to settle, then open once
@@ -205,29 +207,39 @@ function renderMachineRow(s) {
       ? __WEBUI_TEXT__("runtime.ready_2")
       : labels[lm.readiness] ||
         (power.indexOf("ON") === 0 ? __WEBUI_TEXT__("home.on") : $("state").textContent);
-  setRowValue(
-    "machineRow",
-    ...(mins > 0
-      ? [mins + __WEBUI_TEXT__("runtime.min_2"), __WEBUI_TEXT__("home.until_ready")]
-      : target > 0
-        ? [target + "°C", __WEBUI_TEXT__("home.brew_temperature")]
-        : laMarzoccoActive
-          ? [
-              "—",
-              lm.accountProblem
-                ? R.accountProblemLabel(lm.accountProblem)
-                : off
-                  ? __WEBUI_TEXT__("home.turn_on_to_brew")
-                  : needsWater
-                    ? __WEBUI_TEXT__("home.refill_tank")
-                    : power.startsWith("ON ")
-                      ? __WEBUI_TEXT__("home.starting_up")
-                      : "",
-            ]
-          : ["", ""]),
-  );
+  const [value, hint] =
+      mins > 0
+        ? [mins + __WEBUI_TEXT__("runtime.min_2"), __WEBUI_TEXT__("home.until_ready")]
+        : target > 0
+          ? [target + "°C", __WEBUI_TEXT__("home.brew_temperature")]
+          : laMarzoccoActive
+            ? [
+                "—",
+                lm.accountProblem
+                  ? R.accountProblemLabel(lm.accountProblem)
+                  : off
+                    ? __WEBUI_TEXT__("home.turn_on_to_brew")
+                    : needsWater
+                      ? __WEBUI_TEXT__("home.refill_tank")
+                      : power.startsWith("ON ")
+                        ? __WEBUI_TEXT__("home.starting_up")
+                        : "",
+              ]
+            : ["", ""],
+    bad = !rdy && (!laMarzoccoActive || off || needsWater);
+  setRowValue("machineRow", value, hint);
   row.classList.toggle("lampWarn", warming);
-  row.classList.toggle("lampBad", !rdy && (!laMarzoccoActive || off || needsWater));
+  row.classList.toggle("lampBad", bad);
+  // Home's machine heading repeats the row's state and its key reading; a
+  // shot in progress is not a fault, so its dot never turns red while brewing.
+  $("machineId").dataset.state = warming
+    ? "warn"
+    : bad && !BREWING_STATES.includes(s.state)
+      ? "bad"
+      : "ok";
+  $("machineIdState").textContent = rs.textContent;
+  $("machineIdDetail").textContent =
+    mins > 0 ? __WEBUI_TEXT__("home.ready_in").replace("%1", mins) : value === "—" ? hint : value;
 }
 export function init() {
   if (ready) return;

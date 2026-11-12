@@ -83,6 +83,12 @@ it, with no Reload button. The Admin page still locks after 15 idle minutes
 there too, and a page opened directly at the controller's own address always
 follows the Reload rule above.
 
+Home opens with the name of the machine this controller runs, its make above
+the model, so with more than one controller you can tell at a glance which one
+you're looking at. Beside it you'll see the machine's state, such as **Ready**
+or **Turned off**, and on a Linea Micra the brew temperature or how long it has
+left to warm up.
+
 Each row in **Equipment** shows the device's icon with a small mark: a green
 check when it's ready, an amber exclamation mark when it needs a look, and a red
 cross when it isn't ready or isn't connected. Beside it, the state is spelled out,
@@ -308,8 +314,8 @@ mode, and Quick rinse off:
 5. Leave the cup on the scale through the drip delay (default 3 s). The final
    weight then updates Last Shot and, if eligible, history.
 
-While brewing, a card at the top of Home follows the shot live — weight
-against the goal, elapsed time, flow, and the first drop. After the stop it
+While brewing, a card just below the machine's name follows the shot live —
+weight against the goal, elapsed time, flow, and the first drop. After the stop it
 keeps the result: the weight, time chips and pills such as **FAST**,
 **ON RECIPE**, **SLOW** or **MAX TIME**, plus **EXTENDED**, **STOPPED EARLY**,
 **CHANNELING** or **NO SCALE** when they apply. A manual stop shows how the shot
