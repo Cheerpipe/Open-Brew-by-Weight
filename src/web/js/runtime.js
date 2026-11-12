@@ -4727,8 +4727,9 @@ function presetGraph(host, m, x = {}) {
         ([t, g]) => `<circle cx="${f(X(t))}" cy="${f(Y(g))}" r="2" fill="var(--mu)" opacity=".6"/>`,
       )
       .join("") +
+    // Past shots were cut on the line, so each sits where it ended, not on the target.
     shown
-      .map((t) => `<circle class="rvArrival" cx="${f(X(t))}" cy="${f(Y(m.goal))}" r="3"/>`)
+      .map((t) => `<circle class="rvArrival" cx="${f(X(t))}" cy="${f(Y(cutLine(t, m)))}" r="3"/>`)
       .join("") +
     // The hatch keeps its inline name only where it fits; the legend names it too.
     (!compact && X(m.prot) - L >= 96
