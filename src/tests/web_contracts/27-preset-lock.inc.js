@@ -14,7 +14,11 @@
       partialHtml.home.indexOf('id="homePresetBlock"'));
   assert.ok(panel.includes('id="presetLockButton"'), 'The lock sits in the Presets legend');
   assert.ok(css.includes('conic-gradient(var(--ac) calc(var(--hold,0)*360deg)'),
-      'A hold fills a ring around the lock icon and the row dot');
+      'A hold fills a ring around the lock icon');
+  assert.ok(css.includes('width:calc(var(--hold,0)*100%);background:var(--pa)') &&
+      codeIncludes(accordion, 'item.style.setProperty("--hold", v);') &&
+      codeIncludes(accordion, 'item.classList.add("held");'),
+  'Holding a row fills it like a progress bar in the selected preset colour');
 
   const timers = new Map();
   let timer = 0;

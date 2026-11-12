@@ -4042,12 +4042,19 @@ function renderHomePresetAccordion() {
       badge.className = "presetAccBadge";
       badge.setAttribute("aria-live", "polite");
       head.append(dot, name, badge);
-      // Locked, holding an inactive preset is how you switch to it.
+      // Locked, holding an inactive preset is how you switch to it: the row
+      // fills like a progress bar, and a finished hold lands without a fade.
       pressAndHold(
         head,
         () => !appSetting("presetUnlocked") && !item.classList.contains("open") && !head.disabled,
-        (v) => head.style.setProperty("--hold", v),
-        () => applyPreset(p.id),
+        (v) => {
+          item.style.setProperty("--hold", v);
+          item.classList.toggle("holding", v > 0);
+        },
+        () => {
+          item.classList.add("held");
+          applyPreset(p.id);
+        },
       );
       const panel = document.createElement("div");
       panel.className = "presetAccPanel";
@@ -4076,7 +4083,7 @@ function renderHomePresetAccordion() {
     }
     const head = item.firstChild;
     item.classList.toggle("open", active);
-    if (!active) item.classList.remove("full");
+    if (!active) item.classList.remove("full", "held");
     item.querySelector(".presetAccToggle").ariaExpanded = item.classList.contains("full");
     head.setAttribute("aria-expanded", active);
     head.disabled = !active && !canSelect;

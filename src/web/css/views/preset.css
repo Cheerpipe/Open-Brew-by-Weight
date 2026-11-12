@@ -573,6 +573,8 @@
 }
 
 .presetAccHead {
+  position: relative;
+  isolation: isolate;
   display: flex;
   width: 100%;
   align-items: center;
@@ -587,7 +589,6 @@
 }
 
 .presetAccDot {
-  position: relative;
   flex: none;
   width: 1.05rem;
   height: 1.05rem;
@@ -630,9 +631,10 @@
   letter-spacing: 0.06em;
 }
 
-/* Preset lock: the legend's toggle, and a ring that fills while a hold runs
-   around its icon or around a row's dot. A locked tap shakes the row and
-   turns its badge into the hint. */
+/* Preset lock: the legend's toggle, with a ring that fills around its icon
+   while a hold runs. Holding a row fills it like a progress bar in the
+   selected preset's colour, warming its border and draining back if released
+   early. A locked tap shakes the row and turns its badge into the hint. */
 .presetLock {
   display: inline-flex;
   align-items: center;
@@ -688,8 +690,7 @@
   transform: translateX(5px) rotate(18deg);
 }
 
-.presetLockIcon::after,
-.presetAccDot::after {
+.presetLockIcon::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -699,8 +700,32 @@
   pointer-events: none;
 }
 
-.presetAccDot::after {
-  inset: -5px;
+.presetAccHead::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  width: calc(var(--hold, 0) * 100%);
+  background: var(--pa);
+  box-shadow: inset -2px 0 0 color-mix(in srgb, var(--ac) 55%, transparent);
+  opacity: min(1, var(--hold, 0) * 30);
+  pointer-events: none;
+  transition:
+    width 0.22s ease-out,
+    opacity 0.22s ease-out;
+}
+
+.presetAccItem.holding {
+  border-color: color-mix(in srgb, var(--ac) calc(var(--hold, 0) * 50%), var(--ln));
+}
+
+/* Each frame of a hold is painted from --hold, so nothing eases behind it,
+   and a finished hold lands on the selected fill without fading in again. */
+.presetAccItem.holding,
+.presetAccItem.held,
+.presetAccItem.holding .presetAccHead::before,
+.presetAccItem.open .presetAccHead::before {
+  transition: none;
 }
 
 .presetAccBadge.lockSay {
@@ -734,7 +759,8 @@
     animation: none;
   }
 
-  .presetLock path {
+  .presetLock path,
+  .presetAccHead::before {
     transition: none;
   }
 }
