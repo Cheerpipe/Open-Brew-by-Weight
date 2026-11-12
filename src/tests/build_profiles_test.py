@@ -220,6 +220,8 @@ for icon, text in (
         ([{"circle": {"cx": 49, "cy": 1, "r": 1}}],
          f"{ICON}[0].circle.cx must be a number from -24 to 48"),
         ([{"circle": {"cx": True, "cy": 1, "r": 1}}], f"{ICON}[0].circle.cx must be a number"),
+        ([{"circle": {"cx": float("nan"), "cy": 1, "r": 1}}], f"{ICON}[0].circle.cx must be a number"),
+        ([{"polygon": {"points": "1,2;3,4"}}], f"{ICON}[0].polygon.points must be SVG path data"),
         ([{"circle": {"cx": "1", "cy": 1, "r": 1}}], f"{ICON}[0].circle.cx must be a number"),
         ([{"path": {"d": "M0 0", "stroke-width": 5}}],
          f"{ICON}[0].path.stroke-width must be a number above 0 and at most 4"),

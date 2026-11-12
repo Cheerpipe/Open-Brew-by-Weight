@@ -736,7 +736,8 @@ def main() -> int:
             if port is not None and (not re.fullmatch(r"[0-9]+", port)
                                      or not 1 <= int(port) <= 65535):
                 raise ValueError("--port must be an integer from 1 to 65535")
-            missing = require(["node"])
+            # The preview renders the canonical pair's resolved profiles.
+            missing = require(["node", "python3"])
             if missing:
                 return record(command, "R1", verbosity,
                               ["missing: " + ", ".join(missing)], 127, "webui-preview")

@@ -457,8 +457,8 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
     const built = await webUi.generate({webUiLanguage: 'EN', profile, write: false});
     const {variant, machine} = profile;
     const markup = [built.html, ...Object.values(built.partials)].join('');
-    const text = [markup, built.js, built.runtimeJs, built.otaImageJs, built.swJs, built.css,
-      ...Object.values(built.modules)].join('\n');
+    const text = [markup, built.js, built.runtimeJs, built.otaImageJs, built.launchJs, built.swJs,
+      built.css, built.manifest, ...Object.values(built.modules)].join('\n');
     if (markup.includes('{{webui-meta:machine-icon}}')) {
       throw new Error(`${variant}: the machine-icon marker must not ship`);
     }
@@ -491,7 +491,9 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
       }
       for (const name of namesOf(other).filter((name) => !own.includes(name))) {
         const haystack = own.some((mine) => mine.includes(name)) ? withoutOwn : text;
-        if (new RegExp(`\\b${name}\\b`).test(haystack)) {
+        // Word-bounded even when a name starts or ends with punctuation.
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`(?<!\\w)${escaped}(?!\\w)`).test(haystack)) {
           throw new Error(`${variant} ships another machine's name: ${name}`);
         }
       }

@@ -55,8 +55,8 @@ run without one. Web tooling resolves real pairs with
 `python3 scripts/resolve_build_profiles.py --print --hardware <id> --machine <id>`,
 which writes no files: the size budgets and the design preview use the
 canonical development pair, the markup lint every compatible pair, and the Web
-contracts name a pair for each check. `./scripts/dev test web` and
-`./scripts/dev test lint` therefore need `python3` as well as `node`.
+contracts name a pair for each check. `./scripts/dev test web`, `test lint`,
+`test budgets`, and `preview` therefore need `python3` as well as `node`.
 
 ## Web UI lint
 

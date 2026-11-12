@@ -175,7 +175,7 @@
     "admin.leave_empty_to_keep_the_saved_password": "Leave empty to keep the saved password. Otherwise 8\u201363 characters.",
     "admin.leave_password_empty": "Leave password empty.",
     "admin.lets_the_processor_slow_down": "Lets the processor slow down and the Bluetooth radio sleep while the machine is not in use. Bluetooth search intensity still follows BLE scan mode; Wi-Fi sleep is set separately.",
-    "admin.lets_the_processor_slow_down_lm": "Settings \u2192 Machine power can also make Bluetooth search harder while the {machine-short} is on and less while it is in standby.",
+    "admin.lets_the_processor_slow_down_lm": "Settings \u2192 Machine power can also speed up the scale search while the {machine-short} is on and slow it down in standby.",
     "admin.lock": "Lock",
     "admin.lock_administration": "Lock administration",
     "admin.log_history_cleared": "Log history cleared.",

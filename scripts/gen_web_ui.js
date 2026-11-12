@@ -380,7 +380,7 @@ async function generate(options = {}) {
   const version = options.versionOverride || readFirmwareVersion();
   // Every Web UI is one build's: its resolved hardware and machine profiles.
   const {profile} = options;
-  if (!MACHINE_TYPE_EXCLUSIONS[profile?.machine_type]) {
+  if (!Object.hasOwn(MACHINE_TYPE_EXCLUSIONS, profile?.machine_type)) {
     throw new Error('generate() requires a resolved build profile (--build-profile)');
   }
   const flags = {remoteControl: options.remoteControl,
