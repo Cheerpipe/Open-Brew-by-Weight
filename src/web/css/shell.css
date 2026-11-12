@@ -1548,14 +1548,20 @@ body.homeAdminActions .view[data-view="home"]:not(.hidden) ~ .pageFooter {
   justify-content: center;
 }
 
+/* Cards sit farther from each other than their content sits from their own
+   edges, so each title reads as part of its card, not of the one above. */
 fieldset,
 #adminControls {
   min-width: 0;
-  margin: 1rem 0;
-  padding: 1rem;
+  margin: 1.5rem 0;
+  padding: 0.5rem 1rem;
   border: 1px solid var(--ln);
   border-radius: var(--r);
   background: var(--sf);
+}
+
+fieldset > :last-child {
+  margin-bottom: 0;
 }
 
 legend {

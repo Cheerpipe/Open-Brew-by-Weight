@@ -646,6 +646,10 @@ label:has(> input[type="checkbox"]) .fieldHint {
   gap: 0.65rem;
   margin: 0.85rem 0 0.75rem;
   padding-inline: 0.25rem;
+}
+
+legend + .scopeNote {
+  margin-top: 0.25rem;
   color: var(--mu);
   font-size: 0.8125rem;
   line-height: 1.35;
