@@ -557,11 +557,19 @@
   border-radius: 0.6rem;
   background: var(--sf);
   overflow: hidden;
-  transition: border-color 0.25s ease-out;
+  transition:
+    border-color 0.25s ease-out,
+    background-color 0.25s ease-out,
+    box-shadow 0.25s ease-out;
 }
 
+/* The selected preset: a warm fill inside a soft 1.5px accent ring. Its name
+   stays in the text colour and its badge is a solid pill, so both read
+   clearly on the fill. */
 .presetAccItem.open {
-  border-color: var(--ac);
+  border-color: color-mix(in srgb, var(--ac) 50%, transparent);
+  background: var(--pa);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--ac) 50%, transparent);
 }
 
 .presetAccHead {
@@ -593,7 +601,7 @@
 
 .presetAccItem.open .presetAccDot {
   border-color: var(--pri);
-  box-shadow: inset 0 0 0 3.5px var(--sf);
+  box-shadow: inset 0 0 0 3.5px var(--pa);
   background: var(--pri);
 }
 
@@ -604,16 +612,22 @@
   min-width: 0;
 }
 
-.presetAccItem.open .presetAccName {
-  color: var(--pri);
-}
-
 .presetAccBadge {
   flex: none;
   margin-left: auto;
   font-size: 0.68rem;
   color: var(--mu);
   text-transform: uppercase;
+}
+
+.presetAccItem.open .presetAccBadge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--pri) 88%, #000);
+  color: var(--on);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 /* Preset lock: the legend's toggle, and a ring that fills while a hold runs
@@ -781,6 +795,10 @@
 
 .presetAccRows .guardRow:first-child {
   border-top: 0;
+}
+
+.presetAccItem.open .guardRow {
+  border-top-color: color-mix(in srgb, var(--ac) 22%, transparent);
 }
 
 .guardName {
