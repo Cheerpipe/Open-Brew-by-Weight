@@ -1214,7 +1214,7 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !css.includes('#historyTable tr{display:grid;grid-template-columns:1.75rem minmax(0,1fr) auto auto;grid-template-areas:"icon type dur del" "icon time dur del"') ||
     !css.includes(':is(#shotTable,#historyTable) tr.histDay{display:block') ||
     !codeIncludes(viewJs.history, 'time.textContent.split(" at ")[0]') ||
-    !codeIncludes(viewJs.history, 'head.className="histDay"') ||
+    !codeIncludes(viewJs.history, 'head.className="histDay histDate"') ||
     !codeIncludes(viewJs.history, 'HISTORY_PAGE_SIZE=20') ||
     codeIncludes(historyRuntimeJs, "'/api/v1/history?offset='") ||
     !codeIncludes(viewJs.history, 'function startHistoryStream(') ||

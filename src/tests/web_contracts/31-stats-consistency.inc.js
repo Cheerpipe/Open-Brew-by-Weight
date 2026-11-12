@@ -254,7 +254,8 @@ if (!codeIncludes(viewJs.stats, 'renderShotSpark(spark,r,m)') ||
     !codeIncludes(viewJs.stats, 'shotMaxFlowGS(r,m)') ||
     !codeIncludes(viewJs.stats, '.starRate`)?.children[star-1]?.focus()') ||
     !codeIncludes(viewJs.stats, 'new ResizeObserver(()=>R.activeView===stats&&layoutChartLabels())') ||
-    !codeIncludes(viewJs.history, 'icon.append(histIcons[r.type].cloneNode(true))') ||
+    !codeIncludes(viewJs.history, 'return histIcons[type].cloneNode(true)') ||
+    !codeIncludes(viewJs.history, 'icon.append(histIcon(r.type))') ||
     codeIncludes(viewJs.history, 'icon.innerHTML=typeSvg')) {
   throw new Error('Stats and History must not rebuild per-row work they can reuse');
 }

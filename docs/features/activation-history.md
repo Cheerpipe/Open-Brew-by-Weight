@@ -57,11 +57,14 @@ connection. From then on the diary keeps refreshing in the background while
 you are on other pages, so History always opens instantly. The list loads
 **20 entries at a time** as you scroll. New or deleted entries refresh the list
 automatically from the first page; scroll to load more again. Sort by date,
-newest or oldest first, from the sort control at the top. Entries are grouped
-under a small heading for each day — "Today", "Yesterday", the weekday name for
+newest or oldest first, from the sort control at the top. Each day gets its
+own card. Its header names the day — "Today", "Yesterday", the weekday name for
 the rest of the week, "2 weeks ago" for older weeks, and a short date like
-"Sep 15" for older entries. Each compact card shows the activation type with
-its time underneath, such as "Today at 08:47", and the duration on the right.
+"Sep 15" for older entries — and counts that day's shots and rinses with the
+same cup and droplet icons. The counts cover the entries the list has loaded
+and match your filter, so a day at the bottom of the list can grow as you
+scroll. Each entry shows the activation type with its time underneath, such
+as "Today at 08:47", and the duration on the right.
 Hovering the time shows the exact date and time. Shots carry a coffee-cup
 icon on the left of the card; the cup is only outlined when the scale had no
 valid weight at the end of the shot. Rinses carry a droplet, and other

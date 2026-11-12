@@ -428,7 +428,7 @@
   color: var(--sf);
 }
 
-.archiveKept .srText {
+:is(.archiveKept, .histTally) .srText {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -664,14 +664,19 @@
   grid-template-areas: "icon type dur del" "icon time dur del";
   column-gap: 0.75rem;
   align-items: center;
-  margin: 0 0 0.5rem;
 }
 
+/* Each day is one card: its header opens it, every row draws the divider
+   below it, and the day's last row closes it. */
 #historyTable tr:not(.histDay) {
   background: var(--sf);
   border: 1px solid var(--ln);
-  border-radius: var(--r);
+  border-top: 0;
   padding: 0.45rem 0.1rem 0.45rem 0.85rem;
+}
+
+#historyTable tr:not(.histDay):is(:has(+ .histDay), :last-child) {
+  border-radius: 0 0 var(--r) var(--r);
 }
 
 /* Day, earlier-history and gap lines in both lists: a plain caption, never a
@@ -689,6 +694,50 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--mu);
+}
+
+#historyTable tr.histDate {
+  margin: 1.5rem 0 0;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--ln);
+  border-radius: var(--r) var(--r) 0 0;
+  background: var(--in);
+}
+
+#historyTable tr.histDay + .histDate {
+  margin-top: 0.5rem;
+}
+
+#historyTable tr.histDate th {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg);
+}
+
+.histTally {
+  display: inline-flex;
+  gap: 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--mu);
+}
+
+.histTally > [aria-hidden] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.histTally svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
 }
 
 #historyTable td.histTime {

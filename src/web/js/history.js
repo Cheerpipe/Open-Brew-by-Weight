@@ -40,6 +40,36 @@ HIST_TYPE_SVG.backflush = '<svg viewBox="0 0 256 256"><use href="#hBF"/></svg>';
 HIST_TYPE_SVG.no_scale_guard_aborted = '<svg class="o"><use href="#hNS"/></svg>';
 // Parsed once per type, then cloned: rows never re-parse kilobytes of path data.
 const histIcons = {};
+const histIcon = (type) => {
+  if (!histIcons[type]) {
+    const t = document.createElement("template");
+    t.innerHTML = HIST_TYPE_SVG[type];
+    histIcons[type] = t.content;
+  }
+  return histIcons[type].cloneNode(true);
+};
+// A day header ends with its shot and rinse counts, drawn with the rows' icons
+// and read aloud as words.
+const dayTally = (n) => {
+  const tally = Object.assign(document.createElement("span"), { className: "histTally" });
+  for (const [type, one, many] of [
+    ["shot", __WEBUI_TEXT__("history.day_shots_one"), __WEBUI_TEXT__("history.day_shots")],
+    ["rinse", __WEBUI_TEXT__("history.day_rinses_one"), __WEBUI_TEXT__("history.day_rinses")],
+  ]) {
+    if (!n[type]) continue;
+    const shown = Object.assign(document.createElement("span"), { ariaHidden: "true" });
+    shown.append(histIcon(type), String(n[type]));
+    const said = n[type] === 1 ? one : R.sub(many, [n[type]]);
+    tally.append(
+      shown,
+      Object.assign(document.createElement("span"), {
+        className: "srText",
+        textContent: ", " + said,
+      }),
+    );
+  }
+  return tally;
+};
 const formatHistoryTime = (r) =>
   r.hasWallTime && r.endedAtLocalSec
     ? R.formatHumanTime(r.endedAtLocalSec)
@@ -86,7 +116,8 @@ function renderHistory() {
     list = merged.list;
   historyArchiveNeed = merged.need;
   if (source && !source.rows.length && !source.done) loadArchive("history", renderHistory);
-  let day;
+  let day, count;
+  const days = [];
   for (const [i, r] of list.entries()) {
     if (archiveHeadings(body, list, i, 5, source || streamArchives.history, true)) day = undefined;
     const time = document.createElement("td");
@@ -95,9 +126,12 @@ function renderHistory() {
     // Entries sharing the label's day part share one header row.
     if (day !== (day = time.textContent.split(__WEBUI_TEXT__("runtime.at"))[0])) {
       const head = body.insertRow();
-      head.className = "histDay";
-      head.append(Object.assign(document.createElement("th"), { colSpan: 5, textContent: day }));
+      head.className = "histDay histDate";
+      const th = Object.assign(document.createElement("th"), { colSpan: 5, textContent: day });
+      head.append(th);
+      days.push([th, (count = {})]);
     }
+    count[r.type] = (count[r.type] || 0) + 1;
     const row = body.insertRow();
     R.wrapTimeEl(time, r);
     const dur = document.createElement("td");
@@ -124,23 +158,18 @@ function renderHistory() {
       btn.onclick = () => entryMenu.open(btn, r);
       del.append(btn);
     }
-    const typeSvg = HIST_TYPE_SVG[r.type];
-    if (typeSvg) {
+    if (HIST_TYPE_SVG[r.type]) {
       const icon = document.createElement("td");
       // A shot without scale weight draws an outlined cup.
       icon.className = r.type === "shot" && r.noWeight ? "histIcon histNoWeight" : "histIcon";
       icon.setAttribute("aria-hidden", "true");
-      if (!histIcons[r.type]) {
-        const t = document.createElement("template");
-        t.innerHTML = typeSvg;
-        histIcons[r.type] = t.content;
-      }
-      icon.append(histIcons[r.type].cloneNode(true));
+      icon.append(histIcon(r.type));
       row.append(icon);
     }
     archiveMark(badge, r);
     row.append(time, dur, type, del);
   }
+  for (const [th, n] of days) th.append(dayTally(n));
   R.lockControls(body);
   archiveListNote("historyArchiveNote", R.uiState.historyData.hasMore);
   R.setEmptyState(
