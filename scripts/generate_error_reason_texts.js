@@ -161,6 +161,9 @@ function loadCatalogCodes() {
     if (/[\x00-\x1f\x7f]/.test(prose) || /[\ud800-\udfff]/.test(prose)) {
       fail(`${catalogPath}: ${key} must be single-line printable text`);
     }
+    // One firmware table serves every machine, so it cannot name one: the
+    // machine markers resolve only in a build's Web UI.
+    if (prose.includes('{machine')) fail(`${catalogPath}: ${key} must not name the machine`);
     const code = key.slice(4).toUpperCase();
     if (codes.has(code)) fail(`${catalogPath}: duplicate reason code ${code}`);
     codes.set(code, prose);

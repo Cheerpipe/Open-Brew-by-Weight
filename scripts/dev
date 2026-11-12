@@ -736,7 +736,8 @@ def main() -> int:
             if port is not None and (not re.fullmatch(r"[0-9]+", port)
                                      or not 1 <= int(port) <= 65535):
                 raise ValueError("--port must be an integer from 1 to 65535")
-            missing = require(["node"])
+            # The preview renders the canonical pair's resolved profiles.
+            missing = require(["node", "python3"])
             if missing:
                 return record(command, "R1", verbosity,
                               ["missing: " + ", ".join(missing)], 127, "webui-preview")
@@ -768,9 +769,11 @@ def main() -> int:
             elif profile in {"web", "budgets"}:
                 deps = [ROOT / "node_modules" / name for name in
                         ["terser", "html-minifier-terser", "clean-css", "lightningcss", "prettier", "@gfx/zopfli"]]
-                if require(["node"]) or any(not dep.exists() for dep in deps):
+                # Every render resolves real build profiles, so python3 is required too.
+                if require(["node", "python3"]) or any(not dep.exists() for dep in deps):
                     return record(command, "R1", verbosity,
-                                  ["Web dependencies missing; run npm ci explicitly"], 127, profile)
+                                  ["Web dependencies missing; needs node, python3, and "
+                                   "npm ci run explicitly"], 127, profile)
                 steps = [WEB_BUDGETS_STEP] if profile == "budgets" else [
                     ("web-format", ["node_modules/.bin/prettier", "--check", "src/web/html",
                                     "src/web/css", "src/web/app.js", "src/web/js"]),
@@ -782,9 +785,10 @@ def main() -> int:
                 # Opt-in Web UI static analysis; the pinned linters come from npm ci.
                 bins = ["node_modules/.bin/eslint", "node_modules/.bin/stylelint"]
                 deps = [ROOT / path for path in [*bins, "node_modules/html-validate"]]
-                if require(["node"]) or any(not dep.exists() for dep in deps):
+                if require(["node", "python3"]) or any(not dep.exists() for dep in deps):
                     return record(command, "R1", verbosity,
-                                  ["Lint dependencies missing; run npm ci explicitly"], 127, "lint")
+                                  ["Lint dependencies missing; needs node, python3, and "
+                                   "npm ci run explicitly"], 127, "lint")
                 steps = [("eslint", [bins[0], "--config", "scripts/lint/eslint.config.mjs",
                                      "--max-warnings", "0", "src/web/app.js", "src/web/js"]),
                          ("stylelint", [bins[1], "--config", "scripts/lint/stylelint.json",

@@ -290,21 +290,63 @@ A machine profile adds these required identity and integration fields:
 | `interface.control` | `momentary` or `paddle`. |
 | `interface.feedback` | `none` or `reed`. Paddle currently permits only `none`. |
 | `factory_defaults` | Defaults appropriate to the selected control topology. |
+| `machine_icon` | The machine's own icon, drawn as a short list of SVG shapes; see [Machine icon](#machine-icon). |
 
-Three more fields may appear:
+Two more fields may appear:
 
 | Field | Contract |
 | --- | --- |
 | `short_model` | The everyday name the Web UI copy uses for the machine, for example `Micra` in **Paddle wakes the Micra**. A profile without it is called by its `model`. `--flags` cannot override it. |
 | `cloud_model` | Required with `la_marzocco_cloud` and rejected with `none`. La Marzocco's model code for the machine: `LINEAMICRA`, `LINEAMINIR`, or `LINEAMINI`. The controller lists only account machines of this model. It selects no other behavior: the firmware reads whichever steam boiler report the machine sends, a level or a temperature. `--flags` cannot override it. |
-| `machine_icon` | Kebab-case name of the machine's own icon in Home's machine heading and Equipment row, and in Diagnostic's La Marzocco group. The glyph catalog is the hidden `data-machine-icons` sprite in `src/web/html/home.html` (`machine-icon-default` is the reserved fallback every profile without the field keeps); the build bakes exactly the named glyph — flat shape elements in a 24×24 viewBox — into each place. |
 
 The brand, model, and integration are not parsed from the file name, ID, or
 display name. Brand and model are compiled separately and shown separately in
 Diagnostic and in Home's machine heading, where the build bakes them into the
 Web UI. An unknown integration fails profile resolution; adding one
-requires its own isolated implementation and build registration. A
-`machine_icon` that names no glyph in the Web UI catalog fails the build.
+requires its own isolated implementation and build registration.
+
+### Machine icon
+
+The Web UI shows the machine's own icon in Home's machine heading and
+Equipment row, and in Diagnostic's La Marzocco group. The profile holds the
+icon itself: an ordered list of 1 to 16 flat SVG shapes drawn in a 24×24 box,
+each an object whose one key is the element name and whose value holds its
+attributes. Each build ships only its own machine's icon. The Web UI strokes
+the shapes in the text color with no fill, so a profile gives the geometry and
+only the stroke details a shape needs. The Linea Micra's icon:
+
+```json
+"machine_icon": [
+  { "path": { "d": "M4 2.5h16a1 1 0 0 1 1 1v5l-1.6 1.6-1.2 5.9H5.8l-1.2-5.9L3 8.5v-5a1 1 0 0 1 1-1ZM10.5 5.5h3M12 9.5v2.5M5.5 18h13" } },
+  { "circle": { "cx": 6.5, "cy": 5.5, "r": 1.3 } },
+  { "circle": { "cx": 17.5, "cy": 5.5, "r": 1.3 } },
+  { "rect": { "x": 3, "y": 16, "width": 18, "height": 5, "rx": 1 } }
+]
+```
+
+| Element | Required attributes | Also accepted |
+| --- | --- | --- |
+| `path` | `d` | |
+| `circle` | `cx`, `cy`, `r` | |
+| `ellipse` | `cx`, `cy`, `rx`, `ry` | |
+| `rect` | `x`, `y`, `width`, `height` | `rx`, `ry` |
+| `line` | `x1`, `y1`, `x2`, `y2` | |
+| `polyline`, `polygon` | `points` | |
+
+Every element also accepts `stroke-width` (a number above 0, at most 4),
+`stroke-linecap` (`butt`, `round`, or `square`), `stroke-linejoin` (`miter`,
+`round`, or `bevel`), and `fill` (`none` or `currentColor`). Coordinates and
+sizes are JSON numbers from −24 to 48, and `r`, `rx`, `ry`, `width`, and
+`height` must be above 0. `d` and `points` hold SVG path data of at most 1024
+characters: path command letters, digits, signs, exponents, spaces, commas, and
+periods. The whole icon must stay within 2048 bytes of markup, because every
+build carries it in each place that shows it.
+
+Anything else fails profile resolution with the exact spot, for example
+`machine.machine_icon[2].circle.r`: an unknown element or attribute, an object
+with more or fewer than one key, an empty or longer list, or an icon that is
+too large. Older profiles named an icon instead (`"machine_icon":
+"linea-micra"`); that form now fails and points here.
 
 ### Momentary machines
 
@@ -492,7 +534,9 @@ build-idf/<hardware-id>--<machine-id>/
 Its `generated/` directory contains:
 
 - `build-profile.json`: the fully resolved hardware and machine data after
-  supported overrides;
+  supported overrides, plus the derived `machine_integration` and
+  `machine_type`; the Web UI generator reads it for everything the Web UI shows
+  about the machine (type, integration, icon, brand, model, and everyday name);
 - `OpenBrewByWeightBuildProfileGenerated.h`: compile-time macros consumed by the
   firmware, including `OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER` from `speaker.present`;
 - `OpenBrewByWeightVersion.h` and `.cpp`: architecture and profile compatibility
@@ -523,19 +567,23 @@ a physical board, pinout, relay circuit, or coffee machine.
 3. Record brand and model separately for a machine. Use an `unqualified`
    integration revision until the exact circuit and machine revision pass the
    manual acceptance plan.
-4. Increment `compatibility_revision` whenever the same ID changes in a way
+4. Draw the machine's `machine_icon` (see [Machine icon](#machine-icon)). A
+   new machine needs no Web UI change: its build takes the icon and names from
+   the profile.
+5. Increment `compatibility_revision` whenever the same ID changes in a way
    that must block cross-installation OTA. Use a new ID when it represents a
    different assembled controller or machine integration.
-5. Run the profile contract test and an exact named build:
+6. Run the profile contract test, the Web UI checks, and an exact named build:
 
    ```sh
    ./scripts/dev test tooling
+   ./scripts/dev test web
    ./scripts/dev build \
      --hardware <hardware-id> \
      --machine <machine-id>
    ```
 
-6. Classify the complete change and run the required validation gate. Hardware
+7. Classify the complete change and run the required validation gate. Hardware
    qualification, flashing, relay operation, and HIL require separate explicit
    authorization and evidence.
 

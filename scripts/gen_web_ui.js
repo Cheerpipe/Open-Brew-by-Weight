@@ -11,7 +11,7 @@ const {minify: htmlMinify} = require('html-minifier-terser');
 const CleanCSS = require('clean-css');
 const {transform: cssTransform} = require('lightningcss');
 const zopfli = require('@gfx/zopfli');
-const {renderSources, CSS_SOURCES} = require('./localize_web_ui.js');
+const {renderSources, readJson, CSS_SOURCES} = require('./localize_web_ui.js');
 
 const repoRoot = path.resolve(__dirname, '..');
 const jsDir = path.join(repoRoot, 'src', 'web', 'js');
@@ -88,14 +88,14 @@ const MACHINE_TYPE_EXCLUSIONS = {
   momentary: ['paddleOnly', 'reedOnly'],
   momentary_reed: ['paddleOnly', 'switchOnly'],
 };
-// Builds without the Linea Micra cloud integration drop its markup and CSS;
+// Builds without the La Marzocco cloud integration drop its markup and CSS;
 // the JS that drives it folds away with __LA_MARZOCCO__.
 const LA_MARZOCCO_EXCLUSIONS = ['laMarzoccoOnly', 'laMarzoccoTempOpt'];
 
-// Classes whose markup and CSS a build strips, for its options.
-function excludedClasses(options) {
-  return [...(MACHINE_TYPE_EXCLUSIONS[options.machineType] || []),
-    ...(options.laMarzocco === false ? LA_MARZOCCO_EXCLUSIONS : [])];
+// Classes whose markup and CSS a build strips, for its machine profile.
+function excludedClasses(profile) {
+  return [...MACHINE_TYPE_EXCLUSIONS[profile.machine_type],
+    ...(profile.machine_integration === 'la_marzocco_cloud' ? [] : LA_MARZOCCO_EXCLUSIONS)];
 }
 
 function stripClassMarkup(html, excluded) {
@@ -215,7 +215,7 @@ function minifyCss(css) {
 
 // Build-profile flags are compile-time constants: Terser folds the guarded
 // branches away, so a build ships no code for features it was compiled
-// without (remote machine control, the Linea Micra cloud integration).
+// without (remote machine control, the La Marzocco cloud integration).
 async function minifyJs(js, flags = {}) {
   const result = await terserMinify(js, {
     module: true,
@@ -378,13 +378,13 @@ async function generate(options = {}) {
   const icon192Raw = fs.readFileSync(icon192Path);
   const icon48Raw = fs.readFileSync(icon48Path);
   const version = options.versionOverride || readFirmwareVersion();
-  if (options.machineType && options.machineType !== 'all' &&
-      !MACHINE_TYPE_EXCLUSIONS[options.machineType]) {
-    throw new Error(`Unknown --machine-type: ${options.machineType}`);
+  // Every Web UI is one build's: its resolved hardware and machine profiles.
+  const {profile} = options;
+  if (!Object.hasOwn(MACHINE_TYPE_EXCLUSIONS, profile?.machine_type)) {
+    throw new Error('generate() requires a resolved build profile (--build-profile)');
   }
-  if (options.machineIcon !== undefined && !options.machineIcon) {
-    throw new Error('--machine-icon requires a value');
-  }
+  const flags = {remoteControl: options.remoteControl,
+    laMarzocco: profile.machine_integration === 'la_marzocco_cloud'};
 
   let shellHtmlRaw = source;
   const partialsRaw = {};
@@ -420,10 +420,7 @@ async function generate(options = {}) {
       type: 'js', content: viewJsRaw[name]})),
     {file: 'app.css', type: 'css', content: cssSource},
   ], {language: webUiLanguage, localesDir: options.localesDir,
-    developmentMode: options.developmentMode === true,
-    machineType: options.machineType, machineIcon: options.machineIcon,
-    machineModel: options.machineModel, machineShortModel: options.machineShortModel,
-    machineBrand: options.machineBrand});
+    developmentMode: options.developmentMode === true, profile});
   let at = 0;
   shellHtmlRaw = localized.sources[at++].content;
   for (const name of VIEW_NAMES) partialsRaw[name] = localized.sources[at++].content;
@@ -433,9 +430,9 @@ async function generate(options = {}) {
   const localizedSw = localized.sources[at++].content;
   for (const name of JS_FILES) viewJsRaw[name] = localized.sources[at++].content;
   const localizedCss = localized.sources[at].content;
-  const excluded = excludedClasses(options);
-  // The shell may carry build-gated markup too (the header's Micra cloud
-  // indicator); typed builds strip it exactly like the view partials.
+  const excluded = excludedClasses(profile);
+  // The shell may carry build-gated markup too (the header's La Marzocco
+  // cloud indicator); typed builds strip it exactly like the view partials.
   shellHtmlRaw = stripClassMarkup(shellHtmlRaw, excluded);
   for (const name of VIEW_NAMES) {
     partialsRaw[name] = stripClassMarkup(partialsRaw[name], excluded);
@@ -454,11 +451,11 @@ async function generate(options = {}) {
     shellHtml: injectHomePartial(await minifyHtml(shellHtmlRaw
         .split('{{webui-meta:development-class}}')
         .join(options.developmentMode === true ? 'devBuild' : '')), partials.home),
-    appJs: await minifyJs(inlineHomeModule(localizedAppJs, viewJsRaw.home), options),
-    runtimeJs: await minifyJs(localizedRuntime, options),
-    otaImageJs: await minifyJs(localizedOtaImage, options),
+    appJs: await minifyJs(inlineHomeModule(localizedAppJs, viewJsRaw.home), flags),
+    runtimeJs: await minifyJs(localizedRuntime, flags),
+    otaImageJs: await minifyJs(localizedOtaImage, flags),
     // The launch gate carries no strings, so it skips localization.
-    launchJs: await minifyJs(fs.readFileSync(launchJsPath, 'utf8'), options),
+    launchJs: await minifyJs(fs.readFileSync(launchJsPath, 'utf8'), flags),
     css: minifyCss(stripClassCss(options.remoteControl === false
         ? stripRemoteControlCss(localizedCss) : localizedCss, excluded)),
     manifest: JSON.stringify(manifestObject),
@@ -466,11 +463,11 @@ async function generate(options = {}) {
     swJs: await minifyJs(localizedSw
         .split('__SHELL_PATHS__').join(JSON.stringify(SHELL_PATHS))
         .split('__SW_ASSETS__').join(
-            JSON.stringify(ASSET_PATHS.filter((p) => !p.endsWith('*') && p !== '/sw.js'))), options),
+            JSON.stringify(ASSET_PATHS.filter((p) => !p.endsWith('*') && p !== '/sw.js'))), flags),
   };
   const modules = {};
   for (const [file, views] of Object.entries(VIEW_MODULES)) {
-    modules[file] = await minifyJs(buildViewModule(file, views, viewJsRaw, partials), options);
+    modules[file] = await minifyJs(buildViewModule(file, views, viewJsRaw, partials), flags);
   }
 
   // The tag fingerprints the exact bytes served (with the placeholder still
@@ -697,13 +694,8 @@ if (require.main === module) {
   Promise.resolve().then(() => {
     let webUiLanguage;
     let developmentMode;
-    let machineType;
     let remoteControl;
-    let laMarzocco;
-    let machineIcon;
-    let machineModel;
-    let machineShortModel;
-    let machineBrand;
+    let profile;
     let versionOverride;
     let output;
     for (let i = 2; i < process.argv.length; i++) {
@@ -715,25 +707,11 @@ if (require.main === module) {
         webUiLanguage = arg.slice('--webui-language='.length);
       } else if (arg === '--no-remote-control') {
         remoteControl = false;
-      } else if (arg === '--no-la-marzocco') {
-        laMarzocco = false;
-      } else if (arg === '--machine-icon') {
-        if (++i >= process.argv.length) throw new Error('--machine-icon requires a value');
-        machineIcon = process.argv[i];
-      } else if (arg.startsWith('--machine-icon=')) {
-        machineIcon = arg.slice('--machine-icon='.length);
-      } else if (['--machine-model', '--machine-short-model', '--machine-brand'].includes(arg)) {
-        if (++i >= process.argv.length) throw new Error(`${arg} requires a value`);
-        if (arg === '--machine-model') machineModel = process.argv[i];
-        else if (arg === '--machine-brand') machineBrand = process.argv[i];
-        else machineShortModel = process.argv[i];
+      } else if (arg === '--build-profile') {
+        if (++i >= process.argv.length) throw new Error('--build-profile requires a value');
+        profile = readJson(process.argv[i]);
       } else if (arg === '--development') {
         developmentMode = true;
-      } else if (arg === '--machine-type') {
-        if (++i >= process.argv.length) throw new Error('--machine-type requires a value');
-        machineType = process.argv[i];
-      } else if (arg.startsWith('--machine-type=')) {
-        machineType = process.argv[i].slice('--machine-type='.length);
       } else if (arg === '--version') {
         if (++i >= process.argv.length) throw new Error('--version requires a value');
         versionOverride = process.argv[i];
@@ -746,8 +724,8 @@ if (require.main === module) {
         throw new Error(`Unknown argument: ${arg}`);
       }
     }
-    return generate({webUiLanguage, developmentMode, machineType, remoteControl,
-      laMarzocco, machineIcon, machineModel, machineShortModel, machineBrand, versionOverride,
+    if (!profile) throw new Error('--build-profile is required');
+    return generate({webUiLanguage, developmentMode, remoteControl, profile, versionOverride,
       output});
   })
       .then((result) => {

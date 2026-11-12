@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const {execFileSync} = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 const defaultLocalesDir = path.join(repoRoot, 'src', 'web', 'locales');
@@ -12,8 +13,6 @@ const HTML_MARKER_RE = /\{\{webui:([a-z0-9_.]+)\}\}/g;
 const META_MARKER_RE =
     /\{\{webui-meta:(locale|direction-attribute|development-class|machine-type-class)\}\}/g;
 const MACHINE_ICON_MARKER = '{{webui-meta:machine-icon}}';
-const MACHINE_ICON_SPRITE_RE = /<svg\b[^>]*\bdata-machine-icons\b[^>]*>([\s\S]*?)<\/svg\s*>/;
-const MACHINE_ICON_SYMBOL_RE = /<symbol\b[^>]*\bid="machine-icon-([a-z0-9-]+)"[^>]*>([\s\S]*?)<\/symbol\s*>/g;
 const JS_MARKER_RE = /__WEBUI_TEXT__\(\s*"([a-z0-9_.]+)"\s*,?\s*\)/g;
 const CSS_MARKER_RE = /"\{\{webui:([a-z0-9_.]+)\}\}"/g;
 
@@ -107,14 +106,44 @@ function loadCatalog(language, options = {}) {
     catalog: catalogs.get(resolvedLanguage), referenceKeys};
 }
 
+// Every render is for one build: the resolved hardware and machine profiles
+// that scripts/resolve_build_profiles.py writes to build-profile.json.
+function requireProfile(profile) {
+  if (!profile || typeof profile.machine_type !== 'string' || !profile.machine ||
+      !Array.isArray(profile.machine.machine_icon)) {
+    fail('a resolved build profile (scripts/resolve_build_profiles.py) is required');
+  }
+  return profile;
+}
+
+// Web UI tooling renders real pairs: the resolver's --print output, once per
+// pair and process.
+const resolvedProfiles = new Map();
+function resolvedProfile(hardware, machine) {
+  if (!hardware || !machine) fail('resolvedProfile needs a hardware and a machine profile');
+  const key = `${hardware}--${machine}`;
+  if (!resolvedProfiles.has(key)) {
+    resolvedProfiles.set(key, JSON.parse(execFileSync('python3', [
+      path.join(repoRoot, 'scripts', 'resolve_build_profiles.py'), '--print',
+      '--hardware', hardware, '--machine', machine], {encoding: 'utf8'})));
+  }
+  return resolvedProfiles.get(key);
+}
+
+// Every buildable pair: each machine profile with each hardware it lists.
+function compatiblePairs() {
+  const dir = path.join(repoRoot, 'config', 'machines');
+  return fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort().flatMap((name) =>
+    readJson(path.join(dir, name)).hardware.map((hardware) => [hardware, path.basename(name, '.json')]));
+}
+
 // Copy names the machine a build is for: {machine} is the machine profile's
-// model, {machine-short} its everyday name and {machine-brand} its maker.
-// Without a profile (tests, lint, the design preview) all read as the
-// reference machine.
-function nameMachine(text, options) {
-  return text.replaceAll('{machine}', options.machineModel || 'Linea Micra')
-      .replaceAll('{machine-short}', options.machineShortModel || 'Micra')
-      .replaceAll('{machine-brand}', options.machineBrand || 'La Marzocco');
+// model, {machine-short} its everyday name (the model when it gives none) and
+// {machine-brand} its maker.
+function nameMachine(text, {machine}) {
+  return text.replaceAll('{machine}', machine.model)
+      .replaceAll('{machine-short}', machine.short_model || machine.model)
+      .replaceAll('{machine-brand}', machine.brand);
 }
 
 function htmlEscape(value) {
@@ -154,60 +183,20 @@ function assertHtmlContext(source, marker, offset, meta) {
   }
 }
 
-// One glyph per machine ships: home.html carries the catalog (one hidden
-// <symbol id="machine-icon-<id>"> per machine) next to the marker that shows
-// it, the render's machineIcon option selects the glyph (default: the generic
-// machine), and every html source in the render may place the marker (Home's
-// machine heading and Equipment row, Diagnostics' machine group). Glyphs are flat shape elements
-// authored in a 24x24 viewBox. Returns undefined when the render has neither.
-function machineIconGlyph(sources, options) {
-  const html = sources.filter((source) => source.type === 'html');
-  const catalogs = html.flatMap((source) =>
-    (source.content.match(new RegExp(MACHINE_ICON_SPRITE_RE.source, 'g')) || [])
-        .map(() => source));
-  if (catalogs.length > 1) {
-    fail(`${catalogs[1].file}: at most one data-machine-icons sprite is allowed`);
-  }
-  const [catalog] = catalogs;
-  if (!catalog) {
-    const marked = html.find((source) => source.content.includes(MACHINE_ICON_MARKER));
-    if (marked) {
-      fail(`${marked.file}: ${MACHINE_ICON_MARKER} requires the data-machine-icons catalog sprite`);
-    }
-    return undefined;
-  }
-  const {file, content} = catalog;
-  if (!content.includes(MACHINE_ICON_MARKER)) {
-    fail(`${file}: the machine-icons catalog sprite requires ${MACHINE_ICON_MARKER}`);
-  }
-  const sprite = content.match(MACHINE_ICON_SPRITE_RE);
-  // The sprite capture ends at the first </svg>, so a nested <svg> inside a
-  // glyph would truncate the catalog and ship stray markup after the strip.
-  if (/<svg[\s>]/i.test(sprite[1])) {
-    fail(`${file}: machine icon glyphs must be flat shape elements without a nested svg`);
-  }
-  const symbols = [...sprite[1].matchAll(MACHINE_ICON_SYMBOL_RE)];
-  const ids = symbols.map((match) => match[1]);
-  if (new Set(ids).size !== ids.length) {
-    fail(`${file}: duplicate machine-icon-* symbol ids in the catalog sprite`);
-  }
-  const id = options.machineIcon || 'default';
-  const glyph = symbols.find((match) => match[1] === id);
-  if (!glyph) fail(`${file}: no machine-icon-${id} glyph in the catalog sprite`);
-  return glyph[2].trim();
-}
-
-function bakeMachineIcon(source, glyph) {
-  if (glyph === undefined) return source;
-  return source.replace(MACHINE_ICON_SPRITE_RE, '').split(MACHINE_ICON_MARKER).join(glyph);
+// The machine profile's glyph: flat SVG shape elements, one single-key object
+// each, that the resolver validated. Escaping keeps even a hand-built profile
+// from injecting markup.
+function machineGlyph({machine}) {
+  return machine.machine_icon.map((element) => Object.entries(element).map(([tag, attributes]) =>
+    `<${htmlEscape(tag)}${Object.entries(attributes).map(([name, value]) =>
+      ` ${htmlEscape(name)}="${htmlEscape(String(value))}"`).join('')}/>`).join('')).join('');
 }
 
 function renderHtml(source, file, state) {
-  // The machine profile's own icon bakes in before marker rendering: the
-  // glyph catalog travels in home.html's hidden data-machine-icons sprite, a
-  // build's machineIcon option selects the glyph, and the scaffolding (sprite
-  // and markers) never survives a render.
-  let rendered = bakeMachineIcon(source, state.machineGlyph);
+  // The machine profile's own glyph bakes in before marker rendering, into
+  // every place that shows it (Home's machine heading and Equipment row,
+  // Diagnostics' machine group).
+  let rendered = source.split(MACHINE_ICON_MARKER).join(state.machineGlyph);
   rendered = rendered.replace(HTML_MARKER_RE, (marker, key, offset) => {
     assertHtmlContext(rendered, marker, offset, false);
     return htmlEscape(useString(file, key, state));
@@ -233,7 +222,7 @@ function renderHtml(source, file, state) {
       if (!inTag) fail(`${file}: ${marker} must be inside the html start tag`);
       const classByType = {paddle: 'paddleBuild', momentary: 'momentaryBuild',
         momentary_reed: 'momentaryBuild reedBuild'};
-      return classByType[state.options.machineType] || '';
+      return classByType[state.profile.machine_type];
     }
     assertHtmlContext(rendered, marker, offset, true);
     return htmlEscape(state.catalog.locale);
@@ -246,7 +235,7 @@ function useString(file, key, state) {
     fail(`${file}: missing key ${key} in ${state.catalog.locale}`);
   }
   state.used.add(key);
-  return nameMachine(state.catalog.strings[key], state.options);
+  return nameMachine(state.catalog.strings[key], state.profile);
 }
 
 function renderJavaScript(source, file, state) {
@@ -269,9 +258,10 @@ function assertNoMarkers(source, file) {
 }
 
 function renderSources(sources, options = {}) {
+  const profile = requireProfile(options.profile);
   const loaded = loadCatalog(options.language || process.env.OPENBREWBYWEIGHT_WEBUI_LANGUAGE || 'en', options);
-  const state = {catalog: loaded.catalog, used: new Set(), options,
-    machineGlyph: machineIconGlyph(sources, options)};
+  const state = {catalog: loaded.catalog, used: new Set(), options, profile,
+    machineGlyph: machineGlyph(profile)};
   const rendered = sources.map((source) => {
     let content;
     if (source.type === 'html') content = renderHtml(source.content, source.file, state);
@@ -324,22 +314,24 @@ function projectSources() {
 
 function parseCli(argv) {
   let language;
+  let profile;
   let check = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--check') check = true;
-    else if (arg === '--webui-language') {
-      if (++i >= argv.length) fail('--webui-language requires a value');
-      language = argv[i];
+    else if (arg === '--webui-language' || arg === '--build-profile') {
+      if (++i >= argv.length) fail(`${arg} requires a value`);
+      if (arg === '--build-profile') profile = readJson(argv[i]);
+      else language = argv[i];
     } else if (arg.startsWith('--webui-language=')) language = arg.slice(17);
     else fail(`unknown argument ${JSON.stringify(arg)}`);
   }
   if (!check) fail('only --check mode is supported');
-  return {language: language || process.env.OPENBREWBYWEIGHT_WEBUI_LANGUAGE || 'en'};
+  return {profile, language: language || process.env.OPENBREWBYWEIGHT_WEBUI_LANGUAGE || 'en'};
 }
 
 module.exports = {normalizeLanguageCode, loadCatalog, jsLiteral, cssLiteral, renderSources,
-  projectSources, CSS_SOURCES};
+  projectSources, resolvedProfile, compatiblePairs, readJson, CSS_SOURCES};
 
 if (require.main === module) {
   try {

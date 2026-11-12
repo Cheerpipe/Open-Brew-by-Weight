@@ -19,6 +19,20 @@ PULLS = {"none", "up", "down"}
 TARGETS = {("esp32s3", "n16r8"): "n16r8"}
 # Memory profiles whose octal PSRAM supports the MSPI hardware ECC.
 PSRAM_ECC_CAPABLE = {"n16r8"}
+# The firmware's OPEN_BREW_BY_WEIGHT_MACHINE_TYPE value is the index.
+MACHINE_TYPES = ("paddle", "momentary", "momentary_reed")
+# machine_icon: flat SVG shape elements in a 24x24 box, each with its
+# geometry; the Web UI's own CSS strokes them.
+ICON_ELEMENTS = {"path": {"d"}, "circle": {"cx", "cy", "r"},
+                 "ellipse": {"cx", "cy", "rx", "ry"},
+                 "rect": {"x", "y", "width", "height"},
+                 "line": {"x1", "y1", "x2", "y2"},
+                 "polyline": {"points"}, "polygon": {"points"}}
+ICON_STYLES = {"stroke-linecap": {"butt", "round", "square"},
+               "stroke-linejoin": {"miter", "round", "bevel"},
+               "fill": {"none", "currentColor"}}
+ICON_POSITIVE = {"r", "rx", "ry", "width", "height"}
+ICON_PATH_RE = re.compile(r"[MmLlHhVvCcSsQqTtAaZz0-9eE .,+-]+\Z")
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -76,6 +90,44 @@ def profile_text(value: Any, where: str, *, identifier: bool = False) -> str:
     elif any(ord(c) < 32 or c in {'"', '\\'} for c in value):
         fail(f"{where} contains unsupported characters")
     return value
+
+
+def machine_icon(value: Any, where: str) -> None:
+    if isinstance(value, str):
+        fail(f"{where} now holds the glyph itself, a list of SVG shape elements, "
+             "instead of a glyph name; see docs/BUILD_PROFILES.md")
+    if not isinstance(value, list) or not 1 <= len(value) <= 16:
+        fail(f"{where} must be a list of 1 to 16 SVG shape elements")
+    markup = 0
+    for index, element in enumerate(value):
+        at = f"{where}[{index}]"
+        if not isinstance(element, dict) or len(element) != 1:
+            fail(f"{at} must be an object with exactly one element name")
+        (tag, attributes), = element.items()
+        choice(tag, set(ICON_ELEMENTS), f"{at} element")
+        at = f"{at}.{tag}"
+        exact(attributes, ICON_ELEMENTS[tag], at, {"stroke-width", *ICON_STYLES} |
+              ({"rx", "ry"} if tag == "rect" else set()))
+        for name, attribute in attributes.items():
+            spot = f"{at}.{name}"
+            if name in {"d", "points"}:
+                if not isinstance(attribute, str) or len(attribute) > 1024 or \
+                        not ICON_PATH_RE.fullmatch(attribute):
+                    fail(f"{spot} must be SVG path data of at most 1024 characters")
+            elif name in ICON_STYLES:
+                choice(attribute, ICON_STYLES[name], spot)
+            else:
+                high = 4 if name == "stroke-width" else 48
+                low = 0 if name == "stroke-width" or name in ICON_POSITIVE else -24
+                if isinstance(attribute, bool) or not isinstance(attribute, (int, float)) or \
+                        not low <= attribute <= high or (low == 0 and attribute == 0):
+                    fail(f"{spot} must be a number " + (f"above 0 and at most {high}" if low == 0
+                                                         else f"from {low} to {high}"))
+            markup += len(f' {name}=""{attribute}')
+        markup += len(f"<{tag}/>")
+    # Every build bakes the glyph into each place that shows it.
+    if markup > 2048:
+        fail(f"{where} is {markup} bytes of SVG markup; the limit is 2048")
 
 
 def gpio(value: Any, where: str) -> int:
@@ -263,14 +315,10 @@ def validate_machine(obj: dict[str, Any]) -> dict[str, Any]:
     where = "machine"
     exact(obj, {"schema_version", "id", "display_name", "compatibility_revision",
                 "hardware", "brand", "model", "integration_revision", "integration",
-                "interface", "factory_defaults"}, where,
-          optional={"machine_icon", "short_model", "cloud_model"})
+                "interface", "factory_defaults", "machine_icon"}, where,
+          optional={"short_model", "cloud_model"})
     common_profile(obj, where)
-    if "machine_icon" in obj:
-        # Names a glyph in src/web/html/home.html's data-machine-icons
-        # sprite; absent means the default generic machine icon, so existing
-        # profiles stay valid unchanged.
-        profile_text(obj["machine_icon"], "machine.machine_icon", identifier=True)
+    machine_icon(obj["machine_icon"], "machine.machine_icon")
     profile_text(obj["brand"], "machine.brand")
     profile_text(obj["model"], "machine.model")
     # The everyday name Web UI copy uses for the machine ("the Micra"); a
@@ -400,9 +448,7 @@ def apply_overrides(hardware: dict[str, Any], machine: dict[str, Any],
                  "OPEN_BREW_BY_WEIGHT_MACHINE_PROFILE_ID",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_COMPATIBILITY_REVISION",
                  "OPEN_BREW_BY_WEIGHT_MACHINE_BRAND", "OPEN_BREW_BY_WEIGHT_MACHINE_MODEL",
-                 "OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL",
-                 "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON",
-                 "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_SHORT_MODEL"}
+                 "OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL"}
     selected = sorted(forbidden & definitions.keys())
     if selected:
         fail(f"profile identity cannot be overridden with --flags: {', '.join(selected)}")
@@ -541,11 +587,11 @@ def resolve(hardware: dict[str, Any], machine: dict[str, Any], flags: str) -> di
         fail("machine requires reed feedback but the hardware profile declares reed absent")
     if definitions.get("OPEN_BREW_BY_WEIGHT_DEVELOPMENT") not in (None, "0", "1"):
         fail("OPEN_BREW_BY_WEIGHT_DEVELOPMENT must be 0 or 1")
+    interface = machine["interface"]
+    machine_type = "momentary_reed" if interface["feedback"] == "reed" else interface["control"]
     if "OPEN_BREW_BY_WEIGHT_MACHINE_TYPE" in definitions:
-        expected = {("paddle", "none"): "0", ("momentary", "none"): "1",
-                    ("momentary", "reed"): "2"}[(machine["interface"]["control"],
-                                                   machine["interface"]["feedback"])]
-        if definitions["OPEN_BREW_BY_WEIGHT_MACHINE_TYPE"] != expected:
+        if definitions["OPEN_BREW_BY_WEIGHT_MACHINE_TYPE"] != \
+                str(MACHINE_TYPES.index(machine_type)):
             fail("OPEN_BREW_BY_WEIGHT_MACHINE_TYPE override conflicts with the machine profile")
     if definitions.get("OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER") == "1" and not hardware["speaker"]["present"]:
         fail("buzzer support cannot be enabled when the hardware speaker is absent")
@@ -554,6 +600,7 @@ def resolve(hardware: dict[str, Any], machine: dict[str, Any], flags: str) -> di
         "variant": f"{hardware['id']}--{machine['id']}",
         "arch": TARGETS[(hardware["target"]["chip"], hardware["target"]["memory_profile"])],
         "machine_integration": machine["integration"],
+        "machine_type": machine_type,
         "hardware": hardware,
         "machine": machine,
     }
@@ -577,12 +624,6 @@ def header_for(resolved: dict[str, Any]) -> str:
            {"none": 0, "la_marzocco_cloud": 1}[resolved["machine_integration"]])
     if "cloud_model" in machine:
         define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL", machine["cloud_model"])
-    # Web UI metadata, consumed by the build's gen_web_ui.js step; the firmware
-    # itself never reads it.
-    if "machine_icon" in machine:
-        define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON", machine["machine_icon"])
-    define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_SHORT_MODEL",
-           machine.get("short_model", machine["model"]))
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_GPIO", hardware["activator"]["gpio"])
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_ACTIVE_LEVEL", LEVELS[hardware["activator"]["active_level"]])
     define(lines, "OPEN_BREW_BY_WEIGHT_ACTIVATOR_DEBOUNCE_MS", hardware["activator"]["debounce_ms"])
@@ -624,9 +665,7 @@ def header_for(resolved: dict[str, Any]) -> str:
                LEVELS[safety["feedback_closed_level"]])
         define(lines, "OPEN_BREW_BY_WEIGHT_SAFETY_HEARTBEAT_TOGGLE_MS", safety["heartbeat_period_ms"])
         define(lines, "OPEN_BREW_BY_WEIGHT_CIRCUIT_FEEDBACK_SETTLE_MS", safety["feedback_settle_ms"])
-    machine_type = {("paddle", "none"): 0, ("momentary", "none"): 1,
-                    ("momentary", "reed"): 2}[(machine["interface"]["control"],
-                                                machine["interface"]["feedback"])]
+    machine_type = MACHINE_TYPES.index(resolved["machine_type"])
     define(lines, "OPEN_BREW_BY_WEIGHT_MACHINE_TYPE", machine_type)
     define(lines, "OPEN_BREW_BY_WEIGHT_DEFAULT_OPERATIONAL_WALL_MS", defaults["operational_wall_ms"])
     define(lines, "OPEN_BREW_BY_WEIGHT_DEFAULT_RINSE_ENABLED", defaults["quick_rinse"]["enabled"])
@@ -665,26 +704,34 @@ def main() -> int:
     parser.add_argument("--flags", default="")
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--check-only", action="store_true")
+    # Writes the resolved profile to stdout and no files (Web UI tooling).
+    parser.add_argument("--print", action="store_true")
     args = parser.parse_args()
     try:
         if args.list:
-            if args.hardware or args.machine or args.output_root or args.check_only:
+            if (args.hardware or args.machine or args.output_root or args.check_only or
+                    args.print):
                 fail("--list cannot be combined with profile or output options")
             list_profiles()
             return 0
-        if not args.hardware or not args.machine or not args.output_root:
-            fail("--hardware, --machine, and --output-root are required")
+        if args.print and (args.output_root or args.check_only):
+            fail("--print cannot be combined with --output-root or --check-only")
+        if not args.hardware or not args.machine or not (args.output_root or args.print):
+            fail("--hardware, --machine, and --output-root (or --print) are required")
         _, hardware = selected_profile("hardware", args.hardware)
         _, machine = selected_profile("machines", args.machine)
         resolved = resolve(hardware, machine, args.flags)
+        manifest = json.dumps(resolved, indent=2, ensure_ascii=False) + "\n"
+        if args.print:
+            sys.stdout.write(manifest)
+            return 0
         output_dir = args.output_root / resolved["variant"] / "generated"
         if not args.check_only:
             output_dir.mkdir(parents=True, exist_ok=True)
             # Rewrite only on change so unchanged builds do not recompile includers.
             for path, text in (
                     (output_dir / "OpenBrewByWeightBuildProfileGenerated.h", header_for(resolved)),
-                    (output_dir / "build-profile.json",
-                     json.dumps(resolved, indent=2, ensure_ascii=False) + "\n")):
+                    (output_dir / "build-profile.json", manifest)):
                 if not path.is_file() or path.read_text(encoding="utf-8") != text:
                     path.write_text(text, encoding="utf-8")
     except ProfileError as error:

@@ -4,7 +4,7 @@ const errorCatalog = JSON.parse(
     .strings;
 
 (async () => {
-  const assert = require('assert').strict, generated = await webUi.generate();
+  const assert = require('assert').strict, generated = await webUi.generate({profile: profiles.micra});
   const runtime = 'data:text/javascript,' + encodeURIComponent('export const $=()=>null;');
   // The records bundle evaluates on its own and hands app.js each view's
   // init and markup; single-view modules export both at top level.

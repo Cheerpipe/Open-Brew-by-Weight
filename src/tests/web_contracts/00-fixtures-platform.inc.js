@@ -21,6 +21,17 @@ webUi.generate = (options = {}) => {
   return generatedVariants.get(key);
 };
 const webUiLocale = require('../../scripts/localize_web_ui.js');
+// Every render is one real build's: the resolved profiles of a compatible
+// pair. micra is the canonical development pair and the default for checks
+// that do not depend on the machine.
+const profiles = {
+  micra: webUiLocale.resolvedProfile('esp32-s3-relay-x1-speaker', 'la-marzocco-linea-micra'),
+  mini: webUiLocale.resolvedProfile('esp32-s3-relay-x1-speaker', 'la-marzocco-linea-mini'),
+  miniR: webUiLocale.resolvedProfile('esp32-s3-relay-x1-speaker', 'la-marzocco-linea-mini-r'),
+  silvia: webUiLocale.resolvedProfile('esp32-s3-relay-x1-speaker', 'rancilio-silvia-pro-x'),
+  silviaReed: webUiLocale.resolvedProfile('esp32-s3-relay-x1-speaker-reed',
+      'rancilio-silvia-pro-x-reed'),
+};
 const imageTag = require('../../scripts/image_tag.js');
 
 const sketchDir = path.resolve(__dirname, '..');
@@ -413,19 +424,11 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
     throw new Error(
         'dev build must empty a non-CMake tree before idf.py set-target fullclean');
   }
-  if (!buildIdf.includes('OpenBrewByWeightBuildProfileGenerated.h') ||
-      !buildIdf.includes('OPEN_BREW_BY_WEIGHT_MACHINE_TYPE') ||
-      !buildIdf.includes('--machine-type paddle') ||
-      !buildIdf.includes('--machine-type momentary') ||
-      !buildIdf.includes('--machine-type momentary_reed') ||
-      !buildIdf.includes('gen_web_ui.js')) {
-    throw new Error(
-        'IDF builds must bake the machine-type-exclusive Web UI by forwarding the resolved machine type to gen_web_ui.js');
-  }
-  if (!buildIdf.includes('OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON') ||
-      !buildIdf.includes('--machine-icon')) {
-    throw new Error(
-        'IDF builds must forward the machine profile icon to gen_web_ui.js so Home bakes the machine row glyph');
+  if (!buildIdf.includes('gen_web_ui.js') ||
+      !buildIdf.includes('--build-profile "$OPENBREWBYWEIGHT_GENERATED_DIR/build-profile.json"') ||
+      /--machine-(?:type|icon|brand|model|short-model)\b|--no-la-marzocco|MACHINE_WEB_/.test(buildIdf)) {
+    throw new Error('IDF builds must hand gen_web_ui.js the resolved build-profile.json, ' +
+        'the only source of what the Web UI shows about the machine');
   }
   if (!buildIdf.includes('OPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL') ||
       !buildIdf.includes('--no-remote-control')) {
@@ -433,76 +436,72 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
         'IDF builds without remote machine control must forward --no-remote-control to gen_web_ui.js');
   }
 }
-// The machine profile's named icon is the only glyph baked into Home's
-// Equipment machine row and Diagnostics' machine group: the catalog sprite
-// and the markers are scaffolding that must never ship, and an unnamed
-// machine keeps the default glyph.
+// Each compatible pair's Web UI is that build's own: its profile's glyph in
+// every place that shows the machine (Home's heading and Equipment row,
+// Diagnostics' machine group) and its own brand, model, and everyday name in
+// the copy. No other profile's glyph or name ships, so a name left in a shared
+// source fails the builds it does not belong to; "La Marzocco" stays allowed as
+// the cloud integration's name. Adding a machine is one profile file.
 {
-  const [defaultUi, laMarzoccoUi, miniUi] = await Promise.all([
-    webUi.generate({webUiLanguage: 'EN', write: false}),
-    webUi.generate({webUiLanguage: 'EN', machineIcon: 'linea-micra', write: false}),
-    webUi.generate({webUiLanguage: 'EN', machineIcon: 'linea-mini', write: false}),
-  ]);
-  const generic = 'M4 3h16v8H4', micra = 'M4 2.5h16a1 1 0 0 1', mini = 'M10.9 3.3h2.2';
-  for (const generated of [defaultUi, laMarzoccoUi, miniUi]) {
-    const markup = [generated.html, ...Object.values(generated.partials)].join('');
-    if (markup.includes('data-machine-icons') ||
-        markup.includes('{{webui-meta:machine-icon}}')) {
-      throw new Error('machine-icon scaffolding must not ship in generated markup');
+  for (const source of webUiLocale.projectSources()) {
+    if (source.content.includes('data-machine-icons')) {
+      throw new Error(`${source.file}: machine glyphs live in the machine profiles, not in a sprite`);
     }
   }
-  if (!defaultUi.html.includes(generic) || defaultUi.html.includes(micra) ||
-      !laMarzoccoUi.html.includes(micra) || laMarzoccoUi.html.includes(generic) ||
-      !miniUi.html.includes(mini) || miniUi.html.includes(micra)) {
-    throw new Error('generate() must bake exactly the machine profile icon into the Home machine row');
-  }
-  const machineGroup = (generated) => (generated.partials.diagnostic
-      .match(/<symbol id="dg-marzocco-machine"[^>]*>([\s\S]*?)<\/symbol>/) || [])[1] || '';
-  if (!machineGroup(defaultUi).includes(generic) ||
-      !machineGroup(laMarzoccoUi).includes(micra) || machineGroup(laMarzoccoUi).includes(mini) ||
-      !machineGroup(miniUi).includes(mini)) {
-    throw new Error('generate() must bake the machine profile icon into the Diagnostics machine group');
-  }
-}
-// Adding a machine is a two-file change (a home.html symbol plus the
-// profile's machine_icon field); every declared icon must bake in CI so a
-// typo'd or stale id fails here, not at that machine's next firmware build.
-{
-  const machinesDir = path.resolve(sketchDir, '..', 'config', 'machines');
-  for (const profile of fs.readdirSync(machinesDir).filter((name) => name.endsWith('.json'))) {
-    const {machine_icon: icon} =
-        JSON.parse(fs.readFileSync(path.join(machinesDir, profile), 'utf8'));
-    if (icon) await webUi.generate({webUiLanguage: 'EN', machineIcon: icon, write: false});
-  }
-  // The copy names the machine each build is for. Without a profile it reads
-  // as the reference machine; no build ships an unresolved name.
-  const copy = async (names) => {
-    const built = await webUi.generate({webUiLanguage: 'EN', write: false, ...names});
-    return [built.html, built.runtimeJs, ...Object.values(built.partials),
-      ...Object.values(built.modules)].join('');
-  };
-  const laMarzoccoCopy = await copy({});
-  const miniCopy = await copy({machineModel: 'Linea Mini R', machineShortModel: 'Mini R'});
-  const silviaCopy = await copy({machineBrand: 'Rancilio', machineModel: 'Silvia Pro X'});
-  for (const text of [laMarzoccoCopy, miniCopy, silviaCopy]) {
-    if (text.includes('{machine')) throw new Error('an unresolved machine name ships in the Web UI');
-  }
-  // Home's machine heading names the build's own brand and model.
-  for (const [text, brand, model] of [[laMarzoccoCopy, 'La Marzocco', 'Linea Micra'],
-    [silviaCopy, 'Rancilio', 'Silvia Pro X']]) {
-    if (!text.includes(`>${brand}</p>`) || !text.includes(`>${model}</h2>`)) {
-      throw new Error(`Home's machine heading must name the ${brand} ${model}`);
+  const glyphOf = ({machine}) => machine.machine_icon.map((element) => Object.entries(element)
+      .map(([tag, attributes]) => `<${tag}${Object.entries(attributes)
+          .map(([name, value]) => ` ${name}="${value}"`).join('')}/>`).join('')).join('');
+  const namesOf = ({machine}) => [machine.model, machine.short_model || machine.model];
+  const pairs = webUiLocale.compatiblePairs().map((pair) => webUiLocale.resolvedProfile(...pair));
+  for (const profile of pairs) {
+    const built = await webUi.generate({webUiLanguage: 'EN', profile, write: false});
+    const {variant, machine} = profile;
+    const markup = [built.html, ...Object.values(built.partials)].join('');
+    const text = [markup, built.js, built.runtimeJs, built.otaImageJs, built.launchJs, built.swJs,
+      built.css, built.manifest, ...Object.values(built.modules)].join('\n');
+    if (markup.includes('{{webui-meta:machine-icon}}')) {
+      throw new Error(`${variant}: the machine-icon marker must not ship`);
     }
-  }
-  for (const [text, model, short] of [[laMarzoccoCopy, 'Linea Micra', 'Micra'],
-    [miniCopy, 'Linea Mini R', 'Mini R']]) {
-    for (const phrase of [`Turn the ${short} on with the scale`, `Paddle wakes the ${short}`,
-      `This account has no ${model}.`]) {
-      if (!text.includes(phrase)) throw new Error(`the Web UI copy must say: ${phrase}`);
+    const glyph = glyphOf(profile);
+    const sites = [/<svg class="machineIdGlyph"[^>]*>(.*?)<\/svg>/,
+      /<details id="machineRow"[^>]*><summary><span class="lamp"[^>]*><svg[^>]*>(.*?)<\/svg>/,
+      /<symbol id="dg-marzocco-machine"[^>]*>(.*?)<\/symbol>/].map((re) => (markup.match(re) || [])[1]);
+    if (sites.some((site) => site !== glyph)) {
+      throw new Error(`${variant} must bake its profile's glyph into Home's machine heading, ` +
+          `Equipment row, and Diagnostics' machine group (got ${JSON.stringify(sites)})`);
     }
-  }
-  if (miniCopy.includes('Paddle wakes the Micra')) {
-    throw new Error('a build for another machine must not name the Micra in its controls');
+    const [model, short] = namesOf(profile);
+    if (!text.includes(`>${machine.brand}</p>`) || !text.includes(`>${model}</h2>`)) {
+      throw new Error(`${variant}: Home's machine heading must name the ${machine.brand} ${model}`);
+    }
+    if (text.includes('{machine')) throw new Error(`${variant}: an unresolved machine name ships`);
+    if (profile.machine_integration === 'la_marzocco_cloud') {
+      for (const phrase of [`Turn the ${short} on with the scale`, `Paddle wakes the ${short}`,
+        `This account has no ${model}.`]) {
+        if (!text.includes(phrase)) throw new Error(`${variant}: the Web UI copy must say: ${phrase}`);
+      }
+    }
+    // An own name may contain another's ("Mini R" holds "Mini"): those are
+    // looked for once the build's own names are taken out.
+    const own = namesOf(profile).sort((a, b) => b.length - a.length);
+    const withoutOwn = own.reduce((rest, name) => rest.replaceAll(name, '\u0000'), text);
+    for (const other of pairs) {
+      if (glyphOf(other) !== glyph && text.includes(glyphOf(other))) {
+        throw new Error(`${variant} ships the ${other.machine.id} glyph`);
+      }
+      for (const name of namesOf(other).filter((name) => !own.includes(name))) {
+        const haystack = own.some((mine) => mine.includes(name)) ? withoutOwn : text;
+        // Word-bounded even when a name starts or ends with punctuation.
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`(?<!\\w)${escaped}(?!\\w)`).test(haystack)) {
+          throw new Error(`${variant} ships another machine's name: ${name}`);
+        }
+      }
+      const brand = other.machine.brand;
+      if (brand !== machine.brand && brand !== 'La Marzocco' && text.includes(brand)) {
+        throw new Error(`${variant} ships another machine's brand: ${brand}`);
+      }
+    }
   }
 }
 if (!taskProfiler.includes('void copySnapshot(TaskProfilerSnapshot &out) const') ||

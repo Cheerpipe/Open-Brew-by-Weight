@@ -21,7 +21,7 @@ if (firmware.includes('maybeCaptureScaleStartLag') ||
 }
 
 (async () => {
-const generated = await webUi.generate();
+const generated = await webUi.generate({profile: profiles.micra});
 // A companion trusts these hashes over the wire: each must name the exact bytes served.
 {
   const digest = (body) => crypto.createHash('sha256').update(body).digest('base64');
@@ -76,9 +76,12 @@ if (!generated.assetTag || !generated.cacheVersion ||
          .includes(`WEB_UI_ASSET_ETAG[] = ${JSON.stringify('"' + generated.assetTag + '"')}`)) {
   throw new Error('Asset URLs and their ETag must carry the content tag alone; the shell ETag embeds FW version + tag');
 }
-const normalizedEnglish = await webUi.generate({webUiLanguage: 'EN', write: false});
-const regionalEnglish = await webUi.generate({webUiLanguage: 'En_en', write: false});
-const developmentShell = await webUi.generate({developmentMode: true, write: false});
+const normalizedEnglish = await webUi.generate({webUiLanguage: 'EN', profile: profiles.micra,
+  write: false});
+const regionalEnglish = await webUi.generate({webUiLanguage: 'En_en', profile: profiles.micra,
+  write: false});
+const developmentShell = await webUi.generate({developmentMode: true, profile: profiles.micra,
+  write: false});
 // Shipped bytes do not depend on how the HTML and CSS sources are formatted:
 // printing them at two widths changes nothing the generator emits.
 {
@@ -89,7 +92,7 @@ const developmentShell = await webUi.generate({developmentMode: true, write: fal
     await prettier.format(fs.readFileSync(file, 'utf8'), {filepath: file, printWidth})])));
   const widths = await Promise.all([40, 160].map(printed));
   const shipped = (r) => [r.html, r.css, ...Object.values(r.partials), ...Object.values(r.modules)];
-  for (const options of [{}, {remoteControl: false, laMarzocco: false, machineType: 'paddle'}]) {
+  for (const options of [{profile: profiles.micra}, {profile: profiles.silvia, remoteControl: false}]) {
     const [narrow, wide] = await Promise.all(widths.map((sources) => webUi.generate(
         {...options, readSource: (file) => sources.get(file), versionOverride: 'format', write: false})));
     require('assert').deepStrictEqual(shipped(narrow), shipped(wide),
@@ -104,9 +107,12 @@ if (generated.html.includes('<body class="devBuild">') ||
     generated.html.includes('devBuild')) {
   throw new Error('release shell must not carry the devBuild class');
 }
-// Machine-type exclusive Web UI: typed generation strips other types'
-// exclusive markup and CSS, and bakes the type class into <html>. JS keeps
-// ids in every variant behind null-safe guards, so only markup/CSS are pinned.
+// Machine-type exclusive Web UI: each build strips other types' exclusive
+// markup and CSS, and bakes its type class into <html>. JS keeps ids in every
+// variant behind null-safe guards, so only markup/CSS are pinned.
+const profileByType = {paddle: profiles.micra, momentary: profiles.silvia,
+  momentary_reed: profiles.silviaReed};
+const typedText = {};
 const machineTypeExclusive = {
   paddle: ['momentaryStartEdge', 'stopPulseMs', 'maxSinglePressMs',
     'reedConfirmTimeoutS', 'dReed', 'forcePulseButton'],
@@ -118,9 +124,9 @@ const machineTypeExclusive = {
     'overrideIdleLink'],
 };
 for (const [machineType, forbidden] of Object.entries(machineTypeExclusive)) {
-  const variant =
-      await webUi.generate({webUiLanguage: 'EN', machineType, write: false});
-  const uiText =
+  const variant = await webUi.generate({webUiLanguage: 'EN', profile: profileByType[machineType],
+    write: false});
+  const uiText = typedText[machineType] =
       [variant.html, ...Object.values(variant.partials), variant.css].join('\n');
   const leaked = forbidden.filter((id) => uiText.includes(id));
   if (leaked.length) {
@@ -176,27 +182,25 @@ for (const [machineType, remoteControl, kept] of [
   ['momentary', false, ['html:not(.momentaryMachine) .switchOnly']],
   ['paddle', false, ['html.momentaryMachine .paddleOnly',
     'html.themeDark .qwSheet{box-shadow:0 -8px']]]) {
-  const {css: typedCss} = await webUi.generate({machineType, remoteControl, write: false});
+  const {css: typedCss} = await webUi.generate({profile: profileByType[machineType], remoteControl,
+    write: false});
   const lost = kept.filter((needle) => !typedCss.includes(needle));
   if (lost.length) {
     throw new Error(`machine-type ${machineType} CSS lost grouped rules: ${lost.join(', ')}`);
   }
 }
-const typeAgnostic = await webUi.generate({webUiLanguage: 'EN', write: false});
-const typeAgnosticText =
-    [typeAgnostic.html, ...Object.values(typeAgnostic.partials),
-     typeAgnostic.css].join('\n');
+// Stripping loses no type's markup: every exclusive id ships in some build.
 for (const id of [...new Set(Object.values(machineTypeExclusive).flat())]) {
-  if (!typeAgnosticText.includes(id)) {
-    throw new Error(`type-agnostic UI must keep every type's markup (${id})`);
+  if (!Object.values(typedText).some((text) => text.includes(id))) {
+    throw new Error(`no machine type's build ships ${id}`);
   }
 }
 // Remote machine control is compile-time opt-in; builds without the flag must
 // ship neither the fixed Home action bar nor the runtime helper driving it,
 // while remote builds keep every piece.
 for (const remoteControl of [false, true]) {
-  const variant =
-      await webUi.generate({webUiLanguage: 'EN', remoteControl, write: false});
+  const variant = await webUi.generate({webUiLanguage: 'EN', profile: profiles.micra, remoteControl,
+    write: false});
   const uiText =
       [variant.html, ...Object.values(variant.partials), variant.css].join('\n');
   const forbidden = ['id="actionsPanel"', '#actionsPanel', 'homeAdminActions'];
@@ -215,12 +219,14 @@ for (const remoteControl of [false, true]) {
   }
   if (remoteControl === false &&
       variant.runtimeJs.length >=
-      (await webUi.generate({webUiLanguage: 'EN', write: false})).runtimeJs.length) {
+      (await webUi.generate({webUiLanguage: 'EN', profile: profiles.micra, write: false}))
+          .runtimeJs.length) {
     throw new Error('no-remote-control runtime must drop the action-bar helper');
   }
 }
-// Only Linea Micra cloud builds ship the Micra status and diagnostics code.
-const noLaMarzocco = await webUi.generate({webUiLanguage: 'EN', laMarzocco: false, write: false});
+// Only La Marzocco cloud builds ship its status and diagnostics code.
+const noLaMarzocco = await webUi.generate({webUiLanguage: 'EN', profile: profiles.silvia,
+  write: false});
 // The Diagnostic module ships the Micra markup in every build; its renderer folds away.
 if (!codeIncludes(generated.modules.diagnostic, 'freshnessPolicy') ||
     codeIncludes(noLaMarzocco.modules.diagnostic, 'freshnessPolicy') ||
@@ -260,7 +266,7 @@ const metadataFixture = makeTestLocales((catalogs) => {
 });
 try {
   const metadataOnly = await webUi.generate({
-    webUiLanguage: 'en', localesDir: metadataFixture.dir, write: false,
+    webUiLanguage: 'en', localesDir: metadataFixture.dir, profile: profiles.micra, write: false,
   });
   localeAssert.equal(metadataOnly.assetTag, generated.assetTag);
 } finally {
@@ -273,7 +279,7 @@ const changedFixture = makeTestLocales((catalogs) => {
 });
 try {
   const changed = await webUi.generate({
-    webUiLanguage: 'en', localesDir: changedFixture.dir, write: false,
+    webUiLanguage: 'en', localesDir: changedFixture.dir, profile: profiles.micra, write: false,
   });
   localeAssert.notEqual(changed.assetTag, generated.assetTag);
 } finally {
@@ -287,7 +293,7 @@ for (const forbidden of ['__WEBUI_', '{{webui:', 'schemaVersion', 'shell.open_br
       `Generated firmware assets must not embed localization token ${forbidden}`);
 }
 await localeAssert.rejects(
-    webUi.generate({webUiLanguage: 'es-CL'}), /no catalog for es-cl/);
+    webUi.generate({webUiLanguage: 'es-CL', profile: profiles.micra}), /no catalog for es-cl/);
 localeAssert.equal(fs.readFileSync(generatedHeaderPath, 'utf8'), generatedHeader,
     'Rejected locale must not replace the generated header');
 const escapedLocaleValue = `quote " apostrophe ' slash \\ newline\nUnicode café`;
@@ -304,7 +310,6 @@ if (roundTrip !== generated.html) {
 }
 if (!generated.html.includes('id="view-home"') ||
     !generated.html.includes('id="stopButton"') ||
-    !generated.html.includes('id="forcePulseButton"') ||
     !generated.html.includes('Start shot') ||
     generated.html.includes('virtualPaddle') ||
     generated.html.includes('<section id="view-home" class="view" data-view="home"></section>')) {
@@ -517,8 +522,10 @@ if (generated.icon192Raw.readUInt32BE(16) !== 192 ||
 // which a fresh checkout lacks ("dev" folds the self-heal away). Only the
 // revalidated shell carries the version; assets stay version-free so a
 // firmware-only release keeps them cached under the same ?v= tag.
-const release = await webUi.generate({versionOverride: '9.8.7+contract', write: false});
-const otherRelease = await webUi.generate({versionOverride: '9.8.8+contract', write: false});
+const release = await webUi.generate({versionOverride: '9.8.7+contract', profile: profiles.micra,
+  write: false});
+const otherRelease = await webUi.generate({versionOverride: '9.8.8+contract',
+  profile: profiles.micra, write: false});
 if (!release.html.includes('data-fw="9.8.7+contract"') ||
     codeIncludes(release.runtimeJs, '9.8.7+contract') ||
     codeIncludes(release.runtimeJs, '__FW_RELEASE__') ||
