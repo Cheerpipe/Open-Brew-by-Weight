@@ -477,3 +477,87 @@
 .accessRow > span > span.warn {
   color: var(--wn);
 }
+
+/* Home's machine heading: the machine this controller runs, named by the
+   build's profile, with its state. The right padding reserves the glyph's
+   column, so a long model name wraps before the drawing; the stroke mixes
+   text into background so the glyph reads the same in both themes. */
+.machineId {
+  position: relative;
+  margin: 0.35rem 0 1rem;
+  padding: 0.6rem 5.75rem 0.45rem 0.25rem;
+}
+
+.machineIdGlyph {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  width: 4.75rem;
+  height: 4.75rem;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: color-mix(in srgb, var(--fg) 26%, var(--bg));
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.machineIdBrand {
+  margin: 0;
+  color: var(--mu);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.machineId h2 {
+  margin: 0.1rem 0 0;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.machineIdStatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.5rem;
+  margin: 0.35rem 0 0;
+  color: var(--mu);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* The state is a word with a dot beside it, never the colour alone. */
+#machineIdState {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--fg);
+  font-weight: 800;
+}
+
+.machineId[data-state] #machineIdState::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.machineId[data-state="warn"] #machineIdState::before {
+  background: var(--lw);
+}
+
+.machineId[data-state="bad"] #machineIdState::before {
+  background: var(--dn);
+}
+
+#machineIdDetail:not(:empty)::before {
+  content: "·";
+  margin-right: 0.5rem;
+}

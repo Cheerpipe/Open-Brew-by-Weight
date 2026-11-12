@@ -1,7 +1,8 @@
 <!-- Machine icons: one flat-shape glyph per machine profile's machine_icon
-  field; the bake inlines the named symbol over the marker below and drops
-  this sprite. The marker site's viewBox is the only coordinate system, and
-  glyphs must not nest svg elements. machine-icon-default is the fallback
+  field; the bake inlines the named symbol over both markers below (Home's
+  machine heading and the Equipment row) and drops this sprite. The marker
+  sites' viewBox is the only coordinate system, and glyphs must not nest svg
+  elements. machine-icon-default is the fallback
   every profile without machine_icon keeps. The linea-micra artwork is the
   same drawing as diagnostic's dg-marzocco-micra; keep the two in step. The
   linea-mini and linea-mini-r glyphs are placeholders that repeat it until
@@ -37,6 +38,16 @@
     <rect x="3" y="16" width="18" height="5" rx="1" />
   </symbol>
 </svg>
+<section id="machineId" class="machineId" aria-labelledby="machineIdModel">
+  <svg class="machineIdGlyph" viewBox="0 0 24 24" aria-hidden="true">
+    {{webui-meta:machine-icon}}
+  </svg>
+  <p class="machineIdBrand">{{webui:home.machine_brand}}</p>
+  <h2 id="machineIdModel">{{webui:home.machine_model}}</h2>
+  <p class="machineIdStatus">
+    <span id="machineIdState">—</span><span id="machineIdDetail"></span>
+  </p>
+</section>
 <p id="homeReadyMsg" class="readyMsg" role="status" hidden></p>
 <div id="heroDeck" class="heroDeck">
   <p class="deckHead" aria-hidden="true">

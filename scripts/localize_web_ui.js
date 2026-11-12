@@ -108,11 +108,13 @@ function loadCatalog(language, options = {}) {
 }
 
 // Copy names the machine a build is for: {machine} is the machine profile's
-// model and {machine-short} its everyday name. Without a profile (tests, lint,
-// the design preview) both read as the reference machine.
+// model, {machine-short} its everyday name and {machine-brand} its maker.
+// Without a profile (tests, lint, the design preview) all read as the
+// reference machine.
 function nameMachine(text, options) {
   return text.replaceAll('{machine}', options.machineModel || 'Linea Micra')
-      .replaceAll('{machine-short}', options.machineShortModel || 'Micra');
+      .replaceAll('{machine-short}', options.machineShortModel || 'Micra')
+      .replaceAll('{machine-brand}', options.machineBrand || 'La Marzocco');
 }
 
 function htmlEscape(value) {
