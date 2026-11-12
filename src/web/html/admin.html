@@ -296,7 +296,9 @@
     ><label
       ><input id="idlePowerSavingEnabled" type="checkbox" role="switch" />
       {{webui:admin.idle_power_saving}}<small class="fieldHint"
-        >{{webui:admin.lets_the_processor_slow_down}}</small
+        >{{webui:admin.lets_the_processor_slow_down}}<span class="laMarzoccoOnly">
+          {{webui:admin.lets_the_processor_slow_down_lm}}</span
+        ></small
       ><small id="powerStatus" class="fieldHint"></small></label
     ><label
       ><input id="staWifiSleep" type="checkbox" checked /> {{webui:admin.wi_fi_sleep}}<small
@@ -638,7 +640,11 @@
   <details id="companionPanel" data-g="companion" class="cfgGroup">
     <summary>{{webui:admin.companion}}</summary>
     <form id="companionConnect" class="enterForm" novalidate>
-      <p class="fieldHint">{{webui:admin.companion_intro}}</p>
+      <p class="fieldHint">
+        {{webui:admin.companion_intro}}<span class="laMarzoccoOnly">
+          {{webui:admin.companion_intro_lm}}</span
+        >
+      </p>
       <div id="companionHere" class="accessRow" hidden>
         <span id="companionHereText"></span>
         <button id="companionPairButton" class="btnGlyph btnInvert" type="button">
