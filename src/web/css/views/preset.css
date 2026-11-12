@@ -1117,6 +1117,16 @@ body.qwOpen {
   transform: rotate(180deg);
 }
 
+/* Unfolded, the selected fill fades to the plain surface where the graph
+   starts, so its bands, hatch and label halos keep their true colours. */
+.presetAccItem.full .presetAccMore > div {
+  background: linear-gradient(transparent, var(--sf) 2.25rem);
+}
+
+.presetAccItem.full .presetAccToggle {
+  background: var(--sf);
+}
+
 .qwReset b {
   font-variant-numeric: tabular-nums;
 }
