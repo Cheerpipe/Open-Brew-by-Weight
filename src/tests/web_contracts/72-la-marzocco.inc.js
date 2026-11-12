@@ -175,7 +175,7 @@ const laMarzoccoDiagnosticHtml = rawPartialHtml.diagnostic;
   const machine = element(), cleaningRow = element(), cleaning = element(), cleaningHint = element();
   cleaning.id = 'dLaMarzoccoCleaning'; cleaningHint.id = 'dLaMarzoccoCleaningHint';
   machine.append(cleaningRow); cleaningRow.append(cleaning, cleaningHint);
-  assert(/<details class="cfgGroup laMarzoccoOnly" data-g="marzocco-micra"><summary>[^<]*<\/summary><div id="laMarzoccoMachineDiagnostics" class="statusColumn">/.test(laMarzoccoDiagnosticHtml));
+  assert(/<details class="cfgGroup laMarzoccoOnly" data-g="marzocco-machine"><summary>[^<]*<\/summary><div id="laMarzoccoMachineDiagnostics" class="statusColumn">/.test(laMarzoccoDiagnosticHtml));
   assert(laMarzoccoDiagnosticHtml.includes('{{webui:diagnostic.la_marzocco}}'));
   for (const id of ['dLaMarzoccoReadiness', 'dLaMarzoccoBrewBoiler', 'dLaMarzoccoSteamBoiler', 'dLaMarzoccoWater']) {
     assert(laMarzoccoDiagnosticHtml.includes(`id="${id}"`), `machine section row missing: ${id}`);

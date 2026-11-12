@@ -105,10 +105,13 @@ function renderSignals() {
 
 function renderMobileMenu() {
   const views = ['stats', 'history', 'settings', 'diagnostic', 'admin'];
-  const {sources} = renderSources(views.map(name => ({
+  // Home rides along only for its machine-icons catalog, which Diagnostics'
+  // machine group bakes from; its own render comes from renderHome().
+  const {sources} = renderSources(['home', ...views].map(name => ({
     file: `src/web/html/${name}.html`, type: 'html',
     content: read(`src/web/html/${name}.html`),
-  })), {language: 'en', allowUnused: true, machineType: 'paddle'});
+  })), {language: 'en', allowUnused: true, machineType: 'paddle', machineIcon: 'linea-micra'});
+  sources.shift();
   let html = renderHome();
   views.forEach((name, index) => {
     html = fillView(html, name, sources[index].content, ' hidden');

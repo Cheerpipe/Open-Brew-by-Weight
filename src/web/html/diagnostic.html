@@ -58,15 +58,8 @@
     <circle cx="12" cy="12" r="9" />
     <path d="M12 7v5l3 2" />
   </symbol>
-  <!-- Same drawing as home's machine-icon-linea-micra; keep the two in step. -->
-  <symbol id="dg-marzocco-micra" viewBox="0 0 24 24">
-    <path
-      d="M4 2.5h16a1 1 0 0 1 1 1v5l-1.6 1.6-1.2 5.9H5.8l-1.2-5.9L3 8.5v-5a1 1 0 0 1 1-1ZM10.5 5.5h3M12 9.5v2.5M5.5 18h13"
-    />
-    <circle cx="6.5" cy="5.5" r="1.3" />
-    <circle cx="17.5" cy="5.5" r="1.3" />
-    <rect x="3" y="16" width="18" height="5" rx="1" />
-  </symbol>
+  <!-- The build's machine profile icon, from home's machine-icons catalog. -->
+  <symbol id="dg-marzocco-machine" viewBox="0 0 24 24">{{webui-meta:machine-icon}}</symbol>
   <symbol id="dg-companion" viewBox="0 0 24 24">
     <rect x="4" y="4" width="16" height="7" rx="1.5" />
     <rect x="4" y="13" width="16" height="7" rx="1.5" />
@@ -709,7 +702,7 @@
         </div>
       </div>
     </details>
-    <details class="cfgGroup laMarzoccoOnly" data-g="marzocco-micra">
+    <details class="cfgGroup laMarzoccoOnly" data-g="marzocco-machine">
       <summary>{{webui:diagnostic.la_marzocco}}</summary>
       <div id="laMarzoccoMachineDiagnostics" class="statusColumn">
         <div class="metric">

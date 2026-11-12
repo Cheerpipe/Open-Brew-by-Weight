@@ -434,23 +434,34 @@ if (sdkconfigDefaults.includes('CONFIG_BT_LE_SLEEP_ENABLE=y') ||
   }
 }
 // The machine profile's named icon is the only glyph baked into Home's
-// Equipment machine row: the catalog sprite and the marker are scaffolding
-// that must never ship, and an unnamed machine keeps the default glyph.
+// Equipment machine row and Diagnostics' machine group: the catalog sprite
+// and the markers are scaffolding that must never ship, and an unnamed
+// machine keeps the default glyph.
 {
-  const [defaultUi, laMarzoccoUi] = await Promise.all([
+  const [defaultUi, laMarzoccoUi, miniUi] = await Promise.all([
     webUi.generate({webUiLanguage: 'EN', write: false}),
     webUi.generate({webUiLanguage: 'EN', machineIcon: 'linea-micra', write: false}),
+    webUi.generate({webUiLanguage: 'EN', machineIcon: 'linea-mini', write: false}),
   ]);
-  const generic = 'M4 3h16v8H4', micra = 'M4 2.5h16a1 1 0 0 1';
-  for (const generated of [defaultUi, laMarzoccoUi]) {
-    if (generated.html.includes('data-machine-icons') ||
-        generated.html.includes('{{webui-meta:machine-icon}}')) {
+  const generic = 'M4 3h16v8H4', micra = 'M4 2.5h16a1 1 0 0 1', mini = 'M10.9 3.3h2.2';
+  for (const generated of [defaultUi, laMarzoccoUi, miniUi]) {
+    const markup = [generated.html, ...Object.values(generated.partials)].join('');
+    if (markup.includes('data-machine-icons') ||
+        markup.includes('{{webui-meta:machine-icon}}')) {
       throw new Error('machine-icon scaffolding must not ship in generated markup');
     }
   }
   if (!defaultUi.html.includes(generic) || defaultUi.html.includes(micra) ||
-      !laMarzoccoUi.html.includes(micra) || laMarzoccoUi.html.includes(generic)) {
+      !laMarzoccoUi.html.includes(micra) || laMarzoccoUi.html.includes(generic) ||
+      !miniUi.html.includes(mini) || miniUi.html.includes(micra)) {
     throw new Error('generate() must bake exactly the machine profile icon into the Home machine row');
+  }
+  const machineGroup = (generated) => (generated.partials.diagnostic
+      .match(/<symbol id="dg-marzocco-machine"[^>]*>([\s\S]*?)<\/symbol>/) || [])[1] || '';
+  if (!machineGroup(defaultUi).includes(generic) ||
+      !machineGroup(laMarzoccoUi).includes(micra) || machineGroup(laMarzoccoUi).includes(mini) ||
+      !machineGroup(miniUi).includes(mini)) {
+    throw new Error('generate() must bake the machine profile icon into the Diagnostics machine group');
   }
 }
 // Adding a machine is a two-file change (a home.html symbol plus the

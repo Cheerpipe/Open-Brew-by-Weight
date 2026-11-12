@@ -155,23 +155,30 @@ function assertHtmlContext(source, marker, offset, meta) {
 // One glyph per machine ships: home.html carries the catalog (one hidden
 // <symbol id="machine-icon-<id>"> per machine) next to the marker that shows
 // it, the render's machineIcon option selects the glyph (default: the generic
-// machine), and both scaffolding pieces drop here. Glyphs are flat shape
-// elements authored in the marker site's 24x24 viewBox.
-function bakeMachineIcon(source, file, options) {
-  const sprite = source.match(MACHINE_ICON_SPRITE_RE);
-  if (!sprite) {
-    if (source.includes(MACHINE_ICON_MARKER)) {
-      fail(`${file}: ${MACHINE_ICON_MARKER} requires the data-machine-icons catalog sprite`);
-    }
-    return source;
+// machine), and every html source in the render may place the marker (Home's
+// Equipment row, Diagnostics' machine group). Glyphs are flat shape elements
+// authored in a 24x24 viewBox. Returns undefined when the render has neither.
+function machineIconGlyph(sources, options) {
+  const html = sources.filter((source) => source.type === 'html');
+  const catalogs = html.flatMap((source) =>
+    (source.content.match(new RegExp(MACHINE_ICON_SPRITE_RE.source, 'g')) || [])
+        .map(() => source));
+  if (catalogs.length > 1) {
+    fail(`${catalogs[1].file}: at most one data-machine-icons sprite is allowed`);
   }
-  if (!source.includes(MACHINE_ICON_MARKER)) {
+  const [catalog] = catalogs;
+  if (!catalog) {
+    const marked = html.find((source) => source.content.includes(MACHINE_ICON_MARKER));
+    if (marked) {
+      fail(`${marked.file}: ${MACHINE_ICON_MARKER} requires the data-machine-icons catalog sprite`);
+    }
+    return undefined;
+  }
+  const {file, content} = catalog;
+  if (!content.includes(MACHINE_ICON_MARKER)) {
     fail(`${file}: the machine-icons catalog sprite requires ${MACHINE_ICON_MARKER}`);
   }
-  const sprites = source.match(new RegExp(MACHINE_ICON_SPRITE_RE.source, 'g'));
-  if (sprites.length > 1) {
-    fail(`${file}: at most one data-machine-icons sprite is allowed`);
-  }
+  const sprite = content.match(MACHINE_ICON_SPRITE_RE);
   // The sprite capture ends at the first </svg>, so a nested <svg> inside a
   // glyph would truncate the catalog and ship stray markup after the strip.
   if (/<svg[\s>]/i.test(sprite[1])) {
@@ -185,16 +192,20 @@ function bakeMachineIcon(source, file, options) {
   const id = options.machineIcon || 'default';
   const glyph = symbols.find((match) => match[1] === id);
   if (!glyph) fail(`${file}: no machine-icon-${id} glyph in the catalog sprite`);
-  return source.replace(MACHINE_ICON_SPRITE_RE, '')
-      .split(MACHINE_ICON_MARKER).join(glyph[2].trim());
+  return glyph[2].trim();
+}
+
+function bakeMachineIcon(source, glyph) {
+  if (glyph === undefined) return source;
+  return source.replace(MACHINE_ICON_SPRITE_RE, '').split(MACHINE_ICON_MARKER).join(glyph);
 }
 
 function renderHtml(source, file, state) {
-  // The machine profile's own Home icon bakes in before marker rendering: the
-  // glyph catalog travels beside the marker in home.html's hidden
-  // data-machine-icons sprite, a build's machineIcon option selects the glyph,
-  // and the scaffolding (sprite and marker) never survives a render.
-  let rendered = bakeMachineIcon(source, file, state.options);
+  // The machine profile's own icon bakes in before marker rendering: the
+  // glyph catalog travels in home.html's hidden data-machine-icons sprite, a
+  // build's machineIcon option selects the glyph, and the scaffolding (sprite
+  // and markers) never survives a render.
+  let rendered = bakeMachineIcon(source, state.machineGlyph);
   rendered = rendered.replace(HTML_MARKER_RE, (marker, key, offset) => {
     assertHtmlContext(rendered, marker, offset, false);
     return htmlEscape(useString(file, key, state));
@@ -257,7 +268,8 @@ function assertNoMarkers(source, file) {
 
 function renderSources(sources, options = {}) {
   const loaded = loadCatalog(options.language || process.env.OPENBREWBYWEIGHT_WEBUI_LANGUAGE || 'en', options);
-  const state = {catalog: loaded.catalog, used: new Set(), options};
+  const state = {catalog: loaded.catalog, used: new Set(), options,
+    machineGlyph: machineIconGlyph(sources, options)};
   const rendered = sources.map((source) => {
     let content;
     if (source.type === 'html') content = renderHtml(source.content, source.file, state);
