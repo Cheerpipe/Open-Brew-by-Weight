@@ -37,8 +37,8 @@ marked with a filled circle and expands to show how it cuts, for example
 **After 36 s · Slow · down to 33 g**. Tap the arrow under these lines to open
 a small chart, and tap it again to fold the chart away. The chart shows
 the same cut line over the shot, the colored fast, on-recipe and slow zones,
-the opening seconds where weight never stops the shot, and dots where your
-recent shots on that preset reached the target. Drag the dot on the cut line
+the opening seconds where weight never stops the shot, and dots on the cut line
+where your recent shots on that preset stopped. Drag the dot on the cut line
 to try shot timings, just like **How this preset cuts** in Settings: the
 example shot follows it right away. On a touch screen, put your finger on the
 dot itself to grab it; anywhere else, the chart scrolls the page as usual. A note below
