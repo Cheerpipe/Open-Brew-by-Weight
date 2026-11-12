@@ -46,11 +46,24 @@ media queries, so the CSS sources stay unprefixed and modern. Reformatting a sou
 embedded bytes; the Web contracts print the sources at two widths and require
 identical generator output.
 
+Every Web UI is one build's: the generator renders only for a resolved
+hardware and machine profile pair, and everything the Web UI shows about the
+machine (its type, the La Marzocco integration, its icon, brand, model, and
+everyday name) comes from that profile. `./scripts/dev build` passes the
+build's `build-profile.json` with `--build-profile`; the generator refuses to
+run without one. Web tooling resolves real pairs with
+`python3 scripts/resolve_build_profiles.py --print --hardware <id> --machine <id>`,
+which writes no files: the size budgets and the design preview use the
+canonical development pair, the markup lint every compatible pair, and the Web
+contracts name a pair for each check. `./scripts/dev test web` and
+`./scripts/dev test lint` therefore need `python3` as well as `node`.
+
 ## Web UI lint
 
 `./scripts/dev test lint` checks the Web UI sources with the linters pinned in
 `package.json`, so install them once with `npm ci`; the command never installs
-anything and exits with 127 when they are missing. It runs three steps:
+anything and exits with 127 when they, `node`, or `python3` are missing. It runs
+three steps:
 
 - **ESLint** on `src/web/app.js` and `src/web/js/` with its full recommended
   rule set (`scripts/lint/eslint.config.mjs`). The build-time constants and markers
@@ -60,7 +73,8 @@ anything and exits with 127 when they are missing. It runs three steps:
   standard config; class, id, custom property and keyframe names must be
   lowerCamelCase.
 - **Markup** (`scripts/lint_web_ui.js`): renders the English shell with every view
-  partial injected, as the browser receives it, and runs html-validate with
+  partial injected, as the browser receives it, for every compatible hardware
+  and machine pair, and runs html-validate with
   every recommended and accessibility rule (`scripts/lint/htmlvalidate.json`,
   which only sets the Prettier styles for void elements and the doctype). It
   also fails on any id used twice across views. The Web contracts check
@@ -230,7 +244,8 @@ retain the physical image and memory placement checks; see [Build](BUILD.md#comp
 
 `./scripts/dev test budgets` measures every Web UI size budget in
 `config/web-asset-budgets.json` in a few seconds and lists each measurement
-against its limit. `test web` runs the same step before the Web contracts.
+against its limit. Shipped sizes are those of the canonical development pair's
+build (`esp32-s3-relay-x1-speaker` with `la-marzocco-linea-micra`). `test web` runs the same step before the Web contracts.
 Inside `test web`, `test budgets`, the R2/R3 `validate` gates, and
 `quality`, the Web UI budget step and each firmware size check only record
 overruns under the run's `artifacts/runs/<run-id>/budgets/`; the final

@@ -34,7 +34,7 @@
     Object,
     Date,
   });
-  vm.runInContext((await webUi.generate()).swJs, worker);
+  vm.runInContext((await webUi.generate({profile: profiles.micra})).swJs, worker);
   for (const type of ["push", "notificationclick", "pushsubscriptionchange"])
     assert.equal(typeof handlers[type], "function", `the worker must handle ${type}`);
 

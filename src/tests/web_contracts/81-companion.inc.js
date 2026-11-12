@@ -248,12 +248,13 @@
 
   // Other builds keep the companion and drop only the La Marzocco parts.
   (async () => {
-    const noLaMarzocco = await webUi.generate({webUiLanguage: 'EN', laMarzocco: false, write: false});
+    const noLaMarzocco = await webUi.generate({webUiLanguage: 'EN', profile: profiles.silvia,
+      write: false});
     const out = [noLaMarzocco.html, noLaMarzocco.js, noLaMarzocco.runtimeJs, ...Object.values(noLaMarzocco.partials),
       ...Object.values(noLaMarzocco.modules)].join('\n');
     const leaked = ['id="companionLm"', 'id="companionApproveLm"', 'id="companionRouteState"', 'id="dCoRoute"',
       'id="dCoLm"', 'id="dCoCounts"', 'id="laMarzoccoSignal"', 'id="laMarzoccoDetails"', 'dg-marzocco-cloud'].filter((s) => out.includes(s));
-    assert.deepEqual(leaked, [], 'The La Marzocco companion parts stay out of builds without Linea Micra');
+    assert.deepEqual(leaked, [], 'The La Marzocco companion parts stay out of builds without the La Marzocco integration');
     const missing = ['id="companionPanel"', 'id="companionHint"', 'id="companionPairHint"', 'id="companionUi"',
       'id="g-companion"', 'id="dCoName"', 'id="dCoUi"', 'id="dUiAccess"', '/api/v1/companion/admin',
       '/__companion/pair', '/__companion/status', 'requestName'].filter((s) => !out.includes(s));

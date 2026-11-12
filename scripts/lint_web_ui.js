@@ -7,12 +7,12 @@
 const fs = require('fs');
 const path = require('path');
 const {HtmlValidate} = require('html-validate');
-const {renderSources} = require('./localize_web_ui.js');
+const {renderSources, resolvedProfile, compatiblePairs} = require('./localize_web_ui.js');
 const webUi = require('./gen_web_ui.js');
 
 const repoRoot = path.resolve(__dirname, '..');
 
-function assembledDocument(machineIcon) {
+function assembledDocument(profile) {
   // The localizer checks the catalog against every source, so all of them go in.
   const html = [webUi.sourcePath, ...webUi.VIEW_NAMES.map((name) =>
     path.join(webUi.htmlDir, `${name}.html`))];
@@ -23,7 +23,7 @@ function assembledDocument(machineIcon) {
     read('js')(webUi.swPath),
     {file: 'app.css', type: 'css',
       content: webUi.cssSourcePaths.map((file) => fs.readFileSync(file, 'utf8')).join('')}],
-    {language: 'en', machineIcon}).sources
+    {language: 'en', profile}).sources
       .slice(0, html.length).map((source) => source.content);
   const views = Object.fromEntries(webUi.VIEW_NAMES.map((name, i) => [name, partials[i]]));
   return shell.split('{{webui-meta:development-class}}').join('')
@@ -36,19 +36,14 @@ async function main() {
   const config = JSON.parse(fs.readFileSync(
       path.join(repoRoot, 'scripts', 'lint', 'htmlvalidate.json'), 'utf8'));
   const validator = new HtmlValidate(config);
-  // The fallback glyph and each machine profile's own glyph ship in real
-  // builds, so every baked form must validate.
-  const machinesDir = path.join(repoRoot, 'config', 'machines');
-  const profileIcons = fs.readdirSync(machinesDir).filter((name) => name.endsWith('.json'))
-      .map((name) => JSON.parse(fs.readFileSync(path.join(machinesDir, name), 'utf8')).machine_icon)
-      .filter(Boolean);
-  for (const machineIcon of [undefined, ...new Set(profileIcons)]) {
-    const doc = assembledDocument(machineIcon);
+  // Each buildable pair bakes its own glyph and names, so every one must validate.
+  for (const [hardware, machine] of compatiblePairs()) {
+    const doc = assembledDocument(resolvedProfile(hardware, machine));
     const report = await validator.validateString(doc, 'webui.html');
     for (const result of report.results) {
       for (const m of result.messages) {
         const context = doc.slice(Math.max(0, m.offset - 40), m.offset + 60).replace(/\s+/g, ' ');
-        failures.push(`${machineIcon || 'default'}: ${m.ruleId}: ${m.message} … ${context}`);
+        failures.push(`${hardware}--${machine}: ${m.ruleId}: ${m.message} … ${context}`);
       }
     }
   }

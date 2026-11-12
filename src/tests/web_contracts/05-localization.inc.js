@@ -58,10 +58,10 @@ localeAssert.throws(() => webUiLocale.loadCatalog('es-CL'), /no catalog for es-c
         content: `<b>{{webui:${key}}}</b><b>{{webui:${key}}}</b>`},
     ];
     const first = webUiLocale.renderSources(sources, {
-      language: 'EN', localesDir: fixture.dir, allowUnused: true,
+      language: 'EN', localesDir: fixture.dir, allowUnused: true, profile: profiles.micra,
     });
     const second = webUiLocale.renderSources(sources, {
-      language: 'en', localesDir: fixture.dir, allowUnused: true,
+      language: 'en', localesDir: fixture.dir, allowUnused: true, profile: profiles.micra,
     });
     localeAssert.deepEqual(first.sources, second.sources);
     localeAssert.deepEqual(first.usedKeys, [key]);
@@ -77,7 +77,7 @@ localeAssert.throws(() => webUiLocale.loadCatalog('es-CL'), /no catalog for es-c
     localeAssert.ok(first.sources.every((source) =>
       !/__WEBUI_|\{\{webui/.test(source.content)));
     const rtl = webUiLocale.renderSources([sources[4]], {
-      language: 'ar', localesDir: fixture.dir, allowUnused: true,
+      language: 'ar', localesDir: fixture.dir, allowUnused: true, profile: profiles.micra,
     });
     localeAssert.equal(rtl.sources[0].content, '<html lang="ar" dir="rtl">');
     localeAssert.equal(webUiLocale.loadCatalog('EN_gb', {
@@ -136,7 +136,7 @@ expectLocaleFailure((c) => {
 
 {
   const key = Object.keys(localeReference.strings)[0];
-  const options = {language: 'en', allowUnused: true};
+  const options = {language: 'en', allowUnused: true, profile: profiles.micra};
   localeAssert.throws(() => webUiLocale.renderSources([
     {file: 'bad.html', type: 'html', content: `<a href="{{webui:${key}}}">x</a>`},
   ], options), /complete allowed quoted HTML attribute value/);
@@ -148,13 +148,14 @@ expectLocaleFailure((c) => {
   ], options), /unresolved or invalid localization marker/);
   localeAssert.throws(() => webUiLocale.renderSources([
     {file: 'unused.html', type: 'html', content: `<p>{{webui:${key}}}</p>`},
-  ], {language: 'en'}), /reference catalog has unused key/);
+  ], {language: 'en', profile: profiles.micra}), /reference catalog has unused key/);
   const fixture = makeTestLocales((c) => {
     c.en.strings['zzzz.extra_test'] = 'extra';
   });
   try {
     localeAssert.throws(() => webUiLocale.renderSources(
-        webUiLocale.projectSources(), {language: 'en', localesDir: fixture.dir}),
+        webUiLocale.projectSources(), {language: 'en', localesDir: fixture.dir,
+          profile: profiles.micra}),
     /reference catalog has unused key zzzz\.extra_test/);
   } finally {
     fixture.clean();

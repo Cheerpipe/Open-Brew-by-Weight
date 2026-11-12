@@ -184,35 +184,14 @@ echo "WebUI language: $(obbw_get webui_language)"
 # the lock panel or the timed UI Override section.
 webui_args=()
 grep -q -- '-DOPEN_BREW_BY_WEIGHT_DEVELOPMENT=1' <<<"$effective_flags" && webui_args+=(--development)
-# Bake only the UI of the compiled machine type into the served Web UI.
-webui_machine_type="$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_TYPE //p' \
-  "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"
-case "$webui_machine_type" in
-  0) webui_args+=(--machine-type paddle) ;;
-  1) webui_args+=(--machine-type momentary) ;;
-  2) webui_args+=(--machine-type momentary_reed) ;;
-  *) echo "warning: unknown machine type '${webui_machine_type}'; generating type-agnostic Web UI" >&2 ;;
-esac
 # Remote control builds embed the fixed Home action bar; without the flag the
 # panel markup and CSS are omitted so a disabled feature costs no UI bytes.
 grep -q -- '-DOPEN_BREW_BY_WEIGHT_ENABLE_REMOTE_MACHINE_CONTROL=1' <<<"$effective_flags" \
   || webui_args+=(--no-remote-control)
-# Only La Marzocco cloud builds ship its settings and diagnostics code.
-[[ "$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION //p' \
-  "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)" == 1 ]] \
-  || webui_args+=(--no-la-marzocco)
-# A machine profile that names its own icon ships it in Home's Equipment row.
-webui_machine_icon="$(sed -n 's/^#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "\(.*\)"$/\1/p' \
-  "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"
-[[ -n "$webui_machine_icon" ]] && webui_args+=(--machine-icon "$webui_machine_icon")
-# The Web UI copy names the machine: its brand, its model, and the everyday
-# name the profile gives it (the model again when it gives none).
-for webui_name in BRAND:--machine-brand MODEL:--machine-model WEB_SHORT_MODEL:--machine-short-model; do
-  webui_value="$(sed -n "s/^#define OPEN_BREW_BY_WEIGHT_MACHINE_${webui_name%%:*} \"\(.*\)\"\$/\1/p" \
-    "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightBuildProfileGenerated.h" 2>/dev/null)"
-  [[ -n "$webui_value" ]] && webui_args+=("${webui_name##*:}" "$webui_value")
-done
+# The resolved profile carries everything the Web UI shows about the machine:
+# its type, La Marzocco integration, glyph, brand, model, and everyday name.
 node ./scripts/gen_web_ui.js \
+  --build-profile "$OPENBREWBYWEIGHT_GENERATED_DIR/build-profile.json" \
   --output "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightWebAssetsGzip.h" \
   --version "$(sed -n 's/^#define FW_VERSION_STRING "\(.*\)"$/\1/p' \
     "$OPENBREWBYWEIGHT_GENERATED_DIR/OpenBrewByWeightVersion.cpp")" \

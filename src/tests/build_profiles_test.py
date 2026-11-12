@@ -51,15 +51,16 @@ def expect_failure(hardware=HARDWARE, machine=PRO_X, flags="", text=""):
         temporary.cleanup()
 
 
-for hardware, machine, expected_type, integration, brand, model, icon, cloud_model in (
-        (HARDWARE, PRO_X, "1", "none", "Rancilio", "Silvia Pro X", None, None),
-        (HARDWARE_REED, PRO_X_REED, "2", "none", "Rancilio", "Silvia Pro X", None, None),
+for hardware, machine, expected_type, integration, brand, model, type_name, cloud_model in (
+        (HARDWARE, PRO_X, "1", "none", "Rancilio", "Silvia Pro X", "momentary", None),
+        (HARDWARE_REED, PRO_X_REED, "2", "none", "Rancilio", "Silvia Pro X",
+         "momentary_reed", None),
         (HARDWARE, MICRA, "0", "la_marzocco_cloud", "La Marzocco", "Linea Micra",
-         "linea-micra", "LINEAMICRA"),
+         "paddle", "LINEAMICRA"),
         (HARDWARE, MINI, "0", "la_marzocco_cloud", "La Marzocco", "Linea Mini",
-         "linea-mini", "LINEAMINI"),
+         "paddle", "LINEAMINI"),
         (HARDWARE, MINI_R, "0", "la_marzocco_cloud", "La Marzocco", "Linea Mini R",
-         "linea-mini-r", "LINEAMINIR")):
+         "paddle", "LINEAMINIR")):
     temporary, result = run(hardware=hardware, machine=machine)
     try:
         assert result.returncode == 0, result.stderr
@@ -74,19 +75,14 @@ for hardware, machine, expected_type, integration, brand, model, icon, cloud_mod
         expected_integration = "1" if integration == "la_marzocco_cloud" else "0"
         assert (f"#define OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION "
                 f"{expected_integration}") in header
-        # The machine's Home icon is profile metadata the build forwards to the
-        # Web UI generator; profiles without it keep the default generic glyph.
-        if icon:
-            assert f'#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON "{icon}"' in header
-        else:
-            assert "OPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON" not in header
+        # The Web UI generator reads its machine data (type, glyph, names) from
+        # the resolved manifest; the firmware header carries none of it.
+        assert manifest["machine_type"] == type_name
+        assert manifest["machine"]["machine_icon"] == \
+            json.loads(machine.read_text())["machine_icon"]
+        assert "_MACHINE_WEB_" not in header
         # The cloud model is the one profile fact the La Marzocco client reads:
         # it selects which account machines the controller lists.
-        # The everyday name the Web UI copy uses; the model when the profile
-        # gives none.
-        short = {"Linea Micra": "Micra", "Linea Mini": "Mini", "Linea Mini R": "Mini R"}
-        assert (f'#define OPEN_BREW_BY_WEIGHT_MACHINE_WEB_SHORT_MODEL '
-                f'"{short.get(model, model)}"') in header
         if cloud_model:
             assert (f'#define OPEN_BREW_BY_WEIGHT_MACHINE_CLOUD_MODEL '
                     f'"{cloud_model}"') in header
@@ -190,12 +186,77 @@ for profile in (mini_profile, mini_r_profile):
         assert profile[key] == la_marzocco_profile[key], \
             f"{profile['id']}: {key} must match the Linea Micra profile"
 
-bad_icon = changed(
-    MICRA, lambda value: value.update(machine_icon="Not An Icon"))
+# machine_icon is the glyph itself: a short list of flat SVG shape elements
+# with bounded geometry, each failure naming its spot.
+GLYPH = [{"path": {"d": "M4 3h16v8H4z", "stroke-width": 1.2, "stroke-linecap": "butt"}},
+         {"circle": {"cx": 6.5, "cy": 5.5, "r": 1.3, "fill": "currentColor"}},
+         {"rect": {"x": 3, "y": 16, "width": 18, "height": 5, "rx": 1}},
+         {"ellipse": {"cx": 12, "cy": 12, "rx": 2, "ry": 1}},
+         {"line": {"x1": -2, "y1": 0, "x2": 24, "y2": 24, "stroke-linejoin": "round"}},
+         {"polyline": {"points": "1,2 3,4"}}, {"polygon": {"points": "1 2 3 4 5 6"}}]
+valid_icon = changed(MICRA, lambda value: value.update(machine_icon=GLYPH))
+temporary, result = run(machine=valid_icon)
 try:
-    expect_failure(machine=bad_icon, text="machine.machine_icon")
+    assert result.returncode == 0, result.stderr
+    generated = Path(dict(line.split("=", 1) for line in
+                          result.stdout.splitlines())["generated_dir"])
+    assert json.loads((generated / "build-profile.json").read_text())[
+        "machine"]["machine_icon"] == GLYPH
 finally:
-    bad_icon.unlink()
+    temporary.cleanup()
+    valid_icon.unlink()
+ICON = "machine.machine_icon"
+for icon, text in (
+        ("linea-micra", f"{ICON} now holds the glyph itself"),
+        ([], f"{ICON} must be a list of 1 to 16"),
+        ([{"path": {"d": "M0 0"}}] * 17, f"{ICON} must be a list of 1 to 16"),
+        ([{"path": {"d": "M0 0"}, "circle": {"cx": 1, "cy": 1, "r": 1}}],
+         f"{ICON}[0] must be an object with exactly one element name"),
+        ([{"path": {"d": "M0 0"}}, {"svg": {}}], f"{ICON}[1] element must be one of"),
+        ([{"path": {"d": "M0 0", "onload": "x"}}], f"{ICON}[0].path has unknown fields: onload"),
+        ([{"path": {"rx": 1, "d": "M0 0"}}], f"{ICON}[0].path has unknown fields: rx"),
+        ([{"circle": {"cx": 1, "cy": 1}}], f"{ICON}[0].circle is missing: r"),
+        ([{"circle": {"cx": 1, "cy": 1, "r": 0}}], f"{ICON}[0].circle.r must be a number above 0"),
+        ([{"circle": {"cx": 49, "cy": 1, "r": 1}}],
+         f"{ICON}[0].circle.cx must be a number from -24 to 48"),
+        ([{"circle": {"cx": True, "cy": 1, "r": 1}}], f"{ICON}[0].circle.cx must be a number"),
+        ([{"circle": {"cx": "1", "cy": 1, "r": 1}}], f"{ICON}[0].circle.cx must be a number"),
+        ([{"path": {"d": "M0 0", "stroke-width": 5}}],
+         f"{ICON}[0].path.stroke-width must be a number above 0 and at most 4"),
+        ([{"path": {"d": "M0 0", "fill": "red"}}], f"{ICON}[0].path.fill must be one of"),
+        ([{"path": {"d": 'M0 0"/><script>'}}], f"{ICON}[0].path.d must be SVG path data"),
+        ([{"path": {"d": "M0 0" * 300}}], f"{ICON}[0].path.d must be SVG path data"),
+        ([{"path": {"d": "M0 0" * 250}}] * 3, "bytes of SVG markup; the limit is 2048")):
+    bad_icon = changed(MICRA, lambda value: value.update(machine_icon=icon))
+    try:
+        expect_failure(machine=bad_icon, text=text)
+    finally:
+        bad_icon.unlink()
+no_icon = changed(MICRA, lambda value: value.pop("machine_icon"))
+try:
+    expect_failure(machine=no_icon, text="machine is missing: machine_icon")
+finally:
+    no_icon.unlink()
+
+# --print writes the resolved manifest to stdout and no files; it is what Web
+# UI tooling renders from, so it equals the build's build-profile.json.
+printed = subprocess.run(
+    ["python3", str(RESOLVER), "--hardware", str(HARDWARE), "--machine", str(MICRA), "--print"],
+    cwd=ROOT, capture_output=True, text=True)
+temporary, result = run(machine=MICRA)
+try:
+    assert printed.returncode == 0, printed.stderr
+    generated = Path(dict(line.split("=", 1) for line in
+                          result.stdout.splitlines())["generated_dir"])
+    assert printed.stdout == (generated / "build-profile.json").read_text()
+finally:
+    temporary.cleanup()
+with tempfile.TemporaryDirectory() as output_root:
+    combined = subprocess.run(
+        ["python3", str(RESOLVER), "--hardware", str(HARDWARE), "--machine", str(MICRA),
+         "--print", "--output-root", output_root], cwd=ROOT, capture_output=True, text=True)
+    assert combined.returncode == 2 and "--print cannot be combined" in combined.stderr
+    assert not any(Path(output_root).iterdir())
 
 # target.psram_ecc reaches the build as psram_ecc=enabled|disabled. Both values
 # come from fixtures, so a shipped profile can switch without a test change.
@@ -316,8 +377,20 @@ expect_failure(flags="-DOPEN_BREW_BY_WEIGHT_SPEAKER_PRESENT=0",
                text="cannot change physical presence")
 expect_failure(flags='-DOPEN_BREW_BY_WEIGHT_HARDWARE_PROFILE_ID="other"',
                text="profile identity cannot be overridden")
-expect_failure(flags='-DOPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON="other"',
-               text="profile identity cannot be overridden")
+# The glyph and the everyday name are profile data only: the retired Web UI
+# macros reach neither the header nor the manifest the Web UI renders from.
+temporary, result = run(machine=MICRA, flags='-DOPEN_BREW_BY_WEIGHT_MACHINE_WEB_ICON="other" '
+                        '-DOPEN_BREW_BY_WEIGHT_MACHINE_WEB_SHORT_MODEL="Other"')
+try:
+    assert result.returncode == 0, result.stderr
+    generated = Path(dict(line.split("=", 1) for line in
+                          result.stdout.splitlines())["generated_dir"])
+    header = (generated / "OpenBrewByWeightBuildProfileGenerated.h").read_text()
+    assert "_MACHINE_WEB_" not in header
+    assert json.loads((generated / "build-profile.json").read_text())["machine"] == \
+        json.loads(MICRA.read_text())
+finally:
+    temporary.cleanup()
 expect_failure(flags="-DOPEN_BREW_BY_WEIGHT_DEFAULT_SHOT_REACTION_TIMEOUT_S=2",
                text="must be an integer from 3 to 30")
 

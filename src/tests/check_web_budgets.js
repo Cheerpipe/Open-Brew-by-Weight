@@ -12,6 +12,10 @@ const webUiLocale = require('../../scripts/localize_web_ui.js');
 
 const budgetPath = path.resolve(__dirname, '..', '..', 'config', 'web-asset-budgets.json');
 const {VIEW_NAMES, JS_FILES} = webUi;
+// Budgets measure the canonical development pair (AGENTS.md), the reference
+// machine's real build, so the glyph and copy a cold Home load carries count.
+const profile = () => webUiLocale.resolvedProfile('esp32-s3-relay-x1-speaker',
+    'la-marzocco-linea-micra');
 
 // Contracts read HTML and CSS in one compact form, so how the sources are
 // formatted cannot change what a needle matches or what a budget counts.
@@ -53,7 +57,7 @@ async function authoringSources() {
     {file: 'sw.js', type: 'js', content: raw.swJs},
     ...JS_FILES.map((name) => ({file: name + '.js', type: 'js', content: raw.viewJs[name]})),
     {file: 'app.css', type: 'css', content: raw.css},
-  ], {language: 'en'}).sources.map((source) => source.content);
+  ], {language: 'en', profile: profile()}).sources.map((source) => source.content);
   const localized = {shellHtml: sources.shift(), partialHtml: {}, viewJs: {}};
   for (const name of VIEW_NAMES) localized.partialHtml[name] = sources.shift();
   [localized.appJs, localized.runtimeJs, localized.otaImageJs, localized.swJs] = sources.splice(0, 4);
@@ -74,14 +78,12 @@ async function authoringSources() {
 
 async function measure() {
   const {allHtml, allJs} = await authoringSources();
-  // Shipped-byte budgets measure the canonical reference machine's build
-  // (AGENTS.md pair), so the machine icon a real cold Home load carries is
-  // the one counted.
-  const generated = await webUi.generate({write: false, machineIcon: 'linea-micra'});
+  const generated = await webUi.generate({write: false, profile: profile()});
   // The runtime bakes the build id (VERSION + short commit SHA), which moves its
   // compressed size on every commit; a fixed sentinel id keeps that noise out of
   // the runtime budget, while the combined budget measures the real assets.
-  const sentinel = await webUi.generate({write: false, versionOverride: '00000000'});
+  const sentinel = await webUi.generate({write: false, versionOverride: '00000000',
+    profile: profile()});
   if (sentinel.version !== '00000000') throw new Error('Sentinel generation ignored the fixed build id');
   const html = Buffer.byteLength(allHtml, 'utf8');
   const js = Buffer.byteLength(allJs, 'utf8');
@@ -134,4 +136,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = {compactMarkup, compactCss, authoringSources};
+module.exports = {compactMarkup, compactCss, authoringSources, profile};

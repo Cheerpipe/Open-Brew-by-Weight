@@ -7,11 +7,14 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const {renderSources, CSS_SOURCES} = require('../localize_web_ui.js');
+const {renderSources, resolvedProfile, CSS_SOURCES} = require('../localize_web_ui.js');
 
 const root = path.resolve(__dirname, '..', '..');
 const mockupsDir = path.join(root, 'webui-mockups');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+// The preview stands in for the reference build: the canonical development
+// pair's resolved profiles name the machine and bake its glyph.
+const profile = () => resolvedProfile('esp32-s3-relay-x1-speaker', 'la-marzocco-linea-micra');
 // The firmware stylesheet, assembled from the same ordered layer list the
 // generator concatenates, so the preview serves identical /app.css bytes.
 const appCssBody = () => CSS_SOURCES.map((name) => read(`src/web/css/${name}`)).join('');
@@ -45,12 +48,10 @@ function fillView(html, name, content, hidden = '') {
 }
 
 function renderHome() {
-  // The preview stands in for the reference machine: its profile icon bakes
-  // into Home's Equipment row exactly as the machine's own builds do.
   const [shell, home] = renderSources(['shell', 'home'].map(name => ({
     file: `src/web/html/${name}.html`, type: 'html',
     content: read(`src/web/html/${name}.html`),
-  })), {language: 'en', allowUnused: true, machineType: 'paddle', machineIcon: 'linea-micra'}).sources;
+  })), {language: 'en', allowUnused: true, profile: profile()}).sources;
   return fillView(shell.content, 'home', home.content)
       .replace('</head>', '<link rel="stylesheet" href="/header.css"></head>')
       .replace(/<script\s+type="module"\s+src="\/app\.js\?v=__FW_ASSET_TAG__"\s*><\/script\s*>/,
@@ -100,18 +101,15 @@ function renderSignals() {
   const content = functionSource(runtime, 'escHtml') + runtime.match(/^const sub = .*$/m)[0] + '\n' +
       runtime.slice(start, end).replace(/^export /gm, '');
   return PREVIEW_HEADER_PRELUDE + renderSources([{file: 'src/web/js/runtime.js', type: 'js', content}],
-      {language: 'en', allowUnused: true}).sources[0].content;
+      {language: 'en', allowUnused: true, profile: profile()}).sources[0].content;
 }
 
 function renderMobileMenu() {
   const views = ['stats', 'history', 'settings', 'diagnostic', 'admin'];
-  // Home rides along only for its machine-icons catalog, which Diagnostics'
-  // machine group bakes from; its own render comes from renderHome().
-  const {sources} = renderSources(['home', ...views].map(name => ({
+  const {sources} = renderSources(views.map(name => ({
     file: `src/web/html/${name}.html`, type: 'html',
     content: read(`src/web/html/${name}.html`),
-  })), {language: 'en', allowUnused: true, machineType: 'paddle', machineIcon: 'linea-micra'});
-  sources.shift();
+  })), {language: 'en', allowUnused: true, profile: profile()});
   let html = renderHome();
   views.forEach((name, index) => {
     html = fillView(html, name, sources[index].content, ' hidden');
@@ -143,7 +141,7 @@ function renderLaMarzoccoScript() {
       .replace(/\bR\.(?:uiState\.)?/g, '');
   const extra = mockup('micra.js');
   return 'const __LA_MARZOCCO__ = true;\n' + renderSources([{file: 'src/web/js/settings.js', type: 'js', content}],
-      {language: 'en', allowUnused: true}).sources[0].content + (extra ? '\n' + extra : '');
+      {language: 'en', allowUnused: true, profile: profile()}).sources[0].content + (extra ? '\n' + extra : '');
 }
 
 function createServer() {
