@@ -267,7 +267,8 @@
   border: 1px solid var(--ln);
   border-radius: var(--r);
   padding: calc(1rem + 10px) 1rem 1rem;
-  margin: 0 0 0.75rem;
+  /* Shot cards are tall; the page's section gap keeps each one apart. */
+  margin: 0 0 1.5rem;
 }
 
 :is(#shotTable, #historyTable) :is(th, td) {
