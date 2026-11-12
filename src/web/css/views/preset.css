@@ -817,6 +817,7 @@
   align-items: baseline;
   padding: 0.5rem 0;
   border-top: 1px solid var(--ln);
+  transition: border-color 0.25s ease-out;
 }
 
 .presetAccRows .guardRow:first-child {
@@ -1117,14 +1118,18 @@ body.qwOpen {
   transform: rotate(180deg);
 }
 
-/* Unfolded, the selected fill fades to the plain surface where the graph
-   starts, so its bands, hatch and label halos keep their true colours. */
-.presetAccItem.full .presetAccMore > div {
-  background: linear-gradient(transparent, var(--sf) 2.25rem);
+/* The tint marks the folded selection: unfolding drains it from the whole
+   card, so the graph's bands, hatch and label halos keep their true colours. */
+.presetAccItem.open.full {
+  background-color: var(--sf);
 }
 
-.presetAccItem.full .presetAccToggle {
-  background: var(--sf);
+.presetAccItem.open.full .guardRow {
+  border-top-color: var(--ln);
+}
+
+.presetAccItem.open.full .presetAccDot {
+  box-shadow: inset 0 0 0 3.5px var(--sf);
 }
 
 .qwReset b {
