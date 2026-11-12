@@ -636,9 +636,10 @@ struct RuntimeConfig {
   bool avoidAccidentalTouchEnabled = true;
   float cupRemovedWeightG = DEFAULT_CUP_REMOVED_WEIGHT_G;
   // Low bits OFF/WARN_ONCE/REQUIRE_SCALE; bits 6/7 are idle accessory
-  // retare (on)/armed rinse (off).
-  uint8_t noScaleBbwMode =
-      static_cast<uint8_t>(NoScaleBbwMode::WARN_ONCE) | IDLE_ACCESSORY_RETARE;
+  // retare (on)/armed rinse (on).
+  uint8_t noScaleBbwMode = static_cast<uint8_t>(NoScaleBbwMode::WARN_ONCE) |
+                           IDLE_ACCESSORY_RETARE |
+                           NO_SCALE_ALLOW_RINSE_WHILE_ARMED;
   uint32_t lastShotCooldownMs = DEFAULT_LAST_SHOT_COOLDOWN_MS;
   // Minimum level sent to the ESP-IDF serial backend. NONE is off; CLI
   // request/reply traffic remains independent.

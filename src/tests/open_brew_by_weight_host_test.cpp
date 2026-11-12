@@ -2863,7 +2863,7 @@ void w01_default_runtime_configuration_is_valid() {
   CHECK(noScaleBbwModeValue(config.noScaleBbwMode) ==
         static_cast<uint8_t>(NoScaleBbwMode::WARN_ONCE));
   CHECK(idleAccessoryRetareEnabled(config.noScaleBbwMode));
-  CHECK(!noScaleAllowRinseWhileArmed(config.noScaleBbwMode));
+  CHECK(noScaleAllowRinseWhileArmed(config.noScaleBbwMode));
   CHECK(config.cupProtectionEnabled);
   CHECK(config.stopIfCupRemoved);
   CHECK(!config.requireCupToStart);

@@ -18,7 +18,7 @@ nor disarmed. See [Linea Micra](linea-micra.md#recognize-paddle-wake-gestures).
 | Mode | Shot without a scale | Rinse without a scale | Cooldown |
 | --- | --- | --- | --- |
 | **Brew manually** | Allowed | Allowed | Not used |
-| **Warn once, then allow** (default) | First attempt is blocked and alerts; later attempts are manual | An Armed rinse does not run water. It uses up that warning so the next brew can be manual. Turn **Rinse without a scale** on if you want that rinse to run | Protection returns after the configured delay |
+| **Warn once, then allow** (default) | First attempt is blocked and alerts; later attempts are manual | An Armed rinse runs, because **Rinse without a scale** is on by default. Turn it off and an Armed rinse does not run water; it uses up that warning so the next brew can be manual | Protection returns after the configured delay |
 | **Require a scale** | Blocked unless temporarily allowed with the physical gesture | Blocked unless temporarily allowed with the physical gesture | Protection returns after the configured delay |
 
 In **Require a scale**, shots and rinses cannot start until the scale is usable.
@@ -32,11 +32,11 @@ scale reconnects while the activator is held, release it before starting again.
 temporary **Require a scale** override. It defaults to 60 minutes and accepts
 5–240 minutes. Boot and scale reconnect re-arm protection immediately.
 
-**Rinse without a scale** is off by default. It applies only to **Warn once,
-then allow**. With it off, a rinse while the missing-scale warning is Armed
-does not run water. The gesture still uses up that warning, so the next brew
-can be manual. With it on, that rinse still runs. You hear the missing-scale
-warning when you start the gesture, then the rinse sound if you finish it.
+**Rinse without a scale** is on by default. It applies only to **Warn once,
+then allow**. With it on, a rinse while the missing-scale warning is Armed
+still runs. You hear the missing-scale warning when you start the gesture,
+then the rinse sound if you finish it. With it off, that rinse does not run
+water. The gesture still uses up that warning, so the next brew can be manual.
 Home **Start rinse** follows the same choice. **Require a scale** still blocks
 rinse unless you complete the temporary physical override.
 
