@@ -599,7 +599,7 @@ const QUICK_ICONS = {
   weight: "M12 4v16M6 20h12M5 7h14M5 7l-3 6.5a3 3 0 0 0 6 0zM19 7l-3 6.5a3 3 0 0 0 6 0z",
   hand: "M8 13V6a1.5 1.5 0 0 1 3 0v5M11 10.5V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7 6 6 0 0 1-5.2-3L3 14.5a1.5 1.5 0 0 1 2.5-1.6L8 15",
   shield: "M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z",
-  fastExtractionGuardEnabled: "M13 3 5 14h6l-1 7 8-11h-6z",
+  fastExtractionGuardEnabled: "m4 6 7 6-7 6M12 6l7 6-7 6",
   slowExtractionGuardEnabled: "M7 3h10M7 21h10M8 3v3l4 6-4 6v3M16 3v3l-4 6 4 6v3",
   noScaleBbwMode:
     "M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM15.2 10.2a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0zM9 16.5h6",
