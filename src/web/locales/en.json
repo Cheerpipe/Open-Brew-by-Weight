@@ -1359,6 +1359,7 @@
     "runtime.cup_removed": "Cup removed",
     "runtime.current_preset": "Current preset: ",
     "runtime.custom_ntp_must_be_empty_or_a": "Custom NTP must be empty or a hostname (letters, digits, hyphen, dot; max 63).",
+    "runtime.cut_active": "Active preset: {0}",
     "runtime.cut_at": "Cut at",
     "runtime.cut_avg_miss": "Avg miss",
     "runtime.cut_bullseye": "Bullseye",
