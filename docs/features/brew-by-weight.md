@@ -89,7 +89,7 @@ appears while you are looking at the active preset.
 | **Earliest weight stop (s)** | Time limits | 12 s | 3–30 s, and at least the retare window plus 3 s (7 s with the default 4 s window); see [Cup protection](cup-protection.md) | The scale cannot stop the shot before this, so tare and first drops cannot trigger it. |
 | **Max shot time (s)** | Time limits | 50 s | 5–60 s | The shot always stops here, target reached or not. Ignored on timer-only and no-scale shots. Cannot exceed the hard 60 s cap. |
 | **Backup stop time (s)** | Time limits | empty | Earliest weight stop to Max shot time | Leave empty to use your recent shots, or the middle of your window until there are enough. See [scale-loss backup](auto-to-manual.md). |
-| **Expected drip weight after the shot stops (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with the field's **Set** key | The coffee still dripping into the cup after the stop, subtracted from the cut line. It learns from every eligible weight-stopped shot that passes its plausibility checks, shown next to a chart of what your last five shots needed. **Set** uses a new value from the next shot and starts a quick start. |
+| **Expected drip weight after the shot stops (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with the field's **Set** key | The coffee still dripping into the cup after the stop, subtracted from the cut line. It learns from every eligible weight-stopped shot that passes its plausibility checks, shown next to a chart of what your last ten shots needed. **Set** uses a new value from the next shot and starts a quick start. |
 | **Learning speed** | Drip compensation | 0.30 | 0.01–1.00, applied with the field's **Set** key | How strongly each shot moves the drip. It may tune itself after about 20 shots; **Set** applies a new value at once and keeps the drip. |
 | **Stop after sustained weight** | Shared settings → Cup protection | ON | ON / OFF | A backup for a weight stop blocked by **Avoid accidental touch**. Fresh readings must stay above the applicable cut threshold for 1 second. Applies to every preset; takes effect on the next shot. |
 
@@ -192,7 +192,9 @@ baseline and connection provenance, following a weight cut on any part of the
 cut line. Manual stops, time/safety limits, scale-loss stops, cup removal,
 detected channeling, cuts made without a usable flow reading (for example right
 after the scale reconnects) and excluded shots do not train it: these stops do
-not measure normal cutoff error.
+not measure normal cutoff error. A cup you set down after starting the shot is
+not one of them: once the automatic retare has zeroed it, the shot trains like
+any other.
 
 Before an observation trains the drip, two plausibility checks guard it. A
 physical bound comes first: with the flow measured at the stop, only so much
@@ -235,11 +237,12 @@ that preset's evidence start over, as a recipe change does. Recipe or relevant
 tare/drip timing changes restart evidence without erasing the offset or gain.
 
 In **Settings → Presets → Drip compensation** you see the drip in use, its
-status, and a small chart of what each of your last five shots with this preset
+status, and a small chart of what each of your last ten shots with this preset
 needed, drawn against a line for the drip in use. Shots that did not train the
 drip — a moved cup, a manual stop, or a shot the plausibility checks discarded
 — keep their bar but show it hatched with diagonal stripes, so you can see at
-a glance what was ignored; shots without a usable weight show as skipped. With
+a glance what was ignored; shots without a usable weight, and ignored shots
+that read below zero, show as skipped. With
 brew by weight
 off the section is hidden; each field carries a **Set** key with a tick and
 an **undo** key that appear inside the field, next to the − key, while your

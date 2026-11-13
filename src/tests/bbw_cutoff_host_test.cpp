@@ -244,6 +244,14 @@ int main() {
     assert(formatDripChartJson(json, sizeof(json), fields) > 0);
     assert(strstr(json, "\"bbwRecentAfterSet\":-1,\"bbwRecentAfterQuick\":-1,\"bbwRecentG\":[]") != nullptr);
     assert(formatDripChartJson(json, 40, fields) == 0);
+    // A trained shot keeps a negative value; a skipped one below zero is null.
+    fields.bbwRecentCount = 3;
+    fields.bbwRecentSkipped = 6;
+    fields.bbwRecentCg[0] = -1;
+    fields.bbwRecentCg[1] = -80;
+    fields.bbwRecentCg[2] = 320;
+    assert(formatDripChartJson(json, sizeof(json), fields) > 0);
+    assert(strstr(json, "\"bbwRecentG\":[-0.01,null,3.20]") != nullptr);
   }
 
   // Drip learning memory: exact NVS round trip, damaged or foreign records

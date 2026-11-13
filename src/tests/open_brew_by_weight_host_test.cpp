@@ -5836,6 +5836,27 @@ void w80_buzzer_only_retare_beeps_before_tare_result() {
   CHECK(localBuzzer.acceptedRequests == before + 1);
 }
 
+// A cup set down after start trips the slew guard; the retare's new zero
+// makes the shot a drip observation again.
+void w80b_late_cup_retare_restores_drip_learning() {
+  resetHarness(false, true);
+  runtimeConfig.autoRetare = true;
+  runtimeConfig.bbwProtectionMs = minimumBbwProtectionMs(runtimeConfig);
+  reachReadyFromBoot();
+  startCycle();
+  CHECK(executeNextScaleCommand());
+  establishPostTareBaseline();
+  CHECK(session.calibrationEligible);
+  runLoopAfter(runtimeConfig.rinseGestureMs + 1);
+  publishStableCupWeight(150.0f, 10);
+  CHECK(session.retarePerformed);
+  CHECK(!session.calibrationEligible);
+  CHECK(executeNextScaleCommand());
+  publishWeight(0.0f, hostMillis + 50, 0, 40);
+  CHECK(!session.retareEffectPending);
+  CHECK(session.calibrationEligible);
+}
+
 void w81_scale_priority_failed_start_falls_back_after_disconnect() {
   resetHarness(false, true);
   runtimeConfig.alertOutputChannel =
@@ -26642,6 +26663,7 @@ const TestCase testCases[] = {
     {"W79c", w79c_rinse_without_scale_beeps_at_circuit_open_and_close},
     {"W79d", w79d_scale_only_start_and_stop_still_use_local_circuit_beeps},
     {"W80", w80_buzzer_only_retare_beeps_before_tare_result},
+    {"W80B", w80b_late_cup_retare_restores_drip_learning},
     {"W81", w81_scale_priority_failed_start_falls_back_after_disconnect},
     {"W94", w94_eclair_scale_priority_uses_local_alerts},
     {"W95", w95_eclair_scale_only_omits_unsupported_alerts},

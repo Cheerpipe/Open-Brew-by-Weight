@@ -667,6 +667,9 @@ void confirmLateRetareBaseline() {
   if (session.active) {
     session.awaitingPostTareBaseline = false;
     holdCupPresenceTransitions(false);
+    // A fresh zero: what disturbed the old frame (the cup going on) cannot
+    // bias the drip this shot measures; later disturbances still clear it.
+    session.calibrationEligible = session.automaticEnabled;
   }
   if (pendingFinalize.pending && pendingFinalize.cycleId == session.id) {
     pendingFinalize.firstDropDs = SHOT_LOG_METRIC_MISSING;
