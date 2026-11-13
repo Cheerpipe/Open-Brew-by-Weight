@@ -1612,7 +1612,7 @@ if (!statsSection ||
       ';const R = {uiState, axisLabel, fadeFill, escHtml: String, lockControls() {}, get sub() { return sub; },' +
       'sendUiOperation(op) { sentOps.push(op); }, get homeStatusCache() { return homeStatusCache; },' +
       'get presetState() { return presetState; }};' +
-      'return{renderStatsDurChart:renderStatsDurChart};')();
+      'return{renderStatsDurChart,merged(h){statsMerged=h;}};')();
   const histRoot = {dataset: {}, className: '', innerHTML: ''};
   const histPlot = {innerHTML: '', style: {setProperty(k, v) { this[k] = v; }},
     querySelector() { return {}; }};
@@ -1628,7 +1628,8 @@ if (!statsSection ||
   const ticks = [];
   let tickMax = 0;
   global.sentOps = [];
-  global.refreshMergedHeader = () => {};
+  let mergedAsks = 0;
+  global.refreshMergedHeader = () => mergedAsks++;
   global.$ = (id) => ({statsDurChart: histRoot, statsDurChartPlot: histPlot,
     statsPresetFilter: histFilter})[id] || null;
   global.homeStatusCache = () => null;
@@ -1701,6 +1702,22 @@ if (!statsSection ||
   if (histRoot.hidden || !histPlot.hidden) {
     throw new Error('A preset without timed shots keeps only the selector visible');
   }
+  // The companion's header asked for All before the page knew its presets
+  // (or before the active preset changed) is asked again for the preset the
+  // page follows; it draws as soon as that one arrives.
+  global.statsPreset = null;
+  mergedAsks = 0;
+  helpers.merged(charts(curve(21, 40, 27, 34, true, [1, 1, 1]), true, [300], {preset: 0}));
+  helpers.renderStatsDurChart();
+  if (mergedAsks !== 1 || pressed() !== 'House' || !histPlot.hidden) {
+    throw new Error('A companion header for another preset must be asked again for the chosen one');
+  }
+  helpers.merged(charts(curve(21, 40, 27, 34, true, [1, 1, 1]), true, [300], {preset: 1}));
+  helpers.renderStatsDurChart();
+  helpers.merged(null);
+  if (mergedAsks !== 1 || histPlot.hidden) {
+    throw new Error('The companion header for the chosen preset must draw without asking again');
+  }
   global.shotStats = {dens: [null, null], cons: {t: [], p: 0}};
   helpers.renderStatsDurChart();
   if (!histRoot.hidden) {
@@ -1709,6 +1726,14 @@ if (!statsSection ||
   for (const name of ['$', 'shotStats', 'fillChartTicks', 'homeStatusCache', 'presetState', 'sub',
     'sentOps', 'refreshMergedHeader', 'statsPreset'])
     delete global[name];
+}
+{
+  // A page's header lands before the companion's is asked for: the presets
+  // it names decide which preset that request follows.
+  const apply = blockAt(viewJs.stats, 'function applyStatsStream(');
+  if (!(apply.indexOf('applyShotPage(') < apply.indexOf('refreshMergedHeader()'))) {
+    throw new Error('Stats must take the page header before asking the companion for its own');
+  }
 }
 
 if (!codeIncludes(ui, 'id="firmwareFooter"') ||
