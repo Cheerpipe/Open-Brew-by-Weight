@@ -411,7 +411,8 @@ counts as a bad shot.
 In its Stats history card, each shot shows everything at once. At the top are
 its duration and yield in large numbers, then when you pulled it and how it
 landed — the time and the **Fast**, **On recipe** or **Slow** verdict sit side
-by side as pills.
+by side as pills. A shot where a sudden surge of flow gave away channeling adds
+a **Channeling** pill, since that shot does not reflect your recipe.
 Below come its target, error, flow, late cup, first drop, how it ended, shot
 type, preset, scale and your star rating, which you can change right there.
 Then comes its **preset chart**: the

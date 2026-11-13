@@ -1597,16 +1597,16 @@ function renderShots() {
         : __WEBUI_TEXT__("runtime.shot") + " " + (r.number ?? r.id);
       archiveMark(num, r);
       row.cells[0].prepend(num);
-      // The verdict sits beside the time so each card says at a glance how the shot landed.
-      if (!bad && r.arrivalS > 0 && ["fast", "on_recipe", "slow"].includes(r.verdict))
+      // The verdict, then any channeling, sit beside the time so each card
+      // says at a glance how the shot landed.
+      const pill = (kind, text) =>
         row.cells[0].insertAdjacentHTML(
           "beforeend",
-          '<span class="heroPill" data-kind="' +
-            r.verdict +
-            '">' +
-            R.verdictLabel(r.verdict) +
-            "</span>",
+          '<span class="heroPill" data-kind="' + kind + '">' + text + "</span>",
         );
+      if (!bad && r.arrivalS > 0 && ["fast", "on_recipe", "slow"].includes(r.verdict))
+        pill(r.verdict, R.verdictLabel(r.verdict));
+      if (!bad && r.channeling) pill("channeling", __WEBUI_TEXT__("runtime.cut_channeling"));
       const rate = document.createElement("td");
       rate.className = "shotRateCell";
       rate.dataset.label = __WEBUI_TEXT__("runtime.rate");

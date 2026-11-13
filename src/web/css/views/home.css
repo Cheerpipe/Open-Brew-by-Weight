@@ -434,6 +434,10 @@
   --z: var(--mu);
 }
 
+[data-kind="channeling"] {
+  --z: var(--wn);
+}
+
 .accessSheet {
   margin: 0.3rem 0 0.6rem;
   padding: 0.7rem 0.85rem 0.2rem;
