@@ -7730,6 +7730,7 @@ function loadSettingsConfig({ config: c, quickRevert }) {
     "buzzerScaleLostBeep",
     "buzzerAutoToManualGuardEndBeep",
     "buzzerManualNoScaleBeep",
+    "buzzerBackflushReadyBeep",
     "buzzerScaleConnectedBeep",
     "buzzerScaleLostStockTone",
     "buzzerScaleConnectedStockTone",

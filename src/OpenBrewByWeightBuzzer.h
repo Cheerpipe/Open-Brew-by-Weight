@@ -35,7 +35,7 @@ inline bool buzzerRequestIsHighPriority(BuzzerPattern pattern, BuzzerCue cue) {
 #if OPEN_BREW_BY_WEIGHT_ENABLE_BUZZER == 1
 struct RtttlCatalog {
   static constexpr uint8_t kCueCount =
-      static_cast<uint8_t>(BuzzerCue::RECOVERY_ERROR) + 1;
+      static_cast<uint8_t>(BuzzerCue::BACKFLUSH_READY) + 1;
   static constexpr uint8_t kPulseRateCount =
       static_cast<uint8_t>(ExtendedPulseRate::RAPID) + 1;
   // Built-in cues use at most five notes; reserve eight and reject growth

@@ -369,6 +369,11 @@ bool jsonBoolean(const cJSON *object, const char *name, bool &output) {
   return true;
 }
 
+// An absent field keeps the candidate's value.
+bool jsonOptionalBoolean(const cJSON *object, const char *name, bool &output) {
+  return !jsonFieldPresent(object, name) || jsonBoolean(object, name, output);
+}
+
 bool jsonUint32(const cJSON *object, const char *name, uint32_t &output) {
   const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
   if (!cJSON_IsNumber(item) || !std::isfinite(item->valuedouble) ||

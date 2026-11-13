@@ -559,6 +559,7 @@ if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !codeIncludes(ui, 'buzzerScaleLostBeep') ||
     !codeIncludes(ui, 'buzzerAutoToManualGuardEndBeep') ||
     !codeIncludes(ui, 'buzzerManualNoScaleBeep') ||
+    !codeIncludes(ui, 'buzzerBackflushReadyBeep') ||
     !codeIncludes(ui, 'buzzerScaleConnectedBeep') ||
     !codeIncludes(ui, 'scaleConnectedLed') ||
     !codeIncludes(ui, 'buzzerExtendedPulseRate') ||
@@ -643,6 +644,7 @@ if (!network.includes('"firstDropBeep"') ||
     !network.includes('"buzzerScaleLostBeep"') ||
     !network.includes('"buzzerAutoToManualGuardEndBeep"') ||
     !network.includes('"buzzerManualNoScaleBeep"') ||
+    !network.includes('"buzzerBackflushReadyBeep"') ||
     !network.includes('"buzzerScaleConnectedBeep"') ||
     !network.includes('"scaleConnectedLed"') ||
     !network.includes('"buzzerExtendedPulseRate"') ||

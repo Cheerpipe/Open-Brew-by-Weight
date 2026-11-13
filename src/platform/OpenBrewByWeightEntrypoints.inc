@@ -920,6 +920,7 @@ void loop() {
   finishLoopPhase(LoopPhase::INPUT_MACHINE_SERVICE);
   const MachineIntention powerIntention = machineLastIntention();
   const bool wakeGestureConsumed = serviceMachineWakeGesture(powerIntention);
+  serviceBackflushReadyAlert();
   if (!wakeGestureConsumed) {
     serviceNoScaleShotGuard(loopGuardInputs);
     serviceCupStartGuard(loopGuardInputs);

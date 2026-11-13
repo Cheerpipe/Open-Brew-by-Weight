@@ -231,6 +231,7 @@ void processWebCommand(const WebCommand &command) {
       candidate.buzzerAutoToManualGuardEndBeep =
           command.config.buzzerAutoToManualGuardEndBeep;
       candidate.buzzerManualNoScaleBeep = command.config.buzzerManualNoScaleBeep;
+      candidate.buzzerBackflushReadyBeep = command.config.buzzerBackflushReadyBeep;
       candidate.buzzerScaleConnectedBeep =
           command.config.buzzerScaleConnectedBeep;
       candidate.buzzerScaleConnectedStockTone =

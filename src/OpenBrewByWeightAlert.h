@@ -19,7 +19,8 @@ enum class AlertEvent : uint8_t {
   MANUAL_NO_SCALE,
   CUP_START_BLOCKED,
   EXTENDED_PULSE,
-  SCALE_CONNECTED
+  SCALE_CONNECTED,
+  BACKFLUSH_READY
 };
 
 enum class AlertKind : uint8_t {
@@ -62,6 +63,7 @@ inline bool alertEventScaleCapable(AlertEvent event) {
     case AlertEvent::CUP_START_BLOCKED:
     case AlertEvent::EXTENDED_PULSE:
     case AlertEvent::SCALE_CONNECTED:
+    case AlertEvent::BACKFLUSH_READY:
       return false;
     default:
       return true;

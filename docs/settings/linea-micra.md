@@ -358,7 +358,9 @@ instructions and prepare the machine before requesting the program.
 
 1. Leave the paddle OFF and request automatic backflush in the app.
 2. Wait until Home reports **Backflush ready · paddle to ON**, then move the
-   paddle ON within the opportunity offered by the app.
+   paddle ON within the opportunity offered by the app. A short call on the
+   buzzer announces the same moment, so you don't need to watch the screen;
+   turn it off with **Backflush ready** in [Alerts](../alerts.md).
 3. Home first shows **Checking backflush**, then **Backflush running**
    when the machine confirms the program. Return the paddle OFF after it ends.
 

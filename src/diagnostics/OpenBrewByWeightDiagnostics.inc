@@ -280,9 +280,7 @@ void publishControlStatus() {
       ? relay.hardLimitMs - electricalElapsed : 0;
   next.backflushWaiting = !session.active && !backflushActive(stopperState) &&
       backflushObservation.valid && backflushObservation.phase == MachineBackflushPhase::AWAITING;
-  next.backflushReady = next.backflushWaiting && backflushObservation.permit.extendable &&
-      backflushObservation.ready && stopperState == StopperState::READY &&
-      firmwareInitializationComplete && !maintenanceLease.active;
+  next.backflushReady = backflushReadyForPaddle();
   next.backflushUnresolved = backflushObservation.unresolved;
   copyCString(next.backflushStopReason, sizeof(next.backflushStopReason), backflushStopReason);
   next.safetyTimersReady = relay.timersReady;

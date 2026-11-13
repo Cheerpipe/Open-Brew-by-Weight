@@ -556,7 +556,7 @@ uint32_t machineWakeStartedAtMs = 0;
 bool machineWakeGestureConsumedThisLoop = false;
 MachineBackflushSnapshot backflushObservation;
 MachineBackflushPermit backflushPermit;
-uint32_t backflushRelayGeneration = 0, backflushSequence = 0;
+uint32_t backflushRelayGeneration = 0, backflushSequence = 0, backflushReadyAlertEpisode = 0;
 const char *backflushStopReason = "none";
 // Boot-scoped master switch: FULL by default, COMPATIBILITY only when the
 // persisted fwmode record says so. setup() assigns it once; nothing else

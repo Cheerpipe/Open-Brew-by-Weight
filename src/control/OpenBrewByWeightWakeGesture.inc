@@ -20,6 +20,23 @@ bool backflushProvenanceCurrent(const MachineBackflushSnapshot &observation) {
       observation.permit.attempt == backflushPermit.attempt;
 }
 
+// Home's "Backflush ready · paddle to ON": paddle ON now admits a supervised
+// backflush that keeps the circuit on for the whole program.
+bool backflushReadyForPaddle() {
+  return !session.active && stopperState == StopperState::READY &&
+      backflushObservation.valid && backflushObservation.phase == MachineBackflushPhase::AWAITING &&
+      backflushObservation.permit.extendable && backflushObservation.ready &&
+      firmwareInitializationComplete && !maintenanceLease.active;
+}
+
+// One cue per awaiting episode, even if readiness flickers within it.
+void serviceBackflushReadyAlert() {
+  if (!backflushReadyForPaddle() ||
+      backflushObservation.permit.episode == backflushReadyAlertEpisode) return;
+  backflushReadyAlertEpisode = backflushObservation.permit.episode;
+  if (runtimeConfig.buzzerBackflushReadyBeep) emitAlert(AlertEvent::BACKFLUSH_READY);
+}
+
 void serviceBackflush(const MachineIntention &intent) {
   const auto relay = getRelaySafetySnapshot();
   bool confirmed = stopperState == StopperState::BACKFLUSH_RUNNING;
