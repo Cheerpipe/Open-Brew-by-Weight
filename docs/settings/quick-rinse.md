@@ -39,7 +39,7 @@ See [Linea Micra](linea-micra.md#recognize-paddle-wake-gestures).
 
 - **Paddle:** from Ready or during a brew, ON then OFF within the **gesture**
   time is a rinse. Holding ON past that time keeps a brew (or, if
-  [No-scale BBW](no-scale-bbw.md) is Armed, may refuse to close the machine
+  the [scale guard](no-scale-bbw.md) is armed, may refuse to close the machine
   circuit). An Armed rinse from Ready does not run water unless **Allow rinse
   while Armed** is on; the gesture still uses up the missing-scale warning.
 - **Momentary / reed:** a long-press that **starts from idle** (off / confirmed
@@ -82,5 +82,5 @@ the physical temporary override was deliberately completed. If **Warn once, then
 allow** is Armed and **Rinse without a scale** is off, the rinse gesture uses
 up the warning and does not run water.
 
-Related: [Paddle](paddle.md), [Momentary](momentary.md), [No-scale BBW](no-scale-bbw.md),
+Related: [Paddle](paddle.md), [Momentary](momentary.md), [Scale guard](no-scale-bbw.md),
 [Shot history](../features/shot-history.md).

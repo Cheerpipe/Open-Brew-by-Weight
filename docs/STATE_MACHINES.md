@@ -866,7 +866,7 @@ not a state machine; it only filters which peripheral may enter
 once, or blocked until a scale is usable. In **Require a scale**, ordinary shot
 and rinse gestures stay blocked; the three-cycle emergency gesture temporarily
 allows manual use. See
-[No-scale BBW](settings/no-scale-bbw.md).
+[Scale guard](settings/no-scale-bbw.md).
 
 The brew orchestrator, not the guard, pushes `machineSetActivatorDriveAllowed` so
 momentary does not 1:1-forward while this guard (or cup-start) would

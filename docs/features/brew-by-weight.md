@@ -53,6 +53,7 @@ means shots stop by weight; it turns into a grey hand when you stop them
 yourself. The shield shows your guards: green when all six are on, red when
 some are off, and faded when none are on. On a wider screen the shield opens
 up into the six guard icons, so you can see at a glance which one is off.
+Each guard has the same icon and name here as in Settings.
 
 Tap either icon to open the panel. There you can switch between **By weight**
 and **Manual**, and turn each guard on or off. These changes are temporary:
@@ -82,7 +83,7 @@ appears while you are looking at the active preset.
 
 | Setting | Group | Default | Range | Effect on the shot |
 | --- | --- | --- | --- | --- |
-| **Brew by weight** | Recipe | ON | ON / OFF | ON: stop by weight when a scale is usable. OFF: paddle, **Stop**, and the 60 s firmware cap only; the fast and slow options, the scale-loss backup, Max shot time, and No-scale BBW become read-only. |
+| **Brew by weight** | Recipe | ON | ON / OFF | ON: stop by weight when a scale is usable. OFF: paddle, **Stop**, and the 60 s firmware cap only; the fast and slow options, the scale-loss backup, Max shot time, and the scale guard become read-only. |
 | **Dose (g)** | Recipe | 18 g | 5–30 g in 0.1 g steps | Coffee in the basket. Shows your ratio; does not change the cut. |
 | **Target yield (g)** | Recipe | 36 g | 10–200 g in 0.1 g steps | Drink weight in the cup, drips included. The stop aims at `cut line − learned drip`. |
 | **Shot time window (s)** | Recipe | 27–36 s | See [Fast and slow shots](fast-and-slow-shots.md#settings) | Reaching the target inside the window is On recipe. |
@@ -152,7 +153,7 @@ uncertain shot over continuing to wait; it does not prove that the reading is
 coffee. Sampling, machine response and dripping mean the final yield can still
 overshoot. Under-reported weight or vibration repeatedly crossing below the
 threshold may prevent this backup from firing, so the existing time limits remain.
-Backup endings appear as **Touch fallback** and do not train the learned drip
+Backup endings appear as **Sustained weight** and do not train the learned drip
 or the scale-loss backup's recent shots.
 
 ### One cutoff algorithm
@@ -283,4 +284,4 @@ accuracy is claimed without representative machine/scale measurements.
 
 Related: [Fast and slow shots](fast-and-slow-shots.md),
 [Cup protection](cup-protection.md), [Tare](../settings/tare.md),
-[Scales](../settings/scales.md), [No-scale BBW](../settings/no-scale-bbw.md).
+[Scales](../settings/scales.md), [Scale guard](../settings/no-scale-bbw.md).

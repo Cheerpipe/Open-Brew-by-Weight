@@ -596,29 +596,26 @@ const QUICK_GUARDS = [
   "cupProtectionEnabled",
 ];
 const QUICK_ICONS = {
-  weight: "M12 4v16M6 20h12M5 7h14M5 7l-3 6.5a3 3 0 0 0 6 0zM19 7l-3 6.5a3 3 0 0 0 6 0z",
-  hand: "M8 13V6a1.5 1.5 0 0 1 3 0v5M11 10.5V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7 6 6 0 0 1-5.2-3L3 14.5a1.5 1.5 0 0 1 2.5-1.6L8 15",
-  shield: "M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z",
-  fastExtractionGuardEnabled: "m4 6 7 6-7 6M12 6l7 6-7 6",
-  slowExtractionGuardEnabled: "M7 3h10M7 21h10M8 3v3l4 6-4 6v3M16 3v3l-4 6 4 6v3",
-  noScaleBbwMode:
-    "M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM15.2 10.2a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0zM9 16.5h6",
-  autoToManualGuardEnabled: "M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5M12 8v4l3 2",
-  avoidAccidentalTouchEnabled:
-    "M9 12V5.5a1.5 1.5 0 0 1 3 0V12M12 11V9.5a1.5 1.5 0 0 1 3 0V12M15 11.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L4 15a1.5 1.5 0 0 1 2.5-1.6L9 16",
-  cupProtectionEnabled:
-    "M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5v2.5M11.5 3.5v2.5",
+  weight: "g-bbw",
+  hand: "g-manual",
+  shield: "g-guards",
+  fastExtractionGuardEnabled: "g-fast",
+  slowExtractionGuardEnabled: "g-slow",
+  noScaleBbwMode: "g-noScale",
+  autoToManualGuardEnabled: "g-finish",
+  avoidAccidentalTouchEnabled: "g-touch",
+  cupProtectionEnabled: "g-protect",
 };
 const quickIcon = (k, cls = "") =>
-  `<svg class="qsI ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${QUICK_ICONS[k]}"/></svg>`;
+  `<svg class="qsI ${cls}" aria-hidden="true"><use href="#${QUICK_ICONS[k]}"/></svg>`;
 function buildQuickSettings() {
   const names = {
-      fastExtractionGuardEnabled: __WEBUI_TEXT__("runtime.quick_extend_fast_shots"),
-      slowExtractionGuardEnabled: __WEBUI_TEXT__("runtime.quick_shorten_slow_shots"),
-      noScaleBbwMode: __WEBUI_TEXT__("runtime.quick_scale_guard"),
-      autoToManualGuardEnabled: __WEBUI_TEXT__("runtime.quick_scale_loss_backup"),
-      avoidAccidentalTouchEnabled: __WEBUI_TEXT__("runtime.quick_avoid_accidental_touch"),
-      cupProtectionEnabled: __WEBUI_TEXT__("runtime.quick_cup_protection"),
+      fastExtractionGuardEnabled: __WEBUI_TEXT__("settings.fast_protection"),
+      slowExtractionGuardEnabled: __WEBUI_TEXT__("settings.slow_protection"),
+      noScaleBbwMode: __WEBUI_TEXT__("settings.no_scale_bbw"),
+      autoToManualGuardEnabled: __WEBUI_TEXT__("settings.scale_loss_backup"),
+      avoidAccidentalTouchEnabled: __WEBUI_TEXT__("settings.avoid_accidental_touch"),
+      cupProtectionEnabled: __WEBUI_TEXT__("settings.cup_protection"),
     },
     modes = quickIcon("weight", "qsW") + quickIcon("hand", "qsM"),
     mode = (value, icon, name, hint) =>
@@ -1134,17 +1131,17 @@ function formatShotEnded(d, verdict) {
       physical_override: __WEBUI_TEXT__("runtime.manual"),
       normal_target: verdictLabel(verdict),
       scale_threshold: verdictLabel(verdict),
-      auto_to_manual: __WEBUI_TEXT__("runtime.scale_loss_backup"),
-      cup_removed: __WEBUI_TEXT__("runtime.cup"),
-      web_stop: __WEBUI_TEXT__("runtime.web"),
-      web_heartbeat: __WEBUI_TEXT__("runtime.heartbeat"),
+      auto_to_manual: __WEBUI_TEXT__("settings.scale_loss_backup"),
+      cup_removed: __WEBUI_TEXT__("runtime.cup_removed"),
+      web_stop: __WEBUI_TEXT__("runtime.web_stop"),
+      web_heartbeat: __WEBUI_TEXT__("runtime.web_connection_lost"),
       hard_limit: __WEBUI_TEXT__("runtime.hard_limit"),
       global_limit: __WEBUI_TEXT__("runtime.hard_limit"),
       wall_limit: __WEBUI_TEXT__("runtime.max_time"),
       configured_wall_limit: __WEBUI_TEXT__("runtime.max_time"),
-      relay_safety: __WEBUI_TEXT__("runtime.relay"),
-      weight_anomaly: __WEBUI_TEXT__("runtime.anomaly"),
-      touch_weight_fallback: __WEBUI_TEXT__("runtime.touch_stop_fallback"),
+      relay_safety: __WEBUI_TEXT__("runtime.relay_safety"),
+      weight_anomaly: __WEBUI_TEXT__("runtime.weight_anomaly"),
+      touch_weight_fallback: __WEBUI_TEXT__("runtime.sustained_weight"),
     }[k] || "—"
   );
 }

@@ -23,7 +23,7 @@ it does not change the normal electrical mirror.
 A hold exceeding **Longest tap** is mirror-only when Quick rinse is off.
 In press mode, the tentative logical start/stop is undone; in release mode,
 it is never applied. With [Quick rinse](quick-rinse.md) enabled, a long hold
-that starts from idle requests a timed rinse instead. If [No-scale BBW](no-scale-bbw.md)
+that starts from idle requests a timed rinse instead. If the [scale guard](no-scale-bbw.md)
 is Armed, that rinse does not run water unless **Rinse without a scale** is
 on; the hold still uses up the missing-scale warning.
 

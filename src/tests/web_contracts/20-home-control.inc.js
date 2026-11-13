@@ -1128,8 +1128,8 @@ if (!codeIncludes(ui, 'id="autoToManualGuardEnabled"') ||
     !codeIncludes(ui, 'id="dripDelayS" type="number" min="0" max="10" step="0.1"') ||
     !codeIncludes(ui, 'id="scaleLossFixedLink"') ||
     html.indexOf('<summary>Scale guard</summary>') >
-        html.indexOf('<summary>Finish by time</summary>') ||
-    html.indexOf('<summary>Finish by time</summary>') >
+        html.indexOf('<summary>Scale-loss backup</summary>') ||
+    html.indexOf('<summary>Scale-loss backup</summary>') >
         html.indexOf('id="scaleLossProjection"') ||
     !codeIncludes(ui, 'id="noScaleBbwMode"') ||
     !codeIncludes(ui, 'id="noScaleAllowRinseWhileArmed"') ||
@@ -1166,7 +1166,7 @@ if (!codeIncludes(ui, 'id="autoToManualGuardEnabled"') ||
     html.indexOf('id="lastShotCooldownMin"') <
         html.indexOf('<summary>Scale guard</summary>') ||
     html.indexOf('id="lastShotCooldownMin"') >
-        html.indexOf('<summary>Finish by time</summary>') ||
+        html.indexOf('<summary>Scale-loss backup</summary>') ||
     html.indexOf('id="paddleMode"') <
         html.indexOf('<summary>Paddle</summary>') ||
     html.indexOf('id="paddleMode"') >

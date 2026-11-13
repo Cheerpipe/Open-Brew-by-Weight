@@ -757,7 +757,7 @@ continuation. See
 | Stop detail | Meaning |
 | --- | --- |
 | `normal_target` | Normal weight endpoint, including offset/prediction |
-| `touch_weight_fallback` | Touch protection blocked the weight stop and the sustained-weight backup ended the shot; Ended shows Touch fallback on Home and Stats, matching Home Assistant's Last shot stop detail |
+| `touch_weight_fallback` | Touch protection blocked the weight stop and the sustained-weight backup ended the shot; Ended shows Sustained weight on Home and Stats, matching Home Assistant's Last shot stop detail |
 | `extended_max_weight` / `extended_min_time` | A fast shot stopped on a raised cut line (**EXTENDED**) |
 | `slow_max_time` / `slow_min_weight` | A slow shot stopped on a lowered cut line (**STOPPED EARLY**) |
 | `auto_to_manual` | The [scale-loss backup](auto-to-manual.md) finished the shot by time |

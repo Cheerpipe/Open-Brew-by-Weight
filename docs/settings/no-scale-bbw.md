@@ -1,8 +1,8 @@
-# No-scale BBW
+# Scale guard
 
 Protection for attempts to use Brew by weight without a usable scale, shared
-by every preset. Configure it under **Settings → Shared settings → No-scale BBW**.
-**Scale guard** in the header's [guard panel](../features/brew-by-weight.md#change-how-shots-stop-for-now)
+by every preset. Configure it under **Settings → Shared settings → Scale guard**.
+The same switch in the header's [guard panel](../features/brew-by-weight.md#change-how-shots-stop-for-now)
 turns it off or back on for now, without saving.
 
 It applies only while **Brew by weight** is on. With BBW off, shots and rinses

@@ -2300,7 +2300,7 @@ function shotVisualizer(r) {
         ]),
       (r.extractionExtended || r.slowExtractionExtended) &&
         (r.slowExtractionExtended
-          ? __WEBUI_TEXT__("stats.note_extended_slow")
+          ? __WEBUI_TEXT__("stats.note_shortened_slow")
           : __WEBUI_TEXT__("stats.note_extended_fast")),
       r.wTruncated && __WEBUI_TEXT__("stats.note_curve_truncated"),
       R.sub(__WEBUI_TEXT__("stats.note_exported_from"), [R.firmwareVersion || ""]).trim(),

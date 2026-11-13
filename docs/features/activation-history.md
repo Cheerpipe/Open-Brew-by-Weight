@@ -2,7 +2,7 @@
 
 The activation history is a simple, independent diary of machine activations
 and paddle attempts: shots, rinses, short runs, recognized machine wake
-gestures, and attempts stopped by No-scale BBW protection. It shows what
+gestures, and attempts stopped by the scale guard. It shows what
 happened and what you tried, without the measurement detail of the
 [shot history](shot-history.md).
 
@@ -10,7 +10,7 @@ happened and what you tried, without the measurement detail of the
 
 Every activation the machine confirmed is recorded when its circuit opens,
 including manual brews and rinses that the shot history skips. A paddle attempt
-stopped by No-scale BBW protection is recorded when you release the paddle.
+stopped by the scale guard is recorded when you release the paddle.
 Each entry keeps the UTC instant and local time calculated with the zone's
 offset when the activation ends, as well as its duration and type:
 
@@ -30,7 +30,7 @@ offset when the activation ends, as well as its duration and type:
 - **Power ON** — a paddle gesture recognized as a Linea Micra standby wake.
   It records how long the paddle kept the wake circuit active but never counts
   as a shot in Stats.
-- **Blocked: no scale** — a paddle attempt that No-scale BBW protection
+- **Blocked: no scale** — a paddle attempt that the scale guard
   prevented from starting. It records how long the attempt lasted, including
   repeated attempts in Require a scale mode, and never counts as a shot.
 
@@ -69,7 +69,7 @@ Hovering the time shows the exact date and time. Shots carry a coffee-cup
 icon on the left of the card; the cup is only outlined when the scale had no
 valid weight at the end of the shot. Rinses carry a droplet, and other
 activations carry a lightning bolt, Power ON entries use the power symbol,
-and Blocked: no scale entries show an X. When the clock
+and Blocked: no scale entries show the crossed-out scale of the scale guard. When the clock
 was not synced when the entry was recorded, the card shows "no time"
 instead of a date, and those entries share a "no time" heading.
 
@@ -122,7 +122,7 @@ The two pages record different things and never substitute for each other:
 
 | | Stats (shot history) | History (activation diary) |
 | --- | --- | --- |
-| Records | Every brew started with a scale, good or bad; a good shot has a valid settled yield over 2 g | Confirmed activations and paddle attempts blocked by No-scale BBW protection |
+| Records | Every brew started with a scale, good or bad; a good shot has a valid settled yield over 2 g | Confirmed activations and paddle attempts blocked by the scale guard |
 | Minimum duration | None; a good shot lasts longer than 12 seconds | Longer than the configured earliest weight stop time to carry a Shot label |
 | Detail | Goal, yield, error, flow, guards, rating, curve | Time, duration, type |
 | Statistics | Good shots only; bad shots are listed with **Show bad shots** | None |

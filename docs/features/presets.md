@@ -150,7 +150,7 @@ preset survives reboot.
 | Scope | Settings |
 | --- | --- |
 | Preset (**Settings → Presets**) | Brew by weight, dose, target yield, shot time window, grind hints, fast and slow shot options and amounts, earliest weight stop, max shot time, the optional scale-loss stop time, starting drip and learning speed, learned drip, learning speed and its provenance, and the preset's shot statistics; Linea Micra builds also retain a brew-boiler target |
-| **Shared settings** | Linea Micra, paddle or switch behavior, quick rinse, scales, tare, cup detection, cup protection (including avoid accidental touch and stop after sustained weight), No-scale BBW, the scale-loss backup switch, alerts; Bluetooth and network settings are in Admin |
+| **Shared settings** | Linea Micra, paddle or switch behavior, quick rinse, scales, tare, cup detection, cup protection (including avoid accidental touch and stop after sustained weight), the scale guard, the scale-loss backup switch, alerts; Bluetooth and network settings are in Admin |
 | Header panel / Home Assistant switches | Temporary: **By weight / Manual** and the six guards change only until you pick another preset or restart. Nothing is saved to the preset or to Settings, and picking a preset brings back its saved values. |
 
 To make an intentional recipe change permanent, edit and save it in Settings;
@@ -160,7 +160,7 @@ by default. Turning
 **Avoid accidental touch** off preserves that choice but disables the backup
 and its editor. See [touch-stop backup](brew-by-weight.md#when-touch-protection-delays-a-stop).
 Home and Settings can therefore display different BBW values.
-Home Assistant follows the same scopes: BBW is session-only, No-scale BBW is a
+Home Assistant follows the same scopes: BBW is session-only, the scale guard is a
 shared policy, fast and slow shot switches persist only in the active preset
 without changing its target or learned values, and the scale-loss backup, cup
 protection and accidental touch are shared settings.
