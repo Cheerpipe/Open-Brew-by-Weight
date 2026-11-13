@@ -612,7 +612,8 @@
   outline-offset: 2px;
 }
 
-.machinePower:disabled {
+/* Not dimmed while this page's own command is in flight. */
+.machinePower:disabled:not([aria-busy="true"]) {
   cursor: not-allowed;
   opacity: 0.45;
 }
@@ -667,7 +668,9 @@
 
 .mpWarm {
   stroke: var(--lw);
-  transition: stroke-dashoffset 1s linear;
+  transition:
+    stroke-dashoffset 1s linear,
+    opacity 0.3s;
 }
 
 .machinePower:not(.ringOn) .mpWarm {

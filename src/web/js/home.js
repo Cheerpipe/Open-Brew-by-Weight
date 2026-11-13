@@ -290,7 +290,7 @@ function renderMachinePower(s, lm, power, active, warming) {
   b.dataset.turn = target ? "on" : "off";
   b.disabled = busy || !!powerPending || !!reason;
   b.classList.toggle("armed", armed && !b.disabled);
-  b.setAttribute("aria-busy", busy);
+  b.setAttribute("aria-busy", busy || !!powerPending);
   b.setAttribute("aria-label", label);
   b.title = label;
   // The warm-up ring fills on the device clock between the firmware's start
