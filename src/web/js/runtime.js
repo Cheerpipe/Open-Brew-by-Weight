@@ -6160,8 +6160,8 @@ function syncHeroDeck(f) {
   if (key !== heroDeck.key) {
     if (heroDeck.last && heroDeck.older)
       heroDeck.older = [heroDeckRow(heroDeck.last), ...heroDeck.older].slice(0, 2);
-    heroDeck.key = key;
-    heroDeck.last = null;
+    // The shift is a guess: the next stored hero refetches, even one seen before.
+    Object.assign(heroDeck, { key, last: null, fetched: "" });
   }
   if (f.phase === "idle" && !f.card.live) {
     heroDeck.last = f;
@@ -6170,7 +6170,7 @@ function syncHeroDeck(f) {
   renderHeroDeck();
 }
 function resetHeroDeck() {
-  Object.assign(heroDeck, { older: null, last: null, key: "", request: 0 });
+  Object.assign(heroDeck, { older: null, last: null, key: "", request: 0, fetched: "" });
   renderHeroDeck();
 }
 registerStream("heroDeck", {
