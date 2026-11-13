@@ -2106,24 +2106,26 @@ struct LaMarzoccoWebSocketTest {
     assert(service.currentStatus().error == LaMarzoccoError::POLICY_REQUIRED);
     finish(service);
   }
-  // During a sync hold (a shot) the companion does not ping and the route
-  // trusts it; the 30 s limit counts again from the hold's end.
+  // During a sync hold (a shot, or the closed relay of a backflush) the
+  // companion does not ping and both the route and backflush supervision trust
+  // it; the 30 s limit counts again from the hold's end.
   static void companionSyncHoldSilence() {
     now = 1000;
     OpenBrewByWeightLaMarzoccoService service;
     direct(service);
     link(service);
     route(service);
+    assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, kAwaiting));
     service.companionPing(true);
     service.companionSyncHold(true);
     now += 240000;  // a long shot without a single ping
-    assert(service.serviceCompanion());
+    assert(service.serviceCompanion() && service.backflush().valid);
     assert(service.companionRouteStatus().route == LaMarzoccoCompanionRoute::COMPANION);
     service.companionSyncHold(false);
     now += 29999;
-    assert(service.serviceCompanion());
+    assert(service.backflush().valid && service.serviceCompanion());
     now += 1;
-    assert(!service.serviceCompanion());
+    assert(!service.backflush().valid && !service.serviceCompanion());
     assert(std::strcmp(service.companionRouteStatus().reason, "ping_missing") == 0);
     finish(service);
   }

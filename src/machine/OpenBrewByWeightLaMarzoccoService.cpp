@@ -929,9 +929,12 @@ void OpenBrewByWeightLaMarzoccoService::qualifyBackflushLocked() {
   const bool linkLost = !config_.accountConfigured || !(config_.options & LA_MARZOCCO_OBSERVE_STATE) ||
       config_.connectionType != static_cast<uint8_t>(LaMarzoccoConnectionType::WEBSOCKET) ||
       // The companion feed qualifies like the socket: subscribed on the current
-      // identity and epoch, an `up` ping within 30 s and a known token.
+      // identity and epoch, `up`, alive by the route's own rule (a ping within
+      // 30 s, none expected during a sync hold such as this closed relay) and a
+      // known token.
       (companion_.status.route == LaMarzoccoCompanionRoute::COMPANION
-           ? !companionFeedLiveLocked() || now - companion_.upAtMs >= 30000 ||
+           ? !companionFeedLiveLocked() ||
+                 (!companion_.syncHold && now - companion_.pingAtMs >= la_marzocco_timing::kCompanionAliveMs) ||
                  companion_.tokenRenewAtMs == 0
            : !websocket_ || websocket_->failed.load() || !websocketStatus_.subscribed ||
                  !tokenAvailable_.load(std::memory_order_acquire) ||

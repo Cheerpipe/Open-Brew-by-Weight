@@ -1092,6 +1092,8 @@ electrical history duration and final classification are appended once.
 An unresolved/consumed request blocks a new hold until observed inactive and a
 new request; only control drains the bounded transition handoff. Loss and
 first-ingress provenance survive batching and cannot be repaired by a pong.
+On the companion route, supervision uses the route's own liveness: a ping
+within 30 seconds, none expected during the sync hold the closed relay starts.
 
 ## Linea Micra power observer and wake qualification
 

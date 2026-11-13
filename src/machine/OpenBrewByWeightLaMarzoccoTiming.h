@@ -56,6 +56,9 @@ inline constexpr uint8_t kMaxCommandCycles = 3;
 // An accepted command's new state normally arrives as a push within seconds;
 // only after this wait does verification fall back to an HTTPS read.
 inline constexpr uint32_t kPushConfirmMs = 10000;
+// The companion route and backflush supervision lose the companion after this
+// long without a ping (none is expected during a sync hold) or with `up` false.
+inline constexpr uint32_t kCompanionAliveMs = 30000;
 inline constexpr uint32_t kGateRetryMs = 1000;
 inline constexpr uint32_t kHttpTimeoutMs = 10000;
 // The cloud silently drops keep-alive sockets idle for ~3-5 min (reuse
