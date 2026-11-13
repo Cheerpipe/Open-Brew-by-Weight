@@ -21,7 +21,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	69,
@@ -40,7 +40,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	68,
@@ -59,7 +59,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	67,
@@ -78,7 +78,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	66,
@@ -97,7 +97,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	65,
@@ -116,7 +116,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"other",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	64,
@@ -135,7 +135,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	63,
@@ -154,7 +154,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	62,
@@ -173,7 +173,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	61,
@@ -192,7 +192,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	60,
@@ -211,7 +211,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	59,
@@ -230,7 +230,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	58,
@@ -249,7 +249,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	57,
@@ -268,7 +268,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	56,
@@ -325,7 +325,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	53,
@@ -363,7 +363,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	51,
@@ -382,7 +382,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	50,
@@ -401,7 +401,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	49,
@@ -420,7 +420,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	48,
@@ -439,7 +439,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	47,
@@ -458,7 +458,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	46,
@@ -496,7 +496,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"other",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	44,
@@ -534,7 +534,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	42,
@@ -553,7 +553,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	41,
@@ -572,7 +572,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}],
 			"header":	{
@@ -601,11 +601,18 @@
 					}],
 				"cons":	{
 					"t":	[348, 238, 211, 367, 243, 259, 255, 306, 225, 278],
-					"p":	[3, 2, 3, 1, 2, 2, 1, 1, 1, 3]
+					"p":	[3, 2, 3, 1, 2, 2, 1, 1, 1, 3],
+					"g":	[0, 1, 0, 2, 0, 1, 2, 2, 2, 2]
 				},
 				"facets":	{
 					"presets":	[[3, "Ethiopia"], [1, "House"], [2, "Decaf \"Swiss\""]],
 					"scales":	[[1513125789, "Pearl S"], [2023440856, "Lunar"]]
+				},
+				"preset":	2,
+				"cut":	{
+					"t":	[340, 340, 350, 350],
+					"e":	[524, -150, -91, 356],
+					"g":	[2, 2, 1, 1]
 				}
 			}
 		}, {
@@ -629,7 +636,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	109,
@@ -648,7 +655,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	108,
@@ -667,7 +674,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	107,
@@ -686,7 +693,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	"short"
 				}, {
 					"id":	106,
@@ -724,7 +731,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	104,
@@ -743,7 +750,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	103,
@@ -762,7 +769,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"web_stop",
 					"badReason":	"no_yield"
 				}, {
 					"id":	102,
@@ -781,7 +788,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	101,
@@ -800,7 +807,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	100,
@@ -819,7 +826,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	99,
@@ -838,7 +845,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_min_time",
 					"badReason":	"low_yield"
 				}, {
 					"id":	98,
@@ -857,7 +864,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	97,
@@ -876,7 +883,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	96,
@@ -895,7 +902,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	95,
@@ -914,7 +921,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	"short"
 				}, {
 					"id":	94,
@@ -933,7 +940,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	93,
@@ -952,7 +959,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	92,
@@ -971,7 +978,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	91,
@@ -990,7 +997,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	"no_yield"
 				}, {
 					"id":	90,
@@ -1028,7 +1035,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	88,
@@ -1047,7 +1054,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	87,
@@ -1066,7 +1073,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	"low_yield"
 				}, {
 					"id":	86,
@@ -1104,7 +1111,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	84,
@@ -1123,7 +1130,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	83,
@@ -1142,7 +1149,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	"short"
 				}, {
 					"id":	82,
@@ -1161,7 +1168,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	81,
@@ -1180,7 +1187,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	80,
@@ -1199,7 +1206,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	79,
@@ -1218,7 +1225,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	"no_yield"
 				}, {
 					"id":	78,
@@ -1237,7 +1244,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	77,
@@ -1256,7 +1263,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	76,
@@ -1275,7 +1282,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	75,
@@ -1294,7 +1301,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"other",
 					"badReason":	"low_yield"
 				}, {
 					"id":	74,
@@ -1313,7 +1320,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	73,
@@ -1332,7 +1339,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	72,
@@ -1351,7 +1358,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	71,
@@ -1370,7 +1377,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	"short"
 				}, {
 					"id":	70,
@@ -1389,7 +1396,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"other",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	69,
@@ -1408,7 +1415,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	68,
@@ -1427,7 +1434,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	67,
@@ -1446,7 +1453,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_min_time",
 					"badReason":	"no_yield"
 				}, {
 					"id":	66,
@@ -1465,7 +1472,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	65,
@@ -1484,7 +1491,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	64,
@@ -1503,7 +1510,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	63,
@@ -1522,7 +1529,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	"low_yield"
 				}, {
 					"id":	62,
@@ -1541,7 +1548,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	61,
@@ -1560,7 +1567,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	60,
@@ -1579,7 +1586,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	59,
@@ -1598,7 +1605,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"normal_target",
 					"badReason":	"short"
 				}, {
 					"id":	58,
@@ -1617,7 +1624,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	57,
@@ -1636,7 +1643,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	56,
@@ -1655,7 +1662,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	55,
@@ -1674,7 +1681,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	"no_yield"
 				}, {
 					"id":	54,
@@ -1693,7 +1700,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	53,
@@ -1712,7 +1719,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	52,
@@ -1731,7 +1738,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	51,
@@ -1750,7 +1757,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	"low_yield"
 				}, {
 					"id":	50,
@@ -1769,7 +1776,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	49,
@@ -1788,7 +1795,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	48,
@@ -1807,7 +1814,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	47,
@@ -1826,7 +1833,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	"short"
 				}, {
 					"id":	46,
@@ -1845,7 +1852,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	45,
@@ -1864,7 +1871,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	44,
@@ -1883,7 +1890,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	43,
@@ -1902,7 +1909,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	"no_yield"
 				}, {
 					"id":	42,
@@ -1921,7 +1928,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	41,
@@ -1940,14 +1947,14 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}],
 			"header":	{
 				"shotCount":	50,
 				"avgDurationS":	27.1,
 				"avgYieldG":	36.7,
-				"avgErrorPct":	6.2,
+				"avgErrorPct":	8.1,
 				"avgFlowGps":	1.81,
 				"shotsPerDay":	2.4,
 				"dens":	[{
@@ -1961,12 +1968,14 @@
 					}, null],
 				"cons":	{
 					"t":	[285, 285, 270, 275, 285, 285, 270, 270, 275, 275, 270, 285, 270, 270, 280, 270, 280, 280, 270, 275, 280, 280, 285, 285, 285, 275, 275, 270, 270, 275, 285, 285, 275, 270, 280, 285, 285, 285, 275, 280],
-					"p":	[3, 2, 2, 1, 1, 3, 3, 1, 1, 1, 3, 1, 2, 1, 2, 2, 1, 3, 1, 2, 2, 3, 3, 3, 1, 3, 3, 3, 2, 1, 3, 1, 3, 3, 3, 2, 3, 2, 2, 3]
+					"p":	[3, 2, 2, 1, 1, 3, 3, 1, 1, 1, 3, 1, 2, 1, 2, 2, 1, 3, 1, 2, 2, 3, 3, 3, 1, 3, 3, 3, 2, 1, 3, 1, 3, 3, 3, 2, 3, 2, 2, 3],
+					"g":	[0, 1, 0, 2, 0, 0, 0, 2, 2, 0, 2, 1, 0, 1, 2, 0, 0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 2, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 2, 2]
 				},
 				"facets":	{
 					"presets":	[[3, "Ethiopia"], [2, "Decaf \"Swiss\""], [1, "House"]],
 					"scales":	[[1513125789, "Pearl S"], [2023440856, "Lunar"]]
-				}
+				},
+				"preset":	9
 			}
 		}, {
 			"name":	"window100_one_preset_130_rows",
@@ -1989,7 +1998,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	169,
@@ -2008,7 +2017,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	168,
@@ -2046,7 +2055,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	166,
@@ -2065,7 +2074,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	165,
@@ -2084,7 +2093,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	164,
@@ -2103,7 +2112,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	163,
@@ -2122,7 +2131,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	162,
@@ -2160,7 +2169,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	160,
@@ -2179,7 +2188,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	159,
@@ -2198,7 +2207,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	158,
@@ -2217,7 +2226,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	157,
@@ -2236,7 +2245,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	156,
@@ -2255,7 +2264,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"manual",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	155,
@@ -2274,7 +2283,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	154,
@@ -2293,7 +2302,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	153,
@@ -2312,7 +2321,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	152,
@@ -2331,7 +2340,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	151,
@@ -2369,7 +2378,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	149,
@@ -2388,7 +2397,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	148,
@@ -2407,7 +2416,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	147,
@@ -2426,7 +2435,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	146,
@@ -2445,7 +2454,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	145,
@@ -2464,7 +2473,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	144,
@@ -2502,7 +2511,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	142,
@@ -2540,7 +2549,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	140,
@@ -2559,7 +2568,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	139,
@@ -2578,7 +2587,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	138,
@@ -2616,7 +2625,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	136,
@@ -2635,7 +2644,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	135,
@@ -2654,7 +2663,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	134,
@@ -2673,7 +2682,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	133,
@@ -2692,7 +2701,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	132,
@@ -2711,7 +2720,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	131,
@@ -2730,7 +2739,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	130,
@@ -2749,7 +2758,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	129,
@@ -2768,7 +2777,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	128,
@@ -2787,7 +2796,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	127,
@@ -2806,7 +2815,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	126,
@@ -2825,7 +2834,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	125,
@@ -2863,7 +2872,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	123,
@@ -2882,7 +2891,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	122,
@@ -2901,7 +2910,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	121,
@@ -2920,7 +2929,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	120,
@@ -2939,7 +2948,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	119,
@@ -2958,7 +2967,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	118,
@@ -2977,7 +2986,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	117,
@@ -2996,7 +3005,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	116,
@@ -3015,7 +3024,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	115,
@@ -3034,7 +3043,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	114,
@@ -3053,7 +3062,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	113,
@@ -3072,7 +3081,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	112,
@@ -3091,7 +3100,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	111,
@@ -3110,7 +3119,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	110,
@@ -3129,7 +3138,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	109,
@@ -3148,7 +3157,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	108,
@@ -3167,7 +3176,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	107,
@@ -3186,7 +3195,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	106,
@@ -3243,7 +3252,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	103,
@@ -3262,7 +3271,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	102,
@@ -3281,7 +3290,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	101,
@@ -3300,7 +3309,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	100,
@@ -3319,7 +3328,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	99,
@@ -3376,7 +3385,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	96,
@@ -3395,7 +3404,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	95,
@@ -3414,7 +3423,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	94,
@@ -3433,7 +3442,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	93,
@@ -3452,7 +3461,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	92,
@@ -3471,7 +3480,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	91,
@@ -3490,7 +3499,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	90,
@@ -3509,7 +3518,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	89,
@@ -3528,7 +3537,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	88,
@@ -3547,7 +3556,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	87,
@@ -3566,7 +3575,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	86,
@@ -3585,7 +3594,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	85,
@@ -3604,7 +3613,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	84,
@@ -3623,7 +3632,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	83,
@@ -3642,7 +3651,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	82,
@@ -3661,7 +3670,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	81,
@@ -3680,7 +3689,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	80,
@@ -3699,7 +3708,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	79,
@@ -3718,7 +3727,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	78,
@@ -3737,7 +3746,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	77,
@@ -3756,7 +3765,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	76,
@@ -3794,7 +3803,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	74,
@@ -3813,7 +3822,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	73,
@@ -3832,7 +3841,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	72,
@@ -3851,7 +3860,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"other",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	71,
@@ -3870,7 +3879,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	70,
@@ -3889,7 +3898,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	69,
@@ -3908,7 +3917,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	68,
@@ -3927,7 +3936,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	67,
@@ -3946,7 +3955,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	66,
@@ -3984,7 +3993,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	64,
@@ -4003,7 +4012,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	63,
@@ -4022,7 +4031,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	62,
@@ -4041,7 +4050,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	61,
@@ -4060,7 +4069,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	60,
@@ -4079,7 +4088,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	59,
@@ -4098,7 +4107,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	58,
@@ -4117,7 +4126,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	57,
@@ -4136,7 +4145,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	56,
@@ -4155,7 +4164,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	55,
@@ -4174,7 +4183,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	54,
@@ -4193,7 +4202,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	53,
@@ -4212,7 +4221,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	52,
@@ -4231,7 +4240,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	51,
@@ -4250,7 +4259,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	50,
@@ -4269,7 +4278,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	49,
@@ -4288,7 +4297,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	48,
@@ -4307,7 +4316,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	47,
@@ -4326,7 +4335,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	46,
@@ -4345,7 +4354,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	45,
@@ -4364,7 +4373,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	44,
@@ -4383,7 +4392,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	43,
@@ -4421,7 +4430,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	41,
@@ -4440,14 +4449,14 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}],
 			"header":	{
 				"shotCount":	100,
 				"avgDurationS":	28.4,
 				"avgYieldG":	36.1,
-				"avgErrorPct":	7.3,
+				"avgErrorPct":	7.6,
 				"avgFlowGps":	2.04,
 				"shotsPerDay":	3,
 				"dens":	[{
@@ -4461,11 +4470,18 @@
 					}, true],
 				"cons":	{
 					"t":	[334, 330, 242, 272, 200, 220, 358, 292, 277, 247, 257, 348, 201, 283, 310, 304, 339, 329, 377, 281, 315, 351, 325, 281, 361, 213, 253, 243, 252, 361, 353, 362, 322, 247, 338, 364, 303, 363, 345, 286, 200, 379, 261, 348, 226, 278, 350, 220, 266, 203, 283, 319, 344, 228, 260, 347, 346, 372, 220, 240, 283, 289, 321, 325, 209, 319, 350, 277, 338, 337, 266, 346, 285, 328, 227, 266, 306, 340, 222, 225, 271, 325, 206, 255, 232, 296, 345, 307, 238, 270, 336, 209, 235, 228, 239, 234, 231, 230, 287, 218],
-					"p":	1
+					"p":	1,
+					"g":	[0, 0, 0, 0, 2, 0, 0, 1, 0, 2, 1, 0, 0, 0, 0, 0, 1, 0, 2, 2, 0, 0, 1, 2, 2, 0, 2, 2, 2, 1, 0, 0, 1, 1, 2, 2, 0, 1, 2, 2, 1, 1, 2, 0, 1, 1, 2, 1, 2, 0, 0, 2, 1, 0, 1, 1, 2, 1, 0, 0, 1, 2, 2, 2, 0, 0, 1, 0, 2, 0, 0, 0, 2, 1, 1, 0, 1, 1, 2, 0, 0, 2, 2, 0, 0, 1, 1, 0, 0, 2, 0, 0, 0, 2, 1, 1, 0, 2, 1, 2]
 				},
 				"facets":	{
 					"presets":	[[1, "House"]],
 					"scales":	[[1513125789, "Pearl S"], [2023440856, "Lunar"]]
+				},
+				"preset":	1,
+				"cut":	{
+					"t":	[350, 380, 370, 340, 370, 370, 360, 340, 340, 350, 340, 350, 350, 370, 360, 380, 340, 360, 350, 340, 360, 370, 340, 360, 360, 350, 360, 370, 340, 360, 370, 370, 370, 350, 370, 360, 340, 370],
+					"e":	[103, -190, 184, 192, -170, -150, -184, 445, -118, 406, 689, 324, 212, 353, 418, -96, 667, 350, 92, 645, 195, 100, 304, 60, 320, 491, -240, 308, -116, -290, -446, -358, 209, 324, 166, -329, -133, -429],
+					"g":	[0, 0, 2, 1, 2, 0, 2, 1, 0, 2, 0, 2, 2, 1, 2, 1, 1, 2, 1, 2, 1, 2, 0, 0, 1, 2, 0, 2, 0, 2, 2, 0, 0, 1, 1, 2, 1, 2]
 				}
 			}
 		}, {
@@ -4489,7 +4505,7 @@
 					"presetName":	"Back\\slash",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	99,
@@ -4508,7 +4524,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	98,
@@ -4527,7 +4543,7 @@
 					"presetName":	"House",
 					"scaleName":	"Hiroia",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	97,
@@ -4546,7 +4562,7 @@
 					"presetName":	"House",
 					"scaleName":	"Varia",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	96,
@@ -4565,7 +4581,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Timemore",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	95,
@@ -4603,7 +4619,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Brewista",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	93,
@@ -4641,7 +4657,7 @@
 					"presetName":	"Huila",
 					"scaleName":	"Acaia\tPyxis",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	91,
@@ -4660,7 +4676,7 @@
 					"presetName":	"Back\\slash",
 					"scaleName":	"Skale",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	90,
@@ -4679,7 +4695,7 @@
 					"presetName":	"Tab\there",
 					"scaleName":	"Eureka",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	89,
@@ -4717,7 +4733,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	87,
@@ -4755,7 +4771,7 @@
 					"presetName":	"Kenya",
 					"scaleName":	"Brewista",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	85,
@@ -4774,7 +4790,7 @@
 					"presetName":	"Guji",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	84,
@@ -4793,7 +4809,7 @@
 					"presetName":	"Sidamo",
 					"scaleName":	"Acaia\tPyxis",
 					"shotType":	"manual",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	83,
@@ -4812,7 +4828,7 @@
 					"presetName":	"Yirga",
 					"scaleName":	"Brewista",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	82,
@@ -4831,7 +4847,7 @@
 					"presetName":	"Yirga",
 					"scaleName":	"Bookoo \"Themis\"",
 					"shotType":	"manual",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	81,
@@ -4850,7 +4866,7 @@
 					"presetName":	"Yirga",
 					"scaleName":	"Felicita Arc",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	80,
@@ -4869,7 +4885,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Hiroia",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	79,
@@ -4888,7 +4904,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	78,
@@ -4907,7 +4923,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"Varia",
 					"shotType":	"manual",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	77,
@@ -4926,7 +4942,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"Varia",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	76,
@@ -4964,7 +4980,7 @@
 					"presetName":	"Huila",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	74,
@@ -4983,7 +4999,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	73,
@@ -5002,7 +5018,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	72,
@@ -5021,7 +5037,7 @@
 					"presetName":	"Back\\slash",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	71,
@@ -5040,7 +5056,7 @@
 					"presetName":	"Yirga",
 					"scaleName":	"Bookoo \"Themis\"",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	70,
@@ -5059,7 +5075,7 @@
 					"presetName":	"Yirga",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	69,
@@ -5097,7 +5113,7 @@
 					"presetName":	"Brazil",
 					"scaleName":	"Varia",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	67,
@@ -5116,7 +5132,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	66,
@@ -5135,7 +5151,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"Varia",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	65,
@@ -5154,7 +5170,7 @@
 					"presetName":	"Kenya",
 					"scaleName":	"Decent\\Scale",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	64,
@@ -5173,7 +5189,7 @@
 					"presetName":	"House",
 					"scaleName":	"Decent\\Scale",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	63,
@@ -5192,7 +5208,7 @@
 					"presetName":	"Back\\slash",
 					"scaleName":	"Felicita Arc",
 					"shotType":	"timer_only",
-					"stopDetail":	"other",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	62,
@@ -5211,7 +5227,7 @@
 					"presetName":	"Brazil",
 					"scaleName":	"Skale",
 					"shotType":	"timer_only",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	61,
@@ -5249,7 +5265,7 @@
 					"presetName":	"Huila",
 					"scaleName":	"Felicita Arc",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	59,
@@ -5268,7 +5284,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	58,
@@ -5287,7 +5303,7 @@
 					"presetName":	"Guji",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	57,
@@ -5306,7 +5322,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"Felicita Arc",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	56,
@@ -5325,7 +5341,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"Skale",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	55,
@@ -5344,7 +5360,7 @@
 					"presetName":	"Kenya",
 					"scaleName":	"Bookoo \"Themis\"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	54,
@@ -5363,7 +5379,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	53,
@@ -5382,7 +5398,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Decent\\Scale",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	52,
@@ -5401,7 +5417,7 @@
 					"presetName":	"Guji",
 					"scaleName":	"Decent\\Scale",
 					"shotType":	"manual",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	51,
@@ -5420,7 +5436,7 @@
 					"presetName":	"Guji",
 					"scaleName":	"Acaia\tPyxis",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	50,
@@ -5439,7 +5455,7 @@
 					"presetName":	"Tab\there",
 					"scaleName":	"Timemore",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	49,
@@ -5458,7 +5474,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	48,
@@ -5477,7 +5493,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Skale",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	47,
@@ -5496,7 +5512,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	46,
@@ -5515,7 +5531,7 @@
 					"presetName":	"Yirga",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	45,
@@ -5534,7 +5550,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	44,
@@ -5553,7 +5569,7 @@
 					"presetName":	"Brazil",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	43,
@@ -5572,7 +5588,7 @@
 					"presetName":	"Colombia",
 					"scaleName":	"Skale",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"normal_target",
 					"badReason":	null
 				}, {
 					"id":	42,
@@ -5591,7 +5607,7 @@
 					"presetName":	"Huila",
 					"scaleName":	"Brewista",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	41,
@@ -5610,14 +5626,14 @@
 					"presetName":	"Back\\slash",
 					"scaleName":	"",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}],
 			"header":	{
 				"shotCount":	10,
 				"avgDurationS":	26.5,
 				"avgYieldG":	36.9,
-				"avgErrorPct":	5.9,
+				"avgErrorPct":	6.7,
 				"avgFlowGps":	1.74,
 				"shotsPerDay":	2.7,
 				"dens":	[{
@@ -5639,11 +5655,18 @@
 					}],
 				"cons":	{
 					"t":	[369, 321, 282, 206, 340, 222, 264, 291, 275, 244],
-					"p":	[5, 12, 5, 2, 2, 2, 1, 1, 3, 5]
+					"p":	[5, 12, 5, 2, 2, 2, 1, 1, 3, 5],
+					"g":	[0, 0, 1, 0, 1, 0, 2, 0, 0, 2]
 				},
 				"facets":	{
 					"presets":	[[5, "Back\\slash"], [3, "Ethiopia"], [1, "House"], [2, "Decaf \"Swiss\""], [12, "Huila"], [6, "Tab\there"], [10, "Sidamo"], [4, "Kenya"]],
 					"scales":	[[1513125789, "Pearl S"], [891528779, "Hiroia"], [3572211697, "Varia"], [439426373, "Timemore"], [4163241358, "Brewista"], [1055516412, "Acaia\tPyxis"], [399302032, "Skale"], [319563842, "Eureka"]]
+				},
+				"preset":	5,
+				"cut":	{
+					"t":	[370, 350, 380, 350],
+					"e":	[314, 199, -134, -182],
+					"g":	[0, 0, 1, 2]
 				}
 			}
 		}, {
@@ -5667,7 +5690,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	79,
@@ -5686,7 +5709,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	78,
@@ -5705,7 +5728,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	"low_yield"
 				}, {
 					"id":	77,
@@ -5724,7 +5747,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	76,
@@ -5743,7 +5766,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	75,
@@ -5781,7 +5804,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	73,
@@ -5800,7 +5823,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	72,
@@ -5819,7 +5842,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	"low_yield"
 				}, {
 					"id":	71,
@@ -5838,7 +5861,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	70,
@@ -5857,7 +5880,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	69,
@@ -5876,7 +5899,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"other",
 					"badReason":	"low_yield"
 				}, {
 					"id":	68,
@@ -5895,7 +5918,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	67,
@@ -5914,7 +5937,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	66,
@@ -5990,7 +6013,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	"low_yield"
 				}, {
 					"id":	62,
@@ -6009,7 +6032,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	61,
@@ -6028,7 +6051,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	60,
@@ -6047,7 +6070,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	"low_yield"
 				}, {
 					"id":	59,
@@ -6066,7 +6089,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	58,
@@ -6085,7 +6108,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	57,
@@ -6104,7 +6127,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	"low_yield"
 				}, {
 					"id":	56,
@@ -6123,7 +6146,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	55,
@@ -6161,7 +6184,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	"low_yield"
 				}, {
 					"id":	53,
@@ -6180,7 +6203,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	52,
@@ -6199,7 +6222,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"other",
 					"badReason":	null
 				}, {
 					"id":	51,
@@ -6218,7 +6241,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	"low_yield"
 				}, {
 					"id":	50,
@@ -6237,7 +6260,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	49,
@@ -6256,7 +6279,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	48,
@@ -6275,7 +6298,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"web_stop",
 					"badReason":	"low_yield"
 				}, {
 					"id":	47,
@@ -6294,7 +6317,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	46,
@@ -6313,7 +6336,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	45,
@@ -6332,7 +6355,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	"low_yield"
 				}, {
 					"id":	44,
@@ -6351,7 +6374,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	43,
@@ -6370,7 +6393,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	42,
@@ -6389,7 +6412,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	"low_yield"
 				}, {
 					"id":	41,
@@ -6408,14 +6431,14 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}],
 			"header":	{
 				"shotCount":	27,
 				"avgDurationS":	28.7,
 				"avgYieldG":	37,
-				"avgErrorPct":	7.4,
+				"avgErrorPct":	6.7,
 				"avgFlowGps":	1.94,
 				"shotsPerDay":	null,
 				"dens":	[{
@@ -6437,12 +6460,14 @@
 					}],
 				"cons":	{
 					"t":	[353, 314, 242, 308, 266, 231, 345, 369, 266, 348, 273, 365, 286, 336, 334, 210, 200, 296, 299, 278, 348, 335, 278, 325, 306, 305, 280],
-					"p":	[1, 3, 2, 3, 1, 1, 1, 3, 1, 3, 3, 3, 1, 1, 3, 1, 3, 3, 3, 3, 1, 2, 3, 2, 3, 3, 2]
+					"p":	[1, 3, 2, 3, 1, 1, 1, 3, 1, 3, 3, 3, 1, 1, 3, 1, 3, 3, 3, 3, 1, 2, 3, 2, 3, 3, 2],
+					"g":	[2, 0, 2, 1, 1, 1, 0, 0, 2, 1, 1, 0, 2, 0, 2, 1, 0, 2, 0, 2, 2, 0, 0, 0, 0, 2, 0]
 				},
 				"facets":	{
 					"presets":	[[2, "Decaf \"Swiss\""], [3, "Ethiopia"], [1, "House"]],
 					"scales":	[[1513125789, "Pearl S"], [2023440856, "Lunar"]]
-				}
+				},
+				"preset":	1
 			}
 		}, {
 			"name":	"window10_no_timed_shots",
@@ -6465,7 +6490,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_min_time",
 					"badReason":	null
 				}, {
 					"id":	54,
@@ -6484,7 +6509,7 @@
 					"presetName":	"House",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"slow_min_weight",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	53,
@@ -6503,7 +6528,7 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"other",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	52,
@@ -6522,7 +6547,7 @@
 					"presetName":	"House",
 					"scaleName":	"",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	51,
@@ -6560,7 +6585,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	49,
@@ -6579,7 +6604,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"manual",
-					"stopDetail":	"extended_max_weight",
+					"stopDetail":	"web_stop",
 					"badReason":	null
 				}, {
 					"id":	48,
@@ -6617,7 +6642,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_max_time",
 					"badReason":	null
 				}, {
 					"id":	46,
@@ -6636,7 +6661,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"auto_to_manual",
 					"badReason":	null
 				}, {
 					"id":	45,
@@ -6655,7 +6680,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"auto",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	44,
@@ -6674,7 +6699,7 @@
 					"presetName":	"House",
 					"scaleName":	"Lunar",
 					"shotType":	"manual",
-					"stopDetail":	"extended_min_time",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}, {
 					"id":	43,
@@ -6693,7 +6718,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"normal_target",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	42,
@@ -6712,7 +6737,7 @@
 					"presetName":	"Ethiopia",
 					"scaleName":	"Pearl S",
 					"shotType":	"auto",
-					"stopDetail":	"web_stop",
+					"stopDetail":	"extended_max_weight",
 					"badReason":	null
 				}, {
 					"id":	41,
@@ -6731,14 +6756,14 @@
 					"presetName":	"Decaf \"Swiss\"",
 					"scaleName":	"Pearl S",
 					"shotType":	"timer_only",
-					"stopDetail":	"auto_to_manual",
+					"stopDetail":	"slow_min_weight",
 					"badReason":	null
 				}],
 			"header":	{
 				"shotCount":	10,
 				"avgDurationS":	28.3,
 				"avgYieldG":	36.3,
-				"avgErrorPct":	1.7,
+				"avgErrorPct":	1.9,
 				"avgFlowGps":	1.84,
 				"shotsPerDay":	2,
 				"dens":	[null, null],
@@ -6749,6 +6774,12 @@
 				"facets":	{
 					"presets":	[[1, "House"], [2, "Decaf \"Swiss\""], [3, "Ethiopia"]],
 					"scales":	[[2023440856, "Lunar"], [1513125789, "Pearl S"]]
+				},
+				"preset":	1,
+				"cut":	{
+					"t":	370,
+					"e":	[-224],
+					"g":	[1]
 				}
 			}
 		}, {
@@ -6771,6 +6802,3496 @@
 				"facets":	{
 					"presets":	[],
 					"scales":	[]
+				},
+				"preset":	1
+			}
+		}, {
+			"name":	"window50_all_presets",
+			"window":	50,
+			"presetId":	0,
+			"rows":	[{
+					"id":	100,
+					"durationS":	25.2,
+					"actualG":	36.98,
+					"avgFlowGS":	1.45,
+					"arrivalS":	29.5,
+					"cutLineG":	null,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728023217,
+					"verdict":	"fast",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	99,
+					"durationS":	20.7,
+					"actualG":	32.18,
+					"avgFlowGS":	2.18,
+					"arrivalS":	26.9,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728027249,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	98,
+					"durationS":	22.6,
+					"actualG":	34.13,
+					"avgFlowGS":	2.1,
+					"arrivalS":	25.7,
+					"cutLineG":	35.56,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728048892,
+					"verdict":	"on_recipe",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	97,
+					"durationS":	20.3,
+					"actualG":	36.24,
+					"avgFlowGS":	2.48,
+					"arrivalS":	23.8,
+					"cutLineG":	34.51,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728019052,
+					"verdict":	"on_recipe",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	96,
+					"durationS":	23,
+					"actualG":	39.73,
+					"avgFlowGS":	2.09,
+					"arrivalS":	30.7,
+					"cutLineG":	35.54,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728133404,
+					"verdict":	"fast",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	95,
+					"durationS":	21.4,
+					"actualG":	38.3,
+					"avgFlowGS":	2.61,
+					"arrivalS":	24.1,
+					"cutLineG":	null,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728118664,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	94,
+					"durationS":	20,
+					"actualG":	33.2,
+					"avgFlowGS":	2.99,
+					"arrivalS":	34.4,
+					"cutLineG":	36.99,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728096326,
+					"verdict":	"slow",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	93,
+					"durationS":	20.6,
+					"actualG":	36.19,
+					"avgFlowGS":	1.07,
+					"arrivalS":	26.8,
+					"cutLineG":	34.19,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728099721,
+					"verdict":	"fast",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	92,
+					"durationS":	21,
+					"actualG":	33.75,
+					"avgFlowGS":	null,
+					"arrivalS":	34.2,
+					"cutLineG":	34.77,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728192820,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	91,
+					"durationS":	23.9,
+					"actualG":	32.28,
+					"avgFlowGS":	2.67,
+					"arrivalS":	37.9,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728223738,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	90,
+					"durationS":	22.9,
+					"actualG":	38.49,
+					"avgFlowGS":	1.17,
+					"arrivalS":	21.9,
+					"cutLineG":	null,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	89,
+					"durationS":	34.4,
+					"actualG":	34.24,
+					"avgFlowGS":	2.36,
+					"arrivalS":	22.3,
+					"cutLineG":	null,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728185426,
+					"verdict":	"on_recipe",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"",
+					"shotType":	"manual",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	88,
+					"durationS":	30.7,
+					"actualG":	39.39,
+					"avgFlowGS":	null,
+					"arrivalS":	35.4,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"on_recipe",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	87,
+					"durationS":	25.2,
+					"actualG":	39.34,
+					"avgFlowGS":	null,
+					"arrivalS":	21.6,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728291736,
+					"verdict":	"on_recipe",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	86,
+					"durationS":	28.1,
+					"actualG":	36.12,
+					"avgFlowGS":	null,
+					"arrivalS":	30,
+					"cutLineG":	34.76,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728259559,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	85,
+					"durationS":	30.7,
+					"actualG":	33.22,
+					"avgFlowGS":	null,
+					"arrivalS":	34,
+					"cutLineG":	36.84,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728286899,
+					"verdict":	"on_recipe",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	84,
+					"durationS":	21.2,
+					"actualG":	34.23,
+					"avgFlowGS":	2.79,
+					"arrivalS":	26.2,
+					"cutLineG":	34.79,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728377221,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	83,
+					"durationS":	20.6,
+					"actualG":	34.69,
+					"avgFlowGS":	2.42,
+					"arrivalS":	30,
+					"cutLineG":	36.46,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728355005,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	82,
+					"durationS":	24.7,
+					"actualG":	33.75,
+					"avgFlowGS":	2.24,
+					"arrivalS":	25.9,
+					"cutLineG":	36.7,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728388993,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	81,
+					"durationS":	22.1,
+					"actualG":	38.29,
+					"avgFlowGS":	2.03,
+					"arrivalS":	26.3,
+					"cutLineG":	null,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728399490,
+					"verdict":	"fast",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	80,
+					"durationS":	24.2,
+					"actualG":	38.83,
+					"avgFlowGS":	1.01,
+					"arrivalS":	21.6,
+					"cutLineG":	null,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	79,
+					"durationS":	22.9,
+					"actualG":	39.06,
+					"avgFlowGS":	2.79,
+					"arrivalS":	35,
+					"cutLineG":	35.21,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728476103,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	78,
+					"durationS":	20.3,
+					"actualG":	38.5,
+					"avgFlowGS":	2.08,
+					"arrivalS":	37.8,
+					"cutLineG":	null,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728473096,
+					"verdict":	"fast",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	77,
+					"durationS":	30.3,
+					"actualG":	37.27,
+					"avgFlowGS":	2.34,
+					"arrivalS":	24.2,
+					"cutLineG":	34.18,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"on_recipe",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	76,
+					"durationS":	25.3,
+					"actualG":	37.57,
+					"avgFlowGS":	1.49,
+					"arrivalS":	24.1,
+					"cutLineG":	36.08,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728527198,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	75,
+					"durationS":	31,
+					"actualG":	35.91,
+					"avgFlowGS":	2.11,
+					"arrivalS":	35.7,
+					"cutLineG":	36.3,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728565922,
+					"verdict":	"on_recipe",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	74,
+					"durationS":	25.1,
+					"actualG":	33.08,
+					"avgFlowGS":	2.58,
+					"arrivalS":	22.3,
+					"cutLineG":	35.48,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728583901,
+					"verdict":	"slow",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	73,
+					"durationS":	24.8,
+					"actualG":	33.8,
+					"avgFlowGS":	null,
+					"arrivalS":	36.8,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728550377,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	72,
+					"durationS":	31.6,
+					"actualG":	37.3,
+					"avgFlowGS":	2.42,
+					"arrivalS":	26.2,
+					"cutLineG":	34.21,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728660158,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	71,
+					"durationS":	20.3,
+					"actualG":	37.74,
+					"avgFlowGS":	2.99,
+					"arrivalS":	29,
+					"cutLineG":	35.15,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728649005,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	70,
+					"durationS":	23.2,
+					"actualG":	39.7,
+					"avgFlowGS":	2.74,
+					"arrivalS":	33.8,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728606453,
+					"verdict":	"slow",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"",
+					"shotType":	"timer_only",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	69,
+					"durationS":	32.7,
+					"actualG":	33.72,
+					"avgFlowGS":	1.54,
+					"arrivalS":	35.7,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728624964,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	68,
+					"durationS":	25.1,
+					"actualG":	32.01,
+					"avgFlowGS":	null,
+					"arrivalS":	37.2,
+					"cutLineG":	36.1,
+					"goalG":	0,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728751532,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	67,
+					"durationS":	25.1,
+					"actualG":	37.65,
+					"avgFlowGS":	2.35,
+					"arrivalS":	26.5,
+					"cutLineG":	35.05,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728749196,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	66,
+					"durationS":	29.3,
+					"actualG":	36.44,
+					"avgFlowGS":	1.2,
+					"arrivalS":	20.8,
+					"cutLineG":	34.8,
+					"goalG":	0,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728713358,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	65,
+					"durationS":	22.3,
+					"actualG":	33.46,
+					"avgFlowGS":	2.64,
+					"arrivalS":	29.1,
+					"cutLineG":	34.25,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728755017,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	64,
+					"durationS":	32.4,
+					"actualG":	37.54,
+					"avgFlowGS":	2.16,
+					"arrivalS":	36.7,
+					"cutLineG":	null,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728779167,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	63,
+					"durationS":	24.5,
+					"actualG":	32.87,
+					"avgFlowGS":	null,
+					"arrivalS":	27.7,
+					"cutLineG":	35.37,
+					"goalG":	0,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728807706,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	62,
+					"durationS":	26.8,
+					"actualG":	39.8,
+					"avgFlowGS":	1.83,
+					"arrivalS":	26.3,
+					"cutLineG":	null,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728818283,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	61,
+					"durationS":	21.1,
+					"actualG":	34.64,
+					"avgFlowGS":	1.48,
+					"arrivalS":	37,
+					"cutLineG":	34.34,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	60,
+					"durationS":	31.1,
+					"actualG":	39.76,
+					"avgFlowGS":	2.61,
+					"arrivalS":	37.9,
+					"cutLineG":	34.87,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	59,
+					"durationS":	29.9,
+					"actualG":	33.43,
+					"avgFlowGS":	1.77,
+					"arrivalS":	32.5,
+					"cutLineG":	34.28,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728879934,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	58,
+					"durationS":	27.3,
+					"actualG":	33.68,
+					"avgFlowGS":	1.39,
+					"arrivalS":	31.6,
+					"cutLineG":	34.87,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728872352,
+					"verdict":	"on_recipe",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"",
+					"shotType":	"timer_only",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	57,
+					"durationS":	34.4,
+					"actualG":	33.16,
+					"avgFlowGS":	null,
+					"arrivalS":	31.4,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728923007,
+					"verdict":	"fast",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	56,
+					"durationS":	20.5,
+					"actualG":	35.02,
+					"avgFlowGS":	2.45,
+					"arrivalS":	24.2,
+					"cutLineG":	null,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"on_recipe",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"",
+					"shotType":	"timer_only",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	55,
+					"durationS":	20.2,
+					"actualG":	39.5,
+					"avgFlowGS":	1.7,
+					"arrivalS":	28.3,
+					"cutLineG":	35.13,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	54,
+					"durationS":	25.2,
+					"actualG":	35.74,
+					"avgFlowGS":	2.02,
+					"arrivalS":	33.7,
+					"cutLineG":	36.92,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728980218,
+					"verdict":	"on_recipe",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	53,
+					"durationS":	28.7,
+					"actualG":	32.19,
+					"avgFlowGS":	2.42,
+					"arrivalS":	36.1,
+					"cutLineG":	35.32,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728965501,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	52,
+					"durationS":	29.4,
+					"actualG":	40.68,
+					"avgFlowGS":	2.32,
+					"arrivalS":	37.5,
+					"cutLineG":	36.15,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729082803,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	51,
+					"durationS":	29.3,
+					"actualG":	37.36,
+					"avgFlowGS":	1.45,
+					"arrivalS":	23.6,
+					"cutLineG":	null,
+					"goalG":	34,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729097420,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	50,
+					"durationS":	24.8,
+					"actualG":	38.88,
+					"avgFlowGS":	2.62,
+					"arrivalS":	34,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729095768,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	49,
+					"durationS":	26.5,
+					"actualG":	40.44,
+					"avgFlowGS":	1.84,
+					"arrivalS":	22.2,
+					"cutLineG":	null,
+					"goalG":	0,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729044874,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	48,
+					"durationS":	30.7,
+					"actualG":	37.85,
+					"avgFlowGS":	2.32,
+					"arrivalS":	32.5,
+					"cutLineG":	34.6,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729142982,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	47,
+					"durationS":	22.6,
+					"actualG":	40.65,
+					"avgFlowGS":	2.17,
+					"arrivalS":	29.2,
+					"cutLineG":	34,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729125775,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	46,
+					"durationS":	23.4,
+					"actualG":	36.65,
+					"avgFlowGS":	2.76,
+					"arrivalS":	21,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729139893,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	45,
+					"durationS":	32.8,
+					"actualG":	38.35,
+					"avgFlowGS":	2.32,
+					"arrivalS":	36.6,
+					"cutLineG":	null,
+					"goalG":	38,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729131883,
+					"verdict":	"slow",
+					"presetId":	2,
+					"presetName":	"Decaf \"Swiss\"",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	44,
+					"durationS":	32.7,
+					"actualG":	33.89,
+					"avgFlowGS":	2.87,
+					"arrivalS":	25.9,
+					"cutLineG":	null,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729217244,
+					"verdict":	"fast",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	43,
+					"durationS":	26,
+					"actualG":	38.59,
+					"avgFlowGS":	1.23,
+					"arrivalS":	24.4,
+					"cutLineG":	null,
+					"goalG":	35,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729213070,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	42,
+					"durationS":	24,
+					"actualG":	37.49,
+					"avgFlowGS":	1.9,
+					"arrivalS":	31.5,
+					"cutLineG":	34.63,
+					"goalG":	0,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729229299,
+					"verdict":	"on_recipe",
+					"presetId":	3,
+					"presetName":	"Ethiopia",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	41,
+					"durationS":	34.3,
+					"actualG":	35.74,
+					"avgFlowGS":	1.71,
+					"arrivalS":	33.4,
+					"cutLineG":	34.02,
+					"goalG":	37,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729213682,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}],
+			"header":	{
+				"shotCount":	50,
+				"avgDurationS":	25.5,
+				"avgYieldG":	36,
+				"avgErrorPct":	9.1,
+				"avgFlowGps":	2.11,
+				"shotsPerDay":	3.2,
+				"dens":	[{
+						"lo":	19,
+						"hi":	39,
+						"a":	25,
+						"b":	32,
+						"shared":	true,
+						"n":	[15, 17, 18],
+						"h":	[1, 1, 2, 3, 4, 6, 9, 12, 17, 21, 27, 33, 39, 45, 51, 55, 59, 60, 60, 59, 56, 53, 51, 50, 51, 54, 58, 63, 68, 72, 73, 72, 69, 64, 59, 56, 55, 56, 61, 68, 77, 86, 93, 98, 100, 98, 94, 86, 78, 69, 61, 54, 48, 45, 43, 43, 44, 46, 49, 51, 54, 56, 58, 58, 58, 57, 55, 53, 50, 48, 46, 44, 43, 41, 40, 38, 37, 35, 33, 31, 30, 30, 30, 33, 36, 41, 46, 52, 58, 63, 67, 69, 69, 69, 69, 68, 68, 68, 69, 70, 71, 72, 74, 75, 77, 79, 82, 84, 85, 86, 85, 82, 77, 70, 62, 53, 43, 34, 26, 18, 13]
+					}, null],
+				"cons":	{
+					"t":	[236, 375, 361, 337, 283, 242, 314, 316, 325, 379, 370, 263, 277, 367, 291, 208, 265, 372, 357, 338, 290, 262, 368, 223, 357, 241, 242, 378, 350, 216, 263, 259, 300, 262, 340, 300, 216, 354, 223, 219, 379, 342, 268, 344, 241, 307, 238, 257, 269, 295],
+					"p":	[1, 2, 1, 3, 2, 3, 2, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 3, 1, 1, 2, 3, 3, 1, 3, 3, 1, 1, 3, 1, 1, 1, 2, 2, 2, 2, 3, 2, 1, 2, 2, 3, 1, 2, 2, 2, 1, 2],
+					"g":	[0, 0, 0, 0, 2, 0, 1, 0, 1, 0, 0, 0, 1, 2, 1, 1, 2, 2, 1, 1, 0, 1, 2, 0, 0, 2, 2, 0, 2, 1, 1, 0, 1, 2, 2, 2, 0, 2, 1, 2, 0, 2, 1, 0, 2, 2, 0, 1, 2, 0]
+				},
+				"facets":	{
+					"presets":	[[2, "Decaf \"Swiss\""], [1, "House"], [3, "Ethiopia"]],
+					"scales":	[[2023440856, "Lunar"], [1513125789, "Pearl S"]]
+				},
+				"preset":	0
+			}
+		}, {
+			"name":	"window100_one_target",
+			"window":	100,
+			"presetId":	1,
+			"rows":	[{
+					"id":	160,
+					"durationS":	24.9,
+					"actualG":	37.31,
+					"avgFlowGS":	2.93,
+					"arrivalS":	27.7,
+					"cutLineG":	35.15,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728046248,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	159,
+					"durationS":	23.7,
+					"actualG":	34.93,
+					"avgFlowGS":	1.07,
+					"arrivalS":	22,
+					"cutLineG":	35.98,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728009120,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	158,
+					"durationS":	24.8,
+					"actualG":	34.05,
+					"avgFlowGS":	2.9,
+					"arrivalS":	27.7,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728058128,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	157,
+					"durationS":	34.9,
+					"actualG":	36.06,
+					"avgFlowGS":	null,
+					"arrivalS":	32.8,
+					"cutLineG":	35.91,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728055541,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	156,
+					"durationS":	21.7,
+					"actualG":	32.98,
+					"avgFlowGS":	2.35,
+					"arrivalS":	37.9,
+					"cutLineG":	36.25,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728131179,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	155,
+					"durationS":	27.5,
+					"actualG":	35.89,
+					"avgFlowGS":	1.68,
+					"arrivalS":	32.4,
+					"cutLineG":	36.31,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728115696,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	154,
+					"durationS":	22.5,
+					"actualG":	39.41,
+					"avgFlowGS":	2.92,
+					"arrivalS":	23.9,
+					"cutLineG":	34.86,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728115893,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	153,
+					"durationS":	34.9,
+					"actualG":	36.31,
+					"avgFlowGS":	2.54,
+					"arrivalS":	23.8,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728111031,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	152,
+					"durationS":	32.9,
+					"actualG":	36.14,
+					"avgFlowGS":	2.56,
+					"arrivalS":	23.2,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728226189,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	151,
+					"durationS":	29.3,
+					"actualG":	34,
+					"avgFlowGS":	1.5,
+					"arrivalS":	33.4,
+					"cutLineG":	34.43,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728206035,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	150,
+					"durationS":	21.1,
+					"actualG":	34.28,
+					"avgFlowGS":	null,
+					"arrivalS":	36.6,
+					"cutLineG":	34.47,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728231597,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	149,
+					"durationS":	33.2,
+					"actualG":	32.25,
+					"avgFlowGS":	2.78,
+					"arrivalS":	21,
+					"cutLineG":	34.19,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728201391,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	148,
+					"durationS":	34.2,
+					"actualG":	35.74,
+					"avgFlowGS":	2.14,
+					"arrivalS":	23.5,
+					"cutLineG":	35.33,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728304797,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	147,
+					"durationS":	22.3,
+					"actualG":	32.56,
+					"avgFlowGS":	null,
+					"arrivalS":	35.1,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728316304,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	146,
+					"durationS":	31.4,
+					"actualG":	40.4,
+					"avgFlowGS":	1.71,
+					"arrivalS":	23.3,
+					"cutLineG":	34.38,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728296378,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	145,
+					"durationS":	30.2,
+					"actualG":	32.14,
+					"avgFlowGS":	null,
+					"arrivalS":	32.4,
+					"cutLineG":	35.21,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728285729,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	144,
+					"durationS":	27.8,
+					"actualG":	35.9,
+					"avgFlowGS":	1.73,
+					"arrivalS":	21.4,
+					"cutLineG":	35.29,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728353224,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	143,
+					"durationS":	21.7,
+					"actualG":	32.38,
+					"avgFlowGS":	2.52,
+					"arrivalS":	36.5,
+					"cutLineG":	36.49,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728373222,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	142,
+					"durationS":	34.1,
+					"actualG":	39.64,
+					"avgFlowGS":	null,
+					"arrivalS":	27.8,
+					"cutLineG":	36.65,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728405969,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	141,
+					"durationS":	31,
+					"actualG":	35.75,
+					"avgFlowGS":	2.04,
+					"arrivalS":	35.4,
+					"cutLineG":	34.37,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	140,
+					"durationS":	24.8,
+					"actualG":	34.87,
+					"avgFlowGS":	2.94,
+					"arrivalS":	31.5,
+					"cutLineG":	36.99,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728462394,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	139,
+					"durationS":	24.6,
+					"actualG":	38.29,
+					"avgFlowGS":	1.29,
+					"arrivalS":	22.1,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728447914,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	138,
+					"durationS":	34.1,
+					"actualG":	35.99,
+					"avgFlowGS":	2.71,
+					"arrivalS":	37.5,
+					"cutLineG":	36.17,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728488751,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	137,
+					"durationS":	34.8,
+					"actualG":	32.82,
+					"avgFlowGS":	2.36,
+					"arrivalS":	31.4,
+					"cutLineG":	35.51,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728432247,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	136,
+					"durationS":	20.9,
+					"actualG":	36.8,
+					"avgFlowGS":	1.23,
+					"arrivalS":	31,
+					"cutLineG":	34.5,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728575939,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	135,
+					"durationS":	29.5,
+					"actualG":	33.09,
+					"avgFlowGS":	2.37,
+					"arrivalS":	37.1,
+					"cutLineG":	35.25,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	134,
+					"durationS":	34.3,
+					"actualG":	40.11,
+					"avgFlowGS":	null,
+					"arrivalS":	25.1,
+					"cutLineG":	35.46,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728576613,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	133,
+					"durationS":	29.5,
+					"actualG":	40.57,
+					"avgFlowGS":	1.94,
+					"arrivalS":	32.7,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728554879,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	132,
+					"durationS":	30.7,
+					"actualG":	36.24,
+					"avgFlowGS":	1.71,
+					"arrivalS":	31.8,
+					"cutLineG":	36.94,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	131,
+					"durationS":	29.7,
+					"actualG":	35.91,
+					"avgFlowGS":	1.48,
+					"arrivalS":	34.2,
+					"cutLineG":	34.74,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728609416,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	130,
+					"durationS":	27.3,
+					"actualG":	34.47,
+					"avgFlowGS":	2.41,
+					"arrivalS":	35.8,
+					"cutLineG":	36.81,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728658078,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	129,
+					"durationS":	25.6,
+					"actualG":	32,
+					"avgFlowGS":	1.92,
+					"arrivalS":	37.3,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728644614,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	128,
+					"durationS":	32.2,
+					"actualG":	36.79,
+					"avgFlowGS":	2.66,
+					"arrivalS":	20.4,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728725031,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"manual",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	127,
+					"durationS":	21.2,
+					"actualG":	36.98,
+					"avgFlowGS":	1.59,
+					"arrivalS":	27.6,
+					"cutLineG":	35.53,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728712734,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	126,
+					"durationS":	27.4,
+					"actualG":	34.25,
+					"avgFlowGS":	2.29,
+					"arrivalS":	33.8,
+					"cutLineG":	34.68,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728737582,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	125,
+					"durationS":	34.3,
+					"actualG":	33.51,
+					"avgFlowGS":	1.87,
+					"arrivalS":	32.6,
+					"cutLineG":	34.91,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728733871,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	124,
+					"durationS":	34.3,
+					"actualG":	40.89,
+					"avgFlowGS":	1.24,
+					"arrivalS":	30.6,
+					"cutLineG":	36.86,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728842025,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	123,
+					"durationS":	22.5,
+					"actualG":	35.91,
+					"avgFlowGS":	1.38,
+					"arrivalS":	35.3,
+					"cutLineG":	34.3,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	122,
+					"durationS":	28.1,
+					"actualG":	39.79,
+					"avgFlowGS":	1.67,
+					"arrivalS":	21.7,
+					"cutLineG":	34.7,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728777809,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	121,
+					"durationS":	27.7,
+					"actualG":	32.9,
+					"avgFlowGS":	2.68,
+					"arrivalS":	28.9,
+					"cutLineG":	34.45,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728820239,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	120,
+					"durationS":	25.7,
+					"actualG":	35.18,
+					"avgFlowGS":	1.77,
+					"arrivalS":	37.7,
+					"cutLineG":	35.67,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728866798,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	119,
+					"durationS":	27.2,
+					"actualG":	37.06,
+					"avgFlowGS":	1.6,
+					"arrivalS":	21.3,
+					"cutLineG":	36.92,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728897645,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	118,
+					"durationS":	29.1,
+					"actualG":	38,
+					"avgFlowGS":	1.19,
+					"arrivalS":	29.3,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728893698,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"timer_only",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	117,
+					"durationS":	26.8,
+					"actualG":	37.14,
+					"avgFlowGS":	2.86,
+					"arrivalS":	21.8,
+					"cutLineG":	35.57,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728911542,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	116,
+					"durationS":	32.5,
+					"actualG":	36.01,
+					"avgFlowGS":	2.16,
+					"arrivalS":	37.2,
+					"cutLineG":	36.31,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728984803,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	115,
+					"durationS":	20.5,
+					"actualG":	40.91,
+					"avgFlowGS":	2.3,
+					"arrivalS":	29.1,
+					"cutLineG":	35.97,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728960338,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	114,
+					"durationS":	25.7,
+					"actualG":	33.42,
+					"avgFlowGS":	1.77,
+					"arrivalS":	36.3,
+					"cutLineG":	35.01,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1728991676,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	113,
+					"durationS":	25.3,
+					"actualG":	37.9,
+					"avgFlowGS":	2.89,
+					"arrivalS":	34.5,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	112,
+					"durationS":	33.3,
+					"actualG":	37.4,
+					"avgFlowGS":	2.98,
+					"arrivalS":	35.5,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729070751,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	111,
+					"durationS":	24.3,
+					"actualG":	36.39,
+					"avgFlowGS":	2.72,
+					"arrivalS":	31.5,
+					"cutLineG":	36.47,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729071937,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	110,
+					"durationS":	23.1,
+					"actualG":	34.58,
+					"avgFlowGS":	1.16,
+					"arrivalS":	29.5,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729085084,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	109,
+					"durationS":	30,
+					"actualG":	36.78,
+					"avgFlowGS":	null,
+					"arrivalS":	31,
+					"cutLineG":	36.21,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729098454,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	108,
+					"durationS":	28.9,
+					"actualG":	33.7,
+					"avgFlowGS":	1.25,
+					"arrivalS":	21.7,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729165478,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	107,
+					"durationS":	21.7,
+					"actualG":	32.02,
+					"avgFlowGS":	1.36,
+					"arrivalS":	33.1,
+					"cutLineG":	34.66,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	106,
+					"durationS":	27,
+					"actualG":	33.84,
+					"avgFlowGS":	null,
+					"arrivalS":	36.4,
+					"cutLineG":	35.53,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729158729,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	105,
+					"durationS":	24.8,
+					"actualG":	35.57,
+					"avgFlowGS":	2.7,
+					"arrivalS":	32.7,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729127822,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	104,
+					"durationS":	33.2,
+					"actualG":	38.89,
+					"avgFlowGS":	1.51,
+					"arrivalS":	29.3,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729248952,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	103,
+					"durationS":	20.6,
+					"actualG":	39.57,
+					"avgFlowGS":	1.5,
+					"arrivalS":	29.5,
+					"cutLineG":	35.88,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	102,
+					"durationS":	22.2,
+					"actualG":	37.71,
+					"avgFlowGS":	1.29,
+					"arrivalS":	27.1,
+					"cutLineG":	34.71,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729229450,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	101,
+					"durationS":	22.7,
+					"actualG":	35.19,
+					"avgFlowGS":	2.72,
+					"arrivalS":	21.1,
+					"cutLineG":	34.75,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729260492,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	100,
+					"durationS":	22.8,
+					"actualG":	32.7,
+					"avgFlowGS":	null,
+					"arrivalS":	20.3,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729356808,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	99,
+					"durationS":	27.3,
+					"actualG":	39.99,
+					"avgFlowGS":	2.1,
+					"arrivalS":	31.6,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729318679,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	98,
+					"durationS":	22.4,
+					"actualG":	39.26,
+					"avgFlowGS":	1.11,
+					"arrivalS":	24.4,
+					"cutLineG":	34.78,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729307168,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	97,
+					"durationS":	34,
+					"actualG":	34.72,
+					"avgFlowGS":	2.22,
+					"arrivalS":	21.3,
+					"cutLineG":	35.06,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729326635,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	96,
+					"durationS":	26.6,
+					"actualG":	32.2,
+					"avgFlowGS":	null,
+					"arrivalS":	24.8,
+					"cutLineG":	36.69,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729407129,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	95,
+					"durationS":	22,
+					"actualG":	40.46,
+					"avgFlowGS":	null,
+					"arrivalS":	37.2,
+					"cutLineG":	35.21,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729417022,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	94,
+					"durationS":	23.1,
+					"actualG":	38.03,
+					"avgFlowGS":	2.8,
+					"arrivalS":	36.5,
+					"cutLineG":	35.16,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729410438,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	93,
+					"durationS":	31.5,
+					"actualG":	38.98,
+					"avgFlowGS":	2.99,
+					"arrivalS":	33.8,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729445893,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	92,
+					"durationS":	27.1,
+					"actualG":	33.77,
+					"avgFlowGS":	null,
+					"arrivalS":	20.4,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729485731,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	91,
+					"durationS":	29,
+					"actualG":	35.76,
+					"avgFlowGS":	2.35,
+					"arrivalS":	26.4,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729479551,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	90,
+					"durationS":	27,
+					"actualG":	38.85,
+					"avgFlowGS":	null,
+					"arrivalS":	35.6,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729514745,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	89,
+					"durationS":	29.4,
+					"actualG":	32.34,
+					"avgFlowGS":	2.04,
+					"arrivalS":	36.4,
+					"cutLineG":	35.2,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729470238,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	88,
+					"durationS":	27,
+					"actualG":	35.77,
+					"avgFlowGS":	1.03,
+					"arrivalS":	24,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729589856,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	87,
+					"durationS":	34.8,
+					"actualG":	40.21,
+					"avgFlowGS":	2.19,
+					"arrivalS":	35.2,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729617479,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	86,
+					"durationS":	30.1,
+					"actualG":	37.61,
+					"avgFlowGS":	1.34,
+					"arrivalS":	29.8,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729592232,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"manual",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	85,
+					"durationS":	24.1,
+					"actualG":	39.59,
+					"avgFlowGS":	2.54,
+					"arrivalS":	28.1,
+					"cutLineG":	35.03,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	84,
+					"durationS":	29.5,
+					"actualG":	36.46,
+					"avgFlowGS":	1.11,
+					"arrivalS":	27.5,
+					"cutLineG":	35.9,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	83,
+					"durationS":	24.9,
+					"actualG":	38.45,
+					"avgFlowGS":	2.53,
+					"arrivalS":	35.5,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729664186,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	82,
+					"durationS":	22.2,
+					"actualG":	34.47,
+					"avgFlowGS":	1.89,
+					"arrivalS":	20,
+					"cutLineG":	35.38,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729705089,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	81,
+					"durationS":	20.7,
+					"actualG":	37.02,
+					"avgFlowGS":	null,
+					"arrivalS":	20.9,
+					"cutLineG":	34.48,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729649541,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	80,
+					"durationS":	25,
+					"actualG":	38.26,
+					"avgFlowGS":	1.43,
+					"arrivalS":	35.3,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729755789,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	79,
+					"durationS":	23.8,
+					"actualG":	39.91,
+					"avgFlowGS":	null,
+					"arrivalS":	36.3,
+					"cutLineG":	35.01,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729783400,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	78,
+					"durationS":	34.2,
+					"actualG":	40.09,
+					"avgFlowGS":	1.89,
+					"arrivalS":	36.1,
+					"cutLineG":	36.88,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729733916,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	77,
+					"durationS":	33,
+					"actualG":	36.55,
+					"avgFlowGS":	2.1,
+					"arrivalS":	23.4,
+					"cutLineG":	34.11,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729763916,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	76,
+					"durationS":	22.8,
+					"actualG":	34.9,
+					"avgFlowGS":	1.32,
+					"arrivalS":	22.1,
+					"cutLineG":	36.25,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729849412,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	75,
+					"durationS":	30.6,
+					"actualG":	38.53,
+					"avgFlowGS":	null,
+					"arrivalS":	36.6,
+					"cutLineG":	35.15,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729842099,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	74,
+					"durationS":	28.7,
+					"actualG":	32.62,
+					"avgFlowGS":	1.54,
+					"arrivalS":	29.6,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	73,
+					"durationS":	29.7,
+					"actualG":	33.84,
+					"avgFlowGS":	null,
+					"arrivalS":	20.2,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	72,
+					"durationS":	25.9,
+					"actualG":	36.27,
+					"avgFlowGS":	1.99,
+					"arrivalS":	37.4,
+					"cutLineG":	35.32,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729944232,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	71,
+					"durationS":	25,
+					"actualG":	33.75,
+					"avgFlowGS":	1.82,
+					"arrivalS":	31.4,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729936289,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	70,
+					"durationS":	33.9,
+					"actualG":	34.28,
+					"avgFlowGS":	1.79,
+					"arrivalS":	36.8,
+					"cutLineG":	34.67,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729936106,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	69,
+					"durationS":	24.9,
+					"actualG":	38.52,
+					"avgFlowGS":	2.66,
+					"arrivalS":	35.7,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1729933045,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	68,
+					"durationS":	32.3,
+					"actualG":	35.89,
+					"avgFlowGS":	1.73,
+					"arrivalS":	21.5,
+					"cutLineG":	35.39,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730024444,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"other",
+					"badReason":	null
+				}, {
+					"id":	67,
+					"durationS":	29.9,
+					"actualG":	32.47,
+					"avgFlowGS":	2.49,
+					"arrivalS":	25.7,
+					"cutLineG":	36.43,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	66,
+					"durationS":	22.9,
+					"actualG":	38.77,
+					"avgFlowGS":	2.29,
+					"arrivalS":	34.7,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730009000,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	65,
+					"durationS":	32.3,
+					"actualG":	39.27,
+					"avgFlowGS":	2.39,
+					"arrivalS":	27.6,
+					"cutLineG":	35.14,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	64,
+					"durationS":	26.1,
+					"actualG":	34.65,
+					"avgFlowGS":	1.99,
+					"arrivalS":	36.3,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730098584,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	63,
+					"durationS":	29.7,
+					"actualG":	40.28,
+					"avgFlowGS":	1.52,
+					"arrivalS":	21.2,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730126756,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	62,
+					"durationS":	33,
+					"actualG":	32.59,
+					"avgFlowGS":	1.21,
+					"arrivalS":	34.1,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730134940,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	61,
+					"durationS":	27.7,
+					"actualG":	33.21,
+					"avgFlowGS":	2.39,
+					"arrivalS":	31.6,
+					"cutLineG":	36.68,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730123761,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	60,
+					"durationS":	34.1,
+					"actualG":	33.44,
+					"avgFlowGS":	1.58,
+					"arrivalS":	27.2,
+					"cutLineG":	36.69,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730171499,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_max_weight",
+					"badReason":	null
+				}, {
+					"id":	59,
+					"durationS":	34.9,
+					"actualG":	33.06,
+					"avgFlowGS":	1.59,
+					"arrivalS":	28.9,
+					"cutLineG":	34.75,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	58,
+					"durationS":	31.1,
+					"actualG":	35.84,
+					"avgFlowGS":	1.22,
+					"arrivalS":	35.5,
+					"cutLineG":	36.3,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	57,
+					"durationS":	25.9,
+					"actualG":	33.1,
+					"avgFlowGS":	1.54,
+					"arrivalS":	35.5,
+					"cutLineG":	35.31,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	56,
+					"durationS":	32.7,
+					"actualG":	40.05,
+					"avgFlowGS":	2.58,
+					"arrivalS":	35.6,
+					"cutLineG":	36.36,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730250786,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	55,
+					"durationS":	34.8,
+					"actualG":	40.6,
+					"avgFlowGS":	1.59,
+					"arrivalS":	23.4,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730293996,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	54,
+					"durationS":	26.3,
+					"actualG":	39.59,
+					"avgFlowGS":	null,
+					"arrivalS":	28.5,
+					"cutLineG":	36.83,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730261895,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"manual",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	53,
+					"durationS":	23.8,
+					"actualG":	36.85,
+					"avgFlowGS":	2.63,
+					"arrivalS":	34.9,
+					"cutLineG":	35.12,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730278954,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	52,
+					"durationS":	32.6,
+					"actualG":	34.74,
+					"avgFlowGS":	1.41,
+					"arrivalS":	32.7,
+					"cutLineG":	35.5,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730387819,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"web_stop",
+					"badReason":	null
+				}, {
+					"id":	51,
+					"durationS":	33.7,
+					"actualG":	38.75,
+					"avgFlowGS":	1.88,
+					"arrivalS":	21.1,
+					"cutLineG":	36.08,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730397987,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"timer_only",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	50,
+					"durationS":	30.6,
+					"actualG":	38.26,
+					"avgFlowGS":	2.36,
+					"arrivalS":	37.3,
+					"cutLineG":	36.86,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730344048,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	49,
+					"durationS":	31.4,
+					"actualG":	32.69,
+					"avgFlowGS":	2.89,
+					"arrivalS":	20.3,
+					"cutLineG":	34.08,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730394301,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	48,
+					"durationS":	23.1,
+					"actualG":	39.24,
+					"avgFlowGS":	null,
+					"arrivalS":	35.8,
+					"cutLineG":	35.9,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	47,
+					"durationS":	30.7,
+					"actualG":	36.48,
+					"avgFlowGS":	2.34,
+					"arrivalS":	37.1,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730433749,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"timer_only",
+					"stopDetail":	"extended_min_time",
+					"badReason":	null
+				}, {
+					"id":	46,
+					"durationS":	33.2,
+					"actualG":	40.13,
+					"avgFlowGS":	1.59,
+					"arrivalS":	33,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730439195,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Pearl S",
+					"shotType":	"timer_only",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}, {
+					"id":	45,
+					"durationS":	29.1,
+					"actualG":	36.81,
+					"avgFlowGS":	null,
+					"arrivalS":	23.4,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730457193,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	44,
+					"durationS":	30.9,
+					"actualG":	36.02,
+					"avgFlowGS":	null,
+					"arrivalS":	25,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"fast",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"Lunar",
+					"shotType":	"auto",
+					"stopDetail":	"slow_max_time",
+					"badReason":	null
+				}, {
+					"id":	43,
+					"durationS":	20.2,
+					"actualG":	36.97,
+					"avgFlowGS":	1.26,
+					"arrivalS":	27.1,
+					"cutLineG":	35.69,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	false,
+					"endedAtLocalSec":	0,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"normal_target",
+					"badReason":	null
+				}, {
+					"id":	42,
+					"durationS":	32.9,
+					"actualG":	35.08,
+					"avgFlowGS":	1.07,
+					"arrivalS":	23.4,
+					"cutLineG":	34.52,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730563334,
+					"verdict":	"on_recipe",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"manual",
+					"stopDetail":	"auto_to_manual",
+					"badReason":	null
+				}, {
+					"id":	41,
+					"durationS":	21.9,
+					"actualG":	34.56,
+					"avgFlowGS":	2.69,
+					"arrivalS":	29.9,
+					"cutLineG":	null,
+					"goalG":	36,
+					"fastBeforeS":	25,
+					"slowAfterS":	32,
+					"hasWallTime":	true,
+					"endedAtLocalSec":	1730547191,
+					"verdict":	"slow",
+					"presetId":	1,
+					"presetName":	"House",
+					"scaleName":	"",
+					"shotType":	"auto",
+					"stopDetail":	"slow_min_weight",
+					"badReason":	null
+				}],
+			"header":	{
+				"shotCount":	100,
+				"avgDurationS":	27.7,
+				"avgYieldG":	36.2,
+				"avgErrorPct":	6.8,
+				"avgFlowGps":	2.02,
+				"shotsPerDay":	3.5,
+				"dens":	[{
+						"lo":	19,
+						"hi":	39,
+						"a":	25,
+						"b":	32,
+						"shared":	true,
+						"n":	[40, 28, 32],
+						"h":	[7, 10, 14, 19, 24, 31, 38, 44, 51, 58, 63, 69, 72, 75, 76, 75, 72, 67, 62, 56, 51, 46, 43, 41, 41, 41, 42, 43, 43, 42, 41, 39, 37, 34, 31, 28, 26, 23, 22, 20, 19, 18, 18, 19, 21, 23, 26, 30, 34, 39, 42, 45, 46, 46, 46, 45, 44, 43, 44, 44, 46, 46, 47, 46, 45, 44, 42, 41, 41, 42, 45, 48, 52, 56, 59, 61, 62, 63, 62, 61, 60, 59, 57, 55, 53, 52, 50, 49, 48, 48, 49, 51, 53, 57, 61, 66, 72, 77, 83, 88, 93, 96, 99, 100, 100, 99, 96, 91, 86, 79, 71, 63, 54, 45, 37, 29, 22, 16, 11, 8, 5]
+					}, true],
+				"cons":	{
+					"t":	[316, 341, 212, 363, 276, 347, 257, 215, 357, 368, 314, 374, 202, 296, 366, 221, 234, 361, 363, 353, 209, 200, 355, 275, 281, 298, 352, 240, 364, 356, 264, 204, 338, 365, 372, 248, 213, 244, 316, 203, 211, 271, 295, 293, 327, 364, 331, 217, 310, 295, 315, 355, 345, 363, 291, 372, 218, 293, 213, 377, 289, 217, 353, 306, 326, 338, 276, 204, 373, 358, 342, 318, 327, 251, 371, 310, 314, 375, 221, 315, 354, 278, 365, 214, 324, 233, 351, 235, 210, 366, 334, 232, 238, 239, 324, 379, 328, 277, 220, 277],
+					"p":	1,
+					"g":	[0, 1, 0, 1, 2, 1, 2, 0, 0, 0, 2, 2, 2, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 2, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 2, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 2, 0, 2, 0, 1, 0, 0, 1, 1, 1, 0, 0, 2, 0, 0, 1, 0, 0, 2, 0, 1, 0, 2, 0, 2, 1, 2, 1, 1, 2, 2, 0, 2, 1, 0, 0, 2, 2, 0, 0, 2, 0]
+				},
+				"facets":	{
+					"presets":	[[1, "House"]],
+					"scales":	[[1513125789, "Pearl S"], [2023440856, "Lunar"]]
+				},
+				"preset":	1,
+				"cut":	{
+					"t":	360,
+					"e":	[-144, 97, 226, -256, -135, 327, -353, -216, -338, 253, 245, 359, 421, 203, -380, -81, 171, 357, 78, -142, 106, 98, -400, -9, -318, 229, -113, -362, 440, -344, -375, -200, 14, -11],
+					"g":	[2, 0, 0, 1, 1, 2, 2, 2, 0, 2, 0, 0, 1, 1, 0, 2, 1, 1, 0, 0, 2, 1, 0, 2, 2, 1, 0, 2, 1, 1, 2, 2, 1, 2]
 				}
 			}
 		}]

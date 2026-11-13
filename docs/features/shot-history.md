@@ -13,7 +13,7 @@ refreshing in the background even while you are elsewhere in the interface, so
 the page always opens instantly with the latest shots.
 
 Choose how far back Stats looks with **Last 10**, **50**, or **100** under the
-averages. The averages and both charts follow your choice, and the note beside
+averages. The averages and the charts follow your choice, and the note beside
 it says how many shots they actually cover. Only the choices that make a
 difference appear: every size smaller than the number of good shots in the
 list, plus the first one that covers them all, and none with ten shots or
@@ -29,8 +29,15 @@ directly, Stats always cover the shots on the controller. Preset figures, such
 as a preset's arrival line and grind hint, always come from the controller's
 own shots, with or without the companion.
 
-The Stats chart shows how those shots, the same ones behind the averages, land
-against the shot time window. Each
+Stats has three charts, each under its own title: **Shot time**,
+**Consistency** and **Cut accuracy**, with a legend under each one explaining
+its colors and marks. One **Preset** row above them chooses whose shots they
+show: **All**, or one preset by name, and every chart follows it. Until you
+pick one, it follows the active preset, even when you switch presets, or
+shows All while that preset has no good shots yet.
+
+The **Shot time** chart shows how those shots, the same ones behind the
+averages, land against the shot time window. Each
 part of the chart shows its share of your shots and how many there were: Fast
 before the window, On recipe inside it and Slow after it. Below those numbers,
 a smooth curve rises where your shot times cluster: a tall, narrow peak means
@@ -38,21 +45,20 @@ consistent shots, while a low, wide curve means they vary from shot to shot.
 Each shot keeps the verdict it got when it was pulled, so editing a preset's
 window later never changes past shots.
 
-The chart starts on **Preset: All**; choose **Current** to see only the
-active preset's shots. When every shot shown used the same window, the time
+When every shot shown used the same window, the time
 axis is in seconds and marks the window's edges, for example 27 s and 36 s.
 When the shots come from presets with different windows, each shot is placed
 against its own window instead: the axis shows **Window start** and
 **Window end**, and how many seconds before or after the window a shot reached
 its target. The chart appears once a shot has a measured arrival time.
 
-Below it, the consistency chart answers a different question: not whether your
+Below it, the **Consistency** chart answers a different question: not whether your
 shots landed on recipe, but how alike they are. It measures time, not weight:
 every shot already stops at its target weight, so what changes from shot to
 shot is how long it took to get there. A barista whose shots all run a little
 slow can still be very consistent. The chart looks at the same shots as the
 averages above, keeps those with an arrival time, and follows the same
-**All** or **Current** preset choice.
+preset choice.
 
 Each shot is a column, with the newest on the right; as new shots arrive, the
 older ones move left. The chart always has room for at least 10 columns; with
@@ -60,10 +66,19 @@ older ones move left. The chart always has room for at least 10 columns; with
 width, so 20 shots look the same under both choices and only grow thinner when
 you have more shots to show. Each column starts at your average time to the target,
 the dashed line, and shows how much slower (up) or faster (down) that shot was.
-The shaded band covers 5 % of the average either side, about 1.4 seconds on a
-28-second shot; columns that go past it are drawn in a stronger color. A shot
-far outside the chart stops at its edge with a dashed cap; move the cursor to
-it to read its real time.
+Columns more than 5 % from the average, about 1.4 seconds on a 28-second shot,
+are drawn in a stronger color. A shot far outside the chart stops at its edge
+with a dashed cap; move the cursor to it to read its real time.
+
+Behind the columns, a shaded band follows your last five shots, from the
+quickest to the slowest of them: a narrowing band means your shots are
+settling, a widening one that they are drifting apart. It is colored by the
+same verdict as the numbers above it, applied to those five shots: green while
+they are very consistent, yellow when fairly consistent, and orange when they
+vary a lot. A shot that a [fast or slow shot guard](fast-and-slow-shots.md)
+stopped is drawn in grey with a dashed outline, red when the guard let a fast
+shot run longer and blue when it ended a slow one early. It still counts: how
+long it took is part of how much your shots vary.
 
 The limits scale with your recipe, because one second matters more on a
 20-second ristretto than on a 45-second lungo. When the shots shown come from a
@@ -81,6 +96,28 @@ its own. **Spread** is the gap between your fastest and slowest shot, and
 and use the arrow keys, to read each shot's time and how far it was from your
 average. On a touch screen, put your finger on the dot itself to grab it;
 anywhere else, the chart scrolls the page as usual.
+
+The **Cut accuracy** chart shows how close each automatic stop of the chosen
+preset brought the cup to its target weight. It looks at that preset's own
+newest shots stopped by weight, as many as **Last 10**, **50** or **100**
+asks for, so it needs a preset chosen above; with **All** it asks you to
+choose one. Each column is one shot, newest on the right, starting at the
+target, the dashed line, and rising for a cup that settled heavier or
+falling for one that settled lighter. Columns within **0.2 g** of the target
+are green, heavier ones red and lighter ones blue. A ring on the line is a
+**bullseye**: a cup that settled exactly on the target, the same moment the
+Bullseye melody plays for. The shaded band behind follows your last five
+stops, green where it stays within 0.2 g and red or blue where it reaches
+beyond.
+
+A shot that a fast or slow shot guard stopped on purpose, heavier or lighter
+than the target by design, is drawn in grey with a dashed outline and left out
+of the numbers, so it never counts as a missed cut. The numbers above the
+chart sum up the rest: **Bullseyes**, how many of those shots landed exactly
+on the target; **Within ±0.2 g**, the share that landed that close; **Avg
+miss**, how far a cup typically settled from the target either way; and
+which way the stops lean, **Centred**, **Leans over** or **Leans under**. Use
+the cursor as on the Consistency chart to read each shot's settled weight.
 
 Stopwatch and gram-weight icons sit beside the large duration and yield values
 in each shot card and beside Avg time and Avg yield in the Stats summary.

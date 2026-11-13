@@ -629,7 +629,17 @@ function fillShotCharts(h, m) {
   seek(cursorT, false);
   return m;
 }
-let statsPresetFilter = "all";
+// The preset the three Stats charts follow (uiState.statsPreset): until one
+// is chosen, the active one while it holds good shots, else All, as the
+// controller's header keeps following the active preset until a page names
+// one. The header's `preset` names the one it followed.
+const statsChosenPreset = () => {
+  const active = (R.homeStatusCache()?.presets || R.presetState)?.activeId;
+  return (
+    R.uiState.statsPreset ??
+    ((statsHeader().facets?.presets || []).some(([id]) => id === active) ? active : 0)
+  );
+};
 // The Stats header (D10-D12): through the companion with the archive on, the
 // one it builds over the whole history (S13) for any window; meanwhile, and
 // whenever the companion cannot answer, the controller's, labelled and with
@@ -650,44 +660,66 @@ function renderStatsDurChart() {
     root.innerHTML =
       '<div id="statsPresetFilter" class="shotSort" role="group" aria-label="' +
       R.escHtml(__WEBUI_TEXT__("runtime.stats_preset_filter")) +
-      '"><span class="sortLbl">' +
-      __WEBUI_TEXT__("runtime.preset") +
-      '</span><button type="button" data-v="all">' +
-      __WEBUI_TEXT__("runtime.all_presets") +
-      '</button><button type="button" data-v="active">' +
-      __WEBUI_TEXT__("runtime.this_preset") +
-      '</button></div><div id="statsDurChartPlot"></div>';
+      '"></div><div id="statsDurChartPlot"></div>';
     root.dataset.ready = "1";
-    for (const b of $("statsPresetFilter").querySelectorAll("button"))
-      b.onclick = () => {
-        statsPresetFilter = b.dataset.v;
-        renderStatsDurChart();
-      };
-    R.lockControls(root);
   }
-  const host = $("statsDurChartPlot");
+  const host = $("statsDurChartPlot"),
+    filter = $("statsPresetFilter");
   if (!host) return;
   const st = statsHeader(),
     presets = R.homeStatusCache()?.presets || R.presetState,
-    only = statsPresetFilter === "all" ? 0 : presets.activeId,
+    names = new Map(st.facets?.presets || []),
+    ids = [...names.keys()],
+    only = statsChosenPreset(),
+    // A header built for an earlier choice draws no preset chart yet.
+    current = st.preset == null || st.preset === only,
     // The firmware's charts over the panel's window, whatever the table's
-    // order or scroll: density curves for all presets and the active one
+    // order or scroll: density curves for all presets and the chosen one
     // (true = the same curve), and the timed arrivals oldest first.
     charts = st.dens || [],
-    d = only ? (charts[1] === true ? charts[0] : charts[1]) : charts[0],
-    names = new Map(st.facets?.presets || []),
+    d = !only ? charts[0] : current ? (charts[1] === true ? charts[0] : charts[1]) : null,
     p = st.cons?.p,
     timed = (st.cons?.t || []).map((t, i) => {
       const presetId = Array.isArray(p) ? p[i] : p;
-      return { arrivalS: t / 10, presetId, presetName: names.get(presetId) };
+      return {
+        arrivalS: t / 10,
+        presetId,
+        presetName: names.get(presetId),
+        guard: st.cons.g?.[i] || 0,
+      };
     }),
     shots = timed.filter((r) => !only || r.presetId === only);
-  // No timed shots: no chart at all; none for this preset: only the filter.
-  root.hidden = !timed.length;
+  // One selector for the three charts; its buttons follow the presets the
+  // log holds. A choice asks the controller (and the companion) for that
+  // preset's chart and cut series.
+  if (filter.dataset.ids !== ids.join()) {
+    filter.dataset.ids = ids.join();
+    filter.innerHTML =
+      '<span class="sortLbl">' +
+      __WEBUI_TEXT__("runtime.preset") +
+      "</span>" +
+      [
+        [0, __WEBUI_TEXT__("runtime.all_presets")],
+        ...ids.map((id) => [id, presets.items?.find((x) => x.id === id)?.name || names.get(id)]),
+      ]
+        .map(([v, t]) => '<button type="button" data-v="' + v + '">' + R.escHtml(t) + "</button>")
+        .join("");
+    for (const b of filter.querySelectorAll("button"))
+      b.onclick = () => {
+        R.uiState.statsPreset = +b.dataset.v;
+        R.sendUiOperation({ op: "stats", on: true, preset: R.uiState.statsPreset });
+        refreshMergedHeader();
+        renderStatsDurChart();
+      };
+    R.lockControls(filter);
+  }
+  for (const b of filter.querySelectorAll("button"))
+    b.setAttribute("aria-pressed", String(+b.dataset.v === only));
+  // No good shots: no charts at all; none timed for this preset: no density.
+  root.hidden = !ids.length;
   host.hidden = !d;
-  for (const b of $("statsPresetFilter").querySelectorAll("button"))
-    b.setAttribute("aria-pressed", String(b.dataset.v === statsPresetFilter));
   renderStatsConsistency(shots);
+  renderStatsCutAccuracy(st, only, current);
   if (!d) {
     host.innerHTML = "";
     return;
@@ -751,14 +783,38 @@ function renderStatsDurChart() {
     );
   host.style.setProperty("--zf", x(a) + "%");
   host.style.setProperty("--zo", x(b) - x(a) + "%");
+  // The legend says what each zone means, in seconds when the window is shared.
   host.innerHTML =
-    '<div class="statsDensZones">' +
+    '<p class="dcTitle">' +
+    __WEBUI_TEXT__("runtime.stats_title_time") +
+    '</p><div class="statsDensZones">' +
     tops +
     '</div><svg class="statsDensPlot" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">' +
     svg +
-    '</svg><div class="ruleChartTicks"></div>';
+    '</svg><div class="ruleChartTicks"></div>' +
+    statsLegend([
+      [
+        "fast",
+        shared
+          ? R.sub(__WEBUI_TEXT__("runtime.stats_legend_fast"), [L(a, "s")])
+          : __WEBUI_TEXT__("runtime.stats_legend_fast_window"),
+      ],
+      [
+        "on",
+        shared
+          ? R.sub(__WEBUI_TEXT__("runtime.stats_legend_on"), [L(a, "s"), L(b, "s")])
+          : __WEBUI_TEXT__("runtime.stats_legend_on_window"),
+      ],
+      [
+        "slow",
+        shared
+          ? R.sub(__WEBUI_TEXT__("runtime.stats_legend_slow"), [L(b, "s")])
+          : __WEBUI_TEXT__("runtime.stats_legend_slow_window"),
+      ],
+      [null, __WEBUI_TEXT__("runtime.stats_legend_curve")],
+    ]);
   fillChartTicks(
-    host.lastChild,
+    host.querySelector(".ruleChartTicks"),
     ticks.filter(([t]) => t > lo && t < hi).map(([t, s, p]) => [t - lo, s, p]),
     hi - lo,
     true,
@@ -808,95 +864,180 @@ function consistencyModel(rows) {
     spread: n ? Math.max(...rel) - Math.min(...rel) : 0,
   };
 }
-function renderStatsConsistency(shots) {
-  const root = $("statsConsistency");
-  if (!root) return;
-  const m = consistencyModel(shots),
-    { rows, rel, sec, M } = m,
-    n = rows.length,
-    // A slot per shot shown (at least ten), latest on the right.
+// A chart legend: [class, text] pairs; a null class is a plain label.
+function statsLegend(items) {
+  return (
+    '<div class="statsLegend">' +
+    items
+      .map(([k, text]) => "<span>" + (k ? '<i class="' + k + '"></i>' : "") + text + "</span>")
+      .join("") +
+    "</div>"
+  );
+}
+// Consistency and Cut accuracy share one frame: a column per shot (at least
+// ten, latest on the right) on a 0–100 × 0–50 plot whose centre line is the
+// reference; the spread of the last five counted shots behind the bars;
+// tinted bars with a solid tip, guard-stopped ones neutral under a dashed
+// border; the scale in a right gutter; and the shot cursor with its pill.
+// `c` gives the title, figures, values and scale, each bar's class, colour
+// and pill, and the band's colours: per stretch by `level`, or per zone
+// around ±`tol` when given.
+const SPREAD_SHOTS = 5;
+function missChart(root, c) {
+  const { vals, M } = c,
+    n = vals.length,
     W = Math.max(10, n),
     gap = 94 / (W - 1),
-    half = gap * 0.27;
-  root.hidden = !n;
-  if (!n) return;
-  const L = (v) =>
-      sec ? R.axisLabel(v * sec, __WEBUI_TEXT__("runtime.s")) : +(v * 100).toFixed(1) + "%",
-    signed = (v, k = Math.round(v * (sec || 100) * 10)) =>
-      (k > 0 ? "+" : k < 0 ? "−" : "") + L(Math.abs(v)),
+    half = gap * 0.27,
     X = (i) => 3 + (W - n + i) * gap,
     Y = (v) => 25 - (23 * Math.max(-M, Math.min(M, v))) / M,
-    out = (i) => Math.abs(rel[i]) > CONSISTENT,
-    bar = (v, i) => {
-      const x = (X(i) - half).toFixed(2),
-        h = Math.abs(Y(v) - 25),
-        y = h < 0.6 ? 24.7 : Math.min(Y(v), 25);
-      return (
-        '<rect class="consBar' +
-        (out(i) ? " out" : "") +
-        '" x="' +
-        x +
-        '" width="' +
-        (2 * half).toFixed(2) +
-        '" y="' +
-        y.toFixed(2) +
-        '" height="' +
-        Math.max(h, 0.6).toFixed(2) +
-        '"/>' +
-        (Math.abs(v) > M
-          ? '<path class="consOver" d="M' +
-            x +
-            " " +
-            (v > 0 ? 1 : 49) +
-            "h" +
-            (2 * half).toFixed(2) +
-            '"/>'
-          : "")
-      );
-    };
-  root.dataset.level = m.level;
+    f = (v) => v.toFixed(2),
+    spread = [];
+  for (let i = 0, win = []; i < n; i++) {
+    if (c.counts(i)) win = [...win, vals[i]].slice(-SPREAD_SHOTS);
+    spread.push(win.length ? win : null);
+  }
+  const pts = spread.map((w, i) => w && [f(X(i)), f(Y(Math.max(...w))), f(Y(Math.min(...w)))]);
+  // The band fades from its outer edges to the centre line, up and down.
+  let svg =
+    "<defs>" +
+    c.bands
+      .map(
+        ([k, color]) =>
+          '<linearGradient id="' +
+          c.id +
+          "Band" +
+          k +
+          '" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="48">' +
+          [0, 0.5, 1]
+            .map(
+              (o) =>
+                '<stop offset="' +
+                o +
+                '" stop-color="' +
+                color +
+                '" stop-opacity="' +
+                (o === 0.5 ? 0.02 : 0.45) +
+                '"/>',
+            )
+            .join("") +
+          "</linearGradient>",
+      )
+      .join("") +
+    "</defs>";
+  if (c.tol == null) {
+    for (let i = 1; i < n; i++)
+      if (pts[i - 1] && pts[i])
+        svg +=
+          '<path class="consSpread ' +
+          c.level(spread[i]) +
+          '" d="M' +
+          [
+            pts[i - 1][0],
+            pts[i - 1][1],
+            pts[i][0],
+            pts[i][1],
+            pts[i][0],
+            pts[i][2],
+            pts[i - 1][0],
+            pts[i - 1][2],
+          ]
+            .map((v, k) => (k % 2 ? " " : k ? "L" : "") + v)
+            .join("") +
+          'Z"/>';
+  } else {
+    const line = pts.filter(Boolean),
+      top = Y(c.tol),
+      bottom = Y(-c.tol);
+    if (line.length > 1) {
+      const d =
+        "M" +
+        line.map((q) => q[0] + " " + q[1]).join("L") +
+        "L" +
+        line
+          .reverse()
+          .map((q) => q[0] + " " + q[2])
+          .join("L") +
+        "Z";
+      for (const [k, y0, y1] of [
+        ["over", -5, top],
+        ["in", top, bottom],
+        ["under", bottom, 55],
+      ])
+        svg +=
+          '<clipPath id="' +
+          c.id +
+          "Zone" +
+          k +
+          '"><rect x="0" width="100" y="' +
+          f(y0) +
+          '" height="' +
+          f(y1 - y0) +
+          '"/></clipPath><path class="consSpread ' +
+          k +
+          '" clip-path="url(#' +
+          c.id +
+          "Zone" +
+          k +
+          ')" d="' +
+          d +
+          '"/>';
+    }
+  }
+  let rings = "";
+  for (let i = 0; i < n; i++) {
+    const v = vals[i],
+      k = c.cls(i),
+      x = f(X(i) - half),
+      w = f(2 * half),
+      y = Y(v),
+      h = Math.abs(y - 25);
+    if (c.ring?.(i)) {
+      rings += '<circle class="cutRing" cx="' + f(X(i)) + '%" cy="50%" r="4"/>';
+      continue;
+    }
+    svg +=
+      '<rect class="consBar ' +
+      k +
+      '" x="' +
+      x +
+      '" width="' +
+      w +
+      '" y="' +
+      f(h < 0.6 ? 24.7 : Math.min(y, 25)) +
+      '" height="' +
+      f(Math.max(h, 0.6)) +
+      '"/>' +
+      (c.guard(i)
+        ? '<path class="consRim ' + k + '" d="M' + x + " 25V" + f(y) + "h" + w + 'V25"/>'
+        : '<path class="consCap ' + k + '" d="M' + x + " " + f(y) + "h" + w + '"/>') +
+      (Math.abs(v) > M
+        ? '<path class="consOver ' + k + '" d="M' + x + " " + (v > 0 ? 1 : 49) + "h" + w + '"/>'
+        : "");
+  }
   root.innerHTML =
-    '<div class="statsDensZones"><span><b>' +
-    (m.typical == null ? "—" : "±" + L(m.typical)) +
-    "</b>" +
-    {
-      good: __WEBUI_TEXT__("runtime.consistency_good"),
-      fair: __WEBUI_TEXT__("runtime.consistency_fair"),
-      poor: __WEBUI_TEXT__("runtime.consistency_poor"),
-      few: __WEBUI_TEXT__("runtime.consistency_few"),
-    }[m.level] +
-    "</span><span><b>" +
-    L(m.spread) +
-    "</b>" +
-    __WEBUI_TEXT__("runtime.consistency_spread") +
-    "</span><span><b>" +
-    n +
-    "</b>" +
-    __WEBUI_TEXT__("runtime.consistency_shots") +
-    '</span></div><div class="consPlot"><svg class="statsDensPlot" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">' +
-    '<rect class="consBand" x="0" width="100" y="' +
-    Y(CONSISTENT) +
-    '" height="' +
-    (Y(-CONSISTENT) - Y(CONSISTENT)) +
-    '"/>' +
-    rel.map(bar).join("") +
-    '<path class="consAvg" d="M0 25H100"/></svg><span class="consEdge">+' +
-    L(M) +
-    '</span><span class="consEdge">' +
-    (sec ? L(1) : __WEBUI_TEXT__("runtime.consistency_avg")) +
-    '</span><span class="consEdge">−' +
-    L(M) +
-    '</span><svg class="consCursor" aria-hidden="true"><g class="shotCursor"><line class="rvGuide" y1="0" y2="100%"/><circle class="rvHandle" r="5"/>' +
+    '<p class="dcTitle">' +
+    c.title +
+    '</p><div class="statsDensZones">' +
+    c.head +
+    '</div><div class="consPlot"><svg class="statsDensPlot" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">' +
+    svg +
+    '<path class="consAvg" d="M0 25H100"/></svg>' +
+    c.edges.map((e) => '<span class="consEdge">' + e + "</span>").join("") +
+    '<svg class="consCursor" aria-hidden="true">' +
+    rings +
+    '<g class="shotCursor"><line class="rvGuide" y1="0" y2="100%"/><circle class="rvHandle" r="5"/>' +
     R.PILL +
     '</g></svg></div><div class="ruleChartTicks"><span class="ruleTick">' +
     __WEBUI_TEXT__("runtime.consistency_oldest") +
     '</span><span class="ruleTick">' +
     __WEBUI_TEXT__("runtime.consistency_latest") +
-    "</span></div>";
+    "</span></div>" +
+    statsLegend(c.legend);
   // The firmware CSP drops markup style attributes; CSSOM writes still apply.
   const plot = root.querySelector(".consPlot"),
     cur = plot.lastChild,
-    [guide, dot, pill] = cur.firstChild.children,
+    [guide, dot, pill] = cur.querySelector(".shotCursor").children,
     [t0, t1] = root.querySelectorAll(".ruleTick");
   [Y(M), 25, Y(-M)].forEach(
     (y, k) => (plot.querySelectorAll(".consEdge")[k].style.top = y * 2 + "%"),
@@ -908,18 +1049,13 @@ function renderStatsConsistency(shots) {
   const seek = (v, held = true) => {
     at = Math.max(0, Math.min(n - 1, v > at ? Math.ceil(v) : Math.floor(v)));
     const x = X(at) + "%",
-      r = rows[at],
-      text = R.sub(__WEBUI_TEXT__("runtime.consistency_pill"), [
-        at + 1,
-        sec ? "" : " · " + shotPresetName(r),
-        R.axisLabel(r.arrivalS, __WEBUI_TEXT__("runtime.s")),
-        signed(rel[at]),
-      ]);
+      y = c.ring?.(at) ? 25 : Y(vals[at]),
+      text = c.pill(at);
     guide.setAttribute("x1", x);
     guide.setAttribute("x2", x);
     dot.setAttribute("cx", x);
-    dot.setAttribute("cy", Y(rel[at]) * 2 + "%");
-    cur.style.setProperty("--c", out(at) ? "var(--zl)" : "var(--zs)");
+    dot.setAttribute("cy", y * 2 + "%");
+    cur.style.setProperty("--c", c.color(at));
     plot.setAttribute("aria-valuenow", at + 1);
     plot.setAttribute("aria-valuetext", text);
     if (held)
@@ -927,7 +1063,7 @@ function renderStatsConsistency(shots) {
         pill,
         R.escHtml(text),
         (X(at) / 100) * cur.clientWidth,
-        (Y(rel[at]) / 50) * cur.clientHeight,
+        (y / 50) * cur.clientHeight,
       );
   };
   R.bindScrub(
@@ -941,10 +1077,218 @@ function renderStatsConsistency(shots) {
     null,
     ".shotCursor .rvHandle",
   );
-  plot.setAttribute("aria-label", __WEBUI_TEXT__("runtime.consistency_cursor"));
+  plot.setAttribute("aria-label", c.aria);
   plot.setAttribute("aria-valuemin", 1);
   plot.setAttribute("aria-valuemax", n);
   seek(at, false);
+}
+// A guard-stopped shot: neutral under a dashed border in the guard's colour.
+const guardColor = (g) => (g === 1 ? "var(--gFast)" : "var(--gSlow)");
+function renderStatsConsistency(shots) {
+  const root = $("statsConsistency");
+  if (!root) return;
+  const m = consistencyModel(shots),
+    { rows, rel, sec, M } = m,
+    n = rows.length;
+  root.hidden = !n;
+  if (!n) return;
+  const L = (v) =>
+      sec ? R.axisLabel(v * sec, __WEBUI_TEXT__("runtime.s")) : +(v * 100).toFixed(1) + "%",
+    signed = (v, k = Math.round(v * (sec || 100) * 10)) =>
+      (k > 0 ? "+" : k < 0 ? "−" : "") + L(Math.abs(v)),
+    out = (i) => Math.abs(rel[i]) > CONSISTENT,
+    // Each stretch of the band takes the level the figures use, over its window.
+    level = (w) => {
+      const j = w
+          .slice(1)
+          .map((v, i) => Math.abs(v - w[i]))
+          .sort((a, b) => a - b),
+        typical = j.length ? (j[(j.length - 1) >> 1] + j[j.length >> 1]) / 2 : 0;
+      return typical <= CONSISTENT ? "good" : typical <= VARIED ? "fair" : "poor";
+    };
+  root.dataset.level = m.level;
+  missChart(root, {
+    id: "cons",
+    title: __WEBUI_TEXT__("runtime.stats_title_consistency"),
+    head:
+      "<span><b>" +
+      (m.typical == null ? "—" : "±" + L(m.typical)) +
+      "</b>" +
+      {
+        good: __WEBUI_TEXT__("runtime.consistency_good"),
+        fair: __WEBUI_TEXT__("runtime.consistency_fair"),
+        poor: __WEBUI_TEXT__("runtime.consistency_poor"),
+        few: __WEBUI_TEXT__("runtime.consistency_few"),
+      }[m.level] +
+      "</span><span><b>" +
+      L(m.spread) +
+      "</b>" +
+      __WEBUI_TEXT__("runtime.consistency_spread") +
+      "</span><span><b>" +
+      n +
+      "</b>" +
+      __WEBUI_TEXT__("runtime.consistency_shots") +
+      "</span>",
+    vals: rel,
+    M,
+    // Guard-stopped shots still count: their timing is the variation shown.
+    counts: () => true,
+    cls: (i) => (rows[i].guard ? "guard g" + rows[i].guard : out(i) ? "out" : "close"),
+    guard: (i) => rows[i].guard,
+    color: (i) => (rows[i].guard ? guardColor(rows[i].guard) : out(i) ? "var(--zl)" : "var(--zs)"),
+    level,
+    bands: [
+      ["good", "var(--ok)"],
+      ["fair", "var(--lw)"],
+      ["poor", "var(--ac)"],
+    ],
+    edges: ["+" + L(M), sec ? L(1) : __WEBUI_TEXT__("runtime.consistency_avg"), "−" + L(M)],
+    pill: (i) =>
+      R.sub(__WEBUI_TEXT__("runtime.consistency_pill"), [
+        i + 1,
+        sec ? "" : " · " + shotPresetName(rows[i]),
+        R.axisLabel(rows[i].arrivalS, __WEBUI_TEXT__("runtime.s")),
+        signed(rel[i]),
+      ]),
+    aria: __WEBUI_TEXT__("runtime.consistency_cursor"),
+    legend: [
+      ["close", __WEBUI_TEXT__("runtime.consistency_legend_close")],
+      ["out", __WEBUI_TEXT__("runtime.consistency_legend_off")],
+      [null, __WEBUI_TEXT__("runtime.consistency_legend_band")],
+      ["good", __WEBUI_TEXT__("runtime.consistency_good")],
+      ["fair", __WEBUI_TEXT__("runtime.consistency_fair")],
+      ["poor", __WEBUI_TEXT__("runtime.consistency_poor")],
+      ["guard", __WEBUI_TEXT__("runtime.stats_legend_guard")],
+    ],
+  });
+}
+// Cut accuracy: how far each automatic stop of the chosen preset settled
+// from its target, from the header's "cut" series (oldest first). A bullseye
+// settles exactly on the target, as the Bullseye melody counts it; shots a
+// guard stopped on purpose are drawn but not scored.
+const CUT_CLOSE_G = 0.2;
+function cutModel(cut) {
+  const rows = cut.e.map((e, i) => ({
+      targetG: (Array.isArray(cut.t) ? cut.t[i] : cut.t) / 10,
+      missG: e / 100,
+      guard: cut.g?.[i] || 0,
+    })),
+    kind = (r) =>
+      r.guard
+        ? "guard g" + r.guard
+        : !Math.round(r.missG * 100)
+          ? "bull"
+          : Math.abs(r.missG) <= CUT_CLOSE_G + 1e-9
+            ? "in"
+            : r.missG > 0
+              ? "over"
+              : "under",
+    scored = rows.filter((r) => !r.guard),
+    mean = (f) => scored.reduce((s, r) => s + f(r), 0) / (scored.length || 1),
+    max = Math.max(0, ...scored.map((r) => Math.abs(r.missG)));
+  return {
+    rows,
+    kind,
+    scored: scored.length,
+    bulls: scored.filter((r) => kind(r) === "bull").length,
+    within: scored.filter((r) => Math.abs(r.missG) <= CUT_CLOSE_G + 1e-9).length,
+    miss: mean((r) => Math.abs(r.missG)),
+    lean: mean((r) => r.missG),
+    // At least ±0.5 g, at most ±1.5 g, in 0.25 g steps over the scored misses.
+    M: Math.min(1.5, Math.max(0.5, Math.ceil((max * 1.15) / 0.25 - 1e-9) * 0.25)),
+    oneTarget: new Set(rows.map((r) => r.targetG)).size === 1,
+  };
+}
+function renderStatsCutAccuracy(st, only, current) {
+  const root = $("statsCutAccuracy");
+  if (!root) return;
+  // With All, or before the header for the chosen preset arrives, it waits.
+  root.hidden = !st.facets?.presets?.length || (only && !current);
+  if (root.hidden) return;
+  const title = '<p class="dcTitle">' + __WEBUI_TEXT__("runtime.stats_title_cut") + "</p>";
+  if (!only || !st.cut?.e?.length) {
+    root.innerHTML =
+      title +
+      '<p class="fieldHint">' +
+      (only ? __WEBUI_TEXT__("runtime.cut_none") : __WEBUI_TEXT__("runtime.cut_pick")) +
+      "</p>";
+    return;
+  }
+  const m = cutModel(st.cut),
+    { rows, kind, M } = m,
+    g = __WEBUI_TEXT__("runtime.g"),
+    grams = (v) => {
+      const t = (Math.round(v * 100) / 100).toFixed(2);
+      return (t.endsWith("0") ? t.slice(0, -1) : t) + " " + g;
+    },
+    // The sign follows the hundredths shown, so a rounded zero reads ±0.
+    signed = (v, k = Math.round(v * 100)) => (k > 0 ? "+" : k < 0 ? "−" : "±") + grams(Math.abs(v)),
+    pct = (k) => (m.scored ? Math.round((100 * k) / m.scored) + "%" : "—"),
+    colors = {
+      bull: "var(--ok)",
+      in: "var(--cutIn)",
+      over: "var(--gFast)",
+      under: "var(--gSlow)",
+    },
+    within = R.sub(__WEBUI_TEXT__("runtime.cut_within"), [grams(CUT_CLOSE_G)]);
+  missChart(root, {
+    id: "cut",
+    title: __WEBUI_TEXT__("runtime.stats_title_cut"),
+    head:
+      "<span><b>" +
+      R.sub(__WEBUI_TEXT__("runtime.cut_of"), [m.bulls, m.scored]) +
+      "</b>" +
+      __WEBUI_TEXT__("runtime.cut_bullseyes") +
+      "</span><span><b>" +
+      pct(m.within) +
+      "</b>" +
+      within +
+      "</span><span><b>" +
+      (m.scored ? grams(m.miss) : "—") +
+      "</b>" +
+      __WEBUI_TEXT__("runtime.cut_avg_miss") +
+      "</span><span><b>" +
+      (m.scored ? signed(m.lean) : "—") +
+      "</b>" +
+      (Math.abs(m.lean) < 0.05
+        ? __WEBUI_TEXT__("runtime.cut_centred")
+        : m.lean > 0
+          ? __WEBUI_TEXT__("runtime.cut_leans_over")
+          : __WEBUI_TEXT__("runtime.cut_leans_under")) +
+      "</span>",
+    vals: rows.map((r) => r.missG),
+    M,
+    counts: (i) => !rows[i].guard,
+    cls: (i) => kind(rows[i]),
+    ring: (i) => kind(rows[i]) === "bull",
+    guard: (i) => rows[i].guard,
+    color: (i) => (rows[i].guard ? guardColor(rows[i].guard) : colors[kind(rows[i])]),
+    tol: CUT_CLOSE_G,
+    bands: [
+      ["over", "var(--gFast)"],
+      ["in", "var(--ok)"],
+      ["under", "var(--gSlow)"],
+    ],
+    edges: [
+      "+" + grams(M),
+      m.oneTarget ? grams(rows[0].targetG) : __WEBUI_TEXT__("runtime.cut_target"),
+      "−" + grams(M),
+    ],
+    pill: (i) =>
+      R.sub(__WEBUI_TEXT__("runtime.cut_pill"), [
+        i + 1,
+        grams(rows[i].targetG + rows[i].missG),
+        kind(rows[i]) === "bull" ? __WEBUI_TEXT__("runtime.cut_bullseye") : signed(rows[i].missG),
+      ]),
+    aria: __WEBUI_TEXT__("runtime.cut_cursor"),
+    legend: [
+      ["bull", __WEBUI_TEXT__("runtime.cut_bullseye")],
+      ["in", within],
+      ["over", __WEBUI_TEXT__("runtime.cut_over")],
+      ["under", __WEBUI_TEXT__("runtime.cut_under")],
+      ["guard", __WEBUI_TEXT__("runtime.stats_legend_guard")],
+    ],
+  });
 }
 function renderShotStats() {
   const z = "—",
@@ -995,7 +1339,7 @@ async function refreshMergedHeader() {
         new URLSearchParams({
           ...filter,
           window: R.uiState.statsWindow,
-          active: (R.homeStatusCache()?.presets || R.presetState)?.activeId ?? 0,
+          active: statsChosenPreset(),
           epoch: statsStreamEpoch,
         }),
     ).catch(() => null);
@@ -2523,6 +2867,7 @@ function statsSubscribeOp() {
     ...(Object.keys(R.uiState.shotFilter).length && { filter: R.uiState.shotFilter }),
     ...(R.uiState.statsWindow !== 10 && { window: Math.min(R.uiState.statsWindow, 100) }),
     ...(statsTag && { tag: statsTag }),
+    ...(R.uiState.statsPreset != null && { preset: R.uiState.statsPreset }),
   };
 }
 function statsSendSubscribe() {
@@ -2777,6 +3122,7 @@ const statsStream = {
   rejected() {
     shotFilterReset();
     R.uiState.statsWindow = 10;
+    R.uiState.statsPreset = null;
   },
   refresh: refreshShots,
   // Delete follows this screen's Admin unlock.

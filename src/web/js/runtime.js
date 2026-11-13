@@ -271,11 +271,13 @@ const uiState = {
   historyExportWindow: null,
   historyNextRequest: 0,
   historyDir: "desc",
-  // Firmware-side list filters (empty = everything) and the Stats window;
-  // none of them outlives the page.
+  // Firmware-side list filters (empty = everything), the Stats window and
+  // the preset the Stats charts follow (0 All, null the active one); none of
+  // them outlives the page.
   historyTypes: [],
   shotFilter: {},
   statsWindow: 10,
+  statsPreset: null,
   scanTimer: 0,
   configDirty: false,
   dateTimeDirty: false,

@@ -437,11 +437,13 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         // View-scoped Stats page subscription on the same contract; one-shot
         // fetches also serve the CSV export window (date/desc, good shots).
         // `filter` works like History's `types`; `window` picks the newest
-        // shots the aggregate and charts cover (a fetch's own header too).
+        // shots the aggregate and charts cover (a fetch's own header too);
+        // `preset` the one the charts follow (0 All; absent the active one; a
+        // fetch's own header too).
         static const char *const kFields[] = {"op",    "on",      "offset",
                                               "limit", "sort",    "dir",
                                               "fetch", "request", "filter",
-                                              "window", "tag"};
+                                              "window", "tag",    "preset"};
         const cJSON *requestId = cJSON_GetObjectItemCaseSensitive(message, "request");
         const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
         const cJSON *offset = cJSON_GetObjectItemCaseSensitive(message, "offset");
@@ -452,15 +454,17 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         const cJSON *filter = cJSON_GetObjectItemCaseSensitive(message, "filter");
         const cJSON *window = cJSON_GetObjectItemCaseSensitive(message, "window");
         const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
+        const cJSON *preset = cJSON_GetObjectItemCaseSensitive(message, "preset");
         ShotListFilter shotFilter;
         bool windowOk = !window;
         for (const size_t size : SHOT_LOG_STATS_WINDOWS)
           windowOk = windowOk || (cJSON_IsNumber(window) && window->valuedouble == size);
-        const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 11) &&
+        const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 12) &&
                              uiStreamParseShotFilter(filter, shotFilter) && windowOk;
         const bool numbersOk =
             uiStreamIntInRange(requestId, 1, UINT32_MAX) &&
             uiStreamIntInRange(tag, 1, UINT32_MAX) &&
+            uiStreamIntInRange(preset, 0, UINT8_MAX) &&
             uiStreamIntInRange(offset, 0, SHOT_LOG_CAPACITY) &&
             uiStreamIntInRange(limit, 1, SHOT_LOG_CAPACITY) &&
             (!fetch || cJSON_IsBool(fetch)) &&
@@ -473,7 +477,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         if (shapeOk && numbersOk) {
           if (!cJSON_IsTrue(on)) {
             accepted = !offset && !limit && !sort && !dir && !fetch && !requestId &&
-                       !filter && !window && !tag;
+                       !filter && !window && !tag && !preset;
             if (accepted) {
               session->statsOn = false;
               session->statsFetch = false;
@@ -486,6 +490,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
               session->statsFetchFilter = filter ? shotFilter : session->statsFilter;
               session->statsFetchWindow =
                   window ? static_cast<size_t>(window->valueint) : session->statsWindow;
+              session->statsFetchPresetChoice =
+                  preset ? static_cast<int16_t>(preset->valueint) : session->statsPresetChoice;
               session->statsFetchOffset =
                   static_cast<size_t>(offset->valueint);
               session->statsFetchLimit = limit
@@ -500,10 +506,11 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
               session->statsFetch = true;
               session->statsFetchRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
             }
-          } else if (window && session->statsOn && !offset && !limit && !sort && !dir &&
-                     !filter && !requestId && !tag) {
-            // A window-only change refreshes the header: rows stay held.
-            session->statsWindow = static_cast<size_t>(window->valueint);
+          } else if ((window || preset) && session->statsOn && !offset && !limit && !sort &&
+                     !dir && !filter && !requestId && !tag) {
+            // A window or preset change refreshes the header: rows stay held.
+            if (window) session->statsWindow = static_cast<size_t>(window->valueint);
+            if (preset) session->statsPresetChoice = static_cast<int16_t>(preset->valueint);
             accepted = true;
           } else {
             session->statsOn = true;
@@ -515,6 +522,8 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
             session->statsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
             session->statsWindow = window ? static_cast<size_t>(window->valueint)
                                           : SHOT_LOG_STATS_WINDOW;
+            session->statsPresetChoice =
+                preset ? static_cast<int16_t>(preset->valueint) : -1;
             if (offset)
               session->statsOffset = static_cast<size_t>(offset->valueint);
             if (limit)

@@ -249,6 +249,8 @@ int httpd_ws_send_frame_async(int, int, httpd_ws_frame_t *frame) {
   frames.emplace_back(reinterpret_cast<const char *>(frame->payload), frame->len);
   return ESP_OK;
 }
+${block(statsHeader, 'uint8_t statsGuardStop(')}
+${block(statsHeader, 'template <typename Value>')}
 ${block(statsHeader, 'bool appendStatsDensity(')}
 ${block(statsHeader, 'bool formatStatsHeader(')}
 ${block(statsPage, 'size_t OpenBrewByWeightNetwork::formatShotStatsRow(')}

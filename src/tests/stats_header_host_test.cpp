@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <string>
 
 namespace openbrewbyweight {
@@ -42,8 +43,8 @@ const char *const kTypes[] = {"auto", "timer_only", "manual"};
 const ShotLogStopDetail kDetails[] = {
     ShotLogStopDetail::NORMAL_TARGET,  ShotLogStopDetail::EXTENDED_MAX_WEIGHT,
     ShotLogStopDetail::SLOW_MIN_WEIGHT, ShotLogStopDetail::EXTENDED_MIN_TIME,
-    ShotLogStopDetail::AUTO_TO_MANUAL, ShotLogStopDetail::WEB_STOP,
-    ShotLogStopDetail::OTHER};
+    ShotLogStopDetail::SLOW_MAX_TIME,  ShotLogStopDetail::AUTO_TO_MANUAL,
+    ShotLogStopDetail::WEB_STOP,       ShotLogStopDetail::OTHER};
 
 const cJSON *field(const cJSON *row, const char *name) {
   const cJSON *item = cJSON_GetObjectItemCaseSensitive(row, name);
@@ -131,6 +132,8 @@ void number(cJSON *row, const char *name, long value, double scale, bool missing
 struct Shape {
   uint8_t presets = 3, scales = 2, badEvery = 0, untimedEvery = 0;
   bool clockless = false, sharedWindow = true, arrivalTies = false;
+  // Every shot asks for the same target (the cut series' shared "t").
+  bool oneGoal = false;
 };
 
 const char *const kPresetNames[] = {"House", "Decaf \"Swiss\"", "Ethiopia", "Kenya", "Back\\slash",
@@ -167,7 +170,8 @@ cJSON *rowsOf(size_t count, const Shape &shape) {
     number(row, "arrivalS", untimed && index % 2 ? 0 : arrival, 10, untimed && !(index % 2));
     const bool cutLine = next(3) != 0;
     number(row, "cutLineG", 3400 + next(300), 100, !cutLine);
-    number(row, "goalG", next(9) == 0 ? 0 : 340 + 10 * next(5), 10);
+    const long goal = next(9) == 0 ? 0 : 340 + 10 * next(5);
+    number(row, "goalG", shape.oneGoal ? 360 : goal, 10);
     number(row, "fastBeforeS", fast, 10);
     number(row, "slowAfterS", slow, 10);
     const bool wall = !shape.clockless && next(5) != 0;
@@ -180,7 +184,7 @@ cJSON *rowsOf(size_t count, const Shape &shape) {
     cJSON_AddStringToObject(row, "scaleName",
                             next(6) == 0 ? "" : kScaleNames[next(shape.scales)]);
     cJSON_AddStringToObject(row, "shotType", kTypes[next(4) == 0 ? 1 + next(2) : 0]);
-    cJSON_AddStringToObject(row, "stopDetail", shotLogStopDetailName(kDetails[next(7)]));
+    cJSON_AddStringToObject(row, "stopDetail", shotLogStopDetailName(kDetails[next(std::size(kDetails))]));
     const char *reason = shotLogBadReason(probe);
     if (reason == nullptr) cJSON_AddNullToObject(row, "badReason");
     else cJSON_AddStringToObject(row, "badReason", reason);
@@ -228,6 +232,14 @@ void regenerate(const char *path) {
   untimed.untimedEvery = 1;
   cJSON_AddItemToArray(cases, caseOf("window10_no_timed_shots", 10, 1, rowsOf(15, untimed)));
   cJSON_AddItemToArray(cases, caseOf("window10_empty", 10, 1, cJSON_CreateArray()));
+  // All presets: no preset chart and no cut series.
+  Shape all;
+  cJSON_AddItemToArray(cases, caseOf("window50_all_presets", 50, 0, rowsOf(60, all)));
+  // One preset, one target: the cut series' "t" is a single number.
+  Shape goal;
+  goal.presets = 1;
+  goal.oneGoal = true;
+  cJSON_AddItemToArray(cases, caseOf("window100_one_target", 100, 1, rowsOf(120, goal)));
   char *printed = cJSON_Print(root);
   FILE *file = std::fopen(path, "wb");
   CHECK(file != nullptr && printed != nullptr);
@@ -258,7 +270,7 @@ void verify(const char *path) {
     }
     cJSON_Delete(computed);
   }
-  CHECK(cases >= 7);
+  CHECK(cases >= 9);
   cJSON_Delete(root);
 }
 

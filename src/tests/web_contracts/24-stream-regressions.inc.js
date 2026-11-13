@@ -81,6 +81,7 @@ struct UiStreamSession {
   bool statsResync=true,statsFetch=false,statsPaging=false,statsPageFetch=false;
   uint32_t statsBoot=0,statsRequest=1,statsFetchRequest=2,statsPageRequest=0;
   uint32_t statsPageEpoch=0,statsEpoch=0,statsFingerprint=0;
+  int16_t statsPresetChoice=-1;
 };
 struct TaskLockGuard { explicit TaskLockGuard(int){} };
 struct httpd_ws_frame_t { int type=0; uint8_t *payload=nullptr; size_t len=0; };
