@@ -86,12 +86,13 @@ Versioning:
 ## Stats header test vectors v1
 
 - [`stats-header-v1.vectors.json`](stats-header-v1.vectors.json): the Web UI
-  Stats header (the aggregate, both density charts, the consistency series
-  and the filter facets) as the firmware's `formatStatsHeader` builds it over
-  fixed sets of shots. The companion builds the same header over the whole
-  history and must reproduce every case. Each case gives `window`, the active
-  `presetId` of the "This preset" chart, `rows` (newest first) and the
-  expected `header`; headers compare as parsed JSON, field for field.
+  Stats header (the aggregate, both density charts, the consistency series,
+  the filter facets, the chosen preset and its cut series) as the firmware's
+  `formatStatsHeader` builds it over fixed sets of shots. The companion builds
+  the same header over the whole history and must reproduce every case. Each
+  case gives `window`, the chosen `presetId` the preset chart and cut series
+  follow (`0` All), `rows` (newest first) and the expected `header`; headers
+  compare as parsed JSON, field for field.
 - The rows are Stats rows in the units the Web UI and the companion store,
   limited to the columns the header reads. Back to the stored record:
   `durationDs = round(durationS × 10)`, `goalWeightDg = round(goalG × 10)`,
@@ -105,7 +106,7 @@ Versioning:
   `STATS_HEADER_REGENERATE=1 build-host/normal/src/tests/stats_header_host_test`
   (from `./scripts/dev test normal`'s build), then update the companion's copy.
   SHA-256 of the current file:
-  `ad46e4e9d0acc434d37a72b3f60e2dc2f4b7a1b713f37c0410f316d8188de547`.
+  `402823758e72dd876c61ae73f13188a3c1dd8346a480de839096ffb10602a78a`.
 - Consumed by the firmware host test `src/tests/stats_header_host_test.cpp`
   and by the companion's tests.
 
@@ -138,7 +139,7 @@ Versioning:
 - Regenerate after a deliberate frame change with
   `COMPANION_RECORDS_REGENERATE=1 node src/tests/check_web_assets.js`, then
   update the companion's copy. SHA-256 of the current file:
-  `bf6e49994641a7975933f8c4370012ab4b36023648433c8910776287c931a0f4`.
+  `ea1837838a3dc400a63efb730cdd62c00923b4a0ef1f24040b65f57db9dad05a`.
 - Produced and checked byte for byte by the web contract
   `src/tests/web_contracts/27-companion-records-vectors.inc.js`; replayed by
   the companion's sync and replica tests.

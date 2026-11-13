@@ -152,6 +152,10 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   // header); so does Home's fetch of its hero shots, with no standing page.
   const bool link = companionRecordsSession(session), rowsOnly = link || !session.statsOn;
   if (rowsOnly && !session.statsFetch) return true;
+  // The preset a page's charts follow: the active one unless it chose.
+  const auto chartPreset = [&](int16_t choice) {
+    return choice < 0 ? control.bbwPresetId : static_cast<uint8_t>(choice);
+  };
   const bool initial =
       !rowsOnly && (session.statsResync || session.statsBoot != control.bootId);
   // Finish the standing page before a later accepted fetch. Cancellation
@@ -169,7 +173,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     session.statsPaging = false;
   }
   if (!session.statsPaging && !initial && !fetch && epoch == session.statsEpoch &&
-      control.bbwPresetId == session.statsPresetId &&
+      chartPreset(session.statsPresetChoice) == session.statsPresetId &&
       session.statsWindow == session.statsShownWindow)
     return true;
   // The link's records work keeps its own pace (companionRecordsService).
@@ -185,6 +189,8 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
   // A fetch's header covers its own window; the standing gate above keeps
   // following the subscription's.
   const size_t statsWindow = fetch ? session.statsFetchWindow : session.statsWindow;
+  const uint8_t statsPreset =
+      chartPreset(fetch ? session.statsFetchPresetChoice : session.statsPresetChoice);
   const uint32_t filterHash = shotListFilterHash(filter);
   NetworkWorkBuf &work = *g_work;
   auto &cache = work.statsCache;
@@ -200,16 +206,15 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     epoch = stored.epoch;
     cache.curveHashes = {};
   }
-  // The header follows the store, the selected window, and the active
-  // preset of its "This preset" chart.
+  // The header follows the store, the selected window, and the preset the
+  // page's charts follow.
   const bool header = !rowsOnly && (!cache.valid || cache.headerEpoch != epoch ||
-      cache.headerWindow != statsWindow ||
-      cache.headerPresetId != control.bbwPresetId);
+      cache.headerWindow != statsWindow || cache.headerPresetId != statsPreset);
   if (header) {
-    cache.statsOk = formatStatsHeader(cache, statsWindow, control.bbwPresetId);
+    cache.statsOk = formatStatsHeader(cache, statsWindow, statsPreset);
     cache.headerEpoch = epoch;
     cache.headerWindow = statsWindow;
-    cache.headerPresetId = control.bbwPresetId;
+    cache.headerPresetId = statsPreset;
   }
   const size_t count = stored.count;
   // The order follows the store copy too: another session (or the record
@@ -284,7 +289,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     // Content identical (e.g. a no-op rating bump): adopt the moved epoch so
     // idle ticks stop at the cheap gate instead of recopying the records.
     session.statsEpoch = epoch;
-    session.statsPresetId = control.bbwPresetId;
+    session.statsPresetId = statsPreset;
     session.statsShownWindow = session.statsWindow;
     return true;
   }
@@ -307,7 +312,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     // The header identity a standing page carries: a later window or
     // preset change, even mid-page, sends the header again.
     session.statsShownWindow = fetch ? session.statsShownWindow : session.statsWindow;
-    session.statsPresetId = fetch ? session.statsPresetId : control.bbwPresetId;
+    session.statsPresetId = fetch ? session.statsPresetId : statsPreset;
   }
   const bool first = session.statsSent == 0;
   const size_t sentBase = session.statsSent;

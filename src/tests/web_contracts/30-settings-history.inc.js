@@ -1598,7 +1598,7 @@ if (!statsSection ||
 {
   const start = runtimeJs.indexOf('function axisLabel(');
   const end = runtimeJs.indexOf('function setEmptyState(');
-  const chartAt = viewJs.stats.indexOf('let statsPresetFilter');
+  const chartAt = viewJs.stats.indexOf('const statsChosenPreset');
   const chartEnd = viewJs.stats.indexOf('function renderShotStats(');
   if (start < 0 || end <= start || chartAt < 0 || chartEnd <= chartAt) {
     throw new Error('Stats density curve helpers not found');
@@ -1609,52 +1609,86 @@ if (!statsSection ||
   const helpers = new Function('const uiState = globalThis;' +
       runtimeJs.slice(start, end) +
       viewJs.stats.slice(chartAt, chartEnd) +
-      ';const R = {uiState, axisLabel, fadeFill, escHtml: String, lockControls() {}, get homeStatusCache() { return homeStatusCache; },' +
+      ';const R = {uiState, axisLabel, fadeFill, escHtml: String, lockControls() {}, get sub() { return sub; },' +
+      'sendUiOperation(op) { sentOps.push(op); }, get homeStatusCache() { return homeStatusCache; },' +
       'get presetState() { return presetState; }};' +
       'return{renderStatsDurChart:renderStatsDurChart};')();
   const histRoot = {dataset: {}, className: '', innerHTML: ''};
-  const histPlot = {innerHTML: '', style: {setProperty(k, v) { this[k] = v; }}};
-  const filterButton = (v) => ({dataset: {v}, attrs: {}, setAttribute(k, x) { this.attrs[k] = x; }});
-  const histFilter = {children: [filterButton('all'), filterButton('active')],
-    querySelectorAll(selector) { return selector === 'button' ? this.children : []; }};
+  const histPlot = {innerHTML: '', style: {setProperty(k, v) { this[k] = v; }},
+    querySelector() { return {}; }};
+  // The selector's buttons are rebuilt from the presets the header names.
+  const histFilter = {dataset: {}, buttons: [],
+    set innerHTML(html) {
+      this.buttons = [...html.matchAll(/data-v="(\d+)">([^<]*)</g)].map(([, v, text]) =>
+        ({dataset: {v}, text, attrs: {}, setAttribute(k, x) { this.attrs[k] = x; }}));
+    },
+    querySelectorAll(selector) { return selector === 'button' ? this.buttons : []; }};
+  const pressed = () => histFilter.buttons.filter((b) => b.attrs['aria-pressed'] === 'true')
+      .map((b) => b.text).join();
   const ticks = [];
   let tickMax = 0;
+  global.sentOps = [];
+  global.refreshMergedHeader = () => {};
   global.$ = (id) => ({statsDurChart: histRoot, statsDurChartPlot: histPlot,
     statsPresetFilter: histFilter})[id] || null;
   global.homeStatusCache = () => null;
-  global.presetState = {activeId: 1, items: []};
+  global.presetState = {activeId: 1, items: [{id: 1, name: 'House'}]};
+  global.statsPreset = null;
   global.sub = (t, vals) => t.replace(/\{(\d)\}/g, (_, i) => vals[+i]);
   global.fillChartTicks = (host, marks, max) => {
     tickMax = max;
-    ticks.splice(0, ticks.length, ...marks.map(m => m[1].replace(/[  ]/g, ' ')));
+    ticks.splice(0, ticks.length, ...marks.map(m => m[1].replace(/[  ]/g, ' ')));
   };
-  // The firmware's charts: density curves for all presets and the active one
-  // (true = the same curve), plus the timed arrivals oldest first.
+  // The firmware's charts: density curves for all presets and the chosen one
+  // (true = the same curve), the timed arrivals oldest first, and the presets.
   const curve = (lo, hi, a, b, shared, n) => ({lo, hi, a, b, shared, n,
     h: Array.from({length: 121}, (_, i) => Math.round(100 * Math.exp(-(((i - 60) / 20) ** 2))))});
-  const charts = (all, active, t = [300]) => ({dens: [all, active], cons: {t, p: 1}});
+  const charts = (all, active, t = [300], extra = {}) => ({dens: [all, active], cons: {t, p: 1},
+    facets: {presets: [[1, 'Stored name'], [2, 'Lungo']]}, ...extra});
   const zones = () => [...histPlot.innerHTML.matchAll(/<b>(\d+)%<\/b>(\d+) ([A-Za-z ]+)</g)]
       .map(m => m[1] + '%/' + m[2] + '/' + m[3]).join();
   const fills = () => (histPlot.innerHTML.match(/fill="url\(#sd(fast|on_recipe|slow)\)"/g) || []).length;
-  // All presets is the default: mixed windows read as offsets from the window edges.
+  // It starts on the active preset, named as the presets name it, without
+  // pinning it (the header keeps following the active one), with its shared
+  // window in seconds and a legend in seconds too.
   global.shotStats = charts(curve(-7, 15, 0, 7, false, [1, 2, 2]), curve(21, 40, 27, 34, true, [1, 2, 1]));
   helpers.renderStatsDurChart();
-  if (histFilter.children[0].attrs['aria-pressed'] !== 'true' || fills() !== 3 ||
-      zones() !== '20%/1/Fast,40%/2/On recipe,40%/2/Slow' ||
+  if (pressed() !== 'House' || histFilter.buttons.map((b) => b.text).join() !== 'All,House,Lungo' ||
+      global.statsPreset !== null || zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' ||
+      ticks.join() !== '27 s,34 s,22 s,39 s' || tickMax !== 19 ||
+      histPlot.style['--zf'] !== '31.58%' || parseFloat(histPlot.style['--zo']).toFixed(2) !== '36.84' ||
+      !histPlot.innerHTML.includes('<p class="dcTitle">') ||
+      !histPlot.innerHTML.includes('<div class="statsLegend">')) {
+    throw new Error('Stats must start on the active preset and draw its shared window in seconds');
+  }
+  // Until a preset is chosen, the page follows the active one with the header.
+  global.presetState.activeId = 2;
+  global.shotStats = charts(curve(-7, 15, 0, 7, false, [1, 2, 2]),
+      curve(21, 40, 27, 34, true, [1, 2, 1]), [300], {preset: 2});
+  helpers.renderStatsDurChart();
+  global.presetState.activeId = 1;
+  if (pressed() !== 'Lungo' || histPlot.hidden || global.sentOps.length) {
+    throw new Error('Until a preset is chosen, Stats must follow the active one');
+  }
+  // All: every shot by its own verdict against its own window; the choice
+  // goes to the controller.
+  histFilter.buttons[0].onclick();
+  if (pressed() !== 'All' || fills() !== 3 || zones() !== '20%/1/Fast,40%/2/On recipe,40%/2/Slow' ||
       !histPlot.innerHTML.includes('<div class="statsDensZones"><span>') ||
-      ticks.join() !== 'Window start,Window end,−5 s,+5 s' || tickMax !== 22) {
+      ticks.join() !== 'Window start,Window end,−5 s,+5 s' || tickMax !== 22 ||
+      JSON.stringify(global.sentOps) !== '[{"op":"stats","on":true,"preset":0}]') {
     throw new Error('All presets must share out every shot by its own verdict against its own window');
   }
-  histFilter.children[1].onclick();
-  if (histFilter.children[1].attrs['aria-pressed'] !== 'true' ||
-      zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' ||
-      ticks.join() !== '27 s,34 s,22 s,39 s' || tickMax !== 19 ||
-      histPlot.style['--zf'] !== '31.58%' || parseFloat(histPlot.style['--zo']).toFixed(2) !== '36.84') {
-    throw new Error('Current preset must draw its shared window in seconds');
-  }
-  global.shotStats = charts(curve(21, 40, 27, 34, true, [1, 1, 1]), true);
+  // A header still built for an earlier choice draws no preset chart.
+  histFilter.buttons[2].onclick();
+  global.shotStats = charts(curve(21, 40, 27, 34, true, [1, 1, 1]), true, [300], {preset: 1});
   helpers.renderStatsDurChart();
-  if (zones() !== '33%/1/Fast,34%/1/On recipe,33%/1/Slow') {
+  if (pressed() !== 'Lungo' || histRoot.hidden || !histPlot.hidden) {
+    throw new Error('A header for another preset must wait for the chosen one');
+  }
+  global.shotStats = charts(curve(21, 40, 27, 34, true, [1, 1, 1]), true, [300], {preset: 2});
+  helpers.renderStatsDurChart();
+  if (histPlot.hidden || zones() !== '33%/1/Fast,34%/1/On recipe,33%/1/Slow') {
     throw new Error('Verdict shares must always add up to 100%, and true reuses the first curve');
   }
   global.shotStats = charts(curve(21, 40, 27, 34, true, [0, 1, 0]), true);
@@ -1665,14 +1699,15 @@ if (!statsSection ||
   global.shotStats = charts(curve(21, 40, 27, 34, true, [0, 1, 0]), null);
   helpers.renderStatsDurChart();
   if (histRoot.hidden || !histPlot.hidden) {
-    throw new Error('A preset without timed shots keeps only the filter visible');
+    throw new Error('A preset without timed shots keeps only the selector visible');
   }
-  global.shotStats = charts(null, null, []);
+  global.shotStats = {dens: [null, null], cons: {t: [], p: 0}};
   helpers.renderStatsDurChart();
   if (!histRoot.hidden) {
-    throw new Error('Without timed shots the chart must not show empty axes');
+    throw new Error('Without good shots the charts must not show empty axes');
   }
-  for (const name of ['$', 'shotStats', 'fillChartTicks', 'homeStatusCache', 'presetState', 'sub'])
+  for (const name of ['$', 'shotStats', 'fillChartTicks', 'homeStatusCache', 'presetState', 'sub',
+    'sentOps', 'refreshMergedHeader', 'statsPreset'])
     delete global[name];
 }
 

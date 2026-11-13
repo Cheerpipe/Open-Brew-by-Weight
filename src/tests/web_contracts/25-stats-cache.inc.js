@@ -184,6 +184,8 @@ ${deltaTypes}
   bool sendRecordsIndex(UiStreamSession &,const ControlStatusSnapshot &);
   bool freshShotSnapshot(uint32_t);
 };
+${body(headerSource, 'uint8_t statsGuardStop(')}
+${body(headerSource, 'template <typename Value>')}
 ${body(headerSource, 'bool appendStatsDensity(')}
 ${body(headerSource, 'bool formatStatsHeader(')}
 ${body(source, 'bool OpenBrewByWeightNetwork::sendUiStreamFrame(')}
@@ -208,12 +210,12 @@ int main(){
     }
     assert(formatStatsHeader(cache,10,4));
     std::string text=cache.header;
-    assert(text.rfind("{\\"shotCount\\":",0)==0&&text.compare(text.size()-3,3,"]}}")==0);
+    assert(text.rfind("{\\"shotCount\\":",0)==0&&text.compare(text.size()-14,14,"]},\\"preset\\":4}")==0);
     // Eligible: i=0 and 2..10 (i=1 has no yield); timed: 2..10, oldest first.
     assert(text.find("\\"cons\\":{\\"t\\":[290,289,288,287,286,285,284,283,282],\\"p\\":[4,4,4,4,4,4,4,7,4]}")!=std::string::npos);
     assert(text.find("\\"dens\\":[{\\"lo\\":19,\\"hi\\":38,\\"a\\":25.0,\\"b\\":32.0,\\"shared\\":true,\\"n\\":[1,8,0],\\"h\\":[")!=std::string::npos);
     assert(text.find("]},\\"facets\\":{\\"presets\\":[[4,\\"House\\"],[7,\\"Decaf\\"]],\\"scales\\":[[")!=std::string::npos);
-    assert(text.find(",\\"Lunar\\"]]}}")!=std::string::npos&&text.find("Acaia")==std::string::npos);
+    assert(text.find(",\\"Lunar\\"]]},\\"preset\\":4}")!=std::string::npos&&text.find("Acaia")==std::string::npos);
     // The active preset's own curve: one Decaf shot; a preset without timed
     // shots gets null, and one holding every timed shot repeats the first.
     assert(text.find("]},{\\"lo\\":")!=std::string::npos);
@@ -227,6 +229,17 @@ int main(){
     assert(formatStatsHeader(cache,50,4)&&std::string(cache.header).find("\\"t\\":[330,")!=std::string::npos);
     for(size_t i=0;i<recent.count;++i)recent.records[i].arrivalDs=0;
     assert(formatStatsHeader(cache,10,4)&&std::string(cache.header).find("\\"dens\\":[null,null],\\"cons\\":{\\"t\\":[],\\"p\\":0}")!=std::string::npos);
+    // The chosen preset's newest weight cuts, oldest first, with the guard
+    // that decided each stop; the timed series carries it too, without the
+    // newest shot, which has no arrival. All has none.
+    for(size_t i=0;i<recent.count;++i){recent.records[i].goalWeightDg=360;recent.records[i].arrivalDs=280+i;}
+    recent.records[2].stopDetail=static_cast<uint8_t>(ShotLogStopDetail::SLOW_MIN_WEIGHT);
+    recent.records[3].actualWeightCg=3612;
+    assert(formatStatsHeader(cache,3,4));
+    assert(std::string(cache.header).find("\\"p\\":4,\\"g\\":[0,2]},")!=std::string::npos);
+    assert(std::string(cache.header).find("]},\\"preset\\":4,\\"cut\\":{\\"t\\":360,\\"e\\":[12,0,0],\\"g\\":[0,2,0]}}")!=std::string::npos);
+    assert(formatStatsHeader(cache,3,0)&&std::string(cache.header).find("\\"cut\\"")==std::string::npos);
+    assert(std::string(cache.header).find("]},null],")!=std::string::npos);
     cache=StatsStreamCache{};
   }
   OpenBrewByWeightNetwork network;auto &session=network.uiStreams_[0];

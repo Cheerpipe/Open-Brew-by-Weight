@@ -1523,10 +1523,13 @@ names why it is bad in `badReason` (`short`, `no_yield`, `low_yield`, or
 how many of the newest good shots the `stats` header covers; a page opened
 through the companion with its archive may show 500 or 1,000, still subscribes
 with `100` and draws the header the companion builds over the whole history
-(the controller's when the companion cannot answer). A subscribe
-carrying only `window` (no `request`) changes the header alone: the firmware
-sends a standing refresh with the new header and the rows it already holds as
-bare ids.
+(the controller's when the companion cannot answer). `preset` (`0`–`255`)
+picks the preset the header's preset chart and cut series follow, `0` for All;
+without it they follow the active preset. A subscribe carrying only `window`,
+`preset` or both (no `request`) changes the header alone: the firmware sends a
+standing refresh with the new header and the rows it already holds as bare
+ids. A fetch may name its own `preset` as it names its `window`: its header
+follows it without changing the subscription.
 
 Scrolling to the page sentinel sends a one-shot fetch for the next window,
 and the CSV and JSON exports ask for their own export window — up to 1,000
@@ -1567,19 +1570,30 @@ In this stream the aggregate covers the subscribed `window` (and leaves out
 `durationsS`), and it also carries what the Stats charts draw, so they match
 the averages whatever the sort, filter, or scroll:
 
-- `dens`: the arrival-time density charts for all presets and for the active
+- `dens`: the arrival-time density charts for all presets and for the chosen
   preset. Each is `{lo, hi, a, b, shared, n, h}`: the time axis from `lo` to
   `hi` seconds, the on-recipe zone from `a` to `b` (window seconds when
   `shared`, else offsets from a common window), the `[fast, on_recipe, slow]`
   shot counts, and `h`, 121 heights from 0 to 100 sampled evenly from `lo` to
-  `hi`, scaled to the curve's own peak. The active-preset entry is `null`
-  without timed shots of that preset and `true` when it equals the first.
+  `hi`, scaled to the curve's own peak. The chosen-preset entry is `null`
+  without timed shots of that preset (and always with All) and `true` when it
+  equals the first.
 - `cons`: the window's timed shots oldest first, for the consistency chart:
-  `t`, times to target in tenths of a second, and `p`, their preset ids (one
-  number when they share one).
+  `t`, times to target in tenths of a second, `p`, their preset ids (one
+  number when they share one), and `g`, present only when a guard decided
+  any of their stops: per shot `1` when the fast-shot guard extended it, `2`
+  when the slow-shot guard shortened it, `0` otherwise.
 - `facets`: the presets (`[id, name]`) and scales (`[key, name]`) the good
   shots of the whole log hold, newest first, up to eight of each, for the
   list filter.
+- `preset`: the preset the chosen-preset chart and `cut` follow (`0` All), so
+  the page can tell a header built for an earlier choice.
+- `cut`: for the cut accuracy chart, absent with All or when the chosen preset
+  has none: that preset's newest `window` good shots stopped by weight (target,
+  fast-guard or slow-guard cut) with a settled yield, oldest first, as `t`,
+  their targets in tenths of a gram (one number when they share one), `e`,
+  the settled yield minus the target in hundredths of a gram, and `g` as in
+  `cons`.
 
 The integration API's stats object stays at ten shots.
 Each row retains its own `bootId` and curve arrays; row errors are calculated

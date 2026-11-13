@@ -527,6 +527,11 @@
 
 .shotCard :is(.shotDur, .shotActual) > strong {
   grid-column: 1/-1;
+  /* The shot rows' DUR and YIELD labels. */
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 
   /* Indent to the value column: metric column (2.78rem) + column gap. */
   padding-left: calc(2.78rem + 0.5rem);
@@ -535,6 +540,8 @@
 .shotCard :is(.shotDur, .shotActual) > div {
   grid-column: 2;
   grid-row: 2;
+  /* The shot rows' value: 1.15em of their 1.85rem cell. */
+  font-size: 2.1275rem;
 }
 
 #shotTable .shotDur::before,

@@ -24,7 +24,7 @@
   const renderer = runtimeJs.slice(runtimeJs.indexOf('function shotRuleModel('),
       runtimeJs.indexOf('function setEmptyState(')) +
     viewJs.stats.slice(viewJs.stats.indexOf('// The value of a time-sorted curve'),
-      viewJs.stats.indexOf('let statsPresetFilter'));
+      viewJs.stats.indexOf('const statsChosenPreset'));
   // One combined chart: a weight axis, a flow axis, one time axis and the final-yield overlay.
   const ticks = [], markers = [], axes = [], keys = [{style:{}}, {style:{}}];
   let markup = '', plot = null;

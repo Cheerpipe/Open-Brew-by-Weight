@@ -496,9 +496,12 @@ class OpenBrewByWeightNetwork {
     ShotLogSortDir statsDir = ShotLogSortDir::Desc, statsFetchDir = ShotLogSortDir::Desc;
     ShotListFilter statsFilter, statsFetchFilter;
     uint32_t statsEpoch = 0, statsFingerprint = 0, statsBoot = 0, statsSeq = 0, statsKnownTag = 0;
-    // Window and active preset of the last standing page's header.
+    // Window and preset of the last standing page's header.
     size_t statsShownWindow = 0;
     uint8_t statsPresetId = 0;
+    // The preset the page's charts follow (`preset`), and a fetch's own:
+    // -1 the active one (an earlier page sends none), 0 All, else its id.
+    int16_t statsPresetChoice = -1, statsFetchPresetChoice = -1;
     // Paced delivery: one budgeted frame per dispatch resumes the in-flight
     // page (snapshot/fetch identity and store epoch captured at page start)
     // until its terminating frame; a deferred send keeps this state intact.

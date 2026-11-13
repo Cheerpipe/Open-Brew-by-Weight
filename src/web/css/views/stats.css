@@ -50,9 +50,20 @@
   height: 3.75rem;
 }
 
-#statsConsistency {
-  margin-top: 1.6rem;
+/* The section titles: one per chart, with room above each later chart. */
+:is(#statsDurChartPlot, #statsConsistency, #statsCutAccuracy) > .dcTitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--fg);
+}
 
+#statsConsistency,
+#statsCutAccuracy {
+  margin-top: 2.4rem;
+}
+
+#statsConsistency {
   --zf: 33.333%;
   --zo: 33.333%;
   --z: var(--mu);
@@ -75,7 +86,8 @@
   --zl: var(--ac);
 }
 
-#statsConsistency span {
+#statsConsistency span,
+#statsCutAccuracy span {
   color: var(--mu);
 }
 
@@ -83,9 +95,22 @@
   color: var(--z);
 }
 
+/* Cut accuracy: four figures; bars coloured by where each stop settled. */
+#statsCutAccuracy {
+  --cutIn: color-mix(in srgb, var(--ok) 50%, var(--sf));
+}
+
+#statsCutAccuracy .statsDensZones {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+#statsCutAccuracy .statsDensZones > :first-child {
+  color: var(--ok);
+}
+
 .consPlot {
   position: relative;
-  margin: 0.35rem 2.4rem 0 0;
+  margin: 0.85rem 2.4rem 0 0;
 }
 
 .consPlot .statsDensPlot {
@@ -115,21 +140,100 @@
   white-space: nowrap;
 }
 
-.consBand {
-  fill: var(--zl);
-  fill-opacity: var(--bandPart);
+/* Each bar's colour: --bc from its class, the level's tones in Consistency. */
+#statsConsistency {
+  --bc: var(--zs);
 }
 
+#statsConsistency .out {
+  --bc: var(--zl);
+}
+
+#statsCutAccuracy .in {
+  --bc: var(--cutIn);
+}
+
+#statsCutAccuracy .over {
+  --bc: var(--gFast);
+}
+
+#statsCutAccuracy .under {
+  --bc: var(--gSlow);
+}
+
+:is(#statsConsistency, #statsCutAccuracy) .g1 {
+  --bc: var(--gFast);
+}
+
+:is(#statsConsistency, #statsCutAccuracy) .g2 {
+  --bc: var(--gSlow);
+}
+
+/* A tinted body under a solid tip; a guard-stopped shot is neutral under a
+   dashed border on its three free sides. */
 .consBar {
-  fill: var(--zs);
+  fill: var(--bc);
+  fill-opacity: 0.3;
 }
 
-.consBar.out {
-  fill: var(--zl);
+.consBar.guard {
+  fill: color-mix(in srgb, var(--fg) 12%, var(--sf));
+  fill-opacity: 1;
+}
+
+.consCap,
+.consRim {
+  fill: none;
+  stroke: var(--bc);
+  vector-effect: non-scaling-stroke;
+}
+
+.consCap {
+  stroke-width: 2;
+}
+
+.consRim {
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+/* The spread of the last five shots, fading from its edges to the centre. */
+.consSpread {
+  stroke: none;
+}
+
+#statsConsistency .consSpread.good {
+  fill: url("#consBandgood");
+}
+
+#statsConsistency .consSpread.fair {
+  fill: url("#consBandfair");
+}
+
+#statsConsistency .consSpread.poor {
+  fill: url("#consBandpoor");
+}
+
+#statsCutAccuracy .consSpread.over {
+  fill: url("#cutBandover");
+}
+
+#statsCutAccuracy .consSpread.in {
+  fill: url("#cutBandin");
+}
+
+#statsCutAccuracy .consSpread.under {
+  fill: url("#cutBandunder");
+}
+
+.cutRing {
+  fill: var(--sf);
+  stroke: var(--ok);
+  stroke-width: 2.5;
 }
 
 .consOver {
-  stroke: var(--zl);
+  stroke: var(--bc);
   stroke-width: 2.5;
   stroke-dasharray: 2 1.5;
   vector-effect: non-scaling-stroke;
@@ -196,4 +300,60 @@
 .shotPushed {
   outline: 2px solid var(--ac);
   outline-offset: -2px;
+}
+
+/* Chart legends: a swatch per mark, as the mark is drawn. */
+.statsLegend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 0.8rem;
+  margin: 0.55rem 0 0;
+  font-size: 0.72rem;
+  color: var(--mu);
+}
+
+.statsLegend i {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 0.3rem;
+  border-radius: 2px;
+  vertical-align: -1px;
+  background: color-mix(in srgb, var(--bc) 30%, var(--sf));
+  box-shadow: inset 0 2px var(--bc);
+}
+
+.statsLegend .fast {
+  --bc: var(--gFast);
+}
+
+.statsLegend .on,
+.statsLegend .good {
+  --bc: var(--ok);
+}
+
+.statsLegend .slow {
+  --bc: var(--gSlow);
+}
+
+.statsLegend .fair {
+  --bc: var(--lw);
+}
+
+.statsLegend .poor {
+  --bc: var(--ac);
+}
+
+.statsLegend .bull {
+  border-radius: 50%;
+  background: var(--sf);
+  box-shadow: inset 0 0 0 2px var(--ok);
+}
+
+.statsLegend .guard {
+  background: color-mix(in srgb, var(--fg) 12%, var(--sf));
+  box-shadow: none;
+  outline: 1.5px dashed var(--mu);
+  outline-offset: -1.5px;
 }
