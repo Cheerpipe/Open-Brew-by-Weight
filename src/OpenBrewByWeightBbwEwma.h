@@ -26,13 +26,13 @@ inline float clampOffset(float value) {
   return fmaxf(0.0f, fminf(MAX_OFFSET_G, value));
 }
 
-inline bool learn(float offsetG, float finalWeightG, float goalG, uint8_t alpha,
+// The offset moves toward the caller's observation by alpha.
+inline bool learn(float offsetG, float observationG, uint8_t alpha,
                   bool acceptedFreshObservation, float &updatedOffset) {
-  const float observation = offsetG + (finalWeightG - goalG);
   if (!acceptedFreshObservation || !validBbwAlpha(alpha) ||
-      !std::isfinite(offsetG) || !std::isfinite(observation) ||
-      fabsf(observation) > MAX_OFFSET_G) return false;
-  updatedOffset = clampOffset(offsetG + (static_cast<float>(alpha) / 100.0f) * (finalWeightG - goalG));
+      !std::isfinite(offsetG) || !std::isfinite(observationG) ||
+      fabsf(observationG) > MAX_OFFSET_G) return false;
+  updatedOffset = clampOffset(offsetG + (static_cast<float>(alpha) / 100.0f) * (observationG - offsetG));
   return true;
 }
 
