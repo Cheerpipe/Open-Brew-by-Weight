@@ -94,10 +94,14 @@ esp_err_t OpenBrewByWeightNetwork::beanconquerorHandler(httpd_req_t *request) {
   const auto finish = [&](uint32_t id) {
     const esp_err_t result = out.finish() ? httpd_resp_send_chunk(request, nullptr, 0) : ESP_FAIL;
     (void)httpd_sess_trigger_close(request->handle, httpd_req_to_sockfd(request));
-    if (result != ESP_OK)
-      serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                           "Beanconqueror: %s %lu could not be sent", id ? "shot" : "index",
-                           static_cast<unsigned long>(id));
+    // A served shot is an export people look for in the Web UI log.
+    if (result != ESP_OK || id)
+      serialTraceCategoryf(result == ESP_OK ? LogLevel::INFO : LogLevel::WARNING,
+                           DebugCategory::NETWORK, "Beanconqueror: %s %lu %s", id ? "shot" : "index",
+                           static_cast<unsigned long>(id),
+                           result != ESP_OK ? "could not be sent"
+                           : gaggiuino      ? "sent as a Gaggiuino shot"
+                                            : "sent as a GaggiMate shot");
     self.unlockWorkBuf();
     return result;
   };

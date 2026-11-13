@@ -88,8 +88,8 @@ html.themeDark {
 
 /* One selection contract for the whole UI: it behaves as an app, so text does
    not select. Exempt are the fields people type in, the log's lines (the only
-   diagnostic in the field, and people quote single lines), and the Setup
-   address, whose copy fallback works by selecting it.
+   diagnostic in the field, and people quote single lines), and the Setup and
+   Beanconqueror addresses, whose copy fallbacks work by selecting them.
    A double tap does not zoom and the page does not bounce or pull to refresh;
    pinch zoom stays, because people need it to read small text. */
 html {
@@ -103,7 +103,8 @@ html {
 input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
 textarea,
 #log,
-.setupAddress > span {
+.setupAddress > span,
+#beanconquerorUrl {
   user-select: text;
   -webkit-touch-callout: default;
 }

@@ -51,6 +51,10 @@ while a shot is brewing, it can't connect; try again once the shot has
 ended. With **As a GaggiMate**, leave Beanconqueror's option to write notes
 back to the machine off: the controller doesn't take notes from apps.
 
+Every shot Beanconqueror imports shows up in the Web UI log, for example
+`Beanconqueror: shot 42 sent as a Gaggiuino shot`, so you can check which
+shots it took. Shots served by a companion show up in the companion's log.
+
 ## No password, by design
 
 A Gaggiuino or a GaggiMate lets any app on your network read its shots, and

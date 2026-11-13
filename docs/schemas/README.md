@@ -170,7 +170,10 @@ projects' own formats and are not versioned here:
 - **Beanconqueror brew handoff**: `beanconqueror://ADD_BREW?len=<n>&shareBrew0=…`,
   a gzip-compressed `IHandoffEnvelope` v1 in unpadded base64url split into
   400-character `shareBrew<n>` parameters. Water in is sent as 0 ml because it
-  is not measured. Beanconqueror accepts it from 8.8; earlier releases have no
+  is not measured. `flow` carries the readings as weight deltas (dg) with zero
+  water; Beanconqueror's importer derives no flow from it, so the weight flow
+  (g/s, two decimals, 0 where missing) travels in `metrics` as one `measured`
+  metric, key `weightFlow`, named `Flow`, on the same absolute times. Beanconqueror accepts it from 8.8; earlier releases have no
   `ADD_BREW` route and show their generic wrong-QR-code alert.
 
 ## Beanconqueror machine endpoints v1
@@ -185,7 +188,9 @@ the controller's `Host` check, and send no CORS headers. With the setting Off,
 every path answers `404`. The controller answers `503` while it keeps the
 radio quiet: a shot until its drip delay ends, a rinse, a scale connecting
 (the companion link's sync hold). Only good shots are served; a bad or
-missing shot answers `404`.
+missing shot answers `404`. Each shot sent in full is logged at INFO
+(`Beanconqueror: shot <id> sent as a Gaggiuino shot`, or `GaggiMate`); one cut
+short is a WARNING.
 
 | Format | Path under `/beanconqueror` | Answer |
 | --- | --- | --- |
