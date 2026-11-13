@@ -290,8 +290,6 @@ function renderMachinePower(s, lm, power, active, warming) {
   b.dataset.turn = target ? "on" : "off";
   b.disabled = busy || !!powerPending || !!reason;
   b.classList.toggle("armed", armed && !b.disabled);
-  // A completed hold or second press keeps the ring closed until it settles.
-  b.classList.toggle("acting", busy || !!powerPending);
   b.setAttribute("aria-busy", busy);
   b.setAttribute("aria-label", label);
   b.title = label;
@@ -331,7 +329,8 @@ async function sendMachinePower(turn) {
 function initMachinePower() {
   const b = $("machinePower");
   if (!b) return;
-  // The ring fills by CSS while the timer runs; letting go first cancels.
+  // The ring fills by CSS while the timer runs and fades out once the hold
+  // acts; letting go first cancels.
   let timer = 0;
   const release = () => {
     clearTimeout(timer);
@@ -346,7 +345,7 @@ function initMachinePower() {
     }
     b.classList.add("holding");
     const turn = b.dataset.turn;
-    timer = setTimeout(() => sendMachinePower(turn), 900);
+    timer = setTimeout(() => (release(), sendMachinePower(turn)), 900);
   });
   b.addEventListener("pointerup", release);
   b.addEventListener("pointercancel", release);

@@ -567,9 +567,8 @@
 }
 
 /* Admin → Machine control's power button beside the model name. A hold
-   fills its ring (yellow to turn on, red to turn off) and acts, and the
-   ring stays closed until the command settles, then goes at once with
-   the new tone (an early release clears it at once too); the tone
+   fills its ring (yellow to turn on, red to turn off) and acts; the ring
+   fades out once the hold acts or is released early. The tone
    follows the machine: neutral off, yellow heating with the warm-up ring,
    red once on (the turn-off action), pulsing while a command is pending. */
 .machineIdName {
@@ -681,20 +680,26 @@
 
 .mpHold {
   stroke: var(--pri);
+  opacity: 0;
+  transition:
+    opacity 0.3s,
+    stroke-dashoffset 0s 0.3s;
 }
 
 .machinePower[data-turn="on"] .mpHold {
   stroke: var(--lw);
 }
 
-.machinePower.holding .mpHold,
-.machinePower.acting .mpHold {
+.machinePower.holding .mpHold {
+  opacity: 1;
   stroke-dashoffset: 0;
   transition: stroke-dashoffset 0.9s linear;
 }
 
 .machinePower.armed .mpHold {
+  opacity: 1;
   stroke-dashoffset: 50;
+  transition: none;
   animation: hPulse 1s ease-in-out infinite;
 }
 

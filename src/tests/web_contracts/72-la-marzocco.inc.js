@@ -1016,8 +1016,7 @@ if (!codeIncludes(viewJs.home, 'if(!document.hidden&&R.activeView===home)renderL
   timers.at(-1).fn();
   assert.deepEqual(sent.at(-1), ['/api/v1/machine/la-marzocco', {action: 'power', on: false}]);
   assert.equal(sent.length, 2, 'a completed hold sends the command');
-  pointer('pointerup');
-  assert(button.classList.contains('acting'), 'letting go after the action keeps the ring closed');
+  assert(!button.classList.contains('holding'), 'the ring fades out as soon as the hold acts');
   // Warm-up ring: progress on the device clock between the firmware's start
   // and the later boiler; hidden without data; never runs backwards.
   const heating = (readyAt, since = 1000) => frame({powerState: 'ON', readiness: 'warming_up',
