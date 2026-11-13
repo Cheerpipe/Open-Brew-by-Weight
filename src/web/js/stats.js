@@ -650,7 +650,9 @@ let statsMerged = null,
   statsMergedGood = null,
   statsMergedRetry = 0,
   statsGood = 0,
-  statsHeaderAsk = 0;
+  statsHeaderAsk = 0,
+  // The companion's last question, while pending or answered.
+  statsMergedQuery = null;
 const statsHeader = () => statsMerged || (R.archiveView ? {} : R.uiState.shotStats || {});
 function renderStatsDurChart() {
   const root = $("statsDurChart");
@@ -689,6 +691,9 @@ function renderStatsDurChart() {
       };
     }),
     shots = timed.filter((r) => !only || r.presetId === only);
+  // The companion's header follows the preset it was asked for: once the
+  // choice moves on (the active preset arrived or changed), ask again.
+  if (statsMerged && !current) refreshMergedHeader();
   // One selector for the three charts; its buttons follow the presets the
   // log holds. A choice asks the controller (and the companion) for that
   // preset's chart and cut series.
@@ -1327,27 +1332,32 @@ function renderShotStats() {
   renderStatsDurChart();
 }
 async function refreshMergedHeader() {
-  const ask = ++statsHeaderAsk,
-    q = statsArchiveQuery(),
-    filter = Object.fromEntries(
-      ["result", "preset", "scale"].filter((k) => q[k]).map((k) => [k, q[k]]),
-    );
-  let reply = null;
-  if (archiveStatsReady())
-    reply = await companionArchive(
+  const q = statsArchiveQuery(),
+    ready = archiveStatsReady(),
+    epoch = statsStreamEpoch,
+    query =
       "stats?" +
-        new URLSearchParams({
-          ...filter,
-          window: R.uiState.statsWindow,
-          active: statsChosenPreset(),
-          epoch: statsStreamEpoch,
-        }),
-    ).catch(() => null);
+      new URLSearchParams({
+        ...Object.fromEntries(
+          ["result", "preset", "scale"].filter((k) => q[k]).map((k) => [k, q[k]]),
+        ),
+        window: R.uiState.statsWindow,
+        active: statsChosenPreset(),
+        epoch,
+      });
+  // A choice and the controller's header that follows it ask the same: a
+  // question pending or answered is not asked again.
+  if (ready && query === statsMergedQuery) return;
+  const ask = ++statsHeaderAsk;
+  statsMergedQuery = ready ? query : null;
+  const reply = ready ? await companionArchive(query).catch(() => null) : null;
   if (ask !== statsHeaderAsk) return;
   // A failed answer shows the controller's header, labelled, and asks the
-  // companion again a little later while Stats stay open.
+  // companion again a little later while Stats stay open; it and one from an
+  // older copy (while a shot holds the sync) may be asked again.
   statsMerged = reply?.stats || null;
   if (reply) statsMergedGood = reply.good;
+  if (reply?.epoch !== epoch) statsMergedQuery = null;
   clearTimeout(statsMergedRetry);
   if (!reply && archiveStatsReady())
     statsMergedRetry = setTimeout(() => shotStatsViewActive() && refreshMergedHeader(), 15e3);
@@ -3061,11 +3071,6 @@ function applyStatsStream(message) {
   R.uiState.statsFetchMark = null;
   statsStreamBoot = message.boot;
   statsStreamEpoch = page.epoch;
-  if (page.mode === "replace") {
-    statsTag = page.tag;
-    if (Number.isInteger(page.good)) statsGood = page.good;
-    refreshMergedHeader();
-  }
   applyShotPage(
     {
       bootId: message.boot,
@@ -3076,6 +3081,12 @@ function applyStatsStream(message) {
     },
     page.mode,
   );
+  if (page.mode === "replace") {
+    statsTag = page.tag;
+    if (Number.isInteger(page.good)) statsGood = page.good;
+    // After the page's header, whose presets decide the one to ask for.
+    refreshMergedHeader();
+  }
   // The model updates on every view; only the hidden view's DOM work and
   // reachability signal wait until Stats is actually open.
   if (shotStatsViewActive()) {
