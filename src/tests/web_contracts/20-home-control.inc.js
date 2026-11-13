@@ -1054,7 +1054,7 @@ if (codeIncludes(ui, 'id="shotPanel"') ||
     codeIncludes(statsRuntimeJs, "last?'Last shot.'") ||
     css.includes('.shotFirstDrop') ||
     codeIncludes(statsRuntimeJs, 'stroke="currentColor"') ||
-    !codeIncludes(statsRuntimeJs, "if(spark.hidden)row.classList.add('noSpark')") ||
+    !codeIncludes(statsRuntimeJs, "if(spark.hidden){row.classList.add('noSpark');spark.remove()") ||
     !css.includes('.shotCard{') ||
     !css.includes('.metric,.shotCard>*{') ||
     !css.includes('.metric strong,.shotCard strong{') ||

@@ -1351,7 +1351,8 @@ async function refreshMergedHeader() {
   clearTimeout(statsMergedRetry);
   if (!reply && archiveStatsReady())
     statsMergedRetry = setTimeout(() => shotStatsViewActive() && refreshMergedHeader(), 15e3);
-  if (shotStatsViewActive()) R.paint(renderShots);
+  // Only the header changed: the rows stay as they are.
+  if (shotStatsViewActive()) R.paint(renderShotStats);
 }
 // S18: every window smaller than the good shots the list holds under its
 // filters, plus the smallest one that covers them; no choice up to ten. The
@@ -1488,7 +1489,9 @@ function renderShots() {
         source || streamArchives.shots,
         R.uiState.shotSort === "date",
       );
-      const row = document.createElement("tr");
+      // Attached first, so the spark draws at its real width now instead of
+      // growing inside a ResizeObserver callback (a "loop completed" error).
+      const row = body.appendChild(document.createElement("tr"));
       row.dataset.id = r.id;
       if (r._archive) row.dataset.gen = r.archiveGeneration;
       // A scale-loss shot has no weighed yield: only its estimate, no error.
@@ -1593,11 +1596,13 @@ function renderShots() {
         r._archive ? rateArchivedShot(r, n, star) : rateHistoryShot(r.id, n, star),
       );
       row.appendChild(rate);
-      const spark = document.createElement("td");
+      const spark = row.appendChild(document.createElement("td"));
       spark.className = "shotSparkCell";
       renderShotSpark(spark, r, m);
-      if (spark.hidden) row.classList.add("noSpark");
-      else row.appendChild(spark);
+      if (spark.hidden) {
+        row.classList.add("noSpark");
+        spark.remove();
+      }
       const del = document.createElement("td");
       del.className = "shotDel";
       const btn = document.createElement("button");
@@ -1611,7 +1616,6 @@ function renderShots() {
       btn.onclick = () => shotMenu.open(btn, r);
       del.appendChild(btn);
       row.appendChild(del);
-      body.appendChild(row);
     }
   }
   R.lockControls(body);
