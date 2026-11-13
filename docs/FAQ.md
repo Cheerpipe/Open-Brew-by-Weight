@@ -43,7 +43,7 @@ Weight stop pauses while reconnection continues. Three coherent readings on
 the recovered link can restore it. The [scale-loss backup](features/auto-to-manual.md) and other
 applicable limits still act. A steady unchanged weight is not a lost stream.
 
-If the scale was absent at start, [No-scale BBW](settings/no-scale-bbw.md)
+If the scale was absent at start, [Scale guard](settings/no-scale-bbw.md)
 controls whether the attempt is blocked or manual. A scale arriving later
 does not retroactively make every manual cycle an automatic one.
 

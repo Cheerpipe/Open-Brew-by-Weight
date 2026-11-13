@@ -136,7 +136,7 @@ arrow button beside it discards the change and restores the saved position.
 
 With the switch off, the controller behaves exactly as if no scale existed:
 brew by weight falls back to the behavior described in
-[No-scale BBW](no-scale-bbw.md), and reconnecting after enabling again takes
+[Scale guard](no-scale-bbw.md), and reconnecting after enabling again takes
 a few seconds because the controller honors the standard quiet period that
 follows every scale disconnect. The setting changes nothing else — scan mode,
 preferred scale, history, and every other setting keep their own values, and
@@ -200,7 +200,7 @@ the scale is charging.
 ## When it applies
 
 A usable scale is required for automatic brew-by-weight. If the scale is
-missing, see [No-scale BBW](no-scale-bbw.md). If it drops mid-shot, see
+missing, see [Scale guard](no-scale-bbw.md). If it drops mid-shot, see
 [Scale-loss backup](../features/auto-to-manual.md). A Bluetooth link that
 goes silent, because the scale moved out of range or lost power without
 saying goodbye, is given up after two seconds, so the controller starts

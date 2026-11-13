@@ -37,7 +37,7 @@ const HIST_TYPE_SVG = {
 };
 HIST_TYPE_SVG.power_on = '<svg class="o"><use href="#hPW"/></svg>';
 HIST_TYPE_SVG.backflush = '<svg viewBox="0 0 256 256"><use href="#hBF"/></svg>';
-HIST_TYPE_SVG.no_scale_guard_aborted = '<svg class="o"><use href="#hNS"/></svg>';
+HIST_TYPE_SVG.no_scale_guard_aborted = '<svg class="o"><use href="#g-noScale"/></svg>';
 // Parsed once per type, then cloned: rows never re-parse kilobytes of path data.
 const histIcons = {};
 const histIcon = (type) => {

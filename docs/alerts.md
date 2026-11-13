@@ -32,7 +32,7 @@ It is visual only: it makes no sound and stops nothing by itself. Weight
 stops wait for the load to make sense again; see
 [BBW](features/brew-by-weight.md#when-touch-protection-delays-a-stop).
 
-A **Touch fallback** ending uses the same completion cue as other automatic
+A **Sustained weight** ending uses the same completion cue as other automatic
 stops, subject to **Sound alerts** and the available sound output.
 
 A recognized Linea Micra standby wake is relay-only and intentionally silent:
@@ -60,7 +60,7 @@ changed. On momentary machines, check the actual group and its state feedback.
 | **Use the scale's own power-on tone** | ON | ON / OFF | Plays the scale's own power-on sound instead of the controller's rising tone. Only scales whose sounds are known (today Bookoo Themis Mini and Ultra); other scales keep the controller's tone. Available only while **Scale connected** is on and Play alerts on is not Scale only. |
 | **Scale disconnected** | (buzzer builds) | ON / OFF | Descending RTTTL on the local buzzer when the scale disconnects (idle or during a shot). Hidden / disabled when Play alerts on is Scale only. |
 | **Use the scale's own power-off tone** | ON | ON / OFF | Plays the scale's own power-off sound instead of the controller's descending tone. Only scales whose sounds are known (today Bookoo Themis Mini and Ultra); other scales keep the controller's tone. Available only while **Scale disconnected** is on and Play alerts on is not Scale only. |
-| **Manual without scale (BBW on)** | (buzzer builds) | ON / OFF | Warns on the local buzzer that Brew by weight cannot start normally because the scale is missing, including the first blocked attempt. See [No-scale BBW](settings/no-scale-bbw.md). |
+| **Manual without scale (BBW on)** | (buzzer builds) | ON / OFF | Warns on the local buzzer that Brew by weight cannot start normally because the scale is missing, including the first blocked attempt. See [Scale guard](settings/no-scale-bbw.md). |
 | **First drops** | ON | ON / OFF | One beep on first coffee drops during an automatic shot. Ignored when brew by weight is off. |
 | **Fast-shot beeps** | Fast | Disabled / Slow / Medium / Fast / Rapid | Local-buzzer pulses from the moment a fast shot would have stopped at the target but keeps going for its extra yield. Disabled when Play alerts on is Scale only. |
 | **Slow-shot beeps** | Fast | Same rates | Pulses from the moment a shot runs past your shot time window without having stopped. |

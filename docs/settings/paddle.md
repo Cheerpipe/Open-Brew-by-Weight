@@ -87,5 +87,5 @@ With Natural, BBW on and Quick rinse off, move ON and stop early with OFF.
 With Original, ON→OFF can instead leave the shot running. Confirm the selected
 mode before interpreting a gesture as a stop.
 
-Related: [No-scale BBW](no-scale-bbw.md), [BBW](../features/brew-by-weight.md),
+Related: [Scale guard](no-scale-bbw.md), [BBW](../features/brew-by-weight.md),
 [alerts](../alerts.md), [momentary](momentary.md).

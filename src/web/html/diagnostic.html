@@ -15,9 +15,7 @@
     <circle cx="12" cy="13" r="8" />
     <path d="M12 9v4l2 2M10 2h4" />
   </symbol>
-  <symbol id="dg-guards" viewBox="0 0 24 24">
-    <path d="M12 3 4 7v5c0 5 4 8 8 9 4-1 8-4 8-9V7Zm-3 9 2 2 4-4" />
-  </symbol>
+  <symbol id="dg-guards" viewBox="0 0 24 24"><use href="#g-guards" /></symbol>
   <symbol id="dg-wifi" viewBox="0 0 24 24">
     <path d="M3 9a14 14 0 0 1 18 0M6 12.5a9 9 0 0 1 12 0M9 16a4 4 0 0 1 6 0m-3 3.5h.01" />
   </symbol>
@@ -306,35 +304,35 @@
       </div>
     </details>
     <details class="cfgGroup" data-g="guards">
-      <summary>{{webui:diagnostic.guards}}</summary>
+      <summary>{{webui:shell.guards}}</summary>
       <div class="statusColumn">
         <div class="metric">
-          <strong>{{webui:diagnostic.no_scale_bbw}}</strong>
+          <strong>{{webui:settings.no_scale_bbw}}</strong>
           <div id="dGuardNoScaleUser">—</div>
           <div id="dGuardNoScaleRaw">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.a_to_m_time_guard}}</strong>
+          <strong>{{webui:settings.scale_loss_backup}}</strong>
           <div id="dGuardAtmUser">—</div>
           <div id="dGuardAtmRaw">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.slow_extraction}}</strong>
+          <strong>{{webui:settings.slow_protection}}</strong>
           <div id="dGuardSlowUser">—</div>
           <div id="dGuardSlowRaw">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.fast_extraction}}</strong>
+          <strong>{{webui:settings.fast_protection}}</strong>
           <div id="dGuardFastUser">—</div>
           <div id="dGuardFastRaw">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.avoid_accidental_touch}}</strong>
+          <strong>{{webui:settings.avoid_accidental_touch}}</strong>
           <div id="dGuardTouchUser">—</div>
           <div id="dGuardTouchRaw">—</div>
         </div>
         <div class="metric">
-          <strong>{{webui:diagnostic.cup_protection}}</strong>
+          <strong>{{webui:settings.cup_protection}}</strong>
           <div id="dGuardCupUser">—</div>
           <div id="dGuardCupRaw">—</div>
         </div>

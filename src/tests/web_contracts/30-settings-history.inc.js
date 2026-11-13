@@ -4,7 +4,7 @@
   const ended = new Function(blockAt(runtimeJs, 'function verdictLabel(') + formatter +
     ';return formatShotEnded;')();
   for (const reason of ['touch_weight_fallback', 'TOUCH_WEIGHT_FALLBACK']) {
-    if (ended(reason) !== 'Touch fallback')
+    if (ended(reason) !== 'Sustained weight')
       throw new Error('Ended must identify sustained-weight touch protection');
   }
   for (const [reason, label] of [['extended_max_weight', 'Fast'], ['FAST_EXTRACTION_MIN_TIME', 'Fast'],
@@ -236,7 +236,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     html.includes('id="requireCupToStart" type="checkbox" checked') ||
     !codeIncludes(ui, 'Already on? Lift and replace it.') ||
     html.indexOf('<summary>Slow shots</summary>') < 0 ||
-    html.indexOf('<summary>Finish by time</summary>') < 0 ||
+    html.indexOf('<summary>Scale-loss backup</summary>') < 0 ||
     html.includes('<summary>Avoid accidental touch</summary>') ||
     html.indexOf('<summary>Cup protection</summary>') >
         html.indexOf('id="avoidAccidentalTouchEnabled"') ||
@@ -245,7 +245,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     html.indexOf('<summary>Fast shots</summary>') >
         html.indexOf('<summary>Slow shots</summary>') ||
     html.indexOf('<summary>Slow shots</summary>') >
-        html.indexOf('<summary>Finish by time</summary>') ||
+        html.indexOf('<summary>Scale-loss backup</summary>') ||
     !codeIncludes(ui, 'function withCommandGate(') ||
     codeIncludes(ui, 'el.disabled=!controlsMutable||off||pend') ||
     !codeIncludes(ui, "classList.toggle('fieldOff',off)") ||
@@ -1231,8 +1231,8 @@ if (!shellHtml.includes('href="/history" data-route="/history"') ||
     !codeIncludes(historyRuntimeJs, "power_on:'Power ON'") ||
     !codeIncludes(historyRuntimeJs, 'HIST_TYPE_SVG.power_on=\'<svg class="o"><use href="#hPW"/></svg>\'') ||
     !codeIncludes(historyRuntimeJs, 'Blocked: no scale') ||
-    !codeIncludes(historyRuntimeJs, 'HIST_TYPE_SVG.no_scale_guard_aborted=') ||
-    !partialHtml.history.includes('id="hNS" viewBox="0 0 24 24"') ||
+    !codeIncludes(historyRuntimeJs, 'HIST_TYPE_SVG.no_scale_guard_aborted=\'<svg class="o"><use href="#g-noScale"/></svg>\'') ||
+    partialHtml.history.includes('id="hNS"') ||
     !historyTypesIo.includes('NO_SCALE_GUARD_ABORTED') ||
     !codeIncludes(js, '"/api/v1/history/clear","CLEAR_HISTORY"') ||
     !codeIncludes(historyRuntimeJs, "'/api/v1/history/delete'") ||

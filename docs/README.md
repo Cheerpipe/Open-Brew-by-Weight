@@ -34,7 +34,7 @@ needed rather than reading the entire directory.
 | Physical switch | [Paddle](settings/paddle.md) / [momentary](settings/momentary.md) |
 | Machine integration | [La Marzocco Linea Micra](settings/linea-micra.md) |
 | Coffee apps | [Beanconqueror](settings/beanconqueror.md) |
-| Without a scale / rinse | [No-scale BBW](settings/no-scale-bbw.md) / [quick rinse](settings/quick-rinse.md) |
+| Without a scale / rinse | [Scale guard](settings/no-scale-bbw.md) / [quick rinse](settings/quick-rinse.md) |
 | Scale and cup | [Scales](settings/scales.md) / [Bluetooth on/off](settings/scales.md#bluetooth-onoff) / [cup detection](settings/cup.md) / [tare](settings/tare.md) |
 | Network | [Wi-Fi](settings/wifi.md) / [access point](settings/ap.md) / [device name](settings/wifi.md#discovery-by-name) / [Web UI access](settings/web-access.md) |
 | Energy | [Power management](settings/power-management.md) |

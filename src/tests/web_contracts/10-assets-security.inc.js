@@ -197,6 +197,17 @@ if (shellHtml.split('mask="url(#brandCut)"').length !== 2 ||
   throw new Error(
       'Brand mark must be defined once as an inline symbol sprite and referenced from the header, the loading view, and the inactive overlay');
 }
+{
+  // Guard and mode glyphs live once in the shell sprite; every view uses them.
+  const quickIcons = runtimeJs.match(/const QUICK_ICONS\s*=\s*\{([^}]*)\}/)[1];
+  const views = Object.values(partialHtml).join('');
+  if (!['g-bbw', 'g-manual', 'g-guards', 'g-fast', 'g-slow', 'g-noScale', 'g-finish', 'g-touch', 'g-protect',
+      'g-limits'].every(id => shellHtml.split(`<symbol id="${id}"`).length === 2 && !views.includes(`id="${id}"`)) ||
+      !/^(\s*\w+:\s*["']g-\w+["'],?)+\s*$/.test(quickIcons) ||
+      !views.includes('<symbol id="dg-guards" viewBox="0 0 24 24"><use href="#g-guards"/></symbol>')) {
+    throw new Error('Guard icons must be defined once in the shell sprite and shared by Home, Settings and Diagnostic');
+  }
+}
 if (!shellHtml.includes('class="pageNav"') ||
     shellHtml.includes('id="navToggle"') ||
     shellHtml.indexOf('class="pageNav"') > shellHtml.indexOf('id="app"') ||
