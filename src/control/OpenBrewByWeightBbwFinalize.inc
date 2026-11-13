@@ -38,6 +38,7 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
 
   // Observation = offsetUsed + (final - f(t_cut)): the cut line at the stop.
   const float cutLineG = pendingCutLineDg(snapshot) / 10.0f;
+  const float observation = snapshot.weightOffsetG + (finalWeightG - cutLineG);
   serialTracef(LogLevel::INFO,
                "Final weight: %.2fg; cut line: %.2fg; cycle offset: %.2fg",
                finalWeightG, cutLineG, snapshot.weightOffsetG);
@@ -49,8 +50,8 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
       currentWeightIsFresh(millis()) &&
       currentWeightConnectionGeneration == snapshot.scaleConnectionGeneration &&
       snapshot.scaleConnectionGeneration == scaleConnectionGenerationNow();
-  if (!bbwEwma::learn(snapshot.weightOffsetG, finalWeightG, cutLineG,
-                      snapshot.bbwAlpha, acceptedFresh, updatedOffset)) {
+  if (!bbwEwma::learn(snapshot.weightOffsetG, observation, snapshot.bbwAlpha,
+                      acceptedFresh, updatedOffset)) {
     serialTrace(acceptedFresh ? LogLevel::WARNING : LogLevel::INFO,
                 acceptedFresh
                     ? "Calculated offset outside safe range; offset unchanged"
@@ -79,7 +80,6 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
                 "Offset learn skipped: drip learning restarted during the shot");
     return false;
   }
-  const float observation = snapshot.weightOffsetG + (finalWeightG - cutLineG);
   // Physics gate (design review 2026-10-29): flow that kept running or a
   // scale event is never drip. It also clears a pending outlier: a step is
   // confirmed by statistics on physically possible observations only.

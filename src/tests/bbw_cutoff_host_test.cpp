@@ -20,14 +20,14 @@ int main() {
   assert(bbwAlgorithmVersion(0) == BBW_PROFILE_VERSION &&
          bbwAlgorithmVersion(1) == BBW_PROFILE_VERSION);
   float next = 0;
-  assert(bbwEwma::learn(1.5f, 36.2f, 36, 30, true, next));
+  assert(bbwEwma::learn(1.5f, 1.7f, 30, true, next));
   assert(std::fabs(next - 1.56f) < 1e-5f);
-  assert(!bbwEwma::learn(1.5f, 36.2f, 36, 30, false, next));
-  assert(!bbwEwma::learn(1.5f, 42, 36, 10, true, next));
-  assert(!bbwEwma::learn(NAN, 36, 36, 30, true, next));
-  assert(!bbwEwma::learn(1.5f, 36, 36, 0, true, next));
+  assert(!bbwEwma::learn(1.5f, 1.7f, 30, false, next));
+  assert(!bbwEwma::learn(1.5f, 7.5f, 10, true, next));
+  assert(!bbwEwma::learn(NAN, 1.5f, 30, true, next));
+  assert(!bbwEwma::learn(1.5f, 1.5f, 0, true, next));
   for (uint8_t gain : {1, 30, 37, 100}) {
-    assert(bbwEwma::learn(1.5f, 36.2f, 36, gain, true, next));
+    assert(bbwEwma::learn(1.5f, 1.7f, gain, true, next));
     assert(fabsf(next - (1.5f + gain * .002f)) < 1e-5f);
     uint8_t parsed = 0;
     assert(parseBbwAlphaBaseline(gain / 100.0, parsed) && parsed == gain);
@@ -46,8 +46,8 @@ int main() {
     uint8_t parsed = 50;
     assert(!parseBbwAlphaBaseline(invalid, parsed) && parsed == 50);
   }
-  assert(bbwEwma::learn(0, 35, 36, 30, true, next) && next == 0);
-  assert(bbwEwma::learn(5, 36, 36, 30, true, next) && next == 5);
+  assert(bbwEwma::learn(0, -1, 30, true, next) && next == 0);
+  assert(bbwEwma::learn(5, 5, 30, true, next) && next == 5);
   bbwEwma::Evidence constant, noisy, changed;
   uint8_t alpha = 30;
   for (int i = 0; i < 100; ++i) assert(constant.observe(1.5f, 1.5f, 30) == 30);
