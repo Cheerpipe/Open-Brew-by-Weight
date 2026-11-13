@@ -1797,3 +1797,27 @@ if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
   if(age(0)!=='')
     throw new Error('A running or unstored hero shot has no end time to show');
 }
+{
+  // A cycle the log never keeps (a rinse) shifts the deck like a shot; the
+  // stored hero that follows refetches its older shots, so none repeats.
+  const sent=[],heroDeck={older:null,last:null,key:'',request:0,sentAt:0,rows:[]};
+  const deck=new Function('heroDeck','heroDeckRow','renderHeroDeck','shotWs','uiState',
+    'sendUiOperation','decodeCurveDeltas',['function syncHeroDeck(','function heroDeckFetch(',
+      'function heroDeckFrame('].map((f)=>blockAt(runtimeJs,f)).join(';')+
+    ';return {sync:syncHeroDeck,frame:heroDeckFrame};')(heroDeck,({card})=>({id:card.id}),
+    ()=>{},{readyState:1},{statsNextRequest:0},(m)=>sent.push(m),()=>({}));
+  const sync=(cycle,id,phase='idle')=>(heroDeck.sentAt=0,
+    deck.sync({boot:1,cycle,phase,card:{id,live:phase==='active'}}));
+  const answer=(...ids)=>deck.frame({cols:'id',rows:ids.map((id)=>[id,{}])});
+  const ids=()=>heroDeck.older.map((r)=>r.id).join();
+  sync(1,'A'); answer('B','C');
+  sync(2,'X','active');
+  if(ids()!=='A,B')
+    throw new Error('A new cycle must shift the stored hero onto the deck at once');
+  sync(1,'A');
+  if(sent.length!==2||sent[1].offset!==1||sent[1].limit!==2)
+    throw new Error('Every stored hero must refetch the two shots before it');
+  answer('B','C'); sync(1,'A');
+  if(ids()!=='B,C'||sent.length!==2)
+    throw new Error('The refetched rows must replace the shift, once per stored hero');
+}

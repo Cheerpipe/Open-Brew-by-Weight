@@ -6132,9 +6132,10 @@ registerStream("settings", {
   },
 });
 // The Technical hero's deck: the hero card is the latest shot and two cards
-// show the shots before it, as Stats rows. One rows-only Stats fetch brings
-// them with Home once the hero is stored; a new shot shifts the deck instead.
-// Until they arrive the deck is the hero card alone, with nothing to swipe to.
+// show the shots before it, as Stats rows. A new cycle shifts the deck at once;
+// each stored hero then refetches them in one rows-only Stats fetch, since a
+// cycle the log never keeps (a rinse) or a cycle this page never painted
+// leaves the shift wrong. Until rows arrive the deck is the hero card alone.
 const heroDeck = { older: null, last: null, key: "", request: 0, sentAt: 0, rows: [], shown: null },
   HERO_DECK_NONE = [];
 // A stored hero card as a Stats row, so every deck card draws from one shape.
@@ -6184,7 +6185,7 @@ registerStream("heroDeck", {
 function heroDeckFetch() {
   const wait = heroDeck.sentAt + 5e3 - Date.now();
   clearTimeout(heroDeck.retry);
-  if (heroDeck.older || !heroDeck.last || shotWs?.readyState !== 1) return;
+  if (heroDeck.fetched === heroDeck.key || !heroDeck.last || shotWs?.readyState !== 1) return;
   if (wait > 0) return void (heroDeck.retry = setTimeout(heroDeckFetch, wait));
   Object.assign(heroDeck, {
     request: ++uiState.statsNextRequest,
@@ -6218,7 +6219,8 @@ function heroDeckFrame(m) {
   if (m.more) return;
   heroDeck.request = 0;
   // A shot that started meanwhile moved the deck: the next move refetches.
-  if (heroDeck.at === heroDeck.key) heroDeck.older = heroDeck.rows;
+  if (heroDeck.at === heroDeck.key)
+    Object.assign(heroDeck, { older: heroDeck.rows, fetched: heroDeck.at });
   renderHeroDeck();
 }
 function heroSlide(r, mode) {
