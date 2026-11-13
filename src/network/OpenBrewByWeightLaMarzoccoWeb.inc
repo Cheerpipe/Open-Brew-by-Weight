@@ -240,7 +240,7 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
   if (strcmp(action, "power") == 0) {
     // Manual power is gated here and, independently, in the La Marzocco
     // service: with Machine control off no client turns the machine on or off.
-    if (!self.requireAdminUnlock(request)) return ESP_OK;
+    // The switch is the owner's consent, so no Admin unlock is required.
     const char *const turn = powerOn ? "on" : "off";
     const auto refused = [turn](const char *reason) {
       static RefusalLog refusals;

@@ -932,12 +932,12 @@ if (!codeIncludes(viewJs.home, 'if(!document.hidden&&R.activeView===home)renderL
     attrs: {}, listeners: {}, classList: classes(), setAttribute(k, v) { this.attrs[k] = String(v); },
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }});
   const button = el(), warm = el(), slots = {};
-  let now = 1000, admin = true, last = null;
+  let now = 1000, last = null;
   const sent = [];
   const context = {R: {applyHomeStatus() {}, formatLaMarzoccoCleaning: () => '', deviceUtcSec: () => now,
       homeStatusCache: () => last, shotRecorded: () => null, uiState: {companionHere: null},
       companionPairable: () => false, companionHere: () => Promise.resolve(null),
-      accountProblemLabel: (problem) => 'account:' + problem, adminUnlockedFor: () => admin,
+      accountProblemLabel: (problem) => 'account:' + problem, adminUnlockedFor: () => false,
       controlsMutable: true, activeView: 'home',
       command: async (path, body) => (sent.push([path, {...body}]), true),
       $: (id) => ({machinePower: button, machinePowerWarm: warm}[id] ||
@@ -985,10 +985,9 @@ if (!codeIncludes(viewJs.home, 'if(!document.hidden&&R.activeView===home)renderL
   apply(frame({...off, accountProblem: 'auth'}));
   assert.equal(button.disabled, true);
   assert.match(button.attrs['aria-label'], /— account:auth$/);
-  admin = false;
+  // Machine control is the owner's consent: a locked Admin never dims it.
   apply(frame(off));
-  assert.equal(button.disabled, true, 'Admin must be unlocked to use it');
-  admin = true;
+  assert.equal(button.disabled, false, 'usable while Admin is locked');
   // Keyboard: the first press arms, the second within 3 s sends one command.
   apply(frame(off));
   const click = (detail) => button.listeners.click.forEach((fn) => fn({detail}));
@@ -1038,20 +1037,20 @@ if (!codeIncludes(viewJs.home, 'if(!document.hidden&&R.activeView===home)renderL
   apply(heating(1300, 1300));
   assert(!button.classList.contains('ringOn'), 'no ring when the estimate is not after the start');
 }
-// Two independent gates (AC3): the HTTP action checks the Admin unlock first,
-// then the switch, the account, an idle controller and Wi-Fi; its only queue
+// Two independent gates (AC3): the HTTP action checks the switch, with no
+// Admin unlock, then the account, an idle controller and Wi-Fi; its only queue
 // entry marks every request MANUAL whatever the caller set, and the service
 // lets a manual request through only on the switch.
 {
   const power = laMarzoccoWeb.slice(laMarzoccoWeb.indexOf('if (strcmp(action, "power") == 0) {'),
       laMarzoccoWeb.indexOf('const bool relist ='));
-  const order = ['requireAdminUnlock(request)', 'if (!powerControl)',
+  const order = ['if (!powerControl)',
     '"MACHINE_POWER_DISABLED"', '"LA_MARZOCCO_NOT_READY"', 'controlAllowsConfiguration(gate)',
     '"MACHINE_POWER_REQUIRES_READY"', 'if (!staReady())', '"LA_MARZOCCO_STA_REQUIRED"',
     'queueMachineIntegrationRequest(integrationRequest)', '"LA_MARZOCCO_BUSY"', 'sendAccepted('];
   const at = order.map((needle) => power.indexOf(needle));
   if (at.some((i) => i < 0) || at.some((i, n) => n && i < at[n - 1]) ||
-      !power.includes('STATUS_FORBIDDEN') || !power.includes('static RefusalLog refusals;') ||
+      power.includes('requireAdminUnlock') || !power.includes('STATUS_FORBIDDEN') || !power.includes('static RefusalLog refusals;') ||
       !laMarzoccoWeb.includes('powerControl = self.settings_.runtime.machinePowerControlEnabled;') ||
       !laMarzoccoWeb.includes('(strcmp(action, "power") == 0 || !jsonFieldPresent(root, "on"))') ||
       !laMarzoccoWeb.includes('cJSON_GetArraySize(root) != 2 || !jsonBoolean(root, "on", powerOn)') ||
@@ -1062,6 +1061,6 @@ if (!codeIncludes(viewJs.home, 'if(!document.hidden&&R.activeView===home)renderL
       !machineIntegration.includes('bool queueMachineIntegrationRequest(LaMarzoccoRequest request) {\n' +
           '  request.origin = LaMarzoccoRequestOrigin::MANUAL;\n  return service.queue(request);') ||
       (machineIntegration.match(/LaMarzoccoRequestOrigin::MANUAL/g) || []).length !== 1) {
-    throw new Error('Manual machine power must pass the Admin unlock, Machine control, account, idle and busy gates in order, and the service must gate manual requests on Machine control alone while scale requests keep their options');
+    throw new Error('Manual machine power must pass Machine control (with no Admin unlock), then the account, idle and busy gates in order, and the service must gate manual requests on Machine control alone while scale requests keep their options');
   }
 }

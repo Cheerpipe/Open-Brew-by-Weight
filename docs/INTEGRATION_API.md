@@ -1660,10 +1660,10 @@ return `202`.
 `power` turns the selected machine on (`{"action":"power","on":true}`, the
 app's BrewingMode) or into standby (`"on":false`) through the cloud. It takes
 exactly `action` and the boolean `on` (`422 LA_MARZOCCO_POWER_FIELDS_REQUIRED`
-otherwise, and `on` is refused with any other action) and is checked in this
-order: the caller's Admin unlock (`401 ADMIN_LOCKED`), **Admin → Machine
-control** (`403 MACHINE_POWER_DISABLED` while `machinePowerControlEnabled` is
-off, the default), a selected machine (`409 LA_MARZOCCO_NOT_READY`), and an
+otherwise, and `on` is refused with any other action). It needs no Admin
+unlock: the switch is the owner's consent. It is checked in this order:
+**Admin → Machine control** (`403 MACHINE_POWER_DISABLED` while
+`machinePowerControlEnabled` is off, the default), a selected machine (`409 LA_MARZOCCO_NOT_READY`), and an
 idle controller (`409 MACHINE_POWER_REQUIRES_READY` during a shot, rinse,
 backflush or any other active cycle, whatever the unsafe Web UI override
 says), and a station connection with the setup AP closed (`409
