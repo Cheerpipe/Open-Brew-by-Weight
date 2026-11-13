@@ -46,9 +46,9 @@ starts from that point instead of guessing. A new estimate from the machine
 slows the ring down; it never jumps back.
 
 The button is dimmed during a shot, a rinse, a backflush or any other active
-cycle, while La Marzocco refuses the account or the machine's state is
-unknown, and while Admin is locked. Turning the machine on or off always
-needs an unlocked Admin, so a visitor who can only see Home cannot do it.
+cycle, and while La Marzocco refuses the account or the machine's state is
+unknown. You don't need to unlock Admin to use it: once you allow machine
+control, anyone who can open the Web UI can turn the machine on and off.
 
 ## What stays the same
 
@@ -70,8 +70,9 @@ needs an unlocked Admin, so a visitor who can only see Home cannot do it.
 - This switch protects this controller only. La Marzocco's own app, and
   anything else signed in to your La Marzocco account, can still switch the
   machine.
-- Anyone who can unlock Admin can turn the switch on. If anyone on your
-  network can open the Web UI, protect it with a password in
-  [Web UI access](web-access.md) before you allow machine control.
+- Anyone who can open the Web UI can use the power button, and anyone who
+  can unlock Admin can turn the switch on. If anyone on your network can open
+  the Web UI, protect it with a password in [Web UI access](web-access.md)
+  before you allow machine control.
 - Switching the machine on remotely means it heats up with nobody next to it.
   Turn this on only if you accept that responsibility.

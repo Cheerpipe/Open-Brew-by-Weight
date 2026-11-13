@@ -268,11 +268,9 @@ function renderMachinePower(s, lm, power, active, warming) {
         ? R.accountProblemLabel(lm.accountProblem)
         : power === "—"
           ? __WEBUI_TEXT__("home.power_unreachable")
-          : !R.adminUnlockedFor(s)
-            ? __WEBUI_TEXT__("home.power_unlock_admin")
-            : !R.controlsMutable
-              ? __WEBUI_TEXT__("home.power_unavailable")
-              : "",
+          : !R.controlsMutable
+            ? __WEBUI_TEXT__("home.power_unavailable")
+            : "",
     label = busy
       ? target
         ? __WEBUI_TEXT__("home.power_turning_on")
