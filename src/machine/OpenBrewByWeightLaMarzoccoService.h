@@ -324,7 +324,7 @@ class OpenBrewByWeightLaMarzoccoService {
     struct Intent { uint32_t command = 0, generation = 0; } intents[8];
     uint32_t losses[4] = {};
     uint32_t routeIntent = 0, epoch = 0, requestedAtMs = 0, pingAtMs = 0;
-    uint32_t upAtMs = 0, downSinceMs = 0, tokenRenewAtMs = 0, flapUntilMs = 0;
+    uint32_t downSinceMs = 0, tokenRenewAtMs = 0, flapUntilMs = 0;
     uint32_t lastCommand = 0, resultId = 0;
     uint16_t resultHttp = 0;
     uint8_t nextIntent = 0, nextLoss = 0, lossCount = 0;

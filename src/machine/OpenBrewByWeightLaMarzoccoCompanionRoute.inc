@@ -4,7 +4,7 @@
 // serviceCompanion() and companionCommand(). With no link serviceCompanion()
 // returns at once, so every direct path runs exactly as without a companion.
 namespace {
-constexpr uint32_t kCompanionAliveMs = 30000;  // Ping missing or `up` false.
+using la_marzocco_timing::kCompanionAliveMs;
 constexpr uint32_t kCompanionPendingMs = 30000;  // Full frame after `route`.
 constexpr uint32_t kCompanionCommandMs = 10000;  // `res` after `cmd`.
 constexpr uint32_t kCompanionFlapWindowMs = 600000;
@@ -313,8 +313,7 @@ void OpenBrewByWeightLaMarzoccoService::companionPing(bool upstreamAlive) {
   auto &feed = companion_;
   const uint32_t now = millis();
   feed.pingAtMs = now;
-  if (upstreamAlive) feed.upAtMs = now;
-  else if (feed.up) feed.downSinceMs = now;
+  if (!upstreamAlive && feed.up) feed.downSinceMs = now;
   feed.up = upstreamAlive;
 }
 
