@@ -267,6 +267,7 @@
   border: 1px solid var(--ln);
   border-radius: var(--r);
   padding: calc(1rem + 10px) 1rem 1rem;
+
   /* Shot cards are tall; the page's section gap keeps each one apart. */
   margin: 0 0 1.5rem;
 }
@@ -527,6 +528,7 @@
 
 .shotCard :is(.shotDur, .shotActual) > strong {
   grid-column: 1/-1;
+
   /* The shot rows' DUR and YIELD labels. */
   font-size: 0.6875rem;
   font-weight: 700;
@@ -540,6 +542,7 @@
 .shotCard :is(.shotDur, .shotActual) > div {
   grid-column: 2;
   grid-row: 2;
+
   /* The shot rows' value: 1.15em of their 1.85rem cell. */
   font-size: 2.1275rem;
 }
@@ -745,7 +748,7 @@
 .histTally svg {
   width: 1rem;
   height: 1rem;
-  fill: currentColor;
+  fill: currentcolor;
 }
 
 #historyTable td.histTime {

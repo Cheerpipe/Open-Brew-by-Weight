@@ -69,6 +69,7 @@
   --z: var(--mu);
   --zl: var(--mu);
   --zs: color-mix(in srgb, var(--zl) 55%, var(--sf));
+  --bc: var(--zs);
 }
 
 #statsConsistency[data-level="good"] {
@@ -148,10 +149,6 @@
 }
 
 /* Each bar's colour: --bc from its class, the level's tones in Consistency. */
-#statsConsistency {
-  --bc: var(--zs);
-}
-
 #statsConsistency .out {
   --bc: var(--zl);
 }
