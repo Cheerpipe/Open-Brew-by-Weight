@@ -163,6 +163,16 @@ above the target, so a channeling shot is not run longer. The last shot card
 shows **CHANNELING**, and the shot does not count toward the recent-shot
 statistics, grind hints or the scale-loss backup.
 
+The scale only sees how fast coffee reaches the cup, so this check catches a
+channel that opens during the shot and makes the flow jump. A channel that
+forms as the puck first wets is often the more common kind, and it looks just
+like a coarse grind or a light dose: the whole shot simply runs fast. The
+controller then treats it as a fast shot, and
+[Extend fast shots](#fast-shots) can still raise its cut line. If your shots
+run fast and taste thin, sour and bitter at once, check your puck preparation
+(even distribution, a level tamp, the right dose for your basket) before
+grinding finer.
+
 ## Grind hints
 
 With **Grind hints** on (Recipe group, on by default), the controller looks at

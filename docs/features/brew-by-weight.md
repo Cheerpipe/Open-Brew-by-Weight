@@ -256,7 +256,9 @@ configuration with no recipe change still being saved.
   preset's starting point. It also starts a **quick start**: if your next three
   learning shots agree within 0.4 g, the drip moves straight to the middle one
   instead of taking the usual small step; if they don't, learning simply
-  carries on. The chart colors the shots the quick start counts and marks
+  carries on. Only shots stopped at the target count: while the quick start
+  runs, a shot whose cut line was raised or lowered does not train the drip.
+  The chart colors the shots the quick start counts and marks
   where it began and where it decided. New presets, restored factory presets and a fresh install start the
   same way; presets kept from an earlier firmware keep their drip untouched.
 - **Quick start**, in the row under the chart, starts a quick start without

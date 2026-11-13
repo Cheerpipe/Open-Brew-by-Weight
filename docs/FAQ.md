@@ -29,7 +29,7 @@ last shot card) before changing calibration.
 | --- | --- |
 | Above target, **Fast** / **EXTENDED** | [Extend fast shots](features/fast-and-slow-shots.md#fast-shots) raised the cut line, up to the preset's extra yield. |
 | Below target, **Slow** / **STOPPED EARLY** | [Shorten slow shots](features/fast-and-slow-shots.md#slow-shots) lowered the cut line, down to the preset's reduced yield. |
-| **CHANNELING** | A flow surge kept the cut line at the target. |
+| **CHANNELING** | A sudden flow surge during the shot kept the cut line at the target. A channel present from the first drops shows up as a fast shot instead; see [Channeling](features/fast-and-slow-shots.md#channeling). |
 | **MAX TIME**, around 50 s on factory Double | Max shot time, well after the 36 s window end. |
 | After scale loss (**NO SCALE**) | The [scale-loss backup](features/auto-to-manual.md) time is measured from shot start, not disconnect. |
 | Ordinary stop followed by extra dripping | Learned offset and drip delay; see [BBW](features/brew-by-weight.md). |

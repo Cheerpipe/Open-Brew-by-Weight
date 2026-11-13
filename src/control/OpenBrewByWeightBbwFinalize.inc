@@ -80,6 +80,15 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
                 "Offset learn skipped: drip learning restarted during the shot");
     return false;
   }
+  // A quick start has no outlier gate yet: only a cut at the target trains
+  // while it runs, never one on the raised or lowered segment.
+  const QuickStartEntry *quick = quickStartEntry(bbwQuickStart, presetBank, preset->id, false);
+  if (quick != nullptr && quick->state == static_cast<uint8_t>(QuickStartState::ARMED) &&
+      snapshot.endReason != EndReason::SCALE_THRESHOLD) {
+    serialTrace(LogLevel::INFO,
+                "Offset learn skipped: quick start counts only shots stopped at the target");
+    return false;
+  }
   // Physics gate (design review 2026-10-29): flow that kept running or a
   // scale event is never drip. It also clears a pending outlier: a step is
   // confirmed by statistics on physically possible observations only.

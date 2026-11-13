@@ -21551,7 +21551,7 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
   // A1: after five shots at 1.00 g, Quick start drops their evidence too, so
   // 0.30, 0.32 and 0.30 all count: no outlier hold, no step, the third
   // applies 0.30 g.
-  const auto pull = [&](float needed) {
+  const auto pull = [&](float needed, EndReason reason = EndReason::SCALE_THRESHOLD) {
     preparePendingBbwForTest();
     pendingFinalize.offsetAnalysis = pendingFinalize.logEligible = true;
     pendingFinalize.startedWithScale = pendingFinalize.automaticBrew = true;
@@ -21560,7 +21560,7 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
         getScaleLinkSnapshot().connectionGeneration;
     pendingFinalize.weightOffsetG = preset.bbwEwmaOffsetG;
     pendingFinalize.goalWeightDg = 360;
-    pendingFinalize.endReason = EndReason::SCALE_THRESHOLD;
+    pendingFinalize.endReason = reason;
     pendingFinalize.endedAtMs = hostMillis;
     currentWeight = 36.0f - preset.bbwEwmaOffsetG + needed;
     currentWeightConnectionGeneration = pendingFinalize.scaleConnectionGeneration;
@@ -21574,6 +21574,11 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
   CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f);
   processWebCommand(quick);
   debugLog.clear();
+  // Raised and lowered cuts neither count nor train while it runs.
+  CHECK(!pull(0.90f, EndReason::FAST_EXTRACTION_MAX_WEIGHT));
+  CHECK(!pull(0.10f, EndReason::SLOW_EXTRACTION_MIN_WEIGHT));
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f && armed->count == 0);
+  CHECK(debugLogTextCount("quick start counts only shots stopped at the target") == 2);
   for (const float needed : {0.30f, 0.32f, 0.30f}) CHECK(pull(needed));
   CHECK(fabsf(preset.bbwEwmaOffsetG - 0.30f) < 0.005f);
   CHECK(state() == static_cast<uint8_t>(QuickStartState::APPLIED));
