@@ -290,6 +290,8 @@ function renderMachinePower(s, lm, power, active, warming) {
   b.dataset.turn = target ? "on" : "off";
   b.disabled = busy || !!powerPending || !!reason;
   b.classList.toggle("armed", armed && !b.disabled);
+  // A completed hold or second press keeps the ring closed until it settles.
+  b.classList.toggle("acting", busy || !!powerPending);
   b.setAttribute("aria-busy", busy);
   b.setAttribute("aria-label", label);
   b.title = label;

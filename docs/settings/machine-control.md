@@ -26,7 +26,8 @@ Settings, because the button needs to know whether the machine is on.
 Press and hold the button for about a second. A ring fills around it as you
 hold: yellow when you are turning the machine on, red when you are turning it
 off. Let go before the ring closes and nothing happens, so a quick tap or a
-brush of the screen never switches the machine. With a keyboard, press Enter
+brush of the screen never switches the machine. Once the ring closes, it stays
+closed until the machine answers. With a keyboard, press Enter
 or Space once to arm the button and again within three seconds to act.
 
 The button's colour tells you where the machine is:
