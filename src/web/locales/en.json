@@ -1830,7 +1830,7 @@
     "runtime.stats_legend_slow_window": "Slow: after the window",
     "runtime.stats_preset_filter": "Shots shown",
     "runtime.stats_reset_confirm": "Shot statistics only count shots with this window and target, so they start over.",
-    "runtime.stats_title_consistency": "Consistency",
+    "runtime.stats_title_consistency": "Shot consistency",
     "runtime.stats_title_cut": "Cut accuracy",
     "runtime.stats_title_time": "Shot time",
     "runtime.stats_window_hint": "Averages and charts from your last {0} shots.",

@@ -30,7 +30,7 @@ as a preset's arrival line and grind hint, always come from the controller's
 own shots, with or without the companion.
 
 Stats has three charts, each under its own title: **Shot time**,
-**Consistency** and **Cut accuracy**, with a legend under each one explaining
+**Shot consistency** and **Cut accuracy**, with a legend under each one explaining
 its colors and marks. One **Preset** row above them chooses whose shots they
 show: **All**, or one preset by name, and every chart follows it. Until you
 pick one, it follows the active preset, even when you switch presets, or
@@ -54,7 +54,7 @@ against its own window instead: the axis shows **Window start** and
 **Window end**, and how many seconds before or after the window a shot reached
 its target. The chart appears once a shot has a measured arrival time.
 
-Below it, the **Consistency** chart answers a different question: not whether your
+Below it, the **Shot consistency** chart answers a different question: not whether your
 shots landed on recipe, but how alike they are. It measures time, not weight:
 every shot already stops at its target weight, so what changes from shot to
 shot is how long it took to get there. A barista whose shots all run a little
@@ -120,7 +120,7 @@ chart sum up the rest: **Bullseyes**, how many of those shots landed exactly
 on the target; **Within ±0.2 g**, the share that landed that close; **Avg
 miss**, how far a cup typically settled from the target either way; and
 which way the stops lean, **Centred**, **Leans over** or **Leans under**. Use
-the cursor as on the Consistency chart to read each shot's settled weight.
+the cursor as on the Shot consistency chart to read each shot's settled weight.
 
 Stopwatch and gram-weight icons sit beside the large duration and yield values
 in each shot card and beside Avg time and Avg yield in the Stats summary.
