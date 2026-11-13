@@ -11,6 +11,7 @@ const REVERT_BUTTONS = {
   saveBleButton: "revertBleButton",
   savePowerButton: "revertPowerButton",
   saveFrontendButton: "revertFrontendButton",
+  saveMachineControlButton: "revertMachineControlButton",
   saveCompanionButton: "revertCompanionButton",
 };
 function setSaveDirty(id, hintId, dirty) {
@@ -1173,13 +1174,17 @@ function applyAdminStatus(s) {
     );
   // The switches take their saved values before the baselines are taken, so
   // flipping one and back before the next poll reads as clean.
-  for (const id of POWER_KEYS.concat("showDiagnosticPage")) {
+  for (const id of POWER_KEYS.concat("showDiagnosticPage", "machinePowerControlEnabled")) {
     const el = $(id),
       v = s.config && s.config[id];
     if (
       el &&
       typeof v === "boolean" &&
-      !(id === "showDiagnosticPage" ? R.uiState.frontendDirty : R.uiState.powerDirty)
+      !R.uiState[
+        { showDiagnosticPage: "frontendDirty", machinePowerControlEnabled: "machineControlDirty" }[
+          id
+        ] || "powerDirty"
+      ]
     )
       el.checked = v;
   }
@@ -1195,6 +1200,10 @@ function applyAdminStatus(s) {
   if (!R.uiState.frontendDirty)
     R.uiState.frontendBaseline = R.snapshotControls(
       document.querySelectorAll("#frontendPanel input,#frontendPanel select"),
+    );
+  if (!R.uiState.machineControlDirty)
+    R.uiState.machineControlBaseline = R.snapshotControls(
+      document.querySelectorAll("#machineControlPanel input"),
     );
   $("restartButton").disabled = !R.controlsMutable;
   applyOtaStatus(s.ota);
@@ -1792,10 +1801,12 @@ const WEBHOOK_IDS = [
 export function applyStatus(s) {
   applyAdminStatus(s);
   const compat = !!s.compatibilityMode;
-  ["blePanel", "dateTimePanel", "webhookPanel", "companionPanel"].forEach((id) => {
-    const el = $(id);
-    if (el) el.classList.toggle("hidden", compat);
-  });
+  ["blePanel", "dateTimePanel", "webhookPanel", "companionPanel", "machineControlPanel"].forEach(
+    (id) => {
+      const el = $(id);
+      if (el) el.classList.toggle("hidden", compat);
+    },
+  );
   const diagToggle = $("showDiagnosticPage");
   if (diagToggle && diagToggle.closest("label"))
     diagToggle.closest("label").classList.toggle("hidden", compat);
@@ -1991,6 +2002,26 @@ async function saveFrontendSettings() {
   }
   return ok;
 }
+// Admin → Machine control: the firmware refuses every manual power command
+// while the switch is off, so the explicit Save is the only way to arm it.
+async function saveMachineControlSettings() {
+  if (!R.uiState.machineControlDirty) return;
+  const b = $("saveMachineControlButton");
+  b.classList.add("busy");
+  try {
+    await saveDurableConfigKey(
+      "machinePowerControlEnabled",
+      __WEBUI_TEXT__("admin.machine_power_control_setting"),
+    );
+    sectionDirty("machineControl", false);
+    return true;
+  } catch (e) {
+    R.message(e.message, "error");
+    return false;
+  } finally {
+    b.classList.remove("busy");
+  }
+}
 // Scheduled restart: two 24-hour fields stored as one minute of the day.
 const restartMinute = () =>
   Number($("scheduledRestartHour").value) * 60 + Number($("scheduledRestartMinute").value);
@@ -2087,6 +2118,7 @@ const ADMIN_SUMMARIES = {
       .join(" · ") || __WEBUI_TEXT__("runtime.off_2"),
   clock: () => ($("timezoneId").value || R.uiState.savedTimezoneId || "").replaceAll("_", " "),
   frontend: () => onOff("showDiagnosticPage") + " · " + ($("heroCardMode")?.value ?? ""),
+  machine: () => onOff("machinePowerControlEnabled"),
   schedule: () =>
     $("scheduledRestartEnabled").checked
       ? restartTime(restartMinute())
@@ -2157,7 +2189,7 @@ export function init() {
       el.addEventListener("change", mark);
     });
   };
-  for (const name of ["ble", "power", "frontend", "scheduledRestart"])
+  for (const name of ["ble", "power", "frontend", "machineControl", "scheduledRestart"])
     sectionChanged("#" + name + "Panel", () => sectionDirty(name, true));
   // Two-digit hours and minutes once a value settles (stepper keys or blur).
   for (const id of ["scheduledRestartHour", "scheduledRestartMinute"])
@@ -2173,6 +2205,10 @@ export function init() {
   $("revertPowerButton").onclick = () => revertSection("power");
   $("saveFrontendButton").onclick = saveFrontendSettings;
   $("revertFrontendButton").onclick = () => revertSection("frontend");
+  if (__LA_MARZOCCO__) {
+    $("saveMachineControlButton").onclick = saveMachineControlSettings;
+    $("revertMachineControlButton").onclick = () => revertSection("machineControl");
+  }
   initCompanion();
   const firmwareModeChanged = () => {
     firmwareModeDirty = true;

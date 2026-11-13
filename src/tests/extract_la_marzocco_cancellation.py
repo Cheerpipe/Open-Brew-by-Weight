@@ -20,10 +20,10 @@ def definition(name, text=text, source=source):
     return f'#line {line} "{source.as_posix()}"\n' + text[match.start():end]
 
 
-names = ["secureWipe", "secureCopy", "powerOptionBit", "sameSessionIdentity",
+names = ["secureWipe", "secureCopy", "powerAllowed", "sameSessionIdentity",
          "sameCommandRequest", "laMarzoccoCloudCallResult"]
 names += ["OpenBrewByWeightLaMarzoccoService::" + name for name in
-          ["WorkBuffer", "publishConfig", "publishNetworkState", "queue",
+          ["WorkBuffer", "publishConfig", "publishManualPower", "publishNetworkState", "queue",
            "queueLocked", "muxWaitAnomalyDue", "reportMuxWaitAnomaly",
            "networkEligible",
            "taskLoop", "clearSession", "discardAccessToken", "deferObservation",
@@ -36,7 +36,7 @@ output.mkdir(parents=True, exist_ok=True)
     "namespace openbrewbyweight {\nconstexpr size_t kTokenCapacity = 2048;\n"
     + definition("OpenBrewByWeightLaMarzoccoService::WorkBuffer") + "\n}\n")
 (output / "la_marzocco_websocket_status.inc").write_text(
-    definition("powerOptionBit") + "\n" + definition("secureCopy") + "\n" +
+    definition("powerAllowed") + "\n" + definition("secureCopy") + "\n" +
     "\n".join(definition("OpenBrewByWeightLaMarzoccoService::" + name) for name in
               ("currentStatus", "statusLocked", "liveSubscriptionLocked", "statusPoll", "statusPollStale",
                "mergeReadLocked",

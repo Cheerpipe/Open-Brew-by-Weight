@@ -61,6 +61,8 @@ void publishMachineIntegrationConfig(const PersistedSettings &settings,
   service.publishConfig(settings.laMarzocco, configGeneration);
 }
 
+void publishMachineIntegrationManualPower(bool enabled) { service.publishManualPower(enabled); }
+
 void publishMachineIntegrationNetworkState(bool staConnected, bool apActive,
                                            bool shotActive,
                                            bool scaleConnecting) {
@@ -186,7 +188,10 @@ bool queueMachineIntegrationRelist(uint32_t requestId) {
   return service.queueRelist(requestId);
 }
 
-bool queueMachineIntegrationRequest(const LaMarzoccoRequest &request) {
+// The Web API's only request entry: a power command through it is manual
+// whatever its caller set, so no scale option can ever authorize it.
+bool queueMachineIntegrationRequest(LaMarzoccoRequest request) {
+  request.origin = LaMarzoccoRequestOrigin::MANUAL;
   return service.queue(request);
 }
 

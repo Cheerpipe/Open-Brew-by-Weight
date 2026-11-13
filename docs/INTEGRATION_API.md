@@ -114,7 +114,7 @@ Every error body carries a third field between `error` and `message`:
   the body ever adopts `{error, reason, message}` is a separate
   companion-protocol decision.
 
-The 328 codes, grouped by the routes that answer with them.
+The 331 codes, grouped by the routes that answer with them.
 
 #### Validation rule templates (parameterized)
 
@@ -246,6 +246,7 @@ params substituted in order (see the example above).
 | ``LA_MARZOCCO_CHANGE_PENDING`` | Another La Marzocco change is still being saved. |
 | ``LA_MARZOCCO_CONNECT_FIELDS_ONLY`` | connect requires only username and password. |
 | ``LA_MARZOCCO_NOT_READY`` | Connect an account and select a machine first. |
+| ``LA_MARZOCCO_POWER_FIELDS_REQUIRED`` | power requires only the boolean on. |
 | ``LA_MARZOCCO_READONLY_ACTIONS`` | disconnect, refresh, relist, and acceptPolicy do not accept setting fields. |
 | ``LA_MARZOCCO_REQUIRES_READY`` | La Marzocco settings can be changed only while Ready. |
 | ``LA_MARZOCCO_SAVE_BUSY`` | Control is busy; La Marzocco settings were not saved. |
@@ -253,6 +254,8 @@ params substituted in order (see the example above).
 | ``LA_MARZOCCO_SELECT_FIELDS_REQUIRED`` | select requires serial and all machine options. |
 | ``LA_MARZOCCO_SELECT_MACHINE_UNKNOWN`` | Select a machine returned by the latest account connection. |
 | ``LA_MARZOCCO_STA_REQUIRED`` | Connect to Wi-Fi station mode and close setup AP first. |
+| ``MACHINE_POWER_DISABLED`` | Turning the machine on and off is disabled in Admin → Machine control. |
+| ``MACHINE_POWER_REQUIRES_READY`` | The machine can be turned on or off only when no shot or cycle is running. |
 | ``NETWORK_SETTINGS_CHANGED_RETRY`` | Network settings changed; refresh and retry. |
 | ``NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE`` | Network settings are locked while a cycle is active. |
 | ``NETWORK_SSID_PASSWORD_INVALID`` | Invalid network SSID or password. |
@@ -1240,6 +1243,15 @@ boiler's `readyAtUtcSec` estimate. `readyAtUtcSec` is an absolute UTC second
 timestamp (0 when the machine gave no estimate), and the browser derives the
 ticking countdown locally, so a stable estimate emits no frames. Readiness is
 never evidence for control; power stays ON/OFF-only.
+`laMarzocco.warmingSinceUtcSec` is the UTC second this controller first saw the
+current warm-up (`warming_up` or `waiting_for_steam` with the machine on; a
+controller that starts mid-warm-up uses its first observation), kept through
+new estimates and cleared to 0 once the machine is ready, off, or of unknown
+power: it changes once per warm-up, and the browser fills Home's warm-up ring
+from it and the later `readyAtUtcSec` on its own clock. `machineControl.power`
+is `true` while **Admin → Machine control → Allow turning the machine on and
+off** is on (Micra firmware only); it decides whether Home offers the power
+button and authorizes nothing by itself.
 
 Every build streams `companion.requestName` and `companion.requestAddress`
 while a companion asks to pair (empty strings otherwise), and
@@ -1624,7 +1636,7 @@ CSV order after browsing by rating without repeated store captures per frame.
 
 Micra-compiled firmware exposes `POST /api/v1/machine/la-marzocco` to the
 claimed Web UI. It accepts one strict `action`: `connect`, `select`, `save`,
-`refresh`, `relist`, `acceptPolicy`, or `disconnect`. `connect` requires only `username` and `password`
+`refresh`, `relist`, `acceptPolicy`, `disconnect`, or `power`. `connect` requires only `username` and `password`
 and is rejected unless STA is connected and the setup AP is closed. It queues
 cloud authentication and account-machine discovery but does not persist or
 enable an account. `select` requires a `serial` from the latest discovery plus
@@ -1644,6 +1656,32 @@ persisted settings, so a following `select` can switch machines;
 disconnect erases durable credentials/selection and the RAM session. Unknown,
 duplicate, or action-inappropriate fields are rejected. Accepted commands
 return `202`.
+
+`power` turns the selected machine on (`{"action":"power","on":true}`, the
+app's BrewingMode) or into standby (`"on":false`) through the cloud. It takes
+exactly `action` and the boolean `on` (`422 LA_MARZOCCO_POWER_FIELDS_REQUIRED`
+otherwise, and `on` is refused with any other action) and is checked in this
+order: the caller's Admin unlock (`401 ADMIN_LOCKED`), **Admin → Machine
+control** (`403 MACHINE_POWER_DISABLED` while `machinePowerControlEnabled` is
+off, the default), a selected machine (`409 LA_MARZOCCO_NOT_READY`), and an
+idle controller (`409 MACHINE_POWER_REQUIRES_READY` during a shot, rinse,
+backflush or any other active cycle, whatever the unsafe Web UI override
+says), and a station connection with the setup AP closed (`409
+LA_MARZOCCO_STA_REQUIRED`, so a command never waits offline to run later).
+The cloud worker then accepts the command unless another power
+command is still pending or a shot started meanwhile (`503 LA_MARZOCCO_BUSY`);
+`202` means queued, not done, and the Home stream's optimistic overlay and
+power state report the outcome. The worker checks the same switch on its own,
+so a manual command never runs while it is off, and switching it off drops a
+manual command still pending. The worker's only Web API entry marks every
+request it queues as manual, so no network request can borrow the scale
+options. The scale automations (`powerOnWithScale`,
+`shutdownWithScale`) are separate: they keep their own options and never
+depend on this switch. Every accepted request, and refusals at most once per
+10 seconds with their count, leave a line in the Web UI log.
+`machinePowerControlEnabled` is an Admin setting of `POST /api/v1/config`:
+changing it needs the Admin unlock like the other Admin-only fields, and
+`GET /api/v1/status/admin` returns it under `config` once unlocked.
 
 The Web UI streams carry a `laMarzocco` subtree only in Micra firmware. The
 Home frame reports whether an account is configured, `observeState`,

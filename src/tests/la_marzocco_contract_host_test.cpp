@@ -313,7 +313,32 @@ int main() {
   assert(laMarzoccoReadiness(resolve(lamp)) == LaMarzoccoReadiness::READY);
   lamp.powerState = LaMarzoccoPowerState::UNKNOWN;
   assert(laMarzoccoReadiness(resolve(lamp)) == LaMarzoccoReadiness::UNKNOWN);
-  static_assert(sizeof(LaMarzoccoStatus) == 76, "assumedPower must fill the alignment gap");
+  static_assert(sizeof(LaMarzoccoStatus) == 80, "assumedPower must fill the alignment gap");
+  // The warm-up start for Home's ring: set on entry, kept while warming and
+  // through re-estimates or a brief evidence gap, cleared on ready and off.
+  LaMarzoccoStatus warm;
+  warm.powerState = LaMarzoccoPowerState::ON;
+  warm.quality = LaMarzoccoObservationQuality::CURRENT;
+  warm.coffeeBoiler = warm.steamBoiler = LaMarzoccoBoilerState::HEATING_UP;
+  warm.coffeeReadyAtUtcSec = 1700000600;
+  assert(laMarzoccoWarmingSince(0, resolve(warm), 0) == 0);  // Clock not set yet.
+  uint32_t since = laMarzoccoWarmingSince(0, resolve(warm), 1700000000);
+  assert(since == 1700000000);
+  warm.coffeeReadyAtUtcSec = 1700000900;  // The cloud re-estimates.
+  assert(laMarzoccoWarmingSince(since, resolve(warm), 1700000100) == since);
+  warm.coffeeBoiler = LaMarzoccoBoilerState::READY;  // Waiting for steam.
+  assert(laMarzoccoWarmingSince(since, resolve(warm), 1700000200) == since);
+  warm.coffeeBoiler = warm.steamBoiler = LaMarzoccoBoilerState::UNKNOWN;
+  assert(laMarzoccoWarmingSince(since, resolve(warm), 1700000250) == since);
+  warm.coffeeBoiler = warm.steamBoiler = LaMarzoccoBoilerState::READY;
+  assert(laMarzoccoWarmingSince(since, resolve(warm), 1700000300) == 0);
+  warm.coffeeBoiler = warm.steamBoiler = LaMarzoccoBoilerState::HEATING_UP;
+  warm.powerState = LaMarzoccoPowerState::OFF;  // Standby ends it too.
+  assert(laMarzoccoWarmingSince(since, resolve(warm), 1700000300) == 0);
+  warm.powerState = LaMarzoccoPowerState::UNKNOWN;
+  assert(laMarzoccoWarmingSince(since, resolve(warm), 1700000300) == 0);
+  warm.powerState = LaMarzoccoPowerState::ON;  // A new warm-up starts anew.
+  assert(laMarzoccoWarmingSince(0, resolve(warm), 1700000400) == 1700000400);
   // A preset's brew target is settable only inside the range a cloud session
   // read from the machine; with no range nothing is.
   LaMarzoccoStatus ranged;

@@ -837,7 +837,7 @@ if (!laMarzoccoScaleShutdown.includes('LA_MARZOCCO_SCALE_EXPLICIT_DISCONNECT = 9
     !laMarzoccoService.includes('bool OpenBrewByWeightLaMarzoccoService::executePowerApplication(') ||
     !laMarzoccoService.includes('void OpenBrewByWeightLaMarzoccoService::deferPower(') ||
     !laMarzoccoService.includes('deferPower(request, LaMarzoccoError::CANCELED, 0, false)') ||
-    !laMarzoccoService.includes('uint8_t powerOptionBit(LaMarzoccoRequestType type)') ||
+    !laMarzoccoService.includes('bool powerAllowed(const LaMarzoccoRequest &request, uint8_t options, bool manual)') ||
     !laMarzoccoService.includes('? LA_MARZOCCO_POWER_ON_WITH_SCALE') ||
     !machineIntegration.includes('void serviceMachineIntegrationScaleLink(') ||
     !machineIntegration.includes('LaMarzoccoScaleShutdownTracker') ||
@@ -914,4 +914,154 @@ if (!laMarzoccoMachinePower.includes('LA_MARZOCCO_SCALE_OFF_WITH_MACHINE') ||
 if (!codeIncludes(viewJs.home, 'if(!document.hidden&&R.activeView===home)renderLaMarzoccoBoilers()') ||
     !codeIncludes(viewJs.diagnostic, 'if(!document.hidden&&R.activeView===diagnostic)renderDiagClock()')) {
   throw new Error('Hidden Home and Diagnostic views must not keep painting their clocks');
+}
+
+// Admin → Machine control's Home power button (mockup 04G): absent without
+// the capability, the account or observation; one tone per machine state;
+// locked with a reason during a shot or an account problem; a hold (or two
+// key presses) sends one `power` action; and a warm-up ring that fills on the
+// device clock, never runs backwards, and hides without data.
+{
+  const assert = require('assert').strict, vm = require('vm');
+  const classes = () => {
+    const set = new Set();
+    return {set, add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c),
+      toggle: (c, on = !set.has(c)) => (on ? set.add(c) : set.delete(c), on)};
+  };
+  const el = () => ({textContent: '', hidden: false, disabled: false, title: '', dataset: {}, style: {},
+    attrs: {}, listeners: {}, classList: classes(), setAttribute(k, v) { this.attrs[k] = String(v); },
+    addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }});
+  const button = el(), warm = el(), slots = {};
+  let now = 1000, admin = true, last = null;
+  const sent = [];
+  const context = {R: {applyHomeStatus() {}, formatLaMarzoccoCleaning: () => '', deviceUtcSec: () => now,
+      homeStatusCache: () => last, shotRecorded: () => null, uiState: {companionHere: null},
+      companionPairable: () => false, companionHere: () => Promise.resolve(null),
+      accountProblemLabel: (problem) => 'account:' + problem, adminUnlockedFor: () => admin,
+      controlsMutable: true, activeView: 'home',
+      command: async (path, body) => (sent.push([path, {...body}]), true),
+      $: (id) => ({machinePower: button, machinePowerWarm: warm}[id] ||
+        (/^(machineRow|machineRowState|machineId|machineIdState|machineIdDetail|state|homeLaMarzocco\w+|scaleWeight|preferredScale|cupWeight)$|Row(Value|Hint)$/.test(id)
+          ? (slots[id] ||= el()) : null))},
+    document: {querySelector: () => null, hidden: false}, __LA_MARZOCCO__: true, __REMOTE_CONTROL__: false,
+    setInterval: () => 0, setTimeout: (fn, ms) => timers.push({fn, ms}),
+    clearTimeout: (id) => { if (timers[id - 1]) timers[id - 1].fn = null; },
+    Date: {now: () => now * 1000}};
+  const timers = [];
+  vm.runInNewContext(viewJs.home.replace(/import\s*\*\s*as\s+R\s+from\s*['"][^'"]+['"];?/, '')
+      .replace(/export /g, ''), context);
+  context.initMachinePower();
+  const apply = (s) => { last = s; context.applyStatus(s); };
+  const frame = (laMarzocco, extra = {}) => ({machineIntegration: 'la_marzocco_cloud', state: 'READY',
+    configMutable: true, machineControl: {power: true}, ...extra,
+    laMarzocco: {accountConfigured: true, observeState: true, quality: 'current', ...laMarzocco}});
+  const off = {powerState: 'OFF', readiness: 'off'};
+  // Visibility (D4): the Admin switch, an account and observed power.
+  apply(frame(off, {machineControl: {power: false}}));
+  assert.equal(button.hidden, true, 'no button while Machine control is off');
+  apply(frame({...off, observeState: false}));
+  assert.equal(button.hidden, true, 'no button without Observe machine state');
+  apply(frame({...off, accountConfigured: false}));
+  assert.equal(button.hidden, true, 'no button without an account');
+  // Tones: neutral off (turn on), yellow while heating, red once on.
+  apply(frame(off));
+  assert.deepEqual([button.hidden, button.disabled, button.dataset.tone, button.dataset.turn],
+      [false, false, 'idle', 'on']);
+  assert.match(button.title, /^Hold to turn on /);
+  assert.equal(button.attrs['aria-label'], button.title);
+  apply(frame({powerState: 'ON', readiness: 'warming_up'}));
+  assert.deepEqual([button.dataset.tone, button.dataset.turn], ['warm', 'off']);
+  apply(frame({powerState: 'ON', readiness: 'ready'}));
+  assert.deepEqual([button.dataset.tone, button.dataset.turn, button.disabled], ['stop', 'off', false]);
+  assert.match(button.title, /^Hold to turn off /);
+  // An unconfirmed command pulses and blocks the button.
+  apply(frame({powerState: 'OFF', quality: 'optimistic', optimisticOn: true, readiness: 'unknown'}));
+  assert.deepEqual([button.dataset.tone, button.disabled, button.attrs['aria-busy']], ['busy', true, 'true']);
+  assert.match(button.title, /^Turning on/);
+  // Locked, with the reason in the title and the label.
+  apply(frame({powerState: 'ON', readiness: 'ready'}, {state: 'BREW', configMutable: false}));
+  assert.equal(button.disabled, true, 'locked during a shot');
+  assert.match(button.title, /^Turn off .+ — Available once the machine is idle$/);
+  apply(frame({...off, accountProblem: 'auth'}));
+  assert.equal(button.disabled, true);
+  assert.match(button.attrs['aria-label'], /— account:auth$/);
+  admin = false;
+  apply(frame(off));
+  assert.equal(button.disabled, true, 'Admin must be unlocked to use it');
+  admin = true;
+  // Keyboard: the first press arms, the second within 3 s sends one command.
+  apply(frame(off));
+  const click = (detail) => button.listeners.click.forEach((fn) => fn({detail}));
+  click(1);
+  assert.equal(sent.length, 0, 'a pointer click alone never acts: the hold does');
+  click(0);
+  assert(button.classList.contains('armed'));
+  assert.match(button.attrs['aria-label'], /^Press again to turn on /);
+  click(0);
+  assert.deepEqual(sent, [['/api/v1/machine/la-marzocco', {action: 'power', on: true}]]);
+  assert.equal(button.disabled, true, 'blocked while the request is in flight');
+  // A hold sends after 900 ms; letting go first cancels it.
+  now += 31;
+  apply(frame(off));
+  const pointer = (type) => button.listeners[type].forEach((fn) => fn({button: 0, pointerId: 1}));
+  pointer('pointerdown');
+  assert(button.classList.contains('holding') && timers.at(-1).ms === 900);
+  pointer('pointerup');
+  assert(!button.classList.contains('holding') && timers.at(-1).fn === null && sent.length === 1);
+  pointer('pointerdown');
+  apply(frame({powerState: 'ON', readiness: 'ready'}));  // The machine changed during the hold.
+  timers.at(-1).fn();
+  assert.equal(sent.length, 1, 'a hold never sends an action the button no longer offers');
+  pointer('pointerup');
+  pointer('pointerdown');
+  timers.at(-1).fn();
+  assert.deepEqual(sent.at(-1), ['/api/v1/machine/la-marzocco', {action: 'power', on: false}]);
+  assert.equal(sent.length, 2, 'a completed hold sends the command');
+  // Warm-up ring: progress on the device clock between the firmware's start
+  // and the later boiler; hidden without data; never runs backwards.
+  const heating = (readyAt, since = 1000) => frame({powerState: 'ON', readiness: 'warming_up',
+    warmingSinceUtcSec: since, boiler: {coffee: {readyAtUtcSec: readyAt}, steam: {readyAtUtcSec: 0}}});
+  now = 1150;
+  apply(heating(1300));
+  assert(button.classList.contains('ringOn'));
+  assert.equal(Number(warm.style.strokeDashoffset), 50);
+  now = 1200;
+  apply(heating(1600));  // A later estimate slows the ring but never pulls it back.
+  assert.equal(Number(warm.style.strokeDashoffset), 50);
+  now = 1450;
+  apply(heating(1600));
+  assert.equal(Number(warm.style.strokeDashoffset), 25);
+  apply(heating(1600, 0));
+  assert(!button.classList.contains('ringOn'), 'no ring without a warm-up start');
+  apply(heating(0, 1300));
+  assert(!button.classList.contains('ringOn'), 'no ring without an estimate after the start');
+  apply(heating(1300, 1300));
+  assert(!button.classList.contains('ringOn'), 'no ring when the estimate is not after the start');
+}
+// Two independent gates (AC3): the HTTP action checks the Admin unlock first,
+// then the switch, the account, an idle controller and Wi-Fi; its only queue
+// entry marks every request MANUAL whatever the caller set, and the service
+// lets a manual request through only on the switch.
+{
+  const power = laMarzoccoWeb.slice(laMarzoccoWeb.indexOf('if (strcmp(action, "power") == 0) {'),
+      laMarzoccoWeb.indexOf('const bool relist ='));
+  const order = ['requireAdminUnlock(request)', 'if (!powerControl)',
+    '"MACHINE_POWER_DISABLED"', '"LA_MARZOCCO_NOT_READY"', 'controlAllowsConfiguration(gate)',
+    '"MACHINE_POWER_REQUIRES_READY"', 'if (!staReady())', '"LA_MARZOCCO_STA_REQUIRED"',
+    'queueMachineIntegrationRequest(integrationRequest)', '"LA_MARZOCCO_BUSY"', 'sendAccepted('];
+  const at = order.map((needle) => power.indexOf(needle));
+  if (at.some((i) => i < 0) || at.some((i, n) => n && i < at[n - 1]) ||
+      !power.includes('STATUS_FORBIDDEN') || !power.includes('static RefusalLog refusals;') ||
+      !laMarzoccoWeb.includes('powerControl = self.settings_.runtime.machinePowerControlEnabled;') ||
+      !laMarzoccoWeb.includes('(strcmp(action, "power") == 0 || !jsonFieldPresent(root, "on"))') ||
+      !laMarzoccoWeb.includes('cJSON_GetArraySize(root) != 2 || !jsonBoolean(root, "on", powerOn)') ||
+      !laMarzoccoService.includes('if (request.origin == LaMarzoccoRequestOrigin::MANUAL) return manual;') ||
+      !laMarzoccoService.includes('desiredPower_.request.origin == LaMarzoccoRequestOrigin::MANUAL') ||
+      !machineIntegration.includes('service.publishManualPower(enabled)') ||
+      !machineIntegration.includes('LaMarzoccoRequestType::SET_STANDBY;\n    service.post(request);') ||
+      !machineIntegration.includes('bool queueMachineIntegrationRequest(LaMarzoccoRequest request) {\n' +
+          '  request.origin = LaMarzoccoRequestOrigin::MANUAL;\n  return service.queue(request);') ||
+      (machineIntegration.match(/LaMarzoccoRequestOrigin::MANUAL/g) || []).length !== 1) {
+    throw new Error('Manual machine power must pass the Admin unlock, Machine control, account, idle and busy gates in order, and the service must gate manual requests on Machine control alone while scale requests keep their options');
+  }
 }

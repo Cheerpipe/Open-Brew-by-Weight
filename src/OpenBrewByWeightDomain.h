@@ -557,6 +557,10 @@ struct RuntimeConfig {
   // Internal polarity: true disables weight stop. UI/API brewByWeight is the inverse.
   bool timerOnly = false;
   bool canTareStartTimer = true;
+  // Admin → Machine control: off refuses every manual machine on/off request
+  // from any network client; scale automations keep their own options. Fills
+  // padding.
+  bool machinePowerControlEnabled = false;
   // Optional pad after the scale timer catches up to circuit whole seconds.
   uint32_t scaleTimerStopExtraDelayMs = DEFAULT_SCALE_TIMER_STOP_EXTRA_DELAY_MS;
   // Optional beep when the first coffee drop is detected.

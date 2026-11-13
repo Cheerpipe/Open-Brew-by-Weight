@@ -19,6 +19,12 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   const ControlGateSnapshot gate = self.controlGate();
   if (!self.webUiConfigurationAllowed(request, gate)) {
+    // Refused before the body is read, so a power request among them is
+    // logged here rather than by its own refusal line.
+    static RefusalLog refusals;
+    if (const uint32_t count = refusals.due())
+      lifecycleLogf("La Marzocco: refused %lu request(s) while a cycle is active",
+                    static_cast<unsigned long>(count));
     return sendError(request, STATUS_CONFLICT,
                      "CONFIG_LOCKED_DURING_ACTIVE_CYCLE",
                      nullptr, "LA_MARZOCCO_REQUIRES_READY");
@@ -33,14 +39,17 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
       "observeState", "recognizeWakeGesture", "shutdownWithScale",
       "shutdownGraceSeconds", "powerOnWithScale", "scaleOffWithMachine",
       "boostScaleDetectionWhenOn", "reduceScaleScanningWhenOff",
-      "connectionType"};
+      "connectionType", "on"};
   char action[16] = {};
   char username[LA_MARZOCCO_USERNAME_CAPACITY] = {};
   char password[LA_MARZOCCO_PASSWORD_CAPACITY] = {};
   const bool known = root != nullptr &&
       jsonHasOnlyUniqueFields(root, fields, sizeof(fields) / sizeof(fields[0]));
+  // `on` belongs to `power` alone, which takes nothing else.
   const bool actionOk = known &&
-      jsonString(root, "action", action, sizeof(action), false);
+      jsonString(root, "action", action, sizeof(action), false) &&
+      (strcmp(action, "power") == 0 || !jsonFieldPresent(root, "on"));
+  bool powerOn = false;
   ValidationFailure parseError;
   if (!actionOk) {
     parseError = validationFailure("LA_MARZOCCO_ACTION_FIELDS_INVALID");
@@ -71,9 +80,11 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
     }
   } sensitiveWiper(username, password, candidate);
   uint32_t currentRevision = 0;
+  bool powerControl = false;  // Admin → Machine control
   self.dataMux_.lock();
   candidate = self.settings_.laMarzocco;
   currentRevision = self.settings_.storageRevision;
+  powerControl = self.settings_.runtime.machinePowerControlEnabled;
   self.dataMux_.unlock();
 
   uint8_t connectionType = candidate.connectionType;
@@ -197,6 +208,10 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
         jsonFieldPresent(root, "reduceScaleScanningWhenOff")) {
       parseError = validationFailure("LA_MARZOCCO_READONLY_ACTIONS");
     }
+  } else if (parseError.reason == nullptr && strcmp(action, "power") == 0) {
+    if (cJSON_GetArraySize(root) != 2 || !jsonBoolean(root, "on", powerOn)) {
+      parseError = validationFailure("LA_MARZOCCO_POWER_FIELDS_REQUIRED");
+    }
   } else if (parseError.reason == nullptr) {
     parseError = validationFailure("LA_MARZOCCO_ACTION_UNKNOWN");
   }
@@ -216,6 +231,59 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
                      parseError.reason, parseError.params);
   }
 
+  // The cloud is reachable only from station mode with the setup AP closed.
+  const auto staReady = [&self] {
+    const NetworkStatusSnapshot network = self.snapshot();
+    return network.staState == StaState::CONNECTED && network.wifiConfigured &&
+           network.iface.staIp[0] != '\0' && !network.apActive;
+  };
+  if (strcmp(action, "power") == 0) {
+    // Manual power is gated here and, independently, in the La Marzocco
+    // service: with Machine control off no client turns the machine on or off.
+    if (!self.requireAdminUnlock(request)) return ESP_OK;
+    const char *const turn = powerOn ? "on" : "off";
+    const auto refused = [turn](const char *reason) {
+      static RefusalLog refusals;
+      if (const uint32_t count = refusals.due())
+        lifecycleLogf("Machine power: refused %lu manual request(s), the last to turn %s (%s)",
+                      static_cast<unsigned long>(count), turn, reason);
+    };
+    if (!powerControl) {
+      refused("Machine control is off");
+      return sendError(request, STATUS_FORBIDDEN, "MACHINE_POWER_DISABLED",
+                       nullptr, "MACHINE_POWER_DISABLED");
+    }
+    if (!candidate.accountConfigured) {
+      refused("no La Marzocco account");
+      return sendError(request, STATUS_CONFLICT, "LA_MARZOCCO_NOT_READY",
+                       nullptr, "LA_MARZOCCO_NOT_READY");
+    }
+    // Never around a shot or another cycle, whatever the unsafe override says.
+    if (!controlAllowsConfiguration(gate)) {
+      refused("a cycle is active");
+      return sendError(request, STATUS_CONFLICT, "MACHINE_POWER_REQUIRES_READY",
+                       nullptr, "MACHINE_POWER_REQUIRES_READY");
+    }
+    // Never queued while the cloud is out of reach: it would run whenever
+    // Wi-Fi came back, long after the person pressed the button.
+    if (!staReady()) {
+      refused("no Wi-Fi connection");
+      return sendError(request, STATUS_CONFLICT, "LA_MARZOCCO_STA_REQUIRED",
+                       nullptr, "LA_MARZOCCO_STA_REQUIRED");
+    }
+    LaMarzoccoRequest integrationRequest = {};
+    integrationRequest.requestId = self.allocateRequestId();
+    integrationRequest.type = powerOn ? LaMarzoccoRequestType::SET_POWER_ON
+                                      : LaMarzoccoRequestType::SET_STANDBY;
+    if (!queueMachineIntegrationRequest(integrationRequest)) {
+      refused("busy");
+      return sendError(request, STATUS_UNAVAILABLE, "LA_MARZOCCO_BUSY",
+                       nullptr, "LA_MARZOCCO_BUSY");
+    }
+    lifecycleLogf("Machine power: manual request to turn %s accepted", turn);
+    return self.sendAccepted(request, integrationRequest.requestId);
+  }
+
   const bool relist = strcmp(action, "relist") == 0;
   const bool acceptPolicy = strcmp(action, "acceptPolicy") == 0;
   const bool refresh = acceptPolicy || strcmp(action, "refresh") == 0;
@@ -224,11 +292,7 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
                      nullptr, "LA_MARZOCCO_NOT_READY");
   }
   if (relist || strcmp(action, "connect") == 0) {
-    const NetworkStatusSnapshot network = self.snapshot();
-    const bool staConnected = network.staState == StaState::CONNECTED &&
-                              network.wifiConfigured &&
-                              network.iface.staIp[0] != '\0';
-    if (!staConnected || network.apActive) {
+    if (!staReady()) {
       return sendError(request, STATUS_CONFLICT, "LA_MARZOCCO_STA_REQUIRED",
                        nullptr, "LA_MARZOCCO_STA_REQUIRED");
     }

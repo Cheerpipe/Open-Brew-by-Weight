@@ -6,6 +6,7 @@ void inhibitMachineIntegrationCloud() {}
 bool initializeMachineIntegration() { return true; }
 void publishMachineIntegrationConfig([[maybe_unused]] const PersistedSettings &settings,
                                      [[maybe_unused]] uint32_t configGeneration) {}
+void publishMachineIntegrationManualPower([[maybe_unused]] bool enabled) {}
 void publishMachineIntegrationNetworkState([[maybe_unused]] bool staConnected,
                                            [[maybe_unused]] bool apActive,
                                            [[maybe_unused]] bool shotActive,

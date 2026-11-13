@@ -139,6 +139,7 @@ struct LaMarzoccoCancellationTest {
   static void unrecognizedCleaningLogged();
   static void postWakeSettledFromPush();
   static void companionRouteNeverReads();
+  static void manualPowerGate();
   static void run();
 };
 }
@@ -893,7 +894,72 @@ void LaMarzoccoCancellationTest::companionRouteNeverReads() {
   liveSubscription = false;
 }
 
+// Admin → Machine control is the only gate a manual power command meets in
+// the service, however the request arrives; the scale options keep gating
+// only scale commands, and turning the setting off drops a pending manual
+// command but never a scale one (AC3, AC4).
+void LaMarzoccoCancellationTest::manualPowerGate() {
+  OpenBrewByWeightLaMarzoccoService service;
+  service.task_ = &service;
+  LaMarzoccoPersistedSettings settings;
+  settings.accountConfigured = true;
+  std::strcpy(settings.selectedSerial, "TEST");
+  settings.options = LA_MARZOCCO_OBSERVE_STATE | LA_MARZOCCO_POWER_ON_WITH_SCALE |
+                     LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
+  service.publishConfig(settings, 1);
+  LaMarzoccoRequest manual;
+  manual.type = LaMarzoccoRequestType::SET_POWER_ON;
+  manual.origin = LaMarzoccoRequestOrigin::MANUAL;
+  LaMarzoccoRequest scale;
+  scale.type = LaMarzoccoRequestType::SET_STANDBY;
+  // Off by default: the scale options never authorize a manual command.
+  assert(!service.queue(manual) && !service.desiredPower_.present);
+  // Scale commands keep their own options whatever the setting says.
+  assert(service.queue(scale));
+  service.publishManualPower(false);
+  assert(service.desiredPower_.present &&
+         service.desiredPower_.request.origin == LaMarzoccoRequestOrigin::SCALE);
+  service.desiredPower_ = {};
+  // On: only the setting matters for a manual command, not the scale bits.
+  service.publishManualPower(true);
+  settings.options = LA_MARZOCCO_OBSERVE_STATE;
+  service.publishConfig(settings, 2);
+  assert(!service.queue(scale));
+  assert(service.queue(manual));
+  const LaMarzoccoRequest pending = service.desiredPower_.request;
+  assert(pending.origin == LaMarzoccoRequestOrigin::MANUAL &&
+         service.powerRequestCurrent(pending, 2));
+  // A settings change keeps an allowed manual command current.
+  settings.options |= LA_MARZOCCO_RECOGNIZE_WAKE;
+  service.publishConfig(settings, 3);
+  assert(service.powerRequestCurrent(pending, 3));
+  // One manual command at a time: a second one is refused, never replaces it.
+  LaMarzoccoRequest off = manual;
+  off.type = LaMarzoccoRequestType::SET_STANDBY;
+  assert(!service.queue(off) && service.desiredPower_.request.type == LaMarzoccoRequestType::SET_POWER_ON);
+  // Turning the setting off drops the pending manual command and aborts it.
+  service.powerActive_.store(true);
+  service.abortRequested_.store(false);
+  service.publishManualPower(false);
+  service.powerActive_.store(false);
+  assert(!service.desiredPower_.present && service.abortRequested_.load() &&
+         !service.powerRequestCurrent(pending, 3));
+  assert(!service.queue(manual));
+  // Enabled again: a shot still refuses it.
+  service.publishManualPower(true);
+  service.shotActive_.store(true);
+  assert(!service.queue(manual));
+  service.shotActive_.store(false);
+  assert(service.queue(manual));
+  service.desiredPower_ = {};
+  // A manual command is never authorized without an account.
+  settings.accountConfigured = false;
+  service.publishConfig(settings, 4);
+  assert(!service.queue(manual));
+}
+
 int main() {
+  LaMarzoccoCancellationTest::manualPowerGate();
   LaMarzoccoCancellationTest::companionRouteNeverReads();
   LaMarzoccoCancellationTest::postWakeSettledFromPush();
   LaMarzoccoCancellationTest::relistKeepsSavedMachine();

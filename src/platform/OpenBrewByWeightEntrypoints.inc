@@ -471,6 +471,7 @@ void startAfterBootRecovery() {
                              persistedSettings.scaleHistory);
     publishMachineIntegrationConfig(persistedSettings,
                                     persistedSettings.storageRevision);
+    publishMachineIntegrationManualPower(runtimeConfig.machinePowerControlEnabled);
   }
 #else
   settingsLoaded = settingsDurable = persistenceReady;

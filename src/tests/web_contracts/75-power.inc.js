@@ -54,7 +54,8 @@
       },
       sleep: async () => { now += 150; }
     }, {now: () => now});
-    for (const key of ['idlePowerSavingEnabled', 'performanceBoostEnabled', 'showDiagnosticPage']) {
+    for (const key of ['idlePowerSavingEnabled', 'performanceBoostEnabled', 'showDiagnosticPage',
+      'machinePowerControlEnabled']) {
       for (const value of [true, false]) {
         const snapshot = (state, revision, pending, failed = false, actual = value) => ({
           lastCommand: {requestId: 7, state},

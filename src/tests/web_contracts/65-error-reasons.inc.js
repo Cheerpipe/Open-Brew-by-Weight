@@ -11,7 +11,7 @@
   const catalog = JSON.parse(
       fs.readFileSync(path.join(sketchDir, 'web', 'locales', 'en.json'), 'utf8')).strings;
   const errKeys = Object.keys(catalog).filter((key) => key.startsWith('err.'));
-  assert.equal(errKeys.length, 327, 'the err.* section holds the 327 reason codes');
+  assert.equal(errKeys.length, 330, 'the err.* section holds the 330 reason codes');
 
   // The map in runtime.js references each err.* key exactly once, and every
   // referenced key exists (the localize check enforces the same at build).

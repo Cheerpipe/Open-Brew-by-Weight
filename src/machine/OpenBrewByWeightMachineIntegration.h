@@ -34,6 +34,8 @@ inline void publishMachineIntegrationConfig(const PersistedSettings &,
                                             uint32_t) {}
 inline void publishMachineIntegrationNetworkState(bool, bool, bool,
                                                   bool = false) {}
+inline bool hostMachineManualPower = false;
+inline void publishMachineIntegrationManualPower(bool enabled) { hostMachineManualPower = enabled; }
 inline void serviceMachineIntegrationScaleLink(uint32_t, bool, uint32_t,
                                                uint8_t, bool) {}
 inline void serviceMachineIntegrationMachinePower(bool, bool, bool) {}
@@ -85,6 +87,9 @@ void publishMachineIntegrationConfig(const PersistedSettings &settings,
 void publishMachineIntegrationNetworkState(bool staConnected, bool apActive,
                                            bool shotActive,
                                            bool scaleConnecting = false);
+// Admin → Machine control, from the live runtime settings: off makes the
+// integration refuse every manual power command and drop one still pending.
+void publishMachineIntegrationManualPower(bool enabled);
 // Forwards one scale link observation per control loop so the machine
 // integration can apply its own scale power-off policy. The stopper stays a
 // coordinator and owns no machine logic. machineBusy: relay closed or a

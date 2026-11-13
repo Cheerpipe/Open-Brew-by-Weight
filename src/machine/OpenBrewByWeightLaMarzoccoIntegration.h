@@ -9,7 +9,7 @@ namespace openbrewbyweight {
 bool queueMachineIntegrationConnect(uint32_t requestId, const char *username,
                                     const char *password);
 bool queueMachineIntegrationRelist(uint32_t requestId);
-bool queueMachineIntegrationRequest(const LaMarzoccoRequest &request);
+bool queueMachineIntegrationRequest(LaMarzoccoRequest request);
 bool selectMachineIntegrationDevice(const char *serial,
                                     LaMarzoccoPersistedSettings &settings);
 void clearMachineIntegrationDiscovery();

@@ -114,8 +114,9 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       jsonFieldPresent(root, "scheduledRestartEnabled") ||
       jsonFieldPresent(root, "scheduledRestartMinuteOfDay");
   // Log/debug fields stay public with the Diagnostic page; the visibility
-  // toggle and the Frontend preferences always require the Admin session.
+  // toggle, Frontend preferences and Machine control always need Admin.
   const bool diagnosticPagePatch = jsonFieldPresent(root, "showDiagnosticPage") ||
+      jsonFieldPresent(root, "machinePowerControlEnabled") ||
       jsonFieldPresent(root, "idlePowerSavingEnabled") ||
       jsonFieldPresent(root, "performanceBoostEnabled") || jsonFieldPresent(root, "heroCardMode");
   // Patch: seed live effective config; only present keys overwrite.
@@ -190,7 +191,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "bookooConnectBeepLevel", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
-      "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode", "beanconquerorEndpoint"};
+      "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode", "beanconquerorEndpoint",
+      "machinePowerControlEnabled"};
   ValidationFailure parseError;
   size_t settingFieldCount = 0;
   if (root != nullptr) {
@@ -510,6 +512,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "showDiagnosticPage") &&
              !jsonBoolean(root, "showDiagnosticPage", candidate.showDiagnosticPage)) {
     parseError = validationFailure("FIELD_BOOLEAN", "showDiagnosticPage");
+  } else if (!jsonOptionalBoolean(root, "machinePowerControlEnabled", candidate.machinePowerControlEnabled)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "machinePowerControlEnabled");
   } else if (jsonFieldPresent(root, "heroCardMode") &&
              !jsonEnumId(root, "heroCardMode", HERO_CARD_COLORFUL + 1, heroCardModeId, candidate.heroCardMode)) {
     parseError = validationFailure("FIELD_ENUM", "heroCardMode", "technical or colorful");

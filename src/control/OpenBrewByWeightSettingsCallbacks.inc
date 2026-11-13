@@ -61,6 +61,11 @@ const RuntimeSettingsSubscription runtimeSettingsSubscribers[] = {
        if (++idleTareSettingsGeneration == 0) ++idleTareSettingsGeneration;
      }},
     {[](const RuntimeConfig &a, const RuntimeConfig &b) {
+       return a.machinePowerControlEnabled != b.machinePowerControlEnabled;
+     }, [](const RuntimeConfig &, const RuntimeConfig &after) {
+       publishMachineIntegrationManualPower(after.machinePowerControlEnabled);
+     }},
+    {[](const RuntimeConfig &a, const RuntimeConfig &b) {
        return !a.soundAlertsMuted && b.soundAlertsMuted;
      }, [](const RuntimeConfig &, const RuntimeConfig &) {
        cancelOperationalAlerts();

@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <string>
 #include <thread>
+#include <sys/time.h>
 #include "machine/OpenBrewByWeightLaMarzoccoPublicIdentityCache.h"
 #include "machine/OpenBrewByWeightLaMarzoccoService.h"
 #include "machine/OpenBrewByWeightLaMarzoccoStomp.h"
