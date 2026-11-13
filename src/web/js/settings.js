@@ -323,6 +323,7 @@ function machinePayload() {
     buzzerScaleLostBeep: $("buzzerScaleLostBeep").checked,
     buzzerAutoToManualGuardEndBeep: $("buzzerAutoToManualGuardEndBeep").checked,
     buzzerManualNoScaleBeep: $("buzzerManualNoScaleBeep").checked,
+    buzzerBackflushReadyBeep: $("buzzerBackflushReadyBeep")?.checked,
     buzzerScaleConnectedBeep: $("buzzerScaleConnectedBeep").checked,
     buzzerScaleConnectedStockTone: $("buzzerScaleConnectedStockTone").checked,
     buzzerScaleLostStockTone: $("buzzerScaleLostStockTone").checked,

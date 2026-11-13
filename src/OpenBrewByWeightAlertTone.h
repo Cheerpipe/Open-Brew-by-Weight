@@ -62,6 +62,8 @@ inline BuzzerCue buzzerCueForAlertEvent(AlertEvent event, bool slowExtended) {
       return BuzzerCue::GUARD_STOP;
     case AlertEvent::MANUAL_NO_SCALE:
       return BuzzerCue::NO_SCALE;
+    case AlertEvent::BACKFLUSH_READY:
+      return BuzzerCue::BACKFLUSH_READY;
   }
   return BuzzerCue::NONE;
 }

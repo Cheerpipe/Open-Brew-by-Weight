@@ -27,7 +27,8 @@ enum class BuzzerCue : uint8_t {
   NETWORK_RESET_OK,
   FACTORY_RESET_OK,
   BULLSEYE,
-  RECOVERY_ERROR
+  RECOVERY_ERROR,
+  BACKFLUSH_READY
 };
 
 // Tare
@@ -81,6 +82,9 @@ constexpr const char *RTTTL_FACTORY_RESET_OK =
 // Recovery: error
 constexpr const char *RTTTL_RECOVERY_ERROR =
     "recovery_error:d=8,o=4,b=180:g,16p,d#,16p,g";
+// Backflush ready: two pickups and a higher accent invite paddle ON
+constexpr const char *RTTTL_BACKFLUSH_READY =
+    "backflush_ready:d=16,o=5,b=200:a,32p,a,8e6";
 
 inline const char *rtttlForCue(BuzzerCue cue) {
   switch (cue) {
@@ -123,6 +127,8 @@ inline const char *rtttlForCue(BuzzerCue cue) {
       break;
     case BuzzerCue::RECOVERY_ERROR:
       return RTTTL_RECOVERY_ERROR;
+    case BuzzerCue::BACKFLUSH_READY:
+      return RTTTL_BACKFLUSH_READY;
     case BuzzerCue::NONE:
       break;
   }

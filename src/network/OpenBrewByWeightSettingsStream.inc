@@ -117,6 +117,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("config.buzzerScaleLostBeep", bool(config.buzzerScaleLostBeep));
   fields.field("config.buzzerAutoToManualGuardEndBeep", bool(config.buzzerAutoToManualGuardEndBeep));
   fields.field("config.buzzerManualNoScaleBeep", bool(config.buzzerManualNoScaleBeep));
+  fields.field("config.buzzerBackflushReadyBeep", bool(config.buzzerBackflushReadyBeep));
   fields.field("config.buzzerScaleConnectedBeep", bool(config.buzzerScaleConnectedBeep));
   fields.field("config.buzzerScaleConnectedStockTone", bool(config.buzzerScaleConnectedStockTone));
   fields.field("config.buzzerScaleLostStockTone", bool(config.buzzerScaleLostStockTone));

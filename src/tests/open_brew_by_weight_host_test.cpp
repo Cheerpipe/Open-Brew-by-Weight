@@ -233,6 +233,8 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   hostMachinePhysicalStartCount = 0;
   hostMachinePowerState = MachinePower::UNKNOWN;
   hostBackflushObservations = {};
+  hostBackflushReady = false;
+  backflushReadyAlertEpisode = 0;
   backflushObservation = {};
   backflushPermit = {};
   backflushStopReason = "none";
@@ -1097,6 +1099,29 @@ void bf07_configuration_retirement_opens_and_rearms_normally() {
     CHECK(session.active && !backflushActive(stopperState));
     CHECK(getRelaySafetySnapshot().closed && getRelaySafetySnapshot().hardLimitMs == 60000);
     CHECK(getRelaySafetySnapshot().purpose == RelayPurpose::NORMAL);
+  }
+}
+
+void bf08_ready_cue_once_per_awaiting_episode() {
+  for (bool enabled : {true, false}) {
+    resetHarness(false, false);
+    reachReadyFromBoot();
+    runtimeConfig.alertOutputChannel = static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
+    runtimeConfig.buzzerBackflushReadyBeep = enabled;
+    hostBackflushReady = true;
+    const uint32_t before = localBuzzer.acceptedRequests;
+    for (uint32_t episode = 1; episode <= 2; ++episode) {
+      hostBackflushObservations.observe(MachineBackflushPhase::INACTIVE, 0);
+      hostBackflushObservations.observe(MachineBackflushPhase::AWAITING, 0);
+      loop();
+      publishControlStatus();
+      CHECK(publishedControlStatus.backflushReady);
+      CHECK(localBuzzer.acceptedRequests == before + (enabled ? episode : 0));
+      CHECK(!enabled || localBuzzer.activeCue == BuzzerCue::BACKFLUSH_READY ||
+            localBuzzer.pendingCue == BuzzerCue::BACKFLUSH_READY);
+      runLoopAfter(2000);  // The same awaiting episode never repeats the cue.
+      CHECK(localBuzzer.acceptedRequests == before + (enabled ? episode : 0));
+    }
   }
 }
 
@@ -2841,6 +2866,7 @@ void w01_default_runtime_configuration_is_valid() {
   CHECK(config.buzzerScaleLostBeep);
   CHECK(config.buzzerAutoToManualGuardEndBeep);
   CHECK(config.buzzerManualNoScaleBeep);
+  CHECK(config.buzzerBackflushReadyBeep);
   CHECK(config.buzzerScaleConnectedBeep);
   CHECK(config.scaleConnectedLed);
   CHECK(config.buzzerExtendedPulseRate ==
@@ -6855,7 +6881,7 @@ void w99_rtttl_parser_decodes_notes_and_rests() {
   CHECK(parseRtttlBounded(RTTTL_START_TIMER, notes, kNotes, count));
   CHECK(count == 1);
   CHECK(notes[0].freqHz >= 1040 && notes[0].freqHz <= 1055);
-  for (uint8_t i = 1; i <= static_cast<uint8_t>(BuzzerCue::RECOVERY_ERROR);
+  for (uint8_t i = 1; i <= static_cast<uint8_t>(BuzzerCue::BACKFLUSH_READY);
        ++i) {
     const BuzzerCue cue = static_cast<BuzzerCue>(i);
     const char *rtttl = rtttlForCue(cue);
@@ -26709,6 +26735,7 @@ const TestCase testCases[] = {
     {"BF05", bf05_no_adoption_reuse_or_false_history},
     {"BF06", bf06_normal_flow_matches_absent_backflush},
     {"BF07", bf07_configuration_retirement_opens_and_rearms_normally},
+    {"BF08", bf08_ready_cue_once_per_awaiting_episode},
     {"D16", d16_cloud_pause_requires_a_real_cycle},
     {"D14", d14_control_status_publishes_on_cycle_edge},
     {"D02", d02_first_mode_uses_name_scan},

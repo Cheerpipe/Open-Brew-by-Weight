@@ -577,6 +577,8 @@ struct RuntimeConfig {
   // Imitate the connected scale's own power-on / power-off tone when known.
   bool buzzerScaleConnectedStockTone = true;
   bool buzzerScaleLostStockTone = true;
+  // Cue when a supervised backflush awaits paddle ON (machine integrations).
+  bool buzzerBackflushReadyBeep = true;
   // Onboard GPIO LED: solid when a BLE scale is connected, fast blink while
   // connecting, slow blink while the weight stream is stale.
   bool scaleConnectedLed = true;

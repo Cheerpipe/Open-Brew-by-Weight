@@ -59,8 +59,11 @@ inline MachinePhysicalStartDisposition
         MachinePhysicalStartDisposition::NORMAL;
 inline uint32_t hostMachinePhysicalStartCount = 0;
 inline MachineBackflushObservations hostBackflushObservations;
+inline bool hostBackflushReady = false;
 inline MachineBackflushSnapshot machineIntegrationBackflush(bool consume = false) {
-  return consume ? hostBackflushObservations.take() : hostBackflushObservations.status();
+  auto result = consume ? hostBackflushObservations.take() : hostBackflushObservations.status();
+  result.ready = hostBackflushReady;
+  return result;
 }
 inline void finishMachineIntegrationBackflush(uint32_t attempt) {
   hostBackflushObservations.finish(attempt);

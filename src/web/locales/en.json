@@ -1992,6 +1992,8 @@
     "settings.automatic_tare_outside_a_brew": "Tare when you place a cup",
     "settings.avoid_accidental_touch": "Avoid accidental touch",
     "settings.avoid_accidental_touch_hint": "Ignore brief touches that could stop or extend a shot.",
+    "settings.backflush_ready_beep": "Backflush ready",
+    "settings.backflush_ready_beep_hint": "Plays once the controller knows your machine is set up for a cleaning backflush and will keep it running for the whole program. When you hear it, move the paddle to ON.",
     "settings.bbw_protection_s": "Earliest weight stop (s)",
     "settings.beanconqueror": "Beanconqueror",
     "settings.beanconqueror_alt": "Can’t connect? Use {0}.",

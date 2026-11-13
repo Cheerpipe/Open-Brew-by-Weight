@@ -1338,7 +1338,12 @@
             ></label
           >
         </div>
-        <label class="paddleOnly"
+        <label class="buzzerOpt scaleIncapableOpt laMarzoccoOnly"
+          ><input id="buzzerBackflushReadyBeep" type="checkbox" checked />
+          {{webui:settings.backflush_ready_beep}}<small class="fieldHint"
+            >{{webui:settings.backflush_ready_beep_hint}}</small
+          ></label
+        ><label class="paddleOnly"
           >{{webui:settings.paddle_off_reminder}}<span class="selBox"
             ><select id="paddleReturnReminder">
               <option value="0">{{webui:settings.paddle_off_reminder_off}}</option>

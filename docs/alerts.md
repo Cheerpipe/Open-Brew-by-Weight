@@ -1,8 +1,8 @@
 # Alerts
 
 Sounds and the optional onboard LED that tell you what the controller is
-doing: tare, first drops, paddle left ON, scale disconnected or connected, and
-extended-shot pulses.
+doing: tare, first drops, paddle left ON, scale disconnected or connected,
+extended-shot pulses, and a machine ready for its cleaning backflush.
 
 First-drop sound plays at most once per shot. A confirmed late-cup retare can
 clear an earlier first-drop record, but cannot recall a sound already played.
@@ -67,6 +67,7 @@ changed. On momentary machines, check the actual group and its state feedback.
 | **Shot finished by backup time** | (buzzer builds) | ON / OFF | Distinct RTTTL on the local buzzer when the [scale-loss backup](features/auto-to-manual.md) finishes a shot by time after the scale dropped. Disabled when Play alerts on is Scale only. |
 | **Bullseye melody** | OFF | ON / OFF; Buzzer only | Plays the saved custom RTTTL tune once when a shot stopped by weight **On recipe** remains exactly at its target weight for at least 1 full second. Important alerts, such as a lost scale, interrupt the melody so you never miss them. The text is retained when disabled. |
 | **Custom RTTTL** | empty | Up to 500 ASCII characters / 250 notes | Editable once Bullseye melody is on; otherwise it stays visible and read-only. Bullseye melody and its tune are saved together: switching it on saves nothing until you paste a tune, and a valid tune then saves both by itself. A tune that isn't valid RTTTL is marked and neither is saved. |
+| **Backflush ready** | ON | ON / OFF; La Marzocco machines | A short call on the local buzzer when the controller learns that your machine is set up for an automatic cleaning backflush and will keep it running for the whole program: move the paddle ON when you hear it. It plays once per backflush request, when Home shows **Backflush ready · paddle to ON**. Shown only with the [La Marzocco connection](settings/linea-micra.md#automatic-backflush); disabled when Play alerts on is Scale only. |
 | **Paddle-off reminder** | 30 s | OFF / 15 / 30 / 60 / 120 s | Repeat beeps at the chosen interval while the **physical paddle stays ON** and **machine circuit is already open**; OFF silences them. |
 | **Paddle reminder limit (min)** | 15 min | 1–60 min | Stop beeping after this time even if the paddle remains ON. |
 | **Blue light while connected** | ON | ON / OFF | Onboard light on GPIO 1: steady while a scale is connected, fast blink while it connects, slow blink when a connected scale stops sending weight. Independent of Sound alerts. |

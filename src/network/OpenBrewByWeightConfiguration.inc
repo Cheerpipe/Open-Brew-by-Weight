@@ -168,6 +168,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "buzzerScaleLostBeep", "buzzerAutoToManualGuardEndBeep",
       "buzzerManualNoScaleBeep", "buzzerScaleConnectedBeep",
       "buzzerScaleConnectedStockTone", "buzzerScaleLostStockTone",
+      "buzzerBackflushReadyBeep",
       "buzzerExtendedPulseRate", "buzzerSlowExtendedPulseRate",
       "bullseyeMelodyEnabled", "bullseyeRtttl",
       "alertOutputChannel", "autoRetare", "retareWindowMs", "minimumCupWeightG",
@@ -306,25 +307,21 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "shotReactTimeoutS") &&
              !jsonShotReactTimeoutS(root, candidate)) {
     parseError = validationFailure("SHOT_REACT_TIMEOUT_FIELD_INVALID");
-  } else if (jsonFieldPresent(root, "buzzerScaleLostBeep") &&
-             !jsonBoolean(root, "buzzerScaleLostBeep", candidate.buzzerScaleLostBeep)) {
+  } else if (!jsonOptionalBoolean(root, "buzzerScaleLostBeep", candidate.buzzerScaleLostBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleLostBeep");
-  } else if (jsonFieldPresent(root, "buzzerAutoToManualGuardEndBeep") &&
-             !jsonBoolean(root, "buzzerAutoToManualGuardEndBeep",
-                          candidate.buzzerAutoToManualGuardEndBeep)) {
+  } else if (!jsonOptionalBoolean(root, "buzzerAutoToManualGuardEndBeep",
+                                  candidate.buzzerAutoToManualGuardEndBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerAutoToManualGuardEndBeep");
-  } else if (jsonFieldPresent(root, "buzzerManualNoScaleBeep") &&
-             !jsonBoolean(root, "buzzerManualNoScaleBeep", candidate.buzzerManualNoScaleBeep)) {
+  } else if (!jsonOptionalBoolean(root, "buzzerManualNoScaleBeep", candidate.buzzerManualNoScaleBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerManualNoScaleBeep");
-  } else if (jsonFieldPresent(root, "buzzerScaleConnectedBeep") &&
-             !jsonBoolean(root, "buzzerScaleConnectedBeep", candidate.buzzerScaleConnectedBeep)) {
+  } else if (!jsonOptionalBoolean(root, "buzzerBackflushReadyBeep", candidate.buzzerBackflushReadyBeep)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "buzzerBackflushReadyBeep");
+  } else if (!jsonOptionalBoolean(root, "buzzerScaleConnectedBeep", candidate.buzzerScaleConnectedBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleConnectedBeep");
-  } else if (jsonFieldPresent(root, "buzzerScaleConnectedStockTone") &&
-             !jsonBoolean(root, "buzzerScaleConnectedStockTone",
-                          candidate.buzzerScaleConnectedStockTone)) {
+  } else if (!jsonOptionalBoolean(root, "buzzerScaleConnectedStockTone",
+                                  candidate.buzzerScaleConnectedStockTone)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleConnectedStockTone");
-  } else if (jsonFieldPresent(root, "buzzerScaleLostStockTone") &&
-             !jsonBoolean(root, "buzzerScaleLostStockTone", candidate.buzzerScaleLostStockTone)) {
+  } else if (!jsonOptionalBoolean(root, "buzzerScaleLostStockTone", candidate.buzzerScaleLostStockTone)) {
     parseError = validationFailure("FIELD_BOOLEAN", "buzzerScaleLostStockTone");
   } else if (jsonFieldPresent(root, "buzzerExtendedPulseRate") &&
              !jsonExtendedPulseRate(root, "buzzerExtendedPulseRate",
