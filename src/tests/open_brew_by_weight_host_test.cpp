@@ -232,6 +232,7 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
       MachinePhysicalStartDisposition::NORMAL;
   hostMachinePhysicalStartCount = 0;
   hostMachinePowerState = MachinePower::UNKNOWN;
+  hostMachineManualPower = false;
   hostBackflushObservations = {};
   hostBackflushReady = false;
   backflushReadyAlertEpisode = 0;
@@ -2550,6 +2551,25 @@ void r14_invalid_runtime_configuration_is_transactionally_rejected() {
   CHECK(enqueueWebCommand(update));
   loop();
   CHECK(runtimeConfig.operationalWallMs == original.operationalWallMs);
+}
+
+// Admin → Machine control reaches the machine integration on the config
+// apply itself, not on the deferred flash write, both ways.
+void r14b_machine_power_control_publishes_live() {
+  resetHarness(false, false);
+  reachReadyFromBoot();
+  CHECK(!runtimeConfig.machinePowerControlEnabled && !hostMachineManualPower);
+  for (const bool enabled : {true, false}) {
+    WebCommand update;
+    update.type = WebCommandType::APPLY_CONFIG;
+    update.requestId = enabled ? 141 : 142;
+    update.config = runtimeConfig;
+    update.config.machinePowerControlEnabled = enabled;
+    CHECK(enqueueWebCommand(update));
+    loop();
+    CHECK(runtimeConfig.machinePowerControlEnabled == enabled);
+    CHECK(hostMachineManualPower == enabled);
+  }
 }
 
 void r15_gptimer_opens_circuit_without_arduino_or_esp_timer_tasks() {
@@ -26199,6 +26219,7 @@ const TestCase testCases[] = {
     {"R12d", r12d_scale_signal_level_keeps_hysteresis_across_publishes},
     {"R13", r13_full_queue_prevents_stop_without_delaying_relay_open},
     {"R14", r14_invalid_runtime_configuration_is_transactionally_rejected},
+    {"R14b", r14b_machine_power_control_publishes_live},
     {"R15", r15_gptimer_opens_circuit_without_arduino_or_esp_timer_tasks},
     {"R15b", r15b_isr_trip_without_session_clears_close_marker},
     {"R15c", r15c_stack_overflow_hook_opens_circuit_then_aborts},

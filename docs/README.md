@@ -32,7 +32,7 @@ needed rather than reading the entire directory.
 | Group | Reference |
 | --- | --- |
 | Physical switch | [Paddle](settings/paddle.md) / [momentary](settings/momentary.md) |
-| Machine integration | [La Marzocco Linea Micra](settings/linea-micra.md) |
+| Machine integration | [La Marzocco Linea Micra](settings/linea-micra.md) / [machine control](settings/machine-control.md) |
 | Coffee apps | [Beanconqueror](settings/beanconqueror.md) |
 | Without a scale / rinse | [Scale guard](settings/no-scale-bbw.md) / [quick rinse](settings/quick-rinse.md) |
 | Scale and cup | [Scales](settings/scales.md) / [Bluetooth on/off](settings/scales.md#bluetooth-onoff) / [cup detection](settings/cup.md) / [tare](settings/tare.md) |

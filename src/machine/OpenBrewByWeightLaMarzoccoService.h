@@ -39,6 +39,8 @@ class OpenBrewByWeightLaMarzoccoService {
                      uint32_t configGeneration);
   void publishNetworkState(bool staConnected, bool apActive, bool shotActive,
                            bool scaleConnecting);
+  // Admin → Machine control: whether manual power commands are allowed.
+  void publishManualPower(bool enabled);
   bool queueConnect(uint32_t requestId, const char *username,
                     const char *password);
   bool queueRelist(uint32_t requestId);
@@ -236,6 +238,7 @@ class OpenBrewByWeightLaMarzoccoService {
 
   mutable TaskMutex mux_;
   LaMarzoccoPersistedSettings config_ = {};
+  bool manualPower_ = false;  // Protected by mux_; see publishManualPower().
   LaMarzoccoPersistedSettings candidate_ = {};
   PendingRequest pending_ = {};
   DesiredTemperature desiredTemperature_ = {};
@@ -277,6 +280,9 @@ class OpenBrewByWeightLaMarzoccoService {
   // mux_ and the same task reads them, so nothing else guards them.
   mutable LaMarzoccoStatus statusCache_ = {};
   mutable uint32_t statusCacheWrittenAtMs_ = 0;
+  // Under mux_: statusLocked() advances it on every read (see
+  // laMarzoccoWarmingSince()).
+  mutable uint32_t warmingSinceUtcSec_ = 0;
   // Mirrors published_.powerState == OFF for the lock-free poll; written
   // under mux_ wherever published_.powerState changes.
   std::atomic<bool> powerOff_{false};

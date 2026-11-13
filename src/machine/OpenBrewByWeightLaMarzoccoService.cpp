@@ -316,11 +316,13 @@ bool sameCommandRequest(const LaMarzoccoRequest &left,
          left.presetId == right.presetId && left.type == right.type;
 }
 
-// Persisted option bit that authorizes each power command direction.
-uint8_t powerOptionBit(LaMarzoccoRequestType type) {
-  return type == LaMarzoccoRequestType::SET_POWER_ON
-             ? LA_MARZOCCO_POWER_ON_WITH_SCALE
-             : LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
+// What authorizes a power command: a scale automation's own option bit for
+// its direction, or, for a manual one, Admin → Machine control alone.
+bool powerAllowed(const LaMarzoccoRequest &request, uint8_t options, bool manual) {
+  if (request.origin == LaMarzoccoRequestOrigin::MANUAL) return manual;
+  return (options & (request.type == LaMarzoccoRequestType::SET_POWER_ON
+                         ? LA_MARZOCCO_POWER_ON_WITH_SCALE
+                         : LA_MARZOCCO_SHUTDOWN_WITH_SCALE)) != 0;
 }
 
 bool sameSessionIdentity(const LaMarzoccoPersistedSettings &left,
@@ -480,8 +482,7 @@ void OpenBrewByWeightLaMarzoccoService::publishConfig(
         desiredTemperature_.machineConfigGeneration = configGeneration;
       }
       if (desiredPower_.present &&
-          (effective.options &
-           powerOptionBit(desiredPower_.request.type)) != 0) {
+          powerAllowed(desiredPower_.request, effective.options, manualPower_)) {
         desiredPower_.machineConfigGeneration = configGeneration;
       }
     }
@@ -557,7 +558,7 @@ void OpenBrewByWeightLaMarzoccoService::publishConfig(
       published_.temperatureState = LaMarzoccoTemperatureState::IDLE;
     }
     if (desiredPower_.present &&
-        (effective.options & powerOptionBit(desiredPower_.request.type)) == 0) {
+        !powerAllowed(desiredPower_.request, effective.options, manualPower_)) {
       desiredPower_ = {};
       cancelPowerOff = true;
     }
@@ -588,6 +589,22 @@ void OpenBrewByWeightLaMarzoccoService::publishConfig(
     logCompanionRoute(companionFrom, companionTo, identityChanged ? "account" : "settings");
   notifyCompanion();
   if (task_ != nullptr) xTaskNotifyGive(task_);
+}
+
+// Admin → Machine control. Turning it off drops a manual command still
+// pending (and aborts one in flight); scale commands are never touched.
+void OpenBrewByWeightLaMarzoccoService::publishManualPower(bool enabled) {
+  TaskLockGuard lock(mux_);
+  manualPower_ = enabled;
+  const bool cancel = !enabled && desiredPower_.present &&
+                      desiredPower_.request.origin == LaMarzoccoRequestOrigin::MANUAL;
+  if (cancel) desiredPower_ = {};
+  lock.unlock();  // logging takes its own locks; never nest them in mux_
+  if (!cancel) return;
+  if (powerActive_.load(std::memory_order_acquire))
+    abortRequested_.store(true, std::memory_order_release);
+  serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                       "La Marzocco manual power request canceled: Machine control turned off");
 }
 
 void OpenBrewByWeightLaMarzoccoService::publishNetworkState(bool staConnected,
@@ -777,9 +794,12 @@ bool OpenBrewByWeightLaMarzoccoService::queueLocked(const LaMarzoccoRequest &req
   if (request.type == LaMarzoccoRequestType::SET_STANDBY ||
       request.type == LaMarzoccoRequestType::SET_POWER_ON) {
     const uint32_t shotGeneration = shotGeneration_.load(std::memory_order_acquire);
+    // A manual command never replaces one still in progress; a scale one
+    // keeps the latest-wins rule.
     if (task_ == nullptr || !config_.accountConfigured ||
         shotActive_.load(std::memory_order_acquire) || outboundShotActive.load(std::memory_order_acquire) ||
-        (config_.options & powerOptionBit(request.type)) == 0) {
+        !powerAllowed(request, config_.options, manualPower_) ||
+        (request.origin == LaMarzoccoRequestOrigin::MANUAL && desiredPower_.present)) {
       return false;
     }
     desiredPower_.request = request;
@@ -893,6 +913,13 @@ LaMarzoccoStatus OpenBrewByWeightLaMarzoccoService::statusLocked() const {
   result.apActive = apActive_.load(std::memory_order_acquire);
   result.shotPaused = shotTransportPaused();
   result.scalePaused = !result.connectionFreshness && scaleConnecting_.load(std::memory_order_acquire);
+  // Every status read under mux_ follows the warm-up, the control task's
+  // poll each loop included, so its start never waits for a viewer.
+  timeval wall{};
+  gettimeofday(&wall, nullptr);
+  warmingSinceUtcSec_ = laMarzoccoWarmingSince(
+      warmingSinceUtcSec_, result, wall.tv_sec >= 1700000000L ? static_cast<uint32_t>(wall.tv_sec) : 0);
+  result.warmingSinceUtcSec = warmingSinceUtcSec_;
   return result;
 }
 
@@ -1492,8 +1519,7 @@ bool OpenBrewByWeightLaMarzoccoService::powerRequestCurrent(
          desiredPower_.machineConfigGeneration == machineConfigGeneration &&
          sameCommandRequest(desiredPower_.request, request) &&
          configGeneration_ == machineConfigGeneration &&
-         config_.accountConfigured &&
-         (config_.options & powerOptionBit(request.type)) != 0;
+         config_.accountConfigured && powerAllowed(request, config_.options, manualPower_);
 }
 
 bool OpenBrewByWeightLaMarzoccoService::identityCurrent(
@@ -1572,7 +1598,8 @@ void OpenBrewByWeightLaMarzoccoService::deferPower(
   serialTraceCategoryf(error == LaMarzoccoError::CANCELED ? LogLevel::INFO
                                                           : LogLevel::WARNING,
                        DebugCategory::NETWORK,
-                       "La Marzocco scale power request %s type=%s error=%s http=%u raw=%ld",
+                       "La Marzocco %s power request %s type=%s error=%s http=%u raw=%ld",
+                       laMarzoccoRequestOriginName(request.origin),
                        retryable ? "deferred" : "dropped",
                        request.type == LaMarzoccoRequestType::SET_POWER_ON
                            ? "power_on"
@@ -1893,11 +1920,11 @@ bool OpenBrewByWeightLaMarzoccoService::executePowerApplication(
         desiredPower_ = {};
       }
       lock.unlock();  // logging takes its own locks; never nest them in mux_
-      serialTraceCategoryf(
-          LogLevel::INFO, DebugCategory::NETWORK,
-          standby
-              ? "La Marzocco scale shutdown confirmed: machine is in StandBy"
-              : "La Marzocco scale power-on confirmed: machine is in BrewingMode");
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
+                           "La Marzocco %s %s confirmed: machine is in %s",
+                           laMarzoccoRequestOriginName(request.origin),
+                           standby ? "shutdown" : "power-on",
+                           standby ? "StandBy" : "BrewingMode");
       return true;
     }
 

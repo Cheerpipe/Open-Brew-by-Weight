@@ -40,7 +40,7 @@ transparent:
   Factory reset. The controls of disabled features are hidden with them:
   the Bluetooth section and its scan-mode options inside Power management,
   Date & time (clock sync and time zone), Webhooks and, on Linea Micra
-  builds, Companion.
+  builds, Companion and Machine control.
 - Recovery mode, firmware updates over Wi-Fi (OTA), and the USB serial CLI
   keep working, so you can always reach the controller.
 

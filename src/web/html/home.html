@@ -3,7 +3,23 @@
     {{webui-meta:machine-icon}}
   </svg>
   <p class="machineIdBrand">{{webui:home.machine_brand}}</p>
-  <h2 id="machineIdModel">{{webui:home.machine_model}}</h2>
+  <div class="machineIdName">
+    <h2 id="machineIdModel">{{webui:home.machine_model}}</h2>
+    <button
+      id="machinePower"
+      class="machinePower laMarzoccoOnly"
+      type="button"
+      aria-label="{{webui:home.power_turn_on}}"
+      hidden
+    >
+      <svg class="mpIcon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3v8M6.3 6.8a8 8 0 1 0 11.4 0" /></svg
+      ><svg class="mpRing" viewBox="0 0 50 50" aria-hidden="true">
+        <circle id="machinePowerWarm" class="mpWarm" cx="25" cy="25" r="23" pathLength="100" />
+        <circle class="mpHold" cx="25" cy="25" r="23" pathLength="100" />
+      </svg>
+    </button>
+  </div>
   <p class="machineIdStatus">
     <span id="machineIdState">—</span><span id="machineIdDetail"></span>
   </p>

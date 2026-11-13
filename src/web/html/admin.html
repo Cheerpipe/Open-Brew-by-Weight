@@ -24,6 +24,9 @@
       d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L12 6.3M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"
     />
   </symbol>
+  <symbol id="g-machine" class="laMarzoccoOnly" viewBox="0 0 24 24">
+    <path d="M12 3v8M6.3 6.8a8 8 0 1 0 11.4 0" />
+  </symbol>
   <symbol id="g-access" viewBox="0 0 24 24">
     <circle cx="8" cy="15" r="4" />
     <path d="m11 12 9-9m-4 4 3 3m-6 0 2 2" />
@@ -520,6 +523,39 @@
       </div>
       <small id="webhookDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
     </form>
+  </details>
+  <details id="machineControlPanel" data-g="machine" class="cfgGroup laMarzoccoOnly">
+    <summary>{{webui:admin.machine_control}}</summary>
+    <p class="scopeNote">{{webui:admin.machine_control_note}}</p>
+    <label
+      ><input id="machinePowerControlEnabled" type="checkbox" role="switch" />
+      {{webui:admin.machine_power_control}}<small class="fieldHint"
+        >{{webui:admin.machine_power_control_hint}}</small
+      ></label
+    >
+    <div class="btnBar">
+      <button
+        id="saveMachineControlButton"
+        class="btnGlyph mutable btnInvert"
+        data-dirty="0"
+        disabled
+        type="button"
+      >
+        <span class="g" aria-hidden="true">✓</span
+        ><span class="t">{{webui:admin.save_machine_control_settings}}</span></button
+      ><button
+        id="revertMachineControlButton"
+        class="btnGlyph mutable btnRevert"
+        data-dirty="0"
+        disabled
+        title="{{webui:runtime.revert_unsaved_changes}}"
+        aria-label="{{webui:runtime.revert_unsaved_changes}}"
+        type="button"
+      >
+        <span class="g" aria-hidden="true">↺</span>
+      </button>
+    </div>
+    <small id="machineControlDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
   </details>
   <details id="accessPanel" data-g="access" class="cfgGroup">
     <summary>{{webui:admin.access}}</summary>

@@ -82,7 +82,7 @@
     "if(__LA_MARZOCCO__)$('companionRouteState').textContent=companionRouteText(c)",
     "applyCompanionStatus(s.companion)",
     "initCompanion()",
-    "['blePanel','dateTimePanel','webhookPanel','companionPanel']",
+    "['blePanel','dateTimePanel','webhookPanel','companionPanel','machineControlPanel']",
     // Pairing ends at step 3 once the relay or the link is up.
     "p.stage=!c.paired?1:c.link!=='open'&&c.relay!=='ready'?2:3",
   ])

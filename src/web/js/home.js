@@ -240,11 +240,130 @@ function renderMachineRow(s) {
   $("machineIdState").textContent = rs.textContent;
   $("machineIdDetail").textContent =
     mins > 0 ? __WEBUI_TEXT__("home.ready_in").replace("%1", mins) : value === "—" ? hint : value;
+  if (__LA_MARZOCCO__) renderMachinePower(s, lm, power, laMarzoccoActive, warming);
+}
+// Admin → Machine control's power button. A hold turns the machine on or
+// off; from the keyboard a first press arms it and a second within 3 s acts.
+// Neutral while off, yellow with the warm-up ring while heating, red (turn
+// off) once on; a command shows as busy only once the controller took it.
+let powerPending = null, // {on, until, sent}: the last command this page sent
+  powerArmed = null, // {turn, until}: a first key press waiting for the second
+  warmRing = { since: 0, p: 0 };
+function renderMachinePower(s, lm, power, active, warming) {
+  const b = $("machinePower");
+  if (!b) return;
+  b.hidden = !(s.machineControl?.power && active);
+  if (b.hidden) return;
+  const on = power.startsWith("ON"),
+    overlay = lm.quality === "optimistic" && (lm.optimisticOn || lm.optimisticOff);
+  if (powerPending && (on === powerPending.on || Date.now() > powerPending.until))
+    powerPending = null;
+  const busy = overlay || !!powerPending?.sent,
+    target = overlay ? !!lm.optimisticOn : powerPending ? powerPending.on : !on,
+    armed = powerArmed?.turn === (target ? "on" : "off") && Date.now() < powerArmed.until,
+    // The firmware's own gate (no shot, rinse, backflush or other cycle).
+    reason = !s.configMutable
+      ? __WEBUI_TEXT__("home.power_when_idle")
+      : lm.accountProblem
+        ? R.accountProblemLabel(lm.accountProblem)
+        : power === "—"
+          ? __WEBUI_TEXT__("home.power_unreachable")
+          : !R.adminUnlockedFor(s)
+            ? __WEBUI_TEXT__("home.power_unlock_admin")
+            : !R.controlsMutable
+              ? __WEBUI_TEXT__("home.power_unavailable")
+              : "",
+    label = busy
+      ? target
+        ? __WEBUI_TEXT__("home.power_turning_on")
+        : __WEBUI_TEXT__("home.power_turning_off")
+      : reason
+        ? (target ? __WEBUI_TEXT__("home.power_turn_on") : __WEBUI_TEXT__("home.power_turn_off")) +
+          " — " +
+          reason
+        : armed
+          ? target
+            ? __WEBUI_TEXT__("home.power_again_on")
+            : __WEBUI_TEXT__("home.power_again_off")
+          : target
+            ? __WEBUI_TEXT__("home.power_hold_on")
+            : __WEBUI_TEXT__("home.power_hold_off");
+  b.dataset.tone = busy ? "busy" : !on ? "idle" : warming ? "warm" : "stop";
+  b.dataset.turn = target ? "on" : "off";
+  b.disabled = busy || !!powerPending || !!reason;
+  b.classList.toggle("armed", armed && !b.disabled);
+  b.setAttribute("aria-busy", busy);
+  b.setAttribute("aria-label", label);
+  b.title = label;
+  // The warm-up ring fills on the device clock between the firmware's start
+  // of this warm-up and the later boiler's estimate; a re-estimate slows it
+  // down but never pulls it back.
+  const since = lm.warmingSinceUtcSec || 0,
+    readyAt = Math.max(lm.boiler?.coffee?.readyAtUtcSec || 0, lm.boiler?.steam?.readyAtUtcSec || 0),
+    ring = warming && !busy && since > 0 && readyAt > since;
+  if (warmRing.since !== since) warmRing = { since, p: 0 };
+  if (ring)
+    warmRing.p = Math.max(
+      warmRing.p,
+      Math.min(1, Math.max(0, (R.deviceUtcSec() - since) / (readyAt - since))),
+    );
+  b.classList.toggle("ringOn", ring);
+  $("machinePowerWarm").style.strokeDashoffset = 100 * (1 - warmRing.p);
+}
+// Acts only if the button still offers the action the person started on:
+// a state change or a lock during the hold or between key presses cancels.
+async function sendMachinePower(turn) {
+  const b = $("machinePower");
+  if (b.disabled || b.dataset.turn !== turn) return;
+  const pending = (powerPending = { on: turn === "on", until: Date.now() + 30000 });
+  powerArmed = null;
+  renderLaMarzoccoBoilers();
+  pending.sent = await R.command(
+    "/api/v1/machine/la-marzocco",
+    { action: "power", on: pending.on },
+    false,
+    "",
+    __WEBUI_TEXT__("home.power_failed"),
+  );
+  if (!pending.sent && powerPending === pending) powerPending = null;
+  renderLaMarzoccoBoilers();
+}
+function initMachinePower() {
+  const b = $("machinePower");
+  if (!b) return;
+  // The ring fills by CSS while the timer runs; letting go first cancels.
+  let timer = 0;
+  const release = () => {
+    clearTimeout(timer);
+    b.classList.remove("holding");
+  };
+  b.addEventListener("pointerdown", (e) => {
+    if (b.disabled || e.button > 0) return;
+    try {
+      b.setPointerCapture(e.pointerId);
+    } catch {
+      // A synthetic pointer has nothing to capture.
+    }
+    b.classList.add("holding");
+    const turn = b.dataset.turn;
+    timer = setTimeout(() => sendMachinePower(turn), 900);
+  });
+  b.addEventListener("pointerup", release);
+  b.addEventListener("pointercancel", release);
+  b.addEventListener("click", (e) => {
+    if (e.detail !== 0 || b.disabled) return;
+    if (Date.now() < powerArmed?.until) sendMachinePower(powerArmed.turn);
+    else {
+      powerArmed = { turn: b.dataset.turn, until: Date.now() + 3000 };
+      renderLaMarzoccoBoilers();
+    }
+  });
 }
 export function init() {
   if (ready) return;
   ready = true;
   R.registerViewStatus("home", applyStatus);
+  if (__LA_MARZOCCO__) initMachinePower();
   // The countdown ticks only while Home shows; entering Home repaints it.
   setInterval(() => {
     if (!document.hidden && R.activeView === "home") renderLaMarzoccoBoilers();

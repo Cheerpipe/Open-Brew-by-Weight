@@ -293,6 +293,7 @@ void processWebCommand(const WebCommand &command) {
       candidate.serialLogLevel = command.config.serialLogLevel;
       candidate.ringRetainLogLevel = command.config.ringRetainLogLevel;
       candidate.showDiagnosticPage = command.config.showDiagnosticPage;
+      candidate.machinePowerControlEnabled = command.config.machinePowerControlEnabled;
       candidate.idlePowerSavingEnabled = command.config.idlePowerSavingEnabled;
       candidate.performanceBoostEnabled = command.config.performanceBoostEnabled;
       candidate.heroCardMode = command.config.heroCardMode;

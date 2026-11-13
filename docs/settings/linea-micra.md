@@ -523,6 +523,14 @@ This option is independent from monitoring. Turning monitoring off keeps the
 saved wake preference, but the effective state becomes UNKNOWN, so wake
 recognition is inactive until monitoring produces a confirmed OFF observation.
 
+## Turn the machine on and off from Home
+
+With **Admin → Machine control → Allow turning the Micra on and off** on,
+Home shows a power button beside the machine's name: hold it to turn the
+Micra on or off, and watch its ring fill while the machine heats up. It is
+off by default, needs **Show power state** and an unlocked Admin, and is
+separate from the scale options below. See [Machine control](machine-control.md).
+
 ## Turn machine on when the scale powers on
 
 Keep **Turn the Micra on with the scale** on to wake the Micra when

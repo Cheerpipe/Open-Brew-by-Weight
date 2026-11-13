@@ -565,3 +565,141 @@
   content: "·";
   margin-right: 0.5rem;
 }
+
+/* Admin → Machine control's power button beside the model name. A hold
+   fills its ring (yellow to turn on, red to turn off) and acts; the tone
+   follows the machine: neutral off, yellow heating with the warm-up ring,
+   red once on (the turn-off action), pulsing while a command is pending. */
+.machineIdName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.95rem;
+}
+
+.machinePower {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0.1rem 0 0 0.2rem;
+  padding: 0;
+  border: 2px solid color-mix(in srgb, var(--fg) 22%, var(--bg));
+  border-radius: 50%;
+  background: transparent;
+  color: var(--mu);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mpIcon {
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.machinePower:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.machinePower:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.machinePower[data-tone="idle"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--fg) 45%, var(--bg));
+  color: var(--fg);
+}
+
+.machinePower[data-tone="warm"] {
+  border-color: var(--lw);
+  background: var(--lw);
+  color: #242424;
+}
+
+.machinePower[data-tone="stop"] {
+  border-color: var(--pri);
+  background: var(--pri);
+  color: #fff;
+}
+
+.machinePower[data-tone="stop"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pri) 85%, #000);
+}
+
+.machinePower[data-tone="busy"] {
+  border-color: var(--lw);
+  color: var(--wn);
+  cursor: progress;
+  opacity: 1;
+}
+
+.machinePower[data-tone="busy"] .mpIcon {
+  animation: hPulse 1s ease-in-out infinite;
+}
+
+.machinePower .mpRing {
+  position: absolute;
+  inset: -9px;
+  width: calc(100% + 18px);
+  height: calc(100% + 18px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+
+.mpRing circle {
+  fill: none;
+  stroke-width: 3.5;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+
+.mpWarm {
+  stroke: var(--lw);
+  transition: stroke-dashoffset 1s linear;
+}
+
+.machinePower:not(.ringOn) .mpWarm {
+  display: none;
+}
+
+.machinePower.holding .mpWarm {
+  opacity: 0.2;
+}
+
+.mpHold {
+  stroke: var(--pri);
+  transition: stroke-dashoffset 0.15s;
+}
+
+.machinePower[data-turn="on"] .mpHold {
+  stroke: var(--lw);
+}
+
+.machinePower.holding .mpHold {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.9s linear;
+}
+
+.machinePower.armed .mpHold {
+  stroke-dashoffset: 50;
+  animation: hPulse 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .machinePower *,
+  .machinePower.holding .mpHold {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -247,12 +247,22 @@ inline bool laMarzoccoTemperatureCycleRetryable(LaMarzoccoError error) {
          error == LaMarzoccoError::UNCONFIRMED;
 }
 
+// Who asked for a power command: a scale automation, authorized by its own
+// Settings option, or a person through the Web API, authorized only by
+// Admin → Machine control.
+enum class LaMarzoccoRequestOrigin : uint8_t { SCALE, MANUAL };
+
+inline const char *laMarzoccoRequestOriginName(LaMarzoccoRequestOrigin origin) {
+  return origin == LaMarzoccoRequestOrigin::MANUAL ? "manual" : "scale";
+}
+
 struct LaMarzoccoRequest {
   uint32_t requestId = 0;
   uint32_t configGeneration = 0;
   uint16_t targetDeciC = 0;
   uint8_t presetId = 0;
   LaMarzoccoRequestType type = LaMarzoccoRequestType::OBSERVE_STATE;
+  LaMarzoccoRequestOrigin origin = LaMarzoccoRequestOrigin::SCALE;
 };
 
 struct LaMarzoccoMachineSummary {
@@ -304,6 +314,7 @@ struct LaMarzoccoStatus {
   uint32_t temperatureAtMs = 0;
   uint32_t coffeeReadyAtUtcSec = 0;
   uint32_t steamReadyAtUtcSec = 0;
+  uint32_t warmingSinceUtcSec = 0;  // See laMarzoccoWarmingSince().
   uint32_t configGeneration = 0;
   uint32_t identityGeneration = 0;
   uint16_t targetDeciC = 0;
@@ -405,6 +416,25 @@ inline LaMarzoccoReadiness laMarzoccoReadiness(const LaMarzoccoStatus &status) {
   }
   if (warming(coffee)) return LaMarzoccoReadiness::WARMING_UP;
   return LaMarzoccoReadiness::UNKNOWN;
+}
+
+// When the current warm-up began (UTC s, 0 for none), for Home's progress
+// ring: the first time this controller sees the machine warming (so a boot
+// mid-warm-up starts there, never at a guessed earlier time), kept through
+// re-estimates and evidence gaps while the machine stays on, and cleared
+// once it is ready, off, or of unknown power. 0 while the clock is unset.
+inline uint32_t laMarzoccoWarmingSince(uint32_t since, const LaMarzoccoStatus &status,
+                                      uint32_t nowUtcSec) {
+  switch (laMarzoccoReadiness(status)) {
+    case LaMarzoccoReadiness::WARMING_UP:
+    case LaMarzoccoReadiness::WAITING_FOR_STEAM: return since != 0 ? since : nowUtcSec;
+    case LaMarzoccoReadiness::NEEDS_WATER:
+    case LaMarzoccoReadiness::UNKNOWN:
+      return status.assumedPower == LaMarzoccoAssumedPower::UNKNOWN ? 0 : since;
+    case LaMarzoccoReadiness::READY:
+    case LaMarzoccoReadiness::OFF: break;
+  }
+  return 0;
 }
 
 // A preset's brew target can be set only inside the range the selected

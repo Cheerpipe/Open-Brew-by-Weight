@@ -326,14 +326,18 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   const auto micra = machineIntegrationStatus();
   const auto ws = machineIntegrationWebSocketStatus(false);
   uint8_t options, connection;
+  bool powerControl;
   char safeEmail[LA_MARZOCCO_USERNAME_CAPACITY * 2] = {},
        safeName[LA_MARZOCCO_NAME_CAPACITY * 2] = {};
   { TaskLockGuard lock(dataMux_);
+    powerControl = settings_.runtime.machinePowerControlEnabled;
     options = settings_.laMarzocco.options;
     connection = settings_.laMarzocco.connectionType;
     sanitizeJsonEmbed(settings_.laMarzocco.username, safeEmail, sizeof(safeEmail));
     sanitizeJsonEmbed(settings_.laMarzocco.selectedName, safeName, sizeof(safeName)); }
   delta.field("machineIntegration", "\"la_marzocco_cloud\"");
+  // Admin → Machine control: Home offers the power button only while it is on.
+  delta.field("machineControl.power", powerControl);
   delta.field("laMarzocco.powerState", "\"%s\"", laMarzoccoPowerStateName(micra.powerState));
   delta.field("laMarzocco.quality", "\"%s\"", laMarzoccoObservationQualityName(micra.quality));
   delta.field("laMarzocco.optimisticOn", bool(micra.optimisticOn));
@@ -376,6 +380,10 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
               laMarzoccoBoilerStateName(micra.steamBoiler));
   delta.field("laMarzocco.boiler.steam.readyAtUtcSec",
               static_cast<unsigned long>(micra.steamReadyAtUtcSec));
+  // When this warm-up began (0: none); one change per warm-up, and Home
+  // fills its progress ring from it and readyAtUtcSec on its own clock.
+  delta.field("laMarzocco.warmingSinceUtcSec",
+              static_cast<unsigned long>(micra.warmingSinceUtcSec));
 #else
   delta.field("machineIntegration", "\"none\"");
 #endif

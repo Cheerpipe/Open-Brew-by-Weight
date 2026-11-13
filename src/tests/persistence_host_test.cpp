@@ -81,6 +81,7 @@ void p01_defaults_are_valid() {
   CHECK(!settings.lkgValid);
   CHECK(settings.staWifiSleep);
   CHECK(!settings.runtime.showDiagnosticPage);
+  CHECK(!settings.runtime.machinePowerControlEnabled);  // Factory reset: off.
   CHECK(settings.runtime.ntpSyncEnabled);
   CHECK(settings.runtime.scheduledRestartEnabled == 0);
   CHECK(settings.runtime.scheduledRestartMinuteOfDay == 720);
@@ -3331,6 +3332,40 @@ void p91g_beanconqueror_endpoint_tag() {
   CHECK(strcmp(beanconquerorEndpointId(BEANCONQUEROR_GAGGIUINO), "gaggiuino") == 0);
 }
 
+// Tag 93 is additive: a blob without it (every earlier image, so every OTA
+// upgrade) reads Machine control off; a blob with it round-trips, and an
+// image that does not know the tag (an OTA downgrade) skips it like any
+// unknown field, so the rest of the group still loads.
+void p91h_machine_power_control_tag() {
+  PersistedSettings on;
+  CHECK(initializeDefaultSettings(on));
+  on.runtime.machinePowerControlEnabled = true;
+  std::vector<uint8_t> blob = settingsBlob(on);
+  PersistedSettings decoded;
+  uint32_t malformed = 0;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), decoded, malformed) &&
+        malformed == 0 && decoded.runtime.machinePowerControlEnabled);
+  blob = settingsBlobWithBody({});
+  PersistedSettings older;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), older, malformed) &&
+        !older.runtime.machinePowerControlEnabled);
+  const std::vector<uint8_t> newer = settingsBlobWithBody({
+      SETTINGS_GROUP_RUNTIME, 10,
+      93, 1, 1,                              // machinePowerControlEnabled
+      0xC8, 0x01, 1, 1,                      // a later image's tag 200
+      2, 1, 7});                             // goalWeightDg still loads
+  PersistedSettings mixed;
+  malformed = 0;
+  CHECK(decodePersistedSettings(newer.data(), newer.size(), mixed, malformed) &&
+        malformed == 0 && mixed.runtime.machinePowerControlEnabled &&
+        mixed.runtime.goalWeightDg == 7);
+  const std::vector<uint8_t> invalid = settingsBlobWithBody({SETTINGS_GROUP_RUNTIME, 3, 93, 1, 2});
+  PersistedSettings rejected;
+  malformed = 0;
+  CHECK(decodePersistedSettings(invalid.data(), invalid.size(), rejected, malformed) &&
+        malformed == 1 && !rejected.runtime.machinePowerControlEnabled);
+}
+
 void p91b_settings_codec_round_trips_and_evolves() {
   // Every persisted member survives an encode/decode round trip.
   PersistedSettings original;
@@ -3706,6 +3741,7 @@ const TestCase tests[] = {
     {"P91E", p91e_power_split_migrates_single_setting},
     {"P91F", p91f_scale_stock_tone_tags_round_trip},
     {"P91G", p91g_beanconqueror_endpoint_tag},
+    {"P91H", p91h_machine_power_control_tag},
     {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},
