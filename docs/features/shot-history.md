@@ -568,7 +568,9 @@ that shot only:
   [See what the controller decided](#see-what-the-controller-decided).
 - **Open in Beanconqueror** hands the shot to the Beanconqueror app on the same
   phone or tablet, ready to save as a brew with its dose, yield, time, first
-  drip, target temperature, rating, and weight curve. Open the Web UI on the
+  drip, target temperature, rating, weight curve, and flow. Beanconqueror
+  draws the flow as its own line, **Flow**, and also shows a water line flat
+  at zero, because the controller doesn't measure water. Open the Web UI on the
   device where Beanconqueror is installed. It needs Beanconqueror 8.8 or
   later: older versions answer with a wrong QR code or content message, so
   update the app if you see it. On a device without Beanconqueror nothing

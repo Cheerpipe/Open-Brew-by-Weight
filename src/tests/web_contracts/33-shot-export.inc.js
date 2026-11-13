@@ -482,8 +482,17 @@
   assert.ok(t.length === weight.length && t.length === waterDispensed.length && t.length === 8);
   assert.ok(t.every((v) => Number.isInteger(v) && v >= 0) && sum(t) === 31400);
   assert.equal(sum(weight), 362, 'Weight deltas add up to the last reading in decigrams');
+  // Beanconqueror draws no flow from `flow`: the weight flow is a measured metric
+  // on the same absolute times.
+  const [metric, ...extra] = e.metrics, flowGS = context.shotFlowCurveGS(base);
+  assert.deepEqual([extra, metric.key, metric.name, metric.unit, metric.kind],
+      [[], 'weightFlow', 'Flow', 'g/s', 'measured']);
+  assert.deepEqual(metric.t, t.map((_, i) => sum(t.slice(0, i + 1))));
+  assert.deepEqual(metric.v, context.coffeeSamples(base).map(([, , i]) =>
+    Math.round((flowGS[i] ?? 0) * 100) / 100));
+  assert.ok(metric.v.some((v) => v > 0), 'The handoff carries a non-flat flow');
   const el = decode(await context.shotBeanconquerorLink(lost));
-  assert.ok(!('flow' in el) && !('rating' in el.brew) && !('doseIn' in el.brew));
+  assert.ok(!('flow' in el) && !('metrics' in el) && !('rating' in el.brew) && !('doseIn' in el.brew));
   assert.equal(el.brew.beverageOut.value, 30.5);
 
   // The toolbar menu exports every shot; a card's ⋯ menu acts on its own shot

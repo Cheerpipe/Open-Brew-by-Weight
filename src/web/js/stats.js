@@ -1973,8 +1973,11 @@ function shotVisualizer(r) {
 }
 // Beanconqueror's brew handoff: the envelope gzipped, then unpadded base64url
 // split into 400-character shareBrew<n> parameters behind its total length.
+// Its importer stores `flow` as weight only and draws no flow from it, so the
+// weight flow travels as a measured metric, its own trace in the brew graph.
 async function shotBeanconquerorLink(r) {
-  const s = coffeeSamples(r).map(([ms, cg]) => [ms, Math.round(cg / 10)]),
+  const s = coffeeSamples(r).map(([ms, cg, i]) => [ms, Math.round(cg / 10), i]),
+    flow = shotFlowCurveGS(r),
     delta = (k) => s.map((q, i) => q[k] - (i ? s[i - 1][k] : 0)),
     actual = r.actualG ?? r.estimatedG ?? 0,
     envelope = {
@@ -2001,6 +2004,18 @@ async function shotBeanconquerorLink(r) {
             weight: delta(1),
             waterDispensed: s.map(() => 0),
           }
+        : undefined,
+      metrics: s.length
+        ? [
+            {
+              key: "weightFlow",
+              name: __WEBUI_TEXT__("shell.flow"),
+              unit: "g/s",
+              kind: "measured",
+              t: s.map(([ms]) => ms),
+              v: s.map(([, , i]) => Math.round((flow[i] ?? 0) * 100) / 100),
+            },
+          ]
         : undefined,
       imported: {
         source: "openbrewbyweight",
