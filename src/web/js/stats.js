@@ -632,14 +632,17 @@ function fillShotCharts(h, m) {
 // The preset the three Stats charts follow (uiState.statsPreset): until one
 // is chosen, the active one while it holds good shots, else All, as the
 // controller's header keeps following the active preset until a page names
-// one. The header's `preset` names the one it followed.
+// one. The header's `preset` names the one it was built for: the chosen one,
+// or with All the active one, whose stops Cut accuracy shows, since a stop
+// only compares with its own preset's target.
 const statsChosenPreset = () => {
-  const active = (R.homeStatusCache()?.presets || R.presetState)?.activeId;
-  return (
-    R.uiState.statsPreset ??
-    ((statsHeader().facets?.presets || []).some(([id]) => id === active) ? active : 0)
-  );
-};
+    const active = statsActivePreset();
+    return (
+      R.uiState.statsPreset ??
+      ((statsHeader().facets?.presets || []).some(([id]) => id === active) ? active : 0)
+    );
+  },
+  statsActivePreset = () => (R.homeStatusCache()?.presets || R.presetState)?.activeId || 0;
 // The Stats header (D10-D12): through the companion with the archive on, the
 // one it builds over the whole history (S13) for any window; meanwhile, and
 // whenever the companion cannot answer, the controller's, labelled and with
@@ -673,13 +676,13 @@ function renderStatsDurChart() {
     names = new Map(st.facets?.presets || []),
     ids = [...names.keys()],
     only = statsChosenPreset(),
-    // A header built for an earlier choice draws no preset chart yet.
-    current = st.preset == null || st.preset === only,
+    want = only || statsActivePreset(),
+    nameOf = (id) => presets.items?.find((x) => x.id === id)?.name || names.get(id),
     // The firmware's charts over the panel's window, whatever the table's
     // order or scroll: density curves for all presets and the chosen one
     // (true = the same curve), and the timed arrivals oldest first.
     charts = st.dens || [],
-    d = !only ? charts[0] : current ? (charts[1] === true ? charts[0] : charts[1]) : null,
+    d = !only || charts[1] === true ? charts[0] : charts[1],
     p = st.cons?.p,
     timed = (st.cons?.t || []).map((t, i) => {
       const presetId = Array.isArray(p) ? p[i] : p;
@@ -691,9 +694,6 @@ function renderStatsDurChart() {
       };
     }),
     shots = timed.filter((r) => !only || r.presetId === only);
-  // The companion's header follows the preset it was asked for: once the
-  // choice moves on (the active preset arrived or changed), ask again.
-  if (statsMerged && !current) refreshMergedHeader();
   // One selector for the three charts; its buttons follow the presets the
   // log holds. A choice asks the controller (and the companion) for that
   // preset's chart and cut series.
@@ -703,16 +703,12 @@ function renderStatsDurChart() {
       '<span class="sortLbl">' +
       __WEBUI_TEXT__("runtime.preset") +
       "</span>" +
-      [
-        [0, __WEBUI_TEXT__("runtime.all_presets")],
-        ...ids.map((id) => [id, presets.items?.find((x) => x.id === id)?.name || names.get(id)]),
-      ]
+      [[0, __WEBUI_TEXT__("runtime.all_presets")], ...ids.map((id) => [id, nameOf(id)])]
         .map(([v, t]) => '<button type="button" data-v="' + v + '">' + R.escHtml(t) + "</button>")
         .join("");
     for (const b of filter.querySelectorAll("button"))
       b.onclick = () => {
         R.uiState.statsPreset = +b.dataset.v;
-        R.sendUiOperation({ op: "stats", on: true, preset: R.uiState.statsPreset });
         refreshMergedHeader();
         renderStatsDurChart();
       };
@@ -722,9 +718,18 @@ function renderStatsDurChart() {
     b.setAttribute("aria-pressed", String(+b.dataset.v === only));
   // No good shots: no charts at all; none timed for this preset: no density.
   root.hidden = !ids.length;
+  // A header built for another preset leaves the charts as they are until
+  // the one they follow arrives: the companion is asked again, the
+  // controller told the choice (until then it follows the active preset).
+  if (st.preset != null && st.preset !== want) {
+    if (statsMerged) refreshMergedHeader();
+    else if (R.uiState.statsPreset != null && statsPresetSent !== want)
+      R.sendUiOperation({ op: "stats", on: true, preset: (statsPresetSent = want) });
+    return;
+  }
   host.hidden = !d;
   renderStatsConsistency(shots);
-  renderStatsCutAccuracy(st, only, current);
+  renderStatsCutAccuracy(st, want, !only && nameOf(want));
   if (!d) {
     host.innerHTML = "";
     return;
@@ -1204,18 +1209,23 @@ function cutModel(cut) {
     oneTarget: new Set(rows.map((r) => r.targetG)).size === 1,
   };
 }
-function renderStatsCutAccuracy(st, only, current) {
+// With All it follows the active preset, named beside its title.
+function renderStatsCutAccuracy(st, preset, active) {
   const root = $("statsCutAccuracy");
   if (!root) return;
-  // With All, or before the header for the chosen preset arrives, it waits.
-  root.hidden = !st.facets?.presets?.length || (only && !current);
+  root.hidden = !st.facets?.presets?.length;
   if (root.hidden) return;
-  const title = '<p class="dcTitle">' + __WEBUI_TEXT__("runtime.stats_title_cut") + "</p>";
-  if (!only || !st.cut?.e?.length) {
+  const title =
+    __WEBUI_TEXT__("runtime.stats_title_cut") +
+    (active
+      ? "<span>" + R.sub(__WEBUI_TEXT__("runtime.cut_active"), [R.escHtml(active)]) + "</span>"
+      : "");
+  if (!preset || !st.cut?.e?.length) {
     root.innerHTML =
+      '<p class="dcTitle">' +
       title +
-      '<p class="fieldHint">' +
-      (only ? __WEBUI_TEXT__("runtime.cut_none") : __WEBUI_TEXT__("runtime.cut_pick")) +
+      '</p><p class="fieldHint">' +
+      (preset ? __WEBUI_TEXT__("runtime.cut_none") : __WEBUI_TEXT__("runtime.cut_pick")) +
       "</p>";
     return;
   }
@@ -1238,7 +1248,7 @@ function renderStatsCutAccuracy(st, only, current) {
     within = R.sub(__WEBUI_TEXT__("runtime.cut_within"), [grams(CUT_CLOSE_G)]);
   missChart(root, {
     id: "cut",
-    title: __WEBUI_TEXT__("runtime.stats_title_cut"),
+    title,
     head:
       "<span><b>" +
       R.sub(__WEBUI_TEXT__("runtime.cut_of"), [m.bulls, m.scored]) +
@@ -1342,7 +1352,7 @@ async function refreshMergedHeader() {
           ["result", "preset", "scale"].filter((k) => q[k]).map((k) => [k, q[k]]),
         ),
         window: R.uiState.statsWindow,
-        active: statsChosenPreset(),
+        active: statsChosenPreset() || statsActivePreset(),
         epoch,
       });
   // A choice and the controller's header that follows it ask the same: a
@@ -2862,6 +2872,9 @@ let statsStreamWanted = false,
   statsLastSeq = 0,
   statsPage = null,
   statsTag = 0,
+  // The preset the controller was last asked to build its header for (null:
+  // it follows the active one).
+  statsPresetSent = null,
   statsResolve = null;
 // The subscribe op: a fresh request id separates its page from older frames.
 function statsSubscribeOp() {
@@ -2881,7 +2894,7 @@ function statsSubscribeOp() {
     ...(Object.keys(R.uiState.shotFilter).length && { filter: R.uiState.shotFilter }),
     ...(R.uiState.statsWindow !== 10 && { window: Math.min(R.uiState.statsWindow, 100) }),
     ...(statsTag && { tag: statsTag }),
-    ...(R.uiState.statsPreset != null && { preset: R.uiState.statsPreset }),
+    ...(statsPresetSent != null && { preset: statsPresetSent }),
   };
 }
 function statsSendSubscribe() {
@@ -3137,7 +3150,7 @@ const statsStream = {
   rejected() {
     shotFilterReset();
     R.uiState.statsWindow = 10;
-    R.uiState.statsPreset = null;
+    R.uiState.statsPreset = statsPresetSent = null;
   },
   refresh: refreshShots,
   // Delete follows this screen's Admin unlock.

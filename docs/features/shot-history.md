@@ -34,7 +34,9 @@ Stats has three charts, each under its own title: **Shot time**,
 its colors and marks. One **Preset** row above them chooses whose shots they
 show: **All**, or one preset by name, and every chart follows it. Until you
 pick one, it follows the active preset, even when you switch presets, or
-shows All while that preset has no good shots yet.
+shows All while that preset has no good shots yet. When you pick another
+preset, the charts keep showing what they had until that preset's figures
+arrive, then change at once.
 
 The **Shot time** chart shows how those shots, the same ones behind the
 averages, land against the shot time window. Each
@@ -100,15 +102,16 @@ anywhere else, the chart scrolls the page as usual.
 The **Cut accuracy** chart shows how close each automatic stop of the chosen
 preset brought the cup to its target weight. It looks at that preset's own
 newest shots stopped by weight, as many as **Last 10**, **50** or **100**
-asks for, so it needs a preset chosen above; with **All** it asks you to
-choose one. Each column is one shot, newest on the right, starting at the
-target, the dashed line, and rising for a cup that settled heavier or
-falling for one that settled lighter. Columns within **0.2 g** of the target
-are green, heavier ones red and lighter ones blue. A ring on the line is a
-**bullseye**: a cup that settled exactly on the target, the same moment the
-Bullseye melody plays for. The shaded band behind follows your last five
-stops, green where it stays within 0.2 g and red or blue where it reaches
-beyond.
+asks for. A stop can only be judged against its own preset's target, so with
+**All** chosen above it shows the active preset, named beside its title, and
+follows it when you switch presets. Each column is one shot, newest on the
+right, starting at the target, the dashed line, and rising for a cup that
+settled heavier or falling for one that settled lighter. Columns within
+**0.2 g** of the target are green, heavier ones red and lighter ones blue. A
+ring on the line is a **bullseye**: a cup that settled exactly on the target,
+the same moment the Bullseye melody plays for. The shaded band behind follows
+your last five stops, green where it stays within 0.2 g and red or blue where
+it reaches beyond.
 
 A shot that a fast or slow shot guard stopped on purpose, heavier or lighter
 than the target by design, is drawn in grey with a dashed outline and left out
