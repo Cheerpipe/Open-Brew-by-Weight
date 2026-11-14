@@ -2907,7 +2907,7 @@ void w01_default_runtime_configuration_is_valid() {
   CHECK(config.slowAfterMs == DEFAULT_SLOW_AFTER_MS);
   CHECK(config.scaleLossEnabled && config.scaleLossFixedMs == 0);
   CHECK(noScaleBbwModeValue(config.noScaleBbwMode) ==
-        static_cast<uint8_t>(NoScaleBbwMode::WARN_ONCE));
+        static_cast<uint8_t>(NoScaleBbwMode::OFF));
   CHECK(idleAccessoryRetareEnabled(config.noScaleBbwMode));
   CHECK(noScaleAllowRinseWhileArmed(config.noScaleBbwMode));
   CHECK(config.cupProtectionEnabled);

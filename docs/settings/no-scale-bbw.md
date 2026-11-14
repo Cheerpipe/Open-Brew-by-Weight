@@ -17,8 +17,8 @@ nor disarmed. See [Linea Micra](linea-micra.md#recognize-paddle-wake-gestures).
 
 | Mode | Shot without a scale | Rinse without a scale | Cooldown |
 | --- | --- | --- | --- |
-| **Brew manually** | Allowed | Allowed | Not used |
-| **Warn once, then allow** (default) | First attempt is blocked and alerts; later attempts are manual | An Armed rinse runs, because **Rinse without a scale** is on by default. Turn it off and an Armed rinse does not run water; it uses up that warning so the next brew can be manual | Protection returns after the configured delay |
+| **Brew manually** (default) | Allowed | Allowed | Not used |
+| **Warn once, then allow** | First attempt is blocked and alerts; later attempts are manual | An Armed rinse runs, because **Rinse without a scale** is on by default. Turn it off and an Armed rinse does not run water; it uses up that warning so the next brew can be manual | Protection returns after the configured delay |
 | **Require a scale** | Blocked unless temporarily allowed with the physical gesture | Blocked unless temporarily allowed with the physical gesture | Protection returns after the configured delay |
 
 In **Require a scale**, shots and rinses cannot start until the scale is usable.
