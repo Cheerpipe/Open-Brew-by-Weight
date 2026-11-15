@@ -5,6 +5,13 @@ it off. It is not a shot: no shot history, no last-shot overwrite, and it does
 not count toward the scale-loss backup's recent shots. Rinses do land in the [activation history](../features/activation-history.md)
 as `rinse` entries.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-quick-rinse-dark.webp">
+    <img src="../images/screenshots/settings-quick-rinse-light.webp" alt="Quick rinse settings" width="300">
+  </picture>
+</p>
+
 On Micra, a gesture that starts as a shot with a connected scale pauses cloud
 API work; live updates keep arriving. As soon as it is recognized as a rinse,
 that pause ends and API work can continue while the rinse is still running. Ordinary

@@ -7,6 +7,17 @@ waits for five seconds of actual scanning without another candidate. This also
 applies to machine profiles without Micra integration. Wi-Fi stays connected
 and local settings remain accessible.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-scale-dark.webp">
+    <img src="../images/screenshots/settings-scale-light.webp" alt="Scale settings" width="280">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-bookoo-dark.webp">
+    <img src="../images/screenshots/settings-bookoo-light.webp" alt="Bookoo settings" width="280">
+  </picture>
+</p>
+
 Which Bluetooth scale to use, how long to wait after a shot for drip, and
 Bookoo-specific volume / combined tare. Machine-level, under
 **Settings → Shared settings → Scale**.

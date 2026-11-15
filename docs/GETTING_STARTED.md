@@ -124,6 +124,17 @@ the shot to land. When the shot ends, the circle glides to the shot's real end
 point and settles into a small dot. Flow appears under the weight curve, in its
 own strip below the graph on a tablet.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/screenshots/home-full-screen-dark.webp">
+    <img src="images/screenshots/home-full-screen-light.webp" alt="The live shot view on a phone" width="220">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/screenshots/home-full-screen-tablet-dark.webp">
+    <img src="images/screenshots/home-full-screen-tablet-light.webp" alt="The live shot view on a tablet in landscape" width="440">
+  </picture>
+</p>
+
 The weight leads the numbers: it takes the shot's colour, a bar fills toward
 your target yield, and you see how many grams are left and the ratio so far.
 Below it, the time shows when the shot is expected to end, and a dot on the

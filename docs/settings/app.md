@@ -6,6 +6,13 @@ device: the controller never sees it, and other phones, tablets, and browsers
 keep their own. Tabs and windows of the same browser share the same choices.
 In a browser tab, the group leaves out the settings marked *installed app only*.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-this-device-dark.webp">
+    <img src="../images/screenshots/settings-this-device-light.webp" alt="Settings for this device" width="300">
+  </picture>
+</p>
+
 The [preset lock](../features/presets.md#lock-the-preset-list-on-home) on
 Home is kept the same way, per device, though you set it on Home itself.
 

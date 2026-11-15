@@ -7,6 +7,13 @@ Micra through its [cloud connection](linea-micra.md). It is off on a new
 controller, after a factory reset, and after updating from firmware that did
 not have it.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-machine-control-dark.webp">
+    <img src="../images/screenshots/admin-machine-control-light.webp" alt="Machine control in Admin" width="300">
+  </picture>
+</p>
+
 ## Allow turning the machine on and off
 
 1. Open **Admin**, unlock it with the device password, and open **Machine

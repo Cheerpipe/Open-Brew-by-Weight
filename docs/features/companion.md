@@ -7,6 +7,13 @@ whatever the companion takes over simply comes back to the controller when
 the companion is not there. You never have to change a setting when the
 companion goes away or comes back, even in the middle of a shot.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-companion-dark.webp">
+    <img src="../images/screenshots/admin-companion-light.webp" alt="Companion settings in Admin" width="300">
+  </picture>
+</p>
+
 Without a companion, nothing changes: the controller works exactly as it
 does today.
 

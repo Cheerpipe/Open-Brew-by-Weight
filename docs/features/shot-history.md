@@ -4,6 +4,17 @@ Every shot pulled with a scale is stored on the controller and shown in the
 Web UI shot log. Use it to see how long a shot ran, why it ended, and how
 close it landed to the target when brew by weight was in use.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/shots-stats-dark.webp">
+    <img src="../images/screenshots/shots-stats-light.webp" alt="Stats with the averages and the Shot time, Shot consistency and Cut accuracy charts" width="280">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/shots-history-dark.webp">
+    <img src="../images/screenshots/shots-history-light.webp" alt="Two shot cards in the shot history" width="280">
+  </picture>
+</p>
+
 When you open **Shots**, the Stats section, including its chart, and the
 Shot history section, including its sort and export controls, normally
 appear at once with their data. A brief loading animation covers them only

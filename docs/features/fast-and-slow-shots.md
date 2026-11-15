@@ -13,6 +13,17 @@ always stop at the target. To skip them for a few shots without changing the
 preset, turn them off in the header's [guard
 panel](brew-by-weight.md#change-how-shots-stop-for-now).
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-fast-dark.webp">
+    <img src="../images/screenshots/settings-fast-light.webp" alt="Fast shots settings with the cut-line graph" width="280">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-slow-dark.webp">
+    <img src="../images/screenshots/settings-slow-light.webp" alt="Slow shots settings with the cut-line graph" width="280">
+  </picture>
+</p>
+
 ## When it applies
 
 Automatic brew by weight with a usable scale. Fast and slow handling does not

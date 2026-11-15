@@ -6,6 +6,13 @@ during a shot** if you place the cup after the shot starts. An optional fourth
 switch, **Tare items added to a cup**, extends only the
 outside-brew behavior.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-tare-dark.webp">
+    <img src="../images/screenshots/settings-tare-light.webp" alt="Tare settings" width="300">
+  </picture>
+</p>
+
 All four are **on by default**. Late retare also requires shot-start tare.
 
 ## Automatic tare outside a brew

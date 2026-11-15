@@ -9,6 +9,13 @@ network setup can take a moment to finish before its owner closes the connection
 How the controller joins your home network (STA) and when it falls back to
 its own access point. Details for the fallback AP itself are in [AP](ap.md).
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-network-dark.webp">
+    <img src="../images/screenshots/admin-network-light.webp" alt="Network settings in Admin" width="300">
+  </picture>
+</p>
+
 The Web UI is reachable from any client on the same network. Home and
 Settings use a single-browser claim (`Reload`); see
 [Web access](../GETTING_STARTED.md#web-access). **Admin** is additionally locked

@@ -59,6 +59,13 @@ and installed app follows it. Each browser or installed app can pick its own in
 counter wants the graph while a laptop elsewhere keeps the colorful card.
 Double-tapping the card still opens the full-screen live view in both looks.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-frontend-dark.webp">
+    <img src="../images/screenshots/admin-frontend-light.webp" alt="Frontend settings in Admin, with the hero card choice" width="300">
+  </picture>
+</p>
+
 ## Shot card colors
 
 [**Settings → This device**](app.md) **→ Shot card colors** chooses how the Home shot card uses

@@ -4,6 +4,13 @@ Sounds and the optional onboard LED that tell you what the controller is
 doing: tare, first drops, paddle left ON, scale disconnected or connected,
 extended-shot pulses, and a machine ready for its cleaning backflush.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="images/screenshots/settings-alerts-dark.webp">
+    <img src="images/screenshots/settings-alerts-light.webp" alt="Alert settings" width="300">
+  </picture>
+</p>
+
 First-drop sound plays at most once per shot. A confirmed late-cup retare can
 clear an earlier first-drop record, but cannot recall a sound already played.
 A replacement first drop updates the shot data without another first-drop cue.

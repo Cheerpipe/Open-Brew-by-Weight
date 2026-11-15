@@ -102,6 +102,82 @@ from a shopping list to your first shot by weight in six steps:
 | Update safely without a USB cable | [Over-the-air updates](docs/features/ota.md) over Wi-Fi into a spare firmware slot, with boot verification and automatic rollback |
 | Recover from a mistake | [Emergency recovery](docs/EMERGENCY_RECOVERY.md) restores access or resets settings from the machine's own switch |
 
+## A look at the Web UI
+
+Everything runs from a web page the controller serves itself, on your phone,
+tablet or computer. No app required, and no account to create.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/home-dark.webp">
+    <img src="docs/images/screenshots/home-light.webp" alt="Home with the last shot drawn against the preset's cut line, the presets and the equipment" width="260">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/home-full-screen-dark.webp">
+    <img src="docs/images/screenshots/home-full-screen-light.webp" alt="The live shot view, following a shot full screen" width="260">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/settings-presets-dark.webp">
+    <img src="docs/images/screenshots/settings-presets-light.webp" alt="Settings with the active preset and the graph of how it cuts" width="260">
+  </picture>
+</p>
+
+**Home** shows your last shot against the recipe, your presets and the state of
+your scale and machine. The **live view** follows a shot full screen from a
+phone or tablet propped next to the machine. **Settings** draws exactly how each
+preset will cut a shot. Every page, in light and dark mode, is in the
+[screenshot gallery](docs/SCREENSHOTS.md).
+
+## Your shots, in numbers
+
+Every shot you pull with the scale on is kept, and **Shots** turns them into a
+few honest answers: are my shots landing where I want them, and are they
+getting more alike?
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/shots-stats-dark.webp">
+    <img src="docs/images/screenshots/shots-stats-light.webp" alt="Stats with the averages and the Shot time, Shot consistency and Cut accuracy charts" width="300">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/shots-history-dark.webp">
+    <img src="docs/images/screenshots/shots-history-light.webp" alt="Two shot cards in the shot history, each with its numbers and curves" width="300">
+  </picture>
+</p>
+
+**The averages** at the top sum up your recent shots: how long they usually
+take, how much ends up in the cup, how many you pull a day, how close the stops
+land and how fast the coffee flows. Pick **Last 10**, **50** or **100** to look
+further back, and look at all your presets together or just one.
+
+**Shot time** sorts those shots into fast, on recipe and slow, measured against
+your preset's time window. The curve below shows where your times gather: a
+tall, narrow peak means you are pulling the same shot again and again, while a
+low, wide one means your times wander.
+
+**Shot consistency** asks a different question: not whether you hit the
+recipe, but how alike your shots are. Every shot already stops at the same
+weight, so what changes is how long it takes to get there. Each column is one
+shot, newest on the right, standing above or below your average time. The band
+behind them follows your last five shots and turns green, yellow or orange as
+they settle or drift apart. If all your shots run a touch slow, you can still
+be very consistent, and this chart will tell you so.
+
+**Cut accuracy** shows how close each automatic stop brought the cup to its
+target. Green columns landed within 0.2 g, red ones a little heavy and blue ones
+a little light. A ring on the line is a bullseye: a cup that settled exactly on
+the target.
+
+A quick purge or a pull that was too short to be a real shot is kept, so you can
+look back at it, but it never counts in these numbers.
+
+Below the charts, every shot has its own card: when you pulled it, how it
+ended, its dose, ratio and drip, and its curve drawn against the preset's cut
+line. Rate it with stars, filter the list to compare one coffee or one grinder
+setting, or export your shots to Visualizer.coffee or in the Gaggiuino format.
+The [shot history guide](docs/features/shot-history.md) explains every number
+and chart in detail.
+
 ## Documentation
 
 | I want to… | Read |

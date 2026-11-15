@@ -9,6 +9,13 @@ so a rollback can recover the prior settings.
 Erases saved configuration and returns the controller to first-boot
 credentials. Firmware on the flash is not erased.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-factory-reset-dark.webp">
+    <img src="../images/screenshots/admin-factory-reset-light.webp" alt="Factory reset in Admin" width="300">
+  </picture>
+</p>
+
 ## Clear a history
 
 To start a shot or activation history over without resetting anything else,
@@ -28,6 +35,13 @@ Clearing empties the whole list, including the copy a
 alone holds and histories from before a factory reset. Opened directly on the
 controller, the confirmation says so, since that screen cannot show the older
 records. The controller must be idle, as for a single delete.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-history-dark.webp">
+    <img src="../images/screenshots/admin-history-light.webp" alt="Clearing the shot or activation history in Admin" width="300">
+  </picture>
+</p>
 
 ## What is erased
 

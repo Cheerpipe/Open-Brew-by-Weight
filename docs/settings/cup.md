@@ -4,6 +4,13 @@ Thresholds that decide whether a cup is **on the scale** or **lifted**. Used
 by idle cup-placement tare, late-cup retare, and shot protection. Shared by
 every preset, under **Settings → Shared settings → Cup detection**.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-cup-detection-dark.webp">
+    <img src="../images/screenshots/settings-cup-detection-light.webp" alt="Cup detection settings" width="300">
+  </picture>
+</p>
+
 How those detections protect the shot is explained in
 [Cup protection](../features/cup-protection.md). The cup protection
 switches that act on these detections are also shared by every preset.

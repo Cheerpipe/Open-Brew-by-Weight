@@ -7,6 +7,13 @@ Replacing the factory password later, at any time, turns the same protection
 on by itself — the first time only, so switching the sign-in off afterwards
 is your decision and it stays yours.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-access-dark.webp">
+    <img src="../images/screenshots/admin-access-light.webp" alt="Access settings in Admin" width="300">
+  </picture>
+</p>
+
 Controllers set up before this protection existed keep working as they were:
 anyone on your Wi-Fi can open their Web UI, and Home shows a short note about
 it, with a **Set up** button that takes you to the panel below. **Dismiss**

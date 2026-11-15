@@ -5,6 +5,13 @@ network. Webhooks are useful for software other than Home Assistant; Home
 Assistant users should follow the [native integration guide](home-assistant.md)
 instead of configuring this page manually.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-webhooks-dark.webp">
+    <img src="../images/screenshots/admin-webhooks-light.webp" alt="Webhook settings in Admin" width="300">
+  </picture>
+</p>
+
 Webhooks observe extraction activity. They cannot start or stop the machine.
 Delivery is best effort and uses plain HTTP, so it must not be used as a safety
 signal. Keep the controller and receiver on a trusted LAN.

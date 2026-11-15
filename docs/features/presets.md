@@ -9,6 +9,13 @@ target (see [Fast and slow shots](fast-and-slow-shots.md)). **Manual** never
 stops the shot for you: pick it when you want to end each shot yourself, then
 switch back to a brewing preset to stop by weight again.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-presets-dark.webp">
+    <img src="../images/screenshots/settings-presets-light.webp" alt="Settings showing the active preset and the graph of how it cuts" width="300">
+  </picture>
+</p>
+
 Open **Settings → Presets** while the machine is idle. The preset actions sit
 in a bar above the list (see [Preset actions](#preset-actions)). Each preset appears as a
 card with its name, an **Adaptive**, **Fixed** or **Manual** badge, and a summary such as
@@ -123,6 +130,13 @@ labels (for example **18.0 g in** and **1:2.0**), and a sliding scale between
 Opening `http://<device-address>/?edit_weight=1` also opens this panel.
 The address parameter is used once and removed, so refreshing the page
 afterwards shows the normal Home.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/home-weight-dial-dark.webp">
+    <img src="../images/screenshots/home-weight-dial-light.webp" alt="The target weight dial open at the bottom of Home" width="300">
+  </picture>
+</p>
 
 ## Create or change a recipe
 

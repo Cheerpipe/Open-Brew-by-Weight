@@ -7,6 +7,13 @@ settings → Cup protection**; detection thresholds are in **Cup detection** and
 tare timing in **Tare** of the same section. **Earliest weight stop** is saved
 with each preset under **Settings → Presets → Time limits**.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-cup-protection-dark.webp">
+    <img src="../images/screenshots/settings-cup-protection-light.webp" alt="Cup protection settings" width="300">
+  </picture>
+</p>
+
 ## Choose the behavior
 
 | Control | Factory value | What it does |
