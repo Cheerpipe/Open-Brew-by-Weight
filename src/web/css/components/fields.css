@@ -12,6 +12,26 @@
   appearance: textfield;
 }
 
+.numBox.hasUnit > input {
+  padding-right: calc(var(--keys, 5.5rem) + var(--unit, 3.2rem));
+}
+
+.numUnit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(var(--keys, 5.5rem) + 0.75rem);
+  display: flex;
+  align-items: center;
+  color: var(--mu);
+  pointer-events: none;
+}
+
+.windowPair .numBox {
+  --keys: 4.5rem;
+  --unit: 1.6rem;
+}
+
 .numBox > input::-webkit-inner-spin-button,
 .numBox > input::-webkit-outer-spin-button {
   appearance: none;
@@ -421,7 +441,7 @@ textarea[readonly] {
 }
 
 .windowPair .numBox > input {
-  padding-inline: 0.5rem 4.6rem;
+  padding-inline: 0.5rem calc(var(--keys) + var(--unit));
 }
 
 input:-webkit-autofill:focus {

@@ -212,6 +212,7 @@
           max="30"
           step="0.1"
           required
+          data-unit="g"
         /><small class="fieldHint">{{webui:settings.dose_hint}}</small></label
       ><label
         >{{webui:settings.target_g}}<input
@@ -221,6 +222,7 @@
           max="200"
           step="0.1"
           required
+          data-unit="g"
         /><small class="fieldHint">{{webui:settings.target_weight_hint}}</small></label
       ><label class="laMarzoccoOnly laMarzoccoTempOpt"
         >{{webui:settings.brew_temperature_c}}<input
@@ -230,6 +232,7 @@
           max="100"
           step="0.1"
           required
+          data-unit="°C"
         /><small class="fieldHint">{{webui:settings.brew_temperature_hint}}</small></label
       >
       <div class="windowField">
@@ -243,7 +246,8 @@
               max="58"
               step="0.5"
               required
-              aria-label="{{webui:settings.window_start}}" /></label
+              aria-label="{{webui:settings.window_start}}"
+              data-unit="s" /></label
           ><span>{{webui:settings.window_to}}</span
           ><label
             ><input
@@ -254,6 +258,7 @@
               step="0.5"
               required
               aria-label="{{webui:settings.window_end}}"
+              data-unit="s"
           /></label>
         </div>
         <small class="fieldHint">{{webui:settings.shot_window_hint}}</small
@@ -287,6 +292,7 @@
             max="10"
             step="0.1"
             required
+            data-unit="g"
           /><small id="fastMarginResult" class="fieldResult"></small
           ><small class="fieldHint">{{webui:settings.fast_margin_hint}}</small></label
         ><label class="fastGuardOpt"
@@ -297,6 +303,7 @@
             max="10"
             step="0.5"
             required
+            data-unit="s"
           /><small class="fieldHint">{{webui:settings.fast_ramp_hint}}</small></label
         >
       </div>
@@ -367,6 +374,7 @@
             max="10"
             step="0.1"
             required
+            data-unit="g"
           /><small id="slowMarginResult" class="fieldResult"></small
           ><small class="fieldHint">{{webui:settings.slow_margin_hint}}</small></label
         ><label class="slowGuardOpt"
@@ -377,6 +385,7 @@
             max="10"
             step="0.5"
             required
+            data-unit="s"
           /><small class="fieldHint">{{webui:settings.slow_ramp_hint}}</small></label
         >
       </div>
@@ -437,6 +446,7 @@
           max="30"
           step="0.1"
           required
+          data-unit="s"
         /><small class="fieldHint">{{webui:settings.delay_weight_stopping}}</small></label
       ><label
         >{{webui:settings.max_bbw_time_s}}<input
@@ -446,6 +456,7 @@
           max="60"
           step="1"
           required
+          data-unit="s"
         /><small class="fieldHint">{{webui:settings.max_bbw_time_hint}}</small></label
       ><label
         >{{webui:settings.scale_loss_override_s}}<input
@@ -454,6 +465,7 @@
           min="0.5"
           max="60"
           step="0.1"
+          data-unit="s"
         /><small class="fieldHint">{{webui:settings.scale_loss_override_hint}}</small></label
       >
     </details>
@@ -493,6 +505,7 @@
               min="0"
               max="5"
               step="0.01"
+              data-unit="g"
             /><small class="fieldHint">{{webui:settings.drip_set_hint}}</small></label
           >
           <button
@@ -852,6 +865,7 @@
           max="1000"
           step="10"
           required
+          data-unit="ms"
         /><small class="fieldHint"
           >{{webui:settings.how_long_the_automatic_button_press_lasts}}</small
         ></label
@@ -863,6 +877,7 @@
           max="5000"
           step="50"
           required
+          data-unit="ms"
         /><small class="fieldHint"
           >{{webui:settings.longest_hold_that_still_counts_as_a}}</small
         ></label
@@ -879,6 +894,7 @@
           max="30"
           value="12"
           required
+          data-unit="s"
         /><small class="fieldHint"
           >{{webui:settings.after_you_start_if_the_scale_stays}}</small
         ></label
@@ -890,6 +906,7 @@
           max="5"
           step="0.1"
           required
+          data-unit="s"
         /><small class="fieldHint">{{webui:settings.after_a_start_or_stop_how_long}}</small></label
       >
     </details>
@@ -912,6 +929,7 @@
             max="5"
             step="0.1"
             required
+            data-unit="s"
           /><small class="fieldHint paddleOnly"
             >{{webui:settings.how_long_you_can_leave_the_paddle}}</small
           ><small class="fieldHint momentaryOnly"
@@ -925,6 +943,7 @@
             max="10"
             step="0.1"
             required
+            data-unit="s"
           /><small class="fieldHint"
             >{{webui:settings.how_long_water_runs_through_the_group}}</small
           ></label
@@ -941,6 +960,7 @@
           max="1000"
           step="1"
           required
+          data-unit="ms"
         /><small class="fieldHint"
           >{{webui:settings.extra_wait_for_the_scale_timer_to}}</small
         ></label
@@ -952,6 +972,7 @@
           max="10"
           step="0.1"
           required
+          data-unit="s"
         /><small class="fieldHint"
           >{{webui:settings.wait_for_drips_before_saving_final_weight}}</small
         ></label
@@ -1067,6 +1088,7 @@
           max="10"
           step="0.1"
           required
+          data-unit="s"
         /><small class="fieldHint"
           >{{webui:settings.wait_for_zero_after_tare_before_using}}</small
         ></label
@@ -1083,6 +1105,7 @@
           max="10"
           step="0.1"
           required
+          data-unit="s"
         /><small class="fieldHint"
           >{{webui:settings.late_cup_window_measured_from_shot_start}}</small
         ></label
@@ -1097,7 +1120,8 @@
           min="1"
           max="500"
           step="0.1"
-          required /><small class="fieldHint"
+          required
+          data-unit="g" /><small class="fieldHint"
           >{{webui:settings.lightest_stable_weight_that_counts_as_a}}</small
         ><small id="cupMinGuidance" class="fieldHint" hidden></small></label
       ><label
@@ -1109,6 +1133,7 @@
           step="0.1"
           value="-3"
           required
+          data-unit="g"
         /><small class="fieldHint"
           >{{webui:settings.weight_at_or_below_this_means_the}}</small
         ></label
@@ -1131,6 +1156,7 @@
           max="20"
           step="0.1"
           required
+          data-unit="g"
         /><small class="fieldHint"
           >{{webui:settings.maximum_difference_between_the_lowest_and_highest}}</small
         ></label
@@ -1142,6 +1168,7 @@
           max="5"
           step="0.1"
           required
+          data-unit="s"
         /><small class="fieldHint"
           >{{webui:settings.maximum_gap_between_stable_cup_readings}}</small
         ></label
@@ -1153,6 +1180,7 @@
           max="2"
           step="0.1"
           required
+          data-unit="s"
         /><small class="fieldHint"
           >{{webui:settings.how_long_the_cup_must_stay_steady}}</small
         ></label
@@ -1219,6 +1247,7 @@
           max="240"
           step="1"
           required
+          data-unit="min"
         /><small class="fieldHint">{{webui:settings.protection_returns_after_hint}}</small></label
       >
     </details>
@@ -1347,10 +1376,10 @@
           >{{webui:settings.paddle_off_reminder}}<span class="selBox"
             ><select id="paddleReturnReminder">
               <option value="0">{{webui:settings.paddle_off_reminder_off}}</option>
-              <option value="15">15</option>
-              <option value="30" selected>30</option>
-              <option value="60">60</option>
-              <option value="120">120</option>
+              <option value="15">15 s</option>
+              <option value="30" selected>30 s</option>
+              <option value="60">60 s</option>
+              <option value="120">120 s</option>
             </select></span
           ><small class="fieldHint"
             >{{webui:settings.reminds_you_to_return_the_paddle_after}}</small
@@ -1363,6 +1392,7 @@
             max="60"
             step="1"
             required
+            data-unit="min"
           /><small class="fieldHint"
             >{{webui:settings.stops_reminding_after_this_time_if_the}}</small
           ></label

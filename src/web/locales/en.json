@@ -2227,7 +2227,7 @@
     "settings.output_channel": "Play alerts on",
     "settings.paddle": "Paddle",
     "settings.paddle_mode": "Paddle mode",
-    "settings.paddle_off_reminder": "Paddle-off reminder",
+    "settings.paddle_off_reminder": "Paddle-off reminder (s)",
     "settings.paddle_off_reminder_off": "OFF",
     "settings.paddle_reminder_limit_min": "Paddle reminder limit (min)",
     "settings.placement_min_stable_time_s": "Placement min stable time (s)",

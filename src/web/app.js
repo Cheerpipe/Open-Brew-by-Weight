@@ -91,12 +91,21 @@ function fitBars(root) {
 // steps on click; holding one repeats. data-wrap fields (clock hours and
 // minutes) roll over from max to min and back instead of stopping.
 // The field keeps its arrow keys, so the keys stay out of the tab order.
+// A data-unit field also shows its unit inside the border, left of the keys.
 function addNumberKeys(root) {
   root.querySelectorAll('input[type="number"]').forEach((f) => {
     const box = document.createElement("span");
     box.className = "numBox";
     f.replaceWith(box);
     box.append(f);
+    if (f.dataset.unit) {
+      const u = document.createElement("span");
+      u.className = "numUnit";
+      u.textContent = f.dataset.unit;
+      u.setAttribute("aria-hidden", "true");
+      box.classList.add("hasUnit");
+      box.append(u);
+    }
     for (const up of [false, true]) {
       const b = document.createElement("button");
       let timer,
