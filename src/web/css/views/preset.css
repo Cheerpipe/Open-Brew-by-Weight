@@ -812,7 +812,7 @@
 
 .guardRow {
   display: grid;
-  grid-template-columns: 6.5rem 1fr;
+  grid-template-columns: 9.2rem 1fr;
   gap: 0.6rem;
   align-items: baseline;
   padding: 0.5rem 0;
@@ -837,9 +837,18 @@
 }
 
 .guardName i {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
+  display: flex;
+  flex: none;
+}
+
+.guardName svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .guardRule {
@@ -848,15 +857,15 @@
 }
 
 .guardFast i {
-  background: var(--gFast);
+  color: var(--gFast);
 }
 
 .guardBbw i {
-  background: var(--ok);
+  color: var(--ok);
 }
 
 .guardSlow i {
-  background: var(--gSlow);
+  color: var(--gSlow);
 }
 
 /* Quick target-weight sheet, invoked by the active preset's pencil */

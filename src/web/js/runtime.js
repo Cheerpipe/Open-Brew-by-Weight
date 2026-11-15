@@ -3974,36 +3974,41 @@ function guardRuleRows(m) {
   return [
     [
       "guardFast",
+      "g-fast",
       __WEBUI_TEXT__("runtime.verdict_fast"),
       on && sub(__WEBUI_TEXT__("home.rule_before"), [m.t1]),
       on && m.fast && sub(__WEBUI_TEXT__("home.rule_fast"), [f(m.ceil)]),
     ],
     [
       "guardBbw",
+      "g-recipe",
       __WEBUI_TEXT__("runtime.verdict_on_recipe"),
-      on && sub(__WEBUI_TEXT__("home.rule_window"), [m.t1, m.t2]),
+      on && sub(__WEBUI_TEXT__("home.rule_between"), [m.t1, m.t2]),
       on && f(m.goal),
     ],
     [
       "guardSlow",
+      "g-slow",
       __WEBUI_TEXT__("runtime.verdict_slow"),
       on && sub(__WEBUI_TEXT__("home.rule_after"), [m.t2]),
       on && m.slow && sub(__WEBUI_TEXT__("home.rule_slow"), [f(m.floor)]),
     ],
   ]
-    .map(([c, label, when, detail]) => [
+    .map(([c, icon, label, when, detail]) => [
       when || label,
       c,
+      icon,
       when ? label + " · " + (detail || off) : off,
     ])
-    .map(([n, c, r]) => {
+    .map(([n, c, icon, r]) => {
       const row = document.createElement("div");
       row.className = "guardRow " + c;
       const name = document.createElement("span");
       name.className = "guardName";
-      const dot = document.createElement("i");
-      dot.setAttribute("aria-hidden", "true");
-      name.append(dot, n);
+      const ico = document.createElement("i");
+      ico.setAttribute("aria-hidden", "true");
+      ico.innerHTML = `<svg><use href="#${icon}"/></svg>`;
+      name.append(ico, n);
       const rule = document.createElement("span");
       rule.className = "guardRule";
       rule.textContent = r;

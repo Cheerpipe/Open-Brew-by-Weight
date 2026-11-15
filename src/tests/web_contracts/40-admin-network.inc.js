@@ -43,9 +43,9 @@ if (firmware.indexOf('publishLogLevels(runtimeConfig)',
     !css.includes('.presetAccItem.full .presetAccToggle svg{transform:rotate(180deg)}') ||
     !codeIncludes(ui, 'e.currentTarget.ariaExpanded = item.classList.toggle("full")') ||
     !codeIncludes(ui, 'if (!active) item.classList.remove("full", "held")') ||
-    !css.includes('.guardFast i{background:var(--gFast)}') ||
-    !css.includes('.guardBbw i{background:var(--ok)}') ||
-    !css.includes('.guardSlow i{background:var(--gSlow)}') ||
+    !css.includes('.guardFast i{color:var(--gFast)}') ||
+    !css.includes('.guardBbw i{color:var(--ok)}') ||
+    !css.includes('.guardSlow i{color:var(--gSlow)}') ||
     !codeIncludes(ui, 'function buildRuleChartModel(') ||
     !codeIncludes(ui, 'function renderHomePresetAccordion(') ||
     !codeIncludes(ui, 'function guardRuleRows(') ||
@@ -100,10 +100,10 @@ if (firmware.indexOf('publishLogLevels(runtimeConfig)',
   };
   const home = {...saved}; delete home.bbwProtectionMs;
   assert.deepStrictEqual(rules(home), ['Before 27 s · Fast · up to 40 g',
-    '27–34 s · On recipe · 36 g', 'After 34 s · Slow · down to 33 g']);
+    'Between 27–34 s · On recipe · 36 g', 'After 34 s · Slow · down to 33 g']);
   assert.deepStrictEqual(rules({...home, goalWeightG: 40, fastMarginG: 7.5, slowMarginG: 2.5,
     fastBeforeS: 30, slowAfterS: 46}), ['Before 30 s · Fast · up to 47.5 g',
-    '30–46 s · On recipe · 40 g', 'After 46 s · Slow · down to 37.5 g']);
+    'Between 30–46 s · On recipe · 40 g', 'After 46 s · Slow · down to 37.5 g']);
   assert.strictEqual(rules({...home, fastExtractionGuardEnabled: false})[0], 'Before 27 s · Fast · off');
   assert.deepStrictEqual(rules({...home, brewByWeight: false}),
     ['Fast · off', 'On recipe · off', 'Slow · off']);
