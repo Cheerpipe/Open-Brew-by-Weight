@@ -12,24 +12,26 @@
   appearance: textfield;
 }
 
-.numBox.hasUnit > input {
-  padding-right: calc(var(--keys, 5.5rem) + var(--unit, 3.2rem));
-}
-
+/* The unit sits right after the value, one space away: the overlay's text is
+   the value (invisible) followed by the unit. */
 .numUnit {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  right: calc(var(--keys, 5.5rem) + 0.75rem);
+  inset: 0;
   display: flex;
   align-items: center;
+  overflow: hidden;
+  white-space: pre;
   color: var(--mu);
   pointer-events: none;
 }
 
-.windowPair .numBox {
-  --keys: 4.5rem;
-  --unit: 1.6rem;
+.numUnit::before {
+  content: attr(data-v);
+  visibility: hidden;
+}
+
+.numUnit:not([data-v=""])::after {
+  content: attr(data-u);
 }
 
 .numBox > input::-webkit-inner-spin-button,
@@ -441,7 +443,7 @@ textarea[readonly] {
 }
 
 .windowPair .numBox > input {
-  padding-inline: 0.5rem calc(var(--keys) + var(--unit));
+  padding-inline: 0.5rem 4.6rem;
 }
 
 input:-webkit-autofill:focus {

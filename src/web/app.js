@@ -99,12 +99,22 @@ function addNumberKeys(root) {
     f.replaceWith(box);
     box.append(f);
     if (f.dataset.unit) {
-      const u = document.createElement("span");
-      u.className = "numUnit";
-      u.textContent = f.dataset.unit;
+      // The unit follows the typed value: a hidden copy of the value pushes
+      // it, and a setter hook keeps it in step when code sets the value.
+      const u = box.appendChild(document.createElement("span")),
+        cs = getComputedStyle(f),
+        sync = () => (u.dataset.v = f.value),
+        d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      Object.assign(u, { className: "numUnit" });
+      u.dataset.u = " " + f.dataset.unit;
+      Object.assign(u.style, { font: cs.font, paddingLeft: cs.paddingLeft });
       u.setAttribute("aria-hidden", "true");
-      box.classList.add("hasUnit");
-      box.append(u);
+      Object.defineProperty(f, "value", {
+        get: () => d.get.call(f),
+        set: (v) => (d.set.call(f, v), sync()),
+      });
+      f.addEventListener("input", sync);
+      sync();
     }
     for (const up of [false, true]) {
       const b = document.createElement("button");
