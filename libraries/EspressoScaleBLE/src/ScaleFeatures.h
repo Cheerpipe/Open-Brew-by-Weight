@@ -33,7 +33,9 @@ struct ScaleFeatureSet {
     uint16_t minimumCommandIntervalMs;
     // Prior estimate of this protocol's weight-transport lag (reporting +
     // internal filtering); the brew-by-weight cut leads its flow by it.
-    // Refine from FIRST_DROP telemetry.
+    // Priors follow de1app's per-scale table (measured lag + 50 ms BLE).
+    // Refine from the post-cut knee: the time from the cut until the weight
+    // stops rising at the cut flow, minus the 100 ms valve latency.
     uint16_t sensorLagMs;
 
     bool has(ScaleFeature feature) const {

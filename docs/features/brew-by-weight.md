@@ -112,8 +112,8 @@ Fixed behavior (not separate settings):
 ## Example
 
 Double · Adaptive at 36 g, drip correction 0.5 g, shot time window 27–36 s.
-A shot reaching the target inside the window stops with roughly **34.3 g** on
-the scale: the coffee the flow says is still on its way (about 1.2 g at
+A shot reaching the target inside the window stops with roughly **34.4 g** on
+a Bookoo scale: the coffee the flow says is still on its way (about 1.1 g at
 2 g/s) plus the 0.5 g correction bring the cup close to 36 g. A shot running early gets
 a slightly higher cut line (up to 42 g), one running late a slightly lower one
 (down to 33 g); see [Fast and slow shots](fast-and-slow-shots.md).

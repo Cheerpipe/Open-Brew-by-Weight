@@ -18,7 +18,10 @@ static const ScaleFeatureSet kGenericFeatures = {
     0,
     8000,
     100,
-    500
+    // Themis Mini on a Linea Micra: the post-cut knee sat at 0.55 +/- 0.01 s
+    // over 19 shots (2026-11); minus the 100 ms valve latency. de1app's
+    // 500 ms was never measured for Bookoo.
+    450
 };
 
 void fillGenericCommand(uint8_t out[6], uint8_t data1, uint8_t data2, uint8_t data3) {
