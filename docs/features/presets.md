@@ -24,7 +24,7 @@ level and **Down to 33 g** under its low one. The editor groups its settings:
 | **Fast shots** | Extend fast shots, Extend by up to (g), Transition (s), Transition curve and its hardness |
 | **Slow shots** | Shorten slow shots, Shorten by up to (g), Transition (s), Transition curve and its hardness |
 | **Time limits** | Earliest weight stop (s), Max shot time (s), Backup stop time (s) |
-| **Drip compensation** | Expected drip weight after the shot stops with its recent-shots chart, Learning speed, each applied with its **Set** key |
+| **Drip compensation** | Drip correction with its recent-shots chart, Learning speed, each applied with its **Set** key |
 
 Each change is saved to the preset in use as soon as you make it; the line
 below the recipe reads **Current preset:** followed by that preset. Everything
@@ -149,7 +149,7 @@ preset survives reboot.
 
 | Scope | Settings |
 | --- | --- |
-| Preset (**Settings → Presets**) | Brew by weight, dose, target yield, shot time window, grind hints, fast and slow shot options and amounts, earliest weight stop, max shot time, the optional scale-loss stop time, starting drip and learning speed, learned drip, learning speed and its provenance, and the preset's shot statistics; Linea Micra builds also retain a brew-boiler target |
+| Preset (**Settings → Presets**) | Brew by weight, dose, target yield, shot time window, grind hints, fast and slow shot options and amounts, earliest weight stop, max shot time, the optional scale-loss stop time, starting drip correction and learning speed, learned drip correction, learning speed and its provenance, and the preset's shot statistics; Linea Micra builds also retain a brew-boiler target |
 | **Shared settings** | Linea Micra, paddle or switch behavior, quick rinse, scales, tare, cup detection, cup protection (including avoid accidental touch and stop after sustained weight), the scale guard, the scale-loss backup switch, alerts; Bluetooth and network settings are in Admin |
 | Header panel / Home Assistant switches | Temporary: **By weight / Manual** and the six guards change only until you pick another preset or restart. Nothing is saved to the preset or to Settings, and picking a preset brings back its saved values. |
 
@@ -191,7 +191,7 @@ reported only after the Micra dashboard confirms the same temperature.
 | Extend fast shots: extend by up to | 6 g (42 g) | 3 g (21 g) | off (6 g saved) | off (4 g saved) |
 | Shorten slow shots: shorten by up to | 3 g (33 g) | 1.5 g (16.5 g) | off (3 g saved) | off (1.5 g saved) |
 | Fast and slow transitions | 6 s, Gentle: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) |
-| Expected drip weight after the shot stops | 0.5 g | 0.5 g | 0.5 g | 0.5 g |
+| Drip correction | 0.5 g | 0.5 g | 0.5 g | 0.5 g |
 
 All four start with brew by weight and grind hints on, Max shot time 50 s,
 Earliest weight stop 12 s, and no fixed scale-loss stop time. The Fixed
@@ -220,23 +220,23 @@ candidate evidence. A restart keeps those values and the candidate evidence
 alike.
 
 Use a separate preset for each physical portafilter/basket setup. The learned
-drip in grams, gain α and candidate observations belong to that preset; shots
+drip correction in grams, gain α and candidate observations belong to that preset; shots
 from another preset do not train it. All of it, and the shot log, survive a
 restart; deleting the preset deletes its learning. When you change the physical setup
 under the same preset (another basket, a spouted or bottomless portafilter, a
-different dose), the drip is not re-detected: use **Quick start** under the
-drip chart, or the drip field's **Set** key, to start it again.
+different dose), the correction is not re-detected: use **Quick start** under
+the chart, or the **Drip correction** field's **Set** key, to start it again.
 
-**Set** on the drip field uses the value you enter from the next shot and keeps
+**Set** on the **Drip correction** field uses the value you enter from the next shot and keeps
 it as the preset's starting point; if your next three shots agree on a different
-amount, the drip moves there at once. **Quick start**, under the chart, does
-the same from the drip already in use without changing it, for a setup change
-when you don't know the new drip yet. **Set** on the learning-speed field
-(0.01–1.00, step 0.01) applies a new speed at once and keeps the drip. The
+amount, the correction moves there at once. **Quick start**, under the chart, does
+the same from the correction already in use without changing it, for a setup
+change when you don't know the new value yet. **Set** on the learning-speed field
+(0.01–1.00, step 0.01) applies a new speed at once and keeps the correction. The
 **Set** and **undo** keys appear inside the field while your value differs from
 the one in use: undo puts the value in use back without applying, and typing
 that value back makes both leave. Pressing Enter applies.
-**Restore** on a factory preset returns the whole recipe, its drip and a
+**Restore** on a factory preset returns the whole recipe, its drip correction and a
 learning speed of 0.30, and starts a quick start; it is available only for
 factory presets. A device factory reset additionally erases other settings and
 history. See

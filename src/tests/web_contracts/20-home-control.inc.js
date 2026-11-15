@@ -1549,7 +1549,7 @@ if (!codeIncludes(ui, 'id="learnedOffsetG"') ||
     html.indexOf('id="learnedOffsetG"') > html.indexOf('id="dripBars"') ||
     html.indexOf('id="dripBars"') > html.indexOf('id="dripSetG"') ||
     html.indexOf('id="dripSetG"') > html.indexOf('id="alphaSet"') ||
-    !codeIncludes(ui, 'Expected drip weight after the shot stops') ||
+    !codeIncludes(ui, 'Drip correction (g)') ||
     codeIncludes(ui, 'Save new reset values first') ||
     !codeIncludes(html, '<button id="dripSetButton" class="numSet" type="submit"') ||
     !codeIncludes(html, '<button id="alphaSetButton" class="numSet" type="submit"') ||

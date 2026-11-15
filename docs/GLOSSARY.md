@@ -5,7 +5,7 @@ this project.
 
 | Term | Meaning in this project |
 | --- | --- |
-| α (alpha) | The learning speed used by adaptive EWMA. It controls how much the latest eligible shot changes the learned drip. |
+| α (alpha) | The learning speed used by adaptive EWMA. It controls how much the latest eligible shot changes the drip correction. |
 | A→M | **Automatic-to-manual** transition: brew-by-weight can no longer rely on the scale, so the scale-loss backup limits the remaining shot by time. |
 | Admin unlock | A password-protected authorization required for privileged Web UI actions; it is separate from claiming the browser session. |
 | AGPL-3.0 | GNU Affero General Public License version 3, the repository's current copyleft license. Network use of a modified version can require offering its corresponding source code. |
@@ -18,12 +18,13 @@ this project.
 | Boot / boot verification | Boot is the controller's startup process. After OTA, verification confirms that the new image started safely before it is kept. |
 | Browser claim | The controller's way of assigning ordinary Home and Settings access to a browser session; it does not grant Admin privileges. |
 | CI | Continuous Integration, the practice of running automated checks on every change. This repository runs its checks locally through `./scripts/dev` instead of a hosted pipeline. |
-| Clamp | To restrict a calculated value to a minimum and maximum; the drip-learning formula keeps the learned drip between 0 g and 5 g. |
+| Clamp | To restrict a calculated value to a minimum and maximum; the drip-learning formula keeps the drip correction between 0 g and 5 g. |
 | Compile-time setting | A choice fixed while firmware is built. Changing it requires a new build; it cannot be changed later in the Web UI. |
 | CSV | Comma-Separated Values, a plain-text tabular format used when exporting or exchanging shot data. |
 | Cutoff / stop offset | The point at which the controller requests a stop before the target weight, allowing for coffee that continues to drip. The learned offset is adjusted from previous eligible shots. |
 | DIY | Do it yourself: the user assembles, installs, and validates the hardware rather than receiving a certified finished product. |
-| Drip compensation | Stopping early enough to account for liquid that continues reaching the cup after the machine receives the stop request. |
+| Drip compensation | Stopping early enough to account for liquid that continues reaching the cup after the machine receives the stop request. It combines a lead worked out from the flow at the stop with a small learned drip correction. |
+| Drip correction | The learned part of drip compensation: the coffee allowed for after the stop beyond what the flow already predicts. It can be much smaller than the drip measured after the stop, even zero. |
 | ESP32-S3 | The Espressif microcontroller family on which the controller firmware runs. |
 | ESP-IDF | Espressif IoT Development Framework, the supported toolchain and software framework used to build the firmware. |
 | EWMA | Exponentially Weighted Moving Average, the adaptive learning method that applies a chosen fraction of the latest final-weight error instead of the entire error. |
