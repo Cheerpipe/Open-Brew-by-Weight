@@ -3,13 +3,6 @@
 Master switch that turns every Open Brew by Weight brewing feature on or off
 while leaving the controller in place.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-firmware-dark.webp">
-    <img src="../images/screenshots/admin-firmware-light.webp" alt="Firmware mode switch in Admin" width="300">
-  </picture>
-</p>
-
 ## A new controller starts switched off
 
 When the firmware is first installed, and after a

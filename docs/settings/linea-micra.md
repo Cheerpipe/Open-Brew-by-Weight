@@ -4,17 +4,6 @@ Firmware built for the **La Marzocco Linea Micra** shows its controls in
 **Settings → La Marzocco Cloud**, between Presets and Shared settings. Other
 machine profiles omit the section and its diagnostics.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-account-dark.webp">
-    <img src="../images/screenshots/settings-account-light.webp" alt="La Marzocco account settings" width="280">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-machine-power-dark.webp">
-    <img src="../images/screenshots/settings-machine-power-light.webp" alt="Machine power settings" width="280">
-  </picture>
-</p>
-
 The integration reads the selected machine through La Marzocco's cloud
 service. It does not use the Micra's Bluetooth connection, so scale discovery,
 scale commands, and weight streaming keep exclusive use of the firmware's BLE

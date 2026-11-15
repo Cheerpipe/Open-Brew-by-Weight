@@ -4,13 +4,6 @@ For latch/paddle firmware (`OPEN_BREW_BY_WEIGHT_MACHINE_TYPE=0`), choose
 **Settings → Shared settings → Paddle**. The mode is shared across presets.
 Momentary builds show [Switch](momentary.md) instead.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-paddle-dark.webp">
-    <img src="../images/screenshots/settings-paddle-light.webp" alt="Paddle settings" width="300">
-  </picture>
-</p>
-
 `config/machines/la-marzocco-linea-micra.json` selects this paddle topology for
 the initial La Marzocco Linea Micra integration. Factory reset seeds Natural
 mode, the 30-second return reminder with a 15-minute limit, and Quick rinse on

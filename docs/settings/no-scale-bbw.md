@@ -5,13 +5,6 @@ by every preset. Configure it under **Settings → Shared settings → Scale gua
 The same switch in the header's [guard panel](../features/brew-by-weight.md#change-how-shots-stop-for-now)
 turns it off or back on for now, without saving.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-scale-guard-dark.webp">
-    <img src="../images/screenshots/settings-scale-guard-light.webp" alt="Scale guard settings" width="300">
-  </picture>
-</p>
-
 It applies only while **Brew by weight** is on. With BBW off, shots and rinses
 remain manual regardless of this setting. A scale is usable only when its link
 is available and its weight stream is fresh.

@@ -6,13 +6,6 @@ gestures, and attempts stopped by the scale guard. It shows what
 happened and what you tried, without the measurement detail of the
 [shot history](shot-history.md).
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/history-dark.webp">
-    <img src="../images/screenshots/history-light.webp" alt="Activation history for today" width="300">
-  </picture>
-</p>
-
 ## What is recorded
 
 Every activation the machine confirmed is recorded when its circuit opens,

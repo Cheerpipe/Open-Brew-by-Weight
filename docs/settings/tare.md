@@ -5,13 +5,6 @@ retare while idle, shot-start tare, and late-cup retare. Machine-level, under
 **Settings → Shared settings → Tare**, except **Earliest weight stop**, which is
 saved with each preset under **Settings → Presets → Time limits**.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-tare-dark.webp">
-    <img src="../images/screenshots/settings-tare-light.webp" alt="Tare settings" width="300">
-  </picture>
-</p>
-
 Initial weight-stop protection is a separate brew setting; its range and
 interactions are in [Cup protection](../features/cup-protection.md).
 

@@ -5,13 +5,6 @@ shots. If the scale drops out mid-shot, the controller can no longer stop on
 weight, so it picks the best stop time it can and stops the shot then, unless
 the scale comes back first. **On by default.**
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/settings-scale-loss-dark.webp">
-    <img src="../images/screenshots/settings-scale-loss-light.webp" alt="Scale-loss backup settings" width="300">
-  </picture>
-</p>
-
 A→M means auto-to-manual: weight stop is paused, but the shot keeps running
 until the backup time. Paddle builds open the relay; momentary builds request a
 stop pulse subject to

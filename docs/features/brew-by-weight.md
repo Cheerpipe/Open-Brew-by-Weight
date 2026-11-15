@@ -8,13 +8,6 @@ for shots that run fast and drops a little for shots that run slow, always
 smoothly. See [Fast and slow shots](fast-and-slow-shots.md). It is **on by
 default**.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/home-dark.webp">
-    <img src="../images/screenshots/home-light.webp" alt="Home showing the last shot drawn against its preset's cut line" width="300">
-  </picture>
-</p>
-
 Turn it off if you want the paddle (or switch) and the firmware 60 s cap
 only. Tare and the shot timer still run; weight stop, cup protection at
 start, automatic retare, Max shot time, and drip learning do not.
@@ -70,13 +63,6 @@ to Settings. Picking another preset or restarting the controller always brings
 back your saved values. Home Assistant shows and changes the same switches, so
 both always agree. The panel can't be used during a shot, and the guards are
 paused while shots stop manually.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/home-quick-panel-dark.webp">
-    <img src="../images/screenshots/home-quick-panel-light.webp" alt="The header panel open on Home, with By weight or Manual and the six guards" width="300">
-  </picture>
-</p>
 
 **Duration** chooses when your changes undo themselves:
 

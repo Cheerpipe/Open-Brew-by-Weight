@@ -13,13 +13,6 @@ Firmware can be updated over Wi-Fi without opening the case or using USB.
 Upload a built image with the project scripts while the controller is on
 your network.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-firmware-update-dark.webp">
-    <img src="../images/screenshots/admin-firmware-update-light.webp" alt="Firmware update in Admin" width="300">
-  </picture>
-</p>
-
 ## Requirements
 
 - Authenticate each CLI run using the hidden password prompt or

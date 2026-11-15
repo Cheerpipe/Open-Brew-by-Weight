@@ -5,13 +5,6 @@ at a time you choose, so it starts each day fresh without you pressing
 **Restart controller**. It is off on a new installation and after a factory
 reset.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-scheduled-restart-dark.webp">
-    <img src="../images/screenshots/admin-scheduled-restart-light.webp" alt="Scheduled restart in Admin" width="300">
-  </picture>
-</p>
-
 ## Setting it up
 
 1. Make sure the controller knows the time: it needs Wi-Fi with internet

@@ -6,13 +6,6 @@ group, changes are kept in the page only until you press the group's
 **Save settings** button; the arrow button beside it discards them and puts
 the saved values back. Only the fields you changed are saved.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="../images/screenshots/admin-power-dark.webp">
-    <img src="../images/screenshots/admin-power-light.webp" alt="Power management in Admin" width="300">
-  </picture>
-</p>
-
 - **Performance boost** — runs the processor at full speed (160 MHz) while a
   scale is connecting or connected, and for 30 seconds after it disconnects.
   Off, the processor stays at 80 MHz during that time.
