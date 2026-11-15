@@ -524,7 +524,7 @@
 }
 
 .rvLegNoCut i {
-  background: repeating-linear-gradient(45deg, var(--mu) 0 1px, transparent 1px 4px);
+  background: repeating-linear-gradient(135deg, var(--mu) 0 1px, transparent 1px 4px);
 }
 
 .rvLegSaved i {
