@@ -171,7 +171,7 @@ struct LaMarzoccoObservationFence {
         status.steamReadyAtUtcSec = update.steamReadyAtUtcSec;
         status.steamLevel = update.steamLevel;
         status.steamSwitch = update.steamSwitch;
-        steamTrusted = update.steamSwitch != LaMarzoccoSteamSwitch::UNKNOWN;
+        steamTrusted = true;  // Its switch and level, each as it reports them.
       }
       ++temperatureRevision;
     }

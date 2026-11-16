@@ -981,6 +981,11 @@ struct LaMarzoccoWebSocketTest {
     confirmWith(R"({"code":"CMSteamBoilerLevel","output":{"status":"Off","enabled":false,"targetLevel":"Level2"}})");
     assert(apply(false, 3) && steamWrites == steamBefore + 2);
     assert(cloudSteam == LaMarzoccoSteamSwitch::OFF && cloudSteamLevel == 0);
+    // A level widget that omits its switch still shows the level it holds.
+    const std::string noSwitch = frame(R"({"code":"CMSteamBoilerLevel","output":{"status":"Ready","targetLevel":"Level1"}})");
+    deliver(service, observation(service, noSwitch.c_str()));
+    assert(apply(true, 1) && steamWrites == steamBefore + 2);
+    assert(service.published_.temperatureState == LaMarzoccoTemperatureState::CONFIRMED);
     // A machine that sets steam by temperature (Linea Mini) gets the switch only.
     const std::string mini = frame(R"({"code":"CMSteamBoilerTemperature","output":{"status":"Off","enabled":false}})");
     service.published_.steamLevel = LaMarzoccoSteamLevel::UNKNOWN;  // As a fresh Mini.
@@ -2378,6 +2383,12 @@ struct LaMarzoccoWebSocketTest {
     assert(service.published_.temperatureError == LaMarzoccoError::REJECTED);
     assert(service.desiredTemperature_.present && service.published_.temperatureRetryable);
     service.desiredTemperature_ = {};
+    // A canceled execution (a shot started between two settings) posts nothing.
+    service.abortRequested_.store(true);
+    assert(!service.companionCommand(LaMarzoccoCompanionCommandOp::STEAM, 1));
+    assert(service.companionRouteStatus().commands == commandsSoFar &&
+           service.companionOutbox().commandId == 0);
+    service.abortRequested_.store(false);
     assert(frame(service, LaMarzoccoCompanionStateKind::PUSH, R"({"widgets":[{"code":"CMCoffeeBoiler","output":{"targetTemperature":93.0,"targetTemperatureMin":80,"targetTemperatureMax":100}}]})"));
     // Standby: an older read cannot undo the accepted command's intent; a read
     // ordered after the command confirms it.

@@ -14723,6 +14723,19 @@ void w90c_preset_temperature_presence_and_learning_invalidation() {
   CHECK(hostLastForwardedNetworkCommand.resultState ==
         CommandResultState::FAILED);
   CHECK(hostMachineTemperatureRequestCount == 1);
+
+  // A save carrying only steam settings applies them with the stored target.
+  save.requestId = 904;
+  save.laMarzoccoBrewTargetSpecified = false;
+  save.laMarzoccoSteamEnabled = 0;
+  save.laMarzoccoSteamLevel = 1;
+  processWebCommand(save);
+  CHECK(preset.laMarzoccoBrewTargetDeciC == 945 && !preset.laMarzoccoSteamEnabled &&
+        preset.laMarzoccoSteamLevel == 1);
+  runLoopAfter(RUNTIME_PERSIST_DEBOUNCE_MS + 1);
+  CHECK(hostMachineTemperatureRequestCount == 2);
+  CHECK(hostMachineSettings.targetDeciC == 945 && !hostMachineSettings.steamEnabled &&
+        hostMachineSettings.steamLevel == 1);
 }
 
 // A Quick Settings patch as the Integration API builds it: the field mask in

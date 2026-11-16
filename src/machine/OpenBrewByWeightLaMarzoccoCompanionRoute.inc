@@ -124,7 +124,10 @@ bool OpenBrewByWeightLaMarzoccoService::companionCommand(LaMarzoccoCompanionComm
   {
     TaskLockGuard lock(mux_);
     auto &feed = companion_;
-    if (feed.status.route == LaMarzoccoCompanionRoute::COMPANION) {
+    // A canceled execution (a shot, a scale connection, a newer request)
+    // posts nothing, as cloudRequest refuses it on the direct route.
+    if (feed.status.route == LaMarzoccoCompanionRoute::COMPANION &&
+        !abortRequested_.load(std::memory_order_acquire)) {
       if (++feed.lastCommand == 0) ++feed.lastCommand;
       id = feed.lastCommand;
       feed.outbox.commandId = id;

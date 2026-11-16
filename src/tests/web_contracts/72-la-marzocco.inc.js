@@ -443,7 +443,7 @@ if (!laMarzoccoTypes.includes('APPLY_MACHINE_SETTINGS') ||
     // The preset's target never leaves as it is: what is sent is that target
     // inside the range the machine reported, and nothing without that range.
     !laMarzoccoService.includes('target = laMarzoccoSendableBrewTarget(published_, request.targetDeciC);') ||
-    !laMarzoccoService.includes('if (resolved && target == 0) break;') ||
+    !laMarzoccoService.includes('if (resolved && target == 0 && sent) break;') ||
     !laMarzoccoService.includes(': writePresetSetting(settings, setting, value);') ||
     !laMarzoccoService.includes(': setting == LA_MARZOCCO_SET_STEAM_LEVEL ? request.steamLevel : target;') ||
     laMarzoccoService.includes('LaMarzoccoCompanionCommandOp::TEMPERATURE, request.targetDeciC') ||

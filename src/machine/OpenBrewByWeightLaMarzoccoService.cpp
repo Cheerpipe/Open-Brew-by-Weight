@@ -1655,10 +1655,11 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
     const bool steamTrusted = fresh && observationFence_.steamTrusted;
     pending = laMarzoccoPresetSettingsUnheld(published_, fresh && observationFence_.temperatureTrusted,
                                    steamTrusted, request, target);
-    // A trusted subscription that never reported the steam switch has none
-    // to read either: only the brew target then needs trusting.
+    // A machine that never reported a steam switch or level has none to read
+    // either: only the brew target then needs trusting.
     resolved = target != 0 && fresh && observationFence_.temperatureTrusted &&
-               (steamTrusted || published_.steamSwitch == LaMarzoccoSteamSwitch::UNKNOWN);
+               (steamTrusted || (published_.steamSwitch == LaMarzoccoSteamSwitch::UNKNOWN &&
+                                 published_.steamLevel == LaMarzoccoSteamLevel::UNKNOWN));
     const bool unchanged = resolved && pending == 0;
     published_.requestId = request.requestId;
     published_.requestedTargetDeciC = request.targetDeciC;
@@ -1785,7 +1786,7 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
         }
       }
       // No brew range reported: the steam settings went, the target cannot.
-      if (resolved && target == 0) break;
+      if (resolved && target == 0 && sent) break;
       success = sent && target != 0 &&
                 temperatureRequestCurrent(request, machineConfigGeneration) &&
                 (pushConfirms(pending, request, target, LaMarzoccoPowerState::UNKNOWN) ||
@@ -1830,7 +1831,7 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
   }
 
   wipeLaMarzoccoSettings(settings);
-  if (resolved && target == 0) {
+  if (resolved && target == 0 && (pending & ~accepted) == 0) {
     // The target was not sent: the machine has not reported the range it
     // accepts. The request waits a bounded number of cycles for that report.
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
