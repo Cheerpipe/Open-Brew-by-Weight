@@ -4382,6 +4382,7 @@ function ingestPresets(s) {
   if ($("laMarzoccoSteamEnabled") && !uiState.brewDirty && active) {
     $("laMarzoccoSteamEnabled").checked = active.laMarzoccoSteamEnabled !== false;
     $("laMarzoccoSteamLevel").value = String(active.laMarzoccoSteamLevel || 3);
+    updateConfigGroups(); // Steam power follows the switch just loaded.
   }
 }
 

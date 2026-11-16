@@ -655,7 +655,7 @@ settings the Micra receives when you choose the preset:
 - **Brew temperature**, in 0.1 °C steps.
 - **Steam boiler**, on or off. Turn it off for presets you never steam milk
   with: the Micra is ready sooner and uses less energy.
-- **Steam power**, level 1, 2 or 3, as in the La Marzocco app. It is hidden
+- **Steam power**, level 1, 2 or 3, as in the La Marzocco app. It is dimmed
   while the steam boiler is off, and the Micra's level is left as it is.
 
 New and factory-reset presets start at 91.0 °C with the steam boiler on at

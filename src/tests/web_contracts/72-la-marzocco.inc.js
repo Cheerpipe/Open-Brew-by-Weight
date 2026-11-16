@@ -122,7 +122,10 @@ const laMarzoccoDiagnosticHtml = rawPartialHtml.diagnostic;
   context.applyStatus(frame({state: 'heating_up', readyAtUtcSec: 1000},
       {state: 'heating_up', readyAtUtcSec: 1200, level: 'level_3'}));
   assert.strictEqual(brewBoiler.textContent, 'Heating up · ready in ~16 min');
-  assert.strictEqual(steamBoiler.textContent, 'Heating up · ready in ~19 min');
+  assert.strictEqual(steamBoiler.textContent, 'Heating up · Level 3 · ready in ~19 min');
+  // A steam boiler a preset turned off shows no level.
+  context.applyStatus(frame({state: 'ready'}, {state: 'off', level: 'level_3'}));
+  assert.strictEqual(steamBoiler.textContent, 'Off');
   // A steam boiler set by temperature reports no level: the row needs none.
   context.applyStatus(frame({state: 'ready'},
       {state: 'heating_up', readyAtUtcSec: 1200, level: 'unknown'}));
