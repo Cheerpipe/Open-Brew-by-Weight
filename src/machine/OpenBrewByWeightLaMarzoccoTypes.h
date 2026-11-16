@@ -52,7 +52,8 @@ enum class LaMarzoccoSteamLevel : uint8_t {
   LEVEL_1,
   LEVEL_2,
   LEVEL_3,
-  UNSUPPORTED
+  UNSUPPORTED,
+  NONE  // The steam boiler is set by temperature (Linea Mini): no level.
 };
 // The steam boiler's on/off setting; UNKNOWN until a steam widget reports it.
 enum class LaMarzoccoSteamSwitch : uint8_t { UNKNOWN, OFF, ON };
@@ -158,6 +159,7 @@ inline const char *laMarzoccoSteamLevelName(LaMarzoccoSteamLevel level) {
     case LaMarzoccoSteamLevel::LEVEL_2: return "level_2";
     case LaMarzoccoSteamLevel::LEVEL_3: return "level_3";
     case LaMarzoccoSteamLevel::UNSUPPORTED: return "unsupported";
+    case LaMarzoccoSteamLevel::NONE: return "none";
     case LaMarzoccoSteamLevel::UNKNOWN: return "unknown";
   }
   return "unknown";

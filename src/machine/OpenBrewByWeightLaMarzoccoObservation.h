@@ -166,7 +166,8 @@ struct LaMarzoccoObservationFence {
       // steam boiler: the temperature widget never replaces it.
       if (update.steamBoilerPresent &&
           !(update.steamByTemperature &&
-            status.steamLevel != LaMarzoccoSteamLevel::UNKNOWN)) {
+            status.steamLevel != LaMarzoccoSteamLevel::UNKNOWN &&
+            status.steamLevel != LaMarzoccoSteamLevel::NONE)) {
         status.steamBoiler = update.steamBoiler;
         status.steamReadyAtUtcSec = update.steamReadyAtUtcSec;
         status.steamLevel = update.steamLevel;

@@ -243,8 +243,8 @@ int main() {
   assert(update.steamSwitch == LaMarzoccoSteamSwitch::OFF);
   assert(update.steamBoiler == LaMarzoccoBoilerState::HEATING_UP);
   assert(update.steamReadyAtUtcSec == 1760000820U);
-  // A level is read from the level widget only, as the companion forwards it.
-  assert(update.steamLevel == LaMarzoccoSteamLevel::UNKNOWN);
+  // A level is read from the level widget only: this machine has none.
+  assert(update.steamLevel == LaMarzoccoSteamLevel::NONE);
   // Its steam target is not the brew target: the coffee boiler alone sets it.
   assert(update.temperaturePresent && update.targetDeciC == 930);
   assert(update.coffeeBoiler == LaMarzoccoBoilerState::READY);
@@ -256,6 +256,14 @@ int main() {
     mini.assumedPower = laMarzoccoAssumedPower(mini);
     assert(laMarzoccoReadiness(mini) == LaMarzoccoReadiness::WAITING_FOR_STEAM);
   }
+  // The Mini's dashboard also lists an empty level widget (pylamarzocco's
+  // dashboard_mini.json): the temperature widget is still its steam boiler.
+  fresh();
+  assert(decode(R"({"widgets":[)"
+      R"({"code":"CMSteamBoilerTemperature","output":{"status":"Off","enabled":false,"targetTemperatureSupported":false}},)"
+      R"({"code":"CMSteamBoilerLevel","output":null}]})", update));
+  assert(update.steamByTemperature && update.steamLevel == LaMarzoccoSteamLevel::NONE);
+  assert(update.steamSwitch == LaMarzoccoSteamSwitch::OFF);
   // A steam boiler switched off never blocks readiness, whichever widget says so.
   fresh();
   assert(decode(R"({"widgets":[{"code":"CMSteamBoilerTemperature","output":{"status":"Off"}}]})", update));

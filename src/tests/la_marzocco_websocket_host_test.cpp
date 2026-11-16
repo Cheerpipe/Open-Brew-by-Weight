@@ -990,7 +990,7 @@ struct LaMarzoccoWebSocketTest {
     const std::string mini = frame(R"({"code":"CMSteamBoilerTemperature","output":{"status":"Off","enabled":false}})");
     service.published_.steamLevel = LaMarzoccoSteamLevel::UNKNOWN;  // As a fresh Mini.
     deliver(service, observation(service, mini.c_str()));
-    assert(service.published_.steamLevel == LaMarzoccoSteamLevel::UNKNOWN &&
+    assert(service.published_.steamLevel == LaMarzoccoSteamLevel::NONE &&
            service.published_.steamSwitch == LaMarzoccoSteamSwitch::OFF);
     confirmWith(R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","enabled":true}})");
     assert(apply(true, 3) && steamWrites == steamBefore + 3);

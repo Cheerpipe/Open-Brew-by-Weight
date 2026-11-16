@@ -453,8 +453,9 @@ function applyLaMarzoccoStatus(s) {
     machineSettings = m.applyTemperature && m.accountConfigured;
   root.toggle("laMarzoccoMachineSettings", machineSettings);
   root.toggle("laMarzoccoTemperatureEnabled", machineSettings && ranged);
-  // Steam power is a level only on machines that set steam by level.
-  root.toggle("laMarzoccoSteamByLevel", /^level_[123]$/.test(m.boiler?.steam?.level || ""));
+  // Steam power is a level on every machine but one whose steam boiler
+  // reported it is set by temperature (Linea Mini).
+  root.toggle("laMarzoccoSteamByLevel", m.boiler?.steam?.level !== "none");
   if (ranged && $("laMarzoccoBrewTargetC")) {
     $("laMarzoccoBrewTargetC").min = coffee.targetMinDeciC / 10;
     $("laMarzoccoBrewTargetC").max = coffee.targetMaxDeciC / 10;

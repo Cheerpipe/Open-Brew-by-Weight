@@ -1244,7 +1244,10 @@ Micra firmware streams an informational boiler-readiness layer on the same
 frames: `laMarzocco.readiness` (the derived rollup: `off`, `warming_up`,
 `waiting_for_steam`, `ready`, `needs_water`, or `unknown`),
 `laMarzocco.boiler.coffee.state` and `laMarzocco.boiler.steam.state`, and each
-boiler's `readyAtUtcSec` estimate. `readyAtUtcSec` is an absolute UTC second
+boiler's `readyAtUtcSec` estimate, and `laMarzocco.boiler.steam.level`:
+`level_1`–`level_3`, `none` for a steam boiler set by temperature (Linea Mini,
+which offers no steam power), or `unknown` before the machine has reported
+it. `readyAtUtcSec` is an absolute UTC second
 timestamp (0 when the machine gave no estimate), and the browser derives the
 ticking countdown locally, so a stable estimate emits no frames. Readiness is
 never evidence for control; power stays ON/OFF-only.
@@ -1724,9 +1727,7 @@ freshness, and temperature state. Beyond the cleaning fields Home shows, only
 it includes the `laMarzocco.websocket` detail: socket lifecycle/reason/epoch,
 subscription and machine connectivity, genuine evidence timestamps, payload
 byte counters, fixed 1s/60s rates, retry/stop/publication latency and memory
-metrics. It also carries the boiler detail beyond the Home projection:
-`laMarzocco.boiler.steam.level` (`level_1`–`level_3`) and a whole-second
-`laMarzocco.boiler.sampleAgeMs`.
+metrics. It also carries a whole-second `laMarzocco.boiler.sampleAgeMs`.
 `cloudCall` remains the last HTTP call. Cleaning never changes control state.
 Payload byte totals use 64-bit counters and include positive partial sends.
 Rate windows use the 64-bit monotonic clock, independently of millisecond

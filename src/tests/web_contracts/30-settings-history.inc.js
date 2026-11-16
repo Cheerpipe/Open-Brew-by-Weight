@@ -331,6 +331,19 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
   throw new Error('Brew presets CRUD UI must block factory delete, support reset, click-to-load, and save pending edits before switching');
 }
 {
+  // Every top-level group draws its icon from a sprite symbol (initGroupRows).
+  const assert = require('assert').strict;
+  const sprites = rawShellHtml + rawPartialHtml.settings + rawPartialHtml.admin;
+  for (const view of ['settings', 'admin']) {
+    const nested = [];
+    for (const [tag, attributes = ''] of rawPartialHtml[view].matchAll(/<details\b([^>]*)>|<\/details>/g)) {
+      if (tag === '</details>') { nested.pop(); continue; }
+      const group = /\bcfgGroup\b/.test(attributes), key = /data-g="([^"]+)"/.exec(attributes)?.[1];
+      if (group && key && !nested.includes(true))
+        assert(sprites.includes(`<symbol id="g-${key}"`), `${view} group ${key} has no icon`);
+      nested.push(group);
+    }
+  }
   const diagHtml = html.slice(html.indexOf('id="view-diagnostic"'), html.indexOf('id="view-settings"'));
   const adminHtml = html.slice(html.indexOf('id="view-admin"'),
                                html.indexOf('id="firmwareFooter"'));

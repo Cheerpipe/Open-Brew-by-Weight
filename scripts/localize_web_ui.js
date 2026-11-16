@@ -195,7 +195,7 @@ function machineGlyph({machine}) {
 function renderHtml(source, file, state) {
   // The machine profile's own glyph bakes in before marker rendering, into
   // every place that shows it (Home's machine heading and Equipment row,
-  // Diagnostics' machine group).
+  // Diagnostics' machine group, Settings' preset Machine group).
   let rendered = source.split(MACHINE_ICON_MARKER).join(state.machineGlyph);
   rendered = rendered.replace(HTML_MARKER_RE, (marker, key, offset) => {
     assertHtmlContext(rendered, marker, offset, false);

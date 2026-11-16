@@ -380,6 +380,8 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
               laMarzoccoBoilerStateName(micra.steamBoiler));
   delta.field("laMarzocco.boiler.steam.readyAtUtcSec",
               static_cast<unsigned long>(micra.steamReadyAtUtcSec));
+  // Home shows the level and Settings offers steam power unless it is "none".
+  delta.field("laMarzocco.boiler.steam.level", "\"%s\"", laMarzoccoSteamLevelName(micra.steamLevel));
   // When this warm-up began (0: none); one change per warm-up, and Home
   // fills its progress ring from it and readyAtUtcSec on its own clock.
   delta.field("laMarzocco.warmingSinceUtcSec",
@@ -559,8 +561,6 @@ bool OpenBrewByWeightNetwork::sendDiagnosticStream(UiStreamSession &session,
                 micra.connectionFreshness ? "connection" : "time");
     delta.field("laMarzocco.freshnessMs",
                 static_cast<unsigned long>(la_marzocco_timing::kStateFreshnessMs));
-    delta.field("laMarzocco.boiler.steam.level", "\"%s\"",
-                laMarzoccoSteamLevelName(micra.steamLevel));
     // Whole seconds, like sampleAgeMs: the browser interpolates the boiler
     // age and estimate countdowns locally instead of costing delta frames.
     delta.field("laMarzocco.boiler.sampleAgeMs",

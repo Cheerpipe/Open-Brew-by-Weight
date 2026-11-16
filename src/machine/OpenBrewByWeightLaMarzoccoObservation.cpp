@@ -58,12 +58,14 @@ uint16_t deciC(const cJSON *value) {
       ? 0 : static_cast<uint16_t>(tenths);
 }
 
-// True when a widgets or removedWidgets array names this widget code.
+// True when a widgets or removedWidgets array names this widget code; a
+// widget with no output (the Linea Mini's empty level widget) reports nothing.
 bool names(const cJSON *list, const char *code) {
   const cJSON *entry = nullptr;
   cJSON_ArrayForEach(entry, list) {
     const char *name = cJSON_IsString(entry) ? entry->valuestring : text(entry, "code");
-    if (name != nullptr && strcmp(name, code) == 0) return true;
+    if (name != nullptr && strcmp(name, code) == 0 &&
+        (cJSON_IsString(entry) || cJSON_IsObject(find(entry, "output")))) return true;
   }
   return false;
 }
@@ -190,8 +192,8 @@ bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update)
       } else {
         next.steamByTemperature = !levelFrame;
         if (ready != nullptr) next.steamReadyAtUtcSec = readyAt;
-        if (levelFrame && target != nullptr && cJSON_IsString(target) &&
-            target->valuestring != nullptr)
+        if (!levelFrame) next.steamLevel = LaMarzoccoSteamLevel::NONE;
+        else if (target != nullptr && cJSON_IsString(target) && target->valuestring != nullptr)
           next.steamLevel = steamLevel(target->valuestring);
       }
     } else if (next.source == LaMarzoccoObservationSource::WEBSOCKET) {

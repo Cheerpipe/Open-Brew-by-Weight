@@ -260,6 +260,9 @@ int main(){
       (stream.slice(0, stream.indexOf('sendDiagnosticStream')).match(/\bdelta\.field\(/g) || []).length;
   assert(homeFieldCalls > 0 && homeFieldCalls <= homeFieldSlots,
       `Home projection ${homeFieldCalls} fields exceeds ${homeFieldSlots} fingerprint slots`);
+  // Home shows the steam level and Settings offers steam power from it.
+  assert(stream.slice(0, stream.indexOf('sendDiagnosticStream')).includes('delta.field("laMarzocco.boiler.steam.level"'),
+      'the Home frame carries the steam level');
 }
 {
   const handshake = network.slice(

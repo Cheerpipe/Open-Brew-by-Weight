@@ -744,7 +744,7 @@ function renderLaMarzoccoDiagnostic() {
   );
   $("dLaMarzoccoSteamBoiler").textContent = boilerRow(
     steam,
-    steam.level && steam.level !== "unknown" && steam.level !== "unsupported"
+    /^level_/.test(steam.level || "")
       ? steam.level.replace("level_", __WEBUI_TEXT__("diagnostic.level_word"))
       : "",
   );

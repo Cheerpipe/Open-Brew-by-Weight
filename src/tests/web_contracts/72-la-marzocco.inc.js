@@ -538,6 +538,16 @@ for (const id of ['laMarzoccoSignIn', 'laMarzoccoBusy', 'laMarzoccoSteps', 'laMa
          network.includes('delta.field("laMarzocco.boiler.steam.readyAtUtcSec"'),
       'Home stream must project the boiler states and estimates');
 }
+{
+  // Preset machine settings draw this build's machine icon; steam power is
+  // offered unless the machine reported a steam boiler set by temperature.
+  const assert = require('assert').strict;
+  assert(laMarzoccoSettingsHtml.includes(
+      '<symbol id="g-presetMachine" viewBox="0 0 24 24">{{webui-meta:machine-icon}}</symbol>'));
+  assert(codeIncludes(rawViewJs.settings,
+      'root.toggle("laMarzoccoSteamByLevel", m.boiler?.steam?.level !== "none");'),
+      'steam power hides only on a machine without steam levels');
+}
 for (const id of ['dLaMarzoccoPower', 'dLaMarzoccoPowerValue', 'dLaMarzoccoMode',
   'dLaMarzoccoQuality', 'dLaMarzoccoAge', 'laMarzoccoRefreshLink']) {
   if (!laMarzoccoDiagnosticHtml.includes(`id="${id}"`)) {
