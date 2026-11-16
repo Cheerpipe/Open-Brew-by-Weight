@@ -416,8 +416,11 @@ translates it to something the brew orchestrator understands. The brew orchestra
 reads GPIO, paddle mode, or machine type.
 
 Source: `OpenBrewByWeightMachineTypes.h`, `machinePollIntention()`. Latch TYPE=0
-maps GPIO + snapshotted `PaddleMode` onto these intents (Original/Auto may
-omit `REQUEST_STOP` after the rinse window). A short ON→OFF with rinse
+maps GPIO + snapshotted `PaddleMode` onto these intents (Original/Auto
+omit `REQUEST_STOP` after the rinse window until an ON after that release
+promotes the shot to Natural). Each in-cycle edge also logs its result
+(`PADDLE_ENDS_SHOT`, `PADDLE_STARTS_RINSE`, `PADDLE_KEEPS_RUNNING`,
+`PADDLE_TO_NATURAL`) at INFO, which the shot trace keeps. A short ON→OFF with rinse
 enabled publishes `REQUEST_RINSE`. Momentary maps a hold no longer than
 Single-press limit to start/stop (on press or on release). With rinse
 enabled, an idle long-press at the rinse gesture publishes `REQUEST_RINSE`

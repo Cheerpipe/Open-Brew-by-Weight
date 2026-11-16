@@ -2124,11 +2124,16 @@ enum class DebugCode : uint8_t {
   // argument1: baseline weight (cg); argument2: ms since the tare.
   SCALE_TARE_BASELINE_CONFIRMED,
   // argument1: CupPresenceEvent; argument2: raw weight (cg).
-  CUP_PRESENCE_CHANGED
+  CUP_PRESENCE_CHANGED,
+  // What a paddle edge did to the running shot; argument1: its PaddleMode.
+  PADDLE_ENDS_SHOT,
+  PADDLE_STARTS_RINSE,
+  PADDLE_KEEPS_RUNNING,
+  PADDLE_TO_NATURAL
 };
 // Codes in use; a code appended above must move this (asserted after
 // debugCodeName).
-constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::CUP_PRESENCE_CHANGED) + 1U;
+constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::PADDLE_TO_NATURAL) + 1U;
 
 enum class ScheduledRestartCause : uint8_t {
   NONE = 0,
@@ -2529,6 +2534,10 @@ constexpr const char *debugCodeName(DebugCode code) {
     case DebugCode::SCALE_LATE_TARE_UNDONE: return "late scale tare was a cup lift";
     case DebugCode::SCALE_TARE_BASELINE_CONFIRMED: return "scale tare confirmed";
     case DebugCode::CUP_PRESENCE_CHANGED: return "cup presence changed";
+    case DebugCode::PADDLE_ENDS_SHOT: return "paddle OFF stops shot";
+    case DebugCode::PADDLE_STARTS_RINSE: return "paddle OFF starts rinse";
+    case DebugCode::PADDLE_KEEPS_RUNNING: return "paddle OFF keeps shot as Original";
+    case DebugCode::PADDLE_TO_NATURAL: return "paddle ON switches shot to Natural";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2940,6 +2949,16 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
     case DebugCode::CYCLE_ENDED:
       snprintf(message, capacity, "cycle ended by %s",
                endReasonDebugName(static_cast<EndReason>(event.argument1)));
+      return true;
+    case DebugCode::PADDLE_ENDS_SHOT:
+    case DebugCode::PADDLE_STARTS_RINSE:
+    case DebugCode::PADDLE_KEEPS_RUNNING:
+    case DebugCode::PADDLE_TO_NATURAL:
+      snprintf(message, capacity, "%s%s (%s mode)", debugCodeName(event.code),
+               event.code == DebugCode::PADDLE_KEEPS_RUNNING ? "; ON then OFF stops it"
+               : event.code == DebugCode::PADDLE_TO_NATURAL  ? "; OFF stops it"
+                                                             : "",
+               paddleModeId(static_cast<uint8_t>(event.argument1)));
       return true;
     case DebugCode::SYSTEM_LOG_OVERRUN:
       snprintf(message, capacity, "diagnostic log overrun dropped=%ld",

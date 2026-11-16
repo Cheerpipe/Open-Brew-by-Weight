@@ -53,8 +53,8 @@ constexpr uint32_t MAX_PADDLE_RETURN_REMINDER_MAX_DURATION_MS =
 // Latch-switch brew feel. Snapshot by the machine at cycle start; brew/stopper
 // never branch on this enum. Natural = OFF ends the shot. Original = legacy
 // start gesture (BBW+scale: OFF after rinse keeps the circuit closed until
-// weight stop; ON again promotes to Natural). Auto = BBW finish regardless of
-// ON/OFF (no promote, no hold-off of automation).
+// weight stop; ON again promotes to Natural). Auto = BBW finish in either
+// position (no hold-off of automation); OFF then ON promotes like Original.
 enum class PaddleMode : uint8_t {
   NATURAL = 0,
   ORIGINAL = 1,

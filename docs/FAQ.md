@@ -18,7 +18,8 @@ Check, in order:
 6. On momentary firmware, the machine state permits an automatic stop pulse.
 
 Use the stop action for your physical switch/mode if the result is unexpected.
-[Auto paddle mode](settings/paddle.md#auto) does not interpret OFF as early stop.
+In [Original](settings/paddle.md#original) and [Auto](settings/paddle.md#auto)
+paddle modes, OFF alone does not stop the shot: move the paddle ON, then OFF.
 
 ### The shot ended above or below target
 

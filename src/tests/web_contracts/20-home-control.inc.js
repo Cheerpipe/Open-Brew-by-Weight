@@ -1269,7 +1269,7 @@ if (!html.includes('<summary>Paddle</summary>') ||
     !html.includes('To stop early, ON then OFF again') ||
     !html.includes('Left ON, it runs to the 60 s safety limit') ||
     !html.includes('wherever the paddle is') ||
-    !html.includes('after the first second the paddle') ||
+    !html.includes('After the first second, OFF lets the shot carry on; to stop it early, move the paddle ON, then OFF') ||
     !html.includes('OFF in the first second stops it, or starts a rinse if Quick rinse is on') ||
     !html.includes('Without weight control, OFF stops normally') ||
     !codeIncludes(ui, "paddleMode:$('paddleMode')?['auto','natural','original']") ||

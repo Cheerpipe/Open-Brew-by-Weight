@@ -50,14 +50,12 @@ void machineBeginCycle(bool automaticBbw) {
   machineCycleRinseGestureMs = runtimeConfig.rinseGestureMs;
 }
 
+// Original and Auto hide a later OFF until ON after a release switches the
+// shot to Natural.
 bool machineHidesPhysicalStop() {
-  if (!machineCycleActive || !machineCycleAutomaticBbw) {
-    return false;
-  }
-  if (machineCyclePaddleMode == static_cast<uint8_t>(PaddleMode::ORIGINAL)) {
-    return !machineCyclePromotedToNatural;
-  }
-  return machineCyclePaddleMode == static_cast<uint8_t>(PaddleMode::AUTO);
+  return machineCycleActive && machineCycleAutomaticBbw &&
+         machineCyclePaddleMode != static_cast<uint8_t>(PaddleMode::NATURAL) &&
+         !machineCyclePromotedToNatural;
 }
 
 bool machineAllowsAutomationStop() {
@@ -81,7 +79,8 @@ bool machineCyclePromotedToNaturalForTest() {
 #endif
 
 // Early paddle OFF still reports stop (or rinse) so Original/Auto walk-away
-// does not hide the gesture. After that window, Original/Auto may hide stop.
+// does not hide the gesture. After that window, Original/Auto hide it until
+// promoted to Natural.
 bool machineReportsStopOnRelease() {
   return !machineHidesPhysicalStop() ||
          (machineCycleActive &&
@@ -93,7 +92,7 @@ bool paddleHoldIsRinseGesture() {
     return false;
   }
   // Active cycle: demote only while still inside the cycle-start window.
-  // A later short ON→OFF (Original promote, Auto walk-away) is stop, not rinse.
+  // A later short ON→OFF (Original/Auto promote) is stop, not rinse.
   if (machineCycleActive) {
     return elapsedMs(machineCycleStartedAtMs) <= machineCycleRinseGestureMs;
   }
@@ -108,8 +107,9 @@ MachineIntention machinePollIntention() {
   if (machineCycleActive && activatorTurnedOff) {
     machineCycleSawRelease = true;
   }
-  if (machineHidesPhysicalStop() && activatorTurnedOn && machineCycleSawRelease &&
-      machineCyclePaddleMode == static_cast<uint8_t>(PaddleMode::ORIGINAL)) {
+  const bool promotes =
+      machineHidesPhysicalStop() && activatorTurnedOn && machineCycleSawRelease;
+  if (promotes) {
     machineCyclePromotedToNatural = true;
   }
 
@@ -131,6 +131,17 @@ MachineIntention machinePollIntention() {
     out.intent = UserIntent::HOLD_ACTIVE;
   } else if (out.stablyOff) {
     out.intent = UserIntent::STABLE_IDLE;
+  }
+  // What the edge did to the running shot; a rinse consumes its own edges.
+  const bool rinse = out.intent == UserIntent::REQUEST_RINSE;
+  if (machineCycleActive && !rinseActuationActive &&
+      (promotes || rinse || swallowStop || out.intent == UserIntent::REQUEST_STOP)) {
+    addDebugEvent(DebugCategory::ACTIVATOR,
+                  promotes      ? DebugCode::PADDLE_TO_NATURAL
+                  : rinse       ? DebugCode::PADDLE_STARTS_RINSE
+                  : swallowStop ? DebugCode::PADDLE_KEEPS_RUNNING
+                                : DebugCode::PADDLE_ENDS_SHOT,
+                  machineCyclePaddleMode);
   }
   return machineCaptureIntention(out);
 }

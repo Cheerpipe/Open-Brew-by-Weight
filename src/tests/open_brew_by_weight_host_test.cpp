@@ -23038,7 +23038,7 @@ void pm13_auto_bbw_hold_allows_auto_stop() {
   CHECK(!getRelaySafetySnapshot().closed);
 }
 
-void pm14_auto_bbw_off_on_off_stays_brewing() {
+void pm14_auto_bbw_off_on_off_ends_like_natural() {
   resetHarness(false, true);
   reachReadyFromBoot();
   runtimeConfig.paddleMode = static_cast<uint8_t>(PaddleMode::AUTO);
@@ -23051,16 +23051,18 @@ void pm14_auto_bbw_off_on_off_stays_brewing() {
   CHECK(machineHidesPhysicalStop());
   setRawPaddle(true);
   runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
-  CHECK(!machineCyclePromotedToNaturalForTest());
-  CHECK(machineHidesPhysicalStop());
+  CHECK(machineCyclePromotedToNaturalForTest());
+  CHECK(!machineHidesPhysicalStop());
+  (void)machineLastIntention();
+  (void)machineLastIntention();
+  CHECK(machineCyclePromotedToNaturalForTest());
   CHECK(stopperState == StopperState::BREW);
   CHECK(getRelaySafetySnapshot().closed);
   setRawPaddle(false);
   runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
-  CHECK(stopperState == StopperState::BREW);
-  CHECK(session.active);
-  CHECK(getRelaySafetySnapshot().closed);
-  CHECK(machineHidesPhysicalStop());
+  CHECK(stopperState == StopperState::READY);
+  CHECK(session.endReason == EndReason::ACTIVATOR);
+  CHECK(!getRelaySafetySnapshot().closed);
 }
 
 void pm15_auto_no_scale_paddle_off_ends_shot() {
@@ -23257,6 +23259,283 @@ void pm26_blocked_no_scale_hold_does_not_close_k1() {
   attemptBlockedNoScaleStart();
   CHECK(!getRelaySafetySnapshot().closed);
   CHECK(hostPinLevel[RELAY_GPIO] == RELAY_OPEN_LEVEL);
+}
+
+// Paddle movements and what the paddle made of each, oldest first: "on",
+// "off", then ">stop", ">rinse", ">original" or ">natural" with the shot's
+// PaddleMode, e.g. "on off>original2 on>natural2 off>stop2". A result
+// logged at another level than INFO is marked "!".
+void appendPaddleToken(std::string &out, DebugCode code, int32_t mode, bool info) {
+  const char *token = code == DebugCode::ACTIVATOR_ON           ? " on"
+                      : code == DebugCode::ACTIVATOR_OFF        ? " off"
+                      : code == DebugCode::PADDLE_ENDS_SHOT     ? ">stop"
+                      : code == DebugCode::PADDLE_STARTS_RINSE  ? ">rinse"
+                      : code == DebugCode::PADDLE_KEEPS_RUNNING ? ">original"
+                      : code == DebugCode::PADDLE_TO_NATURAL    ? ">natural"
+                                                                : nullptr;
+  if (token == nullptr) return;
+  out += token;
+  if (token[0] == '>') out += std::to_string(mode) + (info ? "" : "!");
+}
+
+std::string paddleLogAfter(uint32_t afterSequence) {
+  static DebugEvent events[DEBUG_EVENT_CAPACITY];
+  const size_t count = copyDebugEvents(afterSequence, events, DEBUG_EVENT_CAPACITY);
+  std::string out;
+  for (size_t i = 0; i < count; ++i)
+    appendPaddleToken(out, events[i].code, events[i].argument1,
+                      events[i].level == LogLevel::INFO);
+  return out.empty() ? out : out.substr(1);
+}
+
+std::string paddleTraceOfLastShot() {
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  shot_trace_test::Trace trace;
+  CHECK_VALUE(shot_trace_test::decodeCompleted(trace), std::string("no trace"));
+  std::string out;
+  for (const shot_trace_test::Event &event : trace.events)
+    if (event.debug)
+      appendPaddleToken(out, static_cast<DebugCode>(event.kind), event.argument1(), true);
+  return out.empty() ? out : out.substr(1);
+}
+
+void paddleOffThenOn() {
+  setRawPaddle(false);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  setRawPaddle(true);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+}
+
+// Original and Auto shots switched to Natural with the paddle ON keep every
+// automatic cut; Auto never holds one off, Original only until the release.
+void pm27_promoted_shots_keep_every_automatic_cut() {
+  for (const PaddleMode mode : {PaddleMode::ORIGINAL, PaddleMode::AUTO}) {
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    runtimeConfig.paddleMode = static_cast<uint8_t>(mode);
+    startCycle();
+    advanceToBrew();
+    paddleOffThenOn();
+    CHECK(machineCyclePromotedToNaturalForTest() && machineAllowsAutomationStop());
+    CHECK(machineCycleHardMaxArmedForTest() == (mode == PaddleMode::ORIGINAL));
+    endBbwProtectionForTests();
+    shot.expectedEndS = 1.0f;
+    runLoopAfter(1000);
+    loop();
+    CHECK(stopperState == StopperState::REQUIRES_OFF);
+    CHECK(session.endReason == EndReason::SCALE_THRESHOLD);
+    CHECK(!getRelaySafetySnapshot().closed);
+
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    configureOriginalBbwShortWall();
+    runtimeConfig.paddleMode = static_cast<uint8_t>(mode);
+    startCycle();
+    advanceToBrew();
+    paddleOffThenOn();
+    advanceToOriginalBbwOperationalWall();
+    CHECK(!getRelaySafetySnapshot().closed);
+    CHECK(session.endReason == EndReason::CONFIGURED_WALL_LIMIT);
+
+    resetHarness(false, true);
+    runtimeConfig.scaleLossEnabled = true;
+    runtimeConfig.scaleLossFixedMs = 15000;
+    reachReadyFromBoot();
+    runtimeConfig.paddleMode = static_cast<uint8_t>(mode);
+    startCycle();
+    advanceToBrew();
+    paddleOffThenOn();
+    endBbwProtectionForTests();
+    setScaleConnected(false);
+    loop();
+    CHECK(session.autoToManualGuardEnforced);
+    reachSessionElapsed(15000);
+    CHECK(session.endReason == EndReason::AUTO_TO_MANUAL_GUARD);
+    CHECK(!getRelaySafetySnapshot().closed);
+
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    seedCupPresence(80.0f);
+    runtimeConfig.paddleMode = static_cast<uint8_t>(mode);
+    startCycle();
+    advanceToBrew();
+    paddleOffThenOn();
+    publishWeight(-80.0f, hostMillis, 1, 40);
+    publishWeight(-81.0f, hostMillis + 1, 1, 41);
+    runLoopAfter(1);
+    CHECK(session.endReason == EndReason::CUP_REMOVED);
+    CHECK(!getRelaySafetySnapshot().closed);
+  }
+}
+
+// An early paddle stop leaves the same shot record, learned offset and
+// scale-loss projection whichever mode reached it.
+struct EarlyPaddleStop {
+  ShotLogRecord record = {};
+  float offsetG = 0.0f;
+  uint32_t lossDeadlineMs = 0;
+};
+
+EarlyPaddleStop earlyPaddleStop(PaddleMode mode) {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  shotLog.clear();
+  runtimeConfig.paddleMode = static_cast<uint8_t>(mode);
+  const uint32_t rawOnAt = startCycle();
+  advanceToBrew();
+  for (int i = 1; i <= 6; ++i) publishWeight(0.4f * i, hostMillis + 400);
+  if (mode != PaddleMode::NATURAL) paddleOffThenOn();
+  for (int i = 7; i <= 12; ++i) publishWeight(0.4f * i, hostMillis + 400);
+  releaseAtPhysicalDuration(rawOnAt, 12000);
+  EarlyPaddleStop out;
+  CHECK_VALUE(session.endReason == EndReason::ACTIVATOR && stopperState == StopperState::READY,
+              out);
+  runLoopAfter(runtimeConfig.dripDelayMs);
+  CHECK_VALUE(shotLog.copyNewestFirst(&out.record, 1) == 1, out);
+  out.offsetG = runtimeConfig.weightOffsetG;
+  out.lossDeadlineMs =
+      static_cast<uint32_t>(idleScaleLossDeadline(activeShotPreset(presetBank)).deadlineMs);
+  return out;
+}
+
+void pm28_early_paddle_stop_matches_natural() {
+  const EarlyPaddleStop natural = earlyPaddleStop(PaddleMode::NATURAL);
+  for (const PaddleMode mode : {PaddleMode::ORIGINAL, PaddleMode::AUTO}) {
+    const EarlyPaddleStop promoted = earlyPaddleStop(mode);
+    CHECK(memcmp(&promoted.record, &natural.record, sizeof(ShotLogRecord)) == 0);
+    CHECK(promoted.offsetG == natural.offsetG);
+    CHECK(promoted.lossDeadlineMs == natural.lossDeadlineMs);
+  }
+}
+
+// Each in-shot paddle edge leaves its movement and its result in the log
+// (INFO) and in the shot trace; the starting ON opens the trace.
+void pm29_paddle_gestures_are_logged_and_traced() {
+  struct Case {
+    PaddleMode mode;
+    int extraToggles;
+    const char *log;
+  } cases[] = {
+      {PaddleMode::NATURAL, 0, "on off>stop0"},
+      {PaddleMode::ORIGINAL, 1, "on off>original1 on>natural1 off>stop1"},
+      {PaddleMode::AUTO, 1, "on off>original2 on>natural2 off>stop2"},
+  };
+  for (const Case &c : cases) {
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    runtimeConfig.paddleMode = static_cast<uint8_t>(c.mode);
+    const uint32_t mark = debugLog.latestSequence();
+    startCycle();
+    advanceToBrew();
+    if (c.extraToggles != 0) paddleOffThenOn();
+    setRawPaddle(false);
+    runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+    CHECK(session.endReason == EndReason::ACTIVATOR);
+    const std::string log = paddleLogAfter(mark);
+    if (log != c.log) std::cerr << "paddle log: " << log << "\n";
+    CHECK(log == c.log);
+    const std::string traced = paddleTraceOfLastShot();
+    if (traced != std::string(c.log).substr(3)) std::cerr << "paddle trace: " << traced << "\n";
+    CHECK(traced == std::string(c.log).substr(3));
+  }
+
+  // No scale: every mode stops on the first OFF.
+  for (const PaddleMode mode : {PaddleMode::ORIGINAL, PaddleMode::AUTO}) {
+    resetHarness(false, false);
+    reachReadyFromBoot();
+    runtimeConfig.paddleMode = static_cast<uint8_t>(mode);
+    const uint32_t mark = debugLog.latestSequence();
+    startCycle();
+    reachManualNoScaleState();
+    runLoopAfter(runtimeConfig.rinseGestureMs + 1);
+    setRawPaddle(false);
+    runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+    CHECK(session.endReason == EndReason::ACTIVATOR);
+    CHECK(paddleLogAfter(mark) ==
+          "on off>stop" + std::to_string(static_cast<int>(mode)));
+  }
+
+  // A rinse gesture, then edges the rinse consumes: no result for those.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.paddleMode = static_cast<uint8_t>(PaddleMode::AUTO);
+  uint32_t mark = debugLog.latestSequence();
+  const uint32_t rawOnAt = startCycle();
+  releaseAtPhysicalDuration(rawOnAt, runtimeConfig.rinseGestureMs);
+  CHECK(stopperState == StopperState::RINSE);
+  const uint32_t rinseDeadline = session.rinseStartedAtMs + runtimeConfig.rinseDurationMs;
+  paddleOffThenOn();
+  setRawPaddle(false);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  CHECK(stopperState == StopperState::RINSE);
+  CHECK(session.rinseStartedAtMs + runtimeConfig.rinseDurationMs == rinseDeadline);
+  CHECK(paddleLogAfter(mark) == "on off>rinse2 on off");
+
+  // Rinse off: an Auto OFF inside the gesture window still stops.
+  resetHarness(false, true);
+  runtimeConfig.rinseEnabled = false;
+  reachReadyFromBoot();
+  runtimeConfig.paddleMode = static_cast<uint8_t>(PaddleMode::AUTO);
+  mark = debugLog.latestSequence();
+  releaseAtPhysicalDuration(startCycle(), runtimeConfig.rinseGestureMs);
+  CHECK(session.endReason == EndReason::ACTIVATOR);
+  CHECK(paddleLogAfter(mark) == "on off>stop2");
+
+  // A web start ends on the first physical edge, with no paddle result.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.paddleMode = static_cast<uint8_t>(PaddleMode::AUTO);
+  mark = debugLog.latestSequence();
+  processWebCommand(webControlCommand(WebCommandType::REMOTE_ON));
+  CHECK(session.active);
+  runLoopAfter(2000);
+  setRawPaddle(true);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  CHECK(session.endReason == EndReason::PHYSICAL_OVERRIDE);
+  CHECK(!machineCyclePromotedToNaturalForTest());
+  CHECK(paddleLogAfter(mark) == "on");
+
+  // An edge after the shot ended has no result either.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  runtimeConfig.paddleMode = static_cast<uint8_t>(PaddleMode::AUTO);
+  startCycle();
+  advanceToBrew();
+  endBbwProtectionForTests();
+  shot.expectedEndS = 1.0f;
+  runLoopAfter(1000);
+  loop();
+  CHECK(stopperState == StopperState::REQUIRES_OFF);
+  mark = debugLog.latestSequence();
+  setRawPaddle(false);
+  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  CHECK(paddleLogAfter(mark) == "off");
+}
+
+void pm30_paddle_gesture_log_text() {
+  const struct {
+    DebugCode code;
+    PaddleMode mode;
+    const char *text;
+  } cases[] = {
+      {DebugCode::PADDLE_ENDS_SHOT, PaddleMode::NATURAL, "paddle OFF stops shot (natural mode)"},
+      {DebugCode::PADDLE_STARTS_RINSE, PaddleMode::ORIGINAL,
+       "paddle OFF starts rinse (original mode)"},
+      {DebugCode::PADDLE_KEEPS_RUNNING, PaddleMode::AUTO,
+       "paddle OFF keeps shot as Original; ON then OFF stops it (auto mode)"},
+      {DebugCode::PADDLE_TO_NATURAL, PaddleMode::AUTO,
+       "paddle ON switches shot to Natural; OFF stops it (auto mode)"},
+  };
+  for (const auto &c : cases) {
+    DebugEvent event;
+    event.code = c.code;
+    event.argument1 = static_cast<int32_t>(c.mode);
+    char message[DEBUG_EVENT_TEXT_CAPACITY] = {};
+    CHECK(formatLifecycleDebugMessage(event, message, sizeof(message)));
+    if (strcmp(message, c.text) != 0) std::cerr << "paddle text: " << message << "\n";
+    CHECK(strcmp(message, c.text) == 0);
+    CHECK(debugCodeDefaultLevel(c.code) == LogLevel::INFO);
+  }
 }
 
 using TestFunction = void (*)();
@@ -26194,7 +26473,7 @@ const TestCase testCases[] = {
     {"PM11", pm11_original_bbw_release_honors_operational_wall},
     {"PM12", pm12_auto_bbw_release_after_rinse_keeps_machine_running},
     {"PM13", pm13_auto_bbw_hold_allows_auto_stop},
-    {"PM14", pm14_auto_bbw_off_on_off_stays_brewing},
+    {"PM14", pm14_auto_bbw_off_on_off_ends_like_natural},
     {"PM15", pm15_auto_no_scale_paddle_off_ends_shot},
     {"PM16", pm16_auto_timer_only_paddle_off_ends_shot},
     {"PM17", pm17_auto_bbw_release_inside_rinse_is_rinse},
@@ -26207,6 +26486,10 @@ const TestCase testCases[] = {
     {"PM24", pm24_no_scale_hard_limit_does_not_reclose_while_held},
     {"PM25", pm25_web_start_paddle_off_keeps_k1_closed_with_scale},
     {"PM26", pm26_blocked_no_scale_hold_does_not_close_k1},
+    {"PM27", pm27_promoted_shots_keep_every_automatic_cut},
+    {"PM28", pm28_early_paddle_stop_matches_natural},
+    {"PM29", pm29_paddle_gestures_are_logged_and_traced},
+    {"PM30", pm30_paddle_gesture_log_text},
     {"R01", r01_transient_disconnect_suspends_weight_control},
     {"R02", r02_stalled_scale_worker_suspends_until_validated},
     {"R03", r03_non_finite_weights_cannot_corrupt_state_or_offset},

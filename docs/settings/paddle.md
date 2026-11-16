@@ -29,11 +29,15 @@ is, until you choose another one.
 | Move ON | Start | Start | Start |
 | Leave ON | Stop automatically by weight/guards | Weight stop and operational wall wait for OFF; electrical hard cap remains | Stop automatically by weight/guards |
 | Move OFF after any enabled rinse window | Stop now | Continue automatically | Continue automatically |
-| Stop early using the paddle | OFF | ON again, then OFF | ON/OFF only changes the current subtype; it is not an early-stop gesture |
+| Stop early using the paddle | OFF | ON again, then OFF | ON again, then OFF |
 
-Choose Natural if you want OFF to mean stop. Auto is a different workflow:
-do not assume returning the paddle to OFF will stop an automatic shot.
-Authenticated Web Stop and applicable limits remain available.
+Choose Natural if you want OFF to mean stop. In Original and Auto, the first
+OFF lets the shot carry on; to stop early, move the paddle back ON and then
+OFF again. Authenticated Web Stop and applicable limits remain available.
+
+**Diagnostic → Log** shows what each paddle move did during a shot: stopped
+it, started a rinse, kept it running, or switched it to Natural. The shot's
+[trace](../features/shot-history.md#see-what-the-controller-decided) keeps the same lines.
 
 Without a usable scale at start, or with BBW off, OFF ends the shot in all
 three modes. No-scale policy can block the start first. Max shot time does not
@@ -63,9 +67,15 @@ wall are held off. [Compatibility mode](firmware-mode.md) has no duration cap.
 
 ## Auto
 
-Start with ON and leave the paddle ON or OFF after any rinse gesture window.
-Weight control can stop in either position. Moving ON/OFF changes only this
-shot's internal subtype; it does not switch to Natural's early-stop behavior.
+1. Move ON to start. Leave it ON and the shot finishes by weight, just like
+   Natural.
+2. Move OFF after the rinse window, if enabled, and the shot keeps running and
+   finishes by weight, just like Original.
+3. To stop early, move ON again, then OFF. That shot switches to Natural
+   behavior; the saved mode stays Auto.
+
+Unlike Original, Auto never holds back the weight stop while the paddle is ON,
+so the shot always finishes at your yield in either position.
 
 ## How K1 follows the paddle
 
