@@ -2156,7 +2156,7 @@ void bbw01_snapshots_and_isolated_finalization() {
     const ShotPreset *after = mutableShotPreset(presetBank, origin);
     CHECK(fabsf(after->bbwEwmaOffsetG -
                 (learn ? used + 0.10f : used)) < 1e-5f);
-    CHECK(activeShotPreset(presetBank).bbwEwmaOffsetG == 0.5f);
+    CHECK(activeShotPreset(presetBank).bbwEwmaOffsetG == DEFAULT_WEIGHT_OFFSET_G);
     ShotLogRecord record[1] = {};
     CHECK(shotLog.copyNewestFirst(record, 1) == 1);
     CHECK(record[0].offsetUsedCg == weightToCentigrams(used));
@@ -10001,8 +10001,8 @@ void cw28_observed_unload_preserves_previous_shot() {
       CHECK(persistedLastShot.currentWeightG == (liftSamples == 0 ? 37.0f : 36.0f));
       ShotLogRecord record[1] = {};
       CHECK(shotLog.copyNewestFirst(record, 1) == 1);
-      CHECK(record[0].actualWeightSource == static_cast<uint8_t>(
-          liftSamples == 0 ? ActualWeightSource::POST_DRIP : ActualWeightSource::LAST_KNOWN));
+      CHECK(shotLogWeightSource(record[0]) ==
+            (liftSamples == 0 ? ActualWeightSource::POST_DRIP : ActualWeightSource::LAST_KNOWN));
       if (liftSamples != 0)
         CHECK(strcmp(shotLogBbwLearningApplied(record[0]), "false") == 0);
       if (liftSamples != 0) CHECK(runtimeConfig.weightOffsetG == offset);
@@ -13734,6 +13734,7 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
     corridor::FirstDropStats ownDrop, otherDrop;
     size_t drips;
     int16_t dripCg[10];
+    uint8_t dripNote[10];
     uint16_t skipped;
     uint32_t dripIds[10];
     ShotLogRecord home;
@@ -13770,7 +13771,7 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
     out.hint = shotLog.grindHint(preset);
     out.ownDrop = shotLog.firstDropStats(preset);
     out.otherDrop = shotLog.firstDropStats(preset, true);
-    out.drips = shotLog.recentDrips(preset.id, out.dripIds, out.dripCg, out.skipped, 10);
+    out.drips = shotLog.recentDrips(preset.id, out.dripIds, out.dripCg, out.dripNote, out.skipped, 10);
     out.hasHome = copyHomeShot(out.home, nullptr);
     copyPresetShotStats(presetBank, out.preset);
   };
@@ -14571,8 +14572,7 @@ void s17_new_cycle_commits_pending_log_as_last_known() {
   CHECK(shotLog.count() == 1);
   ShotLogRecord records[1] = {};
   CHECK(shotLog.copyNewestFirst(records, 1) == 1);
-  CHECK(records[0].actualWeightSource ==
-        static_cast<uint8_t>(ActualWeightSource::LAST_KNOWN));
+  CHECK(shotLogWeightSource(records[0]) == ActualWeightSource::LAST_KNOWN);
   CHECK(records[0].actualWeightCg == shotLogWeightToCentigrams(43.7f));
   CHECK(records[0].avgFlowCgS == 412);
 }
@@ -15305,8 +15305,7 @@ void s15b_cup_off_after_end_keeps_last_known_actual() {
   CHECK(shotLog.count() == 1);
   ShotLogRecord records[1] = {};
   CHECK(shotLog.copyNewestFirst(records, 1) == 1);
-  CHECK(records[0].actualWeightSource ==
-        static_cast<uint8_t>(ActualWeightSource::LAST_KNOWN));
+  CHECK(shotLogWeightSource(records[0]) == ActualWeightSource::LAST_KNOWN);
   CHECK(records[0].actualWeightCg == shotLogWeightToCentigrams(42.1f));
   CHECK(fabsf(persistedLastShot.currentWeightG - 42.1f) < 0.001f);
 }
@@ -20794,7 +20793,7 @@ void lt05_late_start_zero_keeps_the_coffee_already_weighed() {
   pendingShotFinalizeTask();
   ShotLogRecord saved[1] = {};
   CHECK(shotLog.copyNewestFirst(saved, 1) == 1);
-  CHECK(saved[0].actualWeightSource == static_cast<uint8_t>(ActualWeightSource::POST_DRIP));
+  CHECK(shotLogWeightSource(saved[0]) == ActualWeightSource::POST_DRIP);
   CHECK(fabsf(saved[0].actualWeightCg / 100.0f - (threshold + 0.4f)) < 0.02f);
 }
 
@@ -20991,7 +20990,7 @@ void lt07_unseen_cup_lift_in_the_window_is_undone_when_it_returns() {
     }
     ShotLogRecord saved[1] = {};
     CHECK(shotLog.copyNewestFirst(saved, 1) == 1);
-    CHECK(saved[0].actualWeightSource == static_cast<uint8_t>(ActualWeightSource::POST_DRIP));
+    CHECK(shotLogWeightSource(saved[0]) == ActualWeightSource::POST_DRIP);
     CHECK(fabsf(saved[0].actualWeightCg / 100.0f - threshold) < 1.0f);
   }
 }
@@ -21568,7 +21567,11 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
   WebCommand speed;
   speed.type = WebCommandType::RESET_WEIGHT_OFFSET;
   speed.bbwAlphaBaseline = 50;
+  debugLog.clear();
   processWebCommand(speed);
+  // P1: every drip change names itself, the values now in use and its origin.
+  CHECK(debugLogTextCount("Learning speed set for \"") == 1 &&
+        debugLogTextCount("\": drip 1.20 g, speed 0.50 (Web UI)") == 1);
   CHECK(preset.bbwEwmaAlpha == 50 && preset.bbwAlphaBaseline == 50 &&
         preset.bbwAlphaLearned == 0 && preset.bbwEwmaOffsetG == 1.2f);
   CHECK(state() == static_cast<uint8_t>(QuickStartState::ARMED));
@@ -21633,22 +21636,38 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
   CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f);
   processWebCommand(quick);
   debugLog.clear();
-  // Raised and lowered cuts neither count nor train while it runs.
-  CHECK(!pull(0.90f, EndReason::FAST_EXTRACTION_MAX_WEIGHT));
-  CHECK(!pull(0.10f, EndReason::SLOW_EXTRACTION_MIN_WEIGHT));
-  CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f && armed->count == 0);
-  CHECK(debugLogTextCount("quick start counts only shots stopped at the target") == 2);
-  for (const float needed : {0.30f, 0.32f, 0.30f}) CHECK(pull(needed));
+  // Raised and lowered cuts train the drip but never count while it runs.
+  CHECK(pull(0.90f, EndReason::FAST_EXTRACTION_MAX_WEIGHT));
+  CHECK(pendingFinalize.dripLearnNote == DripLearnNote::TARGET_ONLY);
+  CHECK(pull(0.10f, EndReason::SLOW_EXTRACTION_MIN_WEIGHT));
+  CHECK(pendingFinalize.dripLearnNote == DripLearnNote::TARGET_ONLY);
+  CHECK(fabsf(preset.bbwEwmaOffsetG - 0.525f) < 0.005f && armed->count == 0);
+  for (const float needed : {0.30f, 0.32f, 0.30f}) {
+    CHECK(pull(needed));
+    CHECK(pendingFinalize.dripLearnNote == DripLearnNote::NONE);
+  }
   CHECK(fabsf(preset.bbwEwmaOffsetG - 0.30f) < 0.005f);
+  CHECK(debugLogTextCount("Quick start: three shots agree; drip correction 0.30 g") == 1);
   CHECK(state() == static_cast<uint8_t>(QuickStartState::APPLIED));
-  CHECK(debugLogTextCount("is an outlier") == 0 && debugLogTextCount("Drip step") == 0);
+  CHECK(!debugEventExists(DebugCode::DRIP_LEARN_SKIPPED, static_cast<int32_t>(DripLearnNote::OUTLIER)) && debugLogTextCount("Drip step") == 0);
   // Restore quick starts again and marks where the factory drip came back,
   // so the chart fades the shots pulled before it.
   WebCommand restore;
   restore.type = WebCommandType::PRESET_OP;
   restore.presetAction = static_cast<uint8_t>(PresetAction::RESTORE_FACTORY_VALUES);
   restore.presetId = preset.id;
+  restore.viaCompanion = true;
+  debugLog.clear();
   processWebCommand(restore);
+  CHECK(debugLogTextCount("Factory values restored for \"") == 1 &&
+        debugLogTextCount("\": drip 0.10 g, speed 0.30, quick start armed (companion)") == 1);
+  // The longest preset name still fits one log line.
+  ShotPreset longest = preset;
+  memset(longest.name, 'x', sizeof(longest.name) - 1);
+  longest.name[sizeof(longest.name) - 1] = '\0';
+  debugLog.clear();
+  logDripChange("Factory values restored", longest, true, restore);
+  CHECK(debugLogTextCount("quick start armed (companion)") == 1);
   const QuickStartEntry *restored = quickStartEntry(bbwQuickStart, presetBank, preset.id, false);
   CHECK(restored->state == static_cast<uint8_t>(QuickStartState::ARMED));
   CHECK(restored->setAtId != 0 && restored->setAtId == shotStatisticsEpochNow());
@@ -21672,6 +21691,7 @@ void fw06_status_carries_recent_drips_and_markers() {
     shotLogSetPresetId(record, preset.id);
     shotLogSetBbw(record, {.algorithm = 1, .version = BBW_PROFILE_VERSION, .alpha = 30,
                            .learningApplied = i != 4});
+    if (i == 4) record.actualWeightSource |= static_cast<uint8_t>(DripLearnNote::NOT_FRESH) << 2;
     TaskLockGuard lock(shotStoreMutex);
     if (i == 3) setAtId = shotLog.nextRecordId();
     CHECK(shotLog.append(record, false));
@@ -21685,15 +21705,18 @@ void fw06_status_carries_recent_drips_and_markers() {
   CHECK(status.bbwRecentCg[0] == 55 && status.bbwRecentCg[1] == 54 &&
         status.bbwRecentCg[2] == 53 && status.bbwRecentCg[4] == 51);
   CHECK(status.bbwRecentAfterSet == 3 && status.bbwRecentAfterQuick == 0xFF);
+  CHECK(status.bbwRecentNote[1] == static_cast<uint8_t>(DripLearnNote::NOT_FRESH) &&
+        status.bbwRecentNote[0] == 0);
   CHECK(status.bbwQuickState == static_cast<uint8_t>(QuickStartState::ARMED) &&
         status.bbwQuickSetCg == 120);
   char json[256];
   CHECK(formatDripChartJson(json, sizeof(json), status) > 0);
-  // The skipped fifth shot keeps its measured value and rides the mask.
+  // The skipped fifth shot keeps its measured value, rides the mask and
+  // names why it did not train.
   CHECK(strcmp(json, ",\"bbwQuickStart\":{\"state\":\"armed\",\"count\":0,\"setG\":1.20,"
                      "\"quickG\":0.00},\"bbwRecentAfterSet\":3,\"bbwRecentAfterQuick\":-1,"
                      "\"bbwRecentG\":[0.55,0.54,0.53,0.52,0.51,0.50],"
-                     "\"bbwRecentSkipped\":2") == 0);
+                     "\"bbwRecentSkipped\":2,\"bbwRecentNote\":[0,9,0,0,0,0]") == 0);
   // Another preset's shots never reach this preset's chart.
   CHECK(setActiveShotPreset(presetBank, presetBank.presets[1].id));
   publishControlStatus();
@@ -21733,6 +21756,7 @@ void fw08_drip_filter_physics_outliers_and_step() {
   resetHarness(false, true);
   reachReadyFromBoot();
   ShotPreset &preset = mutableActiveShotPreset(presetBank);
+  preset.bbwEwmaOffsetG = 0.50f;
   bool ok = false;
   const auto shot = [&](float offsetUsed, float needed, int32_t rateX100) {
     preparePendingBbwForTest();
@@ -21841,7 +21865,7 @@ void fw09_learning_skips_name_their_reason() {
   reachReadyFromBoot();
   ShotPreset &preset = mutableActiveShotPreset(presetBank);
   preset.bbwEwmaOffsetG = 0.70f;
-  const auto skips = [&](const char *reason, const auto &spoil) {
+  const auto skips = [&](DripLearnNote note, const char *text, const auto &spoil) {
     pendingFinalize = PendingShotFinalize{};
     preparePendingBbwForTest();
     pendingFinalize.offsetAnalysis = pendingFinalize.logEligible = true;
@@ -21860,28 +21884,40 @@ void fw09_learning_skips_name_their_reason() {
     currentWeightReceivedAtMs = ++hostMillis;
     debugLog.clear();
     const bool learned = learnPendingBbw(pendingFinalize, currentWeight, true);
-    return !learned && debugLogTextCount("Offset learn skipped") == 1 &&
-           debugLogTextCount(reason) == 1 && preset.bbwEwmaOffsetG == 0.70f;
+    static DebugEvent events[DEBUG_EVENT_CAPACITY];
+    const size_t count = copyDebugEvents(0, events, DEBUG_EVENT_CAPACITY);
+    size_t lines = 0;
+    char message[DEBUG_EVENT_TEXT_CAPACITY];
+    for (size_t i = 0; i < count; ++i) {
+      if (events[i].code != DebugCode::DRIP_LEARN_SKIPPED) continue;
+      formatDebugEventMessage(events[i], message, sizeof(message), "");
+      lines += events[i].argument1 == static_cast<int32_t>(note) && strstr(message, text) != nullptr &&
+               strstr(message, "drip learning skipped: ") == message;
+    }
+    return !learned && lines == 1 && count > 0 && pendingFinalize.dripLearnNote == note &&
+           preset.bbwEwmaOffsetG == 0.70f;
   };
-  CHECK(skips("weight disturbed during the shot",
+  CHECK(skips(DripLearnNote::WEIGHT_DISTURBED, "weight disturbed during the shot",
               [] { pendingFinalize.offsetAnalysis = false; }));
-  CHECK(skips("manual brew", [] {
+  CHECK(skips(DripLearnNote::MANUAL_BREW, "manual brew", [] {
     pendingFinalize.offsetAnalysis = pendingFinalize.automaticBrew = false;
   }));
-  CHECK(skips("channeling", [] { pendingFinalize.channeling = true; }));
-  CHECK(skips("no valid flow rate", [] { pendingFinalize.rateAtStopX100 = 0; }));
-  CHECK(skips("not a weight cut",
+  CHECK(skips(DripLearnNote::CHANNELING, "channeling; correction unchanged",
+              [] { pendingFinalize.channeling = true; }));
+  CHECK(skips(DripLearnNote::NO_FLOW_RATE, "no valid flow rate",
+              [] { pendingFinalize.rateAtStopX100 = 0; }));
+  CHECK(skips(DripLearnNote::NOT_WEIGHT_CUT, "not a weight cut",
               [] { pendingFinalize.endReason = EndReason::GLOBAL_LIMIT; }));
-  CHECK(skips("another drip algorithm version",
+  CHECK(skips(DripLearnNote::OTHER_ALGORITHM, "another drip algorithm version (needed 0.70g)",
               [] { ++pendingFinalize.bbwProfileVersion; }));
-  CHECK(skips("drip learning restarted during the shot", [&] {
+  CHECK(skips(DripLearnNote::RESTARTED, "drip learning restarted during the shot", [&] {
     bbwLearningBank.invalidate(preset.id, presetBank);
   }));
   // A rinse never reaches the shot log, so it adds no line.
   debugLog.clear();
   pendingFinalize.endReason = EndReason::RINSE_COMPLETE;
   CHECK(!learnPendingBbw(pendingFinalize, currentWeight, true));
-  CHECK(debugLogTextCount("Offset learn skipped") == 0);
+  CHECK(!debugEventExists(DebugCode::DRIP_LEARN_SKIPPED));
 }
 
 // One weight-cut shot of the active preset that needed `needed` grams of drip.
@@ -21946,7 +21982,7 @@ void fw10_drip_learning_memory_survives_a_restart() {
   stable();
   restartBbwLearningForTest();
   CHECK(!pullBbwShotForTest(0.30f));
-  CHECK(debugLogTextCount("is an outlier") == 1);
+  CHECK(debugEventExists(DebugCode::DRIP_LEARN_SKIPPED, static_cast<int32_t>(DripLearnNote::OUTLIER)));
   CHECK(fabsf(preset.bbwEwmaOffsetG - 1.0f) < 0.005f);
   // A12: 19 shots, a restart, the 20th: the same state as without it.
   struct Outcome {
@@ -21991,7 +22027,7 @@ void fw10_drip_learning_memory_survives_a_restart() {
     processWebCommand(*reset);
     restartBbwLearningForTest();
     CHECK(pullBbwShotForTest(0.30f));
-    CHECK(debugLogTextCount("is an outlier") == 0);
+    CHECK(!debugEventExists(DebugCode::DRIP_LEARN_SKIPPED, static_cast<int32_t>(DripLearnNote::OUTLIER)));
   }
   // A14: an absent or unreadable record restores nothing, says so once, and
   // learning carries on as on a fresh install.
@@ -22392,8 +22428,7 @@ void fw04_post_stop_ceiling_ignores_touches() {
   ShotLogRecord record[1] = {};
   CHECK(shotLog.copyNewestFirst(record, 1) == 1);
   CHECK(fabsf(record[0].actualWeightCg / 100.0f - 35.8f) < 0.02f);
-  CHECK(record[0].actualWeightSource ==
-        static_cast<uint8_t>(ActualWeightSource::POST_DRIP));
+  CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::POST_DRIP);
 
   // The only reading of the hold is a refused one: no post-drip weight, so
   // the record falls back to the weight at the stop instead of that reading.
@@ -22404,12 +22439,11 @@ void fw04_post_stop_ceiling_ignores_touches() {
   pendingShotFinalizeTask();
   CHECK(shotLog.copyNewestFirst(record, 1) == 1);
   CHECK(fabsf(record[0].actualWeightCg / 100.0f - 34.7f) < 0.02f);
-  CHECK(record[0].actualWeightSource ==
-        static_cast<uint8_t>(ActualWeightSource::LAST_KNOWN));
+  CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::LAST_KNOWN);
 
-  // A hold cut short (cup lifted, next shot started) keeps a tail that had
-  // already settled, without training the drip; before the ring fills only
-  // the weight at the stop is known.
+  // A hold cut short by the cup leaving keeps a tail that had already
+  // settled and trains the drip with it; before the ring fills only the
+  // weight at the stop is known, and nothing trains.
   for (size_t published : {size_t{22}, size_t{12}}) {
     holdAfterStop(3000);
     sequence = pendingFinalize.curveLastSequence + 1U;
@@ -22422,11 +22456,67 @@ void fw04_post_stop_ceiling_ignores_touches() {
     CHECK(!pendingFinalize.pending);
     CHECK(shotLog.copyNewestFirst(record, 1) == 1);
     CHECK(fabsf(record[0].actualWeightCg / 100.0f - (settled ? 35.7f : 34.7f)) < 0.02f);
-    CHECK(record[0].actualWeightSource ==
-          static_cast<uint8_t>(settled ? ActualWeightSource::POST_DRIP
-                                       : ActualWeightSource::LAST_KNOWN));
-    CHECK(strcmp(shotLogBbwLearningApplied(record[0]), "false") == 0);
+    CHECK(shotLogWeightSource(record[0]) ==
+          (settled ? ActualWeightSource::POST_DRIP : ActualWeightSource::LAST_KNOWN));
+    CHECK(strcmp(shotLogBbwLearningApplied(record[0]), settled ? "true" : "false") == 0);
+    CHECK(shotLogDripLearnNote(record[0]) ==
+          static_cast<uint8_t>(settled ? DripLearnNote::NONE : DripLearnNote::CUT_SHORT));
     CHECK(!settled || pendingFinalize.curve.ended.weightCg == 3570);
+  }
+}
+
+// Field recording (2026-11-16, shot 72): the tail settles at 35.59 g, then a
+// hand lifts the cup 1.6 s after the stop, inside the 3 s drip delay.
+constexpr PostStopSample POST_STOP_CUP_LIFT_TAIL[] = {
+    {146, 34.9f},  {206, 35.0f},  {296, 35.2f},   {416, 35.3f},   {506, 35.5f},
+    {596, 35.5f},  {716, 35.59f}, {806, 35.59f},  {926, 35.59f},  {1016, 35.59f},
+    {1106, 35.7f}, {1226, 35.59f}, {1316, 35.59f}, {1406, 35.59f}, {1526, 35.59f},
+    {1616, 37.0f}, {1706, 41.5f}, {1826, 48.6f},  {1916, 46.2f},  {2006, 49.8f},
+    {2126, 83.7f}, {2216, 96.9f}, {2366, -7.1f},  {2426, -262.7f}, {2516, -356.7f},
+    {2636, -351.5f}, {2726, -340.5f}, {2816, -338.0f}, {2966, -374.9f}};
+
+void fw12_settled_tail_trains_after_a_cup_lift() {
+  // Both ways the lift ends the hold: the cup leaves (the hold is cut short)
+  // or every later reading is refused (the live weight goes stale). The tail
+  // had settled, so the shot trains the drip and its record says so.
+  for (const size_t published : {size_t{16}, std::size(POST_STOP_CUP_LIFT_TAIL)}) {
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    startCycle();
+    advanceToBrew();
+    session.startedWithScale = true;
+    session.scaleBaselineReady = true;
+    endBbwProtectionForTests();
+    publishControlRamp(1.0f, 30.0f, 0.5f, 100, 10);
+    schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
+    session.active = false;
+    pendingFinalize.dripDelayMs = 3000;
+    pendingFinalize.lastKnownWeightG = 34.7f;
+    pendingFinalize.lastKnownWeightValid = true;
+    pendingFinalize.tailRateX100 = pendingFinalize.rateAtStopX100 = 1570;
+    pendingFinalize.cutLineDg = 360;
+    pendingFinalize.weightOffsetG = 0.50f;  // The field shot needed 0.09 g.
+    pendingFinalize.endedAtMs = hostMillis;
+    pendingFinalize.tailRefAtMs = hostMillis - 500;
+    const float before = activeShotPreset(presetBank).bbwEwmaOffsetG;
+    uint32_t sequence = pendingFinalize.curveLastSequence + 1U;
+    for (size_t i = 0; i < published; ++i) {
+      hostMillis = pendingFinalize.endedAtMs + POST_STOP_CUP_LIFT_TAIL[i].afterMs;
+      markScaleWorkerProgress();
+      publishWeight(POST_STOP_CUP_LIFT_TAIL[i].weightG, hostMillis,
+                    pendingFinalize.scaleConnectionGeneration, sequence++);
+    }
+    const bool lifted = published == std::size(POST_STOP_CUP_LIFT_TAIL);
+    CHECK(pendingFinalize.pending != lifted);
+    hostMillis = pendingFinalize.endedAtMs + pendingFinalize.dripDelayMs + 1;
+    pendingShotFinalizeTask();
+    ShotLogRecord record[1] = {};
+    CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+    CHECK(fabsf(record[0].actualWeightCg / 100.0f - 35.59f) < 0.02f);
+    CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::POST_DRIP);
+    CHECK(strcmp(shotLogBbwLearningApplied(record[0]), "true") == 0);
+    CHECK(shotLogDripLearnNote(record[0]) == 0);
+    CHECK(activeShotPreset(presetBank).bbwEwmaOffsetG != before);
   }
 }
 
@@ -24460,7 +24550,7 @@ void trc01_scale_shot_is_traced_from_cycle_start_to_drip_finalize() {
   CHECK(shot_trace_test::find(trace, ScaleProfileEvent::SHOT_END) != nullptr);
   const Event *final = shot_trace_test::find(trace, ShotTraceKind::FINAL_WEIGHT);
   CHECK(final != nullptr && final == &trace.events.back() &&
-        final->b == stored[0].actualWeightSource);
+        final->b == static_cast<int32_t>(shotLogWeightSource(stored[0])));
   // State changes: initial at the window start, then each change.
   const Event *control = shot_trace_test::findState(trace, ScaleProfileSignal::WEIGHT_CONTROL);
   CHECK(control != nullptr && (control->b & SHOT_TRACE_STATE_INITIAL) != 0 &&
@@ -26653,6 +26743,7 @@ const TestCase testCases[] = {
     {"FW02", fw02_offset_learns_below_sensor_lag},
     {"FW03", fw03_dense_tail_decimates_to_reachable_median},
     {"FW04", fw04_post_stop_ceiling_ignores_touches},
+    {"FW12", fw12_settled_tail_trains_after_a_cup_lift},
     {"FF13", ff13_rinse_first_drop_goes_through_stopper},
     {"FF14", ff14_no_scale_first_drop_does_not_skip_stopper},
     {"FF15", ff15_orchestrate_post_tare_holds_cup_transitions},

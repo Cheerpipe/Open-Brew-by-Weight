@@ -185,6 +185,7 @@ uint8_t statusDripCount = 0;
 uint16_t statusDripSkipped = 0;
 uint32_t statusDripId[10] = {};
 int16_t statusDripCg[10] = {};
+uint8_t statusDripNote[10] = {};
 
 void publishControlStatus() {
   const uint32_t now = millis();
@@ -223,7 +224,7 @@ void publishControlStatus() {
       statusDripCachePreset != presetBank.activeId) {
     TaskLockGuard lock(shotStoreMutex);
     statusDripCount = static_cast<uint8_t>(shotLog.recentDrips(
-        presetBank.activeId, statusDripId, statusDripCg, statusDripSkipped, 10));
+        presetBank.activeId, statusDripId, statusDripCg, statusDripNote, statusDripSkipped, 10));
     statusDripCacheGeneration = gatherGeneration;
     statusDripCachePreset = presetBank.activeId;
     statusDripCacheValid = true;
@@ -388,6 +389,7 @@ void publishControlStatus() {
   next.bbwRecentCount = statusDripCount;
   next.bbwRecentSkipped = statusDripSkipped;
   memcpy(next.bbwRecentCg, statusDripCg, sizeof(statusDripCg));
+  memcpy(next.bbwRecentNote, statusDripNote, sizeof(statusDripNote));
   if (const QuickStartEntry *quick =
           quickStartEntry(bbwQuickStart, presetBank, bbwPreset.id, false)) {
     next.bbwQuickState = quick->state;

@@ -338,6 +338,7 @@ struct PendingShotFinalize {
   uint32_t scaleConnectionGeneration = 0;
   bool scaleBaselineReady = false;
   bool bbwLearningApplied = false;
+  DripLearnNote dripLearnNote = DripLearnNote::NONE;
   bool pending = false;
   bool curveBreakPending = false;
   uint32_t curveLastSequence = 0;
@@ -477,6 +478,8 @@ bool bbwQuickStartPersistPending = false;
 bool bbwQuickStartPersistFailLatched = false;  // persist worker only
 TaskMutex bbwQuickStartMux;
 void stageBbwQuickStart();
+bool learnPendingBbw(PendingShotFinalize &snapshot, float finalWeightG,
+                     bool postDripWeightValid);
 // Staged copy of bbwLearningBank for the settings_persist worker, guarded by
 // bbwLearningMux; saveBbwLearning sets its header.
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS BbwLearningRecord bbwLearningStaged;

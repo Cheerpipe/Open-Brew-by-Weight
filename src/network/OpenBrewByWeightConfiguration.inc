@@ -939,6 +939,8 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
   command.type = WebCommandType::PRESET_OP;
   command.requestId = self.allocateRequestId();
   command.unsafeWebUiOverride = self.webUiOverrideAllowed(request);
+  CompanionPrincipal caller;
+  command.viaCompanion = self.webUiPrincipal(request, caller) && caller.relayed;
   if (self.callbacks_.copyRuntimeConfig != nullptr) {
     self.callbacks_.copyRuntimeConfig(&command.config);
   }
@@ -1134,6 +1136,8 @@ esp_err_t OpenBrewByWeightNetwork::resetCalibrationHandler(httpd_req_t *request)
   command.config.revision = baseRevision;
   command.requestId = self.allocateRequestId();
   command.unsafeWebUiOverride = self.webUiOverrideAllowed(request);
+  CompanionPrincipal caller;
+  command.viaCompanion = self.webUiPrincipal(request, caller) && caller.relayed;
   if (!self.callbacks_.enqueueWebCommand(command)) {
     return sendError(request, STATUS_UNAVAILABLE, "CONTROL_QUEUE_FULL",
                      nullptr, "CALIBRATION_RESET_BUSY");

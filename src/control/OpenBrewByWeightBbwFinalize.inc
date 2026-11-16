@@ -1,102 +1,75 @@
 // Control-owned post-shot learning; no actuation or direct flash writes.
-bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
+// Leaves in snapshot.dripLearnNote what the shot did to the drip (its record
+// keeps it); every skip names its reason in the Web UI log and the shot trace.
+bool learnPendingBbw(PendingShotFinalize &snapshot, float finalWeightG,
                      bool postDripWeightValid) {
   // r learns from weight cuts only (target, raised or lowered segment),
   // never from channeling, scale loss, the wall or a manual stop, nor from a
   // cut without a valid rate (no q x tau lead, so the error is not drip).
-  // A rinse never reaches the shot log; every other skip names its reason.
+  // A rinse never reaches the shot log.
+  snapshot.dripLearnNote = DripLearnNote::NONE;
   if (pendingFinalizeIsRinse(snapshot)) return false;
-  const char *const skipped =
-      !snapshot.offsetAnalysis
-          ? (!snapshot.automaticBrew ? "manual brew"
-             : snapshot.timerOnly    ? "timer-only shot"
-                                     : "weight disturbed during the shot")
-      : snapshot.channeling           ? "channeling"
-      : snapshot.rateAtStopX100 == 0  ? "no valid flow rate at the stop"
-      : !corridor::weightCutReason(static_cast<uint8_t>(snapshot.endReason))
-          ? "not a weight cut"
-          : nullptr;
-  if (skipped != nullptr) {
-    serialTracef(LogLevel::INFO, "Offset learn skipped: %s; offset unchanged", skipped);
+  const auto skip = [&snapshot](DripLearnNote note, int32_t neededCg = INT32_MIN) {
+    snapshot.dripLearnNote = note;
+    addDebugEvent(DebugCategory::CONFIG, DebugCode::DRIP_LEARN_SKIPPED,
+                  static_cast<int32_t>(note), neededCg);
     return false;
-  }
-
+  };
+  if (!snapshot.offsetAnalysis)
+    return skip(!snapshot.automaticBrew ? DripLearnNote::MANUAL_BREW
+                : snapshot.timerOnly    ? DripLearnNote::TIMER_ONLY
+                                        : DripLearnNote::WEIGHT_DISTURBED);
+  if (snapshot.channeling) return skip(DripLearnNote::CHANNELING);
+  if (snapshot.rateAtStopX100 == 0) return skip(DripLearnNote::NO_FLOW_RATE);
+  if (!corridor::weightCutReason(static_cast<uint8_t>(snapshot.endReason)))
+    return skip(DripLearnNote::NOT_WEIGHT_CUT);
   if (!scaleAvailable() || !std::isfinite(finalWeightG) ||
       !std::isfinite(snapshot.weightOffsetG) ||
       currentWeightSequence == snapshot.endedWeightSequence ||
-      !tickAfter(currentWeightReceivedAtMs, snapshot.endedAtMs)) {
-    serialTrace(LogLevel::INFO,
-                "Final weight unavailable; offset unchanged");
-    return false;
-  }
-
-  if (finalWeightG < 1.0f) {
-    serialTrace(LogLevel::INFO,
-                "Final weight below history threshold; offset unchanged");
-    return false;
-  }
+      !tickAfter(currentWeightReceivedAtMs, snapshot.endedAtMs))
+    return skip(DripLearnNote::NO_FINAL_WEIGHT);
+  if (finalWeightG < 1.0f) return skip(DripLearnNote::FINAL_TOO_LOW);
 
   // Observation = offsetUsed + (final - f(t_cut)): the cut line at the stop.
   const float cutLineG = pendingCutLineDg(snapshot) / 10.0f;
   const float observation = snapshot.weightOffsetG + (finalWeightG - cutLineG);
+  const int32_t neededCg = lroundf(observation * 100.0f);
   serialTracef(LogLevel::INFO,
                "Final weight: %.2fg; cut line: %.2fg; cycle offset: %.2fg",
                finalWeightG, cutLineG, snapshot.weightOffsetG);
 
+  // A tail that settled is the yield even when the cup left before the hold
+  // ended: the live reading may be refused or stale by then.
   float updatedOffset = 0.0f;
   const bool acceptedFresh = postDripWeightValid && snapshot.scaleBaselineReady &&
       shotLogBbwEligible(snapshot.startedWithScale, snapshot.timerOnly,
                          snapshot.automaticBrew) &&
-      currentWeightIsFresh(millis()) &&
-      currentWeightConnectionGeneration == snapshot.scaleConnectionGeneration &&
+      (std::isfinite(snapshot.tailSettledG) ||
+       (currentWeightIsFresh(millis()) &&
+        currentWeightConnectionGeneration == snapshot.scaleConnectionGeneration)) &&
       snapshot.scaleConnectionGeneration == scaleConnectionGenerationNow();
   if (!bbwEwma::learn(snapshot.weightOffsetG, observation, snapshot.bbwAlpha,
-                      acceptedFresh, updatedOffset)) {
-    serialTrace(acceptedFresh ? LogLevel::WARNING : LogLevel::INFO,
-                acceptedFresh
-                    ? "Calculated offset outside safe range; offset unchanged"
-                    : "Final weight not a fresh post-drip reading; offset unchanged");
-    return false;
-  }
+                      acceptedFresh, updatedOffset))
+    return skip(acceptedFresh ? DripLearnNote::OUT_OF_RANGE : DripLearnNote::NOT_FRESH,
+                neededCg);
 
   ShotPreset *preset = mutableShotPreset(
       presetBank, snapshot.activePresetId != 0 ? snapshot.activePresetId
                                                : presetBank.activeId);
-  if (preset == nullptr) {
-    serialTrace(LogLevel::WARNING,
-                "Offset learn skipped; shot preset no longer exists");
-    return false;
-  }
+  if (preset == nullptr) return skip(DripLearnNote::PRESET_GONE, neededCg);
   if (snapshot.bbwAlgorithm !=
           static_cast<uint8_t>(BbwAlgorithm::LINEAR_EWMA) ||
-      snapshot.bbwProfileVersion != bbwAlgorithmVersion(snapshot.bbwAlgorithm)) {
-    serialTrace(LogLevel::INFO,
-                "Offset learn skipped: shot used another drip algorithm version");
-    return false;
-  }
+      snapshot.bbwProfileVersion != bbwAlgorithmVersion(snapshot.bbwAlgorithm))
+    return skip(DripLearnNote::OTHER_ALGORITHM, neededCg);
   auto &learning = bbwLearningBank.forPreset(preset->id, presetBank);
-  if (snapshot.bbwLearningGeneration != learning.generation) {
-    serialTrace(LogLevel::INFO,
-                "Offset learn skipped: drip learning restarted during the shot");
-    return false;
-  }
-  // A quick start has no outlier gate yet: only a cut at the target trains
-  // while it runs, never one on the raised or lowered segment.
-  const QuickStartEntry *quick = quickStartEntry(bbwQuickStart, presetBank, preset->id, false);
-  if (quick != nullptr && quick->state == static_cast<uint8_t>(QuickStartState::ARMED) &&
-      snapshot.endReason != EndReason::SCALE_THRESHOLD) {
-    serialTrace(LogLevel::INFO,
-                "Offset learn skipped: quick start counts only shots stopped at the target");
-    return false;
-  }
+  if (snapshot.bbwLearningGeneration != learning.generation)
+    return skip(DripLearnNote::RESTARTED, neededCg);
   // Physics gate (design review 2026-10-29): flow that kept running or a
   // scale event is never drip. It also clears a pending outlier: a step is
   // confirmed by statistics on physically possible observations only.
   if (!bbwEwma::physicsPlausibleDrip(observation, snapshot.rateAtStopX100)) {
     if (std::exchange(learning.pendingOutlier, false)) stageBbwLearning();
-    serialTrace(LogLevel::INFO,
-                "Drip observation impossible for the flow at the stop; offset unchanged");
-    return false;
+    return skip(DripLearnNote::IMPOSSIBLE, neededCg);
   }
   bool stepConfirmed = false;
   if (bbwEwma::hampelOutlier(learning.evidence, observation)) {
@@ -114,26 +87,32 @@ bool learnPendingBbw(const PendingShotFinalize &snapshot, float finalWeightG,
                    updatedOffset);
     } else {
       learning.pendingOutlier = true;
-      learning.pendingCg = static_cast<int16_t>(lroundf(observation * 100.0f));
+      learning.pendingCg = static_cast<int16_t>(neededCg);
       stageBbwLearning();
-      serialTracef(LogLevel::INFO,
-                    "Drip observation %.2fg is an outlier; offset unchanged",
-                    observation);
-      return false;
+      return skip(DripLearnNote::OUTLIER, neededCg);
     }
   } else {
     learning.pendingOutlier = false;
   }
-  // Quick start: the third shot that agrees sets the drip to the median;
-  // only good shots reach here (pendingShotFinalizeTask), so the chart
-  // markers line up.
+  // Quick start: the third shot stopped at the target that agrees sets the
+  // drip to the median. It has no outlier gate yet, so a raised or lowered
+  // cut trains the correction but never counts there; only good shots reach
+  // here, so the chart markers line up.
   int16_t jumpCg = -1;
-  if (!stepConfirmed &&
-      observeQuickStart(bbwQuickStart, presetBank, preset->id,
-                        {static_cast<int16_t>(lroundf(observation * 100.0f)),
-                         shotStatisticsEpochNow()},
-                        jumpCg)) {
+  const QuickStartEntry *quick = quickStartEntry(bbwQuickStart, presetBank, preset->id, false);
+  if (snapshot.endReason != EndReason::SCALE_THRESHOLD && quick != nullptr &&
+      quick->state == static_cast<uint8_t>(QuickStartState::ARMED)) {
+    snapshot.dripLearnNote = DripLearnNote::TARGET_ONLY;
+  } else if (!stepConfirmed &&
+             observeQuickStart(bbwQuickStart, presetBank, preset->id,
+                               {static_cast<int16_t>(neededCg), shotStatisticsEpochNow()},
+                               jumpCg)) {
     if (jumpCg >= 0) updatedOffset = jumpCg / 100.0f;
+    if (quick->count == QUICK_START_SHOTS)
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::CONFIG,
+                           jumpCg >= 0 ? "Quick start: three shots agree; drip correction %.2f g"
+                                       : "Quick start: shots disagree; learning goes on from %.2f g",
+                           updatedOffset);
     stageBbwQuickStart();
   }
   preset->bbwEwmaOffsetG = updatedOffset;

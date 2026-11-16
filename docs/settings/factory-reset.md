@@ -74,7 +74,7 @@ A shorter paddle gesture (three cycles) restores the device password / forgets S
 
 ## After reset
 
-Factory Single/Double use adaptive EWMA with offsets at their 0.50/0.50 g
+Factory Single/Double use adaptive EWMA with offsets at their 0.10/0.10 g
 baselines, current/base α=0.30, initial provenance and empty candidate
 evidence. In Settings, offset-only reset restores the saved baseline; **Reset
 EWMA learning** additionally resets the gain to the preset's saved alpha

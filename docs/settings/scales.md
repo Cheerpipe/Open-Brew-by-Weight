@@ -219,7 +219,8 @@ stop and is held, and a light press still there in the final second. Leave the
 cup alone until the final weight appears. If you lift it off early, or start
 the next shot, the shot keeps the weight it had already settled at; within
 about the first second, before it settles, it records the weight at the moment
-the machine stopped.
+the machine stopped. A cup lifted after its weight settled still teaches the
+drip correction; one lifted before, or a hold ended by the next shot, does not.
 
 ## Parameters
 

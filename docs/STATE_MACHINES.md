@@ -173,7 +173,10 @@ log line. When the hold ends with no accepted tail reading, the newest
 reading is used if it passes the same floor and ceiling; otherwise the record
 keeps the last-known weight. A drip hold cut short (cup continuity lost, a new
 cycle, rinse or backflush) records the settled yield if the ring had filled,
-else the last-known weight, and never learns.
+else the last-known weight; only a hold the cup ended learns, and only from a
+settled yield. A settled ring also stands in for the freshness of the live
+reading at the end of a full hold, so a lift whose readings are refused still
+learns.
 The drip offset learns from weight cuts on any segment, against the cut line at
 the stop (observation = offset used + final − f(t_cut)); channeling, manual,
 time/safety-limit, A→M and cup-removal outcomes, and cuts without a valid flow
@@ -181,8 +184,13 @@ estimate (no q·τ lead), cannot adjust it or its candidate evidence. The
 channeling surge baseline must lie a full estimator window after the first
 drop. A quick start (armed by Set drip, Quick start alone, a new or restored
 preset, or a fresh install; persisted in NVS key `bbwQs`, absent = off) records
-the raw observations of the next three learning shots; when max − min ≤ 0.40 g
-the third sets the offset to their median instead of the EWMA step.
+the raw observations of the next three learning shots stopped at the target
+(SCALE_THRESHOLD); raised or lowered cuts take the EWMA step but are not
+counted. When max − min ≤ 0.40 g the third sets the offset to their median
+instead of the EWMA step. Every good shot stores its `DripLearnNote` in shot
+record bits 2–6 of `actualWeightSource` (0 in earlier records), which the
+drip chart and a `DRIP_LEARN_SKIPPED` debug event (Web UI log and shot trace)
+name.
 EWMA reuses the accepted final observation and additionally requires fresh weight,
 valid baseline and matching connection provenance. Control updates only the
 originating preset/algorithm generation. Reset or deletion invalidates pending

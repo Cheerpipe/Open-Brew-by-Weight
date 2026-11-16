@@ -187,7 +187,7 @@ see [machine settings in presets](../settings/linea-micra.md#machine-settings-in
 | Extend fast shots: extend by up to | 6 g (42 g) | 3 g (21 g) | off (6 g saved) | off (4 g saved) |
 | Shorten slow shots: shorten by up to | 3 g (33 g) | 1.5 g (16.5 g) | off (3 g saved) | off (1.5 g saved) |
 | Fast and slow transitions | 6 s, Gentle: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) |
-| Drip correction | 0.5 g | 0.5 g | 0.5 g | 0.5 g |
+| Drip correction | 0.1 g | 0.1 g | 0.1 g | 0.1 g |
 
 All four start with brew by weight and grind hints on, Max shot time 50 s,
 Earliest weight stop 12 s, and no fixed scale-loss stop time. The Fixed

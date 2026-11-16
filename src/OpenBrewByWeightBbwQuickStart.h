@@ -168,11 +168,11 @@ inline bool observeQuickStart(QuickStartRecord &record, const ShotPresetBank &ba
 }
 
 // The drip chart fields of the settings status: quick start, marker positions
-// (-1 = none), the newest needed drips (null = no computable value) and the
+// (-1 = none), the newest needed drips (null = no computable value), the
 // bitmask of shots that did not train the drip (bit i matches bbwRecentG[i];
 // skipped shots with a value draw hatched in the chart; one at or below zero
-// measured no drip and goes as null). Returns the length written, or 0 when
-// the buffer is too small.
+// measured no drip and goes as null) and each shot's DripLearnNote. Returns
+// the length written, or 0 when the buffer is too small.
 inline size_t formatDripChartJson(char *out, size_t cap, const ControlStatusFields &c) {
   static const char *const states[] = {"off", "armed", "applied", "disagreed"};
   size_t used = 0;
@@ -198,6 +198,10 @@ inline size_t formatDripChartJson(char *out, size_t cap, const ControlStatusFiel
                  static_cast<unsigned>(c.bbwRecentCount < 10
                      ? c.bbwRecentSkipped & ((1U << c.bbwRecentCount) - 1U)
                      : c.bbwRecentSkipped)));
+  for (uint8_t i = 0; used < cap && i < c.bbwRecentCount && i < 10; ++i)
+    put(snprintf(out + used, cap - used, "%s%u", i ? "," : ",\"bbwRecentNote\":[",
+                 static_cast<unsigned>(c.bbwRecentNote[i])));
+  if (used < cap && c.bbwRecentCount > 0) put(snprintf(out + used, cap - used, "]"));
   return used < cap ? used : 0;
 }
 

@@ -143,7 +143,10 @@ constexpr uint32_t DEFAULT_DRIP_DELAY_MS = 3000;
 constexpr uint32_t MAX_DRIP_DELAY_MS = 10000;
 constexpr uint32_t MAX_SCALE_TIMER_STOP_CATCHUP_MS = 2000;
 constexpr float MAX_OFFSET_G = 5.0f;
-constexpr float DEFAULT_WEIGHT_OFFSET_G = 0.5f;
+// The drip correction a new or restored preset starts from: the residual on
+// top of the q x tau lead, measured near 0.1 g on a Linea Micra with a
+// Bookoo Themis (18 shots, 2026-11-10..16).
+constexpr float DEFAULT_WEIGHT_OFFSET_G = 0.1f;
 
 enum class StopperState : uint8_t {
   REQUIRES_OFF,

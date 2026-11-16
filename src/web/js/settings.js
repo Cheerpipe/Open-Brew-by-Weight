@@ -1532,13 +1532,38 @@ function syncHeroTintAvailability() {
   if ($("appHeroTint")) $("appHeroTint").disabled = R.heroCardMode() === "technical";
 }
 // What each newest shot needed against the drip in use, oldest bar first.
-// Markers show where the owner set the drip and where quick start decided.
+// Markers show where the owner set the drip and where quick start decided;
+// a line per reason says why shots did not train it or did not count.
 function renderDripChart(c) {
+  // What a charted shot did to the drip correction, by DripLearnNote number
+  // (firmware OpenBrewByWeightBbwTypes.h); 0 trained and needs no line, 16
+  // trained it without counting toward quick start.
+  const NOTES = [
+    "",
+    __WEBUI_TEXT__("runtime.drip_note_manual"),
+    __WEBUI_TEXT__("runtime.drip_note_timer"),
+    __WEBUI_TEXT__("runtime.drip_note_disturbed"),
+    __WEBUI_TEXT__("runtime.drip_note_channeling"),
+    __WEBUI_TEXT__("runtime.drip_note_no_rate"),
+    __WEBUI_TEXT__("runtime.drip_note_not_weight"),
+    __WEBUI_TEXT__("runtime.drip_note_no_final"),
+    __WEBUI_TEXT__("runtime.drip_note_too_low"),
+    __WEBUI_TEXT__("runtime.drip_note_not_fresh"),
+    __WEBUI_TEXT__("runtime.drip_note_range"),
+    __WEBUI_TEXT__("runtime.drip_note_preset_gone"),
+    __WEBUI_TEXT__("runtime.drip_note_old"),
+    __WEBUI_TEXT__("runtime.drip_note_restarted"),
+    __WEBUI_TEXT__("runtime.drip_note_impossible"),
+    __WEBUI_TEXT__("runtime.drip_note_outlier"),
+    __WEBUI_TEXT__("runtime.drip_note_target_only"),
+    __WEBUI_TEXT__("runtime.drip_note_cut_short"),
+  ];
   const dripText = (g) => (g > 0 ? g.toFixed(2) : "0") + __WEBUI_TEXT__("runtime.g_2"),
     dripRange = (v) =>
       (Math.min(...v) > 0 ? Math.min(...v).toFixed(2) : "0") + "–" + dripText(Math.max(...v));
   const recent = c?.bbwRecentG || [],
     skip = (i) => (c?.bbwRecentSkipped >> i) & 1,
+    note = (i) => c?.bbwRecentNote?.[i] || 0,
     q = c?.bbwQuickStart || {},
     n = recent.length,
     use = c?.bbwEwmaOffsetG || 0,
@@ -1563,6 +1588,7 @@ function renderDripChart(c) {
       marked &&
       s.g != null &&
       !skip(s.i) &&
+      note(s.i) !== 16 &&
       (afterSet < 0 || s.i < afterSet) &&
       s.i >= Math.max(afterQuick, 0),
     old = (s) => marked && afterSet >= 0 && s.i >= afterSet,
@@ -1671,6 +1697,17 @@ function renderDripChart(c) {
         applied: __WEBUI_TEXT__("runtime.drip_hint_applied"),
         varied: __WEBUI_TEXT__("runtime.drip_hint_varied"),
       }[mode];
+  const reasons = new Map();
+  for (const s of shots)
+    if (NOTES[note(s.i)])
+      reasons.set(note(s.i), [
+        ...(reasons.get(note(s.i)) || []),
+        s.g != null ? dripText(s.g) : __WEBUI_TEXT__("runtime.drip_skipped"),
+      ]);
+  $("dripNotes").replaceChildren(
+    ...[...reasons].map(([k, values]) => el("li", "", values.join(", ") + ": " + NOTES[k])),
+  );
+  $("dripNotes").hidden = !reasons.size;
   $("dripQuickStart").hidden = !c || armed;
   $("dripStatus").className = "dcStatus" + (armed || mode === "applied" ? " quick" : "");
   $("dripStatus").lastElementChild.textContent = armed

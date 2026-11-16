@@ -1186,8 +1186,9 @@ void p24_preset_bank_size_and_crud_budgets() {
   CHECK(FLASH_IO_SCRATCH_BYTES >= PERSISTED_SETTINGS_NVS_BUDGET);
   // 6920: +8 bytes for the hero tint; 6944: +24 for the drip chart; 6952: +8
   // for its ten shots; 7432: the delta-stream curve record (external
-  // work-area growth; see OpenBrewByWeightControlStatusTypes.inc).
-  CHECK(sizeof(ControlStatusSnapshot) <= 7432);
+  // work-area growth; see OpenBrewByWeightControlStatusTypes.inc); 7448: +16
+  // for the charted shots' drip notes.
+  CHECK(sizeof(ControlStatusSnapshot) <= 7448);
   CHECK(sizeof(ControlGateSnapshot) <= 32);
   CHECK(sizeof(WebCommand) <= 440);
   WebCommand command;
@@ -1233,9 +1234,9 @@ void p24_preset_bank_size_and_crud_budgets() {
     float offset;
   } factory[] = {
       {"Double \xC2\xB7 Adaptive", 180, 360, 60, 30, 27000, 36000, true, DEFAULT_WEIGHT_OFFSET_G},
-      {"Single \xC2\xB7 Adaptive", 90, 180, 30, 15, 23000, 32000, true, 0.5f},
+      {"Single \xC2\xB7 Adaptive", 90, 180, 30, 15, 23000, 32000, true, FACTORY_SINGLE_WEIGHT_OFFSET_G},
       {"Double \xC2\xB7 Fixed", 180, 360, 60, 30, 27000, 36000, false, DEFAULT_WEIGHT_OFFSET_G},
-      {"Single \xC2\xB7 Fixed", 90, 180, 40, 15, 23000, 32000, false, 0.5f},
+      {"Single \xC2\xB7 Fixed", 90, 180, 40, 15, 23000, 32000, false, FACTORY_SINGLE_WEIGHT_OFFSET_G},
   };
   for (uint8_t i = 0; i < FACTORY_PRESET_COUNT; ++i) {
     const ShotPreset &preset = bank.presets[i];

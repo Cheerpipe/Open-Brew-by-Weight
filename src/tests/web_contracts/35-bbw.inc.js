@@ -34,7 +34,7 @@
     return n;
   };
   const elements = new Map();
-  for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripBars', 'dripBarX',
+  for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripNotes', 'dripBars', 'dripBarX',
     'dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton',
     'dripQuickStart', 'dripQuickStartButton'])
     elements.set(id, node());
@@ -82,6 +82,16 @@
   assert.equal(hatched.children[0].style.height, '100%');
   assert(elements.get('dripBarX').innerHTML.includes('3.20'));
   assert.equal(elements.get('dripVerdict').textContent, 'On track: your last shots needed 0.59–0.72 g');
+  // Without a reason (an earlier record) no line explains it.
+  assert(elements.get('dripNotes').hidden);
+  // Each reason gets one line naming its shots.
+  refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.70, bbwAlpha: 0.3,
+    bbwRecentG: [0.59, 0.72, 0.63, 0.10], bbwRecentSkipped: 10, bbwRecentNote: [0, 9, 0, 9],
+    bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
+  assert(!elements.get('dripNotes').hidden);
+  assert.equal(elements.get('dripNotes').children.length, 1);
+  assert.equal(elements.get('dripNotes').children[0].children[0],
+    '0.10 g, 0.72 g: the scale stopped reporting before the drip wait ended');
   // An edited field keeps the owner's value across refreshes.
   elements.get('dripSetG').value = '0.50';
   elements.get('dripSetG').dataset.edited = '1';
@@ -109,6 +119,12 @@
   assert.equal(elements.get('dripVerdict').textContent, 'Your shots need about 0.48 g');
   assert.equal(bars().filter(b => b.className.includes('qs')).length, 2);
   assert.equal(bars().filter(b => b.className.includes('old')).length, 2);
+  // A guard cut trained the correction but never counts toward quick start.
+  refresh({bbwPresetId: 2, bbwEwmaOffsetG: 1.2, bbwAlpha: 0.3, bbwRecentG: [0.52, 0.48, 0.55, 0.63],
+    bbwRecentNote: [16, 0, 0, 0], bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1,
+    bbwQuickStart: {state: 'armed', count: 1, setG: 1.2, quickG: 0}});
+  assert.equal(bars().filter(b => b.className.includes('qs')).length, 1);
+  assert(elements.get('dripNotes').children[0].children[0].startsWith('0.52 g: stopped by Extend fast shots'));
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);
   assert.equal(marks()[0].children[0].children[0], 'Quick start from 1.20 g');

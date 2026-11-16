@@ -649,6 +649,14 @@ inline const char *shotLogBbwLearningApplied(const ShotLogRecord &record) {
   const uint8_t code = (record.extractionExtended >> 5) & 3;
   return code == 1 ? "false" : code == 2 ? "true" : "null";
 }
+// actualWeightSource bits 0–1: ActualWeightSource; 2–6: DripLearnNote, which
+// reads NONE in earlier records.
+inline ActualWeightSource shotLogWeightSource(const ShotLogRecord &record) {
+  return static_cast<ActualWeightSource>(record.actualWeightSource & 3);
+}
+inline uint8_t shotLogDripLearnNote(const ShotLogRecord &record) {
+  return static_cast<uint8_t>(record.actualWeightSource >> 2 & 31);
+}
 // The BBW model a shot ran with, as its summary records it.
 struct ShotLogBbw {
   uint8_t algorithm, version, alpha;

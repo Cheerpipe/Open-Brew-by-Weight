@@ -14,6 +14,31 @@ constexpr uint8_t DEFAULT_BBW_EWMA_ALPHA = 30;  // Hundredths, dimensionless.
 constexpr uint8_t BBW_PROFILE_VERSION = 3;
 constexpr uint8_t BBW_ALPHA_CANDIDATES[] = {10, 30, 50, 100};
 
+// What a good shot did to the drip correction, kept with its record (5 bits).
+// NONE: it trained (or an earlier record); TARGET_ONLY: it trained the
+// correction, but the quick start counts only shots stopped at the target.
+// Every other note names why the correction stayed. Append only.
+enum class DripLearnNote : uint8_t {
+  NONE, MANUAL_BREW, TIMER_ONLY, WEIGHT_DISTURBED, CHANNELING, NO_FLOW_RATE,
+  NOT_WEIGHT_CUT, NO_FINAL_WEIGHT, FINAL_TOO_LOW, NOT_FRESH, OUT_OF_RANGE,
+  PRESET_GONE, OTHER_ALGORITHM, RESTARTED, IMPOSSIBLE, OUTLIER, TARGET_ONLY, CUT_SHORT
+};
+constexpr uint8_t DRIP_LEARN_NOTE_COUNT = static_cast<uint8_t>(DripLearnNote::CUT_SHORT) + 1;
+
+inline const char *dripLearnNoteText(uint8_t note) {
+  static const char *const text[DRIP_LEARN_NOTE_COUNT] = {
+      "trained", "manual brew", "timer-only shot", "weight disturbed during the shot",
+      "channeling", "no valid flow rate at the stop", "not a weight cut",
+      "final weight unavailable", "final weight below history threshold",
+      "final weight not a fresh post-drip reading", "drip outside the safe range",
+      "shot preset no longer exists", "shot used another drip algorithm version",
+      "drip learning restarted during the shot", "drip impossible for the flow at the stop",
+      "drip is an outlier against recent shots",
+      "quick start counts only shots stopped at the target",
+      "drip wait cut short before the weight settled"};
+  return note < DRIP_LEARN_NOTE_COUNT ? text[note] : "unknown";
+}
+
 inline bool validBbwAlpha(uint8_t alpha) {
   return alpha >= 1 && alpha <= 100;
 }

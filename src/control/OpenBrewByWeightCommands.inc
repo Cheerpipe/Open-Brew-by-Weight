@@ -48,6 +48,17 @@ void armBbwQuickStart(const ShotPreset &preset, bool userSet) {
   stageBbwQuickStart();
 }
 
+// The Web UI log names every drip change the owner makes and how it came,
+// within one log line (127 bytes with the longest preset name).
+void logDripChange(const char *change, const ShotPreset &preset, bool quickStart,
+                   const WebCommand &command) {
+  serialTraceCategoryf(LogLevel::INFO, DebugCategory::CONFIG,
+                       "%s for \"%s\": drip %.2f g, speed %.2f%s (%s)", change, preset.name,
+                       preset.bbwEwmaOffsetG, preset.bbwEwmaAlpha / 100.0,
+                       quickStart ? ", quick start armed" : "",
+                       command.viaCompanion ? "companion" : "Web UI");
+}
+
 // Commits a session-only Quick Settings change: live and announced, never saved.
 void commitSessionQuickSettings(RuntimeConfig candidate) {
   candidate.revision = runtimeConfig.revision == UINT32_MAX ? 1 : runtimeConfig.revision + 1;
@@ -414,6 +425,7 @@ void processWebCommand(const WebCommand &command) {
       bbwLearningBank.invalidate(preset.id, presetBank);
       if (command.bbwQuickStart) {
         armBbwQuickStart(preset, true);
+        logDripChange("Quick start", preset, true, command);
         stageBbwLearning();
         reportControlCommandResult(command, CommandResultState::APPLIED);
         return;
@@ -430,6 +442,10 @@ void processWebCommand(const WebCommand &command) {
         preset.bbwEwmaAlpha = preset.bbwAlphaBaseline;
         preset.bbwAlphaLearned = 0;
       }
+      logDripChange(command.bbwSetDrip                ? "Drip correction set"
+                    : command.bbwAlphaBaseline != 0 ? "Learning speed set"
+                                                    : "Drip learning reset",
+                    preset, command.bbwSetDrip || command.bbwAlphaBaseline == 0, command);
       stageBbwLearning();  // after the drip it saves alongside
       RuntimeConfig candidate = runtimeConfig;
       applyShotPresetToConfig(preset, candidate);
@@ -559,6 +575,8 @@ void processWebCommand(const WebCommand &command) {
             mutableShotPreset(presetBank, command.presetId)->learningEpoch =
                 shotStatisticsEpochNow();
             armBbwQuickStart(*mutableShotPreset(presetBank, command.presetId), true);
+            logDripChange("Factory values restored",
+                          *mutableShotPreset(presetBank, command.presetId), true, command);
           }
           break;
         case PresetAction::NEW_COFFEE: {

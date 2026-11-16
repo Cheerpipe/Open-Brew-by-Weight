@@ -91,7 +91,7 @@ appears while you are looking at the active preset.
 | **Earliest weight stop (s)** | Time limits | 12 s | 3–30 s, and at least the retare window plus 3 s (7 s with the default 4 s window); see [Cup protection](cup-protection.md) | The scale cannot stop the shot before this, so tare and first drops cannot trigger it. |
 | **Max shot time (s)** | Time limits | 50 s | 5–60 s | The shot always stops here, target reached or not. Ignored on timer-only and no-scale shots. Cannot exceed the hard 60 s cap. |
 | **Backup stop time (s)** | Time limits | empty | Earliest weight stop to Max shot time | Leave empty to use your recent shots, or the middle of your window until there are enough. See [scale-loss backup](auto-to-manual.md). |
-| **Drip correction (g)** | Drip compensation | 0.5 g in new presets | 0–5 g, applied with the field's **Set** key | Coffee allowed for after the stop on top of what the flow already predicts, so it can be much smaller than the drip you see, even zero. It learns from every eligible weight-stopped shot that passes its plausibility checks, shown next to a chart of what your last ten shots needed. **Set** uses a new value from the next shot and starts a quick start. |
+| **Drip correction (g)** | Drip compensation | 0.1 g in new presets | 0–5 g, applied with the field's **Set** key | Coffee allowed for after the stop on top of what the flow already predicts, so it can be much smaller than the drip you see, even zero. It learns from every eligible weight-stopped shot that passes its plausibility checks, shown next to a chart of what your last ten shots needed. **Set** uses a new value from the next shot and starts a quick start. |
 | **Learning speed** | Drip compensation | 0.30 | 0.01–1.00, applied with the field's **Set** key | How strongly each shot moves the drip correction. It may tune itself after about 20 shots; **Set** applies a new value at once and keeps the correction. |
 | **Stop after sustained weight** | Shared settings → Cup protection | ON | ON / OFF | A backup for a weight stop blocked by **Avoid accidental touch**. Fresh readings must stay above the applicable cut threshold for 1 second. Applies to every preset; takes effect on the next shot. |
 
@@ -111,10 +111,10 @@ Fixed behavior (not separate settings):
 
 ## Example
 
-Double · Adaptive at 36 g, drip correction 0.5 g, shot time window 27–36 s.
-A shot reaching the target inside the window stops with roughly **34.4 g** on
+Double · Adaptive at 36 g, drip correction 0.1 g, shot time window 27–36 s.
+A shot reaching the target inside the window stops with roughly **34.8 g** on
 a Bookoo scale: the coffee the flow says is still on its way (about 1.1 g at
-2 g/s) plus the 0.5 g correction bring the cup close to 36 g. A shot running early gets
+2 g/s) plus the 0.1 g correction bring the cup close to 36 g. A shot running early gets
 a slightly higher cut line (up to 42 g), one running late a slightly lower one
 (down to 33 g); see [Fast and slow shots](fast-and-slow-shots.md).
 
@@ -244,7 +244,12 @@ needed, drawn against a line for the correction in use. Shots that did not train
 correction — a moved cup, a manual stop, or a shot the plausibility checks discarded
 — keep their bar but show it hatched with diagonal stripes, so you can see at
 a glance what was ignored; shots without a usable weight, and ignored shots
-that read below zero, show as skipped. With
+that read below zero, show as skipped. Under the chart, one line per reason
+names those shots and says why they were left out, for example that the
+scale stopped reporting before the drip wait ended. The Web UI log keeps the
+same reason for every shot, and a line for every change you make to the
+correction: what changed, the correction and learning speed now in use, and
+whether it came from this Web UI or through the companion. With
 brew by weight
 off the section is hidden; each field carries a **Set** key with a tick and
 an **undo** key that appear inside the field, next to the − key, while your
@@ -258,7 +263,8 @@ configuration with no recipe change still being saved.
   learning shots agree within 0.4 g, the correction moves straight to the middle one
   instead of taking the usual small step; if they don't, learning simply
   carries on. Only shots stopped at the target count: while the quick start
-  runs, a shot whose cut line was raised or lowered does not train the correction.
+  runs, a shot that **Extend fast shots** or **Shorten slow shots** stopped still
+  trains the correction a little, as usual, but is not one of the three.
   The chart colors the shots the quick start counts and marks
   where it began and where it decided. New presets, restored factory presets and a fresh install start the
   same way; presets kept from an earlier firmware keep their correction untouched.

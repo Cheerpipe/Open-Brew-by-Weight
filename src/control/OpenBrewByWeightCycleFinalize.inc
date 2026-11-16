@@ -488,7 +488,8 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
   record.doseDg = snapshot.activePresetDoseDg;
   record.arrivalDs = SHOT_LOG_METRIC_MISSING;
   record.verdict = static_cast<uint8_t>(corridor::Verdict::UNCLASSIFIED);
-  record.actualWeightSource = static_cast<uint8_t>(weightSource);
+  record.actualWeightSource = static_cast<uint8_t>(
+      static_cast<uint8_t>(weightSource) | static_cast<uint8_t>(snapshot.dripLearnNote) << 2);
   shotLogSetBbw(record, {.algorithm = snapshot.bbwAlgorithm,
                          .version = snapshot.bbwProfileVersion,
                          .alpha = snapshot.bbwAlpha,
@@ -706,6 +707,16 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
     valid = true;
   }
   const bool good = snapshot.logEligible && shotLogWeightEligible(weightG, valid);
+  // A cup lifted once the tail settled took nothing the drip still owed; a
+  // hold cut short earlier, or by the next cycle or a new coffee, does not
+  // train, and says so.
+  if (good && profileReason == 1 && source == ActualWeightSource::POST_DRIP) {
+    snapshot.bbwLearningApplied = learnPendingBbw(snapshot, weightG, true);
+  } else if (good && snapshot.offsetAnalysis) {
+    snapshot.dripLearnNote = DripLearnNote::CUT_SHORT;
+    addDebugEvent(DebugCategory::CONFIG, DebugCode::DRIP_LEARN_SKIPPED,
+                  static_cast<int32_t>(DripLearnNote::CUT_SHORT), INT32_MIN);
+  }
   // Keep the internal completed-cycle snapshot for linked metadata.
   if (!pendingFinalizeIsRinse(snapshot) &&
       !brewEndIsAbandonedStart(snapshot.endReason)) {

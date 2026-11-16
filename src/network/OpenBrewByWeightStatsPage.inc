@@ -126,7 +126,7 @@ size_t OpenBrewByWeightNetwork::formatShotStatsRow(NetworkWorkBuf &work,
       // The stored snapshot keeps the nearest curve (shot-log schema).
       rampHardnessPctOf(corridor::rampCurveHardnessOf(record.fastCurve)) / 2.0,
       rampHardnessPctOf(corridor::rampCurveHardnessOf(record.slowCurve)) / 2.0, dripDelay,
-      actualWeightSourceName(static_cast<ActualWeightSource>(record.actualWeightSource)),
+      actualWeightSourceName(shotLogWeightSource(record)),
       static_cast<unsigned>(shotLogRating(record.sideFlags)), bad, number,
       curveJson);
   if (bytes <= 0 || static_cast<size_t>(bytes) >= NetworkWorkBuf::kJsonItem)

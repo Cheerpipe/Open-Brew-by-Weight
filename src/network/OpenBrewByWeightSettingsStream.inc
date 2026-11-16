@@ -13,7 +13,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   uiStreamSendKind = "settings";
   const auto &config = control.config;
   const bool initial = session.settingsResync || session.settingsBoot != control.bootId;
-  char drip[256];
+  char drip[320];
   if (!formatDripChartJson(drip, sizeof(drip), control)) return false;
   if (callbacks_.copyBullseyeConfig) callbacks_.copyBullseyeConfig(&g_work->bullseyeMelody);
   else g_work->bullseyeMelody = BullseyeMelodyConfig{};

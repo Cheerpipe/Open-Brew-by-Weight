@@ -934,7 +934,7 @@ inline bool factoryShotPresetId(uint8_t id) {
   return (id >= 1 && id <= FACTORY_PRESET_COUNT) ||
          id == FACTORY_PRESET_ID_MANUAL;
 }
-constexpr float FACTORY_SINGLE_WEIGHT_OFFSET_G = 0.5f;
+constexpr float FACTORY_SINGLE_WEIGHT_OFFSET_G = DEFAULT_WEIGHT_OFFSET_G;
 constexpr uint16_t FACTORY_SINGLE_GOAL_WEIGHT_DG = 180;
 constexpr uint16_t FACTORY_SINGLE_FAST_MARGIN_DG = 40;
 constexpr uint16_t FACTORY_SINGLE_ADAPTIVE_FAST_MARGIN_DG = 30;
@@ -1691,6 +1691,7 @@ struct WebCommand {
   // Set by the network task after an explicit WebUI unlock; it permits this
   // command to bypass the configuration gate but never changes relay safety.
   bool unsafeWebUiOverride = false;
+  bool viaCompanion = false;  // Relayed by the companion; named in the log only.
   uint32_t maintenanceLeaseId = 0;
   union {
     RuntimeConfig config = {};
@@ -2129,11 +2130,14 @@ enum class DebugCode : uint8_t {
   PADDLE_ENDS_SHOT,
   PADDLE_STARTS_RINSE,
   PADDLE_KEEPS_RUNNING,
-  PADDLE_TO_NATURAL
+  PADDLE_TO_NATURAL,
+  // A good shot left the drip correction alone; argument1: DripLearnNote;
+  // argument2: the drip it needed (cg), INT32_MIN when not measured.
+  DRIP_LEARN_SKIPPED
 };
 // Codes in use; a code appended above must move this (asserted after
 // debugCodeName).
-constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::PADDLE_TO_NATURAL) + 1U;
+constexpr size_t DEBUG_CODE_COUNT = static_cast<size_t>(DebugCode::DRIP_LEARN_SKIPPED) + 1U;
 
 enum class ScheduledRestartCause : uint8_t {
   NONE = 0,
@@ -2538,6 +2542,7 @@ constexpr const char *debugCodeName(DebugCode code) {
     case DebugCode::PADDLE_STARTS_RINSE: return "paddle OFF starts rinse";
     case DebugCode::PADDLE_KEEPS_RUNNING: return "paddle OFF keeps shot as Original";
     case DebugCode::PADDLE_TO_NATURAL: return "paddle ON switches shot to Natural";
+    case DebugCode::DRIP_LEARN_SKIPPED: return "drip learning skipped";
     case DebugCode::ACTIVATOR_ON: return "activator on";
     case DebugCode::ACTIVATOR_OFF: return "activator off";
     case DebugCode::RELAY_CLOSED: return "machine circuit closed";
@@ -2959,6 +2964,14 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
                : event.code == DebugCode::PADDLE_TO_NATURAL  ? "; OFF stops it"
                                                              : "",
                paddleModeId(static_cast<uint8_t>(event.argument1)));
+      return true;
+    case DebugCode::DRIP_LEARN_SKIPPED:
+      formatWeightCentigrams(event.argument2, weightText, sizeof(weightText));
+      snprintf(message, capacity, "drip learning skipped: %s%s%s%s; correction unchanged",
+               dripLearnNoteText(static_cast<uint8_t>(event.argument1)),
+               event.argument2 == INT32_MIN ? "" : " (needed ",
+               event.argument2 == INT32_MIN ? "" : weightText,
+               event.argument2 == INT32_MIN ? "" : ")");
       return true;
     case DebugCode::SYSTEM_LOG_OVERRUN:
       snprintf(message, capacity, "diagnostic log overrun dropped=%ld",
