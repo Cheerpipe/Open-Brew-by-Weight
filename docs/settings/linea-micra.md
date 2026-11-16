@@ -330,10 +330,12 @@ while heating, the machine's own estimate of the time remaining, for example
 `Warming up · ready in ~6 min`. The estimate counts down on the screen without
 extra network traffic. While the brew boiler warms up, a notice at the top of
 Home says the same, for example **Machine warming up · ready in ~6 min**, so you
-don't need to open the panel. The steam row shows the steam level set in the app
-(level 1–3), because the Micra controls steam by level rather than by
-temperature; the current temperature of either boiler is not available through
-the cloud service.
+don't need to open the panel. The steam row also shows the steam level (1–3),
+whether it was set in the La Marzocco app or by a preset's **Steam power**, and
+**Off** when the steam boiler is off, for example after choosing a preset that
+turns it off. The Micra controls steam by level rather than by temperature;
+the current temperature of either boiler is not available through the cloud
+service.
 
 Diagnostics groups every machine-reported state under **Linea Micra**:
 readiness, power state, observed mode, both boilers (with the brew target

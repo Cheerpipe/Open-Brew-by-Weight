@@ -16,13 +16,20 @@ function laMarzoccoBoilerText(lm, boiler) {
   if (!lm.observeState) return __WEBUI_TEXT__("runtime.disabled");
   const data = lm.boiler ? lm.boiler[boiler] : null;
   const state = data ? data.state : "";
-  if (state === "ready") return __WEBUI_TEXT__("runtime.ready_2");
   const label =
-    __WEBUI_TEXT__("home.boiler_states").split("|")[
-      ["heating_up", "no_water", "eco", "off", "standby"].indexOf(state)
-    ];
+    state === "ready"
+      ? __WEBUI_TEXT__("runtime.ready_2")
+      : __WEBUI_TEXT__("home.boiler_states").split("|")[
+          ["heating_up", "no_water", "eco", "off", "standby"].indexOf(state)
+        ];
   if (!label) return "—";
-  return state === "heating_up" || state === "eco" ? label + readyIn(minsLeft(data)) : label;
+  // A steam boiler set by level shows its level, as presets set it.
+  const level = /^level_([123])$/.exec(data.level || "")?.[1],
+    text =
+      level && state !== "off"
+        ? label + " · " + __WEBUI_TEXT__("home.level").replace("%1", level)
+        : label;
+  return state === "heating_up" || state === "eco" ? text + readyIn(minsLeft(data)) : text;
 }
 // Whole minutes until a boiler's readyAtUtcSec; zero or less once it passed.
 function minsLeft(boiler) {
