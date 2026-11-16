@@ -766,7 +766,7 @@ const autosave = {
     save: (patch) => R.saveBrewPreset(patch, ""),
   },
   ...(__LA_MARZOCCO__ && {
-    micra: {
+    laMarzocco: {
       payload: laMarzoccoPayload,
       save: (patch) => saveLaMarzoccoSettings("save", "", patch),
     },
@@ -2333,7 +2333,7 @@ export function init() {
       const typed = el.tagName === "TEXTAREA" || ["text", "number"].includes(el.type);
       const fn = (e) => {
         const sec = R.settingsSectionOf(el.id);
-        if (sec === "micra") $("laMarzoccoLinkedNote").hidden = true;
+        if (sec === "laMarzocco") $("laMarzoccoLinkedNote").hidden = true;
         R.noteEdit(autosave[sec], !typed ? 300 : e.type === "change" && e.isTrusted ? 0 : 1200);
         R.updateConfigGroups();
         // Failed-save red marks on brew fields hand over to the live yellow

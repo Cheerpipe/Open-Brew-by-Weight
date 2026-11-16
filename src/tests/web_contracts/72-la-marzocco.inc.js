@@ -708,7 +708,10 @@ for (const id of ['dLaMarzoccoPower', 'dLaMarzoccoPowerValue', 'dLaMarzoccoMode'
     assert.deepStrictEqual(pill({observeState: false}), ['runtime.la_marzocco_pill_monitoring_off', '']);
     assert.deepStrictEqual(pill({shotPaused: true}), ['runtime.la_marzocco_power_on · runtime.target 93.5 °C · runtime.shot_paused', 'on']);
     apply(connected);
-    context.laMarzoccoDirty = true;
+    // The flag autosave raises for these fields is the one status respects.
+    const section = vm.runInNewContext('(' + blockAt(rawRuntimeJs, 'function settingsSectionOf(') +
+        ')', {BREW_CONTROL_IDS: []})('laMarzoccoApplyTemperature');
+    context[section + 'Dirty'] = true;
     get('laMarzoccoObserveState').checked = false;
     get('laMarzoccoApplyTemperature').checked = false;
     apply(connected);

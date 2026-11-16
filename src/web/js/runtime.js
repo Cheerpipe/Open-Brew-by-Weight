@@ -3628,7 +3628,7 @@ const BREW_CONTROL_IDS = [
 ];
 function settingsSectionOf(id) {
   if (BREW_CONTROL_IDS.includes(id)) return "brew";
-  return id.startsWith("laMarzocco") ? "micra" : "config";
+  return id.startsWith("laMarzocco") ? "laMarzocco" : "config";
 }
 // The browser-local "This device" group (data-g=app) sits inside #workflowPanel
 // but never joins a controller section sweep.
@@ -6570,7 +6570,7 @@ window.addEventListener("pagehide", stopUiStream);
 function hasUnsavedEdits() {
   return !!(
     document.querySelector('[data-dirty="1"]') ||
-    ["config", "brew", "dateTime", "ble", "power", "frontend", "micra", "quick"].some(
+    ["config", "brew", "dateTime", "ble", "power", "frontend", "laMarzocco", "quick"].some(
       (k) => uiState[k + "Dirty"],
     )
   );
