@@ -20,8 +20,8 @@ void serviceMachineIntegrationMachinePower([[maybe_unused]] bool scaleLinkUp,
                                            [[maybe_unused]] bool scaleSupportsPowerOff,
                                            [[maybe_unused]] bool machineBusy) {}
 MachinePower machineIntegrationPowerState() { return MachinePower::UNKNOWN; }
-void requestMachineIntegrationPresetTemperature([[maybe_unused]] PresetTemperature preset,
-                                                [[maybe_unused]] uint32_t configGeneration) {}
+void requestMachineIntegrationPresetSettings([[maybe_unused]] PresetMachineSettings preset,
+                                             [[maybe_unused]] uint32_t configGeneration) {}
 uint16_t machineIntegrationShotTargetDeciC() { return 0; }
 MachinePhysicalStartDisposition machineIntegrationPhysicalStart(MachineBackflushPermit *permit) {
   if (permit) *permit = {};

@@ -75,7 +75,7 @@ int main() {
           (2U << LA_MARZOCCO_SHUTDOWN_GRACE_SHIFT)));
   assert(laMarzoccoShutdownGraceSeconds(LA_MARZOCCO_DEFAULT_OPTIONS) == 15);
   assert(LA_MARZOCCO_KNOWN_OPTIONS ==
-         (LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_OBSERVE_STATE |
+         (LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_OBSERVE_STATE |
           LA_MARZOCCO_RECOGNIZE_WAKE | LA_MARZOCCO_SHUTDOWN_WITH_SCALE |
           LA_MARZOCCO_POWER_ON_WITH_SCALE | LA_MARZOCCO_SHUTDOWN_GRACE_MASK));
   std::strcpy(settings.username, "barista@example.com");
@@ -154,11 +154,11 @@ int main() {
   settings.connectionType = 2;
   assert(!validLaMarzoccoSettings(settings));
   LaMarzoccoRequest temperatureRequest;
-  temperatureRequest.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
+  temperatureRequest.type = LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
   temperatureRequest.configGeneration = 7;
   temperatureRequest.presetId = 2;
   temperatureRequest.targetDeciC = 935;
-  assert(temperatureRequest.type == LaMarzoccoRequestType::APPLY_TEMPERATURE);
+  assert(temperatureRequest.type == LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS);
   assert(temperatureRequest.targetDeciC == 935);
   LaMarzoccoRequest standbyRequest;
   standbyRequest.type = LaMarzoccoRequestType::SET_STANDBY;
@@ -520,7 +520,7 @@ int main() {
   assert(effective.quality == LaMarzoccoObservationQuality::UNSUPPORTED);
   assert(!power.notePhysicalStart(authoritative, false, true, 1101));
 
-  const uint8_t shutdownOff = LA_MARZOCCO_APPLY_TEMPERATURE |
+  const uint8_t shutdownOff = LA_MARZOCCO_APPLY_MACHINE_SETTINGS |
                               LA_MARZOCCO_OBSERVE_STATE |
                               LA_MARZOCCO_RECOGNIZE_WAKE;
   const uint8_t shutdownOptions15s =

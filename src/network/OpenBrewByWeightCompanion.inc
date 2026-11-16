@@ -192,6 +192,8 @@ const char *companionRouteName(LaMarzoccoCompanionRoute route) {
     case LaMarzoccoCompanionCommandOp::STANDBY: return "standby";
     case LaMarzoccoCompanionCommandOp::POWER_ON: return "on";
     case LaMarzoccoCompanionCommandOp::REFRESH: return "refresh";
+    case LaMarzoccoCompanionCommandOp::STEAM: return "steam";
+    case LaMarzoccoCompanionCommandOp::STEAM_LEVEL: return "steamlevel";
     default: return nullptr;
   }
 }
@@ -1083,7 +1085,8 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const char *op = companionCommandName(outbox.commandOp);
   due.command = outbox.commandId != 0 && outbox.commandId != lastCommand && op != nullptr;
   built.command = due.command &&
-      (outbox.commandOp == LaMarzoccoCompanionCommandOp::TEMPERATURE
+      (outbox.commandOp == LaMarzoccoCompanionCommandOp::TEMPERATURE ||
+               outbox.commandOp >= LaMarzoccoCompanionCommandOp::STEAM
            ? companionAddBody(count, "\"t\":\"cmd\",\"id\":%lu,\"op\":\"%s\",\"v\":%u}",
                               static_cast<unsigned long>(outbox.commandId), op,
                               static_cast<unsigned>(outbox.commandValue))

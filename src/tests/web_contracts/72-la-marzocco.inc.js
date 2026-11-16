@@ -427,24 +427,28 @@ if (!laMarzoccoStatusSource.includes('delta.field("laMarzocco.optimisticOn"') ||
     terminalFailure.includes('LaMarzoccoPowerState::UNKNOWN')) {
   throw new Error('Pending, retry, and canceled observations must preserve power; a terminal API failure holds the last reading as a stale assumption');
 }
-if (!laMarzoccoTypes.includes('APPLY_TEMPERATURE') ||
-    !machineIntegration.includes('requestMachineIntegrationPresetTemperature') ||
-    !commandPersistence.includes('requestActivePresetMachineTemperature()') ||
-    !controlCommands.includes('applyMachineTemperature') ||
-    !scaleEvents.includes('requestActivePresetMachineTemperature()') ||
+if (!laMarzoccoTypes.includes('APPLY_MACHINE_SETTINGS') ||
+    !machineIntegration.includes('requestMachineIntegrationPresetSettings') ||
+    !commandPersistence.includes('requestActivePresetMachineSettings()') ||
+    !controlCommands.includes('applyMachineSettings') ||
+    !scaleEvents.includes('requestActivePresetMachineSettings()') ||
     !networkService.includes('scaleConnecting_.load(std::memory_order_acquire)') ||
     !laMarzoccoService.includes('CoffeeMachineSettingCoffeeBoilerTargetTemperature') ||
     !laMarzoccoService.includes('{\\\"boilerIndex\\\":1,\\\"targetTemperature\\\":%u.%u}') ||
-    !laMarzoccoService.includes('verification.targetDeciC == target') ||
+    !laMarzoccoService.includes('CoffeeMachineSettingSteamBoilerEnabled') ||
+    !laMarzoccoService.includes('CoffeeMachineSettingSteamBoilerTargetLevel') ||
+    // Only the settings the machine does not hold are sent.
+    !laMarzoccoTypes.includes('status.targetValid && status.targetDeciC == target') ||
+    !laMarzoccoService.includes('if ((pending & setting) == 0 || (accepted & setting) != 0) continue;') ||
     // The preset's target never leaves as it is: what is sent is that target
     // inside the range the machine reported, and nothing without that range.
     !laMarzoccoService.includes('target = laMarzoccoSendableBrewTarget(published_, request.targetDeciC);') ||
-    !laMarzoccoService.includes('if (target == 0 && !unread) break;') ||
-    !laMarzoccoService.includes(': writeTemperature(settings, target);') ||
-    laMarzoccoService.includes('writeTemperature(settings, request.targetDeciC)') ||
+    !laMarzoccoService.includes('if (resolved && target == 0) break;') ||
+    !laMarzoccoService.includes(': writePresetSetting(settings, setting, value);') ||
+    !laMarzoccoService.includes(': setting == LA_MARZOCCO_SET_STEAM_LEVEL ? request.steamLevel : target;') ||
     laMarzoccoService.includes('LaMarzoccoCompanionCommandOp::TEMPERATURE, request.targetDeciC') ||
-    !laMarzoccoService.includes('commandAccepted = desiredTemperature_.commandAccepted;') ||
-    !laMarzoccoService.includes('desiredTemperature_.commandAccepted = true;') ||
+    !laMarzoccoService.includes('accepted = desiredTemperature_.accepted;') ||
+    !laMarzoccoService.includes('desiredTemperature_.accepted = accepted;') ||
     !laMarzoccoService.includes('laMarzoccoHttpRetryable') ||
     !laMarzoccoService.includes('laMarzoccoTemperatureCycleRetryable') ||
     !laMarzoccoService.includes('observationFence_.merge(published_, powerState_, update') ||
@@ -458,7 +462,7 @@ if (!laMarzoccoTypes.includes('APPLY_TEMPERATURE') ||
     laMarzoccoService.includes('Bearer %s", work_->accessToken);\n    const bool ok = length > 0 &&\n                    static_cast<size_t>(length) < sizeof(io_->response)') ||
     !laMarzoccoStatusSource.includes('delta.field("laMarzocco.temperatureState"') ||
     !laMarzoccoStatusSource.includes('delta.field("laMarzocco.temperatureError"')) {
-  throw new Error('Linea Micra preset temperature must coalesce, gate on scale/shot activity, reuse authentication, and confirm dashboard readback');
+  throw new Error('La Marzocco preset machine settings must coalesce, gate on scale/shot activity, reuse authentication, and confirm dashboard readback');
 }
 for (const id of ['laMarzoccoSignIn', 'laMarzoccoBusy', 'laMarzoccoSteps', 'laMarzoccoLegendHint',
   'laMarzoccoChoose', 'laMarzoccoConnected',

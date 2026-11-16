@@ -1,3 +1,35 @@
+// A preset save's machine settings (brew target, steam on/off and level);
+// any of them refused on builds without the La Marzocco integration.
+ValidationFailure parseLaMarzoccoPresetSettings(const cJSON *root, WebCommand &command) {
+  const cJSON *target = cJSON_GetObjectItemCaseSensitive(root, "laMarzoccoBrewTargetC");
+  const bool steamSent = jsonFieldPresent(root, "laMarzoccoSteamEnabled"),
+             levelSent = jsonFieldPresent(root, "laMarzoccoSteamLevel");
+  if (target == nullptr && !steamSent && !levelSent) return {};
+#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
+  const double scaled = target == nullptr ? 0.0
+                        : cJSON_IsNumber(target) ? target->valuedouble * 10.0 : NAN;
+  const long rounded = lround(scaled);
+  bool steamEnabled = true;
+  uint8_t steamLevel = 0;
+  if (target != nullptr &&
+      (!std::isfinite(scaled) || fabs(scaled - rounded) > 0.0001 ||
+       !laMarzoccoBrewTargetSettable(machineIntegrationStatus(), rounded)))
+    return validationFailure("LA_MARZOCCO_PRESET_TARGET_RANGE");
+  if ((steamSent && !jsonBoolean(root, "laMarzoccoSteamEnabled", steamEnabled)) ||
+      (levelSent && (!jsonUint8(root, "laMarzoccoSteamLevel", steamLevel) || steamLevel < 1 ||
+                     steamLevel > LA_MARZOCCO_STEAM_LEVEL_MAX)))
+    return validationFailure("LA_MARZOCCO_PRESET_STEAM_INVALID");
+  command.laMarzoccoBrewTargetSpecified = target != nullptr;
+  command.laMarzoccoBrewTargetDeciC = static_cast<uint16_t>(rounded);
+  if (steamSent) command.laMarzoccoSteamEnabled = steamEnabled ? 1 : 0;
+  command.laMarzoccoSteamLevel = steamLevel;
+  return {};
+#else
+  (void)command;
+  return validationFailure("LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED");
+#endif
+}
+
 // Maps the grace seconds accepted by the Web API to its packed option code.
 bool laMarzoccoGraceCodeFromSeconds(int16_t seconds, uint8_t &code) {
   for (uint8_t index = 0; index <= LA_MARZOCCO_SHUTDOWN_GRACE_CODE_MAX;
@@ -151,7 +183,7 @@ esp_err_t OpenBrewByWeightNetwork::laMarzoccoHandler(httpd_req_t *request) {
   } else if (parseError.reason == nullptr && strcmp(action, "save") == 0) {
     // A save is a patch: each absent option keeps its stored value.
     const uint8_t o = candidate.options, so = candidate.scaleOptions;
-    applyTemperature = o & LA_MARZOCCO_APPLY_TEMPERATURE;
+    applyTemperature = o & LA_MARZOCCO_APPLY_MACHINE_SETTINGS;
     observeState = o & LA_MARZOCCO_OBSERVE_STATE;
     recognizeWakeGesture = o & LA_MARZOCCO_RECOGNIZE_WAKE;
     shutdownWithScale = o & LA_MARZOCCO_SHUTDOWN_WITH_SCALE;

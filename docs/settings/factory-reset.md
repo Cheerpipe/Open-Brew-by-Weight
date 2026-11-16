@@ -44,8 +44,8 @@ On Linea Micra firmware it also erases
 the cloud account credentials, installation key, selected machine, and session.
 Presets return to the five factory presets (Double · Adaptive, Single · Adaptive,
 Double · Fixed, Single · Fixed and Manual) with Manual active. Its three
-integration options return to ON, and factory preset boiler targets return to
-93.0 °C. Performance boost, Idle power saving, Wi-Fi sleep, and the BLE scan
+integration options return to ON, and factory presets return to a 91.0 °C brew
+temperature with the steam boiler on at level 3. Performance boost, Idle power saving, Wi-Fi sleep, and the BLE scan
 mode return to their factory values: Performance boost on, Idle power saving
 on, Wi-Fi sleep on, and Balanced scan mode. The machine-aware scale search options return to off. The device
 password returns to **`ineedacoffee`** and the device name to

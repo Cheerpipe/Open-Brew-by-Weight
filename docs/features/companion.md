@@ -31,8 +31,8 @@ does today.
   switch on, the companion takes over that work: it holds the cloud
   connection and passes the controller only what it needs, namely the
   machine's power state, the boilers, the brew temperature and automatic
-  backflush. Temperature changes, waking the machine and putting it to
-  standby still work exactly as before; they just travel through the
+  backflush. Preset temperature and steam changes, waking the machine and
+  putting it to standby still work exactly as before; they just travel through the
   companion. The controller then spends its Wi-Fi and processor on your
   scale and your shot instead of on the cloud. During a shot with a scale it
   holds the machine's updates back until the shot is over — the newest one

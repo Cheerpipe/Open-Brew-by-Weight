@@ -152,6 +152,11 @@ bool decodeLaMarzoccoDashboard(const cJSON *root, LaMarzoccoObservation &update)
         } else {
           next.steamBoilerPresent = true;
           next.steamBoiler = boilerState(status->valuestring);
+          const cJSON *enabled = find(output, "enabled");
+          if (duplicated(enabled, "enabled")) return false;
+          if (cJSON_IsBool(enabled))
+            next.steamSwitch = cJSON_IsTrue(enabled) ? LaMarzoccoSteamSwitch::ON
+                                                     : LaMarzoccoSteamSwitch::OFF;
         }
       }
       const cJSON *ready = find(output, "readyStartTime");

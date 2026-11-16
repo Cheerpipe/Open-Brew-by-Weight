@@ -72,13 +72,15 @@ void publishMachineIntegrationNetworkState(bool staConnected, bool apActive,
 
 void inhibitMachineIntegrationCloud() { service.inhibitCloud(); }
 
-void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
-                                                uint32_t configGeneration) {
+void requestMachineIntegrationPresetSettings(PresetMachineSettings preset,
+                                             uint32_t configGeneration) {
   LaMarzoccoRequest request;
   request.configGeneration = configGeneration;
   request.targetDeciC = preset.targetDeciC;
   request.presetId = preset.presetId;
-  request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
+  request.steamEnabled = preset.steamEnabled;
+  request.steamLevel = preset.steamLevel;
+  request.type = LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
   service.post(request);
 }
 

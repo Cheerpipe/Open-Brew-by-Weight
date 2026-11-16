@@ -12,7 +12,7 @@ constexpr size_t LA_MARZOCCO_MAX_ACCOUNT_MACHINES = 8;
 enum class LaMarzoccoRequestType : uint8_t {
   CONNECT,
   OBSERVE_STATE,
-  APPLY_TEMPERATURE,
+  APPLY_MACHINE_SETTINGS,
   SET_STANDBY,
   SET_POWER_ON,
   LIST_MACHINES,
@@ -54,6 +54,8 @@ enum class LaMarzoccoSteamLevel : uint8_t {
   LEVEL_3,
   UNSUPPORTED
 };
+// The steam boiler's on/off setting; UNKNOWN until a steam widget reports it.
+enum class LaMarzoccoSteamSwitch : uint8_t { UNKNOWN, OFF, ON };
 enum class LaMarzoccoReadiness : uint8_t {
   UNKNOWN,
   OFF,
@@ -261,6 +263,8 @@ struct LaMarzoccoRequest {
   uint32_t configGeneration = 0;
   uint16_t targetDeciC = 0;
   uint8_t presetId = 0;
+  bool steamEnabled = true;
+  uint8_t steamLevel = 0;  // 1..3; 0 sends no level.
   LaMarzoccoRequestType type = LaMarzoccoRequestType::OBSERVE_STATE;
   LaMarzoccoRequestOrigin origin = LaMarzoccoRequestOrigin::SCALE;
 };
@@ -324,7 +328,9 @@ struct LaMarzoccoStatus {
   uint16_t targetMaxDeciC = 0;
   uint16_t requestedTargetDeciC = 0;
   uint16_t appliedTargetDeciC = 0;
-  LaMarzoccoAssumedPower assumedPower = LaMarzoccoAssumedPower::UNKNOWN;  // Fills an alignment gap.
+  // These two fill an alignment gap.
+  LaMarzoccoAssumedPower assumedPower = LaMarzoccoAssumedPower::UNKNOWN;
+  LaMarzoccoSteamSwitch steamSwitch = LaMarzoccoSteamSwitch::UNKNOWN;
   int32_t transportStatus = 0;
   int32_t temperatureTransportStatus = 0;
   uint16_t httpStatus = 0;
@@ -338,6 +344,7 @@ struct LaMarzoccoStatus {
   LaMarzoccoBoilerState coffeeBoiler = LaMarzoccoBoilerState::UNKNOWN;
   LaMarzoccoBoilerState steamBoiler = LaMarzoccoBoilerState::UNKNOWN;
   LaMarzoccoSteamLevel steamLevel = LaMarzoccoSteamLevel::UNKNOWN;
+  // State of the preset machine settings application (brew target and steam).
   LaMarzoccoTemperatureState temperatureState =
       LaMarzoccoTemperatureState::Disabled;
   LaMarzoccoError temperatureError = LaMarzoccoError::NONE;
@@ -453,6 +460,37 @@ inline uint16_t laMarzoccoSendableBrewTarget(const LaMarzoccoStatus &status,
   if (status.targetMinDeciC == 0) return 0;
   return presetDeciC < status.targetMinDeciC ? status.targetMinDeciC
       : presetDeciC > status.targetMaxDeciC ? status.targetMaxDeciC : presetDeciC;
+}
+
+// A preset's machine settings, applied in this bit order: the steam boiler
+// is switched first so a level reaches a boiler that is on.
+constexpr uint8_t LA_MARZOCCO_SET_STEAM = 1U << 0;
+constexpr uint8_t LA_MARZOCCO_SET_STEAM_LEVEL = 1U << 1;
+constexpr uint8_t LA_MARZOCCO_SET_BREW_TARGET = 1U << 2;
+
+// The settings of `request` that `status` does not hold, each judged only on
+// trusted state: a setting the machine holds is never sent. Steam is set
+// only on a machine that reports its switch, a level only while the preset
+// keeps steam on and the machine sets steam by level (not the Linea Mini),
+// and the brew target only once the machine reported its range (target 0).
+inline uint8_t laMarzoccoPresetSettingsUnheld(const LaMarzoccoStatus &status,
+                                              bool temperatureTrusted, bool steamTrusted,
+                                              const LaMarzoccoRequest &request,
+                                              uint16_t target) {
+  const auto level = static_cast<uint8_t>(status.steamLevel);
+  const bool byLevel = level >= static_cast<uint8_t>(LaMarzoccoSteamLevel::LEVEL_1) &&
+                       level <= static_cast<uint8_t>(LaMarzoccoSteamLevel::LEVEL_3);
+  const auto wanted = request.steamEnabled ? LaMarzoccoSteamSwitch::ON : LaMarzoccoSteamSwitch::OFF;
+  uint8_t unheld = 0;
+  if (status.steamSwitch != LaMarzoccoSteamSwitch::UNKNOWN &&
+      !(steamTrusted && status.steamSwitch == wanted))
+    unheld |= LA_MARZOCCO_SET_STEAM;
+  if (request.steamEnabled && request.steamLevel != 0 && byLevel &&
+      !(steamTrusted && level == request.steamLevel))
+    unheld |= LA_MARZOCCO_SET_STEAM_LEVEL;
+  if (target != 0 && !(temperatureTrusted && status.targetValid && status.targetDeciC == target))
+    unheld |= LA_MARZOCCO_SET_BREW_TARGET;
+  return unheld;
 }
 
 static_assert(sizeof(LaMarzoccoRequest) <= 16,

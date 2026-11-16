@@ -241,7 +241,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
 | `{"t":"hold","on":true,"sync":true}` | `on`: a shot with a scale, a scale connection, scale setup or the scale's quiet interval is in progress; hold `read` and `push` frames until `on` is `false` (Linea Micra builds; always `false` elsewhere). `sync`: a [sync hold](#sync-holds) is active. Sent whenever `sync` changes, on every build. As the answer to a `ping` it reads `{"t":"hold","on":false,"sync":false,"sh":E1,"hi":E2}`, with both store epochs (below) |
-| `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `standby`, `on`, or `refresh` (one read) |
+| `{"t":"cmd","id":7,"op":"temp","v":935}` | Command: `temp` (tenths of °C), `steam` (`v` 1 on, 0 off), `steamlevel` (`v` 1–3), `standby`, `on`, or `refresh` (one read) |
 | `{"t":"log","b":42,"e":[[seq,atMs,wallSec,lvl,cat,"message"],…]}` | Diagnostic log events (below), the formatted text the Web UI log view renders, `lvl` one of `c/e/w/i/d` |
 | `{"t":"rs","sh":E1,"hi":E2}` | The shot and activation store epochs, once a change to either is saved ([archive sync](#archive-sync)) |
 | `{"t":"ev","topic":"shot_result","key":"42-1003","ttl":3600,"d":{…}}` | An event for the devices that asked for its topic ([events](#events)) |
@@ -315,9 +315,10 @@ decodes, so the controller runs the same decoder as for a direct connection:
 - in `widgets`, only `CMMachineStatus` (`output.mode`), `CMCoffeeBoiler`
   (`output.status`, `targetTemperature`, `targetTemperatureMin`,
   `targetTemperatureMax`, `readyStartTime`),
-  `CMSteamBoilerLevel` (`output.status`, `targetLevel`, `readyStartTime`),
-  `CMSteamBoilerTemperature` (`output.status`, `readyStartTime`: the steam
-  boiler of a machine that sets steam by temperature) and, in pushes,
+  `CMSteamBoilerLevel` (`output.status`, `enabled`, `targetLevel`,
+  `readyStartTime`), `CMSteamBoilerTemperature` (`output.status`, `enabled`,
+  `readyStartTime`: the steam boiler of a machine that sets steam by
+  temperature) and, in pushes,
   `CMBackFlush` (`output.status`), each with only those keys;
 - in `removedWidgets`, only those five codes.
 

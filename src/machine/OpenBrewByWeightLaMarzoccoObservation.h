@@ -33,6 +33,7 @@ struct LaMarzoccoObservation {
   LaMarzoccoBoilerState coffeeBoiler = LaMarzoccoBoilerState::UNKNOWN;
   LaMarzoccoBoilerState steamBoiler = LaMarzoccoBoilerState::UNKNOWN;
   LaMarzoccoSteamLevel steamLevel = LaMarzoccoSteamLevel::UNKNOWN;
+  LaMarzoccoSteamSwitch steamSwitch = LaMarzoccoSteamSwitch::UNKNOWN;
   LaMarzoccoCleaningState cleaning = LaMarzoccoCleaningState::UNKNOWN;
   char cleaningLabel[33] = {};
   bool powerPresent = false;
@@ -85,11 +86,12 @@ struct LaMarzoccoObservationFence {
   // it holds, every later change arrives as a push, so a command asking for
   // the trusted value would change nothing.
   bool temperatureTrusted = false;
+  bool steamTrusted = false;
   bool powerTrusted = false;
 
   void invalidate() {
     ++connectionRevision;
-    synchronized = temperatureTrusted = powerTrusted = false;
+    synchronized = temperatureTrusted = steamTrusted = powerTrusted = false;
   }
 
   LaMarzoccoObservationStamp stamp(uint32_t identity, uint32_t intent) const {
@@ -168,6 +170,8 @@ struct LaMarzoccoObservationFence {
         status.steamBoiler = update.steamBoiler;
         status.steamReadyAtUtcSec = update.steamReadyAtUtcSec;
         status.steamLevel = update.steamLevel;
+        status.steamSwitch = update.steamSwitch;
+        steamTrusted = update.steamSwitch != LaMarzoccoSteamSwitch::UNKNOWN;
       }
       ++temperatureRevision;
     }

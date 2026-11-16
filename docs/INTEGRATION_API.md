@@ -237,8 +237,9 @@ params substituted in order (see the example above).
 | ``INVALID_LA_MARZOCCO_CONFIG`` | The La Marzocco settings are not valid. |
 | ``INVALID_WEBHOOK`` | Use an http:// URL without embedded credentials; HTTPS is not supported. |
 | ``JSON_TOO_LARGE`` | JSON too large for device buffer |
+| ``LA_MARZOCCO_PRESET_STEAM_INVALID`` | laMarzoccoSteamEnabled must be true or false, and laMarzoccoSteamLevel 1, 2 or 3. |
 | ``LA_MARZOCCO_PRESET_TARGET_RANGE`` | laMarzoccoBrewTargetC must be inside the range the connected machine reports, in 0.1 degree steps. |
-| ``LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED`` | La Marzocco preset temperature is not supported by this firmware. |
+| ``LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED`` | La Marzocco preset machine settings are not supported by this firmware. |
 | ``LA_MARZOCCO_ACTION_FIELDS_INVALID`` | action is required and all fields must be known. |
 | ``LA_MARZOCCO_ACTION_UNKNOWN`` | Unknown La Marzocco action. |
 | ``LA_MARZOCCO_BOUNDED_JSON_REQUIRED`` | A bounded La Marzocco JSON request is required. |
@@ -674,7 +675,8 @@ here to one item):
    "fastMarginG":6.0,"slowMarginG":3.0,"operationalWallMs":50000,
    "bbwProtectionMs":12000,"fastExtractionGuardEnabled":true,
    "slowExtractionGuardEnabled":true,"grindHintsEnabled":true,
-   "laMarzoccoBrewTargetC":93.0,"fastRampS":5.0,"slowRampS":5.0,
+   "laMarzoccoBrewTargetC":93.0,"laMarzoccoSteamEnabled":true,
+   "laMarzoccoSteamLevel":3,"fastRampS":5.0,"slowRampS":5.0,
    "fastCurve":"even","slowCurve":"even","fastCurveHardness":0.0,
    "slowCurveHardness":0.0,
    "shotStats":{"n":5,"total":5,"minS":21.4,"maxS":34.2,"medianS":30.6},
@@ -703,11 +705,14 @@ after it when the matching guard is enabled, nothing is cut before
 `arrivalsS` describe the preset's newest timed shots (arrival times at the
 target, oldest first), `firstDropS` is their median first drop (`firstDropN`
 shots; `0` falls back to other presets), and `grindHint` is the Web UI grind
-hint object or `null`. `laMarzoccoBrewTargetC` only matters on Linea Micra
-builds; a save may change it only while the connected machine has reported
-its brew range, and only to a value inside that range. What the machine is
-sent is that value brought inside the range, and nothing before the machine
-has reported one. The statistics follow every stored good shot (bad shots never count),
+hint object or `null`. `laMarzoccoBrewTargetC`, `laMarzoccoSteamEnabled`
+and `laMarzoccoSteamLevel` (1–3) only matter on La Marzocco builds; other
+builds refuse them with `LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED`. A save may
+change the brew target only while the connected machine has reported its brew
+range, and only to a value inside that range. What the machine is sent is that
+value brought inside the range, and nothing before the machine has reported
+one. Only the settings the machine does not already hold are sent; a level is
+sent only while the preset keeps steam on and the machine sets steam by level. The statistics follow every stored good shot (bad shots never count),
 so Home Assistant's read after the `end` webhook already returns the new
 arrival.
 

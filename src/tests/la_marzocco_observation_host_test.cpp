@@ -175,13 +175,14 @@ int main() {
   assert(decode(R"({"widgets":[)"
       R"({"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},)"
       R"({"code":"CMCoffeeBoiler","output":{"status":"HeatingUp","targetTemperature":93.0,"readyStartTime":1760000460000}},)"
-      R"({"code":"CMSteamBoilerLevel","output":{"status":"HeatingUp","targetLevel":"Level3","readyStartTime":1760000820500}}]})", update));
+      R"({"code":"CMSteamBoilerLevel","output":{"status":"HeatingUp","enabled":true,"targetLevel":"Level3","readyStartTime":1760000820500}}]})", update));
   assert(update.powerPresent && update.mode == LaMarzoccoObservedMode::BREWING);
   assert(update.temperaturePresent && update.temperatureValid && update.targetDeciC == 930);
   assert(update.coffeeBoilerPresent && update.coffeeBoiler == LaMarzoccoBoilerState::HEATING_UP);
   assert(update.coffeeReadyAtUtcSec == 1760000460U);
   assert(update.steamBoilerPresent && update.steamBoiler == LaMarzoccoBoilerState::HEATING_UP);
   assert(update.steamLevel == LaMarzoccoSteamLevel::LEVEL_3);
+  assert(update.steamSwitch == LaMarzoccoSteamSwitch::ON);
   assert(update.steamReadyAtUtcSec == 1760000820U);
   // Unknown status strings degrade to UNSUPPORTED instead of failing.
   update = {};
@@ -189,6 +190,7 @@ int main() {
   assert(decode(R"({"widgets":[{"code":"CMSteamBoilerLevel","output":{"status":"FutureMode","targetLevel":"Level4"}}]})", update));
   assert(update.steamBoiler == LaMarzoccoBoilerState::UNSUPPORTED);
   assert(update.steamLevel == LaMarzoccoSteamLevel::UNSUPPORTED);
+  assert(update.steamSwitch == LaMarzoccoSteamSwitch::UNKNOWN);  // Not reported.
   // Null estimate means no estimate; malformed values degrade to absent
   // instead of failing the frame (display-only field), and both epoch
   // milliseconds and seconds-scale values are interpreted.
@@ -236,8 +238,9 @@ int main() {
   assert(decode(R"({"widgets":[)"
       R"({"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},)"
       R"({"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0}},)"
-      R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","targetTemperature":128.0,"targetLevel":"Level2","readyStartTime":1760000820500}}]})", update));
+      R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","enabled":false,"targetTemperature":128.0,"targetLevel":"Level2","readyStartTime":1760000820500}}]})", update));
   assert(update.steamBoilerPresent && update.steamByTemperature);
+  assert(update.steamSwitch == LaMarzoccoSteamSwitch::OFF);
   assert(update.steamBoiler == LaMarzoccoBoilerState::HEATING_UP);
   assert(update.steamReadyAtUtcSec == 1760000820U);
   // A level is read from the level widget only, as the companion forwards it.

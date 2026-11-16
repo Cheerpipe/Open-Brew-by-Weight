@@ -117,7 +117,8 @@ inline constexpr SettingsField SETTINGS_PRESET_FIELDS[] = {
     SF(19, grindHintsEnabled), SF(20, bbwEwmaAlpha), SF(21, bbwAlphaLearned),
     SF(22, bbwAlphaBaseline), SF(23, laMarzoccoBrewTargetDeciC), SF(24, fastRampMs),
     SF(25, slowRampMs), SF(26, fastCurve), SF(27, fastCurveHardness), SF(28, slowCurve),
-    SF(29, slowCurveHardness), SF(30, fastCurveHardnessPct), SF(31, slowCurveHardnessPct)};
+    SF(29, slowCurveHardness), SF(30, fastCurveHardnessPct), SF(31, slowCurveHardnessPct),
+    SF(32, laMarzoccoSteamEnabled), SF(33, laMarzoccoSteamLevel)};
 #undef SF
 
 // The bank's preset count is the number of preset groups.
@@ -207,7 +208,7 @@ constexpr size_t settingsFieldBytes(const SettingsField (&fields)[N]) {
 
 static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 16 == sizeof(RuntimeConfig),
               "every RuntimeConfig member needs a settings field row");
-static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 3 == sizeof(ShotPreset),
+static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 1 == sizeof(ShotPreset),
               "every ShotPreset member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_PRESET_BANK_FIELDS) +
                       sizeof(ShotPresetBank::count) + sizeof(ShotPresetBank::presets) + 1 ==

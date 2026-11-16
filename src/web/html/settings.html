@@ -220,16 +220,6 @@
           required
           data-unit="g"
         /><small class="fieldHint">{{webui:settings.target_weight_hint}}</small></label
-      ><label class="laMarzoccoOnly laMarzoccoTempOpt"
-        >{{webui:settings.brew_temperature_c}}<input
-          id="laMarzoccoBrewTargetC"
-          type="number"
-          min="80"
-          max="100"
-          step="0.1"
-          required
-          data-unit="°C"
-        /><small class="fieldHint">{{webui:settings.brew_temperature_hint}}</small></label
       >
       <div class="windowField">
         <span>{{webui:settings.shot_window_s}}</span>
@@ -266,6 +256,33 @@
           class="fieldHint"
           >{{webui:settings.grind_hints_hint}}</small
         ></label
+      >
+    </details>
+    <details data-g="presetMachine" class="cfgGroup laMarzoccoOnly laMarzoccoMachineOpt">
+      <summary>{{webui:settings.machine}}</summary>
+      <label class="laMarzoccoTempOpt"
+        >{{webui:settings.brew_temperature_c}}<input
+          id="laMarzoccoBrewTargetC"
+          type="number"
+          min="80"
+          max="100"
+          step="0.1"
+          required
+          data-unit="°C"
+        /><small class="fieldHint">{{webui:settings.brew_temperature_hint}}</small></label
+      ><label
+        ><input id="laMarzoccoSteamEnabled" type="checkbox" checked />
+        {{webui:settings.steam_boiler}}<small class="fieldHint"
+          >{{webui:settings.steam_boiler_hint}}</small
+        ></label
+      ><label class="laMarzoccoSteamLevelOpt"
+        >{{webui:settings.steam_power}}<span class="selBox"
+          ><select id="laMarzoccoSteamLevel">
+            <option value="1">{{webui:settings.steam_level_1}}</option>
+            <option value="2">{{webui:settings.steam_level_2}}</option>
+            <option value="3" selected>{{webui:settings.steam_level_3}}</option>
+          </select></span
+        ><small class="fieldHint">{{webui:settings.steam_power_hint}}</small></label
       >
     </details>
     <details data-g="fast" class="cfgGroup">
@@ -754,8 +771,8 @@
         <summary>{{webui:settings.preset_extensions}}</summary>
         <label
           ><input id="laMarzoccoApplyTemperature" type="checkbox" checked />
-          {{webui:settings.allow_brew_temperature}}<small class="fieldHint"
-            >{{webui:settings.allow_brew_temperature_hint}}</small
+          {{webui:settings.machine_settings_in_presets}}<small class="fieldHint"
+            >{{webui:settings.machine_settings_in_presets_hint}}</small
           ></label
         >
       </details>

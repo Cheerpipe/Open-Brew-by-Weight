@@ -6,7 +6,7 @@ int main() {
   using namespace openbrewbyweight;
   assert(initializeMachineIntegration());
   publishMachineIntegrationNetworkState(true, false, false);
-  requestMachineIntegrationPresetTemperature({2, 935}, 7);
+  requestMachineIntegrationPresetSettings({2, 935, true, 3}, 7);
   assert(machineIntegrationPhysicalStart() ==
          MachinePhysicalStartDisposition::NORMAL);
   assert(machineIntegrationBackflush().phase == MachineBackflushPhase::UNSUPPORTED);

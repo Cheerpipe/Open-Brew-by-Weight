@@ -1027,13 +1027,13 @@ void serviceSettingsPersistResult() {
     if (pendingPresetPersistence.requestId != 0 &&
         tickReached(runtimeRevision, pendingPresetPersistence.revision)) {
       const bool notifyPresets = pendingPresetPersistence.notifyPresets;
-      const bool applyMachineTemperature =
-          pendingPresetPersistence.applyMachineTemperature;
+      const bool applyMachineSettings =
+          pendingPresetPersistence.applyMachineSettings;
       WebCommand persisted;
       persisted.requestId = pendingPresetPersistence.requestId;
       reportControlCommandResult(persisted, CommandResultState::PERSISTED);
       pendingPresetPersistence = {};
-      if (applyMachineTemperature) requestActivePresetMachineTemperature();
+      if (applyMachineSettings) requestActivePresetMachineSettings();
       if (notifyPresets) queueWebhookPresetsChanged();
     }
     if (!scaleWorkerClearPreferredDirty(persistedSettings.preferredScaleMac,
@@ -1431,10 +1431,10 @@ void serviceRuntimePersistence(
   if (pendingPresetPersistence.requestId != 0 &&
       tickReached(runtimeConfig.revision, pendingPresetPersistence.revision)) {
     const bool notifyPresets = pendingPresetPersistence.notifyPresets;
-    const bool applyMachineTemperature =
-        pendingPresetPersistence.applyMachineTemperature;
+    const bool applyMachineSettings =
+        pendingPresetPersistence.applyMachineSettings;
     pendingPresetPersistence = {};
-    if (applyMachineTemperature) requestActivePresetMachineTemperature();
+    if (applyMachineSettings) requestActivePresetMachineSettings();
     if (notifyPresets) queueWebhookPresetsChanged();
   }
   if (quickSettingsPersistPending) {

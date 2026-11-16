@@ -644,34 +644,51 @@ the switch stays disabled. The account requirement covers the machine
 observation; the scale command itself is local Bluetooth and works with the
 connected scale regardless of brand.
 
-## Brew temperature in presets
+## Machine settings in presets
 
-**Set the brew temperature in each preset** reveals a per-preset value in
-0.1 °C steps. Its limits are the ones your machine reports through La
+**Machine settings in presets** (in **Preset extensions**) adds a **Machine**
+group to each preset, between **Recipe** and **Fast shots**. It holds three
+settings the Micra receives when you choose the preset:
+
+- **Brew temperature**, in 0.1 °C steps.
+- **Steam boiler**, on or off. Turn it off for presets you never steam milk
+  with: the Micra is ready sooner and uses less energy.
+- **Steam power**, level 1, 2 or 3, as in the La Marzocco app. It is hidden
+  while the steam boiler is off, and the Micra's level is left as it is.
+
+New and factory-reset presets start at 91.0 °C with the steam boiler on at
+level 3. Duplicates copy the source preset's values. Turning the option off
+or disconnecting the account keeps every saved value.
+
+Only what differs is sent: when the Micra already has a preset's brew
+temperature, steam setting or steam level, that setting is not sent again,
+and when it has all three nothing is sent at all. The Web UI log lists each
+setting sent and notes when a preset needed nothing.
+
+The brew temperature's limits are the ones your machine reports through La
 Marzocco's cloud, 80.0 to 100.0 °C on a Linea Micra, so the field appears once
 the connected account has read them. The controller never sends a temperature
 the machine has not said it accepts: until the machine has reported its
-limits, nothing is sent.
+limits, no temperature is sent.
 
 If a preset was saved with a value the machine's limits no longer allow, the
 preset keeps that value and the machine gets the nearest one it accepts. A
 note under the field says which, for example **Your Micra accepts 85.0–100.0 °C,
 so it gets 85.0 °C instead of this preset's 80.0 °C**, and the Web UI log
 records it. You can still change the preset's other fields; a new temperature
-has to fit the limits. New and factory-reset presets start at 93.0 °C;
-duplicates copy the source value. Turning the option off or disconnecting the
-account keeps every saved preset value.
+has to fit the limits.
 
-When a preset change has been saved successfully, Open Brew by Weight sends its target
-to the selected Micra. Saving an already-active preset also sends the target
-after persistence when the temperature changed. A newly connected scale sends
-the current active target again, which covers sessions where the machine or
-controller was unavailable when the preset was selected. Repeated triggers are
-combined, and only the latest active target remains pending. When the live
-connection already shows the machine at that temperature, nothing is sent:
-the target is reported as applied without contacting the cloud. While the
-La Marzocco cloud reports the machine offline, the target waits and is sent as
-soon as the machine is back online.
+When a preset change has been saved successfully, Open Brew by Weight sends its
+machine settings to the selected Micra. Saving an already-active preset also
+sends them after persistence when one of them changed. A newly connected scale
+sends the active preset's settings again, which covers sessions where the
+machine or controller was unavailable when the preset was selected. Repeated
+triggers are combined, and only the latest active preset remains pending. When
+the live connection already shows the machine with every setting, nothing is
+sent: the preset is reported as applied without contacting the cloud. Without
+a live connection the controller reads the machine first and sends only what
+differs. While the La Marzocco cloud reports the machine offline, the settings
+wait and are sent as soon as the machine is back online.
 
 Application waits while a shot or backflush is active, while a backflush request
 is pending, and while the scale is connecting. These conditions cancel an
@@ -682,10 +699,10 @@ clock is still synchronizing or station Wi-Fi is not ready, it is sent as soon
 as those conditions clear, without waiting for a cooldown. Temporary cloud and
 authorization failures use the same bounded retries and saved account session
 as power-state monitoring. The integration never asks for credentials or registers a new
-installation merely to retry a temperature.
+installation merely to retry a preset's settings.
 
-The cloud command is complete only after the machine reports the requested
-target. With live updates this normally arrives within seconds of the change;
+The application is complete only after the machine reports every setting
+that was sent. With live updates this normally arrives within seconds of the change;
 if it has not arrived after 10 seconds, a dashboard read checks instead. Once
 the cloud accepts a change, delayed confirmation retries only that check
 instead of resending the change. Status and diagnostics
@@ -703,11 +720,11 @@ redirect or other permanent request rejection also stops automatic attempts for
 that trigger, avoiding repeated cloud requests. Selecting or saving a preset
 again, or reconnecting the scale, creates a new trigger. Turning this option
 off, disconnecting the account, losing station Wi-Fi, or entering setup AP mode
-prevents writes; saved preset values remain unchanged. Temperature application
-does not require **Show power state** to be enabled.
+prevents writes; saved preset values remain unchanged. Applying machine
+settings does not require **Show power state** to be enabled.
 
 Factory reset removes the Micra cloud account, selected machine, installation
 key, and RAM session. The options return to the
-[recommended defaults](#recommended-options), and preset temperatures
-return to 93.0 °C. See
+[recommended defaults](#recommended-options), and presets return to 91.0 °C
+with the steam boiler on at level 3. See
 [Factory reset](factory-reset.md) and [Presets](../features/presets.md).

@@ -152,9 +152,9 @@ struct NetworkWorkBuf {
   static constexpr size_t kStatusJson = 40960;
   // Worst case: 8 presets with fully escaped 23-char names plus every
   // per-preset rule field (both transitions included) and shot statistic the
-  // Web UI renders: ~7.8 KB. Eight realistic items with the grind hint
-  // object: ~7.3 KB.
-  static constexpr size_t kPresetsJson = 8192;
+  // Web UI renders: ~8.2 KB. Eight realistic items with the grind hint
+  // object: ~7.7 KB.
+  static constexpr size_t kPresetsJson = 8704;
   static constexpr size_t kHistoryJson = 1400;
   // One full-capacity curve plus scalar fields per row; the 4 KiB headroom
   // (external memory) keeps a maximal row well under the client's frame
@@ -1226,6 +1226,7 @@ bool buildSlimPresetsJson(const char *lead = "") {
         "\"operationalWallMs\":%lu,\"bbwProtectionMs\":%lu,"
         "\"fastExtractionGuardEnabled\":%s,\"slowExtractionGuardEnabled\":%s,"
         "\"grindHintsEnabled\":%s,\"laMarzoccoBrewTargetC\":%.1f,"
+        "\"laMarzoccoSteamEnabled\":%s,\"laMarzoccoSteamLevel\":%u,"
         "\"fastRampS\":%.1f,\"slowRampS\":%.1f,\"fastCurve\":\"%s\",\"slowCurve\":\"%s\","
         "\"fastCurveHardness\":%.1f,\"slowCurveHardness\":%.1f",
         i == 0 ? "" : ",", static_cast<unsigned>(p.id), safeName,
@@ -1240,7 +1241,9 @@ bool buildSlimPresetsJson(const char *lead = "") {
         p.fastSideEnabled ? "true" : "false",
         p.slowSideEnabled ? "true" : "false",
         p.grindHintsEnabled ? "true" : "false",
-        static_cast<double>(p.laMarzoccoBrewTargetDeciC) / 10.0, p.fastRampMs / 1000.0,
+        static_cast<double>(p.laMarzoccoBrewTargetDeciC) / 10.0,
+        p.laMarzoccoSteamEnabled ? "true" : "false",
+        static_cast<unsigned>(p.laMarzoccoSteamLevel), p.fastRampMs / 1000.0,
         p.slowRampMs / 1000.0, rampCurveName(p.fastCurve), rampCurveName(p.slowCurve),
         rampHardnessPercent(p.fastCurveHardnessPct, p.fastCurveHardness),
         rampHardnessPercent(p.slowCurveHardnessPct, p.slowCurveHardness));

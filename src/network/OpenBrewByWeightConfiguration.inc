@@ -1,3 +1,5 @@
+ValidationFailure parseLaMarzoccoPresetSettings(const cJSON *root, WebCommand &command);
+
 esp_err_t OpenBrewByWeightNetwork::timeSyncHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   if (!self.requireAdminUnlock(request)) {
@@ -991,7 +993,8 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
           "slowExtractionGuardEnabled", "slowMarginG", "slowAfterS", "scaleLossFixedS",
           "fastRampS", "fastCurve", "fastCurveHardness", "slowRampS", "slowCurve",
           "slowCurveHardness", "weightOffsetBaselineG", "doseG", "grindHintsEnabled",
-          "bbwAlphaBaseline", "laMarzoccoBrewTargetC"};
+          "bbwAlphaBaseline", "laMarzoccoBrewTargetC", "laMarzoccoSteamEnabled",
+          "laMarzoccoSteamLevel"};
       uint32_t present = 0;
       for (size_t i = 0; i < sizeof(recipeKeys) / sizeof(recipeKeys[0]); ++i)
         if (jsonFieldPresent(root, recipeKeys[i])) present |= 1UL << i;
@@ -1054,26 +1057,7 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
             jsonFieldPresent(root, "bbwAlphaLearned") ||
             jsonFieldPresent(root, "bbwEwmaOffsetG"))
           parseError = validationFailure("BBW_LEARNING_READ_ONLY");
-        const cJSON *laMarzoccoTarget =
-            cJSON_GetObjectItemCaseSensitive(root, "laMarzoccoBrewTargetC");
-        if (parseError.reason == nullptr && laMarzoccoTarget != nullptr) {
-#if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
-          const double scaled = cJSON_IsNumber(laMarzoccoTarget)
-                                    ? laMarzoccoTarget->valuedouble * 10.0
-                                    : NAN;
-          const long rounded = lround(scaled);
-          if (!std::isfinite(scaled) || fabs(scaled - rounded) > 0.0001 ||
-              !laMarzoccoBrewTargetSettable(machineIntegrationStatus(), rounded)) {
-            parseError = validationFailure("LA_MARZOCCO_PRESET_TARGET_RANGE");
-          } else {
-            command.laMarzoccoBrewTargetSpecified = true;
-            command.laMarzoccoBrewTargetDeciC =
-                static_cast<uint16_t>(rounded);
-          }
-#else
-          parseError = validationFailure("LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED");
-#endif
-        }
+        if (parseError.reason == nullptr) parseError = parseLaMarzoccoPresetSettings(root, command);
       }
     }
   } else {

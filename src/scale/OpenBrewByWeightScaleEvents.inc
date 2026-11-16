@@ -312,7 +312,7 @@ void processScaleLinkTransitions() {
       link.disconnectSequence != handledScaleDisconnectSequence;
 
   auto handleConnected = [&]() {
-    requestActivePresetMachineTemperature();
+    requestActivePresetMachineSettings();
     if (!localBuzzer.configureScaleTones(link.stockTones)) {
       serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,
                           "Scale tone invalid; default melody kept");

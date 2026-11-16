@@ -2481,7 +2481,7 @@ void p85_schema1_is_strict_and_la_marzocco_defaults_round_trip() {
   CHECK(savePersistedSettings(settings));
   CHECK(loadPersistedSettings(settings));
   CHECK(settings.laMarzocco.options ==
-        (LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_OBSERVE_STATE |
+        (LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_OBSERVE_STATE |
          LA_MARZOCCO_RECOGNIZE_WAKE));
   CHECK(settings.laMarzocco.accountConfigured);
   CHECK(settings.laMarzocco.connectionType == static_cast<uint8_t>(LaMarzoccoConnectionType::API));
@@ -2507,17 +2507,30 @@ void p85_schema1_is_strict_and_la_marzocco_defaults_round_trip() {
 
   ShotPresetBank bank = settings.presets;
   mutableShotPreset(bank, bank.activeId)->laMarzoccoBrewTargetDeciC = 947;
+  mutableShotPreset(bank, bank.activeId)->laMarzoccoSteamEnabled = false;
+  mutableShotPreset(bank, bank.activeId)->laMarzoccoSteamLevel = 1;
   uint8_t duplicateId = 0;
   CHECK(duplicateShotPreset(bank, bank.activeId, duplicateId));
   CHECK(findShotPreset(bank, duplicateId)->laMarzoccoBrewTargetDeciC == 947);
+  CHECK(!findShotPreset(bank, duplicateId)->laMarzoccoSteamEnabled);
+  CHECK(findShotPreset(bank, duplicateId)->laMarzoccoSteamLevel == 1);
   uint8_t createdId = 0;
   CHECK(createUntitledShotPreset(bank, createdId));
-  CHECK(findShotPreset(bank, createdId)->laMarzoccoBrewTargetDeciC == 930);
+  CHECK(findShotPreset(bank, createdId)->laMarzoccoBrewTargetDeciC == 910);
+  CHECK(findShotPreset(bank, createdId)->laMarzoccoSteamEnabled);
+  CHECK(findShotPreset(bank, createdId)->laMarzoccoSteamLevel == 3);
+  settings.presets = bank;
+  CHECK(savePersistedSettings(settings));
+  CHECK(loadPersistedSettings(settings));
+  CHECK(!findShotPreset(settings.presets, duplicateId)->laMarzoccoSteamEnabled);
+  CHECK(findShotPreset(settings.presets, duplicateId)->laMarzoccoSteamLevel == 1);
   CHECK(resetPersistedSettingsToFactory(settings));
   CHECK(settings.laMarzocco.options == LA_MARZOCCO_DEFAULT_OPTIONS);
   CHECK(settings.laMarzocco.scaleOptions == LA_MARZOCCO_KNOWN_SCALE_OPTIONS);
   CHECK(strcmp(settings.deviceName, DEFAULT_DEVICE_NAME) == 0);
-  CHECK(settings.presets.presets[0].laMarzoccoBrewTargetDeciC == 930);
+  CHECK(settings.presets.presets[0].laMarzoccoBrewTargetDeciC == 910);
+  CHECK(settings.presets.presets[0].laMarzoccoSteamEnabled);
+  CHECK(settings.presets.presets[0].laMarzoccoSteamLevel == 3);
 }
 
 struct TestCase {

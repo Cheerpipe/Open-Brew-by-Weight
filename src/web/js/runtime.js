@@ -2101,6 +2101,7 @@ const errorReasonTexts = {
   JSON_TOO_LARGE: __WEBUI_TEXT__("err.json_too_large"),
   LAST_SHOT_NOT_FOUND: __WEBUI_TEXT__("err.last_shot_not_found"),
   LAST_SHOT_OVERFLOW: __WEBUI_TEXT__("err.last_shot_overflow"),
+  LA_MARZOCCO_PRESET_STEAM_INVALID: __WEBUI_TEXT__("err.la_marzocco_preset_steam_invalid"),
   LA_MARZOCCO_PRESET_TARGET_RANGE: __WEBUI_TEXT__("err.la_marzocco_preset_target_range"),
   LA_MARZOCCO_PRESET_TARGET_UNSUPPORTED: __WEBUI_TEXT__(
     "err.la_marzocco_preset_target_unsupported",
@@ -3622,6 +3623,8 @@ const BREW_CONTROL_IDS = [
   "grindHintsEnabled",
   "scaleLossFixedS",
   "laMarzoccoBrewTargetC",
+  "laMarzoccoSteamEnabled",
+  "laMarzoccoSteamLevel",
 ];
 function settingsSectionOf(id) {
   if (BREW_CONTROL_IDS.includes(id)) return "brew";
@@ -3828,6 +3831,7 @@ function updateConfigGroups() {
   apply("tareOpt", !$("autoTare").checked);
   apply("paddleOpt", $("paddleReturnReminder")?.value === "0");
   apply("fastGuardOpt", !$("fastExtractionGuardEnabled").checked);
+  apply("laMarzoccoSteamLevelOpt", !$("laMarzoccoSteamEnabled")?.checked);
   apply("touchStopOpt", !$("brewByWeight").checked || !$("avoidAccidentalTouchEnabled").checked);
   apply("slowGuardOpt", !$("slowExtractionGuardEnabled").checked);
   apply("noScaleGuardOpt", $("noScaleBbwMode").value === "off");
@@ -4375,6 +4379,10 @@ function ingestPresets(s) {
     typeof active.laMarzoccoBrewTargetC === "number"
   )
     $("laMarzoccoBrewTargetC").value = active.laMarzoccoBrewTargetC.toFixed(1);
+  if ($("laMarzoccoSteamEnabled") && !uiState.brewDirty && active) {
+    $("laMarzoccoSteamEnabled").checked = active.laMarzoccoSteamEnabled !== false;
+    $("laMarzoccoSteamLevel").value = String(active.laMarzoccoSteamLevel || 3);
+  }
 }
 
 // Cut line f(t), non-increasing: the ceiling holds until the Fast transition

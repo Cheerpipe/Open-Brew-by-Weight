@@ -14,7 +14,7 @@ constexpr size_t LA_MARZOCCO_PASSWORD_CAPACITY = 97;
 constexpr size_t LA_MARZOCCO_SERIAL_CAPACITY = 33;
 constexpr size_t LA_MARZOCCO_NAME_CAPACITY = 49;
 constexpr size_t LA_MARZOCCO_PRIVATE_KEY_BYTES = 32;
-constexpr uint8_t LA_MARZOCCO_APPLY_TEMPERATURE = 1U << 0;
+constexpr uint8_t LA_MARZOCCO_APPLY_MACHINE_SETTINGS = 1U << 0;
 constexpr uint8_t LA_MARZOCCO_OBSERVE_STATE = 1U << 1;
 constexpr uint8_t LA_MARZOCCO_RECOGNIZE_WAKE = 1U << 2;
 constexpr uint8_t LA_MARZOCCO_SHUTDOWN_WITH_SCALE = 1U << 3;
@@ -25,12 +25,12 @@ constexpr uint8_t LA_MARZOCCO_SHUTDOWN_GRACE_SHIFT = 4;
 constexpr uint8_t LA_MARZOCCO_SHUTDOWN_GRACE_MASK = 0x70U;
 constexpr uint8_t LA_MARZOCCO_SHUTDOWN_GRACE_CODE_MAX = 4;
 constexpr uint8_t LA_MARZOCCO_KNOWN_OPTIONS =
-    LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_OBSERVE_STATE |
+    LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_OBSERVE_STATE |
     LA_MARZOCCO_RECOGNIZE_WAKE | LA_MARZOCCO_SHUTDOWN_WITH_SCALE |
     LA_MARZOCCO_POWER_ON_WITH_SCALE | LA_MARZOCCO_SHUTDOWN_GRACE_MASK;
 // Remote power-on stays off by default; scale-off standby waits 15 s (code 2).
 constexpr uint8_t LA_MARZOCCO_DEFAULT_OPTIONS =
-    LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_OBSERVE_STATE |
+    LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_OBSERVE_STATE |
     LA_MARZOCCO_RECOGNIZE_WAKE | LA_MARZOCCO_SHUTDOWN_WITH_SCALE |
     (2U << LA_MARZOCCO_SHUTDOWN_GRACE_SHIFT);
 // Scale-directed machine-link options live in their own byte so the option
@@ -49,6 +49,7 @@ constexpr uint16_t LA_MARZOCCO_SHUTDOWN_GRACE_SECONDS[] = {0, 5, 15, 30, 60};
 // stored preset, an observed target and a sent command stay inside them.
 constexpr uint16_t LA_MARZOCCO_BREW_TARGET_MIN_DECI_C = 600;
 constexpr uint16_t LA_MARZOCCO_BREW_TARGET_MAX_DECI_C = 1100;
+constexpr uint8_t LA_MARZOCCO_STEAM_LEVEL_MAX = 3;  // Steam levels are 1..3.
 enum class LaMarzoccoConnectionType : uint8_t { WEBSOCKET = 0, API = 1 };
 inline const char *laMarzoccoConnectionTypeName(uint8_t value) {
   return value == static_cast<uint8_t>(LaMarzoccoConnectionType::API) ? "api" : "websocket";
@@ -190,7 +191,7 @@ inline void setLaMarzoccoOptions(LaMarzoccoPersistedSettings &settings,
     shutdownGraceCode = 0;
   }
   settings.options =
-      (applyTemperature ? LA_MARZOCCO_APPLY_TEMPERATURE : 0U) |
+      (applyTemperature ? LA_MARZOCCO_APPLY_MACHINE_SETTINGS : 0U) |
       (observeState ? LA_MARZOCCO_OBSERVE_STATE : 0U) |
       (recognizeWake ? LA_MARZOCCO_RECOGNIZE_WAKE : 0U) |
       (shutdownWithScale ? LA_MARZOCCO_SHUTDOWN_WITH_SCALE : 0U) |

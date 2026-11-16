@@ -228,11 +228,11 @@ void LaMarzoccoCancellationTest::run() {
   settings.accountConfigured = true;
   std::strcpy(settings.username, "test@example.invalid");
   std::strcpy(settings.selectedSerial, "TEST");
-  settings.options = LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
+  settings.options = LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
   service.publishConfig(settings, 1);
   service.publishNetworkState(true, false, false, false);
   LaMarzoccoRequest request;
-  request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
+  request.type = LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
   request.presetId = 1;
   request.targetDeciC = 930;
   assert(service.queue(request));
@@ -266,7 +266,7 @@ void LaMarzoccoCancellationTest::run() {
     service.temperatureActive_.store(!power);
     service.powerActive_.store(power);
     request.type = power ? LaMarzoccoRequestType::SET_STANDBY
-                         : LaMarzoccoRequestType::APPLY_TEMPERATURE;
+                         : LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
     assert(service.queue(request));
     service.publishNetworkState(true, false, false, false);
     assert(service.abortRequested_.load());
@@ -387,7 +387,7 @@ void LaMarzoccoCancellationTest::initializationAndGates() {
   assert(calls == 2 && !initialSnapshot);
 
   for (auto type : {LaMarzoccoRequestType::CONNECT, LaMarzoccoRequestType::OBSERVE_STATE,
-                    LaMarzoccoRequestType::APPLY_TEMPERATURE, LaMarzoccoRequestType::SET_STANDBY,
+                    LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS, LaMarzoccoRequestType::SET_STANDBY,
                     LaMarzoccoRequestType::SET_POWER_ON}) {
     const auto before = calls;
     service.pending_.present = true;

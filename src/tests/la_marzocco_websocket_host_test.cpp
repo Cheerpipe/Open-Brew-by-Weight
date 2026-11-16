@@ -183,8 +183,19 @@ static uint16_t cloudRangeMinDeciC = 0, cloudRangeMaxDeciC = 0;  // What a direc
 static bool cloudIgnoresTemperature = false;
 static bool cloudRefusesCommands = false;
 static LaMarzoccoPowerState cloudPower = LaMarzoccoPowerState::UNKNOWN;
-bool OpenBrewByWeightLaMarzoccoService::writeTemperature(const LaMarzoccoPersistedSettings &,
-                                                    uint16_t targetDeciC) {
+static LaMarzoccoSteamSwitch cloudSteam = LaMarzoccoSteamSwitch::UNKNOWN;
+static uint8_t cloudSteamLevel = 0;
+static unsigned steamWrites = 0;
+bool OpenBrewByWeightLaMarzoccoService::writePresetSetting(const LaMarzoccoPersistedSettings &,
+                                                           uint8_t setting, uint16_t targetDeciC) {
+  if (setting != LA_MARZOCCO_SET_BREW_TARGET) {
+    ++steamWrites;
+    if (setting == LA_MARZOCCO_SET_STEAM)
+      cloudSteam = targetDeciC ? LaMarzoccoSteamSwitch::ON : LaMarzoccoSteamSwitch::OFF;
+    else
+      cloudSteamLevel = static_cast<uint8_t>(targetDeciC);
+    return true;
+  }
   ++temperatureWrites;
   if (cloudRefusesCommands) {
     work_->httpStatus = 403;
@@ -211,6 +222,8 @@ bool OpenBrewByWeightLaMarzoccoService::readDashboard(const LaMarzoccoPersistedS
   result.targetMinDeciC = cloudRangeMinDeciC;
   result.targetMaxDeciC = cloudRangeMaxDeciC;
   result.powerState = cloudPower;
+  result.steamSwitch = cloudSteam;
+  result.steamLevel = static_cast<LaMarzoccoSteamLevel>(cloudSteamLevel);
   return true;
 }
 void OpenBrewByWeightLaMarzoccoService::waitRetry(uint32_t) {}
@@ -805,7 +818,7 @@ struct LaMarzoccoWebSocketTest {
     now = 1000;
     OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
-    service.config_.options = LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_OBSERVE_STATE |
+    service.config_.options = LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_OBSERVE_STATE |
         LA_MARZOCCO_POWER_ON_WITH_SCALE | LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.published_.connectionFreshness = true;
@@ -818,7 +831,7 @@ struct LaMarzoccoWebSocketTest {
     uint32_t requestId = 0;
     const auto temperature = [&](uint16_t targetDeciC) {
       LaMarzoccoRequest request;
-      request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
+      request.type = LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
       request.presetId = 1;
       request.targetDeciC = targetDeciC;
       request.requestId = ++requestId;
@@ -853,8 +866,16 @@ struct LaMarzoccoWebSocketTest {
     assert(temperatureWrites == 1 && !service.desiredTemperature_.present);
     assert(dashboardReads == readsBefore);
     deliver(service, observation(service, brewing93));
-    // A gap in observation removes the trust, so the equal target is written.
+    // A gap in observation removes the trust: the machine is read first, and
+    // only a target it does not hold is written.
     service.observationFence_.invalidate();
+    cloudTargetDeciC = 930;
+    auto gapReads = dashboardReads;
+    assert(service.executeTemperatureApplication(temperature(930), service.configGeneration_));
+    assert(temperatureWrites == 1 && dashboardReads == gapReads + 1);
+    deliver(service, observation(service, brewing93));
+    service.observationFence_.invalidate();
+    cloudTargetDeciC = 940;
     assert(service.executeTemperatureApplication(temperature(930), service.configGeneration_));
     assert(temperatureWrites == 2);
     // Measured power on a live subscription skips a command that changes nothing.
@@ -904,6 +925,72 @@ struct LaMarzoccoWebSocketTest {
     assert(temperatureWrites == writes && cloudTargetDeciC == 850);
     assert(service.published_.temperatureState == LaMarzoccoTemperatureState::FAILED &&
            service.published_.temperatureError == LaMarzoccoError::REJECTED);
+    service.stopWebSocket(true);
+    delete service.work_;
+  }
+  static void presetSteamSettingsSendOnlyDifferences() {
+    now = 1000;
+    OpenBrewByWeightLaMarzoccoService service;
+    service.config_.accountConfigured = true;
+    service.config_.options = LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_OBSERVE_STATE;
+    std::strcpy(service.config_.selectedSerial, "synthetic");
+    service.published_.connectionFreshness = true;
+    service.staConnected_.store(true);
+    service.serviceWebSocket();
+    subscribe(service);
+    const auto frame = [](const char *steam) {
+      return std::string(R"({"connected":true,"widgets":[{"code":"CMMachineStatus","output":{"mode":"BrewingMode"}},{"code":"CMCoffeeBoiler","output":{"status":"Ready","targetTemperature":93.0,"targetTemperatureMin":80,"targetTemperatureMax":100}},)") +
+             steam + "]}";
+    };
+    const std::string micra = frame(R"({"code":"CMSteamBoilerLevel","output":{"status":"Ready","enabled":true,"targetLevel":"Level3"}})");
+    deliver(service, observation(service, micra.c_str()));
+    assert(service.observationFence_.steamTrusted &&
+           service.published_.steamSwitch == LaMarzoccoSteamSwitch::ON);
+    uint32_t requestId = 0;
+    const auto apply = [&](bool steamEnabled, uint8_t steamLevel) {
+      LaMarzoccoRequest request;
+      request.type = LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
+      request.presetId = 1;
+      request.targetDeciC = 930;
+      request.steamEnabled = steamEnabled;
+      request.steamLevel = steamLevel;
+      request.requestId = ++requestId;
+      service.desiredTemperature_ = {};
+      service.desiredTemperature_.request = request;
+      service.desiredTemperature_.machineConfigGeneration = service.configGeneration_;
+      service.desiredTemperature_.present = true;
+      return service.executeTemperatureApplication(request, service.configGeneration_);
+    };
+    const auto confirmWith = [&](const char *steam) {
+      notifyHook = [&service, steam] {
+        notifyHook = nullptr;
+        deliver(service, observation(service, (std::string(R"({"widgets":[)") + steam + "]}").c_str()));
+      };
+    };
+    const auto steamBefore = steamWrites, temperatureBefore = temperatureWrites,
+               readsBefore = dashboardReads;
+    // Every setting already held: nothing is sent.
+    assert(apply(true, 3) && steamWrites == steamBefore && temperatureWrites == temperatureBefore);
+    assert(service.published_.temperatureState == LaMarzoccoTemperatureState::CONFIRMED);
+    // Only the level differs: only the level is sent.
+    confirmWith(R"({"code":"CMSteamBoilerLevel","output":{"status":"Ready","enabled":true,"targetLevel":"Level2"}})");
+    assert(apply(true, 2) && steamWrites == steamBefore + 1 && cloudSteamLevel == 2);
+    assert(temperatureWrites == temperatureBefore && !service.desiredTemperature_.present);
+    // Steam turned off: the switch is sent and the level is left alone.
+    cloudSteamLevel = 0;
+    confirmWith(R"({"code":"CMSteamBoilerLevel","output":{"status":"Off","enabled":false,"targetLevel":"Level2"}})");
+    assert(apply(false, 3) && steamWrites == steamBefore + 2);
+    assert(cloudSteam == LaMarzoccoSteamSwitch::OFF && cloudSteamLevel == 0);
+    // A machine that sets steam by temperature (Linea Mini) gets the switch only.
+    const std::string mini = frame(R"({"code":"CMSteamBoilerTemperature","output":{"status":"Off","enabled":false}})");
+    service.published_.steamLevel = LaMarzoccoSteamLevel::UNKNOWN;  // As a fresh Mini.
+    deliver(service, observation(service, mini.c_str()));
+    assert(service.published_.steamLevel == LaMarzoccoSteamLevel::UNKNOWN &&
+           service.published_.steamSwitch == LaMarzoccoSteamSwitch::OFF);
+    confirmWith(R"({"code":"CMSteamBoilerTemperature","output":{"status":"HeatingUp","enabled":true}})");
+    assert(apply(true, 3) && steamWrites == steamBefore + 3);
+    assert(cloudSteam == LaMarzoccoSteamSwitch::ON && cloudSteamLevel == 0);
+    assert(temperatureWrites == temperatureBefore && dashboardReads == readsBefore);
     service.stopWebSocket(true);
     delete service.work_;
   }
@@ -1573,7 +1660,7 @@ struct LaMarzoccoWebSocketTest {
     OpenBrewByWeightLaMarzoccoService service;
     service.config_.accountConfigured = true;
     std::strcpy(service.config_.selectedSerial, "synthetic");
-    service.config_.options |= LA_MARZOCCO_APPLY_TEMPERATURE;
+    service.config_.options |= LA_MARZOCCO_APPLY_MACHINE_SETTINGS;
     service.staConnected_.store(true);
     service.tokenAvailable_.store(true);
     service.tokenIssuedAtMs_.store(millis());
@@ -1583,7 +1670,7 @@ struct LaMarzoccoWebSocketTest {
     assert(service.backflush(true).busy());
     service.task_ = reinterpret_cast<TaskHandle_t>(1);
     LaMarzoccoRequest request;
-    request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
+    request.type = LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
     request.presetId = 1;
     request.targetDeciC = LA_MARZOCCO_BREW_TARGET_MIN_DECI_C;
     withMuxHeld(service, [&] {
@@ -1727,7 +1814,7 @@ struct LaMarzoccoWebSocketTest {
   }
   static void direct(OpenBrewByWeightLaMarzoccoService &service) {
     service.config_.accountConfigured = true;
-    service.config_.options |= LA_MARZOCCO_APPLY_TEMPERATURE | LA_MARZOCCO_POWER_ON_WITH_SCALE |
+    service.config_.options |= LA_MARZOCCO_APPLY_MACHINE_SETTINGS | LA_MARZOCCO_POWER_ON_WITH_SCALE |
         LA_MARZOCCO_SHUTDOWN_WITH_SCALE;
     std::strcpy(service.config_.selectedSerial, "synthetic");
     service.published_.connectionFreshness = true;
@@ -2216,7 +2303,7 @@ struct LaMarzoccoWebSocketTest {
     uint32_t requestId = 100;
     const auto temperature = [&](uint16_t targetDeciC) {
       LaMarzoccoRequest request;
-      request.type = LaMarzoccoRequestType::APPLY_TEMPERATURE;
+      request.type = LaMarzoccoRequestType::APPLY_MACHINE_SETTINGS;
       request.presetId = 1;
       request.targetDeciC = targetDeciC;
       request.requestId = ++requestId;
@@ -2399,6 +2486,7 @@ int main() {
   openbrewbyweight::LaMarzoccoWebSocketTest::renewalKeepsSubscription();
   openbrewbyweight::LaMarzoccoWebSocketTest::initialSynchronization();
   openbrewbyweight::LaMarzoccoWebSocketTest::commandsSkipUnchangedMachineState();
+  openbrewbyweight::LaMarzoccoWebSocketTest::presetSteamSettingsSendOnlyDifferences();
   openbrewbyweight::LaMarzoccoWebSocketTest::backflushContract();
   openbrewbyweight::LaMarzoccoWebSocketTest::backflushReleasedAfterLostLink();
   openbrewbyweight::LaMarzoccoWebSocketTest::backflushReleasedOnUnrecognizedStatus();

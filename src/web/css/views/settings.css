@@ -165,7 +165,9 @@ html:not(.momentaryMachine) .switchOnly {
 }
 
 html:not(.laMarzoccoIntegration) .laMarzoccoOnly,
-html:not(.laMarzoccoTemperatureEnabled) .laMarzoccoTempOpt {
+html:not(.laMarzoccoMachineSettings) .laMarzoccoMachineOpt,
+html:not(.laMarzoccoTemperatureEnabled) .laMarzoccoTempOpt,
+html:not(.laMarzoccoSteamByLevel) .laMarzoccoSteamLevelOpt {
   display: none !important;
 }
 

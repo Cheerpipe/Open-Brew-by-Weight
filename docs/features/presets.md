@@ -166,20 +166,16 @@ without changing its target or learned values, and the scale-loss backup, cup
 protection and accidental touch are shared settings.
 Save remains bound to the preset whose fields were loaded into the form; an
 asynchronous active-preset change cannot redirect those values to another recipe.
-The Linea Micra brew target accepts the range the machine itself reports
-through La Marzocco's cloud (80.0–100.0 °C on a Linea Micra) in 0.1 °C steps,
-and defaults to 93.0 °C for new and factory-reset recipes. The field appears
-once the connected account has read that range; without a connection there is
-no range and no brew temperature to set or send. A preset whose saved value
-the range no longer allows keeps it, and the machine gets the nearest value
-it accepts; see [Linea Micra settings](../settings/linea-micra.md#brew-temperature-in-presets). Duplicating a preset copies this value;
-disabling the option or disconnecting the Micra account does not erase it. See
-[Linea Micra settings](../settings/linea-micra.md).
-With a connected Micra account and **Set the brew temperature in each preset**
-enabled, a persisted active-preset change applies that value through the cloud.
-A scale connection reapplies the active value. Shot or scale-connection activity
-defers the request, rapid changes keep only the newest target, and success is
-reported only after the Micra dashboard confirms the same temperature.
+With a Linea Micra account connected and **Machine settings in presets** on,
+each preset also has a **Machine** group with the brew temperature, the steam
+boiler on or off, and the steam power (level 1–3). New and factory-reset
+presets start at 91.0 °C with steam on at level 3; duplicating a preset copies
+these values, and turning the option off or disconnecting the account does not
+erase them. Choosing a preset, saving a change to the active one, or
+connecting the scale sends the Micra only the settings it doesn't already
+have, never during a shot or while the scale connects. The brew temperature
+stays inside the range the machine reports (80.0–100.0 °C on a Linea Micra);
+see [machine settings in presets](../settings/linea-micra.md#machine-settings-in-presets).
 
 ## Factory recipes
 

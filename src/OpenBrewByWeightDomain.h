@@ -1707,6 +1707,8 @@ struct WebCommand {
   uint8_t presetId = 0;
   bool laMarzoccoBrewTargetSpecified = false;
   uint16_t laMarzoccoBrewTargetDeciC = 0;
+  int8_t laMarzoccoSteamEnabled = -1;  // Negative means omitted.
+  uint8_t laMarzoccoSteamLevel = 0;    // Zero means omitted.
   char presetName[24] = {};
   bool persistPresets = false;
   bool bbwBaselineSpecified = true;

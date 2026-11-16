@@ -103,13 +103,14 @@ class OpenBrewByWeightLaMarzoccoService {
     bool initialSnapshot = false;
     bool present = false;
   };
+  // A preset's machine settings (brew target and steam) to apply.
   struct DesiredTemperature {
     LaMarzoccoRequest request = {};
     uint32_t machineConfigGeneration = 0;
     uint32_t retryAtMs = 0;
     uint8_t cycles = 0;  // Exhausted cycles while the machine was online.
     bool present = false;
-    bool commandAccepted = false;
+    uint8_t accepted = 0;  // Settings whose command the cloud accepted.
   };
   struct DesiredPower {
     LaMarzoccoRequest request = {};
@@ -179,8 +180,8 @@ class OpenBrewByWeightLaMarzoccoService {
   bool readDashboard(const LaMarzoccoPersistedSettings &settings,
                      LaMarzoccoStatus &result,
                      const LaMarzoccoObservationStamp *snapshot = nullptr);
-  bool writeTemperature(const LaMarzoccoPersistedSettings &settings,
-                        uint16_t targetDeciC);
+  bool writePresetSetting(const LaMarzoccoPersistedSettings &settings, uint8_t setting,
+                          uint16_t value);
   bool writeStandby(const LaMarzoccoPersistedSettings &settings);
   bool writePowerOn(const LaMarzoccoPersistedSettings &settings);
   bool acceptPolicy(const LaMarzoccoPersistedSettings &settings);
@@ -199,7 +200,9 @@ class OpenBrewByWeightLaMarzoccoService {
   bool networkEligible(LaMarzoccoError &error, bool observation = false) const;
   LaMarzoccoStatus statusLocked() const;
   bool liveSubscriptionLocked() const;
-  bool pushConfirms(uint16_t targetDeciC, LaMarzoccoPowerState power);
+  // Settings (`pending` non-zero) or power, as a live subscription pushes them.
+  bool pushConfirms(uint8_t pending, const LaMarzoccoRequest &request, uint16_t targetDeciC,
+                    LaMarzoccoPowerState power);
   bool queueLocked(const LaMarzoccoRequest &request);
   void qualifyBackflushLocked();
   bool backflushReadyLocked() const;

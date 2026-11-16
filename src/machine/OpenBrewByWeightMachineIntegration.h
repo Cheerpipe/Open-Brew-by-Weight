@@ -22,10 +22,12 @@ enum class MachinePhysicalStartDisposition : uint8_t {
   BLOCKED_CLEANING
 };
 
-// A preset's machine brew temperature target.
-struct PresetTemperature {
+// A preset's machine settings: brew target, steam boiler on/off and level.
+struct PresetMachineSettings {
   uint8_t presetId;
   uint16_t targetDeciC;
+  bool steamEnabled;
+  uint8_t steamLevel;
 };
 
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
@@ -45,8 +47,10 @@ inline uint32_t hostMachineTemperatureRequestCount = 0;
 inline uint8_t hostMachineTemperaturePresetId = 0;
 inline uint32_t hostMachineTemperatureGeneration = 0;
 inline uint16_t hostMachineTemperatureTargetDeciC = 0;
-inline void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
-                                                       uint32_t configGeneration) {
+inline PresetMachineSettings hostMachineSettings{};
+inline void requestMachineIntegrationPresetSettings(PresetMachineSettings preset,
+                                                    uint32_t configGeneration) {
+  hostMachineSettings = preset;
   ++hostMachineTemperatureRequestCount;
   hostMachineTemperaturePresetId = preset.presetId;
   hostMachineTemperatureGeneration = configGeneration;
@@ -109,8 +113,8 @@ void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
 // optimistic overlay) for the control task's power policy; UNKNOWN when the
 // integration cannot tell. Reads the cached status poll, never blocks.
 MachinePower machineIntegrationPowerState();
-void requestMachineIntegrationPresetTemperature(PresetTemperature preset,
-                                                uint32_t configGeneration);
+void requestMachineIntegrationPresetSettings(PresetMachineSettings preset,
+                                             uint32_t configGeneration);
 // The integration's current coffee target in deci-Celsius for the shot
 // record's snapshot, taken on the control task at the shot's end; 0 when no
 // integration reports a valid target.

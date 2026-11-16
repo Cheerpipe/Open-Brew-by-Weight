@@ -46,7 +46,8 @@ output.mkdir(parents=True, exist_ok=True)
                "physicalStartLocked", "post", "applyPostedLocked", "publish",
                "fail")) + "\n")
 (output / "la_marzocco_websocket_commands.inc").write_text(
-    "\n".join([definition("sameCommandRequest"), definition("commandFailure")] +
+    "\n".join([definition("sameCommandRequest"), definition("commandFailure"),
+               definition("presetSettingName"), definition("logPresetSettingsSkipped")] +
               [definition("OpenBrewByWeightLaMarzoccoService::" + name) for name in
               ("temperatureRequestCurrent", "powerRequestCurrent", "pushConfirms",
                "temperatureEligible", "deferTemperature", "deferPower",

@@ -449,10 +449,12 @@ function applyLaMarzoccoStatus(s) {
   // one there is no range and no brew temperature to set.
   const coffee = m.boiler?.coffee || {},
     ranged = coffee.targetMinDeciC > 0 && coffee.targetMaxDeciC > coffee.targetMinDeciC;
-  document.documentElement.classList.toggle(
-    "laMarzoccoTemperatureEnabled",
-    m.applyTemperature && m.accountConfigured && ranged,
-  );
+  const root = document.documentElement.classList,
+    machineSettings = m.applyTemperature && m.accountConfigured;
+  root.toggle("laMarzoccoMachineSettings", machineSettings);
+  root.toggle("laMarzoccoTemperatureEnabled", machineSettings && ranged);
+  // Steam power is a level only on machines that set steam by level.
+  root.toggle("laMarzoccoSteamByLevel", /^level_[123]$/.test(m.boiler?.steam?.level || ""));
   if (ranged && $("laMarzoccoBrewTargetC")) {
     $("laMarzoccoBrewTargetC").min = coffee.targetMinDeciC / 10;
     $("laMarzoccoBrewTargetC").max = coffee.targetMaxDeciC / 10;
@@ -839,7 +841,7 @@ const BREW_FIELD_TEXT = {
       __WEBUI_TEXT__("runtime.s"),
       "limits",
     ],
-    laMarzoccoBrewTargetC: [__WEBUI_TEXT__("runtime.brew_temperature"), "°C"],
+    laMarzoccoBrewTargetC: [__WEBUI_TEXT__("runtime.brew_temperature"), "°C", "presetMachine"],
     fastBeforeS: [__WEBUI_TEXT__("runtime.window_start"), __WEBUI_TEXT__("runtime.s"), "recipe"],
     fastMarginG: [__WEBUI_TEXT__("runtime.fast_margin"), __WEBUI_TEXT__("runtime.g"), "fast"],
     slowAfterS: [__WEBUI_TEXT__("runtime.window_end"), __WEBUI_TEXT__("runtime.s"), "recipe"],
@@ -856,6 +858,7 @@ const BREW_FIELD_TEXT = {
   },
   BREW_SECTION_TEXT = {
     recipe: __WEBUI_TEXT__("settings.recipe"),
+    presetMachine: __WEBUI_TEXT__("settings.machine"),
     fast: __WEBUI_TEXT__("settings.fast_shots"),
     slow: __WEBUI_TEXT__("settings.slow_shots"),
     limits: __WEBUI_TEXT__("settings.shot_limits"),
@@ -1061,6 +1064,12 @@ function brewPayload() {
     ...(document.documentElement.classList.contains("laMarzoccoTemperatureEnabled") &&
     editedBrewFields().has("laMarzoccoBrewTargetC")
       ? { laMarzoccoBrewTargetC: R.number("laMarzoccoBrewTargetC") }
+      : {}),
+    ...(document.documentElement.classList.contains("laMarzoccoMachineSettings")
+      ? {
+          laMarzoccoSteamEnabled: $("laMarzoccoSteamEnabled").checked,
+          laMarzoccoSteamLevel: Number($("laMarzoccoSteamLevel").value),
+        }
       : {}),
   };
 }
@@ -2081,8 +2090,20 @@ const GROUP_SUMMARIES = {
     ]
       .filter(Boolean)
       .join(" + ") || OFF,
+  presetMachine: () =>
+    [
+      document.documentElement.classList.contains("laMarzoccoTemperatureEnabled") &&
+        val("laMarzoccoBrewTargetC") + " °C",
+      !on("laMarzoccoSteamEnabled")
+        ? __WEBUI_TEXT__("settings.sum_steam_off")
+        : document.documentElement.classList.contains("laMarzoccoSteamByLevel")
+          ? R.sub(__WEBUI_TEXT__("settings.sum_steam_level"), [$("laMarzoccoSteamLevel").value])
+          : __WEBUI_TEXT__("settings.sum_steam_on"),
+    ]
+      .filter(Boolean)
+      .join(" · "),
   laMarzoccoPresets: () =>
-    on("laMarzoccoApplyTemperature") ? __WEBUI_TEXT__("settings.sum_sets_temperature") : OFF,
+    on("laMarzoccoApplyTemperature") ? __WEBUI_TEXT__("settings.sum_sends_machine_settings") : OFF,
   paddle: () => picked("paddleMode"),
   switch: () =>
     $("momentaryStartEdge").value === "release"

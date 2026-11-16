@@ -117,6 +117,8 @@ inline bool validateShotPresetRecipe(const ShotPreset &preset,
       !validBbwAlpha(preset.bbwAlphaBaseline) || preset.bbwAlphaLearned > 1 ||
       preset.laMarzoccoBrewTargetDeciC < LA_MARZOCCO_BREW_TARGET_MIN_DECI_C ||
       preset.laMarzoccoBrewTargetDeciC > LA_MARZOCCO_BREW_TARGET_MAX_DECI_C ||
+      preset.laMarzoccoSteamLevel < 1 ||
+      preset.laMarzoccoSteamLevel > LA_MARZOCCO_STEAM_LEVEL_MAX ||
       preset.doseDg < MIN_DOSE_DG || preset.doseDg > MAX_DOSE_DG ||
       !std::isfinite(preset.bbwEwmaOffsetG) || preset.bbwEwmaOffsetG < 0.0f ||
       preset.bbwEwmaOffsetG > MAX_OFFSET_G) return false;

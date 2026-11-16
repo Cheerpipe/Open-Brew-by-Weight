@@ -165,7 +165,8 @@ bool OpenBrewByWeightLaMarzoccoService::companionCommand(LaMarzoccoCompanionComm
     work_->httpStatus = accepted ? 200 : http;
   }
   if (!accepted && millis() - lastLogAtMs >= kCompanionLogPeriodMs) {
-    static constexpr const char *names[] = {"none", "temp", "standby", "on", "refresh"};
+    static constexpr const char *names[] = {"none",    "temp",  "standby",   "on",
+                                            "refresh", "steam", "steamlevel"};
     lastLogAtMs = millis();
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
                          "La Marzocco companion command %s %s http=%u",

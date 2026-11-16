@@ -699,7 +699,7 @@ struct PendingPresetPersistence {
   uint32_t requestId = 0;
   uint32_t revision = 0;
   bool notifyPresets = false;
-  bool applyMachineTemperature = false;
+  bool applyMachineSettings = false;
 };
 PendingPresetPersistence pendingPresetPersistence;
 bool quickSettingsPersistPending = false;
@@ -1169,10 +1169,12 @@ RuntimeConfig effectiveRuntimeConfig() {
                                      composeEffectiveConfig(runtimeConfig, presetBank));
 }
 
-void requestActivePresetMachineTemperature() {
+void requestActivePresetMachineSettings() {
   const ShotPreset &preset = activeShotPreset(presetBank);
-  requestMachineIntegrationPresetTemperature({preset.id, preset.laMarzoccoBrewTargetDeciC},
-                                             runtimeConfig.revision);
+  requestMachineIntegrationPresetSettings({preset.id, preset.laMarzoccoBrewTargetDeciC,
+                                           preset.laMarzoccoSteamEnabled,
+                                           preset.laMarzoccoSteamLevel},
+                                          runtimeConfig.revision);
 }
 
 bool scaleAvailable() {

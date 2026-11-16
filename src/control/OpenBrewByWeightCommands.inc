@@ -496,6 +496,10 @@ void processWebCommand(const WebCommand &command) {
           if (command.laMarzoccoBrewTargetSpecified)
             candidateRecipe.laMarzoccoBrewTargetDeciC =
                 command.laMarzoccoBrewTargetDeciC;
+          if (command.laMarzoccoSteamEnabled >= 0)
+            candidateRecipe.laMarzoccoSteamEnabled = command.laMarzoccoSteamEnabled != 0;
+          if (command.laMarzoccoSteamLevel != 0)
+            candidateRecipe.laMarzoccoSteamLevel = command.laMarzoccoSteamLevel;
           if (!command.bbwBaselineSpecified)
             candidateRecipe.weightOffsetBaselineG = preset->weightOffsetBaselineG;
           if (command.bbwAlphaBaseline != 0)
@@ -589,10 +593,11 @@ void processWebCommand(const WebCommand &command) {
       commitLiveRuntimeConfig(candidate, RUNTIME_PERSIST_REASON_USER);
       const ShotPreset &beforeActive = activeShotPreset(quickBefore.presets);
       const ShotPreset &afterActive = activeShotPreset(presetBank);
-      const bool applyMachineTemperature =
+      const bool applyMachineSettings =
           beforeActive.id != afterActive.id ||
-          beforeActive.laMarzoccoBrewTargetDeciC !=
-              afterActive.laMarzoccoBrewTargetDeciC;
+          beforeActive.laMarzoccoBrewTargetDeciC != afterActive.laMarzoccoBrewTargetDeciC ||
+          beforeActive.laMarzoccoSteamEnabled != afterActive.laMarzoccoSteamEnabled ||
+          beforeActive.laMarzoccoSteamLevel != afterActive.laMarzoccoSteamLevel;
       RecipeSnapshot quickAfter;
       quickAfter.presets = presetBank;
       quickAfter.runtime = runtimeConfig;
@@ -600,7 +605,7 @@ void processWebCommand(const WebCommand &command) {
           quickSettingsSnapshot(quickBefore), quickSettingsSnapshot(quickAfter));
       pendingPresetPersistence = {command.requestId, candidate.revision,
                                   presetChanged,
-                                  applyMachineTemperature};
+                                  applyMachineSettings};
       reportControlCommandResult(command, CommandResultState::APPLIED);
       return;
     }

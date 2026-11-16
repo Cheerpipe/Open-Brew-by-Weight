@@ -161,7 +161,7 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
                shotLogScaleLossSourceJson(static_cast<uint8_t>(control.scaleLossProjectedSource << 3)));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   fields.field("laMarzocco.selectedSerial", "\"%s\"", serial);
-  fields.field("laMarzocco.applyTemperature", bool(options & LA_MARZOCCO_APPLY_TEMPERATURE));
+  fields.field("laMarzocco.applyTemperature", bool(options & LA_MARZOCCO_APPLY_MACHINE_SETTINGS));
   fields.field("laMarzocco.recognizeWakeGesture", bool(options & LA_MARZOCCO_RECOGNIZE_WAKE));
   fields.field("laMarzocco.powerOnWithScale", bool(options & LA_MARZOCCO_POWER_ON_WITH_SCALE));
   fields.field("laMarzocco.shutdownWithScale", bool(options & LA_MARZOCCO_SHUTDOWN_WITH_SCALE));

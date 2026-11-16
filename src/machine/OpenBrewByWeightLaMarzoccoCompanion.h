@@ -15,7 +15,9 @@ struct cJSON;
 namespace openbrewbyweight {
 
 enum class LaMarzoccoCompanionStateKind : uint8_t { FULL, PUSH, READ };
-enum class LaMarzoccoCompanionCommandOp : uint8_t { NONE, TEMPERATURE, STANDBY, POWER_ON, REFRESH };
+enum class LaMarzoccoCompanionCommandOp : uint8_t {
+  NONE, TEMPERATURE, STANDBY, POWER_ON, REFRESH, STEAM, STEAM_LEVEL
+};
 enum class LaMarzoccoCompanionRoute : uint8_t { DIRECT, PENDING, COMPANION };
 
 // What the service wants the link to send. The link resends the whole
