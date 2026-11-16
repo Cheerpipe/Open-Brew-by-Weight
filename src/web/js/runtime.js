@@ -2651,7 +2651,7 @@ function noteFirmwareFlash(flash) {
 }
 // Cards the controller dismisses for every browser and address: the
 // firmware image and rolled back image acknowledged, the ignored grind
-// advice, the Only my scale suggestion, and the Wi-Fi change result. The page hides a card at once; the
+// advice, the Home notes, and the Wi-Fi change result. The page hides a card at once; the
 // status confirms it.
 let dismissed = { image: "", rollback: "", grind: [] };
 function dismissOnController(card, key) {
@@ -7424,7 +7424,8 @@ function liveShotDash(d, model, m) {
         prev?.firstDropS ? sub(__WEBUI_TEXT__("shell.live_last"), [strong(prev.firstDropS)]) : "",
       );
 }
-// Home hint cards dismissed in this browser only (see dismissOnController).
+// Home cards dismissed in this browser only: the scale recording card, and
+// notes dismissed before the controller kept them (see dismissOnController).
 function cardDismissed(key) {
   try {
     return localStorage.getItem(key) || "";

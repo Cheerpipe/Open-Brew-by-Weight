@@ -1574,7 +1574,9 @@ void p91c_card_dismissals_validate_order_and_persist() {
   CHECK(cardIgnoreGrind(d, "20:1:vary:"));
   for (const char *entry : d.grind) CHECK(cardGrindPreset(entry) != 3);
 
-  d.scaleOnly = 1;
+  CHECK(cardNoteBit("scaleOnly") == 1 && cardNoteBit("laMarzoccoCloud") == 8 &&
+        cardNoteBit("grind") == 0 && cardNoteBit("") == 0);
+  d.notes = cardNoteBit("recipe") | cardNoteBit("companionPair");
   CardDismissals loaded;
   CHECK(loadCardDismissals(loaded) == SettingsBlobLoad::MISSING);
   CHECK(saveCardDismissals(d));
@@ -1585,10 +1587,10 @@ void p91c_card_dismissals_validate_order_and_persist() {
   d.checksum = cardDismissalsChecksum(d);
   persistence_host::putRaw(SETTINGS_NAMESPACE, CARD_DISMISSALS_KEY, &d, sizeof(d));
   CHECK(loadCardDismissals(loaded) == SettingsBlobLoad::INVALID);
-  CHECK(loaded.image[0] == '\0' && loaded.grind[0][0] == '\0' && loaded.scaleOnly == 0);
-  // Only my scale holds 0 or 1; anything else is a corrupt record.
+  CHECK(loaded.image[0] == '\0' && loaded.grind[0][0] == '\0' && loaded.notes == 0);
+  // A bit no note stands for is a corrupt record.
   strcpy(d.grind[0], "3:41:vary:");
-  d.scaleOnly = 2;
+  d.notes = 1U << CARD_NOTE_COUNT;
   d.checksum = cardDismissalsChecksum(d);
   persistence_host::putRaw(SETTINGS_NAMESPACE, CARD_DISMISSALS_KEY, &d, sizeof(d));
   CHECK(loadCardDismissals(loaded) == SettingsBlobLoad::INVALID);

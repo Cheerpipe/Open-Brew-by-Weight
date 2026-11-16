@@ -212,18 +212,19 @@
       codeIncludes(blockAt(rawRuntimeJs, 'function setInactiveHint(text) {'), 'h.dataset.d||=h.textContent'),
       'The direct takeover explains itself and the overlay keeps its own text');
   // Home cards show independently, each whenever its own condition holds, and
-  // none waits for another or for the grind hint. Dismissals other than access
-  // and Only my scale stay in the browser under the legacy card keys.
+  // none waits for another or for the grind hint. The controller keeps every
+  // dismissal; one left in the browser under a legacy card key is handed over.
   const order = ['laMarzoccoPolicyHint', 'laMarzoccoAccountHint', 'companionHint', 'companionPairHint', 'accessHint', 'laMarzoccoCloudHint',
     'recipeHint', 'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
   for (const id of order) nodes[id] = {hidden: true};
   const $ = (id) => nodes[id] ||= {textContent: '', hidden: false,
     classList: {toggle() {}, add() {}, remove() {}, contains: () => false}};
-  const cards = new Map(), here = {companionHere: null};
+  const cards = new Map(), here = {companionHere: null}, posted = [];
   let recorded = false, pairable = false;
   const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, presetState: {items: []},
-    cardDismissed: (k) => cards.get(k) || '', dismissCard: (k, v = '1') => cards.set(k, v), shotRecorded: () => recorded,
+    cardDismissed: (k) => cards.get(k) || '', dismissCard: (k, v = '1') => cards.set(k, v),
+    dismissOnController: (card) => posted.push(card), shotRecorded: () => recorded,
     controlsMutable: true, uiState: here, companionHere: () => Promise.resolve(here.companionHere),
     companionPairable: () => pairable, sub: (t, a) => t + ':' + a.join(',')},
     document: {}, __LA_MARZOCCO__: false, __WEBUI_TEXT__: (key) => key};
@@ -261,15 +262,21 @@
       !partialHtml.home.includes('laMarzoccoPolicyHintDismiss'), 'The terms card offers Accept, no dismissal');
   assert.ok(partialHtml.home.includes('id="laMarzoccoAccountHint"') &&
       !partialHtml.home.includes('laMarzoccoAccountHintDismiss'), 'The account card sends to Settings, no dismissal');
-  // A preset change retires the recipe hint for good.
+  // A preset change retires the recipe hint for good, in every browser.
   recorded = false;
-  assert.deepEqual(shown({...noCloud, presetsTag: 8}), ['scaleOnlyHint']);
-  assert.equal(cards.get('obbwCard:recipe'), '1');
-  // The controller keeps the Only my scale dismissal for every browser.
-  assert.deepEqual(shown({...noCloud, presetsTag: 8, dismissed: {scaleOnly: true}}), []);
-  assert.ok(codeIncludes(viewJs.home, "if(id==='scaleOnlyHint')R.dismissOnController('scaleOnly')"),
-      'Dismissing Only my scale is sent to the controller');
-  fresh.dismissed = {scaleOnly: true};
+  shown({...noCloud, presetsTag: 8});
+  assert.deepEqual(posted.splice(0), ['recipe']);
+  const gone = {recipe: true, scaleOnly: true, companionPair: false, laMarzoccoCloud: false};
+  assert.deepEqual(shown({...noCloud, presetsTag: 9, dismissed: gone}), []);
+  assert.deepEqual(posted, [], 'A dismissed note is not sent again');
+  // A note dismissed in this browser before the controller kept it is handed over.
+  cards.set('obbwCard:laMarzoccoCloud', '1');
+  assert.deepEqual(shown({...fresh, dismissed: gone}), ['accessHint']);
+  assert.deepEqual(posted.splice(0), ['laMarzoccoCloud']);
+  cards.delete('obbwCard:laMarzoccoCloud');
+  assert.ok(codeIncludes(viewJs.home, '}else R.dismissOnController(cardName(id));'),
+      'Dismissing a note is sent to the controller');
+  fresh.dismissed = gone;
   // A page that came through an unpaired companion offers to pair it; the
   // request it sends then replaces that offer, with the code typed in Admin.
   pairable = true;
@@ -282,8 +289,8 @@
   here.companionHere = {name: 'nas', paired: false, pairing: {state: 'pending', code: '123456'}};
   assert.deepEqual(shown(asking), ['companionHint', 'accessHint', 'laMarzoccoCloudHint']);
   assert.match(nodes.companionHintText.textContent, /^Its code is .*:123456$/);
-  cards.set('obbwCard:companionPair', '1');
-  assert.deepEqual(shown(fresh), ['accessHint', 'laMarzoccoCloudHint'], 'the pairing offer can be dismissed in this browser');
+  fresh.dismissed = {...gone, companionPair: true};
+  assert.deepEqual(shown(fresh), ['accessHint', 'laMarzoccoCloudHint'], 'the pairing offer can be dismissed for every browser');
   pairable = false;
   nodes.grindHintCard.hidden = false;
   assert.deepEqual(shown(fresh), ['accessHint', 'laMarzoccoCloudHint'], 'the grind hint holds no card back');

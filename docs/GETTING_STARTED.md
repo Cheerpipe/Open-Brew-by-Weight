@@ -102,7 +102,7 @@ apply: whether to ask for a password, how to connect a Linea Micra to your La Ma
 a reminder to check your recipe before the first shot, and, once your scale is
 saved, the option to use only that scale. Each note has a button that takes
 you straight there and a **Dismiss** button. A dismissed note doesn't come back
-in that browser, and the password note doesn't come back on any phone. Notes
+on any phone or browser. Notes
 also leave on their own once you're done: the recipe note, for example, goes
 away after your first shot or when you change a recipe.
 

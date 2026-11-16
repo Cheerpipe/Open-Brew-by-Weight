@@ -2,7 +2,7 @@
 
 // Home cards dismissed once for every browser and address: the firmware image
 // and the rolled back image the owner acknowledged, each preset's ignored
-// grind advice, newest first, and the Only my scale suggestion. The network task owns it under dataMux_ and
+// grind advice, newest first, and each Home note (CARD_NOTES). The network task owns it under dataMux_ and
 // persists it as one blob; missing or invalid, nothing is dismissed. The
 // Wi-Fi change result it dismisses lives in RAM (NetworkStatusSnapshot).
 
@@ -19,6 +19,11 @@ namespace openbrewbyweight {
 constexpr uint32_t CARD_DISMISSALS_MAGIC = 0x43445331U;  // "CDS1"
 constexpr uint16_t CARD_DISMISSALS_VERSION = 1;
 constexpr const char *CARD_DISMISSALS_KEY = "cardDismissals";
+// Home notes dismissed once for good, one bit each in this order; the Web
+// UI names them after their cards (recipeHint -> "recipe").
+constexpr const char *CARD_NOTES[] = {"scaleOnly", "recipe", "companionPair",
+                                      "laMarzoccoCloud"};
+constexpr size_t CARD_NOTE_COUNT = sizeof(CARD_NOTES) / sizeof(CARD_NOTES[0]);
 // The image digest prefix the status shows ("runningImage").
 constexpr size_t CARD_IMAGE_CHARS = 16;
 // "<preset>:<segment>:<advice>:<tier>", the Web UI's identity of one advice.
@@ -31,8 +36,8 @@ struct CardDismissals {
   char image[CARD_IMAGE_CHARS + 1] = {};
   char rollback[CARD_IMAGE_CHARS + 1] = {};
   char grind[MAX_SHOT_PRESETS][CARD_GRIND_KEY_BYTES] = {};
-  uint8_t scaleOnly = 0;  // 1 once dismissed; older records hold 0 here
-  uint8_t reserved = 0;   // no padding: the checksum covers every byte
+  uint8_t notes = 0;     // CARD_NOTES bits; older records hold 0 here
+  uint8_t reserved = 0;  // no padding: the checksum covers every byte
   uint32_t checksum = 0;
 };
 static_assert(sizeof(CardDismissals) == 368, "cardDismissals blob layout changed");
@@ -68,12 +73,20 @@ inline bool validCardDismissals(const CardDismissals &dismissals) {
       dismissals.version != CARD_DISMISSALS_VERSION ||
       dismissals.structureSize != sizeof(CardDismissals) ||
       dismissals.checksum != cardDismissalsChecksum(dismissals) ||
-      dismissals.scaleOnly > 1 || !cardImageValid(dismissals.image) ||
+      (dismissals.notes >> CARD_NOTE_COUNT) != 0 || !cardImageValid(dismissals.image) ||
       !cardImageValid(dismissals.rollback)) {
     return false;
   }
   return std::all_of(std::begin(dismissals.grind), std::end(dismissals.grind),
                      [](const char *key) { return key[0] == '\0' || cardGrindPreset(key) != 0; });
+}
+
+// The CARD_NOTES bit a card name stands for, 0 for any other name.
+inline uint8_t cardNoteBit(const char *card) {
+  for (size_t i = 0; i < CARD_NOTE_COUNT; ++i) {
+    if (strcmp(card, CARD_NOTES[i]) == 0) return 1U << i;
+  }
+  return 0;
 }
 
 // Acknowledges a valid image prefix; returns whether it changed.

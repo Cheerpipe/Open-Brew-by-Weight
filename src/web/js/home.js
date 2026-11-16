@@ -99,12 +99,14 @@ export function applyStatus(s) {
 // lasting answer, and a key could not tell a new request from an old one.
 // A page that came through an unpaired companion offers to pair it; a request
 // coming or going refreshes that companion's own status (its code, its state).
-const cardKey = (id) => "obbwCard:" + id.replace(/Hint$/, "");
+const cardName = (id) => id.replace(/Hint$/, ""),
+  cardKey = (id) => "obbwCard:" + cardName(id);
 let companionAsked = false;
 function renderHints(s) {
   if (!s) return;
   // A preset change means the recipe has been looked at.
-  if (recipeTag && s.presetsTag !== recipeTag) R.dismissCard(cardKey("recipeHint"));
+  if (recipeTag && s.presetsTag !== recipeTag && !s.dismissed?.recipe)
+    R.dismissOnController("recipe");
   recipeTag = s.presetsTag;
   // A refused La Marzocco account blocks the machine link: shown first, no
   // dismissal, gone once the account works again.
@@ -153,16 +155,16 @@ function renderHints(s) {
     // Until the first shot is saved; unknown until the shot stream answers.
     ["recipeHint", R.shotRecorded() === false],
     // My scale first, with a scale already saved: it may still accept another.
-    [
-      "scaleOnlyHint",
-      s.config?.scaleMacCacheMode === "prefer" &&
-        !!s.scale?.preferredMac &&
-        !s.dismissed?.scaleOnly,
-    ],
+    ["scaleOnlyHint", s.config?.scaleMacCacheMode === "prefer" && !!s.scale?.preferredMac],
   ]) {
     const el = $(id);
     if (!el) continue;
-    el.hidden = !(want && !R.cardDismissed(cardKey(id)));
+    const name = cardName(id),
+      local = R.cardDismissed(cardKey(id));
+    // The controller keeps these notes for every browser; one dismissed here
+    // before it did is handed over.
+    if (local && s.dismissed?.[name] === false) R.dismissOnController(name);
+    el.hidden = !(want && !local && !s.dismissed?.[name]);
   }
   if ($("scaleOnlyHintUse")) $("scaleOnlyHintUse").disabled = !R.controlsMutable;
   // One card per recording: Stop while it runs, Delete once it is held.
@@ -431,12 +433,11 @@ export function init() {
       };
     if (!dismiss) continue;
     dismiss.onclick = () => {
-      // These choices are kept on the controller, so other phones skip them too.
+      // Dismissals are kept on the controller, so other phones skip them too.
       if (id === "accessHint") {
         accessHintClosed = true;
         R.api("/api/v1/auth/notice", { method: "POST", body: "{}" }).catch(() => {});
-      } else if (id === "scaleOnlyHint") R.dismissOnController("scaleOnly");
-      else R.dismissCard(cardKey(id));
+      } else R.dismissOnController(cardName(id));
       renderHints(R.homeStatusCache());
     };
   }

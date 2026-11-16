@@ -445,12 +445,12 @@ esp_err_t OpenBrewByWeightNetwork::authNoticeHandler(httpd_req_t *request) {
 // One Home card dismissed for every browser: {"card":"image"|"rollback"|
 // "grind","key":...} names the image prefix or advice key the page showed,
 // so a stale page can only dismiss what it showed; {"card":"wifi"} ends the
-// Wi-Fi change report and {"card":"scaleOnly"} the Only my scale suggestion.
+// Wi-Fi change report; a CARD_NOTES name dismisses that Home note.
 esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   esp_err_t sent = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (sent != ESP_OK) return sent;
-  char card[12] = {}, key[CARD_GRIND_KEY_BYTES] = {};
+  char card[16] = {}, key[CARD_GRIND_KEY_BYTES] = {};
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   static const char *const fields[] = {"card", "key"};
   const bool parsed = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 2) &&
@@ -468,9 +468,9 @@ esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
           image ? g_cardDismissals.image : g_cardDismissals.rollback, key);
     } else if (strcmp(card, "grind") == 0 && cardGrindPreset(key) != 0) {
       g_cardDismissalsDirty |= cardIgnoreGrind(g_cardDismissals, key);
-    } else if (strcmp(card, "scaleOnly") == 0) {
-      g_cardDismissalsDirty |= g_cardDismissals.scaleOnly == 0;
-      g_cardDismissals.scaleOnly = 1;
+    } else if (const uint8_t note = cardNoteBit(card)) {
+      g_cardDismissalsDirty |= (g_cardDismissals.notes & note) == 0;
+      g_cardDismissals.notes |= note;
     } else if (strcmp(card, "wifi") == 0) {
       self.status_.staChangeResult = "";
     } else {

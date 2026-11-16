@@ -243,17 +243,20 @@ static bool g_cardDismissalsDirty = false;
 // The dismissals as the status "dismissed" object, under dataMux_. Image
 // prefixes and advice keys are JSON safe once validated.
 static void formatCardDismissals(char *out, size_t cap) {
-  int used = snprintf(out, cap,
-                      "{\"image\":\"%s\",\"rollback\":\"%s\",\"scaleOnly\":%s,\"grind\":[",
-                      g_cardDismissals.image, g_cardDismissals.rollback,
-                      g_cardDismissals.scaleOnly ? "true" : "false");
+  int used = snprintf(out, cap, "{\"image\":\"%s\",\"rollback\":\"%s\",\"grind\":[",
+                      g_cardDismissals.image, g_cardDismissals.rollback);
+  const auto fits = [&] { return used >= 0 && static_cast<size_t>(used) < cap; };
   const char *separator = "";
   for (const char *key : g_cardDismissals.grind) {
-    if (key[0] == '\0' || used < 0 || static_cast<size_t>(used) >= cap) continue;
+    if (key[0] == '\0' || !fits()) continue;
     used += snprintf(out + used, cap - used, "%s\"%s\"", separator, key);
     separator = ",";
   }
-  if (used >= 0 && static_cast<size_t>(used) < cap) snprintf(out + used, cap - used, "]}");
+  for (size_t i = 0; i < CARD_NOTE_COUNT && fits(); ++i) {
+    used += snprintf(out + used, cap - used, "%s\"%s\":%s", i == 0 ? "]," : ",", CARD_NOTES[i],
+                     (g_cardDismissals.notes >> i) & 1U ? "true" : "false");
+  }
+  if (fits()) snprintf(out + used, cap - used, "}");
 }
 // Companion pairing, link and relay; dataMux_ guards it (network/OpenBrewByWeightCompanion.inc).
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionState g_companion;
