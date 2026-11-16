@@ -248,7 +248,7 @@ Source: `OpenBrewByWeightBrewTypes.h`, orchestrated in `openBrewByWeight.cpp`.
 | Activator ON (`REQUEST_START`) | User intent | From `READY`: `beginCycle`. May be held/blocked by no-scale or cup-start guards. |
 | `REQUEST_RINSE` | Machine (paddle short ON→OFF, momentary idle long-press, or web) | From `READY`: `beginRinseCycle` + timed `RINSE`. From `BREW` / `MANUAL_NO_SCALE`: demote to `RINSE`. The clock anchors to the machine run's start (the acceptance time for a fresh rinse), never to a raw GPIO edge. |
 | Activator OFF after rinse window | User intent | Natural mode: end shot (`EndReason::ACTIVATOR` → `READY`). Original/Auto BBW: may keep machine circuit closed (walk-away). `REQUEST_STOP` always ends a shot; it does not demote to rinse. |
-| Paddle ON during Original BBW | User intent | Promotes the rest of that shot to Natural (paddle OFF will then end it). |
+| Paddle ON after a release during Original/Auto BBW | User intent | Promotes the rest of that shot to Natural (paddle OFF will then end it). |
 | Weight cut due | Weight control | `finalizeCycle` with `SCALE_THRESHOLD` or a guard `EndReason`. |
 | Cup removed | Cup presence | Optional cut (`CUP_REMOVED`) if cup-stop is enabled. |
 | A→M deadline | Weight control suspended | Cut (`AUTO_TO_MANUAL_GUARD`) if the guard is enforced. |
@@ -418,9 +418,10 @@ reads GPIO, paddle mode, or machine type.
 Source: `OpenBrewByWeightMachineTypes.h`, `machinePollIntention()`. Latch TYPE=0
 maps GPIO + snapshotted `PaddleMode` onto these intents (Original/Auto
 omit `REQUEST_STOP` after the rinse window until an ON after that release
-promotes the shot to Natural). Each in-cycle edge also logs its result
-(`PADDLE_ENDS_SHOT`, `PADDLE_STARTS_RINSE`, `PADDLE_KEEPS_RUNNING`,
-`PADDLE_TO_NATURAL`) at INFO, which the shot trace keeps. A short ON→OFF with rinse
+promotes the shot to Natural). Outside a rinse, each in-shot edge also logs
+what it did (`PADDLE_ENDS_SHOT`, `PADDLE_STARTS_RINSE`, `PADDLE_KEEPS_RUNNING`,
+`PADDLE_TO_NATURAL`) at INFO, which the shot trace keeps; the ON of a Web cycle
+is reported by its `PHYSICAL_OVERRIDE` end instead. A short ON→OFF with rinse
 enabled publishes `REQUEST_RINSE`. Momentary maps a hold no longer than
 Single-press limit to start/stop (on press or on release). With rinse
 enabled, an idle long-press at the rinse gesture publishes `REQUEST_RINSE`

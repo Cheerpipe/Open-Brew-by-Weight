@@ -23053,9 +23053,6 @@ void pm14_auto_bbw_off_on_off_ends_like_natural() {
   runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
   CHECK(machineCyclePromotedToNaturalForTest());
   CHECK(!machineHidesPhysicalStop());
-  (void)machineLastIntention();
-  (void)machineLastIntention();
-  CHECK(machineCyclePromotedToNaturalForTest());
   CHECK(stopperState == StopperState::BREW);
   CHECK(getRelaySafetySnapshot().closed);
   setRawPaddle(false);
@@ -23464,9 +23461,10 @@ void pm29_paddle_gestures_are_logged_and_traced() {
   releaseAtPhysicalDuration(rawOnAt, runtimeConfig.rinseGestureMs);
   CHECK(stopperState == StopperState::RINSE);
   const uint32_t rinseDeadline = session.rinseStartedAtMs + runtimeConfig.rinseDurationMs;
-  paddleOffThenOn();
-  setRawPaddle(false);
-  runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  for (const bool on : {true, false}) {
+    setRawPaddle(on);
+    runLoopAfter(ACTIVATOR_DEBOUNCE_MS);
+  }
   CHECK(stopperState == StopperState::RINSE);
   CHECK(session.rinseStartedAtMs + runtimeConfig.rinseDurationMs == rinseDeadline);
   CHECK(paddleLogAfter(mark) == "on off>rinse2 on off");

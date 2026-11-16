@@ -19,7 +19,8 @@ Check, in order:
 
 Use the stop action for your physical switch/mode if the result is unexpected.
 In [Original](settings/paddle.md#original) and [Auto](settings/paddle.md#auto)
-paddle modes, OFF alone does not stop the shot: move the paddle ON, then OFF.
+paddle modes, OFF after the first second lets a weight-controlled shot carry
+on: to stop it, move the paddle ON, then OFF.
 
 ### The shot ended above or below target
 

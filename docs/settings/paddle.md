@@ -75,7 +75,7 @@ wall are held off. [Compatibility mode](firmware-mode.md) has no duration cap.
    behavior; the saved mode stays Auto.
 
 Unlike Original, Auto never holds back the weight stop while the paddle is ON,
-so the shot always finishes at your yield in either position.
+so weight control can finish the shot whichever way the paddle points.
 
 ## How K1 follows the paddle
 
