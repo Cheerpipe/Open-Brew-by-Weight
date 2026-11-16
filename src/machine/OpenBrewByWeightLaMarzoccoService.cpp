@@ -325,11 +325,10 @@ const char *presetSettingName(uint8_t setting) {
 void logPresetSettingsSkipped(const LaMarzoccoRequest &request, uint16_t target) {
   serialTraceCategoryf(LogLevel::INFO, DebugCategory::NETWORK,
                        "La Marzocco preset=%u settings already set (temperature %u.%u, "
-                       "steam %s, level %u), command skipped",
+                       "steam %s), command skipped",
                        static_cast<unsigned>(request.presetId),
                        static_cast<unsigned>(target / 10U), static_cast<unsigned>(target % 10U),
-                       request.steamEnabled ? "on" : "off",
-                       static_cast<unsigned>(request.steamLevel));
+                       request.steamEnabled ? "on" : "off");
 }
 
 // What authorizes a power command: a scale automation's own option bit for
@@ -1584,7 +1583,7 @@ void OpenBrewByWeightLaMarzoccoService::deferTemperature(
   lock.unlock();  // logging takes its own locks; never nest them in mux_
   if (error != LaMarzoccoError::CANCELED) {
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::NETWORK,
-                         "La Marzocco temperature request failed preset=%u target=%u.%u error=%s http=%u raw=%ld",
+                         "La Marzocco preset settings request failed preset=%u target=%u.%u error=%s http=%u raw=%ld",
                          static_cast<unsigned>(request.presetId),
                          static_cast<unsigned>(request.targetDeciC / 10U),
                          static_cast<unsigned>(request.targetDeciC % 10U),
@@ -1723,10 +1722,17 @@ bool OpenBrewByWeightLaMarzoccoService::executeTemperatureApplication(
     if ((companion || ensureSession(settings, false)) &&
         temperatureRequestCurrent(request, machineConfigGeneration)) {
       // A state not yet trusted (or a brew range not yet reported) is read
-      // before any command, so a setting the machine holds is never sent. The
-      // companion route has no read of its own and uses its pushed state. A
-      // failed read retries like a failed command.
-      if (!resolved && (companion || readDashboard(settings, verification))) {
+      // before any command, so a setting the machine holds is never sent. On
+      // the companion route the companion reads (`refresh`): its state
+      // arrives before its answer. A failed read retries like a failed command.
+      if (!resolved && (companion ? companionCommand(LaMarzoccoCompanionCommandOp::REFRESH, 0)
+                                  : readDashboard(settings, verification))) {
+        if (companion) {
+          TaskLockGuard lock(mux_);
+          verification = published_;
+          temperatureTrusted = observationFence_.temperatureTrusted;
+          steamTrusted = observationFence_.steamTrusted;
+        }
         if (target == 0)
           target = laMarzoccoSendableBrewTarget(verification, request.targetDeciC);
         pending = laMarzoccoPresetSettingsUnheld(verification, !companion || temperatureTrusted,
