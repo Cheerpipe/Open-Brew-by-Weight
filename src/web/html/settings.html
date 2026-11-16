@@ -726,11 +726,6 @@
               >{{webui:settings.recognize_wake_gesture_hint}}</small
             ></label
           ><label
-            ><input id="laMarzoccoScaleOffWithMachine" type="checkbox" checked />
-            {{webui:settings.turn_scale_off_with_machine}}<small class="fieldHint"
-              >{{webui:settings.turn_scale_off_with_machine_hint}}</small
-            ></label
-          ><label
             ><input id="laMarzoccoBoostScaleDetectionWhenOn" type="checkbox" checked />
             {{webui:settings.boost_scale_detection_when_machine_on}}<small class="fieldHint"
               >{{webui:settings.boost_scale_detection_when_machine_on_hint}}</small
@@ -766,6 +761,11 @@
               <option value="60">{{webui:settings.shutdown_grace_60s}}</option>
             </select></span
           ><small class="fieldHint">{{webui:settings.shutdown_grace_period_hint}}</small></label
+        ><label id="laMarzoccoScaleOffWrap"
+          ><input id="laMarzoccoScaleOffWithMachine" type="checkbox" checked />
+          {{webui:settings.turn_scale_off_with_machine}}<small class="fieldHint"
+            >{{webui:settings.turn_scale_off_with_machine_hint}}</small
+          ></label
         >
       </details>
       <details data-g="laMarzoccoPresets" class="cfgGroup">

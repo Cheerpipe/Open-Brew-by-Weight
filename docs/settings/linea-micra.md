@@ -77,9 +77,10 @@ The options are grouped under **Machine power**, **Scale automations** and
 you change it. **Sign in**, **Use this machine**, **(Change)** and
 **(Disconnect)** are actions of their own and also take effect immediately.
 
-The four options that rely on **Show power state** are listed under it. When
-**Show power state** is off they are dimmed and can't be changed, but keep
-their choices.
+The three options that rely on **Show power state** are listed under it.
+**Turn the scale off with the Micra**, under **Scale automations**, relies on it
+too. When **Show power state** is off these options are dimmed and can't be
+changed, but keep their choices.
 
 ### Change machine
 

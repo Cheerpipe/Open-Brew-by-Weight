@@ -577,11 +577,12 @@ function applyLaMarzoccoStatus(s) {
 }
 function updateLaMarzoccoDependentControls() {
   const canEdit = R.controlsMutable,
-    deps = $("laMarzoccoPowerDeps"),
     observe = $("laMarzoccoObserveState").checked,
     on = $("laMarzoccoShutdownWithScale").checked;
-  deps.classList.toggle("fieldOff", !observe);
-  deps.querySelectorAll("input").forEach((i) => (i.disabled = !canEdit || !observe));
+  for (const deps of [$("laMarzoccoPowerDeps"), $("laMarzoccoScaleOffWrap")]) {
+    deps.classList.toggle("fieldOff", !observe);
+    deps.querySelectorAll("input").forEach((i) => (i.disabled = !canEdit || !observe));
+  }
   $("laMarzoccoShutdownGrace").disabled = !canEdit || !on;
   $("laMarzoccoShutdownGraceWrap").classList.toggle("hidden", !on);
 }
@@ -2088,6 +2089,9 @@ const GROUP_SUMMARIES = {
     [
       on("laMarzoccoPowerOnWithScale") && __WEBUI_TEXT__("settings.sum_wake"),
       on("laMarzoccoShutdownWithScale") && __WEBUI_TEXT__("settings.sum_standby"),
+      on("laMarzoccoObserveState") &&
+        on("laMarzoccoScaleOffWithMachine") &&
+        __WEBUI_TEXT__("settings.sum_scale_off"),
     ]
       .filter(Boolean)
       .join(" + ") || OFF,

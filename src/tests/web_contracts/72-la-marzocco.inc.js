@@ -588,8 +588,9 @@ for (const id of ['dLaMarzoccoPower', 'dLaMarzoccoPowerValue', 'dLaMarzoccoMode'
     return n;
   };
   const get = id => { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); };
-  get('laMarzoccoPowerDeps').children = ['RecognizeWake', 'ScaleOffWithMachine', 'BoostScaleDetectionWhenOn',
+  get('laMarzoccoPowerDeps').children = ['RecognizeWake', 'BoostScaleDetectionWhenOn',
     'ReduceScaleScanningWhenOff'].map(id => get('laMarzocco' + id));
+  get('laMarzoccoScaleOffWrap').children = [get('laMarzoccoScaleOffWithMachine')];
   const commands = [];
   const rootClasses = new Set();
   let actionOk = true, polls = 0;
@@ -712,7 +713,8 @@ for (const id of ['dLaMarzoccoPower', 'dLaMarzoccoPowerValue', 'dLaMarzoccoMode'
     get('laMarzoccoApplyTemperature').checked = false;
     apply(connected);
     assert.strictEqual(get('laMarzoccoApplyTemperature').checked, false, 'Status must not overwrite unsaved edits');
-    assert(get('laMarzoccoPowerDeps').classes.has('fieldOff') && get('laMarzoccoRecognizeWake').disabled,
+    assert(get('laMarzoccoPowerDeps').classes.has('fieldOff') && get('laMarzoccoRecognizeWake').disabled &&
+        get('laMarzoccoScaleOffWrap').classes.has('fieldOff') && get('laMarzoccoScaleOffWithMachine').disabled,
         'Options that need the power state follow Show power state');
     const all = vm.runInContext('laMarzoccoPayload()', context);
     assert.strictEqual(all.applyTemperature, false);
