@@ -2651,12 +2651,12 @@ function noteFirmwareFlash(flash) {
 }
 // Cards the controller dismisses for every browser and address: the
 // firmware image and rolled back image acknowledged, the ignored grind
-// advice, and the Wi-Fi change result. The page hides a card at once; the
+// advice, the Only my scale suggestion, and the Wi-Fi change result. The page hides a card at once; the
 // status confirms it.
 let dismissed = { image: "", rollback: "", grind: [] };
 function dismissOnController(card, key) {
   if (card === "grind") dismissed.grind = [key, ...dismissed.grind];
-  else if (key) dismissed[card] = key;
+  else dismissed[card] = key || true;
   api("/api/v1/home/dismiss", {
     method: "POST",
     body: JSON.stringify(key ? { card, key } : { card }),

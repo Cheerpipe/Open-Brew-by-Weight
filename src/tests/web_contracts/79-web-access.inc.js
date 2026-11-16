@@ -213,7 +213,7 @@
       'The direct takeover explains itself and the overlay keeps its own text');
   // Home cards show independently, each whenever its own condition holds, and
   // none waits for another or for the grind hint. Dismissals other than access
-  // stay in the browser under the legacy card keys.
+  // and Only my scale stay in the browser under the legacy card keys.
   const order = ['laMarzoccoPolicyHint', 'laMarzoccoAccountHint', 'companionHint', 'companionPairHint', 'accessHint', 'laMarzoccoCloudHint',
     'recipeHint', 'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
@@ -265,8 +265,11 @@
   recorded = false;
   assert.deepEqual(shown({...noCloud, presetsTag: 8}), ['scaleOnlyHint']);
   assert.equal(cards.get('obbwCard:recipe'), '1');
-  cards.set('obbwCard:scaleOnly', '1');
-  assert.deepEqual(shown({...noCloud, presetsTag: 8}), []);
+  // The controller keeps the Only my scale dismissal for every browser.
+  assert.deepEqual(shown({...noCloud, presetsTag: 8, dismissed: {scaleOnly: true}}), []);
+  assert.ok(codeIncludes(viewJs.home, "if(id==='scaleOnlyHint')R.dismissOnController('scaleOnly')"),
+      'Dismissing Only my scale is sent to the controller');
+  fresh.dismissed = {scaleOnly: true};
   // A page that came through an unpaired companion offers to pair it; the
   // request it sends then replaces that offer, with the code typed in Admin.
   pairable = true;

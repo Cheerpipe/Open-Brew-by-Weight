@@ -445,7 +445,7 @@ esp_err_t OpenBrewByWeightNetwork::authNoticeHandler(httpd_req_t *request) {
 // One Home card dismissed for every browser: {"card":"image"|"rollback"|
 // "grind","key":...} names the image prefix or advice key the page showed,
 // so a stale page can only dismiss what it showed; {"card":"wifi"} ends the
-// Wi-Fi change report.
+// Wi-Fi change report and {"card":"scaleOnly"} the Only my scale suggestion.
 esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   esp_err_t sent = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
@@ -468,6 +468,9 @@ esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
           image ? g_cardDismissals.image : g_cardDismissals.rollback, key);
     } else if (strcmp(card, "grind") == 0 && cardGrindPreset(key) != 0) {
       g_cardDismissalsDirty |= cardIgnoreGrind(g_cardDismissals, key);
+    } else if (strcmp(card, "scaleOnly") == 0) {
+      g_cardDismissalsDirty |= g_cardDismissals.scaleOnly == 0;
+      g_cardDismissals.scaleOnly = 1;
     } else if (strcmp(card, "wifi") == 0) {
       self.status_.staChangeResult = "";
     } else {

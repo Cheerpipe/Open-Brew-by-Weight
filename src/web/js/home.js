@@ -153,7 +153,12 @@ function renderHints(s) {
     // Until the first shot is saved; unknown until the shot stream answers.
     ["recipeHint", R.shotRecorded() === false],
     // My scale first, with a scale already saved: it may still accept another.
-    ["scaleOnlyHint", s.config?.scaleMacCacheMode === "prefer" && !!s.scale?.preferredMac],
+    [
+      "scaleOnlyHint",
+      s.config?.scaleMacCacheMode === "prefer" &&
+        !!s.scale?.preferredMac &&
+        !s.dismissed?.scaleOnly,
+    ],
   ]) {
     const el = $(id);
     if (!el) continue;
@@ -426,11 +431,12 @@ export function init() {
       };
     if (!dismiss) continue;
     dismiss.onclick = () => {
-      // The access choice is kept on the controller, so other phones skip it too.
+      // These choices are kept on the controller, so other phones skip them too.
       if (id === "accessHint") {
         accessHintClosed = true;
         R.api("/api/v1/auth/notice", { method: "POST", body: "{}" }).catch(() => {});
-      } else R.dismissCard(cardKey(id));
+      } else if (id === "scaleOnlyHint") R.dismissOnController("scaleOnly");
+      else R.dismissCard(cardKey(id));
       renderHints(R.homeStatusCache());
     };
   }

@@ -243,8 +243,10 @@ static bool g_cardDismissalsDirty = false;
 // The dismissals as the status "dismissed" object, under dataMux_. Image
 // prefixes and advice keys are JSON safe once validated.
 static void formatCardDismissals(char *out, size_t cap) {
-  int used = snprintf(out, cap, "{\"image\":\"%s\",\"rollback\":\"%s\",\"grind\":[",
-                      g_cardDismissals.image, g_cardDismissals.rollback);
+  int used = snprintf(out, cap,
+                      "{\"image\":\"%s\",\"rollback\":\"%s\",\"scaleOnly\":%s,\"grind\":[",
+                      g_cardDismissals.image, g_cardDismissals.rollback,
+                      g_cardDismissals.scaleOnly ? "true" : "false");
   const char *separator = "";
   for (const char *key : g_cardDismissals.grind) {
     if (key[0] == '\0' || used < 0 || static_cast<size_t>(used) >= cap) continue;

@@ -1,8 +1,8 @@
 #pragma once
 
 // Home cards dismissed once for every browser and address: the firmware image
-// and the rolled back image the owner acknowledged, and each preset's ignored
-// grind advice, newest first. The network task owns it under dataMux_ and
+// and the rolled back image the owner acknowledged, each preset's ignored
+// grind advice, newest first, and the Only my scale suggestion. The network task owns it under dataMux_ and
 // persists it as one blob; missing or invalid, nothing is dismissed. The
 // Wi-Fi change result it dismisses lives in RAM (NetworkStatusSnapshot).
 
@@ -31,7 +31,8 @@ struct CardDismissals {
   char image[CARD_IMAGE_CHARS + 1] = {};
   char rollback[CARD_IMAGE_CHARS + 1] = {};
   char grind[MAX_SHOT_PRESETS][CARD_GRIND_KEY_BYTES] = {};
-  uint8_t reserved[2] = {};  // no padding: the checksum covers every byte
+  uint8_t scaleOnly = 0;  // 1 once dismissed; older records hold 0 here
+  uint8_t reserved = 0;   // no padding: the checksum covers every byte
   uint32_t checksum = 0;
 };
 static_assert(sizeof(CardDismissals) == 368, "cardDismissals blob layout changed");
@@ -67,7 +68,8 @@ inline bool validCardDismissals(const CardDismissals &dismissals) {
       dismissals.version != CARD_DISMISSALS_VERSION ||
       dismissals.structureSize != sizeof(CardDismissals) ||
       dismissals.checksum != cardDismissalsChecksum(dismissals) ||
-      !cardImageValid(dismissals.image) || !cardImageValid(dismissals.rollback)) {
+      dismissals.scaleOnly > 1 || !cardImageValid(dismissals.image) ||
+      !cardImageValid(dismissals.rollback)) {
     return false;
   }
   return std::all_of(std::begin(dismissals.grind), std::end(dismissals.grind),
