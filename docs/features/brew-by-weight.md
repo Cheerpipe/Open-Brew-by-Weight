@@ -95,10 +95,12 @@ appears while you are looking at the active preset.
 | **Learning speed** | Drip compensation | 0.30 | 0.01–1.00, applied with the field's **Set** key | How strongly each shot moves the drip correction. It may tune itself after about 20 shots; **Set** applies a new value at once and keeps the correction. |
 | **Stop after sustained weight** | Shared settings → Cup protection | ON | ON / OFF | A backup for a weight stop blocked by **Avoid accidental touch**. Fresh readings must stay above the applicable cut threshold for 1 second. Applies to every preset; takes effect on the next shot. |
 
-**Home → Presets** shows how each recipe cuts as three rows, for example
-**Before 27 s · Fast · up to 42 g**, **27–36 s · On recipe · 36 g** and
-**After 36 s · Slow · down to 33 g**; a side that is switched off reads
-**off**. The active recipe arrives expanded.
+**Home → Presets** shows how each recipe cuts, one line for each weight it can
+stop at, for example **Before 27 s · Up to 42 g**,
+**Between 27–36 s · Stops at 36 g** and **After 36 s · Down to 33 g**. A side
+that is switched off stops at the target, so it joins the target's line; a
+Fixed recipe shows a single line. See [Presets](presets.md). The active recipe
+arrives expanded.
 
 Fixed behavior (not separate settings):
 

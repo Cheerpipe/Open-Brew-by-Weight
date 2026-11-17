@@ -3971,54 +3971,82 @@ function renderPresetCards(targetId) {
     el.appendChild(card);
   }
 }
+// One row per distinct cut weight, so nothing reads "off": a side that is off
+// cuts at the target, so its time joins the target row. Fixed has one weight
+// and Manual (timer only) none.
 function guardRuleRows(m) {
-  const on = !!m && m.mode === "active",
-    off = __WEBUI_TEXT__("home.rule_off"),
-    f = (v) => (Number.isFinite(v) ? axisLabel(v, "g") : "\u2014");
+  if (!m || m.mode === "empty") return [];
+  const g = (v) => (Number.isFinite(v) ? axisLabel(v, "g") : "—"),
+    b = (v) => `<b>${g(v)}</b>`,
+    also = (text) => `<span class="guardAlso">${text}</span>`,
+    row = (c, icon, n, r) => {
+      const el = document.createElement("div"),
+        name = document.createElement("span"),
+        rule = document.createElement("span");
+      el.className = "guardRow " + c;
+      name.className = "guardName";
+      if (icon) {
+        const ico = document.createElement("i");
+        ico.setAttribute("aria-hidden", "true");
+        ico.innerHTML = `<svg><use href="#${icon}"/></svg>`;
+        name.append(ico);
+      }
+      name.append(n);
+      rule.className = "guardRule";
+      rule.innerHTML = r;
+      el.append(name, rule);
+      return el;
+    };
+  if (m.mode === "timerOnly")
+    return [
+      row(
+        "guardManual",
+        "g-manual",
+        __WEBUI_TEXT__("home.rule_manual"),
+        __WEBUI_TEXT__("home.rule_manual_hint"),
+      ),
+    ];
+  if (!m.fast && !m.slow)
+    return [
+      row(
+        "guardBbw guardFixed",
+        "",
+        g(m.goal),
+        sub(__WEBUI_TEXT__("home.rule_every_shot"), [g(m.goal)]),
+      ),
+    ];
+  const both = m.fast && m.slow;
   return [
-    [
-      "guardFast",
-      "g-fast",
-      __WEBUI_TEXT__("runtime.verdict_fast"),
-      on && sub(__WEBUI_TEXT__("home.rule_before"), [m.t1]),
-      on && m.fast && sub(__WEBUI_TEXT__("home.rule_fast"), [f(m.ceil)]),
-    ],
-    [
+    m.fast &&
+      row(
+        "guardFast",
+        "g-fast",
+        sub(__WEBUI_TEXT__("home.rule_before"), [m.t1]),
+        sub(__WEBUI_TEXT__("home.rule_fast"), [b(m.ceil)]),
+      ),
+    row(
       "guardBbw",
       "g-recipe",
-      __WEBUI_TEXT__("runtime.verdict_on_recipe"),
-      on && sub(__WEBUI_TEXT__("home.rule_between"), [m.t1, m.t2]),
-      on && f(m.goal),
-    ],
-    [
-      "guardSlow",
-      "g-slow",
-      __WEBUI_TEXT__("runtime.verdict_slow"),
-      on && sub(__WEBUI_TEXT__("home.rule_after"), [m.t2]),
-      on && m.slow && sub(__WEBUI_TEXT__("home.rule_slow"), [f(m.floor)]),
-    ],
-  ]
-    .map(([c, icon, label, when, detail]) => [
-      when || label,
-      c,
-      icon,
-      when ? label + " · " + (detail || off) : off,
-    ])
-    .map(([n, c, icon, r]) => {
-      const row = document.createElement("div");
-      row.className = "guardRow " + c;
-      const name = document.createElement("span");
-      name.className = "guardName";
-      const ico = document.createElement("i");
-      ico.setAttribute("aria-hidden", "true");
-      ico.innerHTML = `<svg><use href="#${icon}"/></svg>`;
-      name.append(ico, n);
-      const rule = document.createElement("span");
-      rule.className = "guardRule";
-      rule.textContent = r;
-      row.append(name, rule);
-      return row;
-    });
+      both
+        ? sub(__WEBUI_TEXT__("home.rule_between"), [m.t1, m.t2])
+        : m.slow
+          ? sub(__WEBUI_TEXT__("home.rule_until"), [m.t2])
+          : sub(__WEBUI_TEXT__("home.rule_from"), [m.t1]),
+      sub(__WEBUI_TEXT__("home.rule_stops_at"), [b(m.goal)]) +
+        (both
+          ? ""
+          : m.slow
+            ? also(sub(__WEBUI_TEXT__("home.rule_also_fast"), [m.t1]))
+            : also(sub(__WEBUI_TEXT__("home.rule_also_slow"), [m.t2]))),
+    ),
+    m.slow &&
+      row(
+        "guardSlow",
+        "g-slow",
+        sub(__WEBUI_TEXT__("home.rule_after"), [m.t2]),
+        sub(__WEBUI_TEXT__("home.rule_slow"), [b(m.floor)]),
+      ),
+  ].filter(Boolean);
 }
 function renderHomePresetAccordion() {
   const el = $("homePresetAcc");
@@ -4114,6 +4142,8 @@ function renderHomePresetAccordion() {
       // Past arrivals, as in Settings, while the target is the saved one they were judged against.
       arrivals = m.goal === saved.goal ? p.arrivalsS || [] : [];
     const rows = guardRuleRows(m);
+    // Manual has no cut line to chart, so it shows no graph toggle.
+    if (item.classList.toggle("noGraph", m.mode !== "active")) item.classList.remove("full");
     // The active preset's target opens the quick-weight sheet.
     if (p.id === presetState.activeId && m.mode === "active") {
       const pen = document.createElement("button");
@@ -4123,7 +4153,9 @@ function renderHomePresetAccordion() {
       pen.setAttribute("aria-label", pen.title);
       pen.innerHTML =
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
-      rows[1].lastChild.append(pen);
+      const at = rows.find((r) => r.classList.contains("guardBbw")),
+        w = at.querySelector(".guardRule b");
+      w ? w.after(pen) : at.firstChild.append(pen);
     }
     item.lastChild.firstChild.firstChild.replaceChildren(...rows);
     const graph = item.querySelector(".presetAccGraph");

@@ -44,7 +44,7 @@ if (firmware.indexOf('publishLogLevels(runtimeConfig)',
     !codeIncludes(ui, 'e.currentTarget.ariaExpanded = item.classList.toggle("full")') ||
     !codeIncludes(ui, 'if (!active) item.classList.remove("full", "held")') ||
     !css.includes('.guardFast i{color:var(--gFast)}') ||
-    !css.includes('.guardBbw i{color:var(--ok)}') ||
+    !/\.guardBbw i\{color:color-mix\(in srgb, ?var\(--ok\) 78%, ?var\(--fg\)\)\}/.test(css) ||
     !css.includes('.guardSlow i{color:var(--gSlow)}') ||
     !codeIncludes(ui, 'function buildRuleChartModel(') ||
     !codeIncludes(ui, 'function renderHomePresetAccordion(') ||
@@ -92,21 +92,28 @@ if (firmware.indexOf('publishLogLevels(runtimeConfig)',
     ...['axisLabel', 'guardRuleRows', 'rampCurveIndex', 'buildRuleChartModel',
       'updateRuleChartFromStatus'].map((name) => blockAt(runtimeJs, 'function ' + name + '('))]
       .join('\n'), context);
-  // Each row names its time span and what the cut line does there.
+  // One row per distinct cut weight: each names its time span and where the
+  // shot stops there; a side that is off joins the target row, never "off".
   const rules = config => {
     context.status = {config};
     return Array.from(vm.runInContext('updateRuleChartFromStatus(status); guardRuleRows(liveRuleModel)', context),
-      row => row.children[0].children[1] + ' · ' + row.children[1].textContent.replace(/\u00a0/g, ' '));
+      row => (row.children[0].children.at(-1) + ' · ' + row.children[1].innerHTML
+        .replace('<span class="guardAlso">', ' | ').replace(/<[^>]+>/g, '')).replace(/\u00a0/g, ' '));
   };
   const home = {...saved}; delete home.bbwProtectionMs;
-  assert.deepStrictEqual(rules(home), ['Before 27 s · Fast · up to 40 g',
-    'Between 27–34 s · On recipe · 36 g', 'After 34 s · Slow · down to 33 g']);
+  assert.deepStrictEqual(rules(home), ['Before 27 s · Up to 40 g',
+    'Between 27–34 s · Stops at 36 g', 'After 34 s · Down to 33 g']);
   assert.deepStrictEqual(rules({...home, goalWeightG: 40, fastMarginG: 7.5, slowMarginG: 2.5,
-    fastBeforeS: 30, slowAfterS: 46}), ['Before 30 s · Fast · up to 47.5 g',
-    'Between 30–46 s · On recipe · 40 g', 'After 46 s · Slow · down to 37.5 g']);
-  assert.strictEqual(rules({...home, fastExtractionGuardEnabled: false})[0], 'Before 27 s · Fast · off');
+    fastBeforeS: 30, slowAfterS: 46}), ['Before 30 s · Up to 47.5 g',
+    'Between 30–46 s · Stops at 40 g', 'After 46 s · Down to 37.5 g']);
+  assert.deepStrictEqual(rules({...home, fastExtractionGuardEnabled: false}), [
+    'Up to 34 s · Stops at 36 g | On recipe from 27 s · faster shots too', 'After 34 s · Down to 33 g']);
+  assert.deepStrictEqual(rules({...home, slowExtractionGuardEnabled: false}), ['Before 27 s · Up to 40 g',
+    'From 27 s · Stops at 36 g | On recipe until 34 s · slower shots too']);
+  assert.deepStrictEqual(rules({...home, fastExtractionGuardEnabled: false, slowExtractionGuardEnabled: false}),
+    ['36 g · Every shot stops at 36 g.']);
   assert.deepStrictEqual(rules({...home, brewByWeight: false}),
-    ['Fast · off', 'On recipe · off', 'Slow · off']);
+    ['You end every shot · The controller times the shot but never stops it.']);
 }
 if (!codeIncludes(ui, 'id="staIpMode"') ||
     !codeIncludes(ui, 'id="staStaticIp"') ||

@@ -810,6 +810,10 @@
   padding: 0.15rem 0.6rem 0.5rem;
 }
 
+.presetAccItem.noGraph :is(.presetAccToggle, .presetAccMore) {
+  display: none;
+}
+
 .guardRow {
   display: grid;
   grid-template-columns: 9.2rem 1fr;
@@ -846,7 +850,7 @@
   height: 1.05rem;
   fill: none;
   stroke: currentcolor;
-  stroke-width: 2;
+  stroke-width: 2.3;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -860,12 +864,57 @@
   color: var(--gFast);
 }
 
+/* Darker than --ok in light themes so the thin glyph keeps 3:1 on the open row. */
 .guardBbw i {
-  color: var(--ok);
+  color: color-mix(in srgb, var(--ok) 78%, var(--fg));
 }
 
 .guardSlow i {
   color: var(--gSlow);
+}
+
+.guardAlso {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.76rem;
+  color: var(--mu);
+}
+
+.guardFixed {
+  grid-template-columns: 4.4rem 1fr;
+  align-items: center;
+}
+
+.guardFixed .guardName {
+  font-size: 1.15rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.guardManual {
+  grid-template-columns: 1fr;
+  gap: 0.15rem;
+}
+
+.guardManual .guardName {
+  font-size: 0.9rem;
+  gap: 0.55rem;
+}
+
+.guardManual i {
+  color: var(--ac);
+}
+
+.guardManual svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke-width: 1.8;
+}
+
+.guardManual .guardRule {
+  padding-left: 2.05rem;
+  font-size: 0.76rem;
+  color: var(--mu);
 }
 
 /* Quick target-weight sheet, invoked by the active preset's pencil */
@@ -898,6 +947,11 @@
 }
 
 .qeditPen:disabled {
+  display: none;
+}
+
+/* The row pencil is dormant: it stays wired, but Home does not show it for now. */
+.presetAccEdit {
   display: none;
 }
 

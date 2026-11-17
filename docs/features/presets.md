@@ -32,10 +32,22 @@ under **Shared settings** further down applies to every preset and is saved the
 same way.
 
 On Home, the **Presets** section lists the recipes as rows: the active one is
-marked with a filled circle and expands to show how it cuts, for example
-**Before 27 s · Fast · up to 42 g**, **Between 27–36 s · On recipe · 36 g** and
-**After 36 s · Slow · down to 33 g**. Tap the arrow under these lines to open
-a small chart, and tap it again to fold the chart away. The chart shows
+marked with a filled circle and expands to show how it cuts, with one line
+for each weight it can stop at:
+
+- An Adaptive preset reads **Before 27 s · Up to 42 g**,
+  **Between 27–36 s · Stops at 36 g** and **After 36 s · Down to 33 g**.
+- When only one side adapts, the other one stops at your target too, so it
+  joins the target's line. With only slow shots shortened, the first line
+  reads **Up to 36 s · Stops at 36 g**, with **On recipe from 27 s · faster
+  shots too** below it; with only fast shots extended, it reads
+  **From 27 s · Stops at 36 g** and **On recipe until 36 s · slower shots too**.
+- A Fixed preset shows its target and **Every shot stops at 36 g.**
+- **Manual** reads **You end every shot**: the controller times the shot but
+  never stops it.
+
+Tap the arrow under these lines to open a small chart, and tap it again to
+fold the chart away. Manual has no arrow, because it has no cut line. The chart shows
 the same cut line over the shot, the colored fast, on-recipe and slow zones,
 the opening seconds where weight never stops the shot, and dots on the cut line
 where your recent shots on that preset stopped. Drag the dot on the cut line
@@ -92,9 +104,9 @@ affected. With a keyboard, hold Space or Enter instead of pressing.
 
 ## Change the target weight from Home
 
-The active preset's **On recipe** row in Home's **Presets** section has a
-small pencil next to the target weight. Tap it to open a panel at the bottom
-of the screen. It shows the weight, the dose and the ratio as two small
+Open `http://<device-address>/?edit_weight=1` to change the active preset's
+target weight without opening Settings. A panel opens at the bottom of the
+screen. It shows the weight, the dose and the ratio as two small
 labels (for example **18.0 g in** and **1:2.0**), and a sliding scale between
 **−** and **+** buttons:
 
@@ -120,7 +132,6 @@ labels (for example **18.0 g in** and **1:2.0**), and a sliding scale between
   weight to the active recipe right away. The change is the same as
   saving the target in Settings.
 
-Opening `http://<device-address>/?edit_weight=1` also opens this panel.
 The address parameter is used once and removed, so refreshing the page
 afterwards shows the normal Home.
 
