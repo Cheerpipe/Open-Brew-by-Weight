@@ -4,6 +4,72 @@ Notable changes for people who install and use Open Brew by Weight. Version
 numbers follow `MAJOR.MINOR.PATCH`; the firmware reports the same number in the
 Web UI footer.
 
+## 2.1.0 — 2026-11-17
+
+Update from 2.0.0 over Wi-Fi or USB; your shots, presets and settings are kept.
+
+- **Turn the Linea Micra on and off from Home:** after you allow it in
+  **Admin → Machine control**, Home shows a power button next to the machine's
+  name. Press and hold it until its ring closes, so a quick tap never switches
+  the machine. It is off until you turn it on. See
+  [Machine control](docs/settings/machine-control.md).
+- **Steam in your presets:** with **Machine settings in presets** on, each
+  preset can also switch the Micra's steam boiler on or off and choose its
+  steam power (level 1–3), next to the brew temperature. The controller sends
+  only what the machine doesn't already have, never during a shot, and Home
+  shows the steam level in the steam boiler row. New and factory-reset presets
+  start at 91.0 °C with steam on at level 3. See
+  [Presets](docs/features/presets.md).
+- **Home names your machine:** the top of Home shows the machine's brand,
+  model and icon, with its state and the reading that matters right now: brew
+  temperature, minutes until it is ready, or what to do next.
+- **A cue when the backflush is ready:** on a Linea Micra, the buzzer gives a
+  short call when the machine is ready for its automatic cleaning backflush,
+  so you know to move the paddle ON without watching Home. A new switch under
+  **Alerts** turns it off. See [Alerts](docs/alerts.md).
+- **Stop an Auto shot early with the paddle:** in Auto paddle mode, moving the
+  paddle ON again and then OFF now stops the shot, as in Original. The log and
+  the shot's trace say what each paddle move did. See
+  [Paddle](docs/settings/paddle.md).
+- **Cut accuracy chart:** Stats has a new chart that shows how close each
+  automatic stop of a preset landed on its target, shot by shot. One preset
+  choice drives all three Stats charts, and **All** follows the active preset.
+  Shot cards show a **Channeling** pill when a sudden surge of flow gave it
+  away. See [Shot history](docs/features/shot-history.md).
+- **History by day:** each day in History is its own card, with a header that
+  names the day and counts its shots and rinses.
+- **Drip learning misses fewer good shots:** a shot where the cup was set down
+  after the start, or lifted once its weight had settled, now teaches the drip
+  correction like any other. While a preset's quick start runs, only shots
+  stopped at the target count toward it. The log says why a shot was left out
+  and who changed a drip value, and the drip chart shows skipped shots as
+  skipped. See [Brew by weight](docs/features/brew-by-weight.md).
+- **Bookoo stops a little closer to the target:** the controller now expects
+  the Bookoo Themis to report weight slightly sooner, as measured on a Themis
+  Mini, so shots are less likely to end a touch short.
+- **Dismissed notes stay dismissed everywhere:** dismissing a note on Home,
+  such as the recipe reminder, the companion offer or the La Marzocco Cloud
+  note, now hides it on every phone and browser, not only the one you used.
+- **Beanconqueror shows the flow:** a shot imported into Beanconqueror now
+  draws its flow curve, the **Copy** button in **Settings → Coffee apps**
+  copies the address, and each shot sent appears in the log.
+- **Clearer presets:** the selected preset on Home is filled and easier to
+  spot, holding a locked preset fills its row like a progress bar, the preset
+  rules use the Fast, Recipe and Slow icons, and the preset charts draw past
+  shots where they actually stopped on the cut line.
+- **One name and one icon for each guard:** guards and stop reasons look and
+  read the same on Home, Settings, Stats, History and Diagnostic. Cup
+  protection and Time limits have new icons.
+- **Units in number fields:** Settings fields show their unit (g, s, ms, min,
+  °C) inside the field, so 15 s and 15 min no longer look alike.
+- **New installations brew manually without a scale:** a new controller, or
+  one after a factory reset, starts with the scale guard set to **Brew
+  manually**. Controllers you already use keep their choice. See
+  [Scale guard](docs/settings/no-scale-bbw.md).
+- **Fixes:** La Marzocco Cloud switches in Settings no longer flip back while
+  they save; a backflush run through the companion is no longer cut short; and
+  scale power-off is listed with the other scale automations.
+
 ## 2.0.0 — 2026-11-11
 
 Install this version over USB with a full erase: earlier shot curves and
