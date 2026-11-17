@@ -127,7 +127,6 @@
     bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'armed', count: 2, setG: 1.2, quickG: 0}});
   assert.equal(elements.get('dripVerdict').textContent,
     'Your shots varied (0.48–0.95 g), so the correction adjusts gradually');
-  assert(!elements.get('dripHint').hidden);
   // Once quick start found them varied, the headline alone says so.
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.6, bbwAlpha: 0.3, bbwRecentG: [0.95, 0.48, 0.55, 0.63],
     bbwRecentAfterSet: 3, bbwRecentAfterQuick: 0, bbwQuickStart: {state: 'disagreed', count: 3, setG: 1.2, quickG: 0}});
@@ -142,7 +141,8 @@
   assert.deepEqual(legend(), ['Used in the current correction', 'Also used in quick start', 'Used before you set 1.20 g']);
   // One counted shot gives quick start nothing to say yet.
   assert(elements.get('dripVerdict').hidden);
-  assert(elements.get('dripNotes').children[0].children[0].startsWith('0.52 g: stopped by Extend fast shots'));
+  // The legend tells it apart: no note line, and no hint while quick start runs.
+  assert(elements.get('dripNotes').hidden && elements.get('dripHint').hidden);
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);
   assert.equal(marks()[0].children[0].children[0], 'Quick start from 1.20 g');
