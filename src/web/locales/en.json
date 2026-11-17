@@ -1446,6 +1446,7 @@
     "runtime.drip_note_preset_gone": "its preset was deleted",
     "runtime.drip_note_range": "the drip was outside 0\u20135 g",
     "runtime.drip_note_restarted": "learning restarted during the shot",
+    "runtime.drip_note_target_only": "a guard set the stop; it trained the correction, but quick start counts only shots stopped at the target",
     "runtime.drip_note_timer": "a timer-only shot, without weight",
     "runtime.drip_note_too_low": "almost nothing reached the cup",
     "runtime.drip_on_track": "On track: ",

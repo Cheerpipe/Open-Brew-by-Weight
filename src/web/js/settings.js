@@ -1536,8 +1536,8 @@ function syncHeroTintAvailability() {
 // a line per reason says why shots did not train it.
 function renderDripChart(c) {
   // What a charted shot did to the drip correction, by DripLearnNote number
-  // (firmware OpenBrewByWeightBbwTypes.h); 0 trained it and 16 trained it
-  // without counting toward quick start, which the legend already shows.
+  // (firmware OpenBrewByWeightBbwTypes.h); 0 trained it, and 16 trained it
+  // but a guard set its stop, so quick start left it out.
   const NOTES = [
     "",
     __WEBUI_TEXT__("runtime.drip_note_manual"),
@@ -1555,12 +1555,13 @@ function renderDripChart(c) {
     __WEBUI_TEXT__("runtime.drip_note_restarted"),
     __WEBUI_TEXT__("runtime.drip_note_impossible"),
     __WEBUI_TEXT__("runtime.drip_note_outlier"),
-    "",
+    __WEBUI_TEXT__("runtime.drip_note_target_only"),
     __WEBUI_TEXT__("runtime.drip_note_cut_short"),
   ];
-  const dripText = (g) => (g > 0 ? g.toFixed(2) : "0") + __WEBUI_TEXT__("runtime.g_2"),
-    dripRange = (v) =>
-      (Math.min(...v) > 0 ? Math.min(...v).toFixed(2) : "0") + "–" + dripText(Math.max(...v));
+  const unit = __WEBUI_TEXT__("runtime.g_2"),
+    dripNum = (g) => (g > 0 ? g.toFixed(2) : "0"),
+    dripText = (g) => dripNum(g) + unit,
+    dripRange = (v) => dripNum(Math.min(...v)) + "–" + dripText(Math.max(...v));
   const recent = c?.bbwRecentG || [],
     skip = (i) => (c?.bbwRecentSkipped >> i) & 1,
     note = (i) => c?.bbwRecentNote?.[i] || 0,
@@ -1637,10 +1638,10 @@ function renderDripChart(c) {
     ...marks.map(([k, label, end], i) => {
       const mark = el(
         "div",
-        "dcMark" + end + (marks.length > 1 && !i ? " up" : ""),
+        "dcMark" + end + (marks.length > 1 && !i ? " up" : "") + (!end && k > 5 ? " flip" : ""),
         el("span", "", label),
       );
-      mark.style.left = `calc((100% + .5rem) * ${k} / 10 - .25rem)`;
+      mark.style.left = `calc((100% + var(--dcGap)) * ${k} / 10 - var(--dcGap) / 2)`;
       return mark;
     }),
   );
@@ -1648,7 +1649,7 @@ function renderDripChart(c) {
     const line = el(
       "div",
       "dcUse",
-      el("span", "", __WEBUI_TEXT__("runtime.drip_in_use"), el("br", ""), dripText(use)),
+      el("span", "", __WEBUI_TEXT__("runtime.drip_in_use"), " ", el("br", ""), dripText(use)),
     );
     line.style.bottom = h(use);
     bars.append(line);
@@ -1659,7 +1660,7 @@ function renderDripChart(c) {
       (s, k) =>
         `<span class="${old(s) ? "old" : ""}">` +
         (s.g != null
-          ? `<b>${dripText(s.g)}</b>`
+          ? `<b>${dripNum(s.g)}<span class="u">${unit}</span></b>`
           : "i" in s
             ? __WEBUI_TEXT__("runtime.drip_skipped")
             : s.next

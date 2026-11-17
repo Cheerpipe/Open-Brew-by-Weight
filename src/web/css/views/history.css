@@ -7,14 +7,19 @@
 
 .dcBarX {
   display: flex;
-  gap: 0.5rem;
   margin: 0.2rem 4.6rem 0 0;
   font-size: 0.68rem;
   color: var(--mu);
 }
 
-.dcBarX span {
-  flex: 1;
+/* Equal columns whatever the text, so each label stays under its bar; a
+   word wider than its column spills evenly to both sides. */
+.dcBarX > span {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   line-height: 1.25;
 }
@@ -31,11 +36,16 @@
   font-weight: 400;
 }
 
+/* Drawn as a dashed fill: iOS WebKit drops a dashed border on a box with
+   no width, leaving only its first dash. */
 .dcMark {
+  --mk: var(--mu);
+
   position: absolute;
   top: -1rem;
   bottom: 0;
-  border-left: 1.5px dashed var(--mu);
+  width: 1.5px;
+  background: repeating-linear-gradient(var(--mk) 0 3px, transparent 3px 6px);
 }
 
 .dcMark.up {
@@ -53,23 +63,24 @@
 }
 
 .dcMark.end {
-  border-left-color: var(--ac);
+  --mk: var(--ac);
 }
 
+/* The line ends short of its label, so the label needs no fill: the chart
+   sits on more than one surface color. */
 .dcUse {
   position: absolute;
   left: 0;
-  right: -4.6rem;
+  right: -0.4rem;
   border-top: 2px solid var(--fg);
   pointer-events: none;
 }
 
 .dcUse span {
   position: absolute;
-  right: 0;
-  top: -0.6rem;
-  padding-left: 0.3rem;
-  background: var(--sf);
+  left: calc(100% + 0.3rem);
+  top: -1px;
+  transform: translateY(-50%);
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--fg);
@@ -81,6 +92,47 @@
   left: auto;
   right: 0.3rem;
   color: var(--ac);
+}
+
+/* Phone width: the chart takes the full width, "in use" rides on its line,
+   the grams unit stays in the headline, and a late mark labels leftward. */
+@container (width < 30rem) {
+  .dcBars,
+  .dcBarX {
+    --dcGap: 0.25rem;
+
+    margin-right: 0;
+  }
+
+  .dcBarX {
+    font-size: 0.6rem;
+  }
+
+  .dcBarX b {
+    font-size: 0.68rem;
+  }
+
+  .dcBarX .u,
+  .dcUse br {
+    display: none;
+  }
+
+  .dcUse {
+    right: 0;
+  }
+
+  .dcUse span {
+    left: auto;
+    right: 0;
+    top: auto;
+    bottom: 0.3rem;
+    transform: none;
+  }
+
+  .dcMark.flip span {
+    left: auto;
+    right: 0.3rem;
+  }
 }
 
 /* Quick start without a new drip: the reason and the action in one row. */

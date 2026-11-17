@@ -141,8 +141,10 @@
   assert.deepEqual(legend(), ['Used in the current correction', 'Also used in quick start', 'Used before you set 1.20 g']);
   // One counted shot gives quick start nothing to say yet.
   assert(elements.get('dripVerdict').hidden);
-  // The legend tells it apart: no note line, and no hint while quick start runs.
-  assert(elements.get('dripNotes').hidden && elements.get('dripHint').hidden);
+  // A note line says why it stayed out of quick start; no hint while it runs.
+  assert(!elements.get('dripNotes').hidden && elements.get('dripHint').hidden);
+  assert.equal(elements.get('dripNotes').children[0].children[0],
+    '0.52 g: a guard set the stop; it trained the correction, but quick start counts only shots stopped at the target');
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);
   assert.equal(marks()[0].children[0].children[0], 'Quick start from 1.20 g');

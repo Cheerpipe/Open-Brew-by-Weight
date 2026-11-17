@@ -218,6 +218,7 @@ and a sort group its buttons; the label stays as the accessible name. */
 
 .dcChart {
   margin: 0.8rem 0 1.25rem;
+  container-type: inline-size;
 }
 
 .dcTitle {
@@ -227,13 +228,20 @@ and a sort group its buttons; the label stays as the accessible name. */
   margin: 0 0 0.25rem;
 }
 
+/* Bars and their labels share one column grid; marks position by the gap. */
+.dcBars,
+.dcBarX {
+  --dcGap: 0.5rem;
+
+  gap: var(--dcGap);
+}
+
 .dcBars {
   position: relative;
   height: 5.5rem;
   margin: 1.5rem 4.6rem 0.2rem 0;
   display: flex;
   align-items: flex-end;
-  gap: 0.5rem;
   border-bottom: 1px solid var(--ln);
 }
 
