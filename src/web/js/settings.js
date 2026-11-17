@@ -1536,8 +1536,8 @@ function syncHeroTintAvailability() {
 // a line per reason says why shots did not train it.
 function renderDripChart(c) {
   // What a charted shot did to the drip correction, by DripLearnNote number
-  // (firmware OpenBrewByWeightBbwTypes.h); 0 trained it, and 16 trained it
-  // but a guard set its stop, so quick start left it out.
+  // (firmware OpenBrewByWeightBbwTypes.h); 0 trained it and 16 trained it
+  // without counting toward quick start, which the legend already shows.
   const NOTES = [
     "",
     __WEBUI_TEXT__("runtime.drip_note_manual"),
@@ -1555,7 +1555,7 @@ function renderDripChart(c) {
     __WEBUI_TEXT__("runtime.drip_note_restarted"),
     __WEBUI_TEXT__("runtime.drip_note_impossible"),
     __WEBUI_TEXT__("runtime.drip_note_outlier"),
-    __WEBUI_TEXT__("runtime.drip_note_target_only"),
+    "",
     __WEBUI_TEXT__("runtime.drip_note_cut_short"),
   ];
   const unit = __WEBUI_TEXT__("runtime.g_2"),
@@ -1692,9 +1692,9 @@ function renderDripChart(c) {
   );
   const sorted = [...needed].sort((a, b) => a - b);
   const lead = __WEBUI_TEXT__("runtime.drip_last_needed");
-  // Quick start says nothing about a single shot; from two on, whether they
-  // still agree within the 0.40 g its third shot needs (firmware
-  // QUICK_START_SPREAD_CG).
+  // Quick start speaks only once its shots no longer agree within the 0.40 g
+  // its third shot needs (firmware QUICK_START_SPREAD_CG); the status and
+  // the bars already show the shots that still agree.
   const disagree =
     mode === "varied" ||
     (mode === "quick" && Math.round((sorted[sorted.length - 1] - sorted[0]) * 100) > 40);
@@ -1706,12 +1706,12 @@ function renderDripChart(c) {
           dripRange(needed) +
           __WEBUI_TEXT__("runtime.drip_varied_end")
         : mode === "quick"
-          ? __WEBUI_TEXT__("runtime.drip_quick_agree") + dripRange(needed)
+          ? ""
           : use >= sorted[0] - 0.15 && use <= sorted[sorted.length - 1] + 0.15
             ? __WEBUI_TEXT__("runtime.drip_on_track") + lead + dripRange(needed)
             : lead.charAt(0).toUpperCase() + lead.slice(1) + dripRange(needed);
+  // Always laid out, so the chart keeps its place when there is nothing to say.
   $("dripVerdict").textContent = verdict;
-  $("dripVerdict").hidden = !verdict;
   $("dripHint").textContent = !n
     ? __WEBUI_TEXT__("runtime.drip_hint_none")
     : {

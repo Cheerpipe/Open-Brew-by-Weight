@@ -94,8 +94,9 @@
   color: var(--ac);
 }
 
-/* Phone width: the chart takes the full width, "in use" rides on its line,
-   the grams unit stays in the headline, and a late mark labels leftward. */
+/* Phone width: the chart takes the full width, "in use" rides on its line
+   in two narrow rows, the grams unit stays in the headline, and a late mark
+   labels leftward. */
 @container (width < 30rem) {
   .dcBars,
   .dcBarX {
@@ -112,8 +113,7 @@
     font-size: 0.68rem;
   }
 
-  .dcBarX .u,
-  .dcUse br {
+  .dcBarX .u {
     display: none;
   }
 
@@ -127,6 +127,7 @@
     top: auto;
     bottom: 0.3rem;
     transform: none;
+    text-align: right;
   }
 
   .dcMark.flip span {

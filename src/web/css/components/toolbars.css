@@ -222,6 +222,7 @@ and a sort group its buttons; the label stays as the accessible name. */
 }
 
 .dcTitle {
+  min-height: 1lh;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--mu);

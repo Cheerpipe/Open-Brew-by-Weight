@@ -119,7 +119,8 @@
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 1.2, bbwAlpha: 0.3, bbwRecentG: [0.52, 0.48, 0.55, 0.63],
     bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'armed', count: 2, setG: 1.2, quickG: 0}});
   assert.equal(elements.get('dripStatus').lastElementChild.textContent, 'Quick start · 2 of 3 shots');
-  assert.equal(elements.get('dripVerdict').textContent, 'So far your shots agree: 0.48–0.52 g');
+  // Shots that still agree leave the headline empty; status and bars say it.
+  assert.equal(elements.get('dripVerdict').textContent, '');
   assert.equal(bars().filter(b => b.className.includes('qs')).length, 2);
   assert.equal(bars().filter(b => b.className.includes('old')).length, 2);
   // Two counted shots more than 0.40 g apart can no longer quick start.
@@ -140,11 +141,9 @@
   assert.equal(bars().filter(b => b.className.includes('qs')).length, 1);
   assert.deepEqual(legend(), ['Used in the current correction', 'Also used in quick start', 'Used before you set 1.20 g']);
   // One counted shot gives quick start nothing to say yet.
-  assert(elements.get('dripVerdict').hidden);
-  // A note line says why it stayed out of quick start; no hint while it runs.
-  assert(!elements.get('dripNotes').hidden && elements.get('dripHint').hidden);
-  assert.equal(elements.get('dripNotes').children[0].children[0],
-    '0.52 g: a guard set the stop; it trained the correction, but quick start counts only shots stopped at the target');
+  assert.equal(elements.get('dripVerdict').textContent, '');
+  // The legend tells it apart: no note line, and no hint while quick start runs.
+  assert(elements.get('dripNotes').hidden && elements.get('dripHint').hidden);
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);
   assert.equal(marks()[0].children[0].children[0], 'Quick start from 1.20 g');
@@ -154,7 +153,7 @@
     bbwRecentAfterSet: 3, bbwRecentAfterQuick: 0, bbwQuickStart: {state: 'applied', count: 3, setG: 1.2, quickG: 0.5}});
   assert.equal(elements.get('dripStatus').lastElementChild.textContent, 'Set from 3 shots that agreed');
   assert.equal(marks().length, 2);
-  assert(elements.get('dripVerdict').hidden);
+  assert.equal(elements.get('dripVerdict').textContent, '');
   // Unsaved recipe edits, read-only access or another preset block the sets.
   context.uiState.brewDirty = true;
   refresh();
