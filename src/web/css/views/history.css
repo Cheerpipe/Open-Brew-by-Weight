@@ -1,5 +1,6 @@
 /* Shots that did not train the drip keep their bar, hatched. */
-.dcBar.skip i {
+.dcBar.skip i,
+.dcLegend .skip {
   background: repeating-linear-gradient(45deg, transparent 0 2px, currentcolor 2px 4px);
   opacity: 0.55;
 }

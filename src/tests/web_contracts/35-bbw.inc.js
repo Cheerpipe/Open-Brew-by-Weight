@@ -34,7 +34,7 @@
     return n;
   };
   const elements = new Map();
-  for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripNotes', 'dripBars', 'dripBarX',
+  for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripNotes', 'dripBars', 'dripBarX', 'dripLegend',
     'dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton',
     'dripQuickStart', 'dripQuickStartButton'])
     elements.set(id, node());
@@ -55,6 +55,7 @@
     vm.runInContext('updateBbwControls()', context);
   };
   const bars = () => elements.get('dripBars').children.filter(e => e.tag === 'div' && e.className.startsWith('dcBar'));
+  const legend = () => elements.get('dripLegend').children.map(e => e.children[1]);
   const marks = () => elements.get('dripBars').children.filter(e => e.className.startsWith('dcMark'));
   elements.get('brewByWeight').checked = true;
   // Learning: ten slots oldest first, a skipped shot, the line in use.
@@ -80,6 +81,8 @@
   assert(hatched && hatched.children.length === 1);
   // Wild skipped values clamp at full height and never size the chart.
   assert.equal(hatched.children[0].style.height, '100%');
+  // The legend names only the kinds of bar drawn.
+  assert.deepEqual(legend(), ['Adjusted the correction', 'Ignored']);
   assert(elements.get('dripBarX').innerHTML.includes('3.20'));
   assert.equal(elements.get('dripVerdict').textContent, 'On track: your last shots needed 0.59–0.72 g');
   // Without a reason (an earlier record) no line explains it.
@@ -124,6 +127,7 @@
     bbwRecentNote: [16, 0, 0, 0], bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1,
     bbwQuickStart: {state: 'armed', count: 1, setG: 1.2, quickG: 0}});
   assert.equal(bars().filter(b => b.className.includes('qs')).length, 1);
+  assert.deepEqual(legend(), ['Counted by quick start', 'Adjusted the correction', 'Before quick start']);
   assert(elements.get('dripNotes').children[0].children[0].startsWith('0.52 g: stopped by Extend fast shots'));
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);

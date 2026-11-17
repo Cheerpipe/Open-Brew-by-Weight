@@ -254,18 +254,26 @@ and a sort group its buttons; the label stays as the accessible name. */
   display: block;
   width: min(1.6rem, 70%);
   border-radius: 0.25rem 0.25rem 0 0;
+}
+
+/* Each legend swatch is drawn as its bar. */
+.dcBar i,
+.dcLegend i {
   background: color-mix(in srgb, var(--fg) 55%, var(--sf));
+  box-shadow: none;
 }
 
 .dcStatus.quick i {
   background: var(--ac);
 }
 
-.dcBar.old i {
+.dcBar.old i,
+.dcLegend .old {
   opacity: 0.35;
 }
 
-.dcBar.qs i {
+.dcBar.qs i,
+.dcLegend .qs {
   background: var(--ac);
 }
 

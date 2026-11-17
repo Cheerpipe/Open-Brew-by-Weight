@@ -1669,6 +1669,23 @@ function renderDripChart(c) {
         "</span>",
     )
     .join("");
+  // The legend names only the kinds of bar drawn, hatched first as the bars are.
+  const kinds = new Set(
+    slots
+      .filter((s) => s.g != null)
+      .map((s) => (skip(s.i) ? "skip" : old(s) ? "old" : counted(s) ? "qs" : "")),
+  );
+  $("dripLegend").replaceChildren(
+    ...[
+      ["qs", __WEBUI_TEXT__("runtime.drip_legend_counted")],
+      ["", __WEBUI_TEXT__("runtime.drip_legend_trained")],
+      ["old", __WEBUI_TEXT__("runtime.drip_legend_before")],
+      ["skip", __WEBUI_TEXT__("runtime.drip_legend_ignored")],
+    ]
+      .filter(([k]) => kinds.has(k))
+      .map(([k, text]) => el("span", "", el("i", k), text)),
+  );
+  $("dripLegend").hidden = !kinds.size;
   const needed = recent.filter(
     (g, i) => g != null && !skip(i) && (mode === "learning" || counted({ g, i })),
   );
