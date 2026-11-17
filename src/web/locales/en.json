@@ -1418,7 +1418,6 @@
     "runtime.drip_hint_learning": "Each bar is what one shot needed.",
     "runtime.drip_hint_none": "Pull a shot with this preset to see what it needed.",
     "runtime.drip_hint_quick": "If your next shots agree, the correction moves there right away.",
-    "runtime.drip_hint_varied": "Shots that disagree only move the correction a little each time.",
     "runtime.drip_in_use": "in use",
     "runtime.drip_last_needed": "your last shots needed ",
     "runtime.drip_last_shot": "last shot",

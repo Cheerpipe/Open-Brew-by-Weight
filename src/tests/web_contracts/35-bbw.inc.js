@@ -127,6 +127,13 @@
     bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'armed', count: 2, setG: 1.2, quickG: 0}});
   assert.equal(elements.get('dripVerdict').textContent,
     'Your shots varied (0.48–0.95 g), so the correction adjusts gradually');
+  assert(!elements.get('dripHint').hidden);
+  // Once quick start found them varied, the headline alone says so.
+  refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.6, bbwAlpha: 0.3, bbwRecentG: [0.95, 0.48, 0.55, 0.63],
+    bbwRecentAfterSet: 3, bbwRecentAfterQuick: 0, bbwQuickStart: {state: 'disagreed', count: 3, setG: 1.2, quickG: 0}});
+  assert.equal(elements.get('dripVerdict').textContent,
+    'Your shots varied (0.48–0.95 g), so the correction adjusts gradually');
+  assert(elements.get('dripHint').hidden);
   // A guard cut trained the correction but never counts toward quick start.
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 1.2, bbwAlpha: 0.3, bbwRecentG: [0.52, 0.48, 0.55, 0.63],
     bbwRecentNote: [16, 0, 0, 0], bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1,
