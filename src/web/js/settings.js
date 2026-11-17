@@ -1677,10 +1677,10 @@ function renderDripChart(c) {
   );
   $("dripLegend").replaceChildren(
     ...[
-      ["qs", __WEBUI_TEXT__("runtime.drip_legend_counted")],
-      ["", __WEBUI_TEXT__("runtime.drip_legend_trained")],
-      ["old", __WEBUI_TEXT__("runtime.drip_legend_before")],
-      ["skip", __WEBUI_TEXT__("runtime.drip_legend_ignored")],
+      ["", __WEBUI_TEXT__("runtime.drip_legend_current")],
+      ["qs", __WEBUI_TEXT__("runtime.drip_legend_quick")],
+      ["old", __WEBUI_TEXT__("runtime.drip_legend_before") + dripText(q.setG)],
+      ["skip", __WEBUI_TEXT__("runtime.drip_legend_unused")],
     ]
       .filter(([k]) => kinds.has(k))
       .map(([k, text]) => el("span", "", el("i", k), text)),
@@ -1691,16 +1691,21 @@ function renderDripChart(c) {
   );
   const sorted = [...needed].sort((a, b) => a - b);
   const lead = __WEBUI_TEXT__("runtime.drip_last_needed");
-  const verdict = !needed.length
-    ? ""
-    : mode === "quick"
-      ? __WEBUI_TEXT__("runtime.drip_need_about") + dripText(sorted[(sorted.length - 1) >> 1])
-      : mode === "varied"
+  // Quick start says nothing about a single shot; from two on, whether they
+  // still agree within the 0.40 g its third shot needs (firmware
+  // QUICK_START_SPREAD_CG).
+  const disagree =
+    mode === "varied" ||
+    (mode === "quick" && Math.round((sorted[sorted.length - 1] - sorted[0]) * 100) > 40);
+  const verdict =
+    needed.length < (mode === "quick" ? 2 : 1) || mode === "applied"
+      ? ""
+      : disagree
         ? __WEBUI_TEXT__("runtime.drip_varied") +
           dripRange(needed) +
           __WEBUI_TEXT__("runtime.drip_varied_end")
-        : mode === "applied"
-          ? ""
+        : mode === "quick"
+          ? __WEBUI_TEXT__("runtime.drip_quick_agree") + dripRange(needed)
           : use >= sorted[0] - 0.15 && use <= sorted[sorted.length - 1] + 0.15
             ? __WEBUI_TEXT__("runtime.drip_on_track") + lead + dripRange(needed)
             : lead.charAt(0).toUpperCase() + lead.slice(1) + dripRange(needed);

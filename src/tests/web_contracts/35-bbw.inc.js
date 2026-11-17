@@ -82,7 +82,7 @@
   // Wild skipped values clamp at full height and never size the chart.
   assert.equal(hatched.children[0].style.height, '100%');
   // The legend names only the kinds of bar drawn.
-  assert.deepEqual(legend(), ['Adjusted the correction', 'Ignored']);
+  assert.deepEqual(legend(), ['Used in the current correction', 'Not used']);
   assert(elements.get('dripBarX').innerHTML.includes('3.20'));
   assert.equal(elements.get('dripVerdict').textContent, 'On track: your last shots needed 0.59–0.72 g');
   // Without a reason (an earlier record) no line explains it.
@@ -119,15 +119,22 @@
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 1.2, bbwAlpha: 0.3, bbwRecentG: [0.52, 0.48, 0.55, 0.63],
     bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'armed', count: 2, setG: 1.2, quickG: 0}});
   assert.equal(elements.get('dripStatus').lastElementChild.textContent, 'Quick start · 2 of 3 shots');
-  assert.equal(elements.get('dripVerdict').textContent, 'Your shots need about 0.48 g');
+  assert.equal(elements.get('dripVerdict').textContent, 'So far your shots agree: 0.48–0.52 g');
   assert.equal(bars().filter(b => b.className.includes('qs')).length, 2);
   assert.equal(bars().filter(b => b.className.includes('old')).length, 2);
+  // Two counted shots more than 0.40 g apart can no longer quick start.
+  refresh({bbwPresetId: 2, bbwEwmaOffsetG: 1.2, bbwAlpha: 0.3, bbwRecentG: [0.95, 0.48, 0.55, 0.63],
+    bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'armed', count: 2, setG: 1.2, quickG: 0}});
+  assert.equal(elements.get('dripVerdict').textContent,
+    'Your shots varied (0.48–0.95 g), so the correction adjusts gradually');
   // A guard cut trained the correction but never counts toward quick start.
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 1.2, bbwAlpha: 0.3, bbwRecentG: [0.52, 0.48, 0.55, 0.63],
     bbwRecentNote: [16, 0, 0, 0], bbwRecentAfterSet: 2, bbwRecentAfterQuick: -1,
     bbwQuickStart: {state: 'armed', count: 1, setG: 1.2, quickG: 0}});
   assert.equal(bars().filter(b => b.className.includes('qs')).length, 1);
-  assert.deepEqual(legend(), ['Counted by quick start', 'Adjusted the correction', 'Before quick start']);
+  assert.deepEqual(legend(), ['Used in the current correction', 'Also used in quick start', 'Used before you set 1.20 g']);
+  // One counted shot gives quick start nothing to say yet.
+  assert(elements.get('dripVerdict').hidden);
   assert(elements.get('dripNotes').children[0].children[0].startsWith('0.52 g: stopped by Extend fast shots'));
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);

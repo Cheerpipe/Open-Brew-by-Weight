@@ -244,10 +244,12 @@ needed, drawn against a line for the correction in use. Shots that did not train
 correction — a moved cup, a manual stop, or a shot the plausibility checks discarded
 — keep their bar but show it hatched with diagonal stripes, so you can see at
 a glance what was ignored; shots without a usable weight, and ignored shots
-that read below zero, show as skipped. A legend under the chart names each
-kind of bar it shows: shots counted by quick start, shots that only adjusted
-the correction, shots from before quick start began, and ignored shots. Below
-it, one line per reason
+that read below zero, show as skipped. A legend under the chart says what
+each kind of bar it shows was used for: the current correction, quick start
+as well, only the correction from before you last set it, or nothing. While a
+quick start runs, the line above the chart stays empty after one shot; from
+two on it says whether your shots still agree closely enough to quick start.
+Below the legend, one line per reason
 names those shots and says why they were left out, for example that the
 scale stopped reporting before the drip wait ended. The Web UI log keeps the
 same reason for every shot, and a line for every change you make to the
