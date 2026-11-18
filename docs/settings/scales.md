@@ -98,7 +98,8 @@ in a few places:
 - **Header:** the Bluetooth icon gains a small upright battery after the
   signal bars, filled to the current charge. It stays quiet while the charge
   is healthy, turns amber at 15 % or less, red at 10 % or less, and blinks at
-  5 % or less. Tap the icon to see the exact percentage,
+  5 % or less. Tap the icon to see the exact percentage (on a phone, with a
+  bar of the charge in the same colours),
   or turn on [**Show battery percentage**](app.md) to keep the number beside it.
 - **Live shot view:** the same header icons sit at the top of the view, so
   you can keep an eye on the battery during a shot.

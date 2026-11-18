@@ -339,6 +339,48 @@ body {
   font-size: 0.95rem;
 }
 
+/* In the sheet each status leads with a dot in the header icon's colours:
+   green when fine, amber when weak or partial, red when the scale battery
+   runs out, grey when off or unknown. The battery adds a bar of its charge. */
+.pageSheet [data-tone] {
+  --tone: var(--mu);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.pageSheet [data-tone]::before {
+  content: "";
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.pageSheet :is([data-tone="2"], [data-tone="3"], [data-tone="on"], [data-tone="ok"]) {
+  --tone: var(--ok);
+}
+
+.pageSheet :is([data-tone="1"], [data-tone="partial"], [data-tone="low"]) {
+  --tone: var(--lw);
+}
+
+.pageSheet :is([data-tone="critical"], [data-tone="empty"]) {
+  --tone: var(--live);
+}
+
+.pageSheet #bluetoothBattery::after {
+  content: "";
+  flex: none;
+  width: 2.2rem;
+  height: 0.55rem;
+  border-radius: 1rem;
+  background: linear-gradient(to right, var(--tone) var(--pct, 0%), var(--ln) 0);
+}
+
 .qsI {
   width: 1.35rem;
   height: 1.35rem;

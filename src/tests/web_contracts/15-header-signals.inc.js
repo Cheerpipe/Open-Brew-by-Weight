@@ -14,9 +14,9 @@
     getAttribute(name) { return this.attributes[name]; }};
   const elements = Object.fromEntries([...['wifi', 'bluetooth'].flatMap((kind, i) => [
     [kind + 'Signal', buttons[i]], [kind + 'Details', {hidden: true}],
-    [kind + 'Name', {}], [kind + 'Detail', {}],
-  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {}], ['companionRelay', {}],
-    ['laMarzoccoSignal', laMarzoccoButton], ['laMarzoccoName', {}], ['laMarzoccoSelected', {}], ['laMarzoccoDetail', {}],
+    [kind + 'Name', {}], [kind + 'Detail', {dataset: {}}],
+  ]), ['companionSignal', companionButton], ['companionName', {}], ['companionDetail', {dataset: {}}], ['companionRelay', {}],
+    ['laMarzoccoSignal', laMarzoccoButton], ['laMarzoccoName', {}], ['laMarzoccoSelected', {}], ['laMarzoccoDetail', {dataset: {}}],
     ['laMarzoccoRoute', {textContent: '—'}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
   assert(start >= 0, 'Shared header must render cached signal status');
@@ -47,6 +47,8 @@
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3, bluetoothConnected: true, bluetoothLevel: 2}});
   assert.equal(elements.wifiSignal.title, 'Wi-Fi: Strong');
   assert.equal(elements.bluetoothSignal.title, 'Scale signal: Medium');
+  assert.deepEqual([elements.wifiDetail.dataset.tone, elements.bluetoothDetail.dataset.tone].map(String),
+      ['3', '2'], 'The phone sheet colours each status by its level');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: null, wifiName: 'Cafe "A"\\B', bluetoothConnected: true, bluetoothLevel: 3, bluetoothName: '<img src=x onerror=alert(1)>'}});
   assert.equal(elements.wifiName.textContent, 'Cafe "A"\\B', 'Connected names survive missing signal level');
   assert.equal(elements.bluetoothName.textContent, '<img src=x onerror=alert(1)>', 'Identity is rendered as text');
@@ -68,6 +70,7 @@
       'Not connected · the companion and this controller use different link versions; update the older one',
       'A refused link version names the connection problem');
   context.updateHeaderSignals({connections: {wifiConnected: true, wifiLevel: 3}, companion: {paired: true, link: 'open', name: 'nas'}});
+  assert.equal(elements.companionDetail.dataset.tone, 'on', 'An open link reads green in the phone sheet');
   assert.equal(elements.companionSignal.dataset.level, 'on');
   assert.equal(elements.companionSignal.attributes['aria-label'], 'Companion: Link: Connected \u00b7 Relay: Not used by this page');
   vm.runInContext('uiState.companionHere = {paired: true}', context);
@@ -171,7 +174,7 @@
     assert.equal(context.scaleBatteryLevel(pct), level, String(pct));
   const attrs = () => ({attrs: {}, setAttribute(name, value) { this.attrs[name] = value; }});
   const fill = attrs(), glyph = attrs();
-  Object.assign(elements, {bluetoothBatteryFill: fill, bluetoothBatteryLine: {hidden: true}, bluetoothBattery: {}, bluetoothBatteryPct: {}});
+  Object.assign(elements, {bluetoothBatteryFill: fill, bluetoothBatteryLine: {hidden: true}, bluetoothBattery: {dataset: {}, style: {setProperty(k, v) { this[k] = v; }}}, bluetoothBatteryPct: {}});
   buttons[1].querySelector = selector => (assert.equal(selector, 'svg'), glyph);
   const battery = (batteryPct, extra) => context.updateHeaderSignals(
     {scale: {available: true, batteryPct}, connections: {bluetoothLevel: 3}, ...extra});
@@ -187,6 +190,8 @@
   battery(12);
   assert.equal(buttons[1].dataset.batt, 'low');
   assert.equal(elements.bluetoothBattery.textContent, '12% · low');
+  assert.deepEqual([elements.bluetoothBattery.dataset.tone, elements.bluetoothBattery.style['--pct']],
+      ['low', '12%'], 'The phone sheet tints the battery and fills its bar to the charge');
   assert.equal(buttons[1].attributes['aria-label'], 'Scale signal: Strong · battery 12% · low');
   battery(9);
   assert.equal(buttons[1].dataset.batt, 'critical');

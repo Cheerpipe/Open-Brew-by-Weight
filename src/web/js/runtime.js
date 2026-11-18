@@ -386,7 +386,11 @@ function updateHeaderSignals(s = {}) {
           : connected === false
             ? __WEBUI_TEXT__("runtime.none")
             : "—";
-    if (detail) detail.textContent = label;
+    // The phone sheet colours each status by the same level (shell.css).
+    if (detail) {
+      detail.textContent = label;
+      detail.dataset.tone = level;
+    }
   }
   // The scale battery joins the scale indicator: a cell after the bars
   // whose fill follows the percent, coloured only once it needs attention.
@@ -415,7 +419,12 @@ function updateHeaderSignals(s = {}) {
     fill.setAttribute("y", (16.9 - h).toFixed(2));
   }
   if (line) line.hidden = !batt;
-  if (batt && $("bluetoothBattery")) $("bluetoothBattery").textContent = scaleBatteryText(pct);
+  const battery = $("bluetoothBattery");
+  if (batt && battery) {
+    battery.textContent = scaleBatteryText(pct);
+    battery.dataset.tone = batt;
+    battery.style.setProperty("--pct", pct + "%");
+  }
   if (batt && $("bluetoothBatteryPct")) $("bluetoothBatteryPct").textContent = pct + "%";
   // The paired companion: an open link lights both racks, a closed link
   // grays them, and a page the companion itself serves keeps one rack lit
@@ -455,7 +464,10 @@ function updateHeaderSignals(s = {}) {
       detail = $("companionDetail"),
       relayRow = $("companionRelay");
     if (identity) identity.textContent = paired ? s.companion.name || "—" : "—";
-    if (detail) detail.textContent = label;
+    if (detail) {
+      detail.textContent = label;
+      detail.dataset.tone = companion.dataset.level;
+    }
     if (relayRow) relayRow.textContent = relay;
   }
   // The La Marzocco cloud link, in builds that ship it: the feed's observation
@@ -505,7 +517,10 @@ function updateHeaderSignals(s = {}) {
     if (account) account.textContent = lm.email || __WEBUI_TEXT__("diagnostic.cloud_no_account");
     if (machine)
       machine.textContent = lm.selectedName || __WEBUI_TEXT__("diagnostic.cloud_no_machine");
-    if (detail) detail.textContent = label;
+    if (detail) {
+      detail.textContent = label;
+      detail.dataset.tone = live ? "on" : "off";
+    }
     // The route row uses Admin's wording; a frame without a companion model
     // keeps the last route (pending still carries the data direct).
     if (route && s.companion?.route) route.textContent = routeName;
