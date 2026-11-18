@@ -125,6 +125,17 @@
       'the archive view never shows a stale controller header');
   assert.equal(shown({archiveView: false, uiState: {shotStats: header}}, null), header);
 }
+// A remembered preset with no good shots left falls back to the active one,
+// or All when that has none either; All and a present preset are kept.
+{
+  const assert = require('assert');
+  const shotStats = {facets: {presets: [[1, 'House'], [2, 'Decaf']]}};
+  const chosen = (statsPreset, activeId) => new Function('R',
+      `${blockAt(rawViewJs.stats, 'const statsChosenPreset = ')};return statsChosenPreset();`)(
+      {uiState: {statsPreset, shotStats}, homeStatusCache: () => null, presetState: {activeId}});
+  assert.deepEqual([chosen(2, 1), chosen(0, 1), chosen(7, 1), chosen(7, 9), chosen(null, 2)],
+      [2, 0, 1, 0, 2]);
+}
 // S18: the window choices are every window smaller than the good shots the
 // list holds, plus the smallest one covering them; none up to ten. The
 // companion's merged header adds 500 and 1000; a hidden selection falls back.

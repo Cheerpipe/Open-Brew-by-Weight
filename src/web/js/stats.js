@@ -632,18 +632,18 @@ function fillShotCharts(h, m) {
   seek(cursorT, false);
   return m;
 }
-// The preset the three Stats charts follow (uiState.statsPreset): until one
-// is chosen, the active one while it holds good shots, else All, as the
-// controller's header keeps following the active preset until a page names
-// one. The header's `preset` names the one it was built for: the chosen one,
+// The preset the three Stats charts follow (uiState.statsPreset): All, or the
+// chosen one while it holds good shots; until one is chosen, or once the
+// chosen one has none left, the active one while it holds good shots, else
+// All, as the controller's header keeps following the active preset until a
+// page names one. The header's `preset` names the one it was built for: the chosen one,
 // or with All the active one, whose stops Cut accuracy shows, since a stop
 // only compares with its own preset's target.
 const statsChosenPreset = () => {
-    const active = statsActivePreset();
-    return (
-      R.uiState.statsPreset ??
-      ((statsHeader().facets?.presets || []).some(([id]) => id === active) ? active : 0)
-    );
+    const chosen = R.uiState.statsPreset,
+      active = statsActivePreset(),
+      has = (id) => (statsHeader().facets?.presets || []).some(([p]) => p === id);
+    return chosen === 0 || has(chosen) ? chosen : has(active) ? active : 0;
   },
   statsActivePreset = () => (R.homeStatusCache()?.presets || R.presetState)?.activeId || 0;
 // The Stats header (D10-D12): through the companion with the archive on, the
@@ -711,7 +711,7 @@ function renderStatsDurChart() {
         .join("");
     for (const b of filter.querySelectorAll("button"))
       b.onclick = () => {
-        R.uiState.statsPreset = +b.dataset.v;
+        saveStatsChart("preset", (R.uiState.statsPreset = +b.dataset.v));
         refreshMergedHeader();
         renderStatsDurChart();
       };
@@ -3185,10 +3185,33 @@ const statsStream = {
   // Delete follows this screen's Admin unlock.
   admin: () => shotStatsViewActive() && R.paint(renderShots),
 };
+// Each browser keeps its own chart choices: the window, the preset and the
+// band. A choice is saved only when made, so a fallback (a window larger than
+// the shots left, a preset with none) never replaces it and it returns once it
+// fits again.
+const STATS_CHARTS_KEY = "obbwStatsCharts";
+function statsChartsStored() {
+  try {
+    return JSON.parse(localStorage.getItem(STATS_CHARTS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+function saveStatsChart(k, v) {
+  try {
+    localStorage.setItem(STATS_CHARTS_KEY, JSON.stringify({ ...statsChartsStored(), [k]: v }));
+  } catch {
+    // Storage blocked or full: the choice applies to this page only.
+  }
+}
 let ready = false;
 export function init() {
   if (ready) return;
   ready = true;
+  const saved = statsChartsStored();
+  if ([10, 50, 100, 500, 1000].includes(saved.window)) R.uiState.statsWindow = saved.window;
+  if (Number.isInteger(saved.preset) && saved.preset >= 0) R.uiState.statsPreset = saved.preset;
+  if (saved.band === "ewma") R.uiState.statsBand = "ewma";
   R.setStatsRenderers({
     renderShots,
     renderStatsDurChart,
@@ -3279,12 +3302,12 @@ export function init() {
   }
   for (const b of $("statsBandMode").querySelectorAll("button"))
     b.onclick = () => {
-      R.uiState.statsBand = b.dataset.v;
+      saveStatsChart("band", (R.uiState.statsBand = b.dataset.v));
       renderShotStats();
     };
   for (const b of $("statsWindow").querySelectorAll("button"))
     b.onclick = () => {
-      R.uiState.statsWindow = +b.dataset.v;
+      saveStatsChart("window", (R.uiState.statsWindow = +b.dataset.v));
       renderShotStats();
       sendStatsWindow();
       refreshMergedHeader();

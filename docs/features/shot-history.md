@@ -17,7 +17,10 @@ averages. The averages and the charts follow your choice. Only the choices that 
 difference appear: every size smaller than the number of good shots in the
 list, plus the first one that covers them all, and none with ten shots or
 fewer. Filtering the list down to fewer shots moves the selection to the
-largest size still shown. Every time you open the Web UI it starts again at 10. Through [the companion](companion.md#your-whole-history) with its archive,
+largest size still shown. Each browser remembers the size you picked, along with
+the preset and band choices below: when it no longer fits, for example after
+you delete shots or open Stats without the companion, Stats uses the largest
+size still shown, and your choice comes back once it fits again. Through [the companion](companion.md#your-whole-history) with its archive,
 Stats covers your whole history and also offers 500 and 1,000. While the
 companion is still catching up with the controller's newest shots, or cannot
 answer, Stats show the controller's own figures instead, with a note saying so,
@@ -34,7 +37,8 @@ show: **All**, or one preset by name, and every chart follows it. Until you
 pick one, it follows the active preset, even when you switch presets, or
 shows All while that preset has no good shots yet. When you pick another
 preset, the charts keep showing what they had until that preset's figures
-arrive, then change at once.
+arrive, then change at once. If a preset you picked has no good shots left,
+or no longer exists, the charts follow the active preset again.
 
 The **Shot time** chart shows how those shots, the same ones behind the
 averages, land against the shot time window. Each

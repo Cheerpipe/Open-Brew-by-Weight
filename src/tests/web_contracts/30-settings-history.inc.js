@@ -1644,6 +1644,7 @@ if (!statsSection ||
   global.sentOps = [];
   let mergedAsks = 0;
   global.refreshMergedHeader = () => mergedAsks++;
+  global.saveStatsChart = () => {};
   global.$ = (id) => ({statsDurChart: histRoot, statsDurChartPlot: histPlot,
     statsPresetFilter: histFilter, statsCutAccuracy: cutRoot})[id] || null;
   global.homeStatusCache = () => null;

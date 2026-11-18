@@ -271,9 +271,9 @@ const uiState = {
   historyExportWindow: null,
   historyNextRequest: 0,
   historyDir: "desc",
-  // Firmware-side list filters (empty = everything), the Stats window and
-  // the preset the Stats charts follow (0 All, null the active one); none of
-  // them outlives the page.
+  // Firmware-side list filters (empty = everything), which outlive no page;
+  // the Stats window, band and the preset the Stats charts follow (0 All,
+  // null the active one), which Stats restores from this browser.
   historyTypes: [],
   shotFilter: {},
   statsWindow: 10,
