@@ -6574,8 +6574,13 @@ function renderHeroDeck() {
     track.addEventListener("scroll", () => {
       const s = track.children,
         i = s[1] ? Math.round(track.scrollLeft / (s[1].offsetLeft - s[0].offsetLeft)) : 0;
-      if (i !== heroDeck.i) markHeroDeck(i);
+      if (heroDeck.to != null) heroDeck.to = i === heroDeck.to ? null : heroDeck.to;
+      else if (i !== heroDeck.i) markHeroDeck(i);
     });
+    // A pill-driven scroll already marked its target; drags and the scroll's end hand control back.
+    ["scrollend", "pointerdown"].forEach((t) =>
+      track.addEventListener(t, () => (heroDeck.to = null)),
+    );
   }
   if (heroDeck.shown !== rows || heroDeck.look !== look) {
     heroDeck.shown = rows;
@@ -6619,6 +6624,7 @@ function renderHeroDeck() {
 }
 function scrollHeroDeck(i, smooth) {
   const s = $("heroDeckTrack").children;
+  heroDeck.to = smooth && i !== heroDeck.i ? i : null;
   $("heroDeckTrack").scrollTo({
     left: s[i].offsetLeft - s[0].offsetLeft,
     behavior: smooth ? "smooth" : "instant",
