@@ -187,34 +187,31 @@
   stroke-dasharray: 3 2;
 }
 
-/* The spread of the last five shots, fading from its edges to the centre,
-   each half in the colour of its own farthest shot. */
+/* The band of recent shots, from the line to how far they reach, in the
+   colour of their typical distance, with their average drawn over it. */
 .consSpread {
+  fill-opacity: 0.26;
   stroke: none;
 }
 
-#statsConsistency .consSpread.near {
-  fill: url("#consBandnear");
+.consSpread.near {
+  fill: var(--ok);
 }
 
-#statsConsistency .consSpread.mid {
-  fill: url("#consBandmid");
+.consSpread.mid {
+  fill: var(--lw);
 }
 
-#statsConsistency .consSpread.far {
-  fill: url("#consBandfar");
+.consSpread.far {
+  fill: var(--gFast);
 }
 
-#statsCutAccuracy .consSpread.near {
-  fill: url("#cutBandnear");
-}
-
-#statsCutAccuracy .consSpread.mid {
-  fill: url("#cutBandmid");
-}
-
-#statsCutAccuracy .consSpread.far {
-  fill: url("#cutBandfar");
+.consMean {
+  fill: none;
+  stroke: var(--fg);
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
 }
 
 .cutRing {

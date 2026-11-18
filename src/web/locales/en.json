@@ -1884,7 +1884,7 @@
     "runtime.stats_legend_on_window": "On recipe: inside the window",
     "runtime.stats_legend_slow": "Slow: after {0}",
     "runtime.stats_legend_slow_window": "Slow: after the window",
-    "runtime.stats_legend_spread": "Spread of last {0}",
+    "runtime.stats_legend_spread": "Recent average and reach",
     "runtime.stats_legend_within": "Within \u00b1{0}",
     "runtime.stats_preset_filter": "Shots shown",
     "runtime.stats_reset_confirm": "Shot statistics only count shots with this window and target, so they start over.",

@@ -72,12 +72,14 @@ green within 5 %, about 1.4 seconds on a 28-second shot, yellow from 5 % to
 10 %, and red beyond 10 %. A shot far outside the chart stops at its edge
 with a dashed cap; move the cursor to it to read its real time.
 
-Behind the columns, a shaded band follows your last five shots, from the
-quickest to the slowest of them: a narrowing band means your shots are
-settling, a widening one that they are drifting apart. Each half of the band
-takes the color of its own farthest shot among those five, on the same scale
-as the columns: the half above the line follows the slowest shot, the half
-below the quickest. The band changes where the shot that changed it starts.
+Behind the columns, a shaded band follows your recent shots, with the newest
+counting the most: each older shot weighs half as much as the one after it, so
+the band reacts within a few shots when your routine changes. A thin line
+inside it marks your recent average. The band always starts at the dashed line
+and reaches as far as your recent shots tend to land, so a narrowing band means
+your shots are settling and a widening one that they are drifting apart. Its
+color tells how far your shots typically land from the average, on the same
+scale as the columns. It appears once three shots have been counted.
 A shot that a [fast or slow shot guard](fast-and-slow-shots.md) stopped is
 drawn in grey with a dashed outline, red when the guard let a fast shot run
 longer and blue when it ended a slow one early. It still counts: how long it
@@ -111,9 +113,10 @@ settled heavier or falling for one that settled lighter. As on the Shot
 consistency chart, a column's color says how far it missed, whichever way:
 green within **0.2 g** of the target, yellow up to 0.5 g, and red beyond. A
 ring on the line is a **bullseye**: a cup that settled exactly on the target,
-the same moment the Bullseye melody plays for. The shaded band behind follows
-your last five stops the same way, each half in the color of its own farthest
-stop.
+the same moment the Bullseye melody plays for. The shaded band behind
+follows your recent stops the same way: the line marks your recent average
+miss, the band how far your stops tend to reach from the target, and its
+color how far they typically miss, with the newest stops counting the most.
 
 A shot that a fast or slow shot guard stopped on purpose, heavier or lighter
 than the target by design, is drawn in grey with a dashed outline and left out

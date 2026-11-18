@@ -890,24 +890,48 @@ function statsSizeLegend(near, mid, far) {
     ["near", R.sub(__WEBUI_TEXT__("runtime.stats_legend_within"), [near])],
     ["mid", R.sub(__WEBUI_TEXT__("runtime.stats_legend_off_range"), mid)],
     ["far", R.sub(__WEBUI_TEXT__("runtime.stats_legend_off_more"), [far])],
-    ["spread", R.sub(__WEBUI_TEXT__("runtime.stats_legend_spread"), [SPREAD_SHOTS])],
+    ["spread", __WEBUI_TEXT__("runtime.stats_legend_spread")],
     ["guard g1", __WEBUI_TEXT__("runtime.stats_legend_guard_fast")],
     ["guard g2", __WEBUI_TEXT__("runtime.stats_legend_guard_slow")],
   ];
 }
 // Consistency and Cut accuracy share one frame: a column per shot (at least
 // ten, latest on the right) on a 0–100 × 0–50 plot whose centre line is the
-// reference; the spread of the last five counted shots behind the bars;
+// reference; the band of recent counted shots behind the bars;
 // tinted bars with a solid tip, guard-stopped ones neutral under a dashed
 // border; the scale in a right gutter; and the shot cursor with its pill.
 // `c` gives the title, figures, values and scale, each bar's class, colour
 // and pill, and the `near` and `far` limits that size the band's colours.
 // Colour says how far a shot landed, never which way: the side of the line
 // already says that. Within `near` is green, up to `far` amber, beyond red.
-const SPREAD_SHOTS = 5,
+const BAND_WEIGHT = 0.5,
+  BAND_MIN_SHOTS = 3,
   SIZE_COLORS = { near: "var(--ok)", mid: "var(--lw)", far: "var(--gFast)" },
   sizeOf = (v, near, far) =>
     Math.abs(v) <= near + 1e-9 ? "near" : Math.abs(v) <= far + 1e-9 ? "mid" : "far";
+// The band behind the bars: the recent average of the counted shots plus or
+// minus their spread, each older shot weighing half as much as the next, so
+// it follows a change of trend within a few shots. It always starts at the
+// reference line, so it shows how far recent shots reach, and takes the size
+// of their typical distance. Hidden below BAND_MIN_SHOTS counted shots.
+function statsBand(vals, counts, near, far) {
+  const band = [];
+  for (let i = 0, k = 0, m = 0, v = 0, d = 0; i < vals.length; i++) {
+    if (counts(i)) {
+      const e = vals[i] - m;
+      if (k++) {
+        m += BAND_WEIGHT * e;
+        v = (1 - BAND_WEIGHT) * (v + BAND_WEIGHT * e * e);
+        d += BAND_WEIGHT * (Math.abs(vals[i]) - d);
+      } else ((m = vals[i]), (d = Math.abs(m)));
+    }
+    if (k >= BAND_MIN_SHOTS) {
+      const s = Math.sqrt(v);
+      band.push({ i, m, hi: Math.max(0, m + s), lo: Math.min(0, m - s), k: sizeOf(d, near, far) });
+    }
+  }
+  return band;
+}
 function missChart(root, c) {
   const { vals, M } = c,
     n = vals.length,
@@ -917,75 +941,30 @@ function missChart(root, c) {
     X = (i) => 3 + (W - n + i) * gap,
     Y = (v) => 25 - (23 * Math.max(-M, Math.min(M, v))) / M,
     f = (v) => v.toFixed(2),
-    spread = [];
-  for (let i = 0, win = []; i < n; i++) {
-    if (c.counts(i)) win = [...win, vals[i]].slice(-SPREAD_SHOTS);
-    spread.push(win.length ? win : null);
-  }
-  // The band fades from its outer edges to the centre line, up and down.
-  let svg =
-    "<defs>" +
-    Object.entries(SIZE_COLORS)
-      .map(
-        ([k, color]) =>
-          '<linearGradient id="' +
-          c.id +
-          "Band" +
-          k +
-          '" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="48">' +
-          [0, 0.5, 1]
-            .map(
-              (o) =>
-                '<stop offset="' +
-                o +
-                '" stop-color="' +
-                color +
-                '" stop-opacity="' +
-                (o === 0.5 ? 0.02 : 0.45) +
-                '"/>',
-            )
-            .join("") +
-          "</linearGradient>",
-      )
-      .join("") +
-    "</defs>";
-  // A shot's spread starts at its bar's left edge and holds across the bar,
-  // then slopes to the next shot's in the gap, keeping its colours, so the
-  // band changes where the shot that changed it starts. Each half takes the
-  // size of its own farthest shot: the highest above the line, the lowest
-  // below it.
-  const up = (y) => Math.min(y, 25),
-    down = (y) => Math.max(y, 25),
-    part = (k, x0, a0, b0, x1, a1, b1) =>
-      Math.max(b0 - a0, b1 - a1) > 0.01
-        ? '<path class="consSpread ' +
-          k +
-          '" d="M' +
-          [x0, a0, x1, a1, x1, b1, x0, b0]
-            .map((v, i) => (i % 2 ? " " : i ? "L" : "") + f(v))
-            .join("") +
-          'Z"/>'
-        : "";
-  for (let i = 0, prev = null; i < n; i++) {
-    const w = spread[i];
-    if (!w) continue;
-    const s = {
-        x: X(i),
-        hi: Y(Math.max(...w)),
-        lo: Y(Math.min(...w)),
-        up: sizeOf(Math.max(0, ...w), c.near, c.far),
-        down: sizeOf(Math.min(0, ...w), c.near, c.far),
-      },
-      L = s.x - half;
-    if (prev)
-      svg +=
-        part(prev.up, prev.x + half, up(prev.hi), up(prev.lo), L, up(s.hi), up(s.lo)) +
-        part(prev.down, prev.x + half, down(prev.hi), down(prev.lo), L, down(s.hi), down(s.lo));
+    band = statsBand(vals, c.counts, c.near, c.far);
+  let svg = "";
+  for (let i = 1; i < band.length; i++) {
+    const p = band[i - 1],
+      q = band[i];
     svg +=
-      part(s.up, L, up(s.hi), up(s.lo), s.x + half, up(s.hi), up(s.lo)) +
-      part(s.down, L, down(s.hi), down(s.lo), s.x + half, down(s.hi), down(s.lo));
-    prev = s;
+      '<path class="consSpread ' +
+      q.k +
+      '" d="M' +
+      [
+        [X(p.i), Y(p.hi)],
+        [X(q.i), Y(q.hi)],
+        [X(q.i), Y(q.lo)],
+        [X(p.i), Y(p.lo)],
+      ]
+        .map((pt) => f(pt[0]) + " " + f(pt[1]))
+        .join("L") +
+      'Z"/>';
   }
+  if (band.length)
+    svg +=
+      '<path class="consMean" d="M' +
+      band.map((p) => f(X(p.i)) + " " + f(Y(p.m))).join("L") +
+      '"/>';
   let rings = "";
   for (let i = 0; i < n; i++) {
     const v = vals[i],

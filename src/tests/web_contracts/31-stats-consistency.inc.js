@@ -64,11 +64,22 @@
 // limits included), and beyond. Bullseyes and guards keep their own marks.
 {
   const assert = require('assert');
-  const cutModel = new Function(`${blockAt(viewJs.stats, 'const SPREAD_SHOTS = ')}
-      ${blockAt(viewJs.stats, 'const CUT_CLOSE_G = ')};return cutModel;`)();
+  const {cutModel, statsBand} = new Function(`${blockAt(viewJs.stats, 'const BAND_WEIGHT = ')}
+      ${blockAt(viewJs.stats, 'const CUT_CLOSE_G = ')};return {cutModel, statsBand};`)();
   const m = cutModel({t: 360, e: [0, 20, -20, 21, -50, 51, -51, 300], g: [0, 0, 0, 0, 0, 0, 0, 1]});
   assert.deepEqual(m.rows.map(m.kind), ['bull', 'near', 'near', 'mid', 'mid', 'far', 'far', 'guard g1']);
   assert.equal(m.within, 3, 'a guard-stopped shot is drawn but never scored');
+
+  // The band follows recent shots, the newest weighing most: it waits for
+  // three counted shots, skips guard stops, always touches the line, and
+  // recolours within a few shots after a bad stretch.
+  const misses = [-1.91, -0.1, -0.2, -2.2, -0.41, -0.5, -0.1, 0.2, -0.1, -0.1],
+    guard = [1, 0, 0, 1, 0, 0, 1, 0, 0, 0],
+    band = statsBand(misses, (i) => !guard[i], 0.2, 0.5);
+  assert.equal(band[0].i, 4, 'hidden until the third counted shot');
+  assert.deepEqual(band.map((p) => p.k), ['mid', 'mid', 'mid', 'mid', 'near', 'near']);
+  assert.ok(band.every((p) => p.hi >= 0 && p.lo <= 0), 'the band is anchored to the line');
+  assert.equal(statsBand([0.1, 0.1], () => true, 0.2, 0.5).length, 0, 'two shots show no band');
 }
 // Preset names are user text: the consistency pill escapes them before the
 // pill writes its label as markup.
