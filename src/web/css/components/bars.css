@@ -145,7 +145,7 @@ dialog .btnBar {
   border-radius: 2rem;
   background: transparent;
   -webkit-tap-highlight-color: transparent;
-  color: var(--ac);
+  color: var(--fg);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
