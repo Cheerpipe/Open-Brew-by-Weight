@@ -2,16 +2,34 @@
   margin-top: 1.35rem;
 }
 
-.statsWindowBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
+/* The chart toolbar: one button per choice, each naming the current one;
+labels give way to icons from Bands down (app.js fitBar). */
+#statsChartBar {
+  margin: 1rem 0 0;
 }
 
-#statsPresetFilter {
-  margin: 0 0 0.55rem;
+#statsChartBar .g svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#statsChartBar .caret {
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  opacity: 0.7;
+}
+
+#statsChartBar .iconOnly .caret {
+  display: none;
 }
 
 .statsDensZones {

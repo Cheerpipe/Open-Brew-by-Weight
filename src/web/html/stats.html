@@ -29,6 +29,18 @@
         d="M10.5 22Q14 19 18 22T25 22Q28 20 31.5 22v8a5.5 5.5 0 0 1-5.5 5.5H16a5.5 5.5 0 0 1-5.5-5.5v-8Z"
       />
     </symbol>
+    <symbol id="statsIcoWindow" viewBox="0 0 24 24">
+      <path d="M4 6h16M4 12h16M4 18h10" />
+    </symbol>
+    <symbol id="statsIcoPreset" viewBox="0 0 24 24">
+      <path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V9ZM17 11h1.5a2.5 2.5 0 0 1 0 5H17" />
+    </symbol>
+    <symbol id="statsIcoBand" viewBox="0 0 24 24">
+      <path d="M3 9c3-3 6 3 9 0s6-3 9 0M3 15c3-3 6 3 9 0s6-3 9 0" />
+    </symbol>
+    <symbol id="statsIcoCaret" viewBox="0 0 10 10">
+      <path d="M2 3.5 5 6.5 8 3.5" />
+    </symbol>
   </defs>
 </svg>
 <fieldset id="shotStatsPanel">
@@ -73,29 +85,60 @@
       </div>
     </div>
     <p id="statsHeaderNote" class="fieldHint" role="status" hidden></p>
-    <div class="statsWindowBar">
-      <div id="statsWindow" class="shotSort" role="group" aria-label="{{webui:stats.stats_window}}">
-        <span class="sortLbl">{{webui:stats.last}}</span
-        ><button type="button" data-v="10">10</button><button type="button" data-v="50">50</button
-        ><button type="button" data-v="100">100</button
-        ><button type="button" data-v="500" hidden>500</button
-        ><button type="button" data-v="1000" hidden>1000</button>
-      </div>
+    <div
+      id="statsChartBar"
+      class="btnBar glassBar"
+      role="toolbar"
+      aria-label="{{webui:stats.chart_options}}"
+      hidden
+    >
+      <button
+        id="statsWindowButton"
+        class="btnGlyph"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        title="{{webui:stats.stats_window}}"
+        data-sheet-head="{{webui:stats.stats_window}}"
+        data-p="1"
+      >
+        <span class="g" aria-hidden="true"
+          ><svg><use href="#statsIcoWindow" /></svg></span
+        ><span class="t"></span
+        ><svg class="caret" aria-hidden="true"><use href="#statsIcoCaret" /></svg>
+      </button>
+      <button
+        id="statsPresetButton"
+        class="btnGlyph"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        title="{{webui:stats.chart_preset}}"
+        data-sheet-head="{{webui:stats.chart_preset}}"
+        data-p="2"
+      >
+        <span class="g" aria-hidden="true"
+          ><svg><use href="#statsIcoPreset" /></svg></span
+        ><span class="t"></span
+        ><svg class="caret" aria-hidden="true"><use href="#statsIcoCaret" /></svg>
+      </button>
+      <button
+        id="statsBandButton"
+        class="btnGlyph"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        title="{{webui:stats.band}}"
+        data-sheet-head="{{webui:stats.band}}"
+        data-p="3"
+      >
+        <span class="g" aria-hidden="true"
+          ><svg><use href="#statsIcoBand" /></svg></span
+        ><span class="t"></span
+        ><svg class="caret" aria-hidden="true"><use href="#statsIcoCaret" /></svg>
+      </button>
     </div>
     <div id="statsDurChart"></div>
-    <div class="statsWindowBar">
-      <div
-        id="statsBandMode"
-        class="shotSort"
-        role="group"
-        aria-label="{{webui:stats.band_choice}}"
-        hidden
-      >
-        <span class="sortLbl">{{webui:stats.band}}</span
-        ><button type="button" data-v="range">{{webui:stats.band_range}}</button
-        ><button type="button" data-v="ewma">{{webui:stats.band_ewma}}</button>
-      </div>
-    </div>
     <div id="statsConsistency" class="ruleChart" hidden></div>
     <div id="statsCutAccuracy" class="ruleChart" hidden></div>
   </div>

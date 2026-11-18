@@ -275,6 +275,40 @@ export function actionMenu(label, items) {
   });
   return menu;
 }
+// A single-choice menu on the shared popup, titled like the filter menu:
+// items() lists {text, hint, tag, on, off, pick}; picking one closes it.
+export function choiceMenu(label, items) {
+  const menu = createPopup(label, (p, ui) => {
+    if (!ui.sheet)
+      p.append(
+        Object.assign(document.createElement("div"), {
+          className: "histFilterHead",
+          textContent: label,
+        }),
+      );
+    for (const o of items()) {
+      const item = document.createElement("label"),
+        box = document.createElement("input");
+      item.className = "histFilterItem";
+      item.innerHTML = '<span class="menuText"><b></b><small></small></span>';
+      Object.assign(box, { type: "radio", name: "choice", checked: !!o.on, disabled: !!o.off });
+      box.setAttribute("role", "menuitemradio");
+      box.onchange = () => (menu.close(), o.pick());
+      item.prepend(box);
+      item.querySelector("b").textContent = o.text;
+      if (o.tag)
+        item.querySelector("b").append(
+          Object.assign(document.createElement("span"), {
+            className: "menuTag",
+            textContent: o.tag,
+          }),
+        );
+      item.querySelector("small").textContent = o.hint || "";
+      p.append(item);
+    }
+  });
+  return menu;
+}
 // CSV for spreadsheets: a BOM marks it UTF-8, fields with quotes, commas or
 // line breaks are quoted, and text a spreadsheet would run as a formula
 // (=, +, -, @) gets a leading apostrophe; numbers stay as they are.

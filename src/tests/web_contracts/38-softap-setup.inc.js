@@ -404,9 +404,8 @@ for (const needle of ['aria-label="${escHtml($("modeSignal").dataset.label)}"',
   'aria-label="${escHtml(__WEBUI_TEXT__("runtime.graph_scrub"))}"']) {
   if (!rawRuntimeJs.includes(needle)) throw new Error('Unescaped attribute text: ' + needle);
 }
-// RV-10: the same holds for the Stats preset filter and the Settings override note.
-if (!rawViewJs.stats.includes('R.escHtml(__WEBUI_TEXT__("runtime.stats_preset_filter"))') ||
-    !rawViewJs.settings.includes('${R.escHtml(__WEBUI_TEXT__("settings.quick_override_note"))} <button') ||
+// RV-10: the same holds for the Settings override note.
+if (!rawViewJs.settings.includes('${R.escHtml(__WEBUI_TEXT__("settings.quick_override_note"))} <button') ||
     !rawViewJs.settings.includes('>${R.escHtml(__WEBUI_TEXT__("settings.quick_override_use_saved"))}</button>')) {
   throw new Error('Translated text in view-built markup must be escaped');
 }

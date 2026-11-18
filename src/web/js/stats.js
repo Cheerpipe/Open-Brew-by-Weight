@@ -10,6 +10,7 @@ import {
   archiveSources,
   archiveStatsReady,
   armListSentinel,
+  choiceMenu,
   closeRecordSheet,
   companionArchive,
   createFilterMenu,
@@ -24,7 +25,7 @@ import {
   streamArchive,
   streamArchives,
 } from "./records.js?v=__FW_ASSET_TAG__";
-// createFilterMenu, actionMenu, downloadCsv, armListSentinel and ICON_TRASH come
+// createFilterMenu, actionMenu, choiceMenu, downloadCsv, armListSentinel and ICON_TRASH come
 // from the records bundle prelude (records.js).
 const $ = R.$;
 function formatShotTime(r) {
@@ -660,19 +661,23 @@ let statsMerged = null,
   // The companion's last question, while pending or answered.
   statsMergedQuery = null;
 const statsHeader = () => statsMerged || (R.archiveView ? {} : R.uiState.shotStats || {});
+// The presets the toolbar's menu offers ([id, name], All first), and a pick.
+let statsPresetItems = [];
+function pickStatsPreset(v) {
+  saveStatsChart("preset", (R.uiState.statsPreset = v));
+  refreshMergedHeader();
+  renderStatsDurChart();
+}
 function renderStatsDurChart() {
   const root = $("statsDurChart");
   if (!root) return;
   if (!root.dataset.ready) {
     root.className = "ruleChart";
-    root.innerHTML =
-      '<div id="statsPresetFilter" class="shotSort" role="group" aria-label="' +
-      R.escHtml(__WEBUI_TEXT__("runtime.stats_preset_filter")) +
-      '"></div><div id="statsDurChartPlot"></div>';
+    root.innerHTML = '<div id="statsDurChartPlot"></div>';
     root.dataset.ready = "1";
   }
   const host = $("statsDurChartPlot"),
-    filter = $("statsPresetFilter");
+    pick = $("statsPresetButton");
   if (!host) return;
   const st = statsHeader(),
     presets = R.homeStatusCache()?.presets || R.presetState,
@@ -697,28 +702,16 @@ function renderStatsDurChart() {
       };
     }),
     shots = timed.filter((r) => !only || r.presetId === only);
-  // One selector for the three charts; its buttons follow the presets the
-  // log holds. A choice asks the controller (and the companion) for that
-  // preset's chart and cut series.
-  if (filter.dataset.ids !== ids.join()) {
-    filter.dataset.ids = ids.join();
-    filter.innerHTML =
-      '<span class="sortLbl">' +
-      __WEBUI_TEXT__("runtime.preset") +
-      "</span>" +
-      [[0, __WEBUI_TEXT__("runtime.all_presets")], ...ids.map((id) => [id, nameOf(id)])]
-        .map(([v, t]) => '<button type="button" data-v="' + v + '">' + R.escHtml(t) + "</button>")
-        .join("");
-    for (const b of filter.querySelectorAll("button"))
-      b.onclick = () => {
-        saveStatsChart("preset", (R.uiState.statsPreset = +b.dataset.v));
-        refreshMergedHeader();
-        renderStatsDurChart();
-      };
-    R.lockControls(filter);
+  // One toolbar button for the three charts names the preset they follow;
+  // its menu lists All and the presets the log holds.
+  statsPresetItems = [
+    [0, __WEBUI_TEXT__("runtime.all_presets")],
+    ...ids.map((id) => [id, nameOf(id)]),
+  ];
+  if (pick) {
+    pick.hidden = !ids.length;
+    pick.querySelector(".t").textContent = statsPresetItems.find(([v]) => v === only)[1];
   }
-  for (const b of filter.querySelectorAll("button"))
-    b.setAttribute("aria-pressed", String(+b.dataset.v === only));
   // No good shots: no charts at all; none timed for this preset: no density.
   root.hidden = !ids.length;
   // A header built for another preset leaves the charts as they are until
@@ -733,11 +726,15 @@ function renderStatsDurChart() {
   host.hidden = !d;
   renderStatsConsistency(shots);
   renderStatsCutAccuracy(st, want, !only && nameOf(want));
-  const mode = $("statsBandMode");
-  if (mode) {
-    mode.hidden = $("statsConsistency").hidden && $("statsCutAccuracy").hidden;
-    for (const b of mode.querySelectorAll("button"))
-      b.setAttribute("aria-pressed", String(b.dataset.v === R.uiState.statsBand));
+  const band = $("statsBandButton");
+  if (band) {
+    band.hidden = $("statsConsistency").hidden && $("statsCutAccuracy").hidden;
+    band.querySelector(".t").textContent =
+      R.uiState.statsBand === "ewma"
+        ? __WEBUI_TEXT__("stats.band_ewma")
+        : __WEBUI_TEXT__("stats.band_range");
+    const bar = $("statsChartBar");
+    bar.hidden = [...bar.children].every((b) => b.hidden);
   }
   if (!d) {
     host.innerHTML = "";
@@ -1409,6 +1406,9 @@ async function refreshMergedHeader() {
 // hide falls to the largest window still shown. While the controller's header
 // stands in for the companion's, the choice stays for its return: the largest
 // button shown covers the same shots.
+// The window sizes the toolbar's menu offers, the one it marks, and whether
+// the companion's whole history adds 500 and 1000.
+const statsWindowState = { shown: [], pressed: 10, merged: false };
 function statsWindowChoices() {
   const merged = !!statsMerged,
     n = merged ? (statsMergedGood ?? statsGood) : statsGood,
@@ -1417,11 +1417,10 @@ function statsWindowChoices() {
     chosen = merged ? R.uiState.statsWindow : Math.min(R.uiState.statsWindow, 100),
     standIn = !merged && (R.archiveView || archiveStatsReady()),
     pressed = standIn && !shown.includes(chosen) ? shown.at(-1) : chosen;
-  for (const b of $("statsWindow")?.querySelectorAll("button") || []) {
-    b.hidden = !shown.includes(+b.dataset.v);
-    b.setAttribute("aria-pressed", String(+b.dataset.v === pressed));
-  }
-  $("statsWindow").hidden = shown.length < 2;
+  Object.assign(statsWindowState, { shown, pressed, merged });
+  const b = $("statsWindowButton");
+  b.hidden = shown.length < 2;
+  b.querySelector(".t").textContent = R.sub(__WEBUI_TEXT__("stats.last_n"), [pressed]);
   if (!shown.includes(pressed) && (merged ? statsMergedGood != null : statsSynced)) {
     R.uiState.statsWindow = shown.at(-1);
     sendStatsWindow();
@@ -3300,18 +3299,49 @@ export function init() {
     $("sortRatingButton").onclick = () => setShotSort("rating");
     syncShotSortButtons();
   }
-  for (const b of $("statsBandMode").querySelectorAll("button"))
-    b.onclick = () => {
-      saveStatsChart("band", (R.uiState.statsBand = b.dataset.v));
-      renderShotStats();
-    };
-  for (const b of $("statsWindow").querySelectorAll("button"))
-    b.onclick = () => {
-      saveStatsChart("window", (R.uiState.statsWindow = +b.dataset.v));
+  const pickWindow = (v) => {
+      saveStatsChart("window", (R.uiState.statsWindow = v));
       renderShotStats();
       sendStatsWindow();
       refreshMergedHeader();
+    },
+    pickBand = (v) => {
+      saveStatsChart("band", (R.uiState.statsBand = v));
+      renderShotStats();
+    },
+    menus = {
+      statsWindowButton: choiceMenu(__WEBUI_TEXT__("stats.stats_window"), () => {
+        const { shown, pressed, merged } = statsWindowState;
+        return [...shown, ...(merged ? [] : [500, 1000])].map((v) => ({
+          text: R.sub(__WEBUI_TEXT__("stats.last_n_shots"), [v]),
+          hint: shown.includes(v) ? "" : __WEBUI_TEXT__("stats.window_needs_companion"),
+          on: v === pressed,
+          off: !shown.includes(v),
+          pick: () => pickWindow(v),
+        }));
+      }),
+      statsPresetButton: choiceMenu(__WEBUI_TEXT__("stats.chart_preset"), () =>
+        statsPresetItems.map(([v, text]) => ({
+          text,
+          hint: v ? "" : __WEBUI_TEXT__("stats.preset_all_hint"),
+          tag: v && v === statsActivePreset() ? __WEBUI_TEXT__("runtime.active") : "",
+          on: v === statsChosenPreset(),
+          pick: () => pickStatsPreset(v),
+        })),
+      ),
+      statsBandButton: choiceMenu(__WEBUI_TEXT__("stats.band"), () =>
+        [
+          ["range", __WEBUI_TEXT__("stats.band_range"), __WEBUI_TEXT__("stats.band_range_hint")],
+          ["ewma", __WEBUI_TEXT__("stats.band_ewma"), __WEBUI_TEXT__("stats.band_ewma_hint")],
+        ].map(([v, text, hint]) => ({
+          text,
+          hint: R.sub(hint, [SPREAD_SHOTS]),
+          on: v === R.uiState.statsBand,
+          pick: () => pickBand(v),
+        })),
+      ),
     };
+  for (const [id, menu] of Object.entries(menus)) $(id).onclick = () => menu.open($(id));
   shotFilterReset = createFilterMenu(
     "shotFilterButton",
     __WEBUI_TEXT__("history.filter_types"),

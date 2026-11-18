@@ -1186,6 +1186,27 @@
   background: var(--pa);
 }
 
+.histFilterItem:has(input:disabled) {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.histFilterItem:has(input:disabled):hover {
+  background: none;
+}
+
+/* A tag beside a menu item's title, such as the active preset. */
+.menuTag {
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 1rem;
+  background: var(--pa);
+  color: var(--ac);
+  font-size: 0.66rem;
+  font-weight: 700;
+  vertical-align: 0.1em;
+}
+
 .histFilterItem input {
   flex: none;
   width: 1.15rem;

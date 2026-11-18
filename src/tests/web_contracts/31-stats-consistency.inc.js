@@ -142,20 +142,20 @@
 {
   const assert = require('assert');
   const choices = (n, merged, selected, standIn = false) => {
-    const pressed = [];
-    const buttons = [10, 50, 100, 500, 1000].map((v) => ({dataset: {v: String(v)}, hidden: false,
-      setAttribute: (k, on) => on === 'true' && pressed.push(v)}));
-    const group = {hidden: false, querySelectorAll: () => buttons};
+    const label = {textContent: ''};
+    const button = {hidden: false, querySelector: () => label};
+    const state = {};
     const sent = [];
     const uiState = {statsWindow: selected};
     let headers = 0;
-    new Function('$', 'R', 'statsMergedGood', 'statsGood', 'statsMerged', 'statsSynced',
-        'sendStatsWindow', 'refreshMergedHeader', 'archiveStatsReady',
+    new Function('$', 'R', '__WEBUI_TEXT__', 'statsWindowState', 'statsMergedGood', 'statsGood',
+        'statsMerged', 'statsSynced', 'sendStatsWindow', 'refreshMergedHeader', 'archiveStatsReady',
         `${blockAt(rawViewJs.stats, 'function statsWindowChoices(')};statsWindowChoices();`)(
-        () => group, {uiState}, merged ? n : null, n, merged ? {} : null, true,
-        () => sent.push(uiState.statsWindow), () => headers++, () => standIn);
-    return {shown: group.hidden ? [] : buttons.filter((b) => !b.hidden).map((b) => +b.dataset.v),
-      selected: uiState.statsWindow, sent, headers, pressed};
+        () => button, {uiState, sub: (t, v) => t + v}, (k) => k, state, merged ? n : null, n,
+        merged ? {} : null, true, () => sent.push(uiState.statsWindow), () => headers++, () => standIn);
+    assert.equal(label.textContent, 'stats.last_n' + state.pressed, 'the button names the pressed window');
+    return {shown: button.hidden ? [] : state.shown, selected: uiState.statsWindow, sent, headers,
+      pressed: [state.pressed]};
   };
   assert.deepEqual(choices(1, false, 10).shown, []);
   assert.deepEqual(choices(10, false, 10).shown, []);

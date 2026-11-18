@@ -1325,11 +1325,11 @@ if (!statsSection ||
     !statsSection[1].includes('id="statsAvgDaily"') ||
     !statsSection[1].includes('id="statsAvgErr"') ||
     !statsSection[1].includes('id="statsAvgFlow"') ||
-    !statsSection[1].includes('id="statsWindow" class="shotSort" role="group"') ||
-    !['10', '50', '100'].every((n) => statsSection[1].includes(`data-v="${n}">${n}</button`)) ||
+    !statsSection[1].includes('id="statsChartBar"') ||
+    !['statsWindowButton', 'statsPresetButton', 'statsBandButton'].every((id) =>
+      statsSection[1].includes(`id="${id}"`)) ||
     !codeIncludes(viewJs.stats, 'R.sendUiOperation({op:"stats",on:true,window:Math.min(R.uiState.statsWindow,100)});') ||
     !codeIncludes(viewJs.stats, '...(uiState.statsWindow!==10&&{window:Math.min(uiState.statsWindow,100)}),') ||
-    !['500', '1000'].every((n) => statsSection[1].includes(`data-v="${n}" hidden>${n}</button`)) ||
     !codeIncludes(viewJs.stats, 'shown=sizes.filter((v,i)=>i===0||sizes[i-1]<n);') ||
     !codeIncludes(viewJs.stats, '...(Object.keys(uiState.shotFilter).length&&{filter:uiState.shotFilter}),') ||
     !codeIncludes(viewJs.stats, 'R.createFilterMenu("shotFilterButton"') ||
@@ -1625,20 +1625,17 @@ if (!statsSection ||
       ';const R = {uiState, axisLabel, fadeFill, escHtml: String, lockControls() {}, get sub() { return sub; },' +
       'sendUiOperation(op) { sentOps.push(op); }, get homeStatusCache() { return homeStatusCache; },' +
       'get presetState() { return presetState; }};' +
-      'return{renderStatsDurChart,merged(h){statsMerged=h;}};')();
+      'return{renderStatsDurChart,pick:pickStatsPreset,items:()=>statsPresetItems,merged(h){statsMerged=h;}};')();
   const histRoot = {dataset: {}, className: '', innerHTML: ''};
   const histPlot = {innerHTML: '', style: {setProperty(k, v) { this[k] = v; }},
     querySelector() { return {}; }};
   const cutRoot = {hidden: true, innerHTML: ''};
-  // The selector's buttons are rebuilt from the presets the header names.
-  const histFilter = {dataset: {}, buttons: [],
-    set innerHTML(html) {
-      this.buttons = [...html.matchAll(/data-v="(\d+)">([^<]*)</g)].map(([, v, text]) =>
-        ({dataset: {v}, text, attrs: {}, setAttribute(k, x) { this.attrs[k] = x; }}));
-    },
-    querySelectorAll(selector) { return selector === 'button' ? this.buttons : []; }};
-  const pressed = () => histFilter.buttons.filter((b) => b.attrs['aria-pressed'] === 'true')
-      .map((b) => b.text).join();
+  // The toolbar's preset button names the preset the charts follow; its menu
+  // lists All and the presets the header names.
+  const presetLabel = {textContent: ''};
+  const presetButton = {hidden: true, querySelector: () => presetLabel};
+  const pressed = () => presetLabel.textContent;
+  const offered = () => helpers.items().map(([, name]) => name).join();
   const ticks = [];
   let tickMax = 0;
   global.sentOps = [];
@@ -1646,7 +1643,7 @@ if (!statsSection ||
   global.refreshMergedHeader = () => mergedAsks++;
   global.saveStatsChart = () => {};
   global.$ = (id) => ({statsDurChart: histRoot, statsDurChartPlot: histPlot,
-    statsPresetFilter: histFilter, statsCutAccuracy: cutRoot})[id] || null;
+    statsPresetButton: presetButton, statsCutAccuracy: cutRoot})[id] || null;
   global.homeStatusCache = () => null;
   global.presetState = {activeId: 1, items: [{id: 1, name: 'House'}]};
   global.statsPreset = null;
@@ -1670,7 +1667,7 @@ if (!statsSection ||
   // window in seconds and a legend in seconds too.
   global.shotStats = charts(curve(-7, 15, 0, 7, false, [1, 2, 2]), curve(21, 40, 27, 34, true, [1, 2, 1]));
   helpers.renderStatsDurChart();
-  if (pressed() !== 'House' || histFilter.buttons.map((b) => b.text).join() !== 'All,House,Lungo' ||
+  if (pressed() !== 'House' || offered() !== 'All,House,Lungo' ||
       global.statsPreset !== null || zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' ||
       ticks.join() !== '27 s,34 s,22 s,39 s' || tickMax !== 19 ||
       histPlot.style['--zf'] !== '31.58%' || parseFloat(histPlot.style['--zo']).toFixed(2) !== '36.84' ||
@@ -1690,7 +1687,7 @@ if (!statsSection ||
   // All asks the controller for the active preset's header, whose stops Cut
   // accuracy shows under that preset's name; a header built for another
   // preset leaves the charts as they are until it arrives.
-  histFilter.buttons[0].onclick();
+  helpers.pick(0);
   if (pressed() !== 'All' || zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' ||
       JSON.stringify(global.sentOps) !== '[{"op":"stats","on":true,"preset":1}]') {
     throw new Error('All must ask for the active preset and keep the charts until it arrives');
@@ -1706,12 +1703,12 @@ if (!statsSection ||
     throw new Error('All presets must share out every shot by its own verdict against its own window');
   }
   // The active preset from All needs no new header: it draws at once.
-  histFilter.buttons[1].onclick();
+  helpers.pick(1);
   if (pressed() !== 'House' || zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' ||
       cutRoot.innerHTML.includes('Active preset') || global.sentOps.length !== 1) {
     throw new Error('The active preset chosen from All must draw from the header already shown');
   }
-  histFilter.buttons[2].onclick();
+  helpers.pick(2);
   if (pressed() !== 'Lungo' || histRoot.hidden || histPlot.hidden ||
       zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' || global.sentOps.at(-1).preset !== 2) {
     throw new Error('A header for another preset must keep the charts until the chosen one arrives');

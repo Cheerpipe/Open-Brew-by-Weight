@@ -74,6 +74,13 @@ html.themeDark :is(.sheet, #actionsPanel) {
     justify-content: space-between;
   }
 
+  /* The Shots and Stats bars span their panel, aligned to its left edge. */
+  #shotLogPanel .glassBar,
+  #statsChartBar {
+    width: 100%;
+    margin-inline: 0;
+  }
+
   .glassBar > .btnGlyph,
   .glassBar .shotSort button {
     padding: 0 clamp(0.4rem, 4vw - 9.2px, 0.65rem);

@@ -12,8 +12,11 @@ interface starts or after a dropped connection. From then on the data keeps
 refreshing in the background even while you are elsewhere in the interface, so
 the page always opens instantly with the latest shots.
 
-Choose how far back Stats looks with **Last 10**, **50**, or **100** under the
-averages. The averages and the charts follow your choice. Only the choices that make a
+A toolbar under the averages holds the three chart choices. Each button shows
+your current choice; tap it to pick another from its menu. On a narrow screen
+the buttons may show only their icons, still opening the same menus. The first
+chooses how far back Stats looks: **Last 10**, **50**, or **100** shots. The
+averages and the charts follow your choice. Only the choices that make a
 difference appear: every size smaller than the number of good shots in the
 list, plus the first one that covers them all, and none with ten shots or
 fewer. Filtering the list down to fewer shots moves the selection to the
@@ -32,7 +35,7 @@ own shots, with or without the companion.
 
 Stats has three charts, each under its own title: **Shot time**,
 **Shot consistency** and **Cut accuracy**, with a legend under each one explaining
-its colors and marks. One **Preset** row above them chooses whose shots they
+its colors and marks. The toolbar's preset button chooses whose shots they
 show: **All**, or one preset by name, and every chart follows it. Until you
 pick one, it follows the active preset, even when you switch presets, or
 shows All while that preset has no good shots yet. When you pick another
@@ -76,7 +79,7 @@ green within 5 %, about 1.4 seconds on a 28-second shot, yellow from 5 % to
 with a dashed cap; move the cursor to it to read its real time.
 
 Behind the columns, a shaded band shows how your recent shots spread. The
-**Band** pill above the charts switches between two styles, for both this chart
+**Bands** button in the toolbar switches between two styles, for both this chart
 and Cut accuracy. **Moving range** (the default) shades the spread of your last
 five shots, from the quickest to the slowest: a narrowing band means your shots
 are settling, a widening one that they are drifting apart. Each half takes the
