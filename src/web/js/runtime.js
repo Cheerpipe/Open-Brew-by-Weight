@@ -2726,39 +2726,41 @@ function dismissOnController(card, key) {
   renderHomeCards();
 }
 // A closed card leaves an Undo strip in its place for 6 s (the strip's
-// countdown in bars.css). Its commit waits for the strip to end, another
-// close, or the page to hide, so an undone close sends nothing.
-let closing = null;
-function endClose(keep) {
-  const c = closing;
+// countdown in bars.css); each card keeps its own. Its commit waits for its
+// strip to end or the page to hide, so an undone close sends nothing.
+const closing = new Map();
+function endClose(card, keep) {
+  const c = closing.get(card);
   if (!c) return;
-  closing = null;
+  closing.delete(card);
   clearTimeout(c.timer);
   c.strip.remove();
   // Hidden first, so a renderer that animates (reveal) has nothing to fold.
   if (keep) {
-    c.card.hidden = true;
+    card.hidden = true;
     c.commit();
   }
-  c.card.classList.remove("closing");
-  if (!keep) c.card.querySelector(".cardClose")?.focus();
+  card.classList.remove("closing");
+  if (!keep) card.querySelector(".cardClose")?.focus();
 }
 function closeCard(card, text, commit) {
-  endClose(true);
   const strip = document.createElement("div"),
     undo = document.createElement("button");
   strip.className = "cardUndo";
   strip.setAttribute("role", "status");
   undo.type = "button";
   undo.textContent = __WEBUI_TEXT__("runtime.undo");
-  undo.onclick = () => endClose(false);
+  undo.onclick = () => endClose(card, false);
   strip.append(text, undo);
   card.classList.add("closing");
   card.after(strip);
-  closing = { card, strip, commit, timer: setTimeout(endClose, 6e3, true) };
+  closing.set(card, { strip, commit, timer: setTimeout(endClose, 6e3, card, true) });
   undo.focus({ preventScroll: true });
 }
-document.addEventListener("visibilitychange", () => document.hidden && endClose(true));
+document.addEventListener(
+  "visibilitychange",
+  () => document.hidden && [...closing.keys()].forEach((card) => endClose(card, true)),
+);
 function firmwareResult(s) {
   let flash = null;
   try {

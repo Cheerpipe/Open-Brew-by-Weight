@@ -53,7 +53,7 @@ password returns to **`ineedacoffee`** and the device name to
 remembered device and Home Assistant's access are forgotten, and Home shows
 the access note again. Closed firmware update, grind hint and Home note cards
 are forgotten too. To bring back closed Home notes and grind advice without a
-reset, use **Admin → Hidden notes**. The [firmware mode](firmware-mode.md) switch is
+reset, use **Show hidden notes again** in **Admin → Frontend**. The [firmware mode](firmware-mode.md) switch is
 left off, so the machine works as usual until you choose how to brew on the
 setup page or in Admin. The device then restarts.
 

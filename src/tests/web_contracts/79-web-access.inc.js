@@ -375,9 +375,10 @@
   assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&
       codeIncludes(rawPartialHtml.settings, 'id="recipeSettings"') &&
       !codeIncludes(rawPartialHtml.home, 'type="checkbox"'));
-  // A close hides its card behind an Undo strip. Undo brings it back and
-  // commits nothing; the strip's end, another close or a hidden page commits.
-  const closeSrc = rawRuntimeJs.slice(rawRuntimeJs.indexOf('let closing = null;'),
+  // A close hides its card behind its own Undo strip. Undo brings it back and
+  // commits nothing; its strip's end or a hidden page commits. Closes in a row
+  // keep independent strips, each with its own countdown.
+  const closeSrc = rawRuntimeJs.slice(rawRuntimeJs.indexOf('const closing = new Map();'),
       rawRuntimeJs.indexOf('function firmwareResult('));
   const timers = [], hideListeners = [], el = () => ({remove() { this.removed = true; },
     setAttribute() {}, append(...c) { this.kids = c; }, focus() {}});
@@ -386,7 +387,8 @@
     return {classList: {add: (x) => c.add(x), remove: (x) => c.delete(x), has: (x) => c.has(x)},
       after(strip) { this.strip = strip; }, querySelector: () => ({focus() {}})};
   };
-  const close = {__WEBUI_TEXT__: (k) => k, clearTimeout() {}, setTimeout: (f, ms, a) => timers.push(() => f(a)),
+  const close = {__WEBUI_TEXT__: (k) => k, clearTimeout() {}, Map,
+    setTimeout: (f, ms, ...a) => timers.push(() => f(...a)),
     document: {createElement: el, addEventListener: (t, f) => hideListeners.push(f), hidden: false}};
   vm.runInNewContext(closeSrc + ';this.closeCard = closeCard;', close);
   const commits = [], a = card(), b = card();
@@ -396,13 +398,18 @@
   assert.ok(!a.classList.has('closing') && a.strip.removed && commits.length === 0, 'Undo commits nothing');
   close.closeCard(a, 'gone', () => commits.push('a'));
   close.closeCard(b, 'gone', () => commits.push('b'));
-  assert.deepEqual(commits, ['a'], 'Another close commits the open strip');
-  timers.at(-1)();
-  assert.deepEqual(commits, ['a', 'b'], 'The strip commits when it ends');
+  assert.ok(commits.length === 0 && !a.strip.removed && !b.strip.removed,
+      'Another close keeps the first strip and its Undo');
+  b.strip.kids[1].onclick();
+  assert.ok(commits.length === 0 && !b.classList.has('closing') && a.classList.has('closing'),
+      'Each Undo restores only its own card');
+  timers.at(-2)();
+  assert.deepEqual(commits, ['a'], 'Each strip commits when its own countdown ends');
   close.closeCard(a, 'gone', () => commits.push('a2'));
+  close.closeCard(b, 'gone', () => commits.push('b2'));
   close.document.hidden = true;
   hideListeners.forEach((f) => f());
-  assert.deepEqual(commits, ['a', 'b', 'a2'], 'A hidden page commits the open strip');
+  assert.deepEqual(commits, ['a', 'a2', 'b2'], 'A hidden page commits every open strip');
   // Admin brings every hidden note back, on the controller and in this browser.
   assert.ok(codeIncludes(partialHtml.admin, '<button id="restoreNotesButton" class="btnGlyph mutable" type="button">') &&
       codeIncludes(viewJs.admin, 'if(k.startsWith("obbwCard:"))localStorage.removeItem(k);') &&

@@ -1801,7 +1801,7 @@ const WEBHOOK_IDS = [
 // Notes and advice closed for good on the controller; restoring them also
 // forgets what this browser hid.
 let notesRestored = false;
-const hiddenNotes = (d = R.homeStatusCache()?.dismissed || {}) =>
+const hiddenNotes = (d = {}) =>
   Object.values(d).filter((v) => v === true).length + (d.grind?.length || 0);
 export function applyStatus(s) {
   applyAdminStatus(s);
@@ -2150,10 +2150,6 @@ const ADMIN_SUMMARIES = {
       ? __WEBUI_TEXT__("admin.sum_password_required")
       : __WEBUI_TEXT__("admin.sum_no_password"),
   update: () => document.documentElement.dataset.fw,
-  notes: () => {
-    const n = hiddenNotes();
-    return n ? R.sub(__WEBUI_TEXT__("admin.sum_hidden_notes"), [n]) : "";
-  },
   companion: () => {
     const c = companionState;
     if (!c?.paired)

@@ -207,8 +207,8 @@ change from your next shots and starts reading the new setting. Use
 **Relearn**, on the card or in **Settings → Presets**, after a new bag or a
 change to your dose, basket or grinder. The **×** in the card's corner hides
 it on every phone and browser until the advice changes: another direction, a
-firmer suggestion or a new grind setting brings it back. **Admin → Hidden
-notes** brings back every hidden piece of advice at once.
+firmer suggestion or a new grind setting brings it back. **Show hidden notes again**, in **Admin →
+Frontend**, brings back every hidden piece of advice at once.
 
 ## Examples
 

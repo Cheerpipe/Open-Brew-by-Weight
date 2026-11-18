@@ -103,15 +103,17 @@ a reminder to check your recipe before the first shot, and, once your scale is
 saved, the option to use only that scale. Each note has a button that takes
 you straight there and a **×** in its corner. Tapping **×** closes the note on
 every phone and browser, and for a few seconds an **Undo** button sits where
-the note was, in case you tapped it by mistake. Notes
+the note was, in case you tapped it by mistake. Close several cards in a row
+and each keeps its own **Undo**. Notes
 also leave on their own once you're done: the recipe note, for example, goes
 away after your first shot or when you change a recipe.
 
 Other Home cards close the same way but come back when there is news: the
 scale recording card returns after your next shot, and grind advice when it
 changes. The strip that replaces a closed card tells you which kind it was.
-To see every closed note and grind tip again, open **Admin → Hidden notes**
-and tap **Show hidden notes again**.
+To see every closed note and grind tip again, open **Admin → Frontend** and
+tap **Show hidden notes again**; **Hidden notes** above it says how many there
+are.
 
 Home updates automatically when its information changes. In **Equipment → Scale**,
 weight and timer follow the connected scale even outside a shot. Disconnecting
